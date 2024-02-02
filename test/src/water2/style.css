@@ -1,0 +1,41 @@
+* {
+  font-family: Calibri;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --viewport-width: 1200px;
+  --viewport-height: 800px;
+}
+
+canvas {
+  box-sizing: content-box;
+  min-width: var(--viewport-width);
+  background-color: black;
+  margin: 0 auto;
+}
+
+.container {
+  display: flex;
+  flex: 1;
+  position: relative;
+}
+
+aside {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+
+label {
+  padding-right: 16px;
+  width: 60px;
+  display: inline-block;
+}
+
+small {
+  display: inline-block;
+  width: 16px;
+  font-size: 10px;
+}

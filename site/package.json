@@ -1,0 +1,77 @@
+{
+  "name": "@zephyr3d/site",
+  "version": "0.0.1",
+  "description": "zephyr3d document site",
+  "homepage": "https://github.com/gavinyork/zephyr3d#readme",
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gavinyork/zephyr3d.git"
+  },
+  "scripts": {
+    "build:doc": "node build-doc.js 2>&1",
+    "build:showcase": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c rollup.config.showcase.mjs --silent",
+    "build:copy": "shx mkdir -p dist && shx cp -R web dist && shx cp -R ../examples dist/web && npm run build:showcase",
+    "build:web": "rush build && shx rm -rf dist && npm run build:copy && cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent && shx cp -R assets dist/web/tut/assets",
+    "build:site": "npm run build:web && npm run build:doc",
+    "serve": "web-dev-server --open dist/web/index.html"
+  },
+  "engines": {
+    "node": ">=16.18.0"
+  },
+  "devDependencies": {
+    "@microsoft/api-extractor": "^7.34.4",
+    "@microsoft/api-documenter": "^7.21.6",
+    "yargs": "^17.7.1",
+    "cross-spawn": "^7.0.3",
+    "chalk": "^5.2.0",
+    "@typescript-eslint/eslint-plugin": "^5.51.0",
+    "@typescript-eslint/parser": "^5.51.0",
+    "@web/dev-server": "^0.1.35",
+    "eslint": "^8.33.0",
+    "eslint-config-prettier": "^8.6.0",
+    "eslint-plugin-import": "^2.27.5",
+    "eslint-plugin-prettier": "^4.2.1",
+    "eslint-plugin-tsdoc": "^0.2.17",
+    "@babel/core": "^7.20.12",
+    "@babel/preset-env": "^7.20.2",
+    "@rollup/plugin-babel": "^6.0.3",
+    "@rollup/plugin-node-resolve": "^15.0.1",
+    "@rollup/plugin-strip": "^3.0.2",
+    "@rollup/plugin-terser": "^0.4.0",
+    "@rollup/plugin-commonjs": "^25.0.1",
+    "rollup-plugin-typescript2": "^0.34.1",
+    "rollup-plugin-import-css": "^3.3.1",
+    "@rollup/pluginutils": "^5.0.2",
+    "rollup": "^3.15.0",
+    "rollup-plugin-dts": "^5.2.0",
+    "rollup-plugin-copy": "^3.4.0",
+    "@swc/core": "^1.3.62",
+    "rollup-plugin-swc3": "^0.8.2",
+    "prettier": "^2.8.4",
+    "replace": "^1.2.2",
+    "run-script-os": "^1.1.6",
+    "shx": "^0.3.4",
+    "cross-env": "^7.0.3",
+    "typescript": "^5.1.3",
+    "tslib": "^2.5.0"
+  },
+  "dependencies": {
+    "@types/colors": "^1.2.1",
+    "@types/diff": "^5.0.2",
+    "@webgpu/types": "^0.1.31",
+    "colors": "^1.4.0",
+    "diff": "^5.0.0",
+    "highlight.js": "^11.8.0",
+    "bootstrap": "^5.3.1",
+    "@popperjs/core": "^2.11.8",
+    "@zephyr3d/base": "workspace:^0.1.0",
+    "@zephyr3d/device": "workspace:^0.1.0",
+    "@zephyr3d/scene": "workspace:^0.1.0",
+    "@zephyr3d/imgui": "workspace:^0.1.0",
+    "@zephyr3d/backend-webgl": "workspace:^0.1.0",
+    "@zephyr3d/backend-webgpu": "workspace:^0.1.0"
+  }
+}

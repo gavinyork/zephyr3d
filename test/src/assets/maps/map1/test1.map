@@ -1,0 +1,52 @@
+colorMapSize 512
+lightMapSize 512
+detailMapSize 512
+detailScales 10.000000 10.000000 10.000000 12.440000
+shadowDist 63.000000
+shadowFalloff 0.780000
+enableShadows 1
+lightMapBlur 0.280000
+colorMode 1
+undergroundMaterial 4291611852
+detailtexture1 "C:\EarthSculptor\Textures\grayRock.png"
+detailtexture2 "C:\EarthSculptor\Textures\longGrass.png"
+detailtexture3 "C:\EarthSculptor\Textures\cliff.png"
+detailtexture4 "C:\EarthSculptor\Textures\bigRockFace.png"
+detailtexture5 ""
+detailtexture6 ""
+detailtexture7 ""
+detailtexture8 ""
+paintMaterial1 4294967295 "[HOME]Textures\brownsand.png"
+paintMaterial2 4281882314
+paintMaterial3 4286161507
+paintMaterial4 4294967295 "[HOME]Textures\cliff.png"
+paintMaterial5 4282134033
+paintMaterial6 4283916657
+mapname "test1"
+lightDirection 0.000000 0.447011 0.894022
+ambient 4283190348
+light 4291611852
+mapHeight 65.000000
+divisions 0
+fog 1
+fogNear 50.000000
+fogFar 3900.000000
+fogColor 4291611852
+background 4291611852
+renderUnderGround 1
+underGroundStretch 1
+underGroundScale 10.000000
+waterEnable 0
+waterHeight 20.000000
+waterScale 100.000000
+waterOpacity 0.750000
+waterDistortion 0.500000
+waterRefraction 0.500000
+waterSpeed 2.000000
+waterColor 4289387263
+SkyBoxBack 4294967295
+SkyBoxDown 4294967295
+SkyBoxFront 4294967295
+SkyBoxLeft 4294967295
+SkyBoxRight 4294967295
+SkyBoxUp 4294967295

@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "downlevelIteration": true,
+    "moduleResolution": "node",
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": [
+      "es2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "strict": true,
+    "noImplicitAny": false,
+    "preserveConstEnums": false,
+    "listEmittedFiles": true,
+    "noUnusedLocals": false,
+    "strictNullChecks": false,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": false,
+    "emitDecoratorMetadata": false,
+    "sourceMap": true,
+    "stripInternal": true,
+    "keyofStringsOnly": false,
+    "typeRoots": [
+      "./node_modules/@types"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@zephyr3d/*": ["build/@zephyr3d/*"]
+    }
+  },
+  "exclude": [
+    "node_modules",
+    "**/*.spec.ts",
+    "**/*.d.ts"
+  ]
+}

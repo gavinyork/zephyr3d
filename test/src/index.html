@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta
+      http-equiv="origin-trial"
+      content="AqCnZyPTDPRK7MVw+bbVJoQkYndOjHKTarXCp+JTVy4VPAKv/E1SJDuFzsJGm0COxapIEanHG7oF0W+HT0ANwQUAAABJeyJvcmlnaW4iOiJodHRwOi8vbG9jYWxob3N0OjgwMDAiLCJmZWF0dXJlIjoiV2ViR1BVIiwiZXhwaXJ5IjoxNjQzMTU1MTk5fQ=="
+    />
+    <title>zephyr3d tests</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      .fullpage {
+        position: fixed;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        margin: 0;
+      }
+
+      .flex-row {
+        display: flex;
+        flex-flow: row nowrap;
+      }
+
+      .flex-col {
+        display: flex;
+        flex-flow: column nowrap;
+      }
+
+      .nav {
+        position: relative;
+        left: 0;
+        flex: 1 1;
+        max-width: 300px;
+        height: 100vh;
+        overflow: auto;
+        background: #fafafa;
+        padding: 0 15px;
+        color: #045b88;
+      }
+
+      .maximized {
+        flex-grow: 1;
+      }
+
+      .fit {
+        flex-shrink: 1;
+      }
+
+      li {
+        list-style: none;
+        padding: 3px;
+        cursor: pointer;
+      }
+
+      a {
+        text-decoration: none;
+      }
+
+      .active {
+        color: red;
+      }
+
+      .title {
+        text-align: center;
+        font-family: 'Segoe UI Light', 'Segoe UI', 'Trebuchet MS', Tahoma, Arial, Helvetica;
+        font-weight: lighter;
+      }
+    </style>
+  </head>
+
+  <body class="fullpage flex-col">
+    <div class="flex-row maximized fit">
+      <nav class="flex-col nav" style="padding: 15px; width: 200px">
+        <h1 class="title">zephyr3d tests</h1>
+        <label for="device-type" style="color: black">select device:</label>
+        <select id="device-type" style="padding: 3px; margin: 0px 10px 0px 0px; outline: none">
+          <option value="webgl" selected>WebGL</option>
+          <option value="webgl2">WebGL2</option>
+          <option value="webgpu">WebGPU</option>
+        </select>
+        <ul class="maximized fit" style="text-align: left; overflow: auto; padding: 0">
+          <li id="webgpu2">Raw WebGPU test</li>
+          <li id="rawwebgl">Raw WebGL test</li>
+          <li id="imguitest">ImGUI test</li>
+          <li id="app">App</li>
+          <li id="texture">Texture test</li>
+          <li id="gltf">GLTF test</li>
+          <li id="instancing">Instancing test</li>
+          <li id="cubemapping">Cubemapping test</li>
+          <li id="water">Water test</li>
+          <li id="water2">Ocean test</li>
+          <li id="light">Light test</li>
+          <li id="bvhlight">BVH light test</li>
+          <li id="shadow">Shadow test</li>
+          <li id="terrain">Terrain test</li>
+          <li id="mathtest">Math test</li>
+          <li id="builder">Program builder test</li>
+        </ul>
+        <h1 class="title">compute shader tests</h1>
+        <ul class="maximized fit" style="text-align: left; overflow: auto; padding: 0">
+          <li id="imageblur">Image blur</li>
+          <li id="computeboids">Compute boids</li>
+        </ul>
+      </nav>
+      <iframe class="maximized fit" style="border-width: 0" title="render window" scrolling="no"></iframe>
+    </div>
+    <script type="text/javascript">
+      const iframe = document.querySelector('iframe');
+      const selectDevice = document.querySelector('select');
+      const linkCallback = function () {
+        const id = this.id;
+        iframe.src = id + '.html' + '?dev=' + selectDevice.value;
+        const links = document.querySelectorAll('li');
+        for (const link of links) {
+          if (link === this) {
+            link.classList.add('active');
+          } else {
+            link.classList.remove('active');
+          }
+        }
+      };
+      selectDevice.addEventListener('change', function () {
+        if (document.querySelector('.active')) {
+          const src = iframe.src.split('?')[0];
+          iframe.src = src + '?dev=' + this.value;
+        }
+      });
+      const links = document.querySelectorAll('li');
+      for (const link of links) {
+        link.addEventListener('click', linkCallback);
+      }
+    </script>
+  </body>
+</html>

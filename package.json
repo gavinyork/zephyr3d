@@ -1,0 +1,9 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "preinstall": "echo please run 'rush update' instead. && exit 1",
+    "prebuild": "echo please run 'rush build' instead. && exit 1"
+  }
+}
