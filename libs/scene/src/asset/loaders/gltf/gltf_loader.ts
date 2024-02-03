@@ -20,6 +20,7 @@ import { Primitive } from '../../../render/primitive';
 import {
   StandardMaterial,
   UnlitMaterial,
+  Material as M,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial
 } from '../../../material';
@@ -38,6 +39,7 @@ import type {
 import type { AssetManager } from '../../assetmanager';
 import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf';
 import { Application } from '../../../app';
+import { NewUnlitMaterial } from '../../../material/meshmaterial';
 
 /** @internal */
 export interface GLTFContent extends GlTf {
@@ -47,7 +49,7 @@ export interface GLTFContent extends GlTf {
   _bufferCache: Record<string, GPUDataBuffer>;
   _textureCache: Record<string, Texture2D>;
   _primitiveCache: Record<string, Primitive>;
-  _materialCache: Record<string, StandardMaterial>;
+  _materialCache: Record<string, M>;
   _nodes: AssetHierarchyNode[];
   _meshes: AssetMeshData[];
 }
@@ -501,22 +503,20 @@ export class GLTFLoader extends AbstractModelLoader {
   private async _createMaterial(
     assetManager: AssetManager,
     assetMaterial: AssetMaterial
-  ): Promise<StandardMaterial> {
+  ): Promise<M> {
     if (assetMaterial.type === 'unlit') {
       const unlitAssetMaterial = assetMaterial as AssetUnlitMaterial;
-      const unlitMaterial = new UnlitMaterial();
-      unlitMaterial.lightModel.albedo = unlitAssetMaterial.diffuse ?? Vector4.one();
+      const unlitMaterial = new NewUnlitMaterial();
+      unlitMaterial.albedoColor = unlitAssetMaterial.diffuse ?? Vector4.one();
       if (unlitAssetMaterial.diffuseMap) {
-        unlitMaterial.lightModel.setAlbedoMap(
-          unlitAssetMaterial.diffuseMap.texture,
-          unlitAssetMaterial.diffuseMap.sampler,
-          unlitAssetMaterial.diffuseMap.texCoord,
-          unlitAssetMaterial.diffuseMap.transform
-        );
+        unlitMaterial.albedoTexture = unlitAssetMaterial.diffuseMap.texture;
+        unlitMaterial.albedoTextureSampler = unlitAssetMaterial.diffuseMap.sampler;
+        unlitMaterial.albedoTexCoordIndex = unlitAssetMaterial.diffuseMap.texCoord;
+        unlitMaterial.albedoTexMatrix = unlitAssetMaterial.diffuseMap.transform;
       }
       unlitMaterial.vertexColor = unlitAssetMaterial.common.vertexColor;
       if (assetMaterial.common.alphaMode === 'blend') {
-        unlitMaterial.alphaBlend = true;
+        unlitMaterial.blendMode = 'blend';
       } else if (assetMaterial.common.alphaMode === 'mask') {
         unlitMaterial.alphaCutoff = assetMaterial.common.alphaCutoff;
       }
@@ -524,7 +524,6 @@ export class GLTFLoader extends AbstractModelLoader {
         const rasterizerState = unlitMaterial.stateSet.useRasterizerState();
         rasterizerState.setCullMode('none');
       }
-      unlitMaterial.vertexNormal = !!assetMaterial.common.vertexNormal;
       return unlitMaterial;
     } else if (assetMaterial.type === 'pbrSpecularGlossiness') {
       const assetPBRMaterial = assetMaterial as AssetPBRMaterialSG;
@@ -744,7 +743,7 @@ export class GLTFLoader extends AbstractModelLoader {
     vertexColor: boolean,
     vertexNormal: boolean,
     useTangent: boolean
-  ): Promise<StandardMaterial> {
+  ): Promise<M> {
     let assetMaterial: AssetMaterial = null;
     let pbrMetallicRoughness: AssetPBRMaterialMR = null;
     let pbrSpecularGlossness: AssetPBRMaterialSG = null;
