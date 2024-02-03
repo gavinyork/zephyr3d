@@ -3184,7 +3184,10 @@ export class PBOutputScope extends PBScope {
         }
       }
       if (getCurrentProgramBuilder().getCurrentScope() !== getCurrentProgramBuilder().getGlobalScope()) {
-        this[prop] = value;
+        const ast = value.$ast;
+        if (!(ast instanceof AST.ASTShaderExpConstructor) || ast.args.length > 0) {
+          this[prop] = value;
+        }
       }
     }
     return true;
