@@ -126,6 +126,17 @@ export class UnlitMaterial extends MeshMaterial {
       ShaderFramework.ftransform(this);
     }).call(scope);
   }
+  protected getAlbedoColor(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp {
+    let color = scope.kkAlbedo;
+    const pb = scope.$builder;
+    if (this.featureUsed(UnlitMaterial.FEATURE_VERTEX_COLOR, ctx.renderPass.type)) {
+      color = pb.mul(color, scope.$getVertexAttrib('diffuse'));
+    }
+    if (this.featureUsed(UnlitMaterial.FEATURE_ALBEDO_TEXTURE, ctx.renderPass.type)) {
+      color = pb.mul(color, pb.textureSample(scope.kkAlbedoTex, scope.$inputs.kkAlbedoTexCoord));
+    }
+    return color;
+  }
   protected fragmentShader(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp {
     const that = this;
     const pb = scope.$builder;
@@ -134,14 +145,7 @@ export class UnlitMaterial extends MeshMaterial {
       if (that.featureUsed(UnlitMaterial.FEATURE_ALBEDO_TEXTURE, ctx.renderPass.type)) {
         this.$g.kkAlbedoTex = pb.tex2D().uniform(2);
       }
-      this.$l.kkColor = this.kkAlbedo;
-      if (that.featureUsed(UnlitMaterial.FEATURE_VERTEX_COLOR, ctx.renderPass.type)) {
-        this.kkColor = pb.mul(this.kkColor, this.$getVertexAttrib('diffuse'));
-      }
-      if (that.featureUsed(UnlitMaterial.FEATURE_ALBEDO_TEXTURE, ctx.renderPass.type)) {
-        this.kkColor = pb.mul(this.kkColor, pb.textureSample(this.kkAlbedoTex, this.$inputs.kkAlbedoTexCoord));
-      }
-      return this.kkColor;
+      return that.getAlbedoColor(this, ctx);
     }).call(scope);
   }
   /**

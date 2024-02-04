@@ -249,7 +249,7 @@ export abstract class MeshMaterial extends Material {
   }
 }
 
-export class LitMaterial extends UnlitMaterial {
+export abstract class LitMaterial extends UnlitMaterial {
   protected static readonly FEATURE_DOUBLE_SIDED_LIGHTING = 'lm_doublesided_lighting';
   protected static readonly FEATURE_VERTEX_NORMAL = 'lm_vertexnormal';
   protected static readonly FEATURE_VERTEX_TANGENT = 'lm_vertextangent';
@@ -501,6 +501,8 @@ export class LitMaterial extends UnlitMaterial {
       return pb.vec4(pb.mul(this.albedoColor.rgb, pb.add(pb.mul(this.normal, 0.5), pb.vec3(0.5))), 1);
     }).call(scope);
   }
+  protected abstract setup(scope: PBInsideFunctionScope): PBShaderExp;
+  protected abstract envBRDF(scope: PBInsideFunctionScope): PBShaderExp;
   /**
    * {@inheritDoc Material.supportLighting}
    * @override
