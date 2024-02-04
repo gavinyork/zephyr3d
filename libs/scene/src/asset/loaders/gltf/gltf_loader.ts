@@ -39,7 +39,7 @@ import type {
 import type { AssetManager } from '../../assetmanager';
 import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf';
 import { Application } from '../../../app';
-import { NewUnlitMaterial } from '../../../material/meshmaterial';
+import { NewUnlitMaterial, LitMaterial } from '../../../material/meshmaterial';
 
 /** @internal */
 export interface GLTFContent extends GlTf {
@@ -506,7 +506,7 @@ export class GLTFLoader extends AbstractModelLoader {
   ): Promise<M> {
     if (assetMaterial.type === 'unlit') {
       const unlitAssetMaterial = assetMaterial as AssetUnlitMaterial;
-      const unlitMaterial = new NewUnlitMaterial();
+      const unlitMaterial = new LitMaterial(); //new NewUnlitMaterial();
       unlitMaterial.albedoColor = unlitAssetMaterial.diffuse ?? Vector4.one();
       if (unlitAssetMaterial.diffuseMap) {
         unlitMaterial.albedoTexture = unlitAssetMaterial.diffuseMap.texture;
