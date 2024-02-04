@@ -5,6 +5,7 @@ import { DrawContext, EnvironmentLighting, ShadowMapPass } from "../render";
 import { ShaderFramework, encodeColorOutput, encodeNormalizedFloatToRGBA, nonLinearDepthToLinearNormalized } from "../shaders";
 import { Application } from "../app";
 import { Matrix4x4, Vector4 } from "@zephyr3d/base";
+import { UnlitMaterial } from "./unlit";
 
 const allRenderPassTypes = [RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP, RENDER_PASS_TYPE_DEPTH_ONLY];
 
@@ -13,7 +14,8 @@ export abstract class MeshMaterial extends Material {
   protected static readonly FEATURE_ALPHATEST = 'mm_alphatest';
   protected static readonly FEATURE_ALPHABLEND = 'mm_alphablend';
   private _features: Map<string, number>;
-  private _featureStates: number[][];
+  private _featureStates: unknown[][];
+  private _featureIndex: number;
   private _alphaCutoff: number;
   private _blendMode: BlendMode;
   private _opacity: number;
@@ -24,6 +26,7 @@ export abstract class MeshMaterial extends Material {
     this._featureStates[RENDER_PASS_TYPE_FORWARD] = [];
     this._featureStates[RENDER_PASS_TYPE_SHADOWMAP] = [];
     this._featureStates[RENDER_PASS_TYPE_DEPTH_ONLY] = [];
+    this._featureIndex = 0;
     this._alphaCutoff = 0;
     this._blendMode = 'none';
     this._opacity = 1;
@@ -101,38 +104,28 @@ export abstract class MeshMaterial extends Material {
   }
   /**
    * Check if a feature is in use for given render pass type.
-   * 
+   *
    * @param feature - The feature name
    * @param renderPassType - Render pass type
    * @returns true if the feature is in use, otherwise false.
    */
-  protected featureUsed(feature: string, renderPassType: number[]|number = allRenderPassTypes) {
-    if (typeof renderPassType === 'number') {
-      renderPassType = [renderPassType];
-    }
+  protected featureUsed<T = unknown>(feature: string, renderPassType: number): T {
     const index = this._features.get(feature);
-    if (index >= 0) {
-      for (const type of renderPassType) {
-        if (!!this._featureStates[type][index]) {
-          return true;
-        }
-      }
-    }
-    return false;
+    return this._featureStates[renderPassType][index] as T;
   }
   /**
    * Use or unuse a feature of the material, this will cause the shader to be rebuild.
-   * 
+   *
    * @param feature - Which feature will be used or unused
    * @param use - true if use the feature, otherwise false
    */
-  protected useFeature(feature: string, use: number|boolean, renderPassType: number[]|number = allRenderPassTypes) {
+  protected useFeature(feature: string, use: unknown, renderPassType: number[]|number = allRenderPassTypes) {
     if (typeof renderPassType === 'number') {
       renderPassType = [renderPassType];
     }
     let index = this._features.get(feature);
     if (index === void 0) {
-      index = this._featureStates.length;
+      index = this._featureIndex++;
       this._features.set(feature, index);
     }
     let changed = false;
@@ -140,9 +133,8 @@ export abstract class MeshMaterial extends Material {
       if (type !== RENDER_PASS_TYPE_FORWARD && type !== RENDER_PASS_TYPE_SHADOWMAP && type !== RENDER_PASS_TYPE_DEPTH_ONLY) {
         console.error(`useFeature(): invalid render pass type: ${type}`);
       }
-      const val = Number(use);
-      if (this._featureStates[type][index] !== val) {
-        this._featureStates[type][index] = val;
+      if (this._featureStates[type][index] !== use) {
+        this._featureStates[type][index] = use;
         changed = true;
       }
     }
@@ -171,7 +163,7 @@ export abstract class MeshMaterial extends Material {
   }
   /**
    * Check if the color should be computed in fragment shader, this is required for forward render pass or alpha test is in use.
-   * 
+   *
    * @param ctx - The drawing context
    * @returns - true if the color should be computed in fragment shader, otherwise false.
    */
@@ -180,7 +172,7 @@ export abstract class MeshMaterial extends Material {
   }
   /**
    * The vertex shader implementation framework, this should be called in the entry function.
-   * 
+   *
    * @param scope - Entry function scope
    * @param ctx - The drawing context
    * @param shader - Shader generation function
@@ -197,7 +189,7 @@ export abstract class MeshMaterial extends Material {
   }
   /**
    * The fragment shader implementation framework, this should be called in the entry function.
-   * 
+   *
    * @param scope - Entry function scope
    * @param ctx - The drawing context
    * @param shader - Shader generation function
@@ -257,169 +249,7 @@ export abstract class MeshMaterial extends Material {
   }
 }
 
-export class NewUnlitMaterial extends MeshMaterial {
-  protected static readonly FEATURE_VERTEX_COLOR = 'um_vertexcolor';
-  protected static readonly FEATURE_ALBEDO_TEXTURE = 'um_albedo_map';
-  protected static readonly FEATURE_ALBEDO_TEXTURE_MATRIX = 'um_albedo_map_matrix';
-  protected static readonly FEATURE_ALBEDO_TEXCOORD_INDEX = 'um_albedo_texcoord';
-  private _albedoColor: Vector4;
-  private _albedoTexture: Texture2D;
-  private _albedoSampler: TextureSampler;
-  private _albedoTexCoordIndex: number;
-  private _albedoTexCoordMatrix: Matrix4x4;
-  constructor() {
-    super();
-    this._albedoColor = Vector4.one();
-    this._albedoTexture = null;
-    this._albedoSampler = null;
-    this._albedoTexCoordIndex = 0;
-    this._albedoTexCoordMatrix = null;
-  }
-  /** true if vertex color attribute presents */
-  get vertexColor(): boolean {
-    return this.featureUsed(NewUnlitMaterial.FEATURE_VERTEX_COLOR)
-  }
-  set vertexColor(val: boolean) {
-    this.useFeature(NewUnlitMaterial.FEATURE_VERTEX_COLOR, !!val);
-  }
-  /** Albedo color */
-  get albedoColor(): Vector4 {
-    return this._albedoColor;
-  }
-  set albedoColor(val: Vector4) {
-    this._albedoColor.set(val);
-    this.optionChanged(false);
-  }
-  /** Albedo texture */
-  get albedoTexture(): Texture2D {
-    return this._albedoTexture;
-  }
-  set albedoTexture(tex: Texture2D) {
-    this.useFeature(NewUnlitMaterial.FEATURE_ALBEDO_TEXTURE, !!tex);
-    if (tex) {
-      this.useFeature(NewUnlitMaterial.FEATURE_ALBEDO_TEXCOORD_INDEX, this._albedoTexCoordIndex);
-    }
-    this._albedoTexture = tex ?? null;
-  }
-  /** Albedo texture sampler */
-  get albedoTextureSampler(): TextureSampler {
-    return this._albedoSampler;
-  }
-  set albedoTextureSampler(sampler: TextureSampler) {
-    this._albedoSampler = sampler ?? null;
-  }
-  /** Albedo texture coordinate index */
-  get albedoTexCoordIndex(): number {
-    return this._albedoTexCoordIndex;
-  }
-  set albedoTexCoordIndex(val: number) {
-    if (val !== this._albedoTexCoordIndex) {
-      this._albedoTexCoordIndex = val;
-      if (this._albedoTexture) {
-        this.useFeature(NewUnlitMaterial.FEATURE_ALBEDO_TEXCOORD_INDEX, this._albedoTexCoordIndex);
-      }
-    }
-  }
-  /** Albedo texture coordinate transform matrix */
-  get albedoTexMatrix(): Matrix4x4 {
-    return this._albedoTexCoordMatrix;
-  }
-  set albedoTexMatrix(val: Matrix4x4) {
-    if (val !== this._albedoTexCoordMatrix) {
-      this._albedoTexCoordMatrix = val;
-      if (this._albedoTexture) {
-        this.useFeature(NewUnlitMaterial.FEATURE_ALBEDO_TEXTURE_MATRIX, !!this._albedoTexCoordMatrix);
-      }
-    }
-  }
-  /**
-   * {@inheritDoc MeshMaterial._applyUniforms}
-   * @override
-   */
-  protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void {
-    super._applyUniforms(bindGroup, ctx);
-    if (this.needColor(ctx)) {
-      bindGroup.setValue('kkAlbedo', this._albedoColor);
-      if (this.featureUsed(NewUnlitMaterial.FEATURE_ALBEDO_TEXTURE, ctx.renderPass.type)) {
-        bindGroup.setTexture('kkAlbedoTex', this._albedoTexture, this._albedoSampler);
-        if (this.featureUsed(NewUnlitMaterial.FEATURE_ALBEDO_TEXTURE_MATRIX, ctx.renderPass.type)) {
-          bindGroup.setValue('kkAlbedoTextureMatrix', this._albedoTexCoordMatrix);
-        }
-      }
-    }
-  }
-  protected vertexShader(scope: PBInsideFunctionScope, ctx: DrawContext) {
-    const that = this;
-    const pb = scope.$builder;
-    (function(this: PBInsideFunctionScope) {
-      this.$inputs.pos = pb.vec3().attrib('position');
-      if (that.needColor(ctx)) {
-        if (that.featureUsed(NewUnlitMaterial.FEATURE_VERTEX_COLOR, ctx.renderPass.type)) {
-          this.$inputs.kkVertexColor = pb.vec4().attrib('diffuse');
-          this.$outputs.kkVertexColor = this.kkVertexColor;
-        }
-        if (that.featureUsed(NewUnlitMaterial.FEATURE_ALBEDO_TEXTURE, ctx.renderPass.type)) {
-          const semantic = `texCoord${that.albedoTexCoordIndex}` as VertexSemantic;
-          if (!this.$getVertexAttrib(semantic)) {
-            this.$inputs[semantic] = pb.vec2().attrib(semantic);
-          }
-          if (that.featureUsed(NewUnlitMaterial.FEATURE_ALBEDO_TEXTURE_MATRIX, ctx.renderPass.type)) {
-            this.$g.kkAlbedoTextureMatrix = pb.mat4().uniform(2);
-            this.$outputs.kkAlbedoTexCoord = pb.mul(this.kkAlbedoTextureMatrix, pb.vec4(this.$inputs[semantic], 0, 1)).xy;
-          } else {
-            this.$outputs.kkAlbedoTexCoord = this.$inputs[semantic];
-          }
-        }
-      }
-      ShaderFramework.ftransform(this);
-    }).call(scope);
-  }
-  protected fragmentShader(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp {
-    const that = this;
-    const pb = scope.$builder;
-    return (function(this: PBInsideFunctionScope) {
-      this.$g.kkAlbedo = pb.vec4().uniform(2);
-      if (that.featureUsed(NewUnlitMaterial.FEATURE_ALBEDO_TEXTURE, ctx.renderPass.type)) {
-        this.$g.kkAlbedoTex = pb.tex2D().uniform(2);
-      }
-      this.$l.kkColor = this.kkAlbedo;
-      if (that.featureUsed(NewUnlitMaterial.FEATURE_VERTEX_COLOR, ctx.renderPass.type)) {
-        this.kkColor = pb.mul(this.kkColor, this.$getVertexAttrib('diffuse'));
-      }
-      if (that.featureUsed(NewUnlitMaterial.FEATURE_ALBEDO_TEXTURE, ctx.renderPass.type)) {
-        this.kkColor = pb.mul(this.kkColor, pb.textureSample(this.kkAlbedoTex, this.$inputs.kkAlbedoTexCoord));
-      }
-      return this.kkColor;
-    }).call(scope);
-  }
-  /**
-   * {@inheritDoc Material._createProgram}
-   * @override
-   */
-  protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram {
-    const that = this;
-    const program = pb.buildRenderProgram({
-      vertex(pb) {
-        pb.main(function(){
-          that.vertexShaderImpl(this, ctx, function(ctx){
-            that.vertexShader(this, ctx);
-          });
-        });
-      },
-      fragment(pb) {
-        pb.main(function(){
-          that.fragmentShaderImpl(this, ctx, function(ctx){
-            return that.fragmentShader(this, ctx);
-          });
-        });
-      }
-    });
-    //console.log(program.getShaderSource('fragment'));
-    return program;
-  }
-}
-
-export class LitMaterial extends NewUnlitMaterial {
+export class LitMaterial extends UnlitMaterial {
   protected static readonly FEATURE_DOUBLE_SIDED_LIGHTING = 'lm_doublesided_lighting';
   protected static readonly FEATURE_VERTEX_NORMAL = 'lm_vertexnormal';
   protected static readonly FEATURE_VERTEX_TANGENT = 'lm_vertextangent';
@@ -432,7 +262,6 @@ export class LitMaterial extends NewUnlitMaterial {
   private _normalTexCoordIndex: number;
   private _normalTexCoordMatrix: Matrix4x4;
   private _normalScale: number;
-  private _normalMapMode: 'tangent-space'|'object-space';
   constructor() {
     super();
     this._normalTexture = null;
@@ -440,7 +269,6 @@ export class LitMaterial extends NewUnlitMaterial {
     this._normalTexCoordIndex = 0;
     this._normalTexCoordMatrix = null;
     this._normalScale = 1;
-    this._normalMapMode = 'tangent-space';
   }
   get normalScale(): number {
     return this._normalScale;
@@ -449,13 +277,10 @@ export class LitMaterial extends NewUnlitMaterial {
     this._normalScale = val;
   }
   get normalMapMode(): 'tangent-space'|'object-space' {
-    return this._normalMapMode;
+    return this.featureUsed(LitMaterial.FEATURE_OBJECT_SPACE_NORMALMAP, RENDER_PASS_TYPE_FORWARD);
   }
   set normalMapMode(val: 'tangent-space'|'object-space') {
-    this._normalMapMode = val;
-    if (this._normalTexture) {
-      this.useFeature(LitMaterial.FEATURE_OBJECT_SPACE_NORMALMAP, this._normalMapMode === 'object-space', RENDER_PASS_TYPE_FORWARD);
-    }
+    this.useFeature(LitMaterial.FEATURE_OBJECT_SPACE_NORMALMAP, val, RENDER_PASS_TYPE_FORWARD);
   }
   /** true if double sided lighting is used */
   get doubleSidedLighting(): boolean {
@@ -466,14 +291,14 @@ export class LitMaterial extends NewUnlitMaterial {
   }
   /** true if vertex normal attribute presents */
   get vertexNormal(): boolean {
-    return this.featureUsed(LitMaterial.FEATURE_VERTEX_NORMAL)
+    return this.featureUsed(LitMaterial.FEATURE_VERTEX_NORMAL, RENDER_PASS_TYPE_FORWARD)
   }
   set vertexNormal(val: boolean) {
     this.useFeature(LitMaterial.FEATURE_VERTEX_NORMAL, !!val);
   }
   /** true if vertex normal attribute presents */
   get vertexTangent(): boolean {
-    return this.featureUsed(LitMaterial.FEATURE_VERTEX_TANGENT)
+    return this.featureUsed(LitMaterial.FEATURE_VERTEX_TANGENT, RENDER_PASS_TYPE_FORWARD)
   }
   set vertexTangent(val: boolean) {
     this.useFeature(LitMaterial.FEATURE_VERTEX_TANGENT, !!val);
@@ -523,9 +348,10 @@ export class LitMaterial extends NewUnlitMaterial {
   /**
    * Calculate the normal vector for current fragment
    * @param scope - The shader scope
+   * @param ctx - The drawing context
    * @returns Normal vector for current fragment
    */
-  calculateNormal(scope: PBInsideFunctionScope): PBShaderExp {
+  calculateNormal(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
     const args: PBShaderExp[] = [];
@@ -543,9 +369,9 @@ export class LitMaterial extends NewUnlitMaterial {
     }
     pb.func('kkCalculateNormal', params, function(){
       const posW = ShaderFramework.getWorldPosition(this).xyz;
-      this.$l.uv = that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE)
+      this.$l.uv = that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)
         ? scope.$inputs.kkNormalTexCoord ?? pb.vec2(0)
-        : that.featureUsed(LitMaterial.FEATURE_ALBEDO_TEXTURE)
+        : that.featureUsed(LitMaterial.FEATURE_ALBEDO_TEXTURE, ctx.renderPass.type)
           ? scope.$inputs.kkAlbedoTexCoord ?? pb.vec2(0)
           : pb.vec2(0);
       this.$l.TBN = pb.mat3();
@@ -602,11 +428,11 @@ export class LitMaterial extends NewUnlitMaterial {
       } else {
         this.TBN = pb.mat3(pb.normalize(this.worldTangent), pb.normalize(this.worldBinormal), pb.normalize(this.worldNormal));
       }
-      if (that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE)) {
-        if (that.featureUsed(LitMaterial.FEATURE_OBJECT_SPACE_NORMALMAP)) {
+      if (that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
+        if (that.normalMapMode === 'object-space') {
           const pixel = pb.sub(pb.mul(pb.textureSample(this.kkNormalTexture, this.uv).rgb, 2), pb.vec3(1));
           const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.kkNormalScale).xx, 1));
-          this.$return(pb.normalize(normalTex));        
+          this.$return(pb.normalize(normalTex));
         } else {
           const pixel = pb.sub(pb.mul(pb.textureSample(this.kkNormalTexture, this.uv).rgb, 2), pb.vec3(1));
           const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.kkNormalScale).xx, 1));
@@ -645,7 +471,7 @@ export class LitMaterial extends NewUnlitMaterial {
         if (that.vertexTangent) {
           this.$inputs.tangent = pb.vec4().attrib('tangent');
         }
-        if (that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE)) {
+        if (that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
           const semantic = `texCoord${that.normalTexCoordIndex}` as VertexSemantic;
           if (!this.$getVertexAttrib(semantic)) {
             this.$inputs[semantic] = pb.vec2().attrib(semantic);
@@ -666,12 +492,12 @@ export class LitMaterial extends NewUnlitMaterial {
     const pb = scope.$builder;
     const albedoColor = super.fragmentShader(scope, ctx);
     return (function(this: PBInsideFunctionScope) {
-      if (that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE)) {
+      if (that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
         this.$g.kkNormalTexture = pb.tex2D().uniform(2);
         this.$g.kkNormalScale = pb.float().uniform(2);
       }
       this.$l.albedoColor = albedoColor;
-      this.$l.normal = that.calculateNormal(this);
+      this.$l.normal = that.calculateNormal(this, ctx);
       return pb.vec4(pb.mul(this.albedoColor.rgb, pb.add(pb.mul(this.normal, 0.5), pb.vec3(0.5))), 1);
     }).call(scope);
   }
@@ -680,6 +506,6 @@ export class LitMaterial extends NewUnlitMaterial {
    * @override
    */
   supportLighting(): boolean {
-    return true;    
+    return true;
   }
 }

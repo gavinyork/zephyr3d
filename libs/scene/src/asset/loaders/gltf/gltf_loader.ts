@@ -18,7 +18,6 @@ import {
 import { BoundingBox } from '../../../utility/bounding_volume';
 import { Primitive } from '../../../render/primitive';
 import {
-  StandardMaterial,
   UnlitMaterial,
   Material as M,
   PBRMetallicRoughnessMaterial,
@@ -39,7 +38,6 @@ import type {
 import type { AssetManager } from '../../assetmanager';
 import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf';
 import { Application } from '../../../app';
-import { NewUnlitMaterial, LitMaterial } from '../../../material/meshmaterial';
 
 /** @internal */
 export interface GLTFContent extends GlTf {
@@ -506,7 +504,7 @@ export class GLTFLoader extends AbstractModelLoader {
   ): Promise<M> {
     if (assetMaterial.type === 'unlit') {
       const unlitAssetMaterial = assetMaterial as AssetUnlitMaterial;
-      const unlitMaterial = new LitMaterial(); //new NewUnlitMaterial();
+      const unlitMaterial = new UnlitMaterial();
       unlitMaterial.albedoColor = unlitAssetMaterial.diffuse ?? Vector4.one();
       if (unlitAssetMaterial.diffuseMap) {
         unlitMaterial.albedoTexture = unlitAssetMaterial.diffuseMap.texture;
