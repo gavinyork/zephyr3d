@@ -107,12 +107,28 @@ export type PBRSpecularDebugChannel = 'pbrSpecular'|'pbrSpecularFactor'|'pbrSpec
  */
 export type MaterialDebugChannel = ''|MaterialCommonDebugChannel|PBRBaseDebugChannel|PBRClearcoatDebugChannel|PBRSheenDebugChannel|PBRSpecularDebugChannel;
 
+export interface IMaterial {
+  readonly id: number;
+  stateSet: RenderStateSet;
+  isTransparent(): boolean;
+  supportLighting(): boolean;
+  draw(primitive: Primitive, ctx: DrawContext);
+  beginDraw(ctx: DrawContext): boolean;
+  endDraw(): void;
+  getMaterialBindGroup(): BindGroup;
+  applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean): void;
+  getOrCreateProgram(ctx: DrawContext): ProgramInfo;
+  dispose(): void;
+  optionChanged(changeHash: boolean): void;
+  createHash(renderPassType: number): string;
+  clearBindGroupCache(): number;
+}
 
 /**
  * Base class for any kind of materials
  * @public
  */
-export class Material {
+export class Material implements IMaterial {
   /** @internal */
   private static _debugChannel: MaterialDebugChannel = '';
   /** @internal */
