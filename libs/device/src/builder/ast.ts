@@ -1549,11 +1549,10 @@ export class ASTSelect extends ASTExpression {
     return null;
   }
   toWebGL(indent: string, ctx: ASTContext) {
-    const cond = this.condition.toWebGL('', ctx);
-    return `${indent}${cond} ? ${this.first.toWebGL('', ctx)} : ${this.second.toWebGL('', ctx)}`;
+    return `${indent}(${this.condition.toWebGL('', ctx)} ? ${this.first.toWebGL('', ctx)} : ${this.second.toWebGL('', ctx)})`;
   }
   toWebGL2(indent: string, ctx: ASTContext) {
-    return `${indent}${this.condition.toWebGL2('', ctx)} ? ${this.first.toWebGL2('', ctx)} : ${this.second.toWebGL2('', ctx)}`;
+    return `${indent}(${this.condition.toWebGL2('', ctx)} ? ${this.first.toWebGL2('', ctx)} : ${this.second.toWebGL2('', ctx)})`;
   }
   toWGSL(indent: string, ctx: ASTContext) {
     return `${indent}select(${this.second.toWGSL('', ctx)}, ${this.first.toWGSL('', ctx)}, ${this.condition.toWGSL('', ctx)})`;

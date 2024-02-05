@@ -1,9 +1,8 @@
 import { Matrix4x4, Vector4 } from '@zephyr3d/base';
 import { MeshMaterial } from './meshmaterial';
-import { ShaderFramework } from '../shaders';
+import { RENDER_PASS_TYPE_FORWARD } from '../values';
 import type { BindGroup, GPUProgram, PBInsideFunctionScope, PBShaderExp, ProgramBuilder, Texture2D, TextureSampler } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import { RENDER_PASS_TYPE_FORWARD } from '../values';
 
 /**
  * Unlit material
@@ -90,7 +89,7 @@ export class UnlitMaterial extends MeshMaterial {
    */
   protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void {
     super._applyUniforms(bindGroup, ctx);
-    if (this.needColor(ctx)) {
+    if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('kkAlbedo', this._albedoColor);
       if (this.featureUsed(UnlitMaterial.FEATURE_ALBEDO_TEXTURE, ctx.renderPass.type)) {
         bindGroup.setTexture('kkAlbedoTex', this._albedoTexture, this._albedoSampler);
@@ -100,12 +99,23 @@ export class UnlitMaterial extends MeshMaterial {
       }
     }
   }
+  protected calculateAlbedoColor(scope: PBInsideFunctionScope, ctx: DrawContext) {
+    const pb = scope.$builder;
+    let color = scope.kkAlbedo;
+    if (this.featureUsed(UnlitMaterial.FEATURE_VERTEX_COLOR, ctx.renderPass.type)) {
+      color = pb.mul(color, scope.$getVertexAttrib('diffuse'));
+    }
+    if (this.featureUsed(UnlitMaterial.FEATURE_ALBEDO_TEXTURE, ctx.renderPass.type)) {
+      color = pb.mul(color, pb.textureSample(scope.kkAlbedoTex, scope.$inputs.kkAlbedoTexCoord));
+    }
+    return color;
+  }
   protected vertexShader(scope: PBInsideFunctionScope, ctx: DrawContext) {
     const that = this;
     const pb = scope.$builder;
     (function(this: PBInsideFunctionScope) {
       this.$inputs.pos = pb.vec3().attrib('position');
-      if (that.needColor(ctx)) {
+      if (that.needFragmentColor(ctx)) {
         if (that.featureUsed(UnlitMaterial.FEATURE_VERTEX_COLOR, ctx.renderPass.type)) {
           this.$inputs.kkVertexColor = pb.vec4().attrib('diffuse');
           this.$outputs.kkVertexColor = this.kkVertexColor;
@@ -123,7 +133,7 @@ export class UnlitMaterial extends MeshMaterial {
           }
         }
       }
-      ShaderFramework.ftransform(this);
+      that.transformVertexAndNormal(this);
     }).call(scope);
   }
   protected fragmentShader(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp {
@@ -134,14 +144,7 @@ export class UnlitMaterial extends MeshMaterial {
       if (that.featureUsed(UnlitMaterial.FEATURE_ALBEDO_TEXTURE, ctx.renderPass.type)) {
         this.$g.kkAlbedoTex = pb.tex2D().uniform(2);
       }
-      this.$l.kkColor = this.kkAlbedo;
-      if (that.featureUsed(UnlitMaterial.FEATURE_VERTEX_COLOR, ctx.renderPass.type)) {
-        this.kkColor = pb.mul(this.kkColor, this.$getVertexAttrib('diffuse'));
-      }
-      if (that.featureUsed(UnlitMaterial.FEATURE_ALBEDO_TEXTURE, ctx.renderPass.type)) {
-        this.kkColor = pb.mul(this.kkColor, pb.textureSample(this.kkAlbedoTex, this.$inputs.kkAlbedoTexCoord));
-      }
-      return this.kkColor;
+      return that.calculateAlbedoColor(this, ctx);
     }).call(scope);
   }
   /**

@@ -21,7 +21,8 @@ import {
   UnlitMaterial,
   Material as M,
   PBRMetallicRoughnessMaterial,
-  PBRSpecularGlossinessMaterial
+  PBRSpecularGlossinessMaterial,
+  NewLambertMaterial
 } from '../../../material';
 import { ComponentType, GLTFAccessor } from './helpers';
 import { AbstractModelLoader } from '../loader';
@@ -38,6 +39,7 @@ import type {
 import type { AssetManager } from '../../assetmanager';
 import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf';
 import { Application } from '../../../app';
+import { TestLitMaterial } from '../../../material/lit';
 
 /** @internal */
 export interface GLTFContent extends GlTf {
@@ -504,7 +506,7 @@ export class GLTFLoader extends AbstractModelLoader {
   ): Promise<M> {
     if (assetMaterial.type === 'unlit') {
       const unlitAssetMaterial = assetMaterial as AssetUnlitMaterial;
-      const unlitMaterial = new UnlitMaterial();
+      const unlitMaterial = new NewLambertMaterial();// new TestLitMaterial();// new UnlitMaterial();
       unlitMaterial.albedoColor = unlitAssetMaterial.diffuse ?? Vector4.one();
       if (unlitAssetMaterial.diffuseMap) {
         unlitMaterial.albedoTexture = unlitAssetMaterial.diffuseMap.texture;

@@ -138,18 +138,12 @@ export class ShaderFramework {
             pb.vec4[16]('shadowMatrices'),
             pb.float('envLightStrength')
           ])
-        : !useClusteredLighting
-          ? pb.defineStruct([
-              pb.int('numLights'),
-              pb.vec4[MAX_FORWARD_LIGHT_COUNT * 3]('lightParams'),
-              pb.float('envLightStrength')
-            ])
-          : pb.defineStruct([
-              pb.float('envLightStrength'),
-              pb.vec4('clusterParams'),
-              pb.ivec4('countParams'),
-              pb.ivec2('lightIndexTexSize'),
-            ]);
+        : pb.defineStruct([
+            pb.float('envLightStrength'),
+            pb.vec4('clusterParams'),
+            pb.ivec4('countParams'),
+            pb.ivec2('lightIndexTexSize'),
+          ]);
       const globalStruct = pb.defineStruct([cameraStruct('camera'), lightStruct('light'), fogStruct('fog')]);
       scope.global = globalStruct().uniform(0);
       if (useClusteredLighting) {
@@ -576,27 +570,15 @@ export class ShaderFramework {
   }
   /** @internal */
   static getLightPositionAndRange(scope: PBInsideFunctionScope, lightIndex: PBShaderExp|number): PBShaderExp {
-    if (scope.lightBuffer) {
-      return scope.lightBuffer.at(scope.$builder.mul(lightIndex, 3));
-    } else {
-      return scope.global.light.lightParams.at(scope.$builder.mul(lightIndex, 3));
-    }
+    return scope.lightBuffer.at(scope.$builder.mul(lightIndex, 3));
   }
   /** @internal */
   static getLightDirectionAndCutoff(scope: PBInsideFunctionScope, lightIndex: PBShaderExp|number): PBShaderExp {
-    if (scope.lightBuffer) {
-      return scope.lightBuffer.at(scope.$builder.add(scope.$builder.mul(lightIndex, 3), 1));
-    } else {
-      return scope.global.light.lightParams.at(scope.$builder.add(scope.$builder.mul(lightIndex, 3), 1));
-    }
+    return scope.lightBuffer.at(scope.$builder.add(scope.$builder.mul(lightIndex, 3), 1));
   }
   /** @internal */
   static getLightColorAndIntensity(scope: PBInsideFunctionScope, lightIndex: PBShaderExp|number): PBShaderExp {
-    if (scope.lightBuffer) {
-      return scope.lightBuffer.at(scope.$builder.add(scope.$builder.mul(lightIndex, 3), 2));
-    } else {
-      return scope.global.light.lightParams.at(scope.$builder.add(scope.$builder.mul(lightIndex, 3), 2));
-    }
+    return scope.lightBuffer.at(scope.$builder.add(scope.$builder.mul(lightIndex, 3), 2));
   }
   /**
    * Transform vertex position to the clip space and calcuate the world normal and tangent frame if needed

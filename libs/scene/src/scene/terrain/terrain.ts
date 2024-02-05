@@ -75,7 +75,7 @@ export class Terrain extends GraphNode {
     this._maxDetailTextureLevels = MAX_DETAIL_TEXTURE_LEVELS;
     this._wireframe = false;
     this._viewPoint = null;
-    this._castShadow = false;
+    this._castShadow = true;
     this._instanceColor = Vector4.zero();
     this._overridenStateSet = null;
   }

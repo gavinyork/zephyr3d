@@ -3,7 +3,7 @@ import { Material } from './material';
 import { forwardComputeLighting } from '../shaders/lighting';
 import { RENDER_PASS_TYPE_SHADOWMAP, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_DEPTH_ONLY } from '../values';
 import { ShaderFramework } from '../shaders/framework';
-import { encodeColorOutput, encodeNormalizedFloatToRGBA, nonLinearDepthToLinearNormalized } from '../shaders/misc';
+import { encodeNormalizedFloatToRGBA, nonLinearDepthToLinearNormalized } from '../shaders/misc';
 import { Application } from '../app';
 import { PBRLightModelMR } from '.';
 import type { DrawContext } from '../render/drawable';

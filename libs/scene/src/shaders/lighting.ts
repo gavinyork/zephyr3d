@@ -254,17 +254,17 @@ export function forwardComputeLighting(
         this.lightDir = this.directionCutoff.xyz;
         this.$l.nl = pb.dot(this.surfaceData.normal, this.lightDir);
         this.$l.NdotL = pb.clamp(pb.neg(this.nl), 0, 1);
-        this.shadowBound = pb.vec4(0, 0, 1, 1);
-        this.linearDepth = nonLinearDepthToLinear(this, this.$builtins.fragCoord.z);
-        this.splitDistances = ShaderFramework.getCascadeDistances(this);
-        this.comparison = pb.vec4(pb.greaterThan(pb.vec4(this.linearDepth), this.splitDistances));
-        this.cascadeFlags = pb.vec4(
+        this.$l.shadowBound = pb.vec4(0, 0, 1, 1);
+        this.$l.linearDepth = nonLinearDepthToLinear(this, this.$builtins.fragCoord.z);
+        this.$l.splitDistances = ShaderFramework.getCascadeDistances(this);
+        this.$l.comparison = pb.vec4(pb.greaterThan(pb.vec4(this.linearDepth), this.splitDistances));
+        this.$l.cascadeFlags = pb.vec4(
           pb.float(pb.greaterThan(this.shadowCascades, 0)),
           pb.float(pb.greaterThan(this.shadowCascades, 1)),
           pb.float(pb.greaterThan(this.shadowCascades, 2)),
           pb.float(pb.greaterThan(this.shadowCascades, 3))
         );
-        this.split = pb.int(pb.dot(this.comparison, this.cascadeFlags));
+        this.$l.split = pb.int(pb.dot(this.comparison, this.cascadeFlags));
         if (DEBUG_CASCADED_SHADOW_MAPS) {
           this.shadowDebugColor = this.shadowDebugColors.at(this.split);
         }

@@ -1,107 +1,96 @@
-import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, PerspectiveCamera, DirectionalLight, Compositor, Tonemap, PBRMetallicRoughnessMaterial, BoxShape, Mesh, FPSCameraController } from '@zephyr3d/scene';
+import { Scene, Application, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, DirectionalLight, Mesh, BoxShape, LambertMaterial, PlaneShape, PointLight, SpotLight, NewLambertMaterial } from '@zephyr3d/scene';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import * as common from '../common';
 
 const myApp = new Application({
-  backend: backendWebGL2,
+  backend: common.getBackend(),
   canvas: document.querySelector('#canvas')
 });
 
+const usePointLight = true;
+const useSpotLight = true;
+const useDirLight = true;
 
-myApp.ready().then(async() => {
-
+myApp.ready().then(async function () {
   await imGuiInit(myApp.device);
-  myApp.inputManager.use(imGuiInjectEvent);
-
-  // 创建场景
+  
   const scene = new Scene();
+  // Turn off environment lighting
+  scene.env.light.type = 'none';
 
-  // 创建摄像机
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 600);
-  camera.lookAt(new Vector3(0, 8, 30), new Vector3(0, 8, 0), Vector3.axisPY());
-  camera.controller = new FPSCameraController();
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  let dlight: DirectionalLight = null;
+  let plight: PointLight = null;
+  let light: SpotLight = null;
 
-  // 创建方向光
-  const light = new DirectionalLight(scene);
-  light.lookAt(new Vector3(1, 1, 1), new Vector3(0, 0, 0), new Vector3(0, 1, 0));
-  light.castShadow = true;
-  light.shadow.numShadowCascades = 4;
-
-  // 设置天空渲染模式为大气散射
-  scene.env.sky.skyType = 'scatter';
-  // 设置雾效为大气散射
-  scene.env.sky.fogType = 'scatter';
-  // 设置场景距离单位
-  scene.worldUnit = 2;
-
-  // 创建地面和一些盒子
-
-  const material = new PBRMetallicRoughnessMaterial();
-  material.lightModel.metallic = 0.1;
-  material.lightModel.roughness = 0.6;
-  material.lightModel.albedo = new Vector4(0.3, 0.2, 0.2, 1);
-
-  const box = new BoxShape();
-  const floor = new Mesh(scene, box);
-  floor.scale.setXYZ(2000, 10, 2000);
-  floor.position.setXYZ(-1000, -10, -1000);
-  floor.material = material;
-
-  for (let i = -40; i <= 40; i++) {
-    const box1 = new Mesh(scene, box);
-    box1.scale.setXYZ(3, 30, 3);
-    box1.position.setXYZ(-20, 0, i * 10);
-    box1.material = material;
-    const box2 = new Mesh(scene, box);
-    box2.scale.setXYZ(3, 30, 3);
-    box2.position.setXYZ(20, 0, i * 10);
-    box2.material = material;
+  if (useDirLight) {
+    // Create directional light
+    dlight = new DirectionalLight(scene);
+    // light direction
+    dlight.rotation.fromEulerAngle(-Math.PI/4, Math.PI/4, 0, 'ZYX');
+    // light color
+    dlight.color = new Vector4(0, 0.3, 0.3, 1);
   }
 
-  // 添加Tonemap后处理效果
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
+  if (usePointLight) {
+    // Create point light
+    plight = new PointLight(scene);
+    // point light range
+    plight.range = 30;
+    // light color
+    plight.color = new Vector4(1, 1, 0, 1);
+  }
+  
+  if (useSpotLight) {
+    // Create spot light
+    light = new SpotLight(scene);
+    // light color
+    light.color = new Vector4(0, 0, 1, 1);
+    // light cutoff angle
+    light.cutoff = Math.PI * 0.2;
+    // light range
+    light.range = 200;
+    // light position
+    light.position.setXYZ(0, 10, 0);
+  }
 
-  // 窗口大小发生变化重新设置相机投影矩阵的宽高比
-  myApp.on('resize', ev => {
-    camera.aspect = ev.width / ev.height;
-  });
+  // Create several boxes
+  const boxMaterial = new NewLambertMaterial();
+  boxMaterial.albedoColor = new Vector4(1, 1, 1, 1);
+  const boxShape = new BoxShape({ size: 6 });
+  for (let i = 0; i < 16; i++) {
+    const box = new Mesh(scene, boxShape, boxMaterial);
+    box.position.setXYZ(Math.random() * 50 - 25, 0, Math.random() * 50 - 25);
+  }
+  // Create floor
+  const floorMaterial = new NewLambertMaterial();
+  floorMaterial.albedoColor = new Vector4(1, 1, 1, 1);
+  const floor = new Mesh(scene, new PlaneShape({ size: 200 }), floorMaterial);
+  floor.position.x = -100;
+  floor.position.z = -100;
+
+  // Create camera
+  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 600);
+  const eyePos = new Vector3(30, 30, 30);
+  camera.lookAt(eyePos, new Vector3(0, 0, 0), new Vector3(0, 1, 0));
+  camera.controller = new OrbitCameraController({ distance: eyePos.magnitude });
+
+  const compositor = new Compositor();
+  // Add a Tonemap post-processing effect
+  compositor.appendPostEffect(new Tonemap());
 
   const inspector = new common.Inspector(scene, compositor, camera);
 
-  let movingSun = 0;
-  Application.instance.device.canvas.addEventListener('contextmenu', function(ev){
-    ev.preventDefault();
-    return false;
-  });
-  myApp.on('pointerdown', ev => {
-    if (ev.button === 2 && ev.ctrlKey) {
-      const viewport = Application.instance.device.getViewport();
-      const ray = scene.constructRay(camera, viewport.width, viewport.height, ev.offsetX, ev.offsetY);
-      light.lookAt(ray.direction, Vector3.zero(), Vector3.axisPY());
-      movingSun = 1;
-    }
-  });
-  myApp.on('pointerup', ev => {
-    if (ev.button === 2) {
-      movingSun = 0;
-    }
-  });
-  myApp.on('pointermove', ev => {
-    //const obj = scene.raycast(gltfViewer.camera, ev.offsetX, ev.offsetY);
-    //console.log(`raycast: ${obj ? obj.node.constructor.name : null}`);
-    if (movingSun) {
-      const viewport = Application.instance.device.getViewport();
-      const ray = scene.constructRay(camera, viewport.width, viewport.height, ev.offsetX, ev.offsetY);
-      light.lookAt(ray.direction, Vector3.zero(), Vector3.axisPY());
-    }
-  });
+  myApp.inputManager.use(imGuiInjectEvent);
+  myApp.inputManager.use(camera.handleEvent.bind(camera));
+
   myApp.on('tick', function () {
+    dlight?.rotation.fromEulerAngle(-Math.PI/4, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
+    plight?.position.setXYZ(20 * Math.cos(Date.now() * 0.001) - 10, 15, 20 * Math.sin(Date.now() * 0.001) - 10);
+    light?.rotation.fromEulerAngle(-Math.PI/6, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
     camera.updateController();
     camera.render(scene, compositor);
+
     imGuiNewFrame();
     inspector.render();
     imGuiEndFrame();
