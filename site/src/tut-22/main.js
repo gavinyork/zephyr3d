@@ -22,13 +22,13 @@ myApp.ready().then(function () {
 
   // Create a torus
   const material = new LambertMaterial();
-  material.lightModel.albedo = new Vector4(1, 1, 0, 1);
+  material.albedoColor = new Vector4(1, 1, 0, 1);
   const torus = new Mesh(scene, new TorusShape(), material);
   torus.position.setXYZ(0, 20, 0);
 
   // Create floor
   const floorMaterial = new LambertMaterial();
-  floorMaterial.lightModel.albedo = new Vector4(0, 1, 1, 1);
+  floorMaterial.albedoColor = new Vector4(0, 1, 1, 1);
   const floor = new Mesh(scene, new PlaneShape({ size: 100 }), floorMaterial);
   floor.position.x = -50;
   floor.position.z = -50;

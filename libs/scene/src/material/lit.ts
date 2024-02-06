@@ -1,12 +1,12 @@
 import { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp, Texture2D, TextureSampler, VertexSemantic } from "@zephyr3d/device";
-import { UnlitMaterial } from "./unlit";
 import { Matrix4x4 } from "@zephyr3d/base";
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT, RENDER_PASS_TYPE_FORWARD } from "../values";
 import { ShaderFramework, nonLinearDepthToLinear } from "../shaders";
 import { DrawContext } from "../render";
 import { Application } from "../app";
+import { MeshMaterial } from "./meshmaterial";
 
-export class LitMaterial extends UnlitMaterial {
+export class LitMaterial extends MeshMaterial {
   static readonly FEATURE_DOUBLE_SIDED_LIGHTING = 'lm_doublesided_lighting';
   static readonly FEATURE_VERTEX_NORMAL = 'lm_vertexnormal';
   static readonly FEATURE_VERTEX_TANGENT = 'lm_vertextangent';
@@ -26,6 +26,7 @@ export class LitMaterial extends UnlitMaterial {
     this._normalTexCoordIndex = 0;
     this._normalTexCoordMatrix = null;
     this._normalScale = 1;
+    this.useFeature(LitMaterial.FEATURE_VERTEX_NORMAL, true);
   }
   get normalScale(): number {
     return this._normalScale;
@@ -224,10 +225,10 @@ export class LitMaterial extends UnlitMaterial {
     return pb.getGlobalScope().kkCalculateNormal(...args);
   }
   /**
-   * {@inheritDoc NewUnlitMaterial._applyUniforms}
+   * {@inheritDoc MeshMaterial.applyUniformsValues}
    * @override
    */
-   applyUniformsValues(bindGroup: BindGroup, ctx: DrawContext): void {
+   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
     super.applyUniformValues(bindGroup, ctx);
     if (this.needFragmentColor(ctx)) {
       if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
@@ -477,31 +478,28 @@ export class LitMaterial extends UnlitMaterial {
    * @param ctx - The drawing context
    */
   vertexShader(scope: PBFunctionScope, ctx: DrawContext): void {
-    const that = this;
+    super.vertexShader(scope, ctx);
     const pb = scope.$builder;
-    (function(this: PBInsideFunctionScope) {
-      if (that.needFragmentColor(ctx)) {
-        if (that.vertexNormal) {
-          this.$inputs.normal = pb.vec3().attrib('normal');
+    if (this.needFragmentColor(ctx)) {
+      if (this.vertexNormal) {
+        scope.$inputs.normal = pb.vec3().attrib('normal');
+      }
+      if (this.vertexTangent) {
+        scope.$inputs.tangent = pb.vec4().attrib('tangent');
+      }
+      if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
+        const semantic = `texCoord${this.normalTexCoordIndex}` as VertexSemantic;
+        if (!scope.$getVertexAttrib(semantic)) {
+          scope.$inputs[semantic] = pb.vec2().attrib(semantic);
         }
-        if (that.vertexTangent) {
-          this.$inputs.tangent = pb.vec4().attrib('tangent');
-        }
-        if (that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
-          const semantic = `texCoord${that.normalTexCoordIndex}` as VertexSemantic;
-          if (!this.$getVertexAttrib(semantic)) {
-            this.$inputs[semantic] = pb.vec2().attrib(semantic);
-          }
-          if (that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE_MATRIX, ctx.renderPass.type)) {
-            this.$g.kkNormalTextureMatrix = pb.mat4().uniform(2);
-            this.$outputs.kkNormalTexCoord = pb.mul(this.kkNormalTextureMatrix, pb.vec4(this.$inputs[semantic], 0, 1)).xy;
-          } else {
-            this.$outputs.kkNormalTexCoord = this.$inputs[semantic];
-          }
+        if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE_MATRIX, ctx.renderPass.type)) {
+          scope.$g.kkNormalTextureMatrix = pb.mat4().uniform(2);
+          scope.$outputs.kkNormalTexCoord = pb.mul(scope.kkNormalTextureMatrix, pb.vec4(scope.$inputs[semantic], 0, 1)).xy;
+        } else {
+          scope.$outputs.kkNormalTexCoord = scope.$inputs[semantic];
         }
       }
-    }).call(scope);
-    super.vertexShader(scope, ctx);
+    }
   }
   /**
    * Fragment shader implementation
@@ -512,14 +510,11 @@ export class LitMaterial extends UnlitMaterial {
    */
   fragmentShader(scope: PBFunctionScope, ctx: DrawContext) {
     super.fragmentShader(scope, ctx);
-    const that = this;
     const pb = scope.$builder;
-    (function(this: PBInsideFunctionScope) {
-      if (that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
-        this.$g.kkNormalTexture = pb.tex2D().uniform(2);
-        this.$g.kkNormalScale = pb.float().uniform(2);
-      }
-    }).call(scope);
+    if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
+      scope.$g.kkNormalTexture = pb.tex2D().uniform(2);
+      scope.$g.kkNormalScale = pb.float().uniform(2);
+    }
   }
   /**
    * {@inheritDoc Material.supportLighting}

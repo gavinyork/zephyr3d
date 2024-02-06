@@ -25,7 +25,7 @@ myApp.ready().then(function () {
 
   // Create several boxes
   const boxMaterial = new LambertMaterial();
-  boxMaterial.lightModel.albedo = new Vector4(1, 1, 0, 1);
+  boxMaterial.albedoColor = new Vector4(1, 1, 0, 1);
   const boxShape = new BoxShape({ size: 6 });
   for (let i = 0; i < 16; i++) {
     const box = new Mesh(scene, boxShape, boxMaterial);
@@ -33,7 +33,7 @@ myApp.ready().then(function () {
   }
   // Create floor
   const floorMaterial = new LambertMaterial();
-  floorMaterial.lightModel.albedo = new Vector4(0, 1, 1, 1);
+  floorMaterial.albedoColor = new Vector4(0, 1, 1, 1);
   const floor = new Mesh(scene, new PlaneShape({ size: 200 }), floorMaterial);
   floor.position.x = -100;
   floor.position.z = -100;

@@ -25,7 +25,7 @@ light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
 // 创建一个红色Lambert材质
 const material = new LambertMaterial();
-material.lightModel.albedo = new Vector4(1, 0, 0, 1);
+material.albedoColor = new Vector4(1, 0, 0, 1);
 
 // 创建一个球体网格并赋予刚创建的材质
 const sphere = new Mesh(scene, new SphereShape(), material);

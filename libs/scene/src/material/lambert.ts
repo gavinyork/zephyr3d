@@ -1,6 +1,7 @@
-import { StandardMaterial } from './standard';
-import { LambertLightModel } from './lightmodel';
 import { LitMaterial } from './lit';
+import { mixinAlbedoColor } from './mixins/albedocolor';
+import { mixinVertexColor } from './mixins/vertexcolor';
+import { applyMaterialMixins } from './meshmaterial';
 import type { PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 
@@ -8,32 +9,30 @@ import type { DrawContext } from '../render';
  * Lambert material
  * @public
  */
-export class LambertMaterial extends StandardMaterial<LambertLightModel> {
-  /**
-   * Creates an instance of LambertMaterial
-   */
-  constructor() {
-    super();
-    this.lightModel = new LambertLightModel();
-  }
-}
-
-export class NewLambertMaterial extends LitMaterial {
+export class LambertMaterial extends applyMaterialMixins(LitMaterial, mixinVertexColor, mixinAlbedoColor) {
   constructor(){
     super();
   }
-  fragmentShader(scope: PBFunctionScope, ctx: DrawContext): PBShaderExp {
-    const that = this;
-    const pb = scope.$builder;
+  vertexShader(scope: PBFunctionScope, ctx: DrawContext) {
+    super.vertexShader(scope, ctx);
+    scope.$inputs.zPos = scope.$builder.vec3().attrib('position');
+    this.transformVertexAndNormal(scope);
+  }
+  fragmentShader(scope: PBFunctionScope, ctx: DrawContext) {
     super.fragmentShader(scope, ctx);
-    return (function(this: PBInsideFunctionScope) {
-      this.$l.albedo = that.calculateAlbedoColor(this, ctx);
-      this.$l.color = pb.vec3(0);
-      this.$l.normal = that.calculateNormal(scope, ctx);
-      if (that.needCalculateEnvLight(ctx)) {
-        this.color = pb.add(this.color, that.getEnvLightIrradiance(this, this.normal, ctx));
+    const pb = scope.$builder;
+    const that = this;
+    if (this.needFragmentColor(ctx)) {
+      scope.$l.albedo = this.calculateAlbedoColor(scope, ctx);
+      if (this.vertexColor) {
+        scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope, ctx));
       }
-      that.forEachLight(this, ctx, function(type, posRange, dirCutoff, colorIntensity, shadow){
+      scope.$l.color = pb.vec3(0);
+      scope.$l.normal = this.calculateNormal(scope, ctx);
+      if (this.needCalculateEnvLight(ctx)) {
+        scope.color = pb.add(scope.color, this.getEnvLightIrradiance(scope, scope.normal, ctx));
+      }
+      this.forEachLight(scope, ctx, function(type, posRange, dirCutoff, colorIntensity, shadow){
         this.$l.lightAtten = that.calculateLightAttenuation(this, type, posRange, dirCutoff);
         this.$l.lightDir = that.calculateLightDirection(this, type, posRange, dirCutoff);
         this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
@@ -44,7 +43,10 @@ export class NewLambertMaterial extends LitMaterial {
         }
         this.color = pb.add(this.color, this.lightContrib);
       });
-      return pb.mul(this.albedo, pb.vec4(this.color, 1));
-    }).call(scope);
+      scope.$l.litColor = pb.mul(scope.albedo, pb.vec4(scope.color, 1));
+      this.outputFragmentColor(scope, scope.litColor, ctx);
+    } else {
+      this.outputFragmentColor(scope, null, ctx);
+    }
   }
 }

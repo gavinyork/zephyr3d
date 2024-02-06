@@ -23,6 +23,25 @@ export interface IMeshMaterial extends IMaterial {
   outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext);
 }
 
+export type UnionToIntersection<U> = 
+  (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
+
+export type ExtractMixinReturnType<M, T> = M extends (target: infer A) => infer R
+  ? T extends A
+    ? R
+    : never
+  : never;
+
+export type ExtractMixinType<M extends any[], T> = UnionToIntersection<M extends (infer K)[] ? ExtractMixinReturnType<K, T> : never> & T;
+
+export function applyMaterialMixins<M extends ((target: any) => any)[], T>(target: T, ...mixins: M): ExtractMixinType<M, T> {
+  let r: any = target;
+  for (const m of mixins) {
+    r = m(r);
+  }
+  return r;
+}
+
 export class MeshMaterial extends Material implements IMeshMaterial {
   static readonly FEATURE_ALPHATEST = 'mm_alphatest';
   static readonly FEATURE_ALPHABLEND = 'mm_alphablend';

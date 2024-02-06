@@ -11,11 +11,16 @@ export interface IMixinAlbedoColor {
   albedoTexMatrix: Matrix4x4;
   calculateAlbedoColor(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp;
 }
-function mixinAlbedoColor<T extends { new (...args: any[]): IMeshMaterial }>(BaseCls: T) {
+
+function mixinAlbedoColor<T extends IMeshMaterial>(BaseCls: { new (...args: any[]): T }) {
+  if ((BaseCls as any).albedoColorMixed) {
+    return BaseCls as { new (...args: any[]): T & IMixinAlbedoColor };
+  }
   const FEATURE_ALBEDO_MAP = 'z-feature-albedo-map';
   const FEATURE_ALBEDO_TEXCOORD_INDEX = 'z-feature-albedo-texcoord-index';
   const FEATURE_ALBEDO_TEXCOORD_MATRIX = 'z-feature-albedo-texcoord-matrix';
-  return class extends BaseCls implements IMixinAlbedoColor {
+  return class extends (BaseCls as { new (...args: any[]): IMeshMaterial }) {
+    static albedoColorMixed = true;
     private _albedoColor: Vector4;
     private _albedoTexture: Texture2D;
     private _albedoSampler: TextureSampler;
@@ -130,7 +135,7 @@ function mixinAlbedoColor<T extends { new (...args: any[]): IMeshMaterial }>(Bas
         }
       }
     }
-  } as { new (...args: any[]): IMeshMaterial & IMixinAlbedoColor };
+  } as unknown as { new (...args: any[]): T & IMixinAlbedoColor };
 }
 
 export { mixinAlbedoColor };

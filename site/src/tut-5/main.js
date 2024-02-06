@@ -15,7 +15,7 @@ myApp.ready().then(function () {
 
   // Create a lambert material
   const material = new LambertMaterial();
-  material.lightModel.albedo = new Vector4(1, 0, 0, 1);
+  material.albedoColor = new Vector4(1, 0, 0, 1);
   // Create a sphere mesh
   const sphere = new Mesh(scene, new SphereShape(), material);
 

@@ -1,5 +1,5 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, DirectionalLight, Mesh, BoxShape, LambertMaterial, PlaneShape, PointLight, SpotLight, NewLambertMaterial } from '@zephyr3d/scene';
+import { Scene, Application, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, DirectionalLight, Mesh, BoxShape, LambertMaterial, PlaneShape, PointLight, SpotLight } from '@zephyr3d/scene';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import * as common from '../common';
 
@@ -55,7 +55,7 @@ myApp.ready().then(async function () {
   }
 
   // Create several boxes
-  const boxMaterial = new NewLambertMaterial();
+  const boxMaterial = new LambertMaterial();
   boxMaterial.albedoColor = new Vector4(1, 1, 1, 1);
   const boxShape = new BoxShape({ size: 6 });
   for (let i = 0; i < 16; i++) {
@@ -63,7 +63,7 @@ myApp.ready().then(async function () {
     box.position.setXYZ(Math.random() * 50 - 25, 0, Math.random() * 50 - 25);
   }
   // Create floor
-  const floorMaterial = new NewLambertMaterial();
+  const floorMaterial = new LambertMaterial();
   floorMaterial.albedoColor = new Vector4(1, 1, 1, 1);
   const floor = new Mesh(scene, new PlaneShape({ size: 200 }), floorMaterial);
   floor.position.x = -100;

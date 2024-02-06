@@ -43,6 +43,9 @@ export class AABB {
 }
 
 // @public
+export function applyMixins(derivedCtor: any, baseCtors: any[]): void;
+
+// @public
 export enum BoxSide {
     BACK = 5,
     BOTTOM = 2,

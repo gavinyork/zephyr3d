@@ -1,5 +1,5 @@
 import { Matrix4x4, Vector3 } from '@zephyr3d/base';
-import { Scene, OrbitCameraController, Application, PerspectiveCamera, LambertMaterial, AnimationSet, AnimationClip, AssetManager, UserTrack } from '@zephyr3d/scene';
+import { Scene, OrbitCameraController, Application, PerspectiveCamera, AnimationSet, AnimationClip, AssetManager, UserTrack } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({

@@ -1,5 +1,5 @@
 import { Vector3 } from '@zephyr3d/base';
-import { Scene, Application, Mesh, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, SphereShape, BlinnMaterial, DirectionalLight, AssetManager, Primitive, UnlitMaterial } from '@zephyr3d/scene';
+import { Scene, Application, Mesh, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, Primitive, UnlitMaterial } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
