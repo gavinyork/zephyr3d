@@ -1,7 +1,7 @@
 import { Matrix4x4, Vector4 } from "@zephyr3d/base";
 import type { IMeshMaterial } from "../meshmaterial";
 import type { BindGroup, PBFunctionScope, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, Texture2D, TextureSampler } from "@zephyr3d/device";
-import { DrawContext } from "../../render";
+import type { DrawContext } from "../../render";
 
 export interface IMixinAlbedoColor {
   albedoColor: Vector4;
@@ -59,11 +59,15 @@ function mixinAlbedoColor<T extends IMeshMaterial>(BaseCls: { new (...args: any[
       return this._albedoTexture;
     }
     set albedoTexture(tex: Texture2D) {
-      this.useFeature(FEATURE_ALBEDO_MAP, !!tex);
-      if (tex) {
-        this.useFeature(FEATURE_ALBEDO_TEXCOORD_INDEX, this._albedoTexCoordIndex);
+      if (this._albedoTexture !== tex) {
+        this.useFeature(FEATURE_ALBEDO_MAP, !!tex);
+        if (tex) {
+          this.useFeature(FEATURE_ALBEDO_TEXCOORD_INDEX, this._albedoTexCoordIndex);
+          this.useFeature(FEATURE_ALBEDO_TEXCOORD_MATRIX, !!this._albedoTexCoordMatrix);
+        }
+        this._albedoTexture = tex ?? null;
+        this.optionChanged(false);
       }
-      this._albedoTexture = tex ?? null;
     }
     /** Albedo texture sampler */
     get albedoTextureSampler(): TextureSampler {
@@ -82,6 +86,7 @@ function mixinAlbedoColor<T extends IMeshMaterial>(BaseCls: { new (...args: any[
         if (this._albedoTexture) {
           this.useFeature(FEATURE_ALBEDO_TEXCOORD_MATRIX, !!this._albedoTexCoordMatrix);
         }
+        this.optionChanged(false);
       }
     }
     calculateAlbedoColor(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp {

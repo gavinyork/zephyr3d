@@ -16,7 +16,10 @@ export class BlinnMaterial extends applyMaterialMixins(LitMaterial, mixinVertexC
     return this._shininess;
   }
   set shininess(val: number) {
-    this._shininess = val;
+    if (val !== this._shininess) {
+      this._shininess = val;
+      this.optionChanged(false);
+    }
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
     super.applyUniformValues(bindGroup, ctx);

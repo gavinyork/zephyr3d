@@ -32,7 +32,10 @@ export class LitMaterial extends MeshMaterial {
     return this._normalScale;
   }
   set normalScale(val: number) {
-    this._normalScale = val;
+    if (val !== this._normalScale) {
+      this._normalScale = val;
+      this.optionChanged(false);
+    }
   }
   get normalMapMode(): 'tangent-space'|'object-space' {
     return this.featureUsed(LitMaterial.FEATURE_OBJECT_SPACE_NORMALMAP, RENDER_PASS_TYPE_FORWARD);
@@ -66,11 +69,15 @@ export class LitMaterial extends MeshMaterial {
     return this._normalTexture;
   }
   set normalTexture(tex: Texture2D) {
-    this.useFeature(LitMaterial.FEATURE_NORMAL_TEXTURE, !!tex);
-    if (tex) {
-      this.useFeature(LitMaterial.FEATURE_NORMAL_TEXCOORD_INDEX, this._normalTexCoordIndex);
+    if (this._normalTexture !== tex) {
+      this.useFeature(LitMaterial.FEATURE_NORMAL_TEXTURE, !!tex);
+      if (tex) {
+        this.useFeature(LitMaterial.FEATURE_NORMAL_TEXCOORD_INDEX, this._normalTexCoordIndex);
+        this.useFeature(LitMaterial.FEATURE_NORMAL_TEXTURE_MATRIX, !!this._normalTexCoordMatrix);
+      }
+      this._normalTexture = tex ?? null;
+      this.optionChanged(false);
     }
-    this._normalTexture = tex ?? null;
   }
   /** Normal texture sampler */
   get normalTextureSampler(): TextureSampler {
@@ -101,6 +108,7 @@ export class LitMaterial extends MeshMaterial {
       if (this._normalTexture) {
         this.useFeature(LitMaterial.FEATURE_NORMAL_TEXTURE_MATRIX, !!this._normalTexCoordMatrix);
       }
+      this.optionChanged(false);
     }
   }
   /**

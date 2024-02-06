@@ -72,6 +72,7 @@ export class MeshMaterial extends Material implements IMeshMaterial {
     if (this._alphaCutoff !== val) {
       this.useFeature(MeshMaterial.FEATURE_ALPHATEST, val > 0);
       this._alphaCutoff = val;
+      this.optionChanged(false);
     }
   }
   get alphaToCoverage(): boolean {
@@ -99,6 +100,7 @@ export class MeshMaterial extends Material implements IMeshMaterial {
     if (this._opacity !== val) {
       this._opacity = val;
       this.useFeature(MeshMaterial.FEATURE_ALPHABLEND, this._opacity < 1, RENDER_PASS_TYPE_FORWARD);
+      this.optionChanged(false);
     }
   }
   /** @internal */
