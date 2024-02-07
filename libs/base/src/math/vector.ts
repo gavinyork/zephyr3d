@@ -11,7 +11,7 @@ const IDENT_MATRIX4x4 = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0,
 
 /**
  * Base class for vector and matrix types.
- * This class extends the Float32Array to observe data changes.
+ *
  * @public
  */
 export class VectorBase extends Float32Array {

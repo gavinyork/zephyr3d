@@ -1,5 +1,4 @@
 import { Vector4 } from '@zephyr3d/base';
-import { StructuredBuffer, BindGroup, VertexLayout } from '@zephyr3d/device';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
 (async function () {
