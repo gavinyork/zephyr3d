@@ -424,6 +424,10 @@
     //   "tags": [ "tools" ]
     // }
     {
+      "packageName": "@zephyr3d/root",
+      "projectFolder": "/"
+    },
+    {
       "packageName": "@zephyr3d/base",
       "projectFolder": "libs/base",
       "publishFolder": "dist",

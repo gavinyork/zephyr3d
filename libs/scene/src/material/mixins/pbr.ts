@@ -453,44 +453,6 @@ function mixinPBR<T extends IMeshMaterial>(BaseCls: { new(...args: any[]): T }) 
       );
       return pb.getGlobalScope()[funcName](brdf, f0, diffuse, irradiance, NoV, roughness, specularWeight);
     }
-    calculateIndirectLighting(scope: PBInsideFunctionScope, brdf: PBShaderExp, radiance: PBShaderExp, f0: PBShaderExp, NoV: PBShaderExp, roughness: PBShaderExp, specularWeight: PBShaderExp, ctx: DrawContext): PBShaderExp {
-      const pb = scope.$builder;
-      const envLight = ctx.env.light.envLight;
-      const that = this;
-      const funcName = 'kkPBRCalcEnvLight';
-      pb.func(funcName, [pb.vec4('brdf'), pb.vec4('f0'), pb.vec3('radiance'), pb.float('NdotV'), pb.float('roughness'), pb.float('specularWeight')], function (){
-        if (envLight.hasRadiance()) {
-          this.$l.iblSpecular = that.calculateSpecularIBL(this, this.brdf, this.f0.rgb, this.radiance, this.NdotV, this.roughness, this.specularWeight);
-          this.surfaceData.accumSpecular = pb.add(
-            this.surfaceData.accumSpecular,
-            pb.mul(this.iblSpecular, this.surfaceData.occlusion.r)
-          );
-        }
-        if (envLight.hasIrradiance()) {
-          this.$l.iblDiffuse = that.iblDiffuse(this, this.surfaceData.ggxLutSample, this.surfaceData.f0.rgb, this.surfaceData.diffuse.rgb, this.surfaceData.irradiance, this.surfaceData.NdotV, this.surfaceData.roughness, this.surfaceData.specularWeight);
-          this.surfaceData.accumDiffuse = pb.add(
-            this.surfaceData.accumDiffuse,
-            pb.mul(this.iblDiffuse, this.surfaceData.occlusion.r)
-          );
-        }
-        if (that._clearcoat) {
-          this.$l.ccSpecular = that.iblSpecular(this, this.surfaceData.ggxLutSample, this.surfaceData.f0.rgb, this.surfaceData.radianceClearcoat, this.surfaceData.clearcoatNdotV, this.surfaceData.clearcoatFactor.y, 1);
-          this.surfaceData.clearcoatContrib = pb.add(
-            this.surfaceData.clearcoatContrib,
-            pb.mul(this.ccSpecular, this.surfaceData.occlusion.r)
-          );
-        }
-        if (envLight.hasIrradiance() && that._sheen) {
-          this.$l.refl = pb.reflect(pb.neg(this.surfaceData.viewVec), this.surfaceData.normal);
-          this.$l.sheenEnvSample = envLight.getRadiance(this, this.refl, this.surfaceData.sheenRoughness);
-          this.$l.sheenBRDF = pb.textureSample(this.ggxLut, pb.clamp(pb.vec2(this.surfaceData.NdotV, this.surfaceData.sheenRoughness), pb.vec2(0), pb.vec2(1))).b;
-          //this.$l.sheenBRDF = iblSheenBRDF(this, this.surfaceData.sheenRoughness, this.surfaceData.NdotV);
-          this.$l.sheenLighting = pb.mul(this.surfaceData.sheenColor.rgb, this.iblDiffuse, this.sheenBRDF);
-          this.surfaceData.sheenContrib = pb.add(this.surfaceData.sheenContrib, pb.mul(this.sheenLighting, this.surfaceData.occlusion.r));
-        }
-      });
-      pb.getGlobalScope()[PBRLightModelBase.funcNameIllumEnvLight]();
-    }
   } as unknown as { new(...args: any[]): T & IMixinPBR } & TT;
 }
 

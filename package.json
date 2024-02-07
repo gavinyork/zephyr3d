@@ -1,9 +1,21 @@
 {
-  "name": "workspace",
+  "name": "@zephyr3d/root",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "preinstall": "echo please run 'rush update' instead. && exit 1",
-    "prebuild": "echo please run 'rush build' instead. && exit 1"
+    "lint-libs": "eslint \"libs/**/*.ts\" -f compact",
+    "lint-test": "eslint \"test/**/*.ts\" -f compact",
+    "lint-examples": "eslint \"examples/**/*.ts\" -f compact",
+    "lint": "npm run lint-libs && npm run lint-test && npm run lint-examples",
+    "lint-fix-libs": "eslint --fix \"libs/**/*.ts\" -f compact",
+    "lint-fix-test": "eslint --fix \"test/**/*.ts\" -f compact",
+    "lint-fix-examples": "eslint --fix \"examples/**/*.ts\" -f compact",
+    "lint-fix": "npm run lint-fix-libs && npm run lint-fix-test && npm run lint-fix-examples"
+  },
+  "devDependencies": {
+    "eslint": "^8.33.0",
+    "typescript": "^5.1.3",
+    "@typescript-eslint/parser": "^5.51.0",
+    "@typescript-eslint/eslint-plugin": "^5.51.0"
   }
 }

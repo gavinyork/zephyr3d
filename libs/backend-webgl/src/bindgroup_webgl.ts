@@ -8,14 +8,14 @@ import { GPUResourceUsageFlags,
   BindGroupLayoutEntry,
   GPUDataBuffer
  } from '@zephyr3d/device';
-import { WebGLBaseTexture } from './basetexture_webgl';
-import { WebGLGPUProgram } from './gpuprogram_webgl';
 import { WebGLStructuredBuffer } from './structuredbuffer_webgl';
-import { WebGLTextureSampler } from './sampler_webgl';
 import { WebGLGPUObject } from './gpuobject_webgl';
-import { TypedArray } from '@zephyr3d/base';
+import type { WebGLBaseTexture } from './basetexture_webgl';
+import type { WebGLGPUProgram } from './gpuprogram_webgl';
+import type { WebGLTextureSampler } from './sampler_webgl';
+import type { TypedArray } from '@zephyr3d/base';
 import type { WebGLDevice } from './device_webgl';
-import { WebGLGPUBuffer } from './buffer_webgl';
+import type { WebGLGPUBuffer } from './buffer_webgl';
 
 export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup {
   private _layout: BindGroupLayout;
@@ -74,7 +74,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
         if (!(buffer instanceof WebGLStructuredBuffer)) {
           throw new Error(`BindGroup.setValue() failed: '${name}' is not structured buffer`);
         }
-        if ((value as any)?.BYTES_PER_ELEMENT) {
+        if ((value as TypedArray)?.BYTES_PER_ELEMENT) {
           buffer.bufferSubData(0, value as TypedArray);
         } else {
           for (const k in value as any) {
