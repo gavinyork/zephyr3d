@@ -1,19 +1,51 @@
-import { BindGroup, GPUProgram, PBInsideFunctionScope, PBShaderExp, ProgramBuilder, Texture2D, TextureSampler, VertexSemantic } from "@zephyr3d/device";
-import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT, RENDER_PASS_TYPE_DEPTH_ONLY, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP } from "../values";
-import { Material } from "./material";
-import { DrawContext, EnvironmentLighting, ShadowMapPass } from "../render";
-import { ShaderFramework, encodeColorOutput, encodeNormalizedFloatToRGBA, nonLinearDepthToLinear, nonLinearDepthToLinearNormalized } from "../shaders";
+import { BindGroup, GPUProgram, PBFunctionScope, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, ProgramBuilder } from "@zephyr3d/device";
+import { RENDER_PASS_TYPE_DEPTH_ONLY, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP } from "../values";
+import { IMaterial, Material } from "./material";
+import { DrawContext, ShadowMapPass } from "../render";
+import { ShaderFramework, encodeColorOutput, encodeNormalizedFloatToRGBA, nonLinearDepthToLinearNormalized } from "../shaders";
 import { Application } from "../app";
-import { Matrix4x4, Vector4 } from "@zephyr3d/base";
-import { UnlitMaterial } from "./unlit";
 
 const allRenderPassTypes = [RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP, RENDER_PASS_TYPE_DEPTH_ONLY];
 
 export type BlendMode = 'none'|'blend'|'additive'|'max'|'min'
-export abstract class MeshMaterial extends Material {
-  protected static readonly FEATURE_ALPHATEST = 'mm_alphatest';
-  protected static readonly FEATURE_ALPHABLEND = 'mm_alphablend';
-  protected static readonly FEATURE_ALPHATOCOVERAGE = 'mm_alphatocoverage';
+export interface IMeshMaterial extends IMaterial {
+  alphaCutoff: number;
+  alphaToCoverage: boolean;
+  blendMode: BlendMode;
+  opacity: number;
+  featureUsed<T = unknown>(feature: string, renderPassType: number): T;
+  useFeature(feature: string, use: unknown, renderPassType?: number[]|number)
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void;
+  needFragmentColor(ctx: DrawContext): boolean;
+  vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
+  fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void;
+  transformVertexAndNormal(scope: PBInsideFunctionScope);
+  outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext);
+}
+
+export type UnionToIntersection<U> = 
+  (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
+
+export type ExtractMixinReturnType<M, T> = M extends (target: infer A) => infer R
+  ? T extends A
+    ? R
+    : never
+  : never;
+
+export type ExtractMixinType<M extends any[], T> = UnionToIntersection<M extends (infer K)[] ? ExtractMixinReturnType<K, T> : never> & T;
+
+export function applyMaterialMixins<M extends ((target: any) => any)[], T>(target: T, ...mixins: M): ExtractMixinType<M, T> {
+  let r: any = target;
+  for (const m of mixins) {
+    r = m(r);
+  }
+  return r;
+}
+
+export class MeshMaterial extends Material implements IMeshMaterial {
+  static readonly FEATURE_ALPHATEST = 'mm_alphatest';
+  static readonly FEATURE_ALPHABLEND = 'mm_alphablend';
+  static readonly FEATURE_ALPHATOCOVERAGE = 'mm_alphatocoverage';
   private _features: Map<string, number>;
   private _featureStates: unknown[][];
   private _featureIndex: number;
@@ -40,6 +72,7 @@ export abstract class MeshMaterial extends Material {
     if (this._alphaCutoff !== val) {
       this.useFeature(MeshMaterial.FEATURE_ALPHATEST, val > 0);
       this._alphaCutoff = val;
+      this.optionChanged(false);
     }
   }
   get alphaToCoverage(): boolean {
@@ -67,6 +100,7 @@ export abstract class MeshMaterial extends Material {
     if (this._opacity !== val) {
       this._opacity = val;
       this.useFeature(MeshMaterial.FEATURE_ALPHABLEND, this._opacity < 1, RENDER_PASS_TYPE_FORWARD);
+      this.optionChanged(false);
     }
   }
   /** @internal */
@@ -100,6 +134,14 @@ export abstract class MeshMaterial extends Material {
       this.stateSet.defaultBlendingState();
     }
   }
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
+    if (this.featureUsed(MeshMaterial.FEATURE_ALPHATEST, ctx.renderPass.type)) {
+      bindGroup.setValue('kkAlphaCutoff', this._alphaCutoff);
+    }
+    if (this.featureUsed(MeshMaterial.FEATURE_ALPHABLEND, ctx.renderPass.type)) {
+      bindGroup.setValue('kkOpacity', this._opacity);
+    }
+  }
   /** true if the material is transparency */
   isTransparent(): boolean {
     return this._blendMode !== 'none' || this._opacity < 1;
@@ -124,7 +166,7 @@ export abstract class MeshMaterial extends Material {
    * @param renderPassType - Render pass type
    * @returns true if the feature is in use, otherwise false.
    */
-  protected featureUsed<T = unknown>(feature: string, renderPassType: number): T {
+  featureUsed<T = unknown>(feature: string, renderPassType: number): T {
     const index = this._features.get(feature);
     return this._featureStates[renderPassType][index] as T;
   }
@@ -134,7 +176,8 @@ export abstract class MeshMaterial extends Material {
    * @param feature - Which feature will be used or unused
    * @param use - true if use the feature, otherwise false
    */
-  protected useFeature(feature: string, use: unknown, renderPassType: number[]|number = allRenderPassTypes) {
+  useFeature(feature: string, use: unknown, renderPassType?: number[]|number) {
+    renderPassType = renderPassType ?? allRenderPassTypes;
     if (typeof renderPassType === 'number') {
       renderPassType = [renderPassType];
     }
@@ -169,12 +212,7 @@ export abstract class MeshMaterial extends Material {
    * @override
    */
   protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void {
-    if (this.featureUsed(MeshMaterial.FEATURE_ALPHATEST, ctx.renderPass.type)) {
-      bindGroup.setValue('kkAlphaCutoff', this._alphaCutoff);
-    }
-    if (this.featureUsed(MeshMaterial.FEATURE_ALPHABLEND, ctx.renderPass.type)) {
-      bindGroup.setValue('kkOpacity', this._opacity);
-    }
+    this.applyUniformValues(bindGroup, ctx);
   }
   /**
    * Check if the color should be computed in fragment shader, this is required for forward render pass or alpha test is in use or alpha to coverage is in use.
@@ -182,7 +220,7 @@ export abstract class MeshMaterial extends Material {
    * @param ctx - The drawing context
    * @returns - true if the color should be computed in fragment shader, otherwise false.
    */
-  protected needFragmentColor(ctx: DrawContext) {
+  needFragmentColor(ctx: DrawContext): boolean {
     return ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD || this._alphaCutoff > 0 || this.alphaToCoverage;
   }
   /**
@@ -193,87 +231,116 @@ export abstract class MeshMaterial extends Material {
    *
    * @param scope - Current shader scope
    */
-  protected transformVertexAndNormal(scope: PBInsideFunctionScope) {
+  transformVertexAndNormal(scope: PBInsideFunctionScope) {
     ShaderFramework.ftransform(scope);
   }
   /**
-   * The vertex shader implementation framework, this should be called in the entry function.
-   *
-   * @param scope - Entry function scope
+   * Vertex shader implementation of this material
+   * @param scope - Shader scope
    * @param ctx - The drawing context
-   * @param shader - Shader generation function
    */
-  protected vertexShaderImpl(scope: PBInsideFunctionScope, ctx: DrawContext, shader: (this: PBInsideFunctionScope, ctx: DrawContext) => void) {
+  vertexShader(scope: PBFunctionScope, ctx: DrawContext): void {
     const pb = scope.$builder;
-    const g = scope.$builder.getGlobalScope();
     ShaderFramework.prepareVertexShader(pb, ctx);
     if (ctx.target.getBoneMatrices()) {
-      g.$inputs.kkBlendIndices = pb.vec4().attrib('blendIndices');
-      g.$inputs.kkBlendWeights = pb.vec4().attrib('blendWeights');
+      scope.$inputs.kkBlendIndices = pb.vec4().attrib('blendIndices');
+      scope.$inputs.kkBlendWeights = pb.vec4().attrib('blendWeights');
     }
-    shader.call(scope, ctx);
   }
   /**
-   * The fragment shader implementation framework, this should be called in the entry function.
-   *
-   * @param scope - Entry function scope
+   * Fragment shader implementation of this material
+   * @param scope - Shader scope
    * @param ctx - The drawing context
-   * @param shader - Shader generation function
    */
-  protected fragmentShaderImpl(scope: PBInsideFunctionScope, ctx: DrawContext, shader: (this: PBInsideFunctionScope, ctx: DrawContext) => PBShaderExp) {
+  fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void {
     const pb = scope.$builder;
     ShaderFramework.prepareFragmentShader(pb, ctx);
-    const g = scope.$builder.getGlobalScope();
     if (this._alphaCutoff > 0) {
-      g.kkAlphaCutoff = pb.float().uniform(2);
+      scope.$g.kkAlphaCutoff = pb.float().uniform(2);
     }
-    g.$outputs.kkOutColor = pb.vec4();
     if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
       if (this.isTransparent()) {
-        g.kkOpacity = pb.float().uniform(2);
+        scope.$g.kkOpacity = pb.float().uniform(2);
       }
-      scope.$l.kkColor = shader.call(scope, ctx);
-      ShaderFramework.discardIfClipped(scope);
-      if (!this.isTransparent() && !g.kkAlphaCutoff && !this.alphaToCoverage) {
-        scope.kkColor.a = 1;
-      } else if (g.kkOpacity) {
-        scope.kkColor.a = pb.mul(scope.kkColor.a, g.kkOpacity);
-      }
-      if (g.kkAlphaCutoff) {
-        scope.$if(pb.lessThan(scope.kkColor.a, scope.kkAlphaCutoff), function () {
-          pb.discard();
-        });
-      }
-      if (this.isTransparent()) {
-        scope.kkColor = pb.vec4(pb.mul(scope.kkColor.rgb, scope.kkColor.a), scope.kkColor.a);
-      }
-      ShaderFramework.applyFog(scope, scope.kkColor, ctx);
-      g.$outputs.kkOutColor = encodeColorOutput(scope, scope.kkColor);
-    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH_ONLY) {
-      if (g.kkAlphaCutoff || this.alphaToCoverage) {
-        scope.$l.kkColor = shader.call(scope, ctx);
-        scope.$if(pb.lessThan(scope.kkColor.a, scope.kkAlphaCutoff), function () {
-          pb.discard();
-        });
-      }
-      ShaderFramework.discardIfClipped(scope);
-      scope.$l.kkDepth = nonLinearDepthToLinearNormalized(scope, scope.$builtins.fragCoord.z);
-      if (Application.instance.device.type === 'webgl') {
-        g.$outputs.kkOutColor = encodeNormalizedFloatToRGBA(scope, scope.kkDepth);
-      } else {
-        g.$outputs.kkOutColor = pb.vec4(scope.kkDepth, 0, 0, 1);
-      }
-    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
-      if (g.kkAlphaCutoff) {
-        scope.$l.kkColor = shader.call(scope, ctx);
-        scope.$if(pb.lessThan(scope.kkColor.a, scope.kkAlphaCutoff), function () {
-          pb.discard();
-        });
-      }
-      ShaderFramework.discardIfClipped(scope);
-      const shadowMapParams = ctx.shadowMapInfo.get((ctx.renderPass as ShadowMapPass).light);
-      g.$outputs.kkOutColor = shadowMapParams.impl.computeShadowMapDepth(shadowMapParams, scope);
     }
+  }
+  /**
+   * {@inheritDoc Material._createProgram}
+   * @override
+   */
+  protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram {
+    const that = this;
+    const program = pb.buildRenderProgram({
+      vertex(pb) {
+        pb.main(function(){
+          that.vertexShader(this, ctx);
+        });
+      },
+      fragment(pb) {
+        this.$outputs.zFragmentOutput = pb.vec4();
+        pb.main(function(){
+          that.fragmentShader(this, ctx);
+        });
+      }
+    });
+    return program;
+  }
+  /**
+   * Calculate final fragment color for output.
+   *
+   * @param scope - Shader scope
+   * @param color - Lit fragment color
+   * @param ctx - The drawing context
+   *
+   * @returns The final fragment color
+   */
+  outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext) {
+    const pb = scope.$builder;
+    const that = this;
+    pb.func('zOutputFragmentColor', color ? [pb.vec4('color')] : [], function(){
+      this.$l.outColor = color ? this.color : pb.vec4();
+      if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
+        ShaderFramework.discardIfClipped(this);
+        if (!that.isTransparent() && !this.kkAlphaCutoff && !that.alphaToCoverage) {
+          this.outColor.a = 1;
+        } else if (this.kkOpacity) {
+          this.outColor.a = pb.mul(this.outColor.a, this.kkOpacity);
+        }
+        if (this.kkAlphaCutoff) {
+          this.$if(pb.lessThan(this.outColor.a, this.kkAlphaCutoff), function () {
+            pb.discard();
+          });
+        }
+        if (that.isTransparent()) {
+          this.outColor = pb.vec4(pb.mul(this.outColor.rgb, this.outColor.a), this.outColor.a);
+        }
+        ShaderFramework.applyFog(this, this.outColor, ctx);
+        this.$outputs.zFragmentOutput = encodeColorOutput(this, this.outColor);
+      } else if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH_ONLY) {
+        if (color) {
+          this.$if(pb.lessThan(this.outColor.a, this.kkAlphaCutoff), function () {
+            pb.discard();
+          });
+        }
+        ShaderFramework.discardIfClipped(this);
+        this.$l.kkDepth = nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
+        if (Application.instance.device.type === 'webgl') {
+          this.$outputs.zFragmentOutput = encodeNormalizedFloatToRGBA(this, this.kkDepth);
+        } else {
+          this.$outputs.zFragmentOutput = pb.vec4(this.kkDepth, 0, 0, 1);
+        }
+      } else /*if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP)*/ {
+        if (color) {
+          this.$if(pb.lessThan(this.outColor.a, this.kkAlphaCutoff), function () {
+            pb.discard();
+          });
+        }
+        ShaderFramework.discardIfClipped(this);
+        const shadowMapParams = ctx.shadowMapInfo.get((ctx.renderPass as ShadowMapPass).light);
+        this.$outputs.zFragmentOutput = shadowMapParams.impl.computeShadowMapDepth(shadowMapParams, this);
+      }
+    });
+    color ? pb.getGlobalScope().zOutputFragmentColor(color) : pb.getGlobalScope().zOutputFragmentColor();
   }
 }
 

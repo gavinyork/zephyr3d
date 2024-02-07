@@ -42,7 +42,7 @@ bvhLightApp.ready().then(async () => {
   bvhLightApp.inputManager.use(imGuiInjectEvent);
   bvhLightApp.inputManager.use(camera.handleEvent.bind(camera));
 
-  const inspector = new common.Inspector(scene, null, null);
+  const inspector = new common.Inspector(scene, null);
   const assetManager = new AssetManager();
   const tex = await assetManager.fetchTexture<Texture2D>('./assets/images/environments/papermill.hdr');
   const skyMap = device.createCubeTexture('rgba16f', 512);

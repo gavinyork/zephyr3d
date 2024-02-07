@@ -24,7 +24,7 @@ light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
 // Create a red Lambert material
 const material = new LambertMaterial();
-material.lightModel.albedo = new Vector4(1, 0, 0, 1);
+material.albedoColor = new Vector4(1, 0, 0, 1);
 
 // Create a sphere mesh and assign the material we just created
 const sphere = new Mesh(scene, new SphereShape(), material);

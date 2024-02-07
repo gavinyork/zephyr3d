@@ -24,6 +24,7 @@ import { Interpolator } from '@zephyr3d/base';
 import { Matrix4x4 } from '@zephyr3d/base';
 import { ObservableQuaternion } from '@zephyr3d/base';
 import { ObservableVector3 } from '@zephyr3d/base';
+import { PBFunctionScope } from '@zephyr3d/device';
 import { PBGlobalScope } from '@zephyr3d/device';
 import { PBInsideFunctionScope } from '@zephyr3d/device';
 import { PBShaderExp } from '@zephyr3d/device';
@@ -378,9 +379,19 @@ export class BlinnLightModel extends LightModel {
     supportLighting(): boolean;
 }
 
-// @public
-export class BlinnMaterial extends StandardMaterial<BlinnLightModel> {
+// Warning: (ae-forgotten-export) The symbol "BlinnMaterial_base" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export class BlinnMaterial extends BlinnMaterial_base {
     constructor();
+    // (undocumented)
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void;
+    // (undocumented)
+    fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void;
+    get shininess(): number;
+    set shininess(val: number);
+    // (undocumented)
+    vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
 }
 
 // @public
@@ -1453,6 +1464,40 @@ export interface HeightfieldBBoxTreeNode {
     right: HeightfieldBBoxTreeNode;
 }
 
+// @public (undocumented)
+export interface IMaterial {
+    // (undocumented)
+    applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean): void;
+    // (undocumented)
+    beginDraw(ctx: DrawContext): boolean;
+    // (undocumented)
+    clearBindGroupCache(): number;
+    // (undocumented)
+    createHash(renderPassType: number): string;
+    // (undocumented)
+    dispose(): void;
+    // (undocumented)
+    draw(primitive: Primitive, ctx: DrawContext): any;
+    // (undocumented)
+    endDraw(): void;
+    // (undocumented)
+    getMaterialBindGroup(): BindGroup;
+    // Warning: (ae-forgotten-export) The symbol "ProgramInfo" needs to be exported by the entry point index.d.ts
+    //
+    // (undocumented)
+    getOrCreateProgram(ctx: DrawContext): ProgramInfo;
+    // (undocumented)
+    readonly id: number;
+    // (undocumented)
+    isTransparent(): boolean;
+    // (undocumented)
+    optionChanged(changeHash: boolean): void;
+    // (undocumented)
+    stateSet: RenderStateSet;
+    // (undocumented)
+    supportLighting(): boolean;
+}
+
 // @public
 export interface InstanceData {
     // (undocumented)
@@ -1616,7 +1661,7 @@ export interface Logger {
 export type LogMode = 'info' | 'warn' | 'error' | 'debug';
 
 // @public
-export class Material {
+export class Material implements IMaterial {
     constructor();
     applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean): void;
     protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
@@ -1644,7 +1689,6 @@ export class Material {
     // @internal (undocumented)
     protected getHash(renderPassType: number): string;
     getMaterialBindGroup(): BindGroup;
-    // Warning: (ae-forgotten-export) The symbol "ProgramInfo" needs to be exported by the entry point index.d.ts
     getOrCreateProgram(ctx: DrawContext): ProgramInfo;
     // @internal (undocumented)
     static getProgramByHashIndex(hash: string, index: number): GPUProgram<unknown>;
@@ -1751,13 +1795,15 @@ export class Model extends GraphNode {
     update(): void;
 }
 
-// Warning: (ae-forgotten-export) The symbol "LitMaterial" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "NewLambertMaterial_base" needs to be exported by the entry point index.d.ts
 //
 // @public (undocumented)
-export class NewLambertMaterial extends LitMaterial {
+export class NewLambertMaterial extends NewLambertMaterial_base {
     constructor();
     // (undocumented)
-    protected fragmentShader(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp;
+    fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void;
+    // (undocumented)
+    vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
 }
 
 // @public
@@ -3572,6 +3618,7 @@ export class UnlitLightModel extends LightModel {
     supportLighting(): boolean;
 }
 
+<<<<<<< HEAD
 // Warning: (ae-forgotten-export) The symbol "MeshMaterial" needs to be exported by the entry point index.d.ts
 //
 // @public
@@ -3609,6 +3656,19 @@ export class UnlitMaterial extends MeshMaterial {
     set vertexColor(val: boolean);
     // (undocumented)
     protected vertexShader(scope: PBInsideFunctionScope, ctx: DrawContext): void;
+=======
+// Warning: (ae-forgotten-export) The symbol "UnlitMaterial_base" needs to be exported by the entry point index.d.ts
+//
+// @public
+export class UnlitMaterial extends UnlitMaterial_base {
+    constructor();
+    // (undocumented)
+    static readonly FEATURE_VERTEX_COLOR = "um_vertexcolor";
+    // (undocumented)
+    fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void;
+    // (undocumented)
+    vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
+>>>>>>> new-material
 }
 
 // @public

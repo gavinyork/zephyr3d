@@ -15,16 +15,16 @@ myApp.ready().then(function () {
 
   // Create a blinn material
   const material = new BlinnMaterial();
-  material.lightModel.shininess = 256;
+  material.shininess = 256;
   // Load albedo map and normal map
   const assetManager = new AssetManager();
   assetManager.fetchTexture('assets/images/earthcolor.jpg').then(texture => {
-    material.lightModel.setAlbedoMap(texture, null, 0);
+    material.albedoTexture = texture;
   });
   assetManager.fetchTexture('assets/images/earthnormal.png', {
     linearColorSpace: true
   }).then(texture => {
-    material.lightModel.setNormalMap(texture, null, 0);
+    material.normalTexture = texture;
   });
   // Create a sphere mesh
   const sphere = new Mesh(scene, new SphereShape(), material);

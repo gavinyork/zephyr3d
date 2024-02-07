@@ -368,3 +368,21 @@ export function parseColor(input: string): ColorRGBA {
   v.a = Math.min(1, v.a);
   return v;
 }
+/**
+ * Applies mixins to a constructor function.
+ *
+ * This function takes a constructor function of a class (derivedCtor) and an array of constructor functions
+ * from which to inherit or "mix in" properties and methods. It effectively adds the properties and methods
+ * from the base constructors (baseCtors) to the prototype of the derived constructor, allowing the derived
+ * class to inherit features from multiple sources.
+ *
+ * @param derivedCtor - The constructor function of the class that will receive the mixins.
+ * @param baseCtors - An array of constructor functions that will be mixed into the derivedCtor.
+ */
+export function applyMixins(derivedCtor: any, baseCtors: any[]) {
+  baseCtors.forEach(baseCtor => {
+    Object.getOwnPropertyNames(baseCtor.prototype).forEach(name => {
+      derivedCtor.prototype[name] = baseCtor.prototype[name];
+    });
+  });
+}

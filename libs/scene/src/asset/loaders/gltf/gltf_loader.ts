@@ -22,7 +22,8 @@ import {
   Material as M,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
-  NewLambertMaterial
+  LambertMaterial,
+  BlinnMaterial
 } from '../../../material';
 import { ComponentType, GLTFAccessor } from './helpers';
 import { AbstractModelLoader } from '../loader';
