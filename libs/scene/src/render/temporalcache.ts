@@ -1,4 +1,4 @@
-import { BaseTexture, FrameBuffer, TextureFormat, TextureType } from "@zephyr3d/device";
+import type { BaseTexture, FrameBuffer, TextureCreationOptions, TextureFormat, TextureType } from "@zephyr3d/device";
 import { Application } from "../app";
 
 /**
@@ -39,21 +39,22 @@ export class TemporalCache {
     }
     const sizeHash = variant ? '' : `${width}x${height}`;
     const fmtHash = `${colorFmt ?? ''}:${depthFmt ?? ''}:${colorFmt ? colorType : ''}:${numLayers}:${depthFmt ? depthType : ''}:${colorFmt && mipmapping ? 1 : 0}:${sampleCount}`;
-    let sizedFrameBuffers = this._cachedFrameBuffers[sizeHash];
+    const sizedFrameBuffers = this._cachedFrameBuffers[sizeHash];
     const fbList = sizedFrameBuffers?.get(null)?.[fmtHash];
     let fb: FrameBuffer = null;
     if (!fbList || fbList.length === 0) {
       let colorTex: BaseTexture = null;
+      const opt: TextureCreationOptions = mipmapping ? {} : { samplerOptions: { mipFilter: 'none' } };
       if (colorFmt) {
         switch(colorType) {
           case '2d':
-            colorTex = device.createTexture2D(colorFmt, width, height, { noMipmap: !mipmapping });
+            colorTex = device.createTexture2D(colorFmt, width, height, opt);
             break;
           case '2darray':
-            colorTex = device.createTexture2DArray(colorFmt, width, height, numLayers, { noMipmap: !mipmapping });
+            colorTex = device.createTexture2DArray(colorFmt, width, height, numLayers, opt);
             break;
           case 'cube':
-            colorTex = device.createCubeTexture(colorFmt, width, { noMipmap: !mipmapping });
+            colorTex = device.createCubeTexture(colorFmt, width, opt);
             break;
         }
       }
@@ -97,21 +98,22 @@ export class TemporalCache {
     }
     const sizeHash = variant ? '' : `${depth.width}x${depth.height}`;
     const fmtHash = `${colorFmt ?? ''}:${depth.format}:${colorFmt ? colorType : ''}:${numLayers}:${depth.target}:${colorFmt && mipmapping ? 1 : 0}:${sampleCount}`;
-    let sizedFrameBuffers = this._cachedFrameBuffers[sizeHash];
+    const sizedFrameBuffers = this._cachedFrameBuffers[sizeHash];
     const fbList = sizedFrameBuffers?.get(depth)?.[fmtHash];
     let fb: FrameBuffer = null;
     if (!fbList || fbList.length === 0) {
       let colorTex: BaseTexture = null;
+      const opt: TextureCreationOptions = mipmapping ? {} : { samplerOptions: { mipFilter: 'none' } };
       if (colorFmt) {
         switch(colorType) {
           case '2d':
-            colorTex = device.createTexture2D(colorFmt, depth.width, depth.height, { noMipmap: !mipmapping });
+            colorTex = device.createTexture2D(colorFmt, depth.width, depth.height, opt);
             break;
           case '2darray':
-            colorTex = device.createTexture2DArray(colorFmt, depth.width, depth.height, numLayers, { noMipmap: !mipmapping });
+            colorTex = device.createTexture2DArray(colorFmt, depth.width, depth.height, numLayers, opt);
             break;
           case 'cube':
-            colorTex = device.createCubeTexture(colorFmt, depth.width, { noMipmap: !mipmapping });
+            colorTex = device.createCubeTexture(colorFmt, depth.width, opt);
             break;
         }
       }

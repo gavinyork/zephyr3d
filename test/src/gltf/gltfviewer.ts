@@ -1,12 +1,14 @@
-import { Vector4, Vector3, Matrix4x4, AABB, Plane, Vector2 } from '@zephyr3d/base';
-import {
+import type { AABB} from '@zephyr3d/base';
+import { Vector4, Vector3, Vector2 } from '@zephyr3d/base';
+import type {
   SceneNode,
+  Scene,
+  AnimationSet} from '@zephyr3d/scene';
+import {
   BoundingBox,
   GraphNode,
   Material,
-  Model,
   AssetManager,
-  Scene,
   DirectionalLight,
   OrbitCameraController,
   panoramaToCubemap,
@@ -18,11 +20,10 @@ import {
   PostWater,
   Compositor,
   FXAA,
-  AnimationSet,
   Bloom
 } from '@zephyr3d/scene';
-import { Texture2D } from '@zephyr3d/device';
-import { TextureCube } from '@zephyr3d/device';
+import type { Texture2D } from '@zephyr3d/device';
+import type { TextureCube } from '@zephyr3d/device';
 
 export class GLTFViewer {
   private _currentAnimation: string;
@@ -82,7 +83,7 @@ export class GLTFViewer {
     this._light1.shadow.shadowMapSize = 1024;
     this._light1.lookAt(new Vector3(0, 0, 0), new Vector3(-0.5, 0.707, 0.5), Vector3.axisPY());
     this._radianceMap = Application.instance.device.createCubeTexture('rgba16f', 256);
-    this._irradianceMap = Application.instance.device.createCubeTexture('rgba16f', 64, { noMipmap: true });
+    this._irradianceMap = Application.instance.device.createCubeTexture('rgba16f', 64, { samplerOptions: { mipFilter: 'none' } });
 
     scene.env.sky.skyType = 'scatter';
     scene.env.sky.wind = new Vector2(160, 240);
@@ -170,7 +171,9 @@ export class GLTFViewer {
           const hdrFile = Array.from(fileMap.keys())[0];
           this._assetManager.fetchTexture<Texture2D>(hdrFile, {
             linearColorSpace: true,
-            noMipmap: true
+            samplerOptions: {
+              mipFilter: 'none'
+            }
           }).then(tex => {
             panoramaToCubemap(tex, this._skyMap);
             prefilterCubemap(this._skyMap, 'ggx', this._radianceMap);

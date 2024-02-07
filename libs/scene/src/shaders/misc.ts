@@ -1,4 +1,5 @@
-import { PBInsideFunctionScope, PBPrimitiveType, PBShaderExp } from '@zephyr3d/device';
+import type { PBShaderExp } from '@zephyr3d/device';
+import { PBInsideFunctionScope, PBPrimitiveType } from '@zephyr3d/device';
 import { ShaderFramework } from './framework';
 
 /**

@@ -1,16 +1,7 @@
-import { Vector4, TypedArray, makeEventTarget } from '@zephyr3d/base';
-import {
+import type { Vector4, TypedArray} from '@zephyr3d/base';
+import { makeEventTarget } from '@zephyr3d/base';
+import type {
   WebGLContext,
-  hasAlphaChannel,
-  hasRedChannel,
-  hasGreenChannel,
-  hasBlueChannel,
-  isIntegerTextureFormat,
-  isSignedTextureFormat,
-  isFloatTextureFormat,
-  getTextureFormatBlockSize,
-  isCompressedTextureFormat,
-  hasDepthChannel,
   FrameBufferOptions,
   SamplerOptions,
   TextureSampler,
@@ -36,22 +27,34 @@ import {
   GPUProgramConstructParams,
   RenderProgramConstructParams,
   DeviceOptions,
-  DeviceLostEvent,
-  DeviceRestoreEvent,
-  DeviceResizeEvent,
   DeviceViewport,
   DeviceCaps,
   PrimitiveType,
   TextureFormat,
-  BaseDevice,
   RenderStateSet,
   ITimer,
   PBStructTypeInfo,
-  PBPrimitiveType,
-  PBPrimitiveTypeInfo,
   DeviceBackend,
   DeviceEventMap,
   AbstractDevice
+} from '@zephyr3d/device';
+import {
+  hasAlphaChannel,
+  hasRedChannel,
+  hasGreenChannel,
+  hasBlueChannel,
+  isIntegerTextureFormat,
+  isSignedTextureFormat,
+  isFloatTextureFormat,
+  getTextureFormatBlockSize,
+  isCompressedTextureFormat,
+  hasDepthChannel,
+  DeviceLostEvent,
+  DeviceRestoreEvent,
+  DeviceResizeEvent,
+  BaseDevice,
+  PBPrimitiveType,
+  PBPrimitiveTypeInfo
 } from '@zephyr3d/device';
 import { isWebGL2, WebGLError } from './utils';
 import { WebGLEnum } from './webgl_enum';
@@ -72,7 +75,7 @@ import { WebGLGPUProgram } from './gpuprogram_webgl';
 import { primitiveTypeMap, typeMap } from './constants_webgl';
 import { SamplerCache } from './sampler_cache';
 import { WebGLStructuredBuffer } from './structuredbuffer_webgl';
-import { WebGLTextureSampler } from './sampler_webgl';
+import type { WebGLTextureSampler } from './sampler_webgl';
 
 declare global {
   interface WebGLRenderingContext {
@@ -139,7 +142,7 @@ export class WebGLDevice extends BaseDevice {
     super(cvs, backend);
     this._dpr = Math.max(1, Math.floor(options?.dpr ?? window.devicePixelRatio));
     this._isRendering = false;
-    this._msaaSampleCount = !!options?.msaa ? 4 : 1;
+    this._msaaSampleCount = options?.msaa ? 4 : 1;
     let context: WebGLContext = null;
     context = this.canvas.getContext(backend === backend1 ? 'webgl' : 'webgl2', {
       antialias: !!options?.msaa,
@@ -455,13 +458,13 @@ export class WebGLDevice extends BaseDevice {
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
-  createTexture2DArrayFromMipmapData(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): Texture2DArray {
+  createTexture2DArrayFromMipmapData(data: TextureMipmapData, options?: TextureCreationOptions): Texture2DArray {
     const tex = (options?.texture as WebGLTextureCube) ?? new WebGLTexture2DArray(this);
     if (!tex.isTexture2DArray()) {
       console.error('createTexture2DArrayFromMipmapData() failed: options.texture must be 2d array texture');
       return null;
     }
-    tex.createWithMipmapData(data, sRGB, this.parseTextureOptions(options));
+    tex.createWithMipmapData(data, this.parseTextureOptions(options));
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
@@ -520,7 +523,6 @@ export class WebGLDevice extends BaseDevice {
   }
   // render related
   setViewport(vp?: number[]|DeviceViewport) {
-    const oldViewport = Object.assign({}, this._currentViewport);
     if (vp === null || vp === undefined || (!Array.isArray(vp) && vp.default)) {
       this._currentViewport = {
         x: 0,
@@ -553,7 +555,6 @@ export class WebGLDevice extends BaseDevice {
     return Object.assign({}, this._currentViewport);
   }
   setScissor(scissor?: number[]|DeviceViewport) {
-    const oldScissor = Object.assign({}, this._currentScissorRect);
     if (scissor === null || scissor === undefined || (!Array.isArray(scissor) && scissor.default)) {
       this._currentScissorRect = {
         x: 0,
@@ -630,32 +631,7 @@ export class WebGLDevice extends BaseDevice {
     const format = colorAttachment ? colorAttachment.format : 'rgba8unorm';
     let glFormat: number = WebGLEnum.NONE;
     let glType: number = WebGLEnum.NONE;
-    const r = hasRedChannel(format);
-    const g = hasGreenChannel(format);
-    const b = hasBlueChannel(format);
-    const a = hasAlphaChannel(format);
-    const numChannels = (r ? 1 : 0) + (g ? 1 : 0) + (b ? 1 : 0) + (a ? 1 : 0);
     const pixelSize = getTextureFormatBlockSize(format);
-    const size = pixelSize / numChannels;
-    const integer = isIntegerTextureFormat(format);
-    const float = isFloatTextureFormat(format);
-    const signed = isSignedTextureFormat(format);
-    /*
-    if (r && g && b && a) {
-      glFormat = integer ? WebGLEnum.RGBA_INTEGER : WebGLEnum.RGBA;
-    } else if (r && g) {
-      glFormat = integer ? WebGLEnum.RG_INTEGER : WebGLEnum.RG;
-    } else if (r) {
-      glFormat = integer ? WebGLEnum.RED_INTEGER : WebGLEnum.RED;
-    }
-    if (size === 1) {
-      glType = signed ? WebGLEnum.BYTE : WebGLEnum.UNSIGNED_BYTE;
-    } else if (size === 2) {
-      glType = float ? WebGLEnum.HALF_FLOAT : signed ? WebGLEnum.SHORT : WebGLEnum.UNSIGNED_SHORT;
-    } else if (size === 4) {
-      glType = float ? WebGLEnum.FLOAT : signed ? WebGLEnum.INT : WebGLEnum.UNSIGNED_INT;
-    }
-    */
     glFormat = this.context.getParameter(WebGLEnum.IMPLEMENTATION_COLOR_READ_FORMAT);
     glType = this.context.getParameter(WebGLEnum.IMPLEMENTATION_COLOR_READ_TYPE);
     if (

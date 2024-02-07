@@ -714,7 +714,7 @@ export type TypedArrayConstructor<T extends TypedArray = any> = {
 };
 
 // @public
-export function unpackFloat3<T extends Number[] | Float32Array>(pk: number, result: T): void;
+export function unpackFloat3<T extends number[] | Float32Array>(pk: number, result: T): void;
 
 // @public
 export class Vector2 extends VectorBase {

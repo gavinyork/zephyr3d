@@ -1,5 +1,5 @@
 import { Vector3 } from "@zephyr3d/base";
-import { Texture2D, BindGroup, GPUProgram, RenderStateSet, TextureCube, VertexLayout } from "@zephyr3d/device";
+import type { Texture2D, BindGroup, GPUProgram, RenderStateSet, TextureCube, VertexLayout } from "@zephyr3d/device";
 import { Application } from "../app";
 import { gammaToLinear } from "../shaders/misc";
 

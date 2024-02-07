@@ -1,15 +1,16 @@
-import {
-  GPUResourceUsageFlags,
+import type {
   StructuredBuffer,
   IndexBuffer,
   VertexStepMode,
+  VertexSemantic} from './gpuobject';
+import {
+  GPUResourceUsageFlags,
   MAX_VERTEX_ATTRIBUTES,
   getVertexAttribByName,
-  VertexSemantic,
   getVertexBufferStride,
   getVertexBufferAttribType
 } from './gpuobject';
-import { PBArrayTypeInfo, PBPrimitiveTypeInfo } from './builder/types';
+import type { PBArrayTypeInfo, PBPrimitiveTypeInfo } from './builder/types';
 
 /**
  * Vertex buffer information

@@ -1,17 +1,19 @@
 /**
  * The OrderedStringSet class is used to create and manage an ordered set of strings.
  * It can be configured to allow or disallow duplicate strings based on a parameter passed to the constructor.
+ *
+ * @public
  */
-class OrderedStringSet {
+export class OrderedStringSet {
   private _items: string[];
   private _allowDuplicates: boolean;
 
   /**
    * Creates a new instance of the OrderedStringSet class.
-   * 
+   *
    * @param allowDuplicates - A boolean value indicating whether the set should allow duplicate strings.
    */
-  constructor(allowDuplicates: boolean = false) {
+  constructor(allowDuplicates = false) {
     this._items = [];
     this._allowDuplicates = allowDuplicates;
   }
@@ -25,7 +27,7 @@ class OrderedStringSet {
   /**
    * Uses binary search to find the correct insertion position for a string.
    * If duplicates are not allowed, it returns null for existing strings.
-   * 
+   *
    * @param str The string for which to find the insertion position.
    * @returns The position to insert the string, or null if the string exists and duplicates are not allowed.
    */
@@ -49,7 +51,7 @@ class OrderedStringSet {
 
   /**
    * Adds a new string to the set. If duplicates are not allowed and the string already exists, it is not added.
-   * 
+   *
    * @param str The string to add to the set.
    */
   public add(str: string): void {
@@ -63,7 +65,7 @@ class OrderedStringSet {
   /**
    * Removes the first occurrence of a specified string from the set using binary search.
    * If the string does not exist, no action is taken.
-   * 
+   *
    * @param str The string to remove from the set.
    */
   public remove(str: string): void {
@@ -84,11 +86,11 @@ class OrderedStringSet {
    * @param str - The string to be removed from the collection.
    */
   public removeAll(str: string): void {
-    let index = this.findStringPosition(str);
-  
+    const index = this.findStringPosition(str);
+
     // Return immediately if no matching element is found
     if (index === -1) return;
-  
+
     // After finding the first matching element, continue to search for all
     // consecutive matching elements
     let endIndex = index + 1;
@@ -113,7 +115,7 @@ class OrderedStringSet {
   /**
    * Uses binary search to find the index of a string in the set.
    * If the string exists, returns its index. Otherwise, returns -1.
-   * 
+   *
    * @param str The string to find in the set.
    * @returns The index of the string, or -1 if not found.
    */

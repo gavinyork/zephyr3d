@@ -477,7 +477,7 @@ export function createProgramFFT2V(limit?: 4|2) {
       });
     }
   });
-};
+}
 
 /** @internal */
 export function createProgramFFT2H(limit?: 4|2) {
@@ -566,4 +566,4 @@ export function createProgramFFT2H(limit?: 4|2) {
       });
     }
   });
-};
+}

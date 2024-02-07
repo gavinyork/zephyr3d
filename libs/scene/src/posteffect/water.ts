@@ -1,5 +1,6 @@
 import type { AbstractDevice, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, Texture2D } from "@zephyr3d/device";
-import { DrawContext, TemporalCache, WaterMesh } from "../render";
+import type { DrawContext} from "../render";
+import { TemporalCache, WaterMesh } from "../render";
 import { AbstractPostEffect } from "./posteffect";
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from "../shaders";
 import { Application } from "../app";
@@ -299,14 +300,9 @@ export class PostWater extends AbstractPostEffect {
     const reflCamera = new Camera(ctx.scene);
     reflCamera.framebuffer = fbRefl;
     Matrix4x4.multiply(matReflectionR, ctx.camera.worldMatrix).decompose(reflCamera.scale, reflCamera.rotation, reflCamera.position);
-    // Plane.transform(plane, reflCamera.viewMatrix, plane);
     reflCamera.setProjectionMatrix(ctx.camera.getProjectionMatrix());
     reflCamera.clipPlane = clipPlane;
-    // reflCamera.setProjectionMatrix(Matrix4x4.obliqueProjection(ctx.camera.getProjectionMatrix(), plane));
-    //const windowOrderReversed = device.isWindingOrderReversed();
-    //device.reverseVertexWindingOrder(true);
     reflCamera.render(ctx.scene, ctx.compositor);
-    //device.reverseVertexWindingOrder(windowOrderReversed);
     reflCamera.remove();
     this._renderingReflections = false;
 
@@ -361,7 +357,7 @@ export class PostWater extends AbstractPostEffect {
       const width = 128;
       const height = 64;
       this._rampTex = device.createTexture2D('rgba8unorm', width, height, {
-        noMipmap: true
+        samplerOptions: { mipFilter: 'none' }
       });
       const numTexels = width * height;
       const data = new Uint8Array(numTexels * 4);

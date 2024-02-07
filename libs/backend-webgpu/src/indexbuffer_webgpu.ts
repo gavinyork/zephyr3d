@@ -1,4 +1,5 @@
-import { PBPrimitiveTypeInfo, PBPrimitiveType, GPUResourceUsageFlags, IndexBuffer } from '@zephyr3d/device';
+import type { IndexBuffer } from '@zephyr3d/device';
+import { PBPrimitiveTypeInfo, PBPrimitiveType, GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGPUBuffer } from './buffer_webgpu';
 import type { WebGPUDevice } from './device';
 

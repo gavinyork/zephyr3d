@@ -1,4 +1,4 @@
-import {
+import type {
   BindGroup,
   TextureFormat,
   PBShaderExp,
@@ -7,9 +7,11 @@ import {
   FrameBuffer
 } from '@zephyr3d/device';
 import { ShadowImpl } from './shadow_impl';
-import { Blitter, BlitType } from '../blitter';
+import type { BlitType } from '../blitter';
+import { Blitter } from '../blitter';
 import { computeShadowMapDepth, filterShadowVSM } from '../shaders/shadow';
-import { ShadowMapParams, ShadowMapper, ShadowMapType, ShadowMode } from './shadowmapper';
+import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
+import { ShadowMapper } from './shadowmapper';
 import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encode2HalfToRGBA, nonLinearDepthToLinearNormalized } from '../shaders/misc';
 import { ShaderFramework } from '../shaders';
 import { Application } from '../app';

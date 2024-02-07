@@ -1,4 +1,5 @@
-import { Matrix4x4, Vector3, Vector4, ColorRGBA } from '@zephyr3d/base';
+import type { ColorRGBA } from '@zephyr3d/base';
+import { Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   type BindGroup,
   type RenderStateSet,
@@ -133,7 +134,7 @@ export class Renderer {
   /** @internal */
   createTexture(width: number, height: number, color: ColorRGBA, linear: boolean): Texture2D {
     const tex = this._device.createTexture2D(linear ? 'rgba8unorm' : 'rgba8unorm-srgb', width, height, {
-      noMipmap: true
+      samplerOptions: { mipFilter: 'none' }
     });
     if (color) {
       this.clearTexture(tex, color);

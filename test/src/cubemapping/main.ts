@@ -1,11 +1,14 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import {
+import type {
   TextureSampler,
   TextureCube,
   Texture2D,
   PBInsideFunctionScope,
   PBShaderExp
 } from '@zephyr3d/device';
+import type {
+  SceneNode,
+  Material} from '@zephyr3d/scene';
 import {
   Mesh,
   AssetManager,
@@ -20,8 +23,6 @@ import {
   ShaderFramework,
   Application,
   Tonemap,
-  SceneNode,
-  Material,
   BUILTIN_ASSET_TEST_CUBEMAP,
   PerspectiveCamera,
   SphereShape,

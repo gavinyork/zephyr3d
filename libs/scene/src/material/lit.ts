@@ -1,8 +1,8 @@
-import { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp, Texture2D, TextureSampler, VertexSemantic } from "@zephyr3d/device";
-import { Matrix4x4 } from "@zephyr3d/base";
+import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp, Texture2D, TextureSampler, VertexSemantic } from "@zephyr3d/device";
+import type { Matrix4x4 } from "@zephyr3d/base";
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT, RENDER_PASS_TYPE_FORWARD } from "../values";
 import { ShaderFramework, nonLinearDepthToLinear } from "../shaders";
-import { DrawContext } from "../render";
+import type { DrawContext } from "../render";
 import { Application } from "../app";
 import { MeshMaterial } from "./meshmaterial";
 

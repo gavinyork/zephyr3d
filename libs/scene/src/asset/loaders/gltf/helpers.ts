@@ -1,4 +1,4 @@
-import { Accessor, AccessorSparse } from './gltf';
+import type { Accessor, AccessorSparse } from './gltf';
 import type { TypedArray } from '@zephyr3d/base';
 import type { GLTFContent } from './gltf_loader';
 

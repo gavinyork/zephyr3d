@@ -39,7 +39,7 @@
 
 //---- Pack colors to BGRA8 instead of RGBA8 (if you needed to convert from one to another anyway)
 //#define IMGUI_USE_BGRA_PACKED_COLOR
-export const IMGUI_USE_BGRA_PACKED_COLOR: boolean = false;
+export const IMGUI_USE_BGRA_PACKED_COLOR = false;
 
 //---- Implement STB libraries in a namespace to avoid linkage conflicts (defaults to global namespace)
 //#define IMGUI_STB_NAMESPACE     ImGuiStb

@@ -1,8 +1,8 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, FPSCameraController, DirectionalLight, AssetManager, Application, Tonemap, GraphNode, PerspectiveCamera, Compositor, PostWater, FXAA, Terrain } from '@zephyr3d/scene';
+import { Scene, FPSCameraController, DirectionalLight, AssetManager, Application, Tonemap, GraphNode, PerspectiveCamera, Compositor, FXAA, Terrain } from '@zephyr3d/scene';
 import * as common from '../common';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
-import { Texture2D } from '@zephyr3d/device';
+import type { Texture2D } from '@zephyr3d/device';
 
 const terrainApp = new Application({
   backend: common.getBackend(),

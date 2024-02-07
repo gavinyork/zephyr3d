@@ -1,4 +1,5 @@
-import { Ray, Vector3, Vector4 } from '@zephyr3d/base';
+import type { Ray} from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import { BoundingBox } from '../../utility/bounding_volume';
 
 /** @internal */
@@ -93,10 +94,10 @@ export class HeightfieldBBoxTree {
     const tileSizeY = (this._rootNode.bbox.maxPoint.z - this._rootNode.bbox.minPoint.z) / (this._resY - 1);
     const x_unscale = x / tileSizeX;
     const y_unscale = y / tileSizeY;
-    let l = Math.floor(x_unscale);
-    let t = Math.floor(y_unscale);
-    let r = l + 1;
-    let b = t + 1;
+    const l = Math.floor(x_unscale);
+    const t = Math.floor(y_unscale);
+    const r = l + 1;
+    const b = t + 1;
     if (l < 0 || t < 0 || r >= this._resX || b >= this._resY) {
       return 0;
     }
@@ -202,8 +203,8 @@ export class HeightfieldBBoxTree {
       return null;
     }
     if (node.left && node.right) {
-      let l = this.rayIntersectR (ray, node.left);
-      let r = this.rayIntersectR (ray, node.right);
+      const l = this.rayIntersectR (ray, node.left);
+      const r = this.rayIntersectR (ray, node.right);
       if (l !== null && r !== null) {
         return l < r ? l : r;
       } else {

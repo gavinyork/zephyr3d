@@ -1,9 +1,10 @@
-import { Matrix4x4, Vector2, Vector4, nextPowerOf2 } from "@zephyr3d/base";
+import type { Matrix4x4, Vector4} from "@zephyr3d/base";
+import { Vector2, nextPowerOf2 } from "@zephyr3d/base";
 import { Primitive } from "../../render/primitive";
-import { BatchDrawable, Drawable, DrawContext } from "../../render/drawable";
-import { XForm } from "../xform";
+import type { BatchDrawable, Drawable, DrawContext } from "../../render/drawable";
+import type { XForm } from "../xform";
 import { GrassMaterial } from "../../material";
-import { QuadtreeNode } from "./quadtree";
+import type { QuadtreeNode } from "./quadtree";
 import { Application } from "../../app";
 import type { Camera } from "../../camera/camera";
 import type { AbstractDevice, IndexBuffer, StructuredBuffer, Texture2D } from "@zephyr3d/device";

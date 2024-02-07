@@ -1,5 +1,4 @@
-import {
-  genDefaultName,
+import type {
   BindGroup,
   VertexLayout,
   TextureSampler,
@@ -13,7 +12,9 @@ import {
   GPUDataBuffer,
   GPUProgram,
   GPUObject,
-  AbstractDevice,
+  AbstractDevice} from '@zephyr3d/device';
+import {
+  genDefaultName,
   DeviceGPUObjectRenameEvent
 } from '@zephyr3d/device';
 import type { WebGLDevice } from './device_webgl';

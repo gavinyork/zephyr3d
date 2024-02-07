@@ -16,9 +16,7 @@
     "clean": "shx rm -rf dist .tsbuildinfo",
     "tsc": "tsc -p . --noEmit",
     "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent",
-    "dev-test": "web-dev-server -r dist --open /",
-    "lint": "eslint src --ext .ts",
-    "lint-fix": "eslint src --ext .ts --fix"
+    "dev-test": "web-dev-server -r dist --open /"
   },
   "engines": {
     "node": ">=16.18.0"

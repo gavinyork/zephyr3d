@@ -4,7 +4,8 @@ import { RENDER_PASS_TYPE_SHADOWMAP, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_
 import { ShaderFramework } from '../shaders/framework';
 import { encodeColorOutput, encodeNormalizedFloatToRGBA, nonLinearDepthToLinearNormalized } from '../shaders/misc';
 import { Application } from '../app';
-import { TerrainLightModel, TerrainLightModelOptions } from './terrainlightmodel';
+import type { TerrainLightModelOptions } from './terrainlightmodel';
+import { TerrainLightModel } from './terrainlightmodel';
 import { MESH_MATERIAL } from '../shaders/builtins';
 import type { BindGroup, GPUProgram, PBGlobalScope, ProgramBuilder } from '@zephyr3d/device';
 import type { Vector4 } from '@zephyr3d/base';

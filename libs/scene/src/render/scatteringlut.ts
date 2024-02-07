@@ -1,4 +1,4 @@
-import type { AbstractDevice, VertexLayout, GPUProgram, RenderStateSet, Texture2D, TextureFormat, BindGroup, PBGlobalScope, ProgramBuilder, FrameBuffer, PBInsideFunctionScope, PBShaderExp } from "@zephyr3d/device";
+import type { AbstractDevice, VertexLayout, GPUProgram, RenderStateSet, Texture2D, TextureFormat, BindGroup, PBGlobalScope, FrameBuffer } from "@zephyr3d/device";
 import { Application } from "../app";
 import { Vector3 } from "@zephyr3d/base";
 
@@ -65,7 +65,7 @@ export class ScatteringLut {
           ? 'rgba16f'
           : 'rgba8unorm';
       this._multiScatteringLut = device.createTexture2D(format, this._multiScatteringLutWidth, this._multiScatteringLutHeight, {
-        noMipmap: true
+        samplerOptions: { mipFilter: 'none' }
       });
       this._multiScatteringLut.name = 'MultiScatteringLUT';
       const tLut = this.getTransmittanceLut();
@@ -91,7 +91,7 @@ export class ScatteringLut {
           : 'rgba8unorm';
         if (!this._aerialPerspectiveLut) {
           this._aerialPerspectiveLut = device.createTexture2D(format, this._aerialPerspectiveTextureWidth, this._aerialPerspectiveTextureHeight, {
-            noMipmap: true
+            samplerOptions: { mipFilter: 'none' }
           });
           this._aerialPerspectiveLut.name = 'AerialPerspectiveLUT';
         }
@@ -124,7 +124,7 @@ export class ScatteringLut {
             ? 'rgba16f'
             : 'rgba8unorm';
         const skyViewLut = device.createTexture2D(format, this._skyViewLutWidth, this._skyViewLutHeight, {
-          noMipmap: true
+          samplerOptions: { mipFilter: 'none' }
         });
         skyViewLut.name = 'SkyViewLut';
         this._skyViewFramebuffer = device.createFrameBuffer([skyViewLut], null);
@@ -153,7 +153,7 @@ export class ScatteringLut {
           ? 'rgba16f'
           : 'rgba8unorm';
       this._transmittanceLut = device.createTexture2D(format, this._transmittanceLutWidth, this._transmittanceLutHeight, {
-        noMipmap: true
+        samplerOptions: { mipFilter: 'none' }
       });
       this._transmittanceLut.name = 'TransmittanceLUT';
       const tempFramebuffer = device.createFrameBuffer([this._transmittanceLut], null);

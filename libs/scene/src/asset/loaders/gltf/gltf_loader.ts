@@ -1,10 +1,8 @@
-import { Vector3, Vector4, Matrix4x4, Quaternion, Interpolator, InterpolationMode, InterpolationTarget } from '@zephyr3d/base';
-import {
-  SharedModel,
+import type { InterpolationMode} from '@zephyr3d/base';
+import { Vector3, Vector4, Matrix4x4, Quaternion, Interpolator } from '@zephyr3d/base';
+import type {
   AssetHierarchyNode,
   AssetMeshData,
-  AssetSkeleton,
-  AssetScene,
   AssetAnimationData,
   AssetSubMeshData,
   AssetMaterial,
@@ -15,15 +13,19 @@ import {
   MaterialTextureInfo,
   AssetPBRMaterialCommon
 } from '../../model';
+import {
+  SharedModel,
+  AssetSkeleton,
+  AssetScene
+} from '../../model';
 import { BoundingBox } from '../../../utility/bounding_volume';
 import { Primitive } from '../../../render/primitive';
+import type {
+  Material as M} from '../../../material';
 import {
   UnlitMaterial,
-  Material as M,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
-  LambertMaterial,
-  BlinnMaterial
 } from '../../../material';
 import { ComponentType, GLTFAccessor } from './helpers';
 import { AbstractModelLoader } from '../loader';
@@ -40,7 +42,6 @@ import type {
 import type { AssetManager } from '../../assetmanager';
 import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf';
 import { Application } from '../../../app';
-import { TestLitMaterial } from '../../../material/lit';
 
 /** @internal */
 export interface GLTFContent extends GlTf {
@@ -856,7 +857,6 @@ export class GLTFLoader extends AbstractModelLoader {
       pbrMetallicRoughness = assetMaterial;
       // KHR_materials_specular extension
       const specularColorFactor = (materialInfo?.extensions?.KHR_materials_specular?.specularColorFactor ?? [1, 1, 1]) as [number, number, number];
-      const x = materialInfo?.extensions?.KHR_materials_specular?.specularColorFactor ?? [1, 1, 1];
       pbrMetallicRoughness.specularFactor = new Vector4(...specularColorFactor, materialInfo?.extensions?.KHR_materials_specular?.specularFactor ?? 1);
       pbrMetallicRoughness.specularMap = materialInfo?.extensions?.KHR_materials_specular?.specularTexture
         ? await this._loadTexture(gltf, materialInfo.extensions.KHR_materials_specular.specularTexture, false)

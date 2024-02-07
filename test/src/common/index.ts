@@ -1,9 +1,10 @@
 import { Vector2, Vector4 } from '@zephyr3d/base';
-import { SkyType, FogType, Scene, PunctualLight, AssetManager, Application, EnvLightType, GraphNode, ShadowMode, panoramaToCubemap, prefilterCubemap, Compositor, Tonemap, AbstractPostEffect, SAO, PostWater, Bloom, Camera, PerspectiveCamera } from '@zephyr3d/scene';
+import type { SkyType, FogType, Scene, EnvLightType, ShadowMode, Compositor, AbstractPostEffect, Camera} from '@zephyr3d/scene';
+import { PunctualLight, AssetManager, Application, GraphNode, panoramaToCubemap, prefilterCubemap, Tonemap, SAO, PostWater, Bloom, PerspectiveCamera } from '@zephyr3d/scene';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { ImGui } from '@zephyr3d/imgui';
-import { Texture2D, BaseTexture, DeviceBackend, FrameBuffer } from '@zephyr3d/device';
+import type { Texture2D, BaseTexture, DeviceBackend, FrameBuffer } from '@zephyr3d/device';
 import { TextureDrawer } from './textureview';
 
 export function getQueryString(name: string) {
@@ -437,7 +438,7 @@ export class Inspector {
             if (isHDR || isDDS) {
               this._assetManager.fetchTexture(url, {
                 mimeType: isHDR ? 'image/hdr' : 'image/dds',
-                noMipmap: true
+                samplerOptions: { mipFilter: 'none' }
               }).then(tex => {
                 if (tex.isTextureCube()) {
                   this._scene.env.sky.skyboxTexture = tex;
@@ -526,7 +527,7 @@ export class Inspector {
         }
         return val;
       }, 0, 180);
-      let vp = [0, 0, 0, 0] as [number, number, number, number];
+      const vp = [0, 0, 0, 0] as [number, number, number, number];
       if (camera.viewport) {
         vp[0] = camera.viewport[0];
         vp[1] = camera.viewport[1];
@@ -541,7 +542,7 @@ export class Inspector {
       if (ImGui.SliderInt4('Viewport', vp, 0, 4096)) {
         camera.viewport = vp;
       }
-      let window = [0, 0, 0, 0] as [number, number, number, number];
+      const window = [0, 0, 0, 0] as [number, number, number, number];
       if (camera.window) {
         window[0] = camera.window[0];
         window[1] = camera.window[1];
@@ -551,7 +552,6 @@ export class Inspector {
       if (ImGui.SliderFloat4('Window', window, 0, 1)) {
         if (window[0] || window[1] || window[2] || window[3]) {
           camera.window = window;
-          const m = camera.getProjectionMatrix();
         } else {
           camera.window = null;
         }
@@ -594,11 +594,11 @@ export class Inspector {
               const url = URL.createObjectURL(files[0]);
               this._assetManager.fetchTexture<Texture2D>(url, {
                 mimeType: 'image/hdr',
-                noMipmap: true
+                samplerOptions: { mipFilter: 'none' }
               }).then(tex => {
                 const skyMap = Application.instance.device.createCubeTexture('rgba16f', 512);
                 const radianceMap = Application.instance.device.createCubeTexture('rgba16f', 256);
-                const irradianceMap = Application.instance.device.createCubeTexture('rgba16f', 64, { noMipmap: true });
+                const irradianceMap = Application.instance.device.createCubeTexture('rgba16f', 64, { samplerOptions: { mipFilter: 'none' } });
                 panoramaToCubemap(tex, skyMap);
                 prefilterCubemap(skyMap, 'ggx', radianceMap);
                 prefilterCubemap(skyMap, 'lambertian', irradianceMap);
@@ -669,7 +669,7 @@ export class Inspector {
     const textureNameList = textureList.filter(tex => !tex.isTexture3D()).sort((a, b) => a.uid - b.uid).map(tex => this.textureToListName(tex));
     if (textureNameList.length > 0) {
       if (!this._framebuffer) {
-        const renderTarget = Application.instance.device.createTexture2D('rgba8unorm', 512, 512, { noMipmap: true });
+        const renderTarget = Application.instance.device.createTexture2D('rgba8unorm', 512, 512, { samplerOptions: { mipFilter: 'none' } });
         renderTarget.name = '!!textureviewer';
         this._framebuffer = Application.instance.device.createFrameBuffer([renderTarget], null);
         this._framebuffer.setColorAttachmentGenerateMipmaps(0, false);

@@ -1,7 +1,8 @@
+import type {
+  ASTExpression} from './ast';
 import {
   getTextureSampleType,
   ShaderPrecisionType,
-  ASTExpression,
   DeclareType,
   ASTPrimitive,
   ASTScalar,
@@ -14,8 +15,9 @@ import {
   ASTAssignment,
   ASTCast
 } from './ast';
+import type {
+  PBTypeInfo} from './types';
 import {
-  PBTypeInfo,
   PBPrimitiveType,
   PBPrimitiveTypeInfo,
   PBArrayTypeInfo,

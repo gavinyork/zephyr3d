@@ -1,7 +1,7 @@
 import { Matrix4x4, parseColor, Vector3, Vector4 } from "@zephyr3d/base";
 import { Font } from "./font";
 import { GlyphManager } from "./glyphmanager";
-import { RenderStateSet } from "../render_states";
+import type { RenderStateSet } from "../render_states";
 import type { AbstractDevice } from "../base_types";
 import type { BindGroup, GPUProgram, StructuredBuffer, VertexLayout } from "../gpuobject";
 
@@ -82,7 +82,7 @@ export class DrawText {
       device.setRenderStates(this.textRenderStates);
       device.setBindGroup(0, this.textBindGroup);
       let drawn = 0;
-      let total = text.length;
+      const total = text.length;
       while (drawn < total) {
         const count = Math.min(total - drawn, this.GLYPH_COUNT - this.textOffset);
         if (count > 0) {

@@ -1,6 +1,6 @@
 import type { IMeshMaterial } from "../meshmaterial";
 import type { PBFunctionScope, PBInsideFunctionScope } from "@zephyr3d/device";
-import { DrawContext } from "../../render";
+import type { DrawContext } from "../../render";
 import { RENDER_PASS_TYPE_FORWARD } from "../../values";
 
 export interface IMixinVertexColor {

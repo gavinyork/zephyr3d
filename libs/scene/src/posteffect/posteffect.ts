@@ -96,7 +96,7 @@ export abstract class AbstractPostEffect {
     }
     if (!fb.framebuffer) {
       const colorTex = device.createTexture2D(format, width, height, {
-        noMipmap: true,
+        samplerOptions: { mipFilter: 'none' }
       });
       colorTex.name = `Intermediate-<${name}>`
       let depthTex: BaseTexture = null;

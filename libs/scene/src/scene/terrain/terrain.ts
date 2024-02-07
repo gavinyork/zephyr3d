@@ -1,12 +1,13 @@
-import { Ray, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
-import { RenderStateSet, Texture2D } from '@zephyr3d/device';
+import type { Ray} from '@zephyr3d/base';
+import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import type { RenderStateSet, Texture2D } from '@zephyr3d/device';
 import { Quadtree } from './quadtree';
 import { MAX_DETAIL_TEXTURE_LEVELS, TerrainMaterial } from '../../material/terrainmaterial';
 import { GraphNode } from '../graph_node';
 import { Application } from '../../app';
 import { GrassManager } from './grass';
 import { GrassMaterial } from '../../material/grassmaterial';
-import { TerrainLightModelOptions } from '../../material/terrainlightmodel';
+import type { TerrainLightModelOptions } from '../../material/terrainlightmodel';
 import type { Camera } from '../../camera/camera';
 import type { BoundingVolume } from '../../utility/bounding_volume';
 import type { CullVisitor } from '../../render/cull_visitor';

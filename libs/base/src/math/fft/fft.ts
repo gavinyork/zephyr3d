@@ -1,4 +1,5 @@
-import { add, complex, Complex, eix, mult, scale } from './complex';
+import type { Complex} from './complex';
+import { add, complex, eix, mult, scale } from './complex';
 
 /**
  * Discrete fourier transform

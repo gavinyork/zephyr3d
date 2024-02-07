@@ -1,5 +1,5 @@
 import { WebGPUDevice } from "./device";
-import { DeviceBackend, DeviceEventMap } from "@zephyr3d/device";
+import type { DeviceBackend, DeviceEventMap } from "@zephyr3d/device";
 import { makeEventTarget } from "@zephyr3d/base";
 
 /**

@@ -1,4 +1,5 @@
-import { Matrix4x4, Quaternion, Vector3, Vector4, TypedArray, Interpolator } from '@zephyr3d/base';
+import type { Vector4, TypedArray, Interpolator } from '@zephyr3d/base';
+import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { Texture2D, TextureSampler } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
 import type { Material } from '../material';

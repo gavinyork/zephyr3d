@@ -1,5 +1,5 @@
 import { Quaternion } from './vector';
-import { TypedArray } from '../utils';
+import type { TypedArray } from '../utils';
 
 /**
  * The interpolation mode

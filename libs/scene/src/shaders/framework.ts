@@ -1,5 +1,5 @@
 import { Vector4 } from "@zephyr3d/base";
-import { DrawContext } from "../render/drawable";
+import type { DrawContext } from "../render/drawable";
 import { MAX_CLUSTERED_LIGHTS, RENDER_PASS_TYPE_DEPTH_ONLY, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP } from "../values";
 import { Application } from "../app";
 import { ScatteringLut } from "../render/scatteringlut";

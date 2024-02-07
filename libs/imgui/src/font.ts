@@ -1,4 +1,4 @@
-import { ImFont, ImFontGlyph } from './imgui'
+import type { ImFont, ImFontGlyph } from './imgui'
 import { Texture } from './imgui_impl';
 
 const FONT_SPACE=3;
@@ -7,7 +7,7 @@ export class TexturePage
 {
     constructor(tex_size:number, font:ImFont, fontScale: number)
     {
-        let font_size=font.FontSize;
+        const font_size=font.FontSize;
         this.FontName= font.FontStyle + " " + font_size + "px " + font.FontName;
         this.Scale=fontScale;
         this.TextureSize=tex_size;
@@ -51,7 +51,7 @@ export class TexturePage
       ctx.font=this.FontName;
       ctx.clearRect(0,0,image_size,image_size);
       ctx.scale(this.Scale, this.Scale);
-      let m=ctx.measureText(text);
+      const m=ctx.measureText(text);
       ctx.fillText(text, 1, 1);
       //ctx.strokeRect(0,0,image_size-FONT_SPACE, image_size-FONT_SPACE);
       ctx.restore();
@@ -68,13 +68,13 @@ export class TexturePage
               //this.PixelData[(py+y)*this.TextureSize*4+px*4+x*4+3]=(img_data_u32[y*image_size+x]>>24)&0xFF;
           }
       }
-      let w=m.width<this.FontSize?m.width:m.actualBoundingBoxRight-m.actualBoundingBoxLeft;
+      const w=m.width<this.FontSize?m.width:m.actualBoundingBoxRight-m.actualBoundingBoxLeft;
       glyph.X0=0;
       glyph.Y0=this.Descent;
       glyph.X1=w+2;
       glyph.Y1=this.FontSize;
       glyph.AdvanceX=(w)+(glyph.Char<256?this.SpaceX[0]:this.SpaceX[1]);
-      let uv_scale=1.0/(this.TextureSize);
+      const uv_scale=1.0/(this.TextureSize);
       glyph.U0=(px)*uv_scale;
       glyph.V0=(py+this.Ascent*this.Scale)*uv_scale;
       glyph.U1=(px+(w+2)*this.Scale)*uv_scale;
@@ -102,17 +102,17 @@ export class TexturePage
     MaxCharCount:number;
     CharsPerRow:number;
     Texture:Texture;
-    Dirty:boolean=false;
+    Dirty=false;
     SpaceX:number[];
-    Ascent:number=0;
-    Descent:number=0;
+    Ascent=0;
+    Descent=0;
 }
 
 export class Font
 {
     constructor()
     {
-        let canvas=document.createElement("canvas");
+        const canvas=document.createElement("canvas");
         canvas.style.backgroundColor="transparent";
         canvas.style.position='absolute';
         canvas.style.top='0px';
@@ -135,7 +135,7 @@ export class Font
     Create(glyph: ImFontGlyph, font:ImFont, fontScale:number):ImFontGlyph
     {
         let page: TexturePage = null;
-        for(let page2 of this.texturePage)   {
+        for(const page2 of this.texturePage)   {
             if(page2.FontSize==font.FontSize&&page2.IsAvailable)  {
                 page=page2;
                 break;
@@ -166,5 +166,5 @@ export class Font
     texturePage:TexturePage[]=[];
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
-    dirty:boolean=false;
+    dirty=false;
 }

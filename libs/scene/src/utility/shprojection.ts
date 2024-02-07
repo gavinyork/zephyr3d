@@ -1,7 +1,8 @@
 import { halfToFloat, nextPowerOf2, SH, unpackFloat3, Vector3 } from "@zephyr3d/base";
-import { BindGroup, Texture2D, GPUProgram, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, RenderStateSet, TextureCube, VertexLayout } from "@zephyr3d/device";
+import type { BindGroup, Texture2D, GPUProgram, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, RenderStateSet, TextureCube, VertexLayout } from "@zephyr3d/device";
 import { Application } from "../app";
-import { Blitter, BlitType, CopyBlitter } from "../blitter";
+import type { BlitType} from "../blitter";
+import { Blitter, CopyBlitter } from "../blitter";
 
 class ReduceBlitter extends Blitter {
   protected _width: number;
@@ -175,18 +176,18 @@ function createProjectionProgram(): GPUProgram {
 
 async function doProjectCubemap(srcTexture: TextureCube, coeff: number): Promise<Vector3> {
   const device = Application.instance.device;
-  let result = Vector3.zero();
+  const result = Vector3.zero();
   let w = nextPowerOf2(srcTexture.width);
   if (w > srcTexture.width) {
     w = w >> 1;
   }
   const tmpTextures: Texture2D[] = [];
   while (w > 0) {
-    tmpTextures.push(device.createTexture2D('rgba32f', w, w, { noMipmap: true }));
+    tmpTextures.push(device.createTexture2D('rgba32f', w, w, { samplerOptions: { mipFilter: 'none' } }));
     w = w >> 1;
   }
   for (let i = 0; i < 6; i++) {
-    let dstTex = tmpTextures[0];//device.createTexture2D('rgba32f', srcTexture.width, w);
+    const dstTex = tmpTextures[0];//device.createTexture2D('rgba32f', srcTexture.width, w);
     const framebuffer = device.createFrameBuffer([dstTex], null);
     framebuffer.setColorAttachmentGenerateMipmaps(0, false);
     device.setVertexLayout(vertexLayout);
@@ -241,7 +242,7 @@ async function doProjectCubemap(srcTexture: TextureCube, coeff: number): Promise
  */
 export async function projectCubemap(tex: TextureCube): Promise<Vector3[]> {
   const device = Application.instance.device;
-  let srcTex = tex;
+  const srcTex = tex;
   if (!device.getDeviceCaps().textureCaps.supportFloatColorBuffer) {
     throw new Error(`projectCubemap(): device does not support rendering to float color buffer`);
   }
@@ -312,7 +313,7 @@ export async function projectCubemapCPU(input: TextureCube): Promise<Vector3[]> 
   const device = Application.instance.device;
   if (device.getDeviceCaps().textureCaps.supportFloatColorBuffer && input.format === 'rgba16f' && device.type === 'webgl') {
     const dstTex = device.createCubeTexture('rgba32f', input.width, {
-      noMipmap: true,
+      samplerOptions: { mipFilter: 'none' }
     });
     const blitter = new CopyBlitter();
     blitter.blit(input, dstTex);

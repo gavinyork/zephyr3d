@@ -1,5 +1,6 @@
-import { Matrix4x4, Vector3 } from './vector';
-import { AABB } from './aabb';
+import type { Matrix4x4} from './vector';
+import { Vector3 } from './vector';
+import type { AABB } from './aabb';
 
 // reduce GC
 const tmpV0 = new Vector3();

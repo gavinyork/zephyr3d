@@ -69,7 +69,7 @@ export abstract class AbstractTextureLoader extends LoaderBase {
    * @param mimeType - MIME type for the texture image data
    * @param data - The texture image data
    * @param srgb - true if the texture is of sRGB format
-   * @param noMipmap - true if mipmap needn't to be generated for the texture
+   * @param samplerOptions - Sampler options of the texture
    * @param texture - if not null, this is a texture restore operation
    * @returns The loaded texture
    */

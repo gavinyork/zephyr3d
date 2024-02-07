@@ -1,7 +1,8 @@
-import { Vector4, TypedArray, IEventTarget } from '@zephyr3d/base';
-import { CPUTimer, ITimer } from './timer';
+import type { Vector4, TypedArray, IEventTarget } from '@zephyr3d/base';
+import type { ITimer } from './timer';
+import { CPUTimer } from './timer';
 import type { RenderStateSet } from './render_states';
-import {
+import type {
   FrameBufferOptions,
   SamplerOptions,
   TextureSampler,
@@ -23,21 +24,26 @@ import {
   Texture2DArray,
   TextureCreationOptions,
   BufferCreationOptions,
-  GPUResourceUsageFlags,
   BufferUsage,
   VertexSemantic,
   VertexAttribFormat,
-  makeVertexBufferType,
-  getVertexFormatSize,
-  getVertexAttribFormat,
   VertexLayoutOptions,
   BaseTexture
 } from './gpuobject';
-import { PBComputeOptions, PBRenderOptions, PBStructTypeInfo, ProgramBuilder } from './builder';
+import {
+  GPUResourceUsageFlags,
+  makeVertexBufferType,
+  getVertexFormatSize,
+  getVertexAttribFormat
+} from './gpuobject';
+import type { PBComputeOptions, PBRenderOptions, PBStructTypeInfo} from './builder';
+import { ProgramBuilder } from './builder';
 import {
   DeviceResizeEvent,
   DeviceGPUObjectAddedEvent,
-  DeviceGPUObjectRemovedEvent,
+  DeviceGPUObjectRemovedEvent
+} from './base_types';
+import type { DataType, PrimitiveType, TextureFormat ,
   GPUObjectList,
   FrameInfo,
   DeviceCaps,
@@ -47,7 +53,6 @@ import {
   DeviceEventMap,
   DeviceViewport
 } from './base_types';
-import type { DataType, PrimitiveType, TextureFormat } from './base_types';
 import { DrawText } from './helpers';
 
 /**
@@ -62,6 +67,7 @@ export interface DeviceBackend {
 
 type DeviceState = {
   framebuffer: FrameBuffer;
+  windowOrderReversed: boolean;
   viewport: DeviceViewport;
   scissor: DeviceViewport;
   renderStateSet: RenderStateSet;
@@ -173,7 +179,6 @@ export abstract class BaseDevice {
   ): Texture2DArray;
   abstract createTexture2DArrayFromMipmapData(
     data: TextureMipmapData,
-    sRGB: boolean,
     options?: TextureCreationOptions
   ): Texture2DArray;
   abstract createTexture2DArrayFromImages(
@@ -442,6 +447,7 @@ export abstract class BaseDevice {
   }
   pushDeviceStates() {
     this._stateStack.push({
+      windowOrderReversed: this.isWindingOrderReversed(),
       framebuffer: this.getFramebuffer(),
       viewport: this.getViewport(),
       scissor: this.getScissor(),
@@ -466,6 +472,7 @@ export abstract class BaseDevice {
       this.setBindGroup(1, ...top.bindGroups[1]);
       this.setBindGroup(2, ...top.bindGroups[2]);
       this.setBindGroup(3, ...top.bindGroups[3]);
+      this.reverseVertexWindingOrder(top.windowOrderReversed);
     }
   }
   getGPUObjects(): GPUObjectList {
@@ -650,9 +657,9 @@ export abstract class BaseDevice {
     return;
   }
   protected parseTextureOptions(options?: TextureCreationOptions): number {
-    const noMipmapFlag = !!options?.noMipmap ? GPUResourceUsageFlags.TF_NO_MIPMAP : 0;
-    const writableFlag = !!options?.writable ? GPUResourceUsageFlags.TF_WRITABLE : 0;
-    const dynamicFlag = !!options?.dynamic ? GPUResourceUsageFlags.DYNAMIC : 0;
+    const noMipmapFlag = options?.samplerOptions?.mipFilter === 'none' ? GPUResourceUsageFlags.TF_NO_MIPMAP : 0;
+    const writableFlag = options?.writable ? GPUResourceUsageFlags.TF_WRITABLE : 0;
+    const dynamicFlag = options?.dynamic ? GPUResourceUsageFlags.DYNAMIC : 0;
     return noMipmapFlag | writableFlag | dynamicFlag;
   }
   protected parseBufferOptions(options: BufferCreationOptions, defaultUsage?: BufferUsage): number {
@@ -693,4 +700,4 @@ export abstract class BaseDevice {
  * Merge event target interface
  * @public
  */
-export interface BaseDevice extends IEventTarget<DeviceEventMap> {};
+export interface BaseDevice extends IEventTarget<DeviceEventMap> {}

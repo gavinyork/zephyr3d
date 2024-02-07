@@ -3,7 +3,7 @@
  */
 
 import { AABB, ClipState, Matrix4x4, Vector2, Vector3 } from "@zephyr3d/base";
-import { Camera } from "../camera";
+import type { Camera } from "../camera";
 import { Primitive } from "./primitive";
 
 const tmpAABB = new AABB();
@@ -168,7 +168,7 @@ export class Clipmap {
     const patchVertResolution = this._tileResolution + 1;
     const vertices = new Float32Array(patchVertResolution * 8 * 3);
     let n = 0;
-    let offset = this._tileResolution;
+    const offset = this._tileResolution;
     for (let i = 0; i < patchVertResolution; i++) {
       vertices[n++] = offset + i + 1;
       vertices[n++] = 0;
@@ -247,7 +247,7 @@ export class Clipmap {
       vertices[n++] = clipmapVertResolution - i - d;
       vertices[n++] = 0;
     }
-    let startOfHorizonal = n / 3;
+    const startOfHorizonal = n / 3;
     for (let i = 0; i < clipmapVertResolution; i++) {
       vertices[n++] = i + 1 - d;
       vertices[n++] = 0 - d;
@@ -295,7 +295,7 @@ export class Clipmap {
       vertices[n++] = 1;
       vertices[n++] = 0;
     }
-    let startOfVertical = n / 3;
+    const startOfVertical = n / 3;
     for (let i = 0; i < patchVertResolution * 2; i++) {
       vertices[n++] = 0;
       vertices[n++] = i - this._tileResolution;

@@ -2,8 +2,8 @@ import { applyMaterialMixins } from './meshmaterial';
 import { LitMaterial } from './lit';
 import { mixinVertexColor } from './mixins/vertexcolor';
 import { mixinAlbedoColor } from './mixins/albedocolor';
-import { BindGroup, PBFunctionScope } from '@zephyr3d/device';
-import { DrawContext } from '../render';
+import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
+import type { DrawContext } from '../render';
 
 export class BlinnMaterial extends applyMaterialMixins(LitMaterial, mixinVertexColor, mixinAlbedoColor) {
   private _shininess: number;

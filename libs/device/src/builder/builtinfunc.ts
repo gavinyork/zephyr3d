@@ -1,5 +1,6 @@
 import * as typeinfo from './types';
-import { ASTExpression, ASTUnaryFunc, ASTBinaryFunc, ASTFunction, ASTFunctionParameter, ASTAddressOf, ASTScalar } from './ast';
+import type { ASTExpression} from './ast';
+import { ASTUnaryFunc, ASTBinaryFunc, ASTFunction, ASTAddressOf, ASTScalar } from './ast';
 import { PBShaderExp } from './base';
 import {
   PBDeviceNotSupport,

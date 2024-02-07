@@ -1,5 +1,5 @@
 import { Matrix4x4, Vector3, nextPowerOf2 } from '@zephyr3d/base';
-import { SkinnedBoundingBox } from './animation';
+import type { SkinnedBoundingBox } from './animation';
 import { Application } from '../app';
 import type { Texture2D } from '@zephyr3d/device';
 import type { SceneNode } from '../scene/scene_node';
@@ -125,7 +125,6 @@ export class Skeleton {
   private _createJointTexture() {
     const textureWidth = nextPowerOf2(Math.max(4, Math.ceil(Math.sqrt(this._joints.length * 4))));
     this._jointTexture = Application.instance.device.createTexture2D('rgba32f', textureWidth, textureWidth, {
-      noMipmap: true,
       samplerOptions: {
         magFilter: 'nearest',
         minFilter: 'nearest',

@@ -1,5 +1,4 @@
-import { BufferCreationOptions,
-  GPUResourceUsageFlags,
+import type { BufferCreationOptions,
   StructuredValue,
   TextureVideo,
   PBStructTypeInfo,
@@ -8,17 +7,19 @@ import { BufferCreationOptions,
   TextureSampler,
   BindGroup,
   BindGroupLayoutEntry,
-  StructuredBuffer,
   GPUDataBuffer
 } from '@zephyr3d/device';
+import {
+  GPUResourceUsageFlags,
+} from '@zephyr3d/device';
 import { WebGPUStructuredBuffer } from './structuredbuffer_webgpu';
-import { WebGPUBaseTexture } from './basetexture_webgpu';
-import { WebGPUTextureVideo } from './texturevideo_webgpu';
-import { WebGPUTextureSampler } from './sampler_webgpu';
+import type { WebGPUBaseTexture } from './basetexture_webgpu';
+import type { WebGPUTextureVideo } from './texturevideo_webgpu';
+import type { WebGPUTextureSampler } from './sampler_webgpu';
 import { WebGPUObject } from './gpuobject_webgpu';
 import type { TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
-import { WebGPUBuffer } from './buffer_webgpu';
+import type { WebGPUBuffer } from './buffer_webgpu';
 
 export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup {
   private _layout: BindGroupLayout;

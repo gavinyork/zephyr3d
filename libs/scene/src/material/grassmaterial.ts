@@ -1,4 +1,4 @@
-import { Texture2D, BindGroup, GPUProgram, ProgramBuilder } from '@zephyr3d/device';
+import type { Texture2D, BindGroup, GPUProgram, ProgramBuilder } from '@zephyr3d/device';
 import { Material } from './material';
 import { forwardComputeLighting } from '../shaders/lighting';
 import { RENDER_PASS_TYPE_SHADOWMAP, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_DEPTH_ONLY } from '../values';

@@ -13,7 +13,7 @@ import {
   BoxShape
 } from '@zephyr3d/scene';
 import * as common from '../common';
-import { Texture2D } from '@zephyr3d/device';
+import type { Texture2D } from '@zephyr3d/device';
 
 const instancingApp = new Application({
   backend: common.getBackend(),
@@ -30,7 +30,7 @@ instancingApp.ready().then(async () => {
 
   const assetManager = new AssetManager();
   const radianceMap = device.createCubeTexture('rgba16f', 256);
-  const irradianceMap = device.createCubeTexture('rgba16f', 64, { noMipmap: true });
+  const irradianceMap = device.createCubeTexture('rgba16f', 64, { samplerOptions: { mipFilter: 'none' } });
   const skyMap = device.createCubeTexture('rgba16f', 512);
   const hdrTex = await assetManager.fetchTexture<Texture2D>(`./assets/images/environments/papermill.hdr`);
   panoramaToCubemap(hdrTex, skyMap);

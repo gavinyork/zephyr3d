@@ -1,4 +1,5 @@
-import { AABB, TypedArray, Vector3, Matrix4x4, Ray } from '@zephyr3d/base';
+import type { TypedArray, Matrix4x4, Ray } from '@zephyr3d/base';
+import { AABB, Vector3 } from '@zephyr3d/base';
 import type { PrimitiveType } from '@zephyr3d/device';
 
 interface PrimitivesInfo {

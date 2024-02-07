@@ -1,7 +1,8 @@
 import { Matrix4x4, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
-import { DeviceBackend, DrawText } from '@zephyr3d/device';
+import type { DeviceBackend} from '@zephyr3d/device';
+import { DrawText } from '@zephyr3d/device';
 
 (async function() {
   const backendsMap: Record<string, DeviceBackend> = {

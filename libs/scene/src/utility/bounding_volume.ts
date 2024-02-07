@@ -1,4 +1,5 @@
-import { Vector3, Matrix4x4, Frustum, AABB, Plane, ClipState } from '@zephyr3d/base';
+import type { Vector3, Matrix4x4, Plane} from '@zephyr3d/base';
+import { Frustum, AABB, ClipState } from '@zephyr3d/base';
 import { AABBTree } from './aabbtree';
 
 /**

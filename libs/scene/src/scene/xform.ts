@@ -1,4 +1,5 @@
-import { Vector3, Matrix4x4, ObservableVector3, ObservableQuaternion, Quaternion, Vector4 } from '@zephyr3d/base';
+import type { Quaternion} from '@zephyr3d/base';
+import { Vector3, Matrix4x4, ObservableVector3, ObservableQuaternion, Vector4 } from '@zephyr3d/base';
 
 /**
  * Presents a transformation from one space to another

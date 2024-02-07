@@ -1,16 +1,16 @@
-import { ImGui, imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
+import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { floatToHalf, halfToFloat, unpackFloat3, Vector4 } from '@zephyr3d/base';
 import { AssetManager, Application } from '@zephyr3d/scene';
 import * as common from '../common';
 import { TestTexture2D, TestTexture2DArray, TestTexture3D, TestTextureCube, TestTextureCubeSH, TestTextureVideo } from './case';
 import { packFloat3 } from '@zephyr3d/base';
 
-let test2D = true;
-let test3D = true;
-let testCube = true;
-let testCubeSH = true;
-let test2DArray = true;
-let testVideo = true;
+const test2D = true;
+const test3D = true;
+const testCube = true;
+const testCubeSH = true;
+const test2DArray = true;
+const testVideo = true;
 
 const testValues = [
   [1, 1, 1],
@@ -57,8 +57,8 @@ textureApp.ready().then(async () => {
   textureApp.inputManager.use(imGuiInjectEvent);
   const assetManager = new AssetManager();
   function getSubViewport(index: number) {
-    let width = (device.deviceToScreen(device.getDrawingBufferWidth()) / 3) >> 0;
-    let height = (device.deviceToScreen(device.getDrawingBufferHeight()) / 2) >> 0;
+    const width = (device.deviceToScreen(device.getDrawingBufferWidth()) / 3) >> 0;
+    const height = (device.deviceToScreen(device.getDrawingBufferHeight()) / 2) >> 0;
     return [(index % 3) * width, ((index / 3) >> 0) * height, width, height];
   }
   const case2d = new TestTexture2D(assetManager);

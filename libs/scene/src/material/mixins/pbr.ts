@@ -1,11 +1,12 @@
-import { Matrix4x4, Vector3, Vector4 } from "@zephyr3d/base";
+import type { Vector3} from "@zephyr3d/base";
+import { Vector4 } from "@zephyr3d/base";
 import { applyMaterialMixins, type IMeshMaterial } from "../meshmaterial";
 import { Application } from "../../app";
 import { RENDER_PASS_TYPE_FORWARD } from "../../values";
 import { mixinTextureProps } from "./texture";
+import { ShaderFramework } from "../../shaders";
 import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp, ProgramBuilder, Texture2D } from "@zephyr3d/device";
 import type { DrawContext } from "../../render";
-import { ShaderFramework } from "../../shaders";
 
 let ggxLut: Texture2D = null;
 function getGGXLUT() {
@@ -148,7 +149,7 @@ function createGGXLUT(size: number) {
   const rs = device.createRenderStateSet();
   rs.useRasterizerState().setCullMode('none');
   rs.useDepthState().enableTest(false).enableWrite(false);
-  const tex = device.createTexture2D('rgba8unorm', size, size, { noMipmap: true });
+  const tex = device.createTexture2D('rgba8unorm', size, size, { samplerOptions: { mipFilter: 'none' } });
   tex.name = 'GGXLUT';
   const fb = device.createFrameBuffer([tex], null);
   device.pushDeviceStates();

@@ -11,8 +11,6 @@ const texture = device.createTexture2D('rgba8unorm', 256, 256);
 
 // 给定像素格式和宽高，创建2D纹理并指定采样设置
 const texture = device.createTexture2D('rgba8unorm', 256, 256, {
-  // 如果为true，不包含mipmap，默认为false
-  noMipmap: true,
   // 采样设置
   samplerOptions: {
     magFilter: 'nearest',
@@ -25,7 +23,7 @@ const texture = device.createTexture2D('rgba8unorm', 256, 256, {
 
 // 给定像素格式和宽高，创建可写入的2D纹理(仅WebGPU)
 const texture = device.createTexture2D('rgba8unorm', 256, 256, {
-  noMipmap: true,
+  samplerOptions: { mipFilter: 'none' },
   writable: true
 });
 

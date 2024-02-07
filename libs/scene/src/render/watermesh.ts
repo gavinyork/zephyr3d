@@ -1,9 +1,10 @@
 import { Vector2, Vector3, Vector4, PRNG } from '@zephyr3d/base'
-import { AbstractDevice, GPUProgram, BindGroup, Texture2D, FrameBuffer, TextureSampler, TextureFormat, RenderStateSet } from '@zephyr3d/device';
+import type { AbstractDevice, GPUProgram, BindGroup, Texture2D, FrameBuffer, TextureSampler, TextureFormat, RenderStateSet } from '@zephyr3d/device';
 import { Application } from '../app';
 import { Clipmap } from './clipmap';
 import { Primitive } from './primitive';
-import { createProgramH0, createProgramHk, createProgramFFT2H, createProgramFFT2V, createProgramOcean, createProgramPostFFT2, WaterShaderImpl } from '../shaders/water';
+import type { WaterShaderImpl } from '../shaders/water';
+import { createProgramH0, createProgramHk, createProgramFFT2H, createProgramFFT2V, createProgramOcean, createProgramPostFFT2 } from '../shaders/water';
 import type { Camera } from '../camera';
 
 /** @internal */
@@ -477,7 +478,7 @@ export class WaterMesh {
     if (this._resolutionChanged) {
       this.disposeInstanceData();
     }
-    if (true || this._paramsChanged) {
+    if (this._paramsChanged) {
       this.generateInitialSpectrum();
     }
     this._resolutionChanged = false;
@@ -747,7 +748,7 @@ export class WaterMesh {
   }
   private createNTextures(device: AbstractDevice, format: TextureFormat, size: number, num: number, name: string, linear: boolean): Texture2D[] {
     return Array.from({length: num}).map((val, index) => {
-      const tex = device.createTexture2D(format, size ,size, { noMipmap: true })
+      const tex = device.createTexture2D(format, size ,size, { samplerOptions: { mipFilter: 'none' } })
       tex.name = `${name}-${index}`;
       tex.samplerOptions = {
         minFilter: linear ? 'linear' : 'nearest',
@@ -823,7 +824,7 @@ export class WaterMesh {
     const device = Application.instance.device;
     let tex = WaterMesh._globals.butterflyTextures.get(size);
     if (!tex) {
-      tex = device.createTexture2D('rgba32f', Math.log2(size), size, { noMipmap: true });
+      tex = device.createTexture2D('rgba32f', Math.log2(size), size, { samplerOptions: { mipFilter: 'none' } });
       tex.name = `butterfly${size}`;
       tex.update(this.createButterflyTexture(size), 0, 0, tex.width, tex.height);
       WaterMesh._globals.butterflyTextures.set(size, tex);
@@ -856,7 +857,7 @@ export class WaterMesh {
     const device = Application.instance.device;
     let tex = WaterMesh._globals.noiseTextures.get(size);
     if (!tex) {
-      tex = device.createTexture2D(device.type === 'webgl' ? 'rgba32f' : 'rg32f', size, size, { noMipmap: true });
+      tex = device.createTexture2D(device.type === 'webgl' ? 'rgba32f' : 'rg32f', size, size, { samplerOptions: { mipFilter: 'none' } });
       tex.name = `noiseTex${size}`;
       tex.update(this.getNoise2d(size, randomSeed, device.type === 'webgl'), 0, 0, size, size);
       WaterMesh._globals.noiseTextures.set(size, tex);

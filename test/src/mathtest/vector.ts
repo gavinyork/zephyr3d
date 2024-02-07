@@ -1,4 +1,5 @@
-import { Vector2, Vector3, Vector4, Quaternion, Matrix3x3, Matrix4x4 } from '@zephyr3d/base';
+import type { Vector2} from '@zephyr3d/base';
+import { Vector3, Vector4, Quaternion, Matrix3x3, Matrix4x4 } from '@zephyr3d/base';
 import { XForm } from '@zephyr3d/scene';
 import { assert, rand, randInt, randNonZero, numberEquals } from './common';
 
@@ -142,10 +143,6 @@ export function testVectorType(c: VectorConstructor, size: 2 | 3 | 4 | 16) {
 }
 
 export function testQuaternion() {
-  function randQuaternion() {
-    const q = new Quaternion(rand(), rand(), rand(), rand());
-    return q.inplaceNormalize();
-  }
   (function testConstructor() {
     const q1 = new Quaternion();
     assert(q1.x === 0 && q1.y === 0 && q1.z === 0 && q1.w === 1, 'default constructor failed');
@@ -247,7 +244,7 @@ export function testQuaternion() {
       const mat = mats[i];
       const v = Quaternion.fromEulerAngle(angle1, angle2, angle3, order).toEulerAngles();
       Quaternion.fromEulerAngle(v.x, v.y, v.z, order).toMatrix3x3(testMat);
-      if(testMat.equalsTo(mat)) { console.log(`to Euler angles: ${order}`); };
+      if(testMat.equalsTo(mat)) { console.log(`to Euler angles: ${order}`); }
     }
   })();
   (function testSlerp() {

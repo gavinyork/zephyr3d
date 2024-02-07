@@ -1,5 +1,5 @@
-import { WebGPUProgram } from './gpuprogram_webgpu';
-import { WebGPUBindGroup } from './bindgroup_webgpu';
+import type { WebGPUProgram } from './gpuprogram_webgpu';
+import type { WebGPUBindGroup } from './bindgroup_webgpu';
 import { WebGPUMipmapGenerator } from './utils_webgpu';
 import type { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPUBuffer } from './buffer_webgpu';

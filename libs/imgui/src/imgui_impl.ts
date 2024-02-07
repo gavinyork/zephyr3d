@@ -1,18 +1,19 @@
-import { AbstractDevice, GlyphManager, Texture2D, Font as DeviceFont } from '@zephyr3d/device';
+import type { AbstractDevice, Texture2D} from '@zephyr3d/device';
+import { GlyphManager, Font as DeviceFont } from '@zephyr3d/device';
 import { Renderer } from './renderer';
-import { Font } from "./font";
+import type { Font } from "./font";
 import * as ImGui from "./imgui";
 import * as Input from "./input";
 import { Vector4 } from '@zephyr3d/base';
 
-let clipboard_text: string = "";
+let clipboard_text = "";
 let renderer: Renderer = null;
-let prev_time: number = 0;
+let prev_time = 0;
 let g_FontTexture: Texture2D = null;
 let glyphManager: GlyphManager = null;
-let fonts: Record<string, DeviceFont> = {};
+const fonts: Record<string, DeviceFont> = {};
 
-
+/*
 function document_on_copy(event: ClipboardEvent): void {
     if (event.clipboardData) {
         event.clipboardData.setData("text/plain", clipboard_text);
@@ -36,7 +37,7 @@ function document_on_paste(event: ClipboardEvent): void {
     // console.log(`${event.type}: "${clipboard_text}"`);
     event.preventDefault();
 }
-
+*/
 function window_on_resize(): void {
 }
 
@@ -197,7 +198,7 @@ function canvas_on_pointerup(event: PointerEvent): boolean {
 
 function canvas_on_wheel(event: WheelEvent): boolean  {
     const io = ImGui.GetIO();
-    let scale: number = 1.0;
+    let scale = 1.0;
     switch (event.deltaMode) {
         case event.DOM_DELTA_PIXEL: scale = 0.01; break;
         case event.DOM_DELTA_LINE: scale = 0.2; break;
@@ -211,7 +212,7 @@ function canvas_on_wheel(event: WheelEvent): boolean  {
     return false;
 }
 
-let touch_count:number=0;
+let touch_count=0;
 let touch_id:number;
 export class ITouch
 {
@@ -222,30 +223,30 @@ export let multi_touch:{[key:number]:ITouch}={};
 
 function canvas_on_touchstart(event: TouchEvent):void {
     for(let i=0;i<event.changedTouches.length;i++)  {
-        let touch=event.changedTouches[i];
+        const touch=event.changedTouches[i];
         touch_id=touch.identifier;
         multi_touch[touch.identifier]={x:touch.clientX, y:touch.clientY};
     }
-    let mtouch=multi_touch[touch_id];
-    let io=ImGui.GetIO();
+    const mtouch=multi_touch[touch_id];
+    const io=ImGui.GetIO();
     io.MousePos.x=mtouch.x;
     io.MousePos.y=mtouch.y;
     io.MouseDown[0]=true;
 }
 function canvas_on_touchmove(event: TouchEvent):void {
     for(let i=0;i<event.changedTouches.length;i++)  {
-        let touch=event.changedTouches[i];
+        const touch=event.changedTouches[i];
         multi_touch[touch.identifier]={x:touch.clientX, y:touch.clientY};
     }
-    let mtouch=multi_touch[touch_id];
-    let io=ImGui.GetIO();
+    const mtouch=multi_touch[touch_id];
+    const io=ImGui.GetIO();
     io.MousePos.x=mtouch.x;
     io.MousePos.y=mtouch.y;
 }
 function canvas_on_touchend(event: TouchEvent):void {
-    let io=ImGui.GetIO();
+    const io=ImGui.GetIO();
     for(let i=0;i<event.changedTouches.length;i++)  {
-        let touch=event.changedTouches[i];
+        const touch=event.changedTouches[i];
         if(touch.identifier==touch_id)  {
             io.MouseDown[0]=false;
         }
@@ -260,7 +261,7 @@ function canvas_on_touchcancel(event: TouchEvent):void {
     canvas_on_touchend(event);
 }
 
-export let is_contextlost:boolean=false;
+export const is_contextlost=false;
 
 export function injectKeyEvent(ev: KeyboardEvent): boolean {
   if (ev.type === 'keydown') {
@@ -300,6 +301,7 @@ export function injectTouchEvent(ev: TouchEvent) {
   }
 }
 
+/*
 function canvas_on_contextlost(e:Event):void {
     e.preventDefault();
     console.log("canvas_on_contextlost");
@@ -310,6 +312,7 @@ function canvas_on_contextrestored(e:Event):void {
     console.log("canvas_on_contextrestored");
     is_contextlost=false;
 }
+*/
 
 export function Init(device: AbstractDevice): void {
     const io = ImGui.GetIO();
@@ -466,13 +469,13 @@ export function NewFrame(time: number): void {
             const buttons_count: number = gamepad.buttons.length;
             const axes_count: number = gamepad.axes.length;
 
-            var MAP_BUTTON=
+            const MAP_BUTTON=
             function MAP_BUTTON(NAV_NO: number, BUTTON_NO: number): void {
                 if (!gamepad) { return; }
                 if (buttons_count > BUTTON_NO && gamepad.buttons[BUTTON_NO].pressed)
                     io.NavInputs[NAV_NO] = 1.0;
             }
-            var MAP_ANALOG=
+            const MAP_ANALOG=
             function MAP_ANALOG(NAV_NO: number, AXIS_NO: number, V0: number, V1: number): void {
                 if (!gamepad) { return; }
                 let v: number = (axes_count > AXIS_NO) ? gamepad.axes[AXIS_NO] : V0;
@@ -565,6 +568,7 @@ export function NewFrame(time: number): void {
     }
 }
 
+/*
 function toRgba(col:number):string
 {
     const r=(col>>>24);
@@ -573,6 +577,7 @@ function toRgba(col:number):string
     const a=(col&0xFF);
     return 'rgba('+r+','+g+','+b+','+a+')';
 }
+*/
 
 export let dom_font:Font=null;
 
@@ -605,8 +610,8 @@ async function font_update(io:ImGui.IO) {
 }
 
 let current_window_id:ImGui.ImGuiID=0;
-export let scroll_acc:ImGui.ImVec2=new ImGui.ImVec2(0,0);
-let mouse_first_down:boolean=false;
+export const scroll_acc:ImGui.ImVec2=new ImGui.ImVec2(0,0);
+let mouse_first_down=false;
 
 function scroll_update(io:ImGui.IO) {
     const hoveredWin= ImGui.GetHoveredWindow();
@@ -628,7 +633,7 @@ function scroll_update(io:ImGui.IO) {
                 mouse_first_down=true;
             }
 
-            let scroll=new ImGui.ImVec2(hoveredWin.Scroll.x, hoveredWin.Scroll.y);
+            const scroll=new ImGui.ImVec2(hoveredWin.Scroll.x, hoveredWin.Scroll.y);
             if(hoveredWin.ScrollbarY)   {
                 if(io.MouseDown[0] && !first_down) {
                     scroll.y-=io.MouseDelta.y;
@@ -749,7 +754,7 @@ export function CreateFontsTexture(): void {
           rgba8[i++] = p;
         });
         // Upload texture to graphics system
-        g_FontTexture = renderer.device.createTexture2D('rgba8unorm', width, height, { noMipmap: true });
+        g_FontTexture = renderer.device.createTexture2D('rgba8unorm', width, height, { samplerOptions: { mipFilter: 'none' } });
         g_FontTexture.update(rgba8, 0, 0, width, height);
         //gl && gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
 
@@ -790,8 +795,8 @@ export interface ITextureParam
 export class Texture
 {
     public _texture: Texture2D;
-    public _width:number=1;
-    public _height:number=1;
+    public _width=1;
+    public _height=1;
 
     constructor(param?: ITextureParam)
     {
@@ -812,7 +817,7 @@ export class Texture
             }
         }
         else if(src instanceof HTMLVideoElement) {
-            let srcVideo=src as HTMLVideoElement;
+            const srcVideo=src as HTMLVideoElement;
             if(srcVideo)    {
                 w=srcVideo.videoWidth;
                 h=srcVideo.videoHeight;
@@ -834,7 +839,7 @@ export class Texture
         if (!this._texture || this._texture.width !== w || this._texture.height !== h) {
           this._texture?.dispose();
           this._texture = renderer.device.createTexture2D('rgba8unorm', w, h, {
-            noMipmap: true
+            samplerOptions: { mipFilter: 'none' }
           });
           this._width = w;
           this._height = h;
@@ -864,7 +869,7 @@ export class TextureCache
 
     public async Load(name:string, src:string) :Promise<Texture>
     {
-      var image=new Image();
+      const image=new Image();
       image.crossOrigin="anonymous";
       image.src=src;
       await image.decode();

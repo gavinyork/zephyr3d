@@ -1,11 +1,14 @@
-import { Matrix4x4, List, ListIterator } from '@zephyr3d/base';
-import {
+import type { Matrix4x4, ListIterator } from '@zephyr3d/base';
+import { List } from '@zephyr3d/base';
+import type {
   BindGroup,
   GPUProgram,
   RenderStateSet,
-  ProgramBuilder,
   BindGroupLayout,
   TextureSampler
+} from '@zephyr3d/device';
+import {
+  ProgramBuilder
 } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
 import type { Drawable, DrawContext } from '../render/drawable';

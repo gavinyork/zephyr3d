@@ -7,6 +7,7 @@ import type { Visitor } from './visitor';
  * Octree placement
  * @public
  */
+/* eslint-disable no-unused-vars */
 export enum OctreePlacement {
   PPP = 0,
   PPN = 1,

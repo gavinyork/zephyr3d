@@ -1,6 +1,7 @@
 import { Vector3 } from "@zephyr3d/base";
 import { BoundingBox } from "../utility/bounding_volume";
-import { Shape, ShapeCreationOptions } from "./shape";
+import type { ShapeCreationOptions } from "./shape";
+import { Shape } from "./shape";
 
 /**
  * Creation options for plane shapes

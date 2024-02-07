@@ -1,4 +1,5 @@
-import { GPUResourceUsageFlags, GPUDataBuffer } from '@zephyr3d/device';
+import type { GPUDataBuffer } from '@zephyr3d/device';
+import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGLGPUObject } from './gpuobject_webgl';
 import { WebGLEnum } from './webgl_enum';
 import { isWebGL2 } from './utils';

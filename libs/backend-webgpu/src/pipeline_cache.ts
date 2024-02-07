@@ -6,7 +6,8 @@ import {
   blendEquationMap,
   blendFuncMap
 } from './constants_webgpu';
-import { StencilOp, PBPrimitiveTypeInfo, PBPrimitiveType, PrimitiveType, CompareFunc, BlendEquation, BlendFunc, ShaderType } from '@zephyr3d/device';
+import type { StencilOp, PrimitiveType, CompareFunc, BlendEquation, BlendFunc} from '@zephyr3d/device';
+import { PBPrimitiveTypeInfo, PBPrimitiveType } from '@zephyr3d/device';
 import * as rs from './renderstates_webgpu';
 import type { WebGPUVertexLayout } from './vertexlayout_webgpu';
 import type { WebGPUProgram } from './gpuprogram_webgpu';

@@ -1,11 +1,12 @@
-import {
+import type {
   FrameBuffer,
   TextureFormat,
   PBShaderExp,
   PBInsideFunctionScope,
 } from '@zephyr3d/device';
 import { ShadowImpl } from './shadow_impl';
-import { GaussianBlurBlitter, BlitType } from '../blitter';
+import type { BlitType } from '../blitter';
+import { GaussianBlurBlitter } from '../blitter';
 import { computeShadowMapDepth, filterShadowESM } from '../shaders/shadow';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { Application } from '../app';

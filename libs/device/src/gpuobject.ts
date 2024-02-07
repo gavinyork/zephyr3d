@@ -1,7 +1,8 @@
-import { VectorBase, CubeFace, TypedArray, IEventTarget } from '@zephyr3d/base';
+import type { VectorBase, CubeFace, TypedArray, IEventTarget } from '@zephyr3d/base';
 import type { ShaderKind, AbstractDevice } from './base_types';
+import type {
+  PBTypeInfo} from './builder/types';
 import {
-  PBTypeInfo,
   PBArrayTypeInfo,
   PBPrimitiveTypeInfo,
   PBStructTypeInfo,
@@ -675,7 +676,6 @@ export interface BaseCreationOptions {
  * @public
  */
 export interface TextureCreationOptions extends BaseCreationOptions {
-  noMipmap?: boolean;
   writable?: boolean;
   texture?: BaseTexture;
   samplerOptions?: SamplerOptions;
@@ -1269,7 +1269,7 @@ export interface Texture2DArray<T = unknown> extends BaseTexture<T> {
     width: number,
     height: number
   ): void;
-  createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number): void;
+  createWithMipmapData(data: TextureMipmapData, creationFlags?: number): void;
 }
 
 /**
@@ -1286,7 +1286,7 @@ export interface Texture3D<T = unknown> extends BaseTexture<T> {
     height: number,
     depth: number
   ): void;
-  createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number): void;
+  createWithMipmapData(data: TextureMipmapData, creationFlags?: number): void;
 }
 
 /**

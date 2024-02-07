@@ -1,4 +1,5 @@
-import { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import type { PBShaderExp } from '@zephyr3d/device';
+import { PBInsideFunctionScope } from '@zephyr3d/device';
 import {
   DEBUG_CASCADED_SHADOW_MAPS,
   RENDER_PASS_TYPE_FORWARD,
@@ -6,7 +7,7 @@ import {
   LIGHT_TYPE_POINT,
   LIGHT_TYPE_SPOT,
 } from '../values';
-import { DrawContext } from '../render/drawable';
+import type { DrawContext } from '../render/drawable';
 import type { LightModel } from '../material/lightmodel';
 import { ShaderFramework } from './framework';
 import { nonLinearDepthToLinear } from './misc';
@@ -61,10 +62,14 @@ export function forwardComputeLighting(
           this.lightPositionRange.xyz,
           ShaderFramework.getWorldPosition(this).xyz
         );
-        this.$l.falloff = pb.max(0, pb.sub(1, pb.div(this.dist, this.lightPositionRange.w)));
-        this.$l.falloff2 = pb.mul(this.falloff, this.falloff);
-        this.$if(pb.greaterThan(this.falloff2, 0), function () {
-          lm.directBRDF(this, this.lightDir, pb.mul(this.attenuation, this.falloff2));
+        this.$l.a = pb.div(1, pb.add(1, pb.mul(this.dist, this.dist)))
+        this.$l.falloff = pb.mul(this.a, pb.clamp(pb.sub(1, pb.div(this.dist, this.lightPositionRange.w)), 0, 1));
+        //this.$l.t = pb.div(pb.mul(this.dist, 16), this.lightPositionRange.w);
+        //this.$l.falloff = pb.div(1, pb.add(1, pb.mul(this.t, this.t)));
+        //this.$l.falloff = pb.div(1, )   pb.max(0, pb.sub(1, pb.div(this.dist, this.lightPositionRange.w)));
+        //this.falloff = pb.mul(this.falloff, this.falloff);
+        this.$if(pb.greaterThan(this.falloff, 0), function () {
+          lm.directBRDF(this, this.lightDir, pb.mul(this.attenuation, this.falloff));
         });
       }
     );

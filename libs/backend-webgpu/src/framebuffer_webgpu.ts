@@ -1,5 +1,5 @@
-import { CubeFace } from '@zephyr3d/base';
-import { FrameBuffer, FrameBufferOptions, BaseTexture } from '@zephyr3d/device';
+import type { CubeFace } from '@zephyr3d/base';
+import type { FrameBuffer, FrameBufferOptions, BaseTexture } from '@zephyr3d/device';
 import { WebGPUObject } from './gpuobject_webgpu';
 import type { WebGPUDevice } from './device';
 import type { WebGPUBaseTexture } from './basetexture_webgpu';

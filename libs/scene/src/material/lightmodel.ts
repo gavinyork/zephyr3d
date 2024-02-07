@@ -1,5 +1,6 @@
-import { Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
-import {
+import type { Vector3} from '@zephyr3d/base';
+import { Matrix4x4, Vector4 } from '@zephyr3d/base';
+import type {
   BindGroup,
   Texture2D,
   BaseTexture,
@@ -7,12 +8,13 @@ import {
   PBInsideFunctionScope,
   PBShaderExp,
   PBGlobalScope,
+  AbstractDevice} from '@zephyr3d/device';
+import {
   PBStructTypeInfo,
   PBPrimitiveType,
-  PBPrimitiveTypeInfo,
-  AbstractDevice,
+  PBPrimitiveTypeInfo
 } from '@zephyr3d/device';
-import { EnvironmentLighting } from '../render/envlight';
+import type { EnvironmentLighting } from '../render/envlight';
 import { calculateTBN, calculateTBNWithNormal } from '../shaders/misc';
 import { Material } from './material';
 import { fresnelSchlick, directClearcoatLighting, directLighting, directSheenLighting } from '../shaders/pbr';
@@ -1234,7 +1236,7 @@ export abstract class PBRLightModelBase extends LightModel {
     const rs = device.createRenderStateSet();
     rs.useRasterizerState().setCullMode('none');
     rs.useDepthState().enableTest(false).enableWrite(false);
-    const tex = device.createTexture2D('rgba8unorm', size, size, { noMipmap: true });
+    const tex = device.createTexture2D('rgba8unorm', size, size, { samplerOptions: { mipFilter: 'none' } });
     tex.name = 'GGXLUT';
     const fb = device.createFrameBuffer([tex], null);
     device.pushDeviceStates();

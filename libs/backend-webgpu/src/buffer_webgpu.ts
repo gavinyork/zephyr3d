@@ -1,6 +1,8 @@
-import { GPUResourceUsageFlags, GPUDataBuffer } from '@zephyr3d/device';
+import type { GPUDataBuffer } from '@zephyr3d/device';
+import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGPUObject } from './gpuobject_webgpu';
-import { UploadRingBuffer, UploadBuffer } from './uploadringbuffer';
+import type { UploadBuffer } from './uploadringbuffer';
+import { UploadRingBuffer } from './uploadringbuffer';
 import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 

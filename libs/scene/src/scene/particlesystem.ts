@@ -1,8 +1,9 @@
+/* eslint-disable no-unused-vars, @typescript-eslint/no-unused-vars */
 import { Vector2, Vector3 } from "@zephyr3d/base";
-import { PBVoidTypeInfo } from "@zephyr3d/device";
-import { Application, AppResizeEvent } from "../app";
-import { Material } from "../material";
-import { DrawContext, Drawable, Primitive } from "../render";
+import { Application } from "../app";
+import type { Material } from "../material";
+import type { DrawContext} from "../render";
+import { Primitive } from "../render";
 import { GraphNode } from "./graph_node";
 import type { Scene } from "./scene";
 
@@ -28,8 +29,9 @@ type ParticleNode = {
 export interface ParticleEmitter {
   initParticle(ps: ParticleSystem, particle: Particle, emitTime: number): void;
   reset(): void;
-};
+}
 
+/** @internal */
 export class ParticleSystem extends GraphNode {
   /** @internal */
   private static readonly DIRECTIONAL_PARTICLE = (1<<0);
@@ -156,7 +158,7 @@ export class ParticleSystem extends GraphNode {
     }
     this._lastUpdateTime = currentTime;
     let i = 0;
-    let currentActiveCount = this._activeParticleCount;
+    const currentActiveCount = this._activeParticleCount;
     while(i < this._activeParticleCount) {
       const n = this._particles[i];
       const p = n.particle;

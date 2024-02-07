@@ -1,7 +1,7 @@
-import { PBFunctionScope, PBInsideFunctionScope, PBShaderExp, Texture2D, TextureSampler } from "@zephyr3d/device";
-import { IMeshMaterial } from "../meshmaterial";
-import { Matrix4x4 } from "@zephyr3d/base";
-import { DrawContext } from "../../render";
+import type { PBFunctionScope, PBInsideFunctionScope, PBShaderExp, Texture2D, TextureSampler } from "@zephyr3d/device";
+import type { IMeshMaterial } from "../meshmaterial";
+import type { Matrix4x4 } from "@zephyr3d/base";
+import type { DrawContext } from "../../render";
 
 export type TextureProp<U extends string> = {
   [P in 'Texture'|'TextureSampler'|'TexCoordIndex'|'TexCoordMatrix' as `${U}${P}`]:

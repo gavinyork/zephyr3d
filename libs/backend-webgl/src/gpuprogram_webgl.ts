@@ -2,7 +2,8 @@
 import { WebGLGPUObject } from './gpuobject_webgl';
 import { isWebGL2 } from './utils';
 import { WebGLEnum } from './webgl_enum';
-import { PBStructTypeInfo, GPUProgram, semanticList, BindGroupLayout, BindPointInfo, StructuredBuffer, ShaderKind } from '@zephyr3d/device';
+import type { PBStructTypeInfo, GPUProgram, BindGroupLayout, BindPointInfo, StructuredBuffer, ShaderKind } from '@zephyr3d/device';
+import { semanticList } from '@zephyr3d/device';
 import { textureMagFilterToWebGL, textureMinFilterToWebGL, textureWrappingMap } from './constants_webgl';
 import type { WebGLTextureSampler } from './sampler_webgl';
 import type { WebGLBaseTexture } from './basetexture_webgl';

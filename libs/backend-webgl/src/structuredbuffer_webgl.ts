@@ -1,10 +1,11 @@
 import { WebGLGPUBuffer } from './buffer_webgl';
-import { StructuredBufferData,
-  GPUResourceUsageFlags,
+import type {
   StructuredBuffer,
   StructuredValue,
   PBTypeInfo,
-  PBStructTypeInfo,
+  PBStructTypeInfo} from '@zephyr3d/device';
+import { StructuredBufferData,
+  GPUResourceUsageFlags,
   PBPrimitiveType
 } from '@zephyr3d/device';
 import type { TypedArray } from '@zephyr3d/base';

@@ -1,4 +1,5 @@
-import { Vector3, Vector4, Matrix4x4, Ray, AABB, makeEventTarget, nextPowerOf2 } from '@zephyr3d/base';
+import type { Matrix4x4, AABB} from '@zephyr3d/base';
+import { Vector3, Vector4, Ray, makeEventTarget, nextPowerOf2 } from '@zephyr3d/base';
 import { SceneNode } from './scene_node';
 import { Octree } from './octree';
 import { OctreeUpdateVisitor } from './octree_update_visitor';
@@ -15,7 +16,7 @@ import type { AnimationSet } from '../animation/animationset';
  * @public
  */
 export class SceneUpdateEvent {
-  static readonly NAME = 'sceneupdate';
+  static readonly NAME = 'sceneupdate' as const;
   scene: Scene;
   type = SceneUpdateEvent.NAME;
   constructor(scene: Scene) {

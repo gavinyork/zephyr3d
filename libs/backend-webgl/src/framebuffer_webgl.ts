@@ -1,9 +1,10 @@
 import { CubeFace } from '@zephyr3d/base';
-import { BaseTexture, FrameBuffer, FrameBufferOptions, hasStencilChannel } from '@zephyr3d/device';
+import type { BaseTexture, FrameBuffer, FrameBufferOptions} from '@zephyr3d/device';
+import { hasStencilChannel } from '@zephyr3d/device';
 import { WebGLGPUObject } from './gpuobject_webgl';
 import { WebGLEnum } from './webgl_enum';
 import { cubeMapFaceMap } from './constants_webgl';
-import { WebGLTextureCaps } from './capabilities_webgl';
+import type { WebGLTextureCaps } from './capabilities_webgl';
 import type { WebGLDevice } from './device_webgl';
 
 type FrameBufferTextureAttachment = {

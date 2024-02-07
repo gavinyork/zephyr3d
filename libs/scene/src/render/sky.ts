@@ -2,12 +2,12 @@ import { Application } from "../app";
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from "../shaders/misc";
 import { ShaderFramework, smoothNoise3D } from "../shaders";
 import { CubeFace, Matrix4x4, Vector2, Vector3, Vector4 } from "@zephyr3d/base";
-import { Primitive } from "./primitive";
+import type { Primitive } from "./primitive";
 import { BoxShape } from "../shapes";
 import { ScatteringLut } from "./scatteringlut";
 import { Camera } from "../camera/camera";
 import { prefilterCubemap } from "../utility";
-import { DirectionalLight } from "../scene";
+import type { DirectionalLight } from "../scene";
 import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, RenderStateSet, TextureCube, TextureFormat, TextureSampler, VertexLayout } from "@zephyr3d/device";
 import type { DrawContext } from "./drawable";
 
@@ -215,7 +215,7 @@ export class SkyRenderer {
   get irradianceMap(): TextureCube {
     if (!this._irradianceMap) {
       this._irradianceMap = Application.instance.device.createCubeTexture('rgba16f', this._irradianceMapWidth, {
-        noMipmap: true
+        samplerOptions: { mipFilter: 'none' }
       });
       this._irradianceMap.name = 'SkyIrradianceMap';
     }

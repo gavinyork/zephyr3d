@@ -1,19 +1,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { ShaderType, AbstractDevice, ShaderKind } from '../base_types';
-import {
-  MAX_BINDING_GROUPS,
+import type { AbstractDevice, ShaderKind } from '../base_types';
+import { ShaderType } from '../base_types';
+import type {
   GPUProgram,
   BindGroupLayout,
   BindGroupLayoutEntry,
-  getVertexAttribByName,
   VertexSemantic
 } from '../gpuobject';
-import { PBReflection, PBReflectionTagGetter } from './reflection';
+import {
+  MAX_BINDING_GROUPS,
+  getVertexAttribByName
+} from '../gpuobject';
+import type { PBReflectionTagGetter } from './reflection';
+import { PBReflection } from './reflection';
+import type {
+  ShaderExpTagValue,
+  ShaderTypeFunc} from './base';
 import {
   PBShaderExp,
-  ShaderExpTagValue,
-  ShaderTypeFunc,
   setCurrentProgramBuilder,
   getCurrentProgramBuilder,
   makeConstructor,
@@ -23,16 +28,17 @@ import * as AST from './ast';
 import * as errors from './errors';
 import { setBuiltinFuncs } from './builtinfunc';
 import { setConstructors } from './constructors';
+import type {
+  PBPrimitiveTypeInfo,
+  PBStructLayout,
+  PBTextureTypeInfo,
+  PBTypeInfo} from './types';
 import {
   PBArrayTypeInfo,
   PBFunctionTypeInfo,
   PBPrimitiveType,
-  PBPrimitiveTypeInfo,
   PBSamplerAccessMode,
-  PBStructLayout,
   PBStructTypeInfo,
-  PBTextureTypeInfo,
-  PBTypeInfo,
   typeBool,
   typeF32,
   typeFrexpResult,
@@ -109,7 +115,7 @@ export interface PBRenderOptions {
    * @param pb - The program builder instance
    */
   fragment(this: PBGlobalScope, pb: ProgramBuilder);
-};
+}
 
 /**
  * Compute program build options
@@ -122,7 +128,7 @@ export interface PBComputeOptions {
   workgroupSize: [number, number, number];
   /** compute shader */
   compute(this: PBGlobalScope, pb: ProgramBuilder);
-};
+}
 
 type StructDef = {
   structs: Record<string, ShaderTypeFunc>;
@@ -2480,7 +2486,7 @@ export class ProgramBuilder {
       const result: AST.ASTExpression[] = [];
       let matches = true;
       for (let i = 0; i < args.length; i++) {
-        let argInfo = overload.funcType.argTypes[i];
+        const argInfo = overload.funcType.argTypes[i];
         const argType = (argInfo.byRef && argInfo.type instanceof PBPointerTypeInfo) ? argInfo.type.pointerType : argInfo.type;
         const arg = args[i];
         if (typeof arg === 'boolean') {
@@ -2828,7 +2834,7 @@ export class PBScope extends Proxiable<PBScope> {
           );
         }
       }
-      let originalType: PBPrimitiveTypeInfo | PBArrayTypeInfo = null;
+      const originalType: PBPrimitiveTypeInfo | PBArrayTypeInfo = null;
       /*
       if (
         variable.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE &&
@@ -3390,7 +3396,7 @@ export class PBInsideFunctionScope extends PBScope {
     const functionScope = this.findOwnerFunction();
     const astFunc = functionScope.$ast as AST.ASTFunction;
     let returnType: PBTypeInfo = null;
-    let retValNonArray = getCurrentProgramBuilder().normalizeExpValue(retval);
+    const retValNonArray = getCurrentProgramBuilder().normalizeExpValue(retval);
     if (retValNonArray !== undefined && retValNonArray !== null) {
       if (typeof retValNonArray === 'number') {
         if (astFunc.returnType) {

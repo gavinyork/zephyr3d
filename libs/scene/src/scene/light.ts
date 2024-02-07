@@ -1,6 +1,7 @@
 import { Vector3, Vector4, Matrix4x4 } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
-import { BoundingVolume, BoundingBox } from '../utility/bounding_volume';
+import type { BoundingVolume} from '../utility/bounding_volume';
+import { BoundingBox } from '../utility/bounding_volume';
 import { ShadowMapper } from '../shadow/shadowmapper';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import type { Scene } from './scene';

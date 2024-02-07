@@ -1,5 +1,5 @@
 import { ClipState, Frustum, Matrix4x4, Vector3, isPowerOf2, nextPowerOf2 } from '@zephyr3d/base';
-import {
+import type {
   IndexBuffer,
   PrimitiveType,
   Texture2D,
@@ -8,7 +8,7 @@ import { BoundingBox } from '../../utility/bounding_volume';
 import { TerrainPatch } from './patch';
 import { HeightField } from './heightfield';
 import { Application } from '../../app';
-import { CullVisitor } from '../../render/cull_visitor';
+import type { CullVisitor } from '../../render/cull_visitor';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import type { Terrain } from './terrain';
 import type { GrassCluster } from './grass';
@@ -257,7 +257,7 @@ export class Quadtree {
       normalMapBytes[i * 4 + 3] = 255;
     }
     this._normalMap = device.createTexture2D('rgba8unorm', rootSizeX, rootSizeZ, {
-      noMipmap: true
+      samplerOptions: { mipFilter: 'none' }
     });
     this._normalMap.name = `TerrainNormalMap-${this._normalMap.uid}`;
     this._normalMap.update(normalMapBytes, 0, 0, this._normalMap.width, this._normalMap.height);

@@ -377,8 +377,7 @@ export class ImGuiStyle extends Emscripten.EmscriptenClass implements interface_
     public ScaleAllSizes(scale_factor: number): void;
 }
 
-export interface reference_DragDropPayload extends Emscripten.EmscriptenClassReference {
-}
+export type reference_DragDropPayload = Emscripten.EmscriptenClassReference
 
 export type ImDrawCallback = (parent_list: Readonly<reference_ImDrawList>, cmd: Readonly<reference_ImDrawCmd>) => void;
 
@@ -400,7 +399,7 @@ export interface reference_ImDrawCmd extends Emscripten.EmscriptenClassReference
     // readonly ClipRect: Readonly<ImVec4>;
 }
 
-export interface reference_ImDrawListSharedData extends Emscripten.EmscriptenClassReference {}
+export type reference_ImDrawListSharedData = Emscripten.EmscriptenClassReference
 
 export interface reference_ImDrawList extends Emscripten.EmscriptenClassReference {
     IterateDrawCmds(callback: (draw_cmd: reference_ImDrawCmd, ElemStart: number) => void): void;

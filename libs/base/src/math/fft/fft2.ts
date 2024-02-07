@@ -1,4 +1,5 @@
-import { complex, Complex } from './complex';
+import type { Complex } from './complex';
+import { complex } from './complex';
 import { dft, fft, idft, ifft } from './fft';
 
 /**
@@ -113,7 +114,7 @@ export const ifft2 = (fourier: Complex[][]): Complex[][] => {
 export const float4ToComplex2d = (
   data: Float32Array,
   size: number,
-  offset: number = 0
+  offset = 0
 ): Complex[][] => {
   const result = [];
   for (let i = 0; i < size; i++) {

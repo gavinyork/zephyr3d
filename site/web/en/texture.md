@@ -11,8 +11,6 @@ const texture = device.createTexture2D('rgba8unorm', 256, 256);
 
 // Create 2D textures with a given pixel format and width and height and specify the sampler states
 const texture = device.createTexture2D('rgba8unorm', 256, 256, {
-  // If true, no mipmap will be generated, default is false
-  noMipmap: true,
   // Sampler states
   samplerOptions: {
     magFilter: 'nearest',
@@ -25,7 +23,7 @@ const texture = device.createTexture2D('rgba8unorm', 256, 256, {
 
 // Create writable 2D textures with a given pixel format and width and height (WebGPU only)
 const texture = device.createTexture2D('rgba8unorm', 256, 256, {
-  noMipmap: true,
+  samplerOptions: { mipFilter: 'none' },
   writable: true
 });
 

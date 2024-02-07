@@ -3,7 +3,8 @@ import { CullVisitor } from './cull_visitor';
 import { Material } from '../material';
 import { ShaderFramework } from '../shaders';
 import { Application } from '../app';
-import { RenderQueue, RenderQueueItem } from './render_queue';
+import type { RenderQueueItem } from './render_queue';
+import { RenderQueue } from './render_queue';
 import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
 import type { AbstractDevice, BindGroup, BindGroupLayout, RenderStateSet } from '@zephyr3d/device';
@@ -158,11 +159,11 @@ export abstract class RenderPass {
   protected drawItem(device: AbstractDevice, item: RenderQueueItem, ctx: DrawContext, reverseWinding: boolean) {
     const reverse = reverseWinding !== (item.drawable.getXForm().worldMatrixDet < 0);
     if (reverse) {
-      device.reverseVertexWindingOrder(true);
+      device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
     }
     item.drawable.draw(ctx);
     if (reverse) {
-      device.reverseVertexWindingOrder(false);
+      device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
     }
   }
   /** @internal */

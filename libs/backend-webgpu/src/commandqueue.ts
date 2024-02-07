@@ -1,4 +1,4 @@
-import { TypedArray, Vector4 } from '@zephyr3d/base';
+import type { Vector4 } from '@zephyr3d/base';
 import { WebGPURenderPass } from './renderpass_webgpu';
 import { WebGPUComputePass } from './computepass_webgpu';
 import type { PrimitiveType, DeviceViewport } from '@zephyr3d/device';

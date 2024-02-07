@@ -1,6 +1,6 @@
 import { AbstractTextureLoader } from '../loader';
 import { Application } from '../../../app';
-import type { BaseTexture, SamplerOptions } from '@zephyr3d/device';
+import type { BaseTexture, SamplerOptions, TextureCreationOptions } from '@zephyr3d/device';
 import type { AssetManager } from '../../assetmanager';
 
 /**
@@ -72,7 +72,11 @@ export class TGALoader extends AbstractTextureLoader {
           }
         }
       }
-      const tex = Application.instance.device.createTexture2D(sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm', width, height, { noMipmap: !!noMipmap, texture });
+      const opt: TextureCreationOptions = { texture };
+      if (noMipmap) {
+        opt.samplerOptions = { mipFilter: 'none' };
+      }
+      const tex = Application.instance.device.createTexture2D(sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm', width, height, opt);
       tex.update(pixels, 0, 0, width, height);
       return tex;
     } while(false);

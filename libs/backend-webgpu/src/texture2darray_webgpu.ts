@@ -1,14 +1,15 @@
-import {
-  getTextureFormatBlockWidth,
-  getTextureFormatBlockHeight,
-  getTextureFormatBlockSize,
-  linearTextureFormatToSRGB,
-  GPUResourceUsageFlags,
+import type {
   TextureImageElement,
   Texture2DArray,
   GPUDataBuffer,
   TextureFormat,
   TextureMipmapData
+} from '@zephyr3d/device';
+import {
+  getTextureFormatBlockWidth,
+  getTextureFormatBlockHeight,
+  getTextureFormatBlockSize,
+  GPUResourceUsageFlags
 } from '@zephyr3d/device';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { TypedArray } from '@zephyr3d/base';

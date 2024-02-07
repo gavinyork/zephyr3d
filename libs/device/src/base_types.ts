@@ -1,4 +1,5 @@
-import { TypedArray, floatToHalf, Vector4, IEventTarget } from '@zephyr3d/base';
+import type { TypedArray, Vector4, IEventTarget } from '@zephyr3d/base';
+import { floatToHalf } from '@zephyr3d/base';
 import type { PBComputeOptions, PBRenderOptions, PBStructTypeInfo, ProgramBuilder } from './builder';
 import type { BaseTexture, BindGroup, BindGroupLayout, BufferCreationOptions, FrameBuffer, FrameBufferOptions, GPUDataBuffer, GPUObject, GPUProgram, IndexBuffer, SamplerOptions, StructuredBuffer, Texture2D, Texture2DArray, Texture3D, TextureCreationOptions, TextureCube, TextureImageElement, TextureMipmapData, TextureSampler, TextureVideo, VertexAttribFormat, VertexLayout, VertexLayoutOptions, VertexSemantic } from './gpuobject';
 import type { RenderStateSet } from './render_states';
@@ -1600,7 +1601,7 @@ export interface GPUProgramConstructParams {
  */
 export class DeviceLostEvent {
   /** The event name */
-  static readonly NAME: 'devicelost' = 'devicelost';
+  static readonly NAME = 'devicelost' as const;
   type = DeviceLostEvent.NAME;
 }
 
@@ -1610,7 +1611,7 @@ export class DeviceLostEvent {
  */
 export class DeviceRestoreEvent {
   /** The event name */
-  static readonly NAME: 'devicerestored' = 'devicerestored';
+  static readonly NAME = 'devicerestored' as const;
   type = DeviceRestoreEvent.NAME;
 }
 
@@ -1620,7 +1621,7 @@ export class DeviceRestoreEvent {
  */
 export class DeviceResizeEvent {
   /** The event name */
-  static readonly NAME: 'resize' = 'resize';
+  static readonly NAME = 'resize' as const;
   width: number;
   height: number;
   type = DeviceResizeEvent.NAME;
@@ -1636,7 +1637,7 @@ export class DeviceResizeEvent {
  */
 export class DeviceGPUObjectAddedEvent {
   /** the event name */
-  static readonly NAME: 'gpuobject_added' = 'gpuobject_added';
+  static readonly NAME = 'gpuobject_added' as const;
   object: GPUObject;
   type = DeviceGPUObjectAddedEvent.NAME;
   constructor(obj: GPUObject) {
@@ -1650,7 +1651,7 @@ export class DeviceGPUObjectAddedEvent {
  */
 export class DeviceGPUObjectRemovedEvent {
   /** The event name */
-  static readonly NAME: 'gpuobject_removed' = 'gpuobject_removed';
+  static readonly NAME: 'gpuobject_removed' = 'gpuobject_removed' as const;
   object: GPUObject;
   type = DeviceGPUObjectRemovedEvent.NAME;
   constructor(obj: GPUObject) {
@@ -1664,7 +1665,7 @@ export class DeviceGPUObjectRemovedEvent {
  */
 export class DeviceGPUObjectRenameEvent {
   /** The event name */
-  static readonly NAME: 'gpuobject_rename' = 'gpuobject_rename';
+  static readonly NAME: 'gpuobject_rename' = 'gpuobject_rename' as const;
   object: GPUObject;
   lastName: string;
   type = DeviceGPUObjectRenameEvent.NAME;
@@ -1827,7 +1828,6 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    */
   createTexture2DArrayFromMipmapData(
     data: TextureMipmapData,
-    sRGB: boolean,
     options?: TextureCreationOptions
   ): Texture2DArray;
   /**
@@ -1886,7 +1886,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * Set wether to reverse the winding order
    *
    * @remarks
-   * The default winding order is Counterclockwise.
+   * The default winding order is counter-clockwise.
    *
    * @param reverse - true if the winding order should be reversed.
    */

@@ -1,4 +1,5 @@
-import { Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
+import type { Matrix4x4} from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { Primitive } from '../../render/primitive';
 import { Application } from '../../app';
@@ -8,7 +9,7 @@ import type { XForm } from '../xform';
 import type { Camera } from '../../camera/camera';
 import type { Quadtree } from './quadtree';
 import type { Terrain } from './terrain';
-import { GraphNode } from '../graph_node';
+import type { GraphNode } from '../graph_node';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 
 /** @internal */

@@ -1,9 +1,10 @@
-import { StructuredBufferData,
-  GPUResourceUsageFlags,
+import type {
   StructuredBuffer,
   StructuredValue,
   PBStructTypeInfo,
-  PBTypeInfo,
+  PBTypeInfo} from '@zephyr3d/device';
+import { StructuredBufferData,
+  GPUResourceUsageFlags,
   PBPrimitiveType,
   PBPrimitiveTypeInfo
 } from '@zephyr3d/device';

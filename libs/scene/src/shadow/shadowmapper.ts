@@ -458,7 +458,7 @@ export class ShadowMapper {
   ): Texture2D | TextureCube | Texture2DArray {
     const device = Application.instance.device;
     const options: TextureCreationOptions = {
-      noMipmap: true
+      samplerOptions: { mipFilter: 'none' }
     };
     switch (target) {
       case '2d':
@@ -544,7 +544,7 @@ export class ShadowMapper {
       frustumMax.inplaceMax(p);
     });
     let radius = Vector3.distance(frustumMin, frustumMax) * 0.5 * expand;
-    let center = sceneCamera.thisToWorld(Vector3.add(frustumMin, frustumMax, frustumCenter).scaleBy(0.5), frustumCenter);
+    const center = sceneCamera.thisToWorld(Vector3.add(frustumMin, frustumMax, frustumCenter).scaleBy(0.5), frustumCenter);
     // Bounding sphere of the shadow camera should not be larger than bounding sphere of the scene.
     const sceneRadius = sceneAABB.diagonalLength * 0.5 * expand;
     if (sceneRadius < radius) {

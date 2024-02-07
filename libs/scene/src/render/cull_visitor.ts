@@ -1,4 +1,5 @@
-import { AABB, ClipState } from '@zephyr3d/base';
+import type { AABB} from '@zephyr3d/base';
+import { ClipState } from '@zephyr3d/base';
 import { OctreeNode } from '../scene/octree';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../values';
 import { GraphNode } from '../scene/graph_node';
@@ -44,12 +45,12 @@ export class CullVisitor implements Visitor {
   get camera() {
     return this._camera;
   }
+  set camera(camera: Camera) {
+    this._camera = camera || null;
+  }
   /** The camera position of the primary render pass */
   get primaryCamera() {
     return this._primaryCamera;
-  }
-  set camera(camera: Camera) {
-    this._camera = camera || null;
   }
   /** Render pass for the culling task */
   get renderPass(): RenderPass {

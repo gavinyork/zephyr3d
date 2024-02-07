@@ -1,4 +1,5 @@
-import { CubeFace, Vector4 } from '@zephyr3d/base';
+import type { CubeFace} from '@zephyr3d/base';
+import { Vector4 } from '@zephyr3d/base';
 import type {
   RenderStateSet,
   BaseTexture,
@@ -474,7 +475,7 @@ function createBlitProgram(type: BlitType, filter: Blitter, bilinearFiltering: b
         if (scaleBias) {
           this.$l.xy = pb.add(pb.mul(this.$builtins.position.xy, this.scaleBias.xy), this.scaleBias.zw);
           this.$builtins.position = pb.vec4(this.xy, 1, 1);
-        };
+        }
       });
     },
     fragment(pb) {

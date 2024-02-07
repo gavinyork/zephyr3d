@@ -1,4 +1,4 @@
-import { GPUResourceUsageFlags,
+import type {
   StructuredValue,
   PBStructTypeInfo,
   BindGroupLayout,
@@ -7,6 +7,8 @@ import { GPUResourceUsageFlags,
   BindGroup,
   BindGroupLayoutEntry,
   GPUDataBuffer
+ } from '@zephyr3d/device';
+import { GPUResourceUsageFlags
  } from '@zephyr3d/device';
 import { WebGLStructuredBuffer } from './structuredbuffer_webgl';
 import { WebGLGPUObject } from './gpuobject_webgl';

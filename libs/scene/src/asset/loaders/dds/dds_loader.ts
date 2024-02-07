@@ -30,8 +30,8 @@ export class DDSLoader extends AbstractTextureLoader {
       throw new Error(`read DDS file failed: ${url}`);
     }
     const options: TextureCreationOptions = {
-      noMipmap: samplerOptions?.mipFilter === 'none',
-      texture: texture
+      texture: texture,
+      samplerOptions
     };
     return Application.instance.device.createTextureFromMipmapData(mipmapLevelData, srgb, options);
     /*

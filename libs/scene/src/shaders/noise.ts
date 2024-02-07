@@ -53,6 +53,7 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
   const funcNameHash = 'lib_worleyHash';
   // https://www.shadertoy.com/view/4sc3z2
   pb.func(funcNameHash, [pb.vec3('p')], function(){
+    /* eslint-disable no-constant-condition */
     if (1) {
       this.$l.mod3 = pb.vec3(0.1031, 0.11369, 0.13787);
       this.$l.p3 = pb.fract(pb.mul(this.p, this.mod3));
@@ -78,6 +79,7 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
       this.$for(pb.int('y'), -1, 2, function(){
         this.$for(pb.int('z'), -1, 2, function(){
           this.$l.offset = pb.vec3(pb.float(this.x), pb.float(this.y), pb.float(this.z));
+          /* eslint-disable no-constant-condition */
           if (1 /* tilable */) {
             this.$l.h = pb.add(pb.mul(this[funcNameHash](pb.mod(pb.add(this.id, this.offset), pb.vec3(this.freq))), 0.4), pb.vec3(0.3));
           } else {

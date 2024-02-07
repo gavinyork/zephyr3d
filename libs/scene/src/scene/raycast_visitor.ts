@@ -1,10 +1,10 @@
 import { Ray, Vector3 } from '@zephyr3d/base';
-import { GraphNode } from './graph_node';
+import type { GraphNode } from './graph_node';
 import { OctreeNode } from './octree';
-import { Mesh } from './mesh';
-import { Terrain } from './terrain';
+import type { Mesh } from './mesh';
+import type { Terrain } from './terrain';
 import type { Visitor } from './visitor';
-import { SceneNode } from './scene_node';
+import type { SceneNode } from './scene_node';
 
 /** @internal */
 export class RaycastVisitor implements Visitor {

@@ -35,8 +35,8 @@ export class WebImageLoader extends AbstractTextureLoader {
           premultiplyAlpha: 'none'
         }).then((bm) => {
           const options: TextureCreationOptions = {
-            noMipmap: samplerOptions?.mipFilter === 'none',
-            texture: texture
+            texture: texture,
+            samplerOptions
           };
           const tex = Application.instance.device.createTexture2DFromImage(bm, srgb, options);
           if (tex) {

@@ -2,7 +2,7 @@ import { ForwardRenderPass } from './forward_pass';
 import { ShadowMapPass } from './shadowmap_pass';
 import { DepthRenderPass } from './depth_pass';
 import { Vector4 } from '@zephyr3d/base';
-import { FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
+import type { FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
 import { Application } from '../app';
 import { CopyBlitter } from '../blitter';
 import { TemporalCache, type DrawContext } from '.';

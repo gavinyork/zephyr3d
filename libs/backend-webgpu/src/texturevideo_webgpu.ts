@@ -1,5 +1,5 @@
-import { TypedArray } from '@zephyr3d/base';
-import { GPUDataBuffer, TextureVideo } from '@zephyr3d/device';
+import type { TypedArray } from '@zephyr3d/base';
+import type { GPUDataBuffer, TextureVideo } from '@zephyr3d/device';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPUDevice } from './device';
 

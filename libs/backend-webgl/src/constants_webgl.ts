@@ -1,5 +1,5 @@
 import { CubeFace } from '@zephyr3d/base';
-import { PBPrimitiveType,
+import type {
   TextureType,
   CompareFunc,
   TextureAddressMode,
@@ -10,6 +10,8 @@ import { PBPrimitiveType,
   FaceMode,
   FaceWinding,
   StencilOp
+} from '@zephyr3d/device';
+import { PBPrimitiveType
 } from '@zephyr3d/device';
 import { WebGLEnum } from './webgl_enum';
 

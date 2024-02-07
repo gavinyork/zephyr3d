@@ -1,19 +1,21 @@
-import { isPowerOf2, TypedArray } from '@zephyr3d/base';
+import type { TypedArray } from '@zephyr3d/base';
+import { isPowerOf2 } from '@zephyr3d/base';
+import type {
+  TextureCaps,
+  SamplerOptions,
+  BaseTexture,
+  TextureSampler,
+  TextureType,
+  TextureFormat,
+  GPUDataBuffer} from '@zephyr3d/device';
 import {
   isCompressedTextureFormat,
   hasDepthChannel,
   isFloatTextureFormat,
   isIntegerTextureFormat,
   isSignedTextureFormat,
-  TextureCaps,
   GPUResourceUsageFlags,
-  SamplerOptions,
-  BaseTexture,
-  TextureSampler,
-  TextureType,
-  TextureFormat,
   isSRGBTextureFormat,
-  GPUDataBuffer,
   getTextureFormatBlockWidth,
   getTextureFormatBlockHeight,
   getTextureFormatBlockSize

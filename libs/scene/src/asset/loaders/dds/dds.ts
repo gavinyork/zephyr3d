@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import type { TextureFormat, TextureMipmapLevelData, TextureMipmapData } from '@zephyr3d/device';
 import type { TypedArray } from '@zephyr3d/base';
 
@@ -195,95 +196,6 @@ interface DDSPixelFormat {
   dwGBitMask?: number;
   dwBBitMask?: number;
   dwABitMask?: number;
-}
-
-function getDDSHeaderDesc(header: DDSHeader) {
-  let desc = '';
-  const flags: string[] = [];
-  if (header.dwFlags & DDSD_CAPS) {
-    flags.push('Caps');
-  }
-  if (header.dwFlags & DDSD_HEIGHT) {
-    flags.push('Height');
-  }
-  if (header.dwFlags & DDSD_WIDTH) {
-    flags.push('Width');
-  }
-  if (header.dwFlags & DDSD_PITCH) {
-    flags.push('Pitch');
-  }
-  if (header.dwFlags & DDSD_PIXELFORMAT) {
-    flags.push('PixelFormat');
-  }
-  if (header.dwFlags & DDSD_MIPMAPCOUNT) {
-    flags.push('MipmapCount');
-  }
-  if (header.dwFlags & DDSD_LINEARSIZE) {
-    flags.push('LinearSize');
-  }
-  if (header.dwFlags & DDSD_DEPTH) {
-    flags.push('Depth');
-  }
-  desc += `Flags: ${flags.join('|')}\n`;
-  if (header.dwFlags & DDSD_WIDTH) {
-    desc += `Width: ${header.dwWidth}\n`;
-  }
-  if (header.dwFlags & DDSD_HEIGHT) {
-    desc += `Height: ${header.dwHeight}\n`;
-  }
-  if (header.dwFlags & DDSD_DEPTH) {
-    desc += `Depth: ${header.dwDepth}\n`;
-  }
-  if (header.dwFlags & DDSD_PITCH) {
-    desc += `Pitch: ${header.dwPitchOrLinearSize}\n`;
-  }
-  if (header.dwFlags & DDSD_LINEARSIZE) {
-    desc += `LinearSize: ${header.dwPitchOrLinearSize}\n`;
-  }
-  if (header.dwFlags & DDSD_MIPMAPCOUNT) {
-    desc += `MipmapCount: ${header.dwMipmapCount}\n`;
-  }
-  const caps: string[] = [];
-  if (header.dwCaps & DDSCAPS_COMPLEX) {
-    caps.push('Complex');
-  }
-  if (header.dwCaps & DDSCAPS_MIPMAP) {
-    caps.push('Mipmap');
-  }
-  if (header.dwCaps & DDSCAPS_TEXTURE) {
-    caps.push('Texture');
-  }
-  desc += `Caps: ${caps.join('|')}\n`;
-  const caps2: string[] = [];
-  if (header.dwCaps2 & DDSCAPS2_CUBEMAP) {
-    caps2.push('CubeMap');
-  }
-  if (header.dwCaps2 & DDSCAPS2_CUBEMAP_POSITIVEX) {
-    caps2.push('CubeFacePX');
-  }
-  if (header.dwCaps2 & DDSCAPS2_CUBEMAP_NEGATIVEX) {
-    caps2.push('CubeFaceNX');
-  }
-  if (header.dwCaps2 & DDSCAPS2_CUBEMAP_POSITIVEY) {
-    caps2.push('CubeFacePY');
-  }
-  if (header.dwCaps2 & DDSCAPS2_CUBEMAP_NEGATIVEY) {
-    caps2.push('CubeFaceNY');
-  }
-  if (header.dwCaps2 & DDSCAPS2_CUBEMAP_POSITIVEZ) {
-    caps2.push('CubeFacePZ');
-  }
-  if (header.dwCaps2 & DDSCAPS2_CUBEMAP_NEGATIVEZ) {
-    caps2.push('CubeFaceNZ');
-  }
-  if (header.dwCaps2 & DDSCAPS2_VOLUME) {
-    caps2.push('Volume');
-  }
-  desc += `Caps2: ${caps2.join('|')}\n`;
-  if (header.dwFlags & DDSD_PIXELFORMAT) {
-    desc += getPixelFormatDesc(header);
-  }
-  return desc;
 }
 
 interface DDSHeader {

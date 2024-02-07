@@ -1,5 +1,5 @@
 import { Vector3, Matrix4x4 } from '@zephyr3d/base';
-import {
+import type {
   GPUProgram,
   BaseTexture,
   Texture2D,
@@ -7,62 +7,11 @@ import {
   TextureVideo,
   BindGroup,
   RenderStateSet,
-  PBInsideFunctionScope,
-  PBGlobalScope,
-  PBShaderExp,
-  ShaderType
 } from '@zephyr3d/device';
-import { AssetManager, BoxShape, panoramaToCubemap, prefilterCubemap, projectCubemap, projectCubemapCPU, Blitter, BlitType, Application, linearToGamma } from '@zephyr3d/scene';
+import type { AssetManager} from '@zephyr3d/scene';
+import { BoxShape, panoramaToCubemap, prefilterCubemap, projectCubemap, projectCubemapCPU, Application, linearToGamma } from '@zephyr3d/scene';
 
 const cubeMap = './assets/images/environments/cloudy.hdr';
-const faceDirections = [
-  [new Vector3(0, 0, -1), new Vector3(0, -1, 0), new Vector3(1, 0, 0)],
-  [new Vector3(0, 0, 1), new Vector3(0, -1, 0), new Vector3(-1, 0, 0)],
-  [new Vector3(1, 0, 0), new Vector3(0, 0, 1), new Vector3(0, 1, 0)],
-  [new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector3(0, -1, 0)],
-  [new Vector3(1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, 1)],
-  [new Vector3(-1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, -1)],
-];
-
-class ReduceBlitter extends Blitter {
-  protected _width: number;
-  constructor(width?: number) {
-    super();
-    this._width = width ?? 0;
-  }
-  get width(): number {
-    return this._width;
-  }
-  set width(val: number) {
-    this._width = val;
-  }
-  setup(scope: PBGlobalScope, type: BlitType) {
-    const pb = scope.$builder;
-    if (pb.shaderKind === 'fragment') {
-      scope.width = pb.float().uniform(0);
-    }
-  }
-  setUniforms(bindGroup: BindGroup) {
-    bindGroup.setValue('width', this._width);
-  }
-  filter(scope: PBInsideFunctionScope, type: BlitType, srcTex: PBShaderExp, srcUV: PBShaderExp, srcLayer: PBShaderExp): PBShaderExp {
-    const pb = scope.$builder;
-    pb.func('reduce', [pb.vec2('uv')], function(){
-      this.$l.h = pb.div(0.5, this.width);
-      // this.$l.uv1 = pb.add(this.uv, pb.vec2(this.h));
-      this.$l.uv1 = this.uv;
-      this.$l.tl = pb.textureSampleLevel(srcTex, pb.vec2(pb.sub(this.uv1.x, this.h), pb.sub(this.uv1.y, this.h)), 0);
-      this.$l.tr = pb.textureSampleLevel(srcTex, pb.vec2(pb.add(this.uv1.x, this.h), pb.sub(this.uv1.y, this.h)), 0);
-      this.$l.bl = pb.textureSampleLevel(srcTex, pb.vec2(pb.sub(this.uv1.x, this.h), pb.add(this.uv1.y, this.h)), 0);
-      this.$l.br = pb.textureSampleLevel(srcTex, pb.vec2(pb.add(this.uv1.x, this.h), pb.add(this.uv1.y, this.h)), 0);
-      this.$return(pb.vec4(pb.add(this.tl, this.tr, this.bl, this.br).rgb, 1));
-    });
-    return scope.reduce(srcUV);
-  }
-  protected calcHash(): string {
-    return '';
-  }
-}
 
 export abstract class TextureTestCase {
   protected assetManager: AssetManager;
@@ -454,7 +403,7 @@ export class TestTexture3D extends TextureTestCase {
       ...purple
     ]);
     const tex = Application.instance.device.createTexture3D('rgba8unorm', 4, 4, 4, {
-      noMipmap: true
+      samplerOptions: { mipFilter: 'none' }
     });
     tex.update(pixels, 0, 0, 0, 4, 4, 4);
     return tex;
@@ -517,7 +466,7 @@ export class TestTextureCube extends TextureTestCase {
     this.srcTex = Application.instance.device.createCubeTexture(tex.format, 128);
     panoramaToCubemap(tex, this.srcTex);
     tex.dispose();
-    this.prefilteredTex = Application.instance.device.createCubeTexture('rgba16f', 128, { noMipmap: true });
+    this.prefilteredTex = Application.instance.device.createCubeTexture('rgba16f', 128, { samplerOptions: { mipFilter: 'none' } });
     prefilterCubemap(this.srcTex, 'lambertian', this.prefilteredTex, 300);
     return this.srcTex;
   }
@@ -691,7 +640,7 @@ export class TestTextureCubeSH extends TextureTestCase {
     const hdrTex = await this.assetManager.fetchTexture<Texture2D>(cubeMap);
     this.srcTex = Application.instance.device.createCubeTexture(hdrTex.format, hdrTex.height);
     panoramaToCubemap(hdrTex, this.srcTex);
-    this.prefiltered = Application.instance.device.createCubeTexture('rgba16f', 64, { noMipmap: true });
+    this.prefiltered = Application.instance.device.createCubeTexture('rgba16f', 64, { samplerOptions: { mipFilter: 'none' } });
     prefilterCubemap(this.srcTex, 'lambertian', this.prefiltered, 2048);
     hdrTex.dispose();
     if (1) {

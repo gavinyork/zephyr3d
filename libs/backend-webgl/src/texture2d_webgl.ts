@@ -1,10 +1,12 @@
-import { linearTextureFormatToSRGB,
-  GPUResourceUsageFlags,
+import type {
   TextureImageElement,
   TextureMipmapData,
   Texture2D,
   GPUDataBuffer,
   TextureFormat
+} from '@zephyr3d/device';
+import { linearTextureFormatToSRGB,
+  GPUResourceUsageFlags
 } from '@zephyr3d/device';
 import { textureTargetMap } from './constants_webgl';
 import { WebGLBaseTexture } from './basetexture_webgl';
@@ -189,7 +191,7 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
     }
     const width = levels.width;
     const height = levels.height;
-    let mipLevelCount = levels.mipLevels;
+    const mipLevelCount = levels.mipLevels;
     if (levels.isCompressed) {
       if (!this.getTextureCaps().supportS3TCSRGB || !this.getTextureCaps().supportS3TC) {
         console.warn('No s3tc compression format support');

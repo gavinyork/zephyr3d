@@ -1,4 +1,5 @@
-import { ShaderType, BindGroupLayout } from '@zephyr3d/device';
+import type { BindGroupLayout } from '@zephyr3d/device';
+import { ShaderType } from '@zephyr3d/device';
 import { textureFormatMap } from './constants_webgpu';
 import type { WebGPUDevice } from './device';
 

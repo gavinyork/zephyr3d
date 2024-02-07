@@ -2899,11 +2899,11 @@ export interface SceneNodeVisitor {
 export class SceneUpdateEvent {
     constructor(scene: Scene);
     // (undocumented)
-    static readonly NAME = "sceneupdate";
+    static readonly NAME: "sceneupdate";
     // (undocumented)
     scene: Scene;
     // (undocumented)
-    type: string;
+    type: "sceneupdate";
 }
 
 // @public

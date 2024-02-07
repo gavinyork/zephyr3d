@@ -1,20 +1,21 @@
-import { Vector2, Vector3, Vector4, Matrix3x3 } from '@zephyr3d/base';
+import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT } from '../values';
 import type { Texture2D, BaseTexture, TextureCube } from '@zephyr3d/device';
 import type { AssetManager } from './assetmanager';
 import { Application } from '../app';
 
+/*
 interface MicrofacetDistributionSample {
   pdf?: number;
   cosTheta?: number;
   sinTheta?: number;
   phi?: number;
 }
-
+*/
 /** @internal */
 export function getTestCubemapLoader(): (assetManager: AssetManager) => Promise<TextureCube> {
   return async function(assetManager: AssetManager): Promise<TextureCube> {
-    const tex = Application.instance.device.createCubeTexture('rgba8unorm', 32, { noMipmap: true });
+    const tex = Application.instance.device.createCubeTexture('rgba8unorm', 32, { samplerOptions: { mipFilter: 'none' } });
     const fb = Application.instance.device.createFrameBuffer([tex], null);
     Application.instance.device.pushDeviceStates();
     Application.instance.device.setFramebuffer(fb);
@@ -31,19 +32,6 @@ export function getTestCubemapLoader(): (assetManager: AssetManager) => Promise<
 
 /** @internal */
 export function getSheenLutLoader(textureSize: number): (assetManager: AssetManager) => Promise<Texture2D> {
-  const xi = new Vector2();
-  const localSpaceDirection = new Vector3();
-  const V = new Vector3();
-  const N = new Vector3();
-  const L = new Vector3();
-  const H = new Vector3();
-  const direction = new Vector3();
-  const bitangent = new Vector3();
-  const tangent = new Vector3();
-  const up = Vector3.axisPY();
-  const TBN = new Matrix3x3();
-  const importanceSample: MicrofacetDistributionSample = {};
-
   const bits = new Uint32Array(1);
 
   //Van der Corput radical inverse
@@ -72,7 +60,7 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
     out.setXY(i * iN, (bits >>> 0) * tof);
   }
   */
-
+  /*
   function generateTBN(normal: Vector3, out: Matrix3x3) {
     bitangent.setXYZ(0.0, 1.0, 0.0);
     const NdotUp = Vector3.dot(normal, up);
@@ -91,11 +79,9 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
     out.setCol(1, bitangent);
     out.setCol(2, normal);
   }
-
   function mix(x: number, y: number, a: number): number {
     return x * (1 - a) + y * a;
   }
-
   function l(x: number, alphaG: number): number {
     const oneMinusAlphaSq = (1 - alphaG) * (1 - alphaG);
     const a = mix(21.5473, 25.3245, oneMinusAlphaSq);
@@ -105,18 +91,16 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
     const e = mix(-4.32054, -4.85967, oneMinusAlphaSq);
     return a / (1 + b * Math.pow(x, c)) + d * x + e;
   }
-
   function lambdaSheen(cosTheta: number, alphaG: number): number {
     return Math.abs(cosTheta) < 0.5
       ? Math.exp(l(Math.abs(cosTheta), alphaG))
       : Math.exp(2 * l(0.5, alphaG) - l(1 - Math.abs(cosTheta), alphaG));
   }
-
   function visibilityCharlie(NdotV: number, NdotL: number, a: number): number {
     const alphaG = a;
     return 1 / ((1 + lambdaSheen(NdotV, alphaG) + lambdaSheen(NdotL, alphaG)) * (4 * NdotV * NdotL));
   }
-
+  */
   function distributionCharlie(NdotH: number, roughness: number) {
     // roughness = Math.max(roughness, 0.000001);
     const invAlpha = 1 / roughness;
@@ -124,7 +108,7 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
     const sin2h = 1 - cos2h;
     return ((2 + invAlpha) * Math.pow(sin2h, invAlpha * 0.5)) / (2 * Math.PI);
   }
-
+  /*
   function charlie(xi: Vector2, roughness: number, sample: MicrofacetDistributionSample) {
     const alpha = roughness * roughness;
     sample.sinTheta = Math.pow(xi.y, alpha / (2 * alpha + 1));
@@ -132,7 +116,6 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
     sample.phi = 2 * Math.PI * xi.x;
     sample.pdf = distributionCharlie(sample.cosTheta, Math.max(alpha, 0.000001)) / 4;
   }
-
   function getImportanceSample(
     sampleIndex: number,
     sampleCount: number,
@@ -159,7 +142,6 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
     TBN.transform(localSpaceDirection, direction);
     out.setXYZW(direction.x, direction.y, direction.z, importanceSample.pdf);
   }
-
   function lut(NdotV: number, roughness: number, numSamples: number, out: Vector4) {
     V.setXYZ(Math.sqrt(1 - NdotV * NdotV), 0, NdotV);
     N.setXYZ(0, 0, 1);
@@ -210,6 +192,7 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
     tex.name = `builtin:${BUILTIN_ASSET_TEXTURE_SHEEN_LUT}`;
     return tex;
   }
+  */
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -362,6 +345,7 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
     return _tables.baseTable[e] + ((f & 0x007fffff) >> _tables.shiftTable[e]);
   }
 
+  /*
   function decodeF16(val: number) {
     const exponent = (val & 0x7c00) >> 10;
     const fraction = val & 0x03ff;
@@ -376,6 +360,7 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
         : 6.103515625e-5 * (fraction / 0x400))
     );
   }
+  */
 
   async function createSheenLUTFilament(assetManager: AssetManager, texture?: BaseTexture): Promise<Texture2D> {
     if (texture) {

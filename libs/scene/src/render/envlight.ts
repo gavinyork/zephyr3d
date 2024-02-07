@@ -1,5 +1,5 @@
 import { Vector4 } from '@zephyr3d/base';
-import { BindGroup, PBInsideFunctionScope, PBShaderExp, ProgramBuilder, TextureCube } from '@zephyr3d/device';
+import type { BindGroup, PBInsideFunctionScope, PBShaderExp, ProgramBuilder, TextureCube } from '@zephyr3d/device';
 import { Application } from '../app';
 
 /**

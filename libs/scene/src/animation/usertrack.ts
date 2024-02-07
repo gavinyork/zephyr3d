@@ -1,4 +1,5 @@
-import { InterpolationMode, InterpolationTarget, Interpolator } from "@zephyr3d/base";
+import type { InterpolationMode, InterpolationTarget} from "@zephyr3d/base";
+import { Interpolator } from "@zephyr3d/base";
 import { AnimationTrack } from "./animationtrack";
 import type { SceneNode } from "../scene";
 

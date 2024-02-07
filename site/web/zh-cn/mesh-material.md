@@ -46,14 +46,6 @@ camera.controller = new OrbitCameraController({ distance: 4 });
 我们使用[AssetManager](/doc/markdown/./scene.assetmanager)类的fetchTexture()方法加载贴图。<br>
 [AssetManager.fetchTexture()](/doc/markdown/./scene.assetmanager.fetchtexture)方法接受一个URL地址参数以及一个可选的[Options](/doc/markdown/./scene.texturefetchoptions)对象。<br>
 
-Options对象包含以下属性：
-
-|名称|类型|默认值|说明|
-|---|---|---|---|
-|linearColorSpace|boolean|false|true 线性颜色空间，false sRGB颜色空间
-|mimeType|string|null|为空则通过文件扩展名确定
-|noMipmap|boolean|false|true 不生成mipmap false 生成mipmap
-
 AssetManager会对加载的资源进行缓存，如果该贴图已经加载则不会重新加载。
 
 

@@ -1,4 +1,5 @@
-import { CubeFace, Matrix4x4, Vector3, Frustum, Vector4, Plane } from '@zephyr3d/base';
+import type { CubeFace, Vector3, Plane } from '@zephyr3d/base';
+import { Matrix4x4, Frustum, Vector4 } from '@zephyr3d/base';
 import { SceneNode } from '../scene/scene_node';
 import { Application } from '../app';
 import { ForwardRenderScheme } from '../render';
@@ -329,6 +330,7 @@ export class Camera extends SceneNode {
   render(scene: Scene, compositor?: Compositor, logger?: RenderLogger) {
     const device = Application.instance.device;
     device.pushDeviceStates();
+    device.reverseVertexWindingOrder(false);
     device.setFramebuffer(this._framebuffer);
     ForwardRenderScheme.setClearColor(this._clearColor);
     ForwardRenderScheme.renderScene(scene, this, compositor, logger);

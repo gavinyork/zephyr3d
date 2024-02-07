@@ -1,7 +1,5 @@
-import {
+import type {
   AbstractDevice,
-  DeviceGPUObjectRenameEvent,
-  genDefaultName,
   BindGroup,
   VertexLayout,
   TextureSampler,
@@ -15,6 +13,10 @@ import {
   GPUDataBuffer,
   GPUProgram,
   GPUObject
+} from '@zephyr3d/device';
+import {
+  DeviceGPUObjectRenameEvent,
+  genDefaultName
 } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
 import { makeEventTarget } from '@zephyr3d/base';

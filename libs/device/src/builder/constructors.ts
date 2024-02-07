@@ -1,4 +1,5 @@
-import { PBShaderExp, ShaderTypeFunc, makeConstructor } from './base';
+import type { ShaderTypeFunc} from './base';
+import { PBShaderExp, makeConstructor } from './base';
 import * as typeinfo from './types';
 import * as AST from './ast';
 import * as errors from './errors';

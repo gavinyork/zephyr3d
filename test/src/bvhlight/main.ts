@@ -1,4 +1,7 @@
-import { Vector3, Vector4, AABB, Matrix4x4 } from '@zephyr3d/base';
+import type { AABB} from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
+import type {
+  SceneNode} from '@zephyr3d/scene';
 import {
   Scene,
   AssetManager,
@@ -6,10 +9,7 @@ import {
   prefilterCubemap,
   Application,
   Tonemap,
-  Model,
   BoundingBox,
-  SceneNode,
-  Camera,
   FPSCameraController,
   PointLight,
   UnlitMaterial,
@@ -21,7 +21,7 @@ import {
   Compositor,
 } from '@zephyr3d/scene';
 import * as common from '../common';
-import { Texture2D } from '@zephyr3d/device';
+import type { Texture2D } from '@zephyr3d/device';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 
 const bvhLightApp = new Application({
@@ -47,7 +47,7 @@ bvhLightApp.ready().then(async () => {
   const tex = await assetManager.fetchTexture<Texture2D>('./assets/images/environments/papermill.hdr');
   const skyMap = device.createCubeTexture('rgba16f', 512);
   const radianceMap = device.createCubeTexture('rgba16f', 256);
-  const irradianceMap = device.createCubeTexture('rgba16f', 128, { noMipmap: true });
+  const irradianceMap = device.createCubeTexture('rgba16f', 128, { samplerOptions: { mipFilter: 'none' } });
   panoramaToCubemap(tex, skyMap);
   prefilterCubemap(skyMap, 'ggx', radianceMap);
   prefilterCubemap(skyMap, 'lambertian', irradianceMap);

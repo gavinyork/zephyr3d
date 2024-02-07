@@ -1,7 +1,8 @@
-import { Vector3, Vector4, Matrix4x4 } from './vector';
+import type { Matrix4x4 } from './vector';
+import { Vector3, Vector4 } from './vector';
 import { BoxSide, ClipState } from './types';
-import { Plane } from './plane';
-import { Frustum } from './frustum';
+import type { Plane } from './plane';
+import type { Frustum } from './frustum';
 
 /**
  * Axis aligned bounding box

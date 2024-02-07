@@ -1,8 +1,9 @@
-import { TypedArray, Vector4 } from '@zephyr3d/base';
-import { hasStencilChannel, PBPrimitiveTypeInfo, PBPrimitiveType, PrimitiveType, DeviceViewport, isIntegerTextureFormat, isSignedTextureFormat } from '@zephyr3d/device';
-import { WebGPUProgram } from './gpuprogram_webgpu';
-import { WebGPURenderStateSet } from './renderstates_webgpu';
-import { WebGPUBindGroup } from './bindgroup_webgpu';
+import type { TypedArray, Vector4 } from '@zephyr3d/base';
+import type { PrimitiveType, DeviceViewport} from '@zephyr3d/device';
+import { hasStencilChannel, PBPrimitiveTypeInfo, PBPrimitiveType, isIntegerTextureFormat, isSignedTextureFormat } from '@zephyr3d/device';
+import type { WebGPUProgram } from './gpuprogram_webgpu';
+import type { WebGPURenderStateSet } from './renderstates_webgpu';
+import type { WebGPUBindGroup } from './bindgroup_webgpu';
 import { WebGPUMipmapGenerator, WebGPUClearQuad } from './utils_webgpu';
 import type { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPUBuffer } from './buffer_webgpu';
@@ -11,7 +12,7 @@ import type { WebGPUFrameBuffer } from './framebuffer_webgpu';
 import type { WebGPUVertexLayout } from './vertexlayout_webgpu';
 import type { WebGPUIndexBuffer } from './indexbuffer_webgpu';
 import type { FrameBufferInfo } from './pipeline_cache';
-import { WebGPUStructuredBuffer } from './structuredbuffer_webgpu';
+import type { WebGPUStructuredBuffer } from './structuredbuffer_webgpu';
 import { textureFormatInvMap } from './constants_webgpu';
 
 const VALIDATION_NEED_NEW_PASS = 1 << 0;

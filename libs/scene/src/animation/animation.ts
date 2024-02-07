@@ -1,5 +1,5 @@
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
-import { AnimationTrack } from './animationtrack';
+import type { AnimationTrack } from './animationtrack';
 import { BoundingBox } from '../utility/bounding_volume';
 import { Application } from '../app';
 import type { SceneNode } from '../scene/scene_node';

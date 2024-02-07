@@ -1,9 +1,10 @@
-import { GPUDataBuffer, GPUResourceUsageFlags, TextureVideo } from '@zephyr3d/device';
+import type { GPUDataBuffer, TextureVideo } from '@zephyr3d/device';
+import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { textureTargetMap } from './constants_webgl';
 import { WebGLBaseTexture } from './basetexture_webgl';
 import type { WebGLDevice } from './device_webgl';
 import type { WebGLTextureCaps } from './capabilities_webgl';
-import { TypedArray } from '@zephyr3d/base';
+import type { TypedArray } from '@zephyr3d/base';
 
 export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<WebGLTexture> {
   private _source: HTMLVideoElement;

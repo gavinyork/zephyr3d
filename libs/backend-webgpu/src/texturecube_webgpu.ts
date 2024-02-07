@@ -1,15 +1,17 @@
-import { CubeFace, TypedArray } from '@zephyr3d/base';
-import {
-  linearTextureFormatToSRGB,
-  getTextureFormatBlockWidth,
-  getTextureFormatBlockHeight,
-  getTextureFormatBlockSize,
-  GPUResourceUsageFlags,
+import type { CubeFace, TypedArray } from '@zephyr3d/base';
+import type {
   TextureMipmapData,
   TextureCube,
   TextureImageElement,
   GPUDataBuffer,
   TextureFormat
+} from '@zephyr3d/device';
+import {
+  linearTextureFormatToSRGB,
+  getTextureFormatBlockWidth,
+  getTextureFormatBlockHeight,
+  getTextureFormatBlockSize,
+  GPUResourceUsageFlags
 } from '@zephyr3d/device';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPUDevice } from './device';

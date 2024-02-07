@@ -228,7 +228,7 @@ export class ClusteredLight {
     if (textureWidth * textureHeight !== this._tileCountX * this._tileCountY * this._tileCountZ) {
       throw new Error('Internal error');
     }
-    this._lightIndexTexture = device.createTexture2D(device.type === 'webgl' ? 'rgba32f' : 'rgba32ui', textureWidth, textureHeight, { noMipmap: true });
+    this._lightIndexTexture = device.createTexture2D(device.type === 'webgl' ? 'rgba32f' : 'rgba32ui', textureWidth, textureHeight, { samplerOptions: { mipFilter: 'none' } });
     this._lightIndexTexture.name = 'ClusterLightIndex';
     this._lightIndexFramebuffer?.dispose();
     this._lightIndexFramebuffer = device.createFrameBuffer([this._lightIndexTexture], null);

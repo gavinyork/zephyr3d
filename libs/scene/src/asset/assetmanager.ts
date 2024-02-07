@@ -1,5 +1,5 @@
 import { Vector3, isPowerOf2, nextPowerOf2, HttpRequest } from '@zephyr3d/base';
-import { AssetHierarchyNode, AssetSkeleton, AssetSubMeshData, SharedModel } from './model';
+import type { AssetHierarchyNode, AssetSkeleton, AssetSubMeshData, SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
 import { DDSLoader } from './loaders/dds/dds_loader';
@@ -7,7 +7,8 @@ import { HDRLoader } from './loaders/hdr/hdr';
 import { SceneNode } from '../scene/scene_node';
 import { Mesh } from '../scene/mesh';
 import { RotationTrack, ScaleTrack, Skeleton, TranslationTrack } from '../animation';
-import { AnimationClip, SkinnedBoundingBox } from '../animation/animation';
+import type { SkinnedBoundingBox } from '../animation/animation';
+import { AnimationClip } from '../animation/animation';
 import { BoundingBox } from '../utility/bounding_volume';
 import { CopyBlitter } from '../blitter';
 import { getSheenLutLoader, getTestCubemapLoader } from './builtin';
@@ -151,9 +152,7 @@ export class AssetManager {
   /**
    * Fetches a texture resource from a given URL
    * @param url - The URL from where to fetch the resource
-   * @param mimeType - The MIME type of the texture resource
-   * @param srgb - Whether this texture should be loaded in a sRGB format
-   * @param noMipmap - Whether this texture should not generate mipmaps
+   * @param options - Options for texture fetching
    * @returns The fetched texture
    */
   async fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>): Promise<T> {
@@ -298,7 +297,7 @@ export class AssetManager {
             minFilter,
             mipFilter
           });
-          let destFormat = srgb ? 'rgba8unorm' : tex.format;
+          const destFormat = srgb ? 'rgba8unorm' : tex.format;
           const blitter = new CopyBlitter();
           const newTexture = tex.isTexture2D()
             ? device.createTexture2D(destFormat, newWidth, newHeight)

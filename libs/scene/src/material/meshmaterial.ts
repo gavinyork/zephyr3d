@@ -1,7 +1,9 @@
-import { BindGroup, GPUProgram, PBFunctionScope, PBInsideFunctionScope, PBShaderExp, ProgramBuilder } from "@zephyr3d/device";
+import type { BindGroup, GPUProgram, PBFunctionScope, PBInsideFunctionScope, PBShaderExp} from "@zephyr3d/device";
+import { ProgramBuilder } from "@zephyr3d/device";
 import { RENDER_PASS_TYPE_DEPTH_ONLY, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP } from "../values";
-import { IMaterial, Material } from "./material";
-import { DrawContext, ShadowMapPass } from "../render";
+import type { IMaterial} from "./material";
+import { Material } from "./material";
+import type { DrawContext, ShadowMapPass } from "../render";
 import { ShaderFramework, encodeColorOutput, encodeNormalizedFloatToRGBA, nonLinearDepthToLinearNormalized } from "../shaders";
 import { Application } from "../app";
 

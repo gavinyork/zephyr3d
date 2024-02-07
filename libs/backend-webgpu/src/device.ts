@@ -1,6 +1,5 @@
-import { Vector4, TypedArray } from '@zephyr3d/base';
-import {
-  getTextureFormatBlockSize,
+import type { Vector4, TypedArray } from '@zephyr3d/base';
+import type {
   FrameBufferOptions,
   SamplerOptions,
   TextureSampler,
@@ -23,10 +22,8 @@ import {
   BufferCreationOptions,
   VertexLayoutOptions,
   GPUProgramConstructParams,
-  DeviceResizeEvent,
   DeviceCaps,
   DeviceOptions,
-  BaseDevice,
   RenderStateSet,
   PBStructTypeInfo,
   ITimer,
@@ -36,7 +33,12 @@ import {
   DeviceViewport,
   BaseTexture
 } from '@zephyr3d/device';
-import { WebGPUTextureSampler } from './sampler_webgpu';
+import {
+  getTextureFormatBlockSize,
+  DeviceResizeEvent,
+  BaseDevice
+} from '@zephyr3d/device';
+import type { WebGPUTextureSampler } from './sampler_webgpu';
 import { WebGPUProgram } from './gpuprogram_webgpu';
 import { WebGPUBindGroup } from './bindgroup_webgpu';
 import { WebGPUTexture2D } from './texture2d_webgpu';
@@ -338,13 +340,13 @@ export class WebGPUDevice extends BaseDevice {
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
-  createTexture2DArrayFromMipmapData(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): Texture2DArray {
+  createTexture2DArrayFromMipmapData(data: TextureMipmapData, options?: TextureCreationOptions): Texture2DArray {
     const tex = (options?.texture as WebGPUTexture2DArray) ?? new WebGPUTexture2DArray(this);
     if (!tex.isTexture2DArray()) {
       console.error('createTexture2DArrayFromMipmapData() failed: options.texture must be 2d array texture');
       return null;
     }
-    tex.createWithMipmapData(data, sRGB, this.parseTextureOptions(options));
+    tex.createWithMipmapData(data, this.parseTextureOptions(options));
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }

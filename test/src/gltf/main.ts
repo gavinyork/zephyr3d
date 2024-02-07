@@ -1,4 +1,4 @@
-import { ImGui, imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
+import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { Application, Scene } from '@zephyr3d/scene';
 import { getBackend, Inspector } from '../common';
 import { GLTFViewer } from './gltfviewer';

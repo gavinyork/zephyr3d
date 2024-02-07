@@ -1,5 +1,6 @@
 import { Vector4 } from "@zephyr3d/base";
-import { DrawContext, EnvConstantAmbient, EnvHemisphericAmbient, EnvIBL, EnvironmentLighting, EnvLightType } from "../render";
+import type { DrawContext, EnvironmentLighting, EnvLightType } from "../render";
+import { EnvConstantAmbient, EnvHemisphericAmbient, EnvIBL } from "../render";
 import { SkyRenderer } from '../render/sky';
 import type { TextureCube } from "@zephyr3d/device";
 

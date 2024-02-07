@@ -1,11 +1,10 @@
-import { Vector2, Vector3, Vector4, Matrix3x3, Matrix4x4, ObservableVector2, Quaternion, Plane } from '@zephyr3d/base';
-import { TestCase, doTest } from '../common';
+import { Vector2, Vector3, Vector4, Matrix3x3, Matrix4x4 } from '@zephyr3d/base';
+import type { TestCase} from '../common';
+import { doTest } from '../common';
 import { testVectorType, testMatrixType, testQuaternion, testXForm } from './vector';
 import { testPlane } from './plane';
 import { testFrustum } from './frustum';
 import { testAABB } from './aabb';
-import { testSH } from './sh';
-import { packFloat3 } from '@zephyr3d/base';
 
 const testCases: TestCase[] = [
   {
@@ -58,34 +57,8 @@ const testCases: TestCase[] = [
     times: 100,
     execute: () => testAABB()
   },
-  /*
-  {
-    caseName: 'SH test',
-    times: 1,
-    execute: () => testSH()
-  }
-  */
 ];
-const p = Matrix4x4.perspective(Math.PI/2, 1, 1, 200);
-for (let i = 0; i < 100; i++) {
-  const x = new Vector4(0, 0, -1 - i, 1);
-  const z = p.transform(x);
-  console.log(`(${x.z}, ${(z.z/z.w)*0.5 + 0.5})`);
-}
 
-for (let i = 0; i < 10; i++) {
-  const mat = new Matrix4x4();
-  mat.rotateLeft(new Matrix4x4(Quaternion.fromEulerAngle(0, Math.PI * 2 * i / 10, 0, 'ZYX'))).translateLeft(new Vector3(0, 5 * i / 10, 0));
-  console.log(`${mat[12]}, ${mat[13]}, ${mat[14]}`);
-}
-
-const plane = new Plane(0, -1, 0, 0);
-const clipPlane = new Plane(0, -1, 0, 0);
-const matReflectionR = Matrix4x4.invert(Matrix4x4.reflection(-plane.a, -plane.b, -plane.c, -plane.d));
-const m = matReflectionR;
-const m2 = Matrix4x4.lookAt(new Vector3(1,1,1), new Vector3(0,0,0), new Vector3(0,1,0));
-console.log(m.det());
-console.log(m2.det());
 (async function () {
   await doTest('math test', testCases);
 })();

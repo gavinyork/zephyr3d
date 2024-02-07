@@ -33,7 +33,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     createTexture2D(format: TextureFormat, width: number, height: number, options?: TextureCreationOptions): Texture2D;
     createTexture2DArray(format: TextureFormat, width: number, height: number, depth: number, options?: TextureCreationOptions): Texture2DArray;
     createTexture2DArrayFromImages(elements: TextureImageElement[], sRGB: boolean, options?: TextureCreationOptions): Texture2DArray;
-    createTexture2DArrayFromMipmapData(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): Texture2DArray;
+    createTexture2DArrayFromMipmapData(data: TextureMipmapData, options?: TextureCreationOptions): Texture2DArray;
     createTexture2DFromImage(element: TextureImageElement, sRGB: boolean, options?: TextureCreationOptions): Texture2D;
     createTexture2DFromMipmapData(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): Texture2D;
     createTexture3D(format: TextureFormat, width: number, height: number, depth: number, options?: TextureCreationOptions): Texture3D;
@@ -193,7 +193,7 @@ export abstract class BaseDevice {
     // (undocumented)
     abstract createTexture2DArrayFromImages(elements: TextureImageElement[], sRGB: boolean, options?: TextureCreationOptions): Texture2DArray;
     // (undocumented)
-    abstract createTexture2DArrayFromMipmapData(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): Texture2DArray;
+    abstract createTexture2DArrayFromMipmapData(data: TextureMipmapData, options?: TextureCreationOptions): Texture2DArray;
     // (undocumented)
     abstract createTexture2DFromImage(element: TextureImageElement, sRGB: boolean, options?: TextureCreationOptions): Texture2D;
     // (undocumented)
@@ -581,7 +581,7 @@ export type DeviceEventMap = {
 // @public
 export class DeviceGPUObjectAddedEvent {
     constructor(obj: GPUObject);
-    static readonly NAME: 'gpuobject_added';
+    static readonly NAME: "gpuobject_added";
     // (undocumented)
     object: GPUObject;
     // (undocumented)
@@ -612,7 +612,7 @@ export class DeviceGPUObjectRenameEvent {
 
 // @public
 export class DeviceLostEvent {
-    static readonly NAME: 'devicelost';
+    static readonly NAME: "devicelost";
     // (undocumented)
     type: "devicelost";
 }
@@ -628,7 +628,7 @@ export class DeviceResizeEvent {
     constructor(width: number, height: number);
     // (undocumented)
     height: number;
-    static readonly NAME: 'resize';
+    static readonly NAME: "resize";
     // (undocumented)
     type: "resize";
     // (undocumented)
@@ -637,7 +637,7 @@ export class DeviceResizeEvent {
 
 // @public
 export class DeviceRestoreEvent {
-    static readonly NAME: 'devicerestored';
+    static readonly NAME: "devicerestored";
     // (undocumented)
     type: "devicerestored";
 }
@@ -2202,7 +2202,7 @@ export interface Texture2D<T = unknown> extends BaseTexture<T> {
 // @public
 export interface Texture2DArray<T = unknown> extends BaseTexture<T> {
     // (undocumented)
-    createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number): void;
+    createWithMipmapData(data: TextureMipmapData, creationFlags?: number): void;
     // (undocumented)
     update(data: TypedArray, xOffset: number, yOffset: number, zOffset: number, width: number, height: number, depth: number): void;
     // (undocumented)
@@ -2212,7 +2212,7 @@ export interface Texture2DArray<T = unknown> extends BaseTexture<T> {
 // @public
 export interface Texture3D<T = unknown> extends BaseTexture<T> {
     // (undocumented)
-    createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number): void;
+    createWithMipmapData(data: TextureMipmapData, creationFlags?: number): void;
     // (undocumented)
     update(data: TypedArray, xOffset: number, yOffset: number, zOffset: number, width: number, height: number, depth: number): void;
 }
@@ -2269,8 +2269,6 @@ export type TextureColorSpace = 'srgb' | 'linear';
 
 // @public
 export interface TextureCreationOptions extends BaseCreationOptions {
-    // (undocumented)
-    noMipmap?: boolean;
     // (undocumented)
     samplerOptions?: SamplerOptions;
     // (undocumented)

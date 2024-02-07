@@ -1,5 +1,7 @@
-import { Font, FontCanvas } from './font';
-import { TextureAtlasManager, AtlasInfo } from './textureatlas';
+import type { Font} from './font';
+import { FontCanvas } from './font';
+import type { AtlasInfo } from './textureatlas';
+import { TextureAtlasManager } from './textureatlas';
 import type { AbstractDevice } from '../base_types';
 
 /**

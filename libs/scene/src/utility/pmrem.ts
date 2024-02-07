@@ -1,5 +1,5 @@
 import { Vector2, Vector3 } from "@zephyr3d/base";
-import { BindGroup, GPUProgram, RenderStateSet, TextureCube, VertexLayout } from "@zephyr3d/device";
+import type { BindGroup, GPUProgram, RenderStateSet, TextureCube, VertexLayout } from "@zephyr3d/device";
 import { Application } from "../app";
 
 // reference: https://placeholderart.wordpress.com/2015/07/28/implementation-notes-runtime-environment-map-filtering-for-image-based-lighting/
@@ -268,7 +268,7 @@ export function prefilterCubemap(tex: TextureCube, type: DistributionType, destT
   }
   device.pushDeviceStates();
   const rs = device.getRenderStates();
-  let srcTex = tex;
+  const srcTex = tex;
   const width = tex.width;
   const mipmapsCount = tex.mipLevelCount;
   const filteringInfo = new Vector2(width, mipmapsCount);

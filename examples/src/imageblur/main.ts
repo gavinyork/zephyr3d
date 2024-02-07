@@ -36,15 +36,6 @@ import { ImGui, imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from
     ImGui.End();
     imGuiEndFrame();
   }
-
-  function filterSizeChanged(value: number) {
-    settings.filterSize = value;
-    updateSettings();
-  }
-  function iterationChanged(value: number) {
-    settings.iterations = value;
-    updateSettings();
-  }
   const fullScreenQuadProgram = device.buildRenderProgram({
     label: 'fullScreenQuad',
     vertex(pb) {
@@ -152,11 +143,11 @@ import { ImGui, imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from
   const textures = [
     device.createTexture2D('rgba8unorm', texture.width, texture.height, {
       writable: true,
-      noMipmap: true
+      samplerOptions: { mipFilter: 'none' }
     }),
     device.createTexture2D('rgba8unorm', texture.width, texture.height, {
       writable: true,
-      noMipmap: true
+      samplerOptions: { mipFilter: 'none' }
     })
   ];
   const computeUniforms = device.createBindGroup(blurProgram.bindGroupLayouts[0]);

@@ -1,4 +1,5 @@
-import { linearTextureFormatToSRGB, GPUResourceUsageFlags, Texture3D, GPUDataBuffer, TextureFormat, TextureMipmapData } from '@zephyr3d/device';
+import type { Texture3D, GPUDataBuffer, TextureFormat, TextureMipmapData } from '@zephyr3d/device';
+import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { textureTargetMap } from './constants_webgl';
 import { WebGLBaseTexture } from './basetexture_webgl';
 import type { TypedArray } from '@zephyr3d/base';

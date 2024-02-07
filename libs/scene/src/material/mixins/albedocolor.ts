@@ -1,4 +1,5 @@
-import { Matrix4x4, Vector4 } from "@zephyr3d/base";
+import type { Matrix4x4} from "@zephyr3d/base";
+import { Vector4 } from "@zephyr3d/base";
 import type { IMeshMaterial } from "../meshmaterial";
 import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp, Texture2D, TextureSampler } from "@zephyr3d/device";
 import type { DrawContext } from "../../render";

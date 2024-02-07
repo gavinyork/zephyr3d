@@ -26,7 +26,7 @@ export class HDRLoader extends AbstractTextureLoader {
     texture?: BaseTexture
   ): Promise<BaseTexture> {
     let format: TextureFormat;
-    for (let fmt of ['rg11b10uf', 'rgba16f', 'rgba32f', 'rgba8unorm'] as const) {
+    for (const fmt of ['rg11b10uf', 'rgba16f', 'rgba32f', 'rgba8unorm'] as const) {
       const info = Application.instance.device.getDeviceCaps().textureCaps.getTextureFormatInfo(fmt);
       if (info && info.filterable && info.renderable) {
         format = fmt;
@@ -35,8 +35,8 @@ export class HDRLoader extends AbstractTextureLoader {
     }
     const textureData = await this.loadHDR(new Uint8Array(data), format);
     const options: TextureCreationOptions = {
-      noMipmap: samplerOptions?.mipFilter === 'none',
-      texture: texture
+      texture: texture,
+      samplerOptions
     };
     const tex = Application.instance.device.createTexture2D(format, textureData.width, textureData.height, options);
     tex.update(textureData.dataFloat, 0, 0, textureData.width, textureData.height);

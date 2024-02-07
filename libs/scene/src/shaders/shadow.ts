@@ -1,7 +1,8 @@
-import {
+import type {
   TextureFormat,
   PBInsideFunctionScope,
-  PBShaderExp,
+  PBShaderExp} from '@zephyr3d/device';
+import {
   hasDepthChannel
 } from '@zephyr3d/device';
 import { Application } from '../app';

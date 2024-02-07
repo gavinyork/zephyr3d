@@ -1,5 +1,5 @@
-import { TypedArray, Vector2, Vector3 } from "@zephyr3d/base";
-import { BaseTexture, BindGroup, GPUProgram, RenderStateSet, Texture2D } from "@zephyr3d/device";
+import { Vector2, Vector3 } from "@zephyr3d/base";
+import type { BaseTexture, BindGroup, GPUProgram, RenderStateSet, Texture2D } from "@zephyr3d/device";
 import { Application, Primitive, decodeNormalizedFloatFromRGBA, linearToGamma } from "@zephyr3d/scene";
 
 type SampleType = 'depth'|'float'|'unfilterable-float'|'int'|'uint';
@@ -88,7 +88,7 @@ export class TextureDrawer {
     this._renderStates = device.createRenderStateSet();
     this._renderStates.useRasterizerState().setCullMode('none');
     this._renderStates.useDepthState().enableTest(false).enableWrite(false);
-    this._dummyTexture = device.createTexture2D('rgba8unorm', 1, 1, { noMipmap: true });
+    this._dummyTexture = device.createTexture2D('rgba8unorm', 1, 1, { samplerOptions: { mipFilter: 'none' } });
     this.alphaBlend = true;
     this._colorScale = 1;
   }
@@ -111,11 +111,6 @@ export class TextureDrawer {
         this._renderStates.defaultBlendingState();
       }
     }
-  }
-  readPixels(tex: BaseTexture, miplevel: number, faceOrLayer: number): TypedArray {
-    const w = Math.max(tex.width >> miplevel, 1);
-    const h = Math.max(tex.height >> miplevel, 1);
-    return null;
   }
   draw(tex: BaseTexture, repeat: number, gammaCorrect: boolean, linear: boolean, flip: boolean, encode: number, mode: number, miplevel: number, faceOrLayer = 0) {
     tex = tex ?? this._dummyTexture;

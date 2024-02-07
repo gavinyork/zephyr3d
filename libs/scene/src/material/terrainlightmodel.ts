@@ -1,4 +1,4 @@
-import { BindGroup, GPUProgram, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, Texture2D, Texture2DArray } from "@zephyr3d/device";
+import type { BindGroup, GPUProgram, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, Texture2D, Texture2DArray } from "@zephyr3d/device";
 import { PBRLightModelMR } from "./lightmodel";
 import { Vector4 } from "@zephyr3d/base";
 import { RENDER_PASS_TYPE_FORWARD } from "../values";
@@ -223,7 +223,7 @@ export class TerrainLightModel extends PBRLightModelMR {
     const device = Application.instance.device;
     if (!this._options) {
       const tex = device.createTexture2D('rgba8unorm', 1, 1, {
-        noMipmap: true
+        samplerOptions: { mipFilter: 'none' }
       });
       tex.update(new Uint8Array([0, 1, 0, 0]), 0, 0, 1, 1);
       tex.name = 'TerrainMetallicRoughnessMap';

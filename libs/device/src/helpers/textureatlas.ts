@@ -174,7 +174,7 @@ export class TextureAtlasManager {
   /** @internal */
   protected _createAtlasTexture(): Texture2D {
     const tex = this._device.createTexture2D('rgba8unorm', this._binWidth, this._binHeight, {
-      noMipmap: true
+      samplerOptions: { mipFilter: 'none' }
     });
     tex.update(new Uint8Array(tex.width * tex.height * 4), 0, 0, tex.width, tex.height);
     tex.restoreHandler = async () => {

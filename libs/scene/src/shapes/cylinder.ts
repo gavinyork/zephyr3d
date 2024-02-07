@@ -1,6 +1,7 @@
 import { Vector3 } from "@zephyr3d/base";
 import { BoundingBox } from "../utility/bounding_volume";
-import { ShapeCreationOptions, Shape } from "./shape";
+import type { ShapeCreationOptions} from "./shape";
+import { Shape } from "./shape";
 
 /**
  * Creation options for cylinder shape

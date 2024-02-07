@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, no-empty-function, @typescript-eslint/no-explicit-any */
 import type { Texture2D } from "@zephyr3d/device";
 export interface XY { x: number, y: number; }
 export interface XYZ extends XY { z: number; }
@@ -94,7 +95,7 @@ function export_Color4(tuple: Bind.ImTuple4<number>, col: RGBA | Bind.ImTuple4<n
     col.x = tuple[0]; col.y = tuple[1]; col.z = tuple[2]; col.w = tuple[3];
 }
 
-export var isMobile = {
+export const isMobile = {
     Android: function() {
         return navigator.userAgent.match(/Android/i);
     },
@@ -121,15 +122,15 @@ export var isMobile = {
 //import * as config from "./imconfig";
 
 export { IMGUI_VERSION as VERSION }
-export const IMGUI_VERSION: string = "1.80"; // bind.IMGUI_VERSION;
+export const IMGUI_VERSION = "1.80"; // bind.IMGUI_VERSION;
 export { IMGUI_VERSION_NUM as VERSION_NUM }
-export const IMGUI_VERSION_NUM: number = 18000; // bind.IMGUI_VERSION_NUM;
+export const IMGUI_VERSION_NUM = 18000; // bind.IMGUI_VERSION_NUM;
 
 // #define IMGUI_CHECKVERSION()        ImGui::DebugCheckVersionAndDataLayout(IMGUI_VERSION, sizeof(ImGuiIO), sizeof(ImGuiStyle), sizeof(ImVec2), sizeof(ImVec4), sizeof(ImDrawVert))
 export { IMGUI_CHECKVERSION as CHECKVERSION }
 export function IMGUI_CHECKVERSION(): boolean { return DebugCheckVersionAndDataLayout(IMGUI_VERSION, bind.ImGuiIOSize, bind.ImGuiStyleSize, bind.ImVec2Size, bind.ImVec4Size, bind.ImDrawVertSize, bind.ImDrawIdxSize); }
 
-export const IMGUI_HAS_TABLE: boolean = true;
+export const IMGUI_HAS_TABLE = true;
 
 export function ASSERT(c: any): asserts c { if (!c) { throw new Error(); } }
 export function IM_ASSERT(c: any): asserts c { if (!c) { throw new Error(); } }
@@ -300,7 +301,7 @@ export enum ImGuiTabBarFlags {
     FittingPolicyScroll            = 1 << 7,   // Add scroll buttons when tabs don't fit
     FittingPolicyMask_             = FittingPolicyResizeDown | FittingPolicyScroll,
     FittingPolicyDefault_          = FittingPolicyResizeDown
-};
+}
 
 // Flags for ImGui::BeginTabItem()
 export { ImGuiTabItemFlags as TabItemFlags };
@@ -470,8 +471,8 @@ export enum ImGuiDragDropFlags {
 }
 
 // Standard Drag and Drop payload types. You can define you own payload types using 12-characters long strings. Types starting with '_' are defined by Dear ImGui.
-export const IMGUI_PAYLOAD_TYPE_COLOR_3F: string = "_COL3F";    // float[3]     // Standard type for colors, without alpha. User code may use this type.
-export const IMGUI_PAYLOAD_TYPE_COLOR_4F: string = "_COL4F";    // float[4]     // Standard type for colors. User code may use this type.
+export const IMGUI_PAYLOAD_TYPE_COLOR_3F = "_COL3F";    // float[3]     // Standard type for colors, without alpha. User code may use this type.
+export const IMGUI_PAYLOAD_TYPE_COLOR_4F = "_COL4F";    // float[4]     // Standard type for colors. User code may use this type.
 
 // A primary data type
 export { ImGuiDataType as DataType };
@@ -1005,14 +1006,14 @@ export class ImVector<T> extends Array<T>
 // #define IM_UNICODE_CODEPOINT_MAX     0xFFFF     // Maximum Unicode code point supported by this build.
 // #endif
 export { IM_UNICODE_CODEPOINT_MAX as UNICODE_CODEPOINT_MAX }
-export const IM_UNICODE_CODEPOINT_MAX: number = 0xFFFF; // Maximum Unicode code point supported by this build.
+export const IM_UNICODE_CODEPOINT_MAX = 0xFFFF; // Maximum Unicode code point supported by this build.
 
 // Helper: Parse and apply text filters. In format "aaaaa[,bbbb][,ccccc]"
 export { ImGuiTextFilter as TextFilter }
 export class ImGuiTextFilter
 {
     // IMGUI_API           ImGuiTextFilter(const char* default_filter = "");
-    constructor(default_filter: string = "") {
+    constructor(default_filter = "") {
         if (default_filter)
         {
             // ImStrncpy(InputBuf, default_filter, IM_ARRAYSIZE(InputBuf));
@@ -1027,7 +1028,7 @@ export class ImGuiTextFilter
         }
     }
     // IMGUI_API bool      Draw(const char* label = "Filter (inc,-exc)", float width = 0.0f);    // Helper calling InputText+Build
-    public Draw(label: string = "Filter (inc,-exc)", width: number = 0.0): boolean {
+    public Draw(label = "Filter (inc,-exc)", width = 0.0): boolean {
         if (width !== 0.0)
             bind.PushItemWidth(width);
         const value_changed: boolean = InputText(label, this.InputBuf, IM_ARRAYSIZE(this.InputBuf));
@@ -1112,7 +1113,7 @@ export class ImGuiTextFilter
     public InputBuf: ImStringBuffer = new ImStringBuffer(256);
     // ImVector<TextRange> Filters;
     // int                 CountGrep;
-    public CountGrep: number = 0;
+    public CountGrep = 0;
 }
 
 // Helper: Text buffer for logging/accumulating text
@@ -1120,7 +1121,7 @@ export { ImGuiTextBuffer as TextBuffer }
 export class ImGuiTextBuffer
 {
     // ImVector<char>      Buf;
-    public Buf: string = "";
+    public Buf = "";
     public begin(): string { return this.Buf; }
     public size(): number { return this.Buf.length; }
     public clear(): void { this.Buf = ""; }
@@ -1213,13 +1214,13 @@ export interface ImGuiPayload<T>
 }
 
 // Helpers macros to generate 32-bits encoded colors
-export const IM_COL32_R_SHIFT: number = 0;
-export const IM_COL32_G_SHIFT: number = 8;
-export const IM_COL32_B_SHIFT: number = 16;
-export const IM_COL32_A_SHIFT: number = 24;
-export const IM_COL32_A_MASK: number = 0xFF000000;
+export const IM_COL32_R_SHIFT = 0;
+export const IM_COL32_G_SHIFT = 8;
+export const IM_COL32_B_SHIFT = 16;
+export const IM_COL32_A_SHIFT = 24;
+export const IM_COL32_A_MASK = 0xFF000000;
 export { IM_COL32 as COL32 }
-export function IM_COL32(R: number, G: number, B: number, A: number = 255): number {
+export function IM_COL32(R: number, G: number, B: number, A = 255): number {
     return ((A << IM_COL32_A_SHIFT) | (B << IM_COL32_B_SHIFT) | (G << IM_COL32_G_SHIFT) | (R << IM_COL32_R_SHIFT)) >>> 0;
 }
 export const IM_COL32_WHITE: number = IM_COL32(255, 255, 255, 255); export { IM_COL32_WHITE as COL32_WHITE }  // Opaque white = 0xFFFFFFFF
@@ -1246,7 +1247,7 @@ export class ImColor
     constructor(r: number, g: number, b: number, a: number);
     constructor(rgba: Bind.ImU32);
     constructor(col: Readonly<Bind.interface_ImVec4>);
-    constructor(r: number | Bind.ImU32 | Readonly<Bind.interface_ImVec4> = 0.0, g: number = 0.0, b: number = 0.0, a: number = 1.0) {
+    constructor(r: number | Bind.ImU32 | Readonly<Bind.interface_ImVec4> = 0.0, g = 0.0, b = 0.0, a = 1.0) {
         if (typeof(r) === "number") {
             if (r > 255 && g === 0.0 && b === 0.0 && a === 1.0) {
                 this.Value.x = Math.max(0.0, Math.min(1.0, ((r >> IM_COL32_R_SHIFT) & 0xFF) / 255));
@@ -1279,7 +1280,7 @@ export class ImColor
 
     // FIXME-OBSOLETE: May need to obsolete/cleanup those helpers.
     // inline void    SetHSV(float h, float s, float v, float a = 1.0f){ ImGui::ColorConvertHSVtoRGB(h, s, v, Value.x, Value.y, Value.z); Value.w = a; }
-    public SetHSV(h: number, s: number, v: number, a: number = 1.0): void {
+    public SetHSV(h: number, s: number, v: number, a = 1.0): void {
         const ref_r: Bind.ImScalar<number> = [ this.Value.x ];
         const ref_g: Bind.ImScalar<number> = [ this.Value.y ];
         const ref_b: Bind.ImScalar<number> = [ this.Value.z ];
@@ -1290,7 +1291,7 @@ export class ImColor
         this.Value.w = a;
     }
     // static ImColor HSV(float h, float s, float v, float a = 1.0f)   { float r,g,b; ImGui::ColorConvertHSVtoRGB(h, s, v, r, g, b); return ImColor(r,g,b,a); }
-    public static HSV(h: number, s: number, v: number, a: number = 1.0): ImColor {
+    public static HSV(h: number, s: number, v: number, a = 1.0): ImColor {
         const color = new ImColor();
         color.SetHSV(h, s, v, a);
         return color;
@@ -1298,7 +1299,7 @@ export class ImColor
 }
 
 export { ImGuiInputTextDefaultSize as InputTextDefaultSize }
-export const ImGuiInputTextDefaultSize: number = 128;
+export const ImGuiInputTextDefaultSize = 128;
 
 export { ImGuiInputTextCallback as InputTextCallback }
 export type ImGuiInputTextCallback<T> = (data: ImGuiInputTextCallbackData<T>) => number;
@@ -1432,7 +1433,7 @@ export class ImGuiListClipper
     }
 
     // IMGUI_API void Begin(int items_count, float items_height = -1.0f);  // Automatically called by constructor if you passed 'items_count' or by Step() in Step 1.
-    public Begin(items_count: number, items_height: number = -1.0): void {
+    public Begin(items_count: number, items_height = -1.0): void {
         this.native.Begin(items_count, items_height);
     }
     // IMGUI_API void End();                                               // Automatically called on the last call of Step() that returns false.
@@ -1456,7 +1457,7 @@ export class ImGuiListClipper
 //-----------------------------------------------------------------------------
 
 // The maximum line width to bake anti-aliased textures for. Build atlas with ImFontAtlasFlags_NoBakedLines to disable baking.
-export const IM_DRAWLIST_TEX_LINES_WIDTH_MAX: number = 63;
+export const IM_DRAWLIST_TEX_LINES_WIDTH_MAX = 63;
 
 // Draw callbacks for advanced uses.
 // NB- You most likely do NOT need to use draw callbacks just to create your own widget or customized UI rendering (you can poke into the draw list for that)
@@ -1507,20 +1508,20 @@ export class ImDrawCmd
 // typedef unsigned short ImDrawIdx;
 // #endif
 export { ImDrawIdxSize as DrawIdxSize }
-export const ImDrawIdxSize: number = 2; // bind.ImDrawIdxSize;
+export const ImDrawIdxSize = 2; // bind.ImDrawIdxSize;
 export { ImDrawIdx as DrawIdx }
 export type ImDrawIdx = number;
 
 // Vertex layout
 // #ifndef IMGUI_OVERRIDE_DRAWVERT_STRUCT_LAYOUT
 export { ImDrawVertSize as DrawVertSize }
-export const ImDrawVertSize: number = 20; // bind.ImDrawVertSize;
+export const ImDrawVertSize = 20; // bind.ImDrawVertSize;
 export { ImDrawVertPosOffset as DrawVertPosOffset }
-export const ImDrawVertPosOffset: number = 0; // bind.ImDrawVertPosOffset;
+export const ImDrawVertPosOffset = 0; // bind.ImDrawVertPosOffset;
 export { ImDrawVertUVOffset as DrawVertUVOffset }
-export const ImDrawVertUVOffset: number = 8; // bind.ImDrawVertUVOffset;
+export const ImDrawVertUVOffset = 8; // bind.ImDrawVertUVOffset;
 export { ImDrawVertColOffset as DrawVertColOffset }
-export const ImDrawVertColOffset: number = 16; // bind.ImDrawVertColOffset;
+export const ImDrawVertColOffset = 16; // bind.ImDrawVertColOffset;
 export { ImDrawVert as DrawVert }
 export class ImDrawVert
 {
@@ -1531,7 +1532,7 @@ export class ImDrawVert
     // ImU32   col;
     public col: Uint32Array;
 
-    constructor(buffer: ArrayBuffer, byteOffset: number = 0) {
+    constructor(buffer: ArrayBuffer, byteOffset = 0) {
         this.pos = new Float32Array(buffer, byteOffset + bind.ImDrawVertPosOffset, 2);
         this.uv = new Float32Array(buffer, byteOffset + bind.ImDrawVertUVOffset, 2);
         this.col = new Uint32Array(buffer, byteOffset + bind.ImDrawVertColOffset, 1);
@@ -1609,7 +1610,7 @@ export class ImDrawList
     // ImDrawList(const ImDrawListSharedData* shared_data) { _Data = shared_data; _OwnerName = NULL; Clear(); }
     // ~ImDrawList() { ClearFreeMemory(); }
     // IMGUI_API void  PushClipRect(ImVec2 clip_rect_min, ImVec2 clip_rect_max, bool intersect_with_current_clip_rect = false);  // Render-level scissoring. This is passed down to your render function but not used for CPU-side coarse clipping. Prefer using higher-level ImGui::PushClipRect() to affect logic (hit-testing and widget culling)
-    public PushClipRect(clip_rect_min: Readonly<Bind.interface_ImVec2>, clip_rect_max: Readonly<Bind.interface_ImVec2>, intersect_with_current_clip_rect: boolean = false): void {
+    public PushClipRect(clip_rect_min: Readonly<Bind.interface_ImVec2>, clip_rect_max: Readonly<Bind.interface_ImVec2>, intersect_with_current_clip_rect = false): void {
         this.native.PushClipRect(clip_rect_min, clip_rect_max, intersect_with_current_clip_rect);
     }
     // IMGUI_API void  PushClipRectFullScreen();
@@ -1633,15 +1634,15 @@ export class ImDrawList
 
     // Primitives
     // IMGUI_API void  AddLine(const ImVec2& a, const ImVec2& b, ImU32 col, float thickness = 1.0f);
-    public AddLine(a: Readonly<Bind.interface_ImVec2>, b: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, thickness: number = 1.0): void {
+    public AddLine(a: Readonly<Bind.interface_ImVec2>, b: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, thickness = 1.0): void {
         this.native.AddLine(a, b, col, thickness);
     }
     // IMGUI_API void  AddRect(const ImVec2& a, const ImVec2& b, ImU32 col, float rounding = 0.0f, int rounding_corners_flags = ImDrawCornerFlags_All, float thickness = 1.0f);   // a: upper-left, b: lower-right, rounding_corners_flags: 4-bits corresponding to which corner to round
-    public AddRect(a: Readonly<Bind.interface_ImVec2>, b: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, rounding: number = 0.0, rounding_corners_flags: ImDrawCornerFlags = ImDrawCornerFlags.All, thickness: number = 1.0): void {
+    public AddRect(a: Readonly<Bind.interface_ImVec2>, b: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, rounding = 0.0, rounding_corners_flags: ImDrawCornerFlags = ImDrawCornerFlags.All, thickness = 1.0): void {
         this.native.AddRect(a, b, col, rounding, rounding_corners_flags, thickness);
     }
     // IMGUI_API void  AddRectFilled(const ImVec2& a, const ImVec2& b, ImU32 col, float rounding = 0.0f, int rounding_corners_flags = ImDrawCornerFlags_All);                     // a: upper-left, b: lower-right
-    public AddRectFilled(a: Readonly<Bind.interface_ImVec2>, b: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, rounding: number = 0.0, rounding_corners_flags: ImDrawCornerFlags = ImDrawCornerFlags.All): void {
+    public AddRectFilled(a: Readonly<Bind.interface_ImVec2>, b: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, rounding = 0.0, rounding_corners_flags: ImDrawCornerFlags = ImDrawCornerFlags.All): void {
         this.native.AddRectFilled(a, b, col, rounding, rounding_corners_flags);
     }
     // IMGUI_API void  AddRectFilledMultiColor(const ImVec2& a, const ImVec2& b, ImU32 col_upr_left, ImU32 col_upr_right, ImU32 col_bot_right, ImU32 col_bot_left);
@@ -1649,7 +1650,7 @@ export class ImDrawList
         this.native.AddRectFilledMultiColor(a, b, col_upr_left, col_upr_right, col_bot_right, col_bot_left);
     }
     // IMGUI_API void  AddQuad(const ImVec2& a, const ImVec2& b, const ImVec2& c, const ImVec2& d, ImU32 col, float thickness = 1.0f);
-    public AddQuad(a: Readonly<Bind.interface_ImVec2>, b: Readonly<Bind.interface_ImVec2>, c: Readonly<Bind.interface_ImVec2>, d: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, thickness: number = 1.0): void {
+    public AddQuad(a: Readonly<Bind.interface_ImVec2>, b: Readonly<Bind.interface_ImVec2>, c: Readonly<Bind.interface_ImVec2>, d: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, thickness = 1.0): void {
         this.native.AddQuad(a, b, c, d, col, thickness);
     }
     // IMGUI_API void  AddQuadFilled(const ImVec2& a, const ImVec2& b, const ImVec2& c, const ImVec2& d, ImU32 col);
@@ -1657,7 +1658,7 @@ export class ImDrawList
         this.native.AddQuadFilled(a, b, c, d, col);
     }
     // IMGUI_API void  AddTriangle(const ImVec2& a, const ImVec2& b, const ImVec2& c, ImU32 col, float thickness = 1.0f);
-    public AddTriangle(a: Readonly<Bind.interface_ImVec2>, b: Readonly<Bind.interface_ImVec2>, c: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, thickness: number = 1.0): void {
+    public AddTriangle(a: Readonly<Bind.interface_ImVec2>, b: Readonly<Bind.interface_ImVec2>, c: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, thickness = 1.0): void {
         this.native.AddTriangle(a, b, c, col, thickness);
     }
     // IMGUI_API void  AddTriangleFilled(const ImVec2& a, const ImVec2& b, const ImVec2& c, ImU32 col);
@@ -1665,15 +1666,15 @@ export class ImDrawList
         this.native.AddTriangleFilled(a, b, c, col);
     }
     // IMGUI_API void  AddCircle(const ImVec2& centre, float radius, ImU32 col, int num_segments = 12, float thickness = 1.0f);
-    public AddCircle(centre: Readonly<Bind.interface_ImVec2>, radius: number, col: Bind.ImU32, num_segments: number = 12, thickness: number = 1.0): void {
+    public AddCircle(centre: Readonly<Bind.interface_ImVec2>, radius: number, col: Bind.ImU32, num_segments = 12, thickness = 1.0): void {
         this.native.AddCircle(centre, radius, col, num_segments, thickness);
     }
     // IMGUI_API void  AddCircleFilled(const ImVec2& centre, float radius, ImU32 col, int num_segments = 12);
-    public AddCircleFilled(centre: Readonly<Bind.interface_ImVec2>, radius: number, col: Bind.ImU32, num_segments: number = 12): void {
+    public AddCircleFilled(centre: Readonly<Bind.interface_ImVec2>, radius: number, col: Bind.ImU32, num_segments = 12): void {
         this.native.AddCircleFilled(centre, radius, col, num_segments);
     }
     // IMGUI_API void  AddNgon(const ImVec2& center, float radius, ImU32 col, int num_segments, float thickness = 1.0f);
-    public AddNgon(centre: Readonly<Bind.interface_ImVec2>, radius: number, col: Bind.ImU32, num_segments: number, thickness: number = 1.0): void {
+    public AddNgon(centre: Readonly<Bind.interface_ImVec2>, radius: number, col: Bind.ImU32, num_segments: number, thickness = 1.0): void {
         this.native.AddNgon(centre, radius, col, num_segments, thickness);
     }
     // IMGUI_API void  AddNgonFilled(const ImVec2& center, float radius, ImU32 col, int num_segments);
@@ -1712,11 +1713,11 @@ export class ImDrawList
         this.native.AddConvexPolyFilled(points, num_points, col);
     }
     // IMGUI_API void  AddBezierCubic(const ImVec2& p1, const ImVec2& p2, const ImVec2& p3, const ImVec2& p4, ImU32 col, float thickness, int num_segments = 0); // Cubic Bezier (4 control points)
-    public AddBezierCubic(p1: Readonly<Bind.interface_ImVec2>, p2: Readonly<Bind.interface_ImVec2>, p3: Readonly<Bind.interface_ImVec2>, p4: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, thickness: number = 1.0, num_segments: number = 0): void {
+    public AddBezierCubic(p1: Readonly<Bind.interface_ImVec2>, p2: Readonly<Bind.interface_ImVec2>, p3: Readonly<Bind.interface_ImVec2>, p4: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, thickness = 1.0, num_segments = 0): void {
         this.native.AddBezierCubic(p1, p2, p3, p4, col, thickness, num_segments);
     }
     // IMGUI_API void  AddBezierQuadratic(const ImVec2& p1, const ImVec2& p2, const ImVec2& p3, ImU32 col, float thickness, int num_segments = 0);               // Quadratic Bezier (3 control points)
-    public AddBezierQuadratic(p1: Readonly<Bind.interface_ImVec2>, p2: Readonly<Bind.interface_ImVec2>, p3: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, thickness: number = 1.0, num_segments: number = 0): void {
+    public AddBezierQuadratic(p1: Readonly<Bind.interface_ImVec2>, p2: Readonly<Bind.interface_ImVec2>, p3: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, thickness = 1.0, num_segments = 0): void {
         this.native.AddBezierQuadratic(p1, p2, p3, col, thickness, num_segments);
     }
 
@@ -1743,17 +1744,17 @@ export class ImDrawList
     // inline    void  PathFillConvex(ImU32 col)                                   { AddConvexPolyFilled(_Path.Data, _Path.Size, col); PathClear(); }
     public PathFillConvex(col: Bind.ImU32): void { this.native.PathFillConvex(col); }
     // inline    void  PathStroke(ImU32 col, bool closed, float thickness = 1.0f)  { AddPolyline(_Path.Data, _Path.Size, col, closed, thickness); PathClear(); }
-    public PathStroke(col: Bind.ImU32, closed: boolean, thickness: number = 1.0): void { this.native.PathStroke(col, closed, thickness); }
+    public PathStroke(col: Bind.ImU32, closed: boolean, thickness = 1.0): void { this.native.PathStroke(col, closed, thickness); }
     // IMGUI_API void  PathArcTo(const ImVec2& centre, float radius, float a_min, float a_max, int num_segments = 10);
-    public PathArcTo(centre: Readonly<Bind.interface_ImVec2>, radius: number, a_min: number, a_max: number, num_segments: number = 10): void { this.native.PathArcTo(centre, radius, a_min, a_max, num_segments); }
+    public PathArcTo(centre: Readonly<Bind.interface_ImVec2>, radius: number, a_min: number, a_max: number, num_segments = 10): void { this.native.PathArcTo(centre, radius, a_min, a_max, num_segments); }
     // IMGUI_API void  PathArcToFast(const ImVec2& centre, float radius, int a_min_of_12, int a_max_of_12);                                // Use precomputed angles for a 12 steps circle
     public PathArcToFast(centre: Readonly<Bind.interface_ImVec2>, radius: number, a_min_of_12: number, a_max_of_12: number): void { this.native.PathArcToFast(centre, radius, a_min_of_12, a_max_of_12); }
     // IMGUI_API void  PathBezierCubicCurveTo(const ImVec2& p2, const ImVec2& p3, const ImVec2& p4, int num_segments = 0);  // Cubic Bezier (4 control points)
-    public PathBezierCubicCurveTo(p2: Readonly<Bind.interface_ImVec2>, p3: Readonly<Bind.interface_ImVec2>, p4: Readonly<Bind.interface_ImVec2>, num_segments: number = 0): void { this.native.PathBezierCubicCurveTo(p2, p3, p4, num_segments); }
+    public PathBezierCubicCurveTo(p2: Readonly<Bind.interface_ImVec2>, p3: Readonly<Bind.interface_ImVec2>, p4: Readonly<Bind.interface_ImVec2>, num_segments = 0): void { this.native.PathBezierCubicCurveTo(p2, p3, p4, num_segments); }
     // IMGUI_API void  PathBezierQuadraticCurveTo(const ImVec2& p2, const ImVec2& p3, int num_segments = 0);                // Quadratic Bezier (3 control points)
-    public PathBezierQuadraticCurveTo(p2: Readonly<Bind.interface_ImVec2>, p3: Readonly<Bind.interface_ImVec2>, num_segments: number = 0): void { this.native.PathBezierQuadraticCurveTo(p2, p3, num_segments); }
+    public PathBezierQuadraticCurveTo(p2: Readonly<Bind.interface_ImVec2>, p3: Readonly<Bind.interface_ImVec2>, num_segments = 0): void { this.native.PathBezierQuadraticCurveTo(p2, p3, num_segments); }
     // IMGUI_API void  PathRect(const ImVec2& rect_min, const ImVec2& rect_max, float rounding = 0.0f, int rounding_corners_flags = ImDrawCornerFlags_All);
-    public PathRect(rect_min: Readonly<Bind.interface_ImVec2>, rect_max: Readonly<Bind.interface_ImVec2>, rounding: number = 0.0, rounding_corners_flags: ImDrawCornerFlags = ImDrawCornerFlags.All): void { this.native.PathRect(rect_min, rect_max, rounding, rounding_corners_flags); }
+    public PathRect(rect_min: Readonly<Bind.interface_ImVec2>, rect_max: Readonly<Bind.interface_ImVec2>, rounding = 0.0, rounding_corners_flags: ImDrawCornerFlags = ImDrawCornerFlags.All): void { this.native.PathRect(rect_min, rect_max, rounding, rounding_corners_flags); }
 
     // Channels
     // - Use to simulate layers. By switching channels to can render out-of-order (e.g. submit foreground primitives before background primitives)
@@ -1840,16 +1841,16 @@ export class script_ImFontConfig implements Bind.interface_ImFontConfig
     // int             FontDataSize;               //          // TTF/OTF data size
     FontData: DataView | null = null;
     // bool            FontDataOwnedByAtlas;       // true     // TTF/OTF data ownership taken by the container ImFontAtlas (will delete memory itself).
-    FontDataOwnedByAtlas: boolean = true;
+    FontDataOwnedByAtlas = true;
     // int             FontNo;                     // 0        // Index of font within TTF/OTF file
-    FontNo: number = 0;
+    FontNo = 0;
     // float           SizePixels;                 //          // Size in pixels for rasterizer.
-    SizePixels: number = 0;
+    SizePixels = 0;
     // int             OversampleH, OversampleV;   // 3, 1     // Rasterize at higher quality for sub-pixel positioning. We don't use sub-pixel positions on the Y axis.
-    OversampleH: number = 3;
-    OversampleV: number = 1;
+    OversampleH = 3;
+    OversampleV = 1;
     // bool            PixelSnapH;                 // false    // Align every glyph to pixel boundary. Useful e.g. if you are merging a non-pixel aligned font with the default font. If enabled, you can set OversampleH/V to 1.
-    PixelSnapH: boolean = false;
+    PixelSnapH = false;
     // ImVec2          GlyphExtraSpacing;          // 0, 0     // Extra spacing (in pixels) between glyphs. Only X axis is supported for now.
     GlyphExtraSpacing: ImVec2 = new ImVec2(0, 0);
     // ImVec2          GlyphOffset;                // 0, 0     // Offset all glyphs from this font input.
@@ -1857,21 +1858,21 @@ export class script_ImFontConfig implements Bind.interface_ImFontConfig
     // const ImWchar*  GlyphRanges;                // NULL     // Pointer to a user-provided list of Unicode range (2 value per range, values are inclusive, zero-terminated list). THE ARRAY DATA NEEDS TO PERSIST AS LONG AS THE FONT IS ALIVE.
     GlyphRanges: number | null = null;
     // float           GlyphMinAdvanceX;           // 0        // Minimum AdvanceX for glyphs, set Min to align font icons, set both Min/Max to enforce mono-space font
-    GlyphMinAdvanceX: number = 0;
+    GlyphMinAdvanceX = 0;
     // float           GlyphMaxAdvanceX;           // FLT_MAX  // Maximum AdvanceX for glyphs
     GlyphMaxAdvanceX: number = Number.MAX_VALUE;
     // bool            MergeMode;                  // false    // Merge into previous ImFont, so you can combine multiple inputs font into one ImFont (e.g. ASCII font + icons + Japanese glyphs). You may want to use GlyphOffset.y when merge font of different heights.
-    MergeMode: boolean = false;
+    MergeMode = false;
     // unsigned int    RasterizerFlags;            // 0x00     // Settings for custom font rasterizer (e.g. ImGuiFreeType). Leave as zero if you aren't using one.
-    RasterizerFlags: number = 0;
+    RasterizerFlags = 0;
     // float           RasterizerMultiply;         // 1.0f     // Brighten (>1.0f) or darken (<1.0f) font output. Brightening small fonts may be a good workaround to make them more readable.
-    RasterizerMultiply: number = 1.0;
+    RasterizerMultiply = 1.0;
     // ImWchar         EllipsisChar;           // -1       // Explicitly specify unicode codepoint of ellipsis character. When fonts are being merged first specified ellipsis will be used.
-    EllipsisChar: number = -1;
+    EllipsisChar = -1;
 
     // [Internal]
     // char            Name[32];                               // Name (strictly to ease debugging)
-    Name: string = "";
+    Name = "";
     // ImFont*         DstFont;
     DstFont: Bind.reference_ImFont | null = null;
 
@@ -1930,25 +1931,25 @@ export class ImFontConfig {
 export class script_ImFontGlyph implements Bind.interface_ImFontGlyph
 {
     // unsigned int    Codepoint : 31;     // 0x0000..0xFFFF
-    Codepoint: number = 0;
+    Codepoint = 0;
     // unsigned int    Visible : 1;        // Flag to allow early out when rendering
-    Visible: boolean = false;
+    Visible = false;
     // float           AdvanceX;           // Distance to next character (= data from font + ImFontConfig::GlyphExtraSpacing.x baked in)
-    AdvanceX: number = 0.0;
+    AdvanceX = 0.0;
     // float           X0, Y0, X1, Y1;     // Glyph corners
-    X0: number = 0.0;
-    Y0: number = 0.0;
-    X1: number = 1.0;
-    Y1: number = 1.0;
+    X0 = 0.0;
+    Y0 = 0.0;
+    X1 = 1.0;
+    Y1 = 1.0;
     // float           U0, V0, U1, V1;     // Texture coordinates
-    U0: number = 0.0;
-    V0: number = 0.0;
-    U1: number = 1.0;
-    V1: number = 1.0;
+    U0 = 0.0;
+    V0 = 0.0;
+    U1 = 1.0;
+    V1 = 1.0;
 
     TexID:number=null;
 
-    Char:number=0;
+    Char=0;
 }
 
 export { ImFontGlyph as FontGlyph }
@@ -1959,32 +1960,32 @@ export class ImFontGlyph implements Bind.interface_ImFontGlyph {
     // unsigned int    Visible : 1;        // Flag to allow early out when rendering
     get Visible(): boolean {  return this.internal.Visible; }
     // float           AdvanceX;           // Distance to next character (= data from font + ImFontConfig::GlyphExtraSpacing.x baked in)
-    get AdvanceX(): number { return this.internal.AdvanceX; };
+    get AdvanceX(): number { return this.internal.AdvanceX; }
     set AdvanceX(v:number) {this.internal.AdvanceX=v;}
     // float           X0, Y0, X1, Y1;     // Glyph corners
-    get X0(): number { return this.internal.X0; };
+    get X0(): number { return this.internal.X0; }
     set X0(v:number) {this.internal.X0=v;}
-    get Y0(): number { return this.internal.Y0; };
+    get Y0(): number { return this.internal.Y0; }
     set Y0(v:number) {this.internal.Y0=v;}
-    get X1(): number { return this.internal.X1; };
+    get X1(): number { return this.internal.X1; }
     set X1(v:number) {this.internal.X1=v;}
-    get Y1(): number { return this.internal.Y1; };
+    get Y1(): number { return this.internal.Y1; }
     set Y1(v:number) {this.internal.Y1=v;}
     // float           U0, V0, U1, V1;     // Texture coordinates
-    get U0(): number { return this.internal.U0; };
+    get U0(): number { return this.internal.U0; }
     set U0(v:number) {this.internal.U0=v;}
-    get V0(): number { return this.internal.V0; };
+    get V0(): number { return this.internal.V0; }
     set V0(v:number) {this.internal.V0=v;}
-    get U1(): number { return this.internal.U1; };
+    get U1(): number { return this.internal.U1; }
     set U1(v:number) {this.internal.U1=v;}
-    get V1(): number { return this.internal.V1; };
+    get V1(): number { return this.internal.V1; }
     set V1(v:number) {this.internal.V1=v;}
 
     get TexID():number {return this.internal.TexID;}
 
-    get TextureID(): ImTextureID|null { return ImGuiContext.getTexture(this.internal.TexID); };
+    get TextureID(): ImTextureID|null { return ImGuiContext.getTexture(this.internal.TexID); }
     set TextureID(v:ImTextureID|null) {this.internal.TexID=ImGuiContext.setTexture(v);}
-    get Char(): number { return this.internal.Char; };
+    get Char(): number { return this.internal.Char; }
 }
 
 // See ImFontAtlas::AddCustomRectXXX functions.
@@ -2308,7 +2309,7 @@ export class ImFont
         this.native.RenderChar(draw_list.native, size, pos, col, c);
     }
     // IMGUI_API void              RenderText(ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col, const ImVec4& clip_rect, const char* text_begin, const char* text_end, float wrap_width = 0.0f, bool cpu_fine_clip = false) const;
-    public RenderText(draw_list: ImDrawList, size: number, pos: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, clip_rect: Readonly<Bind.interface_ImVec4>, text_begin: string, text_end: number | null = null, wrap_width: number = 0.0, cpu_fine_clip: boolean = false): void {}
+    public RenderText(draw_list: ImDrawList, size: number, pos: Readonly<Bind.interface_ImVec2>, col: Bind.ImU32, clip_rect: Readonly<Bind.interface_ImVec4>, text_begin: string, text_end: number | null = null, wrap_width = 0.0, cpu_fine_clip = false): void {}
 
     // [Internal]
     // IMGUI_API void              GrowIndex(int new_size);
@@ -2323,7 +2324,7 @@ export class ImFont
     public IsGlyphRangeUnused(c_begin: number, c_last: number): boolean { return false; } // TODO
 
     get GlyphToCreate():ImFontGlyph {
-        let glyph=this.native.GlyphToCreate();
+        const glyph=this.native.GlyphToCreate();
         return glyph?new ImFontGlyph(glyph):null;
     }
 
@@ -2348,45 +2349,45 @@ export class ImFont
 
 // a script version of Bind.ImGuiStyle with matching interface
 class script_ImGuiStyle implements Bind.interface_ImGuiStyle {
-    public Alpha: number = 1.0;
+    public Alpha = 1.0;
     public WindowPadding: ImVec2 = new ImVec2(8, 8);
-    public WindowRounding: number = 7.0;
-    public WindowBorderSize: number = 0.0;
+    public WindowRounding = 7.0;
+    public WindowBorderSize = 0.0;
     public WindowMinSize: ImVec2 = new ImVec2(32, 32);
     public WindowTitleAlign: ImVec2 = new ImVec2(0.0, 0.5);
     public WindowMenuButtonPosition: ImGuiDir = ImGuiDir.Left;
-    public ChildRounding: number = 0.0;
-    public ChildBorderSize: number = 1.0;
-    public PopupRounding: number = 0.0;
-    public PopupBorderSize: number = 1.0;
+    public ChildRounding = 0.0;
+    public ChildBorderSize = 1.0;
+    public PopupRounding = 0.0;
+    public PopupBorderSize = 1.0;
     public FramePadding: ImVec2 = new ImVec2(4, 3);
-    public FrameRounding: number = 0.0;
-    public FrameBorderSize: number = 0.0;
+    public FrameRounding = 0.0;
+    public FrameBorderSize = 0.0;
     public ItemSpacing: ImVec2 = new ImVec2(8, 4);
     public ItemInnerSpacing: ImVec2 = new ImVec2(4, 4);
     public CellPadding: ImVec2 = new ImVec2(4, 2);
     public TouchExtraPadding: ImVec2 = new ImVec2(0, 0);
-    public IndentSpacing: number = 21.0;
-    public ColumnsMinSpacing: number = 6.0;
-    public ScrollbarSize: number = 16.0;
-    public ScrollbarRounding: number = 9.0;
-    public GrabMinSize: number = 10.0;
-    public GrabRounding: number = 0.0;
-    public LogSliderDeadzone: number = 4.0;
-    public TabRounding: number = 0.0;
-    public TabBorderSize: number = 0.0;
-    public TabMinWidthForCloseButton: number = 0.0;
+    public IndentSpacing = 21.0;
+    public ColumnsMinSpacing = 6.0;
+    public ScrollbarSize = 16.0;
+    public ScrollbarRounding = 9.0;
+    public GrabMinSize = 10.0;
+    public GrabRounding = 0.0;
+    public LogSliderDeadzone = 4.0;
+    public TabRounding = 0.0;
+    public TabBorderSize = 0.0;
+    public TabMinWidthForCloseButton = 0.0;
     public ColorButtonPosition: ImGuiDir = ImGuiDir.Right;
     public ButtonTextAlign: ImVec2 = new ImVec2(0.5, 0.5);
     public SelectableTextAlign: ImVec2 = new ImVec2(0.0, 0.0);
     public DisplayWindowPadding: ImVec2 = new ImVec2(22, 22);
     public DisplaySafeAreaPadding: ImVec2 = new ImVec2(4, 4);
-    public MouseCursorScale: number = 1;
-    public AntiAliasedLines: boolean = true;
-    public AntiAliasedLinesUseTex: boolean = true;
-    public AntiAliasedFill: boolean = true;
-    public CurveTessellationTol: number = 1.25;
-    public CircleSegmentMaxError: number = 1.60;
+    public MouseCursorScale = 1;
+    public AntiAliasedLines = true;
+    public AntiAliasedLinesUseTex = true;
+    public AntiAliasedFill = true;
+    public CurveTessellationTol = 1.25;
+    public CircleSegmentMaxError = 1.60;
     private Colors: ImVec4[] = [];
     public _getAt_Colors(index: number): Bind.interface_ImVec4 { return this.Colors[index]; }
     public _setAt_Colors(index: number, color: Readonly<Bind.interface_ImVec4>): boolean { this.Colors[index].Copy(color); return true; }
@@ -3023,7 +3024,7 @@ export function End(): void { bind.End(); }
 // IMGUI_API bool          BeginChild(const char* str_id, const ImVec2& size = ImVec2(0, 0), bool border = false, ImGuiWindowFlags flags = 0);
 // IMGUI_API bool          BeginChild(ImGuiID id, const ImVec2& size = ImVec2(0, 0), bool border = false, ImGuiWindowFlags flags = 0);
 // IMGUI_API void          EndChild();
-export function BeginChild(id: string | ImGuiID, size: Readonly<Bind.interface_ImVec2> = ImVec2.ZERO, border: boolean = false, flags: ImGuiWindowFlags = 0): boolean {
+export function BeginChild(id: string | ImGuiID, size: Readonly<Bind.interface_ImVec2> = ImVec2.ZERO, border = false, flags: ImGuiWindowFlags = 0): boolean {
     return bind.BeginChild(id, size, border, flags);
 }
 export function EndChild(): void { bind.EndChild(); }
@@ -3246,10 +3247,10 @@ export function SetScrollX(scroll_x: number): void { bind.SetScrollX(scroll_x); 
 export function SetScrollY(scroll_y: number): void { bind.SetScrollY(scroll_y); }
 export function GetScrollMaxX(): number { return bind.GetScrollMaxX(); }
 export function GetScrollMaxY(): number { return bind.GetScrollMaxY(); }
-export function SetScrollHereX(center_x_ratio: number = 0.5): void { bind.SetScrollHereX(center_x_ratio); }
-export function SetScrollHereY(center_y_ratio: number = 0.5): void { bind.SetScrollHereY(center_y_ratio); }
-export function SetScrollFromPosX(pos_x: number, center_x_ratio: number = 0.5): void { bind.SetScrollFromPosX(pos_x, center_x_ratio); }
-export function SetScrollFromPosY(pos_y: number, center_y_ratio: number = 0.5): void { bind.SetScrollFromPosY(pos_y, center_y_ratio); }
+export function SetScrollHereX(center_x_ratio = 0.5): void { bind.SetScrollHereX(center_x_ratio); }
+export function SetScrollHereY(center_y_ratio = 0.5): void { bind.SetScrollHereY(center_y_ratio); }
+export function SetScrollFromPosX(pos_x: number, center_x_ratio = 0.5): void { bind.SetScrollFromPosX(pos_x, center_x_ratio); }
+export function SetScrollFromPosY(pos_y: number, center_y_ratio = 0.5): void { bind.SetScrollFromPosY(pos_y, center_y_ratio); }
 
 // Parameters stacks (shared)
 // IMGUI_API void          PushFont(ImFont* font);                                         // use NULL as a shortcut to push default font
@@ -3273,9 +3274,9 @@ export function PushStyleColor(idx: ImGuiCol, col: Bind.ImU32 | Readonly<Bind.in
         bind.PushStyleColor(idx, col as (Bind.ImU32 | Readonly<Bind.interface_ImVec4>));
     }
 }
-export function PopStyleColor(count: number = 1): void { bind.PopStyleColor(count); }
+export function PopStyleColor(count = 1): void { bind.PopStyleColor(count); }
 export function PushStyleVar(idx: ImGuiStyleVar, val: number | Readonly<Bind.interface_ImVec2>): void { bind.PushStyleVar(idx, val); }
-export function PopStyleVar(count: number = 1): void { bind.PopStyleVar(count); }
+export function PopStyleVar(count = 1): void { bind.PopStyleVar(count); }
 export function PushAllowKeyboardFocus(allow_keyboard_focus: boolean): void { bind.PushAllowKeyboardFocus(allow_keyboard_focus); }
 export function PopAllowKeyboardFocus(): void { bind.PopAllowKeyboardFocus(); }
 export function PushButtonRepeat(repeat: boolean): void { bind.PushButtonRepeat(repeat); }
@@ -3292,7 +3293,7 @@ export function PushItemWidth(item_width: number): void { bind.PushItemWidth(ite
 export function PopItemWidth(): void { bind.PopItemWidth(); }
 export function SetNextItemWidth(item_width: number): void { bind.SetNextItemWidth(item_width); } // set width of the _next_ common large "item+label" widget. >0.0f: width in pixels, <0.0f align xx pixels to the right of window (so -1.0f always align width to the right side)
 export function CalcItemWidth(): number { return bind.CalcItemWidth(); }
-export function PushTextWrapPos(wrap_pos_x: number = 0.0): void { bind.PushTextWrapPos(wrap_pos_x); }
+export function PushTextWrapPos(wrap_pos_x = 0.0): void { bind.PushTextWrapPos(wrap_pos_x); }
 export function PopTextWrapPos(): void { bind.PopTextWrapPos(); }
 
 // Style read access
@@ -3363,12 +3364,12 @@ export function GetStyleColorVec4(idx: ImGuiCol): Readonly<Bind.reference_ImVec4
 // IMGUI_API float         GetFrameHeight();                                               // ~ FontSize + style.FramePadding.y * 2
 // IMGUI_API float         GetFrameHeightWithSpacing();                                    // ~ FontSize + style.FramePadding.y * 2 + style.ItemSpacing.y (distance in pixels between 2 consecutive lines of framed widgets)
 export function Separator(): void { bind.Separator(); }
-export function SameLine(pos_x: number = 0.0, spacing_w: number = -1.0): void { bind.SameLine(pos_x, spacing_w); }
+export function SameLine(pos_x = 0.0, spacing_w = -1.0): void { bind.SameLine(pos_x, spacing_w); }
 export function NewLine(): void { bind.NewLine(); }
 export function Spacing(): void { bind.Spacing(); }
 export function Dummy(size: Readonly<Bind.interface_ImVec2>): void { bind.Dummy(size); }
-export function Indent(indent_w: number = 0.0) { bind.Indent(indent_w); }
-export function Unindent(indent_w: number = 0.0) { bind.Unindent(indent_w); }
+export function Indent(indent_w = 0.0) { bind.Indent(indent_w); }
+export function Unindent(indent_w = 0.0) { bind.Unindent(indent_w); }
 export function BeginGroup(): void { bind.BeginGroup(); }
 export function EndGroup(): void { bind.EndGroup(); }
 export function GetCursorPos(out: Bind.interface_ImVec2 = new ImVec2()): Bind.interface_ImVec2 { return bind.GetCursorPos(out); }
@@ -3450,7 +3451,7 @@ export function InvisibleButton(str_id: string, size: Readonly<Bind.interface_Im
 export function Image(user_texture_id: ImTextureID | null, size: Readonly<Bind.interface_ImVec2>, uv0: Readonly<Bind.interface_ImVec2> = ImVec2.ZERO, uv1: Readonly<Bind.interface_ImVec2> = ImVec2.UNIT, tint_col: Readonly<Bind.interface_ImVec4> = ImVec4.WHITE, border_col: Readonly<Bind.interface_ImVec4> = ImVec4.ZERO): void {
     bind.Image(ImGuiContext.setTexture(user_texture_id), size, uv0, uv1, tint_col, border_col);
 }
-export function ImageButton(user_texture_id: ImTextureID | null, size: Readonly<Bind.interface_ImVec2> = new ImVec2(Number.MIN_SAFE_INTEGER, 0), uv0: Readonly<Bind.interface_ImVec2> = ImVec2.ZERO, uv1: Readonly<Bind.interface_ImVec2> = ImVec2.UNIT, frame_padding: number = -1, bg_col: Readonly<Bind.interface_ImVec4> = ImVec4.ZERO, tint_col: Readonly<Bind.interface_ImVec4> = ImVec4.WHITE): boolean {
+export function ImageButton(user_texture_id: ImTextureID | null, size: Readonly<Bind.interface_ImVec2> = new ImVec2(Number.MIN_SAFE_INTEGER, 0), uv0: Readonly<Bind.interface_ImVec2> = ImVec2.ZERO, uv1: Readonly<Bind.interface_ImVec2> = ImVec2.UNIT, frame_padding = -1, bg_col: Readonly<Bind.interface_ImVec4> = ImVec4.ZERO, tint_col: Readonly<Bind.interface_ImVec4> = ImVec4.WHITE): boolean {
     return bind.ImageButton(ImGuiContext.setTexture(user_texture_id), size, uv0, uv1, frame_padding, bg_col, tint_col);
 }
 export function Checkbox(label: string, v: Bind.ImScalar<boolean> | Bind.ImAccess<boolean>): boolean {
@@ -3557,31 +3558,31 @@ export function Combo<T>(label: string, current_item: Bind.ImAccess<number> | Bi
 // IMGUI_API bool          DragIntRange2(const char* label, int* v_current_min, int* v_current_max, float v_speed = 1.0f, int v_min = 0, int v_max = 0, const char* format = "%d", const char* format_max = NULL, ImGuiSliderFlags flags = 0);
 // IMGUI_API bool          DragScalar(const char* label, ImGuiDataType data_type, void* p_data, float v_speed, const void* p_min = NULL, const void* p_max = NULL, const char* format = NULL, ImGuiSliderFlags flags = 0);
 // IMGUI_API bool          DragScalarN(const char* label, ImGuiDataType data_type, void* p_data, int components, float v_speed, const void* p_min = NULL, const void* p_max = NULL, const char* format = NULL, ImGuiSliderFlags flags = 0);
-export function DragFloat(label: string, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_speed: number = 1.0, v_min: number = 0.0, v_max: number = 0.0, display_format: string | null = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
+export function DragFloat(label: string, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_speed = 1.0, v_min = 0.0, v_max = 0.0, display_format: string | null = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Scalar(v);
     const ret = bind.DragFloat(label, _v, v_speed, v_min, v_max, display_format, flags);
     export_Scalar(_v, v);
     return ret;
 }
-export function DragFloat2(label: string, v: XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number> | ImVec2, v_speed: number = 1.0, v_min: number = 0.0, v_max: number = 0.0, display_format: string = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
+export function DragFloat2(label: string, v: XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number> | ImVec2, v_speed = 1.0, v_min = 0.0, v_max = 0.0, display_format = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Vector2(v);
     const ret = bind.DragFloat2(label, _v, v_speed, v_min, v_max, display_format, flags);
     export_Vector2(_v, v);
     return ret;
 }
-export function DragFloat3(label: string, v: XYZ | XYZW | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_speed: number = 1.0, v_min: number = 0.0, v_max: number = 0.0, display_format: string = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
+export function DragFloat3(label: string, v: XYZ | XYZW | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_speed = 1.0, v_min = 0.0, v_max = 0.0, display_format = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Vector3(v);
     const ret = bind.DragFloat3(label, _v, v_speed, v_min, v_max, display_format, flags);
     export_Vector3(_v, v);
     return ret;
 }
-export function DragFloat4(label: string, v: XYZW | Bind.ImTuple4<number> | ImVec4, v_speed: number = 1.0, v_min: number = 0.0, v_max: number = 0.0, display_format: string = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
+export function DragFloat4(label: string, v: XYZW | Bind.ImTuple4<number> | ImVec4, v_speed = 1.0, v_min = 0.0, v_max = 0.0, display_format = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Vector4(v);
     const ret = bind.DragFloat4(label, _v, v_speed, v_min, v_max, display_format, flags);
     export_Vector4(_v, v);
     return ret;
 }
-export function DragFloatRange2(label: string, v_current_min: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_current_max: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_speed: number = 1.0, v_min: number = 0.0, v_max: number = 0.0, display_format: string = "%.3f", display_format_max: string | null = null, flags: ImGuiSliderFlags = 0): boolean {
+export function DragFloatRange2(label: string, v_current_min: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_current_max: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_speed = 1.0, v_min = 0.0, v_max = 0.0, display_format = "%.3f", display_format_max: string | null = null, flags: ImGuiSliderFlags = 0): boolean {
     const _v_current_min = import_Scalar(v_current_min);
     const _v_current_max = import_Scalar(v_current_max);
     const ret = bind.DragFloatRange2(label, _v_current_min, _v_current_max, v_speed, v_min, v_max, display_format, display_format_max, flags);
@@ -3589,31 +3590,31 @@ export function DragFloatRange2(label: string, v_current_min: Bind.ImAccess<numb
     export_Scalar(_v_current_max, v_current_max);
     return ret;
 }
-export function DragInt(label: string, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_speed: number = 1.0, v_min: number = 0, v_max: number = 0, format: string = "%d", flags: ImGuiSliderFlags = 0): boolean {
+export function DragInt(label: string, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_speed = 1.0, v_min = 0, v_max = 0, format = "%d", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Scalar(v);
     const ret = bind.DragInt(label, _v, v_speed, v_min, v_max, format, flags);
     export_Scalar(_v, v);
     return ret;
 }
-export function DragInt2(label: string, v: XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_speed: number = 1.0, v_min: number = 0, v_max: number = 0, format: string = "%d", flags: ImGuiSliderFlags = 0): boolean {
+export function DragInt2(label: string, v: XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_speed = 1.0, v_min = 0, v_max = 0, format = "%d", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Vector2(v);
     const ret = bind.DragInt2(label, _v, v_speed, v_min, v_max, format, flags);
     export_Vector2(_v, v);
     return ret;
 }
-export function DragInt3(label: string, v: XYZ | XYZW | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_speed: number = 1.0, v_min: number = 0, v_max: number = 0, format: string = "%d", flags: ImGuiSliderFlags = 0): boolean {
+export function DragInt3(label: string, v: XYZ | XYZW | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_speed = 1.0, v_min = 0, v_max = 0, format = "%d", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Vector3(v);
     const ret = bind.DragInt3(label, _v, v_speed, v_min, v_max, format, flags);
     export_Vector3(_v, v);
     return ret;
 }
-export function DragInt4(label: string, v: XYZW | Bind.ImTuple4<number>, v_speed: number = 1.0, v_min: number = 0, v_max: number = 0, format: string = "%d", flags: ImGuiSliderFlags = 0): boolean {
+export function DragInt4(label: string, v: XYZW | Bind.ImTuple4<number>, v_speed = 1.0, v_min = 0, v_max = 0, format = "%d", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Vector4(v);
     const ret = bind.DragInt4(label, _v, v_speed, v_min, v_max, format, flags);
     export_Vector4(_v, v);
     return ret;
 }
-export function DragIntRange2(label: string, v_current_min: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_current_max: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_speed: number = 1.0, v_min: number = 0, v_max: number = 0, format: string = "%d", format_max: string | null = null, flags: ImGuiSliderFlags = 0): boolean {
+export function DragIntRange2(label: string, v_current_min: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_current_max: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_speed = 1.0, v_min = 0, v_max = 0, format = "%d", format_max: string | null = null, flags: ImGuiSliderFlags = 0): boolean {
     const _v_current_min = import_Scalar(v_current_min);
     const _v_current_max = import_Scalar(v_current_max);
     const ret = bind.DragIntRange2(label, _v_current_min, _v_current_max, v_speed, v_min, v_max, format, format_max, flags);
@@ -3655,37 +3656,37 @@ export function DragScalar(label: string, v: Int8Array | Uint8Array | Int16Array
 // IMGUI_API bool          VSliderFloat(const char* label, const ImVec2& size, float* v, float v_min, float v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0);
 // IMGUI_API bool          VSliderInt(const char* label, const ImVec2& size, int* v, int v_min, int v_max, const char* format = "%d", ImGuiSliderFlags flags = 0);
 // IMGUI_API bool          VSliderScalar(const char* label, const ImVec2& size, ImGuiDataType data_type, void* p_data, const void* p_min, const void* p_max, const char* format = NULL, ImGuiSliderFlags flags = 0);
-export function SliderFloat(label: string, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_min: number, v_max: number, format: string = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
+export function SliderFloat(label: string, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_min: number, v_max: number, format = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Scalar(v);
     const ret = bind.SliderFloat(label, _v, v_min, v_max, format, flags);
     export_Scalar(_v, v);
     return ret;
 }
-export function SliderFloat2(label: string, v: XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number> | Bind.interface_ImVec2, v_min: number, v_max: number, format: string = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
+export function SliderFloat2(label: string, v: XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number> | Bind.interface_ImVec2, v_min: number, v_max: number, format = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Vector2(v);
     const ret = bind.SliderFloat2(label, _v, v_min, v_max, format, flags);
     export_Vector2(_v, v);
     return ret;
 }
-export function SliderFloat3(label: string, v: XYZ | XYZW | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_min: number, v_max: number, format: string = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
+export function SliderFloat3(label: string, v: XYZ | XYZW | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_min: number, v_max: number, format = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Vector3(v);
     const ret = bind.SliderFloat3(label, _v, v_min, v_max, format, flags);
     export_Vector3(_v, v);
     return ret;
 }
-export function SliderFloat4(label: string, v: XYZW | Bind.ImTuple4<number> | XYZW, v_min: number, v_max: number, format: string = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
+export function SliderFloat4(label: string, v: XYZW | Bind.ImTuple4<number> | XYZW, v_min: number, v_max: number, format = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Vector4(v);
     const ret = bind.SliderFloat4(label, _v, v_min, v_max, format, flags);
     export_Vector4(_v, v);
     return ret;
 }
-export function SliderAngle(label: string, v_rad: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_degrees_min: number = -360.0, v_degrees_max: number = +360.0, format: string = "%.0f deg", flags: ImGuiSliderFlags = 0): boolean {
+export function SliderAngle(label: string, v_rad: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_degrees_min = -360.0, v_degrees_max = +360.0, format = "%.0f deg", flags: ImGuiSliderFlags = 0): boolean {
     const _v_rad = import_Scalar(v_rad);
     const ret = bind.SliderAngle(label, _v_rad, v_degrees_min, v_degrees_max, format, flags);
     export_Scalar(_v_rad, v_rad);
     return ret;
 }
-export function SliderAngle3(label: string, v_rad: XYZ | XYZW | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_degrees_min: number = -360.0, v_degrees_max: number = +360.0, format: string = "%.0f deg", flags: ImGuiSliderFlags = 0): boolean {
+export function SliderAngle3(label: string, v_rad: XYZ | XYZW | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_degrees_min = -360.0, v_degrees_max = +360.0, format = "%.0f deg", flags: ImGuiSliderFlags = 0): boolean {
     const _v_rad = import_Vector3(v_rad);
     _v_rad[0] = Math.floor(_v_rad[0] * 180 / Math.PI);
     _v_rad[1] = Math.floor(_v_rad[1] * 180 / Math.PI);
@@ -3697,25 +3698,25 @@ export function SliderAngle3(label: string, v_rad: XYZ | XYZW | Bind.ImTuple3<nu
     export_Vector3(_v_rad, v_rad);
     return ret;
 }
-export function SliderInt(label: string, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_min: number, v_max: number, format: string = "%d", flags: ImGuiSliderFlags = 0): boolean {
+export function SliderInt(label: string, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_min: number, v_max: number, format = "%d", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Scalar(v);
     const ret = bind.SliderInt(label, _v, v_min, v_max, format, flags);
     export_Scalar(_v, v);
     return ret;
 }
-export function SliderInt2(label: string, v: XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_min: number, v_max: number, format: string = "%d", flags: ImGuiSliderFlags = 0): boolean {
+export function SliderInt2(label: string, v: XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_min: number, v_max: number, format = "%d", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Vector2(v);
     const ret = bind.SliderInt2(label, _v, v_min, v_max, format, flags);
     export_Vector2(_v, v);
     return ret;
 }
-export function SliderInt3(label: string, v: XYZ | XYZW | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_min: number, v_max: number, format: string = "%d", flags: ImGuiSliderFlags = 0): boolean {
+export function SliderInt3(label: string, v: XYZ | XYZW | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_min: number, v_max: number, format = "%d", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Vector3(v);
     const ret = bind.SliderInt3(label, _v, v_min, v_max, format, flags);
     export_Vector3(_v, v);
     return ret;
 }
-export function SliderInt4(label: string, v: XYZW | Bind.ImTuple4<number>, v_min: number, v_max: number, format: string = "%d", flags: ImGuiSliderFlags = 0): boolean {
+export function SliderInt4(label: string, v: XYZW | Bind.ImTuple4<number>, v_min: number, v_max: number, format = "%d", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Vector4(v);
     const ret = bind.SliderInt4(label, _v, v_min, v_max, format, flags);
     export_Vector4(_v, v);
@@ -3734,13 +3735,13 @@ export function SliderScalar(label: string, v: Int8Array | Uint8Array | Int16Arr
     if (v instanceof Float64Array) { return bind.SliderScalar(label, ImGuiDataType.Double, v, v_min, v_max, format, flags); }
     throw new Error();
 }
-export function VSliderFloat(label: string, size: Readonly<Bind.interface_ImVec2>, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_min: number, v_max: number, format: string = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
+export function VSliderFloat(label: string, size: Readonly<Bind.interface_ImVec2>, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_min: number, v_max: number, format = "%.3f", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Scalar(v);
     const ret = bind.VSliderFloat(label, size, _v, v_min, v_max, format, flags);
     export_Scalar(_v, v);
     return ret;
 }
-export function VSliderInt(label: string, size: Readonly<Bind.interface_ImVec2>, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_min: number, v_max: number, format: string = "%d", flags: ImGuiSliderFlags = 0): boolean {
+export function VSliderInt(label: string, size: Readonly<Bind.interface_ImVec2>, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, v_min: number, v_max: number, format = "%d", flags: ImGuiSliderFlags = 0): boolean {
     const _v = import_Scalar(v);
     const ret = bind.VSliderInt(label, size, _v, v_min, v_max, format, flags);
     export_Scalar(_v, v);
@@ -3778,7 +3779,7 @@ export function VSliderScalar(label: string, size: Readonly<Bind.interface_ImVec
 // IMGUI_API bool          InputScalar(const char* label, ImGuiDataType data_type, void* p_data, const void* p_step = NULL, const void* p_step_fast = NULL, const char* format = NULL, ImGuiInputTextFlags flags = 0);
 // IMGUI_API bool          InputScalarN(const char* label, ImGuiDataType data_type, void* p_data, int components, const void* p_step = NULL, const void* p_step_fast = NULL, const char* format = NULL, ImGuiInputTextFlags flags = 0);
 export function InputText<T>(label: string, buf: ImStringBuffer | Bind.ImAccess<string> | Bind.ImScalar<string>, buf_size: number = buf instanceof ImStringBuffer ? buf.size : ImGuiInputTextDefaultSize, flags: ImGuiInputTextFlags = 0, callback: ImGuiInputTextCallback<T> | null = null, user_data: T | null = null): boolean {
-    let ret:boolean=false;
+    let ret=false;
     const _callback = callback && ((data: Bind.reference_ImGuiInputTextCallbackData): number => callback(new ImGuiInputTextCallbackData<T>(data, user_data))) || null;
     if (Array.isArray(buf)) {
         return bind.InputText(label, buf, buf_size, flags, _callback, null);
@@ -3795,7 +3796,7 @@ export function InputText<T>(label: string, buf: ImStringBuffer | Bind.ImAccess<
     return ret;
 }
 export function InputTextMultiline<T>(label: string, buf: ImStringBuffer | Bind.ImAccess<string> | Bind.ImScalar<string>, buf_size: number = buf instanceof ImStringBuffer ? buf.size : ImGuiInputTextDefaultSize, size: Readonly<Bind.interface_ImVec2> = ImVec2.ZERO, flags: ImGuiInputTextFlags = 0, callback: ImGuiInputTextCallback<T> | null = null, user_data: T | null = null): boolean {
-    let ret:boolean=false;
+    let ret=false;
 
     const _callback = callback && ((data: Bind.reference_ImGuiInputTextCallbackData): number => callback(new ImGuiInputTextCallbackData<T>(data, user_data))) || null;
     if (Array.isArray(buf)) {
@@ -3813,7 +3814,7 @@ export function InputTextMultiline<T>(label: string, buf: ImStringBuffer | Bind.
     return ret;
 }
 export function InputTextWithHint<T>(label: string, hint: string, buf: ImStringBuffer | Bind.ImAccess<string> | Bind.ImScalar<string>, buf_size: number = buf instanceof ImStringBuffer ? buf.size : ImGuiInputTextDefaultSize, flags: ImGuiInputTextFlags = 0, callback: ImGuiInputTextCallback<T> | null = null, user_data: T | null = null): boolean {
-    let ret:boolean=false;
+    let ret=false;
 
     const _callback = callback && ((data: Bind.reference_ImGuiInputTextCallbackData): number => callback(new ImGuiInputTextCallbackData<T>(data, user_data))) || null;
     if (Array.isArray(buf)) {
@@ -3830,31 +3831,31 @@ export function InputTextWithHint<T>(label: string, hint: string, buf: ImStringB
     }
     return ret;
 }
-export function InputFloat(label: string, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, step: number = 0.0, step_fast: number = 0.0, format: string = "%.3f", flags: ImGuiInputTextFlags = 0): boolean {
+export function InputFloat(label: string, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, step = 0.0, step_fast = 0.0, format = "%.3f", flags: ImGuiInputTextFlags = 0): boolean {
     const _v = import_Scalar(v);
     const ret = bind.InputFloat(label, _v, step, step_fast, format, flags);
     export_Scalar(_v, v);
     return ret;
 }
-export function InputFloat2(label: string, v: XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, format: string = "%.3f", flags: ImGuiInputTextFlags = 0): boolean {
+export function InputFloat2(label: string, v: XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, format = "%.3f", flags: ImGuiInputTextFlags = 0): boolean {
     const _v = import_Vector2(v);
     const ret = bind.InputFloat2(label, _v, format, flags);
     export_Vector2(_v, v);
     return ret;
 }
-export function InputFloat3(label: string, v: XYZ | XYZW | Bind.ImTuple3<number> | Bind.ImTuple4<number>, format: string = "%.3f", flags: ImGuiInputTextFlags = 0): boolean {
+export function InputFloat3(label: string, v: XYZ | XYZW | Bind.ImTuple3<number> | Bind.ImTuple4<number>, format = "%.3f", flags: ImGuiInputTextFlags = 0): boolean {
     const _v = import_Vector3(v);
     const ret = bind.InputFloat3(label, _v, format, flags);
     export_Vector3(_v, v);
     return ret;
 }
-export function InputFloat4(label: string, v: XYZW | Bind.ImTuple4<number>, format: string = "%.3f", flags: ImGuiInputTextFlags = 0): boolean {
+export function InputFloat4(label: string, v: XYZW | Bind.ImTuple4<number>, format = "%.3f", flags: ImGuiInputTextFlags = 0): boolean {
     const _v = import_Vector4(v);
     const ret = bind.InputFloat4(label, _v, format, flags);
     export_Vector4(_v, v);
     return ret;
 }
-export function InputInt(label: string, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, step: number = 1, step_fast: number = 100, flags: ImGuiInputTextFlags = 0): boolean {
+export function InputInt(label: string, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, step = 1, step_fast = 100, flags: ImGuiInputTextFlags = 0): boolean {
     const _v = import_Scalar(v);
     const ret = bind.InputInt(label, _v, step, step_fast, flags);
     export_Scalar(_v, v);
@@ -3878,7 +3879,7 @@ export function InputInt4(label: string, v: XYZW | Bind.ImTuple4<number>, flags:
     export_Vector4(_v, v);
     return ret;
 }
-export function InputDouble(label: string, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, step: number = 0.0, step_fast: number = 0.0, format: string = "%.6f", flags: ImGuiInputTextFlags = 0): boolean {
+export function InputDouble(label: string, v: Bind.ImAccess<number> | Bind.ImScalar<number> | XY | XYZ | XYZW | Bind.ImTuple2<number> | Bind.ImTuple3<number> | Bind.ImTuple4<number>, step = 0.0, step_fast = 0.0, format = "%.6f", flags: ImGuiInputTextFlags = 0): boolean {
     const _v = import_Scalar(v);
     const ret = bind.InputDouble(label, _v, step, step_fast, format, flags);
     export_Scalar(_v, v);
@@ -4075,7 +4076,7 @@ export type ListBoxItemGetter<T> = (data: T, idx: number, out_text: [string]) =>
 export function ListBox(label: string, current_item: Bind.ImAccess<number> | Bind.ImScalar<number>, items: string[], items_count?: number, height_in_items?: number): boolean;
 export function ListBox<T>(label: string, current_item: Bind.ImAccess<number> | Bind.ImScalar<number>, items_getter: ListBoxItemGetter<T>, data: T, items_count: number, height_in_items?: number): boolean;
 export function ListBox<T>(label: string, current_item: Bind.ImAccess<number> | Bind.ImScalar<number>, ...args: any[]): boolean {
-    let ret: boolean = false;
+    let ret = false;
     const _current_item: Bind.ImScalar<number> = Array.isArray(current_item) ? current_item : [ current_item() ];
     if (Array.isArray(args[0])) {
         const items: string[] = args[0];
@@ -4206,7 +4207,7 @@ export function BeginMenuBar(): boolean { return bind.BeginMenuBar(); }
 export function EndMenuBar(): void { bind.EndMenuBar(); }
 export function BeginMainMenuBar(): boolean { return bind.BeginMainMenuBar(); }
 export function EndMainMenuBar(): void { bind.EndMainMenuBar(); }
-export function BeginMenu(label: string, enabled: boolean = true): boolean { return bind.BeginMenu(label, enabled); }
+export function BeginMenu(label: string, enabled = true): boolean { return bind.BeginMenu(label, enabled); }
 export function EndMenu(): void { bind.EndMenu(); }
 export function MenuItem(label: string, shortcut?: string | null, selected?: boolean, enabled?: boolean): boolean;
 export function MenuItem(label: string, shortcut: string | null, p_selected: Bind.ImScalar<boolean> | Bind.ImAccess<boolean> | null, enabled?: boolean): boolean;
@@ -4331,9 +4332,9 @@ export function IsPopupOpen(str_id: string, flags: ImGuiPopupFlags = 0): boolean
 // IMGUI_API void          TableNextRow(ImGuiTableRowFlags row_flags = 0, float min_row_height = 0.0f); // append into the first cell of a new row.
 // IMGUI_API bool          TableNextColumn();                          // append into the next column (or first column of next row if currently in last column). Return true when column is visible.
 // IMGUI_API bool          TableSetColumnIndex(int column_n);          // append into the specified column. Return true when column is visible.
-export function BeginTable(str_id: string, column: number, flags: ImGuiTableFlags = 0, outer_size: Bind.interface_ImVec2 = ImVec2.ZERO, inner_width: number = 0.0): boolean { return bind.BeginTable(str_id, column, flags, outer_size, inner_width); }
+export function BeginTable(str_id: string, column: number, flags: ImGuiTableFlags = 0, outer_size: Bind.interface_ImVec2 = ImVec2.ZERO, inner_width = 0.0): boolean { return bind.BeginTable(str_id, column, flags, outer_size, inner_width); }
 export function EndTable(): void { bind.EndTable(); }
-export function TableNextRow(row_flags: ImGuiTableRowFlags = 0, min_row_height: number = 0.0): void { bind.TableNextRow(row_flags, min_row_height); }
+export function TableNextRow(row_flags: ImGuiTableRowFlags = 0, min_row_height = 0.0): void { bind.TableNextRow(row_flags, min_row_height); }
 export function TableNextColumn(): boolean { return bind.TableNextColumn(); }
 export function TableSetColumnIndex(column_n: number): boolean { return bind.TableSetColumnIndex(column_n); }
 // Tables: Headers & Columns declaration
@@ -4348,7 +4349,7 @@ export function TableSetColumnIndex(column_n: number): boolean { return bind.Tab
 // IMGUI_API void          TableSetupScrollFreeze(int cols, int rows); // lock columns/rows so they stay visible when scrolled.
 // IMGUI_API void          TableHeadersRow();                          // submit all headers cells based on data provided to TableSetupColumn() + submit context menu
 // IMGUI_API void          TableHeader(const char* label);             // submit one header cell manually (rarely used)
-export function TableSetupColumn(label: string, flags: ImGuiTableColumnFlags = 0, init_width_or_weight: number = 0.0, user_id: Bind.ImU32 = 0): void { bind.TableSetupColumn(label, flags, init_width_or_weight, user_id); }
+export function TableSetupColumn(label: string, flags: ImGuiTableColumnFlags = 0, init_width_or_weight = 0.0, user_id: Bind.ImU32 = 0): void { bind.TableSetupColumn(label, flags, init_width_or_weight, user_id); }
 export function TableSetupScrollFreeze(cols: number, rows: number): void { bind.TableSetupScrollFreeze(cols, rows); }
 export function TableHeadersRow(): void { bind.TableHeadersRow(); }
 export function TableHeader(label: string): void { bind.TableHeader(label); }
@@ -4374,9 +4375,9 @@ export function TableGetSortSpecs(): ImGuiTableSortSpecs | null {
 export function TableGetColumnCount(): number { return bind.TableGetColumnCount(); }
 export function TableGetColumnIndex(): number { return bind.TableGetColumnIndex(); }
 export function TableGetRowIndex(): number { return bind.TableGetRowIndex(); }
-export function TableGetColumnName(column_n: number = -1): string { return bind.TableGetColumnName(column_n); }
-export function TableGetColumnFlags(column_n: number = -1): ImGuiTableColumnFlags { return bind.TableGetColumnFlags(column_n); }
-export function TableSetBgColor(target: ImGuiTableBgTarget, color: Bind.ImU32, column_n: number = -1) { bind.TableSetBgColor(target, color, column_n); }
+export function TableGetColumnName(column_n = -1): string { return bind.TableGetColumnName(column_n); }
+export function TableGetColumnFlags(column_n = -1): ImGuiTableColumnFlags { return bind.TableGetColumnFlags(column_n); }
+export function TableSetBgColor(target: ImGuiTableBgTarget, color: Bind.ImU32, column_n = -1) { bind.TableSetBgColor(target, color, column_n); }
 
 // Legacy Columns API (2020: prefer using Tables!)
 // - You can also use SameLine(pos_x) to mimic simplified columns.
@@ -4388,12 +4389,12 @@ export function TableSetBgColor(target: ImGuiTableBgTarget, color: Bind.ImU32, c
 // IMGUI_API float         GetColumnOffset(int column_index = -1);                             // get position of column line (in pixels, from the left side of the contents region). pass -1 to use current column, otherwise 0..GetColumnsCount() inclusive. column 0 is typically 0.0f
 // IMGUI_API void          SetColumnOffset(int column_index, float offset_x);                  // set position of column line (in pixels, from the left side of the contents region). pass -1 to use current column
 // IMGUI_API int           GetColumnsCount();
-export function Columns(count: number = 1, id: string | null = null, border: boolean = true): void { bind.Columns(count, id, border); }
+export function Columns(count = 1, id: string | null = null, border = true): void { bind.Columns(count, id, border); }
 export function NextColumn(): void { bind.NextColumn(); }
 export function GetColumnIndex(): number { return bind.GetColumnIndex(); }
-export function GetColumnWidth(column_index: number = -1): number { return bind.GetColumnWidth(column_index); }
+export function GetColumnWidth(column_index = -1): number { return bind.GetColumnWidth(column_index); }
 export function SetColumnWidth(column_index: number, width: number): void { bind.SetColumnWidth(column_index, width); }
-export function GetColumnOffset(column_index: number = -1): number { return bind.GetColumnOffset(column_index); }
+export function GetColumnOffset(column_index = -1): number { return bind.GetColumnOffset(column_index); }
 export function SetColumnOffset(column_index: number, offset_x: number): void { bind.SetColumnOffset(column_index, offset_x); }
 export function GetColumnsCount(): number { return bind.GetColumnsCount(); }
 
@@ -4430,9 +4431,9 @@ export function SetTabItemClosed(tab_or_docked_window_label: string): void { bin
 // IMGUI_API void          LogFinish();                                                        // stop logging (close file, etc.)
 // IMGUI_API void          LogButtons();                                                       // helper to display buttons for logging to tty/file/clipboard
 // IMGUI_API void          LogText(const char* fmt, ...) IM_FMTARGS(1);                        // pass text data straight to log (without being displayed)
-export function LogToTTY(max_depth: number = -1): void { bind.LogToTTY(max_depth); }
-export function LogToFile(max_depth: number = -1, filename: string | null = null): void { bind.LogToFile(max_depth, filename); }
-export function LogToClipboard(max_depth: number = -1): void { bind.LogToClipboard(max_depth); }
+export function LogToTTY(max_depth = -1): void { bind.LogToTTY(max_depth); }
+export function LogToFile(max_depth = -1, filename: string | null = null): void { bind.LogToFile(max_depth, filename); }
+export function LogToClipboard(max_depth = -1): void { bind.LogToClipboard(max_depth); }
 export function LogFinish(): void { bind.LogFinish(); }
 export function LogButtons(): void { bind.LogButtons(); }
 export function LogText(fmt: string): void { bind.LogText(fmt); }
@@ -4487,7 +4488,7 @@ export function PopClipRect(): void {
 // IMGUI_API void          SetItemDefaultFocus();                                              // make last item the default focused item of a window.
 // IMGUI_API void          SetKeyboardFocusHere(int offset = 0);                               // focus keyboard on the next widget. Use positive 'offset' to access sub components of a multiple component widget. Use -1 to access previous widget.
 export function SetItemDefaultFocus(): void { bind.SetItemDefaultFocus(); }
-export function SetKeyboardFocusHere(offset: number = 0): void { bind.SetKeyboardFocusHere(offset); }
+export function SetKeyboardFocusHere(offset = 0): void { bind.SetKeyboardFocusHere(offset); }
 
 // Item/Widgets Utilities
 // - Most of the functions are referring to the last/previous item we submitted.
@@ -4575,7 +4576,7 @@ export function EndChildFrame(): void { bind.EndChildFrame(); }
 
 // Text Utilities
 // IMGUI_API ImVec2        CalcTextSize(const char* text, const char* text_end = NULL, bool hide_text_after_double_hash = false, float wrap_width = -1.0f);
-export function CalcTextSize(text: string, text_end: number | null = null, hide_text_after_double_hash: boolean = false, wrap_width: number = -1, out: Bind.interface_ImVec2 = new ImVec2()): Bind.interface_ImVec2 {
+export function CalcTextSize(text: string, text_end: number | null = null, hide_text_after_double_hash = false, wrap_width = -1, out: Bind.interface_ImVec2 = new ImVec2()): Bind.interface_ImVec2 {
     return bind.CalcTextSize(text_end !== null ? text.substring(0, text_end) : text, hide_text_after_double_hash, wrap_width, out);
 }
 
@@ -4600,10 +4601,10 @@ export function ColorConvertHSVtoRGB(h: number, s: number, v: number, out_r: Bin
 // IMGUI_API void          CaptureKeyboardFromApp(bool want_capture_keyboard_value = true);    // attention: misleading name! manually override io.WantCaptureKeyboard flag next frame (said flag is entirely left for your application to handle). e.g. force capture keyboard when your widget is being hovered. This is equivalent to setting "io.WantCaptureKeyboard = want_capture_keyboard_value"; after the next NewFrame() call.
 export function GetKeyIndex(imgui_key: ImGuiKey): number { return bind.GetKeyIndex(imgui_key); }
 export function IsKeyDown(user_key_index: number): boolean { return bind.IsKeyDown(user_key_index); }
-export function IsKeyPressed(user_key_index: number, repeat: boolean = true): boolean { return bind.IsKeyPressed(user_key_index, repeat); }
+export function IsKeyPressed(user_key_index: number, repeat = true): boolean { return bind.IsKeyPressed(user_key_index, repeat); }
 export function IsKeyReleased(user_key_index: number): boolean { return bind.IsKeyReleased(user_key_index); }
 export function GetKeyPressedAmount(user_key_index: number, repeat_delay: number, rate: number): number { return bind.GetKeyPressedAmount(user_key_index, repeat_delay, rate); }
-export function CaptureKeyboardFromApp(capture: boolean = true) { return bind.CaptureKeyboardFromApp(capture); }
+export function CaptureKeyboardFromApp(capture = true) { return bind.CaptureKeyboardFromApp(capture); }
 
 // Inputs Utilities: Mouse
 // - To refer to a mouse button, you may use named enums in your code e.g. ImGuiMouseButton_Left, ImGuiMouseButton_Right.
@@ -4625,20 +4626,20 @@ export function CaptureKeyboardFromApp(capture: boolean = true) { return bind.Ca
 // IMGUI_API void          SetMouseCursor(ImGuiMouseCursor cursor_type);                       // set desired cursor type
 // IMGUI_API void          CaptureMouseFromApp(bool want_capture_mouse_value = true);          // attention: misleading name! manually override io.WantCaptureMouse flag next frame (said flag is entirely left for your application to handle). This is equivalent to setting "io.WantCaptureMouse = want_capture_mouse_value;" after the next NewFrame() call.
 export function IsMouseDown(button: number): boolean { return bind.IsMouseDown(button); }
-export function IsMouseClicked(button: number, repeat: boolean = false): boolean { return bind.IsMouseClicked(button, repeat); }
+export function IsMouseClicked(button: number, repeat = false): boolean { return bind.IsMouseClicked(button, repeat); }
 export function IsMouseDoubleClicked(button: number): boolean { return bind.IsMouseDoubleClicked(button); }
 export function IsMouseReleased(button: number): boolean { return bind.IsMouseReleased(button); }
-export function IsMouseHoveringRect(r_min: Readonly<Bind.interface_ImVec2>, r_max: Readonly<Bind.interface_ImVec2>, clip: boolean = true): boolean { return bind.IsMouseHoveringRect(r_min, r_max, clip); }
+export function IsMouseHoveringRect(r_min: Readonly<Bind.interface_ImVec2>, r_max: Readonly<Bind.interface_ImVec2>, clip = true): boolean { return bind.IsMouseHoveringRect(r_min, r_max, clip); }
 export function IsMousePosValid(mouse_pos: Readonly<Bind.interface_ImVec2> | null = null): boolean { return bind.IsMousePosValid(mouse_pos); }
 export function IsAnyMouseDown(): boolean { return bind.IsAnyMouseDown(); }
 export function GetMousePos(out: Bind.interface_ImVec2 = new ImVec2()): Bind.interface_ImVec2 { return bind.GetMousePos(out); }
 export function GetMousePosOnOpeningCurrentPopup(out: Bind.interface_ImVec2 = new ImVec2()): Bind.interface_ImVec2 { return bind.GetMousePosOnOpeningCurrentPopup(out); }
-export function IsMouseDragging(button: number = 0, lock_threshold: number = -1.0): boolean { return bind.IsMouseDragging(button, lock_threshold); }
-export function GetMouseDragDelta(button: number = 0, lock_threshold: number = -1.0, out: Bind.interface_ImVec2 = new ImVec2()): Bind.interface_ImVec2 { return bind.GetMouseDragDelta(button, lock_threshold, out); }
-export function ResetMouseDragDelta(button: number = 0): void { bind.ResetMouseDragDelta(button); }
+export function IsMouseDragging(button = 0, lock_threshold = -1.0): boolean { return bind.IsMouseDragging(button, lock_threshold); }
+export function GetMouseDragDelta(button = 0, lock_threshold = -1.0, out: Bind.interface_ImVec2 = new ImVec2()): Bind.interface_ImVec2 { return bind.GetMouseDragDelta(button, lock_threshold, out); }
+export function ResetMouseDragDelta(button = 0): void { bind.ResetMouseDragDelta(button); }
 export function GetMouseCursor(): ImGuiMouseCursor { return bind.GetMouseCursor(); }
 export function SetMouseCursor(type: ImGuiMouseCursor): void { bind.SetMouseCursor(type); }
-export function CaptureMouseFromApp(capture: boolean = true): void { bind.CaptureMouseFromApp(capture); }
+export function CaptureMouseFromApp(capture = true): void { bind.CaptureMouseFromApp(capture); }
 
 // Clipboard Utilities
 // - Also see the LogToClipboard() function to capture GUI into clipboard, or easily output text data to the clipboard.
@@ -4655,7 +4656,7 @@ export function SetClipboardText(text: string): void { bind.SetClipboardText(tex
 // IMGUI_API void          SaveIniSettingsToDisk(const char* ini_filename);                    // this is automatically called (if io.IniFilename is not empty) a few seconds after any modification that should be reflected in the .ini file (and also by DestroyContext).
 // IMGUI_API const char*   SaveIniSettingsToMemory(size_t* out_ini_size = NULL);               // return a zero-terminated string with the .ini data which you can save by your own mean. call when io.WantSaveIniSettings is set, then save data by your own mean and clear io.WantSaveIniSettings.
 export function LoadIniSettingsFromDisk(ini_filename: string): void { throw new Error(); } // TODO
-export function LoadIniSettingsFromMemory(ini_data: string, ini_size: number = 0): void { bind.LoadIniSettingsFromMemory(ini_data); }
+export function LoadIniSettingsFromMemory(ini_data: string, ini_size = 0): void { bind.LoadIniSettingsFromMemory(ini_data); }
 export function SaveIniSettingsToDisk(ini_filename: string): void { throw new Error(); } // TODO
 export function SaveIniSettingsToMemory(out_ini_size: Bind.ImScalar<number> | null = null): string { return bind.SaveIniSettingsToMemory(); }
 
@@ -4789,7 +4790,7 @@ export function Font_toString(font:ImFont):string
 export function CreateFont(name:string, size:number, style?:string):ImFont
 {
     const io=GetIO();
-    let font =io.Fonts.AddFontDefault();
+    const font =io.Fonts.AddFontDefault();
     font.FontStyle=style;
     font.FontName=name;
     font.FontSize=size;

@@ -1,4 +1,5 @@
-import { Blitter, BlitType } from './blitter';
+import type { BlitType } from './blitter';
+import { Blitter } from './blitter';
 import type { PBShaderExp, PBInsideFunctionScope } from '@zephyr3d/device';
 
 /**

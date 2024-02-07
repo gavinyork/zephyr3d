@@ -1,20 +1,21 @@
 import { ShaderType } from '../base_types';
 import { semanticToAttrib } from '../gpuobject';
+import type {
+  TypeDetailInfo,
+  PBTextureTypeInfo,
+  PBTypeInfo,
+  PBFunctionTypeInfo,
+  PBStructTypeInfo} from './types';
 import {
   typeI32,
   typeU32,
   typeF32,
   typeBool,
-  TypeDetailInfo,
-  PBTextureTypeInfo,
   PBPrimitiveType,
   PBPrimitiveTypeInfo,
   PBTextureType,
-  PBTypeInfo,
   PBAddressSpace,
   PBPointerTypeInfo,
-  PBFunctionTypeInfo,
-  PBStructTypeInfo,
   typeVoid
 } from './types';
 import * as errors from './errors';
@@ -368,7 +369,6 @@ interface ASTContext {
 
 /** @internal */
 export class ShaderAST {
-  constructor() {}
   isReference(): boolean {
     return false;
   }

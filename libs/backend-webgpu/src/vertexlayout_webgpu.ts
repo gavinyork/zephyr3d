@@ -1,12 +1,14 @@
-import {
+import type {
   PrimitiveType,
   StructuredBuffer,
   VertexLayout,
   IndexBuffer,
   VertexSemantic,
   VertexLayoutOptions,
-  VertexData,
   VertexBufferInfo
+} from '@zephyr3d/device';
+import {
+  VertexData
 } from '@zephyr3d/device';
 import { vertexFormatToHash } from './constants_webgpu';
 import { WebGPUObject } from './gpuobject_webgpu';

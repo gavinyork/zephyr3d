@@ -24,7 +24,7 @@ export async function imGuiInit(device: AbstractDevice, fontFamily?: string, fon
   ImGui.CreateContext();
   ImGui.StyleColorsDark();
   const io:ImGui.IO=ImGui.GetIO();
-  let font =io.Fonts.AddFontDefault();
+  const font =io.Fonts.AddFontDefault();
 
   font.FontName = fontFamily || "arial";
   font.FontSize = fontSize || 16;

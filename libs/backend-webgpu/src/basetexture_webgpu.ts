@@ -1,6 +1,13 @@
 import { WebGPUObject } from './gpuobject_webgpu';
-import {
+import type {
   TextureCaps,
+  SamplerOptions,
+  BaseTexture,
+  TextureSampler,
+  GPUDataBuffer,
+  TextureType,
+  TextureFormat} from '@zephyr3d/device';
+import {
   isCompressedTextureFormat,
   hasDepthChannel,
   isFloatTextureFormat,
@@ -10,15 +17,10 @@ import {
   getTextureFormatBlockHeight,
   getTextureFormatBlockSize,
   GPUResourceUsageFlags,
-  SamplerOptions,
-  BaseTexture,
-  TextureSampler,
-  GPUDataBuffer,
-  TextureType,
-  TextureFormat,
   isSRGBTextureFormat
 } from '@zephyr3d/device';
-import { UploadRingBuffer, UploadTexture, UploadImage } from './uploadringbuffer';
+import type { UploadTexture, UploadImage } from './uploadringbuffer';
+import { UploadRingBuffer } from './uploadringbuffer';
 import { textureFormatMap } from './constants_webgpu';
 import type { TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';

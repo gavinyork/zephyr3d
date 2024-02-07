@@ -1,6 +1,6 @@
 import { Camera } from "./camera";
-import { Scene } from "../scene/scene";
-import { Matrix4x4 } from "@zephyr3d/base";
+import type { Scene } from "../scene/scene";
+import type { Matrix4x4 } from "@zephyr3d/base";
 
 /**
  * Orthogonal camera class
