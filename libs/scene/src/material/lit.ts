@@ -233,6 +233,106 @@ export class LitMaterial extends MeshMaterial {
     return pb.getGlobalScope().kkCalculateNormal(...args);
   }
   /**
+   * Calculate the normal vector for current fragment
+   * @param scope - The shader scope
+   * @param ctx - The drawing context
+   * @returns Structure that contains normal vector and TBN matrix
+   */
+  calculateNormalAndTBN(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp {
+    const pb = scope.$builder;
+    const NormalStruct = pb.defineStruct([pb.mat3('TBN'), pb.vec3('normal')]);
+    const that = this;
+    const args: PBShaderExp[] = [];
+    const params: PBShaderExp[] = [];
+    const worldNormal = ShaderFramework.getWorldNormal(scope);
+    const worldTangent = ShaderFramework.getWorldTangent(scope);
+    const worldBinormal = ShaderFramework.getWorldBinormal(scope);
+    if (worldNormal) {
+      params.push(pb.vec3('worldNormal'));
+      args.push(worldNormal);
+      if (worldTangent) {
+        params.push(pb.vec3('worldTangent'), pb.vec3('worldBinormal'));
+        args.push(worldTangent, worldBinormal);
+      }
+    }
+    pb.func('kkCalculateNormalAndTBN', params, function(){
+      const posW = ShaderFramework.getWorldPosition(this).xyz;
+      this.$l.uv = that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)
+        ? scope.$inputs.kkNormalTexCoord ?? pb.vec2(0)
+        : that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)
+          ? scope.$inputs.kkAlbedoTexCoord ?? pb.vec2(0)
+          : pb.vec2(0);
+      this.$l.TBN = pb.mat3();
+      if (!worldNormal) {
+        this.$l.uv_dx = pb.dpdx(pb.vec3(this.uv, 0));
+        this.$l.uv_dy = pb.dpdy(pb.vec3(this.uv, 0));
+        this.$if(
+          pb.lessThanEqual(pb.add(pb.length(this.uv_dx), pb.length(this.uv_dy)), 0.000001),
+          function () {
+            this.uv_dx = pb.vec3(1, 0, 0);
+            this.uv_dy = pb.vec3(0, 1, 0);
+          }
+        );
+        this.$l.t_ = pb.div(
+          pb.sub(pb.mul(pb.dpdx(posW), this.uv_dy.y), pb.mul(pb.dpdy(posW), this.uv_dx.y)),
+          pb.sub(pb.mul(this.uv_dx.x, this.uv_dy.y), pb.mul(this.uv_dx.y, this.uv_dy.x))
+        );
+        this.$l.ng = pb.normalize(pb.cross(pb.dpdx(posW), pb.dpdy(posW)));
+        this.$l.t = pb.normalize(pb.sub(this.t_, pb.mul(this.ng, pb.dot(this.ng, this.t_))));
+        this.$l.b = pb.cross(this.ng, this.t);
+        if (that.doubleSidedLighting) {
+          this.$if(pb.not(this.$builtins.frontFacing), function () {
+            this.t = pb.mul(this.t, -1);
+            this.b = pb.mul(this.b, -1);
+            this.ng = pb.mul(this.ng, -1);
+          });
+        }
+        this.TBN = pb.mat3(this.t, this.b, this.ng);
+      } else if (!worldTangent) {
+        this.$l.uv_dx = pb.dpdx(pb.vec3(this.uv, 0));
+        this.$l.uv_dy = pb.dpdy(pb.vec3(this.uv, 0));
+        this.$if(
+          pb.lessThanEqual(pb.add(pb.length(this.uv_dx), pb.length(this.uv_dy)), 0.000001),
+          function () {
+            this.uv_dx = pb.vec3(1, 0, 0);
+            this.uv_dy = pb.vec3(0, 1, 0);
+          }
+        );
+        this.$l.t_ = pb.div(
+          pb.sub(pb.mul(pb.dpdx(posW), this.uv_dy.y), pb.mul(pb.dpdy(posW), this.uv_dx.y)),
+          pb.sub(pb.mul(this.uv_dx.x, this.uv_dy.y), pb.mul(this.uv_dx.y, this.uv_dy.x))
+        );
+        this.$l.ng = pb.normalize(this.worldNormal);
+        this.$l.t = pb.normalize(pb.sub(this.t_, pb.mul(this.ng, pb.dot(this.ng, this.t_))));
+        this.$l.b = pb.cross(this.ng, this.t);
+        if (that.doubleSidedLighting) {
+          this.$if(pb.not(this.$builtins.frontFacing), function () {
+            this.t = pb.mul(this.t, -1);
+            this.b = pb.mul(this.b, -1);
+            this.ng = pb.mul(this.ng, -1);
+          });
+        }
+        this.TBN = pb.mat3(this.t, this.b, this.ng);
+      } else {
+        this.TBN = pb.mat3(pb.normalize(this.worldTangent), pb.normalize(this.worldBinormal), pb.normalize(this.worldNormal));
+      }
+      if (that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
+        if (that.normalMapMode === 'object-space') {
+          const pixel = pb.sub(pb.mul(pb.textureSample(this.kkNormalTexture, this.uv).rgb, 2), pb.vec3(1));
+          const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.kkNormalScale).xx, 1));
+          this.$return(NormalStruct(this.TBN, pb.normalize(normalTex)));
+        } else {
+          const pixel = pb.sub(pb.mul(pb.textureSample(this.kkNormalTexture, this.uv).rgb, 2), pb.vec3(1));
+          const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.kkNormalScale).xx, 1));
+          this.$return(NormalStruct(this.TBN, pb.normalize(pb.mul(this.TBN, normalTex))));
+        }
+      } else {
+        this.$return(NormalStruct(this.TBN, this.TBN[2]));
+      }
+    });
+    return pb.getGlobalScope().kkCalculateNormalAndTBN(...args);
+  }
+  /**
    * {@inheritDoc MeshMaterial.applyUniformsValues}
    * @override
    */
