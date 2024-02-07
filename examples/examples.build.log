@@ -1,0 +1,60 @@
+Invoking: cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent 
+/home/runner/work/zephyr3d/zephyr3d/examples/src/computeboids
+src files added: /home/runner/work/zephyr3d/zephyr3d/examples/src/computeboids/main.ts
+/home/runner/work/zephyr3d/zephyr3d/examples/src/cube
+src files added: /home/runner/work/zephyr3d/zephyr3d/examples/src/cube/main.ts
+/home/runner/work/zephyr3d/zephyr3d/examples/src/imageblur
+src files added: /home/runner/work/zephyr3d/zephyr3d/examples/src/imageblur/main.ts
+/home/runner/work/zephyr3d/zephyr3d/examples/src/instancecube
+src files added: /home/runner/work/zephyr3d/zephyr3d/examples/src/instancecube/main.ts
+/home/runner/work/zephyr3d/zephyr3d/examples/src/rendertexture
+src files added: /home/runner/work/zephyr3d/zephyr3d/examples/src/rendertexture/main.ts
+/home/runner/work/zephyr3d/zephyr3d/examples/src/sea
+src files added: /home/runner/work/zephyr3d/zephyr3d/examples/src/sea/main.ts
+/home/runner/work/zephyr3d/zephyr3d/examples/src/stenciloutline
+src files added: /home/runner/work/zephyr3d/zephyr3d/examples/src/stenciloutline/main.ts
+/home/runner/work/zephyr3d/zephyr3d/examples/src/texturedcube
+src files added: /home/runner/work/zephyr3d/zephyr3d/examples/src/texturedcube/main.ts
+/home/runner/work/zephyr3d/zephyr3d/examples/src/triangle
+src files added: /home/runner/work/zephyr3d/zephyr3d/examples/src/triangle/main.ts
+/home/runner/work/zephyr3d/zephyr3d/examples/src/computeboids/main.ts , computeboids
+/home/runner/work/zephyr3d/zephyr3d/examples/src/cube/main.ts , cube
+/home/runner/work/zephyr3d/zephyr3d/examples/src/imageblur/main.ts , imageblur
+/home/runner/work/zephyr3d/zephyr3d/examples/src/instancecube/main.ts , instancecube
+/home/runner/work/zephyr3d/zephyr3d/examples/src/rendertexture/main.ts , rendertexture
+/home/runner/work/zephyr3d/zephyr3d/examples/src/sea/main.ts , sea
+/home/runner/work/zephyr3d/zephyr3d/examples/src/stenciloutline/main.ts , stenciloutline
+/home/runner/work/zephyr3d/zephyr3d/examples/src/texturedcube/main.ts , texturedcube
+/home/runner/work/zephyr3d/zephyr3d/examples/src/triangle/main.ts , triangle
+[{"input":"/home/runner/work/zephyr3d/zephyr3d/examples/src/computeboids/main.ts","preserveSymlinks":false,"output":{"file":"/home/runner/work/zephyr3d/zephyr3d/examples/dist/computeboids/computeboids.js","format":"esm","sourcemap":true},"plugins":[{"name":"node-resolve","version":"15.2.0","resolveId":{"order":"post"}},{"name":"swc"},{"name":"copy"}]},{"input":"/home/runner/work/zephyr3d/zephyr3d/examples/src/cube/main.ts","preserveSymlinks":false,"output":{"file":"/home/runner/work/zephyr3d/zephyr3d/examples/dist/cube/cube.js","format":"esm","sourcemap":true},"plugins":[{"name":"node-resolve","version":"15.2.0","resolveId":{"order":"post"}},{"name":"swc"},{"name":"copy"}]},{"input":"/home/runner/work/zephyr3d/zephyr3d/examples/src/imageblur/main.ts","preserveSymlinks":false,"output":{"file":"/home/runner/work/zephyr3d/zephyr3d/examples/dist/imageblur/imageblur.js","format":"esm","sourcemap":true},"plugins":[{"name":"node-resolve","version":"15.2.0","resolveId":{"order":"post"}},{"name":"swc"},{"name":"copy"}]},{"input":"/home/runner/work/zephyr3d/zephyr3d/examples/src/instancecube/main.ts","preserveSymlinks":false,"output":{"file":"/home/runner/work/zephyr3d/zephyr3d/examples/dist/instancecube/instancecube.js","format":"esm","sourcemap":true},"plugins":[{"name":"node-resolve","version":"15.2.0","resolveId":{"order":"post"}},{"name":"swc"},{"name":"copy"}]},{"input":"/home/runner/work/zephyr3d/zephyr3d/examples/src/rendertexture/main.ts","preserveSymlinks":false,"output":{"file":"/home/runner/work/zephyr3d/zephyr3d/examples/dist/rendertexture/rendertexture.js","format":"esm","sourcemap":true},"plugins":[{"name":"node-resolve","version":"15.2.0","resolveId":{"order":"post"}},{"name":"swc"},{"name":"copy"}]},{"input":"/home/runner/work/zephyr3d/zephyr3d/examples/src/sea/main.ts","preserveSymlinks":false,"output":{"file":"/home/runner/work/zephyr3d/zephyr3d/examples/dist/sea/sea.js","format":"esm","sourcemap":true},"plugins":[{"name":"node-resolve","version":"15.2.0","resolveId":{"order":"post"}},{"name":"swc"},{"name":"copy"}]},{"input":"/home/runner/work/zephyr3d/zephyr3d/examples/src/stenciloutline/main.ts","preserveSymlinks":false,"output":{"file":"/home/runner/work/zephyr3d/zephyr3d/examples/dist/stenciloutline/stenciloutline.js","format":"esm","sourcemap":true},"plugins":[{"name":"node-resolve","version":"15.2.0","resolveId":{"order":"post"}},{"name":"swc"},{"name":"copy"}]},{"input":"/home/runner/work/zephyr3d/zephyr3d/examples/src/texturedcube/main.ts","preserveSymlinks":false,"output":{"file":"/home/runner/work/zephyr3d/zephyr3d/examples/dist/texturedcube/texturedcube.js","format":"esm","sourcemap":true},"plugins":[{"name":"node-resolve","version":"15.2.0","resolveId":{"order":"post"}},{"name":"swc"},{"name":"copy"}]},{"input":"/home/runner/work/zephyr3d/zephyr3d/examples/src/triangle/main.ts","preserveSymlinks":false,"output":{"file":"/home/runner/work/zephyr3d/zephyr3d/examples/dist/triangle/triangle.js","format":"esm","sourcemap":true},"plugins":[{"name":"node-resolve","version":"15.2.0","resolveId":{"order":"post"}},{"name":"swc"},{"name":"copy"}]}]
+copied:
+  src/computeboids/index.html → dist/computeboids/index.html
+  src/index.html → dist/index.html
+copied:
+  src/cube/index.html → dist/cube/index.html
+  src/index.html → dist/index.html
+copied:
+  src/imageblur/dog_01.png → dist/imageblur/dog_01.png
+  src/imageblur/dom.html → dist/imageblur/dom.html
+  src/imageblur/index.html → dist/imageblur/index.html
+  src/index.html → dist/index.html
+copied:
+  src/instancecube/index.html → dist/instancecube/index.html
+  src/index.html → dist/index.html
+copied:
+  src/rendertexture/index.html → dist/rendertexture/index.html
+  src/index.html → dist/index.html
+copied:
+  src/sea/index.html → dist/sea/index.html
+  src/index.html → dist/index.html
+copied:
+  src/stenciloutline/index.html → dist/stenciloutline/index.html
+  src/index.html → dist/index.html
+copied:
+  src/texturedcube/index.html → dist/texturedcube/index.html
+  src/texturedcube/layer.jpg → dist/texturedcube/layer.jpg
+  src/texturedcube/sample-video.mp4 → dist/texturedcube/sample-video.mp4
+  src/index.html → dist/index.html
+copied:
+  src/triangle/index.html → dist/triangle/index.html
+  src/index.html → dist/index.html

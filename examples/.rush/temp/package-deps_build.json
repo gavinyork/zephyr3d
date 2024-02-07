@@ -1,0 +1,33 @@
+{
+  "files": {
+    "examples/config/rush-project.json": "4ccea03f33b3867b3e5437786bd7b76beac89fcc",
+    "examples/package.json": "c69680746370fe838bdb3a72cc089d174462aae6",
+    "examples/rollup.config.mjs": "6eca1990be3e116e61c58abff069ca1b9267aa9e",
+    "examples/src/computeboids/index.html": "a8a44fdbf512101056b7467a9941ecd862ab1b04",
+    "examples/src/computeboids/main.ts": "8b7babb0af583487f47b5efca3e2057e51698131",
+    "examples/src/cube/index.html": "b3c617117613f267666b81f192666b222a57264c",
+    "examples/src/cube/main.ts": "23debf654d47386b2afba9c7389a122ccf739159",
+    "examples/src/imageblur/dog_01.png": "be1a1ce0e73e3f2c3e82f466445c5c3884929df7",
+    "examples/src/imageblur/dom.html": "e496bc7c15d1c7c73d1eaeb642ff7b36dfdb77b3",
+    "examples/src/imageblur/index.html": "16bf6510ff7c16568ad0b9297da6a0488b44ba62",
+    "examples/src/imageblur/main.ts": "1e76c4a71e8d03b5a31c0d034feffbe42d2c3ebb",
+    "examples/src/index.html": "bdeddedadfed1dc797f3518fb3ae645745cda772",
+    "examples/src/instancecube/index.html": "787428ea39ffe34deda8d07d1689a7808dd2e47c",
+    "examples/src/instancecube/main.ts": "166537efa173981489cb4fd996ae2c36f42ccc90",
+    "examples/src/rendertexture/index.html": "fb7b5b26111a1ba33f1ab4ea76896af5784a3c1a",
+    "examples/src/rendertexture/main.ts": "c998603a2e1a5f4674bd22230331549da0d4f81c",
+    "examples/src/sea/index.html": "2d761d3bb8453112872e3f3c280cea5dadb77499",
+    "examples/src/sea/main.ts": "a35071e36d2cdb9c65825d1239c7edc93301bdb4",
+    "examples/src/stenciloutline/index.html": "81fd8196d3971ccee3b5ca7ff050ac60ee2312eb",
+    "examples/src/stenciloutline/main.ts": "e2f7537cea381f5ce504c668f3ad4d6ed252660d",
+    "examples/src/texturedcube/index.html": "c8924fb6c06dd55c717e7f52a0b3382f0f346c64",
+    "examples/src/texturedcube/layer.jpg": "f2fbbe321e654d74bad87ea30cbd3ad2e317c7c5",
+    "examples/src/texturedcube/main.ts": "93325f1b6385eee145c49e957ed11b201fc5e41c",
+    "examples/src/texturedcube/sample-video.mp4": "24b738c4f7bb23438d1904f826aaade728d641fc",
+    "examples/src/triangle/index.html": "30c45895e09c4ec2754020ef898534a55adf1326",
+    "examples/src/triangle/main.ts": "1e6d2b6cdff71dad749397f16196995edd2a5eb0",
+    "examples/tsconfig.json": "67587ad705eacfdabf48589330441778de18ddf1",
+    "examples/.rush/temp/shrinkwrap-deps.json": "606034907b67865b5f8e67e63140ff288a0f32bc"
+  },
+  "arguments": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent "
+}
