@@ -1,5 +1,5 @@
 import { Vector4 } from '@zephyr3d/base';
-import { BaseTexture, BindGroup, PBInsideFunctionScope, PBShaderExp, ProgramBuilder, ShaderType, TextureCube, TextureSampler } from '@zephyr3d/device';
+import { BindGroup, PBInsideFunctionScope, PBShaderExp, ProgramBuilder, TextureCube } from '@zephyr3d/device';
 import { Application } from '../app';
 
 /**
@@ -185,10 +185,6 @@ export class EnvIBL extends EnvironmentLighting {
    */
   isIBL(): this is EnvIBL {
     return true;
-  }
-  /** @internal */
-  private getMapSampler(tex: BaseTexture): TextureSampler {
-    return tex.getDefaultSampler(false);
   }
 }
 

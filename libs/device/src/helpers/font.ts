@@ -2,7 +2,6 @@
 export class FontCanvas {
     private static _canvas: HTMLCanvasElement = null;
     private static _context: CanvasRenderingContext2D = null;
-    private static _currentFont: string = null;
     static get canvas() {
       this._realize();
       return this._canvas;

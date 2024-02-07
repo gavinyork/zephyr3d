@@ -420,7 +420,6 @@ const blitProgramCache: {
 } = {};
 
 let blitPrimitive2D: Primitive = null;
-let blitPrimitiveCube: Primitive = null;
 let blitRenderStates: RenderStateSet = null;
 
 function getBlitPrimitive2D(): Primitive {

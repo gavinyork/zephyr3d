@@ -2,7 +2,7 @@ import { Matrix4x4 } from '@zephyr3d/base';
 import { SceneNode } from './scene_node';
 import type { Texture2D } from '@zephyr3d/device';
 import type { XForm } from './xform';
-import type { BatchDrawable, Drawable } from '../render/drawable';
+import type { BatchDrawable } from '../render/drawable';
 import type { Scene } from './scene';
 import type { Camera } from '../camera/camera';
 

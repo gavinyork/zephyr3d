@@ -6,10 +6,10 @@ import { Primitive } from "./primitive";
 import { BoxShape } from "../shapes";
 import { ScatteringLut } from "./scatteringlut";
 import { Camera } from "../camera/camera";
-import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, RenderStateSet, Texture2D, TextureCube, TextureFormat, TextureSampler, VertexLayout } from "@zephyr3d/device";
-import type { DrawContext } from "./drawable";
 import { prefilterCubemap } from "../utility";
 import { DirectionalLight } from "../scene";
+import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, RenderStateSet, TextureCube, TextureFormat, TextureSampler, VertexLayout } from "@zephyr3d/device";
+import type { DrawContext } from "./drawable";
 
 /**
  * Type of sky

@@ -3,7 +3,6 @@ import {
   TextureFormat,
   PBShaderExp,
   PBInsideFunctionScope,
-  TextureSampler,
   PBGlobalScope,
   FrameBuffer
 } from '@zephyr3d/device';

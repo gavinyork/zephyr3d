@@ -305,7 +305,9 @@ export class Matrix3x3 extends VectorBase {
     static scale(a: Matrix3x3, f: number, result?: Matrix3x3): Matrix3x3;
     scaleBy(f: number): Matrix3x3;
     setCol(col: number, v: Vector3): this;
+    setColXYZ(col: number, x: number, y: number, z: number): this;
     setRow(row: number, v: Vector3): this;
+    setRowXYZ(row: number, x: number, y: number, z: number): this;
     static sub(a: Matrix3x3, b: Matrix3x3, result?: Matrix3x3): Matrix3x3;
     subBy(other: Matrix3x3): Matrix3x3;
     transform(vec: Vector3, result?: Vector3): Vector3;
@@ -428,8 +430,10 @@ export class Matrix4x4 extends VectorBase {
     static scaling(s: Vector3, result?: Matrix4x4): Matrix4x4;
     scaling(s: Vector3): Matrix4x4;
     setCol(col: number, v: Vector4): this;
+    setColXYZW(col: number, x: number, y: number, z: number, w: number): this;
     setNearFar(znear: number, zfar: number): this;
     setRow(row: number, v: Vector4): this;
+    setRowXYZW(row: number, x: number, y: number, z: number, w: number): this;
     static sub(a: Matrix4x4, b: Matrix4x4, result?: Matrix4x4): Matrix4x4;
     subBy(other: Matrix4x4): Matrix4x4;
     transform(vec: Vector4, result?: Vector4): Vector4;

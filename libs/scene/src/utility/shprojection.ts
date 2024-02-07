@@ -1,5 +1,5 @@
 import { halfToFloat, nextPowerOf2, SH, unpackFloat3, Vector3 } from "@zephyr3d/base";
-import { BindGroup, Texture2D, GPUProgram, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, RenderStateSet, ShaderType, TextureCube, VertexLayout } from "@zephyr3d/device";
+import { BindGroup, Texture2D, GPUProgram, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, RenderStateSet, TextureCube, VertexLayout } from "@zephyr3d/device";
 import { Application } from "../app";
 import { Blitter, BlitType, CopyBlitter } from "../blitter";
 

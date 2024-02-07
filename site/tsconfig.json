@@ -9,7 +9,7 @@
     "noImplicitAny": false,
     "preserveConstEnums": false,
     "listEmittedFiles": true,
-    "noUnusedLocals": false,
+    "noUnusedLocals": true,
     "strictNullChecks": false,
     "allowJs": true,
     "checkJs": false,

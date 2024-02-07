@@ -1,4 +1,4 @@
-import { Texture2D, BindGroup, GPUProgram, PBGlobalScope, ProgramBuilder, ShaderType } from '@zephyr3d/device';
+import { Texture2D, BindGroup, GPUProgram, ProgramBuilder } from '@zephyr3d/device';
 import { Material } from './material';
 import { forwardComputeLighting } from '../shaders/lighting';
 import { RENDER_PASS_TYPE_SHADOWMAP, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_DEPTH_ONLY } from '../values';
@@ -22,8 +22,6 @@ export class GrassMaterial extends Material {
   private _terrainSize: Vector2;
   /** @internal */
   private _normalMap: Texture2D;
-  /** @internal */
-  private _grassTexture: Texture2D;
   /** @internal */
   private _textureSize: Vector2;
   /** @internal */

@@ -1,4 +1,4 @@
-import type { PBInsideFunctionScope, PBShaderExp, TextureFormat, TextureSampler } from '@zephyr3d/device';
+import type { PBInsideFunctionScope, PBShaderExp, TextureFormat } from '@zephyr3d/device';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
 
 /** @internal */

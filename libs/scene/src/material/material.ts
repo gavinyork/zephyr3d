@@ -544,7 +544,6 @@ export class Material implements IMaterial {
   /** @internal */
   static bindGroupGarbageCollect(bindGroup: BindGroup) {
     const layout: BindGroupLayout = bindGroup.getLayout();
-    type T = BindGroupLayout["entries"]
     for (const entry of layout.entries) {
       if (entry.buffer) {
         const buffer = bindGroup.getBuffer(entry.name);

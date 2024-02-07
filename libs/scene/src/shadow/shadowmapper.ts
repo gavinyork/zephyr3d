@@ -68,7 +68,7 @@ export interface ShadowConfig {
   nearClip?: number;
 }
 
-const zeroPosition = Vector3.zero();
+// const zeroPosition = Vector3.zero();
 /**
  * The shadow map generator
  * @public
@@ -824,10 +824,10 @@ export class ShadowMapper {
             const adjMatrix = new Matrix4x4();
             const col = split % 2;
             const row = split >> 1;
-            adjMatrix.setRow(0, new Vector4(1.5 - 0.5 * numCols, 0, 0, 0));
-            adjMatrix.setRow(1, new Vector4(0, 1.5 - 0.5 * numRows, 0, 0));
-            adjMatrix.setRow(2, new Vector4(0, 0, 1, 0));
-            adjMatrix.setRow(3, new Vector4(col - 0.5 * numCols + 0.5, row - 0.5 * numRows + 0.5, 0, 1));
+            adjMatrix.setRowXYZW(0, 1.5 - 0.5 * numCols, 0, 0, 0);
+            adjMatrix.setRowXYZW(1, 0, 1.5 - 0.5 * numRows, 0, 0);
+            adjMatrix.setRowXYZW(2, 0, 0, 1, 0);
+            adjMatrix.setRowXYZW(3, col - 0.5 * numCols + 0.5, row - 0.5 * numRows + 0.5, 0, 1);
             shadowMapRenderCamera.setProjectionMatrix(Matrix4x4.multiply(adjMatrix, Matrix4x4.multiply(snapMatrix, shadowMapRenderCamera.getProjectionMatrix())));
             if (device.type === 'webgpu') {
               scissor = [
@@ -916,10 +916,6 @@ export class ShadowMapper {
     } else if (mode === 'pcf-opt') {
       this._impl = new PCFOPT(this._pcfKernelSize);
     }
-  }
-  /** @internal */
-  private asSSM(): SSM {
-    return this._impl?.getType() === 'hard' ? (this._impl as SSM) : null;
   }
   /** @internal */
   private asVSM(): VSM {

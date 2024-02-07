@@ -187,7 +187,7 @@ export class WaterMesh {
   private _dataTextureFormat: TextureFormat;
   private _renderMode: number;
   private _updateFrameStamp: number;
-  private _impl: WaterShaderImpl;
+  // private _impl: WaterShaderImpl;
   constructor(device: AbstractDevice, impl?: WaterShaderImpl) {
     const renderTargetFloat32 = device.getDeviceCaps().textureCaps.supportFloatColorBuffer;
     const linearFloat32 = renderTargetFloat32 && device.getDeviceCaps().textureCaps.supportLinearFloatTexture;
@@ -294,7 +294,7 @@ export class WaterMesh {
       this._paramsChanged = true;
       this._resolutionChanged = true;
       this._updateFrameStamp = -1;
-      this._impl = impl;
+      // this._impl = impl;
     }
   }
   get params() {
@@ -303,10 +303,12 @@ export class WaterMesh {
   private paramsChanged() {
     this._paramsChanged = true;
   }
+  /*
   private resolutionChanged() {
     this._resolutionChanged = true;
     this._paramsChanged = true;
   }
+  */
   get alignment(): number {
     return this._params.alignment;
   }

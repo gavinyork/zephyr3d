@@ -1,10 +1,10 @@
 import { Application } from '../app';
 import type{ Vector4 } from '@zephyr3d/base';
-import type { Texture2D, TextureFormat } from '@zephyr3d/device';
+import type { TextureFormat } from '@zephyr3d/device';
 import type { Camera } from '../camera/camera';
 import type { Scene } from '../scene/scene';
 import type { Compositor } from '../posteffect';
-import { DrawContext } from '.';
+import type { DrawContext } from '.';
 
 /**
  * Base class for any kind of render scheme

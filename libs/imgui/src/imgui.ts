@@ -3059,7 +3059,7 @@ export function BeginSection(title: string) {
   const padding = GetStyle().WindowPadding;
 
   const window = GetCurrentWindow();
-  const windowWidth = GetWindowWidth();
+  //const windowWidth = GetWindowWidth();
 
   const boundsX = calculateSecionBoundsX(padding.x);
 
@@ -3779,19 +3779,16 @@ export function VSliderScalar(label: string, size: Readonly<Bind.interface_ImVec
 // IMGUI_API bool          InputScalarN(const char* label, ImGuiDataType data_type, void* p_data, int components, const void* p_step = NULL, const void* p_step_fast = NULL, const char* format = NULL, ImGuiInputTextFlags flags = 0);
 export function InputText<T>(label: string, buf: ImStringBuffer | Bind.ImAccess<string> | Bind.ImScalar<string>, buf_size: number = buf instanceof ImStringBuffer ? buf.size : ImGuiInputTextDefaultSize, flags: ImGuiInputTextFlags = 0, callback: ImGuiInputTextCallback<T> | null = null, user_data: T | null = null): boolean {
     let ret:boolean=false;
-    let text:string;
     const _callback = callback && ((data: Bind.reference_ImGuiInputTextCallbackData): number => callback(new ImGuiInputTextCallbackData<T>(data, user_data))) || null;
     if (Array.isArray(buf)) {
         return bind.InputText(label, buf, buf_size, flags, _callback, null);
     } else if (buf instanceof ImStringBuffer) {
         const ref_buf: Bind.ImScalar<string> = [ buf.buffer ];
         const _buf_size: number = Math.min(buf_size, buf.size);
-        text=buf.buffer;
         ret = bind.InputText(label, ref_buf, _buf_size, flags, _callback, null);
         buf.buffer = ref_buf[0];
     } else {
         const ref_buf: Bind.ImScalar<string> = [ buf() ];
-        text=buf();
         ret = bind.InputText(label, ref_buf, buf_size + 1, flags, _callback, null);
         buf(ref_buf[0]);
     }
@@ -3799,7 +3796,6 @@ export function InputText<T>(label: string, buf: ImStringBuffer | Bind.ImAccess<
 }
 export function InputTextMultiline<T>(label: string, buf: ImStringBuffer | Bind.ImAccess<string> | Bind.ImScalar<string>, buf_size: number = buf instanceof ImStringBuffer ? buf.size : ImGuiInputTextDefaultSize, size: Readonly<Bind.interface_ImVec2> = ImVec2.ZERO, flags: ImGuiInputTextFlags = 0, callback: ImGuiInputTextCallback<T> | null = null, user_data: T | null = null): boolean {
     let ret:boolean=false;
-    let text:string;
 
     const _callback = callback && ((data: Bind.reference_ImGuiInputTextCallbackData): number => callback(new ImGuiInputTextCallbackData<T>(data, user_data))) || null;
     if (Array.isArray(buf)) {
@@ -3807,12 +3803,10 @@ export function InputTextMultiline<T>(label: string, buf: ImStringBuffer | Bind.
     } else if (buf instanceof ImStringBuffer) {
         const ref_buf: Bind.ImScalar<string> = [ buf.buffer ];
         const _buf_size: number = Math.min(buf_size, buf.size);
-        text=buf.buffer;
         ret = bind.InputTextMultiline(label, ref_buf, _buf_size, size, flags, _callback, null);
         buf.buffer = ref_buf[0];
     } else {
         const ref_buf: Bind.ImScalar<string> = [ buf() ];
-        text=buf();
         ret = bind.InputTextMultiline(label, ref_buf, buf_size, size, flags, _callback, null);
         buf(ref_buf[0]);
     }
@@ -3820,7 +3814,6 @@ export function InputTextMultiline<T>(label: string, buf: ImStringBuffer | Bind.
 }
 export function InputTextWithHint<T>(label: string, hint: string, buf: ImStringBuffer | Bind.ImAccess<string> | Bind.ImScalar<string>, buf_size: number = buf instanceof ImStringBuffer ? buf.size : ImGuiInputTextDefaultSize, flags: ImGuiInputTextFlags = 0, callback: ImGuiInputTextCallback<T> | null = null, user_data: T | null = null): boolean {
     let ret:boolean=false;
-    let text:string;
 
     const _callback = callback && ((data: Bind.reference_ImGuiInputTextCallbackData): number => callback(new ImGuiInputTextCallbackData<T>(data, user_data))) || null;
     if (Array.isArray(buf)) {
@@ -3828,12 +3821,10 @@ export function InputTextWithHint<T>(label: string, hint: string, buf: ImStringB
     } else if (buf instanceof ImStringBuffer) {
         const ref_buf: Bind.ImScalar<string> = [ buf.buffer ];
         const _buf_size: number = Math.min(buf_size, buf.size);
-        text=buf.buffer;
         ret = bind.InputTextWithHint(label, hint, ref_buf, _buf_size, flags, _callback, null);
         buf.buffer = ref_buf[0];
     } else {
         const ref_buf: Bind.ImScalar<string> = [ buf() ];
-        text=buf();
         ret = bind.InputTextWithHint(label, hint, ref_buf, buf_size, flags, _callback, null);
         buf(ref_buf[0]);
     }

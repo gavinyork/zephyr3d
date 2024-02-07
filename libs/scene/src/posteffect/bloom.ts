@@ -1,4 +1,4 @@
-import { AbstractDevice, BindGroup, FrameBuffer, FramebufferCaps, GPUProgram, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, RenderStateSet, ShaderType, Texture2D, TextureFormat, TextureSampler } from "@zephyr3d/device";
+import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, RenderStateSet, Texture2D, TextureSampler } from "@zephyr3d/device";
 import { Application } from "../app";
 import { AbstractPostEffect } from "./posteffect";
 import { TemporalCache, type DrawContext } from "../render";

@@ -1,4 +1,4 @@
-import { ShaderType, BindGroup, PBShaderExp, PBInsideFunctionScope, PBGlobalScope, Texture2D } from '@zephyr3d/device';
+import { BindGroup, PBShaderExp, PBInsideFunctionScope, PBGlobalScope, Texture2D } from '@zephyr3d/device';
 import { Blitter, BlitType } from './blitter';
 import { decodeNormalizedFloatFromRGBA } from '../shaders';
 

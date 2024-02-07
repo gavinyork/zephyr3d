@@ -9,7 +9,7 @@
     "noImplicitAny": false,
     "preserveConstEnums": false,
     "listEmittedFiles": true,
-    "noUnusedLocals": false,
+    "noUnusedLocals": true,
     "strictNullChecks": false,
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": false,

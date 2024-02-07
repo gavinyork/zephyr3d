@@ -1,9 +1,9 @@
+import { Vector2 } from "@zephyr3d/base";
 import { Application } from "../app";
 import { AbstractPostEffect } from "./posteffect";
 import { linearToGamma } from "../shaders/misc";
-import type { AbstractDevice, BindGroup, GPUProgram, Texture2D, TextureFormat, TextureSampler } from "@zephyr3d/device";
+import type { AbstractDevice, BindGroup, GPUProgram, Texture2D, TextureSampler } from "@zephyr3d/device";
 import type { DrawContext } from "../render";
-import { Vector2 } from "@zephyr3d/base";
 
 /**
  * FXAA post effect

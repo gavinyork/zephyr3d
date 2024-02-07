@@ -70,6 +70,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     isRendering: boolean;
     isWindingOrderReversed(): boolean;
     popDeviceStates(): any;
+    programBuilder: ProgramBuilder;
     pushDeviceStates(): any;
     readPixels(index: number, x: number, y: number, w: number, h: number, buffer: TypedArray): Promise<void>;
     readPixelsToBuffer(index: number, x: number, y: number, w: number, h: number, buffer: GPUDataBuffer): void;
@@ -304,6 +305,8 @@ export abstract class BaseDevice {
     protected parseTextureOptions(options?: TextureCreationOptions): number;
     // (undocumented)
     popDeviceStates(): void;
+    // (undocumented)
+    get programBuilder(): ProgramBuilder;
     // (undocumented)
     protected _programBuilder: ProgramBuilder;
     // (undocumented)

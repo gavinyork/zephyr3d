@@ -190,9 +190,11 @@ export class RenderQueue {
     outColor[2] = (index >> 8 && 255) / 255;
     outColor[3] = (index >> 0 && 255) / 255;
   }
+  /*
   private decodeInstanceColor(value: Float32Array): number {
     return (value[0] << 24) + (value[1] << 16) + (value[2] << 8) + value[3];
   }
+  */
   setInstanceColors(): GraphNode[] {
     const nodes: GraphNode[] = [];
     let id = 0;

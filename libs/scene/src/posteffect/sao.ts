@@ -1,4 +1,4 @@
-import { AbstractDevice, BindGroup, GPUProgram, RenderStateSet, Texture2D, TextureFormat, TextureSampler, isFloatTextureFormat } from "@zephyr3d/device";
+import { AbstractDevice, BindGroup, GPUProgram, RenderStateSet, Texture2D, TextureSampler, isFloatTextureFormat } from "@zephyr3d/device";
 import { Application } from "../app";
 import { AbstractPostEffect } from "./posteffect";
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from "../shaders/misc";

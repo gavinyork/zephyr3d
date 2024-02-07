@@ -507,7 +507,7 @@ export class ObservableVector2 extends Vector2 {
    * Inherited from Float32Array.set
    */
   set(array: ArrayLike<number>, offset?: number): void {
-    const ret = super.set(array, offset);
+    super.set(array, offset);
     this._callback && this._callback();
   }
   /**
@@ -2330,7 +2330,7 @@ export class ObservableQuaternion extends Quaternion {
    * Inherited from Float32Array.set
    */
   set(array: ArrayLike<number>, offset?: number): void {
-    const ret = super.set(array, offset);
+    super.set(array, offset);
     this._callback && this._callback();
   }
   /**
@@ -2518,6 +2518,20 @@ export class Matrix3x3 extends VectorBase {
     return this;
   }
   /**
+   * Set values to a row in the matrix.
+   * @param row - The row index
+   * @param x - The first value of the row to be set
+   * @param y - The second value of the row to be set
+   * @param z - The third value of the row to be set
+   * @returns - self
+   */
+  setRowXYZ(row: number, x: number, y: number, z: number) {
+    this[row * 3] = x;
+    this[row * 3 + 1] = y;
+    this[row * 3 + 2] = z;
+    return this;
+  }
+  /**
    * Get the values in a column as a Vector3
    * @param col - The column index
    * @param result - The output vector, if not specified, a new vector will be created.
@@ -2536,6 +2550,20 @@ export class Matrix3x3 extends VectorBase {
     this[col] = v.x;
     this[3 + col] = v.y;
     this[6 + col] = v.z;
+    return this;
+  }
+  /**
+   * Set values to a column in the matrix.
+   * @param col - The column index.
+   * @param x - The first value of the column to be set.
+   * @param y - The second value of the column to be set.
+   * @param z - The third value of the column to be set.
+   * @returns self
+   */
+  setColXYZ(col: number, x: number, y: number, z: number) {
+    this[col] = x;
+    this[3 + col] = y;
+    this[6 + col] = z;
     return this;
   }
   /**
@@ -3219,6 +3247,22 @@ export class Matrix4x4 extends VectorBase {
     return this;
   }
   /**
+   * Set values to a row in the matrix.
+   * @param row - The row index
+   * @param x - The first value of the row to be set
+   * @param y - The second value of the row to be set
+   * @param z - The third value of the row to be set
+   * @param w - The fourth value of the row to be set
+   * @returns - self
+   */
+  setRowXYZW(row: number, x: number, y: number, z: number, w: number) {
+    this[row * 4] = x;
+    this[row * 4 + 1] = y;
+    this[row * 4 + 2] = z;
+    this[row * 4 + 3] = w;
+    return this;
+  }
+  /**
    * Get the values in a column as a Vector4
    * @param col - The column index
    * @param result - The output vector, if not specified, a new vector will be created.
@@ -3238,6 +3282,22 @@ export class Matrix4x4 extends VectorBase {
     this[4 + col] = v.y;
     this[8 + col] = v.z;
     this[12 + col] = v.w;
+    return this;
+  }
+  /**
+   * Set values to a column in the matrix.
+   * @param col - The column index.
+   * @param x - The first value of the column to be set.
+   * @param y - The second value of the column to be set.
+   * @param z - The third value of the column to be set.
+   * @param w - The fourth value of the column to be set.
+   * @returns self
+   */
+  setColXYZW(col: number, x: number, y: number, z: number, w: number) {
+    this[col] = x;
+    this[4 + col] = y;
+    this[8 + col] = z;
+    this[12 + col] = w;
     return this;
   }
   /**

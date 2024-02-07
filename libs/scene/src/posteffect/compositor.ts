@@ -1,7 +1,7 @@
 import { Application } from "../app";
 import { linearToGamma } from "../shaders/misc";
 import { TemporalCache, DrawContext } from "../render";
-import type { AbstractDevice, BindGroup, DeviceViewport, FrameBuffer, GPUProgram, RenderStateSet, Texture2D, TextureFormat, TextureSampler, VertexLayout } from "@zephyr3d/device";
+import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, RenderStateSet, Texture2D, TextureSampler, VertexLayout } from "@zephyr3d/device";
 import type { AbstractPostEffect } from "./posteffect";
 
 /**

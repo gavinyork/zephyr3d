@@ -6,7 +6,6 @@ import { Application } from "../app";
 import { Interpolator, Matrix4x4, Plane, Vector2, Vector3, Vector4 } from "@zephyr3d/base";
 import { Camera } from "../camera";
 import { CopyBlitter } from "../blitter";
-import { DirectionalLight } from "../scene";
 import { distributionGGX, fresnelSchlick, visGGX } from "../shaders/pbr";
 
 /**
@@ -385,7 +384,6 @@ export class PostWater extends AbstractPostEffect {
     const hash = `${ctx.sunLight ? 1 : 0}:${ctx.env.light.getHash(ctx)}`;
     let waterMesh = this._waterMeshes[hash];
     if (!waterMesh) {
-      const that = this;
       const device = Application.instance.device;
       waterMesh = new WaterMesh(device, {
         setupUniforms(scope: PBGlobalScope) {

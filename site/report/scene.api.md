@@ -1524,9 +1524,15 @@ export class LambertLightModel extends LightModel {
     supportLighting(): boolean;
 }
 
+// Warning: (ae-forgotten-export) The symbol "LambertMaterial_base" needs to be exported by the entry point index.d.ts
+//
 // @public
-export class LambertMaterial extends StandardMaterial<LambertLightModel> {
+export class LambertMaterial extends LambertMaterial_base {
     constructor();
+    // (undocumented)
+    fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void;
+    // (undocumented)
+    vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
 }
 
 // @public
@@ -1793,17 +1799,6 @@ export class Model extends GraphNode {
     playAnimation(name: string, repeat?: number): void;
     stopAnimation(name: string): void;
     update(): void;
-}
-
-// Warning: (ae-forgotten-export) The symbol "NewLambertMaterial_base" needs to be exported by the entry point index.d.ts
-//
-// @public (undocumented)
-export class NewLambertMaterial extends NewLambertMaterial_base {
-    constructor();
-    // (undocumented)
-    fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void;
-    // (undocumented)
-    vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
 }
 
 // @public
@@ -3275,7 +3270,7 @@ export class SkyRenderer {
     get fogType(): FogType;
     set fogType(val: FogType);
     // @internal (undocumented)
-    getAerialPerspectiveLUT(ctx: DrawContext): Texture2D<unknown>;
+    getAerialPerspectiveLUT(ctx: DrawContext): _zephyr3d_device.Texture2D<unknown>;
     // @internal (undocumented)
     getHash(ctx: DrawContext): string;
     invalidateIBLMaps(): void;
@@ -3618,45 +3613,6 @@ export class UnlitLightModel extends LightModel {
     supportLighting(): boolean;
 }
 
-<<<<<<< HEAD
-// Warning: (ae-forgotten-export) The symbol "MeshMaterial" needs to be exported by the entry point index.d.ts
-//
-// @public
-export class UnlitMaterial extends MeshMaterial {
-    constructor();
-    get albedoColor(): Vector4;
-    set albedoColor(val: Vector4);
-    get albedoTexCoordIndex(): number;
-    set albedoTexCoordIndex(val: number);
-    get albedoTexMatrix(): Matrix4x4;
-    set albedoTexMatrix(val: Matrix4x4);
-    get albedoTexture(): Texture2D;
-    set albedoTexture(tex: Texture2D);
-    get albedoTextureSampler(): TextureSampler;
-    set albedoTextureSampler(sampler: TextureSampler);
-    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: The package "@zephyr3d/scene" does not have an export "MeshMaterial"
-    //
-    // @override (undocumented)
-    protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
-    // (undocumented)
-    protected calculateAlbedoColor(scope: PBInsideFunctionScope, ctx: DrawContext): any;
-    // @override
-    protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram;
-    // (undocumented)
-    protected static readonly FEATURE_ALBEDO_TEXCOORD_INDEX = "um_albedo_texcoord";
-    // (undocumented)
-    protected static readonly FEATURE_ALBEDO_TEXTURE = "um_albedo_map";
-    // (undocumented)
-    protected static readonly FEATURE_ALBEDO_TEXTURE_MATRIX = "um_albedo_map_matrix";
-    // (undocumented)
-    protected static readonly FEATURE_VERTEX_COLOR = "um_vertexcolor";
-    // (undocumented)
-    protected fragmentShader(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp;
-    get vertexColor(): boolean;
-    set vertexColor(val: boolean);
-    // (undocumented)
-    protected vertexShader(scope: PBInsideFunctionScope, ctx: DrawContext): void;
-=======
 // Warning: (ae-forgotten-export) The symbol "UnlitMaterial_base" needs to be exported by the entry point index.d.ts
 //
 // @public
@@ -3668,7 +3624,6 @@ export class UnlitMaterial extends UnlitMaterial_base {
     fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void;
     // (undocumented)
     vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
->>>>>>> new-material
 }
 
 // @public

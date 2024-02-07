@@ -263,6 +263,9 @@ export abstract class BaseDevice {
   get runLoopFunction(): (device: AbstractDevice) => void {
     return this._runLoopFunc
   }
+  get programBuilder(): ProgramBuilder {
+    return this._programBuilder;
+  }
   setFont(fontName: string) {
     DrawText.setFont(this, fontName);
   }

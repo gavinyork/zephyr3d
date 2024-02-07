@@ -3,7 +3,6 @@ import { mixinAlbedoColor } from './mixins/albedocolor';
 import { mixinVertexColor } from './mixins/vertexcolor';
 import type { PBFunctionScope } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import { mixinTextureProps } from './mixins/texture';
 
 /**
  * Unlit material

@@ -1,4 +1,4 @@
-import { AABB, ClipState, Vector3 } from '@zephyr3d/base';
+import { AABB, ClipState } from '@zephyr3d/base';
 import { OctreeNode } from '../scene/octree';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../values';
 import { GraphNode } from '../scene/graph_node';

@@ -2,7 +2,7 @@ import { LitMaterial } from './lit';
 import { mixinAlbedoColor } from './mixins/albedocolor';
 import { mixinVertexColor } from './mixins/vertexcolor';
 import { applyMaterialMixins } from './meshmaterial';
-import type { PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import type { PBFunctionScope } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 
 /**

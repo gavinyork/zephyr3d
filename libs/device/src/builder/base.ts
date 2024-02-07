@@ -24,7 +24,7 @@ import {
   typeI32
 } from './types';
 import { PBASTError } from './errors';
-import type { IndexBuffer, VertexSemantic } from '../gpuobject';
+import type { VertexSemantic } from '../gpuobject';
 import type { ProgramBuilder } from './programbuilder';
 
 let currentProgramBuilder: ProgramBuilder = null;

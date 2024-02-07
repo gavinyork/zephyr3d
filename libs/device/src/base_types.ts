@@ -73,6 +73,7 @@ const COMPRESSED_FORMAT_SHIFT = 24;
 const COMPRESSION_FORMAT_BC1 = 1 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC2 = 2 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC3 = 3 << COMPRESSED_FORMAT_SHIFT;
+/*
 const COMPRESSION_FORMAT_BC4 = 4 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC5 = 5 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC6 = 6 << COMPRESSED_FORMAT_SHIFT;
@@ -94,7 +95,7 @@ const COMPRESSION_FORMAT_ASTC_10x8 = 21 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_ASTC_10x10 = 22 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_ASTC_12x10 = 23 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_ASTC_12x12 = 24 << COMPRESSED_FORMAT_SHIFT;
-
+*/
 const COMPRESSION_FORMAT_BITMASK = 0x1f << COMPRESSED_FORMAT_SHIFT;
 const RED_BITMASK = 1 << RED_SHIFT;
 const GREEN_BITMASK = 1 << GREEN_SHIFT;
@@ -2041,6 +2042,8 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   canvas: HTMLCanvasElement;
   /** Get the device type */
   type: string;
+  /** Get the program builder */
+  programBuilder: ProgramBuilder;
   /** Get the run loop callback function */
   runLoopFunction: (device: AbstractDevice) => void;
   /**

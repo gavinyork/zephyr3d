@@ -883,8 +883,6 @@ export abstract class LightModel {
  * @public
  */
 export class UnlitLightModel extends LightModel {
-  /** @internal */
-  private static readonly funcNameBRDFUnlit = 'libLM_brdfUnlit';
   /**
    * {@inheritDoc LightModel.supportLighting}
    * @override

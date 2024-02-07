@@ -3,9 +3,7 @@ import { RENDER_PASS_TYPE_DEPTH_ONLY } from '../values';
 import { ShaderFramework } from '../shaders';
 import { Application } from '../app';
 import type { RenderQueue } from './render_queue';
-import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
-import type { Scene } from '../scene';
 
 /**
  * Depth render pass

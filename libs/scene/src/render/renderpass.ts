@@ -5,9 +5,8 @@ import { ShaderFramework } from '../shaders';
 import { Application } from '../app';
 import { RenderQueue, RenderQueueItem } from './render_queue';
 import type { Camera } from '../camera/camera';
-import type { Scene } from '../scene/scene';
 import type { DrawContext } from './drawable';
-import { ProgramBuilder, type AbstractDevice, type BindGroup, type BindGroupLayout, type RenderStateSet } from '@zephyr3d/device';
+import type { AbstractDevice, BindGroup, BindGroupLayout, RenderStateSet } from '@zephyr3d/device';
 
 /**
  * Base class for any kind of render passes
@@ -85,8 +84,8 @@ export abstract class RenderPass {
     const hash = this.getGlobalBindGroupHash(ctx);
     let bindGroup = this._globalBindGroups[hash];
     if (!bindGroup) {
-      const programBuilder = new ProgramBuilder(Application.instance.device);
-      const ret = programBuilder.buildRender({
+      //const programBuilder = new ProgramBuilder(Application.instance.device);
+      const ret = Application.instance.device.programBuilder.buildRender({
         vertex(pb) {
           ShaderFramework.prepareVertexShader(pb, ctx);
           pb.main(function () {});

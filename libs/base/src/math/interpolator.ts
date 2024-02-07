@@ -1,4 +1,4 @@
-import { Quaternion, Vector3 } from './vector';
+import { Quaternion } from './vector';
 import { TypedArray } from '../utils';
 
 /**

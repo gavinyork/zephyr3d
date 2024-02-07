@@ -1,4 +1,4 @@
-import { BindGroup, GPUProgram, PBFunctionScope, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, ProgramBuilder } from "@zephyr3d/device";
+import { BindGroup, GPUProgram, PBFunctionScope, PBInsideFunctionScope, PBShaderExp, ProgramBuilder } from "@zephyr3d/device";
 import { RENDER_PASS_TYPE_DEPTH_ONLY, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP } from "../values";
 import { IMaterial, Material } from "./material";
 import { DrawContext, ShadowMapPass } from "../render";
@@ -23,7 +23,7 @@ export interface IMeshMaterial extends IMaterial {
   outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext);
 }
 
-export type UnionToIntersection<U> = 
+export type UnionToIntersection<U> =
   (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
 
 export type ExtractMixinReturnType<M, T> = M extends (target: infer A) => infer R

@@ -1,5 +1,5 @@
 import { InputManager } from "./input/inputmgr";
-import { makeEventTarget, Vector4 } from "@zephyr3d/base";
+import { makeEventTarget } from "@zephyr3d/base";
 import type { AbstractDevice, DeviceBackend } from "@zephyr3d/device";
 
 /**
@@ -163,7 +163,7 @@ export class Application extends makeEventTarget(Object)<appEventMap>(){
     return this._canRender;
   }
   /**
-   * Query time elapsed since last frame in seconds 
+   * Query time elapsed since last frame in seconds
    */
   get timeElapsedInSeconds(): number {
     return this._elapsed;

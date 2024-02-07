@@ -2,13 +2,13 @@ import { Matrix4x4, Vector2, Vector4, nextPowerOf2 } from "@zephyr3d/base";
 import { Primitive } from "../../render/primitive";
 import { BatchDrawable, Drawable, DrawContext } from "../../render/drawable";
 import { XForm } from "../xform";
-import type { Camera } from "../../camera/camera";
-import type { AbstractDevice, IndexBuffer, StructuredBuffer, Texture2D, Texture2DArray } from "@zephyr3d/device";
-import type { Terrain } from "./terrain";
-import type { GraphNode } from "../graph_node";
 import { GrassMaterial } from "../../material";
 import { QuadtreeNode } from "./quadtree";
 import { Application } from "../../app";
+import type { Camera } from "../../camera/camera";
+import type { AbstractDevice, IndexBuffer, StructuredBuffer, Texture2D } from "@zephyr3d/device";
+import type { Terrain } from "./terrain";
+import type { GraphNode } from "../graph_node";
 
 export class GrassCluster implements Drawable {
   private _primitive: Primitive;

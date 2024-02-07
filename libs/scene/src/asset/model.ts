@@ -1,7 +1,7 @@
 import { Matrix4x4, Quaternion, Vector3, Vector4, TypedArray, Interpolator } from '@zephyr3d/base';
 import type { Texture2D, TextureSampler } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
-import type { Material, StandardMaterial } from '../material';
+import type { Material } from '../material';
 
 /**
  * Named object interface for model loading

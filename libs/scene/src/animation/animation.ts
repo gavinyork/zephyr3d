@@ -1,4 +1,4 @@
-import { Matrix4x4, Quaternion, Vector3, InterpolationTarget, Interpolator } from '@zephyr3d/base';
+import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import { AnimationTrack } from './animationtrack';
 import { BoundingBox } from '../utility/bounding_volume';
 import { Application } from '../app';
