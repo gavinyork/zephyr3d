@@ -1751,6 +1751,15 @@ export class Model extends GraphNode {
     update(): void;
 }
 
+// Warning: (ae-forgotten-export) The symbol "LitMaterial" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export class NewLambertMaterial extends LitMaterial {
+    constructor();
+    // (undocumented)
+    protected fragmentShader(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp;
+}
+
 // @public
 export function noise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp;
 
@@ -2859,6 +2868,8 @@ export class SceneUpdateEvent {
 // @public
 export class ShaderFramework {
     // (undocumented)
+    static applyFog(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext): void;
+    // (undocumented)
     static readonly BILLBOARD_SPHERICAL = 1;
     // (undocumented)
     static readonly BILLBOARD_SYLINDRAL = 2;
@@ -3561,9 +3572,43 @@ export class UnlitLightModel extends LightModel {
     supportLighting(): boolean;
 }
 
+// Warning: (ae-forgotten-export) The symbol "MeshMaterial" needs to be exported by the entry point index.d.ts
+//
 // @public
-export class UnlitMaterial extends StandardMaterial<UnlitLightModel> {
+export class UnlitMaterial extends MeshMaterial {
     constructor();
+    get albedoColor(): Vector4;
+    set albedoColor(val: Vector4);
+    get albedoTexCoordIndex(): number;
+    set albedoTexCoordIndex(val: number);
+    get albedoTexMatrix(): Matrix4x4;
+    set albedoTexMatrix(val: Matrix4x4);
+    get albedoTexture(): Texture2D;
+    set albedoTexture(tex: Texture2D);
+    get albedoTextureSampler(): TextureSampler;
+    set albedoTextureSampler(sampler: TextureSampler);
+    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: The package "@zephyr3d/scene" does not have an export "MeshMaterial"
+    //
+    // @override (undocumented)
+    protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
+    // (undocumented)
+    protected calculateAlbedoColor(scope: PBInsideFunctionScope, ctx: DrawContext): any;
+    // @override
+    protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram;
+    // (undocumented)
+    protected static readonly FEATURE_ALBEDO_TEXCOORD_INDEX = "um_albedo_texcoord";
+    // (undocumented)
+    protected static readonly FEATURE_ALBEDO_TEXTURE = "um_albedo_map";
+    // (undocumented)
+    protected static readonly FEATURE_ALBEDO_TEXTURE_MATRIX = "um_albedo_map_matrix";
+    // (undocumented)
+    protected static readonly FEATURE_VERTEX_COLOR = "um_vertexcolor";
+    // (undocumented)
+    protected fragmentShader(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp;
+    get vertexColor(): boolean;
+    set vertexColor(val: boolean);
+    // (undocumented)
+    protected vertexShader(scope: PBInsideFunctionScope, ctx: DrawContext): void;
 }
 
 // @public

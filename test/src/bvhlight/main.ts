@@ -42,7 +42,7 @@ bvhLightApp.ready().then(async () => {
   bvhLightApp.inputManager.use(imGuiInjectEvent);
   bvhLightApp.inputManager.use(camera.handleEvent.bind(camera));
 
-  const inspector = new common.Inspector(scene);
+  const inspector = new common.Inspector(scene, null, null);
   const assetManager = new AssetManager();
   const tex = await assetManager.fetchTexture<Texture2D>('./assets/images/environments/papermill.hdr');
   const skyMap = device.createCubeTexture('rgba16f', 512);
@@ -110,7 +110,7 @@ bvhLightApp.ready().then(async () => {
       }
     }
     const ballMaterial = new UnlitMaterial();
-    ballMaterial.lightModel.albedo = new Vector4(1, 1, 0, 1);
+    ballMaterial.albedoColor = new Vector4(1, 1, 0, 1);
     function initLights(model: SceneNode) {
       const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1)).setIntensity(5).setCastShadow(false);
       light.lookAt(new Vector3(0, 0, 0), new Vector3(0.5, -0.707, -0.5), Vector3.axisPY());

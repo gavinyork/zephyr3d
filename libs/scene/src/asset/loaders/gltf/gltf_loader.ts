@@ -506,7 +506,7 @@ export class GLTFLoader extends AbstractModelLoader {
   ): Promise<M> {
     if (assetMaterial.type === 'unlit') {
       const unlitAssetMaterial = assetMaterial as AssetUnlitMaterial;
-      const unlitMaterial = new NewLambertMaterial();// new TestLitMaterial();// new UnlitMaterial();
+      const unlitMaterial = new UnlitMaterial;//new NewLambertMaterial();// new TestLitMaterial();// new UnlitMaterial();
       unlitMaterial.albedoColor = unlitAssetMaterial.diffuse ?? Vector4.one();
       if (unlitAssetMaterial.diffuseMap) {
         unlitMaterial.albedoTexture = unlitAssetMaterial.diffuseMap.texture;
