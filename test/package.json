@@ -55,7 +55,7 @@
     "rxjs": "7.5.2",
     "ts-keycode-enum": "^1.0.6",
     "gl-matrix": "^3.4.3",
-    "@zephyr3d/base": "workspace:^0.1.0",
+    "@zephyr3d/base": "workspace:^0.1.1",
     "@zephyr3d/device": "workspace:^0.1.0",
     "@zephyr3d/scene": "workspace:^0.1.0",
     "@zephyr3d/imgui": "workspace:^0.1.0",
