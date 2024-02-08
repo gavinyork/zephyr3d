@@ -27,6 +27,7 @@ declare class BoundingBox extends AABB implements BoundingVolume
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
+|  [behindPlane(plane)](doc/markdown/./scene.boundingbox.behindplane.md) |  | Check if this bounding volume is behind a plane |
 |  [clone()](doc/markdown/./scene.boundingbox.clone.md) |  | Creates a new bounding volume by copying from this bounding volume |
 |  [outsideFrustum(frustum)](doc/markdown/./scene.boundingbox.outsidefrustum.md) |  | Check if this bounding volume is outside a frustum |
 |  [toAABB()](doc/markdown/./scene.boundingbox.toaabb.md) |  | Gets the minimum AABB that contains the bounding volume |
