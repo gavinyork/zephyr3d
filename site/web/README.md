@@ -1,6 +1,6 @@
 <img
     src="media/logo_i.svg"
-    style="display: block; width: 400px; margin: auto; margin-bottom: 50"
+    style=" display: block; width: 400px; margin: auto; margin-bottom: 50"
 />
 
 # Introduction
