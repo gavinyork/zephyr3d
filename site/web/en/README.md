@@ -1,5 +1,5 @@
 <img
-    src="media/logo.svg"
+    src="media/logo_i.svg"
     style="display: block; width: 400px; margin: auto; margin-bottom: 0"
 />
 

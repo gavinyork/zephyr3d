@@ -1,4 +1,4 @@
-<img src="media/logo.svg" style="width: 600px;">
+<img src="media/logo_i.svg" style="width: 400px; margin-bottom: 50px;">
 
 > The 3D rendering API of the web platform fully supports WebGL/WebGL2/WebGPU
 
