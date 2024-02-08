@@ -2,7 +2,14 @@ import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zeph
 import { floatToHalf, halfToFloat, unpackFloat3, Vector4 } from '@zephyr3d/base';
 import { AssetManager, Application } from '@zephyr3d/scene';
 import * as common from '../common';
-import { TestTexture2D, TestTexture2DArray, TestTexture3D, TestTextureCube, TestTextureCubeSH, TestTextureVideo } from './case';
+import {
+  TestTexture2D,
+  TestTexture2DArray,
+  TestTexture3D,
+  TestTextureCube,
+  TestTextureCubeSH,
+  TestTextureVideo
+} from './case';
 import { packFloat3 } from '@zephyr3d/base';
 
 const test2D = true;
@@ -20,24 +27,14 @@ const testValues = [
   [10000, 50, 381.5],
   [800000, 90000, -50]
 ];
-const test: number[]= [];
+const test: number[] = [];
 for (const v of testValues) {
   const pk = packFloat3(v[0], v[1], v[2]);
   console.log(`packeFloat3(${v[0]}, ${v[1]}, ${v[2]}) = ${(pk >>> 0).toString(16)}`);
   unpackFloat3(pk, test);
   console.log(`unpackFloat3(0x${pk >>> 0}) = ${test}`);
 }
-const testFloatHalfValues = [
-  -1000000,
-  -500,
-  -3.123,
-  0,
-  0.812,
-  5.4434,
-  1000.32,
-  10000.1,
-  500000.5
-];
+const testFloatHalfValues = [-1000000, -500, -3.123, 0, 0.812, 5.4434, 1000.32, 10000.1, 500000.5];
 for (const v of testFloatHalfValues) {
   const half = floatToHalf(v);
   console.log(`floatToHalf(${v}) = ${(half >>> 0).toString(16)}`);
@@ -74,12 +71,12 @@ textureApp.ready().then(async () => {
   const caseVideo = new TestTextureVideo(assetManager, './assets/images/sample-video.mp4');
   await caseVideo.init();
 
-  textureApp.on('tick', ev => {
+  textureApp.on('tick', (ev) => {
     device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
     device.pushDeviceStates();
     {
       const vp = getSubViewport(0);
-      device.setViewport(vp)
+      device.setViewport(vp);
       device.setScissor(vp);
       device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
       test2D && case2d.draw(vp[2], vp[3]);

@@ -1,5 +1,4 @@
-import type {
-  ASTExpression} from './ast';
+import type { ASTExpression } from './ast';
 import {
   getTextureSampleType,
   ShaderPrecisionType,
@@ -15,8 +14,7 @@ import {
   ASTAssignment,
   ASTCast
 } from './ast';
-import type {
-  PBTypeInfo} from './types';
+import type { PBTypeInfo } from './types';
 import {
   PBPrimitiveType,
   PBPrimitiveTypeInfo,
@@ -117,7 +115,7 @@ export function makeConstructor(typeFunc: ShaderTypeFunc, elementType: PBTypeInf
  * Base class for proxiable object
  * @public
  */
- export abstract class Proxiable<T> {
+export abstract class Proxiable<T> {
   /** @internal */
   private proxy: Proxiable<T>;
   constructor() {
@@ -164,7 +162,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
   /** @internal */
   $ast: ASTExpression;
   /** @internal */
-  $inout: 'out'|'inout';
+  $inout: 'out' | 'inout';
   /** @internal */
   $memberCache: Record<string, PBShaderExp>;
   /** @internal */
@@ -240,8 +238,15 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @returns self
    */
   uniformBuffer(group: number): PBShaderExp {
-    if (!this.$typeinfo.isPrimitiveType() && !this.$typeinfo.isArrayType() && !this.$typeinfo.isStructType()) {
-      throw new PBASTError(this.$ast, 'only primitive type, array type or structure type can be set as uniform buffer');
+    if (
+      !this.$typeinfo.isPrimitiveType() &&
+      !this.$typeinfo.isArrayType() &&
+      !this.$typeinfo.isStructType()
+    ) {
+      throw new PBASTError(
+        this.$ast,
+        'only primitive type, array type or structure type can be set as uniform buffer'
+      );
     }
     this.$declareType = DeclareType.DECLARE_TYPE_UNIFORM;
     this.$group = group;
@@ -280,8 +285,15 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @returns self
    */
   storageBuffer(group: number): PBShaderExp {
-    if (!this.$typeinfo.isPrimitiveType() && !this.$typeinfo.isArrayType() && !this.$typeinfo.isStructType()) {
-      throw new PBASTError(this.$ast, 'only primitive type, array type or structure type can be set as storage buffer');
+    if (
+      !this.$typeinfo.isPrimitiveType() &&
+      !this.$typeinfo.isArrayType() &&
+      !this.$typeinfo.isStructType()
+    ) {
+      throw new PBASTError(
+        this.$ast,
+        'only primitive type, array type or structure type can be set as storage buffer'
+      );
     }
     this.$declareType = DeclareType.DECLARE_TYPE_STORAGE;
     this.$group = group;
@@ -337,7 +349,10 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    */
   at(index: number | PBShaderExp) {
     const varType = this.$ast.getType();
-    if (!varType.isArrayType() && (!varType.isPrimitiveType() || (!varType.isVectorType() && !varType.isMatrixType()))) {
+    if (
+      !varType.isArrayType() &&
+      (!varType.isPrimitiveType() || (!varType.isVectorType() && !varType.isMatrixType()))
+    ) {
       throw new Error('at() function must be used with array types');
     }
     let elementType: PBTypeInfo = null;
@@ -360,11 +375,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
       if (index < 0 || (dimension > 0 && index >= dimension)) {
         throw new Error('at() array index out of bounds');
       }
-      result.$ast = new ASTArrayIndex(
-        this.$ast,
-        new ASTScalar(index, typeI32),
-        elementType
-      );
+      result.$ast = new ASTArrayIndex(this.$ast, new ASTScalar(index, typeI32), elementType);
     } else {
       const type = index.$ast.getType();
       if (!type.isPrimitiveType() || !type.isScalarType()) {
@@ -374,11 +385,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
       if (type.scalarType !== PBPrimitiveType.I32 && type.scalarType !== PBPrimitiveType.U32) {
         ast = new ASTCast(ast, typeI32);
       }
-      result.$ast = new ASTArrayIndex(
-        this.$ast,
-        ast,
-        elementType
-      );
+      result.$ast = new ASTArrayIndex(this.$ast, ast, elementType);
     }
     return result;
   }

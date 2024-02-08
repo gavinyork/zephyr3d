@@ -10,14 +10,14 @@ type FrameBufferTextureAttachment = {
   layer?: number;
   level?: number;
   generateMipmaps?: boolean;
-}
+};
 
 type WebGPUFrameBufferOptions = {
   colorAttachments?: FrameBufferTextureAttachment[];
   depthAttachment?: FrameBufferTextureAttachment;
   sampleCount?: number;
   ignoreDepthStencil?: boolean;
-}
+};
 
 export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuffer<unknown> {
   private _options: WebGPUFrameBufferOptions;
@@ -26,39 +26,58 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
   private _bindFlag: number;
   private _msaaColorTextures: GPUTexture[];
   private _msaaDepthTexture: GPUTexture;
-  constructor(device: WebGPUDevice, colorAttachments: BaseTexture[], depthAttachment: BaseTexture, opt?: FrameBufferOptions) {
+  constructor(
+    device: WebGPUDevice,
+    colorAttachments: BaseTexture[],
+    depthAttachment: BaseTexture,
+    opt?: FrameBufferOptions
+  ) {
     super(device);
-    if (colorAttachments.length > 0 && colorAttachments.findIndex(val => !val) >= 0) {
+    if (colorAttachments.length > 0 && colorAttachments.findIndex((val) => !val) >= 0) {
       throw new Error('WebGPUFramebuffer(): invalid color attachments');
     }
     this._object = null;
     this._options = {
-      colorAttachments: colorAttachments?.length > 0
-        ? colorAttachments.map(value => ({
-            texture: value,
+      colorAttachments:
+        colorAttachments?.length > 0
+          ? colorAttachments.map((value) => ({
+              texture: value,
+              face: 0,
+              layer: 0,
+              level: 0,
+              generateMipmaps: true
+            }))
+          : null,
+      depthAttachment: depthAttachment
+        ? {
+            texture: depthAttachment,
             face: 0,
             layer: 0,
             level: 0,
-            generateMipmaps: true
-          }))
+            generateMipmaps: false
+          }
         : null,
-      depthAttachment: depthAttachment ? {
-        texture: depthAttachment,
-        face: 0,
-        layer: 0,
-        level: 0,
-        generateMipmaps: false
-      } : null,
       sampleCount: opt?.sampleCount ?? 1,
-      ignoreDepthStencil: opt?.ignoreDepthStencil ?? false,
+      ignoreDepthStencil: opt?.ignoreDepthStencil ?? false
     };
     if (!this._options.colorAttachments && !this._options.depthAttachment) {
       throw new Error('WebGPUFramebuffer(): colorAttachments or depthAttachment must be specified');
     }
-    this._width = this._options.colorAttachments ? this._options.colorAttachments[0].texture.width : this._options.depthAttachment.texture.width;
-    this._height = this._options.colorAttachments ? this._options.colorAttachments[0].texture.height : this._options.depthAttachment.texture.height;
-    if ((this._options.colorAttachments && this._options.colorAttachments.findIndex(val => val.texture.width !== this._width || val.texture.height !== this._height) >= 0)
-      || (this._options.depthAttachment && (this._options.depthAttachment.texture.width !== this._width || this._options.depthAttachment.texture.height !== this._height))) {
+    this._width = this._options.colorAttachments
+      ? this._options.colorAttachments[0].texture.width
+      : this._options.depthAttachment.texture.width;
+    this._height = this._options.colorAttachments
+      ? this._options.colorAttachments[0].texture.height
+      : this._options.depthAttachment.texture.height;
+    if (
+      (this._options.colorAttachments &&
+        this._options.colorAttachments.findIndex(
+          (val) => val.texture.width !== this._width || val.texture.height !== this._height
+        ) >= 0) ||
+      (this._options.depthAttachment &&
+        (this._options.depthAttachment.texture.width !== this._width ||
+          this._options.depthAttachment.texture.height !== this._height))
+    ) {
       throw new Error('WebGPUFramebuffer(): attachment textures must have same width and height');
     }
     this._bindFlag = 0;

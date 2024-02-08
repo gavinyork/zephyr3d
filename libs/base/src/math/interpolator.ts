@@ -5,13 +5,13 @@ import type { TypedArray } from '../utils';
  * The interpolation mode
  * @public
  */
-export type InterpolationMode = 'unknown'|'step'|'linear'|'cubicspline';
+export type InterpolationMode = 'unknown' | 'step' | 'linear' | 'cubicspline';
 
 /**
  * Target of interpolation
  * @public
  */
-export type InterpolationTarget = 'number'|'vec2'|'vec3'|'vec4'|'quat';
+export type InterpolationTarget = 'number' | 'vec2' | 'vec3' | 'vec4' | 'quat';
 
 const tmpQuat1 = new Quaternion();
 const tmpQuat2 = new Quaternion();
@@ -65,12 +65,7 @@ export class Interpolator {
    * @param outputs - Vector or scalars representing the properties to be interpolated
    * @param stride - Stride of outputs
    */
-  constructor(
-    mode: InterpolationMode,
-    target: InterpolationTarget,
-    inputs: TypedArray,
-    outputs: TypedArray,
-  ) {
+  constructor(mode: InterpolationMode, target: InterpolationTarget, inputs: TypedArray, outputs: TypedArray) {
     this._prevKey = 0;
     this._prevT = 0;
     this._inputs = inputs;
@@ -93,8 +88,7 @@ export class Interpolator {
   }
   /** @internal */
   private slerpQuat(q1: Quaternion, q2: Quaternion, t: number, result: Quaternion): Quaternion {
-    return Quaternion.slerp(Quaternion.normalize(q1), Quaternion.normalize(q2), t, result)
-      .inplaceNormalize();
+    return Quaternion.slerp(Quaternion.normalize(q1), Quaternion.normalize(q2), t, result).inplaceNormalize();
   }
   /**
    * Calculates the interpolated value at a given time
@@ -179,7 +173,13 @@ export class Interpolator {
     return result;
   }
   /** @internal */
-  private cubicSpline(prevKey: number, nextKey: number, keyDelta: number, t: number, result: Float32Array): Float32Array {
+  private cubicSpline(
+    prevKey: number,
+    nextKey: number,
+    keyDelta: number,
+    t: number,
+    result: Float32Array
+  ): Float32Array {
     const prevIndex = prevKey * this._stride * 3;
     const nextIndex = nextKey * this._stride * 3;
     const A = 0;

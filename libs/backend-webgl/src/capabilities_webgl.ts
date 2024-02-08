@@ -1,6 +1,14 @@
 import { WebGLEnum } from './webgl_enum';
 import { isWebGL2 } from './utils';
-import type { WebGLContext, TextureFormat, FramebufferCaps, MiscCaps, ShaderCaps, TextureCaps, TextureFormatInfo } from '@zephyr3d/device';
+import type {
+  WebGLContext,
+  TextureFormat,
+  FramebufferCaps,
+  MiscCaps,
+  ShaderCaps,
+  TextureCaps,
+  TextureFormatInfo
+} from '@zephyr3d/device';
 
 export interface TextureParams {
   target: number;
@@ -180,12 +188,13 @@ export class WebGLFramebufferCaps implements FramebufferCaps {
     this._isWebGL2 = isWebGL2(gl);
     this._extDrawBuffers = this._isWebGL2 ? null : gl.getExtension('WEBGL_draw_buffers');
     this._extFloatBlending = gl.getExtension('EXT_float_blend');
-    this.maxDrawBuffers = this._isWebGL2 || this._extDrawBuffers
-      ? Math.min(
-          gl.getParameter(WebGLEnum.MAX_COLOR_ATTACHMENTS),
-          gl.getParameter(WebGLEnum.MAX_DRAW_BUFFERS)
-        )
-      : 1;
+    this.maxDrawBuffers =
+      this._isWebGL2 || this._extDrawBuffers
+        ? Math.min(
+            gl.getParameter(WebGLEnum.MAX_COLOR_ATTACHMENTS),
+            gl.getParameter(WebGLEnum.MAX_DRAW_BUFFERS)
+          )
+        : 1;
     this.maxColorAttachmentBytesPerSample = this.maxDrawBuffers * 16;
     this.supportMultisampledFramebuffer = isWebGL2(gl);
     this.supportFloatBlending = !!this._extFloatBlending;
@@ -290,9 +299,10 @@ export class WebGLTextureCaps implements TextureCaps {
   supportFloatBlending: boolean;
   constructor(gl: WebGLContext) {
     this._isWebGL2 = isWebGL2(gl);
-    this._extTextureFilterAnisotropic = gl.getExtension('EXT_texture_filter_anisotropic')
-      || gl.getExtension('MOZ_EXT_texture_filter_anisotropic')
-      || gl.getExtension('WEBKIT_EXT_texture_filter_anisotropic');
+    this._extTextureFilterAnisotropic =
+      gl.getExtension('EXT_texture_filter_anisotropic') ||
+      gl.getExtension('MOZ_EXT_texture_filter_anisotropic') ||
+      gl.getExtension('WEBKIT_EXT_texture_filter_anisotropic');
     this.supportAnisotropicFiltering = !!this._extTextureFilterAnisotropic;
     if (this._isWebGL2) {
       this.supportDepthTexture = true;
@@ -338,9 +348,10 @@ export class WebGLTextureCaps implements TextureCaps {
     }
     this.supportFloatBlending = this.supportFloatColorBuffer && !!gl.getExtension('EXT_float_blend');
 
-    this._extS3TC = gl.getExtension('WEBGL_compressed_texture_s3tc')
-      || gl.getExtension('MOZ_WEBGL_compressed_texture_s3tc')
-      || gl.getExtension('WEBKIT_WEBGL_compressed_texture_s3tc');
+    this._extS3TC =
+      gl.getExtension('WEBGL_compressed_texture_s3tc') ||
+      gl.getExtension('MOZ_WEBGL_compressed_texture_s3tc') ||
+      gl.getExtension('WEBKIT_WEBGL_compressed_texture_s3tc');
     this.supportS3TC = !!this._extS3TC;
     this._extS3TCSRGB = gl.getExtension('WEBGL_compressed_texture_s3tc_srgb');
     this.supportS3TCSRGB = !!this._extS3TCSRGB;
@@ -355,7 +366,7 @@ export class WebGLTextureCaps implements TextureCaps {
       this.npo2Repeating = false;
     }
     this._textureFormatInfos = {
-      'rgba8unorm': {
+      rgba8unorm: {
         glFormat: gl.RGBA,
         glInternalFormat: this._isWebGL2 ? (gl as WebGL2RenderingContext).RGBA8 : gl.RGBA,
         glType: [gl.UNSIGNED_BYTE, gl.UNSIGNED_SHORT_4_4_4_4, gl.UNSIGNED_SHORT_5_5_5_1],

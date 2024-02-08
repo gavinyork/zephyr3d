@@ -1,4 +1,4 @@
-import type { ShaderTypeFunc} from './base';
+import type { ShaderTypeFunc } from './base';
 import { PBShaderExp, makeConstructor } from './base';
 import * as typeinfo from './types';
 import * as AST from './ast';
@@ -46,7 +46,11 @@ function vec_n(
     return new PBShaderExp(args[0], vecType);
   } else {
     const exp = new PBShaderExp('', vecType);
-    if (vecType.isScalarType() && args.length === 1 && (typeof args[0] === 'number' || typeof args[0] === 'boolean')) {
+    if (
+      vecType.isScalarType() &&
+      args.length === 1 &&
+      (typeof args[0] === 'number' || typeof args[0] === 'boolean')
+    ) {
       exp.$ast = new AST.ASTScalar(args[0], vecType);
     } else {
       exp.$ast = new AST.ASTShaderExpConstructor(
@@ -150,7 +154,7 @@ export function setConstructors(cls: typeof ProgramBuilder) {
   Object.keys(texStorageCtors).forEach((k) => {
     cls.prototype[k] = makeStorageTextureCtor(texStorageCtors[k]);
   });
-  cls.prototype['atomic_int'] = function(this: ProgramBuilder, ...args: any[]): PBShaderExp {
+  cls.prototype['atomic_int'] = function (this: ProgramBuilder, ...args: any[]): PBShaderExp {
     if (args.length > 1) {
       throw new errors.PBParamLengthError('atomic_int');
     }
@@ -165,7 +169,7 @@ export function setConstructors(cls: typeof ProgramBuilder) {
       return exp;
     }
   };
-  cls.prototype['atomic_uint'] = function(this: ProgramBuilder, ...args: any[]): PBShaderExp {
+  cls.prototype['atomic_uint'] = function (this: ProgramBuilder, ...args: any[]): PBShaderExp {
     if (args.length > 1) {
       throw new errors.PBParamLengthError('atomic_uint');
     }
@@ -177,11 +181,14 @@ export function setConstructors(cls: typeof ProgramBuilder) {
       return exp;
     }
     const arg = args[0];
-    if ((typeof arg === 'number' && Number.isInteger(arg))
-      || (arg instanceof PBShaderExp
-        && arg.$ast.getType().typeId === typeinfo.typeU32.typeId)) {
+    if (
+      (typeof arg === 'number' && Number.isInteger(arg)) ||
+      (arg instanceof PBShaderExp && arg.$ast.getType().typeId === typeinfo.typeU32.typeId)
+    ) {
       const exp = new PBShaderExp('', typeinfo.typeAtomicU32);
-      exp.$ast = new AST.ASTShaderExpConstructor(exp.$typeinfo, [arg instanceof PBShaderExp ? arg.$ast : arg]);
+      exp.$ast = new AST.ASTShaderExpConstructor(exp.$typeinfo, [
+        arg instanceof PBShaderExp ? arg.$ast : arg
+      ]);
       return exp;
     }
     return null;

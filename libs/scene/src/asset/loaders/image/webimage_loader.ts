@@ -30,7 +30,7 @@ export class WebImageLoader extends AbstractTextureLoader {
       const src = URL.createObjectURL(new Blob([data], { type: mimeType }));
       const img = document.createElement('img');
       img.src = src;
-      img.onload = function(){
+      img.onload = function () {
         createImageBitmap(img, {
           premultiplyAlpha: 'none'
         }).then((bm) => {

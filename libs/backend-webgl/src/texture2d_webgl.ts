@@ -5,9 +5,7 @@ import type {
   GPUDataBuffer,
   TextureFormat
 } from '@zephyr3d/device';
-import { linearTextureFormatToSRGB,
-  GPUResourceUsageFlags
-} from '@zephyr3d/device';
+import { linearTextureFormatToSRGB, GPUResourceUsageFlags } from '@zephyr3d/device';
 import { textureTargetMap } from './constants_webgl';
 import { WebGLBaseTexture } from './basetexture_webgl';
 import type { TypedArray } from '@zephyr3d/base';
@@ -99,7 +97,15 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
       this.generateMipmaps();
     }
   }
-  async readPixels(x: number, y: number, w: number, h: number, faceOrLevel: number, mipLevel: number, buffer: TypedArray): Promise<void> {
+  async readPixels(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    faceOrLevel: number,
+    mipLevel: number,
+    buffer: TypedArray
+  ): Promise<void> {
     if (faceOrLevel !== 0) {
       throw new Error(`Texture2D.readPixels(): parameter 'faceOrLayer' must be 0`);
     }
@@ -117,7 +123,15 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
       fb.dispose();
     }
   }
-  readPixelsToBuffer(x: number, y: number, w: number, h: number, faceOrLevel: number, mipLevel: number, buffer: GPUDataBuffer): void {
+  readPixelsToBuffer(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    faceOrLevel: number,
+    mipLevel: number,
+    buffer: GPUDataBuffer
+  ): void {
     if (faceOrLevel !== 0) {
       throw new Error(`Texture2D.readPixelsToBuffer(): parameter 'faceOrLayer' must be 0`);
     }

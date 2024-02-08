@@ -12,17 +12,18 @@ import type {
   GPUDataBuffer,
   GPUProgram,
   GPUObject,
-  AbstractDevice} from '@zephyr3d/device';
-import {
-  genDefaultName,
-  DeviceGPUObjectRenameEvent
+  AbstractDevice
 } from '@zephyr3d/device';
+import { genDefaultName, DeviceGPUObjectRenameEvent } from '@zephyr3d/device';
 import type { WebGLDevice } from './device_webgl';
 import { makeEventTarget } from '@zephyr3d/base';
 
 let _uniqueId = 0;
 
-export abstract class WebGLGPUObject<T> extends makeEventTarget(Object)<{ disposed: null }>() implements GPUObject<T> {
+export abstract class WebGLGPUObject<T>
+  extends makeEventTarget(Object)<{ disposed: null }>()
+  implements GPUObject<T>
+{
   protected _device: WebGLDevice;
   protected _object: T;
   protected _uid: number;

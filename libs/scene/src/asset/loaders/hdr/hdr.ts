@@ -38,7 +38,12 @@ export class HDRLoader extends AbstractTextureLoader {
       texture: texture,
       samplerOptions
     };
-    const tex = Application.instance.device.createTexture2D(format, textureData.width, textureData.height, options);
+    const tex = Application.instance.device.createTexture2D(
+      format,
+      textureData.width,
+      textureData.height,
+      options
+    );
     tex.update(textureData.dataFloat, 0, 0, textureData.width, textureData.height);
     return tex;
   }
@@ -90,15 +95,15 @@ export class HDRLoader extends AbstractTextureLoader {
 
     for (let i = 0; i < length; i++) {
       const s = Math.pow(2, buffer[i * 4 + 3] - (128 + 8));
-      const r = Math.pow(buffer[i * 4] * s, 1/2.2);
-      const g = Math.pow(buffer[i * 4 + 1] * s, 1/2.2);
-      const b = Math.pow(buffer[i * 4 + 2] * s, 1/2.2);
+      const r = Math.pow(buffer[i * 4] * s, 1 / 2.2);
+      const g = Math.pow(buffer[i * 4 + 1] * s, 1 / 2.2);
+      const b = Math.pow(buffer[i * 4 + 2] * s, 1 / 2.2);
       const rgbMax = Math.max(r, g, b);
-      const M = Math.ceil(255 * rgbMax / 6) / 255;
+      const M = Math.ceil((255 * rgbMax) / 6) / 255;
       const t = M * 6;
-      result[i * 4] = Math.ceil(255 * r / t);
-      result[i * 4 + 1] = Math.ceil(255 * g / t);
-      result[i * 4 + 2] = Math.ceil(255 * b / t);
+      result[i * 4] = Math.ceil((255 * r) / t);
+      result[i * 4 + 1] = Math.ceil((255 * g) / t);
+      result[i * 4 + 2] = Math.ceil((255 * b) / t);
       result[i * 4 + 3] = Math.ceil(255 * Math.min(M, 1));
     }
     return result;
@@ -129,7 +134,8 @@ export class HDRLoader extends AbstractTextureLoader {
     if (rez.length < 4) {
       return undefined;
     }
-    const width = Number(rez[3]) * 1, height = Number(rez[1]) * 1;
+    const width = Number(rez[3]) * 1,
+      height = Number(rez[1]) * 1;
     // Create image.
     const img = new Uint8Array(width * height * 4);
     let ipos = 0;
@@ -137,22 +143,22 @@ export class HDRLoader extends AbstractTextureLoader {
     for (let j = 0; j < height; j++) {
       const scanline = [];
 
-      let rgbe = d8.slice(pos, pos += 4);
-      const isNewRLE = (rgbe[0] == 2 && rgbe[1] == 2 && rgbe[2] == ((width >> 8) & 0xFF) && rgbe[3] == (width & 0xFF));
+      let rgbe = d8.slice(pos, (pos += 4));
+      const isNewRLE =
+        rgbe[0] == 2 && rgbe[1] == 2 && rgbe[2] == ((width >> 8) & 0xff) && rgbe[3] == (width & 0xff);
 
-      if (isNewRLE && (width >= 8) && (width < 32768)) {
+      if (isNewRLE && width >= 8 && width < 32768) {
         for (let i = 0; i < 4; i++) {
           let ptr = i * width;
           const ptr_end = (i + 1) * width;
           let buf = undefined;
           let count = undefined;
           while (ptr < ptr_end) {
-            buf = d8.slice(pos, pos += 2);
+            buf = d8.slice(pos, (pos += 2));
             if (buf[0] > 128) {
               count = buf[0] - 128;
               while (count-- > 0) scanline[ptr++] = buf[1];
-            }
-            else {
+            } else {
               count = buf[0] - 1;
               scanline[ptr++] = buf[1];
               while (count-- > 0) scanline[ptr++] = d8[pos++];
@@ -166,12 +172,11 @@ export class HDRLoader extends AbstractTextureLoader {
           img[ipos++] = scanline[i + 2 * width];
           img[ipos++] = scanline[i + 3 * width];
         }
-      }
-      else {
+      } else {
         pos -= 4;
 
         for (let i = 0; i < width; i++) {
-          rgbe = d8.slice(pos, pos += 4);
+          rgbe = d8.slice(pos, (pos += 4));
 
           img[ipos++] = rgbe[0];
           img[ipos++] = rgbe[1];
@@ -181,13 +186,14 @@ export class HDRLoader extends AbstractTextureLoader {
       }
     }
 
-    const imageFloatBuffer = dstFormat === 'rgba32f'
-      ? this._rgbeToFloat32(img)
-      : dstFormat === 'rgba16f'
+    const imageFloatBuffer =
+      dstFormat === 'rgba32f'
+        ? this._rgbeToFloat32(img)
+        : dstFormat === 'rgba16f'
         ? this._rgbeToFloat16(img)
         : dstFormat === 'rg11b10uf'
-          ? this._rgbeToR11G11B10(img)
-          : this._rgbeToRGBM(img);
+        ? this._rgbeToR11G11B10(img)
+        : this._rgbeToRGBM(img);
 
     return {
       dataFloat: imageFloatBuffer,

@@ -1,7 +1,6 @@
-import type { AABB} from '@zephyr3d/base';
+import type { AABB } from '@zephyr3d/base';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import type {
-  SceneNode} from '@zephyr3d/scene';
+import type { SceneNode } from '@zephyr3d/scene';
 import {
   Scene,
   AssetManager,
@@ -18,7 +17,7 @@ import {
   DirectionalLight,
   PerspectiveCamera,
   SphereShape,
-  Compositor,
+  Compositor
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import type { Texture2D } from '@zephyr3d/device';
@@ -29,11 +28,17 @@ const bvhLightApp = new Application({
   canvas: document.querySelector('#canvas'),
   pixelRatio: 1
 });
-const animationFunctions: ((elapsed: number)=>void)[] = []
+const animationFunctions: ((elapsed: number) => void)[] = [];
 bvhLightApp.ready().then(async () => {
   const device = bvhLightApp.device;
   const scene = new Scene();
-  const camera = new PerspectiveCamera(scene, Math.PI / 3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 260);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
+    1,
+    260
+  );
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
@@ -63,7 +68,7 @@ bvhLightApp.ready().then(async () => {
   scene.env.sky.fogTop = 30;
   tex.dispose();
 
-  assetManager.fetchModel(scene, './assets/models/sponza/Sponza.gltf', null).then(info => {
+  assetManager.fetchModel(scene, './assets/models/sponza/Sponza.gltf', null).then((info) => {
     function traverseModel(group: SceneNode, func: (node: SceneNode) => void, context?: any) {
       if (group) {
         const queue: SceneNode[] = [group];
@@ -91,11 +96,20 @@ bvhLightApp.ready().then(async () => {
       return bbox.isValid() ? bbox : null;
     }
     function randomPoint(bbox: AABB) {
-      return new Vector3(Vector3.add(bbox.minPoint, new Vector3(Math.random() * bbox.extents.x * 2, Math.random() * bbox.extents.y * 2, Math.random() * bbox.extents.z * 2)));
+      return new Vector3(
+        Vector3.add(
+          bbox.minPoint,
+          new Vector3(
+            Math.random() * bbox.extents.x * 2,
+            Math.random() * bbox.extents.y * 2,
+            Math.random() * bbox.extents.z * 2
+          )
+        )
+      );
     }
     function lightAnimation(bbox: AABB, light: PointLight) {
       const velocity = new Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
-      return function(elapsed: number) {
+      return function (elapsed: number) {
         light.position.set(Vector3.add(light.position, Vector3.scale(velocity, elapsed)));
         const pos = light.position;
         for (let i = 0; i < 3; i++) {
@@ -103,16 +117,19 @@ bvhLightApp.ready().then(async () => {
             velocity[i] = Math.abs(velocity[i]);
             pos[i] = bbox.minPoint[i] + light.range;
           } else if (pos[i] > bbox.maxPoint[i] - light.range) {
-            velocity[i] = - Math.abs(velocity[i]);
+            velocity[i] = -Math.abs(velocity[i]);
             pos[i] = bbox.maxPoint[i] - light.range;
           }
         }
-      }
+      };
     }
     const ballMaterial = new UnlitMaterial();
     ballMaterial.albedoColor = new Vector4(1, 1, 0, 1);
     function initLights(model: SceneNode) {
-      const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1)).setIntensity(5).setCastShadow(false);
+      const light = new DirectionalLight(scene)
+        .setColor(new Vector4(1, 1, 1, 1))
+        .setIntensity(5)
+        .setCastShadow(false);
       light.lookAt(new Vector3(0, 0, 0), new Vector3(0.5, -0.707, -0.5), Vector3.axisPY());
       light.castShadow = true;
       light.shadow.shadowMapSize = 1024;
@@ -122,10 +139,10 @@ bvhLightApp.ready().then(async () => {
       for (let i = 0; i < 255; i++) {
         const color = Vector3.normalize(new Vector3(Math.random(), Math.random(), Math.random()));
         const pointlight = new PointLight(scene)
-        .setRange(Math.min(bbox.extents.x, bbox.extents.y, bbox.extents.z) * (0.02 + Math.random() * 0.3))
-        .setIntensity(20)
-        .setColor(new Vector4(color.x, color.y, color.z, 1))
-        .setCastShadow(false);
+          .setRange(Math.min(bbox.extents.x, bbox.extents.y, bbox.extents.z) * (0.02 + Math.random() * 0.3))
+          .setIntensity(20)
+          .setColor(new Vector4(color.x, color.y, color.z, 1))
+          .setCastShadow(false);
         pointlight.position.set(randomPoint(bbox));
         const ball = new Mesh(scene, sphere);
         ball.pickMode = GraphNode.PICK_DISABLED;
@@ -165,7 +182,7 @@ bvhLightApp.ready().then(async () => {
     console.log(scene.boundingBox);
     initLights(info.group);
   });
-  bvhLightApp.on('resize', ev => {
+  bvhLightApp.on('resize', (ev) => {
     camera.aspect = ev.width / ev.height;
   });
   bvhLightApp.on('tick', () => {

@@ -1,4 +1,4 @@
-import type { Vector3} from '@zephyr3d/base';
+import type { Vector3 } from '@zephyr3d/base';
 import { Matrix4x4, Vector4 } from '@zephyr3d/base';
 import type {
   BindGroup,
@@ -8,12 +8,9 @@ import type {
   PBInsideFunctionScope,
   PBShaderExp,
   PBGlobalScope,
-  AbstractDevice} from '@zephyr3d/device';
-import {
-  PBStructTypeInfo,
-  PBPrimitiveType,
-  PBPrimitiveTypeInfo
+  AbstractDevice
 } from '@zephyr3d/device';
+import { PBStructTypeInfo, PBPrimitiveType, PBPrimitiveTypeInfo } from '@zephyr3d/device';
 import type { EnvironmentLighting } from '../render/envlight';
 import { calculateTBN, calculateTBNWithNormal } from '../shaders/misc';
 import { Material } from './material';
@@ -57,7 +54,7 @@ const TEX_NAME_CLEARCOAT_NORMAL = 'clearcoatNormal';
  * Normal map mode
  * @public
  */
-export type NormalMapMode = 'object-space'|'tangent-space';
+export type NormalMapMode = 'object-space' | 'tangent-space';
 
 /**
  * Base class for any kind of light model
@@ -331,7 +328,9 @@ export abstract class LightModel {
   calculateHash(): string {
     const texChannelHash = this._texCoordChannels.map((val) => val.srcLocation).join('');
     const albedoHash = this.albedoMap ? this.albedoMapTexCoord + 1 : 0;
-    const normalHash = this.normalMap ? `${this.normalMapTexCoord + 1}:${this._normalMapMode === 'tangent-space' ? 1 : 0}` : 0;
+    const normalHash = this.normalMap
+      ? `${this.normalMapTexCoord + 1}:${this._normalMapMode === 'tangent-space' ? 1 : 0}`
+      : 0;
     const emissiveHash = this.emissiveMap ? this.emissiveMapTexCoord + 1 : 0;
     return `${texChannelHash}_${albedoHash}_${normalHash}_${emissiveHash}`;
   }
@@ -353,7 +352,9 @@ export abstract class LightModel {
         scope.lm_normalScale = pb.float().uniform(2).tag(LightModel.uniformNormalScale);
       }
       scope.lm_emissiveFactor = pb.vec4().uniform(2).tag(LightModel.uniformEmissiveFactor);
-      scope.surfaceData = pb.defineStructByType(that.getSurfaceDataType(ctx.drawEnvLight ? ctx.env.light.envLight : null))();
+      scope.surfaceData = pb.defineStructByType(
+        that.getSurfaceDataType(ctx.drawEnvLight ? ctx.env.light.envLight : null)
+      )();
       this.setupTextureUniforms(scope);
     }
   }
@@ -414,14 +415,8 @@ export abstract class LightModel {
       );
       this.surfaceData.TBN = this.normalInfo.TBN;
       this.surfaceData.normal = this.normalInfo.normal;
-      this.surfaceData.viewVec = pb.normalize(
-        pb.sub(ShaderFramework.getCameraPosition(this), this.worldPos)
-      );
-      this.surfaceData.NdotV = pb.clamp(
-        pb.dot(this.surfaceData.normal, this.surfaceData.viewVec),
-        0.0001,
-        1
-      );
+      this.surfaceData.viewVec = pb.normalize(pb.sub(ShaderFramework.getCameraPosition(this), this.worldPos));
+      this.surfaceData.NdotV = pb.clamp(pb.dot(this.surfaceData.normal, this.surfaceData.viewVec), 0.0001, 1);
       this.surfaceData.diffuse = that.calculateAlbedo(this);
       this.surfaceData.accumDiffuse = pb.vec3(0);
       this.surfaceData.accumSpecular = pb.vec3(0);
@@ -458,10 +453,7 @@ export abstract class LightModel {
    * @returns The texture coordinate
    */
   calculateTexCoordNoInput(scope: PBInsideFunctionScope, index: number, value: PBShaderExp): PBShaderExp {
-    return scope.$builder.mul(
-      scope[`lm_texTransform${index}`],
-      scope.$builder.vec4(value, 0, 1)
-    ).xy;
+    return scope.$builder.mul(scope[`lm_texTransform${index}`], scope.$builder.vec4(value, 0, 1)).xy;
   }
   /**
    * Calculates the emissive color for current fragment
@@ -517,7 +509,13 @@ export abstract class LightModel {
    * @param TBN - The TBN matrix
    * @returns Object space normal
    */
-  sampleNormalMapWithTBN(scope: PBInsideFunctionScope, tex: PBShaderExp, texCoord: PBShaderExp, normalScale: PBShaderExp, TBN: PBShaderExp): PBShaderExp {
+  sampleNormalMapWithTBN(
+    scope: PBInsideFunctionScope,
+    tex: PBShaderExp,
+    texCoord: PBShaderExp,
+    normalScale: PBShaderExp,
+    TBN: PBShaderExp
+  ): PBShaderExp {
     const pb = scope.$builder;
     const pixel = pb.sub(pb.mul(pb.textureSample(tex, texCoord).rgb, 2), pb.vec3(1));
     const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(normalScale).xx, 1));
@@ -531,7 +529,12 @@ export abstract class LightModel {
    * @param normalScale - The normal scale
    * @returns Object space normal
    */
-  sampleNormalMap(scope: PBInsideFunctionScope, tex: PBShaderExp, texCoord: PBShaderExp, normalScale: PBShaderExp): PBShaderExp {
+  sampleNormalMap(
+    scope: PBInsideFunctionScope,
+    tex: PBShaderExp,
+    texCoord: PBShaderExp,
+    normalScale: PBShaderExp
+  ): PBShaderExp {
     const pb = scope.$builder;
     const pixel = pb.sub(pb.mul(pb.textureSample(tex, texCoord).rgb, 2), pb.vec3(1));
     const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(normalScale).xx, 1));
@@ -547,14 +550,17 @@ export abstract class LightModel {
     return this.normalMap
       ? this._normalMapMode === 'tangent-space'
         ? this.sampleNormalMapWithTBN(
-            scope, scope[this.getTextureUniformName(TEX_NAME_NORMAL)],
+            scope,
+            scope[this.getTextureUniformName(TEX_NAME_NORMAL)],
             texCoord,
             scope.$query(LightModel.uniformNormalScale) || scope.$builder.float(1),
-            TBN)
+            TBN
+          )
         : this.sampleNormalMap(
-            scope, scope[this.getTextureUniformName(TEX_NAME_NORMAL)],
+            scope,
+            scope[this.getTextureUniformName(TEX_NAME_NORMAL)],
             texCoord,
-            scope.$query(LightModel.uniformNormalScale) || scope.$builder.float(1),
+            scope.$query(LightModel.uniformNormalScale) || scope.$builder.float(1)
           )
       : TBN[2];
   }
@@ -578,8 +584,8 @@ export abstract class LightModel {
     const uv = this.normalMap
       ? scope.$inputs[`texcoord${this.normalMapTexCoord}`] ?? pb.vec2(0)
       : this.albedoMap
-        ? scope.$inputs[`texcoord${this.albedoMapTexCoord}`] ?? pb.vec2(0)
-        : pb.vec2(0);
+      ? scope.$inputs[`texcoord${this.albedoMapTexCoord}`] ?? pb.vec2(0)
+      : pb.vec2(0);
     let TBN: PBShaderExp;
     if (!worldNormal) {
       TBN = calculateTBN(scope, worldPosition, uv, this._doubleSideLighting);
@@ -599,21 +605,14 @@ export abstract class LightModel {
    * @param envLight - The environment lighting object
    * @param scope - The shader scope
    */
-  abstract envBRDF(
-    envLight: EnvironmentLighting,
-    scope: PBInsideFunctionScope
-  ): void;
+  abstract envBRDF(envLight: EnvironmentLighting, scope: PBInsideFunctionScope): void;
   /**
    * Calculates BRDF for direct lighting for current fragment
    * @param scope - The shader scope
    * @param lightDir - Vector from the light position to current fragment
    * @param attenuation - Attenuation of the light
    */
-  abstract directBRDF(
-    scope: PBInsideFunctionScope,
-    lightDir: PBShaderExp,
-    attenuation: PBShaderExp
-  ): void;
+  abstract directBRDF(scope: PBInsideFunctionScope, lightDir: PBShaderExp, attenuation: PBShaderExp): void;
   /**
    * Calculates the final color of current fragment by composing individual light contribution
    * @param scope - The shader scope
@@ -623,19 +622,19 @@ export abstract class LightModel {
     const funcNameFinalComposite = 'lib_finalComposite';
     const pb = scope.$builder;
     const that = this;
-    pb.func(
-      funcNameFinalComposite,
-      [],
-      function () {
-        this.surfaceData.accumColor = pb.add(
-          this.surfaceData.accumDiffuse,
-          this.surfaceData.accumSpecular,
-          this.surfaceData.accumEmissive
-        );
-        that.compositeSurfaceData(this);
-        this.$return(Material.debugChannel ? this.surfaceData.debugColor : pb.vec4(this.surfaceData.accumColor, this.surfaceData.diffuse.a));
-      }
-    );
+    pb.func(funcNameFinalComposite, [], function () {
+      this.surfaceData.accumColor = pb.add(
+        this.surfaceData.accumDiffuse,
+        this.surfaceData.accumSpecular,
+        this.surfaceData.accumEmissive
+      );
+      that.compositeSurfaceData(this);
+      this.$return(
+        Material.debugChannel
+          ? this.surfaceData.debugColor
+          : pb.vec4(this.surfaceData.accumColor, this.surfaceData.diffuse.a)
+      );
+    });
     return pb.getGlobalScope()[funcNameFinalComposite]();
   }
   /**
@@ -662,21 +661,33 @@ export abstract class LightModel {
   protected compositeSurfaceData(scope: PBInsideFunctionScope) {
     // to be overriden
     const pb = scope.$builder;
-    switch(Material.debugChannel) {
+    switch (Material.debugChannel) {
       case 'normal': {
-        scope.surfaceData.debugColor = pb.vec4(pb.add(pb.mul(scope.surfaceData.TBN[2], 0.5), pb.vec3(0.5)), 1);
+        scope.surfaceData.debugColor = pb.vec4(
+          pb.add(pb.mul(scope.surfaceData.TBN[2], 0.5), pb.vec3(0.5)),
+          1
+        );
         break;
       }
       case 'tangent': {
-        scope.surfaceData.debugColor = pb.vec4(pb.add(pb.mul(scope.surfaceData.TBN[0], 0.5), pb.vec3(0.5)), 1);
+        scope.surfaceData.debugColor = pb.vec4(
+          pb.add(pb.mul(scope.surfaceData.TBN[0], 0.5), pb.vec3(0.5)),
+          1
+        );
         break;
       }
       case 'binormal': {
-        scope.surfaceData.debugColor = pb.vec4(pb.add(pb.mul(scope.surfaceData.TBN[1], 0.5), pb.vec3(0.5)), 1);
+        scope.surfaceData.debugColor = pb.vec4(
+          pb.add(pb.mul(scope.surfaceData.TBN[1], 0.5), pb.vec3(0.5)),
+          1
+        );
         break;
       }
       case 'shadingNormal': {
-        scope.surfaceData.debugColor = pb.vec4(pb.add(pb.mul(scope.surfaceData.normal, 0.5), pb.vec3(0.5)), 1);
+        scope.surfaceData.debugColor = pb.vec4(
+          pb.add(pb.mul(scope.surfaceData.normal, 0.5), pb.vec3(0.5)),
+          1
+        );
         break;
       }
     }
@@ -687,10 +698,14 @@ export abstract class LightModel {
    * @returns The surface data type
    */
   protected createSurfaceDataType(env: EnvironmentLighting): PBStructTypeInfo {
-    const debugColor = Material.debugChannel ? [{
-      name: 'debugColor',
-      type: typeF32Vec4
-    }] : [];
+    const debugColor = Material.debugChannel
+      ? [
+          {
+            name: 'debugColor',
+            type: typeF32Vec4
+          }
+        ]
+      : [];
     return new PBStructTypeInfo('', 'default', [
       {
         name: 'diffuse',
@@ -744,10 +759,7 @@ export abstract class LightModel {
    * @param scope - The shader scope
    * @param envLight - The environment lighting object
    */
-  protected fillSurfaceData(
-    scope: PBInsideFunctionScope,
-    envLight: EnvironmentLighting
-  ) {
+  protected fillSurfaceData(scope: PBInsideFunctionScope, envLight: EnvironmentLighting) {
     // to be overriden
     if (Material.debugChannel) {
       scope.surfaceData.debugColor = scope.$builder.vec4(scope.surfaceData.diffuse.rgb, 1);
@@ -814,9 +826,13 @@ export abstract class LightModel {
   }
   /** @internal */
   protected calculatePixelNormal(scope: PBInsideFunctionScope, TBN: PBShaderExp): PBShaderExp {
-    const pixelNormal = this.calculateNormalWithTBN(scope, scope.$inputs[`texcoord${this.normalMapTexCoord}`], TBN);
+    const pixelNormal = this.calculateNormalWithTBN(
+      scope,
+      scope.$inputs[`texcoord${this.normalMapTexCoord}`],
+      TBN
+    );
     const pb = scope.$builder;
-    return pb.defineStruct([pb.mat3('TBN'), pb.vec3('normal')])(TBN, pixelNormal)
+    return pb.defineStruct([pb.mat3('TBN'), pb.vec3('normal')])(TBN, pixelNormal);
   }
   /**
    * Notifies that the options has changed
@@ -901,11 +917,7 @@ export class UnlitLightModel extends LightModel {
    * {@inheritDoc LightModel.directBRDF}
    * @override
    */
-  directBRDF(
-    scope: PBInsideFunctionScope,
-    lightDir: PBShaderExp,
-    attenuation: PBShaderExp
-  ): void {}
+  directBRDF(scope: PBInsideFunctionScope, lightDir: PBShaderExp, attenuation: PBShaderExp): void {}
   /**
    * {@inheritDoc LightModel.isNormalUsed}
    * @override
@@ -944,29 +956,28 @@ export class LambertLightModel extends LightModel {
   envBRDF(envLight: EnvironmentLighting, scope: PBInsideFunctionScope): void {
     const pb = scope.$builder;
     if (envLight?.hasIrradiance()) {
-      scope.surfaceData.accumDiffuse = pb.add(scope.surfaceData.accumDiffuse, pb.mul(envLight.getIrradiance(scope, scope.surfaceData.normal).rgb, scope.surfaceData.diffuse.rgb, ShaderFramework.getEnvLightStrength(scope)));
+      scope.surfaceData.accumDiffuse = pb.add(
+        scope.surfaceData.accumDiffuse,
+        pb.mul(
+          envLight.getIrradiance(scope, scope.surfaceData.normal).rgb,
+          scope.surfaceData.diffuse.rgb,
+          ShaderFramework.getEnvLightStrength(scope)
+        )
+      );
     }
   }
   /**
    * {@inheritDoc LightModel.directBRDF}
    * @override
    */
-  directBRDF(
-    scope: PBInsideFunctionScope,
-    lightDir: PBShaderExp,
-    attenuation: PBShaderExp
-  ): void {
+  directBRDF(scope: PBInsideFunctionScope, lightDir: PBShaderExp, attenuation: PBShaderExp): void {
     const pb = scope.$builder;
-    pb.func(
-      LambertLightModel.funcNameBRDFDirect,
-      [pb.vec3('attenuation')],
-      function () {
-        this.surfaceData.accumDiffuse = pb.add(
-          this.surfaceData.accumDiffuse,
-          pb.mul(this.surfaceData.diffuse.rgb, this.attenuation)
-        );
-      }
-    );
+    pb.func(LambertLightModel.funcNameBRDFDirect, [pb.vec3('attenuation')], function () {
+      this.surfaceData.accumDiffuse = pb.add(
+        this.surfaceData.accumDiffuse,
+        pb.mul(this.surfaceData.diffuse.rgb, this.attenuation)
+      );
+    });
     pb.getGlobalScope()[LambertLightModel.funcNameBRDFDirect](attenuation);
   }
 }
@@ -1026,7 +1037,14 @@ export class BlinnLightModel extends LightModel {
   envBRDF(envLight: EnvironmentLighting, scope: PBInsideFunctionScope): void {
     const pb = scope.$builder;
     if (envLight?.hasIrradiance()) {
-      scope.surfaceData.accumDiffuse = pb.add(scope.surfaceData.accumDiffuse, pb.mul(envLight.getIrradiance(scope, scope.surfaceData.normal).rgb, scope.surfaceData.diffuse.rgb, ShaderFramework.getEnvLightStrength(scope)));
+      scope.surfaceData.accumDiffuse = pb.add(
+        scope.surfaceData.accumDiffuse,
+        pb.mul(
+          envLight.getIrradiance(scope, scope.surfaceData.normal).rgb,
+          scope.surfaceData.diffuse.rgb,
+          ShaderFramework.getEnvLightStrength(scope)
+        )
+      );
     }
     /*
     if (envLight?.hasRadiance()) {
@@ -1040,24 +1058,16 @@ export class BlinnLightModel extends LightModel {
    * {@inheritDoc LightModel.directBRDF}
    * @override
    */
-  directBRDF(
-    scope: PBInsideFunctionScope,
-    lightDir: PBShaderExp,
-    attenuation: PBShaderExp
-  ): void {
+  directBRDF(scope: PBInsideFunctionScope, lightDir: PBShaderExp, attenuation: PBShaderExp): void {
     const pb = scope.$builder;
-    pb.func(
-      BlinnLightModel.funcNameBRDFDirect,
-      [pb.vec3('lightDir'), pb.vec3('attenuation')],
-      function () {
-        this.$l.halfVec = pb.normalize(pb.sub(this.surfaceData.viewVec, this.lightDir));
-        this.$l.NdotH = pb.clamp(pb.dot(this.surfaceData.normal, this.halfVec), 0, 1);
-        this.$l.outDiffuse = pb.mul(this.surfaceData.diffuse.rgb, this.attenuation);
-        this.$l.outSpecular = pb.mul(this.attenuation, pb.pow(this.NdotH, this.shininess));
-        this.surfaceData.accumSpecular = pb.add(this.surfaceData.accumSpecular, this.outSpecular);
-        this.surfaceData.accumDiffuse = pb.add(this.surfaceData.accumDiffuse, this.outDiffuse);
-      }
-    );
+    pb.func(BlinnLightModel.funcNameBRDFDirect, [pb.vec3('lightDir'), pb.vec3('attenuation')], function () {
+      this.$l.halfVec = pb.normalize(pb.sub(this.surfaceData.viewVec, this.lightDir));
+      this.$l.NdotH = pb.clamp(pb.dot(this.surfaceData.normal, this.halfVec), 0, 1);
+      this.$l.outDiffuse = pb.mul(this.surfaceData.diffuse.rgb, this.attenuation);
+      this.$l.outSpecular = pb.mul(this.attenuation, pb.pow(this.NdotH, this.shininess));
+      this.surfaceData.accumSpecular = pb.add(this.surfaceData.accumSpecular, this.outSpecular);
+      this.surfaceData.accumDiffuse = pb.add(this.surfaceData.accumDiffuse, this.outDiffuse);
+    });
     pb.getGlobalScope()[BlinnLightModel.funcNameBRDFDirect](lightDir, attenuation);
   }
 }
@@ -1131,74 +1141,142 @@ export abstract class PBRLightModelBase extends LightModel {
               this.n = pb.div(this.n, 2);
               this.$if(pb.equal(this.n, 0), function () {
                 this.$break();
-              })
+              });
             });
             this.$return(this.rand);
           });
           pb.func('hammersley2d', [pb.int('i'), pb.int('N')], function () {
-            this.$return(pb.vec2(pb.div(pb.float(this.i), pb.float(this.N)), this.radicalInverse_VdC(this.i)));
+            this.$return(
+              pb.vec2(pb.div(pb.float(this.i), pb.float(this.N)), this.radicalInverse_VdC(this.i))
+            );
           });
         } else {
           pb.func('radicalInverse_VdC', [pb.uint('bits')], function () {
             this.$l.n = this.bits;
             this.n = pb.compOr(pb.sal(this.n, 16), pb.sar(this.n, 16));
-            this.n = pb.compOr(pb.sal(pb.compAnd(this.n, 0x55555555), 1), pb.sar(pb.compAnd(this.n, 0xAAAAAAAA), 1));
-            this.n = pb.compOr(pb.sal(pb.compAnd(this.n, 0x33333333), 2), pb.sar(pb.compAnd(this.n, 0xCCCCCCCC), 2));
-            this.n = pb.compOr(pb.sal(pb.compAnd(this.n, 0x0F0F0F0F), 4), pb.sar(pb.compAnd(this.n, 0xF0F0F0F0), 4));
-            this.n = pb.compOr(pb.sal(pb.compAnd(this.n, 0x00FF00FF), 8), pb.sar(pb.compAnd(this.n, 0xFF00FF00), 8));
+            this.n = pb.compOr(
+              pb.sal(pb.compAnd(this.n, 0x55555555), 1),
+              pb.sar(pb.compAnd(this.n, 0xaaaaaaaa), 1)
+            );
+            this.n = pb.compOr(
+              pb.sal(pb.compAnd(this.n, 0x33333333), 2),
+              pb.sar(pb.compAnd(this.n, 0xcccccccc), 2)
+            );
+            this.n = pb.compOr(
+              pb.sal(pb.compAnd(this.n, 0x0f0f0f0f), 4),
+              pb.sar(pb.compAnd(this.n, 0xf0f0f0f0), 4)
+            );
+            this.n = pb.compOr(
+              pb.sal(pb.compAnd(this.n, 0x00ff00ff), 8),
+              pb.sar(pb.compAnd(this.n, 0xff00ff00), 8)
+            );
             this.$return(pb.mul(pb.float(this.n), 2.3283064365386963e-10));
           });
           pb.func('hammersley2d', [pb.int('i'), pb.int('N')], function () {
-            this.$return(pb.vec2(pb.div(pb.float(this.i), pb.float(this.N)), this.radicalInverse_VdC(pb.uint(this.i))));
+            this.$return(
+              pb.vec2(pb.div(pb.float(this.i), pb.float(this.N)), this.radicalInverse_VdC(pb.uint(this.i)))
+            );
           });
         }
-        pb.func('generateTBN', [pb.vec3('normal')], function(){
+        pb.func('generateTBN', [pb.vec3('normal')], function () {
           this.$l.bitangent = pb.vec3(0, 1, 0);
           this.$l.NoU = this.normal.y;
           this.$l.epsl = 0.0000001;
-          this.$if(pb.lessThanEqual(pb.sub(1, pb.abs(this.normal.y)), this.epsl), function(){
-            this.bitangent = this.$choice(pb.greaterThan(this.normal.y, 0), pb.vec3(0, 0, 1), pb.vec3(0, 0, -1));
+          this.$if(pb.lessThanEqual(pb.sub(1, pb.abs(this.normal.y)), this.epsl), function () {
+            this.bitangent = this.$choice(
+              pb.greaterThan(this.normal.y, 0),
+              pb.vec3(0, 0, 1),
+              pb.vec3(0, 0, -1)
+            );
           });
           this.$l.tangent = pb.normalize(pb.cross(this.bitangent, this.normal));
           this.bitangent = pb.cross(this.normal, this.tangent);
           this.$return(pb.mat3(this.tangent, this.bitangent, this.normal));
         });
-        pb.func('D_Charlie', [pb.float('sheenRoughness'), pb.float('NdotH')], function(){
+        pb.func('D_Charlie', [pb.float('sheenRoughness'), pb.float('NdotH')], function () {
           this.$l.roughness = pb.max(this.sheenRoughness, 0.000001);
           this.$l.invR = pb.div(1, this.roughness);
           this.$l.cos2h = pb.mul(this.NdotH, this.NdotH);
           this.$l.sin2h = pb.sub(1, this.cos2h);
-          this.$return(pb.div(pb.mul(pb.add(this.invR, 2), pb.pow(this.sin2h, pb.mul(this.invR, 0.5))), Math.PI * 2));
+          this.$return(
+            pb.div(pb.mul(pb.add(this.invR, 2), pb.pow(this.sin2h, pb.mul(this.invR, 0.5))), Math.PI * 2)
+          );
         });
-        pb.func('smithGGXCorrelated', [pb.float('NoV'), pb.float('NoL'), pb.float('roughness')], function(){
+        pb.func('smithGGXCorrelated', [pb.float('NoV'), pb.float('NoL'), pb.float('roughness')], function () {
           this.$l.a2 = pb.mul(this.roughness, this.roughness, this.roughness, this.roughness);
-          this.$l.GGXV = pb.mul(this.NoL, pb.sqrt(pb.add(pb.mul(this.NoV, this.NoV, pb.sub(1, this.a2)), this.a2)));
-          this.$l.GGXL = pb.mul(this.NoV, pb.sqrt(pb.add(pb.mul(this.NoL, this.NoL, pb.sub(1, this.a2)), this.a2)));
+          this.$l.GGXV = pb.mul(
+            this.NoL,
+            pb.sqrt(pb.add(pb.mul(this.NoV, this.NoV, pb.sub(1, this.a2)), this.a2))
+          );
+          this.$l.GGXL = pb.mul(
+            this.NoV,
+            pb.sqrt(pb.add(pb.mul(this.NoL, this.NoL, pb.sub(1, this.a2)), this.a2))
+          );
           this.$return(pb.div(0.5, pb.add(this.GGXV, this.GGXL)));
         });
-        pb.func('V_Ashikhmin', [pb.float('NdotL'), pb.float('NdotV')], function(){
-          this.$return(pb.clamp(pb.div(1, pb.mul(pb.sub(pb.add(this.NdotL, this.NdotV), pb.mul(this.NdotL, this.NdotV)), 4)), 0, 1));
+        pb.func('V_Ashikhmin', [pb.float('NdotL'), pb.float('NdotV')], function () {
+          this.$return(
+            pb.clamp(
+              pb.div(1, pb.mul(pb.sub(pb.add(this.NdotL, this.NdotV), pb.mul(this.NdotL, this.NdotV)), 4)),
+              0,
+              1
+            )
+          );
         });
-        pb.func('importanceSample', [pb.vec2('xi'), pb.vec3('normal'), pb.float('roughness'), pb.vec3('ggx').out(), pb.vec3('charlie').out()], function(){
-          this.$l.alphaRoughness = pb.mul(this.roughness, this.roughness);
-          this.$l.cosTheta = pb.clamp(pb.sqrt(pb.div(pb.sub(1, this.xi.y), pb.add(1, pb.mul(pb.sub(pb.mul(this.alphaRoughness, this.alphaRoughness), 1), this.xi.y)))), 0, 1);
-          this.$l.sinTheta = pb.sqrt(pb.sub(1, pb.mul(this.cosTheta, this.cosTheta)));
-          this.$l.phi = pb.mul(this.xi.x, Math.PI * 2);
-          this.$l.TBN = this.generateTBN(this.normal);
-          this.$l.localSpaceDir = pb.normalize(pb.vec3(pb.mul(this.sinTheta, pb.cos(this.phi)), pb.mul(this.sinTheta, pb.sin(this.phi)), this.cosTheta));
-          this.ggx = pb.mul(this.TBN, this.localSpaceDir);
-          this.sinTheta = pb.pow(this.xi.y, pb.div(this.alphaRoughness, pb.add(pb.mul(this.alphaRoughness, 2), 1)));
-          this.cosTheta = pb.sqrt(pb.sub(1, pb.mul(this.sinTheta, this.sinTheta)));
-          this.localSpaceDir = pb.normalize(pb.vec3(pb.mul(this.sinTheta, pb.cos(this.phi)), pb.mul(this.sinTheta, pb.sin(this.phi)), this.cosTheta));
-          this.charlie = pb.mul(this.TBN, this.localSpaceDir);
-        });
-        pb.func('integrateBRDF', [pb.float('NoV'), pb.float('roughness')], function(){
+        pb.func(
+          'importanceSample',
+          [
+            pb.vec2('xi'),
+            pb.vec3('normal'),
+            pb.float('roughness'),
+            pb.vec3('ggx').out(),
+            pb.vec3('charlie').out()
+          ],
+          function () {
+            this.$l.alphaRoughness = pb.mul(this.roughness, this.roughness);
+            this.$l.cosTheta = pb.clamp(
+              pb.sqrt(
+                pb.div(
+                  pb.sub(1, this.xi.y),
+                  pb.add(1, pb.mul(pb.sub(pb.mul(this.alphaRoughness, this.alphaRoughness), 1), this.xi.y))
+                )
+              ),
+              0,
+              1
+            );
+            this.$l.sinTheta = pb.sqrt(pb.sub(1, pb.mul(this.cosTheta, this.cosTheta)));
+            this.$l.phi = pb.mul(this.xi.x, Math.PI * 2);
+            this.$l.TBN = this.generateTBN(this.normal);
+            this.$l.localSpaceDir = pb.normalize(
+              pb.vec3(
+                pb.mul(this.sinTheta, pb.cos(this.phi)),
+                pb.mul(this.sinTheta, pb.sin(this.phi)),
+                this.cosTheta
+              )
+            );
+            this.ggx = pb.mul(this.TBN, this.localSpaceDir);
+            this.sinTheta = pb.pow(
+              this.xi.y,
+              pb.div(this.alphaRoughness, pb.add(pb.mul(this.alphaRoughness, 2), 1))
+            );
+            this.cosTheta = pb.sqrt(pb.sub(1, pb.mul(this.sinTheta, this.sinTheta)));
+            this.localSpaceDir = pb.normalize(
+              pb.vec3(
+                pb.mul(this.sinTheta, pb.cos(this.phi)),
+                pb.mul(this.sinTheta, pb.sin(this.phi)),
+                this.cosTheta
+              )
+            );
+            this.charlie = pb.mul(this.TBN, this.localSpaceDir);
+          }
+        );
+        pb.func('integrateBRDF', [pb.float('NoV'), pb.float('roughness')], function () {
           this.$l.V = pb.vec3(pb.sub(1, pb.mul(this.NoV, this.NoV)), 0, this.NoV);
           this.$l.a = pb.float(0);
           this.$l.b = pb.float(0);
           this.$l.c = pb.float(0);
           this.$l.n = pb.vec3(0, 0, 1);
-          this.$for(pb.int('i'), 0, SAMPLE_COUNT, function(){
+          this.$for(pb.int('i'), 0, SAMPLE_COUNT, function () {
             this.$l.xi = this.hammersley2d(this.i, SAMPLE_COUNT);
             this.$l.ggxSample = pb.vec3();
             this.$l.charlieSample = pb.vec3();
@@ -1211,27 +1289,43 @@ export abstract class PBRLightModelBase extends LightModel {
             this.$l.charlieNoL = pb.clamp(this.charlieL.z, 0, 1);
             this.$l.charlieNoH = pb.clamp(this.charlieSample.z, 0, 1);
             this.$l.charlieVoH = pb.clamp(pb.dot(this.V, this.charlieSample.xyz), 0, 1);
-            this.$if(pb.greaterThan(this.ggxNoL, 0), function(){
-              this.$l.pdf = pb.div(pb.mul(this.smithGGXCorrelated(this.NoV, this.ggxNoL, this.roughness), this.ggxVoH, this.ggxNoL), this.ggxNoH);
+            this.$if(pb.greaterThan(this.ggxNoL, 0), function () {
+              this.$l.pdf = pb.div(
+                pb.mul(
+                  this.smithGGXCorrelated(this.NoV, this.ggxNoL, this.roughness),
+                  this.ggxVoH,
+                  this.ggxNoL
+                ),
+                this.ggxNoH
+              );
               this.$l.Fc = pb.pow(pb.sub(1, this.ggxVoH), 5);
               this.a = pb.add(this.a, pb.mul(pb.sub(1, this.Fc), this.pdf));
               this.b = pb.add(this.b, pb.mul(this.Fc, this.pdf));
             });
-            this.$if(pb.greaterThan(this.charlieNoL, 0), function(){
+            this.$if(pb.greaterThan(this.charlieNoL, 0), function () {
               this.$l.sheenDistribution = this.D_Charlie(this.roughness, this.charlieNoH);
               this.$l.sheenVis = this.V_Ashikhmin(this.charlieNoL, this.NoV);
-              this.c = pb.add(this.c, pb.mul(this.sheenVis, this.sheenDistribution, this.charlieNoL, this.charlieVoH));
+              this.c = pb.add(
+                this.c,
+                pb.mul(this.sheenVis, this.sheenDistribution, this.charlieNoL, this.charlieVoH)
+              );
             });
           });
-          this.$return(pb.div(pb.vec3(pb.mul(this.a, 4), pb.mul(this.b, 4), pb.mul(this.c, 8 * Math.PI)), SAMPLE_COUNT));
+          this.$return(
+            pb.div(pb.vec3(pb.mul(this.a, 4), pb.mul(this.b, 4), pb.mul(this.c, 8 * Math.PI)), SAMPLE_COUNT)
+          );
         });
-        pb.main(function(){
+        pb.main(function () {
           this.$outputs.color = pb.vec4(this.integrateBRDF(this.$inputs.uv.x, this.$inputs.uv.y), 1);
         });
       }
     });
     const vertexLayout = device.createVertexLayout({
-      vertexBuffers: [{ buffer: device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])) }]
+      vertexBuffers: [
+        {
+          buffer: device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]))
+        }
+      ]
     });
     const rs = device.createRenderStateSet();
     rs.useRasterizerState().setCullMode('none');
@@ -1628,7 +1722,7 @@ export abstract class PBRLightModelBase extends LightModel {
       {
         name: 'radiance',
         type: typeF32Vec3
-      },
+      }
     ];
     if (env) {
       props.push({
@@ -1653,7 +1747,7 @@ export abstract class PBRLightModelBase extends LightModel {
         {
           name: 'sheenContrib',
           type: typeF32Vec3
-        },
+        }
       );
     }
     if (this._clearcoat) {
@@ -1696,133 +1790,147 @@ export abstract class PBRLightModelBase extends LightModel {
    * {@inheritDoc LightModel.fillSurfaceData}
    * @override
    */
-  protected fillSurfaceData(
-    scope: PBInsideFunctionScope,
-    envLight: EnvironmentLighting
-  ) {
+  protected fillSurfaceData(scope: PBInsideFunctionScope, envLight: EnvironmentLighting) {
     super.fillSurfaceData(scope, envLight);
     const funcNameFillSurfaceDataPBRCommon = 'lib_fillSurfaceDataPBRCommon';
     const pb = scope.$builder;
     const that = this;
-    pb.func(
-      funcNameFillSurfaceDataPBRCommon,
-      [],
-      function () {
-        this.surfaceData.f0 = this.$query(PBRLightModelBase.uniformF0);
-        this.surfaceData.f90 = pb.vec3(1);
-        const strength = ShaderFramework.getEnvLightStrength(this);
-        if (that.occlusionMap) {
-          const occlusionStrength = this.$query(PBRLightModelBase.uniformOcclusionStrength);
-          const texCoord = this.$inputs[`texcoord${that.occlusionMapTexCoord ?? that.albedoMapTexCoord}`];
-          this.surfaceData.occlusion = pb.textureSample(
-            this[that.getTextureUniformName(TEX_NAME_OCCLUSION)],
-            texCoord
+    pb.func(funcNameFillSurfaceDataPBRCommon, [], function () {
+      this.surfaceData.f0 = this.$query(PBRLightModelBase.uniformF0);
+      this.surfaceData.f90 = pb.vec3(1);
+      const strength = ShaderFramework.getEnvLightStrength(this);
+      if (that.occlusionMap) {
+        const occlusionStrength = this.$query(PBRLightModelBase.uniformOcclusionStrength);
+        const texCoord = this.$inputs[`texcoord${that.occlusionMapTexCoord ?? that.albedoMapTexCoord}`];
+        this.surfaceData.occlusion = pb.textureSample(
+          this[that.getTextureUniformName(TEX_NAME_OCCLUSION)],
+          texCoord
+        );
+        this.surfaceData.occlusion.r = pb.mul(
+          pb.add(pb.mul(occlusionStrength, pb.sub(this.surfaceData.occlusion.r, 1)), 1),
+          strength
+        );
+      } else {
+        this.surfaceData.occlusion = pb.vec4(strength);
+      }
+      if (that.useClearcoat) {
+        this.surfaceData.clearcoatFactor = this.$query(PBRLightModelBase.uniformClearcoatFactor);
+        if (that.clearcoatNormalMap) {
+          const clearcoatNormalMap = this[that.getTextureUniformName(TEX_NAME_CLEARCOAT_NORMAL)];
+          const texCoord =
+            this.$inputs[`texcoord${that.clearcoatNormalMapTexCoord ?? that.albedoMapTexCoord}`];
+          this.$l.ccNormal = pb.sub(
+            pb.mul(pb.textureSample(clearcoatNormalMap, texCoord).rgb, 2),
+            pb.vec3(1)
           );
-          this.surfaceData.occlusion.r = pb.mul(
-            pb.add(pb.mul(occlusionStrength, pb.sub(this.surfaceData.occlusion.r, 1)), 1),
-            strength
+          this.ccNormal = pb.mul(
+            this.ccNormal,
+            pb.vec3(this.surfaceData.clearcoatFactor.z, this.surfaceData.clearcoatFactor.z, 1)
+          );
+          this.surfaceData.clearcoatNormal = pb.normalize(pb.mul(this.surfaceData.TBN, this.ccNormal));
+          this.surfaceData.clearcoatNdotV = pb.clamp(
+            pb.dot(this.surfaceData.clearcoatNormal, this.surfaceData.viewVec),
+            0.0001,
+            1
           );
         } else {
-          this.surfaceData.occlusion = pb.vec4(strength);
+          this.surfaceData.clearcoatNormal = this.surfaceData.TBN[2];
+          this.surfaceData.clearcoatNdotV = this.surfaceData.NdotV;
         }
-        if (that.useClearcoat) {
-          this.surfaceData.clearcoatFactor = this.$query(PBRLightModelBase.uniformClearcoatFactor);
-          if (that.clearcoatNormalMap) {
-            const clearcoatNormalMap = this[that.getTextureUniformName(TEX_NAME_CLEARCOAT_NORMAL)];
-            const texCoord =
-              this.$inputs[`texcoord${that.clearcoatNormalMapTexCoord ?? that.albedoMapTexCoord}`];
-            this.$l.ccNormal = pb.sub(
-              pb.mul(pb.textureSample(clearcoatNormalMap, texCoord).rgb, 2),
-              pb.vec3(1)
-            );
-            this.ccNormal = pb.mul(
-              this.ccNormal,
-              pb.vec3(this.surfaceData.clearcoatFactor.z, this.surfaceData.clearcoatFactor.z, 1)
-            );
-            this.surfaceData.clearcoatNormal = pb.normalize(pb.mul(this.surfaceData.TBN, this.ccNormal));
-            this.surfaceData.clearcoatNdotV = pb.clamp(
-              pb.dot(this.surfaceData.clearcoatNormal, this.surfaceData.viewVec),
-              0.0001,
-              1
-            );
-          } else {
-            this.surfaceData.clearcoatNormal = this.surfaceData.TBN[2];
-            this.surfaceData.clearcoatNdotV = this.surfaceData.NdotV;
-          }
-          if (that.clearcoatIntensityMap) {
-            const clearcoatIntensityMap = this[that.getTextureUniformName(TEX_NAME_CLEARCOAT_INTENSITY)];
-            const texCoord =
-              this.$inputs[`texcoord${that.clearcoatIntensityMapTexCoord ?? that.albedoMapTexCoord}`];
-            this.surfaceData.clearcoatFactor.x = pb.mul(
-              this.surfaceData.clearcoatFactor.x,
-              pb.textureSample(clearcoatIntensityMap, texCoord).r
-            );
-          }
-          if (that.clearcoatRoughnessMap) {
-            const clearcoatRoughnessMap = this[that.getTextureUniformName(TEX_NAME_CLEARCOAT_ROUGHNESS)];
-            const texCoord =
-              this.$inputs[`texcoord${that.clearcoatRoughnessMapTexCoord ?? that.albedoMapTexCoord}`];
-            this.surfaceData.clearcoatFactor.y = pb.mul(
-              this.surfaceData.clearcoatFactor.y,
-              pb.textureSample(clearcoatRoughnessMap, texCoord).g
-            );
-          }
-          this.surfaceData.clearcoatFactor.y = pb.clamp(this.surfaceData.clearcoatFactor.y, 0, 1);
-          this.surfaceData.clearcoatContrib = pb.vec3(0);
-          if (envLight) {
-            this.surfaceData.clearcoatGGXLutSample = pb.clamp(pb.textureSample(this.ggxLut, pb.vec2(this.surfaceData.NdotV, this.surfaceData.clearcoatFactor.y)), pb.vec4(0), pb.vec4(1));
-          }
-          // clearcoatFresnel/radianceClearcoat will be set after f0 and f90 are set
-        }
-        if (that._sheen) {
-          this.$l.sheenColor = this.$query(PBRLightModelBase.uniformSheenFactor).rgb;
-          this.$l.sheenRoughness = this.$query(PBRLightModelBase.uniformSheenFactor).a;
-          if (that.sheenColorMap) {
-            const sheenColorMap = this[that.getTextureUniformName(TEX_NAME_SHEEN_COLOR)];
-            const texCoord =
-              this.$inputs[`texcoord${that.sheenColorMapTexCoord ?? that.albedoMapTexCoord}`];
-            this.$l.sheenColor = pb.mul(this.$l.sheenColor, pb.textureSample(sheenColorMap, texCoord).rgb);
-          }
-          if (that.sheenRoughnessMap) {
-            const sheenRoughnessMap = this[that.getTextureUniformName(TEX_NAME_SHEEN_ROUGHNESS)];
-            const texCoord =
-              this.$inputs[`texcoord${that.sheenRoughnessMapTexCoord ?? that.albedoMapTexCoord}`];
-            this.$l.sheenRoughness = pb.mul(
-              this.$l.sheenRoughness,
-              pb.textureSample(sheenRoughnessMap, texCoord).a
-            );
-          }
-          if (that.sheenLut) {
-            const sheenLut = this[that.getTextureUniformName(TEX_NAME_SHEEN_LUT)];
-            this.$l.sheenDFG = pb.textureSample(
-              sheenLut,
-              pb.vec2(this.surfaceData.NdotV, this.sheenRoughness)
-            ).b;
-          } else {
-            this.$l.sheenDFG = 0.157;
-          }
-          this.surfaceData.sheenAlbedoScaling = pb.sub(
-            1,
-            pb.mul(pb.max(pb.max(this.sheenColor.r, this.sheenColor.g), this.sheenColor.b), this.sheenDFG)
+        if (that.clearcoatIntensityMap) {
+          const clearcoatIntensityMap = this[that.getTextureUniformName(TEX_NAME_CLEARCOAT_INTENSITY)];
+          const texCoord =
+            this.$inputs[`texcoord${that.clearcoatIntensityMapTexCoord ?? that.albedoMapTexCoord}`];
+          this.surfaceData.clearcoatFactor.x = pb.mul(
+            this.surfaceData.clearcoatFactor.x,
+            pb.textureSample(clearcoatIntensityMap, texCoord).r
           );
-          this.surfaceData.sheenColor = this.sheenColor;
-          this.surfaceData.sheenRoughness = this.sheenRoughness;
-          this.surfaceData.sheenContrib = pb.vec3(0);
-          /*
+        }
+        if (that.clearcoatRoughnessMap) {
+          const clearcoatRoughnessMap = this[that.getTextureUniformName(TEX_NAME_CLEARCOAT_ROUGHNESS)];
+          const texCoord =
+            this.$inputs[`texcoord${that.clearcoatRoughnessMapTexCoord ?? that.albedoMapTexCoord}`];
+          this.surfaceData.clearcoatFactor.y = pb.mul(
+            this.surfaceData.clearcoatFactor.y,
+            pb.textureSample(clearcoatRoughnessMap, texCoord).g
+          );
+        }
+        this.surfaceData.clearcoatFactor.y = pb.clamp(this.surfaceData.clearcoatFactor.y, 0, 1);
+        this.surfaceData.clearcoatContrib = pb.vec3(0);
+        if (envLight) {
+          this.surfaceData.clearcoatGGXLutSample = pb.clamp(
+            pb.textureSample(
+              this.ggxLut,
+              pb.vec2(this.surfaceData.NdotV, this.surfaceData.clearcoatFactor.y)
+            ),
+            pb.vec4(0),
+            pb.vec4(1)
+          );
+        }
+        // clearcoatFresnel/radianceClearcoat will be set after f0 and f90 are set
+      }
+      if (that._sheen) {
+        this.$l.sheenColor = this.$query(PBRLightModelBase.uniformSheenFactor).rgb;
+        this.$l.sheenRoughness = this.$query(PBRLightModelBase.uniformSheenFactor).a;
+        if (that.sheenColorMap) {
+          const sheenColorMap = this[that.getTextureUniformName(TEX_NAME_SHEEN_COLOR)];
+          const texCoord = this.$inputs[`texcoord${that.sheenColorMapTexCoord ?? that.albedoMapTexCoord}`];
+          this.$l.sheenColor = pb.mul(this.$l.sheenColor, pb.textureSample(sheenColorMap, texCoord).rgb);
+        }
+        if (that.sheenRoughnessMap) {
+          const sheenRoughnessMap = this[that.getTextureUniformName(TEX_NAME_SHEEN_ROUGHNESS)];
+          const texCoord =
+            this.$inputs[`texcoord${that.sheenRoughnessMapTexCoord ?? that.albedoMapTexCoord}`];
+          this.$l.sheenRoughness = pb.mul(
+            this.$l.sheenRoughness,
+            pb.textureSample(sheenRoughnessMap, texCoord).a
+          );
+        }
+        if (that.sheenLut) {
+          const sheenLut = this[that.getTextureUniformName(TEX_NAME_SHEEN_LUT)];
+          this.$l.sheenDFG = pb.textureSample(
+            sheenLut,
+            pb.vec2(this.surfaceData.NdotV, this.sheenRoughness)
+          ).b;
+        } else {
+          this.$l.sheenDFG = 0.157;
+        }
+        this.surfaceData.sheenAlbedoScaling = pb.sub(
+          1,
+          pb.mul(pb.max(pb.max(this.sheenColor.r, this.sheenColor.g), this.sheenColor.b), this.sheenDFG)
+        );
+        this.surfaceData.sheenColor = this.sheenColor;
+        this.surfaceData.sheenRoughness = this.sheenRoughness;
+        this.surfaceData.sheenContrib = pb.vec3(0);
+        /*
           this.$l.k = pb.clamp(pb.textureSample(this.ggxLut, pb.vec2(this.surfaceData.NdotV, this.surfaceData.sheenRoughness)), pb.vec4(0), pb.vec4(1)).b;
           this.surfaceData.sheenAlbedoScaling = pb.sub(1, pb.mul(this.k, pb.max(pb.max(this.surfaceData.sheenColor.r, this.surfaceData.sheenColor.g), this.surfaceData.sheenColor.b)));
           */
-        }
       }
-    );
+    });
     pb.getGlobalScope()[funcNameFillSurfaceDataPBRCommon]();
   }
-  protected iblSpecular(scope: PBInsideFunctionScope, brdf: PBShaderExp, f0: PBShaderExp, radiance: PBShaderExp, NdotV: PBShaderExp|number, roughness: PBShaderExp|number, specularWeight: PBShaderExp|number): PBShaderExp {
+  protected iblSpecular(
+    scope: PBInsideFunctionScope,
+    brdf: PBShaderExp,
+    f0: PBShaderExp,
+    radiance: PBShaderExp,
+    NdotV: PBShaderExp | number,
+    roughness: PBShaderExp | number,
+    specularWeight: PBShaderExp | number
+  ): PBShaderExp {
     const pb = scope.$builder;
     const funcName = 'lib_PBRLM_iblspecular_pbr';
     pb.func(
       funcName,
-      [pb.vec4('brdf'), pb.vec3('f0'), pb.vec3('radiance'), pb.float('NdotV'), pb.float('roughness'), pb.float('specularWeight')],
+      [
+        pb.vec4('brdf'),
+        pb.vec3('f0'),
+        pb.vec3('radiance'),
+        pb.float('NdotV'),
+        pb.float('roughness'),
+        pb.float('specularWeight')
+      ],
       function () {
         this.$l.f_ab = this.brdf.rg;
         this.$l.Fr = pb.sub(pb.max(pb.vec3(pb.sub(1, this.roughness)), this.f0), this.f0);
@@ -1833,12 +1941,29 @@ export abstract class PBRLightModelBase extends LightModel {
     );
     return pb.getGlobalScope()[funcName](brdf, f0, radiance, NdotV, roughness, specularWeight);
   }
-  protected iblDiffuse(scope: PBInsideFunctionScope, brdf: PBShaderExp, f0: PBShaderExp, diffuse: PBShaderExp, irradiance: PBShaderExp, NdotV: PBShaderExp|number, roughness: PBShaderExp|number, specularWeight: PBShaderExp|number): PBShaderExp {
+  protected iblDiffuse(
+    scope: PBInsideFunctionScope,
+    brdf: PBShaderExp,
+    f0: PBShaderExp,
+    diffuse: PBShaderExp,
+    irradiance: PBShaderExp,
+    NdotV: PBShaderExp | number,
+    roughness: PBShaderExp | number,
+    specularWeight: PBShaderExp | number
+  ): PBShaderExp {
     const pb = scope.$builder;
     const funcName = 'lib_PBRLM_ibldiffuse_pbr';
     pb.func(
       funcName,
-      [pb.vec4('brdf'), pb.vec3('f0'), pb.vec3('diffuse'), pb.vec3('irradiance'), pb.float('NdotV'), pb.float('roughness'), pb.float('specularWeight')],
+      [
+        pb.vec4('brdf'),
+        pb.vec3('f0'),
+        pb.vec3('diffuse'),
+        pb.vec3('irradiance'),
+        pb.float('NdotV'),
+        pb.float('roughness'),
+        pb.float('specularWeight')
+      ],
       function () {
         this.$l.f_ab = this.brdf.rg;
         this.$l.Fr = pb.sub(pb.max(pb.vec3(pb.sub(1, this.roughness)), this.f0), this.f0);
@@ -1846,7 +1971,10 @@ export abstract class PBRLightModelBase extends LightModel {
         this.$l.FssEss = pb.add(pb.mul(this.k_S, this.f_ab.x, this.specularWeight), pb.vec3(this.f_ab.y));
         this.$l.Ems = pb.sub(1, pb.add(this.f_ab.x, this.f_ab.y));
         this.$l.F_avg = pb.mul(pb.add(this.f0, pb.div(pb.sub(pb.vec3(1), this.f0), 21)), this.specularWeight);
-        this.$l.FmsEms = pb.div(pb.mul(this.FssEss, this.F_avg, this.Ems), pb.sub(pb.vec3(1), pb.mul(this.F_avg, this.Ems)));
+        this.$l.FmsEms = pb.div(
+          pb.mul(this.FssEss, this.F_avg, this.Ems),
+          pb.sub(pb.vec3(1), pb.mul(this.F_avg, this.Ems))
+        );
         this.$l.k_D = pb.mul(this.diffuse, pb.add(pb.sub(pb.vec3(1), this.FssEss), this.FmsEms));
         this.$return(pb.mul(pb.add(this.FmsEms, this.k_D), this.irradiance));
       }
@@ -1857,41 +1985,68 @@ export abstract class PBRLightModelBase extends LightModel {
   protected illumEnvLight(scope: PBInsideFunctionScope, envLight: EnvironmentLighting) {
     const pb = scope.$builder;
     const that = this;
-    pb.func(
-      PBRLightModelBase.funcNameIllumEnvLight,
-      [],
-      function () {
-        if (envLight.hasRadiance()) {
-          this.$l.iblSpecular = that.iblSpecular(this, this.surfaceData.ggxLutSample, this.surfaceData.f0.rgb, this.surfaceData.radiance, this.surfaceData.NdotV, this.surfaceData.roughness, this.surfaceData.specularWeight);
-          this.surfaceData.accumSpecular = pb.add(
-            this.surfaceData.accumSpecular,
-            pb.mul(this.iblSpecular, this.surfaceData.occlusion.r)
-          );
-        }
-        if (envLight.hasIrradiance()) {
-          this.$l.iblDiffuse = that.iblDiffuse(this, this.surfaceData.ggxLutSample, this.surfaceData.f0.rgb, this.surfaceData.diffuse.rgb, this.surfaceData.irradiance, this.surfaceData.NdotV, this.surfaceData.roughness, this.surfaceData.specularWeight);
-          this.surfaceData.accumDiffuse = pb.add(
-            this.surfaceData.accumDiffuse,
-            pb.mul(this.iblDiffuse, this.surfaceData.occlusion.r)
-          );
-        }
-        if (that._clearcoat) {
-          this.$l.ccSpecular = that.iblSpecular(this, this.surfaceData.ggxLutSample, this.surfaceData.f0.rgb, this.surfaceData.radianceClearcoat, this.surfaceData.clearcoatNdotV, this.surfaceData.clearcoatFactor.y, 1);
-          this.surfaceData.clearcoatContrib = pb.add(
-            this.surfaceData.clearcoatContrib,
-            pb.mul(this.ccSpecular, this.surfaceData.occlusion.r)
-          );
-        }
-        if (envLight.hasIrradiance() && that._sheen) {
-          this.$l.refl = pb.reflect(pb.neg(this.surfaceData.viewVec), this.surfaceData.normal);
-          this.$l.sheenEnvSample = envLight.getRadiance(this, this.refl, this.surfaceData.sheenRoughness);
-          this.$l.sheenBRDF = pb.textureSample(this.ggxLut, pb.clamp(pb.vec2(this.surfaceData.NdotV, this.surfaceData.sheenRoughness), pb.vec2(0), pb.vec2(1))).b;
-          //this.$l.sheenBRDF = iblSheenBRDF(this, this.surfaceData.sheenRoughness, this.surfaceData.NdotV);
-          this.$l.sheenLighting = pb.mul(this.surfaceData.sheenColor.rgb, this.iblDiffuse, this.sheenBRDF);
-          this.surfaceData.sheenContrib = pb.add(this.surfaceData.sheenContrib, pb.mul(this.sheenLighting, this.surfaceData.occlusion.r));
-        }
+    pb.func(PBRLightModelBase.funcNameIllumEnvLight, [], function () {
+      if (envLight.hasRadiance()) {
+        this.$l.iblSpecular = that.iblSpecular(
+          this,
+          this.surfaceData.ggxLutSample,
+          this.surfaceData.f0.rgb,
+          this.surfaceData.radiance,
+          this.surfaceData.NdotV,
+          this.surfaceData.roughness,
+          this.surfaceData.specularWeight
+        );
+        this.surfaceData.accumSpecular = pb.add(
+          this.surfaceData.accumSpecular,
+          pb.mul(this.iblSpecular, this.surfaceData.occlusion.r)
+        );
       }
-    );
+      if (envLight.hasIrradiance()) {
+        this.$l.iblDiffuse = that.iblDiffuse(
+          this,
+          this.surfaceData.ggxLutSample,
+          this.surfaceData.f0.rgb,
+          this.surfaceData.diffuse.rgb,
+          this.surfaceData.irradiance,
+          this.surfaceData.NdotV,
+          this.surfaceData.roughness,
+          this.surfaceData.specularWeight
+        );
+        this.surfaceData.accumDiffuse = pb.add(
+          this.surfaceData.accumDiffuse,
+          pb.mul(this.iblDiffuse, this.surfaceData.occlusion.r)
+        );
+      }
+      if (that._clearcoat) {
+        this.$l.ccSpecular = that.iblSpecular(
+          this,
+          this.surfaceData.ggxLutSample,
+          this.surfaceData.f0.rgb,
+          this.surfaceData.radianceClearcoat,
+          this.surfaceData.clearcoatNdotV,
+          this.surfaceData.clearcoatFactor.y,
+          1
+        );
+        this.surfaceData.clearcoatContrib = pb.add(
+          this.surfaceData.clearcoatContrib,
+          pb.mul(this.ccSpecular, this.surfaceData.occlusion.r)
+        );
+      }
+      if (envLight.hasIrradiance() && that._sheen) {
+        this.$l.refl = pb.reflect(pb.neg(this.surfaceData.viewVec), this.surfaceData.normal);
+        this.$l.sheenEnvSample = envLight.getRadiance(this, this.refl, this.surfaceData.sheenRoughness);
+        this.$l.sheenBRDF = pb.textureSample(
+          this.ggxLut,
+          pb.clamp(pb.vec2(this.surfaceData.NdotV, this.surfaceData.sheenRoughness), pb.vec2(0), pb.vec2(1))
+        ).b;
+        //this.$l.sheenBRDF = iblSheenBRDF(this, this.surfaceData.sheenRoughness, this.surfaceData.NdotV);
+        this.$l.sheenLighting = pb.mul(this.surfaceData.sheenColor.rgb, this.iblDiffuse, this.sheenBRDF);
+        this.surfaceData.sheenContrib = pb.add(
+          this.surfaceData.sheenContrib,
+          pb.mul(this.sheenLighting, this.surfaceData.occlusion.r)
+        );
+      }
+    });
     pb.getGlobalScope()[PBRLightModelBase.funcNameIllumEnvLight]();
   }
   /**
@@ -1912,11 +2067,7 @@ export abstract class PBRLightModelBase extends LightModel {
    * {@inheritDoc LightModel.directBRDF}
    * @override
    */
-  directBRDF(
-    scope: PBInsideFunctionScope,
-    lightDir: PBShaderExp,
-    attenuation: PBShaderExp
-  ): void {
+  directBRDF(scope: PBInsideFunctionScope, lightDir: PBShaderExp, attenuation: PBShaderExp): void {
     const that = this;
     const pb = scope.$builder;
     pb.func(
@@ -1931,18 +2082,55 @@ export abstract class PBRLightModelBase extends LightModel {
         this.$l.outSpecular = pb.vec3();
         this.$l.outDiffuse = pb.vec3();
         this.$l.F = fresnelSchlick(this, this.VdotH, this.surfaceData.f0.rgb, this.surfaceData.f90);
-        directLighting(this, this.surfaceData.diffuse.rgb, this.surfaceData.NdotV, this.NdotH, this.NdotL, this.F, this.surfaceData.roughness, this.surfaceData.specularWeight, this.outSpecular, this.outDiffuse);
-        this.surfaceData.accumSpecular = pb.add(this.surfaceData.accumSpecular, pb.mul(this.outSpecular, this.attenuation));
-        this.surfaceData.accumDiffuse = pb.add(this.surfaceData.accumDiffuse, pb.mul(this.outDiffuse, this.attenuation));
+        directLighting(
+          this,
+          this.surfaceData.diffuse.rgb,
+          this.surfaceData.NdotV,
+          this.NdotH,
+          this.NdotL,
+          this.F,
+          this.surfaceData.roughness,
+          this.surfaceData.specularWeight,
+          this.outSpecular,
+          this.outDiffuse
+        );
+        this.surfaceData.accumSpecular = pb.add(
+          this.surfaceData.accumSpecular,
+          pb.mul(this.outSpecular, this.attenuation)
+        );
+        this.surfaceData.accumDiffuse = pb.add(
+          this.surfaceData.accumDiffuse,
+          pb.mul(this.outDiffuse, this.attenuation)
+        );
         if (that._sheen) {
-          this.$l.sheenLighting = directSheenLighting(this, this.surfaceData.NdotV, this.NdotL, this.NdotH, this.surfaceData.sheenColor, this.surfaceData.sheenRoughness);
-          this.surfaceData.sheenContrib = pb.add(this.surfaceData.sheenContrib, pb.mul(this.sheenLighting, this.attenuation));
+          this.$l.sheenLighting = directSheenLighting(
+            this,
+            this.surfaceData.NdotV,
+            this.NdotL,
+            this.NdotH,
+            this.surfaceData.sheenColor,
+            this.surfaceData.sheenRoughness
+          );
+          this.surfaceData.sheenContrib = pb.add(
+            this.surfaceData.sheenContrib,
+            pb.mul(this.sheenLighting, this.attenuation)
+          );
         }
         if (that._clearcoat) {
           this.$l.ccNdotH = pb.clamp(pb.dot(this.surfaceData.clearcoatNormal, this.halfVec), 0, 1);
           this.$l.ccNdotL = pb.clamp(pb.dot(this.surfaceData.clearcoatNormal, this.L), 0, 1);
-          this.$l.ccLighting = directClearcoatLighting(this, this.surfaceData.clearcoatNdotV, this.ccNdotH, this.ccNdotL, this.F, this.surfaceData.clearcoatFactor.y);
-          this.surfaceData.clearcoatContrib = pb.add(this.surfaceData.clearcoatContrib, pb.mul(this.ccLighting, this.attenuation));
+          this.$l.ccLighting = directClearcoatLighting(
+            this,
+            this.surfaceData.clearcoatNdotV,
+            this.ccNdotH,
+            this.ccNdotL,
+            this.F,
+            this.surfaceData.clearcoatFactor.y
+          );
+          this.surfaceData.clearcoatContrib = pb.add(
+            this.surfaceData.clearcoatContrib,
+            pb.mul(this.ccLighting, this.attenuation)
+          );
         }
       }
     );
@@ -1960,15 +2148,28 @@ export abstract class PBRLightModelBase extends LightModel {
         break;
       }
       case 'pbrMetallic': {
-        scope.surfaceData.debugColor = pb.vec4(scope.surfaceData.metallic, scope.surfaceData.metallic, scope.surfaceData.metallic, 1);
+        scope.surfaceData.debugColor = pb.vec4(
+          scope.surfaceData.metallic,
+          scope.surfaceData.metallic,
+          scope.surfaceData.metallic,
+          1
+        );
         break;
       }
       case 'pbrRoughness': {
-        scope.surfaceData.debugColor = pb.vec4(scope.surfaceData.roughness, scope.surfaceData.roughness, scope.surfaceData.roughness, 1);
+        scope.surfaceData.debugColor = pb.vec4(
+          scope.surfaceData.roughness,
+          scope.surfaceData.roughness,
+          scope.surfaceData.roughness,
+          1
+        );
         break;
       }
       case 'pbrMetallicRoughness': {
-        scope.surfaceData.debugColor = pb.vec4(pb.add(scope.surfaceData.accumDiffuse, scope.surfaceData.accumSpecular), 1);
+        scope.surfaceData.debugColor = pb.vec4(
+          pb.add(scope.surfaceData.accumDiffuse, scope.surfaceData.accumSpecular),
+          1
+        );
         break;
       }
       case 'pbrSheen': {
@@ -1989,7 +2190,12 @@ export abstract class PBRLightModelBase extends LightModel {
       }
       case 'pbrSheenRoughness': {
         if (this._sheen) {
-          scope.surfaceData.debugColor = pb.vec4(scope.surfaceData.sheenRoughness, scope.surfaceData.sheenRoughness, scope.surfaceData.sheenRoughness, 1);
+          scope.surfaceData.debugColor = pb.vec4(
+            scope.surfaceData.sheenRoughness,
+            scope.surfaceData.sheenRoughness,
+            scope.surfaceData.sheenRoughness,
+            1
+          );
         } else {
           scope.surfaceData.debugColor = pb.vec4(0, 0, 0, 1);
         }
@@ -1997,7 +2203,12 @@ export abstract class PBRLightModelBase extends LightModel {
       }
       case 'pbrSheenAlbedoScaling': {
         if (this._sheen) {
-          scope.surfaceData.debugColor = pb.vec4(scope.surfaceData.sheenAlbedoScaling, scope.surfaceData.sheenAlbedoScaling, scope.surfaceData.sheenAlbedoScaling, 1);
+          scope.surfaceData.debugColor = pb.vec4(
+            scope.surfaceData.sheenAlbedoScaling,
+            scope.surfaceData.sheenAlbedoScaling,
+            scope.surfaceData.sheenAlbedoScaling,
+            1
+          );
         } else {
           scope.surfaceData.debugColor = pb.vec4(0, 0, 0, 1);
         }
@@ -2014,7 +2225,10 @@ export abstract class PBRLightModelBase extends LightModel {
           scope.surfaceData.accumColor = pb.add(
             pb.mul(
               scope.surfaceData.accumColor,
-              pb.sub(pb.vec3(1), pb.mul(scope.surfaceData.clearcoatFresnel, scope.surfaceData.clearcoatFactor.x))
+              pb.sub(
+                pb.vec3(1),
+                pb.mul(scope.surfaceData.clearcoatFresnel, scope.surfaceData.clearcoatFactor.x)
+              )
             ),
             pb.mul(scope.surfaceData.clearcoatContrib, scope.surfaceData.clearcoatFactor.x)
           );
@@ -2125,71 +2339,72 @@ export class PBRLightModelSG extends PBRLightModelBase {
    * {@inheritDoc LightModel.fillSurfaceData}
    * @override
    */
-  protected fillSurfaceData(
-    scope: PBInsideFunctionScope,
-    envLight: EnvironmentLighting
-  ) {
+  protected fillSurfaceData(scope: PBInsideFunctionScope, envLight: EnvironmentLighting) {
     const funcNameFillSurfaceDataSG = 'lib_fillSurfaceDataSG';
     const that = this;
     const pb = scope.$builder;
     super.fillSurfaceData(scope, envLight);
     // surface data contains F0, metallic, roughness
-    pb.func(
-      funcNameFillSurfaceDataSG,
-      [],
-      function () {
-        this.surfaceData.f0 = pb.vec4(
-          this.$query(PBRLightModelSG.uniformSpecularFactor).rgb,
-          this.surfaceData.f0.a
+    pb.func(funcNameFillSurfaceDataSG, [], function () {
+      this.surfaceData.f0 = pb.vec4(
+        this.$query(PBRLightModelSG.uniformSpecularFactor).rgb,
+        this.surfaceData.f0.a
+      );
+      this.surfaceData.roughness = this.$query(PBRLightModelSG.uniformGlossinessFactor);
+      if (that.specularMap) {
+        const texCoord = this.$inputs[`texcoord${that.specularMapTexCoord ?? that.albedoMapTexCoord}`];
+        this.$l.t = pb.textureSample(this[that.getTextureUniformName(TEX_NAME_SPECULAR)], texCoord);
+        this.surfaceData.roughness = pb.mul(this.surfaceData.roughness, this.t.a);
+        this.surfaceData.f0 = pb.mul(this.surfaceData.f0, pb.vec4(this.t.rgb, 1));
+      }
+      this.surfaceData.roughness = pb.sub(1, this.surfaceData.roughness);
+      this.surfaceData.metallic = pb.max(
+        pb.max(this.surfaceData.f0.r, this.surfaceData.f0.g),
+        this.surfaceData.f0.b
+      );
+      if (envLight) {
+        this.surfaceData.ggxLutSample = pb.clamp(
+          pb.textureSample(this.ggxLut, pb.vec2(this.surfaceData.NdotV, this.surfaceData.roughness)),
+          pb.vec4(0),
+          pb.vec4(1)
         );
-        this.surfaceData.roughness = this.$query(PBRLightModelSG.uniformGlossinessFactor);
-        if (that.specularMap) {
-          const texCoord = this.$inputs[`texcoord${that.specularMapTexCoord ?? that.albedoMapTexCoord}`];
-          this.$l.t = pb.textureSample(this[that.getTextureUniformName(TEX_NAME_SPECULAR)], texCoord);
-          this.surfaceData.roughness = pb.mul(this.surfaceData.roughness, this.t.a);
-          this.surfaceData.f0 = pb.mul(this.surfaceData.f0, pb.vec4(this.t.rgb, 1));
-        }
-        this.surfaceData.roughness = pb.sub(1, this.surfaceData.roughness);
-        this.surfaceData.metallic = pb.max(
-          pb.max(this.surfaceData.f0.r, this.surfaceData.f0.g),
-          this.surfaceData.f0.b
+      }
+      this.surfaceData.diffuse = pb.vec4(
+        pb.mul(this.surfaceData.diffuse.rgb, pb.sub(1, this.surfaceData.metallic)),
+        this.surfaceData.diffuse.a
+      );
+      this.surfaceData.specularWeight = pb.float(1);
+      if (that._clearcoat) {
+        this.surfaceData.clearcoatFresnel = fresnelSchlick(
+          this,
+          this.surfaceData.clearcoatNdotV,
+          this.surfaceData.f0.rgb,
+          this.surfaceData.f90
         );
-        if (envLight) {
-          this.surfaceData.ggxLutSample = pb.clamp(pb.textureSample(this.ggxLut, pb.vec2(this.surfaceData.NdotV, this.surfaceData.roughness)), pb.vec4(0), pb.vec4(1));
-        }
-        this.surfaceData.diffuse = pb.vec4(
-          pb.mul(this.surfaceData.diffuse.rgb, pb.sub(1, this.surfaceData.metallic)),
-          this.surfaceData.diffuse.a
-        );
-        this.surfaceData.specularWeight = pb.float(1);
-        if (that._clearcoat) {
-          this.surfaceData.clearcoatFresnel = fresnelSchlick(
+      }
+      if (envLight?.hasIrradiance()) {
+        this.surfaceData.irradiance = envLight.getIrradiance(this, this.surfaceData.normal);
+      } else {
+        this.surfaceData.irradiance = pb.vec3(0);
+      }
+      if (envLight?.hasRadiance()) {
+        this.$l.refl = pb.reflect(pb.neg(this.surfaceData.viewVec), this.surfaceData.normal);
+        this.surfaceData.radiance = envLight.getRadiance(this, this.refl, this.surfaceData.roughness);
+        if (that.useClearcoat) {
+          this.$l.ccRefl = pb.reflect(pb.neg(this.surfaceData.viewVec), this.surfaceData.clearcoatNormal);
+          this.surfaceData.radianceClearcoat = envLight.getRadiance(
             this,
-            this.surfaceData.clearcoatNdotV,
-            this.surfaceData.f0.rgb,
-            this.surfaceData.f90
+            this.ccRefl,
+            this.surfaceData.clearcoatFactor.y
           );
         }
-        if (envLight?.hasIrradiance()) {
-          this.surfaceData.irradiance = envLight.getIrradiance(this, this.surfaceData.normal);
-        } else {
-          this.surfaceData.irradiance = pb.vec3(0);
-        }
-        if (envLight?.hasRadiance()) {
-          this.$l.refl = pb.reflect(pb.neg(this.surfaceData.viewVec), this.surfaceData.normal);
-          this.surfaceData.radiance = envLight.getRadiance(this, this.refl, this.surfaceData.roughness);
-          if (that.useClearcoat) {
-            this.$l.ccRefl = pb.reflect(pb.neg(this.surfaceData.viewVec), this.surfaceData.clearcoatNormal);
-            this.surfaceData.radianceClearcoat = envLight.getRadiance(this, this.ccRefl, this.surfaceData.clearcoatFactor.y);
-          }
-        } else {
-          this.surfaceData.radiance = pb.vec3(0);
-          if (that.useClearcoat) {
-            this.surfaceData.radianceClearcoat = pb.vec3(0);
-          }
+      } else {
+        this.surfaceData.radiance = pb.vec3(0);
+        if (that.useClearcoat) {
+          this.surfaceData.radianceClearcoat = pb.vec3(0);
         }
       }
-    );
+    });
     pb.getGlobalScope()[funcNameFillSurfaceDataSG]();
   }
   /**
@@ -2400,98 +2615,97 @@ export class PBRLightModelMR extends PBRLightModelBase {
    * {@inheritDoc LightModel.fillSurfaceData}
    * @override
    */
-  protected fillSurfaceData(
-    scope: PBInsideFunctionScope,
-    envLight: EnvironmentLighting
-  ) {
+  protected fillSurfaceData(scope: PBInsideFunctionScope, envLight: EnvironmentLighting) {
     const funcNameFillSurfaceDataMR = 'lib_fillSurfaceDataMR';
     const that = this;
     const pb = scope.$builder;
     super.fillSurfaceData(scope, envLight);
     // surface data contains F0, metallic, roughness
-    pb.func(
-      funcNameFillSurfaceDataMR,
-      [],
-      function () {
-        const metallicMap = that.metallicMap ? this[that.getTextureUniformName(TEX_NAME_METALLIC)] : null;
-        const specularMap = that.specularMap ? this[that.getTextureUniformName(TEX_NAME_SPECULAR)] : null;
-        const specularColorMap = that.specularColorMap
-          ? this[that.getTextureUniformName(TEX_NAME_SPECULAR_COLOR)]
-          : null;
-        const metallicFactor = this.$query(PBRLightModelMR.uniformMetallic);
-        const roughnessFactor = this.$query(PBRLightModelMR.uniformRoughness);
-        if (metallicMap) {
-          const texCoord = this.$inputs[`texcoord${that.metallicMapTexCoord ?? that.albedoMapTexCoord}`];
-          this.$l.t = pb.textureSample(metallicMap, texCoord);
-          const metallic = this.t['xyzw'[that._metallicIndex] || 'z'];
-          const roughness = this.t['xyzw'[that._roughnessIndex] || 'y'];
-          this.surfaceData.metallic = metallicFactor ? pb.mul(metallic, metallicFactor) : metallic;
-          this.surfaceData.roughness = roughnessFactor ? pb.mul(roughness, roughnessFactor) : roughness;
-        } else {
-          this.surfaceData.metallic = metallicFactor;
-          this.surfaceData.roughness = roughnessFactor;
-        }
-        if (envLight) {
-          this.surfaceData.ggxLutSample = pb.textureSample(this.ggxLut, pb.vec2(this.surfaceData.NdotV, this.surfaceData.roughness));
-        }
-        const specularFactor = this.$query(PBRLightModelMR.uniformSpecularFactor);
-        this.$l.specularColorFactor = specularFactor.rgb;
-        this.surfaceData.specularWeight = specularFactor.a;
-        if (specularColorMap) {
-          const texCoord =
-            this.$inputs[`texcoord${that.specularColorMapTexCoord ?? that.albedoMapTexCoord}`];
-          this.specularColorFactor = pb.mul(
-            this.specularColorFactor,
-            pb.textureSample(specularColorMap, texCoord).rgb
-          );
-        }
-        if (specularMap) {
-          const texCoord = this.$inputs[`texcoord${that.specularMapTexCoord ?? that.albedoMapTexCoord}`];
-          this.surfaceData.specularWeight = pb.mul(
-            this.surfaceData.specularWeight,
-            pb.textureSample(specularMap, texCoord).a
-          );
-        }
-        this.surfaceData.f0 = pb.vec4(
-          pb.mix(
-            pb.min(pb.mul(this.surfaceData.f0.rgb, this.specularColorFactor), pb.vec3(1)),
-            this.surfaceData.diffuse.rgb,
-            this.surfaceData.metallic
-          ),
-          this.surfaceData.f0.a
+    pb.func(funcNameFillSurfaceDataMR, [], function () {
+      const metallicMap = that.metallicMap ? this[that.getTextureUniformName(TEX_NAME_METALLIC)] : null;
+      const specularMap = that.specularMap ? this[that.getTextureUniformName(TEX_NAME_SPECULAR)] : null;
+      const specularColorMap = that.specularColorMap
+        ? this[that.getTextureUniformName(TEX_NAME_SPECULAR_COLOR)]
+        : null;
+      const metallicFactor = this.$query(PBRLightModelMR.uniformMetallic);
+      const roughnessFactor = this.$query(PBRLightModelMR.uniformRoughness);
+      if (metallicMap) {
+        const texCoord = this.$inputs[`texcoord${that.metallicMapTexCoord ?? that.albedoMapTexCoord}`];
+        this.$l.t = pb.textureSample(metallicMap, texCoord);
+        const metallic = this.t['xyzw'[that._metallicIndex] || 'z'];
+        const roughness = this.t['xyzw'[that._roughnessIndex] || 'y'];
+        this.surfaceData.metallic = metallicFactor ? pb.mul(metallic, metallicFactor) : metallic;
+        this.surfaceData.roughness = roughnessFactor ? pb.mul(roughness, roughnessFactor) : roughness;
+      } else {
+        this.surfaceData.metallic = metallicFactor;
+        this.surfaceData.roughness = roughnessFactor;
+      }
+      if (envLight) {
+        this.surfaceData.ggxLutSample = pb.textureSample(
+          this.ggxLut,
+          pb.vec2(this.surfaceData.NdotV, this.surfaceData.roughness)
         );
-        this.surfaceData.diffuse = pb.vec4(
-          pb.mix(this.surfaceData.diffuse.rgb, pb.vec3(0), this.surfaceData.metallic),
-          this.surfaceData.diffuse.a
+      }
+      const specularFactor = this.$query(PBRLightModelMR.uniformSpecularFactor);
+      this.$l.specularColorFactor = specularFactor.rgb;
+      this.surfaceData.specularWeight = specularFactor.a;
+      if (specularColorMap) {
+        const texCoord = this.$inputs[`texcoord${that.specularColorMapTexCoord ?? that.albedoMapTexCoord}`];
+        this.specularColorFactor = pb.mul(
+          this.specularColorFactor,
+          pb.textureSample(specularColorMap, texCoord).rgb
         );
-        if (that._clearcoat) {
-          this.surfaceData.clearcoatFresnel = fresnelSchlick(
+      }
+      if (specularMap) {
+        const texCoord = this.$inputs[`texcoord${that.specularMapTexCoord ?? that.albedoMapTexCoord}`];
+        this.surfaceData.specularWeight = pb.mul(
+          this.surfaceData.specularWeight,
+          pb.textureSample(specularMap, texCoord).a
+        );
+      }
+      this.surfaceData.f0 = pb.vec4(
+        pb.mix(
+          pb.min(pb.mul(this.surfaceData.f0.rgb, this.specularColorFactor), pb.vec3(1)),
+          this.surfaceData.diffuse.rgb,
+          this.surfaceData.metallic
+        ),
+        this.surfaceData.f0.a
+      );
+      this.surfaceData.diffuse = pb.vec4(
+        pb.mix(this.surfaceData.diffuse.rgb, pb.vec3(0), this.surfaceData.metallic),
+        this.surfaceData.diffuse.a
+      );
+      if (that._clearcoat) {
+        this.surfaceData.clearcoatFresnel = fresnelSchlick(
+          this,
+          this.surfaceData.clearcoatNdotV,
+          this.surfaceData.f0.rgb,
+          this.surfaceData.f90
+        );
+      }
+      if (envLight?.hasIrradiance()) {
+        this.surfaceData.irradiance = envLight.getIrradiance(this, this.surfaceData.normal);
+      } else {
+        this.surfaceData.irradiance = pb.vec3(0);
+      }
+      if (envLight?.hasRadiance()) {
+        this.$l.refl = pb.reflect(pb.neg(this.surfaceData.viewVec), this.surfaceData.normal);
+        this.surfaceData.radiance = envLight.getRadiance(this, this.refl, this.surfaceData.roughness);
+        if (that.useClearcoat) {
+          this.$l.ccRefl = pb.reflect(pb.neg(this.surfaceData.viewVec), this.surfaceData.clearcoatNormal);
+          this.surfaceData.radianceClearcoat = envLight.getRadiance(
             this,
-            this.surfaceData.clearcoatNdotV,
-            this.surfaceData.f0.rgb,
-            this.surfaceData.f90
+            this.ccRefl,
+            this.surfaceData.clearcoatFactor.y
           );
         }
-        if (envLight?.hasIrradiance()) {
-          this.surfaceData.irradiance = envLight.getIrradiance(this, this.surfaceData.normal);
-        } else {
-          this.surfaceData.irradiance = pb.vec3(0);
-        }
-        if (envLight?.hasRadiance()) {
-          this.$l.refl = pb.reflect(pb.neg(this.surfaceData.viewVec), this.surfaceData.normal);
-          this.surfaceData.radiance = envLight.getRadiance(this, this.refl, this.surfaceData.roughness);
-          if (that.useClearcoat) {
-            this.$l.ccRefl = pb.reflect(pb.neg(this.surfaceData.viewVec), this.surfaceData.clearcoatNormal);
-            this.surfaceData.radianceClearcoat = envLight.getRadiance(this, this.ccRefl, this.surfaceData.clearcoatFactor.y);
-          }
-        } else {
-          this.surfaceData.radiance = pb.vec3(0);
-          if (that.useClearcoat) {
-            this.surfaceData.radianceClearcoat = pb.vec3(0);
-          }
+      } else {
+        this.surfaceData.radiance = pb.vec3(0);
+        if (that.useClearcoat) {
+          this.surfaceData.radianceClearcoat = pb.vec3(0);
         }
       }
-    );
+    });
     pb.getGlobalScope()[funcNameFillSurfaceDataMR]();
   }
   /**

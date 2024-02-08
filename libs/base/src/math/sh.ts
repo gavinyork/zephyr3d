@@ -1,8 +1,8 @@
-import { Vector3 } from "./vector";
+import { Vector3 } from './vector';
 
 /**
  * Spherical harmonics utilities
- * 
+ *
  * @public
  */
 export class SH {
@@ -12,10 +12,10 @@ export class SH {
   static readonly MAX_ORDER = 3;
   /**
    * Evaluate SH basis for specific order
-   * 
+   *
    * @param direction - Direction to evaluate, must be normalized
    * @param order - SH order
-   * 
+   *
    * @returns The SH basis evaluate at given direction
    */
   static evalBasis(direction: Vector3, order: number): number[] {
@@ -42,7 +42,7 @@ export class SH {
       // L=2, M=-1
       out[5] = -1.0925484306 * y * z;
       // L=2, M=0
-      out[6] = 0.9461746956 * z * z + -0.3153915652
+      out[6] = 0.9461746956 * z * z + -0.3153915652;
       // L=2, M=1
       out[7] = -1.0925484306 * x * z;
       // L=2, M=2
@@ -52,11 +52,11 @@ export class SH {
   }
   /**
    * Evaluates a directional light and returns spectral SH data
-   * 
+   *
    * @param direction - Direction of the light
    * @param color - Light color
    * @param order - SH order
-   * 
+   *
    * @returns Evaluated SH data
    */
   static evalDirectionLight(direction: Vector3, color: Vector3, order: number): Vector3[] {
@@ -78,5 +78,3 @@ export class SH {
     return result;
   }
 }
-  
-  

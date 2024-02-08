@@ -10,7 +10,7 @@ import type { DrawContext } from '../render';
  * @public
  */
 export class LambertMaterial extends applyMaterialMixins(LitMaterial, mixinVertexColor, mixinAlbedoColor) {
-  constructor(){
+  constructor() {
     super();
   }
   vertexShader(scope: PBFunctionScope, ctx: DrawContext) {
@@ -32,7 +32,7 @@ export class LambertMaterial extends applyMaterialMixins(LitMaterial, mixinVerte
       if (this.needCalculateEnvLight(ctx)) {
         scope.color = pb.add(scope.color, this.getEnvLightIrradiance(scope, scope.normal, ctx));
       }
-      this.forEachLight(scope, ctx, function(type, posRange, dirCutoff, colorIntensity, shadow){
+      this.forEachLight(scope, ctx, function (type, posRange, dirCutoff, colorIntensity, shadow) {
         this.$l.lightAtten = that.calculateLightAttenuation(this, type, posRange, dirCutoff);
         this.$l.lightDir = that.calculateLightDirection(this, type, posRange, dirCutoff);
         this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);

@@ -1,4 +1,4 @@
-import type { PBInsideFunctionScope, PBShaderExp } from "@zephyr3d/device";
+import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 
 /**
  * Generate single float noise from a vec2
@@ -28,10 +28,7 @@ export function noisef(scope: PBInsideFunctionScope, p: PBShaderExp) {
     this.$return(
       pb.add(
         -1,
-        pb.mul(
-          2,
-          pb.mix(pb.mix(this.h1, this.h2, this.u.x), pb.mix(this.h3, this.h4, this.u.x), this.u.y)
-        )
+        pb.mul(2, pb.mix(pb.mix(this.h1, this.h2, this.u.x), pb.mix(this.h3, this.h4, this.u.x), this.u.y))
       )
     );
   });
@@ -48,17 +45,35 @@ export function noisef(scope: PBInsideFunctionScope, p: PBShaderExp) {
  *
  * @public
  */
-export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq: PBShaderExp|number): PBShaderExp {
+export function worleyNoise(
+  scope: PBInsideFunctionScope,
+  uv: PBShaderExp,
+  freq: PBShaderExp | number
+): PBShaderExp {
   const pb = scope.$builder;
   const funcNameHash = 'lib_worleyHash';
   // https://www.shadertoy.com/view/4sc3z2
-  pb.func(funcNameHash, [pb.vec3('p')], function(){
+  pb.func(funcNameHash, [pb.vec3('p')], function () {
     /* eslint-disable no-constant-condition */
     if (1) {
       this.$l.mod3 = pb.vec3(0.1031, 0.11369, 0.13787);
       this.$l.p3 = pb.fract(pb.mul(this.p, this.mod3));
       this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.yxz, pb.vec3(19.19))));
-      this.$return(pb.sub(pb.mul(pb.fract(pb.vec3(pb.mul(pb.add(this.p3.x, this.p3.y), this.p3.z), pb.mul(pb.add(this.p3.x, this.p3.z), this.p3.y), pb.mul(pb.add(this.p3.y, this.p3.z), this.p3.x))), 2), 1));
+      this.$return(
+        pb.sub(
+          pb.mul(
+            pb.fract(
+              pb.vec3(
+                pb.mul(pb.add(this.p3.x, this.p3.y), this.p3.z),
+                pb.mul(pb.add(this.p3.x, this.p3.z), this.p3.y),
+                pb.mul(pb.add(this.p3.y, this.p3.z), this.p3.x)
+              )
+            ),
+            2
+          ),
+          1
+        )
+      );
     } else {
       this.$l.UI0 = pb.uint(1597334673);
       this.$l.UI1 = pb.uint(3812015801);
@@ -71,17 +86,20 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
     }
   });
   const funcNameNoise = 'lib_worleyNoise';
-  pb.func(funcNameNoise, [pb.vec3('uv'), pb.float('freq')], function(){
+  pb.func(funcNameNoise, [pb.vec3('uv'), pb.float('freq')], function () {
     this.$l.id = pb.floor(this.uv);
     this.$l.p = pb.fract(this.uv);
     this.$l.minDist = pb.float(10000);
-    this.$for(pb.int('x'), -1, 2, function(){
-      this.$for(pb.int('y'), -1, 2, function(){
-        this.$for(pb.int('z'), -1, 2, function(){
+    this.$for(pb.int('x'), -1, 2, function () {
+      this.$for(pb.int('y'), -1, 2, function () {
+        this.$for(pb.int('z'), -1, 2, function () {
           this.$l.offset = pb.vec3(pb.float(this.x), pb.float(this.y), pb.float(this.z));
           /* eslint-disable no-constant-condition */
           if (1 /* tilable */) {
-            this.$l.h = pb.add(pb.mul(this[funcNameHash](pb.mod(pb.add(this.id, this.offset), pb.vec3(this.freq))), 0.4), pb.vec3(0.3));
+            this.$l.h = pb.add(
+              pb.mul(this[funcNameHash](pb.mod(pb.add(this.id, this.offset), pb.vec3(this.freq))), 0.4),
+              pb.vec3(0.3)
+            );
           } else {
             this.$l.h = pb.add(pb.mul(this[funcNameHash](pb.add(this.id, this.offset)), 0.4), pb.vec3(0.3));
           }
@@ -105,10 +123,14 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
  *
  * @public
  */
-export function worleyFBM(scope: PBInsideFunctionScope, p: PBShaderExp, freq: PBShaderExp|number): PBShaderExp {
+export function worleyFBM(
+  scope: PBInsideFunctionScope,
+  p: PBShaderExp,
+  freq: PBShaderExp | number
+): PBShaderExp {
   const pb = scope.$builder;
   const funcName = 'lib_worleyFBM';
-  pb.func(funcName, [pb.vec3('p'), pb.float('freq')], function(){
+  pb.func(funcName, [pb.vec3('p'), pb.float('freq')], function () {
     this.$l.n1 = worleyNoise(this, pb.mul(this.p, this.freq), this.freq);
     this.$l.n2 = worleyNoise(this, pb.mul(this.p, this.freq, 2), pb.mul(this.freq, 2));
     this.$l.n3 = worleyNoise(this, pb.mul(this.p, this.freq, 4), pb.mul(this.freq, 4));
@@ -129,7 +151,7 @@ export function worleyFBM(scope: PBInsideFunctionScope, p: PBShaderExp, freq: PB
 export function noise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
   const pb = scope.$builder;
   const funcName = 'lib_noise3d';
-  pb.func(funcName, [pb.vec3('p')], function(){
+  pb.func(funcName, [pb.vec3('p')], function () {
     this.$l.p3 = pb.fract(pb.mul(this.p, 0.1031));
     this.$l.p3 = pb.add(this.p3, pb.vec3(pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33)))));
     this.$return(pb.fract(pb.mul(pb.add(this.p3.x, this.p3.y), this.p3.z)));
@@ -148,7 +170,7 @@ export function noise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderE
 export function smoothNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
   const pb = scope.$builder;
   const funcName = 'lib_smoothNoise3D';
-  pb.func(funcName, [pb.vec3('p')], function(){
+  pb.func(funcName, [pb.vec3('p')], function () {
     this.$l.cell = pb.floor(this.p);
     this.$l.local = pb.fract(this.p);
     this.$l.local = pb.mul(this.local, pb.mul(this.local, pb.sub(pb.vec3(3), pb.mul(this.local, 2))));
@@ -160,10 +182,21 @@ export function smoothNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBS
     this.$l.rub = noise3D(this, pb.add(this.cell, pb.vec3(1, 1, 0)));
     this.$l.luf = noise3D(this, pb.add(this.cell, pb.vec3(0, 1, 1)));
     this.$l.ruf = noise3D(this, pb.add(this.cell, pb.vec3(1, 1, 1)));
-    this.$return(pb.mix(
-      pb.mix(pb.mix(this.ldb, this.rdb, this.local.x), pb.mix(this.ldf, this.rdf, this.local.x), this.local.z),
-      pb.mix(pb.mix(this.lub, this.rub, this.local.x), pb.mix(this.luf, this.ruf, this.local.x), this.local.z),
-      this.local.y));
+    this.$return(
+      pb.mix(
+        pb.mix(
+          pb.mix(this.ldb, this.rdb, this.local.x),
+          pb.mix(this.ldf, this.rdf, this.local.x),
+          this.local.z
+        ),
+        pb.mix(
+          pb.mix(this.lub, this.rub, this.local.x),
+          pb.mix(this.luf, this.ruf, this.local.x),
+          this.local.z
+        ),
+        this.local.y
+      )
+    );
   });
   return pb.getGlobalScope()[funcName](p);
 }

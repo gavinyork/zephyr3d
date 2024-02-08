@@ -5,7 +5,8 @@ import type {
   GPUDataBuffer,
   TextureFormat
 } from '@zephyr3d/device';
-import { linearTextureFormatToSRGB,
+import {
+  linearTextureFormatToSRGB,
   getTextureFormatBlockWidth,
   getTextureFormatBlockHeight,
   getTextureFormatBlockSize,
@@ -67,7 +68,15 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
       this.uploadImageData(data, srcX, srcY, width, height, destX, destY, 0, 0);
     }
   }
-  async readPixels(x: number, y: number, w: number, h: number, faceOrLayer: number, mipLevel: number, buffer: TypedArray): Promise<void> {
+  async readPixels(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    faceOrLayer: number,
+    mipLevel: number,
+    buffer: TypedArray
+  ): Promise<void> {
     if (faceOrLayer !== 0) {
       throw new Error(`Texture2D.readPixels(): parameter faceOrLayer must be 0`);
     }
@@ -94,7 +103,15 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
     );
     tmpBuffer.dispose();
   }
-  readPixelsToBuffer(x: number, y: number, w: number, h: number, faceOrLayer: number, mipLevel: number, buffer: GPUDataBuffer) {
+  readPixelsToBuffer(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    faceOrLayer: number,
+    mipLevel: number,
+    buffer: GPUDataBuffer
+  ) {
     if (faceOrLayer !== 0) {
       throw new Error(`Texture2D.readPixels(): parameter faceOrLayer must be 0`);
     }

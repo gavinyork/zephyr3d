@@ -1,13 +1,18 @@
 import { Vector4 } from '@zephyr3d/base';
-import type { BindGroup, PBInsideFunctionScope, PBShaderExp, ProgramBuilder, TextureCube } from '@zephyr3d/device';
+import type {
+  BindGroup,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  ProgramBuilder,
+  TextureCube
+} from '@zephyr3d/device';
 import { Application } from '../app';
 
 /**
  * Environment light type
  * @public
  */
-export type EnvLightType = 'ibl'|'hemisphere'|'constant'|'none';
-
+export type EnvLightType = 'ibl' | 'hemisphere' | 'constant' | 'none';
 
 /**
  * Base class for any kind of environment light
@@ -54,7 +59,7 @@ export abstract class EnvironmentLighting {
    * Returns whether this environment lighting supports diffuse light
    */
   abstract hasIrradiance(): boolean;
-   /**
+  /**
    * Whether this is an instance of EnvIBL
    * @returns true if this is an instance of EnvIBL
    */
@@ -131,7 +136,10 @@ export class EnvIBL extends EnvironmentLighting {
     if (pb.shaderKind === 'fragment') {
       pb.getGlobalScope().iblRadianceMap = pb.texCube().uniform(0).tag(EnvIBL.USAGE_IBL_RADIANCE_MAP);
       pb.getGlobalScope().iblIrradianceMap = pb.texCube().uniform(0).tag(EnvIBL.USAGE_IBL_IRRADIANCE_MAP);
-      pb.getGlobalScope().radianceMaxLod = pb.float('radianceMaxLod').uniform(0).tag(EnvIBL.USAGE_IBL_RADIANCE_MAP_MAX_LOD);
+      pb.getGlobalScope().radianceMaxLod = pb
+        .float('radianceMaxLod')
+        .uniform(0)
+        .tag(EnvIBL.USAGE_IBL_RADIANCE_MAP_MAX_LOD);
     }
   }
   /**
@@ -154,8 +162,8 @@ export class EnvIBL extends EnvironmentLighting {
   getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     return Application.instance.device.getDeviceCaps().shaderCaps.supportShaderTextureLod
-    ? pb.textureSampleLevel(scope.iblRadianceMap, refl, pb.mul(roughness, scope.radianceMaxLod)).rgb
-    : pb.textureSample(scope.iblRadianceMap, refl).rgb;
+      ? pb.textureSampleLevel(scope.iblRadianceMap, refl, pb.mul(roughness, scope.radianceMaxLod)).rgb
+      : pb.textureSample(scope.iblRadianceMap, refl).rgb;
   }
   /**
    * {@inheritDoc EnvironmentLighting.getIrradiance}
@@ -229,7 +237,10 @@ export class EnvConstantAmbient extends EnvironmentLighting {
    */
   initShaderBindings(pb: ProgramBuilder): void {
     if (pb.shaderKind === 'fragment') {
-      pb.getGlobalScope().ambientLight = pb.vec4().uniform(0).tag(EnvConstantAmbient.USAGE_CONSTANT_AMBIENT_LIGHTING);
+      pb.getGlobalScope().ambientLight = pb
+        .vec4()
+        .uniform(0)
+        .tag(EnvConstantAmbient.USAGE_CONSTANT_AMBIENT_LIGHTING);
     }
   }
   /**
@@ -280,7 +291,7 @@ export class EnvConstantAmbient extends EnvironmentLighting {
  * Hemispheric ambient light
  * @public
  */
- export class EnvHemisphericAmbient extends EnvironmentLighting {
+export class EnvHemisphericAmbient extends EnvironmentLighting {
   /** @internal */
   public static readonly USAGE_CONSTANT_AMBIENT_UP = 'usage_env_ambient_up';
   /** @internal */
@@ -332,8 +343,14 @@ export class EnvConstantAmbient extends EnvironmentLighting {
    */
   initShaderBindings(pb: ProgramBuilder): void {
     if (pb.shaderKind === 'fragment') {
-      pb.getGlobalScope().ambientUp = pb.vec4().uniform(0).tag(EnvHemisphericAmbient.USAGE_CONSTANT_AMBIENT_UP);
-      pb.getGlobalScope().ambientDown = pb.vec4().uniform(0).tag(EnvHemisphericAmbient.USAGE_CONSTANT_AMBIENT_DOWN);
+      pb.getGlobalScope().ambientUp = pb
+        .vec4()
+        .uniform(0)
+        .tag(EnvHemisphericAmbient.USAGE_CONSTANT_AMBIENT_UP);
+      pb.getGlobalScope().ambientDown = pb
+        .vec4()
+        .uniform(0)
+        .tag(EnvHemisphericAmbient.USAGE_CONSTANT_AMBIENT_DOWN);
     }
   }
   /**

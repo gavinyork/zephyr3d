@@ -166,7 +166,7 @@ void main (void) {
 */
 
 export function testSH() {
-/*
+  /*
   function randVec(): Vector3 {
     return new Vector3(randNonZero(), randNonZero(), randNonZero());
   }

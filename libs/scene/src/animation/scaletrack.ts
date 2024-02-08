@@ -1,7 +1,7 @@
-import type { InterpolationMode} from "@zephyr3d/base";
-import { Interpolator, Vector3 } from "@zephyr3d/base";
-import { AnimationTrack } from "./animationtrack";
-import type { SceneNode } from "../scene";
+import type { InterpolationMode } from '@zephyr3d/base';
+import { Interpolator, Vector3 } from '@zephyr3d/base';
+import { AnimationTrack } from './animationtrack';
+import type { SceneNode } from '../scene';
 
 // Reduce gc
 const tmpVec3 = new Vector3();
@@ -21,15 +21,18 @@ export class ScaleTrack extends AnimationTrack {
    * @param mode - The interpolation mode of keyframes
    * @param keyFrames - Keyframe values
    */
-  constructor(mode: InterpolationMode, keyFrames: { time: number, value: Vector3 }[]);
-  constructor(modeOrInterpolator?: Interpolator|InterpolationMode, keyFrames?: { time: number, value: Vector3 }[]) {
+  constructor(mode: InterpolationMode, keyFrames: { time: number; value: Vector3 }[]);
+  constructor(
+    modeOrInterpolator?: Interpolator | InterpolationMode,
+    keyFrames?: { time: number; value: Vector3 }[]
+  ) {
     if (modeOrInterpolator instanceof Interpolator) {
       if (modeOrInterpolator.target !== 'vec3') {
         throw new Error(`ScaleTrack(): interpolator target must be 'vec3'`);
       }
       super(modeOrInterpolator);
     } else {
-      const inputs = new Float32Array(keyFrames.map(val => val.time));
+      const inputs = new Float32Array(keyFrames.map((val) => val.time));
       const outputs = new Float32Array(keyFrames.length * 3);
       for (let i = 0; i < keyFrames.length; i++) {
         outputs[i * 3 + 0] = keyFrames[i].value.x;

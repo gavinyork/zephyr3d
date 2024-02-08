@@ -68,7 +68,7 @@ export class ListIterator<T = unknown> {
    *
    * @public
    */
-   prev(): ListIterator<T> {
+  prev(): ListIterator<T> {
     if (!this.valid()) {
       throw new Error('ListIterator.prev(): iterator is invalid');
     }
@@ -85,7 +85,7 @@ export class ListIterator<T = unknown> {
    *
    * @public
    */
-   getPrev(): ListIterator<T> {
+  getPrev(): ListIterator<T> {
     if (!this.valid()) {
       throw new Error('ListIterator.getPrev(): iterator is invalid');
     }
@@ -253,7 +253,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-   forEachReverse(callback: (data: T) => void) {
+  forEachReverse(callback: (data: T) => void) {
     if (callback) {
       for (let it = this.rbegin(); it.valid(); it.next()) {
         callback(it.data);
@@ -284,7 +284,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-   back(): T {
+  back(): T {
     if (this.length === 0) {
       throw new Error('List.back(): list is empty');
     }
@@ -305,7 +305,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-   end(): ListIterator<T> {
+  end(): ListIterator<T> {
     return new ListIterator(this, this._head, false);
   }
   /**

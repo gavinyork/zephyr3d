@@ -1,4 +1,4 @@
-import type { InterpolationMode} from '@zephyr3d/base';
+import type { InterpolationMode } from '@zephyr3d/base';
 import { Vector3, Vector4, Matrix4x4, Quaternion, Interpolator } from '@zephyr3d/base';
 import type {
   AssetHierarchyNode,
@@ -13,19 +13,14 @@ import type {
   MaterialTextureInfo,
   AssetPBRMaterialCommon
 } from '../../model';
-import {
-  SharedModel,
-  AssetSkeleton,
-  AssetScene
-} from '../../model';
+import { SharedModel, AssetSkeleton, AssetScene } from '../../model';
 import { BoundingBox } from '../../../utility/bounding_volume';
 import { Primitive } from '../../../render/primitive';
-import type {
-  Material as M} from '../../../material';
+import type { Material as M } from '../../../material';
 import {
   UnlitMaterial,
   PBRMetallicRoughnessMaterial,
-  PBRSpecularGlossinessMaterial,
+  PBRSpecularGlossinessMaterial
 } from '../../../material';
 import { ComponentType, GLTFAccessor } from './helpers';
 import { AbstractModelLoader } from '../loader';
@@ -37,7 +32,7 @@ import type {
   IndexBuffer,
   StructuredBuffer,
   TextureAddressMode,
-  TextureFilterMode,
+  TextureFilterMode
 } from '@zephyr3d/device';
 import type { AssetManager } from '../../assetmanager';
 import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf';
@@ -300,7 +295,7 @@ export class GLTFLoader extends AbstractModelLoader {
     name: string;
     channels: AnimationChannel[];
     samplers: AnimationSampler[];
-    interpolatorTypes: ('translation'|'scale'|'rotation')[];
+    interpolatorTypes: ('translation' | 'scale' | 'rotation')[];
     interpolators: Interpolator[];
     maxTime: number;
     nodes: Map<
@@ -318,7 +313,7 @@ export class GLTFLoader extends AbstractModelLoader {
     const channels = animationInfo.channels;
     const samplers = animationInfo.samplers;
     const interpolators = [] as Interpolator[];
-    const interpolatorTypes = [] as ('translation'|'scale'|'rotation')[];
+    const interpolatorTypes = [] as ('translation' | 'scale' | 'rotation')[];
     const nodes = this.collectNodes(gltf);
     let maxTime = 0;
     for (let i = 0; i < channels.length; i++) {
@@ -502,13 +497,10 @@ export class GLTFLoader extends AbstractModelLoader {
     }
     return mesh;
   }
-  private async _createMaterial(
-    assetManager: AssetManager,
-    assetMaterial: AssetMaterial
-  ): Promise<M> {
+  private async _createMaterial(assetManager: AssetManager, assetMaterial: AssetMaterial): Promise<M> {
     if (assetMaterial.type === 'unlit') {
       const unlitAssetMaterial = assetMaterial as AssetUnlitMaterial;
-      const unlitMaterial = new UnlitMaterial;//new NewLambertMaterial();// new TestLitMaterial();// new UnlitMaterial();
+      const unlitMaterial = new UnlitMaterial(); //new NewLambertMaterial();// new TestLitMaterial();// new UnlitMaterial();
       unlitMaterial.albedoColor = unlitAssetMaterial.diffuse ?? Vector4.one();
       if (unlitAssetMaterial.diffuseMap) {
         unlitMaterial.albedoTexture = unlitAssetMaterial.diffuseMap.texture;
@@ -856,8 +848,13 @@ export class GLTFLoader extends AbstractModelLoader {
     if (assetMaterial.type === 'pbrMetallicRoughness') {
       pbrMetallicRoughness = assetMaterial;
       // KHR_materials_specular extension
-      const specularColorFactor = (materialInfo?.extensions?.KHR_materials_specular?.specularColorFactor ?? [1, 1, 1]) as [number, number, number];
-      pbrMetallicRoughness.specularFactor = new Vector4(...specularColorFactor, materialInfo?.extensions?.KHR_materials_specular?.specularFactor ?? 1);
+      const specularColorFactor = (materialInfo?.extensions?.KHR_materials_specular?.specularColorFactor ?? [
+        1, 1, 1
+      ]) as [number, number, number];
+      pbrMetallicRoughness.specularFactor = new Vector4(
+        ...specularColorFactor,
+        materialInfo?.extensions?.KHR_materials_specular?.specularFactor ?? 1
+      );
       pbrMetallicRoughness.specularMap = materialInfo?.extensions?.KHR_materials_specular?.specularTexture
         ? await this._loadTexture(gltf, materialInfo.extensions.KHR_materials_specular.specularTexture, false)
         : null;

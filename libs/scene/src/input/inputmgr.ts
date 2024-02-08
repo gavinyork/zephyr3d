@@ -11,7 +11,7 @@ type PointerEventData = {
   lastDownTime: number;
   lastMoveX: number;
   lastMoveY: number;
-}
+};
 
 type PointerEventHandler = (this: HTMLElement, ev: PointerEvent) => any;
 type KeyboardEventHandler = (this: HTMLElement, ev: KeyboardEvent) => any;
@@ -130,7 +130,10 @@ export class InputManager {
     }
     return this;
   }
-  private _callMiddlewares(ev: PointerEvent|WheelEvent|KeyboardEvent|DragEvent, type?: string): boolean {
+  private _callMiddlewares(
+    ev: PointerEvent | WheelEvent | KeyboardEvent | DragEvent,
+    type?: string
+  ): boolean {
     for (const handler of this._middlewares) {
       if (handler(ev, type ?? ev.type)) {
         return true;
@@ -140,29 +143,29 @@ export class InputManager {
   }
   private _getPointerCancelHandler() {
     const that = this;
-    return function(ev: PointerEvent) {
+    return function (ev: PointerEvent) {
       const eventData = that._getPointerEventData(ev.pointerId);
       eventData.lastDown = false;
       eventData.lastClick = false;
       if (!that._callMiddlewares(ev)) {
         that._app.dispatchEvent(ev);
       }
-    }
+    };
   }
   private _getPointerMoveHander() {
     const that = this;
-    return function(ev: PointerEvent) {
+    return function (ev: PointerEvent) {
       const eventData = that._getPointerEventData(ev.pointerId);
       eventData.lastMoveX = ev.offsetX;
       eventData.lastMoveY = ev.offsetY;
       if (!that._callMiddlewares(ev)) {
         that._app.dispatchEvent(ev);
       }
-    }
+    };
   }
   private _getPointerDownHandler() {
     const that = this;
-    return function(ev: PointerEvent) {
+    return function (ev: PointerEvent) {
       if (ev.pointerType === 'mouse' && ev.button === 0) {
         that._captureId = ev.pointerId;
         that._app.options.canvas.setPointerCapture(ev.pointerId);
@@ -176,11 +179,11 @@ export class InputManager {
       if (!that._callMiddlewares(ev)) {
         that._app.dispatchEvent(ev);
       }
-    }
+    };
   }
   private _getPointerUpHandler() {
     const that = this;
-    return function(ev: PointerEvent) {
+    return function (ev: PointerEvent) {
       if (ev.pointerType === 'mouse' && ev.button === 0 && that._captureId === ev.pointerId) {
         that._app.options.canvas.releasePointerCapture(ev.pointerId);
         that._captureId = -1;
@@ -227,44 +230,47 @@ export class InputManager {
           eventData.lastClickTime = now;
         }
       }
-    }
+    };
   }
   private _getKeyboardHandler() {
     const that = this;
-    return function(ev: KeyboardEvent) {
+    return function (ev: KeyboardEvent) {
       if (!that._callMiddlewares(ev)) {
         that._app.dispatchEvent(ev);
       }
-    }
+    };
   }
   private _getDragHandler() {
     const that = this;
-    return function(ev: DragEvent) {
+    return function (ev: DragEvent) {
       if (!that._callMiddlewares(ev)) {
         that._app.dispatchEvent(ev);
       }
-    }
+    };
   }
   private _getWheelHandler() {
     const that = this;
-    return function(ev: WheelEvent) {
+    return function (ev: WheelEvent) {
       if (!that._callMiddlewares(ev)) {
         that._app.dispatchEvent(ev);
       }
-    }
+    };
   }
   private _getPointerEventData(pointerId: number): PointerEventData {
-    return this._lastEventDatas[pointerId] ?? (this._lastEventDatas[pointerId] = {
-      lastClick: false,
-      lastClickX: 0,
-      lastClickY: 0,
-      lastClickTime: 0,
-      lastDown: false,
-      lastDownX: 0,
-      lastDownY: 0,
-      lastDownTime: 0,
-      lastMoveX: 0,
-      lastMoveY: 0
-    });
-}
+    return (
+      this._lastEventDatas[pointerId] ??
+      (this._lastEventDatas[pointerId] = {
+        lastClick: false,
+        lastClickX: 0,
+        lastClickY: 0,
+        lastClickTime: 0,
+        lastDown: false,
+        lastDownX: 0,
+        lastDownY: 0,
+        lastDownTime: 0,
+        lastMoveX: 0,
+        lastMoveY: 0
+      })
+    );
+  }
 }

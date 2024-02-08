@@ -1,4 +1,4 @@
-import type { Matrix4x4, AABB} from '@zephyr3d/base';
+import type { Matrix4x4, AABB } from '@zephyr3d/base';
 import { Vector3, Vector4, Ray, makeEventTarget, nextPowerOf2 } from '@zephyr3d/base';
 import { SceneNode } from './scene_node';
 import { Octree } from './octree';
@@ -122,17 +122,23 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
    * @param screenY - The y position on screen
    * @returns The closest object hit by the ray
    */
-  raycast(camera: Camera, screenX: number, screenY: number): { node: GraphNode, dist: number, point: Vector3 } {
+  raycast(
+    camera: Camera,
+    screenX: number,
+    screenY: number
+  ): { node: GraphNode; dist: number; point: Vector3 } {
     const width = camera.viewport ? camera.viewport[2] : Application.instance.device.getViewport().width;
     const height = camera.viewport ? camera.viewport[3] : Application.instance.device.getViewport().height;
     const ray = this.constructRay(camera, width, height, screenX, screenY);
     const raycastVisitor = new RaycastVisitor(ray, camera.getFarPlane());
     this.octree.getRootNode().traverse(raycastVisitor);
-    return raycastVisitor.intersected ? {
-      node: raycastVisitor.intersected,
-      dist: raycastVisitor.intersectedDist,
-      point: raycastVisitor.intersectedPoint
-    } : null;
+    return raycastVisitor.intersected
+      ? {
+          node: raycastVisitor.intersected,
+          dist: raycastVisitor.intersectedDist,
+          point: raycastVisitor.intersectedPoint
+        }
+      : null;
   }
   /**
    * Constructs a ray by a given camera and the position on screen
@@ -246,7 +252,8 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
             Math.abs(worldBox.minPoint.z),
             Math.abs(worldBox.maxPoint.x),
             Math.abs(worldBox.maxPoint.y),
-            Math.abs(worldBox.maxPoint.z));
+            Math.abs(worldBox.maxPoint.z)
+          );
           const rootSize = nextPowerOf2(radius * 2);
           if (rootSize > octree.getRootSize()) {
             octree.initialize(rootSize, octree.getLeafSize());

@@ -1,22 +1,29 @@
-import type { Matrix4x4, Vector4} from "@zephyr3d/base";
-import { Vector2, nextPowerOf2 } from "@zephyr3d/base";
-import { Primitive } from "../../render/primitive";
-import type { BatchDrawable, Drawable, DrawContext } from "../../render/drawable";
-import type { XForm } from "../xform";
-import { GrassMaterial } from "../../material";
-import type { QuadtreeNode } from "./quadtree";
-import { Application } from "../../app";
-import type { Camera } from "../../camera/camera";
-import type { AbstractDevice, IndexBuffer, StructuredBuffer, Texture2D } from "@zephyr3d/device";
-import type { Terrain } from "./terrain";
-import type { GraphNode } from "../graph_node";
+import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
+import { Vector2, nextPowerOf2 } from '@zephyr3d/base';
+import { Primitive } from '../../render/primitive';
+import type { BatchDrawable, Drawable, DrawContext } from '../../render/drawable';
+import type { XForm } from '../xform';
+import { GrassMaterial } from '../../material';
+import type { QuadtreeNode } from './quadtree';
+import { Application } from '../../app';
+import type { Camera } from '../../camera/camera';
+import type { AbstractDevice, IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
+import type { Terrain } from './terrain';
+import type { GraphNode } from '../graph_node';
 
 export class GrassCluster implements Drawable {
   private _primitive: Primitive;
   private _terrain: Terrain;
   private _numInstances: number;
   private _material: GrassMaterial;
-  constructor(device: AbstractDevice, terrain: Terrain, baseVertexBuffer: StructuredBuffer, indexBuffer: IndexBuffer, material: GrassMaterial, grassData: Float32Array) {
+  constructor(
+    device: AbstractDevice,
+    terrain: Terrain,
+    baseVertexBuffer: StructuredBuffer,
+    indexBuffer: IndexBuffer,
+    material: GrassMaterial,
+    grassData: Float32Array
+  ) {
     this._primitive = new Primitive();
     const instanceVertexBuffer = device.createVertexBuffer('tex1_f32x4', grassData);
     this._primitive.setVertexBuffer(baseVertexBuffer, 'vertex');
@@ -68,8 +75,8 @@ export class GrassCluster implements Drawable {
 }
 
 export type GrassLayer = {
-  material: GrassMaterial,
-  clusters: Map<QuadtreeNode, GrassCluster>
+  material: GrassMaterial;
+  clusters: Map<QuadtreeNode, GrassCluster>;
 };
 
 export class GrassManager {
@@ -91,35 +98,71 @@ export class GrassManager {
     }
     const r = bladeWidth * 0.5;
     const t = bladeHeight;
-    const c = r * Math.cos(Math.PI/3);
-    const s = r * Math.sin(Math.PI/3);
+    const c = r * Math.cos(Math.PI / 3);
+    const s = r * Math.sin(Math.PI / 3);
     const vertices = new Float32Array([
-      r, 0, 0,
-      0, 1,
-      r, t, 0,
-      0, 0,
-      -r, t, 0,
-      1, 0,
-      -r, 0, 0,
-      1, 1,
+      r,
+      0,
+      0,
+      0,
+      1,
+      r,
+      t,
+      0,
+      0,
+      0,
+      -r,
+      t,
+      0,
+      1,
+      0,
+      -r,
+      0,
+      0,
+      1,
+      1,
 
-      c, 0, s,
-      0, 1,
-      -c, 0, -s,
-      1, 1,
-      -c, t, -s,
-      1, 0,
-      c, t, s,
-      0, 0,
+      c,
+      0,
+      s,
+      0,
+      1,
+      -c,
+      0,
+      -s,
+      1,
+      1,
+      -c,
+      t,
+      -s,
+      1,
+      0,
+      c,
+      t,
+      s,
+      0,
+      0,
 
-      -c, 0, s,
-      0, 1,
-      c, 0, -s,
-      1, 1,
-      c, t, -s,
-      1, 0,
-      -c, t, s,
-      0, 0
+      -c,
+      0,
+      s,
+      0,
+      1,
+      c,
+      0,
+      -s,
+      1,
+      1,
+      c,
+      t,
+      -s,
+      1,
+      0,
+      -c,
+      t,
+      s,
+      0,
+      0
     ]);
     baseVertexBuffer = device.createInterleavedVertexBuffer(['position_f32x3', 'tex0_f32x2'], vertices);
     this._baseVertexBuffer.set(hash, baseVertexBuffer);
@@ -127,17 +170,27 @@ export class GrassManager {
   }
   getIndexBuffer(device: AbstractDevice) {
     if (!this._indexBuffer) {
-      this._indexBuffer = device.createIndexBuffer(new Uint16Array([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11]));
+      this._indexBuffer = device.createIndexBuffer(
+        new Uint16Array([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11])
+      );
     }
     return this._indexBuffer;
   }
-  addGrassLayer(device: AbstractDevice, terrain: Terrain, density: number[][], bladeWidth: number, bladeHeigh: number, offset: number, grassTexture: Texture2D): GrassLayer {
+  addGrassLayer(
+    device: AbstractDevice,
+    terrain: Terrain,
+    density: number[][],
+    bladeWidth: number,
+    bladeHeigh: number,
+    offset: number,
+    grassTexture: Texture2D
+  ): GrassLayer {
     const densityHeight = density.length;
     const densityWidth = density[0].length;
     const hfScale = terrain.heightFieldScale;
     this._clusterSize = Math.min(nextPowerOf2(this._clusterSize), terrain.width - 1, terrain.height - 1);
     let layer: GrassLayer = null;
-    terrain.traverseQuadtree(node => {
+    terrain.traverseQuadtree((node) => {
       const size = node.getPatch().getStep() * (terrain.patchSize - 1);
       if (size === this._clusterSize) {
         const bbox = node.getPatch().getBoundingBox();
@@ -180,12 +233,23 @@ export class GrassManager {
         if (grassData.length > 0) {
           if (!layer) {
             layer = {
-              material: new GrassMaterial(new Vector2(terrain.scaledWidth, terrain.scaledHeight), terrain.quadtree.normalMap, grassTexture),
+              material: new GrassMaterial(
+                new Vector2(terrain.scaledWidth, terrain.scaledHeight),
+                terrain.quadtree.normalMap,
+                grassTexture
+              ),
               clusters: new Map()
             };
             this._layers.push(layer);
           }
-          const cluster = new GrassCluster(device, terrain, this.getBaseVertexBuffer(device, bladeWidth, bladeHeigh), this.getIndexBuffer(device), layer.material, new Float32Array(grassData));
+          const cluster = new GrassCluster(
+            device,
+            terrain,
+            this.getBaseVertexBuffer(device, bladeWidth, bladeHeigh),
+            this.getIndexBuffer(device),
+            layer.material,
+            new Float32Array(grassData)
+          );
           layer.clusters.set(node, cluster);
           //const cluster = new GrassCluster(device, terrain, this.getBaseVertexBuffer(device, bladeWidth, bladeHeigh), this.getIndexBuffer(device), grassTexture, new Float32Array(grassData));
 

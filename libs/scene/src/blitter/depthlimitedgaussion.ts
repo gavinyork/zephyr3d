@@ -1,4 +1,12 @@
-import type { BindGroup, PBShaderExp, PBInsideFunctionScope, PBGlobalScope, Texture2D, TextureSampler, BaseTexture } from '@zephyr3d/device';
+import type {
+  BindGroup,
+  PBShaderExp,
+  PBInsideFunctionScope,
+  PBGlobalScope,
+  Texture2D,
+  TextureSampler,
+  BaseTexture
+} from '@zephyr3d/device';
 import type { BlitType } from './blitter';
 import { Blitter } from './blitter';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders';
@@ -101,7 +109,8 @@ export class AOBilateralBlurBlitter extends Blitter {
     for (let i = 0; i <= this.kernelRadius; i++) {
       this._offsetsAndWeights[i * 4] = this._uvStep.x * i;
       this._offsetsAndWeights[i * 4 + 1] = this._uvStep.y * i;
-      this._offsetsAndWeights[i * 4 + 2] = Math.exp( - (i * i) / (2 * (this._stdDev * this._stdDev))) / (Math.sqrt(2.0 * Math.PI) * this._stdDev);
+      this._offsetsAndWeights[i * 4 + 2] =
+        Math.exp(-(i * i) / (2 * (this._stdDev * this._stdDev))) / (Math.sqrt(2.0 * Math.PI) * this._stdDev);
     }
   }
   setup(scope: PBGlobalScope, type: BlitType) {
@@ -129,36 +138,44 @@ export class AOBilateralBlurBlitter extends Blitter {
     srcTex: PBShaderExp,
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
-    sampleType: 'float'|'int'|'uint'
+    sampleType: 'float' | 'int' | 'uint'
   ): PBShaderExp {
     const that = this;
     const pb = scope.$builder;
-    pb.func('getLinearDepth', [pb.vec2('uv')], function(){
+    pb.func('getLinearDepth', [pb.vec2('uv')], function () {
       this.$l.depthValue = pb.textureSample(this.depthTex, this.uv);
-      this.$return(pb.getDevice().type === 'webgl' ? decodeNormalizedFloatFromRGBA(this, this.depthValue) : this.depthValue.r);
+      this.$return(
+        pb.getDevice().type === 'webgl'
+          ? decodeNormalizedFloatFromRGBA(this, this.depthValue)
+          : this.depthValue.r
+      );
     });
     scope.depth = scope.getLinearDepth(srcUV);
     scope.weightSum = scope.offsetsAndWeights[0].z;
     scope.srcTexel = that.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
     scope.ao = that._packed ? decodeNormalizedFloatFromRGBA(scope, scope.srcTexel) : scope.srcTexel.r;
     scope.colorSum = pb.mul(scope.ao, scope.weightSum);
-    scope.$for(pb.int('i'), 0, that._kernelRadius, function(){
+    scope.$for(pb.int('i'), 0, that._kernelRadius, function () {
       this.$l.offsetAndWeight = this.offsetsAndWeights.at(pb.add(this.i, 1));
       this.$l.weight = this.offsetAndWeight.z;
       this.$l.offset = pb.div(this.offsetAndWeight.xy, this.size);
       this.$l.uvRight = pb.add(srcUV, this.offset);
       this.$l.depthRight = this.getLinearDepth(this.uvRight);
-      this.$if(pb.lessThan(pb.abs(pb.sub(this.depthRight, this.depth)), this.depthCutoff), function(){
+      this.$if(pb.lessThan(pb.abs(pb.sub(this.depthRight, this.depth)), this.depthCutoff), function () {
         this.$l.srcTexelRight = that.readTexel(this, type, srcTex, this.uvRight, srcLayer, sampleType);
-        this.$l.aoRight = that._packed ? decodeNormalizedFloatFromRGBA(this, this.srcTexelRight) : this.srcTexelRight.r;
+        this.$l.aoRight = that._packed
+          ? decodeNormalizedFloatFromRGBA(this, this.srcTexelRight)
+          : this.srcTexelRight.r;
         this.colorSum = pb.add(this.colorSum, pb.mul(this.aoRight, this.weight));
         this.weightSum = pb.add(this.weightSum, this.weight);
       });
       this.$l.uvLeft = pb.sub(srcUV, this.offset);
       this.$l.depthLeft = this.getLinearDepth(this.uvLeft);
-      this.$if(pb.lessThan(pb.abs(pb.sub(this.depthLeft, this.depth)), this.depthCutoff), function(){
+      this.$if(pb.lessThan(pb.abs(pb.sub(this.depthLeft, this.depth)), this.depthCutoff), function () {
         this.$l.srcTexelLeft = that.readTexel(this, type, srcTex, this.uvLeft, srcLayer, sampleType);
-        this.$l.aoLeft = that._packed ? decodeNormalizedFloatFromRGBA(this, this.srcTexelLeft) : this.srcTexelLeft.r;
+        this.$l.aoLeft = that._packed
+          ? decodeNormalizedFloatFromRGBA(this, this.srcTexelLeft)
+          : this.srcTexelLeft.r;
         this.colorSum = pb.add(this.colorSum, pb.mul(this.aoLeft, this.weight));
         this.weightSum = pb.add(this.weightSum, this.weight);
       });
@@ -169,4 +186,3 @@ export class AOBilateralBlurBlitter extends Blitter {
       : encodeNormalizedFloatToRGBA(scope, scope.colorSum);
   }
 }
-

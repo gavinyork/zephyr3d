@@ -1,8 +1,8 @@
-import { Application } from "../app";
-import { AbstractPostEffect } from "./posteffect";
-import { linearToGamma } from "../shaders/misc";
-import type { AbstractDevice, BindGroup, GPUProgram, Texture2D, TextureSampler } from "@zephyr3d/device";
-import type { DrawContext } from "../render";
+import { Application } from '../app';
+import { AbstractPostEffect } from './posteffect';
+import { linearToGamma } from '../shaders/misc';
+import type { AbstractDevice, BindGroup, GPUProgram, Texture2D, TextureSampler } from '@zephyr3d/device';
+import type { DrawContext } from '../render';
 
 /**
  * Grayscale post effect
@@ -56,7 +56,7 @@ export class Grayscale extends AbstractPostEffect {
           pb.main(function () {
             this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
             this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-            this.$if (pb.notEqual(this.flip, 0), function(){
+            this.$if(pb.notEqual(this.flip, 0), function () {
               this.$builtins.position.y = pb.neg(this.$builtins.position.y);
             });
           });
@@ -65,12 +65,12 @@ export class Grayscale extends AbstractPostEffect {
           this.srcTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
           this.srgbOut = pb.int().uniform(0);
           this.$outputs.outColor = pb.vec4();
-          pb.main(function(){
+          pb.main(function () {
             this.$l.color = pb.textureSample(this.srcTex, this.$inputs.uv);
             this.$l.grayscaleColor = pb.vec3(pb.dot(this.$l.color.rgb, pb.vec3(0.299, 0.587, 0.114)));
-            this.$if(pb.equal(this.srgbOut, 0), function(){
+            this.$if(pb.equal(this.srgbOut, 0), function () {
               this.$outputs.outColor = pb.vec4(this.grayscaleColor, this.color.a);
-            }).$else(function(){
+            }).$else(function () {
               this.$outputs.outColor = pb.vec4(linearToGamma(this, this.grayscaleColor), this.color.a);
             });
           });

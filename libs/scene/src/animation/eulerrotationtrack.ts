@@ -1,7 +1,7 @@
-import type { InterpolationMode} from "@zephyr3d/base";
-import { Interpolator, Quaternion, Vector3 } from "@zephyr3d/base";
-import { AnimationTrack } from "./animationtrack";
-import type { SceneNode } from "../scene";
+import type { InterpolationMode } from '@zephyr3d/base';
+import { Interpolator, Quaternion, Vector3 } from '@zephyr3d/base';
+import { AnimationTrack } from './animationtrack';
+import type { SceneNode } from '../scene';
 
 const tmpVec3 = new Vector3();
 const tmpQuat = new Quaternion();
@@ -16,8 +16,8 @@ export class EulerRotationTrack extends AnimationTrack {
    * @param mode - The interpolation mode of keyframes
    * @param keyFrames - Keyframe values
    */
-  constructor(mode: InterpolationMode, keyFrames: { time: number, value: Vector3 }[]) {
-    const inputs = new Float32Array(keyFrames.map(val => val.time));
+  constructor(mode: InterpolationMode, keyFrames: { time: number; value: Vector3 }[]) {
+    const inputs = new Float32Array(keyFrames.map((val) => val.time));
     const outputs = new Float32Array(keyFrames.length * 3);
     for (let i = 0; i < keyFrames.length; i++) {
       outputs[i * 3 + 0] = keyFrames[i].value.x;

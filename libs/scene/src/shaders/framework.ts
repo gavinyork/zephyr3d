@@ -1,10 +1,22 @@
-import { Vector4 } from "@zephyr3d/base";
-import type { DrawContext } from "../render/drawable";
-import { MAX_CLUSTERED_LIGHTS, RENDER_PASS_TYPE_DEPTH_ONLY, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP } from "../values";
-import { Application } from "../app";
-import { ScatteringLut } from "../render/scatteringlut";
-import type { ProgramBuilder, BindGroup, PBShaderExp, PBInsideFunctionScope, StructuredBuffer, Texture2D } from "@zephyr3d/device"
-import type { PunctualLight } from "../scene/light";
+import { Vector4 } from '@zephyr3d/base';
+import type { DrawContext } from '../render/drawable';
+import {
+  MAX_CLUSTERED_LIGHTS,
+  RENDER_PASS_TYPE_DEPTH_ONLY,
+  RENDER_PASS_TYPE_FORWARD,
+  RENDER_PASS_TYPE_SHADOWMAP
+} from '../values';
+import { Application } from '../app';
+import { ScatteringLut } from '../render/scatteringlut';
+import type {
+  ProgramBuilder,
+  BindGroup,
+  PBShaderExp,
+  PBInsideFunctionScope,
+  StructuredBuffer,
+  Texture2D
+} from '@zephyr3d/device';
+import type { PunctualLight } from '../scene/light';
 
 /**
  * Helper shader functions for the builtin material system
@@ -41,16 +53,16 @@ export class ShaderFramework {
       depthBiasScales: new Vector4(),
       shadowMatrices: new Float32Array(16 * 4)
     }
-  }
+  };
   /** @internal */
   private static _fogUniforms = {
     fog: {
       fogType: 0,
       fogColor: null,
       // [near, far, top, density]
-      fogParams: null,
-    },
-  }
+      fogParams: null
+    }
+  };
   /**
    * Prepares the fragment shader which is going to be used in our material system
    *
@@ -120,11 +132,7 @@ export class ShaderFramework {
       scope.global = globalStruct().uniform(0);
     } else if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
       const useClusteredLighting = !ctx.currentShadowLight;
-      const fogStruct = pb.defineStruct([
-        pb.int('fogType'),
-        pb.vec4('fogColor'),
-        pb.vec4('fogParams')
-      ]);
+      const fogStruct = pb.defineStruct([pb.int('fogType'), pb.vec4('fogColor'), pb.vec4('fogParams')]);
       const lightStruct = ctx.currentShadowLight
         ? pb.defineStruct([
             pb.int('shadowCascades'),
@@ -142,7 +150,7 @@ export class ShaderFramework {
             pb.float('envLightStrength'),
             pb.vec4('clusterParams'),
             pb.ivec4('countParams'),
-            pb.ivec2('lightIndexTexSize'),
+            pb.ivec2('lightIndexTexSize')
           ]);
       const globalStruct = pb.defineStruct([cameraStruct('camera'), lightStruct('light'), fogStruct('fog')]);
       scope.global = globalStruct().uniform(0);
@@ -169,7 +177,9 @@ export class ShaderFramework {
           : scope.$builder.tex2DArray();
         if (
           !shadowMapParams.shadowMap.isDepth() &&
-          !Application.instance.device.getDeviceCaps().textureCaps.getTextureFormatInfo(shadowMapParams.shadowMap.format).filterable
+          !Application.instance.device
+            .getDeviceCaps()
+            .textureCaps.getTextureFormatInfo(shadowMapParams.shadowMap.format).filterable
         ) {
           tex.sampleType('unfilterable-float');
         }
@@ -184,19 +194,22 @@ export class ShaderFramework {
     const skinning = !!ctx.target?.getBoneMatrices();
     const scope = pb.getGlobalScope();
     if (instancing) {
-      const maxNumInstances = Application.instance.device.getDeviceCaps().shaderCaps.maxUniformBufferSize >> 6;
+      const maxNumInstances =
+        Application.instance.device.getDeviceCaps().shaderCaps.maxUniformBufferSize >> 6;
       scope.instanceBufferOffset = pb.uint().uniform(1);
       scope.worldMatrix = pb.mat4[maxNumInstances]().uniformBuffer(3);
       pb.getReflection().tag(ShaderFramework.USAGE_WORLD_MATRIX, () =>
-        scope.worldMatrix.at(
-          pb.add(scope.instanceBufferOffset, pb.uint(scope.$builtins.instanceIndex))
-        )
+        scope.worldMatrix.at(pb.add(scope.instanceBufferOffset, pb.uint(scope.$builtins.instanceIndex)))
       );
     } else {
       scope.worldMatrix = pb.mat4().uniform(1).tag(ShaderFramework.USAGE_WORLD_MATRIX);
     }
     if (skinning) {
-      scope.boneMatrices = pb.tex2D().uniform(1).sampleType('unfilterable-float').tag(ShaderFramework.USAGE_BONE_MATRICIES);
+      scope.boneMatrices = pb
+        .tex2D()
+        .uniform(1)
+        .sampleType('unfilterable-float')
+        .tag(ShaderFramework.USAGE_BONE_MATRICIES);
       scope.invBindMatrix = pb.mat4().uniform(1).tag(ShaderFramework.USAGE_INV_BIND_MATRIX);
       scope.boneTextureSize = pb.int().uniform(1).tag(ShaderFramework.USAGE_BONE_TEXTURE_SIZE);
     }
@@ -239,7 +252,13 @@ export class ShaderFramework {
     }
   }
   /** @internal */
-  static setFogUniforms(bindGroup: BindGroup, fogType: number, fogColor: Vector4, fogParams: Vector4, aerialPerspectiveLUT?: Texture2D) {
+  static setFogUniforms(
+    bindGroup: BindGroup,
+    fogType: number,
+    fogColor: Vector4,
+    fogParams: Vector4,
+    aerialPerspectiveLUT?: Texture2D
+  ) {
     this._fogUniforms.fog.fogColor = fogColor;
     this._fogUniforms.fog.fogParams = fogParams;
     this._fogUniforms.fog.fogType = fogType;
@@ -249,7 +268,14 @@ export class ShaderFramework {
     }
   }
   /** @internal */
-  static setLightUniforms(bindGroup: BindGroup, ctx: DrawContext, clusterParams: Float32Array, countParams: Int32Array, lightBuffer: StructuredBuffer, lightIndexTexture: Texture2D) {
+  static setLightUniforms(
+    bindGroup: BindGroup,
+    ctx: DrawContext,
+    clusterParams: Float32Array,
+    countParams: Int32Array,
+    lightBuffer: StructuredBuffer,
+    lightIndexTexture: Texture2D
+  ) {
     bindGroup.setValue('global', {
       light: {
         clusterParams: clusterParams,
@@ -307,13 +333,16 @@ export class ShaderFramework {
     const funcName = 'lib_discardIfClippped';
     const pb = scope.$builder;
     const that = this;
-    pb.func(funcName, [], function(){
-      this.$if(pb.notEqual(that.getCameraClipPlaneFlag(this), 0), function(){
+    pb.func(funcName, [], function () {
+      this.$if(pb.notEqual(that.getCameraClipPlaneFlag(this), 0), function () {
         this.$l.worldPos = that.getWorldPosition(this);
         this.$l.clipPlane = that.getCameraClipPlane(this);
-        this.$if(pb.greaterThan(pb.add(pb.dot(this.worldPos.xyz, this.clipPlane.xyz), this.clipPlane.w), 0), function(){
-          pb.discard();
-        });
+        this.$if(
+          pb.greaterThan(pb.add(pb.dot(this.worldPos.xyz, this.clipPlane.xyz), this.clipPlane.w), 0),
+          function () {
+            pb.discard();
+          }
+        );
       });
     });
     pb.getGlobalScope()[funcName]();
@@ -402,25 +431,39 @@ export class ShaderFramework {
    * @param fogParams - Fog parameters [start, end, top, density]
    * @returns The computed fog factor
    */
-   static computeFogFactor(scope: PBInsideFunctionScope, viewDir: PBShaderExp, fogType: PBShaderExp, fogParams: PBShaderExp): PBShaderExp {
+  static computeFogFactor(
+    scope: PBInsideFunctionScope,
+    viewDir: PBShaderExp,
+    fogType: PBShaderExp,
+    fogParams: PBShaderExp
+  ): PBShaderExp {
     const pb = scope.$builder;
-    const funcName = 'lib_applyFog'
+    const funcName = 'lib_applyFog';
     const that = this;
-    pb.func(funcName, [pb.vec3('viewDir'), pb.int('fogType'), pb.vec4('fogParams')], function(){
+    pb.func(funcName, [pb.vec3('viewDir'), pb.int('fogType'), pb.vec4('fogParams')], function () {
       this.$l.distance = pb.length(this.viewDir);
       this.$l.top = pb.max(this.viewDir.y, 0.0001);
       this.$l.distance = pb.mul(this.$l.distance, pb.min(1, pb.div(this.fogParams.z, this.top)));
-      this.$if(pb.equal(this.fogType, that.FOG_TYPE_LINEAR), function(){
-        this.$return(pb.clamp(pb.div(pb.sub(this.distance, this.fogParams.x), pb.sub(this.fogParams.y, this.fogParams.x)), 0, 1));
-      }).$elseif(pb.equal(this.fogType, that.FOG_TYPE_EXP), function(){
-        this.$l.e = pb.mul(this.distance, this.fogParams.w);
-        this.$return(pb.sub(1, pb.div(1, pb.exp(this.e))));
-      }).$elseif(pb.equal(this.fogType, that.FOG_TYPE_EXP2), function(){
-        this.$l.e = pb.mul(this.distance, this.fogParams.w);
-        this.$return(pb.sub(1, pb.div(1, pb.exp(pb.mul(this.e, this.e)))));
-      }).$else(function(){
-        this.$return(0);
-      });
+      this.$if(pb.equal(this.fogType, that.FOG_TYPE_LINEAR), function () {
+        this.$return(
+          pb.clamp(
+            pb.div(pb.sub(this.distance, this.fogParams.x), pb.sub(this.fogParams.y, this.fogParams.x)),
+            0,
+            1
+          )
+        );
+      })
+        .$elseif(pb.equal(this.fogType, that.FOG_TYPE_EXP), function () {
+          this.$l.e = pb.mul(this.distance, this.fogParams.w);
+          this.$return(pb.sub(1, pb.div(1, pb.exp(this.e))));
+        })
+        .$elseif(pb.equal(this.fogType, that.FOG_TYPE_EXP2), function () {
+          this.$l.e = pb.mul(this.distance, this.fogParams.w);
+          this.$return(pb.sub(1, pb.div(1, pb.exp(pb.mul(this.e, this.e)))));
+        })
+        .$else(function () {
+          this.$return(0);
+        });
     });
     return pb.getGlobalScope()[funcName](viewDir, fogType, fogParams);
   }
@@ -432,15 +475,26 @@ export class ShaderFramework {
    * @param fogType - Type of the fog
    * @returns The computed fog factor
    */
-  static computeFogFactorForType(scope: PBInsideFunctionScope, viewDir: PBShaderExp, fogParams: PBShaderExp, fogType: 'linear'|'exp'|'exp2'): PBShaderExp {
+  static computeFogFactorForType(
+    scope: PBInsideFunctionScope,
+    viewDir: PBShaderExp,
+    fogParams: PBShaderExp,
+    fogType: 'linear' | 'exp' | 'exp2'
+  ): PBShaderExp {
     const pb = scope.$builder;
-    const funcName = 'lib_applyFog'
-    pb.func(funcName, [pb.vec3('viewDir'), pb.vec4('fogParams')], function(){
+    const funcName = 'lib_applyFog';
+    pb.func(funcName, [pb.vec3('viewDir'), pb.vec4('fogParams')], function () {
       this.$l.distance = pb.length(this.viewDir);
       this.$l.top = pb.max(this.viewDir.y, 0.0001);
       this.$l.distance = pb.mul(this.$l.distance, pb.min(1, pb.div(this.fogParams.z, this.top)));
       if (fogType === 'linear') {
-        this.$return(pb.clamp(pb.div(pb.sub(this.distance, this.fogParams.x), pb.sub(this.fogParams.y, this.fogParams.x)), 0, 1));
+        this.$return(
+          pb.clamp(
+            pb.div(pb.sub(this.distance, this.fogParams.x), pb.sub(this.fogParams.y, this.fogParams.x)),
+            0,
+            1
+          )
+        );
       } else if (fogType === 'exp') {
         this.$l.e = pb.mul(this.distance, this.fogParams.w);
         this.$return(pb.sub(1, pb.div(1, pb.exp(this.e))));
@@ -558,7 +612,10 @@ export class ShaderFramework {
     return scope.global.light.viewMatrix;
   }
   /** @internal */
-  static calculateShadowSpaceVertex(scope: PBInsideFunctionScope, cascade: PBShaderExp|number = 0): PBShaderExp {
+  static calculateShadowSpaceVertex(
+    scope: PBInsideFunctionScope,
+    cascade: PBShaderExp | number = 0
+  ): PBShaderExp {
     const pb = scope.$builder;
     const worldPos = ShaderFramework.getWorldPosition(scope);
     return pb.vec4(
@@ -569,15 +626,24 @@ export class ShaderFramework {
     );
   }
   /** @internal */
-  static getLightPositionAndRange(scope: PBInsideFunctionScope, lightIndex: PBShaderExp|number): PBShaderExp {
+  static getLightPositionAndRange(
+    scope: PBInsideFunctionScope,
+    lightIndex: PBShaderExp | number
+  ): PBShaderExp {
     return scope.lightBuffer.at(scope.$builder.mul(lightIndex, 3));
   }
   /** @internal */
-  static getLightDirectionAndCutoff(scope: PBInsideFunctionScope, lightIndex: PBShaderExp|number): PBShaderExp {
+  static getLightDirectionAndCutoff(
+    scope: PBInsideFunctionScope,
+    lightIndex: PBShaderExp | number
+  ): PBShaderExp {
     return scope.lightBuffer.at(scope.$builder.add(scope.$builder.mul(lightIndex, 3), 1));
   }
   /** @internal */
-  static getLightColorAndIntensity(scope: PBInsideFunctionScope, lightIndex: PBShaderExp|number): PBShaderExp {
+  static getLightColorAndIntensity(
+    scope: PBInsideFunctionScope,
+    lightIndex: PBShaderExp | number
+  ): PBShaderExp {
     return scope.lightBuffer.at(scope.$builder.add(scope.$builder.mul(lightIndex, 3), 2));
   }
   /**
@@ -591,7 +657,7 @@ export class ShaderFramework {
    */
   static ftransform(scope: PBInsideFunctionScope, billboardMode = 0): void {
     const pb = scope.$builder;
-    const funcName = 'lib_ftransform'
+    const funcName = 'lib_ftransform';
     const that = this;
     pb.func(funcName, [], function () {
       const viewProjMatrix = that.getViewProjectionMatrix(this);
@@ -611,9 +677,9 @@ export class ShaderFramework {
         } else if (billboardMode === that.BILLBOARD_SPHERICAL) {
           this.$l.xaxis = this.rotMat[0].xyz;
           this.$l.xscale = pb.length(this.wMat[0]);
-          this.$l.yaxis = this.rotMat[1].xyz
+          this.$l.yaxis = this.rotMat[1].xyz;
           this.$l.yscale = pb.length(this.wMat[1]);
-          this.$l.zaxis = this.rotMat[2].xyz
+          this.$l.zaxis = this.rotMat[2].xyz;
           this.$l.zscale = pb.length(this.wMat[2]);
         } else {
           throw new Error(`ftransform(): invalid billboard mode: ${billboardMode}`);
@@ -637,7 +703,9 @@ export class ShaderFramework {
         this.$l.pos = pb.mul(this.$l.skinMatrix, this.$l.pos);
         this.$l.pos = pb.div(this.$l.pos, this.$l.pos.w);
       }
-      this.$outputs.worldPosition = pb.mul(this.worldMatrix, this.$l.pos).tag(ShaderFramework.USAGE_WORLD_POSITION);
+      this.$outputs.worldPosition = pb
+        .mul(this.worldMatrix, this.$l.pos)
+        .tag(ShaderFramework.USAGE_WORLD_POSITION);
       that.setClipSpacePosition(this, pb.mul(viewProjMatrix, this.$outputs.worldPosition));
       const norm = pb.getGlobalScope().$getVertexAttrib('normal');
       if (norm) {
@@ -645,17 +713,21 @@ export class ShaderFramework {
         if (this.$l.skinMatrix) {
           this.$l.norm = pb.mul(this.$l.skinMatrix, this.$l.norm);
         }
-        this.$outputs.worldNormal = pb.normalize(pb.mul(this.worldMatrix, this.$l.norm).xyz).tag(ShaderFramework.USAGE_WORLD_NORMAL);
+        this.$outputs.worldNormal = pb
+          .normalize(pb.mul(this.worldMatrix, this.$l.norm).xyz)
+          .tag(ShaderFramework.USAGE_WORLD_NORMAL);
         const tan = pb.getGlobalScope().$getVertexAttrib('tangent');
         if (tan) {
           this.$l.tangent = pb.vec4(tan.xyz, 0);
           if (this.$l.skinMatrix) {
             this.$l.tangent = pb.mul(this.$l.skinMatrix, this.$l.tangent);
           }
-          this.$outputs.worldTangent = pb.normalize(pb.mul(this.worldMatrix, this.$l.tangent).xyz).tag(ShaderFramework.USAGE_WORLD_TANGENT);
-          this.$outputs.worldBinormal = pb.normalize(
-            pb.mul(pb.cross(this.$outputs.worldNormal, this.$outputs.worldTangent), tan.w)
-          ).tag(ShaderFramework.USAGE_WORLD_BINORMAL);
+          this.$outputs.worldTangent = pb
+            .normalize(pb.mul(this.worldMatrix, this.$l.tangent).xyz)
+            .tag(ShaderFramework.USAGE_WORLD_TANGENT);
+          this.$outputs.worldBinormal = pb
+            .normalize(pb.mul(pb.cross(this.$outputs.worldNormal, this.$outputs.worldTangent), tan.w))
+            .tag(ShaderFramework.USAGE_WORLD_BINORMAL);
         }
       }
     });
@@ -737,32 +809,64 @@ export class ShaderFramework {
       const pb = scope.$builder;
       if (ctx.env.sky.drawScatteredFog(ctx)) {
         const funcName = 'applyAerialPerspective';
-        pb.func(funcName, [pb.vec4('color').inout()], function(){
-          this.$l.viewDir = pb.sub(ShaderFramework.getWorldPosition(this).xyz, ShaderFramework.getCameraPosition(this));
+        pb.func(funcName, [pb.vec4('color').inout()], function () {
+          this.$l.viewDir = pb.sub(
+            ShaderFramework.getWorldPosition(this).xyz,
+            ShaderFramework.getCameraPosition(this)
+          );
           this.viewDir.y = pb.max(this.viewDir.y, 0);
           this.$l.distance = pb.mul(pb.length(this.viewDir), ShaderFramework.getWorldUnit(this));
-          this.$l.sliceDist = pb.div(pb.mul(ShaderFramework.getCameraParams(this).y, ShaderFramework.getWorldUnit(this)), ScatteringLut.aerialPerspectiveSliceZ);
+          this.$l.sliceDist = pb.div(
+            pb.mul(ShaderFramework.getCameraParams(this).y, ShaderFramework.getWorldUnit(this)),
+            ScatteringLut.aerialPerspectiveSliceZ
+          );
           this.$l.slice0 = pb.floor(pb.div(this.distance, this.sliceDist));
           this.$l.slice1 = pb.add(this.slice0, 1);
           this.$l.factor = pb.sub(pb.div(this.distance, this.sliceDist), this.slice0);
           this.$l.viewNormal = pb.normalize(this.viewDir);
           this.$l.zenithAngle = pb.asin(this.viewNormal.y);
           this.$l.horizonAngle = pb.atan2(this.viewNormal.z, this.viewNormal.x);
-          this.$l.u0 = pb.div(pb.add(this.slice0, pb.div(this.horizonAngle, Math.PI * 2)), ScatteringLut.aerialPerspectiveSliceZ);
+          this.$l.u0 = pb.div(
+            pb.add(this.slice0, pb.div(this.horizonAngle, Math.PI * 2)),
+            ScatteringLut.aerialPerspectiveSliceZ
+          );
           this.$l.u1 = pb.add(this.u0, 1 / ScatteringLut.aerialPerspectiveSliceZ);
-          this.$l.v = pb.div(this.zenithAngle, Math.PI/2);
-          this.$l.t0 = pb.textureSampleLevel(ShaderFramework.getAerialPerspectiveLUT(this), pb.vec2(this.u0, this.v), 0);
-          this.$l.t1 = pb.textureSampleLevel(ShaderFramework.getAerialPerspectiveLUT(this), pb.vec2(this.u1, this.v), 0);
+          this.$l.v = pb.div(this.zenithAngle, Math.PI / 2);
+          this.$l.t0 = pb.textureSampleLevel(
+            ShaderFramework.getAerialPerspectiveLUT(this),
+            pb.vec2(this.u0, this.v),
+            0
+          );
+          this.$l.t1 = pb.textureSampleLevel(
+            ShaderFramework.getAerialPerspectiveLUT(this),
+            pb.vec2(this.u1, this.v),
+            0
+          );
           this.$l.t = pb.mix(this.t0, this.t1, this.factor);
           this.color = pb.vec4(pb.add(pb.mul(this.color.rgb, this.factor), this.t.rgb), this.color.a);
         });
         scope[funcName](color);
       } else {
         const funcName = 'applyFog';
-        pb.func(funcName, [pb.vec4('color').inout()], function(){
-          this.$l.viewDir = pb.sub(ShaderFramework.getWorldPosition(this).xyz, ShaderFramework.getCameraPosition(this));
-          this.$l.fogFactor = ShaderFramework.computeFogFactor(this, this.viewDir, ShaderFramework.getFogType(this), ShaderFramework.getFogParams(this));
-          this.color = pb.vec4(pb.mix(this.color.rgb, ShaderFramework.getFogColor(this).rgb, pb.mul(this.fogFactor, this.color.a, this.color.a)), this.color.a);
+        pb.func(funcName, [pb.vec4('color').inout()], function () {
+          this.$l.viewDir = pb.sub(
+            ShaderFramework.getWorldPosition(this).xyz,
+            ShaderFramework.getCameraPosition(this)
+          );
+          this.$l.fogFactor = ShaderFramework.computeFogFactor(
+            this,
+            this.viewDir,
+            ShaderFramework.getFogType(this),
+            ShaderFramework.getFogParams(this)
+          );
+          this.color = pb.vec4(
+            pb.mix(
+              this.color.rgb,
+              ShaderFramework.getFogColor(this).rgb,
+              pb.mul(this.fogFactor, this.color.a, this.color.a)
+            ),
+            this.color.a
+          );
         });
         scope[funcName](color);
       }

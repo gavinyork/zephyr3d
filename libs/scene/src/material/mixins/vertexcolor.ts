@@ -1,7 +1,7 @@
-import type { IMeshMaterial } from "../meshmaterial";
-import type { PBFunctionScope, PBInsideFunctionScope } from "@zephyr3d/device";
-import type { DrawContext } from "../../render";
-import { RENDER_PASS_TYPE_FORWARD } from "../../values";
+import type { IMeshMaterial } from '../meshmaterial';
+import type { PBFunctionScope, PBInsideFunctionScope } from '@zephyr3d/device';
+import type { DrawContext } from '../../render';
+import { RENDER_PASS_TYPE_FORWARD } from '../../values';
 
 export interface IMixinVertexColor {
   vertexColor: boolean;
@@ -39,7 +39,9 @@ function mixinVertexColor<T extends IMeshMaterial>(BaseCls: { new (...args: any[
     }
     getVertexColor(scope: PBInsideFunctionScope, ctx: DrawContext) {
       if (!this.needFragmentColor(ctx)) {
-        throw new Error('mixinVertexColor.getVertexColor(): No need to calculate albedo color, make sure needFragmentColor() returns true');
+        throw new Error(
+          'mixinVertexColor.getVertexColor(): No need to calculate albedo color, make sure needFragmentColor() returns true'
+        );
       }
       if (scope.$builder.shaderKind === 'fragment') {
         return scope.$inputs.zOutDiffuse;

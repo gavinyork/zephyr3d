@@ -1,6 +1,6 @@
-import { WebGPUDevice } from "./device";
-import type { DeviceBackend, DeviceEventMap } from "@zephyr3d/device";
-import { makeEventTarget } from "@zephyr3d/base";
+import { WebGPUDevice } from './device';
+import type { DeviceBackend, DeviceEventMap } from '@zephyr3d/device';
+import { makeEventTarget } from '@zephyr3d/base';
 
 /**
  * The WebGPU backend
@@ -25,6 +25,5 @@ export const backendWebGPU: DeviceBackend = {
       console.error(err);
       return null;
     }
-  },
-}
-
+  }
+};

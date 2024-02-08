@@ -3,7 +3,7 @@ type Rect = {
   y: number;
   width: number;
   height: number;
-}
+};
 
 /**
  * The type of packed result.
@@ -20,7 +20,7 @@ export type PackRect = {
   height: number;
   /** the image index */
   binIndex: number;
-}
+};
 
 /**
  * The rectangle packer class
@@ -44,11 +44,11 @@ export class RectsPacker {
     this._width = width;
     this._height = height;
     this._maxBins = maxBins;
-    this._bins = [ new Bin(this._width, this._height) ];
+    this._bins = [new Bin(this._width, this._height)];
   }
   /** Clear all image bins of the packer */
   clear() {
-    this._bins = [ new Bin(this._width, this._height) ];
+    this._bins = [new Bin(this._width, this._height)];
   }
   /**
    * Inserts a new rectangle
@@ -60,7 +60,7 @@ export class RectsPacker {
     if (width > this._width || height > this._height) {
       return null;
     }
-    const rect = this._bins[this._bins.length-1].insert(width, height);
+    const rect = this._bins[this._bins.length - 1].insert(width, height);
     if (rect) {
       return {
         x: rect.x,
@@ -72,7 +72,7 @@ export class RectsPacker {
     }
     if (this._maxBins === 0 || this._bins.length < this._maxBins) {
       this._bins.push(new Bin(this._width, this._height));
-      const rect = this._bins[this._bins.length-1].insert(width, height);
+      const rect = this._bins[this._bins.length - 1].insert(width, height);
       return {
         x: rect.x,
         y: rect.y,
@@ -127,8 +127,13 @@ class Bin {
     return rect;
   }
   private splitFreeRect(free: Rect, used: Rect): boolean {
-    if (used.x >= free.x + free.width || used.x + used.width <= free.x || used.y >= free.y + free.height || used.y + used.height <= free.y) {
-      return false;      
+    if (
+      used.x >= free.x + free.width ||
+      used.x + used.width <= free.x ||
+      used.y >= free.y + free.height ||
+      used.y + used.height <= free.y
+    ) {
+      return false;
     }
     if (used.x < free.x + free.width && used.x + used.width > free.x) {
       if (used.y > free.y && used.y < free.y + free.height) {
@@ -194,6 +199,11 @@ class Bin {
     }
   }
   private isRectInRect(test: Rect, container: Rect): boolean {
-    return test.x >= container.x && test.y >= container.y && test.x + test.width <= container.x + container.width && test.y + test.height <= container.y + container.height;
+    return (
+      test.x >= container.x &&
+      test.y >= container.y &&
+      test.x + test.width <= container.x + container.width &&
+      test.y + test.height <= container.y + container.height
+    );
   }
 }

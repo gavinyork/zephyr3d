@@ -153,7 +153,7 @@ export interface AssetMeshData {
  */
 export interface AssetAnimationTrack {
   node: AssetHierarchyNode;
-  type: 'translation'|'scale'|'rotation';
+  type: 'translation' | 'scale' | 'rotation';
   interpolator: Interpolator;
 }
 

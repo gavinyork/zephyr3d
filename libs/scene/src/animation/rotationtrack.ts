@@ -1,7 +1,7 @@
-import type { InterpolationMode} from "@zephyr3d/base";
-import { Interpolator, Quaternion } from "@zephyr3d/base";
-import { AnimationTrack } from "./animationtrack";
-import type { SceneNode } from "../scene";
+import type { InterpolationMode } from '@zephyr3d/base';
+import { Interpolator, Quaternion } from '@zephyr3d/base';
+import { AnimationTrack } from './animationtrack';
+import type { SceneNode } from '../scene';
 
 // Reduce gc
 const tmpQuat = new Quaternion();
@@ -21,15 +21,18 @@ export class RotationTrack extends AnimationTrack {
    * @param mode - The interpolation mode of keyframes
    * @param keyFrames - Keyframe values
    */
-  constructor(mode: InterpolationMode, keyFrames: { time: number, value: Quaternion }[]);
-  constructor(modeOrInterpolator: Interpolator|InterpolationMode, keyFrames?: { time: number, value: Quaternion }[]) {
+  constructor(mode: InterpolationMode, keyFrames: { time: number; value: Quaternion }[]);
+  constructor(
+    modeOrInterpolator: Interpolator | InterpolationMode,
+    keyFrames?: { time: number; value: Quaternion }[]
+  ) {
     if (modeOrInterpolator instanceof Interpolator) {
       if (modeOrInterpolator.target !== 'quat') {
         throw new Error(`RotationTrack(): interpolator target must be 'quat'`);
       }
       super(modeOrInterpolator);
     } else {
-      const inputs = new Float32Array(keyFrames.map(val => val.time));
+      const inputs = new Float32Array(keyFrames.map((val) => val.time));
       const outputs = new Float32Array(keyFrames.length * 4);
       for (let i = 0; i < keyFrames.length; i++) {
         outputs[i * 4 + 0] = keyFrames[i].value.x;

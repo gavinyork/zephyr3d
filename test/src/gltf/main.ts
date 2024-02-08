@@ -21,10 +21,10 @@ gltfApp.ready().then(async () => {
   gltfApp.inputManager.use(imGuiInjectEvent);
   gltfApp.inputManager.use(gltfViewer.camera.handleEvent.bind(gltfViewer.camera));
 
-  gltfApp.on('dragover', ev => {
+  gltfApp.on('dragover', (ev) => {
     ev.preventDefault();
   });
-  gltfApp.on('drop', ev => {
+  gltfApp.on('drop', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
     if (ev.dataTransfer.items.length > 0) {
@@ -32,33 +32,45 @@ gltfApp.ready().then(async () => {
     }
   });
   let movingSun = 0;
-  Application.instance.device.canvas.addEventListener('contextmenu', function(ev){
+  Application.instance.device.canvas.addEventListener('contextmenu', function (ev) {
     ev.preventDefault();
     return false;
   });
-  gltfApp.on('pointermove', ev => {
+  gltfApp.on('pointermove', (ev) => {
     //const obj = scene.raycast(gltfViewer.camera, ev.offsetX, ev.offsetY);
     //console.log(`raycast: ${obj ? obj.node.constructor.name : null}`);
     if (movingSun) {
       const viewport = Application.instance.device.getViewport();
-      const ray = scene.constructRay(gltfViewer.camera, viewport.width, viewport.height, ev.offsetX, ev.offsetY);
+      const ray = scene.constructRay(
+        gltfViewer.camera,
+        viewport.width,
+        viewport.height,
+        ev.offsetX,
+        ev.offsetY
+      );
       gltfViewer.light0.lookAt(ray.direction, Vector3.zero(), Vector3.axisPY());
     }
   });
-  gltfApp.on('pointerdown', ev => {
+  gltfApp.on('pointerdown', (ev) => {
     if (ev.button === 2) {
       const viewport = Application.instance.device.getViewport();
-      const ray = scene.constructRay(gltfViewer.camera, viewport.width, viewport.height, ev.offsetX, ev.offsetY);
+      const ray = scene.constructRay(
+        gltfViewer.camera,
+        viewport.width,
+        viewport.height,
+        ev.offsetX,
+        ev.offsetY
+      );
       gltfViewer.light0.lookAt(ray.direction, Vector3.zero(), Vector3.axisPY());
       movingSun = 1;
     }
   });
-  gltfApp.on('pointerup', ev => {
+  gltfApp.on('pointerup', (ev) => {
     if (ev.button === 2) {
       movingSun = 0;
     }
   });
-  gltfApp.on('keyup', ev => {
+  gltfApp.on('keyup', (ev) => {
     if (ev.code === 'KeyT') {
       gltfViewer.toggleTonemap();
     } else if (ev.code === 'KeyU') {
@@ -69,10 +81,10 @@ gltfApp.ready().then(async () => {
       gltfViewer.toggleBloom();
     }
   });
-  gltfApp.on('resize', ev => {
-    gltfViewer.camera.aspect = ev.width / ev.height
+  gltfApp.on('resize', (ev) => {
+    gltfViewer.camera.aspect = ev.width / ev.height;
   });
-  gltfApp.on('tick', ev => {
+  gltfApp.on('tick', (ev) => {
     gltfViewer.camera.updateController();
     gltfViewer.render();
     imGuiNewFrame();

@@ -1,5 +1,19 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, DirectionalLight, Mesh, BoxShape, LambertMaterial, PlaneShape, PointLight, SpotLight } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  OrbitCameraController,
+  PerspectiveCamera,
+  Compositor,
+  Tonemap,
+  DirectionalLight,
+  Mesh,
+  BoxShape,
+  LambertMaterial,
+  PlaneShape,
+  PointLight,
+  SpotLight
+} from '@zephyr3d/scene';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import * as common from '../common';
 
@@ -14,7 +28,7 @@ const useDirLight = true;
 
 myApp.ready().then(async function () {
   await imGuiInit(myApp.device);
-  
+
   const scene = new Scene();
   // Turn off environment lighting
   scene.env.light.type = 'none';
@@ -27,7 +41,7 @@ myApp.ready().then(async function () {
     // Create directional light
     dlight = new DirectionalLight(scene);
     // light direction
-    dlight.rotation.fromEulerAngle(-Math.PI/4, Math.PI/4, 0, 'ZYX');
+    dlight.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0, 'ZYX');
     // light color
     dlight.color = new Vector4(0, 0.3, 0.3, 1);
   }
@@ -40,7 +54,7 @@ myApp.ready().then(async function () {
     // light color
     plight.color = new Vector4(1, 1, 0, 1);
   }
-  
+
   if (useSpotLight) {
     // Create spot light
     light = new SpotLight(scene);
@@ -70,7 +84,13 @@ myApp.ready().then(async function () {
   floor.position.z = -100;
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 600);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    myApp.device.canvas.width / myApp.device.canvas.height,
+    1,
+    600
+  );
   const eyePos = new Vector3(30, 30, 30);
   camera.lookAt(eyePos, new Vector3(0, 0, 0), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController({ distance: eyePos.magnitude });
@@ -85,9 +105,13 @@ myApp.ready().then(async function () {
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
   myApp.on('tick', function () {
-    dlight?.rotation.fromEulerAngle(-Math.PI/4, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
-    plight?.position.setXYZ(20 * Math.cos(Date.now() * 0.001) - 10, 15, 20 * Math.sin(Date.now() * 0.001) - 10);
-    light?.rotation.fromEulerAngle(-Math.PI/6, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
+    dlight?.rotation.fromEulerAngle(-Math.PI / 4, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
+    plight?.position.setXYZ(
+      20 * Math.cos(Date.now() * 0.001) - 10,
+      15,
+      20 * Math.sin(Date.now() * 0.001) - 10
+    );
+    light?.rotation.fromEulerAngle(-Math.PI / 6, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
     camera.updateController();
     camera.render(scene, compositor);
 

@@ -110,8 +110,8 @@ export class Frustum {
     this._planes = null;
     this._corners = null;
     if (arg0 instanceof Frustum) {
-      this._planes = arg0._planes.map(plane => new Plane(plane));
-      this._corners = arg0._corners.map(vec => new Vector3(vec));
+      this._planes = arg0._planes.map((plane) => new Plane(plane));
+      this._corners = arg0._corners.map((vec) => new Vector3(vec));
     } else {
       this.initWithMatrix(arg0);
     }
@@ -173,22 +173,52 @@ export class Frustum {
   initWithMatrix(transform: Matrix4x4) {
     this._planes = this._planes || Array.from({ length: 6 }).map(() => new Plane());
     this._planes[BoxSide.LEFT]
-      .setEquation(transform.m30 + transform.m00, transform.m31 + transform.m01, transform.m32 + transform.m02, transform.m33 + transform.m03)
+      .setEquation(
+        transform.m30 + transform.m00,
+        transform.m31 + transform.m01,
+        transform.m32 + transform.m02,
+        transform.m33 + transform.m03
+      )
       .inplaceNormalize();
     this._planes[BoxSide.RIGHT]
-      .setEquation(transform.m30 - transform.m00, transform.m31 - transform.m01, transform.m32 - transform.m02, transform.m33 - transform.m03)
+      .setEquation(
+        transform.m30 - transform.m00,
+        transform.m31 - transform.m01,
+        transform.m32 - transform.m02,
+        transform.m33 - transform.m03
+      )
       .inplaceNormalize();
     this._planes[BoxSide.BOTTOM]
-      .setEquation(transform.m30 + transform.m10, transform.m31 + transform.m11, transform.m32 + transform.m12, transform.m33 + transform.m13)
+      .setEquation(
+        transform.m30 + transform.m10,
+        transform.m31 + transform.m11,
+        transform.m32 + transform.m12,
+        transform.m33 + transform.m13
+      )
       .inplaceNormalize();
     this._planes[BoxSide.TOP]
-      .setEquation(transform.m30 - transform.m10, transform.m31 - transform.m11, transform.m32 - transform.m12, transform.m33 - transform.m13)
+      .setEquation(
+        transform.m30 - transform.m10,
+        transform.m31 - transform.m11,
+        transform.m32 - transform.m12,
+        transform.m33 - transform.m13
+      )
       .inplaceNormalize();
     this._planes[BoxSide.FRONT]
-      .setEquation(transform.m30 + transform.m20, transform.m31 + transform.m21, transform.m32 + transform.m22, transform.m33 + transform.m23)
+      .setEquation(
+        transform.m30 + transform.m20,
+        transform.m31 + transform.m21,
+        transform.m32 + transform.m22,
+        transform.m33 + transform.m23
+      )
       .inplaceNormalize();
     this._planes[BoxSide.BACK]
-      .setEquation(transform.m30 - transform.m20, transform.m31 - transform.m21, transform.m32 - transform.m22, transform.m33 - transform.m23)
+      .setEquation(
+        transform.m30 - transform.m20,
+        transform.m31 - transform.m21,
+        transform.m32 - transform.m22,
+        transform.m33 - transform.m23
+      )
       .inplaceNormalize();
     const invMatrix = Matrix4x4.invert(transform);
     const ndcVertices: Vector3[] = BoundingBoxData.ndcVertices.map((v) => new Vector3(v[0], v[1], v[2]));

@@ -1,6 +1,27 @@
 import { Vector2, Vector4 } from '@zephyr3d/base';
-import type { SkyType, FogType, Scene, EnvLightType, ShadowMode, Compositor, AbstractPostEffect, Camera} from '@zephyr3d/scene';
-import { PunctualLight, AssetManager, Application, GraphNode, panoramaToCubemap, prefilterCubemap, Tonemap, SAO, PostWater, Bloom, PerspectiveCamera } from '@zephyr3d/scene';
+import type {
+  SkyType,
+  FogType,
+  Scene,
+  EnvLightType,
+  ShadowMode,
+  Compositor,
+  AbstractPostEffect,
+  Camera
+} from '@zephyr3d/scene';
+import {
+  PunctualLight,
+  AssetManager,
+  Application,
+  GraphNode,
+  panoramaToCubemap,
+  prefilterCubemap,
+  Tonemap,
+  SAO,
+  PostWater,
+  Bloom,
+  PerspectiveCamera
+} from '@zephyr3d/scene';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { ImGui } from '@zephyr3d/imgui';
@@ -36,7 +57,7 @@ export function assert(exp, msg) {
 }
 
 async function delay() {
-  return new Promise(resolve => setTimeout(resolve, 0));
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 function asyncWrapper(fn: Function, msg: HTMLElement, times: number) {
@@ -127,7 +148,15 @@ export class Inspector {
     this._textureRepeat = 1;
     this._textureGammaCorrect = false;
     this._textureDrawMode = 0;
-    this._textureModes = [TextureDrawer.RGBA, TextureDrawer.RGB, TextureDrawer.R, TextureDrawer.G, TextureDrawer.B, TextureDrawer.A, TextureDrawer.RG];
+    this._textureModes = [
+      TextureDrawer.RGBA,
+      TextureDrawer.RGB,
+      TextureDrawer.R,
+      TextureDrawer.G,
+      TextureDrawer.B,
+      TextureDrawer.A,
+      TextureDrawer.RG
+    ];
     this._textureModeNames = ['RGBA', 'RGB', 'R', 'G', 'B', 'A', 'RG'];
     this._textureEncodes = [TextureDrawer.ENCODE_NORMAL, TextureDrawer.ENCODE_NORMALIZED_FLOAT];
     this._textureEncodeNames = ['Normal', 'RGBA encoded float'];
@@ -146,12 +175,15 @@ export class Inspector {
         const prefix = mode ? `[${mode}] ` : '';
         that.log(`${prefix} ${text}`);
       }
-    }
+    };
   }
   calculateSecionBoundsX(padding: number) {
     const window = ImGui.GetCurrentWindow();
     const start = ImGui.GetWindowPos().x;
-    return [start + window.WindowPadding.x + padding, start + ImGui.GetWindowWidth() - window.WindowPadding.x - padding];
+    return [
+      start + window.WindowPadding.x + padding,
+      start + ImGui.GetWindowWidth() - window.WindowPadding.x - padding
+    ];
   }
   chooseFile(multi: boolean, accept: string, callback: (files: File[]) => void) {
     const fileInput = document.createElement('input');
@@ -160,7 +192,7 @@ export class Inspector {
     fileInput.multiple = !!multi;
     fileInput.onchange = () => {
       callback && callback([...fileInput.files]);
-    }
+    };
     fileInput.click();
   }
   log(str: string) {
@@ -224,30 +256,30 @@ export class Inspector {
       }
       if (ImGui.BeginMenu('Inspector')) {
         ImGui.MenuItem('Scene', null, (val?: boolean) => {
-          return this._inspectScene = val ?? this._inspectScene;
+          return (this._inspectScene = val ?? this._inspectScene);
         });
         if (this._camera) {
           ImGui.MenuItem('Camera', null, (val?: boolean) => {
-            return this._inspectCamera = val ?? this._inspectCamera;
+            return (this._inspectCamera = val ?? this._inspectCamera);
           });
         }
         ImGui.MenuItem('Lights', null, (val?: boolean) => {
-          return this._inspectLights = val ?? this._inspectLights;
+          return (this._inspectLights = val ?? this._inspectLights);
         });
         ImGui.MenuItem('Textures', null, (val?: boolean) => {
-          return this._inspectTextures = val ?? this._inspectTextures;
+          return (this._inspectTextures = val ?? this._inspectTextures);
         });
         ImGui.MenuItem('Sky&Fog', null, (val?: boolean) => {
-          return this._inspectSky = val ?? this._inspectSky;
+          return (this._inspectSky = val ?? this._inspectSky);
         });
         ImGui.MenuItem('Show logs', null, (val?: boolean) => {
-          return this._showLogs = val ?? this._showLogs;
+          return (this._showLogs = val ?? this._showLogs);
         });
         ImGui.EndMenu();
       }
       if (this._compositor) {
         const postEffects = this._compositor.getPostEffects();
-        this._renderPostEffects.forEach(val => {
+        this._renderPostEffects.forEach((val) => {
           if (postEffects.indexOf(val) < 0) {
             this._renderPostEffects.delete(val);
           }
@@ -287,53 +319,93 @@ export class Inspector {
   }
   private renderPostWater(water: PostWater) {
     if (ImGui.Begin('PostWater')) {
-      const wireframe = [water.wireframe] as [boolean]
+      const wireframe = [water.wireframe] as [boolean];
       if (ImGui.Checkbox('Wireframe', wireframe)) {
         water.wireframe = wireframe[0];
       }
-      ImGui.SliderFloat('GridScale##water', (val?: number) => {
-        return water.gridScale = val = val ?? water.gridScale;
-      }, 0, 1);
-      ImGui.SliderFloat('Elevation##water', (val?: number) => {
-        return water.elevation = val = val ?? water.elevation;
-      }, 0, 100);
+      ImGui.SliderFloat(
+        'GridScale##water',
+        (val?: number) => {
+          return (water.gridScale = val = val ?? water.gridScale);
+        },
+        0,
+        1
+      );
+      ImGui.SliderFloat(
+        'Elevation##water',
+        (val?: number) => {
+          return (water.elevation = val = val ?? water.elevation);
+        },
+        0,
+        100
+      );
       ImGui.SliderFloat4('Region##water', water.boundary, -1000, 1000);
-      ImGui.SliderFloat('AntiReflectanceLeak##water', (val?: number) => {
-        return water.antiReflectanceLeak = val = val ?? water.antiReflectanceLeak;
-      }, 0, 10);
-      ImGui.SliderFloat('Displace##water', (val?: number) => {
-        return water.displace = val = val ?? water.displace;
-      }, 1, 100);
-      ImGui.SliderFloat('DepthMulti##water', (val?: number) => {
-        return water.depthMulti = val = val ?? water.depthMulti;
-      }, 0, 1);
-      ImGui.SliderFloat('RefractionStrength##water', (val?: number) => {
-        return water.refractionStrength = val = val ?? water.refractionStrength;
-      }, 0, 1);
+      ImGui.SliderFloat(
+        'AntiReflectanceLeak##water',
+        (val?: number) => {
+          return (water.antiReflectanceLeak = val = val ?? water.antiReflectanceLeak);
+        },
+        0,
+        10
+      );
+      ImGui.SliderFloat(
+        'Displace##water',
+        (val?: number) => {
+          return (water.displace = val = val ?? water.displace);
+        },
+        1,
+        100
+      );
+      ImGui.SliderFloat(
+        'DepthMulti##water',
+        (val?: number) => {
+          return (water.depthMulti = val = val ?? water.depthMulti);
+        },
+        0,
+        1
+      );
+      ImGui.SliderFloat(
+        'RefractionStrength##water',
+        (val?: number) => {
+          return (water.refractionStrength = val = val ?? water.refractionStrength);
+        },
+        0,
+        1
+      );
       const tmpWind = new Vector2(water.wind);
       if (ImGui.SliderFloat2('Wind', tmpWind, 0, 32)) {
         water.wind = tmpWind;
       }
-      ImGui.SliderFloat('FoamWidth##water', (val?: number) => {
-        return water.foamWidth = val = val ?? water.foamWidth;
-      }, 0, 2);
-      ImGui.SliderFloat('FoamContrast##water', (val?: number) => {
-        return water.foamContrast = val = val ?? water.foamContrast;
-      }, 0, 8);
-      const alignment = [ water.alignment ] as [number];
+      ImGui.SliderFloat(
+        'FoamWidth##water',
+        (val?: number) => {
+          return (water.foamWidth = val = val ?? water.foamWidth);
+        },
+        0,
+        2
+      );
+      ImGui.SliderFloat(
+        'FoamContrast##water',
+        (val?: number) => {
+          return (water.foamContrast = val = val ?? water.foamContrast);
+        },
+        0,
+        8
+      );
+      const alignment = [water.alignment] as [number];
       if (ImGui.SliderFloat('alignment', alignment, 0, 4)) {
         water.alignment = alignment[0];
       }
       for (let i = 0; i < 3; i++) {
-        const size = [ water[`waveLength${i}`] ] as [number];
+        const size = [water[`waveLength${i}`]] as [number];
         if (ImGui.SliderFloat(`Size${i}`, size, 0, 1000)) {
           water[`waveLength${i}`] = size[0];
         }
-        const strength = [ water[`waveStrength${i}`] ] as [number];
+        const strength = [water[`waveStrength${i}`]] as [number];
         if (ImGui.SliderFloat(`Strength${i}`, strength, 0, 10)) {
           water[`waveStrength${i}`] = strength[0];
         }
-        const croppiness = [ water[`waveCroppiness${i}`] ] as [number];
+        const croppiness = [water[`waveCroppiness${i}`]] as [number];
         if (ImGui.SliderFloat(`Croppiness${i}`, croppiness, -2, 2)) {
           water[`waveCroppiness${i}`] = croppiness[0];
         }
@@ -343,30 +415,75 @@ export class Inspector {
   }
   private renderSAO(sao: SAO) {
     if (ImGui.Begin('SAO')) {
-      ImGui.DragFloat('Scale##sao', (val?: number) => {
-        return sao.scale = val = val ?? sao.scale;
-      }, 0.01, 0, 10);
-      ImGui.DragFloat('Bias##sao', (val?: number) => {
-        return sao.bias = val = val ?? sao.bias;
-      }, 0.01, -1, 1);
-      ImGui.DragFloat('Intensity##sao', (val?: number) => {
-        return sao.intensity = val = val ?? sao.intensity;
-      }, 0.01, 0, 1);
-      ImGui.DragFloat('Radius##sao', (val?: number) => {
-        return sao.radius = val = val ?? sao.radius;
-      }, 0.01, 1, 100);
-      ImGui.DragFloat('minResolution##sao', (val?: number) => {
-        return sao.minResolution = val = val ?? sao.minResolution;
-      }, 0.01, 0, 1);
-      ImGui.SliderFloat('blurKernelSize', (val?: number) => {
-        return sao.blurKernelSize = val = val ?? sao.blurKernelSize;
-      }, 0, 64);
-      ImGui.SliderFloat('blurStdDev', (val?: number) => {
-        return sao.blurStdDev = val = val ?? sao.blurStdDev;
-      }, 0, 128);
-      ImGui.SliderFloat('blurDepthCutoff', (val?: number) => {
-        return sao.blurDepthCutoff = val = val ?? sao.blurDepthCutoff;
-      }, 0, 1);
+      ImGui.DragFloat(
+        'Scale##sao',
+        (val?: number) => {
+          return (sao.scale = val = val ?? sao.scale);
+        },
+        0.01,
+        0,
+        10
+      );
+      ImGui.DragFloat(
+        'Bias##sao',
+        (val?: number) => {
+          return (sao.bias = val = val ?? sao.bias);
+        },
+        0.01,
+        -1,
+        1
+      );
+      ImGui.DragFloat(
+        'Intensity##sao',
+        (val?: number) => {
+          return (sao.intensity = val = val ?? sao.intensity);
+        },
+        0.01,
+        0,
+        1
+      );
+      ImGui.DragFloat(
+        'Radius##sao',
+        (val?: number) => {
+          return (sao.radius = val = val ?? sao.radius);
+        },
+        0.01,
+        1,
+        100
+      );
+      ImGui.DragFloat(
+        'minResolution##sao',
+        (val?: number) => {
+          return (sao.minResolution = val = val ?? sao.minResolution);
+        },
+        0.01,
+        0,
+        1
+      );
+      ImGui.SliderFloat(
+        'blurKernelSize',
+        (val?: number) => {
+          return (sao.blurKernelSize = val = val ?? sao.blurKernelSize);
+        },
+        0,
+        64
+      );
+      ImGui.SliderFloat(
+        'blurStdDev',
+        (val?: number) => {
+          return (sao.blurStdDev = val = val ?? sao.blurStdDev);
+        },
+        0,
+        128
+      );
+      ImGui.SliderFloat(
+        'blurDepthCutoff',
+        (val?: number) => {
+          return (sao.blurDepthCutoff = val = val ?? sao.blurDepthCutoff);
+        },
+        0,
+        1
+      );
     }
     ImGui.End();
   }
@@ -408,14 +525,18 @@ export class Inspector {
     ImGui.Begin('Sky & Fog');
     const sky = this._scene.env.sky;
     if (ImGui.CollapsingHeader('Sky & Fog')) {
-      ImGui.Combo('Type##sky', (val?: number) => {
-        if (val === undefined) {
-          val = this._skyTypes.indexOf(sky.skyType);
-        } else {
-          sky.skyType = this._skyTypes[val];
-        }
-        return val;
-      }, this._skyTypes);
+      ImGui.Combo(
+        'Type##sky',
+        (val?: number) => {
+          if (val === undefined) {
+            val = this._skyTypes.indexOf(sky.skyType);
+          } else {
+            sky.skyType = this._skyTypes[val];
+          }
+          return val;
+        },
+        this._skyTypes
+      );
       ImGui.Checkbox('AutoUpdateIBLMaps##sky', (val?: boolean) => {
         if (val === undefined) {
           val = sky.autoUpdateIBLMaps;
@@ -436,19 +557,21 @@ export class Inspector {
             const isHDR = files[0].name.toLowerCase().endsWith('.hdr');
             const isDDS = files[0].name.toLowerCase().endsWith('.dds');
             if (isHDR || isDDS) {
-              this._assetManager.fetchTexture(url, {
-                mimeType: isHDR ? 'image/hdr' : 'image/dds',
-                samplerOptions: { mipFilter: 'none' }
-              }).then(tex => {
-                if (tex.isTextureCube()) {
-                  this._scene.env.sky.skyboxTexture = tex;
-                } else if (tex.isTexture2D()) {
-                  const skyMap = Application.instance.device.createCubeTexture('rgba16f', 512);
-                  panoramaToCubemap(tex, skyMap);
-                  this._scene.env.sky.skyboxTexture = skyMap;
-                  tex.dispose();
-                }
-              });
+              this._assetManager
+                .fetchTexture(url, {
+                  mimeType: isHDR ? 'image/hdr' : 'image/dds',
+                  samplerOptions: { mipFilter: 'none' }
+                })
+                .then((tex) => {
+                  if (tex.isTextureCube()) {
+                    this._scene.env.sky.skyboxTexture = tex;
+                  } else if (tex.isTexture2D()) {
+                    const skyMap = Application.instance.device.createCubeTexture('rgba16f', 512);
+                    panoramaToCubemap(tex, skyMap);
+                    this._scene.env.sky.skyboxTexture = skyMap;
+                    tex.dispose();
+                  }
+                });
             }
           });
         }
@@ -466,34 +589,65 @@ export class Inspector {
       }
     }
     if (ImGui.CollapsingHeader('Fog')) {
-      ImGui.Combo('Type##fog', (val?: number) => {
-        if (val === undefined) {
-          val = this._fogTypes.indexOf(sky.fogType);
-        } else {
-          sky.fogType = this._fogTypes[val];
-        }
-        return val;
-      }, this._fogTypes);
+      ImGui.Combo(
+        'Type##fog',
+        (val?: number) => {
+          if (val === undefined) {
+            val = this._fogTypes.indexOf(sky.fogType);
+          } else {
+            sky.fogType = this._fogTypes[val];
+          }
+          return val;
+        },
+        this._fogTypes
+      );
       if (sky.fogType !== 'none' && sky.fogType !== 'scatter') {
         const rgbFog = [...sky.fogColor] as [number, number, number];
         if (ImGui.ColorEdit3('Color##fog', rgbFog)) {
           sky.fogColor = new Vector4(rgbFog[0], rgbFog[1], rgbFog[2], 1);
         }
         if (sky.fogType === 'linear') {
-          ImGui.InputFloat('Start##fog', (val?: number) => {
-            return sky.fogStart = val = val ?? sky.fogStart;
-          }, 0, 0, null, ImGui.InputTextFlags.EnterReturnsTrue);
-          ImGui.InputFloat('End##fog', (val?: number) => {
-            return sky.fogEnd = val = val ?? sky.fogEnd;
-          }, 0, 0, null, ImGui.InputTextFlags.EnterReturnsTrue);
+          ImGui.InputFloat(
+            'Start##fog',
+            (val?: number) => {
+              return (sky.fogStart = val = val ?? sky.fogStart);
+            },
+            0,
+            0,
+            null,
+            ImGui.InputTextFlags.EnterReturnsTrue
+          );
+          ImGui.InputFloat(
+            'End##fog',
+            (val?: number) => {
+              return (sky.fogEnd = val = val ?? sky.fogEnd);
+            },
+            0,
+            0,
+            null,
+            ImGui.InputTextFlags.EnterReturnsTrue
+          );
         } else if (sky.fogType === 'exp' || sky.fogType === 'exp2') {
-          ImGui.DragFloat('Density##fog', (val?: number) => {
-            return sky.fogDensity = val = val ?? sky.fogDensity;
-          }, 0.001, 0, 1);
+          ImGui.DragFloat(
+            'Density##fog',
+            (val?: number) => {
+              return (sky.fogDensity = val = val ?? sky.fogDensity);
+            },
+            0.001,
+            0,
+            1
+          );
         }
-        ImGui.InputFloat('Top##fog', (val?: number) => {
-          return sky.fogTop = val = val ?? sky.fogTop;
-        }, 0, 0, null, ImGui.InputTextFlags.EnterReturnsTrue);
+        ImGui.InputFloat(
+          'Top##fog',
+          (val?: number) => {
+            return (sky.fogTop = val = val ?? sky.fogTop);
+          },
+          0,
+          0,
+          null,
+          ImGui.InputTextFlags.EnterReturnsTrue
+        );
       }
     }
     ImGui.End();
@@ -511,22 +665,37 @@ export class Inspector {
   }
   private renderPerspectiveCamera(camera: PerspectiveCamera) {
     if (ImGui.Begin('Camera')) {
-      ImGui.SliderFloat('NearPlane', (val?: number) => {
-        camera.near = val = val ?? camera.near;
-        return val;
-      }, 0, 1000);
-      ImGui.SliderFloat('FarPlane', (val?: number) => {
-        camera.far = val = val ?? camera.far;
-        return val;
-      }, 0, 10000);
-      ImGui.SliderFloat('FovY', (val?: number) => {
-        if (val === undefined) {
-          val = camera.fovY * 180 / Math.PI;
-        } else {
-          camera.fovY = val * Math.PI / 180;
-        }
-        return val;
-      }, 0, 180);
+      ImGui.SliderFloat(
+        'NearPlane',
+        (val?: number) => {
+          camera.near = val = val ?? camera.near;
+          return val;
+        },
+        0,
+        1000
+      );
+      ImGui.SliderFloat(
+        'FarPlane',
+        (val?: number) => {
+          camera.far = val = val ?? camera.far;
+          return val;
+        },
+        0,
+        10000
+      );
+      ImGui.SliderFloat(
+        'FovY',
+        (val?: number) => {
+          if (val === undefined) {
+            val = (camera.fovY * 180) / Math.PI;
+          } else {
+            camera.fovY = (val * Math.PI) / 180;
+          }
+          return val;
+        },
+        0,
+        180
+      );
       const vp = [0, 0, 0, 0] as [number, number, number, number];
       if (camera.viewport) {
         vp[0] = camera.viewport[0];
@@ -575,37 +744,50 @@ export class Inspector {
     let currentIndex = this._envlightTypes.indexOf(this._scene.env.light.type);
     if (currentIndex >= 0) {
       if (ImGui.CollapsingHeader('Environment light')) {
-        ImGui.SliderFloat('Strength', (val?: number) => {
-          this._scene.env.light.strength = val = val ?? this._scene.env.light.strength;
-          return val;
-        }, 0, 1);
-        ImGui.Combo('type', (index? :number) => {
-          if (index === undefined) {
-            index = currentIndex;
-          } else {
-            currentIndex = index;
-            this._scene.env.light.type = this._envlightTypes[index];
-          }
-          return index;
-        }, this._envlightTypes);
+        ImGui.SliderFloat(
+          'Strength',
+          (val?: number) => {
+            this._scene.env.light.strength = val = val ?? this._scene.env.light.strength;
+            return val;
+          },
+          0,
+          1
+        );
+        ImGui.Combo(
+          'type',
+          (index?: number) => {
+            if (index === undefined) {
+              index = currentIndex;
+            } else {
+              currentIndex = index;
+              this._scene.env.light.type = this._envlightTypes[index];
+            }
+            return index;
+          },
+          this._envlightTypes
+        );
         if (this._envlightTypes[currentIndex] === 'ibl') {
           if (ImGui.Button('Select HDR texture')) {
             this.chooseFile(false, '.hdr', (files) => {
               const url = URL.createObjectURL(files[0]);
-              this._assetManager.fetchTexture<Texture2D>(url, {
-                mimeType: 'image/hdr',
-                samplerOptions: { mipFilter: 'none' }
-              }).then(tex => {
-                const skyMap = Application.instance.device.createCubeTexture('rgba16f', 512);
-                const radianceMap = Application.instance.device.createCubeTexture('rgba16f', 256);
-                const irradianceMap = Application.instance.device.createCubeTexture('rgba16f', 64, { samplerOptions: { mipFilter: 'none' } });
-                panoramaToCubemap(tex, skyMap);
-                prefilterCubemap(skyMap, 'ggx', radianceMap);
-                prefilterCubemap(skyMap, 'lambertian', irradianceMap);
-                tex.dispose();
-                this._scene.env.light.radianceMap = radianceMap;
-                this._scene.env.light.irradianceMap = irradianceMap;
-              });
+              this._assetManager
+                .fetchTexture<Texture2D>(url, {
+                  mimeType: 'image/hdr',
+                  samplerOptions: { mipFilter: 'none' }
+                })
+                .then((tex) => {
+                  const skyMap = Application.instance.device.createCubeTexture('rgba16f', 512);
+                  const radianceMap = Application.instance.device.createCubeTexture('rgba16f', 256);
+                  const irradianceMap = Application.instance.device.createCubeTexture('rgba16f', 64, {
+                    samplerOptions: { mipFilter: 'none' }
+                  });
+                  panoramaToCubemap(tex, skyMap);
+                  prefilterCubemap(skyMap, 'ggx', radianceMap);
+                  prefilterCubemap(skyMap, 'lambertian', irradianceMap);
+                  tex.dispose();
+                  this._scene.env.light.radianceMap = radianceMap;
+                  this._scene.env.light.irradianceMap = irradianceMap;
+                });
             });
           }
           if (ImGui.Button('Use sky IBL maps')) {
@@ -643,7 +825,11 @@ export class Inspector {
     }
     for (let i = 0; i < lights.length; i++) {
       ImGui.PushID(i);
-      const type = lights[i].isDirectionLight() ? 'Directional light' : lights[i].isPointLight() ? 'Point light' : 'Spot light';
+      const type = lights[i].isDirectionLight()
+        ? 'Directional light'
+        : lights[i].isPointLight()
+        ? 'Point light'
+        : 'Spot light';
       if (ImGui.CollapsingHeader(type)) {
         this.editLight(lights[i]);
       }
@@ -666,20 +852,28 @@ export class Inspector {
   }
   private renderTextureViewer() {
     const textureList = Application.instance.device.getGPUObjects().textures;
-    const textureNameList = textureList.filter(tex => !tex.isTexture3D()).sort((a, b) => a.uid - b.uid).map(tex => this.textureToListName(tex));
+    const textureNameList = textureList
+      .filter((tex) => !tex.isTexture3D())
+      .sort((a, b) => a.uid - b.uid)
+      .map((tex) => this.textureToListName(tex));
     if (textureNameList.length > 0) {
       if (!this._framebuffer) {
-        const renderTarget = Application.instance.device.createTexture2D('rgba8unorm', 512, 512, { samplerOptions: { mipFilter: 'none' } });
+        const renderTarget = Application.instance.device.createTexture2D('rgba8unorm', 512, 512, {
+          samplerOptions: { mipFilter: 'none' }
+        });
         renderTarget.name = '!!textureviewer';
         this._framebuffer = Application.instance.device.createFrameBuffer([renderTarget], null);
         this._framebuffer.setColorAttachmentGenerateMipmaps(0, false);
       }
       ImGui.Begin('Texture viewer');
-      let tindex = this._currentTextureUid < 0 ? -1 : textureNameList.findIndex(val => {
-        const k = val.split('##');
-        const uid = Number(k[k.length - 1]);
-        return uid === this._currentTextureUid;
-      });
+      let tindex =
+        this._currentTextureUid < 0
+          ? -1
+          : textureNameList.findIndex((val) => {
+              const k = val.split('##');
+              const uid = Number(k[k.length - 1]);
+              return uid === this._currentTextureUid;
+            });
       if (tindex < 0) {
         tindex = 0;
         this._currentTextureMipLevel = 0;
@@ -693,11 +887,19 @@ export class Inspector {
       }
       const k = textureNameList[tindex].split('##');
       this._currentTextureUid = Number(k[k.length - 1]);
-      this._currentTexture = Application.instance.device.getGPUObjectById(this._currentTextureUid) as BaseTexture;
+      this._currentTexture = Application.instance.device.getGPUObjectById(
+        this._currentTextureUid
+      ) as BaseTexture;
       if (this._currentTexture) {
         const mipLevelCount = this._currentTexture.mipLevelCount;
         const miplevel = [this._currentTextureMipLevel] as [number];
-        if (ImGui.Combo('MipLevel', miplevel, Array.from({length: mipLevelCount}).map((val, index) => String(index)))) {
+        if (
+          ImGui.Combo(
+            'MipLevel',
+            miplevel,
+            Array.from({ length: mipLevelCount }).map((val, index) => String(index))
+          )
+        ) {
           this._currentTextureMipLevel = miplevel[0];
         }
         if (this._currentTexture.isTextureCube()) {
@@ -756,10 +958,22 @@ export class Inspector {
       Application.instance.device.pushDeviceStates();
       Application.instance.device.setFramebuffer(this._framebuffer);
       Application.instance.device.clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
-      this._textureDrawer.draw(this._currentTexture, this._textureRepeat, this._textureGammaCorrect, this._textureLinear, this._textureFlip, this._textureEncodes[this._textureDrawEncode], this._textureModes[this._textureDrawMode], this._currentTextureMipLevel, this._currentTextureLayer);
+      this._textureDrawer.draw(
+        this._currentTexture,
+        this._textureRepeat,
+        this._textureGammaCorrect,
+        this._textureLinear,
+        this._textureFlip,
+        this._textureEncodes[this._textureDrawEncode],
+        this._textureModes[this._textureDrawMode],
+        this._currentTextureMipLevel,
+        this._currentTextureLayer
+      );
       Application.instance.device.popDeviceStates();
       const width = ImGui.GetContentRegionAvail().x;
-      const height = this._currentTexture ? Math.floor(width / this._currentTexture.width * this._currentTexture.height) : width;
+      const height = this._currentTexture
+        ? Math.floor((width / this._currentTexture.width) * this._currentTexture.height)
+        : width;
       ImGui.Image(this._framebuffer.getColorAttachments()[0] as Texture2D, new ImGui.ImVec2(width, height));
       ImGui.End();
     }
@@ -784,73 +998,154 @@ export class Inspector {
       return val;
     });
     if (light.castShadow) {
-      ImGui.InputInt('ShadowMapSize', (val?: number) => {
-        if (val === undefined) {
-          val = light.shadow.shadowMapSize;
-        } else {
-          val = Math.max(Math.min(val, 4096), 0);
-          light.shadow.shadowMapSize = Math.max(Math.min(val, 4096), 0);
-        }
-        return val;
-      }, 0, 0, ImGui.InputTextFlags.EnterReturnsTrue);
-      ImGui.SliderFloat('ShadowDistance', (val?: number) => {
-        return light.shadow.shadowDistance = val = val ?? light.shadow.shadowDistance;
-      }, 0, 2000);
-      ImGui.DragFloat('DepthBias', (val?: number) => {
-        return light.shadow.depthBias = val = val ?? light.shadow.depthBias;
-      }, 0.001, 0, 1);
-      ImGui.DragFloat('NormalBias', (val?: number) => {
-        return light.shadow.normalBias = val = val ?? light.shadow.normalBias;
-      }, 0.001, 0, 1);
-      ImGui.Combo('Method', (val?: number) => {
-        if (val === undefined) {
-          val = this._shadowMethods.indexOf(light.shadow.mode);
-        } else {
-          light.shadow.mode = this._shadowMethods[val];
-        }
-        return val;
-      }, this._shadowMethods);
+      ImGui.InputInt(
+        'ShadowMapSize',
+        (val?: number) => {
+          if (val === undefined) {
+            val = light.shadow.shadowMapSize;
+          } else {
+            val = Math.max(Math.min(val, 4096), 0);
+            light.shadow.shadowMapSize = Math.max(Math.min(val, 4096), 0);
+          }
+          return val;
+        },
+        0,
+        0,
+        ImGui.InputTextFlags.EnterReturnsTrue
+      );
+      ImGui.SliderFloat(
+        'ShadowDistance',
+        (val?: number) => {
+          return (light.shadow.shadowDistance = val = val ?? light.shadow.shadowDistance);
+        },
+        0,
+        2000
+      );
+      ImGui.DragFloat(
+        'DepthBias',
+        (val?: number) => {
+          return (light.shadow.depthBias = val = val ?? light.shadow.depthBias);
+        },
+        0.001,
+        0,
+        1
+      );
+      ImGui.DragFloat(
+        'NormalBias',
+        (val?: number) => {
+          return (light.shadow.normalBias = val = val ?? light.shadow.normalBias);
+        },
+        0.001,
+        0,
+        1
+      );
+      ImGui.Combo(
+        'Method',
+        (val?: number) => {
+          if (val === undefined) {
+            val = this._shadowMethods.indexOf(light.shadow.mode);
+          } else {
+            light.shadow.mode = this._shadowMethods[val];
+          }
+          return val;
+        },
+        this._shadowMethods
+      );
       if (light.isDirectionLight()) {
-        ImGui.DragInt('Cascades', (val?: number) => {
-          return light.shadow.numShadowCascades = val = val ?? light.shadow.numShadowCascades;
-        }, 1, 1, 4);
+        ImGui.DragInt(
+          'Cascades',
+          (val?: number) => {
+            return (light.shadow.numShadowCascades = val = val ?? light.shadow.numShadowCascades);
+          },
+          1,
+          1,
+          4
+        );
       }
       if (light.shadow.mode === 'esm') {
         ImGui.DragFloat('ESMDepthScale', (val?: number) => {
-          return light.shadow.esmDepthScale = val = val ?? light.shadow.esmDepthScale;
+          return (light.shadow.esmDepthScale = val = val ?? light.shadow.esmDepthScale);
         });
         ImGui.Checkbox('ESMBlur', (val?: boolean) => {
-          return light.shadow.esmBlur = val = val ?? light.shadow.esmBlur;
+          return (light.shadow.esmBlur = val = val ?? light.shadow.esmBlur);
         });
         if (light.shadow.esmBlur) {
-          ImGui.DragInt('ESMBlurKernelSize', (val?: number) => {
-            return light.shadow.esmBlurKernelSize = val = val ?? light.shadow.esmBlurKernelSize;
-          }, 2, 3, 25);
-          ImGui.DragFloat('ESMBlurRadius', (val?: number) => {
-            return light.shadow.esmBlurRadius = val = val ?? light.shadow.esmBlurRadius;
-          }, 0.1, 0, 20);
+          ImGui.DragInt(
+            'ESMBlurKernelSize',
+            (val?: number) => {
+              return (light.shadow.esmBlurKernelSize = val = val ?? light.shadow.esmBlurKernelSize);
+            },
+            2,
+            3,
+            25
+          );
+          ImGui.DragFloat(
+            'ESMBlurRadius',
+            (val?: number) => {
+              return (light.shadow.esmBlurRadius = val = val ?? light.shadow.esmBlurRadius);
+            },
+            0.1,
+            0,
+            20
+          );
         }
       } else if (light.shadow.mode === 'vsm') {
-        ImGui.DragInt('VSMBlurKernelSize', (val?: number) => {
-          return light.shadow.vsmBlurKernelSize = val = val ?? light.shadow.vsmBlurKernelSize;
-        }, 2, 3, 25);
-        ImGui.DragFloat('VSMBlurRadius', (val?: number) => {
-          return light.shadow.vsmBlurRadius = val = val ?? light.shadow.vsmBlurRadius;
-        }, 0.1, 0, 20);
-        ImGui.DragFloat('VSMDarkness', (val?: number) => {
-          return light.shadow.vsmDarkness = val = val ?? light.shadow.vsmDarkness;
-        }, 0.01, 0, 0.999);
+        ImGui.DragInt(
+          'VSMBlurKernelSize',
+          (val?: number) => {
+            return (light.shadow.vsmBlurKernelSize = val = val ?? light.shadow.vsmBlurKernelSize);
+          },
+          2,
+          3,
+          25
+        );
+        ImGui.DragFloat(
+          'VSMBlurRadius',
+          (val?: number) => {
+            return (light.shadow.vsmBlurRadius = val = val ?? light.shadow.vsmBlurRadius);
+          },
+          0.1,
+          0,
+          20
+        );
+        ImGui.DragFloat(
+          'VSMDarkness',
+          (val?: number) => {
+            return (light.shadow.vsmDarkness = val = val ?? light.shadow.vsmDarkness);
+          },
+          0.01,
+          0,
+          0.999
+        );
       } else if (light.shadow.mode === 'pcf-pd') {
-        ImGui.DragInt('PoissonSampleCount', (val?: number) => {
-          return light.shadow.pdSampleCount = val = val ?? light.shadow.pdSampleCount;
-        }, 1, 1, 64);
-        ImGui.DragFloat('PoissonSampleRadius', (val?: number) => {
-          return light.shadow.pdSampleRadius = val = val ?? light.shadow.pdSampleRadius;
-        }, 0.1, 0, 50);
+        ImGui.DragInt(
+          'PoissonSampleCount',
+          (val?: number) => {
+            return (light.shadow.pdSampleCount = val = val ?? light.shadow.pdSampleCount);
+          },
+          1,
+          1,
+          64
+        );
+        ImGui.DragFloat(
+          'PoissonSampleRadius',
+          (val?: number) => {
+            return (light.shadow.pdSampleRadius = val = val ?? light.shadow.pdSampleRadius);
+          },
+          0.1,
+          0,
+          50
+        );
       } else if (light.shadow.mode === 'pcf-opt') {
-        ImGui.DragInt('PCFKernelSize', (val?: number) => {
-          return light.shadow.pcfKernelSize = val = val ?? light.shadow.pcfKernelSize;
-        }, 2, 3, 7);
+        ImGui.DragInt(
+          'PCFKernelSize',
+          (val?: number) => {
+            return (light.shadow.pcfKernelSize = val = val ?? light.shadow.pcfKernelSize);
+          },
+          2,
+          3,
+          7
+        );
       }
     }
     ImGui.EndSection(1);
@@ -859,32 +1154,47 @@ export class Inspector {
     if (ImGui.ColorEdit3('Color', rgb)) {
       light.color = new Vector4(rgb.r, rgb.g, rgb.b, 1);
     }
-    ImGui.SliderFloat('Intensity', (val?: number) => {
-      if (val === undefined) {
-        val = light.intensity;
-      } else {
-        light.intensity = val;
-      }
-      return val;
-    }, 0, 50);
-    if (light.isPointLight() || light.isSpotLight()) {
-      ImGui.SliderFloat('Range', (val?: number) => {
+    ImGui.SliderFloat(
+      'Intensity',
+      (val?: number) => {
         if (val === undefined) {
-          val = light.range;
+          val = light.intensity;
         } else {
-          light.range = val;
+          light.intensity = val;
         }
         return val;
-      }, 0, 50);
-      if (light.isSpotLight()) {
-        ImGui.SliderFloat('Cutoff', (val?: number) => {
+      },
+      0,
+      50
+    );
+    if (light.isPointLight() || light.isSpotLight()) {
+      ImGui.SliderFloat(
+        'Range',
+        (val?: number) => {
           if (val === undefined) {
-            val = light.cutoff;
+            val = light.range;
           } else {
-            light.cutoff = val;
+            light.range = val;
           }
           return val;
-        }, 0, 1);
+        },
+        0,
+        50
+      );
+      if (light.isSpotLight()) {
+        ImGui.SliderFloat(
+          'Cutoff',
+          (val?: number) => {
+            if (val === undefined) {
+              val = light.cutoff;
+            } else {
+              light.cutoff = val;
+            }
+            return val;
+          },
+          0,
+          1
+        );
       }
     }
     if (light.isDirectionLight() || light.isSpotLight()) {

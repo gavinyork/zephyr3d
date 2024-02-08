@@ -7,9 +7,7 @@ import type {
   BindGroupLayout,
   TextureSampler
 } from '@zephyr3d/device';
-import {
-  ProgramBuilder
-} from '@zephyr3d/device';
+import { ProgramBuilder } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
 import type { Drawable, DrawContext } from '../render/drawable';
 import { Application } from '../app';
@@ -83,32 +81,46 @@ class InstanceBindGroupPool {
  * Common debug channels for material
  * @public
  */
-export type MaterialCommonDebugChannel = 'normal'|'tangent'|'binormal'|'shadingNormal';
+export type MaterialCommonDebugChannel = 'normal' | 'tangent' | 'binormal' | 'shadingNormal';
 /**
  * Base debug channels for PBR material
  * @public
  */
-export type PBRBaseDebugChannel = 'pbrBase'|'pbrMetallic'|'pbrRoughness'|'pbrMetallicRoughness';
+export type PBRBaseDebugChannel = 'pbrBase' | 'pbrMetallic' | 'pbrRoughness' | 'pbrMetallicRoughness';
 /**
  * Clearcoat related debug channels for PBR material
  * @public
  */
-export type PBRClearcoatDebugChannel = 'pbrClearCoat'|'pbrClearCoatFactor'|'pbrClearCoatRoughness'|'pbrClearCoatNormal';
+export type PBRClearcoatDebugChannel =
+  | 'pbrClearCoat'
+  | 'pbrClearCoatFactor'
+  | 'pbrClearCoatRoughness'
+  | 'pbrClearCoatNormal';
 /**
  * Sheen related debug channels for PBR material
  * @public
  */
-export type PBRSheenDebugChannel = 'pbrSheen'|'pbrSheenColor'|'pbrSheenRoughness'|'pbrSheenAlbedoScaling';
+export type PBRSheenDebugChannel =
+  | 'pbrSheen'
+  | 'pbrSheenColor'
+  | 'pbrSheenRoughness'
+  | 'pbrSheenAlbedoScaling';
 /**
  * Specular related debug channels for PBR material
  * @public
  */
-export type PBRSpecularDebugChannel = 'pbrSpecular'|'pbrSpecularFactor'|'pbrSpecularColor';
+export type PBRSpecularDebugChannel = 'pbrSpecular' | 'pbrSpecularFactor' | 'pbrSpecularColor';
 /**
  * Debug channels for material
  * @public
  */
-export type MaterialDebugChannel = ''|MaterialCommonDebugChannel|PBRBaseDebugChannel|PBRClearcoatDebugChannel|PBRSheenDebugChannel|PBRSpecularDebugChannel;
+export type MaterialDebugChannel =
+  | ''
+  | MaterialCommonDebugChannel
+  | PBRBaseDebugChannel
+  | PBRClearcoatDebugChannel
+  | PBRSheenDebugChannel
+  | PBRSpecularDebugChannel;
 
 export interface IMaterial {
   readonly id: number;
@@ -143,13 +155,13 @@ export class Material implements IMaterial {
   /** @internal */
   private static _drawableTimestamps: WeakMap<Drawable, number> = new WeakMap();
   /** @internal */
-  private static _drawableIterators: WeakMap<Drawable, ListIterator<Drawable> > = new WeakMap();
+  private static _drawableIterators: WeakMap<Drawable, ListIterator<Drawable>> = new WeakMap();
   /** @internal */
   private static _drawableLRU: List<Drawable> = new List<Drawable>();
   /** @internal */
   private static _materialTimestamps: WeakMap<Material, number> = new WeakMap();
   /** @internal */
-  private static _materialIterators: WeakMap<Material, ListIterator<Material> > = new WeakMap();
+  private static _materialIterators: WeakMap<Material, ListIterator<Material>> = new WeakMap();
   /** @internal */
   private static _materialLRU: List<Material> = new List<Material>();
   /** @internal */
@@ -316,11 +328,17 @@ export class Material implements IMaterial {
   getOrCreateProgram(ctx: DrawContext): ProgramInfo {
     const programMap = Material._programMap;
     const renderPassType = ctx.renderPass.type;
-    const hash = `${Material.debugChannel}:${this.getHash(renderPassType)}:${!!ctx.target.getBoneMatrices()}:${Number(
-      !!(ctx.instanceData?.worldMatrices.length > 1)
-    )}:${ctx.renderPassHash}`;
+    const hash = `${Material.debugChannel}:${this.getHash(
+      renderPassType
+    )}:${!!ctx.target.getBoneMatrices()}:${Number(!!(ctx.instanceData?.worldMatrices.length > 1))}:${
+      ctx.renderPassHash
+    }`;
     let programInfo = programMap[hash];
-    if (!programInfo || !programInfo.programs[renderPassType] || programInfo.programs[renderPassType].disposed) {
+    if (
+      !programInfo ||
+      !programInfo.programs[renderPassType] ||
+      programInfo.programs[renderPassType].disposed
+    ) {
       console.time(hash);
       const program = this.createProgram(ctx);
       console.timeEnd(hash);
@@ -333,9 +351,9 @@ export class Material implements IMaterial {
       }
       programInfo.programs[renderPassType] = program;
       if (false && program) {
-        console.log ('---------------------------------------');
+        console.log('---------------------------------------');
         console.log(program.getShaderSource('fragment'));
-        console.log ('---------------------------------------');
+        console.log('---------------------------------------');
       }
     }
     return programInfo || null;
@@ -419,7 +437,11 @@ export class Material implements IMaterial {
     let bindGroupInfo = this._bindGroupMap[hash];
     if (!bindGroupInfo) {
       // bindGroups not created or have been garbage collected
-      const materialBindGroup = [RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP, RENDER_PASS_TYPE_DEPTH_ONLY].map((k) => {
+      const materialBindGroup = [
+        RENDER_PASS_TYPE_FORWARD,
+        RENDER_PASS_TYPE_SHADOWMAP,
+        RENDER_PASS_TYPE_DEPTH_ONLY
+      ].map((k) => {
         const program = Material._programMap[hash].programs[k];
         return program?.bindGroupLayouts[2]
           ? Application.instance.device.createBindGroup(program.bindGroupLayouts[2])
@@ -463,7 +485,11 @@ export class Material implements IMaterial {
     }
     let drawableBindGroup = drawableBindGroups[hash];
     if (!drawableBindGroup) {
-      const bindGroup = [RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP, RENDER_PASS_TYPE_DEPTH_ONLY].map((k) => {
+      const bindGroup = [
+        RENDER_PASS_TYPE_FORWARD,
+        RENDER_PASS_TYPE_SHADOWMAP,
+        RENDER_PASS_TYPE_DEPTH_ONLY
+      ].map((k) => {
         const program = Material._programMap[hash].programs[k];
         return program?.bindGroupLayouts[1]
           ? Application.instance.device.createBindGroup(program.bindGroupLayouts[1])
@@ -480,11 +506,7 @@ export class Material implements IMaterial {
   /** @internal */
   private applyInstanceBindGroups(ctx: DrawContext, hash: string): void {
     const index = ctx.renderPass.type;
-    const offset = Material._instanceBindGroupPool.apply(
-      hash,
-      index,
-      ctx.instanceData.worldMatrices
-    );
+    const offset = Material._instanceBindGroupPool.apply(hash, index, ctx.instanceData.worldMatrices);
     const bindGroup = this.getDrawableBindGroup(ctx, hash).bindGroup?.[index];
     if (bindGroup) {
       bindGroup.setValue('instanceBufferOffset', offset);

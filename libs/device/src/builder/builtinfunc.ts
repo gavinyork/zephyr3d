@@ -1,5 +1,5 @@
 import * as typeinfo from './types';
-import type { ASTExpression} from './ast';
+import type { ASTExpression } from './ast';
 import { ASTUnaryFunc, ASTBinaryFunc, ASTFunction, ASTAddressOf, ASTScalar } from './ast';
 import { PBShaderExp } from './base';
 import {
@@ -69,7 +69,10 @@ function genMatrixType(
     const argTypes = args.map((arg) => {
       return { type: arg || genMatrixTypeList[i] };
     });
-    result.push([new ASTFunction(name, null, false, new typeinfo.PBFunctionTypeInfo(name, returnType, argTypes), true), shaderTypeMask]);
+    result.push([
+      new ASTFunction(name, null, false, new typeinfo.PBFunctionTypeInfo(name, returnType, argTypes), true),
+      shaderTypeMask
+    ]);
   }
   return result;
 }
@@ -84,11 +87,17 @@ function genType(
   if (args.findIndex((val) => typeof val === 'number') < 0) {
     return [
       [
-        new ASTFunction(name, null, false, new typeinfo.PBFunctionTypeInfo(
+        new ASTFunction(
           name,
-          r as typeinfo.PBPrimitiveTypeInfo,
-          args.map((arg) => ({ type: arg as typeinfo.PBTypeInfo }))
-        ), true),
+          null,
+          false,
+          new typeinfo.PBFunctionTypeInfo(
+            name,
+            r as typeinfo.PBPrimitiveTypeInfo,
+            args.map((arg) => ({ type: arg as typeinfo.PBTypeInfo }))
+          ),
+          true
+        ),
         shaderTypeMask
       ]
     ];
@@ -104,7 +113,10 @@ function genType(
           return { type: arg };
         }
       });
-      result.push([new ASTFunction(name, null, false, new typeinfo.PBFunctionTypeInfo(name, returnType, argTypes), true), shaderTypeMask]);
+      result.push([
+        new ASTFunction(name, null, false, new typeinfo.PBFunctionTypeInfo(name, returnType, argTypes), true),
+        shaderTypeMask
+      ]);
     }
     return result;
   }
@@ -127,7 +139,6 @@ const MASK_WEBGL2 = 1 << 1;
 const MASK_WEBGPU = 1 << 2;
 const MASK_WEBGL = MASK_WEBGL1 | MASK_WEBGL2;
 const MASK_ALL = MASK_WEBGL | MASK_WEBGPU;
-
 
 const builtinFunctionsAll = {
   add_2: {
@@ -418,7 +429,7 @@ const builtinFunctionsAll = {
       if (pb.getDevice().type === 'webgpu') {
         return callBuiltinChecked(pb, matchResult);
       } else {
-        return pb.add(pb.mul(args[0] as any, args[1] as any), args[2] as any)
+        return pb.add(pb.mul(args[0] as any, args[1] as any), args[2] as any);
       }
     }
   },
@@ -2858,7 +2869,11 @@ const builtinFunctionsAll = {
           if (!Number.isInteger(arg2)) {
             throw new PBParamValueError(name, 'value');
           }
-          return pb.$callFunctionNoCheck(name, [new ASTAddressOf(arg1.$ast), new ASTScalar(arg2, typeinfo.typeI32)], typeinfo.typeVoid);
+          return pb.$callFunctionNoCheck(
+            name,
+            [new ASTAddressOf(arg1.$ast), new ASTScalar(arg2, typeinfo.typeI32)],
+            typeinfo.typeVoid
+          );
         } else if (arg2 instanceof PBShaderExp) {
           if (arg2.$ast.getType().typeId !== typeinfo.typeI32.typeId) {
             throw new PBParamTypeError(name, 'value');
@@ -2872,7 +2887,11 @@ const builtinFunctionsAll = {
           if (!Number.isInteger(arg2)) {
             throw new PBParamValueError(name, 'value');
           }
-          return pb.$callFunctionNoCheck(name, [new ASTAddressOf(arg1.$ast), new ASTScalar(arg2, typeinfo.typeU32)], typeinfo.typeVoid);
+          return pb.$callFunctionNoCheck(
+            name,
+            [new ASTAddressOf(arg1.$ast), new ASTScalar(arg2, typeinfo.typeU32)],
+            typeinfo.typeVoid
+          );
         } else if (arg2 instanceof PBShaderExp) {
           if (arg2.$ast.getType().typeId !== typeinfo.typeU32.typeId) {
             throw new PBParamTypeError(name, 'value');
@@ -2888,7 +2907,15 @@ const builtinFunctionsAll = {
   }
 };
 
-for (const name of ['atomicAdd', 'atomicSub', 'atomicMax', 'atomicMin', 'atomicAnd', 'atomicOr', 'atomicXor']) {
+for (const name of [
+  'atomicAdd',
+  'atomicSub',
+  'atomicMax',
+  'atomicMin',
+  'atomicAnd',
+  'atomicOr',
+  'atomicXor'
+]) {
   builtinFunctionsAll[name] = {
     overloades: [],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
@@ -2905,7 +2932,11 @@ for (const name of ['atomicAdd', 'atomicSub', 'atomicMax', 'atomicMin', 'atomicA
           if (!Number.isInteger(arg2)) {
             throw new PBParamValueError(name, 'value');
           }
-          return pb.$callFunctionNoCheck(name, [new ASTAddressOf(arg1.$ast), new ASTScalar(arg2, typeinfo.typeI32)], typeinfo.typeI32);
+          return pb.$callFunctionNoCheck(
+            name,
+            [new ASTAddressOf(arg1.$ast), new ASTScalar(arg2, typeinfo.typeI32)],
+            typeinfo.typeI32
+          );
         } else if (arg2 instanceof PBShaderExp) {
           if (arg2.$ast.getType().typeId !== typeinfo.typeI32.typeId) {
             throw new PBParamTypeError(name, 'value');
@@ -2919,7 +2950,11 @@ for (const name of ['atomicAdd', 'atomicSub', 'atomicMax', 'atomicMin', 'atomicA
           if (!Number.isInteger(arg2)) {
             throw new PBParamValueError(name, 'value');
           }
-          return pb.$callFunctionNoCheck(name, [new ASTAddressOf(arg1.$ast), new ASTScalar(arg2, typeinfo.typeU32)], typeinfo.typeU32);
+          return pb.$callFunctionNoCheck(
+            name,
+            [new ASTAddressOf(arg1.$ast), new ASTScalar(arg2, typeinfo.typeU32)],
+            typeinfo.typeU32
+          );
         } else if (arg2 instanceof PBShaderExp) {
           if (arg2.$ast.getType().typeId !== typeinfo.typeU32.typeId) {
             throw new PBParamTypeError(name, 'value');
@@ -2936,8 +2971,15 @@ for (const name of ['atomicAdd', 'atomicSub', 'atomicMax', 'atomicMin', 'atomicA
 }
 
 export type PBBuiltinFunction = keyof typeof builtinFunctionsAll;
-export type PBBuiltinFunctionWrapper = (pb: ProgramBuilder, name: string, ...args: ExpValueType[]) => PBShaderExp;
-export type PBBuiltinFunctionOverloadsInfo = { overloads?: [typeinfo.PBFunctionTypeInfo, number][]; normalizeFunc?: PBBuiltinFunctionWrapper };
+export type PBBuiltinFunctionWrapper = (
+  pb: ProgramBuilder,
+  name: string,
+  ...args: ExpValueType[]
+) => PBShaderExp;
+export type PBBuiltinFunctionOverloadsInfo = {
+  overloads?: [typeinfo.PBFunctionTypeInfo, number][];
+  normalizeFunc?: PBBuiltinFunctionWrapper;
+};
 
 /** @internal */
 export function setBuiltinFuncs(cls: typeof ProgramBuilder) {

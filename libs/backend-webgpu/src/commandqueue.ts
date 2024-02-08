@@ -82,13 +82,13 @@ export class CommandQueueImmediate {
       numInstances
     );
   }
-  setViewport(vp?: number[]|DeviceViewport) {
+  setViewport(vp?: number[] | DeviceViewport) {
     this._renderPass.setViewport(vp);
   }
   getViewport(): DeviceViewport {
     return this._renderPass.getViewport();
   }
-  setScissor(scissor?: number[]|DeviceViewport) {
+  setScissor(scissor?: number[] | DeviceViewport) {
     this._renderPass.setScissor(scissor);
   }
   getScissor(): DeviceViewport {

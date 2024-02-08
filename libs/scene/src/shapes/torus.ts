@@ -1,7 +1,7 @@
-import { Vector3 } from "@zephyr3d/base";
-import { BoundingBox } from "../utility/bounding_volume";
-import type { ShapeCreationOptions} from "./shape";
-import { Shape } from "./shape";
+import { Vector3 } from '@zephyr3d/base';
+import { BoundingBox } from '../utility/bounding_volume';
+import type { ShapeCreationOptions } from './shape';
+import { Shape } from './shape';
 
 /**
  * Creation options for torus shape
@@ -37,9 +37,9 @@ VIndex(n, m) = n * (M + 1) + m
 Triangle(n, m) = (VIndex(n, m), VIndex(n+1, m), VIndex(n+1, m+1), VIndex(n, m), VIndex(n+1, m+1), VIndex(n, m+1))*/
 
 /**
- * 
+ *
  * Torus shape
- * 
+ *
  * @public
  */
 export class TorusShape extends Shape<TorusCreationOptions> {
@@ -61,12 +61,7 @@ export class TorusShape extends Shape<TorusCreationOptions> {
     return options;
   }
   /** @internal */
-  protected _createArrays(
-    vertices: number[],
-    normals: number[],
-    uvs: number[],
-    indices: number[],
-  ) {
+  protected _createArrays(vertices: number[], normals: number[], uvs: number[], indices: number[]) {
     this.primitiveType = 'triangle-list';
     const N = this._options.numSlices;
     const M = this._options.numSegments;
@@ -80,7 +75,7 @@ export class TorusShape extends Shape<TorusCreationOptions> {
       for (let m = 0; m <= M; m++) {
         const theta = ((m % M) / M) * Math.PI * 2;
         const idx = n * (M + 1) + m;
-        const t = 1 + IR * Math.cos(theta) / OR;
+        const t = 1 + (IR * Math.cos(theta)) / OR;
         const s = IR * Math.sin(theta);
         vertices[idx * 3 + 0] = cx * t;
         vertices[idx * 3 + 1] = cy * t + s;
@@ -120,9 +115,10 @@ export class TorusShape extends Shape<TorusCreationOptions> {
     this.createAndSetIndexBuffer(new Uint16Array(indices));
     const radiusX = this._options.outerRadius + this._options.innerRadius;
     const radiusY = this._options.innerRadius;
-    this.setBoundingVolume(new BoundingBox(new Vector3(-radiusX, -radiusY, -radiusX), new Vector3(radiusX, radiusY, radiusX)));
+    this.setBoundingVolume(
+      new BoundingBox(new Vector3(-radiusX, -radiusY, -radiusX), new Vector3(radiusX, radiusY, radiusX))
+    );
     this.indexCount = indices.length;
     return true;
   }
 }
-

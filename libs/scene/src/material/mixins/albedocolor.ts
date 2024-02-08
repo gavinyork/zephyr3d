@@ -1,8 +1,15 @@
-import type { Matrix4x4} from "@zephyr3d/base";
-import { Vector4 } from "@zephyr3d/base";
-import type { IMeshMaterial } from "../meshmaterial";
-import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp, Texture2D, TextureSampler } from "@zephyr3d/device";
-import type { DrawContext } from "../../render";
+import type { Matrix4x4 } from '@zephyr3d/base';
+import { Vector4 } from '@zephyr3d/base';
+import type { IMeshMaterial } from '../meshmaterial';
+import type {
+  BindGroup,
+  PBFunctionScope,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  Texture2D,
+  TextureSampler
+} from '@zephyr3d/device';
+import type { DrawContext } from '../../render';
 
 export interface IMixinAlbedoColor {
   albedoColor: Vector4;
@@ -92,7 +99,9 @@ function mixinAlbedoColor<T extends IMeshMaterial>(BaseCls: { new (...args: any[
     }
     calculateAlbedoColor(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp {
       if (!this.needFragmentColor(ctx)) {
-        throw new Error('mixinAlbedoColor.calculateAlbedoColor(): No need to calculate albedo color, make sure needFragmentColor() returns true');
+        throw new Error(
+          'mixinAlbedoColor.calculateAlbedoColor(): No need to calculate albedo color, make sure needFragmentColor() returns true'
+        );
       }
       const pb = scope.$builder;
       let color = scope.kkAlbedo;
@@ -112,7 +121,10 @@ function mixinAlbedoColor<T extends IMeshMaterial>(BaseCls: { new (...args: any[
           }
           if (this.featureUsed(FEATURE_ALBEDO_TEXCOORD_MATRIX, ctx.renderPass.type)) {
             scope.$g.kkAlbedoTextureMatrix = pb.mat4().uniform(2);
-            scope.$outputs.kkAlbedoTexCoord = pb.mul(scope.kkAlbedoTextureMatrix, pb.vec4(scope.$inputs[semantic], 0, 1)).xy;
+            scope.$outputs.kkAlbedoTexCoord = pb.mul(
+              scope.kkAlbedoTextureMatrix,
+              pb.vec4(scope.$inputs[semantic], 0, 1)
+            ).xy;
           } else {
             scope.$outputs.kkAlbedoTexCoord = scope.$inputs[semantic];
           }

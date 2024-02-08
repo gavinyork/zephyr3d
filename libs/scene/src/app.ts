@@ -1,6 +1,6 @@
-import { InputManager } from "./input/inputmgr";
-import { makeEventTarget } from "@zephyr3d/base";
-import type { AbstractDevice, DeviceBackend } from "@zephyr3d/device";
+import { InputManager } from './input/inputmgr';
+import { makeEventTarget } from '@zephyr3d/base';
+import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
 
 /**
  * Event that will be fired every frame
@@ -10,7 +10,7 @@ import type { AbstractDevice, DeviceBackend } from "@zephyr3d/device";
  *
  * @public
  */
- export class AppTickEvent {
+export class AppTickEvent {
   type = 'tick';
 }
 
@@ -30,29 +30,29 @@ export class AppResizeEvent {
 }
 
 type appEventMap = {
-  resize: AppResizeEvent,
-  tick: AppTickEvent,
-  click: PointerEvent,
-  dblclick: PointerEvent,
-  pointerdown: PointerEvent,
-  pointerup: PointerEvent,
-  pointermove: PointerEvent,
-  pointercancel: PointerEvent,
-  pointerenter: PointerEvent,
-  pointerleave: PointerEvent,
-  pointerover: PointerEvent,
-  pointerout: PointerEvent,
-  wheel: WheelEvent,
-  keydown: KeyboardEvent,
-  keyup: KeyboardEvent,
-  keypress: KeyboardEvent,
-  drag: DragEvent,
-  dragenter: DragEvent,
-  dragleave: DragEvent,
-  dragover: DragEvent,
-  dragstart: DragEvent,
-  dragend: DragEvent,
-  drop: DragEvent
+  resize: AppResizeEvent;
+  tick: AppTickEvent;
+  click: PointerEvent;
+  dblclick: PointerEvent;
+  pointerdown: PointerEvent;
+  pointerup: PointerEvent;
+  pointermove: PointerEvent;
+  pointercancel: PointerEvent;
+  pointerenter: PointerEvent;
+  pointerleave: PointerEvent;
+  pointerover: PointerEvent;
+  pointerout: PointerEvent;
+  wheel: WheelEvent;
+  keydown: KeyboardEvent;
+  keyup: KeyboardEvent;
+  keypress: KeyboardEvent;
+  drag: DragEvent;
+  dragenter: DragEvent;
+  dragleave: DragEvent;
+  dragover: DragEvent;
+  dragstart: DragEvent;
+  dragend: DragEvent;
+  drop: DragEvent;
 };
 
 /**
@@ -68,13 +68,13 @@ export type AppOptions = {
   enableMSAA?: boolean;
   /** The device pixel ratio */
   pixelRatio?: number;
-}
+};
 
 /**
  * Log mode
  * @public
  */
-export type LogMode = 'info'|'warn'|'error'|'debug';
+export type LogMode = 'info' | 'warn' | 'error' | 'debug';
 
 /**
  * Logger interface
@@ -96,7 +96,7 @@ export interface Logger {
  *
  * @public
  */
-export class Application extends makeEventTarget(Object)<appEventMap>(){
+export class Application extends makeEventTarget(Object)<appEventMap>() {
   private _options: AppOptions;
   private _device: AbstractDevice;
   private _inputManager: InputManager;
@@ -143,7 +143,7 @@ export class Application extends makeEventTarget(Object)<appEventMap>(){
           console.log(text);
         }
       }
-    }
+    };
   }
   /** The input manager instance */
   get inputManager(): InputManager {
@@ -203,7 +203,7 @@ export class Application extends makeEventTarget(Object)<appEventMap>(){
       }
       this._device.canvas.focus();
       this._inputManager.start();
-      this._device.on('resize', ev => {
+      this._device.on('resize', (ev) => {
         this.dispatchEvent(new AppResizeEvent(ev.width, ev.height));
       });
       this._ready = true;
@@ -244,4 +244,3 @@ export class Application extends makeEventTarget(Object)<appEventMap>(){
     this._logger?.log(text, mode);
   }
 }
-

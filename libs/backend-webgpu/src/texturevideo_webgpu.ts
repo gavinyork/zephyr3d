@@ -33,10 +33,8 @@ export class WebGPUTextureVideo
     }
   }
   updateVideoFrame(): boolean {
-    if (
-      this._source.readyState > 2
-    ) {
-      const videoFrame = new ((window as any).VideoFrame)(this._source);
+    if (this._source.readyState > 2) {
+      const videoFrame = new (window as any).VideoFrame(this._source);
       videoFrame.close();
       this._object = this._device.gpuImportExternalTexture(this._source);
       return true;
@@ -49,10 +47,26 @@ export class WebGPUTextureVideo
   init(): void {
     this.loadFromElement();
   }
-  readPixels(x: number, y: number, w: number, h: number, faceOrLayer: number, mipLevel: number, buffer: TypedArray): Promise<void> {
+  readPixels(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    faceOrLayer: number,
+    mipLevel: number,
+    buffer: TypedArray
+  ): Promise<void> {
     throw new Error(`Video texture does not support readPixels()`);
   }
-  readPixelsToBuffer(x: number, y: number, w: number, h: number, faceOrLayer: number, mipLevel: number, buffer: GPUDataBuffer<unknown>): void {
+  readPixelsToBuffer(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    faceOrLayer: number,
+    mipLevel: number,
+    buffer: GPUDataBuffer<unknown>
+  ): void {
     throw new Error(`Video texture does not support readPixelsToBuffer()`);
   }
   /** @internal */

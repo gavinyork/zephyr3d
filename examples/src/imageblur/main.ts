@@ -11,14 +11,14 @@ import { ImGui, imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from
     return;
   }
   await imGuiInit(device);
-  canvas.addEventListener('pointerdown', ev => imGuiInjectEvent(ev));
-  canvas.addEventListener('pointerup', ev => imGuiInjectEvent(ev));
-  canvas.addEventListener('pointermove', ev => imGuiInjectEvent(ev));
-  canvas.addEventListener('pointerdown', ev => imGuiInjectEvent(ev));
-  canvas.addEventListener('wheel', ev => imGuiInjectEvent(ev));
-  canvas.addEventListener('keydown', ev => imGuiInjectEvent(ev));
-  canvas.addEventListener('keyup', ev => imGuiInjectEvent(ev));
-  canvas.addEventListener('keypress', ev => imGuiInjectEvent(ev));
+  canvas.addEventListener('pointerdown', (ev) => imGuiInjectEvent(ev));
+  canvas.addEventListener('pointerup', (ev) => imGuiInjectEvent(ev));
+  canvas.addEventListener('pointermove', (ev) => imGuiInjectEvent(ev));
+  canvas.addEventListener('pointerdown', (ev) => imGuiInjectEvent(ev));
+  canvas.addEventListener('wheel', (ev) => imGuiInjectEvent(ev));
+  canvas.addEventListener('keydown', (ev) => imGuiInjectEvent(ev));
+  canvas.addEventListener('keyup', (ev) => imGuiInjectEvent(ev));
+  canvas.addEventListener('keypress', (ev) => imGuiInjectEvent(ev));
   function drawSettingsUI() {
     imGuiNewFrame();
     ImGui.SetNextWindowSize(new ImGui.ImVec2(0, 0), ImGui.Cond.FirstUseEver);
@@ -181,34 +181,18 @@ import { ImGui, imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from
   };
   updateSettings();
 
-  device.runLoop(device => {
+  device.runLoop((device) => {
     device.setProgram(blurProgram);
     device.setBindGroup(0, computeUniforms);
     device.setBindGroup(1, computeBindGroup0);
-    device.compute(
-      Math.ceil(texture.width / blockDim),
-      Math.ceil(texture.height / batch[1]),
-      1
-    );
+    device.compute(Math.ceil(texture.width / blockDim), Math.ceil(texture.height / batch[1]), 1);
     device.setBindGroup(1, computeBindGroup1);
-    device.compute(
-      Math.ceil(texture.height / blockDim),
-      Math.ceil(texture.width / batch[1]),
-      1
-    );
+    device.compute(Math.ceil(texture.height / blockDim), Math.ceil(texture.width / batch[1]), 1);
     for (let i = 0; i < settings.iterations - 1; i++) {
       device.setBindGroup(1, computeBindGroup2);
-      device.compute(
-        Math.ceil(texture.width / blockDim),
-        Math.ceil(texture.height / batch[1]),
-        1
-      );
+      device.compute(Math.ceil(texture.width / blockDim), Math.ceil(texture.height / batch[1]), 1);
       device.setBindGroup(1, computeBindGroup1);
-      device.compute(
-        Math.ceil(texture.height / blockDim),
-        Math.ceil(texture.width / batch[1]),
-        1
-      );
+      device.compute(Math.ceil(texture.height / blockDim), Math.ceil(texture.width / batch[1]), 1);
     }
     device.clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
     device.setProgram(fullScreenQuadProgram);

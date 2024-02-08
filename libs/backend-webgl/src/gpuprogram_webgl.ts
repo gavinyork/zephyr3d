@@ -2,7 +2,14 @@
 import { WebGLGPUObject } from './gpuobject_webgl';
 import { isWebGL2 } from './utils';
 import { WebGLEnum } from './webgl_enum';
-import type { PBStructTypeInfo, GPUProgram, BindGroupLayout, BindPointInfo, StructuredBuffer, ShaderKind } from '@zephyr3d/device';
+import type {
+  PBStructTypeInfo,
+  GPUProgram,
+  BindGroupLayout,
+  BindPointInfo,
+  StructuredBuffer,
+  ShaderKind
+} from '@zephyr3d/device';
 import { semanticList } from '@zephyr3d/device';
 import { textureMagFilterToWebGL, textureMinFilterToWebGL, textureWrappingMap } from './constants_webgl';
 import type { WebGLTextureSampler } from './sampler_webgl';
@@ -574,38 +581,47 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     const gl = this._device.context;
     return isWebGL2(gl)
       ? (texture: [WebGLBaseTexture, WebGLTextureSampler]) => {
-        const tex = texture?.[0].object ?? null;
-        const sampler = texture?.[1].object ?? null;
-        gl.uniform1i(location, unit);
-        gl.activeTexture(this._device.context.TEXTURE0 + unit);
-        gl.bindTexture(target, tex);
-        gl.bindSampler(unit, sampler);
-      } : (texture: [WebGLBaseTexture, WebGLTextureSampler]) => {
-        const tex = texture?.[0] ?? null;
-        const sampler = texture?.[1] ?? null;
-        gl.uniform1i(location, unit);
-        gl.activeTexture(this._device.context.TEXTURE0 + unit);
-        gl.bindTexture(target, texture?.[0]?.object || null);
-        if (tex && sampler && this._device.getCurrentSamplerForTexture(tex) !== sampler) {
-          const fallback = tex.isWebGL1Fallback;
-          this._device.setCurrentSamplerForTexture(tex, sampler);
-          gl.texParameteri(target, WebGLEnum.TEXTURE_WRAP_S, textureWrappingMap[false && fallback ? 'clamp' : sampler.addressModeU]);
-          gl.texParameteri(target, WebGLEnum.TEXTURE_WRAP_T, textureWrappingMap[false && fallback ? 'clamp' : sampler.addressModeV]);
-          gl.texParameteri(
-            target,
-            WebGLEnum.TEXTURE_MAG_FILTER,
-            textureMagFilterToWebGL(sampler.magFilter)
-          );
-          gl.texParameteri(
-            target,
-            WebGLEnum.TEXTURE_MIN_FILTER,
-            textureMinFilterToWebGL(sampler.minFilter, tex.isWebGL1Fallback ? 'none' : sampler.mipFilter)
-          );
-          if (this._device.getDeviceCaps().textureCaps.supportAnisotropicFiltering) {
-            gl.texParameterf(target, WebGLEnum.TEXTURE_MAX_ANISOTROPY, sampler.maxAnisotropy);
-          }
+          const tex = texture?.[0].object ?? null;
+          const sampler = texture?.[1].object ?? null;
+          gl.uniform1i(location, unit);
+          gl.activeTexture(this._device.context.TEXTURE0 + unit);
+          gl.bindTexture(target, tex);
+          gl.bindSampler(unit, sampler);
         }
-      };
+      : (texture: [WebGLBaseTexture, WebGLTextureSampler]) => {
+          const tex = texture?.[0] ?? null;
+          const sampler = texture?.[1] ?? null;
+          gl.uniform1i(location, unit);
+          gl.activeTexture(this._device.context.TEXTURE0 + unit);
+          gl.bindTexture(target, texture?.[0]?.object || null);
+          if (tex && sampler && this._device.getCurrentSamplerForTexture(tex) !== sampler) {
+            const fallback = tex.isWebGL1Fallback;
+            this._device.setCurrentSamplerForTexture(tex, sampler);
+            gl.texParameteri(
+              target,
+              WebGLEnum.TEXTURE_WRAP_S,
+              textureWrappingMap[false && fallback ? 'clamp' : sampler.addressModeU]
+            );
+            gl.texParameteri(
+              target,
+              WebGLEnum.TEXTURE_WRAP_T,
+              textureWrappingMap[false && fallback ? 'clamp' : sampler.addressModeV]
+            );
+            gl.texParameteri(
+              target,
+              WebGLEnum.TEXTURE_MAG_FILTER,
+              textureMagFilterToWebGL(sampler.magFilter)
+            );
+            gl.texParameteri(
+              target,
+              WebGLEnum.TEXTURE_MIN_FILTER,
+              textureMinFilterToWebGL(sampler.minFilter, tex.isWebGL1Fallback ? 'none' : sampler.mipFilter)
+            );
+            if (this._device.getDeviceCaps().textureCaps.supportAnisotropicFiltering) {
+              gl.texParameterf(target, WebGLEnum.TEXTURE_MAX_ANISOTROPY, sampler.maxAnisotropy);
+            }
+          }
+        };
   }
   private getTypedArrayInfo(type: number): {
     ctor: TypedArrayConstructor<UniformBlockArray>;

@@ -14,12 +14,21 @@ interface MicrofacetDistributionSample {
 */
 /** @internal */
 export function getTestCubemapLoader(): (assetManager: AssetManager) => Promise<TextureCube> {
-  return async function(assetManager: AssetManager): Promise<TextureCube> {
-    const tex = Application.instance.device.createCubeTexture('rgba8unorm', 32, { samplerOptions: { mipFilter: 'none' } });
+  return async function (assetManager: AssetManager): Promise<TextureCube> {
+    const tex = Application.instance.device.createCubeTexture('rgba8unorm', 32, {
+      samplerOptions: { mipFilter: 'none' }
+    });
     const fb = Application.instance.device.createFrameBuffer([tex], null);
     Application.instance.device.pushDeviceStates();
     Application.instance.device.setFramebuffer(fb);
-    const colors = [new Vector4(1, 0, 0, 1), new Vector4(0.2, 0, 0, 1), new Vector4(0, 1, 0, 1), new Vector4(0, 0.2, 0, 1), new Vector4(0, 0, 1, 1), new Vector4(0, 0, 0.2, 1)];
+    const colors = [
+      new Vector4(1, 0, 0, 1),
+      new Vector4(0.2, 0, 0, 1),
+      new Vector4(0, 1, 0, 1),
+      new Vector4(0, 0.2, 0, 1),
+      new Vector4(0, 0, 1, 1),
+      new Vector4(0, 0, 0.2, 1)
+    ];
     for (let i = 0; i < 6; i++) {
       fb.setColorAttachmentCubeFace(0, i);
       Application.instance.device.clearFrameBuffer(colors[i], null, null);
@@ -27,7 +36,7 @@ export function getTestCubemapLoader(): (assetManager: AssetManager) => Promise<
     Application.instance.device.popDeviceStates();
     fb.dispose();
     return tex;
-  }
+  };
 }
 
 /** @internal */
@@ -362,7 +371,10 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
   }
   */
 
-  async function createSheenLUTFilament(assetManager: AssetManager, texture?: BaseTexture): Promise<Texture2D> {
+  async function createSheenLUTFilament(
+    assetManager: AssetManager,
+    texture?: BaseTexture
+  ): Promise<Texture2D> {
     if (texture) {
       if (!texture.isTexture2D()) {
         throw new Error('can not reload sheen lut texture: invalid texture type');

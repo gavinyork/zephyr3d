@@ -177,7 +177,7 @@ export class Plane extends VectorBase {
    * @param d - The coefficient D of the equation
    * @returns self
    */
-   setEquation(a: number, b: number, c: number, d: number) {
+  setEquation(a: number, b: number, c: number, d: number) {
     this[0] = a;
     this[1] = b;
     this[2] = c;
@@ -202,7 +202,7 @@ export class Plane extends VectorBase {
    * @param p2 - The third point.
    * @returns self
    */
-   initWithPoints(p0: Vector3, p1: Vector3, p2: Vector3) {
+  initWithPoints(p0: Vector3, p1: Vector3, p2: Vector3) {
     const normal = Vector3.cross(Vector3.sub(p1, p0), Vector3.sub(p2, p0)).inplaceNormalize();
     return this.initWithOriginNormal(p0, normal);
   }
@@ -255,9 +255,14 @@ export class Plane extends VectorBase {
    * @param result - A plane object to which the result will be written, if not specified, a new plane object will be returned.
    * @returns The result plane.
    */
-   static normalize(plane: Plane, result?: Plane): Plane {
+  static normalize(plane: Plane, result?: Plane): Plane {
     const len = Math.sqrt(plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2]);
-    return (result || new Plane()).setEquation(plane[0] / len, plane[1] / len, plane[2] / len, plane[3] / len);
+    return (result || new Plane()).setEquation(
+      plane[0] / len,
+      plane[1] / len,
+      plane[2] / len,
+      plane[3] / len
+    );
   }
   /**
    * Create a new plane object by transforming another plane.
@@ -266,7 +271,7 @@ export class Plane extends VectorBase {
    * @param result - A plane object to which the result will be written, if not specified, a new plane object will be returned.
    * @returns The result plane.
    */
-   static transform(plane: Plane, matrix: Matrix4x4, result?: Plane): Plane {
+  static transform(plane: Plane, matrix: Matrix4x4, result?: Plane): Plane {
     const adjMatrix = Matrix4x4.transpose(Matrix4x4.invertAffine(matrix));
     const p = adjMatrix.transform(new Vector4(plane[0], plane[1], plane[2], plane[3]));
     const ret: Plane = result || plane;

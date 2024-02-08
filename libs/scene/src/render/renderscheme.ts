@@ -1,5 +1,5 @@
 import { Application } from '../app';
-import type{ Vector4 } from '@zephyr3d/base';
+import type { Vector4 } from '@zephyr3d/base';
 import type { TextureFormat } from '@zephyr3d/device';
 import type { Camera } from '../camera/camera';
 import type { Scene } from '../scene/scene';
@@ -64,14 +64,14 @@ export abstract class RenderScheme {
     if (!this._shadowMapFormat) {
       const device = Application.instance.device;
       this._shadowMapFormat = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
-      ? device.type === 'webgl'
-        ? 'rgba16f'
-        : 'r16f'
-      : device.getDeviceCaps().textureCaps.supportFloatColorBuffer
-      ? device.type === 'webgl'
-        ? 'rgba32f'
-        : 'r32f'
-      : 'rgba8unorm';
+        ? device.type === 'webgl'
+          ? 'rgba16f'
+          : 'r16f'
+        : device.getDeviceCaps().textureCaps.supportFloatColorBuffer
+        ? device.type === 'webgl'
+          ? 'rgba32f'
+          : 'r32f'
+        : 'rgba8unorm';
     }
     return this._shadowMapFormat;
   }

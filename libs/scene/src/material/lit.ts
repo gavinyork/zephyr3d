@@ -1,10 +1,23 @@
-import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp, Texture2D, TextureSampler, VertexSemantic } from "@zephyr3d/device";
-import type { Matrix4x4 } from "@zephyr3d/base";
-import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT, RENDER_PASS_TYPE_FORWARD } from "../values";
-import { ShaderFramework, nonLinearDepthToLinear } from "../shaders";
-import type { DrawContext } from "../render";
-import { Application } from "../app";
-import { MeshMaterial } from "./meshmaterial";
+import type {
+  BindGroup,
+  PBFunctionScope,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  Texture2D,
+  TextureSampler,
+  VertexSemantic
+} from '@zephyr3d/device';
+import type { Matrix4x4 } from '@zephyr3d/base';
+import {
+  LIGHT_TYPE_DIRECTIONAL,
+  LIGHT_TYPE_POINT,
+  LIGHT_TYPE_SPOT,
+  RENDER_PASS_TYPE_FORWARD
+} from '../values';
+import { ShaderFramework, nonLinearDepthToLinear } from '../shaders';
+import type { DrawContext } from '../render';
+import { Application } from '../app';
+import { MeshMaterial } from './meshmaterial';
 
 export class LitMaterial extends MeshMaterial {
   static readonly FEATURE_DOUBLE_SIDED_LIGHTING = 'lm_doublesided_lighting';
@@ -37,29 +50,29 @@ export class LitMaterial extends MeshMaterial {
       this.optionChanged(false);
     }
   }
-  get normalMapMode(): 'tangent-space'|'object-space' {
+  get normalMapMode(): 'tangent-space' | 'object-space' {
     return this.featureUsed(LitMaterial.FEATURE_OBJECT_SPACE_NORMALMAP, RENDER_PASS_TYPE_FORWARD);
   }
-  set normalMapMode(val: 'tangent-space'|'object-space') {
+  set normalMapMode(val: 'tangent-space' | 'object-space') {
     this.useFeature(LitMaterial.FEATURE_OBJECT_SPACE_NORMALMAP, val, RENDER_PASS_TYPE_FORWARD);
   }
   /** true if double sided lighting is used */
   get doubleSidedLighting(): boolean {
-    return this.featureUsed(LitMaterial.FEATURE_DOUBLE_SIDED_LIGHTING, RENDER_PASS_TYPE_FORWARD)
+    return this.featureUsed(LitMaterial.FEATURE_DOUBLE_SIDED_LIGHTING, RENDER_PASS_TYPE_FORWARD);
   }
   set doubleSidedLighting(val: boolean) {
     this.useFeature(LitMaterial.FEATURE_DOUBLE_SIDED_LIGHTING, !!val, RENDER_PASS_TYPE_FORWARD);
   }
   /** true if vertex normal attribute presents */
   get vertexNormal(): boolean {
-    return this.featureUsed(LitMaterial.FEATURE_VERTEX_NORMAL, RENDER_PASS_TYPE_FORWARD)
+    return this.featureUsed(LitMaterial.FEATURE_VERTEX_NORMAL, RENDER_PASS_TYPE_FORWARD);
   }
   set vertexNormal(val: boolean) {
     this.useFeature(LitMaterial.FEATURE_VERTEX_NORMAL, !!val);
   }
   /** true if vertex normal attribute presents */
   get vertexTangent(): boolean {
-    return this.featureUsed(LitMaterial.FEATURE_VERTEX_TANGENT, RENDER_PASS_TYPE_FORWARD)
+    return this.featureUsed(LitMaterial.FEATURE_VERTEX_TANGENT, RENDER_PASS_TYPE_FORWARD);
   }
   set vertexTangent(val: boolean) {
     this.useFeature(LitMaterial.FEATURE_VERTEX_TANGENT, !!val);
@@ -119,7 +132,9 @@ export class LitMaterial extends MeshMaterial {
    */
   calculateViewVector(scope: PBInsideFunctionScope): PBShaderExp {
     const pb = scope.$builder;
-    return pb.normalize(pb.sub(ShaderFramework.getCameraPosition(scope), ShaderFramework.getWorldPosition(scope).xyz));
+    return pb.normalize(
+      pb.sub(ShaderFramework.getCameraPosition(scope), ShaderFramework.getWorldPosition(scope).xyz)
+    );
   }
   /**
    * Calculate the reflection vector of the view vector with respect to the normal.
@@ -129,7 +144,11 @@ export class LitMaterial extends MeshMaterial {
    * @param viewVec - The view vector
    * @returns The reflection vector
    */
-  calculateReflectionVector(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp): PBShaderExp {
+  calculateReflectionVector(
+    scope: PBInsideFunctionScope,
+    normal: PBShaderExp,
+    viewVec: PBShaderExp
+  ): PBShaderExp {
     const pb = scope.$builder;
     return pb.reflect(pb.neg(viewVec), normal);
   }
@@ -155,13 +174,13 @@ export class LitMaterial extends MeshMaterial {
         args.push(worldTangent, worldBinormal);
       }
     }
-    pb.func('kkCalculateNormal', params, function(){
+    pb.func('kkCalculateNormal', params, function () {
       const posW = ShaderFramework.getWorldPosition(this).xyz;
       this.$l.uv = that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)
         ? scope.$inputs.kkNormalTexCoord ?? pb.vec2(0)
         : that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)
-          ? scope.$inputs.kkAlbedoTexCoord ?? pb.vec2(0)
-          : pb.vec2(0);
+        ? scope.$inputs.kkAlbedoTexCoord ?? pb.vec2(0)
+        : pb.vec2(0);
       this.$l.TBN = pb.mat3();
       if (!worldNormal) {
         this.$l.uv_dx = pb.dpdx(pb.vec3(this.uv, 0));
@@ -214,7 +233,11 @@ export class LitMaterial extends MeshMaterial {
         }
         this.TBN = pb.mat3(this.t, this.b, this.ng);
       } else {
-        this.TBN = pb.mat3(pb.normalize(this.worldTangent), pb.normalize(this.worldBinormal), pb.normalize(this.worldNormal));
+        this.TBN = pb.mat3(
+          pb.normalize(this.worldTangent),
+          pb.normalize(this.worldBinormal),
+          pb.normalize(this.worldNormal)
+        );
       }
       if (that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
         if (that.normalMapMode === 'object-space') {
@@ -255,13 +278,13 @@ export class LitMaterial extends MeshMaterial {
         args.push(worldTangent, worldBinormal);
       }
     }
-    pb.func('kkCalculateNormalAndTBN', params, function(){
+    pb.func('kkCalculateNormalAndTBN', params, function () {
       const posW = ShaderFramework.getWorldPosition(this).xyz;
       this.$l.uv = that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)
         ? scope.$inputs.kkNormalTexCoord ?? pb.vec2(0)
         : that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)
-          ? scope.$inputs.kkAlbedoTexCoord ?? pb.vec2(0)
-          : pb.vec2(0);
+        ? scope.$inputs.kkAlbedoTexCoord ?? pb.vec2(0)
+        : pb.vec2(0);
       this.$l.TBN = pb.mat3();
       if (!worldNormal) {
         this.$l.uv_dx = pb.dpdx(pb.vec3(this.uv, 0));
@@ -314,7 +337,11 @@ export class LitMaterial extends MeshMaterial {
         }
         this.TBN = pb.mat3(this.t, this.b, this.ng);
       } else {
-        this.TBN = pb.mat3(pb.normalize(this.worldTangent), pb.normalize(this.worldBinormal), pb.normalize(this.worldNormal));
+        this.TBN = pb.mat3(
+          pb.normalize(this.worldTangent),
+          pb.normalize(this.worldBinormal),
+          pb.normalize(this.worldNormal)
+        );
       }
       if (that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
         if (that.normalMapMode === 'object-space') {
@@ -336,7 +363,7 @@ export class LitMaterial extends MeshMaterial {
    * {@inheritDoc MeshMaterial.applyUniformsValues}
    * @override
    */
-   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
     super.applyUniformValues(bindGroup, ctx);
     if (this.needFragmentColor(ctx)) {
       if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
@@ -366,12 +393,21 @@ export class LitMaterial extends MeshMaterial {
    *
    * @returns Irradiance of current environment light of type vec3
    */
-  protected getEnvLightIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp, ctx: DrawContext): PBShaderExp {
+  protected getEnvLightIrradiance(
+    scope: PBInsideFunctionScope,
+    normal: PBShaderExp,
+    ctx: DrawContext
+  ): PBShaderExp {
     if (!this.needCalculateEnvLight) {
       console.warn('getEnvLightIrradiance(): No need to calculate environment lighting');
       return scope.$builder.vec3(0);
     }
-    return ctx.env.light.envLight.hasIrradiance() ? scope.$builder.mul(ctx.env.light.envLight.getIrradiance(scope, normal).rgb, ShaderFramework.getEnvLightStrength(scope)) : scope.$builder.vec3(0);
+    return ctx.env.light.envLight.hasIrradiance()
+      ? scope.$builder.mul(
+          ctx.env.light.envLight.getIrradiance(scope, normal).rgb,
+          ShaderFramework.getEnvLightStrength(scope)
+        )
+      : scope.$builder.vec3(0);
   }
   /**
    * Get Radiance of current environment light
@@ -383,12 +419,22 @@ export class LitMaterial extends MeshMaterial {
    *
    * @returns Radiance of current environment light of type vec3
    */
-  protected getEnvLightRadiance(scope: PBInsideFunctionScope, reflectVec: PBShaderExp, roughness: PBShaderExp, ctx: DrawContext): PBShaderExp {
+  protected getEnvLightRadiance(
+    scope: PBInsideFunctionScope,
+    reflectVec: PBShaderExp,
+    roughness: PBShaderExp,
+    ctx: DrawContext
+  ): PBShaderExp {
     if (!this.needCalculateEnvLight) {
       console.warn('getEnvLightRadiance(): No need to calculate environment lighting');
       return scope.$builder.vec3(0);
     }
-    return ctx.env.light.envLight.hasRadiance() ? scope.$builder.mul(ctx.env.light.envLight.getRadiance(scope, reflectVec, roughness).rgb, ShaderFramework.getEnvLightStrength(scope)) : scope.$builder.vec3(0);
+    return ctx.env.light.envLight.hasRadiance()
+      ? scope.$builder.mul(
+          ctx.env.light.envLight.getRadiance(scope, reflectVec, roughness).rgb,
+          ShaderFramework.getEnvLightStrength(scope)
+        )
+      : scope.$builder.vec3(0);
   }
   /**
    * Checks if shadow should be computed
@@ -414,7 +460,7 @@ export class LitMaterial extends MeshMaterial {
     }
     const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
     const funcName = 'lm_calculateCSM';
-    pb.func(funcName, [pb.float('NoL')], function(){
+    pb.func(funcName, [pb.float('NoL')], function () {
       if (shadowMapParams.numShadowCascades > 1) {
         this.$l.shadowCascades = this.global.light.shadowCascades;
         this.$l.shadowBound = pb.vec4(0, 0, 1, 1);
@@ -440,16 +486,43 @@ export class LitMaterial extends MeshMaterial {
           this.$l.shadowVertex = ShaderFramework.calculateShadowSpaceVertex(this, this.split);
         }
         const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
-        this.$l.shadow = shadowMapParams.impl.computeShadowCSM(shadowMapParams, this, this.shadowVertex, this.NoL, this.split);
+        this.$l.shadow = shadowMapParams.impl.computeShadowCSM(
+          shadowMapParams,
+          this,
+          this.shadowVertex,
+          this.NoL,
+          this.split
+        );
         this.$l.shadowDistance = ShaderFramework.getShadowCameraParams(scope).w;
-        this.shadow = pb.mix(this.shadow, 1, pb.smoothStep(pb.mul(this.shadowDistance, 0.8), this.shadowDistance, pb.distance(ShaderFramework.getCameraPosition(this), ShaderFramework.getWorldPosition(this).xyz)));
+        this.shadow = pb.mix(
+          this.shadow,
+          1,
+          pb.smoothStep(
+            pb.mul(this.shadowDistance, 0.8),
+            this.shadowDistance,
+            pb.distance(ShaderFramework.getCameraPosition(this), ShaderFramework.getWorldPosition(this).xyz)
+          )
+        );
         this.$return(this.shadow);
       } else {
         this.$l.shadowVertex = ShaderFramework.calculateShadowSpaceVertex(this);
         const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
-        this.$l.shadow = shadowMapParams.impl.computeShadow(shadowMapParams, this, this.shadowVertex, this.NoL);
+        this.$l.shadow = shadowMapParams.impl.computeShadow(
+          shadowMapParams,
+          this,
+          this.shadowVertex,
+          this.NoL
+        );
         this.$l.shadowDistance = ShaderFramework.getShadowCameraParams(scope).w;
-        this.shadow = pb.mix(this.shadow, 1, pb.smoothStep(pb.mul(this.shadowDistance, 0.8), this.shadowDistance, pb.distance(ShaderFramework.getCameraPosition(this), ShaderFramework.getWorldPosition(this).xyz)));
+        this.shadow = pb.mix(
+          this.shadow,
+          1,
+          pb.smoothStep(
+            pb.mul(this.shadowDistance, 0.8),
+            this.shadowDistance,
+            pb.distance(ShaderFramework.getCameraPosition(this), ShaderFramework.getWorldPosition(this).xyz)
+          )
+        );
         this.$return(this.shadow);
       }
     });
@@ -458,10 +531,18 @@ export class LitMaterial extends MeshMaterial {
   private getClusterIndex(scope: PBInsideFunctionScope, fragCoord: PBShaderExp) {
     const pb = scope.$builder;
     const funcName = 'lm_getClusterIndex';
-    pb.func(funcName, [pb.vec3('fragCoord')], function(){
+    pb.func(funcName, [pb.vec3('fragCoord')], function () {
       const clusterParams = ShaderFramework.getClusterParams(this);
       const countParams = ShaderFramework.getCountParams(this);
-      this.$l.zTile = pb.int(pb.max(pb.add(pb.mul(pb.log2(nonLinearDepthToLinear(this, this.fragCoord.z)), clusterParams.z), clusterParams.w), 0));
+      this.$l.zTile = pb.int(
+        pb.max(
+          pb.add(
+            pb.mul(pb.log2(nonLinearDepthToLinear(this, this.fragCoord.z)), clusterParams.z),
+            clusterParams.w
+          ),
+          0
+        )
+      );
       this.$l.f = pb.vec2(this.fragCoord.x, pb.sub(clusterParams.y, pb.add(this.fragCoord.y, 1)));
       this.$l.xyTile = pb.ivec2(pb.div(this.f, pb.div(clusterParams.xy, pb.vec2(countParams.xy))));
       this.$return(pb.ivec3(this.xyTile, this.zTile));
@@ -471,106 +552,185 @@ export class LitMaterial extends MeshMaterial {
   protected calculatePointLightAttenuation(scope: PBInsideFunctionScope, posRange: PBShaderExp) {
     const pb = scope.$builder;
     const funcName = 'lm_calculatePointLightAttenuation';
-    pb.func(funcName, [pb.vec4('posRange')], function(){
+    pb.func(funcName, [pb.vec4('posRange')], function () {
       this.$l.dist = pb.distance(this.posRange.xyz, ShaderFramework.getWorldPosition(this).xyz);
       this.$l.falloff = pb.max(0, pb.sub(1, pb.div(this.dist, this.posRange.w)));
       this.$return(pb.mul(this.falloff, this.falloff));
     });
     return pb.getGlobalScope()[funcName](posRange);
   }
-  protected calculateSpotLightAttenuation(scope: PBInsideFunctionScope, posRange: PBShaderExp, dirCutoff: PBShaderExp) {
+  protected calculateSpotLightAttenuation(
+    scope: PBInsideFunctionScope,
+    posRange: PBShaderExp,
+    dirCutoff: PBShaderExp
+  ) {
     const pb = scope.$builder;
     const funcName = 'lm_calculateSpotLightAttenuation';
-    pb.func(funcName, [pb.vec4('posRange'), pb.vec4('dirCutoff')], function(){
+    pb.func(funcName, [pb.vec4('posRange'), pb.vec4('dirCutoff')], function () {
       this.$l.dist = pb.distance(this.posRange.xyz, ShaderFramework.getWorldPosition(this).xyz);
       this.$l.falloff = pb.max(0, pb.sub(1, pb.div(this.dist, this.posRange.w)));
-      this.$l.spotFactor = pb.dot(pb.normalize(pb.sub(ShaderFramework.getWorldPosition(this).xyz, this.posRange.xyz)), this.dirCutoff.xyz);
+      this.$l.spotFactor = pb.dot(
+        pb.normalize(pb.sub(ShaderFramework.getWorldPosition(this).xyz, this.posRange.xyz)),
+        this.dirCutoff.xyz
+      );
       this.spotFactor = pb.smoothStep(this.dirCutoff.w, pb.mix(this.dirCutoff.w, 1, 0.5), this.spotFactor);
       this.$return(pb.mul(this.spotFactor, this.falloff, this.falloff));
     });
     return pb.getGlobalScope()[funcName](posRange, dirCutoff);
   }
-  protected calculateLightAttenuation(scope: PBInsideFunctionScope, type: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp) {
+  protected calculateLightAttenuation(
+    scope: PBInsideFunctionScope,
+    type: PBShaderExp,
+    posRange: PBShaderExp,
+    dirCutoff: PBShaderExp
+  ) {
     const pb = scope.$builder;
-    return scope.$choice(pb.equal(type, LIGHT_TYPE_DIRECTIONAL),
+    return scope.$choice(
+      pb.equal(type, LIGHT_TYPE_DIRECTIONAL),
       pb.float(1),
-      scope.$choice(pb.equal(type, LIGHT_TYPE_POINT),
+      scope.$choice(
+        pb.equal(type, LIGHT_TYPE_POINT),
         this.calculatePointLightAttenuation(scope, posRange),
-        this.calculateSpotLightAttenuation(scope, posRange, dirCutoff)));
+        this.calculateSpotLightAttenuation(scope, posRange, dirCutoff)
+      )
+    );
   }
-  protected calculateLightDirection(scope: PBInsideFunctionScope, type: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp) {
+  protected calculateLightDirection(
+    scope: PBInsideFunctionScope,
+    type: PBShaderExp,
+    posRange: PBShaderExp,
+    dirCutoff: PBShaderExp
+  ) {
     const pb = scope.$builder;
-    return scope.$choice(pb.equal(type, LIGHT_TYPE_DIRECTIONAL),
+    return scope.$choice(
+      pb.equal(type, LIGHT_TYPE_DIRECTIONAL),
       pb.neg(dirCutoff.xyz),
-      pb.normalize(pb.sub(posRange.xyz, ShaderFramework.getWorldPosition(scope).xyz)));
+      pb.normalize(pb.sub(posRange.xyz, ShaderFramework.getWorldPosition(scope).xyz))
+    );
   }
-  protected forEachLight(scope: PBInsideFunctionScope, ctx: DrawContext, callback: (this: PBInsideFunctionScope, type: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp, colorIntensity: PBShaderExp, shadow: boolean) => void) {
+  protected forEachLight(
+    scope: PBInsideFunctionScope,
+    ctx: DrawContext,
+    callback: (
+      this: PBInsideFunctionScope,
+      type: PBShaderExp,
+      posRange: PBShaderExp,
+      dirCutoff: PBShaderExp,
+      colorIntensity: PBShaderExp,
+      shadow: boolean
+    ) => void
+  ) {
     const pb = scope.$builder;
     const that = this;
     if (ctx.currentShadowLight) {
       const posRange = scope.global.light.positionAndRange;
       const dirCutoff = scope.global.light.directionAndCutoff;
       const colorIntensity = scope.global.light.diffuseAndIntensity;
-      scope.$scope(function(){
-        const lightType = scope.$choice(pb.lessThan(posRange.w, 0),
-        pb.int(LIGHT_TYPE_DIRECTIONAL),
-        scope.$choice(pb.lessThan(dirCutoff.w, 0), pb.int(LIGHT_TYPE_POINT), pb.int(LIGHT_TYPE_SPOT)));
+      scope.$scope(function () {
+        const lightType = scope.$choice(
+          pb.lessThan(posRange.w, 0),
+          pb.int(LIGHT_TYPE_DIRECTIONAL),
+          scope.$choice(pb.lessThan(dirCutoff.w, 0), pb.int(LIGHT_TYPE_POINT), pb.int(LIGHT_TYPE_SPOT))
+        );
         callback.call(this, lightType, posRange, dirCutoff, colorIntensity, true);
       });
     } else {
-      scope.$scope(function(){
+      scope.$scope(function () {
         const countParams = ShaderFramework.getCountParams(this);
         this.$l.cluster = that.getClusterIndex(this, this.$builtins.fragCoord.xyz);
-        this.$l.clusterIndex = (pb.add(this.cluster.x, pb.mul(this.cluster.y, countParams.x), pb.mul(this.cluster.z, countParams.x, countParams.y)));
+        this.$l.clusterIndex = pb.add(
+          this.cluster.x,
+          pb.mul(this.cluster.y, countParams.x),
+          pb.mul(this.cluster.z, countParams.x, countParams.y)
+        );
         this.$l.texSize = this.global.light.lightIndexTexSize;
         if (pb.getDevice().type === 'webgl') {
-          this.$l.texCoordX = pb.div(pb.add(pb.mod(pb.float(this.clusterIndex), pb.float(this.texSize.x)), 0.5), pb.float(this.texSize.x));
-          this.$l.texCoordY = pb.div(pb.add(pb.float(pb.div(this.clusterIndex, this.texSize.x)), 0.5), pb.float(this.texSize.y));
-          this.$l.samp = pb.textureSample(ShaderFramework.getClusteredLightIndexTexture(this), pb.vec2(this.texCoordX, this.texCoordY));
+          this.$l.texCoordX = pb.div(
+            pb.add(pb.mod(pb.float(this.clusterIndex), pb.float(this.texSize.x)), 0.5),
+            pb.float(this.texSize.x)
+          );
+          this.$l.texCoordY = pb.div(
+            pb.add(pb.float(pb.div(this.clusterIndex, this.texSize.x)), 0.5),
+            pb.float(this.texSize.y)
+          );
+          this.$l.samp = pb.textureSample(
+            ShaderFramework.getClusteredLightIndexTexture(this),
+            pb.vec2(this.texCoordX, this.texCoordY)
+          );
         } else {
           this.$l.texCoordX = pb.mod(this.clusterIndex, this.texSize.x);
           this.$l.texCoordY = pb.div(this.clusterIndex, this.texSize.x);
-          this.$l.samp = pb.textureLoad(ShaderFramework.getClusteredLightIndexTexture(this), pb.ivec2(this.texCoordX, this.texCoordY), 0);
+          this.$l.samp = pb.textureLoad(
+            ShaderFramework.getClusteredLightIndexTexture(this),
+            pb.ivec2(this.texCoordX, this.texCoordY),
+            0
+          );
         }
         if (pb.getDevice().type === 'webgl') {
-          this.$for(pb.int('i'), 0, 4, function(){
+          this.$for(pb.int('i'), 0, 4, function () {
             this.$l.k = this.samp.at(this.i);
             this.$l.lights = pb.int[2]();
             this.$l.lights[0] = pb.int(pb.mod(this.k, 256));
             this.$l.lights[1] = pb.int(pb.div(this.k, 256));
-            this.$for(pb.int('k'), 0, 2, function(){
+            this.$for(pb.int('k'), 0, 2, function () {
               this.$l.li = this.lights.at(this.k);
-              this.$if(pb.greaterThan(this.li, 0), function(){
-                this.$for(pb.int('j'), 1, 256, function(){
-                  this.$if(pb.equal(this.j, this.li), function() {
+              this.$if(pb.greaterThan(this.li, 0), function () {
+                this.$for(pb.int('j'), 1, 256, function () {
+                  this.$if(pb.equal(this.j, this.li), function () {
                     this.$l.positionRange = ShaderFramework.getLightPositionAndRange(this, this.j);
                     this.$l.directionCutoff = ShaderFramework.getLightDirectionAndCutoff(this, this.j);
                     this.$l.diffuseIntensity = ShaderFramework.getLightColorAndIntensity(this, this.j);
-                    this.$l.lightType = this.$choice(pb.lessThan(this.positionRange.w, 0),
+                    this.$l.lightType = this.$choice(
+                      pb.lessThan(this.positionRange.w, 0),
                       pb.int(LIGHT_TYPE_DIRECTIONAL),
-                      this.$choice(pb.lessThan(this.directionCutoff.w, 0), pb.int(LIGHT_TYPE_POINT), pb.int(LIGHT_TYPE_SPOT)));
-                    this.$scope(function(){
-                      callback.call(this, this.lightType, this.positionRange, this.directionCutoff, this.diffuseIntensity, false);
+                      this.$choice(
+                        pb.lessThan(this.directionCutoff.w, 0),
+                        pb.int(LIGHT_TYPE_POINT),
+                        pb.int(LIGHT_TYPE_SPOT)
+                      )
+                    );
+                    this.$scope(function () {
+                      callback.call(
+                        this,
+                        this.lightType,
+                        this.positionRange,
+                        this.directionCutoff,
+                        this.diffuseIntensity,
+                        false
+                      );
                     });
                     this.$break();
                   });
                 });
-              })
+              });
             });
           });
         } else {
-          this.$for(pb.uint('i'), 0, 4, function(){
-            this.$for(pb.uint('k'), 0, 4, function(){
+          this.$for(pb.uint('i'), 0, 4, function () {
+            this.$for(pb.uint('k'), 0, 4, function () {
               this.$l.c = pb.compAnd(pb.sar(this.samp.at(this.i), pb.mul(this.k, 8)), 0xff);
-              this.$if(pb.greaterThan(this.c, 0), function(){
+              this.$if(pb.greaterThan(this.c, 0), function () {
                 this.$l.positionRange = ShaderFramework.getLightPositionAndRange(this, this.c);
                 this.$l.directionCutoff = ShaderFramework.getLightDirectionAndCutoff(this, this.c);
                 this.$l.diffuseIntensity = ShaderFramework.getLightColorAndIntensity(this, this.c);
-                this.$l.lightType = this.$choice(pb.lessThan(this.positionRange.w, 0),
+                this.$l.lightType = this.$choice(
+                  pb.lessThan(this.positionRange.w, 0),
                   pb.int(LIGHT_TYPE_DIRECTIONAL),
-                  this.$choice(pb.lessThan(this.directionCutoff.w, 0), pb.int(LIGHT_TYPE_POINT), pb.int(LIGHT_TYPE_SPOT)));
-                this.$scope(function(){
-                  callback.call(this, this.lightType, this.positionRange, this.directionCutoff, this.diffuseIntensity, false);
+                  this.$choice(
+                    pb.lessThan(this.directionCutoff.w, 0),
+                    pb.int(LIGHT_TYPE_POINT),
+                    pb.int(LIGHT_TYPE_SPOT)
+                  )
+                );
+                this.$scope(function () {
+                  callback.call(
+                    this,
+                    this.lightType,
+                    this.positionRange,
+                    this.directionCutoff,
+                    this.diffuseIntensity,
+                    false
+                  );
                 });
               });
             });
@@ -602,7 +762,10 @@ export class LitMaterial extends MeshMaterial {
         }
         if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE_MATRIX, ctx.renderPass.type)) {
           scope.$g.kkNormalTextureMatrix = pb.mat4().uniform(2);
-          scope.$outputs.kkNormalTexCoord = pb.mul(scope.kkNormalTextureMatrix, pb.vec4(scope.$inputs[semantic], 0, 1)).xy;
+          scope.$outputs.kkNormalTexCoord = pb.mul(
+            scope.kkNormalTextureMatrix,
+            pb.vec4(scope.$inputs[semantic], 0, 1)
+          ).xy;
         } else {
           scope.$outputs.kkNormalTexCoord = scope.$inputs[semantic];
         }
@@ -634,21 +797,21 @@ export class LitMaterial extends MeshMaterial {
 }
 
 export class TestLitMaterial extends LitMaterial {
-  constructor(){
+  constructor() {
     super();
   }
   fragmentShader(scope: PBFunctionScope, ctx: DrawContext): PBShaderExp {
     const albedoColor = super.fragmentShader(scope, ctx);
     const that = this;
     const pb = scope.$builder;
-    return (function(this: PBInsideFunctionScope) {
+    return function (this: PBInsideFunctionScope) {
       this.$l.albedo = albedoColor;
       this.$l.color = pb.vec3(0);
       this.$l.normal = that.calculateNormal(scope, ctx);
       if (that.needCalculateEnvLight(ctx)) {
         this.color = pb.add(this.color, that.getEnvLightIrradiance(this, this.normal, ctx));
       }
-      that.forEachLight(this, ctx, function(type, posRange, dirCutoff, colorIntensity, shadow){
+      that.forEachLight(this, ctx, function (type, posRange, dirCutoff, colorIntensity, shadow) {
         this.$l.NoL = pb.clamp(pb.neg(pb.dot(this.normal, dirCutoff.xyz)), 0, 1);
         this.$l.lightContrib = pb.mul(colorIntensity.rgb, colorIntensity.a, this.NoL);
         if (shadow) {
@@ -657,7 +820,6 @@ export class TestLitMaterial extends LitMaterial {
         this.color = pb.add(this.color, this.lightContrib);
       });
       return pb.mul(this.albedo, pb.vec4(this.color, 1));
-    }).call(scope);
+    }.call(scope);
   }
 }
-

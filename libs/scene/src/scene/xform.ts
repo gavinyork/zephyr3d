@@ -1,11 +1,11 @@
-import type { Quaternion} from '@zephyr3d/base';
+import type { Quaternion } from '@zephyr3d/base';
 import { Vector3, Matrix4x4, ObservableVector3, ObservableQuaternion, Vector4 } from '@zephyr3d/base';
 
 /**
  * Presents a transformation from one space to another
  * @public
  */
-export class XForm<T extends XForm<T> = XForm<any> > {
+export class XForm<T extends XForm<T> = XForm<any>> {
   /** @internal */
   protected _parent: T;
   /** @internal */
@@ -36,7 +36,9 @@ export class XForm<T extends XForm<T> = XForm<any> > {
   constructor() {
     this._parent = null;
     this._children = [];
-    const cb = () => { this._onTransformChanged(true); };
+    const cb = () => {
+      this._onTransformChanged(true);
+    };
     this._position = new ObservableVector3(0, 0, 0);
     this._position.callback = cb;
     this._scaling = new ObservableVector3(1, 1, 1);
@@ -92,7 +94,7 @@ export class XForm<T extends XForm<T> = XForm<any> > {
    */
   worldToThis(v: Vector3, result?: Vector3): Vector3;
   worldToThis(v: Vector4, result?: Vector4): Vector4;
-  worldToThis(v: Vector3|Vector4, result?: Vector3|Vector4): Vector3|Vector4 {
+  worldToThis(v: Vector3 | Vector4, result?: Vector3 | Vector4): Vector3 | Vector4 {
     if (v instanceof Vector3) {
       result = result || new Vector3();
       this.invWorldMatrix.transformPointAffine(v, result as Vector3);
@@ -112,7 +114,7 @@ export class XForm<T extends XForm<T> = XForm<any> > {
    */
   otherToThis(other: XForm, v: Vector3, result?: Vector3): Vector3;
   otherToThis(other: XForm, v: Vector4, result?: Vector4): Vector4;
-  otherToThis(other: XForm, v: Vector3|Vector4, result?: Vector3|Vector4): Vector3|Vector4 {
+  otherToThis(other: XForm, v: Vector3 | Vector4, result?: Vector3 | Vector4): Vector3 | Vector4 {
     return this.worldToThis(other.thisToWorld(v as any, result as any), result as any);
   }
   /**
@@ -123,7 +125,7 @@ export class XForm<T extends XForm<T> = XForm<any> > {
    */
   thisToWorld(v: Vector3, result?: Vector3): Vector3;
   thisToWorld(v: Vector4, result?: Vector4): Vector4;
-  thisToWorld(v: Vector3|Vector4, result?: Vector3|Vector4): Vector3|Vector4 {
+  thisToWorld(v: Vector3 | Vector4, result?: Vector3 | Vector4): Vector3 | Vector4 {
     if (v instanceof Vector3) {
       result = result || new Vector3();
       this.worldMatrix.transformPointAffine(v, result as Vector3);
@@ -143,7 +145,7 @@ export class XForm<T extends XForm<T> = XForm<any> > {
    */
   thisToOther(other: XForm, v: Vector3, result?: Vector3): Vector3;
   thisToOther(other: XForm, v: Vector4, result?: Vector4): Vector4;
-  thisToOther(other: XForm, v: Vector3|Vector4, result?: Vector3|Vector4): Vector3|Vector4 {
+  thisToOther(other: XForm, v: Vector3 | Vector4, result?: Vector3 | Vector4): Vector3 | Vector4 {
     return other.worldToThis(this.thisToWorld(v as any, result as any), result as any);
   }
   /**

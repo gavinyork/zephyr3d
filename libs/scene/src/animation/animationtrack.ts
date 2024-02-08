@@ -48,7 +48,7 @@ export abstract class AnimationTrack {
   }
   /**
    * Apply animation to node
-   * 
+   *
    * @param node - To which node the track will apply
    * @param currentTime - Current animation time
    * @param duration - Total animation duration

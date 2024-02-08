@@ -29,7 +29,7 @@ export type TextureFetchOptions<T extends BaseTexture> = {
   mimeType?: string;
   linearColorSpace?: boolean;
   texture?: T;
-  samplerOptions?: SamplerOptions
+  samplerOptions?: SamplerOptions;
 };
 
 /**
@@ -157,12 +157,23 @@ export class AssetManager {
    */
   async fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>): Promise<T> {
     if (options?.texture) {
-      return this.loadTexture(url, options.mimeType ?? null, !options.linearColorSpace, options.samplerOptions, options.texture) as Promise<T>;
+      return this.loadTexture(
+        url,
+        options.mimeType ?? null,
+        !options.linearColorSpace,
+        options.samplerOptions,
+        options.texture
+      ) as Promise<T>;
     } else {
       const hash = this.getHash('2d', url, options);
       let P = this._textures[hash];
       if (!P) {
-        P = this.loadTexture(url, options?.mimeType ?? null, !options?.linearColorSpace, options?.samplerOptions);
+        P = this.loadTexture(
+          url,
+          options?.mimeType ?? null,
+          !options?.linearColorSpace,
+          options?.samplerOptions
+        );
         this._textures[hash] = P;
       } else {
         const tex = await P;
@@ -190,7 +201,11 @@ export class AssetManager {
    * @param mimeType - The MIME type of the model resource
    * @returns The created model node
    */
-  async fetchModel(scene: Scene, url: string, mimeType?: string): Promise<{ group: SceneNode, animationSet: AnimationSet }> {
+  async fetchModel(
+    scene: Scene,
+    url: string,
+    mimeType?: string
+  ): Promise<{ group: SceneNode; animationSet: AnimationSet }> {
     const sharedModel = await this.fetchModelData(scene, url, mimeType);
     return this.createSceneNode(scene, sharedModel);
   }
@@ -239,7 +254,15 @@ export class AssetManager {
       tex.name = filename;
       if (url.match(/^blob:/)) {
         tex.restoreHandler = async (tex: GPUObject) => {
-          await this.doLoadTexture(loader, filename, mimeType, data, !!srgb, samplerOptions, tex as BaseTexture);
+          await this.doLoadTexture(
+            loader,
+            filename,
+            mimeType,
+            data,
+            !!srgb,
+            samplerOptions,
+            tex as BaseTexture
+          );
         };
       } else {
         const so = samplerOptions ? null : { ...samplerOptions };
@@ -358,7 +381,11 @@ export class AssetManager {
     }
   }
   /** @internal */
-  private createSceneNode(scene: Scene, model: SharedModel, sceneIndex?: number): { group: SceneNode, animationSet: AnimationSet } {
+  private createSceneNode(
+    scene: Scene,
+    model: SharedModel,
+    sceneIndex?: number
+  ): { group: SceneNode; animationSet: AnimationSet } {
     const group = new SceneNode(scene);
     group.name = model.name;
     let animationSet = new AnimationSet(scene);
@@ -415,14 +442,17 @@ export class AssetManager {
       animationSet.dispose();
       animationSet = null;
     }
-    return { group, animationSet }
+    return { group, animationSet };
   }
   /**
    * Sets the loader for a given builtin-texture
    * @param name - Name of the builtin texture
    * @param loader - Loader for the builtin texture
    */
-  static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => Promise<BaseTexture>): void {
+  static setBuiltinTextureLoader(
+    name: string,
+    loader: (assetManager: AssetManager) => Promise<BaseTexture>
+  ): void {
     if (loader) {
       this._builtinTextureLoaders[name] = loader;
     } else {

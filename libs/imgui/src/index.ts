@@ -1,6 +1,6 @@
-import type { AbstractDevice } from "@zephyr3d/device";
-import * as ImGui from "./imgui";
-import * as ImGui_Impl from "./imgui_impl";
+import type { AbstractDevice } from '@zephyr3d/device';
+import * as ImGui from './imgui';
+import * as ImGui_Impl from './imgui_impl';
 
 /**
  * The ImGui interface
@@ -19,14 +19,14 @@ export { ImGui };
 export async function imGuiInit(device: AbstractDevice, fontFamily?: string, fontSize?: number) {
   await ImGui.default();
   ImGui.CHECKVERSION();
-  console.log("ImGui.CreateContext() VERSION=", ImGui.VERSION);
+  console.log('ImGui.CreateContext() VERSION=', ImGui.VERSION);
 
   ImGui.CreateContext();
   ImGui.StyleColorsDark();
-  const io:ImGui.IO=ImGui.GetIO();
-  const font =io.Fonts.AddFontDefault();
+  const io: ImGui.IO = ImGui.GetIO();
+  const font = io.Fonts.AddFontDefault();
 
-  font.FontName = fontFamily || "arial";
+  font.FontName = fontFamily || 'arial';
   font.FontSize = fontSize || 16;
   ImGui_Impl.Init(device);
 }

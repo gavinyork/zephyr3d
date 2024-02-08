@@ -1,4 +1,10 @@
-import type { BindGroup, PBShaderExp, PBInsideFunctionScope, PBGlobalScope, Texture2D } from '@zephyr3d/device';
+import type {
+  BindGroup,
+  PBShaderExp,
+  PBInsideFunctionScope,
+  PBGlobalScope,
+  Texture2D
+} from '@zephyr3d/device';
 import type { BlitType } from './blitter';
 import { Blitter } from './blitter';
 import { decodeNormalizedFloatFromRGBA } from '../shaders';
@@ -153,12 +159,12 @@ export class GaussianBlurBlitter extends Blitter {
     srcTex: PBShaderExp,
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
-    sampleType: 'float'|'int'|'uint'
+    sampleType: 'float' | 'int' | 'uint'
   ): PBShaderExp {
     const that = this;
     const pb = scope.$builder;
     if (that._depthTex) {
-      pb.func('getLinearDepth', [pb.vec2('uv')], function(){
+      pb.func('getLinearDepth', [pb.vec2('uv')], function () {
         this.$l.depthValue = pb.textureSample(this.depthTex, this.uv);
         if (pb.getDevice().type === 'webgl') {
           this.$return(decodeNormalizedFloatFromRGBA(this, this.depthValue));
@@ -199,25 +205,18 @@ export class GaussianBlurBlitter extends Blitter {
       } else {
         this.$l.test1 = true;
       }
-      this.$if(this.test1, function() {
-        this.d1 = that.readTexel(
-          scope,
-          type,
-          srcTex,
-          this.uv1,
-          srcLayer,
-          sampleType
-        );
+      this.$if(this.test1, function () {
+        this.d1 = that.readTexel(scope, type, srcTex, this.uv1, srcLayer, sampleType);
       });
-      this.$l.uv2 = pb.add(srcUV, pb.mul(this.blurMultiplyVec, this.blurSize, this.i)),
-      this.$l.d2 = pb.vec4();
+      (this.$l.uv2 = pb.add(srcUV, pb.mul(this.blurMultiplyVec, this.blurSize, this.i))),
+        (this.$l.d2 = pb.vec4());
       if (that._depthTex) {
         this.$l.depth2 = this.getLinearDepth(this.uv2);
         this.$l.test2 = pb.lessThan(pb.abs(pb.sub(this.depth2, this.centerDepth)), this.depthCutoff);
       } else {
         this.$l.test2 = true;
       }
-      this.$if(this.test2, function() {
+      this.$if(this.test2, function () {
         this.d2 = that.readTexel(
           scope,
           type,
@@ -229,29 +228,35 @@ export class GaussianBlurBlitter extends Blitter {
       });
       if (that._logSpace) {
         if (that._phase === 'horizonal') {
-          this.$if(this.test1, function(){
+          this.$if(this.test1, function () {
             this.avgValue = pb.add(
               this.avgValue,
-              pb.mul(pb.exp(pb.min(this.minExpValue, pb.mul(pb.sub(this.d1, this.d0), this.multiplier))), this.incrementalGaussian.x)
+              pb.mul(
+                pb.exp(pb.min(this.minExpValue, pb.mul(pb.sub(this.d1, this.d0), this.multiplier))),
+                this.incrementalGaussian.x
+              )
             );
             this.coefficientSum = pb.add(this.coefficientSum, this.incrementalGaussian.x);
           });
-          this.$if(this.test2, function(){
+          this.$if(this.test2, function () {
             this.avgValue = pb.add(
               this.avgValue,
-              pb.mul(pb.exp(pb.min(this.minExpValue, pb.mul(pb.sub(this.d2, this.d0), this.multiplier))), this.incrementalGaussian.x)
+              pb.mul(
+                pb.exp(pb.min(this.minExpValue, pb.mul(pb.sub(this.d2, this.d0), this.multiplier))),
+                this.incrementalGaussian.x
+              )
             );
             this.coefficientSum = pb.add(this.coefficientSum, this.incrementalGaussian.x);
           });
         } else {
-          this.$if(this.test1, function(){
+          this.$if(this.test1, function () {
             this.avgValue = pb.add(
               this.avgValue,
               pb.mul(pb.exp(pb.min(this.minExpValue, pb.sub(this.d1, this.d0))), this.incrementalGaussian.x)
             );
             this.coefficientSum = pb.add(this.coefficientSum, this.incrementalGaussian.x);
           });
-          this.$if(this.test2, function(){
+          this.$if(this.test2, function () {
             this.avgValue = pb.add(
               this.avgValue,
               pb.mul(pb.exp(pb.min(this.minExpValue, pb.sub(this.d2, this.d0))), this.incrementalGaussian.x)
@@ -260,11 +265,11 @@ export class GaussianBlurBlitter extends Blitter {
           });
         }
       } else {
-        this.$if(this.test1, function(){
+        this.$if(this.test1, function () {
           this.avgValue = pb.add(this.avgValue, pb.mul(this.d1, this.incrementalGaussian.x));
           this.coefficientSum = pb.add(this.coefficientSum, this.incrementalGaussian.x);
         });
-        this.$if(this.test2, function(){
+        this.$if(this.test2, function () {
           this.avgValue = pb.add(this.avgValue, pb.mul(this.d2, this.incrementalGaussian.x));
           this.coefficientSum = pb.add(this.coefficientSum, this.incrementalGaussian.x);
         });

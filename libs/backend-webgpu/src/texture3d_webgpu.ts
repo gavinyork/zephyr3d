@@ -1,9 +1,4 @@
-import type {
-  Texture3D,
-  GPUDataBuffer,
-  TextureFormat,
-  TextureMipmapData
-} from '@zephyr3d/device';
+import type { Texture3D, GPUDataBuffer, TextureFormat, TextureMipmapData } from '@zephyr3d/device';
 import {
   getTextureFormatBlockWidth,
   getTextureFormatBlockHeight,
@@ -94,7 +89,15 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     );
     tmpBuffer.dispose();
   }
-  readPixelsToBuffer(x: number, y: number, w: number, h: number, layer: number, mipLevel: number, buffer: GPUDataBuffer): void {
+  readPixelsToBuffer(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    layer: number,
+    mipLevel: number,
+    buffer: GPUDataBuffer
+  ): void {
     if (mipLevel !== 0) {
       throw new Error(`Texture3D.readPixelsToBuffer(): parameter mipLevel must be 0`);
     }
@@ -106,7 +109,9 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     } else {
       this._flags = Number(creationFlags) || 0;
       if (this._flags & GPUResourceUsageFlags.TF_WRITABLE) {
-        console.error('Texture2DArray.createWithMipmapData() failed: Webgl device does not support storage texture');
+        console.error(
+          'Texture2DArray.createWithMipmapData() failed: Webgl device does not support storage texture'
+        );
       } else {
         this.loadLevels(data);
       }
@@ -117,7 +122,10 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     const width = levels.width;
     const height = levels.height;
     const depth = levels.depth;
-    const mipLevelCount = levels.mipLevels === 1 && !(this._flags & GPUResourceUsageFlags.TF_NO_MIPMAP) ? this._calcMipLevelCount(levels.format, width, height, depth) : levels.mipLevels;
+    const mipLevelCount =
+      levels.mipLevels === 1 && !(this._flags & GPUResourceUsageFlags.TF_NO_MIPMAP)
+        ? this._calcMipLevelCount(levels.format, width, height, depth)
+        : levels.mipLevels;
     if (levels.isCompressed) {
       if (!this.getTextureCaps().supportS3TCSRGB || !this.getTextureCaps().supportS3TC) {
         console.error('Texture3D.loadLevels(): No s3tc compression format support');

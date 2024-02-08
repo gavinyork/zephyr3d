@@ -141,10 +141,7 @@ export class RenderQueue {
         const instanceList = trans ? itemList.transInstanceList : itemList.opaqueInstanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         const index = instanceList[hash];
-        if (
-          index === undefined ||
-          list[index].instanceData.worldMatrices.length === this.getMaxBatchSize()
-        ) {
+        if (index === undefined || list[index].instanceData.worldMatrices.length === this.getMaxBatchSize()) {
           instanceList[hash] = list.length;
           list.push({
             drawable,
@@ -185,8 +182,8 @@ export class RenderQueue {
     }
   }
   private encodeInstanceColor(index: number, outColor: Float32Array) {
-    outColor[0] = (index >> 24 & 255) / 255;
-    outColor[1] = (index >> 16 & 255) / 255;
+    outColor[0] = ((index >> 24) & 255) / 255;
+    outColor[1] = ((index >> 16) & 255) / 255;
     outColor[2] = (index >> 8 && 255) / 255;
     outColor[3] = (index >> 0 && 255) / 255;
   }

@@ -17,7 +17,7 @@ export class CopyBlitter extends Blitter {
     srcTex: PBShaderExp,
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
-    sampleType: 'float'|'int'|'uint'
+    sampleType: 'float' | 'int' | 'uint'
   ): PBShaderExp {
     return this.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
   }

@@ -52,7 +52,12 @@ export class WebGPUColorState extends WebGPURenderState implements ColorState {
     this._redMask = this._greenMask = this._blueMask = this._alphaMask = true;
   }
   clone(): ColorState {
-    return new WebGPUColorState().setColorMask(this._redMask, this._greenMask, this._blueMask, this._alphaMask);
+    return new WebGPUColorState().setColorMask(
+      this._redMask,
+      this._greenMask,
+      this._blueMask,
+      this._alphaMask
+    );
   }
   get redMask(): boolean {
     return this._redMask;
@@ -249,7 +254,9 @@ export class WebGPUBlendingState extends WebGPURenderState implements BlendingSt
   }
   protected computeHash(): string {
     return this._enabled
-      ? `${this._srcBlendRGB}-${this._srcBlendAlpha}-${this._dstBlendRGB}-${this._dstBlendAlpha}-${this._rgbEquation}-${this._alphaEquation}-${Number(!!this._alphaToCoverageEnabled)}`
+      ? `${this._srcBlendRGB}-${this._srcBlendAlpha}-${this._dstBlendRGB}-${this._dstBlendAlpha}-${
+          this._rgbEquation
+        }-${this._alphaEquation}-${Number(!!this._alphaToCoverageEnabled)}`
       : `${Number(!!this._alphaToCoverageEnabled)}`;
   }
 }
@@ -542,8 +549,10 @@ export class WebGPUStencilState extends WebGPURenderState implements StencilStat
   }
   protected computeHash(): string {
     return this._enabled
-      ? `${this.sideHash(false)}-${this.sideHash(true)}-${this.readMask.toString(16)}-${this.writeMask.toString(16)}-${this.ref.toString(16)}`
-      : ''
+      ? `${this.sideHash(false)}-${this.sideHash(true)}-${this.readMask.toString(
+          16
+        )}-${this.writeMask.toString(16)}-${this.ref.toString(16)}`
+      : '';
   }
   private sideHash(back: boolean): string {
     return back
@@ -580,31 +589,34 @@ export class WebGPURenderStateSet implements RenderStateSet {
     }:${this.depthState?.hash || ''}:${this.stencilState?.hash || ''}`;
   }
   useColorState(state?: ColorState): ColorState {
-    return this.colorState = state as WebGPUColorState ?? this.colorState ?? new WebGPUColorState();
+    return (this.colorState = (state as WebGPUColorState) ?? this.colorState ?? new WebGPUColorState());
   }
   defaultColorState() {
     this.colorState = null;
   }
   useBlendingState(state?: BlendingState): BlendingState {
-    return this.blendingState = state as WebGPUBlendingState ?? this.blendingState ?? new WebGPUBlendingState();
+    return (this.blendingState =
+      (state as WebGPUBlendingState) ?? this.blendingState ?? new WebGPUBlendingState());
   }
   defaultBlendingState() {
     this.blendingState = null;
   }
   useRasterizerState(state?: RasterizerState): RasterizerState {
-    return this.rasterizerState = state as WebGPURasterizerState ?? this.rasterizerState ?? new WebGPURasterizerState();
+    return (this.rasterizerState =
+      (state as WebGPURasterizerState) ?? this.rasterizerState ?? new WebGPURasterizerState());
   }
   defaultRasterizerState() {
     this.rasterizerState = null;
   }
   useDepthState(state?: DepthState): DepthState {
-    return this.depthState = state as WebGPUDepthState ?? this.depthState ?? new WebGPUDepthState();
+    return (this.depthState = (state as WebGPUDepthState) ?? this.depthState ?? new WebGPUDepthState());
   }
   defaultDepthState() {
     this.depthState = null;
   }
   useStencilState(state?: StencilState): StencilState {
-    return this.stencilState = state as WebGPUStencilState ?? this.stencilState ?? new WebGPUStencilState();
+    return (this.stencilState =
+      (state as WebGPUStencilState) ?? this.stencilState ?? new WebGPUStencilState());
   }
   defaultStencilState() {
     this.stencilState = null;

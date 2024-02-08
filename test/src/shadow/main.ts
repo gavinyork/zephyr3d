@@ -25,7 +25,13 @@ shadowApp.ready().then(async () => {
   await imGuiInit(device);
   const scene = new Scene();
   scene.env.light.strength = 0.2;
-  const camera = new PerspectiveCamera(scene, Math.PI / 3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 1000);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
+    1,
+    1000
+  );
   camera.lookAt(new Vector3(0, 8, 30), new Vector3(0, 8, 0), Vector3.axisPY());
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
   shadowApp.inputManager.use(imGuiInjectEvent);
@@ -80,7 +86,7 @@ shadowApp.ready().then(async () => {
   const tga = await assetManager.fetchTexture('./assets/maps/map3/splatmap.tga');
   tga.name = 'TGATest';
 
-  shadowApp.on('resize', ev => {
+  shadowApp.on('resize', (ev) => {
     camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane());
   });
   shadowApp.on('tick', () => {

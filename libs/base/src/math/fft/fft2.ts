@@ -111,11 +111,7 @@ export const ifft2 = (fourier: Complex[][]): Complex[][] => {
   return signal;
 };
 
-export const float4ToComplex2d = (
-  data: Float32Array,
-  size: number,
-  offset = 0
-): Complex[][] => {
+export const float4ToComplex2d = (data: Float32Array, size: number, offset = 0): Complex[][] => {
   const result = [];
   for (let i = 0; i < size; i++) {
     const row: Complex[] = [];

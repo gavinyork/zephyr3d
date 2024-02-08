@@ -2,7 +2,7 @@ import type { PBGlobalScope, ProgramBuilder } from './programbuilder';
 import type { PBShaderExp } from './base';
 import type { VertexSemantic } from '../gpuobject';
 
-/** 
+/**
  * Shader variable getter function type
  * @public
  */

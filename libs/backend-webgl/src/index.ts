@@ -1,4 +1,4 @@
-import { backend1, backend2 } from "./device_webgl";
+import { backend1, backend2 } from './device_webgl';
 
 /**
  * The WebGL1 backend

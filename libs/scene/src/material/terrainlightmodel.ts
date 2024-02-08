@@ -1,35 +1,42 @@
-import type { BindGroup, GPUProgram, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, Texture2D, Texture2DArray } from "@zephyr3d/device";
-import { PBRLightModelMR } from "./lightmodel";
-import { Vector4 } from "@zephyr3d/base";
-import { RENDER_PASS_TYPE_FORWARD } from "../values";
-import { Application } from "../app";
-import { drawFullscreenQuad } from "../render/helper";
-import type { DrawContext, EnvironmentLighting } from "../render";
+import type {
+  BindGroup,
+  GPUProgram,
+  PBGlobalScope,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  Texture2D,
+  Texture2DArray
+} from '@zephyr3d/device';
+import { PBRLightModelMR } from './lightmodel';
+import { Vector4 } from '@zephyr3d/base';
+import { RENDER_PASS_TYPE_FORWARD } from '../values';
+import { Application } from '../app';
+import { drawFullscreenQuad } from '../render/helper';
+import type { DrawContext, EnvironmentLighting } from '../render';
 
 export type TerrainDetailMapInfo = {
-  albedoTextures: Texture2DArray|Texture2D[],
-  uvScale: number[],
-  metallic?: number[],
-  roughness?: number[],
-  normalScale?: number[],
-  normalTextures?: Texture2DArray|Texture2D[],
-  albedoTexCoordIndex?: number|number[],
-  normalTexCoordIndex?: number|number[],
+  albedoTextures: Texture2DArray | Texture2D[];
+  uvScale: number[];
+  metallic?: number[];
+  roughness?: number[];
+  normalScale?: number[];
+  normalTextures?: Texture2DArray | Texture2D[];
+  albedoTexCoordIndex?: number | number[];
+  normalTexCoordIndex?: number | number[];
   grass?: {
-    texture?: Texture2D,
-    bladeWidth?: number,
-    bladeHeigh?: number,
-    density?: number,
-    offset?: number
-  }[][]
+    texture?: Texture2D;
+    bladeWidth?: number;
+    bladeHeigh?: number;
+    density?: number;
+    offset?: number;
+  }[][];
 };
 
 export type TerrainLightModelOptions = {
-  splatMap?: Texture2D,
-  splatMapTexCoordIndex?: number,
-  detailMaps?: TerrainDetailMapInfo
+  splatMap?: Texture2D;
+  splatMapTexCoordIndex?: number;
+  detailMaps?: TerrainDetailMapInfo;
 };
-
 
 const TEX_NAME_SPLATMAP = 'splat';
 const TEX_NAME_DETAIL_COLOR = 'detailColor';
@@ -57,7 +64,10 @@ export class TerrainLightModel extends PBRLightModelMR {
       if (this._numDetailMaps > 4) {
         throw new Error(`TerrainLightModel(): The maximum detail levels is 4`);
       }
-      if (!this._options.detailMaps.uvScale || this._options.detailMaps.uvScale.length !== this._numDetailMaps) {
+      if (
+        !this._options.detailMaps.uvScale ||
+        this._options.detailMaps.uvScale.length !== this._numDetailMaps
+      ) {
         throw new Error(`TerrainLightModel(): Invalid uv scale`);
       }
       this._uvScales = new Float32Array(this._numDetailMaps * 4);
@@ -87,7 +97,9 @@ export class TerrainLightModel extends PBRLightModelMR {
       if (normalTextures) {
         const m = Array.isArray(normalTextures) ? normalTextures.length : normalTextures.depth;
         if (m !== this._numDetailMaps) {
-          throw new Error(`TerrainLightModel(): The number of normal textures not match the number of albedo textures`);
+          throw new Error(
+            `TerrainLightModel(): The number of normal textures not match the number of albedo textures`
+          );
         }
         if (options.detailMaps.normalScale) {
           if (options.detailMaps.normalScale.length !== this._numDetailMaps) {
@@ -99,25 +111,43 @@ export class TerrainLightModel extends PBRLightModelMR {
         }
       }
       this._options = Object.assign({}, options);
-      this._options.splatMapTexCoordIndex = this.setTextureOptions(TEX_NAME_SPLATMAP, this._options.splatMap, null, 0, null);
+      this._options.splatMapTexCoordIndex = this.setTextureOptions(
+        TEX_NAME_SPLATMAP,
+        this._options.splatMap,
+        null,
+        0,
+        null
+      );
       if (Array.isArray(albedoTextures)) {
         this._options.detailMaps.albedoTexCoordIndex = [];
         for (let i = 0; i < albedoTextures.length; i++) {
           if (!albedoTextures[i]) {
             throw new Error(`TerrainLightModel(): Invalid detail albedo texture`);
           }
-          this._options.detailMaps.albedoTexCoordIndex[i] = this.setTextureOptions(`${TEX_NAME_DETAIL_COLOR}${i}`, albedoTextures[i], null, -1, null);
+          this._options.detailMaps.albedoTexCoordIndex[i] = this.setTextureOptions(
+            `${TEX_NAME_DETAIL_COLOR}${i}`,
+            albedoTextures[i],
+            null,
+            -1,
+            null
+          );
           albedoTextures[i].samplerOptions = {
             addressU: 'repeat',
             addressV: 'repeat'
           };
         }
       } else {
-        this._options.detailMaps.albedoTexCoordIndex = this.setTextureOptions(TEX_NAME_DETAIL_COLOR, albedoTextures, null, -1, null);
+        this._options.detailMaps.albedoTexCoordIndex = this.setTextureOptions(
+          TEX_NAME_DETAIL_COLOR,
+          albedoTextures,
+          null,
+          -1,
+          null
+        );
         albedoTextures.samplerOptions = {
           addressU: 'repeat',
           addressV: 'repeat'
-        }
+        };
       }
       if (Array.isArray(normalTextures)) {
         this._options.detailMaps.normalTexCoordIndex = [];
@@ -125,18 +155,30 @@ export class TerrainLightModel extends PBRLightModelMR {
           if (!normalTextures[i]) {
             throw new Error(`TerrainLightModel(): Invalid detail normal texture`);
           }
-          this._options.detailMaps.normalTexCoordIndex[i] = this.setTextureOptions(`${TEX_NAME_DETAIL_NORMAL}${i}`, normalTextures[i], null, -1, null);
+          this._options.detailMaps.normalTexCoordIndex[i] = this.setTextureOptions(
+            `${TEX_NAME_DETAIL_NORMAL}${i}`,
+            normalTextures[i],
+            null,
+            -1,
+            null
+          );
           normalTextures[i].samplerOptions = {
             addressU: 'repeat',
             addressV: 'repeat'
           };
         }
       } else if (normalTextures) {
-        this._options.detailMaps.normalTexCoordIndex = this.setTextureOptions(TEX_NAME_DETAIL_NORMAL, normalTextures, null, -1, null);
+        this._options.detailMaps.normalTexCoordIndex = this.setTextureOptions(
+          TEX_NAME_DETAIL_NORMAL,
+          normalTextures,
+          null,
+          -1,
+          null
+        );
         normalTextures.samplerOptions = {
           addressU: 'repeat',
           addressV: 'repeat'
-        }
+        };
       }
     }
     this.setMetallicMap(this.generateMetallicRoughnessMap(), null, -1);
@@ -167,11 +209,16 @@ export class TerrainLightModel extends PBRLightModelMR {
     const pb = scope.$builder;
     const funcName = 'getTerrainAlbedo';
     pb.func(funcName, [], function () {
-      this.$l.mask = pb.textureSample(this[that.getTextureUniformName(TEX_NAME_SPLATMAP)], this.$inputs[`texcoord${that._options.splatMapTexCoordIndex}`])
+      this.$l.mask = pb.textureSample(
+        this[that.getTextureUniformName(TEX_NAME_SPLATMAP)],
+        this.$inputs[`texcoord${that._options.splatMapTexCoordIndex}`]
+      );
       this.$l.color = pb.vec3(0);
       const useTextureArray = !Array.isArray(that._options.detailMaps.albedoTextures);
       for (let i = 0; i < that._numDetailMaps; i++) {
-        const texCoordIndex = useTextureArray ? that._options.detailMaps.albedoTexCoordIndex : that._options.detailMaps.albedoTexCoordIndex[i];
+        const texCoordIndex = useTextureArray
+          ? that._options.detailMaps.albedoTexCoordIndex
+          : that._options.detailMaps.albedoTexCoordIndex[i];
         const uv = pb.mul(this.$inputs[`texcoord${texCoordIndex}`], this.detailScales.at(i).x);
         const sample = useTextureArray
           ? pb.textureArraySample(this[that.getTextureUniformName(TEX_NAME_DETAIL_COLOR)], uv, i).rgb
@@ -189,7 +236,13 @@ export class TerrainLightModel extends PBRLightModelMR {
     worldTangent?: PBShaderExp,
     worldBinormal?: PBShaderExp
   ): PBShaderExp {
-    scope.$l.terrainBaseNormal = super.calculateNormal(scope, worldPosition, worldNormal, worldTangent, worldBinormal);
+    scope.$l.terrainBaseNormal = super.calculateNormal(
+      scope,
+      worldPosition,
+      worldNormal,
+      worldTangent,
+      worldBinormal
+    );
     const pb = scope.$builder;
     let calcNormal = false;
     if (this._options && this._options.detailMaps.normalTextures) {
@@ -197,15 +250,24 @@ export class TerrainLightModel extends PBRLightModelMR {
         for (let i = 0; i < this._options.detailMaps.normalTextures.length; i++) {
           const tex = scope[this.getTextureUniformName(`${TEX_NAME_DETAIL_NORMAL}${i}`)];
           const scale = scope.detailScales.at(i).y;
-          const texCoord = pb.mul(scope.$inputs[`texcoord${this._options.detailMaps.normalTexCoordIndex[i]}`], scope.detailScales.at(i).x);
-          scope.terrainBaseNormal.normal = pb.add(scope.terrainBaseNormal.normal, this.sampleNormalMapWithTBN(scope, tex, texCoord, scale, scope.terrainBaseNormal.TBN));
+          const texCoord = pb.mul(
+            scope.$inputs[`texcoord${this._options.detailMaps.normalTexCoordIndex[i]}`],
+            scope.detailScales.at(i).x
+          );
+          scope.terrainBaseNormal.normal = pb.add(
+            scope.terrainBaseNormal.normal,
+            this.sampleNormalMapWithTBN(scope, tex, texCoord, scale, scope.terrainBaseNormal.TBN)
+          );
           calcNormal = true;
         }
       } else {
         const tex = scope[this.getTextureUniformName(TEX_NAME_DETAIL_NORMAL)];
         for (let i = 0; i < this._numDetailMaps; i++) {
           const scale = scope.detailScales.at(i).y;
-          const texCoord = pb.mul(scope.$inputs[`texcoord${this._options.detailMaps.normalTexCoordIndex}`], scope.detailScales.at(i).x);
+          const texCoord = pb.mul(
+            scope.$inputs[`texcoord${this._options.detailMaps.normalTexCoordIndex}`],
+            scope.detailScales.at(i).x
+          );
           const pixel = pb.sub(pb.mul(pb.textureArraySample(tex, texCoord, i).rgb, 2), pb.vec3(1));
           const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(scale).xx, 1));
           const detailNormal = pb.normalize(pb.mul(scope.terrainBaseNormal.TBN, normalTex));
@@ -242,12 +304,12 @@ export class TerrainLightModel extends PBRLightModelMR {
             }
           });
         },
-        fragment(pb){
+        fragment(pb) {
           this.$outputs.outColor = pb.vec4();
           this.roughness = pb.vec4().uniform(0);
           this.metallic = pb.vec4().uniform(0);
           this.splatMap = pb.tex2D().uniform(0);
-          pb.main(function(){
+          pb.main(function () {
             this.weights = pb.textureSample(this.splatMap, this.$inputs.uv);
             this.roughnessValue = pb.dot(this.weights, this.roughness);
             this.metallicValue = pb.dot(this.weights, this.metallic);
@@ -255,7 +317,9 @@ export class TerrainLightModel extends PBRLightModelMR {
           });
         }
       });
-      TerrainLightModel._metallicRoughnessGenerationBindGroup = device.createBindGroup(TerrainLightModel._metallicRoughnessGenerationProgram.bindGroupLayouts[0]);
+      TerrainLightModel._metallicRoughnessGenerationBindGroup = device.createBindGroup(
+        TerrainLightModel._metallicRoughnessGenerationProgram.bindGroupLayouts[0]
+      );
     }
     const roughnessValues = Vector4.one();
     const metallicValues = Vector4.zero();
@@ -263,7 +327,11 @@ export class TerrainLightModel extends PBRLightModelMR {
       metallicValues[i] = this._uvScales[i * 4 + 2];
       roughnessValues[i] = this._uvScales[i * 4 + 3];
     }
-    const tex = device.createTexture2D('rgba8unorm', this._options.splatMap.width, this._options.splatMap.height);
+    const tex = device.createTexture2D(
+      'rgba8unorm',
+      this._options.splatMap.width,
+      this._options.splatMap.height
+    );
     tex.name = 'TerrainMetallicRoughnessMap';
     const program = TerrainLightModel._metallicRoughnessGenerationProgram;
     const bindgroup = TerrainLightModel._metallicRoughnessGenerationBindGroup;

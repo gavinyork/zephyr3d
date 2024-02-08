@@ -14,16 +14,16 @@ import type {
   GPUProgram,
   GPUObject
 } from '@zephyr3d/device';
-import {
-  DeviceGPUObjectRenameEvent,
-  genDefaultName
-} from '@zephyr3d/device';
+import { DeviceGPUObjectRenameEvent, genDefaultName } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
 import { makeEventTarget } from '@zephyr3d/base';
 
 let _uniqueId = 0;
 
-export abstract class WebGPUObject<T> extends makeEventTarget(Object)<{ disposed: null }>() implements GPUObject<T> {
+export abstract class WebGPUObject<T>
+  extends makeEventTarget(Object)<{ disposed: null }>()
+  implements GPUObject<T>
+{
   protected _device: WebGPUDevice;
   protected _object: T;
   protected _uid: number;

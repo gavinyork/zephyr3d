@@ -8,7 +8,7 @@ import {
   type GPUProgram,
   type TextureSampler,
   type VertexLayout,
-  type VertexLayoutOptions,
+  type VertexLayoutOptions
 } from '@zephyr3d/device';
 
 export class Renderer {
@@ -80,9 +80,15 @@ export class Renderer {
     this._indexCache = new Uint16Array(Renderer.INDEX_BUFFER_SIZE);
     for (let i = 0; i < 2; i++) {
       const opt: VertexLayoutOptions = {
-        vertexBuffers: [{
-          buffer: this._device.createInterleavedVertexBuffer(['position_f32x2', 'tex0_f32x2', 'diffuse_u8normx4'], this._vertexCache, { dynamic: true })
-        }],
+        vertexBuffers: [
+          {
+            buffer: this._device.createInterleavedVertexBuffer(
+              ['position_f32x2', 'tex0_f32x2', 'diffuse_u8normx4'],
+              this._vertexCache,
+              { dynamic: true }
+            )
+          }
+        ],
         indexBuffer: this._device.createIndexBuffer(this._indexCache, { dynamic: true })
       };
       this._primitiveBuffer.push(this._device.createVertexLayout(opt));
@@ -196,14 +202,22 @@ export class Renderer {
     return this.getCanvas().style.cursor;
   }
   /** @internal */
-  stream(vertexData: Uint8Array, indexData: Uint16Array, indexOffset: number, indexCount: number, texture: Texture2D, scissor: number[]) {
+  stream(
+    vertexData: Uint8Array,
+    indexData: Uint16Array,
+    indexOffset: number,
+    indexCount: number,
+    texture: Texture2D,
+    scissor: number[]
+  ) {
     let tex = texture || null;
     if (tex?.disposed) {
       tex = null;
     }
     const vertexCount = vertexData.length / 20;
-    const overflow = this._drawPosition + vertexCount > Renderer.VERTEX_BUFFER_SIZE
-      || this._indexPosition + indexCount > Renderer.INDEX_BUFFER_SIZE;
+    const overflow =
+      this._drawPosition + vertexCount > Renderer.VERTEX_BUFFER_SIZE ||
+      this._indexPosition + indexCount > Renderer.INDEX_BUFFER_SIZE;
     if (overflow) {
       this._drawPosition = 0;
       this._indexPosition = 0;
@@ -220,7 +234,9 @@ export class Renderer {
     }
     const vertexBuffer = vertexLayout.getVertexBuffer('position');
     vertexBuffer.bufferSubData(this._drawPosition * 20, vertexData, 0, vertexCount * 20);
-    vertexLayout.getIndexBuffer().bufferSubData(this._indexPosition * 2, indexData, indexOffset, alignedIndexCount);
+    vertexLayout
+      .getIndexBuffer()
+      .bufferSubData(this._indexPosition * 2, indexData, indexOffset, alignedIndexCount);
     vertexLayout.setDrawOffset(vertexBuffer, this._drawPosition * 20);
     if (texture) {
       this._device.setProgram(this._programTexture);
@@ -244,9 +260,7 @@ export class Renderer {
     //this._device.setViewport();
     //this._device.setScissor();
     this._projectionMatrix.ortho(0, vp.width, 0, vp.height, -1, 1);
-    this._flipMatrix = Matrix4x4.translation(new Vector3(0, vp.height, 0)).scaleRight(
-      new Vector3(1, -1, 1)
-    );
+    this._flipMatrix = Matrix4x4.translation(new Vector3(0, vp.height, 0)).scaleRight(new Vector3(1, -1, 1));
     const mvpMatrix = Matrix4x4.multiply(this._projectionMatrix, this._flipMatrix);
     this._bindGroup.setValue('mvpMatrix', mvpMatrix);
     this._bindGroupTexture.setValue('mvpMatrix', mvpMatrix);
@@ -255,8 +269,7 @@ export class Renderer {
     }
   }
   /** @internal */
-  endRender() {
-  }
+  endRender() {}
   /** @internal */
   private createStateSet(): RenderStateSet {
     const rs = this._device.createRenderStateSet();
@@ -303,4 +316,3 @@ export class Renderer {
     });
   }
 }
-

@@ -1,7 +1,7 @@
-import { Vector3 } from "@zephyr3d/base";
-import { BoundingBox } from "../utility/bounding_volume";
-import type { ShapeCreationOptions } from "./shape";
-import { Shape } from "./shape";
+import { Vector3 } from '@zephyr3d/base';
+import { BoundingBox } from '../utility/bounding_volume';
+import type { ShapeCreationOptions } from './shape';
+import { Shape } from './shape';
 
 /**
  * Creation options for plane shapes
@@ -69,4 +69,3 @@ export class PlaneShape extends Shape<PlaneCreationOptions> {
     return true;
   }
 }
-

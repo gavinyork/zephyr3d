@@ -1,4 +1,4 @@
-import type { Ray} from '@zephyr3d/base';
+import type { Ray } from '@zephyr3d/base';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import { BoundingBox } from '../../utility/bounding_volume';
 
@@ -53,7 +53,7 @@ export class HeightfieldBBoxTree {
     const tileSizeX = (this._rootNode.bbox.maxPoint.x - this._rootNode.bbox.minPoint.x) / (this._resX - 1);
     const tileSizeY = (this._rootNode.bbox.maxPoint.z - this._rootNode.bbox.minPoint.z) / (this._resY - 1);
     normal.setXYZ(sx * tileSizeY, 2 * tileSizeX * tileSizeY, -sy * tileSizeX).inplaceNormalize();
-    return normal
+    return normal;
   }
   getRealNormal(x: number, y: number, normal?: Vector3): Vector3 {
     normal = normal ?? new Vector3();
@@ -163,13 +163,16 @@ export class HeightfieldBBoxTree {
     if (w <= 2 && h <= 2) {
       node.left = null;
       node.right = null;
-      node.h[0] = this.getHeight (x, y);
-      node.h[1] = this.getHeight (x+1, y);
-      node.h[2] = this.getHeight (x+1, y+1);
-      node.h[3] = this.getHeight (x, y+1);
-      const hMin = Math.min (...node.h);
-      const hMax = Math.max (...node.h);
-      node.bbox = new BoundingBox (new Vector3(x*this._spacingX, hMin, y*this._spacingZ), new Vector3((x+1)*this._spacingX, hMax, (y+1)*this._spacingZ));
+      node.h[0] = this.getHeight(x, y);
+      node.h[1] = this.getHeight(x + 1, y);
+      node.h[2] = this.getHeight(x + 1, y + 1);
+      node.h[3] = this.getHeight(x, y + 1);
+      const hMin = Math.min(...node.h);
+      const hMax = Math.max(...node.h);
+      node.bbox = new BoundingBox(
+        new Vector3(x * this._spacingX, hMin, y * this._spacingZ),
+        new Vector3((x + 1) * this._spacingX, hMax, (y + 1) * this._spacingZ)
+      );
     } else {
       if (w >= h) {
         const w1 = (w + 1) >> 1;
@@ -194,35 +197,51 @@ export class HeightfieldBBoxTree {
     }
     return true;
   }
-  rayIntersect(ray: Ray): number|null {
+  rayIntersect(ray: Ray): number | null {
     return this.rayIntersectR(ray, this._rootNode);
   }
-  rayIntersectR(ray: Ray, node: HeightfieldBBoxTreeNode): number|null {
-    const d = ray.bboxIntersectionTestEx (node.bbox);
+  rayIntersectR(ray: Ray, node: HeightfieldBBoxTreeNode): number | null {
+    const d = ray.bboxIntersectionTestEx(node.bbox);
     if (d === null) {
       return null;
     }
     if (node.left && node.right) {
-      const l = this.rayIntersectR (ray, node.left);
-      const r = this.rayIntersectR (ray, node.right);
+      const l = this.rayIntersectR(ray, node.left);
+      const r = this.rayIntersectR(ray, node.right);
       if (l !== null && r !== null) {
         return l < r ? l : r;
       } else {
         return l === null ? r : l;
       }
     } else {
-      const v00 = new Vector3(node.bbox.minPoint.x, node.h[0]/*this.dvHeights.getFloat32(24 + node.v[0] * 4)*/, node.bbox.minPoint.z);
-      const v01 = new Vector3(node.bbox.maxPoint.x, node.h[1]/*this.dvHeights.getFloat32(24 + node.v[1] * 4)*/, node.bbox.minPoint.z);
-      const v11 = new Vector3(node.bbox.maxPoint.x, node.h[2]/*this.dvHeights.getFloat32(24 + node.v[2] * 4)*/, node.bbox.maxPoint.z);
-      const v10 = new Vector3(node.bbox.minPoint.x, node.h[3]/*this.dvHeights.getFloat32(24 + node.v[3] * 4)*/, node.bbox.maxPoint.z);
+      const v00 = new Vector3(
+        node.bbox.minPoint.x,
+        node.h[0] /*this.dvHeights.getFloat32(24 + node.v[0] * 4)*/,
+        node.bbox.minPoint.z
+      );
+      const v01 = new Vector3(
+        node.bbox.maxPoint.x,
+        node.h[1] /*this.dvHeights.getFloat32(24 + node.v[1] * 4)*/,
+        node.bbox.minPoint.z
+      );
+      const v11 = new Vector3(
+        node.bbox.maxPoint.x,
+        node.h[2] /*this.dvHeights.getFloat32(24 + node.v[2] * 4)*/,
+        node.bbox.maxPoint.z
+      );
+      const v10 = new Vector3(
+        node.bbox.minPoint.x,
+        node.h[3] /*this.dvHeights.getFloat32(24 + node.v[3] * 4)*/,
+        node.bbox.maxPoint.z
+      );
       let intersected = false;
-      let dist1 = ray.intersectionTestTriangle (v00, v01, v10, false);
+      let dist1 = ray.intersectionTestTriangle(v00, v01, v10, false);
       if (dist1 !== null && dist1 > 0) {
         intersected = true;
       } else {
         dist1 = Number.MAX_VALUE;
       }
-      let dist2 = ray.intersectionTestTriangle (v10, v01, v11, false);
+      let dist2 = ray.intersectionTestTriangle(v10, v01, v11, false);
       if (dist2 !== null && dist2 > 0) {
         intersected = true;
       } else {
@@ -299,7 +318,7 @@ export class HeightField {
     this.m_sizeX = 0;
     this.m_sizeZ = 0;
   }
-  rayIntersect (ray: Ray): number|null {
+  rayIntersect(ray: Ray): number | null {
     return this.m_bboxTree.rayIntersect(ray);
   }
   computeNormals(): Uint8Array {

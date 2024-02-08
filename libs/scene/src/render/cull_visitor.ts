@@ -1,4 +1,4 @@
-import type { AABB} from '@zephyr3d/base';
+import type { AABB } from '@zephyr3d/base';
 import { ClipState } from '@zephyr3d/base';
 import { OctreeNode } from '../scene/octree';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../values';
@@ -72,10 +72,10 @@ export class CullVisitor implements Visitor {
    * Visits a node
    * @param target - The node to be visit
    */
-  visit(target: SceneNode|OctreeNode): unknown {
+  visit(target: SceneNode | OctreeNode): unknown {
     if (target instanceof OctreeNode) {
       return this.visitOctreeNode(target);
-    } else  if (target.isMesh()) {
+    } else if (target.isMesh()) {
       return this.visitMesh(target);
     } else if (target.isTerrain()) {
       return this.visitTerrain(target);
@@ -99,7 +99,7 @@ export class CullVisitor implements Visitor {
     if (!node.hidden && (node.castShadow || this._renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP)) {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {
-        return node.cull(this) > 0
+        return node.cull(this) > 0;
       }
     }
     return false;
@@ -117,7 +117,8 @@ export class CullVisitor implements Visitor {
   }
   /** @internal */
   visitOctreeNode(node: OctreeNode) {
-    const clipState = node.getLevel() > 0 ? this.getClipStateWithAABB(node.getBoxLoosed()) : ClipState.CLIPPED;
+    const clipState =
+      node.getLevel() > 0 ? this.getClipStateWithAABB(node.getBoxLoosed()) : ClipState.CLIPPED;
     if (clipState !== ClipState.NOT_CLIPPED) {
       const saveSkipFlag = this._skipClipTest;
       this._skipClipTest = clipState === ClipState.A_INSIDE_B;
@@ -147,6 +148,6 @@ export class CullVisitor implements Visitor {
   protected getClipStateWithAABB(aabb: AABB): ClipState {
     return this.camera.clipMask
       ? aabb.getClipStateWithFrustumMask(this.frustum, this.camera.clipMask)
-      : aabb.getClipStateWithFrustum(this.frustum)
+      : aabb.getClipStateWithFrustum(this.frustum);
   }
 }

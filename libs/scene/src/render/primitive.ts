@@ -1,6 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Ray, TypedArray } from '@zephyr3d/base';
-import type { VertexStepMode, VertexLayout, VertexLayoutOptions, PrimitiveType, StructuredBuffer, IndexBuffer, VertexSemantic, VertexAttribFormat, VertexBufferInfo } from '@zephyr3d/device';
+import type {
+  VertexStepMode,
+  VertexLayout,
+  VertexLayoutOptions,
+  PrimitiveType,
+  StructuredBuffer,
+  IndexBuffer,
+  VertexSemantic,
+  VertexAttribFormat,
+  VertexBufferInfo
+} from '@zephyr3d/device';
 import { Application } from '../app';
 import type { BoundingVolume } from '../utility/bounding_volume';
 
@@ -278,7 +288,10 @@ export class Primitive {
     }
     const info = this.getVertexBufferInfo('position');
     if (info) {
-      return Math.max(0, Math.floor((info.buffer.byteLength - info.drawOffset) / info.stride) - this._indexStart);
+      return Math.max(
+        0,
+        Math.floor((info.buffer.byteLength - info.drawOffset) / info.stride) - this._indexStart
+      );
     }
     return 0;
   }

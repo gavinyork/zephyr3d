@@ -7,9 +7,7 @@ import type {
   VertexLayoutOptions,
   VertexBufferInfo
 } from '@zephyr3d/device';
-import {
-  VertexData
-} from '@zephyr3d/device';
+import { VertexData } from '@zephyr3d/device';
 import { vertexFormatToHash } from './constants_webgpu';
 import { WebGPUObject } from './gpuobject_webgpu';
 import { WebGPUStructuredBuffer } from './structuredbuffer_webgpu';

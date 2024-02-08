@@ -1,22 +1,37 @@
-import type { BindGroup, GPUProgram, PBFunctionScope, PBInsideFunctionScope, PBShaderExp} from "@zephyr3d/device";
-import { ProgramBuilder } from "@zephyr3d/device";
-import { RENDER_PASS_TYPE_DEPTH_ONLY, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP } from "../values";
-import type { IMaterial} from "./material";
-import { Material } from "./material";
-import type { DrawContext, ShadowMapPass } from "../render";
-import { ShaderFramework, encodeColorOutput, encodeNormalizedFloatToRGBA, nonLinearDepthToLinearNormalized } from "../shaders";
-import { Application } from "../app";
+import type {
+  BindGroup,
+  GPUProgram,
+  PBFunctionScope,
+  PBInsideFunctionScope,
+  PBShaderExp
+} from '@zephyr3d/device';
+import { ProgramBuilder } from '@zephyr3d/device';
+import { RENDER_PASS_TYPE_DEPTH_ONLY, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP } from '../values';
+import type { IMaterial } from './material';
+import { Material } from './material';
+import type { DrawContext, ShadowMapPass } from '../render';
+import {
+  ShaderFramework,
+  encodeColorOutput,
+  encodeNormalizedFloatToRGBA,
+  nonLinearDepthToLinearNormalized
+} from '../shaders';
+import { Application } from '../app';
 
-const allRenderPassTypes = [RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP, RENDER_PASS_TYPE_DEPTH_ONLY];
+const allRenderPassTypes = [
+  RENDER_PASS_TYPE_FORWARD,
+  RENDER_PASS_TYPE_SHADOWMAP,
+  RENDER_PASS_TYPE_DEPTH_ONLY
+];
 
-export type BlendMode = 'none'|'blend'|'additive'|'max'|'min'
+export type BlendMode = 'none' | 'blend' | 'additive' | 'max' | 'min';
 export interface IMeshMaterial extends IMaterial {
   alphaCutoff: number;
   alphaToCoverage: boolean;
   blendMode: BlendMode;
   opacity: number;
   featureUsed<T = unknown>(feature: string, renderPassType: number): T;
-  useFeature(feature: string, use: unknown, renderPassType?: number[]|number)
+  useFeature(feature: string, use: unknown, renderPassType?: number[] | number);
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void;
   needFragmentColor(ctx: DrawContext): boolean;
   vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
@@ -25,8 +40,9 @@ export interface IMeshMaterial extends IMaterial {
   outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext);
 }
 
-export type UnionToIntersection<U> =
-  (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
+export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void
+  ? I
+  : never;
 
 export type ExtractMixinReturnType<M, T> = M extends (target: infer A) => infer R
   ? T extends A
@@ -34,9 +50,15 @@ export type ExtractMixinReturnType<M, T> = M extends (target: infer A) => infer 
     : never
   : never;
 
-export type ExtractMixinType<M extends any[], T> = UnionToIntersection<M extends (infer K)[] ? ExtractMixinReturnType<K, T> : never> & T;
+export type ExtractMixinType<M extends any[], T> = UnionToIntersection<
+  M extends (infer K)[] ? ExtractMixinReturnType<K, T> : never
+> &
+  T;
 
-export function applyMaterialMixins<M extends ((target: any) => any)[], T>(target: T, ...mixins: M): ExtractMixinType<M, T> {
+export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
+  target: T,
+  ...mixins: M
+): ExtractMixinType<M, T> {
   let r: any = target;
   for (const m of mixins) {
     r = m(r);
@@ -54,7 +76,7 @@ export class MeshMaterial extends Material implements IMeshMaterial {
   private _alphaCutoff: number;
   private _blendMode: BlendMode;
   private _opacity: number;
-  constructor(){
+  constructor() {
     super();
     this._features = new Map();
     this._featureStates = [];
@@ -90,7 +112,11 @@ export class MeshMaterial extends Material implements IMeshMaterial {
   set blendMode(val: BlendMode) {
     if (this._blendMode !== val) {
       this._blendMode = val;
-      this.useFeature(MeshMaterial.FEATURE_ALPHABLEND, this._blendMode !== 'none' || this._opacity < 1, RENDER_PASS_TYPE_FORWARD)
+      this.useFeature(
+        MeshMaterial.FEATURE_ALPHABLEND,
+        this._blendMode !== 'none' || this._opacity < 1,
+        RENDER_PASS_TYPE_FORWARD
+      );
     }
   }
   /** A value between 0 and 1, presents the opacity */
@@ -178,7 +204,7 @@ export class MeshMaterial extends Material implements IMeshMaterial {
    * @param feature - Which feature will be used or unused
    * @param use - true if use the feature, otherwise false
    */
-  useFeature(feature: string, use: unknown, renderPassType?: number[]|number) {
+  useFeature(feature: string, use: unknown, renderPassType?: number[] | number) {
     renderPassType = renderPassType ?? allRenderPassTypes;
     if (typeof renderPassType === 'number') {
       renderPassType = [renderPassType];
@@ -190,7 +216,11 @@ export class MeshMaterial extends Material implements IMeshMaterial {
     }
     let changed = false;
     for (const type of renderPassType) {
-      if (type !== RENDER_PASS_TYPE_FORWARD && type !== RENDER_PASS_TYPE_SHADOWMAP && type !== RENDER_PASS_TYPE_DEPTH_ONLY) {
+      if (
+        type !== RENDER_PASS_TYPE_FORWARD &&
+        type !== RENDER_PASS_TYPE_SHADOWMAP &&
+        type !== RENDER_PASS_TYPE_DEPTH_ONLY
+      ) {
         console.error(`useFeature(): invalid render pass type: ${type}`);
       }
       if (this._featureStates[type][index] !== use) {
@@ -274,13 +304,13 @@ export class MeshMaterial extends Material implements IMeshMaterial {
     const that = this;
     const program = pb.buildRenderProgram({
       vertex(pb) {
-        pb.main(function(){
+        pb.main(function () {
           that.vertexShader(this, ctx);
         });
       },
       fragment(pb) {
         this.$outputs.zFragmentOutput = pb.vec4();
-        pb.main(function(){
+        pb.main(function () {
           that.fragmentShader(this, ctx);
         });
       }
@@ -299,7 +329,7 @@ export class MeshMaterial extends Material implements IMeshMaterial {
   outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext) {
     const pb = scope.$builder;
     const that = this;
-    pb.func('zOutputFragmentColor', color ? [pb.vec4('color')] : [], function(){
+    pb.func('zOutputFragmentColor', color ? [pb.vec4('color')] : [], function () {
       this.$l.outColor = color ? this.color : pb.vec4();
       if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
         ShaderFramework.discardIfClipped(this);
@@ -331,7 +361,7 @@ export class MeshMaterial extends Material implements IMeshMaterial {
         } else {
           this.$outputs.zFragmentOutput = pb.vec4(this.kkDepth, 0, 0, 1);
         }
-      } else /*if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP)*/ {
+      } /*if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP)*/ else {
         if (color) {
           this.$if(pb.lessThan(this.outColor.a, this.kkAlphaCutoff), function () {
             pb.discard();
@@ -345,4 +375,3 @@ export class MeshMaterial extends Material implements IMeshMaterial {
     color ? pb.getGlobalScope().zOutputFragmentColor(color) : pb.getGlobalScope().zOutputFragmentColor();
   }
 }
-

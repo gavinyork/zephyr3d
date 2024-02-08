@@ -118,7 +118,9 @@ export class GrassMaterial extends Material {
   }
   /** @internal */
   protected _createHash(renderPassType: number): string {
-    return renderPassType === RENDER_PASS_TYPE_FORWARD ? `${Number(this._useAlphaToCoverage)}:${this._lightModel.getHash()}` : `${Number(this._useAlphaToCoverage)}`;
+    return renderPassType === RENDER_PASS_TYPE_FORWARD
+      ? `${Number(this._useAlphaToCoverage)}:${this._lightModel.getHash()}`
+      : `${Number(this._useAlphaToCoverage)}`;
   }
   /** @internal */
   protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram {
@@ -137,9 +139,15 @@ export class GrassMaterial extends Material {
         this.terrainSize = pb.vec2().uniform(2);
         that._lightModel.setupUniforms(this, ctx);
         pb.main(function () {
-          this.$l.normalSample = pb.getDevice().type === 'webgl'
-            ? pb.textureSample(this.terrainNormalMap, pb.div(this.$inputs.placement.xz, this.terrainSize)).rgb
-            : pb.textureSampleLevel(this.terrainNormalMap, pb.div(this.$inputs.placement.xz, this.terrainSize), 0).rgb
+          this.$l.normalSample =
+            pb.getDevice().type === 'webgl'
+              ? pb.textureSample(this.terrainNormalMap, pb.div(this.$inputs.placement.xz, this.terrainSize))
+                  .rgb
+              : pb.textureSampleLevel(
+                  this.terrainNormalMap,
+                  pb.div(this.$inputs.placement.xz, this.terrainSize),
+                  0
+                ).rgb;
           this.$l.normal = pb.normalize(pb.sub(pb.mul(this.normalSample, 2), pb.vec3(1)));
           this.$l.axisX = pb.vec3(1, 0, 0);
           this.$l.axisZ = pb.cross(this.axisX, this.normal);
@@ -147,10 +155,17 @@ export class GrassMaterial extends Material {
           this.$l.rotPos = pb.mul(pb.mat3(this.axisX, this.normal, this.axisZ), this.$inputs.pos);
           this.$l.p = pb.vec4(pb.add(this.rotPos, this.$inputs.placement.xyz), 1);
           this.$outputs.texcoord0 = this.$inputs.uv;
-          this.$outputs.worldPosition = pb.mul(ShaderFramework.getWorldMatrix(this), this.$l.p).tag(ShaderFramework.USAGE_WORLD_POSITION);
-          ShaderFramework.setClipSpacePosition(this, pb.mul(ShaderFramework.getViewProjectionMatrix(this), this.$outputs.worldPosition));
+          this.$outputs.worldPosition = pb
+            .mul(ShaderFramework.getWorldMatrix(this), this.$l.p)
+            .tag(ShaderFramework.USAGE_WORLD_POSITION);
+          ShaderFramework.setClipSpacePosition(
+            this,
+            pb.mul(ShaderFramework.getViewProjectionMatrix(this), this.$outputs.worldPosition)
+          );
           if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
-            this.$outputs.worldNormal = pb.normalize(pb.mul(ShaderFramework.getWorldMatrix(this), pb.vec4(this.normal,0)).xyz).tag(ShaderFramework.USAGE_WORLD_NORMAL);
+            this.$outputs.worldNormal = pb
+              .normalize(pb.mul(ShaderFramework.getWorldMatrix(this), pb.vec4(this.normal, 0)).xyz)
+              .tag(ShaderFramework.USAGE_WORLD_NORMAL);
             this.$outputs.outVertexColor = pb.vec4(1, 1, 1, 1).tag(ShaderFramework.USAGE_VERTEX_COLOR);
           }
         });
@@ -160,7 +175,7 @@ export class GrassMaterial extends Material {
         that._lightModel.setupUniforms(this, ctx);
         this.albedoTextureSize = pb.vec2().uniform(2);
         this.$outputs.outColor = pb.vec4();
-        pb.func('calcMipLevel', [pb.vec2('coord')], function(){
+        pb.func('calcMipLevel', [pb.vec2('coord')], function () {
           this.$l.dx = pb.dpdx(this.coord);
           this.$l.dy = pb.dpdy(this.coord);
           this.$l.deltaMaxSqr = pb.max(pb.dot(this.dx, this.dx), pb.dot(this.dy, this.dy));
@@ -170,11 +185,23 @@ export class GrassMaterial extends Material {
           pb.main(function () {
             this.$l.litColor = forwardComputeLighting(this, that._lightModel, ctx);
             MESH_MATERIAL.DISCARD_IF_CLIPPED(this);
-            this.$l.a = pb.mul(this.litColor.a, pb.add(1, pb.mul(pb.max(0, this.calcMipLevel(pb.mul(this.$inputs.texcoord0, this.albedoTextureSize))), 0.25)));
+            this.$l.a = pb.mul(
+              this.litColor.a,
+              pb.add(
+                1,
+                pb.mul(
+                  pb.max(0, this.calcMipLevel(pb.mul(this.$inputs.texcoord0, this.albedoTextureSize))),
+                  0.25
+                )
+              )
+            );
             if (that._useAlphaToCoverage) {
               // alpha to coverage
-              this.a = pb.add(pb.div(pb.sub(this.litColor.a, 0.4), pb.max(pb.fwidth(this.litColor.a), 0.0001)), 0.5);
-              this.litColor = pb.vec4(this.litColor.rgb, this.a);//pb.vec4(pb.mul(this.litColor.rgb, this.litColor.a), this.litColor.a);
+              this.a = pb.add(
+                pb.div(pb.sub(this.litColor.a, 0.4), pb.max(pb.fwidth(this.litColor.a), 0.0001)),
+                0.5
+              );
+              this.litColor = pb.vec4(this.litColor.rgb, this.a); //pb.vec4(pb.mul(this.litColor.rgb, this.litColor.a), this.litColor.a);
             } else {
               // alpha test
               this.$if(pb.lessThan(this.a, 0.8), function () {
@@ -188,11 +215,23 @@ export class GrassMaterial extends Material {
           pb.main(function () {
             this.$l.litColor = that._lightModel.calculateAlbedo(this);
             MESH_MATERIAL.DISCARD_IF_CLIPPED(this);
-            this.$l.a = pb.mul(this.litColor.a, pb.add(1, pb.mul(pb.max(0, this.calcMipLevel(pb.mul(this.$inputs.texcoord0, this.albedoTextureSize))), 0.25)));
+            this.$l.a = pb.mul(
+              this.litColor.a,
+              pb.add(
+                1,
+                pb.mul(
+                  pb.max(0, this.calcMipLevel(pb.mul(this.$inputs.texcoord0, this.albedoTextureSize))),
+                  0.25
+                )
+              )
+            );
             if (that._useAlphaToCoverage) {
               // alpha to coverage
-              this.a = pb.add(pb.div(pb.sub(this.litColor.a, 0.4), pb.max(pb.fwidth(this.litColor.a), 0.0001)), 0.5);
-              this.litColor = pb.vec4(this.litColor.rgb, this.a);//pb.vec4(pb.mul(this.litColor.rgb, this.litColor.a), this.litColor.a);
+              this.a = pb.add(
+                pb.div(pb.sub(this.litColor.a, 0.4), pb.max(pb.fwidth(this.litColor.a), 0.0001)),
+                0.5
+              );
+              this.litColor = pb.vec4(this.litColor.rgb, this.a); //pb.vec4(pb.mul(this.litColor.rgb, this.litColor.a), this.litColor.a);
             } else {
               // alpha test
               this.$if(pb.lessThan(this.a, 0.8), function () {
@@ -210,11 +249,23 @@ export class GrassMaterial extends Material {
           pb.main(function () {
             this.$l.litColor = that._lightModel.calculateAlbedo(this);
             MESH_MATERIAL.DISCARD_IF_CLIPPED(this);
-            this.$l.a = pb.mul(this.litColor.a, pb.add(1, pb.mul(pb.max(0, this.calcMipLevel(pb.mul(this.$inputs.texcoord0, this.albedoTextureSize))), 0.25)));
+            this.$l.a = pb.mul(
+              this.litColor.a,
+              pb.add(
+                1,
+                pb.mul(
+                  pb.max(0, this.calcMipLevel(pb.mul(this.$inputs.texcoord0, this.albedoTextureSize))),
+                  0.25
+                )
+              )
+            );
             if (that._useAlphaToCoverage) {
               // alpha to coverage
-              this.a = pb.add(pb.div(pb.sub(this.litColor.a, 0.4), pb.max(pb.fwidth(this.litColor.a), 0.0001)), 0.5);
-              this.litColor = pb.vec4(this.litColor.rgb, this.a);//pb.vec4(pb.mul(this.litColor.rgb, this.litColor.a), this.litColor.a);
+              this.a = pb.add(
+                pb.div(pb.sub(this.litColor.a, 0.4), pb.max(pb.fwidth(this.litColor.a), 0.0001)),
+                0.5
+              );
+              this.litColor = pb.vec4(this.litColor.rgb, this.a); //pb.vec4(pb.mul(this.litColor.rgb, this.litColor.a), this.litColor.a);
             } else {
               // alpha test
               this.$if(pb.lessThan(this.a, 0.8), function () {

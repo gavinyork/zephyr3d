@@ -36,7 +36,7 @@ export enum ClipState {
  * Enumerator used to refer to the cube face
  * @public
  */
- export enum CubeFace {
+export enum CubeFace {
   PX = 0,
   NX = 1,
   PY = 2,

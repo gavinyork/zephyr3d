@@ -1,9 +1,9 @@
-import { Matrix4x4, parseColor, Vector3, Vector4 } from "@zephyr3d/base";
-import { Font } from "./font";
-import { GlyphManager } from "./glyphmanager";
-import type { RenderStateSet } from "../render_states";
-import type { AbstractDevice } from "../base_types";
-import type { BindGroup, GPUProgram, StructuredBuffer, VertexLayout } from "../gpuobject";
+import { Matrix4x4, parseColor, Vector3, Vector4 } from '@zephyr3d/base';
+import { Font } from './font';
+import { GlyphManager } from './glyphmanager';
+import type { RenderStateSet } from '../render_states';
+import type { AbstractDevice } from '../base_types';
+import type { BindGroup, GPUProgram, StructuredBuffer, VertexLayout } from '../gpuobject';
 
 const MAX_GLYPH_COUNT = 1024;
 
@@ -99,14 +99,28 @@ export class DrawText {
     }
   }
   /** @internal */
-  private static drawTextNoOverflow(device: AbstractDevice, text: string, start: number, count: number, x: number, y: number): number {
+  private static drawTextNoOverflow(
+    device: AbstractDevice,
+    text: string,
+    start: number,
+    count: number,
+    x: number,
+    y: number
+  ): number {
     let drawn = 0;
     let atlasIndex = -1;
     let i = 0;
     for (; i < count; i++) {
-      const glyph = this.glyphManager.getGlyphInfo(text[i + start], this.font) || this.glyphManager.getGlyphInfo('?', this.font);
+      const glyph =
+        this.glyphManager.getGlyphInfo(text[i + start], this.font) ||
+        this.glyphManager.getGlyphInfo('?', this.font);
       if (atlasIndex >= 0 && glyph.atlasIndex !== atlasIndex) {
-        this.textVertexBuffer.bufferSubData((this.textOffset + drawn) * 16 * 4, this.vertexCache, (this.textOffset + drawn) * 16, (i - drawn) * 16);
+        this.textVertexBuffer.bufferSubData(
+          (this.textOffset + drawn) * 16 * 4,
+          this.vertexCache,
+          (this.textOffset + drawn) * 16,
+          (i - drawn) * 16
+        );
         this.textBindGroup.setTexture('tex', this.glyphManager.getAtlasTexture(atlasIndex));
         device.draw('triangle-list', (this.textOffset + drawn) * 6, (i - drawn) * 6);
         drawn = i;
@@ -131,7 +145,12 @@ export class DrawText {
       this.vertexCache[base + 15] = glyph.vMax;
       x += glyph.width;
     }
-    this.textVertexBuffer.bufferSubData((this.textOffset + drawn) * 16 * 4, this.vertexCache, (this.textOffset + drawn) * 16, (i - drawn) * 16);
+    this.textVertexBuffer.bufferSubData(
+      (this.textOffset + drawn) * 16 * 4,
+      this.vertexCache,
+      (this.textOffset + drawn) * 16,
+      (i - drawn) * 16
+    );
     this.textBindGroup.setTexture('tex', this.glyphManager.getAtlasTexture(atlasIndex));
     device.draw('triangle-list', (this.textOffset + drawn) * 6, (i - drawn) * 6);
     return x;
@@ -143,9 +162,13 @@ export class DrawText {
       this.font = this.font || Font.fetchFont('16px arial', device.getScale());
       this.glyphManager = new GlyphManager(device, 1024, 1024, 1);
       this.vertexCache = new Float32Array(this.GLYPH_COUNT * 16);
-      this.textVertexBuffer = device.createInterleavedVertexBuffer(['position_f32x2', 'tex0_f32x2'], this.vertexCache, {
-        dynamic: true
-      });
+      this.textVertexBuffer = device.createInterleavedVertexBuffer(
+        ['position_f32x2', 'tex0_f32x2'],
+        this.vertexCache,
+        {
+          dynamic: true
+        }
+      );
       const indices = new Uint16Array(this.GLYPH_COUNT * 6);
       for (let i = 0; i < this.GLYPH_COUNT; i++) {
         const base = i * 4;
@@ -169,9 +192,9 @@ export class DrawText {
           this.$outputs.uv = pb.vec2();
           this.flip = pb.int(0).uniform(0);
           this.textMatrix = pb.mat4().uniform(0);
-          pb.main(function(){
+          pb.main(function () {
             this.$builtins.position = pb.mul(this.textMatrix, pb.vec4(this.$inputs.pos, -50, 1));
-            this.$if(pb.notEqual(this.flip, 0), function(){
+            this.$if(pb.notEqual(this.flip, 0), function () {
               this.$builtins.position.y = pb.neg(this.$builtins.position.y);
             });
             this.$outputs.uv = this.$inputs.uv;
@@ -182,11 +205,14 @@ export class DrawText {
           this.textColor = pb.vec4().uniform(0);
           this.tex = pb.tex2D().uniform(0);
           this.srgbOut = pb.int().uniform(0);
-          pb.main(function(){
+          pb.main(function () {
             this.alpha = pb.mul(pb.textureSample(this.tex, this.$inputs.uv).a, this.textColor.a);
-            this.$if(pb.notEqual(this.srgbOut, 0), function(){
-              this.$outputs.color = pb.vec4(pb.mul(pb.pow(this.textColor.rgb, pb.vec3(1/2.2)), this.alpha), this.alpha);
-            }).$else(function(){
+            this.$if(pb.notEqual(this.srgbOut, 0), function () {
+              this.$outputs.color = pb.vec4(
+                pb.mul(pb.pow(this.textColor.rgb, pb.vec3(1 / 2.2)), this.alpha),
+                this.alpha
+              );
+            }).$else(function () {
               this.$outputs.color = pb.vec4(pb.mul(this.textColor.rgb, this.alpha), this.alpha);
             });
           });
@@ -194,7 +220,11 @@ export class DrawText {
       });
       this.textBindGroup = device.createBindGroup(this.textProgram.bindGroupLayouts[0]);
       this.textRenderStates = device.createRenderStateSet();
-      this.textRenderStates.useBlendingState().enable(true).setBlendFuncRGB('one', 'inv-src-alpha').setBlendFuncAlpha('zero', 'one');
+      this.textRenderStates
+        .useBlendingState()
+        .enable(true)
+        .setBlendFuncRGB('one', 'inv-src-alpha')
+        .setBlendFuncAlpha('zero', 'one');
       this.textRenderStates.useDepthState().enableTest(false).enableWrite(false);
       this.textRenderStates.useRasterizerState().setCullMode('none');
     }

@@ -100,7 +100,7 @@ export class BoxFilterBlitter extends Blitter {
     srcTex: PBShaderExp,
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
-    sampleType: 'float'|'int'|'uint'
+    sampleType: 'float' | 'int' | 'uint'
   ): PBShaderExp {
     const that = this;
     const pb = scope.$builder;

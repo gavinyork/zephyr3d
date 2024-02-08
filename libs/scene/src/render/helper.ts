@@ -1,5 +1,5 @@
-import type { RenderStateSet, VertexLayout } from "@zephyr3d/device";
-import { Application } from "../app";
+import type { RenderStateSet, VertexLayout } from '@zephyr3d/device';
+import { Application } from '../app';
 
 let quadVertexLayout: VertexLayout = null;
 let quadRenderStateSet: RenderStateSet = null;
@@ -8,7 +8,11 @@ export function drawFullscreenQuad(renderStates?: RenderStateSet) {
   const device = Application.instance.device;
   if (!quadVertexLayout) {
     quadVertexLayout = device.createVertexLayout({
-      vertexBuffers: [{ buffer: device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])) }]
+      vertexBuffers: [
+        {
+          buffer: device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]))
+        }
+      ]
     });
   }
   if (!quadRenderStateSet) {

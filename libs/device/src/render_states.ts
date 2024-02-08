@@ -121,13 +121,13 @@ export interface BlendingState {
  * The face mode
  * @public
  */
-export type FaceMode = 'none'|'front'|'back';
+export type FaceMode = 'none' | 'front' | 'back';
 
 /**
  * The type of face winding
  * @public
  */
-export type FaceWinding = 'cw'|'ccw';
+export type FaceWinding = 'cw' | 'ccw';
 
 /**
  * The render states related to primitive rasterization
@@ -190,7 +190,7 @@ export interface DepthState {
  * Stencil operations
  * @public
  */
-export type StencilOp = 'keep'|'zero'|'replace'|'incr'|'incr-wrap'|'decr'|'decr-wrap'|'invert';
+export type StencilOp = 'keep' | 'zero' | 'replace' | 'incr' | 'incr-wrap' | 'decr' | 'decr-wrap' | 'invert';
 
 /**
  * The render states related to the stencil buffer
@@ -284,7 +284,7 @@ export interface StencilState {
 export interface RenderStateSet {
   /** Creates a new RenderStateSet by copying this one */
   copyFrom(stateSet: RenderStateSet): void;
-    /** Fragment output related render statements or null if the default values should be used */
+  /** Fragment output related render statements or null if the default values should be used */
   readonly colorState: ColorState;
   /** Alpha blending related render statements or null if the default values should be used */
   readonly blendingState: BlendingState;

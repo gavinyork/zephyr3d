@@ -1,4 +1,15 @@
-import type { TextureFormat, CompareFunc, TextureAddressMode, TextureFilterMode, PrimitiveType, BlendEquation, BlendFunc, FaceMode, FaceWinding, StencilOp } from '@zephyr3d/device';
+import type {
+  TextureFormat,
+  CompareFunc,
+  TextureAddressMode,
+  TextureFilterMode,
+  PrimitiveType,
+  BlendEquation,
+  BlendFunc,
+  FaceMode,
+  FaceWinding,
+  StencilOp
+} from '@zephyr3d/device';
 
 export const textureWrappingMap: Record<TextureAddressMode, GPUAddressMode> = {
   repeat: 'repeat',
@@ -24,12 +35,12 @@ export const compareFuncMap: Record<CompareFunc, GPUCompareFunction> = {
 };
 
 export const stencilOpMap: Record<StencilOp, GPUStencilOperation> = {
-  'keep': 'keep',
-  'replace': 'replace',
-  'zero': 'zero',
-  'invert': 'invert',
-  'incr': 'increment-clamp',
-  'decr': 'decrement-clamp',
+  keep: 'keep',
+  replace: 'replace',
+  zero: 'zero',
+  invert: 'invert',
+  incr: 'increment-clamp',
+  decr: 'decrement-clamp',
   'incr-wrap': 'increment-wrap',
   'decr-wrap': 'decrement-wrap'
 };
@@ -44,14 +55,14 @@ export const primitiveTypeMap: Record<PrimitiveType, GPUPrimitiveTopology> = {
 };
 
 export const faceWindingMap: Record<FaceWinding, GPUFrontFace> = {
-  'ccw': 'ccw',
-  'cw': 'cw'
+  ccw: 'ccw',
+  cw: 'cw'
 };
 
 export const faceModeMap: Record<FaceMode, GPUCullMode> = {
-  'back': 'back',
-  'front': 'front',
-  'none': 'none'
+  back: 'back',
+  front: 'front',
+  none: 'none'
 };
 
 export const blendEquationMap: Record<BlendEquation, GPUBlendOperation> = {

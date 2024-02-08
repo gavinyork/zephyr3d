@@ -1,35 +1,35 @@
-import { Vector2, Vector3 } from "@zephyr3d/base";
-import type { BaseTexture, BindGroup, GPUProgram, RenderStateSet, Texture2D } from "@zephyr3d/device";
-import { Application, Primitive, decodeNormalizedFloatFromRGBA, linearToGamma } from "@zephyr3d/scene";
+import { Vector2, Vector3 } from '@zephyr3d/base';
+import type { BaseTexture, BindGroup, GPUProgram, RenderStateSet, Texture2D } from '@zephyr3d/device';
+import { Application, Primitive, decodeNormalizedFloatFromRGBA, linearToGamma } from '@zephyr3d/scene';
 
-type SampleType = 'depth'|'float'|'unfilterable-float'|'int'|'uint';
+type SampleType = 'depth' | 'float' | 'unfilterable-float' | 'int' | 'uint';
 
 type TextureViewProgram = {
   // 'float'
   normal: {
-    program: GPUProgram,
-    bindGroup: BindGroup
-  },
+    program: GPUProgram;
+    bindGroup: BindGroup;
+  };
   // 'unfilterable-float'
   nonfilterable: {
-    program: GPUProgram,
-    bindGroup: BindGroup
-  },
+    program: GPUProgram;
+    bindGroup: BindGroup;
+  };
   // 'int'
   int: {
-    program: GPUProgram,
-    bindGroup: BindGroup
-  },
+    program: GPUProgram;
+    bindGroup: BindGroup;
+  };
   // 'uint
   uint: {
-    program: GPUProgram,
-    bindGroup: BindGroup
-  },
+    program: GPUProgram;
+    bindGroup: BindGroup;
+  };
   // 'depth'
   depth: {
-    program: GPUProgram,
-    bindGroup: BindGroup
-  }
+    program: GPUProgram;
+    bindGroup: BindGroup;
+  };
 };
 type TextureViewProgramEncodes = TextureViewProgram[];
 
@@ -47,7 +47,7 @@ export class TextureDrawer {
     [new Vector3(1, 0, 0), new Vector3(0, 0, 1), new Vector3(0, 1, 0)],
     [new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector3(0, -1, 0)],
     [new Vector3(1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, 1)],
-    [new Vector3(-1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, -1)],
+    [new Vector3(-1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, -1)]
   ];
   static readonly ENCODE_NORMAL = 1;
   static readonly ENCODE_NORMALIZED_FLOAT = 2;
@@ -68,7 +68,7 @@ export class TextureDrawer {
     this._programCube = [];
     this._programVideo = [];
     this._program2DArray = [];
-    [TextureDrawer.ENCODE_NORMAL, TextureDrawer.ENCODE_NORMALIZED_FLOAT].forEach(val => {
+    [TextureDrawer.ENCODE_NORMAL, TextureDrawer.ENCODE_NORMALIZED_FLOAT].forEach((val) => {
       this._program2D[val] = this.create2DPrograms(val);
       this._programCube[val] = this.createCubePrograms(val);
       this._programVideo[val] = this.createVideoPrograms(val);
@@ -77,18 +77,23 @@ export class TextureDrawer {
       }
     });
     this._programBk = this.createBkShader();
-    const vb = device.createInterleavedVertexBuffer(['position_f32x2', 'tex0_f32x2'], new Float32Array([1, 1, 1, 0, -1, 1, 0, 0, -1, -1, 0, 1, 1, -1, 1, 1]));
+    const vb = device.createInterleavedVertexBuffer(
+      ['position_f32x2', 'tex0_f32x2'],
+      new Float32Array([1, 1, 1, 0, -1, 1, 0, 0, -1, -1, 0, 1, 1, -1, 1, 1])
+    );
     const ib = device.createIndexBuffer(new Uint16Array([0, 1, 2, 0, 2, 3]));
     this._rect = new Primitive();
     this._rect.setVertexBuffer(vb);
-    this._rect.setIndexBuffer(ib)
+    this._rect.setIndexBuffer(ib);
     this._rect.indexStart = 0;
     this._rect.indexCount = 6;
     this._rect.primitiveType = 'triangle-list';
     this._renderStates = device.createRenderStateSet();
     this._renderStates.useRasterizerState().setCullMode('none');
     this._renderStates.useDepthState().enableTest(false).enableWrite(false);
-    this._dummyTexture = device.createTexture2D('rgba8unorm', 1, 1, { samplerOptions: { mipFilter: 'none' } });
+    this._dummyTexture = device.createTexture2D('rgba8unorm', 1, 1, {
+      samplerOptions: { mipFilter: 'none' }
+    });
     this.alphaBlend = true;
     this._colorScale = 1;
   }
@@ -112,43 +117,55 @@ export class TextureDrawer {
       }
     }
   }
-  draw(tex: BaseTexture, repeat: number, gammaCorrect: boolean, linear: boolean, flip: boolean, encode: number, mode: number, miplevel: number, faceOrLayer = 0) {
+  draw(
+    tex: BaseTexture,
+    repeat: number,
+    gammaCorrect: boolean,
+    linear: boolean,
+    flip: boolean,
+    encode: number,
+    mode: number,
+    miplevel: number,
+    faceOrLayer = 0
+  ) {
     tex = tex ?? this._dummyTexture;
     const device = Application.instance.device;
     const sampler = device.createSampler({
       magFilter: linear ? 'linear' : 'nearest',
       minFilter: linear ? 'linear' : 'nearest',
-      mipFilter: tex.mipLevelCount > 1 ? linear ? 'linear' : 'nearest' : 'none',
+      mipFilter: tex.mipLevelCount > 1 ? (linear ? 'linear' : 'nearest') : 'none',
       addressU: repeat === 1 ? 'clamp' : 'repeat',
       addressV: repeat === 1 ? 'clamp' : 'repeat'
-    })
-    const programinfo = tex.isTextureVideo() ? this._programVideo[encode].normal : tex.isTexture2D()
+    });
+    const programinfo = tex.isTextureVideo()
+      ? this._programVideo[encode].normal
+      : tex.isTexture2D()
       ? tex.isDepth()
         ? this._program2D[encode].depth
         : tex.isFilterable()
-          ? this._program2D[encode].normal
-          : tex.isIntegerFormat()
-            ? tex.isSignedFormat()
-              ? this._program2D[encode].int
-              : this._program2D[encode].uint
-            : this._program2D[encode].nonfilterable
+        ? this._program2D[encode].normal
+        : tex.isIntegerFormat()
+        ? tex.isSignedFormat()
+          ? this._program2D[encode].int
+          : this._program2D[encode].uint
+        : this._program2D[encode].nonfilterable
       : tex.isTextureCube()
-        ? tex.isDepth()
-          ? this._programCube[encode].depth
-          : tex.isFilterable()
-            ? this._programCube[encode].normal
-            : this._programCube[encode].nonfilterable
-        : tex.isTexture2DArray()
-          ? tex.isDepth()
-            ? this._program2DArray[encode].depth
-            : tex.isFilterable()
-              ? this._program2DArray[encode].normal
-              : tex.isIntegerFormat()
-                ? tex.isSignedFormat()
-                  ? this._program2DArray[encode].int
-                  : this._program2DArray[encode].uint
-                : this._program2DArray[encode].nonfilterable
-          :null;
+      ? tex.isDepth()
+        ? this._programCube[encode].depth
+        : tex.isFilterable()
+        ? this._programCube[encode].normal
+        : this._programCube[encode].nonfilterable
+      : tex.isTexture2DArray()
+      ? tex.isDepth()
+        ? this._program2DArray[encode].depth
+        : tex.isFilterable()
+        ? this._program2DArray[encode].normal
+        : tex.isIntegerFormat()
+        ? tex.isSignedFormat()
+          ? this._program2DArray[encode].int
+          : this._program2DArray[encode].uint
+        : this._program2DArray[encode].nonfilterable
+      : null;
     if (!programinfo || tex.disposed) {
       return;
     }
@@ -160,7 +177,7 @@ export class TextureDrawer {
     programinfo.bindGroup.setValue('linearOutput', gammaCorrect ? 0 : 1);
     programinfo.bindGroup.setValue('flip', flip ? -1 : 1);
     programinfo.bindGroup.setValue('repeat', repeat);
-    programinfo.bindGroup.setValue('colorScale', this._colorScale * this._colorScale)
+    programinfo.bindGroup.setValue('colorScale', this._colorScale * this._colorScale);
     programinfo.bindGroup.setValue('mode', mode);
     programinfo.bindGroup.setValue('miplevel', miplevel);
     if (tex.isTextureCube()) {
@@ -250,7 +267,7 @@ export class TextureDrawer {
         bindGroup: device.createBindGroup(depth.bindGroupLayouts[0])
       },
       int: null,
-      uint: null,
+      uint: null
     };
   }
   private create2DArrayPrograms(encode: number): TextureViewProgram {
@@ -323,23 +340,43 @@ export class TextureDrawer {
         this.miplevel = pb.float().uniform(0);
         this.colorScale = pb.float().uniform(0);
         this.$outputs.color = pb.vec4();
-        pb.func('getCenter', [pb.vec2('coord'), pb.vec2('texelSize')], function(){
-          this.$return(pb.add(pb.sub(this.coord, pb.mod(this.coord, this.texelSize)), pb.mul(this.texelSize, 0.5)));
+        pb.func('getCenter', [pb.vec2('coord'), pb.vec2('texelSize')], function () {
+          this.$return(
+            pb.add(pb.sub(this.coord, pb.mod(this.coord, this.texelSize)), pb.mul(this.texelSize, 0.5))
+          );
         });
         if (sampleType === 'float' || sampleType === 'unfilterable-float') {
-          pb.func('linearFilter', [pb.vec2('coord')], function(){
+          pb.func('linearFilter', [pb.vec2('coord')], function () {
             this.$l.invTexSize = pb.div(pb.vec2(1), this.texSize);
             this.$l.x = pb.fract(this.coord);
             this.$l.t = pb.floor(pb.sub(pb.mul(this.x, this.texSize), pb.vec2(0.5)));
             this.$l.lt = pb.div(pb.add(this.t, pb.vec2(0.5)), this.texSize);
             this.$l.ratio = pb.mul(pb.sub(this.x, this.lt), this.texSize);
             this.$l.ltSample = pb.textureSampleLevel(this.tex, this.lt, this.miplevel);
-            this.$l.lbSample = pb.textureSampleLevel(this.tex, pb.add(this.lt, pb.vec2(0, this.invTexSize.y)), this.miplevel);
-            this.$l.rbSample = pb.textureSampleLevel(this.tex, pb.add(this.lt, this.invTexSize), this.miplevel);
-            this.$l.rtSample = pb.textureSampleLevel(this.tex, pb.add(this.lt, pb.vec2(this.invTexSize.x, 0)), this.miplevel);
+            this.$l.lbSample = pb.textureSampleLevel(
+              this.tex,
+              pb.add(this.lt, pb.vec2(0, this.invTexSize.y)),
+              this.miplevel
+            );
+            this.$l.rbSample = pb.textureSampleLevel(
+              this.tex,
+              pb.add(this.lt, this.invTexSize),
+              this.miplevel
+            );
+            this.$l.rtSample = pb.textureSampleLevel(
+              this.tex,
+              pb.add(this.lt, pb.vec2(this.invTexSize.x, 0)),
+              this.miplevel
+            );
             //this.$return(pb.vec4(this.lt.x));
-            this.$return(pb.mix(pb.mix(this.ltSample, this.rtSample, this.ratio.x), pb.mix(this.lbSample, this.rbSample, this.ratio.x), this.ratio.y))
-/*
+            this.$return(
+              pb.mix(
+                pb.mix(this.ltSample, this.rtSample, this.ratio.x),
+                pb.mix(this.lbSample, this.rbSample, this.ratio.x),
+                this.ratio.y
+              )
+            );
+            /*
             this.$l.texelSize = pb.div(pb.vec2(1), this.texSize);
             this.$l.lt = pb.sub(this.coord, pb.mul(this.texelSize, 0.49));
             this.$l.rb = pb.add(this.coord, pb.mul(this.texelSize, 0.49));
@@ -359,12 +396,24 @@ export class TextureDrawer {
           });
         }
         pb.main(function () {
-          this.c = sampleType === 'depth'
-            ? pb.textureSample(this.tex, this.$inputs.uv)
-            : sampleType === 'float' || sampleType === 'unfilterable-float'
-              ? /*this.linearFilter(this.$inputs.uv) */pb.textureSampleLevel(this.tex, this.$inputs.uv, this.miplevel)
-              : pb.textureLoad(this.tex, pb.ivec2(pb.mul(this.$inputs.uv, this.texSize)), pb.int(this.miplevel));
-          if ((sampleType === 'float' || sampleType === 'unfilterable-float') && encode === TextureDrawer.ENCODE_NORMALIZED_FLOAT) {
+          this.c =
+            sampleType === 'depth'
+              ? pb.textureSample(this.tex, this.$inputs.uv)
+              : sampleType === 'float' || sampleType === 'unfilterable-float'
+              ? /*this.linearFilter(this.$inputs.uv) */ pb.textureSampleLevel(
+                  this.tex,
+                  this.$inputs.uv,
+                  this.miplevel
+                )
+              : pb.textureLoad(
+                  this.tex,
+                  pb.ivec2(pb.mul(this.$inputs.uv, this.texSize)),
+                  pb.int(this.miplevel)
+                );
+          if (
+            (sampleType === 'float' || sampleType === 'unfilterable-float') &&
+            encode === TextureDrawer.ENCODE_NORMALIZED_FLOAT
+          ) {
             this.rgb = pb.vec3(decodeNormalizedFloatFromRGBA(this, this.c));
             this.a = pb.float(1);
           } else {
@@ -373,22 +422,27 @@ export class TextureDrawer {
           }
           this.$if(pb.equal(this.mode, TextureDrawer.RGB), function () {
             this.a = 1;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.R), function () {
-            this.rgb = this.rgb.rrr;
-            this.a = 1;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.G), function () {
-            this.rgb = this.rgb.ggg;
-            this.a = 1;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.B), function () {
-            this.rgb = this.rgb.bbb;
-            this.a = 1;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.A), function() {
-            this.rgb = pb.vec3(this.a);
-            this.a = 1;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.RG), function(){
-            this.rgb = pb.vec3(this.rgb.rg, 0);
-            this.a = 1;
-          });
+          })
+            .$elseif(pb.equal(this.mode, TextureDrawer.R), function () {
+              this.rgb = this.rgb.rrr;
+              this.a = 1;
+            })
+            .$elseif(pb.equal(this.mode, TextureDrawer.G), function () {
+              this.rgb = this.rgb.ggg;
+              this.a = 1;
+            })
+            .$elseif(pb.equal(this.mode, TextureDrawer.B), function () {
+              this.rgb = this.rgb.bbb;
+              this.a = 1;
+            })
+            .$elseif(pb.equal(this.mode, TextureDrawer.A), function () {
+              this.rgb = pb.vec3(this.a);
+              this.a = 1;
+            })
+            .$elseif(pb.equal(this.mode, TextureDrawer.RG), function () {
+              this.rgb = pb.vec3(this.rgb.rg, 0);
+              this.a = 1;
+            });
           this.rgb = pb.abs(pb.mul(this.rgb, this.colorScale));
           this.$if(pb.notEqual(this.linearOutput, 0), function () {
             this.$outputs.color = pb.vec4(pb.mul(this.rgb, this.a), this.a);
@@ -425,13 +479,16 @@ export class TextureDrawer {
           this.rgb = pb.vec3(this.c.rgb);
           this.$if(pb.equal(this.mode, TextureDrawer.R), function () {
             this.rgb = this.rgb.rrr;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.G), function () {
-            this.rgb = this.rgb.ggg;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.B), function () {
-            this.rgb = this.rgb.bbb;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.A), function() {
-            this.rgb = pb.vec3(1);
-          });
+          })
+            .$elseif(pb.equal(this.mode, TextureDrawer.G), function () {
+              this.rgb = this.rgb.ggg;
+            })
+            .$elseif(pb.equal(this.mode, TextureDrawer.B), function () {
+              this.rgb = this.rgb.bbb;
+            })
+            .$elseif(pb.equal(this.mode, TextureDrawer.A), function () {
+              this.rgb = pb.vec3(1);
+            });
           this.rgb = pb.abs(pb.mul(this.rgb, this.colorScale));
           this.$if(pb.notEqual(this.linearOutput, 0), function () {
             this.$outputs.color = pb.vec4(this.rgb, 1);
@@ -454,7 +511,10 @@ export class TextureDrawer {
         this.repeat = pb.float().uniform(0);
         pb.main(function () {
           this.$builtins.position = pb.mul(pb.vec4(this.$inputs.pos, 0, 1), pb.vec4(1, this.flip, 1, 1));
-          this.$outputs.direction = pb.mul(pb.mat3(this.up, this.right, this.front), pb.vec3(this.$inputs.pos, 1));
+          this.$outputs.direction = pb.mul(
+            pb.mat3(this.up, this.right, this.front),
+            pb.vec3(this.$inputs.pos, 1)
+          );
           if (pb.getDevice().type === 'webgpu') {
             this.$builtins.position.y = pb.neg(this.$builtins.position.y);
           }
@@ -482,10 +542,14 @@ export class TextureDrawer {
         this.$outputs.color = pb.vec4();
         pb.main(function () {
           this.$l.n = this.$inputs.direction;
-          this.c = sampleType === 'depth'
-            ? pb.textureSample(this.tex, this.n)
-            : pb.textureSampleLevel(this.tex, this.n, this.miplevel);
-          if ((sampleType === 'float' || sampleType === 'unfilterable-float') && encode === TextureDrawer.ENCODE_NORMALIZED_FLOAT) {
+          this.c =
+            sampleType === 'depth'
+              ? pb.textureSample(this.tex, this.n)
+              : pb.textureSampleLevel(this.tex, this.n, this.miplevel);
+          if (
+            (sampleType === 'float' || sampleType === 'unfilterable-float') &&
+            encode === TextureDrawer.ENCODE_NORMALIZED_FLOAT
+          ) {
             this.rgb = pb.vec3(decodeNormalizedFloatFromRGBA(this, this.c));
             this.a = pb.float(1);
           } else {
@@ -494,22 +558,27 @@ export class TextureDrawer {
           }
           this.$if(pb.equal(this.mode, TextureDrawer.RGB), function () {
             this.a = 1;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.R), function () {
-            this.rgb = this.rgb.rrr;
-            this.a = 1;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.G), function () {
-            this.rgb = this.rgb.ggg;
-            this.a = 1;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.B), function () {
-            this.rgb = this.rgb.bbb;
-            this.a = 1;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.A), function() {
-            this.rgb = pb.vec3(this.a);
-            this.a = 1;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.RG), function(){
-            this.rgb = pb.vec3(this.rgb.rg, 0);
-            this.a = 1;
-          });
+          })
+            .$elseif(pb.equal(this.mode, TextureDrawer.R), function () {
+              this.rgb = this.rgb.rrr;
+              this.a = 1;
+            })
+            .$elseif(pb.equal(this.mode, TextureDrawer.G), function () {
+              this.rgb = this.rgb.ggg;
+              this.a = 1;
+            })
+            .$elseif(pb.equal(this.mode, TextureDrawer.B), function () {
+              this.rgb = this.rgb.bbb;
+              this.a = 1;
+            })
+            .$elseif(pb.equal(this.mode, TextureDrawer.A), function () {
+              this.rgb = pb.vec3(this.a);
+              this.a = 1;
+            })
+            .$elseif(pb.equal(this.mode, TextureDrawer.RG), function () {
+              this.rgb = pb.vec3(this.rgb.rg, 0);
+              this.a = 1;
+            });
           this.rgb = pb.abs(pb.mul(this.rgb, this.colorScale));
           this.$if(pb.notEqual(this.linearOutput, 0), function () {
             this.$outputs.color = pb.vec4(pb.mul(this.rgb, this.a), this.a);
@@ -562,12 +631,21 @@ export class TextureDrawer {
         this.layer = pb.int().uniform(0);
         this.$outputs.color = pb.vec4();
         pb.main(function () {
-          this.c = sampleType === 'depth'
-            ? pb.textureArraySample(this.tex, this.$inputs.uv, this.layer)
-            : sampleType === 'float' || sampleType === 'unfilterable-float'
+          this.c =
+            sampleType === 'depth'
+              ? pb.textureArraySample(this.tex, this.$inputs.uv, this.layer)
+              : sampleType === 'float' || sampleType === 'unfilterable-float'
               ? pb.textureArraySampleLevel(this.tex, this.$inputs.uv, this.layer, this.miplevel)
-              : pb.textureArrayLoad(this.tex, pb.ivec2(pb.mul(this.texSize, this.$inputs.uv)), this.layer, pb.int(this.miplevel))
-          if ((sampleType === 'float' || sampleType === 'unfilterable-float') && encode === TextureDrawer.ENCODE_NORMALIZED_FLOAT) {
+              : pb.textureArrayLoad(
+                  this.tex,
+                  pb.ivec2(pb.mul(this.texSize, this.$inputs.uv)),
+                  this.layer,
+                  pb.int(this.miplevel)
+                );
+          if (
+            (sampleType === 'float' || sampleType === 'unfilterable-float') &&
+            encode === TextureDrawer.ENCODE_NORMALIZED_FLOAT
+          ) {
             this.rgb = pb.vec3(decodeNormalizedFloatFromRGBA(this, this.c));
             this.a = pb.float(1);
           } else {
@@ -576,22 +654,27 @@ export class TextureDrawer {
           }
           this.$if(pb.equal(this.mode, TextureDrawer.RGB), function () {
             this.a = 1;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.R), function () {
-            this.rgb = this.rgb.rrr;
-            this.a = 1;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.G), function () {
-            this.rgb = this.rgb.ggg;
-            this.a = 1;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.B), function () {
-            this.rgb = this.rgb.bbb;
-            this.a = 1;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.A), function() {
-            this.rgb = pb.vec3(this.a);
-            this.a = 1;
-          }).$elseif(pb.equal(this.mode, TextureDrawer.RG), function(){
-            this.rgb = pb.vec3(this.rgb.rg, 0);
-            this.a = 1;
-          });
+          })
+            .$elseif(pb.equal(this.mode, TextureDrawer.R), function () {
+              this.rgb = this.rgb.rrr;
+              this.a = 1;
+            })
+            .$elseif(pb.equal(this.mode, TextureDrawer.G), function () {
+              this.rgb = this.rgb.ggg;
+              this.a = 1;
+            })
+            .$elseif(pb.equal(this.mode, TextureDrawer.B), function () {
+              this.rgb = this.rgb.bbb;
+              this.a = 1;
+            })
+            .$elseif(pb.equal(this.mode, TextureDrawer.A), function () {
+              this.rgb = pb.vec3(this.a);
+              this.a = 1;
+            })
+            .$elseif(pb.equal(this.mode, TextureDrawer.RG), function () {
+              this.rgb = pb.vec3(this.rgb.rg, 0);
+              this.a = 1;
+            });
           this.rgb = pb.abs(pb.mul(this.rgb, this.colorScale));
           this.$if(pb.notEqual(this.linearOutput, 0), function () {
             this.$outputs.color = pb.vec4(pb.mul(this.rgb, this.a), this.a);

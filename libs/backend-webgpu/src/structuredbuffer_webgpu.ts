@@ -1,9 +1,6 @@
-import type {
-  StructuredBuffer,
-  StructuredValue,
-  PBStructTypeInfo,
-  PBTypeInfo} from '@zephyr3d/device';
-import { StructuredBufferData,
+import type { StructuredBuffer, StructuredValue, PBStructTypeInfo, PBTypeInfo } from '@zephyr3d/device';
+import {
+  StructuredBufferData,
   GPUResourceUsageFlags,
   PBPrimitiveType,
   PBPrimitiveTypeInfo
@@ -71,12 +68,7 @@ const vertexFormatTable: Record<string, GPUVertexFormat> = {
 export class WebGPUStructuredBuffer extends WebGPUBuffer implements StructuredBuffer {
   private _structure: PBStructTypeInfo;
   private _data: StructuredBufferData;
-  constructor(
-    device: WebGPUDevice,
-    structure: PBStructTypeInfo,
-    usage: number,
-    source?: TypedArray
-  ) {
+  constructor(device: WebGPUDevice, structure: PBStructTypeInfo, usage: number, source?: TypedArray) {
     if (!structure?.isStructType()) {
       throw new Error('invalid structure type');
     }

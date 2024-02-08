@@ -1,9 +1,6 @@
-import type { AABB} from '@zephyr3d/base';
+import type { AABB } from '@zephyr3d/base';
 import { Vector4, Vector3, Vector2 } from '@zephyr3d/base';
-import type {
-  SceneNode,
-  Scene,
-  AnimationSet} from '@zephyr3d/scene';
+import type { SceneNode, Scene, AnimationSet } from '@zephyr3d/scene';
 import {
   BoundingBox,
   GraphNode,
@@ -73,7 +70,14 @@ export class GLTFViewer {
     this._nearPlane = 1;
     this._compositor = new Compositor();
     this._compositor.appendPostEffect(new FXAA());
-    this._camera = new PerspectiveCamera(scene, Math.PI / 3, Application.instance.device.getDrawingBufferWidth() / Application.instance.device.getDrawingBufferHeight(), 1, 160);
+    this._camera = new PerspectiveCamera(
+      scene,
+      Math.PI / 3,
+      Application.instance.device.getDrawingBufferWidth() /
+        Application.instance.device.getDrawingBufferHeight(),
+      1,
+      160
+    );
     this._camera.position.setXYZ(0, 0, 15);
     this._camera.controller = new OrbitCameraController();
     this._light0 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
@@ -83,7 +87,9 @@ export class GLTFViewer {
     this._light1.shadow.shadowMapSize = 1024;
     this._light1.lookAt(new Vector3(0, 0, 0), new Vector3(-0.5, 0.707, 0.5), Vector3.axisPY());
     this._radianceMap = Application.instance.device.createCubeTexture('rgba16f', 256);
-    this._irradianceMap = Application.instance.device.createCubeTexture('rgba16f', 64, { samplerOptions: { mipFilter: 'none' } });
+    this._irradianceMap = Application.instance.device.createCubeTexture('rgba16f', 64, {
+      samplerOptions: { mipFilter: 'none' }
+    });
 
     scene.env.sky.skyType = 'scatter';
     scene.env.sky.wind = new Vector2(160, 240);
@@ -169,24 +175,26 @@ export class GLTFViewer {
         };
         if (fileMap.size === 1 && /\.hdr$/i.test(Array.from(fileMap.keys())[0])) {
           const hdrFile = Array.from(fileMap.keys())[0];
-          this._assetManager.fetchTexture<Texture2D>(hdrFile, {
-            linearColorSpace: true,
-            samplerOptions: {
-              mipFilter: 'none'
-            }
-          }).then(tex => {
-            panoramaToCubemap(tex, this._skyMap);
-            prefilterCubemap(this._skyMap, 'ggx', this._radianceMap);
-            prefilterCubemap(this._skyMap, 'lambertian', this._irradianceMap);
-            this._scene.env.sky.skyboxTexture = this._skyMap;
-            tex.dispose();
-          });
+          this._assetManager
+            .fetchTexture<Texture2D>(hdrFile, {
+              linearColorSpace: true,
+              samplerOptions: {
+                mipFilter: 'none'
+              }
+            })
+            .then((tex) => {
+              panoramaToCubemap(tex, this._skyMap);
+              prefilterCubemap(this._skyMap, 'ggx', this._radianceMap);
+              prefilterCubemap(this._skyMap, 'lambertian', this._irradianceMap);
+              this._scene.env.sky.skyboxTexture = this._skyMap;
+              tex.dispose();
+            });
         } else {
           const modelFile = Array.from(fileMap.keys()).find((val) => /(\.gltf|\.glb)$/i.test(val));
           if (modelFile) {
             this._modelNode?.remove();
             this._assetManager.clearCache();
-            this._assetManager.fetchModel(this._scene, modelFile, null).then(info => {
+            this._assetManager.fetchModel(this._scene, modelFile, null).then((info) => {
               this._modelNode?.dispose();
               this._modelNode = info.group;
               this._animationSet?.dispose();

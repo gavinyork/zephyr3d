@@ -1,4 +1,4 @@
-import type { Matrix4x4} from './vector';
+import type { Matrix4x4 } from './vector';
 import { Vector3 } from './vector';
 import type { AABB } from './aabb';
 
@@ -60,7 +60,7 @@ export class Ray {
    * @param bbox - The box to be test.
    * @returns The distance from the origin to intersected point if the ray intersect with the box, otherwise null.
    */
-   bboxIntersectionTestEx: (bbox: AABB) => number | null;
+  bboxIntersectionTestEx: (bbox: AABB) => number | null;
 
   /**
    * Construct a ray from origin and normalized direction vector.
@@ -99,11 +99,17 @@ export class Ray {
   transform(matrix: Matrix4x4, other?: Ray): Ray {
     if (other) {
       matrix.transformPointAffine(this._origin, other._origin);
-      matrix.transformPointAffine(Vector3.add(this._origin, this._direction), other._direction).subBy(other._origin).inplaceNormalize();
+      matrix
+        .transformPointAffine(Vector3.add(this._origin, this._direction), other._direction)
+        .subBy(other._origin)
+        .inplaceNormalize();
       other.prepare();
     } else {
       const origin = matrix.transformPointAffine(this._origin);
-      const direction = matrix.transformPointAffine(Vector3.add(this._origin, this._direction)).subBy(origin).inplaceNormalize();
+      const direction = matrix
+        .transformPointAffine(Vector3.add(this._origin, this._direction))
+        .subBy(origin)
+        .inplaceNormalize();
       other = new Ray(origin, direction);
     }
     return other;

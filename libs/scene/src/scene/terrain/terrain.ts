@@ -1,4 +1,4 @@
-import type { Ray} from '@zephyr3d/base';
+import type { Ray } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { RenderStateSet, Texture2D } from '@zephyr3d/device';
 import { Quadtree } from './quadtree';
@@ -181,7 +181,14 @@ export class Terrain extends GraphNode {
    * @param patchSize - Patch size of the terrain
    * @returns true if succeeded
    */
-  create(sizeX: number, sizeZ: number, elevations: Float32Array, scale: Vector3, patchSize: number, options?: TerrainLightModelOptions): boolean {
+  create(
+    sizeX: number,
+    sizeZ: number,
+    elevations: Float32Array,
+    scale: Vector3,
+    patchSize: number,
+    options?: TerrainLightModelOptions
+  ): boolean {
     this._quadtree = new Quadtree(this);
     if (options?.splatMap && options.splatMap.format !== 'rgba8unorm') {
       throw new Error('SplatMap must be rgba8unorm format');
@@ -202,7 +209,7 @@ export class Terrain extends GraphNode {
     this.invalidateBoundingVolume();
     // create grass layers
     if (options?.splatMap && options?.detailMaps?.grass) {
-      if (options.detailMaps.grass.findIndex(a => a && a.findIndex(b => !!b) >= 0) >= 0) {
+      if (options.detailMaps.grass.findIndex((a) => a && a.findIndex((b) => !!b) >= 0) >= 0) {
         const splatMap = options.splatMap;
         const data = new Uint8Array(splatMap.width * splatMap.height * 4);
         splatMap.readPixels(0, 0, splatMap.width, splatMap.height, 0, 0, data).then(() => {
@@ -239,16 +246,37 @@ export class Terrain extends GraphNode {
    * @param maxGrassPerCell - Maximum number of grasses in a cell (world space 1x1)
    * @param density - The density map
    */
-  createGrass(density: number[][], bladeWidth: number, bladeHeight: number, offset: number, grassTexture: Texture2D) {
+  createGrass(
+    density: number[][],
+    bladeWidth: number,
+    bladeHeight: number,
+    offset: number,
+    grassTexture: Texture2D
+  ) {
     if (!this._grassManager) {
       this._grassManager = new GrassManager(64, density);
     }
     if (!this._grassMaterial) {
-      this._grassMaterial = new GrassMaterial(new Vector2(this.scaledWidth, this.scaledHeight), this._quadtree.normalMap);
+      this._grassMaterial = new GrassMaterial(
+        new Vector2(this.scaledWidth, this.scaledHeight),
+        this._quadtree.normalMap
+      );
     }
-    this._grassMaterial = new GrassMaterial(new Vector2(this.scaledWidth, this.scaledHeight), this._quadtree.normalMap, grassTexture);
+    this._grassMaterial = new GrassMaterial(
+      new Vector2(this.scaledWidth, this.scaledHeight),
+      this._quadtree.normalMap,
+      grassTexture
+    );
     this._grassMaterial.stateSet.useRasterizerState().setCullMode('none');
-    this._grassManager.addGrassLayer(Application.instance.device, this, density, bladeWidth, bladeHeight, offset, grassTexture);
+    this._grassManager.addGrassLayer(
+      Application.instance.device,
+      this,
+      density,
+      bladeWidth,
+      bladeHeight,
+      offset,
+      grassTexture
+    );
   }
   /** Get elevation at specified position in terrain coordinate space */
   getElevation(x: number, z: number): number {
@@ -259,7 +287,7 @@ export class Terrain extends GraphNode {
     return this._quadtree.getHeightField().getRealNormal(x, z, normal);
   }
   /** Get intersection distance by a ray in terrain coordinate space */
-  rayIntersect(ray: Ray): number|null {
+  rayIntersect(ray: Ray): number | null {
     return this._quadtree.getHeightField().rayIntersect(ray);
   }
   /**
@@ -285,13 +313,13 @@ export class Terrain extends GraphNode {
     }
     const rootNode = this._quadtree.rootNode;
     if (rootNode) {
-      visitQuadtreeNode_r(this._quadtree.rootNode)
+      visitQuadtreeNode_r(this._quadtree.rootNode);
     }
   }
   /** @internal */
   cull(cullVisitor: CullVisitor): number {
     const tanHalfFovy = cullVisitor.primaryCamera.getTanHalfFovy();
-    if (tanHalfFovy !== this._lastTanHalfFOVY ||this._maxPixelErrorDirty) {
+    if (tanHalfFovy !== this._lastTanHalfFOVY || this._maxPixelErrorDirty) {
       this._maxPixelErrorDirty = false;
       this._lastTanHalfFOVY = tanHalfFovy;
       this._quadtree.setupCamera(1024, tanHalfFovy, this._maxPixelError);

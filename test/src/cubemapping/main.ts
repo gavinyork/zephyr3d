@@ -6,9 +6,7 @@ import type {
   PBInsideFunctionScope,
   PBShaderExp
 } from '@zephyr3d/device';
-import type {
-  SceneNode,
-  Material} from '@zephyr3d/scene';
+import type { SceneNode, Material } from '@zephyr3d/scene';
 import {
   Mesh,
   AssetManager,
@@ -26,7 +24,7 @@ import {
   BUILTIN_ASSET_TEST_CUBEMAP,
   PerspectiveCamera,
   SphereShape,
-  Compositor,
+  Compositor
 } from '@zephyr3d/scene';
 import { getBackend } from '../common';
 
@@ -45,9 +43,7 @@ class ReflectLightModel extends UnlitLightModel {
   calculateAlbedo(scope: PBInsideFunctionScope): PBShaderExp {
     const pb = scope.$builder;
     const reflectTexture = scope[this.getTextureUniformName('reflection')];
-    const v = pb.normalize(
-      pb.sub(scope.$inputs.worldPosition.xyz, ShaderFramework.getCameraPosition(scope))
-    );
+    const v = pb.normalize(pb.sub(scope.$inputs.worldPosition.xyz, ShaderFramework.getCameraPosition(scope)));
     const r = pb.reflect(v, pb.normalize(scope.$inputs.worldNormal));
     return pb.textureSample(reflectTexture, r);
   }
@@ -60,7 +56,13 @@ const cmApp = new Application({
 cmApp.ready().then(async () => {
   const device = cmApp.device;
   const scene = new Scene();
-  const camera = new PerspectiveCamera(scene, Math.PI / 3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 160);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
+    1,
+    160
+  );
   camera.lookAt(new Vector3(0, 0, 30), new Vector3(0, 0, 0), Vector3.axisPY());
   camera.controller = new OrbitCameraController({ distance: camera.position.magnitude });
   cmApp.inputManager.use(camera.handleEvent.bind(camera));
@@ -99,30 +101,34 @@ cmApp.ready().then(async () => {
   const stdMat = new PBRMetallicRoughnessMaterial();
   const albedoMap = await assetManager.fetchTexture<Texture2D>('./assets/images/rustediron2_basecolor.png');
   stdMat.lightModel.setAlbedoMap(albedoMap, null, 0);
-  const normalMap = await assetManager.fetchTexture<Texture2D>('./assets/images/rustediron2_normal.png', { linearColorSpace: true });
+  const normalMap = await assetManager.fetchTexture<Texture2D>('./assets/images/rustediron2_normal.png', {
+    linearColorSpace: true
+  });
   stdMat.lightModel.setNormalMap(normalMap, null, 0);
-  const metallicMap = await assetManager.fetchTexture<Texture2D>('./assets/images/mr.png', { linearColorSpace: true });
+  const metallicMap = await assetManager.fetchTexture<Texture2D>('./assets/images/mr.png', {
+    linearColorSpace: true
+  });
   stdMat.lightModel.setMetallicMap(metallicMap, null, 0);
   stdMat.lightModel.metallicIndex = 0;
   stdMat.lightModel.roughnessIndex = 1;
 
   const sphere = new SphereShape();
   const spheres0 = new Mesh(scene, sphere);
-  spheres0.name = 'sphere0'
+  spheres0.name = 'sphere0';
   spheres0.material = stdMat;
   spheres0.scale.setXYZ(3, 3, 3);
 
   const spheres1 = new Mesh(scene, sphere);
-  spheres1.name = 'sphere1'
+  spheres1.name = 'sphere1';
   spheres1.material = stdMat;
   spheres1.scale.setXYZ(3, 3, 3);
 
   const spheres2 = new Mesh(scene, sphere);
-  spheres2.name = 'sphere2'
+  spheres2.name = 'sphere2';
   spheres2.material = stdMat;
   spheres2.scale.setXYZ(3, 3, 3);
 
-  cmApp.on('resize', ev => {
+  cmApp.on('resize', (ev) => {
     camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane());
   });
   cmApp.on('tick', () => {
@@ -144,4 +150,3 @@ cmApp.ready().then(async () => {
 
   cmApp.run();
 });
-

@@ -184,12 +184,12 @@ export class StandardMaterial<T extends LightModel = LightModel> extends Materia
    */
   protected _createHash(renderPassType: number): string {
     return renderPassType === values.RENDER_PASS_TYPE_FORWARD || this._alphaCutoff > 0
-      ? `|${Number(!!this._vertexColor)}`
-        + `|${Number(!!this._useTangent)}`
-        + `|${Number(!!this._hasNormal)}`
-        + `|${Number(this._opacity < 1 || this._alphaBlend)}`
-        + `|${Number(this._alphaCutoff > 0)}`
-        + `|${this._lightModel?.getHash() || ''}`
+      ? `|${Number(!!this._vertexColor)}` +
+          `|${Number(!!this._useTangent)}` +
+          `|${Number(!!this._hasNormal)}` +
+          `|${Number(this._opacity < 1 || this._alphaBlend)}` +
+          `|${Number(this._alphaCutoff > 0)}` +
+          `|${this._lightModel?.getHash() || ''}`
       : '';
   }
   /**
@@ -199,7 +199,9 @@ export class StandardMaterial<T extends LightModel = LightModel> extends Materia
   protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram {
     const that = this;
     const useNormal =
-      that._hasNormal && ctx.renderPass.type === values.RENDER_PASS_TYPE_FORWARD && that._lightModel?.isNormalUsed();
+      that._hasNormal &&
+      ctx.renderPass.type === values.RENDER_PASS_TYPE_FORWARD &&
+      that._lightModel?.isNormalUsed();
     if (ctx.renderPass.type === values.RENDER_PASS_TYPE_SHADOWMAP) {
       const shadowMapParams = ctx.shadowMapInfo.get((ctx.renderPass as ShadowMapPass).light);
       pb.emulateDepthClamp = !!shadowMapParams.depthClampEnabled;

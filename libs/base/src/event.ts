@@ -1,4 +1,4 @@
-import type { GenericConstructor } from "./utils";
+import type { GenericConstructor } from './utils';
 
 /**
  * Mapping table of event types and their constructors
@@ -33,7 +33,7 @@ type EventListenerMap<T extends EventMap> = Partial<{
     options: REventHandlerOptions;
     removed: boolean;
   }[];
-}>
+}>;
 
 /**
  * The event target interface
@@ -74,9 +74,9 @@ export interface IEventTarget<T extends EventMap = any> {
  * @returns - The event target class
  * @public
  */
-export function makeEventTarget<C extends GenericConstructor|ObjectConstructor>(cls: C) {
+export function makeEventTarget<C extends GenericConstructor | ObjectConstructor>(cls: C) {
   return function _<X extends EventMap>() {
-    type I = InstanceType<typeof cls> extends IEventTarget<infer U> ? (X & U) : X;
+    type I = InstanceType<typeof cls> extends IEventTarget<infer U> ? X & U : X;
     return class E extends cls implements IEventTarget<I> {
       /** @internal */
       _listeners: EventListenerMap<I>;
@@ -94,7 +94,10 @@ export function makeEventTarget<C extends GenericConstructor|ObjectConstructor>(
        * {@inheritDoc IEventTarget.once}
        */
       once<K extends keyof I>(type: K, listener: EventListener<I, K>, context?: unknown): void {
-        this._listeners = this._internalAddEventListener(this._listeners, type, listener, { context, once: true });
+        this._listeners = this._internalAddEventListener(this._listeners, type, listener, {
+          context,
+          once: true
+        });
       }
       /**
        * {@inheritDoc IEventTarget.off}
@@ -179,5 +182,5 @@ export function makeEventTarget<C extends GenericConstructor|ObjectConstructor>(
         }
       }
     };
-  }
+  };
 }
