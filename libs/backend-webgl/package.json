@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/backend-webgl",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The WebGL backend of zephyr3d",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
@@ -57,11 +57,11 @@
     "shx": "^0.3.4",
     "cross-env": "^7.0.3",
     "typescript": "^5.1.3",
-    "@zephyr3d/device": "workspace:^0.1.0",
+    "@zephyr3d/device": "workspace:^0.1.1",
     "@zephyr3d/base": "workspace:^0.1.1"
   },
   "peerDependencies": {
-    "@zephyr3d/device": "workspace:^0.1.0",
+    "@zephyr3d/device": "workspace:^0.1.1",
     "@zephyr3d/base": "workspace:^0.1.1"
   },
   "dependencies": {
