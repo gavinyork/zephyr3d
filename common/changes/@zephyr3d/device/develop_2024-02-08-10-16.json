@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "update rollup config",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}

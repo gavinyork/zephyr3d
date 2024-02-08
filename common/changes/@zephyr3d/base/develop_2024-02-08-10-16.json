@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/base",
+      "comment": "update rollup config",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/base"
+}
