@@ -2,6 +2,32 @@
   "name": "@zephyr3d/imgui",
   "entries": [
     {
+      "version": "0.1.2",
+      "tag": "@zephyr3d/imgui_v0.1.2",
+      "date": "Thu, 08 Feb 2024 10:49:24 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "update rollup config"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.1.1` to `^0.1.2`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.1.1` to `^0.1.2`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.1.1` to `^0.1.2`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.1.1` to `^0.1.2`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.1",
       "tag": "@zephyr3d/imgui_v0.1.1",
       "date": "Thu, 08 Feb 2024 09:29:37 GMT",

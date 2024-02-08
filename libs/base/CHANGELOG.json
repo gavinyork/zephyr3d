@@ -2,6 +2,21 @@
   "name": "@zephyr3d/base",
   "entries": [
     {
+      "version": "0.1.2",
+      "tag": "@zephyr3d/base_v0.1.2",
+      "date": "Thu, 08 Feb 2024 10:49:24 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "update rollup config"
+          },
+          {
+            "comment": "minor changes"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.1",
       "tag": "@zephyr3d/base_v0.1.1",
       "date": "Thu, 08 Feb 2024 09:11:35 GMT",
