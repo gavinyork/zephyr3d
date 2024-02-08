@@ -12,11 +12,6 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 2
-      - name: Git config user
-        uses: snow-actions/git-config-user@v1.0.0
-        with:
-          name: gavinyork
-          email: gavinyork2024@outlook.com
       - uses: actions/setup-node@v3
         with:
           node-version: 16
@@ -33,4 +28,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.SITE_DEPLOY_TOKEN }}
         with:
           email: gavinyork2024@outlook.com
-          publish_dir: ./site/dist/web
+          build_dir: ./site/dist/web
