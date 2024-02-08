@@ -81,7 +81,7 @@ myApp.ready().then(async () => {
   scene.env.sky.fogType = 'scatter';
 
   const assetManager = new AssetManager();
-  await loadTerrain(scene, assetManager);
+  loadTerrain(scene, assetManager);
 
   myApp.on('resize', ev => {
     camera.aspect = ev.width / ev.height;
