@@ -25,7 +25,7 @@ jobs:
       - name: Rush rebuild
         run: node common/scripts/install-run-rush.js rebuild --verbose
       - name: Build site
-        run: cd site && npm run build:site
+        run: pushd site && npm run build:site && popd
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
