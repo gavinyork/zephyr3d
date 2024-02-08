@@ -1,0 +1,29 @@
+<html>
+  <head>
+    <style>
+      body {
+        flex-direction: column;
+      }
+      #button-group {
+          display: flex;
+          flex-flow: column nowrap;
+          left: 0px;
+          top: 0px;
+          padding: 10px;
+          width: 200px;
+          height: auto;
+          background-color: rgba(0, 0, 0, 0.5);
+      }
+      #button-group > scrollbar {
+        margin-top: 10px;
+        background-color: #aaa;
+      }
+    </style>
+  </head>
+  <body customdraw="true">
+    <div id="button-group">
+      <scrollbar id="filter-size" orientation="horizonal" stepValue="2" rangestart="2" rangeend="32" buttonsize="12" blocksize="12" style="height: 20px;" value="2"></scrollbar>
+      <scrollbar id="iterations" orientation="horizonal" stepValue="1" rangestart="1" rangeend="10" buttonsize="12" blocksize="12" style="height: 20px;" value="2"></scrollbar>
+    </div>
+  </body>
+</html>
