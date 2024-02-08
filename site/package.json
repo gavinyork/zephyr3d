@@ -13,7 +13,7 @@
   "scripts": {
     "build:doc": "node build-doc.js 2>&1",
     "build:showcase": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c rollup.config.showcase.mjs --silent",
-    "build:copy": "shx mkdir -p dist && shx cp -R web dist && shx cp -R ../examples dist/web && npm run build:showcase",
+    "build:copy": "shx mkdir -p dist && shx cp -R web dist && npm run build:showcase",
     "build:web": "shx rm -rf dist && npm run build:copy && cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent && shx cp -R assets dist/web/tut/assets",
     "build:site": "npm run build:web && npm run build:doc",
     "serve": "web-dev-server --open dist/web/index.html"
