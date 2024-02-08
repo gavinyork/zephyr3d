@@ -28,7 +28,9 @@ jobs:
         run: pushd site && npm run build:site && popd
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: Cecilapp/GitHub-Pages-deploy@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.SITE_DEPLOY_TOKEN }}
         with:
-          github_token: ${{ secrets.SITE_DEPLOY_TOKEN }}
+          email: gavinyork2024@outlook.com
           publish_dir: ./site/dist/web
