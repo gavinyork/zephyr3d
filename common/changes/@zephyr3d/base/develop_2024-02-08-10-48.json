@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/base",
+      "comment": "minor changes",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/base"
+}
