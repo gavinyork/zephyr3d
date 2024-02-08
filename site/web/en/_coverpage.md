@@ -3,9 +3,9 @@
 > The 3D rendering API of the web platform fully supports WebGL/WebGL2/WebGPU
 
 - Easy to use.
-- Seamless support for WebGL and WebGPU.
-- Writing shaders in native javascript without knowledge of GLSL or WGSL.
-- Complete low-level API encapsulation, which is convenient for developing your own rendering framework.
+- Seamlessly supports WebGL and WebGPU. 
+- Write shaders using native Javascript without the need to learn GLSL and WGSL.
+- Offers a comprehensive low-level API wrapper, making it convenient for developing your own rendering framework.
 
 [GitHub](https://github.com/gavinyork/zephyr3d/)
 [API](doc/markdown/index.md)

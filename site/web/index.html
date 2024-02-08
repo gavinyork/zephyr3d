@@ -51,9 +51,6 @@
           '/': 'Search',
         },
         pathNamespaces: ['/zh-cn'],
-      },
-      alias: {
-        '/doc/.*/_sidebar.md': '/_nosidebar.md'
       }
     }
   </script>
@@ -80,7 +77,6 @@
       const observer = new MutationObserver(function(mutations_list) {
         mutations_list.forEach(function(mutation) {
           mutation.addedNodes.forEach(function(added_node) {
-            console.log(`Node added: ${added_node.classList}`);
             if(added_node instanceof HTMLElement && added_node.classList.contains('showcase')) {
               createCase(added_node);
             }

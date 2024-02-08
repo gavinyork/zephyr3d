@@ -1,6 +1,6 @@
 # Introduction
 
-Zephyr3d is a browser-based 3D rendering framework primarily composed of two sets of APIs.
+Zephyr3d is a 3D rendering framework for browsers, developed in TypeScript. It primarily consists of two sets of APIs: the Device API and the Scene API.
 
 ## Device API
 

@@ -20,8 +20,8 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
   const program = device.buildRenderProgram({
     vertex(pb) {
       // Vertex stream definitions
-      this.$inputs.position = pb.vec2().attrib('position'); // 位置
-      this.$inputs.color = pb.vec4().attrib('diffuse'); // 颜色
+      this.$inputs.position = pb.vec2().attrib('position');
+      this.$inputs.color = pb.vec4().attrib('diffuse');
       // Varying definitions
       this.$outputs.color = pb.vec4();
       // Entry point
