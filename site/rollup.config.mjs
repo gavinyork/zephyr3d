@@ -1,5 +1,6 @@
 import { swc } from 'rollup-plugin-swc3';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
+import terser from '@rollup/plugin-terser';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -44,7 +45,7 @@ function getTutTarget(input, output) {
     plugins: [
       nodeResolve(),
       swc(),
-      // terser()
+      terser(),
       copy({
         targets: [
           {
