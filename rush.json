@@ -430,37 +430,31 @@
     {
       "packageName": "@zephyr3d/base",
       "projectFolder": "libs/base",
-      "publishFolder": "dist",
       "shouldPublish": true
     },
     {
       "packageName": "@zephyr3d/device",
       "projectFolder": "libs/device",
-      "publishFolder": "dist",
       "shouldPublish": true
     },
     {
       "packageName": "@zephyr3d/scene",
       "projectFolder": "libs/scene",
-      "publishFolder": "dist",
       "shouldPublish": true
     },
     {
       "packageName": "@zephyr3d/imgui",
       "projectFolder": "libs/imgui",
-      "publishFolder": "dist",
       "shouldPublish": true
     },
     {
       "packageName": "@zephyr3d/backend-webgl",
       "projectFolder": "libs/backend-webgl",
-      "publishFolder": "dist",
       "shouldPublish": true
     },
     {
       "packageName": "@zephyr3d/backend-webgpu",
       "projectFolder": "libs/backend-webgpu",
-      "publishFolder": "dist",
       "shouldPublish": true
     },
     {

@@ -60,6 +60,10 @@ export class BoundingBox extends AABB implements BoundingVolume {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     super(arg0 as any, arg1);
   }
+  /** {@inheritDoc BoundingVolume.behindPlane} */
+  behindPlane(plane: Plane): boolean {
+    return this.toAABB().behindPlane(plane);
+  }
   /** {@inheritDoc BoundingVolume.clone} */
   clone(): BoundingVolume {
     return new BoundingBox(this);
