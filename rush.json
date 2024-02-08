@@ -473,8 +473,7 @@
     },
     {
       "packageName": "@zephyr3d/site",
-      "projectFolder": "site",
-      "shouldPublish": false
+      "projectFolder": "site"
     }
   ]
 }
