@@ -1,4 +1,4 @@
-import type { Font} from './font';
+import type { Font } from './font';
 import { FontCanvas } from './font';
 import type { AtlasInfo } from './textureatlas';
 import { TextureAtlasManager } from './textureatlas';
@@ -63,7 +63,7 @@ export class GlyphManager extends TextureAtlasManager {
    * @param charMargin - Margin size between characters
    * @param start - Start index of the string to be clipped
    * @param font - Font of the string
-   * @returns 
+   * @returns
    */
   clipStringToWidth(str: string, width: number, charMargin: number, start: number, font: Font) {
     let sum = 0;
@@ -108,7 +108,10 @@ export class GlyphManager extends TextureAtlasManager {
     return w;
   }
   /** @internal */
-  private _getGlyphBitmap(char: string, font: Font): ImageData | { x: number; y: number; w: number; h: number } {
+  private _getGlyphBitmap(
+    char: string,
+    font: Font
+  ): ImageData | { x: number; y: number; w: number; h: number } {
     if (!font) {
       return null;
     }

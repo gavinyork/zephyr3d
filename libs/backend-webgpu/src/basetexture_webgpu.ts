@@ -6,7 +6,8 @@ import type {
   TextureSampler,
   GPUDataBuffer,
   TextureType,
-  TextureFormat} from '@zephyr3d/device';
+  TextureFormat
+} from '@zephyr3d/device';
 import {
   isCompressedTextureFormat,
   hasDepthChannel,
@@ -97,11 +98,29 @@ export abstract class WebGPUBaseTexture<
   }
   set samplerOptions(options: SamplerOptions) {
     const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
-    this._samplerOptions = options ? Object.assign({}, this._getSamplerOptions(params, !!options.compare), options) : null;
+    this._samplerOptions = options
+      ? Object.assign({}, this._getSamplerOptions(params, !!options.compare), options)
+      : null;
   }
   abstract init(): void;
-  abstract readPixels(x: number, y: number, w: number, h: number, faceOrLayer: number, mipLevel: number, buffer: TypedArray): Promise<void>;
-  abstract readPixelsToBuffer(x: number, y: number, w: number, h: number, faceOrLayer: number, mipLevel: number, buffer: GPUDataBuffer): void;
+  abstract readPixels(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    faceOrLayer: number,
+    mipLevel: number,
+    buffer: TypedArray
+  ): Promise<void>;
+  abstract readPixelsToBuffer(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    faceOrLayer: number,
+    mipLevel: number,
+    buffer: GPUDataBuffer
+  ): void;
   isTexture(): this is BaseTexture {
     return true;
   }
@@ -271,19 +290,21 @@ export abstract class WebGPUBaseTexture<
             mipLevel: upload.mipLevel,
             premultipliedAlpha: false
           };
-          this._device.device.queue.copyExternalImageToTexture({
-            source: upload.image,
-            origin: {
-              x: upload.srcX,
-              y: upload.srcY
+          this._device.device.queue.copyExternalImageToTexture(
+            {
+              source: upload.image,
+              origin: {
+                x: upload.srcX,
+                y: upload.srcY
+              }
+            },
+            copyView,
+            {
+              width: upload.width,
+              height: upload.height,
+              depthOrArrayLayers: upload.depth
             }
-          },
-          copyView,
-          {
-            width: upload.width,
-            height: upload.height,
-            depthOrArrayLayers: upload.depth
-          });
+          );
         }
       }
       this._pendingUploads.length = 0;
@@ -302,7 +323,11 @@ export abstract class WebGPUBaseTexture<
   }
   getDefaultSampler(shadow: boolean): TextureSampler {
     const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
-    return this._device.createSampler(!this._samplerOptions || !this._samplerOptions.compare !== !shadow ? this._getSamplerOptions(params, shadow) : this._samplerOptions);
+    return this._device.createSampler(
+      !this._samplerOptions || !this._samplerOptions.compare !== !shadow
+        ? this._getSamplerOptions(params, shadow)
+        : this._samplerOptions
+    );
   }
   abstract createView(level?: number, face?: number, mipCount?: number): GPUTextureView;
   /** @internal */
@@ -348,7 +373,7 @@ export abstract class WebGPUBaseTexture<
       if (this.isTexture3D()) {
         size = Math.max(size, depth);
       }
-      const autoMipLevelCount = Math.floor(Math.log2(size)) + 1;//this._calcMipLevelCount(format, width, height, depth);
+      const autoMipLevelCount = Math.floor(Math.log2(size)) + 1; //this._calcMipLevelCount(format, width, height, depth);
       //const autoMipLevelCount = this._calcMipLevelCount(format, width, height, depth);
       if (!Number.isInteger(numMipLevels) || numMipLevels < 0 || numMipLevels > autoMipLevelCount) {
         numMipLevels = autoMipLevelCount;
@@ -565,7 +590,9 @@ export abstract class WebGPUBaseTexture<
     miplevel: number,
     layer: number
   ) {
-    if (false && !this._device.isTextureUploading(this as any) &&
+    if (
+      false &&
+      !this._device.isTextureUploading(this as any) &&
       this._device.device.queue.copyExternalImageToTexture
     ) {
       this.clearPendingUploads();

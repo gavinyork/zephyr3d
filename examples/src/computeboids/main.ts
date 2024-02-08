@@ -1,6 +1,6 @@
 import { Vector4 } from '@zephyr3d/base';
-import type { StructuredBuffer, BindGroup, VertexLayout} from '@zephyr3d/device';
-import { DrawText} from '@zephyr3d/device';
+import type { StructuredBuffer, BindGroup, VertexLayout } from '@zephyr3d/device';
+import { DrawText } from '@zephyr3d/device';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
 (async function () {
@@ -112,7 +112,10 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
   });
   console.log(spriteUpdateProgram.getShaderSource('compute'));
   console.log(spriteUpdateProgram.bindGroupLayouts[0]);
-  const spriteVertexBuffer = device.createVertexBuffer('position_f32x2', new Float32Array([-0.01, -0.02, 0.01, -0.02, 0.0, 0.02]));
+  const spriteVertexBuffer = device.createVertexBuffer(
+    'position_f32x2',
+    new Float32Array([-0.01, -0.02, 0.01, -0.02, 0.0, 0.02])
+  );
   const simParams = {
     deltaT: 0.04,
     rule1Distance: 0.1,
@@ -136,7 +139,9 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
   const primitives: VertexLayout[] = [];
   for (let i = 0; i < 2; i++) {
     particleBuffers.push(
-      device.createInterleavedVertexBuffer(['tex0_f32x2', 'tex1_f32x2'], initialParticleData, { storage: true })
+      device.createInterleavedVertexBuffer(['tex0_f32x2', 'tex1_f32x2'], initialParticleData, {
+        storage: true
+      })
     );
   }
   for (let i = 0; i < 2; i++) {
@@ -147,13 +152,16 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
     particleBindGroups.push(bindGroup);
 
     const primitive = device.createVertexLayout({
-      vertexBuffers: [{
-        buffer: spriteVertexBuffer,
-        stepMode: 'vertex'
-      }, {
-        buffer: particleBuffers[i],
-        stepMode: 'instance'
-      }]
+      vertexBuffers: [
+        {
+          buffer: spriteVertexBuffer,
+          stepMode: 'vertex'
+        },
+        {
+          buffer: particleBuffers[i],
+          stepMode: 'instance'
+        }
+      ]
     });
     primitives.push(primitive);
   }

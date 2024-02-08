@@ -1,14 +1,16 @@
 import type { VectorBase, CubeFace, TypedArray, IEventTarget } from '@zephyr3d/base';
 import type { ShaderKind, AbstractDevice } from './base_types';
+import type { PBTypeInfo } from './builder/types';
+import { PBArrayTypeInfo, PBPrimitiveTypeInfo, PBStructTypeInfo, PBPrimitiveType } from './builder/types';
 import type {
-  PBTypeInfo} from './builder/types';
-import {
-  PBArrayTypeInfo,
-  PBPrimitiveTypeInfo,
-  PBStructTypeInfo,
-  PBPrimitiveType
-} from './builder/types';
-import type { TextureType, CompareFunc, TextureAddressMode, TextureFilterMode, DataType, PrimitiveType, TextureFormat } from './base_types';
+  TextureType,
+  CompareFunc,
+  TextureAddressMode,
+  TextureFilterMode,
+  DataType,
+  PrimitiveType,
+  TextureFormat
+} from './base_types';
 import type { VertexBufferInfo } from './vertexdata';
 
 /**
@@ -57,260 +59,260 @@ export const VERTEX_ATTRIB_BLEND_INDICES = 13;
  * @public
  */
 export type VertexAttribFormat =
-  'position_u8normx2'|
-  'position_u8normx4'|
-  'position_i8normx2'|
-  'position_i8normx4'|
-  'position_u16x2'|
-  'position_u16x4'|
-  'position_i16x2'|
-  'position_i16x4'|
-  'position_u16normx2'|
-  'position_u16normx4'|
-  'position_i16normx2'|
-  'position_i16normx4'|
-  'position_f16x2'|
-  'position_f16x4'|
-  'position_f32'|
-  'position_f32x2'|
-  'position_f32x3'|
-  'position_f32x4'|
-  'position_i32'|
-  'position_i32x2'|
-  'position_i32x3'|
-  'position_i32x4'|
-  'position_u32'|
-  'position_u32x2'|
-  'position_u32x3'|
-  'position_u32x4'|
-  'normal_f16x4'|
-  'normal_f32x3'|
-  'normal_f32x4'|
-  'diffuse_u8normx4'|
-  'diffuse_u16x4'|
-  'diffuse_u16normx4'|
-  'diffuse_f16x4'|
-  'diffuse_f32x3'|
-  'diffuse_f32x4'|
-  'diffuse_u32x3'|
-  'diffuse_u32x4'|
-  'tangent_f16x4'|
-  'tangent_f32x3'|
-  'tangent_f32x4'|
-  'tex0_u8normx2'|
-  'tex0_u8normx4'|
-  'tex0_i8normx2'|
-  'tex0_i8normx4'|
-  'tex0_u16x2'|
-  'tex0_u16x4'|
-  'tex0_i16x2'|
-  'tex0_i16x4'|
-  'tex0_u16normx2'|
-  'tex0_u16normx4'|
-  'tex0_i16normx2'|
-  'tex0_i16normx4'|
-  'tex0_f16x2'|
-  'tex0_f16x4'|
-  'tex0_f32'|
-  'tex0_f32x2'|
-  'tex0_f32x3'|
-  'tex0_f32x4'|
-  'tex0_i32'|
-  'tex0_i32x2'|
-  'tex0_i32x3'|
-  'tex0_i32x4'|
-  'tex0_u32'|
-  'tex0_u32x2'|
-  'tex0_u32x3'|
-  'tex0_u32x4'|
-  'tex1_u8normx2'|
-  'tex1_u8normx4'|
-  'tex1_i8normx2'|
-  'tex1_i8normx4'|
-  'tex1_u16x2'|
-  'tex1_u16x4'|
-  'tex1_i16x2'|
-  'tex1_i16x4'|
-  'tex1_u16normx2'|
-  'tex1_u16normx4'|
-  'tex1_i16normx2'|
-  'tex1_i16normx4'|
-  'tex1_f16x2'|
-  'tex1_f16x4'|
-  'tex1_f32'|
-  'tex1_f32x2'|
-  'tex1_f32x3'|
-  'tex1_f32x4'|
-  'tex1_i32'|
-  'tex1_i32x2'|
-  'tex1_i32x3'|
-  'tex1_i32x4'|
-  'tex1_u32'|
-  'tex1_u32x2'|
-  'tex1_u32x3'|
-  'tex1_u32x4'|
-  'tex2_u8normx2'|
-  'tex2_u8normx4'|
-  'tex2_i8normx2'|
-  'tex2_i8normx4'|
-  'tex2_u16x2'|
-  'tex2_u16x4'|
-  'tex2_i16x2'|
-  'tex2_i16x4'|
-  'tex2_u16normx2'|
-  'tex2_u16normx4'|
-  'tex2_i16normx2'|
-  'tex2_i16normx4'|
-  'tex2_f16x2'|
-  'tex2_f16x4'|
-  'tex2_f32'|
-  'tex2_f32x2'|
-  'tex2_f32x3'|
-  'tex2_f32x4'|
-  'tex2_i32'|
-  'tex2_i32x2'|
-  'tex2_i32x3'|
-  'tex2_i32x4'|
-  'tex2_u32'|
-  'tex2_u32x2'|
-  'tex2_u32x3'|
-  'tex2_u32x4'|
-  'tex3_u8normx2'|
-  'tex3_u8normx4'|
-  'tex3_i8normx2'|
-  'tex3_i8normx4'|
-  'tex3_u16x2'|
-  'tex3_u16x4'|
-  'tex3_i16x2'|
-  'tex3_i16x4'|
-  'tex3_u16normx2'|
-  'tex3_u16normx4'|
-  'tex3_i16normx2'|
-  'tex3_i16normx4'|
-  'tex3_f16x2'|
-  'tex3_f16x4'|
-  'tex3_f32'|
-  'tex3_f32x2'|
-  'tex3_f32x3'|
-  'tex3_f32x4'|
-  'tex3_i32'|
-  'tex3_i32x2'|
-  'tex3_i32x3'|
-  'tex3_i32x4'|
-  'tex3_u32'|
-  'tex3_u32x2'|
-  'tex3_u32x3'|
-  'tex3_u32x4'|
-  'tex4_u8normx2'|
-  'tex4_u8normx4'|
-  'tex4_i8normx2'|
-  'tex4_i8normx4'|
-  'tex4_u16x2'|
-  'tex4_u16x4'|
-  'tex4_i16x2'|
-  'tex4_i16x4'|
-  'tex4_u16normx2'|
-  'tex4_u16normx4'|
-  'tex4_i16normx2'|
-  'tex4_i16normx4'|
-  'tex4_f16x2'|
-  'tex4_f16x4'|
-  'tex4_f32'|
-  'tex4_f32x2'|
-  'tex4_f32x3'|
-  'tex4_f32x4'|
-  'tex4_i32'|
-  'tex4_i32x2'|
-  'tex4_i32x3'|
-  'tex4_i32x4'|
-  'tex4_u32'|
-  'tex4_u32x2'|
-  'tex4_u32x3'|
-  'tex4_u32x4'|
-  'tex5_u8normx2'|
-  'tex5_u8normx4'|
-  'tex5_i8normx2'|
-  'tex5_i8normx4'|
-  'tex5_u16x2'|
-  'tex5_u16x4'|
-  'tex5_i16x2'|
-  'tex5_i16x4'|
-  'tex5_u16normx2'|
-  'tex5_u16normx4'|
-  'tex5_i16normx2'|
-  'tex5_i16normx4'|
-  'tex5_f16x2'|
-  'tex5_f16x4'|
-  'tex5_f32'|
-  'tex5_f32x2'|
-  'tex5_f32x3'|
-  'tex5_f32x4'|
-  'tex5_i32'|
-  'tex5_i32x2'|
-  'tex5_i32x3'|
-  'tex5_i32x4'|
-  'tex5_u32'|
-  'tex5_u32x2'|
-  'tex5_u32x3'|
-  'tex5_u32x4'|
-  'tex6_u8normx2'|
-  'tex6_u8normx4'|
-  'tex6_i8normx2'|
-  'tex6_i8normx4'|
-  'tex6_u16x2'|
-  'tex6_u16x4'|
-  'tex6_i16x2'|
-  'tex6_i16x4'|
-  'tex6_u16normx2'|
-  'tex6_u16normx4'|
-  'tex6_i16normx2'|
-  'tex6_i16normx4'|
-  'tex6_f16x2'|
-  'tex6_f16x4'|
-  'tex6_f32'|
-  'tex6_f32x2'|
-  'tex6_f32x3'|
-  'tex6_f32x4'|
-  'tex6_i32'|
-  'tex6_i32x2'|
-  'tex6_i32x3'|
-  'tex6_i32x4'|
-  'tex6_u32'|
-  'tex6_u32x2'|
-  'tex6_u32x3'|
-  'tex6_u32x4'|
-  'tex7_u8normx2'|
-  'tex7_u8normx4'|
-  'tex7_i8normx2'|
-  'tex7_i8normx4'|
-  'tex7_u16x2'|
-  'tex7_u16x4'|
-  'tex7_i16x2'|
-  'tex7_i16x4'|
-  'tex7_u16normx2'|
-  'tex7_u16normx4'|
-  'tex7_i16normx2'|
-  'tex7_i16normx4'|
-  'tex7_f16x2'|
-  'tex7_f16x4'|
-  'tex7_f32'|
-  'tex7_f32x2'|
-  'tex7_f32x3'|
-  'tex7_f32x4'|
-  'tex7_i32'|
-  'tex7_i32x2'|
-  'tex7_i32x3'|
-  'tex7_i32x4'|
-  'tex7_u32'|
-  'tex7_u32x2'|
-  'tex7_u32x3'|
-  'tex7_u32x4'|
-  'blendweights_f16x4'|
-  'blendweights_f32x4'|
-  'blendindices_u16x4'|
-  'blendindices_f16x4'|
-  'blendindices_f32x4'|
-  'blendindices_u32x4';
+  | 'position_u8normx2'
+  | 'position_u8normx4'
+  | 'position_i8normx2'
+  | 'position_i8normx4'
+  | 'position_u16x2'
+  | 'position_u16x4'
+  | 'position_i16x2'
+  | 'position_i16x4'
+  | 'position_u16normx2'
+  | 'position_u16normx4'
+  | 'position_i16normx2'
+  | 'position_i16normx4'
+  | 'position_f16x2'
+  | 'position_f16x4'
+  | 'position_f32'
+  | 'position_f32x2'
+  | 'position_f32x3'
+  | 'position_f32x4'
+  | 'position_i32'
+  | 'position_i32x2'
+  | 'position_i32x3'
+  | 'position_i32x4'
+  | 'position_u32'
+  | 'position_u32x2'
+  | 'position_u32x3'
+  | 'position_u32x4'
+  | 'normal_f16x4'
+  | 'normal_f32x3'
+  | 'normal_f32x4'
+  | 'diffuse_u8normx4'
+  | 'diffuse_u16x4'
+  | 'diffuse_u16normx4'
+  | 'diffuse_f16x4'
+  | 'diffuse_f32x3'
+  | 'diffuse_f32x4'
+  | 'diffuse_u32x3'
+  | 'diffuse_u32x4'
+  | 'tangent_f16x4'
+  | 'tangent_f32x3'
+  | 'tangent_f32x4'
+  | 'tex0_u8normx2'
+  | 'tex0_u8normx4'
+  | 'tex0_i8normx2'
+  | 'tex0_i8normx4'
+  | 'tex0_u16x2'
+  | 'tex0_u16x4'
+  | 'tex0_i16x2'
+  | 'tex0_i16x4'
+  | 'tex0_u16normx2'
+  | 'tex0_u16normx4'
+  | 'tex0_i16normx2'
+  | 'tex0_i16normx4'
+  | 'tex0_f16x2'
+  | 'tex0_f16x4'
+  | 'tex0_f32'
+  | 'tex0_f32x2'
+  | 'tex0_f32x3'
+  | 'tex0_f32x4'
+  | 'tex0_i32'
+  | 'tex0_i32x2'
+  | 'tex0_i32x3'
+  | 'tex0_i32x4'
+  | 'tex0_u32'
+  | 'tex0_u32x2'
+  | 'tex0_u32x3'
+  | 'tex0_u32x4'
+  | 'tex1_u8normx2'
+  | 'tex1_u8normx4'
+  | 'tex1_i8normx2'
+  | 'tex1_i8normx4'
+  | 'tex1_u16x2'
+  | 'tex1_u16x4'
+  | 'tex1_i16x2'
+  | 'tex1_i16x4'
+  | 'tex1_u16normx2'
+  | 'tex1_u16normx4'
+  | 'tex1_i16normx2'
+  | 'tex1_i16normx4'
+  | 'tex1_f16x2'
+  | 'tex1_f16x4'
+  | 'tex1_f32'
+  | 'tex1_f32x2'
+  | 'tex1_f32x3'
+  | 'tex1_f32x4'
+  | 'tex1_i32'
+  | 'tex1_i32x2'
+  | 'tex1_i32x3'
+  | 'tex1_i32x4'
+  | 'tex1_u32'
+  | 'tex1_u32x2'
+  | 'tex1_u32x3'
+  | 'tex1_u32x4'
+  | 'tex2_u8normx2'
+  | 'tex2_u8normx4'
+  | 'tex2_i8normx2'
+  | 'tex2_i8normx4'
+  | 'tex2_u16x2'
+  | 'tex2_u16x4'
+  | 'tex2_i16x2'
+  | 'tex2_i16x4'
+  | 'tex2_u16normx2'
+  | 'tex2_u16normx4'
+  | 'tex2_i16normx2'
+  | 'tex2_i16normx4'
+  | 'tex2_f16x2'
+  | 'tex2_f16x4'
+  | 'tex2_f32'
+  | 'tex2_f32x2'
+  | 'tex2_f32x3'
+  | 'tex2_f32x4'
+  | 'tex2_i32'
+  | 'tex2_i32x2'
+  | 'tex2_i32x3'
+  | 'tex2_i32x4'
+  | 'tex2_u32'
+  | 'tex2_u32x2'
+  | 'tex2_u32x3'
+  | 'tex2_u32x4'
+  | 'tex3_u8normx2'
+  | 'tex3_u8normx4'
+  | 'tex3_i8normx2'
+  | 'tex3_i8normx4'
+  | 'tex3_u16x2'
+  | 'tex3_u16x4'
+  | 'tex3_i16x2'
+  | 'tex3_i16x4'
+  | 'tex3_u16normx2'
+  | 'tex3_u16normx4'
+  | 'tex3_i16normx2'
+  | 'tex3_i16normx4'
+  | 'tex3_f16x2'
+  | 'tex3_f16x4'
+  | 'tex3_f32'
+  | 'tex3_f32x2'
+  | 'tex3_f32x3'
+  | 'tex3_f32x4'
+  | 'tex3_i32'
+  | 'tex3_i32x2'
+  | 'tex3_i32x3'
+  | 'tex3_i32x4'
+  | 'tex3_u32'
+  | 'tex3_u32x2'
+  | 'tex3_u32x3'
+  | 'tex3_u32x4'
+  | 'tex4_u8normx2'
+  | 'tex4_u8normx4'
+  | 'tex4_i8normx2'
+  | 'tex4_i8normx4'
+  | 'tex4_u16x2'
+  | 'tex4_u16x4'
+  | 'tex4_i16x2'
+  | 'tex4_i16x4'
+  | 'tex4_u16normx2'
+  | 'tex4_u16normx4'
+  | 'tex4_i16normx2'
+  | 'tex4_i16normx4'
+  | 'tex4_f16x2'
+  | 'tex4_f16x4'
+  | 'tex4_f32'
+  | 'tex4_f32x2'
+  | 'tex4_f32x3'
+  | 'tex4_f32x4'
+  | 'tex4_i32'
+  | 'tex4_i32x2'
+  | 'tex4_i32x3'
+  | 'tex4_i32x4'
+  | 'tex4_u32'
+  | 'tex4_u32x2'
+  | 'tex4_u32x3'
+  | 'tex4_u32x4'
+  | 'tex5_u8normx2'
+  | 'tex5_u8normx4'
+  | 'tex5_i8normx2'
+  | 'tex5_i8normx4'
+  | 'tex5_u16x2'
+  | 'tex5_u16x4'
+  | 'tex5_i16x2'
+  | 'tex5_i16x4'
+  | 'tex5_u16normx2'
+  | 'tex5_u16normx4'
+  | 'tex5_i16normx2'
+  | 'tex5_i16normx4'
+  | 'tex5_f16x2'
+  | 'tex5_f16x4'
+  | 'tex5_f32'
+  | 'tex5_f32x2'
+  | 'tex5_f32x3'
+  | 'tex5_f32x4'
+  | 'tex5_i32'
+  | 'tex5_i32x2'
+  | 'tex5_i32x3'
+  | 'tex5_i32x4'
+  | 'tex5_u32'
+  | 'tex5_u32x2'
+  | 'tex5_u32x3'
+  | 'tex5_u32x4'
+  | 'tex6_u8normx2'
+  | 'tex6_u8normx4'
+  | 'tex6_i8normx2'
+  | 'tex6_i8normx4'
+  | 'tex6_u16x2'
+  | 'tex6_u16x4'
+  | 'tex6_i16x2'
+  | 'tex6_i16x4'
+  | 'tex6_u16normx2'
+  | 'tex6_u16normx4'
+  | 'tex6_i16normx2'
+  | 'tex6_i16normx4'
+  | 'tex6_f16x2'
+  | 'tex6_f16x4'
+  | 'tex6_f32'
+  | 'tex6_f32x2'
+  | 'tex6_f32x3'
+  | 'tex6_f32x4'
+  | 'tex6_i32'
+  | 'tex6_i32x2'
+  | 'tex6_i32x3'
+  | 'tex6_i32x4'
+  | 'tex6_u32'
+  | 'tex6_u32x2'
+  | 'tex6_u32x3'
+  | 'tex6_u32x4'
+  | 'tex7_u8normx2'
+  | 'tex7_u8normx4'
+  | 'tex7_i8normx2'
+  | 'tex7_i8normx4'
+  | 'tex7_u16x2'
+  | 'tex7_u16x4'
+  | 'tex7_i16x2'
+  | 'tex7_i16x4'
+  | 'tex7_u16normx2'
+  | 'tex7_u16normx4'
+  | 'tex7_i16normx2'
+  | 'tex7_i16normx4'
+  | 'tex7_f16x2'
+  | 'tex7_f16x4'
+  | 'tex7_f32'
+  | 'tex7_f32x2'
+  | 'tex7_f32x3'
+  | 'tex7_f32x4'
+  | 'tex7_i32'
+  | 'tex7_i32x2'
+  | 'tex7_i32x3'
+  | 'tex7_i32x4'
+  | 'tex7_u32'
+  | 'tex7_u32x2'
+  | 'tex7_u32x3'
+  | 'tex7_u32x4'
+  | 'blendweights_f16x4'
+  | 'blendweights_f32x4'
+  | 'blendindices_u16x4'
+  | 'blendindices_f16x4'
+  | 'blendindices_f32x4'
+  | 'blendindices_u32x4';
 
 const vertexAttribFormatMap: Record<VertexAttribFormat, [number, PBPrimitiveType, number, string, number]> = {
   position_u8normx2: [VERTEX_ATTRIB_POSITION, PBPrimitiveType.U8VEC2_NORM, 2, 'u8norm', 2],
@@ -566,7 +568,7 @@ const vertexAttribFormatMap: Record<VertexAttribFormat, [number, PBPrimitiveType
   blendindices_u16x4: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.U16VEC4, 8, 'u16', 4],
   blendindices_f16x4: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.F16VEC4, 8, 'f16', 4],
   blendindices_f32x4: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.F32VEC4, 16, 'f32', 4],
-  blendindices_u32x4: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.U32VEC4, 16, 'u32', 4],
+  blendindices_u32x4: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.U32VEC4, 16, 'u32', 4]
 };
 
 /**
@@ -574,21 +576,20 @@ const vertexAttribFormatMap: Record<VertexAttribFormat, [number, PBPrimitiveType
  * @public
  */
 export type VertexSemantic =
-'position'|
-'normal'|
-'diffuse'|
-'tangent'|
-'blendIndices'|
-'blendWeights'|
-'texCoord0'|
-'texCoord1'|
-'texCoord2'|
-'texCoord3'|
-'texCoord4'|
-'texCoord5'|
-'texCoord6'|
-'texCoord7';
-
+  | 'position'
+  | 'normal'
+  | 'diffuse'
+  | 'tangent'
+  | 'blendIndices'
+  | 'blendWeights'
+  | 'texCoord0'
+  | 'texCoord1'
+  | 'texCoord2'
+  | 'texCoord3'
+  | 'texCoord4'
+  | 'texCoord5'
+  | 'texCoord6'
+  | 'texCoord7';
 
 const vertexAttribNameMap: Record<VertexSemantic, number> = {
   position: VERTEX_ATTRIB_POSITION,
@@ -604,7 +605,7 @@ const vertexAttribNameMap: Record<VertexSemantic, number> = {
   texCoord4: VERTEX_ATTRIB_TEXCOORD4,
   texCoord5: VERTEX_ATTRIB_TEXCOORD5,
   texCoord6: VERTEX_ATTRIB_TEXCOORD6,
-  texCoord7: VERTEX_ATTRIB_TEXCOORD7,
+  texCoord7: VERTEX_ATTRIB_TEXCOORD7
 };
 
 const vertexAttribNameRevMap = {
@@ -621,7 +622,7 @@ const vertexAttribNameRevMap = {
   [VERTEX_ATTRIB_TEXCOORD4]: 'texCoord4',
   [VERTEX_ATTRIB_TEXCOORD5]: 'texCoord5',
   [VERTEX_ATTRIB_TEXCOORD6]: 'texCoord6',
-  [VERTEX_ATTRIB_TEXCOORD7]: 'texCoord7',
+  [VERTEX_ATTRIB_TEXCOORD7]: 'texCoord7'
 };
 
 /**
@@ -636,17 +637,17 @@ export type VertexLayoutOptions = {
     /**
      * vertex buffer object created by device
      */
-    buffer: StructuredBuffer,
+    buffer: StructuredBuffer;
     /**
      * the vertex buffer step mode,
      * value can be 'vertex' or 'instance', default is 'vertex'
      */
-    stepMode?: VertexStepMode
-  }[],
+    stepMode?: VertexStepMode;
+  }[];
   /**
    * optional index buffer in this vertex layout
    */
-  indexBuffer?: IndexBuffer
+  indexBuffer?: IndexBuffer;
 };
 
 /**
@@ -775,7 +776,7 @@ export function getVertexBufferLength(vertexBufferType: PBStructTypeInfo) {
  * @returns The byte stride of the vertex buffer
  * @public
  */
- export function getVertexBufferStride(vertexBufferType: PBStructTypeInfo) {
+export function getVertexBufferStride(vertexBufferType: PBStructTypeInfo) {
   const vertexType = (vertexBufferType.structMembers[0].type as PBArrayTypeInfo).elementType;
   if (vertexType.isStructType()) {
     let stride = 0;
@@ -820,7 +821,7 @@ export function getVertexBufferAttribTypeBySemantic(
  * @returns - The primitive type of the vertex attribute
  * @public
  */
- export function getVertexBufferAttribType(
+export function getVertexBufferAttribType(
   vertexBufferType: PBStructTypeInfo,
   attrib: number
 ): PBPrimitiveTypeInfo {
@@ -1222,8 +1223,24 @@ export interface BaseTexture<T = unknown> extends GPUObject<T> {
   isFilterable(): boolean;
   isDepth(): boolean;
   getDefaultSampler(comparison: boolean): TextureSampler;
-  readPixels(x: number, y: number, w: number, h: number, faceOrLayer: number, mipLevel: number, buffer: TypedArray): Promise<void>;
-  readPixelsToBuffer(x: number, y: number, w: number, h: number, faceOrLayer: number, mipLevel: number, buffer: GPUDataBuffer): void;
+  readPixels(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    faceOrLayer: number,
+    mipLevel: number,
+    buffer: TypedArray
+  ): Promise<void>;
+  readPixelsToBuffer(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    faceOrLayer: number,
+    mipLevel: number,
+    buffer: GPUDataBuffer
+  ): void;
 }
 
 /**
@@ -1423,7 +1440,14 @@ export interface BindGroup extends GPUObject<unknown> {
   setValue(name: string, value: StructuredValue);
   setRawData(name: string, byteOffset: number, data: TypedArray, srcPos?: number, srcLength?: number);
   setTexture(name: string, texture: BaseTexture, sampler?: TextureSampler);
-  setTextureView(name: string, value: BaseTexture, level?: number, face?: number, mipCount?: number, sampler?: TextureSampler);
+  setTextureView(
+    name: string,
+    value: BaseTexture,
+    level?: number,
+    face?: number,
+    mipCount?: number,
+    sampler?: TextureSampler
+  );
   setSampler(name: string, sampler: TextureSampler);
 }
 

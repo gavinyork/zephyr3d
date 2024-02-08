@@ -8,7 +8,8 @@ import type { FrameBufferInfo } from './pipeline_cache';
 import type { WebGPURenderPass } from './renderpass_webgpu';
 
 export class WebGPUClearQuad {
-  private static _clearPrograms: { [hash: string]: { program: WebGPUProgram, bindGroup: WebGPUBindGroup } } = {};
+  private static _clearPrograms: { [hash: string]: { program: WebGPUProgram; bindGroup: WebGPUBindGroup } } =
+    {};
   private static _clearBindGroup: WebGPUBindGroup = null;
   private static _clearStateSet: WebGPURenderStateSet = null;
   private static _defaultClearColor = new Vector4(0, 0, 0, 1);
@@ -47,7 +48,10 @@ export class WebGPUClearQuad {
       1
     );
   }
-  private static getClearProgram(device: WebGPUDevice, hash: string): { program: WebGPUProgram, bindGroup: WebGPUBindGroup } {
+  private static getClearProgram(
+    device: WebGPUDevice,
+    hash: string
+  ): { program: WebGPUProgram; bindGroup: WebGPUBindGroup } {
     let programInfo = this._clearPrograms[hash];
     if (!programInfo) {
       const colorAttachments = hash.split('');
@@ -57,11 +61,7 @@ export class WebGPUClearQuad {
           this.clearDepth = pb.float().uniform(0);
           this.coords = [pb.vec2(-1, 1), pb.vec2(1, 1), pb.vec2(-1, -1), pb.vec2(1, -1)];
           pb.main(function () {
-            this.$builtins.position = pb.vec4(
-              this.coords.at(this.$builtins.vertexIndex),
-              this.clearDepth,
-              1
-            );
+            this.$builtins.position = pb.vec4(this.coords.at(this.$builtins.vertexIndex), this.clearDepth, 1);
           });
         },
         fragment(pb) {
@@ -73,11 +73,21 @@ export class WebGPUClearQuad {
             });
           } else {
             for (let i = 0; i < colorAttachments.length; i++) {
-              this.$outputs[`outColor${i}`] = colorAttachments[i] === 'f' ? pb.vec4() : colorAttachments[i] === 'i' ? pb.ivec4() : pb.uvec4();
+              this.$outputs[`outColor${i}`] =
+                colorAttachments[i] === 'f'
+                  ? pb.vec4()
+                  : colorAttachments[i] === 'i'
+                  ? pb.ivec4()
+                  : pb.uvec4();
             }
             pb.main(function () {
               for (let i = 0; i < colorAttachments.length; i++) {
-                this.$outputs[`outColor${i}`] = colorAttachments[i] === 'f' ? this.clearColor : colorAttachments[i] === 'i' ? pb.ivec4(this.clearColor) : pb.uvec4(this.clearColor);
+                this.$outputs[`outColor${i}`] =
+                  colorAttachments[i] === 'f'
+                    ? this.clearColor
+                    : colorAttachments[i] === 'i'
+                    ? pb.ivec4(this.clearColor)
+                    : pb.uvec4(this.clearColor);
               }
             });
           }
@@ -85,7 +95,8 @@ export class WebGPUClearQuad {
       }) as WebGPUProgram;
       const bindGroup = device.createBindGroup(program.bindGroupLayouts[0]) as WebGPUBindGroup;
       programInfo = {
-        program, bindGroup
+        program,
+        bindGroup
       };
       this._clearPrograms[hash] = programInfo;
     }

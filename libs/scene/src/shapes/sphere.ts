@@ -1,8 +1,8 @@
-import type { Ray} from "@zephyr3d/base";
-import { Vector3 } from "@zephyr3d/base";
-import { BoundingBox } from "../utility/bounding_volume";
-import type { ShapeCreationOptions } from "./shape";
-import { Shape } from "./shape";
+import type { Ray } from '@zephyr3d/base';
+import { Vector3 } from '@zephyr3d/base';
+import { BoundingBox } from '../utility/bounding_volume';
+import type { ShapeCreationOptions } from './shape';
+import { Shape } from './shape';
 
 /**
  * Creation options for sphere shape

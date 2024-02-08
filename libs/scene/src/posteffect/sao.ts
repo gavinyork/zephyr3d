@@ -1,12 +1,19 @@
-import type { AbstractDevice, BindGroup, GPUProgram, RenderStateSet, Texture2D, TextureSampler} from "@zephyr3d/device";
-import { isFloatTextureFormat } from "@zephyr3d/device";
-import { Application } from "../app";
-import { AbstractPostEffect } from "./posteffect";
-import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from "../shaders/misc";
-import { Matrix4x4, Vector2, Vector4 } from "@zephyr3d/base";
-import { AOBilateralBlurBlitter } from "../blitter/depthlimitedgaussion";
-import { CopyBlitter } from "../blitter";
-import { TemporalCache, type DrawContext } from "../render";
+import type {
+  AbstractDevice,
+  BindGroup,
+  GPUProgram,
+  RenderStateSet,
+  Texture2D,
+  TextureSampler
+} from '@zephyr3d/device';
+import { isFloatTextureFormat } from '@zephyr3d/device';
+import { Application } from '../app';
+import { AbstractPostEffect } from './posteffect';
+import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
+import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
+import { AOBilateralBlurBlitter } from '../blitter/depthlimitedgaussion';
+import { CopyBlitter } from '../blitter';
+import { TemporalCache, type DrawContext } from '../render';
 
 const NUM_SAMPLES = 7;
 const NUM_RINGS = 4;
@@ -189,11 +196,12 @@ export class SAO extends AbstractPostEffect {
   }
   private _getIntermediateTextureFormat(device: AbstractDevice) {
     const texCaps = device.getDeviceCaps().textureCaps;
-    return device.type === 'webgl' || (!texCaps.supportHalfFloatColorBuffer && !texCaps.supportFloatColorBuffer)
+    return device.type === 'webgl' ||
+      (!texCaps.supportHalfFloatColorBuffer && !texCaps.supportFloatColorBuffer)
       ? 'rgba8unorm'
       : texCaps.supportHalfFloatColorBuffer
-        ? 'r16f'
-        : 'r32f';
+      ? 'r16f'
+      : 'r32f';
   }
   /** @internal */
   private _prepare(device: AbstractDevice, srcTexture: Texture2D) {
@@ -207,7 +215,7 @@ export class SAO extends AbstractPostEffect {
           minFilter: 'nearest',
           mipFilter: 'none',
           addressU: 'clamp',
-          addressV: 'clamp',
+          addressV: 'clamp'
         });
       }
       if (!SAO._renderState) {
@@ -217,7 +225,11 @@ export class SAO extends AbstractPostEffect {
         SAO._renderStateBlend = device.createRenderStateSet();
         SAO._renderStateBlend.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('gt');
         SAO._renderStateBlend.useRasterizerState().setCullMode('none');
-        SAO._renderStateBlend.useBlendingState().enable(true).setBlendFuncRGB('zero', 'src-color').setBlendFuncAlpha('zero', 'one');
+        SAO._renderStateBlend
+          .useBlendingState()
+          .enable(true)
+          .setBlendFuncRGB('zero', 'src-color')
+          .setBlendFuncAlpha('zero', 'one');
       }
       function createProgram(packed: boolean) {
         return device.buildRenderProgram({
@@ -228,7 +240,7 @@ export class SAO extends AbstractPostEffect {
             pb.main(function () {
               this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
               this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-              this.$if (pb.notEqual(this.flip, 0), function(){
+              this.$if(pb.notEqual(this.flip, 0), function () {
                 this.$builtins.position.y = pb.neg(this.$builtins.position.y);
               });
             });
@@ -246,7 +258,7 @@ export class SAO extends AbstractPostEffect {
             this.randomSeed = pb.float().uniform(0);
             this.$l.scaleDividedByCameraFar = pb.float();
             this.$l.minResolutionMultipliedByCameraFar = pb.float();
-            pb.func('rand', [pb.vec2('uv')], function() {
+            pb.func('rand', [pb.vec2('uv')], function () {
               this.$l.a = 12.9898;
               this.$l.b = 78.233;
               this.$l.c = 43758.5453;
@@ -254,49 +266,86 @@ export class SAO extends AbstractPostEffect {
               this.$l.sn = pb.mod(this.dt, Math.PI);
               this.$return(pb.fract(pb.mul(pb.sin(this.sn), this.c)));
             });
-            pb.func('getPositionVS', [pb.vec2('uv')], function(){
+            pb.func('getPositionVS', [pb.vec2('uv')], function () {
               this.$l.depthValue = pb.textureSample(this.depthTex, this.uv);
               if (device.type === 'webgl') {
                 this.$l.linearDepth = decodeNormalizedFloatFromRGBA(this, this.depthValue);
               } else {
                 this.$l.linearDepth = this.depthValue.r;
               }
-              this.$l.nonLinearDepth = pb.div(pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y), pb.sub(this.cameraNearFar.x, this.cameraNearFar.y));
-              this.$l.clipSpacePos = pb.vec4(pb.sub(pb.mul(this.uv, 2), pb.vec2(1)), pb.sub(pb.mul(this.nonLinearDepth, 2), 1), 1);
+              this.$l.nonLinearDepth = pb.div(
+                pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
+                pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
+              );
+              this.$l.clipSpacePos = pb.vec4(
+                pb.sub(pb.mul(this.uv, 2), pb.vec2(1)),
+                pb.sub(pb.mul(this.nonLinearDepth, 2), 1),
+                1
+              );
               // this.$l.clipSpacePos = pb.vec4(this.uv, this.nonLinearDepth, 1);
               this.$l.vPos = pb.mul(this.invProj, this.clipSpacePos);
               this.vPos = pb.div(this.vPos, this.vPos.w);
               this.$return(this.vPos.xyz);
             });
-            pb.func('getOcclusion', [pb.vec3('centerPos'), pb.vec3('centerNormal'), pb.vec3('samplePos')], function(){
-              this.$l.viewDelta = pb.sub(this.samplePos, this.centerPos);
-              this.$l.viewDistance = pb.length(this.viewDelta);
-              this.$l.scaledScreenDistance = pb.mul(this.scaleDividedByCameraFar, this.viewDistance);
-              this.$return(pb.div(pb.max(0, pb.sub(pb.div(pb.sub(pb.dot(this.centerNormal, this.viewDelta), this.minResolutionMultipliedByCameraFar), this.scaledScreenDistance), this.bias)), pb.add(pb.mul(this.scaledScreenDistance, this.scaledScreenDistance), 1)));
-            });
-            pb.func('getAO', [pb.vec3('vPos')], function(){
+            pb.func(
+              'getOcclusion',
+              [pb.vec3('centerPos'), pb.vec3('centerNormal'), pb.vec3('samplePos')],
+              function () {
+                this.$l.viewDelta = pb.sub(this.samplePos, this.centerPos);
+                this.$l.viewDistance = pb.length(this.viewDelta);
+                this.$l.scaledScreenDistance = pb.mul(this.scaleDividedByCameraFar, this.viewDistance);
+                this.$return(
+                  pb.div(
+                    pb.max(
+                      0,
+                      pb.sub(
+                        pb.div(
+                          pb.sub(
+                            pb.dot(this.centerNormal, this.viewDelta),
+                            this.minResolutionMultipliedByCameraFar
+                          ),
+                          this.scaledScreenDistance
+                        ),
+                        this.bias
+                      )
+                    ),
+                    pb.add(pb.mul(this.scaledScreenDistance, this.scaledScreenDistance), 1)
+                  )
+                );
+              }
+            );
+            pb.func('getAO', [pb.vec3('vPos')], function () {
               this.scaleDividedByCameraFar = pb.div(this.scale, this.cameraNearFar.y);
               this.minResolutionMultipliedByCameraFar = pb.mul(this.minResolution, this.cameraNearFar.y);
               this.$l.centerViewNormal = pb.normalize(pb.cross(pb.dpdx(this.vPos), pb.dpdy(this.vPos)));
-              this.$l.angle = pb.mul(this.rand(pb.add(this.$inputs.uv, pb.vec2(this.randomSeed))), Math.PI * 2);
+              this.$l.angle = pb.mul(
+                this.rand(pb.add(this.$inputs.uv, pb.vec2(this.randomSeed))),
+                Math.PI * 2
+              );
               this.$l.radius = pb.div(pb.vec2(pb.mul(this.kernelRadius, 1 / NUM_SAMPLES)), this.size);
               this.$l.radiusStep = this.radius;
               this.$l.occlusionSum = pb.float(0);
               this.$l.weightSum = pb.float(0);
-              this.$for(pb.int('i'), 0, NUM_SAMPLES, function(){
-                this.$l.sampleUV = pb.add(this.$inputs.uv, pb.mul(pb.vec2(pb.cos(this.angle), pb.sin(this.angle)), this.radius));
+              this.$for(pb.int('i'), 0, NUM_SAMPLES, function () {
+                this.$l.sampleUV = pb.add(
+                  this.$inputs.uv,
+                  pb.mul(pb.vec2(pb.cos(this.angle), pb.sin(this.angle)), this.radius)
+                );
                 this.radius = pb.add(this.radius, this.radiusStep);
-                this.angle = pb.add(this.angle, Math.PI * NUM_RINGS / NUM_SAMPLES);
+                this.angle = pb.add(this.angle, (Math.PI * NUM_RINGS) / NUM_SAMPLES);
                 this.samplePos = this.getPositionVS(this.sampleUV);
-                this.occlusionSum = pb.add(this.occlusionSum, this.getOcclusion(this.vPos, this.centerViewNormal, this.samplePos));
+                this.occlusionSum = pb.add(
+                  this.occlusionSum,
+                  this.getOcclusion(this.vPos, this.centerViewNormal, this.samplePos)
+                );
                 this.weightSum = pb.add(this.weightSum, 1);
               });
-              this.$if(pb.equal(this.weightSum, 0), function(){
+              this.$if(pb.equal(this.weightSum, 0), function () {
                 pb.discard();
               });
               this.$return(pb.div(pb.mul(this.occlusionSum, this.intensity), this.weightSum));
             });
-            pb.main(function(){
+            pb.main(function () {
               this.$l.vPos = this.getPositionVS(this.$inputs.uv);
               this.$l.ao = pb.clamp(pb.sub(1, this.getAO(this.vPos)), 0, packed ? 0.999 : 1);
               if (packed) {

@@ -61,7 +61,9 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     }
     let uploadSize = srcLength * data.BYTES_PER_ELEMENT;
     if ((dstByteOffset & 3) !== 0 || (uploadSize & 3) !== 0) {
-      throw new Error('bufferSubData() failed: destination byte offset or upload size must be 4 bytes aligned');
+      throw new Error(
+        'bufferSubData() failed: destination byte offset or upload size must be 4 bytes aligned'
+      );
     }
     const uploadOffset = data.byteOffset + srcOffset * data.BYTES_PER_ELEMENT;
     const writeOffset = dstByteOffset;

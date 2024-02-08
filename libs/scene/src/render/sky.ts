@@ -1,15 +1,25 @@
-import { Application } from "../app";
-import { decodeNormalizedFloatFromRGBA, linearToGamma } from "../shaders/misc";
-import { ShaderFramework, smoothNoise3D } from "../shaders";
-import { CubeFace, Matrix4x4, Vector2, Vector3, Vector4 } from "@zephyr3d/base";
-import type { Primitive } from "./primitive";
-import { BoxShape } from "../shapes";
-import { ScatteringLut } from "./scatteringlut";
-import { Camera } from "../camera/camera";
-import { prefilterCubemap } from "../utility";
-import type { DirectionalLight } from "../scene";
-import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, RenderStateSet, TextureCube, TextureFormat, TextureSampler, VertexLayout } from "@zephyr3d/device";
-import type { DrawContext } from "./drawable";
+import { Application } from '../app';
+import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders/misc';
+import { ShaderFramework, smoothNoise3D } from '../shaders';
+import { CubeFace, Matrix4x4, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import type { Primitive } from './primitive';
+import { BoxShape } from '../shapes';
+import { ScatteringLut } from './scatteringlut';
+import { Camera } from '../camera/camera';
+import { prefilterCubemap } from '../utility';
+import type { DirectionalLight } from '../scene';
+import type {
+  AbstractDevice,
+  BindGroup,
+  FrameBuffer,
+  GPUProgram,
+  RenderStateSet,
+  TextureCube,
+  TextureFormat,
+  TextureSampler,
+  VertexLayout
+} from '@zephyr3d/device';
+import type { DrawContext } from './drawable';
 
 /**
  * Type of sky
@@ -22,13 +32,13 @@ import type { DrawContext } from "./drawable";
  *
  * @public
  */
-export type SkyType = 'color'|'skybox'|'scatter'|'scatter-nocloud'|'none';
+export type SkyType = 'color' | 'skybox' | 'scatter' | 'scatter-nocloud' | 'none';
 
 /**
  * Type of fog
  * @public
  */
-export type FogType = 'linear'|'exp'|'exp2'|'scatter'|'none';
+export type FogType = 'linear' | 'exp' | 'exp2' | 'scatter' | 'none';
 
 const fogTypeMap: Record<FogType, number> = {
   linear: ShaderFramework.FOG_TYPE_LINEAR,
@@ -117,7 +127,7 @@ export class SkyRenderer {
   }
   /** @internal */
   getHash(ctx: DrawContext): string {
-    return ctx.applyFog ? this._fogType === 'none' ? '0' : this.drawScatteredFog(ctx) ? '1' : '2' : '';
+    return ctx.applyFog ? (this._fogType === 'none' ? '0' : this.drawScatteredFog(ctx) ? '1' : '2') : '';
   }
   /** Which type of the sky should be rendered */
   get skyType(): SkyType {
@@ -214,9 +224,13 @@ export class SkyRenderer {
    */
   get irradianceMap(): TextureCube {
     if (!this._irradianceMap) {
-      this._irradianceMap = Application.instance.device.createCubeTexture('rgba16f', this._irradianceMapWidth, {
-        samplerOptions: { mipFilter: 'none' }
-      });
+      this._irradianceMap = Application.instance.device.createCubeTexture(
+        'rgba16f',
+        this._irradianceMapWidth,
+        {
+          samplerOptions: { mipFilter: 'none' }
+        }
+      );
       this._irradianceMap.name = 'SkyIrradianceMap';
     }
     return this._irradianceMap;
@@ -333,9 +347,10 @@ export class SkyRenderer {
     } else {
       if (!this._scatterSkyboxFramebuffer) {
         const texCaps = device.getDeviceCaps().textureCaps;
-        const format: TextureFormat = texCaps.supportHalfFloatColorBuffer && texCaps.supportLinearHalfFloatTexture
-          ? 'rgba16f'
-          : texCaps.supportFloatColorBuffer && texCaps.supportLinearFloatTexture
+        const format: TextureFormat =
+          texCaps.supportHalfFloatColorBuffer && texCaps.supportLinearHalfFloatTexture
+            ? 'rgba16f'
+            : texCaps.supportFloatColorBuffer && texCaps.supportLinearFloatTexture
             ? 'rgba32f'
             : 'rgba8unorm';
         const tex = device.createCubeTexture(format, this._scatterSkyboxTextureWidth);
@@ -363,7 +378,7 @@ export class SkyRenderer {
   /** @internal */
   renderFog(ctx: DrawContext) {
     const camera = ctx.camera;
-    const sceneDepthTexture = ctx.linearDepthTexture
+    const sceneDepthTexture = ctx.linearDepthTexture;
     const device = Application.instance.device;
     const savedRenderStates = device.getRenderStates();
     this._prepareSkyBox(device);
@@ -387,7 +402,7 @@ export class SkyRenderer {
         const alpha = Math.PI / 2 - Math.acos(Math.max(-1, Math.min(1, sunDir.y)));
         const farPlane = ctx.camera.getFarPlane() * ctx.scene.worldUnit;
         bindgroup.setTexture('apLut', ScatteringLut.getAerialPerspectiveLut(alpha, farPlane));
-        bindgroup.setValue('sliceDist', farPlane/ScatteringLut.aerialPerspectiveSliceZ);
+        bindgroup.setValue('sliceDist', farPlane / ScatteringLut.aerialPerspectiveSliceZ);
         bindgroup.setValue('sunDir', sunDir);
         bindgroup.setValue('worldScale', ctx.scene.worldUnit);
       } else {
@@ -411,7 +426,11 @@ export class SkyRenderer {
     }
     this._renderSky(ctx.camera, true, sunDir, false, this._skyType === 'scatter' && this._cloudy > 0);
     if (this._radianceMapDirty && ctx.env.light.type === 'ibl') {
-      if (ctx.env.light.radianceMap && (ctx.env.light.radianceMap === this._radianceMap || ctx.env.light.irradianceMap === this._irradianceMap)) {
+      if (
+        ctx.env.light.radianceMap &&
+        (ctx.env.light.radianceMap === this._radianceMap ||
+          ctx.env.light.irradianceMap === this._irradianceMap)
+      ) {
         this._radianceMapDirty = false;
         this._lastSunDir.set(sunDir);
         this.updateIBLMaps(sunDir);
@@ -419,14 +438,20 @@ export class SkyRenderer {
     }
   }
   /** @internal */
-  private _renderSky(camera: Camera, depthTest: boolean, sunDir: Vector3, drawGround: boolean, drawCloud: boolean) {
+  private _renderSky(
+    camera: Camera,
+    depthTest: boolean,
+    sunDir: Vector3,
+    drawGround: boolean,
+    drawCloud: boolean
+  ) {
     const device = Application.instance.device;
     const savedRenderStates = device.getRenderStates();
     this._prepareSkyBox(device);
     if (this._skyType === 'scatter') {
       this._drawScattering(camera, sunDir, depthTest, drawGround, drawCloud);
     } else if (this._skyType === 'skybox' && this._skyboxTexture) {
-      this._drawSkybox(camera, depthTest)
+      this._drawSkybox(camera, depthTest);
     } else {
       this._drawSkyColor(camera, depthTest);
     }
@@ -451,7 +476,10 @@ export class SkyRenderer {
     const device = Application.instance.device;
     const bindgroup = this._bindgroupSky.skybox;
     bindgroup.setTexture('skyCubeMap', this._skyboxTexture);
-    bindgroup.setValue('flip', device.getFramebuffer() && device.type === 'webgpu' ? new Vector4(1, -1, 1, 1) : new Vector4(1, 1, 1, 1));
+    bindgroup.setValue(
+      'flip',
+      device.getFramebuffer() && device.type === 'webgpu' ? new Vector4(1, -1, 1, 1) : new Vector4(1, 1, 1, 1)
+    );
     bindgroup.setValue('viewProjMatrix', camera.viewProjectionMatrix);
     bindgroup.setValue('worldMatrix', this._skyWorldMatrix);
     bindgroup.setValue('cameraPos', camera.getWorldPosition());
@@ -462,7 +490,13 @@ export class SkyRenderer {
     this._primitiveSky.draw();
   }
   /** @internal */
-  private _drawScattering(camera: Camera, sunDir: Vector3, depthTest: boolean, drawGround: boolean, drawCloud: boolean) {
+  private _drawScattering(
+    camera: Camera,
+    sunDir: Vector3,
+    depthTest: boolean,
+    drawGround: boolean,
+    drawCloud: boolean
+  ) {
     const device = Application.instance.device;
     const alpha = Math.PI / 2 - Math.acos(Math.max(-1, Math.min(1, sunDir.y)));
     const tLut = ScatteringLut.getTransmittanceLut();
@@ -471,7 +505,10 @@ export class SkyRenderer {
     const program = drawCloud ? this._programSky.scatter : this._programSky['scatter-nocloud'];
     const bindgroup = drawCloud ? this._bindgroupSky.scatter : this._bindgroupSky['scatter-nocloud'];
     bindgroup.setValue('sunDir', sunDir);
-    bindgroup.setValue('flip', device.getFramebuffer() && device.type === 'webgpu' ? new Vector4(1, -1, 1, 1) : new Vector4(1, 1, 1, 1));
+    bindgroup.setValue(
+      'flip',
+      device.getFramebuffer() && device.type === 'webgpu' ? new Vector4(1, -1, 1, 1) : new Vector4(1, 1, 1, 1)
+    );
     bindgroup.setValue('viewProjMatrix', camera.viewProjectionMatrix);
     bindgroup.setValue('worldMatrix', this._skyWorldMatrix);
     bindgroup.setValue('cameraPos', camera.getWorldPosition());
@@ -503,7 +540,7 @@ export class SkyRenderer {
             this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
             this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
             if (device.type === 'webgpu') {
-              this.$if (pb.notEqual(this.rt, 0), function(){
+              this.$if(pb.notEqual(this.rt, 0), function () {
                 this.$builtins.position.y = pb.neg(this.$builtins.position.y);
               });
             }
@@ -520,16 +557,23 @@ export class SkyRenderer {
           this.sunDir = pb.vec3().uniform(0);
           this.srgbOut = pb.int().uniform(0);
           this.$outputs.outColor = pb.vec4();
-          pb.main(function(){
+          pb.main(function () {
             this.$l.depthValue = pb.textureSample(this.depthTex, this.$inputs.uv);
             if (device.type === 'webgl') {
               this.$l.linearDepth = decodeNormalizedFloatFromRGBA(this, this.depthValue);
             } else {
               this.$l.linearDepth = this.depthValue.r;
             }
-            this.$l.nonLinearDepth = pb.div(pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y), pb.sub(this.cameraNearFar.x, this.cameraNearFar.y));
+            this.$l.nonLinearDepth = pb.div(
+              pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
+              pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
+            );
             //this.$l.clipSpacePos = pb.vec4(pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1)), this.nonLinearDepth, 1);
-            this.$l.clipSpacePos = pb.vec4(pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1)), pb.sub(pb.mul(this.nonLinearDepth, 2), 1), 1);
+            this.$l.clipSpacePos = pb.vec4(
+              pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1)),
+              pb.sub(pb.mul(this.nonLinearDepth, 2), 1),
+              1
+            );
             this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
             this.$l.hPos = pb.div(this.$l.hPos, this.$l.hPos.w);
             this.$l.viewDir = pb.sub(this.hPos.xyz, this.cameraPosition);
@@ -540,12 +584,17 @@ export class SkyRenderer {
             this.$l.slice1 = pb.add(this.slice0, 1);
             this.$l.factor = pb.sub(pb.div(this.distance, this.sliceDist), this.slice0);
             this.$l.viewNormal = pb.normalize(this.viewDir);
-            this.$l.horizonAngle = pb.acos(pb.clamp(pb.dot(pb.normalize(this.sunDir.xz), pb.normalize(this.viewNormal.xz)), 0, 1));
+            this.$l.horizonAngle = pb.acos(
+              pb.clamp(pb.dot(pb.normalize(this.sunDir.xz), pb.normalize(this.viewNormal.xz)), 0, 1)
+            );
             this.$l.zenithAngle = pb.asin(this.viewNormal.y);
-            this.$l.sliceU = pb.max(pb.div(this.horizonAngle, Math.PI * 2), 0.5/ScatteringLut.aerialPerspectiveSliceZ);
+            this.$l.sliceU = pb.max(
+              pb.div(this.horizonAngle, Math.PI * 2),
+              0.5 / ScatteringLut.aerialPerspectiveSliceZ
+            );
             this.$l.u0 = pb.div(pb.add(this.slice0, this.sliceU), ScatteringLut.aerialPerspectiveSliceZ);
             this.$l.u1 = pb.add(this.u0, 1 / ScatteringLut.aerialPerspectiveSliceZ);
-            this.$l.v = pb.div(this.zenithAngle, Math.PI/2);
+            this.$l.v = pb.div(this.zenithAngle, Math.PI / 2);
             this.$l.t0 = pb.textureSampleLevel(this.apLut, pb.vec2(this.u0, this.v), 0);
             this.$l.t1 = pb.textureSampleLevel(this.apLut, pb.vec2(this.u1, this.v), 0);
             this.$l.t = pb.mix(this.t0, this.t1, this.factor);
@@ -566,7 +615,7 @@ export class SkyRenderer {
             this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
             this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
             if (device.type === 'webgpu') {
-              this.$if (pb.notEqual(this.rt, 0), function(){
+              this.$if(pb.notEqual(this.rt, 0), function () {
                 this.$builtins.position.y = pb.neg(this.$builtins.position.y);
               });
             }
@@ -582,24 +631,36 @@ export class SkyRenderer {
           this.fogParams = pb.vec4().uniform(0);
           this.srgbOut = pb.int().uniform(0);
           this.$outputs.outColor = pb.vec4();
-          pb.main(function(){
+          pb.main(function () {
             this.$l.depthValue = pb.textureSample(this.depthTex, this.$inputs.uv);
             if (device.type === 'webgl') {
               this.$l.linearDepth = decodeNormalizedFloatFromRGBA(this, this.depthValue);
             } else {
               this.$l.linearDepth = this.depthValue.r;
             }
-            this.$l.nonLinearDepth = pb.div(pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y), pb.sub(this.cameraNearFar.x, this.cameraNearFar.y));
+            this.$l.nonLinearDepth = pb.div(
+              pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
+              pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
+            );
             //this.$l.clipSpacePos = pb.vec4(pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1)), this.nonLinearDepth, 1);
-            this.$l.clipSpacePos = pb.vec4(pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1)), pb.sub(pb.mul(this.nonLinearDepth, 2), 1), 1);
+            this.$l.clipSpacePos = pb.vec4(
+              pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1)),
+              pb.sub(pb.mul(this.nonLinearDepth, 2), 1),
+              1
+            );
             this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
             this.$l.hPos = pb.div(this.$l.hPos, this.$l.hPos.w);
             this.$l.viewDir = pb.sub(this.hPos.xyz, this.cameraPosition);
-            this.$l.fogFactor = ShaderFramework.computeFogFactor(this, this.viewDir, this.fogType, this.fogParams);
+            this.$l.fogFactor = ShaderFramework.computeFogFactor(
+              this,
+              this.viewDir,
+              this.fogType,
+              this.fogParams
+            );
             this.$l.color = pb.mul(this.fogColor.rgb, this.fogFactor);
-            this.$if(pb.equal(this.srgbOut, 0), function() {
+            this.$if(pb.equal(this.srgbOut, 0), function () {
               this.$outputs.outColor = pb.vec4(this.color, this.fogFactor);
-            }).$else(function(){
+            }).$else(function () {
               this.$outputs.outColor = pb.vec4(linearToGamma(this, this.color), this.fogFactor);
             });
           });
@@ -615,9 +676,12 @@ export class SkyRenderer {
           this.worldMatrix = pb.mat4().uniform(0);
           this.viewProjMatrix = pb.mat4().uniform(0);
           this.cameraPos = pb.vec3().uniform(0);
-          pb.main(function() {
+          pb.main(function () {
             this.$l.worldDirection = pb.mul(this.worldMatrix, pb.vec4(this.$inputs.pos, 0)).xyz;
-            this.$builtins.position = pb.mul(this.viewProjMatrix, pb.vec4(pb.add(this.worldDirection, this.cameraPos), 1));
+            this.$builtins.position = pb.mul(
+              this.viewProjMatrix,
+              pb.vec4(pb.add(this.worldDirection, this.cameraPos), 1)
+            );
             this.$builtins.position.z = this.$builtins.position.w;
           });
         },
@@ -625,10 +689,10 @@ export class SkyRenderer {
           this.$outputs.outColor = pb.vec4();
           this.color = pb.vec4().uniform(0);
           this.srgbOut = pb.int().uniform(0);
-          pb.main(function(){
-            this.$if(pb.equal(this.srgbOut, 0), function() {
+          pb.main(function () {
+            this.$if(pb.equal(this.srgbOut, 0), function () {
               this.$outputs.outColor = pb.vec4(this.color.rgb, 1);
-            }).$else(function(){
+            }).$else(function () {
               this.$outputs.outColor = pb.vec4(linearToGamma(this, this.color.rgb), 1);
             });
           });
@@ -642,7 +706,9 @@ export class SkyRenderer {
     }
     if (!this._programSky['scatter-nocloud']) {
       this._programSky['scatter-nocloud'] = SkyRenderer._createScatterProgram(device, false);
-      this._bindgroupSky['scatter-nocloud'] = device.createBindGroup(this._programSky['scatter-nocloud'].bindGroupLayouts[0]);
+      this._bindgroupSky['scatter-nocloud'] = device.createBindGroup(
+        this._programSky['scatter-nocloud'].bindGroupLayouts[0]
+      );
     }
     if (!this._programSky.skybox) {
       this._programSky.skybox = device.buildRenderProgram({
@@ -656,7 +722,10 @@ export class SkyRenderer {
           this.flip = pb.vec4().uniform(0);
           pb.main(function () {
             this.$outputs.texCoord = this.$inputs.pos;
-            this.$l.worldPos = pb.add(this.cameraPos, pb.mul(this.worldMatrix, pb.vec4(this.$inputs.pos, 0)).xyz);
+            this.$l.worldPos = pb.add(
+              this.cameraPos,
+              pb.mul(this.worldMatrix, pb.vec4(this.$inputs.pos, 0)).xyz
+            );
             this.$builtins.position = pb.mul(this.viewProjMatrix, pb.vec4(this.worldPos, 1), this.flip);
             this.$builtins.position.z = this.$builtins.position.w;
           });
@@ -668,9 +737,9 @@ export class SkyRenderer {
           pb.main(function () {
             this.$l.texCoord = pb.normalize(this.$inputs.texCoord);
             this.$l.color = pb.textureSampleLevel(this.skyCubeMap, this.texCoord, 0).rgb;
-            this.$if(pb.equal(this.srgbOut, 0), function() {
+            this.$if(pb.equal(this.srgbOut, 0), function () {
               this.$outputs.outColor = pb.vec4(this.color, 1);
-            }).$else(function(){
+            }).$else(function () {
               this.$outputs.outColor = pb.vec4(linearToGamma(this, this.color), 1);
             });
           });
@@ -711,7 +780,14 @@ export class SkyRenderer {
     }
     if (!this._vertexLayout) {
       this._vertexLayout = device.createVertexLayout({
-        vertexBuffers: [{ buffer: device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])) }]
+        vertexBuffers: [
+          {
+            buffer: device.createVertexBuffer(
+              'position_f32x2',
+              new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])
+            )
+          }
+        ]
       });
     }
     if (!this._primitiveSky) {
@@ -731,9 +807,13 @@ export class SkyRenderer {
         this.viewProjMatrix = pb.mat4().uniform(0);
         this.cameraPos = pb.vec3().uniform(0);
         this.flip = pb.vec4().uniform(0);
-        pb.main(function() {
+        pb.main(function () {
           this.$outputs.worldDirection = pb.mul(this.worldMatrix, pb.vec4(this.$inputs.pos, 0)).xyz;
-          this.$builtins.position = pb.mul(this.viewProjMatrix, pb.vec4(pb.add(this.$outputs.worldDirection, this.cameraPos), 1), this.flip);
+          this.$builtins.position = pb.mul(
+            this.viewProjMatrix,
+            pb.vec4(pb.add(this.$outputs.worldDirection, this.cameraPos), 1),
+            this.flip
+          );
           this.$builtins.position.z = this.$builtins.position.w;
         });
       },
@@ -750,16 +830,23 @@ export class SkyRenderer {
         }
         this.drawGround = pb.int().uniform(0);
         this.srgbOut = pb.int().uniform(0);
-        this.viewPos = pb.vec3(ScatteringLut.viewPosition.x, ScatteringLut.viewPosition.y, ScatteringLut.viewPosition.z);
-        pb.func('getMiePhase', [pb.float('cosTheta')], function(){
+        this.viewPos = pb.vec3(
+          ScatteringLut.viewPosition.x,
+          ScatteringLut.viewPosition.y,
+          ScatteringLut.viewPosition.z
+        );
+        pb.func('getMiePhase', [pb.float('cosTheta')], function () {
           this.$l.g = pb.float(0.8);
           this.$l.scale = pb.float(3 / (Math.PI * 8));
           this.$l.gg = pb.mul(this.g, this.g);
           this.$l.num = pb.mul(pb.sub(1, this.gg), pb.add(pb.mul(this.cosTheta, this.cosTheta), 1));
-          this.$l.denom = pb.mul(pb.add(2, this.gg), pb.pow(pb.sub(pb.add(1, this.gg), pb.mul(this.g, this.cosTheta, 2)), 1.5));
+          this.$l.denom = pb.mul(
+            pb.add(2, this.gg),
+            pb.pow(pb.sub(pb.add(1, this.gg), pb.mul(this.g, this.cosTheta, 2)), 1.5)
+          );
           this.$return(pb.div(pb.mul(this.scale, this.num), this.denom));
         });
-        pb.func('noise', [pb.vec3('p'), pb.float('t')], function(){
+        pb.func('noise', [pb.vec3('p'), pb.float('t')], function () {
           this.p2 = pb.mul(this.p, 0.25);
           this.f = pb.mul(smoothNoise3D(this, this.p2), 0.5);
           this.p2 = pb.mul(this.p2, 3.02);
@@ -776,32 +863,45 @@ export class SkyRenderer {
           this.f = pb.add(this.f, pb.mul(smoothNoise3D(this, this.p2), 0.015625));
           this.$return(this.f);
         });
-        pb.func('getValFromSkyLUT', [pb.vec3('rayDir'), pb.vec3('sunDir')], function(){
+        pb.func('getValFromSkyLUT', [pb.vec3('rayDir'), pb.vec3('sunDir')], function () {
           this.$l.height = pb.length(this.viewPos);
           this.$l.up = pb.div(this.viewPos, this.height);
-          this.$l.c = pb.div(pb.sqrt(pb.sub(pb.mul(this.height,this.height), pb.mul(ScatteringLut.groundRadius, ScatteringLut.groundRadius))), this.height);
+          this.$l.c = pb.div(
+            pb.sqrt(
+              pb.sub(
+                pb.mul(this.height, this.height),
+                pb.mul(ScatteringLut.groundRadius, ScatteringLut.groundRadius)
+              )
+            ),
+            this.height
+          );
           this.$l.horizonAngle = pb.acos(pb.clamp(this.c, -1, 1));
           this.$l.altitudeAngle = pb.sub(this.horizonAngle, pb.acos(pb.dot(this.rayDir, this.up)));
           this.$l.azimuthAngle = pb.float();
-          this.$if(pb.greaterThan(pb.abs(this.altitudeAngle), Math.PI * 0.5 - 0.0001), function(){
+          this.$if(pb.greaterThan(pb.abs(this.altitudeAngle), Math.PI * 0.5 - 0.0001), function () {
             this.azimuthAngle = 0;
-          }).$else(function(){
+          }).$else(function () {
             this.$l.right = pb.cross(this.sunDir, this.up);
             this.$l.forward = pb.cross(this.up, this.right);
-            this.$l.projectedDir = pb.normalize(pb.sub(this.rayDir, pb.mul(this.up, pb.dot(this.rayDir, this.up))));
+            this.$l.projectedDir = pb.normalize(
+              pb.sub(this.rayDir, pb.mul(this.up, pb.dot(this.rayDir, this.up)))
+            );
             this.$l.sinTheta = pb.dot(this.projectedDir, this.right);
             this.$l.cosTheta = pb.dot(this.projectedDir, this.forward);
             this.azimuthAngle = pb.add(pb.atan2(this.sinTheta, this.cosTheta), Math.PI);
           });
-          this.$l.v = pb.add(0.5, pb.mul(0.5, pb.sign(this.altitudeAngle), pb.sqrt(pb.mul(pb.abs(this.altitudeAngle), 2/Math.PI))));
+          this.$l.v = pb.add(
+            0.5,
+            pb.mul(0.5, pb.sign(this.altitudeAngle), pb.sqrt(pb.mul(pb.abs(this.altitudeAngle), 2 / Math.PI)))
+          );
           this.$l.uv = pb.vec2(pb.div(this.azimuthAngle, Math.PI * 2), this.v);
           this.$return(pb.textureSampleLevel(this.skyLut, this.uv, 0).rgb);
         });
-        pb.func('sunWithBloom', [pb.vec3('rayDir'), pb.vec3('sunDir')], function(){
-          this.$l.sunSolidAngle = 0.53 * Math.PI / 180;
+        pb.func('sunWithBloom', [pb.vec3('rayDir'), pb.vec3('sunDir')], function () {
+          this.$l.sunSolidAngle = (0.53 * Math.PI) / 180;
           this.$l.minSunCosTheta = pb.cos(this.sunSolidAngle);
           this.$l.cosTheta = pb.dot(this.rayDir, this.sunDir);
-          this.$if(pb.greaterThanEqual(this.cosTheta, this.minSunCosTheta), function(){
+          this.$if(pb.greaterThanEqual(this.cosTheta, this.minSunCosTheta), function () {
             this.$return(pb.vec3(1));
           });
           this.$l.offset = pb.sub(this.minSunCosTheta, this.cosTheta);
@@ -809,29 +909,38 @@ export class SkyRenderer {
           this.$l.invBloom = pb.mul(pb.div(1, pb.add(0.02, pb.mul(this.offset, 300))), 0.01);
           this.$return(pb.vec3(pb.add(this.gaussianBloom, this.invBloom)));
         });
-        pb.func('rayIntersectSphere', [pb.vec3('ro'), pb.vec3('rd'), pb.float('rad')], function(){
+        pb.func('rayIntersectSphere', [pb.vec3('ro'), pb.vec3('rd'), pb.float('rad')], function () {
           this.$l.b = pb.dot(this.ro, this.rd);
           this.$l.c = pb.sub(pb.dot(this.ro, this.ro), pb.mul(this.rad, this.rad));
-          this.$if(pb.and(pb.greaterThan(this.c, 0), pb.greaterThan(this.b, 0)), function(){
+          this.$if(pb.and(pb.greaterThan(this.c, 0), pb.greaterThan(this.b, 0)), function () {
             this.$return(pb.float(-1));
           });
           this.$l.bb = pb.mul(this.b, this.b);
           this.$l.discr = pb.sub(this.bb, this.c);
-          this.$if(pb.lessThan(this.discr, 0), function(){
+          this.$if(pb.lessThan(this.discr, 0), function () {
             this.$return(pb.float(-1));
           });
-          this.$if(pb.greaterThan(this.discr, this.bb), function(){
+          this.$if(pb.greaterThan(this.discr, this.bb), function () {
             this.$return(pb.sub(pb.sqrt(this.discr), this.b));
           });
           this.$return(pb.sub(pb.neg(pb.sqrt(this.discr)), this.b));
         });
-        pb.func('getValFromTLUT', [pb.vec3('pos'), pb.vec3('sunDir')], function(){
+        pb.func('getValFromTLUT', [pb.vec3('pos'), pb.vec3('sunDir')], function () {
           this.$l.height = pb.length(this.pos);
           this.$l.up = pb.div(this.pos, this.height);
           this.$l.sunCosZenithAngle = pb.dot(this.sunDir, this.up);
           this.$l.uv = pb.vec2(
             pb.clamp(pb.add(0.5, pb.mul(this.sunCosZenithAngle, 0.5)), 0, 1),
-            pb.max(0, pb.min(1, pb.div(pb.sub(this.height, ScatteringLut.groundRadius), pb.sub(ScatteringLut.atmosphereRadius, ScatteringLut.groundRadius))))
+            pb.max(
+              0,
+              pb.min(
+                1,
+                pb.div(
+                  pb.sub(this.height, ScatteringLut.groundRadius),
+                  pb.sub(ScatteringLut.atmosphereRadius, ScatteringLut.groundRadius)
+                )
+              )
+            )
           );
           this.$return(pb.textureSampleLevel(this.tLut, this.uv, 0).rgb);
         });
@@ -843,14 +952,17 @@ export class SkyRenderer {
           // compute cloud
           if (cloud) {
             this.$l.noiseValue = pb.float();
-            this.$if(pb.lessThanEqual(this.rayDir.y, 0), function(){
+            this.$if(pb.lessThanEqual(this.rayDir.y, 0), function () {
               this.noiseValue = 0;
-            }).$else(function(){
+            }).$else(function () {
               this.$l.tMin = pb.div(3000, this.rayDir.y);
               this.$l.cloudPoint = pb.mul(this.rayDir, this.tMin);
               this.speed = pb.mul(pb.vec3(this.velocity.x, 0, this.velocity.y), this.time);
               this.$l.noiseScale = pb.float(4e-4);
-              this.noiseValue = this.noise(pb.mul(pb.add(this.cloudPoint, this.speed), this.noiseScale), this.time);
+              this.noiseValue = this.noise(
+                pb.mul(pb.add(this.cloudPoint, this.speed), this.noiseScale),
+                this.time
+              );
               this.noiseValue = pb.add(this.noiseValue, this.cloudy);
               this.noiseValue = pb.smoothStep(1, pb.add(1, this.cloudy), this.noiseValue);
             });
@@ -860,14 +972,24 @@ export class SkyRenderer {
           }
 
           // Compute sky color
-          this.$l.skyRayDir = this.$choice(pb.equal(this.drawGround, 0), pb.normalize(pb.vec3(this.rayDir.x, pb.max(0, this.rayDir.y), this.rayDir.z)), this.rayDir);
+          this.$l.skyRayDir = this.$choice(
+            pb.equal(this.drawGround, 0),
+            pb.normalize(pb.vec3(this.rayDir.x, pb.max(0, this.rayDir.y), this.rayDir.z)),
+            this.rayDir
+          );
           this.$l.lum = this.getValFromSkyLUT(this.skyRayDir, this.sunDir);
           this.$l.sunLum = this.sunWithBloom(this.rayDir, this.sunDir);
           this.sunLum = pb.smoothStep(pb.vec3(0.002), pb.vec3(1), this.sunLum);
-          this.$if(pb.greaterThan(pb.length(this.sunLum), 0), function(){
-            this.$if(pb.greaterThanEqual(this.rayIntersectSphere(this.viewPos, this.rayDir, ScatteringLut.groundRadius), 0), function(){
-              this.sunLum = pb.vec3(0);
-            }).$else(function(){
+          this.$if(pb.greaterThan(pb.length(this.sunLum), 0), function () {
+            this.$if(
+              pb.greaterThanEqual(
+                this.rayIntersectSphere(this.viewPos, this.rayDir, ScatteringLut.groundRadius),
+                0
+              ),
+              function () {
+                this.sunLum = pb.vec3(0);
+              }
+            ).$else(function () {
               this.sunLum = pb.mul(this.sunLum, this.getValFromTLUT(this.viewPos, this.sunDir));
             });
           });
@@ -882,11 +1004,14 @@ export class SkyRenderer {
           }
           this.color = pb.mul(this.color, 8);
           this.color = pb.pow(this.color, pb.vec3(1.3));
-          this.color = pb.div(this.color, pb.add(pb.mul(pb.smoothStep(0, 0.2, pb.clamp(this.sunDir.y, 0, 1)), 2), 0.15))
+          this.color = pb.div(
+            this.color,
+            pb.add(pb.mul(pb.smoothStep(0, 0.2, pb.clamp(this.sunDir.y, 0, 1)), 2), 0.15)
+          );
 
-          this.$if(pb.equal(this.srgbOut, 0), function() {
+          this.$if(pb.equal(this.srgbOut, 0), function () {
             this.$outputs.outColor = pb.vec4(this.color, 1);
-          }).$else(function(){
+          }).$else(function () {
             this.$outputs.outColor = pb.vec4(linearToGamma(this, this.color), 1);
           });
         });

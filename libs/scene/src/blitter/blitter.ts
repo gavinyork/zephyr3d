@@ -1,4 +1,4 @@
-import type { CubeFace} from '@zephyr3d/base';
+import type { CubeFace } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type {
   RenderStateSet,
@@ -112,7 +112,9 @@ export abstract class Blitter {
    */
   get hash(): string {
     if (!this._hash) {
-      this._hash = `${this.constructor.name}:${this._srgbOut?1:0}:${this._flip?1:0}:${this._destRect?1:0}:${this.calcHash()}`;
+      this._hash = `${this.constructor.name}:${this._srgbOut ? 1 : 0}:${this._flip ? 1 : 0}:${
+        this._destRect ? 1 : 0
+      }:${this.calcHash()}`;
     }
     return this._hash;
   }
@@ -137,7 +139,7 @@ export abstract class Blitter {
     srcTex: PBShaderExp,
     uv: PBShaderExp,
     srcLayer: PBShaderExp,
-    sampleType: 'float'|'int'|'uint'
+    sampleType: 'float' | 'int' | 'uint'
   ): PBShaderExp {
     const pb = scope.$builder;
     if (sampleType === 'float') {
@@ -159,7 +161,12 @@ export abstract class Blitter {
         case 'cube':
           throw new Error('Integer format cube texture not supported');
         case '2d-array':
-          return pb.textureArrayLoad(srcTex, pb.ivec2(pb.mul(pb.vec2(pb.textureDimensions(srcTex, 0)), uv)), srcLayer, 0);
+          return pb.textureArrayLoad(
+            srcTex,
+            pb.ivec2(pb.mul(pb.vec2(pb.textureDimensions(srcTex, 0)), uv)),
+            srcLayer,
+            0
+          );
         default:
           return null;
       }
@@ -173,12 +180,7 @@ export abstract class Blitter {
    * @param texel - The texel to be written
    * @returns The written texel
    */
-  writeTexel(
-    scope: PBInsideFunctionScope,
-    type: BlitType,
-    uv: PBShaderExp,
-    texel: PBShaderExp
-  ): PBShaderExp {
+  writeTexel(scope: PBInsideFunctionScope, type: BlitType, uv: PBShaderExp, texel: PBShaderExp): PBShaderExp {
     return texel;
   }
   /**
@@ -207,7 +209,7 @@ export abstract class Blitter {
     srcTex: PBShaderExp,
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
-    sampeType: 'float'|'int'|'uint'
+    sampeType: 'float' | 'int' | 'uint'
   ): PBShaderExp;
   /**
    * Calculates the hash code
@@ -221,7 +223,13 @@ export abstract class Blitter {
     const bilinearFiltering = sampler
       ? sampler.magFilter === 'linear' || sampler.minFilter === 'linear' || sampler.mipFilter === 'linear'
       : source.isFilterable();
-    const programInfo = getBlitProgram('2d', this, bilinearFiltering, source.isIntegerFormat() ? source.isSignedFormat() ? 'int' : 'uint' : 'float', flip);
+    const programInfo = getBlitProgram(
+      '2d',
+      this,
+      bilinearFiltering,
+      source.isIntegerFormat() ? (source.isSignedFormat() ? 'int' : 'uint') : 'float',
+      flip
+    );
     programInfo.bindGroup.setTexture('srcTex', source, sampler);
     if (this._destRect) {
       const destWidth = this._viewport?.[2] ?? dest?.getWidth() ?? device.getBackBufferWidth();
@@ -230,7 +238,8 @@ export abstract class Blitter {
         this._destRect[2] / destWidth,
         this._destRect[3] / destHeight,
         (this._destRect[2] + 2 * this._destRect[0]) / destWidth - 1,
-        (this._destRect[3] + 2 * this._destRect[1]) / destHeight - 1);
+        (this._destRect[3] + 2 * this._destRect[1]) / destHeight - 1
+      );
       programInfo.bindGroup.setValue('scaleBias', this._offsetParams);
     }
     this.setUniforms(programInfo.bindGroup, source);
@@ -254,7 +263,13 @@ export abstract class Blitter {
     const bilinearFiltering = sampler
       ? sampler.magFilter === 'linear' || sampler.minFilter === 'linear' || sampler.mipFilter === 'linear'
       : source.isFilterable();
-    const programInfo = getBlitProgram('2d-array', this, bilinearFiltering, source.isIntegerFormat() ? source.isSignedFormat() ? 'int' : 'uint' : 'float', flip);
+    const programInfo = getBlitProgram(
+      '2d-array',
+      this,
+      bilinearFiltering,
+      source.isIntegerFormat() ? (source.isSignedFormat() ? 'int' : 'uint') : 'float',
+      flip
+    );
     programInfo.bindGroup.setTexture('srcTex', source, sampler);
     programInfo.bindGroup.setValue('srcLayer', layer);
     this.setUniforms(programInfo.bindGroup, source);
@@ -278,7 +293,13 @@ export abstract class Blitter {
     const bilinearFiltering = sampler
       ? sampler.magFilter === 'linear' || sampler.minFilter === 'linear' || sampler.mipFilter === 'linear'
       : source.isFilterable();
-    const programInfo = getBlitProgram('cube', this, bilinearFiltering, source.isIntegerFormat() ? source.isSignedFormat() ? 'int' : 'uint' : 'float', flip);
+    const programInfo = getBlitProgram(
+      'cube',
+      this,
+      bilinearFiltering,
+      source.isIntegerFormat() ? (source.isSignedFormat() ? 'int' : 'uint') : 'float',
+      flip
+    );
     programInfo.bindGroup.setTexture('srcTex', source, sampler);
     programInfo.bindGroup.setValue('texelSize', 1 / source.width);
     programInfo.bindGroup.setValue('cubeFace', face);
@@ -363,9 +384,7 @@ export abstract class Blitter {
         throw new Error('Blitter.blit() failed: invalid texture type');
       }
     } else {
-      const framebuffer = dest.isFramebuffer()
-        ? dest
-        : device.createFrameBuffer([dest], null);
+      const framebuffer = dest.isFramebuffer() ? dest : device.createFrameBuffer([dest], null);
       const destTexture = dest.isFramebuffer() ? dest.getColorAttachments()?.[0] : dest;
       if (source.isTexture2D()) {
         if (!destTexture?.isTexture2D() && !destTexture?.isTexture2DArray()) {
@@ -426,7 +445,10 @@ let blitRenderStates: RenderStateSet = null;
 function getBlitPrimitive2D(): Primitive {
   if (!blitPrimitive2D) {
     blitPrimitive2D = new Primitive();
-    const vb = Application.instance.device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]));
+    const vb = Application.instance.device.createVertexBuffer(
+      'position_f32x2',
+      new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])
+    );
     blitPrimitive2D.setVertexBuffer(vb);
     blitPrimitive2D.indexCount = 4;
     blitPrimitive2D.indexStart = 0;
@@ -444,17 +466,31 @@ function getBlitRenderStateSet(): RenderStateSet {
   return blitRenderStates;
 }
 
-function getBlitProgram(type: BlitType, filter: Blitter, bilinearFiltering: boolean, sampleType: 'int'|'uint'|'float', flip: boolean): BlitProgramInfo {
-  const hash = `${type}:${filter.hash}:${bilinearFiltering}:${sampleType}:${flip?1:0}`;
+function getBlitProgram(
+  type: BlitType,
+  filter: Blitter,
+  bilinearFiltering: boolean,
+  sampleType: 'int' | 'uint' | 'float',
+  flip: boolean
+): BlitProgramInfo {
+  const hash = `${type}:${filter.hash}:${bilinearFiltering}:${sampleType}:${flip ? 1 : 0}`;
   let programInfo = blitProgramCache[hash];
   if (programInfo === undefined) {
-    programInfo = createBlitProgram(type, filter, bilinearFiltering, sampleType, flip, !!filter.destRect) || null;
+    programInfo =
+      createBlitProgram(type, filter, bilinearFiltering, sampleType, flip, !!filter.destRect) || null;
     blitProgramCache[hash] = programInfo;
   }
   return programInfo;
 }
 
-function createBlitProgram(type: BlitType, filter: Blitter, bilinearFiltering: boolean, st: 'int'|'uint'|'float', flip: boolean, scaleBias: boolean): BlitProgramInfo {
+function createBlitProgram(
+  type: BlitType,
+  filter: Blitter,
+  bilinearFiltering: boolean,
+  st: 'int' | 'uint' | 'float',
+  flip: boolean,
+  scaleBias: boolean
+): BlitProgramInfo {
   const program = Application.instance.device.buildRenderProgram({
     vertex(pb) {
       this.$inputs.pos = pb.vec2().attrib('position');
@@ -486,7 +522,10 @@ function createBlitProgram(type: BlitType, filter: Blitter, bilinearFiltering: b
           } else if (st === 'uint') {
             this.srcTex = pb.utex2D().sampleType('uint').uniform(0);
           } else {
-            this.srcTex = pb.tex2D().sampleType(bilinearFiltering ? 'float' : 'unfilterable-float').uniform(0);
+            this.srcTex = pb
+              .tex2D()
+              .sampleType(bilinearFiltering ? 'float' : 'unfilterable-float')
+              .uniform(0);
           }
           break;
         case '2d-array':
@@ -495,7 +534,10 @@ function createBlitProgram(type: BlitType, filter: Blitter, bilinearFiltering: b
           } else if (st === 'uint') {
             this.srcTex = pb.utex2DArray().sampleType('uint').uniform(0);
           } else {
-            this.srcTex = pb.tex2DArray().sampleType(bilinearFiltering ? 'float' : 'unfilterable-float').uniform(0);
+            this.srcTex = pb
+              .tex2DArray()
+              .sampleType(bilinearFiltering ? 'float' : 'unfilterable-float')
+              .uniform(0);
           }
           this.srcLayer = pb.int().uniform(0);
           break;
@@ -505,7 +547,10 @@ function createBlitProgram(type: BlitType, filter: Blitter, bilinearFiltering: b
           } else if (st === 'uint') {
             this.srcTex = pb.utexCube().sampleType('uint').uniform(0);
           } else {
-            this.srcTex = pb.texCube().sampleType(bilinearFiltering ? 'float' : 'unfilterable-float').uniform(0);
+            this.srcTex = pb
+              .texCube()
+              .sampleType(bilinearFiltering ? 'float' : 'unfilterable-float')
+              .uniform(0);
           }
           this.texelSize = pb.float().uniform(0);
           this.cubeFace = pb.int().uniform(0);
@@ -520,21 +565,22 @@ function createBlitProgram(type: BlitType, filter: Blitter, bilinearFiltering: b
           this.uv = pb.vec3();
           this.$if(pb.equal(this.cubeFace, 0), function () {
             this.uv = pb.vec3(1, this.$inputs.uv.y, pb.neg(this.$inputs.uv.x));
-          }).$elseif(pb.equal(this.cubeFace, 1), function () {
-            this.uv = pb.vec3(-1, this.$inputs.uv.y, this.$inputs.uv.x);
           })
-          .$elseif(pb.equal(this.cubeFace, 2), function () {
-            this.uv = pb.vec3(this.$inputs.uv.x, 1, pb.neg(this.$inputs.uv.y));
-          })
-          .$elseif(pb.equal(this.cubeFace, 3), function () {
-            this.uv = pb.vec3(this.$inputs.uv.x, -1, this.$inputs.uv.y);
-          })
-          .$elseif(pb.equal(this.cubeFace, 4), function () {
-            this.uv = pb.vec3(this.$inputs.uv.x, this.$inputs.uv.y, 1);
-          })
-          .$else(function () {
-            this.uv = pb.vec3(pb.neg(this.$inputs.uv.x), this.$inputs.uv.y, -1);
-          });
+            .$elseif(pb.equal(this.cubeFace, 1), function () {
+              this.uv = pb.vec3(-1, this.$inputs.uv.y, this.$inputs.uv.x);
+            })
+            .$elseif(pb.equal(this.cubeFace, 2), function () {
+              this.uv = pb.vec3(this.$inputs.uv.x, 1, pb.neg(this.$inputs.uv.y));
+            })
+            .$elseif(pb.equal(this.cubeFace, 3), function () {
+              this.uv = pb.vec3(this.$inputs.uv.x, -1, this.$inputs.uv.y);
+            })
+            .$elseif(pb.equal(this.cubeFace, 4), function () {
+              this.uv = pb.vec3(this.$inputs.uv.x, this.$inputs.uv.y, 1);
+            })
+            .$else(function () {
+              this.uv = pb.vec3(pb.neg(this.$inputs.uv.x), this.$inputs.uv.y, -1);
+            });
         } else {
           this.uv = this.$inputs.uv;
         }
@@ -551,7 +597,10 @@ function createBlitProgram(type: BlitType, filter: Blitter, bilinearFiltering: b
         );
         this.$outputs.outColor = filter.writeTexel(this, type, this.$inputs.uv, this.outTexel);
         if (filter.srgbOut) {
-          this.$outputs.outColor = pb.vec4(linearToGamma(this, this.$outputs.outColor.rgb), this.$outputs.outColor.a);
+          this.$outputs.outColor = pb.vec4(
+            linearToGamma(this, this.$outputs.outColor.rgb),
+            this.$outputs.outColor.a
+          );
         }
       });
     }

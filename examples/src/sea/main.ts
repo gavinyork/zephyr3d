@@ -1,10 +1,10 @@
 import { Vector4 } from '@zephyr3d/base';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
-import type { DeviceBackend} from '@zephyr3d/device';
+import type { DeviceBackend } from '@zephyr3d/device';
 import { DrawText } from '@zephyr3d/device';
 
-(async function() {
+(async function () {
   const backendsMap: Record<string, DeviceBackend> = {
     webgl: backendWebGL1,
     webgl2: backendWebGL2,
@@ -19,11 +19,16 @@ import { DrawText } from '@zephyr3d/device';
   }
   const device = await backend.createDevice(canvas);
 
-  const vertices = device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]));
+  const vertices = device.createVertexBuffer(
+    'position_f32x2',
+    new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])
+  );
   const vertexLayout = device.createVertexLayout({
-    vertexBuffers: [{
-      buffer: vertices
-    }]
+    vertexBuffers: [
+      {
+        buffer: vertices
+      }
+    ]
   });
 
   const program = device.buildRenderProgram({
@@ -265,7 +270,7 @@ import { DrawText } from '@zephyr3d/device';
   const renderStates = device.createRenderStateSet();
   renderStates.useDepthState().enableTest(false);
 
-  device.runLoop(device => {
+  device.runLoop((device) => {
     bindGroup.setValue(
       'uniforms',
       new Vector4(

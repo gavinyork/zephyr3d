@@ -7,9 +7,8 @@ import type {
   BindGroup,
   BindGroupLayoutEntry,
   GPUDataBuffer
- } from '@zephyr3d/device';
-import { GPUResourceUsageFlags
- } from '@zephyr3d/device';
+} from '@zephyr3d/device';
+import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGLStructuredBuffer } from './structuredbuffer_webgl';
 import { WebGLGPUObject } from './gpuobject_webgl';
 import type { WebGLBaseTexture } from './basetexture_webgl';
@@ -88,7 +87,14 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
       }
     }
   }
-  setTextureView(name: string, value: BaseTexture, level?: number, face?: number, mipCount?: number, sampler?: TextureSampler) {
+  setTextureView(
+    name: string,
+    value: BaseTexture,
+    level?: number,
+    face?: number,
+    mipCount?: number,
+    sampler?: TextureSampler
+  ) {
     throw new Error('setTextureView() not supported for webgl device');
   }
   getTexture(name: string): BaseTexture {

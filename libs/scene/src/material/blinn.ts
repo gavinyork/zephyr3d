@@ -7,7 +7,7 @@ import type { DrawContext } from '../render';
 
 export class BlinnMaterial extends applyMaterialMixins(LitMaterial, mixinVertexColor, mixinAlbedoColor) {
   private _shininess: number;
-  constructor(){
+  constructor() {
     super();
     this._shininess = 32;
   }
@@ -48,7 +48,7 @@ export class BlinnMaterial extends applyMaterialMixins(LitMaterial, mixinVertexC
       if (this.needCalculateEnvLight(ctx)) {
         scope.diffuseColor = pb.add(scope.diffuseColor, this.getEnvLightIrradiance(scope, scope.normal, ctx));
       }
-      this.forEachLight(scope, ctx, function(type, posRange, dirCutoff, colorIntensity, shadow){
+      this.forEachLight(scope, ctx, function (type, posRange, dirCutoff, colorIntensity, shadow) {
         this.$l.lightAtten = that.calculateLightAttenuation(this, type, posRange, dirCutoff);
         this.$l.lightDir = that.calculateLightDirection(this, type, posRange, dirCutoff);
         this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
@@ -66,7 +66,10 @@ export class BlinnMaterial extends applyMaterialMixins(LitMaterial, mixinVertexC
         this.diffuseColor = pb.add(this.diffuseColor, this.diffuse);
         this.specularColor = pb.add(this.specularColor, this.specular);
       });
-      scope.$l.litColor = pb.add(pb.mul(scope.albedo, pb.vec4(scope.diffuseColor, 1)), pb.vec4(scope.specularColor, 0));
+      scope.$l.litColor = pb.add(
+        pb.mul(scope.albedo, pb.vec4(scope.diffuseColor, 1)),
+        pb.vec4(scope.specularColor, 0)
+      );
       this.outputFragmentColor(scope, scope.litColor, ctx);
     } else {
       this.outputFragmentColor(scope, null, ctx);

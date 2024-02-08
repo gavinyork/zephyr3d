@@ -1,5 +1,17 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, FPSCameraController, DirectionalLight, AssetManager, Application, Tonemap, GraphNode, PerspectiveCamera, Compositor, FXAA, Terrain } from '@zephyr3d/scene';
+import {
+  Scene,
+  FPSCameraController,
+  DirectionalLight,
+  AssetManager,
+  Application,
+  Tonemap,
+  GraphNode,
+  PerspectiveCamera,
+  Compositor,
+  FXAA,
+  Terrain
+} from '@zephyr3d/scene';
 import * as common from '../common';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import type { Texture2D } from '@zephyr3d/device';
@@ -23,14 +35,30 @@ terrainApp.ready().then(async () => {
     const grassMap1 = await assetManager.fetchTexture<Texture2D>('./assets/images/857caeb1.dds');
     const grassMap2 = await assetManager.fetchTexture<Texture2D>('./assets/images/grass1x.dds');
     const grassMap3 = await assetManager.fetchTexture<Texture2D>('./assets/images/gj02.dds');
-    const albedoMap = await assetManager.fetchTexture<Texture2D>('./assets/maps/map4/colormap.png', { linearColorSpace: false });
-    const splatMap = await assetManager.fetchTexture<Texture2D>('./assets/maps/map4/splatmap.tga', { linearColorSpace: true });
-    const detailAlbedo0 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map5/grass_color.png', { linearColorSpace: false });
-    const detailNormal0 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map5/grass_norm.png', { linearColorSpace: true });
-    const detailAlbedo1 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map5/28.png', { linearColorSpace: false });
-    const detailNormal1 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map5/29.png', { linearColorSpace: true });
-    const detailAlbedo2 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map5/174.jpg', { linearColorSpace: false });
-    const detailNormal2 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map5/174_norm.jpg', { linearColorSpace: true });
+    const albedoMap = await assetManager.fetchTexture<Texture2D>('./assets/maps/map4/colormap.png', {
+      linearColorSpace: false
+    });
+    const splatMap = await assetManager.fetchTexture<Texture2D>('./assets/maps/map4/splatmap.tga', {
+      linearColorSpace: true
+    });
+    const detailAlbedo0 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map5/grass_color.png', {
+      linearColorSpace: false
+    });
+    const detailNormal0 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map5/grass_norm.png', {
+      linearColorSpace: true
+    });
+    const detailAlbedo1 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map5/28.png', {
+      linearColorSpace: false
+    });
+    const detailNormal1 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map5/29.png', {
+      linearColorSpace: true
+    });
+    const detailAlbedo2 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map5/174.jpg', {
+      linearColorSpace: false
+    });
+    const detailNormal2 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map5/174_norm.jpg', {
+      linearColorSpace: true
+    });
     const terrain = new Terrain(scene);
     terrain.create(mapWidth, mapHeight, heightsF32, new Vector3(1, 100, 1), 33, {
       splatMap,
@@ -41,25 +69,33 @@ terrainApp.ready().then(async () => {
         normalScale: [2, 5, 0.5],
         metallic: [0, 0, 0],
         roughness: [0.95, 0.9, 0.7],
-        grass: [[{
-          bladeWidth: 2,
-          bladeHeigh: 2,
-          density: 1.2,
-          offset: -0.1,
-          texture: grassMap1
-        }, {
-          bladeWidth: 2,
-          bladeHeigh: 3,
-          density: 0.06,
-          offset: -0.02,
-          texture: grassMap2
-        }], [{
-          bladeWidth: 2,
-          bladeHeigh: 2,
-          density: 0.6,
-          offset: 0,
-          texture: grassMap3
-        }]]
+        grass: [
+          [
+            {
+              bladeWidth: 2,
+              bladeHeigh: 2,
+              density: 1.2,
+              offset: -0.1,
+              texture: grassMap1
+            },
+            {
+              bladeWidth: 2,
+              bladeHeigh: 3,
+              density: 0.06,
+              offset: -0.02,
+              texture: grassMap2
+            }
+          ],
+          [
+            {
+              bladeWidth: 2,
+              bladeHeigh: 2,
+              density: 0.6,
+              offset: 0,
+              texture: grassMap3
+            }
+          ]
+        ]
       }
     });
     terrain.material.lightModel.setAlbedoMap(albedoMap, null, -1);
@@ -88,7 +124,7 @@ terrainApp.ready().then(async () => {
   }
 
   const device = terrainApp.device;
-  device.canvas.addEventListener('contextmenu', function(ev) {
+  device.canvas.addEventListener('contextmenu', function (ev) {
     ev.preventDefault();
     return false;
   });
@@ -96,7 +132,13 @@ terrainApp.ready().then(async () => {
   scene.worldUnit = 60;
   scene.env.light.strength = 0.1;
   await imGuiInit(device);
-  const camera = new PerspectiveCamera(scene, Math.PI/3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 500);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
+    1,
+    500
+  );
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
   camera.sampleCount = 1;
   terrainApp.inputManager.use(imGuiInjectEvent);
@@ -144,19 +186,25 @@ terrainApp.ready().then(async () => {
 
   const inspector = new common.Inspector(scene, compositor, camera);
 
-  terrainApp.on('pointerup', ev => {
+  terrainApp.on('pointerup', (ev) => {
     const obj = scene.raycast(camera, ev.offsetX, ev.offsetY);
     if (obj && obj.node.isTerrain()) {
       terrain.invWorldMatrix.transformPointAffine(obj.point, actorTarget);
       if (ev.button === 2) {
-        actorDirection.set(Vector3.mul(Vector3.sub(actorTarget, actor.group.position), new Vector3(1, 0, 1)).inplaceNormalize());
-        actor.group.lookAt(actor.group.position, Vector3.sub(actor.group.position, actorDirection), Vector3.axisPY());
+        actorDirection.set(
+          Vector3.mul(Vector3.sub(actorTarget, actor.group.position), new Vector3(1, 0, 1)).inplaceNormalize()
+        );
+        actor.group.lookAt(
+          actor.group.position,
+          Vector3.sub(actor.group.position, actorDirection),
+          Vector3.axisPY()
+        );
         actor.animationSet.playAnimation('Run', 0);
         actorRunning = true;
       }
     }
   });
-  terrainApp.on('keyup', ev => {
+  terrainApp.on('keyup', (ev) => {
     if (ev.code === 'KeyU') {
       terrain.wireframe = !terrain.wireframe;
     } else if (ev.code === 'KeyM') {
@@ -168,11 +216,11 @@ terrainApp.ready().then(async () => {
     }
   });
   let movingSun = 0;
-  Application.instance.device.canvas.addEventListener('contextmenu', function(ev){
+  Application.instance.device.canvas.addEventListener('contextmenu', function (ev) {
     ev.preventDefault();
     return false;
   });
-  terrainApp.on('pointerdown', ev => {
+  terrainApp.on('pointerdown', (ev) => {
     if (ev.button === 2 && ev.ctrlKey) {
       const viewport = Application.instance.device.getViewport();
       const ray = scene.constructRay(camera, viewport.width, viewport.height, ev.offsetX, ev.offsetY);
@@ -180,12 +228,12 @@ terrainApp.ready().then(async () => {
       movingSun = 1;
     }
   });
-  terrainApp.on('pointerup', ev => {
+  terrainApp.on('pointerup', (ev) => {
     if (ev.button === 2) {
       movingSun = 0;
     }
   });
-  terrainApp.on('pointermove', ev => {
+  terrainApp.on('pointermove', (ev) => {
     //const obj = scene.raycast(gltfViewer.camera, ev.offsetX, ev.offsetY);
     //console.log(`raycast: ${obj ? obj.node.constructor.name : null}`);
     if (movingSun) {
@@ -194,13 +242,16 @@ terrainApp.ready().then(async () => {
       light.lookAt(ray.direction, Vector3.zero(), Vector3.axisPY());
     }
   });
-  terrainApp.on('resize', ev => {
+  terrainApp.on('resize', (ev) => {
     camera.aspect = ev.width / ev.height;
   });
-  terrainApp.on('tick', ev => {
+  terrainApp.on('tick', (ev) => {
     if (actorRunning) {
-      const distance = Vector3.distance(Vector3.mul(actor.group.position, new Vector3(1, 0, 1)), Vector3.mul(actorTarget, new Vector3(1, 0, 1)));
-      let movement = device.frameInfo.elapsedFrame * actorSpeed / 1000;
+      const distance = Vector3.distance(
+        Vector3.mul(actor.group.position, new Vector3(1, 0, 1)),
+        Vector3.mul(actorTarget, new Vector3(1, 0, 1))
+      );
+      let movement = (device.frameInfo.elapsedFrame * actorSpeed) / 1000;
       if (movement >= distance) {
         actorRunning = false;
         movement = distance;
@@ -220,6 +271,6 @@ terrainApp.ready().then(async () => {
     imGuiNewFrame();
     inspector.render();
     imGuiEndFrame();
-  })
+  });
   terrainApp.run();
 });

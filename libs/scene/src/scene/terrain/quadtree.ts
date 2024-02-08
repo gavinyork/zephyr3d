@@ -1,9 +1,5 @@
 import { ClipState, Frustum, Matrix4x4, Vector3, isPowerOf2, nextPowerOf2 } from '@zephyr3d/base';
-import type {
-  IndexBuffer,
-  PrimitiveType,
-  Texture2D,
-} from '@zephyr3d/device';
+import type { IndexBuffer, PrimitiveType, Texture2D } from '@zephyr3d/device';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { TerrainPatch } from './patch';
 import { HeightField } from './heightfield';
@@ -78,7 +74,18 @@ export class QuadtreeNode {
           this._children[i] = null;
         } else {
           this._children[i] = new QuadtreeNode();
-          if (!this._children[i].initialize(quadtree, this, i & 1, i >> 1, baseVertices, normals, heightScale, elevations)) {
+          if (
+            !this._children[i].initialize(
+              quadtree,
+              this,
+              i & 1,
+              i >> 1,
+              baseVertices,
+              normals,
+              heightScale,
+              elevations
+            )
+          ) {
             return false;
           }
           const childBBox = this._children[i]._patch.getBoundingBox();
@@ -261,16 +268,7 @@ export class Quadtree {
     });
     this._normalMap.name = `TerrainNormalMap-${this._normalMap.uid}`;
     this._normalMap.update(normalMapBytes, 0, 0, this._normalMap.width, this._normalMap.height);
-    return this._rootNode.initialize(
-      this,
-      null,
-      0,
-      0,
-      this._baseVertices,
-      normals,
-      scaleY,
-      elevations
-    );
+    return this._rootNode.initialize(this, null, 0, 0, this._baseVertices, normals, scaleY, elevations);
   }
   strip(vertexCacheSize: number): Uint16Array {
     const dimension = this._patchSize + 2;
@@ -393,7 +391,9 @@ export class Quadtree {
     let ret = 0;
     let clipState: ClipState;
     if (cliptest) {
-      clipState = camera.clipMask ? bbox.getClipStateWithFrustumMask(frustum, camera.clipMask) : bbox.getClipStateWithFrustum(frustum);
+      clipState = camera.clipMask
+        ? bbox.getClipStateWithFrustumMask(frustum, camera.clipMask)
+        : bbox.getClipStateWithFrustum(frustum);
       if (clipState === ClipState.NOT_CLIPPED) {
         return ret;
       } else if (clipState === ClipState.A_INSIDE_B) {

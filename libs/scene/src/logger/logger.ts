@@ -1,5 +1,5 @@
-import type { BaseTexture, DeviceViewport, FrameBuffer } from "@zephyr3d/device";
-import type { PunctualLight } from "../scene";
+import type { BaseTexture, DeviceViewport, FrameBuffer } from '@zephyr3d/device';
+import type { PunctualLight } from '../scene';
 
 export class RenderLogger {
   private _frameLog: any[];
@@ -12,8 +12,7 @@ export class RenderLogger {
     this._frameLog = [];
     this._scopeStack = [this._frameLog];
   }
-  stop() {
-  }
+  stop() {}
   begin(name: string) {
     const scope = [];
     const top = this._scopeStack[this._scopeStack.length - 1];
@@ -27,7 +26,12 @@ export class RenderLogger {
     this._scopeStack[this._scopeStack.length - 1].push(str);
   }
   framebuffer(fb: FrameBuffer) {
-    return fb ? `FrameBuffer<${fb.uid}> [${fb.getColorAttachments().map(tex => this.texture(tex)).join(',')}] ${this.texture(fb.getDepthAttachment())}` : 'null';
+    return fb
+      ? `FrameBuffer<${fb.uid}> [${fb
+          .getColorAttachments()
+          .map((tex) => this.texture(tex))
+          .join(',')}] ${this.texture(fb.getDepthAttachment())}`
+      : 'null';
   }
   texture(tex: BaseTexture) {
     if (!tex) {
@@ -36,15 +40,15 @@ export class RenderLogger {
     const type = tex.isTexture2D()
       ? 'Texture2D'
       : tex.isTexture3D()
-        ? 'Texture3D'
-        : tex.isTexture2DArray()
-          ? 'Texture2DArray'
-          : tex.isTextureCube()
-            ? 'TextureCube'
-            : 'UnknownTexture'
+      ? 'Texture3D'
+      : tex.isTexture2DArray()
+      ? 'Texture2DArray'
+      : tex.isTextureCube()
+      ? 'TextureCube'
+      : 'UnknownTexture';
     return `${type}<${tex.uid}>{${tex.format}}`;
   }
-  viewport(vp: DeviceViewport|number[]) {
+  viewport(vp: DeviceViewport | number[]) {
     if (!vp) {
       return 'null';
     } else if (Array.isArray(vp)) {

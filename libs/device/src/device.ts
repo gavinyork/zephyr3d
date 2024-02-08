@@ -36,14 +36,13 @@ import {
   getVertexFormatSize,
   getVertexAttribFormat
 } from './gpuobject';
-import type { PBComputeOptions, PBRenderOptions, PBStructTypeInfo} from './builder';
+import type { PBComputeOptions, PBRenderOptions, PBStructTypeInfo } from './builder';
 import { ProgramBuilder } from './builder';
-import {
-  DeviceResizeEvent,
-  DeviceGPUObjectAddedEvent,
-  DeviceGPUObjectRemovedEvent
-} from './base_types';
-import type { DataType, PrimitiveType, TextureFormat ,
+import { DeviceResizeEvent, DeviceGPUObjectAddedEvent, DeviceGPUObjectRemovedEvent } from './base_types';
+import type {
+  DataType,
+  PrimitiveType,
+  TextureFormat,
   GPUObjectList,
   FrameInfo,
   DeviceCaps,
@@ -74,7 +73,7 @@ type DeviceState = {
   program: GPUProgram;
   vertexLayout: VertexLayout;
   bindGroups: [BindGroup, Iterable<number>][];
-}
+};
 
 /**
  * Base class for rendering device
@@ -153,7 +152,11 @@ export abstract class BaseDevice {
   abstract createGPUTimer(): ITimer;
   abstract createRenderStateSet(): RenderStateSet;
   abstract createSampler(options: SamplerOptions): TextureSampler;
-  abstract createTextureFromMipmapData<T extends BaseTexture>(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): T;
+  abstract createTextureFromMipmapData<T extends BaseTexture>(
+    data: TextureMipmapData,
+    sRGB: boolean,
+    options?: TextureCreationOptions
+  ): T;
   abstract createTexture2D(
     format: TextureFormat,
     width: number,
@@ -217,11 +220,15 @@ export abstract class BaseDevice {
     data?: TypedArray
   ): StructuredBuffer;
   abstract createVertexLayout(options: VertexLayoutOptions): VertexLayout;
-  abstract createFrameBuffer(colorAttachments: BaseTexture[], depthAttachment: BaseTexture, options?: FrameBufferOptions): FrameBuffer;
+  abstract createFrameBuffer(
+    colorAttachments: BaseTexture[],
+    depthAttachment: BaseTexture,
+    options?: FrameBufferOptions
+  ): FrameBuffer;
   // render related
-  abstract setViewport(vp?: number[]|DeviceViewport): void;
+  abstract setViewport(vp?: number[] | DeviceViewport): void;
   abstract getViewport(): DeviceViewport;
-  abstract setScissor(scissor?: number[]|DeviceViewport): void;
+  abstract setScissor(scissor?: number[] | DeviceViewport): void;
   abstract getScissor(): DeviceViewport;
   abstract setProgram(program: GPUProgram): void;
   abstract getProgram(): GPUProgram;
@@ -235,8 +242,22 @@ export abstract class BaseDevice {
   abstract getBindGroup(index: number): [BindGroup, Iterable<number>];
   abstract flush(): void;
   // misc
-  abstract readPixels(index: number, x: number, y: number, w: number, h: number, buffer: TypedArray): Promise<void>;
-  abstract readPixelsToBuffer(index: number, x: number, y: number, w: number, h: number, buffer: GPUDataBuffer): void;
+  abstract readPixels(
+    index: number,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    buffer: TypedArray
+  ): Promise<void>;
+  abstract readPixelsToBuffer(
+    index: number,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    buffer: GPUDataBuffer
+  ): void;
   abstract looseContext(): void;
   abstract restoreContext(): void;
   protected abstract _draw(primitiveType: PrimitiveType, first: number, count: number): void;
@@ -246,7 +267,11 @@ export abstract class BaseDevice {
     count: number,
     numInstances: number
   ): void;
-  protected abstract _compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number): void;
+  protected abstract _compute(
+    workgroupCountX: number,
+    workgroupCountY: number,
+    workgroupCountZ: number
+  ): void;
   get backend(): DeviceBackend {
     return this._backend;
   }
@@ -266,7 +291,7 @@ export abstract class BaseDevice {
     return this._backend.typeName();
   }
   get runLoopFunction(): (device: AbstractDevice) => void {
-    return this._runLoopFunc
+    return this._runLoopFunc;
   }
   get programBuilder(): ProgramBuilder {
     return this._programBuilder;
@@ -530,7 +555,10 @@ export abstract class BaseDevice {
   protected abstract onBeginFrame(): boolean;
   protected abstract onEndFrame(): void;
   private _onresize() {
-    if (this._canvasClientWidth !== this._canvas.clientWidth || this._canvasClientHeight !== this._canvas.clientHeight) {
+    if (
+      this._canvasClientWidth !== this._canvas.clientWidth ||
+      this._canvasClientHeight !== this._canvas.clientHeight
+    ) {
       this._canvasClientWidth = this._canvas.clientWidth;
       this._canvasClientHeight = this._canvas.clientHeight;
       this.dispatchEvent(new DeviceResizeEvent(this._canvasClientWidth, this._canvasClientHeight));
@@ -657,7 +685,8 @@ export abstract class BaseDevice {
     return;
   }
   protected parseTextureOptions(options?: TextureCreationOptions): number {
-    const noMipmapFlag = options?.samplerOptions?.mipFilter === 'none' ? GPUResourceUsageFlags.TF_NO_MIPMAP : 0;
+    const noMipmapFlag =
+      options?.samplerOptions?.mipFilter === 'none' ? GPUResourceUsageFlags.TF_NO_MIPMAP : 0;
     const writableFlag = options?.writable ? GPUResourceUsageFlags.TF_WRITABLE : 0;
     const dynamicFlag = options?.dynamic ? GPUResourceUsageFlags.DYNAMIC : 0;
     return noMipmapFlag | writableFlag | dynamicFlag;
@@ -689,8 +718,8 @@ export abstract class BaseDevice {
         usageFlag = 0;
         break;
     }
-    const storageFlag = (options?.storage ?? false) ? GPUResourceUsageFlags.BF_STORAGE : 0;
-    const dynamicFlag = (options?.dynamic ?? false) ? GPUResourceUsageFlags.DYNAMIC : 0;
+    const storageFlag = options?.storage ?? false ? GPUResourceUsageFlags.BF_STORAGE : 0;
+    const dynamicFlag = options?.dynamic ?? false ? GPUResourceUsageFlags.DYNAMIC : 0;
     const managedFlag = dynamicFlag === 0 && (options?.managed ?? true) ? GPUResourceUsageFlags.MANAGED : 0;
     return usageFlag | storageFlag | dynamicFlag | managedFlag;
   }

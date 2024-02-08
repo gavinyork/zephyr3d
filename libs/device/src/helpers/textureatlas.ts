@@ -51,7 +51,13 @@ export class TextureAtlasManager {
    * @param rectBorderWidth - Border width of an atlas
    * @param linearSpace - true if the texture space is linear
    */
-  constructor(device: AbstractDevice, binWidth: number, binHeight: number, rectBorderWidth: number, linearSpace?: boolean) {
+  constructor(
+    device: AbstractDevice,
+    binWidth: number,
+    binHeight: number,
+    rectBorderWidth: number,
+    linearSpace?: boolean
+  ) {
     this._device = device;
     this._binWidth = binWidth;
     this._binHeight = binHeight;
@@ -116,21 +122,19 @@ export class TextureAtlasManager {
    * @param h - height of the rectangle
    * @returns The atals info or null if insert failed
    */
-  pushCanvas(key: string, ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): AtlasInfo {
+  pushCanvas(
+    key: string,
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number
+  ): AtlasInfo {
     const rc = this._packer.insert(w + 2 * this._rectBorderWidth, h + 2 * this._rectBorderWidth);
     if (rc) {
       const atlasX = rc.x + this._rectBorderWidth;
       const atlasY = rc.y + this._rectBorderWidth;
-      this._updateAtlasTextureCanvas(
-        rc.binIndex,
-        ctx,
-        atlasX,
-        atlasY,
-        w,
-        h,
-        x,
-        y
-      );
+      this._updateAtlasTextureCanvas(rc.binIndex, ctx, atlasX, atlasY, w, h, x, y);
       const info: AtlasInfo = {
         atlasIndex: rc.binIndex,
         uMin: atlasX / this._binWidth,
@@ -151,8 +155,11 @@ export class TextureAtlasManager {
    * @param bitmap - The bitmap object
    * @returns The atals info or null if insert failed
    */
-  pushBitmap(key: string, bitmap: ImageData|ImageBitmap): AtlasInfo {
-    const rc = this._packer.insert(bitmap.width + 2 * this._rectBorderWidth, bitmap.height + 2 * this._rectBorderWidth);
+  pushBitmap(key: string, bitmap: ImageData | ImageBitmap): AtlasInfo {
+    const rc = this._packer.insert(
+      bitmap.width + 2 * this._rectBorderWidth,
+      bitmap.height + 2 * this._rectBorderWidth
+    );
     if (rc) {
       const atlasX = rc.x + this._rectBorderWidth;
       const atlasY = rc.y + this._rectBorderWidth;
@@ -204,7 +211,7 @@ export class TextureAtlasManager {
     textureAtlas.updateFromElement(ctx.canvas, x, y, xOffset, yOffset, w, h);
   }
   /** @internal */
-  private _updateAtlasTexture(atlasIndex: number, bitmap: ImageData|ImageBitmap, x: number, y: number) {
+  private _updateAtlasTexture(atlasIndex: number, bitmap: ImageData | ImageBitmap, x: number, y: number) {
     let textureAtlas: Texture2D = null;
     if (atlasIndex === this._atlasList.length) {
       textureAtlas = this._createAtlasTexture();

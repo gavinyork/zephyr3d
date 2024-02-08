@@ -1,9 +1,4 @@
-import type {
-  FrameBuffer,
-  TextureFormat,
-  PBShaderExp,
-  PBInsideFunctionScope,
-} from '@zephyr3d/device';
+import type { FrameBuffer, TextureFormat, PBShaderExp, PBInsideFunctionScope } from '@zephyr3d/device';
 import { ShadowImpl } from './shadow_impl';
 import type { BlitType } from '../blitter';
 import { GaussianBlurBlitter } from '../blitter';
@@ -18,7 +13,7 @@ import { ShaderFramework } from '../shaders';
 type ESMImplData = {
   blurFramebuffer: FrameBuffer;
   blurFramebuffer2: FrameBuffer;
-}
+};
 
 class BlurBlitter extends GaussianBlurBlitter {
   protected _packFloat: boolean;
@@ -37,7 +32,7 @@ class BlurBlitter extends GaussianBlurBlitter {
     srcTex: PBShaderExp,
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
-    sampleType: 'float'|'int'|'uint'
+    sampleType: 'float' | 'int' | 'uint'
   ): PBShaderExp {
     const pb = scope.$builder;
     const texel = super.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
@@ -139,11 +134,15 @@ export class ESM extends ShadowImpl {
     return 'esm';
   }
   getShadowMapBorder(shadowMapParams: ShadowMapParams): number {
-    return this._blur ? Math.ceil((this._kernelSize + 1) / 2 * this._blurSize) : 0;
+    return this._blur ? Math.ceil(((this._kernelSize + 1) / 2) * this._blurSize) : 0;
   }
   getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType {
     const implData = shadowMapParams.implData as ESMImplData;
-    return (implData ? implData.blurFramebuffer2.getColorAttachments()[0] : shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0]) as ShadowMapType;
+    return (
+      implData
+        ? implData.blurFramebuffer2.getColorAttachments()[0]
+        : shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0]
+    ) as ShadowMapType;
   }
   doUpdateResources(shadowMapParams: ShadowMapParams) {
     const implData: ESMImplData = {
@@ -157,8 +156,26 @@ export class ESM extends ShadowImpl {
     const shadowMapHeight = shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0].height;
     if (this._blur) {
       shadowMapParams.implData = {
-        blurFramebuffer: TemporalCache.getFramebufferFixedSize(shadowMapWidth, shadowMapHeight, shadowMapParams.numShadowCascades, colorFormat, null, target, null, false),
-        blurFramebuffer2: TemporalCache.getFramebufferFixedSize(shadowMapWidth, shadowMapHeight, shadowMapParams.numShadowCascades, colorFormat, null, target, null, this._mipmap)
+        blurFramebuffer: TemporalCache.getFramebufferFixedSize(
+          shadowMapWidth,
+          shadowMapHeight,
+          shadowMapParams.numShadowCascades,
+          colorFormat,
+          null,
+          target,
+          null,
+          false
+        ),
+        blurFramebuffer2: TemporalCache.getFramebufferFixedSize(
+          shadowMapWidth,
+          shadowMapHeight,
+          shadowMapParams.numShadowCascades,
+          colorFormat,
+          null,
+          target,
+          null,
+          this._mipmap
+        )
       };
     }
     shadowMapParams.shadowMap = this.getShadowMap(shadowMapParams);
@@ -177,7 +194,10 @@ export class ESM extends ShadowImpl {
       this._blitterV.logSpace = this._logSpace;
       this._blitterV.packFloat = colorAttachment.format === 'rgba8unorm';
       this._blitterH.blit(colorAttachment as any, implData.blurFramebuffer);
-      this._blitterV.blit(implData.blurFramebuffer.getColorAttachments()[0] as any, implData.blurFramebuffer2);
+      this._blitterV.blit(
+        implData.blurFramebuffer.getColorAttachments()[0] as any,
+        implData.blurFramebuffer2
+      );
     }
   }
   releaseTemporalResources(shadowMapParams: ShadowMapParams) {
@@ -265,49 +285,41 @@ export class ESM extends ShadowImpl {
   ): PBShaderExp {
     const funcNameComputeShadow = 'lib_computeShadow';
     const pb = scope.$builder;
-    pb.func(
-      funcNameComputeShadow,
-      [pb.vec4('shadowVertex'), pb.float('NdotL')],
-      function () {
-        if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
-          this.$l.dir = pb.sub(this.shadowVertex.xyz, ShaderFramework.getLightPositionAndRangeForShadow(this).xyz);
-          this.$return(
-            filterShadowESM(
-              this,
-              LIGHT_TYPE_POINT,
-              shadowMapParams.shadowMap.format,
-              this.dir
-            )
+    pb.func(funcNameComputeShadow, [pb.vec4('shadowVertex'), pb.float('NdotL')], function () {
+      if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
+        this.$l.dir = pb.sub(
+          this.shadowVertex.xyz,
+          ShaderFramework.getLightPositionAndRangeForShadow(this).xyz
+        );
+        this.$return(filterShadowESM(this, LIGHT_TYPE_POINT, shadowMapParams.shadowMap.format, this.dir));
+      } else {
+        this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
+        this.$l.shadowCoord = pb.add(pb.mul(this.shadowCoord, 0.5), 0.5);
+        this.$l.inShadow = pb.all(
+          pb.bvec2(
+            pb.all(
+              pb.bvec4(
+                pb.greaterThanEqual(this.shadowCoord.x, 0),
+                pb.lessThanEqual(this.shadowCoord.x, 1),
+                pb.greaterThanEqual(this.shadowCoord.y, 0),
+                pb.lessThanEqual(this.shadowCoord.y, 1)
+              )
+            ),
+            pb.lessThanEqual(this.shadowCoord.z, 1)
+          )
+        );
+        this.$l.shadow = pb.float(1);
+        this.$if(this.inShadow, function () {
+          this.shadow = filterShadowESM(
+            this,
+            shadowMapParams.lightType,
+            shadowMapParams.shadowMap.format,
+            this.shadowCoord
           );
-        } else {
-          this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
-          this.$l.shadowCoord = pb.add(pb.mul(this.shadowCoord, 0.5), 0.5);
-          this.$l.inShadow = pb.all(
-            pb.bvec2(
-              pb.all(
-                pb.bvec4(
-                  pb.greaterThanEqual(this.shadowCoord.x, 0),
-                  pb.lessThanEqual(this.shadowCoord.x, 1),
-                  pb.greaterThanEqual(this.shadowCoord.y, 0),
-                  pb.lessThanEqual(this.shadowCoord.y, 1)
-                )
-              ),
-              pb.lessThanEqual(this.shadowCoord.z, 1)
-            )
-          );
-          this.$l.shadow = pb.float(1);
-          this.$if(this.inShadow, function () {
-            this.shadow = filterShadowESM(
-              this,
-              shadowMapParams.lightType,
-              shadowMapParams.shadowMap.format,
-              this.shadowCoord
-            );
-          });
-          this.$return(this.shadow);
-        }
+        });
+        this.$return(this.shadow);
       }
-    );
+    });
     return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL);
   }
   useNativeShadowMap(shadowMapParams: ShadowMapParams): boolean {

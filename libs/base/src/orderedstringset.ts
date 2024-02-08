@@ -70,7 +70,8 @@ export class OrderedStringSet {
    */
   public remove(str: string): void {
     const position = this.findStringPosition(str);
-    if (position !== -1) { // Only attempt to remove if the element exists.
+    if (position !== -1) {
+      // Only attempt to remove if the element exists.
       this._items.splice(position, 1);
     }
   }

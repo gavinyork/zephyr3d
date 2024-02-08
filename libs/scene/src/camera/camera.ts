@@ -119,7 +119,7 @@ export class Camera extends SceneNode {
     return this._scissor ? [...this._scissor] : null;
   }
   set scissor(rect: number[]) {
-    this. _scissor = rect?.slice() ?? null;
+    this._scissor = rect?.slice() ?? null;
   }
   /** Color value used to clear color buffer before rendering, if null, color buffer will not be cleared */
   get clearColor(): Vector4 {
@@ -382,8 +382,7 @@ export class Camera extends SceneNode {
     }
   }
   /** @internal */
-  protected _computeProj() {
-  }
+  protected _computeProj() {}
   /** @internal */
   protected _onTransformChanged(invalidateLocal: boolean) {
     super._onTransformChanged(invalidateLocal);

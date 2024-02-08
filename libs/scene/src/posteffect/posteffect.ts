@@ -1,7 +1,15 @@
-import { Application } from "../app";
-import type { AbstractDevice, BaseTexture, FrameBuffer, RenderStateSet, Texture2D, TextureFormat, VertexLayout } from "@zephyr3d/device";
-import type { DrawContext } from "../render";
-import { drawFullscreenQuad } from "../render/helper";
+import { Application } from '../app';
+import type {
+  AbstractDevice,
+  BaseTexture,
+  FrameBuffer,
+  RenderStateSet,
+  Texture2D,
+  TextureFormat,
+  VertexLayout
+} from '@zephyr3d/device';
+import type { DrawContext } from '../render';
+import { drawFullscreenQuad } from '../render/helper';
 
 /**
  * Base class for any type of post effect
@@ -15,10 +23,10 @@ export abstract class AbstractPostEffect {
   protected _opaque: boolean;
   protected _intermediateFramebuffers: {
     [name: string]: {
-      framebuffer: FrameBuffer,
-      depth: 'none'|'current'|'temporal'
-    }
-  }
+      framebuffer: FrameBuffer;
+      depth: 'none' | 'current' | 'temporal';
+    };
+  };
   /**
    * Creates an instance of a post effect
    * @param name - Name of the post effect
@@ -56,7 +64,7 @@ export abstract class AbstractPostEffect {
    * @param format - Render target texture format
    * @param useDepth - Whether the scene depth buffer should be attached to the frame buffer
    */
-  protected addIntermediateFramebuffer(name: string, depth: 'none'|'current'|'temporal') {
+  protected addIntermediateFramebuffer(name: string, depth: 'none' | 'current' | 'temporal') {
     if (this._intermediateFramebuffers[name]) {
       throw new Error(`Intermediate framebuffer already exists: ${name}`);
     }
@@ -75,7 +83,12 @@ export abstract class AbstractPostEffect {
    * @remarks
    * The intemediate buffer will be resized to fit the given size if needed
    */
-  protected getIntermediateFramebuffer(name: string, format: TextureFormat, width: number, height: number): FrameBuffer {
+  protected getIntermediateFramebuffer(
+    name: string,
+    format: TextureFormat,
+    width: number,
+    height: number
+  ): FrameBuffer {
     const fb = this._intermediateFramebuffers[name];
     if (!fb) {
       return null;
@@ -98,7 +111,7 @@ export abstract class AbstractPostEffect {
       const colorTex = device.createTexture2D(format, width, height, {
         samplerOptions: { mipFilter: 'none' }
       });
-      colorTex.name = `Intermediate-<${name}>`
+      colorTex.name = `Intermediate-<${name}>`;
       let depthTex: BaseTexture = null;
       if (fb.depth === 'current') {
         depthTex = currentDepthBuffer;
@@ -130,7 +143,12 @@ export abstract class AbstractPostEffect {
    * @remarks
    * The frame buffer of the post effect is already set when apply() is called.
    */
-  abstract apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean): void;
+  abstract apply(
+    ctx: DrawContext,
+    inputColorTexture: Texture2D,
+    sceneDepthTexture: Texture2D,
+    srgbOutput: boolean
+  ): void;
   /**
    * Disposes the post effect.
    */
@@ -172,7 +190,11 @@ export abstract class AbstractPostEffect {
   /** @internal */
   protected createVertexLayout(device: AbstractDevice): VertexLayout {
     return device.createVertexLayout({
-      vertexBuffers: [{ buffer: device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])) }]
+      vertexBuffers: [
+        {
+          buffer: device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]))
+        }
+      ]
     });
   }
   /** @internal */

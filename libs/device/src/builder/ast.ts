@@ -5,7 +5,8 @@ import type {
   PBTextureTypeInfo,
   PBTypeInfo,
   PBFunctionTypeInfo,
-  PBStructTypeInfo} from './types';
+  PBStructTypeInfo
+} from './types';
 import {
   typeI32,
   typeU32,
@@ -417,7 +418,7 @@ export class ASTFunctionParameter extends ASTExpression {
   }
   markWritable(): void {
     if (this.paramAST instanceof ASTPrimitive) {
-      console.warn(`Write to non-output parameter ${this.paramAST.value.$str}`)
+      console.warn(`Write to non-output parameter ${this.paramAST.value.$str}`);
     }
     this.writable = true;
   }
@@ -616,7 +617,9 @@ export class ASTPrimitive extends ASTExpression {
   }
   isWritable(): boolean {
     const type = this.getType();
-    return this.writable || type.isAtomicI32() || type.isAtomicU32() || (type.isStructType() && type.isWritable());
+    return (
+      this.writable || type.isAtomicI32() || type.isAtomicU32() || (type.isStructType() && type.isWritable())
+    );
   }
   getAddressSpace(): PBAddressSpace {
     switch (this.value.$declareType) {
@@ -711,11 +714,7 @@ export class ASTLValueHash extends ASTLValue {
   field: string;
   /** @internal */
   type: PBTypeInfo;
-  constructor(
-    scope: ASTLValueScalar | ASTLValueHash | ASTLValueArray,
-    field: string,
-    type: PBTypeInfo
-  ) {
+  constructor(scope: ASTLValueScalar | ASTLValueHash | ASTLValueArray, field: string, type: PBTypeInfo) {
     super();
     this.scope = scope;
     this.field = field;
@@ -867,8 +866,7 @@ export class ASTLValueDeclare extends ASTLValue {
         const readonly =
           this.getType().isPointerType() ||
           (!this.value.isWritable() &&
-            (addressSpace === PBAddressSpace.PRIVATE ||
-              addressSpace === PBAddressSpace.FUNCTION));
+            (addressSpace === PBAddressSpace.PRIVATE || addressSpace === PBAddressSpace.FUNCTION));
         const moduleScope = addressSpace === PBAddressSpace.PRIVATE;
         const storageAccessMode =
           addressSpace === PBAddressSpace.STORAGE && this.value.isWritable() ? ', read_write' : '';
@@ -1000,7 +998,7 @@ export class ASTScalar extends ASTExpression {
       }
       if (
         type.primitiveType === PBPrimitiveType.I32 &&
-        (!Number.isInteger(value) || value < (0x80000000 >> 0) || value > 0xffffffff)
+        (!Number.isInteger(value) || value < 0x80000000 >> 0 || value > 0xffffffff)
       ) {
         throw new errors.PBTypeCastError(value, typeof value, type);
       }
@@ -1463,7 +1461,11 @@ export class ASTSelect extends ASTExpression {
   second: ASTExpression;
   /** @internal */
   type: PBTypeInfo;
-  constructor(condition: ASTExpression|boolean|number, first: ASTExpression|number|boolean, second: ASTExpression|number|boolean) {
+  constructor(
+    condition: ASTExpression | boolean | number,
+    first: ASTExpression | number | boolean,
+    second: ASTExpression | number | boolean
+  ) {
     super();
     this.condition = condition instanceof ASTExpression ? condition : new ASTScalar(condition, typeBool);
     let firstType: PBTypeInfo = null;
@@ -1549,13 +1551,22 @@ export class ASTSelect extends ASTExpression {
     return null;
   }
   toWebGL(indent: string, ctx: ASTContext) {
-    return `${indent}(${this.condition.toWebGL('', ctx)} ? ${this.first.toWebGL('', ctx)} : ${this.second.toWebGL('', ctx)})`;
+    return `${indent}(${this.condition.toWebGL('', ctx)} ? ${this.first.toWebGL(
+      '',
+      ctx
+    )} : ${this.second.toWebGL('', ctx)})`;
   }
   toWebGL2(indent: string, ctx: ASTContext) {
-    return `${indent}(${this.condition.toWebGL2('', ctx)} ? ${this.first.toWebGL2('', ctx)} : ${this.second.toWebGL2('', ctx)})`;
+    return `${indent}(${this.condition.toWebGL2('', ctx)} ? ${this.first.toWebGL2(
+      '',
+      ctx
+    )} : ${this.second.toWebGL2('', ctx)})`;
   }
   toWGSL(indent: string, ctx: ASTContext) {
-    return `${indent}select(${this.second.toWGSL('', ctx)}, ${this.first.toWGSL('', ctx)}, ${this.condition.toWGSL('', ctx)})`;
+    return `${indent}select(${this.second.toWGSL('', ctx)}, ${this.first.toWGSL(
+      '',
+      ctx
+    )}, ${this.condition.toWGSL('', ctx)})`;
     //return `${indent}${this.condition.toWGSL('', ctx)} ? ${this.first.toWGSL('', ctx)} : ${this.second.toWGSL('', ctx)}`;
   }
 }
@@ -1687,10 +1698,7 @@ export class ASTAssignment extends ShaderAST {
       return `${indent}${name} = ${rhs};\n`;
     }
   }
-  private checkScalarType(
-    value: number | boolean | ASTExpression,
-    targetType: PBTypeInfo
-  ): PBTypeInfo {
+  private checkScalarType(value: number | boolean | ASTExpression, targetType: PBTypeInfo): PBTypeInfo {
     if (value instanceof ASTExpression) {
       return value.getType();
     }
@@ -1702,42 +1710,18 @@ export class ASTAssignment extends ShaderAST {
     if (targetType.isPrimitiveType()) {
       switch (targetType.primitiveType) {
         case PBPrimitiveType.BOOL:
-          return isBool
-            ? targetType
-            : isInt
-            ? typeI32
-            : isUint
-            ? typeU32
-            : typeF32;
+          return isBool ? targetType : isInt ? typeI32 : isUint ? typeU32 : typeF32;
         case PBPrimitiveType.F32:
           return isFloat ? targetType : typeBool;
         case PBPrimitiveType.I32:
-          return isInt
-            ? targetType
-            : isBool
-            ? typeBool
-            : isUint
-            ? typeU32
-            : typeF32;
+          return isInt ? targetType : isBool ? typeBool : isUint ? typeU32 : typeF32;
         case PBPrimitiveType.U32:
-          return isUint
-            ? targetType
-            : isBool
-            ? typeBool
-            : isInt
-            ? typeI32
-            : typeF32;
+          return isUint ? targetType : isBool ? typeBool : isInt ? typeI32 : typeF32;
         default:
           return null;
       }
     } else {
-      return isBool
-        ? typeBool
-        : isInt
-        ? typeI32
-        : isUint
-        ? typeU32
-        : typeF32;
+      return isBool ? typeBool : isInt ? typeI32 : isUint ? typeU32 : typeF32;
     }
   }
 }
@@ -1843,10 +1827,7 @@ export class ASTCallFunction extends ASTExpression {
         if (funcArg.byRef) {
           if (deviceType === 'webgpu') {
             const argAddressSpace = args[i].getAddressSpace();
-            if (
-              argAddressSpace !== PBAddressSpace.FUNCTION &&
-              argAddressSpace !== PBAddressSpace.PRIVATE
-            ) {
+            if (argAddressSpace !== PBAddressSpace.FUNCTION && argAddressSpace !== PBAddressSpace.PRIVATE) {
               throw new errors.PBParamTypeError(
                 name,
                 'pointer type of function parameter must be function or private'
@@ -2121,7 +2102,13 @@ export class ASTFunction extends ASTScope {
   builtins: string[];
   /** @internal */
   returnType: PBTypeInfo;
-  constructor(name: string, args: ASTFunctionParameter[], isMainFunc: boolean, type: PBFunctionTypeInfo, isBuiltin = false) {
+  constructor(
+    name: string,
+    args: ASTFunctionParameter[],
+    isMainFunc: boolean,
+    type: PBFunctionTypeInfo,
+    isBuiltin = false
+  ) {
     super();
     this.name = name;
     this.args = args;
@@ -2491,7 +2478,9 @@ function convertArgs(
   const result: ASTExpression[] = [];
   for (let i = 0; i < args.length; i++) {
     const isRef = !!overload.argTypes[i].byRef;
-    const argType = isRef ? (overload.argTypes[i].type as PBPointerTypeInfo).pointerType : overload.argTypes[i].type;
+    const argType = isRef
+      ? (overload.argTypes[i].type as PBPointerTypeInfo).pointerType
+      : overload.argTypes[i].type;
     const arg = args[i];
     if (typeof arg === 'number') {
       if (

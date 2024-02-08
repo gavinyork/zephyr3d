@@ -129,7 +129,15 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
     );
     tmpBuffer.dispose();
   }
-  readPixelsToBuffer(x: number, y: number, w: number, h: number, face: number, mipLevel: number, buffer: GPUDataBuffer): void {
+  readPixelsToBuffer(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    face: number,
+    mipLevel: number,
+    buffer: GPUDataBuffer
+  ): void {
     if (mipLevel < 0 || mipLevel >= this.mipLevelCount) {
       throw new Error(`TextureCube.readPixelsToBuffer(): invalid miplevel: ${mipLevel}`);
     }
@@ -193,7 +201,10 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
     const width = levels.width;
     const height = levels.height;
     //const mipLevelCount = levels.mipLevels;
-    const mipLevelCount = levels.mipLevels === 1 && !(this._flags & GPUResourceUsageFlags.TF_NO_MIPMAP) ? this._calcMipLevelCount(levels.format, width, height, 1) : levels.mipLevels;
+    const mipLevelCount =
+      levels.mipLevels === 1 && !(this._flags & GPUResourceUsageFlags.TF_NO_MIPMAP)
+        ? this._calcMipLevelCount(levels.format, width, height, 1)
+        : levels.mipLevels;
     if (levels.isCompressed) {
       if (!this.getTextureCaps().supportS3TCSRGB || !this.getTextureCaps().supportS3TC) {
         console.error('TextureCube.loadLevels(): No s3tc compression format support');

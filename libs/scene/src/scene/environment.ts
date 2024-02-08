@@ -1,8 +1,8 @@
-import { Vector4 } from "@zephyr3d/base";
-import type { DrawContext, EnvironmentLighting, EnvLightType } from "../render";
-import { EnvConstantAmbient, EnvHemisphericAmbient, EnvIBL } from "../render";
+import { Vector4 } from '@zephyr3d/base';
+import type { DrawContext, EnvironmentLighting, EnvLightType } from '../render';
+import { EnvConstantAmbient, EnvHemisphericAmbient, EnvIBL } from '../render';
 import { SkyRenderer } from '../render/sky';
-import type { TextureCube } from "@zephyr3d/device";
+import type { TextureCube } from '@zephyr3d/device';
 
 /**
  * Wrapper for environmant lighting
@@ -28,7 +28,11 @@ export class EnvLightWrapper {
   }
   /** @internal */
   getHash(ctx: DrawContext): string {
-    return ctx.drawEnvLight ? `${this.type}:${this._envLight.hasRadiance() ? '1' : '0'}:${this._envLight.hasIrradiance() ? '1' : '0'}` : 'none';
+    return ctx.drawEnvLight
+      ? `${this.type}:${this._envLight.hasRadiance() ? '1' : '0'}:${
+          this._envLight.hasIrradiance() ? '1' : '0'
+        }`
+      : 'none';
   }
   /** @internal */
   get envLight(): EnvironmentLighting {
@@ -96,7 +100,7 @@ export class EnvLightWrapper {
     return this._envLight?.getType() ?? 'none';
   }
   set type(val: EnvLightType) {
-    switch(val) {
+    switch (val) {
       case 'none':
         this._envLight = null;
         break;

@@ -1,4 +1,11 @@
-import type { TextureFormat, FramebufferCaps, TextureFormatInfo, MiscCaps, ShaderCaps, TextureCaps } from '@zephyr3d/device';
+import type {
+  TextureFormat,
+  FramebufferCaps,
+  TextureFormatInfo,
+  MiscCaps,
+  ShaderCaps,
+  TextureCaps
+} from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
 
 export interface TextureParams {
@@ -494,7 +501,6 @@ export class WebGPUTextureCaps implements TextureCaps {
       this._textureFormatInfos['r16f'].filterable &&
       this._textureFormatInfos['rg16f'].filterable &&
       this._textureFormatInfos['rgba16f'].filterable;
-
   }
   calcMemoryUsage(format: TextureFormat, numPixels): number {
     return this._textureFormatInfos[format] ? this._textureFormatInfos[format].size * numPixels : 0;

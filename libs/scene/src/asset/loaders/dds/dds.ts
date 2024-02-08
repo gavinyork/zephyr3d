@@ -314,7 +314,7 @@ const dxgiFormatMap: Record<number, TextureFormat> = {
   [75]: 'dxt3-srgb',
   [77]: 'dxt5',
   [78]: 'dxt5-srgb'
-}
+};
 
 const legacyDDSMap: {
   format: TextureFormat;
@@ -542,9 +542,7 @@ function getMetaDataFromHeader(header: DDSHeader, metaData?: DDSMetaData): DDSMe
     return null;
   }
   metaData.isCompressed =
-    metaData.format === 'dxt1' ||
-    metaData.format === 'dxt3' ||
-    metaData.format === 'dxt5';
+    metaData.format === 'dxt1' || metaData.format === 'dxt3' || metaData.format === 'dxt5';
   metaData.dataOffset = header.ddsHeaderDX10 ? 37 * 4 : 32 * 4;
   metaData.width = header.dwWidth;
   metaData.height = header.dwHeight;

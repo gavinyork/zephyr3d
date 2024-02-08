@@ -1,4 +1,10 @@
-import type { TextureImageElement, Texture2DArray, GPUDataBuffer, TextureFormat, TextureMipmapData } from '@zephyr3d/device';
+import type {
+  TextureImageElement,
+  Texture2DArray,
+  GPUDataBuffer,
+  TextureFormat,
+  TextureMipmapData
+} from '@zephyr3d/device';
 import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { textureTargetMap } from './constants_webgl';
 import { WebGLBaseTexture } from './basetexture_webgl';
@@ -61,7 +67,9 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
     } else {
       this._flags = Number(creationFlags) || 0;
       if (this._flags & GPUResourceUsageFlags.TF_WRITABLE) {
-        console.error('Texture2DArray.createWithMipmapData() failed: Webgl device does not support storage texture');
+        console.error(
+          'Texture2DArray.createWithMipmapData() failed: Webgl device does not support storage texture'
+        );
       } else {
         this.loadLevels(data);
       }
@@ -71,7 +79,10 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
     const format = levels.format;
     const width = levels.width;
     const height = levels.height;
-    const mipLevelCount = levels.mipLevels === 1 && !(this._flags & GPUResourceUsageFlags.TF_NO_MIPMAP) ? this._calcMipLevelCount(levels.format, width, height, 1) : levels.mipLevels;
+    const mipLevelCount =
+      levels.mipLevels === 1 && !(this._flags & GPUResourceUsageFlags.TF_NO_MIPMAP)
+        ? this._calcMipLevelCount(levels.format, width, height, 1)
+        : levels.mipLevels;
     if (levels.isCompressed) {
       if (!this.getTextureCaps().supportS3TCSRGB || !this.getTextureCaps().supportS3TC) {
         console.error('Texture2DArray.loadLevels(): No s3tc compression format support');
@@ -211,15 +222,23 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
       this._device.context.generateMipmap(target);
     }
   }
-  readPixels(x: number, y: number, w: number, h: number, layer: number, mipLevel: number, buffer: TypedArray): Promise<void> {
+  readPixels(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    layer: number,
+    mipLevel: number,
+    buffer: TypedArray
+  ): Promise<void> {
     if (layer < 0 || layer >= this._depth) {
       throw new Error(`Texture2DArray.readPixels(): invalid layer: ${layer}`);
     }
     if (mipLevel < 0 || mipLevel >= this.mipLevelCount) {
       throw new Error(`Texture2DArray.readPixels(): invalid miplevel: ${mipLevel}`);
     }
-    return new Promise<void>(resolve => {
-      const fb =this._device.createFrameBuffer([this], null);
+    return new Promise<void>((resolve) => {
+      const fb = this._device.createFrameBuffer([this], null);
       fb.setColorAttachmentLayer(0, layer);
       fb.setColorAttachmentMipLevel(0, mipLevel);
       fb.setColorAttachmentGenerateMipmaps(0, false);
@@ -232,14 +251,22 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
       this._device.popDeviceStates();
     });
   }
-  readPixelsToBuffer(x: number, y: number, w: number, h: number, layer: number, mipLevel: number, buffer: GPUDataBuffer): void {
+  readPixelsToBuffer(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    layer: number,
+    mipLevel: number,
+    buffer: GPUDataBuffer
+  ): void {
     if (layer < 0 || layer >= this._depth) {
       throw new Error(`Texture2DArray.readPixelsToBuffer(): invalid layer: ${layer}`);
     }
     if (mipLevel < 0 || mipLevel >= this.mipLevelCount) {
       throw new Error(`Texture2DArray.readPixelsToBuffer(): invalid miplevel: ${mipLevel}`);
     }
-    const fb =this._device.createFrameBuffer([this], null);
+    const fb = this._device.createFrameBuffer([this], null);
     fb.setColorAttachmentLayer(0, layer);
     fb.setColorAttachmentMipLevel(0, mipLevel);
     fb.setColorAttachmentGenerateMipmaps(0, false);

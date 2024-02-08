@@ -220,7 +220,7 @@ export class WebGLRasterizerState extends WebGLRenderState implements Rasterizer
   }
   enableDepthClamp(enable: boolean): this {
     if (enable) {
-      console.error('Depth clamp not supported')
+      console.error('Depth clamp not supported');
     }
     return this;
   }
@@ -470,31 +470,33 @@ export class WebGLRenderStateSet implements RenderStateSet {
     }
   }
   useColorState(state?: ColorState): ColorState {
-    return this.colorState = state as WebGLColorState ?? this.colorState ?? new WebGLColorState();
+    return (this.colorState = (state as WebGLColorState) ?? this.colorState ?? new WebGLColorState());
   }
   defaultColorState() {
     this.colorState = null;
   }
   useBlendingState(state?: BlendingState): BlendingState {
-    return this.blendingState = state as WebGLBlendingState ?? this.blendingState ?? new WebGLBlendingState();
+    return (this.blendingState =
+      (state as WebGLBlendingState) ?? this.blendingState ?? new WebGLBlendingState());
   }
   defaultBlendingState() {
     this.blendingState = null;
   }
   useRasterizerState(state?: RasterizerState): RasterizerState {
-    return this.rasterizerState = state as WebGLRasterizerState ?? this.rasterizerState ?? new WebGLRasterizerState();
+    return (this.rasterizerState =
+      (state as WebGLRasterizerState) ?? this.rasterizerState ?? new WebGLRasterizerState());
   }
   defaultRasterizerState() {
     this.rasterizerState = null;
   }
   useDepthState(state?: DepthState): DepthState {
-    return this.depthState = state as WebGLDepthState ?? this.depthState ?? new WebGLDepthState();
+    return (this.depthState = (state as WebGLDepthState) ?? this.depthState ?? new WebGLDepthState());
   }
   defaultDepthState() {
     this.depthState = null;
   }
   useStencilState(state?: StencilState): StencilState {
-    return this.stencilState = state as WebGLStencilState ?? this.stencilState ?? new WebGLStencilState();
+    return (this.stencilState = (state as WebGLStencilState) ?? this.stencilState ?? new WebGLStencilState());
   }
   defaultStencilState() {
     this.stencilState = null;

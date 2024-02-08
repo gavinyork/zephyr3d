@@ -380,8 +380,8 @@ export function parseColor(input: string): ColorRGBA {
  * @param baseCtors - An array of constructor functions that will be mixed into the derivedCtor.
  */
 export function applyMixins(derivedCtor: any, baseCtors: any[]) {
-  baseCtors.forEach(baseCtor => {
-    Object.getOwnPropertyNames(baseCtor.prototype).forEach(name => {
+  baseCtors.forEach((baseCtor) => {
+    Object.getOwnPropertyNames(baseCtor.prototype).forEach((name) => {
       derivedCtor.prototype[name] = baseCtor.prototype[name];
     });
   });

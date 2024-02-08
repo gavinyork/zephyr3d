@@ -92,7 +92,9 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
     } else {
       this._flags = Number(creationFlags) || 0;
       if (this._flags & GPUResourceUsageFlags.TF_WRITABLE) {
-        console.error('Texture2DArray.createWithMipmapData() failed: Webgl device does not support storage texture');
+        console.error(
+          'Texture2DArray.createWithMipmapData() failed: Webgl device does not support storage texture'
+        );
       } else {
         this.loadLevels(data);
       }
@@ -144,7 +146,15 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
     );
     tmpBuffer.dispose();
   }
-  readPixelsToBuffer(x: number, y: number, w: number, h: number, layer: number, mipLevel: number, buffer: GPUDataBuffer): void {
+  readPixelsToBuffer(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    layer: number,
+    mipLevel: number,
+    buffer: GPUDataBuffer
+  ): void {
     if (layer < 0 || layer >= this._depth) {
       throw new Error(`Texture2DArray.readPixelsToBuffer(): invalid layer: ${layer}`);
     }
@@ -170,7 +180,10 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
     const width = levels.width;
     const height = levels.height;
     const depth = levels.arraySize;
-    const mipLevelCount = levels.mipLevels === 1 && !(this._flags & GPUResourceUsageFlags.TF_NO_MIPMAP) ? this._calcMipLevelCount(levels.format, width, height, depth) : levels.mipLevels;
+    const mipLevelCount =
+      levels.mipLevels === 1 && !(this._flags & GPUResourceUsageFlags.TF_NO_MIPMAP)
+        ? this._calcMipLevelCount(levels.format, width, height, depth)
+        : levels.mipLevels;
     if (levels.isCompressed) {
       if (!this.getTextureCaps().supportS3TCSRGB || !this.getTextureCaps().supportS3TC) {
         console.error('Texture2DArray.loadLevels(): No s3tc compression format support');

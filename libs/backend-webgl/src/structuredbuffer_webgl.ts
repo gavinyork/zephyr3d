@@ -1,13 +1,6 @@
 import { WebGLGPUBuffer } from './buffer_webgl';
-import type {
-  StructuredBuffer,
-  StructuredValue,
-  PBTypeInfo,
-  PBStructTypeInfo} from '@zephyr3d/device';
-import { StructuredBufferData,
-  GPUResourceUsageFlags,
-  PBPrimitiveType
-} from '@zephyr3d/device';
+import type { StructuredBuffer, StructuredValue, PBTypeInfo, PBStructTypeInfo } from '@zephyr3d/device';
+import { StructuredBufferData, GPUResourceUsageFlags, PBPrimitiveType } from '@zephyr3d/device';
 import type { TypedArray } from '@zephyr3d/base';
 import type { WebGLDevice } from './device_webgl';
 

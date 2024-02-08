@@ -12,7 +12,12 @@ import { Blitter } from '../blitter';
 import { computeShadowMapDepth, filterShadowVSM } from '../shaders/shadow';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
 import { ShadowMapper } from './shadowmapper';
-import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encode2HalfToRGBA, nonLinearDepthToLinearNormalized } from '../shaders/misc';
+import {
+  decode2HalfFromRGBA,
+  decodeNormalizedFloatFromRGBA,
+  encode2HalfToRGBA,
+  nonLinearDepthToLinearNormalized
+} from '../shaders/misc';
 import { ShaderFramework } from '../shaders';
 import { Application } from '../app';
 import { TemporalCache } from '../render';
@@ -21,7 +26,7 @@ import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 type VSMImplData = {
   blurFramebuffer: FrameBuffer;
   blurFramebuffer2: FrameBuffer;
-}
+};
 
 class VSMBlitter extends Blitter {
   protected _phase: 'horizonal' | 'vertical';
@@ -84,7 +89,7 @@ class VSMBlitter extends Blitter {
     srcTex: PBShaderExp,
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
-    sampleType: 'float'|'int'|'uint'
+    sampleType: 'float' | 'int' | 'uint'
   ): PBShaderExp {
     const pb = scope.$builder;
     const texel = super.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
@@ -117,7 +122,7 @@ class VSMBlitter extends Blitter {
     srcTex: PBShaderExp,
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
-    sampleType: 'int'|'float'|'uint'
+    sampleType: 'int' | 'float' | 'uint'
   ): PBShaderExp {
     const that = this;
     const pb = scope.$builder;
@@ -232,11 +237,15 @@ export class VSM extends ShadowImpl {
     return 'vsm';
   }
   getShadowMapBorder(shadowMapParams: ShadowMapParams): number {
-    return this._blur ? Math.ceil((this._kernelSize + 1) / 2 * this._blurSize) : 0;
+    return this._blur ? Math.ceil(((this._kernelSize + 1) / 2) * this._blurSize) : 0;
   }
   getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType {
     const implData = shadowMapParams.implData as VSMImplData;
-    return (implData ? implData.blurFramebuffer2.getColorAttachments()[0] : shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0]) as ShadowMapType;
+    return (
+      implData
+        ? implData.blurFramebuffer2.getColorAttachments()[0]
+        : shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0]
+    ) as ShadowMapType;
   }
   doUpdateResources(shadowMapParams: ShadowMapParams) {
     const colorFormat = this.getShadowMapColorFormat(shadowMapParams);
@@ -245,9 +254,27 @@ export class VSM extends ShadowImpl {
     const shadowMapHeight = shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0].height;
     if (this._blur) {
       shadowMapParams.implData = {
-        blurFramebuffer: TemporalCache.getFramebufferFixedSize(shadowMapWidth, shadowMapHeight, shadowMapParams.numShadowCascades, colorFormat, null, target, null, false),
-        blurFramebuffer2: TemporalCache.getFramebufferFixedSize(shadowMapWidth, shadowMapHeight, shadowMapParams.numShadowCascades, colorFormat, null, target, null, this._mipmap)
-      }
+        blurFramebuffer: TemporalCache.getFramebufferFixedSize(
+          shadowMapWidth,
+          shadowMapHeight,
+          shadowMapParams.numShadowCascades,
+          colorFormat,
+          null,
+          target,
+          null,
+          false
+        ),
+        blurFramebuffer2: TemporalCache.getFramebufferFixedSize(
+          shadowMapWidth,
+          shadowMapHeight,
+          shadowMapParams.numShadowCascades,
+          colorFormat,
+          null,
+          target,
+          null,
+          this._mipmap
+        )
+      };
     }
     shadowMapParams.shadowMap = this.getShadowMap(shadowMapParams);
     shadowMapParams.shadowMapSampler = shadowMapParams.shadowMap?.getDefaultSampler(false) ?? null;
@@ -261,8 +288,14 @@ export class VSM extends ShadowImpl {
       this._blitterV.blurSize = this._blurSize / shadowMapParams.shadowMap.height;
       this._blitterV.kernelSize = this._kernelSize;
       this._blitterV.packFloat = shadowMapParams.shadowMap.format === 'rgba8unorm';
-      this._blitterH.blit(shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0] as any, implData.blurFramebuffer);
-      this._blitterV.blit(implData.blurFramebuffer.getColorAttachments()[0] as any, implData.blurFramebuffer2);
+      this._blitterH.blit(
+        shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0] as any,
+        implData.blurFramebuffer
+      );
+      this._blitterV.blit(
+        implData.blurFramebuffer.getColorAttachments()[0] as any,
+        implData.blurFramebuffer2
+      );
     }
   }
   releaseTemporalResources(shadowMapParams: ShadowMapParams) {
@@ -325,7 +358,12 @@ export class VSM extends ShadowImpl {
         );
         this.$l.shadow = pb.float(1);
         this.$if(this.inShadow, function () {
-          this.$l.shadowBias = ShadowMapper.computeShadowBiasCSM(shadowMapParams, this, this.NdotL, this.split);
+          this.$l.shadowBias = ShadowMapper.computeShadowBiasCSM(
+            shadowMapParams,
+            this,
+            this.NdotL,
+            this.split
+          );
           this.shadowCoord.z = pb.sub(this.shadowCoord.z, this.shadowBias);
           this.shadow = filterShadowVSM(
             this,
@@ -348,55 +386,75 @@ export class VSM extends ShadowImpl {
   ): PBShaderExp {
     const funcNameComputeShadow = 'lib_computeShadow';
     const pb = scope.$builder;
-    pb.func(
-      funcNameComputeShadow,
-      [pb.vec4('shadowVertex'), pb.float('NdotL')],
-      function () {
-        if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
-          this.$l.dir = pb.sub(this.shadowVertex.xyz, ShaderFramework.getLightPositionAndRangeForShadow(this).xyz);
-          this.$l.distance = pb.div(pb.length(this.dir), ShaderFramework.getLightPositionAndRangeForShadow(this).w);
-          this.$l.shadowBias = ShadowMapper.computeShadowBias(shadowMapParams, this, this.distance, this.NdotL, true);
-          this.$l.coord = pb.vec4(this.dir, pb.sub(this.distance, this.shadowBias));
-          this.$return(
-            filterShadowVSM(this, shadowMapParams.lightType, shadowMapParams.shadowMap.format, this.coord)
-          );
-        } else {
-          this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
-          this.$l.shadowCoord = pb.add(pb.mul(this.shadowCoord, 0.5), 0.5);
-          this.$l.inShadow = pb.all(
-            pb.bvec2(
-              pb.all(
-                pb.bvec4(
-                  pb.greaterThanEqual(this.shadowCoord.x, 0),
-                  pb.lessThanEqual(this.shadowCoord.x, 1),
-                  pb.greaterThanEqual(this.shadowCoord.y, 0),
-                  pb.lessThanEqual(this.shadowCoord.y, 1)
-                )
-              ),
-              pb.lessThanEqual(this.shadowCoord.z, 1)
-            )
-          );
-          this.$l.shadow = pb.float(1);
-          this.$if(this.inShadow, function () {
-            if (shadowMapParams.lightType === LIGHT_TYPE_SPOT) {
-              this.$l.nearFar = ShaderFramework.getShadowCameraParams(this).xy;
-              this.shadowCoord.z = nonLinearDepthToLinearNormalized(this, this.shadowCoord.z, this.nearFar);
-              this.$l.shadowBias = ShadowMapper.computeShadowBias(shadowMapParams, this, this.shadowCoord.z, this.NdotL, true);
-            } else {
-              this.$l.shadowBias = ShadowMapper.computeShadowBias(shadowMapParams, this, this.shadowCoord.z, this.NdotL, false);
-            }
-            this.shadowCoord.z = pb.sub(this.shadowCoord.z, this.shadowBias);
-            this.shadow = filterShadowVSM(
+    pb.func(funcNameComputeShadow, [pb.vec4('shadowVertex'), pb.float('NdotL')], function () {
+      if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
+        this.$l.dir = pb.sub(
+          this.shadowVertex.xyz,
+          ShaderFramework.getLightPositionAndRangeForShadow(this).xyz
+        );
+        this.$l.distance = pb.div(
+          pb.length(this.dir),
+          ShaderFramework.getLightPositionAndRangeForShadow(this).w
+        );
+        this.$l.shadowBias = ShadowMapper.computeShadowBias(
+          shadowMapParams,
+          this,
+          this.distance,
+          this.NdotL,
+          true
+        );
+        this.$l.coord = pb.vec4(this.dir, pb.sub(this.distance, this.shadowBias));
+        this.$return(
+          filterShadowVSM(this, shadowMapParams.lightType, shadowMapParams.shadowMap.format, this.coord)
+        );
+      } else {
+        this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
+        this.$l.shadowCoord = pb.add(pb.mul(this.shadowCoord, 0.5), 0.5);
+        this.$l.inShadow = pb.all(
+          pb.bvec2(
+            pb.all(
+              pb.bvec4(
+                pb.greaterThanEqual(this.shadowCoord.x, 0),
+                pb.lessThanEqual(this.shadowCoord.x, 1),
+                pb.greaterThanEqual(this.shadowCoord.y, 0),
+                pb.lessThanEqual(this.shadowCoord.y, 1)
+              )
+            ),
+            pb.lessThanEqual(this.shadowCoord.z, 1)
+          )
+        );
+        this.$l.shadow = pb.float(1);
+        this.$if(this.inShadow, function () {
+          if (shadowMapParams.lightType === LIGHT_TYPE_SPOT) {
+            this.$l.nearFar = ShaderFramework.getShadowCameraParams(this).xy;
+            this.shadowCoord.z = nonLinearDepthToLinearNormalized(this, this.shadowCoord.z, this.nearFar);
+            this.$l.shadowBias = ShadowMapper.computeShadowBias(
+              shadowMapParams,
               this,
-              shadowMapParams.lightType,
-              shadowMapParams.shadowMap.format,
-              this.shadowCoord
+              this.shadowCoord.z,
+              this.NdotL,
+              true
             );
-          });
-          this.$return(this.shadow);
-        }
+          } else {
+            this.$l.shadowBias = ShadowMapper.computeShadowBias(
+              shadowMapParams,
+              this,
+              this.shadowCoord.z,
+              this.NdotL,
+              false
+            );
+          }
+          this.shadowCoord.z = pb.sub(this.shadowCoord.z, this.shadowBias);
+          this.shadow = filterShadowVSM(
+            this,
+            shadowMapParams.lightType,
+            shadowMapParams.shadowMap.format,
+            this.shadowCoord
+          );
+        });
+        this.$return(this.shadow);
       }
-    );
+    });
     return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL);
   }
   useNativeShadowMap(shadowMapParams: ShadowMapParams): boolean {

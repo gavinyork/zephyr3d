@@ -27,4 +27,3 @@ export class UnlitMaterial extends applyMaterialMixins(MeshMaterial, mixinVertex
     this.outputFragmentColor(scope, this.needFragmentColor(ctx) ? color : null, ctx);
   }
 }
-

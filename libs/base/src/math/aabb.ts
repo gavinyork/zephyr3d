@@ -58,7 +58,7 @@ export class AABB {
     this._minPoint.set(p);
   }
   /** Get the max point of the AABB. */
-   get maxPoint() {
+  get maxPoint() {
     return this._maxPoint;
   }
   set maxPoint(p: Vector3) {
@@ -125,7 +125,7 @@ export class AABB {
    * @param y - The y coordinate of the point.
    * @param z - The z coordinate of the point.
    */
-   extend3(x: number, y: number, z: number) {
+  extend3(x: number, y: number, z: number) {
     if (x < this._minPoint.x) this._minPoint.x = x;
     if (x > this._maxPoint.x) this._maxPoint.x = x;
     if (y < this._minPoint.y) this._minPoint.y = y;
@@ -268,7 +268,7 @@ export class AABB {
    * @param viewProjMatrix - The view projection matrix of the frustum.
    * @returns The clip test result.
    */
-   getClipState(viewProjMatrix: Matrix4x4): ClipState {
+  getClipState(viewProjMatrix: Matrix4x4): ClipState {
     let andFlags = 0xffff;
     let orFlags = 0;
     const v0 = new Vector3();
@@ -328,7 +328,7 @@ export class AABB {
    * @param frustum - The frustum object.
    * @returns The clip test result.
    */
-   getClipStateWithFrustum(frustum: Frustum): ClipState {
+  getClipStateWithFrustum(frustum: Frustum): ClipState {
     let badIntersect = false;
     const cx = (this._maxPoint.x + this._minPoint.x) * 0.5;
     const cy = (this._maxPoint.y + this._minPoint.y) * 0.5;
@@ -353,7 +353,7 @@ export class AABB {
    * @param mask - The frustum planes that needs to be tested.
    * @returns The clip test result.
    */
-   getClipStateWithFrustumMask(frustum: Frustum, mask: number): ClipState {
+  getClipStateWithFrustumMask(frustum: Frustum, mask: number): ClipState {
     let badIntersect = false;
     const cx = (this._maxPoint.x + this._minPoint.x) * 0.5;
     const cy = (this._maxPoint.y + this._minPoint.y) * 0.5;

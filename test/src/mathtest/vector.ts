@@ -1,4 +1,4 @@
-import type { Vector2} from '@zephyr3d/base';
+import type { Vector2 } from '@zephyr3d/base';
 import { Vector3, Vector4, Quaternion, Matrix3x3, Matrix4x4 } from '@zephyr3d/base';
 import { XForm } from '@zephyr3d/scene';
 import { assert, rand, randInt, randNonZero, numberEquals } from './common';
@@ -81,10 +81,7 @@ export function testVectorType(c: VectorConstructor, size: 2 | 3 | 4 | 16) {
       op[0](v1, v2, v3);
       for (let i = 0; i < size; i++) {
         const t = op[2](v1[i], v2[i]);
-        assert(
-          Math.abs(t - v3[i]) < 0.01 && Math.abs(t - v4[i]) < 0.01,
-          `${op[3]} failed`
-        );
+        assert(Math.abs(t - v3[i]) < 0.01 && Math.abs(t - v4[i]) < 0.01, `${op[3]} failed`);
       }
       op[1].bind(v1)(v2 as any);
       assert(v1.equalsTo(v3), `${op[3]} failed`);
@@ -201,40 +198,22 @@ export function testQuaternion() {
     const matY = Matrix3x3.rotationY(angle2);
     const matZ = Matrix3x3.rotationZ(angle3);
     const testMat = new Matrix3x3();
-    const rotMatrixXYZ = Matrix3x3.identity()
-      .multiplyRight(matX)
-      .multiplyRight(matY)
-      .multiplyRight(matZ);
+    const rotMatrixXYZ = Matrix3x3.identity().multiplyRight(matX).multiplyRight(matY).multiplyRight(matZ);
     Quaternion.fromEulerAngle(angle1, angle2, angle3, 'XYZ').toMatrix3x3(testMat);
     assert(testMat.equalsTo(rotMatrixXYZ), 'euler angle XYZ failed');
-    const rotMatrixXZY = Matrix3x3.identity()
-      .multiplyRight(matX)
-      .multiplyRight(matZ)
-      .multiplyRight(matY);
+    const rotMatrixXZY = Matrix3x3.identity().multiplyRight(matX).multiplyRight(matZ).multiplyRight(matY);
     Quaternion.fromEulerAngle(angle1, angle2, angle3, 'XZY').toMatrix3x3(testMat);
     assert(testMat.equalsTo(rotMatrixXZY), 'euler angle XZY failed');
-    const rotMatrixYXZ = Matrix3x3.identity()
-      .multiplyRight(matY)
-      .multiplyRight(matX)
-      .multiplyRight(matZ);
+    const rotMatrixYXZ = Matrix3x3.identity().multiplyRight(matY).multiplyRight(matX).multiplyRight(matZ);
     Quaternion.fromEulerAngle(angle1, angle2, angle3, 'YXZ').toMatrix3x3(testMat);
     assert(testMat.equalsTo(rotMatrixYXZ), 'euler angle YXZ failed');
-    const rotMatrixYZX = Matrix3x3.identity()
-      .multiplyRight(matY)
-      .multiplyRight(matZ)
-      .multiplyRight(matX);
+    const rotMatrixYZX = Matrix3x3.identity().multiplyRight(matY).multiplyRight(matZ).multiplyRight(matX);
     Quaternion.fromEulerAngle(angle1, angle2, angle3, 'YZX').toMatrix3x3(testMat);
     assert(testMat.equalsTo(rotMatrixYZX), 'euler angle YZX failed');
-    const rotMatrixZXY = Matrix3x3.identity()
-      .multiplyRight(matZ)
-      .multiplyRight(matX)
-      .multiplyRight(matY);
+    const rotMatrixZXY = Matrix3x3.identity().multiplyRight(matZ).multiplyRight(matX).multiplyRight(matY);
     Quaternion.fromEulerAngle(angle1, angle2, angle3, 'ZXY').toMatrix3x3(testMat);
     assert(testMat.equalsTo(rotMatrixZXY), 'euler angle ZXY failed');
-    const rotMatrixZYX = Matrix3x3.identity()
-      .multiplyRight(matZ)
-      .multiplyRight(matY)
-      .multiplyRight(matX);
+    const rotMatrixZYX = Matrix3x3.identity().multiplyRight(matZ).multiplyRight(matY).multiplyRight(matX);
     Quaternion.fromEulerAngle(angle1, angle2, angle3, 'ZYX').toMatrix3x3(testMat);
     assert(testMat.equalsTo(rotMatrixZYX), 'euler angle ZYX failed');
     const orders = ['XYZ', 'YXZ', 'ZXY', 'ZYX', 'YZX', 'XZY'] as const;
@@ -244,7 +223,9 @@ export function testQuaternion() {
       const mat = mats[i];
       const v = Quaternion.fromEulerAngle(angle1, angle2, angle3, order).toEulerAngles();
       Quaternion.fromEulerAngle(v.x, v.y, v.z, order).toMatrix3x3(testMat);
-      if(testMat.equalsTo(mat)) { console.log(`to Euler angles: ${order}`); }
+      if (testMat.equalsTo(mat)) {
+        console.log(`to Euler angles: ${order}`);
+      }
     }
   })();
   (function testSlerp() {
@@ -310,10 +291,7 @@ export function testMatrixType(c: MatrixConstructor, rows: number, cols: number)
       op[0](m1, m2, m3);
       for (let i = 0; i < size; i++) {
         const t = op[2](m1[i], m2[i]);
-        assert(
-          Math.abs(t - m3[i]) < 0.01 && Math.abs(t - m4[i]) < 0.01,
-          `${op[3]} failed`
-        );
+        assert(Math.abs(t - m3[i]) < 0.01 && Math.abs(t - m4[i]) < 0.01, `${op[3]} failed`);
       }
       op[1].bind(m1)(m2 as any);
       assert(m1.equalsTo(m3), `${op[3]} failed`);
@@ -336,10 +314,7 @@ export function testMatrixType(c: MatrixConstructor, rows: number, cols: number)
     const m2 = c.identity();
     for (let i = 0; i < size; i++) {
       const val = i % (cols + 1) === 0 ? 1 : 0;
-      assert(
-        Math.abs(m1[i] - val) < 0.01 && Math.abs(m2[i] - val) < 0.01,
-        'identity failed'
-      );
+      assert(Math.abs(m1[i] - val) < 0.01 && Math.abs(m2[i] - val) < 0.01, 'identity failed');
     }
   })();
   (function testInverse() {

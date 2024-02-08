@@ -6,7 +6,7 @@ import {
   blendEquationMap,
   blendFuncMap
 } from './constants_webgpu';
-import type { StencilOp, PrimitiveType, CompareFunc, BlendEquation, BlendFunc} from '@zephyr3d/device';
+import type { StencilOp, PrimitiveType, CompareFunc, BlendEquation, BlendFunc } from '@zephyr3d/device';
 import { PBPrimitiveTypeInfo, PBPrimitiveType } from '@zephyr3d/device';
 import * as rs from './renderstates_webgpu';
 import type { WebGPUVertexLayout } from './vertexlayout_webgpu';
@@ -128,8 +128,8 @@ export class PipelineCache {
     if (!topology) {
       throw new Error(`createPrimitiveState() failed: invalid primitive type: ${primitiveType}`);
     }
-    const rasterizerState = stateSet?.rasterizerState ||
-      (rs.WebGPURasterizerState.defaultState as rs.WebGPURasterizerState);
+    const rasterizerState =
+      stateSet?.rasterizerState || (rs.WebGPURasterizerState.defaultState as rs.WebGPURasterizerState);
     const cullMode = faceModeMap[rasterizerState.cullMode];
     if (!cullMode) {
       throw new Error(`createPrimitiveState() failed: invalid cull mode: ${rasterizerState.cullMode}`);
@@ -151,7 +151,10 @@ export class PipelineCache {
   private createMultisampleState(sampleCount: number, stateSet: WebGPURenderStateSet): GPUMultisampleState {
     return {
       count: sampleCount,
-      alphaToCoverageEnabled: sampleCount > 1 && (stateSet?.blendingState ?? rs.WebGPUBlendingState.defaultState as rs.WebGPUBlendingState).alphaToCoverageEnabled
+      alphaToCoverageEnabled:
+        sampleCount > 1 &&
+        (stateSet?.blendingState ?? (rs.WebGPUBlendingState.defaultState as rs.WebGPUBlendingState))
+          .alphaToCoverageEnabled
     };
   }
   private createDepthStencilState(
@@ -161,10 +164,9 @@ export class PipelineCache {
     if (!depthFormat) {
       return undefined;
     }
-    const depthState = stateSet?.depthState ||
-      (rs.WebGPUDepthState.defaultState as rs.WebGPUDepthState);
-    const stencilState = stateSet?.stencilState ||
-      (rs.WebGPUStencilState.defaultState as rs.WebGPUStencilState);
+    const depthState = stateSet?.depthState || (rs.WebGPUDepthState.defaultState as rs.WebGPUDepthState);
+    const stencilState =
+      stateSet?.stencilState || (rs.WebGPUStencilState.defaultState as rs.WebGPUStencilState);
     const hasStencil = stencilFormats.indexOf(depthFormat) >= 0;
     const hasDepth = depthFormats.indexOf(depthFormat) >= 0;
     const depthWriteEnabled = hasDepth ? depthState.writeEnabled : false;
@@ -215,10 +217,9 @@ export class PipelineCache {
     };
   }
   private createColorTargetState(stateSet: WebGPURenderStateSet, format: GPUTextureFormat) {
-    const blendingState = stateSet?.blendingState ||
-      (rs.WebGPUBlendingState.defaultState as rs.WebGPUBlendingState);
-    const colorState = stateSet?.colorState ||
-      (rs.WebGPUColorState.defaultState as rs.WebGPUColorState);
+    const blendingState =
+      stateSet?.blendingState || (rs.WebGPUBlendingState.defaultState as rs.WebGPUBlendingState);
+    const colorState = stateSet?.colorState || (rs.WebGPUColorState.defaultState as rs.WebGPUColorState);
     const r = colorState.redMask ? GPUColorWrite.RED : 0;
     const g = colorState.greenMask ? GPUColorWrite.GREEN : 0;
     const b = colorState.blueMask ? GPUColorWrite.BLUE : 0;
@@ -275,7 +276,9 @@ export class PipelineCache {
     const programHash = program.hash;
     const vertexHash = vertexData?.getLayouts(program.vertexAttributes).layoutHash || '';
     const stateHash = stateSet?.hash || '';
-    return `${programHash}:${vertexHash}:${fbHash}:${primitiveType}:${stateHash}:${Number(this._device.isWindingOrderReversed())}`;
+    return `${programHash}:${vertexHash}:${fbHash}:${primitiveType}:${stateHash}:${Number(
+      this._device.isWindingOrderReversed()
+    )}`;
   }
   private getComputePipelineHash(program: WebGPUProgram): string {
     return program.hash;

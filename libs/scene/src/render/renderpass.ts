@@ -17,7 +17,7 @@ export abstract class RenderPass {
   /** @internal */
   protected _type: number;
   /** @internal */
-  protected _globalBindGroups: Record<string, { bindGroup: BindGroup, layout: BindGroupLayout }>;
+  protected _globalBindGroups: Record<string, { bindGroup: BindGroup; layout: BindGroupLayout }>;
   /** @internal */
   protected _clearColor: Vector4;
   /** @internal */
@@ -64,9 +64,7 @@ export abstract class RenderPass {
   }
   /** @internal */
   isAutoFlip(): boolean {
-    return !!(
-      Application.instance.device.getFramebuffer() && Application.instance.device.type === 'webgpu'
-    );
+    return !!(Application.instance.device.getFramebuffer() && Application.instance.device.type === 'webgpu');
   }
   /**
    * Renders a scene
@@ -81,7 +79,7 @@ export abstract class RenderPass {
     device.setRenderStates(stateSet);
   }
   /** @internal */
-  protected getGlobalBindGroupInfo(ctx: DrawContext): { bindGroup: BindGroup, layout: BindGroupLayout } {
+  protected getGlobalBindGroupInfo(ctx: DrawContext): { bindGroup: BindGroup; layout: BindGroupLayout } {
     const hash = this.getGlobalBindGroupHash(ctx);
     let bindGroup = this._globalBindGroups[hash];
     if (!bindGroup) {
@@ -156,8 +154,13 @@ export abstract class RenderPass {
     return null;
   }
   /** @internal */
-  protected drawItem(device: AbstractDevice, item: RenderQueueItem, ctx: DrawContext, reverseWinding: boolean) {
-    const reverse = reverseWinding !== (item.drawable.getXForm().worldMatrixDet < 0);
+  protected drawItem(
+    device: AbstractDevice,
+    item: RenderQueueItem,
+    ctx: DrawContext,
+    reverseWinding: boolean
+  ) {
+    const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
     if (reverse) {
       device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
     }

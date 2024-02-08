@@ -1,4 +1,4 @@
-import type { Vector4, TypedArray} from '@zephyr3d/base';
+import type { Vector4, TypedArray } from '@zephyr3d/base';
 import { makeEventTarget } from '@zephyr3d/base';
 import type {
   WebGLContext,
@@ -305,8 +305,12 @@ export class WebGLDevice extends BaseDevice {
   createSampler(options: SamplerOptions): TextureSampler {
     return this._samplerCache.fetchSampler(options);
   }
-  createTextureFromMipmapData<T extends BaseTexture>(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): T {
-    if(!data) {
+  createTextureFromMipmapData<T extends BaseTexture>(
+    data: TextureMipmapData,
+    sRGB: boolean,
+    options?: TextureCreationOptions
+  ): T {
+    if (!data) {
       console.error(`Device.createTextureFromMipmapData() failed: invalid data`);
       return null;
     }
@@ -318,7 +322,7 @@ export class WebGLDevice extends BaseDevice {
       const tex = new WebGLTexture3D(this);
       tex.createWithMipmapData(data, this.parseTextureOptions(options));
       return tex as unknown as T;
-    } else if (data.isArray){
+    } else if (data.isArray) {
       const tex = new WebGLTexture2DArray(this);
       tex.createWithMipmapData(data, this.parseTextureOptions(options));
       return tex as unknown as T;
@@ -343,7 +347,11 @@ export class WebGLDevice extends BaseDevice {
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
-  createTexture2DFromMipmapData(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): Texture2D {
+  createTexture2DFromMipmapData(
+    data: TextureMipmapData,
+    sRGB: boolean,
+    options?: TextureCreationOptions
+  ): Texture2D {
     const tex = (options?.texture as WebGLTexture2D) ?? new WebGLTexture2D(this);
     if (!tex.isTexture2D()) {
       console.error('createTexture2DFromMipmapData() failed: options.texture must be 2d texture');
@@ -353,7 +361,11 @@ export class WebGLDevice extends BaseDevice {
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
-  createTexture2DFromImage(element: TextureImageElement, sRGB: boolean, options?: TextureCreationOptions): Texture2D {
+  createTexture2DFromImage(
+    element: TextureImageElement,
+    sRGB: boolean,
+    options?: TextureCreationOptions
+  ): Texture2D {
     const tex = (options?.texture as WebGLTexture2D) ?? new WebGLTexture2D(this);
     if (!tex.isTexture2D()) {
       console.error('createTexture2DFromImage() failed: options.texture must be 2d texture');
@@ -379,7 +391,11 @@ export class WebGLDevice extends BaseDevice {
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
-  createTexture2DArrayFromImages(elements: TextureImageElement[], sRGB: boolean, options?: TextureCreationOptions): Texture2DArray {
+  createTexture2DArrayFromImages(
+    elements: TextureImageElement[],
+    sRGB: boolean,
+    options?: TextureCreationOptions
+  ): Texture2DArray {
     if (!elements || elements.length === 0) {
       console.error('createTexture2DArrayFromImages() failed: Invalid image elements');
       return null;
@@ -402,15 +418,25 @@ export class WebGLDevice extends BaseDevice {
     let tex: Texture2DArray = options?.texture as Texture2DArray;
     if (tex) {
       if (tex.depth !== elements.length) {
-        console.error('createTexture2DArrayFromImages() failed: Layer count of options.texture not match the given image elements');
+        console.error(
+          'createTexture2DArrayFromImages() failed: Layer count of options.texture not match the given image elements'
+        );
         return null;
       }
       if (tex.width !== width || tex.height !== height) {
-        console.error('createTexture2DArrayFromImages() failed: Size of options.texture not match the given image elements');
+        console.error(
+          'createTexture2DArrayFromImages() failed: Size of options.texture not match the given image elements'
+        );
         return null;
       }
     } else {
-      tex = this.createTexture2DArray(sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm', width, height, elements.length, options);
+      tex = this.createTexture2DArray(
+        sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm',
+        width,
+        height,
+        elements.length,
+        options
+      );
       for (let i = 0; i < elements.length; i++) {
         tex.updateFromElement(elements[i], 0, 0, i, 0, 0, width, height);
       }
@@ -448,7 +474,11 @@ export class WebGLDevice extends BaseDevice {
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
-  createCubeTextureFromMipmapData(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): TextureCube {
+  createCubeTextureFromMipmapData(
+    data: TextureMipmapData,
+    sRGB: boolean,
+    options?: TextureCreationOptions
+  ): TextureCube {
     const tex = (options?.texture as WebGLTextureCube) ?? new WebGLTextureCube(this);
     if (!tex.isTextureCube()) {
       console.error('createCubeTextureFromMipmapData() failed: options.texture must be cube texture');
@@ -458,7 +488,10 @@ export class WebGLDevice extends BaseDevice {
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
-  createTexture2DArrayFromMipmapData(data: TextureMipmapData, options?: TextureCreationOptions): Texture2DArray {
+  createTexture2DArrayFromMipmapData(
+    data: TextureMipmapData,
+    options?: TextureCreationOptions
+  ): Texture2DArray {
     const tex = (options?.texture as WebGLTextureCube) ?? new WebGLTexture2DArray(this);
     if (!tex.isTexture2DArray()) {
       console.error('createTexture2DArrayFromMipmapData() failed: options.texture must be 2d array texture');
@@ -505,7 +538,11 @@ export class WebGLDevice extends BaseDevice {
   createVertexLayout(options: VertexLayoutOptions): VertexLayout {
     return new WebGLVertexLayout(this, options);
   }
-  createFrameBuffer(colorAttachments: BaseTexture[], depthAttachement: BaseTexture, options?: FrameBufferOptions): FrameBuffer {
+  createFrameBuffer(
+    colorAttachments: BaseTexture[],
+    depthAttachement: BaseTexture,
+    options?: FrameBufferOptions
+  ): FrameBuffer {
     this.pushDeviceStates();
     const fb = new WebGLFrameBuffer(this, colorAttachments, depthAttachement, options);
     this.popDeviceStates();
@@ -522,7 +559,7 @@ export class WebGLDevice extends BaseDevice {
     return [this._currentBindGroups[index], this._currentBindGroupOffsets[index]];
   }
   // render related
-  setViewport(vp?: number[]|DeviceViewport) {
+  setViewport(vp?: number[] | DeviceViewport) {
     if (vp === null || vp === undefined || (!Array.isArray(vp) && vp.default)) {
       this._currentViewport = {
         x: 0,
@@ -554,7 +591,7 @@ export class WebGLDevice extends BaseDevice {
   getViewport(): DeviceViewport {
     return Object.assign({}, this._currentViewport);
   }
-  setScissor(scissor?: number[]|DeviceViewport) {
+  setScissor(scissor?: number[] | DeviceViewport) {
     if (scissor === null || scissor === undefined || (!Array.isArray(scissor) && scissor.default)) {
       this._currentScissorRect = {
         x: 0,
@@ -625,7 +662,14 @@ export class WebGLDevice extends BaseDevice {
   flush(): void {
     this.context.flush();
   }
-  async readPixels(index: number, x: number, y: number, w: number, h: number, buffer: TypedArray): Promise<void> {
+  async readPixels(
+    index: number,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    buffer: TypedArray
+  ): Promise<void> {
     const fb = this.getFramebuffer();
     const colorAttachment = fb ? fb.getColorAttachments()[index] : null;
     const format = colorAttachment ? colorAttachment.format : 'rgba8unorm';
@@ -647,7 +691,7 @@ export class WebGLDevice extends BaseDevice {
     if (isWebGL2(this.context)) {
       const stagingBuffer = this.createBuffer(byteSize, {
         usage: 'read',
-        managed: false,
+        managed: false
       });
       this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, stagingBuffer.object);
       this.context.readBuffer(fb ? WebGLEnum.COLOR_ATTACHMENT0 + index : WebGLEnum.COLOR_ATTACHMENT0);
@@ -658,15 +702,7 @@ export class WebGLDevice extends BaseDevice {
       await stagingBuffer.getBufferSubData(data);
       stagingBuffer.dispose();
     } else {
-      this.context.readPixels(
-        x,
-        y,
-        w,
-        h,
-        glFormat,
-        glType,
-        buffer
-      );
+      this.context.readPixels(x, y, w, h, glFormat, glType, buffer);
     }
   }
   readPixelsToBuffer(index: number, x: number, y: number, w: number, h: number, buffer: GPUDataBuffer): void {
@@ -751,7 +787,9 @@ export class WebGLDevice extends BaseDevice {
             const offsets = this._currentBindGroupOffsets[i];
             bindGroup.apply(this._currentProgram, offsets);
           } else {
-            console.error(`Missing bind group (${i}) when drawing with program '${this._currentProgram.name}'`);
+            console.error(
+              `Missing bind group (${i}) when drawing with program '${this._currentProgram.name}'`
+            );
             return;
           }
         }
@@ -915,7 +953,7 @@ export class WebGLDevice extends BaseDevice {
       framebufferCaps: new WebGLFramebufferCaps(this._context),
       shaderCaps: new WebGLShaderCaps(this._context),
       textureCaps: new WebGLTextureCaps(this._context)
-    }
+    };
     this._vaoExt = this.createVertexArrayObjectEXT();
     this._instancedArraysExt = this.createInstancedArraysEXT();
     this._drawBuffersExt = this.createDrawBuffersEXT();
@@ -954,7 +992,11 @@ let webGL1Supported = null;
 let webGL2Supported = null;
 const factory = makeEventTarget(WebGLDevice)<DeviceEventMap>();
 
-async function createWebGLDevice(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions): Promise<AbstractDevice> {
+async function createWebGLDevice(
+  backend: DeviceBackend,
+  cvs: HTMLCanvasElement,
+  options?: DeviceOptions
+): Promise<AbstractDevice> {
   try {
     const device = new factory(backend, cvs, options);
     await device.initContext();
@@ -984,8 +1026,8 @@ export const backend1: DeviceBackend = {
   },
   async createDevice(cvs, options?) {
     return createWebGLDevice(this, cvs, options);
-  },
-}
+  }
+};
 
 /** @internal */
 export const backend2: DeviceBackend = {
@@ -1004,6 +1046,5 @@ export const backend2: DeviceBackend = {
   },
   async createDevice(cvs, options?) {
     return createWebGLDevice(this, cvs, options);
-  },
-}
-
+  }
+};

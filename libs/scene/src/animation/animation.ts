@@ -83,7 +83,7 @@ export class AnimationClip {
   dispose() {
     this._model = null;
     this._tracks = null;
-    this._skeletons?.forEach((val, key) => key.dispose()) ;
+    this._skeletons?.forEach((val, key) => key.dispose());
     this._skeletons = null;
   }
   /** Gets the name of the animation */

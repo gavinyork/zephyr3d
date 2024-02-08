@@ -1,8 +1,16 @@
-import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, RenderStateSet, Texture2D, TextureSampler } from "@zephyr3d/device";
-import { Application } from "../app";
-import { AbstractPostEffect } from "./posteffect";
-import { TemporalCache, type DrawContext } from "../render";
-import { Vector2, Vector4 } from "@zephyr3d/base";
+import type {
+  AbstractDevice,
+  BindGroup,
+  FrameBuffer,
+  GPUProgram,
+  RenderStateSet,
+  Texture2D,
+  TextureSampler
+} from '@zephyr3d/device';
+import { Application } from '../app';
+import { AbstractPostEffect } from './posteffect';
+import { TemporalCache, type DrawContext } from '../render';
+import { Vector2, Vector4 } from '@zephyr3d/base';
 
 /**
  * The bloom post effect
@@ -98,12 +106,29 @@ export class Bloom extends AbstractPostEffect {
     device.pushDeviceStates();
     const w = Math.max(inputColorTexture.width >> 1, 1);
     const h = Math.max(inputColorTexture.height >> 1, 1);
-    const prefilterFramebuffer = TemporalCache.getFramebufferFixedSize(w, h, 1, inputColorTexture.format, null, '2d', null, false);
+    const prefilterFramebuffer = TemporalCache.getFramebufferFixedSize(
+      w,
+      h,
+      1,
+      inputColorTexture.format,
+      null,
+      '2d',
+      null,
+      false
+    );
     this.prefilter(device, inputColorTexture, prefilterFramebuffer);
-    this.downsample(device, prefilterFramebuffer.getColorAttachments()[0] as Texture2D, downsampleFramebuffers);
+    this.downsample(
+      device,
+      prefilterFramebuffer.getColorAttachments()[0] as Texture2D,
+      downsampleFramebuffers
+    );
     this.upsample(device, downsampleFramebuffers);
     device.popDeviceStates();
-    this.finalCompose(device, inputColorTexture, downsampleFramebuffers[0].getColorAttachments()[0] as Texture2D);
+    this.finalCompose(
+      device,
+      inputColorTexture,
+      downsampleFramebuffers[0].getColorAttachments()[0] as Texture2D
+    );
     for (const fb of downsampleFramebuffers) {
       TemporalCache.releaseFramebuffer(fb);
     }
@@ -129,7 +154,7 @@ export class Bloom extends AbstractPostEffect {
     device.setProgram(Bloom._programFinalCompose);
     device.setBindGroup(0, this._bindgroupFinalCompose);
     this._bindgroupFinalCompose.setTexture('srcTex', srcTexture);
-    this._bindgroupFinalCompose.setTexture('bloomTex', bloomTexture)
+    this._bindgroupFinalCompose.setTexture('bloomTex', bloomTexture);
     this._bindgroupFinalCompose.setValue('intensity', this._intensity);
     this._bindgroupFinalCompose.setValue('flip', device.type === 'webgpu' && device.getFramebuffer() ? 1 : 0);
     this.drawFullscreenQuad();
@@ -140,7 +165,7 @@ export class Bloom extends AbstractPostEffect {
     device.setBindGroup(0, this._bindgroupUpsample);
     this._bindgroupUpsample.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     for (let i = framebuffers.length - 2; i >= 0; i--) {
-      this._bindgroupUpsample.setTexture('tex', framebuffers[i+1].getColorAttachments()[0]);
+      this._bindgroupUpsample.setTexture('tex', framebuffers[i + 1].getColorAttachments()[0]);
       device.setFramebuffer(framebuffers[i]);
       this.drawFullscreenQuad(Bloom._renderStateAdditive);
     }
@@ -155,12 +180,30 @@ export class Bloom extends AbstractPostEffect {
     this._bindgroupDownsampleH.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     this._bindgroupDownsampleV.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     while ((w >= t || h >= t) && maxLevels > 0) {
-      const fb = TemporalCache.getFramebufferFixedSize(w, h, 1, inputColorTexture.format, null, '2d', '2d', false);
-      const fbMiddle = TemporalCache.getFramebufferFixedSize(w, h, 1, inputColorTexture.format, null, '2d', '2d', false);
+      const fb = TemporalCache.getFramebufferFixedSize(
+        w,
+        h,
+        1,
+        inputColorTexture.format,
+        null,
+        '2d',
+        '2d',
+        false
+      );
+      const fbMiddle = TemporalCache.getFramebufferFixedSize(
+        w,
+        h,
+        1,
+        inputColorTexture.format,
+        null,
+        '2d',
+        '2d',
+        false
+      );
       framebuffers.push(fb);
 
       // horizonal blur
-      this._invTexSize.setXY(1/sourceTex.width, 1/sourceTex.height);
+      this._invTexSize.setXY(1 / sourceTex.width, 1 / sourceTex.height);
       device.setFramebuffer(fbMiddle);
       device.setProgram(Bloom._programDownsampleH);
       device.setBindGroup(0, this._bindgroupDownsampleH);
@@ -170,7 +213,7 @@ export class Bloom extends AbstractPostEffect {
 
       // vertical blur
       const midTex = fbMiddle.getColorAttachments()[0];
-      this._invTexSize.setXY(1/midTex.width, 1/midTex.height);
+      this._invTexSize.setXY(1 / midTex.width, 1 / midTex.height);
       device.setFramebuffer(fb);
       device.setProgram(Bloom._programDownsampleV);
       device.setBindGroup(0, this._bindgroupDownsampleV);
@@ -196,7 +239,7 @@ export class Bloom extends AbstractPostEffect {
           pb.main(function () {
             this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
             this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-            this.$if (pb.notEqual(this.flip, 0), function(){
+            this.$if(pb.notEqual(this.flip, 0), function () {
               this.$builtins.position.y = pb.neg(this.$builtins.position.y);
             });
           });
@@ -206,10 +249,13 @@ export class Bloom extends AbstractPostEffect {
           this.bloomTex = pb.tex2D().uniform(0);
           this.intensity = pb.float().uniform(0);
           this.$outputs.outColor = pb.vec4();
-          pb.main(function() {
+          pb.main(function () {
             this.$l.srcSample = pb.textureSampleLevel(this.srcTex, this.$inputs.uv, 0);
             this.$l.bloomSample = pb.textureSampleLevel(this.bloomTex, this.$inputs.uv, 0);
-            this.$outputs.outColor = pb.vec4(pb.add(this.srcSample.rgb, pb.mul(this.bloomSample.rgb, this.intensity)), 1);
+            this.$outputs.outColor = pb.vec4(
+              pb.add(this.srcSample.rgb, pb.mul(this.bloomSample.rgb, this.intensity)),
+              1
+            );
           });
         }
       });
@@ -226,7 +272,7 @@ export class Bloom extends AbstractPostEffect {
           pb.main(function () {
             this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
             this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-            this.$if (pb.notEqual(this.flip, 0), function(){
+            this.$if(pb.notEqual(this.flip, 0), function () {
               this.$builtins.position.y = pb.neg(this.$builtins.position.y);
             });
           });
@@ -235,12 +281,15 @@ export class Bloom extends AbstractPostEffect {
           this.tex = pb.tex2D().uniform(0);
           this.threshold = pb.vec4().uniform(0);
           this.$outputs.outColor = pb.vec4();
-          pb.main(function() {
+          pb.main(function () {
             this.$l.p = pb.textureSampleLevel(this.tex, this.$inputs.uv, 0);
             this.$l.brightness = pb.max(pb.max(this.p.r, this.p.g), this.p.b);
             this.$l.soft = pb.clamp(pb.add(this.brightness, this.threshold.y), 0, this.threshold.z);
             this.soft = pb.mul(this.soft, this.soft, this.threshold.w);
-            this.$l.contrib = pb.div(pb.max(this.soft, pb.sub(this.brightness, this.threshold.x)), pb.max(this.brightness, 0.00001));
+            this.$l.contrib = pb.div(
+              pb.max(this.soft, pb.sub(this.brightness, this.threshold.x)),
+              pb.max(this.brightness, 0.00001)
+            );
             this.$outputs.outColor = pb.vec4(pb.mul(this.p.rgb, this.contrib), 1);
           });
         }
@@ -258,7 +307,7 @@ export class Bloom extends AbstractPostEffect {
           pb.main(function () {
             this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
             this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-            this.$if (pb.notEqual(this.flip, 0), function(){
+            this.$if(pb.notEqual(this.flip, 0), function () {
               this.$builtins.position.y = pb.neg(this.$builtins.position.y);
             });
           });
@@ -266,7 +315,7 @@ export class Bloom extends AbstractPostEffect {
         fragment(pb) {
           this.tex = pb.tex2D().uniform(0);
           this.$outputs.outColor = pb.vec4();
-          pb.main(function() {
+          pb.main(function () {
             this.$outputs.outColor = pb.textureSampleLevel(this.tex, this.$inputs.uv, 0);
           });
         }
@@ -277,7 +326,10 @@ export class Bloom extends AbstractPostEffect {
     }
     if (!Bloom._programDownsampleH) {
       const offsets = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
-      const weights = [0.01621622, 0.05405405, 0.12162162, 0.19459459, 0.22702703, 0.19459459, 0.12162162, 0.05405405, 0.01621622];
+      const weights = [
+        0.01621622, 0.05405405, 0.12162162, 0.19459459, 0.22702703, 0.19459459, 0.12162162, 0.05405405,
+        0.01621622
+      ];
       Bloom._programDownsampleH = device.buildRenderProgram({
         vertex(pb) {
           this.flip = pb.int().uniform(0);
@@ -286,7 +338,7 @@ export class Bloom extends AbstractPostEffect {
           pb.main(function () {
             this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
             this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-            this.$if (pb.notEqual(this.flip, 0), function(){
+            this.$if(pb.notEqual(this.flip, 0), function () {
               this.$builtins.position.y = pb.neg(this.$builtins.position.y);
             });
           });
@@ -295,12 +347,18 @@ export class Bloom extends AbstractPostEffect {
           this.invTexSize = pb.vec2().uniform(0);
           this.tex = pb.tex2D().uniform(0);
           this.$outputs.outColor = pb.vec4();
-          pb.main(function() {
+          pb.main(function () {
             this.$l.sum = pb.vec3(0);
             this.$l.offset = pb.float();
             for (let i = 0; i < 9; i++) {
               this.offset = pb.mul(this.invTexSize.x, offsets[i] * 2);
-              this.sum = pb.add(this.sum, pb.mul(pb.textureSampleLevel(this.tex, pb.add(this.$inputs.uv, pb.vec2(this.offset, 0)), 0).rgb, weights[i]));
+              this.sum = pb.add(
+                this.sum,
+                pb.mul(
+                  pb.textureSampleLevel(this.tex, pb.add(this.$inputs.uv, pb.vec2(this.offset, 0)), 0).rgb,
+                  weights[i]
+                )
+              );
             }
             this.$outputs.outColor = pb.vec4(this.sum, 1);
           });
@@ -321,7 +379,7 @@ export class Bloom extends AbstractPostEffect {
           pb.main(function () {
             this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
             this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-            this.$if (pb.notEqual(this.flip, 0), function(){
+            this.$if(pb.notEqual(this.flip, 0), function () {
               this.$builtins.position.y = pb.neg(this.$builtins.position.y);
             });
           });
@@ -330,12 +388,18 @@ export class Bloom extends AbstractPostEffect {
           this.invTexSize = pb.vec2().uniform(0);
           this.tex = pb.tex2D().uniform(0);
           this.$outputs.outColor = pb.vec4();
-          pb.main(function() {
+          pb.main(function () {
             this.$l.sum = pb.vec3(0);
             this.$l.offset = pb.float();
             for (let i = 0; i < 5; i++) {
               this.offset = pb.mul(this.invTexSize.y, offsets[i]);
-              this.sum = pb.add(this.sum, pb.mul(pb.textureSampleLevel(this.tex, pb.add(this.$inputs.uv, pb.vec2(0, this.offset)), 0).rgb, weights[i]));
+              this.sum = pb.add(
+                this.sum,
+                pb.mul(
+                  pb.textureSampleLevel(this.tex, pb.add(this.$inputs.uv, pb.vec2(0, this.offset)), 0).rgb,
+                  weights[i]
+                )
+              );
             }
             this.$outputs.outColor = pb.vec4(this.sum, 1);
           });
@@ -358,7 +422,11 @@ export class Bloom extends AbstractPostEffect {
       Bloom._renderStateAdditive = device.createRenderStateSet();
       Bloom._renderStateAdditive.useRasterizerState().setCullMode('none');
       Bloom._renderStateAdditive.useDepthState().enableTest(false).enableWrite(false);
-      Bloom._renderStateAdditive.useBlendingState().enable(true).setBlendFuncRGB('one', 'one').setBlendFuncAlpha('one', 'zero');
+      Bloom._renderStateAdditive
+        .useBlendingState()
+        .enable(true)
+        .setBlendFuncRGB('one', 'one')
+        .setBlendFuncAlpha('one', 'zero');
     }
   }
   /** {@inheritDoc AbstractPostEffect.dispose} */

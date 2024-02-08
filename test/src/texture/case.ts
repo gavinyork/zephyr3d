@@ -6,10 +6,18 @@ import type {
   TextureCube,
   TextureVideo,
   BindGroup,
-  RenderStateSet,
+  RenderStateSet
 } from '@zephyr3d/device';
-import type { AssetManager} from '@zephyr3d/scene';
-import { BoxShape, panoramaToCubemap, prefilterCubemap, projectCubemap, projectCubemapCPU, Application, linearToGamma } from '@zephyr3d/scene';
+import type { AssetManager } from '@zephyr3d/scene';
+import {
+  BoxShape,
+  panoramaToCubemap,
+  prefilterCubemap,
+  projectCubemap,
+  projectCubemapCPU,
+  Application,
+  linearToGamma
+} from '@zephyr3d/scene';
 
 const cubeMap = './assets/images/environments/cloudy.hdr';
 
@@ -317,10 +325,7 @@ export class TestTexture3D extends TextureTestCase {
         this.$outputs.color = pb.vec4();
         pb.main(function () {
           this.$outputs.color = pb.textureSample(this.tex, this.$inputs.texcoord);
-          this.$outputs.color = pb.vec4(
-            linearToGamma(this, this.$outputs.color.rgb),
-            this.$outputs.color.w
-          );
+          this.$outputs.color = pb.vec4(linearToGamma(this, this.$outputs.color.rgb), this.$outputs.color.w);
         });
       }
     });
@@ -466,7 +471,9 @@ export class TestTextureCube extends TextureTestCase {
     this.srcTex = Application.instance.device.createCubeTexture(tex.format, 128);
     panoramaToCubemap(tex, this.srcTex);
     tex.dispose();
-    this.prefilteredTex = Application.instance.device.createCubeTexture('rgba16f', 128, { samplerOptions: { mipFilter: 'none' } });
+    this.prefilteredTex = Application.instance.device.createCubeTexture('rgba16f', 128, {
+      samplerOptions: { mipFilter: 'none' }
+    });
     prefilterCubemap(this.srcTex, 'lambertian', this.prefilteredTex, 300);
     return this.srcTex;
   }
@@ -512,10 +519,7 @@ export class TestTextureCubePMREM extends TextureTestCase {
         this.$outputs.color = pb.vec4();
         pb.main(function () {
           this.$outputs.color = pb.textureSample(this.tex, pb.normalize(this.$inputs.texcoord));
-          this.$outputs.color = pb.vec4(
-            linearToGamma(this, this.$outputs.color.rgb),
-            this.$outputs.color.w
-          );
+          this.$outputs.color = pb.vec4(linearToGamma(this, this.$outputs.color.rgb), this.$outputs.color.w);
         });
       }
     });
@@ -529,7 +533,9 @@ export class TestTextureCubePMREM extends TextureTestCase {
     srcTex.dispose();
     return prefilteredTex;
     */
-    const srcTex = (await this.assetManager.fetchTexture(`./assets/images/environments/Colorful_Studio.hdr`)) as Texture2D;
+    const srcTex = (await this.assetManager.fetchTexture(
+      `./assets/images/environments/Colorful_Studio.hdr`
+    )) as Texture2D;
     const tex = Application.instance.device.createCubeTexture(srcTex.format, 256);
     panoramaToCubemap(srcTex, tex);
     //const prefilteredTex = prefilterCubemap(tex, 'lambertian', 64);
@@ -592,31 +598,31 @@ export class TestTextureCubeSH extends TextureTestCase {
         ]);
         this.sh = structSH().uniform(0);
         this.$outputs.color = pb.vec4();
-        pb.func('Y0', [pb.vec3('v')], function(){
+        pb.func('Y0', [pb.vec3('v')], function () {
           this.$return(0.2820947917);
         });
-        pb.func('Y1', [pb.vec3('v')], function(){
+        pb.func('Y1', [pb.vec3('v')], function () {
           this.$return(pb.mul(this.v.y, -0.4886025119));
         });
-        pb.func('Y2', [pb.vec3('v')], function(){
+        pb.func('Y2', [pb.vec3('v')], function () {
           this.$return(pb.mul(this.v.z, 0.4886025119));
         });
-        pb.func('Y3', [pb.vec3('v')], function(){
+        pb.func('Y3', [pb.vec3('v')], function () {
           this.$return(pb.mul(this.v.x, -0.4886025119));
         });
-        pb.func('Y4', [pb.vec3('v')], function(){
+        pb.func('Y4', [pb.vec3('v')], function () {
           this.$return(pb.mul(this.v.x, this.v.y, 1.0925484306));
         });
-        pb.func('Y5', [pb.vec3('v')], function(){
+        pb.func('Y5', [pb.vec3('v')], function () {
           this.$return(pb.mul(this.v.y, this.v.z, -1.0925484306));
         });
-        pb.func('Y6', [pb.vec3('v')], function(){
+        pb.func('Y6', [pb.vec3('v')], function () {
           this.$return(pb.mul(pb.sub(pb.mul(this.v.z, this.v.z, 3), 1), 0.3153915652));
         });
-        pb.func('Y7', [pb.vec3('v')], function(){
+        pb.func('Y7', [pb.vec3('v')], function () {
           this.$return(pb.mul(this.v.x, this.v.z, -1.0925484306));
         });
-        pb.func('Y8', [pb.vec3('v')], function(){
+        pb.func('Y8', [pb.vec3('v')], function () {
           this.$return(pb.mul(pb.sub(pb.mul(this.v.x, this.v.x), pb.mul(this.v.y, this.v.y)), 0.5462742153));
         });
         pb.main(function () {
@@ -640,7 +646,9 @@ export class TestTextureCubeSH extends TextureTestCase {
     const hdrTex = await this.assetManager.fetchTexture<Texture2D>(cubeMap);
     this.srcTex = Application.instance.device.createCubeTexture(hdrTex.format, hdrTex.height);
     panoramaToCubemap(hdrTex, this.srcTex);
-    this.prefiltered = Application.instance.device.createCubeTexture('rgba16f', 64, { samplerOptions: { mipFilter: 'none' } });
+    this.prefiltered = Application.instance.device.createCubeTexture('rgba16f', 64, {
+      samplerOptions: { mipFilter: 'none' }
+    });
     prefilterCubemap(this.srcTex, 'lambertian', this.prefiltered, 2048);
     hdrTex.dispose();
     if (1) {

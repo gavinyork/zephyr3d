@@ -11,8 +11,7 @@ import type {
   FaceWinding,
   StencilOp
 } from '@zephyr3d/device';
-import { PBPrimitiveType
-} from '@zephyr3d/device';
+import { PBPrimitiveType } from '@zephyr3d/device';
 import { WebGLEnum } from './webgl_enum';
 
 export const blendEquationMap: Record<BlendEquation, number> = {
@@ -68,9 +67,9 @@ export const blendFuncInvMap: Record<number, BlendFunc> = {
 };
 
 export const faceModeMap: Record<FaceMode, number> = {
-  'none': WebGLEnum.NONE,
-  'front': WebGLEnum.FRONT,
-  'back': WebGLEnum.BACK
+  none: WebGLEnum.NONE,
+  front: WebGLEnum.FRONT,
+  back: WebGLEnum.BACK
 };
 
 export const faceModeInvMap: Record<number, FaceMode> = {
@@ -80,8 +79,8 @@ export const faceModeInvMap: Record<number, FaceMode> = {
 };
 
 export const faceWindingMap: Record<FaceWinding, number> = {
-  'cw': WebGLEnum.CW,
-  'ccw': WebGLEnum.CCW
+  cw: WebGLEnum.CW,
+  ccw: WebGLEnum.CCW
 };
 
 export const faceWindingInvMap: Record<number, FaceWinding> = {
@@ -90,14 +89,14 @@ export const faceWindingInvMap: Record<number, FaceWinding> = {
 };
 
 export const stencilOpMap: Record<StencilOp, number> = {
-  'keep': WebGLEnum.KEEP,
-  'zero': WebGLEnum.ZERO,
-  'replace': WebGLEnum.REPLACE,
-  'incr': WebGLEnum.INCR,
+  keep: WebGLEnum.KEEP,
+  zero: WebGLEnum.ZERO,
+  replace: WebGLEnum.REPLACE,
+  incr: WebGLEnum.INCR,
   'incr-wrap': WebGLEnum.INCR_WRAP,
-  'decr': WebGLEnum.DECR,
+  decr: WebGLEnum.DECR,
   'decr-wrap': WebGLEnum.DECR_WRAP,
-  'invert': WebGLEnum.INVERT
+  invert: WebGLEnum.INVERT
 };
 
 export const stencilOpInvMap: Record<number, StencilOp> = {

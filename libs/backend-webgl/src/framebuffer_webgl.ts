@@ -1,5 +1,5 @@
 import { CubeFace } from '@zephyr3d/base';
-import type { BaseTexture, FrameBuffer, FrameBufferOptions} from '@zephyr3d/device';
+import type { BaseTexture, FrameBuffer, FrameBufferOptions } from '@zephyr3d/device';
 import { hasStencilChannel } from '@zephyr3d/device';
 import { WebGLGPUObject } from './gpuobject_webgl';
 import { WebGLEnum } from './webgl_enum';
@@ -13,14 +13,14 @@ type FrameBufferTextureAttachment = {
   layer?: number;
   level?: number;
   generateMipmaps?: boolean;
-}
+};
 
 type Options = {
   colorAttachments?: FrameBufferTextureAttachment[];
   depthAttachment?: FrameBufferTextureAttachment;
   sampleCount?: number;
   ignoreDepthStencil?: boolean;
-}
+};
 
 const STATUS_UNCHECKED = 0;
 const STATUS_OK = 1;
@@ -42,11 +42,19 @@ export class WebGLFrameBuffer
   private _depthAttachmentTarget: number;
   private _colorAttachmentsAA: WebGLRenderbuffer[];
   private _depthAttachmentAA: WebGLRenderbuffer;
-  private _intermediateAttachments: Map<BaseTexture, { texture: WebGLTexture, width: number, height: number }[]>;
+  private _intermediateAttachments: Map<
+    BaseTexture,
+    { texture: WebGLTexture; width: number; height: number }[]
+  >;
   private _framebufferAA: WebGLFramebuffer;
-  constructor(device: WebGLDevice, colorAttachments: BaseTexture[], depthAttachment: BaseTexture, opt?: FrameBufferOptions) {
+  constructor(
+    device: WebGLDevice,
+    colorAttachments: BaseTexture[],
+    depthAttachment: BaseTexture,
+    opt?: FrameBufferOptions
+  ) {
     super(device);
-    if (colorAttachments.length > 0 && colorAttachments.findIndex(val => !val) >= 0) {
+    if (colorAttachments.length > 0 && colorAttachments.findIndex((val) => !val) >= 0) {
       throw new Error('WebGLFramebuffer(): invalid color attachments');
     }
     this._object = null;
@@ -60,37 +68,50 @@ export class WebGLFrameBuffer
     this._status = STATUS_UNCHECKED;
     this._statusAA = STATUS_UNCHECKED;
     this._options = {
-      colorAttachments: colorAttachments?.length > 0
-        ? colorAttachments.map(value =>({
-            texture: value,
+      colorAttachments:
+        colorAttachments?.length > 0
+          ? colorAttachments.map((value) => ({
+              texture: value,
+              face: 0,
+              layer: 0,
+              level: 0,
+              generateMipmaps: true
+            }))
+          : null,
+      depthAttachment: depthAttachment
+        ? {
+            texture: depthAttachment,
             face: 0,
             layer: 0,
             level: 0,
-            generateMipmaps: true
-          }))
+            generateMipmaps: false
+          }
         : null,
-      depthAttachment: depthAttachment ? {
-        texture: depthAttachment,
-        face: 0,
-        layer: 0,
-        level: 0,
-        generateMipmaps: false
-      } : null,
       sampleCount: device.type === 'webgl' ? 1 : opt?.sampleCount ?? 1,
       ignoreDepthStencil: opt?.ignoreDepthStencil ?? false
     };
     if (!this._options.colorAttachments && !this._options.depthAttachment) {
       throw new Error('WebGLFramebuffer(): colorAttachments or depthAttachment must be specified');
     }
-    this._width = this._options.colorAttachments ? this._options.colorAttachments[0].texture.width : this._options.depthAttachment.texture.width;
-    this._height = this._options.colorAttachments ? this._options.colorAttachments[0].texture.height : this._options.depthAttachment.texture.height;
-    if ((this._options.colorAttachments && this._options.colorAttachments.findIndex(val => val.texture.width !== this._width || val.texture.height !== this._height) >= 0)
-      || (this._options.depthAttachment && (this._options.depthAttachment.texture.width !== this._width || this._options.depthAttachment.texture.height !== this._height))) {
+    this._width = this._options.colorAttachments
+      ? this._options.colorAttachments[0].texture.width
+      : this._options.depthAttachment.texture.width;
+    this._height = this._options.colorAttachments
+      ? this._options.colorAttachments[0].texture.height
+      : this._options.depthAttachment.texture.height;
+    if (
+      (this._options.colorAttachments &&
+        this._options.colorAttachments.findIndex(
+          (val) => val.texture.width !== this._width || val.texture.height !== this._height
+        ) >= 0) ||
+      (this._options.depthAttachment &&
+        (this._options.depthAttachment.texture.width !== this._width ||
+          this._options.depthAttachment.texture.height !== this._height))
+    ) {
       throw new Error('WebGLFramebuffer(): attachment textures must have same width and height');
     }
-    this._drawBuffers = this._options.colorAttachments?.map(
-      (val, index) => WebGLEnum.COLOR_ATTACHMENT0 + index
-    ) ?? [];
+    this._drawBuffers =
+      this._options.colorAttachments?.map((val, index) => WebGLEnum.COLOR_ATTACHMENT0 + index) ?? [];
     this._isMRT = this._drawBuffers.length > 1;
     if (this._options.depthAttachment) {
       const format = this._options.depthAttachment.texture.format;
@@ -282,13 +303,37 @@ export class WebGLFrameBuffer
             if (texture) {
               const tmpFramebuffer = this._device.context.createFramebuffer();
               this._device.context.bindFramebuffer(WebGLEnum.FRAMEBUFFER, tmpFramebuffer);
-              this._device.context.framebufferTexture2D(WebGLEnum.FRAMEBUFFER, WebGLEnum.COLOR_ATTACHMENT0, WebGLEnum.TEXTURE_2D, texture.texture, 0);
+              this._device.context.framebufferTexture2D(
+                WebGLEnum.FRAMEBUFFER,
+                WebGLEnum.COLOR_ATTACHMENT0,
+                WebGLEnum.TEXTURE_2D,
+                texture.texture,
+                0
+              );
               if (tex.isTexture2D()) {
                 this._device.context.bindTexture(WebGLEnum.TEXTURE_2D, tex.object);
-                this._device.context.copyTexSubImage2D(WebGLEnum.TEXTURE_2D, attachment.level, 0, 0, 0, 0, texture.width, texture.height);
+                this._device.context.copyTexSubImage2D(
+                  WebGLEnum.TEXTURE_2D,
+                  attachment.level,
+                  0,
+                  0,
+                  0,
+                  0,
+                  texture.width,
+                  texture.height
+                );
               } else if (tex.isTextureCube()) {
                 this._device.context.bindTexture(WebGLEnum.TEXTURE_CUBE_MAP, tex.object);
-                this._device.context.copyTexSubImage2D(cubeMapFaceMap[attachment.face ?? CubeFace.PX], attachment.level, 0, 0, 0, 0, texture.width, texture.height);
+                this._device.context.copyTexSubImage2D(
+                  cubeMapFaceMap[attachment.face ?? CubeFace.PX],
+                  attachment.level,
+                  0,
+                  0,
+                  0,
+                  0,
+                  texture.width,
+                  texture.height
+                );
               }
               this._device.context.bindFramebuffer(WebGLEnum.FRAMEBUFFER, null);
               this._device.context.deleteFramebuffer(tmpFramebuffer);
@@ -308,7 +353,11 @@ export class WebGLFrameBuffer
       gl.bindFramebuffer(WebGLEnum.DRAW_FRAMEBUFFER, this._object);
       let depthStencilMask = 0;
       if (!this._options.ignoreDepthStencil && this._depthAttachmentTarget !== WebGLEnum.NONE) {
-        depthStencilMask = WebGLEnum.DEPTH_BUFFER_BIT | (this._depthAttachmentTarget === WebGLEnum.DEPTH_STENCIL_ATTACHMENT ? WebGLEnum.STENCIL_BUFFER_BIT : 0);
+        depthStencilMask =
+          WebGLEnum.DEPTH_BUFFER_BIT |
+          (this._depthAttachmentTarget === WebGLEnum.DEPTH_STENCIL_ATTACHMENT
+            ? WebGLEnum.STENCIL_BUFFER_BIT
+            : 0);
       }
       for (let i = 0; i < this._drawBuffers.length; i++) {
         for (let j = 0; j < this._drawBuffers.length; j++) {
@@ -325,7 +374,7 @@ export class WebGLFrameBuffer
           0,
           this._width,
           this._height,
-          WebGLEnum.COLOR_BUFFER_BIT|depthStencilMask,
+          WebGLEnum.COLOR_BUFFER_BIT | depthStencilMask,
           WebGLEnum.NEAREST
         );
         depthStencilMask = 0;
@@ -385,7 +434,7 @@ export class WebGLFrameBuffer
         }
         let intermediateAttachments = this._intermediateAttachments.get(info.texture);
         if (!intermediateAttachments) {
-          intermediateAttachments =[];
+          intermediateAttachments = [];
           this._intermediateAttachments.set(info.texture, intermediateAttachments);
         }
         if (!intermediateAttachments[info.level]) {
@@ -396,17 +445,35 @@ export class WebGLFrameBuffer
             width = Math.max(width >> 1, 1);
             height = Math.max(height >> 1, 1);
           }
-          const formatInfo = (this.device.getDeviceCaps().textureCaps as WebGLTextureCaps).getTextureFormatInfo(info.texture.format);
+          const formatInfo = (
+            this.device.getDeviceCaps().textureCaps as WebGLTextureCaps
+          ).getTextureFormatInfo(info.texture.format);
           intermediateTexture = this._device.context.createTexture();
           this._device.context.bindTexture(WebGLEnum.TEXTURE_2D, intermediateTexture);
-          this._device.context.texImage2D(WebGLEnum.TEXTURE_2D, 0, formatInfo.glInternalFormat, width, height, 0, formatInfo.glFormat, formatInfo.glType[0], null);
+          this._device.context.texImage2D(
+            WebGLEnum.TEXTURE_2D,
+            0,
+            formatInfo.glInternalFormat,
+            width,
+            height,
+            0,
+            formatInfo.glFormat,
+            formatInfo.glType[0],
+            null
+          );
           intermediateAttachments[info.level] = { texture: intermediateTexture, width, height };
         } else {
           intermediateTexture = intermediateAttachments[info.level].texture;
         }
       }
       if (intermediateTexture) {
-        this._device.context.framebufferTexture2D(WebGLEnum.FRAMEBUFFER, attachment, WebGLEnum.TEXTURE_2D, intermediateTexture, 0);
+        this._device.context.framebufferTexture2D(
+          WebGLEnum.FRAMEBUFFER,
+          attachment,
+          WebGLEnum.TEXTURE_2D,
+          intermediateTexture,
+          0
+        );
       } else {
         if (info.texture.isTexture2D()) {
           if (intermediateTexture) {
@@ -415,7 +482,7 @@ export class WebGLFrameBuffer
               attachment,
               WebGLEnum.RENDERBUFFER,
               intermediateTexture
-            )
+            );
           } else {
             this._device.context.framebufferTexture2D(
               WebGLEnum.FRAMEBUFFER,
@@ -480,7 +547,9 @@ export class WebGLFrameBuffer
   }
   private _createRenderbufferAA(texture: BaseTexture): WebGLRenderbuffer {
     const renderBuffer = this._device.context.createRenderbuffer();
-    const formatInfo = (this.device.getDeviceCaps().textureCaps as WebGLTextureCaps).getTextureFormatInfo(texture.format);
+    const formatInfo = (this.device.getDeviceCaps().textureCaps as WebGLTextureCaps).getTextureFormatInfo(
+      texture.format
+    );
     this._device.context.bindRenderbuffer(WebGLEnum.RENDERBUFFER, renderBuffer);
     (this._device.context as WebGL2RenderingContext).renderbufferStorageMultisample(
       WebGLEnum.RENDERBUFFER,
@@ -536,7 +605,10 @@ export class WebGLFrameBuffer
     if (this._options.sampleCount !== 1 && this._options.sampleCount !== 4) {
       throw new Error(`WebGLFramebuffer(): Sample should be 1 or 4, got ${this._options.sampleCount}`);
     }
-    if (this._options.sampleCount > 1 && !this._device.getDeviceCaps().framebufferCaps.supportMultisampledFramebuffer) {
+    if (
+      this._options.sampleCount > 1 &&
+      !this._device.getDeviceCaps().framebufferCaps.supportMultisampledFramebuffer
+    ) {
       throw new Error('WebGLFramebuffer(): Multisampled frame buffer not supported');
     }
     this._load();

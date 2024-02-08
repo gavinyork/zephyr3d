@@ -1,7 +1,33 @@
 import type { TypedArray, Vector4, IEventTarget } from '@zephyr3d/base';
 import { floatToHalf } from '@zephyr3d/base';
 import type { PBComputeOptions, PBRenderOptions, PBStructTypeInfo, ProgramBuilder } from './builder';
-import type { BaseTexture, BindGroup, BindGroupLayout, BufferCreationOptions, FrameBuffer, FrameBufferOptions, GPUDataBuffer, GPUObject, GPUProgram, IndexBuffer, SamplerOptions, StructuredBuffer, Texture2D, Texture2DArray, Texture3D, TextureCreationOptions, TextureCube, TextureImageElement, TextureMipmapData, TextureSampler, TextureVideo, VertexAttribFormat, VertexLayout, VertexLayoutOptions, VertexSemantic } from './gpuobject';
+import type {
+  BaseTexture,
+  BindGroup,
+  BindGroupLayout,
+  BufferCreationOptions,
+  FrameBuffer,
+  FrameBufferOptions,
+  GPUDataBuffer,
+  GPUObject,
+  GPUProgram,
+  IndexBuffer,
+  SamplerOptions,
+  StructuredBuffer,
+  Texture2D,
+  Texture2DArray,
+  Texture3D,
+  TextureCreationOptions,
+  TextureCube,
+  TextureImageElement,
+  TextureMipmapData,
+  TextureSampler,
+  TextureVideo,
+  VertexAttribFormat,
+  VertexLayout,
+  VertexLayoutOptions,
+  VertexSemantic
+} from './gpuobject';
 import type { RenderStateSet } from './render_states';
 
 /**
@@ -156,56 +182,56 @@ function makeTextureFormat(
  * @public
  */
 export type TextureFormat =
-  'unknown'|
-  'r8unorm'|
-  'r8snorm'|
-  'r16f'|
-  'r32f'|
-  'r8ui'|
-  'r8i'|
-  'r16ui'|
-  'r16i'|
-  'r32ui'|
-  'r32i'|
-  'rg8unorm'|
-  'rg8snorm'|
-  'rg16f'|
-  'rg32f'|
-  'rg8ui'|
-  'rg8i'|
-  'rg16ui'|
-  'rg16i'|
-  'rg32ui'|
-  'rg32i'|
-  'rgba8unorm'|
-  'rgba8unorm-srgb'|
-  'rgba8snorm'|
-  'bgra8unorm'|
-  'bgra8unorm-srgb'|
-  'rgba16f'|
-  'rgba32f'|
-  'rgba8ui'|
-  'rgba8i'|
-  'rgba16ui'|
-  'rgba16i'|
-  'rgba32ui'|
-  'rgba32i'|
-  'rg11b10uf'|
-  'd16'|
-  'd24'|
-  'd32f'|
-  'd24s8'|
-  'd32fs8'|
-  'dxt1'|
-  'dxt1-srgb'|
-  'dxt3'|
-  'dxt3-srgb'|
-  'dxt5'|
-  'dxt5-srgb';
+  | 'unknown'
+  | 'r8unorm'
+  | 'r8snorm'
+  | 'r16f'
+  | 'r32f'
+  | 'r8ui'
+  | 'r8i'
+  | 'r16ui'
+  | 'r16i'
+  | 'r32ui'
+  | 'r32i'
+  | 'rg8unorm'
+  | 'rg8snorm'
+  | 'rg16f'
+  | 'rg32f'
+  | 'rg8ui'
+  | 'rg8i'
+  | 'rg16ui'
+  | 'rg16i'
+  | 'rg32ui'
+  | 'rg32i'
+  | 'rgba8unorm'
+  | 'rgba8unorm-srgb'
+  | 'rgba8snorm'
+  | 'bgra8unorm'
+  | 'bgra8unorm-srgb'
+  | 'rgba16f'
+  | 'rgba32f'
+  | 'rgba8ui'
+  | 'rgba8i'
+  | 'rgba16ui'
+  | 'rgba16i'
+  | 'rgba32ui'
+  | 'rgba32i'
+  | 'rg11b10uf'
+  | 'd16'
+  | 'd24'
+  | 'd32f'
+  | 'd24s8'
+  | 'd32fs8'
+  | 'dxt1'
+  | 'dxt1-srgb'
+  | 'dxt3'
+  | 'dxt3-srgb'
+  | 'dxt5'
+  | 'dxt5-srgb';
 
 const textureFormatMap: Record<TextureFormat, number> = {
-  'unknown': 0,
-  'r8unorm': makeTextureFormat(
+  unknown: 0,
+  r8unorm: makeTextureFormat(
     0,
     true,
     false,
@@ -222,7 +248,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     1
   ),
-  'r8snorm': makeTextureFormat(
+  r8snorm: makeTextureFormat(
     0,
     true,
     false,
@@ -239,7 +265,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     1
   ),
-  'r16f': makeTextureFormat(
+  r16f: makeTextureFormat(
     0,
     true,
     false,
@@ -256,7 +282,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     2
   ),
-  'r32f': makeTextureFormat(
+  r32f: makeTextureFormat(
     0,
     true,
     false,
@@ -273,7 +299,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     4
   ),
-  'r8ui': makeTextureFormat(
+  r8ui: makeTextureFormat(
     0,
     true,
     false,
@@ -290,7 +316,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     1
   ),
-  'r8i': makeTextureFormat(
+  r8i: makeTextureFormat(
     0,
     true,
     false,
@@ -307,7 +333,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     1
   ),
-  'r16ui': makeTextureFormat(
+  r16ui: makeTextureFormat(
     0,
     true,
     false,
@@ -324,7 +350,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     2
   ),
-  'r16i': makeTextureFormat(
+  r16i: makeTextureFormat(
     0,
     true,
     false,
@@ -341,7 +367,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     2
   ),
-  'r32ui': makeTextureFormat(
+  r32ui: makeTextureFormat(
     0,
     true,
     false,
@@ -358,7 +384,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     4
   ),
-  'r32i': makeTextureFormat(
+  r32i: makeTextureFormat(
     0,
     true,
     false,
@@ -375,7 +401,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     4
   ),
-  'rg8unorm': makeTextureFormat(
+  rg8unorm: makeTextureFormat(
     0,
     true,
     true,
@@ -392,7 +418,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     2
   ),
-  'rg8snorm': makeTextureFormat(
+  rg8snorm: makeTextureFormat(
     0,
     true,
     true,
@@ -409,7 +435,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     2
   ),
-  'rg16f': makeTextureFormat(
+  rg16f: makeTextureFormat(
     0,
     true,
     true,
@@ -426,7 +452,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     4
   ),
-  'rg32f': makeTextureFormat(
+  rg32f: makeTextureFormat(
     0,
     true,
     true,
@@ -443,7 +469,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     8
   ),
-  'rg8ui': makeTextureFormat(
+  rg8ui: makeTextureFormat(
     0,
     true,
     true,
@@ -460,7 +486,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     2
   ),
-  'rg8i': makeTextureFormat(
+  rg8i: makeTextureFormat(
     0,
     true,
     true,
@@ -477,7 +503,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     2
   ),
-  'rg16ui': makeTextureFormat(
+  rg16ui: makeTextureFormat(
     0,
     true,
     true,
@@ -494,7 +520,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     4
   ),
-  'rg16i': makeTextureFormat(
+  rg16i: makeTextureFormat(
     0,
     true,
     true,
@@ -511,7 +537,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     4
   ),
-  'rg32ui': makeTextureFormat(
+  rg32ui: makeTextureFormat(
     0,
     true,
     true,
@@ -528,7 +554,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     8
   ),
-  'rg32i': makeTextureFormat(
+  rg32i: makeTextureFormat(
     0,
     true,
     true,
@@ -545,7 +571,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     8
   ),
-  'rgba8unorm': makeTextureFormat(
+  rgba8unorm: makeTextureFormat(
     0,
     true,
     true,
@@ -579,7 +605,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     4
   ),
-  'rgba8snorm': makeTextureFormat(
+  rgba8snorm: makeTextureFormat(
     0,
     true,
     true,
@@ -596,7 +622,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     4
   ),
-  'bgra8unorm': makeTextureFormat(
+  bgra8unorm: makeTextureFormat(
     0,
     true,
     true,
@@ -630,7 +656,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     4
   ),
-  'rgba16f': makeTextureFormat(
+  rgba16f: makeTextureFormat(
     0,
     true,
     true,
@@ -647,7 +673,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     8
   ),
-  'rgba32f': makeTextureFormat(
+  rgba32f: makeTextureFormat(
     0,
     true,
     true,
@@ -664,7 +690,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     16
   ),
-  'rgba8ui': makeTextureFormat(
+  rgba8ui: makeTextureFormat(
     0,
     true,
     true,
@@ -681,7 +707,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     4
   ),
-  'rgba8i': makeTextureFormat(
+  rgba8i: makeTextureFormat(
     0,
     true,
     true,
@@ -698,7 +724,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     4
   ),
-  'rgba16ui': makeTextureFormat(
+  rgba16ui: makeTextureFormat(
     0,
     true,
     true,
@@ -715,7 +741,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     8
   ),
-  'rgba16i': makeTextureFormat(
+  rgba16i: makeTextureFormat(
     0,
     true,
     true,
@@ -732,7 +758,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     8
   ),
-  'rgba32ui': makeTextureFormat(
+  rgba32ui: makeTextureFormat(
     0,
     true,
     true,
@@ -749,7 +775,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     16
   ),
-  'rgba32i': makeTextureFormat(
+  rgba32i: makeTextureFormat(
     0,
     true,
     true,
@@ -766,7 +792,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     16
   ),
-  'rg11b10uf': makeTextureFormat(
+  rg11b10uf: makeTextureFormat(
     0,
     true,
     true,
@@ -783,7 +809,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     4
   ),
-  'd16': makeTextureFormat(
+  d16: makeTextureFormat(
     0,
     false,
     false,
@@ -800,7 +826,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     2
   ),
-  'd24': makeTextureFormat(
+  d24: makeTextureFormat(
     0,
     false,
     false,
@@ -817,7 +843,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     0,
     0
   ),
-  'd32f': makeTextureFormat(
+  d32f: makeTextureFormat(
     0,
     false,
     false,
@@ -834,7 +860,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     4
   ),
-  'd24s8': makeTextureFormat(
+  d24s8: makeTextureFormat(
     0,
     false,
     false,
@@ -851,7 +877,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     1,
     4
   ),
-  'd32fs8': makeTextureFormat(
+  d32fs8: makeTextureFormat(
     0,
     false,
     false,
@@ -869,7 +895,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     5
   ),
   // compressed texture formats
-  'dxt1': makeTextureFormat(
+  dxt1: makeTextureFormat(
     COMPRESSION_FORMAT_BC1,
     true,
     true,
@@ -903,7 +929,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     4,
     8
   ),
-  'dxt3': makeTextureFormat(
+  dxt3: makeTextureFormat(
     COMPRESSION_FORMAT_BC2,
     true,
     true,
@@ -937,7 +963,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     4,
     16
   ),
-  'dxt5': makeTextureFormat(
+  dxt5: makeTextureFormat(
     COMPRESSION_FORMAT_BC3,
     true,
     true,
@@ -971,7 +997,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
     4,
     16
   )
-}
+};
 
 /**
  * Converts a non-sRGB texture format to the corresponding sRGB texture format
@@ -1121,7 +1147,7 @@ export function getTextureFormatBlockSize(format: TextureFormat): number {
  * @returns The block width
  * @public
  */
- export function getTextureFormatBlockWidth(format: TextureFormat): number {
+export function getTextureFormatBlockWidth(format: TextureFormat): number {
   return (textureFormatMap[format] & BLOCK_WIDTH_MASK) >> BLOCK_WIDTH_SHIFT;
 }
 
@@ -1131,7 +1157,7 @@ export function getTextureFormatBlockSize(format: TextureFormat): number {
  * @returns The block height
  * @public
  */
- export function getTextureFormatBlockHeight(format: TextureFormat): number {
+export function getTextureFormatBlockHeight(format: TextureFormat): number {
   return (textureFormatMap[format] & BLOCK_HEIGHT_MASK) >> BLOCK_HEIGHT_SHIFT;
 }
 
@@ -1357,7 +1383,13 @@ export function encodePixelToArray(
  * The primitive type
  * @public
  */
-export type PrimitiveType = 'triangle-list'|'triangle-strip'|'triangle-fan'|'line-list'|'line-strip'|'point-list';
+export type PrimitiveType =
+  | 'triangle-list'
+  | 'triangle-strip'
+  | 'triangle-fan'
+  | 'line-list'
+  | 'line-strip'
+  | 'point-list';
 
 /**
  * Shader type
@@ -1373,7 +1405,7 @@ export enum ShaderType {
  * Shader kind
  * @public
  */
-export type ShaderKind = 'vertex'|'fragment'|'compute';
+export type ShaderKind = 'vertex' | 'fragment' | 'compute';
 
 /**
  * Frame information
@@ -1422,7 +1454,6 @@ export interface GPUObjectList {
   /** list of bind groups */
   bindGroups: BindGroup[];
 }
-
 
 /**
  * The device capabilities
@@ -1691,12 +1722,12 @@ export interface DeviceOptions {
  * @public
  */
 export type DeviceEventMap = {
-  [DeviceResizeEvent.NAME]: DeviceResizeEvent,
-  [DeviceLostEvent.NAME]: DeviceLostEvent,
-  [DeviceRestoreEvent.NAME]: DeviceRestoreEvent,
-  [DeviceGPUObjectAddedEvent.NAME]: DeviceGPUObjectAddedEvent,
-  [DeviceGPUObjectRemovedEvent.NAME]: DeviceGPUObjectRemovedEvent,
-  [DeviceGPUObjectRenameEvent.NAME]: DeviceGPUObjectRenameEvent
+  [DeviceResizeEvent.NAME]: DeviceResizeEvent;
+  [DeviceLostEvent.NAME]: DeviceLostEvent;
+  [DeviceRestoreEvent.NAME]: DeviceRestoreEvent;
+  [DeviceGPUObjectAddedEvent.NAME]: DeviceGPUObjectAddedEvent;
+  [DeviceGPUObjectRemovedEvent.NAME]: DeviceGPUObjectRemovedEvent;
+  [DeviceGPUObjectRenameEvent.NAME]: DeviceGPUObjectRenameEvent;
 };
 
 /**
@@ -1705,19 +1736,19 @@ export type DeviceEventMap = {
  */
 export type DeviceViewport = {
   /** viewport left */
-  x: number,
+  x: number;
   /** viewport top */
-  y: number,
+  y: number;
   /** viewport width */
-  width: number,
+  width: number;
   /** viewport height */
-  height: number,
+  height: number;
   /**
    * A boolean value that indicates whether this is full screen viewport
    * @remarks
    * The full screen viewport will be automatically resized when the screen size chenged
    */
-  default: boolean
+  default: boolean;
 };
 
 /**
@@ -1771,7 +1802,11 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param options - Texture creation options
    * @returns The created texture
    */
-  createTextureFromMipmapData<T extends BaseTexture = BaseTexture>(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): T;
+  createTextureFromMipmapData<T extends BaseTexture = BaseTexture>(
+    data: TextureMipmapData,
+    sRGB: boolean,
+    options?: TextureCreationOptions
+  ): T;
   /**
    * Creates a 2d texture
    * @param format - The texture format
@@ -1862,11 +1897,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param size - Pixel width of the texture
    * @param options - The creation options
    */
-  createCubeTexture(
-    format: TextureFormat,
-    size: number,
-    options?: TextureCreationOptions
-  ): TextureCube;
+  createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube;
   /**
    * Creates a cube texture from given mipmap data
    * @param data - The mipmap data
@@ -1937,20 +1968,24 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * Creates a frame buffer
    * @param options - The creation options
    */
-  createFrameBuffer(colorAttachments: BaseTexture[], depthAttachment: BaseTexture, options?: FrameBufferOptions): FrameBuffer;
+  createFrameBuffer(
+    colorAttachments: BaseTexture[],
+    depthAttachment: BaseTexture,
+    options?: FrameBufferOptions
+  ): FrameBuffer;
   /**
    * Set viewport from an array that contains the position and size
    *
    * @param vp - The viewport position and size, if not specified, the viewport will be set to [0, 0, drawingBufferWidth, drawingBufferHeight]
    */
-  setViewport(vp?: DeviceViewport|number[]): void;
+  setViewport(vp?: DeviceViewport | number[]): void;
   /** Get current viewport as [x, y, width, height] */
   getViewport(): DeviceViewport;
   /**
    * Set scissor rectangle from an array that contains the position and size
    * @param scissor - The scissor rectangle position and size, if not specified, the scissor rectangle will be set to [0, 0, drawingBufferWidth,drawingBufferHeight]
    */
-  setScissor(scissor?: DeviceViewport|number[]): void;
+  setScissor(scissor?: DeviceViewport | number[]): void;
   /**
    * Get current scissor rectangle
    */
@@ -2171,7 +2206,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   buildRenderProgram(options: PBRenderOptions): GPUProgram;
   /** Builds compute program */
   buildComputeProgram(options: PBComputeOptions): GPUProgram;
-    /** Pushes current FrameBuffer state */
+  /** Pushes current FrameBuffer state */
   pushDeviceStates();
   /** Pops last FrameBuffer state */
   popDeviceStates();

@@ -76,28 +76,33 @@ export class TGALoader extends AbstractTextureLoader {
       if (noMipmap) {
         opt.samplerOptions = { mipFilter: 'none' };
       }
-      const tex = Application.instance.device.createTexture2D(sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm', width, height, opt);
+      const tex = Application.instance.device.createTexture2D(
+        sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm',
+        width,
+        height,
+        opt
+      );
       tex.update(pixels, 0, 0, width, height);
       return tex;
-    } while(false);
+    } while (false);
     throw new Error(`Unsupported TGA file format`);
   }
   private mergeBytes(dest: Uint8Array, offset: number, pixel: number[], numBytes: number) {
     if (numBytes === 4) {
-      dest[offset+0] = pixel[2];
-      dest[offset+1] = pixel[1];
-      dest[offset+2] = pixel[0];
-      dest[offset+3] = pixel[3];
+      dest[offset + 0] = pixel[2];
+      dest[offset + 1] = pixel[1];
+      dest[offset + 2] = pixel[0];
+      dest[offset + 3] = pixel[3];
     } else if (numBytes === 3) {
-      dest[offset+0] = pixel[2];
-      dest[offset+1] = pixel[1];
-      dest[offset+2] = pixel[0];
-      dest[offset+3] = 255;
+      dest[offset + 0] = pixel[2];
+      dest[offset + 1] = pixel[1];
+      dest[offset + 2] = pixel[0];
+      dest[offset + 3] = 255;
     } else if (numBytes === 2) {
-      dest[offset+0] = (pixel[1] & 0x7c) << 1;
-      dest[offset+1] = ((pixel[1] & 0x03) << 6) | ((pixel[0] & 0xe0) >> 2);
-      dest[offset+2] = (pixel[0] & 0x1f) << 3;
-      dest[offset+3] = pixel[1] & 0x80;
+      dest[offset + 0] = (pixel[1] & 0x7c) << 1;
+      dest[offset + 1] = ((pixel[1] & 0x03) << 6) | ((pixel[0] & 0xe0) >> 2);
+      dest[offset + 2] = (pixel[0] & 0x1f) << 3;
+      dest[offset + 3] = pixel[1] & 0x80;
     }
   }
   async load(

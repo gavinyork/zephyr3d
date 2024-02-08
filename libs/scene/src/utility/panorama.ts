@@ -1,7 +1,14 @@
-import { Vector3 } from "@zephyr3d/base";
-import type { Texture2D, BindGroup, GPUProgram, RenderStateSet, TextureCube, VertexLayout } from "@zephyr3d/device";
-import { Application } from "../app";
-import { gammaToLinear } from "../shaders/misc";
+import { Vector3 } from '@zephyr3d/base';
+import type {
+  Texture2D,
+  BindGroup,
+  GPUProgram,
+  RenderStateSet,
+  TextureCube,
+  VertexLayout
+} from '@zephyr3d/device';
+import { Application } from '../app';
+import { gammaToLinear } from '../shaders/misc';
 
 let vertexLayout: VertexLayout = null;
 let renderStates: RenderStateSet = null;
@@ -15,7 +22,7 @@ const faceDirections = [
   [new Vector3(1, 0, 0), new Vector3(0, 0, 1), new Vector3(0, 1, 0)],
   [new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector3(0, -1, 0)],
   [new Vector3(1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, 1)],
-  [new Vector3(-1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, -1)],
+  [new Vector3(-1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, -1)]
 ];
 
 function init() {
@@ -23,9 +30,11 @@ function init() {
   const vertices = new Float32Array([1, 1, -1, 1, -1, -1, 1, -1]);
   const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
   vertexLayout = device.createVertexLayout({
-    vertexBuffers: [{
-      buffer: device.createVertexBuffer('position_f32x2', vertices)
-    }],
+    vertexBuffers: [
+      {
+        buffer: device.createVertexBuffer('position_f32x2', vertices)
+      }
+    ],
     indexBuffer: device.createIndexBuffer(indices)
   });
   renderStates = device.createRenderStateSet();
@@ -48,7 +57,10 @@ function createPanoramaToCubemapProgram(rgbm: boolean): GPUProgram {
       this.front = pb.vec3().uniform(0);
       pb.main(function () {
         this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
-        this.$outputs.direction = pb.mul(pb.mat3(this.up, this.right, this.front), pb.vec3(this.$inputs.pos, 1));
+        this.$outputs.direction = pb.mul(
+          pb.mat3(this.up, this.right, this.front),
+          pb.vec3(this.$inputs.pos, 1)
+        );
         if (pb.getDevice().type === 'webgpu') {
           this.$builtins.position.y = pb.neg(this.$builtins.position.y);
         }
@@ -74,7 +86,7 @@ function createPanoramaToCubemapProgram(rgbm: boolean): GPUProgram {
         }
       });
     }
-  })
+  });
 }
 
 function doConvertPanoramaToCubemap(srcTexture: Texture2D, dstTexture: TextureCube) {

@@ -1,7 +1,7 @@
-import type { InterpolationMode, InterpolationTarget} from "@zephyr3d/base";
-import { Interpolator } from "@zephyr3d/base";
-import { AnimationTrack } from "./animationtrack";
-import type { SceneNode } from "../scene";
+import type { InterpolationMode, InterpolationTarget } from '@zephyr3d/base';
+import { Interpolator } from '@zephyr3d/base';
+import { AnimationTrack } from './animationtrack';
+import type { SceneNode } from '../scene';
 
 /**
  * Track handler type for numeric or vector keyframe values
@@ -24,12 +24,17 @@ export class UserTrack extends AnimationTrack {
    * @param keyFrames - Keyframe values
    * @param handler - Handler to apply the keyframe values
    */
-  constructor(mode: InterpolationMode, target: InterpolationTarget, keyFrames: { time: number, value: number|Float32Array }[], handler: NumberTrackHandler) {
+  constructor(
+    mode: InterpolationMode,
+    target: InterpolationTarget,
+    keyFrames: { time: number; value: number | Float32Array }[],
+    handler: NumberTrackHandler
+  ) {
     const stride = Interpolator.getTargetStride(target);
     if (!stride) {
       throw new Error(`UserTrack(): invalid target: ${target}`);
     }
-    const inputs = new Float32Array(keyFrames.map(val => val.time));
+    const inputs = new Float32Array(keyFrames.map((val) => val.time));
     const outputs = new Float32Array(keyFrames.length * stride);
     for (let i = 0; i < keyFrames.length; i++) {
       for (let j = 0; j < stride; j++) {

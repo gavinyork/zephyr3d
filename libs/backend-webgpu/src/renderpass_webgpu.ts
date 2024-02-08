@@ -1,6 +1,12 @@
 import type { TypedArray, Vector4 } from '@zephyr3d/base';
-import type { PrimitiveType, DeviceViewport} from '@zephyr3d/device';
-import { hasStencilChannel, PBPrimitiveTypeInfo, PBPrimitiveType, isIntegerTextureFormat, isSignedTextureFormat } from '@zephyr3d/device';
+import type { PrimitiveType, DeviceViewport } from '@zephyr3d/device';
+import {
+  hasStencilChannel,
+  PBPrimitiveTypeInfo,
+  PBPrimitiveType,
+  isIntegerTextureFormat,
+  isSignedTextureFormat
+} from '@zephyr3d/device';
 import type { WebGPUProgram } from './gpuprogram_webgpu';
 import type { WebGPURenderStateSet } from './renderstates_webgpu';
 import type { WebGPUBindGroup } from './bindgroup_webgpu';
@@ -68,7 +74,7 @@ export class WebGPURenderPass {
   getFramebuffer(): WebGPUFrameBuffer {
     return this._frameBuffer;
   }
-  setViewport(vp?: number[]|DeviceViewport) {
+  setViewport(vp?: number[] | DeviceViewport) {
     if (!vp || (!Array.isArray(vp) && vp.default)) {
       this._currentViewport = {
         x: 0,
@@ -106,7 +112,7 @@ export class WebGPURenderPass {
   getViewport(): DeviceViewport {
     return Object.assign({}, this._currentViewport);
   }
-  setScissor(scissor?: number[]|DeviceViewport){
+  setScissor(scissor?: number[] | DeviceViewport) {
     const backBufferWidth = this._device.deviceToScreen(this._device.drawingBufferWidth);
     const backBufferHeight = this._device.deviceToScreen(this._device.drawingBufferHeight);
     if (scissor === null || scissor === undefined || (!Array.isArray(scissor) && scissor.default)) {
@@ -227,7 +233,7 @@ export class WebGPURenderPass {
         depthFormat: this._device.backbufferDepthFormat,
         sampleCount: this._device.sampleCount,
         hash: `${this._device.backbufferFormat}:${this._device.backbufferDepthFormat}:${this._device.sampleCount}`,
-        clearHash: isIntegerTextureFormat(fmt) ? isSignedTextureFormat(fmt) ? 'i' : 'u' : 'f'
+        clearHash: isIntegerTextureFormat(fmt) ? (isSignedTextureFormat(fmt) ? 'i' : 'u') : 'f'
       };
       const mainPassDesc = this._device.defaultRenderPassDesc;
       const colorAttachmentDesc = this._device.defaultRenderPassDesc.colorAttachments[0];
@@ -255,19 +261,21 @@ export class WebGPURenderPass {
           depthAttachmentTexture.isTexture2DArray() || depthAttachmentTexture.isTexture3D()
             ? attachment.layer
             : depthAttachmentTexture.isTextureCube()
-              ? attachment.face
-              : 0;
+            ? attachment.face
+            : 0;
         depthTextureView = depthAttachmentTexture.getView(0, layer ?? 0, 1);
       }
       this._frameBufferInfo = {
-        colorFormats: colorAttachmentTextures.map(val => val.gpuFormat),
+        colorFormats: colorAttachmentTextures.map((val) => val.gpuFormat),
         depthFormat: depthAttachmentTexture?.gpuFormat,
         sampleCount: this._frameBuffer.getOptions().sampleCount,
         hash: null,
-        clearHash: colorAttachmentTextures.map(val => {
-          const fmt = textureFormatInvMap[val.gpuFormat];
-          return isIntegerTextureFormat(fmt) ? isSignedTextureFormat(fmt) ? 'i' : 'u' : 'f';
-        }).join(''),
+        clearHash: colorAttachmentTextures
+          .map((val) => {
+            const fmt = textureFormatInvMap[val.gpuFormat];
+            return isIntegerTextureFormat(fmt) ? (isSignedTextureFormat(fmt) ? 'i' : 'u') : 'f';
+          })
+          .join('')
       };
       this._frameBufferInfo.hash = `${this._frameBufferInfo.colorFormats.join('-')}:${
         this._frameBufferInfo.depthFormat
@@ -276,44 +284,45 @@ export class WebGPURenderPass {
 
       const passDesc: GPURenderPassDescriptor = {
         label: `customRenderPass:${this._frameBufferInfo.hash}`,
-        colorAttachments: this._frameBuffer.getOptions().colorAttachments?.map((attachment, index) => {
-          const tex = attachment.texture as WebGPUBaseTexture;
-          if (tex) {
-            tex._markAsCurrentFB(true);
-            const layer =
-              tex.isTexture2DArray() || tex.isTexture3D()
-                ? attachment.layer
-                : tex.isTextureCube()
-                ? attachment.face
-                : 0;
-            if (this._frameBuffer.getOptions().sampleCount === 1) {
-              return {
-                view: tex.getView(attachment.level ?? 0, layer ?? 0, 1),
-                loadOp: color ? 'clear' : 'load',
-                clearValue: color,
-                storeOp: 'store'
-              } as GPURenderPassColorAttachment;
+        colorAttachments:
+          this._frameBuffer.getOptions().colorAttachments?.map((attachment, index) => {
+            const tex = attachment.texture as WebGPUBaseTexture;
+            if (tex) {
+              tex._markAsCurrentFB(true);
+              const layer =
+                tex.isTexture2DArray() || tex.isTexture3D()
+                  ? attachment.layer
+                  : tex.isTextureCube()
+                  ? attachment.face
+                  : 0;
+              if (this._frameBuffer.getOptions().sampleCount === 1) {
+                return {
+                  view: tex.getView(attachment.level ?? 0, layer ?? 0, 1),
+                  loadOp: color ? 'clear' : 'load',
+                  clearValue: color,
+                  storeOp: 'store'
+                } as GPURenderPassColorAttachment;
+              } else {
+                const msaaTexture = this._frameBuffer.getMSAAColorAttacments()[index];
+                const msaaView = this._device.gpuCreateTextureView(msaaTexture, {
+                  dimension: '2d',
+                  baseMipLevel: attachment.level ?? 0,
+                  mipLevelCount: 1,
+                  baseArrayLayer: 0,
+                  arrayLayerCount: 1
+                });
+                return {
+                  view: msaaView,
+                  resolveTarget: tex.getView(attachment.level ?? 0, layer ?? 0, 1),
+                  loadOp: color ? 'clear' : 'load',
+                  clearValue: color,
+                  storeOp: 'store'
+                } as GPURenderPassColorAttachment;
+              }
             } else {
-              const msaaTexture = this._frameBuffer.getMSAAColorAttacments()[index];
-              const msaaView = this._device.gpuCreateTextureView(msaaTexture, {
-                dimension: '2d',
-                baseMipLevel: attachment.level ?? 0,
-                mipLevelCount: 1,
-                baseArrayLayer: 0,
-                arrayLayerCount: 1
-              });
-              return {
-                view: msaaView,
-                resolveTarget: tex.getView(attachment.level ?? 0, layer ?? 0, 1),
-                loadOp: color ? 'clear' : 'load',
-                clearValue: color,
-                storeOp: 'store'
-              } as GPURenderPassColorAttachment;
+              return null;
             }
-          } else {
-            return null;
-          }
-        }) ?? [],
+          }) ?? [],
         depthStencilAttachment: depthAttachmentTexture
           ? this._frameBuffer.getOptions().sampleCount === 1
             ? {
@@ -505,7 +514,7 @@ export class WebGPURenderPass {
     if (this._frameBuffer && this._frameBuffer.bindFlag !== this._fbBindFlag) {
       validation |= VALIDATION_NEED_NEW_PASS;
     }
-    const needNewPass = (validation & VALIDATION_NEED_NEW_PASS) || (validation & VALIDATION_NEED_GENERATE_MIPMAP);
+    const needNewPass = validation & VALIDATION_NEED_NEW_PASS || validation & VALIDATION_NEED_GENERATE_MIPMAP;
     if (bufferUploads.length > 0) {
       const bu = needNewPass ? this._bufferUploadsNext : this._bufferUploads;
       for (const buffer of bufferUploads) {

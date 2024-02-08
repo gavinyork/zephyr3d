@@ -18,7 +18,12 @@ const COLS_BITSHIFT = 7;
 const NORM_BITMASK = 1;
 const NORM_BITSHIFT = 10;
 
-type LayoutableType = PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo;
+type LayoutableType =
+  | PBPrimitiveTypeInfo
+  | PBArrayTypeInfo
+  | PBStructTypeInfo
+  | PBAtomicI32TypeInfo
+  | PBAtomicU32TypeInfo;
 
 function align(n: number, alignment: number): number {
   return (n + alignment - 1) & ~(alignment - 1);
@@ -48,7 +53,9 @@ function getSize(type: LayoutableType): number {
       ? type.rows * getAlignment(PBPrimitiveTypeInfo.getCachedTypeInfo(type.resizeType(1, type.cols)))
       : 4 * type.cols;
   } else if (type.isArrayType()) {
-    return type.elementType.isAnyType() ? 0 : type.dimension * align(getSize(type.elementType), getAlignment(type.elementType));
+    return type.elementType.isAnyType()
+      ? 0
+      : type.dimension * align(getSize(type.elementType), getAlignment(type.elementType));
   } else if (type.isAtomicI32() || type.isAtomicU32()) {
     return 4;
   } else {
@@ -98,12 +105,7 @@ function getSizePacked(type: LayoutableType): number {
   }
 }
 
-function makePrimitiveType(
-  scalarTypeMask: number,
-  rows: number,
-  cols: number,
-  norm: 0 | 1
-): PBPrimitiveType {
+function makePrimitiveType(scalarTypeMask: number, rows: number, cols: number, norm: 0 | 1): PBPrimitiveType {
   return scalarTypeMask | (rows << ROWS_BITSHIFT) | (cols << COLS_BITSHIFT) | (norm << NORM_BITSHIFT);
 }
 
@@ -371,23 +373,23 @@ const textureTypeMapWGSL = {
 };
 
 const storageTexelFormatMap = {
-  'rgba8unorm': 'rgba8unorm',
-  'rgba8snorm': 'rgba8snorm',
-  'bgra8unorm': 'bgra8unorm',
-  'rgba8ui': 'rgba8uint',
-  'rgba8i': 'rgba8sint',
-  'rgba16ui': 'rgba16uint',
-  'rgba16i': 'rgba16sint',
-  'rgba16f': 'rgba16float',
-  'r32f': 'r32float',
-  'r32ui': 'r32uint',
-  'r32i': 'r32sint',
-  'rg32f': 'rg32float',
-  'rg32ui': 'rg32uint',
-  'rg32i': 'rg32sint',
-  'rgba32f': 'rgba32float',
-  'rgba32ui': 'rgba32uint',
-  'rgba32i': 'rgba32sint'
+  rgba8unorm: 'rgba8unorm',
+  rgba8snorm: 'rgba8snorm',
+  bgra8unorm: 'bgra8unorm',
+  rgba8ui: 'rgba8uint',
+  rgba8i: 'rgba8sint',
+  rgba16ui: 'rgba16uint',
+  rgba16i: 'rgba16sint',
+  rgba16f: 'rgba16float',
+  r32f: 'r32float',
+  r32ui: 'r32uint',
+  r32i: 'r32sint',
+  rg32f: 'rg32float',
+  rg32ui: 'rg32uint',
+  rg32i: 'rg32sint',
+  rgba32f: 'rgba32float',
+  rgba32ui: 'rgba32uint',
+  rgba32i: 'rgba32sint'
 } as const;
 
 /**
@@ -464,7 +466,12 @@ export interface StructTypeDetail {
     /** Name of the struct member */
     name: string;
     /** Type of the struct member */
-    type: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo | PBStructTypeInfo;
+    type:
+      | PBPrimitiveTypeInfo
+      | PBArrayTypeInfo
+      | PBAtomicI32TypeInfo
+      | PBAtomicU32TypeInfo
+      | PBStructTypeInfo;
     /** Alignment of the struct member */
     alignment: number;
     /** Byte size of the struct member */
@@ -545,7 +552,7 @@ export interface FunctionTypeDetail {
     /** Type of the argument */
     type: PBTypeInfo;
     /** true if this argument will be passed by reference */
-    byRef?: boolean
+    byRef?: boolean;
   }[];
 }
 
@@ -637,7 +644,7 @@ export abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetailI
   isCompatibleType(other: PBTypeInfo): boolean {
     return other.typeId === this.typeId;
   }
-   /**
+  /**
    * Creates a buffer layout from this type
    * @param offset - Byte offset of the layout
    * @param layout - Type of the layout
@@ -680,7 +687,7 @@ export class PBVoidTypeInfo extends PBTypeInfo<null> {
  * The void type info
  * @public
  */
- export class PBAnyTypeInfo extends PBTypeInfo<null> {
+export class PBAnyTypeInfo extends PBTypeInfo<null> {
   constructor() {
     super(PBTypeClass.ANY, null);
   }
@@ -832,7 +839,14 @@ export class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail> {
   /** Whether the type is signed or unsigned integer scalar or vector */
   isInteger(): boolean {
     const st = this.primitiveType & SCALAR_TYPE_BITMASK;
-    return st === I8_BITMASK || st === U8_BITMASK || st === I16_BITMASK || st === U16_BITMASK || st === I32_BITMASK || st === U32_BITMASK;
+    return (
+      st === I8_BITMASK ||
+      st === U8_BITMASK ||
+      st === I16_BITMASK ||
+      st === U16_BITMASK ||
+      st === I32_BITMASK ||
+      st === U32_BITMASK
+    );
   }
   /** Get the scalar type */
   get scalarType(): PBPrimitiveType {
@@ -952,7 +966,15 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
   constructor(
     name: string,
     layout: PBStructLayout,
-    members: { name: string; type: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo | PBStructTypeInfo }[]
+    members: {
+      name: string;
+      type:
+        | PBPrimitiveTypeInfo
+        | PBArrayTypeInfo
+        | PBAtomicI32TypeInfo
+        | PBAtomicU32TypeInfo
+        | PBStructTypeInfo;
+    }[]
   ) {
     super(PBTypeClass.PLAIN, {
       layout: layout || 'default',
@@ -1149,7 +1171,10 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
         if (member.type.isMatrixType() && member.type.cols === 2) {
           throw new Error(`matrix${member.type.rows}x${member.type.cols} can not be used in std140 layout`);
         }
-      } else if (member.type.isArrayType() && (member.type.elementType.isAnyType() || getAlignment(member.type.elementType) !== 16)) {
+      } else if (
+        member.type.isArrayType() &&
+        (member.type.elementType.isAnyType() || getAlignment(member.type.elementType) !== 16)
+      ) {
         throw new Error('array element must be 16 bytes aligned in std140 layout');
       } else if (member.type.isStructType()) {
         member.alignment = 16;
@@ -1171,7 +1196,10 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
  * @public
  */
 export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
-  constructor(elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo, dimension?: number) {
+  constructor(
+    elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo,
+    dimension?: number
+  ) {
     super(PBTypeClass.ARRAY, {
       elementType: elementType,
       dimension: Number(dimension) || 0
@@ -1231,11 +1259,11 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
   }
   /** @internal */
   getLayoutAlignment(layout: PBStructLayout): number {
-    return (layout === 'packed' || this.elementType.isAnyType())
+    return layout === 'packed' || this.elementType.isAnyType()
       ? 1
       : layout === 'std430'
-        ? this.elementType.getLayoutAlignment(layout)
-        : align(this.elementType.getLayoutAlignment(layout), 16)
+      ? this.elementType.getLayoutAlignment(layout)
+      : align(this.elementType.getLayoutAlignment(layout), 16);
   }
   /** @internal */
   getLayoutSize(layout: PBStructLayout): number {
@@ -1244,7 +1272,9 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
       // array element stride of std140 layout must be multiple of 16
       throw new Error('Error: array element stride of std140 must be multiple of 16');
     }
-    return this.elementType.isAnyType() ? 0 : this.dimension * align(this.elementType.getLayoutSize(layout), elementAlignment);
+    return this.elementType.isAnyType()
+      ? 0
+      : this.dimension * align(this.elementType.getLayoutSize(layout), elementAlignment);
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
   toBufferLayout(offset: number): UniformBufferLayout {
@@ -1821,175 +1851,73 @@ export const typeITexMultisampled2D = new PBTextureTypeInfo(PBTextureType.ITEX_M
 /** @internal */
 export const typeUTexMultisampled2D = new PBTextureTypeInfo(PBTextureType.UTEX_MULTISAMPLED_2D);
 /** @internal */
-export const typeTexStorage1D_rgba8unorm = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'rgba8unorm'
-);
+export const typeTexStorage1D_rgba8unorm = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'rgba8unorm');
 /** @internal */
-export const typeTexStorage1D_rgba8snorm = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'rgba8snorm'
-);
+export const typeTexStorage1D_rgba8snorm = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'rgba8snorm');
 /** @internal */
-export const typeTexStorage1D_bgra8unorm = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'rgba8unorm'
-);
+export const typeTexStorage1D_bgra8unorm = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'rgba8unorm');
 /** @internal */
-export const typeTexStorage1D_rgba8uint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'rgba8ui'
-);
+export const typeTexStorage1D_rgba8uint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'rgba8ui');
 /** @internal */
-export const typeTexStorage1D_rgba8sint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'rgba8i'
-);
+export const typeTexStorage1D_rgba8sint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'rgba8i');
 /** @internal */
-export const typeTexStorage1D_rgba16uint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'rgba16ui'
-);
+export const typeTexStorage1D_rgba16uint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'rgba16ui');
 /** @internal */
-export const typeTexStorage1D_rgba16sint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'rgba16i'
-);
+export const typeTexStorage1D_rgba16sint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'rgba16i');
 /** @internal */
-export const typeTexStorage1D_rgba16float = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'rgba16f'
-);
+export const typeTexStorage1D_rgba16float = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'rgba16f');
 /** @internal */
-export const typeTexStorage1D_rgba32uint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'rgba32ui'
-);
+export const typeTexStorage1D_rgba32uint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'rgba32ui');
 /** @internal */
-export const typeTexStorage1D_rgba32sint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'rgba32i'
-);
+export const typeTexStorage1D_rgba32sint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'rgba32i');
 /** @internal */
-export const typeTexStorage1D_rgba32float = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'rgba32f'
-);
+export const typeTexStorage1D_rgba32float = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'rgba32f');
 /** @internal */
-export const typeTexStorage1D_rg32uint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'rg32ui'
-);
+export const typeTexStorage1D_rg32uint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'rg32ui');
 /** @internal */
-export const typeTexStorage1D_rg32sint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'rg32i'
-);
+export const typeTexStorage1D_rg32sint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'rg32i');
 /** @internal */
-export const typeTexStorage1D_rg32float = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'rg32f'
-);
+export const typeTexStorage1D_rg32float = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'rg32f');
 /** @internal */
-export const typeTexStorage1D_r32uint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'r32ui'
-);
+export const typeTexStorage1D_r32uint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'r32ui');
 /** @internal */
-export const typeTexStorage1D_r32sint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'r32i'
-);
+export const typeTexStorage1D_r32sint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'r32i');
 /** @internal */
-export const typeTexStorage1D_r32float = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_1D,
-  'r32f'
-);
+export const typeTexStorage1D_r32float = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_1D, 'r32f');
 /** @internal */
-export const typeTexStorage2D_rgba8unorm = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'rgba8unorm'
-);
+export const typeTexStorage2D_rgba8unorm = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'rgba8unorm');
 /** @internal */
-export const typeTexStorage2D_rgba8snorm = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'rgba8snorm'
-);
+export const typeTexStorage2D_rgba8snorm = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'rgba8snorm');
 /** @internal */
-export const typeTexStorage2D_bgra8unorm = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'bgra8unorm'
-);
+export const typeTexStorage2D_bgra8unorm = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'bgra8unorm');
 /** @internal */
-export const typeTexStorage2D_rgba8uint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'rgba8ui'
-);
+export const typeTexStorage2D_rgba8uint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'rgba8ui');
 /** @internal */
-export const typeTexStorage2D_rgba8sint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'rgba8i'
-);
+export const typeTexStorage2D_rgba8sint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'rgba8i');
 /** @internal */
-export const typeTexStorage2D_rgba16uint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'rgba16ui'
-);
+export const typeTexStorage2D_rgba16uint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'rgba16ui');
 /** @internal */
-export const typeTexStorage2D_rgba16sint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'rgba16i'
-);
+export const typeTexStorage2D_rgba16sint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'rgba16i');
 /** @internal */
-export const typeTexStorage2D_rgba16float = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'rgba16f'
-);
+export const typeTexStorage2D_rgba16float = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'rgba16f');
 /** @internal */
-export const typeTexStorage2D_rgba32uint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'rgba32ui'
-);
+export const typeTexStorage2D_rgba32uint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'rgba32ui');
 /** @internal */
-export const typeTexStorage2D_rgba32sint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'rgba32i'
-);
+export const typeTexStorage2D_rgba32sint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'rgba32i');
 /** @internal */
-export const typeTexStorage2D_rgba32float = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'rgba32f'
-);
+export const typeTexStorage2D_rgba32float = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'rgba32f');
 /** @internal */
-export const typeTexStorage2D_rg32uint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'rg32ui'
-);
+export const typeTexStorage2D_rg32uint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'rg32ui');
 /** @internal */
-export const typeTexStorage2D_rg32sint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'rg32i'
-);
+export const typeTexStorage2D_rg32sint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'rg32i');
 /** @internal */
-export const typeTexStorage2D_rg32float = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'rg32f'
-);
+export const typeTexStorage2D_rg32float = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'rg32f');
 /** @internal */
-export const typeTexStorage2D_r32uint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'r32ui'
-);
+export const typeTexStorage2D_r32uint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'r32ui');
 /** @internal */
-export const typeTexStorage2D_r32sint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'r32i'
-);
+export const typeTexStorage2D_r32sint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'r32i');
 /** @internal */
-export const typeTexStorage2D_r32float = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_2D,
-  'r32f'
-);
+export const typeTexStorage2D_r32float = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_2D, 'r32f');
 /** @internal */
 export const typeTexStorage2DArray_rgba8unorm = new PBTextureTypeInfo(
   PBTextureType.TEX_STORAGE_2D_ARRAY,
@@ -2076,90 +2004,39 @@ export const typeTexStorage2DArray_r32float = new PBTextureTypeInfo(
   'r32f'
 );
 /** @internal */
-export const typeTexStorage3D_rgba8unorm = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'rgba8unorm'
-);
+export const typeTexStorage3D_rgba8unorm = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'rgba8unorm');
 /** @internal */
-export const typeTexStorage3D_rgba8snorm = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'rgba8snorm'
-);
+export const typeTexStorage3D_rgba8snorm = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'rgba8snorm');
 /** @internal */
-export const typeTexStorage3D_bgra8unorm = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'bgra8unorm'
-);
+export const typeTexStorage3D_bgra8unorm = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'bgra8unorm');
 /** @internal */
-export const typeTexStorage3D_rgba8uint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'rgba8ui'
-);
+export const typeTexStorage3D_rgba8uint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'rgba8ui');
 /** @internal */
-export const typeTexStorage3D_rgba8sint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'rgba8i'
-);
+export const typeTexStorage3D_rgba8sint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'rgba8i');
 /** @internal */
-export const typeTexStorage3D_rgba16uint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'rgba16ui'
-);
+export const typeTexStorage3D_rgba16uint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'rgba16ui');
 /** @internal */
-export const typeTexStorage3D_rgba16sint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'rgba16i'
-);
+export const typeTexStorage3D_rgba16sint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'rgba16i');
 /** @internal */
-export const typeTexStorage3D_rgba16float = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'rgba16f'
-);
+export const typeTexStorage3D_rgba16float = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'rgba16f');
 /** @internal */
-export const typeTexStorage3D_rgba32uint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'rgba32ui'
-);
+export const typeTexStorage3D_rgba32uint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'rgba32ui');
 /** @internal */
-export const typeTexStorage3D_rgba32sint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'rgba32i'
-);
+export const typeTexStorage3D_rgba32sint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'rgba32i');
 /** @internal */
-export const typeTexStorage3D_rgba32float = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'rgba32f'
-);
+export const typeTexStorage3D_rgba32float = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'rgba32f');
 /** @internal */
-export const typeTexStorage3D_rg32uint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'rg32ui'
-);
+export const typeTexStorage3D_rg32uint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'rg32ui');
 /** @internal */
-export const typeTexStorage3D_rg32sint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'rg32i'
-);
+export const typeTexStorage3D_rg32sint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'rg32i');
 /** @internal */
-export const typeTexStorage3D_rg32float = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'rg32f'
-);
+export const typeTexStorage3D_rg32float = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'rg32f');
 /** @internal */
-export const typeTexStorage3D_r32uint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'r32ui'
-);
+export const typeTexStorage3D_r32uint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'r32ui');
 /** @internal */
-export const typeTexStorage3D_r32sint = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'r32i'
-);
+export const typeTexStorage3D_r32sint = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'r32i');
 /** @internal */
-export const typeTexStorage3D_r32float = new PBTextureTypeInfo(
-  PBTextureType.TEX_STORAGE_3D,
-  'r32f'
-);
+export const typeTexStorage3D_r32float = new PBTextureTypeInfo(PBTextureType.TEX_STORAGE_3D, 'r32f');
 /** @internal */
 export const typeTexDepth2D = new PBTextureTypeInfo(PBTextureType.TEX_DEPTH_2D);
 /** @internal */

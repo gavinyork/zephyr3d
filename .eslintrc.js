@@ -2,10 +2,19 @@ module.exports = {
   parser: '@typescript-eslint/parser',
   extends: [
     'plugin:@typescript-eslint/recommended',
+    'plugin:prettier/recommended'
+  ],
+  plugins: [
+    'prettier'
   ],
   parserOptions: {
-    ecmaVersion: 2020,
+    ecmaVersion: 12,
     sourceType: 'module',
+  },
+  env: {
+    browser: true,
+    node: true,
+    es2021: true
   },
   ignorePatterns: ['**/*.d.ts', '**/dist/**'],
   rules: {
@@ -18,6 +27,7 @@ module.exports = {
     '@typescript-eslint/no-empty-interface': 'off',
     '@typescript-eslint/no-this-alias': 'off',
     '@typescript-eslint/consistent-type-imports': 'warn',
-    '@typescript-eslint/ban-types': 'off'
+    '@typescript-eslint/ban-types': 'off',
+    'prettier/prettier': 'error'
   },
 };

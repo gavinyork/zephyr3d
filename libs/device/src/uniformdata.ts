@@ -1,5 +1,5 @@
 import { PBPrimitiveType } from './builder/types';
-import type { TypedArray, TypedArrayConstructor} from '@zephyr3d/base';
+import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
 import type { StructuredValue, UniformBufferLayout, StructuredBuffer } from './gpuobject';
 
 /**
@@ -72,7 +72,12 @@ export class StructuredBufferData {
             this._buffer.bufferSubData(this._uniformPositions[name][0], view);
           } else if (value['BYTES_PER_ELEMENT'] && size <= (value['byteLength'] as number)) {
             const arr = value as TypedArray;
-            this._buffer.bufferSubData(this._uniformPositions[name][0], arr, 0, (size / arr.BYTES_PER_ELEMENT) >> 0);
+            this._buffer.bufferSubData(
+              this._uniformPositions[name][0],
+              arr,
+              0,
+              (size / arr.BYTES_PER_ELEMENT) >> 0
+            );
           } else {
             throw new Error('invalid uniform value');
           }

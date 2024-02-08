@@ -1,10 +1,10 @@
 import { Matrix4x4, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
-import type { DeviceBackend} from '@zephyr3d/device';
+import type { DeviceBackend } from '@zephyr3d/device';
 import { DrawText } from '@zephyr3d/device';
 
-(async function() {
+(async function () {
   const backendsMap: Record<string, DeviceBackend> = {
     webgl: backendWebGL1,
     webgl2: backendWebGL2,
@@ -49,17 +49,21 @@ import { DrawText } from '@zephyr3d/device';
     0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0
   ];
   const indices = [
-    0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23
+    0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19,
+    20, 21, 22, 20, 22, 23
   ];
   const vbPos = device.createVertexBuffer('position_f32x3', new Float32Array(vertices));
   const vbNorm = device.createVertexBuffer('normal_f32x3', new Float32Array(normals));
   const ib = device.createIndexBuffer(new Uint16Array(indices));
   const vertexLayout = device.createVertexLayout({
-    vertexBuffers: [{
-      buffer: vbPos
-    }, {
-      buffer: vbNorm
-    }],
+    vertexBuffers: [
+      {
+        buffer: vbPos
+      },
+      {
+        buffer: vbNorm
+      }
+    ],
     indexBuffer: ib
   });
 
@@ -71,7 +75,7 @@ import { DrawText } from '@zephyr3d/device';
       this.$inputs.position = pb.vec3().attrib('position');
       this.$inputs.normal = pb.vec3().attrib('normal');
       this.$outputs.normal = pb.vec3();
-      pb.main(function() {
+      pb.main(function () {
         this.worldPos = pb.mul(this.worldMatrix, pb.vec4(this.$inputs.position, 1));
         this.$builtins.position = pb.mul(this.projMatrix, this.worldPos);
         this.$outputs.normal = this.$inputs.normal;
@@ -79,9 +83,9 @@ import { DrawText } from '@zephyr3d/device';
     },
     fragment(pb) {
       this.$outputs.color = pb.vec4();
-      pb.main(function() {
+      pb.main(function () {
         this.normal = pb.add(pb.mul(pb.normalize(this.$inputs.normal), 0.5), pb.vec3(0.5));
-        this.$outputs.color = pb.vec4(pb.pow(this.normal, pb.vec3(1/2.2)), 1);
+        this.$outputs.color = pb.vec4(pb.pow(this.normal, pb.vec3(1 / 2.2)), 1);
       });
     }
   });
@@ -90,11 +94,14 @@ import { DrawText } from '@zephyr3d/device';
   const bindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
 
   // start render loop
-  device.runLoop(device => {
+  device.runLoop((device) => {
     const t = device.frameInfo.elapsedOverall * 0.002;
     const rotateMatrix = Quaternion.fromEulerAngle(t, t, 0, 'XYZ').toMatrix4x4();
     bindGroup.setValue('worldMatrix', Matrix4x4.translateLeft(rotateMatrix, new Vector3(0, 0, -4)));
-    bindGroup.setValue('projMatrix', Matrix4x4.perspective(1.5, device.getDrawingBufferWidth()/device.getDrawingBufferHeight(), 1, 50));
+    bindGroup.setValue(
+      'projMatrix',
+      Matrix4x4.perspective(1.5, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 50)
+    );
 
     device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
     device.setProgram(program);

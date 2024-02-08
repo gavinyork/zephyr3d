@@ -2,21 +2,11 @@
 
 import type { AbstractDevice, ShaderKind } from '../base_types';
 import { ShaderType } from '../base_types';
-import type {
-  GPUProgram,
-  BindGroupLayout,
-  BindGroupLayoutEntry,
-  VertexSemantic
-} from '../gpuobject';
-import {
-  MAX_BINDING_GROUPS,
-  getVertexAttribByName
-} from '../gpuobject';
+import type { GPUProgram, BindGroupLayout, BindGroupLayoutEntry, VertexSemantic } from '../gpuobject';
+import { MAX_BINDING_GROUPS, getVertexAttribByName } from '../gpuobject';
 import type { PBReflectionTagGetter } from './reflection';
 import { PBReflection } from './reflection';
-import type {
-  ShaderExpTagValue,
-  ShaderTypeFunc} from './base';
+import type { ShaderExpTagValue, ShaderTypeFunc } from './base';
 import {
   PBShaderExp,
   setCurrentProgramBuilder,
@@ -28,11 +18,7 @@ import * as AST from './ast';
 import * as errors from './errors';
 import { setBuiltinFuncs } from './builtinfunc';
 import { setConstructors } from './constructors';
-import type {
-  PBPrimitiveTypeInfo,
-  PBStructLayout,
-  PBTextureTypeInfo,
-  PBTypeInfo} from './types';
+import type { PBPrimitiveTypeInfo, PBStructLayout, PBTextureTypeInfo, PBTypeInfo } from './types';
 import {
   PBArrayTypeInfo,
   PBFunctionTypeInfo,
@@ -773,7 +759,11 @@ export interface ProgramBuilder {
   /** return x && y */
   and_2(x: PBShaderExp | number | boolean, y: PBShaderExp | number | boolean): PBShaderExp;
   /** return x && y && ... */
-  and(x: PBShaderExp | number | boolean, y: PBShaderExp | number | boolean, ...rest: (PBShaderExp | number | boolean)[]);
+  and(
+    x: PBShaderExp | number | boolean,
+    y: PBShaderExp | number | boolean,
+    ...rest: (PBShaderExp | number | boolean)[]
+  );
   /** return x & y, per component */
   compAnd(x: PBShaderExp | number, y: PBShaderExp | number): PBShaderExp;
   /** return x ^ y, per component */
@@ -976,21 +966,21 @@ export interface ProgramBuilder {
   /** atomicLoad, only valid for WebGPU device */
   atomicLoad(ptr: PBShaderExp);
   /** atomicStore, only valid for WebGPU device */
-  atomicStore(ptr: PBShaderExp, value: number|PBShaderExp);
+  atomicStore(ptr: PBShaderExp, value: number | PBShaderExp);
   /** atomicAdd, only valid for WebGPU device */
-  atomicAdd(ptr: PBShaderExp, value: number|PBShaderExp): PBShaderExp;
+  atomicAdd(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
   /** atomicSub, only valid for WebGPU device */
-  atomicSub(ptr: PBShaderExp, value: number|PBShaderExp): PBShaderExp;
+  atomicSub(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
   /** atomicMax, only valid for WebGPU device */
-  atomicMax(ptr: PBShaderExp, value: number|PBShaderExp): PBShaderExp;
+  atomicMax(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
   /** atomicMin, only valid for WebGPU device */
-  atomicMin(ptr: PBShaderExp, value: number|PBShaderExp): PBShaderExp;
+  atomicMin(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
   /** atomicAnd, only valid for WebGPU device */
-  atomicAnd(ptr: PBShaderExp, value: number|PBShaderExp): PBShaderExp;
+  atomicAnd(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
   /** atomicOr, only valid for WebGPU device */
-  atomicOr(ptr: PBShaderExp, value: number|PBShaderExp): PBShaderExp;
+  atomicOr(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
   /** atomicXor, only valid for WebGPU device */
-  atomicXor(ptr: PBShaderExp, value: number|PBShaderExp): PBShaderExp;
+  atomicXor(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
 }
 
 /**
@@ -1073,10 +1063,10 @@ export class ProgramBuilder {
     return this._shaderType === ShaderType.Vertex
       ? 'vertex'
       : this._shaderType === ShaderType.Fragment
-        ? 'fragment'
-        : this._shaderType === ShaderType.Compute
-          ? 'compute'
-          : null;
+      ? 'fragment'
+      : this._shaderType === ShaderType.Compute
+      ? 'compute'
+      : null;
   }
   /** Gets the global scope */
   getGlobalScope(): PBGlobalScope {
@@ -1603,7 +1593,11 @@ export class ProgramBuilder {
         throw new Error(`invalid in/out variable type: '${k[1].value.name}'`);
       }
       args.push({ name: k[1].value.name, type: type });
-      prefix.push(`@location(${k[1].value.value.$location}) ${type.isPrimitiveType() && type.isInteger() ? '@interpolate(flat) ' : ''}`);
+      prefix.push(
+        `@location(${k[1].value.value.$location}) ${
+          type.isPrimitiveType() && type.isInteger() ? '@interpolate(flat) ' : ''
+        }`
+      );
     }
     if (args.length > 0) {
       const st = this.findStructType(structName, shaderType);
@@ -2053,7 +2047,10 @@ export class ProgramBuilder {
             const type = u.texture.exp.$ast.getType();
             if (type.isTextureType() && type.isDepthTexture() && u.texture.autoBindSampler === 'sample') {
               if (type.is2DTexture()) {
-                context.typeReplacement.set(u.texture.exp, type.isArrayTexture() ? typeTex2DArray : typeTex2D);
+                context.typeReplacement.set(
+                  u.texture.exp,
+                  type.isArrayTexture() ? typeTex2DArray : typeTex2D
+                );
               } else if (type.isCubeTexture()) {
                 context.typeReplacement.set(u.texture.exp, typeTexCube);
               }
@@ -2087,10 +2084,14 @@ export class ProgramBuilder {
   }
   /** @internal */
   private mergeUniformsCompute(globalScope: PBGlobalScope) {
-    const uniformList: { member: PBShaderExp, uniform: number }[][] = [];
+    const uniformList: { member: PBShaderExp; uniform: number }[][] = [];
     for (let i = 0; i < this._uniforms.length; i++) {
       const u = this._uniforms[i];
-      if (u.block && (u.block.exp.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM || u.block.exp.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE)) {
+      if (
+        u.block &&
+        (u.block.exp.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM ||
+          u.block.exp.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE)
+      ) {
         if (u.block.exp.$typeinfo.isStructType() && u.block.exp.$isBuffer) {
           continue;
         }
@@ -2107,17 +2108,17 @@ export class ProgramBuilder {
       if (uniformList[k].length > 0) {
         const types = ['std140', 'std430'] as PBStructLayout[];
         const nameList = [COMPUTE_UNIFORM_NAME, COMPUTE_STORAGE_NAME];
-        const ulist: { member: PBShaderExp, uniform: number }[][] = [
-          uniformList[k].filter(val => val.member.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM),
-          uniformList[k].filter(val => val.member.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE)
+        const ulist: { member: PBShaderExp; uniform: number }[][] = [
+          uniformList[k].filter((val) => val.member.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM),
+          uniformList[k].filter((val) => val.member.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE)
         ];
         for (let i = 0; i < 2; i++) {
           if (ulist[i].length === 0) {
             continue;
           }
-          const nonBufferList = ulist[i].filter(val => !val.member.$isBuffer);
-          const bufferList = ulist[i].filter(val => val.member.$isBuffer);
-          const allLists = [nonBufferList, ...bufferList.map(val => [val])];
+          const nonBufferList = ulist[i].filter((val) => !val.member.$isBuffer);
+          const bufferList = ulist[i].filter((val) => val.member.$isBuffer);
+          const allLists = [nonBufferList, ...bufferList.map((val) => [val])];
           for (let p = 0; p < allLists.length; p++) {
             if (allLists[p].length === 0) {
               continue;
@@ -2129,7 +2130,7 @@ export class ProgramBuilder {
               types[i],
               ShaderType.Compute,
               false,
-              ...allLists[p].map(val => val.member)
+              ...allLists[p].map((val) => val.member)
             );
             const exp = t();
             if (i === 0) {
@@ -2178,15 +2179,19 @@ export class ProgramBuilder {
   }
   /** @internal */
   private mergeUniforms(globalScopeVertex: PBGlobalScope, globalScopeFragmet: PBGlobalScope) {
-    const vertexUniformList: { member: PBShaderExp, uniform: number }[][] = [];
-    const fragUniformList: { member: PBShaderExp, uniform: number }[][] = [];
-    const sharedUniformList: { member: PBShaderExp, uniform: number }[][] = [];
+    const vertexUniformList: { member: PBShaderExp; uniform: number }[][] = [];
+    const fragUniformList: { member: PBShaderExp; uniform: number }[][] = [];
+    const sharedUniformList: { member: PBShaderExp; uniform: number }[][] = [];
     //const vertexUniformList: { members: PBShaderExp[]; uniforms: number[] }[] = [];
     //const fragUniformList: { members: PBShaderExp[]; uniforms: number[] }[] = [];
     //const sharedUniformList: { members: PBShaderExp[]; uniforms: number[] }[] = [];
     for (let i = 0; i < this._uniforms.length; i++) {
       const u = this._uniforms[i];
-      if (u.block && (u.block.exp.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM || u.block.exp.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE)) {
+      if (
+        u.block &&
+        (u.block.exp.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM ||
+          u.block.exp.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE)
+      ) {
         if (u.block.exp.$typeinfo.isStructType() && u.block.exp.$isBuffer) {
           continue;
         }
@@ -2203,7 +2208,7 @@ export class ProgramBuilder {
           //sharedUniformList[u.group].uniforms.push(i);
         } else if (v) {
           if (!vertexUniformList[u.group]) {
-            vertexUniformList[u.group] = [];//{ members: [], uniforms: [] };
+            vertexUniformList[u.group] = []; //{ members: [], uniforms: [] };
           }
           const exp = new PBShaderExp(u.block.exp.$str, u.block.exp.$ast.getType());
           exp.$declareType = u.block.exp.$declareType;
@@ -2217,7 +2222,7 @@ export class ProgramBuilder {
           const exp = new PBShaderExp(u.block.exp.$str, u.block.exp.$ast.getType());
           exp.$declareType = u.block.exp.$declareType;
           exp.$isBuffer = u.block.exp.$isBuffer;
-          fragUniformList[u.group].push({ member: exp, uniform: i });//members.push(exp);
+          fragUniformList[u.group].push({ member: exp, uniform: i }); //members.push(exp);
           //fragUniformList[u.group].uniforms.push(i);
         }
       }
@@ -2229,19 +2234,23 @@ export class ProgramBuilder {
     for (let i = 0; i < 3; i++) {
       for (const k in uniformLists[i]) {
         if (uniformLists[i][k]?.length > 0) {
-          const ulist: { member: PBShaderExp, uniform: number }[][] = [
-            uniformLists[i][k].filter(val => val.member.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM),
-            uniformLists[i][k].filter(val => val.member.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE)
+          const ulist: { member: PBShaderExp; uniform: number }[][] = [
+            uniformLists[i][k].filter(
+              (val) => val.member.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM
+            ),
+            uniformLists[i][k].filter(
+              (val) => val.member.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE
+            )
           ];
-          const nameList: string[][] = [ nameListUniform, nameListStorage];
+          const nameList: string[][] = [nameListUniform, nameListStorage];
           const layoutList: PBStructLayout[] = ['std140', 'std430'];
           for (let j = 0; j < 2; j++) {
             if (ulist[j].length === 0) {
               continue;
             }
-            const nonBufferList = ulist[j].filter(val => !val.member.$isBuffer);
-            const bufferList = ulist[j].filter(val => val.member.$isBuffer);
-            const allLists = [nonBufferList, ...bufferList.map(val => [val])];
+            const nonBufferList = ulist[j].filter((val) => !val.member.$isBuffer);
+            const bufferList = ulist[j].filter((val) => val.member.$isBuffer);
+            const allLists = [nonBufferList, ...bufferList.map((val) => [val])];
             for (let p = 0; p < allLists.length; p++) {
               if (allLists[p].length === 0) {
                 continue;
@@ -2253,7 +2262,7 @@ export class ProgramBuilder {
                 layoutList[j],
                 maskList[i],
                 false,
-                ...allLists[p].map(val => val.member)
+                ...allLists[p].map((val) => val.member)
               );
               if (maskList[i] & ShaderType.Vertex) {
                 const exp = t();
@@ -2365,7 +2374,11 @@ export class ProgramBuilder {
         );
         const isStorage = uniformInfo.block.exp.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE;
         entry.buffer = {
-          type: isStorage ? (uniformInfo.block.exp.$ast as AST.ASTPrimitive).isWritable() ? 'storage' : 'read-only-storage' : 'uniform',
+          type: isStorage
+            ? (uniformInfo.block.exp.$ast as AST.ASTPrimitive).isWritable()
+              ? 'storage'
+              : 'read-only-storage'
+            : 'uniform',
           hasDynamicOffset: uniformInfo.block.dynamicOffset,
           uniformLayout: entry.type.toBufferLayout(0, (entry.type as PBStructTypeInfo).layout)
         };
@@ -2487,7 +2500,10 @@ export class ProgramBuilder {
       let matches = true;
       for (let i = 0; i < args.length; i++) {
         const argInfo = overload.funcType.argTypes[i];
-        const argType = (argInfo.byRef && argInfo.type instanceof PBPointerTypeInfo) ? argInfo.type.pointerType : argInfo.type;
+        const argType =
+          argInfo.byRef && argInfo.type instanceof PBPointerTypeInfo
+            ? argInfo.type.pointerType
+            : argInfo.type;
         const arg = args[i];
         if (typeof arg === 'boolean') {
           if (!argType.isPrimitiveType() || argType.primitiveType !== PBPrimitiveType.BOOL) {
@@ -2539,12 +2555,7 @@ export class ProgramBuilder {
       throw new errors.PBNonScopedFunctionCall(funcName);
     }
     const exp = new PBShaderExp('', func.returnType);
-    exp.$ast = new AST.ASTCallFunction(
-      funcName,
-      args,
-      func,
-      getCurrentProgramBuilder().getDevice().type
-    );
+    exp.$ast = new AST.ASTCallFunction(funcName, args, func, getCurrentProgramBuilder().getDevice().type);
     this.getCurrentScope().$ast.statements.push(exp.$ast);
     return exp;
   }
@@ -2973,7 +2984,7 @@ export class PBLocalScope extends PBScope {
     if (val === undefined) {
       const type = getCurrentProgramBuilder().guessExpValueType(value);
       if (type.isCompatibleType(typeVoid)) {
-        throw new Error(`Cannot assign void type to '${prop}'`)
+        throw new Error(`Cannot assign void type to '${prop}'`);
       }
       const exp = new PBShaderExp(prop, type);
       if (value instanceof PBShaderExp && !this.$_scope.$parent) {
@@ -3003,7 +3014,7 @@ export class PBLocalScope extends PBScope {
  */
 export interface PBBuiltinScope {
   position: PBShaderExp;
-  pointSize: PBShaderExp|number;
+  pointSize: PBShaderExp | number;
   fragDepth: PBShaderExp;
   readonly fragCoord: PBShaderExp;
   readonly frontFacing: PBShaderExp;
@@ -3022,7 +3033,7 @@ export interface PBBuiltinScope {
  * The builtin scope of a shader
  * @public
  */
- export class PBBuiltinScope extends PBScope {
+export class PBBuiltinScope extends PBScope {
   /** @internal */
   $_usedBuiltins: Set<string>;
   /** @internal */
@@ -3179,7 +3190,10 @@ export class PBOutputScope extends PBScope {
         pb.out(
           location,
           prop,
-          new PBShaderExp(`${pb.shaderKind === 'vertex' ? output_prefix_vs : output_prefix_fs}${prop}`, type).tag(...value.$tags)
+          new PBShaderExp(
+            `${pb.shaderKind === 'vertex' ? output_prefix_vs : output_prefix_fs}${prop}`,
+            type
+          ).tag(...value.$tags)
         );
         // modify output struct for webgpu
         if (getCurrentProgramBuilder().getDevice().type === 'webgpu') {
@@ -3270,11 +3284,7 @@ export class PBGlobalScope extends PBScope {
     }
   }
   /** @internal */
-  $createFunctionIfNotExists(
-    name: string,
-    params: PBShaderExp[],
-    body?: (this: PBFunctionScope) => void
-  ) {
+  $createFunctionIfNotExists(name: string, params: PBShaderExp[], body?: (this: PBFunctionScope) => void) {
     if (true || !this.$builder.getFunction(name)) {
       this.$internalCreateFunction(name, params, false, body);
     }
@@ -3315,7 +3325,13 @@ export class PBGlobalScope extends PBScope {
     });
     const overloads = this.$getFunctions(name);
     const currentFunctionScope = this.$getCurrentFunctionScope();
-    const astFunc = new AST.ASTFunction(name, params.map(val => val.$ast as AST.ASTFunctionParameter), isMain, null, false);
+    const astFunc = new AST.ASTFunction(
+      name,
+      params.map((val) => val.$ast as AST.ASTFunctionParameter),
+      isMain,
+      null,
+      false
+    );
     if (currentFunctionScope) {
       const curIndex = this.$ast.statements.indexOf(currentFunctionScope.$ast);
       if (curIndex < 0) {
@@ -3333,17 +3349,17 @@ export class PBGlobalScope extends PBScope {
     astFunc.funcType = new PBFunctionTypeInfo(
       astFunc.name,
       astFunc.returnType,
-      params.map(param => {
+      params.map((param) => {
         const ast = param.$ast as AST.ASTFunctionParameter;
         return ast.paramAST instanceof AST.ASTReferenceOf
           ? {
-            type: ast.paramAST.value.getType(),
-            byRef: ast.paramAST instanceof AST.ASTReferenceOf
-          }
+              type: ast.paramAST.value.getType(),
+              byRef: ast.paramAST instanceof AST.ASTReferenceOf
+            }
           : {
-            type: ast.paramAST.getType(),
-            byRef: false
-          };
+              type: ast.paramAST.getType(),
+              byRef: false
+            };
       })
     );
     for (const overload of overloads) {
@@ -3400,7 +3416,11 @@ export class PBInsideFunctionScope extends PBScope {
     if (retValNonArray !== undefined && retValNonArray !== null) {
       if (typeof retValNonArray === 'number') {
         if (astFunc.returnType) {
-          if (astFunc.returnType.isPrimitiveType() && astFunc.returnType.isScalarType() && !astFunc.returnType.isCompatibleType(typeBool)) {
+          if (
+            astFunc.returnType.isPrimitiveType() &&
+            astFunc.returnType.isScalarType() &&
+            !astFunc.returnType.isCompatibleType(typeBool)
+          ) {
             returnType = astFunc.returnType;
           }
         }
@@ -3487,11 +3507,16 @@ export class PBInsideFunctionScope extends PBScope {
    * @param second - The second value
    * @returns The first value if condition evaluates to true, otherwise returns the second value
    */
-  $choice(condition: ExpValueNonArrayType, first: ExpValueNonArrayType, second: ExpValueNonArrayType): PBShaderExp {
+  $choice(
+    condition: ExpValueNonArrayType,
+    first: ExpValueNonArrayType,
+    second: ExpValueNonArrayType
+  ): PBShaderExp {
     const ast = new AST.ASTSelect(
       condition instanceof PBShaderExp ? condition.$ast : condition,
       first instanceof PBShaderExp ? first.$ast : first,
-      second instanceof PBShaderExp ? second.$ast : second);
+      second instanceof PBShaderExp ? second.$ast : second
+    );
     const exp = new PBShaderExp('', ast.getType());
     exp.$ast = ast;
     return exp;

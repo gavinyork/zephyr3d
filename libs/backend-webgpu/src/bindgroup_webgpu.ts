@@ -1,4 +1,5 @@
-import type { BufferCreationOptions,
+import type {
+  BufferCreationOptions,
   StructuredValue,
   TextureVideo,
   PBStructTypeInfo,
@@ -9,9 +10,7 @@ import type { BufferCreationOptions,
   BindGroupLayoutEntry,
   GPUDataBuffer
 } from '@zephyr3d/device';
-import {
-  GPUResourceUsageFlags,
-} from '@zephyr3d/device';
+import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGPUStructuredBuffer } from './structuredbuffer_webgpu';
 import type { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPUTextureVideo } from './texturevideo_webgpu';
@@ -28,11 +27,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   private _textures: WebGPUBaseTexture[];
   private _videoTextures: WebGPUTextureVideo[];
   private _resources: {
-    [name: string]:
-      | WebGPUBuffer
-      | WebGPUTextureVideo
-      | [WebGPUBaseTexture, GPUTextureView]
-      | GPUSampler;
+    [name: string]: WebGPUBuffer | WebGPUTextureVideo | [WebGPUBaseTexture, GPUTextureView] | GPUSampler;
   };
   constructor(device: WebGPUDevice, layout: BindGroupLayout) {
     super(device);
@@ -137,7 +132,14 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
       throw new Error(`getTexture() failed:${name} is not a texture`);
     }
   }
-  setTextureView(name: string, value: BaseTexture, level?: number, face?: number, mipCount?: number, sampler?: TextureSampler) {
+  setTextureView(
+    name: string,
+    value: BaseTexture,
+    level?: number,
+    face?: number,
+    mipCount?: number,
+    sampler?: TextureSampler
+  ) {
     if (!value) {
       throw new Error(`WebGPUBindGroup.setTextureView() failed: invalid texture uniform value: ${value}`);
     } else {
@@ -369,7 +371,9 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
           true
         ) as WebGPUBuffer;
         if (!buffer) {
-          throw new Error(`Uniform buffer '${entry.name}' not exists, maybe you forgot settings some uniform values`);
+          throw new Error(
+            `Uniform buffer '${entry.name}' not exists, maybe you forgot settings some uniform values`
+          );
         }
         if (this._buffers.indexOf(buffer) < 0) {
           this._buffers.push(buffer);

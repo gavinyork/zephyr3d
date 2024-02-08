@@ -1,5 +1,5 @@
 import { Vector2, Vector3, Vector4, Matrix3x3, Matrix4x4 } from '@zephyr3d/base';
-import type { TestCase} from '../common';
+import type { TestCase } from '../common';
 import { doTest } from '../common';
 import { testVectorType, testMatrixType, testQuaternion, testXForm } from './vector';
 import { testPlane } from './plane';
@@ -56,7 +56,7 @@ const testCases: TestCase[] = [
     caseName: 'AABB test',
     times: 100,
     execute: () => testAABB()
-  },
+  }
 ];
 
 (async function () {

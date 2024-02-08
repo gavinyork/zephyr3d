@@ -7,7 +7,8 @@ import type {
   TextureSampler,
   TextureType,
   TextureFormat,
-  GPUDataBuffer} from '@zephyr3d/device';
+  GPUDataBuffer
+} from '@zephyr3d/device';
 import {
   isCompressedTextureFormat,
   hasDepthChannel,
@@ -74,7 +75,9 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
   }
   set samplerOptions(options: SamplerOptions) {
     const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
-    this._samplerOptions = options ? Object.assign({}, this._getSamplerOptions(params, !!options.compare), options) : null;
+    this._samplerOptions = options
+      ? Object.assign({}, this._getSamplerOptions(params, !!options.compare), options)
+      : null;
   }
   get isWebGL1Fallback(): boolean {
     return this._webgl1fallback;
@@ -127,12 +130,32 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
   }
   getDefaultSampler(shadow: boolean): TextureSampler {
     const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
-    return this._device.createSampler(!this._samplerOptions || !this._samplerOptions.compare !== !shadow ? this._getSamplerOptions(params, shadow) : this._samplerOptions);
+    return this._device.createSampler(
+      !this._samplerOptions || !this._samplerOptions.compare !== !shadow
+        ? this._getSamplerOptions(params, shadow)
+        : this._samplerOptions
+    );
   }
   abstract generateMipmaps(): void;
   abstract init(): void;
-  abstract readPixels(x: number, y: number, w: number, h: number, faceOrLayer: number, mipLevel: number, buffer: TypedArray): Promise<void>;
-  abstract readPixelsToBuffer(x: number, y: number, w: number, h: number, faceOrLayer: number, mipLevel: number, buffer: GPUDataBuffer): void;
+  abstract readPixels(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    faceOrLayer: number,
+    mipLevel: number,
+    buffer: TypedArray
+  ): Promise<void>;
+  abstract readPixelsToBuffer(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    faceOrLayer: number,
+    mipLevel: number,
+    buffer: GPUDataBuffer
+  ): void;
   /** @internal */
   protected allocInternal(
     format: TextureFormat,
@@ -155,7 +178,7 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
       if (this.isTexture3D()) {
         size = Math.max(size, depth);
       }
-      const autoMipLevelCount = Math.floor(Math.log2(size)) + 1;//this._calcMipLevelCount(format, width, height, depth);
+      const autoMipLevelCount = Math.floor(Math.log2(size)) + 1; //this._calcMipLevelCount(format, width, height, depth);
       if (!Number.isInteger(numMipLevels) || numMipLevels < 0 || numMipLevels > autoMipLevelCount) {
         numMipLevels = autoMipLevelCount;
       }
@@ -215,7 +238,9 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
           const blockHeight = getTextureFormatBlockHeight(this._format);
           const blockSize = getTextureFormatBlockSize(this._format);
           for (let mip = 0; mip < numMipLevels; mip++) {
-            const data = isCompressed ? new Uint8Array(Math.ceil(w / blockWidth) * Math.ceil(h / blockHeight) * blockSize) : null;
+            const data = isCompressed
+              ? new Uint8Array(Math.ceil(w / blockWidth) * Math.ceil(h / blockHeight) * blockSize)
+              : null;
             data?.fill(0xff);
             if (this.isTextureCube()) {
               for (let face = 0; face < 6; face++) {

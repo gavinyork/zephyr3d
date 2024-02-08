@@ -1,4 +1,4 @@
-import type { Complex} from './complex';
+import type { Complex } from './complex';
 import { add, complex, eix, mult, scale } from './complex';
 
 /**
@@ -96,10 +96,7 @@ export const ifft = (fourier: Complex[]): Complex[] => {
     const fhat = new Array<Complex>(n);
     const coeff = (2 * Math.PI) / n;
     for (let k = 0; k < n; k++) {
-      fhat[k] = scale(
-        add(evenFft[k % n2], mult(oddFft[k % n2], eix(coeff * k))),
-        0.5
-      );
+      fhat[k] = scale(add(evenFft[k % n2], mult(oddFft[k % n2], eix(coeff * k))), 0.5);
     }
     return fhat;
   }

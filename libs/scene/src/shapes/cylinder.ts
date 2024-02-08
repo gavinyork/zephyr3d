@@ -1,7 +1,7 @@
-import { Vector3 } from "@zephyr3d/base";
-import { BoundingBox } from "../utility/bounding_volume";
-import type { ShapeCreationOptions} from "./shape";
-import { Shape } from "./shape";
+import { Vector3 } from '@zephyr3d/base';
+import { BoundingBox } from '../utility/bounding_volume';
+import type { ShapeCreationOptions } from './shape';
+import { Shape } from './shape';
 
 /**
  * Creation options for cylinder shape
@@ -61,12 +61,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
     indices.push(lt, lb, rb, lt, rb, rt);
   }
   /** @internal */
-  protected _createArrays(
-    vertices: number[],
-    normals: number[],
-    uvs: number[],
-    indices: number[],
-  ) {
+  protected _createArrays(vertices: number[], normals: number[], uvs: number[], indices: number[]) {
     const slope = (this._options.bottomRadius - this._options.topRadius) / this._options.height;
     for (let y = 0; y <= this._options.heightDetail; y++) {
       const v = y / this._options.heightDetail;
@@ -99,9 +94,13 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
     this.createAndSetVertexBuffer('tex0_f32x2', new Float32Array(uvs));
     this.createAndSetIndexBuffer(new Uint16Array(indices));
     const radiusMax = Math.max(this._options.topRadius, this._options.bottomRadius);
-    this.setBoundingVolume(new BoundingBox(new Vector3(-radiusMax, 0, -radiusMax), new Vector3(radiusMax, this._options.height, radiusMax)));
+    this.setBoundingVolume(
+      new BoundingBox(
+        new Vector3(-radiusMax, 0, -radiusMax),
+        new Vector3(radiusMax, this._options.height, radiusMax)
+      )
+    );
     this.indexCount = indices.length;
     return true;
   }
 }
-

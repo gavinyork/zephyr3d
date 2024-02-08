@@ -1,11 +1,11 @@
 /* eslint-disable no-unused-vars, @typescript-eslint/no-unused-vars */
-import { Vector2, Vector3 } from "@zephyr3d/base";
-import { Application } from "../app";
-import type { Material } from "../material";
-import type { DrawContext} from "../render";
-import { Primitive } from "../render";
-import { GraphNode } from "./graph_node";
-import type { Scene } from "./scene";
+import { Vector2, Vector3 } from '@zephyr3d/base';
+import { Application } from '../app';
+import type { Material } from '../material';
+import type { DrawContext } from '../render';
+import { Primitive } from '../render';
+import { GraphNode } from './graph_node';
+import type { Scene } from './scene';
 
 type Particle = {
   pos: Vector3;
@@ -34,9 +34,9 @@ export interface ParticleEmitter {
 /** @internal */
 export class ParticleSystem extends GraphNode {
   /** @internal */
-  private static readonly DIRECTIONAL_PARTICLE = (1<<0);
+  private static readonly DIRECTIONAL_PARTICLE = 1 << 0;
   /** @internal */
-  private static readonly WORLDSPACE = (1<<1);
+  private static readonly WORLDSPACE = 1 << 1;
   /** @internal */
   private _primitive: Primitive;
   /** @internal */
@@ -54,7 +54,7 @@ export class ParticleSystem extends GraphNode {
   /** @internal */
   private _flags: number;
   /** @internal */
-    private _gravity: Vector3;
+  private _gravity: Vector3;
   /** @internal */
   private _wind: Vector3;
   /** @internal */
@@ -133,9 +133,15 @@ export class ParticleSystem extends GraphNode {
       this._primitive.dispose();
       this._primitive = new Primitive();
       this._vertexData = new Float32Array(11 * 4 * this._maxParticleCount);
-      const vertices = device.createInterleavedVertexBuffer(['position_f32x4', 'tex0_f32x4', 'tex1_f32x3'], this._vertexData);
+      const vertices = device.createInterleavedVertexBuffer(
+        ['position_f32x4', 'tex0_f32x4', 'tex1_f32x3'],
+        this._vertexData
+      );
       this._primitive.setVertexBuffer(vertices);
-      const indexData = this._maxParticleCount > 16384 ? new Uint32Array(this._maxParticleCount * 6) : new Uint16Array(this._maxParticleCount * 6);
+      const indexData =
+        this._maxParticleCount > 16384
+          ? new Uint32Array(this._maxParticleCount * 6)
+          : new Uint16Array(this._maxParticleCount * 6);
       for (let i = 0; i < this._maxParticleCount; i++) {
         indexData[i * 6 + 0] = i * 4 + 0;
         indexData[i * 6 + 1] = i * 4 + 1;
@@ -159,7 +165,7 @@ export class ParticleSystem extends GraphNode {
     this._lastUpdateTime = currentTime;
     let i = 0;
     const currentActiveCount = this._activeParticleCount;
-    while(i < this._activeParticleCount) {
+    while (i < this._activeParticleCount) {
       const n = this._particles[i];
       const p = n.particle;
       n.elapsedTime += elapsed;
@@ -179,7 +185,7 @@ export class ParticleSystem extends GraphNode {
         p.pos.y += p.vel.y * this.scale.y * elapsed;
         p.pos.z += p.vel.z * this.scale.z * elapsed;
         n.jitterAngle = (n.elapsedTime + p.lifeSpan * n.ageBias) * this._jitterSpeed;
-        n.size = p.size1 + p.size2 * n.elapsedTime / p.lifeSpan;
+        n.size = p.size1 + (p.size2 * n.elapsedTime) / p.lifeSpan;
         n.rotation += p.rotation * elapsed;
         i++;
       }

@@ -151,7 +151,8 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
     const t0 = Date.now();
     let sm = this._device.device.createShaderModule({ code });
     if (sm) {
-      const func: (this: GPUShaderModule) => Promise<GPUCompilationInfo> = (sm as any).compilationInfo || (sm as any).getCompilationInfo;
+      const func: (this: GPUShaderModule) => Promise<GPUCompilationInfo> =
+        (sm as any).compilationInfo || (sm as any).getCompilationInfo;
       if (!func) {
         return sm;
       }
@@ -167,7 +168,10 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
             if (message.type === 'error') {
               err = true;
             }
-            msg += `Line ${message.lineNum}:${message.linePos} - ${code.slice(message.offset, message.offset + message.length)}\n`;
+            msg += `Line ${message.lineNum}:${message.linePos} - ${code.slice(
+              message.offset,
+              message.offset + message.length
+            )}\n`;
             msg += `${message.message}\n`;
             if (message.type === 'error') {
               err = true;

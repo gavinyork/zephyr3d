@@ -31,10 +31,11 @@ export class RaycastVisitor implements Visitor {
   get intersectedPoint(): Vector3 {
     return Vector3.add(this._ray.origin, Vector3.scale(this._ray.direction, this._intersectedDist));
   }
-  visit(target: SceneNode|OctreeNode): boolean {
+  visit(target: SceneNode | OctreeNode): boolean {
     if (target instanceof OctreeNode) {
       return this.visitOctreeNode(target);
-    } if (target.isMesh()) {
+    }
+    if (target.isMesh()) {
       return this.visitMesh(target);
     } else if (target.isTerrain()) {
       return this.visitTerrain(target);
@@ -44,7 +45,7 @@ export class RaycastVisitor implements Visitor {
   visitTerrain(node: Terrain) {
     if (!node.hidden && node.pickable) {
       this._ray.transform(node.invWorldMatrix, this._rayLocal);
-      const d = node.rayIntersect(this._rayLocal);// this._rayLocal.bboxIntersectionTestEx(node.getBoundingVolume().toAABB());
+      const d = node.rayIntersect(this._rayLocal); // this._rayLocal.bboxIntersectionTestEx(node.getBoundingVolume().toAABB());
       if (d !== null && d < this._intersectedDist) {
         this._intersectedDist = d;
         this._intersected = node;

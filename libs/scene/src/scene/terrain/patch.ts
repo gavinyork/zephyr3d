@@ -1,4 +1,4 @@
-import type { Matrix4x4} from '@zephyr3d/base';
+import type { Matrix4x4 } from '@zephyr3d/base';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { Primitive } from '../../render/primitive';
@@ -87,7 +87,12 @@ export class TerrainPatch implements Drawable {
           this._offsetZ * scaleZ + (this._quadtree.getPatchSize() - 1) * this._step * scaleZ;
       }
       this.setupVertices(this.computeSkirtLength(), baseVertices, normals, heightScale, elevations);
-      this._offsetScale = new Vector4(this._step * scaleX, this._offsetX * scaleX, this._step * scaleZ, this._offsetZ * scaleZ);
+      this._offsetScale = new Vector4(
+        this._step * scaleX,
+        this._offsetX * scaleX,
+        this._step * scaleZ,
+        this._offsetZ * scaleZ
+      );
     }
     return true;
   }
@@ -99,7 +104,10 @@ export class TerrainPatch implements Drawable {
   }
   draw(ctx: DrawContext) {
     const isShadowMapPass = ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP;
-    const primitive = this._quadtree.getTerrain().wireframe && !isShadowMapPass ? this.getGeometryWireframe() :this.getGeometry();
+    const primitive =
+      this._quadtree.getTerrain().wireframe && !isShadowMapPass
+        ? this.getGeometryWireframe()
+        : this.getGeometry();
     const material = this._quadtree.getTerrain().material;
     if (isShadowMapPass) {
       material.stateSet.useRasterizerState().setCullMode('front');
@@ -228,7 +236,12 @@ export class TerrainPatch implements Drawable {
     if (!this._offsetScale) {
       const scaleX = this._quadtree.getScaleX();
       const scaleZ = this._quadtree.getScaleZ();
-      this._offsetScale = new Vector4(this._step * scaleX, this._offsetX * scaleX, this._step * scaleZ, this._offsetZ * scaleZ);
+      this._offsetScale = new Vector4(
+        this._step * scaleX,
+        this._offsetX * scaleX,
+        this._step * scaleZ,
+        this._offsetZ * scaleZ
+      );
     }
     return this._offsetScale;
   }

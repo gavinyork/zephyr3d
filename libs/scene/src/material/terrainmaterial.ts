@@ -2,7 +2,11 @@ import { Material } from './material';
 import { forwardComputeLighting } from '../shaders/lighting';
 import { RENDER_PASS_TYPE_SHADOWMAP, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_DEPTH_ONLY } from '../values';
 import { ShaderFramework } from '../shaders/framework';
-import { encodeColorOutput, encodeNormalizedFloatToRGBA, nonLinearDepthToLinearNormalized } from '../shaders/misc';
+import {
+  encodeColorOutput,
+  encodeNormalizedFloatToRGBA,
+  nonLinearDepthToLinearNormalized
+} from '../shaders/misc';
 import { Application } from '../app';
 import type { TerrainLightModelOptions } from './terrainlightmodel';
 import { TerrainLightModel } from './terrainlightmodel';
@@ -70,7 +74,7 @@ export class TerrainMaterial extends Material {
    * {@inheritDoc Material._applyUniforms}
    * @override
    */
-   protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void {
+  protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void {
     if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
       bindGroup.setValue('terrainInfo', this._terrainInfo);
     }
@@ -152,4 +156,3 @@ export class TerrainMaterial extends Material {
     return program;
   }
 }
-

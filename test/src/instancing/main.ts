@@ -23,7 +23,13 @@ const instancingApp = new Application({
 instancingApp.ready().then(async () => {
   const device = instancingApp.device;
   const scene = new Scene();
-  const camera = new PerspectiveCamera(scene, Math.PI / 3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 160);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
+    1,
+    160
+  );
   camera.position.setXYZ(0, 0, 60);
   camera.controller = new OrbitCameraController({ distance: camera.position.magnitude });
   instancingApp.inputManager.use(camera.handleEvent.bind(camera));
@@ -72,13 +78,13 @@ instancingApp.ready().then(async () => {
     }
   }
 
-  const light = new DirectionalLight(scene)
-    .setCastShadow(false)
-    .setColor(new Vector4(1, 1, 1, 1));
+  const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
   light.rotation.set(Quaternion.fromAxisAngle(new Vector3(1, 1, 0).inplaceNormalize(), (Math.PI * 2) / 3));
 
-  instancingApp.on('resize', ev => { camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane()) });
-  instancingApp.on('tick', ev => {
+  instancingApp.on('resize', (ev) => {
+    camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane());
+  });
+  instancingApp.on('tick', (ev) => {
     camera.updateController();
     camera.render(scene);
   });

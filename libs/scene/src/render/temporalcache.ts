@@ -1,5 +1,11 @@
-import type { BaseTexture, FrameBuffer, TextureCreationOptions, TextureFormat, TextureType } from "@zephyr3d/device";
-import { Application } from "../app";
+import type {
+  BaseTexture,
+  FrameBuffer,
+  TextureCreationOptions,
+  TextureFormat,
+  TextureType
+} from '@zephyr3d/device';
+import { Application } from '../app';
 
 /**
  * Temporal framebuffer cache
@@ -11,20 +17,103 @@ export class TemporalCache {
   static _variantWidth = 0;
   static _variantHeight = 0;
   static _releaseFuncs: Map<FrameBuffer, (fb: FrameBuffer) => void> = new Map();
-  static _cachedFrameBuffers: Record<string, Map<BaseTexture, Record<string, FrameBuffer[]> > > = {};
-  static getFramebufferFixedSize(width: number, height: number, numLayers: number, colorFmt: TextureFormat, depthFmt: TextureFormat, colorType: TextureType, depthType: TextureType, mipmapping: boolean, sampleCount = 1) {
-    return this.getFramebuffer(width, height, numLayers, colorFmt, depthFmt, colorType, depthType, mipmapping, false, sampleCount);
+  static _cachedFrameBuffers: Record<string, Map<BaseTexture, Record<string, FrameBuffer[]>>> = {};
+  static getFramebufferFixedSize(
+    width: number,
+    height: number,
+    numLayers: number,
+    colorFmt: TextureFormat,
+    depthFmt: TextureFormat,
+    colorType: TextureType,
+    depthType: TextureType,
+    mipmapping: boolean,
+    sampleCount = 1
+  ) {
+    return this.getFramebuffer(
+      width,
+      height,
+      numLayers,
+      colorFmt,
+      depthFmt,
+      colorType,
+      depthType,
+      mipmapping,
+      false,
+      sampleCount
+    );
   }
-  static getFramebufferVariantSize(width: number, height: number, numLayers: number, colorFmt: TextureFormat, depthFmt: TextureFormat, colorType: TextureType, depthType: TextureType, mipmapping: boolean, sampleCount = 1) {
-    return this.getFramebuffer(width, height, numLayers, colorFmt, depthFmt, colorType, depthType, mipmapping, true, sampleCount);
+  static getFramebufferVariantSize(
+    width: number,
+    height: number,
+    numLayers: number,
+    colorFmt: TextureFormat,
+    depthFmt: TextureFormat,
+    colorType: TextureType,
+    depthType: TextureType,
+    mipmapping: boolean,
+    sampleCount = 1
+  ) {
+    return this.getFramebuffer(
+      width,
+      height,
+      numLayers,
+      colorFmt,
+      depthFmt,
+      colorType,
+      depthType,
+      mipmapping,
+      true,
+      sampleCount
+    );
   }
-  static getFramebufferFixedSizeWithDepth(depthTex: BaseTexture, numLayers: number, colorFmt: TextureFormat, colorType: TextureType, mipmapping: boolean, sampleCount = 1) {
-    return this.getFramebufferWithDepth(depthTex, numLayers, colorFmt, colorType, mipmapping, false, sampleCount);
+  static getFramebufferFixedSizeWithDepth(
+    depthTex: BaseTexture,
+    numLayers: number,
+    colorFmt: TextureFormat,
+    colorType: TextureType,
+    mipmapping: boolean,
+    sampleCount = 1
+  ) {
+    return this.getFramebufferWithDepth(
+      depthTex,
+      numLayers,
+      colorFmt,
+      colorType,
+      mipmapping,
+      false,
+      sampleCount
+    );
   }
-  static getFramebufferVariantSizeWithDepth(depthTex: BaseTexture, numLayers: number, colorFmt: TextureFormat, colorType: TextureType, mipmapping: boolean, sampleCount = 1) {
-    return this.getFramebufferWithDepth(depthTex, numLayers, colorFmt, colorType, mipmapping, true, sampleCount);
+  static getFramebufferVariantSizeWithDepth(
+    depthTex: BaseTexture,
+    numLayers: number,
+    colorFmt: TextureFormat,
+    colorType: TextureType,
+    mipmapping: boolean,
+    sampleCount = 1
+  ) {
+    return this.getFramebufferWithDepth(
+      depthTex,
+      numLayers,
+      colorFmt,
+      colorType,
+      mipmapping,
+      true,
+      sampleCount
+    );
   }
-  static getFramebuffer(width: number, height: number, numLayers: number, colorFmt: TextureFormat, depthFmt: TextureFormat, colorType: TextureType, depthType: TextureType, mipmapping: boolean, variant: boolean, sampleCount: number): FrameBuffer {
+  static getFramebuffer(
+    width: number,
+    height: number,
+    numLayers: number,
+    colorFmt: TextureFormat,
+    depthFmt: TextureFormat,
+    colorType: TextureType,
+    depthType: TextureType,
+    mipmapping: boolean,
+    variant: boolean,
+    sampleCount: number
+  ): FrameBuffer {
     if (variant && (width !== this._variantWidth || height !== this._variantHeight)) {
       this.purgeVariantFramebuffers();
       this._variantWidth = width;
@@ -35,10 +124,12 @@ export class TemporalCache {
     }
     const device = Application.instance.device;
     if (device.type === 'webgl') {
-      sampleCount = 1
+      sampleCount = 1;
     }
     const sizeHash = variant ? '' : `${width}x${height}`;
-    const fmtHash = `${colorFmt ?? ''}:${depthFmt ?? ''}:${colorFmt ? colorType : ''}:${numLayers}:${depthFmt ? depthType : ''}:${colorFmt && mipmapping ? 1 : 0}:${sampleCount}`;
+    const fmtHash = `${colorFmt ?? ''}:${depthFmt ?? ''}:${colorFmt ? colorType : ''}:${numLayers}:${
+      depthFmt ? depthType : ''
+    }:${colorFmt && mipmapping ? 1 : 0}:${sampleCount}`;
     const sizedFrameBuffers = this._cachedFrameBuffers[sizeHash];
     const fbList = sizedFrameBuffers?.get(null)?.[fmtHash];
     let fb: FrameBuffer = null;
@@ -46,7 +137,7 @@ export class TemporalCache {
       let colorTex: BaseTexture = null;
       const opt: TextureCreationOptions = mipmapping ? {} : { samplerOptions: { mipFilter: 'none' } };
       if (colorFmt) {
-        switch(colorType) {
+        switch (colorType) {
           case '2d':
             colorTex = device.createTexture2D(colorFmt, width, height, opt);
             break;
@@ -60,7 +151,7 @@ export class TemporalCache {
       }
       let depthTex: BaseTexture = null;
       if (depthFmt) {
-        switch(depthType) {
+        switch (depthType) {
           case '2d':
             depthTex = device.createTexture2D(depthFmt, width, height);
             break;
@@ -80,10 +171,21 @@ export class TemporalCache {
     } else {
       fb = fbList.pop();
     }
-    this._releaseFuncs.set(fb, variant ? this.releaseWithoutDepthTexVariantSize : this.releaseWithoutDepthTexFixedSize);
+    this._releaseFuncs.set(
+      fb,
+      variant ? this.releaseWithoutDepthTexVariantSize : this.releaseWithoutDepthTexFixedSize
+    );
     return fb;
   }
-  static getFramebufferWithDepth(depth: BaseTexture, numLayers: number, colorFmt: TextureFormat, colorType: TextureType, mipmapping: boolean, variant: boolean, sampleCount: number): FrameBuffer {
+  static getFramebufferWithDepth(
+    depth: BaseTexture,
+    numLayers: number,
+    colorFmt: TextureFormat,
+    colorType: TextureType,
+    mipmapping: boolean,
+    variant: boolean,
+    sampleCount: number
+  ): FrameBuffer {
     if (variant && (depth.width !== this._variantWidth || depth.height !== this._variantHeight)) {
       this.purgeVariantFramebuffers();
       this._variantWidth = depth.width;
@@ -97,7 +199,9 @@ export class TemporalCache {
       sampleCount = 1;
     }
     const sizeHash = variant ? '' : `${depth.width}x${depth.height}`;
-    const fmtHash = `${colorFmt ?? ''}:${depth.format}:${colorFmt ? colorType : ''}:${numLayers}:${depth.target}:${colorFmt && mipmapping ? 1 : 0}:${sampleCount}`;
+    const fmtHash = `${colorFmt ?? ''}:${depth.format}:${colorFmt ? colorType : ''}:${numLayers}:${
+      depth.target
+    }:${colorFmt && mipmapping ? 1 : 0}:${sampleCount}`;
     const sizedFrameBuffers = this._cachedFrameBuffers[sizeHash];
     const fbList = sizedFrameBuffers?.get(depth)?.[fmtHash];
     let fb: FrameBuffer = null;
@@ -105,7 +209,7 @@ export class TemporalCache {
       let colorTex: BaseTexture = null;
       const opt: TextureCreationOptions = mipmapping ? {} : { samplerOptions: { mipFilter: 'none' } };
       if (colorFmt) {
-        switch(colorType) {
+        switch (colorType) {
           case '2d':
             colorTex = device.createTexture2D(colorFmt, depth.width, depth.height, opt);
             break;
@@ -144,7 +248,10 @@ export class TemporalCache {
     } else {
       fb = fbList.pop();
     }
-    this._releaseFuncs.set(fb, variant ? this.releaseWithDepthTexVariantSize : this.releaseWithDepthTexFixedSize);
+    this._releaseFuncs.set(
+      fb,
+      variant ? this.releaseWithDepthTexVariantSize : this.releaseWithDepthTexFixedSize
+    );
     return fb;
   }
   static releaseFramebuffer(fb: FrameBuffer) {
@@ -176,8 +283,16 @@ export class TemporalCache {
     }
     const colorTex = fb.getColorAttachments()[0];
     const depthTex = fb.getDepthAttachment();
-    const numLayers = colorTex?.isTexture2DArray() ? colorTex.depth : depthTex?.isTexture2DArray() ? depthTex.depth : 1;
-    const hash = `${colorTex?.format ?? ''}:${depthTex?.format ?? ''}:${colorTex ? colorTex.target : ''}:${numLayers}:${depthTex ? depthTex.target : ''}:${colorTex?.mipLevelCount > 1 ? 1 : 0}:${fb.getSampleCount()}`;
+    const numLayers = colorTex?.isTexture2DArray()
+      ? colorTex.depth
+      : depthTex?.isTexture2DArray()
+      ? depthTex.depth
+      : 1;
+    const hash = `${colorTex?.format ?? ''}:${depthTex?.format ?? ''}:${
+      colorTex ? colorTex.target : ''
+    }:${numLayers}:${depthTex ? depthTex.target : ''}:${
+      colorTex?.mipLevelCount > 1 ? 1 : 0
+    }:${fb.getSampleCount()}`;
     let entry = variantSizeFrameBuffers.get(withDepthTex);
     if (!entry) {
       entry = {};
@@ -194,7 +309,7 @@ export class TemporalCache {
     const variantSizeFrameBuffers = this._cachedFrameBuffers[''];
     variantSizeFrameBuffers?.forEach((val, key) => {
       for (const k in val) {
-        val[k].forEach(fb => {
+        val[k].forEach((fb) => {
           fb.getColorAttachments()[0].dispose();
           fb.dispose();
         });

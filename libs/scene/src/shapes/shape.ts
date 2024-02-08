@@ -48,4 +48,3 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
   /** @internal */
   protected abstract _create(): boolean;
 }
-

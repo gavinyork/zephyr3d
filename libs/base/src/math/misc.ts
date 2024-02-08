@@ -84,7 +84,7 @@ export function floatToHalf(val: number): number {
   ivalue = ivalue & 0x7fffffff;
   if (ivalue >= 0x47800000) {
     // number is too large
-    result = 0x7c00 | ((ivalue > 0x7f800000) ? (0x200 | ((ivalue >>> 13) & 0x3ff)) : 0);
+    result = 0x7c00 | (ivalue > 0x7f800000 ? 0x200 | ((ivalue >>> 13) & 0x3ff) : 0);
   } else if (ivalue <= 0x33000000) {
     result = 0;
   } else if (ivalue < 0x38800000) {
@@ -163,7 +163,7 @@ export function packFloat3(a: number, b: number, c: number): number {
   const ivalues: number[] = [];
   const result: number[] = [];
   tmpFloatArray[0] = a;
-  ivalues[0] = tmpUint32Array[0]
+  ivalues[0] = tmpUint32Array[0];
   tmpFloatArray[0] = b;
   ivalues[1] = tmpUint32Array[0];
   tmpFloatArray[0] = c;
@@ -172,10 +172,10 @@ export function packFloat3(a: number, b: number, c: number): number {
   for (let j = 0; j < 2; j++) {
     const sign = ivalues[j] & 0x80000000;
     let I = ivalues[j] & 0x7fffffff;
-    if ((I & 0x7f800000) === 0x7F800000) {
+    if ((I & 0x7f800000) === 0x7f800000) {
       // INF or NAN
       result[j] = 0x7c0;
-      if ((I & 0x7FFFFF) !== 0) {
+      if ((I & 0x7fffff) !== 0) {
         result[j] = 0x7ff;
       } else if (sign) {
         // -INF, clamp to 0
@@ -184,7 +184,7 @@ export function packFloat3(a: number, b: number, c: number): number {
     } else if (sign || I < 0x35800000) {
       // clamp to 0
       result[j] = 0;
-    } else if (I > 0x477E0000) {
+    } else if (I > 0x477e0000) {
       // too large, clamp to max
       result[j] = 0x7bf;
     } else {
@@ -192,14 +192,14 @@ export function packFloat3(a: number, b: number, c: number): number {
         const shift = 113 - (I >>> 23);
         I = (0x800000 | (I & 0x7fffff)) >>> shift;
       } else {
-        I += 0xC8000000;
+        I += 0xc8000000;
       }
       result[j] = ((I + 0xffff + ((I >>> 17) & 1)) >>> 17) & 0x7ff;
     }
   }
   const sign = ivalues[2] & 0x80000000;
   let I = ivalues[2] & 0x7fffffff;
-  if ((I & 0x7F800000) === 0x7F800000) {
+  if ((I & 0x7f800000) === 0x7f800000) {
     // INF or NAN
     result[2] = 0x3e0;
     if (I & 0x7fffff) {
@@ -231,7 +231,7 @@ export function packFloat3(a: number, b: number, c: number): number {
  *
  * @public
  */
-export function unpackFloat3<T extends number[]|Float32Array>(pk: number, result: T): void {
+export function unpackFloat3<T extends number[] | Float32Array>(pk: number, result: T): void {
   /*
   result[0] = halfToFloat((pk & 0x7ff) << 4);
   result[1] = halfToFloat((pk & 0x3ff800) >> 7);
@@ -308,4 +308,3 @@ export function unpackFloat3<T extends number[]|Float32Array>(pk: number, result
   tmpUint32Array[0] = ret[2];
   result[2] = tmpFloatArray[0];
 }
-

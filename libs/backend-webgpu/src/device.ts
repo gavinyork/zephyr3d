@@ -33,11 +33,7 @@ import type {
   DeviceViewport,
   BaseTexture
 } from '@zephyr3d/device';
-import {
-  getTextureFormatBlockSize,
-  DeviceResizeEvent,
-  BaseDevice
-} from '@zephyr3d/device';
+import { getTextureFormatBlockSize, DeviceResizeEvent, BaseDevice } from '@zephyr3d/device';
 import type { WebGPUTextureSampler } from './sampler_webgpu';
 import { WebGPUProgram } from './gpuprogram_webgpu';
 import { WebGPUBindGroup } from './bindgroup_webgpu';
@@ -212,10 +208,10 @@ export class WebGPUDevice extends BaseDevice {
     for (const feature of this._device.features) {
       console.log(` - ${feature}`);
     }
-    this.device.lost.then(info => {
+    this.device.lost.then((info) => {
       console.error(`WebGPU device was lost: ${info.message}`);
       this._canRender = false;
-    })
+    });
     this._context = (this.canvas.getContext('webgpu') as unknown as GPUCanvasContext) || null;
     if (!this._context) {
       this._canRender = false;
@@ -266,8 +262,12 @@ export class WebGPUDevice extends BaseDevice {
   createSampler(options: SamplerOptions): TextureSampler {
     return this.fetchSampler(options);
   }
-  createTextureFromMipmapData<T extends BaseTexture>(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): T {
-    if(!data) {
+  createTextureFromMipmapData<T extends BaseTexture>(
+    data: TextureMipmapData,
+    sRGB: boolean,
+    options?: TextureCreationOptions
+  ): T {
+    if (!data) {
       console.error(`Device.createTextureFromMipmapData() failed: invalid data`);
       return null;
     }
@@ -279,7 +279,7 @@ export class WebGPUDevice extends BaseDevice {
       const tex = new WebGPUTexture3D(this);
       tex.createWithMipmapData(data, this.parseTextureOptions(options));
       return tex as unknown as T;
-    } else if (data.isArray){
+    } else if (data.isArray) {
       const tex = new WebGPUTexture2DArray(this);
       tex.createWithMipmapData(data, this.parseTextureOptions(options));
       return tex as unknown as T;
@@ -304,7 +304,11 @@ export class WebGPUDevice extends BaseDevice {
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
-  createTexture2DFromMipmapData(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): Texture2D {
+  createTexture2DFromMipmapData(
+    data: TextureMipmapData,
+    sRGB: boolean,
+    options?: TextureCreationOptions
+  ): Texture2D {
     const tex = (options?.texture as WebGPUTexture2D) ?? new WebGPUTexture2D(this);
     if (!tex.isTexture2D()) {
       console.error('createTexture2DFromMipmapData() failed: options.texture must be 2d texture');
@@ -314,7 +318,11 @@ export class WebGPUDevice extends BaseDevice {
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
-  createTexture2DFromImage(element: TextureImageElement, sRGB: boolean, options?: TextureCreationOptions): Texture2D {
+  createTexture2DFromImage(
+    element: TextureImageElement,
+    sRGB: boolean,
+    options?: TextureCreationOptions
+  ): Texture2D {
     const tex = (options?.texture as WebGPUTexture2D) ?? new WebGPUTexture2D(this);
     if (!tex.isTexture2D()) {
       console.error('createTexture2DFromImage() failed: options.texture must be 2d texture');
@@ -340,7 +348,10 @@ export class WebGPUDevice extends BaseDevice {
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
-  createTexture2DArrayFromMipmapData(data: TextureMipmapData, options?: TextureCreationOptions): Texture2DArray {
+  createTexture2DArrayFromMipmapData(
+    data: TextureMipmapData,
+    options?: TextureCreationOptions
+  ): Texture2DArray {
     const tex = (options?.texture as WebGPUTexture2DArray) ?? new WebGPUTexture2DArray(this);
     if (!tex.isTexture2DArray()) {
       console.error('createTexture2DArrayFromMipmapData() failed: options.texture must be 2d array texture');
@@ -350,7 +361,11 @@ export class WebGPUDevice extends BaseDevice {
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
-  createTexture2DArrayFromImages(elements: TextureImageElement[], sRGB: boolean, options?: TextureCreationOptions): Texture2DArray {
+  createTexture2DArrayFromImages(
+    elements: TextureImageElement[],
+    sRGB: boolean,
+    options?: TextureCreationOptions
+  ): Texture2DArray {
     if (!elements || elements.length === 0) {
       console.error('createTexture2DArrayFromImages() failed: Invalid image elements');
       return null;
@@ -373,15 +388,25 @@ export class WebGPUDevice extends BaseDevice {
     let tex: Texture2DArray = options?.texture as Texture2DArray;
     if (tex) {
       if (tex.depth !== elements.length) {
-        console.error('createTexture2DArrayFromImages() failed: Layer count of options.texture not match the given image elements');
+        console.error(
+          'createTexture2DArrayFromImages() failed: Layer count of options.texture not match the given image elements'
+        );
         return null;
       }
       if (tex.width !== width || tex.height !== height) {
-        console.error('createTexture2DArrayFromImages() failed: Size of options.texture not match the given image elements');
+        console.error(
+          'createTexture2DArrayFromImages() failed: Size of options.texture not match the given image elements'
+        );
         return null;
       }
     } else {
-      tex = this.createTexture2DArray(sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm', width, height, elements.length, options);
+      tex = this.createTexture2DArray(
+        sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm',
+        width,
+        height,
+        elements.length,
+        options
+      );
       for (let i = 0; i < elements.length; i++) {
         tex.updateFromElement(elements[i], 0, 0, i, 0, 0, width, height);
       }
@@ -415,7 +440,11 @@ export class WebGPUDevice extends BaseDevice {
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
-  createCubeTextureFromMipmapData(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): TextureCube {
+  createCubeTextureFromMipmapData(
+    data: TextureMipmapData,
+    sRGB: boolean,
+    options?: TextureCreationOptions
+  ): TextureCube {
     const tex = (options?.texture as WebGPUTextureCube) ?? new WebGPUTextureCube(this);
     if (!tex.isTextureCube()) {
       console.error('createCubeTextureFromMipmapData() failed: options.texture must be cube texture');
@@ -452,7 +481,11 @@ export class WebGPUDevice extends BaseDevice {
   createVertexLayout(options: VertexLayoutOptions): VertexLayout {
     return new WebGPUVertexLayout(this, options);
   }
-  createFrameBuffer(colorAttachments: BaseTexture[], depthAttachement: BaseTexture, options?: FrameBufferOptions): FrameBuffer {
+  createFrameBuffer(
+    colorAttachments: BaseTexture[],
+    depthAttachement: BaseTexture,
+    options?: FrameBufferOptions
+  ): FrameBuffer {
     return new WebGPUFrameBuffer(this, colorAttachments, depthAttachement, options);
   }
   setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>) {
@@ -463,13 +496,13 @@ export class WebGPUDevice extends BaseDevice {
     return [this._currentBindGroups[index], this._currentBindGroupOffsets[index]];
   }
   // render related
-  setViewport(vp?: number[]|DeviceViewport) {
+  setViewport(vp?: number[] | DeviceViewport) {
     this._commandQueue.setViewport(vp);
   }
   getViewport(): DeviceViewport {
     return this._commandQueue.getViewport();
   }
-  setScissor(scissor?: number[]|DeviceViewport) {
+  setScissor(scissor?: number[] | DeviceViewport) {
     this._commandQueue.setScissor(scissor);
   }
   getScissor(): DeviceViewport {
@@ -605,12 +638,21 @@ export class WebGPUDevice extends BaseDevice {
   flush(): void {
     this._commandQueue.flush();
   }
-  async readPixels(index: number, x: number, y: number, w: number, h: number, buffer: TypedArray): Promise<void> {
+  async readPixels(
+    index: number,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    buffer: TypedArray
+  ): Promise<void> {
     const fb = this.getFramebuffer();
     const colorAttachment = fb
       ? (fb.getColorAttachments()[index]?.object as GPUTexture)
       : this.context.getCurrentTexture();
-    const texFormat = fb ? fb.getColorAttachments()[index]?.format : textureFormatInvMap[this._backBufferFormat];
+    const texFormat = fb
+      ? fb.getColorAttachments()[index]?.format
+      : textureFormatInvMap[this._backBufferFormat];
     if (colorAttachment && texFormat) {
       const pixelSize = getTextureFormatBlockSize(texFormat);
       const bufferSize = w * h * pixelSize;
@@ -630,7 +672,9 @@ export class WebGPUDevice extends BaseDevice {
     const colorAttachment = fb
       ? (fb.getColorAttachments()[index]?.object as GPUTexture)
       : this.context.getCurrentTexture();
-    const texFormat = fb ? fb.getColorAttachments()[index]?.format : textureFormatInvMap[this._backBufferFormat];
+    const texFormat = fb
+      ? fb.getColorAttachments()[index]?.format
+      : textureFormatInvMap[this._backBufferFormat];
     const texWidth = fb ? fb.getColorAttachments()[index]?.width : this.getDrawingBufferWidth();
     const texHeight = fb ? fb.getColorAttachments()[index]?.height : this.getDrawingBufferHeight();
     if (colorAttachment && texFormat) {
@@ -720,7 +764,9 @@ export class WebGPUDevice extends BaseDevice {
   }
   private configure() {
     this._backBufferFormat = navigator.gpu.getPreferredCanvasFormat();
-    this._depthFormat = this._deviceCaps.framebufferCaps.supportDepth32floatStencil8 ? 'depth32float-stencil8' : 'depth24plus-stencil8';
+    this._depthFormat = this._deviceCaps.framebufferCaps.supportDepth32floatStencil8
+      ? 'depth32float-stencil8'
+      : 'depth24plus-stencil8';
     this._context.configure({
       device: this._device,
       format: this._backBufferFormat,

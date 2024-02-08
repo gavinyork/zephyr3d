@@ -1,4 +1,4 @@
-import type { AbstractDevice, GPUProgram} from '@zephyr3d/device';
+import type { AbstractDevice, GPUProgram } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';

@@ -1,8 +1,18 @@
-import { halfToFloat, nextPowerOf2, SH, unpackFloat3, Vector3 } from "@zephyr3d/base";
-import type { BindGroup, Texture2D, GPUProgram, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, RenderStateSet, TextureCube, VertexLayout } from "@zephyr3d/device";
-import { Application } from "../app";
-import type { BlitType} from "../blitter";
-import { Blitter, CopyBlitter } from "../blitter";
+import { halfToFloat, nextPowerOf2, SH, unpackFloat3, Vector3 } from '@zephyr3d/base';
+import type {
+  BindGroup,
+  Texture2D,
+  GPUProgram,
+  PBGlobalScope,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  RenderStateSet,
+  TextureCube,
+  VertexLayout
+} from '@zephyr3d/device';
+import { Application } from '../app';
+import type { BlitType } from '../blitter';
+import { Blitter, CopyBlitter } from '../blitter';
 
 class ReduceBlitter extends Blitter {
   protected _width: number;
@@ -25,16 +35,38 @@ class ReduceBlitter extends Blitter {
   setUniforms(bindGroup: BindGroup) {
     bindGroup.setValue('width', this._width);
   }
-  filter(scope: PBInsideFunctionScope, type: BlitType, srcTex: PBShaderExp, srcUV: PBShaderExp, srcLayer: PBShaderExp): PBShaderExp {
+  filter(
+    scope: PBInsideFunctionScope,
+    type: BlitType,
+    srcTex: PBShaderExp,
+    srcUV: PBShaderExp,
+    srcLayer: PBShaderExp
+  ): PBShaderExp {
     const pb = scope.$builder;
-    pb.func('reduce', [pb.vec2('uv')], function(){
+    pb.func('reduce', [pb.vec2('uv')], function () {
       this.$l.h = pb.div(0.5, this.width);
       //this.$l.uv1 = pb.add(this.uv, pb.vec2(this.h));
       this.$l.uv1 = this.uv;
-      this.$l.tl = pb.textureSampleLevel(srcTex, pb.vec2(pb.sub(this.uv1.x, this.h), pb.sub(this.uv1.y, this.h)), 0);
-      this.$l.tr = pb.textureSampleLevel(srcTex, pb.vec2(pb.add(this.uv1.x, this.h), pb.sub(this.uv1.y, this.h)), 0);
-      this.$l.bl = pb.textureSampleLevel(srcTex, pb.vec2(pb.sub(this.uv1.x, this.h), pb.add(this.uv1.y, this.h)), 0);
-      this.$l.br = pb.textureSampleLevel(srcTex, pb.vec2(pb.add(this.uv1.x, this.h), pb.add(this.uv1.y, this.h)), 0);
+      this.$l.tl = pb.textureSampleLevel(
+        srcTex,
+        pb.vec2(pb.sub(this.uv1.x, this.h), pb.sub(this.uv1.y, this.h)),
+        0
+      );
+      this.$l.tr = pb.textureSampleLevel(
+        srcTex,
+        pb.vec2(pb.add(this.uv1.x, this.h), pb.sub(this.uv1.y, this.h)),
+        0
+      );
+      this.$l.bl = pb.textureSampleLevel(
+        srcTex,
+        pb.vec2(pb.sub(this.uv1.x, this.h), pb.add(this.uv1.y, this.h)),
+        0
+      );
+      this.$l.br = pb.textureSampleLevel(
+        srcTex,
+        pb.vec2(pb.add(this.uv1.x, this.h), pb.add(this.uv1.y, this.h)),
+        0
+      );
       this.$return(pb.vec4(pb.add(this.tl, this.tr, this.bl, this.br).rgb, 1));
     });
     return scope.reduce(srcUV);
@@ -54,7 +86,7 @@ const faceDirections = [
   [new Vector3(1, 0, 0), new Vector3(0, 0, 1), new Vector3(0, 1, 0)],
   [new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector3(0, -1, 0)],
   [new Vector3(1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, 1)],
-  [new Vector3(-1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, -1)],
+  [new Vector3(-1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, -1)]
 ];
 
 function init() {
@@ -62,9 +94,11 @@ function init() {
   const vertices = new Float32Array([1, 1, -1, 1, -1, -1, 1, -1]);
   const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
   vertexLayout = device.createVertexLayout({
-    vertexBuffers: [{
-      buffer: device.createVertexBuffer('position_f32x2', vertices)
-    }],
+    vertexBuffers: [
+      {
+        buffer: device.createVertexBuffer('position_f32x2', vertices)
+      }
+    ],
     indexBuffer: device.createIndexBuffer(indices)
   });
   renderStates = device.createRenderStateSet();
@@ -86,7 +120,10 @@ function createProjectionProgram(): GPUProgram {
       this.front = pb.vec3().uniform(0);
       pb.main(function () {
         this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
-        this.$outputs.direction = pb.mul(pb.mat3(this.up, this.right, this.front), pb.vec3(this.$inputs.pos, 1));
+        this.$outputs.direction = pb.mul(
+          pb.mat3(this.up, this.right, this.front),
+          pb.vec3(this.$inputs.pos, 1)
+        );
         if (device.type === 'webgpu') {
           this.$builtins.position.y = pb.neg(this.$builtins.position.y);
         }
@@ -98,69 +135,88 @@ function createProjectionProgram(): GPUProgram {
       this.u_coeff = pb.int().uniform(0);
       this.$outputs.outcolor = pb.vec4();
       pb.func('dirToUV', [pb.vec3('dir')], function () {
-        this.$return(pb.vec2(pb.add(0.5, pb.div(pb.mul(0.5, pb.atan2(this.dir.z, this.dir.x)), Math.PI)), pb.sub(1, pb.div(pb.acos(this.dir.y), Math.PI))));
+        this.$return(
+          pb.vec2(
+            pb.add(0.5, pb.div(pb.mul(0.5, pb.atan2(this.dir.z, this.dir.x)), Math.PI)),
+            pb.sub(1, pb.div(pb.acos(this.dir.y), Math.PI))
+          )
+        );
       });
-      pb.func('areaElement', [pb.float('x'), pb.float('y')], function(){
-        this.$return(pb.atan2(pb.mul(this.x, this.y), pb.sqrt(pb.add(pb.mul(this.x, this.x), pb.mul(this.y, this.y), 1))));
+      pb.func('areaElement', [pb.float('x'), pb.float('y')], function () {
+        this.$return(
+          pb.atan2(pb.mul(this.x, this.y), pb.sqrt(pb.add(pb.mul(this.x, this.x), pb.mul(this.y, this.y), 1)))
+        );
       });
-      pb.func('solidAngle', [pb.vec2('uv')], function(){
+      pb.func('solidAngle', [pb.vec2('uv')], function () {
         this.$l.inv = pb.div(1, pb.float(this.u_width));
         this.$l.uv2 = pb.sub(pb.mul(pb.add(this.uv, pb.mul(this.inv, 0.5)), 2), pb.vec2(1));
         this.$l.xy0 = pb.sub(this.uv2, pb.vec2(this.inv));
         this.$l.xy1 = pb.add(this.uv2, pb.vec2(this.inv));
-        this.$return(pb.sub(
-          pb.add(this.areaElement(this.xy0.x, this.xy0.y), this.areaElement(this.xy1.x, this.xy1.y)),
-          pb.add(this.areaElement(this.xy0.x, this.xy1.y), this.areaElement(this.xy1.x, this.xy0.y))));
+        this.$return(
+          pb.sub(
+            pb.add(this.areaElement(this.xy0.x, this.xy0.y), this.areaElement(this.xy1.x, this.xy1.y)),
+            pb.add(this.areaElement(this.xy0.x, this.xy1.y), this.areaElement(this.xy1.x, this.xy0.y))
+          )
+        );
       });
-      pb.func('Y0', [pb.vec3('v')], function(){
+      pb.func('Y0', [pb.vec3('v')], function () {
         this.$return(0.2820947917);
       });
-      pb.func('Y1', [pb.vec3('v')], function(){
+      pb.func('Y1', [pb.vec3('v')], function () {
         this.$return(pb.mul(this.v.y, -0.4886025119));
       });
-      pb.func('Y2', [pb.vec3('v')], function(){
+      pb.func('Y2', [pb.vec3('v')], function () {
         this.$return(pb.mul(this.v.z, 0.4886025119));
       });
-      pb.func('Y3', [pb.vec3('v')], function(){
+      pb.func('Y3', [pb.vec3('v')], function () {
         this.$return(pb.mul(this.v.x, -0.4886025119));
       });
-      pb.func('Y4', [pb.vec3('v')], function(){
+      pb.func('Y4', [pb.vec3('v')], function () {
         this.$return(pb.mul(this.v.x, this.v.y, 1.0925484306));
       });
-      pb.func('Y5', [pb.vec3('v')], function(){
+      pb.func('Y5', [pb.vec3('v')], function () {
         this.$return(pb.mul(this.v.y, this.v.z, -1.0925484306));
       });
-      pb.func('Y6', [pb.vec3('v')], function(){
+      pb.func('Y6', [pb.vec3('v')], function () {
         this.$return(pb.mul(pb.sub(pb.mul(this.v.z, this.v.z, 3), 1), 0.3153915652));
       });
-      pb.func('Y7', [pb.vec3('v')], function(){
+      pb.func('Y7', [pb.vec3('v')], function () {
         this.$return(pb.mul(this.v.x, this.v.z, -1.0925484306));
       });
-      pb.func('Y8', [pb.vec3('v')], function(){
+      pb.func('Y8', [pb.vec3('v')], function () {
         this.$return(pb.mul(pb.sub(pb.mul(this.v.x, this.v.x), pb.mul(this.v.y, this.v.y)), 0.5462742153));
       });
-      pb.func('evalBasis', [pb.vec3('dir'), pb.int('c')], function(){
-        this.$if(pb.equal(this.c, 0), function(){
+      pb.func('evalBasis', [pb.vec3('dir'), pb.int('c')], function () {
+        this.$if(pb.equal(this.c, 0), function () {
           this.$return(this.Y0(this.dir));
-        }).$elseif(pb.equal(this.c, 1), function(){
-          this.$return(this.Y1(this.dir));
-        }).$elseif(pb.equal(this.c, 2), function(){
-          this.$return(this.Y2(this.dir));
-        }).$elseif(pb.equal(this.c, 3), function(){
-          this.$return(this.Y3(this.dir));
-        }).$elseif(pb.equal(this.c, 4), function(){
-          this.$return(this.Y4(this.dir));
-        }).$elseif(pb.equal(this.c, 5), function(){
-          this.$return(this.Y5(this.dir));
-        }).$elseif(pb.equal(this.c, 6), function(){
-          this.$return(this.Y6(this.dir));
-        }).$elseif(pb.equal(this.c, 7), function(){
-          this.$return(this.Y7(this.dir));
-        }).$elseif(pb.equal(this.c, 8), function(){
-          this.$return(this.Y8(this.dir));
-        }).$else(function(){
-          this.$return(0);
-        });
+        })
+          .$elseif(pb.equal(this.c, 1), function () {
+            this.$return(this.Y1(this.dir));
+          })
+          .$elseif(pb.equal(this.c, 2), function () {
+            this.$return(this.Y2(this.dir));
+          })
+          .$elseif(pb.equal(this.c, 3), function () {
+            this.$return(this.Y3(this.dir));
+          })
+          .$elseif(pb.equal(this.c, 4), function () {
+            this.$return(this.Y4(this.dir));
+          })
+          .$elseif(pb.equal(this.c, 5), function () {
+            this.$return(this.Y5(this.dir));
+          })
+          .$elseif(pb.equal(this.c, 6), function () {
+            this.$return(this.Y6(this.dir));
+          })
+          .$elseif(pb.equal(this.c, 7), function () {
+            this.$return(this.Y7(this.dir));
+          })
+          .$elseif(pb.equal(this.c, 8), function () {
+            this.$return(this.Y8(this.dir));
+          })
+          .$else(function () {
+            this.$return(0);
+          });
       });
       pb.main(function () {
         this.$l.dir = pb.normalize(this.$inputs.direction);
@@ -187,7 +243,7 @@ async function doProjectCubemap(srcTexture: TextureCube, coeff: number): Promise
     w = w >> 1;
   }
   for (let i = 0; i < 6; i++) {
-    const dstTex = tmpTextures[0];//device.createTexture2D('rgba32f', srcTexture.width, w);
+    const dstTex = tmpTextures[0]; //device.createTexture2D('rgba32f', srcTexture.width, w);
     const framebuffer = device.createFrameBuffer([dstTex], null);
     framebuffer.setColorAttachmentGenerateMipmaps(0, false);
     device.setVertexLayout(vertexLayout);
@@ -311,7 +367,11 @@ function directionFromCubemapTexel(face: number, x: number, y: number, invSize: 
 export async function projectCubemapCPU(input: TextureCube): Promise<Vector3[]> {
   let srcTex = input;
   const device = Application.instance.device;
-  if (device.getDeviceCaps().textureCaps.supportFloatColorBuffer && input.format === 'rgba16f' && device.type === 'webgl') {
+  if (
+    device.getDeviceCaps().textureCaps.supportFloatColorBuffer &&
+    input.format === 'rgba16f' &&
+    device.type === 'webgl'
+  ) {
     const dstTex = device.createCubeTexture('rgba32f', input.width, {
       samplerOptions: { mipFilter: 'none' }
     });
@@ -322,20 +382,21 @@ export async function projectCubemapCPU(input: TextureCube): Promise<Vector3[]> 
   const size = srcTex.width;
   const output: Vector3[] = Array.from({ length: 9 }).map(() => Vector3.zero());
   const radiance = new Vector3();
-  const input_face = srcTex.format === 'rgba8unorm' || srcTex.format === 'rgba8unorm-srgb'
-    ? new Uint8Array(size * size * 4)
-    : srcTex.format === 'rgba32f'
+  const input_face =
+    srcTex.format === 'rgba8unorm' || srcTex.format === 'rgba8unorm-srgb'
+      ? new Uint8Array(size * size * 4)
+      : srcTex.format === 'rgba32f'
       ? new Float32Array(size * size * 4)
       : srcTex.format === 'rgba16f'
-        ? new Uint16Array(size * size * 4)
-        : srcTex.format === 'rg11b10uf'
-          ? new Uint32Array(size * size)
-          : null;
+      ? new Uint16Array(size * size * 4)
+      : srcTex.format === 'rg11b10uf'
+      ? new Uint32Array(size * size)
+      : null;
   if (!input_face) {
     throw new Error(`invalid input texture format: ${input.format}`);
   }
   const fB = -1 + 1 / size;
-  const fS = size > 1 ? (2 * (1 - 1 / size) / (size - 1)) : 0;
+  const fS = size > 1 ? (2 * (1 - 1 / size)) / (size - 1) : 0;
   let fWt = 0;
   for (let face = 0; face < 6; face++) {
     await srcTex.readPixels(0, 0, size, size, face, 0, input_face);
@@ -377,7 +438,7 @@ export async function projectCubemapCPU(input: TextureCube): Promise<Vector3[]> 
     }
   }
   for (const v of output) {
-    v.scaleBy(4 * Math.PI / fWt);
+    v.scaleBy((4 * Math.PI) / fWt);
   }
   if (srcTex !== input) {
     srcTex.dispose();

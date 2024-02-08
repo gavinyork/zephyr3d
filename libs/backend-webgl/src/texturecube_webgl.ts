@@ -1,5 +1,11 @@
 import type { CubeFace, TypedArray } from '@zephyr3d/base';
-import type { TextureMipmapData, TextureCube, TextureImageElement, GPUDataBuffer, TextureFormat } from '@zephyr3d/device';
+import type {
+  TextureMipmapData,
+  TextureCube,
+  TextureImageElement,
+  GPUDataBuffer,
+  TextureFormat
+} from '@zephyr3d/device';
 import { linearTextureFormatToSRGB, GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGLBaseTexture } from './basetexture_webgl';
 import { textureTargetMap, cubeMapFaceMap } from './constants_webgl';
@@ -104,12 +110,20 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       this.loadEmpty(format, size, 0);
     }
   }
-  readPixels(x: number, y: number, w: number, h: number, face: number, mipLevel: number, buffer: TypedArray): Promise<void> {
+  readPixels(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    face: number,
+    mipLevel: number,
+    buffer: TypedArray
+  ): Promise<void> {
     if (mipLevel < 0 || mipLevel >= this.mipLevelCount) {
       throw new Error(`TextureCube.readPixels(): invalid miplevel: ${mipLevel}`);
     }
-    return new Promise<void>(resolve => {
-      const fb =this._device.createFrameBuffer([this], null);
+    return new Promise<void>((resolve) => {
+      const fb = this._device.createFrameBuffer([this], null);
       fb.setColorAttachmentCubeFace(0, face);
       fb.setColorAttachmentMipLevel(0, mipLevel);
       fb.setColorAttachmentGenerateMipmaps(0, false);
@@ -122,11 +136,19 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       this._device.popDeviceStates();
     });
   }
-  readPixelsToBuffer(x: number, y: number, w: number, h: number, face: number, mipLevel: number, buffer: GPUDataBuffer): void {
+  readPixelsToBuffer(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    face: number,
+    mipLevel: number,
+    buffer: GPUDataBuffer
+  ): void {
     if (mipLevel < 0 || mipLevel >= this.mipLevelCount) {
       throw new Error(`TextureCube.readPixels(): invalid miplevel: ${mipLevel}`);
     }
-    const fb =this._device.createFrameBuffer([this], null);
+    const fb = this._device.createFrameBuffer([this], null);
     fb.setColorAttachmentCubeFace(0, face);
     fb.setColorAttachmentMipLevel(0, mipLevel);
     fb.setColorAttachmentGenerateMipmaps(0, false);

@@ -340,17 +340,13 @@ export class SceneNode extends XForm<SceneNode> {
     this.invalidateWorldBoundingVolume();
   }
   /** @internal */
-  protected _willAttach(): void {
-  }
+  protected _willAttach(): void {}
   /** @internal */
-  protected _attached(): void {
-  }
+  protected _attached(): void {}
   /** @internal */
-  protected _willDetach(): void {
-  }
+  protected _willDetach(): void {}
   /** @internal */
-  protected _detached(): void {
-  }
+  protected _detached(): void {}
   /** @internal */
   notifyHiddenChanged() {
     this._visibleChanged();
@@ -361,6 +357,5 @@ export class SceneNode extends XForm<SceneNode> {
     }
   }
   /** @internal */
-  protected _visibleChanged(): void {
-  }
+  protected _visibleChanged(): void {}
 }

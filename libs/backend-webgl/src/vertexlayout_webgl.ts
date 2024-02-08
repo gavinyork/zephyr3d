@@ -9,9 +9,7 @@ import type {
   PrimitiveType,
   VertexBufferInfo
 } from '@zephyr3d/device';
-import {
-  VertexData
-} from '@zephyr3d/device';
+import { VertexData } from '@zephyr3d/device';
 import { typeMap } from './constants_webgl';
 import type { WebGLDevice } from './device_webgl';
 

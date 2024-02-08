@@ -1,8 +1,4 @@
-import type {
-  StructuredBuffer,
-  IndexBuffer,
-  VertexStepMode,
-  VertexSemantic} from './gpuobject';
+import type { StructuredBuffer, IndexBuffer, VertexStepMode, VertexSemantic } from './gpuobject';
 import {
   GPUResourceUsageFlags,
   MAX_VERTEX_ATTRIBUTES,
@@ -23,7 +19,7 @@ export type VertexBufferInfo = {
   drawOffset: number;
   type: PBPrimitiveTypeInfo;
   stepMode: VertexStepMode;
-}
+};
 
 /**
  * The vertex data class
@@ -86,7 +82,7 @@ export class VertexData {
    * @returns Vertex buffer information of the given semantic
    */
   getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo {
-    return this._vertexBuffers[getVertexAttribByName(semantic)] ?? null
+    return this._vertexBuffers[getVertexAttribByName(semantic)] ?? null;
   }
   /**
    * Gets the index buffer

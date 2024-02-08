@@ -6,7 +6,7 @@
  * It not only encapsulates the programming interface, but also provides
  * a unified way to write shaders and automatically generate shader code
  * for the current platform.
- * 
+ *
  * @packageDocumentation
  */
 

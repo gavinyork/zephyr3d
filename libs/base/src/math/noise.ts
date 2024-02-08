@@ -28,7 +28,8 @@ function smoothNoise1(x: number): number {
 }
 
 function smoothNoise2(x: number, y: number): number {
-  const corners = (noise2(x - 1, y - 1) + noise2(x + 1, y - 1) + noise2(x - 1, y + 1) + noise2(x + 1, y + 1)) / 16;
+  const corners =
+    (noise2(x - 1, y - 1) + noise2(x + 1, y - 1) + noise2(x - 1, y + 1) + noise2(x + 1, y + 1)) / 16;
   const sides = (noise2(x - 1, y) + noise2(x + 1, y) + noise2(x, y - 1) + noise2(x, y + 1)) / 8;
   const center = noise2(x, y) / 4;
   return corners + sides + center;
@@ -36,16 +37,32 @@ function smoothNoise2(x: number, y: number): number {
 
 function smoothNoise3(x: number, y: number, z: number): number {
   let corners: number, sides: number, center: number;
-  corners = (noise3(x - 1, y - 1, z - 1) + noise3(x + 1, y - 1, z - 1) + noise3(x - 1, y + 1, z - 1) + noise3(x + 1, y + 1, z - 1)) / 16;
-  sides = (noise3(x - 1, y, z - 1) + noise3(x + 1, y, z - 1) + noise3(x, y - 1, z - 1) + noise3(x, y + 1, z - 1)) / 8;
+  corners =
+    (noise3(x - 1, y - 1, z - 1) +
+      noise3(x + 1, y - 1, z - 1) +
+      noise3(x - 1, y + 1, z - 1) +
+      noise3(x + 1, y + 1, z - 1)) /
+    16;
+  sides =
+    (noise3(x - 1, y, z - 1) + noise3(x + 1, y, z - 1) + noise3(x, y - 1, z - 1) + noise3(x, y + 1, z - 1)) /
+    8;
   center = noise3(x, y, z - 1) / 4;
   const zm1 = corners + sides + center;
-  corners = (noise3(x - 1, y - 1, z) + noise3(x + 1, y - 1, z) + noise3(x - 1, y + 1, z) + noise3(x + 1, y + 1, z)) / 16;
+  corners =
+    (noise3(x - 1, y - 1, z) + noise3(x + 1, y - 1, z) + noise3(x - 1, y + 1, z) + noise3(x + 1, y + 1, z)) /
+    16;
   sides = (noise3(x - 1, y, z) + noise3(x + 1, y, z) + noise3(x, y - 1, z) + noise3(x, y + 1, z)) / 8;
   center = noise3(x, y, z) / 4;
   const zo = corners + sides + center;
-  corners = (noise3(x - 1, y - 1, z + 1) + noise3(x + 1, y - 1, z + 1) + noise3(x - 1, y + 1, z + 1) + noise3(x + 1, y + 1, z + 1)) / 16;
-  sides = (noise3(x - 1, y, z + 1) + noise3(x + 1, y, z + 1) + noise3(x, y - 1, z + 1) + noise3(x, y + 1, z + 1)) / 8;
+  corners =
+    (noise3(x - 1, y - 1, z + 1) +
+      noise3(x + 1, y - 1, z + 1) +
+      noise3(x - 1, y + 1, z + 1) +
+      noise3(x + 1, y + 1, z + 1)) /
+    16;
+  sides =
+    (noise3(x - 1, y, z + 1) + noise3(x + 1, y, z + 1) + noise3(x, y - 1, z + 1) + noise3(x, y + 1, z + 1)) /
+    8;
   center = noise3(x, y, z + 1) / 4;
   const zp1 = corners + sides + center;
   return zm1 / 4 + zo / 2 + zp1 / 4;
@@ -108,6 +125,14 @@ export function perlinNoise2D(x: number, y: number, amp: number, freqX: number, 
 }
 
 /** @internal */
-export function perlinNoise3D(x: number, y: number, z: number, amp: number, freqX: number, freqY: number, freqZ: number) {
+export function perlinNoise3D(
+  x: number,
+  y: number,
+  z: number,
+  amp: number,
+  freqX: number,
+  freqY: number,
+  freqZ: number
+) {
   return interpolateNoise3(x * freqX, y * freqY, z * freqZ) * amp;
 }

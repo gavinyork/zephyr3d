@@ -1,8 +1,8 @@
-import type { Matrix4x4} from '@zephyr3d/base';
+import type { Matrix4x4 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import { BoxFrameShape } from '../shapes';
-import type { Material} from '../material';
+import type { Material } from '../material';
 import { LambertLightModel, StandardMaterial } from '../material';
 import type { RenderPass, Primitive, BatchDrawable, DrawContext } from '../render';
 import { Application } from '../app';
@@ -251,4 +251,3 @@ export class Mesh extends GraphNode implements BatchDrawable {
     return this._defaultMaterial;
   }
 }
-

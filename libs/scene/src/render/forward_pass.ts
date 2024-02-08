@@ -80,17 +80,33 @@ export class ForwardRenderPass extends RenderPass {
   ) {
     const device = Application.instance.device;
     const baseLightPass = !blend;
-    ctx.drawEnvLight = baseLightPass && ctx.env.light.type !== 'none' && (ctx.env.light.envLight.hasRadiance() || ctx.env.light.envLight.hasIrradiance());
+    ctx.drawEnvLight =
+      baseLightPass &&
+      ctx.env.light.type !== 'none' &&
+      (ctx.env.light.envLight.hasRadiance() || ctx.env.light.envLight.hasIrradiance());
     ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
     const info = this.getGlobalBindGroupInfo(ctx);
     ShaderFramework.setCameraUniforms(info.bindGroup, ctx, !!device.getFramebuffer());
     if (ctx.currentShadowLight) {
       ShaderFramework.setLightUniformsShadow(info.bindGroup, ctx, lights[0]);
     } else {
-      ShaderFramework.setLightUniforms(info.bindGroup, ctx, ctx.clusteredLight.clusterParam, ctx.clusteredLight.countParam, ctx.clusteredLight.lightBuffer, ctx.clusteredLight.lightIndexTexture);
+      ShaderFramework.setLightUniforms(
+        info.bindGroup,
+        ctx,
+        ctx.clusteredLight.clusterParam,
+        ctx.clusteredLight.countParam,
+        ctx.clusteredLight.lightBuffer,
+        ctx.clusteredLight.lightIndexTexture
+      );
     }
     if (ctx.applyFog) {
-      ShaderFramework.setFogUniforms(info.bindGroup, ctx.env.sky.mappedFogType, baseLightPass ? ctx.env.sky.fogColor : Vector4.zero(), ctx.env.sky.fogParams, ctx.env.sky.getAerialPerspectiveLUT(ctx));
+      ShaderFramework.setFogUniforms(
+        info.bindGroup,
+        ctx.env.sky.mappedFogType,
+        baseLightPass ? ctx.env.sky.fogColor : Vector4.zero(),
+        ctx.env.sky.fogParams,
+        ctx.env.sky.getAerialPerspectiveLUT(ctx)
+      );
     }
     device.setBindGroup(0, info.bindGroup);
     if (blend) {
@@ -118,7 +134,9 @@ export class ForwardRenderPass extends RenderPass {
     ctx.flip = this.isAutoFlip();
     renderQueue.sortItems();
 
-    const orders = Object.keys(renderQueue.items).map((val) => Number(val)).sort((a, b) => a - b);
+    const orders = Object.keys(renderQueue.items)
+      .map((val) => Number(val))
+      .sort((a, b) => a - b);
     for (let i = 0; i < 2; i++) {
       ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none';
       for (const order of orders) {
@@ -137,7 +155,15 @@ export class ForwardRenderPass extends RenderPass {
         if (lightIndex === 0 || renderQueue.unshadowedLights.length > 0) {
           ctx.currentShadowLight = null;
           this._shadowMapHash = '';
-          this.renderLightPass(ctx.camera, renderQueue, ctx, list, renderQueue.unshadowedLights, i > 0, lightIndex > 0);
+          this.renderLightPass(
+            ctx.camera,
+            renderQueue,
+            ctx,
+            list,
+            renderQueue.unshadowedLights,
+            i > 0,
+            lightIndex > 0
+          );
         }
       }
       if (i === 0) {

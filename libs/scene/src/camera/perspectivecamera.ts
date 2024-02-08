@@ -1,6 +1,6 @@
-import { Camera } from "./camera";
-import type { Scene } from "../scene/scene";
-import type { Matrix4x4 } from "@zephyr3d/base";
+import { Camera } from './camera';
+import type { Scene } from '../scene/scene';
+import type { Matrix4x4 } from '@zephyr3d/base';
 
 /**
  * Perspective camera class
@@ -119,7 +119,9 @@ export class PerspectiveCamera extends Camera {
       this._far = matrix.getFarPlane();
       this._invalidate(true);
     } else {
-      throw new Error(`PerspectiveCamera.setProjectionMatrix(): param is not a perspective projection matrix`);
+      throw new Error(
+        `PerspectiveCamera.setProjectionMatrix(): param is not a perspective projection matrix`
+      );
     }
   }
   /** @internal */

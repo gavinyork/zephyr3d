@@ -1,5 +1,5 @@
-import type { Scene } from "../scene";
-import type { AnimationClip } from "./animation";
+import type { Scene } from '../scene';
+import type { AnimationClip } from './animation';
 
 /**
  * Animation set

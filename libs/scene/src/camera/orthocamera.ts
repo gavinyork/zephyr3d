@@ -1,6 +1,6 @@
-import { Camera } from "./camera";
-import type { Scene } from "../scene/scene";
-import type { Matrix4x4 } from "@zephyr3d/base";
+import { Camera } from './camera';
+import type { Scene } from '../scene/scene';
+import type { Matrix4x4 } from '@zephyr3d/base';
 
 /**
  * Orthogonal camera class
@@ -22,7 +22,15 @@ export class OrthoCamera extends Camera {
    * @param nearPlane - The near clip plane
    * @param farPlane - The far clip plane
    */
-  constructor(scene: Scene, left: number, right: number, bottom: number, top: number, near: number, far: number) {
+  constructor(
+    scene: Scene,
+    left: number,
+    right: number,
+    bottom: number,
+    top: number,
+    near: number,
+    far: number
+  ) {
     super(scene);
     this._left = left;
     this._right = right;
