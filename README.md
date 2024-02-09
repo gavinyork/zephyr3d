@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://docsify.js.org">
+  <a href="https://gavinyork.github.io/zephyr3d">
     <img alt="zephyr3d" src="./site/web/media/logo_i.svg" style="width:200px;">
   </a>
 </p>
