@@ -34,6 +34,7 @@ export class NewPBRMetallicRoughnessMaterial extends applyMaterialMixins(
       scope.$l.pbrData = this.calculateCommonData(scope, scope.albedo);
       scope.$l.diffuseColor = pb.vec3(0);
       scope.$l.specularColor = pb.vec3(0);
+      scope.$l.emissiveColor = this.calculateEmissiveColor(scope);
       this.indirectLighting(scope, scope.normal, scope.viewVec, scope.pbrData, scope.diffuseColor, scope.specularColor, ctx);
       this.forEachLight(scope, ctx, function (type, posRange, dirCutoff, colorIntensity, shadow) {
         this.$l.diffuse = pb.vec3();
@@ -51,7 +52,7 @@ export class NewPBRMetallicRoughnessMaterial extends applyMaterialMixins(
         this.diffuseColor = pb.add(this.diffuseColor, pb.mul(this.diffuse, this.lightColor));
         this.specularColor = pb.add(this.specularColor, pb.mul(this.specular, this.lightColor));
       });
-      scope.$l.litColor = pb.vec4(pb.add(scope.diffuseColor, scope.specularColor), scope.albedo.a);
+      scope.$l.litColor = pb.vec4(pb.add(scope.diffuseColor, scope.specularColor, scope.emissiveColor), scope.albedo.a);
       //scope.$l.litColor = pb.vec4(pb.vec3(scope.pbrData.roughness), 1);
       this.outputFragmentColor(scope, scope.litColor, ctx);
     } else {

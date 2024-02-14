@@ -610,28 +610,20 @@ export class GLTFLoader extends AbstractModelLoader {
       }
       pbrMaterial.normalScale = assetPBRMaterial.common.bumpScale;
       if (assetPBRMaterial.common.emissiveMap) {
-        /*
-        pbrMaterial.lightModel.setEmissiveMap(
-          assetPBRMaterial.common.emissiveMap.texture,
-          assetPBRMaterial.common.emissiveMap.sampler,
-          assetPBRMaterial.common.emissiveMap.texCoord,
-          assetPBRMaterial.common.emissiveMap.transform
-        );
-        */
+        pbrMaterial.emissiveTexture = assetPBRMaterial.common.emissiveMap.texture;
+        pbrMaterial.emissiveTextureSampler = assetPBRMaterial.common.emissiveMap.sampler;
+        pbrMaterial.emissiveTexCoordIndex = assetPBRMaterial.common.emissiveMap.texCoord;
+        pbrMaterial.emissiveTexCoordMatrix = assetPBRMaterial.common.emissiveMap.transform;
       }
-      /*
-      pbrMaterial.lightModel.emissiveColor = assetPBRMaterial.common.emissiveColor;
-      pbrMaterial.lightModel.emissiveStrength = assetPBRMaterial.common.emissiveStrength;
+      pbrMaterial.emissiveColor = assetPBRMaterial.common.emissiveColor;
+      pbrMaterial.emissiveStrength = assetPBRMaterial.common.emissiveStrength;
       if (assetPBRMaterial.common.occlusionMap) {
-        pbrMaterial.lightModel.setOcclusionMap(
-          assetPBRMaterial.common.occlusionMap.texture,
-          assetPBRMaterial.common.occlusionMap.sampler,
-          assetPBRMaterial.common.occlusionMap.texCoord,
-          assetPBRMaterial.common.occlusionMap.transform
-        );
+        pbrMaterial.occlusionTexture = assetPBRMaterial.common.occlusionMap.texture;
+        pbrMaterial.occlusionTextureSampler = assetPBRMaterial.common.occlusionMap.sampler;
+        pbrMaterial.occlusionTexCoordIndex = assetPBRMaterial.common.occlusionMap.texCoord;
+        pbrMaterial.occlusionTexCoordMatrix = assetPBRMaterial.common.occlusionMap.transform;
+        pbrMaterial.occlusionStrength = assetPBRMaterial.common.occlusionStrength;
       }
-      pbrMaterial.lightModel.occlusionStrength = assetPBRMaterial.common.occlusionStrength;
-      */
       if (assetPBRMaterial.metallicMap) {
         pbrMaterial.metallicRoughnessTexture = assetPBRMaterial.metallicMap.texture;
         pbrMaterial.metallicRoughnessTextureSampler = assetPBRMaterial.metallicMap.sampler;

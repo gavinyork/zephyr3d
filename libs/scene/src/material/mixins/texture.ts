@@ -29,6 +29,8 @@ export type TextureMixinTypes<T> = ReturnType<
   typeof applyMaterialMixins<PBRToMixedTextureType<T>, { new (...args: any[]): IMeshMaterial }>
 >;
 
+export type TextureMixinInstanceTypes<T> = TextureMixinTypes<T> extends { new (...args: any[]): infer U } ? U : never;
+
 export type TextureProp<U extends string> = {
   [P in 'Texture' | 'TextureSampler' | 'TexCoordIndex' | 'TexCoordMatrix' as `${U}${P}`]: P extends 'Texture'
     ? Texture2D

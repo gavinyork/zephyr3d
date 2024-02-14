@@ -13,7 +13,7 @@ export interface IMixinPBRMetallicRoughness {
 }
 
 export function mixinPBRMetallicRoughness<T extends IMeshMaterial>(BaseCls: { new (...args: any[]): T }) {
-  if ((BaseCls as any).pbrMixed) {
+  if ((BaseCls as any).pbrMetallicRoughnessMixed) {
     return BaseCls as { new (...args: any[]): T & IMixinPBRMetallicRoughness & IMixinPBRCommon } & TextureMixinTypes<['metallicRoughness', 'occlusion', 'specular', 'specularColor']>;
   }
   const S = applyMaterialMixins(
@@ -25,6 +25,7 @@ export function mixinPBRMetallicRoughness<T extends IMeshMaterial>(BaseCls: { ne
     mixinTextureProps('specularColor')
   );
   return class extends S {
+    static readonly pbrMetallicRoughnessMixed = true;
     private _metallic: number;
     private _roughness: number;
     private _specularFactor: Vector4;
