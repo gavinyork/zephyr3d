@@ -105,7 +105,7 @@ function mixinAlbedoColor<T extends IMeshMaterial>(BaseCls: { new (...args: any[
       }
       const pb = scope.$builder;
       let color = scope.kkAlbedo;
-      if (this.featureUsed(FEATURE_ALBEDO_MAP, ctx.renderPass.type)) {
+      if (this.featureUsed(FEATURE_ALBEDO_MAP)) {
         color = pb.mul(color, pb.textureSample(scope.kkAlbedoTex, scope.$inputs.kkAlbedoTexCoord));
       }
       return color;
@@ -114,12 +114,12 @@ function mixinAlbedoColor<T extends IMeshMaterial>(BaseCls: { new (...args: any[
       super.vertexShader(scope, ctx);
       if (this.needFragmentColor(ctx)) {
         const pb = scope.$builder;
-        if (this.featureUsed(FEATURE_ALBEDO_MAP, ctx.renderPass.type)) {
+        if (this.featureUsed(FEATURE_ALBEDO_MAP)) {
           const semantic = `texCoord${this.albedoTexCoordIndex}` as any;
           if (!scope.$getVertexAttrib(semantic)) {
             scope.$inputs[semantic] = pb.vec2().attrib(semantic);
           }
-          if (this.featureUsed(FEATURE_ALBEDO_TEXCOORD_MATRIX, ctx.renderPass.type)) {
+          if (this.featureUsed(FEATURE_ALBEDO_TEXCOORD_MATRIX)) {
             scope.$g.kkAlbedoTextureMatrix = pb.mat4().uniform(2);
             scope.$outputs.kkAlbedoTexCoord = pb.mul(
               scope.kkAlbedoTextureMatrix,
@@ -136,7 +136,7 @@ function mixinAlbedoColor<T extends IMeshMaterial>(BaseCls: { new (...args: any[
       if (this.needFragmentColor(ctx)) {
         const pb = scope.$builder;
         scope.$g.kkAlbedo = pb.vec4().uniform(2);
-        if (this.featureUsed(FEATURE_ALBEDO_MAP, ctx.renderPass.type)) {
+        if (this.featureUsed(FEATURE_ALBEDO_MAP)) {
           scope.$g.kkAlbedoTex = pb.tex2D().uniform(2);
         }
       }
@@ -145,9 +145,9 @@ function mixinAlbedoColor<T extends IMeshMaterial>(BaseCls: { new (...args: any[
       super.applyUniformValues(bindGroup, ctx);
       if (this.needFragmentColor(ctx)) {
         bindGroup.setValue('kkAlbedo', this._albedoColor);
-        if (this.featureUsed(FEATURE_ALBEDO_MAP, ctx.renderPass.type)) {
+        if (this.featureUsed(FEATURE_ALBEDO_MAP)) {
           bindGroup.setTexture('kkAlbedoTex', this._albedoTexture, this._albedoSampler);
-          if (this.featureUsed(FEATURE_ALBEDO_TEXCOORD_MATRIX, ctx.renderPass.type)) {
+          if (this.featureUsed(FEATURE_ALBEDO_TEXCOORD_MATRIX)) {
             bindGroup.setValue('kkAlbedoTextureMatrix', this._albedoTexCoordMatrix);
           }
         }

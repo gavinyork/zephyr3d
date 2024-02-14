@@ -18,20 +18,14 @@ import {
 } from '../shaders';
 import { Application } from '../app';
 
-const allRenderPassTypes = [
-  RENDER_PASS_TYPE_FORWARD,
-  RENDER_PASS_TYPE_SHADOWMAP,
-  RENDER_PASS_TYPE_DEPTH_ONLY
-];
-
 export type BlendMode = 'none' | 'blend' | 'additive' | 'max' | 'min';
 export interface IMeshMaterial extends IMaterial {
   alphaCutoff: number;
   alphaToCoverage: boolean;
   blendMode: BlendMode;
   opacity: number;
-  featureUsed<T = unknown>(feature: string, renderPassType: number): T;
-  useFeature(feature: string, use: unknown, renderPassType?: number[] | number);
+  featureUsed<T = unknown>(feature: string): T;
+  useFeature(feature: string, use: unknown);
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void;
   needFragmentColor(ctx: DrawContext): boolean;
   vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
@@ -71,7 +65,7 @@ export class MeshMaterial extends Material implements IMeshMaterial {
   static readonly FEATURE_ALPHABLEND = 'mm_alphablend';
   static readonly FEATURE_ALPHATOCOVERAGE = 'mm_alphatocoverage';
   private _features: Map<string, number>;
-  private _featureStates: unknown[][];
+  private _featureStates: unknown[];
   private _featureIndex: number;
   private _alphaCutoff: number;
   private _blendMode: BlendMode;
@@ -80,9 +74,6 @@ export class MeshMaterial extends Material implements IMeshMaterial {
     super();
     this._features = new Map();
     this._featureStates = [];
-    this._featureStates[RENDER_PASS_TYPE_FORWARD] = [];
-    this._featureStates[RENDER_PASS_TYPE_SHADOWMAP] = [];
-    this._featureStates[RENDER_PASS_TYPE_DEPTH_ONLY] = [];
     this._featureIndex = 0;
     this._alphaCutoff = 0;
     this._blendMode = 'none';
@@ -100,10 +91,10 @@ export class MeshMaterial extends Material implements IMeshMaterial {
     }
   }
   get alphaToCoverage(): boolean {
-    return this.featureUsed(MeshMaterial.FEATURE_ALPHATOCOVERAGE, RENDER_PASS_TYPE_FORWARD);
+    return this.featureUsed(MeshMaterial.FEATURE_ALPHATOCOVERAGE);
   }
   set alphaToCoverage(val: boolean) {
-    this.useFeature(MeshMaterial.FEATURE_ALPHATOCOVERAGE, !!val, RENDER_PASS_TYPE_FORWARD);
+    this.useFeature(MeshMaterial.FEATURE_ALPHATOCOVERAGE, !!val);
   }
   /** Blending mode */
   get blendMode(): BlendMode {
@@ -112,11 +103,7 @@ export class MeshMaterial extends Material implements IMeshMaterial {
   set blendMode(val: BlendMode) {
     if (this._blendMode !== val) {
       this._blendMode = val;
-      this.useFeature(
-        MeshMaterial.FEATURE_ALPHABLEND,
-        this._blendMode !== 'none' || this._opacity < 1,
-        RENDER_PASS_TYPE_FORWARD
-      );
+      this.useFeature(MeshMaterial.FEATURE_ALPHABLEND, this._blendMode !== 'none' || this._opacity < 1);
     }
   }
   /** A value between 0 and 1, presents the opacity */
@@ -127,14 +114,14 @@ export class MeshMaterial extends Material implements IMeshMaterial {
     val = val < 0 ? 0 : val > 1 ? 1 : val;
     if (this._opacity !== val) {
       this._opacity = val;
-      this.useFeature(MeshMaterial.FEATURE_ALPHABLEND, this._opacity < 1, RENDER_PASS_TYPE_FORWARD);
+      this.useFeature(MeshMaterial.FEATURE_ALPHABLEND, this._blendMode !== 'none' || this._opacity < 1);
       this.optionChanged(false);
     }
   }
   /** @internal */
   private updateBlendingState(ctx: DrawContext) {
-    const blending = this.featureUsed<boolean>(MeshMaterial.FEATURE_ALPHABLEND, ctx.renderPass.type);
-    const a2c = this.featureUsed<boolean>(MeshMaterial.FEATURE_ALPHATOCOVERAGE, ctx.renderPass.type);
+    const blending = this.featureUsed<boolean>(MeshMaterial.FEATURE_ALPHABLEND);
+    const a2c = this.featureUsed<boolean>(MeshMaterial.FEATURE_ALPHATOCOVERAGE);
     if (blending || a2c) {
       const blendingState = this.stateSet.useBlendingState();
       if (blending) {
@@ -163,16 +150,16 @@ export class MeshMaterial extends Material implements IMeshMaterial {
     }
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
-    if (this.featureUsed(MeshMaterial.FEATURE_ALPHATEST, ctx.renderPass.type)) {
+    if (this.featureUsed(MeshMaterial.FEATURE_ALPHATEST)) {
       bindGroup.setValue('kkAlphaCutoff', this._alphaCutoff);
     }
-    if (this.featureUsed(MeshMaterial.FEATURE_ALPHABLEND, ctx.renderPass.type)) {
+    if (this.featureUsed(MeshMaterial.FEATURE_ALPHABLEND)) {
       bindGroup.setValue('kkOpacity', this._opacity);
     }
   }
   /** true if the material is transparency */
   isTransparent(): boolean {
-    return this._blendMode !== 'none' || this._opacity < 1;
+    return this.featureUsed(MeshMaterial.FEATURE_ALPHABLEND);
   }
   beginDraw(ctx: DrawContext): boolean {
     this.updateBlendingState(ctx);
@@ -194,9 +181,9 @@ export class MeshMaterial extends Material implements IMeshMaterial {
    * @param renderPassType - Render pass type
    * @returns true if the feature is in use, otherwise false.
    */
-  featureUsed<T = unknown>(feature: string, renderPassType: number): T {
+  featureUsed<T = unknown>(feature: string): T {
     const index = this._features.get(feature);
-    return this._featureStates[renderPassType][index] as T;
+    return this._featureStates[index] as T;
   }
   /**
    * Use or unuse a feature of the material, this will cause the shader to be rebuild.
@@ -204,29 +191,16 @@ export class MeshMaterial extends Material implements IMeshMaterial {
    * @param feature - Which feature will be used or unused
    * @param use - true if use the feature, otherwise false
    */
-  useFeature(feature: string, use: unknown, renderPassType?: number[] | number) {
-    renderPassType = renderPassType ?? allRenderPassTypes;
-    if (typeof renderPassType === 'number') {
-      renderPassType = [renderPassType];
-    }
+  useFeature(feature: string, use: unknown) {
     let index = this._features.get(feature);
     if (index === void 0) {
       index = this._featureIndex++;
       this._features.set(feature, index);
     }
     let changed = false;
-    for (const type of renderPassType) {
-      if (
-        type !== RENDER_PASS_TYPE_FORWARD &&
-        type !== RENDER_PASS_TYPE_SHADOWMAP &&
-        type !== RENDER_PASS_TYPE_DEPTH_ONLY
-      ) {
-        console.error(`useFeature(): invalid render pass type: ${type}`);
-      }
-      if (this._featureStates[type][index] !== use) {
-        this._featureStates[type][index] = use;
-        changed = true;
-      }
+    if (this._featureStates[index] !== use) {
+      this._featureStates[index] = use;
+      changed = true;
     }
     if (changed) {
       this.optionChanged(true);
@@ -237,7 +211,7 @@ export class MeshMaterial extends Material implements IMeshMaterial {
    * @override
    */
   protected _createHash(renderPassType: number): string {
-    return this._featureStates[renderPassType].join('');
+    return this._featureStates.join('');
   }
   /**
    * {@inheritDoc Material._applyUniforms}

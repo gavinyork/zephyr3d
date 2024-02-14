@@ -51,28 +51,28 @@ export class LitMaterial extends MeshMaterial {
     }
   }
   get normalMapMode(): 'tangent-space' | 'object-space' {
-    return this.featureUsed(LitMaterial.FEATURE_OBJECT_SPACE_NORMALMAP, RENDER_PASS_TYPE_FORWARD);
+    return this.featureUsed(LitMaterial.FEATURE_OBJECT_SPACE_NORMALMAP);
   }
   set normalMapMode(val: 'tangent-space' | 'object-space') {
-    this.useFeature(LitMaterial.FEATURE_OBJECT_SPACE_NORMALMAP, val, RENDER_PASS_TYPE_FORWARD);
+    this.useFeature(LitMaterial.FEATURE_OBJECT_SPACE_NORMALMAP, val);
   }
   /** true if double sided lighting is used */
   get doubleSidedLighting(): boolean {
-    return this.featureUsed(LitMaterial.FEATURE_DOUBLE_SIDED_LIGHTING, RENDER_PASS_TYPE_FORWARD);
+    return this.featureUsed(LitMaterial.FEATURE_DOUBLE_SIDED_LIGHTING);
   }
   set doubleSidedLighting(val: boolean) {
-    this.useFeature(LitMaterial.FEATURE_DOUBLE_SIDED_LIGHTING, !!val, RENDER_PASS_TYPE_FORWARD);
+    this.useFeature(LitMaterial.FEATURE_DOUBLE_SIDED_LIGHTING, !!val);
   }
   /** true if vertex normal attribute presents */
   get vertexNormal(): boolean {
-    return this.featureUsed(LitMaterial.FEATURE_VERTEX_NORMAL, RENDER_PASS_TYPE_FORWARD);
+    return this.featureUsed(LitMaterial.FEATURE_VERTEX_NORMAL);
   }
   set vertexNormal(val: boolean) {
     this.useFeature(LitMaterial.FEATURE_VERTEX_NORMAL, !!val);
   }
   /** true if vertex normal attribute presents */
   get vertexTangent(): boolean {
-    return this.featureUsed(LitMaterial.FEATURE_VERTEX_TANGENT, RENDER_PASS_TYPE_FORWARD);
+    return this.featureUsed(LitMaterial.FEATURE_VERTEX_TANGENT);
   }
   set vertexTangent(val: boolean) {
     this.useFeature(LitMaterial.FEATURE_VERTEX_TANGENT, !!val);
@@ -128,6 +128,7 @@ export class LitMaterial extends MeshMaterial {
    * Calculates the normalized vector from world coordinates to the viewpoint.
    *
    * @param scope - Shader scope
+   *
    * @returns The view vector
    */
   calculateViewVector(scope: PBInsideFunctionScope): PBShaderExp {
@@ -176,9 +177,9 @@ export class LitMaterial extends MeshMaterial {
     }
     pb.func('kkCalculateNormal', params, function () {
       const posW = ShaderFramework.getWorldPosition(this).xyz;
-      this.$l.uv = that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)
+      this.$l.uv = that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE)
         ? scope.$inputs.kkNormalTexCoord ?? pb.vec2(0)
-        : that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)
+        : that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE)
         ? scope.$inputs.kkAlbedoTexCoord ?? pb.vec2(0)
         : pb.vec2(0);
       this.$l.TBN = pb.mat3();
@@ -239,7 +240,10 @@ export class LitMaterial extends MeshMaterial {
           pb.normalize(this.worldNormal)
         );
       }
-      if (that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
+      if (
+        ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD &&
+        that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE)
+      ) {
         if (that.normalMapMode === 'object-space') {
           const pixel = pb.sub(pb.mul(pb.textureSample(this.kkNormalTexture, this.uv).rgb, 2), pb.vec3(1));
           const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.kkNormalScale).xx, 1));
@@ -280,9 +284,9 @@ export class LitMaterial extends MeshMaterial {
     }
     pb.func('kkCalculateNormalAndTBN', params, function () {
       const posW = ShaderFramework.getWorldPosition(this).xyz;
-      this.$l.uv = that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)
+      this.$l.uv = that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE)
         ? scope.$inputs.kkNormalTexCoord ?? pb.vec2(0)
-        : that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)
+        : that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE)
         ? scope.$inputs.kkAlbedoTexCoord ?? pb.vec2(0)
         : pb.vec2(0);
       this.$l.TBN = pb.mat3();
@@ -343,7 +347,10 @@ export class LitMaterial extends MeshMaterial {
           pb.normalize(this.worldNormal)
         );
       }
-      if (that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
+      if (
+        ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD &&
+        that.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE)
+      ) {
         if (that.normalMapMode === 'object-space') {
           const pixel = pb.sub(pb.mul(pb.textureSample(this.kkNormalTexture, this.uv).rgb, 2), pb.vec3(1));
           const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.kkNormalScale).xx, 1));
@@ -365,11 +372,11 @@ export class LitMaterial extends MeshMaterial {
    */
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
     super.applyUniformValues(bindGroup, ctx);
-    if (this.needFragmentColor(ctx)) {
-      if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
+    if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
+      if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE)) {
         bindGroup.setValue('kkNormalScale', this._normalScale);
         bindGroup.setTexture('kkNormalTexture', this._normalTexture, this._normalSampler);
-        if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE_MATRIX, ctx.renderPass.type)) {
+        if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE_MATRIX)) {
           bindGroup.setValue('kkNormalTextureMatrix', this._normalTexCoordMatrix);
         }
       }
@@ -382,7 +389,7 @@ export class LitMaterial extends MeshMaterial {
    * @returns true Environment lighting should be calculated, otherwise false
    */
   protected needCalculateEnvLight(ctx: DrawContext): boolean {
-    return ctx.drawEnvLight;
+    return ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD && ctx.drawEnvLight;
   }
   /**
    * Get irradiance of current environment light
@@ -398,7 +405,7 @@ export class LitMaterial extends MeshMaterial {
     normal: PBShaderExp,
     ctx: DrawContext
   ): PBShaderExp {
-    if (!this.needCalculateEnvLight) {
+    if (!this.needCalculateEnvLight(ctx)) {
       console.warn('getEnvLightIrradiance(): No need to calculate environment lighting');
       return scope.$builder.vec3(0);
     }
@@ -425,7 +432,7 @@ export class LitMaterial extends MeshMaterial {
     roughness: PBShaderExp,
     ctx: DrawContext
   ): PBShaderExp {
-    if (!this.needCalculateEnvLight) {
+    if (!this.needCalculateEnvLight(ctx)) {
       console.warn('getEnvLightRadiance(): No need to calculate environment lighting');
       return scope.$builder.vec3(0);
     }
@@ -442,7 +449,7 @@ export class LitMaterial extends MeshMaterial {
    * @returns true if shadow should be computed, other wise false
    */
   protected needCalucateShadow(ctx: DrawContext): boolean {
-    return !!ctx.currentShadowLight;
+    return ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD && !!ctx.currentShadowLight;
   }
   /**
    * Calculates shadow of current fragment
@@ -622,6 +629,9 @@ export class LitMaterial extends MeshMaterial {
   ) {
     const pb = scope.$builder;
     const that = this;
+    if (ctx.renderPass.type !== RENDER_PASS_TYPE_FORWARD) {
+      console.warn('LitMaterial.forEachLight(): must be called in forward render pass');
+    }
     if (ctx.currentShadowLight) {
       const posRange = scope.global.light.positionAndRange;
       const dirCutoff = scope.global.light.directionAndCutoff;
@@ -748,19 +758,19 @@ export class LitMaterial extends MeshMaterial {
   vertexShader(scope: PBFunctionScope, ctx: DrawContext): void {
     super.vertexShader(scope, ctx);
     const pb = scope.$builder;
-    if (this.needFragmentColor(ctx)) {
+    if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
       if (this.vertexNormal) {
         scope.$inputs.normal = pb.vec3().attrib('normal');
       }
       if (this.vertexTangent) {
         scope.$inputs.tangent = pb.vec4().attrib('tangent');
       }
-      if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
+      if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE)) {
         const semantic = `texCoord${this.normalTexCoordIndex}` as VertexSemantic;
         if (!scope.$getVertexAttrib(semantic)) {
           scope.$inputs[semantic] = pb.vec2().attrib(semantic);
         }
-        if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE_MATRIX, ctx.renderPass.type)) {
+        if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE_MATRIX)) {
           scope.$g.kkNormalTextureMatrix = pb.mat4().uniform(2);
           scope.$outputs.kkNormalTexCoord = pb.mul(
             scope.kkNormalTextureMatrix,
@@ -782,9 +792,11 @@ export class LitMaterial extends MeshMaterial {
   fragmentShader(scope: PBFunctionScope, ctx: DrawContext) {
     super.fragmentShader(scope, ctx);
     const pb = scope.$builder;
-    if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE, ctx.renderPass.type)) {
-      scope.$g.kkNormalTexture = pb.tex2D().uniform(2);
-      scope.$g.kkNormalScale = pb.float().uniform(2);
+    if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
+      if (this.featureUsed(LitMaterial.FEATURE_NORMAL_TEXTURE)) {
+        scope.$g.kkNormalTexture = pb.tex2D().uniform(2);
+        scope.$g.kkNormalScale = pb.float().uniform(2);
+      }
     }
   }
   /**
@@ -793,33 +805,5 @@ export class LitMaterial extends MeshMaterial {
    */
   supportLighting(): boolean {
     return true;
-  }
-}
-
-export class TestLitMaterial extends LitMaterial {
-  constructor() {
-    super();
-  }
-  fragmentShader(scope: PBFunctionScope, ctx: DrawContext): PBShaderExp {
-    const albedoColor = super.fragmentShader(scope, ctx);
-    const that = this;
-    const pb = scope.$builder;
-    return function (this: PBInsideFunctionScope) {
-      this.$l.albedo = albedoColor;
-      this.$l.color = pb.vec3(0);
-      this.$l.normal = that.calculateNormal(scope, ctx);
-      if (that.needCalculateEnvLight(ctx)) {
-        this.color = pb.add(this.color, that.getEnvLightIrradiance(this, this.normal, ctx));
-      }
-      that.forEachLight(this, ctx, function (type, posRange, dirCutoff, colorIntensity, shadow) {
-        this.$l.NoL = pb.clamp(pb.neg(pb.dot(this.normal, dirCutoff.xyz)), 0, 1);
-        this.$l.lightContrib = pb.mul(colorIntensity.rgb, colorIntensity.a, this.NoL);
-        if (shadow) {
-          this.lightContrib = pb.mul(this.lightContrib, that.calculateShadow(this, this.NoL, ctx));
-        }
-        this.color = pb.add(this.color, this.lightContrib);
-      });
-      return pb.mul(this.albedo, pb.vec4(this.color, 1));
-    }.call(scope);
   }
 }

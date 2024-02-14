@@ -1,7 +1,6 @@
 import type { IMeshMaterial } from '../meshmaterial';
 import type { PBFunctionScope, PBInsideFunctionScope } from '@zephyr3d/device';
 import type { DrawContext } from '../../render';
-import { RENDER_PASS_TYPE_FORWARD } from '../../values';
 
 export interface IMixinVertexColor {
   vertexColor: boolean;
@@ -20,7 +19,7 @@ function mixinVertexColor<T extends IMeshMaterial>(BaseCls: { new (...args: any[
     }
     /** Albedo color */
     get vertexColor(): boolean {
-      return this.featureUsed(FEATURE_VERTEX_COLOR, RENDER_PASS_TYPE_FORWARD);
+      return this.featureUsed(FEATURE_VERTEX_COLOR);
     }
     set vertexColor(val: boolean) {
       this.useFeature(FEATURE_VERTEX_COLOR, !!val);

@@ -1,13 +1,33 @@
 import type {
+  BindGroup,
   PBFunctionScope,
   PBInsideFunctionScope,
   PBShaderExp,
   Texture2D,
   TextureSampler
 } from '@zephyr3d/device';
-import type { IMeshMaterial } from '../meshmaterial';
+import type { IMeshMaterial, applyMaterialMixins } from '../meshmaterial';
 import type { Matrix4x4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
+
+export type PBRTextureNames = [
+  'occlusion',
+  'cheenColor',
+  'sheenRoughness',
+  'clearcoatIntensity',
+  'clearcoatNormal',
+  'clearcoatRoughness'
+];
+export type PBRToMixedTextureType<T> = T extends [infer First, ...infer Rest]
+  ? [
+      First extends string ? ReturnType<typeof mixinTextureProps<First>> : never,
+      ...PBRToMixedTextureType<Rest>
+    ]
+  : [];
+
+export type TextureMixinTypes<T> = ReturnType<
+  typeof applyMaterialMixins<PBRToMixedTextureType<T>, { new (...args: any[]): IMeshMaterial }>
+>;
 
 export type TextureProp<U extends string> = {
   [P in 'Texture' | 'TextureSampler' | 'TexCoordIndex' | 'TexCoordMatrix' as `${U}${P}`]: P extends 'Texture'
@@ -38,8 +58,8 @@ export function mixinTextureProps<U extends string>(name: U) {
     type FeatureType<U extends string> = { [P in `FEATURE_TEXTURE_${Uppercase<U>}`]: string };
     if ((BaseCls as any)[id]) {
       return BaseCls as {
-        new (...args: any[]): T & TextureProp<U> & FeatureType<U> & TexturePropUniforms<U>;
-      };
+        new (...args: any[]): T & TextureProp<U> & TexturePropUniforms<U>;
+      } & FeatureType<U>;
     }
     const cls = class extends (BaseCls as { new (...args: any[]): IMeshMaterial }) {
       constructor(...args: any[]) {
@@ -53,7 +73,7 @@ export function mixinTextureProps<U extends string>(name: U) {
         };
         (this as any)[`get${capName}TexCoord`] = function (scope: PBInsideFunctionScope) {
           return scope.$builder.shaderKind === 'fragment'
-            ? scope[`kk${capName}TexCoord`]
+            ? scope.$inputs[`kk${capName}TexCoord`]
             : scope.$outputs[`kk${capName}TexCoord`];
         };
         Object.defineProperty(this, `${name}Texture`, {
@@ -110,12 +130,12 @@ export function mixinTextureProps<U extends string>(name: U) {
         super.vertexShader(scope, ctx);
         if (this.needFragmentColor(ctx)) {
           const pb = scope.$builder;
-          if (this.featureUsed(feature, ctx.renderPass.type)) {
+          if (this.featureUsed(feature)) {
             const semantic = `texCoord${(this as any)[`${name}TexCoordIndex`]}` as any;
             if (!scope.$getVertexAttrib(semantic)) {
               scope.$inputs[semantic] = pb.vec2().attrib(semantic);
             }
-            if (this.featureUsed(featureTexMatrix, ctx.renderPass.type)) {
+            if (this.featureUsed(featureTexMatrix)) {
               scope.$g[`kk${capName}TextureMatrix`] = pb.mat4().uniform(2);
               scope.$outputs[`kk${capName}TexCoord`] = pb.mul(
                 scope[`kk${capName}TextureMatrix`],
@@ -131,8 +151,19 @@ export function mixinTextureProps<U extends string>(name: U) {
         super.fragmentShader(scope, ctx);
         if (this.needFragmentColor(ctx)) {
           const pb = scope.$builder;
-          if (this.featureUsed(feature, ctx.renderPass.type)) {
+          if (this.featureUsed(feature)) {
             scope.$g[`kk${capName}Tex`] = pb.tex2D().uniform(2);
+          }
+        }
+      }
+      applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
+        super.applyUniformValues(bindGroup, ctx);
+        if (this.needFragmentColor(ctx)){
+          if (this.featureUsed(feature)) {
+            bindGroup.setTexture(`kk${capName}Tex`, (this as any)[`${name}Texture`], (this as any)[`${name}TextureSampler`]);
+            if (this.featureUsed(featureTexMatrix)) {
+              bindGroup.setValue(`kk${capName}TextureMatrix`, (this as any)[`${name}TexCoordMatrix`]);
+            }
           }
         }
       }
@@ -140,7 +171,7 @@ export function mixinTextureProps<U extends string>(name: U) {
     cls[id] = true;
     cls[`FEATURE_TEXTURE_${upperName}`] = feature;
     return cls as unknown as {
-      new (...args: any[]): T & TextureProp<U> & FeatureType<U> & TexturePropUniforms<U>;
-    };
+      new (...args: any[]): T & TextureProp<U> & TexturePropUniforms<U>;
+    } & FeatureType<U>;
   };
 }

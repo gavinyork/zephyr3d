@@ -37,6 +37,7 @@ import type {
 import type { AssetManager } from '../../assetmanager';
 import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf';
 import { Application } from '../../../app';
+import { NewPBRMetallicRoughnessMaterial } from '../../../material/pbrmr';
 
 /** @internal */
 export interface GLTFContent extends GlTf {
@@ -590,36 +591,35 @@ export class GLTFLoader extends AbstractModelLoader {
       return pbrMaterial;
     } else if (assetMaterial.type === 'pbrMetallicRoughness') {
       const assetPBRMaterial = assetMaterial as AssetPBRMaterialMR;
-      const pbrMaterial = new PBRMetallicRoughnessMaterial();
-      pbrMaterial.lightModel.ior = assetPBRMaterial.ior;
-      pbrMaterial.lightModel.albedo = assetPBRMaterial.diffuse;
-      pbrMaterial.lightModel.metallic = assetPBRMaterial.metallic;
-      pbrMaterial.lightModel.roughness = assetPBRMaterial.roughness;
+      const pbrMaterial = new NewPBRMetallicRoughnessMaterial();
+      pbrMaterial.ior = assetPBRMaterial.ior;
+      pbrMaterial.albedoColor = assetPBRMaterial.diffuse;
+      pbrMaterial.metallic = assetPBRMaterial.metallic;
+      pbrMaterial.roughness = assetPBRMaterial.roughness;
       if (assetPBRMaterial.diffuseMap) {
-        pbrMaterial.lightModel.setAlbedoMap(
-          assetPBRMaterial.diffuseMap.texture,
-          assetPBRMaterial.diffuseMap.sampler,
-          assetPBRMaterial.diffuseMap.texCoord,
-          assetPBRMaterial.diffuseMap.transform
-        );
+        pbrMaterial.albedoTexture = assetPBRMaterial.diffuseMap.texture;
+        pbrMaterial.albedoTextureSampler = assetPBRMaterial.diffuseMap.sampler;
+        pbrMaterial.albedoTexCoordIndex = assetPBRMaterial.diffuseMap.texCoord;
+        pbrMaterial.albedoTexMatrix = assetPBRMaterial.diffuseMap.transform;
       }
       if (assetPBRMaterial.common.normalMap) {
-        pbrMaterial.lightModel.setNormalMap(
-          assetPBRMaterial.common.normalMap.texture,
-          assetPBRMaterial.common.normalMap.sampler,
-          assetPBRMaterial.common.normalMap.texCoord,
-          assetPBRMaterial.common.normalMap.transform
-        );
+        pbrMaterial.normalTexture = assetPBRMaterial.common.normalMap.texture;
+        pbrMaterial.normalTextureSampler = assetPBRMaterial.common.normalMap.sampler;
+        pbrMaterial.normalTexCoordIndex = assetPBRMaterial.common.normalMap.texCoord;
+        pbrMaterial.normalTexMatrix = assetPBRMaterial.common.normalMap.transform;
       }
-      pbrMaterial.lightModel.normalScale = assetPBRMaterial.common.bumpScale;
+      pbrMaterial.normalScale = assetPBRMaterial.common.bumpScale;
       if (assetPBRMaterial.common.emissiveMap) {
+        /*
         pbrMaterial.lightModel.setEmissiveMap(
           assetPBRMaterial.common.emissiveMap.texture,
           assetPBRMaterial.common.emissiveMap.sampler,
           assetPBRMaterial.common.emissiveMap.texCoord,
           assetPBRMaterial.common.emissiveMap.transform
         );
+        */
       }
+      /*
       pbrMaterial.lightModel.emissiveColor = assetPBRMaterial.common.emissiveColor;
       pbrMaterial.lightModel.emissiveStrength = assetPBRMaterial.common.emissiveStrength;
       if (assetPBRMaterial.common.occlusionMap) {
@@ -631,43 +631,33 @@ export class GLTFLoader extends AbstractModelLoader {
         );
       }
       pbrMaterial.lightModel.occlusionStrength = assetPBRMaterial.common.occlusionStrength;
+      */
       if (assetPBRMaterial.metallicMap) {
-        pbrMaterial.lightModel.setMetallicMap(
-          assetPBRMaterial.metallicMap.texture,
-          assetPBRMaterial.metallicMap.sampler,
-          assetPBRMaterial.metallicMap.texCoord,
-          assetPBRMaterial.metallicMap.transform
-        );
+        pbrMaterial.metallicRoughnessTexture = assetPBRMaterial.metallicMap.texture;
+        pbrMaterial.metallicRoughnessTextureSampler = assetPBRMaterial.metallicMap.sampler;
+        pbrMaterial.metallicRoughnessTexCoordIndex = assetPBRMaterial.metallicMap.texCoord;
+        pbrMaterial.metallicRoughnessTexCoordMatrix = assetPBRMaterial.metallicMap.transform;
       }
-      pbrMaterial.lightModel.metallicIndex = assetPBRMaterial.metallicIndex;
-      pbrMaterial.lightModel.roughnessIndex = assetPBRMaterial.roughnessIndex;
-      pbrMaterial.lightModel.specularFactor = assetPBRMaterial.specularFactor;
+      pbrMaterial.specularFactor = assetPBRMaterial.specularFactor;
       if (assetPBRMaterial.specularMap) {
-        pbrMaterial.lightModel.setSpecularMap(
-          assetPBRMaterial.specularMap.texture,
-          assetPBRMaterial.specularMap.sampler,
-          assetPBRMaterial.specularMap.texCoord,
-          assetPBRMaterial.specularMap.transform
-        );
+        pbrMaterial.specularTexture = assetPBRMaterial.specularMap.texture;
+        pbrMaterial.specularTextureSampler = assetPBRMaterial.specularMap.sampler;
+        pbrMaterial.specularTexCoordIndex = assetPBRMaterial.specularMap.texCoord;
+        pbrMaterial.specularTexCoordMatrix = assetPBRMaterial.specularMap.transform;
       }
       if (assetPBRMaterial.specularColorMap) {
-        pbrMaterial.lightModel.setSpecularColorMap(
-          assetPBRMaterial.specularColorMap.texture,
-          assetPBRMaterial.specularColorMap.sampler,
-          assetPBRMaterial.specularColorMap.texCoord,
-          assetPBRMaterial.specularColorMap.transform
-        );
+        pbrMaterial.specularColorTexture = assetPBRMaterial.specularColorMap.texture;
+        pbrMaterial.specularColorTextureSampler = assetPBRMaterial.specularColorMap.sampler;
+        pbrMaterial.specularColorTexCoordIndex = assetPBRMaterial.specularColorMap.texCoord;
+        pbrMaterial.specularColorTexCoordMatrix = assetPBRMaterial.specularColorMap.transform;
       }
+      /*
       if (assetPBRMaterial.sheen) {
         const sheen = assetPBRMaterial.sheen;
         pbrMaterial.lightModel.useSheen = true;
         pbrMaterial.lightModel.sheenColorFactor = sheen.sheenColorFactor;
         pbrMaterial.lightModel.sheenRoughnessFactor = sheen.sheenRoughnessFactor;
-        /*
-        pbrMaterial.lightModel.setSheenLut(
-          await assetManager.fetchBuiltinTexture(BUILTIN_ASSET_TEXTURE_SHEEN_LUT)
-        );
-        */
+        //pbrMaterial.lightModel.setSheenLut(await assetManager.fetchBuiltinTexture(BUILTIN_ASSET_TEXTURE_SHEEN_LUT));
         if (sheen.sheenColorMap) {
           pbrMaterial.lightModel.setSheenColorMap(
             sheen.sheenColorMap.texture,
@@ -715,10 +705,11 @@ export class GLTFLoader extends AbstractModelLoader {
           );
         }
       }
+      */
       pbrMaterial.vertexTangent = assetPBRMaterial.common.useTangent;
       pbrMaterial.vertexColor = assetPBRMaterial.common.vertexColor;
       if (assetPBRMaterial.common.alphaMode === 'blend') {
-        pbrMaterial.alphaBlend = true;
+        pbrMaterial.blendMode = 'blend';
       } else if (assetPBRMaterial.common.alphaMode === 'mask') {
         pbrMaterial.alphaCutoff = assetPBRMaterial.common.alphaCutoff;
       }
