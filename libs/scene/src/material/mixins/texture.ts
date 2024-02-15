@@ -6,7 +6,7 @@ import type {
   Texture2D,
   TextureSampler
 } from '@zephyr3d/device';
-import type { IMeshMaterial, applyMaterialMixins } from '../meshmaterial';
+import type { IMeshMaterial, MeshMaterialConstructor, applyMaterialMixins } from '../meshmaterial';
 import type { Matrix4x4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
 
@@ -50,20 +50,19 @@ export type TexturePropUniforms<U extends string> = {
 };
 
 export function mixinTextureProps<U extends string>(name: U) {
-  return function <T extends IMeshMaterial>(BaseCls: { new (...args: any[]): T }) {
+  return function <T extends IMeshMaterial>(BaseCls: MeshMaterialConstructor<T>) {
     const capName = `${name[0].toUpperCase()}${name.slice(1)}`;
-    const upperName = name.toUpperCase();
     const id = `mixinTexture${capName}`;
-    const feature = `FEATURE_TEXTURE_${upperName}`;
-    const featureTexIndex = `FEATURE_TEXTURE_TEXCOORD_INDEX_${upperName}`;
-    const featureTexMatrix = `FEATURE_TEXTURE_TEXCOORD_MATRIX_${upperName}`;
-    type FeatureType<U extends string> = { [P in `FEATURE_TEXTURE_${Uppercase<U>}`]: string };
+    const feature = BaseCls.NEXT_FEATURE_INDEX;
+    const featureTexIndex = BaseCls.NEXT_FEATURE_INDEX + 1;
+    const featureTexMatrix = BaseCls.NEXT_FEATURE_INDEX + 2;
     if ((BaseCls as any)[id]) {
-      return BaseCls as {
-        new (...args: any[]): T & TextureProp<U> & TexturePropUniforms<U>;
-      } & FeatureType<U>;
+      return BaseCls as unknown as MeshMaterialConstructor<T> & {
+        new (...args: any[]): TextureProp<U> & TexturePropUniforms<U>;
+      };
     }
     const cls = class extends (BaseCls as { new (...args: any[]): IMeshMaterial }) {
+      static readonly NEXT_FEATURE_INDEX = BaseCls.NEXT_FEATURE_INDEX + 3;
       constructor(...args: any[]) {
         super(...args);
         let textureValue: Texture2D = null;
@@ -171,9 +170,8 @@ export function mixinTextureProps<U extends string>(name: U) {
       }
     };
     cls[id] = true;
-    cls[`FEATURE_TEXTURE_${upperName}`] = feature;
-    return cls as unknown as {
-      new (...args: any[]): T & TextureProp<U> & TexturePropUniforms<U>;
-    } & FeatureType<U>;
+    return cls as unknown as MeshMaterialConstructor<T> & {
+      new (...args: any[]): TextureProp<U> & TexturePropUniforms<U>;
+    };
   };
 }

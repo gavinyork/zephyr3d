@@ -79,8 +79,8 @@ export function mixinPBRMetallicRoughness<T extends IMeshMaterial>(BaseCls: { ne
         bindGroup.setValue('kkSpecularFactor', this._specularFactor);
       }
     }
-    calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, data: PBShaderExp): void {
-      super.calculateCommonData(scope, albedo, data);
+    calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void {
+      super.calculateCommonData(scope, albedo, viewVec, TBN, data);
       const pb = scope.$builder;
       if (this.metallicRoughnessTexture){
         scope.$l.metallicRoughnessSample = pb.textureSample(this.getMetallicRoughnessTextureUniform(scope), this.getMetallicRoughnessTexCoord(scope));

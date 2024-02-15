@@ -24,8 +24,8 @@ export interface IMeshMaterial extends IMaterial {
   alphaToCoverage: boolean;
   blendMode: BlendMode;
   opacity: number;
-  featureUsed<T = unknown>(feature: string): T;
-  useFeature(feature: string, use: unknown);
+  featureUsed<T = unknown>(feature: number): T;
+  useFeature(feature: number, use: unknown);
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void;
   needFragmentColor(ctx: DrawContext): boolean;
   vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
@@ -39,15 +39,21 @@ export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) ex
   : never;
 
 export type ExtractMixinReturnType<M, T> = M extends (target: infer A) => infer R
-  ? T extends A
-    ? R
-    : never
+  ? R
   : never;
 
+/*
 export type ExtractMixinType<M extends any[], T> = UnionToIntersection<
   M extends (infer K)[] ? ExtractMixinReturnType<K, T> : never
 > &
   T;
+*/
+export type ExtractMixinType<M, T> =
+  M extends [infer First]
+    ? ExtractMixinReturnType<First, T>
+    : M extends [infer First, ...infer Rest]
+      ? ExtractMixinReturnType<First, T> & ExtractMixinType<[...Rest], T>
+      : never
 
 export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
   target: T,
@@ -60,21 +66,23 @@ export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
   return r;
 }
 
+export type MeshMaterialConstructor<T extends IMeshMaterial> = {
+  NEXT_FEATURE_INDEX: number;
+  new (...args: any[]): T;
+}
+
 export class MeshMaterial extends Material implements IMeshMaterial {
-  static readonly FEATURE_ALPHATEST = 'mm_alphatest';
-  static readonly FEATURE_ALPHABLEND = 'mm_alphablend';
-  static readonly FEATURE_ALPHATOCOVERAGE = 'mm_alphatocoverage';
-  private _features: Map<string, number>;
+  static readonly FEATURE_ALPHATEST = 0;
+  static readonly FEATURE_ALPHABLEND = 1;
+  static readonly FEATURE_ALPHATOCOVERAGE = 2;
+  static readonly NEXT_FEATURE_INDEX: number = 3;
   private _featureStates: unknown[];
-  private _featureIndex: number;
   private _alphaCutoff: number;
   private _blendMode: BlendMode;
   private _opacity: number;
   constructor() {
     super();
-    this._features = new Map();
     this._featureStates = [];
-    this._featureIndex = 0;
     this._alphaCutoff = 0;
     this._blendMode = 'none';
     this._opacity = 1;
@@ -177,13 +185,11 @@ export class MeshMaterial extends Material implements IMeshMaterial {
   /**
    * Check if a feature is in use for given render pass type.
    *
-   * @param feature - The feature name
-   * @param renderPassType - Render pass type
+   * @param feature - The feature index
    * @returns true if the feature is in use, otherwise false.
    */
-  featureUsed<T = unknown>(feature: string): T {
-    const index = this._features.get(feature);
-    return this._featureStates[index] as T;
+  featureUsed<T = unknown>(feature: number): T {
+    return this._featureStates[feature] as T;
   }
   /**
    * Use or unuse a feature of the material, this will cause the shader to be rebuild.
@@ -191,18 +197,9 @@ export class MeshMaterial extends Material implements IMeshMaterial {
    * @param feature - Which feature will be used or unused
    * @param use - true if use the feature, otherwise false
    */
-  useFeature(feature: string, use: unknown) {
-    let index = this._features.get(feature);
-    if (index === void 0) {
-      index = this._featureIndex++;
-      this._features.set(feature, index);
-    }
-    let changed = false;
-    if (this._featureStates[index] !== use) {
-      this._featureStates[index] = use;
-      changed = true;
-    }
-    if (changed) {
+  useFeature(feature: number, use: unknown) {
+    if (this._featureStates[feature] !== use) {
+      this._featureStates[feature] = use;
       this.optionChanged(true);
     }
   }
@@ -211,7 +208,7 @@ export class MeshMaterial extends Material implements IMeshMaterial {
    * @override
    */
   protected _createHash(renderPassType: number): string {
-    return this._featureStates.join('');
+    return this._featureStates.map(val => val === undefined ? '' : val).join('|');
   }
   /**
    * {@inheritDoc Material._applyUniforms}

@@ -662,38 +662,30 @@ export class GLTFLoader extends AbstractModelLoader {
           pbrMaterial.sheenRoughnessTexCoordMatrix = sheen.sheenRoughnessMap.transform;
         }
       }
-      /*
       if (assetPBRMaterial.clearcoat) {
         const cc = assetPBRMaterial.clearcoat;
-        pbrMaterial.lightModel.useClearcoat = true;
-        pbrMaterial.lightModel.clearcoatIntensity = cc.clearCoatFactor;
-        pbrMaterial.lightModel.clearcoatRoughnessFactor = cc.clearCoatRoughnessFactor;
+        pbrMaterial.clearcoat = true;
+        pbrMaterial.clearcoatIntensity = cc.clearCoatFactor;
+        pbrMaterial.clearcoatRoughnessFactor = cc.clearCoatRoughnessFactor;
         if (cc.clearCoatIntensityMap) {
-          pbrMaterial.lightModel.setClearcoatIntensityMap(
-            cc.clearCoatIntensityMap.texture,
-            cc.clearCoatIntensityMap.sampler,
-            cc.clearCoatIntensityMap.texCoord,
-            cc.clearCoatIntensityMap.transform
-          );
+          pbrMaterial.clearcoatIntensityTexture = cc.clearCoatIntensityMap.texture;
+          pbrMaterial.clearcoatIntensityTextureSampler = cc.clearCoatIntensityMap.sampler;
+          pbrMaterial.clearcoatIntensityTexCoordIndex = cc.clearCoatIntensityMap.texCoord;
+          pbrMaterial.clearcoatIntensityTexCoordMatrix = cc.clearCoatIntensityMap.transform;
         }
         if (cc.clearCoatRoughnessMap) {
-          pbrMaterial.lightModel.setClearcoatRoughnessMap(
-            cc.clearCoatRoughnessMap.texture,
-            cc.clearCoatRoughnessMap.sampler,
-            cc.clearCoatRoughnessMap.texCoord,
-            cc.clearCoatRoughnessMap.transform
-          );
+          pbrMaterial.clearcoatRoughnessTexture = cc.clearCoatRoughnessMap.texture;
+          pbrMaterial.clearcoatRoughnessTextureSampler = cc.clearCoatRoughnessMap.sampler;
+          pbrMaterial.clearcoatRoughnessTexCoordIndex = cc.clearCoatRoughnessMap.texCoord;
+          pbrMaterial.clearcoatRoughnessTexCoordMatrix = cc.clearCoatRoughnessMap.transform;
         }
         if (cc.clearCoatNormalMap) {
-          pbrMaterial.lightModel.setClearcoatNormalMap(
-            cc.clearCoatNormalMap.texture,
-            cc.clearCoatNormalMap.sampler,
-            cc.clearCoatNormalMap.texCoord,
-            cc.clearCoatNormalMap.transform
-          );
+          pbrMaterial.clearcoatNormalTexture = cc.clearCoatNormalMap.texture;
+          pbrMaterial.clearcoatNormalTextureSampler = cc.clearCoatNormalMap.sampler;
+          pbrMaterial.clearcoatNormalTexCoordIndex = cc.clearCoatNormalMap.texCoord;
+          pbrMaterial.clearcoatNormalTexCoordMatrix = cc.clearCoatNormalMap.transform;
         }
       }
-      */
       pbrMaterial.vertexTangent = assetPBRMaterial.common.useTangent;
       pbrMaterial.vertexColor = assetPBRMaterial.common.vertexColor;
       if (assetPBRMaterial.common.alphaMode === 'blend') {

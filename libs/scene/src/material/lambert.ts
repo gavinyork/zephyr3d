@@ -1,7 +1,6 @@
-import { LitMaterial } from './lit';
-import { mixinAlbedoColor } from './mixins/albedocolor';
+import { mixinLight } from './mixins/lit';
 import { mixinVertexColor } from './mixins/vertexcolor';
-import { applyMaterialMixins } from './meshmaterial';
+import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import type { PBFunctionScope } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 
@@ -9,7 +8,7 @@ import type { DrawContext } from '../render';
  * Lambert material
  * @public
  */
-export class LambertMaterial extends applyMaterialMixins(LitMaterial, mixinVertexColor, mixinAlbedoColor) {
+export class LambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLight, mixinVertexColor) {
   constructor() {
     super();
   }

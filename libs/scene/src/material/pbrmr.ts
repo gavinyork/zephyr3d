@@ -1,16 +1,15 @@
-import { LitMaterial } from './lit';
-import { applyMaterialMixins } from './meshmaterial';
-import { mixinAlbedoColor } from './mixins/albedocolor';
+import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinVertexColor } from './mixins/vertexcolor';
 import { PBFunctionScope } from '@zephyr3d/device';
 import { DrawContext } from '../render';
 import { mixinPBRMetallicRoughness } from './mixins/pbr/metallicroughness';
+import { mixinLight } from './mixins/lit';
 
 export class NewPBRMetallicRoughnessMaterial extends applyMaterialMixins(
-  LitMaterial,
+  MeshMaterial,
+  mixinLight,
   mixinPBRMetallicRoughness,
   mixinVertexColor,
-  mixinAlbedoColor,
 ) {
   constructor() {
     super();
@@ -29,9 +28,10 @@ export class NewPBRMetallicRoughnessMaterial extends applyMaterialMixins(
       if (this.vertexColor) {
         scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope, ctx));
       }
-      scope.$l.normal = this.calculateNormal(scope, ctx);
+      scope.$l.normalInfo = this.calculateNormalAndTBN(scope, ctx);
+      scope.$l.normal = scope.normalInfo.normal;
       scope.$l.viewVec = this.calculateViewVector(scope);
-      scope.$l.pbrData = this.getCommonData(scope, scope.albedo);
+      scope.$l.pbrData = this.getCommonData(scope, scope.albedo, scope.viewVec, scope.normalInfo.TBN);
       scope.$l.lightingColor = pb.vec3(0);
       scope.$l.emissiveColor = this.calculateEmissiveColor(scope);
       this.indirectLighting(scope, scope.normal, scope.viewVec, scope.pbrData, scope.lightingColor, ctx);
