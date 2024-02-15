@@ -31,30 +31,24 @@ export class NewPBRMetallicRoughnessMaterial extends applyMaterialMixins(
       }
       scope.$l.normal = this.calculateNormal(scope, ctx);
       scope.$l.viewVec = this.calculateViewVector(scope);
-      scope.$l.pbrData = this.calculateCommonData(scope, scope.albedo);
-      scope.$l.diffuseColor = pb.vec3(0);
-      scope.$l.specularColor = pb.vec3(0);
+      scope.$l.pbrData = this.getCommonData(scope, scope.albedo);
+      scope.$l.lightingColor = pb.vec3(0);
       scope.$l.emissiveColor = this.calculateEmissiveColor(scope);
-      this.indirectLighting(scope, scope.normal, scope.viewVec, scope.pbrData, scope.diffuseColor, scope.specularColor, ctx);
+      this.indirectLighting(scope, scope.normal, scope.viewVec, scope.pbrData, scope.lightingColor, ctx);
       this.forEachLight(scope, ctx, function (type, posRange, dirCutoff, colorIntensity, shadow) {
         this.$l.diffuse = pb.vec3();
         this.$l.specular = pb.vec3();
         this.$l.lightAtten = that.calculateLightAttenuation(this, type, posRange, dirCutoff);
-        this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
         this.$l.lightDir = that.calculateLightDirection(this, type, posRange, dirCutoff);
-        that.directLighting(this, this.lightDir, this.normal, this.viewVec, this.pbrData, this.diffuse, this.specular);
+        this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
+        this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
         if (shadow) {
-          this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
-          this.$l.shadow = pb.vec3(that.calculateShadow(this, this.NoL, ctx));
-          this.diffuse = pb.mul(this.diffuse, this.shadow);
-          this.specular = pb.mul(this.specular, this.shadow);
+          this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.NoL, ctx));
         }
-        this.diffuseColor = pb.add(this.diffuseColor, pb.mul(this.diffuse, this.lightColor));
-        this.specularColor = pb.add(this.specularColor, pb.mul(this.specular, this.lightColor));
+        that.directLighting(this, this.lightDir, this.lightColor, this.normal, this.viewVec, this.pbrData, this.lightingColor);
       });
-      scope.$l.litColor = pb.vec4(pb.add(scope.diffuseColor, scope.specularColor, scope.emissiveColor), scope.albedo.a);
-      //scope.$l.litColor = pb.vec4(pb.vec3(scope.pbrData.roughness), 1);
-      this.outputFragmentColor(scope, scope.litColor, ctx);
+      scope.$l.litColor = pb.add(scope.lightingColor, scope.emissiveColor);
+      this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a), ctx);
     } else {
       this.outputFragmentColor(scope, null, ctx);
     }

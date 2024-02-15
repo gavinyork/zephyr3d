@@ -79,6 +79,32 @@ export function mixinPBRMetallicRoughness<T extends IMeshMaterial>(BaseCls: { ne
         bindGroup.setValue('kkSpecularFactor', this._specularFactor);
       }
     }
+    calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, data: PBShaderExp): void {
+      super.calculateCommonData(scope, albedo, data);
+      const pb = scope.$builder;
+      if (this.metallicRoughnessTexture){
+        scope.$l.metallicRoughnessSample = pb.textureSample(this.getMetallicRoughnessTextureUniform(scope), this.getMetallicRoughnessTexCoord(scope));
+        data.metallic = pb.mul(scope.kkMetallic, scope.metallicRoughnessSample.z);
+        data.roughness = pb.mul(scope.kkRoughness, scope.metallicRoughnessSample.y);
+      } else {
+        data.metallic = scope.kkMetallic;
+        data.roughness = scope.kkRoughness;
+      }
+      if (this.specularColorTexture){
+        scope.$l.specularColor = pb.mul(scope.kkSpecularFactor.rgb, pb.textureSample(this.getSpecularColorTextureUniform(scope), this.getSpecularColorTexCoord(scope))).rgb;
+      } else {
+        scope.$l.specularColor = scope.kkSpecularFactor.rgb;
+      }
+      if (this.specularTexture){
+        data.specularWeight = pb.mul(scope.kkSpecularFactor.a, pb.textureSample(this.getSpecularTextureUniform(scope), this.getSpecularTexCoord(scope))).a;
+      } else {
+        data.specularWeight = scope.kkSpecularFactor.a;
+      }
+      data.f0 = pb.vec4(pb.mix(pb.min(pb.mul(this.getF0(scope).rgb, scope.specularColor), pb.vec3(1)), albedo.rgb, data.metallic), this.getF0(scope).a);
+      data.f90 = pb.vec3(1);
+      data.diffuse = pb.vec4(pb.mix(albedo.rgb, pb.vec3(0), data.metallic), albedo.a);
+    }
+    /*
     calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
       const that = this;
@@ -110,6 +136,7 @@ export function mixinPBRMetallicRoughness<T extends IMeshMaterial>(BaseCls: { ne
       });
       return scope.$g[funcName](albedo);
     }
+    */
   } as unknown as {
     new (...args: any[]): T & IMixinPBRMetallicRoughness & IMixinPBRCommon;
   } & { new (...args: any[]): T & IMixinPBRMetallicRoughness & IMixinPBRCommon } & TextureMixinTypes<['metallicRoughness', 'occlusion', 'specular', 'specularColor']>;

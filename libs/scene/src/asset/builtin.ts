@@ -392,12 +392,12 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
     const image = new Uint16Array(textureSize * textureSize * 4);
     let p = 0;
     const one = encodeF16(1);
-    for (let y = 0; y < textureSize; y++) {
+    for (let y = textureSize - 1; y >= 0; y--) {
       const coord = Math.min(Math.max((y + 0.5) / textureSize, 0), 1);
       const roughness = coord * coord;
       for (let x = 0; x < textureSize; x++) {
         const NdotV = Math.min(Math.max((x + 0.5) / textureSize, 0), 1);
-        const c = dfvCharlieUniform(NdotV, roughness, 4096);
+        const c = dfvCharlieUniform(NdotV, roughness, 512);
         const f16 = encodeF16(c);
         image[p++] = 0;
         image[p++] = 0;

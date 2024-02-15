@@ -11,6 +11,11 @@ export type IMixinPBRCommon = {
   emissiveColor: Vector3;
   emissiveStrength: number;
   occlusionStrength: number;
+  sheen: boolean;
+  sheenColorFactor: Vector3;
+  sheenRoughnessFactor: number;
+  getCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp): PBShaderExp;
+  calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, data: PBShaderExp): void;
   fresnelSchlick(scope: PBInsideFunctionScope, cosTheta: PBShaderExp, F0: PBShaderExp): PBShaderExp;
   distributionGGX(
     scope: PBInsideFunctionScope,
@@ -26,9 +31,11 @@ export type IMixinPBRCommon = {
   getCommonDatasStruct(scope: PBInsideFunctionScope): ShaderTypeFunc;
   calculateEmissiveColor(scope: PBInsideFunctionScope): PBShaderExp;
   getF0(scope: PBInsideFunctionScope): PBShaderExp;
-  directLighting(scope: PBInsideFunctionScope, lightDir: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outDiffuse: PBShaderExp, outSpecular: PBShaderExp);
-  indirectLighting(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outDiffuse: PBShaderExp, outSpecular: PBShaderExp, ctx: DrawContext);
-} & TextureMixinInstanceTypes<['occlusion', 'emissive']>;
+  directLighting(scope: PBInsideFunctionScope, lightDir: PBShaderExp, lightColor: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outColor: PBShaderExp);
+  indirectLighting(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outColor: PBShaderExp, ctx: DrawContext);
+} & TextureMixinInstanceTypes<['occlusion', 'emissive', 'sheenColor', 'sheenRoughness']>;
+
+const FEATURE_SHEEN = 'FEATURE_SHEEN';
 
 export function mixinPBRCommon<T extends IMeshMaterial>(BaseCls: { new (...args: any[]): T }) {
   if ((BaseCls as any).pbrCommonMixed) {
@@ -37,20 +44,22 @@ export function mixinPBRCommon<T extends IMeshMaterial>(BaseCls: { new (...args:
   const S = applyMaterialMixins(
     BaseCls as { new (...args: any[]): IMeshMaterial },
     mixinTextureProps('occlusion'),
-    mixinTextureProps('emissive')
+    mixinTextureProps('emissive'),
+    mixinTextureProps('sheenColor'),
+    mixinTextureProps('sheenRoughness')
   );
   return class extends S {
     static readonly pbrCommonMixed = true;
     private _f0: Vector4;
     private _emissiveFactor: Vector4;
     private _occlusionStrength: number;
-    private _commonDataStruct: ShaderTypeFunc;
+    private _sheenFactor: Vector4;
     constructor(){
       super();
       this._f0 = new Vector4(0.04, 0.04, 0.04, 1.5);
       this._occlusionStrength = 1;
       this._emissiveFactor = new Vector4(0, 0, 0, 1);
-      this._commonDataStruct = null;
+      this._sheenFactor = Vector4.zero();
     }
     get ior(): number {
       return this._f0.w;
@@ -96,6 +105,32 @@ export function mixinPBRCommon<T extends IMeshMaterial>(BaseCls: { new (...args:
         this.optionChanged(false);
       }
     }
+    get sheen(): boolean {
+      return this.featureUsed<boolean>(FEATURE_SHEEN);
+    }
+    set sheen(val: boolean) {
+      this.useFeature(FEATURE_SHEEN, !!val);
+    }
+    get sheenColorFactor(): Vector3 {
+      return this._sheenFactor.xyz();
+    }
+    set sheenColorFactor(val: Vector3) {
+      if (val.x !== this._sheenFactor.x || val.y !== this._sheenFactor.y || val.z !== this._sheenFactor.z) {
+        this._sheenFactor.x = val.x;
+        this._sheenFactor.y = val.y;
+        this._sheenFactor.z = val.z;
+        this.optionChanged(false);
+      }
+    }
+    get sheenRoughnessFactor(): number {
+      return this._sheenFactor.w;
+    }
+    set sheenRoughnessFactor(val: number) {
+      if (val !== this._sheenFactor.w) {
+        this._sheenFactor.w = val;
+        this.optionChanged(false);
+      }
+    }
     fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void {
       const pb = scope.$builder;
       super.fragmentShader(scope, ctx);
@@ -104,6 +139,9 @@ export function mixinPBRCommon<T extends IMeshMaterial>(BaseCls: { new (...args:
         scope.$g.kkEmissiveFactor = pb.vec4().uniform(2);
         if (this.occlusionTexture) {
           scope.$g.kkOcclusionStrength = pb.float().uniform(2);
+        }
+        if (this.sheen){
+          scope.$g.kkSheenFactor = pb.vec4().uniform(2);
         }
         if (ctx.drawEnvLight) {
           scope.$g.kkGGXLut = pb.tex2D().uniform(2);
@@ -118,6 +156,9 @@ export function mixinPBRCommon<T extends IMeshMaterial>(BaseCls: { new (...args:
         if (this.occlusionTexture) {
           bindGroup.setValue('kkOcclusionStrength', this._occlusionStrength);
         }
+        if (this.sheen){
+          bindGroup.setValue('kkSheenFactor', this._sheenFactor);
+        }
         if (ctx.drawEnvLight) {
           bindGroup.setTexture('kkGGXLut', getGGXLUT(1024));
         }
@@ -127,18 +168,46 @@ export function mixinPBRCommon<T extends IMeshMaterial>(BaseCls: { new (...args:
       return scope.kkF0;
     }
     getCommonDatasStruct(scope: PBInsideFunctionScope): ShaderTypeFunc {
-      if (!this._commonDataStruct) {
-        const pb = scope.$builder;
-        this._commonDataStruct = pb.defineStruct([
-          pb.vec4('f0'),
-          pb.vec3('f90'),
-          pb.vec4('diffuse'),
-          pb.float('metallic'),
-          pb.float('roughness'),
-          pb.float('specularWeight')
-        ]);
+      const pb = scope.$builder;
+      return pb.defineStruct([
+        pb.vec4('f0'),
+        pb.vec3('f90'),
+        pb.vec4('diffuse'),
+        pb.float('metallic'),
+        pb.float('roughness'),
+        pb.float('specularWeight'),
+        ...(this.sheen ? [pb.float('sheenAlbedoScaling'), pb.vec3('sheenColor'), pb.float('sheenRoughness')] : [])
+      ]);
+    }
+    getCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp): PBShaderExp {
+      const pb = scope.$builder;
+      const that = this;
+      const funcName = 'kkGetCommonData';
+      pb.func(funcName, [pb.vec4('albedo')], function(){
+        this.$l.data = that.getCommonDatasStruct(this)();
+        that.calculateCommonData(this, this.albedo, this.data);
+        this.$return(this.data);
+      });
+      return scope.$g[funcName](albedo);
+    }
+    calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, data: PBShaderExp): void {
+      const pb = scope.$builder;
+      if (this.sheen) {
+        if (this.sheenColorTexture){
+          const sheenColorSample = pb.textureSample(this.getSheenColorTextureUniform(scope), this.getSheenColorTexCoord(scope)).rgb;
+          data.sheenColor = pb.mul(sheenColorSample, scope.kkSheenFactor.rgb);
+        } else {
+          data.sheenColor = scope.kkSheenFactor.rgb;
+        }
+        if (this.sheenRoughnessTexture){
+          const sheenRoughnessSample = pb.textureSample(this.getSheenRoughnessTextureUniform(scope), this.getSheenRoughnessTexCoord(scope)).a;
+          data.sheenRoughness = pb.mul(sheenRoughnessSample, scope.kkSheenFactor.a);
+        } else {
+          data.sheenRoughness = scope.kkSheenFactor.a;
+        }
+        scope.$l.sheenDFG = 0.157;
+        data.sheenAlbedoScaling = pb.sub(1, pb.mul(pb.max(pb.max(data.sheenColor.r, data.sheenColor.g), data.sheenColor.b), scope.sheenDFG));
       }
-      return this._commonDataStruct;
     }
     calculateEmissiveColor(scope: PBInsideFunctionScope): PBShaderExp {
       const pb = scope.$builder;
@@ -148,11 +217,47 @@ export function mixinPBRCommon<T extends IMeshMaterial>(BaseCls: { new (...args:
         return pb.mul(scope.kkEmissiveFactor.rgb, scope.kkEmissiveFactor.a);
       }
     }
-    directLighting(scope: PBInsideFunctionScope, lightDir: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outDiffuse: PBShaderExp, outSpecular: PBShaderExp) {
+    D_Charlie(
+      scope: PBInsideFunctionScope,
+      NdotH: PBShaderExp,
+      sheenRoughness: PBShaderExp
+    ): PBShaderExp {
+      const funcNameDCharlie = 'kkDCharlie';
+      const pb = scope.$builder;
+      pb.func(funcNameDCharlie, [pb.float('NdotH'), pb.float('sheenRoughness')], function () {
+        this.$l.alphaG = pb.mul(this.sheenRoughness, this.sheenRoughness);
+        this.$l.invR = pb.div(1, this.alphaG);
+        this.$l.cos2h = pb.mul(this.NdotH, this.NdotH);
+        this.$l.sin2h = pb.max(pb.sub(1, this.cos2h), 0.0078125);
+        this.$return(
+          pb.div(pb.mul(pb.add(this.invR, 2), pb.pow(this.sin2h, pb.mul(this.invR, 0.5))), 2 * Math.PI)
+        );
+      });
+      return scope.$g[funcNameDCharlie](NdotH, sheenRoughness);
+    }
+    V_Ashikhmin(
+      scope: PBInsideFunctionScope,
+      NdotL: PBShaderExp,
+      NdotV: PBShaderExp
+    ): PBShaderExp {
+      const funcNameVAshikhmin = 'kkVAshikhmin';
+      const pb = scope.$builder;
+      pb.func(funcNameVAshikhmin, [pb.float('NdotL'), pb.float('NdotV')], function () {
+        this.$return(
+          pb.clamp(
+            pb.div(1, pb.mul(pb.sub(pb.add(this.NdotL, this.NdotV), pb.mul(this.NdotL, this.NdotV)), 4)),
+            0,
+            1
+          )
+        );
+      });
+      return scope.$g[funcNameVAshikhmin](NdotL, NdotV);
+    }
+    directLighting(scope: PBInsideFunctionScope, lightDir: PBShaderExp, lightColor: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outColor: PBShaderExp) {
       const pb = scope.$builder;
       const that = this;
       const funcName = 'kkPBRDirectLighting';
-      pb.func(funcName, [pb.vec3('L'), pb.vec3('normal'), pb.vec3('viewVec'), that.getCommonDatasStruct(scope)('data'), pb.vec3('outDiffuse').out(), pb.vec3('outSpecular').out()], function(){
+      pb.func(funcName, [pb.vec3('L'), pb.vec3('lightColor'), pb.vec3('normal'), pb.vec3('viewVec'), that.getCommonDatasStruct(scope)('data'), pb.vec3('outColor').inout()], function(){
         this.$l.H = pb.normalize(pb.add(this.viewVec, this.L));
         this.$l.NoH = pb.clamp(pb.dot(this.normal, this.H), 0, 1);
         this.$l.NoL = pb.clamp(pb.dot(this.normal, this.L), 0, 1);
@@ -162,19 +267,30 @@ export function mixinPBRCommon<T extends IMeshMaterial>(BaseCls: { new (...args:
         this.$l.alphaRoughness = pb.mul(this.data.roughness, this.data.roughness);
         this.$l.D = that.distributionGGX(this, this.NoH, this.alphaRoughness);
         this.$l.V = that.visGGX(this, this.NoV, this.NoL, this.alphaRoughness);
-        this.outSpecular = pb.mul(this.D, this.V, this.F, this.data.specularWeight);
-        this.outDiffuse = pb.max(pb.mul(pb.sub(pb.vec3(1), pb.mul(this.F, this.data.specularWeight)), pb.div(this.data.diffuse.rgb, Math.PI)), pb.vec3(0));
+        this.$l.specular = pb.mul(this.lightColor, this.D, this.V, this.F, this.data.specularWeight);
+        if (that.sheen){
+          this.specular = pb.mul(this.specular, this.data.sheenAlbedoScaling);
+        }
+        this.outColor = pb.add(this.outColor, this.specular);
+        this.$l.diffuse = pb.mul(this.lightColor, pb.max(pb.mul(pb.sub(pb.vec3(1), pb.mul(this.F, this.data.specularWeight)), pb.div(this.data.diffuse.rgb, Math.PI)), pb.vec3(0)));
+        if (that.sheen){
+          this.diffuse = pb.mul(this.diffuse, this.data.sheenAlbedoScaling);
+        }
+        this.outColor = pb.add(this.outColor, this.diffuse);
+        if (that.sheen){
+          this.$l.sheenD = that.D_Charlie(this, this.NoH, this.data.sheenRoughness);
+          this.$l.sheenV = that.V_Ashikhmin(this, this.NoL, this.NoV);
+          this.outColor = pb.add(this.outColor, pb.mul(this.lightColor, this.data.sheenColor, this.sheenD, this.sheenV));
+        }
       });
-      scope.$g[funcName](lightDir, normal, viewVec, commonData, outDiffuse, outSpecular);
+      scope.$g[funcName](lightDir, lightColor, normal, viewVec, commonData, outColor);
     }
-    indirectLighting(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outDiffuse: PBShaderExp, outSpecular: PBShaderExp, ctx: DrawContext) {
+    indirectLighting(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outColor: PBShaderExp, ctx: DrawContext) {
       const pb = scope.$builder;
       const that = this;
       const funcName = 'kkPBRIndirectLighting';
-      pb.func(funcName, [pb.vec3('normal'), pb.vec3('viewVec'), that.getCommonDatasStruct(scope)('data'), pb.vec3('outDiffuse').out(), pb.vec3('outSpecular').out()], function(){
+      pb.func(funcName, [pb.vec3('normal'), pb.vec3('viewVec'), that.getCommonDatasStruct(scope)('data'), pb.vec3('outColor').inout()], function(){
         if (!ctx.drawEnvLight || (!ctx.env.light.envLight.hasRadiance() && !ctx.env.light.envLight.hasIrradiance())) {
-          this.outDiffuse = pb.vec3(0);
-          this.outSpecular = pb.vec3(0);
           return;
         }
         const envLightStrength = ShaderFramework.getEnvLightStrength(this);
@@ -185,14 +301,18 @@ export function mixinPBRCommon<T extends IMeshMaterial>(BaseCls: { new (...args:
           this.$l.occlusion = envLightStrength;
         }
         this.$l.NoV = pb.clamp(pb.dot(this.normal, this.viewVec), 0.0001, 1)
-        this.$l.ggxLutSample = pb.clamp(pb.textureSampleLevel(this.kkGGXLut, pb.vec2(this.NoV, this.data.roughness), 0), pb.vec4(0), pb.vec4(1));
+        this.$l.ggxLutSample = pb.clamp(pb.textureSampleLevel(this.kkGGXLut, pb.clamp(pb.vec2(this.NoV, this.data.roughness), pb.vec2(0), pb.vec2(1)), 0), pb.vec4(0), pb.vec4(1));
         this.$l.f_ab = this.ggxLutSample.rg;
         this.$l.Fr = pb.sub(pb.max(pb.vec3(pb.sub(1, this.data.roughness)), this.data.f0.rgb), this.data.f0.rgb);
         this.$l.k_S = pb.add(this.data.f0.rgb, pb.mul(this.Fr, pb.pow(pb.sub(1, this.NoV), 5)));
         if (ctx.env.light.envLight.hasRadiance()) {
           this.$l.radiance = ctx.env.light.envLight.getRadiance(this, pb.reflect(pb.neg(this.viewVec), this.normal), this.data.roughness);
           this.$l.FssEss = pb.add(pb.mul(this.k_S, this.f_ab.x), pb.vec3(this.f_ab.y));
-          this.outSpecular = pb.mul(this.radiance, this.FssEss, this.data.specularWeight, this.occlusion);
+          this.$l.iblSpecular = pb.mul(this.radiance, this.FssEss, this.data.specularWeight, this.occlusion);
+          if (that.sheen){
+            this.iblSpecular = pb.mul(this.iblSpecular, this.data.sheenAlbedoScaling);
+          }
+          this.outColor = pb.add(this.outColor, this.iblSpecular);
         }
         if (ctx.env.light.envLight.hasIrradiance()) {
           this.$l.irradiance = ctx.env.light.envLight.getIrradiance(this, this.normal);
@@ -204,10 +324,19 @@ export function mixinPBRCommon<T extends IMeshMaterial>(BaseCls: { new (...args:
             pb.sub(pb.vec3(1), pb.mul(this.F_avg, this.Ems))
           );
           this.$l.k_D = pb.mul(this.data.diffuse.rgb, pb.add(pb.sub(pb.vec3(1), this.FssEss), this.FmsEms));
-          this.outDiffuse = pb.mul(pb.add(this.FmsEms, this.k_D), this.irradiance, this.occlusion);
+          this.$l.iblDiffuse = pb.mul(pb.add(this.FmsEms, this.k_D), this.irradiance, this.occlusion);
+          if (that.sheen){
+            this.iblDiffuse = pb.mul(this.iblDiffuse, this.data.sheenAlbedoScaling);
+          }
+          this.outColor = pb.add(this.outColor, this.iblDiffuse);
+        }
+        if (that.sheen && ctx.env.light.envLight.hasIrradiance()) {
+          this.$l.refl = pb.reflect(pb.neg(this.viewVec), this.normal);
+          this.$l.sheenBRDF = pb.clamp(pb.textureSampleLevel(this.kkGGXLut, pb.clamp(pb.vec2(this.NoV, this.data.sheenRoughness), pb.vec2(0), pb.vec2(1)), 0), pb.vec4(0), pb.vec4(1)).b;
+          this.outColor = pb.add(this.outColor, pb.mul(this.data.sheenColor, this.iblDiffuse, this.sheenBRDF));
         }
       });
-      scope.$g[funcName](normal, viewVec, commonData, outDiffuse, outSpecular);
+      scope.$g[funcName](normal, viewVec, commonData, outColor);
     }
     fresnelSchlick(scope: PBInsideFunctionScope, cosTheta: PBShaderExp, F0: PBShaderExp, F90: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;

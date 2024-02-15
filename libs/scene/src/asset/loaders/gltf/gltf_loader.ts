@@ -643,30 +643,26 @@ export class GLTFLoader extends AbstractModelLoader {
         pbrMaterial.specularColorTexCoordIndex = assetPBRMaterial.specularColorMap.texCoord;
         pbrMaterial.specularColorTexCoordMatrix = assetPBRMaterial.specularColorMap.transform;
       }
-      /*
       if (assetPBRMaterial.sheen) {
         const sheen = assetPBRMaterial.sheen;
-        pbrMaterial.lightModel.useSheen = true;
-        pbrMaterial.lightModel.sheenColorFactor = sheen.sheenColorFactor;
-        pbrMaterial.lightModel.sheenRoughnessFactor = sheen.sheenRoughnessFactor;
+        pbrMaterial.sheen = true;
+        pbrMaterial.sheenColorFactor = sheen.sheenColorFactor;
+        pbrMaterial.sheenRoughnessFactor = sheen.sheenRoughnessFactor;
         //pbrMaterial.lightModel.setSheenLut(await assetManager.fetchBuiltinTexture(BUILTIN_ASSET_TEXTURE_SHEEN_LUT));
         if (sheen.sheenColorMap) {
-          pbrMaterial.lightModel.setSheenColorMap(
-            sheen.sheenColorMap.texture,
-            sheen.sheenColorMap.sampler,
-            sheen.sheenColorMap.texCoord,
-            sheen.sheenColorMap.transform
-          );
+          pbrMaterial.sheenColorTexture = sheen.sheenColorMap.texture;
+          pbrMaterial.sheenColorTextureSampler = sheen.sheenColorMap.sampler;
+          pbrMaterial.sheenColorTexCoordIndex = sheen.sheenColorMap.texCoord;
+          pbrMaterial.sheenColorTexCoordMatrix = sheen.sheenColorMap.transform;
         }
         if (sheen.sheenRoughnessMap) {
-          pbrMaterial.lightModel.setSheenRoughnessMap(
-            sheen.sheenRoughnessMap.texture,
-            sheen.sheenRoughnessMap.sampler,
-            sheen.sheenRoughnessMap.texCoord,
-            sheen.sheenRoughnessMap.transform
-          );
+          pbrMaterial.sheenRoughnessTexture = sheen.sheenRoughnessMap.texture;
+          pbrMaterial.sheenRoughnessTextureSampler = sheen.sheenRoughnessMap.sampler;
+          pbrMaterial.sheenRoughnessTexCoordIndex = sheen.sheenRoughnessMap.texCoord;
+          pbrMaterial.sheenRoughnessTexCoordMatrix = sheen.sheenRoughnessMap.transform;
         }
       }
+      /*
       if (assetPBRMaterial.clearcoat) {
         const cc = assetPBRMaterial.clearcoat;
         pbrMaterial.lightModel.useClearcoat = true;
