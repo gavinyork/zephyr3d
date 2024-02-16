@@ -1,4 +1,4 @@
-import type { IMeshMaterial, MeshMaterialConstructor } from '../meshmaterial';
+import type { MeshMaterial } from '../meshmaterial';
 import type { PBFunctionScope, PBInsideFunctionScope } from '@zephyr3d/device';
 import type { DrawContext } from '../../render';
 
@@ -7,12 +7,12 @@ export interface IMixinVertexColor {
   getVertexColor(scope: PBInsideFunctionScope, ctx: DrawContext);
 }
 
-function mixinVertexColor<T extends IMeshMaterial>(BaseCls: MeshMaterialConstructor<T>) {
+function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).vertexColorMixed) {
-    return BaseCls as MeshMaterialConstructor<T> & { new (...args: any[]): IMixinVertexColor };
+    return BaseCls as T & { new (...args: any[]): IMixinVertexColor };
   }
   const FEATURE_VERTEX_COLOR = BaseCls.NEXT_FEATURE_INDEX;
-  return class extends (BaseCls as MeshMaterialConstructor<IMeshMaterial>) {
+  return class extends BaseCls {
     static NEXT_FEATURE_INDEX = BaseCls.NEXT_FEATURE_INDEX + 1;
     static vertexColorMixed = true;
     constructor(...args: any[]) {
@@ -49,7 +49,7 @@ function mixinVertexColor<T extends IMeshMaterial>(BaseCls: MeshMaterialConstruc
         return scope.$inputs.zDiffuse;
       }
     }
-  } as unknown as { new (...args: any[]): T & IMixinVertexColor };
+  } as unknown as T & { new (...args: any[]): IMixinVertexColor };
 }
 
 export { mixinVertexColor };

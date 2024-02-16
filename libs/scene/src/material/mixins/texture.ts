@@ -6,7 +6,7 @@ import type {
   Texture2D,
   TextureSampler
 } from '@zephyr3d/device';
-import type { IMeshMaterial, MeshMaterialConstructor, applyMaterialMixins } from '../meshmaterial';
+import type { MeshMaterial, applyMaterialMixins } from '../meshmaterial';
 import type { Matrix4x4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
 
@@ -26,7 +26,7 @@ export type PBRToMixedTextureType<T> = T extends [infer First, ...infer Rest]
   : [];
 
 export type TextureMixinTypes<T> = ReturnType<
-  typeof applyMaterialMixins<PBRToMixedTextureType<T>, { new (...args: any[]): IMeshMaterial }>
+  typeof applyMaterialMixins<PBRToMixedTextureType<T>, typeof MeshMaterial>
 >;
 
 export type TextureMixinInstanceTypes<T> = TextureMixinTypes<T> extends { new (...args: any[]): infer U } ? U : never;
@@ -50,18 +50,18 @@ export type TexturePropUniforms<U extends string> = {
 };
 
 export function mixinTextureProps<U extends string>(name: U) {
-  return function <T extends IMeshMaterial>(BaseCls: MeshMaterialConstructor<T>) {
+  return function <T extends typeof MeshMaterial>(BaseCls: T) {
     const capName = `${name[0].toUpperCase()}${name.slice(1)}`;
     const id = `mixinTexture${capName}`;
     const feature = BaseCls.NEXT_FEATURE_INDEX;
     const featureTexIndex = BaseCls.NEXT_FEATURE_INDEX + 1;
     const featureTexMatrix = BaseCls.NEXT_FEATURE_INDEX + 2;
     if ((BaseCls as any)[id]) {
-      return BaseCls as unknown as MeshMaterialConstructor<T> & {
+      return BaseCls as unknown as T & {
         new (...args: any[]): TextureProp<U> & TexturePropUniforms<U>;
       };
     }
-    const cls = class extends (BaseCls as { new (...args: any[]): IMeshMaterial }) {
+    const cls = class extends BaseCls {
       static readonly NEXT_FEATURE_INDEX = BaseCls.NEXT_FEATURE_INDEX + 3;
       constructor(...args: any[]) {
         super(...args);
@@ -100,7 +100,7 @@ export function mixinTextureProps<U extends string>(name: U) {
           enumerable: true,
           configurable: true
         });
-        Object.defineProperty(this, `${name}TexCoordIndex`, {
+        Object.defineProperty(this, `${name}TexCoordMatrix`, {
           get: () => textureCoordMatrix,
           set: (newValue) => {
             if (textureCoordMatrix !== newValue) {
@@ -113,7 +113,7 @@ export function mixinTextureProps<U extends string>(name: U) {
           enumerable: true,
           configurable: true
         });
-        Object.defineProperty(this, `${name}TexCoordMatrix`, {
+        Object.defineProperty(this, `${name}TexCoordIndex`, {
           get: () => textureCoordIndex,
           set: (newValue) => {
             if (textureCoordIndex !== newValue) {
@@ -170,7 +170,7 @@ export function mixinTextureProps<U extends string>(name: U) {
       }
     };
     cls[id] = true;
-    return cls as unknown as MeshMaterialConstructor<T> & {
+    return cls as unknown as T & {
       new (...args: any[]): TextureProp<U> & TexturePropUniforms<U>;
     };
   };

@@ -1,5 +1,5 @@
 import { Vector4 } from '@zephyr3d/base';
-import { applyMaterialMixins, type IMeshMaterial, type MeshMaterialConstructor } from '../meshmaterial';
+import { applyMaterialMixins, MeshMaterial } from '../meshmaterial';
 import type {
   BindGroup,
   PBFunctionScope,
@@ -14,19 +14,19 @@ export type IMixinAlbedoColor = {
   calculateAlbedoColor(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp;
 } & TextureMixinInstanceTypes<['albedo']>;
 
-function mixinAlbedoColor<T extends IMeshMaterial>(BaseCls: MeshMaterialConstructor<T>) {
+function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).albedoColorMixed) {
-    return BaseCls as MeshMaterialConstructor<T> & { new (...args: any[]): IMixinAlbedoColor };
+    return BaseCls as T & { new (...args: any[]): IMixinAlbedoColor };
   }
   const S = applyMaterialMixins(
-    BaseCls as MeshMaterialConstructor<IMeshMaterial>,
+    BaseCls,
     mixinTextureProps('albedo'),
   );
   return class extends S {
     static albedoColorMixed = true;
     private _albedoColor: Vector4;
-    constructor(...args: any[]) {
-      super(...args);
+    constructor() {
+      super();
       this._albedoColor = Vector4.one();
     }
     /** Albedo color */
@@ -64,7 +64,7 @@ function mixinAlbedoColor<T extends IMeshMaterial>(BaseCls: MeshMaterialConstruc
         bindGroup.setValue('kkAlbedo', this._albedoColor);
       }
     }
-  } as unknown as MeshMaterialConstructor<T> & { new (...args: any[]): IMixinAlbedoColor };
+  } as unknown as T & { new (...args: any[]): IMixinAlbedoColor };
 }
 
 export { mixinAlbedoColor };

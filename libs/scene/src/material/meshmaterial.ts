@@ -7,7 +7,6 @@ import type {
 } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
 import { RENDER_PASS_TYPE_DEPTH_ONLY, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP } from '../values';
-import type { IMaterial } from './material';
 import { Material } from './material';
 import type { DrawContext, ShadowMapPass } from '../render';
 import {
@@ -19,20 +18,6 @@ import {
 import { Application } from '../app';
 
 export type BlendMode = 'none' | 'blend' | 'additive' | 'max' | 'min';
-export interface IMeshMaterial extends IMaterial {
-  alphaCutoff: number;
-  alphaToCoverage: boolean;
-  blendMode: BlendMode;
-  opacity: number;
-  featureUsed<T = unknown>(feature: number): T;
-  useFeature(feature: number, use: unknown);
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void;
-  needFragmentColor(ctx: DrawContext): boolean;
-  vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
-  fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void;
-  transformVertexAndNormal(scope: PBInsideFunctionScope);
-  outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext);
-}
 
 export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void
   ? I
@@ -66,12 +51,7 @@ export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
   return r;
 }
 
-export type MeshMaterialConstructor<T extends IMeshMaterial> = {
-  NEXT_FEATURE_INDEX: number;
-  new (...args: any[]): T;
-}
-
-export class MeshMaterial extends Material implements IMeshMaterial {
+export class MeshMaterial extends Material {
   static readonly FEATURE_ALPHATEST = 0;
   static readonly FEATURE_ALPHABLEND = 1;
   static readonly FEATURE_ALPHATOCOVERAGE = 2;
@@ -80,7 +60,7 @@ export class MeshMaterial extends Material implements IMeshMaterial {
   private _alphaCutoff: number;
   private _blendMode: BlendMode;
   private _opacity: number;
-  constructor() {
+  constructor(...args: any[]) {
     super();
     this._featureStates = [];
     this._alphaCutoff = 0;

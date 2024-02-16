@@ -13,7 +13,7 @@ import {
 import { ShaderFramework, nonLinearDepthToLinear } from '../../shaders';
 import type { DrawContext } from '../../render';
 import { Application } from '../../app';
-import { IMeshMaterial, MeshMaterialConstructor, applyMaterialMixins } from '../meshmaterial';
+import { MeshMaterial, applyMaterialMixins } from '../meshmaterial';
 import { TextureMixinInstanceTypes, mixinTextureProps } from './texture';
 import { IMixinAlbedoColor, mixinAlbedoColor } from './albedocolor';
 
@@ -70,12 +70,12 @@ export type IMixinLight = {
   ): void;
 } & TextureMixinInstanceTypes<['normal']> & IMixinAlbedoColor;
 
-export function mixinLight<T extends IMeshMaterial>(BaseCls: MeshMaterialConstructor<T>) {
+export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).lightMixed) {
-    return BaseCls as MeshMaterialConstructor<T> & { new (...args: any[]): IMixinLight };
+    return BaseCls as T & { new (...args: any[]): IMixinLight };
   }
   const S = applyMaterialMixins(
-    BaseCls as MeshMaterialConstructor<IMeshMaterial>,
+    BaseCls,
     mixinAlbedoColor,
     mixinTextureProps('normal'),
   );
@@ -790,6 +790,6 @@ export function mixinLight<T extends IMeshMaterial>(BaseCls: MeshMaterialConstru
     supportLighting(): boolean {
       return true;
     }
-  } as unknown as MeshMaterialConstructor<T> & { new (...args: any[]): IMixinLight }
+  } as unknown as T & { new (...args: any[]): IMixinLight }
 }
 

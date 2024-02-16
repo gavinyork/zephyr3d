@@ -507,7 +507,7 @@ export class GLTFLoader extends AbstractModelLoader {
         unlitMaterial.albedoTexture = unlitAssetMaterial.diffuseMap.texture;
         unlitMaterial.albedoTextureSampler = unlitAssetMaterial.diffuseMap.sampler;
         unlitMaterial.albedoTexCoordIndex = unlitAssetMaterial.diffuseMap.texCoord;
-        unlitMaterial.albedoTexMatrix = unlitAssetMaterial.diffuseMap.transform;
+        unlitMaterial.albedoTexCoordMatrix = unlitAssetMaterial.diffuseMap.transform;
       }
       unlitMaterial.vertexColor = unlitAssetMaterial.common.vertexColor;
       if (assetMaterial.common.alphaMode === 'blend') {
@@ -600,13 +600,13 @@ export class GLTFLoader extends AbstractModelLoader {
         pbrMaterial.albedoTexture = assetPBRMaterial.diffuseMap.texture;
         pbrMaterial.albedoTextureSampler = assetPBRMaterial.diffuseMap.sampler;
         pbrMaterial.albedoTexCoordIndex = assetPBRMaterial.diffuseMap.texCoord;
-        pbrMaterial.albedoTexMatrix = assetPBRMaterial.diffuseMap.transform;
+        pbrMaterial.albedoTexCoordMatrix = assetPBRMaterial.diffuseMap.transform;
       }
       if (assetPBRMaterial.common.normalMap) {
         pbrMaterial.normalTexture = assetPBRMaterial.common.normalMap.texture;
         pbrMaterial.normalTextureSampler = assetPBRMaterial.common.normalMap.sampler;
         pbrMaterial.normalTexCoordIndex = assetPBRMaterial.common.normalMap.texCoord;
-        pbrMaterial.normalTexMatrix = assetPBRMaterial.common.normalMap.transform;
+        pbrMaterial.normalTexCoordMatrix = assetPBRMaterial.common.normalMap.transform;
       }
       pbrMaterial.normalScale = assetPBRMaterial.common.bumpScale;
       if (assetPBRMaterial.common.emissiveMap) {

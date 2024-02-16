@@ -1,23 +1,23 @@
 import { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from "@zephyr3d/device";
-import { IMeshMaterial, applyMaterialMixins } from "../../meshmaterial";
-import { TextureMixinTypes, mixinTextureProps } from "../texture";
+import { MeshMaterial, applyMaterialMixins } from "../../meshmaterial";
+import { TextureMixinInstanceTypes, mixinTextureProps } from "../texture";
 import { IMixinPBRCommon, mixinPBRCommon } from "./common";
 import { DrawContext } from "../../../render";
 import { Vector4 } from "@zephyr3d/base";
 
-export interface IMixinPBRMetallicRoughness {
+export type IMixinPBRMetallicRoughness = {
   metallic: number;
   roughness: number;
   specularFactor: Vector4;
   calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp): PBShaderExp;
-}
+} & IMixinPBRCommon & TextureMixinInstanceTypes<['metallicRoughness', 'occlusion', 'specular', 'specularColor']>;
 
-export function mixinPBRMetallicRoughness<T extends IMeshMaterial>(BaseCls: { new (...args: any[]): T }) {
+export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).pbrMetallicRoughnessMixed) {
-    return BaseCls as { new (...args: any[]): T & IMixinPBRMetallicRoughness & IMixinPBRCommon } & TextureMixinTypes<['metallicRoughness', 'occlusion', 'specular', 'specularColor']>;
+    return BaseCls as T & { new (...args: any[]): IMixinPBRMetallicRoughness };
   }
   const S = applyMaterialMixins(
-    BaseCls as { new (...args: any[]): IMeshMaterial },
+    BaseCls,
     mixinPBRCommon,
     mixinTextureProps('metallicRoughness'),
     mixinTextureProps('occlusion'),
@@ -137,10 +137,5 @@ export function mixinPBRMetallicRoughness<T extends IMeshMaterial>(BaseCls: { ne
       return scope.$g[funcName](albedo);
     }
     */
-  } as unknown as {
-    new (...args: any[]): T & IMixinPBRMetallicRoughness & IMixinPBRCommon;
-  } & { new (...args: any[]): T & IMixinPBRMetallicRoughness & IMixinPBRCommon } & TextureMixinTypes<['metallicRoughness', 'occlusion', 'specular', 'specularColor']>;
+  } as unknown as T & { new (...args: any[]): IMixinPBRMetallicRoughness };
 }
-
-
-

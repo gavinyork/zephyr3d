@@ -1,5 +1,5 @@
 import { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp, ShaderTypeFunc } from "@zephyr3d/device";
-import { IMeshMaterial, MeshMaterialConstructor, applyMaterialMixins } from "../../meshmaterial";
+import { MeshMaterial, applyMaterialMixins } from "../../meshmaterial";
 import { Vector3, Vector4 } from "@zephyr3d/base";
 import { DrawContext } from "../../../render";
 import { getGGXLUT } from "../ggxlut";
@@ -39,12 +39,12 @@ export type IMixinPBRCommon = {
   indirectLighting(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outColor: PBShaderExp, ctx: DrawContext);
 } & TextureMixinInstanceTypes<['occlusion', 'emissive', 'sheenColor', 'sheenRoughness', 'clearcoatIntensity', 'clearcoatRoughness', 'clearcoatNormal']>;
 
-export function mixinPBRCommon<T extends IMeshMaterial>(BaseCls: MeshMaterialConstructor<T>) {
+export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).pbrCommonMixed) {
-    return BaseCls as MeshMaterialConstructor<T> & { new (...args: any[]): IMixinPBRCommon };
+    return BaseCls as T & { new (...args: any[]): IMixinPBRCommon };
   }
   const S = applyMaterialMixins(
-    BaseCls as MeshMaterialConstructor<T>,
+    BaseCls,
     mixinTextureProps('occlusion'),
     mixinTextureProps('emissive'),
     mixinTextureProps('sheenColor'),
@@ -476,5 +476,5 @@ export function mixinPBRCommon<T extends IMeshMaterial>(BaseCls: MeshMaterialCon
       });
       return scope.$g[funcName](NdotV, NdotL, alphaRoughness);
     }
-  } as unknown as MeshMaterialConstructor<T> & { new (...args: any[]): IMixinPBRCommon };
+  } as unknown as T & { new (...args: any[]): IMixinPBRCommon };
 }

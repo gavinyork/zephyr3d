@@ -4,6 +4,7 @@ import { PBFunctionScope } from '@zephyr3d/device';
 import { DrawContext } from '../render';
 import { mixinPBRMetallicRoughness } from './mixins/pbr/metallicroughness';
 import { mixinLight } from './mixins/lit';
+import { Material } from './material';
 
 export class NewPBRMetallicRoughnessMaterial extends applyMaterialMixins(
   MeshMaterial,
