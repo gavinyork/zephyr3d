@@ -100,17 +100,15 @@ cmApp.ready().then(async () => {
 
   const stdMat = new PBRMetallicRoughnessMaterial();
   const albedoMap = await assetManager.fetchTexture<Texture2D>('./assets/images/rustediron2_basecolor.png');
-  stdMat.lightModel.setAlbedoMap(albedoMap, null, 0);
+  stdMat.albedoTexture = albedoMap;
   const normalMap = await assetManager.fetchTexture<Texture2D>('./assets/images/rustediron2_normal.png', {
     linearColorSpace: true
   });
-  stdMat.lightModel.setNormalMap(normalMap, null, 0);
+  stdMat.normalTexture = normalMap;
   const metallicMap = await assetManager.fetchTexture<Texture2D>('./assets/images/mr.png', {
     linearColorSpace: true
   });
-  stdMat.lightModel.setMetallicMap(metallicMap, null, 0);
-  stdMat.lightModel.metallicIndex = 0;
-  stdMat.lightModel.roughnessIndex = 1;
+  stdMat.metallicRoughnessTexture = metallicMap;
 
   const sphere = new SphereShape();
   const spheres0 = new Mesh(scene, sphere);

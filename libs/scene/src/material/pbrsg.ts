@@ -1,15 +1,15 @@
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinVertexColor } from './mixins/vertexcolor';
-import { PBFunctionScope } from '@zephyr3d/device';
-import { DrawContext } from '../render';
-import { mixinPBRMetallicRoughness } from './mixins/pbr/metallicroughness';
+import type { PBFunctionScope } from '@zephyr3d/device';
+import type { DrawContext } from '../render';
 import { mixinLight } from './mixins/lit';
+import { mixinPBRSpecularGlossness } from './mixins/pbr/specularglossness';
 
-export class PBRMetallicRoughnessMaterial extends applyMaterialMixins(
+export class PBRSpecularGlossinessMaterial extends applyMaterialMixins(
   MeshMaterial,
   mixinLight,
-  mixinPBRMetallicRoughness,
-  mixinVertexColor,
+  mixinPBRSpecularGlossness,
+  mixinVertexColor
 ) {
   constructor() {
     super();
@@ -45,7 +45,15 @@ export class PBRMetallicRoughnessMaterial extends applyMaterialMixins(
         if (shadow) {
           this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.NoL, ctx));
         }
-        that.directLighting(this, this.lightDir, this.lightColor, this.normal, this.viewVec, this.pbrData, this.lightingColor);
+        that.directLighting(
+          this,
+          this.lightDir,
+          this.lightColor,
+          this.normal,
+          this.viewVec,
+          this.pbrData,
+          this.lightingColor
+        );
       });
       scope.$l.litColor = pb.add(scope.lightingColor, scope.emissiveColor);
       this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a), ctx);

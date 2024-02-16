@@ -50,23 +50,9 @@ instancingApp.ready().then(async () => {
   hdrTex.dispose();
 
   const boxMaterial = new PBRMetallicRoughnessMaterial();
-  boxMaterial.lightModel.setAlbedoMap(
-    await assetManager.fetchTexture('./assets/images/rustediron2_basecolor.png'),
-    null,
-    0
-  );
-  boxMaterial.lightModel.setNormalMap(
-    await assetManager.fetchTexture('./assets/images/rustediron2_normal.png', { linearColorSpace: true }),
-    null,
-    0
-  );
-  boxMaterial.lightModel.setMetallicMap(
-    await assetManager.fetchTexture('./assets/images/mr.png', { linearColorSpace: true }),
-    null,
-    0
-  );
-  boxMaterial.lightModel.metallicIndex = 0;
-  boxMaterial.lightModel.roughnessIndex = 1;
+  boxMaterial.albedoTexture = await assetManager.fetchTexture('./assets/images/rustediron2_basecolor.png');
+  boxMaterial.normalTexture = await assetManager.fetchTexture('./assets/images/rustediron2_normal.png', { linearColorSpace: true });
+  boxMaterial.metallicRoughnessTexture = await assetManager.fetchTexture('./assets/images/mr.png', { linearColorSpace: true });
   const box = new BoxShape();
   for (let x = -20; x <= 20; x += 2) {
     for (let y = -20; y <= 20; y += 2) {

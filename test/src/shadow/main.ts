@@ -47,8 +47,8 @@ shadowApp.ready().then(async () => {
   directionlight.shadow.numShadowCascades = 4;
 
   const planeMaterial = new PBRMetallicRoughnessMaterial();
-  planeMaterial.lightModel.metallic = 0.1;
-  planeMaterial.lightModel.roughness = 0.6;
+  planeMaterial.metallic = 0.1;
+  planeMaterial.roughness = 0.6;
 
   const box = new BoxShape();
   const floor = new Mesh(scene, box);
