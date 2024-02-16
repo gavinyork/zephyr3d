@@ -83,7 +83,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
       super.calculateCommonData(scope, albedo, viewVec, TBN, data);
       const pb = scope.$builder;
       if (this.metallicRoughnessTexture){
-        scope.$l.metallicRoughnessSample = pb.textureSample(this.getMetallicRoughnessTextureUniform(scope), this.getMetallicRoughnessTexCoord(scope));
+        scope.$l.metallicRoughnessSample = this.sampleMetallicRoughnessTexture(scope);
         data.metallic = pb.mul(scope.kkMetallic, scope.metallicRoughnessSample.z);
         data.roughness = pb.mul(scope.kkRoughness, scope.metallicRoughnessSample.y);
       } else {
@@ -91,12 +91,12 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
         data.roughness = scope.kkRoughness;
       }
       if (this.specularColorTexture){
-        scope.$l.specularColor = pb.mul(scope.kkSpecularFactor.rgb, pb.textureSample(this.getSpecularColorTextureUniform(scope), this.getSpecularColorTexCoord(scope))).rgb;
+        scope.$l.specularColor = pb.mul(scope.kkSpecularFactor.rgb, this.sampleSpecularColorTexture(scope).rgb);
       } else {
         scope.$l.specularColor = scope.kkSpecularFactor.rgb;
       }
       if (this.specularTexture){
-        data.specularWeight = pb.mul(scope.kkSpecularFactor.a, pb.textureSample(this.getSpecularTextureUniform(scope), this.getSpecularTexCoord(scope))).a;
+        data.specularWeight = pb.mul(scope.kkSpecularFactor.a, this.sampleSpecularTexture(scope).a);
       } else {
         data.specularWeight = scope.kkSpecularFactor.a;
       }
@@ -104,38 +104,5 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
       data.f90 = pb.vec3(1);
       data.diffuse = pb.vec4(pb.mix(albedo.rgb, pb.vec3(0), data.metallic), albedo.a);
     }
-    /*
-    calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp): PBShaderExp {
-      const pb = scope.$builder;
-      const that = this;
-      const funcName = 'kkGetCommonData';
-      pb.func(funcName, [pb.vec4('albedo')], function(){
-        this.$l.data = that.getCommonDatasStruct(this)();
-        if (that.metallicRoughnessTexture){
-          this.$l.metallicRoughnessSample = pb.textureSample(that.getMetallicRoughnessTextureUniform(this), that.getMetallicRoughnessTexCoord(this));
-          this.data.metallic = pb.mul(scope.kkMetallic, this.metallicRoughnessSample.z);
-          this.data.roughness = pb.mul(scope.kkRoughness, this.metallicRoughnessSample.y);
-        } else {
-          this.data.metallic = scope.kkMetallic;
-          this.data.roughness = scope.kkRoughness;
-        }
-        if (that.specularColorTexture){
-          this.$l.specularColor = pb.mul(this.kkSpecularFactor.rgb, pb.textureSample(that.getSpecularColorTextureUniform(this), that.getSpecularColorTexCoord(this))).rgb;
-        } else {
-          this.$l.specularColor = this.kkSpecularFactor.rgb;
-        }
-        if (that.specularTexture){
-          this.data.specularWeight = pb.mul(this.kkSpecularFactor.a, pb.textureSample(that.getSpecularTextureUniform(this), that.getSpecularTexCoord(this))).a;
-        } else {
-          this.data.specularWeight = this.kkSpecularFactor.a;
-        }
-        this.data.f0 = pb.vec4(pb.mix(pb.min(pb.mul(that.getF0(this).rgb, this.specularColor), pb.vec3(1)), this.albedo.rgb, this.data.metallic), that.getF0(this).a);
-        this.data.f90 = pb.vec3(1);
-        this.data.diffuse = pb.vec4(pb.mix(this.albedo.rgb, pb.vec3(0), this.data.metallic), this.albedo.a);
-        this.$return(this.data);
-      });
-      return scope.$g[funcName](albedo);
-    }
-    */
   } as unknown as T & { new (...args: any[]): IMixinPBRMetallicRoughness };
 }

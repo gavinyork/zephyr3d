@@ -98,10 +98,10 @@ terrainApp.ready().then(async () => {
         ]
       }
     });
-    terrain.material.lightModel.setAlbedoMap(albedoMap, null, -1);
+    terrain.material.albedoTexture = albedoMap;
     //terrain.material.lightModel.setNormalMap(normalMap, null, -1);
     terrain.maxPixelError = 6;
-    terrain.castShadow = false;
+    terrain.castShadow = true;
     /*
     const detailMask = splatMap;
     const data = new Uint8Array(detailMask.width * detailMask.height * 4);
@@ -162,7 +162,7 @@ terrainApp.ready().then(async () => {
   scene.env.light.irradianceMap = scene.env.sky.irradianceMap;
   scene.env.sky.skyType = 'scatter';
   scene.env.sky.autoUpdateIBLMaps = true;
-  scene.env.sky.fogType = 'scatter';
+  scene.env.sky.fogType = 'none';
 
   const assetManager = new AssetManager();
   const terrain = await loadTerrain(scene, assetManager);

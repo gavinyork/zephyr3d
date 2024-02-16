@@ -2,17 +2,16 @@ import type { Ray } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { RenderStateSet, Texture2D } from '@zephyr3d/device';
 import { Quadtree } from './quadtree';
-import { MAX_DETAIL_TEXTURE_LEVELS, TerrainMaterial } from '../../material/terrainmaterial';
 import { GraphNode } from '../graph_node';
 import { Application } from '../../app';
 import { GrassManager } from './grass';
 import { GrassMaterial } from '../../material/grassmaterial';
-import type { TerrainLightModelOptions } from '../../material/terrainlightmodel';
 import type { Camera } from '../../camera/camera';
 import type { BoundingVolume } from '../../utility/bounding_volume';
 import type { CullVisitor } from '../../render/cull_visitor';
 import type { Scene } from '../scene';
 import type { QuadtreeNode } from './quadtree';
+import { TerrainMaterial, type TerrainLightModelOptions } from '../../material/terrainmaterial';
 
 /**
  * Terrain node
@@ -44,8 +43,6 @@ export class Terrain extends GraphNode {
   /** @internal */
   private _grassMaterial: GrassMaterial;
   /** @internal */
-  private _maxDetailTextureLevels: number;
-  /** @internal */
   private _wireframe: boolean;
   /** @internal */
   private _viewPoint: Vector3;
@@ -73,7 +70,6 @@ export class Terrain extends GraphNode {
     this._height = 0;
     this._material = null;
     this._grassMaterial = null;
-    this._maxDetailTextureLevels = MAX_DETAIL_TEXTURE_LEVELS;
     this._wireframe = false;
     this._viewPoint = null;
     this._castShadow = true;
@@ -102,10 +98,6 @@ export class Terrain extends GraphNode {
   }
   set castShadow(val: boolean) {
     this._castShadow = !!val;
-  }
-  /** The maximum value of detail texture levels */
-  get maxDetailTextureLevels(): number {
-    return this._maxDetailTextureLevels;
   }
   /** The maximum pixel error for terrain LOD */
   get maxPixelError(): number {
@@ -202,7 +194,8 @@ export class Terrain extends GraphNode {
     this._heightFieldScale.set(scale);
     this._width = sizeX;
     this._height = sizeZ;
-    this._material.lightModel.setNormalMap(this._quadtree.normalMap, null, -1);
+    this._material.normalTexture = this._quadtree.normalMap;
+    this._material.normalTexCoordIndex = -1;
     this._material.terrainInfo = new Vector4(this.scaledWidth, this.scaledHeight, 0, 0);
     this._overridenStateSet = Application.instance.device.createRenderStateSet();
     this._overridenStateSet.useRasterizerState().setCullMode('front');

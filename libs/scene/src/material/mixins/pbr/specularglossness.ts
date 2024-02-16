@@ -71,10 +71,7 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
       super.calculateCommonData(scope, albedo, viewVec, TBN, data);
       const pb = scope.$builder;
       if (this.specularTexture) {
-        scope.$l.specularTextureSample = pb.textureSample(
-          this.getSpecularTextureUniform(scope),
-          this.getSpecularTexCoord(scope)
-        );
+        scope.$l.specularTextureSample = this.sampleSpecularTexture(scope);
         data.roughness = pb.sub(1, pb.mul(scope.kkGlossinessFactor, scope.specularTextureSample.a));
         data.f0 = pb.vec4(
           pb.mul(scope.specularTextureSample.rgb, scope.kkSpecularFactor.rgb),

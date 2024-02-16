@@ -47,7 +47,7 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
       }
       let color = scope.kkAlbedo;
       if (this.albedoTexture) {
-        color = pb.mul(color, pb.textureSample(this.getAlbedoTextureUniform(scope), this.getAlbedoTexCoord(scope)));
+        color = pb.mul(color, this.sampleAlbedoTexture(scope));
       }
       return color;
     }

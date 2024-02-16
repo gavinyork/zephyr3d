@@ -244,14 +244,12 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       if (this.sheen) {
         if (this.sheenColorTexture){
-          const sheenColorSample = pb.textureSample(this.getSheenColorTextureUniform(scope), this.getSheenColorTexCoord(scope)).rgb;
-          data.sheenColor = pb.mul(sheenColorSample, scope.kkSheenFactor.rgb);
+          data.sheenColor = pb.mul(this.sampleSheenColorTexture(scope).rgb, scope.kkSheenFactor.rgb);
         } else {
           data.sheenColor = scope.kkSheenFactor.rgb;
         }
         if (this.sheenRoughnessTexture){
-          const sheenRoughnessSample = pb.textureSample(this.getSheenRoughnessTextureUniform(scope), this.getSheenRoughnessTexCoord(scope)).a;
-          data.sheenRoughness = pb.mul(sheenRoughnessSample, scope.kkSheenFactor.a);
+          data.sheenRoughness = pb.mul(this.sampleSheenRoughnessTexture(scope).a, scope.kkSheenFactor.a);
         } else {
           data.sheenRoughness = scope.kkSheenFactor.a;
         }
@@ -260,8 +258,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       }
       if (this.clearcoat){
         if (this.clearcoatNormalTexture){
-          const ccNormalSample = pb.textureSample(this.getClearcoatNormalTextureUniform(scope), this.getClearcoatNormalTexCoord(scope)).rgb;
-          const ccNormal = pb.mul(pb.sub(pb.mul(ccNormalSample, 2), pb.vec3(1)), pb.vec3(scope.kkClearcoatFactor.zz, 1));
+          const ccNormal = pb.mul(pb.sub(pb.mul(this.sampleClearcoatNormalTexture(scope).rgb, 2), pb.vec3(1)), pb.vec3(scope.kkClearcoatFactor.zz, 1));
           data.ccNormal = pb.normalize(pb.mul(TBN, ccNormal));
         } else {
           data.ccNormal = TBN[2];
@@ -269,17 +266,17 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         data.ccNoV = pb.clamp(pb.dot(data.ccNormal, viewVec), 0.0001, 1);
         data.ccFactor = scope.kkClearcoatFactor;
         if (this.clearcoatIntensityTexture){
-          data.ccFactor.x = pb.mul(data.ccFactor.x, pb.textureSample(this.getClearcoatIntensityTextureUniform(scope), this.getClearcoatIntensityTexCoord(scope)).r);
+          data.ccFactor.x = pb.mul(data.ccFactor.x, this.sampleClearcoatIntensityTexture(scope).r);
         }
         if (this.clearcoatRoughnessTexture){
-          data.ccFactor.y = pb.clamp(pb.mul(data.ccFactor.y, pb.textureSample(this.getClearcoatRoughnessTextureUniform(scope), this.getClearcoatRoughnessTexCoord(scope)).g), 0, 1);
+          data.ccFactor.y = pb.clamp(pb.mul(data.ccFactor.y, this.sampleClearcoatRoughnessTexture(scope).g), 0, 1);
         }
       }
     }
     calculateEmissiveColor(scope: PBInsideFunctionScope): PBShaderExp {
       const pb = scope.$builder;
       if (this.emissiveTexture){
-        return pb.mul(pb.textureSample(this.getEmissiveTextureUniform(scope), this.getEmissiveTexCoord(scope)).rgb, scope.kkEmissiveFactor.rgb, scope.kkEmissiveFactor.a);
+        return pb.mul(this.sampleEmissiveTexture(scope).rgb, scope.kkEmissiveFactor.rgb, scope.kkEmissiveFactor.a);
       } else {
         return pb.mul(scope.kkEmissiveFactor.rgb, scope.kkEmissiveFactor.a);
       }
@@ -370,7 +367,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         }
         const envLightStrength = ShaderFramework.getEnvLightStrength(this);
         if (that.occlusionTexture){
-          const occlusionSample = pb.textureSample(that.getOcclusionTextureUniform(this), that.getOcclusionTexCoord(this)).r;
+          const occlusionSample = that.sampleOcclusionTexture(this).r;
           this.$l.occlusion = pb.mul(pb.add(pb.mul(this.kkOcclusionStrength, pb.sub(occlusionSample, 1)), 1), envLightStrength);
         } else {
           this.$l.occlusion = envLightStrength;

@@ -27,7 +27,7 @@ export class GrassMaterial extends Material {
   /** @internal */
   private _useAlphaToCoverage: boolean;
   /**
-   * Creates an instance of TerrainMaterial
+   * Creates an instance of GrassMaterial
    */
   constructor(terrainSize: Vector2, normalMap: Texture2D, grassTexture?: Texture2D) {
     super();
