@@ -38,7 +38,6 @@ myApp.ready().then(async () => {
         roughness: [0.95, 0.9, 0.7]
       }
     });
-    terrain.material.albedoTexture = albedoMap;
     terrain.castShadow = true;
     return terrain;
   }

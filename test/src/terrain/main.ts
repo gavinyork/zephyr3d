@@ -98,7 +98,6 @@ terrainApp.ready().then(async () => {
         ]
       }
     });
-    terrain.material.albedoTexture = albedoMap;
     terrain.maxPixelError = 6;
     terrain.castShadow = true;
     return terrain;

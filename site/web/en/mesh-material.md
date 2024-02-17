@@ -58,18 +58,18 @@ const assetManager = new AssetManager();
 // Creates a PBR material
 const material = new PBRMetallicRoughnessMaterial();
 // metallic 0.9
-material.lightModel.metallic = 0.9;
+material.metallic = 0.9;
 // roughness 0.6
-material.lightModel.roughness = 0.6;
+material.roughness = 0.6;
 // Adds the diffuse texture
 assetManager.fetchTexture('assets/images/earthcolor.jpg').then(texture => {
-  material.lightModel.setAlbedoMap(texture, null, 0);
+  material.albedoTexture = texture;
 });
 // Adds the normal map
 assetManager.fetchTexture('assets/images/earthnormal.png', {
   linearColorSpace: true
 }).then(texture => {
-  material.lightModel.setNormalMap(texture, null, 0);
+  material.normalTexture = texture;
 });
 
 ```

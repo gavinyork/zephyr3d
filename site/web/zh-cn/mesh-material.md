@@ -60,18 +60,18 @@ const assetManager = new AssetManager();
 // 创建一个PBR材质
 const material = new PBRMetallicRoughnessMaterial();
 // 金属度 0.9
-material.lightModel.metallic = 0.9;
+material.metallic = 0.9;
 // 粗糙度 0.6
-material.lightModel.roughness = 0.6;
+material.roughness = 0.6;
 // 添加diffuse贴图
 assetManager.fetchTexture('assets/images/earthcolor.jpg').then(texture => {
-  material.lightModel.setAlbedoMap(texture, null, 0);
+  material.albedoTexture = texture;
 });
 // 添加法线贴图
 assetManager.fetchTexture('assets/images/earthnormal.png', {
   linearColorSpace: true
 }).then(texture => {
-  material.lightModel.setNormalMap(texture, null, 0);
+  material.normalTexture = texture;
 });
 
 ```
