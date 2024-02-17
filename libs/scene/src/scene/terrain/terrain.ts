@@ -5,13 +5,13 @@ import { Quadtree } from './quadtree';
 import { GraphNode } from '../graph_node';
 import { Application } from '../../app';
 import { GrassManager } from './grass';
-import { GrassMaterial } from '../../material/grassmaterial';
 import type { Camera } from '../../camera/camera';
 import type { BoundingVolume } from '../../utility/bounding_volume';
 import type { CullVisitor } from '../../render/cull_visitor';
 import type { Scene } from '../scene';
 import type { QuadtreeNode } from './quadtree';
-import { TerrainMaterial, type TerrainLightModelOptions } from '../../material/terrainmaterial';
+import { TerrainMaterial, type TerrainMaterialOptions } from '../../material/terrainmaterial';
+import { GrassMaterial } from '../../material/grassmaterial';
 
 /**
  * Terrain node
@@ -179,7 +179,7 @@ export class Terrain extends GraphNode {
     elevations: Float32Array,
     scale: Vector3,
     patchSize: number,
-    options?: TerrainLightModelOptions
+    options?: TerrainMaterialOptions
   ): boolean {
     this._quadtree = new Quadtree(this);
     if (options?.splatMap && options.splatMap.format !== 'rgba8unorm') {
@@ -252,14 +252,10 @@ export class Terrain extends GraphNode {
     if (!this._grassMaterial) {
       this._grassMaterial = new GrassMaterial(
         new Vector2(this.scaledWidth, this.scaledHeight),
-        this._quadtree.normalMap
+        this._quadtree.normalMap,
+        grassTexture
       );
     }
-    this._grassMaterial = new GrassMaterial(
-      new Vector2(this.scaledWidth, this.scaledHeight),
-      this._quadtree.normalMap,
-      grassTexture
-    );
     this._grassMaterial.stateSet.useRasterizerState().setCullMode('none');
     this._grassManager.addGrassLayer(
       Application.instance.device,

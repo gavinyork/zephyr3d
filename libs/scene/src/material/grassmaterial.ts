@@ -1,82 +1,37 @@
-import type { Texture2D, BindGroup, GPUProgram, ProgramBuilder } from '@zephyr3d/device';
-import { Material } from './material';
-import { forwardComputeLighting } from '../shaders/lighting';
-import { RENDER_PASS_TYPE_SHADOWMAP, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_DEPTH_ONLY } from '../values';
-import { ShaderFramework } from '../shaders/framework';
-import { encodeNormalizedFloatToRGBA, nonLinearDepthToLinearNormalized } from '../shaders/misc';
-import { Application } from '../app';
-import { PBRLightModelMR } from '.';
-import type { DrawContext } from '../render/drawable';
-import type { ShadowMapPass } from '../render';
 import { Vector2, Vector4 } from '@zephyr3d/base';
-import { MESH_MATERIAL } from '../shaders/builtins';
+import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
+import { mixinLight } from './mixins/lit';
+import { mixinPBRMetallicRoughness } from './mixins/pbr/metallicroughness';
+import type {
+  BindGroup,
+  PBFunctionScope,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  Texture2D
+} from '@zephyr3d/device';
+import type { DrawContext } from '../render';
 
-/**
- * The terrain material
- * @public
- */
-export class GrassMaterial extends Material {
-  /** @internal */
-  private _lightModel: PBRLightModelMR;
+export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight, mixinPBRMetallicRoughness) {
   /** @internal */
   private _terrainSize: Vector2;
   /** @internal */
-  private _normalMap: Texture2D;
+  private _terrainNormalMap: Texture2D;
   /** @internal */
   private _textureSize: Vector2;
-  /** @internal */
-  private _useAlphaToCoverage: boolean;
-  /**
-   * Creates an instance of GrassMaterial
-   */
   constructor(terrainSize: Vector2, normalMap: Texture2D, grassTexture?: Texture2D) {
     super();
-    this._lightModel = new PBRLightModelMR();
-    this._lightModel.metallic = 0;
-    this._lightModel.roughness = 1;
-    this._lightModel.specularFactor = new Vector4(1, 1, 1, 0.2);
-    this._lightModel.doubleSideLighting = false;
+    this.metallic = 0;
+    this.roughness = 1;
+    this.specularFactor = new Vector4(1, 1, 1, 0.2);
+    this.doubleSidedLighting = false;
+    this.vertexNormal = false;
     this._terrainSize = terrainSize;
-    this._normalMap = normalMap;
+    this._terrainNormalMap = normalMap;
     this._textureSize = Vector2.one();
-    this._useAlphaToCoverage = false;
     if (grassTexture) {
-      this._lightModel.setAlbedoMap(grassTexture, null, 0);
+      this.albedoTexture = grassTexture;
       this._textureSize.setXY(grassTexture.width, grassTexture.height);
     }
-  }
-  /** enable alpha to coverage */
-  get alphaToCoverage(): boolean {
-    return this._useAlphaToCoverage;
-  }
-  set alphaToCoverage(val: boolean) {
-    if (this._useAlphaToCoverage !== !!val) {
-      this._useAlphaToCoverage = !!val;
-      if (this._useAlphaToCoverage) {
-        this.stateSet.useBlendingState().enableAlphaToCoverage(true);
-      } else {
-        this.stateSet.defaultBlendingState();
-      }
-      this.optionChanged(true);
-    }
-  }
-  /** Light model */
-  get lightModel(): PBRLightModelMR {
-    return this._lightModel;
-  }
-  /** Base map */
-  get colorMap(): Texture2D {
-    return this._lightModel.albedoMap;
-  }
-  set colorMap(tex: Texture2D) {
-    this._lightModel.setAlbedoMap(tex, null, 0);
-  }
-  /** Color */
-  get color(): Vector4 {
-    return this._lightModel.albedo;
-  }
-  set color(val: Vector4) {
-    this._lightModel.albedo = val;
   }
   /**
    * {@inheritDoc Material.isTransparent}
@@ -90,198 +45,119 @@ export class GrassMaterial extends Material {
    * @override
    */
   supportLighting(): boolean {
-    return this._lightModel.supportLighting();
+    return true;
   }
-  /**
-   * {@inheritDoc Material.applyUniforms}
-   * @override
-   */
-  applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean): void {
-    super.applyUniforms(bindGroup, ctx, needUpdate);
-    this._lightModel.applyUniformsIfOutdated(bindGroup, ctx);
-  }
-  /**
-   * {@inheritDoc Material._applyUniforms}
-   * @override
-   */
-  protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void {
-    bindGroup.setValue('terrainSize', this._terrainSize);
-    bindGroup.setTexture('terrainNormalMap', this._normalMap);
-    bindGroup.setValue('albedoTextureSize', this._textureSize);
-  }
-  /** @internal */
-  protected getHash(renderPassType: number): string {
-    if (this._hash[renderPassType] === void 0 || !this._lightModel.peekHash()) {
-      this._hash[renderPassType] = this.createHash(renderPassType);
-    }
-    return this._hash[renderPassType];
-  }
-  /** @internal */
-  protected _createHash(renderPassType: number): string {
-    return renderPassType === RENDER_PASS_TYPE_FORWARD
-      ? `${Number(this._useAlphaToCoverage)}:${this._lightModel.getHash()}`
-      : `${Number(this._useAlphaToCoverage)}`;
-  }
-  /** @internal */
-  protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram {
-    const that = this;
-    if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
-      const shadowMapParams = ctx.shadowMapInfo.get((ctx.renderPass as ShadowMapPass).light);
-      pb.emulateDepthClamp = !!shadowMapParams.depthClampEnabled;
-    }
-    const program = pb.buildRenderProgram({
-      vertex(pb) {
-        ShaderFramework.prepareVertexShader(pb, ctx);
-        this.$inputs.pos = pb.vec3().attrib('position');
-        this.$inputs.uv = pb.vec2().attrib('texCoord0');
-        this.$inputs.placement = pb.vec4().attrib('texCoord1');
-        this.terrainNormalMap = pb.tex2D().uniform(2);
-        this.terrainSize = pb.vec2().uniform(2);
-        that._lightModel.setupUniforms(this, ctx);
-        pb.main(function () {
-          this.$l.normalSample =
-            pb.getDevice().type === 'webgl'
-              ? pb.textureSample(this.terrainNormalMap, pb.div(this.$inputs.placement.xz, this.terrainSize))
-                  .rgb
-              : pb.textureSampleLevel(
-                  this.terrainNormalMap,
-                  pb.div(this.$inputs.placement.xz, this.terrainSize),
-                  0
-                ).rgb;
-          this.$l.normal = pb.normalize(pb.sub(pb.mul(this.normalSample, 2), pb.vec3(1)));
-          this.$l.axisX = pb.vec3(1, 0, 0);
-          this.$l.axisZ = pb.cross(this.axisX, this.normal);
-          this.$l.axisX = pb.cross(this.normal, this.axisZ);
-          this.$l.rotPos = pb.mul(pb.mat3(this.axisX, this.normal, this.axisZ), this.$inputs.pos);
-          this.$l.p = pb.vec4(pb.add(this.rotPos, this.$inputs.placement.xyz), 1);
-          this.$outputs.texcoord0 = this.$inputs.uv;
-          this.$outputs.worldPosition = pb
-            .mul(ShaderFramework.getWorldMatrix(this), this.$l.p)
-            .tag(ShaderFramework.USAGE_WORLD_POSITION);
-          ShaderFramework.setClipSpacePosition(
-            this,
-            pb.mul(ShaderFramework.getViewProjectionMatrix(this), this.$outputs.worldPosition)
-          );
-          if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
-            this.$outputs.worldNormal = pb
-              .normalize(pb.mul(ShaderFramework.getWorldMatrix(this), pb.vec4(this.normal, 0)).xyz)
-              .tag(ShaderFramework.USAGE_WORLD_NORMAL);
-            this.$outputs.outVertexColor = pb.vec4(1, 1, 1, 1).tag(ShaderFramework.USAGE_VERTEX_COLOR);
-          }
-        });
-      },
-      fragment(pb) {
-        ShaderFramework.prepareFragmentShader(pb, ctx);
-        that._lightModel.setupUniforms(this, ctx);
-        this.albedoTextureSize = pb.vec2().uniform(2);
-        this.$outputs.outColor = pb.vec4();
-        pb.func('calcMipLevel', [pb.vec2('coord')], function () {
-          this.$l.dx = pb.dpdx(this.coord);
-          this.$l.dy = pb.dpdy(this.coord);
-          this.$l.deltaMaxSqr = pb.max(pb.dot(this.dx, this.dx), pb.dot(this.dy, this.dy));
-          this.$return(pb.max(0, pb.mul(pb.log2(this.deltaMaxSqr), 0.5)));
-        });
-        if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
-          pb.main(function () {
-            this.$l.litColor = forwardComputeLighting(this, that._lightModel, ctx);
-            MESH_MATERIAL.DISCARD_IF_CLIPPED(this);
-            this.$l.a = pb.mul(
-              this.litColor.a,
-              pb.add(
-                1,
-                pb.mul(
-                  pb.max(0, this.calcMipLevel(pb.mul(this.$inputs.texcoord0, this.albedoTextureSize))),
-                  0.25
-                )
-              )
-            );
-            if (that._useAlphaToCoverage) {
-              // alpha to coverage
-              this.a = pb.add(
-                pb.div(pb.sub(this.litColor.a, 0.4), pb.max(pb.fwidth(this.litColor.a), 0.0001)),
-                0.5
-              );
-              this.litColor = pb.vec4(this.litColor.rgb, this.a); //pb.vec4(pb.mul(this.litColor.rgb, this.litColor.a), this.litColor.a);
-            } else {
-              // alpha test
-              this.$if(pb.lessThan(this.a, 0.8), function () {
-                pb.discard();
-              });
-            }
-            MESH_MATERIAL.APPLY_FOG(this, this.litColor, ctx);
-            this.$outputs.outColor = MESH_MATERIAL.FRAGMENT_OUTPUT(this, this.litColor);
-          });
-        } else if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH_ONLY) {
-          pb.main(function () {
-            this.$l.litColor = that._lightModel.calculateAlbedo(this);
-            MESH_MATERIAL.DISCARD_IF_CLIPPED(this);
-            this.$l.a = pb.mul(
-              this.litColor.a,
-              pb.add(
-                1,
-                pb.mul(
-                  pb.max(0, this.calcMipLevel(pb.mul(this.$inputs.texcoord0, this.albedoTextureSize))),
-                  0.25
-                )
-              )
-            );
-            if (that._useAlphaToCoverage) {
-              // alpha to coverage
-              this.a = pb.add(
-                pb.div(pb.sub(this.litColor.a, 0.4), pb.max(pb.fwidth(this.litColor.a), 0.0001)),
-                0.5
-              );
-              this.litColor = pb.vec4(this.litColor.rgb, this.a); //pb.vec4(pb.mul(this.litColor.rgb, this.litColor.a), this.litColor.a);
-            } else {
-              // alpha test
-              this.$if(pb.lessThan(this.a, 0.8), function () {
-                pb.discard();
-              });
-            }
-            this.$l.depth = nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
-            if (Application.instance.device.type === 'webgl') {
-              this.$outputs.outColor = encodeNormalizedFloatToRGBA(this, this.depth);
-            } else {
-              this.$outputs.outColor = pb.vec4(this.depth, 0, 0, this.a);
-            }
-          });
-        } else if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
-          pb.main(function () {
-            this.$l.litColor = that._lightModel.calculateAlbedo(this);
-            MESH_MATERIAL.DISCARD_IF_CLIPPED(this);
-            this.$l.a = pb.mul(
-              this.litColor.a,
-              pb.add(
-                1,
-                pb.mul(
-                  pb.max(0, this.calcMipLevel(pb.mul(this.$inputs.texcoord0, this.albedoTextureSize))),
-                  0.25
-                )
-              )
-            );
-            if (that._useAlphaToCoverage) {
-              // alpha to coverage
-              this.a = pb.add(
-                pb.div(pb.sub(this.litColor.a, 0.4), pb.max(pb.fwidth(this.litColor.a), 0.0001)),
-                0.5
-              );
-              this.litColor = pb.vec4(this.litColor.rgb, this.a); //pb.vec4(pb.mul(this.litColor.rgb, this.litColor.a), this.litColor.a);
-            } else {
-              // alpha test
-              this.$if(pb.lessThan(this.a, 0.8), function () {
-                pb.discard();
-              });
-            }
-            const shadowMapParams = ctx.shadowMapInfo.get((ctx.renderPass as ShadowMapPass).light);
-            this.$outputs.outColor = shadowMapParams.impl.computeShadowMapDepth(shadowMapParams, this);
-          });
-        } else {
-          throw new Error(`unknown render pass type: ${ctx.renderPass.type}`);
-        }
-      }
+  calculateObjectSpacePosition(
+    scope: PBInsideFunctionScope,
+    pos: PBShaderExp,
+    skinMatrix: PBShaderExp
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    const funcName = 'kkGetDisplacedPosition';
+    pb.func(funcName, [pb.vec3('pos'), pb.vec4('placement'), pb.vec3('normal')], function () {
+      this.$l.axisX = pb.vec3(1, 0, 0);
+      this.$l.axisZ = pb.cross(this.axisX, this.normal);
+      this.$l.axisX = pb.cross(this.normal, this.axisZ);
+      this.$l.rotPos = pb.mul(pb.mat3(this.axisX, this.normal, this.axisZ), this.pos);
+      this.$return(pb.add(this.rotPos, this.placement.xyz));
     });
-    // console.log(program?.getShaderSource('vertex'));
-    // console.log(program?.getShaderSource('fragment'));
-    return program;
+    return scope.$g[funcName](scope.$inputs.pos, scope.$inputs.placement, scope.kkNormal);
+  }
+  calculateObjectSpaceNormal(
+    scope: PBInsideFunctionScope,
+    normal: PBShaderExp,
+    skinMatrix: PBShaderExp
+  ): PBShaderExp {
+    return scope.kkNormal;
+  }
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
+    super.applyUniformValues(bindGroup, ctx);
+    bindGroup.setTexture('kkTerrainNormalMap', this._terrainNormalMap);
+    bindGroup.setValue('kkTerrainSize', this._terrainSize);
+    if (this.needFragmentColor(ctx)) {
+      bindGroup.setValue('albedoTextureSize', this._textureSize);
+    }
+  }
+  vertexShader(scope: PBFunctionScope): void {
+    super.vertexShader(scope);
+    const pb = scope.$builder;
+    scope.$inputs.pos = pb.vec3().attrib('position');
+    scope.$inputs.placement = pb.vec4().attrib('texCoord1');
+    scope.$g.kkTerrainNormalMap = pb.tex2D().uniform(2);
+    scope.$g.kkTerrainSize = pb.vec2().uniform(2);
+    scope.$g.kkNormal = pb.vec3();
+    const normalSample = pb.textureSampleLevel(
+      scope.kkTerrainNormalMap,
+      pb.div(scope.$inputs.placement.xz, scope.kkTerrainSize),
+      0
+    ).rgb;
+    scope.kkNormal = pb.normalize(pb.sub(pb.mul(normalSample, 2), pb.vec3(1)));
+    this.transformVertexAndNormal(scope);
+  }
+  fragmentShader(scope: PBFunctionScope): void {
+    super.fragmentShader(scope);
+    const pb = scope.$builder;
+    const that = this;
+    if (this.needFragmentColor()) {
+      scope.$g.albedoTextureSize = pb.vec2().uniform(2);
+      pb.func('calcMipLevel', [pb.vec2('coord')], function () {
+        this.$l.dx = pb.dpdx(this.coord);
+        this.$l.dy = pb.dpdy(this.coord);
+        this.$l.deltaMaxSqr = pb.max(pb.dot(this.dx, this.dx), pb.dot(this.dy, this.dy));
+        this.$return(pb.max(0, pb.mul(pb.log2(this.deltaMaxSqr), 0.5)));
+      });
+      scope.$l.albedo = this.calculateAlbedoColor(scope);
+      scope.$l.normalInfo = this.calculateNormalAndTBN(scope);
+      scope.$l.normal = scope.normalInfo.normal;
+      scope.$l.viewVec = this.calculateViewVector(scope);
+      scope.$l.pbrData = this.getCommonData(scope, scope.albedo, scope.viewVec, scope.normalInfo.TBN);
+      scope.$l.lightingColor = pb.vec3(0);
+      scope.$l.emissiveColor = this.calculateEmissiveColor(scope);
+      this.indirectLighting(scope, scope.normal, scope.viewVec, scope.pbrData, scope.lightingColor);
+      this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, shadow) {
+        this.$l.diffuse = pb.vec3();
+        this.$l.specular = pb.vec3();
+        this.$l.lightAtten = that.calculateLightAttenuation(this, type, posRange, dirCutoff);
+        this.$l.lightDir = that.calculateLightDirection(this, type, posRange, dirCutoff);
+        this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
+        this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
+        if (shadow) {
+          this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.NoL));
+        }
+        that.directLighting(
+          this,
+          this.lightDir,
+          this.lightColor,
+          this.normal,
+          this.viewVec,
+          this.pbrData,
+          this.lightingColor
+        );
+      });
+      scope.$l.litColor = pb.add(scope.lightingColor, scope.emissiveColor);
+      scope.albedo.a = pb.mul(
+        scope.albedo.a,
+        pb.add(
+          1,
+          pb.mul(
+            pb.max(0, scope.$g.calcMipLevel(pb.mul(that.getAlbedoTexCoord(scope), scope.albedoTextureSize))),
+            0.25
+          )
+        )
+      );
+      if (that.alphaToCoverage) {
+        scope.albedo.a = pb.add(
+          pb.div(pb.sub(scope.albedo.a, 0.4), pb.max(pb.fwidth(scope.albedo.a), 0.0001)),
+          0.5
+        );
+      } else {
+        scope.$if(pb.lessThan(scope.albedo.a, 0.8), function () {
+          pb.discard();
+        });
+      }
+      this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a));
+    } else {
+      this.outputFragmentColor(scope, null);
+    }
   }
 }

@@ -3,7 +3,7 @@ import { Vector4 } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import { BoxFrameShape } from '../shapes';
 import type { Material } from '../material';
-import { LambertLightModel, StandardMaterial } from '../material';
+import { LambertMaterial } from '../material';
 import type { RenderPass, Primitive, BatchDrawable, DrawContext } from '../render';
 import { Application } from '../app';
 import type { Texture2D } from '@zephyr3d/device';
@@ -239,14 +239,13 @@ export class Mesh extends GraphNode implements BatchDrawable {
     this.invalidateBoundingVolume();
   }
   /** @internal */
-  private static _defaultMaterial: StandardMaterial = null;
+  private static _defaultMaterial: Material = null;
   /** @internal */
   private static _defaultBoxFrame: Primitive = null;
   /** @internal */
-  private static _getDefaultMaterial(): StandardMaterial {
+  private static _getDefaultMaterial(): Material {
     if (!this._defaultMaterial) {
-      this._defaultMaterial = new StandardMaterial();
-      this._defaultMaterial.lightModel = new LambertLightModel();
+      this._defaultMaterial = new LambertMaterial();
     }
     return this._defaultMaterial;
   }

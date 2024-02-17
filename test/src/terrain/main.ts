@@ -99,27 +99,8 @@ terrainApp.ready().then(async () => {
       }
     });
     terrain.material.albedoTexture = albedoMap;
-    //terrain.material.lightModel.setNormalMap(normalMap, null, -1);
     terrain.maxPixelError = 6;
     terrain.castShadow = true;
-    /*
-    const detailMask = splatMap;
-    const data = new Uint8Array(detailMask.width * detailMask.height * 4);
-    await detailMask.readPixels(0, 0, detailMask.width, detailMask.height, 0, 0, data);
-    const density = [] as number[][];
-    for (let i = 0; i < detailMask.height; i++) {
-      const row = [] as number[];
-      for (let j = 0; j < detailMask.width; j++) {
-        const val = data[i * 4 * detailMask.width + j * 4] / 255;
-        //row.push(val > 0.8 ? Math.random() * 0.5 * val : 0);
-        row.push(Math.random() * 0.3);
-        //row.push(val > 0.8 ? 1 : 0);
-      }
-      density.push(row);
-    }
-    terrain.createGrass(density, 4, 2, -0.3, grassMap1);
-    //terrain.createGrass(density, 3, 6, 0, grassMap2);
-    */
     return terrain;
   }
 

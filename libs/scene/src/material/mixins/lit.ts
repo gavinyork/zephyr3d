@@ -1,9 +1,4 @@
-import type {
-  BindGroup,
-  PBFunctionScope,
-  PBInsideFunctionScope,
-  PBShaderExp,
-} from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import {
   LIGHT_TYPE_DIRECTIONAL,
   LIGHT_TYPE_POINT,
@@ -13,9 +8,12 @@ import {
 import { ShaderFramework, nonLinearDepthToLinear } from '../../shaders';
 import type { DrawContext } from '../../render';
 import { Application } from '../../app';
-import { MeshMaterial, applyMaterialMixins } from '../meshmaterial';
-import { TextureMixinInstanceTypes, mixinTextureProps } from './texture';
-import { IMixinAlbedoColor, mixinAlbedoColor } from './albedocolor';
+import type { MeshMaterial } from '../meshmaterial';
+import { applyMaterialMixins } from '../meshmaterial';
+import type { TextureMixinInstanceTypes } from './texture';
+import { mixinTextureProps } from './texture';
+import type { IMixinAlbedoColor } from './albedocolor';
+import { mixinAlbedoColor } from './albedocolor';
 
 export type IMixinLight = {
   normalScale: number;
@@ -23,17 +21,12 @@ export type IMixinLight = {
   doubleSidedLighting: boolean;
   vertexNormal: boolean;
   vertexTangent: boolean;
-  needCalculateEnvLight(ctx: DrawContext): boolean;
-  getEnvLightIrradiance(
-    scope: PBInsideFunctionScope,
-    normal: PBShaderExp,
-    ctx: DrawContext
-  ): PBShaderExp;
+  needCalculateEnvLight(): boolean;
+  getEnvLightIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
   getEnvLightRadiance(
     scope: PBInsideFunctionScope,
     reflectVec: PBShaderExp,
-    roughness: PBShaderExp,
-    ctx: DrawContext
+    roughness: PBShaderExp
   ): PBShaderExp;
   calculateViewVector(scope: PBInsideFunctionScope): PBShaderExp;
   calculateReflectionVector(
@@ -41,8 +34,8 @@ export type IMixinLight = {
     normal: PBShaderExp,
     viewVec: PBShaderExp
   ): PBShaderExp;
-  calculateNormal(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp;
-  calculateNormalAndTBN(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp;
+  calculateNormal(scope: PBInsideFunctionScope): PBShaderExp;
+  calculateNormalAndTBN(scope: PBInsideFunctionScope): PBShaderExp;
   calculateLightAttenuation(
     scope: PBInsideFunctionScope,
     type: PBShaderExp,
@@ -55,10 +48,9 @@ export type IMixinLight = {
     posRange: PBShaderExp,
     dirCutoff: PBShaderExp
   ): PBShaderExp;
-  calculateShadow(scope: PBInsideFunctionScope, NoL: PBShaderExp, ctx: DrawContext): PBShaderExp;
+  calculateShadow(scope: PBInsideFunctionScope, NoL: PBShaderExp): PBShaderExp;
   forEachLight(
     scope: PBInsideFunctionScope,
-    ctx: DrawContext,
     callback: (
       this: PBInsideFunctionScope,
       type: PBShaderExp,
@@ -68,17 +60,14 @@ export type IMixinLight = {
       shadow: boolean
     ) => void
   ): void;
-} & TextureMixinInstanceTypes<['normal']> & IMixinAlbedoColor;
+} & TextureMixinInstanceTypes<['normal']> &
+  IMixinAlbedoColor;
 
 export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).lightMixed) {
     return BaseCls as T & { new (...args: any[]): IMixinLight };
   }
-  const S = applyMaterialMixins(
-    BaseCls,
-    mixinAlbedoColor,
-    mixinTextureProps('normal'),
-  );
+  const S = applyMaterialMixins(BaseCls, mixinAlbedoColor, mixinTextureProps('normal'));
   const FEATURE_DOUBLE_SIDED_LIGHTING = S.NEXT_FEATURE_INDEX;
   const FEATURE_VERTEX_NORMAL = S.NEXT_FEATURE_INDEX + 1;
   const FEATURE_VERTEX_TANGENT = S.NEXT_FEATURE_INDEX + 2;
@@ -160,10 +149,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     /**
      * Calculate the normal vector for current fragment
      * @param scope - The shader scope
-     * @param ctx - The drawing context
      * @returns Normal vector for current fragment
      */
-    calculateNormal(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp {
+    calculateNormal(scope: PBInsideFunctionScope): PBShaderExp {
       const pb = scope.$builder;
       const that = this;
       const args: PBShaderExp[] = [];
@@ -244,16 +232,19 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
             pb.normalize(this.worldNormal)
           );
         }
-        if (
-          ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD &&
-          that.normalTexture
-        ) {
+        if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD && that.normalTexture) {
           if (that.normalMapMode === 'object-space') {
-            const pixel = pb.sub(pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2), pb.vec3(1));
+            const pixel = pb.sub(
+              pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
+              pb.vec3(1)
+            );
             const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.kkNormalScale).xx, 1));
             this.$return(pb.normalize(normalTex));
           } else {
-            const pixel = pb.sub(pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2), pb.vec3(1));
+            const pixel = pb.sub(
+              pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
+              pb.vec3(1)
+            );
             const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.kkNormalScale).xx, 1));
             this.$return(pb.normalize(pb.mul(this.TBN, normalTex)));
           }
@@ -265,11 +256,11 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     /**
      * Calculate the normal vector for current fragment
+     *
      * @param scope - The shader scope
-     * @param ctx - The drawing context
      * @returns Structure that contains normal vector and TBN matrix
      */
-    calculateNormalAndTBN(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp {
+    calculateNormalAndTBN(scope: PBInsideFunctionScope): PBShaderExp {
       const pb = scope.$builder;
       const NormalStruct = pb.defineStruct([pb.mat3('TBN'), pb.vec3('normal')]);
       const that = this;
@@ -351,16 +342,19 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
             pb.normalize(this.worldNormal)
           );
         }
-        if (
-          ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD &&
-          that.normalTexture
-        ) {
+        if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD && that.normalTexture) {
           if (that.normalMapMode === 'object-space') {
-            const pixel = pb.sub(pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2), pb.vec3(1));
+            const pixel = pb.sub(
+              pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
+              pb.vec3(1)
+            );
             const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.kkNormalScale).xx, 1));
             this.$return(NormalStruct(this.TBN, pb.normalize(normalTex)));
           } else {
-            const pixel = pb.sub(pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2), pb.vec3(1));
+            const pixel = pb.sub(
+              pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
+              pb.vec3(1)
+            );
             const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.kkNormalScale).xx, 1));
             this.$return(NormalStruct(this.TBN, pb.normalize(pb.mul(this.TBN, normalTex))));
           }
@@ -385,33 +379,27 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     /**
      * Check if the environment lighting should be calculated.
      *
-     * @param ctx - Draw context
      * @returns true Environment lighting should be calculated, otherwise false
      */
-    needCalculateEnvLight(ctx: DrawContext): boolean {
-      return ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD && ctx.drawEnvLight;
+    needCalculateEnvLight(): boolean {
+      return this.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD && this.drawContext.drawEnvLight;
     }
     /**
      * Get irradiance of current environment light
      *
      * @param scope - Shader scope
      * @param normal - Fragment normal vector
-     * @param ctx - The drawing context
      *
      * @returns Irradiance of current environment light of type vec3
      */
-    getEnvLightIrradiance(
-      scope: PBInsideFunctionScope,
-      normal: PBShaderExp,
-      ctx: DrawContext
-    ): PBShaderExp {
-      if (!this.needCalculateEnvLight(ctx)) {
+    getEnvLightIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp {
+      if (!this.needCalculateEnvLight()) {
         console.warn('getEnvLightIrradiance(): No need to calculate environment lighting');
         return scope.$builder.vec3(0);
       }
-      return ctx.env.light.envLight.hasIrradiance()
+      return this.drawContext.env.light.envLight.hasIrradiance()
         ? scope.$builder.mul(
-            ctx.env.light.envLight.getIrradiance(scope, normal).rgb,
+            this.drawContext.env.light.envLight.getIrradiance(scope, normal).rgb,
             ShaderFramework.getEnvLightStrength(scope)
           )
         : scope.$builder.vec3(0);
@@ -422,50 +410,50 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      * @param scope - Shader scope
      * @param reflectVec - The reflection vector
      * @param roughness - Roughness value of current fragment
-     * @param ctx - The drawing context
      *
      * @returns Radiance of current environment light of type vec3
      */
     getEnvLightRadiance(
       scope: PBInsideFunctionScope,
       reflectVec: PBShaderExp,
-      roughness: PBShaderExp,
-      ctx: DrawContext
+      roughness: PBShaderExp
     ): PBShaderExp {
-      if (!this.needCalculateEnvLight(ctx)) {
+      if (!this.needCalculateEnvLight()) {
         console.warn('getEnvLightRadiance(): No need to calculate environment lighting');
         return scope.$builder.vec3(0);
       }
-      return ctx.env.light.envLight.hasRadiance()
+      return this.drawContext.env.light.envLight.hasRadiance()
         ? scope.$builder.mul(
-            ctx.env.light.envLight.getRadiance(scope, reflectVec, roughness).rgb,
+            this.drawContext.env.light.envLight.getRadiance(scope, reflectVec, roughness).rgb,
             ShaderFramework.getEnvLightStrength(scope)
           )
         : scope.$builder.vec3(0);
     }
     /**
      * Checks if shadow should be computed
-     * @param ctx - The drawing context
+     *
      * @returns true if shadow should be computed, other wise false
      */
-    protected needCalucateShadow(ctx: DrawContext): boolean {
-      return ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD && !!ctx.currentShadowLight;
+    protected needCalucateShadow(): boolean {
+      return (
+        this.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD && !!this.drawContext.currentShadowLight
+      );
     }
     /**
      * Calculates shadow of current fragment
      *
      * @param scope - Shader scope
      * @param NoL - NdotL vector
-     * @param ctx - The drawing context
      * @returns Shadow of current fragment, 1 means no shadow and 0 means full shadowed.
      */
-    calculateShadow(scope: PBInsideFunctionScope, NoL: PBShaderExp, ctx: DrawContext): PBShaderExp {
+    calculateShadow(scope: PBInsideFunctionScope, NoL: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
-      if (!this.needCalucateShadow(ctx)) {
+      const that = this;
+      if (!this.needCalucateShadow()) {
         console.warn('calculateShadow(): No need to calculate shadow');
         return pb.float(1);
       }
-      const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
+      const shadowMapParams = this.drawContext.shadowMapInfo.get(this.drawContext.currentShadowLight);
       const funcName = 'lm_calculateCSM';
       pb.func(funcName, [pb.float('NoL')], function () {
         if (shadowMapParams.numShadowCascades > 1) {
@@ -492,7 +480,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           } else {
             this.$l.shadowVertex = ShaderFramework.calculateShadowSpaceVertex(this, this.split);
           }
-          const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
+          const shadowMapParams = that.drawContext.shadowMapInfo.get(that.drawContext.currentShadowLight);
           this.$l.shadow = shadowMapParams.impl.computeShadowCSM(
             shadowMapParams,
             this,
@@ -513,7 +501,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$return(this.shadow);
         } else {
           this.$l.shadowVertex = ShaderFramework.calculateShadowSpaceVertex(this);
-          const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
+          const shadowMapParams = that.drawContext.shadowMapInfo.get(that.drawContext.currentShadowLight);
           this.$l.shadow = shadowMapParams.impl.computeShadow(
             shadowMapParams,
             this,
@@ -617,7 +605,6 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     forEachLight(
       scope: PBInsideFunctionScope,
-      ctx: DrawContext,
       callback: (
         this: PBInsideFunctionScope,
         type: PBShaderExp,
@@ -629,10 +616,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     ) {
       const pb = scope.$builder;
       const that = this;
-      if (ctx.renderPass.type !== RENDER_PASS_TYPE_FORWARD) {
+      if (that.drawContext.renderPass.type !== RENDER_PASS_TYPE_FORWARD) {
         console.warn('LitMaterialXX.forEachLight(): must be called in forward render pass');
       }
-      if (ctx.currentShadowLight) {
+      if (that.drawContext.currentShadowLight) {
         const posRange = scope.global.light.positionAndRange;
         const dirCutoff = scope.global.light.directionAndCutoff;
         const colorIntensity = scope.global.light.diffuseAndIntensity;
@@ -753,12 +740,11 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      * Vertex shader implementation.
      *
      * @param scope - Shader scope
-     * @param ctx - The drawing context
      */
-    vertexShader(scope: PBFunctionScope, ctx: DrawContext): void {
-      super.vertexShader(scope, ctx);
+    vertexShader(scope: PBFunctionScope): void {
+      super.vertexShader(scope);
       const pb = scope.$builder;
-      if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
+      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
         if (this.vertexNormal) {
           scope.$inputs.normal = pb.vec3().attrib('normal');
         }
@@ -771,13 +757,12 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      * Fragment shader implementation
      *
      * @param scope - Shader scope
-     * @param ctx - The drawing context
      * @returns Calucated fragment color
      */
-    fragmentShader(scope: PBFunctionScope, ctx: DrawContext) {
-      super.fragmentShader(scope, ctx);
+    fragmentShader(scope: PBFunctionScope) {
+      super.fragmentShader(scope);
       const pb = scope.$builder;
-      if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
+      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
         if (this.normalTexture) {
           scope.$g.kkNormalScale = pb.float().uniform(2);
         }
@@ -790,6 +775,5 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     supportLighting(): boolean {
       return true;
     }
-  } as unknown as T & { new (...args: any[]): IMixinLight }
+  } as unknown as T & { new (...args: any[]): IMixinLight };
 }
-

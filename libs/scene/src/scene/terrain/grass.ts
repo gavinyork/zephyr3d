@@ -3,13 +3,13 @@ import { Vector2, nextPowerOf2 } from '@zephyr3d/base';
 import { Primitive } from '../../render/primitive';
 import type { BatchDrawable, Drawable, DrawContext } from '../../render/drawable';
 import type { XForm } from '../xform';
-import { GrassMaterial } from '../../material';
 import type { QuadtreeNode } from './quadtree';
 import { Application } from '../../app';
 import type { Camera } from '../../camera/camera';
 import type { AbstractDevice, IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
 import type { Terrain } from './terrain';
 import type { GraphNode } from '../graph_node';
+import { GrassMaterial } from '../../material/grassmaterial';
 
 export class GrassCluster implements Drawable {
   private _primitive: Primitive;

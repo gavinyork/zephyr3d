@@ -1,7 +1,7 @@
-import { Texture2D } from "@zephyr3d/device";
-import { Application } from "../../app";
+import type { Texture2D } from '@zephyr3d/device';
+import { Application } from '../../app';
 
-let ggxLut: Map<number, Texture2D> = new Map();
+const ggxLut: Map<number, Texture2D> = new Map();
 export function getGGXLUT(size: number): Texture2D {
   let lut = ggxLut.get(size);
   if (!lut) {

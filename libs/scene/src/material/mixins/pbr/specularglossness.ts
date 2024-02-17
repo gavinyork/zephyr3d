@@ -46,9 +46,9 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
         this.optionChanged(false);
       }
     }
-    fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void {
-      super.fragmentShader(scope, ctx);
-      if (this.needFragmentColor(ctx)) {
+    fragmentShader(scope: PBFunctionScope): void {
+      super.fragmentShader(scope);
+      if (this.needFragmentColor()) {
         const pb = scope.$builder;
         scope.$g.kkSpecularFactor = pb.vec4().uniform(2);
         scope.$g.kkGlossinessFactor = pb.float().uniform(2);

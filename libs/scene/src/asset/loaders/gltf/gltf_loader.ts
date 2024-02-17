@@ -17,9 +17,7 @@ import { SharedModel, AssetSkeleton, AssetScene } from '../../model';
 import { BoundingBox } from '../../../utility/bounding_volume';
 import { Primitive } from '../../../render/primitive';
 import type { Material as M } from '../../../material';
-import {
-  UnlitMaterial,
-} from '../../../material';
+import { UnlitMaterial } from '../../../material';
 import { ComponentType, GLTFAccessor } from './helpers';
 import { AbstractModelLoader } from '../loader';
 import type {
@@ -636,7 +634,6 @@ export class GLTFLoader extends AbstractModelLoader {
         pbrMaterial.sheen = true;
         pbrMaterial.sheenColorFactor = sheen.sheenColorFactor;
         pbrMaterial.sheenRoughnessFactor = sheen.sheenRoughnessFactor;
-        //pbrMaterial.lightModel.setSheenLut(await assetManager.fetchBuiltinTexture(BUILTIN_ASSET_TEXTURE_SHEEN_LUT));
         if (sheen.sheenColorMap) {
           pbrMaterial.sheenColorTexture = sheen.sheenColorMap.texture;
           pbrMaterial.sheenColorTextureSampler = sheen.sheenColorMap.sampler;

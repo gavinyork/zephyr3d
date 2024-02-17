@@ -2,7 +2,6 @@ import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinAlbedoColor } from './mixins/albedocolor';
 import { mixinVertexColor } from './mixins/vertexcolor';
 import type { PBFunctionScope } from '@zephyr3d/device';
-import type { DrawContext } from '../render';
 
 /**
  * Unlit material
@@ -13,17 +12,17 @@ export class UnlitMaterial extends applyMaterialMixins(MeshMaterial, mixinVertex
   constructor() {
     super();
   }
-  vertexShader(scope: PBFunctionScope, ctx: DrawContext) {
-    super.vertexShader(scope, ctx);
+  vertexShader(scope: PBFunctionScope) {
+    super.vertexShader(scope);
     scope.$inputs.zPos = scope.$builder.vec3().attrib('position');
     this.transformVertexAndNormal(scope);
   }
-  fragmentShader(scope: PBFunctionScope, ctx: DrawContext) {
-    super.fragmentShader(scope, ctx);
-    let color = this.calculateAlbedoColor(scope, ctx);
+  fragmentShader(scope: PBFunctionScope) {
+    super.fragmentShader(scope);
+    let color = this.calculateAlbedoColor(scope);
     if (this.vertexColor) {
-      color = scope.$builder.mul(color, this.getVertexColor(scope, ctx));
+      color = scope.$builder.mul(color, this.getVertexColor(scope));
     }
-    this.outputFragmentColor(scope, this.needFragmentColor(ctx) ? color : null, ctx);
+    this.outputFragmentColor(scope, this.needFragmentColor() ? color : null);
   }
 }

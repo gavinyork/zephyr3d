@@ -1,10 +1,9 @@
 import type { MeshMaterial } from '../meshmaterial';
 import type { PBFunctionScope, PBInsideFunctionScope } from '@zephyr3d/device';
-import type { DrawContext } from '../../render';
 
 export interface IMixinVertexColor {
   vertexColor: boolean;
-  getVertexColor(scope: PBInsideFunctionScope, ctx: DrawContext);
+  getVertexColor(scope: PBInsideFunctionScope);
 }
 
 function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T) {
@@ -25,9 +24,9 @@ function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T) {
     set vertexColor(val: boolean) {
       this.useFeature(FEATURE_VERTEX_COLOR, !!val);
     }
-    vertexShader(scope: PBFunctionScope, ctx: DrawContext): void {
-      super.vertexShader(scope, ctx);
-      if (this.needFragmentColor(ctx)) {
+    vertexShader(scope: PBFunctionScope): void {
+      super.vertexShader(scope);
+      if (this.needFragmentColor()) {
         if (this.vertexColor) {
           if (scope.$getVertexAttrib('diffuse')) {
             throw new Error('mixinVertexColor.vertexShader(): diffuse vertex stream already defined');
@@ -37,8 +36,8 @@ function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T) {
         }
       }
     }
-    getVertexColor(scope: PBInsideFunctionScope, ctx: DrawContext) {
-      if (!this.needFragmentColor(ctx)) {
+    getVertexColor(scope: PBInsideFunctionScope) {
+      if (!this.needFragmentColor()) {
         throw new Error(
           'mixinVertexColor.getVertexColor(): No need to calculate albedo color, make sure needFragmentColor() returns true'
         );

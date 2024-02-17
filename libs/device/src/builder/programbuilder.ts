@@ -1998,6 +1998,16 @@ export class ProgramBuilder {
     }
     body && body.call(this._globalScope, this);
     this.popScope();
+
+    // Global delcarations should be at the first
+    this._globalScope.$ast.statements = [
+      ...this._globalScope.$ast.statements.filter(
+        (val) => val instanceof AST.ASTDeclareVar || val instanceof AST.ASTAssignment
+      ),
+      ...this._globalScope.$ast.statements.filter(
+        (val) => !(val instanceof AST.ASTDeclareVar) && !(val instanceof AST.ASTAssignment)
+      )
+    ];
   }
   /** @internal */
   private generateRenderSource(

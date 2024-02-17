@@ -1,6 +1,14 @@
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
-import { BindGroup, GPUProgram, PBFunctionScope, PBInsideFunctionScope, PBShaderExp, Texture2D, Texture2DArray } from '@zephyr3d/device';
-import { DrawContext } from '../render';
+import type {
+  BindGroup,
+  GPUProgram,
+  PBFunctionScope,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  Texture2D,
+  Texture2DArray
+} from '@zephyr3d/device';
+import type { DrawContext } from '../render';
 import { mixinPBRMetallicRoughness } from './mixins/pbr/metallicroughness';
 import { mixinLight } from './mixins/lit';
 import { Application } from '../app';
@@ -25,7 +33,7 @@ export type TerrainDetailMapInfo = {
   }[][];
 };
 
-export type TerrainLightModelOptions = {
+export type TerrainMaterialOptions = {
   splatMap?: Texture2D;
   splatMapTexCoordIndex?: number;
   detailMaps?: TerrainDetailMapInfo;
@@ -38,11 +46,11 @@ export class TerrainMaterial extends applyMaterialMixins(
 ) {
   private static _metallicRoughnessGenerationProgram: GPUProgram = null;
   private static _metallicRoughnessGenerationBindGroup: BindGroup = null;
-  private _options: TerrainLightModelOptions;
+  private _options: TerrainMaterialOptions;
   private _uvScales: Float32Array;
   private _numDetailMaps: number;
   private _terrainInfo: Vector4;
-  constructor(options?: TerrainLightModelOptions) {
+  constructor(options?: TerrainMaterialOptions) {
     super();
     this.normalMapMode = 'object-space';
     this._options = null;
@@ -54,16 +62,16 @@ export class TerrainMaterial extends applyMaterialMixins(
       const albedoTextures = this._options.detailMaps.albedoTextures;
       this._numDetailMaps = Array.isArray(albedoTextures) ? albedoTextures.length : albedoTextures.depth;
       if (!this._numDetailMaps) {
-        throw new Error(`TerrainLightModel(): Invalid detail textures`);
+        throw new Error(`TerrainMaterial(): Invalid detail textures`);
       }
       if (this._numDetailMaps > 4) {
-        throw new Error(`TerrainLightModel(): The maximum detail levels is 4`);
+        throw new Error(`TerrainMaterial(): The maximum detail levels is 4`);
       }
       if (
         !this._options.detailMaps.uvScale ||
         this._options.detailMaps.uvScale.length !== this._numDetailMaps
       ) {
-        throw new Error(`TerrainLightModel(): Invalid uv scale`);
+        throw new Error(`TerrainMaterial(): Invalid uv scale`);
       }
       this._uvScales = new Float32Array(this._numDetailMaps * 4);
       for (let i = 0; i < this._numDetailMaps; i++) {
@@ -74,7 +82,7 @@ export class TerrainMaterial extends applyMaterialMixins(
       }
       if (this._options.detailMaps.metallic) {
         if (this._options.detailMaps.metallic.length !== this._numDetailMaps) {
-          throw new Error(`TerrainLightModel(): Invalid metallic values`);
+          throw new Error(`TerrainMaterial(): Invalid metallic values`);
         }
         for (let i = 0; i < this._numDetailMaps; i++) {
           this._uvScales[i * 4 + 2] = this._options.detailMaps.metallic[i];
@@ -82,7 +90,7 @@ export class TerrainMaterial extends applyMaterialMixins(
       }
       if (this._options.detailMaps.roughness) {
         if (this._options.detailMaps.roughness.length !== this._numDetailMaps) {
-          throw new Error(`TerrainLightModel(): Invalid roughness values`);
+          throw new Error(`TerrainMaterial(): Invalid roughness values`);
         }
         for (let i = 0; i < this._numDetailMaps; i++) {
           this._uvScales[i * 4 + 3] = this._options.detailMaps.roughness[i];
@@ -93,12 +101,12 @@ export class TerrainMaterial extends applyMaterialMixins(
         const m = Array.isArray(normalTextures) ? normalTextures.length : normalTextures.depth;
         if (m !== this._numDetailMaps) {
           throw new Error(
-            `TerrainLightModel(): The number of normal textures not match the number of albedo textures`
+            `TerrainMaterial(): The number of normal textures not match the number of albedo textures`
           );
         }
         if (options.detailMaps.normalScale) {
           if (options.detailMaps.normalScale.length !== this._numDetailMaps) {
-            throw new Error(`TerrainLightModel(): Invalid normal scale`);
+            throw new Error(`TerrainMaterial(): Invalid normal scale`);
           }
           for (let i = 0; i < this._numDetailMaps; i++) {
             this._uvScales[i * 4 + 1] = options.detailMaps.normalScale[i];
@@ -109,7 +117,7 @@ export class TerrainMaterial extends applyMaterialMixins(
       if (Array.isArray(albedoTextures)) {
         for (let i = 0; i < albedoTextures.length; i++) {
           if (!albedoTextures[i]) {
-            throw new Error(`TerrainLightModel(): Invalid detail albedo texture`);
+            throw new Error(`TerrainMaterial(): Invalid detail albedo texture`);
           }
           albedoTextures[i].samplerOptions = {
             addressU: 'repeat',
@@ -125,7 +133,7 @@ export class TerrainMaterial extends applyMaterialMixins(
       if (Array.isArray(normalTextures)) {
         for (let i = 0; i < normalTextures.length; i++) {
           if (!normalTextures[i]) {
-            throw new Error(`TerrainLightModel(): Invalid detail normal texture`);
+            throw new Error(`TerrainMaterial(): Invalid detail normal texture`);
           }
           normalTextures[i].samplerOptions = {
             addressU: 'repeat',
@@ -173,15 +181,15 @@ export class TerrainMaterial extends applyMaterialMixins(
       if (this._options) {
         bindGroup.setValue('kkDetailScales', this._uvScales);
         bindGroup.setTexture('kkSplatMap', this._options.splatMap);
-        if (Array.isArray(this._options.detailMaps.albedoTextures)){
-          for (let i = 0; i < this._numDetailMaps; i++){
+        if (Array.isArray(this._options.detailMaps.albedoTextures)) {
+          for (let i = 0; i < this._numDetailMaps; i++) {
             bindGroup.setTexture(`kkDetailAlbedoMap${i}`, this._options.detailMaps.albedoTextures[i]);
           }
         } else {
           bindGroup.setTexture('kkDetailAlbedoMap', this._options.detailMaps.albedoTextures);
         }
-        if (Array.isArray(this._options.detailMaps.normalTextures)){
-          for (let i = 0; i < this._numDetailMaps; i++){
+        if (Array.isArray(this._options.detailMaps.normalTextures)) {
+          for (let i = 0; i < this._numDetailMaps; i++) {
             bindGroup.setTexture(`kkDetailNormalMap${i}`, this._options.detailMaps.normalTextures[i]);
           }
         } else {
@@ -202,9 +210,9 @@ export class TerrainMaterial extends applyMaterialMixins(
   getAlbedoTexCoord(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.$inputs.mapUV;
   }
-  calculateAlbedoColor(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp {
+  calculateAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp {
     if (!this._options) {
-      return super.calculateAlbedoColor(scope, ctx);
+      return super.calculateAlbedoColor(scope);
     }
     const that = this;
     const pb = scope.$builder;
@@ -236,8 +244,8 @@ export class TerrainMaterial extends applyMaterialMixins(
     const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(normalScale).xx, 1));
     return pb.normalize(pb.mul(TBN, normalTex));
   }
-  calculateNormalAndTBN(scope: PBInsideFunctionScope, ctx: DrawContext): PBShaderExp {
-    scope.$l.normalInfo = super.calculateNormalAndTBN(scope, ctx);
+  calculateNormalAndTBN(scope: PBInsideFunctionScope): PBShaderExp {
+    scope.$l.normalInfo = super.calculateNormalAndTBN(scope);
     const pb = scope.$builder;
     let calcNormal = false;
     if (this._options && this._options.detailMaps.normalTextures) {
@@ -249,7 +257,10 @@ export class TerrainMaterial extends applyMaterialMixins(
           const texCoord = pb.mul(scope.$inputs.mapUV, scope.kkDetailScales.at(i).x);
           scope.normalInfo.normal = pb.add(
             scope.normalInfo.normal,
-            pb.mul(this.sampleNormalMapWithTBN(scope, tex, texCoord, scale, scope.normalInfo.TBN), scope.detailMask[i])
+            pb.mul(
+              this.sampleNormalMapWithTBN(scope, tex, texCoord, scale, scope.normalInfo.TBN),
+              scope.detailMask[i]
+            )
           );
           calcNormal = true;
         }
@@ -261,7 +272,10 @@ export class TerrainMaterial extends applyMaterialMixins(
           const pixel = pb.sub(pb.mul(pb.textureArraySample(tex, texCoord, i).rgb, 2), pb.vec3(1));
           const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(scale).xx, 1));
           const detailNormal = pb.normalize(pb.mul(scope.normalInfo.TBN, normalTex));
-          scope.normalInfo.normal = pb.add(scope.normalInfo.normal, pb.mul(detailNormal, scope.detailMask[i]));
+          scope.normalInfo.normal = pb.add(
+            scope.normalInfo.normal,
+            pb.mul(detailNormal, scope.detailMask[i])
+          );
           calcNormal = true;
         }
       }
@@ -271,22 +285,22 @@ export class TerrainMaterial extends applyMaterialMixins(
     }
     return scope.normalInfo;
   }
-  vertexShader(scope: PBFunctionScope, ctx: DrawContext): void {
-    super.vertexShader(scope, ctx);
+  vertexShader(scope: PBFunctionScope): void {
+    super.vertexShader(scope);
     const pb = scope.$builder;
     scope.$inputs.zPos = pb.vec3().attrib('position');
-    if (this.needFragmentColor(ctx)){
+    if (this.needFragmentColor()) {
       scope.$g.terrainInfo = pb.vec4().uniform(2);
       scope.$outputs.mapUV = pb.div(scope.$inputs.zPos.xz, scope.terrainInfo.xy);
     }
     this.transformVertexAndNormal(scope);
   }
-  fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void {
-    super.fragmentShader(scope, ctx);
+  fragmentShader(scope: PBFunctionScope): void {
+    super.fragmentShader(scope);
     const pb = scope.$builder;
     const that = this;
-    if (this.needFragmentColor(ctx)) {
-      if (this._options){
+    if (this.needFragmentColor()) {
+      if (this._options) {
         scope.$g.kkDetailScales = pb.vec4[this._numDetailMaps]().uniform(2);
         scope.$g.kkSplatMap = pb.tex2D().uniform(2);
         const useAlbedoTextureArray = !Array.isArray(that._options.detailMaps.albedoTextures);
@@ -306,15 +320,15 @@ export class TerrainMaterial extends applyMaterialMixins(
           }
         }
       }
-      scope.$l.albedo = this.calculateAlbedoColor(scope, ctx);
-      scope.$l.normalInfo = this.calculateNormalAndTBN(scope, ctx);
+      scope.$l.albedo = this.calculateAlbedoColor(scope);
+      scope.$l.normalInfo = this.calculateNormalAndTBN(scope);
       scope.$l.normal = scope.normalInfo.normal;
       scope.$l.viewVec = this.calculateViewVector(scope);
       scope.$l.pbrData = this.getCommonData(scope, scope.albedo, scope.viewVec, scope.normalInfo.TBN);
       scope.$l.lightingColor = pb.vec3(0);
       scope.$l.emissiveColor = this.calculateEmissiveColor(scope);
-      this.indirectLighting(scope, scope.normal, scope.viewVec, scope.pbrData, scope.lightingColor, ctx);
-      this.forEachLight(scope, ctx, function (type, posRange, dirCutoff, colorIntensity, shadow) {
+      this.indirectLighting(scope, scope.normal, scope.viewVec, scope.pbrData, scope.lightingColor);
+      this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, shadow) {
         this.$l.diffuse = pb.vec3();
         this.$l.specular = pb.vec3();
         this.$l.lightAtten = that.calculateLightAttenuation(this, type, posRange, dirCutoff);
@@ -322,14 +336,22 @@ export class TerrainMaterial extends applyMaterialMixins(
         this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
         this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
         if (shadow) {
-          this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.NoL, ctx));
+          this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.NoL));
         }
-        that.directLighting(this, this.lightDir, this.lightColor, this.normal, this.viewVec, this.pbrData, this.lightingColor);
+        that.directLighting(
+          this,
+          this.lightDir,
+          this.lightColor,
+          this.normal,
+          this.viewVec,
+          this.pbrData,
+          this.lightingColor
+        );
       });
       scope.$l.litColor = pb.add(scope.lightingColor, scope.emissiveColor);
-      this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a), ctx);
+      this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
-      this.outputFragmentColor(scope, null, ctx);
+      this.outputFragmentColor(scope, null);
     }
   }
   generateMetallicRoughnessMap(): Texture2D {

@@ -51,8 +51,12 @@ instancingApp.ready().then(async () => {
 
   const boxMaterial = new PBRMetallicRoughnessMaterial();
   boxMaterial.albedoTexture = await assetManager.fetchTexture('./assets/images/rustediron2_basecolor.png');
-  boxMaterial.normalTexture = await assetManager.fetchTexture('./assets/images/rustediron2_normal.png', { linearColorSpace: true });
-  boxMaterial.metallicRoughnessTexture = await assetManager.fetchTexture('./assets/images/mr.png', { linearColorSpace: true });
+  boxMaterial.normalTexture = await assetManager.fetchTexture('./assets/images/rustediron2_normal.png', {
+    linearColorSpace: true
+  });
+  boxMaterial.metallicRoughnessTexture = await assetManager.fetchTexture('./assets/images/mr.png', {
+    linearColorSpace: true
+  });
   const box = new BoxShape();
   for (let x = -20; x <= 20; x += 2) {
     for (let y = -20; y <= 20; y += 2) {

@@ -23,27 +23,18 @@ export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) ex
   ? I
   : never;
 
-export type ExtractMixinReturnType<M, T> = M extends (target: infer A) => infer R
-  ? R
-  : never;
+export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ? R : never;
 
-/*
-export type ExtractMixinType<M extends any[], T> = UnionToIntersection<
-  M extends (infer K)[] ? ExtractMixinReturnType<K, T> : never
-> &
-  T;
-*/
-export type ExtractMixinType<M, T> =
-  M extends [infer First]
-    ? ExtractMixinReturnType<First, T>
-    : M extends [infer First, ...infer Rest]
-      ? ExtractMixinReturnType<First, T> & ExtractMixinType<[...Rest], T>
-      : never
+export type ExtractMixinType<M> = M extends [infer First]
+  ? ExtractMixinReturnType<First>
+  : M extends [infer First, ...infer Rest]
+  ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]>
+  : never;
 
 export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
   target: T,
   ...mixins: M
-): ExtractMixinType<M, T> {
+): ExtractMixinType<M> {
   let r: any = target;
   for (const m of mixins) {
     r = m(r);
@@ -60,12 +51,18 @@ export class MeshMaterial extends Material {
   private _alphaCutoff: number;
   private _blendMode: BlendMode;
   private _opacity: number;
+  private _ctx: DrawContext;
   constructor(...args: any[]) {
     super();
     this._featureStates = [];
     this._alphaCutoff = 0;
     this._blendMode = 'none';
     this._opacity = 1;
+    this._ctx = null;
+  }
+  /** Draw context for shader creation */
+  get drawContext(): DrawContext {
+    return this._ctx;
   }
   /** A value between 0 and 1, presents the cutoff for alpha testing */
   get alphaCutoff(): number {
@@ -188,7 +185,7 @@ export class MeshMaterial extends Material {
    * @override
    */
   protected _createHash(renderPassType: number): string {
-    return this._featureStates.map(val => val === undefined ? '' : val).join('|');
+    return this._featureStates.map((val) => (val === undefined ? '' : val)).join('|');
   }
   /**
    * {@inheritDoc Material._applyUniforms}
@@ -200,11 +197,14 @@ export class MeshMaterial extends Material {
   /**
    * Check if the color should be computed in fragment shader, this is required for forward render pass or alpha test is in use or alpha to coverage is in use.
    *
-   * @param ctx - The drawing context
    * @returns - true if the color should be computed in fragment shader, otherwise false.
    */
-  needFragmentColor(ctx: DrawContext): boolean {
-    return ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD || this._alphaCutoff > 0 || this.alphaToCoverage;
+  needFragmentColor(ctx?: DrawContext): boolean {
+    return (
+      (ctx ?? this.drawContext).renderPass.type === RENDER_PASS_TYPE_FORWARD ||
+      this._alphaCutoff > 0 ||
+      this.alphaToCoverage
+    );
   }
   /**
    * Transform vertex position to the clip space and calcuate the world position, world normal and tangent frame if needed
@@ -225,9 +225,15 @@ export class MeshMaterial extends Material {
       if (that.hasSkinning(this)) {
         this.$l.skinMatrix = that.calculateSkinMatrix(this);
       }
-      const oPos = that.calculateObjectSpacePosition(this, this.$getVertexAttrib('position'), that.hasSkinning(this) ? this.skinMatrix : null);
-      if (!oPos){
-        throw new Error(`MeshMaterial.transformVertexAndNormal(): calculateObjectSpacePosition() returns null`);
+      const oPos = that.calculateObjectSpacePosition(
+        this,
+        this.$getVertexAttrib('position'),
+        that.hasSkinning(this) ? this.skinMatrix : null
+      );
+      if (!oPos) {
+        throw new Error(
+          `MeshMaterial.transformVertexAndNormal(): calculateObjectSpacePosition() returns null`
+        );
       }
       this.$l.oPos = oPos;
       this.$outputs.worldPosition = pb
@@ -235,21 +241,31 @@ export class MeshMaterial extends Material {
         .tag(ShaderFramework.USAGE_WORLD_POSITION);
       that.setClipSpacePosition(this, pb.mul(viewProjMatrix, this.$outputs.worldPosition));
 
-      const oNorm = that.calculateObjectSpaceNormal(this, this.$getVertexAttrib('normal'), that.hasSkinning(this) ? this.skinMatrix : null);
+      const oNorm = that.calculateObjectSpaceNormal(
+        this,
+        this.$getVertexAttrib('normal'),
+        that.hasSkinning(this) ? this.skinMatrix : null
+      );
       if (oNorm) {
         this.$l.oNorm = oNorm;
         this.$outputs.worldNormal = pb
           .normalize(pb.mul(this.normalMatrix, pb.vec4(this.$l.oNorm, 0)).xyz)
           .tag(ShaderFramework.USAGE_WORLD_NORMAL);
 
-        const oTangent = that.calculateObjectSpaceTangent(this, this.$getVertexAttrib('tangent'), that.hasSkinning(this) ? this.skinMatrix : null);
+        const oTangent = that.calculateObjectSpaceTangent(
+          this,
+          this.$getVertexAttrib('tangent'),
+          that.hasSkinning(this) ? this.skinMatrix : null
+        );
         if (oTangent) {
           this.$l.oTangent = oTangent;
           this.$outputs.worldTangent = pb
             .normalize(pb.mul(this.normalMatrix, pb.vec4(this.$l.oTangent.xyz, 0)).xyz)
             .tag(ShaderFramework.USAGE_WORLD_TANGENT);
           this.$outputs.worldBinormal = pb
-            .normalize(pb.mul(pb.cross(this.$outputs.worldNormal, this.$outputs.worldTangent), this.$l.oTangent.w))
+            .normalize(
+              pb.mul(pb.cross(this.$outputs.worldNormal, this.$outputs.worldTangent), this.$l.oTangent.w)
+            )
             .tag(ShaderFramework.USAGE_WORLD_BINORMAL);
         }
       }
@@ -267,7 +283,7 @@ export class MeshMaterial extends Material {
    * @returns The world matrix
    */
   getWorldMatrix(scope: PBInsideFunctionScope) {
-    if(scope.$builder.shaderKind !== 'vertex'){
+    if (scope.$builder.shaderKind !== 'vertex') {
       throw new Error(`MeshMaterial.getWorldMatrix(): must be called in vertex stage`);
     }
     return scope.$query(ShaderFramework.USAGE_WORLD_MATRIX);
@@ -370,7 +386,7 @@ export class MeshMaterial extends Material {
    * @returns Skinning matrix for current vertex, or null if there is not skeletal animation
    */
   calculateSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp {
-    if(!this.hasSkinning(scope)){
+    if (!this.hasSkinning(scope)) {
       return null;
     }
     const pb = scope.$builder;
@@ -426,12 +442,16 @@ export class MeshMaterial extends Material {
    * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
    * @returns The calculated vertex position in object space, or null if pos is null
    */
-  calculateObjectSpacePosition(scope: PBInsideFunctionScope, pos: PBShaderExp, skinMatrix: PBShaderExp): PBShaderExp {
+  calculateObjectSpacePosition(
+    scope: PBInsideFunctionScope,
+    pos: PBShaderExp,
+    skinMatrix: PBShaderExp
+  ): PBShaderExp {
     const pb = scope.$builder;
     if (pb.shaderKind !== 'vertex') {
       throw new Error(`MeshMaterial.calculateObjectSpacePosition(): must be called in vertex stage`);
     }
-    return pos ? skinMatrix ? pb.mul(skinMatrix, pb.vec4(pos, 1)).xyz : pos : null;
+    return pos ? (skinMatrix ? pb.mul(skinMatrix, pb.vec4(pos, 1)).xyz : pos) : null;
   }
   /**
    * Calculates the normal vector of type vec3 in object space
@@ -441,12 +461,16 @@ export class MeshMaterial extends Material {
    * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
    * @returns The calculated normal vector in object space, or null if normal is null
    */
-  calculateObjectSpaceNormal(scope: PBInsideFunctionScope, normal: PBShaderExp, skinMatrix: PBShaderExp): PBShaderExp {
+  calculateObjectSpaceNormal(
+    scope: PBInsideFunctionScope,
+    normal: PBShaderExp,
+    skinMatrix: PBShaderExp
+  ): PBShaderExp {
     const pb = scope.$builder;
     if (pb.shaderKind !== 'vertex') {
       throw new Error(`MeshMaterial.calculateObjectSpaceNormal(): must be called in vertex stage`);
     }
-    return normal ? skinMatrix ? pb.mul(skinMatrix, pb.vec4(normal, 0)).xyz : normal : null;
+    return normal ? (skinMatrix ? pb.mul(skinMatrix, pb.vec4(normal, 0)).xyz : normal) : null;
   }
   /**
    * Calculates the tangent vector of type vec3 in object space
@@ -456,12 +480,20 @@ export class MeshMaterial extends Material {
    * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
    * @returns The calculated tangent vector of type vec4 in object space, or null if tangent is null
    */
-  calculateObjectSpaceTangent(scope: PBInsideFunctionScope, tangent: PBShaderExp, skinMatrix: PBShaderExp): PBShaderExp {
+  calculateObjectSpaceTangent(
+    scope: PBInsideFunctionScope,
+    tangent: PBShaderExp,
+    skinMatrix: PBShaderExp
+  ): PBShaderExp {
     const pb = scope.$builder;
     if (pb.shaderKind !== 'vertex') {
       throw new Error(`MeshMaterial.calculateObjectSpaceTangent(): must be called in vertex stage`);
     }
-    return tangent ? skinMatrix ? pb.vec4(pb.mul(skinMatrix, pb.vec4(tangent.xyz, 0)).xyz, tangent.w) : tangent : null;
+    return tangent
+      ? skinMatrix
+        ? pb.vec4(pb.mul(skinMatrix, pb.vec4(tangent.xyz, 0)).xyz, tangent.w)
+        : tangent
+      : null;
   }
   /**
    * Sets the clip space position in vertex shader
@@ -490,12 +522,11 @@ export class MeshMaterial extends Material {
   /**
    * Vertex shader implementation of this material
    * @param scope - Shader scope
-   * @param ctx - The drawing context
    */
-  vertexShader(scope: PBFunctionScope, ctx: DrawContext): void {
+  vertexShader(scope: PBFunctionScope): void {
     const pb = scope.$builder;
-    ShaderFramework.prepareVertexShader(pb, ctx);
-    if (ctx.target.getBoneMatrices()) {
+    ShaderFramework.prepareVertexShader(pb, this.drawContext);
+    if (this.drawContext.target.getBoneMatrices()) {
       scope.$inputs.kkBlendIndices = pb.vec4().attrib('blendIndices');
       scope.$inputs.kkBlendWeights = pb.vec4().attrib('blendWeights');
     }
@@ -503,15 +534,14 @@ export class MeshMaterial extends Material {
   /**
    * Fragment shader implementation of this material
    * @param scope - Shader scope
-   * @param ctx - The drawing context
    */
-  fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void {
+  fragmentShader(scope: PBFunctionScope): void {
     const pb = scope.$builder;
-    ShaderFramework.prepareFragmentShader(pb, ctx);
+    ShaderFramework.prepareFragmentShader(pb, this.drawContext);
     if (this._alphaCutoff > 0) {
       scope.$g.kkAlphaCutoff = pb.float().uniform(2);
     }
-    if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
+    if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
       if (this.isTransparent()) {
         scope.$g.kkOpacity = pb.float().uniform(2);
       }
@@ -523,16 +553,17 @@ export class MeshMaterial extends Material {
    */
   protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram {
     const that = this;
+    this._ctx = ctx;
     const program = pb.buildRenderProgram({
       vertex(pb) {
         pb.main(function () {
-          that.vertexShader(this, ctx);
+          that.vertexShader(this);
         });
       },
       fragment(pb) {
         this.$outputs.zFragmentOutput = pb.vec4();
         pb.main(function () {
-          that.fragmentShader(this, ctx);
+          that.fragmentShader(this);
         });
       }
     });
@@ -543,16 +574,15 @@ export class MeshMaterial extends Material {
    *
    * @param scope - Shader scope
    * @param color - Lit fragment color
-   * @param ctx - The drawing context
    *
    * @returns The final fragment color
    */
-  outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext) {
+  outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp) {
     const pb = scope.$builder;
     const that = this;
     pb.func('zOutputFragmentColor', color ? [pb.vec4('color')] : [], function () {
       this.$l.outColor = color ? this.color : pb.vec4();
-      if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
+      if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
         ShaderFramework.discardIfClipped(this);
         if (!that.isTransparent() && !this.kkAlphaCutoff && !that.alphaToCoverage) {
           this.outColor.a = 1;
@@ -567,9 +597,9 @@ export class MeshMaterial extends Material {
         if (that.isTransparent()) {
           this.outColor = pb.vec4(pb.mul(this.outColor.rgb, this.outColor.a), this.outColor.a);
         }
-        ShaderFramework.applyFog(this, this.outColor, ctx);
+        ShaderFramework.applyFog(this, this.outColor, that.drawContext);
         this.$outputs.zFragmentOutput = encodeColorOutput(this, this.outColor);
-      } else if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH_ONLY) {
+      } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_DEPTH_ONLY) {
         if (color) {
           this.$if(pb.lessThan(this.outColor.a, this.kkAlphaCutoff), function () {
             pb.discard();
@@ -582,14 +612,16 @@ export class MeshMaterial extends Material {
         } else {
           this.$outputs.zFragmentOutput = pb.vec4(this.kkDepth, 0, 0, 1);
         }
-      } /*if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP)*/ else {
+      } /*if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP)*/ else {
         if (color) {
           this.$if(pb.lessThan(this.outColor.a, this.kkAlphaCutoff), function () {
             pb.discard();
           });
         }
         ShaderFramework.discardIfClipped(this);
-        const shadowMapParams = ctx.shadowMapInfo.get((ctx.renderPass as ShadowMapPass).light);
+        const shadowMapParams = that.drawContext.shadowMapInfo.get(
+          (that.drawContext.renderPass as ShadowMapPass).light
+        );
         this.$outputs.zFragmentOutput = shadowMapParams.impl.computeShadowMapDepth(shadowMapParams, this);
       }
     });
