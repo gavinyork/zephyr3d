@@ -215,7 +215,277 @@ export class MeshMaterial extends Material {
    * @param scope - Current shader scope
    */
   transformVertexAndNormal(scope: PBInsideFunctionScope) {
-    ShaderFramework.ftransform(scope);
+    const pb = scope.$builder;
+    const funcName = 'kkTransformVertexAndNormal';
+    const that = this;
+    pb.func(funcName, [], function () {
+      const viewProjMatrix = that.getViewProjectionMatrix(this);
+      this.$l.worldMatrix = that.getWorldMatrix(this);
+      this.$l.normalMatrix = that.getNormalMatrix(this);
+      if (that.hasSkinning(this)) {
+        this.$l.skinMatrix = that.calculateSkinMatrix(this);
+      }
+      const oPos = that.calculateObjectSpacePosition(this, this.$getVertexAttrib('position'), that.hasSkinning(this) ? this.skinMatrix : null);
+      if (!oPos){
+        throw new Error(`MeshMaterial.transformVertexAndNormal(): calculateObjectSpacePosition() returns null`);
+      }
+      this.$l.oPos = oPos;
+      this.$outputs.worldPosition = pb
+        .mul(this.worldMatrix, pb.vec4(this.$l.oPos, 1))
+        .tag(ShaderFramework.USAGE_WORLD_POSITION);
+      that.setClipSpacePosition(this, pb.mul(viewProjMatrix, this.$outputs.worldPosition));
+
+      const oNorm = that.calculateObjectSpaceNormal(this, this.$getVertexAttrib('normal'), that.hasSkinning(this) ? this.skinMatrix : null);
+      if (oNorm) {
+        this.$l.oNorm = oNorm;
+        this.$outputs.worldNormal = pb
+          .normalize(pb.mul(this.normalMatrix, pb.vec4(this.$l.oNorm, 0)).xyz)
+          .tag(ShaderFramework.USAGE_WORLD_NORMAL);
+
+        const oTangent = that.calculateObjectSpaceTangent(this, this.$getVertexAttrib('tangent'), that.hasSkinning(this) ? this.skinMatrix : null);
+        if (oTangent) {
+          this.$l.oTangent = oTangent;
+          this.$outputs.worldTangent = pb
+            .normalize(pb.mul(this.normalMatrix, pb.vec4(this.$l.oTangent.xyz, 0)).xyz)
+            .tag(ShaderFramework.USAGE_WORLD_TANGENT);
+          this.$outputs.worldBinormal = pb
+            .normalize(pb.mul(pb.cross(this.$outputs.worldNormal, this.$outputs.worldTangent), this.$l.oTangent.w))
+            .tag(ShaderFramework.USAGE_WORLD_BINORMAL);
+        }
+      }
+    });
+    pb.getGlobalScope()[funcName]();
+  }
+  /**
+   * Gets the uniform variable of type mat4 which transforms vertex position from object space to world space
+   *
+   * @remarks
+   * This function must be called in vertex stage
+   *
+   * @param scope - Current shader scope
+   *
+   * @returns The world matrix
+   */
+  getWorldMatrix(scope: PBInsideFunctionScope) {
+    if(scope.$builder.shaderKind !== 'vertex'){
+      throw new Error(`MeshMaterial.getWorldMatrix(): must be called in vertex stage`);
+    }
+    return scope.$query(ShaderFramework.USAGE_WORLD_MATRIX);
+  }
+  /**
+   * Gets the uniform variable of type mat4 which transforms vertex normal from object space to world space
+   *
+   * @remarks
+   * This function must be called in vertex stage
+   *
+   * @param scope - Current shader scope
+   *
+   * @returns The normal matrix
+   */
+  getNormalMatrix(scope: PBInsideFunctionScope) {
+    // TODO: should use inverse-transpose of the world matrix
+    return this.getWorldMatrix(scope);
+  }
+  /**
+   * Gets the uniform variable of type mat4 which holds the view-projection matrix of current camera
+   *
+   * @remarks
+   * This function can be called in vertex stage and fragment stage
+   *
+   * @param scope - Current shader scope
+   *
+   * @returns The view-projection matrix variable
+   */
+  getViewProjectionMatrix(scope: PBInsideFunctionScope) {
+    return ShaderFramework.getViewProjectionMatrix(scope);
+  }
+  /**
+   * Gets the uniform variable of type mat4 which holds the view matrix of current camera
+   *
+   * @remarks
+   * View matrix will transform points from world space to camera space
+   * This function can be called in vertex stage and fragment stage
+   *
+   * @param scope - Current shader scope
+   *
+   * @returns The view matrix uniform variable
+   */
+  getViewMatrix(scope: PBInsideFunctionScope) {
+    return ShaderFramework.getViewMatrix(scope);
+  }
+  /**
+   * Gets the uniform variable of type mat4 which holds the rotation matrix of current camera
+   *
+   * @remarks
+   * This function can be called in vertex stage and fragment stage
+   *
+   * @param scope - Current shader scope
+   *
+   * @returns The rotation matrix uniform variable
+   */
+  getRotationMatrix(scope: PBInsideFunctionScope) {
+    return ShaderFramework.getCameraRotationMatrix(scope);
+  }
+  /**
+   * Gets the uniform variable of type mat4 which holds the projection matrix of current camera
+   *
+   * @remarks
+   * This function can be called in vertex stage and fragment stage
+   *
+   * @param scope - Current shader scope
+   *
+   * @returns The projection matrix uniform variable
+   */
+  getProjectionMatrix(scope: PBInsideFunctionScope) {
+    return ShaderFramework.getProjectionMatrix(scope);
+  }
+  /**
+   * Gets the uniform variable of type vec3 which holds the camera position
+   *
+   * @remarks
+   * This function can be called in vertex stage and fragment stage
+   *
+   * @param scope - Current shader scope
+   *
+   * @returns The camera position uniform variable
+   */
+  getCameraPosition(scope: PBInsideFunctionScope): PBShaderExp {
+    return ShaderFramework.getCameraPosition(scope);
+  }
+  /**
+   * This function checks if the shader needs to process skeletal animation.
+   *
+   * @param scope - Current shader scope
+   *
+   * @returns true if the shader needs to process skeletal animation, otherwise false.
+   */
+  hasSkinning(scope: PBInsideFunctionScope): boolean {
+    return !!scope.$query(ShaderFramework.USAGE_BONE_MATRICIES);
+  }
+  /**
+   * Calculate skinning matrix for current vertex
+   *
+   * @param scope - Current shader scope
+   *
+   * @returns Skinning matrix for current vertex, or null if there is not skeletal animation
+   */
+  calculateSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+    if(!this.hasSkinning(scope)){
+      return null;
+    }
+    const pb = scope.$builder;
+    const funcNameGetBoneMatrixFromTexture = 'kkGetBoneMatrixFromTexture';
+    pb.func(funcNameGetBoneMatrixFromTexture, [pb.int('boneIndex')], function () {
+      const boneTexture = this.$query(ShaderFramework.USAGE_BONE_MATRICIES);
+      this.$l.w = pb.float(this.$query(ShaderFramework.USAGE_BONE_TEXTURE_SIZE));
+      this.$l.pixelIndex = pb.float(pb.mul(this.boneIndex, 4));
+      this.$l.xIndex = pb.mod(this.pixelIndex, this.w);
+      this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.w));
+      this.$l.u1 = pb.div(pb.add(this.xIndex, 0.5), this.w);
+      this.$l.u2 = pb.div(pb.add(this.xIndex, 1.5), this.w);
+      this.$l.u3 = pb.div(pb.add(this.xIndex, 2.5), this.w);
+      this.$l.u4 = pb.div(pb.add(this.xIndex, 3.5), this.w);
+      this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.w);
+      if (Application.instance.device.type !== 'webgl') {
+        this.$l.row1 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u1, this.v), 0);
+        this.$l.row2 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u2, this.v), 0);
+        this.$l.row3 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u3, this.v), 0);
+        this.$l.row4 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u4, this.v), 0);
+      } else {
+        this.$l.row1 = pb.textureSample(boneTexture, pb.vec2(this.u1, this.v));
+        this.$l.row2 = pb.textureSample(boneTexture, pb.vec2(this.u2, this.v));
+        this.$l.row3 = pb.textureSample(boneTexture, pb.vec2(this.u3, this.v));
+        this.$l.row4 = pb.textureSample(boneTexture, pb.vec2(this.u4, this.v));
+      }
+      this.$return(pb.mat4(this.row1, this.row2, this.row3, this.row4));
+    });
+    const funcNameGetSkinningMatrix = 'kkGetSkinningMatrix';
+    pb.func(funcNameGetSkinningMatrix, [], function () {
+      const invBindMatrix = this.$query(ShaderFramework.USAGE_INV_BIND_MATRIX);
+      const blendIndices = scope.$getVertexAttrib('blendIndices');
+      const blendWeights = scope.$getVertexAttrib('blendWeights');
+      this.$l.m0 = scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[0]));
+      this.$l.m1 = scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[1]));
+      this.$l.m2 = scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[2]));
+      this.$l.m3 = scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[3]));
+      this.$l.m = pb.add(
+        pb.mul(this.m0, blendWeights.x),
+        pb.mul(this.m1, blendWeights.y),
+        pb.mul(this.m2, blendWeights.z),
+        pb.mul(this.m3, blendWeights.w)
+      );
+      this.$return(pb.mul(invBindMatrix, this.m));
+    });
+    return scope.$g[funcNameGetSkinningMatrix]();
+  }
+  /**
+   * Calculates the vertex position of type vec3 in object space
+   *
+   * @param scope - Current shader scope
+   * @param pos - Vertex position input, must be type of vec3, null if no vertex position input
+   * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
+   * @returns The calculated vertex position in object space, or null if pos is null
+   */
+  calculateObjectSpacePosition(scope: PBInsideFunctionScope, pos: PBShaderExp, skinMatrix: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    if (pb.shaderKind !== 'vertex') {
+      throw new Error(`MeshMaterial.calculateObjectSpacePosition(): must be called in vertex stage`);
+    }
+    return pos ? skinMatrix ? pb.mul(skinMatrix, pb.vec4(pos, 1)).xyz : pos : null;
+  }
+  /**
+   * Calculates the normal vector of type vec3 in object space
+   *
+   * @param scope - Current shader scope
+   * @param normal - Vertex normal input, must be type of vec3, null if no vertex normal input
+   * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
+   * @returns The calculated normal vector in object space, or null if normal is null
+   */
+  calculateObjectSpaceNormal(scope: PBInsideFunctionScope, normal: PBShaderExp, skinMatrix: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    if (pb.shaderKind !== 'vertex') {
+      throw new Error(`MeshMaterial.calculateObjectSpaceNormal(): must be called in vertex stage`);
+    }
+    return normal ? skinMatrix ? pb.mul(skinMatrix, pb.vec4(normal, 0)).xyz : normal : null;
+  }
+  /**
+   * Calculates the tangent vector of type vec3 in object space
+   *
+   * @param scope - Current shader scope
+   * @param tangent - Vertex tangent input, must be type of vec4, null if no vertex tangent input
+   * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
+   * @returns The calculated tangent vector of type vec4 in object space, or null if tangent is null
+   */
+  calculateObjectSpaceTangent(scope: PBInsideFunctionScope, tangent: PBShaderExp, skinMatrix: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    if (pb.shaderKind !== 'vertex') {
+      throw new Error(`MeshMaterial.calculateObjectSpaceTangent(): must be called in vertex stage`);
+    }
+    return tangent ? skinMatrix ? pb.vec4(pb.mul(skinMatrix, pb.vec4(tangent.xyz, 0)).xyz, tangent.w) : tangent : null;
+  }
+  /**
+   * Sets the clip space position in vertex shader
+   *
+   * @remarks
+   * Use this function instead of using
+   * <pre>
+   * // Do not use this
+   * this.$builtins.position = some_value;
+   * // Use this
+   * ShaderFramework.setClipSpacePosition(some_value);
+   * </pre>,
+   *
+   * @param scope - Current shader scope
+   * @param pos - The clip space position to be set
+   */
+  setClipSpacePosition(scope: PBInsideFunctionScope, pos: PBShaderExp): void {
+    const pb = scope.$builder;
+    const cameraParams = ShaderFramework.getCameraParams(scope);
+    if (cameraParams) {
+      scope.$builtins.position = pb.mul(pos, pb.vec4(1, cameraParams.z, 1, 1));
+    } else {
+      scope.$builtins.position = pos;
+    }
   }
   /**
    * Vertex shader implementation of this material

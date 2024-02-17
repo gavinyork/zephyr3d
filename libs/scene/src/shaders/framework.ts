@@ -524,6 +524,22 @@ export class ShaderFramework {
     return scope.global.camera.viewProjectionMatrix;
   }
   /**
+   * Gets the uniform variable of type mat4 which holds the view matrix of current camera
+   * @param scope - Current shader scope
+   * @returns The view matrix of current camera
+   */
+  static getViewMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope.global.camera.viewMatrix;
+  }
+  /**
+   * Gets the uniform variable of type mat4 which holds the projection matrix of current camera
+   * @param scope - Current shader scope
+   * @returns The projection matrix of current camera
+   */
+  static getProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope.global.camera.projectionMatrix;
+  }
+  /**
    * Gets the uniform variable of type mat4 which holds the view projection matrix of current camera
    * @param scope - Current shader scope
    * @returns The view projection matrix of current camera
