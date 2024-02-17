@@ -20,6 +20,7 @@ myApp.ready().then(async() => {
 
   const assetManager = new AssetManager();
   // Load panorama
+  /** @type {import('@zephyr3d/device').Texture2D} */
   const panorama = await assetManager.fetchTexture('assets/images/Wide_Street.hdr');
   // Create the skybox cubemap
   const skyboxTexture = myApp.device.createCubeTexture('rgba16f', 512);

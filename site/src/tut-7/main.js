@@ -19,12 +19,12 @@ myApp.ready().then(function () {
   // Load albedo map and normal map
   const assetManager = new AssetManager();
   assetManager.fetchTexture('assets/images/earthcolor.jpg').then(texture => {
-    material.albedoTexture = texture;
+    material.albedoTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
   });
   assetManager.fetchTexture('assets/images/earthnormal.png', {
     linearColorSpace: true
   }).then(texture => {
-    material.normalTexture = texture;
+    material.normalTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
   });
   // Create a sphere mesh
   const sphere = new Mesh(scene, new SphereShape(), material);

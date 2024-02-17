@@ -12,7 +12,7 @@
     "noUnusedLocals": true,
     "strictNullChecks": false,
     "allowJs": true,
-    "checkJs": false,
+    "checkJs": true,
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": false,
     "emitDecoratorMetadata": false,

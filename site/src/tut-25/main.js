@@ -1,5 +1,5 @@
-import { InterpolationMode, Quaternion, Vector3 } from '@zephyr3d/base';
-import { Scene, OrbitCameraController, Application, PerspectiveCamera, LambertMaterial, AnimationSet, AnimationClip, TranslationTrack, BoxShape, Mesh, RotationTrack, Quadtree, EulerRotationTrack } from '@zephyr3d/scene';
+import { Vector3 } from '@zephyr3d/base';
+import { Scene, OrbitCameraController, Application, PerspectiveCamera, LambertMaterial, AnimationSet, AnimationClip, TranslationTrack, BoxShape, Mesh, EulerRotationTrack } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
@@ -24,10 +24,10 @@ myApp.ready().then(async () => {
     value: new Vector3(0, 0, 0)
   }])).addTrack(box, new EulerRotationTrack('linear', [{
     time: 0,
-    value: new Vector3(0, 0, 0, 'ZYX')
+    value: new Vector3(0, 0, 0)
   }, {
     time: 2,
-    value: new Vector3(0, 8 * Math.PI, 0, 'ZYX')
+    value: new Vector3(0, 8 * Math.PI, 0)
   }]));
   animationSet.add(animationClip);
   animationSet.playAnimation('move', 0);

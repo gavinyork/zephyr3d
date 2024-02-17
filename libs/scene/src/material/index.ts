@@ -2,6 +2,7 @@ export * from './lambert';
 export * from './blinn';
 export * from './unlit';
 export * from './material';
+export * from './meshmaterial';
 export * from './grassmaterial';
 export * from './terrainmaterial';
 export * from './pbrmr';

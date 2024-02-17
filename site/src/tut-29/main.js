@@ -18,8 +18,8 @@ myApp.ready().then(function () {
 
   // Create scene
   const material = new PBRMetallicRoughnessMaterial();
-  material.lightModel.metallic = 0.1;
-  material.lightModel.roughness = 0.9;
+  material.metallic = 0.1;
+  material.roughness = 0.9;
   const box = new Mesh(scene, new BoxShape({ size: 10 }), material);
   box.position.setXYZ(16, 0, -12);
   const floor = new Mesh(scene, new PlaneShape({ size: 60 }), material);
@@ -51,7 +51,7 @@ myApp.ready().then(function () {
     camera.viewport = [0, 0, width, height >> 1];
     camera.aspect = camera.viewport[2]/camera.viewport[3];
     camera.render(scene, compositor);
-    // No SAO on the upper half of the screen 
+    // No SAO on the upper half of the screen
     compositor.removePostEffect(sao);
     camera.viewport = [0, height >> 1, width, height - (height >> 1)];
     camera.aspect = camera.viewport[2]/camera.viewport[3];

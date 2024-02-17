@@ -19,12 +19,12 @@ myApp.ready().then(function () {
   // Load albedo map and normal map
   const assetManager = new AssetManager();
   assetManager.fetchTexture('assets/images/earthcolor.jpg').then(texture => {
-    material.albedoTexture = texture;
+    material.albedoTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
   });
   assetManager.fetchTexture('assets/images/earthnormal.png', {
     linearColorSpace: true
   }).then(texture => {
-    material.normalTexture = texture;
+    material.normalTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
   });
   // All sphere meshes share the same vertex data and materials, allowing for rendering with geometry instances on WebGL2 and WebGPU devices
   const spherePrimitive = new SphereShape();

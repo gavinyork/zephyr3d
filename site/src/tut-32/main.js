@@ -20,6 +20,7 @@ myApp.ready().then(async() => {
 
   // Load skybox texture
   const assetManager = new AssetManager();
+  /** @type {import('@zephyr3d/device').TextureCube} */
   const skyboxTexture = await assetManager.fetchTexture('assets/images/sky.dds');
 
   // Set the sky rendering mode to Skybox

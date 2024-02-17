@@ -15,7 +15,7 @@ myApp.ready().then(function () {
   assetManager.fetchTexture('assets/images/Wide_Street.hdr').then(tex => {
     // Generate a cube sky map from the panorama
     const skyMap = myApp.device.createCubeTexture('rgba16f', 512);
-    panoramaToCubemap(tex, skyMap);
+    panoramaToCubemap(/** @type {import('@zephyr3d/device').Texture2D} */ (tex), skyMap);
     // Generate an radiance map from the cube sky map
     const radianceMap = myApp.device.createCubeTexture('rgba16f', 256);
     prefilterCubemap(skyMap, 'ggx', radianceMap);

@@ -1,5 +1,5 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, LambertMaterial, Mesh, DirectionalLight, PointLight, SpotLight, BoxShape, PlaneShape } from '@zephyr3d/scene';
+import { Scene, Application, OrbitCameraController, PerspectiveCamera, LambertMaterial, Mesh, PointLight, BoxShape, PlaneShape } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({

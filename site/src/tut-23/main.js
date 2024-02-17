@@ -25,8 +25,8 @@ myApp.ready().then(async () => {
 
   // Create the ground and some boxes
   const material = new PBRMetallicRoughnessMaterial();
-  material.lightModel.metallic = 0.1;
-  material.lightModel.roughness = 0.6;
+  material.metallic = 0.1;
+  material.roughness = 0.6;
 
   const box = new BoxShape();
   const floor = new Mesh(scene, box);

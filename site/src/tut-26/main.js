@@ -22,10 +22,8 @@ myApp.ready().then(async () => {
   }], (node, value) => {
     node.iterate(node => {
       if (node.isMesh()) {
-        /** @type {import("@zephyr3d/scene").StandardMaterial} */
-        const material = node.material;
-        const textureMatrix = Matrix4x4.translation(new Vector3(value[0], 0, 0));
-        material.setTexCoordTransform(material.lightModel.albedoMapTexCoord, textureMatrix);
+        const material = /** @type {import('@zephyr3d/scene').PBRMetallicRoughnessMaterial} */ (node.material);
+        material.albedoTexCoordMatrix = Matrix4x4.translation(new Vector3(value[0], 0, 0));
       }
     });
   }));
@@ -41,8 +39,7 @@ myApp.ready().then(async () => {
   }], (node, value) => {
     node.iterate(node => {
       if (node.isMesh()) {
-        /** @type {import("@zephyr3d/scene").StandardMaterial} */
-        const material = node.material;
+        const material = /** @type {import('@zephyr3d/scene').MeshMaterial} */ (node.material);
         material.opacity = value[0];
       }
     });

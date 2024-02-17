@@ -38,7 +38,7 @@ myApp.ready().then(async () => {
         roughness: [0.95, 0.9, 0.7]
       }
     });
-    terrain.material.lightModel.setAlbedoMap(albedoMap, null, -1);
+    terrain.material.albedoTexture = albedoMap;
     terrain.castShadow = true;
     return terrain;
   }
@@ -62,7 +62,7 @@ myApp.ready().then(async () => {
   light.castShadow = true;
   light.shadow.mode = 'pcf-opt';
 
-  const water = new PostWater();
+  const water = new PostWater(0);
   water.boundary.setXYZW(0, 0, 500, 500);
   water.depthMulti = 0.06;
   water.refractionStrength = 0.12;
