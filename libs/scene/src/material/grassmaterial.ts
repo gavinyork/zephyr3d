@@ -85,7 +85,7 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
     scope.$inputs.placement = pb.vec4().attrib('texCoord1');
     scope.kkTerrainNormalMap = pb.tex2D().uniform(2);
     scope.kkTerrainSize = pb.vec2().uniform(2);
-    scope.kkNormal = pb.vec3();
+    scope.$g.kkNormal = pb.vec3();
     const normalSample = pb.textureSampleLevel(
       scope.kkTerrainNormalMap,
       pb.div(scope.$inputs.placement.xz, scope.kkTerrainSize),

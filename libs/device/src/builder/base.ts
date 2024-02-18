@@ -445,6 +445,13 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     return this;
   }
   /**
+   * Whether this is a constructor
+   * @returns true if this is a constructor
+   */
+  isConstructor(): boolean {
+    return this.$ast instanceof ASTShaderExpConstructor && this.$ast.args.length === 0;
+  }
+  /**
    * Determine if this variable is of vector type
    * @returns true if the variable is of vector type, otherwise false
    */

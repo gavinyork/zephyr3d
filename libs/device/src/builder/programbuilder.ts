@@ -1758,7 +1758,7 @@ export class ProgramBuilder {
             throw new Error(`cannot assign to readonly variable: ${name}`);
           }
         });
-      } 
+      }
       //throw new Error(`input location ${location} already declared`);
     } else {
       variable.$location = location;
@@ -3002,7 +3002,10 @@ export class PBLocalScope extends PBScope {
       this[prop] = value;
       return true;
     }
-    if (!(this.$_scope instanceof PBGlobalScope) && value instanceof PBShaderExp && value.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM) {
+    if (!(this.$_scope instanceof PBGlobalScope)
+      && value instanceof PBShaderExp
+      && (value.isConstructor() || (value.$typeinfo.isTextureType() && value.$ast instanceof AST.ASTPrimitive && !value.$ast.name))
+      && value.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM) {
       // We are setting uniform a uniform, should invoke in the global scope
       this.$g[prop] = value;
       return true;
