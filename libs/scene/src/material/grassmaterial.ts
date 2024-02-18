@@ -83,9 +83,9 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
     const pb = scope.$builder;
     scope.$inputs.pos = pb.vec3().attrib('position');
     scope.$inputs.placement = pb.vec4().attrib('texCoord1');
-    scope.$g.kkTerrainNormalMap = pb.tex2D().uniform(2);
-    scope.$g.kkTerrainSize = pb.vec2().uniform(2);
-    scope.$g.kkNormal = pb.vec3();
+    scope.kkTerrainNormalMap = pb.tex2D().uniform(2);
+    scope.kkTerrainSize = pb.vec2().uniform(2);
+    scope.kkNormal = pb.vec3();
     const normalSample = pb.textureSampleLevel(
       scope.kkTerrainNormalMap,
       pb.div(scope.$inputs.placement.xz, scope.kkTerrainSize),
@@ -99,7 +99,7 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
     const pb = scope.$builder;
     const that = this;
     if (this.needFragmentColor()) {
-      scope.$g.albedoTextureSize = pb.vec2().uniform(2);
+      scope.albedoTextureSize = pb.vec2().uniform(2);
       pb.func('calcMipLevel', [pb.vec2('coord')], function () {
         this.$l.dx = pb.dpdx(this.coord);
         this.$l.dy = pb.dpdy(this.coord);

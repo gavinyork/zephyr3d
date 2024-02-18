@@ -539,11 +539,11 @@ export class MeshMaterial extends Material {
     const pb = scope.$builder;
     ShaderFramework.prepareFragmentShader(pb, this.drawContext);
     if (this._alphaCutoff > 0) {
-      scope.$g.kkAlphaCutoff = pb.float().uniform(2);
+      scope.kkAlphaCutoff = pb.float().uniform(2);
     }
     if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
       if (this.isTransparent()) {
-        scope.$g.kkOpacity = pb.float().uniform(2);
+        scope.kkOpacity = pb.float().uniform(2);
       }
     }
   }

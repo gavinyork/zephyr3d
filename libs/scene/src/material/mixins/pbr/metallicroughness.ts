@@ -70,9 +70,9 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
       super.fragmentShader(scope);
       if (this.needFragmentColor()) {
         const pb = scope.$builder;
-        scope.$g.kkMetallic = pb.float().uniform(2);
-        scope.$g.kkRoughness = pb.float().uniform(2);
-        scope.$g.kkSpecularFactor = pb.vec4().uniform(2);
+        scope.kkMetallic = pb.float().uniform(2);
+        scope.kkRoughness = pb.float().uniform(2);
+        scope.kkSpecularFactor = pb.vec4().uniform(2);
       }
     }
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {

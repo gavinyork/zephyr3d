@@ -83,7 +83,7 @@ export function mixinTextureProps<U extends string>(name: U) {
                 scope.$inputs[semantic] = pb.vec2().attrib(semantic);
               }
               if (this.featureUsed(featureTexMatrix)) {
-                scope.$g[`kk${capName}TextureMatrix`] = pb.mat4().uniform(2);
+                scope[`kk${capName}TextureMatrix`] = pb.mat4().uniform(2);
                 if (!vertex) {
                   scope.$outputs[`kk${capName}TexCoord`] = pb.mul(
                     scope[`kk${capName}TextureMatrix`],
@@ -102,7 +102,7 @@ export function mixinTextureProps<U extends string>(name: U) {
         if (this.needFragmentColor()) {
           const pb = scope.$builder;
           if (this.featureUsed(feature)) {
-            scope.$g[`kk${capName}Tex`] = pb.tex2D().uniform(2);
+            scope[`kk${capName}Tex`] = pb.tex2D().uniform(2);
           }
         }
       }

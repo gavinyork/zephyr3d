@@ -49,7 +49,7 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
       super.fragmentShader(scope);
       if (this.needFragmentColor()) {
         const pb = scope.$builder;
-        scope.$g.kkAlbedo = pb.vec4().uniform(2);
+        scope.kkAlbedo = pb.vec4().uniform(2);
       }
     }
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {

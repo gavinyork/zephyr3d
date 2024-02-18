@@ -36,7 +36,7 @@ export class BlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
     const pb = scope.$builder;
     const that = this;
     if (this.needFragmentColor()) {
-      scope.$g.kkShininess = scope.$builder.float().uniform(2);
+      scope.kkShininess = scope.$builder.float().uniform(2);
       scope.$l.albedo = this.calculateAlbedoColor(scope);
       if (this.vertexColor) {
         scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope));

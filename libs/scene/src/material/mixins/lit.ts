@@ -764,7 +764,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
         if (this.normalTexture) {
-          scope.$g.kkNormalScale = pb.float().uniform(2);
+          scope.kkNormalScale = pb.float().uniform(2);
         }
       }
     }

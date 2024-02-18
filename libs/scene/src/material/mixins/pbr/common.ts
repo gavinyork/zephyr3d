@@ -218,19 +218,19 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       super.fragmentShader(scope);
       if (this.needFragmentColor()) {
-        scope.$g.kkF0 = pb.vec4().uniform(2);
-        scope.$g.kkEmissiveFactor = pb.vec4().uniform(2);
+        scope.kkF0 = pb.vec4().uniform(2);
+        scope.kkEmissiveFactor = pb.vec4().uniform(2);
         if (this.occlusionTexture) {
-          scope.$g.kkOcclusionStrength = pb.float().uniform(2);
+          scope.kkOcclusionStrength = pb.float().uniform(2);
         }
         if (this.sheen) {
-          scope.$g.kkSheenFactor = pb.vec4().uniform(2);
+          scope.kkSheenFactor = pb.vec4().uniform(2);
         }
         if (this.clearcoat) {
-          scope.$g.kkClearcoatFactor = pb.vec4().uniform(2);
+          scope.kkClearcoatFactor = pb.vec4().uniform(2);
         }
         if (this.drawContext.drawEnvLight) {
-          scope.$g.kkGGXLut = pb.tex2D().uniform(2);
+          scope.kkGGXLut = pb.tex2D().uniform(2);
         }
       }
     }
