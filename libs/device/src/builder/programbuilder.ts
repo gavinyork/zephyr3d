@@ -3002,6 +3002,11 @@ export class PBLocalScope extends PBScope {
       this[prop] = value;
       return true;
     }
+    if (!(this.$_scope instanceof PBGlobalScope) && value instanceof PBShaderExp && value.$ast instanceof AST.ASTShaderExpConstructor && value.$ast.args.length === 0 && value.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM) {
+      // We are setting uniform a uniform, should invoke in the global scope
+      this.$g[prop] = value;
+      return true;
+    }
     const val = this.$_scope.$localGet(prop);
     if (val === undefined) {
       const type = getCurrentProgramBuilder().guessExpValueType(value);
