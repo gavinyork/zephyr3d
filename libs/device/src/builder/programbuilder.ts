@@ -1748,20 +1748,32 @@ export class ProgramBuilder {
   /** @internal */
   in(location: number, name: string, variable: PBShaderExp): void {
     if (this._inputs[location]) {
-      throw new Error(`input location ${location} already declared`);
+      // input already exists, create an alias
+      if (!this._inputScope[name]){
+        Object.defineProperty(this._inputScope, name, {
+          get: function (this: PBInputScope) {
+            return variable;
+          },
+          set: function () {
+            throw new Error(`cannot assign to readonly variable: ${name}`);
+          }
+        });
+      } 
+      //throw new Error(`input location ${location} already declared`);
+    } else {
+      variable.$location = location;
+      variable.$declareType = AST.DeclareType.DECLARE_TYPE_IN;
+      this._inputs[location] = [name, new AST.ASTDeclareVar(new AST.ASTPrimitive(variable))];
+      Object.defineProperty(this._inputScope, name, {
+        get: function (this: PBInputScope) {
+          return variable;
+        },
+        set: function () {
+          throw new Error(`cannot assign to readonly variable: ${name}`);
+        }
+      });
+      variable.$tags.forEach((val) => this.tagShaderExp(() => variable, val));
     }
-    variable.$location = location;
-    variable.$declareType = AST.DeclareType.DECLARE_TYPE_IN;
-    this._inputs[location] = [name, new AST.ASTDeclareVar(new AST.ASTPrimitive(variable))];
-    Object.defineProperty(this._inputScope, name, {
-      get: function (this: PBInputScope) {
-        return variable;
-      },
-      set: function () {
-        throw new Error(`cannot assign to readonly variable: ${name}`);
-      }
-    });
-    variable.$tags.forEach((val) => this.tagShaderExp(() => variable, val));
   }
   /** @internal */
   out(location: number, name: string, variable: PBShaderExp): void {
@@ -3133,6 +3145,9 @@ export class PBInputScope extends PBScope {
     } else if (prop in this) {
       throw new Error(`Can not assign to shader input variable: "${prop}"`);
     } else {
+      if (!(value instanceof PBShaderExp)) {
+        throw new Error(`invalid vertex input value`);
+      }
       const st = getCurrentProgramBuilder().shaderType;
       if (st !== ShaderType.Vertex) {
         throw new Error(`shader input variables can only be declared in vertex shader: "${prop}"`);
@@ -3142,7 +3157,12 @@ export class PBInputScope extends PBScope {
         throw new Error(`can not declare shader input variable: invalid vertex attribute: "${prop}"`);
       }
       if (getCurrentProgramBuilder()._vertexAttributes.indexOf(attrib) >= 0) {
-        throw new Error(`can not declare shader input variable: attribute already declared: "${prop}"`);
+        const p = getCurrentProgramBuilder().getReflection().attribute(value.$attrib);
+        if (p.$typeinfo.typeId !== value.$typeinfo.typeId) {
+          throw new Error(`can not declare shader input variable: attribute already declared with different type: "${prop}"`);
+        }
+        getCurrentProgramBuilder().in(p.$location, prop, p);
+        return;
       }
       if (!(value instanceof PBShaderExp) || !(value.$ast instanceof AST.ASTShaderExpConstructor)) {
         throw new Error(`invalid shader input variable declaration: "${prop}"`);
