@@ -25,7 +25,11 @@
   <script>
     var url = new URL(location.href);
     if (url.hash === '#/' || url.hash === '') {
-      url.hash = '#/en/';
+      if (navigator.language.indexOf('zh') === 0) {
+        url.hash = '#/zh-cn/';
+      } else {
+        url.hash = '#/en/';
+      }
       location.href = url.href;
     }
     window.$docsify = {

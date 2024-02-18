@@ -1401,6 +1401,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     highp(): PBShaderExp;
     // (undocumented)
     inout(): PBShaderExp;
+    isConstructor(): boolean;
     isVector(): boolean;
     lowp(): PBShaderExp;
     mediump(): PBShaderExp;
