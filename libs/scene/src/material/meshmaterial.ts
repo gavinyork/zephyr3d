@@ -52,6 +52,7 @@ export class MeshMaterial extends Material {
   private _blendMode: BlendMode;
   private _opacity: number;
   private _ctx: DrawContext;
+  private _materialPass: number;
   constructor(...args: any[]) {
     super();
     this._featureStates = [];
@@ -59,10 +60,15 @@ export class MeshMaterial extends Material {
     this._blendMode = 'none';
     this._opacity = 1;
     this._ctx = null;
+    this._materialPass = -1;
   }
   /** Draw context for shader creation */
   get drawContext(): DrawContext {
     return this._ctx;
+  }
+  /** Current material pass */
+  get pass(): number {
+    return this._materialPass;
   }
   /** A value between 0 and 1, presents the cutoff for alpha testing */
   get alphaCutoff(): number {
@@ -146,18 +152,18 @@ export class MeshMaterial extends Material {
   isTransparent(): boolean {
     return this.featureUsed(MeshMaterial.FEATURE_ALPHABLEND);
   }
-  beginDraw(ctx: DrawContext): boolean {
+  beginDraw(ctx: DrawContext, pass: number): boolean {
     this.updateBlendingState(ctx);
-    return super.beginDraw(ctx);
+    return super.beginDraw(ctx, pass);
   }
   /** @internal */
-  protected createProgram(ctx: DrawContext): GPUProgram {
+  protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
     const pb = new ProgramBuilder(Application.instance.device);
     if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
       const shadowMapParams = ctx.shadowMapInfo.get((ctx.renderPass as ShadowMapPass).light);
       pb.emulateDepthClamp = !!shadowMapParams.depthClampEnabled;
     }
-    return this._createProgram(pb, ctx);
+    return this._createProgram(pb, ctx, pass);
   }
   /**
    * Check if a feature is in use for given render pass type.
@@ -551,9 +557,10 @@ export class MeshMaterial extends Material {
    * {@inheritDoc Material._createProgram}
    * @override
    */
-  protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram {
+  protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram {
     const that = this;
     this._ctx = ctx;
+    this._materialPass = pass;
     const program = pb.buildRenderProgram({
       vertex(pb) {
         pb.main(function () {

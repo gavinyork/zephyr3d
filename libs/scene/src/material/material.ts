@@ -77,65 +77,21 @@ class InstanceBindGroupPool {
   }
 }
 
-/**
- * Common debug channels for material
- * @public
- */
-export type MaterialCommonDebugChannel = 'normal' | 'tangent' | 'binormal' | 'shadingNormal';
-/**
- * Base debug channels for PBR material
- * @public
- */
-export type PBRBaseDebugChannel = 'pbrBase' | 'pbrMetallic' | 'pbrRoughness' | 'pbrMetallicRoughness';
-/**
- * Clearcoat related debug channels for PBR material
- * @public
- */
-export type PBRClearcoatDebugChannel =
-  | 'pbrClearCoat'
-  | 'pbrClearCoatFactor'
-  | 'pbrClearCoatRoughness'
-  | 'pbrClearCoatNormal';
-/**
- * Sheen related debug channels for PBR material
- * @public
- */
-export type PBRSheenDebugChannel =
-  | 'pbrSheen'
-  | 'pbrSheenColor'
-  | 'pbrSheenRoughness'
-  | 'pbrSheenAlbedoScaling';
-/**
- * Specular related debug channels for PBR material
- * @public
- */
-export type PBRSpecularDebugChannel = 'pbrSpecular' | 'pbrSpecularFactor' | 'pbrSpecularColor';
-/**
- * Debug channels for material
- * @public
- */
-export type MaterialDebugChannel =
-  | ''
-  | MaterialCommonDebugChannel
-  | PBRBaseDebugChannel
-  | PBRClearcoatDebugChannel
-  | PBRSheenDebugChannel
-  | PBRSpecularDebugChannel;
-
 export interface IMaterial {
   readonly id: number;
   stateSet: RenderStateSet;
   isTransparent(): boolean;
   supportLighting(): boolean;
   draw(primitive: Primitive, ctx: DrawContext);
-  beginDraw(ctx: DrawContext): boolean;
-  endDraw(): void;
+  drawInstanced(primitive: Primitive, numInstances: number, ctx: DrawContext);
+  beginDraw(ctx: DrawContext, pass: number): boolean;
+  endDraw(pass: number): void;
   getMaterialBindGroup(): BindGroup;
-  applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean): void;
-  getOrCreateProgram(ctx: DrawContext): ProgramInfo;
+  applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number): void;
+  getOrCreateProgram(ctx: DrawContext, pass: number): ProgramInfo;
   dispose(): void;
   optionChanged(changeHash: boolean): void;
-  createHash(renderPassType: number): string;
+  createHash(renderPassType: number, pass: number): string;
   clearBindGroupCache(): number;
 }
 
@@ -144,8 +100,6 @@ export interface IMaterial {
  * @public
  */
 export class Material implements IMaterial {
-  /** @internal */
-  private static _debugChannel: MaterialDebugChannel = '';
   /** @internal */
   private static _nextId = 0;
   /** @internal */
@@ -187,7 +141,9 @@ export class Material implements IMaterial {
     }
   > = new WeakMap();
   /** @internal */
-  protected _hash: string[];
+  protected _numPasses: number;
+  /** @internal */
+  protected _hash: string[][];
   /** @internal */
   protected _renderStateSet: RenderStateSet;
   /** @internal */
@@ -209,29 +165,32 @@ export class Material implements IMaterial {
    */
   constructor() {
     this._id = ++Material._nextId;
-    this._hash = [];
+    this._numPasses = 1;
+    this._hash = [[]];
     this._renderStateSet = null;
     this._bindGroupMap = {};
     this._optionTag = 0;
     this._materialBindGroup = null;
   }
-  /** Debug channel */
-  static get debugChannel(): MaterialDebugChannel {
-    return this._debugChannel;
-  }
-  static set debugChannel(val: MaterialDebugChannel) {
-    this._debugChannel = val;
-  }
   /** Unique identifier of the material */
   get id(): number {
     return this._id;
   }
-  /** @internal */
-  protected getHash(renderPassType: number): string {
-    if (this._hash[renderPassType] === void 0) {
-      this._hash[renderPassType] = this.createHash(renderPassType);
+  get numPasses(): number {
+    return this._numPasses;
+  }
+  set numPasses(val: number) {
+    while (this._hash.length < val) {
+      this._hash.push([]);
     }
-    return this._hash[renderPassType];
+    this._numPasses = val;
+  }
+  /** @internal */
+  protected getHash(renderPassType: number, pass: number): string {
+    if (this._hash[pass][renderPassType] === void 0) {
+      this._hash[pass][renderPassType] = this.createHash(renderPassType, pass);
+    }
+    return this._hash[pass][renderPassType];
   }
   /** Render states associated to this material */
   get stateSet(): RenderStateSet {
@@ -257,13 +216,29 @@ export class Material implements IMaterial {
    * @param ctx - The context of current drawing task
    */
   draw(primitive: Primitive, ctx: DrawContext) {
-    if (this.beginDraw(ctx)) {
-      if (ctx.instanceData?.worldMatrices.length > 1) {
-        primitive.drawInstanced(ctx.instanceData.worldMatrices.length);
-      } else {
-        primitive.draw();
+    for (let i = 0; i < this._numPasses; i++) {
+      if (this.beginDraw(ctx, i)) {
+        if (ctx.instanceData?.worldMatrices.length > 1) {
+          primitive.drawInstanced(ctx.instanceData.worldMatrices.length);
+        } else {
+          primitive.draw();
+        }
+        this.endDraw(i);
       }
-      this.endDraw();
+    }
+  }
+  /**
+   * Draws instanced primitives using this material
+   * @param primitive - The prmitive to be drawn
+   * @param numInstances - How many instances should be drawn
+   * @param ctx - The context of current drawing task
+   */
+  drawInstanced(primitive: Primitive, numInstances: number, ctx: DrawContext) {
+    for (let i = 0; i < this._numPasses; i++) {
+      if (this.beginDraw(ctx, i)) {
+        primitive.drawInstanced(numInstances);
+        this.endDraw(i);
+      }
     }
   }
   /**
@@ -271,16 +246,16 @@ export class Material implements IMaterial {
    * @param ctx - The context of current drawing task
    * @returns true if succeeded, otherwise false
    */
-  beginDraw(ctx: DrawContext): boolean {
+  beginDraw(ctx: DrawContext, pass: number): boolean {
     const numInstances = ctx.instanceData?.worldMatrices?.length || 1;
     const device = Application.instance.device;
-    const programInfo = this.getOrCreateProgram(ctx);
+    const programInfo = this.getOrCreateProgram(ctx, pass);
     if (programInfo) {
       const hash = programInfo.hash;
       if (!programInfo.programs[ctx.renderPass.type]) {
         return null;
       }
-      this._materialBindGroup = this.applyMaterialBindGroups(ctx, hash);
+      this._materialBindGroup = this.applyMaterialBindGroups(ctx, hash, pass);
       if (numInstances > 1) {
         this.applyInstanceBindGroups(ctx, hash);
       } else {
@@ -299,7 +274,7 @@ export class Material implements IMaterial {
   /**
    * Ends drawing a primitive
    */
-  endDraw(): void {
+  endDraw(pass: number): void {
     this._materialBindGroup = null;
   }
   /**
@@ -315,9 +290,9 @@ export class Material implements IMaterial {
    * @param ctx - The context of current drawing task
    * @param needUpdate - true if the uniform values needs to update
    */
-  applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean): void {
+  applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number): void {
     if (needUpdate) {
-      this._applyUniforms(bindGroup, ctx);
+      this._applyUniforms(bindGroup, ctx, pass);
     }
   }
   /**
@@ -325,11 +300,11 @@ export class Material implements IMaterial {
    * @param ctx - The context for current drawing task
    * @returns Information of the gpu program
    */
-  getOrCreateProgram(ctx: DrawContext): ProgramInfo {
+  getOrCreateProgram(ctx: DrawContext, pass: number): ProgramInfo {
     const programMap = Material._programMap;
     const renderPassType = ctx.renderPass.type;
-    const hash = `${Material.debugChannel}:${this.getHash(
-      renderPassType
+    const hash = `${this.getHash(
+      renderPassType, pass
     )}:${!!ctx.target.getBoneMatrices()}:${Number(!!(ctx.instanceData?.worldMatrices.length > 1))}:${
       ctx.renderPassHash
     }`;
@@ -340,7 +315,7 @@ export class Material implements IMaterial {
       programInfo.programs[renderPassType].disposed
     ) {
       console.time(hash);
-      const program = this.createProgram(ctx);
+      const program = this.createProgram(ctx, pass);
       console.timeEnd(hash);
       if (!programInfo) {
         programInfo = {
@@ -350,11 +325,6 @@ export class Material implements IMaterial {
         programMap[hash] = programInfo;
       }
       programInfo.programs[renderPassType] = program;
-      if (false && program) {
-        console.log('---------------------------------------');
-        console.log(program.getShaderSource('fragment'));
-        console.log('---------------------------------------');
-      }
     }
     return programInfo || null;
   }
@@ -424,7 +394,9 @@ export class Material implements IMaterial {
   optionChanged(changeHash: boolean) {
     this._optionTag++;
     if (changeHash) {
-      this._hash = [];
+      for (let i = 0; i < this._numPasses; i++) {
+        this._hash[i] = [];
+      }
     }
   }
   /** @internal */
@@ -432,7 +404,7 @@ export class Material implements IMaterial {
     return this._programMap[hash].programs[index];
   }
   /** @internal */
-  private applyMaterialBindGroups(ctx: DrawContext, hash: string): BindGroup {
+  private applyMaterialBindGroups(ctx: DrawContext, hash: string, pass: number): BindGroup {
     const index = ctx.renderPass.type;
     let bindGroupInfo = this._bindGroupMap[hash];
     if (!bindGroupInfo) {
@@ -459,7 +431,8 @@ export class Material implements IMaterial {
         bindGroup,
         ctx,
         bindGroupInfo.materialTag[index] < this._optionTag ||
-          bindGroupInfo.bindGroupTag[index] !== bindGroup.cid
+          bindGroupInfo.bindGroupTag[index] !== bindGroup.cid,
+        pass
       );
       bindGroupInfo.materialTag[index] = this._optionTag;
       bindGroupInfo.bindGroupTag[index] = bindGroup.cid;
@@ -549,8 +522,8 @@ export class Material implements IMaterial {
     }
   }
   /** @internal */
-  createHash(renderPassType: number): string {
-    return `${this.constructor.name}|${this._createHash(renderPassType)}`;
+  createHash(renderPassType: number, pass: number): string {
+    return `${this.constructor.name}|${pass}|${this._createHash(renderPassType)}`;
   }
   /** @internal */
   clearBindGroupCache(): number {
@@ -596,9 +569,9 @@ export class Material implements IMaterial {
     this._materialIterators.set(material, this._materialLRU.append(material));
   }
   /** @internal */
-  protected createProgram(ctx: DrawContext): GPUProgram {
+  protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
     const pb = new ProgramBuilder(Application.instance.device);
-    return this._createProgram(pb, ctx);
+    return this._createProgram(pb, ctx, pass);
   }
   /** @internal */
   protected createRenderStateSet(): RenderStateSet {
@@ -611,7 +584,7 @@ export class Material implements IMaterial {
    * @param func - The material func
    * @returns The created shader program
    */
-  protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram {
+  protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram {
     return null;
   }
   /**
@@ -619,7 +592,7 @@ export class Material implements IMaterial {
    * @param bindGroup - The bind group
    * @param ctx - The drawing context
    */
-  protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext) {}
+  protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number) {}
   /**
    * Calculates the hash code of the shader program
    * @returns The hash code
