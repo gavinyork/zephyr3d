@@ -67,6 +67,7 @@ export class GrassCluster implements Drawable {
   }
   draw(ctx: DrawContext) {
     this._material.alphaToCoverage = Application.instance.device.getFrameBufferSampleCount() > 1;
+    this._material.alphaCutoff = this._material.alphaToCoverage ? 1 : 0.8;
     if (this._material.beginDraw(ctx)) {
       this._primitive.drawInstanced(this._numInstances);
       this._terrain.grassMaterial.endDraw();

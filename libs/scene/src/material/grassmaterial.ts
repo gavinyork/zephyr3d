@@ -10,6 +10,7 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
+import { RENDER_PASS_TYPE_FORWARD } from '../values';
 
 export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight, mixinPBRMetallicRoughness) {
   /** @internal */
@@ -107,34 +108,34 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
         this.$return(pb.max(0, pb.mul(pb.log2(this.deltaMaxSqr), 0.5)));
       });
       scope.$l.albedo = this.calculateAlbedoColor(scope);
-      scope.$l.normalInfo = this.calculateNormalAndTBN(scope);
-      scope.$l.normal = scope.normalInfo.normal;
-      scope.$l.viewVec = this.calculateViewVector(scope);
-      scope.$l.pbrData = this.getCommonData(scope, scope.albedo, scope.viewVec, scope.normalInfo.TBN);
-      scope.$l.lightingColor = pb.vec3(0);
-      scope.$l.emissiveColor = this.calculateEmissiveColor(scope);
-      this.indirectLighting(scope, scope.normal, scope.viewVec, scope.pbrData, scope.lightingColor);
-      this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, shadow) {
-        this.$l.diffuse = pb.vec3();
-        this.$l.specular = pb.vec3();
-        this.$l.lightAtten = that.calculateLightAttenuation(this, type, posRange, dirCutoff);
-        this.$l.lightDir = that.calculateLightDirection(this, type, posRange, dirCutoff);
-        this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
-        this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
-        if (shadow) {
-          this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.NoL));
-        }
-        that.directLighting(
-          this,
-          this.lightDir,
-          this.lightColor,
-          this.normal,
-          this.viewVec,
-          this.pbrData,
-          this.lightingColor
-        );
-      });
-      scope.$l.litColor = pb.add(scope.lightingColor, scope.emissiveColor);
+      scope.$l.litColor = pb.vec3(0);
+      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
+        scope.$l.normalInfo = this.calculateNormalAndTBN(scope);
+        scope.$l.normal = scope.normalInfo.normal;
+        scope.$l.viewVec = this.calculateViewVector(scope);
+        scope.$l.pbrData = this.getCommonData(scope, scope.albedo, scope.viewVec, scope.normalInfo.TBN);
+        this.indirectLighting(scope, scope.normal, scope.viewVec, scope.pbrData, scope.litColor);
+        this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, shadow) {
+          this.$l.diffuse = pb.vec3();
+          this.$l.specular = pb.vec3();
+          this.$l.lightAtten = that.calculateLightAttenuation(this, type, posRange, dirCutoff);
+          this.$l.lightDir = that.calculateLightDirection(this, type, posRange, dirCutoff);
+          this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
+          this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
+          if (shadow) {
+            this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.NoL));
+          }
+          that.directLighting(
+            this,
+            this.lightDir,
+            this.lightColor,
+            this.normal,
+            this.viewVec,
+            this.pbrData,
+            this.litColor
+          );
+        });
+      }
       scope.albedo.a = pb.mul(
         scope.albedo.a,
         pb.add(
@@ -150,10 +151,6 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
           pb.div(pb.sub(scope.albedo.a, 0.4), pb.max(pb.fwidth(scope.albedo.a), 0.0001)),
           0.5
         );
-      } else {
-        scope.$if(pb.lessThan(scope.albedo.a, 0.8), function () {
-          pb.discard();
-        });
       }
       this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
