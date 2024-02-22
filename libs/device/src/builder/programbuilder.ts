@@ -1140,6 +1140,14 @@ export class ProgramBuilder {
   getCurrentScope(): PBScope {
     return this._scopeStack[0];
   }
+  /** Gets the current function scope */
+  getCurrentFunctionScope(): PBScope {
+    let funcScope: PBScope = this.getCurrentScope();
+    while (funcScope && !(funcScope instanceof PBFunctionScope)) {
+      funcScope = funcScope.$parent;
+    }
+    return funcScope;
+  }
   /**
    * Generates shader codes for a render program
    * @param options - The build options
@@ -1613,7 +1621,7 @@ export class ProgramBuilder {
         );
         this.findStructType(structName, shaderType).prefix = prefix;
         const structInstance = this.struct(structName, instanceName);
-        const structInstanceIN = inOrOut === 'in' ? this.struct(structName, 'uu_AppInput') : structInstance;
+        const structInstanceIN = inOrOut === 'in' ? this.struct(structName, AST.getBuiltinParamName(shaderType)) : structInstance;
         return [structType, structInstance, structName, structInstanceIN];
       }
     } else {
@@ -3114,6 +3122,9 @@ export class PBBuiltinScope extends PBScope {
       const v = AST.builtinVariables[pb.getDevice().type];
       const info = v[name];
       const inout = info.inOrOut;
+      if (inout === 'in') {
+        return pb.getCurrentFunctionScope()[AST.getBuiltinParamName(pb.shaderType)][info.name];
+      }
       const structName =
         inout === 'in'
           ? AST.getBuiltinInputStructInstanceName(pb.shaderType)
@@ -3145,6 +3156,16 @@ export class PBInputScope extends PBScope {
   /** @internal */
   protected $_getLocalScope(): PBLocalScope {
     return null;
+  }
+  /** @internal */
+  protected $get(prop: string) {
+    const pb = this.$builder;
+    if (pb.getDevice().type === 'webgpu') {
+      const param = pb.getCurrentFunctionScope()[AST.getBuiltinParamName(pb.shaderType)];
+      const prefix = pb.shaderKind === 'vertex' ? input_prefix : output_prefix_vs;
+      return param[`${prefix}${prop}`];
+    }
+    return super.$get(prop);
   }
   /** @internal */
   protected $set(prop: string, value: any): boolean {
@@ -3363,7 +3384,7 @@ export class PBGlobalScope extends PBScope {
   ) {
     const pb = getCurrentProgramBuilder();
     if (pb.getDevice().type === 'webgpu' && !isMain) {
-      params.push(this.$inputStruct(AST.getBuiltinParamName()))
+      params.push(this.$inputStruct(AST.getBuiltinParamName(pb.shaderType)))
     }
     params.forEach((param) => {
       if (!(param.$ast instanceof AST.ASTPrimitive)) {

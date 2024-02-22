@@ -30,7 +30,9 @@ const BuiltinOutputStructNameFS = 'uu_FSOutput';
 const BuiltinInputStructNameCS = 'uu_CSInput';
 const BuiltinOutputStructNameCS = 'uu_CSOutput';
 
-const BuiltinParamName = 'uu_InputPtr';
+const BuiltinParamNameVS = 'uu_VertexInput';
+const BuiltinParamNameFS = 'uu_VertexOutput';
+const BuiltinParamNameCS = 'uu_ComputeInput';
 
 const BuiltinInputStructInstanceNameVS = 'uu_VSInputCpy';
 const BuiltinOutputStructInstanceNameVS = 'uu_VSOutputCpy';
@@ -58,8 +60,13 @@ export enum ShaderPrecisionType {
 }
 
 /** @internal */
-export function getBuiltinParamName() {
-  return BuiltinParamName;
+export function getBuiltinParamName(shaderType: ShaderType) {
+  switch(shaderType) {
+    case ShaderType.Vertex: return BuiltinParamNameVS;
+    case ShaderType.Fragment: return BuiltinParamNameFS;
+    case ShaderType.Compute: return BuiltinParamNameCS;
+    default: return null;
+  }
 }
 
 /** @internal */
