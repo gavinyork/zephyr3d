@@ -2667,7 +2667,7 @@ export class PBScope extends Proxiable<PBScope> {
    * @returns The input vertex attribute or null if not exists
    */
   $getVertexAttrib(semantic: VertexSemantic): PBShaderExp {
-    return getCurrentProgramBuilder().getReflection().attribute(semantic);
+    return this.$inputs.$getVertexAttrib(semantic);// getCurrentProgramBuilder().getReflection().attribute(semantic);
   }
   /** Get the current local scope */
   get $l(): PBLocalScope {
@@ -3150,8 +3150,18 @@ export class PBBuiltinScope extends PBScope {
  */
 export class PBInputScope extends PBScope {
   /** @internal */
+  private $_names: Record<string, string>;
+  private $_aliases: Record<string, string>;
+  /** @internal */
   constructor() {
     super(null);
+    this.$_names = {};
+    this.$_aliases = {};
+  }
+  /** @internal */
+  $getVertexAttrib(attrib: VertexSemantic): PBShaderExp {
+    const name = this.$_names[attrib];
+    return name ? this[name] : null;
   }
   /** @internal */
   protected $_getLocalScope(): PBLocalScope {
@@ -3159,6 +3169,12 @@ export class PBInputScope extends PBScope {
   }
   /** @internal */
   protected $get(prop: string) {
+    if (prop[0] === '$') {
+      return this[prop];
+    }
+    if (this.$_aliases[prop]) {
+      prop = this.$_aliases[prop];
+    }
     const pb = this.$builder;
     if (pb.getDevice().type === 'webgpu') {
       const param = pb.getCurrentFunctionScope()[AST.getBuiltinParamName(pb.shaderType)];
@@ -3186,11 +3202,14 @@ export class PBInputScope extends PBScope {
         throw new Error(`can not declare shader input variable: invalid vertex attribute: "${prop}"`);
       }
       if (getCurrentProgramBuilder()._vertexAttributes.indexOf(attrib) >= 0) {
-        const p = getCurrentProgramBuilder().getReflection().attribute(value.$attrib);
-        if (p.$typeinfo.typeId !== value.$typeinfo.typeId) {
-          throw new Error(`can not declare shader input variable: attribute already declared with different type: "${prop}"`);
+        const lastName = this.$_names[value.$attrib];
+        if(prop !== lastName) {
+          const p = this[lastName] as PBShaderExp;
+          if (p.$typeinfo.typeId !== value.$typeinfo.typeId) {
+            throw new Error(`can not declare shader input variable: attribute already declared with different type: "${prop}"`);
+          }
+          this.$_aliases[prop] = lastName;
         }
-        getCurrentProgramBuilder().in(p.$location, prop, p);
         return;
       }
       if (!(value instanceof PBShaderExp) || !(value.$ast instanceof AST.ASTShaderExpConstructor)) {
@@ -3200,11 +3219,12 @@ export class PBInputScope extends PBScope {
       if (!type.isPrimitiveType() || type.isMatrixType() || type.primitiveType === PBPrimitiveType.BOOL) {
         throw new Error(`type cannot be used as pipeline input/output: ${prop}`);
       }
+      this.$_names[value.$attrib] = prop;
       const location = getCurrentProgramBuilder()._inputs.length;
       const exp = new PBShaderExp(`${input_prefix}${prop}`, type).tag(...value.$tags);
       getCurrentProgramBuilder().in(location, prop, exp);
       getCurrentProgramBuilder()._vertexAttributes.push(attrib);
-      getCurrentProgramBuilder().getReflection().setAttrib(value.$attrib, exp);
+      //getCurrentProgramBuilder().getReflection().setAttrib(value.$attrib, exp);
       // modify input struct for webgpu
       if (getCurrentProgramBuilder().getDevice().type === 'webgpu') {
         if (getCurrentProgramBuilder().findStructType(AST.getBuiltinInputStructName(st), st)) {
@@ -3301,25 +3321,28 @@ export class PBGlobalScope extends PBScope {
     const pb = getCurrentProgramBuilder();
     if (pb.getDevice().type === 'webgpu') {
       const inputStruct = this.$inputStructInfo;
-      this.$local(inputStruct[1]);
+      //this.$local(inputStruct[1]);
       const isCompute = pb.shaderType === ShaderType.Compute;
       const outputStruct = isCompute ? null : pb.defineBuiltinStruct(pb.shaderType, 'out');
       if (outputStruct) {
         this.$local(outputStruct[1]);
       }
-      this.$internalCreateFunction('chMainStub', [], false, body);
+      // this.$internalCreateFunction('chMainStub', [], false, body);
       this.$internalCreateFunction(
         'main',
         inputStruct ? [inputStruct[3]] : [],
         true,
         function (this: PBFunctionScope) {
+          /*
           if (inputStruct) {
             this[inputStruct[1].$str] = this[inputStruct[3].$str];
           }
+          */
           if (pb.shaderType === ShaderType.Fragment && pb.emulateDepthClamp) {
             this.$builtins.fragDepth = pb.clamp(this.$inputs.clamppedDepth, 0, 1);
           }
-          this.chMainStub();
+          body?.call(this);
+          //this.chMainStub();
           if (pb.shaderType === ShaderType.Vertex) {
             if (pb.depthRangeCorrection) {
               this.$builtins.position.z = pb.mul(
