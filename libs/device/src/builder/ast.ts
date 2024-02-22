@@ -30,6 +30,8 @@ const BuiltinOutputStructNameFS = 'uu_FSOutput';
 const BuiltinInputStructNameCS = 'uu_CSInput';
 const BuiltinOutputStructNameCS = 'uu_CSOutput';
 
+const BuiltinParamName = 'uu_InputPtr';
+
 const BuiltinInputStructInstanceNameVS = 'uu_VSInputCpy';
 const BuiltinOutputStructInstanceNameVS = 'uu_VSOutputCpy';
 const BuiltinInputStructInstanceNameFS = 'uu_FSInputCpy';
@@ -53,6 +55,11 @@ export enum ShaderPrecisionType {
   HIGH,
   MEDIUM,
   LOW
+}
+
+/** @internal */
+export function getBuiltinParamName() {
+  return BuiltinParamName;
 }
 
 /** @internal */
@@ -1890,17 +1897,7 @@ export class ASTCallFunction extends ASTExpression {
     return `${this.isStatement ? indent : ''}${this.name}(${args.join(',')})${this.isStatement ? ';\n' : ''}`;
   }
   toWGSL(indent: string, ctx: ASTContext) {
-    let thisArgs = this.args.filter((val) => {
-      const type = val.getType();
-      if (
-        val instanceof ASTPrimitive &&
-        type.isStructType() &&
-        ctx.types.findIndex((t) => t instanceof ASTStructDefine && t.type.structName === type.structName) < 0
-      ) {
-        return false;
-      }
-      return true;
-    });
+    let thisArgs = this.args;
     if (this.func) {
       let argsNew: ASTExpression[];
       const convertedArgs = convertArgs(thisArgs, this.func.funcType);
@@ -1910,7 +1907,16 @@ export class ASTCallFunction extends ASTExpression {
       if (!argsNew) {
         throw new Error(`no matching overloading found for function '${this.name}'`);
       }
-      thisArgs = argsNew;
+      thisArgs = argsNew.filter((val) => {
+        const type = val.getType();
+        if (
+          type.isStructType() &&
+          ctx.types.findIndex((t) => t instanceof ASTStructDefine && t.type.structName === type.structName) < 0
+        ) {
+          return false;
+        }
+        return true;
+      });
     }
     const args = thisArgs.map((arg) => unbracket(arg.toWGSL(indent, ctx)));
     return `${this.isStatement ? indent : ''}${this.name}(${args.join(',')})${this.isStatement ? ';\n' : ''}`;

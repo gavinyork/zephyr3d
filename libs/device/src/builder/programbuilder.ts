@@ -3258,18 +3258,32 @@ export class PBOutputScope extends PBScope {
  */
 export class PBGlobalScope extends PBScope {
   /** @internal */
+  $_inputStructInfo: [ShaderTypeFunc, PBShaderExp, string, PBShaderExp];
+  /** @internal */
   constructor() {
     super(new AST.ASTGlobalScope());
+    this.$_inputStructInfo = null;
+  }
+  /** @internal */
+  get $inputStructInfo(): [ShaderTypeFunc, PBShaderExp, string, PBShaderExp] {
+    if (!this.$_inputStructInfo){
+      this.$_inputStructInfo = this.$builder.defineBuiltinStruct(this.$builder.shaderType, 'in');
+    }
+    return this.$_inputStructInfo;
+  }
+  /** @internal */
+  get $inputStruct(): ShaderTypeFunc {
+    return this.$inputStructInfo[0];
   }
   /** @internal */
   $mainFunc(body?: (this: PBFunctionScope) => void) {
     const pb = getCurrentProgramBuilder();
     if (pb.getDevice().type === 'webgpu') {
-      const inputStruct = pb.defineBuiltinStruct(pb.shaderType, 'in');
+      const inputStruct = this.$inputStructInfo;
       this.$local(inputStruct[1]);
       const isCompute = pb.shaderType === ShaderType.Compute;
       const outputStruct = isCompute ? null : pb.defineBuiltinStruct(pb.shaderType, 'out');
-      if (!isCompute) {
+      if (outputStruct) {
         this.$local(outputStruct[1]);
       }
       this.$internalCreateFunction('chMainStub', [], false, body);
@@ -3348,6 +3362,9 @@ export class PBGlobalScope extends PBScope {
     body?: (this: PBFunctionScope) => void
   ) {
     const pb = getCurrentProgramBuilder();
+    if (pb.getDevice().type === 'webgpu' && !isMain) {
+      params.push(this.$inputStruct(AST.getBuiltinParamName()))
+    }
     params.forEach((param) => {
       if (!(param.$ast instanceof AST.ASTPrimitive)) {
         throw new Error(`${name}(): invalid function definition`);
@@ -3420,7 +3437,18 @@ export class PBGlobalScope extends PBScope {
             throw new Error(`function ${name} not found`);
           }
           return (...args: ExpValueType[]) => {
-            const argsNonArray = args.map((val) => pb.normalizeExpValue(val));
+            let inputArg: PBShaderExp = null;
+            if (pb.getDevice().type === 'webgpu') {
+              let funcScope = pb.getCurrentScope();
+              while (funcScope && !(funcScope instanceof PBFunctionScope)) {
+                funcScope = funcScope.$parent;
+              }
+              const funcArgs = (funcScope.$ast as AST.ASTFunction).args;
+              const arg = funcArgs[funcArgs.length - 1].paramAST;
+              const name = (arg as AST.ASTPrimitive).name;
+              inputArg = funcScope[name];
+            }
+            const argsNonArray = (inputArg ? [...args, inputArg] : args).map((val) => pb.normalizeExpValue(val));
             const funcType = pb._getFunctionOverload(name, argsNonArray);
             if (!funcType) {
               throw new Error(`ERROR: no matching overloads for function ${name}`);
