@@ -3179,6 +3179,10 @@ export class PBInputScope extends PBScope {
     if (pb.getDevice().type === 'webgpu') {
       const param = pb.getCurrentFunctionScope()[AST.getBuiltinParamName(pb.shaderType)];
       const prefix = pb.shaderKind === 'vertex' ? input_prefix : output_prefix_vs;
+      const name = `${prefix}${prop}`;
+      if ((param.$typeinfo as PBStructTypeInfo).structMembers.findIndex(val => val.name === name) < 0){
+        return undefined;
+      }
       return param[`${prefix}${prop}`];
     }
     return super.$get(prop);

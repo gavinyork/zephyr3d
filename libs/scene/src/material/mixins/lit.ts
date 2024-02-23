@@ -550,7 +550,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       const that = this;
       if (that.drawContext.renderPass.type !== RENDER_PASS_TYPE_FORWARD) {
-        console.warn('LitMaterialXX.forEachLight(): must be called in forward render pass');
+        console.warn('LitMaterial.forEachLight(): must be called in forward render pass');
         return;
       }
       if (that.drawContext.currentShadowLight) {
