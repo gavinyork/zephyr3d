@@ -1,9 +1,9 @@
 import { RenderPass } from './renderpass';
 import { RENDER_PASS_TYPE_DEPTH_ONLY } from '../values';
-import { ShaderFramework } from '../shaders';
 import { Application } from '../app';
 import type { RenderQueue } from './render_queue';
 import type { DrawContext } from './drawable';
+import { ShaderHelper } from '../material/shader/helper';
 
 /**
  * Depth render pass
@@ -34,7 +34,7 @@ export class DepthRenderPass extends RenderPass {
     const device = Application.instance.device;
     const bindGroup = this.getGlobalBindGroupInfo(ctx).bindGroup;
     device.setBindGroup(0, bindGroup);
-    ShaderFramework.setCameraUniforms(bindGroup, ctx, true);
+    ShaderHelper.setCameraUniforms(bindGroup, ctx, true);
     ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
     const reverseWinding = ctx.camera.worldMatrixDet < 0;
     for (const order of Object.keys(renderQueue.items)

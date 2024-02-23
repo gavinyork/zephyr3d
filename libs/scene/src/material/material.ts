@@ -12,6 +12,7 @@ import type { Primitive } from '../render/primitive';
 import type { Drawable, DrawContext } from '../render/drawable';
 import { Application } from '../app';
 import { RENDER_PASS_TYPE_DEPTH_ONLY, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP } from '../values';
+import { ShaderHelper } from './shader/helper';
 
 /**
  * Garbage collection options for material
@@ -69,7 +70,7 @@ class InstanceBindGroupPool {
     const bindGroup = this._bindGroups[bindGroupIndex];
     const offset = (maxSize - bindGroup.freeSize) / 64;
     for (const matrix of worldMatrices) {
-      bindGroup.bindGroup.setRawData('worldMatrix', maxSize - bindGroup.freeSize, matrix);
+      bindGroup.bindGroup.setRawData(ShaderHelper.getWorldMatricesUniformName(), maxSize - bindGroup.freeSize, matrix);
       bindGroup.freeSize -= 64;
     }
     device.setBindGroup(3, bindGroup.bindGroup);
@@ -482,7 +483,7 @@ export class Material implements IMaterial {
     const offset = Material._instanceBindGroupPool.apply(hash, index, ctx.instanceData.worldMatrices);
     const bindGroup = this.getDrawableBindGroup(ctx, hash).bindGroup?.[index];
     if (bindGroup) {
-      bindGroup.setValue('instanceBufferOffset', offset);
+      bindGroup.setValue(ShaderHelper.getInstanceBufferOffsetUniformName(), offset);
       Application.instance.device.setBindGroup(1, bindGroup);
     } else {
       Application.instance.device.setBindGroup(1, null);
@@ -499,7 +500,7 @@ export class Material implements IMaterial {
         drawableBindGroup.xformTag[index] < ctx.target.getXForm().getTag() ||
         drawableBindGroup.bindGroupTag[index] !== bindGroup.cid
       ) {
-        bindGroup.setValue('worldMatrix', ctx.target.getXForm().worldMatrix);
+        bindGroup.setValue(ShaderHelper.getWorldMatrixUniformName(), ctx.target.getXForm().worldMatrix);
         drawableBindGroup.xformTag[index] = ctx.target.getXForm().getTag();
         drawableBindGroup.bindGroupTag[index] = bindGroup.cid;
       }
@@ -512,9 +513,9 @@ export class Material implements IMaterial {
             mipFilter: 'none'
           });
         }
-        bindGroup.setTexture('boneMatrices', boneMatrices);
-        bindGroup.setValue('boneTextureSize', boneMatrices.width);
-        bindGroup.setValue('invBindMatrix', ctx.target.getInvBindMatrix());
+        bindGroup.setTexture(ShaderHelper.getBoneMatricesUniformName(), boneMatrices);
+        bindGroup.setValue(ShaderHelper.getBoneTextureSizeUniformName(), boneMatrices.width);
+        bindGroup.setValue(ShaderHelper.getBoneInvBindMatrixUniformName(), ctx.target.getInvBindMatrix());
       }
       device.setBindGroup(1, bindGroup);
     } else {

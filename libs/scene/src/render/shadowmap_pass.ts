@@ -1,11 +1,11 @@
 import { RenderPass } from './renderpass';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../values';
-import { ShaderFramework } from '../shaders';
 import { Application } from '../app';
 import type { PunctualLight } from '../scene/light';
 import type { RenderQueue } from './render_queue';
 import type { DrawContext } from './drawable';
 import type { AbstractDevice, RenderStateSet } from '@zephyr3d/device';
+import { ShaderHelper } from '../material/shader/helper';
 
 /**
  * Shadow map render pass
@@ -63,8 +63,8 @@ export class ShadowMapPass extends RenderPass {
     const device = Application.instance.device;
     const bindGroup = this.getGlobalBindGroupInfo(ctx).bindGroup;
     device.setBindGroup(0, bindGroup);
-    ShaderFramework.setLightUniformsShadowMap(bindGroup, ctx, this._currentLight);
-    ShaderFramework.setCameraUniforms(bindGroup, ctx, true);
+    ShaderHelper.setLightUniformsShadowMap(bindGroup, ctx, this._currentLight);
+    ShaderHelper.setCameraUniforms(bindGroup, ctx, true);
     ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
     const reverseWinding = ctx.camera.worldMatrixDet < 0;
     for (const order of Object.keys(renderQueue.items)

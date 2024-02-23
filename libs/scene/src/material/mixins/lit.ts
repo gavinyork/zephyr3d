@@ -5,9 +5,8 @@ import {
   LIGHT_TYPE_SPOT,
   RENDER_PASS_TYPE_FORWARD
 } from '../../values';
-import { ShaderFramework, nonLinearDepthToLinear } from '../../shaders';
+import { nonLinearDepthToLinear } from '../../shaders';
 import type { DrawContext } from '../../render';
-import { Application } from '../../app';
 import type { MeshMaterial } from '../meshmaterial';
 import { applyMaterialMixins } from '../meshmaterial';
 import type { TextureMixinInstanceTypes } from './texture';
@@ -127,7 +126,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     calculateViewVector(scope: PBInsideFunctionScope): PBShaderExp {
       const pb = scope.$builder;
       return pb.normalize(
-        pb.sub(ShaderFramework.getCameraPosition(scope), ShaderFramework.getWorldPosition(scope).xyz)
+        pb.sub(this.helper.getCameraPosition(scope), this.helper.getWorldPosition(scope).xyz)
       );
     }
     /**
@@ -156,9 +155,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       const that = this;
       const args: PBShaderExp[] = [];
       const params: PBShaderExp[] = [];
-      const worldNormal = ShaderFramework.getWorldNormal(scope);
-      const worldTangent = ShaderFramework.getWorldTangent(scope);
-      const worldBinormal = ShaderFramework.getWorldBinormal(scope);
+      const worldNormal = that.helper.getWorldNormal(scope);
+      const worldTangent = that.helper.getWorldTangent(scope);
+      const worldBinormal = that.helper.getWorldBinormal(scope);
       if (worldNormal) {
         params.push(pb.vec3('worldNormal'));
         args.push(worldNormal);
@@ -168,7 +167,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         }
       }
       pb.func('kkCalculateNormal', params, function () {
-        const posW = ShaderFramework.getWorldPosition(this).xyz;
+        const posW = that.helper.getWorldPosition(this).xyz;
         this.$l.uv = that.normalTexture
           ? that.getNormalTexCoord(this) ?? pb.vec2(0)
           : that.albedoTexture
@@ -266,9 +265,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       const that = this;
       const args: PBShaderExp[] = [];
       const params: PBShaderExp[] = [];
-      const worldNormal = ShaderFramework.getWorldNormal(scope);
-      const worldTangent = ShaderFramework.getWorldTangent(scope);
-      const worldBinormal = ShaderFramework.getWorldBinormal(scope);
+      const worldNormal = that.helper.getWorldNormal(scope);
+      const worldTangent = that.helper.getWorldTangent(scope);
+      const worldBinormal = that.helper.getWorldBinormal(scope);
       if (worldNormal) {
         params.push(pb.vec3('worldNormal'));
         args.push(worldNormal);
@@ -278,7 +277,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         }
       }
       pb.func('kkCalculateNormalAndTBN', params, function () {
-        const posW = ShaderFramework.getWorldPosition(this).xyz;
+        const posW = that.helper.getWorldPosition(this).xyz;
         this.$l.uv = that.normalTexture
           ? that.getNormalTexCoord(this) ?? pb.vec2(0)
           : that.albedoTexture
@@ -400,7 +399,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       return this.drawContext.env.light.envLight.hasIrradiance()
         ? scope.$builder.mul(
             this.drawContext.env.light.envLight.getIrradiance(scope, normal).rgb,
-            ShaderFramework.getEnvLightStrength(scope)
+            this.helper.getEnvLightStrength(scope)
           )
         : scope.$builder.vec3(0);
     }
@@ -425,7 +424,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       return this.drawContext.env.light.envLight.hasRadiance()
         ? scope.$builder.mul(
             this.drawContext.env.light.envLight.getRadiance(scope, reflectVec, roughness).rgb,
-            ShaderFramework.getEnvLightStrength(scope)
+            this.helper.getEnvLightStrength(scope)
           )
         : scope.$builder.vec3(0);
     }
@@ -448,87 +447,19 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      */
     calculateShadow(scope: PBInsideFunctionScope, NoL: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
-      const that = this;
       if (!this.needCalucateShadow()) {
         console.warn('calculateShadow(): No need to calculate shadow');
         return pb.float(1);
       }
-      const shadowMapParams = this.drawContext.shadowMapInfo.get(this.drawContext.currentShadowLight);
-      const funcName = 'lm_calculateCSM';
-      pb.func(funcName, [pb.float('NoL')], function () {
-        if (shadowMapParams.numShadowCascades > 1) {
-          this.$l.shadowCascades = this.global.light.shadowCascades;
-          this.$l.shadowBound = pb.vec4(0, 0, 1, 1);
-          this.$l.linearDepth = nonLinearDepthToLinear(this, this.$builtins.fragCoord.z);
-          this.$l.splitDistances = ShaderFramework.getCascadeDistances(this);
-          this.$l.comparison = pb.vec4(pb.greaterThan(pb.vec4(this.linearDepth), this.splitDistances));
-          this.$l.cascadeFlags = pb.vec4(
-            pb.float(pb.greaterThan(this.shadowCascades, 0)),
-            pb.float(pb.greaterThan(this.shadowCascades, 1)),
-            pb.float(pb.greaterThan(this.shadowCascades, 2)),
-            pb.float(pb.greaterThan(this.shadowCascades, 3))
-          );
-          this.$l.split = pb.int(pb.dot(this.comparison, this.cascadeFlags));
-          if (Application.instance.device.type === 'webgl') {
-            this.$l.shadowVertex = pb.vec4();
-            this.$for(pb.int('cascade'), 0, 4, function () {
-              this.$if(pb.equal(this.cascade, this.split), function () {
-                this.shadowVertex = ShaderFramework.calculateShadowSpaceVertex(this, this.cascade);
-                this.$break();
-              });
-            });
-          } else {
-            this.$l.shadowVertex = ShaderFramework.calculateShadowSpaceVertex(this, this.split);
-          }
-          const shadowMapParams = that.drawContext.shadowMapInfo.get(that.drawContext.currentShadowLight);
-          this.$l.shadow = shadowMapParams.impl.computeShadowCSM(
-            shadowMapParams,
-            this,
-            this.shadowVertex,
-            this.NoL,
-            this.split
-          );
-          this.$l.shadowDistance = ShaderFramework.getShadowCameraParams(scope).w;
-          this.shadow = pb.mix(
-            this.shadow,
-            1,
-            pb.smoothStep(
-              pb.mul(this.shadowDistance, 0.8),
-              this.shadowDistance,
-              pb.distance(ShaderFramework.getCameraPosition(this), ShaderFramework.getWorldPosition(this).xyz)
-            )
-          );
-          this.$return(this.shadow);
-        } else {
-          this.$l.shadowVertex = ShaderFramework.calculateShadowSpaceVertex(this);
-          const shadowMapParams = that.drawContext.shadowMapInfo.get(that.drawContext.currentShadowLight);
-          this.$l.shadow = shadowMapParams.impl.computeShadow(
-            shadowMapParams,
-            this,
-            this.shadowVertex,
-            this.NoL
-          );
-          this.$l.shadowDistance = ShaderFramework.getShadowCameraParams(scope).w;
-          this.shadow = pb.mix(
-            this.shadow,
-            1,
-            pb.smoothStep(
-              pb.mul(this.shadowDistance, 0.8),
-              this.shadowDistance,
-              pb.distance(ShaderFramework.getCameraPosition(this), ShaderFramework.getWorldPosition(this).xyz)
-            )
-          );
-          this.$return(this.shadow);
-        }
-      });
-      return pb.getGlobalScope()[funcName](NoL);
+      return this.helper.calculateShadow(scope, NoL, this.drawContext);
     }
     private getClusterIndex(scope: PBInsideFunctionScope, fragCoord: PBShaderExp) {
       const pb = scope.$builder;
+      const that = this;
       const funcName = 'lm_getClusterIndex';
       pb.func(funcName, [pb.vec3('fragCoord')], function () {
-        const clusterParams = ShaderFramework.getClusterParams(this);
-        const countParams = ShaderFramework.getCountParams(this);
+        const clusterParams = that.helper.getClusterParams(this);
+        const countParams = that.helper.getCountParams(this);
         this.$l.zTile = pb.int(
           pb.max(
             pb.add(
@@ -546,9 +477,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     protected calculatePointLightAttenuation(scope: PBInsideFunctionScope, posRange: PBShaderExp) {
       const pb = scope.$builder;
+      const that = this;
       const funcName = 'lm_calculatePointLightAttenuation';
       pb.func(funcName, [pb.vec4('posRange')], function () {
-        this.$l.dist = pb.distance(this.posRange.xyz, ShaderFramework.getWorldPosition(this).xyz);
+        this.$l.dist = pb.distance(this.posRange.xyz, that.helper.getWorldPosition(this).xyz);
         this.$l.falloff = pb.max(0, pb.sub(1, pb.div(this.dist, this.posRange.w)));
         this.$return(pb.mul(this.falloff, this.falloff));
       });
@@ -560,12 +492,13 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       dirCutoff: PBShaderExp
     ) {
       const pb = scope.$builder;
+      const that = this;
       const funcName = 'lm_calculateSpotLightAttenuation';
       pb.func(funcName, [pb.vec4('posRange'), pb.vec4('dirCutoff')], function () {
-        this.$l.dist = pb.distance(this.posRange.xyz, ShaderFramework.getWorldPosition(this).xyz);
+        this.$l.dist = pb.distance(this.posRange.xyz, that.helper.getWorldPosition(this).xyz);
         this.$l.falloff = pb.max(0, pb.sub(1, pb.div(this.dist, this.posRange.w)));
         this.$l.spotFactor = pb.dot(
-          pb.normalize(pb.sub(ShaderFramework.getWorldPosition(this).xyz, this.posRange.xyz)),
+          pb.normalize(pb.sub(that.helper.getWorldPosition(this).xyz, this.posRange.xyz)),
           this.dirCutoff.xyz
         );
         this.spotFactor = pb.smoothStep(this.dirCutoff.w, pb.mix(this.dirCutoff.w, 1, 0.5), this.spotFactor);
@@ -600,7 +533,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       return scope.$choice(
         pb.equal(type, LIGHT_TYPE_DIRECTIONAL),
         pb.neg(dirCutoff.xyz),
-        pb.normalize(pb.sub(posRange.xyz, ShaderFramework.getWorldPosition(scope).xyz))
+        pb.normalize(pb.sub(posRange.xyz, this.helper.getWorldPosition(scope).xyz))
       );
     }
     forEachLight(
@@ -621,9 +554,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         return;
       }
       if (that.drawContext.currentShadowLight) {
-        const posRange = scope.global.light.positionAndRange;
-        const dirCutoff = scope.global.light.directionAndCutoff;
-        const colorIntensity = scope.global.light.diffuseAndIntensity;
+        const posRange = that.helper.getGlobalUniforms(scope).light.positionAndRange;
+        const dirCutoff = that.helper.getGlobalUniforms(scope).light.directionAndCutoff;
+        const colorIntensity = that.helper.getGlobalUniforms(scope).light.diffuseAndIntensity;
         scope.$scope(function () {
           const lightType = scope.$choice(
             pb.lessThan(posRange.w, 0),
@@ -634,14 +567,14 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         });
       } else {
         scope.$scope(function () {
-          const countParams = ShaderFramework.getCountParams(this);
+          const countParams = that.helper.getCountParams(this);
           this.$l.cluster = that.getClusterIndex(this, this.$builtins.fragCoord.xyz);
           this.$l.clusterIndex = pb.add(
             this.cluster.x,
             pb.mul(this.cluster.y, countParams.x),
             pb.mul(this.cluster.z, countParams.x, countParams.y)
           );
-          this.$l.texSize = this.global.light.lightIndexTexSize;
+          this.$l.texSize = that.helper.getGlobalUniforms(scope).light.lightIndexTexSize;
           if (pb.getDevice().type === 'webgl') {
             this.$l.texCoordX = pb.div(
               pb.add(pb.mod(pb.float(this.clusterIndex), pb.float(this.texSize.x)), 0.5),
@@ -652,14 +585,14 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
               pb.float(this.texSize.y)
             );
             this.$l.samp = pb.textureSample(
-              ShaderFramework.getClusteredLightIndexTexture(this),
+              that.helper.getClusteredLightIndexTexture(this),
               pb.vec2(this.texCoordX, this.texCoordY)
             );
           } else {
             this.$l.texCoordX = pb.mod(this.clusterIndex, this.texSize.x);
             this.$l.texCoordY = pb.div(this.clusterIndex, this.texSize.x);
             this.$l.samp = pb.textureLoad(
-              ShaderFramework.getClusteredLightIndexTexture(this),
+              that.helper.getClusteredLightIndexTexture(this),
               pb.ivec2(this.texCoordX, this.texCoordY),
               0
             );
@@ -675,9 +608,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                 this.$if(pb.greaterThan(this.li, 0), function () {
                   this.$for(pb.int('j'), 1, 256, function () {
                     this.$if(pb.equal(this.j, this.li), function () {
-                      this.$l.positionRange = ShaderFramework.getLightPositionAndRange(this, this.j);
-                      this.$l.directionCutoff = ShaderFramework.getLightDirectionAndCutoff(this, this.j);
-                      this.$l.diffuseIntensity = ShaderFramework.getLightColorAndIntensity(this, this.j);
+                      this.$l.positionRange = that.helper.getLightPositionAndRange(this, this.j);
+                      this.$l.directionCutoff = that.helper.getLightDirectionAndCutoff(this, this.j);
+                      this.$l.diffuseIntensity = that.helper.getLightColorAndIntensity(this, this.j);
                       this.$l.lightType = this.$choice(
                         pb.lessThan(this.positionRange.w, 0),
                         pb.int(LIGHT_TYPE_DIRECTIONAL),
@@ -708,9 +641,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
               this.$for(pb.uint('k'), 0, 4, function () {
                 this.$l.c = pb.compAnd(pb.sar(this.samp.at(this.i), pb.mul(this.k, 8)), 0xff);
                 this.$if(pb.greaterThan(this.c, 0), function () {
-                  this.$l.positionRange = ShaderFramework.getLightPositionAndRange(this, this.c);
-                  this.$l.directionCutoff = ShaderFramework.getLightDirectionAndCutoff(this, this.c);
-                  this.$l.diffuseIntensity = ShaderFramework.getLightColorAndIntensity(this, this.c);
+                  this.$l.positionRange = that.helper.getLightPositionAndRange(this, this.c);
+                  this.$l.directionCutoff = that.helper.getLightDirectionAndCutoff(this, this.c);
+                  this.$l.diffuseIntensity = that.helper.getLightColorAndIntensity(this, this.c);
                   this.$l.lightType = this.$choice(
                     pb.lessThan(this.positionRange.w, 0),
                     pb.int(LIGHT_TYPE_DIRECTIONAL),

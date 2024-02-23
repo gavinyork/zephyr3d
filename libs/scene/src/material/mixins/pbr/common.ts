@@ -13,7 +13,6 @@ import type { DrawContext } from '../../../render';
 import { getGGXLUT } from '../ggxlut';
 import type { TextureMixinInstanceTypes } from '../texture';
 import { mixinTextureProps } from '../texture';
-import { ShaderFramework } from '../../../shaders';
 
 export type IMixinPBRCommon = {
   ior: number;
@@ -475,7 +474,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           ) {
             return;
           }
-          const envLightStrength = ShaderFramework.getEnvLightStrength(this);
+          const envLightStrength = that.helper.getEnvLightStrength(this);
           if (that.occlusionTexture) {
             const occlusionSample = that.sampleOcclusionTexture(this).r;
             this.$l.occlusion = pb.mul(

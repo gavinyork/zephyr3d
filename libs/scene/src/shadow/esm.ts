@@ -8,7 +8,7 @@ import { Application } from '../app';
 import { TemporalCache } from '../render';
 import { LIGHT_TYPE_POINT } from '../values';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
-import { ShaderFramework } from '../shaders';
+import { ShaderHelper } from '../material/shader/helper';
 
 type ESMImplData = {
   blurFramebuffer: FrameBuffer;
@@ -289,7 +289,7 @@ export class ESM extends ShadowImpl {
       if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
         this.$l.dir = pb.sub(
           this.shadowVertex.xyz,
-          ShaderFramework.getLightPositionAndRangeForShadow(this).xyz
+          ShaderHelper.getLightPositionAndRangeForShadow(this).xyz
         );
         this.$return(filterShadowESM(this, LIGHT_TYPE_POINT, shadowMapParams.shadowMap.format, this.dir));
       } else {

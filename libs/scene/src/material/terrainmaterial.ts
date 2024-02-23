@@ -293,7 +293,7 @@ export class TerrainMaterial extends applyMaterialMixins(
       scope.terrainInfo = pb.vec4().uniform(2);
       scope.$outputs.mapUV = pb.div(scope.$inputs.zPos.xz, scope.terrainInfo.xy);
     }
-    this.transformVertexAndNormal(scope);
+    this.helper.transformVertexAndNormal(scope);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);

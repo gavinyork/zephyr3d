@@ -93,7 +93,7 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
       0
     ).rgb;
     scope.kkNormal = pb.normalize(pb.sub(pb.mul(normalSample, 2), pb.vec3(1)));
-    this.transformVertexAndNormal(scope);
+    this.helper.transformVertexAndNormal(scope);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);

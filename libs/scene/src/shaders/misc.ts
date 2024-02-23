@@ -1,6 +1,6 @@
 import type { PBShaderExp } from '@zephyr3d/device';
 import { PBInsideFunctionScope, PBPrimitiveType } from '@zephyr3d/device';
-import { ShaderFramework } from './framework';
+import { ShaderHelper } from '../material/shader/helper';
 
 /**
  * Calculates the TBN matrix
@@ -114,7 +114,7 @@ export function linearDepthToNonLinear(
   nearFar?: PBShaderExp
 ): PBShaderExp {
   const pb = scope.$builder;
-  nearFar = nearFar || ShaderFramework.getCameraParams(scope);
+  nearFar = nearFar ?? ShaderHelper.getCameraParams(scope);
   return pb.div(pb.sub(nearFar.y, pb.div(pb.mul(nearFar.x, nearFar.y), depth)), pb.sub(nearFar.y, nearFar.x));
 }
 
@@ -134,7 +134,7 @@ export function nonLinearDepthToLinear(
   nearFar?: PBShaderExp
 ): PBShaderExp {
   const pb = scope.$builder;
-  nearFar = nearFar || ShaderFramework.getCameraParams(scope);
+  nearFar = nearFar ?? ShaderHelper.getCameraParams(scope);
   return pb.div(pb.mul(nearFar.x, nearFar.y), pb.mix(nearFar.y, nearFar.x, depth));
 }
 
@@ -154,7 +154,7 @@ export function nonLinearDepthToLinearNormalized(
   nearFar?: PBShaderExp
 ): PBShaderExp {
   const pb = scope.$builder;
-  nearFar = nearFar || ShaderFramework.getCameraParams(scope);
+  nearFar = nearFar ?? ShaderHelper.getCameraParams(scope);
   return pb.div(nearFar.x, pb.mix(nearFar.y, nearFar.x, depth));
 }
 
@@ -375,7 +375,7 @@ export function encodeColorOutput(scope: PBInsideFunctionScope, outputColor: PBS
   const pb = scope.$builder;
   const funcName = 'lib_EncodeColorOutput';
   pb.func(funcName, [pb.vec4('outputColor')], function () {
-    const params = ShaderFramework.getCameraParams(this);
+    const params = ShaderHelper.getCameraParams(this);
     this.$if(pb.notEqual(params.w, 0), function () {
       this.$return(pb.vec4(linearToGamma(this, this.outputColor.rgb), this.outputColor.w));
     }).$else(function () {

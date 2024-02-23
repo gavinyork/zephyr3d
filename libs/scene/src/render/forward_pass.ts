@@ -1,6 +1,5 @@
 import { RenderPass } from './renderpass';
 import { RENDER_PASS_TYPE_FORWARD } from '../values';
-import { ShaderFramework } from '../shaders';
 import { Application } from '../app';
 import { Vector4 } from '@zephyr3d/base';
 import type { RenderQueueItem, RenderQueue } from './render_queue';
@@ -8,6 +7,7 @@ import type { Camera } from '../camera/camera';
 import type { AbstractDevice, RenderStateSet } from '@zephyr3d/device';
 import type { PunctualLight } from '../scene/light';
 import type { DrawContext } from './drawable';
+import { ShaderHelper } from '../material/shader/helper';
 
 /**
  * Forward render pass
@@ -86,11 +86,11 @@ export class ForwardRenderPass extends RenderPass {
       (ctx.env.light.envLight.hasRadiance() || ctx.env.light.envLight.hasIrradiance());
     ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
     const info = this.getGlobalBindGroupInfo(ctx);
-    ShaderFramework.setCameraUniforms(info.bindGroup, ctx, !!device.getFramebuffer());
+    ShaderHelper.setCameraUniforms(info.bindGroup, ctx, !!device.getFramebuffer());
     if (ctx.currentShadowLight) {
-      ShaderFramework.setLightUniformsShadow(info.bindGroup, ctx, lights[0]);
+      ShaderHelper.setLightUniformsShadow(info.bindGroup, ctx, lights[0]);
     } else {
-      ShaderFramework.setLightUniforms(
+      ShaderHelper.setLightUniforms(
         info.bindGroup,
         ctx,
         ctx.clusteredLight.clusterParam,
@@ -100,7 +100,7 @@ export class ForwardRenderPass extends RenderPass {
       );
     }
     if (ctx.applyFog) {
-      ShaderFramework.setFogUniforms(
+      ShaderHelper.setFogUniforms(
         info.bindGroup,
         ctx.env.sky.mappedFogType,
         baseLightPass ? ctx.env.sky.fogColor : Vector4.zero(),

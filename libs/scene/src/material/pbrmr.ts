@@ -16,7 +16,7 @@ export class PBRMetallicRoughnessMaterial extends applyMaterialMixins(
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
     scope.$inputs.zPos = scope.$builder.vec3().attrib('position');
-    this.transformVertexAndNormal(scope);
+    this.helper.transformVertexAndNormal(scope);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);

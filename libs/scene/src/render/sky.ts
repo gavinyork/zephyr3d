@@ -1,6 +1,6 @@
 import { Application } from '../app';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders/misc';
-import { ShaderFramework, smoothNoise3D } from '../shaders';
+import { smoothNoise3D } from '../shaders';
 import { CubeFace, Matrix4x4, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { Primitive } from './primitive';
 import { BoxShape } from '../shapes';
@@ -20,6 +20,7 @@ import type {
   VertexLayout
 } from '@zephyr3d/device';
 import type { DrawContext } from './drawable';
+import { ShaderHelper } from '../material/shader/helper';
 
 /**
  * Type of sky
@@ -41,11 +42,11 @@ export type SkyType = 'color' | 'skybox' | 'scatter' | 'scatter-nocloud' | 'none
 export type FogType = 'linear' | 'exp' | 'exp2' | 'scatter' | 'none';
 
 const fogTypeMap: Record<FogType, number> = {
-  linear: ShaderFramework.FOG_TYPE_LINEAR,
-  exp: ShaderFramework.FOG_TYPE_EXP,
-  exp2: ShaderFramework.FOG_TYPE_EXP2,
-  scatter: ShaderFramework.FOG_TYPE_SCATTER,
-  none: ShaderFramework.FOG_TYPE_NONE
+  linear: ShaderHelper.FOG_TYPE_LINEAR,
+  exp: ShaderHelper.FOG_TYPE_EXP,
+  exp2: ShaderHelper.FOG_TYPE_EXP2,
+  scatter: ShaderHelper.FOG_TYPE_SCATTER,
+  none: ShaderHelper.FOG_TYPE_NONE
 };
 
 const defaultSkyWorldMatrix = Matrix4x4.identity();
@@ -651,7 +652,7 @@ export class SkyRenderer {
             this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
             this.$l.hPos = pb.div(this.$l.hPos, this.$l.hPos.w);
             this.$l.viewDir = pb.sub(this.hPos.xyz, this.cameraPosition);
-            this.$l.fogFactor = ShaderFramework.computeFogFactor(
+            this.$l.fogFactor = ShaderHelper.computeFogFactor(
               this,
               this.viewDir,
               this.fogType,

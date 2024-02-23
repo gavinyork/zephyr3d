@@ -15,7 +15,7 @@ export class UnlitMaterial extends applyMaterialMixins(MeshMaterial, mixinVertex
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     scope.$inputs.zPos = scope.$builder.vec3().attrib('position');
-    this.transformVertexAndNormal(scope);
+    this.helper.transformVertexAndNormal(scope);
   }
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);

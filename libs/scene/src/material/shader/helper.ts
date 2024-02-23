@@ -17,7 +17,7 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
-import { MeshMaterial } from '../meshmaterial';
+import { nonLinearDepthToLinear } from '../../shaders';
 
 const UNIFORM_NAME_GLOBAL = 'z_UniformGlobal';
 const UNIFORM_NAME_LIGHT_BUFFER = 'z_UniformLightBuffer';
@@ -72,6 +72,24 @@ export class ShaderHelper {
       fogParams: null
     }
   };
+  static getWorldMatrixUniformName(): string {
+    return UNIFORM_NAME_WORLD_MATRIX;
+  }
+  static getWorldMatricesUniformName(): string {
+    return UNIFORM_NAME_WORLD_MATRICES;
+  }
+  static getInstanceBufferOffsetUniformName(): string {
+    return UNIFORM_NAME_INSTANCE_BUFFER_OFFSET;
+  }
+  static getBoneMatricesUniformName(): string {
+    return UNIFORM_NAME_BONE_MATRICES;
+  }
+  static getBoneTextureSizeUniformName(): string {
+    return UNIFORM_NAME_BONE_TEXTURE_SIZE;
+  }
+  static getBoneInvBindMatrixUniformName(): string {
+    return UNIFORM_NAME_BONE_INV_BIND_MATRIX;
+  }
   /**
    * Prepares the fragment shader which is going to be used in our material system
    *
@@ -580,7 +598,7 @@ export class ShaderHelper {
   }
   /** @internal */
   static getClusteredLightIndexTexture(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope.lightIndexTex;
+    return scope[UNIFORM_NAME_LIGHT_INDEX_TEXTURE];
   }
   /**
    * Gets the uniform variable of type vec4 which holds the fog color
@@ -952,6 +970,171 @@ export class ShaderHelper {
         scope[funcName](color);
       } else {
         const funcName = 'applyFog';
+        pb.func(funcName, [pb.vec4('color').inout()], function () {
+          this.$l.viewDir = pb.sub(
+            this.getWorldPosition(this).xyz,
+            this.getCameraPosition(this)
+          );
+          this.$l.fogFactor = this.computeFogFactor(
+            this,
+            this.viewDir,
+            this.getFogType(this),
+            this.getFogParams(this)
+          );
+          this.color = pb.vec4(
+            pb.mix(
+              this.color.rgb,
+              this.getFogColor(this).rgb,
+              pb.mul(this.fogFactor, this.color.a, this.color.a)
+            ),
+            this.color.a
+          );
+        });
+        scope[funcName](color);
+      }
+    }
+  }
+  /**
+   * Get global uniforms
+   *
+   * @param scope - Shader scope
+   */
+  static getGlobalUniforms(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL];
+  }
+  /**
+   * Get shadow map uniform value
+   *
+   * @param scope - Shader scope
+   * @returns The shadow map texture uniform
+   */
+  static getShadowMap(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_SHADOW_MAP];
+  }
+  /**
+   * Calculates shadow of current fragment
+   *
+   * @param scope - Shader scope
+   * @param NoL - NdotL vector
+   * @returns Shadow of current fragment, 1 means no shadow and 0 means full shadowed.
+   */
+  static calculateShadow(scope: PBInsideFunctionScope, NoL: PBShaderExp, ctx: DrawContext): PBShaderExp {
+    const pb = scope.$builder;
+    const that = this;
+    const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
+    const funcName = 'lm_calculateCSM';
+    pb.func(funcName, [pb.float('NoL')], function () {
+      if (shadowMapParams.numShadowCascades > 1) {
+        this.$l.shadowCascades = that.getGlobalUniforms(this).light.shadowCascades;
+        this.$l.shadowBound = pb.vec4(0, 0, 1, 1);
+        this.$l.linearDepth = nonLinearDepthToLinear(this, this.$builtins.fragCoord.z);
+        this.$l.splitDistances = that.getCascadeDistances(this);
+        this.$l.comparison = pb.vec4(pb.greaterThan(pb.vec4(this.linearDepth), this.splitDistances));
+        this.$l.cascadeFlags = pb.vec4(
+          pb.float(pb.greaterThan(this.shadowCascades, 0)),
+          pb.float(pb.greaterThan(this.shadowCascades, 1)),
+          pb.float(pb.greaterThan(this.shadowCascades, 2)),
+          pb.float(pb.greaterThan(this.shadowCascades, 3))
+        );
+        this.$l.split = pb.int(pb.dot(this.comparison, this.cascadeFlags));
+        if (Application.instance.device.type === 'webgl') {
+          this.$l.shadowVertex = pb.vec4();
+          this.$for(pb.int('cascade'), 0, 4, function () {
+            this.$if(pb.equal(this.cascade, this.split), function () {
+              this.shadowVertex = that.calculateShadowSpaceVertex(this, this.cascade);
+              this.$break();
+            });
+          });
+        } else {
+          this.$l.shadowVertex = that.calculateShadowSpaceVertex(this, this.split);
+        }
+        const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
+        this.$l.shadow = shadowMapParams.impl.computeShadowCSM(
+          shadowMapParams,
+          this,
+          this.shadowVertex,
+          this.NoL,
+          this.split
+        );
+        this.$l.shadowDistance = that.getShadowCameraParams(scope).w;
+        this.shadow = pb.mix(
+          this.shadow,
+          1,
+          pb.smoothStep(
+            pb.mul(this.shadowDistance, 0.8),
+            this.shadowDistance,
+            pb.distance(that.getCameraPosition(this), that.getWorldPosition(this).xyz)
+          )
+        );
+        this.$return(this.shadow);
+      } else {
+        this.$l.shadowVertex = that.calculateShadowSpaceVertex(this);
+        const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
+        this.$l.shadow = shadowMapParams.impl.computeShadow(
+          shadowMapParams,
+          this,
+          this.shadowVertex,
+          this.NoL
+        );
+        this.$l.shadowDistance = that.getShadowCameraParams(scope).w;
+        this.shadow = pb.mix(
+          this.shadow,
+          1,
+          pb.smoothStep(
+            pb.mul(this.shadowDistance, 0.8),
+            this.shadowDistance,
+            pb.distance(that.getCameraPosition(this), that.getWorldPosition(this).xyz)
+          )
+        );
+        this.$return(this.shadow);
+      }
+    });
+    return pb.getGlobalScope()[funcName](NoL);
+  }
+  static applyFog(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext) {
+    if (ctx.applyFog) {
+      const pb = scope.$builder;
+      if (ctx.env.sky.drawScatteredFog(ctx)) {
+        const funcName = 'zApplySkyFog';
+        pb.func(funcName, [pb.vec4('color').inout()], function () {
+          this.$l.viewDir = pb.sub(
+            this.getWorldPosition(this).xyz,
+            this.getCameraPosition(this)
+          );
+          this.viewDir.y = pb.max(this.viewDir.y, 0);
+          this.$l.distance = pb.mul(pb.length(this.viewDir), this.getWorldUnit(this));
+          this.$l.sliceDist = pb.div(
+            pb.mul(this.getCameraParams(this).y, this.getWorldUnit(this)),
+            ScatteringLut.aerialPerspectiveSliceZ
+          );
+          this.$l.slice0 = pb.floor(pb.div(this.distance, this.sliceDist));
+          this.$l.slice1 = pb.add(this.slice0, 1);
+          this.$l.factor = pb.sub(pb.div(this.distance, this.sliceDist), this.slice0);
+          this.$l.viewNormal = pb.normalize(this.viewDir);
+          this.$l.zenithAngle = pb.asin(this.viewNormal.y);
+          this.$l.horizonAngle = pb.atan2(this.viewNormal.z, this.viewNormal.x);
+          this.$l.u0 = pb.div(
+            pb.add(this.slice0, pb.div(this.horizonAngle, Math.PI * 2)),
+            ScatteringLut.aerialPerspectiveSliceZ
+          );
+          this.$l.u1 = pb.add(this.u0, 1 / ScatteringLut.aerialPerspectiveSliceZ);
+          this.$l.v = pb.div(this.zenithAngle, Math.PI / 2);
+          this.$l.t0 = pb.textureSampleLevel(
+            this.getAerialPerspectiveLUT(this),
+            pb.vec2(this.u0, this.v),
+            0
+          );
+          this.$l.t1 = pb.textureSampleLevel(
+            this.getAerialPerspectiveLUT(this),
+            pb.vec2(this.u1, this.v),
+            0
+          );
+          this.$l.t = pb.mix(this.t0, this.t1, this.factor);
+          this.color = pb.vec4(pb.add(pb.mul(this.color.rgb, this.factor), this.t.rgb), this.color.a);
+        });
+        scope[funcName](color);
+      } else {
+        const funcName = 'zApplyFog';
         pb.func(funcName, [pb.vec4('color').inout()], function () {
           this.$l.viewDir = pb.sub(
             this.getWorldPosition(this).xyz,

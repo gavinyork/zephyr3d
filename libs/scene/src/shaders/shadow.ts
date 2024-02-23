@@ -2,13 +2,13 @@ import type { TextureFormat, PBInsideFunctionScope, PBShaderExp } from '@zephyr3
 import { hasDepthChannel } from '@zephyr3d/device';
 import { Application } from '../app';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
-import { ShaderFramework } from './framework';
 import {
   decode2HalfFromRGBA,
   decodeNormalizedFloatFromRGBA,
   encodeNormalizedFloatToRGBA,
   nonLinearDepthToLinearNormalized
 } from './misc';
+import { ShaderHelper } from '../material/shader/helper';
 
 /*
   const PCF_KERNEL_3x3 = [
@@ -120,11 +120,11 @@ const PCF_POISSON_DISC = [
 ];
 
 function getShadowMapTexelSize(scope: PBInsideFunctionScope): PBShaderExp {
-  return scope.$builder.div(1, ShaderFramework.getShadowCameraParams(scope).z);
+  return scope.$builder.div(1, ShaderHelper.getShadowCameraParams(scope).z);
 }
 
 function getShadowMapSize(scope: PBInsideFunctionScope): PBShaderExp {
-  return ShaderFramework.getShadowCameraParams(scope).z;
+  return ShaderHelper.getShadowCameraParams(scope).z;
 }
 
 /** @internal */
@@ -147,7 +147,7 @@ export function computeShadowMapDepth(
       );
     } else {
       this.$l.depth = pb.float();
-      this.$l.lightType = ShaderFramework.getLightTypeForShadow(this);
+      this.$l.lightType = ShaderHelper.getLightTypeForShadow(this);
       this.$if(pb.equal(this.lightType, LIGHT_TYPE_DIRECTIONAL), function () {
         this.depth = pb.emulateDepthClamp
           ? pb.clamp(this.$inputs.clamppedDepth, 0, 1)
@@ -155,13 +155,13 @@ export function computeShadowMapDepth(
       })
         .$elseif(pb.equal(this.lightType, LIGHT_TYPE_POINT), function () {
           this.$l.lightSpacePos = pb.mul(
-            ShaderFramework.getLightViewMatrixForShadow(this),
-            ShaderFramework.getWorldPosition(this)
+            ShaderHelper.getLightViewMatrixForShadow(this),
+            ShaderHelper.getWorldPosition(this)
           );
           this.depth = pb.clamp(
             pb.div(
               pb.length(this.lightSpacePos.xyz),
-              ShaderFramework.getLightPositionAndRangeForShadow(this).w
+              ShaderHelper.getLightPositionAndRangeForShadow(this).w
             ),
             0,
             1
@@ -169,11 +169,11 @@ export function computeShadowMapDepth(
         })
         .$else(function () {
           this.$l.lightSpacePos = pb.mul(
-            ShaderFramework.getLightViewMatrixForShadow(this),
-            ShaderFramework.getWorldPosition(this)
+            ShaderHelper.getLightViewMatrixForShadow(this),
+            ShaderHelper.getWorldPosition(this)
           );
           this.depth = pb.clamp(
-            pb.div(pb.neg(this.lightSpacePos.z), ShaderFramework.getLightPositionAndRangeForShadow(this).w),
+            pb.div(pb.neg(this.lightSpacePos.z), ShaderHelper.getLightPositionAndRangeForShadow(this).w),
             0,
             1
           );
@@ -239,7 +239,7 @@ function getRandomRotationMatrix(scope: PBInsideFunctionScope, fragCoord: PBShad
 }
 
 function getPoissonDiscSampleRadius(scope: PBInsideFunctionScope): PBShaderExp {
-  return ShaderFramework.getDepthBiasValues(scope).z;
+  return ShaderHelper.getDepthBiasValues(scope).z;
 }
 
 function sampleShadowMapPCF(
@@ -262,14 +262,14 @@ function sampleShadowMapPCF(
       if (nativeShadowMap) {
         this.$return(
           cascade && Application.instance.device.type !== 'webgl'
-            ? pb.textureArraySampleCompareLevel(this.shadowMap, uv, this.cascade, sampleDepth)
-            : pb.textureSampleCompareLevel(this.shadowMap, uv, sampleDepth)
+            ? pb.textureArraySampleCompareLevel(ShaderHelper.getShadowMap(this), uv, this.cascade, sampleDepth)
+            : pb.textureSampleCompareLevel(ShaderHelper.getShadowMap(this), uv, sampleDepth)
         );
       } else {
         this.$l.shadowTex =
           cascade && Application.instance.device.type !== 'webgl'
-            ? pb.textureArraySampleLevel(this.shadowMap, uv, this.cascade, 0)
-            : pb.textureSampleLevel(this.shadowMap, uv, 0);
+            ? pb.textureArraySampleLevel(ShaderHelper.getShadowMap(this), uv, this.cascade, 0)
+            : pb.textureSampleLevel(ShaderHelper.getShadowMap(this), uv, 0);
         if (shadowMapFormat === 'rgba8unorm') {
           this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
         }
@@ -301,9 +301,9 @@ function sampleShadowMap(
     function () {
       if (lightType === LIGHT_TYPE_POINT) {
         if (nativeShadowMap) {
-          this.$return(pb.clamp(pb.textureSampleCompareLevel(this.shadowMap, this.coords, this.z), 0, 1));
+          this.$return(pb.clamp(pb.textureSampleCompareLevel(ShaderHelper.getShadowMap(this), this.coords, this.z), 0, 1));
         } else {
-          this.$l.shadowTex = pb.textureSampleLevel(this.shadowMap, this.coords, 0);
+          this.$l.shadowTex = pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.coords, 0);
           if (shadowMapFormat === 'rgba8unorm') {
             this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
           }
@@ -313,14 +313,14 @@ function sampleShadowMap(
         if (nativeShadowMap) {
           this.$return(
             cascade && Application.instance.device.type !== 'webgl'
-              ? pb.textureArraySampleCompareLevel(this.shadowMap, this.coords, this.cascade, this.z)
-              : pb.textureSampleCompareLevel(this.shadowMap, this.coords, this.z)
+              ? pb.textureArraySampleCompareLevel(ShaderHelper.getShadowMap(this), this.coords, this.cascade, this.z)
+              : pb.textureSampleCompareLevel(ShaderHelper.getShadowMap(this), this.coords, this.z)
           );
         } else {
           this.$l.shadowTex =
             cascade && Application.instance.device.type !== 'webgl'
-              ? pb.textureArraySampleLevel(this.shadowMap, this.coords, this.cascade, 0)
-              : pb.textureSampleLevel(this.shadowMap, this.coords, 0);
+              ? pb.textureArraySampleLevel(ShaderHelper.getShadowMap(this), this.coords, this.cascade, 0)
+              : pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.coords, 0);
           if (shadowMapFormat === 'rgba8unorm') {
             this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
           }
@@ -347,7 +347,7 @@ function chebyshevUpperBound(
     this.$if(pb.notEqual(this.test, 1), function () {
       this.$l.d = pb.sub(this.distance, this.occluder.x);
       this.$l.variance = pb.max(pb.mul(this.occluder.y, this.occluder.y), 0);
-      const darkness = ShaderFramework.getDepthBiasValues(this).z;
+      const darkness = ShaderHelper.getDepthBiasValues(this).z;
       this.shadow = pb.div(this.variance, pb.add(this.variance, pb.mul(this.d, this.d)));
       this.shadow = pb.clamp(pb.div(pb.sub(this.shadow, darkness), pb.sub(1, darkness)), 0, 1);
     });
@@ -371,7 +371,7 @@ export function filterShadowVSM(
     [pb.vec4('texCoord'), ...(cascade ? [pb.int('cascade')] : [])],
     function () {
       if (lightType === LIGHT_TYPE_POINT) {
-        this.$l.shadowTex = pb.textureSampleLevel(this.shadowMap, this.texCoord.xyz, 0);
+        this.$l.shadowTex = pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.texCoord.xyz, 0);
         this.$return(
           chebyshevUpperBound(
             this,
@@ -381,9 +381,9 @@ export function filterShadowVSM(
         );
       } else {
         if (Application.instance.device.type !== 'webgl' && cascade) {
-          this.$l.shadowTex = pb.textureArraySampleLevel(this.shadowMap, this.texCoord.xy, this.cascade, 0);
+          this.$l.shadowTex = pb.textureArraySampleLevel(ShaderHelper.getShadowMap(this), this.texCoord.xy, this.cascade, 0);
         } else {
-          this.$l.shadowTex = pb.textureSampleLevel(this.shadowMap, this.texCoord.xy, 0);
+          this.$l.shadowTex = pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.texCoord.xy, 0);
         }
         this.$return(
           chebyshevUpperBound(
@@ -418,34 +418,34 @@ export function filterShadowESM(
       if (lightType === LIGHT_TYPE_POINT) {
         this.$l.depth = pb.div(
           pb.length(this.shadowVertex.xyz),
-          ShaderFramework.getLightPositionAndRangeForShadow(this).w
+          ShaderHelper.getLightPositionAndRangeForShadow(this).w
         );
-        this.$l.shadowTex = pb.textureSampleLevel(this.shadowMap, this.shadowVertex.xyz, 0);
+        this.$l.shadowTex = pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.shadowVertex.xyz, 0);
         if (shadowMapFormat === 'rgba8unorm') {
           this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
         }
       } else {
         if (cascade && Application.instance.device.type !== 'webgl') {
           this.$l.shadowTex = pb.textureArraySampleLevel(
-            this.shadowMap,
+            ShaderHelper.getShadowMap(this),
             this.shadowVertex.xy,
             this.cascade,
             0
           );
         } else {
-          this.$l.shadowTex = pb.textureSampleLevel(this.shadowMap, this.shadowVertex.xy, 0);
+          this.$l.shadowTex = pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.shadowVertex.xy, 0);
         }
         if (shadowMapFormat === 'rgba8unorm') {
           this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
         }
         if (lightType === LIGHT_TYPE_SPOT) {
-          this.$l.nearFar = ShaderFramework.getShadowCameraParams(this).xy;
+          this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
           this.$l.depth = nonLinearDepthToLinearNormalized(this, this.shadowVertex.z, this.nearFar);
         } else {
           this.$l.depth = this.shadowVertex.z;
         }
       }
-      const depthScale = ShaderFramework.getDepthBiasValues(this).z;
+      const depthScale = ShaderHelper.getDepthBiasValues(this).z;
       this.$return(
         pb.clamp(pb.exp(pb.min(87, pb.mul(depthScale, pb.sub(this.shadowTex.x, this.depth)))), 0, 1)
       );
