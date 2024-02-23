@@ -16,6 +16,7 @@ import {
   nonLinearDepthToLinearNormalized
 } from '../shaders';
 import { Application } from '../app';
+import { ShaderHelper } from './shader/helper';
 
 export type BlendMode = 'none' | 'blend' | 'additive' | 'max' | 'min';
 
@@ -52,6 +53,7 @@ export class MeshMaterial extends Material {
   private _blendMode: BlendMode;
   private _opacity: number;
   private _ctx: DrawContext;
+  private _helper: typeof ShaderHelper;
   private _materialPass: number;
   constructor(...args: any[]) {
     super();
@@ -61,6 +63,11 @@ export class MeshMaterial extends Material {
     this._opacity = 1;
     this._ctx = null;
     this._materialPass = -1;
+    this._helper = ShaderHelper;
+  }
+  /** Shader helper */
+  get helper(): typeof ShaderHelper {
+    return this._helper;
   }
   /** Draw context for shader creation */
   get drawContext(): DrawContext {
@@ -226,8 +233,6 @@ export class MeshMaterial extends Material {
     const that = this;
     pb.func(funcName, [], function () {
       const viewProjMatrix = that.getViewProjectionMatrix(this);
-      this.$l.worldMatrix = that.getWorldMatrix(this);
-      this.$l.normalMatrix = that.getNormalMatrix(this);
       if (that.hasSkinning(this)) {
         this.$l.skinMatrix = that.calculateSkinMatrix(this);
       }
@@ -243,7 +248,7 @@ export class MeshMaterial extends Material {
       }
       this.$l.oPos = oPos;
       this.$outputs.worldPosition = pb
-        .mul(this.worldMatrix, pb.vec4(this.$l.oPos, 1))
+        .mul(that.helper.getWorldMatrix(this), pb.vec4(this.$l.oPos, 1))
         .tag(ShaderFramework.USAGE_WORLD_POSITION);
       that.setClipSpacePosition(this, pb.mul(viewProjMatrix, this.$outputs.worldPosition));
 
@@ -255,7 +260,7 @@ export class MeshMaterial extends Material {
       if (oNorm) {
         this.$l.oNorm = oNorm;
         this.$outputs.worldNormal = pb
-          .normalize(pb.mul(this.normalMatrix, pb.vec4(this.$l.oNorm, 0)).xyz)
+          .normalize(pb.mul(that.helper.getNormalMatrix(this), pb.vec4(this.$l.oNorm, 0)).xyz)
           .tag(ShaderFramework.USAGE_WORLD_NORMAL);
 
         const oTangent = that.calculateObjectSpaceTangent(
@@ -266,7 +271,7 @@ export class MeshMaterial extends Material {
         if (oTangent) {
           this.$l.oTangent = oTangent;
           this.$outputs.worldTangent = pb
-            .normalize(pb.mul(this.normalMatrix, pb.vec4(this.$l.oTangent.xyz, 0)).xyz)
+            .normalize(pb.mul(that.helper.getNormalMatrix(this), pb.vec4(this.$l.oTangent.xyz, 0)).xyz)
             .tag(ShaderFramework.USAGE_WORLD_TANGENT);
           this.$outputs.worldBinormal = pb
             .normalize(
@@ -277,36 +282,6 @@ export class MeshMaterial extends Material {
       }
     });
     pb.getGlobalScope()[funcName]();
-  }
-  /**
-   * Gets the uniform variable of type mat4 which transforms vertex position from object space to world space
-   *
-   * @remarks
-   * This function must be called in vertex stage
-   *
-   * @param scope - Current shader scope
-   *
-   * @returns The world matrix
-   */
-  getWorldMatrix(scope: PBInsideFunctionScope) {
-    if (scope.$builder.shaderKind !== 'vertex') {
-      throw new Error(`MeshMaterial.getWorldMatrix(): must be called in vertex stage`);
-    }
-    return scope.$query(ShaderFramework.USAGE_WORLD_MATRIX);
-  }
-  /**
-   * Gets the uniform variable of type mat4 which transforms vertex normal from object space to world space
-   *
-   * @remarks
-   * This function must be called in vertex stage
-   *
-   * @param scope - Current shader scope
-   *
-   * @returns The normal matrix
-   */
-  getNormalMatrix(scope: PBInsideFunctionScope) {
-    // TODO: should use inverse-transpose of the world matrix
-    return this.getWorldMatrix(scope);
   }
   /**
    * Gets the uniform variable of type mat4 which holds the view-projection matrix of current camera
