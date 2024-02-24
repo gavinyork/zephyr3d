@@ -287,10 +287,7 @@ export class ESM extends ShadowImpl {
     const pb = scope.$builder;
     pb.func(funcNameComputeShadow, [pb.vec4('shadowVertex'), pb.float('NdotL')], function () {
       if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
-        this.$l.dir = pb.sub(
-          this.shadowVertex.xyz,
-          ShaderHelper.getLightPositionAndRangeForShadow(this).xyz
-        );
+        this.$l.dir = pb.sub(this.shadowVertex.xyz, ShaderHelper.getLightPositionAndRangeForShadow(this).xyz);
         this.$return(filterShadowESM(this, LIGHT_TYPE_POINT, shadowMapParams.shadowMap.format, this.dir));
       } else {
         this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);

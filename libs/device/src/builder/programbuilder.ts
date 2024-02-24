@@ -1621,7 +1621,8 @@ export class ProgramBuilder {
         );
         this.findStructType(structName, shaderType).prefix = prefix;
         const structInstance = this.struct(structName, instanceName);
-        const structInstanceIN = inOrOut === 'in' ? this.struct(structName, AST.getBuiltinParamName(shaderType)) : structInstance;
+        const structInstanceIN =
+          inOrOut === 'in' ? this.struct(structName, AST.getBuiltinParamName(shaderType)) : structInstance;
         return [structType, structInstance, structName, structInstanceIN];
       }
     } else {
@@ -1757,7 +1758,7 @@ export class ProgramBuilder {
   in(location: number, name: string, variable: PBShaderExp): void {
     if (this._inputs[location]) {
       // input already exists, create an alias
-      if (!this._inputScope[name]){
+      if (!this._inputScope[name]) {
         Object.defineProperty(this._inputScope, name, {
           get: function (this: PBInputScope) {
             return variable;
@@ -2667,7 +2668,7 @@ export class PBScope extends Proxiable<PBScope> {
    * @returns The input vertex attribute or null if not exists
    */
   $getVertexAttrib(semantic: VertexSemantic): PBShaderExp {
-    return this.$inputs.$getVertexAttrib(semantic);// getCurrentProgramBuilder().getReflection().attribute(semantic);
+    return this.$inputs.$getVertexAttrib(semantic); // getCurrentProgramBuilder().getReflection().attribute(semantic);
   }
   /** Get the current local scope */
   get $l(): PBLocalScope {
@@ -3010,10 +3011,13 @@ export class PBLocalScope extends PBScope {
       this[prop] = value;
       return true;
     }
-    if (!(this.$_scope instanceof PBGlobalScope)
-      && value instanceof PBShaderExp
-      && (value.isConstructor() || (value.$typeinfo.isTextureType() && value.$ast instanceof AST.ASTPrimitive && !value.$ast.name))
-      && value.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM) {
+    if (
+      !(this.$_scope instanceof PBGlobalScope) &&
+      value instanceof PBShaderExp &&
+      (value.isConstructor() ||
+        (value.$typeinfo.isTextureType() && value.$ast instanceof AST.ASTPrimitive && !value.$ast.name)) &&
+      value.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM
+    ) {
       // We are setting uniform a uniform, should invoke in the global scope
       this.$g[prop] = value;
       return true;
@@ -3180,7 +3184,7 @@ export class PBInputScope extends PBScope {
       const param = pb.getCurrentFunctionScope()[AST.getBuiltinParamName(pb.shaderType)];
       const prefix = pb.shaderKind === 'vertex' ? input_prefix : output_prefix_vs;
       const name = `${prefix}${prop}`;
-      if ((param.$typeinfo as PBStructTypeInfo).structMembers.findIndex(val => val.name === name) < 0){
+      if ((param.$typeinfo as PBStructTypeInfo).structMembers.findIndex((val) => val.name === name) < 0) {
         return undefined;
       }
       return param[`${prefix}${prop}`];
@@ -3207,10 +3211,12 @@ export class PBInputScope extends PBScope {
       }
       if (getCurrentProgramBuilder()._vertexAttributes.indexOf(attrib) >= 0) {
         const lastName = this.$_names[value.$attrib];
-        if(prop !== lastName) {
+        if (prop !== lastName) {
           const p = this[lastName] as PBShaderExp;
           if (p.$typeinfo.typeId !== value.$typeinfo.typeId) {
-            throw new Error(`can not declare shader input variable: attribute already declared with different type: "${prop}"`);
+            throw new Error(
+              `can not declare shader input variable: attribute already declared with different type: "${prop}"`
+            );
           }
           this.$_aliases[prop] = lastName;
         }
@@ -3311,7 +3317,7 @@ export class PBGlobalScope extends PBScope {
   }
   /** @internal */
   get $inputStructInfo(): [ShaderTypeFunc, PBShaderExp, string, PBShaderExp] {
-    if (!this.$_inputStructInfo){
+    if (!this.$_inputStructInfo) {
       this.$_inputStructInfo = this.$builder.defineBuiltinStruct(this.$builder.shaderType, 'in');
     }
     return this.$_inputStructInfo;
@@ -3411,7 +3417,7 @@ export class PBGlobalScope extends PBScope {
   ) {
     const pb = getCurrentProgramBuilder();
     if (pb.getDevice().type === 'webgpu' && !isMain) {
-      params.push(this.$inputStruct(AST.getBuiltinParamName(pb.shaderType)))
+      params.push(this.$inputStruct(AST.getBuiltinParamName(pb.shaderType)));
     }
     params.forEach((param) => {
       if (!(param.$ast instanceof AST.ASTPrimitive)) {
@@ -3496,7 +3502,9 @@ export class PBGlobalScope extends PBScope {
               const name = (arg as AST.ASTPrimitive).name;
               inputArg = funcScope[name];
             }
-            const argsNonArray = (inputArg ? [...args, inputArg] : args).map((val) => pb.normalizeExpValue(val));
+            const argsNonArray = (inputArg ? [...args, inputArg] : args).map((val) =>
+              pb.normalizeExpValue(val)
+            );
             const funcType = pb._getFunctionOverload(name, argsNonArray);
             if (!funcType) {
               throw new Error(`ERROR: no matching overloads for function ${name}`);

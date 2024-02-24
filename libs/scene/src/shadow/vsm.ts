@@ -388,10 +388,7 @@ export class VSM extends ShadowImpl {
     const pb = scope.$builder;
     pb.func(funcNameComputeShadow, [pb.vec4('shadowVertex'), pb.float('NdotL')], function () {
       if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
-        this.$l.dir = pb.sub(
-          this.shadowVertex.xyz,
-          ShaderHelper.getLightPositionAndRangeForShadow(this).xyz
-        );
+        this.$l.dir = pb.sub(this.shadowVertex.xyz, ShaderHelper.getLightPositionAndRangeForShadow(this).xyz);
         this.$l.distance = pb.div(
           pb.length(this.dir),
           ShaderHelper.getLightPositionAndRangeForShadow(this).w

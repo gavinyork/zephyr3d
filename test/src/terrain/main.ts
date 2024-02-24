@@ -35,9 +35,6 @@ terrainApp.ready().then(async () => {
     const grassMap1 = await assetManager.fetchTexture<Texture2D>('./assets/images/857caeb1.dds');
     const grassMap2 = await assetManager.fetchTexture<Texture2D>('./assets/images/grass1x.dds');
     const grassMap3 = await assetManager.fetchTexture<Texture2D>('./assets/images/gj02.dds');
-    const albedoMap = await assetManager.fetchTexture<Texture2D>('./assets/maps/map4/colormap.png', {
-      linearColorSpace: false
-    });
     const splatMap = await assetManager.fetchTexture<Texture2D>('./assets/maps/map4/splatmap.tga', {
       linearColorSpace: true
     });

@@ -61,11 +61,15 @@ export enum ShaderPrecisionType {
 
 /** @internal */
 export function getBuiltinParamName(shaderType: ShaderType) {
-  switch(shaderType) {
-    case ShaderType.Vertex: return BuiltinParamNameVS;
-    case ShaderType.Fragment: return BuiltinParamNameFS;
-    case ShaderType.Compute: return BuiltinParamNameCS;
-    default: return null;
+  switch (shaderType) {
+    case ShaderType.Vertex:
+      return BuiltinParamNameVS;
+    case ShaderType.Fragment:
+      return BuiltinParamNameFS;
+    case ShaderType.Compute:
+      return BuiltinParamNameCS;
+    default:
+      return null;
   }
 }
 
@@ -1595,9 +1599,6 @@ export class ASTAssignment extends ShaderAST {
     if (!lvalue.isReference()) {
       throw new Error('assignment: l-value required');
     }
-    if (rvalue instanceof ASTPrimitive && rvalue.value.$declareType === DeclareType.DECLARE_TYPE_IN) {
-      console.log('xx');
-    }
     this.lvalue = lvalue;
     this.rvalue = rvalue;
     if (!(this.lvalue instanceof ASTLValueDeclare)) {
@@ -1921,7 +1922,8 @@ export class ASTCallFunction extends ASTExpression {
         const type = val.getType();
         if (
           type.isStructType() &&
-          ctx.types.findIndex((t) => t instanceof ASTStructDefine && t.type.structName === type.structName) < 0
+          ctx.types.findIndex((t) => t instanceof ASTStructDefine && t.type.structName === type.structName) <
+            0
         ) {
           return false;
         }

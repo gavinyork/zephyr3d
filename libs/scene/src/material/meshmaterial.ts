@@ -9,11 +9,7 @@ import { ProgramBuilder } from '@zephyr3d/device';
 import { RENDER_PASS_TYPE_DEPTH_ONLY, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP } from '../values';
 import { Material } from './material';
 import type { DrawContext, ShadowMapPass } from '../render';
-import {
-  encodeColorOutput,
-  encodeNormalizedFloatToRGBA,
-  nonLinearDepthToLinearNormalized
-} from '../shaders';
+import { encodeColorOutput, encodeNormalizedFloatToRGBA, nonLinearDepthToLinearNormalized } from '../shaders';
 import { Application } from '../app';
 import { ShaderHelper } from './shader/helper';
 

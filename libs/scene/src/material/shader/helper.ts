@@ -167,7 +167,9 @@ export class ShaderHelper {
       scope[UNIFORM_NAME_GLOBAL] = globalStruct().uniform(0);
       if (useClusteredLighting) {
         scope[UNIFORM_NAME_LIGHT_BUFFER] = pb.vec4[(MAX_CLUSTERED_LIGHTS + 1) * 3]().uniformBuffer(0);
-        scope[UNIFORM_NAME_LIGHT_INDEX_TEXTURE] = (pb.getDevice().type === 'webgl' ? pb.tex2D() : pb.utex2D()).uniform(0);
+        scope[UNIFORM_NAME_LIGHT_INDEX_TEXTURE] = (
+          pb.getDevice().type === 'webgl' ? pb.tex2D() : pb.utex2D()
+        ).uniform(0);
       }
       if (ctx.applyFog && ctx.scene.env.sky.drawScatteredFog(ctx)) {
         scope[UNIFORM_NAME_AERIALPERSPECTIVE_LUT] = pb.tex2D().uniform(0);
@@ -298,17 +300,18 @@ export class ShaderHelper {
   }
   /**
    * Propagate world position from vertex stage to fragment stage
-   * 
+   *
    * @param scope - Current shader scope
    * @param worldNormal - World position
    */
-  static propagateWorldPosition(scope: PBInsideFunctionScope, worldPos: PBShaderExp){
+  static propagateWorldPosition(scope: PBInsideFunctionScope, worldPos: PBShaderExp) {
     const pb = scope.$builder;
-    scope.$outputs[VARYING_NAME_WORLD_POSITION] = worldPos.numComponents() === 3 ? pb.vec4(worldPos, 1) : worldPos;
+    scope.$outputs[VARYING_NAME_WORLD_POSITION] =
+      worldPos.numComponents() === 3 ? pb.vec4(worldPos, 1) : worldPos;
   }
   /**
    * Propagate world normal vector from vertex stage to fragment stage
-   * 
+   *
    * @param scope - Current shader scope
    * @param worldNormal - World normal vector
    */
@@ -317,20 +320,20 @@ export class ShaderHelper {
   }
   /**
    * Propagate world tangent vector from vertex stage to fragment stage
-   * 
+   *
    * @param scope - Current shader scope
    * @param worldNormal - World tangent vector
    */
-  static propagateWorldTangent(scope: PBInsideFunctionScope, worldTangent: PBShaderExp){
+  static propagateWorldTangent(scope: PBInsideFunctionScope, worldTangent: PBShaderExp) {
     scope.$outputs[VARYING_NAME_WORLD_TANGENT] = worldTangent;
   }
   /**
    * Propagate world binormal vector from vertex stage to fragment stage
-   * 
+   *
    * @param scope - Current shader scope
    * @param worldNormal - World binormal vector
    */
-  static propagateWorldBinormal(scope: PBInsideFunctionScope, worldBinormal: PBShaderExp){
+  static propagateWorldBinormal(scope: PBInsideFunctionScope, worldBinormal: PBShaderExp) {
     scope.$outputs[VARYING_NAME_WORLD_BINORMAL] = worldBinormal;
   }
   /**
@@ -394,7 +397,10 @@ export class ShaderHelper {
       );
       if (oNorm) {
         this.$l.oNorm = oNorm;
-        that.propagateWorldNormal(this, pb.normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oNorm, 0)).xyz));
+        that.propagateWorldNormal(
+          this,
+          pb.normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oNorm, 0)).xyz)
+        );
         const oTangent = that.calculateObjectSpaceTangent(
           this,
           this.$getVertexAttrib('tangent'),
@@ -402,10 +408,19 @@ export class ShaderHelper {
         );
         if (oTangent) {
           this.$l.oTangent = oTangent;
-          that.propagateWorldTangent(this, pb.normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oTangent.xyz, 0)).xyz));
-          that.propagateWorldBinormal(this, pb.normalize(
-            pb.mul(pb.cross(this.$outputs[VARYING_NAME_WORLD_NORMAL], this.$outputs[VARYING_NAME_WORLD_TANGENT]), this.$l.oTangent.w)
-          ));
+          that.propagateWorldTangent(
+            this,
+            pb.normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oTangent.xyz, 0)).xyz)
+          );
+          that.propagateWorldBinormal(
+            this,
+            pb.normalize(
+              pb.mul(
+                pb.cross(this.$outputs[VARYING_NAME_WORLD_NORMAL], this.$outputs[VARYING_NAME_WORLD_TANGENT]),
+                this.$l.oTangent.w
+              )
+            )
+          );
         }
       }
     });
@@ -418,7 +433,12 @@ export class ShaderHelper {
    */
   static getWorldMatrix(scope: PBInsideFunctionScope): PBShaderExp {
     const pb = scope.$builder;
-    return scope[UNIFORM_NAME_WORLD_MATRIX] ?? scope[UNIFORM_NAME_WORLD_MATRICES].at(pb.add(scope[UNIFORM_NAME_INSTANCE_BUFFER_OFFSET], pb.uint(scope.$builtins.instanceIndex)));
+    return (
+      scope[UNIFORM_NAME_WORLD_MATRIX] ??
+      scope[UNIFORM_NAME_WORLD_MATRICES].at(
+        pb.add(scope[UNIFORM_NAME_INSTANCE_BUFFER_OFFSET], pb.uint(scope.$builtins.instanceIndex))
+      )
+    );
   }
   /**
    * Gets the uniform variable of type mat4 which holds the normal matrix of current object to be drawn
@@ -535,7 +555,11 @@ export class ShaderHelper {
     this._lightUniformShadow.light.depthBiasScales.set(shadowMapParams.depthBiasScales);
     this._lightUniformShadow.light.shadowMatrices.set(shadowMapParams.shadowMatrices);
     bindGroup.setValue(UNIFORM_NAME_GLOBAL, this._lightUniformShadow);
-    bindGroup.setTexture(UNIFORM_NAME_SHADOW_MAP, shadowMapParams.shadowMap, shadowMapParams.shadowMapSampler);
+    bindGroup.setTexture(
+      UNIFORM_NAME_SHADOW_MAP,
+      shadowMapParams.shadowMap,
+      shadowMapParams.shadowMapSampler
+    );
     ctx.drawEnvLight && ctx.env.light.envLight.updateBindGroup(bindGroup);
   }
   /**
@@ -964,10 +988,7 @@ export class ShaderHelper {
       if (ctx.env.sky.drawScatteredFog(ctx)) {
         const funcName = 'applyAerialPerspective';
         pb.func(funcName, [pb.vec4('color').inout()], function () {
-          this.$l.viewDir = pb.sub(
-            this.getWorldPosition(this).xyz,
-            this.getCameraPosition(this)
-          );
+          this.$l.viewDir = pb.sub(this.getWorldPosition(this).xyz, this.getCameraPosition(this));
           this.viewDir.y = pb.max(this.viewDir.y, 0);
           this.$l.distance = pb.mul(pb.length(this.viewDir), this.getWorldUnit(this));
           this.$l.sliceDist = pb.div(
@@ -986,16 +1007,8 @@ export class ShaderHelper {
           );
           this.$l.u1 = pb.add(this.u0, 1 / ScatteringLut.aerialPerspectiveSliceZ);
           this.$l.v = pb.div(this.zenithAngle, Math.PI / 2);
-          this.$l.t0 = pb.textureSampleLevel(
-            this.getAerialPerspectiveLUT(this),
-            pb.vec2(this.u0, this.v),
-            0
-          );
-          this.$l.t1 = pb.textureSampleLevel(
-            this.getAerialPerspectiveLUT(this),
-            pb.vec2(this.u1, this.v),
-            0
-          );
+          this.$l.t0 = pb.textureSampleLevel(this.getAerialPerspectiveLUT(this), pb.vec2(this.u0, this.v), 0);
+          this.$l.t1 = pb.textureSampleLevel(this.getAerialPerspectiveLUT(this), pb.vec2(this.u1, this.v), 0);
           this.$l.t = pb.mix(this.t0, this.t1, this.factor);
           this.color = pb.vec4(pb.add(pb.mul(this.color.rgb, this.factor), this.t.rgb), this.color.a);
         });
@@ -1003,10 +1016,7 @@ export class ShaderHelper {
       } else {
         const funcName = 'applyFog';
         pb.func(funcName, [pb.vec4('color').inout()], function () {
-          this.$l.viewDir = pb.sub(
-            this.getWorldPosition(this).xyz,
-            this.getCameraPosition(this)
-          );
+          this.$l.viewDir = pb.sub(this.getWorldPosition(this).xyz, this.getCameraPosition(this));
           this.$l.fogFactor = this.computeFogFactor(
             this,
             this.viewDir,
@@ -1129,10 +1139,7 @@ export class ShaderHelper {
       if (ctx.env.sky.drawScatteredFog(ctx)) {
         const funcName = 'zApplySkyFog';
         pb.func(funcName, [pb.vec4('color').inout()], function () {
-          this.$l.viewDir = pb.sub(
-            this.getWorldPosition(this).xyz,
-            this.getCameraPosition(this)
-          );
+          this.$l.viewDir = pb.sub(this.getWorldPosition(this).xyz, this.getCameraPosition(this));
           this.viewDir.y = pb.max(this.viewDir.y, 0);
           this.$l.distance = pb.mul(pb.length(this.viewDir), this.getWorldUnit(this));
           this.$l.sliceDist = pb.div(
@@ -1151,16 +1158,8 @@ export class ShaderHelper {
           );
           this.$l.u1 = pb.add(this.u0, 1 / ScatteringLut.aerialPerspectiveSliceZ);
           this.$l.v = pb.div(this.zenithAngle, Math.PI / 2);
-          this.$l.t0 = pb.textureSampleLevel(
-            this.getAerialPerspectiveLUT(this),
-            pb.vec2(this.u0, this.v),
-            0
-          );
-          this.$l.t1 = pb.textureSampleLevel(
-            this.getAerialPerspectiveLUT(this),
-            pb.vec2(this.u1, this.v),
-            0
-          );
+          this.$l.t0 = pb.textureSampleLevel(this.getAerialPerspectiveLUT(this), pb.vec2(this.u0, this.v), 0);
+          this.$l.t1 = pb.textureSampleLevel(this.getAerialPerspectiveLUT(this), pb.vec2(this.u1, this.v), 0);
           this.$l.t = pb.mix(this.t0, this.t1, this.factor);
           this.color = pb.vec4(pb.add(pb.mul(this.color.rgb, this.factor), this.t.rgb), this.color.a);
         });
@@ -1168,10 +1167,7 @@ export class ShaderHelper {
       } else {
         const funcName = 'zApplyFog';
         pb.func(funcName, [pb.vec4('color').inout()], function () {
-          this.$l.viewDir = pb.sub(
-            this.getWorldPosition(this).xyz,
-            this.getCameraPosition(this)
-          );
+          this.$l.viewDir = pb.sub(this.getWorldPosition(this).xyz, this.getCameraPosition(this));
           this.$l.fogFactor = this.computeFogFactor(
             this,
             this.viewDir,

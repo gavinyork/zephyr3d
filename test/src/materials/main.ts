@@ -8,7 +8,6 @@ import {
   Tonemap,
   DirectionalLight,
   Mesh,
-  LambertMaterial,
   SphereShape
 } from '@zephyr3d/scene';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';

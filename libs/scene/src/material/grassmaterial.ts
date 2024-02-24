@@ -2,13 +2,7 @@ import { Vector2, Vector4 } from '@zephyr3d/base';
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinLight } from './mixins/lit';
 import { mixinPBRMetallicRoughness } from './mixins/pbr/metallicroughness';
-import type {
-  BindGroup,
-  PBFunctionScope,
-  PBInsideFunctionScope,
-  PBShaderExp,
-  Texture2D
-} from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { RENDER_PASS_TYPE_FORWARD } from '../values';
 
@@ -48,29 +42,6 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
   supportLighting(): boolean {
     return true;
   }
-  calculateObjectSpacePosition(
-    scope: PBInsideFunctionScope,
-    pos: PBShaderExp,
-    skinMatrix: PBShaderExp
-  ): PBShaderExp {
-    const pb = scope.$builder;
-    const funcName = 'kkGetDisplacedPosition';
-    pb.func(funcName, [pb.vec3('pos'), pb.vec4('placement'), pb.vec3('normal')], function () {
-      this.$l.axisX = pb.vec3(1, 0, 0);
-      this.$l.axisZ = pb.cross(this.axisX, this.normal);
-      this.$l.axisX = pb.cross(this.normal, this.axisZ);
-      this.$l.rotPos = pb.mul(pb.mat3(this.axisX, this.normal, this.axisZ), this.pos);
-      this.$return(pb.add(this.rotPos, this.placement.xyz));
-    });
-    return scope.$g[funcName](scope.$inputs.pos, scope.$inputs.placement, scope.kkNormal);
-  }
-  calculateObjectSpaceNormal(
-    scope: PBInsideFunctionScope,
-    normal: PBShaderExp,
-    skinMatrix: PBShaderExp
-  ): PBShaderExp {
-    return scope.kkNormal;
-  }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
     super.applyUniformValues(bindGroup, ctx);
     bindGroup.setTexture('kkTerrainNormalMap', this._terrainNormalMap);
@@ -96,10 +67,19 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
     scope.$l.axisZ = pb.cross(scope.axisX, scope.kkNormal);
     scope.$l.axisX = pb.cross(scope.kkNormal, scope.axisZ);
     scope.$l.rotPos = pb.mul(pb.mat3(scope.axisX, scope.kkNormal, scope.axisZ), scope.$inputs.pos);
-    scope.$l.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(pb.add(scope.rotPos, scope.$inputs.placement.xyz), 1));
+    scope.$l.worldPos = pb.mul(
+      this.helper.getWorldMatrix(scope),
+      pb.vec4(pb.add(scope.rotPos, scope.$inputs.placement.xyz), 1)
+    );
     this.helper.propagateWorldPosition(scope, scope.worldPos);
-    this.helper.propagateWorldNormal(scope, pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.kkNormal, 0)).xyz);
-    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), scope.worldPos));
+    this.helper.propagateWorldNormal(
+      scope,
+      pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.kkNormal, 0)).xyz
+    );
+    this.helper.setClipSpacePosition(
+      scope,
+      pb.mul(this.helper.getViewProjectionMatrix(scope), scope.worldPos)
+    );
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);

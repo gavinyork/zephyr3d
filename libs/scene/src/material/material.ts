@@ -70,7 +70,11 @@ class InstanceBindGroupPool {
     const bindGroup = this._bindGroups[bindGroupIndex];
     const offset = (maxSize - bindGroup.freeSize) / 64;
     for (const matrix of worldMatrices) {
-      bindGroup.bindGroup.setRawData(ShaderHelper.getWorldMatricesUniformName(), maxSize - bindGroup.freeSize, matrix);
+      bindGroup.bindGroup.setRawData(
+        ShaderHelper.getWorldMatricesUniformName(),
+        maxSize - bindGroup.freeSize,
+        matrix
+      );
       bindGroup.freeSize -= 64;
     }
     device.setBindGroup(3, bindGroup.bindGroup);
@@ -304,11 +308,9 @@ export class Material implements IMaterial {
   getOrCreateProgram(ctx: DrawContext, pass: number): ProgramInfo {
     const programMap = Material._programMap;
     const renderPassType = ctx.renderPass.type;
-    const hash = `${this.getHash(
-      renderPassType, pass
-    )}:${!!ctx.target.getBoneMatrices()}:${Number(!!(ctx.instanceData?.worldMatrices.length > 1))}:${
-      ctx.renderPassHash
-    }`;
+    const hash = `${this.getHash(renderPassType, pass)}:${!!ctx.target.getBoneMatrices()}:${Number(
+      !!(ctx.instanceData?.worldMatrices.length > 1)
+    )}:${ctx.renderPassHash}`;
     let programInfo = programMap[hash];
     if (
       !programInfo ||

@@ -163,7 +163,11 @@ export class EnvIBL extends EnvironmentLighting {
   getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     return Application.instance.device.getDeviceCaps().shaderCaps.supportShaderTextureLod
-      ? pb.textureSampleLevel(scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP], refl, pb.mul(roughness, scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD])).rgb
+      ? pb.textureSampleLevel(
+          scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP],
+          refl,
+          pb.mul(roughness, scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD])
+        ).rgb
       : pb.textureSample(scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP], refl).rgb;
   }
   /**
@@ -337,12 +341,8 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
    */
   initShaderBindings(pb: ProgramBuilder): void {
     if (pb.shaderKind === 'fragment') {
-      pb.getGlobalScope()[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_UP] = pb
-        .vec4()
-        .uniform(0);
-      pb.getGlobalScope()[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_DOWN] = pb
-        .vec4()
-        .uniform(0);
+      pb.getGlobalScope()[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_UP] = pb.vec4().uniform(0);
+      pb.getGlobalScope()[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_DOWN] = pb.vec4().uniform(0);
     }
   }
   /**
@@ -367,7 +367,11 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
   getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const factor = pb.add(pb.mul(normal.y, 0.5), 0.5);
-    return pb.mix(scope[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_DOWN], scope[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_UP], factor).rgb;
+    return pb.mix(
+      scope[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_DOWN],
+      scope[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_UP],
+      factor
+    ).rgb;
   }
   /**
    * {@inheritDoc EnvironmentLighting.hasRadiance}

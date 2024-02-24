@@ -159,10 +159,7 @@ export function computeShadowMapDepth(
             ShaderHelper.getWorldPosition(this)
           );
           this.depth = pb.clamp(
-            pb.div(
-              pb.length(this.lightSpacePos.xyz),
-              ShaderHelper.getLightPositionAndRangeForShadow(this).w
-            ),
+            pb.div(pb.length(this.lightSpacePos.xyz), ShaderHelper.getLightPositionAndRangeForShadow(this).w),
             0,
             1
           );
@@ -262,7 +259,12 @@ function sampleShadowMapPCF(
       if (nativeShadowMap) {
         this.$return(
           cascade && Application.instance.device.type !== 'webgl'
-            ? pb.textureArraySampleCompareLevel(ShaderHelper.getShadowMap(this), uv, this.cascade, sampleDepth)
+            ? pb.textureArraySampleCompareLevel(
+                ShaderHelper.getShadowMap(this),
+                uv,
+                this.cascade,
+                sampleDepth
+              )
             : pb.textureSampleCompareLevel(ShaderHelper.getShadowMap(this), uv, sampleDepth)
         );
       } else {
@@ -301,7 +303,9 @@ function sampleShadowMap(
     function () {
       if (lightType === LIGHT_TYPE_POINT) {
         if (nativeShadowMap) {
-          this.$return(pb.clamp(pb.textureSampleCompareLevel(ShaderHelper.getShadowMap(this), this.coords, this.z), 0, 1));
+          this.$return(
+            pb.clamp(pb.textureSampleCompareLevel(ShaderHelper.getShadowMap(this), this.coords, this.z), 0, 1)
+          );
         } else {
           this.$l.shadowTex = pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.coords, 0);
           if (shadowMapFormat === 'rgba8unorm') {
@@ -313,7 +317,12 @@ function sampleShadowMap(
         if (nativeShadowMap) {
           this.$return(
             cascade && Application.instance.device.type !== 'webgl'
-              ? pb.textureArraySampleCompareLevel(ShaderHelper.getShadowMap(this), this.coords, this.cascade, this.z)
+              ? pb.textureArraySampleCompareLevel(
+                  ShaderHelper.getShadowMap(this),
+                  this.coords,
+                  this.cascade,
+                  this.z
+                )
               : pb.textureSampleCompareLevel(ShaderHelper.getShadowMap(this), this.coords, this.z)
           );
         } else {
@@ -381,7 +390,12 @@ export function filterShadowVSM(
         );
       } else {
         if (Application.instance.device.type !== 'webgl' && cascade) {
-          this.$l.shadowTex = pb.textureArraySampleLevel(ShaderHelper.getShadowMap(this), this.texCoord.xy, this.cascade, 0);
+          this.$l.shadowTex = pb.textureArraySampleLevel(
+            ShaderHelper.getShadowMap(this),
+            this.texCoord.xy,
+            this.cascade,
+            0
+          );
         } else {
           this.$l.shadowTex = pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.texCoord.xy, 0);
         }
