@@ -8,11 +8,14 @@ import {
   Tonemap,
   DirectionalLight,
   Mesh,
-  SphereShape
+  SphereShape,
+  AssetManager
 } from '@zephyr3d/scene';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import * as common from '../common';
 import { WoodMaterial } from './materials/wood';
+import { FurMaterial } from './materials/fur';
+import { Texture2D } from '@zephyr3d/device';
 
 const myApp = new Application({
   backend: common.getBackend(),
@@ -32,9 +35,19 @@ myApp.ready().then(async function () {
   // light color
   dlight.color = new Vector4(1, 1, 1, 1);
 
+  const assetManager = new AssetManager();
+  const furColorTex = await assetManager.fetchTexture<Texture2D>('assets/images/fur-color.png');
+  const furAlphaTex = await assetManager.fetchTexture<Texture2D>('assets/images/fur-alpha.png');
+  furAlphaTex.samplerOptions = {
+    addressU: 'repeat',
+    addressV: 'repeat'
+  }
   // Create sphere
   const sphereMaterial = new WoodMaterial();
-  new Mesh(scene, new SphereShape({ radius: 2 }), sphereMaterial);
+  const furMaterial = new FurMaterial();
+  furMaterial.colorTexture = furColorTex;
+  furMaterial.alphaTexture = furAlphaTex;
+  new Mesh(scene, new SphereShape({ radius: 2 }), furMaterial);
 
   // Create camera
   const camera = new PerspectiveCamera(

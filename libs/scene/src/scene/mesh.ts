@@ -174,7 +174,7 @@ export class Mesh extends GraphNode implements BatchDrawable {
    * {@inheritDoc Drawable.isBatchable}
    */
   isBatchable(): this is BatchDrawable {
-    return this._batchable && !this._boneMatrices;
+    return this._batchable && !this._boneMatrices && this._material?.isBatchable();
   }
   /** Disposes the mesh node */
   dispose() {

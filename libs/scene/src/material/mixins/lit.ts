@@ -367,8 +367,8 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      * {@inheritDoc MeshMaterial.applyUniformsValues}
      * @override
      */
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
-      super.applyUniformValues(bindGroup, ctx);
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+      super.applyUniformValues(bindGroup, ctx, pass);
       if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
         if (this.normalTexture) {
           bindGroup.setValue('kkNormalScale', this._normalScale);

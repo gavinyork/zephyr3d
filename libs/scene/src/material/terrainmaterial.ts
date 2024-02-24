@@ -174,8 +174,15 @@ export class TerrainMaterial extends applyMaterialMixins(
   supportLighting(): boolean {
     return true;
   }
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
-    super.applyUniformValues(bindGroup, ctx);
+  /**
+   * {@inheritDoc Material.isBatchable}
+   * @override
+   */
+  isBatchable(): boolean {
+    return false;
+  }
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+    super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('terrainInfo', this._terrainInfo);
       if (this._options) {

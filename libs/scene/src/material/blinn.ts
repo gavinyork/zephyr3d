@@ -20,8 +20,8 @@ export class BlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
       this.optionChanged(false);
     }
   }
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
-    super.applyUniformValues(bindGroup, ctx);
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+    super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('kkShininess', this._shininess);
     }

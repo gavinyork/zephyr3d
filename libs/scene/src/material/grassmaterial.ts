@@ -42,8 +42,8 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
   supportLighting(): boolean {
     return true;
   }
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
-    super.applyUniformValues(bindGroup, ctx);
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+    super.applyUniformValues(bindGroup, ctx, pass);
     bindGroup.setTexture('kkTerrainNormalMap', this._terrainNormalMap);
     bindGroup.setValue('kkTerrainSize', this._terrainSize);
     if (this.needFragmentColor(ctx)) {

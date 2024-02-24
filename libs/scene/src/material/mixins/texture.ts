@@ -106,8 +106,8 @@ export function mixinTextureProps<U extends string>(name: U) {
           }
         }
       }
-      applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
-        super.applyUniformValues(bindGroup, ctx);
+      applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+        super.applyUniformValues(bindGroup, ctx, pass);
         if (this.needFragmentColor(ctx)) {
           if (this.featureUsed(feature)) {
             const that = this as any;

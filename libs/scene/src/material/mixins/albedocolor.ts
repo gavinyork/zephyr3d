@@ -52,8 +52,8 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
         scope.kkAlbedo = pb.vec4().uniform(2);
       }
     }
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
-      super.applyUniformValues(bindGroup, ctx);
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+      super.applyUniformValues(bindGroup, ctx, pass);
       if (this.needFragmentColor(ctx)) {
         bindGroup.setValue('kkAlbedo', this._albedoColor);
       }

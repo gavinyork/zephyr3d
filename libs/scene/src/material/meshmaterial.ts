@@ -119,20 +119,19 @@ export class MeshMaterial extends Material {
       const blendingState = this.stateSet.useBlendingState();
       if (blending) {
         blendingState.enable(true);
+        blendingState.setBlendFuncAlpha('zero', 'one');
         if (this._blendMode === 'additive') {
           blendingState.setBlendEquation('add', 'add');
-          blendingState.setBlendFunc('one', 'one');
+          blendingState.setBlendFuncRGB('one', 'one');
         } else if (this._blendMode === 'max') {
           blendingState.setBlendEquation('max', 'add');
           blendingState.setBlendFuncRGB('one', 'one');
-          blendingState.setBlendFuncAlpha('zero', 'one');
         } else if (this._blendMode === 'min') {
           blendingState.setBlendEquation('min', 'add');
           blendingState.setBlendFuncRGB('one', 'one');
-          blendingState.setBlendFuncAlpha('zero', 'one');
         } else {
           blendingState.setBlendEquation('add', 'add');
-          blendingState.setBlendFunc('one', 'inv-src-alpha');
+          blendingState.setBlendFuncRGB('one', 'inv-src-alpha');
         }
       } else {
         blendingState.enable(false);
@@ -142,7 +141,7 @@ export class MeshMaterial extends Material {
       this.stateSet.defaultBlendingState();
     }
   }
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     if (this.featureUsed(MeshMaterial.FEATURE_ALPHATEST)) {
       bindGroup.setValue('kkAlphaCutoff', this._alphaCutoff);
     }
@@ -154,9 +153,9 @@ export class MeshMaterial extends Material {
   isTransparent(): boolean {
     return this.featureUsed(MeshMaterial.FEATURE_ALPHABLEND);
   }
-  beginDraw(ctx: DrawContext, pass: number): boolean {
+  beginDraw(pass: number, ctx: DrawContext): boolean {
     this.updateBlendingState(ctx);
-    return super.beginDraw(ctx, pass);
+    return super.beginDraw(pass, ctx);
   }
   /** @internal */
   protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
@@ -199,8 +198,8 @@ export class MeshMaterial extends Material {
    * {@inheritDoc Material._applyUniforms}
    * @override
    */
-  protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void {
-    this.applyUniformValues(bindGroup, ctx);
+  protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+    this.applyUniformValues(bindGroup, ctx, pass);
   }
   /**
    * Check if the color should be computed in fragment shader, this is required for forward render pass or alpha test is in use or alpha to coverage is in use.

@@ -233,8 +233,8 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         }
       }
     }
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
-      super.applyUniformValues(bindGroup, ctx);
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+      super.applyUniformValues(bindGroup, ctx, pass);
       if (this.needFragmentColor(ctx)) {
         bindGroup.setValue('kkF0', this._f0);
         bindGroup.setValue('kkEmissiveFactor', this._emissiveFactor);

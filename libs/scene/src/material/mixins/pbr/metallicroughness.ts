@@ -75,8 +75,8 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
         scope.kkSpecularFactor = pb.vec4().uniform(2);
       }
     }
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void {
-      super.applyUniformValues(bindGroup, ctx);
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+      super.applyUniformValues(bindGroup, ctx, pass);
       if (this.needFragmentColor(ctx)) {
         bindGroup.setValue('kkMetallic', this._metallic);
         bindGroup.setValue('kkRoughness', this._roughness);

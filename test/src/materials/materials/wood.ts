@@ -555,6 +555,6 @@ export class WoodMaterial extends LambertMaterial {
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
     scope.$outputs.oPos = scope.$getVertexAttrib('position');
-    this.transformVertexAndNormal(scope);
+    this.helper.transformVertexAndNormal(scope);
   }
 }

@@ -87,9 +87,9 @@ export interface IMaterial {
   stateSet: RenderStateSet;
   isTransparent(): boolean;
   supportLighting(): boolean;
-  draw(primitive: Primitive, ctx: DrawContext);
-  drawInstanced(primitive: Primitive, numInstances: number, ctx: DrawContext);
-  beginDraw(ctx: DrawContext, pass: number): boolean;
+  isBatchable(): boolean;
+  draw(primitive: Primitive, ctx: DrawContext, numInstances?: number): void;
+  beginDraw(pass: number, ctx: DrawContext): boolean;
   endDraw(pass: number): void;
   getMaterialBindGroup(): BindGroup;
   applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number): void;
@@ -215,33 +215,21 @@ export class Material implements IMaterial {
   supportLighting(): boolean {
     return true;
   }
-  /**
-   * Draws a primitive using this material
-   * @param primitive - The prmitive to be drawn
-   * @param ctx - The context of current drawing task
-   */
-  draw(primitive: Primitive, ctx: DrawContext) {
-    for (let i = 0; i < this._numPasses; i++) {
-      if (this.beginDraw(ctx, i)) {
-        if (ctx.instanceData?.worldMatrices.length > 1) {
-          primitive.drawInstanced(ctx.instanceData.worldMatrices.length);
-        } else {
-          primitive.draw();
-        }
-        this.endDraw(i);
-      }
-    }
+  /** Returns true if this material supports geometry instancing  */
+  isBatchable(): boolean {
+    return true;
   }
   /**
-   * Draws instanced primitives using this material
+   * Draws a primitive using this material
+   *
    * @param primitive - The prmitive to be drawn
-   * @param numInstances - How many instances should be drawn
    * @param ctx - The context of current drawing task
+   * @param numInstances - How many instances should be drawn. if zero, the instance count will be automatically detected.
    */
-  drawInstanced(primitive: Primitive, numInstances: number, ctx: DrawContext) {
+  draw(primitive: Primitive, ctx: DrawContext, numInstances = 0) {
     for (let i = 0; i < this._numPasses; i++) {
-      if (this.beginDraw(ctx, i)) {
-        primitive.drawInstanced(numInstances);
+      if (this.beginDraw(i, ctx)) {
+        this.drawPrimitive(i, primitive, ctx, numInstances);
         this.endDraw(i);
       }
     }
@@ -251,7 +239,7 @@ export class Material implements IMaterial {
    * @param ctx - The context of current drawing task
    * @returns true if succeeded, otherwise false
    */
-  beginDraw(ctx: DrawContext, pass: number): boolean {
+  beginDraw(pass: number, ctx: DrawContext): boolean {
     const numInstances = ctx.instanceData?.worldMatrices?.length || 1;
     const device = Application.instance.device;
     const programInfo = this.getOrCreateProgram(ctx, pass);
@@ -261,10 +249,12 @@ export class Material implements IMaterial {
         return null;
       }
       this._materialBindGroup = this.applyMaterialBindGroups(ctx, hash, pass);
-      if (numInstances > 1) {
-        this.applyInstanceBindGroups(ctx, hash);
-      } else {
-        this.applyDrawableBindGroups(ctx, hash);
+      if (pass === 0) {
+        if (numInstances > 1) {
+          this.applyInstanceBindGroups(ctx, hash);
+        } else {
+          this.applyDrawableBindGroups(ctx, hash);
+        }
       }
       ctx.renderPass.applyRenderStates(device, this.stateSet, ctx);
       device.setProgram(programInfo.programs[ctx.renderPass.type]);
@@ -570,6 +560,21 @@ export class Material implements IMaterial {
       this._materialLRU.remove(iter);
     }
     this._materialIterators.set(material, this._materialLRU.append(material));
+  }
+  /**
+   * Draw primitve
+   *
+   * @param primitive - Primitive to be drawn
+   * @param ctx - Draw context
+   */
+  drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number): void {
+    if (numInstances > 0) {
+      primitive.drawInstanced(numInstances);
+    } else if (ctx.instanceData?.worldMatrices.length > 1) {
+      primitive.drawInstanced(ctx.instanceData.worldMatrices.length);
+    } else {
+      primitive.draw();
+    }
   }
   /** @internal */
   protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
