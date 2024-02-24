@@ -297,6 +297,43 @@ export class ShaderHelper {
     return normal ? (skinMatrix ? pb.mul(skinMatrix, pb.vec4(normal, 0)).xyz : normal) : null;
   }
   /**
+   * Propagate world position from vertex stage to fragment stage
+   * 
+   * @param scope - Current shader scope
+   * @param worldNormal - World position
+   */
+  static propagateWorldPosition(scope: PBInsideFunctionScope, worldPos: PBShaderExp){
+    const pb = scope.$builder;
+    scope.$outputs[VARYING_NAME_WORLD_POSITION] = worldPos.numComponents() === 3 ? pb.vec4(worldPos, 1) : worldPos;
+  }
+  /**
+   * Propagate world normal vector from vertex stage to fragment stage
+   * 
+   * @param scope - Current shader scope
+   * @param worldNormal - World normal vector
+   */
+  static propagateWorldNormal(scope: PBInsideFunctionScope, worldNormal: PBShaderExp): void {
+    scope.$outputs[VARYING_NAME_WORLD_NORMAL] = worldNormal;
+  }
+  /**
+   * Propagate world tangent vector from vertex stage to fragment stage
+   * 
+   * @param scope - Current shader scope
+   * @param worldNormal - World tangent vector
+   */
+  static propagateWorldTangent(scope: PBInsideFunctionScope, worldTangent: PBShaderExp){
+    scope.$outputs[VARYING_NAME_WORLD_TANGENT] = worldTangent;
+  }
+  /**
+   * Propagate world binormal vector from vertex stage to fragment stage
+   * 
+   * @param scope - Current shader scope
+   * @param worldNormal - World binormal vector
+   */
+  static propagateWorldBinormal(scope: PBInsideFunctionScope, worldBinormal: PBShaderExp){
+    scope.$outputs[VARYING_NAME_WORLD_BINORMAL] = worldBinormal;
+  }
+  /**
    * Calculates the tangent vector of type vec3 in object space
    *
    * @param scope - Current shader scope
@@ -347,8 +384,7 @@ export class ShaderHelper {
         );
       }
       this.$l.oPos = oPos;
-      this.$outputs[VARYING_NAME_WORLD_POSITION] = pb
-        .mul(that.getWorldMatrix(this), pb.vec4(this.$l.oPos, 1));
+      that.propagateWorldPosition(this, pb.mul(that.getWorldMatrix(this), pb.vec4(this.$l.oPos, 1)));
       that.setClipSpacePosition(this, pb.mul(viewProjMatrix, this.$outputs[VARYING_NAME_WORLD_POSITION]));
 
       const oNorm = that.calculateObjectSpaceNormal(
@@ -358,9 +394,7 @@ export class ShaderHelper {
       );
       if (oNorm) {
         this.$l.oNorm = oNorm;
-        this.$outputs[VARYING_NAME_WORLD_NORMAL] = pb
-          .normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oNorm, 0)).xyz);
-
+        that.propagateWorldNormal(this, pb.normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oNorm, 0)).xyz));
         const oTangent = that.calculateObjectSpaceTangent(
           this,
           this.$getVertexAttrib('tangent'),
@@ -368,12 +402,10 @@ export class ShaderHelper {
         );
         if (oTangent) {
           this.$l.oTangent = oTangent;
-          this.$outputs[VARYING_NAME_WORLD_TANGENT] = pb
-            .normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oTangent.xyz, 0)).xyz);
-          this.$outputs[VARYING_NAME_WORLD_BINORMAL] = pb
-            .normalize(
-              pb.mul(pb.cross(this.$outputs[VARYING_NAME_WORLD_NORMAL], this.$outputs[VARYING_NAME_WORLD_TANGENT]), this.$l.oTangent.w)
-            );
+          that.propagateWorldTangent(this, pb.normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oTangent.xyz, 0)).xyz));
+          that.propagateWorldBinormal(this, pb.normalize(
+            pb.mul(pb.cross(this.$outputs[VARYING_NAME_WORLD_NORMAL], this.$outputs[VARYING_NAME_WORLD_TANGENT]), this.$l.oTangent.w)
+          ));
         }
       }
     });

@@ -86,14 +86,20 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
     scope.$inputs.placement = pb.vec4().attrib('texCoord1');
     scope.kkTerrainNormalMap = pb.tex2D().uniform(2);
     scope.kkTerrainSize = pb.vec2().uniform(2);
-    scope.$g.kkNormal = pb.vec3();
     const normalSample = pb.textureSampleLevel(
       scope.kkTerrainNormalMap,
       pb.div(scope.$inputs.placement.xz, scope.kkTerrainSize),
       0
     ).rgb;
-    scope.kkNormal = pb.normalize(pb.sub(pb.mul(normalSample, 2), pb.vec3(1)));
-    this.helper.transformVertexAndNormal(scope);
+    scope.$l.kkNormal = pb.normalize(pb.sub(pb.mul(normalSample, 2), pb.vec3(1)));
+    scope.$l.axisX = pb.vec3(1, 0, 0);
+    scope.$l.axisZ = pb.cross(scope.axisX, scope.kkNormal);
+    scope.$l.axisX = pb.cross(scope.kkNormal, scope.axisZ);
+    scope.$l.rotPos = pb.mul(pb.mat3(scope.axisX, scope.kkNormal, scope.axisZ), scope.$inputs.pos);
+    scope.$l.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(pb.add(scope.rotPos, scope.$inputs.placement.xyz), 1));
+    this.helper.propagateWorldPosition(scope, scope.worldPos);
+    this.helper.propagateWorldNormal(scope, pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.kkNormal, 0)).xyz);
+    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), scope.worldPos));
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
