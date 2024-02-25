@@ -1,9 +1,9 @@
-import { Vector4 } from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render/drawable';
 import {
   MAX_CLUSTERED_LIGHTS,
-  RENDER_PASS_TYPE_DEPTH_ONLY,
-  RENDER_PASS_TYPE_FORWARD,
+  RENDER_PASS_TYPE_DEPTH,
+  RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_SHADOWMAP
 } from '../../values';
 import { Application } from '../../app';
@@ -48,6 +48,7 @@ export class ShaderHelper {
   static readonly FOG_TYPE_SCATTER = 4;
   static readonly BILLBOARD_SPHERICAL = 1;
   static readonly BILLBOARD_SYLINDRAL = 2;
+  static defaultSunDir = Vector3.one().inplaceNormalize();
   /** @internal */
   private static _lightUniformShadow = {
     light: {
@@ -138,10 +139,10 @@ export class ShaderHelper {
       ]);
       const globalStruct = pb.defineStruct([cameraStruct('camera'), lightStruct('light')]);
       scope[UNIFORM_NAME_GLOBAL] = globalStruct().uniform(0);
-    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH_ONLY) {
+    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
       const globalStruct = pb.defineStruct([cameraStruct('camera')]);
       scope[UNIFORM_NAME_GLOBAL] = globalStruct().uniform(0);
-    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
+    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
       const useClusteredLighting = !ctx.currentShadowLight;
       const fogStruct = pb.defineStruct([pb.int('fogType'), pb.vec4('fogColor'), pb.vec4('fogParams')]);
       const lightStruct = ctx.currentShadowLight
@@ -158,6 +159,7 @@ export class ShaderHelper {
             pb.float('envLightStrength')
           ])
         : pb.defineStruct([
+            pb.vec3('sunDir'),
             pb.float('envLightStrength'),
             pb.vec4('clusterParams'),
             pb.ivec4('countParams'),
@@ -275,7 +277,7 @@ export class ShaderHelper {
   ): PBShaderExp {
     const pb = scope.$builder;
     if (pb.shaderKind !== 'vertex') {
-      throw new Error(`MeshMaterial.calculateObjectSpacePosition(): must be called in vertex stage`);
+      throw new Error(`ShaderHelper.calculateObjectSpacePosition(): must be called in vertex stage`);
     }
     return pos ? (skinMatrix ? pb.mul(skinMatrix, pb.vec4(pos, 1)).xyz : pos) : null;
   }
@@ -294,7 +296,7 @@ export class ShaderHelper {
   ): PBShaderExp {
     const pb = scope.$builder;
     if (pb.shaderKind !== 'vertex') {
-      throw new Error(`MeshMaterial.calculateObjectSpaceNormal(): must be called in vertex stage`);
+      throw new Error(`ShaderHelper.calculateObjectSpaceNormal(): must be called in vertex stage`);
     }
     return normal ? (skinMatrix ? pb.mul(skinMatrix, pb.vec4(normal, 0)).xyz : normal) : null;
   }
@@ -351,7 +353,7 @@ export class ShaderHelper {
   ): PBShaderExp {
     const pb = scope.$builder;
     if (pb.shaderKind !== 'vertex') {
-      throw new Error(`MeshMaterial.calculateObjectSpaceTangent(): must be called in vertex stage`);
+      throw new Error(`ShaderHelper.calculateObjectSpaceTangent(): must be called in vertex stage`);
     }
     return tangent
       ? skinMatrix
@@ -367,47 +369,74 @@ export class ShaderHelper {
    *
    * @param scope - Current shader scope
    */
-  static transformVertexAndNormal(scope: PBInsideFunctionScope) {
+  static transformVertexAndNormal(
+    scope: PBInsideFunctionScope,
+    pos?: PBShaderExp,
+    normal?: PBShaderExp,
+    tangent?: PBShaderExp
+  ) {
     const pb = scope.$builder;
     const funcName = 'zTransformVertexAndNormal';
     const that = this;
-    pb.func(funcName, [], function () {
+    const params: PBShaderExp[] = [];
+    const args: PBShaderExp[] = [];
+    pos = pos ?? scope.$getVertexAttrib('position');
+    if (!pos) {
+      throw new Error('ShaderHelper.transformVertexAndNormal(): No vertex input');
+    }
+    if (pos.numComponents() !== 3) {
+      throw new Error('ShaderHelper.transformVertexAndNormal(): vertex position must be of type vec3');
+    }
+    params.push(pb.vec3('pos'));
+    args.push(pos);
+    normal = normal ?? scope.$getVertexAttrib('normal');
+    if (normal) {
+      if (normal.numComponents() !== 3) {
+        console.error('ShaderHelper.transformVertexAndNormal(): vertex normal must be of type vec3');
+        normal = null;
+      } else {
+        params.push(pb.vec3('normal'));
+        args.push(normal);
+      }
+    }
+    tangent = tangent ?? scope.$getVertexAttrib('tangent');
+    if (tangent) {
+      if (tangent.numComponents() !== 4) {
+        console.error('ShaderHelper.transformVertexAndNormal(): vertex tangent must be of type vec4');
+        tangent = null;
+      } else {
+        params.push(pb.vec4('tangent'));
+        args.push(tangent);
+      }
+    }
+    pb.func(funcName, params, function () {
       const viewProjMatrix = that.getViewProjectionMatrix(this);
       if (that.hasSkinning(this)) {
         this.$l.skinMatrix = that.calculateSkinMatrix(this);
       }
-      const oPos = that.calculateObjectSpacePosition(
+      this.$l.oPos = that.calculateObjectSpacePosition(
         this,
-        this.$getVertexAttrib('position'),
+        this.pos,
         that.hasSkinning(this) ? this.skinMatrix : null
       );
-      if (!oPos) {
-        throw new Error(
-          `MeshMaterial.transformVertexAndNormal(): calculateObjectSpacePosition() returns null`
-        );
-      }
-      this.$l.oPos = oPos;
       that.propagateWorldPosition(this, pb.mul(that.getWorldMatrix(this), pb.vec4(this.$l.oPos, 1)));
       that.setClipSpacePosition(this, pb.mul(viewProjMatrix, this.$outputs[VARYING_NAME_WORLD_POSITION]));
-
-      const oNorm = that.calculateObjectSpaceNormal(
-        this,
-        this.$getVertexAttrib('normal'),
-        that.hasSkinning(this) ? this.skinMatrix : null
-      );
-      if (oNorm) {
-        this.$l.oNorm = oNorm;
+      if (normal) {
+        this.$l.oNorm = that.calculateObjectSpaceNormal(
+          this,
+          this.normal,
+          that.hasSkinning(this) ? this.skinMatrix : null
+        );
         that.propagateWorldNormal(
           this,
           pb.normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oNorm, 0)).xyz)
         );
-        const oTangent = that.calculateObjectSpaceTangent(
-          this,
-          this.$getVertexAttrib('tangent'),
-          that.hasSkinning(this) ? this.skinMatrix : null
-        );
-        if (oTangent) {
-          this.$l.oTangent = oTangent;
+        if (tangent) {
+          this.$l.oTangent = that.calculateObjectSpaceTangent(
+            this,
+            this.tangent,
+            that.hasSkinning(this) ? this.skinMatrix : null
+          );
           that.propagateWorldTangent(
             this,
             pb.normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oTangent.xyz, 0)).xyz)
@@ -424,7 +453,7 @@ export class ShaderHelper {
         }
       }
     });
-    pb.getGlobalScope()[funcName]();
+    pb.getGlobalScope()[funcName](...args);
   }
   /**
    * Gets the uniform variable of type mat4 which holds the world matrix of current object to be drawn
@@ -531,6 +560,7 @@ export class ShaderHelper {
   ) {
     bindGroup.setValue(UNIFORM_NAME_GLOBAL, {
       light: {
+        sunDir: ctx.sunLight ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1) : this.defaultSunDir,
         clusterParams: clusterParams,
         countParams: countParams,
         envLightStrength: ctx.env.light.strength ?? 0,
@@ -695,7 +725,7 @@ export class ShaderHelper {
     fogParams: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
-    const funcName = 'zApplyFog';
+    const funcName = 'zComputeFogFactor';
     const that = this;
     pb.func(funcName, [pb.vec3('viewDir'), pb.int('fogType'), pb.vec4('fogParams')], function () {
       this.$l.distance = pb.length(this.viewDir);
@@ -865,6 +895,10 @@ export class ShaderHelper {
     return scope[UNIFORM_NAME_GLOBAL].light.numLights;
   }
   /** @internal */
+  static getSunLightDir(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].light.sunDir;
+  }
+  /** @internal */
   static getLightTypeForShadow(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_GLOBAL].light.lightType;
   }
@@ -982,60 +1016,6 @@ export class ShaderHelper {
     });
     return pb.getGlobalScope()[funcNameGetSkinningMatrix]();
   }
-  applyFog(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext) {
-    if (ctx.applyFog) {
-      const pb = scope.$builder;
-      if (ctx.env.sky.drawScatteredFog(ctx)) {
-        const funcName = 'applyAerialPerspective';
-        pb.func(funcName, [pb.vec4('color').inout()], function () {
-          this.$l.viewDir = pb.sub(this.getWorldPosition(this).xyz, this.getCameraPosition(this));
-          this.viewDir.y = pb.max(this.viewDir.y, 0);
-          this.$l.distance = pb.mul(pb.length(this.viewDir), this.getWorldUnit(this));
-          this.$l.sliceDist = pb.div(
-            pb.mul(this.getCameraParams(this).y, this.getWorldUnit(this)),
-            ScatteringLut.aerialPerspectiveSliceZ
-          );
-          this.$l.slice0 = pb.floor(pb.div(this.distance, this.sliceDist));
-          this.$l.slice1 = pb.add(this.slice0, 1);
-          this.$l.factor = pb.sub(pb.div(this.distance, this.sliceDist), this.slice0);
-          this.$l.viewNormal = pb.normalize(this.viewDir);
-          this.$l.zenithAngle = pb.asin(this.viewNormal.y);
-          this.$l.horizonAngle = pb.atan2(this.viewNormal.z, this.viewNormal.x);
-          this.$l.u0 = pb.div(
-            pb.add(this.slice0, pb.div(this.horizonAngle, Math.PI * 2)),
-            ScatteringLut.aerialPerspectiveSliceZ
-          );
-          this.$l.u1 = pb.add(this.u0, 1 / ScatteringLut.aerialPerspectiveSliceZ);
-          this.$l.v = pb.div(this.zenithAngle, Math.PI / 2);
-          this.$l.t0 = pb.textureSampleLevel(this.getAerialPerspectiveLUT(this), pb.vec2(this.u0, this.v), 0);
-          this.$l.t1 = pb.textureSampleLevel(this.getAerialPerspectiveLUT(this), pb.vec2(this.u1, this.v), 0);
-          this.$l.t = pb.mix(this.t0, this.t1, this.factor);
-          this.color = pb.vec4(pb.add(pb.mul(this.color.rgb, this.factor), this.t.rgb), this.color.a);
-        });
-        scope[funcName](color);
-      } else {
-        const funcName = 'applyFog';
-        pb.func(funcName, [pb.vec4('color').inout()], function () {
-          this.$l.viewDir = pb.sub(this.getWorldPosition(this).xyz, this.getCameraPosition(this));
-          this.$l.fogFactor = this.computeFogFactor(
-            this,
-            this.viewDir,
-            this.getFogType(this),
-            this.getFogParams(this)
-          );
-          this.color = pb.vec4(
-            pb.mix(
-              this.color.rgb,
-              this.getFogColor(this).rgb,
-              pb.mul(this.fogFactor, this.color.a, this.color.a)
-            ),
-            this.color.a
-          );
-        });
-        scope[funcName](color);
-      }
-    }
-  }
   /**
    * Get global uniforms
    *
@@ -1136,50 +1116,56 @@ export class ShaderHelper {
   static applyFog(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext) {
     if (ctx.applyFog) {
       const pb = scope.$builder;
+      const that = this;
       if (ctx.env.sky.drawScatteredFog(ctx)) {
         const funcName = 'zApplySkyFog';
         pb.func(funcName, [pb.vec4('color').inout()], function () {
-          this.$l.viewDir = pb.sub(this.getWorldPosition(this).xyz, this.getCameraPosition(this));
+          this.$l.viewDir = pb.sub(that.getWorldPosition(this).xyz, that.getCameraPosition(this));
           this.viewDir.y = pb.max(this.viewDir.y, 0);
-          this.$l.distance = pb.mul(pb.length(this.viewDir), this.getWorldUnit(this));
+          this.$l.distance = pb.mul(pb.length(this.viewDir), that.getWorldUnit(this));
           this.$l.sliceDist = pb.div(
-            pb.mul(this.getCameraParams(this).y, this.getWorldUnit(this)),
+            pb.mul(that.getCameraParams(this).y, that.getWorldUnit(this)),
             ScatteringLut.aerialPerspectiveSliceZ
           );
           this.$l.slice0 = pb.floor(pb.div(this.distance, this.sliceDist));
           this.$l.slice1 = pb.add(this.slice0, 1);
           this.$l.factor = pb.sub(pb.div(this.distance, this.sliceDist), this.slice0);
           this.$l.viewNormal = pb.normalize(this.viewDir);
-          this.$l.zenithAngle = pb.asin(this.viewNormal.y);
-          this.$l.horizonAngle = pb.atan2(this.viewNormal.z, this.viewNormal.x);
-          this.$l.u0 = pb.div(
-            pb.add(this.slice0, pb.div(this.horizonAngle, Math.PI * 2)),
-            ScatteringLut.aerialPerspectiveSliceZ
+          this.$l.horizonAngle = pb.acos(
+            pb.clamp(
+              pb.dot(pb.normalize(that.getSunLightDir(this).xz), pb.normalize(this.viewNormal.xz)),
+              0,
+              1
+            )
           );
+          this.$l.zenithAngle = pb.asin(this.viewNormal.y);
+          this.$l.sliceU = pb.max(
+            pb.div(this.horizonAngle, Math.PI * 2),
+            0.5 / ScatteringLut.aerialPerspectiveSliceZ
+          );
+          this.$l.u0 = pb.div(pb.add(this.slice0, this.sliceU), ScatteringLut.aerialPerspectiveSliceZ);
           this.$l.u1 = pb.add(this.u0, 1 / ScatteringLut.aerialPerspectiveSliceZ);
           this.$l.v = pb.div(this.zenithAngle, Math.PI / 2);
-          this.$l.t0 = pb.textureSampleLevel(this.getAerialPerspectiveLUT(this), pb.vec2(this.u0, this.v), 0);
-          this.$l.t1 = pb.textureSampleLevel(this.getAerialPerspectiveLUT(this), pb.vec2(this.u1, this.v), 0);
+          this.$l.t0 = pb.textureSampleLevel(that.getAerialPerspectiveLUT(this), pb.vec2(this.u0, this.v), 0);
+          this.$l.t1 = pb.textureSampleLevel(that.getAerialPerspectiveLUT(this), pb.vec2(this.u1, this.v), 0);
           this.$l.t = pb.mix(this.t0, this.t1, this.factor);
-          this.color = pb.vec4(pb.add(pb.mul(this.color.rgb, this.factor), this.t.rgb), this.color.a);
+
+          this.color = pb.vec4(pb.add(pb.mul(this.color.rgb, this.t.a), this.t.rgb), this.color.a);
+          //this.color = pb.vec4(pb.vec3(pb.mix(this.u0, this.u1, this.factor)), this.color.a);
         });
         scope[funcName](color);
       } else {
         const funcName = 'zApplyFog';
         pb.func(funcName, [pb.vec4('color').inout()], function () {
-          this.$l.viewDir = pb.sub(this.getWorldPosition(this).xyz, this.getCameraPosition(this));
-          this.$l.fogFactor = this.computeFogFactor(
+          this.$l.viewDir = pb.sub(that.getWorldPosition(this).xyz, that.getCameraPosition(this));
+          this.$l.fogFactor = that.computeFogFactor(
             this,
             this.viewDir,
-            this.getFogType(this),
-            this.getFogParams(this)
+            that.getFogType(this),
+            that.getFogParams(this)
           );
           this.color = pb.vec4(
-            pb.mix(
-              this.color.rgb,
-              this.getFogColor(this).rgb,
-              pb.mul(this.fogFactor, this.color.a, this.color.a)
-            ),
+            pb.mix(this.color.rgb, that.getFogColor(this).rgb, this.fogFactor),
             this.color.a
           );
         });

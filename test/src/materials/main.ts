@@ -15,7 +15,7 @@ import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zeph
 import * as common from '../common';
 import { WoodMaterial } from './materials/wood';
 import { FurMaterial } from './materials/fur';
-import { Texture2D } from '@zephyr3d/device';
+import type { Texture2D } from '@zephyr3d/device';
 
 const myApp = new Application({
   backend: common.getBackend(),
@@ -37,11 +37,15 @@ myApp.ready().then(async function () {
 
   const assetManager = new AssetManager();
   const furColorTex = await assetManager.fetchTexture<Texture2D>('assets/images/fur-color.png');
+  furColorTex.samplerOptions = {
+    addressU: 'repeat',
+    addressV: 'repeat'
+  };
   const furAlphaTex = await assetManager.fetchTexture<Texture2D>('assets/images/fur-alpha.png');
   furAlphaTex.samplerOptions = {
     addressU: 'repeat',
     addressV: 'repeat'
-  }
+  };
   // Create sphere
   const sphereMaterial = new WoodMaterial();
   const furMaterial = new FurMaterial();

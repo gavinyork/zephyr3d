@@ -1,6 +1,7 @@
 import { Vector4 } from '@zephyr3d/base';
 import type { BindGroup, PBFunctionScope, Texture2D } from '@zephyr3d/device';
-import { DrawContext, MeshMaterial, Primitive, RENDER_PASS_TYPE_FORWARD } from '@zephyr3d/scene';
+import type { DrawContext, Primitive } from '@zephyr3d/scene';
+import { MeshMaterial, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '@zephyr3d/scene';
 
 export class FurMaterial extends MeshMaterial {
   private _thickness: number;
@@ -12,13 +13,13 @@ export class FurMaterial extends MeshMaterial {
   private _alphaTexture: Texture2D;
   constructor() {
     super();
-    this._thickness = 0.008;
+    this._thickness = 0.005;
     this._numLayers = 30;
-    this._colorStart = new Vector4(0, 0, 0, 1);
-    this._colorEnd = new Vector4(1, 1, 1, 0);
+    this._colorStart = new Vector4(1, 1, 1, 1);
+    this._colorEnd = new Vector4(1, 1, 1, 0.4);
     this._colorTexture = null;
     this._alphaTexture = null;
-    this._alphaRepeat = 3;
+    this._alphaRepeat = 8;
     this.numPasses = 2;
   }
   get colorTexture(): Texture2D {
@@ -33,22 +34,29 @@ export class FurMaterial extends MeshMaterial {
   set alphaTexture(tex: Texture2D) {
     this._alphaTexture = tex;
   }
+  getQueueType(): number {
+    return QUEUE_TRANSPARENT;
+  }
+  isTransparent(pass: number): boolean {
+    return pass > 0;
+  }
   isBatchable(): boolean {
     return false;
   }
   beginDraw(pass: number, ctx: DrawContext): boolean {
     if (pass > 0) {
-      if (ctx.renderPass.type !== RENDER_PASS_TYPE_FORWARD) {
+      if (ctx.renderPass.type !== RENDER_PASS_TYPE_LIGHT) {
         return false;
       } else {
         this.blendMode = 'blend';
-        this.stateSet.useDepthState().enableTest(true).enableWrite(false);
       }
     } else {
       this.blendMode = 'none';
-      this.stateSet.useDepthState().enableTest(true).enableWrite(true);
     }
     return super.beginDraw(pass, ctx);
+  }
+  endDraw(pass: number) {
+    this.blendMode = 'none';
   }
   drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number): void {
     if (pass === 0) {
@@ -59,15 +67,15 @@ export class FurMaterial extends MeshMaterial {
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
-    if (this.needFragmentColor(ctx)){
+    if (this.needFragmentColor(ctx)) {
       bindGroup.setTexture('colorTex', this._colorTexture);
-      if(pass > 0){
+      bindGroup.setValue('alphaRepeat', this._alphaRepeat);
+      if (pass > 0) {
         bindGroup.setValue('layerThickness', this._thickness);
         bindGroup.setValue('numLayers', this._numLayers);
         bindGroup.setValue('colorStart', this._colorStart);
         bindGroup.setValue('colorEnd', this._colorEnd);
         bindGroup.setTexture('alphaTex', this._alphaTexture);
-        bindGroup.setValue('alphaRepeat', this._alphaRepeat);
       }
     }
   }
@@ -92,20 +100,27 @@ export class FurMaterial extends MeshMaterial {
       scope.$outputs.tex = scope.$inputs.tex;
     }
     scope.$l.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(vertexPos, 1));
-    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), scope.worldPos));
+    this.helper.setClipSpacePosition(
+      scope,
+      pb.mul(this.helper.getViewProjectionMatrix(scope), scope.worldPos)
+    );
     this.helper.propagateWorldPosition(scope, scope.worldPos);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
     const pb = scope.$builder;
-    if (this.needFragmentColor(this.drawContext)){
+    if (this.needFragmentColor(this.drawContext)) {
       scope.colorTex = pb.tex2D().uniform(2);
+      scope.alphaRepeat = pb.float().uniform(2);
       scope.$l.color = pb.textureSample(scope.colorTex, scope.$inputs.tex);
+      scope.$l.color.a = 1;
       if (this.pass > 0) {
         scope.alphaTex = pb.tex2D().uniform(2);
-        scope.alphaRepeat = pb.float().uniform(2);
         scope.color = pb.mul(scope.color, scope.$inputs.ao);
-        scope.color.a = pb.mul(scope.color.a, pb.textureSample(scope.alphaTex, pb.mul(scope.$inputs.tex, scope.alphaRepeat)).r);
+        scope.color.a = pb.mul(
+          scope.color.a,
+          pb.textureSample(scope.alphaTex, pb.mul(scope.$inputs.tex, scope.alphaRepeat)).r
+        );
         scope.color = pb.vec4(pb.mul(scope.color.rgb, scope.color.a), scope.color.a);
       }
       this.outputFragmentColor(scope, scope.color);

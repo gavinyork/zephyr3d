@@ -2,7 +2,7 @@
  * Forward render pass type
  * @public
  */
-export const RENDER_PASS_TYPE_FORWARD = 0;
+export const RENDER_PASS_TYPE_LIGHT = 0;
 /**
  * Shadow map render pass type
  * @public
@@ -12,15 +12,7 @@ export const RENDER_PASS_TYPE_SHADOWMAP = 1;
  * Depth only render pass type
  * @public
  */
-export const RENDER_PASS_TYPE_DEPTH_ONLY = 2;
-/**
- * Max light count for forward rendering
- * @internal
- */
-export const MAX_FORWARD_LIGHT_COUNT = 8;
-
-/** @internal */
-export const DEBUG_CASCADED_SHADOW_MAPS = false;
+export const RENDER_PASS_TYPE_DEPTH = 2;
 
 /**
  * Builtin texture name for sheen LUT
@@ -63,3 +55,15 @@ export const LIGHT_TYPE_SPOT = 3;
  * @public
  */
 export const MAX_CLUSTERED_LIGHTS = 255;
+
+/**
+ * Opaque render queue type
+ * @public
+ */
+export const QUEUE_OPAQUE = 1;
+
+/**
+ * Transparent render queue type
+ * @public
+ */
+export const QUEUE_TRANSPARENT = 2;

@@ -4,7 +4,7 @@ import { mixinLight } from './mixins/lit';
 import { mixinPBRMetallicRoughness } from './mixins/pbr/metallicroughness';
 import type { BindGroup, PBFunctionScope, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import { RENDER_PASS_TYPE_FORWARD } from '../values';
+import { RENDER_PASS_TYPE_LIGHT } from '../values';
 
 export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight, mixinPBRMetallicRoughness) {
   /** @internal */
@@ -67,18 +67,10 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
     scope.$l.axisZ = pb.cross(scope.axisX, scope.kkNormal);
     scope.$l.axisX = pb.cross(scope.kkNormal, scope.axisZ);
     scope.$l.rotPos = pb.mul(pb.mat3(scope.axisX, scope.kkNormal, scope.axisZ), scope.$inputs.pos);
-    scope.$l.worldPos = pb.mul(
-      this.helper.getWorldMatrix(scope),
-      pb.vec4(pb.add(scope.rotPos, scope.$inputs.placement.xyz), 1)
-    );
-    this.helper.propagateWorldPosition(scope, scope.worldPos);
-    this.helper.propagateWorldNormal(
+    this.helper.transformVertexAndNormal(
       scope,
-      pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.kkNormal, 0)).xyz
-    );
-    this.helper.setClipSpacePosition(
-      scope,
-      pb.mul(this.helper.getViewProjectionMatrix(scope), scope.worldPos)
+      pb.add(scope.rotPos, scope.$inputs.placement.xyz),
+      scope.kkNormal
     );
   }
   fragmentShader(scope: PBFunctionScope): void {
@@ -95,7 +87,7 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
       });
       scope.$l.albedo = this.calculateAlbedoColor(scope);
       scope.$l.litColor = pb.vec3(0);
-      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
+      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         scope.$l.normalInfo = this.calculateNormalAndTBN(scope);
         scope.$l.normal = scope.normalInfo.normal;
         scope.$l.viewVec = this.calculateViewVector(scope);

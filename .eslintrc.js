@@ -5,7 +5,8 @@ module.exports = {
     'plugin:prettier/recommended'
   ],
   plugins: [
-    'prettier'
+    'prettier',
+    'import'
   ],
   parserOptions: {
     ecmaVersion: 12,
@@ -18,6 +19,7 @@ module.exports = {
   },
   ignorePatterns: ['**/*.d.ts', '**/dist/**'],
   rules: {
+    'import/no-cycle': 'warn',
     'no-explicit-any': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
     '@typescript-eslint/ban-ts-comment': 'off',

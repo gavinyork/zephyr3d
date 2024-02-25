@@ -38,6 +38,10 @@ export interface DrawContext {
   env: Environment;
   /** Timestamp */
   timestamp: number;
+  /** current queue */
+  queue: number;
+  /** whether is blending light */
+  lightBlending: boolean;
   /** Depth texture */
   depthTexture?: Texture2D;
   /** Linear depth texture */
@@ -70,8 +74,6 @@ export interface DrawContext {
   clusteredLight?: ClusteredLight;
   /** render logger */
   logger?: RenderLogger;
-  /** user data */
-  userData?: unknown;
 }
 
 /**
@@ -93,8 +95,8 @@ export interface Drawable {
   getInvBindMatrix(): Matrix4x4;
   /** Gets the distance for object sorting */
   getSortDistance(camera: Camera): number;
-  /** true if the object is transparency, false otherwise */
-  isTransparency(): boolean;
+  /** Gets the type of render queue */
+  getQueueType(): number;
   /** true if the shading of this object is independent of lighting */
   isUnlit(): boolean;
   /**

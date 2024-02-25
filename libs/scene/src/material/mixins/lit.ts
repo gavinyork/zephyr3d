@@ -3,7 +3,7 @@ import {
   LIGHT_TYPE_DIRECTIONAL,
   LIGHT_TYPE_POINT,
   LIGHT_TYPE_SPOT,
-  RENDER_PASS_TYPE_FORWARD
+  RENDER_PASS_TYPE_LIGHT
 } from '../../values';
 import { nonLinearDepthToLinear } from '../../shaders';
 import type { DrawContext } from '../../render';
@@ -231,7 +231,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
             pb.normalize(this.worldNormal)
           );
         }
-        if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD && that.normalTexture) {
+        if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
           if (that.normalMapMode === 'object-space') {
             const pixel = pb.sub(
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
@@ -341,7 +341,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
             pb.normalize(this.worldNormal)
           );
         }
-        if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD && that.normalTexture) {
+        if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
           if (that.normalMapMode === 'object-space') {
             const pixel = pb.sub(
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
@@ -369,7 +369,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      */
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
       super.applyUniformValues(bindGroup, ctx, pass);
-      if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
+      if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         if (this.normalTexture) {
           bindGroup.setValue('kkNormalScale', this._normalScale);
         }
@@ -381,7 +381,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      * @returns true Environment lighting should be calculated, otherwise false
      */
     needCalculateEnvLight(): boolean {
-      return this.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD && this.drawContext.drawEnvLight;
+      return this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && this.drawContext.drawEnvLight;
     }
     /**
      * Get irradiance of current environment light
@@ -435,7 +435,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      */
     protected needCalucateShadow(): boolean {
       return (
-        this.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD && !!this.drawContext.currentShadowLight
+        this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && !!this.drawContext.currentShadowLight
       );
     }
     /**
@@ -549,7 +549,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     ) {
       const pb = scope.$builder;
       const that = this;
-      if (that.drawContext.renderPass.type !== RENDER_PASS_TYPE_FORWARD) {
+      if (that.drawContext.renderPass.type !== RENDER_PASS_TYPE_LIGHT) {
         console.warn('LitMaterial.forEachLight(): must be called in forward render pass');
         return;
       }
@@ -678,7 +678,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     vertexShader(scope: PBFunctionScope): void {
       super.vertexShader(scope);
       const pb = scope.$builder;
-      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
+      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         if (this.vertexNormal) {
           scope.$inputs.normal = pb.vec3().attrib('normal');
         }
@@ -696,7 +696,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     fragmentShader(scope: PBFunctionScope) {
       super.fragmentShader(scope);
       const pb = scope.$builder;
-      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
+      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         if (this.normalTexture) {
           scope.kkNormalScale = pb.float().uniform(2);
         }

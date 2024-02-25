@@ -2,8 +2,8 @@ import { Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../render/drawable';
 import {
   MAX_CLUSTERED_LIGHTS,
-  RENDER_PASS_TYPE_DEPTH_ONLY,
-  RENDER_PASS_TYPE_FORWARD,
+  RENDER_PASS_TYPE_DEPTH,
+  RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_SHADOWMAP
 } from '../values';
 import { Application } from '../app';
@@ -127,10 +127,10 @@ export class ShaderFramework {
       ]);
       const globalStruct = pb.defineStruct([cameraStruct('camera'), lightStruct('light')]);
       scope.global = globalStruct().uniform(0);
-    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH_ONLY) {
+    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
       const globalStruct = pb.defineStruct([cameraStruct('camera')]);
       scope.global = globalStruct().uniform(0);
-    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
+    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
       const useClusteredLighting = !ctx.currentShadowLight;
       const fogStruct = pb.defineStruct([pb.int('fogType'), pb.vec4('fogColor'), pb.vec4('fogParams')]);
       const lightStruct = ctx.currentShadowLight

@@ -6,14 +6,20 @@ import type {
   PBShaderExp
 } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
-import { RENDER_PASS_TYPE_DEPTH_ONLY, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP } from '../values';
+import {
+  QUEUE_OPAQUE,
+  QUEUE_TRANSPARENT,
+  RENDER_PASS_TYPE_DEPTH,
+  RENDER_PASS_TYPE_LIGHT,
+  RENDER_PASS_TYPE_SHADOWMAP
+} from '../values';
 import { Material } from './material';
 import type { DrawContext, ShadowMapPass } from '../render';
 import { encodeColorOutput, encodeNormalizedFloatToRGBA, nonLinearDepthToLinearNormalized } from '../shaders';
 import { Application } from '../app';
 import { ShaderHelper } from './shader/helper';
 
-export type BlendMode = 'none' | 'blend' | 'additive' | 'max' | 'min';
+export type BlendMode = 'none' | 'blend' | 'additive';
 
 export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void
   ? I
@@ -111,8 +117,45 @@ export class MeshMaterial extends Material {
       this.optionChanged(false);
     }
   }
-  /** @internal */
-  private updateBlendingState(ctx: DrawContext) {
+  /**
+   * Update blending state according to draw context and current material pass
+   * @param pass - Current material pass
+   * @param ctx - Draw context
+   */
+  protected updateBlendingAndDepthState(pass: number, ctx: DrawContext): void {
+    const blending = this.featureUsed<boolean>(MeshMaterial.FEATURE_ALPHABLEND);
+    const a2c = this.featureUsed<boolean>(MeshMaterial.FEATURE_ALPHATOCOVERAGE);
+    if (blending || a2c || ctx.lightBlending) {
+      const blendingState = this.stateSet.useBlendingState();
+      if (blending) {
+        blendingState.enable(true);
+        blendingState.setBlendFuncAlpha('zero', 'one');
+        blendingState.setBlendEquation('add', 'add');
+        if (this._blendMode === 'additive' || ctx.lightBlending) {
+          blendingState.setBlendFuncRGB('one', 'one');
+        } else {
+          blendingState.setBlendFuncRGB('one', 'inv-src-alpha');
+        }
+      } else {
+        blendingState.enable(false);
+      }
+      blendingState.enableAlphaToCoverage(a2c);
+      if (blendingState.enabled) {
+        this.stateSet.useDepthState().enableTest(true).enableWrite(false);
+      } else {
+        this.stateSet.defaultDepthState();
+      }
+    } else if (this.stateSet.blendingState?.enabled && !blending) {
+      this.stateSet.defaultBlendingState();
+      this.stateSet.defaultDepthState();
+    }
+  }
+  /**
+   * Update Depth state according to draw context and current material pass
+   * @param pass - Current material pass
+   * @param ctx - Draw context
+   */
+  protected updateDepthState(pass: number, ctx: DrawContext): void {
     const blending = this.featureUsed<boolean>(MeshMaterial.FEATURE_ALPHABLEND);
     const a2c = this.featureUsed<boolean>(MeshMaterial.FEATURE_ALPHATOCOVERAGE);
     if (blending || a2c) {
@@ -120,17 +163,10 @@ export class MeshMaterial extends Material {
       if (blending) {
         blendingState.enable(true);
         blendingState.setBlendFuncAlpha('zero', 'one');
-        if (this._blendMode === 'additive') {
-          blendingState.setBlendEquation('add', 'add');
-          blendingState.setBlendFuncRGB('one', 'one');
-        } else if (this._blendMode === 'max') {
-          blendingState.setBlendEquation('max', 'add');
-          blendingState.setBlendFuncRGB('one', 'one');
-        } else if (this._blendMode === 'min') {
-          blendingState.setBlendEquation('min', 'add');
+        blendingState.setBlendEquation('add', 'add');
+        if (this._blendMode === 'additive' || ctx.lightBlending) {
           blendingState.setBlendFuncRGB('one', 'one');
         } else {
-          blendingState.setBlendEquation('add', 'add');
           blendingState.setBlendFuncRGB('one', 'inv-src-alpha');
         }
       } else {
@@ -149,12 +185,15 @@ export class MeshMaterial extends Material {
       bindGroup.setValue('kkOpacity', this._opacity);
     }
   }
+  getQueueType(): number {
+    return this.isTransparent(0) ? QUEUE_TRANSPARENT : QUEUE_OPAQUE;
+  }
   /** true if the material is transparency */
-  isTransparent(): boolean {
+  isTransparent(pass: number): boolean {
     return this.featureUsed(MeshMaterial.FEATURE_ALPHABLEND);
   }
   beginDraw(pass: number, ctx: DrawContext): boolean {
-    this.updateBlendingState(ctx);
+    this.updateBlendingAndDepthState(pass, ctx);
     return super.beginDraw(pass, ctx);
   }
   /** @internal */
@@ -208,7 +247,7 @@ export class MeshMaterial extends Material {
    */
   needFragmentColor(ctx?: DrawContext): boolean {
     return (
-      (ctx ?? this.drawContext).renderPass.type === RENDER_PASS_TYPE_FORWARD ||
+      (ctx ?? this.drawContext).renderPass.type === RENDER_PASS_TYPE_LIGHT ||
       this._alphaCutoff > 0 ||
       this.alphaToCoverage
     );
@@ -235,8 +274,8 @@ export class MeshMaterial extends Material {
     if (this._alphaCutoff > 0) {
       scope.kkAlphaCutoff = pb.float().uniform(2);
     }
-    if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
-      if (this.isTransparent()) {
+    if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+      if (this.isTransparent(this.pass)) {
         scope.kkOpacity = pb.float().uniform(2);
       }
     }
@@ -277,9 +316,9 @@ export class MeshMaterial extends Material {
     const that = this;
     pb.func('zOutputFragmentColor', color ? [pb.vec4('color')] : [], function () {
       this.$l.outColor = color ? this.color : pb.vec4();
-      if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_FORWARD) {
+      if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         that.helper.discardIfClipped(this);
-        if (!that.isTransparent() && !this.kkAlphaCutoff && !that.alphaToCoverage) {
+        if (!that.isTransparent(that.pass) && !this.kkAlphaCutoff && !that.alphaToCoverage) {
           this.outColor.a = 1;
         } else if (this.kkOpacity) {
           this.outColor.a = pb.mul(this.outColor.a, this.kkOpacity);
@@ -289,12 +328,12 @@ export class MeshMaterial extends Material {
             pb.discard();
           });
         }
-        if (that.isTransparent()) {
+        if (that.isTransparent(that.pass)) {
           this.outColor = pb.vec4(pb.mul(this.outColor.rgb, this.outColor.a), this.outColor.a);
         }
         that.helper.applyFog(this, this.outColor, that.drawContext);
         this.$outputs.zFragmentOutput = encodeColorOutput(this, this.outColor);
-      } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_DEPTH_ONLY) {
+      } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
         if (color) {
           this.$if(pb.lessThan(this.outColor.a, this.kkAlphaCutoff), function () {
             pb.discard();

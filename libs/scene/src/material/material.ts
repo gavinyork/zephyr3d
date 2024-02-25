@@ -11,7 +11,12 @@ import { ProgramBuilder } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
 import type { Drawable, DrawContext } from '../render/drawable';
 import { Application } from '../app';
-import { RENDER_PASS_TYPE_DEPTH_ONLY, RENDER_PASS_TYPE_FORWARD, RENDER_PASS_TYPE_SHADOWMAP } from '../values';
+import {
+  QUEUE_OPAQUE,
+  RENDER_PASS_TYPE_DEPTH,
+  RENDER_PASS_TYPE_LIGHT,
+  RENDER_PASS_TYPE_SHADOWMAP
+} from '../values';
 import { ShaderHelper } from './shader/helper';
 
 /**
@@ -85,7 +90,8 @@ class InstanceBindGroupPool {
 export interface IMaterial {
   readonly id: number;
   stateSet: RenderStateSet;
-  isTransparent(): boolean;
+  getQueueType(): number;
+  isTransparent(pass: number): boolean;
   supportLighting(): boolean;
   isBatchable(): boolean;
   draw(primitive: Primitive, ctx: DrawContext, numInstances?: number): void;
@@ -207,8 +213,11 @@ export class Material implements IMaterial {
   set stateSet(stateset: RenderStateSet) {
     this._renderStateSet = stateset;
   }
+  getQueueType(): number {
+    return QUEUE_OPAQUE;
+  }
   /** Returns true if this is a transparency material */
-  isTransparent(): boolean {
+  isTransparent(pass: number): boolean {
     return false;
   }
   /** Returns true if shading of the material will be affected by lights  */
@@ -246,7 +255,7 @@ export class Material implements IMaterial {
     if (programInfo) {
       const hash = programInfo.hash;
       if (!programInfo.programs[ctx.renderPass.type]) {
-        return null;
+        return false;
       }
       this._materialBindGroup = this.applyMaterialBindGroups(ctx, hash, pass);
       if (pass === 0) {
@@ -302,14 +311,8 @@ export class Material implements IMaterial {
       !!(ctx.instanceData?.worldMatrices.length > 1)
     )}:${ctx.renderPassHash}`;
     let programInfo = programMap[hash];
-    if (
-      !programInfo ||
-      !programInfo.programs[renderPassType] ||
-      programInfo.programs[renderPassType].disposed
-    ) {
-      console.time(hash);
-      const program = this.createProgram(ctx, pass);
-      console.timeEnd(hash);
+    if (!programInfo || programInfo.programs[renderPassType] === undefined) {
+      const program = this.createProgram(ctx, pass) ?? null;
       if (!programInfo) {
         programInfo = {
           programs: [null, null, null],
@@ -319,7 +322,7 @@ export class Material implements IMaterial {
       }
       programInfo.programs[renderPassType] = program;
     }
-    return programInfo || null;
+    return programInfo;
   }
   dispose(): void {
     this.clearBindGroupCache();
@@ -403,9 +406,9 @@ export class Material implements IMaterial {
     if (!bindGroupInfo) {
       // bindGroups not created or have been garbage collected
       const materialBindGroup = [
-        RENDER_PASS_TYPE_FORWARD,
+        RENDER_PASS_TYPE_LIGHT,
         RENDER_PASS_TYPE_SHADOWMAP,
-        RENDER_PASS_TYPE_DEPTH_ONLY
+        RENDER_PASS_TYPE_DEPTH
       ].map((k) => {
         const program = Material._programMap[hash].programs[k];
         return program?.bindGroupLayouts[2]
@@ -451,16 +454,14 @@ export class Material implements IMaterial {
     }
     let drawableBindGroup = drawableBindGroups[hash];
     if (!drawableBindGroup) {
-      const bindGroup = [
-        RENDER_PASS_TYPE_FORWARD,
-        RENDER_PASS_TYPE_SHADOWMAP,
-        RENDER_PASS_TYPE_DEPTH_ONLY
-      ].map((k) => {
-        const program = Material._programMap[hash].programs[k];
-        return program?.bindGroupLayouts[1]
-          ? Application.instance.device.createBindGroup(program.bindGroupLayouts[1])
-          : null;
-      });
+      const bindGroup = [RENDER_PASS_TYPE_LIGHT, RENDER_PASS_TYPE_SHADOWMAP, RENDER_PASS_TYPE_DEPTH].map(
+        (k) => {
+          const program = Material._programMap[hash].programs[k];
+          return program?.bindGroupLayouts[1]
+            ? Application.instance.device.createBindGroup(program.bindGroupLayouts[1])
+            : null;
+        }
+      );
       drawableBindGroup = drawableBindGroups[hash] = {
         bindGroup,
         bindGroupTag: [0, 0, 0],

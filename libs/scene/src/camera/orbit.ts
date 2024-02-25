@@ -117,8 +117,6 @@ export class OrbitCameraController extends BaseCameraController {
    * @override
    */
   protected _onMouseWheel(evt: WheelEvent): boolean {
-    console.log(`wheel deltaX: ${evt.deltaX}`);
-    console.log(`wheel deltaY: ${evt.deltaY}`);
     const factor = Math.pow(0.9, Math.abs(this.options.zoomSpeed));
     if (evt.deltaY > 0) {
       this.scale /= factor;

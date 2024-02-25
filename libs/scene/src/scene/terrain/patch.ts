@@ -10,7 +10,7 @@ import type { Camera } from '../../camera/camera';
 import type { Quadtree } from './quadtree';
 import type { Terrain } from './terrain';
 import type { GraphNode } from '../graph_node';
-import { RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
+import { QUEUE_OPAQUE, RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 
 /** @internal */
 export class TerrainPatch implements Drawable {
@@ -139,8 +139,8 @@ export class TerrainPatch implements Drawable {
   getSortDistance(camera: Camera): number {
     return this._quadtree.getTerrain().getSortDistance(camera);
   }
-  isTransparency(): boolean {
-    return false;
+  getQueueType(): number {
+    return QUEUE_OPAQUE;
   }
   isUnlit(): boolean {
     return false;

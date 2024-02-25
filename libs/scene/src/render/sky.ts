@@ -56,7 +56,6 @@ const defaultSkyWorldMatrix = Matrix4x4.identity();
  * @public
  */
 export class SkyRenderer {
-  private static _defaultSunDir = Vector3.one().inplaceNormalize();
   private _skyType: SkyType;
   private _skyColor: Vector4;
   private _skyboxTexture: TextureCube;
@@ -399,7 +398,7 @@ export class SkyRenderer {
       bindgroup.setValue('cameraPosition', camera.getWorldPosition());
       bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
       if (this._fogType === 'scatter') {
-        const sunDir = sunLight ? sunLight.directionAndCutoff.xyz().scaleBy(-1) : SkyRenderer._defaultSunDir;
+        const sunDir = sunLight ? sunLight.directionAndCutoff.xyz().scaleBy(-1) : ShaderHelper.defaultSunDir;
         const alpha = Math.PI / 2 - Math.acos(Math.max(-1, Math.min(1, sunDir.y)));
         const farPlane = ctx.camera.getFarPlane() * ctx.scene.worldUnit;
         bindgroup.setTexture('apLut', ScatteringLut.getAerialPerspectiveLut(alpha, farPlane));
@@ -798,7 +797,7 @@ export class SkyRenderer {
   /** @internal */
   private static _getSunDir(sunLight: DirectionalLight) {
     // TODO: reduce GC
-    return sunLight?.directionAndCutoff.xyz().scaleBy(-1) ?? SkyRenderer._defaultSunDir;
+    return sunLight?.directionAndCutoff.xyz().scaleBy(-1) ?? ShaderHelper.defaultSunDir;
   }
   private static _createScatterProgram(device: AbstractDevice, cloud: boolean) {
     return device.buildRenderProgram({

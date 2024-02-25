@@ -1,6 +1,6 @@
-import { ForwardRenderPass } from './forward_pass';
+import { LightPass } from './lightpass';
 import { ShadowMapPass } from './shadowmap_pass';
-import { DepthRenderPass } from './depth_pass';
+import { DepthPass } from './depthpass';
 import { Vector4 } from '@zephyr3d/base';
 import type { FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
 import { Application } from '../app';
@@ -18,11 +18,11 @@ import { ClusteredLight } from './cluster_light';
  * Forward render scheme
  * @internal
  */
-export class ForwardRenderScheme {
+export class SceneRenderer {
   /** @internal */
-  private static _scenePass = new ForwardRenderPass();
+  private static _scenePass = new LightPass();
   /** @internal */
-  private static _depthPass = new DepthRenderPass();
+  private static _depthPass = new DepthPass();
   /** @internal */
   private static _shadowMapPass = new ShadowMapPass();
   /** @internal */
@@ -59,6 +59,8 @@ export class ForwardRenderScheme {
       compositor: compositor?.needDrawPostEffects() ? compositor : null,
       timestamp: device.frameInfo.frameTimestamp,
       logger,
+      queue: 0,
+      lightBlending: false,
       target: null,
       renderPass: null,
       renderPassHash: null,

@@ -56,8 +56,8 @@ export class GrassCluster implements Drawable {
   getSortDistance(camera: Camera): number {
     return this._terrain.getSortDistance(camera);
   }
-  isTransparency(): boolean {
-    return this._terrain.grassMaterial.isTransparent();
+  getQueueType(): number {
+    return this._terrain.grassMaterial.getQueueType();
   }
   isUnlit(): boolean {
     return !this._terrain.grassMaterial.supportLighting();

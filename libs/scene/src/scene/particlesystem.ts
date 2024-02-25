@@ -112,7 +112,7 @@ export class ParticleSystem extends GraphNode {
    * {@inheritDoc Drawable.isTransparency}
    */
   isTransparency(): boolean {
-    return !!this._material?.isTransparent();
+    return !!this._material?.isTransparent(0);
   }
   /**
    * {@inheritDoc Drawable.isUnlit}

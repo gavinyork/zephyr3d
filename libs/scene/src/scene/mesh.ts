@@ -10,6 +10,7 @@ import type { Texture2D } from '@zephyr3d/device';
 import type { XForm } from './xform';
 import type { Scene } from './scene';
 import type { BoundingBox, BoundingVolume } from '../utility/bounding_volume';
+import { QUEUE_OPAQUE } from '../values';
 
 /**
  * Mesh node
@@ -183,10 +184,10 @@ export class Mesh extends GraphNode implements BatchDrawable {
     super.dispose();
   }
   /**
-   * {@inheritDoc Drawable.isTransparency}
+   * {@inheritDoc Drawable.getQueueType}
    */
-  isTransparency(): boolean {
-    return !!this.material?.isTransparent();
+  getQueueType(): number {
+    return this.material?.getQueueType() ?? QUEUE_OPAQUE;
   }
   /**
    * {@inheritDoc Drawable.isUnlit}

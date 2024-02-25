@@ -1,5 +1,5 @@
 import { RenderPass } from './renderpass';
-import { RENDER_PASS_TYPE_DEPTH_ONLY } from '../values';
+import { RENDER_PASS_TYPE_DEPTH } from '../values';
 import { Application } from '../app';
 import type { RenderQueue } from './render_queue';
 import type { DrawContext } from './drawable';
@@ -12,12 +12,12 @@ import { ShaderHelper } from '../material/shader/helper';
  *
  * @public
  */
-export class DepthRenderPass extends RenderPass {
+export class DepthPass extends RenderPass {
   /**
    * Creates an instance of DepthRenderPass
    */
   constructor() {
-    super(RENDER_PASS_TYPE_DEPTH_ONLY);
+    super(RENDER_PASS_TYPE_DEPTH);
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
