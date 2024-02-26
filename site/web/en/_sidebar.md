@@ -5,7 +5,7 @@
 
 - Demos
 
-  - [GLTF viewer](https://baidu.com)
+  - [GLTF viewer](en/gltf.md)
 
 - DeviceAPI
 

@@ -80,11 +80,21 @@
       }
       const cases = document.querySelectorAll('.showcase').values();
       const observer = new MutationObserver(function(mutations_list) {
+        let caseNodes = new Set();
         mutations_list.forEach(function(mutation) {
           mutation.addedNodes.forEach(function(added_node) {
+            const caseList = (added_node instanceof HTMLElement) ? added_node.querySelectorAll('.showcase') : [];
+            caseList.forEach(el => {
+              if (!caseNodes.has(el)) {
+                caseNodes.add(el);
+                createCase(el);
+              }
+            });
+            /*
             if(added_node instanceof HTMLElement && added_node.classList.contains('showcase')) {
               createCase(added_node);
             }
+            */
           });
         });
       });

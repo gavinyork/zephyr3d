@@ -1,7 +1,7 @@
-import type { AABB } from '@zephyr3d/base';
 import * as zip from '@zip.js/zip.js';
 import { Vector4, Vector3, Vector2 } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet } from '@zephyr3d/scene';
+import type { AABB } from '@zephyr3d/base';
 import {
   BoundingBox,
   GraphNode,
@@ -54,7 +54,6 @@ export class GLTFViewer {
     this._scene = scene;
     this._assetManager = new AssetManager();
     this._assetManager.fetchBuiltinTexture(BUILTIN_ASSET_TEXTURE_SHEEN_LUT);
-    this._assetManager.fetchTexture('assets/images/lut.png');
     this._tonemap = new Tonemap();
     this._sao = new SAO();
     this._bloom = new Bloom();

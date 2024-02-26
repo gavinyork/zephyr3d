@@ -2,11 +2,10 @@ import { swc } from 'rollup-plugin-swc3';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
 import fs from 'fs';
+import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import copy from 'rollup-plugin-copy';
-import commonjs from '@rollup/plugin-commonjs';
-import css from 'rollup-plugin-import-css';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,7 +13,66 @@ const __dirname = path.dirname(__filename);
 const srcdir = path.join(__dirname, 'src');
 const destdir = path.join(__dirname, 'dist', 'web', 'tut');
 const srcfiles = [];
+const cacheFile = path.join(__dirname, '.buildcache.json');
+const tmpcacheFile = path.join(__dirname, '.buildcache.tmp.json');
 
+function deepEqual(obj1, obj2) {
+  if (obj1 === obj2) {
+    return true;
+  }
+  if (typeof obj1 !== 'object' || obj1 === null || typeof obj2 !== 'object' || obj2 === null) {
+    return false;
+  }
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
+  if (keys1.length !== keys2.length) {
+    return false;
+  }
+  for (let key of keys1) {
+    if (!keys2.includes(key) || !deepEqual(obj1[key], obj2[key])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function calculateFileMD5(filePath) {
+  const fileBuffer = fs.readFileSync(filePath);
+  const hash = crypto.createHash('md5');
+  hash.update(fileBuffer);
+  return hash.digest('hex');
+}
+
+function traverseDirectory(dirPath, rootPath, dict) {
+  const entries = fs.readdirSync(dirPath);
+  dict = dict || {};
+  for (const entry of entries) {
+    const fullPath = path.join(dirPath, entry);
+    const stats = fs.statSync(fullPath);
+    if (stats.isDirectory()) {
+      // 如果是目录，则递归遍历
+      traverseDirectory(fullPath, rootPath, dict);
+    } else {
+      // 计算文件的MD5并添加到Map中
+      const fileMD5 = calculateFileMD5(fullPath);
+      dict[path.relative(rootPath, fullPath)] = fileMD5;
+    }
+  }
+  return dict;
+}
+
+let buildCache = {};
+try {
+  if (fs.statSync(cacheFile).isFile()){
+    const content = fs.readFileSync(cacheFile, 'utf8');
+    buildCache = JSON.parse(content);
+  }
+} catch(err) {
+  console.log('Build cache file not exists');
+}
+fs.writeFileSync(tmpcacheFile, JSON.stringify(buildCache, null, ' '));
+
+let cacheChanged = false;
 fs.readdirSync(srcdir).filter((dir) => {
   const fullpath = path.join(srcdir, dir);
   if (fs.statSync(fullpath).isDirectory()) {
@@ -29,14 +87,55 @@ fs.readdirSync(srcdir).filter((dir) => {
       fs.existsSync(html) &&
       fs.statSync(html).isFile()
     ) {
-      console.log('src files added: ' + main);
-      srcfiles.push([main, dir]);
+      const cache = buildCache[dir];
+      const dict = traverseDirectory(fullpath, fullpath);
+      if (!deepEqual(cache, dict)) {
+        console.log('src files added: ' + main);
+        buildCache[dir] = dict;
+        cacheChanged = true;
+        srcfiles.push([main, dir]);
+      }
     }
   }
 });
 
+if (cacheChanged){
+  fs.writeFileSync(tmpcacheFile, JSON.stringify(buildCache, null, ' '), 'utf8');
+}
+
+function getCacheTarget() {
+  return {
+    input: 'dummy.js',
+    output: {
+      file: 'dummy.js',
+      format: 'esm'
+    },
+    plugins: [
+      copy({
+        targets: [{
+          src: tmpcacheFile,
+          dest: cacheFile,
+        }],
+        hook: 'buildEnd'
+      }),
+      {
+        name: 'copy-cache-file',
+        buildEnd: async () => {
+          fs.copyFileSync(tmpcacheFile, cacheFile);
+        }
+      },
+      {
+        name: 'delete-tmp-cache',
+        buildEnd: async () => {
+          console.log('Delete tmporal cache file');
+          fs.rmSync(tmpcacheFile);
+        }
+      }
+    ]
+  }
+}
+
 function getTutTarget(input, output) {
-  console.log(input, ',', output);
   return {
     input: input,
     preserveSymlinks: false,
@@ -69,5 +168,5 @@ function getTutTarget(input, output) {
 
 export default (args) => {
   const tutTargets = srcfiles.map((f) => getTutTarget(f[0], f[1]));
-  return tutTargets;
+  return [...tutTargets, getCacheTarget()];
 };

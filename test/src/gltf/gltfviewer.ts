@@ -54,7 +54,6 @@ export class GLTFViewer {
     this._scene = scene;
     this._assetManager = new AssetManager();
     this._assetManager.fetchBuiltinTexture(BUILTIN_ASSET_TEXTURE_SHEEN_LUT);
-    this._assetManager.fetchTexture('assets/images/lut.png');
     this._tonemap = new Tonemap();
     this._sao = new SAO();
     this._bloom = new Bloom();
