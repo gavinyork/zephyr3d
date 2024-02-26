@@ -1992,6 +1992,7 @@ export class ProgramBuilder {
     // (undocumented)
     get emulateDepthClamp(): boolean;
     set emulateDepthClamp(val: boolean);
+    getCurrentFunctionScope(): PBScope;
     getReflection(): PBReflection;
     get lastError(): string;
     get shaderKind(): ShaderKind;

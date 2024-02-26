@@ -360,7 +360,7 @@ export interface BatchDrawable extends Drawable {
 }
 
 // @public (undocumented)
-export type BlendMode = 'none' | 'blend' | 'additive' | 'max' | 'min';
+export type BlendMode = 'none' | 'blend' | 'additive';
 
 // Warning: (ae-forgotten-export) The symbol "BlinnMaterial_base" needs to be exported by the entry point index.d.ts
 //
@@ -368,7 +368,7 @@ export type BlendMode = 'none' | 'blend' | 'additive' | 'max' | 'min';
 export class BlinnMaterial extends BlinnMaterial_base {
     constructor();
     // (undocumented)
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void;
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
     // (undocumented)
     fragmentShader(scope: PBFunctionScope): void;
     get shininess(): number;
@@ -840,11 +840,6 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
     protected createDefaultOptions(): CylinderCreationOptions;
 }
 
-// Warning: (ae-internal-missing-underscore) The name "DEBUG_CASCADED_SHADOW_MAPS" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal (undocumented)
-export const DEBUG_CASCADED_SHADOW_MAPS = false;
-
 // @public
 export function decode2HalfFromRGBA(scope: PBInsideFunctionScope, value: PBShaderExp): PBShaderExp;
 
@@ -863,7 +858,7 @@ export function decodeRGBM(scope: PBInsideFunctionScope, rgbm: PBShaderExp, maxR
 export const defaultBuildParams: OceanFieldBuildParams;
 
 // @public
-export class DepthRenderPass extends RenderPass {
+export class DepthPass extends RenderPass {
     constructor();
     // @internal (undocumented)
     protected _getGlobalBindGroupHash(ctx: DrawContext): string;
@@ -892,10 +887,10 @@ export interface Drawable {
     getInvBindMatrix(): Matrix4x4;
     getName(): string;
     getPickTarget(): GraphNode;
+    getQueueType(): number;
     getSortDistance(camera: Camera): number;
     getXForm(): XForm;
     isBatchable(): this is BatchDrawable;
-    isTransparency(): boolean;
     isUnlit(): boolean;
 }
 
@@ -916,9 +911,11 @@ export interface DrawContext {
     env: Environment;
     flip: boolean;
     instanceData?: InstanceData;
+    lightBlending: boolean;
     linearDepthTexture?: Texture2D;
     logger?: RenderLogger;
     primaryCamera: Camera;
+    queue: number;
     renderPass: RenderPass;
     renderPassHash: string;
     scene: Scene;
@@ -927,7 +924,6 @@ export interface DrawContext {
     sunLight?: DirectionalLight;
     target: Drawable;
     timestamp: number;
-    userData?: unknown;
     viewportHeight?: number;
     viewportWidth?: number;
     viewportX?: number;
@@ -954,8 +950,6 @@ export class EnvConstantAmbient extends EnvironmentLighting {
     constructor(ambientColor?: Vector4);
     get ambientColor(): Vector4;
     set ambientColor(ambientColor: Vector4);
-    // @internal (undocumented)
-    static readonly funcNameGetAmbient = "lib_getConstantAmbient";
     // @override
     getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
     // @override
@@ -970,10 +964,10 @@ export class EnvConstantAmbient extends EnvironmentLighting {
     initShaderBindings(pb: ProgramBuilder): void;
     // @override
     isConstant(): this is EnvConstantAmbient;
+    // @internal (undocumented)
+    static readonly UNIFORM_NAME_CONSTANT_AMBIENT = "zConstantAmbient";
     // @override
     updateBindGroup(bg: BindGroup): void;
-    // @internal (undocumented)
-    static readonly USAGE_CONSTANT_AMBIENT_LIGHTING = "usage_env_constant_ambient";
 }
 
 // @public
@@ -983,8 +977,6 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
     set ambientDown(color: Vector4);
     get ambientUp(): Vector4;
     set ambientUp(color: Vector4);
-    // @internal (undocumented)
-    static readonly funcNameGetAmbient = "lib_getConstantAmbient";
     // @override
     getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
     // @override
@@ -999,12 +991,12 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
     initShaderBindings(pb: ProgramBuilder): void;
     // @override
     isHemispheric(): this is EnvHemisphericAmbient;
+    // @internal (undocumented)
+    static readonly UNIFORM_NAME_AMBIENT_DOWN = "zHemisphericAmbientDown";
+    // @internal (undocumented)
+    static readonly UNIFORM_NAME_AMBIENT_UP = "zHemisphericAmbientUp";
     // @override
     updateBindGroup(bg: BindGroup): void;
-    // @internal (undocumented)
-    static readonly USAGE_CONSTANT_AMBIENT_DOWN = "usage_env_ambient_down";
-    // @internal (undocumented)
-    static readonly USAGE_CONSTANT_AMBIENT_UP = "usage_env_ambient_up";
 }
 
 // @public
@@ -1028,14 +1020,14 @@ export class EnvIBL extends EnvironmentLighting {
     isIBL(): this is EnvIBL;
     get radianceMap(): TextureCube;
     set radianceMap(tex: TextureCube);
+    // @internal (undocumented)
+    static readonly UNIFORM_NAME_IBL_IRRADIANCE_MAP = "zIBLIrradianceMap";
+    // @internal (undocumented)
+    static readonly UNIFORM_NAME_IBL_RADIANCE_MAP = "zIBLRadianceMap";
+    // @internal (undocumented)
+    static readonly UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD = "zIBLRadianceMapMaxLOD";
     // @override
     updateBindGroup(bg: BindGroup): void;
-    // @internal (undocumented)
-    static readonly USAGE_IBL_IRRADIANCE_MAP = "usage_ibl_irradiance_map";
-    // @internal (undocumented)
-    static readonly USAGE_IBL_RADIANCE_MAP = "usage_ibl_radiance_map";
-    // @internal (undocumented)
-    static readonly USAGE_IBL_RADIANCE_MAP_MAX_LOD = "usage_ibl_radiance_map_maxlod";
 }
 
 // @public
@@ -1182,44 +1174,6 @@ export type ExtractMixinType<M> = M extends [infer First] ? ExtractMixinReturnTy
 // @public
 export type FogType = 'linear' | 'exp' | 'exp2' | 'scatter' | 'none';
 
-// Warning: (ae-internal-missing-underscore) The name "ForwardRenderPass" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal
-export class ForwardRenderPass extends RenderPass {
-    constructor();
-    // (undocumented)
-    applyRenderStates(device: AbstractDevice, stateSet: RenderStateSet, ctx: DrawContext): void;
-    // (undocumented)
-    protected _getGlobalBindGroupHash(ctx: DrawContext): string;
-    // (undocumented)
-    protected _overridenState: RenderStateSet;
-    // (undocumented)
-    protected _overridenStateTrans: RenderStateSet;
-    // (undocumented)
-    protected renderItems(ctx: DrawContext, renderQueue: RenderQueue): void;
-    // (undocumented)
-    protected renderLightPass(camera: Camera, renderQueue: RenderQueue, ctx: DrawContext, items: RenderQueueItem[], lights: PunctualLight[], trans: boolean, blend: boolean): void;
-    // (undocumented)
-    protected _shadowMapHash: string;
-}
-
-// Warning: (ae-internal-missing-underscore) The name "ForwardRenderScheme" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal
-export class ForwardRenderScheme {
-    // (undocumented)
-    static freeClusteredLight(clusteredLight: ClusteredLight): void;
-    // (undocumented)
-    static getClusteredLight(): ClusteredLight;
-    static renderScene(scene: Scene, camera: Camera, compositor?: Compositor, logger?: RenderLogger): void;
-    // (undocumented)
-    protected static _renderScene(ctx: DrawContext): void;
-    // (undocumented)
-    protected static _renderSceneDepth(ctx: DrawContext, renderQueue: RenderQueue, depthFramebuffer: FrameBuffer): void;
-    // (undocumented)
-    static setClearColor(color: Vector4): void;
-}
-
 // @public
 export class FPSCameraController extends BaseCameraController {
     constructor(options?: FPSCameraControllerOptions);
@@ -1328,11 +1282,7 @@ export class GraphNode extends SceneNode {
 export class GrassMaterial extends GrassMaterial_base {
     constructor(terrainSize: Vector2, normalMap: Texture2D, grassTexture?: Texture2D);
     // (undocumented)
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void;
-    // (undocumented)
-    calculateObjectSpaceNormal(scope: PBInsideFunctionScope, normal: PBShaderExp, skinMatrix: PBShaderExp): PBShaderExp;
-    // (undocumented)
-    calculateObjectSpacePosition(scope: PBInsideFunctionScope, pos: PBShaderExp, skinMatrix: PBShaderExp): PBShaderExp;
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
     // (undocumented)
     fragmentShader(scope: PBFunctionScope): void;
     // @override
@@ -1452,29 +1402,33 @@ export interface HeightfieldBBoxTreeNode {
 // @public (undocumented)
 export interface IMaterial {
     // (undocumented)
-    applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean): void;
+    applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number): void;
     // (undocumented)
-    beginDraw(ctx: DrawContext): boolean;
+    beginDraw(pass: number, ctx: DrawContext): boolean;
     // (undocumented)
     clearBindGroupCache(): number;
     // (undocumented)
-    createHash(renderPassType: number): string;
+    createHash(renderPassType: number, pass: number): string;
     // (undocumented)
     dispose(): void;
     // (undocumented)
-    draw(primitive: Primitive, ctx: DrawContext): any;
+    draw(primitive: Primitive, ctx: DrawContext, numInstances?: number): void;
     // (undocumented)
-    endDraw(): void;
+    endDraw(pass: number): void;
     // (undocumented)
     getMaterialBindGroup(): BindGroup;
     // Warning: (ae-forgotten-export) The symbol "ProgramInfo" needs to be exported by the entry point index.d.ts
     //
     // (undocumented)
-    getOrCreateProgram(ctx: DrawContext): ProgramInfo;
+    getOrCreateProgram(ctx: DrawContext, pass: number): ProgramInfo;
+    // (undocumented)
+    getQueueType(): number;
     // (undocumented)
     readonly id: number;
     // (undocumented)
-    isTransparent(): boolean;
+    isBatchable(): boolean;
+    // (undocumented)
+    isTransparent(pass: number): boolean;
     // (undocumented)
     optionChanged(changeHash: boolean): void;
     // (undocumented)
@@ -1599,6 +1553,21 @@ export const LIGHT_TYPE_POINT = 2;
 // @public
 export const LIGHT_TYPE_SPOT = 3;
 
+// Warning: (ae-internal-missing-underscore) The name "LightPass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export class LightPass extends RenderPass {
+    constructor();
+    // (undocumented)
+    protected _getGlobalBindGroupHash(ctx: DrawContext): string;
+    // (undocumented)
+    protected renderItems(ctx: DrawContext, renderQueue: RenderQueue): void;
+    // (undocumented)
+    protected renderLightPass(ctx: DrawContext, items: RenderQueueItem[], lights: PunctualLight[]): void;
+    // (undocumented)
+    protected _shadowMapHash: string;
+}
+
 // @public
 export function linearDepthToNonLinear(scope: PBInsideFunctionScope, depth: PBShaderExp, nearFar?: PBShaderExp): PBShaderExp;
 
@@ -1617,39 +1586,46 @@ export type LogMode = 'info' | 'warn' | 'error' | 'debug';
 // @public
 export class Material implements IMaterial {
     constructor();
-    applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean): void;
-    protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
-    beginDraw(ctx: DrawContext): boolean;
+    applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number): void;
+    protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
+    beginDraw(pass: number, ctx: DrawContext): boolean;
     // @internal (undocumented)
     static bindGroupGarbageCollect(bindGroup: BindGroup): void;
     // @internal (undocumented)
     clearBindGroupCache(): number;
     // @internal (undocumented)
-    createHash(renderPassType: number): string;
+    createHash(renderPassType: number, pass: number): string;
     protected _createHash(renderPassType: number): string;
     // @internal (undocumented)
-    protected createProgram(ctx: DrawContext): GPUProgram;
-    protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram;
+    protected createProgram(ctx: DrawContext, pass: number): GPUProgram;
+    protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram;
     // @internal (undocumented)
     protected createRenderStateSet(): RenderStateSet;
-    static get debugChannel(): MaterialDebugChannel;
-    static set debugChannel(val: MaterialDebugChannel);
     // (undocumented)
     dispose(): void;
-    draw(primitive: Primitive, ctx: DrawContext): void;
-    endDraw(): void;
+    draw(primitive: Primitive, ctx: DrawContext, numInstances?: number): void;
+    drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number): void;
+    endDraw(pass: number): void;
     static garbageCollect(ts: number): number;
     static getGCOptions(): MaterialGCOptions;
     // @internal (undocumented)
-    protected getHash(renderPassType: number): string;
+    protected getHash(renderPassType: number, pass: number): string;
     getMaterialBindGroup(): BindGroup;
-    getOrCreateProgram(ctx: DrawContext): ProgramInfo;
+    getOrCreateProgram(ctx: DrawContext, pass: number): ProgramInfo;
     // @internal (undocumented)
     static getProgramByHashIndex(hash: string, index: number): GPUProgram<unknown>;
+    // (undocumented)
+    getQueueType(): number;
     // @internal (undocumented)
-    protected _hash: string[];
+    protected _hash: string[][];
     get id(): number;
-    isTransparent(): boolean;
+    isBatchable(): boolean;
+    isTransparent(pass: number): boolean;
+    // (undocumented)
+    get numPasses(): number;
+    set numPasses(val: number);
+    // @internal (undocumented)
+    protected _numPasses: number;
     // @internal (undocumented)
     optionChanged(changeHash: boolean): void;
     // @internal (undocumented)
@@ -1659,12 +1635,6 @@ export class Material implements IMaterial {
     set stateSet(stateset: RenderStateSet);
     supportLighting(): boolean;
 }
-
-// @public
-export type MaterialCommonDebugChannel = 'normal' | 'tangent' | 'binormal' | 'shadingNormal';
-
-// @public
-export type MaterialDebugChannel = '' | MaterialCommonDebugChannel | PBRBaseDebugChannel | PBRClearcoatDebugChannel | PBRSheenDebugChannel | PBRSpecularDebugChannel;
 
 // @public
 export type MaterialGCOptions = {
@@ -1677,11 +1647,6 @@ export type MaterialGCOptions = {
 
 // @public
 export const MAX_CLUSTERED_LIGHTS = 255;
-
-// Warning: (ae-internal-missing-underscore) The name "MAX_FORWARD_LIGHT_COUNT" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal
-export const MAX_FORWARD_LIGHT_COUNT = 8;
 
 // @public
 export class Mesh extends GraphNode implements BatchDrawable {
@@ -1712,6 +1677,7 @@ export class Mesh extends GraphNode implements BatchDrawable {
     getInvBindMatrix(): Matrix4x4;
     getName(): string;
     getPickTarget(): GraphNode;
+    getQueueType(): number;
     getXForm(): XForm;
     // @internal (undocumented)
     protected _instanceColor: Vector4;
@@ -1721,7 +1687,6 @@ export class Mesh extends GraphNode implements BatchDrawable {
     protected _invBindMatrix: Matrix4x4;
     isBatchable(): this is BatchDrawable;
     isMesh(): boolean;
-    isTransparency(): boolean;
     isUnlit(): boolean;
     get material(): Material;
     set material(m: Material);
@@ -1741,23 +1706,19 @@ export class MeshMaterial extends Material {
     get alphaToCoverage(): boolean;
     set alphaToCoverage(val: boolean);
     // @override
-    protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
+    protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
     // (undocumented)
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void;
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
     // (undocumented)
-    beginDraw(ctx: DrawContext): boolean;
+    beginDraw(pass: number, ctx: DrawContext): boolean;
     get blendMode(): BlendMode;
     set blendMode(val: BlendMode);
-    calculateObjectSpaceNormal(scope: PBInsideFunctionScope, normal: PBShaderExp, skinMatrix: PBShaderExp): PBShaderExp;
-    calculateObjectSpacePosition(scope: PBInsideFunctionScope, pos: PBShaderExp, skinMatrix: PBShaderExp): PBShaderExp;
-    calculateObjectSpaceTangent(scope: PBInsideFunctionScope, tangent: PBShaderExp, skinMatrix: PBShaderExp): PBShaderExp;
-    calculateSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     // @override
     protected _createHash(renderPassType: number): string;
     // @internal (undocumented)
-    protected createProgram(ctx: DrawContext): GPUProgram;
+    protected createProgram(ctx: DrawContext, pass: number): GPUProgram;
     // @override
-    protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram;
+    protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram;
     get drawContext(): DrawContext;
     // (undocumented)
     static readonly FEATURE_ALPHABLEND = 1;
@@ -1767,23 +1728,20 @@ export class MeshMaterial extends Material {
     static readonly FEATURE_ALPHATOCOVERAGE = 2;
     featureUsed<T = unknown>(feature: number): T;
     fragmentShader(scope: PBFunctionScope): void;
-    getCameraPosition(scope: PBInsideFunctionScope): PBShaderExp;
-    getNormalMatrix(scope: PBInsideFunctionScope): PBShaderExp;
-    getProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp;
-    getRotationMatrix(scope: PBInsideFunctionScope): PBShaderExp;
-    getViewMatrix(scope: PBInsideFunctionScope): PBShaderExp;
-    getViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp;
-    getWorldMatrix(scope: PBInsideFunctionScope): PBShaderExp;
-    hasSkinning(scope: PBInsideFunctionScope): boolean;
-    isTransparent(): boolean;
+    // (undocumented)
+    getQueueType(): number;
+    // Warning: (ae-forgotten-export) The symbol "ShaderHelper" needs to be exported by the entry point index.d.ts
+    get helper(): typeof ShaderHelper;
+    isTransparent(pass: number): boolean;
     needFragmentColor(ctx?: DrawContext): boolean;
     // (undocumented)
     static readonly NEXT_FEATURE_INDEX: number;
     get opacity(): number;
     set opacity(val: number);
     outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp): void;
-    setClipSpacePosition(scope: PBInsideFunctionScope, pos: PBShaderExp): void;
-    transformVertexAndNormal(scope: PBInsideFunctionScope): void;
+    get pass(): number;
+    protected updateBlendingAndDepthState(pass: number, ctx: DrawContext): void;
+    protected updateDepthState(pass: number, ctx: DrawContext): void;
     useFeature(feature: number, use: unknown): void;
     vertexShader(scope: PBFunctionScope): void;
 }
@@ -2001,12 +1959,6 @@ export class OrthoCamera extends Camera {
 // @public
 export function panoramaToCubemap(tex: Texture2D, outputCubeMap: TextureCube): void;
 
-// @public
-export type PBRBaseDebugChannel = 'pbrBase' | 'pbrMetallic' | 'pbrRoughness' | 'pbrMetallicRoughness';
-
-// @public
-export type PBRClearcoatDebugChannel = 'pbrClearCoat' | 'pbrClearCoatFactor' | 'pbrClearCoatRoughness' | 'pbrClearCoatNormal';
-
 // Warning: (ae-forgotten-export) The symbol "PBRMetallicRoughnessMaterial_base" needs to be exported by the entry point index.d.ts
 //
 // @public (undocumented)
@@ -2017,12 +1969,6 @@ export class PBRMetallicRoughnessMaterial extends PBRMetallicRoughnessMaterial_b
     // (undocumented)
     vertexShader(scope: PBFunctionScope): void;
 }
-
-// @public
-export type PBRSheenDebugChannel = 'pbrSheen' | 'pbrSheenColor' | 'pbrSheenRoughness' | 'pbrSheenAlbedoScaling';
-
-// @public
-export type PBRSpecularDebugChannel = 'pbrSpecular' | 'pbrSpecularFactor' | 'pbrSpecularColor';
 
 // Warning: (ae-forgotten-export) The symbol "PBRSpecularGlossinessMaterial_base" needs to be exported by the entry point index.d.ts
 //
@@ -2443,10 +2389,16 @@ export class QuadtreeNode {
 }
 
 // @public
-export const RENDER_PASS_TYPE_DEPTH_ONLY = 2;
+export const QUEUE_OPAQUE = 1;
 
 // @public
-export const RENDER_PASS_TYPE_FORWARD = 0;
+export const QUEUE_TRANSPARENT = 2;
+
+// @public
+export const RENDER_PASS_TYPE_DEPTH = 2;
+
+// @public
+export const RENDER_PASS_TYPE_LIGHT = 0;
 
 // @public
 export const RENDER_PASS_TYPE_SHADOWMAP = 1;
@@ -2752,6 +2704,23 @@ export class SceneNode extends XForm<SceneNode> {
 export interface SceneNodeVisitor {
     // (undocumented)
     visit(target: SceneNode): unknown;
+}
+
+// Warning: (ae-internal-missing-underscore) The name "SceneRenderer" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export class SceneRenderer {
+    // (undocumented)
+    static freeClusteredLight(clusteredLight: ClusteredLight): void;
+    // (undocumented)
+    static getClusteredLight(): ClusteredLight;
+    static renderScene(scene: Scene, camera: Camera, compositor?: Compositor, logger?: RenderLogger): void;
+    // (undocumented)
+    protected static _renderScene(ctx: DrawContext): void;
+    // (undocumented)
+    protected static _renderSceneDepth(ctx: DrawContext, renderQueue: RenderQueue, depthFramebuffer: FrameBuffer): void;
+    // (undocumented)
+    static setClearColor(color: Vector4): void;
 }
 
 // @public
@@ -3299,7 +3268,7 @@ export type TerrainDetailMapInfo = {
 export class TerrainMaterial extends TerrainMaterial_base {
     constructor(options?: TerrainMaterialOptions);
     // (undocumented)
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void;
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
     // (undocumented)
     calculateAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp;
     // (undocumented)
@@ -3311,6 +3280,8 @@ export class TerrainMaterial extends TerrainMaterial_base {
     getAlbedoTexCoord(scope: PBInsideFunctionScope): PBShaderExp;
     getMetallicRoughnessTexCoord(scope: PBInsideFunctionScope): PBShaderExp;
     getNormalTexCoord(scope: PBInsideFunctionScope): PBShaderExp;
+    // @override
+    isBatchable(): boolean;
     // @override
     isTransparent(): boolean;
     // (undocumented)
@@ -3379,6 +3350,8 @@ export class TerrainPatch implements Drawable {
     // (undocumented)
     getPickTarget(): GraphNode;
     // (undocumented)
+    getQueueType(): number;
+    // (undocumented)
     getSortDistance(camera: Camera): number;
     // (undocumented)
     getStep(): number;
@@ -3390,8 +3363,6 @@ export class TerrainPatch implements Drawable {
     isBatchable(): this is BatchDrawable;
     // (undocumented)
     isDummy(): boolean;
-    // (undocumented)
-    isTransparency(): boolean;
     // (undocumented)
     isUnlit(): boolean;
     // (undocumented)

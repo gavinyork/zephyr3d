@@ -65,7 +65,8 @@
     window.onload = function(){
       const createCase = function(el) {
         const iframe = document.createElement('iframe');
-        iframe.src = `showcase.html?showcase=${el.getAttribute('case')}`; //`examples/dist/${el.getAttribute('case')}`
+        const nocode = el.getAttribute('nocode')!==null;
+        iframe.src = `${nocode ? 'showdemo' : 'showcase'}.html?showcase=${el.getAttribute('case')}${el.getAttribute('nocode')!==null ? '&nocode' : ''}`;
         iframe.style.border = "0";
         iframe.style.width = '100%';
         iframe.style.height = '100%';

@@ -3,6 +3,10 @@
   - [Introduction](en/intro.md)
   - [Installation](en/installation.md)
 
+- Demos
+
+  - [GLTF viewer](https://baidu.com)
+
 - DeviceAPI
 
   - [Device](en/device.md)

@@ -416,7 +416,7 @@ export class AssetManager {
           } else if (track.type === 'rotation') {
             animation.addTrack(nodeMap.get(track.node), new RotationTrack(track.interpolator));
           } else {
-            throw new Error(`Could not load model: invalid animation track type: ${track.type}`);
+            console.error(`Invalid animation track type: ${track.type}`);
           }
         }
         for (const sk of animationData.skeletons) {

@@ -18,7 +18,10 @@ const srcfiles = [];
 fs.readdirSync(srcdir).filter((dir) => {
   const fullpath = path.join(srcdir, dir);
   if (fs.statSync(fullpath).isDirectory()) {
-    const main = path.join(fullpath, 'main.js');
+    let main = path.join(fullpath, 'main.js');
+    if (!fs.existsSync(main)) {
+      main = path.join(fullpath, 'main.ts');
+    }
     const html = path.join('src', dir, 'index.html');
     if (
       fs.existsSync(main) &&
