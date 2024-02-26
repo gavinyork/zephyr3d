@@ -18,8 +18,7 @@ import {
   PostWater,
   Compositor,
   FXAA,
-  Bloom,
-  BUILTIN_ASSET_TEXTURE_SHEEN_LUT
+  Bloom
 } from '@zephyr3d/scene';
 import type { Texture2D } from '@zephyr3d/device';
 import type { TextureCube } from '@zephyr3d/device';
@@ -29,6 +28,7 @@ export class GLTFViewer {
   private _modelNode: SceneNode;
   private _animationSet: AnimationSet;
   private _assetManager: AssetManager;
+  private _assetManagerSky: AssetManager;
   private _scene: Scene;
   private _tonemap: Tonemap;
   private _sao: SAO;
@@ -53,7 +53,7 @@ export class GLTFViewer {
     this._animationSet = null;
     this._scene = scene;
     this._assetManager = new AssetManager();
-    this._assetManager.fetchBuiltinTexture(BUILTIN_ASSET_TEXTURE_SHEEN_LUT);
+    this._assetManagerSky = new AssetManager();
     this._tonemap = new Tonemap();
     this._sao = new SAO();
     this._bloom = new Bloom();
@@ -126,9 +126,6 @@ export class GLTFViewer {
       verbose: true
     });
   }
-  get assetManager() {
-    return this._assetManager;
-  }
   get light0(): DirectionalLight {
     return this._light0;
   }
@@ -180,17 +177,20 @@ export class GLTFViewer {
   }
   async handleDrop(data: DataTransfer) {
     this.resolveDraggedItems(data).then(async (fileMap) => {
-      if (fileMap) {
+      if (fileMap){
         this._assetManager.httpRequest.urlResolver = (url) => {
           return fileMap.get(url) || url;
         };
+        this._assetManagerSky.httpRequest.urlResolver = (url) => {
+          return fileMap.get(url) || url;
+        }
         if (fileMap.size === 1 && /\.zip$/i.test(Array.from(fileMap.keys())[0])) {
           fileMap = await this.readZip(fileMap.get(Array.from(fileMap.keys())[0]))
         }
-        console.log(fileMap);
         if (fileMap.size === 1 && /\.hdr$/i.test(Array.from(fileMap.keys())[0])) {
           const hdrFile = Array.from(fileMap.keys())[0];
-          this._assetManager
+          this._assetManagerSky.purgeCache();
+          this._assetManagerSky
             .fetchTexture<Texture2D>(hdrFile, {
               linearColorSpace: true,
               samplerOptions: {
@@ -208,7 +208,7 @@ export class GLTFViewer {
           const modelFile = Array.from(fileMap.keys()).find((val) => /(\.gltf|\.glb)$/i.test(val));
           if (modelFile) {
             this._modelNode?.remove();
-            this._assetManager.clearCache();
+            this._assetManager.purgeCache();
             this._assetManager.fetchModel(this._scene, modelFile, null).then((info) => {
               this._modelNode?.dispose();
               this._modelNode = info.group;

@@ -98,6 +98,18 @@ export class AssetManager {
     this._textDatas = {};
   }
   /**
+   * Remove and dispose all cached assets
+   */
+  purgeCache() {
+    for (const k in this._textures) {
+      this._textures[k].then(tex => tex?.dispose()).catch(err => {});
+      delete this._textures[k];
+    }
+    this._models = {}
+    this._binaryDatas = {};
+    this._textDatas = {};
+  }
+  /**
    * Adds a texture loader to the asset manager
    *
    * @remarks

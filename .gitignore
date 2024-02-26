@@ -112,3 +112,7 @@ common/temp/
 
 # vscode
 .vscode
+
+# site tmp cache
+.buildcache.json
+.buildcache.tmp.json
