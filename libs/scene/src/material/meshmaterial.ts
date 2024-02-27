@@ -123,9 +123,9 @@ export class MeshMaterial extends Material {
    * @param ctx - Draw context
    */
   protected updateBlendingAndDepthState(pass: number, ctx: DrawContext): void {
-    const blending = this.featureUsed<boolean>(MeshMaterial.FEATURE_ALPHABLEND);
+    const blending = this.featureUsed<boolean>(MeshMaterial.FEATURE_ALPHABLEND) || ctx.lightBlending;
     const a2c = this.featureUsed<boolean>(MeshMaterial.FEATURE_ALPHATOCOVERAGE);
-    if (blending || a2c || ctx.lightBlending) {
+    if (blending || a2c) {
       const blendingState = this.stateSet.useBlendingState();
       if (blending) {
         blendingState.enable(true);
