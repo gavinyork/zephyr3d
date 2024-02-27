@@ -404,7 +404,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$l.NoH = pb.clamp(pb.dot(this.normal, this.H), 0, 1);
           this.$l.NoL = pb.clamp(pb.dot(this.normal, this.L), 0, 1);
           this.$l.NoV = pb.clamp(pb.dot(this.normal, this.viewVec), 0, 1);
-          this.$if(pb.and(pb.greaterThan(this.NoL, 0), pb.greaterThan(this.NoV, 0)), function(){
+          this.$if(pb.greaterThan(this.NoL, 0), function(){
             this.$l.VoH = pb.clamp(pb.dot(this.viewVec, this.H), 0, 1);
             this.$l.F = that.fresnelSchlick(this, this.VoH, this.data.f0.rgb, this.data.f90);
             this.$l.alphaRoughness = pb.mul(this.data.roughness, this.data.roughness);
@@ -557,7 +557,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             ).b;
             this.outColor = pb.add(
               this.outColor,
-              pb.mul(this.data.sheenColor, this.iblDiffuse, this.sheenBRDF)
+              pb.mul(this.data.sheenColor, this.irradiance.rgb, this.sheenBRDF)
             );
           }
           if (that.clearcoat && ctx.env.light.envLight.hasRadiance()) {
