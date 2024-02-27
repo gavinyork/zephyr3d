@@ -403,47 +403,51 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$l.H = pb.normalize(pb.add(this.viewVec, this.L));
           this.$l.NoH = pb.clamp(pb.dot(this.normal, this.H), 0, 1);
           this.$l.NoL = pb.clamp(pb.dot(this.normal, this.L), 0, 1);
-          this.$l.VoH = pb.clamp(pb.dot(this.viewVec, this.H), 0, 1);
           this.$l.NoV = pb.clamp(pb.dot(this.normal, this.viewVec), 0, 1);
-          this.$l.F = that.fresnelSchlick(this, this.VoH, this.data.f0.rgb, this.data.f90);
-          this.$l.alphaRoughness = pb.mul(this.data.roughness, this.data.roughness);
-          this.$l.D = that.distributionGGX(this, this.NoH, this.alphaRoughness);
-          this.$l.V = that.visGGX(this, this.NoV, this.NoL, this.alphaRoughness);
-          this.$l.specular = pb.mul(this.lightColor, this.D, this.V, this.F, this.data.specularWeight);
-          if (that.sheen) {
-            this.specular = pb.mul(this.specular, this.data.sheenAlbedoScaling);
-          }
-          this.outColor = pb.add(this.outColor, this.specular);
-          this.$l.diffuse = pb.mul(
-            this.lightColor,
-            pb.max(
-              pb.mul(
-                pb.sub(pb.vec3(1), pb.mul(this.F, this.data.specularWeight)),
-                pb.div(this.data.diffuse.rgb, Math.PI)
-              ),
-              pb.vec3(0)
-            )
-          );
-          if (that.sheen) {
-            this.diffuse = pb.mul(this.diffuse, this.data.sheenAlbedoScaling);
-          }
-          this.outColor = pb.add(this.outColor, this.diffuse);
-          if (that.sheen) {
-            this.$l.sheenD = that.D_Charlie(this, this.NoH, this.data.sheenRoughness);
-            this.$l.sheenV = that.V_Ashikhmin(this, this.NoL, this.NoV);
-            this.outColor = pb.add(
-              this.outColor,
-              pb.mul(this.lightColor, this.data.sheenColor, this.sheenD, this.sheenV)
+          this.$if(pb.and(pb.greaterThan(this.NoL, 0), pb.greaterThan(this.NoV, 0)), function(){
+            this.$l.VoH = pb.clamp(pb.dot(this.viewVec, this.H), 0, 1);
+            this.$l.F = that.fresnelSchlick(this, this.VoH, this.data.f0.rgb, this.data.f90);
+            this.$l.alphaRoughness = pb.mul(this.data.roughness, this.data.roughness);
+            this.$l.D = that.distributionGGX(this, this.NoH, this.alphaRoughness);
+            this.$l.V = that.visGGX(this, this.NoV, this.NoL, this.alphaRoughness);
+            this.$l.specular = pb.mul(this.lightColor, this.D, this.V, this.F, this.data.specularWeight);
+            if (that.sheen) {
+              this.specular = pb.mul(this.specular, this.data.sheenAlbedoScaling);
+            }
+            this.outColor = pb.add(this.outColor, this.specular);
+            this.$l.diffuse = pb.mul(
+              this.lightColor,
+              pb.max(
+                pb.mul(
+                  pb.sub(pb.vec3(1), pb.mul(this.F, this.data.specularWeight)),
+                  pb.div(this.data.diffuse.rgb, Math.PI)
+                ),
+                pb.vec3(0)
+              )
             );
-          }
-          if (that.clearcoat) {
-            this.alphaRoughness = pb.mul(this.data.ccFactor.y, this.data.ccFactor.y);
-            this.NoH = pb.clamp(pb.dot(this.data.ccNormal, this.H), 0, 1);
-            this.NoL = pb.clamp(pb.dot(this.data.ccNormal, this.L), 0, 1);
-            this.D = that.distributionGGX(this, this.NoH, this.alphaRoughness);
-            this.V = that.visGGX(this, this.data.ccNoV, this.NoL, this.alphaRoughness);
-            this.outColor = pb.add(this.outColor, pb.mul(this.D, this.V, this.F, this.data.ccFactor.x));
-          }
+            if (that.sheen) {
+              this.diffuse = pb.mul(this.diffuse, this.data.sheenAlbedoScaling);
+            }
+            this.outColor = pb.add(this.outColor, this.diffuse);
+            if (that.sheen) {
+              this.$l.sheenD = that.D_Charlie(this, this.NoH, this.data.sheenRoughness);
+              this.$l.sheenV = that.V_Ashikhmin(this, this.NoL, this.NoV);
+              this.outColor = pb.add(
+                this.outColor,
+                pb.mul(this.lightColor, this.data.sheenColor, this.sheenD, this.sheenV)
+              );
+            }
+            if (that.clearcoat) {
+              this.alphaRoughness = pb.mul(this.data.ccFactor.y, this.data.ccFactor.y);
+              this.NoH = pb.clamp(pb.dot(this.data.ccNormal, this.H), 0, 1);
+              this.NoL = pb.clamp(pb.dot(this.data.ccNormal, this.L), 0, 1);
+              this.ccF0 = pb.vec3(pb.pow(pb.div(pb.sub(this.data.f0.a, 1), pb.add(this.data.f0.a, 1)), 2))
+              this.F = that.fresnelSchlick(this, this.VoH, this.ccF0, pb.vec3(1));
+              this.D = that.distributionGGX(this, this.NoH, this.alphaRoughness);
+              this.V = that.visGGX(this, this.data.ccNoV, this.NoL, this.alphaRoughness);
+              this.outColor = pb.add(this.outColor, pb.mul(this.D, this.V, this.F, this.data.ccFactor.x));
+            }
+          });
         }
       );
       scope.$g[funcName](lightDir, lightColor, normal, viewVec, commonData, outColor);

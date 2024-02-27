@@ -79,6 +79,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       super();
       this._normalScale = 1;
       this.useFeature(FEATURE_VERTEX_NORMAL, true);
+      this.useFeature(FEATURE_DOUBLE_SIDED_LIGHTING, true);
     }
     get normalScale(): number {
       return this._normalScale;
@@ -225,11 +226,17 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           }
           this.TBN = pb.mat3(this.t, this.b, this.ng);
         } else {
-          this.TBN = pb.mat3(
-            pb.normalize(this.worldTangent),
-            pb.normalize(this.worldBinormal),
-            pb.normalize(this.worldNormal)
-          );
+          this.$l.ng = pb.normalize(this.worldNormal);
+          this.$l.t = pb.normalize(this.worldTangent);
+          this.$l.b = pb.normalize(this.worldBinormal);
+          if (that.doubleSidedLighting) {
+            this.$if(pb.not(this.$builtins.frontFacing), function () {
+              this.t = pb.mul(this.t, -1);
+              this.b = pb.mul(this.b, -1);
+              this.ng = pb.mul(this.ng, -1);
+            });
+          }
+          this.TBN = pb.mat3(this.t, this.b, this.ng);
         }
         if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
           if (that.normalMapMode === 'object-space') {
@@ -335,11 +342,17 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           }
           this.TBN = pb.mat3(this.t, this.b, this.ng);
         } else {
-          this.TBN = pb.mat3(
-            pb.normalize(this.worldTangent),
-            pb.normalize(this.worldBinormal),
-            pb.normalize(this.worldNormal)
-          );
+          this.$l.ng = pb.normalize(this.worldNormal);
+          this.$l.t = pb.normalize(this.worldTangent);
+          this.$l.b = pb.normalize(this.worldBinormal);
+          if (that.doubleSidedLighting) {
+            this.$if(pb.not(this.$builtins.frontFacing), function () {
+              this.t = pb.mul(this.t, -1);
+              this.b = pb.mul(this.b, -1);
+              this.ng = pb.mul(this.ng, -1);
+            });
+          }
+          this.TBN = pb.mat3(this.t, this.b, this.ng);
         }
         if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
           if (that.normalMapMode === 'object-space') {
