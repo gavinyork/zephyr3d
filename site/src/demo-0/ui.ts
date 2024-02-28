@@ -55,6 +55,22 @@ export class UI {
         });
         ImGui.EndMenu();
       }
+      const animations = this._viewer.animationSet?.getAnimationNames() ?? [];
+      if (animations.length > 0) {
+        if (ImGui.BeginMenu('Animation')){
+          for(const name of animations){
+            ImGui.MenuItem(`${name}##ani`, null, (val?: boolean) => {
+              if (val === undefined) {
+                val = this._viewer.animationSet.isPlayingAnimation(name);
+              } else if (val) {
+                this._viewer.animationSet.playAnimation(name);
+              }
+              return val;
+            });
+          }
+          ImGui.EndMenu();
+        }
+      }
       ImGui.EndMainMenuBar();
     }
   }

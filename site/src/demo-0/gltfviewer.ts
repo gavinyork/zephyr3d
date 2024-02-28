@@ -112,6 +112,9 @@ export class GLTFViewer {
   get scene(): Scene {
     return this._scene;
   }
+  get animationSet(): AnimationSet {
+    return this._animationSet;
+  }
   get animations(): string[] {
     return this._animationSet?.getAnimationNames() || [];
   }

@@ -1,11 +1,36 @@
 import { Application, Scene } from '@zephyr3d/scene';
 import { GLTFViewer } from './gltfviewer';
 import { Vector3 } from '@zephyr3d/base';
-import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { backendWebGL2, backendWebGL1 } from '@zephyr3d/backend-webgl';
+import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { imGuiInit, imGuiInjectEvent } from '@zephyr3d/imgui';
+import type { DeviceBackend } from '@zephyr3d/device';
+
+function getQueryString(name: string) {
+  return new URL(window.location.toString()).searchParams.get(name) || null;
+}
+
+function getBackend(): DeviceBackend {
+  const type = getQueryString('dev') || 'webgl';
+  if (type === 'webgpu') {
+    if (backendWebGPU.supported()) {
+      return backendWebGPU;
+    } else {
+      console.warn('No WebGPU support, fall back to WebGL2');
+    }
+  }
+  if (type === 'webgl2') {
+    if (backendWebGL2.supported()) {
+      return backendWebGL2;
+    } else {
+      console.warn('No WebGL2 support, fall back to WebGL1');
+    }
+  }
+  return backendWebGL1;
+}
 
 const gltfApp = new Application({
-  backend: backendWebGL2,
+  backend: getBackend(),
   canvas: document.querySelector('#canvas'),
   enableMSAA: true
 });
