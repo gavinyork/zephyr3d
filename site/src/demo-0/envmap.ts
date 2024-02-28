@@ -15,9 +15,12 @@ export class EnvMaps {
     this._envMaps = {
       'Phalzer forest': {
         path: 'assets/images/environments/phalzer_forest.hdr',
-      }, 
+      },
       'Street night': {
         path: 'assets/images/environments/street_night.hdr',
+      },
+      'Pond_2k': {
+        path: 'assets/images/environments/pond_2k.hdr',
       }
     };
     this._assetManager = new AssetManager();

@@ -17,6 +17,7 @@ import {
   Bloom
 } from '@zephyr3d/scene';
 import { EnvMaps } from './envmap';
+import { UI } from './ui';
 
 export class GLTFViewer {
   private _currentAnimation: string;
@@ -26,14 +27,17 @@ export class GLTFViewer {
   private _scene: Scene;
   private _tonemap: Tonemap;
   private _bloom: Bloom;
+  private _fxaa: FXAA;
   private _doTonemap: boolean;
   private _doBloom: boolean;
+  private _doFXAA: boolean;
   private _camera: PerspectiveCamera;
   private _light0: DirectionalLight;
   private _light1: DirectionalLight;
   private _fov: number;
   private _nearPlane: number;
   private _envMaps: EnvMaps;
+  private _ui: UI;
   private _compositor: Compositor;
   constructor(scene: Scene) {
     this._currentAnimation = null;
@@ -41,19 +45,22 @@ export class GLTFViewer {
     this._animationSet = null;
     this._scene = scene;
     this._envMaps = new EnvMaps();
+    this._ui = new UI(this);
     this._assetManager = new AssetManager();
     this._tonemap = new Tonemap();
     this._bloom = new Bloom();
-    this._bloom.threshold = 0.9;
+    this._bloom.threshold = 0.85;
     this._bloom.intensity = 1.5;
+    this._fxaa = new FXAA();
     this._doTonemap = true;
-    this._doBloom = false;
+    this._doBloom = true;
+    this._doFXAA = true;
     this._fov = Math.PI / 3;
     this._nearPlane = 1;
     this._compositor = new Compositor();
     this._compositor.appendPostEffect(this._tonemap);
     this._compositor.appendPostEffect(this._bloom);
-    this._compositor.appendPostEffect(new FXAA());
+    this._compositor.appendPostEffect(this._fxaa);
     this._camera = new PerspectiveCamera(
       scene,
       Math.PI / 3,
@@ -77,6 +84,9 @@ export class GLTFViewer {
       inactiveTimeDuration: 10000,
       verbose: true
     });
+  }
+  get envMaps(): EnvMaps {
+    return this._envMaps;
   }
   get light0(): DirectionalLight {
     return this._light0;
@@ -180,28 +190,48 @@ export class GLTFViewer {
   enableShadow(enable: boolean) {
     this._light0.setCastShadow(enable);
   }
-  toggleBloom(): boolean {
-    if (this._doBloom) {
-      this._compositor.removePostEffect(this._bloom);
-      this._doBloom = false;
-    } else {
-      this._compositor.appendPostEffect(this._bloom);
-      this._doBloom = true;
-    }
+  bloomEnabled(): boolean {
     return this._doBloom;
   }
-  toggleTonemap(): boolean {
-    if (!this._doTonemap) {
-      this._compositor.appendPostEffect(this._tonemap);
-      this._doTonemap = true;
-    } else {
-      this._compositor.removePostEffect(this._tonemap);
-      this._doTonemap = false;
-    }
+  tonemapEnabled(): boolean {
     return this._doTonemap;
+  }
+  FXAAEnabled(): boolean {
+    return this._doFXAA;
+  }
+  syncPostEffects() {
+    this._compositor.clear();
+    if (this._doTonemap) {
+      this._compositor.appendPostEffect(this._tonemap);
+    }
+    if (this._doBloom) {
+      this._compositor.appendPostEffect(this._bloom);
+    }
+    if (this._doFXAA) {
+      this._compositor.appendPostEffect(this._fxaa);
+    }
+  }
+  enableBloom(enable: boolean) {
+    if (!!enable !== this._doBloom) {
+      this._doBloom = !!enable;
+      this.syncPostEffects();
+    }
+  }
+  enableTonemap(enable: boolean) {
+    if (!!enable !== this._doTonemap) {
+      this._doTonemap = !!enable;
+      this.syncPostEffects();
+    }
+  }
+  enableFXAA(enable: boolean) {
+    if (!!enable !== this._doFXAA) {
+      this._doFXAA = !!enable;
+      this.syncPostEffects();
+    }
   }
   render() {
     this._camera.render(this._scene, this._compositor);
+    this._ui.render();
   }
   lookAt() {
     const bbox = this.getBoundingBox();

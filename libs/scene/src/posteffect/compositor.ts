@@ -98,6 +98,13 @@ export class Compositor {
     }
   }
   /**
+   * Removes all post effects
+   */
+  clear(): void {
+    this._postEffectsOpaque = [];
+    this._postEffectsTransparency = [];
+  }
+  /**
    * Gets all post effects
    */
   getPostEffects(): AbstractPostEffect[] {

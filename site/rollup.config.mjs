@@ -147,7 +147,7 @@ function getTutTarget(input, output) {
     plugins: [
       nodeResolve(),
       swc(),
-      terser(),
+      //terser(),
       copy({
         targets: [
           {

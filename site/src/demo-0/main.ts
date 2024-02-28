@@ -2,6 +2,7 @@ import { Application, Scene } from '@zephyr3d/scene';
 import { GLTFViewer } from './gltfviewer';
 import { Vector3 } from '@zephyr3d/base';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { imGuiInit, imGuiInjectEvent } from '@zephyr3d/imgui';
 
 const gltfApp = new Application({
   backend: backendWebGL2,
@@ -10,6 +11,8 @@ const gltfApp = new Application({
 });
 
 gltfApp.ready().then(async () => {
+  await imGuiInit(gltfApp.device);
+  gltfApp.inputManager.use(imGuiInjectEvent);
   const scene = new Scene();
   scene.env.sky.fogType = 'exp';
   const gltfViewer = new GLTFViewer(scene);
@@ -56,13 +59,6 @@ gltfApp.ready().then(async () => {
   gltfApp.on('pointerup', (ev) => {
     if (ev.button === 2) {
       movingSun = 0;
-    }
-  });
-  gltfApp.on('keyup', (ev) => {
-    if (ev.code === 'KeyT') {
-      gltfViewer.toggleTonemap();
-    } else if (ev.code === 'KeyB') {
-      gltfViewer.toggleBloom();
     }
   });
   gltfApp.on('resize', (ev) => {
