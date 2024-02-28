@@ -14,9 +14,6 @@ gltfApp.ready().then(async () => {
   scene.env.sky.fogType = 'exp';
   const gltfViewer = new GLTFViewer(scene);
   gltfApp.inputManager.use(gltfViewer.camera.handleEvent.bind(gltfViewer.camera));
-  gltfApp.on('dragover', (ev) => {
-    ev.preventDefault();
-  });
   gltfApp.on('drop', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
@@ -64,10 +61,6 @@ gltfApp.ready().then(async () => {
   gltfApp.on('keyup', (ev) => {
     if (ev.code === 'KeyT') {
       gltfViewer.toggleTonemap();
-    } else if (ev.code === 'KeyU') {
-      gltfViewer.toggleSAO();
-    } else if (ev.code === 'KeyP') {
-      gltfViewer.toggleWater();
     } else if (ev.code === 'KeyB') {
       gltfViewer.toggleBloom();
     }

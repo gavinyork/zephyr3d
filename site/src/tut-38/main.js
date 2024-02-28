@@ -1,6 +1,6 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, FPSCameraController, DirectionalLight, AssetManager, Application, Tonemap, GraphNode, PerspectiveCamera, Compositor, Terrain, FXAA, PostWater } from '@zephyr3d/scene';
+import { Scene, FPSCameraController, DirectionalLight, AssetManager, Application, Tonemap, PerspectiveCamera, Compositor, Terrain, FXAA, PostWater } from '@zephyr3d/scene';
 
 const myApp = new Application({
   backend: backendWebGL2,
@@ -18,7 +18,6 @@ myApp.ready().then(async () => {
     for (let i = 0; i < mapWidth * mapHeight; i++) {
       heightsF32[i] = heightsInt16[i] / 65535;
     }
-    const albedoMap = await assetManager.fetchTexture('./assets/maps/map2/colormap.png', { linearColorSpace: false });
     const splatMap = await assetManager.fetchTexture('./assets/maps/map2/splatmap.tga', { linearColorSpace: true });
     const detailAlbedo0 = await assetManager.fetchTexture('./assets/maps/map2/stone_color.png', { linearColorSpace: false });
     const detailNormal0 = await assetManager.fetchTexture('./assets/maps/map2/stone_norm.png', { linearColorSpace: true });

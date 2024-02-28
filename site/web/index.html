@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Zephyr3d</title>
+  <title>Zephyr3d documentation</title>
   <link rel="icon" href="media/favicon.ico" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
-  <meta name="description" content="Realtime 3d rendering framework for web browser">
+  <meta name="description" content="Zephyr3d documentation page">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
   <link rel="stylesheet" href="css/var.css">
   <link rel="stylesheet" href="vendor/themes/style.min.css">
@@ -83,6 +83,10 @@
         let caseNodes = new Set();
         mutations_list.forEach(function(mutation) {
           mutation.addedNodes.forEach(function(added_node) {
+            if(added_node instanceof HTMLElement && added_node.classList.contains('showcase') && !caseNodes.has(added_node)) {
+              createCase(added_node);
+              caseNodes.add()
+            }
             const caseList = (added_node instanceof HTMLElement) ? added_node.querySelectorAll('.showcase') : [];
             caseList.forEach(el => {
               if (!caseNodes.has(el)) {
@@ -90,11 +94,6 @@
                 createCase(el);
               }
             });
-            /*
-            if(added_node instanceof HTMLElement && added_node.classList.contains('showcase')) {
-              createCase(added_node);
-            }
-            */
           });
         });
       });

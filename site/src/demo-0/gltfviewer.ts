@@ -1,5 +1,5 @@
 import * as zip from '@zip.js/zip.js';
-import { Vector4, Vector3, Vector2 } from '@zephyr3d/base';
+import { Vector4, Vector3 } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
 import {
@@ -9,62 +9,50 @@ import {
   AssetManager,
   DirectionalLight,
   OrbitCameraController,
-  panoramaToCubemap,
-  prefilterCubemap,
   Application,
   Tonemap,
-  SAO,
   PerspectiveCamera,
-  PostWater,
   Compositor,
   FXAA,
   Bloom
 } from '@zephyr3d/scene';
-import type { Texture2D } from '@zephyr3d/device';
-import type { TextureCube } from '@zephyr3d/device';
+import { EnvMaps } from './envmap';
 
 export class GLTFViewer {
   private _currentAnimation: string;
   private _modelNode: SceneNode;
   private _animationSet: AnimationSet;
   private _assetManager: AssetManager;
-  private _assetManagerSky: AssetManager;
   private _scene: Scene;
   private _tonemap: Tonemap;
-  private _sao: SAO;
   private _bloom: Bloom;
-  private _water: PostWater;
   private _doTonemap: boolean;
-  private _doSAO: boolean;
   private _doBloom: boolean;
-  private _doWater: boolean;
   private _camera: PerspectiveCamera;
   private _light0: DirectionalLight;
   private _light1: DirectionalLight;
   private _fov: number;
   private _nearPlane: number;
-  private _radianceMap: TextureCube;
-  private _irradianceMap: TextureCube;
-  private _skyMap: TextureCube;
+  private _envMaps: EnvMaps;
   private _compositor: Compositor;
   constructor(scene: Scene) {
     this._currentAnimation = null;
     this._modelNode = null;
     this._animationSet = null;
     this._scene = scene;
+    this._envMaps = new EnvMaps();
     this._assetManager = new AssetManager();
-    this._assetManagerSky = new AssetManager();
     this._tonemap = new Tonemap();
-    this._sao = new SAO();
     this._bloom = new Bloom();
-    this._water = new PostWater(0);
-    this._doTonemap = false;
-    this._doSAO = false;
+    this._bloom.threshold = 0.9;
+    this._bloom.intensity = 1.5;
+    this._doTonemap = true;
     this._doBloom = false;
-    this._doWater = false;
     this._fov = Math.PI / 3;
     this._nearPlane = 1;
     this._compositor = new Compositor();
+    this._compositor.appendPostEffect(this._tonemap);
+    this._compositor.appendPostEffect(this._bloom);
     this._compositor.appendPostEffect(new FXAA());
     this._camera = new PerspectiveCamera(
       scene,
@@ -82,43 +70,7 @@ export class GLTFViewer {
     this._light1 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
     this._light1.shadow.shadowMapSize = 1024;
     this._light1.lookAt(new Vector3(0, 0, 0), new Vector3(-0.5, 0.707, 0.5), Vector3.axisPY());
-    this._radianceMap = Application.instance.device.createCubeTexture('rgba16f', 256);
-    this._irradianceMap = Application.instance.device.createCubeTexture('rgba16f', 64, {
-      samplerOptions: { mipFilter: 'none' }
-    });
-
-    scene.env.sky.skyType = 'scatter';
-    scene.env.sky.wind = new Vector2(160, 240);
-    scene.env.sky.fogType = 'none';
-    scene.env.sky.fogStart = 10;
-    scene.env.sky.fogEnd = 300;
-    scene.env.sky.fogTop = 30;
-    if (scene.env.sky.skyboxTexture) {
-      prefilterCubemap(scene.env.sky.skyboxTexture, 'ggx', this._radianceMap);
-      prefilterCubemap(scene.env.sky.skyboxTexture, 'lambertian', this._irradianceMap);
-    }
-    scene.env.light.type = 'ibl';
-    //scene.env.light.radianceMap = this._radianceMap;
-    //scene.env.light.irradianceMap = this._irradianceMap;
-    this._skyMap = Application.instance.device.createCubeTexture('rgba16f', 512);
-
-    /*
-    this._assetManager.fetchTexture<Texture2D>(`./assets/images/environments/papermill.hdr`).then(tex => {
-      panoramaToCubemap(tex, this._skyMap);
-      prefilterCubemap(this._skyMap, 'ggx', this._radianceMap);
-      prefilterCubemap(this._skyMap, 'lambertian', this._irradianceMap);
-      scene.env.light.type = 'ibl';
-      scene.env.light.radianceMap = this._radianceMap;
-      scene.env.light.irradianceMap = this._irradianceMap;
-      scene.env.sky.skyType = 'skybox';
-      scene.env.sky.skyboxTexture = this._skyMap;
-      scene.env.sky.fogType = 'none';
-      scene.env.sky.fogStart = 10;
-      scene.env.sky.fogEnd = 300;
-      scene.env.sky.fogTop = 30;
-      tex.dispose();
-    });
-    */
+    this._envMaps.selectById(this._envMaps.getIdList()[0], this.scene);
     Material.setGCOptions({
       drawableCountThreshold: 0,
       materialCountThreshold: 0,
@@ -140,9 +92,6 @@ export class GLTFViewer {
       this._fov = val;
       this.lookAt();
     }
-  }
-  get sao(): SAO {
-    return this._sao;
   }
   get bloom(): Bloom {
     return this._bloom;
@@ -181,29 +130,12 @@ export class GLTFViewer {
         this._assetManager.httpRequest.urlResolver = (url) => {
           return fileMap.get(url) || url;
         };
-        this._assetManagerSky.httpRequest.urlResolver = (url) => {
-          return fileMap.get(url) || url;
-        }
         if (fileMap.size === 1 && /\.zip$/i.test(Array.from(fileMap.keys())[0])) {
           fileMap = await this.readZip(fileMap.get(Array.from(fileMap.keys())[0]))
         }
         if (fileMap.size === 1 && /\.hdr$/i.test(Array.from(fileMap.keys())[0])) {
           const hdrFile = Array.from(fileMap.keys())[0];
-          this._assetManagerSky.purgeCache();
-          this._assetManagerSky
-            .fetchTexture<Texture2D>(hdrFile, {
-              linearColorSpace: true,
-              samplerOptions: {
-                mipFilter: 'none'
-              }
-            })
-            .then((tex) => {
-              panoramaToCubemap(tex, this._skyMap);
-              prefilterCubemap(this._skyMap, 'ggx', this._radianceMap);
-              prefilterCubemap(this._skyMap, 'lambertian', this._irradianceMap);
-              this._scene.env.sky.skyboxTexture = this._skyMap;
-              tex.dispose();
-            });
+          this._envMaps.selectByPath(hdrFile, this.scene, url => fileMap.get(url) || url);
         } else {
           const modelFile = Array.from(fileMap.keys()).find((val) => /(\.gltf|\.glb)$/i.test(val));
           if (modelFile) {
@@ -248,16 +180,6 @@ export class GLTFViewer {
   enableShadow(enable: boolean) {
     this._light0.setCastShadow(enable);
   }
-  toggleWater(): boolean {
-    if (!this._doWater) {
-      this._compositor.appendPostEffect(this._water);
-      this._doWater = true;
-    } else {
-      this._compositor.removePostEffect(this._water);
-      this._doWater = false;
-    }
-    return this._doWater;
-  }
   toggleBloom(): boolean {
     if (this._doBloom) {
       this._compositor.removePostEffect(this._bloom);
@@ -277,16 +199,6 @@ export class GLTFViewer {
       this._doTonemap = false;
     }
     return this._doTonemap;
-  }
-  toggleSAO(): boolean {
-    if (!this._doSAO) {
-      this._compositor.appendPostEffect(this._sao);
-      this._doSAO = true;
-    } else {
-      this._compositor.removePostEffect(this._sao);
-      this._doSAO = false;
-    }
-    return this._doSAO;
   }
   render() {
     this._camera.render(this._scene, this._compositor);
