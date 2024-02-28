@@ -7,18 +7,27 @@ import type { IMixinPBRCommon } from './common';
 import { mixinPBRCommon } from './common';
 import type { DrawContext } from '../../../render';
 import { Vector4 } from '@zephyr3d/base';
+import { IMixinLight, mixinLight } from '../lit';
 
 export type IMixinPBRSpecularGlossiness = {
   specularFactor: Vector4;
   glossinessFactor: number;
-} & IMixinPBRCommon &
+  PBRLight(scope: PBFunctionScope, normal: PBShaderExp, TBN: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+  calculateCommonData(
+    scope: PBInsideFunctionScope,
+    albedo: PBShaderExp,
+    viewVec: PBShaderExp,
+    TBN: PBShaderExp,
+    data: PBShaderExp
+  ): void;
+} & IMixinPBRCommon & IMixinLight &
   TextureMixinInstanceTypes<['specular']>;
 
 export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).pbrSpecularGlossnessMixed) {
     return BaseCls as T & { new (...args: any[]): IMixinPBRSpecularGlossiness };
   }
-  const S = applyMaterialMixins(BaseCls, mixinPBRCommon, mixinTextureProps('specular'));
+  const S = applyMaterialMixins(BaseCls, mixinPBRCommon, mixinLight, mixinTextureProps('specular'));
   return class extends S {
     static readonly pbrSpecularGlossnessMixed = true;
     private _specularFactor: Vector4;
@@ -60,6 +69,39 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
         bindGroup.setValue('zSpecularFactor', this._specularFactor);
         bindGroup.setValue('zGlossinessFactor', this._glossinessFactor);
       }
+    }
+    PBRLight(scope: PBFunctionScope, normal: PBShaderExp, TBN: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp {
+      const pb = scope.$builder;
+      const funcName = 'z_PBRLight';
+      const that = this;
+      pb.func(funcName, [pb.vec3('normal'), pb.mat3('TBN'), pb.vec3('viewVec'), pb.vec4('albedo')], function(){
+        this.$l.pbrData = that.getCommonData(this, this.albedo, this.viewVec, this.TBN);
+        this.$l.lightingColor = pb.vec3(0);
+        this.$l.emissiveColor = that.calculateEmissiveColor(this);
+        that.indirectLighting(this, this.normal, this.viewVec, this.pbrData, this.lightingColor);
+        that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
+          this.$l.diffuse = pb.vec3();
+          this.$l.specular = pb.vec3();
+          this.$l.lightAtten = that.calculateLightAttenuation(this, type, posRange, dirCutoff);
+          this.$l.lightDir = that.calculateLightDirection(this, type, posRange, dirCutoff);
+          this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
+          this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
+          if (shadow) {
+            this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.NoL));
+          }
+          that.directLighting(
+            this,
+            this.lightDir,
+            this.lightColor,
+            this.normal,
+            this.viewVec,
+            this.pbrData,
+            this.lightingColor
+          );
+        });
+        this.$return(pb.add(this.lightingColor, this.emissiveColor));
+      });
+      return pb.getGlobalScope()[funcName](normal, TBN, viewVec, albedo);
     }
     calculateCommonData(
       scope: PBInsideFunctionScope,
