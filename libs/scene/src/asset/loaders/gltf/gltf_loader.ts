@@ -1099,7 +1099,7 @@ export class GLTFLoader extends AbstractModelLoader {
     const accessor = gltf._accessors[accessorIndex];
     const componentCount = accessor.getComponentCount(accessor.type);
     const normalized = !!accessor.normalized;
-    const hash = `${accessorIndex}:${!!semantic}:${Number(normalized)}`;
+    const hash = `${accessorIndex}:${semantic||''}:${Number(normalized)}`;
     let buffer = gltf._bufferCache[hash];
     if (!buffer) {
       let data = accessor.getNormalizedDeinterlacedView(gltf);
