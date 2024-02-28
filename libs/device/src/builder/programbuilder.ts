@@ -78,9 +78,9 @@ export type ExpValueNonArrayType = number | boolean | PBShaderExp;
  */
 export type ExpValueType = ExpValueNonArrayType | Array<ExpValueType>;
 
-const input_prefix = 'uu_in_';
-const output_prefix_vs = 'uu_vsout_';
-const output_prefix_fs = 'uu_fsout_';
+const input_prefix = 'zVSInput_';
+const output_prefix_vs = 'zVSOutput_';
+const output_prefix_fs = 'zFSOutput_';
 
 /**
  * Render program build options
@@ -1314,7 +1314,7 @@ export class ProgramBuilder {
   }
   /** @internal */
   generateStructureName(): string {
-    return `uu_GeneratedStruct${this._autoStructureTypeIndex++}`;
+    return `zStruct${this._autoStructureTypeIndex++}`;
   }
   /** @internal */
   getVertexAttributes(): number[] {

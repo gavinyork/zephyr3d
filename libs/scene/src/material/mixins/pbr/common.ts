@@ -217,43 +217,43 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       super.fragmentShader(scope);
       if (this.needFragmentColor()) {
-        scope.kkF0 = pb.vec4().uniform(2);
-        scope.kkEmissiveFactor = pb.vec4().uniform(2);
+        scope.zF0 = pb.vec4().uniform(2);
+        scope.zEmissiveFactor = pb.vec4().uniform(2);
         if (this.occlusionTexture) {
-          scope.kkOcclusionStrength = pb.float().uniform(2);
+          scope.zOcclusionStrength = pb.float().uniform(2);
         }
         if (this.sheen) {
-          scope.kkSheenFactor = pb.vec4().uniform(2);
+          scope.zSheenFactor = pb.vec4().uniform(2);
         }
         if (this.clearcoat) {
-          scope.kkClearcoatFactor = pb.vec4().uniform(2);
+          scope.zClearcoatFactor = pb.vec4().uniform(2);
         }
         if (this.drawContext.drawEnvLight) {
-          scope.kkGGXLut = pb.tex2D().uniform(2);
+          scope.zGGXLut = pb.tex2D().uniform(2);
         }
       }
     }
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
       super.applyUniformValues(bindGroup, ctx, pass);
       if (this.needFragmentColor(ctx)) {
-        bindGroup.setValue('kkF0', this._f0);
-        bindGroup.setValue('kkEmissiveFactor', this._emissiveFactor);
+        bindGroup.setValue('zF0', this._f0);
+        bindGroup.setValue('zEmissiveFactor', this._emissiveFactor);
         if (this.occlusionTexture) {
-          bindGroup.setValue('kkOcclusionStrength', this._occlusionStrength);
+          bindGroup.setValue('zOcclusionStrength', this._occlusionStrength);
         }
         if (this.sheen) {
-          bindGroup.setValue('kkSheenFactor', this._sheenFactor);
+          bindGroup.setValue('zSheenFactor', this._sheenFactor);
         }
         if (this.clearcoat) {
-          bindGroup.setValue('kkClearcoatFactor', this._clearcoatFactor);
+          bindGroup.setValue('zClearcoatFactor', this._clearcoatFactor);
         }
         if (ctx.drawEnvLight) {
-          bindGroup.setTexture('kkGGXLut', getGGXLUT(1024));
+          bindGroup.setTexture('zGGXLut', getGGXLUT(1024));
         }
       }
     }
     getF0(scope: PBInsideFunctionScope): PBShaderExp {
-      return scope.kkF0;
+      return scope.zF0;
     }
     getCommonDatasStruct(scope: PBInsideFunctionScope): ShaderTypeFunc {
       const pb = scope.$builder;
@@ -280,7 +280,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     ): PBShaderExp {
       const pb = scope.$builder;
       const that = this;
-      const funcName = 'kkGetCommonData';
+      const funcName = 'Z_GetCommonData';
       pb.func(funcName, [pb.vec4('albedo'), pb.vec3('viewVec'), pb.mat3('TBN')], function () {
         this.$l.data = that.getCommonDatasStruct(this)();
         that.calculateCommonData(this, this.albedo, this.viewVec, this.TBN, this.data);
@@ -298,14 +298,14 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       if (this.sheen) {
         if (this.sheenColorTexture) {
-          data.sheenColor = pb.mul(this.sampleSheenColorTexture(scope).rgb, scope.kkSheenFactor.rgb);
+          data.sheenColor = pb.mul(this.sampleSheenColorTexture(scope).rgb, scope.zSheenFactor.rgb);
         } else {
-          data.sheenColor = scope.kkSheenFactor.rgb;
+          data.sheenColor = scope.zSheenFactor.rgb;
         }
         if (this.sheenRoughnessTexture) {
-          data.sheenRoughness = pb.mul(this.sampleSheenRoughnessTexture(scope).a, scope.kkSheenFactor.a);
+          data.sheenRoughness = pb.mul(this.sampleSheenRoughnessTexture(scope).a, scope.zSheenFactor.a);
         } else {
-          data.sheenRoughness = scope.kkSheenFactor.a;
+          data.sheenRoughness = scope.zSheenFactor.a;
         }
         scope.$l.sheenDFG = 0.157;
         data.sheenAlbedoScaling = pb.sub(
@@ -317,14 +317,14 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         if (this.clearcoatNormalTexture) {
           const ccNormal = pb.mul(
             pb.sub(pb.mul(this.sampleClearcoatNormalTexture(scope).rgb, 2), pb.vec3(1)),
-            pb.vec3(scope.kkClearcoatFactor.zz, 1)
+            pb.vec3(scope.zClearcoatFactor.zz, 1)
           );
           data.ccNormal = pb.normalize(pb.mul(TBN, ccNormal));
         } else {
           data.ccNormal = TBN[2];
         }
         data.ccNoV = pb.clamp(pb.dot(data.ccNormal, viewVec), 0.0001, 1);
-        data.ccFactor = scope.kkClearcoatFactor;
+        data.ccFactor = scope.zClearcoatFactor;
         if (this.clearcoatIntensityTexture) {
           data.ccFactor.x = pb.mul(data.ccFactor.x, this.sampleClearcoatIntensityTexture(scope).r);
         }
@@ -342,15 +342,15 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       if (this.emissiveTexture) {
         return pb.mul(
           this.sampleEmissiveTexture(scope).rgb,
-          scope.kkEmissiveFactor.rgb,
-          scope.kkEmissiveFactor.a
+          scope.zEmissiveFactor.rgb,
+          scope.zEmissiveFactor.a
         );
       } else {
-        return pb.mul(scope.kkEmissiveFactor.rgb, scope.kkEmissiveFactor.a);
+        return pb.mul(scope.zEmissiveFactor.rgb, scope.zEmissiveFactor.a);
       }
     }
     D_Charlie(scope: PBInsideFunctionScope, NdotH: PBShaderExp, sheenRoughness: PBShaderExp): PBShaderExp {
-      const funcNameDCharlie = 'kkDCharlie';
+      const funcNameDCharlie = 'Z_DCharlie';
       const pb = scope.$builder;
       pb.func(funcNameDCharlie, [pb.float('NdotH'), pb.float('sheenRoughness')], function () {
         this.$l.alphaG = pb.mul(this.sheenRoughness, this.sheenRoughness);
@@ -364,7 +364,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       return scope.$g[funcNameDCharlie](NdotH, sheenRoughness);
     }
     V_Ashikhmin(scope: PBInsideFunctionScope, NdotL: PBShaderExp, NdotV: PBShaderExp): PBShaderExp {
-      const funcNameVAshikhmin = 'kkVAshikhmin';
+      const funcNameVAshikhmin = 'Z_VAshikhmin';
       const pb = scope.$builder;
       pb.func(funcNameVAshikhmin, [pb.float('NdotL'), pb.float('NdotV')], function () {
         this.$return(
@@ -388,7 +388,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     ) {
       const pb = scope.$builder;
       const that = this;
-      const funcName = 'kkPBRDirectLighting';
+      const funcName = 'Z_PBRDirectLighting';
       pb.func(
         funcName,
         [
@@ -462,7 +462,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       const that = this;
       const ctx = that.drawContext;
-      const funcName = 'kkPBRIndirectLighting';
+      const funcName = 'Z_PBRIndirectLighting';
       pb.func(
         funcName,
         [
@@ -482,7 +482,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           if (that.occlusionTexture) {
             const occlusionSample = that.sampleOcclusionTexture(this).r;
             this.$l.occlusion = pb.mul(
-              pb.add(pb.mul(this.kkOcclusionStrength, pb.sub(occlusionSample, 1)), 1),
+              pb.add(pb.mul(this.zOcclusionStrength, pb.sub(occlusionSample, 1)), 1),
               envLightStrength
             );
           } else {
@@ -491,7 +491,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$l.NoV = pb.clamp(pb.dot(this.normal, this.viewVec), 0.0001, 1);
           this.$l.ggxLutSample = pb.clamp(
             pb.textureSampleLevel(
-              this.kkGGXLut,
+              this.zGGXLut,
               pb.clamp(pb.vec2(this.NoV, this.data.roughness), pb.vec2(0), pb.vec2(1)),
               0
             ),
@@ -548,7 +548,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             this.$l.refl = pb.reflect(pb.neg(this.viewVec), this.normal);
             this.$l.sheenBRDF = pb.clamp(
               pb.textureSampleLevel(
-                this.kkGGXLut,
+                this.zGGXLut,
                 pb.clamp(pb.vec2(this.NoV, this.data.sheenRoughness), pb.vec2(0), pb.vec2(1)),
                 0
               ),
@@ -564,7 +564,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             this.$l.NoV = pb.clamp(pb.dot(this.data.ccNormal, this.viewVec), 0.0001, 1);
             this.$l.ggxLutSample = pb.clamp(
               pb.textureSampleLevel(
-                this.kkGGXLut,
+                this.zGGXLut,
                 pb.clamp(pb.vec2(this.NoV, this.data.ccFactor.y), pb.vec2(0), pb.vec2(1)),
                 0
               ),
@@ -597,7 +597,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       F90: PBShaderExp
     ): PBShaderExp {
       const pb = scope.$builder;
-      const funcName = 'kkFresnelSchlick';
+      const funcName = 'Z_FresnelSchlick';
       pb.func(funcName, [pb.float('cosTheta'), pb.vec3('f0'), pb.vec3('f90')], function () {
         this.$return(
           pb.add(
@@ -614,7 +614,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       alphaRoughness: PBShaderExp
     ): PBShaderExp {
       const pb = scope.$builder;
-      const funcName = 'kkDistributionGGX';
+      const funcName = 'Z_DistributionGGX';
       pb.func(funcName, [pb.float('NdotH'), pb.float('roughness')], function () {
         this.$l.a2 = pb.mul(this.roughness, this.roughness);
         this.$l.NdotH2 = pb.mul(this.NdotH, this.NdotH);
@@ -632,7 +632,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       alphaRoughness: PBShaderExp
     ): PBShaderExp {
       const pb = scope.$builder;
-      const funcName = 'kkVisGGX';
+      const funcName = 'Z_VisGGX';
       pb.func(funcName, [pb.float('NdotV'), pb.float('NdotL'), pb.float('roughness')], function () {
         this.$l.a2 = pb.mul(this.roughness, this.roughness);
         this.$l.ggxV = pb.mul(

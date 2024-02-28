@@ -23,7 +23,7 @@ export class BlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx)) {
-      bindGroup.setValue('kkShininess', this._shininess);
+      bindGroup.setValue('shininess', this._shininess);
     }
   }
   vertexShader(scope: PBFunctionScope) {
@@ -36,7 +36,7 @@ export class BlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
     const pb = scope.$builder;
     const that = this;
     if (this.needFragmentColor()) {
-      scope.kkShininess = scope.$builder.float().uniform(2);
+      scope.shininess = scope.$builder.float().uniform(2);
       scope.$l.albedo = this.calculateAlbedoColor(scope);
       if (this.vertexColor) {
         scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope));
@@ -56,7 +56,7 @@ export class BlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
         this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
         this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
         this.$l.diffuse = pb.mul(this.lightColor, this.NoL);
-        this.$l.specular = pb.mul(this.lightColor, pb.pow(this.NoH, this.kkShininess));
+        this.$l.specular = pb.mul(this.lightColor, pb.pow(this.NoH, this.shininess));
         if (shadow) {
           this.$l.shadow = pb.vec3(that.calculateShadow(this, this.NoL));
           this.diffuse = pb.mul(this.diffuse, this.shadow);

@@ -2,11 +2,9 @@ import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinVertexColor } from './mixins/vertexcolor';
 import type { PBFunctionScope } from '@zephyr3d/device';
 import { mixinPBRMetallicRoughness } from './mixins/pbr/metallicroughness';
-import { mixinLight } from './mixins/lit';
 
 export class PBRMetallicRoughnessMaterial extends applyMaterialMixins(
   MeshMaterial,
-  mixinLight,
   mixinPBRMetallicRoughness,
   mixinVertexColor
 ) {
@@ -21,15 +19,17 @@ export class PBRMetallicRoughnessMaterial extends applyMaterialMixins(
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
     const pb = scope.$builder;
-    const that = this;
+    //const that = this;
     if (this.needFragmentColor()) {
       scope.$l.albedo = this.calculateAlbedoColor(scope);
       if (this.vertexColor) {
         scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope));
       }
       scope.$l.normalInfo = this.calculateNormalAndTBN(scope);
-      scope.$l.normal = scope.normalInfo.normal;
       scope.$l.viewVec = this.calculateViewVector(scope);
+      scope.$l.litColor = this.PBRLight(scope, scope.normalInfo.normal, scope.normalInfo.TBN, scope.viewVec, scope.albedo);
+      /*
+      scope.$l.normal = scope.normalInfo.normal;
       scope.$l.pbrData = this.getCommonData(scope, scope.albedo, scope.viewVec, scope.normalInfo.TBN);
       scope.$l.lightingColor = pb.vec3(0);
       scope.$l.emissiveColor = this.calculateEmissiveColor(scope);
@@ -55,6 +55,7 @@ export class PBRMetallicRoughnessMaterial extends applyMaterialMixins(
         );
       });
       scope.$l.litColor = pb.add(scope.lightingColor, scope.emissiveColor);
+      */
       this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
       this.outputFragmentColor(scope, null);

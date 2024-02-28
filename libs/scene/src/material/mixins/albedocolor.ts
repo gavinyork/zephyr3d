@@ -39,7 +39,7 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
         );
         return pb.vec4(1);
       }
-      let color = scope.kkAlbedo;
+      let color = scope.zAlbedo;
       if (this.albedoTexture) {
         color = pb.mul(color, this.sampleAlbedoTexture(scope));
       }
@@ -49,13 +49,13 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
       super.fragmentShader(scope);
       if (this.needFragmentColor()) {
         const pb = scope.$builder;
-        scope.kkAlbedo = pb.vec4().uniform(2);
+        scope.zAlbedo = pb.vec4().uniform(2);
       }
     }
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
       super.applyUniformValues(bindGroup, ctx, pass);
       if (this.needFragmentColor(ctx)) {
-        bindGroup.setValue('kkAlbedo', this._albedoColor);
+        bindGroup.setValue('zAlbedo', this._albedoColor);
       }
     }
   } as unknown as T & { new (...args: any[]): IMixinAlbedoColor };

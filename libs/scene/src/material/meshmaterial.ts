@@ -179,10 +179,10 @@ export class MeshMaterial extends Material {
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     if (this.featureUsed(MeshMaterial.FEATURE_ALPHATEST)) {
-      bindGroup.setValue('kkAlphaCutoff', this._alphaCutoff);
+      bindGroup.setValue('zAlphaCutoff', this._alphaCutoff);
     }
     if (this.featureUsed(MeshMaterial.FEATURE_ALPHABLEND)) {
-      bindGroup.setValue('kkOpacity', this._opacity);
+      bindGroup.setValue('zOpacity', this._opacity);
     }
   }
   getQueueType(): number {
@@ -260,8 +260,8 @@ export class MeshMaterial extends Material {
     const pb = scope.$builder;
     this.helper.prepareVertexShader(pb, this.drawContext);
     if (this.drawContext.target.getBoneMatrices()) {
-      scope.$inputs.kkBlendIndices = pb.vec4().attrib('blendIndices');
-      scope.$inputs.kkBlendWeights = pb.vec4().attrib('blendWeights');
+      scope.$inputs.blendIndices = pb.vec4().attrib('blendIndices');
+      scope.$inputs.blendWeights = pb.vec4().attrib('blendWeights');
     }
   }
   /**
@@ -272,11 +272,11 @@ export class MeshMaterial extends Material {
     const pb = scope.$builder;
     this.helper.prepareFragmentShader(pb, this.drawContext);
     if (this._alphaCutoff > 0) {
-      scope.kkAlphaCutoff = pb.float().uniform(2);
+      scope.zAlphaCutoff = pb.float().uniform(2);
     }
     if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
       if (this.isTransparent(this.pass)) {
-        scope.kkOpacity = pb.float().uniform(2);
+        scope.zOpacity = pb.float().uniform(2);
       }
     }
   }
@@ -318,13 +318,13 @@ export class MeshMaterial extends Material {
       this.$l.outColor = color ? this.color : pb.vec4();
       if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         that.helper.discardIfClipped(this);
-        if (!that.isTransparent(that.pass) && !this.kkAlphaCutoff && !that.alphaToCoverage) {
+        if (!that.isTransparent(that.pass) && !this.zAlphaCutoff && !that.alphaToCoverage) {
           this.outColor.a = 1;
-        } else if (this.kkOpacity) {
-          this.outColor.a = pb.mul(this.outColor.a, this.kkOpacity);
+        } else if (this.zOpacity) {
+          this.outColor.a = pb.mul(this.outColor.a, this.zOpacity);
         }
-        if (this.kkAlphaCutoff) {
-          this.$if(pb.lessThan(this.outColor.a, this.kkAlphaCutoff), function () {
+        if (this.zAlphaCutoff) {
+          this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
             pb.discard();
           });
         }
@@ -335,20 +335,20 @@ export class MeshMaterial extends Material {
         this.$outputs.zFragmentOutput = encodeColorOutput(this, this.outColor);
       } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
         if (color) {
-          this.$if(pb.lessThan(this.outColor.a, this.kkAlphaCutoff), function () {
+          this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
             pb.discard();
           });
         }
         that.helper.discardIfClipped(this);
-        this.$l.kkDepth = nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
+        this.$l.depth = nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
         if (Application.instance.device.type === 'webgl') {
-          this.$outputs.zFragmentOutput = encodeNormalizedFloatToRGBA(this, this.kkDepth);
+          this.$outputs.zFragmentOutput = encodeNormalizedFloatToRGBA(this, this.depth);
         } else {
-          this.$outputs.zFragmentOutput = pb.vec4(this.kkDepth, 0, 0, 1);
+          this.$outputs.zFragmentOutput = pb.vec4(this.depth, 0, 0, 1);
         }
       } /*if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP)*/ else {
         if (color) {
-          this.$if(pb.lessThan(this.outColor.a, this.kkAlphaCutoff), function () {
+          this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
             pb.discard();
           });
         }

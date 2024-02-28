@@ -83,15 +83,15 @@ export function mixinTextureProps<U extends string>(name: U) {
                 scope.$inputs[semantic] = pb.vec2().attrib(semantic);
               }
               if (this.featureUsed(featureTexMatrix)) {
-                scope[`kk${capName}TextureMatrix`] = pb.mat4().uniform(2);
+                scope[`z${capName}TextureMatrix`] = pb.mat4().uniform(2);
                 if (!vertex) {
-                  scope.$outputs[`kk${capName}TexCoord`] = pb.mul(
-                    scope[`kk${capName}TextureMatrix`],
+                  scope.$outputs[`z${capName}TexCoord`] = pb.mul(
+                    scope[`z${capName}TextureMatrix`],
                     pb.vec4(scope.$inputs[semantic], 0, 1)
                   ).xy;
                 }
               } else if (!vertex) {
-                scope.$outputs[`kk${capName}TexCoord`] = scope.$inputs[semantic];
+                scope.$outputs[`z${capName}TexCoord`] = scope.$inputs[semantic];
               }
             }
           }
@@ -102,7 +102,7 @@ export function mixinTextureProps<U extends string>(name: U) {
         if (this.needFragmentColor()) {
           const pb = scope.$builder;
           if (this.featureUsed(feature)) {
-            scope[`kk${capName}Tex`] = pb.tex2D().uniform(2);
+            scope[`z${capName}Tex`] = pb.tex2D().uniform(2);
           }
         }
       }
@@ -111,9 +111,9 @@ export function mixinTextureProps<U extends string>(name: U) {
         if (this.needFragmentColor(ctx)) {
           if (this.featureUsed(feature)) {
             const that = this as any;
-            bindGroup.setTexture(`kk${capName}Tex`, that[`${name}Texture`], that[`${name}TextureSampler`]);
+            bindGroup.setTexture(`z${capName}Tex`, that[`${name}Texture`], that[`${name}TextureSampler`]);
             if (this.featureUsed(featureTexMatrix)) {
-              bindGroup.setValue(`kk${capName}TextureMatrix`, that[`${name}TexCoordMatrix`]);
+              bindGroup.setValue(`z${capName}TextureMatrix`, that[`${name}TexCoordMatrix`]);
             }
           }
         }
@@ -134,7 +134,7 @@ export function mixinTextureProps<U extends string>(name: U) {
       return scope.$builder.textureSample(tex, coord);
     };
     proto[`get${capName}TextureUniform`] = function (scope: PBInsideFunctionScope): PBShaderExp {
-      return scope.$builder.shaderKind === 'fragment' ? scope[`kk${capName}Tex`] : null;
+      return scope.$builder.shaderKind === 'fragment' ? scope[`z${capName}Tex`] : null;
     };
     proto[`get${capName}TexCoord`] = function (scope: PBInsideFunctionScope): PBShaderExp {
       if (proto[propTexCoord] < 0) {
@@ -149,10 +149,10 @@ export function mixinTextureProps<U extends string>(name: U) {
         );
       }
       return scope.$builder.shaderKind === 'fragment'
-        ? scope.$inputs[`kk${capName}TexCoord`]
+        ? scope.$inputs[`z${capName}TexCoord`]
         : this.featureUsed(featureTexMatrix)
         ? pb.mul(
-            scope[`kk${capName}TextureMatrix`],
+            scope[`z${capName}TextureMatrix`],
             pb.vec4(scope.$inputs[`texCoord${proto[propTexCoord]}`], 0, 1)
           ).xy
         : scope.$inputs[`texCoord${proto[propTexCoord]}`];

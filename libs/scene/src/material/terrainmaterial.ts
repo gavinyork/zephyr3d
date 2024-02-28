@@ -186,21 +186,21 @@ export class TerrainMaterial extends applyMaterialMixins(
     if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('terrainInfo', this._terrainInfo);
       if (this._options) {
-        bindGroup.setValue('kkDetailScales', this._uvScales);
-        bindGroup.setTexture('kkSplatMap', this._options.splatMap);
+        bindGroup.setValue('detailScales', this._uvScales);
+        bindGroup.setTexture('splatMap', this._options.splatMap);
         if (Array.isArray(this._options.detailMaps.albedoTextures)) {
           for (let i = 0; i < this._numDetailMaps; i++) {
-            bindGroup.setTexture(`kkDetailAlbedoMap${i}`, this._options.detailMaps.albedoTextures[i]);
+            bindGroup.setTexture(`detailAlbedoMap${i}`, this._options.detailMaps.albedoTextures[i]);
           }
         } else {
-          bindGroup.setTexture('kkDetailAlbedoMap', this._options.detailMaps.albedoTextures);
+          bindGroup.setTexture('detailAlbedoMap', this._options.detailMaps.albedoTextures);
         }
         if (Array.isArray(this._options.detailMaps.normalTextures)) {
           for (let i = 0; i < this._numDetailMaps; i++) {
-            bindGroup.setTexture(`kkDetailNormalMap${i}`, this._options.detailMaps.normalTextures[i]);
+            bindGroup.setTexture(`detailNormalMap${i}`, this._options.detailMaps.normalTextures[i]);
           }
         } else {
-          bindGroup.setTexture('kkDetailNormalMap', this._options.detailMaps.normalTextures);
+          bindGroup.setTexture('detailNormalMap', this._options.detailMaps.normalTextures);
         }
       }
     }
@@ -225,14 +225,14 @@ export class TerrainMaterial extends applyMaterialMixins(
     const pb = scope.$builder;
     const funcName = 'getTerrainAlbedo';
     pb.func(funcName, [], function () {
-      this.$l.mask = pb.textureSample(this.kkSplatMap, this.$inputs.mapUV);
+      this.$l.mask = pb.textureSample(this.splatMap, this.$inputs.mapUV);
       this.$l.color = pb.vec3(0);
       const useTextureArray = !Array.isArray(that._options.detailMaps.albedoTextures);
       for (let i = 0; i < that._numDetailMaps; i++) {
-        const uv = pb.mul(this.$inputs.mapUV, this.kkDetailScales.at(i).x);
+        const uv = pb.mul(this.$inputs.mapUV, this.detailScales.at(i).x);
         const sample = useTextureArray
-          ? pb.textureArraySample(this.kkDetailAlbedoMap, uv, i).rgb
-          : pb.textureSample(this[`kkDetailAlbedoMap${i}`], uv).rgb;
+          ? pb.textureArraySample(this.detailAlbedoMap, uv, i).rgb
+          : pb.textureSample(this[`detailAlbedoMap${i}`], uv).rgb;
         this.color = pb.add(this.color, pb.mul(sample, this.mask[i]));
       }
       this.$return(pb.vec4(this.color, 1));
@@ -256,12 +256,12 @@ export class TerrainMaterial extends applyMaterialMixins(
     const pb = scope.$builder;
     let calcNormal = false;
     if (this._options && this._options.detailMaps.normalTextures) {
-      scope.$l.detailMask = pb.textureSample(scope.kkSplatMap, scope.$inputs.mapUV);
+      scope.$l.detailMask = pb.textureSample(scope.splatMap, scope.$inputs.mapUV);
       if (Array.isArray(this._options.detailMaps.normalTextures)) {
         for (let i = 0; i < this._options.detailMaps.normalTextures.length; i++) {
-          const tex = scope[`kkDetailNormalMap${i}`];
-          const scale = scope.kkDetailScales.at(i).y;
-          const texCoord = pb.mul(scope.$inputs.mapUV, scope.kkDetailScales.at(i).x);
+          const tex = scope[`detailNormalMap${i}`];
+          const scale = scope.detailScales.at(i).y;
+          const texCoord = pb.mul(scope.$inputs.mapUV, scope.detailScales.at(i).x);
           scope.normalInfo.normal = pb.add(
             scope.normalInfo.normal,
             pb.mul(
@@ -272,10 +272,10 @@ export class TerrainMaterial extends applyMaterialMixins(
           calcNormal = true;
         }
       } else {
-        const tex = scope.kkDetailNormalMap;
+        const tex = scope.detailNormalMap;
         for (let i = 0; i < this._numDetailMaps; i++) {
-          const scale = scope.kkDetailScales.at(i).y;
-          const texCoord = pb.mul(scope.$inputs.mapUV, scope.kkDetailScales.at(i).x);
+          const scale = scope.detailScales.at(i).y;
+          const texCoord = pb.mul(scope.$inputs.mapUV, scope.detailScales.at(i).x);
           const pixel = pb.sub(pb.mul(pb.textureArraySample(tex, texCoord, i).rgb, 2), pb.vec3(1));
           const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(scale).xx, 1));
           const detailNormal = pb.normalize(pb.mul(scope.normalInfo.TBN, normalTex));
@@ -308,22 +308,22 @@ export class TerrainMaterial extends applyMaterialMixins(
     const that = this;
     if (this.needFragmentColor()) {
       if (this._options) {
-        scope.kkDetailScales = pb.vec4[this._numDetailMaps]().uniform(2);
-        scope.kkSplatMap = pb.tex2D().uniform(2);
+        scope.detailScales = pb.vec4[this._numDetailMaps]().uniform(2);
+        scope.splatMap = pb.tex2D().uniform(2);
         const useAlbedoTextureArray = !Array.isArray(that._options.detailMaps.albedoTextures);
         if (useAlbedoTextureArray) {
-          scope.kkDetailAlbedoMap = pb.tex2DArray().uniform(2);
+          scope.detailAlbedoMap = pb.tex2DArray().uniform(2);
         } else {
           for (let i = 0; i < that._numDetailMaps; i++) {
-            scope[`kkDetailAlbedoMap${i}`] = pb.tex2D().uniform(2);
+            scope[`detailAlbedoMap${i}`] = pb.tex2D().uniform(2);
           }
         }
         const useNormalTextureArray = !Array.isArray(that._options.detailMaps.normalTextures);
         if (useNormalTextureArray) {
-          scope.kkDetailNormalMap = pb.tex2DArray().uniform(2);
+          scope.detailNormalMap = pb.tex2DArray().uniform(2);
         } else {
           for (let i = 0; i < that._numDetailMaps; i++) {
-            scope[`kkDetailNormalMap${i}`] = pb.tex2D().uniform(2);
+            scope[`detailNormalMap${i}`] = pb.tex2D().uniform(2);
           }
         }
       }

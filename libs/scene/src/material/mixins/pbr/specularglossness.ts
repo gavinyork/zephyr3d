@@ -50,15 +50,15 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
       super.fragmentShader(scope);
       if (this.needFragmentColor()) {
         const pb = scope.$builder;
-        scope.kkSpecularFactor = pb.vec4().uniform(2);
-        scope.kkGlossinessFactor = pb.float().uniform(2);
+        scope.zSpecularFactor = pb.vec4().uniform(2);
+        scope.zGlossinessFactor = pb.float().uniform(2);
       }
     }
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
       super.applyUniformValues(bindGroup, ctx, pass);
       if (this.needFragmentColor(ctx)) {
-        bindGroup.setValue('kkSpecularFactor', this._specularFactor);
-        bindGroup.setValue('kkGlossinessFactor', this._glossinessFactor);
+        bindGroup.setValue('zSpecularFactor', this._specularFactor);
+        bindGroup.setValue('zGlossinessFactor', this._glossinessFactor);
       }
     }
     calculateCommonData(
@@ -72,14 +72,14 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
       const pb = scope.$builder;
       if (this.specularTexture) {
         scope.$l.specularTextureSample = this.sampleSpecularTexture(scope);
-        data.roughness = pb.sub(1, pb.mul(scope.kkGlossinessFactor, scope.specularTextureSample.a));
+        data.roughness = pb.sub(1, pb.mul(scope.zGlossinessFactor, scope.specularTextureSample.a));
         data.f0 = pb.vec4(
-          pb.mul(scope.specularTextureSample.rgb, scope.kkSpecularFactor.rgb),
+          pb.mul(scope.specularTextureSample.rgb, scope.zSpecularFactor.rgb),
           this.getF0(scope).a
         );
       } else {
-        data.roughness = pb.sub(1, scope.kkGlossinessFactor);
-        data.f0 = pb.vec4(scope.kkSpecularFactor.rgb, this.getF0(scope).a);
+        data.roughness = pb.sub(1, scope.zGlossinessFactor);
+        data.f0 = pb.vec4(scope.zSpecularFactor.rgb, this.getF0(scope).a);
       }
       data.metallic = pb.max(pb.max(data.f0.r, data.f0.g), data.f0.b);
       data.diffuse = pb.vec4(pb.mul(albedo.rgb, pb.sub(1, data.metallic)), albedo.a);

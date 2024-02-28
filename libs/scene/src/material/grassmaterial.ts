@@ -44,8 +44,8 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
-    bindGroup.setTexture('kkTerrainNormalMap', this._terrainNormalMap);
-    bindGroup.setValue('kkTerrainSize', this._terrainSize);
+    bindGroup.setTexture('terrainNormalMap', this._terrainNormalMap);
+    bindGroup.setValue('terrainSize', this._terrainSize);
     if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('albedoTextureSize', this._textureSize);
     }
@@ -55,22 +55,22 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
     const pb = scope.$builder;
     scope.$inputs.pos = pb.vec3().attrib('position');
     scope.$inputs.placement = pb.vec4().attrib('texCoord1');
-    scope.kkTerrainNormalMap = pb.tex2D().uniform(2);
-    scope.kkTerrainSize = pb.vec2().uniform(2);
+    scope.terrainNormalMap = pb.tex2D().uniform(2);
+    scope.terrainSize = pb.vec2().uniform(2);
     const normalSample = pb.textureSampleLevel(
-      scope.kkTerrainNormalMap,
-      pb.div(scope.$inputs.placement.xz, scope.kkTerrainSize),
+      scope.terrainNormalMap,
+      pb.div(scope.$inputs.placement.xz, scope.terrainSize),
       0
     ).rgb;
-    scope.$l.kkNormal = pb.normalize(pb.sub(pb.mul(normalSample, 2), pb.vec3(1)));
+    scope.$l.normal = pb.normalize(pb.sub(pb.mul(normalSample, 2), pb.vec3(1)));
     scope.$l.axisX = pb.vec3(1, 0, 0);
-    scope.$l.axisZ = pb.cross(scope.axisX, scope.kkNormal);
-    scope.$l.axisX = pb.cross(scope.kkNormal, scope.axisZ);
-    scope.$l.rotPos = pb.mul(pb.mat3(scope.axisX, scope.kkNormal, scope.axisZ), scope.$inputs.pos);
+    scope.$l.axisZ = pb.cross(scope.axisX, scope.normal);
+    scope.$l.axisX = pb.cross(scope.normal, scope.axisZ);
+    scope.$l.rotPos = pb.mul(pb.mat3(scope.axisX, scope.normal, scope.axisZ), scope.$inputs.pos);
     this.helper.transformVertexAndNormal(
       scope,
       pb.add(scope.rotPos, scope.$inputs.placement.xyz),
-      scope.kkNormal
+      scope.normal
     );
   }
   fragmentShader(scope: PBFunctionScope): void {

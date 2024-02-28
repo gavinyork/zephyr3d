@@ -167,7 +167,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           args.push(worldTangent, worldBinormal);
         }
       }
-      pb.func('kkCalculateNormal', params, function () {
+      pb.func('Z_CalculateNormal', params, function () {
         const posW = that.helper.getWorldPosition(this).xyz;
         this.$l.uv = that.normalTexture
           ? that.getNormalTexCoord(this) ?? pb.vec2(0)
@@ -244,21 +244,21 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
               pb.vec3(1)
             );
-            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.kkNormalScale).xx, 1));
+            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.zNormalScale).xx, 1));
             this.$return(pb.normalize(normalTex));
           } else {
             const pixel = pb.sub(
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
               pb.vec3(1)
             );
-            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.kkNormalScale).xx, 1));
+            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.zNormalScale).xx, 1));
             this.$return(pb.normalize(pb.mul(this.TBN, normalTex)));
           }
         } else {
           this.$return(this.TBN[2]);
         }
       });
-      return pb.getGlobalScope().kkCalculateNormal(...args);
+      return pb.getGlobalScope().Z_CalculateNormal(...args);
     }
     /**
      * Calculate the normal vector for current fragment
@@ -283,7 +283,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           args.push(worldTangent, worldBinormal);
         }
       }
-      pb.func('kkCalculateNormalAndTBN', params, function () {
+      pb.func('Z_CalculateNormalAndTBN', params, function () {
         const posW = that.helper.getWorldPosition(this).xyz;
         this.$l.uv = that.normalTexture
           ? that.getNormalTexCoord(this) ?? pb.vec2(0)
@@ -360,21 +360,21 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
               pb.vec3(1)
             );
-            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.kkNormalScale).xx, 1));
+            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.zNormalScale).xx, 1));
             this.$return(NormalStruct(this.TBN, pb.normalize(normalTex)));
           } else {
             const pixel = pb.sub(
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
               pb.vec3(1)
             );
-            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.kkNormalScale).xx, 1));
+            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.zNormalScale).xx, 1));
             this.$return(NormalStruct(this.TBN, pb.normalize(pb.mul(this.TBN, normalTex))));
           }
         } else {
           this.$return(NormalStruct(this.TBN, this.TBN[2]));
         }
       });
-      return pb.getGlobalScope().kkCalculateNormalAndTBN(...args);
+      return pb.getGlobalScope().Z_CalculateNormalAndTBN(...args);
     }
     /**
      * {@inheritDoc MeshMaterial.applyUniformsValues}
@@ -384,7 +384,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       super.applyUniformValues(bindGroup, ctx, pass);
       if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         if (this.normalTexture) {
-          bindGroup.setValue('kkNormalScale', this._normalScale);
+          bindGroup.setValue('zNormalScale', this._normalScale);
         }
       }
     }
@@ -711,7 +711,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         if (this.normalTexture) {
-          scope.kkNormalScale = pb.float().uniform(2);
+          scope.zNormalScale = pb.float().uniform(2);
         }
       }
     }
