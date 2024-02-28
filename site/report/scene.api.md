@@ -289,6 +289,7 @@ export class AssetManager {
     loadTextData(url: string): Promise<string>;
     // @internal (undocumented)
     loadTexture(url: string, mimeType?: string, srgb?: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<BaseTexture>;
+    purgeCache(): void;
     static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => Promise<BaseTexture>): void;
 }
 
@@ -1501,14 +1502,17 @@ export type IMixinPBRMetallicRoughness = {
     metallic: number;
     roughness: number;
     specularFactor: Vector4;
-    calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp): PBShaderExp;
-} & IMixinPBRCommon & TextureMixinInstanceTypes<['metallicRoughness', 'occlusion', 'specular', 'specularColor']>;
+    PBRLight(scope: PBFunctionScope, normal: PBShaderExp, TBN: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+    calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
+} & IMixinPBRCommon & IMixinLight & TextureMixinInstanceTypes<['metallicRoughness', 'occlusion', 'specular', 'specularColor']>;
 
 // @public (undocumented)
 export type IMixinPBRSpecularGlossiness = {
     specularFactor: Vector4;
     glossinessFactor: number;
-} & IMixinPBRCommon & TextureMixinInstanceTypes<['specular']>;
+    PBRLight(scope: PBFunctionScope, normal: PBShaderExp, TBN: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+    calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
+} & IMixinPBRCommon & IMixinLight & TextureMixinInstanceTypes<['specular']>;
 
 // @public (undocumented)
 export interface IMixinVertexColor {

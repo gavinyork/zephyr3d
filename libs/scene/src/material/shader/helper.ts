@@ -91,6 +91,9 @@ export class ShaderHelper {
   static getBoneInvBindMatrixUniformName(): string {
     return UNIFORM_NAME_BONE_INV_BIND_MATRIX;
   }
+  static getLightBufferUniformName(): string {
+    return UNIFORM_NAME_LIGHT_BUFFER;
+  }
   /**
    * Prepares the fragment shader which is going to be used in our material system
    *

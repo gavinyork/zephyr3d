@@ -634,16 +634,16 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       const funcName = 'Z_VisGGX';
       pb.func(funcName, [pb.float('NdotV'), pb.float('NdotL'), pb.float('roughness')], function () {
-        this.$l.a2 = pb.mul(this.roughness, this.roughness);
+        this.$l.a = this.roughness;
         this.$l.ggxV = pb.mul(
           this.NdotL,
-          pb.sqrt(pb.add(pb.mul(this.NdotV, this.NdotV, pb.sub(1, this.a2)), this.a2))
+          pb.sqrt(pb.add(pb.mul(this.NdotV, this.NdotV, pb.sub(1, this.a)), this.a))
         );
         this.$l.ggxL = pb.mul(
           this.NdotV,
-          pb.sqrt(pb.add(pb.mul(this.NdotL, this.NdotL, pb.sub(1, this.a2)), this.a2))
+          pb.sqrt(pb.add(pb.mul(this.NdotL, this.NdotL, pb.sub(1, this.a)), this.a))
         );
-        this.$l.ggx = pb.add(this.ggxV, this.ggxL);
+        this.$l.ggx = pb.add(this.ggxV, this.ggxL, 1e-5);
         this.$if(pb.greaterThan(this.ggx, 0), function () {
           this.$return(pb.div(0.5, this.ggx));
         }).$else(function () {

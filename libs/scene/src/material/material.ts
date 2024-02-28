@@ -131,7 +131,7 @@ export class Material implements IMaterial {
   private static _materialLRU: List<Material> = new List<Material>();
   /** @internal */
   private static _gcOptions: MaterialGCOptions = {
-    disabled: false,
+    disabled: true,
     drawableCountThreshold: 500,
     materialCountThreshold: 200,
     inactiveTimeDuration: 30000

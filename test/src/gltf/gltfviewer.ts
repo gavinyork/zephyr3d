@@ -82,6 +82,7 @@ export class GLTFViewer {
     this._light1 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
     this._light1.shadow.shadowMapSize = 1024;
     this._light1.lookAt(new Vector3(0, 0, 0), new Vector3(-0.5, 0.707, 0.5), Vector3.axisPY());
+    this._light1.remove();
     this._radianceMap = Application.instance.device.createCubeTexture('rgba16f', 256);
     this._irradianceMap = Application.instance.device.createCubeTexture('rgba16f', 64, {
       samplerOptions: { mipFilter: 'none' }
@@ -97,7 +98,7 @@ export class GLTFViewer {
       prefilterCubemap(scene.env.sky.skyboxTexture, 'ggx', this._radianceMap);
       prefilterCubemap(scene.env.sky.skyboxTexture, 'lambertian', this._irradianceMap);
     }
-    scene.env.light.type = 'ibl';
+    scene.env.light.type = 'none';
     //scene.env.light.radianceMap = this._radianceMap;
     //scene.env.light.irradianceMap = this._irradianceMap;
     this._skyMap = Application.instance.device.createCubeTexture('rgba16f', 512);
