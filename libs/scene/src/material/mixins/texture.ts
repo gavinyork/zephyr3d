@@ -50,7 +50,7 @@ export type TexturePropUniforms<U extends string> = {
     scope: PBInsideFunctionScope
   ) => PBShaderExp;
 } & {
-  [P in 'Texture' as `sample${Capitalize<U>}${P}`]: (scope: PBInsideFunctionScope) => PBShaderExp;
+  [P in 'Texture' as `sample${Capitalize<U>}${P}`]: (scope: PBInsideFunctionScope, texCoord?: PBShaderExp) => PBShaderExp;
 };
 
 export function mixinTextureProps<U extends string>(name: U) {
@@ -128,9 +128,9 @@ export function mixinTextureProps<U extends string>(name: U) {
     proto[propSampler] = null;
     proto[propTexCoord] = 0;
     proto[propMatrix] = null;
-    proto[`sample${capName}Texture`] = function (scope: PBInsideFunctionScope): PBShaderExp {
+    proto[`sample${capName}Texture`] = function (scope: PBInsideFunctionScope, texCoord?: PBShaderExp): PBShaderExp {
       const tex = this[`get${capName}TextureUniform`](scope);
-      const coord = this[`get${capName}TexCoord`](scope);
+      const coord = texCoord ?? this[`get${capName}TexCoord`](scope);
       return scope.$builder.textureSample(tex, coord);
     };
     proto[`get${capName}TextureUniform`] = function (scope: PBInsideFunctionScope): PBShaderExp {

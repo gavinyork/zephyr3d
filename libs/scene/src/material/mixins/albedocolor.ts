@@ -8,7 +8,7 @@ import { mixinTextureProps } from './texture';
 
 export type IMixinAlbedoColor = {
   albedoColor: Vector4;
-  calculateAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp;
+  calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp;
 } & TextureMixinInstanceTypes<['albedo']>;
 
 function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
@@ -31,7 +31,7 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
       this._albedoColor.set(val);
       this.optionChanged(false);
     }
-    calculateAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp {
+    calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
       if (!this.needFragmentColor()) {
         console.warn(
@@ -41,7 +41,7 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
       }
       let color = scope.zAlbedo;
       if (this.albedoTexture) {
-        color = pb.mul(color, this.sampleAlbedoTexture(scope));
+        color = pb.mul(color, this.sampleAlbedoTexture(scope, uv));
       }
       return color;
     }

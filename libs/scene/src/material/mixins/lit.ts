@@ -33,6 +33,7 @@ export type IMixinLight = {
     normal: PBShaderExp,
     viewVec: PBShaderExp
   ): PBShaderExp;
+  calculateTBN(scope: PBInsideFunctionScope): PBShaderExp;
   calculateNormal(scope: PBInsideFunctionScope): PBShaderExp;
   calculateNormalAndTBN(scope: PBInsideFunctionScope): PBShaderExp;
   calculateLightAttenuation(
@@ -168,76 +169,12 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         }
       }
       pb.func('Z_CalculateNormal', params, function () {
-        const posW = that.helper.getWorldPosition(this).xyz;
         this.$l.uv = that.normalTexture
           ? that.getNormalTexCoord(this) ?? pb.vec2(0)
           : that.albedoTexture
           ? that.getAlbedoTexCoord(this) ?? pb.vec2(0)
           : pb.vec2(0);
-        this.$l.TBN = pb.mat3();
-        if (!worldNormal) {
-          this.$l.uv_dx = pb.dpdx(pb.vec3(this.uv, 0));
-          this.$l.uv_dy = pb.dpdy(pb.vec3(this.uv, 0));
-          this.$if(
-            pb.lessThanEqual(pb.add(pb.length(this.uv_dx), pb.length(this.uv_dy)), 0.000001),
-            function () {
-              this.uv_dx = pb.vec3(1, 0, 0);
-              this.uv_dy = pb.vec3(0, 1, 0);
-            }
-          );
-          this.$l.t_ = pb.div(
-            pb.sub(pb.mul(pb.dpdx(posW), this.uv_dy.y), pb.mul(pb.dpdy(posW), this.uv_dx.y)),
-            pb.sub(pb.mul(this.uv_dx.x, this.uv_dy.y), pb.mul(this.uv_dx.y, this.uv_dy.x))
-          );
-          this.$l.ng = pb.normalize(pb.cross(pb.dpdx(posW), pb.dpdy(posW)));
-          this.$l.t = pb.normalize(pb.sub(this.t_, pb.mul(this.ng, pb.dot(this.ng, this.t_))));
-          this.$l.b = pb.cross(this.ng, this.t);
-          if (that.doubleSidedLighting) {
-            this.$if(pb.not(this.$builtins.frontFacing), function () {
-              this.t = pb.mul(this.t, -1);
-              this.b = pb.mul(this.b, -1);
-              this.ng = pb.mul(this.ng, -1);
-            });
-          }
-          this.TBN = pb.mat3(this.t, this.b, this.ng);
-        } else if (!worldTangent) {
-          this.$l.uv_dx = pb.dpdx(pb.vec3(this.uv, 0));
-          this.$l.uv_dy = pb.dpdy(pb.vec3(this.uv, 0));
-          this.$if(
-            pb.lessThanEqual(pb.add(pb.length(this.uv_dx), pb.length(this.uv_dy)), 0.000001),
-            function () {
-              this.uv_dx = pb.vec3(1, 0, 0);
-              this.uv_dy = pb.vec3(0, 1, 0);
-            }
-          );
-          this.$l.t_ = pb.div(
-            pb.sub(pb.mul(pb.dpdx(posW), this.uv_dy.y), pb.mul(pb.dpdy(posW), this.uv_dx.y)),
-            pb.sub(pb.mul(this.uv_dx.x, this.uv_dy.y), pb.mul(this.uv_dx.y, this.uv_dy.x))
-          );
-          this.$l.ng = pb.normalize(this.worldNormal);
-          this.$l.t = pb.normalize(pb.sub(this.t_, pb.mul(this.ng, pb.dot(this.ng, this.t_))));
-          this.$l.b = pb.cross(this.ng, this.t);
-          if (that.doubleSidedLighting) {
-            this.$if(pb.not(this.$builtins.frontFacing), function () {
-              this.t = pb.mul(this.t, -1);
-              this.b = pb.mul(this.b, -1);
-              this.ng = pb.mul(this.ng, -1);
-            });
-          }
-          this.TBN = pb.mat3(this.t, this.b, this.ng);
-        } else {
-          this.$l.ng = pb.normalize(this.worldNormal);
-          this.$l.t = pb.normalize(this.worldTangent);
-          this.$l.b = pb.normalize(this.worldBinormal);
-          if (that.doubleSidedLighting) {
-            this.$if(pb.not(this.$builtins.frontFacing), function () {
-              this.t = pb.mul(this.t, -1);
-              this.b = pb.mul(this.b, -1);
-              this.ng = pb.mul(this.ng, -1);
-            });
-          }
-          this.TBN = pb.mat3(this.t, this.b, this.ng);
-        }
+        this.$l.TBN = that.calculateTBN(this);
         if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
           if (that.normalMapMode === 'object-space') {
             const pixel = pb.sub(
@@ -284,6 +221,57 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         }
       }
       pb.func('Z_CalculateNormalAndTBN', params, function () {
+        this.$l.uv = that.normalTexture
+          ? that.getNormalTexCoord(this) ?? pb.vec2(0)
+          : that.albedoTexture
+          ? that.getAlbedoTexCoord(this) ?? pb.vec2(0)
+          : pb.vec2(0);
+        this.$l.TBN = that.calculateTBN(this);
+        if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
+          if (that.normalMapMode === 'object-space') {
+            const pixel = pb.sub(
+              pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
+              pb.vec3(1)
+            );
+            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.zNormalScale).xx, 1));
+            this.$return(NormalStruct(this.TBN, pb.normalize(normalTex)));
+          } else {
+            const pixel = pb.sub(
+              pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
+              pb.vec3(1)
+            );
+            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.zNormalScale).xx, 1));
+            this.$return(NormalStruct(this.TBN, pb.normalize(pb.mul(this.TBN, normalTex))));
+          }
+        } else {
+          this.$return(NormalStruct(this.TBN, this.TBN[2]));
+        }
+      });
+      return pb.getGlobalScope().Z_CalculateNormalAndTBN(...args);
+    }
+    /**
+     * Calculate the TBN matrix
+     *
+     * @param scope - The shader scope
+     * @returns TBN matrix
+     */
+    calculateTBN(scope: PBInsideFunctionScope): PBShaderExp {
+      const pb = scope.$builder;
+      const that = this;
+      const args: PBShaderExp[] = [];
+      const params: PBShaderExp[] = [];
+      const worldNormal = that.helper.getWorldNormal(scope);
+      const worldTangent = that.helper.getWorldTangent(scope);
+      const worldBinormal = that.helper.getWorldBinormal(scope);
+      if (worldNormal) {
+        params.push(pb.vec3('worldNormal'));
+        args.push(worldNormal);
+        if (worldTangent) {
+          params.push(pb.vec3('worldTangent'), pb.vec3('worldBinormal'));
+          args.push(worldTangent, worldBinormal);
+        }
+      }
+      pb.func('Z_CalculateTBN', params, function () {
         const posW = that.helper.getWorldPosition(this).xyz;
         this.$l.uv = that.normalTexture
           ? that.getNormalTexCoord(this) ?? pb.vec2(0)
@@ -354,27 +342,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           }
           this.TBN = pb.mat3(this.t, this.b, this.ng);
         }
-        if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
-          if (that.normalMapMode === 'object-space') {
-            const pixel = pb.sub(
-              pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
-              pb.vec3(1)
-            );
-            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.zNormalScale).xx, 1));
-            this.$return(NormalStruct(this.TBN, pb.normalize(normalTex)));
-          } else {
-            const pixel = pb.sub(
-              pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
-              pb.vec3(1)
-            );
-            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.zNormalScale).xx, 1));
-            this.$return(NormalStruct(this.TBN, pb.normalize(pb.mul(this.TBN, normalTex))));
-          }
-        } else {
-          this.$return(NormalStruct(this.TBN, this.TBN[2]));
-        }
+        this.$return(this.TBN);
       });
-      return pb.getGlobalScope().Z_CalculateNormalAndTBN(...args);
+      return pb.getGlobalScope().Z_CalculateTBN(...args);
     }
     /**
      * {@inheritDoc MeshMaterial.applyUniformsValues}

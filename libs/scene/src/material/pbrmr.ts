@@ -1,7 +1,7 @@
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinVertexColor } from './mixins/vertexcolor';
 import type { PBFunctionScope } from '@zephyr3d/device';
-import { mixinPBRMetallicRoughness } from './mixins/pbr/metallicroughness';
+import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 
 export class PBRMetallicRoughnessMaterial extends applyMaterialMixins(
   MeshMaterial,

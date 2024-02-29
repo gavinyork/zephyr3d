@@ -16,10 +16,10 @@ export class FurMaterial extends MeshMaterial {
     this._thickness = 0.005;
     this._numLayers = 30;
     this._colorStart = new Vector4(1, 1, 1, 1);
-    this._colorEnd = new Vector4(1, 1, 1, 0.4);
+    this._colorEnd = new Vector4(1, 1, 1, 0.2);
     this._colorTexture = null;
     this._alphaTexture = null;
-    this._alphaRepeat = 8;
+    this._alphaRepeat = 4;
     this.numPasses = 2;
   }
   get colorTexture(): Texture2D {
@@ -49,9 +49,11 @@ export class FurMaterial extends MeshMaterial {
         return false;
       } else {
         this.blendMode = 'blend';
+        this.stateSet.useRasterizerState().setCullMode('none');
       }
     } else {
       this.blendMode = 'none';
+      this.stateSet.defaultRasterizerState();
     }
     return super.beginDraw(pass, ctx);
   }

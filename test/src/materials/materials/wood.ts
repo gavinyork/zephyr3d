@@ -1,9 +1,6 @@
 import type { PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { LambertMaterial } from '@zephyr3d/scene';
 
-/**
- * Reference: https://www.shadertoy.com/view/ldscDM
- */
 export class WoodMaterial extends LambertMaterial {
   constructor() {
     super();

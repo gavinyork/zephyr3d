@@ -9,7 +9,7 @@ import type {
   Texture2DArray
 } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import { mixinPBRMetallicRoughness } from './mixins/pbr/metallicroughness';
+import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 import { mixinLight } from './mixins/lit';
 import { Application } from '../app';
 import { Vector4 } from '@zephyr3d/base';

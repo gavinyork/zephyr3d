@@ -9,13 +9,17 @@ import {
   DirectionalLight,
   Mesh,
   SphereShape,
-  AssetManager
+  AssetManager,
+  BlinnMaterial,
+  PlaneShape,
+  BoxShape
 } from '@zephyr3d/scene';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import * as common from '../common';
 import { WoodMaterial } from './materials/wood';
 import { FurMaterial } from './materials/fur';
 import type { Texture2D } from '@zephyr3d/device';
+import { ParallaxMapMaterial } from './materials/parallax';
 
 const myApp = new Application({
   backend: common.getBackend(),
@@ -46,12 +50,19 @@ myApp.ready().then(async function () {
     addressU: 'repeat',
     addressV: 'repeat'
   };
+  const rocksTex = await assetManager.fetchTexture<Texture2D>('assets/images/rocks.jpg');
+  const rocksNHTex = await assetManager.fetchTexture<Texture2D>('assets/images/rocks_NM_height.tga');
   // Create sphere
   const sphereMaterial = new WoodMaterial();
+  const blinnMaterial = new BlinnMaterial();
   const furMaterial = new FurMaterial();
   furMaterial.colorTexture = furColorTex;
   furMaterial.alphaTexture = furAlphaTex;
-  new Mesh(scene, new SphereShape({ radius: 2 }), furMaterial);
+  const parallaxMaterial = new ParallaxMapMaterial();
+  parallaxMaterial.albedoTexture = rocksTex;
+  parallaxMaterial.normalTexture = rocksNHTex;
+  parallaxMaterial.stateSet.useRasterizerState().setCullMode('none');
+  new Mesh(scene, new BoxShape({ size: 4, anchorX: 0.5, anchorY: 0.5, anchorZ: 0.5 }), furMaterial);
 
   // Create camera
   const camera = new PerspectiveCamera(

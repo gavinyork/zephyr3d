@@ -1,7 +1,7 @@
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinVertexColor } from './mixins/vertexcolor';
 import type { PBFunctionScope } from '@zephyr3d/device';
-import { mixinPBRSpecularGlossness } from './mixins/pbr/specularglossness';
+import { mixinPBRSpecularGlossness } from './mixins/lightmodel/pbrspecularglossness';
 
 export class PBRSpecularGlossinessMaterial extends applyMaterialMixins(
   MeshMaterial,

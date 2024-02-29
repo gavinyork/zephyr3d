@@ -1,7 +1,7 @@
 import { Vector2, Vector4 } from '@zephyr3d/base';
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinLight } from './mixins/lit';
-import { mixinPBRMetallicRoughness } from './mixins/pbr/metallicroughness';
+import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 import type { BindGroup, PBFunctionScope, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { RENDER_PASS_TYPE_LIGHT } from '../values';

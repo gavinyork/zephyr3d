@@ -3,8 +3,8 @@ import type { MeshMaterial } from '../../meshmaterial';
 import { applyMaterialMixins } from '../../meshmaterial';
 import type { TextureMixinInstanceTypes } from '../texture';
 import { mixinTextureProps } from '../texture';
-import type { IMixinPBRCommon } from './common';
-import { mixinPBRCommon } from './common';
+import type { IMixinPBRCommon } from '../pbr/common';
+import { mixinPBRCommon } from '../pbr/common';
 import type { DrawContext } from '../../../render';
 import { Vector4 } from '@zephyr3d/base';
 import { IMixinLight, mixinLight } from '../lit';
@@ -12,7 +12,7 @@ import { IMixinLight, mixinLight } from '../lit';
 export type IMixinPBRSpecularGlossiness = {
   specularFactor: Vector4;
   glossinessFactor: number;
-  PBRLight(scope: PBFunctionScope, normal: PBShaderExp, TBN: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+  PBRLight(scope: PBInsideFunctionScope, normal: PBShaderExp, TBN: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
   calculateCommonData(
     scope: PBInsideFunctionScope,
     albedo: PBShaderExp,
@@ -70,9 +70,9 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
         bindGroup.setValue('zGlossinessFactor', this._glossinessFactor);
       }
     }
-    PBRLight(scope: PBFunctionScope, normal: PBShaderExp, TBN: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp {
+    PBRLight(scope: PBInsideFunctionScope, normal: PBShaderExp, TBN: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
-      const funcName = 'z_PBRLight';
+      const funcName = 'Z_PBRLight';
       const that = this;
       pb.func(funcName, [pb.vec3('normal'), pb.mat3('TBN'), pb.vec3('viewVec'), pb.vec4('albedo')], function(){
         this.$l.pbrData = that.getCommonData(this, this.albedo, this.viewVec, this.TBN);
