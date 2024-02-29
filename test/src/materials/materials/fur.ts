@@ -1,32 +1,35 @@
 import { Vector4 } from '@zephyr3d/base';
 import type { BindGroup, PBFunctionScope, Texture2D } from '@zephyr3d/device';
 import type { DrawContext, Primitive } from '@zephyr3d/scene';
-import { MeshMaterial, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '@zephyr3d/scene';
+import { Application, MeshMaterial, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT, applyMaterialMixins, mixinLambert } from '@zephyr3d/scene';
 
-export class FurMaterial extends MeshMaterial {
+export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
   private _thickness: number;
   private _numLayers: number;
   private _alphaRepeat: number;
   private _colorStart: Vector4;
   private _colorEnd: Vector4;
-  private _colorTexture: Texture2D;
+  private _instancing: boolean;
   private _alphaTexture: Texture2D;
   constructor() {
     super();
     this._thickness = 0.005;
     this._numLayers = 30;
-    this._colorStart = new Vector4(1, 1, 1, 1);
-    this._colorEnd = new Vector4(1, 1, 1, 0.2);
-    this._colorTexture = null;
+    this._colorStart = new Vector4(0, 0, 0, 1);
+    this._colorEnd = new Vector4(1, 1, 1, 0.3);
     this._alphaTexture = null;
     this._alphaRepeat = 4;
-    this.numPasses = 2;
+    this._instancing = Application.instance.device.type !== 'webgl';
+    this.numPasses = this._instancing ? 2 : 1 + this._numLayers;
   }
-  get colorTexture(): Texture2D {
-    return this._colorTexture;
+  get numLayers(): number {
+    return this._numLayers;
   }
-  set colorTexture(tex: Texture2D) {
-    this._colorTexture = tex;
+  set numLayers(val: number) {
+    this._numLayers = val;
+    if (!this._instancing) {
+      this.numPasses = 1 + this._numLayers;
+    }
   }
   get alphaTexture(): Texture2D {
     return this._alphaTexture;
@@ -61,7 +64,7 @@ export class FurMaterial extends MeshMaterial {
     this.blendMode = 'none';
   }
   drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number): void {
-    if (pass === 0) {
+    if (pass === 0 || !this._instancing) {
       primitive.draw();
     } else {
       primitive.drawInstanced(this._numLayers);
@@ -70,9 +73,11 @@ export class FurMaterial extends MeshMaterial {
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx)) {
-      bindGroup.setTexture('colorTex', this._colorTexture);
       bindGroup.setValue('alphaRepeat', this._alphaRepeat);
       if (pass > 0) {
+        if (!this._instancing){
+          bindGroup.setValue('currentLayer', pass - 1);
+        }
         bindGroup.setValue('layerThickness', this._thickness);
         bindGroup.setValue('numLayers', this._numLayers);
         bindGroup.setValue('colorStart', this._colorStart);
@@ -90,12 +95,20 @@ export class FurMaterial extends MeshMaterial {
       scope.$inputs.tex = pb.vec2().attrib('texCoord0');
       scope.$inputs.normal = pb.vec3().attrib('normal');
       if (this.pass > 0) {
+        if (!this._instancing){
+          scope.$l.currentLayer = pb.float().uniform(2);
+        }
         scope.$l.layerThickness = pb.float().uniform(2);
         scope.$l.numLayers = pb.float().uniform(2);
         scope.$l.colorStart = pb.vec4().uniform(2);
         scope.$l.colorEnd = pb.vec4().uniform(2);
-        scope.$l.t = pb.div(pb.float(scope.$builtins.instanceIndex), scope.numLayers);
-        scope.$l.f = pb.mul(pb.float(pb.add(scope.$builtins.instanceIndex, 1)), scope.layerThickness);
+        if(!this._instancing){
+          scope.$l.t = pb.div(scope.currentLayer, scope.numLayers);
+          scope.$l.f = pb.mul(pb.add(scope.currentLayer, 1), scope.layerThickness);
+        } else {
+          scope.$l.t = pb.div(pb.float(scope.$builtins.instanceIndex), scope.numLayers);
+          scope.$l.f = pb.mul(pb.float(pb.add(scope.$builtins.instanceIndex, 1)), scope.layerThickness);
+        }
         vertexPos = pb.add(scope.$inputs.pos, pb.mul(scope.$inputs.normal, scope.f));
         scope.$outputs.ao = pb.mix(scope.colorStart, scope.colorEnd, scope.t);
       }
@@ -112,10 +125,10 @@ export class FurMaterial extends MeshMaterial {
     super.fragmentShader(scope);
     const pb = scope.$builder;
     if (this.needFragmentColor(this.drawContext)) {
-      scope.colorTex = pb.tex2D().uniform(2);
       scope.alphaRepeat = pb.float().uniform(2);
-      scope.$l.color = pb.textureSample(scope.colorTex, scope.$inputs.tex);
-      scope.$l.color.a = 1;
+      scope.$l.albedo = this.calculateAlbedoColor(scope);
+      scope.$l.normal = this.calculateNormal(scope);
+      scope.$l.color = pb.vec4(this.lambertLight(scope, scope.normal, scope.albedo), scope.albedo.a);
       if (this.pass > 0) {
         scope.alphaTex = pb.tex2D().uniform(2);
         scope.color = pb.mul(scope.color, scope.$inputs.ao);
@@ -123,7 +136,6 @@ export class FurMaterial extends MeshMaterial {
           scope.color.a,
           pb.textureSample(scope.alphaTex, pb.mul(scope.$inputs.tex, scope.alphaRepeat)).r
         );
-        scope.color = pb.vec4(pb.mul(scope.color.rgb, scope.color.a), scope.color.a);
       }
       this.outputFragmentColor(scope, scope.color);
     } else {

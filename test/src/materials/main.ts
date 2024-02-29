@@ -56,13 +56,13 @@ myApp.ready().then(async function () {
   const sphereMaterial = new WoodMaterial();
   const blinnMaterial = new BlinnMaterial();
   const furMaterial = new FurMaterial();
-  furMaterial.colorTexture = furColorTex;
+  furMaterial.albedoTexture = furColorTex;
   furMaterial.alphaTexture = furAlphaTex;
   const parallaxMaterial = new ParallaxMapMaterial();
   parallaxMaterial.albedoTexture = rocksTex;
   parallaxMaterial.normalTexture = rocksNHTex;
   parallaxMaterial.stateSet.useRasterizerState().setCullMode('none');
-  new Mesh(scene, new BoxShape({ size: 4, anchorX: 0.5, anchorY: 0.5, anchorZ: 0.5 }), furMaterial);
+  new Mesh(scene, new BoxShape({ size: 4, needTangent: true, anchorX: 0.5, anchorY: 0.5, anchorZ: 0.5 }), parallaxMaterial);
 
   // Create camera
   const camera = new PerspectiveCamera(

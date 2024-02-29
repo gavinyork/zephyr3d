@@ -726,6 +726,7 @@ export class Compositor {
     begin(ctx: DrawContext): void;
     // @internal (undocumented)
     static _blit(device: AbstractDevice, srcTex: Texture2D, srgbOutput: boolean): void;
+    clear(): void;
     // @internal (undocumented)
     drawPostEffects(ctx: DrawContext, opaque: boolean, sceneDepthTexture: Texture2D): void;
     // @internal (undocumented)

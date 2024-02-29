@@ -3195,8 +3195,6 @@ export class PBInputScope extends PBScope {
   protected $set(prop: string, value: any): boolean {
     if (prop[0] === '$') {
       this[prop] = value;
-    } else if (prop in this) {
-      throw new Error(`Can not assign to shader input variable: "${prop}"`);
     } else {
       if (!(value instanceof PBShaderExp)) {
         throw new Error(`invalid vertex input value`);
@@ -3220,7 +3218,7 @@ export class PBInputScope extends PBScope {
           }
           this.$_aliases[prop] = lastName;
         }
-        return;
+        return true;
       }
       if (!(value instanceof PBShaderExp) || !(value.$ast instanceof AST.ASTShaderExpConstructor)) {
         throw new Error(`invalid shader input variable declaration: "${prop}"`);
