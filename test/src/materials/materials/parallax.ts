@@ -1,18 +1,22 @@
 import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
 import { DrawContext, MeshMaterial, applyMaterialMixins, mixinAlbedoColor, mixinBlinnPhong, mixinLambert } from '@zephyr3d/scene';
 
+export type ParallaxMappingMode = 'basic'|'steep'|'relief'|'occlusion';
 //const ITERATIONS = 32;
 export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor, mixinBlinnPhong) {
   private _parallaxScale: number;
   private _minLayers: number;
   private _maxLayers: number;
-  private _mode: 'basic'|'steep'|'relief'|'occlusion';
+  private _mode: ParallaxMappingMode;
   constructor() {
     super();
     this._parallaxScale = 0.1;
     this._minLayers = 10;
     this._maxLayers = 30;
     this._mode = 'occlusion';
+  }
+  get mode(): ParallaxMappingMode {
+    return this._mode;
   }
   get parallaxScale(): number {
     return this._parallaxScale;

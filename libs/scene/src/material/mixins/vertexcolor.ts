@@ -10,9 +10,8 @@ function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).vertexColorMixed) {
     return BaseCls as T & { new (...args: any[]): IMixinVertexColor };
   }
-  const FEATURE_VERTEX_COLOR = BaseCls.NEXT_FEATURE_INDEX;
-  return class extends BaseCls {
-    static NEXT_FEATURE_INDEX = BaseCls.NEXT_FEATURE_INDEX + 1;
+  let FEATURE_VERTEX_COLOR: number;
+  const cls = class extends BaseCls {
     static vertexColorMixed = true;
     constructor(...args: any[]) {
       super(...args);
@@ -49,6 +48,8 @@ function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T) {
       }
     }
   } as unknown as T & { new (...args: any[]): IMixinVertexColor };
+  FEATURE_VERTEX_COLOR = cls.defineFeature();
+  return cls;
 }
 
 export { mixinVertexColor };

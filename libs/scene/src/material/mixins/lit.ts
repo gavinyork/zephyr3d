@@ -68,12 +68,11 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     return BaseCls as T & { new (...args: any[]): IMixinLight };
   }
   const S = applyMaterialMixins(BaseCls, mixinAlbedoColor, mixinTextureProps('normal'));
-  const FEATURE_DOUBLE_SIDED_LIGHTING = S.NEXT_FEATURE_INDEX;
-  const FEATURE_VERTEX_NORMAL = S.NEXT_FEATURE_INDEX + 1;
-  const FEATURE_VERTEX_TANGENT = S.NEXT_FEATURE_INDEX + 2;
-  const FEATURE_OBJECT_SPACE_NORMALMAP = S.NEXT_FEATURE_INDEX + 3;
-  return class extends S {
-    static readonly NEXT_FEATURE_INDEX = S.NEXT_FEATURE_INDEX + 4;
+  let FEATURE_DOUBLE_SIDED_LIGHTING: number;
+  let FEATURE_VERTEX_NORMAL: number;
+  let FEATURE_VERTEX_TANGENT: number;
+  let FEATURE_OBJECT_SPACE_NORMALMAP: number;
+  const cls = class extends S {
     static readonly lightMixed = true;
     private _normalScale: number;
     constructor() {
@@ -693,4 +692,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       return true;
     }
   } as unknown as T & { new (...args: any[]): IMixinLight };
+  FEATURE_DOUBLE_SIDED_LIGHTING = cls.defineFeature();
+  FEATURE_VERTEX_NORMAL = cls.defineFeature();
+  FEATURE_VERTEX_TANGENT = cls.defineFeature();
+  FEATURE_OBJECT_SPACE_NORMALMAP = cls.defineFeature();
+  return cls;
 }

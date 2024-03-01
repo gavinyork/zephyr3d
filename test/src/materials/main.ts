@@ -50,8 +50,8 @@ myApp.ready().then(async function () {
     addressU: 'repeat',
     addressV: 'repeat'
   };
-  const rocksTex = await assetManager.fetchTexture<Texture2D>('assets/images/rocks.jpg');
-  const rocksNHTex = await assetManager.fetchTexture<Texture2D>('assets/images/rocks_NM_height.tga');
+  const rocksTex = await assetManager.fetchTexture<Texture2D>('assets/images/wood.jpg');
+  const rocksNHTex = await assetManager.fetchTexture<Texture2D>('assets/images/four_NM_height.tga');
   // Create sphere
   const sphereMaterial = new WoodMaterial();
   const blinnMaterial = new BlinnMaterial();
@@ -60,6 +60,7 @@ myApp.ready().then(async function () {
   furMaterial.alphaTexture = furAlphaTex;
   const parallaxMaterial = new ParallaxMapMaterial();
   parallaxMaterial.shininess = 8;
+  parallaxMaterial.parallaxScale = 0.5;
   parallaxMaterial.albedoTexture = rocksTex;
   parallaxMaterial.normalTexture = rocksNHTex;
   parallaxMaterial.stateSet.useRasterizerState().setCullMode('none');

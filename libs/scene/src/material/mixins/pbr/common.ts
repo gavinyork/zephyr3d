@@ -92,10 +92,9 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     mixinTextureProps('clearcoatRoughness'),
     mixinTextureProps('clearcoatNormal')
   );
-  const FEATURE_SHEEN = S.NEXT_FEATURE_INDEX;
-  const FEATURE_CLEARCOAT = S.NEXT_FEATURE_INDEX + 1;
-  return class extends S {
-    static NEXT_FEATURE_INDEX = S.NEXT_FEATURE_INDEX + 2;
+  let FEATURE_SHEEN: number;
+  let FEATURE_CLEARCOAT: number;
+  const cls = class extends S {
     static readonly pbrCommonMixed = true;
     private _f0: Vector4;
     private _emissiveFactor: Vector4;
@@ -653,4 +652,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       return scope.$g[funcName](NdotV, NdotL, alphaRoughness);
     }
   } as unknown as T & { new (...args: any[]): IMixinPBRCommon };
+  FEATURE_SHEEN = cls.defineFeature();
+  FEATURE_CLEARCOAT = cls.defineFeature();
+  return cls;
 }

@@ -57,16 +57,15 @@ export function mixinTextureProps<U extends string>(name: U) {
   return function <T extends typeof MeshMaterial>(BaseCls: T, vertex = false) {
     const capName = `${name[0].toUpperCase()}${name.slice(1)}`;
     const id = `mixinTexture${capName}`;
-    const feature = BaseCls.NEXT_FEATURE_INDEX;
-    const featureTexIndex = BaseCls.NEXT_FEATURE_INDEX + 1;
-    const featureTexMatrix = BaseCls.NEXT_FEATURE_INDEX + 2;
+    let feature: number;
+    let featureTexIndex: number;
+    let featureTexMatrix: number;
     if ((BaseCls as any)[id]) {
       return BaseCls as unknown as T & {
         new (...args: any[]): TextureProp<U> & TexturePropUniforms<U>;
       };
     }
     const cls = class extends BaseCls {
-      static readonly NEXT_FEATURE_INDEX = BaseCls.NEXT_FEATURE_INDEX + 3;
       constructor(...args: any[]) {
         super(...args);
       }
@@ -119,6 +118,9 @@ export function mixinTextureProps<U extends string>(name: U) {
         }
       }
     };
+    feature = cls.defineFeature();
+    featureTexIndex = cls.defineFeature();
+    featureTexMatrix = cls.defineFeature();
     const proto: any = cls.prototype;
     const propTexture = `__${name}Texture`;
     const propSampler = `__${name}Sampler`;

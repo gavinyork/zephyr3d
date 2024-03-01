@@ -48,7 +48,7 @@ export class MeshMaterial extends Material {
   static readonly FEATURE_ALPHATEST = 0;
   static readonly FEATURE_ALPHABLEND = 1;
   static readonly FEATURE_ALPHATOCOVERAGE = 2;
-  static readonly NEXT_FEATURE_INDEX: number = 3;
+  static NEXT_FEATURE_INDEX: number = 3;
   private _featureStates: unknown[];
   private _alphaCutoff: number;
   private _blendMode: BlendMode;
@@ -65,6 +65,12 @@ export class MeshMaterial extends Material {
     this._ctx = null;
     this._materialPass = -1;
     this._helper = ShaderHelper;
+  }
+  /** Define feature index */
+  static defineFeature(): number {
+    const val = this.NEXT_FEATURE_INDEX;
+    this.NEXT_FEATURE_INDEX++;
+    return val;
   }
   /** Shader helper */
   get helper(): typeof ShaderHelper {
