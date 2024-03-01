@@ -4,6 +4,7 @@ import { DrawContext, MeshMaterial, applyMaterialMixins, mixinAlbedoColor, mixin
 export type ParallaxMappingMode = 'basic'|'steep'|'relief'|'occlusion';
 //const ITERATIONS = 32;
 export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor, mixinBlinnPhong) {
+  static FEATURE_PARALLAX_MODE = this.defineFeature();
   private _parallaxScale: number;
   private _minLayers: number;
   private _maxLayers: number;
@@ -13,10 +14,13 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
     this._parallaxScale = 0.1;
     this._minLayers = 10;
     this._maxLayers = 30;
-    this._mode = 'occlusion';
+    this.useFeature(ParallaxMapMaterial.FEATURE_PARALLAX_MODE, 'occlusion');
   }
   get mode(): ParallaxMappingMode {
-    return this._mode;
+    return this.featureUsed<ParallaxMappingMode>(ParallaxMapMaterial.FEATURE_PARALLAX_MODE);
+  }
+  set mode(val: ParallaxMappingMode) {
+    this.useFeature(ParallaxMapMaterial.FEATURE_PARALLAX_MODE, val);
   }
   get parallaxScale(): number {
     return this._parallaxScale;

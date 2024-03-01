@@ -44,10 +44,10 @@ export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
   return r;
 }
 
+let FEATURE_ALPHATEST: number;
+let FEATURE_ALPHABLEND: number;
+let FEATURE_ALPHATOCOVERAGE: number;
 export class MeshMaterial extends Material {
-  static readonly FEATURE_ALPHATEST = 0;
-  static readonly FEATURE_ALPHABLEND = 1;
-  static readonly FEATURE_ALPHATOCOVERAGE = 2;
   static NEXT_FEATURE_INDEX: number = 3;
   private _featureStates: unknown[];
   private _alphaCutoff: number;
@@ -90,16 +90,16 @@ export class MeshMaterial extends Material {
   }
   set alphaCutoff(val: number) {
     if (this._alphaCutoff !== val) {
-      this.useFeature(MeshMaterial.FEATURE_ALPHATEST, val > 0);
+      this.useFeature(FEATURE_ALPHATEST, val > 0);
       this._alphaCutoff = val;
       this.optionChanged(false);
     }
   }
   get alphaToCoverage(): boolean {
-    return this.featureUsed(MeshMaterial.FEATURE_ALPHATOCOVERAGE);
+    return this.featureUsed(FEATURE_ALPHATOCOVERAGE);
   }
   set alphaToCoverage(val: boolean) {
-    this.useFeature(MeshMaterial.FEATURE_ALPHATOCOVERAGE, !!val);
+    this.useFeature(FEATURE_ALPHATOCOVERAGE, !!val);
   }
   /** Blending mode */
   get blendMode(): BlendMode {
@@ -108,7 +108,7 @@ export class MeshMaterial extends Material {
   set blendMode(val: BlendMode) {
     if (this._blendMode !== val) {
       this._blendMode = val;
-      this.useFeature(MeshMaterial.FEATURE_ALPHABLEND, this._blendMode !== 'none' || this._opacity < 1);
+      this.useFeature(FEATURE_ALPHABLEND, this._blendMode !== 'none' || this._opacity < 1);
     }
   }
   /** A value between 0 and 1, presents the opacity */
@@ -119,7 +119,7 @@ export class MeshMaterial extends Material {
     val = val < 0 ? 0 : val > 1 ? 1 : val;
     if (this._opacity !== val) {
       this._opacity = val;
-      this.useFeature(MeshMaterial.FEATURE_ALPHABLEND, this._blendMode !== 'none' || this._opacity < 1);
+      this.useFeature(FEATURE_ALPHABLEND, this._blendMode !== 'none' || this._opacity < 1);
       this.optionChanged(false);
     }
   }
@@ -129,8 +129,8 @@ export class MeshMaterial extends Material {
    * @param ctx - Draw context
    */
   protected updateBlendingAndDepthState(pass: number, ctx: DrawContext): void {
-    const blending = this.featureUsed<boolean>(MeshMaterial.FEATURE_ALPHABLEND) || ctx.lightBlending;
-    const a2c = this.featureUsed<boolean>(MeshMaterial.FEATURE_ALPHATOCOVERAGE);
+    const blending = this.featureUsed<boolean>(FEATURE_ALPHABLEND) || ctx.lightBlending;
+    const a2c = this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
     if (blending || a2c) {
       const blendingState = this.stateSet.useBlendingState();
       if (blending) {
@@ -162,8 +162,8 @@ export class MeshMaterial extends Material {
    * @param ctx - Draw context
    */
   protected updateDepthState(pass: number, ctx: DrawContext): void {
-    const blending = this.featureUsed<boolean>(MeshMaterial.FEATURE_ALPHABLEND);
-    const a2c = this.featureUsed<boolean>(MeshMaterial.FEATURE_ALPHATOCOVERAGE);
+    const blending = this.featureUsed<boolean>(FEATURE_ALPHABLEND);
+    const a2c = this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
     if (blending || a2c) {
       const blendingState = this.stateSet.useBlendingState();
       if (blending) {
@@ -184,10 +184,10 @@ export class MeshMaterial extends Material {
     }
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
-    if (this.featureUsed(MeshMaterial.FEATURE_ALPHATEST)) {
+    if (this.featureUsed(FEATURE_ALPHATEST)) {
       bindGroup.setValue('zAlphaCutoff', this._alphaCutoff);
     }
-    if (this.featureUsed(MeshMaterial.FEATURE_ALPHABLEND)) {
+    if (this.featureUsed(FEATURE_ALPHABLEND)) {
       bindGroup.setValue('zOpacity', this._opacity);
     }
   }
@@ -196,7 +196,7 @@ export class MeshMaterial extends Material {
   }
   /** true if the material is transparency */
   isTransparent(pass: number): boolean {
-    return this.featureUsed(MeshMaterial.FEATURE_ALPHABLEND);
+    return this.featureUsed(FEATURE_ALPHABLEND);
   }
   beginDraw(pass: number, ctx: DrawContext): boolean {
     this.updateBlendingAndDepthState(pass, ctx);
@@ -368,3 +368,6 @@ export class MeshMaterial extends Material {
     color ? pb.getGlobalScope().zOutputFragmentColor(color) : pb.getGlobalScope().zOutputFragmentColor();
   }
 }
+FEATURE_ALPHATEST = MeshMaterial.defineFeature();
+FEATURE_ALPHABLEND = MeshMaterial.defineFeature();
+FEATURE_ALPHATOCOVERAGE = MeshMaterial.defineFeature();
