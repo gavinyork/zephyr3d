@@ -1,4 +1,4 @@
-import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { DrawContext, MeshMaterial, applyMaterialMixins, mixinAlbedoColor, mixinBlinnPhong, mixinLambert } from '@zephyr3d/scene';
 
 export type ParallaxMappingMode = 'basic'|'steep'|'relief'|'occlusion';
@@ -8,7 +8,6 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
   private _parallaxScale: number;
   private _minLayers: number;
   private _maxLayers: number;
-  private _mode: ParallaxMappingMode;
   constructor() {
     super();
     this._parallaxScale = 0.1;
@@ -62,6 +61,14 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
     scope.$inputs.pos = scope.$builder.vec3().attrib('position');
     this.helper.transformVertexAndNormal(scope);
   }
+  sampleNormalMap(scope: PBInsideFunctionScope, texCoords: PBShaderExp) {
+    const pb = scope.$builder;
+    if (pb.getDevice().type === 'webgpu'){
+      return pb.textureSampleGrad(this.getNormalTextureUniform(scope), texCoords, scope.dx, scope.dy);
+    } else {
+      return this.sampleNormalTexture(scope, texCoords);
+    }
+  }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
     const that = this;
@@ -71,8 +78,12 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
       scope.parallaxMinLayers = pb.float().uniform(2);
       scope.parallaxMaxLayers = pb.float().uniform(2);
       pb.func('parallaxMapping', [pb.vec3('V'), pb.vec2('uv')], function(){
-        if (that._mode === 'basic'){
-          this.$l.initialHeight = that.sampleNormalTexture(this).a;
+        if (pb.getDevice().type === 'webgpu'){
+          this.$l.dx = pb.dpdx(this.uv);
+          this.$l.dy = pb.dpdy(this.uv);
+        }
+        if (that.mode === 'basic'){
+          this.$l.initialHeight = that.sampleNormalMap(this, this.uv).a;
           this.$l.offset = pb.mul(this.V.xy, this.parallaxScale, this.initialHeight);
           this.$return(pb.sub(this.uv, this.offset));
         } else {
@@ -81,15 +92,15 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
           this.$l.currentLayerHeight = pb.float(0);
           this.$l.dtex = pb.div(pb.mul(this.V.xy, this.parallaxScale), pb.mul(this.V.z, this.numLayers));
           this.$l.currentTextureCoords = this.uv;
-          this.$l.heightFromTexture = that.sampleNormalTexture(this, this.currentTextureCoords).a;
+          this.$l.heightFromTexture = that.sampleNormalMap(this, this.currentTextureCoords).a;
           this.$while(pb.greaterThan(this.heightFromTexture, this.currentLayerHeight), function(){
             this.currentLayerHeight = pb.add(this.currentLayerHeight, this.layerHeight);
             this.currentTextureCoords = pb.sub(this.currentTextureCoords, this.dtex);
-            this.heightFromTexture = that.sampleNormalTexture(this, this.currentTextureCoords).a;
+            this.heightFromTexture = that.sampleNormalMap(this, this.currentTextureCoords).a;
           });
-          if (that._mode === 'steep'){
+          if (that.mode === 'steep'){
             this.$return(this.currentTextureCoords);
-          } else if (that._mode === 'relief'){
+          } else if (that.mode === 'relief'){
             this.$l.deltaTexCoord = pb.div(this.dtex, 2);
             this.$l.deltaHeight = pb.div(this.layerHeight, 2);
             this.currentTextureCoords = pb.add(this.currentTextureCoords, this.deltaTexCoord);
@@ -98,7 +109,7 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
             this.$for(pb.int('i'), 0, SEARCH_STEPS, function(){
               this.deltaTexCoord = pb.div(this.deltaTexCoord, 2);
               this.deltaHeight = pb.div(this.deltaHeight, 2);
-              this.heightFromTexture = that.sampleNormalTexture(this, this.currentTextureCoords).a;
+              this.heightFromTexture = that.sampleNormalMap(this, this.currentTextureCoords).a;
               this.$if(pb.greaterThan(this.heightFromTexture, this.currentLayerHeight), function(){
                 this.currentTextureCoords = pb.sub(this.currentTextureCoords, this.deltaTexCoord);
                 this.currentLayerHeight = pb.add(this.currentLayerHeight, this.deltaHeight);
@@ -108,15 +119,12 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
               });
             });
             this.$return(this.currentTextureCoords);
-          } else if (that._mode === 'occlusion'){
+          } else if (that.mode === 'occlusion'){
             this.$l.prevTCoords = pb.add(this.currentTextureCoords, this.dtex);
             this.$l.nextH = pb.sub(this.heightFromTexture, this.currentLayerHeight);
-            this.$l.prevH = pb.add(pb.sub(that.sampleNormalTexture(this, this.prevTCoords).a, this.currentLayerHeight), this.layerHeight);
+            this.$l.prevH = pb.add(pb.sub(that.sampleNormalMap(this, this.prevTCoords).a, this.currentLayerHeight), this.layerHeight);
             this.$l.weight = pb.div(this.nextH, pb.sub(this.nextH, this.prevH));
             this.currentTextureCoords = pb.add(pb.mul(this.prevTCoords, this.weight), pb.mul(this.currentTextureCoords, pb.sub(1, this.weight)));
-            this.$if(pb.or(pb.greaterThan(this.currentTextureCoords.x, 1), pb.greaterThan(this.currentTextureCoords.y, 1), pb.lessThan(this.currentTextureCoords.x, 0), pb.lessThan(this.currentTextureCoords.y, 0)), function(){
-              this.currentTextureCoords = this.uv;
-            });
             this.$return(this.currentTextureCoords);
           } else {
             this.$return(this.uv);
