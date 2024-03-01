@@ -1,17 +1,52 @@
 import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
-import { DrawContext, MeshMaterial, applyMaterialMixins, mixinAlbedoColor, mixinLambert } from '@zephyr3d/scene';
+import { DrawContext, MeshMaterial, applyMaterialMixins, mixinAlbedoColor, mixinBlinnPhong, mixinLambert } from '@zephyr3d/scene';
 
 //const ITERATIONS = 32;
-export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor, mixinLambert) {
-  private _depthFactor: number;
+export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor, mixinBlinnPhong) {
+  private _parallaxScale: number;
+  private _minLayers: number;
+  private _maxLayers: number;
+  private _mode: 'basic'|'steep'|'relief'|'occlusion';
   constructor() {
     super();
-    this._depthFactor = 0.05;
+    this._parallaxScale = 0.1;
+    this._minLayers = 10;
+    this._maxLayers = 30;
+    this._mode = 'occlusion';
+  }
+  get parallaxScale(): number {
+    return this._parallaxScale;
+  }
+  set parallaxScale(val: number) {
+    if (val !== this._parallaxScale){
+      this._parallaxScale = val;
+      this.optionChanged(false);
+    }
+  }
+  get minParallaxLayers(): number {
+    return this._minLayers;
+  }
+  set minParallaxLayers(val: number) {
+    if (val !== this._minLayers){
+      this._minLayers = val;
+      this.optionChanged(false);
+    }
+  }
+  get maxParallaxLayers(): number {
+    return this._maxLayers;
+  }
+  set maxParallaxLayers(val: number) {
+    if (val !== this._maxLayers){
+      this._maxLayers = val;
+      this.optionChanged(false);
+    }
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx)){
-      bindGroup.setValue('depthFactor', this._depthFactor);
+      bindGroup.setValue('parallaxScale', -this._parallaxScale);
+      bindGroup.setValue('parallaxMinLayers', this._minLayers);
+      bindGroup.setValue('parallaxMaxLayers', this._maxLayers);
     }
   }
   vertexShader(scope: PBFunctionScope): void {
@@ -24,48 +59,83 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
     const that = this;
     const pb = scope.$builder;
     if (this.needFragmentColor()){
-      pb.func('parallaxMapping', [pb.vec2('texCoords'), pb.vec3('viewVec')], function(){
-        this.$l.heightScale = 0.2;
-        this.$l.numLayers = pb.int(64);
-        this.$l.layerDepth = pb.div(1, pb.float(this.numLayers));
-        this.$l.currentLayerDepth = pb.float(0);
-        this.$l.P = pb.mul(this.viewVec.xy, this.heightScale);
-        this.$l.deltaTexCoords = pb.div(this.P, pb.float(this.numLayers));
-        this.$l.currentTexCoords = this.texCoords;
-        this.$l.currentDepthValue = that.sampleNormalTexture(this, this.currentTexCoords).a;
-        this.$while(pb.lessThan(this.currentLayerDepth, this.currentDepthValue), function(){
-          this.currentTexCoords = pb.sub(this.currentTexCoords, this.deltaTexCoords);
-          this.currentDepthValue = that.sampleNormalTexture(this, this.currentTexCoords).a;
-          this.currentLayerDepth = pb.add(this.currentLayerDepth, this.layerDepth);
-        });
-        this.$l.prevCoords = pb.add(this.currentTexCoords, this.deltaTexCoords);
-        this.$l.nextH = pb.sub(this.currentDepthValue, this.currentLayerDepth);
-        this.$l.prevH = pb.add(pb.sub(that.sampleNormalTexture(this, this.prevCoords).a, this.currentLayerDepth), this.layerDepth);
-        this.$l.weight = pb.div(this.nextH, pb.sub(this.nextH, this.prevH));
-        this.currentTexCoords = pb.add(pb.mul(this.prevCoords, this.weight), pb.mul(this.currentTexCoords, pb.sub(1, this.weight)));
-        this.$return(this.currentTexCoords);
-      });
-      scope.$l.TBN = this.calculateTBN(scope);
-      scope.$l.mW2T = pb.transpose(scope.TBN);
-      scope.$l.viewVec = this.calculateViewVector(scope);
-      scope.$l.viewVecTS = pb.mul(scope.mW2T, scope.viewVec);
-      //scope.$l.viewVecTS = pb.vec3(pb.dot(scope.viewVec, scope.TBN[0]), pb.dot(scope.viewVec, scope.TBN[1]), pb.dot(scope.viewVec, scope.TBN[2]));
-      scope.$l.texCoords = scope.parallaxMapping(this.getNormalTexCoord(scope), scope.viewVecTS);
-      if (0) {
-        scope.$l.albedo = that.calculateAlbedoColor(scope, scope.texCoords);
-        scope.$l.normal = this.sampleNormalTexture(scope, scope.texCoords).rgb;
-        this.outputFragmentColor(scope, pb.vec4(scope.normal.rgb, 1));
-      } else {
-        scope.$l.normal = pb.sub(pb.mul(this.sampleNormalTexture(scope, scope.texCoords).rgb, 2), pb.vec3(1));
-        scope.$l.normal = pb.mul(scope.TBN, scope.normal);
-        scope.$l.albedo = pb.vec4(1);//that.calculateAlbedoColor(scope, scope.texCoords);
-        if (1) {
-          this.outputFragmentColor(scope, pb.vec4(pb.add(pb.mul(scope.normal, 0.5), pb.vec3(0.5)), scope.albedo.a));
+      scope.parallaxScale = pb.float().uniform(2);
+      scope.parallaxMinLayers = pb.float().uniform(2);
+      scope.parallaxMaxLayers = pb.float().uniform(2);
+      pb.func('parallaxMapping', [pb.vec3('V'), pb.vec2('uv')], function(){
+        if (that._mode === 'basic'){
+          this.$l.initialHeight = that.sampleNormalTexture(this).a;
+          this.$l.offset = pb.mul(this.V.xy, this.parallaxScale, this.initialHeight);
+          this.$return(pb.sub(this.uv, this.offset));
         } else {
-          scope.$l.litColor = this.lambertLight(scope, scope.normal, scope.albedo);
-          this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a));
+          this.$l.numLayers = pb.mix(this.parallaxMaxLayers, this.parallaxMinLayers, pb.abs(this.V.z));
+          this.$l.layerHeight = pb.div(1, this.numLayers);
+          this.$l.currentLayerHeight = pb.float(0);
+          this.$l.dtex = pb.div(pb.mul(this.V.xy, this.parallaxScale), pb.mul(this.V.z, this.numLayers));
+          this.$l.currentTextureCoords = this.uv;
+          this.$l.heightFromTexture = that.sampleNormalTexture(this, this.currentTextureCoords).a;
+          this.$while(pb.greaterThan(this.heightFromTexture, this.currentLayerHeight), function(){
+            this.currentLayerHeight = pb.add(this.currentLayerHeight, this.layerHeight);
+            this.currentTextureCoords = pb.sub(this.currentTextureCoords, this.dtex);
+            this.heightFromTexture = that.sampleNormalTexture(this, this.currentTextureCoords).a;
+          });
+          if (that._mode === 'steep'){
+            this.$return(this.currentTextureCoords);
+          } else if (that._mode === 'relief'){
+            this.$l.deltaTexCoord = pb.div(this.dtex, 2);
+            this.$l.deltaHeight = pb.div(this.layerHeight, 2);
+            this.currentTextureCoords = pb.add(this.currentTextureCoords, this.deltaTexCoord);
+            this.currentLayerHeight = pb.sub(this.currentLayerHeight, this.deltaHeight);
+            const SEARCH_STEPS = 5;
+            this.$for(pb.int('i'), 0, SEARCH_STEPS, function(){
+              this.deltaTexCoord = pb.div(this.deltaTexCoord, 2);
+              this.deltaHeight = pb.div(this.deltaHeight, 2);
+              this.heightFromTexture = that.sampleNormalTexture(this, this.currentTextureCoords).a;
+              this.$if(pb.greaterThan(this.heightFromTexture, this.currentLayerHeight), function(){
+                this.currentTextureCoords = pb.sub(this.currentTextureCoords, this.deltaTexCoord);
+                this.currentLayerHeight = pb.add(this.currentLayerHeight, this.deltaHeight);
+              }).$else(function(){
+                this.currentTextureCoords = pb.add(this.currentTextureCoords, this.deltaTexCoord);
+                this.currentLayerHeight =pb.sub(this.currentLayerHeight, this.deltaHeight);
+              });
+            });
+            this.$return(this.currentTextureCoords);
+          } else if (that._mode === 'occlusion'){
+            this.$l.prevTCoords = pb.add(this.currentTextureCoords, this.dtex);
+            this.$l.nextH = pb.sub(this.heightFromTexture, this.currentLayerHeight);
+            this.$l.prevH = pb.add(pb.sub(that.sampleNormalTexture(this, this.prevTCoords).a, this.currentLayerHeight), this.layerHeight);
+            this.$l.weight = pb.div(this.nextH, pb.sub(this.nextH, this.prevH));
+            this.currentTextureCoords = pb.add(pb.mul(this.prevTCoords, this.weight), pb.mul(this.currentTextureCoords, pb.sub(1, this.weight)));
+            this.$if(pb.or(pb.greaterThan(this.currentTextureCoords.x, 1), pb.greaterThan(this.currentTextureCoords.y, 1), pb.lessThan(this.currentTextureCoords.x, 0), pb.lessThan(this.currentTextureCoords.y, 0)), function(){
+              this.currentTextureCoords = this.uv;
+            });
+            this.$return(this.currentTextureCoords);
+          } else {
+            this.$return(this.uv);
+          }
         }
-      }
+      });
+      pb.func('calcUV', [pb.vec3('worldPos'), pb.vec3('worldNormal'), pb.vec3('viewPos'), pb.vec2('uv')], function(){
+        this.$l.texDx = pb.dpdx(this.uv);
+        this.$l.texDy = pb.dpdy(this.uv);
+        this.$l.sigmaX = pb.dpdx(this.worldPos);
+        this.$l.sigmaY = pb.dpdy(this.worldPos);
+        this.$l.vR1 = pb.cross(this.sigmaY, this.worldNormal);
+        this.$l.vR2 = pb.cross(this.worldNormal, this.sigmaX);
+        this.$l.fDet = pb.dot(this.sigmaX, this.vR1);
+        this.$l.projVscr = pb.div(pb.vec2(pb.dot(this.vR1, this.viewPos), pb.dot(this.vR2, this.viewPos)), this.fDet);
+        this.$l.projVtex = pb.vec3(pb.add(pb.mul(this.texDx, this.projVscr.x), pb.mul(this.texDy, this.projVscr.y)), pb.dot(this.worldNormal, this.viewPos));
+        this.$return(pb.getGlobalScope().parallaxMapping(this.projVtex, this.uv));
+      });
+      scope.$l.viewVec = this.calculateViewVector(scope);
+      scope.$l.TBN = this.calculateTBN(scope);
+      scope.$l.texCoords = scope.calcUV(this.helper.getWorldPosition(scope).xyz, pb.normalize(this.helper.getWorldNormal(scope)), pb.normalize(this.helper.getCameraPosition(scope)), this.getNormalTexCoord(scope));
+      scope.$l.normal = pb.sub(pb.mul(this.sampleNormalTexture(scope, scope.texCoords).rgb, 2), pb.vec3(1));
+      scope.$l.normal = pb.mul(scope.TBN, scope.normal);
+      scope.$l.viewVec = that.calculateViewVector(scope);
+      scope.$l.albedo = that.calculateAlbedoColor(scope, scope.texCoords);
+      scope.$l.litColor = this.blinnPhongLight(scope, scope.normal, scope.viewVec, scope.albedo);
+      this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
       this.outputFragmentColor(scope, null);
     }

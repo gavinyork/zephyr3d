@@ -3682,6 +3682,9 @@ export class PBInsideFunctionScope extends PBScope {
    * @returns The scope that inside the do..while statement
    */
   $do(body: (this: PBDoWhileScope) => void): PBDoWhileScope {
+    if (this.$builder.getDevice().type === 'webgl') {
+      throw new Error(`No do-while() loop support for WebGL1.0 device`);
+    }
     const astDoWhile = new AST.ASTDoWhile(null);
     this.$ast.statements.push(astDoWhile);
     return new PBDoWhileScope(this, astDoWhile, body);

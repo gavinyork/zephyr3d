@@ -2361,10 +2361,7 @@ export class ASTDoWhile extends ASTScope {
     }
   }
   toWebGL(indent: string, ctx: ASTContext): string {
-    let str = `${indent}do {\n`;
-    str += super.toWebGL(indent + ' ', ctx);
-    str += `${indent}} while(${unbracket(this.condition.toWebGL(indent, ctx))});\n`;
-    return str;
+    throw new Error(`No do-while() loop support for WebGL1.0 device`);
   }
   toWebGL2(indent: string, ctx: ASTContext): string {
     let str = `${indent}do {\n`;
@@ -2393,8 +2390,10 @@ export class ASTWhile extends ASTScope {
     }
   }
   toWebGL(indent: string, ctx: ASTContext): string {
-    let str = `${indent}while(${unbracket(this.condition.toWebGL(indent, ctx))}) {\n`;
-    str += super.toWebGL(indent + '  ', ctx);
+    let str = `${indent}for(int z_tmp_counter = 0; z_tmp_counter == 0; z_tmp_counter += 0) {\n`;
+    const indent2 = indent + '  ';
+    str += `${indent2}if(!(${unbracket(this.condition.toWebGL(indent, ctx))})){ break; }\n`;
+    str += super.toWebGL(indent2, ctx);
     str += `${indent}}\n`;
     return str;
   }

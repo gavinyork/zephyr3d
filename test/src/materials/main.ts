@@ -59,6 +59,7 @@ myApp.ready().then(async function () {
   furMaterial.albedoTexture = furColorTex;
   furMaterial.alphaTexture = furAlphaTex;
   const parallaxMaterial = new ParallaxMapMaterial();
+  parallaxMaterial.shininess = 8;
   parallaxMaterial.albedoTexture = rocksTex;
   parallaxMaterial.normalTexture = rocksNHTex;
   parallaxMaterial.stateSet.useRasterizerState().setCullMode('none');
