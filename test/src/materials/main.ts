@@ -12,7 +12,8 @@ import {
   AssetManager,
   BlinnMaterial,
   PlaneShape,
-  BoxShape
+  BoxShape,
+  Material
 } from '@zephyr3d/scene';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import * as common from '../common';
@@ -20,6 +21,7 @@ import { WoodMaterial } from './materials/wood';
 import { FurMaterial } from './materials/fur';
 import type { Texture2D } from '@zephyr3d/device';
 import { ParallaxMapMaterial } from './materials/parallax';
+import { UI } from './ui';
 
 const myApp = new Application({
   backend: common.getBackend(),
@@ -39,6 +41,7 @@ myApp.ready().then(async function () {
   // light color
   dlight.color = new Vector4(1, 1, 1, 1);
 
+  const materials: Material[] = [];
   const assetManager = new AssetManager();
   const furColorTex = await assetManager.fetchTexture<Texture2D>('assets/images/fur-color.png');
   furColorTex.samplerOptions = {
@@ -52,12 +55,12 @@ myApp.ready().then(async function () {
   };
   const rocksTex = await assetManager.fetchTexture<Texture2D>('assets/images/rocks.jpg');
   const rocksNHTex = await assetManager.fetchTexture<Texture2D>('assets/images/rocks_NM_height.tga');
-  // Create sphere
-  const sphereMaterial = new WoodMaterial();
-  const blinnMaterial = new BlinnMaterial();
+
+  materials.push(new WoodMaterial());
   const furMaterial = new FurMaterial();
   furMaterial.albedoTexture = furColorTex;
   furMaterial.alphaTexture = furAlphaTex;
+  materials.push(furMaterial);
   const parallaxMaterial = new ParallaxMapMaterial();
   parallaxMaterial.shininess = 8;
   parallaxMaterial.mode = 'occlusion';
@@ -65,8 +68,11 @@ myApp.ready().then(async function () {
   parallaxMaterial.maxParallaxLayers = 120;
   parallaxMaterial.albedoTexture = rocksTex;
   parallaxMaterial.normalTexture = rocksNHTex;
-  parallaxMaterial.stateSet.useRasterizerState().setCullMode('none');
-  new Mesh(scene, new BoxShape({ size: 4, needTangent: true, anchorX: 0.5, anchorY: 0.5, anchorZ: 0.5 }), parallaxMaterial);
+  materials.push(parallaxMaterial);
+
+  const ui = new UI(materials);
+  const mesh = new Mesh(scene, new BoxShape({ size: 4, needTangent: true, anchorX: 0.5, anchorY: 0.5, anchorZ: 0.5 }), ui.currentMaterial);
+  ui.on('change', mat => { mesh.material = mat; });
 
   // Create camera
   const camera = new PerspectiveCamera(
@@ -83,7 +89,7 @@ myApp.ready().then(async function () {
   // Add a Tonemap post-processing effect
   compositor.appendPostEffect(new Tonemap());
 
-  const inspector = new common.Inspector(scene, compositor, camera);
+  //const inspector = new common.Inspector(scene, compositor, camera);
 
   myApp.inputManager.use(imGuiInjectEvent);
   myApp.inputManager.use(camera.handleEvent.bind(camera));
@@ -91,10 +97,7 @@ myApp.ready().then(async function () {
   myApp.on('tick', function () {
     camera.updateController();
     camera.render(scene, compositor);
-
-    imGuiNewFrame();
-    inspector.render();
-    imGuiEndFrame();
+    ui.render();
   });
 
   myApp.run();

@@ -22,13 +22,25 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
     this._instancing = Application.instance.device.type !== 'webgl';
     this.numPasses = this._instancing ? 2 : 1 + this._numLayers;
   }
+  get thickness(): number {
+    return this._thickness;
+  }
+  set thickness(val: number) {
+    if(val !== this._thickness) {
+      this._thickness = val;
+      this.optionChanged(false);
+    }
+  }
   get numLayers(): number {
     return this._numLayers;
   }
   set numLayers(val: number) {
-    this._numLayers = val;
-    if (!this._instancing) {
-      this.numPasses = 1 + this._numLayers;
+    if (val !== this._numLayers) {
+      this._numLayers = val;
+      if (!this._instancing) {
+        this.numPasses = 1 + this._numLayers;
+      }
+      this.optionChanged(false);
     }
   }
   get alphaTexture(): Texture2D {
