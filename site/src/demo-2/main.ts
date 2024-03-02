@@ -76,7 +76,9 @@ lightApp.ready().then(async () => {
   const assetManager = new AssetManager();
   scene.env.light.strength = 0.3;
 
+  let message = 'Loading, please wait...';
   assetManager.fetchModel(scene, './assets/models/sponza/Sponza.gltf', null).then((info) => {
+    message = '';
     function traverseModel(group: SceneNode, func: (node: SceneNode) => void, context?: any) {
       if (group) {
         const queue: SceneNode[] = [group];
@@ -203,6 +205,11 @@ lightApp.ready().then(async () => {
     camera.updateController();
     camera.render(scene, compositor);
     ui.render();
+
+    if (message) {
+      lightApp.device.setFont('32px arial');
+      lightApp.device.drawText(message, 20, 20, '#a00000');
+    }
   });
   lightApp.run();
 });
