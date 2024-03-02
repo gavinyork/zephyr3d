@@ -3,7 +3,7 @@ import { Application, AssetManager, Scene, panoramaToCubemap, prefilterCubemap }
 
 type EnvMapInfo = {
   path: string,
-  maps?: TextureCube[],
+  maps?: Promise<TextureCube[]>,
 };
 
 export class EnvMaps {
@@ -29,6 +29,9 @@ export class EnvMaps {
     this._assetManager = new AssetManager();
     this._assetManagerEx = new AssetManager();
     this._currentId = '';
+    for (const k in this._envMaps) {
+      this._envMaps[k].maps = this.loadEnvMap(this._envMaps[k].path, this._assetManager);
+    }
   }
   getIdList(): string[] {
     return Object.keys(this._envMaps);
@@ -36,7 +39,8 @@ export class EnvMaps {
   getCurrentId(): string {
     return this._currentId;
   }
-  async loadEnvMap(path: string, maps: TextureCube[], assetManager: AssetManager) {
+  async loadEnvMap(path: string, assetManager: AssetManager): Promise<TextureCube[]> {
+    const maps = this.createMaps();
     try {
       const panorama = await assetManager.fetchTexture<Texture2D>(path);
       panoramaToCubemap(panorama, maps[0]);
@@ -45,6 +49,7 @@ export class EnvMaps {
     } catch(err) {
       console.error(err);
     }
+    return maps;
   }
   createMaps(): TextureCube[] {
     return [
@@ -55,11 +60,10 @@ export class EnvMaps {
       })
     ];
   }
-  selectByPath(path: string, scene: Scene, urlResolver: (url: string) => string) {
-    const maps = this.createMaps();
+  async selectByPath(path: string, scene: Scene, urlResolver: (url: string) => string) {
     this._assetManagerEx.purgeCache();
     this._assetManagerEx.httpRequest.urlResolver = urlResolver;
-    this.loadEnvMap(path, maps, this._assetManagerEx);
+    const maps = await this.loadEnvMap(path, this._assetManagerEx);
     this._currentId = '';
     scene.env.sky.skyType = 'skybox';
     scene.env.sky.skyboxTexture = maps[0];
@@ -68,21 +72,18 @@ export class EnvMaps {
     scene.env.light.radianceMap = maps[1];
     scene.env.light.irradianceMap = maps[2];
   }
-  selectById(id: string, scene: Scene){
+  async selectById(id: string, scene: Scene){
     const info = this._envMaps[id];
     if (!info) {
       console.error(`Environment map id not found: ${id}`);
       return;
     }
-    if (!info.maps) {
-      info.maps = this.createMaps();
-      this.loadEnvMap(info.path, info.maps, this._assetManager);
-    }
+    const maps = await info.maps;
     this._currentId = id;
     scene.env.sky.skyType = 'skybox';
-    scene.env.sky.skyboxTexture = info.maps[0];
+    scene.env.sky.skyboxTexture = maps[0];
     scene.env.sky.fogType = 'none';
-    scene.env.light.radianceMap = info.maps[1];
-    scene.env.light.irradianceMap = info.maps[2];
+    scene.env.light.radianceMap = maps[1];
+    scene.env.light.irradianceMap = maps[2];
   }
 }

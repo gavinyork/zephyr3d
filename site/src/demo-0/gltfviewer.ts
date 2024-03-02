@@ -251,7 +251,6 @@ export class GLTFViewer {
   }
   lookAt() {
     const bbox = this.getBoundingBox();
-    console.log(bbox.extents.toString());
     const minSize = 10;
     const maxSize = 100;
     if (bbox) {
@@ -273,7 +272,7 @@ export class GLTFViewer {
         Vector3.axisPY()
       );
       this._camera.near = Math.min(1, this._camera.near);
-      this._camera.far = Math.max(10, dist + extents.z + 100);
+      this._camera.far = Math.max(1000, dist + extents.z + 100);
       (this._camera.controller as OrbitCameraController).setOptions({ distance: dist });
     }
   }
