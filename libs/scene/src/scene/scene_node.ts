@@ -74,7 +74,7 @@ export class SceneNode extends XForm<SceneNode> {
     this._bvDirty = true;
     this._clipMode = SceneNode.CLIP_ENABLED;
     this._boxDrawMode = SceneNode.BBOXDRAW_DISABLED;
-    this._visible = SceneNode.SHOW_DEFAULT;
+    this._visible = SceneNode.SHOW_INHERITED;
     this._pickMode = SceneNode.PICK_DISABLED;
     if (scene && this !== scene.rootNode) {
       this.reparent(scene.rootNode);
@@ -262,14 +262,11 @@ export class SceneNode extends XForm<SceneNode> {
   }
   /** Computed value of show state */
   get hidden(): boolean {
-    if (this._visible === SceneNode.SHOW_INHERITED) {
-      let parent = this.parent;
-      while (parent && !parent.isGraphNode()) {
-        parent = parent.parent;
-      }
-      return parent?.hidden ?? false;
+    let node: SceneNode = this;
+    while (node && node._visible === SceneNode.SHOW_INHERITED) {
+      node = node.parent;
     }
-    return this._visible === SceneNode.SHOW_HIDE;
+    return node ? node._visible === SceneNode.SHOW_HIDE : false;
   }
   /** Show state */
   get showState() {
@@ -351,7 +348,7 @@ export class SceneNode extends XForm<SceneNode> {
   notifyHiddenChanged() {
     this._visibleChanged();
     for (const child of this._children) {
-      if (child.isGraphNode() && child.showState === SceneNode.SHOW_INHERITED) {
+      if (child.showState === SceneNode.SHOW_INHERITED) {
         child.notifyHiddenChanged();
       }
     }

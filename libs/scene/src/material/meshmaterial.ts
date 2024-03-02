@@ -266,8 +266,8 @@ export class MeshMaterial extends Material {
     const pb = scope.$builder;
     this.helper.prepareVertexShader(pb, this.drawContext);
     if (this.drawContext.target.getBoneMatrices()) {
-      scope.$inputs.blendIndices = pb.vec4().attrib('blendIndices');
-      scope.$inputs.blendWeights = pb.vec4().attrib('blendWeights');
+      scope.$inputs.zBlendIndices = pb.vec4().attrib('blendIndices');
+      scope.$inputs.zBlendWeights = pb.vec4().attrib('blendWeights');
     }
   }
   /**

@@ -294,7 +294,6 @@ export class GLTFViewer {
   }
   lookAt() {
     const bbox = this.getBoundingBox();
-    console.log(bbox.extents.toString());
     const minSize = 10;
     const maxSize = 100;
     if (bbox) {

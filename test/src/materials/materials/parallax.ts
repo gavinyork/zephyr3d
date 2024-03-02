@@ -2,7 +2,6 @@ import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } f
 import { DrawContext, MeshMaterial, applyMaterialMixins, mixinAlbedoColor, mixinBlinnPhong, mixinLambert } from '@zephyr3d/scene';
 
 export type ParallaxMappingMode = 'basic'|'steep'|'relief'|'occlusion';
-//const ITERATIONS = 32;
 export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor, mixinBlinnPhong) {
   static FEATURE_PARALLAX_MODE = this.defineFeature();
   private _parallaxScale: number;

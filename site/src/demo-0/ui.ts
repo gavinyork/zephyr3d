@@ -9,70 +9,72 @@ export class UI {
   }
   render(){
     imGuiNewFrame();
-    this.renderMenuBar();
+    this.renderSettings();
     this.renderStatusBar();
     imGuiEndFrame();
   }
-  renderMenuBar(){
-    if(ImGui.BeginMainMenuBar()){
-      if(ImGui.BeginMenu('Scene')){
-        if(ImGui.BeginMenu('Environment')){
-          for(const id of this._viewer.envMaps.getIdList()){
-            ImGui.MenuItem(`${id}##env`, null, (val?: boolean) => {
-              if (val === undefined) {
-                val = id === this._viewer.envMaps.getCurrentId();
-              } else if (val) {
-                this._viewer.envMaps.selectById(id, this._viewer.scene);
-              }
-              return val;
-            });
-          }
-          ImGui.EndMenu();
-        }
-        ImGui.MenuItem('Bloom', null, (val?: boolean) => {
-          if (val === undefined) {
-            val = this._viewer.bloomEnabled();
-          } else {
-            this._viewer.enableBloom(val);
-          }
-          return val;
-        });
-        ImGui.MenuItem('ToneMap', null, (val?: boolean) => {
-          if (val === undefined) {
-            val = this._viewer.tonemapEnabled();
-          } else {
-            this._viewer.enableTonemap(val);
-          }
-          return val;
-        });
-        ImGui.MenuItem('FXAA', null, (val?: boolean) => {
-          if (val === undefined) {
-            val = this._viewer.FXAAEnabled();
-          } else {
-            this._viewer.enableFXAA(val);
-          }
-          return val;
-        });
-        ImGui.EndMenu();
+  renderSettings(){
+    ImGui.SetNextWindowPos(new ImGui.ImVec2(0, 0), ImGui.Cond.Always);
+    ImGui.SetNextWindowSize(new ImGui.ImVec2(300, Math.min(400, Application.instance.device.getViewport().height)), ImGui.Cond.Always);
+    if (ImGui.Begin('Settings')){
+      ImGui.BeginSection('Light');
+      const idList = this._viewer.envMaps.getIdList();
+      const index = [idList.indexOf(this._viewer.envMaps.getCurrentId())] as [number];
+      ImGui.SetNextItemWidth(150);
+      if(ImGui.Combo('Environment', index, idList)){
+        this._viewer.envMaps.selectById(idList[index[0]], this._viewer.scene);
       }
-      const animations = this._viewer.animationSet?.getAnimationNames() ?? [];
-      if (animations.length > 0) {
-        if (ImGui.BeginMenu('Animation')){
-          for(const name of animations){
-            ImGui.MenuItem(`${name}##ani`, null, (val?: boolean) => {
-              if (val === undefined) {
-                val = this._viewer.animationSet.isPlayingAnimation(name);
-              } else if (val) {
-                this._viewer.animationSet.playAnimation(name);
-              }
-              return val;
-            });
-          }
-          ImGui.EndMenu();
+      ImGui.Checkbox('Enable IBL lighting', (val?: boolean) => {
+        if (val === undefined) {
+          val = this._viewer.environmentLightEnabled;
+        } else {
+          this._viewer.environmentLightEnabled = val;
         }
+        return val;
+      });
+      ImGui.Checkbox('Enable Punctual lighting', (val?: boolean) => {
+        if (val === undefined) {
+          val = this._viewer.punctualLightEnabled;
+        } else {
+          this._viewer.punctualLightEnabled = val;
+        }
+        return val;
+      });
+      ImGui.EndSection(1);
+
+      ImGui.BeginSection('Post process');
+      ImGui.Checkbox('Tonemap', (val?: boolean) => {
+        if (val === undefined) {
+          val = this._viewer.tonemapEnabled();
+        } else {
+          this._viewer.enableTonemap(val);;
+        }
+        return val;
+      });
+      ImGui.Checkbox('Bloom', (val?: boolean) => {
+        if (val === undefined) {
+          val = this._viewer.bloomEnabled();
+        } else {
+          this._viewer.enableBloom(val);;
+        }
+        return val;
+      });
+      ImGui.Checkbox('Fxaa', (val?: boolean) => {
+        if (val === undefined) {
+          val = this._viewer.FXAAEnabled();
+        } else {
+          this._viewer.enableFXAA(val);;
+        }
+        return val;
+      });
+      ImGui.EndSection(1);
+      if (ImGui.BeginChild('Usage')) {
+        ImGui.TextWrapped('Drag GLTF/GLB/ZIP to view model.')
+        ImGui.TextWrapped('Drag HDR to change environment.')
       }
-      ImGui.EndMainMenuBar();
+      ImGui.EndChild();
     }
+    ImGui.End();
   }
   private renderStatusBar() {
     if (ImGui.BeginStatusBar()) {

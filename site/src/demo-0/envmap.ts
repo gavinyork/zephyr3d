@@ -13,14 +13,17 @@ export class EnvMaps {
   private _currentId: string;
   constructor(){
     this._envMaps = {
-      'Phalzer forest': {
-        path: 'assets/images/environments/phalzer_forest.hdr',
+      'tower': {
+        path: 'assets/images/environments/tower.hdr',
+      },
+      'doge2': {
+        path: 'assets/images/environments/doge2.hdr',
       },
       'Street night': {
         path: 'assets/images/environments/street_night.hdr',
       },
-      'Pond_2k': {
-        path: 'assets/images/environments/pond_2k.hdr',
+      'forest': {
+        path: 'assets/images/environments/forest.hdr',
       }
     };
     this._assetManager = new AssetManager();
@@ -79,7 +82,6 @@ export class EnvMaps {
     scene.env.sky.skyType = 'skybox';
     scene.env.sky.skyboxTexture = info.maps[0];
     scene.env.sky.fogType = 'none';
-    scene.env.light.type = 'ibl';
     scene.env.light.radianceMap = info.maps[1];
     scene.env.light.irradianceMap = info.maps[2];
   }

@@ -87,6 +87,7 @@ export class SkyRenderer {
   private _renderStatesSkyNoDepthTest: RenderStateSet;
   private _renderStatesFog: RenderStateSet;
   private _renderStatesFogScatter: RenderStateSet;
+  private _drawGround: boolean;
   private _lastSunDir: Vector3;
   /**
    * Creates an instance of SkyRenderer
@@ -109,6 +110,7 @@ export class SkyRenderer {
     this._cloudy = 0.6;
     this._cloudIntensity = 40;
     this._wind = Vector2.zero();
+    this._drawGround = false;
     this._nearestSampler = null;
     this._programSky = {};
     this._bindgroupSky = {};
@@ -138,6 +140,13 @@ export class SkyRenderer {
       this._skyType = val;
       this.invalidateIBLMaps();
     }
+  }
+  /** Whether ground should be rendered */
+  get drawGround(): boolean {
+    return this._drawGround;
+  }
+  set drawGround(val: boolean) {
+    this._drawGround = !!val;
   }
   /**
    * Wether the IBL maps should be updated automatically.
@@ -424,7 +433,7 @@ export class SkyRenderer {
     if (!sunDir.equalsTo(this._lastSunDir)) {
       this._radianceMapDirty = true;
     }
-    this._renderSky(ctx.camera, true, sunDir, false, this._skyType === 'scatter' && this._cloudy > 0);
+    this._renderSky(ctx.camera, true, sunDir, this._drawGround, this._skyType === 'scatter' && this._cloudy > 0);
     if (this._radianceMapDirty && ctx.env.light.type === 'ibl') {
       if (
         ctx.env.light.radianceMap &&

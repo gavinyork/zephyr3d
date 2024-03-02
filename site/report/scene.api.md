@@ -369,11 +369,7 @@ export type BlendMode = 'none' | 'blend' | 'additive';
 export class BlinnMaterial extends BlinnMaterial_base {
     constructor();
     // (undocumented)
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
-    // (undocumented)
     fragmentShader(scope: PBFunctionScope): void;
-    get shininess(): number;
-    set shininess(val: number);
     // (undocumented)
     vertexShader(scope: PBFunctionScope): void;
 }
@@ -1276,6 +1272,8 @@ export class GraphNode extends SceneNode {
     isGraphNode(): this is GraphNode;
     get renderOrder(): number;
     set renderOrder(val: number);
+    // @internal (undocumented)
+    protected _visibleChanged(): void;
 }
 
 // Warning: (ae-forgotten-export) The symbol "GrassMaterial_base" needs to be exported by the entry point index.d.ts
@@ -1442,8 +1440,19 @@ export interface IMaterial {
 // @public (undocumented)
 export type IMixinAlbedoColor = {
     albedoColor: Vector4;
-    calculateAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp;
+    calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp;
 } & TextureMixinInstanceTypes<['albedo']>;
+
+// @public (undocumented)
+export type IMixinBlinnPhong = {
+    shininess: number;
+    blinnPhongLight(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+} & IMixinLight;
+
+// @public (undocumented)
+export type IMixinLambert = {
+    lambertLight(scope: PBInsideFunctionScope, normal: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+} & IMixinLight;
 
 // @public (undocumented)
 export type IMixinLight = {
@@ -1457,6 +1466,7 @@ export type IMixinLight = {
     getEnvLightRadiance(scope: PBInsideFunctionScope, reflectVec: PBShaderExp, roughness: PBShaderExp): PBShaderExp;
     calculateViewVector(scope: PBInsideFunctionScope): PBShaderExp;
     calculateReflectionVector(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp): PBShaderExp;
+    calculateTBN(scope: PBInsideFunctionScope): PBShaderExp;
     calculateNormal(scope: PBInsideFunctionScope): PBShaderExp;
     calculateNormalAndTBN(scope: PBInsideFunctionScope): PBShaderExp;
     calculateLightAttenuation(scope: PBInsideFunctionScope, type: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp): PBShaderExp;
@@ -1503,7 +1513,7 @@ export type IMixinPBRMetallicRoughness = {
     metallic: number;
     roughness: number;
     specularFactor: Vector4;
-    PBRLight(scope: PBFunctionScope, normal: PBShaderExp, TBN: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+    PBRLight(scope: PBInsideFunctionScope, normal: PBShaderExp, TBN: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
     calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
 } & IMixinPBRCommon & IMixinLight & TextureMixinInstanceTypes<['metallicRoughness', 'occlusion', 'specular', 'specularColor']>;
 
@@ -1511,7 +1521,7 @@ export type IMixinPBRMetallicRoughness = {
 export type IMixinPBRSpecularGlossiness = {
     specularFactor: Vector4;
     glossinessFactor: number;
-    PBRLight(scope: PBFunctionScope, normal: PBShaderExp, TBN: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+    PBRLight(scope: PBInsideFunctionScope, normal: PBShaderExp, TBN: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
     calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
 } & IMixinPBRCommon & IMixinLight & TextureMixinInstanceTypes<['specular']>;
 
@@ -1724,13 +1734,8 @@ export class MeshMaterial extends Material {
     protected createProgram(ctx: DrawContext, pass: number): GPUProgram;
     // @override
     protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram;
+    static defineFeature(): number;
     get drawContext(): DrawContext;
-    // (undocumented)
-    static readonly FEATURE_ALPHABLEND = 1;
-    // (undocumented)
-    static readonly FEATURE_ALPHATEST = 0;
-    // (undocumented)
-    static readonly FEATURE_ALPHATOCOVERAGE = 2;
     featureUsed<T = unknown>(feature: number): T;
     fragmentShader(scope: PBFunctionScope): void;
     // (undocumented)
@@ -1740,7 +1745,7 @@ export class MeshMaterial extends Material {
     isTransparent(pass: number): boolean;
     needFragmentColor(ctx?: DrawContext): boolean;
     // (undocumented)
-    static readonly NEXT_FEATURE_INDEX: number;
+    static NEXT_FEATURE_INDEX: number;
     get opacity(): number;
     set opacity(val: number);
     outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp): void;
@@ -1753,6 +1758,12 @@ export class MeshMaterial extends Material {
 
 // @public (undocumented)
 export function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinAlbedoColor);
+
+// @public (undocumented)
+export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinBlinnPhong);
+
+// @public (undocumented)
+export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinLambert);
 
 // @public (undocumented)
 export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinLight);
@@ -3407,7 +3418,7 @@ export type TextureProp<U extends string> = {
 export type TexturePropUniforms<U extends string> = {
     [P in 'TextureUniform' | 'TexCoord' as `get${Capitalize<U>}${P}`]: (scope: PBInsideFunctionScope) => PBShaderExp;
 } & {
-    [P in 'Texture' as `sample${Capitalize<U>}${P}`]: (scope: PBInsideFunctionScope) => PBShaderExp;
+    [P in 'Texture' as `sample${Capitalize<U>}${P}`]: (scope: PBInsideFunctionScope, texCoord?: PBShaderExp) => PBShaderExp;
 };
 
 // @public

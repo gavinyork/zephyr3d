@@ -13,7 +13,7 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
   private _alphaTexture: Texture2D;
   constructor() {
     super();
-    this._thickness = 0.005;
+    this._thickness = 0.1;
     this._numLayers = 30;
     this._colorStart = new Vector4(0, 0, 0, 1);
     this._colorEnd = new Vector4(1, 1, 1, 0.3);
@@ -40,6 +40,15 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
       if (!this._instancing) {
         this.numPasses = 1 + this._numLayers;
       }
+      this.optionChanged(false);
+    }
+  }
+  get noiseRepeat(): number {
+    return this._alphaRepeat;
+  }
+  set noiseRepeat(val: number) {
+    if (val !== this._alphaRepeat) {
+      this._alphaRepeat = val;
       this.optionChanged(false);
     }
   }
@@ -122,9 +131,11 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
           scope.$l.f = pb.mul(pb.float(pb.add(scope.$builtins.instanceIndex, 1)), scope.layerThickness);
         }
         vertexPos = pb.add(scope.$inputs.pos, pb.mul(scope.$inputs.normal, scope.f));
-        scope.$outputs.ao = pb.mix(scope.colorStart, scope.colorEnd, scope.t);
+        scope.$outputs.ao = pb.mix(scope.colorStart, scope.colorEnd, pb.sin(pb.mul(scope.t, Math.PI/2)));
       }
       scope.$outputs.tex = scope.$inputs.tex;
+      scope.$l.worldNormal = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.$inputs.normal, 0)).xyz;
+      this.helper.propagateWorldNormal(scope, scope.worldNormal);
     }
     scope.$l.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(vertexPos, 1));
     this.helper.setClipSpacePosition(

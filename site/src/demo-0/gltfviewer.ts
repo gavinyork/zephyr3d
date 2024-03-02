@@ -214,6 +214,19 @@ export class GLTFViewer {
       this._compositor.appendPostEffect(this._fxaa);
     }
   }
+  get punctualLightEnabled(): boolean {
+    return this._light0.showState !== GraphNode.SHOW_HIDE;
+  }
+  set punctualLightEnabled(enable: boolean) {
+    this._light0.showState = enable ? GraphNode.SHOW_DEFAULT : GraphNode.SHOW_HIDE;
+    this._light1.showState = enable ? GraphNode.SHOW_DEFAULT : GraphNode.SHOW_HIDE;
+  }
+  get environmentLightEnabled(): boolean {
+    return this._scene.env.light.type === 'ibl';
+  }
+  set environmentLightEnabled(enable: boolean) {
+    this._scene.env.light.type = enable ? 'ibl' : 'none';
+  }
   enableBloom(enable: boolean) {
     if (!!enable !== this._doBloom) {
       this._doBloom = !!enable;

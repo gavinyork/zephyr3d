@@ -79,4 +79,8 @@ export class GraphNode extends SceneNode {
   isBatchable(): this is BatchDrawable {
     return false;
   }
+  /** @internal */
+  protected _visibleChanged(): void {
+    this._scene?.invalidateNodePlacement(this);
+  }
 }
