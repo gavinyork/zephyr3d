@@ -68,6 +68,16 @@ export class UI {
         return val;
       });
       ImGui.EndSection(1);
+      const animations = this._viewer.animationSet?.getAnimationNames() ?? [];
+      if (animations.length > 0) {
+        ImGui.BeginSection('Animation');
+        const index = [animations.findIndex(ani => this._viewer.animationSet.isPlayingAnimation(ani))] as [number];
+        ImGui.SetNextItemWidth(150);
+        if (ImGui.Combo('Animation', index, animations)){
+          this._viewer.animationSet.playAnimation(animations[index[0]]);
+        }
+        ImGui.EndSection(1);
+      }
       if (ImGui.BeginChild('Usage')) {
         ImGui.TextWrapped('Drag GLTF/GLB/ZIP to view model.')
         ImGui.TextWrapped('Drag HDR to change environment.')
