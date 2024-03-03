@@ -12,11 +12,7 @@ import { Blitter } from '../blitter';
 import { computeShadowMapDepth, filterShadowVSM } from '../shaders/shadow';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
 import { ShadowMapper } from './shadowmapper';
-import {
-  decode2HalfFromRGBA,
-  decodeNormalizedFloatFromRGBA,
-  encode2HalfToRGBA
-} from '../shaders/misc';
+import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encode2HalfToRGBA } from '../shaders/misc';
 import { Application } from '../app';
 import { TemporalCache } from '../render';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
@@ -423,7 +419,11 @@ export class VSM extends ShadowImpl {
         this.$if(this.inShadow, function () {
           if (shadowMapParams.lightType === LIGHT_TYPE_SPOT) {
             this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
-            this.shadowCoord.z = ShaderHelper.nonLinearDepthToLinearNormalized(this, this.shadowCoord.z, this.nearFar);
+            this.shadowCoord.z = ShaderHelper.nonLinearDepthToLinearNormalized(
+              this,
+              this.shadowCoord.z,
+              this.nearFar
+            );
             this.$l.shadowBias = ShadowMapper.computeShadowBias(
               shadowMapParams,
               this,

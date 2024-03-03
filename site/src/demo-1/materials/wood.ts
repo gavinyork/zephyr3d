@@ -61,9 +61,11 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
   }
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
-    scope.$inputs.pos = scope.$builder.vec3().attrib('position');
+    const pb = scope.$builder;
+    scope.$inputs.pos = pb.vec3().attrib('position');
+    scope.$inputs.normal = pb.vec3().attrib('normal');
     scope.$outputs.oPos = scope.$inputs.pos;
-    this.helper.transformVertexAndNormal(scope);
+    this.helper.processPositionAndNormal(scope);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);

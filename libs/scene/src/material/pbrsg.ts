@@ -8,13 +8,37 @@ export class PBRSpecularGlossinessMaterial extends applyMaterialMixins(
   mixinPBRSpecularGlossness,
   mixinVertexColor
 ) {
+  private static FEATURE_VERTEX_NORMAL = this.defineFeature();
+  private static FEATURE_VERTEX_TANGENT = this.defineFeature();
   constructor() {
     super();
+    this.useFeature(PBRSpecularGlossinessMaterial.FEATURE_VERTEX_NORMAL, true);
+  }
+  /** true if vertex normal attribute presents */
+  get vertexNormal(): boolean {
+    return this.featureUsed(PBRSpecularGlossinessMaterial.FEATURE_VERTEX_NORMAL);
+  }
+  set vertexNormal(val: boolean) {
+    this.useFeature(PBRSpecularGlossinessMaterial.FEATURE_VERTEX_NORMAL, !!val);
+  }
+  /** true if vertex normal attribute presents */
+  get vertexTangent(): boolean {
+    return this.featureUsed(PBRSpecularGlossinessMaterial.FEATURE_VERTEX_TANGENT);
+  }
+  set vertexTangent(val: boolean) {
+    this.useFeature(PBRSpecularGlossinessMaterial.FEATURE_VERTEX_TANGENT, !!val);
   }
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
-    scope.$inputs.zPos = scope.$builder.vec3().attrib('position');
-    this.helper.transformVertexAndNormal(scope);
+    const pb = scope.$builder;
+    scope.$inputs.zPos = pb.vec3().attrib('position');
+    if (this.vertexNormal) {
+      scope.$inputs.normal = pb.vec3().attrib('normal');
+    }
+    if (this.vertexTangent) {
+      scope.$inputs.tangent = pb.vec4().attrib('tangent');
+    }
+    this.helper.processPositionAndNormal(scope);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
@@ -30,7 +54,13 @@ export class PBRSpecularGlossinessMaterial extends applyMaterialMixins(
       }
       scope.$l.normalInfo = this.calculateNormalAndTBN(scope);
       scope.$l.viewVec = this.calculateViewVector(scope);
-      scope.$l.litColor = this.PBRLight(scope, scope.normalInfo.normal, scope.normalInfo.TBN, scope.viewVec, scope.albedo);
+      scope.$l.litColor = this.PBRLight(
+        scope,
+        scope.normalInfo.normal,
+        scope.normalInfo.TBN,
+        scope.viewVec,
+        scope.albedo
+      );
       this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
       this.outputFragmentColor(scope, null);

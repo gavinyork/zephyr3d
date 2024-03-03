@@ -10,7 +10,7 @@ function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).vertexColorMixed) {
     return BaseCls as T & { new (...args: any[]): IMixinVertexColor };
   }
-  let FEATURE_VERTEX_COLOR: number;
+  let FEATURE_VERTEX_COLOR = 0;
   const cls = class extends BaseCls {
     static vertexColorMixed = true;
     constructor(...args: any[]) {

@@ -1,11 +1,18 @@
-import { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from "@zephyr3d/device";
-import { MeshMaterial, applyMaterialMixins } from "../../meshmaterial";
-import { IMixinLight, mixinLight } from "../lit";
-import { DrawContext } from "../../../render";
+import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import type { MeshMaterial } from '../../meshmaterial';
+import { applyMaterialMixins } from '../../meshmaterial';
+import type { IMixinLight } from '../lit';
+import { mixinLight } from '../lit';
+import type { DrawContext } from '../../../render';
 
 export type IMixinBlinnPhong = {
   shininess: number;
-  blinnPhongLight(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+  blinnPhongLight(
+    scope: PBInsideFunctionScope,
+    normal: PBShaderExp,
+    viewVec: PBShaderExp,
+    albedo: PBShaderExp
+  ): PBShaderExp;
 } & IMixinLight;
 
 export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
@@ -39,16 +46,21 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
       super.applyUniformValues(bindGroup, ctx, pass);
-      if (this.needFragmentColor()){
+      if (this.needFragmentColor()) {
         bindGroup.setValue('zShininess', this._shininess);
       }
     }
-    blinnPhongLight(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp {
+    blinnPhongLight(
+      scope: PBInsideFunctionScope,
+      normal: PBShaderExp,
+      viewVec: PBShaderExp,
+      albedo: PBShaderExp
+    ): PBShaderExp {
       const pb = scope.$builder;
       const funcName = 'Z_blinnPhongLight';
       const that = this;
-      pb.func(funcName, [pb.vec3('normal'), pb.vec3('viewVec'), pb.vec4('albedo')], function(){
-        if (!that.needFragmentColor()){
+      pb.func(funcName, [pb.vec3('normal'), pb.vec3('viewVec'), pb.vec4('albedo')], function () {
+        if (!that.needFragmentColor()) {
           this.$return(this.albedo.rgb);
         } else {
           if (that.needCalculateEnvLight()) {
@@ -80,5 +92,5 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
       });
       return pb.getGlobalScope()[funcName](normal, viewVec, albedo);
     }
-  } as unknown as T & { new (...args: any[]): IMixinBlinnPhong }
+  } as unknown as T & { new (...args: any[]): IMixinBlinnPhong };
 }

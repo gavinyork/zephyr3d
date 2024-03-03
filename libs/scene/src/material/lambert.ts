@@ -8,13 +8,37 @@ import type { PBFunctionScope } from '@zephyr3d/device';
  * @public
  */
 export class LambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLight, mixinVertexColor) {
+  private static FEATURE_VERTEX_NORMAL = this.defineFeature();
+  private static FEATURE_VERTEX_TANGENT = this.defineFeature();
   constructor() {
     super();
+    this.useFeature(LambertMaterial.FEATURE_VERTEX_NORMAL, true);
+  }
+  /** true if vertex normal attribute presents */
+  get vertexNormal(): boolean {
+    return this.featureUsed(LambertMaterial.FEATURE_VERTEX_NORMAL);
+  }
+  set vertexNormal(val: boolean) {
+    this.useFeature(LambertMaterial.FEATURE_VERTEX_NORMAL, !!val);
+  }
+  /** true if vertex normal attribute presents */
+  get vertexTangent(): boolean {
+    return this.featureUsed(LambertMaterial.FEATURE_VERTEX_TANGENT);
+  }
+  set vertexTangent(val: boolean) {
+    this.useFeature(LambertMaterial.FEATURE_VERTEX_TANGENT, !!val);
   }
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
-    scope.$inputs.zPos = scope.$builder.vec3().attrib('position');
-    this.helper.transformVertexAndNormal(scope);
+    const pb = scope.$builder;
+    scope.$inputs.zPos = pb.vec3().attrib('position');
+    if (this.vertexNormal) {
+      scope.$inputs.normal = pb.vec3().attrib('normal');
+    }
+    if (this.vertexTangent) {
+      scope.$inputs.tangent = pb.vec4().attrib('tangent');
+    }
+    this.helper.processPositionAndNormal(scope);
   }
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);

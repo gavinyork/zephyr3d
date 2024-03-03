@@ -433,7 +433,13 @@ export class SkyRenderer {
     if (!sunDir.equalsTo(this._lastSunDir)) {
       this._radianceMapDirty = true;
     }
-    this._renderSky(ctx.camera, true, sunDir, this._drawGround, this._skyType === 'scatter' && this._cloudy > 0);
+    this._renderSky(
+      ctx.camera,
+      true,
+      sunDir,
+      this._drawGround,
+      this._skyType === 'scatter' && this._cloudy > 0
+    );
     if (this._radianceMapDirty && ctx.env.light.type === 'ibl') {
       if (
         ctx.env.light.radianceMap &&

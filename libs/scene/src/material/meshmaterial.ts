@@ -44,11 +44,11 @@ export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
   return r;
 }
 
-let FEATURE_ALPHATEST: number;
-let FEATURE_ALPHABLEND: number;
-let FEATURE_ALPHATOCOVERAGE: number;
+let FEATURE_ALPHATEST = 0;
+let FEATURE_ALPHABLEND = 0;
+let FEATURE_ALPHATOCOVERAGE = 0;
 export class MeshMaterial extends Material {
-  static NEXT_FEATURE_INDEX: number = 3;
+  static NEXT_FEATURE_INDEX = 3;
   private _featureStates: unknown[];
   private _alphaCutoff: number;
   private _blendMode: BlendMode;

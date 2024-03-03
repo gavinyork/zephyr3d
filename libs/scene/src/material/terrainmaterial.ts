@@ -147,7 +147,6 @@ export class TerrainMaterial extends applyMaterialMixins(
         };
       }
     }
-    this.vertexNormal = true;
     this.metallicRoughnessTexture = this.generateMetallicRoughnessMap();
     this.metallicRoughnessTexCoordIndex = -1;
     this.albedoTexCoordIndex = -1;
@@ -296,11 +295,12 @@ export class TerrainMaterial extends applyMaterialMixins(
     super.vertexShader(scope);
     const pb = scope.$builder;
     scope.$inputs.zPos = pb.vec3().attrib('position');
+    scope.$inputs.zNormal = pb.vec3().attrib('normal');
     if (this.needFragmentColor()) {
       scope.terrainInfo = pb.vec4().uniform(2);
       scope.$outputs.mapUV = pb.div(scope.$inputs.zPos.xz, scope.terrainInfo.xy);
     }
-    this.helper.transformVertexAndNormal(scope);
+    this.helper.processPositionAndNormal(scope);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
@@ -329,33 +329,14 @@ export class TerrainMaterial extends applyMaterialMixins(
       }
       scope.$l.albedo = this.calculateAlbedoColor(scope);
       scope.$l.normalInfo = this.calculateNormalAndTBN(scope);
-      scope.$l.normal = scope.normalInfo.normal;
       scope.$l.viewVec = this.calculateViewVector(scope);
-      scope.$l.pbrData = this.getCommonData(scope, scope.albedo, scope.viewVec, scope.normalInfo.TBN);
-      scope.$l.lightingColor = pb.vec3(0);
-      scope.$l.emissiveColor = this.calculateEmissiveColor(scope);
-      this.indirectLighting(scope, scope.normal, scope.viewVec, scope.pbrData, scope.lightingColor);
-      this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, shadow) {
-        this.$l.diffuse = pb.vec3();
-        this.$l.specular = pb.vec3();
-        this.$l.lightAtten = that.calculateLightAttenuation(this, type, posRange, dirCutoff);
-        this.$l.lightDir = that.calculateLightDirection(this, type, posRange, dirCutoff);
-        this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
-        this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
-        if (shadow) {
-          this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.NoL));
-        }
-        that.directLighting(
-          this,
-          this.lightDir,
-          this.lightColor,
-          this.normal,
-          this.viewVec,
-          this.pbrData,
-          this.lightingColor
-        );
-      });
-      scope.$l.litColor = pb.add(scope.lightingColor, scope.emissiveColor);
+      scope.$l.litColor = this.PBRLight(
+        scope,
+        scope.normalInfo.normal,
+        scope.normalInfo.TBN,
+        scope.viewVec,
+        scope.albedo
+      );
       this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
       this.outputFragmentColor(scope, null);

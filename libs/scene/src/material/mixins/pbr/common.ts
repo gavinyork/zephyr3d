@@ -92,8 +92,8 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     mixinTextureProps('clearcoatRoughness'),
     mixinTextureProps('clearcoatNormal')
   );
-  let FEATURE_SHEEN: number;
-  let FEATURE_CLEARCOAT: number;
+  let FEATURE_SHEEN = 0;
+  let FEATURE_CLEARCOAT = 0;
   const cls = class extends S {
     static readonly pbrCommonMixed = true;
     private _f0: Vector4;
@@ -403,7 +403,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$l.NoH = pb.clamp(pb.dot(this.normal, this.H), 0, 1);
           this.$l.NoL = pb.clamp(pb.dot(this.normal, this.L), 0, 1);
           this.$l.NoV = pb.clamp(pb.dot(this.normal, this.viewVec), 0, 1);
-          this.$if(pb.greaterThan(this.NoL, 0), function(){
+          this.$if(pb.greaterThan(this.NoL, 0), function () {
             this.$l.VoH = pb.clamp(pb.dot(this.viewVec, this.H), 0, 1);
             this.$l.F = that.fresnelSchlick(this, this.VoH, this.data.f0.rgb, this.data.f90);
             this.$l.alphaRoughness = pb.mul(this.data.roughness, this.data.roughness);
@@ -440,7 +440,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
               this.alphaRoughness = pb.mul(this.data.ccFactor.y, this.data.ccFactor.y);
               this.NoH = pb.clamp(pb.dot(this.data.ccNormal, this.H), 0, 1);
               this.NoL = pb.clamp(pb.dot(this.data.ccNormal, this.L), 0, 1);
-              this.ccF0 = pb.vec3(pb.pow(pb.div(pb.sub(this.data.f0.a, 1), pb.add(this.data.f0.a, 1)), 2))
+              this.ccF0 = pb.vec3(pb.pow(pb.div(pb.sub(this.data.f0.a, 1), pb.add(this.data.f0.a, 1)), 2));
               this.F = that.fresnelSchlick(this, this.VoH, this.ccF0, pb.vec3(1));
               this.D = that.distributionGGX(this, this.NoH, this.alphaRoughness);
               this.V = that.visGGX(this, this.data.ccNoV, this.NoL, this.alphaRoughness);

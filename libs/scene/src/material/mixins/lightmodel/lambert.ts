@@ -1,6 +1,8 @@
-import { PBInsideFunctionScope, PBShaderExp } from "@zephyr3d/device";
-import { MeshMaterial, applyMaterialMixins } from "../../meshmaterial";
-import { IMixinLight, mixinLight } from "../lit";
+import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import type { MeshMaterial } from '../../meshmaterial';
+import { applyMaterialMixins } from '../../meshmaterial';
+import type { IMixinLight } from '../lit';
+import { mixinLight } from '../lit';
 
 export type IMixinLambert = {
   lambertLight(scope: PBInsideFunctionScope, normal: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
@@ -20,8 +22,8 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       const funcName = 'Z_lambertLight';
       const that = this;
-      pb.func(funcName, [pb.vec3('normal'), pb.vec4('albedo')], function(){
-        if (!that.needFragmentColor()){
+      pb.func(funcName, [pb.vec3('normal'), pb.vec4('albedo')], function () {
+        if (!that.needFragmentColor()) {
           this.$return(this.albedo.rgb);
         } else {
           if (that.needCalculateEnvLight()) {
@@ -47,5 +49,5 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
       });
       return pb.getGlobalScope()[funcName](normal, albedo);
     }
-  } as unknown as T & { new (...args: any[]): IMixinLambert }
+  } as unknown as T & { new (...args: any[]): IMixinLambert };
 }

@@ -17,8 +17,6 @@ export type IMixinLight = {
   normalScale: number;
   normalMapMode: 'tangent-space' | 'object-space';
   doubleSidedLighting: boolean;
-  vertexNormal: boolean;
-  vertexTangent: boolean;
   needCalculateEnvLight(): boolean;
   getEnvLightIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
   getEnvLightRadiance(
@@ -67,17 +65,14 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     return BaseCls as T & { new (...args: any[]): IMixinLight };
   }
   const S = applyMaterialMixins(BaseCls, mixinAlbedoColor, mixinTextureProps('normal'));
-  let FEATURE_DOUBLE_SIDED_LIGHTING: number;
-  let FEATURE_VERTEX_NORMAL: number;
-  let FEATURE_VERTEX_TANGENT: number;
-  let FEATURE_OBJECT_SPACE_NORMALMAP: number;
+  let FEATURE_DOUBLE_SIDED_LIGHTING = 0;
+  let FEATURE_OBJECT_SPACE_NORMALMAP = 0;
   const cls = class extends S {
     static readonly lightMixed = true;
     private _normalScale: number;
     constructor() {
       super();
       this._normalScale = 1;
-      this.useFeature(FEATURE_VERTEX_NORMAL, true);
       this.useFeature(FEATURE_DOUBLE_SIDED_LIGHTING, true);
     }
     get normalScale(): number {
@@ -101,20 +96,6 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     set doubleSidedLighting(val: boolean) {
       this.useFeature(FEATURE_DOUBLE_SIDED_LIGHTING, !!val);
-    }
-    /** true if vertex normal attribute presents */
-    get vertexNormal(): boolean {
-      return this.featureUsed(FEATURE_VERTEX_NORMAL);
-    }
-    set vertexNormal(val: boolean) {
-      this.useFeature(FEATURE_VERTEX_NORMAL, !!val);
-    }
-    /** true if vertex normal attribute presents */
-    get vertexTangent(): boolean {
-      return this.featureUsed(FEATURE_VERTEX_TANGENT);
-    }
-    set vertexTangent(val: boolean) {
-      this.useFeature(FEATURE_VERTEX_TANGENT, !!val);
     }
     /**
      * Calculates the normalized vector from world coordinates to the viewpoint.
@@ -655,23 +636,6 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       }
     }
     /**
-     * Vertex shader implementation.
-     *
-     * @param scope - Shader scope
-     */
-    vertexShader(scope: PBFunctionScope): void {
-      super.vertexShader(scope);
-      const pb = scope.$builder;
-      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
-        if (this.vertexNormal) {
-          scope.$inputs.normal = pb.vec3().attrib('normal');
-        }
-        if (this.vertexTangent) {
-          scope.$inputs.tangent = pb.vec4().attrib('tangent');
-        }
-      }
-    }
-    /**
      * Fragment shader implementation
      *
      * @param scope - Shader scope
@@ -695,8 +659,6 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     }
   } as unknown as T & { new (...args: any[]): IMixinLight };
   FEATURE_DOUBLE_SIDED_LIGHTING = cls.defineFeature();
-  FEATURE_VERTEX_NORMAL = cls.defineFeature();
-  FEATURE_VERTEX_TANGENT = cls.defineFeature();
   FEATURE_OBJECT_SPACE_NORMALMAP = cls.defineFeature();
   return cls;
 }

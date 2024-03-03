@@ -2,11 +2,7 @@ import type { TextureFormat, PBInsideFunctionScope, PBShaderExp } from '@zephyr3
 import { hasDepthChannel } from '@zephyr3d/device';
 import { Application } from '../app';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
-import {
-  decode2HalfFromRGBA,
-  decodeNormalizedFloatFromRGBA,
-  encodeNormalizedFloatToRGBA
-} from './misc';
+import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from './misc';
 import { ShaderHelper } from '../material/shader/helper';
 
 /*
@@ -453,7 +449,11 @@ export function filterShadowESM(
         }
         if (lightType === LIGHT_TYPE_SPOT) {
           this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
-          this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(this, this.shadowVertex.z, this.nearFar);
+          this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(
+            this,
+            this.shadowVertex.z,
+            this.nearFar
+          );
         } else {
           this.$l.depth = this.shadowVertex.z;
         }

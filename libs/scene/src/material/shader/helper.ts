@@ -309,7 +309,7 @@ export class ShaderHelper {
    * @param scope - Current shader scope
    * @param worldNormal - World position
    */
-  static propagateWorldPosition(scope: PBInsideFunctionScope, worldPos: PBShaderExp) {
+  static pipeWorldPosition(scope: PBInsideFunctionScope, worldPos: PBShaderExp) {
     const pb = scope.$builder;
     scope.$outputs[VARYING_NAME_WORLD_POSITION] =
       worldPos.numComponents() === 3 ? pb.vec4(worldPos, 1) : worldPos;
@@ -320,7 +320,7 @@ export class ShaderHelper {
    * @param scope - Current shader scope
    * @param worldNormal - World normal vector
    */
-  static propagateWorldNormal(scope: PBInsideFunctionScope, worldNormal: PBShaderExp): void {
+  static pipeWorldNormal(scope: PBInsideFunctionScope, worldNormal: PBShaderExp): void {
     scope.$outputs[VARYING_NAME_WORLD_NORMAL] = worldNormal;
   }
   /**
@@ -329,7 +329,7 @@ export class ShaderHelper {
    * @param scope - Current shader scope
    * @param worldNormal - World tangent vector
    */
-  static propagateWorldTangent(scope: PBInsideFunctionScope, worldTangent: PBShaderExp) {
+  static pipeWorldTangent(scope: PBInsideFunctionScope, worldTangent: PBShaderExp) {
     scope.$outputs[VARYING_NAME_WORLD_TANGENT] = worldTangent;
   }
   /**
@@ -338,7 +338,7 @@ export class ShaderHelper {
    * @param scope - Current shader scope
    * @param worldNormal - World binormal vector
    */
-  static propagateWorldBinormal(scope: PBInsideFunctionScope, worldBinormal: PBShaderExp) {
+  static pipeWorldBinormal(scope: PBInsideFunctionScope, worldBinormal: PBShaderExp) {
     scope.$outputs[VARYING_NAME_WORLD_BINORMAL] = worldBinormal;
   }
   /**
@@ -365,37 +365,44 @@ export class ShaderHelper {
       : null;
   }
   /**
-   * Transform vertex position to the clip space and calcuate the world position, world normal and tangent frame if needed
+   * Perform standard processing on vertices, normals, and tangents.
    *
    * @remarks
-   * This function handles skin animation and geometry instancing if needed
+   * This function performs skeletal transformations (if present) and
+   * world transformations on vertices, normals, and tangents, outputting
+   * them to the Fragment shader. It also transforms the vertices from
+   * local space to clip space.If vertex normals or tangents are absent,
+   * they will be ignored.
    *
    * @param scope - Current shader scope
+   * @param pos - Local space vertex coordinates, if omitted, vertex input will be used instead.
+   * @param normal - Local space vertex normal, if omitted, vertex input will be used instead.
+   * @param tangent - Local space vertex tangent, if omitted, vertex input will be used instead.
    */
-  static transformVertexAndNormal(
+  static processPositionAndNormal(
     scope: PBInsideFunctionScope,
     pos?: PBShaderExp,
     normal?: PBShaderExp,
     tangent?: PBShaderExp
   ) {
     const pb = scope.$builder;
-    const funcName = 'Z_transformVertexAndNormal';
+    const funcName = 'Z_processPositionAndNormal';
     const that = this;
     const params: PBShaderExp[] = [];
     const args: PBShaderExp[] = [];
     pos = pos ?? scope.$getVertexAttrib('position');
     if (!pos) {
-      throw new Error('ShaderHelper.transformVertexAndNormal(): No vertex input');
+      throw new Error('ShaderHelper.processPositionAndNormal(): No vertex input');
     }
     if (pos.numComponents() !== 3) {
-      throw new Error('ShaderHelper.transformVertexAndNormal(): vertex position must be of type vec3');
+      throw new Error('ShaderHelper.processPositionAndNormal(): vertex position must be of type vec3');
     }
     params.push(pb.vec3('pos'));
     args.push(pos);
     normal = normal ?? scope.$getVertexAttrib('normal');
     if (normal) {
       if (normal.numComponents() !== 3) {
-        console.error('ShaderHelper.transformVertexAndNormal(): vertex normal must be of type vec3');
+        console.error('ShaderHelper.processPositionAndNormal(): vertex normal must be of type vec3');
         normal = null;
       } else {
         params.push(pb.vec3('normal'));
@@ -405,7 +412,7 @@ export class ShaderHelper {
     tangent = tangent ?? scope.$getVertexAttrib('tangent');
     if (tangent) {
       if (tangent.numComponents() !== 4) {
-        console.error('ShaderHelper.transformVertexAndNormal(): vertex tangent must be of type vec4');
+        console.error('ShaderHelper.processPositionAndNormal(): vertex tangent must be of type vec4');
         tangent = null;
       } else {
         params.push(pb.vec4('tangent'));
@@ -422,7 +429,7 @@ export class ShaderHelper {
         this.pos,
         that.hasSkinning(this) ? this.skinMatrix : null
       );
-      that.propagateWorldPosition(this, pb.mul(that.getWorldMatrix(this), pb.vec4(this.$l.oPos, 1)));
+      that.pipeWorldPosition(this, pb.mul(that.getWorldMatrix(this), pb.vec4(this.$l.oPos, 1)));
       that.setClipSpacePosition(this, pb.mul(viewProjMatrix, this.$outputs[VARYING_NAME_WORLD_POSITION]));
       if (normal) {
         this.$l.oNorm = that.calculateObjectSpaceNormal(
@@ -430,7 +437,7 @@ export class ShaderHelper {
           this.normal,
           that.hasSkinning(this) ? this.skinMatrix : null
         );
-        that.propagateWorldNormal(
+        that.pipeWorldNormal(
           this,
           pb.normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oNorm, 0)).xyz)
         );
@@ -440,11 +447,11 @@ export class ShaderHelper {
             this.tangent,
             that.hasSkinning(this) ? this.skinMatrix : null
           );
-          that.propagateWorldTangent(
+          that.pipeWorldTangent(
             this,
             pb.normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oTangent.xyz, 0)).xyz)
           );
-          that.propagateWorldBinormal(
+          that.pipeWorldBinormal(
             this,
             pb.normalize(
               pb.mul(
@@ -1191,7 +1198,10 @@ export class ShaderHelper {
   ): PBShaderExp {
     const pb = scope.$builder;
     nearFar = nearFar ?? this.getCameraParams(scope);
-    return pb.div(pb.sub(nearFar.y, pb.div(pb.mul(nearFar.x, nearFar.y), depth)), pb.sub(nearFar.y, nearFar.x));
+    return pb.div(
+      pb.sub(nearFar.y, pb.div(pb.mul(nearFar.x, nearFar.y), depth)),
+      pb.sub(nearFar.y, nearFar.x)
+    );
   }
   /**
    * Calculates the linear depth from non-linear depth

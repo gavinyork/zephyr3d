@@ -50,16 +50,19 @@ export type TexturePropUniforms<U extends string> = {
     scope: PBInsideFunctionScope
   ) => PBShaderExp;
 } & {
-  [P in 'Texture' as `sample${Capitalize<U>}${P}`]: (scope: PBInsideFunctionScope, texCoord?: PBShaderExp) => PBShaderExp;
+  [P in 'Texture' as `sample${Capitalize<U>}${P}`]: (
+    scope: PBInsideFunctionScope,
+    texCoord?: PBShaderExp
+  ) => PBShaderExp;
 };
 
 export function mixinTextureProps<U extends string>(name: U) {
   return function <T extends typeof MeshMaterial>(BaseCls: T, vertex = false) {
     const capName = `${name[0].toUpperCase()}${name.slice(1)}`;
     const id = `mixinTexture${capName}`;
-    let feature: number;
-    let featureTexIndex: number;
-    let featureTexMatrix: number;
+    let feature = 0;
+    let featureTexIndex = 0;
+    let featureTexMatrix = 0;
     if ((BaseCls as any)[id]) {
       return BaseCls as unknown as T & {
         new (...args: any[]): TextureProp<U> & TexturePropUniforms<U>;
@@ -130,7 +133,10 @@ export function mixinTextureProps<U extends string>(name: U) {
     proto[propSampler] = null;
     proto[propTexCoord] = 0;
     proto[propMatrix] = null;
-    proto[`sample${capName}Texture`] = function (scope: PBInsideFunctionScope, texCoord?: PBShaderExp): PBShaderExp {
+    proto[`sample${capName}Texture`] = function (
+      scope: PBInsideFunctionScope,
+      texCoord?: PBShaderExp
+    ): PBShaderExp {
       const tex = this[`get${capName}TextureUniform`](scope);
       const coord = texCoord ?? this[`get${capName}TexCoord`](scope);
       return scope.$builder.textureSample(tex, coord);

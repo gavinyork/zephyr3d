@@ -1,8 +1,6 @@
 import type { TextureFormat, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { ShadowImpl } from './shadow_impl';
-import {
-  decodeNormalizedFloatFromRGBA
-} from '../shaders/misc';
+import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
 import { ShadowMapper } from './shadowmapper';
 import { Application } from '../app';
@@ -268,7 +266,11 @@ export class SSM extends ShadowImpl {
           } else {
             if (shadowMapParams.lightType === LIGHT_TYPE_SPOT) {
               this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
-              this.shadowCoord.z = ShaderHelper.nonLinearDepthToLinearNormalized(this, this.shadowCoord.z, this.nearFar);
+              this.shadowCoord.z = ShaderHelper.nonLinearDepthToLinearNormalized(
+                this,
+                this.shadowCoord.z,
+                this.nearFar
+              );
               this.$l.shadowBias = ShadowMapper.computeShadowBias(
                 shadowMapParams,
                 this,

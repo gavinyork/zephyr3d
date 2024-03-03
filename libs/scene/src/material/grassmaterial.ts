@@ -19,7 +19,6 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
     this.roughness = 1;
     this.specularFactor = new Vector4(1, 1, 1, 0.2);
     this.doubleSidedLighting = false;
-    this.vertexNormal = false;
     this._terrainSize = terrainSize;
     this._terrainNormalMap = normalMap;
     this._textureSize = Vector2.one();
@@ -67,7 +66,7 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
     scope.$l.axisZ = pb.cross(scope.axisX, scope.normal);
     scope.$l.axisX = pb.cross(scope.normal, scope.axisZ);
     scope.$l.rotPos = pb.mul(pb.mat3(scope.axisX, scope.normal, scope.axisZ), scope.$inputs.pos);
-    this.helper.transformVertexAndNormal(
+    this.helper.processPositionAndNormal(
       scope,
       pb.add(scope.rotPos, scope.$inputs.placement.xyz),
       scope.normal
@@ -89,30 +88,14 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
       scope.$l.litColor = pb.vec3(0);
       if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         scope.$l.normalInfo = this.calculateNormalAndTBN(scope);
-        scope.$l.normal = scope.normalInfo.normal;
         scope.$l.viewVec = this.calculateViewVector(scope);
-        scope.$l.pbrData = this.getCommonData(scope, scope.albedo, scope.viewVec, scope.normalInfo.TBN);
-        this.indirectLighting(scope, scope.normal, scope.viewVec, scope.pbrData, scope.litColor);
-        this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, shadow) {
-          this.$l.diffuse = pb.vec3();
-          this.$l.specular = pb.vec3();
-          this.$l.lightAtten = that.calculateLightAttenuation(this, type, posRange, dirCutoff);
-          this.$l.lightDir = that.calculateLightDirection(this, type, posRange, dirCutoff);
-          this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
-          this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
-          if (shadow) {
-            this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.NoL));
-          }
-          that.directLighting(
-            this,
-            this.lightDir,
-            this.lightColor,
-            this.normal,
-            this.viewVec,
-            this.pbrData,
-            this.litColor
-          );
-        });
+        scope.$l.litColor = this.PBRLight(
+          scope,
+          scope.normalInfo.normal,
+          scope.normalInfo.TBN,
+          scope.viewVec,
+          scope.albedo
+        );
       }
       scope.albedo.a = pb.mul(
         scope.albedo.a,

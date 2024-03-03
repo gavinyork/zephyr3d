@@ -55,9 +55,9 @@ export class ToonMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoC
     if (this.pass === 0) {
       scope.edge = pb.float().uniform(2);
       const vertexPos = pb.add(scope.$inputs.pos, pb.mul(scope.$inputs.normal, scope.edge));
-      this.helper.transformVertexAndNormal(scope, vertexPos);
+      this.helper.processPositionAndNormal(scope, vertexPos);
     } else {
-      this.helper.transformVertexAndNormal(scope);
+      this.helper.processPositionAndNormal(scope);
     }
   }
   fragmentShader(scope: PBFunctionScope): void {

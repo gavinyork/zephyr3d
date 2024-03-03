@@ -135,14 +135,14 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
       }
       scope.$outputs.tex = scope.$inputs.tex;
       scope.$l.worldNormal = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.$inputs.normal, 0)).xyz;
-      this.helper.propagateWorldNormal(scope, scope.worldNormal);
+      this.helper.pipeWorldNormal(scope, scope.worldNormal);
     }
     scope.$l.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(vertexPos, 1));
     this.helper.setClipSpacePosition(
       scope,
       pb.mul(this.helper.getViewProjectionMatrix(scope), scope.worldPos)
     );
-    this.helper.propagateWorldPosition(scope, scope.worldPos);
+    this.helper.pipeWorldPosition(scope, scope.worldPos);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
