@@ -1,9 +1,7 @@
 import type { TextureFormat, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { ShadowImpl } from './shadow_impl';
 import {
-  decodeNormalizedFloatFromRGBA,
-  linearDepthToNonLinear,
-  nonLinearDepthToLinearNormalized
+  decodeNormalizedFloatFromRGBA
 } from '../shaders/misc';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
 import { ShadowMapper } from './shadowmapper';
@@ -201,7 +199,7 @@ export class SSM extends ShadowImpl {
         if (that.useNativeShadowMap(shadowMapParams)) {
           this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
           this.$l.maxZ = pb.max(pb.max(pb.abs(this.dir.x), pb.abs(this.dir.y)), pb.abs(this.dir.z));
-          this.$l.distance = linearDepthToNonLinear(this, this.maxZ, this.nearFar);
+          this.$l.distance = ShaderHelper.linearDepthToNonLinear(this, this.maxZ, this.nearFar);
           this.$l.shadowBias = ShadowMapper.computeShadowBias(
             shadowMapParams,
             this,
@@ -270,7 +268,7 @@ export class SSM extends ShadowImpl {
           } else {
             if (shadowMapParams.lightType === LIGHT_TYPE_SPOT) {
               this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
-              this.shadowCoord.z = nonLinearDepthToLinearNormalized(this, this.shadowCoord.z, this.nearFar);
+              this.shadowCoord.z = ShaderHelper.nonLinearDepthToLinearNormalized(this, this.shadowCoord.z, this.nearFar);
               this.$l.shadowBias = ShadowMapper.computeShadowBias(
                 shadowMapParams,
                 this,

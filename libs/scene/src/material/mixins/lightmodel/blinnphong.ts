@@ -45,7 +45,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     blinnPhongLight(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
-      const funcName = 'Z_BlinnPhongLight';
+      const funcName = 'Z_blinnPhongLight';
       const that = this;
       pb.func(funcName, [pb.vec3('normal'), pb.vec3('viewVec'), pb.vec4('albedo')], function(){
         if (!that.needFragmentColor()){

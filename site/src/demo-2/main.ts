@@ -4,8 +4,6 @@ import type { SceneNode } from '@zephyr3d/scene';
 import {
   Scene,
   AssetManager,
-  panoramaToCubemap,
-  prefilterCubemap,
   Application,
   Tonemap,
   BoundingBox,
@@ -19,7 +17,7 @@ import {
   SphereShape,
   Compositor
 } from '@zephyr3d/scene';
-import type { DeviceBackend, Texture2D } from '@zephyr3d/device';
+import type { DeviceBackend } from '@zephyr3d/device';
 import { imGuiInit, imGuiInjectEvent } from '@zephyr3d/imgui';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
@@ -57,6 +55,7 @@ const lightApp = new Application({
 const animationFunctions: ((elapsed: number) => void)[] = [];
 lightApp.ready().then(async () => {
   const device = lightApp.device;
+  device.setFont('24px arial');
   const scene = new Scene();
   const camera = new PerspectiveCamera(
     scene,
@@ -78,7 +77,7 @@ lightApp.ready().then(async () => {
 
   let message = 'Loading, please wait...';
   assetManager.fetchModel(scene, './assets/models/sponza/Sponza.gltf', null).then((info) => {
-    message = '';
+    message = 'Move with W/S/A/D keys, rotate with left mouse button.';
     function traverseModel(group: SceneNode, func: (node: SceneNode) => void, context?: any) {
       if (group) {
         const queue: SceneNode[] = [group];
@@ -205,11 +204,7 @@ lightApp.ready().then(async () => {
     camera.updateController();
     camera.render(scene, compositor);
     ui.render();
-
-    if (message) {
-      lightApp.device.setFont('32px arial');
-      lightApp.device.drawText(message, 20, 20, '#a00000');
-    }
+    lightApp.device.drawText(message, 20, 20, '#a00000');
   });
   lightApp.run();
 });

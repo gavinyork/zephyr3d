@@ -7,7 +7,7 @@ import {
 } from '../shaders/shadow';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
 import { ShadowMapper } from './shadowmapper';
-import { decodeNormalizedFloatFromRGBA, linearDepthToNonLinear } from '../shaders/misc';
+import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import { Application } from '../app';
 import { LIGHT_TYPE_POINT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
@@ -155,7 +155,7 @@ export class PCFPD extends ShadowImpl {
         if (that.useNativeShadowMap(shadowMapParams)) {
           this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
           this.$l.maxZ = pb.max(pb.max(pb.abs(this.dir.x), pb.abs(this.dir.y)), pb.abs(this.dir.z));
-          this.$l.distance = linearDepthToNonLinear(this, this.maxZ, this.nearFar);
+          this.$l.distance = ShaderHelper.linearDepthToNonLinear(this, this.maxZ, this.nearFar);
           this.$l.shadowBias = ShadowMapper.computeShadowBias(
             shadowMapParams,
             this,

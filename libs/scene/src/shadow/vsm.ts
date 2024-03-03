@@ -15,8 +15,7 @@ import { ShadowMapper } from './shadowmapper';
 import {
   decode2HalfFromRGBA,
   decodeNormalizedFloatFromRGBA,
-  encode2HalfToRGBA,
-  nonLinearDepthToLinearNormalized
+  encode2HalfToRGBA
 } from '../shaders/misc';
 import { Application } from '../app';
 import { TemporalCache } from '../render';
@@ -424,7 +423,7 @@ export class VSM extends ShadowImpl {
         this.$if(this.inShadow, function () {
           if (shadowMapParams.lightType === LIGHT_TYPE_SPOT) {
             this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
-            this.shadowCoord.z = nonLinearDepthToLinearNormalized(this, this.shadowCoord.z, this.nearFar);
+            this.shadowCoord.z = ShaderHelper.nonLinearDepthToLinearNormalized(this, this.shadowCoord.z, this.nearFar);
             this.$l.shadowBias = ShadowMapper.computeShadowBias(
               shadowMapParams,
               this,

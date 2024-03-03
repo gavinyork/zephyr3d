@@ -279,7 +279,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     ): PBShaderExp {
       const pb = scope.$builder;
       const that = this;
-      const funcName = 'Z_GetCommonData';
+      const funcName = 'Z_getCommonData';
       pb.func(funcName, [pb.vec4('albedo'), pb.vec3('viewVec'), pb.mat3('TBN')], function () {
         this.$l.data = that.getCommonDatasStruct(this)();
         that.calculateCommonData(this, this.albedo, this.viewVec, this.TBN, this.data);
@@ -596,7 +596,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       F90: PBShaderExp
     ): PBShaderExp {
       const pb = scope.$builder;
-      const funcName = 'Z_FresnelSchlick';
+      const funcName = 'Z_fresnelSchlick';
       pb.func(funcName, [pb.float('cosTheta'), pb.vec3('f0'), pb.vec3('f90')], function () {
         this.$return(
           pb.add(
@@ -613,7 +613,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       alphaRoughness: PBShaderExp
     ): PBShaderExp {
       const pb = scope.$builder;
-      const funcName = 'Z_DistributionGGX';
+      const funcName = 'Z_distributionGGX';
       pb.func(funcName, [pb.float('NdotH'), pb.float('roughness')], function () {
         this.$l.a2 = pb.mul(this.roughness, this.roughness);
         this.$l.NdotH2 = pb.mul(this.NdotH, this.NdotH);
@@ -631,7 +631,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       alphaRoughness: PBShaderExp
     ): PBShaderExp {
       const pb = scope.$builder;
-      const funcName = 'Z_VisGGX';
+      const funcName = 'Z_visGGX';
       pb.func(funcName, [pb.float('NdotV'), pb.float('NdotL'), pb.float('roughness')], function () {
         this.$l.a = this.roughness;
         this.$l.ggxV = pb.mul(

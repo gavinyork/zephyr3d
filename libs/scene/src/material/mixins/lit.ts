@@ -5,7 +5,6 @@ import {
   LIGHT_TYPE_SPOT,
   RENDER_PASS_TYPE_LIGHT
 } from '../../values';
-import { nonLinearDepthToLinear } from '../../shaders';
 import type { DrawContext } from '../../render';
 import type { MeshMaterial } from '../meshmaterial';
 import { applyMaterialMixins } from '../meshmaterial';
@@ -167,7 +166,8 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           args.push(worldTangent, worldBinormal);
         }
       }
-      pb.func('Z_CalculateNormal', params, function () {
+      const funcName = 'Z_calculateNormal';
+      pb.func(funcName, params, function () {
         this.$l.uv = that.normalTexture
           ? that.getNormalTexCoord(this) ?? pb.vec2(0)
           : that.albedoTexture
@@ -194,7 +194,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$return(this.TBN[2]);
         }
       });
-      return pb.getGlobalScope().Z_CalculateNormal(...args);
+      return pb.getGlobalScope()[funcName](...args);
     }
     /**
      * Calculate the normal vector for current fragment
@@ -219,7 +219,8 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           args.push(worldTangent, worldBinormal);
         }
       }
-      pb.func('Z_CalculateNormalAndTBN', params, function () {
+      const funcName = 'Z_calculateNormalAndTBN';
+      pb.func(funcName, params, function () {
         this.$l.uv = that.normalTexture
           ? that.getNormalTexCoord(this) ?? pb.vec2(0)
           : that.albedoTexture
@@ -246,7 +247,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$return(NormalStruct(this.TBN, this.TBN[2]));
         }
       });
-      return pb.getGlobalScope().Z_CalculateNormalAndTBN(...args);
+      return pb.getGlobalScope()[funcName](...args);
     }
     /**
      * Calculate the TBN matrix
@@ -270,7 +271,8 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           args.push(worldTangent, worldBinormal);
         }
       }
-      pb.func('Z_CalculateTBN', params, function () {
+      const funcName = 'Z_calculateTBN';
+      pb.func(funcName, params, function () {
         const posW = that.helper.getWorldPosition(this).xyz;
         this.$l.uv = that.normalTexture
           ? that.getNormalTexCoord(this) ?? pb.vec2(0)
@@ -343,7 +345,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         }
         this.$return(this.TBN);
       });
-      return pb.getGlobalScope().Z_CalculateTBN(...args);
+      return pb.getGlobalScope()[funcName](...args);
     }
     /**
      * {@inheritDoc MeshMaterial.applyUniformsValues}
@@ -445,7 +447,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         this.$l.zTile = pb.int(
           pb.max(
             pb.add(
-              pb.mul(pb.log2(nonLinearDepthToLinear(this, this.fragCoord.z)), clusterParams.z),
+              pb.mul(pb.log2(that.helper.nonLinearDepthToLinear(this, this.fragCoord.z)), clusterParams.z),
               clusterParams.w
             ),
             0

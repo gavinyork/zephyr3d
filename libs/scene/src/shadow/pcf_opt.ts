@@ -1,6 +1,6 @@
 import type { PBInsideFunctionScope, PBShaderExp, TextureFormat, TextureSampler } from '@zephyr3d/device';
 import { ShadowImpl } from './shadow_impl';
-import { decodeNormalizedFloatFromRGBA, linearDepthToNonLinear } from '../shaders/misc';
+import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import { computeShadowMapDepth, computeReceiverPlaneDepthBias, filterShadowPCF } from '../shaders/shadow';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
 import { ShadowMapper } from './shadowmapper';
@@ -135,7 +135,7 @@ export class PCFOPT extends ShadowImpl {
         if (that.useNativeShadowMap(shadowMapParams)) {
           this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
           this.$l.maxZ = pb.max(pb.max(pb.abs(this.dir.x), pb.abs(this.dir.y)), pb.abs(this.dir.z));
-          this.$l.distance = linearDepthToNonLinear(this, this.maxZ, this.nearFar);
+          this.$l.distance = ShaderHelper.linearDepthToNonLinear(this, this.maxZ, this.nearFar);
           this.$l.shadowBias = ShadowMapper.computeShadowBias(
             shadowMapParams,
             this,

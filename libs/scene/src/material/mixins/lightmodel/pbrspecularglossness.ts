@@ -72,7 +72,7 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
     }
     PBRLight(scope: PBInsideFunctionScope, normal: PBShaderExp, TBN: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
-      const funcName = 'Z_PBRLight';
+      const funcName = 'Z_PBRSpecularGlossinessLight';
       const that = this;
       pb.func(funcName, [pb.vec3('normal'), pb.mat3('TBN'), pb.vec3('viewVec'), pb.vec4('albedo')], function(){
         this.$l.pbrData = that.getCommonData(this, this.albedo, this.viewVec, this.TBN);

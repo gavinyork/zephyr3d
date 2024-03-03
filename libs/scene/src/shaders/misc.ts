@@ -1,6 +1,5 @@
 import type { PBShaderExp } from '@zephyr3d/device';
 import { PBInsideFunctionScope, PBPrimitiveType } from '@zephyr3d/device';
-import { ShaderHelper } from '../material/shader/helper';
 
 /**
  * Calculates the TBN matrix
@@ -96,66 +95,6 @@ export function calculateTBNWithNormal(
     this.$return(pb.mat3(this.t, this.b, this.ng));
   });
   return pb.getGlobalScope()[funcName](worldPosition, worldNormal, uv);
-}
-
-/**
- * Calculates the non-linear depth from linear depth
- *
- * @param scope - Current shader scope
- * @param depth - The linear depth
- * @param nearFar - A vector that contains the near clip plane in x component and the far clip plane in y component
- * @returns The calculated non-linear depth
- *
- * @public
- */
-export function linearDepthToNonLinear(
-  scope: PBInsideFunctionScope,
-  depth: PBShaderExp,
-  nearFar?: PBShaderExp
-): PBShaderExp {
-  const pb = scope.$builder;
-  nearFar = nearFar ?? ShaderHelper.getCameraParams(scope);
-  return pb.div(pb.sub(nearFar.y, pb.div(pb.mul(nearFar.x, nearFar.y), depth)), pb.sub(nearFar.y, nearFar.x));
-}
-
-/**
- * Calculates the linear depth from non-linear depth
- *
- * @param scope - Current shader scope
- * @param depth - The non-linear depth
- * @param nearFar - A vector that contains the near clip plane in x component and the far clip plane in y component
- * @returns The calculated linear depth
- *
- * @public
- */
-export function nonLinearDepthToLinear(
-  scope: PBInsideFunctionScope,
-  depth: PBShaderExp,
-  nearFar?: PBShaderExp
-): PBShaderExp {
-  const pb = scope.$builder;
-  nearFar = nearFar ?? ShaderHelper.getCameraParams(scope);
-  return pb.div(pb.mul(nearFar.x, nearFar.y), pb.mix(nearFar.y, nearFar.x, depth));
-}
-
-/**
- * Calculates the normalized linear depth from non-linear depth
- *
- * @param scope - Current shader scope
- * @param depth - The non-linear depth
- * @param nearFar - A vector that contains the near clip plane in x component and the far clip plane in y component
- * @returns The calculated normalized linear depth
- *
- * @public
- */
-export function nonLinearDepthToLinearNormalized(
-  scope: PBInsideFunctionScope,
-  depth: PBShaderExp,
-  nearFar?: PBShaderExp
-): PBShaderExp {
-  const pb = scope.$builder;
-  nearFar = nearFar ?? ShaderHelper.getCameraParams(scope);
-  return pb.div(nearFar.x, pb.mix(nearFar.y, nearFar.x, depth));
 }
 
 /**
@@ -360,29 +299,6 @@ export function decode2HalfFromRGBA(scope: PBInsideFunctionScope, value: PBShade
     );
   });
   return pb.getGlobalScope()[funcName](value);
-}
-
-/**
- * Transform color to sRGB color space if nessesary
- *
- * @param scope - Current shader scope
- * @param outputColor - The color to be transformed
- * @returns The transformed color
- *
- * @public
- */
-export function encodeColorOutput(scope: PBInsideFunctionScope, outputColor: PBShaderExp): PBShaderExp {
-  const pb = scope.$builder;
-  const funcName = 'lib_EncodeColorOutput';
-  pb.func(funcName, [pb.vec4('outputColor')], function () {
-    const params = ShaderHelper.getCameraParams(this);
-    this.$if(pb.notEqual(params.w, 0), function () {
-      this.$return(pb.vec4(linearToGamma(this, this.outputColor.rgb), this.outputColor.w));
-    }).$else(function () {
-      this.$return(this.outputColor);
-    });
-  });
-  return pb.getGlobalScope()[funcName](outputColor);
 }
 
 /**

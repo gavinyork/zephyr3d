@@ -17,24 +17,24 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
-import { nonLinearDepthToLinear } from '../../shaders';
+import { linearToGamma } from '../../shaders';
 
-const UNIFORM_NAME_GLOBAL = 'z_UniformGlobal';
-const UNIFORM_NAME_LIGHT_BUFFER = 'z_UniformLightBuffer';
-const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'z_UniformLightIndexTex';
-const UNIFORM_NAME_AERIALPERSPECTIVE_LUT = 'z_UniformAerialPerspectiveLUT';
-const UNIFORM_NAME_SHADOW_MAP = 'z_UniformShadowMap';
-const UNIFORM_NAME_INSTANCE_BUFFER_OFFSET = 'z_UniformInstanceBufferOffset';
-const UNIFORM_NAME_WORLD_MATRIX = 'z_UniformWorldMatrix';
-const UNIFORM_NAME_WORLD_MATRICES = 'z_UniformWorldMatrices';
-const UNIFORM_NAME_BONE_MATRICES = 'z_UniformBoneMatrices';
-const UNIFORM_NAME_BONE_TEXTURE_SIZE = 'z_UniformBoneTexSize';
-const UNIFORM_NAME_BONE_INV_BIND_MATRIX = 'z_UniformBoneInvBindMatrix';
+const UNIFORM_NAME_GLOBAL = 'Z_UniformGlobal';
+const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
+const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'Z_UniformLightIndexTex';
+const UNIFORM_NAME_AERIALPERSPECTIVE_LUT = 'Z_UniformAerialPerspectiveLUT';
+const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
+const UNIFORM_NAME_INSTANCE_BUFFER_OFFSET = 'Z_UniformInstanceBufferOffset';
+const UNIFORM_NAME_WORLD_MATRIX = 'Z_UniformWorldMatrix';
+const UNIFORM_NAME_WORLD_MATRICES = 'Z_UniformWorldMatrices';
+const UNIFORM_NAME_BONE_MATRICES = 'Z_UniformBoneMatrices';
+const UNIFORM_NAME_BONE_TEXTURE_SIZE = 'Z_UniformBoneTexSize';
+const UNIFORM_NAME_BONE_INV_BIND_MATRIX = 'Z_UniformBoneInvBindMatrix';
 
-const VARYING_NAME_WORLD_POSITION = 'z_VaryingWorldPosition';
-const VARYING_NAME_WORLD_NORMAL = 'z_VaryingWorldNormal';
-const VARYING_NAME_WORLD_TANGENT = 'z_VaryingWorldTangent';
-const VARYING_NAME_WORLD_BINORMAL = 'z_VaryingWorldBinormal';
+const VARYING_NAME_WORLD_POSITION = 'Z_VaryingWorldPosition';
+const VARYING_NAME_WORLD_NORMAL = 'Z_VaryingWorldNormal';
+const VARYING_NAME_WORLD_TANGENT = 'Z_VaryingWorldTangent';
+const VARYING_NAME_WORLD_BINORMAL = 'Z_VaryingWorldBinormal';
 
 /**
  * Helper shader functions for the builtin material system
@@ -228,7 +228,7 @@ export class ShaderHelper {
       return null;
     }
     const pb = scope.$builder;
-    const funcNameGetBoneMatrixFromTexture = 'zGetBoneMatrixFromTexture';
+    const funcNameGetBoneMatrixFromTexture = 'Z_getBoneMatrixFromTexture';
     pb.func(funcNameGetBoneMatrixFromTexture, [pb.int('boneIndex')], function () {
       const boneTexture = this[UNIFORM_NAME_BONE_MATRICES];
       this.$l.w = pb.float(this[UNIFORM_NAME_BONE_TEXTURE_SIZE]);
@@ -246,7 +246,7 @@ export class ShaderHelper {
       this.$l.row4 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u4, this.v), 0);
       this.$return(pb.mat4(this.row1, this.row2, this.row3, this.row4));
     });
-    const funcNameGetSkinningMatrix = 'zGetSkinningMatrix';
+    const funcNameGetSkinningMatrix = 'Z_getSkinningMatrix';
     pb.func(funcNameGetSkinningMatrix, [], function () {
       const invBindMatrix = this[UNIFORM_NAME_BONE_INV_BIND_MATRIX];
       const blendIndices = scope.$getVertexAttrib('blendIndices');
@@ -379,7 +379,7 @@ export class ShaderHelper {
     tangent?: PBShaderExp
   ) {
     const pb = scope.$builder;
-    const funcName = 'zTransformVertexAndNormal';
+    const funcName = 'Z_transformVertexAndNormal';
     const that = this;
     const params: PBShaderExp[] = [];
     const args: PBShaderExp[] = [];
@@ -620,7 +620,7 @@ export class ShaderHelper {
    * @param scope - Current shader scope
    */
   static discardIfClipped(scope: PBInsideFunctionScope) {
-    const funcName = 'zDiscardIfClippped';
+    const funcName = 'Z_discardIfClippped';
     const pb = scope.$builder;
     const that = this;
     pb.func(funcName, [], function () {
@@ -728,7 +728,7 @@ export class ShaderHelper {
     fogParams: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
-    const funcName = 'zComputeFogFactor';
+    const funcName = 'Z_computeFogFactor';
     const that = this;
     pb.func(funcName, [pb.vec3('viewDir'), pb.int('fogType'), pb.vec4('fogParams')], function () {
       this.$l.distance = pb.length(this.viewDir);
@@ -772,7 +772,7 @@ export class ShaderHelper {
     fogType: 'linear' | 'exp' | 'exp2'
   ): PBShaderExp {
     const pb = scope.$builder;
-    const funcName = `zComputeFogFactor${fogType[0].toUpperCase()}${fogType.slice(1)}`;
+    const funcName = `Z_computeFogFactor${fogType[0].toUpperCase()}${fogType.slice(1)}`;
     pb.func(funcName, [pb.vec3('viewDir'), pb.vec4('fogParams')], function () {
       this.$l.distance = pb.length(this.viewDir);
       this.$l.top = pb.max(this.viewDir.y, 0.0001);
@@ -975,7 +975,7 @@ export class ShaderHelper {
   /** @internal */
   static getSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp {
     const pb = scope.$builder;
-    const funcNameGetBoneMatrixFromTexture = 'zGetBoneMatrixFromTexture';
+    const funcNameGetBoneMatrixFromTexture = 'Z_getBoneMatrixFromTexture';
     pb.func(funcNameGetBoneMatrixFromTexture, [pb.int('boneIndex')], function () {
       const boneTexture = this[UNIFORM_NAME_BONE_MATRICES];
       this.$l.w = pb.float(this[UNIFORM_NAME_BONE_TEXTURE_SIZE]);
@@ -1000,7 +1000,7 @@ export class ShaderHelper {
       }
       this.$return(pb.mat4(this.row1, this.row2, this.row3, this.row4));
     });
-    const funcNameGetSkinningMatrix = 'zGetSkinningMatrix';
+    const funcNameGetSkinningMatrix = 'Z_getSkinningMatrix';
     pb.func(funcNameGetSkinningMatrix, [], function () {
       const invBindMatrix = this[UNIFORM_NAME_BONE_INV_BIND_MATRIX];
       const blendIndices = pb.getGlobalScope().$getVertexAttrib('blendIndices');
@@ -1047,12 +1047,12 @@ export class ShaderHelper {
     const pb = scope.$builder;
     const that = this;
     const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
-    const funcName = 'lm_calculateCSM';
+    const funcName = 'Z_calculateCSM';
     pb.func(funcName, [pb.float('NoL')], function () {
       if (shadowMapParams.numShadowCascades > 1) {
         this.$l.shadowCascades = that.getGlobalUniforms(this).light.shadowCascades;
         this.$l.shadowBound = pb.vec4(0, 0, 1, 1);
-        this.$l.linearDepth = nonLinearDepthToLinear(this, this.$builtins.fragCoord.z);
+        this.$l.linearDepth = that.nonLinearDepthToLinear(this, this.$builtins.fragCoord.z);
         this.$l.splitDistances = that.getCascadeDistances(this);
         this.$l.comparison = pb.vec4(pb.greaterThan(pb.vec4(this.linearDepth), this.splitDistances));
         this.$l.cascadeFlags = pb.vec4(
@@ -1121,7 +1121,7 @@ export class ShaderHelper {
       const pb = scope.$builder;
       const that = this;
       if (ctx.env.sky.drawScatteredFog(ctx)) {
-        const funcName = 'zApplySkyFog';
+        const funcName = 'Z_applySkyFog';
         pb.func(funcName, [pb.vec4('color').inout()], function () {
           this.$l.viewDir = pb.sub(that.getWorldPosition(this).xyz, that.getCameraPosition(this));
           this.viewDir.y = pb.max(this.viewDir.y, 0);
@@ -1158,7 +1158,7 @@ export class ShaderHelper {
         });
         scope[funcName](color);
       } else {
-        const funcName = 'zApplyFog';
+        const funcName = 'Z_applyFog';
         pb.func(funcName, [pb.vec4('color').inout()], function () {
           this.$l.viewDir = pb.sub(that.getWorldPosition(this).xyz, that.getCameraPosition(this));
           this.$l.fogFactor = that.computeFogFactor(
@@ -1175,5 +1175,77 @@ export class ShaderHelper {
         scope[funcName](color);
       }
     }
+  }
+  /**
+   * Calculates the non-linear depth from linear depth
+   *
+   * @param scope - Current shader scope
+   * @param depth - The linear depth
+   * @param nearFar - A vector that contains the near clip plane in x component and the far clip plane in y component
+   * @returns The calculated non-linear depth
+   */
+  static linearDepthToNonLinear(
+    scope: PBInsideFunctionScope,
+    depth: PBShaderExp,
+    nearFar?: PBShaderExp
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    nearFar = nearFar ?? this.getCameraParams(scope);
+    return pb.div(pb.sub(nearFar.y, pb.div(pb.mul(nearFar.x, nearFar.y), depth)), pb.sub(nearFar.y, nearFar.x));
+  }
+  /**
+   * Calculates the linear depth from non-linear depth
+   *
+   * @param scope - Current shader scope
+   * @param depth - The non-linear depth
+   * @param nearFar - A vector that contains the near clip plane in x component and the far clip plane in y component
+   * @returns The calculated linear depth
+   */
+  static nonLinearDepthToLinear(
+    scope: PBInsideFunctionScope,
+    depth: PBShaderExp,
+    nearFar?: PBShaderExp
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    nearFar = nearFar ?? this.getCameraParams(scope);
+    return pb.div(pb.mul(nearFar.x, nearFar.y), pb.mix(nearFar.y, nearFar.x, depth));
+  }
+  /**
+   * Calculates the normalized linear depth from non-linear depth
+   *
+   * @param scope - Current shader scope
+   * @param depth - The non-linear depth
+   * @param nearFar - A vector that contains the near clip plane in x component and the far clip plane in y component
+   * @returns The calculated normalized linear depth
+   */
+  static nonLinearDepthToLinearNormalized(
+    scope: PBInsideFunctionScope,
+    depth: PBShaderExp,
+    nearFar?: PBShaderExp
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    nearFar = nearFar ?? this.getCameraParams(scope);
+    return pb.div(nearFar.x, pb.mix(nearFar.y, nearFar.x, depth));
+  }
+  /**
+   * Transform color to sRGB color space if nessesary
+   *
+   * @param scope - Current shader scope
+   * @param outputColor - The color to be transformed
+   * @returns The transformed color
+   */
+  static encodeColorOutput(scope: PBInsideFunctionScope, outputColor: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    const that = this;
+    const funcName = 'Z_encodeColorOutput';
+    pb.func(funcName, [pb.vec4('outputColor')], function () {
+      const params = that.getCameraParams(this);
+      this.$if(pb.notEqual(params.w, 0), function () {
+        this.$return(pb.vec4(linearToGamma(this, this.outputColor.rgb), this.outputColor.w));
+      }).$else(function () {
+        this.$return(this.outputColor);
+      });
+    });
+    return pb.getGlobalScope()[funcName](outputColor);
   }
 }

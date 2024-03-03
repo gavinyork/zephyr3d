@@ -18,7 +18,7 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     lambertLight(scope: PBInsideFunctionScope, normal: PBShaderExp, albedo: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
-      const funcName = 'Z_LambertLight';
+      const funcName = 'Z_lambertLight';
       const that = this;
       pb.func(funcName, [pb.vec3('normal'), pb.vec4('albedo')], function(){
         if (!that.needFragmentColor()){

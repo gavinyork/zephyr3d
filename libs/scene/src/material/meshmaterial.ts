@@ -15,7 +15,7 @@ import {
 } from '../values';
 import { Material } from './material';
 import type { DrawContext, ShadowMapPass } from '../render';
-import { encodeColorOutput, encodeNormalizedFloatToRGBA, nonLinearDepthToLinearNormalized } from '../shaders';
+import { encodeNormalizedFloatToRGBA } from '../shaders';
 import { Application } from '../app';
 import { ShaderHelper } from './shader/helper';
 
@@ -320,7 +320,8 @@ export class MeshMaterial extends Material {
   outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp) {
     const pb = scope.$builder;
     const that = this;
-    pb.func('zOutputFragmentColor', color ? [pb.vec4('color')] : [], function () {
+    const funcName = 'Z_outputFragmentColor';
+    pb.func(funcName, color ? [pb.vec4('color')] : [], function () {
       this.$l.outColor = color ? this.color : pb.vec4();
       if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         that.helper.discardIfClipped(this);
@@ -338,7 +339,7 @@ export class MeshMaterial extends Material {
           this.outColor = pb.vec4(pb.mul(this.outColor.rgb, this.outColor.a), this.outColor.a);
         }
         that.helper.applyFog(this, this.outColor, that.drawContext);
-        this.$outputs.zFragmentOutput = encodeColorOutput(this, this.outColor);
+        this.$outputs.zFragmentOutput = that.helper.encodeColorOutput(this, this.outColor);
       } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
         if (color) {
           this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
@@ -346,7 +347,7 @@ export class MeshMaterial extends Material {
           });
         }
         that.helper.discardIfClipped(this);
-        this.$l.depth = nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
+        this.$l.depth = that.helper.nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
         if (Application.instance.device.type === 'webgl') {
           this.$outputs.zFragmentOutput = encodeNormalizedFloatToRGBA(this, this.depth);
         } else {
@@ -365,7 +366,7 @@ export class MeshMaterial extends Material {
         this.$outputs.zFragmentOutput = shadowMapParams.impl.computeShadowMapDepth(shadowMapParams, this);
       }
     });
-    color ? pb.getGlobalScope().zOutputFragmentColor(color) : pb.getGlobalScope().zOutputFragmentColor();
+    color ? pb.getGlobalScope()[funcName](color) : pb.getGlobalScope()[funcName]();
   }
 }
 FEATURE_ALPHATEST = MeshMaterial.defineFeature();

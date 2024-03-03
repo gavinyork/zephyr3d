@@ -5,8 +5,7 @@ import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../va
 import {
   decode2HalfFromRGBA,
   decodeNormalizedFloatFromRGBA,
-  encodeNormalizedFloatToRGBA,
-  nonLinearDepthToLinearNormalized
+  encodeNormalizedFloatToRGBA
 } from './misc';
 import { ShaderHelper } from '../material/shader/helper';
 
@@ -454,7 +453,7 @@ export function filterShadowESM(
         }
         if (lightType === LIGHT_TYPE_SPOT) {
           this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
-          this.$l.depth = nonLinearDepthToLinearNormalized(this, this.shadowVertex.z, this.nearFar);
+          this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(this, this.shadowVertex.z, this.nearFar);
         } else {
           this.$l.depth = this.shadowVertex.z;
         }

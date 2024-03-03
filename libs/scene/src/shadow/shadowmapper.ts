@@ -18,7 +18,6 @@ import { ESM } from './esm';
 import { VSM } from './vsm';
 import { PCFPD } from './pcf_pd';
 import { PCFOPT } from './pcf_opt';
-import { nonLinearDepthToLinearNormalized } from '../shaders/misc';
 import { Application } from '../app';
 import type { PointLight, PunctualLight, SpotLight } from '../scene/light';
 import type { ShadowMapPass } from '../render/shadowmap_pass';
@@ -426,7 +425,7 @@ export class ShadowMapper {
       return pb.dot(pb.mul(depthBiasParam.xy, pb.vec2(1, pb.sub(1, NdotL))), pb.vec2(1, 1));
     } else {
       const nearFar = ShaderHelper.getShadowCameraParams(scope).xy;
-      const linearDepth = linear ? z : nonLinearDepthToLinearNormalized(scope, z, nearFar);
+      const linearDepth = linear ? z : ShaderHelper.nonLinearDepthToLinearNormalized(scope, z, nearFar);
       const biasScaleFactor = pb.mix(1, depthBiasParam.w, linearDepth);
       return pb.dot(pb.mul(depthBiasParam.xy, pb.vec2(1, pb.sub(1, NdotL)), biasScaleFactor), pb.vec2(1, 1));
     }
