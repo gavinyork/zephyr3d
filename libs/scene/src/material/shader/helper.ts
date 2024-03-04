@@ -649,13 +649,12 @@ export class ShaderHelper {
    * Discard the fragment if it was clipped by the clip plane
    * @param scope - Current shader scope
    */
-  static discardIfClipped(scope: PBInsideFunctionScope) {
+  static discardIfClipped(scope: PBInsideFunctionScope, worldPos: PBShaderExp) {
     const funcName = 'Z_discardIfClippped';
     const pb = scope.$builder;
     const that = this;
-    pb.func(funcName, [], function () {
+    pb.func(funcName, [pb.vec3('worldPos')], function () {
       this.$if(pb.notEqual(that.getCameraClipPlaneFlag(this), 0), function () {
-        this.$l.worldPos = that.getWorldPosition(this);
         this.$l.clipPlane = that.getCameraClipPlane(this);
         this.$if(
           pb.greaterThan(pb.add(pb.dot(this.worldPos.xyz, this.clipPlane.xyz), this.clipPlane.w), 0),
@@ -665,7 +664,7 @@ export class ShaderHelper {
         );
       });
     });
-    pb.getGlobalScope()[funcName]();
+    pb.getGlobalScope()[funcName](worldPos);
   }
   /**
    * Gets the clip plane flag
@@ -946,10 +945,10 @@ export class ShaderHelper {
   /** @internal */
   static calculateShadowSpaceVertex(
     scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
     cascade: PBShaderExp | number = 0
   ): PBShaderExp {
     const pb = scope.$builder;
-    const worldPos = this.getWorldPosition(scope);
     return pb.vec4(
       pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 0)), worldPos),
       pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 1)), worldPos),
@@ -1073,12 +1072,12 @@ export class ShaderHelper {
    * @param NoL - NdotL vector
    * @returns Shadow of current fragment, 1 means no shadow and 0 means full shadowed.
    */
-  static calculateShadow(scope: PBInsideFunctionScope, NoL: PBShaderExp, ctx: DrawContext): PBShaderExp {
+  static calculateShadow(scope: PBInsideFunctionScope, worldPos: PBShaderExp, NoL: PBShaderExp, ctx: DrawContext): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
     const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
-    const funcName = 'Z_calculateCSM';
-    pb.func(funcName, [pb.float('NoL')], function () {
+    const funcName = 'Z_calculateShadow';
+    pb.func(funcName, [pb.vec3('worldPos'), pb.float('NoL')], function () {
       if (shadowMapParams.numShadowCascades > 1) {
         this.$l.shadowCascades = that.getGlobalUniforms(this).light.shadowCascades;
         this.$l.shadowBound = pb.vec4(0, 0, 1, 1);
@@ -1096,12 +1095,12 @@ export class ShaderHelper {
           this.$l.shadowVertex = pb.vec4();
           this.$for(pb.int('cascade'), 0, 4, function () {
             this.$if(pb.equal(this.cascade, this.split), function () {
-              this.shadowVertex = that.calculateShadowSpaceVertex(this, this.cascade);
+              this.shadowVertex = that.calculateShadowSpaceVertex(this, pb.vec4(this.worldPos, 1), this.cascade);
               this.$break();
             });
           });
         } else {
-          this.$l.shadowVertex = that.calculateShadowSpaceVertex(this, this.split);
+          this.$l.shadowVertex = that.calculateShadowSpaceVertex(this, pb.vec4(this.worldPos, 1), this.split);
         }
         const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
         this.$l.shadow = shadowMapParams.impl.computeShadowCSM(
@@ -1118,12 +1117,12 @@ export class ShaderHelper {
           pb.smoothStep(
             pb.mul(this.shadowDistance, 0.8),
             this.shadowDistance,
-            pb.distance(that.getCameraPosition(this), that.getWorldPosition(this).xyz)
+            pb.distance(that.getCameraPosition(this), this.worldPos)
           )
         );
         this.$return(this.shadow);
       } else {
-        this.$l.shadowVertex = that.calculateShadowSpaceVertex(this);
+        this.$l.shadowVertex = that.calculateShadowSpaceVertex(this, pb.vec4(this.worldPos, 1));
         const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
         this.$l.shadow = shadowMapParams.impl.computeShadow(
           shadowMapParams,
@@ -1138,22 +1137,22 @@ export class ShaderHelper {
           pb.smoothStep(
             pb.mul(this.shadowDistance, 0.8),
             this.shadowDistance,
-            pb.distance(that.getCameraPosition(this), that.getWorldPosition(this).xyz)
+            pb.distance(that.getCameraPosition(this), this.worldPos)
           )
         );
         this.$return(this.shadow);
       }
     });
-    return pb.getGlobalScope()[funcName](NoL);
+    return pb.getGlobalScope()[funcName](worldPos, NoL);
   }
-  static applyFog(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext) {
+  static applyFog(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: PBShaderExp, ctx: DrawContext) {
     if (ctx.applyFog) {
       const pb = scope.$builder;
       const that = this;
       if (ctx.env.sky.drawScatteredFog(ctx)) {
         const funcName = 'Z_applySkyFog';
-        pb.func(funcName, [pb.vec4('color').inout()], function () {
-          this.$l.viewDir = pb.sub(that.getWorldPosition(this).xyz, that.getCameraPosition(this));
+        pb.func(funcName, [pb.vec3('worldPos'), pb.vec4('color').inout()], function () {
+          this.$l.viewDir = pb.sub(this.worldPos, that.getCameraPosition(this));
           this.viewDir.y = pb.max(this.viewDir.y, 0);
           this.$l.distance = pb.mul(pb.length(this.viewDir), that.getWorldUnit(this));
           this.$l.sliceDist = pb.div(
@@ -1186,11 +1185,11 @@ export class ShaderHelper {
           this.color = pb.vec4(pb.add(pb.mul(this.color.rgb, this.t.a), this.t.rgb), this.color.a);
           //this.color = pb.vec4(pb.vec3(pb.mix(this.u0, this.u1, this.factor)), this.color.a);
         });
-        scope[funcName](color);
+        scope[funcName](worldPos, color);
       } else {
         const funcName = 'Z_applyFog';
-        pb.func(funcName, [pb.vec4('color').inout()], function () {
-          this.$l.viewDir = pb.sub(that.getWorldPosition(this).xyz, that.getCameraPosition(this));
+        pb.func(funcName, [pb.vec3('worldPos'), pb.vec4('color').inout()], function () {
+          this.$l.viewDir = pb.sub(this.worldPos, that.getCameraPosition(this));
           this.$l.fogFactor = that.computeFogFactor(
             this,
             this.viewDir,
@@ -1202,7 +1201,7 @@ export class ShaderHelper {
             this.color.a
           );
         });
-        scope[funcName](color);
+        scope[funcName](worldPos, color);
       }
     }
   }

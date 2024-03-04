@@ -47,18 +47,18 @@ export class BlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinBlinnP
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     const pb = scope.$builder;
-    const that = this;
+    scope.$l.worldPos = this.helper.getWorldPosition(scope).xyz;
     if (this.needFragmentColor()) {
       scope.$l.albedo = this.calculateAlbedoColor(scope);
       if (this.vertexColor) {
         scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope));
       }
-      scope.$l.normal = this.calculateNormal(scope);
-      scope.$l.viewVec = that.calculateViewVector(scope);
-      scope.$l.litColor = this.blinnPhongLight(scope, scope.normal, scope.viewVec, scope.albedo);
-      this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a));
+      scope.$l.normal = this.calculateNormal(scope, scope.worldPos);
+      scope.$l.viewVec = this.calculateViewVector(scope, scope.worldPos);
+      scope.$l.litColor = this.blinnPhongLight(scope, scope.worldPos, scope.normal, scope.viewVec, scope.albedo);
+      this.outputFragmentColor(scope, scope.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
-      this.outputFragmentColor(scope, null);
+      this.outputFragmentColor(scope, scope.worldPos, null);
     }
   }
 }

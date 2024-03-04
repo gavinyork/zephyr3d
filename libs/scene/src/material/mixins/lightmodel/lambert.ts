@@ -5,7 +5,7 @@ import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
 
 export type IMixinLambert = {
-  lambertLight(scope: PBInsideFunctionScope, normal: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+  lambertLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
 } & IMixinLight;
 
 export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
@@ -18,11 +18,11 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
     constructor() {
       super();
     }
-    lambertLight(scope: PBInsideFunctionScope, normal: PBShaderExp, albedo: PBShaderExp): PBShaderExp {
+    lambertLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, albedo: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
       const funcName = 'Z_lambertLight';
       const that = this;
-      pb.func(funcName, [pb.vec3('normal'), pb.vec4('albedo')], function () {
+      pb.func(funcName, [pb.vec3('worldPos'), pb.vec3('normal'), pb.vec4('albedo')], function () {
         if (!that.needFragmentColor()) {
           this.$return(this.albedo.rgb);
         } else {
@@ -32,13 +32,13 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
             this.diffuseColor = pb.vec3(0);
           }
           that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
-            this.$l.lightAtten = that.calculateLightAttenuation(this, type, posRange, dirCutoff);
-            this.$l.lightDir = that.calculateLightDirection(this, type, posRange, dirCutoff);
+            this.$l.lightAtten = that.calculateLightAttenuation(this, type, this.worldPos, posRange, dirCutoff);
+            this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
             this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
             this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
             this.$l.diffuse = pb.mul(this.lightColor, this.NoL);
             if (shadow) {
-              this.$l.shadow = pb.vec3(that.calculateShadow(this, this.NoL));
+              this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, this.NoL));
               this.diffuse = pb.mul(this.diffuse, this.shadow);
             }
             this.diffuseColor = pb.add(this.diffuseColor, this.diffuse);
@@ -47,7 +47,7 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$return(this.litColor);
         }
       });
-      return pb.getGlobalScope()[funcName](normal, albedo);
+      return pb.getGlobalScope()[funcName](worldPos, normal, albedo);
     }
   } as unknown as T & { new (...args: any[]): IMixinLambert };
 }

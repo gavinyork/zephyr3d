@@ -320,14 +320,14 @@ export class MeshMaterial extends Material {
    *
    * @returns The final fragment color
    */
-  outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp) {
+  outputFragmentColor(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: PBShaderExp) {
     const pb = scope.$builder;
     const that = this;
     const funcName = 'Z_outputFragmentColor';
-    pb.func(funcName, color ? [pb.vec4('color')] : [], function () {
+    pb.func(funcName, color ? [pb.vec3('worldPos'), pb.vec4('color')] : [pb.vec3('worldPos')], function () {
       this.$l.outColor = color ? this.color : pb.vec4();
       if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
-        that.helper.discardIfClipped(this);
+        that.helper.discardIfClipped(this, this.worldPos);
         if (!that.isTransparent(that.pass) && !this.zAlphaCutoff && !that.alphaToCoverage) {
           this.outColor.a = 1;
         } else if (this.zOpacity) {
@@ -341,7 +341,7 @@ export class MeshMaterial extends Material {
         if (that.isTransparent(that.pass)) {
           this.outColor = pb.vec4(pb.mul(this.outColor.rgb, this.outColor.a), this.outColor.a);
         }
-        that.helper.applyFog(this, this.outColor, that.drawContext);
+        that.helper.applyFog(this, this.worldPos, this.outColor, that.drawContext);
         this.$outputs.zFragmentOutput = that.helper.encodeColorOutput(this, this.outColor);
       } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
         if (color) {
@@ -349,7 +349,7 @@ export class MeshMaterial extends Material {
             pb.discard();
           });
         }
-        that.helper.discardIfClipped(this);
+        that.helper.discardIfClipped(this, this.worldPos);
         this.$l.depth = that.helper.nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
         if (Application.instance.device.type === 'webgl') {
           this.$outputs.zFragmentOutput = encodeNormalizedFloatToRGBA(this, this.depth);
@@ -362,14 +362,14 @@ export class MeshMaterial extends Material {
             pb.discard();
           });
         }
-        that.helper.discardIfClipped(this);
+        that.helper.discardIfClipped(this, this.worldPos);
         const shadowMapParams = that.drawContext.shadowMapInfo.get(
           (that.drawContext.renderPass as ShadowMapPass).light
         );
-        this.$outputs.zFragmentOutput = shadowMapParams.impl.computeShadowMapDepth(shadowMapParams, this);
+        this.$outputs.zFragmentOutput = shadowMapParams.impl.computeShadowMapDepth(shadowMapParams, this, this.worldPos);
       }
     });
-    color ? pb.getGlobalScope()[funcName](color) : pb.getGlobalScope()[funcName]();
+    color ? pb.getGlobalScope()[funcName](worldPos, color) : pb.getGlobalScope()[funcName](worldPos);
   }
 }
 FEATURE_ALPHATEST = MeshMaterial.defineFeature();

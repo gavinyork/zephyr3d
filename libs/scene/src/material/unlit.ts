@@ -26,6 +26,6 @@ export class UnlitMaterial extends applyMaterialMixins(MeshMaterial, mixinVertex
     if (this.vertexColor) {
       color = scope.$builder.mul(color, this.getVertexColor(scope));
     }
-    this.outputFragmentColor(scope, this.needFragmentColor() ? color : null);
+    this.outputFragmentColor(scope, this.helper.getWorldPosition(scope).xyz, this.needFragmentColor() ? color : null);
   }
 }

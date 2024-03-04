@@ -76,6 +76,7 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
     super.fragmentShader(scope);
     const pb = scope.$builder;
     const that = this;
+    scope.$l.worldPos = this.helper.getWorldPosition(scope).xyz;
     if (this.needFragmentColor()) {
       scope.albedoTextureSize = pb.vec2().uniform(2);
       pb.func('calcMipLevel', [pb.vec2('coord')], function () {
@@ -87,10 +88,11 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
       scope.$l.albedo = this.calculateAlbedoColor(scope);
       scope.$l.litColor = pb.vec3(0);
       if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
-        scope.$l.normalInfo = this.calculateNormalAndTBN(scope);
-        scope.$l.viewVec = this.calculateViewVector(scope);
+        scope.$l.normalInfo = this.calculateNormalAndTBN(scope, scope.worldPos);
+        scope.$l.viewVec = this.calculateViewVector(scope, scope.worldPos);
         scope.$l.litColor = this.PBRLight(
           scope,
+          scope.worldPos,
           scope.normalInfo.normal,
           scope.normalInfo.TBN,
           scope.viewVec,
@@ -113,9 +115,9 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
           0.5
         );
       }
-      this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a));
+      this.outputFragmentColor(scope, scope.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
-      this.outputFragmentColor(scope, null);
+      this.outputFragmentColor(scope, scope.worldPos, null);
     }
   }
 }

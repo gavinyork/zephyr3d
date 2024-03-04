@@ -515,9 +515,17 @@ export class Material implements IMaterial {
       device.setBindGroup(1, null);
     }
   }
+  /**
+   * Convert pass to hash
+   * @param pass - pass number
+   * @returns String hash
+   */
+  passToHash(pass: number): string {
+    return String(pass);
+  }
   /** @internal */
   createHash(renderPassType: number, pass: number): string {
-    return `${this.constructor.name}|${pass}|${this._createHash(renderPassType)}`;
+    return `${this.constructor.name}|${this.passToHash(pass)}|${this._createHash(renderPassType)}`;
   }
   /** @internal */
   clearBindGroupCache(): number {

@@ -368,10 +368,6 @@ export class ShadowMapper {
     }
   }
   /** @internal */
-  computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope): PBShaderExp {
-    return this._impl.computeShadowMapDepth(shadowMapParams, scope);
-  }
-  /** @internal */
   computeShadow(
     shadowMapParams: ShadowMapParams,
     scope: PBInsideFunctionScope,

@@ -78,6 +78,7 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
     super.fragmentShader(scope);
     const that = this;
     const pb = scope.$builder;
+    scope.$l.worldPos = this.helper.getWorldPosition(scope).xyz;
     if (this.needFragmentColor()){
       scope.parallaxScale = pb.float().uniform(2);
       scope.parallaxMinLayers = pb.float().uniform(2);
@@ -148,17 +149,16 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
         this.$l.projVtex = pb.vec3(pb.add(pb.mul(this.texDx, this.projVscr.x), pb.mul(this.texDy, this.projVscr.y)), pb.dot(this.worldNormal, this.viewPos));
         this.$return(pb.getGlobalScope().parallaxMapping(this.projVtex, this.uv));
       });
-      scope.$l.viewVec = this.calculateViewVector(scope);
-      scope.$l.TBN = this.calculateTBN(scope);
+      scope.$l.viewVec = this.calculateViewVector(scope, this.helper.getWorldPosition(scope));
+      scope.$l.TBN = this.calculateTBN(scope, scope.worldPos);
       scope.$l.texCoords = scope.calcUV(this.helper.getWorldPosition(scope).xyz, pb.normalize(this.helper.getWorldNormal(scope)), pb.normalize(this.helper.getCameraPosition(scope)), this.getNormalTexCoord(scope));
       scope.$l.normal = pb.sub(pb.mul(this.sampleNormalTexture(scope, scope.texCoords).rgb, 2), pb.vec3(1));
       scope.$l.normal = pb.mul(scope.TBN, scope.normal);
-      scope.$l.viewVec = that.calculateViewVector(scope);
       scope.$l.albedo = that.calculateAlbedoColor(scope, scope.texCoords);
-      scope.$l.litColor = this.blinnPhongLight(scope, scope.normal, scope.viewVec, scope.albedo);
-      this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a));
+      scope.$l.litColor = this.blinnPhongLight(scope, scope.worldPos, scope.normal, scope.viewVec, scope.albedo);
+      this.outputFragmentColor(scope, scope.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
-      this.outputFragmentColor(scope, null);
+      this.outputFragmentColor(scope, scope.worldPos, null);
     }
   }
 }

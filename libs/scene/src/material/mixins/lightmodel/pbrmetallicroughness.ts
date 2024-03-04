@@ -16,6 +16,7 @@ export type IMixinPBRMetallicRoughness = {
   specularFactor: Vector4;
   PBRLight(
     scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
     normal: PBShaderExp,
     TBN: PBShaderExp,
     viewVec: PBShaderExp,
@@ -85,6 +86,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
     }
     PBRLight(
       scope: PBInsideFunctionScope,
+      worldPos: PBShaderExp,
       normal: PBShaderExp,
       TBN: PBShaderExp,
       viewVec: PBShaderExp,
@@ -95,7 +97,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
       const that = this;
       pb.func(
         funcName,
-        [pb.vec3('normal'), pb.mat3('TBN'), pb.vec3('viewVec'), pb.vec4('albedo')],
+        [pb.vec3('worldPos'), pb.vec3('normal'), pb.mat3('TBN'), pb.vec3('viewVec'), pb.vec4('albedo')],
         function () {
           this.$l.pbrData = that.getCommonData(this, this.albedo, this.viewVec, this.TBN);
           this.$l.lightingColor = pb.vec3(0);
@@ -104,12 +106,12 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
           that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
             this.$l.diffuse = pb.vec3();
             this.$l.specular = pb.vec3();
-            this.$l.lightAtten = that.calculateLightAttenuation(this, type, posRange, dirCutoff);
-            this.$l.lightDir = that.calculateLightDirection(this, type, posRange, dirCutoff);
+            this.$l.lightAtten = that.calculateLightAttenuation(this, type, this.worldPos, posRange, dirCutoff);
+            this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
             this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
             this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
             if (shadow) {
-              this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.NoL));
+              this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.worldPos, this.NoL));
             }
             that.directLighting(
               this,
@@ -124,7 +126,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
           this.$return(pb.add(this.lightingColor, this.emissiveColor));
         }
       );
-      return pb.getGlobalScope()[funcName](normal, TBN, viewVec, albedo);
+      return pb.getGlobalScope()[funcName](worldPos, normal, TBN, viewVec, albedo);
     }
     fragmentShader(scope: PBFunctionScope): void {
       super.fragmentShader(scope);

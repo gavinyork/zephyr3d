@@ -24,28 +24,30 @@ export type IMixinLight = {
     reflectVec: PBShaderExp,
     roughness: PBShaderExp
   ): PBShaderExp;
-  calculateViewVector(scope: PBInsideFunctionScope): PBShaderExp;
+  calculateViewVector(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
   calculateReflectionVector(
     scope: PBInsideFunctionScope,
     normal: PBShaderExp,
     viewVec: PBShaderExp
   ): PBShaderExp;
-  calculateTBN(scope: PBInsideFunctionScope): PBShaderExp;
-  calculateNormal(scope: PBInsideFunctionScope): PBShaderExp;
-  calculateNormalAndTBN(scope: PBInsideFunctionScope): PBShaderExp;
+  calculateTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
+  calculateNormal(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
+  calculateNormalAndTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
   calculateLightAttenuation(
     scope: PBInsideFunctionScope,
     type: PBShaderExp,
+    worldPos: PBShaderExp,
     posRange: PBShaderExp,
     dirCutoff: PBShaderExp
   ): PBShaderExp;
   calculateLightDirection(
     scope: PBInsideFunctionScope,
     type: PBShaderExp,
+    worldPos: PBShaderExp,
     posRange: PBShaderExp,
     dirCutoff: PBShaderExp
   ): PBShaderExp;
-  calculateShadow(scope: PBInsideFunctionScope, NoL: PBShaderExp): PBShaderExp;
+  calculateShadow(scope: PBInsideFunctionScope, worldPos: PBShaderExp, NoL: PBShaderExp): PBShaderExp;
   forEachLight(
     scope: PBInsideFunctionScope,
     callback: (
@@ -104,10 +106,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      *
      * @returns The view vector
      */
-    calculateViewVector(scope: PBInsideFunctionScope): PBShaderExp {
+    calculateViewVector(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
       return pb.normalize(
-        pb.sub(this.helper.getCameraPosition(scope), this.helper.getWorldPosition(scope).xyz)
+        pb.sub(this.helper.getCameraPosition(scope), worldPos.xyz)
       );
     }
     /**
@@ -131,11 +133,11 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      * @param scope - The shader scope
      * @returns Normal vector for current fragment
      */
-    calculateNormal(scope: PBInsideFunctionScope): PBShaderExp {
+    calculateNormal(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
       const that = this;
-      const args: PBShaderExp[] = [];
-      const params: PBShaderExp[] = [];
+      const args: PBShaderExp[] = [worldPos.xyz];
+      const params: PBShaderExp[] = [pb.vec3('worldPos')];
       const worldNormal = that.helper.getWorldNormal(scope);
       const worldTangent = that.helper.getWorldTangent(scope);
       const worldBinormal = that.helper.getWorldBinormal(scope);
@@ -154,7 +156,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           : that.albedoTexture
           ? that.getAlbedoTexCoord(this) ?? pb.vec2(0)
           : pb.vec2(0);
-        this.$l.TBN = that.calculateTBN(this);
+        this.$l.TBN = that.calculateTBN(this, this.worldPos);
         if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
           if (that.normalMapMode === 'object-space') {
             const pixel = pb.sub(
@@ -183,12 +185,12 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      * @param scope - The shader scope
      * @returns Structure that contains normal vector and TBN matrix
      */
-    calculateNormalAndTBN(scope: PBInsideFunctionScope): PBShaderExp {
+    calculateNormalAndTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
       const NormalStruct = pb.defineStruct([pb.mat3('TBN'), pb.vec3('normal')]);
       const that = this;
-      const args: PBShaderExp[] = [];
-      const params: PBShaderExp[] = [];
+      const args: PBShaderExp[] = [worldPos.xyz];
+      const params: PBShaderExp[] = [pb.vec3('worldPos')];
       const worldNormal = that.helper.getWorldNormal(scope);
       const worldTangent = that.helper.getWorldTangent(scope);
       const worldBinormal = that.helper.getWorldBinormal(scope);
@@ -207,7 +209,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           : that.albedoTexture
           ? that.getAlbedoTexCoord(this) ?? pb.vec2(0)
           : pb.vec2(0);
-        this.$l.TBN = that.calculateTBN(this);
+        this.$l.TBN = that.calculateTBN(this, this.worldPos);
         if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
           if (that.normalMapMode === 'object-space') {
             const pixel = pb.sub(
@@ -236,11 +238,11 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      * @param scope - The shader scope
      * @returns TBN matrix
      */
-    calculateTBN(scope: PBInsideFunctionScope): PBShaderExp {
+    calculateTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
       const that = this;
-      const args: PBShaderExp[] = [];
-      const params: PBShaderExp[] = [];
+      const args: PBShaderExp[] = [worldPos.xyz];
+      const params: PBShaderExp[] = [pb.vec3('worldPos')];
       const worldNormal = that.helper.getWorldNormal(scope);
       const worldTangent = that.helper.getWorldTangent(scope);
       const worldBinormal = that.helper.getWorldBinormal(scope);
@@ -254,7 +256,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       }
       const funcName = 'Z_calculateTBN';
       pb.func(funcName, params, function () {
-        const posW = that.helper.getWorldPosition(this).xyz;
+        const posW = this.worldPos;
         this.$l.uv = that.normalTexture
           ? that.getNormalTexCoord(this) ?? pb.vec2(0)
           : that.albedoTexture
@@ -410,13 +412,13 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      * @param NoL - NdotL vector
      * @returns Shadow of current fragment, 1 means no shadow and 0 means full shadowed.
      */
-    calculateShadow(scope: PBInsideFunctionScope, NoL: PBShaderExp): PBShaderExp {
+    calculateShadow(scope: PBInsideFunctionScope, worldPos: PBShaderExp, NoL: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
       if (!this.needCalucateShadow()) {
         console.warn('calculateShadow(): No need to calculate shadow');
         return pb.float(1);
       }
-      return this.helper.calculateShadow(scope, NoL, this.drawContext);
+      return this.helper.calculateShadow(scope, worldPos, NoL, this.drawContext);
     }
     private getClusterIndex(scope: PBInsideFunctionScope, fragCoord: PBShaderExp) {
       const pb = scope.$builder;
@@ -440,40 +442,40 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       });
       return pb.getGlobalScope()[funcName](fragCoord);
     }
-    protected calculatePointLightAttenuation(scope: PBInsideFunctionScope, posRange: PBShaderExp) {
+    protected calculatePointLightAttenuation(scope: PBInsideFunctionScope, worldPos: PBShaderExp, posRange: PBShaderExp) {
       const pb = scope.$builder;
-      const that = this;
-      const funcName = 'lm_calculatePointLightAttenuation';
-      pb.func(funcName, [pb.vec4('posRange')], function () {
-        this.$l.dist = pb.distance(this.posRange.xyz, that.helper.getWorldPosition(this).xyz);
+      const funcName = 'Z_calculatePointLightAttenuation';
+      pb.func(funcName, [pb.vec3('worldPos'), pb.vec4('posRange')], function () {
+        this.$l.dist = pb.distance(this.posRange.xyz, this.worldPos);
         this.$l.falloff = pb.max(0, pb.sub(1, pb.div(this.dist, this.posRange.w)));
         this.$return(pb.mul(this.falloff, this.falloff));
       });
-      return pb.getGlobalScope()[funcName](posRange);
+      return pb.getGlobalScope()[funcName](worldPos, posRange);
     }
     protected calculateSpotLightAttenuation(
       scope: PBInsideFunctionScope,
+      worldPos: PBShaderExp,
       posRange: PBShaderExp,
       dirCutoff: PBShaderExp
     ) {
       const pb = scope.$builder;
-      const that = this;
-      const funcName = 'lm_calculateSpotLightAttenuation';
-      pb.func(funcName, [pb.vec4('posRange'), pb.vec4('dirCutoff')], function () {
-        this.$l.dist = pb.distance(this.posRange.xyz, that.helper.getWorldPosition(this).xyz);
+      const funcName = 'Z_calculateSpotLightAttenuation';
+      pb.func(funcName, [pb.vec3('worldPos'), pb.vec4('posRange'), pb.vec4('dirCutoff')], function () {
+        this.$l.dist = pb.distance(this.posRange.xyz, this.worldPos);
         this.$l.falloff = pb.max(0, pb.sub(1, pb.div(this.dist, this.posRange.w)));
         this.$l.spotFactor = pb.dot(
-          pb.normalize(pb.sub(that.helper.getWorldPosition(this).xyz, this.posRange.xyz)),
+          pb.normalize(pb.sub(this.worldPos, this.posRange.xyz)),
           this.dirCutoff.xyz
         );
         this.spotFactor = pb.smoothStep(this.dirCutoff.w, pb.mix(this.dirCutoff.w, 1, 0.5), this.spotFactor);
         this.$return(pb.mul(this.spotFactor, this.falloff, this.falloff));
       });
-      return pb.getGlobalScope()[funcName](posRange, dirCutoff);
+      return pb.getGlobalScope()[funcName](worldPos, posRange, dirCutoff);
     }
     calculateLightAttenuation(
       scope: PBInsideFunctionScope,
       type: PBShaderExp,
+      worldPos: PBShaderExp,
       posRange: PBShaderExp,
       dirCutoff: PBShaderExp
     ): PBShaderExp {
@@ -483,14 +485,15 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         pb.float(1),
         scope.$choice(
           pb.equal(type, LIGHT_TYPE_POINT),
-          this.calculatePointLightAttenuation(scope, posRange),
-          this.calculateSpotLightAttenuation(scope, posRange, dirCutoff)
+          this.calculatePointLightAttenuation(scope, worldPos.xyz, posRange),
+          this.calculateSpotLightAttenuation(scope, worldPos.xyz, posRange, dirCutoff)
         )
       );
     }
     calculateLightDirection(
       scope: PBInsideFunctionScope,
       type: PBShaderExp,
+      worldPos: PBShaderExp,
       posRange: PBShaderExp,
       dirCutoff: PBShaderExp
     ): PBShaderExp {
@@ -498,7 +501,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       return scope.$choice(
         pb.equal(type, LIGHT_TYPE_DIRECTIONAL),
         pb.neg(dirCutoff.xyz),
-        pb.normalize(pb.sub(posRange.xyz, this.helper.getWorldPosition(scope).xyz))
+        pb.normalize(pb.sub(posRange.xyz, worldPos.xyz))
       );
     }
     forEachLight(

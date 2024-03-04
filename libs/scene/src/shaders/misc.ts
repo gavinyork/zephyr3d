@@ -2,102 +2,6 @@ import type { PBShaderExp } from '@zephyr3d/device';
 import { PBInsideFunctionScope, PBPrimitiveType } from '@zephyr3d/device';
 
 /**
- * Calculates the TBN matrix
- *
- * @remarks
- * This function computes the tangent frame for normal mapping without world normal
- *
- * @param scope - Current shader scope
- * @param worldPosition - World position of current fragment
- * @param uv - Texture coordinate for normal map
- * @returns The calculated TBN matrix
- *
- * @public
- */
-export function calculateTBN(
-  scope: PBInsideFunctionScope,
-  worldPosition: PBShaderExp,
-  uv: PBShaderExp,
-  doubleSideLighting: boolean
-): PBShaderExp {
-  const funcName = 'lib_calculateTBN';
-  const pb = scope.$builder;
-  pb.func(funcName, [pb.vec3('posW'), pb.vec2('uv')], function () {
-    this.$l.uv_dx = pb.dpdx(pb.vec3(this.uv, 0));
-    this.$l.uv_dy = pb.dpdy(pb.vec3(this.uv, 0));
-    this.$if(pb.lessThanEqual(pb.add(pb.length(this.uv_dx), pb.length(this.uv_dy)), 0.000001), function () {
-      this.uv_dx = pb.vec3(1, 0, 0);
-      this.uv_dy = pb.vec3(0, 1, 0);
-    });
-    this.$l.t_ = pb.div(
-      pb.sub(pb.mul(pb.dpdx(this.posW), this.uv_dy.y), pb.mul(pb.dpdy(this.posW), this.uv_dx.y)),
-      pb.sub(pb.mul(this.uv_dx.x, this.uv_dy.y), pb.mul(this.uv_dx.y, this.uv_dy.x))
-    );
-    this.$l.ng = pb.normalize(pb.cross(pb.dpdx(this.posW), pb.dpdy(this.posW)));
-    this.$l.t = pb.normalize(pb.sub(this.t_, pb.mul(this.ng, pb.dot(this.ng, this.t_))));
-    this.$l.b = pb.cross(this.ng, this.t);
-    if (doubleSideLighting) {
-      this.$if(pb.not(this.$builtins.frontFacing), function () {
-        this.t = pb.mul(this.t, -1);
-        this.b = pb.mul(this.b, -1);
-        this.ng = pb.mul(this.ng, -1);
-      });
-    }
-    this.$return(pb.mat3(this.t, this.b, this.ng));
-  });
-  return pb.getGlobalScope()[funcName](worldPosition.xyz, uv);
-}
-
-/**
- * Calculates the TBN matrix
- *
- * @remarks
- * This function computes the tangent frame for normal mapping with world normal
- *
- * @param scope - Current shader scope
- * @param worldPosition - World position of current fragment
- * @param worldNormal - World normal of current fragment
- * @param uv - Texture coordinate for normal map
- * @returns The calculated TBN matrix
- *
- * @public
- */
-export function calculateTBNWithNormal(
-  scope: PBInsideFunctionScope,
-  worldPosition: PBShaderExp,
-  worldNormal: PBShaderExp,
-  uv: PBShaderExp,
-  doubleSideLighting: boolean
-): PBShaderExp {
-  const funcName = 'lib_calculateTBNWithNormal';
-  const pb = scope.$builder;
-  pb.func(funcName, [pb.vec3('posW'), pb.vec3('normalW'), pb.vec2('uv')], function () {
-    this.$l.uv_dx = pb.dpdx(pb.vec3(this.uv, 0));
-    this.$l.uv_dy = pb.dpdy(pb.vec3(this.uv, 0));
-    this.$if(pb.lessThanEqual(pb.add(pb.length(this.uv_dx), pb.length(this.uv_dy)), 0.000001), function () {
-      this.uv_dx = pb.vec3(1, 0, 0);
-      this.uv_dy = pb.vec3(0, 1, 0);
-    });
-    this.$l.t_ = pb.div(
-      pb.sub(pb.mul(pb.dpdx(this.posW), this.uv_dy.y), pb.mul(pb.dpdy(this.posW), this.uv_dx.y)),
-      pb.sub(pb.mul(this.uv_dx.x, this.uv_dy.y), pb.mul(this.uv_dx.y, this.uv_dy.x))
-    );
-    this.$l.ng = pb.normalize(this.normalW);
-    this.$l.t = pb.normalize(pb.sub(this.t_, pb.mul(this.ng, pb.dot(this.ng, this.t_))));
-    this.$l.b = pb.cross(this.ng, this.t);
-    if (doubleSideLighting) {
-      this.$if(pb.not(this.$builtins.frontFacing), function () {
-        this.t = pb.mul(this.t, -1);
-        this.b = pb.mul(this.b, -1);
-        this.ng = pb.mul(this.ng, -1);
-      });
-    }
-    this.$return(pb.mat3(this.t, this.b, this.ng));
-  });
-  return pb.getGlobalScope()[funcName](worldPosition, worldNormal, uv);
-}
-
-/**
  * Decodes a float that was encoded into a rgba8unorm
  *
  * @param scope - Current shader scope
@@ -120,7 +24,7 @@ export function decodeFloatFromRGBA(scope: PBInsideFunctionScope, value: PBShade
       'decodeFloatFromRGBA() failed: decodeNormalizedFloatFromRGBA() must be called inside a function'
     );
   }
-  const funcName = 'lib_DecodeFloatFromRGBA';
+  const funcName = 'Z_DecodeFloatFromRGBA';
   pb.func(funcName, [pb.vec4('value')], function () {
     this.$l.pack = pb.floor(pb.add(pb.mul(this.value, 255), 0.5));
 
@@ -155,7 +59,7 @@ export function decodeFloatFromRGBA(scope: PBInsideFunctionScope, value: PBShade
  */
 export function encodeFloatToRGBA(scope: PBInsideFunctionScope, value: PBShaderExp | number): PBShaderExp {
   const pb = scope.$builder;
-  const funcName = 'lib_EncodeFloatToRGBA';
+  const funcName = 'Z_EncodeFloatToRGBA';
   pb.func(funcName, [pb.float('value')], function () {
     this.$l.floatMax = pb.mul(1.70141184, pb.pow(10, 38));
     this.$l.floatMin = pb.mul(1.17549435, pb.pow(10, -38));
@@ -216,7 +120,7 @@ export function decodeNormalizedFloatFromRGBA(scope: PBInsideFunctionScope, valu
       'decodeNormalizedFloatFromRGBA() failed: decodeNormalizedFloatFromRGBA() must be called inside a function'
     );
   }
-  const funcName = 'lib_DecodeNormalizedFloatFromRGBA';
+  const funcName = 'Z_decodeNormalizedFloatFromRGBA';
   pb.func(funcName, [pb.vec4('value')], function () {
     this.$l.bitShift = pb.vec4(1 / (256 * 256 * 256), 1 / (256 * 256), 1 / 256, 1);
     this.$return(pb.dot(this.value, this.bitShift));
@@ -238,7 +142,7 @@ export function encodeNormalizedFloatToRGBA(
   value: PBShaderExp | number
 ): PBShaderExp {
   const pb = scope.$builder;
-  const funcName = 'lib_EncodeNormalizedFloatToRGBA';
+  const funcName = 'Z_encodeNormalizedFloatToRGBA';
   pb.func(funcName, [pb.float('value')], function () {
     this.$l.bitShift = pb.vec4(256 * 256 * 256, 256 * 256, 256, 1);
     this.$l.bitMask = pb.vec4(0, 1 / 256, 1 / 256, 1 / 256);
@@ -264,7 +168,7 @@ export function encode2HalfToRGBA(
   b: PBShaderExp | number
 ): PBShaderExp {
   const pb = scope.$builder;
-  const funcName = 'lib_Encode2HalfToRGBA';
+  const funcName = 'Z_encode2HalfToRGBA';
   pb.func(funcName, [pb.float('a'), pb.float('b')], function () {
     this.$l.t = pb.vec4(this.a, pb.fract(pb.mul(this.a, 255)), this.b, pb.fract(pb.mul(this.b, 255)));
     this.$return(
@@ -289,7 +193,7 @@ export function encode2HalfToRGBA(
  */
 export function decode2HalfFromRGBA(scope: PBInsideFunctionScope, value: PBShaderExp): PBShaderExp {
   const pb = scope.$builder;
-  const funcName = 'lib_Decode2HalfFromRGBA';
+  const funcName = 'Z_decode2HalfFromRGBA';
   pb.func(funcName, [pb.vec4('value')], function () {
     this.$return(
       pb.vec2(
@@ -317,7 +221,7 @@ export function encodeRGBM(
   maxRange: PBShaderExp | number
 ): PBShaderExp {
   const pb = scope.$builder;
-  const funcName = 'lib_encodeRGBM';
+  const funcName = 'Z_encodeRGBM';
   pb.func(funcName, [pb.vec3('rgb'), pb.float('range')], function () {
     this.$l.maxRGB = pb.max(this.rgb.r, pb.max(this.rgb.g, this.rgb.b));
     this.$l.M = pb.div(this.maxRGB, this.range);
@@ -343,7 +247,7 @@ export function decodeRGBM(
   maxRange: PBShaderExp | number
 ): PBShaderExp {
   const pb = scope.$builder;
-  const funcName = 'lib_decodeRGBM';
+  const funcName = 'Z_decodeRGBM';
   pb.func(funcName, [pb.vec4('rgbm'), pb.float('range')], function () {
     this.$return(pb.mul(this.rgbm.rgb, this.rgbm.a, this.range));
   });
@@ -361,7 +265,7 @@ export function decodeRGBM(
  */
 export function gammaToLinear(scope: PBInsideFunctionScope, color: PBShaderExp): PBShaderExp {
   const pb = scope.$builder;
-  const funcName = 'lib_gammaToLinear';
+  const funcName = 'Z_gammaToLinear';
   pb.func(funcName, [pb.vec3('color')], function () {
     // Approximate version from http://chilliant.blogspot.com.au/2012/08/srgb-approximations-for-hlsl.html?m=1
     // float3 RGB = sRGB * (sRGB * (sRGB * 0.305306011 + 0.682171111) + 0.012522878);
@@ -389,7 +293,7 @@ export function gammaToLinear(scope: PBInsideFunctionScope, color: PBShaderExp):
  */
 export function linearToGamma(scope: PBInsideFunctionScope, color: PBShaderExp) {
   const pb = scope.$builder;
-  const funcName = 'lib_linearToGamma';
+  const funcName = 'Z_linearToGamma';
   pb.func(funcName, [pb.vec3('color')], function () {
     // Almost perfect version from http://chilliant.blogspot.com.au/2012/08/srgb-approximations-for-hlsl.html?m=1
     // C_srgb_2 = max(1.055 * pow(C_lin, 0.416666667) - 0.055, 0);

@@ -250,8 +250,8 @@ export class TerrainMaterial extends applyMaterialMixins(
     const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(normalScale).xx, 1));
     return pb.normalize(pb.mul(TBN, normalTex));
   }
-  calculateNormalAndTBN(scope: PBInsideFunctionScope): PBShaderExp {
-    scope.$l.normalInfo = super.calculateNormalAndTBN(scope);
+  calculateNormalAndTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
+    scope.$l.normalInfo = super.calculateNormalAndTBN(scope, worldPos);
     const pb = scope.$builder;
     let calcNormal = false;
     if (this._options && this._options.detailMaps.normalTextures) {
@@ -310,6 +310,7 @@ export class TerrainMaterial extends applyMaterialMixins(
     super.fragmentShader(scope);
     const pb = scope.$builder;
     const that = this;
+    scope.$l.worldPos = this.helper.getWorldPosition(scope).xyz;
     if (this.needFragmentColor()) {
       if (this._options) {
         scope.detailScales = pb.vec4[this._numDetailMaps]().uniform(2);
@@ -332,18 +333,19 @@ export class TerrainMaterial extends applyMaterialMixins(
         }
       }
       scope.$l.albedo = this.calculateAlbedoColor(scope);
-      scope.$l.normalInfo = this.calculateNormalAndTBN(scope);
-      scope.$l.viewVec = this.calculateViewVector(scope);
+      scope.$l.normalInfo = this.calculateNormalAndTBN(scope, scope.worldPos);
+      scope.$l.viewVec = this.calculateViewVector(scope, scope.worldPos);
       scope.$l.litColor = this.PBRLight(
         scope,
+        scope.worldPos,
         scope.normalInfo.normal,
         scope.normalInfo.TBN,
         scope.viewVec,
         scope.albedo
       );
-      this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a));
+      this.outputFragmentColor(scope, scope.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
-      this.outputFragmentColor(scope, null);
+      this.outputFragmentColor(scope, scope.worldPos, null);
     }
   }
   generateMetallicRoughnessMap(): Texture2D {

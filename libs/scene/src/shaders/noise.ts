@@ -11,8 +11,8 @@ import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
  */
 export function noisef(scope: PBInsideFunctionScope, p: PBShaderExp) {
   const pb = scope.$builder;
-  const funcNameHash = 'lib_hashf';
-  const funcNameNoise = 'lib_noisef';
+  const funcNameHash = 'Z_hashf';
+  const funcNameNoise = 'Z_noisef';
   pb.func(funcNameHash, [pb.vec2('p')], function () {
     this.h = pb.dot(this.p, pb.vec2(127.1, 311.7));
     this.$return(pb.fract(pb.mul(pb.sin(this.h), 43758.5453123)));
@@ -51,7 +51,7 @@ export function worleyNoise(
   freq: PBShaderExp | number
 ): PBShaderExp {
   const pb = scope.$builder;
-  const funcNameHash = 'lib_worleyHash';
+  const funcNameHash = 'Z_worleyHash';
   // https://www.shadertoy.com/view/4sc3z2
   pb.func(funcNameHash, [pb.vec3('p')], function () {
     /* eslint-disable no-constant-condition */
@@ -85,7 +85,7 @@ export function worleyNoise(
       this.$return(pb.sub(pb.mul(pb.vec3(this.q), this.UIF, 2), pb.vec3(1)));
     }
   });
-  const funcNameNoise = 'lib_worleyNoise';
+  const funcNameNoise = 'Z_worleyNoise';
   pb.func(funcNameNoise, [pb.vec3('uv'), pb.float('freq')], function () {
     this.$l.id = pb.floor(this.uv);
     this.$l.p = pb.fract(this.uv);
@@ -129,7 +129,7 @@ export function worleyFBM(
   freq: PBShaderExp | number
 ): PBShaderExp {
   const pb = scope.$builder;
-  const funcName = 'lib_worleyFBM';
+  const funcName = 'Z_worleyFBM';
   pb.func(funcName, [pb.vec3('p'), pb.float('freq')], function () {
     this.$l.n1 = worleyNoise(this, pb.mul(this.p, this.freq), this.freq);
     this.$l.n2 = worleyNoise(this, pb.mul(this.p, this.freq, 2), pb.mul(this.freq, 2));
@@ -150,7 +150,7 @@ export function worleyFBM(
  */
 export function noise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
   const pb = scope.$builder;
-  const funcName = 'lib_noise3d';
+  const funcName = 'Z_noise3d';
   pb.func(funcName, [pb.vec3('p')], function () {
     this.$l.p3 = pb.fract(pb.mul(this.p, 0.1031));
     this.$l.p3 = pb.add(this.p3, pb.vec3(pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33)))));
@@ -169,7 +169,7 @@ export function noise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderE
  */
 export function smoothNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
   const pb = scope.$builder;
-  const funcName = 'lib_smoothNoise3D';
+  const funcName = 'Z_smoothNoise3D';
   pb.func(funcName, [pb.vec3('p')], function () {
     this.$l.cell = pb.floor(this.p);
     this.$l.local = pb.fract(this.p);

@@ -9,6 +9,7 @@ export type IMixinBlinnPhong = {
   shininess: number;
   blinnPhongLight(
     scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
     normal: PBShaderExp,
     viewVec: PBShaderExp,
     albedo: PBShaderExp
@@ -52,6 +53,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     blinnPhongLight(
       scope: PBInsideFunctionScope,
+      worldPos: PBShaderExp,
       normal: PBShaderExp,
       viewVec: PBShaderExp,
       albedo: PBShaderExp
@@ -59,7 +61,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       const funcName = 'Z_blinnPhongLight';
       const that = this;
-      pb.func(funcName, [pb.vec3('normal'), pb.vec3('viewVec'), pb.vec4('albedo')], function () {
+      pb.func(funcName, [pb.vec3('worldPos'), pb.vec3('normal'), pb.vec3('viewVec'), pb.vec4('albedo')], function () {
         if (!that.needFragmentColor()) {
           this.$return(this.albedo.rgb);
         } else {
@@ -70,8 +72,8 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
           }
           this.$l.specularColor = pb.vec3(0);
           that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
-            this.$l.lightAtten = that.calculateLightAttenuation(this, type, posRange, dirCutoff);
-            this.$l.lightDir = that.calculateLightDirection(this, type, posRange, dirCutoff);
+            this.$l.lightAtten = that.calculateLightAttenuation(this, type, this.worldPos, posRange, dirCutoff);
+            this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
             this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
             this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
             this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
@@ -79,7 +81,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
             this.$l.diffuse = pb.mul(this.lightColor, this.NoL);
             this.$l.specular = pb.mul(this.lightColor, pb.pow(this.NoH, this.zShininess));
             if (shadow) {
-              this.$l.shadow = pb.vec3(that.calculateShadow(this, this.NoL));
+              this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, this.NoL));
               this.diffuse = pb.mul(this.diffuse, this.shadow);
               this.specular = pb.mul(this.specular, this.shadow);
             }
@@ -90,7 +92,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$return(this.litColor);
         }
       });
-      return pb.getGlobalScope()[funcName](normal, viewVec, albedo);
+      return pb.getGlobalScope()[funcName](worldPos, normal, viewVec, albedo);
     }
   } as unknown as T & { new (...args: any[]): IMixinBlinnPhong };
 }

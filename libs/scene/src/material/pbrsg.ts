@@ -51,6 +51,7 @@ export class PBRSpecularGlossinessMaterial extends applyMaterialMixins(
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
     const pb = scope.$builder;
+    scope.$l.worldPos = this.helper.getWorldPosition(scope).xyz;
     if (this.needFragmentColor()) {
       scope.$l.albedo = this.calculateAlbedoColor(scope);
       if (this.vertexColor) {
@@ -60,18 +61,19 @@ export class PBRSpecularGlossinessMaterial extends applyMaterialMixins(
       if (this.vertexColor) {
         scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope));
       }
-      scope.$l.normalInfo = this.calculateNormalAndTBN(scope);
-      scope.$l.viewVec = this.calculateViewVector(scope);
+      scope.$l.normalInfo = this.calculateNormalAndTBN(scope, scope.worldPos);
+      scope.$l.viewVec = this.calculateViewVector(scope, scope.worldPos);
       scope.$l.litColor = this.PBRLight(
         scope,
+        scope.worldPos,
         scope.normalInfo.normal,
         scope.normalInfo.TBN,
         scope.viewVec,
         scope.albedo
       );
-      this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a));
+      this.outputFragmentColor(scope, scope.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
-      this.outputFragmentColor(scope, null);
+      this.outputFragmentColor(scope, scope.worldPos, null);
     }
   }
 }

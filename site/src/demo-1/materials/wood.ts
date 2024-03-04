@@ -74,6 +74,7 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
     const pb = scope.$builder;
+    scope.$l.worldPos = this.helper.getWorldPosition(scope).xyz;
     if (this.needFragmentColor()) {
       scope.distored = pb.vec3().uniform(2);
       scope.darkColor = pb.vec3().uniform(2);
@@ -615,11 +616,11 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
         this.$return(pb.vec4(this.color, 1));
       });
       scope.$l.albedo = scope.wood(scope.$inputs.oPos, scope.distored, scope.density, scope.darkColor, scope.lightColor);
-      scope.$l.normal = this.calculateNormal(scope);
-      scope.$l.litColor = this.lambertLight(scope, scope.normal, scope.albedo);
-      this.outputFragmentColor(scope, pb.vec4(scope.litColor, scope.albedo.a));
+      scope.$l.normal = this.calculateNormal(scope, scope.worldPos);
+      scope.$l.litColor = this.lambertLight(scope, scope.worldPos, scope.normal, scope.albedo);
+      this.outputFragmentColor(scope, scope.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
-      this.outputFragmentColor(scope, null);
+      this.outputFragmentColor(scope, scope.worldPos, null);
     }
   }
 }

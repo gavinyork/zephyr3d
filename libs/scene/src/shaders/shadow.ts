@@ -125,11 +125,12 @@ function getShadowMapSize(scope: PBInsideFunctionScope): PBShaderExp {
 /** @internal */
 export function computeShadowMapDepth(
   scope: PBInsideFunctionScope,
+  worldPos: PBShaderExp,
   targetFormat: TextureFormat
 ): PBShaderExp {
-  const funcNameComputeShadowMapDepth = 'lib_computeShadowMapDepth';
+  const funcNameComputeShadowMapDepth = 'Z_computeShadowMapDepth';
   const pb = scope.$builder;
-  pb.func(funcNameComputeShadowMapDepth, [], function () {
+  pb.func(funcNameComputeShadowMapDepth, [pb.vec3('worldPos')], function () {
     if (hasDepthChannel(targetFormat)) {
       // use native shadowmap
       this.$return(
@@ -151,7 +152,7 @@ export function computeShadowMapDepth(
         .$elseif(pb.equal(this.lightType, LIGHT_TYPE_POINT), function () {
           this.$l.lightSpacePos = pb.mul(
             ShaderHelper.getLightViewMatrixForShadow(this),
-            ShaderHelper.getWorldPosition(this)
+            pb.vec4(this.worldPos, 1)
           );
           this.depth = pb.clamp(
             pb.div(pb.length(this.lightSpacePos.xyz), ShaderHelper.getLightPositionAndRangeForShadow(this).w),
@@ -162,7 +163,7 @@ export function computeShadowMapDepth(
         .$else(function () {
           this.$l.lightSpacePos = pb.mul(
             ShaderHelper.getLightViewMatrixForShadow(this),
-            ShaderHelper.getWorldPosition(this)
+            pb.vec4(this.worldPos, 1)
           );
           this.depth = pb.clamp(
             pb.div(pb.neg(this.lightSpacePos.z), ShaderHelper.getLightPositionAndRangeForShadow(this).w),
@@ -177,7 +178,7 @@ export function computeShadowMapDepth(
       );
     }
   });
-  return pb.getGlobalScope()[funcNameComputeShadowMapDepth]();
+  return pb.getGlobalScope()[funcNameComputeShadowMapDepth](worldPos);
 }
 
 /** @internal */
