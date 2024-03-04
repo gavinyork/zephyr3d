@@ -66,11 +66,11 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
     scope.$l.axisZ = pb.cross(scope.axisX, scope.normal);
     scope.$l.axisX = pb.cross(scope.normal, scope.axisZ);
     scope.$l.rotPos = pb.mul(pb.mat3(scope.axisX, scope.normal, scope.axisZ), scope.$inputs.pos);
-    this.helper.processPositionAndNormal(
-      scope,
-      pb.add(scope.rotPos, scope.$inputs.placement.xyz),
-      scope.normal
-    );
+
+    scope.$l.wPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(pb.add(scope.rotPos, scope.$inputs.placement.xyz), 1));
+    this.helper.pipeWorldPosition(scope, scope.wPos);
+    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), scope.wPos));
+    this.helper.pipeWorldNormal(scope, pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.normal, 0)).xyz);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);

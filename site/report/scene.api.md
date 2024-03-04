@@ -370,8 +370,12 @@ export class BlinnMaterial extends BlinnMaterial_base {
     constructor();
     // (undocumented)
     fragmentShader(scope: PBFunctionScope): void;
+    get vertexNormal(): boolean;
+    set vertexNormal(val: boolean);
     // (undocumented)
     vertexShader(scope: PBFunctionScope): void;
+    get vertexTangent(): boolean;
+    set vertexTangent(val: boolean);
 }
 
 // @public
@@ -932,9 +936,6 @@ export interface DrawContext {
 export function encode2HalfToRGBA(scope: PBInsideFunctionScope, a: PBShaderExp | number, b: PBShaderExp | number): PBShaderExp;
 
 // @public
-export function encodeColorOutput(scope: PBInsideFunctionScope, outputColor: PBShaderExp): PBShaderExp;
-
-// @public
 export function encodeFloatToRGBA(scope: PBInsideFunctionScope, value: PBShaderExp | number): PBShaderExp;
 
 // @public
@@ -1459,8 +1460,6 @@ export type IMixinLight = {
     normalScale: number;
     normalMapMode: 'tangent-space' | 'object-space';
     doubleSidedLighting: boolean;
-    vertexNormal: boolean;
-    vertexTangent: boolean;
     needCalculateEnvLight(): boolean;
     getEnvLightIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
     getEnvLightRadiance(scope: PBInsideFunctionScope, reflectVec: PBShaderExp, roughness: PBShaderExp): PBShaderExp;
@@ -1552,8 +1551,12 @@ export class LambertMaterial extends LambertMaterial_base {
     constructor();
     // (undocumented)
     fragmentShader(scope: PBFunctionScope): void;
+    get vertexNormal(): boolean;
+    set vertexNormal(val: boolean);
     // (undocumented)
     vertexShader(scope: PBFunctionScope): void;
+    get vertexTangent(): boolean;
+    set vertexTangent(val: boolean);
 }
 
 // @public
@@ -1582,9 +1585,6 @@ export class LightPass extends RenderPass {
     // (undocumented)
     protected _shadowMapHash: string;
 }
-
-// @public
-export function linearDepthToNonLinear(scope: PBInsideFunctionScope, depth: PBShaderExp, nearFar?: PBShaderExp): PBShaderExp;
 
 // @public
 export function linearToGamma(scope: PBInsideFunctionScope, color: PBShaderExp): any;
@@ -1802,12 +1802,6 @@ export function noise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderE
 export function noisef(scope: PBInsideFunctionScope, p: PBShaderExp): any;
 
 // @public
-export function nonLinearDepthToLinear(scope: PBInsideFunctionScope, depth: PBShaderExp, nearFar?: PBShaderExp): PBShaderExp;
-
-// @public
-export function nonLinearDepthToLinearNormalized(scope: PBInsideFunctionScope, depth: PBShaderExp, nearFar?: PBShaderExp): PBShaderExp;
-
-// @public
 export type NumberTrackHandler = (node: SceneNode, value: Float32Array) => void;
 
 // Warning: (ae-internal-missing-underscore) The name "OceanFieldBuildParams" should be prefixed with an underscore because the declaration is marked as @internal
@@ -1982,8 +1976,12 @@ export class PBRMetallicRoughnessMaterial extends PBRMetallicRoughnessMaterial_b
     constructor();
     // (undocumented)
     fragmentShader(scope: PBFunctionScope): void;
+    get vertexNormal(): boolean;
+    set vertexNormal(val: boolean);
     // (undocumented)
     vertexShader(scope: PBFunctionScope): void;
+    get vertexTangent(): boolean;
+    set vertexTangent(val: boolean);
 }
 
 // Warning: (ae-forgotten-export) The symbol "PBRSpecularGlossinessMaterial_base" needs to be exported by the entry point index.d.ts
@@ -1993,8 +1991,12 @@ export class PBRSpecularGlossinessMaterial extends PBRSpecularGlossinessMaterial
     constructor();
     // (undocumented)
     fragmentShader(scope: PBFunctionScope): void;
+    get vertexNormal(): boolean;
+    set vertexNormal(val: boolean);
     // (undocumented)
     vertexShader(scope: PBFunctionScope): void;
+    get vertexTangent(): boolean;
+    set vertexTangent(val: boolean);
 }
 
 // @public (undocumented)
@@ -3098,6 +3100,8 @@ export class SkyRenderer {
     set cloudIntensity(val: number);
     get cloudy(): number;
     set cloudy(val: number);
+    get drawGround(): boolean;
+    set drawGround(val: boolean);
     // @internal (undocumented)
     drawScatteredFog(ctx: DrawContext): boolean;
     get fogColor(): Vector4;

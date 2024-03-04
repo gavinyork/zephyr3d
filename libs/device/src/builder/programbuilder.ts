@@ -1141,12 +1141,12 @@ export class ProgramBuilder {
     return this._scopeStack[0];
   }
   /** Gets the current function scope */
-  getCurrentFunctionScope(): PBScope {
+  getCurrentFunctionScope(): PBFunctionScope {
     let funcScope: PBScope = this.getCurrentScope();
     while (funcScope && !(funcScope instanceof PBFunctionScope)) {
       funcScope = funcScope.$parent;
     }
-    return funcScope;
+    return funcScope as PBFunctionScope;
   }
   /**
    * Generates shader codes for a render program
@@ -3739,6 +3739,9 @@ export class PBFunctionScope extends PBInsideFunctionScope {
     getCurrentProgramBuilder().pushScope(this);
     body && body.call(this);
     getCurrentProgramBuilder().popScope();
+  }
+  $isMain(): boolean {
+    return (this.$ast as AST.ASTFunction).isMainFunc;
   }
 }
 

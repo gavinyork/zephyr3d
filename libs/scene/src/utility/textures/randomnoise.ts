@@ -1,5 +1,5 @@
 import type { AbstractDevice, GPUProgram } from '@zephyr3d/device';
-import { drawFullscreenQuad } from '../../render/helper';
+import { drawFullscreenQuad } from '../../render/fullscreenquad';
 
 let randomNoiseProgram: GPUProgram = null;
 

@@ -1,5 +1,5 @@
 import type { AbstractDevice, BindGroup, GPUProgram } from '@zephyr3d/device';
-import { drawFullscreenQuad } from '../../render/helper';
+import { drawFullscreenQuad } from '../../render/fullscreenquad';
 
 let gradientNoiseProgram: GPUProgram = null;
 let gradientNoiseBindGroup: BindGroup = null;

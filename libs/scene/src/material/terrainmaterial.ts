@@ -13,7 +13,7 @@ import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughn
 import { mixinLight } from './mixins/lit';
 import { Application } from '../app';
 import { Vector4 } from '@zephyr3d/base';
-import { drawFullscreenQuad } from '../render/helper';
+import { drawFullscreenQuad } from '../render/fullscreenquad';
 
 export type TerrainDetailMapInfo = {
   albedoTextures: Texture2DArray | Texture2D[];
@@ -294,13 +294,17 @@ export class TerrainMaterial extends applyMaterialMixins(
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
     const pb = scope.$builder;
-    scope.$inputs.zPos = pb.vec3().attrib('position');
-    scope.$inputs.zNormal = pb.vec3().attrib('normal');
+    scope.$l.oPos = this.helper.resolveVertexPosition(scope);
+    scope.$l.wPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1));
+    this.helper.pipeWorldPosition(scope, scope.wPos);
+    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), scope.wPos));
     if (this.needFragmentColor()) {
       scope.terrainInfo = pb.vec4().uniform(2);
-      scope.$outputs.mapUV = pb.div(scope.$inputs.zPos.xz, scope.terrainInfo.xy);
+      scope.$l.oNorm = this.helper.resolveVertexNormal(scope);
+      scope.$l.wNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
+      this.helper.pipeWorldNormal(scope, scope.wNorm);
+      scope.$outputs.mapUV = pb.div(scope.oPos.xz, scope.terrainInfo.xy);
     }
-    this.helper.processPositionAndNormal(scope);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);

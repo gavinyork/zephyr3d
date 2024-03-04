@@ -57,9 +57,14 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
   }
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
-    scope.$inputs.pos = scope.$builder.vec3().attrib('position');
-    scope.$inputs.normal = scope.$builder.vec3().attrib('normal');
-    this.helper.processPositionAndNormal(scope);
+    const pb = scope.$builder;
+    scope.$l.oPos = this.helper.resolveVertexPosition(scope);
+    scope.$l.wPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1));
+    this.helper.pipeWorldPosition(scope, scope.wPos);
+    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), scope.wPos));
+    scope.$l.oNorm = this.helper.resolveVertexNormal(scope);
+    scope.$l.wNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
+    this.helper.pipeWorldNormal(scope, scope.wNorm);
   }
   sampleNormalMap(scope: PBInsideFunctionScope, texCoords: PBShaderExp) {
     const pb = scope.$builder;

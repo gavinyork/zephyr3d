@@ -14,8 +14,11 @@ export class UnlitMaterial extends applyMaterialMixins(MeshMaterial, mixinVertex
   }
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
-    scope.$inputs.zPos = scope.$builder.vec3().attrib('position');
-    this.helper.processPositionAndNormal(scope);
+    const pb = scope.$builder;
+    scope.$l.oPos = this.helper.resolveVertexPosition(scope);
+    scope.$l.wPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1));
+    this.helper.pipeWorldPosition(scope, scope.wPos);
+    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), scope.wPos));
   }
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);

@@ -54,11 +54,16 @@ export class ToonMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoC
     scope.$inputs.normal = pb.vec3().attrib('normal');
     if (this.pass === 0) {
       scope.edge = pb.float().uniform(2);
-      const vertexPos = pb.add(scope.$inputs.pos, pb.mul(scope.$inputs.normal, scope.edge));
-      this.helper.processPositionAndNormal(scope, vertexPos);
+      scope.$l.oPos = this.helper.resolveVertexPosition(scope, pb.add(scope.$inputs.pos, pb.mul(scope.$inputs.normal, scope.edge)));
     } else {
-      this.helper.processPositionAndNormal(scope);
+      scope.$l.oPos = this.helper.resolveVertexPosition(scope);
     }
+    scope.$l.wPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1));
+    this.helper.pipeWorldPosition(scope, scope.wPos);
+    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), scope.wPos));
+    scope.$l.oNorm = this.helper.resolveVertexNormal(scope);
+    scope.$l.wNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
+    this.helper.pipeWorldNormal(scope, scope.wNorm);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);

@@ -14,7 +14,7 @@ import type {
   PBShaderExp,
   PBInsideFunctionScope,
   StructuredBuffer,
-  Texture2D
+  Texture2D,
 } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
 import { linearToGamma } from '../../shaders';
@@ -48,7 +48,10 @@ export class ShaderHelper {
   static readonly FOG_TYPE_SCATTER = 4;
   static readonly BILLBOARD_SPHERICAL = 1;
   static readonly BILLBOARD_SYLINDRAL = 2;
+  /** @internal */
   static defaultSunDir = Vector3.one().inplaceNormalize();
+  /** @internal */
+  private static readonly SKIN_MATRIX_NAME = 'Z_SkinMatrix';
   /** @internal */
   private static _lightUniformShadow = {
     light: {
@@ -273,16 +276,29 @@ export class ShaderHelper {
    * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
    * @returns The calculated vertex position in object space, or null if pos is null
    */
-  static calculateObjectSpacePosition(
-    scope: PBInsideFunctionScope,
-    pos: PBShaderExp,
-    skinMatrix: PBShaderExp
-  ): PBShaderExp {
+  static resolveVertexPosition(scope: PBInsideFunctionScope, pos?: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     if (pb.shaderKind !== 'vertex') {
-      throw new Error(`ShaderHelper.calculateObjectSpacePosition(): must be called in vertex stage`);
+      throw new Error(`ShaderHelper.resolveVertexPosition(): must be called at vertex stage`);
     }
-    return pos ? (skinMatrix ? pb.mul(skinMatrix, pb.vec4(pos, 1)).xyz : pos) : null;
+    const funcScope = pb.getCurrentFunctionScope();
+    if (!funcScope || !funcScope.$isMain()) {
+      throw new Error(`ShaderHelper.resolveVertexPosition(): must be called at entry function`);
+    }
+    if (!pos) {
+      if (!scope.$getVertexAttrib('position')) {
+        scope.$inputs.Z_pos = pb.vec3().attrib('position');
+      }
+      pos = scope.$getVertexAttrib('position');
+    }
+    if (this.hasSkinning(scope)) {
+      if (!funcScope[this.SKIN_MATRIX_NAME]) {
+        funcScope[this.SKIN_MATRIX_NAME] = this.calculateSkinMatrix(funcScope);
+      }
+      return pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(pos, 1)).xyz;
+    } else {
+      return pos;
+    }
   }
   /**
    * Calculates the normal vector of type vec3 in object space
@@ -292,16 +308,61 @@ export class ShaderHelper {
    * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
    * @returns The calculated normal vector in object space, or null if normal is null
    */
-  static calculateObjectSpaceNormal(
-    scope: PBInsideFunctionScope,
-    normal: PBShaderExp,
-    skinMatrix: PBShaderExp
-  ): PBShaderExp {
+  static resolveVertexNormal(scope: PBInsideFunctionScope, normal?: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     if (pb.shaderKind !== 'vertex') {
-      throw new Error(`ShaderHelper.calculateObjectSpaceNormal(): must be called in vertex stage`);
+      throw new Error(`ShaderHelper.resolveVertexNormal(): must be called in vertex stage`);
     }
-    return normal ? (skinMatrix ? pb.mul(skinMatrix, pb.vec4(normal, 0)).xyz : normal) : null;
+    const funcScope = pb.getCurrentFunctionScope();
+    if (!funcScope || !funcScope.$isMain()) {
+      throw new Error(`ShaderHelper.resolveVertexNormal(): must be called at entry function`);
+    }
+    if (!normal) {
+      if (!scope.$getVertexAttrib('normal')) {
+        scope.$inputs.Z_normal = pb.vec3().attrib('normal');
+      }
+      normal = scope.$getVertexAttrib('normal');
+    }
+    if (this.hasSkinning(scope)) {
+      if (!funcScope[this.SKIN_MATRIX_NAME]) {
+        funcScope[this.SKIN_MATRIX_NAME] = this.calculateSkinMatrix(funcScope);
+      }
+      return pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(normal, 0)).xyz;
+    } else {
+      return normal;
+    }
+  }
+  /**
+   * Calculates the tangent vector of type vec3 in object space
+   *
+   * @param scope - Current shader scope
+   * @param tangent - Vertex tangent input, must be type of vec4, null if no vertex tangent input
+   * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
+   * @returns The calculated tangent vector of type vec4 in object space, or null if tangent is null
+   */
+  static resolveVertexTangent(scope: PBInsideFunctionScope, tangent?: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    if (pb.shaderKind !== 'vertex') {
+      throw new Error(`ShaderHelper.resolveVertexTangent(): must be called in vertex stage`);
+    }
+    const funcScope = pb.getCurrentFunctionScope();
+    if (!funcScope || !funcScope.$isMain()) {
+      throw new Error(`ShaderHelper.resolveVertexTangent(): must be called at entry function`);
+    }
+    if (!tangent) {
+      if (!scope.$getVertexAttrib('tangent')) {
+        scope.$inputs.Z_tangent = pb.vec4().attrib('tangent');
+      }
+      tangent = scope.$getVertexAttrib('tangent');
+    }
+    if (this.hasSkinning(scope)) {
+      if (!funcScope[this.SKIN_MATRIX_NAME]) {
+        funcScope[this.SKIN_MATRIX_NAME] = this.calculateSkinMatrix(funcScope);
+      }
+      return pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(tangent, 0)).xyz;
+    } else {
+      return tangent;
+    }
   }
   /**
    * Propagate world position from vertex stage to fragment stage
@@ -340,29 +401,6 @@ export class ShaderHelper {
    */
   static pipeWorldBinormal(scope: PBInsideFunctionScope, worldBinormal: PBShaderExp) {
     scope.$outputs[VARYING_NAME_WORLD_BINORMAL] = worldBinormal;
-  }
-  /**
-   * Calculates the tangent vector of type vec3 in object space
-   *
-   * @param scope - Current shader scope
-   * @param tangent - Vertex tangent input, must be type of vec4, null if no vertex tangent input
-   * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
-   * @returns The calculated tangent vector of type vec4 in object space, or null if tangent is null
-   */
-  static calculateObjectSpaceTangent(
-    scope: PBInsideFunctionScope,
-    tangent: PBShaderExp,
-    skinMatrix: PBShaderExp
-  ): PBShaderExp {
-    const pb = scope.$builder;
-    if (pb.shaderKind !== 'vertex') {
-      throw new Error(`ShaderHelper.calculateObjectSpaceTangent(): must be called in vertex stage`);
-    }
-    return tangent
-      ? skinMatrix
-        ? pb.vec4(pb.mul(skinMatrix, pb.vec4(tangent.xyz, 0)).xyz, tangent.w)
-        : tangent
-      : null;
   }
   /**
    * Perform standard processing on vertices, normals, and tangents.
@@ -421,32 +459,17 @@ export class ShaderHelper {
     }
     pb.func(funcName, params, function () {
       const viewProjMatrix = that.getViewProjectionMatrix(this);
-      if (that.hasSkinning(this)) {
-        this.$l.skinMatrix = that.calculateSkinMatrix(this);
-      }
-      this.$l.oPos = that.calculateObjectSpacePosition(
-        this,
-        this.pos,
-        that.hasSkinning(this) ? this.skinMatrix : null
-      );
+      this.$l.oPos = that.resolveVertexPosition(this, this.pos);
       that.pipeWorldPosition(this, pb.mul(that.getWorldMatrix(this), pb.vec4(this.$l.oPos, 1)));
       that.setClipSpacePosition(this, pb.mul(viewProjMatrix, this.$outputs[VARYING_NAME_WORLD_POSITION]));
       if (normal) {
-        this.$l.oNorm = that.calculateObjectSpaceNormal(
-          this,
-          this.normal,
-          that.hasSkinning(this) ? this.skinMatrix : null
-        );
+        this.$l.oNorm = that.resolveVertexNormal(this, this.normal);
         that.pipeWorldNormal(
           this,
           pb.normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oNorm, 0)).xyz)
         );
         if (tangent) {
-          this.$l.oTangent = that.calculateObjectSpaceTangent(
-            this,
-            this.tangent,
-            that.hasSkinning(this) ? this.skinMatrix : null
-          );
+          this.$l.oTangent = that.resolveVertexTangent(this, this.tangent);
           that.pipeWorldTangent(
             this,
             pb.normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oTangent.xyz, 0)).xyz)

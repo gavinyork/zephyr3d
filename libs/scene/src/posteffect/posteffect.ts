@@ -9,7 +9,7 @@ import type {
   VertexLayout
 } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import { drawFullscreenQuad } from '../render/helper';
+import { drawFullscreenQuad } from '../render/fullscreenquad';
 
 /**
  * Base class for any type of post effect

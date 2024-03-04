@@ -31,14 +31,22 @@ export class PBRSpecularGlossinessMaterial extends applyMaterialMixins(
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
     const pb = scope.$builder;
-    scope.$inputs.zPos = pb.vec3().attrib('position');
+    scope.$l.oPos = this.helper.resolveVertexPosition(scope);
+    scope.$l.wPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1));
+    this.helper.pipeWorldPosition(scope, scope.wPos);
+    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), scope.wPos));
     if (this.vertexNormal) {
-      scope.$inputs.normal = pb.vec3().attrib('normal');
+      scope.$l.oNorm = this.helper.resolveVertexNormal(scope);
+      scope.$l.wNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
+      this.helper.pipeWorldNormal(scope, scope.wNorm);
+      if (this.vertexTangent) {
+        scope.$l.oTangent = this.helper.resolveVertexTangent(scope);
+        scope.$l.wTangent = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oTangent.xyz, 0)).xyz;
+        this.helper.pipeWorldTangent(scope, scope.wTangent);
+        scope.$l.wBinormal = pb.mul(pb.cross(scope.wNorm, scope.wTangent), scope.oTangent.w);
+        this.helper.pipeWorldBinormal(scope, scope.wBinormal);
+      }
     }
-    if (this.vertexTangent) {
-      scope.$inputs.tangent = pb.vec4().attrib('tangent');
-    }
-    this.helper.processPositionAndNormal(scope);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
