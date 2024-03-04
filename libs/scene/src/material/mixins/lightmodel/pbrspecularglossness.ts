@@ -17,9 +17,9 @@ export type IMixinPBRSpecularGlossiness = {
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp,
     normal: PBShaderExp,
-    TBN: PBShaderExp,
     viewVec: PBShaderExp,
-    albedo: PBShaderExp
+    albedo: PBShaderExp,
+    TBN?: PBShaderExp,
   ): PBShaderExp;
   calculateCommonData(
     scope: PBInsideFunctionScope,
@@ -83,9 +83,9 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
       scope: PBInsideFunctionScope,
       worldPos: PBShaderExp,
       normal: PBShaderExp,
-      TBN: PBShaderExp,
       viewVec: PBShaderExp,
-      albedo: PBShaderExp
+      albedo: PBShaderExp,
+      TBN?: PBShaderExp,
     ): PBShaderExp {
       const pb = scope.$builder;
       const funcName = 'Z_PBRSpecularGlossinessLight';

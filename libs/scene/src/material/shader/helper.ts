@@ -31,7 +31,6 @@ const UNIFORM_NAME_BONE_MATRICES = 'Z_UniformBoneMatrices';
 const UNIFORM_NAME_BONE_TEXTURE_SIZE = 'Z_UniformBoneTexSize';
 const UNIFORM_NAME_BONE_INV_BIND_MATRIX = 'Z_UniformBoneInvBindMatrix';
 
-const VARYING_NAME_WORLD_POSITION = 'Z_VaryingWorldPosition';
 const VARYING_NAME_WORLD_NORMAL = 'Z_VaryingWorldNormal';
 const VARYING_NAME_WORLD_TANGENT = 'Z_VaryingWorldTangent';
 const VARYING_NAME_WORLD_BINORMAL = 'Z_VaryingWorldBinormal';
@@ -359,134 +358,10 @@ export class ShaderHelper {
       if (!funcScope[this.SKIN_MATRIX_NAME]) {
         funcScope[this.SKIN_MATRIX_NAME] = this.calculateSkinMatrix(funcScope);
       }
-      return pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(tangent, 0)).xyz;
+      return pb.vec4(pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(tangent.xyz, 0)).xyz, tangent.w);
     } else {
       return tangent;
     }
-  }
-  /**
-   * Propagate world position from vertex stage to fragment stage
-   *
-   * @param scope - Current shader scope
-   * @param worldNormal - World position
-   */
-  static pipeWorldPosition(scope: PBInsideFunctionScope, worldPos: PBShaderExp) {
-    const pb = scope.$builder;
-    scope.$outputs[VARYING_NAME_WORLD_POSITION] =
-      worldPos.numComponents() === 3 ? pb.vec4(worldPos, 1) : worldPos;
-  }
-  /**
-   * Propagate world normal vector from vertex stage to fragment stage
-   *
-   * @param scope - Current shader scope
-   * @param worldNormal - World normal vector
-   */
-  static pipeWorldNormal(scope: PBInsideFunctionScope, worldNormal: PBShaderExp): void {
-    scope.$outputs[VARYING_NAME_WORLD_NORMAL] = worldNormal;
-  }
-  /**
-   * Propagate world tangent vector from vertex stage to fragment stage
-   *
-   * @param scope - Current shader scope
-   * @param worldNormal - World tangent vector
-   */
-  static pipeWorldTangent(scope: PBInsideFunctionScope, worldTangent: PBShaderExp) {
-    scope.$outputs[VARYING_NAME_WORLD_TANGENT] = worldTangent;
-  }
-  /**
-   * Propagate world binormal vector from vertex stage to fragment stage
-   *
-   * @param scope - Current shader scope
-   * @param worldNormal - World binormal vector
-   */
-  static pipeWorldBinormal(scope: PBInsideFunctionScope, worldBinormal: PBShaderExp) {
-    scope.$outputs[VARYING_NAME_WORLD_BINORMAL] = worldBinormal;
-  }
-  /**
-   * Perform standard processing on vertices, normals, and tangents.
-   *
-   * @remarks
-   * This function performs skeletal transformations (if present) and
-   * world transformations on vertices, normals, and tangents, outputting
-   * them to the Fragment shader. It also transforms the vertices from
-   * local space to clip space.If vertex normals or tangents are absent,
-   * they will be ignored.
-   *
-   * @param scope - Current shader scope
-   * @param pos - Local space vertex coordinates, if omitted, vertex input will be used instead.
-   * @param normal - Local space vertex normal, if omitted, vertex input will be used instead.
-   * @param tangent - Local space vertex tangent, if omitted, vertex input will be used instead.
-   */
-  static processPositionAndNormal(
-    scope: PBInsideFunctionScope,
-    pos?: PBShaderExp,
-    normal?: PBShaderExp,
-    tangent?: PBShaderExp
-  ) {
-    const pb = scope.$builder;
-    const funcName = 'Z_processPositionAndNormal';
-    const that = this;
-    const params: PBShaderExp[] = [];
-    const args: PBShaderExp[] = [];
-    pos = pos ?? scope.$getVertexAttrib('position');
-    if (!pos) {
-      throw new Error('ShaderHelper.processPositionAndNormal(): No vertex input');
-    }
-    if (pos.numComponents() !== 3) {
-      throw new Error('ShaderHelper.processPositionAndNormal(): vertex position must be of type vec3');
-    }
-    params.push(pb.vec3('pos'));
-    args.push(pos);
-    normal = normal ?? scope.$getVertexAttrib('normal');
-    if (normal) {
-      if (normal.numComponents() !== 3) {
-        console.error('ShaderHelper.processPositionAndNormal(): vertex normal must be of type vec3');
-        normal = null;
-      } else {
-        params.push(pb.vec3('normal'));
-        args.push(normal);
-      }
-    }
-    tangent = tangent ?? scope.$getVertexAttrib('tangent');
-    if (tangent) {
-      if (tangent.numComponents() !== 4) {
-        console.error('ShaderHelper.processPositionAndNormal(): vertex tangent must be of type vec4');
-        tangent = null;
-      } else {
-        params.push(pb.vec4('tangent'));
-        args.push(tangent);
-      }
-    }
-    pb.func(funcName, params, function () {
-      const viewProjMatrix = that.getViewProjectionMatrix(this);
-      this.$l.oPos = that.resolveVertexPosition(this, this.pos);
-      that.pipeWorldPosition(this, pb.mul(that.getWorldMatrix(this), pb.vec4(this.$l.oPos, 1)));
-      that.setClipSpacePosition(this, pb.mul(viewProjMatrix, this.$outputs[VARYING_NAME_WORLD_POSITION]));
-      if (normal) {
-        this.$l.oNorm = that.resolveVertexNormal(this, this.normal);
-        that.pipeWorldNormal(
-          this,
-          pb.normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oNorm, 0)).xyz)
-        );
-        if (tangent) {
-          this.$l.oTangent = that.resolveVertexTangent(this, this.tangent);
-          that.pipeWorldTangent(
-            this,
-            pb.normalize(pb.mul(that.getNormalMatrix(this), pb.vec4(this.$l.oTangent.xyz, 0)).xyz)
-          );
-          that.pipeWorldBinormal(
-            this,
-            pb.normalize(
-              pb.mul(
-                pb.cross(this.$outputs[VARYING_NAME_WORLD_NORMAL], this.$outputs[VARYING_NAME_WORLD_TANGENT]),
-                this.$l.oTangent.w
-              )
-            )
-          );
-        }
-      }
-    });
-    pb.getGlobalScope()[funcName](...args);
   }
   /**
    * Gets the uniform variable of type mat4 which holds the world matrix of current object to be drawn
@@ -857,54 +732,6 @@ export class ShaderHelper {
    */
   static getCameraRotationMatrix(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_GLOBAL].camera.rotationMatrix;
-  }
-  /**
-   * Gets the varying input value of type vec4 which holds the world position of current fragment
-   *
-   * @remarks
-   * This function can only be used in the fragment shader
-   *
-   * @param scope - Current shader scope
-   * @returns The world position of current fragment
-   */
-  static getWorldPosition(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope.$inputs[VARYING_NAME_WORLD_POSITION];
-  }
-  /**
-   * Gets the varying input value of type vec3 which holds the world normal of current fragment
-   *
-   * @remarks
-   * This function can only be used in the fragment shader
-   *
-   * @param scope - Current shader scope
-   * @returns The world normal of current fragment
-   */
-  static getWorldNormal(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope.$inputs[VARYING_NAME_WORLD_NORMAL];
-  }
-  /**
-   * Gets the varying input value of type vec3 which holds the world tangent vector of current fragment
-   *
-   * @remarks
-   * This function can only be used in the fragment shader
-   *
-   * @param scope - Current shader scope
-   * @returns The world tangent vector of current fragment
-   */
-  static getWorldTangent(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope.$inputs[VARYING_NAME_WORLD_TANGENT];
-  }
-  /**
-   * Gets the varying input value of type vec3 which holds the world binormal vector of current fragment
-   *
-   * @remarks
-   * This function can only be used in the fragment shader
-   *
-   * @param scope - Current shader scope
-   * @returns The world binormal vector of current fragment
-   */
-  static getWorldBinormal(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope.$inputs[VARYING_NAME_WORLD_BINORMAL];
   }
   /** @internal */
   static getCascadeDistances(scope: PBInsideFunctionScope): PBShaderExp {

@@ -16,9 +16,8 @@ export class UnlitMaterial extends applyMaterialMixins(MeshMaterial, mixinVertex
     super.vertexShader(scope);
     const pb = scope.$builder;
     scope.$l.oPos = this.helper.resolveVertexPosition(scope);
-    scope.$l.wPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1));
-    this.helper.pipeWorldPosition(scope, scope.wPos);
-    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), scope.wPos));
+    scope.$outputs.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
+    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
   }
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
@@ -26,6 +25,6 @@ export class UnlitMaterial extends applyMaterialMixins(MeshMaterial, mixinVertex
     if (this.vertexColor) {
       color = scope.$builder.mul(color, this.getVertexColor(scope));
     }
-    this.outputFragmentColor(scope, this.helper.getWorldPosition(scope).xyz, this.needFragmentColor() ? color : null);
+    this.outputFragmentColor(scope, scope.$inputs.worldPos, this.needFragmentColor() ? color : null);
   }
 }

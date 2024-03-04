@@ -238,7 +238,7 @@ export class TerrainMaterial extends applyMaterialMixins(
     });
     return pb.getGlobalScope()[funcName]();
   }
-  sampleNormalMapWithTBN(
+  sampleDetailNormalMap(
     scope: PBInsideFunctionScope,
     tex: PBShaderExp,
     texCoord: PBShaderExp,
@@ -250,59 +250,16 @@ export class TerrainMaterial extends applyMaterialMixins(
     const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(normalScale).xx, 1));
     return pb.normalize(pb.mul(TBN, normalTex));
   }
-  calculateNormalAndTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
-    scope.$l.normalInfo = super.calculateNormalAndTBN(scope, worldPos);
-    const pb = scope.$builder;
-    let calcNormal = false;
-    if (this._options && this._options.detailMaps.normalTextures) {
-      scope.$l.detailMask = pb.textureSample(scope.splatMap, scope.$inputs.mapUV);
-      if (Array.isArray(this._options.detailMaps.normalTextures)) {
-        for (let i = 0; i < this._options.detailMaps.normalTextures.length; i++) {
-          const tex = scope[`detailNormalMap${i}`];
-          const scale = scope.detailScales.at(i).y;
-          const texCoord = pb.mul(scope.$inputs.mapUV, scope.detailScales.at(i).x);
-          scope.normalInfo.normal = pb.add(
-            scope.normalInfo.normal,
-            pb.mul(
-              this.sampleNormalMapWithTBN(scope, tex, texCoord, scale, scope.normalInfo.TBN),
-              scope.detailMask[i]
-            )
-          );
-          calcNormal = true;
-        }
-      } else {
-        const tex = scope.detailNormalMap;
-        for (let i = 0; i < this._numDetailMaps; i++) {
-          const scale = scope.detailScales.at(i).y;
-          const texCoord = pb.mul(scope.$inputs.mapUV, scope.detailScales.at(i).x);
-          const pixel = pb.sub(pb.mul(pb.textureArraySample(tex, texCoord, i).rgb, 2), pb.vec3(1));
-          const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(scale).xx, 1));
-          const detailNormal = pb.normalize(pb.mul(scope.normalInfo.TBN, normalTex));
-          scope.normalInfo.normal = pb.add(
-            scope.normalInfo.normal,
-            pb.mul(detailNormal, scope.detailMask[i])
-          );
-          calcNormal = true;
-        }
-      }
-    }
-    if (calcNormal) {
-      scope.normalInfo.normal = pb.normalize(scope.normalInfo.normal);
-    }
-    return scope.normalInfo;
-  }
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
     const pb = scope.$builder;
     scope.$l.oPos = this.helper.resolveVertexPosition(scope);
-    scope.$l.wPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1));
-    this.helper.pipeWorldPosition(scope, scope.wPos);
-    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), scope.wPos));
+    scope.$outputs.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
+    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
     if (this.needFragmentColor()) {
       scope.terrainInfo = pb.vec4().uniform(2);
       scope.$l.oNorm = this.helper.resolveVertexNormal(scope);
-      scope.$l.wNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
-      this.helper.pipeWorldNormal(scope, scope.wNorm);
+      scope.$outputs.worldNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
       scope.$outputs.mapUV = pb.div(scope.oPos.xz, scope.terrainInfo.xy);
     }
   }
@@ -310,7 +267,6 @@ export class TerrainMaterial extends applyMaterialMixins(
     super.fragmentShader(scope);
     const pb = scope.$builder;
     const that = this;
-    scope.$l.worldPos = this.helper.getWorldPosition(scope).xyz;
     if (this.needFragmentColor()) {
       if (this._options) {
         scope.detailScales = pb.vec4[this._numDetailMaps]().uniform(2);
@@ -333,19 +289,55 @@ export class TerrainMaterial extends applyMaterialMixins(
         }
       }
       scope.$l.albedo = this.calculateAlbedoColor(scope);
-      scope.$l.normalInfo = this.calculateNormalAndTBN(scope, scope.worldPos);
-      scope.$l.viewVec = this.calculateViewVector(scope, scope.worldPos);
+      scope.$l.normalInfo = this.calculateNormalAndTBN(scope, scope.$inputs.worldPos, scope.$inputs.worldNorm);
+      let calcNormal = false;
+      if (this._options && this._options.detailMaps.normalTextures) {
+        scope.$l.detailMask = pb.textureSample(scope.splatMap, scope.$inputs.mapUV);
+        if (Array.isArray(this._options.detailMaps.normalTextures)) {
+          for (let i = 0; i < this._options.detailMaps.normalTextures.length; i++) {
+            const tex = scope[`detailNormalMap${i}`];
+            const scale = scope.detailScales.at(i).y;
+            const texCoord = pb.mul(scope.$inputs.mapUV, scope.detailScales.at(i).x);
+            scope.normalInfo.normal = pb.add(
+              scope.normalInfo.normal,
+              pb.mul(
+                this.sampleDetailNormalMap(scope, tex, texCoord, scale, scope.normalInfo.TBN),
+                scope.detailMask[i]
+              )
+            );
+            calcNormal = true;
+          }
+        } else {
+          const tex = scope.detailNormalMap;
+          for (let i = 0; i < this._numDetailMaps; i++) {
+            const scale = scope.detailScales.at(i).y;
+            const texCoord = pb.mul(scope.$inputs.mapUV, scope.detailScales.at(i).x);
+            const pixel = pb.sub(pb.mul(pb.textureArraySample(tex, texCoord, i).rgb, 2), pb.vec3(1));
+            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(scale).xx, 1));
+            const detailNormal = pb.normalize(pb.mul(scope.normalInfo.TBN, normalTex));
+            scope.normalInfo.normal = pb.add(
+              scope.normalInfo.normal,
+              pb.mul(detailNormal, scope.detailMask[i])
+            );
+            calcNormal = true;
+          }
+        }
+      }
+      if (calcNormal) {
+        scope.normalInfo.normal = pb.normalize(scope.normalInfo.normal);
+      }
+      scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
       scope.$l.litColor = this.PBRLight(
         scope,
-        scope.worldPos,
+        scope.$inputs.worldPos,
         scope.normalInfo.normal,
-        scope.normalInfo.TBN,
         scope.viewVec,
-        scope.albedo
+        scope.albedo,
+        scope.normalInfo.TBN
       );
-      this.outputFragmentColor(scope, scope.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
-      this.outputFragmentColor(scope, scope.worldPos, null);
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
   }
   generateMetallicRoughnessMap(): Texture2D {

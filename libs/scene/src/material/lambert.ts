@@ -32,19 +32,15 @@ export class LambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLigh
     super.vertexShader(scope);
     const pb = scope.$builder;
     scope.$l.oPos = this.helper.resolveVertexPosition(scope);
-    scope.$l.wPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1));
-    this.helper.pipeWorldPosition(scope, scope.wPos);
-    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), scope.wPos));
+    scope.$outputs.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
+    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
     if (this.vertexNormal) {
       scope.$l.oNorm = this.helper.resolveVertexNormal(scope);
-      scope.$l.wNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
-      this.helper.pipeWorldNormal(scope, scope.wNorm);
+      scope.$outputs.wNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
       if (this.vertexTangent) {
         scope.$l.oTangent = this.helper.resolveVertexTangent(scope);
-        scope.$l.wTangent = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oTangent.xyz, 0)).xyz;
-        this.helper.pipeWorldTangent(scope, scope.wTangent);
-        scope.$l.wBinormal = pb.mul(pb.cross(scope.wNorm, scope.wTangent), scope.oTangent.w);
-        this.helper.pipeWorldBinormal(scope, scope.wBinormal);
+        scope.$outputs.wTangent = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oTangent.xyz, 0)).xyz;
+        scope.$outputs.wBinormal = pb.mul(pb.cross(scope.$outputs.wNorm, scope.$outputs.wTangent), scope.oTangent.w);
       }
     }
   }
@@ -52,32 +48,31 @@ export class LambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLigh
     super.fragmentShader(scope);
     const pb = scope.$builder;
     const that = this;
-    scope.$l.worldPos = this.helper.getWorldPosition(scope).xyz;
     if (this.needFragmentColor()) {
       scope.$l.albedo = this.calculateAlbedoColor(scope);
       if (this.vertexColor) {
         scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope));
       }
       scope.$l.color = pb.vec3(0);
-      scope.$l.normal = this.calculateNormal(scope, scope.worldPos);
+      scope.$l.normal = this.calculateNormal(scope, scope.$inputs.worldPos, scope.$inputs.wNorm, scope.$inputs.wTangent, scope.$inputs.wBinormal);
       if (this.needCalculateEnvLight()) {
         scope.color = pb.add(scope.color, this.getEnvLightIrradiance(scope, scope.normal));
       }
       this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, shadow) {
-        this.$l.lightAtten = that.calculateLightAttenuation(this, type, scope.worldPos, posRange, dirCutoff);
-        this.$l.lightDir = that.calculateLightDirection(this, type, scope.worldPos, posRange, dirCutoff);
+        this.$l.lightAtten = that.calculateLightAttenuation(this, type, scope.$inputs.worldPos, posRange, dirCutoff);
+        this.$l.lightDir = that.calculateLightDirection(this, type, scope.$inputs.worldPos, posRange, dirCutoff);
         this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
         this.$l.lightContrib = pb.mul(colorIntensity.rgb, colorIntensity.a, this.NoL, this.lightAtten);
         if (shadow) {
-          this.$l.shadow = pb.vec3(that.calculateShadow(this, scope.worldPos, this.NoL));
+          this.$l.shadow = pb.vec3(that.calculateShadow(this, scope.$inputs.worldPos, this.NoL));
           this.lightContrib = pb.mul(this.lightContrib, this.shadow);
         }
         this.color = pb.add(this.color, this.lightContrib);
       });
       scope.$l.litColor = pb.mul(scope.albedo, pb.vec4(scope.color, 1));
-      this.outputFragmentColor(scope, scope.worldPos, scope.litColor);
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.litColor);
     } else {
-      this.outputFragmentColor(scope, scope.worldPos, null);
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
   }
 }

@@ -59,12 +59,10 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
     super.vertexShader(scope);
     const pb = scope.$builder;
     scope.$l.oPos = this.helper.resolveVertexPosition(scope);
-    scope.$l.wPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1));
-    this.helper.pipeWorldPosition(scope, scope.wPos);
-    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), scope.wPos));
+    scope.$outputs.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
+    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
     scope.$l.oNorm = this.helper.resolveVertexNormal(scope);
-    scope.$l.wNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
-    this.helper.pipeWorldNormal(scope, scope.wNorm);
+    scope.$outputs.worldNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
   }
   sampleNormalMap(scope: PBInsideFunctionScope, texCoords: PBShaderExp) {
     const pb = scope.$builder;
@@ -78,7 +76,6 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
     super.fragmentShader(scope);
     const that = this;
     const pb = scope.$builder;
-    scope.$l.worldPos = this.helper.getWorldPosition(scope).xyz;
     if (this.needFragmentColor()){
       scope.parallaxScale = pb.float().uniform(2);
       scope.parallaxMinLayers = pb.float().uniform(2);
@@ -149,16 +146,17 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
         this.$l.projVtex = pb.vec3(pb.add(pb.mul(this.texDx, this.projVscr.x), pb.mul(this.texDy, this.projVscr.y)), pb.dot(this.worldNormal, this.viewPos));
         this.$return(pb.getGlobalScope().parallaxMapping(this.projVtex, this.uv));
       });
-      scope.$l.viewVec = this.calculateViewVector(scope, this.helper.getWorldPosition(scope));
-      scope.$l.TBN = this.calculateTBN(scope, scope.worldPos);
-      scope.$l.texCoords = scope.calcUV(this.helper.getWorldPosition(scope).xyz, pb.normalize(this.helper.getWorldNormal(scope)), pb.normalize(this.helper.getCameraPosition(scope)), this.getNormalTexCoord(scope));
+      scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
+      scope.$l.wNorm = pb.normalize(scope.$inputs.worldNorm);
+      scope.$l.TBN = this.calculateTBN(scope, scope.$inputs.worldPos, scope.wNorm);
+      scope.$l.texCoords = scope.calcUV(scope.$inputs.worldPos, scope.wNorm, pb.normalize(this.helper.getCameraPosition(scope)), this.getNormalTexCoord(scope));
       scope.$l.normal = pb.sub(pb.mul(this.sampleNormalTexture(scope, scope.texCoords).rgb, 2), pb.vec3(1));
       scope.$l.normal = pb.mul(scope.TBN, scope.normal);
       scope.$l.albedo = that.calculateAlbedoColor(scope, scope.texCoords);
-      scope.$l.litColor = this.blinnPhongLight(scope, scope.worldPos, scope.normal, scope.viewVec, scope.albedo);
-      this.outputFragmentColor(scope, scope.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
+      scope.$l.litColor = this.blinnPhongLight(scope, scope.$inputs.worldPos, scope.normal, scope.viewVec, scope.albedo);
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
-      this.outputFragmentColor(scope, scope.worldPos, null);
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
   }
 }

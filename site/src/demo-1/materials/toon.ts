@@ -58,35 +58,32 @@ export class ToonMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoC
     } else {
       scope.$l.oPos = this.helper.resolveVertexPosition(scope);
     }
-    scope.$l.wPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1));
-    this.helper.pipeWorldPosition(scope, scope.wPos);
-    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), scope.wPos));
+    scope.$outputs.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
+    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
     scope.$l.oNorm = this.helper.resolveVertexNormal(scope);
-    scope.$l.wNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
-    this.helper.pipeWorldNormal(scope, scope.wNorm);
+    scope.$outputs.wNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
     const that = this;
     const pb = scope.$builder;
-    scope.$l.worldPos = this.helper.getWorldPosition(scope).xyz;
     if (this.needFragmentColor()){
       scope.$l.albedo = that.calculateAlbedoColor(scope, scope.texCoords);
       if (this.pass === 0) {
-        this.outputFragmentColor(scope, scope.worldPos, pb.vec4(0, 0, 0, scope.albedo.a));
+        this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(0, 0, 0, scope.albedo.a));
       } else {
         scope.bands = pb.float().uniform(2);
-        scope.$l.normal = this.calculateNormal(scope, scope.worldPos);
-        scope.$l.litColor = this.lambertLight(scope, scope.worldPos, scope.normal, scope.albedo);
+        scope.$l.normal = this.calculateNormal(scope, scope.$inputs.worldPos, scope.$inputs.wNorm);
+        scope.$l.litColor = this.lambertLight(scope, scope.$inputs.worldPos, scope.normal, scope.albedo);
         scope.$l.litIntensity = pb.add(scope.litColor.r, scope.litColor.g, scope.litColor.b, 0.00001);
         scope.$l.albedoIntensity = pb.add(scope.albedo.r, scope.albedo.g, scope.albedo.g, 0.00001);
         scope.$l.intensity = pb.clamp(pb.div(scope.litIntensity, scope.albedoIntensity), 0, 1);
         scope.intensity = pb.div(pb.ceil(pb.mul(scope.intensity, scope.bands)), scope.bands);
         scope.litColor = pb.mul(pb.vec3(scope.intensity), scope.albedo.rgb);
-        this.outputFragmentColor(scope, scope.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
+        this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
       }
     } else {
-      this.outputFragmentColor(scope, scope.worldPos, null);
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
   }
 }

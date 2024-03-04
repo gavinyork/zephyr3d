@@ -63,18 +63,15 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
     super.vertexShader(scope);
     const pb = scope.$builder;
     scope.$l.oPos = this.helper.resolveVertexPosition(scope);
-    scope.$l.wPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1));
-    this.helper.pipeWorldPosition(scope, scope.wPos);
-    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), scope.wPos));
+    scope.$outputs.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
+    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
     scope.$l.oNorm = this.helper.resolveVertexNormal(scope);
-    scope.$l.wNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
-    this.helper.pipeWorldNormal(scope, scope.wNorm);
+    scope.$outputs.wNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
     scope.$outputs.oPos = scope.oPos;
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
     const pb = scope.$builder;
-    scope.$l.worldPos = this.helper.getWorldPosition(scope).xyz;
     if (this.needFragmentColor()) {
       scope.distored = pb.vec3().uniform(2);
       scope.darkColor = pb.vec3().uniform(2);
@@ -616,11 +613,11 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
         this.$return(pb.vec4(this.color, 1));
       });
       scope.$l.albedo = scope.wood(scope.$inputs.oPos, scope.distored, scope.density, scope.darkColor, scope.lightColor);
-      scope.$l.normal = this.calculateNormal(scope, scope.worldPos);
-      scope.$l.litColor = this.lambertLight(scope, scope.worldPos, scope.normal, scope.albedo);
-      this.outputFragmentColor(scope, scope.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
+      scope.$l.normal = this.calculateNormal(scope, scope.$inputs.worldPos, scope.$inputs.wNorm);
+      scope.$l.litColor = this.lambertLight(scope, scope.$inputs.worldPos, scope.normal, scope.albedo);
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
-      this.outputFragmentColor(scope, scope.worldPos, null);
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
   }
 }

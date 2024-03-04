@@ -65,41 +65,6 @@ export class SSM extends ShadowImpl {
   }
   computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
     return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap.format);
-    /*
-    if (this.useNativeShadowMap(shadowMapParams)) {
-      return scope.$builder.vec4(
-        scope.$builder.emulateDepthClamp
-          ? scope.$builder.clamp(scope.$inputs.clamppedDepth, 0, 1)
-          : scope.$builtins.fragCoord.z,
-        0,
-        0,
-        1
-      );
-    } else {
-      const pb = scope.$builder;
-      let depth: PBShaderExp = null;
-      if (shadowMapParams.lightType === LIGHT_TYPE_DIRECTIONAL) {
-        depth = pb.emulateDepthClamp
-          ? pb.clamp(scope.$inputs.clamppedDepth, 0, 1)
-          : scope.$builtins.fragCoord.z;
-      } else if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
-        const lightSpacePos = pb.mul(
-          ShaderHelper.getLightViewMatrixForShadow(scope),
-          ShaderHelper.getWorldPosition(scope)
-        );
-        depth = pb.div(pb.length(lightSpacePos.xyz), ShaderHelper.getLightPositionAndRangeForShadow(scope).w);
-      } else if (shadowMapParams.lightType === LIGHT_TYPE_SPOT) {
-        const lightSpacePos = pb.mul(
-          ShaderHelper.getLightViewMatrixForShadow(scope),
-          ShaderHelper.getWorldPosition(scope)
-        );
-        depth = pb.min(pb.div(pb.neg(lightSpacePos.z), ShaderHelper.getLightPositionAndRangeForShadow(scope).w), 1);
-      }
-      return shadowMapParams.shadowMap.format === 'rgba8unorm'
-        ? encodeNormalizedFloatToRGBA(scope, depth)
-        : pb.vec4(depth, 0, 0, 1);
-    }
-    */
   }
   computeShadowCSM(
     shadowMapParams: ShadowMapParams,

@@ -30,9 +30,9 @@ export type IMixinLight = {
     normal: PBShaderExp,
     viewVec: PBShaderExp
   ): PBShaderExp;
-  calculateTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
-  calculateNormal(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
-  calculateNormalAndTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
+  calculateTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp, worldNormal?: PBShaderExp, worldTangent?: PBShaderExp, worldBinormal?: PBShaderExp): PBShaderExp;
+  calculateNormal(scope: PBInsideFunctionScope, worldPos: PBShaderExp, worldNormal?: PBShaderExp, worldTangent?: PBShaderExp, worldBinormal?: PBShaderExp): PBShaderExp;
+  calculateNormalAndTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp, worldNormal?: PBShaderExp, worldTangent?: PBShaderExp, worldBinormal?: PBShaderExp): PBShaderExp;
   calculateLightAttenuation(
     scope: PBInsideFunctionScope,
     type: PBShaderExp,
@@ -133,30 +133,29 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      * @param scope - The shader scope
      * @returns Normal vector for current fragment
      */
-    calculateNormal(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
+    calculateNormal(scope: PBInsideFunctionScope, worldPos: PBShaderExp, worldNormal?: PBShaderExp, worldTangent?: PBShaderExp, worldBinormal?: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
       const that = this;
-      const args: PBShaderExp[] = [worldPos.xyz];
-      const params: PBShaderExp[] = [pb.vec3('worldPos')];
-      const worldNormal = that.helper.getWorldNormal(scope);
-      const worldTangent = that.helper.getWorldTangent(scope);
-      const worldBinormal = that.helper.getWorldBinormal(scope);
+      const args: PBShaderExp[] = [ worldPos ];
+      const params: PBShaderExp[] = [ pb.vec3('worldPos') ];
+      let funcName = 'Z_calculateNormal';
       if (worldNormal) {
         params.push(pb.vec3('worldNormal'));
         args.push(worldNormal);
-        if (worldTangent) {
+        funcName += '_N';
+        if (worldTangent && worldBinormal) {
           params.push(pb.vec3('worldTangent'), pb.vec3('worldBinormal'));
           args.push(worldTangent, worldBinormal);
+          funcName += '_T';
         }
       }
-      const funcName = 'Z_calculateNormal';
       pb.func(funcName, params, function () {
         this.$l.uv = that.normalTexture
           ? that.getNormalTexCoord(this) ?? pb.vec2(0)
           : that.albedoTexture
           ? that.getAlbedoTexCoord(this) ?? pb.vec2(0)
           : pb.vec2(0);
-        this.$l.TBN = that.calculateTBN(this, this.worldPos);
+        this.$l.TBN = that.calculateTBN(this, this.worldPos, this.worldNormal, this.worldTangent, this.worldBinormal);
         if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
           if (that.normalMapMode === 'object-space') {
             const pixel = pb.sub(
@@ -185,31 +184,30 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      * @param scope - The shader scope
      * @returns Structure that contains normal vector and TBN matrix
      */
-    calculateNormalAndTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
+    calculateNormalAndTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp, worldNormal?: PBShaderExp, worldTangent?: PBShaderExp, worldBinormal?: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
       const NormalStruct = pb.defineStruct([pb.mat3('TBN'), pb.vec3('normal')]);
       const that = this;
       const args: PBShaderExp[] = [worldPos.xyz];
       const params: PBShaderExp[] = [pb.vec3('worldPos')];
-      const worldNormal = that.helper.getWorldNormal(scope);
-      const worldTangent = that.helper.getWorldTangent(scope);
-      const worldBinormal = that.helper.getWorldBinormal(scope);
+      let funcName = 'Z_calculateNormalAndTBN';
       if (worldNormal) {
         params.push(pb.vec3('worldNormal'));
         args.push(worldNormal);
-        if (worldTangent) {
+        funcName += '_N';
+        if (worldTangent && worldBinormal) {
           params.push(pb.vec3('worldTangent'), pb.vec3('worldBinormal'));
           args.push(worldTangent, worldBinormal);
+          funcName += '_T';
         }
       }
-      const funcName = 'Z_calculateNormalAndTBN';
       pb.func(funcName, params, function () {
         this.$l.uv = that.normalTexture
           ? that.getNormalTexCoord(this) ?? pb.vec2(0)
           : that.albedoTexture
           ? that.getAlbedoTexCoord(this) ?? pb.vec2(0)
           : pb.vec2(0);
-        this.$l.TBN = that.calculateTBN(this, this.worldPos);
+        this.$l.TBN = that.calculateTBN(this, this.worldPos, this.worldNormal, this.worldTangent, this.worldBinormal);
         if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
           if (that.normalMapMode === 'object-space') {
             const pixel = pb.sub(
@@ -238,23 +236,22 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      * @param scope - The shader scope
      * @returns TBN matrix
      */
-    calculateTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
+    calculateTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp, worldNormal?: PBShaderExp, worldTangent?: PBShaderExp, worldBinormal?: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
       const that = this;
       const args: PBShaderExp[] = [worldPos.xyz];
       const params: PBShaderExp[] = [pb.vec3('worldPos')];
-      const worldNormal = that.helper.getWorldNormal(scope);
-      const worldTangent = that.helper.getWorldTangent(scope);
-      const worldBinormal = that.helper.getWorldBinormal(scope);
+      let funcName = 'Z_calculateTBN';
       if (worldNormal) {
         params.push(pb.vec3('worldNormal'));
         args.push(worldNormal);
-        if (worldTangent) {
+        funcName += '_N';
+        if (worldTangent && worldBinormal) {
           params.push(pb.vec3('worldTangent'), pb.vec3('worldBinormal'));
           args.push(worldTangent, worldBinormal);
+          funcName += '_T';
         }
       }
-      const funcName = 'Z_calculateTBN';
       pb.func(funcName, params, function () {
         const posW = this.worldPos;
         this.$l.uv = that.normalTexture

@@ -137,25 +137,22 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
         scope.$outputs.ao = pb.mix(scope.colorStart, scope.colorEnd, pb.sin(pb.mul(scope.t, Math.PI/2)));
       }
       scope.$outputs.tex = scope.$inputs.tex;
-      scope.$l.worldNormal = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.$inputs.normal, 0)).xyz;
-      this.helper.pipeWorldNormal(scope, scope.worldNormal);
+      scope.$outputs.worldNormal = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.$inputs.normal, 0)).xyz;
     }
-    scope.$l.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(vertexPos, 1));
+    scope.$outputs.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(vertexPos, 1)).xyz;
     this.helper.setClipSpacePosition(
       scope,
-      pb.mul(this.helper.getViewProjectionMatrix(scope), scope.worldPos)
+      pb.mul(this.helper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
     );
-    this.helper.pipeWorldPosition(scope, scope.worldPos);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
     const pb = scope.$builder;
-    scope.$l.worldPos = this.helper.getWorldPosition(scope).xyz;
     if (this.needFragmentColor(this.drawContext)) {
       scope.alphaRepeat = pb.float().uniform(2);
       scope.$l.albedo = this.calculateAlbedoColor(scope);
-      scope.$l.normal = this.calculateNormal(scope, scope.worldPos);
-      scope.$l.color = pb.vec4(this.lambertLight(scope, scope.worldPos, scope.normal, scope.albedo), scope.albedo.a);
+      scope.$l.normal = this.calculateNormal(scope, scope.$inputs.worldPos, scope.$inputs.worldNormal);
+      scope.$l.color = pb.vec4(this.lambertLight(scope, scope.$inputs.worldPos, scope.normal, scope.albedo), scope.albedo.a);
       if (this.pass > 0) {
         scope.alphaTex = pb.tex2D().uniform(2);
         scope.color = pb.mul(scope.color, scope.$inputs.ao);
@@ -164,9 +161,9 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
           pb.textureSample(scope.alphaTex, pb.mul(scope.$inputs.tex, scope.alphaRepeat)).r
         );
       }
-      this.outputFragmentColor(scope, scope.worldPos, scope.color);
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.color);
     } else {
-      this.outputFragmentColor(scope, scope.worldPos, null);
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
   }
 }
