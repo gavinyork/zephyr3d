@@ -2,6 +2,7 @@ import { mixinLight } from './mixins/lit';
 import { mixinVertexColor } from './mixins/vertexcolor';
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import type { PBFunctionScope } from '@zephyr3d/device';
+import { ShaderHelper } from './shader/helper';
 
 /**
  * Lambert material
@@ -31,15 +32,15 @@ export class LambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLigh
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
-    scope.$l.oPos = this.helper.resolveVertexPosition(scope);
-    scope.$outputs.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
-    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
+    scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
+    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
     if (this.vertexNormal) {
-      scope.$l.oNorm = this.helper.resolveVertexNormal(scope);
-      scope.$outputs.wNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
+      scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
+      scope.$outputs.wNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
       if (this.vertexTangent) {
-        scope.$l.oTangent = this.helper.resolveVertexTangent(scope);
-        scope.$outputs.wTangent = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oTangent.xyz, 0)).xyz;
+        scope.$l.oTangent = ShaderHelper.resolveVertexTangent(scope);
+        scope.$outputs.wTangent = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oTangent.xyz, 0)).xyz;
         scope.$outputs.wBinormal = pb.mul(pb.cross(scope.$outputs.wNorm, scope.$outputs.wTangent), scope.oTangent.w);
       }
     }

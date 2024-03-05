@@ -54,7 +54,6 @@ export class MeshMaterial extends Material {
   private _blendMode: BlendMode;
   private _opacity: number;
   private _ctx: DrawContext;
-  private _helper: typeof ShaderHelper;
   private _materialPass: number;
   constructor(...args: any[]) {
     super();
@@ -64,17 +63,12 @@ export class MeshMaterial extends Material {
     this._opacity = 1;
     this._ctx = null;
     this._materialPass = -1;
-    this._helper = ShaderHelper;
   }
   /** Define feature index */
   static defineFeature(): number {
     const val = this.NEXT_FEATURE_INDEX;
     this.NEXT_FEATURE_INDEX++;
     return val;
-  }
-  /** Shader helper */
-  get helper(): typeof ShaderHelper {
-    return this._helper;
   }
   /** Draw context for shader creation */
   get drawContext(): DrawContext {
@@ -264,7 +258,7 @@ export class MeshMaterial extends Material {
    */
   vertexShader(scope: PBFunctionScope): void {
     const pb = scope.$builder;
-    this.helper.prepareVertexShader(pb, this.drawContext);
+    ShaderHelper.prepareVertexShader(pb, this.drawContext);
     if (this.drawContext.target.getBoneMatrices()) {
       scope.$inputs.zBlendIndices = pb.vec4().attrib('blendIndices');
       scope.$inputs.zBlendWeights = pb.vec4().attrib('blendWeights');
@@ -276,7 +270,7 @@ export class MeshMaterial extends Material {
    */
   fragmentShader(scope: PBFunctionScope): void {
     const pb = scope.$builder;
-    this.helper.prepareFragmentShader(pb, this.drawContext);
+    ShaderHelper.prepareFragmentShader(pb, this.drawContext);
     if (this._alphaCutoff > 0) {
       scope.zAlphaCutoff = pb.float().uniform(2);
     }
@@ -327,7 +321,7 @@ export class MeshMaterial extends Material {
     pb.func(funcName, color ? [pb.vec3('worldPos'), pb.vec4('color')] : [pb.vec3('worldPos')], function () {
       this.$l.outColor = color ? this.color : pb.vec4();
       if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
-        that.helper.discardIfClipped(this, this.worldPos);
+        ShaderHelper.discardIfClipped(this, this.worldPos);
         if (!that.isTransparent(that.pass) && !this.zAlphaCutoff && !that.alphaToCoverage) {
           this.outColor.a = 1;
         } else if (this.zOpacity) {
@@ -341,16 +335,16 @@ export class MeshMaterial extends Material {
         if (that.isTransparent(that.pass)) {
           this.outColor = pb.vec4(pb.mul(this.outColor.rgb, this.outColor.a), this.outColor.a);
         }
-        that.helper.applyFog(this, this.worldPos, this.outColor, that.drawContext);
-        this.$outputs.zFragmentOutput = that.helper.encodeColorOutput(this, this.outColor);
+        ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext);
+        this.$outputs.zFragmentOutput = ShaderHelper.encodeColorOutput(this, this.outColor);
       } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
         if (color) {
           this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
             pb.discard();
           });
         }
-        that.helper.discardIfClipped(this, this.worldPos);
-        this.$l.depth = that.helper.nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
+        ShaderHelper.discardIfClipped(this, this.worldPos);
+        this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
         if (Application.instance.device.type === 'webgl') {
           this.$outputs.zFragmentOutput = encodeNormalizedFloatToRGBA(this, this.depth);
         } else {
@@ -362,7 +356,7 @@ export class MeshMaterial extends Material {
             pb.discard();
           });
         }
-        that.helper.discardIfClipped(this, this.worldPos);
+        ShaderHelper.discardIfClipped(this, this.worldPos);
         const shadowMapParams = that.drawContext.shadowMapInfo.get(
           (that.drawContext.renderPass as ShadowMapPass).light
         );

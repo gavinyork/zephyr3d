@@ -1,7 +1,7 @@
 import { Vector4 } from '@zephyr3d/base';
 import type { BindGroup, PBFunctionScope, Texture2D } from '@zephyr3d/device';
 import type { DrawContext, Primitive } from '@zephyr3d/scene';
-import { Application, MeshMaterial, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT, applyMaterialMixins, mixinLambert } from '@zephyr3d/scene';
+import { Application, MeshMaterial, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT, ShaderHelper, applyMaterialMixins, mixinLambert } from '@zephyr3d/scene';
 
 export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
   private _thickness: number;
@@ -137,12 +137,12 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
         scope.$outputs.ao = pb.mix(scope.colorStart, scope.colorEnd, pb.sin(pb.mul(scope.t, Math.PI/2)));
       }
       scope.$outputs.tex = scope.$inputs.tex;
-      scope.$outputs.worldNormal = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.$inputs.normal, 0)).xyz;
+      scope.$outputs.worldNormal = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.$inputs.normal, 0)).xyz;
     }
-    scope.$outputs.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(vertexPos, 1)).xyz;
-    this.helper.setClipSpacePosition(
+    scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(vertexPos, 1)).xyz;
+    ShaderHelper.setClipSpacePosition(
       scope,
-      pb.mul(this.helper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
     );
   }
   fragmentShader(scope: PBFunctionScope): void {

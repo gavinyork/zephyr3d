@@ -1,5 +1,5 @@
 import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
-import { DrawContext, MeshMaterial, applyMaterialMixins, mixinAlbedoColor, mixinBlinnPhong, mixinLambert } from '@zephyr3d/scene';
+import { DrawContext, MeshMaterial, ShaderHelper, applyMaterialMixins, mixinAlbedoColor, mixinBlinnPhong, mixinLambert } from '@zephyr3d/scene';
 
 export type ParallaxMappingMode = 'basic'|'steep'|'relief'|'occlusion';
 export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor, mixinBlinnPhong) {
@@ -58,11 +58,11 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
     const pb = scope.$builder;
-    scope.$l.oPos = this.helper.resolveVertexPosition(scope);
-    scope.$outputs.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
-    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
-    scope.$l.oNorm = this.helper.resolveVertexNormal(scope);
-    scope.$outputs.worldNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
+    scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
+    scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
+    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
+    scope.$outputs.worldNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
   }
   sampleNormalMap(scope: PBInsideFunctionScope, texCoords: PBShaderExp) {
     const pb = scope.$builder;
@@ -149,7 +149,7 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
       scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
       scope.$l.wNorm = pb.normalize(scope.$inputs.worldNorm);
       scope.$l.TBN = this.calculateTBN(scope, scope.$inputs.worldPos, scope.wNorm);
-      scope.$l.texCoords = scope.calcUV(scope.$inputs.worldPos, scope.wNorm, pb.normalize(this.helper.getCameraPosition(scope)), this.getNormalTexCoord(scope));
+      scope.$l.texCoords = scope.calcUV(scope.$inputs.worldPos, scope.wNorm, pb.normalize(ShaderHelper.getCameraPosition(scope)), this.getNormalTexCoord(scope));
       scope.$l.normal = pb.sub(pb.mul(this.sampleNormalTexture(scope, scope.texCoords).rgb, 2), pb.vec3(1));
       scope.$l.normal = pb.mul(scope.TBN, scope.normal);
       scope.$l.albedo = that.calculateAlbedoColor(scope, scope.texCoords);

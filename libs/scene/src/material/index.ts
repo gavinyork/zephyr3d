@@ -1,3 +1,4 @@
+export * from './shader/helper';
 export * from './lambert';
 export * from './blinn';
 export * from './unlit';

@@ -5,6 +5,7 @@ import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughn
 import type { BindGroup, PBFunctionScope, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { RENDER_PASS_TYPE_LIGHT } from '../values';
+import { ShaderHelper } from './shader/helper';
 
 export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight, mixinPBRMetallicRoughness) {
   /** @internal */
@@ -67,9 +68,9 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
     scope.$l.axisX = pb.cross(scope.normal, scope.axisZ);
     scope.$l.rotPos = pb.mul(pb.mat3(scope.axisX, scope.normal, scope.axisZ), scope.$inputs.pos);
 
-    scope.$outputs.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(pb.add(scope.rotPos, scope.$inputs.placement.xyz), 1)).xyz;
-    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
-    scope.$outputs.worldNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.normal, 0)).xyz;
+    scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(pb.add(scope.rotPos, scope.$inputs.placement.xyz), 1)).xyz;
+    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    scope.$outputs.worldNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.normal, 0)).xyz;
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);

@@ -1,5 +1,5 @@
 import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
-import { DrawContext, MeshMaterial, applyMaterialMixins, mixinAlbedoColor, mixinLambert } from '@zephyr3d/scene';
+import { DrawContext, MeshMaterial, ShaderHelper, applyMaterialMixins, mixinAlbedoColor, mixinLambert } from '@zephyr3d/scene';
 
 export class ToonMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor, mixinLambert) {
   static FEATURE_PARALLAX_MODE = this.defineFeature();
@@ -54,14 +54,14 @@ export class ToonMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoC
     scope.$inputs.normal = pb.vec3().attrib('normal');
     if (this.pass === 0) {
       scope.edge = pb.float().uniform(2);
-      scope.$l.oPos = this.helper.resolveVertexPosition(scope, pb.add(scope.$inputs.pos, pb.mul(scope.$inputs.normal, scope.edge)));
+      scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope, pb.add(scope.$inputs.pos, pb.mul(scope.$inputs.normal, scope.edge)));
     } else {
-      scope.$l.oPos = this.helper.resolveVertexPosition(scope);
+      scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
     }
-    scope.$outputs.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
-    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
-    scope.$l.oNorm = this.helper.resolveVertexNormal(scope);
-    scope.$outputs.wNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
+    scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
+    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
+    scope.$outputs.wNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);

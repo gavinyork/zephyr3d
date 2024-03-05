@@ -1,6 +1,6 @@
 import { Vector3 } from '@zephyr3d/base';
 import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
-import { DrawContext, MeshMaterial, applyMaterialMixins, mixinLambert } from '@zephyr3d/scene';
+import { DrawContext, MeshMaterial, ShaderHelper, applyMaterialMixins, mixinLambert } from '@zephyr3d/scene';
 
 export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
   private _distored: Vector3;
@@ -62,11 +62,11 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
     const pb = scope.$builder;
-    scope.$l.oPos = this.helper.resolveVertexPosition(scope);
-    scope.$outputs.worldPos = pb.mul(this.helper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
-    this.helper.setClipSpacePosition(scope, pb.mul(this.helper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
-    scope.$l.oNorm = this.helper.resolveVertexNormal(scope);
-    scope.$outputs.wNorm = pb.mul(this.helper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
+    scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
+    scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
+    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
+    scope.$outputs.wNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
     scope.$outputs.oPos = scope.oPos;
   }
   fragmentShader(scope: PBFunctionScope): void {

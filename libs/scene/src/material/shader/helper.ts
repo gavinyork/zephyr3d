@@ -31,10 +31,6 @@ const UNIFORM_NAME_BONE_MATRICES = 'Z_UniformBoneMatrices';
 const UNIFORM_NAME_BONE_TEXTURE_SIZE = 'Z_UniformBoneTexSize';
 const UNIFORM_NAME_BONE_INV_BIND_MATRIX = 'Z_UniformBoneInvBindMatrix';
 
-const VARYING_NAME_WORLD_NORMAL = 'Z_VaryingWorldNormal';
-const VARYING_NAME_WORLD_TANGENT = 'Z_VaryingWorldTangent';
-const VARYING_NAME_WORLD_BINORMAL = 'Z_VaryingWorldBinormal';
-
 /**
  * Helper shader functions for the builtin material system
  * @public
