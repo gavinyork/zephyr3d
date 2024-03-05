@@ -32,9 +32,9 @@ const sphere = new Mesh(scene, new SphereShape(), material);
 // Creates the camera
 // The created mesh is at the world coordinate system origin by default, and we place the camera at (0,0,4) and look at the origin
 const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
-camera.lookAt(new Vector3(0, 0, 4), new Vector3(0, 0, 0), new Vector3(0, 1, 0));
-// The Orbit controller distance is set to 4, which is the distance from the camera to the object
-camera.controller = new OrbitCameraController({ distance: 4 });
+camera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
+// Set center of orbit camera controller to origin
+camera.controller = new OrbitCameraController({ center: Vector3.zero() });
 
 ```
 

@@ -31,7 +31,7 @@ instancingApp.ready().then(async () => {
     160
   );
   camera.position.setXYZ(0, 0, 60);
-  camera.controller = new OrbitCameraController({ distance: camera.position.magnitude });
+  camera.controller = new OrbitCameraController();
   instancingApp.inputManager.use(camera.handleEvent.bind(camera));
 
   const assetManager = new AssetManager();

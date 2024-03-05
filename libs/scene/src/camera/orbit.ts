@@ -6,6 +6,8 @@ import { BaseCameraController } from './base';
  * @public
  */
 export interface OrbitCameraControllerOptions {
+  /** target position */
+  center: Vector3;
   /** initial distance between the camera and the target */
   distance?: number;
   /** damping value */
@@ -55,6 +57,7 @@ export class OrbitCameraController extends BaseCameraController {
     super();
     this.options = Object.assign(
       {
+        center: Vector3.zero(),
         distance: 1,
         damping: 0.1,
         moveSpeed: 0.2,
@@ -83,6 +86,7 @@ export class OrbitCameraController extends BaseCameraController {
     this.lastMouseY = 0;
     this.rotateX = 0;
     this.rotateY = 0;
+    this.upVector = Vector3.axisPY();
     this.scale = 1;
     this._loadCameraParams();
   }
@@ -143,11 +147,15 @@ export class OrbitCameraController extends BaseCameraController {
   }
   /** @internal */
   private _loadCameraParams() {
-    if (this._getCamera()) {
-      const mat = this._getCamera().worldMatrix;
-      mat.decomposeLookAt(this.eyePos, this.target);
-      Vector3.normalize(Vector3.sub(this.eyePos, this.target), this.direction);
-      Vector3.sub(this.eyePos, Vector3.scale(this.direction, this.options.distance), this.target);
+    const camera = this._getCamera();
+    if (camera) {
+      this.eyePos = this._getCamera().position;
+      this.target.set(this.options.center);
+      camera.lookAt(this.eyePos, this.target, this.upVector);
+      Vector3.sub(this.eyePos, this.target, this.direction);
+      this.options.distance = this.direction.magnitude;
+      this.direction.inplaceNormalize();
+      const mat = this._getCamera().localMatrix;
       this.xVector.setXYZ(mat[0], mat[1], mat[2]);
     }
   }

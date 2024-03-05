@@ -54,17 +54,6 @@ export class UI {
     const center = bbox.center;
     const extents = bbox.extents;
     let size = Math.max(extents.x, extents.y);
-    /*
-    const minSize = 10;
-    const maxSize = 100;
-    if (size < minSize || size > maxSize) {
-      const scale = size < minSize ? minSize / size : maxSize / size;
-      node.scaleBy(new Vector3(scale, scale, scale));
-      center.scaleBy(scale);
-      extents.scaleBy(scale);
-      size *= scale;
-    }
-    */
     const dist = size / Math.tan(this._camera.fovY * 0.5) + extents.z + this._camera.near;
 
     this._camera.lookAt(
@@ -74,7 +63,7 @@ export class UI {
     );
     this._camera.near = Math.min(1, this._camera.near);
     this._camera.far = Math.max(10, dist + extents.z + 100);
-    (this._camera.controller as OrbitCameraController).setOptions({ distance: dist });
+    (this._camera.controller as OrbitCameraController).setOptions({ center });
   }
   updateMeshShowState() {
     for (let i = 0; i < this._meshes.length; i++) {

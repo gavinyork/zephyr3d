@@ -92,8 +92,8 @@ myApp.ready().then(async function () {
     600
   );
   const eyePos = new Vector3(30, 30, 30);
-  camera.lookAt(eyePos, new Vector3(0, 0, 0), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController({ distance: eyePos.magnitude });
+  camera.lookAt(eyePos, Vector3.zero(), new Vector3(0, 1, 0));
+  camera.controller = new OrbitCameraController();
 
   const compositor = new Compositor();
   // Add a Tonemap post-processing effect

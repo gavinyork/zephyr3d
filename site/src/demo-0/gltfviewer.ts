@@ -273,7 +273,7 @@ export class GLTFViewer {
       );
       this._camera.near = Math.min(1, this._camera.near);
       this._camera.far = Math.max(1000, dist + extents.z + 100);
-      (this._camera.controller as OrbitCameraController).setOptions({ distance: dist });
+      (this._camera.controller as OrbitCameraController).setOptions({ center });
     }
   }
   private getBoundingBox(): AABB {
