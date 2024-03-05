@@ -16,6 +16,7 @@ import { imGuiInit, imGuiInjectEvent } from '@zephyr3d/imgui';
 import type { DeviceBackend, Texture2D } from '@zephyr3d/device';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { Character } from './character';
 
 function getQueryString(name: string) {
   return new URL(window.location.toString()).searchParams.get(name) || null;

@@ -113,7 +113,7 @@ myApp.ready().then(async function () {
 
   // Toon material
   const toonMaterial = new ToonMaterial();
-  toonMaterial.bands = 4;
+  toonMaterial.bands = 2;
   toonMaterial.edgeThickness = 1;
   const toonMesh = await assetManager.fetchModel(scene, 'assets/models/Duck.glb');
   toonMesh.group.iterate(node => {
