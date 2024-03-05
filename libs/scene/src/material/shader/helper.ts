@@ -50,6 +50,7 @@ export class ShaderHelper {
   /** @internal */
   private static _lightUniformShadow = {
     light: {
+      sunDir: new Vector3(),
       envLightStrength: 1,
       shadowCascades: 1,
       positionAndRange: new Vector4(),
@@ -148,6 +149,7 @@ export class ShaderHelper {
       const fogStruct = pb.defineStruct([pb.int('fogType'), pb.vec4('fogColor'), pb.vec4('fogParams')]);
       const lightStruct = ctx.currentShadowLight
         ? pb.defineStruct([
+            pb.vec3('sunDir'),
             pb.int('shadowCascades'),
             pb.vec4('positionAndRange'),
             pb.vec4('directionAndCutoff'),
@@ -478,6 +480,7 @@ export class ShaderHelper {
   /** @internal */
   static setLightUniformsShadow(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight) {
     const shadowMapParams = ctx.shadowMapInfo.get(light);
+    this._lightUniformShadow.light.sunDir = ctx.sunLight ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1) : this.defaultSunDir,
     this._lightUniformShadow.light.envLightStrength = ctx.env?.light.strength ?? 0;
     this._lightUniformShadow.light.shadowCascades = shadowMapParams.numShadowCascades;
     this._lightUniformShadow.light.positionAndRange.set(light.positionAndRange);

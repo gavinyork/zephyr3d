@@ -13,6 +13,7 @@ const __dirname = path.dirname(__filename);
 const srcdir = path.join(__dirname, 'src');
 const destdir = path.join(__dirname, 'dist', 'web', 'tut');
 const srcfiles = [];
+const zephyr3d = path.join(__dirname, 'node_modules', '@zephyr3d');
 const cacheFile = path.join(__dirname, '.buildcache.json');
 const tmpcacheFile = path.join(__dirname, '.buildcache.tmp.json');
 
@@ -73,6 +74,13 @@ try {
 fs.writeFileSync(tmpcacheFile, JSON.stringify(buildCache, null, ' '));
 
 let cacheChanged = false;
+let invalidAll = false;
+const dict = traverseDirectory(zephyr3d, zephyr3d);
+const cachedZephr3d = buildCache['@zephyr3d'];
+if (!deepEqual(cachedZephr3d, dict)){
+  buildCache['@zephyr3d'] = dict;
+  invalidAll = true;
+}
 fs.readdirSync(srcdir).filter((dir) => {
   const fullpath = path.join(srcdir, dir);
   if (fs.statSync(fullpath).isDirectory()) {
@@ -89,7 +97,7 @@ fs.readdirSync(srcdir).filter((dir) => {
     ) {
       const cache = buildCache[dir];
       const dict = traverseDirectory(fullpath, fullpath);
-      if (!deepEqual(cache, dict)) {
+      if (invalidAll || !deepEqual(cache, dict)) {
         console.log('src files added: ' + main);
         buildCache[dir] = dict;
         cacheChanged = true;

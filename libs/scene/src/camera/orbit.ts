@@ -76,6 +76,13 @@ export class OrbitCameraController extends BaseCameraController {
     this.quat = new Quaternion();
     this.scale = 1;
   }
+  /** Rotation center */
+  get center(): Vector3 {
+    return this.options.center;
+  }
+  set center(val: Vector3) {
+    this.options.center.set(val);
+  }
   /**
    * {@inheritDoc BaseCameraController.reset}
    * @override
@@ -173,6 +180,13 @@ export class OrbitCameraController extends BaseCameraController {
    */
   update() {
     if (this._getCamera()) {
+      const dx = this.options.center.x - this.target.x;
+      const dy = this.options.center.y - this.target.y;
+      const dz = this.options.center.z - this.target.z;
+      this.eyePos.x += dx;
+      this.eyePos.y += dy;
+      this.eyePos.z += dz;
+      this.target.set(this.options.center);
       Quaternion.fromAxisAngle(this.xVector, this.rotateX, this.quat);
       this.quat.transform(this.eyePos.subBy(this.target), this.eyePos);
       Quaternion.fromEulerAngle(0, this.rotateY, 0, 'XYZ', this.quat);

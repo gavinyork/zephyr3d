@@ -171,7 +171,9 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
   }
   /** @internal */
   invalidateNodePlacement(node: SceneNode) {
-    this._nodePlaceList.add(node);
+    if (node.isGraphNode() || node.children.length > 0) {
+      this._nodePlaceList.add(node);
+    }
   }
   /** @internal */
   _xformChanged(node: SceneNode) {

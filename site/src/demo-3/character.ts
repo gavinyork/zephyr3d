@@ -44,13 +44,15 @@ export class Character {
     await reader.close();
     return fileMap;
   }
-  async load(url: string) {
-    const fileMap = await this.readZip(url);
+  async load(): Promise<SceneNode> {
+    const fileMap = await this.readZip('./assets/models/alice_shellfire.zip');
     const assetManager = new AssetManager();
     assetManager.httpRequest.urlResolver = url => fileMap.get(url) || url;
     const modelFile = Array.from(fileMap.keys()).find((val) => /(\.gltf|\.glb)$/i.test(val));
     const modelInfo = await assetManager.fetchModel(this._scene, modelFile);
     this._node = modelInfo.group;
+    this._node.scale.setXYZ(2, 2, 2);
     this._animations = modelInfo.animationSet;
+    return this._node;
   }
 }

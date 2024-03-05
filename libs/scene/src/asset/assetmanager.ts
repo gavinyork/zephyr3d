@@ -33,6 +33,16 @@ export type TextureFetchOptions<T extends BaseTexture> = {
 };
 
 /**
+ * Data structure returned by AssetManager.fetchModel()
+ */
+export type ModelInfo = {
+  /** Mesh group */
+  group: SceneNode,
+  /** Animation set, null if no animation */
+  animationSet: AnimationSet
+}
+
+/**
  * The asset manager
  * @public
  */
@@ -217,7 +227,7 @@ export class AssetManager {
     scene: Scene,
     url: string,
     mimeType?: string
-  ): Promise<{ group: SceneNode; animationSet: AnimationSet }> {
+  ): Promise<ModelInfo> {
     const sharedModel = await this.fetchModelData(scene, url, mimeType);
     return this.createSceneNode(scene, sharedModel);
   }
