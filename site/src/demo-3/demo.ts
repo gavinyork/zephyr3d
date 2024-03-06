@@ -1,8 +1,8 @@
-import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
+import { PRNG, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import { Texture2D } from '@zephyr3d/device';
 import { Application, AssetHierarchyNode, AssetManager, Compositor, DirectionalLight, FXAA, GraphNode, MeshMaterial, ModelInfo, OrbitCameraController, PBRMetallicRoughnessMaterial, PBRSpecularGlossinessMaterial, PerspectiveCamera, Scene, SceneNode, SharedModel, Terrain, Tonemap } from '@zephyr3d/scene';
 import * as zip from '@zip.js/zip.js';
-import { TreeMaterialMetallicRoughness, TreeMaterialSpecularGlossiness } from './treematerial';
+import { TreeMaterialMetallicRoughness } from './treematerial';
 
 export class Demo {
   private _assetManager: AssetManager;
@@ -16,17 +16,23 @@ export class Demo {
   private _actorDirection: Vector3;
   private _actorSpeed: number;
   private _actorRunning: boolean;
+  private _loaded: boolean;
   constructor(){
-    this._assetManager = null;
-    this._scene = null;
     this._terrain = null;
-    this._camera = null;
-    this._compositor = null;
     this._axisPZ = Vector3.axisPZ();
     this._actorTarget = new Vector3();
     this._actorDirection = new Vector3();
     this._actorSpeed = 6;
     this._actorRunning = false;
+    this._assetManager = new AssetManager();
+    this._scene = this.createScene();
+    this._camera = this.createCamera(this._scene);
+    this._compositor = new Compositor();
+    this._compositor.appendPostEffect(new Tonemap());
+    this._compositor.appendPostEffect(new FXAA());
+    Application.instance.device.setFont('24px arial');
+    this.render();
+    this._loaded = false;
   }
   private async readZip(url: string): Promise<Map<string, string>> {
     const response = await fetch(url);
@@ -49,13 +55,14 @@ export class Demo {
   }
   createScene(): Scene {
     const scene = new Scene();
-    scene.worldUnit = 60;
+    scene.worldUnit = 120;
     scene.env.light.type = 'ibl';
     scene.env.light.strength = 1;
     scene.env.light.radianceMap = scene.env.sky.radianceMap;
     scene.env.light.irradianceMap = scene.env.sky.irradianceMap;
     scene.env.sky.skyType = 'scatter';
     scene.env.sky.fogType = 'scatter';
+    scene.env.sky.cloudy = 0.6;
 
     const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1));
     light.lookAt(new Vector3(1, 1, 1), new Vector3(0, 0, 0), Vector3.axisPY());
@@ -76,31 +83,29 @@ export class Demo {
       1,
       1500
     );
-    camera.controller = new OrbitCameraController();
     return camera;
   }
   async load() {
+    this._loaded = false;
     // load world
-    this._assetManager = new AssetManager();
-    this._scene = this.createScene();
     this._terrain = await this.loadTerrain(this._scene, this._assetManager);
-    this._camera = this.createCamera(this._scene);
     this._character = await this.loadCharacter(this._scene, this._assetManager);
-    this._compositor = new Compositor();
-    this._compositor.appendPostEffect(new Tonemap());
-    this._compositor.appendPostEffect(new FXAA());
     // initialize
     this._camera.parent = this._terrain;
     this._character.group.parent = this._terrain;
-    const x = this._terrain.scaledWidth * 0.5;
-    const z = this._terrain.scaledHeight * 0.5;
+    const x = this._terrain.scaledWidth * 0.37;
+    const z = this._terrain.scaledHeight * 0.19;
     const y = this._terrain.getElevation(x, z);
     this._character.group.position.setXYZ(x, y, z);
     this._character.animationSet.playAnimation('idle01_yindao', 0);
-    const eyePos = new Vector3(x + 10, y + 10, z + 10);
+    const eyePos = new Vector3(x + 1, y + 5, z - 21);
     const destPos = new Vector3(x, y, z);
     this._camera.lookAt(eyePos, destPos, Vector3.axisPY());
-    (this._camera.controller as OrbitCameraController).setOptions({ center: destPos });
+    this._camera.controller = new OrbitCameraController({ center: destPos });
+    // loaded
+    this._terrain.showState = GraphNode.SHOW_DEFAULT;
+    this._scene.env.sky.wind.setXY(700, 350);
+    this._loaded = true;
   }
   async loadModelIndirect(fileMap: Map<string, string>, modelFile: string, scene: Scene, assetManager: AssetManager) {
     const urlResolver = assetManager.httpRequest.urlResolver;
@@ -157,6 +162,7 @@ export class Demo {
       linearColorSpace: true
     });
     const terrain = new Terrain(scene);
+    terrain.showState = GraphNode.SHOW_HIDE;
     terrain.create(mapWidth, mapHeight, heightsF32, new Vector3(1, 100, 1), 33, {
       splatMap,
       detailMaps: {
@@ -206,17 +212,19 @@ export class Demo {
       scale: 1.5
     }];
     const f = 1 / trees.length;
+    const seed = 0;
+    const prng = new PRNG(seed);
     for (let i = 0; i < 500; i++) {
-      const x = Math.random() * terrain.scaledWidth;
-      const z = Math.random() * terrain.scaledHeight;
+      const x = prng.get() * terrain.scaledWidth;
+      const z = prng.get() * terrain.scaledHeight;
       const y = terrain.getElevation(x, z);
-      const index = Math.min(Math.floor(Math.random() / f), trees.length - 1);
+      const index = Math.min(Math.floor(prng.get() / f), trees.length - 1);
       const tree = await assetManager.fetchModel(scene, trees[index].url, null, this.replaceMaterials);
       tree.group.parent = terrain;
       tree.group.pickMode = SceneNode.PICK_DISABLED;
       tree.group.position.setXYZ(x, y, z);
       tree.group.scale.setXYZ(trees[index].scale, trees[index].scale, trees[index].scale);
-      tree.group.rotation = Quaternion.fromAxisAngle(PY, Math.random() * 2 * Math.PI);
+      tree.group.rotation = Quaternion.fromAxisAngle(PY, prng.get() * 2 * Math.PI);
     }
 
     return terrain;
@@ -308,6 +316,9 @@ export class Demo {
     return model;
   }
   handlePointerUp(button: number, x: number, y: number) {
+    if (!this._loaded) {
+      return;
+    }
     const obj = this._scene.raycast(this._camera, x, y);
     if (obj && obj.node.isTerrain()) {
       this._terrain.invWorldMatrix.transformPointAffine(obj.point, this._actorTarget);
@@ -322,7 +333,7 @@ export class Demo {
     }
   }
   updateCharacter() {
-    if (this._actorRunning) {
+    if (this._loaded && this._actorRunning) {
       const distance = Vector3.distance(
         Vector3.mul(this._character.group.position, new Vector3(1, 0, 1)),
         Vector3.mul(this._actorTarget, new Vector3(1, 0, 1))
@@ -347,8 +358,13 @@ export class Demo {
     }
   }
   render() {
-    this.updateCharacter();
-    this.updateCamera();
+    if (this._loaded) {
+      this.updateCharacter();
+      this.updateCamera();
+    }
     this._camera.render(this._scene, this._compositor);
+    if (!this._loaded) {
+      Application.instance.device.drawText('Loading, please wait ...', 20, 20, '#a00000');
+    }
   }
 }

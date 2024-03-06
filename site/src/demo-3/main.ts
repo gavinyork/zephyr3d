@@ -35,7 +35,6 @@ const terrainApp = new Application({
 
 terrainApp.ready().then(async () => {
   const demo = new Demo();
-  await demo.load();
   const device = terrainApp.device;
   device.canvas.addEventListener('contextmenu', function (ev) {
     ev.preventDefault();
@@ -56,5 +55,6 @@ terrainApp.ready().then(async () => {
   terrainApp.on('tick', (ev) => {
     demo.render();
   });
+  demo.load();
   terrainApp.run();
 });
