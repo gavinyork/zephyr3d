@@ -135,6 +135,10 @@ export class GLTFViewer {
       }
     }
     await reader.close();
+    // Make url unique so that a file url in zip will not conflict with other zip
+    for (const key of Array.from(fileMap.keys())) {
+      fileMap.set(url + key, fileMap.get(key));
+    }
     return fileMap;
   }
   async handleDrop(data: DataTransfer) {

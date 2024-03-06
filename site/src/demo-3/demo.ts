@@ -1,7 +1,8 @@
 import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import { Texture2D } from '@zephyr3d/device';
-import { Application, AssetManager, Compositor, DirectionalLight, FXAA, GraphNode, ModelInfo, OrbitCameraController, PerspectiveCamera, Scene, SceneNode, Terrain, Tonemap } from '@zephyr3d/scene';
+import { Application, AssetHierarchyNode, AssetManager, Compositor, DirectionalLight, FXAA, GraphNode, MeshMaterial, ModelInfo, OrbitCameraController, PBRMetallicRoughnessMaterial, PBRSpecularGlossinessMaterial, PerspectiveCamera, Scene, SceneNode, SharedModel, Terrain, Tonemap } from '@zephyr3d/scene';
 import * as zip from '@zip.js/zip.js';
+import { TreeMaterialMetallicRoughness, TreeMaterialSpecularGlossiness } from './treematerial';
 
 export class Demo {
   private _assetManager: AssetManager;
@@ -165,7 +166,6 @@ export class Demo {
         normalScale: [2, 5, 0.5],
         metallic: [0, 0, 0],
         roughness: [0.95, 0.9, 0.7],
-        /*
         grass: [
           [
             {
@@ -193,47 +193,119 @@ export class Demo {
             }
           ]
         ]
-        */
       }
     });
     terrain.maxPixelError = 6;
     terrain.castShadow = true;
     terrain.pickMode = GraphNode.PICK_ENABLED;
 
-    if (false) {
-      const PY = Vector3.axisPY();
-      const zipUrl = 'assets/models/low_poly_tree.zip';
-      const fileMap = await this.readZip(zipUrl);
-      const keys = Array.from(fileMap.keys());
-      const modelFile = keys.find((val) => /(\.gltf|\.glb)$/i.test(val));
-      for (const key of keys) {
-        fileMap.set(zipUrl + key, fileMap.get(key));
+    // Distribute some trees
+    const PY = Vector3.axisPY();
+    const trees = [{
+      url: 'assets/models/stylized_tree.glb',
+      scale: 1.5
+    }];
+    const f = 1 / trees.length;
+    for (let i = 0; i < 500; i++) {
+      const x = Math.random() * terrain.scaledWidth;
+      const z = Math.random() * terrain.scaledHeight;
+      const y = terrain.getElevation(x, z);
+      const index = Math.min(Math.floor(Math.random() / f), trees.length - 1);
+      const tree = await assetManager.fetchModel(scene, trees[index].url, null, this.replaceMaterials);
+      tree.group.parent = terrain;
+      tree.group.pickMode = SceneNode.PICK_DISABLED;
+      tree.group.position.setXYZ(x, y, z);
+      tree.group.scale.setXYZ(trees[index].scale, trees[index].scale, trees[index].scale);
+      tree.group.rotation = Quaternion.fromAxisAngle(PY, Math.random() * 2 * Math.PI);
+    }
+
+    return terrain;
+  }
+  replaceMaterials(model: SharedModel): SharedModel {
+    function recusivelyReplaceMaterial(node: AssetHierarchyNode) {
+      if (node.mesh) {
+        for (const subMesh of node.mesh.subMeshes) {
+          const material = subMesh.material as MeshMaterial;
+          const needChange = material.blendMode === 'blend' || material.alphaCutoff > 0;
+          if (material instanceof PBRMetallicRoughnessMaterial && material.albedoTexture && needChange) {
+            const newMaterial = new TreeMaterialMetallicRoughness();
+            newMaterial.textureWidth = material.albedoTexture.width;
+            newMaterial.textureHeight = material.albedoTexture.height;
+            newMaterial.blendMode = 'none';
+            newMaterial.alphaCutoff = 0.8;
+            newMaterial.stateSet.useRasterizerState().setCullMode('none');
+            newMaterial.ior = material.ior;
+            newMaterial.specularFactor = material.specularFactor;
+            newMaterial.albedoColor = material.albedoColor;
+            newMaterial.albedoTexCoordIndex = material.albedoTexCoordIndex;
+            newMaterial.albedoTexCoordMatrix = material.albedoTexCoordMatrix;
+            newMaterial.albedoTexture = material.albedoTexture;
+            newMaterial.albedoTextureSampler = material.albedoTextureSampler;
+            newMaterial.normalTexture = material.normalTexture;
+            newMaterial.normalTexCoordIndex = material.normalTexCoordIndex;
+            newMaterial.normalTexCoordMatrix = material.normalTexCoordMatrix;
+            newMaterial.normalTextureSampler = material.normalTextureSampler;
+            newMaterial.normalScale = material.normalScale;
+            newMaterial.occlusionTexture = material.occlusionTexture;
+            newMaterial.occlusionTexCoordIndex = material.occlusionTexCoordIndex;
+            newMaterial.occlusionTexCoordMatrix = material.occlusionTexCoordMatrix;
+            newMaterial.occlusionTextureSampler = material.occlusionTextureSampler;
+            newMaterial.metallicRoughnessTexture = material.metallicRoughnessTexture;
+            newMaterial.metallicRoughnessTexCoordIndex = material.metallicRoughnessTexCoordIndex;
+            newMaterial.metallicRoughnessTexCoordMatrix = material.metallicRoughnessTexCoordMatrix;
+            newMaterial.metallicRoughnessTextureSampler = material.metallicRoughnessTextureSampler;
+            newMaterial.specularTexture = material.specularTexture;
+            newMaterial.specularTexCoordIndex = material.specularTexCoordIndex;
+            newMaterial.specularTexCoordMatrix = material.specularTexCoordMatrix;
+            newMaterial.specularTextureSampler = material.specularTextureSampler;
+            newMaterial.specularColorTexture = material.specularColorTexture;
+            newMaterial.specularColorTexCoordIndex = material.specularColorTexCoordIndex;
+            newMaterial.specularColorTexCoordMatrix = material.specularColorTexCoordMatrix;
+            newMaterial.specularColorTextureSampler = material.specularColorTextureSampler;
+            newMaterial.metallic = 0;
+            newMaterial.roughness = 1;
+            subMesh.material = newMaterial;
+          } else if (material instanceof PBRSpecularGlossinessMaterial && material.albedoTexture && needChange) {
+            const newMaterial = new TreeMaterialMetallicRoughness();
+            newMaterial.textureWidth = material.albedoTexture.width;
+            newMaterial.textureHeight = material.albedoTexture.height;
+            newMaterial.blendMode = 'none';
+            newMaterial.alphaCutoff = 0.8;
+            newMaterial.stateSet.useRasterizerState().setCullMode('none');
+            newMaterial.ior = material.ior;
+            newMaterial.specularFactor = material.specularFactor;
+            newMaterial.albedoColor = material.albedoColor;
+            newMaterial.albedoTexCoordIndex = material.albedoTexCoordIndex;
+            newMaterial.albedoTexCoordMatrix = material.albedoTexCoordMatrix;
+            newMaterial.albedoTexture = material.albedoTexture;
+            newMaterial.albedoTextureSampler = material.albedoTextureSampler;
+            newMaterial.normalTexture = material.normalTexture;
+            newMaterial.normalTexCoordIndex = material.normalTexCoordIndex;
+            newMaterial.normalTexCoordMatrix = material.normalTexCoordMatrix;
+            newMaterial.normalTextureSampler = material.normalTextureSampler;
+            newMaterial.normalScale = material.normalScale;
+            newMaterial.occlusionTexture = material.occlusionTexture;
+            newMaterial.occlusionTexCoordIndex = material.occlusionTexCoordIndex;
+            newMaterial.occlusionTexCoordMatrix = material.occlusionTexCoordMatrix;
+            newMaterial.occlusionTextureSampler = material.occlusionTextureSampler;
+            newMaterial.specularTexture = material.specularTexture;
+            newMaterial.specularTexCoordIndex = material.specularTexCoordIndex;
+            newMaterial.specularTexCoordMatrix = material.specularTexCoordMatrix;
+            newMaterial.specularTextureSampler = material.specularTextureSampler;
+            newMaterial.metallic = 0;
+            newMaterial.roughness = 1;
+            subMesh.material = newMaterial;
+          }
+        }
       }
-      for (let i = 0; i < 1000; i++) {
-        const x = Math.random() * terrain.scaledWidth;
-        const z = Math.random() * terrain.scaledHeight;
-        const y = terrain.getElevation(x, z);
-        const tree = await this.loadModelIndirect(fileMap, zipUrl + modelFile, scene, assetManager);
-        tree.group.parent = terrain;
-        tree.group.position.setXYZ(x, y, z);
-        tree.group.scale.setXYZ(0.01, 0.01, 0.01);
-        tree.group.rotation = Quaternion.fromAxisAngle(PY, Math.random() * 2 * Math.PI);
-      }
-    } else {
-      const PY = Vector3.axisPY();
-      for (let i = 0; i < 1000; i++) {
-        const x = Math.random() * terrain.scaledWidth;
-        const z = Math.random() * terrain.scaledHeight;
-        const y = terrain.getElevation(x, z);
-        const tree = await assetManager.fetchModel(scene, 'assets/models/a_fantasy_tree.glb', null);
-        tree.group.parent = terrain;
-        tree.group.pickMode = SceneNode.PICK_DISABLED;
-        tree.group.position.setXYZ(x, y, z);
-        tree.group.scale.setXYZ(0.5, 0.5, 0.5);
-        tree.group.rotation = Quaternion.fromAxisAngle(PY, Math.random() * 2 * Math.PI);
+      for (const child of node.children) {
+        recusivelyReplaceMaterial(child);
       }
     }
-    return terrain;
+    for(const node of model.nodes) {
+      recusivelyReplaceMaterial(node);
+    }
+    return model;
   }
   handlePointerUp(button: number, x: number, y: number) {
     const obj = this._scene.raycast(this._camera, x, y);

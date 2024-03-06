@@ -283,14 +283,11 @@ export class SceneNode extends XForm<SceneNode> {
   }
   /** Computed value of pick mode */
   get pickable(): boolean {
-    if (this._pickMode === SceneNode.PICK_INHERITED) {
-      let parent = this.parent;
-      while (parent && !parent.isGraphNode()) {
-        parent = parent.parent;
-      }
-      return parent?.pickable ?? false;
+    let node: SceneNode = this;
+    while (node && node._pickMode === SceneNode.PICK_INHERITED) {
+      node = node.parent;
     }
-    return this._pickMode !== SceneNode.PICK_DISABLED;
+    return node ? node._pickMode === SceneNode.PICK_ENABLED : false;
   }
   /** Pick mode */
   get pickMode(): number {

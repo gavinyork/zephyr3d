@@ -1,13 +1,13 @@
 import { Vector2, Vector4 } from '@zephyr3d/base';
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
-import { mixinLight } from './mixins/lit';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 import type { BindGroup, PBFunctionScope, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { RENDER_PASS_TYPE_LIGHT } from '../values';
 import { ShaderHelper } from './shader/helper';
+import { mixinFoliage } from './mixins/foliage';
 
-export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight, mixinPBRMetallicRoughness) {
+export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinPBRMetallicRoughness, mixinFoliage) {
   /** @internal */
   private _terrainSize: Vector2;
   /** @internal */
@@ -78,13 +78,8 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
     const that = this;
     if (this.needFragmentColor()) {
       scope.albedoTextureSize = pb.vec2().uniform(2);
-      pb.func('calcMipLevel', [pb.vec2('coord')], function () {
-        this.$l.dx = pb.dpdx(this.coord);
-        this.$l.dy = pb.dpdy(this.coord);
-        this.$l.deltaMaxSqr = pb.max(pb.dot(this.dx, this.dx), pb.dot(this.dy, this.dy));
-        this.$return(pb.max(0, pb.mul(pb.log2(this.deltaMaxSqr), 0.5)));
-      });
       scope.$l.albedo = this.calculateAlbedoColor(scope);
+      scope.albedo = that.calculateFoliageAlbedo(scope, scope.albedo, pb.mul(that.getAlbedoTexCoord(scope), scope.albedoTextureSize))
       scope.$l.litColor = pb.vec3(0);
       if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         scope.$l.normalInfo = this.calculateNormalAndTBN(scope, scope.$inputs.worldPos, scope.$inputs.worldNorm);
@@ -96,22 +91,6 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinLight,
           scope.viewVec,
           scope.albedo,
           scope.normalInfo.TBN
-        );
-      }
-      scope.albedo.a = pb.mul(
-        scope.albedo.a,
-        pb.add(
-          1,
-          pb.mul(
-            pb.max(0, scope.$g.calcMipLevel(pb.mul(that.getAlbedoTexCoord(scope), scope.albedoTextureSize))),
-            0.25
-          )
-        )
-      );
-      if (that.alphaToCoverage) {
-        scope.albedo.a = pb.add(
-          pb.div(pb.sub(scope.albedo.a, 0.4), pb.max(pb.fwidth(scope.albedo.a), 0.0001)),
-          0.5
         );
       }
       this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, scope.albedo.a));

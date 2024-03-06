@@ -148,12 +148,20 @@ export class AssetManager {
   /**
    * Fetches a text resource from a given URL
    * @param url - The URL from where to fetch the resource
+   * @param postProcess - A function that will be involved when the text data was loaded.
+   * 
+   * @remarks
+   * If a text data has already been loaded, the function will ignore the
+   * postProcess parameter and directly return the text loaded previously.
+   * To load the same text with different postProcess parameters,
+   * use different AssetManager instances separately.
+   * 
    * @returns The fetched text
    */
-  async fetchTextData(url: string): Promise<string> {
+  async fetchTextData(url: string, postProcess?: (text: string) => string): Promise<string> {
     let P = this._textDatas[url];
     if (!P) {
-      P = this.loadTextData(url);
+      P = this.loadTextData(url, postProcess);
       this._textDatas[url] = P;
     }
     return P;
@@ -161,12 +169,20 @@ export class AssetManager {
   /**
    * Fetches a binary resource from a given URL
    * @param url - The URL from where to fetch the resource
-   * @returns
+   * @param postProcess - A function that will be involved when the binary data was loaded.
+   * 
+   * @remarks
+   * If a binary data has already been loaded, the function will ignore the
+   * postProcess parameter and directly return the data loaded previously.
+   * To load the same data with different postProcess parameters,
+   * use different AssetManager instances separately.
+   * 
+   * @returns Binary data as ArrayBuffer
    */
-  async fetchBinaryData(url: string): Promise<ArrayBuffer> {
+  async fetchBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer> {
     let P = this._binaryDatas[url];
     if (!P) {
-      P = this.loadBinaryData(url);
+      P = this.loadBinaryData(url, postProcess);
       this._binaryDatas[url] = P;
     }
     return P;
@@ -208,10 +224,10 @@ export class AssetManager {
     }
   }
   /** @internal */
-  async fetchModelData(scene: Scene, url: string, mimeType?: string): Promise<SharedModel> {
+  async fetchModelData(scene: Scene, url: string, mimeType?: string, postProcess?: (model: SharedModel) => SharedModel): Promise<SharedModel> {
     let P = this._models[url];
     if (!P) {
-      P = this.loadModel(url, mimeType);
+      P = this.loadModel(url, mimeType, postProcess);
       this._models[url] = P;
     }
     return P;
@@ -220,24 +236,49 @@ export class AssetManager {
    * Fetches a model resource from a given URL and adds it to a scene
    * @param scene - The scene to which the model node belongs
    * @param url - The URL from where to fetch the resource
-   * @param mimeType - The MIME type of the model resource
+   * @param mimeType - The MIME type of the model resource, if not provided, model type will be determined by file extension
+   * @param postProcess - A function that will be involved when the model was loaded.
+   * 
+   * @remarks
+   * If a model has already been loaded, the function will ignore the
+   * postProcess parameter and directly return the model loaded previously.
+   * To load the same model with different postProcess parameters,
+   * use different AssetManager instances separately.
+   * 
    * @returns The created model node
    */
   async fetchModel(
     scene: Scene,
     url: string,
-    mimeType?: string
+    mimeType?: string,
+    postProcess?: (model: SharedModel) => SharedModel
   ): Promise<ModelInfo> {
-    const sharedModel = await this.fetchModelData(scene, url, mimeType);
+    const sharedModel = await this.fetchModelData(scene, url, mimeType, postProcess);
     return this.createSceneNode(scene, sharedModel);
   }
   /** @internal */
-  async loadTextData(url: string): Promise<string> {
-    return this._httpRequest.requestText(url);
+  async loadTextData(url: string, postProcess?: (text: string) => string): Promise<string> {
+    let text = await this._httpRequest.requestText(url);
+    if (postProcess) {
+      try {
+        text = postProcess(text);
+      } catch(err) {
+        throw new Error(`Load text data post process failed: ${err}`);
+      }
+    }
+    return text;
   }
   /** @internal */
-  async loadBinaryData(url: string): Promise<ArrayBuffer> {
-    return this._httpRequest.requestArrayBuffer(url);
+  async loadBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer> {
+    let data = await this._httpRequest.requestArrayBuffer(url);
+    if (postProcess) {
+      try {
+        data = postProcess(data);
+      } catch(err) {
+        throw new Error(`Load binary data post process failed: ${err}`);
+      }
+    }
+    return data;
   }
   /** @internal */
   async loadTexture(
@@ -356,7 +397,7 @@ export class AssetManager {
     }
   }
   /** @internal */
-  async loadModel(url: string, mimeType?: string, name?: string): Promise<SharedModel> {
+  async loadModel(url: string, mimeType?: string, postProcess?: (model: SharedModel) => SharedModel): Promise<SharedModel> {
     const data = await this.httpRequest.requestBlob(url);
     const filename = new URL(url, new URL(location.href).origin).pathname
       .split('/')
@@ -368,11 +409,18 @@ export class AssetManager {
       if (!loader.supportExtension(ext) && !loader.supportMIMEType(mimeType || data.type)) {
         continue;
       }
-      const model = await loader.load(this, url, mimeType || data.type, data);
+      let model = await loader.load(this, url, mimeType || data.type, data);
       if (!model) {
         throw new Error(`Load asset failed: ${url}`);
       }
-      model.name = name || filename;
+      if (postProcess) {
+        try {
+          model = postProcess(model);
+        }catch(err) {
+          throw new Error(`Model loader post process failed: ${err}`);
+        }
+      }
+      model.name = filename;
       return model;
     }
     throw new Error(`Can not find loader for asset ${url}`);

@@ -17,3 +17,4 @@ export * from './mixins/albedocolor';
 export * from './mixins/lit';
 export * from './mixins/texture';
 export * from './mixins/vertexcolor';
+export * from './mixins/foliage';

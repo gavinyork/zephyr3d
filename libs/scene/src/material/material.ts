@@ -514,6 +514,7 @@ export class Material implements IMaterial {
     } else {
       device.setBindGroup(1, null);
     }
+    device.setBindGroup(3, null);
   }
   /**
    * Convert pass to hash

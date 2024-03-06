@@ -25,7 +25,15 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
     super(device);
     this._device = device;
     this._layout = layout;
-    this._resources = {};
+    this._resources = new Proxy({}, {
+      get: function(target, prop) {
+        return target[prop];
+      },
+      set: function(target, prop, value) {
+        target[prop] = value;
+        return true;
+      }
+    });
     this._object = {};
   }
   getLayout(): BindGroupLayout {
