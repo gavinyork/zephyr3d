@@ -1,6 +1,8 @@
-import { backendWebGL2 } from '@zephyr3d/backend-webgl';
-import { Vector3 } from '@zephyr3d/base';
-import { Scene, Application, PerspectiveCamera, MeshMaterial, ShaderHelper, OrbitCameraController, Mesh, TorusShape, Compositor, Tonemap } from '@zephyr3d/scene';
+# 无光照材质
+
+下面是一个简单的例子，我们定义一个不受光照的材质，表现一些边缘光的效果。
+
+```javascript
 
 // 定义边缘光材质
 class RimColorMaterial extends MeshMaterial {
@@ -56,8 +58,11 @@ class RimColorMaterial extends MeshMaterial {
     // 父类fragmentShader负责初始化全局uniform参数
     super.vertexShader(scope);
     const pb = scope.$builder;
-    // MeshMaterial的needFragmentColor()函数返回当前Shader是否需要计算片元颜色。
-    // 如果当前的RenderPass是DepthPass或ShadowMapPass且材质alphaCutoff属性等于0(未开启AlphaTest)，则无需计算片元颜色。
+    // MeshMaterial的needFragmentColor()函数返回
+    // 当前Shader是否需要计算片元颜色。如果当前的
+    // RenderPass是DepthPass或ShadowMapPass且材质
+    // alphaCutoff属性等于0(未开启AlphaTest)，则
+    // 无需计算片元颜色。
     if (this.needFragmentColor()) {
       // 定义一个vec3类型的uniform用于指定边缘光颜色
       // 注意：用于材质的uniform，对应的BindGroup索引
@@ -72,9 +77,8 @@ class RimColorMaterial extends MeshMaterial {
       // 计算最终的片元颜色
       scope.$l.finalColor = pb.mul(scope.rimColor, pb.pow(pb.sub(1, scope.NdotV), 4));
       // 输出片元颜色
-      // 材质的outputFragmentColor()方法用于输出片元颜色。该方法执行剪裁平面测试(如果定义了剪裁平面),
-      // AlphaTest测试(如果材质的alphaCutoff大于0)，根据是否半透明材质处理片元的alpha通道，
-      // 在需要的情况下执行sRGB颜色空间转换。
+      // 材质的outputFragmentColor()方法用于输出片元颜色。该方法执行剪裁平面测试(如果定义了剪裁平面), AlphaTest测试
+      // (如果材质的alphaCutoff大于0)，根据是否半透明材质处理片元的alpha通道，在需要的情况下执行GammaCorrection。
       this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.finalColor, 1));
     } else {
       // 不需要计算片元颜色则直接输出null
@@ -92,38 +96,17 @@ class RimColorMaterial extends MeshMaterial {
   }
 }
 
-const myApp = new Application({
-  backend: backendWebGL2,
-  canvas: document.querySelector('#my-canvas')
-});
+// 使用自定义材质
+const material = new RimColorMaterial();
+// 设置边缘光颜色为黄色
+material.color.setXYZ(1, 1, 0)
+// 材质的uniform有缓存，当材质uniform发生变化时需要调用
+// uniformChanged()方法通知材质需要重新提交uniform
+material.uniformChanged();
 
-myApp.ready().then(async () => {
-  const device = myApp.device;
+// 使用此材质渲染网格。
+const mesh = new Mesh(scene, new TorusShape(), material);
 
-  const scene = new Scene();
-  scene.env.sky.skyType = 'scatter';
-  const material = new RimColorMaterial();
-  material.color.setXYZ(1, 1, 0);
-  material.uniformChanged();
+```
 
-  new Mesh(scene, new TorusShape(), material);
-
-  const camera = new PerspectiveCamera(scene, Math.PI/3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 500);
-  camera.lookAt(new Vector3(25, 15, 0), new Vector3(0, 0, 0), Vector3.axisPY());
-  camera.controller = new OrbitCameraController();
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
-
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
-
-  myApp.on('resize', ev => {
-    camera.aspect = ev.width / ev.height;
-  });
-
-  myApp.on('tick', ev => {
-    camera.updateController();
-    camera.render(scene, compositor);
-  });
-
-  myApp.run();
-});
+<div class="showcase" case="tut-39"></div>

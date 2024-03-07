@@ -87,30 +87,12 @@ class InstanceBindGroupPool {
   }
 }
 
-export interface IMaterial {
-  readonly id: number;
-  stateSet: RenderStateSet;
-  getQueueType(): number;
-  isTransparent(pass: number): boolean;
-  supportLighting(): boolean;
-  isBatchable(): boolean;
-  draw(primitive: Primitive, ctx: DrawContext, numInstances?: number): void;
-  beginDraw(pass: number, ctx: DrawContext): boolean;
-  endDraw(pass: number): void;
-  getMaterialBindGroup(): BindGroup;
-  applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number): void;
-  getOrCreateProgram(ctx: DrawContext, pass: number): ProgramInfo;
-  dispose(): void;
-  optionChanged(changeHash: boolean): void;
-  createHash(renderPassType: number, pass: number): string;
-  clearBindGroupCache(): number;
-}
-
 /**
  * Base class for any kind of materials
+ *
  * @public
  */
-export class Material implements IMaterial {
+export class Material {
   /** @internal */
   private static _nextId = 0;
   /** @internal */

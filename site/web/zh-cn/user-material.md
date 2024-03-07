@@ -2,12 +2,12 @@
 
 ## 简介
 
-材质对于物体的渲染效果非常重要。引擎目前已经预定义了PBR材质，Unlit材质，Blinn材质和Lambert材质。
-为了实现更为丰富的渲染效果，引擎提供了材质的自定义功能。自定义材质可以应用于任何Mesh对象。
+材质对于物体的渲染效果非常重要。引擎的材质系统目前已经预定义了PBR，Unlit，Blinn和Lambert材质。
+为了实现更为丰富的渲染效果，材质系统也提供了相关接口用于自定义材质。自定义材质可以应用于任何Mesh对象。
 
 ## 前提条件
 
-引擎使用javascript编写Shader，在实现自定义材质之前请确认你已经熟悉这部分内容。[编写shader](zh-cn/shader.md)
+引擎使用javascript编写Shader，在实现自定义材质之前请确认你已经熟悉这部分内容。参见：[编写shader](zh-cn/shader.md)
 
 ## 渲染流程
 
@@ -15,7 +15,7 @@
 
 1. DepthPass
 
-  在需要的情况下，场景会先进行一次深度渲染生成深度缓冲区，线性深度会被渲染到一张Float纹理。DepthPass只渲染不透明物体
+  在需要的情况下，场景会先进行一次深度渲染生成深度缓冲区，线性深度会被渲染到一张Float32纹理。DepthPass只渲染不透明物体。
 
 2. ShadowMapPass
 
@@ -32,8 +32,32 @@
 
 ## 创建自定义材质
 
-任何自定义材质必须继承于[MeshMaterial](/doc/markdown/./scene.meshmaterial)。
+[MeshMaterial](/doc/markdown/./scene.meshmaterial)是所有Mesh材质的基类，任何自定义材质必须继承于MeshMaterial。
 
-下面是一个最简单的例子，我们定义一个不受光照的材质，输出法线的RGB值和一个指定颜色的乘积。
+自定义材质继承MeshMaterial以后需要重写一些类方法：
 
-<div class="showcase" case="tut-39"></div>
+  - [MeshMaterial.supportLighting()](/doc/markdown/./scene.meshmaterial.supportlighting)
+
+    返回true表明该材质受光照影响，否则为无光照材质。该函数默认返回true。
+
+  - [MeshMaterial.isTransparent(pass)](/doc/markdown/./scene.meshmaterial.istransparent)
+
+    返回true表明该材质的指定pass是否为半透明。该值影响Shader对alpha通道的处理，当pass为0时该属性影响物体在哪个队列内渲染。
+    默认情况下该函数通过[MeshMaterial.blendMode](/doc/markdown/./scene.meshmaterial.blendmode)
+    属性来判断是否半透明，如果blendMode为'none'则返回false，否则返回true。
+
+  - [MeshMaterial.applyUniformValues(bindGroup, ctx, pass)](/doc/markdown/./scene.meshmaterial.applyuniformvalues)
+
+    该函数用于上传该材质指定pass所需的uniform常量。如果自定义材质定义了新的uniform常量，则需要重写
+    该函数。在重写该函数时必需调用父类的该方法。
+  
+  - [MeshMaterial.vertexShader(scope)](/doc/markdown/./scene.meshmaterial.vertexshader)
+
+    这里是该材质的VertexShader实现，必需重写。
+
+  - [MeshMaterial.fragmentShader(scope)](/doc/markdown/./scene.meshmaterial.fragmentshader)
+
+    这里是该材质的fragmentShader实现，必需重写。
+
+类[ShaderHelper](/doc/markdown/./scene.shaderhelper)提供了编写材质需要的诸多工具函数。
+

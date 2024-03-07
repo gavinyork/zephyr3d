@@ -1,0 +1,26 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/api-extractor/v7/api-extractor.schema.json",
+  "projectFolder": ".",
+  "mainEntryPointFilePath": "<projectFolder>/dist/index.d.ts",
+  "bundledPackages": [],
+  "compiler": {
+    "tsconfigFilePath": "<projectFolder>/tsconfig.json"
+  },
+  "apiReport": {
+    "enabled": true,
+    "reportFileName": "base.api.md",
+    "reportFolder": "<projectFolder>/../../site/report",
+    "reportTempFolder": "<projectFolder>/../../site/report"
+  },
+  "docModel": {
+    "enabled": true,
+    "projectFolderUrl": "http://localhost:3000/#/doc/markdown",
+    "apiJsonFilePath": "<projectFolder>/../../site/dist/web/doc/input/base.api.json"
+  },
+  "dtsRollup": {
+    "enabled": false
+  },
+  "tsdocMetadata": {
+    "enabled": false
+  }
+}

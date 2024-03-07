@@ -1625,44 +1625,6 @@ export interface HeightfieldBBoxTreeNode {
 }
 
 // @public (undocumented)
-export interface IMaterial {
-    // (undocumented)
-    applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number): void;
-    // (undocumented)
-    beginDraw(pass: number, ctx: DrawContext): boolean;
-    // (undocumented)
-    clearBindGroupCache(): number;
-    // (undocumented)
-    createHash(renderPassType: number, pass: number): string;
-    // (undocumented)
-    dispose(): void;
-    // (undocumented)
-    draw(primitive: Primitive, ctx: DrawContext, numInstances?: number): void;
-    // (undocumented)
-    endDraw(pass: number): void;
-    // (undocumented)
-    getMaterialBindGroup(): BindGroup;
-    // Warning: (ae-forgotten-export) The symbol "ProgramInfo" needs to be exported by the entry point index.d.ts
-    //
-    // (undocumented)
-    getOrCreateProgram(ctx: DrawContext, pass: number): ProgramInfo;
-    // (undocumented)
-    getQueueType(): number;
-    // (undocumented)
-    readonly id: number;
-    // (undocumented)
-    isBatchable(): boolean;
-    // (undocumented)
-    isTransparent(pass: number): boolean;
-    // (undocumented)
-    optionChanged(changeHash: boolean): void;
-    // (undocumented)
-    stateSet: RenderStateSet;
-    // (undocumented)
-    supportLighting(): boolean;
-}
-
-// @public (undocumented)
 export type IMixinAlbedoColor = {
     albedoColor: Vector4;
     calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp;
@@ -1829,7 +1791,7 @@ export interface Logger {
 export type LogMode = 'info' | 'warn' | 'error' | 'debug';
 
 // @public
-export class Material implements IMaterial {
+export class Material {
     constructor();
     applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number): void;
     protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
@@ -1856,6 +1818,7 @@ export class Material implements IMaterial {
     // @internal (undocumented)
     protected getHash(renderPassType: number, pass: number): string;
     getMaterialBindGroup(): BindGroup;
+    // Warning: (ae-forgotten-export) The symbol "ProgramInfo" needs to be exported by the entry point index.d.ts
     getOrCreateProgram(ctx: DrawContext, pass: number): ProgramInfo;
     // @internal (undocumented)
     static getProgramByHashIndex(hash: string, index: number): GPUProgram<unknown>;
@@ -1955,7 +1918,7 @@ export class Mesh extends GraphNode implements BatchDrawable {
     setInvBindMatrix(matrix: Matrix4x4): void;
 }
 
-// @public (undocumented)
+// @public
 export class MeshMaterial extends Material {
     constructor(...args: any[]);
     get alphaCutoff(): number;
@@ -1965,9 +1928,7 @@ export class MeshMaterial extends Material {
     set alphaToCoverage(val: boolean);
     // @internal @override
     protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
-    // (undocumented)
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
-    // (undocumented)
     beginDraw(pass: number, ctx: DrawContext): boolean;
     get blendMode(): BlendMode;
     set blendMode(val: BlendMode);
@@ -1981,16 +1942,17 @@ export class MeshMaterial extends Material {
     get drawContext(): DrawContext;
     featureUsed<T = unknown>(feature: number): T;
     fragmentShader(scope: PBFunctionScope): void;
-    // (undocumented)
     getQueueType(): number;
     isTransparent(pass: number): boolean;
     needFragmentColor(ctx?: DrawContext): boolean;
-    // (undocumented)
+    // @internal (undocumented)
     static NEXT_FEATURE_INDEX: number;
     get opacity(): number;
     set opacity(val: number);
     outputFragmentColor(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: PBShaderExp): void;
     get pass(): number;
+    supportLighting(): boolean;
+    uniformChanged(): void;
     protected updateBlendingAndDepthState(pass: number, ctx: DrawContext): void;
     protected updateDepthState(pass: number, ctx: DrawContext): void;
     useFeature(feature: number, use: unknown): void;

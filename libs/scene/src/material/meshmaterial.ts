@@ -47,14 +47,31 @@ export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
 let FEATURE_ALPHATEST = 0;
 let FEATURE_ALPHABLEND = 0;
 let FEATURE_ALPHATOCOVERAGE = 0;
+
+/**
+ * Base class for any kind of mesh materials
+ *
+ * @public
+ */
 export class MeshMaterial extends Material {
+  /** @internal */
   static NEXT_FEATURE_INDEX = 3;
+  /** @internal */
   private _featureStates: unknown[];
+  /** @internal */
   private _alphaCutoff: number;
+  /** @internal */
   private _blendMode: BlendMode;
+  /** @internal */
   private _opacity: number;
+  /** @internal */
   private _ctx: DrawContext;
+  /** @internal */
   private _materialPass: number;
+  /**
+   * Creates an instance of MeshMaterial class
+   * @param args - constructor arguments
+   */
   constructor(...args: any[]) {
     super();
     this._featureStates = [];
@@ -121,6 +138,10 @@ export class MeshMaterial extends Material {
       this.uniformChanged();
     }
   }
+  /** Returns true if shading of the material will be affected by lights  */
+  supportLighting(): boolean {
+    return true;
+  }
   /**
    * Update blending state according to draw context and current material pass
    * @param pass - Current material pass
@@ -181,6 +202,13 @@ export class MeshMaterial extends Material {
       this.stateSet.defaultBlendingState();
     }
   }
+  /**
+   * Submit Uniform values before rendering with this material.
+   *
+   * @param bindGroup - Bind group for this material
+   * @param ctx - Draw context
+   * @param pass - Current pass of the material
+   */
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     if (this.featureUsed(FEATURE_ALPHATEST)) {
       bindGroup.setValue('zAlphaCutoff', this._alphaCutoff);
@@ -189,13 +217,24 @@ export class MeshMaterial extends Material {
       bindGroup.setValue('zOpacity', this._opacity);
     }
   }
+  /**
+   * Determine which queue should be used to render this material.
+   * @returns QUEUE_TRANSPARENT or QUEUE_OPAQUE
+   */
   getQueueType(): number {
     return this.isTransparent(0) ? QUEUE_TRANSPARENT : QUEUE_OPAQUE;
   }
-  /** true if the material is transparency */
+  /**
+   * Determine if a certain pass of this material is translucent.
+   * @param pass - Pass of the material
+   * @returns True if it is translucent, otherwise false.
+   */
   isTransparent(pass: number): boolean {
     return this.featureUsed(FEATURE_ALPHABLEND);
   }
+  /**
+   * {@inheritdoc Material.beginDraw}
+   */
   beginDraw(pass: number, ctx: DrawContext): boolean {
     this.updateBlendingAndDepthState(pass, ctx);
     return super.beginDraw(pass, ctx);
@@ -233,7 +272,7 @@ export class MeshMaterial extends Material {
   /**
    * {@inheritDoc Material._createHash}
    * @override
-   * 
+   *
    * @internal
    */
   protected _createHash(renderPassType: number): string {
@@ -242,7 +281,7 @@ export class MeshMaterial extends Material {
   /**
    * {@inheritDoc Material._applyUniforms}
    * @override
-   * 
+   *
    * @internal
    */
   protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
@@ -291,7 +330,7 @@ export class MeshMaterial extends Material {
   /**
    * {@inheritDoc Material._createProgram}
    * @override
-   * 
+   *
    * @internal
    */
   protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram {
@@ -311,9 +350,10 @@ export class MeshMaterial extends Material {
         });
       }
     });
-    
-    console.log(program.getShaderSource('vertex'));
-    console.log(program.getShaderSource('fragment'));
+    if (program) {
+      console.log(program.getShaderSource('vertex'));
+      console.log(program.getShaderSource('fragment'));
+    }
     return program;
   }
   /**
