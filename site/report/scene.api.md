@@ -251,6 +251,55 @@ export class AppTickEvent {
 }
 
 // @public
+export interface AssetAnimationData {
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    nodes: AssetHierarchyNode[];
+    // (undocumented)
+    skeletons: AssetSkeleton[];
+    // (undocumented)
+    tracks: AssetAnimationTrack[];
+}
+
+// @public
+export interface AssetAnimationTrack {
+    // (undocumented)
+    interpolator: Interpolator;
+    // (undocumented)
+    node: AssetHierarchyNode;
+    // (undocumented)
+    type: 'translation' | 'scale' | 'rotation';
+}
+
+// @public
+export class AssetHierarchyNode extends NamedObject {
+    constructor(name: string, parent?: AssetHierarchyNode);
+    addChild(child: AssetHierarchyNode): void;
+    get attachIndex(): number;
+    attachToSkeleton(skeleton: AssetSkeleton, index: number): void;
+    get children(): AssetHierarchyNode[];
+    // @internal (undocumented)
+    computeTransforms(parentTransform: Matrix4x4): void;
+    get matrix(): Matrix4x4;
+    get mesh(): AssetMeshData;
+    set mesh(data: AssetMeshData);
+    get meshAttached(): boolean;
+    get parent(): AssetHierarchyNode;
+    get position(): Vector3;
+    set position(val: Vector3);
+    removeChild(child: AssetHierarchyNode): void;
+    get rotation(): Quaternion;
+    set rotation(val: Quaternion);
+    get scaling(): Vector3;
+    set scaling(val: Vector3);
+    get skeleton(): AssetSkeleton;
+    set skeleton(skeleton: AssetSkeleton);
+    get skeletonAttached(): AssetSkeleton;
+    get worldMatrix(): Matrix4x4;
+}
+
+// @public
 export class AssetManager {
     constructor();
     // Warning: (ae-forgotten-export) The symbol "AbstractModelLoader" needs to be exported by the entry point index.d.ts
@@ -268,29 +317,210 @@ export class AssetManager {
     clearCache(): void;
     // @internal (undocumented)
     doLoadTexture(loader: AbstractTextureLoader, url: string, mimeType: string, data: ArrayBuffer, srgb: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<BaseTexture>;
-    fetchBinaryData(url: string): Promise<ArrayBuffer>;
+    fetchBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer>;
     fetchBuiltinTexture<T extends BaseTexture>(name: string, texture?: BaseTexture): Promise<T>;
-    fetchModel(scene: Scene, url: string, mimeType?: string): Promise<{
-        group: SceneNode;
-        animationSet: AnimationSet;
-    }>;
-    // Warning: (ae-forgotten-export) The symbol "SharedModel" needs to be exported by the entry point index.d.ts
-    //
+    fetchModel(scene: Scene, url: string, mimeType?: string, postProcess?: (model: SharedModel) => SharedModel): Promise<ModelInfo>;
     // @internal (undocumented)
-    fetchModelData(scene: Scene, url: string, mimeType?: string): Promise<SharedModel>;
-    fetchTextData(url: string): Promise<string>;
+    fetchModelData(scene: Scene, url: string, mimeType?: string, postProcess?: (model: SharedModel) => SharedModel): Promise<SharedModel>;
+    fetchTextData(url: string, postProcess?: (text: string) => string): Promise<string>;
     fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>): Promise<T>;
     get httpRequest(): HttpRequest;
     // @internal (undocumented)
-    loadBinaryData(url: string): Promise<ArrayBuffer>;
+    loadBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer>;
     // @internal (undocumented)
-    loadModel(url: string, mimeType?: string, name?: string): Promise<SharedModel>;
+    loadModel(url: string, mimeType?: string, postProcess?: (model: SharedModel) => SharedModel): Promise<SharedModel>;
     // @internal (undocumented)
-    loadTextData(url: string): Promise<string>;
+    loadTextData(url: string, postProcess?: (text: string) => string): Promise<string>;
     // @internal (undocumented)
     loadTexture(url: string, mimeType?: string, srgb?: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<BaseTexture>;
     purgeCache(): void;
     static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => Promise<BaseTexture>): void;
+}
+
+// @public
+export interface AssetMaterial {
+    // (undocumented)
+    common: AssetMaterialCommon;
+    // (undocumented)
+    type: string;
+}
+
+// @public
+export interface AssetMaterialClearcoat {
+    // (undocumented)
+    clearCoatFactor?: number;
+    // (undocumented)
+    clearCoatIntensityMap?: MaterialTextureInfo;
+    // (undocumented)
+    clearCoatNormalMap?: MaterialTextureInfo;
+    // (undocumented)
+    clearCoatRoughnessFactor?: number;
+    // (undocumented)
+    clearCoatRoughnessMap?: MaterialTextureInfo;
+}
+
+// @public
+export interface AssetMaterialCommon {
+    // (undocumented)
+    alphaCutoff?: number;
+    // (undocumented)
+    alphaMode?: 'blend' | 'mask';
+    // (undocumented)
+    bumpScale?: number;
+    // (undocumented)
+    doubleSided?: boolean;
+    // (undocumented)
+    emissiveColor?: Vector3;
+    // (undocumented)
+    emissiveMap?: MaterialTextureInfo;
+    // (undocumented)
+    emissiveStrength?: number;
+    // (undocumented)
+    normalMap?: MaterialTextureInfo;
+    // (undocumented)
+    occlusionMap?: MaterialTextureInfo;
+    // (undocumented)
+    occlusionStrength?: number;
+    // (undocumented)
+    useTangent?: boolean;
+    // (undocumented)
+    vertexColor?: boolean;
+    // (undocumented)
+    vertexNormal?: boolean;
+}
+
+// @public
+export interface AssetMaterialSheen {
+    // (undocumented)
+    sheenColorFactor?: Vector3;
+    // (undocumented)
+    sheenColorMap?: MaterialTextureInfo;
+    // (undocumented)
+    sheenRoughnessFactor?: number;
+    // (undocumented)
+    sheenRoughnessMap?: MaterialTextureInfo;
+}
+
+// @public
+export interface AssetMeshData {
+    // (undocumented)
+    subMeshes: AssetSubMeshData[];
+}
+
+// @public
+export interface AssetPBRMaterialCommon extends AssetUnlitMaterial {
+    // (undocumented)
+    ior?: number;
+}
+
+// @public
+export interface AssetPBRMaterialMR extends AssetPBRMaterialCommon {
+    // (undocumented)
+    clearcoat?: AssetMaterialClearcoat;
+    // (undocumented)
+    metallic?: number;
+    // (undocumented)
+    metallicIndex?: number;
+    // (undocumented)
+    metallicMap?: MaterialTextureInfo;
+    // (undocumented)
+    roughness?: number;
+    // (undocumented)
+    roughnessIndex?: number;
+    // (undocumented)
+    sheen?: AssetMaterialSheen;
+    // (undocumented)
+    specularColorMap?: MaterialTextureInfo;
+    // (undocumented)
+    specularFactor?: Vector4;
+    // (undocumented)
+    specularMap?: MaterialTextureInfo;
+}
+
+// @public
+export interface AssetPBRMaterialSG extends AssetPBRMaterialCommon {
+    // (undocumented)
+    glossness?: number;
+    // (undocumented)
+    specular?: Vector3;
+    // (undocumented)
+    specularGlossnessMap?: MaterialTextureInfo;
+}
+
+// @public
+export interface AssetRotationTrack extends AssetAnimationTrack {
+    // (undocumented)
+    keyFrames: Record<number, Quaternion[]>;
+    // (undocumented)
+    nodes: number[];
+}
+
+// @public
+export interface AssetScaleTrack extends AssetAnimationTrack {
+    // (undocumented)
+    keyFrames: Record<number, Vector3[]>;
+    // (undocumented)
+    nodes: number[];
+}
+
+// @public
+export class AssetScene extends NamedObject {
+    constructor(name: string);
+    rootNodes: AssetHierarchyNode[];
+}
+
+// @public
+export interface AssetSkeletalAnimationTrack extends AssetAnimationTrack {
+    // (undocumented)
+    keyFrames: Record<number, {
+        translation: Vector3;
+        rotation: Quaternion;
+        scale: Vector3;
+    }[]>;
+    // (undocumented)
+    skeleton: AssetSkeleton;
+}
+
+// @public
+export class AssetSkeleton extends NamedObject {
+    constructor(name: string);
+    addJoint(joint: AssetHierarchyNode, inverseBindMatrix: Matrix4x4): void;
+    bindPoseMatrices: Matrix4x4[];
+    inverseBindMatrices: Matrix4x4[];
+    joints: AssetHierarchyNode[];
+    pivot: AssetHierarchyNode;
+}
+
+// @public
+export interface AssetSubMeshData {
+    // (undocumented)
+    material: Material;
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    primitive: Primitive;
+    // (undocumented)
+    rawBlendIndices: TypedArray;
+    // (undocumented)
+    rawJointWeights: TypedArray;
+    // (undocumented)
+    rawPositions: Float32Array;
+}
+
+// @public
+export interface AssetTranslationTrack extends AssetAnimationTrack {
+    // (undocumented)
+    keyFrames: Record<number, Vector3[]>;
+    // (undocumented)
+    nodes: number[];
+}
+
+// @public
+export interface AssetUnlitMaterial extends AssetMaterial {
+    // (undocumented)
+    diffuse?: Vector4;
+    // (undocumented)
+    diffuseMap?: MaterialTextureInfo;
 }
 
 // @public
@@ -558,12 +788,6 @@ export const BUILTIN_ASSET_TEST_CUBEMAP = "TEST_Cubemap";
 
 // @public
 export const BUILTIN_ASSET_TEXTURE_SHEEN_LUT = "LUT_Sheen";
-
-// @public
-export function calculateTBN(scope: PBInsideFunctionScope, worldPosition: PBShaderExp, uv: PBShaderExp, doubleSideLighting: boolean): PBShaderExp;
-
-// @public
-export function calculateTBNWithNormal(scope: PBInsideFunctionScope, worldPosition: PBShaderExp, worldNormal: PBShaderExp, uv: PBShaderExp, doubleSideLighting: boolean): PBShaderExp;
 
 // @public
 export class Camera extends SceneNode {
@@ -1109,7 +1333,7 @@ export class ESM extends ShadowImpl {
     // (undocumented)
     computeShadowCSM(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, shadowVertex: PBShaderExp, NdotL: PBShaderExp, split: PBShaderExp): PBShaderExp;
     // (undocumented)
-    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope): PBShaderExp;
+    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
     // (undocumented)
     protected _depthScale: number;
     // (undocumented)
@@ -1447,12 +1671,18 @@ export type IMixinAlbedoColor = {
 // @public (undocumented)
 export type IMixinBlinnPhong = {
     shininess: number;
-    blinnPhongLight(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+    blinnPhongLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
 } & IMixinLight;
 
 // @public (undocumented)
+export interface IMixinFoliage {
+    // (undocumented)
+    calculateFoliageAlbedo(scope: PBInsideFunctionScope, albedoColor: PBShaderExp, texelCoord: PBShaderExp): PBShaderExp;
+}
+
+// @public (undocumented)
 export type IMixinLambert = {
-    lambertLight(scope: PBInsideFunctionScope, normal: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+    lambertLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
 } & IMixinLight;
 
 // @public (undocumented)
@@ -1463,14 +1693,14 @@ export type IMixinLight = {
     needCalculateEnvLight(): boolean;
     getEnvLightIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
     getEnvLightRadiance(scope: PBInsideFunctionScope, reflectVec: PBShaderExp, roughness: PBShaderExp): PBShaderExp;
-    calculateViewVector(scope: PBInsideFunctionScope): PBShaderExp;
+    calculateViewVector(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
     calculateReflectionVector(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp): PBShaderExp;
-    calculateTBN(scope: PBInsideFunctionScope): PBShaderExp;
-    calculateNormal(scope: PBInsideFunctionScope): PBShaderExp;
-    calculateNormalAndTBN(scope: PBInsideFunctionScope): PBShaderExp;
-    calculateLightAttenuation(scope: PBInsideFunctionScope, type: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp): PBShaderExp;
-    calculateLightDirection(scope: PBInsideFunctionScope, type: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp): PBShaderExp;
-    calculateShadow(scope: PBInsideFunctionScope, NoL: PBShaderExp): PBShaderExp;
+    calculateTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp, worldNormal?: PBShaderExp, worldTangent?: PBShaderExp, worldBinormal?: PBShaderExp): PBShaderExp;
+    calculateNormal(scope: PBInsideFunctionScope, worldPos: PBShaderExp, worldNormal?: PBShaderExp, worldTangent?: PBShaderExp, worldBinormal?: PBShaderExp): PBShaderExp;
+    calculateNormalAndTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp, worldNormal?: PBShaderExp, worldTangent?: PBShaderExp, worldBinormal?: PBShaderExp): PBShaderExp;
+    calculateLightAttenuation(scope: PBInsideFunctionScope, type: PBShaderExp, worldPos: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp): PBShaderExp;
+    calculateLightDirection(scope: PBInsideFunctionScope, type: PBShaderExp, worldPos: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp): PBShaderExp;
+    calculateShadow(scope: PBInsideFunctionScope, worldPos: PBShaderExp, NoL: PBShaderExp): PBShaderExp;
     forEachLight(scope: PBInsideFunctionScope, callback: (this: PBInsideFunctionScope, type: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp, colorIntensity: PBShaderExp, shadow: boolean) => void): void;
 } & TextureMixinInstanceTypes<['normal']> & IMixinAlbedoColor;
 
@@ -1512,7 +1742,7 @@ export type IMixinPBRMetallicRoughness = {
     metallic: number;
     roughness: number;
     specularFactor: Vector4;
-    PBRLight(scope: PBInsideFunctionScope, normal: PBShaderExp, TBN: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+    PBRLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp, TBN?: PBShaderExp): PBShaderExp;
     calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
 } & IMixinPBRCommon & IMixinLight & TextureMixinInstanceTypes<['metallicRoughness', 'occlusion', 'specular', 'specularColor']>;
 
@@ -1520,7 +1750,7 @@ export type IMixinPBRMetallicRoughness = {
 export type IMixinPBRSpecularGlossiness = {
     specularFactor: Vector4;
     glossinessFactor: number;
-    PBRLight(scope: PBInsideFunctionScope, normal: PBShaderExp, TBN: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+    PBRLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp, TBN?: PBShaderExp): PBShaderExp;
     calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
 } & IMixinPBRCommon & IMixinLight & TextureMixinInstanceTypes<['specular']>;
 
@@ -1643,6 +1873,7 @@ export class Material implements IMaterial {
     protected _numPasses: number;
     // @internal (undocumented)
     optionChanged(changeHash: boolean): void;
+    passToHash(pass: number): string;
     // @internal (undocumented)
     protected _renderStateSet: RenderStateSet;
     static setGCOptions(opt: MaterialGCOptions): void;
@@ -1659,6 +1890,18 @@ export type MaterialGCOptions = {
     inactiveTimeDuration?: number;
     verbose?: boolean;
 };
+
+// @public
+export interface MaterialTextureInfo {
+    // (undocumented)
+    sampler: TextureSampler;
+    // (undocumented)
+    texCoord: number;
+    // (undocumented)
+    texture: Texture2D;
+    // (undocumented)
+    transform: Matrix4x4;
+}
 
 // @public
 export const MAX_CLUSTERED_LIGHTS = 255;
@@ -1720,7 +1963,7 @@ export class MeshMaterial extends Material {
     // (undocumented)
     get alphaToCoverage(): boolean;
     set alphaToCoverage(val: boolean);
-    // @override
+    // @internal @override
     protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
     // (undocumented)
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
@@ -1728,11 +1971,11 @@ export class MeshMaterial extends Material {
     beginDraw(pass: number, ctx: DrawContext): boolean;
     get blendMode(): BlendMode;
     set blendMode(val: BlendMode);
-    // @override
+    // @internal @override
     protected _createHash(renderPassType: number): string;
     // @internal (undocumented)
     protected createProgram(ctx: DrawContext, pass: number): GPUProgram;
-    // @override
+    // @internal @override
     protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram;
     static defineFeature(): number;
     get drawContext(): DrawContext;
@@ -1740,15 +1983,13 @@ export class MeshMaterial extends Material {
     fragmentShader(scope: PBFunctionScope): void;
     // (undocumented)
     getQueueType(): number;
-    // Warning: (ae-forgotten-export) The symbol "ShaderHelper" needs to be exported by the entry point index.d.ts
-    get helper(): typeof ShaderHelper;
     isTransparent(pass: number): boolean;
     needFragmentColor(ctx?: DrawContext): boolean;
     // (undocumented)
     static NEXT_FEATURE_INDEX: number;
     get opacity(): number;
     set opacity(val: number);
-    outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp): void;
+    outputFragmentColor(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: PBShaderExp): void;
     get pass(): number;
     protected updateBlendingAndDepthState(pass: number, ctx: DrawContext): void;
     protected updateDepthState(pass: number, ctx: DrawContext): void;
@@ -1761,6 +2002,9 @@ export function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T): T &
 
 // @public (undocumented)
 export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinBlinnPhong);
+
+// @public (undocumented)
+export function mixinFoliage<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinFoliage);
 
 // @public (undocumented)
 export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinLambert);
@@ -1793,6 +2037,19 @@ export class Model extends GraphNode {
     playAnimation(name: string, repeat?: number): void;
     stopAnimation(name: string): void;
     update(): void;
+}
+
+// @public
+export type ModelInfo = {
+    group: SceneNode;
+    animationSet: AnimationSet;
+};
+
+// @public
+export class NamedObject {
+    constructor(name: string);
+    // (undocumented)
+    name: string;
 }
 
 // @public
@@ -1921,6 +2178,8 @@ export enum OctreePlacement {
 // @public
 export class OrbitCameraController extends BaseCameraController {
     constructor(options?: OrbitCameraControllerOptions);
+    get center(): Vector3;
+    set center(val: Vector3);
     // @override
     protected _onMouseDown(evt: PointerEvent): boolean;
     // @override
@@ -1938,6 +2197,7 @@ export class OrbitCameraController extends BaseCameraController {
 
 // @public
 export interface OrbitCameraControllerOptions {
+    center: Vector3;
     damping?: number;
     distance?: number;
     rotateSpeed?: number;
@@ -2025,7 +2285,7 @@ export class PCFOPT extends ShadowImpl {
     // (undocumented)
     computeShadowCSM(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, shadowVertex: PBShaderExp, NdotL: PBShaderExp, split: PBShaderExp): PBShaderExp;
     // (undocumented)
-    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope): PBShaderExp;
+    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
     // (undocumented)
     dispose(): void;
     // (undocumented)
@@ -2077,7 +2337,7 @@ export class PCFPD extends ShadowImpl {
     // (undocumented)
     computeShadowCSM(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, shadowVertex: PBShaderExp, NdotL: PBShaderExp, split: PBShaderExp): PBShaderExp;
     // (undocumented)
-    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope): PBShaderExp;
+    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
     // (undocumented)
     dispose(): void;
     // (undocumented)
@@ -2753,18 +3013,23 @@ export class SceneUpdateEvent {
 }
 
 // @public
-export class ShaderFramework {
+export class ShaderHelper {
     // (undocumented)
-    static applyFog(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext): void;
+    static applyFog(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: PBShaderExp, ctx: DrawContext): void;
     // (undocumented)
     static readonly BILLBOARD_SPHERICAL = 1;
     // (undocumented)
     static readonly BILLBOARD_SYLINDRAL = 2;
+    static calculateShadow(scope: PBInsideFunctionScope, worldPos: PBShaderExp, NoL: PBShaderExp, ctx: DrawContext): PBShaderExp;
     // @internal (undocumented)
-    static calculateShadowSpaceVertex(scope: PBInsideFunctionScope, cascade?: PBShaderExp | number): PBShaderExp;
+    static calculateShadowSpaceVertex(scope: PBInsideFunctionScope, worldPos: PBShaderExp, cascade?: PBShaderExp | number): PBShaderExp;
+    static calculateSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     static computeFogFactor(scope: PBInsideFunctionScope, viewDir: PBShaderExp, fogType: PBShaderExp, fogParams: PBShaderExp): PBShaderExp;
     static computeFogFactorForType(scope: PBInsideFunctionScope, viewDir: PBShaderExp, fogParams: PBShaderExp, fogType: 'linear' | 'exp' | 'exp2'): PBShaderExp;
-    static discardIfClipped(scope: PBInsideFunctionScope): void;
+    // @internal (undocumented)
+    static defaultSunDir: Vector3;
+    static discardIfClipped(scope: PBInsideFunctionScope, worldPos: PBShaderExp): void;
+    static encodeColorOutput(scope: PBInsideFunctionScope, outputColor: PBShaderExp): PBShaderExp;
     // (undocumented)
     static readonly FOG_TYPE_EXP = 2;
     // (undocumented)
@@ -2775,8 +3040,13 @@ export class ShaderFramework {
     static readonly FOG_TYPE_NONE = 0;
     // (undocumented)
     static readonly FOG_TYPE_SCATTER = 4;
-    static ftransform(scope: PBInsideFunctionScope, billboardMode?: number): void;
     static getAerialPerspectiveLUT(scope: PBInsideFunctionScope): PBShaderExp;
+    // (undocumented)
+    static getBoneInvBindMatrixUniformName(): string;
+    // (undocumented)
+    static getBoneMatricesUniformName(): string;
+    // (undocumented)
+    static getBoneTextureSizeUniformName(): string;
     static getCameraClipPlane(scope: PBInsideFunctionScope): any;
     static getCameraClipPlaneFlag(scope: PBInsideFunctionScope): PBShaderExp;
     static getCameraParams(scope: PBInsideFunctionScope): PBShaderExp;
@@ -2798,6 +3068,11 @@ export class ShaderFramework {
     static getFogColor(scope: PBInsideFunctionScope): PBShaderExp;
     static getFogParams(scope: PBInsideFunctionScope): PBShaderExp;
     static getFogType(scope: PBInsideFunctionScope): PBShaderExp;
+    static getGlobalUniforms(scope: PBInsideFunctionScope): PBShaderExp;
+    // (undocumented)
+    static getInstanceBufferOffsetUniformName(): string;
+    // (undocumented)
+    static getLightBufferUniformName(): string;
     // @internal (undocumented)
     static getLightColorAndIntensity(scope: PBInsideFunctionScope, lightIndex: PBShaderExp | number): PBShaderExp;
     // @internal (undocumented)
@@ -2810,25 +3085,36 @@ export class ShaderFramework {
     static getLightTypeForShadow(scope: PBInsideFunctionScope): PBShaderExp;
     // @internal (undocumented)
     static getLightViewMatrixForShadow(scope: PBInsideFunctionScope): PBShaderExp;
+    static getNormalMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     // @internal (undocumented)
     static getNumLights(scope: PBInsideFunctionScope): PBShaderExp;
     static getProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     // @internal (undocumented)
     static getShadowCameraParams(scope: PBInsideFunctionScope): PBShaderExp;
+    static getShadowMap(scope: PBInsideFunctionScope): PBShaderExp;
     // @internal (undocumented)
     static getSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp;
+    // @internal (undocumented)
+    static getSunLightDir(scope: PBInsideFunctionScope): PBShaderExp;
     static getViewMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     static getViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp;
-    static getWorldBinormal(scope: PBInsideFunctionScope): PBShaderExp;
+    // (undocumented)
+    static getWorldMatricesUniformName(): string;
     static getWorldMatrix(scope: PBInsideFunctionScope): PBShaderExp;
-    static getWorldNormal(scope: PBInsideFunctionScope): PBShaderExp;
-    static getWorldPosition(scope: PBInsideFunctionScope): PBShaderExp;
-    static getWorldTangent(scope: PBInsideFunctionScope): PBShaderExp;
+    // (undocumented)
+    static getWorldMatrixUniformName(): string;
     static getWorldUnit(scope: PBInsideFunctionScope): PBShaderExp;
+    static hasSkinning(scope: PBInsideFunctionScope): boolean;
+    static linearDepthToNonLinear(scope: PBInsideFunctionScope, depth: PBShaderExp, nearFar?: PBShaderExp): PBShaderExp;
+    static nonLinearDepthToLinear(scope: PBInsideFunctionScope, depth: PBShaderExp, nearFar?: PBShaderExp): PBShaderExp;
+    static nonLinearDepthToLinearNormalized(scope: PBInsideFunctionScope, depth: PBShaderExp, nearFar?: PBShaderExp): PBShaderExp;
     static prepareFragmentShader(pb: ProgramBuilder, ctx: DrawContext): void;
     static prepareVertexShader(pb: ProgramBuilder, ctx: DrawContext): void;
     // @internal (undocumented)
     static prepareVertexShaderCommon(pb: ProgramBuilder, ctx: DrawContext): void;
+    static resolveVertexNormal(scope: PBInsideFunctionScope, normal?: PBShaderExp): PBShaderExp;
+    static resolveVertexPosition(scope: PBInsideFunctionScope, pos?: PBShaderExp): PBShaderExp;
+    static resolveVertexTangent(scope: PBInsideFunctionScope, tangent?: PBShaderExp): PBShaderExp;
     // @internal (undocumented)
     static setCameraUniforms(bindGroup: BindGroup, ctx: DrawContext, linear: boolean): void;
     static setClipSpacePosition(scope: PBInsideFunctionScope, pos: PBShaderExp): void;
@@ -2840,24 +3126,6 @@ export class ShaderFramework {
     static setLightUniformsShadow(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight): void;
     // @internal (undocumented)
     static setLightUniformsShadowMap(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight): void;
-    // (undocumented)
-    static readonly USAGE_BONE_MATRICIES = "usage_BoneMatrices";
-    // (undocumented)
-    static readonly USAGE_BONE_TEXTURE_SIZE = "usage_BoneTextureSize";
-    // (undocumented)
-    static readonly USAGE_INV_BIND_MATRIX = "usage_InvBindMatrix";
-    // (undocumented)
-    static readonly USAGE_VERTEX_COLOR = "usage_VertexColor";
-    // (undocumented)
-    static readonly USAGE_WORLD_BINORMAL = "usage_WorldBinormal";
-    // (undocumented)
-    static readonly USAGE_WORLD_MATRIX = "usage_WorldMatrix";
-    // (undocumented)
-    static readonly USAGE_WORLD_NORMAL = "usage_WorldNormal";
-    // (undocumented)
-    static readonly USAGE_WORLD_POSITION = "usage_WorldPosition";
-    // (undocumented)
-    static readonly USAGE_WORLD_TANGENT = "usage_WorldTangent";
 }
 
 // Warning: (ae-internal-missing-underscore) The name "ShadowConfig" should be prefixed with an underscore because the declaration is marked as @internal
@@ -2930,8 +3198,6 @@ export class ShadowMapper {
     static computeShadowBiasCSM(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, NdotL: PBShaderExp, split: PBShaderExp): PBShaderExp;
     // @internal (undocumented)
     computeShadowCSM(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, shadowVertex: PBShaderExp, NdotL: PBShaderExp, split: PBShaderExp): PBShaderExp;
-    // @internal (undocumented)
-    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope): PBShaderExp;
     // @internal (undocumented)
     protected _config: ShadowConfig;
     // @internal (undocumented)
@@ -3049,6 +3315,22 @@ export interface ShapeCreationOptions {
     needNormal?: boolean;
     needTangent?: boolean;
     needUV?: boolean;
+}
+
+// @public
+export class SharedModel {
+    constructor(name?: string);
+    get activeScene(): number;
+    set activeScene(val: number);
+    addAnimation(animation: AssetAnimationData): void;
+    addNode(parent: AssetHierarchyNode, index: number, name: string): AssetHierarchyNode;
+    addSkeleton(skeleton: AssetSkeleton): void;
+    get animations(): AssetAnimationData[];
+    get name(): string;
+    set name(val: string);
+    get nodes(): AssetHierarchyNode[];
+    get scenes(): AssetScene[];
+    get skeletons(): AssetSkeleton[];
 }
 
 // @public
@@ -3292,8 +3574,6 @@ export class TerrainMaterial extends TerrainMaterial_base {
     // (undocumented)
     calculateAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp;
     // (undocumented)
-    calculateNormalAndTBN(scope: PBInsideFunctionScope): PBShaderExp;
-    // (undocumented)
     fragmentShader(scope: PBFunctionScope): void;
     // (undocumented)
     generateMetallicRoughnessMap(): Texture2D;
@@ -3305,7 +3585,7 @@ export class TerrainMaterial extends TerrainMaterial_base {
     // @override
     isTransparent(): boolean;
     // (undocumented)
-    sampleNormalMapWithTBN(scope: PBInsideFunctionScope, tex: PBShaderExp, texCoord: PBShaderExp, normalScale: PBShaderExp, TBN: PBShaderExp): PBShaderExp;
+    sampleDetailNormalMap(scope: PBInsideFunctionScope, tex: PBShaderExp, texCoord: PBShaderExp, normalScale: PBShaderExp, TBN: PBShaderExp): PBShaderExp;
     // @override
     supportLighting(): boolean;
     // (undocumented)
@@ -3523,7 +3803,7 @@ export class VSM extends ShadowImpl {
     // (undocumented)
     computeShadowCSM(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, shadowVertex: PBShaderExp, NdotL: PBShaderExp, split: PBShaderExp): PBShaderExp;
     // (undocumented)
-    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope): PBShaderExp;
+    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
     // (undocumented)
     protected _darkness: number;
     // (undocumented)

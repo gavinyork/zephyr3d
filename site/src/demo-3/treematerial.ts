@@ -19,7 +19,7 @@ export class TreeMaterialMetallicRoughness extends applyMaterialMixins(MeshMater
   set textureWidth(val: number) {
     if (val !== this._textureSize.x) {
       this._textureSize.x = val;
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   get textureHeight(): number {
@@ -28,7 +28,7 @@ export class TreeMaterialMetallicRoughness extends applyMaterialMixins(MeshMater
   set textureHeight(val: number) {
     if (val !== this._textureSize.y) {
       this._textureSize.y = val;
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
@@ -87,7 +87,7 @@ export class TreeMaterialSpecularGlossiness extends applyMaterialMixins(MeshMate
   set textureWidth(val: number) {
     if (val !== this._textureSize.x) {
       this._textureSize.x = val;
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   get textureHeight(): number {
@@ -96,7 +96,7 @@ export class TreeMaterialSpecularGlossiness extends applyMaterialMixins(MeshMate
   set textureHeight(val: number) {
     if (val !== this._textureSize.y) {
       this._textureSize.y = val;
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {

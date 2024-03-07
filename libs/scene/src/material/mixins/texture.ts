@@ -176,7 +176,7 @@ export function mixinTextureProps<U extends string>(name: U) {
           if (this[propTexture]) {
             this.useFeature(featureTexIndex, this[propTexCoord]);
             this.useFeature(featureTexMatrix, !!this[propMatrix]);
-            this.optionChanged(false);
+            this.uniformChanged();
           }
         }
       },

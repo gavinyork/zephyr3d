@@ -52,7 +52,7 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
     set specularFactor(val: Vector4) {
       if (!val.equalsTo(this._specularFactor)) {
         this._specularFactor.set(val);
-        this.optionChanged(true);
+        this.uniformChanged();
       }
     }
     get glossinessFactor(): number {
@@ -61,7 +61,7 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
     set glossinessFactor(val: number) {
       if (val !== this._glossinessFactor) {
         this._glossinessFactor = val;
-        this.optionChanged(false);
+        this.uniformChanged();
       }
     }
     fragmentShader(scope: PBFunctionScope): void {

@@ -84,7 +84,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     set normalScale(val: number) {
       if (val !== this._normalScale) {
         this._normalScale = val;
-        this.optionChanged(false);
+        this.uniformChanged();
       }
     }
     get normalMapMode(): 'tangent-space' | 'object-space' {

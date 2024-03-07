@@ -118,7 +118,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         let k = (val - 1) / (val + 1);
         k *= k;
         this._f0.setXYZW(k, k, k, val);
-        this.optionChanged(false);
+        this.uniformChanged();
       }
     }
     get occlusionStrength(): number {
@@ -127,7 +127,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     set occlusionStrength(val: number) {
       if (val !== this._occlusionStrength) {
         this._occlusionStrength = val;
-        this.optionChanged(false);
+        this.uniformChanged();
       }
     }
     get emissiveColor(): Vector3 {
@@ -142,7 +142,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         this._emissiveFactor.x = val.x;
         this._emissiveFactor.y = val.y;
         this._emissiveFactor.z = val.z;
-        this.optionChanged(false);
+        this.uniformChanged();
       }
     }
     get emissiveStrength(): number {
@@ -151,7 +151,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     set emissiveStrength(val: number) {
       if (this._emissiveFactor.w !== val) {
         this._emissiveFactor.w = val;
-        this.optionChanged(false);
+        this.uniformChanged();
       }
     }
     get clearcoat(): boolean {
@@ -166,7 +166,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     set clearcoatIntensity(val: number) {
       if (val !== this._clearcoatFactor.x) {
         this._clearcoatFactor.x = val;
-        this.optionChanged(false);
+        this.uniformChanged();
       }
     }
     get clearcoatRoughnessFactor(): number {
@@ -175,7 +175,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     set clearcoatRoughnessFactor(val: number) {
       if (val !== this._clearcoatFactor.y) {
         this._clearcoatFactor.y = val;
-        this.optionChanged(false);
+        this.uniformChanged();
       }
     }
     get clearcoatNormalScale(): number {
@@ -184,7 +184,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     set clearcoatNormalScale(val: number) {
       if (val !== this._clearcoatFactor.z) {
         this._clearcoatFactor.z = val;
-        this.optionChanged(false);
+        this.uniformChanged();
       }
     }
     get sheen(): boolean {
@@ -201,7 +201,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         this._sheenFactor.x = val.x;
         this._sheenFactor.y = val.y;
         this._sheenFactor.z = val.z;
-        this.optionChanged(false);
+        this.uniformChanged();
       }
     }
     get sheenRoughnessFactor(): number {
@@ -210,7 +210,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     set sheenRoughnessFactor(val: number) {
       if (val !== this._sheenFactor.w) {
         this._sheenFactor.w = val;
-        this.optionChanged(false);
+        this.uniformChanged();
       }
     }
     fragmentShader(scope: PBFunctionScope): void {

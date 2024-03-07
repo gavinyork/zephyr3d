@@ -17,7 +17,7 @@ export class ToonMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoC
   set bands(val: number) {
     if (val !== this._bands) {
       this._bands = val;
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   get edgeThickness(): number {
@@ -26,7 +26,7 @@ export class ToonMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoC
   set edgeThickness(val: number) {
     if (val !== this._edgeThickness) {
       this._edgeThickness = val;
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   beginDraw(pass: number, ctx: DrawContext): boolean {

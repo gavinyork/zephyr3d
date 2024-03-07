@@ -64,6 +64,10 @@ export class MeshMaterial extends Material {
     this._ctx = null;
     this._materialPass = -1;
   }
+  /** Indicate that the uniform has changed and needs to be resubmitted. */
+  uniformChanged() {
+    this.optionChanged(false);
+  }
   /** Define feature index */
   static defineFeature(): number {
     const val = this.NEXT_FEATURE_INDEX;
@@ -86,7 +90,7 @@ export class MeshMaterial extends Material {
     if (this._alphaCutoff !== val) {
       this.useFeature(FEATURE_ALPHATEST, val > 0);
       this._alphaCutoff = val;
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   get alphaToCoverage(): boolean {
@@ -114,7 +118,7 @@ export class MeshMaterial extends Material {
     if (this._opacity !== val) {
       this._opacity = val;
       this.useFeature(FEATURE_ALPHABLEND, this._blendMode !== 'none' || this._opacity < 1);
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   /**
@@ -229,6 +233,8 @@ export class MeshMaterial extends Material {
   /**
    * {@inheritDoc Material._createHash}
    * @override
+   * 
+   * @internal
    */
   protected _createHash(renderPassType: number): string {
     return this._featureStates.map((val) => (val === undefined ? '' : val)).join('|');
@@ -236,6 +242,8 @@ export class MeshMaterial extends Material {
   /**
    * {@inheritDoc Material._applyUniforms}
    * @override
+   * 
+   * @internal
    */
   protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     this.applyUniformValues(bindGroup, ctx, pass);
@@ -283,6 +291,8 @@ export class MeshMaterial extends Material {
   /**
    * {@inheritDoc Material._createProgram}
    * @override
+   * 
+   * @internal
    */
   protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram {
     const that = this;

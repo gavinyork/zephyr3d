@@ -28,7 +28,7 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
   set thickness(val: number) {
     if(val !== this._thickness) {
       this._thickness = val;
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   get numLayers(): number {
@@ -40,7 +40,7 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
       if (!this._instancing) {
         this.numPasses = 1 + this._numLayers;
       }
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   get noiseRepeat(): number {
@@ -49,7 +49,7 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
   set noiseRepeat(val: number) {
     if (val !== this._alphaRepeat) {
       this._alphaRepeat = val;
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   get alphaTexture(): Texture2D {

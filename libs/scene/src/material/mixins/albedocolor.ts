@@ -29,7 +29,7 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     set albedoColor(val: Vector4) {
       this._albedoColor.set(val);
-      this.optionChanged(false);
+      this.uniformChanged();
     }
     calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;

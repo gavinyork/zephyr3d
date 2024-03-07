@@ -35,7 +35,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
     set shininess(val: number) {
       if (val !== this._shininess) {
         this._shininess = val;
-        this.optionChanged(false);
+        this.uniformChanged();
       }
     }
     fragmentShader(scope: PBFunctionScope): void {

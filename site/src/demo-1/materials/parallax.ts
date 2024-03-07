@@ -1,5 +1,5 @@
 import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
-import { DrawContext, MeshMaterial, ShaderHelper, applyMaterialMixins, mixinAlbedoColor, mixinBlinnPhong, mixinLambert } from '@zephyr3d/scene';
+import { DrawContext, MeshMaterial, ShaderHelper, applyMaterialMixins, mixinAlbedoColor, mixinBlinnPhong } from '@zephyr3d/scene';
 
 export type ParallaxMappingMode = 'basic'|'steep'|'relief'|'occlusion';
 export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor, mixinBlinnPhong) {
@@ -26,7 +26,7 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
   set parallaxScale(val: number) {
     if (val !== this._parallaxScale){
       this._parallaxScale = val;
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   get minParallaxLayers(): number {
@@ -35,7 +35,7 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
   set minParallaxLayers(val: number) {
     if (val !== this._minLayers){
       this._minLayers = val;
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   get maxParallaxLayers(): number {
@@ -44,7 +44,7 @@ export class ParallaxMapMaterial extends applyMaterialMixins(MeshMaterial, mixin
   set maxParallaxLayers(val: number) {
     if (val !== this._maxLayers){
       this._maxLayers = val;
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {

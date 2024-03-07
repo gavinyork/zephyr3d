@@ -1102,6 +1102,8 @@ export class PBForScope extends PBInsideFunctionScope {
 
 // @public
 export class PBFunctionScope extends PBInsideFunctionScope {
+    // (undocumented)
+    $isMain(): boolean;
 }
 
 // @public
@@ -1992,7 +1994,7 @@ export class ProgramBuilder {
     // (undocumented)
     get emulateDepthClamp(): boolean;
     set emulateDepthClamp(val: boolean);
-    getCurrentFunctionScope(): PBScope;
+    getCurrentFunctionScope(): PBFunctionScope;
     getReflection(): PBReflection;
     get lastError(): string;
     get shaderKind(): ShaderKind;

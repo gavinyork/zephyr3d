@@ -63,7 +63,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
     set metallic(val: number) {
       if (val !== this._metallic) {
         this._metallic = val;
-        this.optionChanged(false);
+        this.uniformChanged();
       }
     }
     get roughness(): number {
@@ -72,7 +72,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
     set roughness(val: number) {
       if (val !== this._roughness) {
         this._roughness = val;
-        this.optionChanged(false);
+        this.uniformChanged();
       }
     }
     get specularFactor(): Vector4 {
@@ -81,7 +81,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
     set specularFactor(val: Vector4) {
       if (!val.equalsTo(this._specularFactor)) {
         this._specularFactor.set(val);
-        this.optionChanged(true);
+        this.uniformChanged();
       }
     }
     PBRLight(

@@ -20,7 +20,7 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
   set distord(val: Vector3) {
     if(!val.equalsTo(this._distored)){
       this._distored.set(val);
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   get darkColor(): Vector3 {
@@ -29,7 +29,7 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
   set darkColor(val: Vector3) {
     if (!val.equalsTo(this._darkcolor)){
       this._darkcolor.set(val);
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   get lightColor(): Vector3 {
@@ -38,7 +38,7 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
   set lightColor(val: Vector3) {
     if (!val.equalsTo(this._lightcolor)){
       this._lightcolor.set(val);
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   get density(): number {
@@ -47,7 +47,7 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
   set density(val: number) {
     if (val !== this._density) {
       this._density = val;
-      this.optionChanged(false);
+      this.uniformChanged();
     }
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {

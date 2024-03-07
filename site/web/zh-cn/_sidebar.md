@@ -27,4 +27,6 @@
     - [天空渲染](zh-cn/sky.md)
     - [大气及雾效](zh-cn/fog.md)
     - [水面渲染](zh-cn/water.md)
+  - 高级
+    - [自定义材质](zh-cn/user-material.md)
 

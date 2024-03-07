@@ -158,7 +158,7 @@ export class TerrainMaterial extends applyMaterialMixins(
   }
   set terrainInfo(val: Vector4) {
     this._terrainInfo = val;
-    this.optionChanged(false);
+    this.uniformChanged();
   }
   /**
    * {@inheritDoc Material.isTransparent}
