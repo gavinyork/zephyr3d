@@ -19,7 +19,8 @@ import {
   linearToGamma
 } from '@zephyr3d/scene';
 
-const cubeMap = './assets/images/environments/cloudy.hdr';
+const panorama = './assets/images/cloudy.hdr';
+const texture = './assets/images/Di-3d.png';
 
 export abstract class TextureTestCase {
   protected assetManager: AssetManager;
@@ -91,7 +92,7 @@ export class TestTexture2D extends TextureTestCase {
     });
   }
   protected async createTexture(): Promise<BaseTexture> {
-    return (await this.assetManager.fetchTexture(`./assets/images/gj02.dds`)) as Texture2D;
+    return (await this.assetManager.fetchTexture(texture)) as Texture2D;
   }
   protected createBindGroup(): BindGroup {
     const bindGroup = Application.instance.device.createBindGroup(this.program.bindGroupLayouts[0]);
@@ -467,7 +468,7 @@ export class TestTextureCube extends TextureTestCase {
     });
   }
   protected async createTexture(): Promise<BaseTexture> {
-    const tex = (await this.assetManager.fetchTexture(cubeMap)) as Texture2D;
+    const tex = await this.assetManager.fetchTexture<Texture2D>(panorama);
     this.srcTex = Application.instance.device.createCubeTexture(tex.format, 128);
     panoramaToCubemap(tex, this.srcTex);
     tex.dispose();
@@ -489,71 +490,6 @@ export class TestTextureCube extends TextureTestCase {
       : vpMatrix;
     this.bindgroup.setValue('mvpMatrix', matrix);
     this.bindgroup.setTexture('tex', this.prefilteredTex);
-  }
-}
-
-export class TestTextureCubePMREM extends TextureTestCase {
-  private viewMatrix: Matrix4x4;
-  constructor(assetManager: AssetManager) {
-    super(assetManager);
-    this.viewMatrix = Matrix4x4.lookAt(
-      new Vector3(3, 3, 3),
-      Vector3.zero(),
-      Vector3.axisPY()
-    ).inplaceInvertAffine();
-  }
-  protected createProgram(): GPUProgram {
-    return Application.instance.device.buildRenderProgram({
-      label: 'cube',
-      vertex(pb) {
-        this.$inputs.pos = pb.vec3().attrib('position');
-        this.$outputs.texcoord = pb.vec3();
-        this.mvpMatrix = pb.mat4().uniform(0);
-        pb.main(function () {
-          this.$builtins.position = pb.mul(this.mvpMatrix, pb.vec4(this.$inputs.pos, 1));
-          this.$outputs.texcoord = this.$inputs.pos;
-        });
-      },
-      fragment(pb) {
-        this.tex = pb.texCube().uniform(0);
-        this.$outputs.color = pb.vec4();
-        pb.main(function () {
-          this.$outputs.color = pb.textureSample(this.tex, pb.normalize(this.$inputs.texcoord));
-          this.$outputs.color = pb.vec4(linearToGamma(this, this.$outputs.color.rgb), this.$outputs.color.w);
-        });
-      }
-    });
-  }
-  protected async createTexture(): Promise<BaseTexture> {
-    /*
-    const srcTex = (await this.assetManager.fetchTexture('./assets/images/sky2.dds', null, true)) as TextureCube;
-    //const srcTex = await this.assetManager.fetchTexture<TextureCube>(`./assets/images/environments/sunset/output_skybox.dds`)
-    const pmremGenerator = new PMREMGenerator(Application.instance.device);
-    const prefilteredTex = pmremGenerator.prefilterCubemap(srcTex, 'lambertian', 64);
-    srcTex.dispose();
-    return prefilteredTex;
-    */
-    const srcTex = (await this.assetManager.fetchTexture(
-      `./assets/images/environments/Colorful_Studio.hdr`
-    )) as Texture2D;
-    const tex = Application.instance.device.createCubeTexture(srcTex.format, 256);
-    panoramaToCubemap(srcTex, tex);
-    //const prefilteredTex = prefilterCubemap(tex, 'lambertian', 64);
-    srcTex.dispose();
-    //tex.dispose();
-    return tex;
-  }
-  protected createBindGroup(): BindGroup {
-    const bindGroup = Application.instance.device.createBindGroup(this.program.bindGroupLayouts[0]);
-    bindGroup.setTexture('tex', this.texture);
-    return bindGroup;
-  }
-  protected updateBindGroup(t: number, w: number, h: number) {
-    const vpMatrix = Matrix4x4.multiply(Matrix4x4.perspective(Math.PI / 3, w / h, 1, 10), this.viewMatrix);
-    const matrix = this.animate
-      ? Matrix4x4.multiply(vpMatrix, Matrix4x4.rotationY((t * 0.001) % (2 * Math.PI)))
-      : vpMatrix;
-    this.bindgroup.setValue('mvpMatrix', matrix);
   }
 }
 
@@ -636,14 +572,13 @@ export class TestTextureCubeSH extends TextureTestCase {
           this.c = pb.add(this.c, pb.mul(this.sh.sh6, this.Y6(this.v)));
           this.c = pb.add(this.c, pb.mul(this.sh.sh7, this.Y7(this.v)));
           this.c = pb.add(this.c, pb.mul(this.sh.sh8, this.Y8(this.v)));
-          //this.c = pb.div(this.c, pb.add(pb.vec3(1), this.c));
           this.$outputs.color = pb.vec4(this.c, 1);
         });
       }
     });
   }
   protected async createTexture(): Promise<BaseTexture> {
-    const hdrTex = await this.assetManager.fetchTexture<Texture2D>(cubeMap);
+    const hdrTex = await this.assetManager.fetchTexture<Texture2D>(panorama);
     this.srcTex = Application.instance.device.createCubeTexture(hdrTex.format, hdrTex.height);
     panoramaToCubemap(hdrTex, this.srcTex);
     this.prefiltered = Application.instance.device.createCubeTexture('rgba16f', 64, {
