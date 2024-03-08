@@ -61,3 +61,18 @@
 
 类[ShaderHelper](/doc/markdown/./scene.shaderhelper)提供了编写材质需要的诸多工具函数。
 
+## 系统设计
+
+引擎的材质系统使用混入(Mixin)设计模式提供组件的共用。组件被混入以后会给自定义材质注入相关的属性和方法，也可能会改变材质的一些默认行为。
+
+自定义材质可以通过调用[applyMaterialMixins](/doc/markdown/./scene.applymaterialmixins)方法混入一个或多个组件。
+
+例如，需要混入组件mixinLambert光照模型，类需要定义如下：
+
+```javascript
+
+class MyMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
+  // 材质实现
+}
+
+```

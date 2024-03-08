@@ -1,21 +1,19 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
-import { Vector3 } from '@zephyr3d/base';
-import { Scene, Application, PerspectiveCamera, MeshMaterial, ShaderHelper, OrbitCameraController, Mesh, TorusShape, Compositor, Tonemap } from '@zephyr3d/scene';
+import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Scene, Application, PerspectiveCamera, MeshMaterial, ShaderHelper, OrbitCameraController, Mesh, TorusShape, Compositor, Tonemap, AssetManager, applyMaterialMixins, mixinBlinnPhong, DirectionalLight } from '@zephyr3d/scene';
 
-// 定义边缘光材质
-class RimColorMaterial extends MeshMaterial {
+// 自定义Blinn-phong材质
+class MyBlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinBlinnPhong) {
   constructor() {
     super();
-    // 边缘光的颜色
-    this.color = new Vector3(1, 1, 1);
+    // 漫反射颜色
+    this.color = new Vector4(1, 1, 1, 1);
+    // 漫反射贴图
+    this.diffuseTexture = null;
   }
-  // 不透明材质
-  isTransparent(pass) {
-    return false;
-  }
-  // 不受光照影响
+  // 受光照影响
   supportLighting() {
-    return false;
+    return true;
   }
   // VertexShader实现
   // scope是vertexShader的main函数作用域
@@ -30,6 +28,8 @@ class RimColorMaterial extends MeshMaterial {
     // 定义顶点法线输入
     // 如果使用了ShaderHelper.resolveVertexNormal()函数，这一行可以省略。
     scope.$inputs.normal = pb.vec3().attrib('normal');
+    // 定义纹理坐标
+    scope.$inputs.texcoord = pb.vec2().attrib('texCoord0');
     // ShaderHelper.resolveVertexPosition()函数用于计算局部坐标系的顶点位置。
     // 如果有骨骼动画，该函数计算经过骨骼运算后的顶点位置，否则返回输入的顶点位置。
     scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
@@ -43,6 +43,8 @@ class RimColorMaterial extends MeshMaterial {
     // 计算世界坐标系的顶点法线向量并输出到fragmentShader
     // ShaderHelper.getNormalMatrix()函数用于获取当前的局部到世界的法线变换矩阵
     scope.$outputs.worldNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
+    // 输出纹理坐标到fragmentShader
+    scope.$outputs.texcoord = scope.$inputs.texcoord;
     // 输出剪裁空间的顶点坐标
     // ShaderHelper.getViewProjectionMatrix()获取当前的世界空间到剪裁空间的变换矩阵。
     // 注意不要直接给scope.$builtins.position赋值，因为在WebGPU设备下渲染到纹理时需要上下翻转
@@ -56,26 +58,29 @@ class RimColorMaterial extends MeshMaterial {
     // 父类fragmentShader负责初始化全局uniform参数
     super.fragmentShader(scope);
     const pb = scope.$builder;
-    // MeshMaterial的needFragmentColor()函数返回当前Shader是否需要计算片元颜色。
-    // 如果当前的RenderPass是DepthPass或ShadowMapPass且材质alphaCutoff属性等于0(未开启AlphaTest)，则无需计算片元颜色。
+    // MeshMaterial的needFragmentColor()函数返回
+    // 当前Shader是否需要计算片元颜色。如果当前的
+    // RenderPass是DepthPass或ShadowMapPass且材质
+    // alphaCutoff属性等于0(未开启AlphaTest)，则
+    // 无需计算片元颜色。
     if (this.needFragmentColor()) {
-      // 定义一个vec3类型的uniform用于指定边缘光颜色
-      // 注意：用于材质的uniform，对应的BindGroup索引
-      // 为2。
-      scope.rimColor = pb.vec3().uniform(2);
-      // 计算视线向量
-      // ShaderHelper.getCameraPosition()函数用于获取当前摄像机的世界坐标系位置。
-      // scope.$inputs作用域保存由vertexShader传来的varying变量。
+      // 定义一个vec4类型的uniform用于指定漫反射颜色
+      // 注意：用于材质的uniform，对应的BindGroup索引为2。
+      scope.diffuseColor = pb.vec4().uniform(2);
+      // 定义uniform用于指定漫反射贴图
+      scope.diffuseTexture = pb.tex2D().uniform(2);
+      // 利用mixinLight提供的calculateNormal方法计算片元法线（如果设置了法线贴图，该方法会采样法线贴图计算片元法线）
+      scope.$l.normal = this.calculateNormal(scope, scope.$inputs.worldPos, scope.$inputs.worldNorm);
+      // 利用mixinLight提供的calculateViewVector方法计算视线向量（从片元世界坐标指向摄像机世界坐标的单位向量）
       scope.$l.viewVec = pb.normalize(pb.sub(ShaderHelper.getCameraPosition(scope), scope.$inputs.worldPos));
-      // 计算NdotV，值越小边缘光越亮
-      scope.$l.NdotV = pb.clamp(pb.dot(pb.normalize(scope.$inputs.worldNorm), scope.viewVec), 0, 1);
-      // 计算最终的片元颜色
-      scope.$l.finalColor = pb.mul(scope.rimColor, pb.pow(pb.sub(1, scope.NdotV), 4));
+      // 计算漫反射颜色（漫反射贴图颜色乘以漫反射颜色）
+      scope.$l.diffuse = pb.mul(pb.textureSample(scope.diffuseTexture, scope.$inputs.texcoord), scope.diffuseColor);
+      // 计算光照，结果是vec3类型的光照以后的颜色
+      scope.$l.litColor = this.blinnPhongLight(scope, scope.$inputs.worldPos, scope.normal, scope.viewVec, scope.diffuse);
+      // 合并漫反射的alpha通道到最终颜色
+      scope.$l.finalColor = pb.vec4(scope.litColor, scope.diffuse.a);
       // 输出片元颜色
-      // 材质的outputFragmentColor()方法用于输出片元颜色。该方法执行剪裁平面测试(如果定义了剪裁平面),
-      // AlphaTest测试(如果材质的alphaCutoff大于0)，根据是否半透明材质处理片元的alpha通道，
-      // 在需要的情况下执行sRGB颜色空间转换。
-      this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.finalColor, 1));
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.finalColor);
     } else {
       // 不需要计算片元颜色则直接输出null
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
@@ -86,8 +91,10 @@ class RimColorMaterial extends MeshMaterial {
     // 必须调用父类
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx)){
-    // 需要计算片元颜色时我们才定义此Uniform
-      bindGroup.setValue('rimColor', this.color);
+      // 漫反射颜色
+      bindGroup.setValue('diffuseColor', this.color);
+      // 漫反射贴图（不可以是null）
+      bindGroup.setTexture('diffuseTexture', this.diffuseTexture)
     }
   }
 }
@@ -101,9 +108,17 @@ myApp.ready().then(async () => {
   const device = myApp.device;
 
   const scene = new Scene();
-  scene.env.sky.skyType = 'scatter';
-  const material = new RimColorMaterial();
-  material.color.setXYZ(1, 1, 0);
+
+  // Creates a directional light
+  const light = new DirectionalLight(scene);
+  light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
+
+  const assetManager = new AssetManager();
+  const material = new MyBlinnMaterial();
+  material.color.setXYZW(1, 1, 0, 1);
+  // shininess是mixinBlinnPhong引入的属性
+  material.shininess = 64;
+  material.diffuseTexture = await assetManager.loadTexture('./assets/images/layer.jpg');
   material.uniformChanged();
 
   new Mesh(scene, new TorusShape(), material);

@@ -66,9 +66,9 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$return(this.albedo.rgb);
         } else {
           if (that.needCalculateEnvLight()) {
-            this.diffuseColor = that.getEnvLightIrradiance(this, this.normal);
+            this.$l.diffuseColor = that.getEnvLightIrradiance(this, this.normal);
           } else {
-            this.diffuseColor = pb.vec3(0);
+            this.$l.diffuseColor = pb.vec3(0);
           }
           this.$l.specularColor = pb.vec3(0);
           that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {

@@ -11,10 +11,6 @@ class RimColorMaterial extends MeshMaterial {
     // 边缘光的颜色
     this.color = new Vector3(1, 1, 1);
   }
-  // 不透明材质
-  isTransparent(pass) {
-    return false;
-  }
   // 不受光照影响
   supportLighting() {
     return false;
@@ -56,7 +52,7 @@ class RimColorMaterial extends MeshMaterial {
   fragmentShader(scope) {
     // 必须调用父类的fragmentShader方法
     // 父类fragmentShader负责初始化全局uniform参数
-    super.vertexShader(scope);
+    super.fragmentShader(scope);
     const pb = scope.$builder;
     // MeshMaterial的needFragmentColor()函数返回
     // 当前Shader是否需要计算片元颜色。如果当前的

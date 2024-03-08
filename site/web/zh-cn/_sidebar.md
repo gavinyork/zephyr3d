@@ -15,21 +15,35 @@
 
 - 使用场景API
 
-  - [基本框架](zh-cn/scene-basic.md)
-  - [网格及材质](zh-cn/mesh-material.md)
-  - [场景图及节点](zh-cn/scene-graph.md)
-  - [光照](zh-cn/lighting.md)
-  - [阴影](zh-cn/shadow.md)
-  - [动画](zh-cn/animation.md)
-  - [后处理](zh-cn/posteffect.md)
+  - 基本框架
+    - [基本框架](zh-cn/scene-basic.md)
+    - [网格及材质](zh-cn/mesh-material.md)
+    - [场景图及节点](zh-cn/scene-graph.md)
+  - 光照
+    - [概述](zh-cn/lighting-intro.md)
+    - [直接光照](zh-cn/lighting-direct.md)
+    - [间接光照](zh-cn/lighting-indirect.md)
+  - 阴影
+    - [概述](zh-cn/shadow-intro.md)
+    - [反走样](zh-cn/shadow-aa.md)
+  - 动画
+    - [概述](zh-cn/animation-intro.md)
+    - [骨骼动画](zh-cn/animation-skeleton.md)
+    - [关键帧动画](zh-cn/animation-keyframe.md)
+    - [自定义动画](zh-cn/animation-custom.md)
+  - 后处理
+    - [概述](zh-cn/posteffect-intro.md)
+    - [Tonemap](zh-cn/posteffect-tonemap.md)
+    - [Bloom](zh-cn/posteffect-bloom.md)
+    - [SSAO](zh-cn/posteffect-sao.md)
+    - [FXAA](zh-cn/posteffect-fxaa.md)
   - 自然景观
     - [地形渲染](zh-cn/terrain.md)
     - [天空渲染](zh-cn/sky.md)
     - [大气及雾效](zh-cn/fog.md)
     - [水面渲染](zh-cn/water.md)
-
-- 自定义材质
-
-  - [材质基础](zh-cn/user-material.md)
-  - [无光照材质](zh-cn/user-material-unlit.md)
+  - 自定义材质
+    - [材质基础](zh-cn/user-material.md)
+    - [无光照材质](zh-cn/user-material-unlit.md)
+    - [光照材质](zh-cn/user-material-lit.md)
 
