@@ -46,4 +46,6 @@
     - [材质基础](zh-cn/user-material.md)
     - [无光照材质](zh-cn/user-material-unlit.md)
     - [光照材质](zh-cn/user-material-lit.md)
+    - [多遍材质](zh-cn/user-material-multipass.md)
+    - [Shader变体](zh-cn/user-material-var.md)
 

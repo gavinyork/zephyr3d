@@ -1,5 +1,6 @@
 import type {
   BindGroup,
+  FaceMode,
   GPUProgram,
   PBFunctionScope,
   PBInsideFunctionScope,
@@ -63,6 +64,8 @@ export class MeshMaterial extends Material {
   /** @internal */
   private _blendMode: BlendMode;
   /** @internal */
+  private _cullMode: FaceMode;
+  /** @internal */
   private _opacity: number;
   /** @internal */
   private _ctx: DrawContext;
@@ -77,6 +80,7 @@ export class MeshMaterial extends Material {
     this._featureStates = [];
     this._alphaCutoff = 0;
     this._blendMode = 'none';
+    this._cullMode = 'back';
     this._opacity = 1;
     this._ctx = null;
     this._materialPass = -1;
@@ -126,6 +130,13 @@ export class MeshMaterial extends Material {
       this.useFeature(FEATURE_ALPHABLEND, this._blendMode !== 'none' || this._opacity < 1);
     }
   }
+  /** Cull mode */
+  get cullMode(): FaceMode {
+    return this._cullMode;
+  }
+  set cullMode(val: FaceMode) {
+    this._cullMode = val;
+  }
   /** A value between 0 and 1, presents the opacity */
   get opacity(): number {
     return this._opacity;
@@ -143,11 +154,11 @@ export class MeshMaterial extends Material {
     return true;
   }
   /**
-   * Update blending state according to draw context and current material pass
+   * Update render states according to draw context and current material pass
    * @param pass - Current material pass
    * @param ctx - Draw context
    */
-  protected updateBlendingAndDepthState(pass: number, ctx: DrawContext): void {
+  protected updateRenderStates(pass: number, ctx: DrawContext): void {
     const blending = this.featureUsed<boolean>(FEATURE_ALPHABLEND) || ctx.lightBlending;
     const a2c = this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
     if (blending || a2c) {
@@ -173,6 +184,11 @@ export class MeshMaterial extends Material {
     } else if (this.stateSet.blendingState?.enabled && !blending) {
       this.stateSet.defaultBlendingState();
       this.stateSet.defaultDepthState();
+    }
+    if (this._cullMode !== 'back') {
+      this.stateSet.useRasterizerState().cullMode = this._cullMode;
+    } else {
+      this.stateSet.defaultRasterizerState();
     }
   }
   /**
@@ -236,7 +252,7 @@ export class MeshMaterial extends Material {
    * {@inheritdoc Material.beginDraw}
    */
   beginDraw(pass: number, ctx: DrawContext): boolean {
-    this.updateBlendingAndDepthState(pass, ctx);
+    this.updateRenderStates(pass, ctx);
     return super.beginDraw(pass, ctx);
   }
   /** @internal */

@@ -59,6 +59,18 @@
 
     这里是该材质的fragmentShader实现，必需重写。
 
+  - [MeshMaterial.beginDraw(pass, ctx)](/doc/markdown/./scene.material.begindraw)
+
+    当开始渲染材质的某一Pass之前调用，按需创建Shader设置uniform常量。返回true正常渲染，返回false则不渲染此Pass
+
+  - [MeshMaterial.beginDraw(pass, ctx)](/doc/markdown/./scene.material.begindraw)
+
+    当开始渲染材质的某一Pass之前调用，按需创建Shader设置uniform常量。返回true正常渲染，返回false则不渲染此Pass
+
+  - [MeshMaterial.endDraw(pass, ctx)](/doc/markdown/./scene.material.begindraw)
+
+    材质的某一Pass渲染完成之后调用
+
 类[ShaderHelper](/doc/markdown/./scene.shaderhelper)提供了编写材质需要的诸多工具函数。
 
 ## 系统设计

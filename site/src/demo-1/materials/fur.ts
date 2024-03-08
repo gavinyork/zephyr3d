@@ -76,16 +76,13 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
         return false;
       } else {
         this.blendMode = 'blend';
-        this.stateSet.useRasterizerState().setCullMode('none');
+        this.cullMode = 'none';
       }
     } else {
       this.blendMode = 'none';
-      this.stateSet.defaultRasterizerState();
+      this.cullMode = 'back';
     }
     return super.beginDraw(pass, ctx);
-  }
-  endDraw(pass: number) {
-    this.blendMode = 'none';
   }
   drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number): void {
     if (pass === 0 || !this._instancing) {

@@ -13,6 +13,7 @@ function mixinFoliage<T extends typeof MeshMaterial>(BaseCls: T) {
     static foliageMixed = true;
     constructor(...args: any[]) {
       super(...args);
+      this.cullMode = 'none';
     }
     calculateFoliageAlbedo(scope: PBInsideFunctionScope, albedoColor: PBShaderExp, texelCoord: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;

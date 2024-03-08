@@ -239,6 +239,9 @@ export class Material {
       if (!programInfo.programs[ctx.renderPass.type]) {
         return false;
       }
+      if (pass > 0) {
+        this.optionChanged(false);
+      }
       this._materialBindGroup = this.applyMaterialBindGroups(ctx, hash, pass);
       if (pass === 0) {
         if (numInstances > 1) {
