@@ -69,7 +69,9 @@ export class ShaderHelper {
       fogType: 0,
       fogColor: null,
       // [near, far, top, density]
-      fogParams: null
+      fogParams: null,
+      // aerial perspective density
+      apDensity: 1
     }
   };
   static getWorldMatrixUniformName(): string {
@@ -128,8 +130,7 @@ export class ShaderHelper {
       pb.mat4('viewMatrix'),
       pb.mat4('rotationMatrix'),
       pb.mat4('projectionMatrix'),
-      pb.vec4('params'),
-      pb.float('worldUnit')
+      pb.vec4('params')
     ]);
     if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
       const lightStruct = pb.defineStruct([
@@ -146,7 +147,7 @@ export class ShaderHelper {
       scope[UNIFORM_NAME_GLOBAL] = globalStruct().uniform(0);
     } else if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
       const useClusteredLighting = !ctx.currentShadowLight;
-      const fogStruct = pb.defineStruct([pb.int('fogType'), pb.vec4('fogColor'), pb.vec4('fogParams')]);
+      const fogStruct = pb.defineStruct([pb.int('fogType'), pb.vec4('fogColor'), pb.vec4('fogParams'), pb.float('apDensity')]);
       const lightStruct = ctx.currentShadowLight
         ? pb.defineStruct([
             pb.vec3('sunDir'),
@@ -412,7 +413,6 @@ export class ShaderHelper {
       viewMatrix: ctx.camera.viewMatrix,
       rotationMatrix: ctx.camera.getRotationMatrix(),
       projectionMatrix: ctx.camera.getProjectionMatrix(),
-      worldUnit: ctx.scene.worldUnit,
       params: new Vector4(
         ctx.camera.getNearPlane(),
         ctx.camera.getFarPlane(),
@@ -445,11 +445,13 @@ export class ShaderHelper {
     fogType: number,
     fogColor: Vector4,
     fogParams: Vector4,
+    apDensity: number,
     aerialPerspectiveLUT?: Texture2D
   ) {
     this._fogUniforms.fog.fogColor = fogColor;
     this._fogUniforms.fog.fogParams = fogParams;
     this._fogUniforms.fog.fogType = fogType;
+    this._fogUniforms.fog.apDensity = apDensity;
     bindGroup.setValue(UNIFORM_NAME_GLOBAL, this._fogUniforms);
     if (aerialPerspectiveLUT) {
       bindGroup.setTexture(UNIFORM_NAME_AERIALPERSPECTIVE_LUT, aerialPerspectiveLUT);
@@ -549,14 +551,6 @@ export class ShaderHelper {
     return scope[UNIFORM_NAME_GLOBAL].camera.position.w;
   }
   /**
-   * Gets the world unit
-   * @param scope - Current shader scope
-   * @returns The world unit
-   */
-  static getWorldUnit(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.worldUnit;
-  }
-  /**
    * Gets the clip plane
    * @param scope - Current shader scope
    * @returns A vec4 presents the clip plane
@@ -615,6 +609,14 @@ export class ShaderHelper {
    */
   static getFogParams(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_GLOBAL].fog.fogParams;
+  }
+  /**
+   * Gets the uniform variable of type float which holds the aerial perspective density
+   * @param scope - Current shader scope
+   * @returns aerial perspective density
+   */
+  static getAPDensity(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].fog.apDensity;
   }
   /**
    * Computes the fog factor for a given view vector
@@ -980,9 +982,9 @@ export class ShaderHelper {
         pb.func(funcName, [pb.vec3('worldPos'), pb.vec4('color').inout()], function () {
           this.$l.viewDir = pb.sub(this.worldPos, that.getCameraPosition(this));
           this.viewDir.y = pb.max(this.viewDir.y, 0);
-          this.$l.distance = pb.mul(pb.length(this.viewDir), that.getWorldUnit(this));
+          this.$l.distance = pb.mul(pb.length(this.viewDir), that.getAPDensity(this));
           this.$l.sliceDist = pb.div(
-            pb.mul(that.getCameraParams(this).y, that.getWorldUnit(this)),
+            pb.mul(that.getCameraParams(this).y, that.getAPDensity(this)),
             ScatteringLut.aerialPerspectiveSliceZ
           );
           this.$l.slice0 = pb.floor(pb.div(this.distance, this.sliceDist));

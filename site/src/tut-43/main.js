@@ -1,49 +1,16 @@
-# Shader变体
-
-一种很常见的情况是，我们设置材质的不同属性以后，材质需要生成不相同的代码，也就是说同一材质的Shader可能会有不同的变体。
-
-你可以调用材质的静态方法[defineFeature()](/doc/markdown/./scene.meshmaterial.definefeature)来为材质声明变体。
-
-```javascript
-
-class MyMaterial extends MeshMaterial {
-  // 定义了一个Feature，该feature可以拥有若干变体
-  static featureA = this.defineFeature();
-  // 另一个Feature
-  static featureB = this.defineFeature();
-
-  foo() {
-    // useFeature()方法可以用来激活一个变体
-    // value参数可以是任何值，每个不同的值各代表一个变体
-    // 未调用useFeature()，变体值默认为undefined
-    this.useFeature(MyMaterial.featureA, value);
-    // 获取当前的变体
-    const value = this.featureUsed(MyMaterial.featureA);
-  }
-  bar() {
-    // 如果是简单的开关，可以使用布尔值做变体
-    this.useFeature(MyMaterial.featureB, true);
-  }
-}
-
-```
-
-在Shader的实现中要注意根据变体做不同的实现。
-
-
-下面的例子中，我们定义了一个Lambert材质，该材质你可以设置一个可选的纹理，从而生成两个Shader变体。
-
-```javascript
+import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Scene, Application, PerspectiveCamera, MeshMaterial, ShaderHelper, OrbitCameraController, Mesh, TorusShape, Compositor, Tonemap, AssetManager, applyMaterialMixins, DirectionalLight, mixinLambert } from '@zephyr3d/scene';
 
 // 自定义Lambert材质
-// 材质的diffuseTexture属性是否为空个代表一个变体
+// 我们需要混入mixinLight组件
 class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
   static featureDiffuseTexture = this.defineFeature();
   constructor() {
     super();
     // 漫反射颜色
     this.color = new Vector4(1, 1, 1, 1);
-    // 漫反射贴图，默认为空
+    // 漫反射贴图，该帖图是否存在会生成两个shader变体
     this.diffuseTexture = null;
   }
   // 每次渲染之前更新变体值
@@ -115,9 +82,54 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) 
   }
 }
 
-```
+const myApp = new Application({
+  backend: backendWebGL2,
+  canvas: document.querySelector('#my-canvas')
+});
 
-下面的例子中，按下空格键可以切换有无贴图两个变体。
+myApp.ready().then(async () => {
+  const device = myApp.device;
 
-<div class="showcase" case="tut-43"></div>
+  const scene = new Scene();
 
+  // Creates a directional light
+  const light = new DirectionalLight(scene);
+  light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
+
+  const assetManager = new AssetManager();
+  const tex = await assetManager.loadTexture('./assets/images/layer.jpg');
+  const material = new MyLambertMaterial();
+  material.color.setXYZW(1, 1, 0, 1);
+  material.diffuseTexture = tex
+  material.uniformChanged();
+
+  new Mesh(scene, new TorusShape(), material);
+
+  const camera = new PerspectiveCamera(scene, Math.PI/3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 500);
+  camera.lookAt(new Vector3(25, 15, 0), new Vector3(0, 0, 0), Vector3.axisPY());
+  camera.controller = new OrbitCameraController();
+  myApp.inputManager.use(camera.handleEvent.bind(camera));
+
+  const compositor = new Compositor();
+  compositor.appendPostEffect(new Tonemap());
+
+  myApp.on('resize', ev => {
+    camera.aspect = ev.width / ev.height;
+  });
+
+  myApp.on('keyup', ev => {
+    if (ev.code === 'Space') {
+      if (material.diffuseTexture) {
+        material.diffuseTexture = null;
+      } else {
+        material.diffuseTexture = tex;
+      }
+    }
+  })
+  myApp.on('tick', ev => {
+    camera.updateController();
+    camera.render(scene, compositor);
+  });
+
+  myApp.run();
+});

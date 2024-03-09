@@ -78,7 +78,7 @@ myApp.ready().then(async() => {
 
   const device = myApp.device;
   const scene = new Scene();
-  scene.worldUnit = 60;
+  scene.env.sky.aerialPerspectiveDensity = 8;
   const camera = new PerspectiveCamera(scene, Math.PI/3, device.canvas.width / device.canvas.height, 1, 500);
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
   myApp.inputManager.use(camera.handleEvent.bind(camera));

@@ -57,6 +57,7 @@ myApp.ready().then(async function () {
   await imGuiInit(myApp.device);
 
   const scene = new Scene();
+  scene.env.sky.fogType = 'scatter';
 
   let dlight: DirectionalLight = null;
   // Create directional light

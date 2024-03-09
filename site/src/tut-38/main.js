@@ -44,7 +44,7 @@ myApp.ready().then(async () => {
   const device = myApp.device;
 
   const scene = new Scene();
-  scene.worldUnit = 60;
+  scene.env.sky.aerialPerspectiveDensity = 8;
   scene.env.light.strength = 0.1;
 
   const camera = new PerspectiveCamera(scene, Math.PI/3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 500);

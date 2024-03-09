@@ -64,7 +64,7 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
   passToHash(pass: number): string {
     return super.passToHash(pass > 0 ? 1 : 0);
   }
-  isTransparent(pass: number): boolean {
+  isTransparentPass(pass: number): boolean {
     return pass > 0;
   }
   isBatchable(): boolean {

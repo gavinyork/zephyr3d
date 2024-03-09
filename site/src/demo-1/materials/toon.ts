@@ -2,7 +2,6 @@ import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
 import { DrawContext, MeshMaterial, ShaderHelper, applyMaterialMixins, mixinAlbedoColor, mixinLambert } from '@zephyr3d/scene';
 
 export class ToonMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor, mixinLambert) {
-  static FEATURE_PARALLAX_MODE = this.defineFeature();
   private _bands: number;
   private _edgeThickness: number;
   constructor() {
@@ -29,13 +28,9 @@ export class ToonMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoC
       this.uniformChanged();
     }
   }
-  beginDraw(pass: number, ctx: DrawContext): boolean {
-    if (pass === 0) {
-      this.stateSet.useRasterizerState().setCullMode('front');
-    } else {
-      this.stateSet.defaultRasterizerState();
-    }
-    return super.beginDraw(pass, ctx);
+  protected updateRenderStates(pass: number, ctx: DrawContext): void {
+    super.updateRenderStates(pass, ctx);
+    this.stateSet.useRasterizerState().cullMode = pass === 0 ? 'front' : 'back';
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
@@ -50,25 +45,22 @@ export class ToonMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoC
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
     const pb = scope.$builder;
-    scope.$inputs.pos = pb.vec3().attrib('position');
-    scope.$inputs.normal = pb.vec3().attrib('normal');
+    scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
+    scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
     if (this.pass === 0) {
       scope.edge = pb.float().uniform(2);
-      scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope, pb.add(scope.$inputs.pos, pb.mul(scope.$inputs.normal, scope.edge)));
-    } else {
-      scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
+      scope.oPos = pb.add(scope.oPos, pb.mul(scope.oNorm, scope.edge));
     }
     scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
     ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
-    scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
     scope.$outputs.wNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
     const that = this;
     const pb = scope.$builder;
+    scope.$l.albedo = that.calculateAlbedoColor(scope, scope.texCoords);
     if (this.needFragmentColor()){
-      scope.$l.albedo = that.calculateAlbedoColor(scope, scope.texCoords);
       if (this.pass === 0) {
         this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(0, 0, 0, scope.albedo.a));
       } else {

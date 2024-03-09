@@ -192,33 +192,6 @@ export class MeshMaterial extends Material {
     }
   }
   /**
-   * Update Depth state according to draw context and current material pass
-   * @param pass - Current material pass
-   * @param ctx - Draw context
-   */
-  protected updateDepthState(pass: number, ctx: DrawContext): void {
-    const blending = this.featureUsed<boolean>(FEATURE_ALPHABLEND);
-    const a2c = this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
-    if (blending || a2c) {
-      const blendingState = this.stateSet.useBlendingState();
-      if (blending) {
-        blendingState.enable(true);
-        blendingState.setBlendFuncAlpha('zero', 'one');
-        blendingState.setBlendEquation('add', 'add');
-        if (this._blendMode === 'additive' || ctx.lightBlending) {
-          blendingState.setBlendFuncRGB('one', 'one');
-        } else {
-          blendingState.setBlendFuncRGB('one', 'inv-src-alpha');
-        }
-      } else {
-        blendingState.enable(false);
-      }
-      blendingState.enableAlphaToCoverage(a2c);
-    } else if (this.stateSet.blendingState?.enabled && !blending) {
-      this.stateSet.defaultBlendingState();
-    }
-  }
-  /**
    * Submit Uniform values before rendering with this material.
    *
    * @param bindGroup - Bind group for this material
@@ -238,14 +211,14 @@ export class MeshMaterial extends Material {
    * @returns QUEUE_TRANSPARENT or QUEUE_OPAQUE
    */
   getQueueType(): number {
-    return this.isTransparent(0) ? QUEUE_TRANSPARENT : QUEUE_OPAQUE;
+    return this.isTransparentPass(0) ? QUEUE_TRANSPARENT : QUEUE_OPAQUE;
   }
   /**
    * Determine if a certain pass of this material is translucent.
    * @param pass - Pass of the material
    * @returns True if it is translucent, otherwise false.
    */
-  isTransparent(pass: number): boolean {
+  isTransparentPass(pass: number): boolean {
     return this.featureUsed(FEATURE_ALPHABLEND);
   }
   /**
@@ -338,7 +311,7 @@ export class MeshMaterial extends Material {
       scope.zAlphaCutoff = pb.float().uniform(2);
     }
     if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
-      if (this.isTransparent(this.pass)) {
+      if (this.isTransparentPass(this.pass)) {
         scope.zOpacity = pb.float().uniform(2);
       }
     }
@@ -388,7 +361,7 @@ export class MeshMaterial extends Material {
       this.$l.outColor = color ? this.color : pb.vec4();
       if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         ShaderHelper.discardIfClipped(this, this.worldPos);
-        if (!that.isTransparent(that.pass) && !this.zAlphaCutoff && !that.alphaToCoverage) {
+        if (!that.isTransparentPass(that.pass) && !this.zAlphaCutoff && !that.alphaToCoverage) {
           this.outColor.a = 1;
         } else if (this.zOpacity) {
           this.outColor.a = pb.mul(this.outColor.a, this.zOpacity);
@@ -398,7 +371,7 @@ export class MeshMaterial extends Material {
             pb.discard();
           });
         }
-        if (that.isTransparent(that.pass)) {
+        if (that.isTransparentPass(that.pass)) {
           this.outColor = pb.vec4(pb.mul(this.outColor.rgb, this.outColor.a), this.outColor.a);
         }
         ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext);

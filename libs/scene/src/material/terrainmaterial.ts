@@ -161,10 +161,10 @@ export class TerrainMaterial extends applyMaterialMixins(
     this.uniformChanged();
   }
   /**
-   * {@inheritDoc Material.isTransparent}
+   * {@inheritDoc MeshMaterial.isTransparentPass}
    * @override
    */
-  isTransparent(): boolean {
+  isTransparentPass(pass: number): boolean {
     return false;
   }
   /**

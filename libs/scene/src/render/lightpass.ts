@@ -55,6 +55,7 @@ export class LightPass extends RenderPass {
         ctx.env.sky.mappedFogType,
         baseLightPass ? ctx.env.sky.fogColor : Vector4.zero(),
         ctx.env.sky.fogParams,
+        ctx.env.sky.aerialPerspectiveDensity * ctx.env.sky.aerialPerspectiveDensity,
         ctx.env.sky.getAerialPerspectiveLUT(ctx)
       );
     }

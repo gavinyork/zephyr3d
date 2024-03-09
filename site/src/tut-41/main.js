@@ -1,6 +1,6 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, PerspectiveCamera, MeshMaterial, ShaderHelper, OrbitCameraController, Mesh, TorusShape, Compositor, Tonemap, AssetManager, applyMaterialMixins, mixinBlinnPhong, DirectionalLight, mixinLight } from '@zephyr3d/scene';
+import { Scene, Application, PerspectiveCamera, MeshMaterial, ShaderHelper, OrbitCameraController, Mesh, TorusShape, Compositor, Tonemap, AssetManager, applyMaterialMixins, DirectionalLight, mixinLight } from '@zephyr3d/scene';
 
 // 自定义Lambert材质
 // 我们需要混入mixinLight组件

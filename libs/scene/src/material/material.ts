@@ -199,7 +199,7 @@ export class Material {
     return QUEUE_OPAQUE;
   }
   /** Returns true if this is a transparency material */
-  isTransparent(pass: number): boolean {
+  isTransparentPass(pass: number): boolean {
     return false;
   }
   /** Returns true if shading of the material will be affected by lights  */

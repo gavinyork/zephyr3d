@@ -29,10 +29,10 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinPBRMet
     }
   }
   /**
-   * {@inheritDoc Material.isTransparent}
+   * {@inheritDoc MeshMaterial.isTransparentPass}
    * @override
    */
-  isTransparent(): boolean {
+  isTransparentPass(pass: number): boolean {
     return false;
   }
   /**

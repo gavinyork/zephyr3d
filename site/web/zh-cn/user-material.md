@@ -24,7 +24,7 @@
 3. LightingPass
 
   根据光源的数量以及是否投射阴影，场景需要被渲染一遍或多遍。每个投射阴影的光源需要单独渲染一遍，其他不投射阴影的光源
-  利用聚簇光照(Clustered lighting)算法渲染一遍。
+  利用聚簇光照(Clustered lighting)技术渲染一遍。
 
 4. 天空，雾效以及后处理
 
@@ -34,42 +34,52 @@
 
 [MeshMaterial](/doc/markdown/./scene.meshmaterial)是所有Mesh材质的基类，任何自定义材质必须继承于MeshMaterial。
 
-自定义材质继承MeshMaterial以后需要重写一些类方法：
+自定义材质继承MeshMaterial以后可能需要重写一些类方法：
 
   - [MeshMaterial.supportLighting()](/doc/markdown/./scene.meshmaterial.supportlighting)
 
     返回true表明该材质受光照影响，否则为无光照材质。该函数默认返回true。
 
-  - [MeshMaterial.isTransparent(pass)](/doc/markdown/./scene.meshmaterial.istransparent)
+  - [MeshMaterial.getQueueType()](/doc/markdown/./scene.meshmaterial.getqueuetype)
 
-    返回true表明该材质的指定pass是否为半透明。该值影响Shader对alpha通道的处理，当pass为0时该属性影响物体在哪个队列内渲染。
+    返回[QUEUE_OPAQUE](/doc/markdown/./scene.queue_opaque)表明此材质需要在不透明阶段旭渲染，
+    返回[QUEUE_TRANSPARENT](/doc/markdown/./scene.queue_transparent)表明此材质需要在透明阶段渲染。
+
+  - [MeshMaterial.isTransparentPass(pass)](/doc/markdown/./scene.meshmaterial.istransparent)
+
+    返回true表明该材质的指定pass是否为半透明。该值影响Shader对alpha通道的处理。
     默认情况下该函数通过[MeshMaterial.blendMode](/doc/markdown/./scene.meshmaterial.blendmode)
     属性来判断是否半透明，如果blendMode为'none'则返回false，否则返回true。
 
   - [MeshMaterial.applyUniformValues(bindGroup, ctx, pass)](/doc/markdown/./scene.meshmaterial.applyuniformvalues)
 
-    该函数用于上传该材质指定pass所需的uniform常量。如果自定义材质定义了新的uniform常量，则需要重写
-    该函数。在重写该函数时必需调用父类的该方法。
-  
+    该函数用于上传该材质指定pass所需的uniform常量。如果自定义材质定义了新的uniform常量，则需要重写该函数。
+    重写此方法必须调用其默认实现。
+
   - [MeshMaterial.vertexShader(scope)](/doc/markdown/./scene.meshmaterial.vertexshader)
 
     这里是该材质的VertexShader实现，必需重写。
+    重写此方法必须调用其默认实现。
 
   - [MeshMaterial.fragmentShader(scope)](/doc/markdown/./scene.meshmaterial.fragmentshader)
 
     这里是该材质的fragmentShader实现，必需重写。
+    重写此方法必须调用其默认实现。
 
+  - [MeshMaterial.updateRenderStates(pass, ctx)](/doc/markdown/./scene.meshmaterial.updaterenderstates)
+
+    在beginDraw()方法中调用，用于设置材质的渲染状态。
+    重写此方法必须调用其默认实现。
+    
   - [MeshMaterial.beginDraw(pass, ctx)](/doc/markdown/./scene.material.begindraw)
 
-    当开始渲染材质的某一Pass之前调用，按需创建Shader设置uniform常量。返回true正常渲染，返回false则不渲染此Pass
-
-  - [MeshMaterial.beginDraw(pass, ctx)](/doc/markdown/./scene.material.begindraw)
-
-    当开始渲染材质的某一Pass之前调用，按需创建Shader设置uniform常量。返回true正常渲染，返回false则不渲染此Pass
+    当开始渲染材质的某一Pass之前调用，按需创建Shader设置uniform常量。返回true正常渲染，返回false则不渲染此Pass。
+    重写此方法必须调用其默认实现。
 
   - [MeshMaterial.endDraw(pass, ctx)](/doc/markdown/./scene.material.begindraw)
 
     材质的某一Pass渲染完成之后调用
+    重写此方法必须调用其默认实现。
 
 类[ShaderHelper](/doc/markdown/./scene.shaderhelper)提供了编写材质需要的诸多工具函数。
 

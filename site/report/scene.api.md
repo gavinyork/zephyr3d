@@ -13,6 +13,7 @@ import { ClipState } from '@zephyr3d/base';
 import { CubeFace } from '@zephyr3d/base';
 import { DeviceBackend } from '@zephyr3d/device';
 import { DeviceViewport } from '@zephyr3d/device';
+import { FaceMode } from '@zephyr3d/device';
 import { FrameBuffer } from '@zephyr3d/device';
 import { Frustum } from '@zephyr3d/base';
 import { GPUProgram } from '@zephyr3d/device';
@@ -1938,6 +1939,8 @@ export class MeshMaterial extends Material {
     protected createProgram(ctx: DrawContext, pass: number): GPUProgram;
     // @internal @override
     protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram;
+    get cullMode(): FaceMode;
+    set cullMode(val: FaceMode);
     static defineFeature(): number;
     get drawContext(): DrawContext;
     featureUsed<T = unknown>(feature: number): T;
@@ -1953,8 +1956,7 @@ export class MeshMaterial extends Material {
     get pass(): number;
     supportLighting(): boolean;
     uniformChanged(): void;
-    protected updateBlendingAndDepthState(pass: number, ctx: DrawContext): void;
-    protected updateDepthState(pass: number, ctx: DrawContext): void;
+    protected updateRenderStates(pass: number, ctx: DrawContext): void;
     useFeature(feature: number, use: unknown): void;
     vertexShader(scope: PBFunctionScope): void;
 }

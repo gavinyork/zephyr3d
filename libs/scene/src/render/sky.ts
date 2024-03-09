@@ -63,6 +63,7 @@ export class SkyRenderer {
   private _radianceMapDirty: boolean;
   private _scatterSkyboxFramebuffer: FrameBuffer;
   private _scatterSkyboxTextureWidth: number;
+  private _aerialPerspectiveDensity: number;
   private _radianceMap: TextureCube;
   private _radianceMapWidth: number;
   private _irradianceMap: TextureCube;
@@ -100,6 +101,7 @@ export class SkyRenderer {
     this._skyboxTexture = null;
     this._scatterSkyboxFramebuffer = null;
     this._scatterSkyboxTextureWidth = 256;
+    this._aerialPerspectiveDensity = 1;
     this._radianceMap = null;
     this._radianceMapWidth = 128;
     this._irradianceMap = null;
@@ -177,6 +179,13 @@ export class SkyRenderer {
       this._skyColor.set(val);
       this.invalidateIBLMaps();
     }
+  }
+  /** Aerial perspective density */
+  get aerialPerspectiveDensity() {
+    return this._aerialPerspectiveDensity;
+  }
+  set aerialPerspectiveDensity(val: number) {
+    this._aerialPerspectiveDensity = val;
   }
   /**
    * Light density of the sky.
@@ -337,7 +346,7 @@ export class SkyRenderer {
     if (this.drawScatteredFog(ctx)) {
       const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
       const alpha = Math.PI / 2 - Math.acos(Math.max(-1, Math.min(1, sunDir.y)));
-      const farPlane = ctx.camera.getFarPlane() * ctx.scene.worldUnit;
+      const farPlane = ctx.camera.getFarPlane() * this._aerialPerspectiveDensity * this._aerialPerspectiveDensity;
       return ScatteringLut.getAerialPerspectiveLut(alpha, farPlane);
     } else {
       return null;
@@ -409,11 +418,12 @@ export class SkyRenderer {
       if (this._fogType === 'scatter') {
         const sunDir = sunLight ? sunLight.directionAndCutoff.xyz().scaleBy(-1) : ShaderHelper.defaultSunDir;
         const alpha = Math.PI / 2 - Math.acos(Math.max(-1, Math.min(1, sunDir.y)));
-        const farPlane = ctx.camera.getFarPlane() * ctx.scene.worldUnit;
+        const scale =  this._aerialPerspectiveDensity * this._aerialPerspectiveDensity;
+        const farPlane = ctx.camera.getFarPlane() * scale;
         bindgroup.setTexture('apLut', ScatteringLut.getAerialPerspectiveLut(alpha, farPlane));
         bindgroup.setValue('sliceDist', farPlane / ScatteringLut.aerialPerspectiveSliceZ);
         bindgroup.setValue('sunDir', sunDir);
-        bindgroup.setValue('worldScale', ctx.scene.worldUnit);
+        bindgroup.setValue('worldScale', scale);
       } else {
         bindgroup.setValue('fogType', this.mappedFogType);
         bindgroup.setValue('fogColor', this._fogColor);

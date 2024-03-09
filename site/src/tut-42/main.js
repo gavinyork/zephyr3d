@@ -1,21 +1,13 @@
-# 多遍材质
-
-多遍材质允许通过多次渲染同一物体来逐步构建出最终的视觉效果。每一次渲染可以使用不同的Shader。
-
-引擎材质系统支持使用单一材质对物体进行多遍渲染，只需要设置材质的numPasses属性。
-
-在下面的例子中，我们用多遍材质实现一个简单的卡通效果。物体一共渲染两遍：
-第一遍：将物体沿法线方向略微扩张，用描边颜色渲染物体的背面，模拟描边效果。
-第二遍：正常渲染物体，将连续的光照量化为几个区域，模拟卡通着色效果。
-
-```javascript
+import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Scene, Application, PerspectiveCamera, MeshMaterial, ShaderHelper, OrbitCameraController, Mesh, TorusShape, Compositor, Tonemap, applyMaterialMixins, DirectionalLight, mixinLambert } from '@zephyr3d/scene';
 
 // 光照基于Lambert光照模型
 class CartoonMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
   constructor() {
     super();
     // 色彩量化级数
-    this.bands = 3;
+    this.bands = 4;
     // 描边的宽度
     this.edgeThickness = 0.3;
     // 物体的颜色
@@ -107,6 +99,43 @@ class CartoonMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
   }
 }
 
-```
+const myApp = new Application({
+  backend: backendWebGL2,
+  canvas: document.querySelector('#my-canvas')
+});
 
-<div class="showcase" case="tut-42"></div>
+myApp.ready().then(async () => {
+  const device = myApp.device;
+
+  const scene = new Scene();
+  scene.env.light.strength = 0;
+
+  // Creates a directional light
+  const light = new DirectionalLight(scene);
+  light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
+
+  const material = new CartoonMaterial();
+  material.color.setXYZW(1, 1, 0, 1);
+  material.uniformChanged();
+
+  new Mesh(scene, new TorusShape(), material);
+
+  const camera = new PerspectiveCamera(scene, Math.PI/3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 500);
+  camera.lookAt(new Vector3(25, 15, 0), new Vector3(0, 0, 0), Vector3.axisPY());
+  camera.controller = new OrbitCameraController();
+  myApp.inputManager.use(camera.handleEvent.bind(camera));
+
+  const compositor = new Compositor();
+  compositor.appendPostEffect(new Tonemap());
+
+  myApp.on('resize', ev => {
+    camera.aspect = ev.width / ev.height;
+  });
+
+  myApp.on('tick', ev => {
+    camera.updateController();
+    camera.render(scene, compositor);
+  });
+
+  myApp.run();
+});

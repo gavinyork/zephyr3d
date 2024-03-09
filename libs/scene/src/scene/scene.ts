@@ -44,8 +44,6 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
   /** @internal */
   protected _updateFrame: number;
   /** @internal */
-  protected _worldUnit: number;
-  /** @internal */
   protected _animationSet: AnimationSet[];
   /** @internal */
   protected _id: number;
@@ -60,7 +58,6 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
     this._env = new Environment();
     this._updateEvent = new SceneUpdateEvent(this);
     this._updateFrame = -1;
-    this._worldUnit = 1;
     this._animationSet = [];
     this._rootNode = new SceneNode(this);
   }
@@ -73,13 +70,6 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
    */
   get id(): number {
     return this._id;
-  }
-  /** How many meters a unit corresponds to. */
-  get worldUnit(): number {
-    return this._worldUnit;
-  }
-  set worldUnit(val: number) {
-    this._worldUnit = val;
   }
   /**
    * Gets the root scene node of the scene
