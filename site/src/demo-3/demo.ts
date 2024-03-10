@@ -1,6 +1,6 @@
 import { PRNG, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import { Texture2D } from '@zephyr3d/device';
-import { Application, AssetHierarchyNode, AssetManager, Compositor, DirectionalLight, FXAA, GraphNode, MeshMaterial, ModelInfo, OrbitCameraController, PBRMetallicRoughnessMaterial, PBRSpecularGlossinessMaterial, PerspectiveCamera, Scene, SceneNode, SharedModel, Terrain, Tonemap } from '@zephyr3d/scene';
+import { Application, AssetHierarchyNode, AssetManager, Bloom, Compositor, DirectionalLight, FXAA, GraphNode, MeshMaterial, ModelInfo, OrbitCameraController, PBRMetallicRoughnessMaterial, PBRSpecularGlossinessMaterial, PerspectiveCamera, Scene, SceneNode, SharedModel, Terrain, Tonemap } from '@zephyr3d/scene';
 import * as zip from '@zip.js/zip.js';
 import { TreeMaterialMetallicRoughness } from './treematerial';
 
@@ -29,6 +29,7 @@ export class Demo {
     this._camera = this.createCamera(this._scene);
     this._compositor = new Compositor();
     this._compositor.appendPostEffect(new Tonemap());
+    this._compositor.appendPostEffect(new Bloom());
     this._compositor.appendPostEffect(new FXAA());
     Application.instance.device.setFont('24px arial');
     this.render();

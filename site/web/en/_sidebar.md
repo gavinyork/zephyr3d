@@ -46,4 +46,10 @@
     - [Sky](en/sky.md)
     - [Fog](en/fog.md)
     - [Water](en/water.md)
+  - Custom material
+    - [Basics](en/user-material.md)
+    - [Unlit material](en/user-material-unlit.md)
+    - [Light material](en/user-material-lit.md)
+    - [Multi-pass material](en/user-material-multipass.md)
+    - [Shader variants](en/user-material-var.md)
 
