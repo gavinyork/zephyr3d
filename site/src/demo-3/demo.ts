@@ -17,6 +17,7 @@ export class Demo {
   private _actorSpeed: number;
   private _actorRunning: boolean;
   private _loaded: boolean;
+  private _loadPercent: number;
   constructor(){
     this._terrain = null;
     this._axisPZ = Vector3.axisPZ();
@@ -34,10 +35,42 @@ export class Demo {
     Application.instance.device.setFont('24px arial');
     this.render();
     this._loaded = false;
+    this._loadPercent = 0;
   }
-  private async readZip(url: string): Promise<Map<string, string>> {
+  async fetchAssetArchive(url: string, progressCallback: (percent: number) => void): Promise<Blob> {
+    progressCallback(0);
     const response = await fetch(url);
-    const blob = await response.blob();
+    if (!response.ok) {
+      throw new Error('Download failed');
+    }
+    const contentLength = response.headers.get('content-length');
+    const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
+    let receivedBytes = 0;
+    let data: Uint8Array = new Uint8Array(totalBytes || 1024 * 1024);
+    const reader = response.body.getReader();
+    if (!reader) {
+      throw new Error('Download data is empty');
+    }
+    const read = async (): Promise<void> => {
+      const { done, value } = await reader.read();
+      if (done) {
+        return;
+      }
+      if (data.length < receivedBytes + value.length) {
+        const newData = new Uint8Array(Math.max(2 * data.length, receivedBytes + value.length));
+        newData.set(data);
+        data = newData;
+      }
+      data.set(value, receivedBytes);
+      receivedBytes += value.length;
+      progressCallback(Math.floor((receivedBytes / totalBytes) * 100));
+      return read();
+    }
+    await read();
+    return new Blob([data]);
+  }
+
+  private async readZip(blob: Blob): Promise<Map<string, string>> {
     const reader = new zip.ZipReader(new zip.BlobReader(blob));
     const entries = await reader.getEntries();
     const fileMap = new Map();
@@ -51,6 +84,7 @@ export class Demo {
     await reader.close();
     return fileMap;
   }
+
   get camera() {
     return this._camera;
   }
@@ -88,78 +122,71 @@ export class Demo {
   }
   async load() {
     this._loaded = false;
-    // load world
-    this._terrain = await this.loadTerrain(this._scene, this._assetManager);
-    this._character = await this.loadCharacter(this._scene, this._assetManager);
-    // initialize
-    this._camera.parent = this._terrain;
-    this._character.group.parent = this._terrain;
-    const x = this._terrain.scaledWidth * 0.37;
-    const z = this._terrain.scaledHeight * 0.19;
-    const y = this._terrain.getElevation(x, z);
-    this._character.group.position.setXYZ(x, y, z);
-    this._character.animationSet.playAnimation('idle01_yindao', 0);
-    const eyePos = new Vector3(x + 1, y + 5, z - 21);
-    const destPos = new Vector3(x, y, z);
-    this._camera.lookAt(eyePos, destPos, Vector3.axisPY());
-    this._camera.controller = new OrbitCameraController({ center: destPos });
-    // loaded
-    this._terrain.showState = GraphNode.SHOW_DEFAULT;
-    this._scene.env.sky.wind.setXY(700, 350);
-    this._loaded = true;
-  }
-  async loadModelIndirect(fileMap: Map<string, string>, modelFile: string, scene: Scene, assetManager: AssetManager) {
-    const urlResolver = assetManager.httpRequest.urlResolver;
-    assetManager.httpRequest.urlResolver = url => fileMap.get(url) || url;
-    const modelInfo = await this._assetManager.fetchModel(scene, modelFile);
-    assetManager.httpRequest.urlResolver = urlResolver;
-    return modelInfo;
-  }
-  async loadModelFromZip(zipUrl: string, scene: Scene, assetManager: AssetManager) {
-    const fileMap = await this.readZip(zipUrl);
-    const keys = Array.from(fileMap.keys());
-    const modelFile = keys.find((val) => /(\.gltf|\.glb)$/i.test(val));
-    for (const key of keys) {
-      fileMap.set(zipUrl + key, fileMap.get(key));
-    }
-    return await this.loadModelIndirect(fileMap, zipUrl + modelFile, scene, assetManager);
+    this._loadPercent = 0;
+    const zipContent = await this.fetchAssetArchive('./assets/terrain_assets.zip', percent => {
+      this._loadPercent = percent;
+    });
+    Application.instance.device.runNextFrame(async () => {
+      const fileMap = await this.readZip(zipContent);
+      this._assetManager.httpRequest.urlResolver = url => fileMap.get(url) || url;
+
+      // load world
+      this._terrain = await this.loadTerrain(this._scene, this._assetManager);
+      this._character = await this.loadCharacter(this._scene, this._assetManager);
+      // initialize
+      this._camera.parent = this._terrain;
+      this._character.group.parent = this._terrain;
+      const x = this._terrain.scaledWidth * 0.37;
+      const z = this._terrain.scaledHeight * 0.19;
+      const y = this._terrain.getElevation(x, z);
+      this._character.group.position.setXYZ(x, y, z);
+      this._character.animationSet.playAnimation('idle01_yindao', 0);
+      const eyePos = new Vector3(x + 1, y + 5, z - 21);
+      const destPos = new Vector3(x, y, z);
+      this._camera.lookAt(eyePos, destPos, Vector3.axisPY());
+      this._camera.controller = new OrbitCameraController({ center: destPos });
+      // loaded
+      this._terrain.showState = GraphNode.SHOW_DEFAULT;
+      this._scene.env.sky.wind.setXY(700, 350);
+      this._loaded = true;
+    });
   }
   async loadCharacter(scene: Scene, assetManager: AssetManager) {
-    const character = await this.loadModelFromZip('assets/models/alice_shellfire.zip', scene, assetManager);
+    const character = await assetManager.fetchModel(scene, '/assets/models/alice_shellfire/scene.gltf');
     character.group.scale.setXYZ(2, 2, 2);
     return character;
   }
   async loadTerrain(scene: Scene, assetManager: AssetManager) {
     const mapWidth = 1025;
     const mapHeight = 1025;
-    const heightMap = await assetManager.fetchBinaryData('assets/maps/map3/heightmap.raw');
+    const heightMap = await assetManager.fetchBinaryData('/assets/maps/map3/heightmap.raw');
     const heightsInt16 = new Uint16Array(heightMap);
     const heightsF32 = new Float32Array(mapWidth * mapHeight);
     for (let i = 0; i < mapWidth * mapHeight; i++) {
       heightsF32[i] = heightsInt16[i] / 65535;
     }
-    const grassMap1 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map3/857caeb1.dds');
-    const grassMap2 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map3/grass1x.dds');
-    const grassMap3 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map3/gj02.dds');
-    const splatMap = await assetManager.fetchTexture<Texture2D>('./assets/maps/map3/splatmap.tga', {
+    const grassMap1 = await assetManager.fetchTexture<Texture2D>('/assets/maps/map3/857caeb1.dds');
+    const grassMap2 = await assetManager.fetchTexture<Texture2D>('/assets/maps/map3/grass1x.dds');
+    const grassMap3 = await assetManager.fetchTexture<Texture2D>('/assets/maps/map3/gj02.dds');
+    const splatMap = await assetManager.fetchTexture<Texture2D>('/assets/maps/map3/splatmap.tga', {
       linearColorSpace: true
     });
-    const detailAlbedo0 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map3/grass_color.png', {
+    const detailAlbedo0 = await assetManager.fetchTexture<Texture2D>('/assets/maps/map3/grass_color.png', {
       linearColorSpace: false
     });
-    const detailNormal0 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map3/grass_norm.png', {
+    const detailNormal0 = await assetManager.fetchTexture<Texture2D>('/assets/maps/map3/grass_norm.png', {
       linearColorSpace: true
     });
-    const detailAlbedo1 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map3/28.png', {
+    const detailAlbedo1 = await assetManager.fetchTexture<Texture2D>('/assets/maps/map3/28.png', {
       linearColorSpace: false
     });
-    const detailNormal1 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map3/29.png', {
+    const detailNormal1 = await assetManager.fetchTexture<Texture2D>('/assets/maps/map3/29.png', {
       linearColorSpace: true
     });
-    const detailAlbedo2 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map3/174.jpg', {
+    const detailAlbedo2 = await assetManager.fetchTexture<Texture2D>('/assets/maps/map3/174.jpg', {
       linearColorSpace: false
     });
-    const detailNormal2 = await assetManager.fetchTexture<Texture2D>('./assets/maps/map3/174_norm.jpg', {
+    const detailNormal2 = await assetManager.fetchTexture<Texture2D>('/assets/maps/map3/174_norm.jpg', {
       linearColorSpace: true
     });
     const terrain = new Terrain(scene);
@@ -209,7 +236,7 @@ export class Demo {
     // Distribute some trees
     const PY = Vector3.axisPY();
     const trees = [{
-      url: 'assets/models/stylized_tree.glb',
+      url: '/assets/models/stylized_tree.glb',
       scale: 1.5
     }];
     const f = 1 / trees.length;
@@ -365,7 +392,7 @@ export class Demo {
     }
     this._camera.render(this._scene, this._compositor);
     if (!this._loaded) {
-      Application.instance.device.drawText('Loading, please wait ...', 20, 20, '#a00000');
+      Application.instance.device.drawText(`Loading: %${this._loadPercent}`, 20, 20, '#a00000');
     }
   }
 }

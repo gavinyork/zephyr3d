@@ -1,3 +1,4 @@
+import * as zip from '@zip.js/zip.js';
 import type { AABB } from '@zephyr3d/base';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { SceneNode } from '@zephyr3d/scene';
@@ -46,6 +47,54 @@ function getBackend(): DeviceBackend {
   return backendWebGL1;
 }
 
+async function fetchAssetArchive(url: string, progressCallback: (percent: number) => void): Promise<Blob> {
+  progressCallback(0);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error('Download failed');
+  }
+  const contentLength = response.headers.get('content-length');
+  const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
+  let receivedBytes = 0;
+  let data: Uint8Array = new Uint8Array(totalBytes || 1024 * 1024);
+  const reader = response.body.getReader();
+  if (!reader) {
+    throw new Error('Download data is empty');
+  }
+  const read = async (): Promise<void> => {
+    const { done, value } = await reader.read();
+    if (done) {
+      return;
+    }
+    if (data.length < receivedBytes + value.length) {
+      const newData = new Uint8Array(Math.max(2 * data.length, receivedBytes + value.length));
+      newData.set(data);
+      data = newData;
+    }
+    data.set(value, receivedBytes);
+    receivedBytes += value.length;
+    progressCallback(Math.floor((receivedBytes / totalBytes) * 100));
+    return read();
+  }
+  await read();
+  return new Blob([data]);
+}
+
+async function readZip(blob: Blob): Promise<Map<string, string>> {
+  const reader = new zip.ZipReader(new zip.BlobReader(blob));
+  const entries = await reader.getEntries();
+  const fileMap = new Map();
+  for (const entry of entries) {
+    if (!entry.directory) {
+      const blob = await entry.getData(new zip.BlobWriter());
+      const fileURL = URL.createObjectURL(blob);
+      fileMap.set(`/${entry.filename}`, fileURL);
+    }
+  }
+  await reader.close();
+  return fileMap;
+}
+
 const lightApp = new Application({
   backend: getBackend(),
   canvas: document.querySelector('#canvas'),
@@ -75,8 +124,15 @@ lightApp.ready().then(async () => {
   const assetManager = new AssetManager();
   scene.env.light.strength = 0.3;
 
-  let message = 'Loading, please wait...';
-  assetManager.fetchModel(scene, './assets/models/sponza/Sponza.gltf', null).then((info) => {
+  let loadPercent = 0;
+  let message = `Loading %${loadPercent} ...`;
+  const zipContent = await fetchAssetArchive('./assets/sponza.zip', percent => {
+    message = `Loading %${percent} ...`;
+  });
+  const fileMap = await readZip(zipContent);
+  assetManager.httpRequest.urlResolver = url => fileMap.get(url) || url;
+
+  assetManager.fetchModel(scene, '/sponza/Sponza.gltf', null).then((info) => {
     message = 'Move with W/S/A/D keys, rotate with left mouse button.';
     function traverseModel(group: SceneNode, func: (node: SceneNode) => void, context?: any) {
       if (group) {

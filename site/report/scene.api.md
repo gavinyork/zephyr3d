@@ -1512,7 +1512,7 @@ export class GrassMaterial extends GrassMaterial_base {
     // (undocumented)
     fragmentShader(scope: PBFunctionScope): void;
     // @override
-    isTransparent(): boolean;
+    isTransparentPass(pass: number): boolean;
     // @override
     supportLighting(): boolean;
     // (undocumented)
@@ -1829,7 +1829,7 @@ export class Material {
     protected _hash: string[][];
     get id(): number;
     isBatchable(): boolean;
-    isTransparent(pass: number): boolean;
+    isTransparentPass(pass: number): boolean;
     // (undocumented)
     get numPasses(): number;
     set numPasses(val: number);
@@ -1946,7 +1946,7 @@ export class MeshMaterial extends Material {
     featureUsed<T = unknown>(feature: number): T;
     fragmentShader(scope: PBFunctionScope): void;
     getQueueType(): number;
-    isTransparent(pass: number): boolean;
+    isTransparentPass(pass: number): boolean;
     needFragmentColor(ctx?: DrawContext): boolean;
     // @internal (undocumented)
     static NEXT_FEATURE_INDEX: number;
@@ -2832,10 +2832,6 @@ export class Scene extends Scene_base {
     // @internal (undocumented)
     protected _updateFrame: number;
     updateNodePlacement(octree: Octree, list: Set<SceneNode>): void;
-    get worldUnit(): number;
-    set worldUnit(val: number);
-    // @internal (undocumented)
-    protected _worldUnit: number;
     // @internal (undocumented)
     _xformChanged(node: SceneNode): void;
 }
@@ -3005,6 +3001,7 @@ export class ShaderHelper {
     // (undocumented)
     static readonly FOG_TYPE_SCATTER = 4;
     static getAerialPerspectiveLUT(scope: PBInsideFunctionScope): PBShaderExp;
+    static getAPDensity(scope: PBInsideFunctionScope): PBShaderExp;
     // (undocumented)
     static getBoneInvBindMatrixUniformName(): string;
     // (undocumented)
@@ -3067,7 +3064,6 @@ export class ShaderHelper {
     static getWorldMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     // (undocumented)
     static getWorldMatrixUniformName(): string;
-    static getWorldUnit(scope: PBInsideFunctionScope): PBShaderExp;
     static hasSkinning(scope: PBInsideFunctionScope): boolean;
     static linearDepthToNonLinear(scope: PBInsideFunctionScope, depth: PBShaderExp, nearFar?: PBShaderExp): PBShaderExp;
     static nonLinearDepthToLinear(scope: PBInsideFunctionScope, depth: PBShaderExp, nearFar?: PBShaderExp): PBShaderExp;
@@ -3083,7 +3079,7 @@ export class ShaderHelper {
     static setCameraUniforms(bindGroup: BindGroup, ctx: DrawContext, linear: boolean): void;
     static setClipSpacePosition(scope: PBInsideFunctionScope, pos: PBShaderExp): void;
     // @internal (undocumented)
-    static setFogUniforms(bindGroup: BindGroup, fogType: number, fogColor: Vector4, fogParams: Vector4, aerialPerspectiveLUT?: Texture2D): void;
+    static setFogUniforms(bindGroup: BindGroup, fogType: number, fogColor: Vector4, fogParams: Vector4, apDensity: number, aerialPerspectiveLUT?: Texture2D): void;
     // @internal (undocumented)
     static setLightUniforms(bindGroup: BindGroup, ctx: DrawContext, clusterParams: Float32Array, countParams: Int32Array, lightBuffer: StructuredBuffer, lightIndexTexture: Texture2D): void;
     // @internal (undocumented)
@@ -3340,6 +3336,8 @@ export interface SkinnedBoundingBox {
 // @public
 export class SkyRenderer {
     constructor();
+    get aerialPerspectiveDensity(): number;
+    set aerialPerspectiveDensity(val: number);
     get autoUpdateIBLMaps(): boolean;
     set autoUpdateIBLMaps(val: boolean);
     get cloudIntensity(): number;
@@ -3547,7 +3545,7 @@ export class TerrainMaterial extends TerrainMaterial_base {
     // @override
     isBatchable(): boolean;
     // @override
-    isTransparent(): boolean;
+    isTransparentPass(pass: number): boolean;
     // (undocumented)
     sampleDetailNormalMap(scope: PBInsideFunctionScope, tex: PBShaderExp, texCoord: PBShaderExp, normalScale: PBShaderExp, TBN: PBShaderExp): PBShaderExp;
     // @override
