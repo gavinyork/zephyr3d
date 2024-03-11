@@ -13,6 +13,7 @@ import { ClipState } from '@zephyr3d/base';
 import { CubeFace } from '@zephyr3d/base';
 import { DeviceBackend } from '@zephyr3d/device';
 import { DeviceViewport } from '@zephyr3d/device';
+import { FaceMode } from '@zephyr3d/device';
 import { FrameBuffer } from '@zephyr3d/device';
 import { Frustum } from '@zephyr3d/base';
 import { GPUProgram } from '@zephyr3d/device';
@@ -28,7 +29,6 @@ import { PBFunctionScope } from '@zephyr3d/device';
 import { PBGlobalScope } from '@zephyr3d/device';
 import { PBInsideFunctionScope } from '@zephyr3d/device';
 import { PBShaderExp } from '@zephyr3d/device';
-import { PBStructTypeInfo } from '@zephyr3d/device';
 import { Plane } from '@zephyr3d/base';
 import { PrimitiveType } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
@@ -36,6 +36,7 @@ import { Quaternion } from '@zephyr3d/base';
 import { Ray } from '@zephyr3d/base';
 import { RenderStateSet } from '@zephyr3d/device';
 import { SamplerOptions } from '@zephyr3d/device';
+import { ShaderTypeFunc } from '@zephyr3d/device';
 import { StructuredBuffer } from '@zephyr3d/device';
 import { Texture2D } from '@zephyr3d/device';
 import { Texture2DArray } from '@zephyr3d/device';
@@ -222,6 +223,9 @@ export class Application extends Application_base {
     get timeElapsedInSeconds(): number;
 }
 
+// @public (undocumented)
+export function applyMaterialMixins<M extends ((target: any) => any)[], T>(target: T, ...mixins: M): ExtractMixinType<M>;
+
 // @public
 export type AppOptions = {
     canvas: HTMLCanvasElement;
@@ -248,6 +252,55 @@ export class AppTickEvent {
 }
 
 // @public
+export interface AssetAnimationData {
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    nodes: AssetHierarchyNode[];
+    // (undocumented)
+    skeletons: AssetSkeleton[];
+    // (undocumented)
+    tracks: AssetAnimationTrack[];
+}
+
+// @public
+export interface AssetAnimationTrack {
+    // (undocumented)
+    interpolator: Interpolator;
+    // (undocumented)
+    node: AssetHierarchyNode;
+    // (undocumented)
+    type: 'translation' | 'scale' | 'rotation';
+}
+
+// @public
+export class AssetHierarchyNode extends NamedObject {
+    constructor(name: string, parent?: AssetHierarchyNode);
+    addChild(child: AssetHierarchyNode): void;
+    get attachIndex(): number;
+    attachToSkeleton(skeleton: AssetSkeleton, index: number): void;
+    get children(): AssetHierarchyNode[];
+    // @internal (undocumented)
+    computeTransforms(parentTransform: Matrix4x4): void;
+    get matrix(): Matrix4x4;
+    get mesh(): AssetMeshData;
+    set mesh(data: AssetMeshData);
+    get meshAttached(): boolean;
+    get parent(): AssetHierarchyNode;
+    get position(): Vector3;
+    set position(val: Vector3);
+    removeChild(child: AssetHierarchyNode): void;
+    get rotation(): Quaternion;
+    set rotation(val: Quaternion);
+    get scaling(): Vector3;
+    set scaling(val: Vector3);
+    get skeleton(): AssetSkeleton;
+    set skeleton(skeleton: AssetSkeleton);
+    get skeletonAttached(): AssetSkeleton;
+    get worldMatrix(): Matrix4x4;
+}
+
+// @public
 export class AssetManager {
     constructor();
     // Warning: (ae-forgotten-export) The symbol "AbstractModelLoader" needs to be exported by the entry point index.d.ts
@@ -265,28 +318,210 @@ export class AssetManager {
     clearCache(): void;
     // @internal (undocumented)
     doLoadTexture(loader: AbstractTextureLoader, url: string, mimeType: string, data: ArrayBuffer, srgb: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<BaseTexture>;
-    fetchBinaryData(url: string): Promise<ArrayBuffer>;
+    fetchBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer>;
     fetchBuiltinTexture<T extends BaseTexture>(name: string, texture?: BaseTexture): Promise<T>;
-    fetchModel(scene: Scene, url: string, mimeType?: string): Promise<{
-        group: SceneNode;
-        animationSet: AnimationSet;
-    }>;
-    // Warning: (ae-forgotten-export) The symbol "SharedModel" needs to be exported by the entry point index.d.ts
-    //
+    fetchModel(scene: Scene, url: string, mimeType?: string, postProcess?: (model: SharedModel) => SharedModel): Promise<ModelInfo>;
     // @internal (undocumented)
-    fetchModelData(scene: Scene, url: string, mimeType?: string): Promise<SharedModel>;
-    fetchTextData(url: string): Promise<string>;
+    fetchModelData(scene: Scene, url: string, mimeType?: string, postProcess?: (model: SharedModel) => SharedModel): Promise<SharedModel>;
+    fetchTextData(url: string, postProcess?: (text: string) => string): Promise<string>;
     fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>): Promise<T>;
     get httpRequest(): HttpRequest;
     // @internal (undocumented)
-    loadBinaryData(url: string): Promise<ArrayBuffer>;
+    loadBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer>;
     // @internal (undocumented)
-    loadModel(url: string, mimeType?: string, name?: string): Promise<SharedModel>;
+    loadModel(url: string, mimeType?: string, postProcess?: (model: SharedModel) => SharedModel): Promise<SharedModel>;
     // @internal (undocumented)
-    loadTextData(url: string): Promise<string>;
+    loadTextData(url: string, postProcess?: (text: string) => string): Promise<string>;
     // @internal (undocumented)
     loadTexture(url: string, mimeType?: string, srgb?: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<BaseTexture>;
+    purgeCache(): void;
     static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => Promise<BaseTexture>): void;
+}
+
+// @public
+export interface AssetMaterial {
+    // (undocumented)
+    common: AssetMaterialCommon;
+    // (undocumented)
+    type: string;
+}
+
+// @public
+export interface AssetMaterialClearcoat {
+    // (undocumented)
+    clearCoatFactor?: number;
+    // (undocumented)
+    clearCoatIntensityMap?: MaterialTextureInfo;
+    // (undocumented)
+    clearCoatNormalMap?: MaterialTextureInfo;
+    // (undocumented)
+    clearCoatRoughnessFactor?: number;
+    // (undocumented)
+    clearCoatRoughnessMap?: MaterialTextureInfo;
+}
+
+// @public
+export interface AssetMaterialCommon {
+    // (undocumented)
+    alphaCutoff?: number;
+    // (undocumented)
+    alphaMode?: 'blend' | 'mask';
+    // (undocumented)
+    bumpScale?: number;
+    // (undocumented)
+    doubleSided?: boolean;
+    // (undocumented)
+    emissiveColor?: Vector3;
+    // (undocumented)
+    emissiveMap?: MaterialTextureInfo;
+    // (undocumented)
+    emissiveStrength?: number;
+    // (undocumented)
+    normalMap?: MaterialTextureInfo;
+    // (undocumented)
+    occlusionMap?: MaterialTextureInfo;
+    // (undocumented)
+    occlusionStrength?: number;
+    // (undocumented)
+    useTangent?: boolean;
+    // (undocumented)
+    vertexColor?: boolean;
+    // (undocumented)
+    vertexNormal?: boolean;
+}
+
+// @public
+export interface AssetMaterialSheen {
+    // (undocumented)
+    sheenColorFactor?: Vector3;
+    // (undocumented)
+    sheenColorMap?: MaterialTextureInfo;
+    // (undocumented)
+    sheenRoughnessFactor?: number;
+    // (undocumented)
+    sheenRoughnessMap?: MaterialTextureInfo;
+}
+
+// @public
+export interface AssetMeshData {
+    // (undocumented)
+    subMeshes: AssetSubMeshData[];
+}
+
+// @public
+export interface AssetPBRMaterialCommon extends AssetUnlitMaterial {
+    // (undocumented)
+    ior?: number;
+}
+
+// @public
+export interface AssetPBRMaterialMR extends AssetPBRMaterialCommon {
+    // (undocumented)
+    clearcoat?: AssetMaterialClearcoat;
+    // (undocumented)
+    metallic?: number;
+    // (undocumented)
+    metallicIndex?: number;
+    // (undocumented)
+    metallicMap?: MaterialTextureInfo;
+    // (undocumented)
+    roughness?: number;
+    // (undocumented)
+    roughnessIndex?: number;
+    // (undocumented)
+    sheen?: AssetMaterialSheen;
+    // (undocumented)
+    specularColorMap?: MaterialTextureInfo;
+    // (undocumented)
+    specularFactor?: Vector4;
+    // (undocumented)
+    specularMap?: MaterialTextureInfo;
+}
+
+// @public
+export interface AssetPBRMaterialSG extends AssetPBRMaterialCommon {
+    // (undocumented)
+    glossness?: number;
+    // (undocumented)
+    specular?: Vector3;
+    // (undocumented)
+    specularGlossnessMap?: MaterialTextureInfo;
+}
+
+// @public
+export interface AssetRotationTrack extends AssetAnimationTrack {
+    // (undocumented)
+    keyFrames: Record<number, Quaternion[]>;
+    // (undocumented)
+    nodes: number[];
+}
+
+// @public
+export interface AssetScaleTrack extends AssetAnimationTrack {
+    // (undocumented)
+    keyFrames: Record<number, Vector3[]>;
+    // (undocumented)
+    nodes: number[];
+}
+
+// @public
+export class AssetScene extends NamedObject {
+    constructor(name: string);
+    rootNodes: AssetHierarchyNode[];
+}
+
+// @public
+export interface AssetSkeletalAnimationTrack extends AssetAnimationTrack {
+    // (undocumented)
+    keyFrames: Record<number, {
+        translation: Vector3;
+        rotation: Quaternion;
+        scale: Vector3;
+    }[]>;
+    // (undocumented)
+    skeleton: AssetSkeleton;
+}
+
+// @public
+export class AssetSkeleton extends NamedObject {
+    constructor(name: string);
+    addJoint(joint: AssetHierarchyNode, inverseBindMatrix: Matrix4x4): void;
+    bindPoseMatrices: Matrix4x4[];
+    inverseBindMatrices: Matrix4x4[];
+    joints: AssetHierarchyNode[];
+    pivot: AssetHierarchyNode;
+}
+
+// @public
+export interface AssetSubMeshData {
+    // (undocumented)
+    material: Material;
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    primitive: Primitive;
+    // (undocumented)
+    rawBlendIndices: TypedArray;
+    // (undocumented)
+    rawJointWeights: TypedArray;
+    // (undocumented)
+    rawPositions: Float32Array;
+}
+
+// @public
+export interface AssetTranslationTrack extends AssetAnimationTrack {
+    // (undocumented)
+    keyFrames: Record<number, Vector3[]>;
+    // (undocumented)
+    nodes: number[];
+}
+
+// @public
+export interface AssetUnlitMaterial extends AssetMaterial {
+    // (undocumented)
+    diffuse?: Vector4;
+    // (undocumented)
+    diffuseMap?: MaterialTextureInfo;
 }
 
 // @public
@@ -356,28 +591,8 @@ export interface BatchDrawable extends Drawable {
     getInstanceId(renderPass: RenderPass): string;
 }
 
-// @public
-export class BlinnLightModel extends LightModel {
-    constructor();
-    // @override
-    applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
-    // @override
-    directBRDF(scope: PBInsideFunctionScope, lightDir: PBShaderExp, attenuation: PBShaderExp): void;
-    // @override
-    envBRDF(envLight: EnvironmentLighting, scope: PBInsideFunctionScope): void;
-    // (undocumented)
-    protected static readonly funcNameBRDFDirect = "lib_blinnLM_direct";
-    // (undocumented)
-    protected static readonly funcNameBRDFEnvIBL = "lib_blinnLM_envIBL";
-    // @override
-    setupUniforms(scope: PBGlobalScope, ctx: DrawContext): void;
-    get shininess(): number;
-    set shininess(val: number);
-    // @internal (undocumented)
-    protected _shininess: number;
-    // @override
-    supportLighting(): boolean;
-}
+// @public (undocumented)
+export type BlendMode = 'none' | 'blend' | 'additive';
 
 // Warning: (ae-forgotten-export) The symbol "BlinnMaterial_base" needs to be exported by the entry point index.d.ts
 //
@@ -385,13 +600,13 @@ export class BlinnLightModel extends LightModel {
 export class BlinnMaterial extends BlinnMaterial_base {
     constructor();
     // (undocumented)
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext): void;
+    fragmentShader(scope: PBFunctionScope): void;
+    get vertexNormal(): boolean;
+    set vertexNormal(val: boolean);
     // (undocumented)
-    fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void;
-    get shininess(): number;
-    set shininess(val: number);
-    // (undocumented)
-    vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
+    vertexShader(scope: PBFunctionScope): void;
+    get vertexTangent(): boolean;
+    set vertexTangent(val: boolean);
 }
 
 // @public
@@ -480,6 +695,7 @@ export class BoundingBox extends AABB implements BoundingVolume {
     constructor();
     constructor(box: AABB);
     constructor(minPoint: Vector3, maxPoint: Vector3);
+    behindPlane(plane: Plane): boolean;
     clone(): BoundingVolume;
     outsideFrustum(frustum: Frustum | Matrix4x4): boolean;
     toAABB(): AABB;
@@ -573,12 +789,6 @@ export const BUILTIN_ASSET_TEST_CUBEMAP = "TEST_Cubemap";
 
 // @public
 export const BUILTIN_ASSET_TEXTURE_SHEEN_LUT = "LUT_Sheen";
-
-// @public
-export function calculateTBN(scope: PBInsideFunctionScope, worldPosition: PBShaderExp, uv: PBShaderExp, doubleSideLighting: boolean): PBShaderExp;
-
-// @public
-export function calculateTBNWithNormal(scope: PBInsideFunctionScope, worldPosition: PBShaderExp, worldNormal: PBShaderExp, uv: PBShaderExp, doubleSideLighting: boolean): PBShaderExp;
 
 // @public
 export class Camera extends SceneNode {
@@ -741,6 +951,7 @@ export class Compositor {
     begin(ctx: DrawContext): void;
     // @internal (undocumented)
     static _blit(device: AbstractDevice, srcTex: Texture2D, srgbOutput: boolean): void;
+    clear(): void;
     // @internal (undocumented)
     drawPostEffects(ctx: DrawContext, opaque: boolean, sceneDepthTexture: Texture2D): void;
     // @internal (undocumented)
@@ -856,11 +1067,6 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
     protected createDefaultOptions(): CylinderCreationOptions;
 }
 
-// Warning: (ae-internal-missing-underscore) The name "DEBUG_CASCADED_SHADOW_MAPS" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal (undocumented)
-export const DEBUG_CASCADED_SHADOW_MAPS = false;
-
 // @public
 export function decode2HalfFromRGBA(scope: PBInsideFunctionScope, value: PBShaderExp): PBShaderExp;
 
@@ -879,7 +1085,7 @@ export function decodeRGBM(scope: PBInsideFunctionScope, rgbm: PBShaderExp, maxR
 export const defaultBuildParams: OceanFieldBuildParams;
 
 // @public
-export class DepthRenderPass extends RenderPass {
+export class DepthPass extends RenderPass {
     constructor();
     // @internal (undocumented)
     protected _getGlobalBindGroupHash(ctx: DrawContext): string;
@@ -908,10 +1114,10 @@ export interface Drawable {
     getInvBindMatrix(): Matrix4x4;
     getName(): string;
     getPickTarget(): GraphNode;
+    getQueueType(): number;
     getSortDistance(camera: Camera): number;
     getXForm(): XForm;
     isBatchable(): this is BatchDrawable;
-    isTransparency(): boolean;
     isUnlit(): boolean;
 }
 
@@ -932,9 +1138,11 @@ export interface DrawContext {
     env: Environment;
     flip: boolean;
     instanceData?: InstanceData;
+    lightBlending: boolean;
     linearDepthTexture?: Texture2D;
     logger?: RenderLogger;
     primaryCamera: Camera;
+    queue: number;
     renderPass: RenderPass;
     renderPassHash: string;
     scene: Scene;
@@ -943,7 +1151,6 @@ export interface DrawContext {
     sunLight?: DirectionalLight;
     target: Drawable;
     timestamp: number;
-    userData?: unknown;
     viewportHeight?: number;
     viewportWidth?: number;
     viewportX?: number;
@@ -952,9 +1159,6 @@ export interface DrawContext {
 
 // @public
 export function encode2HalfToRGBA(scope: PBInsideFunctionScope, a: PBShaderExp | number, b: PBShaderExp | number): PBShaderExp;
-
-// @public
-export function encodeColorOutput(scope: PBInsideFunctionScope, outputColor: PBShaderExp): PBShaderExp;
 
 // @public
 export function encodeFloatToRGBA(scope: PBInsideFunctionScope, value: PBShaderExp | number): PBShaderExp;
@@ -970,8 +1174,6 @@ export class EnvConstantAmbient extends EnvironmentLighting {
     constructor(ambientColor?: Vector4);
     get ambientColor(): Vector4;
     set ambientColor(ambientColor: Vector4);
-    // @internal (undocumented)
-    static readonly funcNameGetAmbient = "lib_getConstantAmbient";
     // @override
     getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
     // @override
@@ -986,10 +1188,10 @@ export class EnvConstantAmbient extends EnvironmentLighting {
     initShaderBindings(pb: ProgramBuilder): void;
     // @override
     isConstant(): this is EnvConstantAmbient;
+    // @internal (undocumented)
+    static readonly UNIFORM_NAME_CONSTANT_AMBIENT = "zConstantAmbient";
     // @override
     updateBindGroup(bg: BindGroup): void;
-    // @internal (undocumented)
-    static readonly USAGE_CONSTANT_AMBIENT_LIGHTING = "usage_env_constant_ambient";
 }
 
 // @public
@@ -999,8 +1201,6 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
     set ambientDown(color: Vector4);
     get ambientUp(): Vector4;
     set ambientUp(color: Vector4);
-    // @internal (undocumented)
-    static readonly funcNameGetAmbient = "lib_getConstantAmbient";
     // @override
     getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
     // @override
@@ -1015,12 +1215,12 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
     initShaderBindings(pb: ProgramBuilder): void;
     // @override
     isHemispheric(): this is EnvHemisphericAmbient;
+    // @internal (undocumented)
+    static readonly UNIFORM_NAME_AMBIENT_DOWN = "zHemisphericAmbientDown";
+    // @internal (undocumented)
+    static readonly UNIFORM_NAME_AMBIENT_UP = "zHemisphericAmbientUp";
     // @override
     updateBindGroup(bg: BindGroup): void;
-    // @internal (undocumented)
-    static readonly USAGE_CONSTANT_AMBIENT_DOWN = "usage_env_ambient_down";
-    // @internal (undocumented)
-    static readonly USAGE_CONSTANT_AMBIENT_UP = "usage_env_ambient_up";
 }
 
 // @public
@@ -1044,14 +1244,14 @@ export class EnvIBL extends EnvironmentLighting {
     isIBL(): this is EnvIBL;
     get radianceMap(): TextureCube;
     set radianceMap(tex: TextureCube);
+    // @internal (undocumented)
+    static readonly UNIFORM_NAME_IBL_IRRADIANCE_MAP = "zIBLIrradianceMap";
+    // @internal (undocumented)
+    static readonly UNIFORM_NAME_IBL_RADIANCE_MAP = "zIBLRadianceMap";
+    // @internal (undocumented)
+    static readonly UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD = "zIBLRadianceMapMaxLOD";
     // @override
     updateBindGroup(bg: BindGroup): void;
-    // @internal (undocumented)
-    static readonly USAGE_IBL_IRRADIANCE_MAP = "usage_ibl_irradiance_map";
-    // @internal (undocumented)
-    static readonly USAGE_IBL_RADIANCE_MAP = "usage_ibl_radiance_map";
-    // @internal (undocumented)
-    static readonly USAGE_IBL_RADIANCE_MAP_MAX_LOD = "usage_ibl_radiance_map_maxlod";
 }
 
 // @public
@@ -1134,7 +1334,7 @@ export class ESM extends ShadowImpl {
     // (undocumented)
     computeShadowCSM(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, shadowVertex: PBShaderExp, NdotL: PBShaderExp, split: PBShaderExp): PBShaderExp;
     // (undocumented)
-    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope): PBShaderExp;
+    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
     // (undocumented)
     protected _depthScale: number;
     // (undocumented)
@@ -1189,46 +1389,14 @@ export class EulerRotationTrack extends AnimationTrack {
     apply(node: SceneNode, currentTime: number, duration: number): boolean;
 }
 
+// @public (undocumented)
+export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ? R : never;
+
+// @public (undocumented)
+export type ExtractMixinType<M> = M extends [infer First] ? ExtractMixinReturnType<First> : M extends [infer First, ...infer Rest] ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]> : never;
+
 // @public
 export type FogType = 'linear' | 'exp' | 'exp2' | 'scatter' | 'none';
-
-// Warning: (ae-internal-missing-underscore) The name "ForwardRenderPass" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal
-export class ForwardRenderPass extends RenderPass {
-    constructor();
-    // (undocumented)
-    applyRenderStates(device: AbstractDevice, stateSet: RenderStateSet, ctx: DrawContext): void;
-    // (undocumented)
-    protected _getGlobalBindGroupHash(ctx: DrawContext): string;
-    // (undocumented)
-    protected _overridenState: RenderStateSet;
-    // (undocumented)
-    protected _overridenStateTrans: RenderStateSet;
-    // (undocumented)
-    protected renderItems(ctx: DrawContext, renderQueue: RenderQueue): void;
-    // (undocumented)
-    protected renderLightPass(camera: Camera, renderQueue: RenderQueue, ctx: DrawContext, items: RenderQueueItem[], lights: PunctualLight[], trans: boolean, blend: boolean): void;
-    // (undocumented)
-    protected _shadowMapHash: string;
-}
-
-// Warning: (ae-internal-missing-underscore) The name "ForwardRenderScheme" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal
-export class ForwardRenderScheme {
-    // (undocumented)
-    static freeClusteredLight(clusteredLight: ClusteredLight): void;
-    // (undocumented)
-    static getClusteredLight(): ClusteredLight;
-    static renderScene(scene: Scene, camera: Camera, compositor?: Compositor, logger?: RenderLogger): void;
-    // (undocumented)
-    protected static _renderScene(ctx: DrawContext): void;
-    // (undocumented)
-    protected static _renderSceneDepth(ctx: DrawContext, renderQueue: RenderQueue, depthFramebuffer: FrameBuffer): void;
-    // (undocumented)
-    static setClearColor(color: Vector4): void;
-}
 
 // @public
 export class FPSCameraController extends BaseCameraController {
@@ -1330,32 +1498,25 @@ export class GraphNode extends SceneNode {
     isGraphNode(): this is GraphNode;
     get renderOrder(): number;
     set renderOrder(val: number);
+    // @internal (undocumented)
+    protected _visibleChanged(): void;
 }
 
-// @public
-export class GrassMaterial extends Material {
+// Warning: (ae-forgotten-export) The symbol "GrassMaterial_base" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export class GrassMaterial extends GrassMaterial_base {
     constructor(terrainSize: Vector2, normalMap: Texture2D, grassTexture?: Texture2D);
-    get alphaToCoverage(): boolean;
-    set alphaToCoverage(val: boolean);
+    // (undocumented)
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
+    // (undocumented)
+    fragmentShader(scope: PBFunctionScope): void;
     // @override
-    applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean): void;
-    // @override
-    protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
-    get color(): Vector4;
-    set color(val: Vector4);
-    get colorMap(): Texture2D;
-    set colorMap(tex: Texture2D);
-    // @internal (undocumented)
-    protected _createHash(renderPassType: number): string;
-    // @internal (undocumented)
-    protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram;
-    // @internal (undocumented)
-    protected getHash(renderPassType: number): string;
-    // @override
-    isTransparent(): boolean;
-    get lightModel(): PBRLightModelMR;
+    isTransparentPass(pass: number): boolean;
     // @override
     supportLighting(): boolean;
+    // (undocumented)
+    vertexShader(scope: PBFunctionScope): void;
 }
 
 // @public
@@ -1465,37 +1626,103 @@ export interface HeightfieldBBoxTreeNode {
 }
 
 // @public (undocumented)
-export interface IMaterial {
+export type IMixinAlbedoColor = {
+    albedoColor: Vector4;
+    calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp;
+} & TextureMixinInstanceTypes<['albedo']>;
+
+// @public (undocumented)
+export type IMixinBlinnPhong = {
+    shininess: number;
+    blinnPhongLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+} & IMixinLight;
+
+// @public (undocumented)
+export interface IMixinFoliage {
     // (undocumented)
-    applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean): void;
+    calculateFoliageAlbedo(scope: PBInsideFunctionScope, albedoColor: PBShaderExp, texelCoord: PBShaderExp): PBShaderExp;
+}
+
+// @public (undocumented)
+export type IMixinLambert = {
+    lambertLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+} & IMixinLight;
+
+// @public (undocumented)
+export type IMixinLight = {
+    normalScale: number;
+    normalMapMode: 'tangent-space' | 'object-space';
+    doubleSidedLighting: boolean;
+    needCalculateEnvLight(): boolean;
+    getEnvLightIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
+    getEnvLightRadiance(scope: PBInsideFunctionScope, reflectVec: PBShaderExp, roughness: PBShaderExp): PBShaderExp;
+    calculateViewVector(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
+    calculateReflectionVector(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp): PBShaderExp;
+    calculateTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp, worldNormal?: PBShaderExp, worldTangent?: PBShaderExp, worldBinormal?: PBShaderExp): PBShaderExp;
+    calculateNormal(scope: PBInsideFunctionScope, worldPos: PBShaderExp, worldNormal?: PBShaderExp, worldTangent?: PBShaderExp, worldBinormal?: PBShaderExp): PBShaderExp;
+    calculateNormalAndTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp, worldNormal?: PBShaderExp, worldTangent?: PBShaderExp, worldBinormal?: PBShaderExp): PBShaderExp;
+    calculateLightAttenuation(scope: PBInsideFunctionScope, type: PBShaderExp, worldPos: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp): PBShaderExp;
+    calculateLightDirection(scope: PBInsideFunctionScope, type: PBShaderExp, worldPos: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp): PBShaderExp;
+    calculateShadow(scope: PBInsideFunctionScope, worldPos: PBShaderExp, NoL: PBShaderExp): PBShaderExp;
+    forEachLight(scope: PBInsideFunctionScope, callback: (this: PBInsideFunctionScope, type: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp, colorIntensity: PBShaderExp, shadow: boolean) => void): void;
+} & TextureMixinInstanceTypes<['normal']> & IMixinAlbedoColor;
+
+// @public (undocumented)
+export type IMixinPBRCommon = {
+    ior: number;
+    emissiveColor: Vector3;
+    emissiveStrength: number;
+    occlusionStrength: number;
+    sheen: boolean;
+    sheenColorFactor: Vector3;
+    sheenRoughnessFactor: number;
+    clearcoat: boolean;
+    clearcoatIntensity: number;
+    clearcoatRoughnessFactor: number;
+    clearcoatNormalScale: number;
+    getCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp): PBShaderExp;
+    calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
+    fresnelSchlick(scope: PBInsideFunctionScope, cosTheta: PBShaderExp, F0: PBShaderExp): PBShaderExp;
+    distributionGGX(scope: PBInsideFunctionScope, NdotH: PBShaderExp, alphaRoughness: PBShaderExp): PBShaderExp;
+    visGGX(scope: PBInsideFunctionScope, NdotV: PBShaderExp, NdotL: PBShaderExp, alphaRoughness: PBShaderExp): PBShaderExp;
+    getCommonDatasStruct(scope: PBInsideFunctionScope): ShaderTypeFunc;
+    calculateEmissiveColor(scope: PBInsideFunctionScope): PBShaderExp;
+    getF0(scope: PBInsideFunctionScope): PBShaderExp;
+    directLighting(scope: PBInsideFunctionScope, lightDir: PBShaderExp, lightColor: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outColor: PBShaderExp): any;
+    indirectLighting(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outColor: PBShaderExp): any;
+} & TextureMixinInstanceTypes<[
+'occlusion',
+'emissive',
+'sheenColor',
+'sheenRoughness',
+'clearcoatIntensity',
+'clearcoatRoughness',
+'clearcoatNormal'
+]>;
+
+// @public (undocumented)
+export type IMixinPBRMetallicRoughness = {
+    metallic: number;
+    roughness: number;
+    specularFactor: Vector4;
+    PBRLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp, TBN?: PBShaderExp): PBShaderExp;
+    calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
+} & IMixinPBRCommon & IMixinLight & TextureMixinInstanceTypes<['metallicRoughness', 'occlusion', 'specular', 'specularColor']>;
+
+// @public (undocumented)
+export type IMixinPBRSpecularGlossiness = {
+    specularFactor: Vector4;
+    glossinessFactor: number;
+    PBRLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp, TBN?: PBShaderExp): PBShaderExp;
+    calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
+} & IMixinPBRCommon & IMixinLight & TextureMixinInstanceTypes<['specular']>;
+
+// @public (undocumented)
+export interface IMixinVertexColor {
     // (undocumented)
-    beginDraw(ctx: DrawContext): boolean;
+    getVertexColor(scope: PBInsideFunctionScope): any;
     // (undocumented)
-    clearBindGroupCache(): number;
-    // (undocumented)
-    createHash(renderPassType: number): string;
-    // (undocumented)
-    dispose(): void;
-    // (undocumented)
-    draw(primitive: Primitive, ctx: DrawContext): any;
-    // (undocumented)
-    endDraw(): void;
-    // (undocumented)
-    getMaterialBindGroup(): BindGroup;
-    // Warning: (ae-forgotten-export) The symbol "ProgramInfo" needs to be exported by the entry point index.d.ts
-    //
-    // (undocumented)
-    getOrCreateProgram(ctx: DrawContext): ProgramInfo;
-    // (undocumented)
-    readonly id: number;
-    // (undocumented)
-    isTransparent(): boolean;
-    // (undocumented)
-    optionChanged(changeHash: boolean): void;
-    // (undocumented)
-    stateSet: RenderStateSet;
-    // (undocumented)
-    supportLighting(): boolean;
+    vertexColor: boolean;
 }
 
 // @public
@@ -1510,29 +1737,19 @@ export interface InstanceData {
     worldMatrices: Matrix4x4[];
 }
 
-// @public
-export class LambertLightModel extends LightModel {
-    // @override
-    directBRDF(scope: PBInsideFunctionScope, lightDir: PBShaderExp, attenuation: PBShaderExp): void;
-    // @override
-    envBRDF(envLight: EnvironmentLighting, scope: PBInsideFunctionScope): void;
-    // (undocumented)
-    protected static readonly funcNameBRDFDirect = "lib_lambertLM_direct";
-    // (undocumented)
-    protected static readonly funcNameBRDFEnvIBL = "lib_lambertLM_envIBL";
-    // @override
-    supportLighting(): boolean;
-}
-
 // Warning: (ae-forgotten-export) The symbol "LambertMaterial_base" needs to be exported by the entry point index.d.ts
 //
 // @public
 export class LambertMaterial extends LambertMaterial_base {
     constructor();
     // (undocumented)
-    fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void;
+    fragmentShader(scope: PBFunctionScope): void;
+    get vertexNormal(): boolean;
+    set vertexNormal(val: boolean);
     // (undocumented)
-    vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
+    vertexShader(scope: PBFunctionScope): void;
+    get vertexTangent(): boolean;
+    set vertexTangent(val: boolean);
 }
 
 // @public
@@ -1547,112 +1764,20 @@ export const LIGHT_TYPE_POINT = 2;
 // @public
 export const LIGHT_TYPE_SPOT = 3;
 
-// @public
-export abstract class LightModel {
+// Warning: (ae-internal-missing-underscore) The name "LightPass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export class LightPass extends RenderPass {
     constructor();
-    // @internal (undocumented)
-    protected addTexCoordChannel(srcLocation: number, transform?: Matrix4x4): number;
-    get albedo(): Vector4;
-    set albedo(val: Vector4);
-    // @internal (undocumented)
-    protected _albedo: Vector4;
-    get albedoMap(): Texture2D;
-    get albedoMapTexCoord(): number;
-    get albedoSampler(): TextureSampler;
-    protected applyTextureUniforms(bindGroup: BindGroup): void;
-    applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
-    applyUniformsIfOutdated(bindGroup: BindGroup, ctx: DrawContext): void;
-    // @internal (undocumented)
-    protected _bindGroupTagList: WeakMap<BindGroup, [number, number]>;
-    calculateAlbedo(scope: PBInsideFunctionScope): PBShaderExp;
-    calculateEmissive(scope: PBInsideFunctionScope): PBShaderExp;
-    calculateHash(): string;
-    calculateNormal(scope: PBInsideFunctionScope, worldPosition: PBShaderExp, worldNormal?: PBShaderExp, worldTangent?: PBShaderExp, worldBinormal?: PBShaderExp): PBShaderExp;
-    calculateNormalWithTBN(scope: PBInsideFunctionScope, texCoord: PBShaderExp, TBN: PBShaderExp): PBShaderExp;
-    // @internal (undocumented)
-    protected calculatePixelNormal(scope: PBInsideFunctionScope, TBN: PBShaderExp): PBShaderExp;
-    calculateTexCoord(scope: PBInsideFunctionScope, index: number): PBShaderExp;
-    calculateTexCoordNoInput(scope: PBInsideFunctionScope, index: number, value: PBShaderExp): PBShaderExp;
-    protected compositeSurfaceData(scope: PBInsideFunctionScope): void;
-    protected createSurfaceDataType(env: EnvironmentLighting): PBStructTypeInfo;
-    abstract directBRDF(scope: PBInsideFunctionScope, lightDir: PBShaderExp, attenuation: PBShaderExp): void;
-    get doubleSideLighting(): boolean;
-    set doubleSideLighting(val: boolean);
-    // @internal (undocumented)
-    protected _doubleSideLighting: boolean;
-    get emissiveColor(): Vector3;
-    set emissiveColor(val: Vector3);
-    // @internal (undocumented)
-    protected _emissiveFactor: Vector4;
-    get emissiveMap(): Texture2D;
-    get emissiveMapTexCoord(): number;
-    get emissiveSampler(): TextureSampler;
-    get emissiveStrength(): number;
-    set emissiveStrength(val: number);
-    abstract envBRDF(envLight: EnvironmentLighting, scope: PBInsideFunctionScope): void;
-    protected fillSurfaceData(scope: PBInsideFunctionScope, envLight: EnvironmentLighting): void;
-    finalComposite(scope: PBInsideFunctionScope): PBShaderExp;
-    // @internal (undocumented)
-    protected static readonly funcNameBRDFEnvConstantAmbient = "libLM_envConstantAmbient";
-    // @internal (undocumented)
-    protected static readonly funcNameBRDFEnvHemispheric = "libLM_envHemispheric";
-    getHash(): string;
-    getSurfaceData(scope: PBInsideFunctionScope, envLight: EnvironmentLighting, worldPos: PBShaderExp, worldNormal?: PBShaderExp, worldTangent?: PBShaderExp, worldBinormal?: PBShaderExp): void;
-    getSurfaceDataType(env: EnvironmentLighting): PBStructTypeInfo;
-    getTexCoordSrcLocation(texCoordIndex: number): number;
-    getTexCoordTransform(texCoordIndex: number): Matrix4x4;
-    getTextureUniformName(key: string): string;
-    // @internal (undocumented)
-    protected _hash: string;
-    // @internal (undocumented)
-    protected _hashVersion: number;
-    isNormalUsed(): boolean;
-    isTexCoordIndexUsed(texCoordIndex: number): boolean;
-    isTexCoordSrcLocationUsed(loc: number): boolean;
-    isTextureUsed(name: string): boolean;
-    get normalMap(): Texture2D;
-    // @internal (undocumented)
-    protected _normalMapMode: NormalMapMode;
-    get normalMapTexCoord(): number;
-    get normalSampler(): TextureSampler;
-    get normalScale(): number;
-    set normalScale(val: number);
-    // @internal (undocumented)
-    protected _normalScale: number;
-    protected optionChanged(changeHash: boolean): void;
-    peekHash(): string;
-    sampleNormalMap(scope: PBInsideFunctionScope, tex: PBShaderExp, texCoord: PBShaderExp, normalScale: PBShaderExp): PBShaderExp;
-    sampleNormalMapWithTBN(scope: PBInsideFunctionScope, tex: PBShaderExp, texCoord: PBShaderExp, normalScale: PBShaderExp, TBN: PBShaderExp): PBShaderExp;
-    setAlbedoMap(tex: Texture2D, sampler: TextureSampler, texCoordIndex: number, texTransform?: Matrix4x4): void;
-    setEmissiveMap(tex: Texture2D, sampler: TextureSampler, texCoordIndex: number, texTransform?: Matrix4x4): void;
-    setNormalMap(tex: Texture2D, sampler: TextureSampler, texCoordIndex: number, texTransform?: Matrix4x4): void;
-    setTexCoordTransform(texCoordIndex: number, transform: Matrix4x4): void;
-    setTextureOptions(name: string, tex: BaseTexture, sampler: TextureSampler, texCoord: number, texTransform: Matrix4x4): number;
-    protected setupTextureUniforms(scope: PBGlobalScope): void;
-    setupUniforms(scope: PBGlobalScope, ctx: DrawContext): void;
-    abstract supportLighting(): boolean;
-    // @internal (undocumented)
-    protected _surfaceDataType: PBStructTypeInfo;
-    // Warning: (ae-forgotten-export) The symbol "TexCoordChannel" needs to be exported by the entry point index.d.ts
-    //
-    // @internal (undocumented)
-    protected _texCoordChannels: TexCoordChannel[];
-    // Warning: (ae-forgotten-export) The symbol "TextureOptions" needs to be exported by the entry point index.d.ts
-    //
-    // @internal (undocumented)
-    protected _textureOptions: Record<string, TextureOptions>;
-    // @internal (undocumented)
-    protected static readonly uniformAlbedoColor = "libLM_USAGE_albedoColor";
-    // @internal (undocumented)
-    protected static readonly uniformEmissiveFactor = "libLM_USAGE_emissiveFactor";
-    // @internal (undocumented)
-    protected static readonly uniformNormalScale = "libLM_USAGE_normalScale";
-    // @internal (undocumented)
-    protected _uniformVersion: number;
+    // (undocumented)
+    protected _getGlobalBindGroupHash(ctx: DrawContext): string;
+    // (undocumented)
+    protected renderItems(ctx: DrawContext, renderQueue: RenderQueue): void;
+    // (undocumented)
+    protected renderLightPass(ctx: DrawContext, items: RenderQueueItem[], lights: PunctualLight[]): void;
+    // (undocumented)
+    protected _shadowMapHash: string;
 }
-
-// @public
-export function linearDepthToNonLinear(scope: PBInsideFunctionScope, depth: PBShaderExp, nearFar?: PBShaderExp): PBShaderExp;
 
 // @public
 export function linearToGamma(scope: PBInsideFunctionScope, color: PBShaderExp): any;
@@ -1667,43 +1792,52 @@ export interface Logger {
 export type LogMode = 'info' | 'warn' | 'error' | 'debug';
 
 // @public
-export class Material implements IMaterial {
+export class Material {
     constructor();
-    applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean): void;
-    protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
-    beginDraw(ctx: DrawContext): boolean;
+    applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number): void;
+    protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
+    beginDraw(pass: number, ctx: DrawContext): boolean;
     // @internal (undocumented)
     static bindGroupGarbageCollect(bindGroup: BindGroup): void;
     // @internal (undocumented)
     clearBindGroupCache(): number;
     // @internal (undocumented)
-    createHash(renderPassType: number): string;
+    createHash(renderPassType: number, pass: number): string;
     protected _createHash(renderPassType: number): string;
     // @internal (undocumented)
-    protected createProgram(ctx: DrawContext): GPUProgram;
-    protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram;
+    protected createProgram(ctx: DrawContext, pass: number): GPUProgram;
+    protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram;
     // @internal (undocumented)
     protected createRenderStateSet(): RenderStateSet;
-    static get debugChannel(): MaterialDebugChannel;
-    static set debugChannel(val: MaterialDebugChannel);
     // (undocumented)
     dispose(): void;
-    draw(primitive: Primitive, ctx: DrawContext): void;
-    endDraw(): void;
+    draw(primitive: Primitive, ctx: DrawContext, numInstances?: number): void;
+    drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number): void;
+    endDraw(pass: number): void;
     static garbageCollect(ts: number): number;
     static getGCOptions(): MaterialGCOptions;
     // @internal (undocumented)
-    protected getHash(renderPassType: number): string;
+    protected getHash(renderPassType: number, pass: number): string;
     getMaterialBindGroup(): BindGroup;
-    getOrCreateProgram(ctx: DrawContext): ProgramInfo;
+    // Warning: (ae-forgotten-export) The symbol "ProgramInfo" needs to be exported by the entry point index.d.ts
+    getOrCreateProgram(ctx: DrawContext, pass: number): ProgramInfo;
     // @internal (undocumented)
     static getProgramByHashIndex(hash: string, index: number): GPUProgram<unknown>;
+    // (undocumented)
+    getQueueType(): number;
     // @internal (undocumented)
-    protected _hash: string[];
+    protected _hash: string[][];
     get id(): number;
-    isTransparent(): boolean;
+    isBatchable(): boolean;
+    isTransparentPass(pass: number): boolean;
+    // (undocumented)
+    get numPasses(): number;
+    set numPasses(val: number);
+    // @internal (undocumented)
+    protected _numPasses: number;
     // @internal (undocumented)
     optionChanged(changeHash: boolean): void;
+    passToHash(pass: number): string;
     // @internal (undocumented)
     protected _renderStateSet: RenderStateSet;
     static setGCOptions(opt: MaterialGCOptions): void;
@@ -1711,12 +1845,6 @@ export class Material implements IMaterial {
     set stateSet(stateset: RenderStateSet);
     supportLighting(): boolean;
 }
-
-// @public
-export type MaterialCommonDebugChannel = 'normal' | 'tangent' | 'binormal' | 'shadingNormal';
-
-// @public
-export type MaterialDebugChannel = '' | MaterialCommonDebugChannel | PBRBaseDebugChannel | PBRClearcoatDebugChannel | PBRSheenDebugChannel | PBRSpecularDebugChannel;
 
 // @public
 export type MaterialGCOptions = {
@@ -1728,17 +1856,19 @@ export type MaterialGCOptions = {
 };
 
 // @public
+export interface MaterialTextureInfo {
+    // (undocumented)
+    sampler: TextureSampler;
+    // (undocumented)
+    texCoord: number;
+    // (undocumented)
+    texture: Texture2D;
+    // (undocumented)
+    transform: Matrix4x4;
+}
+
+// @public
 export const MAX_CLUSTERED_LIGHTS = 255;
-
-// Warning: (ae-internal-missing-underscore) The name "MAX_DETAIL_TEXTURE_LEVELS" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal (undocumented)
-export const MAX_DETAIL_TEXTURE_LEVELS = 8;
-
-// Warning: (ae-internal-missing-underscore) The name "MAX_FORWARD_LIGHT_COUNT" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal
-export const MAX_FORWARD_LIGHT_COUNT = 8;
 
 // @public
 export class Mesh extends GraphNode implements BatchDrawable {
@@ -1769,6 +1899,7 @@ export class Mesh extends GraphNode implements BatchDrawable {
     getInvBindMatrix(): Matrix4x4;
     getName(): string;
     getPickTarget(): GraphNode;
+    getQueueType(): number;
     getXForm(): XForm;
     // @internal (undocumented)
     protected _instanceColor: Vector4;
@@ -1778,7 +1909,6 @@ export class Mesh extends GraphNode implements BatchDrawable {
     protected _invBindMatrix: Matrix4x4;
     isBatchable(): this is BatchDrawable;
     isMesh(): boolean;
-    isTransparency(): boolean;
     isUnlit(): boolean;
     get material(): Material;
     set material(m: Material);
@@ -1788,6 +1918,78 @@ export class Mesh extends GraphNode implements BatchDrawable {
     setBoneMatrices(matrices: Texture2D): void;
     setInvBindMatrix(matrix: Matrix4x4): void;
 }
+
+// @public
+export class MeshMaterial extends Material {
+    constructor(...args: any[]);
+    get alphaCutoff(): number;
+    set alphaCutoff(val: number);
+    // (undocumented)
+    get alphaToCoverage(): boolean;
+    set alphaToCoverage(val: boolean);
+    // @internal @override
+    protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
+    beginDraw(pass: number, ctx: DrawContext): boolean;
+    get blendMode(): BlendMode;
+    set blendMode(val: BlendMode);
+    // @internal @override
+    protected _createHash(renderPassType: number): string;
+    // @internal (undocumented)
+    protected createProgram(ctx: DrawContext, pass: number): GPUProgram;
+    // @internal @override
+    protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram;
+    get cullMode(): FaceMode;
+    set cullMode(val: FaceMode);
+    static defineFeature(): number;
+    get drawContext(): DrawContext;
+    featureUsed<T = unknown>(feature: number): T;
+    fragmentShader(scope: PBFunctionScope): void;
+    getQueueType(): number;
+    isTransparentPass(pass: number): boolean;
+    needFragmentColor(ctx?: DrawContext): boolean;
+    // @internal (undocumented)
+    static NEXT_FEATURE_INDEX: number;
+    get opacity(): number;
+    set opacity(val: number);
+    outputFragmentColor(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: PBShaderExp): void;
+    get pass(): number;
+    supportLighting(): boolean;
+    uniformChanged(): void;
+    protected updateRenderStates(pass: number, ctx: DrawContext): void;
+    useFeature(feature: number, use: unknown): void;
+    vertexShader(scope: PBFunctionScope): void;
+}
+
+// @public (undocumented)
+export function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinAlbedoColor);
+
+// @public (undocumented)
+export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinBlinnPhong);
+
+// @public (undocumented)
+export function mixinFoliage<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinFoliage);
+
+// @public (undocumented)
+export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinLambert);
+
+// @public (undocumented)
+export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinLight);
+
+// @public (undocumented)
+export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinPBRCommon);
+
+// @public (undocumented)
+export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinPBRMetallicRoughness);
+
+// @public (undocumented)
+export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinPBRSpecularGlossiness);
+
+// @public (undocumented)
+export function mixinTextureProps<U extends string>(name: U): <T extends typeof MeshMaterial>(BaseCls: T, vertex?: boolean) => T & (new (...args: any[]) => TextureProp<U> & TexturePropUniforms<U>);
+
+// @public (undocumented)
+export function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinVertexColor);
 
 // @public
 export class Model extends GraphNode {
@@ -1802,19 +2004,23 @@ export class Model extends GraphNode {
 }
 
 // @public
+export type ModelInfo = {
+    group: SceneNode;
+    animationSet: AnimationSet;
+};
+
+// @public
+export class NamedObject {
+    constructor(name: string);
+    // (undocumented)
+    name: string;
+}
+
+// @public
 export function noise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp;
 
 // @public
 export function noisef(scope: PBInsideFunctionScope, p: PBShaderExp): any;
-
-// @public
-export function nonLinearDepthToLinear(scope: PBInsideFunctionScope, depth: PBShaderExp, nearFar?: PBShaderExp): PBShaderExp;
-
-// @public
-export function nonLinearDepthToLinearNormalized(scope: PBInsideFunctionScope, depth: PBShaderExp, nearFar?: PBShaderExp): PBShaderExp;
-
-// @public
-export type NormalMapMode = 'object-space' | 'tangent-space';
 
 // @public
 export type NumberTrackHandler = (node: SceneNode, value: Float32Array) => void;
@@ -1936,6 +2142,8 @@ export enum OctreePlacement {
 // @public
 export class OrbitCameraController extends BaseCameraController {
     constructor(options?: OrbitCameraControllerOptions);
+    get center(): Vector3;
+    set center(val: Vector3);
     // @override
     protected _onMouseDown(evt: PointerEvent): boolean;
     // @override
@@ -1953,6 +2161,7 @@ export class OrbitCameraController extends BaseCameraController {
 
 // @public
 export interface OrbitCameraControllerOptions {
+    center: Vector3;
     damping?: number;
     distance?: number;
     rotateSpeed?: number;
@@ -1984,213 +2193,51 @@ export class OrthoCamera extends Camera {
 // @public
 export function panoramaToCubemap(tex: Texture2D, outputCubeMap: TextureCube): void;
 
-// @public
-export type PBRBaseDebugChannel = 'pbrBase' | 'pbrMetallic' | 'pbrRoughness' | 'pbrMetallicRoughness';
-
-// @public
-export type PBRClearcoatDebugChannel = 'pbrClearCoat' | 'pbrClearCoatFactor' | 'pbrClearCoatRoughness' | 'pbrClearCoatNormal';
-
-// @public
-export abstract class PBRLightModelBase extends LightModel {
-    constructor();
-    // @override
-    applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
-    // @override
-    calculateHash(): string;
-    // @internal (undocumented)
-    protected _clearcoat: boolean;
-    // @internal (undocumented)
-    protected _clearcoatFactor: Vector4;
-    get clearcoatIntensity(): number;
-    set clearcoatIntensity(val: number);
-    get clearcoatIntensityMap(): Texture2D;
-    get clearcoatIntensityMapTexCoord(): number;
-    get clearcoatIntensitySampler(): TextureSampler;
-    get clearcoatNormalMap(): Texture2D;
-    get clearcoatNormalMapTexCoord(): number;
-    get clearcoatNormalSampler(): TextureSampler;
-    get clearcoatNormalScale(): number;
-    set clearcoatNormalScale(val: number);
-    get clearcoatRoughnessFactor(): number;
-    set clearcoatRoughnessFactor(val: number);
-    get clearcoatRoughnessMap(): Texture2D;
-    get clearcoatRoughnessMapTexCoord(): number;
-    get clearcoatRoughnessSampler(): TextureSampler;
-    // @override
-    protected compositeSurfaceData(scope: PBInsideFunctionScope): void;
-    // @internal (undocumented)
-    static createGGXLUT(device: AbstractDevice, size: number): Texture2D<unknown>;
-    // @override
-    protected createSurfaceDataType(env: EnvironmentLighting): PBStructTypeInfo;
-    // @override
-    directBRDF(scope: PBInsideFunctionScope, lightDir: PBShaderExp, attenuation: PBShaderExp): void;
-    // @override
-    envBRDF(envLight: EnvironmentLighting, scope: PBInsideFunctionScope): void;
-    // @internal (undocumented)
-    protected _f0: Vector4;
-    // @override
-    protected fillSurfaceData(scope: PBInsideFunctionScope, envLight: EnvironmentLighting): void;
-    // @internal (undocumented)
-    static getGGXLUT(): Texture2D<unknown>;
-    // @internal (undocumented)
-    protected static ggxLut: Texture2D;
-    // (undocumented)
-    protected iblDiffuse(scope: PBInsideFunctionScope, brdf: PBShaderExp, f0: PBShaderExp, diffuse: PBShaderExp, irradiance: PBShaderExp, NdotV: PBShaderExp | number, roughness: PBShaderExp | number, specularWeight: PBShaderExp | number): PBShaderExp;
-    // (undocumented)
-    protected iblSpecular(scope: PBInsideFunctionScope, brdf: PBShaderExp, f0: PBShaderExp, radiance: PBShaderExp, NdotV: PBShaderExp | number, roughness: PBShaderExp | number, specularWeight: PBShaderExp | number): PBShaderExp;
-    // @internal (undocumented)
-    protected illumEnvLight(scope: PBInsideFunctionScope, envLight: EnvironmentLighting): void;
-    get ior(): number;
-    set ior(val: number);
-    get occlusionMap(): Texture2D;
-    get occlusionMapTexCoord(): number;
-    get occlusionSampler(): TextureSampler;
-    get occlusionStrength(): number;
-    set occlusionStrength(val: number);
-    // @internal (undocumented)
-    protected _occlusionStrength: number;
-    setClearcoatIntensityMap(tex: Texture2D, sampler: TextureSampler, texCoordIndex: number, texTransform?: Matrix4x4): void;
-    setClearcoatNormalMap(tex: Texture2D, sampler: TextureSampler, texCoordIndex: number, texTransform?: Matrix4x4): void;
-    setClearcoatRoughnessMap(tex: Texture2D, sampler: TextureSampler, texCoordIndex: number, texTransform?: Matrix4x4): void;
-    setOcclusionMap(tex: Texture2D, sampler: TextureSampler, texCoordIndex: number, texTransform?: Matrix4x4): void;
-    setSheenColorMap(tex: Texture2D, sampler: TextureSampler, texCoordIndex: number, texTransform?: Matrix4x4): void;
-    setSheenLut(tex: Texture2D): void;
-    setSheenRoughnessMap(tex: Texture2D, sampler: TextureSampler, texCoordIndex: number, texTransform?: Matrix4x4): void;
-    // @override
-    setupUniforms(scope: PBGlobalScope, ctx: DrawContext): void;
-    // @internal (undocumented)
-    protected _sheen: boolean;
-    get sheenColorFactor(): Vector3;
-    set sheenColorFactor(val: Vector3);
-    get sheenColorMap(): Texture2D;
-    get sheenColorMapTexCoord(): number;
-    get sheenColorSampler(): TextureSampler;
-    // @internal (undocumented)
-    protected _sheenFactor: Vector4;
-    get sheenLut(): Texture2D;
-    get sheenRoughnessFactor(): number;
-    set sheenRoughnessFactor(val: number);
-    get sheenRoughnessMap(): Texture2D;
-    // (undocumented)
-    get sheenRoughnessMapTexCoord(): number;
-    get sheenRoughnessSampler(): TextureSampler;
-    // @override
-    supportLighting(): boolean;
-    // @internal (undocumented)
-    protected static readonly uniformClearcoatFactor = "lib_PBRLM_clearcoatFactor";
-    // @internal (undocumented)
-    protected static readonly uniformClearcoatNormalScale = "lib_PBRLM_clearcoatNormalScale";
-    // @internal (undocumented)
-    protected static readonly uniformSheenFactor = "lib_PBRLM_sheenFactor";
-    get useClearcoat(): boolean;
-    set useClearcoat(val: boolean);
-    get useSheen(): boolean;
-    set useSheen(val: boolean);
-}
-
-// @public
-export class PBRLightModelMR extends PBRLightModelBase {
-    constructor();
-    // @override
-    applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
-    // @override
-    calculateHash(): string;
-    // @override
-    protected createSurfaceDataType(env: EnvironmentLighting): PBStructTypeInfo;
-    // @override
-    protected fillSurfaceData(scope: PBInsideFunctionScope, envLight: EnvironmentLighting): void;
-    // @override
-    isTextureUsed(name: string): boolean;
-    get metallic(): number;
-    set metallic(val: number);
-    // @internal (undocumented)
-    protected _metallic: number;
-    get metallicIndex(): number;
-    set metallicIndex(val: number);
-    // @internal (undocumented)
-    protected _metallicIndex: number;
-    get metallicMap(): Texture2D;
-    get metallicMapTexCoord(): number;
-    get metallicSampler(): TextureSampler;
-    get roughness(): number;
-    set roughness(val: number);
-    // @internal (undocumented)
-    protected _roughness: number;
-    get roughnessIndex(): number;
-    set roughnessIndex(val: number);
-    // @internal (undocumented)
-    protected _roughnessIndex: number;
-    setMetallicMap(tex: Texture2D, sampler: TextureSampler, texCoordIndex: number, texTransform?: Matrix4x4): void;
-    setSpecularColorMap(tex: Texture2D, sampler: TextureSampler, texCoordIndex: number, texTransform?: Matrix4x4): void;
-    setSpecularMap(tex: Texture2D, sampler: TextureSampler, texCoordIndex: number, texTransform?: Matrix4x4): void;
-    // @override
-    setupUniforms(scope: PBGlobalScope, ctx: DrawContext): void;
-    get specularColorMap(): Texture2D;
-    get specularColorMapTexCoord(): number;
-    get specularColorSampler(): TextureSampler;
-    get specularFactor(): Vector4;
-    set specularFactor(val: Vector4);
-    // @internal (undocumented)
-    protected _specularFactor: Vector4;
-    get specularMap(): Texture2D;
-    get specularMapTexCoord(): number;
-    get specularSampler(): TextureSampler;
-    // @internal (undocumented)
-    protected static readonly uniformMetallic = "lib_PBRLM_metallic";
-    // @internal (undocumented)
-    protected static readonly uniformRoughness = "lib_PBRLM_roughness";
-    // @internal (undocumented)
-    protected static readonly uniformSpecularFactor = "lib_PBRLM_specularFactor";
-}
-
-// @public
-export class PBRLightModelSG extends PBRLightModelBase {
-    constructor();
-    // @override
-    applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
-    // @override
-    calculateHash(): string;
-    // @override
-    protected createSurfaceDataType(env: EnvironmentLighting): PBStructTypeInfo;
-    // @override
-    protected fillSurfaceData(scope: PBInsideFunctionScope, envLight: EnvironmentLighting): void;
-    get glossinessFactor(): number;
-    set glossinessFactor(val: number);
-    // @internal (undocumented)
-    protected _glossinessFactor: number;
-    setSpecularMap(tex: Texture2D, sampler: TextureSampler, texCoordIndex: number, texTransform?: Matrix4x4): void;
-    // @override
-    setupUniforms(scope: PBGlobalScope, ctx: DrawContext): void;
-    get specularFactor(): Vector4;
-    set specularFactor(val: Vector4);
-    // @internal (undocumented)
-    protected _specularFactor: Vector4;
-    get specularMap(): Texture2D;
-    get specularMapTexCoord(): number;
-    get specularSampler(): TextureSampler;
-    // @internal (undocumented)
-    protected static readonly uniformGlossinessFactor = "lib_PBRSG_glossinessFactor";
-    // @internal (undocumented)
-    protected static readonly uniformSpecularFactor = "lib_PBRSG_specularFactor";
-}
-
-// @public
-export class PBRMetallicRoughnessMaterial extends StandardMaterial<PBRLightModelMR> {
+// Warning: (ae-forgotten-export) The symbol "PBRMetallicRoughnessMaterial_base" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export class PBRMetallicRoughnessMaterial extends PBRMetallicRoughnessMaterial_base {
     constructor();
     // (undocumented)
-    get GGXLUT(): _zephyr3d_device.Texture2D<unknown>;
+    fragmentShader(scope: PBFunctionScope): void;
+    get vertexNormal(): boolean;
+    set vertexNormal(val: boolean);
+    // (undocumented)
+    vertexShader(scope: PBFunctionScope): void;
+    get vertexTangent(): boolean;
+    set vertexTangent(val: boolean);
 }
 
-// @public
-export type PBRSheenDebugChannel = 'pbrSheen' | 'pbrSheenColor' | 'pbrSheenRoughness' | 'pbrSheenAlbedoScaling';
-
-// @public
-export type PBRSpecularDebugChannel = 'pbrSpecular' | 'pbrSpecularFactor' | 'pbrSpecularColor';
-
-// @public
-export class PBRSpecularGlossinessMaterial extends StandardMaterial<PBRLightModelSG> {
+// Warning: (ae-forgotten-export) The symbol "PBRSpecularGlossinessMaterial_base" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export class PBRSpecularGlossinessMaterial extends PBRSpecularGlossinessMaterial_base {
     constructor();
+    // (undocumented)
+    fragmentShader(scope: PBFunctionScope): void;
+    get vertexNormal(): boolean;
+    set vertexNormal(val: boolean);
+    // (undocumented)
+    vertexShader(scope: PBFunctionScope): void;
+    get vertexTangent(): boolean;
+    set vertexTangent(val: boolean);
 }
+
+// @public (undocumented)
+export type PBRTextureNames = [
+'occlusion',
+'cheenColor',
+'sheenRoughness',
+'clearcoatIntensity',
+'clearcoatNormal',
+'clearcoatRoughness'
+];
+
+// @public (undocumented)
+export type PBRToMixedTextureType<T> = T extends [infer First, ...infer Rest] ? [
+First extends string ? ReturnType<typeof mixinTextureProps<First>> : never,
+...PBRToMixedTextureType<Rest>
+] : [];
 
 // Warning: (ae-internal-missing-underscore) The name "PCFOPT" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -2202,7 +2249,7 @@ export class PCFOPT extends ShadowImpl {
     // (undocumented)
     computeShadowCSM(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, shadowVertex: PBShaderExp, NdotL: PBShaderExp, split: PBShaderExp): PBShaderExp;
     // (undocumented)
-    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope): PBShaderExp;
+    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
     // (undocumented)
     dispose(): void;
     // (undocumented)
@@ -2254,7 +2301,7 @@ export class PCFPD extends ShadowImpl {
     // (undocumented)
     computeShadowCSM(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, shadowVertex: PBShaderExp, NdotL: PBShaderExp, split: PBShaderExp): PBShaderExp;
     // (undocumented)
-    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope): PBShaderExp;
+    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
     // (undocumented)
     dispose(): void;
     // (undocumented)
@@ -2584,10 +2631,16 @@ export class QuadtreeNode {
 }
 
 // @public
-export const RENDER_PASS_TYPE_DEPTH_ONLY = 2;
+export const QUEUE_OPAQUE = 1;
 
 // @public
-export const RENDER_PASS_TYPE_FORWARD = 0;
+export const QUEUE_TRANSPARENT = 2;
+
+// @public
+export const RENDER_PASS_TYPE_DEPTH = 2;
+
+// @public
+export const RENDER_PASS_TYPE_LIGHT = 0;
 
 // @public
 export const RENDER_PASS_TYPE_SHADOWMAP = 1;
@@ -2779,10 +2832,6 @@ export class Scene extends Scene_base {
     // @internal (undocumented)
     protected _updateFrame: number;
     updateNodePlacement(octree: Octree, list: Set<SceneNode>): void;
-    get worldUnit(): number;
-    set worldUnit(val: number);
-    // @internal (undocumented)
-    protected _worldUnit: number;
     // @internal (undocumented)
     _xformChanged(node: SceneNode): void;
 }
@@ -2895,6 +2944,23 @@ export interface SceneNodeVisitor {
     visit(target: SceneNode): unknown;
 }
 
+// Warning: (ae-internal-missing-underscore) The name "SceneRenderer" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export class SceneRenderer {
+    // (undocumented)
+    static freeClusteredLight(clusteredLight: ClusteredLight): void;
+    // (undocumented)
+    static getClusteredLight(): ClusteredLight;
+    static renderScene(scene: Scene, camera: Camera, compositor?: Compositor, logger?: RenderLogger): void;
+    // (undocumented)
+    protected static _renderScene(ctx: DrawContext): void;
+    // (undocumented)
+    protected static _renderSceneDepth(ctx: DrawContext, renderQueue: RenderQueue, depthFramebuffer: FrameBuffer): void;
+    // (undocumented)
+    static setClearColor(color: Vector4): void;
+}
+
 // @public
 export class SceneUpdateEvent {
     constructor(scene: Scene);
@@ -2907,18 +2973,23 @@ export class SceneUpdateEvent {
 }
 
 // @public
-export class ShaderFramework {
+export class ShaderHelper {
     // (undocumented)
-    static applyFog(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext): void;
+    static applyFog(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: PBShaderExp, ctx: DrawContext): void;
     // (undocumented)
     static readonly BILLBOARD_SPHERICAL = 1;
     // (undocumented)
     static readonly BILLBOARD_SYLINDRAL = 2;
+    static calculateShadow(scope: PBInsideFunctionScope, worldPos: PBShaderExp, NoL: PBShaderExp, ctx: DrawContext): PBShaderExp;
     // @internal (undocumented)
-    static calculateShadowSpaceVertex(scope: PBInsideFunctionScope, cascade?: PBShaderExp | number): PBShaderExp;
+    static calculateShadowSpaceVertex(scope: PBInsideFunctionScope, worldPos: PBShaderExp, cascade?: PBShaderExp | number): PBShaderExp;
+    static calculateSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     static computeFogFactor(scope: PBInsideFunctionScope, viewDir: PBShaderExp, fogType: PBShaderExp, fogParams: PBShaderExp): PBShaderExp;
     static computeFogFactorForType(scope: PBInsideFunctionScope, viewDir: PBShaderExp, fogParams: PBShaderExp, fogType: 'linear' | 'exp' | 'exp2'): PBShaderExp;
-    static discardIfClipped(scope: PBInsideFunctionScope): void;
+    // @internal (undocumented)
+    static defaultSunDir: Vector3;
+    static discardIfClipped(scope: PBInsideFunctionScope, worldPos: PBShaderExp): void;
+    static encodeColorOutput(scope: PBInsideFunctionScope, outputColor: PBShaderExp): PBShaderExp;
     // (undocumented)
     static readonly FOG_TYPE_EXP = 2;
     // (undocumented)
@@ -2929,8 +3000,14 @@ export class ShaderFramework {
     static readonly FOG_TYPE_NONE = 0;
     // (undocumented)
     static readonly FOG_TYPE_SCATTER = 4;
-    static ftransform(scope: PBInsideFunctionScope, billboardMode?: number): void;
     static getAerialPerspectiveLUT(scope: PBInsideFunctionScope): PBShaderExp;
+    static getAPDensity(scope: PBInsideFunctionScope): PBShaderExp;
+    // (undocumented)
+    static getBoneInvBindMatrixUniformName(): string;
+    // (undocumented)
+    static getBoneMatricesUniformName(): string;
+    // (undocumented)
+    static getBoneTextureSizeUniformName(): string;
     static getCameraClipPlane(scope: PBInsideFunctionScope): any;
     static getCameraClipPlaneFlag(scope: PBInsideFunctionScope): PBShaderExp;
     static getCameraParams(scope: PBInsideFunctionScope): PBShaderExp;
@@ -2952,6 +3029,11 @@ export class ShaderFramework {
     static getFogColor(scope: PBInsideFunctionScope): PBShaderExp;
     static getFogParams(scope: PBInsideFunctionScope): PBShaderExp;
     static getFogType(scope: PBInsideFunctionScope): PBShaderExp;
+    static getGlobalUniforms(scope: PBInsideFunctionScope): PBShaderExp;
+    // (undocumented)
+    static getInstanceBufferOffsetUniformName(): string;
+    // (undocumented)
+    static getLightBufferUniformName(): string;
     // @internal (undocumented)
     static getLightColorAndIntensity(scope: PBInsideFunctionScope, lightIndex: PBShaderExp | number): PBShaderExp;
     // @internal (undocumented)
@@ -2964,52 +3046,46 @@ export class ShaderFramework {
     static getLightTypeForShadow(scope: PBInsideFunctionScope): PBShaderExp;
     // @internal (undocumented)
     static getLightViewMatrixForShadow(scope: PBInsideFunctionScope): PBShaderExp;
+    static getNormalMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     // @internal (undocumented)
     static getNumLights(scope: PBInsideFunctionScope): PBShaderExp;
+    static getProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     // @internal (undocumented)
     static getShadowCameraParams(scope: PBInsideFunctionScope): PBShaderExp;
+    static getShadowMap(scope: PBInsideFunctionScope): PBShaderExp;
     // @internal (undocumented)
     static getSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp;
+    // @internal (undocumented)
+    static getSunLightDir(scope: PBInsideFunctionScope): PBShaderExp;
+    static getViewMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     static getViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp;
-    static getWorldBinormal(scope: PBInsideFunctionScope): PBShaderExp;
+    // (undocumented)
+    static getWorldMatricesUniformName(): string;
     static getWorldMatrix(scope: PBInsideFunctionScope): PBShaderExp;
-    static getWorldNormal(scope: PBInsideFunctionScope): PBShaderExp;
-    static getWorldPosition(scope: PBInsideFunctionScope): PBShaderExp;
-    static getWorldTangent(scope: PBInsideFunctionScope): PBShaderExp;
-    static getWorldUnit(scope: PBInsideFunctionScope): PBShaderExp;
+    // (undocumented)
+    static getWorldMatrixUniformName(): string;
+    static hasSkinning(scope: PBInsideFunctionScope): boolean;
+    static linearDepthToNonLinear(scope: PBInsideFunctionScope, depth: PBShaderExp, nearFar?: PBShaderExp): PBShaderExp;
+    static nonLinearDepthToLinear(scope: PBInsideFunctionScope, depth: PBShaderExp, nearFar?: PBShaderExp): PBShaderExp;
+    static nonLinearDepthToLinearNormalized(scope: PBInsideFunctionScope, depth: PBShaderExp, nearFar?: PBShaderExp): PBShaderExp;
     static prepareFragmentShader(pb: ProgramBuilder, ctx: DrawContext): void;
     static prepareVertexShader(pb: ProgramBuilder, ctx: DrawContext): void;
     // @internal (undocumented)
     static prepareVertexShaderCommon(pb: ProgramBuilder, ctx: DrawContext): void;
+    static resolveVertexNormal(scope: PBInsideFunctionScope, normal?: PBShaderExp): PBShaderExp;
+    static resolveVertexPosition(scope: PBInsideFunctionScope, pos?: PBShaderExp): PBShaderExp;
+    static resolveVertexTangent(scope: PBInsideFunctionScope, tangent?: PBShaderExp): PBShaderExp;
     // @internal (undocumented)
     static setCameraUniforms(bindGroup: BindGroup, ctx: DrawContext, linear: boolean): void;
     static setClipSpacePosition(scope: PBInsideFunctionScope, pos: PBShaderExp): void;
     // @internal (undocumented)
-    static setFogUniforms(bindGroup: BindGroup, fogType: number, fogColor: Vector4, fogParams: Vector4, aerialPerspectiveLUT?: Texture2D): void;
+    static setFogUniforms(bindGroup: BindGroup, fogType: number, fogColor: Vector4, fogParams: Vector4, apDensity: number, aerialPerspectiveLUT?: Texture2D): void;
     // @internal (undocumented)
     static setLightUniforms(bindGroup: BindGroup, ctx: DrawContext, clusterParams: Float32Array, countParams: Int32Array, lightBuffer: StructuredBuffer, lightIndexTexture: Texture2D): void;
     // @internal (undocumented)
     static setLightUniformsShadow(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight): void;
     // @internal (undocumented)
     static setLightUniformsShadowMap(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight): void;
-    // (undocumented)
-    static readonly USAGE_BONE_MATRICIES = "usage_BoneMatrices";
-    // (undocumented)
-    static readonly USAGE_BONE_TEXTURE_SIZE = "usage_BoneTextureSize";
-    // (undocumented)
-    static readonly USAGE_INV_BIND_MATRIX = "usage_InvBindMatrix";
-    // (undocumented)
-    static readonly USAGE_VERTEX_COLOR = "usage_VertexColor";
-    // (undocumented)
-    static readonly USAGE_WORLD_BINORMAL = "usage_WorldBinormal";
-    // (undocumented)
-    static readonly USAGE_WORLD_MATRIX = "usage_WorldMatrix";
-    // (undocumented)
-    static readonly USAGE_WORLD_NORMAL = "usage_WorldNormal";
-    // (undocumented)
-    static readonly USAGE_WORLD_POSITION = "usage_WorldPosition";
-    // (undocumented)
-    static readonly USAGE_WORLD_TANGENT = "usage_WorldTangent";
 }
 
 // Warning: (ae-internal-missing-underscore) The name "ShadowConfig" should be prefixed with an underscore because the declaration is marked as @internal
@@ -3082,8 +3158,6 @@ export class ShadowMapper {
     static computeShadowBiasCSM(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, NdotL: PBShaderExp, split: PBShaderExp): PBShaderExp;
     // @internal (undocumented)
     computeShadowCSM(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, shadowVertex: PBShaderExp, NdotL: PBShaderExp, split: PBShaderExp): PBShaderExp;
-    // @internal (undocumented)
-    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope): PBShaderExp;
     // @internal (undocumented)
     protected _config: ShadowConfig;
     // @internal (undocumented)
@@ -3204,6 +3278,22 @@ export interface ShapeCreationOptions {
 }
 
 // @public
+export class SharedModel {
+    constructor(name?: string);
+    get activeScene(): number;
+    set activeScene(val: number);
+    addAnimation(animation: AssetAnimationData): void;
+    addNode(parent: AssetHierarchyNode, index: number, name: string): AssetHierarchyNode;
+    addSkeleton(skeleton: AssetSkeleton): void;
+    get animations(): AssetAnimationData[];
+    get name(): string;
+    set name(val: string);
+    get nodes(): AssetHierarchyNode[];
+    get scenes(): AssetScene[];
+    get skeletons(): AssetSkeleton[];
+}
+
+// @public
 export class Skeleton {
     constructor(joints: SceneNode[], inverseBindMatrices: Matrix4x4[], bindPoseMatrices: Matrix4x4[]);
     // @internal (undocumented)
@@ -3246,12 +3336,16 @@ export interface SkinnedBoundingBox {
 // @public
 export class SkyRenderer {
     constructor();
+    get aerialPerspectiveDensity(): number;
+    set aerialPerspectiveDensity(val: number);
     get autoUpdateIBLMaps(): boolean;
     set autoUpdateIBLMaps(val: boolean);
     get cloudIntensity(): number;
     set cloudIntensity(val: number);
     get cloudy(): number;
     set cloudy(val: number);
+    get drawGround(): boolean;
+    set drawGround(val: boolean);
     // @internal (undocumented)
     drawScatteredFog(ctx: DrawContext): boolean;
     get fogColor(): Vector4;
@@ -3341,40 +3435,6 @@ export class SpotLight extends PunctualLight {
     setRange(val: number): this;
 }
 
-// @public
-export class StandardMaterial<T extends LightModel = LightModel> extends Material {
-    constructor();
-    get alphaBlend(): boolean;
-    set alphaBlend(val: boolean);
-    get alphaCutoff(): number;
-    set alphaCutoff(val: number);
-    // @override
-    applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean): void;
-    // @override
-    protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
-    // @override
-    protected _createHash(renderPassType: number): string;
-    // @override
-    protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram;
-    // @internal (undocumented)
-    protected getHash(renderPassType: number): string;
-    getTexCoordTransform(texCoordIndex: number): Matrix4x4;
-    isTransparent(): boolean;
-    get lightModel(): T;
-    set lightModel(lm: T);
-    get opacity(): number;
-    set opacity(val: number);
-    setTexCoordTransform(texCoordIndex: number, transform: Matrix4x4): void;
-    // @override
-    supportLighting(): boolean;
-    get vertexColor(): boolean;
-    set vertexColor(val: boolean);
-    get vertexNormal(): boolean;
-    set vertexNormal(val: boolean);
-    get vertexTangent(): boolean;
-    set vertexTangent(val: boolean);
-}
-
 // Warning: (ae-internal-missing-underscore) The name "TemporalCache" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal
@@ -3412,8 +3472,7 @@ export class Terrain extends GraphNode {
     set castShadow(val: boolean);
     // @override
     computeBoundingVolume(bv: BoundingVolume): BoundingVolume;
-    // Warning: (ae-forgotten-export) The symbol "TerrainLightModelOptions" needs to be exported by the entry point index.d.ts
-    create(sizeX: number, sizeZ: number, elevations: Float32Array, scale: Vector3, patchSize: number, options?: TerrainLightModelOptions): boolean;
+    create(sizeX: number, sizeZ: number, elevations: Float32Array, scale: Vector3, patchSize: number, options?: TerrainMaterialOptions): boolean;
     createGrass(density: number[][], bladeWidth: number, bladeHeight: number, offset: number, grassTexture: Texture2D): void;
     // @internal (undocumented)
     cull(cullVisitor: CullVisitor): number;
@@ -3429,7 +3488,6 @@ export class Terrain extends GraphNode {
     get LODCamera(): Camera;
     set LODCamera(camera: Camera);
     get material(): TerrainMaterial;
-    get maxDetailTextureLevels(): number;
     get maxPixelError(): number;
     set maxPixelError(val: number);
     get normalMap(): Texture2D;
@@ -3449,31 +3507,62 @@ export class Terrain extends GraphNode {
     set wireframe(b: boolean);
 }
 
-// @public
-export class TerrainMaterial extends Material {
-    constructor(options?: TerrainLightModelOptions);
-    // @override
-    applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean): void;
-    // @override
-    protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
-    // @internal (undocumented)
-    protected _createHash(renderPassType: number): string;
-    // @internal (undocumented)
-    protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram;
-    // @internal (undocumented)
-    protected getHash(renderPassType: number): string;
-    // @override
-    isTransparent(): boolean;
-    // Warning: (ae-forgotten-export) The symbol "TerrainLightModel" needs to be exported by the entry point index.d.ts
-    //
+// @public (undocumented)
+export type TerrainDetailMapInfo = {
+    albedoTextures: Texture2DArray | Texture2D[];
+    uvScale: number[];
+    metallic?: number[];
+    roughness?: number[];
+    normalScale?: number[];
+    normalTextures?: Texture2DArray | Texture2D[];
+    albedoTexCoordIndex?: number | number[];
+    normalTexCoordIndex?: number | number[];
+    grass?: {
+        texture?: Texture2D;
+        bladeWidth?: number;
+        bladeHeigh?: number;
+        density?: number;
+        offset?: number;
+    }[][];
+};
+
+// Warning: (ae-forgotten-export) The symbol "TerrainMaterial_base" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export class TerrainMaterial extends TerrainMaterial_base {
+    constructor(options?: TerrainMaterialOptions);
     // (undocumented)
-    get lightModel(): TerrainLightModel;
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
+    // (undocumented)
+    calculateAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp;
+    // (undocumented)
+    fragmentShader(scope: PBFunctionScope): void;
+    // (undocumented)
+    generateMetallicRoughnessMap(): Texture2D;
+    getAlbedoTexCoord(scope: PBInsideFunctionScope): PBShaderExp;
+    getMetallicRoughnessTexCoord(scope: PBInsideFunctionScope): PBShaderExp;
+    getNormalTexCoord(scope: PBInsideFunctionScope): PBShaderExp;
+    // @override
+    isBatchable(): boolean;
+    // @override
+    isTransparentPass(pass: number): boolean;
+    // (undocumented)
+    sampleDetailNormalMap(scope: PBInsideFunctionScope, tex: PBShaderExp, texCoord: PBShaderExp, normalScale: PBShaderExp, TBN: PBShaderExp): PBShaderExp;
     // @override
     supportLighting(): boolean;
     // (undocumented)
     get terrainInfo(): Vector4;
     set terrainInfo(val: Vector4);
+    // (undocumented)
+    vertexShader(scope: PBFunctionScope): void;
 }
+
+// @public (undocumented)
+export type TerrainMaterialOptions = {
+    splatMap?: Texture2D;
+    splatMapTexCoordIndex?: number;
+    detailMaps?: TerrainDetailMapInfo;
+};
 
 // Warning: (ae-internal-missing-underscore) The name "TerrainPatch" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -3523,6 +3612,8 @@ export class TerrainPatch implements Drawable {
     // (undocumented)
     getPickTarget(): GraphNode;
     // (undocumented)
+    getQueueType(): number;
+    // (undocumented)
     getSortDistance(camera: Camera): number;
     // (undocumented)
     getStep(): number;
@@ -3534,8 +3625,6 @@ export class TerrainPatch implements Drawable {
     isBatchable(): this is BatchDrawable;
     // (undocumented)
     isDummy(): boolean;
-    // (undocumented)
-    isTransparency(): boolean;
     // (undocumented)
     isUnlit(): boolean;
     // (undocumented)
@@ -3556,6 +3645,26 @@ export type TextureFetchOptions<T extends BaseTexture> = {
     linearColorSpace?: boolean;
     texture?: T;
     samplerOptions?: SamplerOptions;
+};
+
+// @public (undocumented)
+export type TextureMixinInstanceTypes<T> = TextureMixinTypes<T> extends {
+    new (...args: any[]): infer U;
+} ? U : never;
+
+// @public (undocumented)
+export type TextureMixinTypes<T> = ReturnType<typeof applyMaterialMixins<PBRToMixedTextureType<T>, typeof MeshMaterial>>;
+
+// @public (undocumented)
+export type TextureProp<U extends string> = {
+    [P in 'Texture' | 'TextureSampler' | 'TexCoordIndex' | 'TexCoordMatrix' as `${U}${P}`]: P extends 'Texture' ? Texture2D : P extends 'TextureSampler' ? TextureSampler : P extends 'TexCoordIndex' ? number : P extends 'TexCoordMatrix' ? Matrix4x4 : never;
+};
+
+// @public (undocumented)
+export type TexturePropUniforms<U extends string> = {
+    [P in 'TextureUniform' | 'TexCoord' as `get${Capitalize<U>}${P}`]: (scope: PBInsideFunctionScope) => PBShaderExp;
+} & {
+    [P in 'Texture' as `sample${Capitalize<U>}${P}`]: (scope: PBInsideFunctionScope, texCoord?: PBShaderExp) => PBShaderExp;
 };
 
 // @public
@@ -3599,19 +3708,8 @@ export class TranslationTrack extends AnimationTrack {
     apply(node: SceneNode, currentTime: number, duration: number): boolean;
 }
 
-// @public
-export class UnlitLightModel extends LightModel {
-    // @override
-    protected compositeSurfaceData(scope: PBInsideFunctionScope): void;
-    // @override
-    directBRDF(scope: PBInsideFunctionScope, lightDir: PBShaderExp, attenuation: PBShaderExp): void;
-    // @override
-    envBRDF(envLight: EnvironmentLighting, scope: PBInsideFunctionScope): void;
-    // @override
-    isNormalUsed(): boolean;
-    // @override
-    supportLighting(): boolean;
-}
+// @public (undocumented)
+export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never;
 
 // Warning: (ae-forgotten-export) The symbol "UnlitMaterial_base" needs to be exported by the entry point index.d.ts
 //
@@ -3621,9 +3719,9 @@ export class UnlitMaterial extends UnlitMaterial_base {
     // (undocumented)
     static readonly FEATURE_VERTEX_COLOR = "um_vertexcolor";
     // (undocumented)
-    fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void;
+    fragmentShader(scope: PBFunctionScope): void;
     // (undocumented)
-    vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
+    vertexShader(scope: PBFunctionScope): void;
 }
 
 // @public
@@ -3667,7 +3765,7 @@ export class VSM extends ShadowImpl {
     // (undocumented)
     computeShadowCSM(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, shadowVertex: PBShaderExp, NdotL: PBShaderExp, split: PBShaderExp): PBShaderExp;
     // (undocumented)
-    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope): PBShaderExp;
+    computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;
     // (undocumented)
     protected _darkness: number;
     // (undocumented)

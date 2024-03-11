@@ -1,6 +1,6 @@
 import { Application } from '../app';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders/misc';
-import { ShaderFramework, smoothNoise3D } from '../shaders';
+import { smoothNoise3D } from '../shaders';
 import { CubeFace, Matrix4x4, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { Primitive } from './primitive';
 import { BoxShape } from '../shapes';
@@ -20,6 +20,7 @@ import type {
   VertexLayout
 } from '@zephyr3d/device';
 import type { DrawContext } from './drawable';
+import { ShaderHelper } from '../material/shader/helper';
 
 /**
  * Type of sky
@@ -41,11 +42,11 @@ export type SkyType = 'color' | 'skybox' | 'scatter' | 'scatter-nocloud' | 'none
 export type FogType = 'linear' | 'exp' | 'exp2' | 'scatter' | 'none';
 
 const fogTypeMap: Record<FogType, number> = {
-  linear: ShaderFramework.FOG_TYPE_LINEAR,
-  exp: ShaderFramework.FOG_TYPE_EXP,
-  exp2: ShaderFramework.FOG_TYPE_EXP2,
-  scatter: ShaderFramework.FOG_TYPE_SCATTER,
-  none: ShaderFramework.FOG_TYPE_NONE
+  linear: ShaderHelper.FOG_TYPE_LINEAR,
+  exp: ShaderHelper.FOG_TYPE_EXP,
+  exp2: ShaderHelper.FOG_TYPE_EXP2,
+  scatter: ShaderHelper.FOG_TYPE_SCATTER,
+  none: ShaderHelper.FOG_TYPE_NONE
 };
 
 const defaultSkyWorldMatrix = Matrix4x4.identity();
@@ -55,7 +56,6 @@ const defaultSkyWorldMatrix = Matrix4x4.identity();
  * @public
  */
 export class SkyRenderer {
-  private static _defaultSunDir = Vector3.one().inplaceNormalize();
   private _skyType: SkyType;
   private _skyColor: Vector4;
   private _skyboxTexture: TextureCube;
@@ -63,6 +63,7 @@ export class SkyRenderer {
   private _radianceMapDirty: boolean;
   private _scatterSkyboxFramebuffer: FrameBuffer;
   private _scatterSkyboxTextureWidth: number;
+  private _aerialPerspectiveDensity: number;
   private _radianceMap: TextureCube;
   private _radianceMapWidth: number;
   private _irradianceMap: TextureCube;
@@ -87,6 +88,7 @@ export class SkyRenderer {
   private _renderStatesSkyNoDepthTest: RenderStateSet;
   private _renderStatesFog: RenderStateSet;
   private _renderStatesFogScatter: RenderStateSet;
+  private _drawGround: boolean;
   private _lastSunDir: Vector3;
   /**
    * Creates an instance of SkyRenderer
@@ -99,6 +101,7 @@ export class SkyRenderer {
     this._skyboxTexture = null;
     this._scatterSkyboxFramebuffer = null;
     this._scatterSkyboxTextureWidth = 256;
+    this._aerialPerspectiveDensity = 1;
     this._radianceMap = null;
     this._radianceMapWidth = 128;
     this._irradianceMap = null;
@@ -109,6 +112,7 @@ export class SkyRenderer {
     this._cloudy = 0.6;
     this._cloudIntensity = 40;
     this._wind = Vector2.zero();
+    this._drawGround = false;
     this._nearestSampler = null;
     this._programSky = {};
     this._bindgroupSky = {};
@@ -139,6 +143,13 @@ export class SkyRenderer {
       this.invalidateIBLMaps();
     }
   }
+  /** Whether ground should be rendered */
+  get drawGround(): boolean {
+    return this._drawGround;
+  }
+  set drawGround(val: boolean) {
+    this._drawGround = !!val;
+  }
   /**
    * Wether the IBL maps should be updated automatically.
    *
@@ -168,6 +179,13 @@ export class SkyRenderer {
       this._skyColor.set(val);
       this.invalidateIBLMaps();
     }
+  }
+  /** Aerial perspective density */
+  get aerialPerspectiveDensity() {
+    return this._aerialPerspectiveDensity;
+  }
+  set aerialPerspectiveDensity(val: number) {
+    this._aerialPerspectiveDensity = val;
   }
   /**
    * Light density of the sky.
@@ -328,7 +346,7 @@ export class SkyRenderer {
     if (this.drawScatteredFog(ctx)) {
       const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
       const alpha = Math.PI / 2 - Math.acos(Math.max(-1, Math.min(1, sunDir.y)));
-      const farPlane = ctx.camera.getFarPlane() * ctx.scene.worldUnit;
+      const farPlane = ctx.camera.getFarPlane() * this._aerialPerspectiveDensity * this._aerialPerspectiveDensity;
       return ScatteringLut.getAerialPerspectiveLut(alpha, farPlane);
     } else {
       return null;
@@ -398,13 +416,14 @@ export class SkyRenderer {
       bindgroup.setValue('cameraPosition', camera.getWorldPosition());
       bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
       if (this._fogType === 'scatter') {
-        const sunDir = sunLight ? sunLight.directionAndCutoff.xyz().scaleBy(-1) : SkyRenderer._defaultSunDir;
+        const sunDir = sunLight ? sunLight.directionAndCutoff.xyz().scaleBy(-1) : ShaderHelper.defaultSunDir;
         const alpha = Math.PI / 2 - Math.acos(Math.max(-1, Math.min(1, sunDir.y)));
-        const farPlane = ctx.camera.getFarPlane() * ctx.scene.worldUnit;
+        const scale =  this._aerialPerspectiveDensity * this._aerialPerspectiveDensity;
+        const farPlane = ctx.camera.getFarPlane() * scale;
         bindgroup.setTexture('apLut', ScatteringLut.getAerialPerspectiveLut(alpha, farPlane));
         bindgroup.setValue('sliceDist', farPlane / ScatteringLut.aerialPerspectiveSliceZ);
         bindgroup.setValue('sunDir', sunDir);
-        bindgroup.setValue('worldScale', ctx.scene.worldUnit);
+        bindgroup.setValue('worldScale', scale);
       } else {
         bindgroup.setValue('fogType', this.mappedFogType);
         bindgroup.setValue('fogColor', this._fogColor);
@@ -424,7 +443,13 @@ export class SkyRenderer {
     if (!sunDir.equalsTo(this._lastSunDir)) {
       this._radianceMapDirty = true;
     }
-    this._renderSky(ctx.camera, true, sunDir, false, this._skyType === 'scatter' && this._cloudy > 0);
+    this._renderSky(
+      ctx.camera,
+      true,
+      sunDir,
+      this._drawGround,
+      this._skyType === 'scatter' && this._cloudy > 0
+    );
     if (this._radianceMapDirty && ctx.env.light.type === 'ibl') {
       if (
         ctx.env.light.radianceMap &&
@@ -651,7 +676,7 @@ export class SkyRenderer {
             this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
             this.$l.hPos = pb.div(this.$l.hPos, this.$l.hPos.w);
             this.$l.viewDir = pb.sub(this.hPos.xyz, this.cameraPosition);
-            this.$l.fogFactor = ShaderFramework.computeFogFactor(
+            this.$l.fogFactor = ShaderHelper.computeFogFactor(
               this,
               this.viewDir,
               this.fogType,
@@ -797,7 +822,7 @@ export class SkyRenderer {
   /** @internal */
   private static _getSunDir(sunLight: DirectionalLight) {
     // TODO: reduce GC
-    return sunLight?.directionAndCutoff.xyz().scaleBy(-1) ?? SkyRenderer._defaultSunDir;
+    return sunLight?.directionAndCutoff.xyz().scaleBy(-1) ?? ShaderHelper.defaultSunDir;
   }
   private static _createScatterProgram(device: AbstractDevice, cloud: boolean) {
     return device.buildRenderProgram({

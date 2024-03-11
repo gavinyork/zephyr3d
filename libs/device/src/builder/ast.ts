@@ -23,19 +23,23 @@ import * as errors from './errors';
 import type { PBGlobalScope } from './programbuilder';
 import type { PBShaderExp } from './base';
 
-const BuiltinInputStructNameVS = 'uu_VSInput';
-const BuiltinOutputStructNameVS = 'uu_VSOutput';
-const BuiltinInputStructNameFS = 'uu_FSInput';
-const BuiltinOutputStructNameFS = 'uu_FSOutput';
-const BuiltinInputStructNameCS = 'uu_CSInput';
-const BuiltinOutputStructNameCS = 'uu_CSOutput';
+const BuiltinInputStructNameVS = 'zVSInput';
+const BuiltinOutputStructNameVS = 'zVSOutput';
+const BuiltinInputStructNameFS = 'zFSInput';
+const BuiltinOutputStructNameFS = 'zFSOutput';
+const BuiltinInputStructNameCS = 'zCSInput';
+const BuiltinOutputStructNameCS = 'zCSOutput';
 
-const BuiltinInputStructInstanceNameVS = 'uu_VSInputCpy';
-const BuiltinOutputStructInstanceNameVS = 'uu_VSOutputCpy';
-const BuiltinInputStructInstanceNameFS = 'uu_FSInputCpy';
-const BuiltinOutputStructInstanceNameFS = 'uu_FSOutputCpy';
-const BuiltinInputStructInstanceNameCS = 'uu_CSInputCpy';
-const BuiltinOutputStructInstanceNameCS = 'uu_CSOutputCpy';
+const BuiltinParamNameVS = 'zVertexInput';
+const BuiltinParamNameFS = 'zVertexOutput';
+const BuiltinParamNameCS = 'zComputeInput';
+
+const BuiltinInputStructInstanceNameVS = 'zVSInputCpy';
+const BuiltinOutputStructInstanceNameVS = 'zVSOutputCpy';
+const BuiltinInputStructInstanceNameFS = 'zFSInputCpy';
+const BuiltinOutputStructInstanceNameFS = 'zFSOutputCpy';
+const BuiltinInputStructInstanceNameCS = 'zCSInputCpy';
+const BuiltinOutputStructInstanceNameCS = 'zCSOutputCpy';
 
 /** @internal */
 export enum DeclareType {
@@ -53,6 +57,20 @@ export enum ShaderPrecisionType {
   HIGH,
   MEDIUM,
   LOW
+}
+
+/** @internal */
+export function getBuiltinParamName(shaderType: ShaderType) {
+  switch (shaderType) {
+    case ShaderType.Vertex:
+      return BuiltinParamNameVS;
+    case ShaderType.Fragment:
+      return BuiltinParamNameFS;
+    case ShaderType.Compute:
+      return BuiltinParamNameCS;
+    default:
+      return null;
+  }
 }
 
 /** @internal */
@@ -225,91 +243,91 @@ export const builtinVariables = {
   },
   webgpu: {
     vertexIndex: {
-      name: 'ch_builtin_vertexIndex',
+      name: 'zVertexId',
       semantic: 'vertex_index',
       type: new PBPrimitiveTypeInfo(PBPrimitiveType.U32),
       inOrOut: 'in',
       stage: 'vertex'
     },
     instanceIndex: {
-      name: 'ch_builtin_instanceIndex',
+      name: 'zInstanceId',
       semantic: 'instance_index',
       type: new PBPrimitiveTypeInfo(PBPrimitiveType.U32),
       inOrOut: 'in',
       stage: 'vertex'
     },
     position: {
-      name: 'ch_builtin_position',
+      name: 'zPosition',
       semantic: 'position',
       type: new PBPrimitiveTypeInfo(PBPrimitiveType.F32VEC4),
       inOrOut: 'out',
       stage: 'vertex'
     },
     fragCoord: {
-      name: 'ch_builtin_fragCoord',
+      name: 'zFragCoord',
       semantic: 'position',
       type: new PBPrimitiveTypeInfo(PBPrimitiveType.F32VEC4),
       inOrOut: 'in',
       stage: 'fragment'
     },
     frontFacing: {
-      name: 'ch_builtin_frontFacing',
+      name: 'zFrontFacing',
       semantic: 'front_facing',
       type: new PBPrimitiveTypeInfo(PBPrimitiveType.BOOL),
       inOrOut: 'in',
       stage: 'fragment'
     },
     fragDepth: {
-      name: 'ch_builtin_fragDepth',
+      name: 'zFragDepth',
       semantic: 'frag_depth',
       type: new PBPrimitiveTypeInfo(PBPrimitiveType.F32),
       inOrOut: 'out',
       stage: 'fragment'
     },
     localInvocationId: {
-      name: 'ch_builtin_localInvocationId',
+      name: 'zLocalInvocationId',
       semantic: 'local_invocation_id',
       type: new PBPrimitiveTypeInfo(PBPrimitiveType.U32VEC3),
       inOrOut: 'in',
       stage: 'compute'
     },
     globalInvocationId: {
-      name: 'ch_builtin_globalInvocationId',
+      name: 'zGlobalInvocationId',
       semantic: 'global_invocation_id',
       type: new PBPrimitiveTypeInfo(PBPrimitiveType.U32VEC3),
       inOrOut: 'in',
       stage: 'compute'
     },
     workGroupId: {
-      name: 'ch_builtin_workGroupId',
+      name: 'zWorkGroupId',
       semantic: 'workgroup_id',
       type: new PBPrimitiveTypeInfo(PBPrimitiveType.U32VEC3),
       inOrOut: 'in',
       stage: 'compute'
     },
     numWorkGroups: {
-      name: 'ch_builtin_numWorkGroups',
+      name: 'zNumWorkGroups',
       semantic: 'num_workgroups',
       type: new PBPrimitiveTypeInfo(PBPrimitiveType.U32VEC3),
       inOrOut: 'in',
       stage: 'compute'
     },
     sampleMaskIn: {
-      name: 'ch_builtin_sampleMaskIn',
+      name: 'zSampleMaskIn',
       semantic: 'sample_mask_in',
       type: new PBPrimitiveTypeInfo(PBPrimitiveType.U32),
       inOrOut: 'in',
       stage: 'fragment'
     },
     sampleMaskOut: {
-      name: 'ch_builtin_sampleMaskOut',
+      name: 'zSampleMaskOut',
       semantic: 'sample_mask_out',
       type: new PBPrimitiveTypeInfo(PBPrimitiveType.U32),
       inOrOut: 'out',
       stage: 'fragment'
     },
     sampleIndex: {
-      name: 'ch_builtin_sampleIndex',
+      name: 'zSampleIndex',
       semantic: 'sample_index',
       type: new PBPrimitiveTypeInfo(PBPrimitiveType.U32),
       inOrOut: 'in',
@@ -1890,17 +1908,7 @@ export class ASTCallFunction extends ASTExpression {
     return `${this.isStatement ? indent : ''}${this.name}(${args.join(',')})${this.isStatement ? ';\n' : ''}`;
   }
   toWGSL(indent: string, ctx: ASTContext) {
-    let thisArgs = this.args.filter((val) => {
-      const type = val.getType();
-      if (
-        val instanceof ASTPrimitive &&
-        type.isStructType() &&
-        ctx.types.findIndex((t) => t instanceof ASTStructDefine && t.type.structName === type.structName) < 0
-      ) {
-        return false;
-      }
-      return true;
-    });
+    let thisArgs = this.args;
     if (this.func) {
       let argsNew: ASTExpression[];
       const convertedArgs = convertArgs(thisArgs, this.func.funcType);
@@ -1910,7 +1918,17 @@ export class ASTCallFunction extends ASTExpression {
       if (!argsNew) {
         throw new Error(`no matching overloading found for function '${this.name}'`);
       }
-      thisArgs = argsNew;
+      thisArgs = argsNew.filter((val) => {
+        const type = val.getType();
+        if (
+          type.isStructType() &&
+          ctx.types.findIndex((t) => t instanceof ASTStructDefine && t.type.structName === type.structName) <
+            0
+        ) {
+          return false;
+        }
+        return true;
+      });
     }
     const args = thisArgs.map((arg) => unbracket(arg.toWGSL(indent, ctx)));
     return `${this.isStatement ? indent : ''}${this.name}(${args.join(',')})${this.isStatement ? ';\n' : ''}`;
@@ -2343,10 +2361,7 @@ export class ASTDoWhile extends ASTScope {
     }
   }
   toWebGL(indent: string, ctx: ASTContext): string {
-    let str = `${indent}do {\n`;
-    str += super.toWebGL(indent + ' ', ctx);
-    str += `${indent}} while(${unbracket(this.condition.toWebGL(indent, ctx))});\n`;
-    return str;
+    throw new Error(`No do-while() loop support for WebGL1.0 device`);
   }
   toWebGL2(indent: string, ctx: ASTContext): string {
     let str = `${indent}do {\n`;
@@ -2375,8 +2390,10 @@ export class ASTWhile extends ASTScope {
     }
   }
   toWebGL(indent: string, ctx: ASTContext): string {
-    let str = `${indent}while(${unbracket(this.condition.toWebGL(indent, ctx))}) {\n`;
-    str += super.toWebGL(indent + '  ', ctx);
+    let str = `${indent}for(int z_tmp_counter = 0; z_tmp_counter == 0; z_tmp_counter += 0) {\n`;
+    const indent2 = indent + '  ';
+    str += `${indent2}if(!(${unbracket(this.condition.toWebGL(indent, ctx))})){ break; }\n`;
+    str += super.toWebGL(indent2, ctx);
     str += `${indent}}\n`;
     return str;
   }

@@ -3,6 +3,7 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 (async function() {
   // create render device
+  /** @type HTMLCanvasElement */
   const canvas = document.querySelector('#canvas');
   const device = await backendWebGL2.createDevice(canvas);
 
@@ -58,7 +59,7 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
       this.$inputs.position = pb.vec3().attrib('position');
       this.$inputs.normal = pb.vec3().attrib('normal');
       this.$outputs.normal = pb.vec3();
-      pb.main(function() {
+      pb.main(/** @this {*} */ function() {
         this.worldPos = pb.mul(this.worldMatrix, pb.vec4(this.$inputs.position, 1));
         this.$builtins.position = pb.mul(this.projMatrix, this.worldPos);
         this.$outputs.normal = this.$inputs.normal;
@@ -66,7 +67,7 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
     },
     fragment(pb) {
       this.$outputs.color = pb.vec4();
-      pb.main(function() {
+      pb.main(/** @this {*} */ function() {
         this.normal = pb.add(pb.mul(pb.normalize(this.$inputs.normal), 0.5), pb.vec3(0.5));
         this.$outputs.color = pb.vec4(pb.pow(this.normal, pb.vec3(1/2.2)), 1);
       });
@@ -78,7 +79,7 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
       this.projMatrix = pb.mat4().uniform(0);
       this.worldMatrix = pb.mat4().uniform(0);
       this.$inputs.position = pb.vec3().attrib('position');
-      pb.main(function() {
+      pb.main(/** @this {*} */ function() {
         this.worldPos = pb.mul(this.worldMatrix, pb.vec4(this.$inputs.position, 1));
         this.$builtins.position = pb.mul(this.projMatrix, this.worldPos);
       });

@@ -4,6 +4,7 @@ import vhtml from 'highlight.js/lib/languages/vbscript-html';
 import hlstyle from 'highlight.js/styles/atom-one-dark.css';
 
 let caseName = null;
+let noCode = false;
 let code = null;
 let html = null;
 let liveDemo = null;
@@ -66,39 +67,45 @@ async function showLiveDemo() {
 }
 
 window.onload = function () {
-  hljs.registerLanguage('javascript', javascript);
-  hljs.registerLanguage('html', vhtml);
-  for (const style of [hlstyle]) {
-    const styleElement = document.createElement('style');
-    styleElement.append(style);
-    document.head.append(styleElement);
-  }
-  caseName = new URL(location.href).searchParams.get('showcase');
-  const action = function (func) {
-    if (!debounce && !this.classList.contains('active')) {
-      debounce = true;
-      this.parentElement.querySelectorAll('button').forEach(value => {
-        value.classList.remove('active');
-      });
-      this.classList.add('active');
-      func().then(() => {
-        debounce = false;
-      }).catch(err => {
-        debounce = false;
-      });
+  const params = new URL(location.href).searchParams;
+  caseName = params.get('showcase');
+  noCode = params.get('nocode') !== null;
+  if (noCode) {
+    showLiveDemo();
+  } else {
+    hljs.registerLanguage('javascript', javascript);
+    hljs.registerLanguage('html', vhtml);
+    for (const style of [hlstyle]) {
+      const styleElement = document.createElement('style');
+      styleElement.append(style);
+      document.head.append(styleElement);
     }
-  }
-  const btnShowJs = document.querySelector('#show-code');
-  btnShowJs.addEventListener('click', function () {
-    action.call(btnShowJs, showCode);
-  });
-  const btnShowHTML = document.querySelector('#show-html');
-  btnShowHTML.addEventListener('click', function () {
-    action.call(btnShowHTML, showHtml);
-  });
-  const btnShowLiveDemo = document.querySelector('#live-demo');
-  btnShowLiveDemo.addEventListener('click', function () {
+    const action = function (func) {
+      if (!debounce && !this.classList.contains('active')) {
+        debounce = true;
+        this.parentElement.querySelectorAll('button').forEach(value => {
+          value.classList.remove('active');
+        });
+        this.classList.add('active');
+        func().then(() => {
+          debounce = false;
+        }).catch(err => {
+          debounce = false;
+        });
+      }
+    }
+    const btnShowJs = document.querySelector('#show-code');
+    btnShowJs.addEventListener('click', function () {
+      action.call(btnShowJs, showCode);
+    });
+    const btnShowHTML = document.querySelector('#show-html');
+    btnShowHTML.addEventListener('click', function () {
+      action.call(btnShowHTML, showHtml);
+    });
+    const btnShowLiveDemo = document.querySelector('#live-demo');
+    btnShowLiveDemo.addEventListener('click', function () {
+      action.call(btnShowLiveDemo, showLiveDemo);
+    });
     action.call(btnShowLiveDemo, showLiveDemo);
-  });
-  action.call(btnShowLiveDemo, showLiveDemo);
+  }
 };

@@ -92,6 +92,7 @@ export class WebGPUDevice extends BaseDevice {
   private _gpuObjectHasher: WeakMap<GPUObjectBase, number>;
   private _defaultRenderPassDesc: GPURenderPassDescriptor;
   private _sampleCount: number;
+  private _emptyBindGroup: GPUBindGroup;
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend);
     this._dpr = Math.max(1, Math.floor(options?.dpr ?? window.devicePixelRatio));
@@ -116,6 +117,7 @@ export class WebGPUDevice extends BaseDevice {
     this._deviceCaps = null;
     this._gpuObjectHasher = new WeakMap();
     this._gpuObjectHashCounter = 1;
+    this._emptyBindGroup = null;
     this._samplerCache = new SamplerCache(this);
   }
   get context() {
@@ -169,6 +171,9 @@ export class WebGPUDevice extends BaseDevice {
   get currentPass(): WebGPURenderPass | WebGPUComputePass {
     return this._commandQueue.currentPass;
   }
+  get emptyBindGroup(): GPUBindGroup {
+    return this._emptyBindGroup;
+  }
   getScale(): number {
     return this._dpr;
   }
@@ -211,6 +216,10 @@ export class WebGPUDevice extends BaseDevice {
     this.device.lost.then((info) => {
       console.error(`WebGPU device was lost: ${info.message}`);
       this._canRender = false;
+    });
+    this._emptyBindGroup = this.device.createBindGroup({
+      layout: this.device.createBindGroupLayout({ entries: [] }),
+      entries: []
     });
     this._context = (this.canvas.getContext('webgpu') as unknown as GPUCanvasContext) || null;
     if (!this._context) {

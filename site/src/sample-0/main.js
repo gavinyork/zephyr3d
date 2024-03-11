@@ -3,6 +3,7 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 (async function() {
   // Create WebGL2 device
+  /** @type HTMLCanvasElement */
   const canvas = document.querySelector('#canvas');
   const device = await backendWebGL2.createDevice(canvas);
   // Create vertex buffers

@@ -15,7 +15,7 @@ myApp.ready().then(function () {
   assetManager.fetchTexture('assets/images/Wide_Street.hdr').then(tex => {
     // Generate a cube sky map from the panorama
     const skyMap = myApp.device.createCubeTexture('rgba16f', 512);
-    panoramaToCubemap(tex, skyMap);
+    panoramaToCubemap(/** @type {import('@zephyr3d/device').Texture2D} */ (tex), skyMap);
     // Generate an radiance map from the cube sky map
     const radianceMap = myApp.device.createCubeTexture('rgba16f', 256);
     prefilterCubemap(skyMap, 'ggx', radianceMap);
@@ -44,8 +44,8 @@ myApp.ready().then(function () {
   // Create camera
   const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 600);
   const eyePos = new Vector3(0, 0, 30);
-  camera.lookAt(eyePos, new Vector3(0, 0, 0), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController({ distance: 30 });
+  camera.lookAt(eyePos, Vector3.zero(), new Vector3(0, 1, 0));
+  camera.controller = new OrbitCameraController();
 
   const compositor = new Compositor();
   // Add a Tonemap post-processing effect

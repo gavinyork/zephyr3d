@@ -6,6 +6,8 @@ import { BaseCameraController } from './base';
  * @public
  */
 export interface OrbitCameraControllerOptions {
+  /** target position */
+  center: Vector3;
   /** initial distance between the camera and the target */
   distance?: number;
   /** damping value */
@@ -55,6 +57,7 @@ export class OrbitCameraController extends BaseCameraController {
     super();
     this.options = Object.assign(
       {
+        center: Vector3.zero(),
         distance: 1,
         damping: 0.1,
         moveSpeed: 0.2,
@@ -73,6 +76,13 @@ export class OrbitCameraController extends BaseCameraController {
     this.quat = new Quaternion();
     this.scale = 1;
   }
+  /** Rotation center */
+  get center(): Vector3 {
+    return this.options.center;
+  }
+  set center(val: Vector3) {
+    this.options.center.set(val);
+  }
   /**
    * {@inheritDoc BaseCameraController.reset}
    * @override
@@ -83,6 +93,7 @@ export class OrbitCameraController extends BaseCameraController {
     this.lastMouseY = 0;
     this.rotateX = 0;
     this.rotateY = 0;
+    this.upVector = Vector3.axisPY();
     this.scale = 1;
     this._loadCameraParams();
   }
@@ -117,8 +128,6 @@ export class OrbitCameraController extends BaseCameraController {
    * @override
    */
   protected _onMouseWheel(evt: WheelEvent): boolean {
-    console.log(`wheel deltaX: ${evt.deltaX}`);
-    console.log(`wheel deltaY: ${evt.deltaY}`);
     const factor = Math.pow(0.9, Math.abs(this.options.zoomSpeed));
     if (evt.deltaY > 0) {
       this.scale /= factor;
@@ -145,11 +154,15 @@ export class OrbitCameraController extends BaseCameraController {
   }
   /** @internal */
   private _loadCameraParams() {
-    if (this._getCamera()) {
-      const mat = this._getCamera().worldMatrix;
-      mat.decomposeLookAt(this.eyePos, this.target);
-      Vector3.normalize(Vector3.sub(this.eyePos, this.target), this.direction);
-      Vector3.sub(this.eyePos, Vector3.scale(this.direction, this.options.distance), this.target);
+    const camera = this._getCamera();
+    if (camera) {
+      this.eyePos = this._getCamera().position;
+      this.target.set(this.options.center);
+      camera.lookAt(this.eyePos, this.target, this.upVector);
+      Vector3.sub(this.eyePos, this.target, this.direction);
+      this.options.distance = this.direction.magnitude;
+      this.direction.inplaceNormalize();
+      const mat = this._getCamera().localMatrix;
       this.xVector.setXYZ(mat[0], mat[1], mat[2]);
     }
   }
@@ -167,6 +180,13 @@ export class OrbitCameraController extends BaseCameraController {
    */
   update() {
     if (this._getCamera()) {
+      const dx = this.options.center.x - this.target.x;
+      const dy = this.options.center.y - this.target.y;
+      const dz = this.options.center.z - this.target.z;
+      this.eyePos.x += dx;
+      this.eyePos.y += dy;
+      this.eyePos.z += dz;
+      this.target.set(this.options.center);
       Quaternion.fromAxisAngle(this.xVector, this.rotateX, this.quat);
       this.quat.transform(this.eyePos.subBy(this.target), this.eyePos);
       Quaternion.fromEulerAngle(0, this.rotateY, 0, 'XYZ', this.quat);

@@ -33,9 +33,9 @@ const sphere = new Mesh(scene, new SphereShape(), material);
 // 创建相机
 // 创建的网格默认位于世界坐标系原点，我们将摄像机放置在(0,0,4)并看向原点
 const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
-camera.lookAt(new Vector3(0, 0, 4), new Vector3(0, 0, 0), new Vector3(0, 1, 0));
-// Orbit控制器距离设置为4，即摄像机到物体的距离
-camera.controller = new OrbitCameraController({ distance: 4 });
+camera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
+// Orbit控制器旋转中心设为原点
+camera.controller = new OrbitCameraController({ center: Vector3.zero() });
 
 ```
 
@@ -60,18 +60,18 @@ const assetManager = new AssetManager();
 // 创建一个PBR材质
 const material = new PBRMetallicRoughnessMaterial();
 // 金属度 0.9
-material.lightModel.metallic = 0.9;
+material.metallic = 0.9;
 // 粗糙度 0.6
-material.lightModel.roughness = 0.6;
+material.roughness = 0.6;
 // 添加diffuse贴图
 assetManager.fetchTexture('assets/images/earthcolor.jpg').then(texture => {
-  material.lightModel.setAlbedoMap(texture, null, 0);
+  material.albedoTexture = texture;
 });
 // 添加法线贴图
 assetManager.fetchTexture('assets/images/earthnormal.png', {
   linearColorSpace: true
 }).then(texture => {
-  material.lightModel.setNormalMap(texture, null, 0);
+  material.normalTexture = texture;
 });
 
 ```

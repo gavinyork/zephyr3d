@@ -1,5 +1,5 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, DirectionalLight, Mesh, BoxShape, LambertMaterial, PlaneShape, SpotLight } from '@zephyr3d/scene';
+import { Scene, Application, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, Mesh, BoxShape, LambertMaterial, PlaneShape, SpotLight } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
@@ -41,8 +41,8 @@ myApp.ready().then(function () {
   // Create camera
   const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 600);
   const eyePos = new Vector3(30, 30, 30);
-  camera.lookAt(eyePos, new Vector3(0, 0, 0), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController({ distance: eyePos.magnitude });
+  camera.lookAt(eyePos, Vector3.zero(), new Vector3(0, 1, 0));
+  camera.controller = new OrbitCameraController();
 
   const compositor = new Compositor();
   // Add a Tonemap post-processing effect

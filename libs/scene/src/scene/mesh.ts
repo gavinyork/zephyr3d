@@ -3,13 +3,14 @@ import { Vector4 } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import { BoxFrameShape } from '../shapes';
 import type { Material } from '../material';
-import { LambertLightModel, StandardMaterial } from '../material';
+import { LambertMaterial } from '../material';
 import type { RenderPass, Primitive, BatchDrawable, DrawContext } from '../render';
 import { Application } from '../app';
 import type { Texture2D } from '@zephyr3d/device';
 import type { XForm } from './xform';
 import type { Scene } from './scene';
 import type { BoundingBox, BoundingVolume } from '../utility/bounding_volume';
+import { QUEUE_OPAQUE } from '../values';
 
 /**
  * Mesh node
@@ -174,7 +175,7 @@ export class Mesh extends GraphNode implements BatchDrawable {
    * {@inheritDoc Drawable.isBatchable}
    */
   isBatchable(): this is BatchDrawable {
-    return this._batchable && !this._boneMatrices;
+    return this._batchable && !this._boneMatrices && this._material?.isBatchable();
   }
   /** Disposes the mesh node */
   dispose() {
@@ -183,10 +184,10 @@ export class Mesh extends GraphNode implements BatchDrawable {
     super.dispose();
   }
   /**
-   * {@inheritDoc Drawable.isTransparency}
+   * {@inheritDoc Drawable.getQueueType}
    */
-  isTransparency(): boolean {
-    return !!this.material?.isTransparent();
+  getQueueType(): number {
+    return this.material?.getQueueType() ?? QUEUE_OPAQUE;
   }
   /**
    * {@inheritDoc Drawable.isUnlit}
@@ -239,14 +240,13 @@ export class Mesh extends GraphNode implements BatchDrawable {
     this.invalidateBoundingVolume();
   }
   /** @internal */
-  private static _defaultMaterial: StandardMaterial = null;
+  private static _defaultMaterial: Material = null;
   /** @internal */
   private static _defaultBoxFrame: Primitive = null;
   /** @internal */
-  private static _getDefaultMaterial(): StandardMaterial {
+  private static _getDefaultMaterial(): Material {
     if (!this._defaultMaterial) {
-      this._defaultMaterial = new StandardMaterial();
-      this._defaultMaterial.lightModel = new LambertLightModel();
+      this._defaultMaterial = new LambertMaterial();
     }
     return this._defaultMaterial;
   }

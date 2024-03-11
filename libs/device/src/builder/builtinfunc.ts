@@ -2515,6 +2515,10 @@ const builtinFunctionsAll = {
       if (!texType.isTextureType()) {
         throw new PBParamTypeError('textureSampleLevel', 'texture');
       }
+      if (pb.getDevice().type === 'webgl' && pb.shaderKind === 'vertex') {
+        // WebGL1 does not support vertex texture lod
+        return pb.textureSample(tex, args[1] as any);
+      }
       if (pb.getDevice().type === 'webgpu') {
         if (texType.isExternalTexture()) {
           return pb.textureLoad(tex, pb.ivec2(args[1] as any), 0);

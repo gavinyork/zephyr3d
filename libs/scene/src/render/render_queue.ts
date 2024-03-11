@@ -5,6 +5,7 @@ import type { Drawable } from './drawable';
 import type { DirectionalLight, PunctualLight } from '../scene/light';
 import type { RenderPass } from '.';
 import type { GraphNode } from '../scene';
+import { QUEUE_TRANSPARENT } from '../values';
 
 /**
  * Instance data
@@ -135,7 +136,7 @@ export class RenderQueue {
         };
         this._itemLists[renderOrder] = itemList;
       }
-      const trans = drawable.isTransparency();
+      const trans = drawable.getQueueType() === QUEUE_TRANSPARENT;
       const list = trans ? itemList.transList : itemList.opaqueList;
       if (drawable.isBatchable()) {
         const instanceList = trans ? itemList.transInstanceList : itemList.opaqueInstanceList;

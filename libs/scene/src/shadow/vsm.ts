@@ -12,16 +12,11 @@ import { Blitter } from '../blitter';
 import { computeShadowMapDepth, filterShadowVSM } from '../shaders/shadow';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
 import { ShadowMapper } from './shadowmapper';
-import {
-  decode2HalfFromRGBA,
-  decodeNormalizedFloatFromRGBA,
-  encode2HalfToRGBA,
-  nonLinearDepthToLinearNormalized
-} from '../shaders/misc';
-import { ShaderFramework } from '../shaders';
+import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encode2HalfToRGBA } from '../shaders/misc';
 import { Application } from '../app';
 import { TemporalCache } from '../render';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
+import { ShaderHelper } from '../material/shader/helper';
 
 type VSMImplData = {
   blurFramebuffer: FrameBuffer;
@@ -325,8 +320,8 @@ export class VSM extends ShadowImpl {
   getShadowMapDepthFormat(shadowMapParams: ShadowMapParams): TextureFormat {
     return 'd24s8';
   }
-  computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope): PBShaderExp {
-    return computeShadowMapDepth(scope, shadowMapParams.shadowMap.format);
+  computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
+    return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap.format);
   }
   computeShadowCSM(
     shadowMapParams: ShadowMapParams,
@@ -388,13 +383,10 @@ export class VSM extends ShadowImpl {
     const pb = scope.$builder;
     pb.func(funcNameComputeShadow, [pb.vec4('shadowVertex'), pb.float('NdotL')], function () {
       if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
-        this.$l.dir = pb.sub(
-          this.shadowVertex.xyz,
-          ShaderFramework.getLightPositionAndRangeForShadow(this).xyz
-        );
+        this.$l.dir = pb.sub(this.shadowVertex.xyz, ShaderHelper.getLightPositionAndRangeForShadow(this).xyz);
         this.$l.distance = pb.div(
           pb.length(this.dir),
-          ShaderFramework.getLightPositionAndRangeForShadow(this).w
+          ShaderHelper.getLightPositionAndRangeForShadow(this).w
         );
         this.$l.shadowBias = ShadowMapper.computeShadowBias(
           shadowMapParams,
@@ -426,8 +418,12 @@ export class VSM extends ShadowImpl {
         this.$l.shadow = pb.float(1);
         this.$if(this.inShadow, function () {
           if (shadowMapParams.lightType === LIGHT_TYPE_SPOT) {
-            this.$l.nearFar = ShaderFramework.getShadowCameraParams(this).xy;
-            this.shadowCoord.z = nonLinearDepthToLinearNormalized(this, this.shadowCoord.z, this.nearFar);
+            this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
+            this.shadowCoord.z = ShaderHelper.nonLinearDepthToLinearNormalized(
+              this,
+              this.shadowCoord.z,
+              this.nearFar
+            );
             this.$l.shadowBias = ShadowMapper.computeShadowBias(
               shadowMapParams,
               this,

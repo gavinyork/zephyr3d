@@ -3,13 +3,13 @@ import { Vector2, nextPowerOf2 } from '@zephyr3d/base';
 import { Primitive } from '../../render/primitive';
 import type { BatchDrawable, Drawable, DrawContext } from '../../render/drawable';
 import type { XForm } from '../xform';
-import { GrassMaterial } from '../../material';
 import type { QuadtreeNode } from './quadtree';
 import { Application } from '../../app';
 import type { Camera } from '../../camera/camera';
 import type { AbstractDevice, IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
 import type { Terrain } from './terrain';
 import type { GraphNode } from '../graph_node';
+import { GrassMaterial } from '../../material/grassmaterial';
 
 export class GrassCluster implements Drawable {
   private _primitive: Primitive;
@@ -56,8 +56,8 @@ export class GrassCluster implements Drawable {
   getSortDistance(camera: Camera): number {
     return this._terrain.getSortDistance(camera);
   }
-  isTransparency(): boolean {
-    return this._terrain.grassMaterial.isTransparent();
+  getQueueType(): number {
+    return this._terrain.grassMaterial.getQueueType();
   }
   isUnlit(): boolean {
     return !this._terrain.grassMaterial.supportLighting();
@@ -67,10 +67,8 @@ export class GrassCluster implements Drawable {
   }
   draw(ctx: DrawContext) {
     this._material.alphaToCoverage = Application.instance.device.getFrameBufferSampleCount() > 1;
-    if (this._material.beginDraw(ctx)) {
-      this._primitive.drawInstanced(this._numInstances);
-      this._terrain.grassMaterial.endDraw();
-    }
+    this._material.alphaCutoff = this._material.alphaToCoverage ? 1 : 0.8;
+    this._material.draw(this._primitive, ctx, this._numInstances);
   }
 }
 

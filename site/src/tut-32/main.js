@@ -1,4 +1,5 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { Vector3 } from '@zephyr3d/base';
 import { Scene, AssetManager, Application, PerspectiveCamera, OrbitCameraController } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -15,11 +16,12 @@ myApp.ready().then(async() => {
 
   // Create camera
   const camera = new PerspectiveCamera(scene, Math.PI/3, device.canvas.width / device.canvas.height, 1, 500);
-  camera.controller = new OrbitCameraController();
+  camera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
   // Load skybox texture
   const assetManager = new AssetManager();
+  /** @type {import('@zephyr3d/device').TextureCube} */
   const skyboxTexture = await assetManager.fetchTexture('assets/images/sky.dds');
 
   // Set the sky rendering mode to Skybox

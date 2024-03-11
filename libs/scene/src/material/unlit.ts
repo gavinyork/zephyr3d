@@ -2,7 +2,7 @@ import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinAlbedoColor } from './mixins/albedocolor';
 import { mixinVertexColor } from './mixins/vertexcolor';
 import type { PBFunctionScope } from '@zephyr3d/device';
-import type { DrawContext } from '../render';
+import { ShaderHelper } from './shader/helper';
 
 /**
  * Unlit material
@@ -13,17 +13,19 @@ export class UnlitMaterial extends applyMaterialMixins(MeshMaterial, mixinVertex
   constructor() {
     super();
   }
-  vertexShader(scope: PBFunctionScope, ctx: DrawContext) {
-    super.vertexShader(scope, ctx);
-    scope.$inputs.zPos = scope.$builder.vec3().attrib('position');
-    this.transformVertexAndNormal(scope);
+  vertexShader(scope: PBFunctionScope) {
+    super.vertexShader(scope);
+    const pb = scope.$builder;
+    scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
+    scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
+    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
   }
-  fragmentShader(scope: PBFunctionScope, ctx: DrawContext) {
-    super.fragmentShader(scope, ctx);
-    let color = this.calculateAlbedoColor(scope, ctx);
+  fragmentShader(scope: PBFunctionScope) {
+    super.fragmentShader(scope);
+    let color = this.calculateAlbedoColor(scope);
     if (this.vertexColor) {
-      color = scope.$builder.mul(color, this.getVertexColor(scope, ctx));
+      color = scope.$builder.mul(color, this.getVertexColor(scope));
     }
-    this.outputFragmentColor(scope, this.needFragmentColor(ctx) ? color : null, ctx);
+    this.outputFragmentColor(scope, scope.$inputs.worldPos, this.needFragmentColor() ? color : null);
   }
 }

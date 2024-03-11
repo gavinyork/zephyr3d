@@ -16,7 +16,7 @@ myApp.ready().then(async() => {
 
   // Create camera
   const camera = new PerspectiveCamera(scene, Math.PI/3, device.canvas.width / device.canvas.height, 1, 500);
-  camera.controller = new OrbitCameraController();
+  camera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
   // Create a directional light (which automatically sets the sunlight properties)
@@ -26,6 +26,10 @@ myApp.ready().then(async() => {
 
   // Set the sky rendering mode to Atmospheric Scattering
   scene.env.sky.skyType = 'scatter';
+  // Set cloud density
+  scene.env.sky.cloudy = 0.7;
+  // Set cloud move speed
+  scene.env.sky.wind.setXY(600, 0);
 
   // Added a Tonemap post-processing effect
   const compositor = new Compositor();

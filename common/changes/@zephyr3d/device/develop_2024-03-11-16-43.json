@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Improve webgpu shader generation",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}

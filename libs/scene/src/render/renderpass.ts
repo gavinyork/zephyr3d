@@ -1,13 +1,13 @@
 import { Vector4 } from '@zephyr3d/base';
 import { CullVisitor } from './cull_visitor';
 import { Material } from '../material';
-import { ShaderFramework } from '../shaders';
 import { Application } from '../app';
 import type { RenderQueueItem } from './render_queue';
 import { RenderQueue } from './render_queue';
 import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
 import type { AbstractDevice, BindGroup, BindGroupLayout, RenderStateSet } from '@zephyr3d/device';
+import { ShaderHelper } from '../material/shader/helper';
 
 /**
  * Base class for any kind of render passes
@@ -86,11 +86,11 @@ export abstract class RenderPass {
       //const programBuilder = new ProgramBuilder(Application.instance.device);
       const ret = Application.instance.device.programBuilder.buildRender({
         vertex(pb) {
-          ShaderFramework.prepareVertexShader(pb, ctx);
+          ShaderHelper.prepareVertexShader(pb, ctx);
           pb.main(function () {});
         },
         fragment(pb) {
-          ShaderFramework.prepareFragmentShader(pb, ctx);
+          ShaderHelper.prepareFragmentShader(pb, ctx);
           pb.main(function () {});
         }
       });

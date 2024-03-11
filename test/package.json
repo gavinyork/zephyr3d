@@ -53,6 +53,7 @@
     "lil-gui": "^0.16.1",
     "lodash-es": "^4.17.21",
     "rxjs": "7.5.2",
+    "@zip.js/zip.js": "^2.7.35",
     "ts-keycode-enum": "^1.0.6",
     "gl-matrix": "^3.4.3",
     "@zephyr3d/base": "workspace:^0.1.2",

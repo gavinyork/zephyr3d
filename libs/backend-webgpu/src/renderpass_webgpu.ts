@@ -546,7 +546,7 @@ export class WebGPURenderPass {
           }
           renderPassEncoder.setBindGroup(i, bindGroup, bindGroupOffsets?.[i] || undefined);
         } else {
-          renderPassEncoder.setBindGroup(i, null);
+          renderPassEncoder.setBindGroup(i, this._device.emptyBindGroup);
         }
       }
     }

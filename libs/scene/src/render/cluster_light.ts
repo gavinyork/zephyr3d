@@ -14,6 +14,7 @@ import type {
 } from '@zephyr3d/device';
 import type { Camera } from '../camera/camera';
 import type { RenderQueue } from './render_queue';
+import { ShaderHelper } from '../material/shader/helper';
 
 export class ClusteredLight {
   private _tileCountX: number;
@@ -99,7 +100,8 @@ export class ClusteredLight {
         this.viewMatrix = pb.mat4().uniform(0);
         this.sizeParam = pb.vec4().uniform(0);
         this.countParam = pb.ivec4().uniform(0);
-        this.lightBuffer = pb.vec4[(MAX_CLUSTERED_LIGHTS + 1) * 3]().uniformBuffer(0);
+        this[ShaderHelper.getLightBufferUniformName()] =
+          pb.vec4[(MAX_CLUSTERED_LIGHTS + 1) * 3]().uniformBuffer(0);
         pb.func('lineIntersectionToZPlane', [pb.vec3('a'), pb.vec3('b'), pb.float('zDistance')], function () {
           this.$l.normal = pb.vec3(0, 0, 1);
           this.$l.ab = pb.sub(this.b, this.a);
@@ -219,7 +221,7 @@ export class ClusteredLight {
               this.$if(pb.equal(this.i, this.countParam.w), function () {
                 this.$break();
               });
-              this.$l.light = this.lightBuffer.at(pb.mul(this.i, 3));
+              this.$l.light = this[ShaderHelper.getLightBufferUniformName()].at(pb.mul(this.i, 3));
               this.$l.lightPos = pb.mul(this.viewMatrix, pb.vec4(this.light.xyz, 1));
               this.$l.lightPos.w = this.light.w;
               this.$if(this.sphereIntersectsAABB(this.lightPos, this.aabbMin, this.aabbMax), function () {
@@ -259,7 +261,7 @@ export class ClusteredLight {
               pb.uint(0)
             ];
             this.$for(pb.uint('i'), 1, pb.uint(this.countParam.w), function () {
-              this.$l.light = this.lightBuffer.at(pb.mul(this.i, 3));
+              this.$l.light = this[ShaderHelper.getLightBufferUniformName()].at(pb.mul(this.i, 3));
               this.$l.lightPos = pb.mul(this.viewMatrix, pb.vec4(this.light.xyz, 1));
               this.$l.lightPos.w = this.light.w;
               this.$if(this.sphereIntersectsAABB(this.lightPos, this.aabbMin, this.aabbMax), function () {
@@ -307,7 +309,9 @@ export class ClusteredLight {
     });
     this._bindGroup = device.createBindGroup(this._lightIndexProgram.bindGroupLayouts[0]);
     this._lightBuffer?.dispose();
-    const lightBufferType = this._lightIndexProgram.getBindingInfo('lightBuffer').type;
+    const lightBufferType = this._lightIndexProgram.getBindingInfo(
+      ShaderHelper.getLightBufferUniformName()
+    ).type;
     this._lightBuffer = device.createStructuredBuffer(lightBufferType as PBStructTypeInfo, {
       usage: 'uniform'
     });
@@ -368,7 +372,7 @@ export class ClusteredLight {
       this._bindGroup.setValue('viewMatrix', camera.viewMatrix);
       this._bindGroup.setValue('sizeParam', this._sizeParam);
       this._bindGroup.setValue('countParam', this._countParam);
-      this._bindGroup.setBuffer('lightBuffer', this._lightBuffer);
+      this._bindGroup.setBuffer(ShaderHelper.getLightBufferUniformName(), this._lightBuffer);
       device.setProgram(this._lightIndexProgram);
       device.setVertexLayout(this._lightIndexVertexLayout);
       device.setBindGroup(0, this._bindGroup);

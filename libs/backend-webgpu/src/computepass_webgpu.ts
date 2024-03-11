@@ -79,7 +79,7 @@ export class WebGPUComputePass {
           }
           computePassEncoder.setBindGroup(i, bindGroup, bindGroupOffsets?.[i] || undefined);
         } else {
-          computePassEncoder.setBindGroup(i, null);
+          computePassEncoder.setBindGroup(i, this._device.emptyBindGroup);
         }
       }
     }

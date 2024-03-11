@@ -51,33 +51,18 @@ export function createProgramOcean(impl?: WaterShaderImpl) {
         this.$outputs.uv0 = pb.div(this.xz, this.sizes.x);
         this.$outputs.uv1 = pb.div(this.xz, this.sizes.y);
         this.$outputs.uv2 = pb.div(this.xz, this.sizes.z);
-        if (pb.getDevice().type === 'webgl') {
-          this.$l.a = pb.mul(
-            pb.textureSample(this.dx_hy_dz_dxdz0, this.$outputs.uv0).rgb,
-            pb.vec3(this.croppinesses.x, 1, this.croppinesses.x)
-          );
-          this.$l.b = pb.mul(
-            pb.textureSample(this.dx_hy_dz_dxdz1, this.$outputs.uv1).rgb,
-            pb.vec3(this.croppinesses.y, 1, this.croppinesses.y)
-          );
-          this.$l.c = pb.mul(
-            pb.textureSample(this.dx_hy_dz_dxdz2, this.$outputs.uv2).rgb,
-            pb.vec3(this.croppinesses.z, 1, this.croppinesses.z)
-          );
-        } else {
-          this.$l.a = pb.mul(
-            pb.textureSampleLevel(this.dx_hy_dz_dxdz0, this.$outputs.uv0, 0).rgb,
-            pb.vec3(this.croppinesses.x, 1, this.croppinesses.x)
-          );
-          this.$l.b = pb.mul(
-            pb.textureSampleLevel(this.dx_hy_dz_dxdz1, this.$outputs.uv1, 0).rgb,
-            pb.vec3(this.croppinesses.y, 1, this.croppinesses.y)
-          );
-          this.$l.c = pb.mul(
-            pb.textureSampleLevel(this.dx_hy_dz_dxdz2, this.$outputs.uv2, 0).rgb,
-            pb.vec3(this.croppinesses.z, 1, this.croppinesses.z)
-          );
-        }
+        this.$l.a = pb.mul(
+          pb.textureSampleLevel(this.dx_hy_dz_dxdz0, this.$outputs.uv0, 0).rgb,
+          pb.vec3(this.croppinesses.x, 1, this.croppinesses.x)
+        );
+        this.$l.b = pb.mul(
+          pb.textureSampleLevel(this.dx_hy_dz_dxdz1, this.$outputs.uv1, 0).rgb,
+          pb.vec3(this.croppinesses.y, 1, this.croppinesses.y)
+        );
+        this.$l.c = pb.mul(
+          pb.textureSampleLevel(this.dx_hy_dz_dxdz2, this.$outputs.uv2, 0).rgb,
+          pb.vec3(this.croppinesses.z, 1, this.croppinesses.z)
+        );
         this.$l.displacement = pb.add(this.a, this.b, this.c);
         this.$outputs.outPos = pb.add(pb.vec3(this.xz.x, this.level, this.xz.y), this.displacement);
         this.$outputs.outXZ = this.xz;

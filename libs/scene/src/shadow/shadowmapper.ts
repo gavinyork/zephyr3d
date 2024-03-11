@@ -18,8 +18,6 @@ import { ESM } from './esm';
 import { VSM } from './vsm';
 import { PCFPD } from './pcf_pd';
 import { PCFOPT } from './pcf_opt';
-import { nonLinearDepthToLinearNormalized } from '../shaders/misc';
-import { ShaderFramework } from '../shaders';
 import { Application } from '../app';
 import type { PointLight, PunctualLight, SpotLight } from '../scene/light';
 import type { ShadowMapPass } from '../render/shadowmap_pass';
@@ -27,6 +25,7 @@ import type { Scene } from '../scene/scene';
 import type { ShadowImpl } from './shadow_impl';
 import { TemporalCache, type DrawContext } from '../render';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_NONE } from '../values';
+import { ShaderHelper } from '../material/shader/helper';
 
 const tmpMatrix = new Matrix4x4();
 const tmpFrustum = new Frustum(Matrix4x4.identity());
@@ -369,10 +368,6 @@ export class ShadowMapper {
     }
   }
   /** @internal */
-  computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope): PBShaderExp {
-    return this._impl.computeShadowMapDepth(shadowMapParams, scope);
-  }
-  /** @internal */
   computeShadow(
     shadowMapParams: ShadowMapParams,
     scope: PBInsideFunctionScope,
@@ -421,12 +416,12 @@ export class ShadowMapper {
     linear: boolean
   ): PBShaderExp {
     const pb = scope.$builder;
-    const depthBiasParam = ShaderFramework.getDepthBiasValues(scope);
+    const depthBiasParam = ShaderHelper.getDepthBiasValues(scope);
     if (shadowMapParams.lightType === LIGHT_TYPE_DIRECTIONAL) {
       return pb.dot(pb.mul(depthBiasParam.xy, pb.vec2(1, pb.sub(1, NdotL))), pb.vec2(1, 1));
     } else {
-      const nearFar = ShaderFramework.getShadowCameraParams(scope).xy;
-      const linearDepth = linear ? z : nonLinearDepthToLinearNormalized(scope, z, nearFar);
+      const nearFar = ShaderHelper.getShadowCameraParams(scope).xy;
+      const linearDepth = linear ? z : ShaderHelper.nonLinearDepthToLinearNormalized(scope, z, nearFar);
       const biasScaleFactor = pb.mix(1, depthBiasParam.w, linearDepth);
       return pb.dot(pb.mul(depthBiasParam.xy, pb.vec2(1, pb.sub(1, NdotL)), biasScaleFactor), pb.vec2(1, 1));
     }
@@ -439,14 +434,14 @@ export class ShadowMapper {
     split: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
-    const depthBiasParam = ShaderFramework.getDepthBiasValues(scope);
+    const depthBiasParam = ShaderHelper.getDepthBiasValues(scope);
     const splitFlags = pb.vec4(
       pb.float(pb.equal(split, 0)),
       pb.float(pb.equal(split, 1)),
       pb.float(pb.equal(split, 2)),
       pb.float(pb.equal(split, 3))
     );
-    const depthBiasScale = pb.dot(ShaderFramework.getDepthBiasScales(scope), splitFlags);
+    const depthBiasScale = pb.dot(ShaderHelper.getDepthBiasScales(scope), splitFlags);
     return pb.dot(pb.mul(depthBiasParam.xy, pb.vec2(1, pb.sub(1, NdotL)), depthBiasScale), pb.vec2(1, 1));
   }
   /** @internal */

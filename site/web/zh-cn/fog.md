@@ -8,8 +8,8 @@
 
 // 设置为大气散射雾效（通常需要配合大气散射天空渲染模式)
 scene.env.sky.fogType = 'scatter';
-// 使用大气散射雾效时，这个属性可以调节雾效的浓度，值越小，雾效浓度越小
-scene.worldUnit = 100;
+// 使用大气散射雾效时，这个属性可以调节雾效的浓度，值越小，雾效浓度越小, 默认值为1
+scene.env.sky.aerialPerspectiveDensity = 10;
 
 ```
 

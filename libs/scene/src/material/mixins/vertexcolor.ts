@@ -1,33 +1,31 @@
-import type { IMeshMaterial } from '../meshmaterial';
+import type { MeshMaterial } from '../meshmaterial';
 import type { PBFunctionScope, PBInsideFunctionScope } from '@zephyr3d/device';
-import type { DrawContext } from '../../render';
-import { RENDER_PASS_TYPE_FORWARD } from '../../values';
 
 export interface IMixinVertexColor {
   vertexColor: boolean;
-  getVertexColor(scope: PBInsideFunctionScope, ctx: DrawContext);
+  getVertexColor(scope: PBInsideFunctionScope);
 }
 
-function mixinVertexColor<T extends IMeshMaterial>(BaseCls: { new (...args: any[]): T }) {
+function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).vertexColorMixed) {
-    return BaseCls as { new (...args: any[]): T & IMixinVertexColor };
+    return BaseCls as T & { new (...args: any[]): IMixinVertexColor };
   }
-  const FEATURE_VERTEX_COLOR = 'z-feature-vertex-color';
-  return class extends (BaseCls as { new (...args: any[]): IMeshMaterial }) {
+  let FEATURE_VERTEX_COLOR = 0;
+  const cls = class extends BaseCls {
     static vertexColorMixed = true;
     constructor(...args: any[]) {
       super(...args);
     }
     /** Albedo color */
     get vertexColor(): boolean {
-      return this.featureUsed(FEATURE_VERTEX_COLOR, RENDER_PASS_TYPE_FORWARD);
+      return this.featureUsed(FEATURE_VERTEX_COLOR);
     }
     set vertexColor(val: boolean) {
       this.useFeature(FEATURE_VERTEX_COLOR, !!val);
     }
-    vertexShader(scope: PBFunctionScope, ctx: DrawContext): void {
-      super.vertexShader(scope, ctx);
-      if (this.needFragmentColor(ctx)) {
+    vertexShader(scope: PBFunctionScope): void {
+      super.vertexShader(scope);
+      if (this.needFragmentColor()) {
         if (this.vertexColor) {
           if (scope.$getVertexAttrib('diffuse')) {
             throw new Error('mixinVertexColor.vertexShader(): diffuse vertex stream already defined');
@@ -37,8 +35,8 @@ function mixinVertexColor<T extends IMeshMaterial>(BaseCls: { new (...args: any[
         }
       }
     }
-    getVertexColor(scope: PBInsideFunctionScope, ctx: DrawContext) {
-      if (!this.needFragmentColor(ctx)) {
+    getVertexColor(scope: PBInsideFunctionScope) {
+      if (!this.needFragmentColor()) {
         throw new Error(
           'mixinVertexColor.getVertexColor(): No need to calculate albedo color, make sure needFragmentColor() returns true'
         );
@@ -49,7 +47,9 @@ function mixinVertexColor<T extends IMeshMaterial>(BaseCls: { new (...args: any[
         return scope.$inputs.zDiffuse;
       }
     }
-  } as unknown as { new (...args: any[]): T & IMixinVertexColor };
+  } as unknown as T & { new (...args: any[]): IMixinVertexColor };
+  FEATURE_VERTEX_COLOR = cls.defineFeature();
+  return cls;
 }
 
 export { mixinVertexColor };

@@ -2,7 +2,7 @@ import type { CubeFace, Vector3, Plane } from '@zephyr3d/base';
 import { Matrix4x4, Frustum, Vector4 } from '@zephyr3d/base';
 import { SceneNode } from '../scene/scene_node';
 import { Application } from '../app';
-import { ForwardRenderScheme } from '../render';
+import { SceneRenderer } from '../render';
 import type { FrameBuffer } from '@zephyr3d/device';
 import type { Compositor } from '../posteffect';
 import type { Scene } from '../scene/scene';
@@ -332,8 +332,8 @@ export class Camera extends SceneNode {
     device.pushDeviceStates();
     device.reverseVertexWindingOrder(false);
     device.setFramebuffer(this._framebuffer);
-    ForwardRenderScheme.setClearColor(this._clearColor);
-    ForwardRenderScheme.renderScene(scene, this, compositor, logger);
+    SceneRenderer.setClearColor(this._clearColor);
+    SceneRenderer.renderScene(scene, this, compositor, logger);
     device.popDeviceStates();
   }
   /**

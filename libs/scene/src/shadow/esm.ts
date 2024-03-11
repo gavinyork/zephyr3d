@@ -8,7 +8,7 @@ import { Application } from '../app';
 import { TemporalCache } from '../render';
 import { LIGHT_TYPE_POINT } from '../values';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
-import { ShaderFramework } from '../shaders';
+import { ShaderHelper } from '../material/shader/helper';
 
 type ESMImplData = {
   blurFramebuffer: FrameBuffer;
@@ -231,8 +231,8 @@ export class ESM extends ShadowImpl {
   getShadowMapDepthFormat(shadowMapParams: ShadowMapParams): TextureFormat {
     return 'd24s8';
   }
-  computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope): PBShaderExp {
-    return computeShadowMapDepth(scope, shadowMapParams.shadowMap.format);
+  computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
+    return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap.format);
   }
   computeShadowCSM(
     shadowMapParams: ShadowMapParams,
@@ -287,10 +287,7 @@ export class ESM extends ShadowImpl {
     const pb = scope.$builder;
     pb.func(funcNameComputeShadow, [pb.vec4('shadowVertex'), pb.float('NdotL')], function () {
       if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
-        this.$l.dir = pb.sub(
-          this.shadowVertex.xyz,
-          ShaderFramework.getLightPositionAndRangeForShadow(this).xyz
-        );
+        this.$l.dir = pb.sub(this.shadowVertex.xyz, ShaderHelper.getLightPositionAndRangeForShadow(this).xyz);
         this.$return(filterShadowESM(this, LIGHT_TYPE_POINT, shadowMapParams.shadowMap.format, this.dir));
       } else {
         this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
