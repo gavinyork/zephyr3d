@@ -4,6 +4,8 @@
 
 ## IMixinAlbedoColor type
 
+Interface for albedo color mixin
+
 **Signature:**
 
 ```typescript

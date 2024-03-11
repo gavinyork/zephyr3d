@@ -4,6 +4,8 @@
 
 ## IMixinPBRMetallicRoughness type
 
+Interface for PBRMetallicRoughness lighting model mixin
+
 **Signature:**
 
 ```typescript

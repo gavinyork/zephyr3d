@@ -4,6 +4,8 @@
 
 ## mixinBlinnPhong() function
 
+Blinn-phong lighting model mixin
+
 **Signature:**
 
 ```typescript
@@ -14,9 +16,11 @@ declare function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T): T &
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  BaseCls | T |  |
+|  BaseCls | T | Class to mix in |
 
 **Returns:**
 
 T &amp; (new (...args: any\[\]) =&gt; [IMixinBlinnPhong](doc/markdown/./scene.imixinblinnphong.md)<!-- -->)
+
+Mixed class
 

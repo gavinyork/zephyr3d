@@ -4,6 +4,8 @@
 
 ## mixinLambert() function
 
+Lambert lighting model mixin
+
 **Signature:**
 
 ```typescript
@@ -14,9 +16,11 @@ declare function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T): T & (n
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  BaseCls | T |  |
+|  BaseCls | T | Class to mix in |
 
 **Returns:**
 
 T &amp; (new (...args: any\[\]) =&gt; [IMixinLambert](doc/markdown/./scene.imixinlambert.md)<!-- -->)
+
+Mixed class
 

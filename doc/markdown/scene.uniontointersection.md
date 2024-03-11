@@ -4,6 +4,8 @@
 
 ## UnionToIntersection type
 
+Convert union type to intersection
+
 **Signature:**
 
 ```typescript

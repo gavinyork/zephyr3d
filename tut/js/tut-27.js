@@ -27301,7 +27301,14 @@ class InstanceBindGroupPool {
     }
 }
 
-function applyMaterialMixins(target, ...mixins) {
+/**
+ * Apply material mixins to specific material class
+ * @param target - Material class
+ * @param mixins - mixins
+ * @returns Mixed mesh material class
+ *
+ * @public
+ */ function applyMaterialMixins(target, ...mixins) {
     let r = target;
     for (const m of mixins){
         r = m(r);
@@ -27637,7 +27644,13 @@ FEATURE_ALPHATEST = MeshMaterial.defineFeature();
 FEATURE_ALPHABLEND = MeshMaterial.defineFeature();
 FEATURE_ALPHATOCOVERAGE = MeshMaterial.defineFeature();
 
-function mixinTextureProps(name) {
+/**
+ * Texture property mixin
+ * @param name - Texture name
+ * @returns Texture mixin
+ *
+ * @public
+ */ function mixinTextureProps(name) {
     return function(BaseCls, vertex = false) {
         const capName = `${name[0].toUpperCase()}${name.slice(1)}`;
         const id = `mixinTexture${capName}`;
@@ -27786,7 +27799,13 @@ function mixinTextureProps(name) {
     };
 }
 
-function mixinAlbedoColor(BaseCls) {
+/**
+ * Albedo color mixin
+ * @param BaseCls - Class to mix in
+ * @returns Mixed class
+ *
+ * @public
+ */ function mixinAlbedoColor(BaseCls) {
     if (BaseCls.albedoColorMixed) {
         return BaseCls;
     }
@@ -27833,7 +27852,12 @@ function mixinAlbedoColor(BaseCls) {
     };
 }
 
-function mixinLight(BaseCls) {
+/**
+ * Light mixin
+ * @param BaseCls - class to mix in
+ * @returns Mixed class
+ * @public
+ */ function mixinLight(BaseCls) {
     if (BaseCls.lightMixed) {
         return BaseCls;
     }
@@ -28284,7 +28308,12 @@ function mixinLight(BaseCls) {
     return cls;
 }
 
-function mixinVertexColor(BaseCls) {
+/**
+ * Vertex color mixin
+ *
+ * @param BaseCls - Base class to mix in
+ * @returns Mixed class
+ */ function mixinVertexColor(BaseCls) {
     if (BaseCls.vertexColorMixed) {
         return BaseCls;
     }
@@ -28398,7 +28427,12 @@ function mixinVertexColor(BaseCls) {
     }
 }
 
-function mixinBlinnPhong(BaseCls) {
+/**
+ * Blinn-phong lighting model mixin
+ * @param BaseCls - Class to mix in
+ * @returns Mixed class
+ * @public
+ */ function mixinBlinnPhong(BaseCls) {
     if (BaseCls.blinnPhongMixed) {
         return BaseCls;
     }
@@ -28477,10 +28511,15 @@ function mixinBlinnPhong(BaseCls) {
     };
 }
 
-class BlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinBlinnPhong, mixinVertexColor) {
-    static FEATURE_VERTEX_NORMAL = this.defineFeature();
-    static FEATURE_VERTEX_TANGENT = this.defineFeature();
-    constructor(){
+/**
+ * Blinn material
+ * @public
+ */ class BlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinBlinnPhong, mixinVertexColor) {
+    /** @internal */ static FEATURE_VERTEX_NORMAL = this.defineFeature();
+    /** @internal */ static FEATURE_VERTEX_TANGENT = this.defineFeature();
+    /**
+   * Creates an instance of BlinnMaterial class
+   */ constructor(){
         super();
         this.useFeature(BlinnMaterial.FEATURE_VERTEX_NORMAL, true);
     }
@@ -28764,7 +28803,11 @@ function createGGXLUT(size) {
     return tex;
 }
 
-function mixinPBRCommon(BaseCls) {
+/**
+ * PBR common stuff mixin
+ * @param BaseCls - Class to mix in
+ * @returns Mixed class
+ */ function mixinPBRCommon(BaseCls) {
     if (BaseCls.pbrCommonMixed) {
         return BaseCls;
     }
@@ -29203,7 +29246,12 @@ function mixinPBRCommon(BaseCls) {
     return cls;
 }
 
-function mixinPBRMetallicRoughness(BaseCls) {
+/**
+ * PBRMetallicRoughness lighting model mixin
+ * @param BaseCls - Class to mix in
+ * @returns Mixed class
+ * @public
+ */ function mixinPBRMetallicRoughness(BaseCls) {
     if (BaseCls.pbrMetallicRoughnessMixed) {
         return BaseCls;
     }
@@ -29322,7 +29370,14 @@ function mixinPBRMetallicRoughness(BaseCls) {
     };
 }
 
-function mixinFoliage(BaseCls) {
+/**
+ * Foliage mixin
+ *
+ * @param BaseCls - Class to mix in
+ * @returns Mixed class
+ *
+ * @public
+ */ function mixinFoliage(BaseCls) {
     if (BaseCls.foliageMixed) {
         return BaseCls;
     }
@@ -29360,11 +29415,19 @@ function mixinFoliage(BaseCls) {
     };
 }
 
-class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinPBRMetallicRoughness, mixinFoliage) {
+/**
+ * Terrain grass material
+ * @public
+ */ class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinPBRMetallicRoughness, mixinFoliage) {
     /** @internal */ _terrainSize;
     /** @internal */ _terrainNormalMap;
     /** @internal */ _textureSize;
-    constructor(terrainSize, normalMap, grassTexture){
+    /**
+   * Creates an instance of GrassMaterial class
+   * @param terrainSize - terrain size
+   * @param normalMap - normal map
+   * @param grassTexture - grass texture
+   */ constructor(terrainSize, normalMap, grassTexture){
         super();
         this.metallic = 0;
         this.roughness = 1;
@@ -29470,7 +29533,10 @@ function drawFullscreenQuad(renderStates) {
     device.setRenderStates(saveRenderStateSet);
 }
 
-class TerrainMaterial extends applyMaterialMixins(MeshMaterial, mixinLight, mixinPBRMetallicRoughness) {
+/**
+ * Terrain material class
+ * @public
+ */ class TerrainMaterial extends applyMaterialMixins(MeshMaterial, mixinLight, mixinPBRMetallicRoughness) {
     static _metallicRoughnessGenerationProgram = null;
     static _metallicRoughnessGenerationBindGroup = null;
     _options;
@@ -29804,10 +29870,15 @@ class TerrainMaterial extends applyMaterialMixins(MeshMaterial, mixinLight, mixi
     }
 }
 
-class PBRMetallicRoughnessMaterial extends applyMaterialMixins(MeshMaterial, mixinPBRMetallicRoughness, mixinVertexColor) {
-    static FEATURE_VERTEX_NORMAL = this.defineFeature();
-    static FEATURE_VERTEX_TANGENT = this.defineFeature();
-    constructor(){
+/**
+ * PBRMetallicRoughness material class
+ * @public
+ */ class PBRMetallicRoughnessMaterial extends applyMaterialMixins(MeshMaterial, mixinPBRMetallicRoughness, mixinVertexColor) {
+    /** @internal */ static FEATURE_VERTEX_NORMAL = this.defineFeature();
+    /** @internal */ static FEATURE_VERTEX_TANGENT = this.defineFeature();
+    /**
+   * Creates an instance of PBRMetallicRoughnessMaterial class
+   */ constructor(){
         super();
         this.useFeature(PBRMetallicRoughnessMaterial.FEATURE_VERTEX_NORMAL, true);
     }
@@ -40014,13 +40085,13 @@ interface MicrofacetDistributionSample {
    * Fetches a text resource from a given URL
    * @param url - The URL from where to fetch the resource
    * @param postProcess - A function that will be involved when the text data was loaded.
-   * 
+   *
    * @remarks
    * If a text data has already been loaded, the function will ignore the
    * postProcess parameter and directly return the text loaded previously.
    * To load the same text with different postProcess parameters,
    * use different AssetManager instances separately.
-   * 
+   *
    * @returns The fetched text
    */ async fetchTextData(url, postProcess) {
         let P = this._textDatas[url];
@@ -40034,13 +40105,13 @@ interface MicrofacetDistributionSample {
    * Fetches a binary resource from a given URL
    * @param url - The URL from where to fetch the resource
    * @param postProcess - A function that will be involved when the binary data was loaded.
-   * 
+   *
    * @remarks
    * If a binary data has already been loaded, the function will ignore the
    * postProcess parameter and directly return the data loaded previously.
    * To load the same data with different postProcess parameters,
    * use different AssetManager instances separately.
-   * 
+   *
    * @returns Binary data as ArrayBuffer
    */ async fetchBinaryData(url, postProcess) {
         let P = this._binaryDatas[url];
@@ -40088,13 +40159,13 @@ interface MicrofacetDistributionSample {
    * @param url - The URL from where to fetch the resource
    * @param mimeType - The MIME type of the model resource, if not provided, model type will be determined by file extension
    * @param postProcess - A function that will be involved when the model was loaded.
-   * 
+   *
    * @remarks
    * If a model has already been loaded, the function will ignore the
    * postProcess parameter and directly return the model loaded previously.
    * To load the same model with different postProcess parameters,
    * use different AssetManager instances separately.
-   * 
+   *
    * @returns The created model node
    */ async fetchModel(scene, url, mimeType, postProcess) {
         const sharedModel = await this.fetchModelData(scene, url, mimeType, postProcess);

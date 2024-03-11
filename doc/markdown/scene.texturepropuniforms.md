@@ -4,6 +4,8 @@
 
 ## TexturePropUniforms type
 
+TexturePropUniforms
+
 **Signature:**
 
 ```typescript

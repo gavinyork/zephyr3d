@@ -3159,7 +3159,7 @@
         {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/scene!applyMaterialMixins:function(1)",
-          "docComment": "",
+          "docComment": "/**\n * Apply material mixins to specific material class\n *\n * @param target - Material class\n *\n * @param mixins - mixins\n *\n * @returns Mixed mesh material class\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -8514,7 +8514,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!BlendMode:type",
-          "docComment": "",
+          "docComment": "/**\n * Blending mode for mesh material\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -8540,7 +8540,7 @@
         {
           "kind": "Class",
           "canonicalReference": "@zephyr3d/scene!BlinnMaterial:class",
-          "docComment": "",
+          "docComment": "/**\n * Blinn material\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -8565,7 +8565,7 @@
             {
               "kind": "Constructor",
               "canonicalReference": "@zephyr3d/scene!BlinnMaterial:constructor(1)",
-              "docComment": "/**\n * Constructs a new instance of the `BlinnMaterial` class\n */\n",
+              "docComment": "/**\n * Creates an instance of BlinnMaterial class\n */\n",
               "excerptTokens": [
                 {
                   "kind": "Content",
@@ -19422,7 +19422,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!ExtractMixinReturnType:type",
-          "docComment": "",
+          "docComment": "/**\n * Extract mixin return type\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -19461,7 +19461,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!ExtractMixinType:type",
-          "docComment": "",
+          "docComment": "/**\n * Extract mixin type\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -21301,7 +21301,7 @@
         {
           "kind": "Class",
           "canonicalReference": "@zephyr3d/scene!GrassMaterial:class",
-          "docComment": "",
+          "docComment": "/**\n * Terrain grass material\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -21326,7 +21326,7 @@
             {
               "kind": "Constructor",
               "canonicalReference": "@zephyr3d/scene!GrassMaterial:constructor(1)",
-              "docComment": "/**\n * Constructs a new instance of the `GrassMaterial` class\n */\n",
+              "docComment": "/**\n * Creates an instance of GrassMaterial class\n *\n * @param terrainSize - terrain size\n *\n * @param normalMap - normal map\n *\n * @param grassTexture - grass texture\n */\n",
               "excerptTokens": [
                 {
                   "kind": "Content",
@@ -21898,7 +21898,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!IMixinAlbedoColor:type",
-          "docComment": "",
+          "docComment": "/**\n * Interface for albedo color mixin\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -21969,7 +21969,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!IMixinBlinnPhong:type",
-          "docComment": "",
+          "docComment": "/**\n * Interface for blinn-phong lighting model mixin\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -22054,7 +22054,7 @@
         {
           "kind": "Interface",
           "canonicalReference": "@zephyr3d/scene!IMixinFoliage:interface",
-          "docComment": "",
+          "docComment": "/**\n * Interface for foliage mixin\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -22153,7 +22153,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!IMixinLambert:type",
-          "docComment": "",
+          "docComment": "/**\n * Interface of lambert lighting model mixin\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -22229,7 +22229,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!IMixinLight:type",
-          "docComment": "",
+          "docComment": "/**\n * Interface for light mixin\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -22755,7 +22755,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!IMixinPBRCommon:type",
-          "docComment": "",
+          "docComment": "/**\n * Interface for common PBR mixin\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -23177,7 +23177,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!IMixinPBRMetallicRoughness:type",
-          "docComment": "",
+          "docComment": "/**\n * Interface for PBRMetallicRoughness lighting model mixin\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -23517,7 +23517,7 @@
         {
           "kind": "Interface",
           "canonicalReference": "@zephyr3d/scene!IMixinVertexColor:interface",
-          "docComment": "",
+          "docComment": "/**\n * Interface for vertex color mixin\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -27489,7 +27489,7 @@
         {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/scene!mixinAlbedoColor:function(1)",
-          "docComment": "",
+          "docComment": "/**\n * Albedo color mixin\n *\n * @param BaseCls - Class to mix in\n *\n * @returns Mixed class\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -27569,7 +27569,7 @@
         {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/scene!mixinBlinnPhong:function(1)",
-          "docComment": "",
+          "docComment": "/**\n * Blinn-phong lighting model mixin\n *\n * @param BaseCls - Class to mix in\n *\n * @returns Mixed class\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -27649,7 +27649,7 @@
         {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/scene!mixinFoliage:function(1)",
-          "docComment": "",
+          "docComment": "/**\n * Foliage mixin\n *\n * @param BaseCls - Class to mix in\n *\n * @returns Mixed class\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -27729,7 +27729,7 @@
         {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/scene!mixinLambert:function(1)",
-          "docComment": "",
+          "docComment": "/**\n * Lambert lighting model mixin\n *\n * @param BaseCls - Class to mix in\n *\n * @returns Mixed class\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -27809,7 +27809,7 @@
         {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/scene!mixinLight:function(1)",
-          "docComment": "",
+          "docComment": "/**\n * Light mixin\n *\n * @param BaseCls - class to mix in\n *\n * @returns Mixed class\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -27889,7 +27889,7 @@
         {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/scene!mixinPBRCommon:function(1)",
-          "docComment": "",
+          "docComment": "/**\n * PBR common stuff mixin\n *\n * @param BaseCls - Class to mix in\n *\n * @returns Mixed class\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -27969,7 +27969,7 @@
         {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/scene!mixinPBRMetallicRoughness:function(1)",
-          "docComment": "",
+          "docComment": "/**\n * PBRMetallicRoughness lighting model mixin\n *\n * @param BaseCls - Class to mix in\n *\n * @returns Mixed class\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -28129,7 +28129,7 @@
         {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/scene!mixinTextureProps:function(1)",
-          "docComment": "",
+          "docComment": "/**\n * Texture property mixin\n *\n * @param name - Texture name\n *\n * @returns Texture mixin\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -28222,7 +28222,7 @@
         {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/scene!mixinVertexColor:function(1)",
-          "docComment": "",
+          "docComment": "/**\n * Vertex color mixin\n *\n * @param BaseCls - Base class to mix in\n *\n * @returns Mixed class\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -28686,7 +28686,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!ModelInfo:type",
-          "docComment": "/**\n * Data structure returned by AssetManager.fetchModel()\n */\n",
+          "docComment": "/**\n * Data structure returned by AssetManager.fetchModel()\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -32763,7 +32763,7 @@
         {
           "kind": "Class",
           "canonicalReference": "@zephyr3d/scene!PBRMetallicRoughnessMaterial:class",
-          "docComment": "",
+          "docComment": "/**\n * PBRMetallicRoughness material class\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -32788,7 +32788,7 @@
             {
               "kind": "Constructor",
               "canonicalReference": "@zephyr3d/scene!PBRMetallicRoughnessMaterial:constructor(1)",
-              "docComment": "/**\n * Constructs a new instance of the `PBRMetallicRoughnessMaterial` class\n */\n",
+              "docComment": "/**\n * Creates an instance of PBRMetallicRoughnessMaterial class\n */\n",
               "excerptTokens": [
                 {
                   "kind": "Content",
@@ -33169,98 +33169,6 @@
             "endIndex": 2
           },
           "implementsTokenRanges": []
-        },
-        {
-          "kind": "TypeAlias",
-          "canonicalReference": "@zephyr3d/scene!PBRTextureNames:type",
-          "docComment": "",
-          "excerptTokens": [
-            {
-              "kind": "Content",
-              "text": "type PBRTextureNames = "
-            },
-            {
-              "kind": "Content",
-              "text": "[\n    'occlusion',\n    'cheenColor',\n    'sheenRoughness',\n    'clearcoatIntensity',\n    'clearcoatNormal',\n    'clearcoatRoughness'\n]"
-            },
-            {
-              "kind": "Content",
-              "text": ";"
-            }
-          ],
-          "fileUrlPath": "dist/index.d.ts",
-          "releaseTag": "Public",
-          "name": "PBRTextureNames",
-          "typeTokenRange": {
-            "startIndex": 1,
-            "endIndex": 2
-          }
-        },
-        {
-          "kind": "TypeAlias",
-          "canonicalReference": "@zephyr3d/scene!PBRToMixedTextureType:type",
-          "docComment": "",
-          "excerptTokens": [
-            {
-              "kind": "Content",
-              "text": "type PBRToMixedTextureType<T> = "
-            },
-            {
-              "kind": "Content",
-              "text": "T extends [infer First, ...infer Rest] ? [\n    First extends string ? "
-            },
-            {
-              "kind": "Reference",
-              "text": "ReturnType",
-              "canonicalReference": "!ReturnType:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<typeof "
-            },
-            {
-              "kind": "Reference",
-              "text": "mixinTextureProps",
-              "canonicalReference": "@zephyr3d/scene!mixinTextureProps:function"
-            },
-            {
-              "kind": "Content",
-              "text": "<First>> : never,\n    ..."
-            },
-            {
-              "kind": "Reference",
-              "text": "PBRToMixedTextureType",
-              "canonicalReference": "@zephyr3d/scene!PBRToMixedTextureType:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<Rest>\n] : []"
-            },
-            {
-              "kind": "Content",
-              "text": ";"
-            }
-          ],
-          "fileUrlPath": "dist/index.d.ts",
-          "releaseTag": "Public",
-          "name": "PBRToMixedTextureType",
-          "typeParameters": [
-            {
-              "typeParameterName": "T",
-              "constraintTokenRange": {
-                "startIndex": 0,
-                "endIndex": 0
-              },
-              "defaultTypeTokenRange": {
-                "startIndex": 0,
-                "endIndex": 0
-              }
-            }
-          ],
-          "typeTokenRange": {
-            "startIndex": 1,
-            "endIndex": 8
-          }
         },
         {
           "kind": "Class",
@@ -47852,7 +47760,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!TerrainDetailMapInfo:type",
-          "docComment": "",
+          "docComment": "/**\n * Terrain detail map information\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -47923,7 +47831,7 @@
         {
           "kind": "Class",
           "canonicalReference": "@zephyr3d/scene!TerrainMaterial:class",
-          "docComment": "",
+          "docComment": "/**\n * Terrain material class\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -48668,7 +48576,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!TerrainMaterialOptions:type",
-          "docComment": "",
+          "docComment": "/**\n * Terrain material options\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -48769,7 +48677,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!TextureMixinInstanceTypes:type",
-          "docComment": "",
+          "docComment": "/**\n * TextureMixinInstanceTypes\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -48813,7 +48721,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!TextureMixinTypes:type",
-          "docComment": "",
+          "docComment": "/**\n * TextureMixinTypes\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -48839,8 +48747,8 @@
             },
             {
               "kind": "Reference",
-              "text": "PBRToMixedTextureType",
-              "canonicalReference": "@zephyr3d/scene!PBRToMixedTextureType:type"
+              "text": "ToMixedTextureType",
+              "canonicalReference": "@zephyr3d/scene!ToMixedTextureType:type"
             },
             {
               "kind": "Content",
@@ -48884,7 +48792,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!TextureProp:type",
-          "docComment": "",
+          "docComment": "/**\n * TextureProp\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -48958,7 +48866,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!TexturePropUniforms:type",
-          "docComment": "",
+          "docComment": "/**\n * TexturePropUniforms\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -49063,6 +48971,72 @@
           "typeTokenRange": {
             "startIndex": 3,
             "endIndex": 18
+          }
+        },
+        {
+          "kind": "TypeAlias",
+          "canonicalReference": "@zephyr3d/scene!ToMixedTextureType:type",
+          "docComment": "/**\n * ToMixedTextureType\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "type ToMixedTextureType<T> = "
+            },
+            {
+              "kind": "Content",
+              "text": "T extends [infer First, ...infer Rest] ? [\n    First extends string ? "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReturnType",
+              "canonicalReference": "!ReturnType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "mixinTextureProps",
+              "canonicalReference": "@zephyr3d/scene!mixinTextureProps:function"
+            },
+            {
+              "kind": "Content",
+              "text": "<First>> : never,\n    ..."
+            },
+            {
+              "kind": "Reference",
+              "text": "ToMixedTextureType",
+              "canonicalReference": "@zephyr3d/scene!ToMixedTextureType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<Rest>\n] : []"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "releaseTag": "Public",
+          "name": "ToMixedTextureType",
+          "typeParameters": [
+            {
+              "typeParameterName": "T",
+              "constraintTokenRange": {
+                "startIndex": 0,
+                "endIndex": 0
+              },
+              "defaultTypeTokenRange": {
+                "startIndex": 0,
+                "endIndex": 0
+              }
+            }
+          ],
+          "typeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 8
           }
         },
         {
@@ -49786,7 +49760,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!UnionToIntersection:type",
-          "docComment": "",
+          "docComment": "/**\n * Convert union type to intersection\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",

@@ -4,6 +4,8 @@
 
 ## mixinPBRCommon() function
 
+PBR common stuff mixin
+
 **Signature:**
 
 ```typescript
@@ -14,9 +16,11 @@ declare function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T): T & 
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  BaseCls | T |  |
+|  BaseCls | T | Class to mix in |
 
 **Returns:**
 
 T &amp; (new (...args: any\[\]) =&gt; [IMixinPBRCommon](doc/markdown/./scene.imixinpbrcommon.md)<!-- -->)
+
+Mixed class
 

@@ -4,7 +4,7 @@
 
 ## PBRMetallicRoughnessMaterial.(constructor)
 
-Constructs a new instance of the `PBRMetallicRoughnessMaterial` class
+Creates an instance of PBRMetallicRoughnessMaterial class
 
 **Signature:**
 

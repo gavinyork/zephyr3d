@@ -4,6 +4,8 @@
 
 ## BlendMode type
 
+Blending mode for mesh material
+
 **Signature:**
 
 ```typescript

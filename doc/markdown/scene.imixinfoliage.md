@@ -4,6 +4,8 @@
 
 ## IMixinFoliage interface
 
+Interface for foliage mixin
+
 **Signature:**
 
 ```typescript

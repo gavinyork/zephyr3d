@@ -4,6 +4,8 @@
 
 ## TerrainMaterial class
 
+Terrain material class
+
 **Signature:**
 
 ```typescript

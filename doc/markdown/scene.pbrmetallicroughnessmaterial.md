@@ -4,6 +4,8 @@
 
 ## PBRMetallicRoughnessMaterial class
 
+PBRMetallicRoughness material class
+
 **Signature:**
 
 ```typescript
@@ -15,7 +17,7 @@ declare class PBRMetallicRoughnessMaterial extends PBRMetallicRoughnessMaterial_
 
 |  Constructor | Modifiers | Description |
 |  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.pbrmetallicroughnessmaterial._constructor_.md) |  | Constructs a new instance of the <code>PBRMetallicRoughnessMaterial</code> class |
+|  [(constructor)()](doc/markdown/./scene.pbrmetallicroughnessmaterial._constructor_.md) |  | Creates an instance of PBRMetallicRoughnessMaterial class |
 
 ## Properties
 

@@ -4,6 +4,8 @@
 
 ## TextureMixinInstanceTypes type
 
+TextureMixinInstanceTypes
+
 **Signature:**
 
 ```typescript

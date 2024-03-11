@@ -4,6 +4,8 @@
 
 ## IMixinPBRCommon type
 
+Interface for common PBR mixin
+
 **Signature:**
 
 ```typescript

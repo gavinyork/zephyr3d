@@ -4,6 +4,8 @@
 
 ## mixinVertexColor() function
 
+Vertex color mixin
+
 **Signature:**
 
 ```typescript
@@ -14,9 +16,11 @@ declare function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T): T 
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  BaseCls | T |  |
+|  BaseCls | T | Base class to mix in |
 
 **Returns:**
 
 T &amp; (new (...args: any\[\]) =&gt; [IMixinVertexColor](doc/markdown/./scene.imixinvertexcolor.md)<!-- -->)
+
+Mixed class
 

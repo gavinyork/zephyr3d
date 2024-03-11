@@ -4,7 +4,7 @@
 
 ## GrassMaterial.(constructor)
 
-Constructs a new instance of the `GrassMaterial` class
+Creates an instance of GrassMaterial class
 
 **Signature:**
 
@@ -16,7 +16,7 @@ constructor(terrainSize: Vector2, normalMap: Texture2D, grassTexture?: Texture2D
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  terrainSize | [Vector2](doc/markdown/./base.vector2.md) |  |
-|  normalMap | [Texture2D](doc/markdown/./device.texture2d.md) |  |
-|  grassTexture | [Texture2D](doc/markdown/./device.texture2d.md) | _(Optional)_ |
+|  terrainSize | [Vector2](doc/markdown/./base.vector2.md) | terrain size |
+|  normalMap | [Texture2D](doc/markdown/./device.texture2d.md) | normal map |
+|  grassTexture | [Texture2D](doc/markdown/./device.texture2d.md) | _(Optional)_ grass texture |
 

@@ -4,6 +4,8 @@
 
 ## mixinTextureProps() function
 
+Texture property mixin
+
 **Signature:**
 
 ```typescript
@@ -14,9 +16,11 @@ declare function mixinTextureProps<U extends string>(name: U): <T extends typeof
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  name | U |  |
+|  name | U | Texture name |
 
 **Returns:**
 
 &lt;T extends typeof [MeshMaterial](doc/markdown/./scene.meshmaterial.md)<!-- -->&gt;(BaseCls: T, vertex?: boolean) =&gt; T &amp; (new (...args: any\[\]) =&gt; [TextureProp](doc/markdown/./scene.textureprop.md)<!-- -->&lt;U&gt; &amp; [TexturePropUniforms](doc/markdown/./scene.texturepropuniforms.md)<!-- -->&lt;U&gt;)
+
+Texture mixin
 

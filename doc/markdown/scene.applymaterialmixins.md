@@ -4,6 +4,8 @@
 
 ## applyMaterialMixins() function
 
+Apply material mixins to specific material class
+
 **Signature:**
 
 ```typescript
@@ -14,10 +16,12 @@ declare function applyMaterialMixins<M extends ((target: any) => any)[], T>(targ
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  target | T |  |
-|  mixins | M |  |
+|  target | T | Material class |
+|  mixins | M | mixins |
 
 **Returns:**
 
 [ExtractMixinType](doc/markdown/./scene.extractmixintype.md)<!-- -->&lt;M&gt;
+
+Mixed mesh material class
 

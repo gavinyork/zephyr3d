@@ -4,6 +4,8 @@
 
 ## ExtractMixinReturnType type
 
+Extract mixin return type
+
 **Signature:**
 
 ```typescript

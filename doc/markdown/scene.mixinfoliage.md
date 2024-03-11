@@ -4,6 +4,8 @@
 
 ## mixinFoliage() function
 
+Foliage mixin
+
 **Signature:**
 
 ```typescript
@@ -14,9 +16,11 @@ declare function mixinFoliage<T extends typeof MeshMaterial>(BaseCls: T): T & (n
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  BaseCls | T |  |
+|  BaseCls | T | Class to mix in |
 
 **Returns:**
 
 T &amp; (new (...args: any\[\]) =&gt; [IMixinFoliage](doc/markdown/./scene.imixinfoliage.md)<!-- -->)
+
+Mixed class
 

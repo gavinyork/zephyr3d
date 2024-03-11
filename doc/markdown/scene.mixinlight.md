@@ -4,6 +4,8 @@
 
 ## mixinLight() function
 
+Light mixin
+
 **Signature:**
 
 ```typescript
@@ -14,9 +16,11 @@ declare function mixinLight<T extends typeof MeshMaterial>(BaseCls: T): T & (new
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  BaseCls | T |  |
+|  BaseCls | T | class to mix in |
 
 **Returns:**
 
 T &amp; (new (...args: any\[\]) =&gt; [IMixinLight](doc/markdown/./scene.imixinlight.md)<!-- -->)
+
+Mixed class
 

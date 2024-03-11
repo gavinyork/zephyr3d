@@ -4,10 +4,12 @@
 
 ## TextureMixinTypes type
 
+TextureMixinTypes
+
 **Signature:**
 
 ```typescript
-type TextureMixinTypes<T> = ReturnType<typeof applyMaterialMixins<PBRToMixedTextureType<T>, typeof MeshMaterial>>;
+type TextureMixinTypes<T> = ReturnType<typeof applyMaterialMixins<ToMixedTextureType<T>, typeof MeshMaterial>>;
 ```
-**References:** [PBRToMixedTextureType](doc/markdown/./scene.pbrtomixedtexturetype.md)<!-- -->, [MeshMaterial](doc/markdown/./scene.meshmaterial.md)
+**References:** [ToMixedTextureType](doc/markdown/./scene.tomixedtexturetype.md)<!-- -->, [MeshMaterial](doc/markdown/./scene.meshmaterial.md)
 

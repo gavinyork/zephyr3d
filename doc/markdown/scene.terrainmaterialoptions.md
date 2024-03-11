@@ -4,6 +4,8 @@
 
 ## TerrainMaterialOptions type
 
+Terrain material options
+
 **Signature:**
 
 ```typescript

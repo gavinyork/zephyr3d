@@ -4,6 +4,8 @@
 
 ## TerrainDetailMapInfo type
 
+Terrain detail map information
+
 **Signature:**
 
 ```typescript

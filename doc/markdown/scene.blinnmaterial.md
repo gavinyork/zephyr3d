@@ -4,6 +4,8 @@
 
 ## BlinnMaterial class
 
+Blinn material
+
 **Signature:**
 
 ```typescript
@@ -15,7 +17,7 @@ declare class BlinnMaterial extends BlinnMaterial_base
 
 |  Constructor | Modifiers | Description |
 |  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.blinnmaterial._constructor_.md) |  | Constructs a new instance of the <code>BlinnMaterial</code> class |
+|  [(constructor)()](doc/markdown/./scene.blinnmaterial._constructor_.md) |  | Creates an instance of BlinnMaterial class |
 
 ## Properties
 

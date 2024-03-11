@@ -4,6 +4,8 @@
 
 ## IMixinBlinnPhong type
 
+Interface for blinn-phong lighting model mixin
+
 **Signature:**
 
 ```typescript

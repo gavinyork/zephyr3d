@@ -4,6 +4,8 @@
 
 ## IMixinLight type
 
+Interface for light mixin
+
 **Signature:**
 
 ```typescript

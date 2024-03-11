@@ -4,6 +4,8 @@
 
 ## IMixinVertexColor interface
 
+Interface for vertex color mixin
+
 **Signature:**
 
 ```typescript

@@ -4,6 +4,8 @@
 
 ## IMixinLambert type
 
+Interface of lambert lighting model mixin
+
 **Signature:**
 
 ```typescript

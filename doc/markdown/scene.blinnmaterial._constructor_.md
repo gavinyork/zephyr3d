@@ -4,7 +4,7 @@
 
 ## BlinnMaterial.(constructor)
 
-Constructs a new instance of the `BlinnMaterial` class
+Creates an instance of BlinnMaterial class
 
 **Signature:**
 

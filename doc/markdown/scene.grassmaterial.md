@@ -4,6 +4,8 @@
 
 ## GrassMaterial class
 
+Terrain grass material
+
 **Signature:**
 
 ```typescript
@@ -15,7 +17,7 @@ declare class GrassMaterial extends GrassMaterial_base
 
 |  Constructor | Modifiers | Description |
 |  --- | --- | --- |
-|  [(constructor)(terrainSize, normalMap, grassTexture)](doc/markdown/./scene.grassmaterial._constructor_.md) |  | Constructs a new instance of the <code>GrassMaterial</code> class |
+|  [(constructor)(terrainSize, normalMap, grassTexture)](doc/markdown/./scene.grassmaterial._constructor_.md) |  | Creates an instance of GrassMaterial class |
 
 ## Methods
 

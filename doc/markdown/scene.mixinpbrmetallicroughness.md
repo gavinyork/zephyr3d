@@ -4,6 +4,8 @@
 
 ## mixinPBRMetallicRoughness() function
 
+PBRMetallicRoughness lighting model mixin
+
 **Signature:**
 
 ```typescript
@@ -14,9 +16,11 @@ declare function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCl
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  BaseCls | T |  |
+|  BaseCls | T | Class to mix in |
 
 **Returns:**
 
 T &amp; (new (...args: any\[\]) =&gt; [IMixinPBRMetallicRoughness](doc/markdown/./scene.imixinpbrmetallicroughness.md)<!-- -->)
+
+Mixed class
 

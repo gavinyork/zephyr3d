@@ -4,6 +4,8 @@
 
 ## TextureProp type
 
+TextureProp
+
 **Signature:**
 
 ```typescript
