@@ -133,7 +133,7 @@ lightApp.ready().then(async () => {
   assetManager.httpRequest.urlResolver = url => fileMap.get(url) || url;
 
   assetManager.fetchModel(scene, '/sponza/Sponza.gltf', null).then((info) => {
-    message = 'Move with W/S/A/D keys, rotate with left mouse button.';
+    message = '';
     function traverseModel(group: SceneNode, func: (node: SceneNode) => void, context?: any) {
       if (group) {
         const queue: SceneNode[] = [group];
@@ -259,8 +259,11 @@ lightApp.ready().then(async () => {
     }
     camera.updateController();
     camera.render(scene, compositor);
-    ui.render();
-    lightApp.device.drawText(message, 20, 20, '#a00000');
+    if (message) {
+      lightApp.device.drawText(message, 20, 20, '#a00000');
+    } else {
+      ui.render();
+    }
   });
   lightApp.run();
 });

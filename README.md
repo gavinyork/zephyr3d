@@ -165,7 +165,8 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 ### Documentation
 
-- [Github page](https://gavinyork.github.io/zephyr3d)
+- [Github page](https://gavinyork.github.io/zephyr3d/index.html)
+- [Demos](https://gavinyork.github.io/zephyr3d/demo.html)
 
 ### License
 

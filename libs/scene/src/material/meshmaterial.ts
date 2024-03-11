@@ -339,10 +339,12 @@ export class MeshMaterial extends Material {
         });
       }
     });
+    /*
     if (program) {
       console.log(program.getShaderSource('vertex'));
       console.log(program.getShaderSource('fragment'));
     }
+    */
     return program;
   }
   /**

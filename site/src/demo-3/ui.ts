@@ -26,9 +26,11 @@ export class UI {
         window.location.href = url.href;
       }
       ImGui.EndSection(1);
+
       if (ImGui.BeginChild('')) {
-        ImGui.TextWrapped('Move with W/S/A/D keys.');
         ImGui.TextWrapped('Rotate with left mouse button.');
+        ImGui.TextWrapped('Zoom with mouse wheel.');
+        ImGui.TextWrapped('Move with right mouse button.');
       }
       ImGui.EndChild();
     }

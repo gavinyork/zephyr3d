@@ -141,6 +141,25 @@ export class GLTFViewer {
     }
     return fileMap;
   }
+  async loadModel(url: string) {
+    this._modelNode?.remove();
+    this._assetManager.purgeCache();
+    this._assetManager.fetchModel(this._scene, url, null).then((info) => {
+      this._modelNode?.dispose();
+      this._modelNode = info.group;
+      this._animationSet?.dispose();
+      this._animationSet = info.animationSet;
+      this._modelNode.pickMode = GraphNode.PICK_ENABLED;
+      this._currentAnimation = null;
+      if (this._animationSet) {
+        const animations = this._animationSet.getAnimationNames();
+        if (animations.length > 0) {
+          this._animationSet.playAnimation(animations[0], 0);
+        }
+      }
+      this.lookAt();
+    });
+  }
   async handleDrop(data: DataTransfer) {
     this.resolveDraggedItems(data).then(async (fileMap) => {
       if (fileMap){
@@ -155,27 +174,8 @@ export class GLTFViewer {
           this._envMaps.selectByPath(hdrFile, this.scene, url => fileMap.get(url) || url);
         } else {
           const modelFile = Array.from(fileMap.keys()).find((val) => /(\.gltf|\.glb)$/i.test(val));
-          if (modelFile) {
-            this._modelNode?.remove();
-            this._assetManager.purgeCache();
-            this._assetManager.fetchModel(this._scene, modelFile, null).then((info) => {
-              this._modelNode?.dispose();
-              this._modelNode = info.group;
-              this._animationSet?.dispose();
-              this._animationSet = info.animationSet;
-              this._modelNode.pickMode = GraphNode.PICK_ENABLED;
-              this._currentAnimation = null;
-              if (this._animationSet) {
-                const animations = this._animationSet.getAnimationNames();
-                if (animations.length > 0) {
-                  this._animationSet.playAnimation(animations[0], 0);
-                }
-              }
-              this.lookAt();
-            });
-          }
+          await this.loadModel(modelFile);
         }
-        console.log(this._modelNode);
       }
     });
   }

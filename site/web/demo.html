@@ -35,12 +35,13 @@
         position: relative;
         left: 0;
         flex: 1 1;
-        max-width: 300px;
+        max-width: 260px;
         height: 100vh;
         overflow: auto;
-        background: #fafafa;
+        background: #eaf1b3;
         padding: 0 15px;
         color: #045b88;
+        border: 1px solid #a0a0a0;
       }
 
       .maximized {
@@ -52,9 +53,19 @@
       }
 
       li {
-        list-style: none;
         padding: 3px;
         cursor: pointer;
+        display: flex;
+        margin: 10px;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      li img {
+        display: block;
+        height: auto;
+        width: 100%;
+        margin-bottom: 5px;
       }
 
       a {
@@ -77,27 +88,20 @@
     <div class="flex-row maximized fit">
       <nav class="flex-col nav" style="padding: 15px; width: 200px">
         <h1 class="title">zephyr3d demos</h1>
-        <label for="device-type" style="color: black">select device:</label>
-        <select id="device-type" style="padding: 3px; margin: 0px 10px 0px 0px; outline: none">
-          <option value="webgl" selected>WebGL</option>
-          <option value="webgl2">WebGL2</option>
-          <option value="webgpu">WebGPU</option>
-        </select>
         <ul class="maximized fit" style="text-align: left; overflow: auto; padding: 0">
-          <li id="demo-0">GLTF viewer</li>
-          <li id="demo-1">Materials</li>
-          <li id="demo-2">LightCluster</li>
-          <li id="demo-3">Terrain</li>
+          <li id="demo-0"><span>GLTF viewer</span><img src="./media/gltf.jpg" alt="GLTF viewer"></li>
+          <li id="demo-1"><span>Custom Material</span><img src="./media/material.jpg" alt="Custom material"></li>
+          <li id="demo-2"><span>Clustered lighting</span><img src="./media/lights.jpg" alt="Clustered lighting"></li>
+          <li id="demo-3"><span>Terrain</span><img src="./media/terrain.jpg" alt="Terrain"></li>
         </ul>
       </nav>
       <iframe class="maximized fit" style="border-width: 0" title="render window" scrolling="no"></iframe>
     </div>
     <script type="text/javascript">
       const iframe = document.querySelector('iframe');
-      const selectDevice = document.querySelector('select');
       const linkCallback = function () {
         const id = this.id;
-        iframe.src = 'tut/' + id + '.html' + '?dev=' + selectDevice.value;
+        iframe.src = 'tut/' + id + '.html' + '?dev=webgl2';
         const links = document.querySelectorAll('li');
         for (const link of links) {
           if (link === this) {
@@ -107,16 +111,11 @@
           }
         }
       };
-      selectDevice.addEventListener('change', function () {
-        if (document.querySelector('.active')) {
-          const src = iframe.src.split('?')[0];
-          iframe.src = src + '?dev=' + this.value;
-        }
-      });
       const links = document.querySelectorAll('li');
       for (const link of links) {
         link.addEventListener('click', linkCallback);
       }
+      linkCallback.call(links[0]);
     </script>
   </body>
 </html>

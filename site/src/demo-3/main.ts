@@ -3,6 +3,7 @@ import type { DeviceBackend } from '@zephyr3d/device';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Demo } from './demo';
+import { imGuiInit, imGuiInjectEvent } from '@zephyr3d/imgui';
 
 function getQueryString(name: string) {
   return new URL(window.location.toString()).searchParams.get(name) || null;
@@ -34,12 +35,14 @@ const terrainApp = new Application({
 });
 
 terrainApp.ready().then(async () => {
+  await imGuiInit(terrainApp.device);
   const demo = new Demo();
   const device = terrainApp.device;
   device.canvas.addEventListener('contextmenu', function (ev) {
     ev.preventDefault();
     return false;
   });
+  terrainApp.inputManager.use(imGuiInjectEvent);
   terrainApp.inputManager.use(demo.camera.handleEvent.bind(demo.camera));
 
   terrainApp.on('pointerup', (ev) => {

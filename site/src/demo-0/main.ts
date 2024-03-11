@@ -93,5 +93,6 @@ gltfApp.ready().then(async () => {
     gltfViewer.camera.updateController();
     gltfViewer.render();
   });
+  gltfViewer.loadModel('./assets/models/DamagedHelmet.glb');
   gltfApp.run();
 });

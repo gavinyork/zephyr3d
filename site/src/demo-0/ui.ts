@@ -4,8 +4,12 @@ import type { GLTFViewer } from "./gltfviewer";
 
 export class UI {
   private _viewer: GLTFViewer;
+  private _deviceList: string[];
+  private _deviceIndex: [number];
   constructor(viewer: GLTFViewer){
     this._viewer = viewer;
+    this._deviceList = ['WebGL', 'WebGL2', 'WebGPU'];
+    this._deviceIndex = [this._deviceList.findIndex(val => val.toLowerCase() === Application.instance.device.type)];
   }
   render(){
     imGuiNewFrame();
@@ -17,6 +21,14 @@ export class UI {
     ImGui.SetNextWindowPos(new ImGui.ImVec2(0, 0), ImGui.Cond.Always);
     ImGui.SetNextWindowSize(new ImGui.ImVec2(300, Math.min(500, Application.instance.device.getViewport().height)), ImGui.Cond.Always);
     if (ImGui.Begin('Settings')){
+      ImGui.BeginSection('System');
+      ImGui.SetNextItemWidth(150);
+      if(ImGui.Combo('Select device', this._deviceIndex, this._deviceList)){
+        const url = new URL(window.location.href);
+        url.searchParams.set('dev', this._deviceList[this._deviceIndex[0]].toLowerCase());
+        window.location.href = url.href;
+      }
+      ImGui.EndSection(1);
       ImGui.BeginSection('Light');
       const idList = this._viewer.envMaps.getIdList();
       const index = [idList.indexOf(this._viewer.envMaps.getCurrentId())] as [number];
