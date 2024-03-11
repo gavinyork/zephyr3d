@@ -10,6 +10,10 @@ import { Vector4 } from '@zephyr3d/base';
 import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
 
+/**
+ * Interface for PBRMetallicRoughness lighting model mixin
+ * @public
+ */
 export type IMixinPBRMetallicRoughness = {
   metallic: number;
   roughness: number;
@@ -33,6 +37,12 @@ export type IMixinPBRMetallicRoughness = {
   IMixinLight &
   TextureMixinInstanceTypes<['metallicRoughness', 'occlusion', 'specular', 'specularColor']>;
 
+/**
+ * PBRMetallicRoughness lighting model mixin
+ * @param BaseCls - Class to mix in
+ * @returns Mixed class
+ * @public
+ */
 export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).pbrMetallicRoughnessMixed) {
     return BaseCls as T & { new (...args: any[]): IMixinPBRMetallicRoughness };

@@ -4,13 +4,22 @@ import type { PBFunctionScope } from '@zephyr3d/device';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 import { ShaderHelper } from './shader/helper';
 
+/**
+ * PBRMetallicRoughness material class
+ * @public
+ */
 export class PBRMetallicRoughnessMaterial extends applyMaterialMixins(
   MeshMaterial,
   mixinPBRMetallicRoughness,
   mixinVertexColor
 ) {
+  /** @internal */
   private static FEATURE_VERTEX_NORMAL = this.defineFeature();
+  /** @internal */
   private static FEATURE_VERTEX_TANGENT = this.defineFeature();
+  /**
+   * Creates an instance of PBRMetallicRoughnessMaterial class
+   */
   constructor() {
     super();
     this.useFeature(PBRMetallicRoughnessMaterial.FEATURE_VERTEX_NORMAL, true);

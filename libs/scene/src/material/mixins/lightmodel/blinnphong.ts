@@ -5,6 +5,10 @@ import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
 import type { DrawContext } from '../../../render';
 
+/**
+ * Interface for blinn-phong lighting model mixin
+ * @public
+ */
 export type IMixinBlinnPhong = {
   shininess: number;
   blinnPhongLight(
@@ -16,6 +20,12 @@ export type IMixinBlinnPhong = {
   ): PBShaderExp;
 } & IMixinLight;
 
+/**
+ * Blinn-phong lighting model mixin
+ * @param BaseCls - Class to mix in
+ * @returns Mixed class
+ * @public
+ */
 export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).blinnPhongMixed) {
     return BaseCls as T & { new (...args: any[]): IMixinBlinnPhong };

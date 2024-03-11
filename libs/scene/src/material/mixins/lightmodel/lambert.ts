@@ -4,10 +4,20 @@ import { applyMaterialMixins } from '../../meshmaterial';
 import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
 
+/**
+ * Interface of lambert lighting model mixin
+ * @public
+ */
 export type IMixinLambert = {
   lambertLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
 } & IMixinLight;
 
+/**
+ * Lambert lighting model mixin
+ * @param BaseCls - Class to mix in
+ * @returns Mixed class
+ * @public
+ */
 export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).lambertMixed) {
     return BaseCls as T & { new (...args: any[]): IMixinLambert };

@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Update documentation",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

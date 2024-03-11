@@ -34,6 +34,7 @@ export type TextureFetchOptions<T extends BaseTexture> = {
 
 /**
  * Data structure returned by AssetManager.fetchModel()
+ * @public
  */
 export type ModelInfo = {
   /** Mesh group */
@@ -149,13 +150,13 @@ export class AssetManager {
    * Fetches a text resource from a given URL
    * @param url - The URL from where to fetch the resource
    * @param postProcess - A function that will be involved when the text data was loaded.
-   * 
+   *
    * @remarks
    * If a text data has already been loaded, the function will ignore the
    * postProcess parameter and directly return the text loaded previously.
    * To load the same text with different postProcess parameters,
    * use different AssetManager instances separately.
-   * 
+   *
    * @returns The fetched text
    */
   async fetchTextData(url: string, postProcess?: (text: string) => string): Promise<string> {
@@ -170,13 +171,13 @@ export class AssetManager {
    * Fetches a binary resource from a given URL
    * @param url - The URL from where to fetch the resource
    * @param postProcess - A function that will be involved when the binary data was loaded.
-   * 
+   *
    * @remarks
    * If a binary data has already been loaded, the function will ignore the
    * postProcess parameter and directly return the data loaded previously.
    * To load the same data with different postProcess parameters,
    * use different AssetManager instances separately.
-   * 
+   *
    * @returns Binary data as ArrayBuffer
    */
   async fetchBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer> {
@@ -238,13 +239,13 @@ export class AssetManager {
    * @param url - The URL from where to fetch the resource
    * @param mimeType - The MIME type of the model resource, if not provided, model type will be determined by file extension
    * @param postProcess - A function that will be involved when the model was loaded.
-   * 
+   *
    * @remarks
    * If a model has already been loaded, the function will ignore the
    * postProcess parameter and directly return the model loaded previously.
    * To load the same model with different postProcess parameters,
    * use different AssetManager instances separately.
-   * 
+   *
    * @returns The created model node
    */
   async fetchModel(

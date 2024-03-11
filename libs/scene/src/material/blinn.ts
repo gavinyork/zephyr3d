@@ -4,9 +4,18 @@ import type { PBFunctionScope } from '@zephyr3d/device';
 import { mixinBlinnPhong } from './mixins/lightmodel/blinnphong';
 import { ShaderHelper } from './shader/helper';
 
+/**
+ * Blinn material
+ * @public
+ */
 export class BlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinBlinnPhong, mixinVertexColor) {
+  /** @internal */
   private static FEATURE_VERTEX_NORMAL = this.defineFeature();
+  /** @internal */
   private static FEATURE_VERTEX_TANGENT = this.defineFeature();
+  /**
+   * Creates an instance of BlinnMaterial class
+   */
   constructor() {
     super();
     this.useFeature(BlinnMaterial.FEATURE_VERTEX_NORMAL, true);

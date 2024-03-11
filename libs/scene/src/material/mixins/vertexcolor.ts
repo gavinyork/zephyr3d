@@ -1,11 +1,22 @@
 import type { MeshMaterial } from '../meshmaterial';
 import type { PBFunctionScope, PBInsideFunctionScope } from '@zephyr3d/device';
 
+/**
+ * Interface for vertex color mixin
+ *
+ * @public
+ */
 export interface IMixinVertexColor {
   vertexColor: boolean;
   getVertexColor(scope: PBInsideFunctionScope);
 }
 
+/**
+ * Vertex color mixin
+ *
+ * @param BaseCls - Base class to mix in
+ * @returns Mixed class
+ */
 function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).vertexColorMixed) {
     return BaseCls as T & { new (...args: any[]): IMixinVertexColor };

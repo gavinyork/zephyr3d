@@ -14,6 +14,10 @@ import type { IMixinAlbedoColor } from './albedocolor';
 import { mixinAlbedoColor } from './albedocolor';
 import { ShaderHelper } from '../shader/helper';
 
+/**
+ * Interface for light mixin
+ * @public
+ */
 export type IMixinLight = {
   normalScale: number;
   normalMapMode: 'tangent-space' | 'object-space';
@@ -63,6 +67,12 @@ export type IMixinLight = {
 } & TextureMixinInstanceTypes<['normal']> &
   IMixinAlbedoColor;
 
+/**
+ * Light mixin
+ * @param BaseCls - class to mix in
+ * @returns Mixed class
+ * @public
+ */
 export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).lightMixed) {
     return BaseCls as T & { new (...args: any[]): IMixinLight };

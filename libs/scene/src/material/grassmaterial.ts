@@ -7,6 +7,10 @@ import { RENDER_PASS_TYPE_LIGHT } from '../values';
 import { ShaderHelper } from './shader/helper';
 import { mixinFoliage } from './mixins/foliage';
 
+/**
+ * Terrain grass material
+ * @public
+ */
 export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinPBRMetallicRoughness, mixinFoliage) {
   /** @internal */
   private _terrainSize: Vector2;
@@ -14,6 +18,12 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinPBRMet
   private _terrainNormalMap: Texture2D;
   /** @internal */
   private _textureSize: Vector2;
+  /**
+   * Creates an instance of GrassMaterial class
+   * @param terrainSize - terrain size
+   * @param normalMap - normal map
+   * @param grassTexture - grass texture
+   */
   constructor(terrainSize: Vector2, normalMap: Texture2D, grassTexture?: Texture2D) {
     super();
     this.metallic = 0;
