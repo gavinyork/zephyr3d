@@ -2,6 +2,31 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.2.0",
+      "tag": "@zephyr3d/scene_v0.2.0",
+      "date": "Mon, 11 Mar 2024 18:19:27 GMT",
+      "comments": {
+        "minor": [
+          {
+            "comment": "Rewrite material system"
+          }
+        ],
+        "patch": [
+          {
+            "comment": "Update documentation"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.1.2` to `^0.2.0`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.1.2` to `^0.2.0`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.2",
       "tag": "@zephyr3d/scene_v0.1.2",
       "date": "Thu, 08 Feb 2024 10:49:24 GMT",

@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/device",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "base system for zephyr3d library",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
