@@ -16,6 +16,10 @@ import { Vector4 } from '@zephyr3d/base';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { ShaderHelper } from './shader/helper';
 
+/**
+ * Terrain detail map information
+ * @public
+ */
 export type TerrainDetailMapInfo = {
   albedoTextures: Texture2DArray | Texture2D[];
   uvScale: number[];
@@ -34,12 +38,20 @@ export type TerrainDetailMapInfo = {
   }[][];
 };
 
+/**
+ * Terrain material options
+ * @public
+ */
 export type TerrainMaterialOptions = {
   splatMap?: Texture2D;
   splatMapTexCoordIndex?: number;
   detailMaps?: TerrainDetailMapInfo;
 };
 
+/**
+ * Terrain material class
+ * @public
+ */
 export class TerrainMaterial extends applyMaterialMixins(
   MeshMaterial,
   mixinLight,

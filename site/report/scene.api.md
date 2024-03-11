@@ -223,7 +223,7 @@ export class Application extends Application_base {
     get timeElapsedInSeconds(): number;
 }
 
-// @public (undocumented)
+// @public
 export function applyMaterialMixins<M extends ((target: any) => any)[], T>(target: T, ...mixins: M): ExtractMixinType<M>;
 
 // @public
@@ -591,12 +591,12 @@ export interface BatchDrawable extends Drawable {
     getInstanceId(renderPass: RenderPass): string;
 }
 
-// @public (undocumented)
+// @public
 export type BlendMode = 'none' | 'blend' | 'additive';
 
 // Warning: (ae-forgotten-export) The symbol "BlinnMaterial_base" needs to be exported by the entry point index.d.ts
 //
-// @public (undocumented)
+// @public
 export class BlinnMaterial extends BlinnMaterial_base {
     constructor();
     // (undocumented)
@@ -1389,10 +1389,10 @@ export class EulerRotationTrack extends AnimationTrack {
     apply(node: SceneNode, currentTime: number, duration: number): boolean;
 }
 
-// @public (undocumented)
+// @public
 export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ? R : never;
 
-// @public (undocumented)
+// @public
 export type ExtractMixinType<M> = M extends [infer First] ? ExtractMixinReturnType<First> : M extends [infer First, ...infer Rest] ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]> : never;
 
 // @public
@@ -1504,7 +1504,7 @@ export class GraphNode extends SceneNode {
 
 // Warning: (ae-forgotten-export) The symbol "GrassMaterial_base" needs to be exported by the entry point index.d.ts
 //
-// @public (undocumented)
+// @public
 export class GrassMaterial extends GrassMaterial_base {
     constructor(terrainSize: Vector2, normalMap: Texture2D, grassTexture?: Texture2D);
     // (undocumented)
@@ -1625,30 +1625,30 @@ export interface HeightfieldBBoxTreeNode {
     right: HeightfieldBBoxTreeNode;
 }
 
-// @public (undocumented)
+// @public
 export type IMixinAlbedoColor = {
     albedoColor: Vector4;
     calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp;
 } & TextureMixinInstanceTypes<['albedo']>;
 
-// @public (undocumented)
+// @public
 export type IMixinBlinnPhong = {
     shininess: number;
     blinnPhongLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
 } & IMixinLight;
 
-// @public (undocumented)
+// @public
 export interface IMixinFoliage {
     // (undocumented)
     calculateFoliageAlbedo(scope: PBInsideFunctionScope, albedoColor: PBShaderExp, texelCoord: PBShaderExp): PBShaderExp;
 }
 
-// @public (undocumented)
+// @public
 export type IMixinLambert = {
     lambertLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
 } & IMixinLight;
 
-// @public (undocumented)
+// @public
 export type IMixinLight = {
     normalScale: number;
     normalMapMode: 'tangent-space' | 'object-space';
@@ -1667,7 +1667,7 @@ export type IMixinLight = {
     forEachLight(scope: PBInsideFunctionScope, callback: (this: PBInsideFunctionScope, type: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp, colorIntensity: PBShaderExp, shadow: boolean) => void): void;
 } & TextureMixinInstanceTypes<['normal']> & IMixinAlbedoColor;
 
-// @public (undocumented)
+// @public
 export type IMixinPBRCommon = {
     ior: number;
     emissiveColor: Vector3;
@@ -1700,7 +1700,7 @@ export type IMixinPBRCommon = {
 'clearcoatNormal'
 ]>;
 
-// @public (undocumented)
+// @public
 export type IMixinPBRMetallicRoughness = {
     metallic: number;
     roughness: number;
@@ -1717,7 +1717,7 @@ export type IMixinPBRSpecularGlossiness = {
     calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
 } & IMixinPBRCommon & IMixinLight & TextureMixinInstanceTypes<['specular']>;
 
-// @public (undocumented)
+// @public
 export interface IMixinVertexColor {
     // (undocumented)
     getVertexColor(scope: PBInsideFunctionScope): any;
@@ -1961,34 +1961,34 @@ export class MeshMaterial extends Material {
     vertexShader(scope: PBFunctionScope): void;
 }
 
-// @public (undocumented)
+// @public
 export function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinAlbedoColor);
 
-// @public (undocumented)
+// @public
 export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinBlinnPhong);
 
-// @public (undocumented)
+// @public
 export function mixinFoliage<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinFoliage);
 
-// @public (undocumented)
+// @public
 export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinLambert);
 
-// @public (undocumented)
+// @public
 export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinLight);
 
-// @public (undocumented)
+// @public
 export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinPBRCommon);
 
-// @public (undocumented)
+// @public
 export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinPBRMetallicRoughness);
 
 // @public (undocumented)
 export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinPBRSpecularGlossiness);
 
-// @public (undocumented)
+// @public
 export function mixinTextureProps<U extends string>(name: U): <T extends typeof MeshMaterial>(BaseCls: T, vertex?: boolean) => T & (new (...args: any[]) => TextureProp<U> & TexturePropUniforms<U>);
 
-// @public (undocumented)
+// @public
 export function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinVertexColor);
 
 // @public
@@ -2195,7 +2195,7 @@ export function panoramaToCubemap(tex: Texture2D, outputCubeMap: TextureCube): v
 
 // Warning: (ae-forgotten-export) The symbol "PBRMetallicRoughnessMaterial_base" needs to be exported by the entry point index.d.ts
 //
-// @public (undocumented)
+// @public
 export class PBRMetallicRoughnessMaterial extends PBRMetallicRoughnessMaterial_base {
     constructor();
     // (undocumented)
@@ -2222,22 +2222,6 @@ export class PBRSpecularGlossinessMaterial extends PBRSpecularGlossinessMaterial
     get vertexTangent(): boolean;
     set vertexTangent(val: boolean);
 }
-
-// @public (undocumented)
-export type PBRTextureNames = [
-'occlusion',
-'cheenColor',
-'sheenRoughness',
-'clearcoatIntensity',
-'clearcoatNormal',
-'clearcoatRoughness'
-];
-
-// @public (undocumented)
-export type PBRToMixedTextureType<T> = T extends [infer First, ...infer Rest] ? [
-First extends string ? ReturnType<typeof mixinTextureProps<First>> : never,
-...PBRToMixedTextureType<Rest>
-] : [];
 
 // Warning: (ae-internal-missing-underscore) The name "PCFOPT" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -3507,7 +3491,7 @@ export class Terrain extends GraphNode {
     set wireframe(b: boolean);
 }
 
-// @public (undocumented)
+// @public
 export type TerrainDetailMapInfo = {
     albedoTextures: Texture2DArray | Texture2D[];
     uvScale: number[];
@@ -3528,7 +3512,7 @@ export type TerrainDetailMapInfo = {
 
 // Warning: (ae-forgotten-export) The symbol "TerrainMaterial_base" needs to be exported by the entry point index.d.ts
 //
-// @public (undocumented)
+// @public
 export class TerrainMaterial extends TerrainMaterial_base {
     constructor(options?: TerrainMaterialOptions);
     // (undocumented)
@@ -3557,7 +3541,7 @@ export class TerrainMaterial extends TerrainMaterial_base {
     vertexShader(scope: PBFunctionScope): void;
 }
 
-// @public (undocumented)
+// @public
 export type TerrainMaterialOptions = {
     splatMap?: Texture2D;
     splatMapTexCoordIndex?: number;
@@ -3647,25 +3631,31 @@ export type TextureFetchOptions<T extends BaseTexture> = {
     samplerOptions?: SamplerOptions;
 };
 
-// @public (undocumented)
+// @public
 export type TextureMixinInstanceTypes<T> = TextureMixinTypes<T> extends {
     new (...args: any[]): infer U;
 } ? U : never;
 
-// @public (undocumented)
-export type TextureMixinTypes<T> = ReturnType<typeof applyMaterialMixins<PBRToMixedTextureType<T>, typeof MeshMaterial>>;
+// @public
+export type TextureMixinTypes<T> = ReturnType<typeof applyMaterialMixins<ToMixedTextureType<T>, typeof MeshMaterial>>;
 
-// @public (undocumented)
+// @public
 export type TextureProp<U extends string> = {
     [P in 'Texture' | 'TextureSampler' | 'TexCoordIndex' | 'TexCoordMatrix' as `${U}${P}`]: P extends 'Texture' ? Texture2D : P extends 'TextureSampler' ? TextureSampler : P extends 'TexCoordIndex' ? number : P extends 'TexCoordMatrix' ? Matrix4x4 : never;
 };
 
-// @public (undocumented)
+// @public
 export type TexturePropUniforms<U extends string> = {
     [P in 'TextureUniform' | 'TexCoord' as `get${Capitalize<U>}${P}`]: (scope: PBInsideFunctionScope) => PBShaderExp;
 } & {
     [P in 'Texture' as `sample${Capitalize<U>}${P}`]: (scope: PBInsideFunctionScope, texCoord?: PBShaderExp) => PBShaderExp;
 };
+
+// @public
+export type ToMixedTextureType<T> = T extends [infer First, ...infer Rest] ? [
+First extends string ? ReturnType<typeof mixinTextureProps<First>> : never,
+...ToMixedTextureType<Rest>
+] : [];
 
 // @public
 export class Tonemap extends AbstractPostEffect {
@@ -3708,7 +3698,7 @@ export class TranslationTrack extends AnimationTrack {
     apply(node: SceneNode, currentTime: number, duration: number): boolean;
 }
 
-// @public (undocumented)
+// @public
 export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never;
 
 // Warning: (ae-forgotten-export) The symbol "UnlitMaterial_base" needs to be exported by the entry point index.d.ts

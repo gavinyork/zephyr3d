@@ -20,20 +20,44 @@ import { encodeNormalizedFloatToRGBA } from '../shaders';
 import { Application } from '../app';
 import { ShaderHelper } from './shader/helper';
 
+/**
+ * Blending mode for mesh material
+ * @public
+ */
 export type BlendMode = 'none' | 'blend' | 'additive';
 
+/**
+ * Convert union type to intersection
+ * @public
+ */
 export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void
   ? I
   : never;
 
+/**
+ * Extract mixin return type
+ * @public
+ */
 export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ? R : never;
 
+/**
+ * Extract mixin type
+ * @public
+ */
 export type ExtractMixinType<M> = M extends [infer First]
   ? ExtractMixinReturnType<First>
   : M extends [infer First, ...infer Rest]
   ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]>
   : never;
 
+/**
+ * Apply material mixins to specific material class
+ * @param target - Material class
+ * @param mixins - mixins
+ * @returns Mixed mesh material class
+ *
+ * @public
+ */
 export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
   target: T,
   ...mixins: M

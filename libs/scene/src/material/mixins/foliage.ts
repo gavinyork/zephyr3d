@@ -1,10 +1,22 @@
 import { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import type { MeshMaterial } from '../meshmaterial';
 
+/**
+ * Interface for foliage mixin
+ * @public
+ */
 export interface IMixinFoliage {
   calculateFoliageAlbedo(scope: PBInsideFunctionScope, albedoColor: PBShaderExp, texelCoord: PBShaderExp): PBShaderExp;
 }
 
+/**
+ * Foliage mixin
+ *
+ * @param BaseCls - Class to mix in
+ * @returns Mixed class
+ *
+ * @public
+ */
 function mixinFoliage<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).foliageMixed) {
     return BaseCls as T & { new (...args: any[]): IMixinFoliage };

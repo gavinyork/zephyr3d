@@ -15,6 +15,11 @@ import type { TextureMixinInstanceTypes } from '../texture';
 import { mixinTextureProps } from '../texture';
 import { ShaderHelper } from '../../shader/helper';
 
+/**
+ * Interface for common PBR mixin
+ *
+ * @public
+ */
 export type IMixinPBRCommon = {
   ior: number;
   emissiveColor: Vector3;
@@ -79,6 +84,11 @@ export type IMixinPBRCommon = {
   ]
 >;
 
+/**
+ * PBR common stuff mixin
+ * @param BaseCls - Class to mix in
+ * @returns Mixed class
+ */
 export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).pbrCommonMixed) {
     return BaseCls as T & { new (...args: any[]): IMixinPBRCommon };

@@ -6,11 +6,22 @@ import type { DrawContext } from '../../render';
 import type { TextureMixinInstanceTypes } from './texture';
 import { mixinTextureProps } from './texture';
 
+/**
+ * Interface for albedo color mixin
+ * @public
+ */
 export type IMixinAlbedoColor = {
   albedoColor: Vector4;
   calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp;
 } & TextureMixinInstanceTypes<['albedo']>;
 
+/**
+ * Albedo color mixin
+ * @param BaseCls - Class to mix in
+ * @returns Mixed class
+ *
+ * @public
+ */
 function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).albedoColorMixed) {
     return BaseCls as T & { new (...args: any[]): IMixinAlbedoColor };

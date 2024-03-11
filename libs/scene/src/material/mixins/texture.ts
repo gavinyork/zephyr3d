@@ -10,29 +10,41 @@ import type { MeshMaterial, applyMaterialMixins } from '../meshmaterial';
 import type { Matrix4x4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
 
-export type PBRTextureNames = [
-  'occlusion',
-  'cheenColor',
-  'sheenRoughness',
-  'clearcoatIntensity',
-  'clearcoatNormal',
-  'clearcoatRoughness'
-];
-export type PBRToMixedTextureType<T> = T extends [infer First, ...infer Rest]
+/**
+ * ToMixedTextureType
+ *
+ * @public
+ */
+export type ToMixedTextureType<T> = T extends [infer First, ...infer Rest]
   ? [
       First extends string ? ReturnType<typeof mixinTextureProps<First>> : never,
-      ...PBRToMixedTextureType<Rest>
+      ...ToMixedTextureType<Rest>
     ]
   : [];
 
+/**
+ * TextureMixinTypes
+ *
+ * @public
+ */
 export type TextureMixinTypes<T> = ReturnType<
-  typeof applyMaterialMixins<PBRToMixedTextureType<T>, typeof MeshMaterial>
+  typeof applyMaterialMixins<ToMixedTextureType<T>, typeof MeshMaterial>
 >;
 
+/**
+ * TextureMixinInstanceTypes
+ *
+ * @public
+ */
 export type TextureMixinInstanceTypes<T> = TextureMixinTypes<T> extends { new (...args: any[]): infer U }
   ? U
   : never;
 
+/**
+ * TextureProp
+ *
+ * @public
+ */
 export type TextureProp<U extends string> = {
   [P in 'Texture' | 'TextureSampler' | 'TexCoordIndex' | 'TexCoordMatrix' as `${U}${P}`]: P extends 'Texture'
     ? Texture2D
@@ -45,6 +57,11 @@ export type TextureProp<U extends string> = {
     : never;
 };
 
+/**
+ * TexturePropUniforms
+ *
+ * @public
+ */
 export type TexturePropUniforms<U extends string> = {
   [P in 'TextureUniform' | 'TexCoord' as `get${Capitalize<U>}${P}`]: (
     scope: PBInsideFunctionScope
@@ -56,6 +73,13 @@ export type TexturePropUniforms<U extends string> = {
   ) => PBShaderExp;
 };
 
+/**
+ * Texture property mixin
+ * @param name - Texture name
+ * @returns Texture mixin
+ *
+ * @public
+ */
 export function mixinTextureProps<U extends string>(name: U) {
   return function <T extends typeof MeshMaterial>(BaseCls: T, vertex = false) {
     const capName = `${name[0].toUpperCase()}${name.slice(1)}`;
