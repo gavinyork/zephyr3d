@@ -29,6 +29,6 @@ declare class UnlitMaterial extends UnlitMaterial_base
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [fragmentShader(scope, ctx)](doc/markdown/./scene.unlitmaterial.fragmentshader.md) |  |  |
-|  [vertexShader(scope, ctx)](doc/markdown/./scene.unlitmaterial.vertexshader.md) |  |  |
+|  [fragmentShader(scope)](doc/markdown/./scene.unlitmaterial.fragmentshader.md) |  |  |
+|  [vertexShader(scope)](doc/markdown/./scene.unlitmaterial.vertexshader.md) |  |  |
 

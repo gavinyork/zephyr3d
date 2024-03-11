@@ -4,34 +4,39 @@
 
 ## TerrainMaterial class
 
-The terrain material
-
 **Signature:**
 
 ```typescript
-declare class TerrainMaterial extends Material 
+declare class TerrainMaterial extends TerrainMaterial_base 
 ```
-**Extends:** [Material](doc/markdown/./scene.material.md)
+**Extends:** TerrainMaterial\_base
 
 ## Constructors
 
 |  Constructor | Modifiers | Description |
 |  --- | --- | --- |
-|  [(constructor)(options)](doc/markdown/./scene.terrainmaterial._constructor_.md) |  | Creates an instance of TerrainMaterial |
+|  [(constructor)(options)](doc/markdown/./scene.terrainmaterial._constructor_.md) |  | Constructs a new instance of the <code>TerrainMaterial</code> class |
 
 ## Properties
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
-|  [lightModel](doc/markdown/./scene.terrainmaterial.lightmodel.md) | <code>readonly</code> | TerrainLightModel |  |
 |  [terrainInfo](doc/markdown/./scene.terrainmaterial.terraininfo.md) |  | [Vector4](doc/markdown/./base.vector4.md) |  |
 
 ## Methods
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [\_applyUniforms(bindGroup, ctx)](doc/markdown/./scene.terrainmaterial._applyuniforms.md) | <code>protected</code> | Applies uniform values |
-|  [applyUniforms(bindGroup, ctx, needUpdate)](doc/markdown/./scene.terrainmaterial.applyuniforms.md) |  | Sets all uniform values to the bind group of the material if needed |
-|  [isTransparent()](doc/markdown/./scene.terrainmaterial.istransparent.md) |  | Returns true if this is a transparency material |
+|  [applyUniformValues(bindGroup, ctx, pass)](doc/markdown/./scene.terrainmaterial.applyuniformvalues.md) |  |  |
+|  [calculateAlbedoColor(scope)](doc/markdown/./scene.terrainmaterial.calculatealbedocolor.md) |  |  |
+|  [fragmentShader(scope)](doc/markdown/./scene.terrainmaterial.fragmentshader.md) |  |  |
+|  [generateMetallicRoughnessMap()](doc/markdown/./scene.terrainmaterial.generatemetallicroughnessmap.md) |  |  |
+|  [getAlbedoTexCoord(scope)](doc/markdown/./scene.terrainmaterial.getalbedotexcoord.md) |  | @<!-- -->ts-ignore |
+|  [getMetallicRoughnessTexCoord(scope)](doc/markdown/./scene.terrainmaterial.getmetallicroughnesstexcoord.md) |  | @<!-- -->ts-ignore |
+|  [getNormalTexCoord(scope)](doc/markdown/./scene.terrainmaterial.getnormaltexcoord.md) |  | @<!-- -->ts-ignore |
+|  [isBatchable()](doc/markdown/./scene.terrainmaterial.isbatchable.md) |  | Returns true if this material supports geometry instancing |
+|  [isTransparentPass(pass)](doc/markdown/./scene.terrainmaterial.istransparentpass.md) |  | Determine if a certain pass of this material is translucent. |
+|  [sampleDetailNormalMap(scope, tex, texCoord, normalScale, TBN)](doc/markdown/./scene.terrainmaterial.sampledetailnormalmap.md) |  |  |
 |  [supportLighting()](doc/markdown/./scene.terrainmaterial.supportlighting.md) |  | Returns true if shading of the material will be affected by lights |
+|  [vertexShader(scope)](doc/markdown/./scene.terrainmaterial.vertexshader.md) |  |  |
 

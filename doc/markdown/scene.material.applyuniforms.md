@@ -9,7 +9,7 @@ Sets all uniform values to the bind group of the material if needed
 **Signature:**
 
 ```typescript
-applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean): void;
+applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number): void;
 ```
 
 ## Parameters
@@ -19,6 +19,7 @@ applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean): void
 |  bindGroup | [BindGroup](doc/markdown/./device.bindgroup.md) | The bind group of the material |
 |  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | The context of current drawing task |
 |  needUpdate | boolean | true if the uniform values needs to update |
+|  pass | number |  |
 
 **Returns:**
 

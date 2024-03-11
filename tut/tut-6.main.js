@@ -16,26 +16,26 @@ myApp.ready().then(function () {
   // Create a PBR material
   const material = new PBRMetallicRoughnessMaterial();
   // metallic 0.9
-  material.lightModel.metallic = 0.9;
+  material.metallic = 0.9;
   // roughness 0.6
-  material.lightModel.roughness = 0.6;
+  material.roughness = 0.6;
   // Load albedo map and normal map
   const assetManager = new AssetManager();
   assetManager.fetchTexture('assets/images/earthcolor.jpg').then(texture => {
-    material.lightModel.setAlbedoMap(texture, null, 0);
+    material.albedoTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
   });
   assetManager.fetchTexture('assets/images/earthnormal.png', {
     linearColorSpace: true
   }).then(texture => {
-    material.lightModel.setNormalMap(texture, null, 0);
+    material.normalTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
   });
   // Create a sphere mesh
   const sphere = new Mesh(scene, new SphereShape(), material);
 
   // Create camera
   const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
-  camera.lookAt(new Vector3(0, 0, 4), new Vector3(0, 0, 0), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController({ distance: 4 });
+  camera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
+  camera.controller = new OrbitCameraController();
 
   const compositor = new Compositor();
   // Add a Tonemap post-processing effect

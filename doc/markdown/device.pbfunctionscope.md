@@ -13,3 +13,9 @@ declare class PBFunctionScope extends PBInsideFunctionScope
 ```
 **Extends:** [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
 
+## Methods
+
+|  Method | Modifiers | Description |
+|  --- | --- | --- |
+|  [$isMain()](doc/markdown/./device.pbfunctionscope._ismain.md) |  |  |
+

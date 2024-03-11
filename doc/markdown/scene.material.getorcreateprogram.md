@@ -9,7 +9,7 @@ Fetch the gpu program of the material for drawing
 **Signature:**
 
 ```typescript
-getOrCreateProgram(ctx: DrawContext): ProgramInfo;
+getOrCreateProgram(ctx: DrawContext, pass: number): ProgramInfo;
 ```
 
 ## Parameters
@@ -17,6 +17,7 @@ getOrCreateProgram(ctx: DrawContext): ProgramInfo;
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | The context for current drawing task |
+|  pass | number |  |
 
 **Returns:**
 

@@ -6,6 +6,7 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
     alert('Error: Browser does not support WebGPU.');
     return;
   }
+  /** @type HTMLCanvasElement */
   const canvas = document.querySelector('#canvas');
   const device = await backendWebGPU.createDevice(canvas);
   const spriteProgram = device.buildRenderProgram({
@@ -14,7 +15,7 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
       this.$inputs.pos = pb.vec2().attrib('position');
       this.$inputs.instPos = pb.vec2().attrib('texCoord0');
       this.$inputs.instVel = pb.vec2().attrib('texCoord1');
-      pb.main(function () {
+      pb.main( /** @this {*} */ function () {
         this.angle = pb.neg(pb.atan2(this.$inputs.instVel.x, this.$inputs.instVel.y));
         this.c = pb.cos(this.angle);
         this.s = pb.sin(this.angle);
@@ -50,7 +51,7 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
       this.params = structParams().uniformBuffer(0);
       this.particlesA = structParticle[0]().storageBuffer(0);
       this.particlesB = structParticle[0]().storageBuffer(0);
-      pb.main(function () {
+      pb.main(/** @this {*} */ function () {
         this.index = this.$builtins.globalInvocationId.x;
         this.vPos = this.particlesA.at(this.index).pos;
         this.vVel = this.particlesA.at(this.index).vel;
@@ -61,29 +62,29 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
         this.cVelCount = pb.uint(0);
         this.pos = pb.vec2();
         this.vel = pb.vec2();
-        this.$for(pb.uint('i'), 0, pb.arrayLength(this.particlesA), function () {
-          this.$if(pb.equal(this.i, this.index), function () {
+        this.$for(pb.uint('i'), 0, pb.arrayLength(this.particlesA), /** @this {*} */ function () {
+          this.$if(pb.equal(this.i, this.index), /** @this {*} */ function () {
             this.$continue();
           });
           this.pos = this.particlesA.at(this.i).pos.xy;
           this.vel = this.particlesA.at(this.i).vel.xy;
-          this.$if(pb.lessThan(pb.distance(this.pos, this.vPos), this.params.rule1Distance), function () {
+          this.$if(pb.lessThan(pb.distance(this.pos, this.vPos), this.params.rule1Distance), /** @this {*} */ function () {
             this.cMass = pb.add(this.cMass, this.pos);
             this.cMassCount = pb.add(this.cMassCount, 1);
           });
-          this.$if(pb.lessThan(pb.distance(this.pos, this.vPos), this.params.rule2Distance), function () {
+          this.$if(pb.lessThan(pb.distance(this.pos, this.vPos), this.params.rule2Distance), /** @this {*} */ function () {
             this.colVel = pb.sub(this.colVel, pb.sub(this.pos, this.vPos));
           });
-          this.$if(pb.lessThan(pb.distance(this.pos, this.vPos), this.params.rule3Distance), function () {
+          this.$if(pb.lessThan(pb.distance(this.pos, this.vPos), this.params.rule3Distance), /** @this {*} */ function () {
             this.cVel = pb.add(this.cVel, this.vel);
             this.cVelCount = pb.add(this.cVelCount, 1);
           });
         });
-        this.$if(pb.greaterThan(this.cMassCount, 0), function () {
+        this.$if(pb.greaterThan(this.cMassCount, 0), /** @this {*} */ function () {
           this.temp = pb.float(this.cMassCount);
           this.cMass = pb.sub(pb.div(this.cMass, pb.vec2(this.temp)), this.vPos);
         });
-        this.$if(pb.greaterThan(this.cVelCount, 0), function () {
+        this.$if(pb.greaterThan(this.cVelCount, 0), /** @this {*} */ function () {
           this.temp = pb.float(this.cVelCount);
           this.cVel = pb.div(this.cVel, pb.vec2(this.temp));
         });
@@ -92,16 +93,16 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
         this.vVel = pb.add(this.vVel, pb.mul(this.cVel, this.params.rule3Scale));
         this.vVel = pb.mul(pb.normalize(this.vVel), pb.clamp(pb.length(this.vVel), 0, 0.1));
         this.vPos = pb.add(this.vPos, pb.mul(this.vVel, this.params.deltaT));
-        this.$if(pb.lessThan(this.vPos.x, -1), function () {
+        this.$if(pb.lessThan(this.vPos.x, -1), /** @this {*} */ function () {
           this.vPos.x = 1;
         });
-        this.$if(pb.greaterThan(this.vPos.x, 1), function () {
+        this.$if(pb.greaterThan(this.vPos.x, 1), /** @this {*} */ function () {
           this.vPos.x = -1;
         });
-        this.$if(pb.lessThan(this.vPos.y, -1), function () {
+        this.$if(pb.lessThan(this.vPos.y, -1), /** @this {*} */ function () {
           this.vPos.y = 1;
         });
-        this.$if(pb.greaterThan(this.vPos.y, 1), function () {
+        this.$if(pb.greaterThan(this.vPos.y, 1), /** @this {*} */ function () {
           this.vPos.y = -1;
         });
         this.particlesB.at(this.index).pos = this.vPos;

@@ -31,10 +31,11 @@ declare class AssetManager
 |  [addModelLoader(loader)](doc/markdown/./scene.assetmanager.addmodelloader.md) |  | Adds a model loader to the asset manager |
 |  [addTextureLoader(loader)](doc/markdown/./scene.assetmanager.addtextureloader.md) |  | Adds a texture loader to the asset manager |
 |  [clearCache()](doc/markdown/./scene.assetmanager.clearcache.md) |  | Removes all cached assets |
-|  [fetchBinaryData(url)](doc/markdown/./scene.assetmanager.fetchbinarydata.md) |  | Fetches a binary resource from a given URL |
+|  [fetchBinaryData(url, postProcess)](doc/markdown/./scene.assetmanager.fetchbinarydata.md) |  | Fetches a binary resource from a given URL |
 |  [fetchBuiltinTexture(name, texture)](doc/markdown/./scene.assetmanager.fetchbuiltintexture.md) |  | Fetches a built-in texture |
-|  [fetchModel(scene, url, mimeType)](doc/markdown/./scene.assetmanager.fetchmodel.md) |  | Fetches a model resource from a given URL and adds it to a scene |
-|  [fetchTextData(url)](doc/markdown/./scene.assetmanager.fetchtextdata.md) |  | Fetches a text resource from a given URL |
+|  [fetchModel(scene, url, mimeType, postProcess)](doc/markdown/./scene.assetmanager.fetchmodel.md) |  | Fetches a model resource from a given URL and adds it to a scene |
+|  [fetchTextData(url, postProcess)](doc/markdown/./scene.assetmanager.fetchtextdata.md) |  | Fetches a text resource from a given URL |
 |  [fetchTexture(url, options)](doc/markdown/./scene.assetmanager.fetchtexture.md) |  | Fetches a texture resource from a given URL |
+|  [purgeCache()](doc/markdown/./scene.assetmanager.purgecache.md) |  | Remove and dispose all cached assets |
 |  [setBuiltinTextureLoader(name, loader)](doc/markdown/./scene.assetmanager.setbuiltintextureloader.md) | <code>static</code> | Sets the loader for a given builtin-texture |
 

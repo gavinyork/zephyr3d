@@ -7,7 +7,7 @@
 **Signature:**
 
 ```typescript
-vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
+vertexShader(scope: PBFunctionScope): void;
 ```
 
 ## Parameters
@@ -15,7 +15,6 @@ vertexShader(scope: PBFunctionScope, ctx: DrawContext): void;
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  scope | [PBFunctionScope](doc/markdown/./device.pbfunctionscope.md) |  |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) |  |
 
 **Returns:**
 

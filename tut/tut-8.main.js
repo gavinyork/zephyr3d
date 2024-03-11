@@ -19,12 +19,12 @@ myApp.ready().then(function () {
   // Load albedo map and normal map
   const assetManager = new AssetManager();
   assetManager.fetchTexture('assets/images/earthcolor.jpg').then(texture => {
-    material.albedoTexture = texture;
+    material.albedoTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
   });
   assetManager.fetchTexture('assets/images/earthnormal.png', {
     linearColorSpace: true
   }).then(texture => {
-    material.normalTexture = texture;
+    material.normalTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
   });
   // All sphere meshes share the same vertex data and materials, allowing for rendering with geometry instances on WebGL2 and WebGPU devices
   const spherePrimitive = new SphereShape();
@@ -41,8 +41,8 @@ myApp.ready().then(function () {
 
   // Create camera
   const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
-  camera.lookAt(new Vector3(0, 0, 20), new Vector3(0, 0, 0), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController({ distance: 20 });
+  camera.lookAt(new Vector3(0, 0, 20), Vector3.zero(), new Vector3(0, 1, 0));
+  camera.controller = new OrbitCameraController();
 
   const compositor = new Compositor();
   // Add a Tonemap post-processing effect

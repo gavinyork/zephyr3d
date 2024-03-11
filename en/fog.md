@@ -8,8 +8,8 @@ Fog effects are used to simulate the natural phenomenon where objects become inc
 
 // Set to atmospheric scattering fog effect (usually required in conjunction with atmospheric scattering sky rendering mode)
 scene.env.sky.fogType = 'scatter';
-// When using the Atmospheric Scatter Fog effect, this property adjusts the concentration of the fog effect, the smaller the value, the smaller the fog concentration
-scene.worldUnit = 100;
+// When using the Atmospheric Scatter Fog effect, this property adjusts the fog density.
+scene.env.sky.aerialPerspectiveDensity = 100;
 
 ```
 

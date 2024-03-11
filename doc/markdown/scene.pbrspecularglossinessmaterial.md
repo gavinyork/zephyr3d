@@ -4,18 +4,30 @@
 
 ## PBRSpecularGlossinessMaterial class
 
-PBR material for specular-glossness workflow
-
 **Signature:**
 
 ```typescript
-declare class PBRSpecularGlossinessMaterial extends StandardMaterial<PBRLightModelSG> 
+declare class PBRSpecularGlossinessMaterial extends PBRSpecularGlossinessMaterial_base 
 ```
-**Extends:** [StandardMaterial](doc/markdown/./scene.standardmaterial.md)<!-- -->&lt;[PBRLightModelSG](doc/markdown/./scene.pbrlightmodelsg.md)<!-- -->&gt;
+**Extends:** PBRSpecularGlossinessMaterial\_base
 
 ## Constructors
 
 |  Constructor | Modifiers | Description |
 |  --- | --- | --- |
 |  [(constructor)()](doc/markdown/./scene.pbrspecularglossinessmaterial._constructor_.md) |  | Constructs a new instance of the <code>PBRSpecularGlossinessMaterial</code> class |
+
+## Properties
+
+|  Property | Modifiers | Type | Description |
+|  --- | --- | --- | --- |
+|  [vertexNormal](doc/markdown/./scene.pbrspecularglossinessmaterial.vertexnormal.md) |  | boolean | true if vertex normal attribute presents |
+|  [vertexTangent](doc/markdown/./scene.pbrspecularglossinessmaterial.vertextangent.md) |  | boolean | true if vertex normal attribute presents |
+
+## Methods
+
+|  Method | Modifiers | Description |
+|  --- | --- | --- |
+|  [fragmentShader(scope)](doc/markdown/./scene.pbrspecularglossinessmaterial.fragmentshader.md) |  |  |
+|  [vertexShader(scope)](doc/markdown/./scene.pbrspecularglossinessmaterial.vertexshader.md) |  |  |
 

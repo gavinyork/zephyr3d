@@ -21,8 +21,8 @@ myApp.ready().then(function () {
 
   // Create camera
   const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
-  camera.lookAt(new Vector3(0, 0, 3), new Vector3(0, 0, 0), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController({ distance: 3 });
+  camera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
+  camera.controller = new OrbitCameraController();
 
   const compositor = new Compositor();
   // Add a Tonemap post-processing effect

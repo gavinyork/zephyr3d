@@ -22,9 +22,11 @@ declare class SkyRenderer
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
+|  [aerialPerspectiveDensity](doc/markdown/./scene.skyrenderer.aerialperspectivedensity.md) |  | number | Aerial perspective density |
 |  [autoUpdateIBLMaps](doc/markdown/./scene.skyrenderer.autoupdateiblmaps.md) |  | boolean | Wether the IBL maps should be updated automatically. |
 |  [cloudIntensity](doc/markdown/./scene.skyrenderer.cloudintensity.md) |  | number | Intensity of the sky color |
 |  [cloudy](doc/markdown/./scene.skyrenderer.cloudy.md) |  | number | Light density of the sky. |
+|  [drawGround](doc/markdown/./scene.skyrenderer.drawground.md) |  | boolean | Whether ground should be rendered |
 |  [fogColor](doc/markdown/./scene.skyrenderer.fogcolor.md) |  | [Vector4](doc/markdown/./base.vector4.md) | The fog color if fog type is not scatter |
 |  [fogDensity](doc/markdown/./scene.skyrenderer.fogdensity.md) |  | number | Density of exp/exp2 fog |
 |  [fogEnd](doc/markdown/./scene.skyrenderer.fogend.md) |  | number | End distance of linear fog |

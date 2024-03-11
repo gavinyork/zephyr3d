@@ -22,9 +22,9 @@ interface Drawable
 |  [getInvBindMatrix()](doc/markdown/./scene.drawable.getinvbindmatrix.md) | Gets the inversed bind matrix for skeleton animation |
 |  [getName()](doc/markdown/./scene.drawable.getname.md) | Gets name of the drawable object |
 |  [getPickTarget()](doc/markdown/./scene.drawable.getpicktarget.md) | If set, the pick target will be returned as the pick result |
+|  [getQueueType()](doc/markdown/./scene.drawable.getqueuetype.md) | Gets the type of render queue |
 |  [getSortDistance(camera)](doc/markdown/./scene.drawable.getsortdistance.md) | Gets the distance for object sorting |
 |  [getXForm()](doc/markdown/./scene.drawable.getxform.md) | Gets the XForm of the object |
 |  [isBatchable()](doc/markdown/./scene.drawable.isbatchable.md) | returns true if the object is batchable |
-|  [isTransparency()](doc/markdown/./scene.drawable.istransparency.md) | true if the object is transparency, false otherwise |
 |  [isUnlit()](doc/markdown/./scene.drawable.isunlit.md) | true if the shading of this object is independent of lighting |
 

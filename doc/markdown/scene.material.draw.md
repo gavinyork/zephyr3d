@@ -9,7 +9,7 @@ Draws a primitive using this material
 **Signature:**
 
 ```typescript
-draw(primitive: Primitive, ctx: DrawContext): void;
+draw(primitive: Primitive, ctx: DrawContext, numInstances?: number): void;
 ```
 
 ## Parameters
@@ -18,6 +18,7 @@ draw(primitive: Primitive, ctx: DrawContext): void;
 |  --- | --- | --- |
 |  primitive | [Primitive](doc/markdown/./scene.primitive.md) | The prmitive to be drawn |
 |  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | The context of current drawing task |
+|  numInstances | number | _(Optional)_ How many instances should be drawn. if zero, the instance count will be automatically detected. |
 
 **Returns:**
 

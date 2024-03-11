@@ -9,8 +9,15 @@ Ends drawing a primitive
 **Signature:**
 
 ```typescript
-endDraw(): void;
+endDraw(pass: number): void;
 ```
+
+## Parameters
+
+|  Parameter | Type | Description |
+|  --- | --- | --- |
+|  pass | number |  |
+
 **Returns:**
 
 void

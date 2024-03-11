@@ -28,15 +28,15 @@ myApp.ready().then(async() => {
   scene.env.sky.skyType = 'scatter';
   // Set the fog effect to atmospheric scattering
   scene.env.sky.fogType = 'scatter';
-  // Sets the scene distance units
-  scene.worldUnit = 500;
+  // Sets aerial perspective density
+  scene.env.sky.aerialPerspectiveDensity = 20;
 
   // Create the ground and some boxes
 
   const material = new PBRMetallicRoughnessMaterial();
-  material.lightModel.metallic = 0.1;
-  material.lightModel.roughness = 0.6;
-  material.lightModel.albedo = new Vector4(0.3, 0.2, 0.2, 1);
+  material.metallic = 0.1;
+  material.roughness = 0.6;
+  material.albedoColor = new Vector4(0.3, 0.2, 0.2, 1);
 
   const box = new BoxShape();
   const floor = new Mesh(scene, box);

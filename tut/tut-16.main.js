@@ -1,5 +1,5 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, LambertMaterial, Mesh, DirectionalLight, PointLight, SpotLight, BoxShape, PlaneShape } from '@zephyr3d/scene';
+import { Scene, Application, OrbitCameraController, PerspectiveCamera, LambertMaterial, Mesh, DirectionalLight, BoxShape, PlaneShape } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
@@ -37,8 +37,8 @@ myApp.ready().then(function () {
 
   // Create camera
   const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 600);
-  camera.lookAt(new Vector3(0, 40, 60), new Vector3(0, 0, 0), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController({ distance: camera.getWorldPosition().magnitude });
+  camera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
+  camera.controller = new OrbitCameraController();
 
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 

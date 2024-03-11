@@ -28,7 +28,6 @@ declare class Scene extends Scene_base
 |  [id](doc/markdown/./scene.scene.id.md) | <code>readonly</code> | number | Gets the unique identifier of the scene |
 |  [octree](doc/markdown/./scene.scene.octree.md) | <code>readonly</code> | [Octree](doc/markdown/./scene.octree.md) | Gets the octree |
 |  [rootNode](doc/markdown/./scene.scene.rootnode.md) | <code>readonly</code> | [SceneNode](doc/markdown/./scene.scenenode.md) | Gets the root scene node of the scene |
-|  [worldUnit](doc/markdown/./scene.scene.worldunit.md) |  | number | How many meters a unit corresponds to. |
 
 ## Methods
 

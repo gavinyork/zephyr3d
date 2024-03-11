@@ -4,17 +4,17 @@
 
 ## TerrainMaterial.(constructor)
 
-Creates an instance of TerrainMaterial
+Constructs a new instance of the `TerrainMaterial` class
 
 **Signature:**
 
 ```typescript
-constructor(options?: TerrainLightModelOptions);
+constructor(options?: TerrainMaterialOptions);
 ```
 
 ## Parameters
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  options | TerrainLightModelOptions | _(Optional)_ |
+|  options | [TerrainMaterialOptions](doc/markdown/./scene.terrainmaterialoptions.md) | _(Optional)_ |
 

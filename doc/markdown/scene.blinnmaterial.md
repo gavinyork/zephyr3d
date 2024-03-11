@@ -21,13 +21,13 @@ declare class BlinnMaterial extends BlinnMaterial_base
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
-|  [shininess](doc/markdown/./scene.blinnmaterial.shininess.md) |  | number | Shininess |
+|  [vertexNormal](doc/markdown/./scene.blinnmaterial.vertexnormal.md) |  | boolean | true if vertex normal attribute presents |
+|  [vertexTangent](doc/markdown/./scene.blinnmaterial.vertextangent.md) |  | boolean | true if vertex normal attribute presents |
 
 ## Methods
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [applyUniformValues(bindGroup, ctx)](doc/markdown/./scene.blinnmaterial.applyuniformvalues.md) |  |  |
-|  [fragmentShader(scope, ctx)](doc/markdown/./scene.blinnmaterial.fragmentshader.md) |  |  |
-|  [vertexShader(scope, ctx)](doc/markdown/./scene.blinnmaterial.vertexshader.md) |  |  |
+|  [fragmentShader(scope)](doc/markdown/./scene.blinnmaterial.fragmentshader.md) |  |  |
+|  [vertexShader(scope)](doc/markdown/./scene.blinnmaterial.vertexshader.md) |  |  |
 

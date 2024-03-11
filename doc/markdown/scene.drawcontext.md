@@ -28,16 +28,17 @@ interface DrawContext
 |  [env](doc/markdown/./scene.drawcontext.env.md) |  | [Environment](doc/markdown/./scene.environment.md) | The scene environment |
 |  [flip](doc/markdown/./scene.drawcontext.flip.md) |  | boolean | Wether should flip upside down |
 |  [instanceData?](doc/markdown/./scene.drawcontext.instancedata.md) |  | [InstanceData](doc/markdown/./scene.instancedata.md) | _(Optional)_ Instance data for current drawing task |
+|  [lightBlending](doc/markdown/./scene.drawcontext.lightblending.md) |  | boolean | whether is blending light |
 |  [linearDepthTexture?](doc/markdown/./scene.drawcontext.lineardepthtexture.md) |  | [Texture2D](doc/markdown/./device.texture2d.md) | _(Optional)_ Linear depth texture |
 |  [logger?](doc/markdown/./scene.drawcontext.logger.md) |  | RenderLogger | _(Optional)_ render logger |
 |  [primaryCamera](doc/markdown/./scene.drawcontext.primarycamera.md) |  | [Camera](doc/markdown/./scene.camera.md) | The camera position of the primary render pass |
+|  [queue](doc/markdown/./scene.drawcontext.queue.md) |  | number | current queue |
 |  [renderPass](doc/markdown/./scene.drawcontext.renderpass.md) |  | [RenderPass](doc/markdown/./scene.renderpass.md) | The render pass to which the current drawing task belongs |
 |  [renderPassHash](doc/markdown/./scene.drawcontext.renderpasshash.md) |  | string | Hash value for the drawing task |
 |  [scene](doc/markdown/./scene.drawcontext.scene.md) |  | [Scene](doc/markdown/./scene.scene.md) | The scene that is currently been drawing |
 |  [sunLight?](doc/markdown/./scene.drawcontext.sunlight.md) |  | [DirectionalLight](doc/markdown/./scene.directionallight.md) | _(Optional)_ the sun light |
 |  [target](doc/markdown/./scene.drawcontext.target.md) |  | [Drawable](doc/markdown/./scene.drawable.md) | The object that is currently being drawn |
 |  [timestamp](doc/markdown/./scene.drawcontext.timestamp.md) |  | number | Timestamp |
-|  [userData?](doc/markdown/./scene.drawcontext.userdata.md) |  | unknown | _(Optional)_ user data |
 |  [viewportHeight?](doc/markdown/./scene.drawcontext.viewportheight.md) |  | number | _(Optional)_ viewport height |
 |  [viewportWidth?](doc/markdown/./scene.drawcontext.viewportwidth.md) |  | number | _(Optional)_ viewport width |
 |  [viewportX?](doc/markdown/./scene.drawcontext.viewportx.md) |  | number | _(Optional)_ viewport X |

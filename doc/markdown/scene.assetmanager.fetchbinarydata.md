@@ -9,7 +9,7 @@ Fetches a binary resource from a given URL
 **Signature:**
 
 ```typescript
-fetchBinaryData(url: string): Promise<ArrayBuffer>;
+fetchBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer>;
 ```
 
 ## Parameters
@@ -17,9 +17,15 @@ fetchBinaryData(url: string): Promise<ArrayBuffer>;
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  url | string | The URL from where to fetch the resource |
+|  postProcess | (data: ArrayBuffer) =&gt; ArrayBuffer | _(Optional)_ A function that will be involved when the binary data was loaded. |
 
 **Returns:**
 
 Promise&lt;ArrayBuffer&gt;
 
+Binary data as ArrayBuffer
+
+## Remarks
+
+If a binary data has already been loaded, the function will ignore the postProcess parameter and directly return the data loaded previously. To load the same data with different postProcess parameters, use different AssetManager instances separately.
 

@@ -9,10 +9,7 @@ Fetches a model resource from a given URL and adds it to a scene
 **Signature:**
 
 ```typescript
-fetchModel(scene: Scene, url: string, mimeType?: string): Promise<{
-        group: SceneNode;
-        animationSet: AnimationSet;
-    }>;
+fetchModel(scene: Scene, url: string, mimeType?: string, postProcess?: (model: SharedModel) => SharedModel): Promise<ModelInfo>;
 ```
 
 ## Parameters
@@ -21,11 +18,16 @@ fetchModel(scene: Scene, url: string, mimeType?: string): Promise<{
 |  --- | --- | --- |
 |  scene | [Scene](doc/markdown/./scene.scene.md) | The scene to which the model node belongs |
 |  url | string | The URL from where to fetch the resource |
-|  mimeType | string | _(Optional)_ The MIME type of the model resource |
+|  mimeType | string | _(Optional)_ The MIME type of the model resource, if not provided, model type will be determined by file extension |
+|  postProcess | (model: [SharedModel](doc/markdown/./scene.sharedmodel.md)<!-- -->) =&gt; [SharedModel](doc/markdown/./scene.sharedmodel.md) | _(Optional)_ A function that will be involved when the model was loaded. |
 
 **Returns:**
 
-Promise&lt;{ group: [SceneNode](doc/markdown/./scene.scenenode.md)<!-- -->; animationSet: [AnimationSet](doc/markdown/./scene.animationset.md)<!-- -->; }&gt;
+Promise&lt;[ModelInfo](doc/markdown/./scene.modelinfo.md)<!-- -->&gt;
 
 The created model node
+
+## Remarks
+
+If a model has already been loaded, the function will ignore the postProcess parameter and directly return the model loaded previously. To load the same model with different postProcess parameters, use different AssetManager instances separately.
 

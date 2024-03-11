@@ -14,9 +14,11 @@
 |  [Application](doc/markdown/./scene.application.md) | Application class |
 |  [AppResizeEvent](doc/markdown/./scene.appresizeevent.md) | This event will be fired whenever the device size changes |
 |  [AppTickEvent](doc/markdown/./scene.apptickevent.md) | Event that will be fired every frame |
+|  [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md) | Heirarchical node interface for model loading |
 |  [AssetManager](doc/markdown/./scene.assetmanager.md) | The asset manager |
+|  [AssetScene](doc/markdown/./scene.assetscene.md) | Scene for model loading |
+|  [AssetSkeleton](doc/markdown/./scene.assetskeleton.md) | Skeleton information for model loading |
 |  [BaseCameraController](doc/markdown/./scene.basecameracontroller.md) | Base class for any kind of camera controllers |
-|  [BlinnLightModel](doc/markdown/./scene.blinnlightmodel.md) | Blinn-phong light model |
 |  [BlinnMaterial](doc/markdown/./scene.blinnmaterial.md) |  |
 |  [Bloom](doc/markdown/./scene.bloom.md) | The bloom post effect |
 |  [BoundingBox](doc/markdown/./scene.boundingbox.md) | The bounding box class |
@@ -29,7 +31,7 @@
 |  [CopyBlitter](doc/markdown/./scene.copyblitter.md) | Copy blitter |
 |  [CullVisitor](doc/markdown/./scene.cullvisitor.md) | Node visitor for culling |
 |  [CylinderShape](doc/markdown/./scene.cylindershape.md) | Box shape |
-|  [DepthRenderPass](doc/markdown/./scene.depthrenderpass.md) | <p>Depth render pass</p><p>Scene depth render pass</p> |
+|  [DepthPass](doc/markdown/./scene.depthpass.md) | <p>Depth render pass</p><p>Scene depth render pass</p> |
 |  [DirectionalLight](doc/markdown/./scene.directionallight.md) | Directional light |
 |  [EnvConstantAmbient](doc/markdown/./scene.envconstantambient.md) | Constant ambient light |
 |  [EnvHemisphericAmbient](doc/markdown/./scene.envhemisphericambient.md) | Hemispheric ambient light |
@@ -41,22 +43,21 @@
 |  [FXAA](doc/markdown/./scene.fxaa.md) | FXAA post effect |
 |  [GaussianBlurBlitter](doc/markdown/./scene.gaussianblurblitter.md) | Gaussian blur blitter |
 |  [GraphNode](doc/markdown/./scene.graphnode.md) | Graph scene node |
-|  [GrassMaterial](doc/markdown/./scene.grassmaterial.md) | The terrain material |
+|  [GrassMaterial](doc/markdown/./scene.grassmaterial.md) |  |
 |  [Grayscale](doc/markdown/./scene.grayscale.md) | Grayscale post effect |
-|  [LambertLightModel](doc/markdown/./scene.lambertlightmodel.md) | Lambert light model |
 |  [LambertMaterial](doc/markdown/./scene.lambertmaterial.md) | Lambert material |
 |  [Material](doc/markdown/./scene.material.md) | Base class for any kind of materials |
 |  [Mesh](doc/markdown/./scene.mesh.md) | Mesh node |
+|  [MeshMaterial](doc/markdown/./scene.meshmaterial.md) | Base class for any kind of mesh materials |
 |  [Model](doc/markdown/./scene.model.md) | Model node |
+|  [NamedObject](doc/markdown/./scene.namedobject.md) | Named object interface for model loading |
 |  [Octree](doc/markdown/./scene.octree.md) | Octree class |
 |  [OctreeNode](doc/markdown/./scene.octreenode.md) | Octree node |
 |  [OctreeNodeChunk](doc/markdown/./scene.octreenodechunk.md) | Octree node chunk |
 |  [OrbitCameraController](doc/markdown/./scene.orbitcameracontroller.md) | Orbit camera controller |
 |  [OrthoCamera](doc/markdown/./scene.orthocamera.md) | Orthogonal camera class |
-|  [PBRLightModelMR](doc/markdown/./scene.pbrlightmodelmr.md) | Metallic-Roughness PBR light model |
-|  [PBRLightModelSG](doc/markdown/./scene.pbrlightmodelsg.md) | specular-glossness PBR light model |
-|  [PBRMetallicRoughnessMaterial](doc/markdown/./scene.pbrmetallicroughnessmaterial.md) | PBR material for metallic-roughenss work flow |
-|  [PBRSpecularGlossinessMaterial](doc/markdown/./scene.pbrspecularglossinessmaterial.md) | PBR material for specular-glossness workflow |
+|  [PBRMetallicRoughnessMaterial](doc/markdown/./scene.pbrmetallicroughnessmaterial.md) |  |
+|  [PBRSpecularGlossinessMaterial](doc/markdown/./scene.pbrspecularglossinessmaterial.md) |  |
 |  [PerspectiveCamera](doc/markdown/./scene.perspectivecamera.md) | Perspective camera class |
 |  [PlaneShape](doc/markdown/./scene.planeshape.md) | The plane shape |
 |  [PointLight](doc/markdown/./scene.pointlight.md) | Point light |
@@ -69,20 +70,19 @@
 |  [Scene](doc/markdown/./scene.scene.md) | Presents a world that manages a couple of objects that will be rendered |
 |  [SceneNode](doc/markdown/./scene.scenenode.md) | The base class for any kind of scene objects |
 |  [SceneUpdateEvent](doc/markdown/./scene.sceneupdateevent.md) | Event that will be fired when the scene needs to be updated |
-|  [ShaderFramework](doc/markdown/./scene.shaderframework.md) | Helper shader functions for the builtin material system |
+|  [ShaderHelper](doc/markdown/./scene.shaderhelper.md) | Helper shader functions for the builtin material system |
 |  [ShadowMapPass](doc/markdown/./scene.shadowmappass.md) | Shadow map render pass |
 |  [ShadowMapper](doc/markdown/./scene.shadowmapper.md) | The shadow map generator |
+|  [SharedModel](doc/markdown/./scene.sharedmodel.md) | Model information that can be shared by multiple model nodes |
 |  [Skeleton](doc/markdown/./scene.skeleton.md) | Skeleton for skinned animation |
 |  [SkyRenderer](doc/markdown/./scene.skyrenderer.md) | The sky renderer |
 |  [SphereShape](doc/markdown/./scene.sphereshape.md) | Sphere shape |
 |  [SpotLight](doc/markdown/./scene.spotlight.md) | Spot light |
-|  [StandardMaterial](doc/markdown/./scene.standardmaterial.md) | The standard mesh material |
 |  [Terrain](doc/markdown/./scene.terrain.md) | Terrain node |
-|  [TerrainMaterial](doc/markdown/./scene.terrainmaterial.md) | The terrain material |
+|  [TerrainMaterial](doc/markdown/./scene.terrainmaterial.md) |  |
 |  [Tonemap](doc/markdown/./scene.tonemap.md) | The tonemap post effect |
 |  [TorusShape](doc/markdown/./scene.torusshape.md) | Torus shape |
 |  [TranslationTrack](doc/markdown/./scene.translationtrack.md) | Translate animation track |
-|  [UnlitLightModel](doc/markdown/./scene.unlitlightmodel.md) | Unlit light model |
 |  [UnlitMaterial](doc/markdown/./scene.unlitmaterial.md) | Unlit material |
 |  [UserTrack](doc/markdown/./scene.usertrack.md) | User-defined animation track |
 |  [XForm](doc/markdown/./scene.xform.md) | Presents a transformation from one space to another |
@@ -96,8 +96,6 @@
 |  [BaseLight](doc/markdown/./scene.baselight.md) | Base class for any kind of light node |
 |  [Blitter](doc/markdown/./scene.blitter.md) | Base class for any kind of blitters |
 |  [EnvironmentLighting](doc/markdown/./scene.environmentlighting.md) | Base class for any kind of environment light |
-|  [LightModel](doc/markdown/./scene.lightmodel.md) | Base class for any kind of light model |
-|  [PBRLightModelBase](doc/markdown/./scene.pbrlightmodelbase.md) | Base class for PBR light model |
 |  [PunctualLight](doc/markdown/./scene.punctuallight.md) | Base class for any kind of puncual light |
 |  [RenderPass](doc/markdown/./scene.renderpass.md) | Base class for any kind of render passes |
 |  [RenderScheme](doc/markdown/./scene.renderscheme.md) | Base class for any kind of render scheme |
@@ -113,24 +111,29 @@
 
 |  Function | Description |
 |  --- | --- |
-|  [calculateTBN(scope, worldPosition, uv, doubleSideLighting)](doc/markdown/./scene.calculatetbn.md) | Calculates the TBN matrix |
-|  [calculateTBNWithNormal(scope, worldPosition, worldNormal, uv, doubleSideLighting)](doc/markdown/./scene.calculatetbnwithnormal.md) | Calculates the TBN matrix |
+|  [applyMaterialMixins(target, mixins)](doc/markdown/./scene.applymaterialmixins.md) |  |
 |  [decode2HalfFromRGBA(scope, value)](doc/markdown/./scene.decode2halffromrgba.md) | Decodes two half floats that was encoded into a rgba8unorm |
 |  [decodeFloatFromRGBA(scope, value)](doc/markdown/./scene.decodefloatfromrgba.md) | Decodes a float that was encoded into a rgba8unorm |
 |  [decodeNormalizedFloatFromRGBA(scope, value)](doc/markdown/./scene.decodenormalizedfloatfromrgba.md) | Decodes a float that was encoded into a rgba8unorm |
 |  [decodeRGBM(scope, rgbm, maxRange)](doc/markdown/./scene.decodergbm.md) | Decodes color value that was encoded into RGBM format |
 |  [encode2HalfToRGBA(scope, a, b)](doc/markdown/./scene.encode2halftorgba.md) | Encodes two half floats into a rgba8unorm |
-|  [encodeColorOutput(scope, outputColor)](doc/markdown/./scene.encodecoloroutput.md) | Transform color to sRGB color space if nessesary |
 |  [encodeFloatToRGBA(scope, value)](doc/markdown/./scene.encodefloattorgba.md) | Encodes a float into a rgba8unorm |
 |  [encodeNormalizedFloatToRGBA(scope, value)](doc/markdown/./scene.encodenormalizedfloattorgba.md) | Encodes a float into a rgba8unorm |
 |  [encodeRGBM(scope, rgb, maxRange)](doc/markdown/./scene.encodergbm.md) | Encodes a color value into RGBM format |
 |  [gammaToLinear(scope, color)](doc/markdown/./scene.gammatolinear.md) | Converts a vec3 color from gamma space to linear space |
-|  [linearDepthToNonLinear(scope, depth, nearFar)](doc/markdown/./scene.lineardepthtononlinear.md) | Calculates the non-linear depth from linear depth |
 |  [linearToGamma(scope, color)](doc/markdown/./scene.lineartogamma.md) | Converts a vec3 color from linear space to gamma space |
+|  [mixinAlbedoColor(BaseCls)](doc/markdown/./scene.mixinalbedocolor.md) |  |
+|  [mixinBlinnPhong(BaseCls)](doc/markdown/./scene.mixinblinnphong.md) |  |
+|  [mixinFoliage(BaseCls)](doc/markdown/./scene.mixinfoliage.md) |  |
+|  [mixinLambert(BaseCls)](doc/markdown/./scene.mixinlambert.md) |  |
+|  [mixinLight(BaseCls)](doc/markdown/./scene.mixinlight.md) |  |
+|  [mixinPBRCommon(BaseCls)](doc/markdown/./scene.mixinpbrcommon.md) |  |
+|  [mixinPBRMetallicRoughness(BaseCls)](doc/markdown/./scene.mixinpbrmetallicroughness.md) |  |
+|  [mixinPBRSpecularGlossness(BaseCls)](doc/markdown/./scene.mixinpbrspecularglossness.md) |  |
+|  [mixinTextureProps(name)](doc/markdown/./scene.mixintextureprops.md) |  |
+|  [mixinVertexColor(BaseCls)](doc/markdown/./scene.mixinvertexcolor.md) |  |
 |  [noise3D(scope, p)](doc/markdown/./scene.noise3d.md) | Calculate 3d noise by a 3d position |
 |  [noisef(scope, p)](doc/markdown/./scene.noisef.md) | Generate single float noise from a vec2 |
-|  [nonLinearDepthToLinear(scope, depth, nearFar)](doc/markdown/./scene.nonlineardepthtolinear.md) | Calculates the linear depth from non-linear depth |
-|  [nonLinearDepthToLinearNormalized(scope, depth, nearFar)](doc/markdown/./scene.nonlineardepthtolinearnormalized.md) | Calculates the normalized linear depth from non-linear depth |
 |  [panoramaToCubemap(tex, outputCubeMap)](doc/markdown/./scene.panoramatocubemap.md) | Converts an equirectangular image to cubemap |
 |  [prefilterCubemap(tex, type, destTex, numSamples)](doc/markdown/./scene.prefiltercubemap.md) | Prefilters an environment cubemap |
 |  [projectCubemap(tex)](doc/markdown/./scene.projectcubemap.md) | Projects a function represented in a cubemap into spherical harmonics using GPU |
@@ -143,6 +146,22 @@
 
 |  Interface | Description |
 |  --- | --- |
+|  [AssetAnimationData](doc/markdown/./scene.assetanimationdata.md) | Animation data interface for model loading |
+|  [AssetAnimationTrack](doc/markdown/./scene.assetanimationtrack.md) | Animation track interface for model loading |
+|  [AssetMaterial](doc/markdown/./scene.assetmaterial.md) | Base material properties for model loading |
+|  [AssetMaterialClearcoat](doc/markdown/./scene.assetmaterialclearcoat.md) | Clearcoat related material properties for model loading |
+|  [AssetMaterialCommon](doc/markdown/./scene.assetmaterialcommon.md) | Common properties of material for model loading |
+|  [AssetMaterialSheen](doc/markdown/./scene.assetmaterialsheen.md) | Sheen related material properties for model loading |
+|  [AssetMeshData](doc/markdown/./scene.assetmeshdata.md) | Mesh data interface for model loading |
+|  [AssetPBRMaterialCommon](doc/markdown/./scene.assetpbrmaterialcommon.md) | PBR related material properties for model loading |
+|  [AssetPBRMaterialMR](doc/markdown/./scene.assetpbrmaterialmr.md) | PBR of Metallic-Roughness workflow related material properties for model loading |
+|  [AssetPBRMaterialSG](doc/markdown/./scene.assetpbrmaterialsg.md) | PBR of Specular-Glossness workfow related material properties for model loading |
+|  [AssetRotationTrack](doc/markdown/./scene.assetrotationtrack.md) | Rotation track of key frame animation interface for model loading |
+|  [AssetScaleTrack](doc/markdown/./scene.assetscaletrack.md) | Scale track of key frame animation interface for model loading |
+|  [AssetSkeletalAnimationTrack](doc/markdown/./scene.assetskeletalanimationtrack.md) | Skeletal animation track interface for model loading |
+|  [AssetSubMeshData](doc/markdown/./scene.assetsubmeshdata.md) | Sub mesh data interface for model loading |
+|  [AssetTranslationTrack](doc/markdown/./scene.assettranslationtrack.md) | Translation track of key frame animation interface for model loading |
+|  [AssetUnlitMaterial](doc/markdown/./scene.assetunlitmaterial.md) | Unlit related material properties for model loading |
 |  [BatchDrawable](doc/markdown/./scene.batchdrawable.md) | interface for any objects that support instancing |
 |  [BoundingVolume](doc/markdown/./scene.boundingvolume.md) | Base interface for any kind of bounding volumes |
 |  [BoxCreationOptions](doc/markdown/./scene.boxcreationoptions.md) | Creation options for box shape |
@@ -151,9 +170,11 @@
 |  [Drawable](doc/markdown/./scene.drawable.md) | Base interface for a drawble object |
 |  [DrawContext](doc/markdown/./scene.drawcontext.md) | The context for drawing objects |
 |  [FPSCameraControllerOptions](doc/markdown/./scene.fpscameracontrolleroptions.md) | Creation options for FPSCameraController |
-|  [IMaterial](doc/markdown/./scene.imaterial.md) |  |
+|  [IMixinFoliage](doc/markdown/./scene.imixinfoliage.md) |  |
+|  [IMixinVertexColor](doc/markdown/./scene.imixinvertexcolor.md) |  |
 |  [InstanceData](doc/markdown/./scene.instancedata.md) | Instance data |
 |  [Logger](doc/markdown/./scene.logger.md) | Logger interface |
+|  [MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md) | Texture information for model loading |
 |  [OrbitCameraControllerOptions](doc/markdown/./scene.orbitcameracontrolleroptions.md) | Creation options for OrbitCameraController |
 |  [PlaneCreationOptions](doc/markdown/./scene.planecreationoptions.md) | Creation options for plane shapes |
 |  [RenderQueueItem](doc/markdown/./scene.renderqueueitem.md) | Render queue item |
@@ -175,8 +196,10 @@
 |  [LIGHT\_TYPE\_POINT](doc/markdown/./scene.light_type_point.md) | Point light type |
 |  [LIGHT\_TYPE\_SPOT](doc/markdown/./scene.light_type_spot.md) | Spot light type |
 |  [MAX\_CLUSTERED\_LIGHTS](doc/markdown/./scene.max_clustered_lights.md) | Max light size for clustered lighting |
-|  [RENDER\_PASS\_TYPE\_DEPTH\_ONLY](doc/markdown/./scene.render_pass_type_depth_only.md) | Depth only render pass type |
-|  [RENDER\_PASS\_TYPE\_FORWARD](doc/markdown/./scene.render_pass_type_forward.md) | Forward render pass type |
+|  [QUEUE\_OPAQUE](doc/markdown/./scene.queue_opaque.md) | Opaque render queue type |
+|  [QUEUE\_TRANSPARENT](doc/markdown/./scene.queue_transparent.md) | Transparent render queue type |
+|  [RENDER\_PASS\_TYPE\_DEPTH](doc/markdown/./scene.render_pass_type_depth.md) | Depth only render pass type |
+|  [RENDER\_PASS\_TYPE\_LIGHT](doc/markdown/./scene.render_pass_type_light.md) | Forward render pass type |
 |  [RENDER\_PASS\_TYPE\_SHADOWMAP](doc/markdown/./scene.render_pass_type_shadowmap.md) | Shadow map render pass type |
 
 ## Type Aliases
@@ -184,20 +207,33 @@
 |  Type Alias | Description |
 |  --- | --- |
 |  [AppOptions](doc/markdown/./scene.appoptions.md) | The creation options for Application |
+|  [BlendMode](doc/markdown/./scene.blendmode.md) |  |
 |  [BlitType](doc/markdown/./scene.blittype.md) | Blit type |
 |  [EnvLightType](doc/markdown/./scene.envlighttype.md) | Environment light type |
+|  [ExtractMixinReturnType](doc/markdown/./scene.extractmixinreturntype.md) |  |
+|  [ExtractMixinType](doc/markdown/./scene.extractmixintype.md) |  |
 |  [FogType](doc/markdown/./scene.fogtype.md) | Type of fog |
+|  [IMixinAlbedoColor](doc/markdown/./scene.imixinalbedocolor.md) |  |
+|  [IMixinBlinnPhong](doc/markdown/./scene.imixinblinnphong.md) |  |
+|  [IMixinLambert](doc/markdown/./scene.imixinlambert.md) |  |
+|  [IMixinLight](doc/markdown/./scene.imixinlight.md) |  |
+|  [IMixinPBRCommon](doc/markdown/./scene.imixinpbrcommon.md) |  |
+|  [IMixinPBRMetallicRoughness](doc/markdown/./scene.imixinpbrmetallicroughness.md) |  |
+|  [IMixinPBRSpecularGlossiness](doc/markdown/./scene.imixinpbrspecularglossiness.md) |  |
 |  [LogMode](doc/markdown/./scene.logmode.md) | Log mode |
-|  [MaterialCommonDebugChannel](doc/markdown/./scene.materialcommondebugchannel.md) | Common debug channels for material |
-|  [MaterialDebugChannel](doc/markdown/./scene.materialdebugchannel.md) | Debug channels for material |
 |  [MaterialGCOptions](doc/markdown/./scene.materialgcoptions.md) | Garbage collection options for material |
-|  [NormalMapMode](doc/markdown/./scene.normalmapmode.md) | Normal map mode |
+|  [ModelInfo](doc/markdown/./scene.modelinfo.md) | Data structure returned by AssetManager.fetchModel() |
 |  [NumberTrackHandler](doc/markdown/./scene.numbertrackhandler.md) | Track handler type for numeric or vector keyframe values |
-|  [PBRBaseDebugChannel](doc/markdown/./scene.pbrbasedebugchannel.md) | Base debug channels for PBR material |
-|  [PBRClearcoatDebugChannel](doc/markdown/./scene.pbrclearcoatdebugchannel.md) | Clearcoat related debug channels for PBR material |
-|  [PBRSheenDebugChannel](doc/markdown/./scene.pbrsheendebugchannel.md) | Sheen related debug channels for PBR material |
-|  [PBRSpecularDebugChannel](doc/markdown/./scene.pbrspeculardebugchannel.md) | Specular related debug channels for PBR material |
+|  [PBRTextureNames](doc/markdown/./scene.pbrtexturenames.md) |  |
+|  [PBRToMixedTextureType](doc/markdown/./scene.pbrtomixedtexturetype.md) |  |
 |  [ShadowMode](doc/markdown/./scene.shadowmode.md) | Shadow mapping mode |
 |  [SkyType](doc/markdown/./scene.skytype.md) | Type of sky |
+|  [TerrainDetailMapInfo](doc/markdown/./scene.terraindetailmapinfo.md) |  |
+|  [TerrainMaterialOptions](doc/markdown/./scene.terrainmaterialoptions.md) |  |
 |  [TextureFetchOptions](doc/markdown/./scene.texturefetchoptions.md) | Options for texture fetching |
+|  [TextureMixinInstanceTypes](doc/markdown/./scene.texturemixininstancetypes.md) |  |
+|  [TextureMixinTypes](doc/markdown/./scene.texturemixintypes.md) |  |
+|  [TextureProp](doc/markdown/./scene.textureprop.md) |  |
+|  [TexturePropUniforms](doc/markdown/./scene.texturepropuniforms.md) |  |
+|  [UnionToIntersection](doc/markdown/./scene.uniontointersection.md) |  |
 

@@ -9,7 +9,7 @@ Applies uniform values
 **Signature:**
 
 ```typescript
-protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
+protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
 ```
 
 ## Parameters
@@ -18,6 +18,7 @@ protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
 |  --- | --- | --- |
 |  bindGroup | [BindGroup](doc/markdown/./device.bindgroup.md) | The bind group |
 |  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | The drawing context |
+|  pass | number |  |
 
 **Returns:**
 

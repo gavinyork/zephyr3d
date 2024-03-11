@@ -19,6 +19,12 @@ declare class OrbitCameraController extends BaseCameraController
 |  --- | --- | --- |
 |  [(constructor)(options)](doc/markdown/./scene.orbitcameracontroller._constructor_.md) |  | Creates an instance of OrbitCameraController |
 
+## Properties
+
+|  Property | Modifiers | Type | Description |
+|  --- | --- | --- | --- |
+|  [center](doc/markdown/./scene.orbitcameracontroller.center.md) |  | [Vector3](doc/markdown/./base.vector3.md) | Rotation center |
+
 ## Methods
 
 |  Method | Modifiers | Description |

@@ -1,6 +1,6 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, FPSCameraController, DirectionalLight, AssetManager, Application, Tonemap, GraphNode, PerspectiveCamera, Compositor, Terrain, FXAA, PostWater } from '@zephyr3d/scene';
+import { Scene, FPSCameraController, DirectionalLight, AssetManager, Application, Tonemap, PerspectiveCamera, Compositor, Terrain, FXAA, PostWater } from '@zephyr3d/scene';
 
 const myApp = new Application({
   backend: backendWebGL2,
@@ -18,7 +18,6 @@ myApp.ready().then(async () => {
     for (let i = 0; i < mapWidth * mapHeight; i++) {
       heightsF32[i] = heightsInt16[i] / 65535;
     }
-    const albedoMap = await assetManager.fetchTexture('./assets/maps/map2/colormap.png', { linearColorSpace: false });
     const splatMap = await assetManager.fetchTexture('./assets/maps/map2/splatmap.tga', { linearColorSpace: true });
     const detailAlbedo0 = await assetManager.fetchTexture('./assets/maps/map2/stone_color.png', { linearColorSpace: false });
     const detailNormal0 = await assetManager.fetchTexture('./assets/maps/map2/stone_norm.png', { linearColorSpace: true });
@@ -38,7 +37,6 @@ myApp.ready().then(async () => {
         roughness: [0.95, 0.9, 0.7]
       }
     });
-    terrain.material.lightModel.setAlbedoMap(albedoMap, null, -1);
     terrain.castShadow = true;
     return terrain;
   }
@@ -46,7 +44,7 @@ myApp.ready().then(async () => {
   const device = myApp.device;
 
   const scene = new Scene();
-  scene.worldUnit = 60;
+  scene.env.sky.aerialPerspectiveDensity = 8;
   scene.env.light.strength = 0.1;
 
   const camera = new PerspectiveCamera(scene, Math.PI/3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 500);
@@ -62,7 +60,7 @@ myApp.ready().then(async () => {
   light.castShadow = true;
   light.shadow.mode = 'pcf-opt';
 
-  const water = new PostWater();
+  const water = new PostWater(0);
   water.boundary.setXYZW(0, 0, 500, 500);
   water.depthMulti = 0.06;
   water.refractionStrength = 0.12;

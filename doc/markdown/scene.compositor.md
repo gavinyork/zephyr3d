@@ -23,6 +23,7 @@ declare class Compositor
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
 |  [appendPostEffect(postEffect)](doc/markdown/./scene.compositor.appendposteffect.md) |  | Adds a posteffect |
+|  [clear()](doc/markdown/./scene.compositor.clear.md) |  | Removes all post effects |
 |  [getPostEffects()](doc/markdown/./scene.compositor.getposteffects.md) |  | Gets all post effects |
 |  [removePostEffect(postEffect)](doc/markdown/./scene.compositor.removeposteffect.md) |  | Removes a posteffect that was previously added |
 

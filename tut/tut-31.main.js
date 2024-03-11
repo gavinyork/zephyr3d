@@ -1,6 +1,6 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, SAO, FPSCameraController, DirectionalLight, AssetManager, Application, Tonemap, GraphNode, PerspectiveCamera, Compositor, Terrain, FXAA } from '@zephyr3d/scene';
+import { Scene, SAO, FPSCameraController, DirectionalLight, AssetManager, Application, Tonemap, PerspectiveCamera, Compositor, Terrain, FXAA } from '@zephyr3d/scene';
 
 const myApp = new Application({
   backend: backendWebGL2,
@@ -23,18 +23,27 @@ myApp.ready().then(async() => {
       heightsF32[i] = heightsInt16[i] / 65535;
     }
     // Splat map
+    /** @type {import('@zephyr3d/device').Texture2D} */
     const splatMap = await assetManager.fetchTexture('assets/maps/map1/splatmap.tga', { linearColorSpace: true });
     // Detail Texture 1, the weights correspond to the R channel of the splat map
+    /** @type {import('@zephyr3d/device').Texture2D} */
     const detailAlbedo0 = await assetManager.fetchTexture('assets/maps/map1/detail1.jpg', { linearColorSpace: false });
+    /** @type {import('@zephyr3d/device').Texture2D} */
     const detailNormal0 = await assetManager.fetchTexture('assets/maps/map1/detail1_norm.jpg', { linearColorSpace: true });
     // Detail Texture 2, the weights correspond to the G channel of the splat map
+    /** @type {import('@zephyr3d/device').Texture2D} */
     const detailAlbedo1 = await assetManager.fetchTexture('assets/maps/map1/detail2.jpg', { linearColorSpace: false });
+    /** @type {import('@zephyr3d/device').Texture2D} */
     const detailNormal1 = await assetManager.fetchTexture('assets/maps/map1/detail2_norm.jpg', { linearColorSpace: true });
     // Detail Texture 3, the weights correspond to the B channel of the splat map
+    /** @type {import('@zephyr3d/device').Texture2D} */
     const detailAlbedo2 = await assetManager.fetchTexture('assets/maps/map1/detail3.jpg', { linearColorSpace: false });
+    /** @type {import('@zephyr3d/device').Texture2D} */
     const detailNormal2 = await assetManager.fetchTexture('assets/maps/map1/detail3_norm.jpg', { linearColorSpace: true });
     // Grass blade textures
+    /** @type {import('@zephyr3d/device').Texture2D} */
     const grass1 = await assetManager.fetchTexture('assets/images/grass1.dds');
+    /** @type {import('@zephyr3d/device').Texture2D} */
     const grass2 = await assetManager.fetchTexture('assets/images/grass2.dds');
     // Create and initialize the terrain
     const terrain = new Terrain(scene);
@@ -69,7 +78,7 @@ myApp.ready().then(async() => {
 
   const device = myApp.device;
   const scene = new Scene();
-  scene.worldUnit = 60;
+  scene.env.sky.aerialPerspectiveDensity = 8;
   const camera = new PerspectiveCamera(scene, Math.PI/3, device.canvas.width / device.canvas.height, 1, 500);
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
   myApp.inputManager.use(camera.handleEvent.bind(camera));
@@ -118,7 +127,7 @@ myApp.ready().then(async() => {
 
   myApp.on('tick', function () {
     camera.updateController();
-    // Correct the height if the camera is within terrain, 
+    // Correct the height if the camera is within terrain,
     if (camera.position.x > 0
       && camera.position.x < terrain.scaledWidth
       && camera.position.z > 0

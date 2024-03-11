@@ -19,10 +19,17 @@ declare class LambertMaterial extends LambertMaterial_base
 |  --- | --- | --- |
 |  [(constructor)()](doc/markdown/./scene.lambertmaterial._constructor_.md) |  | Constructs a new instance of the <code>LambertMaterial</code> class |
 
+## Properties
+
+|  Property | Modifiers | Type | Description |
+|  --- | --- | --- | --- |
+|  [vertexNormal](doc/markdown/./scene.lambertmaterial.vertexnormal.md) |  | boolean | true if vertex normal attribute presents |
+|  [vertexTangent](doc/markdown/./scene.lambertmaterial.vertextangent.md) |  | boolean | true if vertex normal attribute presents |
+
 ## Methods
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [fragmentShader(scope, ctx)](doc/markdown/./scene.lambertmaterial.fragmentshader.md) |  |  |
-|  [vertexShader(scope, ctx)](doc/markdown/./scene.lambertmaterial.vertexshader.md) |  |  |
+|  [fragmentShader(scope)](doc/markdown/./scene.lambertmaterial.fragmentshader.md) |  |  |
+|  [vertexShader(scope)](doc/markdown/./scene.lambertmaterial.vertexshader.md) |  |  |
 

@@ -28,6 +28,7 @@ declare class PBShaderExp extends Proxiable<PBShaderExp>
 |  [getTypeName()](doc/markdown/./device.pbshaderexp.gettypename.md) |  | Get type name of this variable |
 |  [highp()](doc/markdown/./device.pbshaderexp.highp.md) |  | Point out that the variable should be in high precision |
 |  [inout()](doc/markdown/./device.pbshaderexp.inout.md) |  |  |
+|  [isConstructor()](doc/markdown/./device.pbshaderexp.isconstructor.md) |  | Whether this is a constructor |
 |  [isVector()](doc/markdown/./device.pbshaderexp.isvector.md) |  | Determine if this variable is of vector type |
 |  [lowp()](doc/markdown/./device.pbshaderexp.lowp.md) |  | Points out that the variable should be in low precision |
 |  [mediump()](doc/markdown/./device.pbshaderexp.mediump.md) |  | Points out that the variable should be in medium precision |

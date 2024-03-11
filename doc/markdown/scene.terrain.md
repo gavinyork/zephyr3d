@@ -29,7 +29,6 @@ declare class Terrain extends GraphNode
 |  [heightFieldScale](doc/markdown/./scene.terrain.heightfieldscale.md) | <code>readonly</code> | [Vector3](doc/markdown/./base.vector3.md) | Scale value of the height field |
 |  [LODCamera](doc/markdown/./scene.terrain.lodcamera.md) |  | [Camera](doc/markdown/./scene.camera.md) | Camera that will be used to compute LOD level of terrain patches |
 |  [material](doc/markdown/./scene.terrain.material.md) | <code>readonly</code> | [TerrainMaterial](doc/markdown/./scene.terrainmaterial.md) | Material of the terrain |
-|  [maxDetailTextureLevels](doc/markdown/./scene.terrain.maxdetailtexturelevels.md) | <code>readonly</code> | number | The maximum value of detail texture levels |
 |  [maxPixelError](doc/markdown/./scene.terrain.maxpixelerror.md) |  | number | The maximum pixel error for terrain LOD |
 |  [normalMap](doc/markdown/./scene.terrain.normalmap.md) | <code>readonly</code> | [Texture2D](doc/markdown/./device.texture2d.md) | Normal map of the terrain |
 |  [scaledHeight](doc/markdown/./scene.terrain.scaledheight.md) | <code>readonly</code> | number | Scaled terrain height |

@@ -9,13 +9,14 @@ Prepares for drawing
 **Signature:**
 
 ```typescript
-beginDraw(ctx: DrawContext): boolean;
+beginDraw(pass: number, ctx: DrawContext): boolean;
 ```
 
 ## Parameters
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
+|  pass | number |  |
 |  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | The context of current drawing task |
 
 **Returns:**

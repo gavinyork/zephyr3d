@@ -9,7 +9,7 @@ Creates the terrain
 **Signature:**
 
 ```typescript
-create(sizeX: number, sizeZ: number, elevations: Float32Array, scale: Vector3, patchSize: number, options?: TerrainLightModelOptions): boolean;
+create(sizeX: number, sizeZ: number, elevations: Float32Array, scale: Vector3, patchSize: number, options?: TerrainMaterialOptions): boolean;
 ```
 
 ## Parameters
@@ -21,7 +21,7 @@ create(sizeX: number, sizeZ: number, elevations: Float32Array, scale: Vector3, p
 |  elevations | Float32Array | Elevation data of the terrain |
 |  scale | [Vector3](doc/markdown/./base.vector3.md) | Scale of the terrain |
 |  patchSize | number | Patch size of the terrain |
-|  options | TerrainLightModelOptions | _(Optional)_ |
+|  options | [TerrainMaterialOptions](doc/markdown/./scene.terrainmaterialoptions.md) | _(Optional)_ |
 
 **Returns:**
 

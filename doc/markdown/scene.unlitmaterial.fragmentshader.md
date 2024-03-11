@@ -7,7 +7,7 @@
 **Signature:**
 
 ```typescript
-fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void;
+fragmentShader(scope: PBFunctionScope): void;
 ```
 
 ## Parameters
@@ -15,7 +15,6 @@ fragmentShader(scope: PBFunctionScope, ctx: DrawContext): void;
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  scope | [PBFunctionScope](doc/markdown/./device.pbfunctionscope.md) |  |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) |  |
 
 **Returns:**
 

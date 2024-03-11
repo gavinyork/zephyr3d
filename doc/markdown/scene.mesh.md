@@ -42,10 +42,10 @@ declare class Mesh extends GraphNode implements BatchDrawable
 |  [getInvBindMatrix()](doc/markdown/./scene.mesh.getinvbindmatrix.md) |  | Gets the inversed bind matrix for skeleton animation |
 |  [getName()](doc/markdown/./scene.mesh.getname.md) |  | Gets name of the drawable object |
 |  [getPickTarget()](doc/markdown/./scene.mesh.getpicktarget.md) |  | If set, the pick target will be returned as the pick result |
+|  [getQueueType()](doc/markdown/./scene.mesh.getqueuetype.md) |  | Gets the type of render queue |
 |  [getXForm()](doc/markdown/./scene.mesh.getxform.md) |  | Gets the XForm of the object |
 |  [isBatchable()](doc/markdown/./scene.mesh.isbatchable.md) |  | returns true if the object is batchable |
 |  [isMesh()](doc/markdown/./scene.mesh.ismesh.md) |  | true if this is a mesh node, false otherwise |
-|  [isTransparency()](doc/markdown/./scene.mesh.istransparency.md) |  | true if the object is transparency, false otherwise |
 |  [isUnlit()](doc/markdown/./scene.mesh.isunlit.md) |  | true if the shading of this object is independent of lighting |
 |  [setAnimatedBoundingBox(bbox)](doc/markdown/./scene.mesh.setanimatedboundingbox.md) |  | Sets the bounding box for animation |
 |  [setBoneMatrices(matrices)](doc/markdown/./scene.mesh.setbonematrices.md) |  | Sets the texture that contains the bone matrices for skeletal animation |

@@ -4,7 +4,7 @@
 
 ## GrassMaterial.(constructor)
 
-Creates an instance of TerrainMaterial
+Constructs a new instance of the `GrassMaterial` class
 
 **Signature:**
 

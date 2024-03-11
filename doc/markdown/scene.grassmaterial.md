@@ -4,36 +4,26 @@
 
 ## GrassMaterial class
 
-The terrain material
-
 **Signature:**
 
 ```typescript
-declare class GrassMaterial extends Material 
+declare class GrassMaterial extends GrassMaterial_base 
 ```
-**Extends:** [Material](doc/markdown/./scene.material.md)
+**Extends:** GrassMaterial\_base
 
 ## Constructors
 
 |  Constructor | Modifiers | Description |
 |  --- | --- | --- |
-|  [(constructor)(terrainSize, normalMap, grassTexture)](doc/markdown/./scene.grassmaterial._constructor_.md) |  | Creates an instance of TerrainMaterial |
-
-## Properties
-
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [alphaToCoverage](doc/markdown/./scene.grassmaterial.alphatocoverage.md) |  | boolean | enable alpha to coverage |
-|  [color](doc/markdown/./scene.grassmaterial.color.md) |  | [Vector4](doc/markdown/./base.vector4.md) | Color |
-|  [colorMap](doc/markdown/./scene.grassmaterial.colormap.md) |  | [Texture2D](doc/markdown/./device.texture2d.md) | Base map |
-|  [lightModel](doc/markdown/./scene.grassmaterial.lightmodel.md) | <code>readonly</code> | [PBRLightModelMR](doc/markdown/./scene.pbrlightmodelmr.md) | Light model |
+|  [(constructor)(terrainSize, normalMap, grassTexture)](doc/markdown/./scene.grassmaterial._constructor_.md) |  | Constructs a new instance of the <code>GrassMaterial</code> class |
 
 ## Methods
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [\_applyUniforms(bindGroup, ctx)](doc/markdown/./scene.grassmaterial._applyuniforms.md) | <code>protected</code> | Applies uniform values |
-|  [applyUniforms(bindGroup, ctx, needUpdate)](doc/markdown/./scene.grassmaterial.applyuniforms.md) |  | Sets all uniform values to the bind group of the material if needed |
-|  [isTransparent()](doc/markdown/./scene.grassmaterial.istransparent.md) |  | Returns true if this is a transparency material |
+|  [applyUniformValues(bindGroup, ctx, pass)](doc/markdown/./scene.grassmaterial.applyuniformvalues.md) |  |  |
+|  [fragmentShader(scope)](doc/markdown/./scene.grassmaterial.fragmentshader.md) |  |  |
+|  [isTransparentPass(pass)](doc/markdown/./scene.grassmaterial.istransparentpass.md) |  | Determine if a certain pass of this material is translucent. |
 |  [supportLighting()](doc/markdown/./scene.grassmaterial.supportlighting.md) |  | Returns true if shading of the material will be affected by lights |
+|  [vertexShader(scope)](doc/markdown/./scene.grassmaterial.vertexshader.md) |  |  |
 

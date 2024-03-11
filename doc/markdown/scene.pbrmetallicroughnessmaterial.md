@@ -4,14 +4,12 @@
 
 ## PBRMetallicRoughnessMaterial class
 
-PBR material for metallic-roughenss work flow
-
 **Signature:**
 
 ```typescript
-declare class PBRMetallicRoughnessMaterial extends StandardMaterial<PBRLightModelMR> 
+declare class PBRMetallicRoughnessMaterial extends PBRMetallicRoughnessMaterial_base 
 ```
-**Extends:** [StandardMaterial](doc/markdown/./scene.standardmaterial.md)<!-- -->&lt;[PBRLightModelMR](doc/markdown/./scene.pbrlightmodelmr.md)<!-- -->&gt;
+**Extends:** PBRMetallicRoughnessMaterial\_base
 
 ## Constructors
 
@@ -23,5 +21,13 @@ declare class PBRMetallicRoughnessMaterial extends StandardMaterial<PBRLightMode
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
-|  [GGXLUT](doc/markdown/./scene.pbrmetallicroughnessmaterial.ggxlut.md) | <code>readonly</code> | [\_zephyr3d\_device.Texture2D](doc/markdown/./device.texture2d.md)<!-- -->&lt;unknown&gt; |  |
+|  [vertexNormal](doc/markdown/./scene.pbrmetallicroughnessmaterial.vertexnormal.md) |  | boolean | true if vertex normal attribute presents |
+|  [vertexTangent](doc/markdown/./scene.pbrmetallicroughnessmaterial.vertextangent.md) |  | boolean | true if vertex normal attribute presents |
+
+## Methods
+
+|  Method | Modifiers | Description |
+|  --- | --- | --- |
+|  [fragmentShader(scope)](doc/markdown/./scene.pbrmetallicroughnessmaterial.fragmentshader.md) |  |  |
+|  [vertexShader(scope)](doc/markdown/./scene.pbrmetallicroughnessmaterial.vertexshader.md) |  |  |
 

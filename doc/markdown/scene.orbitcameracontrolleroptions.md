@@ -16,6 +16,7 @@ interface OrbitCameraControllerOptions
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
+|  [center](doc/markdown/./scene.orbitcameracontrolleroptions.center.md) |  | [Vector3](doc/markdown/./base.vector3.md) | target position |
 |  [damping?](doc/markdown/./scene.orbitcameracontrolleroptions.damping.md) |  | number | _(Optional)_ damping value |
 |  [distance?](doc/markdown/./scene.orbitcameracontrolleroptions.distance.md) |  | number | _(Optional)_ initial distance between the camera and the target |
 |  [rotateSpeed?](doc/markdown/./scene.orbitcameracontrolleroptions.rotatespeed.md) |  | number | _(Optional)_ Rotating speed |

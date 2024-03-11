@@ -9,7 +9,7 @@ Creates the shader program
 **Signature:**
 
 ```typescript
-protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram;
+protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram;
 ```
 
 ## Parameters
@@ -18,6 +18,7 @@ protected _createProgram(pb: ProgramBuilder, ctx: DrawContext): GPUProgram;
 |  --- | --- | --- |
 |  pb | [ProgramBuilder](doc/markdown/./device.programbuilder.md) | The program builder |
 |  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | The drawing context |
+|  pass | number |  |
 
 **Returns:**
 

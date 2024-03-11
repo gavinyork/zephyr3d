@@ -23584,7 +23584,39 @@
           "isAbstract": false,
           "name": "PBFunctionScope",
           "preserveMemberOrder": false,
-          "members": [],
+          "members": [
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/device!PBFunctionScope#$isMain:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "$isMain(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "$isMain"
+            }
+          ],
           "extendsTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -28173,6 +28205,37 @@
             },
             {
               "kind": "Method",
+              "canonicalReference": "@zephyr3d/device!PBShaderExp#isConstructor:member(1)",
+              "docComment": "/**\n * Whether this is a constructor\n *\n * @returns true if this is a constructor\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "isConstructor(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "isConstructor"
+            },
+            {
+              "kind": "Method",
               "canonicalReference": "@zephyr3d/device!PBShaderExp#isVector:member(1)",
               "docComment": "/**\n * Determine if this variable is of vector type\n *\n * @returns true if the variable is of vector type, otherwise false\n */\n",
               "excerptTokens": [
@@ -31474,6 +31537,38 @@
               "isStatic": false,
               "isProtected": false,
               "isAbstract": false
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/device!ProgramBuilder#getCurrentFunctionScope:member(1)",
+              "docComment": "/**\n * Gets the current function scope\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getCurrentFunctionScope(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "PBFunctionScope",
+                  "canonicalReference": "@zephyr3d/device!PBFunctionScope:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "getCurrentFunctionScope"
             },
             {
               "kind": "Method",

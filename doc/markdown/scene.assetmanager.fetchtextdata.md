@@ -9,7 +9,7 @@ Fetches a text resource from a given URL
 **Signature:**
 
 ```typescript
-fetchTextData(url: string): Promise<string>;
+fetchTextData(url: string, postProcess?: (text: string) => string): Promise<string>;
 ```
 
 ## Parameters
@@ -17,10 +17,15 @@ fetchTextData(url: string): Promise<string>;
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  url | string | The URL from where to fetch the resource |
+|  postProcess | (text: string) =&gt; string | _(Optional)_ A function that will be involved when the text data was loaded. |
 
 **Returns:**
 
 Promise&lt;string&gt;
 
 The fetched text
+
+## Remarks
+
+If a text data has already been loaded, the function will ignore the postProcess parameter and directly return the text loaded previously. To load the same text with different postProcess parameters, use different AssetManager instances separately.
 
