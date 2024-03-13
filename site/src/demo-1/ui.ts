@@ -3,23 +3,23 @@ import { Application, BoundingBox, GraphNode, Material, OrbitCameraController, P
 import { FurMaterial } from "./materials/fur";
 import { ParallaxMapMaterial, ParallaxMappingMode } from "./materials/parallax";
 import { WoodMaterial } from "./materials/wood";
-import { AABB, Vector3 } from "@zephyr3d/base";
+import { AABB, Vector3, Vector4 } from "@zephyr3d/base";
 import { ToonMaterial } from "./materials/toon";
 
 export class UI {
   private _camera: PerspectiveCamera;
-  private _meshes: { node: SceneNode, material: Material, bbox?: AABB }[];
+  private _meshes: { node: SceneNode, material: Material, name: string, bbox?: AABB }[];
   private _materialNames: string[];
   private _index: number;
   private _parallaxModes: ParallaxMappingMode[];
   private _deviceList: string[];
   private _deviceIndex: [number];
-  constructor(camera: PerspectiveCamera, meshes: { node: SceneNode, material: Material }[]){
+  constructor(camera: PerspectiveCamera, meshes: { node: SceneNode, material: Material, name: string }[]){
     this._camera = camera;
     this._deviceList = ['WebGL', 'WebGL2', 'WebGPU'];
     this._deviceIndex = [this._deviceList.findIndex(val => val.toLowerCase() === Application.instance.device.type)];
     this._meshes = meshes;
-    this._materialNames = this._meshes.map(val => val.material.constructor.name.slice(0, -8));
+    this._materialNames = this._meshes.map(val => val.name);
     this._index = 0;
     this._parallaxModes = [
       'basic',
@@ -66,7 +66,7 @@ export class UI {
       Vector3.axisPY()
     );
     this._camera.near = Math.min(1, this._camera.near);
-    this._camera.far = Math.max(10, dist + extents.z + 100);
+    this._camera.far = Math.max(10, dist + extents.z + Math.max(extents.x, extents.y, extents.z) * 8);
     (this._camera.controller as OrbitCameraController).setOptions({ center });
   }
   updateMeshShowState() {
@@ -153,6 +153,24 @@ export class UI {
     ImGui.SetNextItemWidth(150);
     if (ImGui.SliderFloat('Noise repeat', noiseRepeat, 1, 100)) {
       material.noiseRepeat = noiseRepeat[0];
+    }
+    const colorStart = {
+      r: material.colorStart.x,
+      g: material.colorStart.y,
+      b: material.colorStart.z,
+      a: material.colorStart.w
+    };
+    if (ImGui.ColorEdit4('AO start', colorStart)){
+      material.colorStart = new Vector4(colorStart.r, colorStart.g, colorStart.b, colorStart.a);
+    }
+    const colorEnd = {
+      r: material.colorEnd.x,
+      g: material.colorEnd.y,
+      b: material.colorEnd.z,
+      a: material.colorEnd.w
+    };
+    if (ImGui.ColorEdit4('AO end', colorEnd)){
+      material.colorEnd = new Vector4(colorEnd.r, colorEnd.g, colorEnd.b, colorEnd.a);
     }
   }
   renderMaterialUI(){
