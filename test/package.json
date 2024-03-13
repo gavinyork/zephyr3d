@@ -50,7 +50,6 @@
     "@webgpu/types": "^0.1.31",
     "colors": "^1.4.0",
     "diff": "^5.0.0",
-    "lil-gui": "^0.16.1",
     "lodash-es": "^4.17.21",
     "rxjs": "7.5.2",
     "@zip.js/zip.js": "^2.7.35",

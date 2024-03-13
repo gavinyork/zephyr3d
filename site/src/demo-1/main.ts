@@ -17,15 +17,14 @@ import {
   PBRMetallicRoughnessMaterial,
   TorusShape
 } from '@zephyr3d/scene';
-import { imGuiInit, imGuiInjectEvent } from '@zephyr3d/imgui';
 import { WoodMaterial } from './materials/wood';
 import { FurMaterial } from './materials/fur';
 import type { DeviceBackend, Texture2D } from '@zephyr3d/device';
 import { ParallaxMapMaterial } from './materials/parallax';
-import { UI } from './ui';
 import { ToonMaterial } from './materials/toon';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { Panel } from './ui';
 
 function getQueryString(name: string) {
   return new URL(window.location.toString()).searchParams.get(name) || null;
@@ -87,8 +86,6 @@ const myApp = new Application({
 });
 
 myApp.ready().then(async function () {
-  await imGuiInit(myApp.device);
-
   const scene = new Scene();
   scene.env.sky.fogType = 'scatter';
 
@@ -182,11 +179,12 @@ myApp.ready().then(async function () {
 
   //const inspector = new common.Inspector(scene, compositor, camera);
 
-  myApp.inputManager.use(imGuiInjectEvent);
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
   // UI
-  const ui = new UI(camera, meshes);
+  //const ui = new UI(camera, meshes);
+
+  new Panel(camera, meshes);
 
   myApp.on('resize', (ev) => {
     camera.aspect = ev.width / ev.height;
@@ -195,7 +193,7 @@ myApp.ready().then(async function () {
   myApp.on('tick', function () {
     camera.updateController();
     camera.render(scene, compositor);
-    ui.render();
+    //ui.render();
   });
 
   myApp.run();

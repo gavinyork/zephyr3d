@@ -3,7 +3,6 @@ import { GLTFViewer } from './gltfviewer';
 import { Vector3 } from '@zephyr3d/base';
 import { backendWebGL2, backendWebGL1 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
-import { imGuiInit, imGuiInjectEvent } from '@zephyr3d/imgui';
 import type { DeviceBackend } from '@zephyr3d/device';
 
 function getQueryString(name: string) {
@@ -36,11 +35,12 @@ const gltfApp = new Application({
 });
 
 gltfApp.ready().then(async () => {
-  await imGuiInit(gltfApp.device);
-  gltfApp.inputManager.use(imGuiInjectEvent);
+  //await imGuiInit(gltfApp.device);
+  //gltfApp.inputManager.use(imGuiInjectEvent);
   const scene = new Scene();
   scene.env.sky.fogType = 'exp';
   const gltfViewer = new GLTFViewer(scene);
+  gltfViewer.loadModel('./assets/models/DamagedHelmet.glb');
   gltfApp.inputManager.use(gltfViewer.camera.handleEvent.bind(gltfViewer.camera));
   gltfApp.on('drop', (ev) => {
     ev.preventDefault();
@@ -93,6 +93,5 @@ gltfApp.ready().then(async () => {
     gltfViewer.camera.updateController();
     gltfViewer.render();
   });
-  gltfViewer.loadModel('./assets/models/DamagedHelmet.glb');
   gltfApp.run();
 });

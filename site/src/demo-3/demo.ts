@@ -3,7 +3,7 @@ import { Texture2D } from '@zephyr3d/device';
 import { Application, AssetHierarchyNode, AssetManager, Bloom, Compositor, DirectionalLight, FXAA, GraphNode, MeshMaterial, ModelInfo, OrbitCameraController, PBRMetallicRoughnessMaterial, PBRSpecularGlossinessMaterial, PerspectiveCamera, Scene, SceneNode, SharedModel, Terrain, Tonemap } from '@zephyr3d/scene';
 import * as zip from '@zip.js/zip.js';
 import { TreeMaterialMetallicRoughness } from './treematerial';
-import { UI } from './ui';
+import { Panel } from './ui';
 
 export class Demo {
   private _assetManager: AssetManager;
@@ -19,7 +19,7 @@ export class Demo {
   private _actorRunning: boolean;
   private _loaded: boolean;
   private _loadPercent: number;
-  private _ui: UI;
+  private _ui: Panel;
   constructor(){
     this._terrain = null;
     this._axisPZ = Vector3.axisPZ();
@@ -38,7 +38,7 @@ export class Demo {
     this.render();
     this._loaded = false;
     this._loadPercent = 0;
-    this._ui = new UI();
+    this._ui = null;
   }
   async fetchAssetArchive(url: string, progressCallback: (percent: number) => void): Promise<Blob> {
     progressCallback(0);
@@ -396,8 +396,8 @@ export class Demo {
     this._camera.render(this._scene, this._compositor);
     if (!this._loaded) {
       Application.instance.device.drawText(`Loading: %${this._loadPercent}`, 20, 20, '#a00000');
-    } else {
-      this._ui.render();
+    } else if (!this._ui) {
+      this._ui = new Panel();
     }
   }
 }

@@ -17,7 +17,7 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
   get distored(): Vector3 {
     return this._distored;
   }
-  set distord(val: Vector3) {
+  set distored(val: Vector3) {
     if(!val.equalsTo(this._distored)){
       this._distored.set(val);
       this.uniformChanged();
