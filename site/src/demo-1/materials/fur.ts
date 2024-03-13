@@ -16,9 +16,9 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
     this._thickness = 0.1;
     this._numLayers = 30;
     this._colorStart = new Vector4(0, 0, 0, 1);
-    this._colorEnd = new Vector4(1, 1, 1, 0.3);
+    this._colorEnd = new Vector4(1, 1, 1, 0);
     this._alphaTexture = null;
-    this._alphaRepeat = 4;
+    this._alphaRepeat = 1;
     this._instancing = Application.instance.device.type !== 'webgl';
     this.numPasses = this._instancing ? 2 : 1 + this._numLayers;
   }
@@ -51,6 +51,20 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
       this._alphaRepeat = val;
       this.uniformChanged();
     }
+  }
+  get colorStart(): Vector4 {
+    return this._colorStart;
+  }
+  set colorStart(val: Vector4) {
+    this._colorStart.set(val);
+    this.optionChanged(false);
+  }
+  get colorEnd(): Vector4 {
+    return this._colorEnd;
+  }
+  set colorEnd(val: Vector4) {
+    this._colorEnd.set(val);
+    this.optionChanged(false);
   }
   get alphaTexture(): Texture2D {
     return this._alphaTexture;

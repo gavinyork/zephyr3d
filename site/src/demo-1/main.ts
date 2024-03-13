@@ -1,3 +1,4 @@
+import * as zip from '@zip.js/zip.js';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Scene,
@@ -13,7 +14,8 @@ import {
   BoxShape,
   SceneNode,
   Material,
-  PBRMetallicRoughnessMaterial
+  PBRMetallicRoughnessMaterial,
+  TorusShape
 } from '@zephyr3d/scene';
 import { imGuiInit, imGuiInjectEvent } from '@zephyr3d/imgui';
 import { WoodMaterial } from './materials/wood';
@@ -48,6 +50,37 @@ function getBackend(): DeviceBackend {
   return backendWebGL1;
 }
 
+async function readZip(url: string): Promise<Map<string, string>> {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  const reader = new zip.ZipReader(new zip.BlobReader(blob));
+  const entries = await reader.getEntries();
+  const fileMap = new Map();
+  for (const entry of entries) {
+    if (!entry.directory) {
+      const blob = await entry.getData(new zip.BlobWriter());
+      const fileURL = URL.createObjectURL(blob);
+      fileMap.set(`/${entry.filename}`, fileURL);
+    }
+  }
+  await reader.close();
+  // Make url unique so that a file url in zip will not conflict with other zip
+  for (const key of Array.from(fileMap.keys())) {
+    fileMap.set(url + key, fileMap.get(key));
+  }
+  return fileMap;
+}
+
+async function fetchModel(scene: Scene, url: string) {
+  const assetManager = new AssetManager();
+  if (/(\.zip)$/i.test(url)) {
+    const fileMap = await readZip(url);
+    url = Array.from(fileMap.keys()).find((val) => /(\.gltf|\.glb)$/i.test(val));
+    assetManager.httpRequest.urlResolver = url => fileMap.get(url) || url;
+  }
+  return url ? await assetManager.fetchModel(scene, url) : null;
+}
+
 const myApp = new Application({
   backend: getBackend(),
   canvas: document.querySelector('#canvas')
@@ -68,7 +101,7 @@ myApp.ready().then(async function () {
   dlight.color = new Vector4(1, 1, 1, 1);
 
 
-  const meshes: { node: SceneNode, material: Material }[] = [];
+  const meshes: { node: SceneNode, material: Material, name: string }[] = [];
   const assetManager = new AssetManager();
 
   // Fur material
@@ -84,15 +117,22 @@ myApp.ready().then(async function () {
   };
   const furMaterial = new FurMaterial();
   furMaterial.alphaTexture = furAlphaTex;
-  const furMesh = await assetManager.fetchModel(scene, 'assets/models/stanford_bunny_pbr.glb');
+  furMaterial.albedoColor = new Vector4(1, 1, 0, 1);
+  furMaterial.thickness = 0.05;
+  furMaterial.numLayers = 30;
+  furMaterial.noiseRepeat = 16;
+  //const furMesh = await fetchModel(scene, 'assets/models/stanford-bunny.zip');
+  const furMesh = new Mesh(scene, new TorusShape(), furMaterial);
+  /*
   furMesh.group.iterate(node => {
     if (node.isMesh()) {
       furMaterial.albedoTexture = (node.material as PBRMetallicRoughnessMaterial).albedoTexture;
       node.material = furMaterial;
     }
   });
+  */
   //const furMesh = new Mesh(scene, new SphereShape({ radius: 2 }), furMaterial);
-  meshes.push({ node: furMesh.group, material: furMaterial });
+  meshes.push({ node: furMesh, material: furMaterial, name: 'Fur' });
 
   // Parallax mapping material
   const rocksTex = await assetManager.fetchTexture<Texture2D>('assets/images/rocks.jpg');
@@ -105,25 +145,25 @@ myApp.ready().then(async function () {
   parallaxMaterial.albedoTexture = rocksTex;
   parallaxMaterial.normalTexture = rocksNHTex;
   const parallaxMesh = new Mesh(scene, new BoxShape({ size: 4, anchorX: 0.5, anchorY: 0.5, anchorZ: 0.5 }), parallaxMaterial);
-  meshes.push({ node: parallaxMesh, material: parallaxMaterial });
+  meshes.push({ node: parallaxMesh, material: parallaxMaterial, name: 'ParallaxMap' });
 
   // Wood material
   const woodMaterial = new WoodMaterial();
   const woodMesh = new Mesh(scene, new SphereShape({ radius: 2 }), woodMaterial);
-  meshes.push({ node: woodMesh, material: woodMaterial });
+  meshes.push({ node: woodMesh, material: woodMaterial, name: 'Wood' });
 
   // Toon material
   const toonMaterial = new ToonMaterial();
   toonMaterial.bands = 2;
   toonMaterial.edgeThickness = 1;
-  const toonMesh = await assetManager.fetchModel(scene, 'assets/models/Duck.glb');
+  const toonMesh = await fetchModel(scene, 'assets/models/Duck.glb');
   toonMesh.group.iterate(node => {
     if (node.isMesh()) {
       toonMaterial.albedoTexture = (node.material as PBRMetallicRoughnessMaterial).albedoTexture;
       node.material = toonMaterial;
     }
   });
-  meshes.push({ node: toonMesh.group, material: toonMaterial });
+  meshes.push({ node: toonMesh.group, material: toonMaterial, name: 'Cartoon' });
 
   // Create camera
   const camera = new PerspectiveCamera(
@@ -131,7 +171,7 @@ myApp.ready().then(async function () {
     Math.PI / 3,
     myApp.device.canvas.width / myApp.device.canvas.height,
     1,
-    600
+    1000
   );
   camera.lookAt(new Vector3(0, 0, 12), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
