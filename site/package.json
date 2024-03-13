@@ -59,6 +59,7 @@
     "diff": "^5.0.0",
     "highlight.js": "^11.8.0",
     "bootstrap": "^5.3.1",
+    "lil-gui": "^0.19.2",
     "@zip.js/zip.js": "^2.7.35",
     "@popperjs/core": "^2.11.8",
     "@zephyr3d/base": "workspace:^0.1.0",

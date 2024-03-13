@@ -17,7 +17,7 @@ import {
   Bloom
 } from '@zephyr3d/scene';
 import { EnvMaps } from './envmap';
-import { UI } from './ui';
+import { Panel } from './ui';
 
 export class GLTFViewer {
   private _currentAnimation: string;
@@ -37,7 +37,8 @@ export class GLTFViewer {
   private _fov: number;
   private _nearPlane: number;
   private _envMaps: EnvMaps;
-  private _ui: UI;
+  //private _ui: UI;
+  private _ui: Panel;
   private _compositor: Compositor;
   constructor(scene: Scene) {
     this._currentAnimation = null;
@@ -45,7 +46,7 @@ export class GLTFViewer {
     this._animationSet = null;
     this._scene = scene;
     this._envMaps = new EnvMaps();
-    this._ui = new UI(this);
+    //this._ui = new UI(this);
     this._assetManager = new AssetManager();
     this._tonemap = new Tonemap();
     this._bloom = new Bloom();
@@ -84,6 +85,7 @@ export class GLTFViewer {
       inactiveTimeDuration: 10000,
       verbose: true
     });
+    this._ui = new Panel(this);
   }
   get envMaps(): EnvMaps {
     return this._envMaps;
@@ -157,6 +159,7 @@ export class GLTFViewer {
           this._animationSet.playAnimation(animations[0], 0);
         }
       }
+      this._ui.update();
       this.lookAt();
     });
   }
@@ -251,7 +254,7 @@ export class GLTFViewer {
   }
   render() {
     this._camera.render(this._scene, this._compositor);
-    this._ui.render();
+    //this._ui.render();
   }
   lookAt() {
     const bbox = this.getBoundingBox();

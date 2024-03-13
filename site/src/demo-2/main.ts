@@ -19,10 +19,9 @@ import {
   Compositor
 } from '@zephyr3d/scene';
 import type { DeviceBackend } from '@zephyr3d/device';
-import { imGuiInit, imGuiInjectEvent } from '@zephyr3d/imgui';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
-import { UI } from './ui';
+import { Panel } from './ui';
 
 function getQueryString(name: string) {
   return new URL(window.location.toString()).searchParams.get(name) || null;
@@ -116,9 +115,7 @@ lightApp.ready().then(async () => {
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
-  await imGuiInit(device);
 
-  lightApp.inputManager.use(imGuiInjectEvent);
   lightApp.inputManager.use(camera.handleEvent.bind(camera));
 
   const assetManager = new AssetManager();
@@ -248,8 +245,7 @@ lightApp.ready().then(async () => {
     initLights(info.group);
   });
 
-  const ui = new UI();
-
+  let ui: Panel = null;
   lightApp.on('resize', (ev) => {
     camera.aspect = ev.width / ev.height;
   });
@@ -261,9 +257,10 @@ lightApp.ready().then(async () => {
     camera.render(scene, compositor);
     if (message) {
       lightApp.device.drawText(message, 20, 20, '#a00000');
-    } else {
-      ui.render();
+    } else if (!ui) {
+      ui = new Panel();
     }
   });
+
   lightApp.run();
 });

@@ -78,8 +78,8 @@ export class EnvMaps {
       console.error(`Environment map id not found: ${id}`);
       return;
     }
-    const maps = await info.maps;
     this._currentId = id;
+    const maps = await info.maps;
     scene.env.sky.skyType = 'skybox';
     scene.env.sky.skyboxTexture = maps[0];
     scene.env.sky.fogType = 'none';

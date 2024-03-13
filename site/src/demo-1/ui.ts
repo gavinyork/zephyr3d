@@ -1,40 +1,83 @@
-import { ImGui, imGuiEndFrame, imGuiNewFrame } from "@zephyr3d/imgui";
+import { GUI } from 'lil-gui';
 import { Application, BoundingBox, GraphNode, Material, OrbitCameraController, PerspectiveCamera, SceneNode } from "@zephyr3d/scene";
 import { FurMaterial } from "./materials/fur";
 import { ParallaxMapMaterial, ParallaxMappingMode } from "./materials/parallax";
 import { WoodMaterial } from "./materials/wood";
-import { AABB, Vector3, Vector4 } from "@zephyr3d/base";
+import { AABB, Vector3 } from "@zephyr3d/base";
 import { ToonMaterial } from "./materials/toon";
 
-export class UI {
+interface GUIParams {
+  deviceType: string;
+  material: string;
+}
+
+interface FurParams {
+  layerCount: number;
+  layerThickness: number;
+  noiseRepeat: number;
+}
+
+interface ParallaxMapParams {
+  mode: string;
+  parallaxScale: number;
+  minLayers: number;
+  maxLayers: number;
+}
+
+interface WoodParams {
+  distoredX: number;
+  distoredY: number;
+  distoredZ: number;
+  density: number;
+  lightColor: string;
+  darkColor: string;
+}
+
+interface ToonParams {
+  bands: number;
+  edgeThickness: number;
+}
+
+export class Panel {
   private _camera: PerspectiveCamera;
   private _meshes: { node: SceneNode, material: Material, name: string, bbox?: AABB }[];
   private _materialNames: string[];
   private _index: number;
   private _parallaxModes: ParallaxMappingMode[];
   private _deviceList: string[];
-  private _deviceIndex: [number];
+  private _furParams: FurParams;
+  private _parallaxMapParams: ParallaxMapParams;
+  private _woodParams: WoodParams;
+  private _toonParams: ToonParams;
+  private _materialGroup: GUI;
+  private _params: GUIParams;
+  private _gui: GUI;
   constructor(camera: PerspectiveCamera, meshes: { node: SceneNode, material: Material, name: string }[]){
     this._camera = camera;
     this._deviceList = ['WebGL', 'WebGL2', 'WebGPU'];
-    this._deviceIndex = [this._deviceList.findIndex(val => val.toLowerCase() === Application.instance.device.type)];
     this._meshes = meshes;
     this._materialNames = this._meshes.map(val => val.name);
     this._index = 0;
+    this._params = {
+      deviceType: this._deviceList[this._deviceList.findIndex(val => val.toLowerCase() === Application.instance.device.type)],
+      material: this._materialNames[this._index]
+    }
     this._parallaxModes = [
       'basic',
       'steep',
       'occlusion',
       'relief'
     ];
+    this._gui = new GUI({ container: document.body });
+    this._furParams = null;
+    this._parallaxMapParams = null;
+    this._woodParams = null;
+    this._toonParams = null;
+    this._materialGroup = null;
     this.updateMeshShowState();
     this.updateBoundingBoxes();
     this.lookAt();
-  }
-  render(){
-    imGuiNewFrame();
-    this.renderMaterialUI();
-    imGuiEndFrame();
+    this.create();
   }
   updateBoundingBoxes(){
     for (let i = 0; i < this._meshes.length; i++) {
@@ -74,86 +117,134 @@ export class UI {
       this._meshes[i].node.showState = i === this._index ? GraphNode.SHOW_DEFAULT : GraphNode.SHOW_HIDE;
     }
   }
-  renderWoodMaterialSettings(material: WoodMaterial){
-    const distored = [...material.distored] as [number,number,number];
-    ImGui.SetNextItemWidth(150);
-    if (ImGui.SliderFloat3('Distored', distored, 0, 100)){
-      material.distord = new Vector3(...distored);
+  css2rgb(css: string): Vector3 {
+    if (css[0] === '#') {
+      const hex = css.slice(1);
+      let r, g, b;
+      if (hex.length === 3) {
+          r = parseInt(hex[0] + hex[0], 16);
+          g = parseInt(hex[1] + hex[1], 16);
+          b = parseInt(hex[2] + hex[2], 16);
+      } else {
+          r = parseInt(hex.substring(0, 2), 16);
+          g = parseInt(hex.substring(2, 4), 16);
+          b = parseInt(hex.substring(4, 6), 16);
+      }
+      return new Vector3(r/255, g/255, b/255);
+    } else {
+      const rgb = css.match(/\d+/g);
+      return new Vector3(parseInt(rgb[0])/255, parseInt(rgb[1])/255, parseInt(rgb[2])/255);
     }
-    const darkColor = {
-      r: material.darkColor.x,
-      g: material.darkColor.y,
-      b: material.darkColor.z
+  }
+  editWoodMaterial(material: WoodMaterial){
+    this._woodParams = {
+      distoredX: material.distored.x,
+      distoredY: material.distored.y,
+      distoredZ: material.distored.z,
+      darkColor: `rgb(${Math.floor(material.darkColor.x * 255)}, ${Math.floor(material.darkColor.y * 255)}, ${Math.floor(material.darkColor.z * 255)})`,
+      lightColor: `rgb(${Math.floor(material.lightColor.x * 255)}, ${Math.floor(material.lightColor.y * 255)}, ${Math.floor(material.lightColor.z * 255)})`,
+      density: material.density
     };
-    ImGui.SetNextItemWidth(150);
-    if (ImGui.ColorEdit3('Dark color', darkColor)){
-      material.darkColor = new Vector3(darkColor.r, darkColor.g, darkColor.b);
-    }
-    const lightColor = {
-      r: material.lightColor.x,
-      g: material.lightColor.y,
-      b: material.lightColor.z
+    this._materialGroup.add(this._woodParams, 'distoredX', 0, 100, 0.1)
+    .name('Distored X')
+    .onChange(value=>{
+      material.distored.x = value;
+      material.uniformChanged();
+    });
+    this._materialGroup.add(this._woodParams, 'distoredY', 0, 100, 0.1)
+    .name('Distored Y')
+    .onChange(value=>{
+      material.distored.y = value;
+      material.uniformChanged();
+    });
+    this._materialGroup.add(this._woodParams, 'distoredZ', 0, 100, 0.1)
+    .name('Distored Z')
+    .onChange(value=>{
+      material.distored.z = value;
+      material.uniformChanged();
+    });
+    this._materialGroup.add(this._woodParams, 'density', 0, 100, 0.1)
+    .name('Density')
+    .onChange(value=>{
+      material.density = value;
+    });
+    this._materialGroup.addColor(this._woodParams, 'darkColor')
+    .name('Dark color')
+    .onChange(value=>{
+      material.darkColor = this.css2rgb(value);
+    });
+    this._materialGroup.addColor(this._woodParams, 'lightColor')
+    .name('Light color')
+    .onChange(value=>{
+      material.lightColor = this.css2rgb(value);
+    });
+  }
+  editParallaxMaterial(material: ParallaxMapMaterial){
+    this._parallaxMapParams = {
+      minLayers: material.minParallaxLayers,
+      maxLayers: material.maxParallaxLayers,
+      parallaxScale: material.parallaxScale,
+      mode: material.mode
     };
-    ImGui.SetNextItemWidth(150);
-    if (ImGui.ColorEdit3('Light color', lightColor)){
-      material.lightColor = new Vector3(lightColor.r, lightColor.g, lightColor.b);
-    }
-    const density = [material.density] as [number];
-    ImGui.SetNextItemWidth(150);
-    if (ImGui.SliderFloat('Density', density, 0, 100)){
-      material.density = density[0];
-    }
+    this._materialGroup.add(this._parallaxMapParams, 'mode', this._parallaxModes)
+    .name('Mode')
+    .onChange(value=>{
+      material.mode = value;
+    });
+    this._materialGroup.add(this._parallaxMapParams, 'parallaxScale', 0, 1, 0.01)
+    .name('Parallax scale')
+    .onChange(value=>{
+      material.parallaxScale = value;
+    });
+    this._materialGroup.add(this._parallaxMapParams, 'minLayers', 1, 100, 1)
+    .name('Min layers')
+    .onChange(value=>{
+      material.minParallaxLayers = value;
+    });
+    this._materialGroup.add(this._parallaxMapParams, 'maxLayers', 1, 100, 1)
+    .name('Max layers')
+    .onChange(value=>{
+      material.maxParallaxLayers = value;
+    })
   }
-  renderParallaxMaterialSettings(material: ParallaxMapMaterial){
-    const index = [this._parallaxModes.indexOf(material.mode)] as [number];
-    ImGui.SetNextItemWidth(150);
-    if (ImGui.Combo('Mode', index, this._parallaxModes)){
-      material.mode = this._parallaxModes[index[0]];
-    }
-    const parallaxScale = [material.parallaxScale] as [number];
-    ImGui.SetNextItemWidth(150);
-    if(ImGui.SliderFloat('Parallax scale', parallaxScale, 0, 1)){
-      material.parallaxScale = parallaxScale[0];
-    }
-    const minLayers = [material.minParallaxLayers] as [number];
-    ImGui.SetNextItemWidth(150);
-    if(ImGui.SliderInt('Min layers', minLayers, 1, 100)){
-      material.minParallaxLayers = minLayers[0];
-    }
-    const maxLayers = [material.maxParallaxLayers] as [number];
-    ImGui.SetNextItemWidth(150);
-    if(ImGui.SliderInt('Max layers', maxLayers, 1, 100)){
-      material.maxParallaxLayers = maxLayers[0];
-    }
+  editToonMaterial(material: ToonMaterial){
+    this._toonParams = {
+      bands: material.bands,
+      edgeThickness: material.edgeThickness
+    };
+    this._materialGroup.add(this._toonParams, 'bands', 1, 8, 1)
+    .name('Bands')
+    .onChange(value=>{
+      material.bands = value;
+    });
+    this._materialGroup.add(this._toonParams, 'edgeThickness', 0, 2, 0.005)
+    .name('Edge thickness')
+    .onChange(value=>{
+      material.edgeThickness = value;
+    });
   }
-  renderToonMaterialSettings(material: ToonMaterial){
-    const bands = [material.bands] as [number];
-    ImGui.SetNextItemWidth(150);
-    if (ImGui.SliderInt('Bands', bands, 1, 8)) {
-      material.bands = bands[0];
+  editFurMaterial(material: FurMaterial){
+    this._furParams = {
+      layerCount: material.numLayers,
+      layerThickness: material.thickness,
+      noiseRepeat: material.noiseRepeat
     }
-    const edgeThickness = [material.edgeThickness] as [number];
-    ImGui.SetNextItemWidth(150);
-    if (ImGui.SliderFloat('Edge thickness', edgeThickness, 0, 2)) {
-      material.edgeThickness = edgeThickness[0];
-    }
-  }
-  renderFurMaterialSettings(material: FurMaterial){
-    const numLayers = [material.numLayers] as [number];
-    ImGui.SetNextItemWidth(150);
-    if (ImGui.SliderInt('Layer count', numLayers, 1, 100)) {
-      material.numLayers = numLayers[0];
-    }
-    const layerThickness = [material.thickness] as [number];
-    ImGui.SetNextItemWidth(150);
-    if (ImGui.SliderFloat('Layer thickness', layerThickness, 0, 0.5)) {
-      material.thickness = layerThickness[0];
-    }
-    const noiseRepeat = [material.noiseRepeat] as [number];
-    ImGui.SetNextItemWidth(150);
-    if (ImGui.SliderFloat('Noise repeat', noiseRepeat, 1, 100)) {
-      material.noiseRepeat = noiseRepeat[0];
-    }
+    this._materialGroup.add(this._furParams, 'layerCount', 1, 100, 1)
+    .name('Layer count')
+    .onChange(value=>{
+      material.numLayers = value;
+    });
+    this._materialGroup.add(this._furParams, 'layerThickness', 0, 0.5, 0.01)
+    .name('Layer thickness')
+    .onChange(value=>{
+      material.thickness = value;
+    });
+    this._materialGroup.add(this._furParams, 'noiseRepeat', 1, 32, 1)
+    .name('Noise repeat')
+    .onChange(value=>{
+      material.noiseRepeat = value;
+    });
+    /*
     const colorStart = {
       r: material.colorStart.x,
       g: material.colorStart.y,
@@ -172,40 +263,43 @@ export class UI {
     if (ImGui.ColorEdit4('AO end', colorEnd)){
       material.colorEnd = new Vector4(colorEnd.r, colorEnd.g, colorEnd.b, colorEnd.a);
     }
+    */
   }
-  renderMaterialUI(){
-    ImGui.SetNextWindowPos(new ImGui.ImVec2(0, 0), ImGui.Cond.Always);
-    ImGui.SetNextWindowSize(new ImGui.ImVec2(350, Math.min(500, Application.instance.device.getViewport().height)), ImGui.Cond.Always);
-    if (ImGui.Begin('Custom material example')){
-      ImGui.BeginSection('System');
-      ImGui.SetNextItemWidth(150);
-      if(ImGui.Combo('Select device', this._deviceIndex, this._deviceList)){
-        const url = new URL(window.location.href);
-        url.searchParams.set('dev', this._deviceList[this._deviceIndex[0]].toLowerCase());
-        window.location.href = url.href;
-      }
-      ImGui.EndSection(1);
-      ImGui.BeginSection('Material');
-      const t = [this._index] as [number];
-      ImGui.SetNextItemWidth(150);
-      if (ImGui.Combo('Select material', t, this._materialNames)){
-        this._index = t[0];
-        this.updateMeshShowState();
-        this.lookAt();
-      }
-      const material = this._meshes[this._index].material;
-      if (material instanceof FurMaterial){
-        this.renderFurMaterialSettings(material);
-      } else if (material instanceof ParallaxMapMaterial){
-        this.renderParallaxMaterialSettings(material);
-      } else if (material instanceof WoodMaterial){
-        this.renderWoodMaterialSettings(material);
-      } else if (material instanceof ToonMaterial){
-        this.renderToonMaterialSettings(material);
-      }
-      ImGui.EndSection(1);
+  create(){
+    const systemSettings = this._gui.addFolder('System');
+    systemSettings.add(this._params, 'deviceType', this._deviceList)
+    .name('Select device')
+    .onChange(value=>{
+      const url = new URL(window.location.href);
+      url.searchParams.set('dev', value.toLowerCase());
+      window.location.href = url.href;
+    });
+    this.updateMaterialGroup();
+  }
+  updateMaterialGroup(){
+    if (this._materialGroup) {
+      this._materialGroup.destroy();
     }
-    ImGui.End();
+    this._materialGroup = this._gui.addFolder('Material');
+    this._materialGroup.add(this._params, 'material', this._materialNames)
+    .name('Select material')
+    .onChange(value=>{
+      this._params.material = value;
+      this._index = this._materialNames.indexOf(value);
+      this.updateMaterialGroup();
+    });
+    this.updateMeshShowState();
+    this.lookAt();
+    const material = this._meshes[this._index].material;
+    if (material instanceof FurMaterial){
+      this.editFurMaterial(material);
+    } else if (material instanceof ParallaxMapMaterial){
+      this.editParallaxMaterial(material);
+    } else if (material instanceof WoodMaterial){
+      this.editWoodMaterial(material);
+    } else if (material instanceof ToonMaterial){
+      this.editToonMaterial(material);
+    }
   }
 }
 
