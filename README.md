@@ -6,6 +6,9 @@
 
 [User manual](https://gavinyork.github.io/zephyr3d/) | [API reference](https://gavinyork.github.io/zephyr3d/#/doc/markdown/index) | [Demos](https://gavinyork.github.io/zephyr3d/demo.html)
 
+[![Test](https://github.com/gavinyork/zephyr3d/actions/workflows/ci.yml/badge.svg)](https://github.com/gavinyork/zephyr3d/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@zephyr3d/scene)](https://www.npmjs.com/package/@zephyr3d/scene)
+
 </div>
 
 Zephyr3d is a 3D rendering engine for browsers, developed in TypeScript. It is easy to use and highly extensible, with seamless support for both WebGL and WebGPU.
@@ -21,9 +24,6 @@ Zephyr3d primarily consists of two sets of APIs: the Device API and the Scene AP
   Scene API is a high-level rendering framework built on top of DeviceAPI, serving both as a test environment for device API and as a direct tool for graphics development. Currently, Scene API has implemented features such as PBR/IBL rendering, clustered lighting, shadow mapping, terrain rendering, post processing, among others.
 
 **Note: The engine is currently in the early stages of development and is not recommended for use in production projects.**
-
-[![Test](https://github.com/gavinyork/zephyr3d/actions/workflows/ci.yml/badge.svg)](https://github.com/gavinyork/zephyr3d/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/@zephyr3d/scene)](https://www.npmjs.com/package/@zephyr3d/scene)
 
 ## Install
 
