@@ -320,7 +320,11 @@ export class VSM extends ShadowImpl {
   getShadowMapDepthFormat(shadowMapParams: ShadowMapParams): TextureFormat {
     return 'd24s8';
   }
-  computeShadowMapDepth(shadowMapParams: ShadowMapParams, scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
+  computeShadowMapDepth(
+    shadowMapParams: ShadowMapParams,
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp
+  ): PBShaderExp {
     return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap.format);
   }
   computeShadowCSM(

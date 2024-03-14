@@ -9,7 +9,12 @@ import { mixinLight } from '../lit';
  * @public
  */
 export type IMixinLambert = {
-  lambertLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+  lambertLight(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    normal: PBShaderExp,
+    albedo: PBShaderExp
+  ): PBShaderExp;
 } & IMixinLight;
 
 /**
@@ -28,7 +33,12 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
     constructor() {
       super();
     }
-    lambertLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, albedo: PBShaderExp): PBShaderExp {
+    lambertLight(
+      scope: PBInsideFunctionScope,
+      worldPos: PBShaderExp,
+      normal: PBShaderExp,
+      albedo: PBShaderExp
+    ): PBShaderExp {
       const pb = scope.$builder;
       const funcName = 'Z_lambertLight';
       const that = this;
@@ -42,7 +52,13 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
             this.$l.diffuseColor = pb.vec3(0);
           }
           that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
-            this.$l.lightAtten = that.calculateLightAttenuation(this, type, this.worldPos, posRange, dirCutoff);
+            this.$l.lightAtten = that.calculateLightAttenuation(
+              this,
+              type,
+              this.worldPos,
+              posRange,
+              dirCutoff
+            );
             this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
             this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
             this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);

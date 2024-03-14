@@ -11,7 +11,11 @@ import { mixinFoliage } from './mixins/foliage';
  * Terrain grass material
  * @public
  */
-export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinPBRMetallicRoughness, mixinFoliage) {
+export class GrassMaterial extends applyMaterialMixins(
+  MeshMaterial,
+  mixinPBRMetallicRoughness,
+  mixinFoliage
+) {
   /** @internal */
   private _terrainSize: Vector2;
   /** @internal */
@@ -78,8 +82,14 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinPBRMet
     scope.$l.axisX = pb.cross(scope.normal, scope.axisZ);
     scope.$l.rotPos = pb.mul(pb.mat3(scope.axisX, scope.normal, scope.axisZ), scope.$inputs.pos);
 
-    scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(pb.add(scope.rotPos, scope.$inputs.placement.xyz), 1)).xyz;
-    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    scope.$outputs.worldPos = pb.mul(
+      ShaderHelper.getWorldMatrix(scope),
+      pb.vec4(pb.add(scope.rotPos, scope.$inputs.placement.xyz), 1)
+    ).xyz;
+    ShaderHelper.setClipSpacePosition(
+      scope,
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+    );
     scope.$outputs.worldNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.normal, 0)).xyz;
   }
   fragmentShader(scope: PBFunctionScope): void {
@@ -89,10 +99,18 @@ export class GrassMaterial extends applyMaterialMixins(MeshMaterial, mixinPBRMet
     if (this.needFragmentColor()) {
       scope.albedoTextureSize = pb.vec2().uniform(2);
       scope.$l.albedo = this.calculateAlbedoColor(scope);
-      scope.albedo = that.calculateFoliageAlbedo(scope, scope.albedo, pb.mul(that.getAlbedoTexCoord(scope), scope.albedoTextureSize))
+      scope.albedo = that.calculateFoliageAlbedo(
+        scope,
+        scope.albedo,
+        pb.mul(that.getAlbedoTexCoord(scope), scope.albedoTextureSize)
+      );
       scope.$l.litColor = pb.vec3(0);
       if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
-        scope.$l.normalInfo = this.calculateNormalAndTBN(scope, scope.$inputs.worldPos, scope.$inputs.worldNorm);
+        scope.$l.normalInfo = this.calculateNormalAndTBN(
+          scope,
+          scope.$inputs.worldPos,
+          scope.$inputs.worldNorm
+        );
         scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
         scope.$l.litColor = this.PBRLight(
           scope,

@@ -268,7 +268,10 @@ export class TerrainMaterial extends applyMaterialMixins(
     const pb = scope.$builder;
     scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
     scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
-    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    ShaderHelper.setClipSpacePosition(
+      scope,
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+    );
     if (this.needFragmentColor()) {
       scope.terrainInfo = pb.vec4().uniform(2);
       scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
@@ -302,7 +305,11 @@ export class TerrainMaterial extends applyMaterialMixins(
         }
       }
       scope.$l.albedo = this.calculateAlbedoColor(scope);
-      scope.$l.normalInfo = this.calculateNormalAndTBN(scope, scope.$inputs.worldPos, scope.$inputs.worldNorm);
+      scope.$l.normalInfo = this.calculateNormalAndTBN(
+        scope,
+        scope.$inputs.worldPos,
+        scope.$inputs.worldNorm
+      );
       let calcNormal = false;
       if (this._options && this._options.detailMaps.normalTextures) {
         scope.$l.detailMask = pb.textureSample(scope.splatMap, scope.$inputs.mapUV);

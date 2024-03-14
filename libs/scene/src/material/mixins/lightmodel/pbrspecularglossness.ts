@@ -19,7 +19,7 @@ export type IMixinPBRSpecularGlossiness = {
     normal: PBShaderExp,
     viewVec: PBShaderExp,
     albedo: PBShaderExp,
-    TBN?: PBShaderExp,
+    TBN?: PBShaderExp
   ): PBShaderExp;
   calculateCommonData(
     scope: PBInsideFunctionScope,
@@ -85,7 +85,7 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
       normal: PBShaderExp,
       viewVec: PBShaderExp,
       albedo: PBShaderExp,
-      TBN?: PBShaderExp,
+      TBN?: PBShaderExp
     ): PBShaderExp {
       const pb = scope.$builder;
       const funcName = 'Z_PBRSpecularGlossinessLight';
@@ -101,7 +101,13 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
           that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
             this.$l.diffuse = pb.vec3();
             this.$l.specular = pb.vec3();
-            this.$l.lightAtten = that.calculateLightAttenuation(this, type, this.worldPos, posRange, dirCutoff);
+            this.$l.lightAtten = that.calculateLightAttenuation(
+              this,
+              type,
+              this.worldPos,
+              posRange,
+              dirCutoff
+            );
             this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
             this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
             this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);

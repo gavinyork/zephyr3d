@@ -38,10 +38,10 @@ export type TextureFetchOptions<T extends BaseTexture> = {
  */
 export type ModelInfo = {
   /** Mesh group */
-  group: SceneNode,
+  group: SceneNode;
   /** Animation set, null if no animation */
-  animationSet: AnimationSet
-}
+  animationSet: AnimationSet;
+};
 
 /**
  * The asset manager
@@ -225,7 +225,12 @@ export class AssetManager {
     }
   }
   /** @internal */
-  async fetchModelData(scene: Scene, url: string, mimeType?: string, postProcess?: (model: SharedModel) => SharedModel): Promise<SharedModel> {
+  async fetchModelData(
+    scene: Scene,
+    url: string,
+    mimeType?: string,
+    postProcess?: (model: SharedModel) => SharedModel
+  ): Promise<SharedModel> {
     let P = this._models[url];
     if (!P) {
       P = this.loadModel(url, mimeType, postProcess);
@@ -263,7 +268,7 @@ export class AssetManager {
     if (postProcess) {
       try {
         text = postProcess(text);
-      } catch(err) {
+      } catch (err) {
         throw new Error(`Load text data post process failed: ${err}`);
       }
     }
@@ -275,7 +280,7 @@ export class AssetManager {
     if (postProcess) {
       try {
         data = postProcess(data);
-      } catch(err) {
+      } catch (err) {
         throw new Error(`Load binary data post process failed: ${err}`);
       }
     }
@@ -398,7 +403,11 @@ export class AssetManager {
     }
   }
   /** @internal */
-  async loadModel(url: string, mimeType?: string, postProcess?: (model: SharedModel) => SharedModel): Promise<SharedModel> {
+  async loadModel(
+    url: string,
+    mimeType?: string,
+    postProcess?: (model: SharedModel) => SharedModel
+  ): Promise<SharedModel> {
     const data = await this.httpRequest.requestBlob(url);
     const filename = new URL(url, new URL(location.href).origin).pathname
       .split('/')
@@ -417,7 +426,7 @@ export class AssetManager {
       if (postProcess) {
         try {
           model = postProcess(model);
-        }catch(err) {
+        } catch (err) {
           throw new Error(`Model loader post process failed: ${err}`);
         }
       }
