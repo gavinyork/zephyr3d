@@ -56,6 +56,17 @@ export class Panel {
     }
   }
   create(){
+    const desc1 = document.createElement('p');
+    desc1.style.marginTop = '1.5rem';
+    desc1.style.padding = '0.5rem';
+    desc1.style.color = '#ffff00';
+    desc1.innerText = 'Drag GLTF/GLB/ZIP/Folder to view model';
+    const desc2 = document.createElement('p');
+    desc2.style.marginBottom = '1rem';
+    desc2.style.padding = '0.5rem';
+    desc2.style.color = '#ffff00';
+    desc2.innerText = 'Drag HDR to change environment';
+    this._gui.domElement.append(desc1, desc2);
     const systemSettings = this._gui.addFolder('System');
     systemSettings.add(this._params, 'deviceType', this._deviceList)
     .name('Select device')
