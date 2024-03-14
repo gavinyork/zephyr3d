@@ -19,6 +19,7 @@ import type { DrawContext, ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA } from '../shaders';
 import { Application } from '../app';
 import { ShaderHelper } from './shader/helper';
+import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 
 /**
  * Blending mode for mesh material
@@ -73,12 +74,17 @@ let FEATURE_ALPHATEST = 0;
 let FEATURE_ALPHABLEND = 0;
 let FEATURE_ALPHATOCOVERAGE = 0;
 
+/** @internal */
+export type InstanceUniformType = 'float'|'vec2'|'vec3'|'vec4';
+
 /**
  * Base class for any kind of mesh materials
  *
  * @public
  */
 export class MeshMaterial extends Material {
+  /** @internal */
+  static INSTANCE_UNIFORMS: [string, InstanceUniformType][] = [];
   /** @internal */
   static NEXT_FEATURE_INDEX = 3;
   /** @internal */
@@ -118,6 +124,109 @@ export class MeshMaterial extends Material {
     const val = this.NEXT_FEATURE_INDEX;
     this.NEXT_FEATURE_INDEX++;
     return val;
+  }
+  /** Define instance uniform index */
+  static defineInstanceUniform(prop: string, type: InstanceUniformType): number {
+    if (this.INSTANCE_UNIFORMS.findIndex(val => val[0] === prop) >= 0) {
+      throw new Error(`${this.name}.defineInstanceUniform(): ${prop} was already defined`);
+    }
+    if (type !== 'float' && type !== 'vec2' && type !== 'vec3' && type !== 'vec4') {
+      throw new Error(`${this.name}.defineInstanceUniform(): invalid uniform type ${type}`);
+    }
+    this.INSTANCE_UNIFORMS = [...this.INSTANCE_UNIFORMS, [prop, type]];
+    return this.INSTANCE_UNIFORMS.length - 1;
+  }
+  /** Create material instance */
+  createInstance<T extends this>(): this {
+    const instanceUniforms = (this.constructor as typeof MeshMaterial).INSTANCE_UNIFORMS;
+    const uniformsHolder = instanceUniforms.length > 0 ? new Float32Array(4 * instanceUniforms.length) : null;
+    // Copy original uniform values
+    for (let i = 0; i < instanceUniforms.length; i++) {
+      const [prop, type] = instanceUniforms[i];
+      const value = this[prop];
+      switch(type) {
+        case 'float': {
+          uniformsHolder[i*4] = Number(value);
+          break;
+        }
+        case 'vec2': {
+          if (!(value instanceof Vector2)) {
+            throw new Error(`Instance uniform property ${prop} must be of type Vector2`);
+          }
+          uniformsHolder[i*4] = value.x;
+          uniformsHolder[i*4+1] = value.y;
+          break;
+        }
+        case 'vec3': {
+          if (!(value instanceof Vector3)) {
+            throw new Error(`Instance uniform property ${prop} must be of type Vector3`);
+          }
+          uniformsHolder[i*4] = value.x;
+          uniformsHolder[i*4+1] = value.y;
+          uniformsHolder[i*4+2] = value.z;
+          break;
+        }
+        case 'vec4': {
+          if (!(value instanceof Vector4)) {
+            throw new Error(`Instance uniform property ${prop} must be of type Vector4`);
+          }
+          uniformsHolder[i*4] = value.x;
+          uniformsHolder[i*4+1] = value.y;
+          uniformsHolder[i*4+2] = value.z;
+          uniformsHolder[i*4+3] = value.w;
+          break;
+        }
+      }
+    }
+    const handler: ProxyHandler<T> = {
+      get(target, prop, receiver){
+        if (prop === '$instanceUniforms') {
+          return uniformsHolder;
+        } else if (prop === '$isInstance') {
+          return true;
+        } else if (typeof prop === 'string') {
+          const index = instanceUniforms.findIndex(val => val[0] === prop);
+          if (index >= 0) {
+            switch(instanceUniforms[index][1]) {
+              case 'float': return uniformsHolder[index * 4];
+              case 'vec2': return new Vector2(uniformsHolder[index*4], uniformsHolder[index*4+1]);
+              case 'vec3': return new Vector3(uniformsHolder[index*4], uniformsHolder[index*4+1], uniformsHolder[index*4+2]);
+              case 'vec4': return new Vector4(uniformsHolder[index*4], uniformsHolder[index*4+1], uniformsHolder[index*4+2], uniformsHolder[index*4+3]);
+            }
+          }
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+      set(target, prop, value, receiver) {
+        const i = instanceUniforms.findIndex(val => val[0] === prop);
+        if (i >= 0) {
+          const value = target[prop];
+          if (typeof value === 'number') {
+            uniformsHolder[i*4 + 0] = value;
+          } else if (value instanceof Float32Array) {
+            uniformsHolder.set(value);
+          }
+          return true;
+        } else {
+          return Reflect.set(target, prop, value, receiver);
+        }
+      }
+    }
+    return new Proxy(this, handler);
+  }
+  /**
+   * True if this is a material instance
+   * @internal
+   **/
+  get $isInstance() {
+    return false;
+  }
+  /**
+   * Returns the instance uniforms if this is a material instance
+   * @internal
+   **/
+  get $instanceUniforms(): Float32Array {
+    return null;
   }
   /** Draw context for shader creation */
   get drawContext(): DrawContext {
