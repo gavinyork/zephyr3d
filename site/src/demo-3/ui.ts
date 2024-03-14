@@ -18,6 +18,17 @@ export class Panel {
     this.create();
   }
   create(){
+    const desc1 = document.createElement('p');
+    desc1.style.marginTop = '1.5rem';
+    desc1.style.padding = '0.5rem';
+    desc1.style.color = '#ffff00'
+    desc1.innerText = 'Rotate with left mouse button.';
+    const desc2 = document.createElement('p');
+    desc2.style.marginBottom = '1rem';
+    desc2.style.padding = '0.5rem';
+    desc2.style.color = '#ffff00'
+    desc2.innerText = 'Move with right mouse button.';
+    this._gui.domElement.append(desc1, desc2);
     const systemSettings = this._gui.addFolder('System');
     systemSettings.add(this._params, 'deviceType', this._deviceList)
     .name('Select device')
@@ -26,14 +37,5 @@ export class Panel {
       url.searchParams.set('dev', value.toLowerCase());
       window.location.href = url.href;
     });
-    const desc1 = document.createElement('p');
-    desc1.style.marginTop = '1.5rem';
-    desc1.style.padding = '0.5rem';
-    desc1.innerText = 'Rotate with left mouse button.';
-    const desc2 = document.createElement('p');
-    desc2.style.marginBottom = '1rem';
-    desc2.style.padding = '0.5rem';
-    desc2.innerText = 'Move with right mouse button.';
-    this._gui.domElement.append(desc1, desc2);
   }
 }
