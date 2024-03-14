@@ -1,29 +1,19 @@
-<p align="center">
-  <a href="https://gavinyork.github.io/zephyr3d">
-    <img alt="zephyr3d" src="./site/web/media/logo_i.svg" style="width:200px;">
-  </a>
-</p>
+<div align="center">
 
-A 3D rendering API for browser platforms, supporting both WebGL and WebGPU.
+<img alt="zephyr3d" src="./site/web/media/logo_i.svg" style="width:200px;">
+
+# WebGL & WebGPU rendering engine
+
+[Documentation](https://gavinyork.github.io/zephyr3d/) | [Demos](https://gavinyork.github.io/zephyr3d/demo.html)
+
+Zephyr3d is a 3D rendering engine for browsers, developed in TypeScript. It is easy to use and highly extensible, with seamless support for both WebGL and WebGPU.
 
 [![Test](https://github.com/gavinyork/zephyr3d/actions/workflows/ci.yml/badge.svg)](https://github.com/gavinyork/zephyr3d/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@zephyr3d/scene)](https://www.npmjs.com/package/@zephyr3d/scene)
 
-### Introduction
+</div>
 
-Zephyr3d is a 3D rendering framework for browsers, developed in TypeScript. It primarily consists of two sets of APIs: the Device API and the Scene API.
-
-#### Device API
-
-Device API offers a set of low-level abstract encapsulation interfaces that allow users to invoke the WebGL, WebGL2, and WebGPU graphics interfaces in exactly the same way. These interfaces encompass most of the capabilities of the underlying APIs, facilitating easy support for cross-API graphics rendering. 
-
-#### Scene API
-
-Scene API is a high-level rendering framework built on top of DeviceAPI, serving both as a test environment for device API and as a direct tool for graphics development. Currently, Scene API has implemented features such as PBR/IBL rendering, clustered lighting, shadow mapping, terrain rendering, post processing, among others.
-
-Note: Scene API is still in the early stages of development and is not recommended for use in official projects.
-
-### Install
+## Install
 
 Zephyr3d is released as ES6 modules and requires npm for installation. It is designed to be used in conjunction with front-end build tools such as Webpack or Vite for development.
 
@@ -42,7 +32,21 @@ npm install --save @zephyr3d/scene
 npm install --save @zephyr3d/imgui
 ```
 
-### Usage
+## Usage
+
+Zephyr3d primarily consists of two sets of APIs: the Device API and the Scene API.
+
+- Device API
+
+  Device API offers a set of low-level abstract encapsulation interfaces that allow users to invoke the WebGL, WebGL2, and WebGPU graphics interfaces in exactly the same way. These interfaces encompass most of the capabilities of the underlying APIs, facilitating easy support for cross-API graphics rendering. 
+
+- Scene API
+
+  Scene API is a high-level rendering framework built on top of DeviceAPI, serving both as a test environment for device API and as a direct tool for graphics development. Currently, Scene API has implemented features such as PBR/IBL rendering, clustered lighting, shadow mapping, terrain rendering, post processing, among others.
+
+**Note: The engine is currently in the early stages of development and is not recommended for use in production projects.**
+
+
 
 Here is an example of rendering a cube using the Scene API.
 
@@ -162,12 +166,6 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 })();
 
 ```
-
-### Documentation
-
-- [Github page](https://gavinyork.github.io/zephyr3d/index.html)
-- [Demos](https://gavinyork.github.io/zephyr3d/demo.html)
-
-### License
+## License
 
 Zephyr3d is released under the [MIT](https://opensource.org/licenses/MIT) license.
