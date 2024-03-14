@@ -50,7 +50,7 @@ Here is an example of rendering a cube using the Scene API.
 
 ```javascript
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, LambertMaterial, Mesh, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, SphereShape, DirectionalLight } from '@zephyr3d/scene';
+import { Scene, Application, LambertMaterial, Mesh, OrbitCameraController, PerspectiveCamera, SphereShape, DirectionalLight } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 // Creates the application.
@@ -85,7 +85,7 @@ myApp.ready().then(function () {
   // frame animation
   myApp.on('tick', function () {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   // Starts rendering loop
