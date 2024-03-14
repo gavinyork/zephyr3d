@@ -425,7 +425,11 @@ export class MeshMaterial extends Material {
         const shadowMapParams = that.drawContext.shadowMapInfo.get(
           (that.drawContext.renderPass as ShadowMapPass).light
         );
-        this.$outputs.zFragmentOutput = shadowMapParams.impl.computeShadowMapDepth(shadowMapParams, this, this.worldPos);
+        this.$outputs.zFragmentOutput = shadowMapParams.impl.computeShadowMapDepth(
+          shadowMapParams,
+          this,
+          this.worldPos
+        );
       }
     });
     color ? pb.getGlobalScope()[funcName](worldPos, color) : pb.getGlobalScope()[funcName](worldPos);

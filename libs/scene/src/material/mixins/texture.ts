@@ -16,10 +16,7 @@ import type { DrawContext } from '../../render';
  * @public
  */
 export type ToMixedTextureType<T> = T extends [infer First, ...infer Rest]
-  ? [
-      First extends string ? ReturnType<typeof mixinTextureProps<First>> : never,
-      ...ToMixedTextureType<Rest>
-    ]
+  ? [First extends string ? ReturnType<typeof mixinTextureProps<First>> : never, ...ToMixedTextureType<Rest>]
   : [];
 
 /**

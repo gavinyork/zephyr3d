@@ -14,7 +14,7 @@ import type {
   PBShaderExp,
   PBInsideFunctionScope,
   StructuredBuffer,
-  Texture2D,
+  Texture2D
 } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
 import { linearToGamma } from '../../shaders';
@@ -147,7 +147,12 @@ export class ShaderHelper {
       scope[UNIFORM_NAME_GLOBAL] = globalStruct().uniform(0);
     } else if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
       const useClusteredLighting = !ctx.currentShadowLight;
-      const fogStruct = pb.defineStruct([pb.int('fogType'), pb.vec4('fogColor'), pb.vec4('fogParams'), pb.float('apDensity')]);
+      const fogStruct = pb.defineStruct([
+        pb.int('fogType'),
+        pb.vec4('fogColor'),
+        pb.vec4('fogParams'),
+        pb.float('apDensity')
+      ]);
       const lightStruct = ctx.currentShadowLight
         ? pb.defineStruct([
             pb.vec3('sunDir'),
@@ -482,8 +487,10 @@ export class ShaderHelper {
   /** @internal */
   static setLightUniformsShadow(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight) {
     const shadowMapParams = ctx.shadowMapInfo.get(light);
-    this._lightUniformShadow.light.sunDir = ctx.sunLight ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1) : this.defaultSunDir,
-    this._lightUniformShadow.light.envLightStrength = ctx.env?.light.strength ?? 0;
+    (this._lightUniformShadow.light.sunDir = ctx.sunLight
+      ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1)
+      : this.defaultSunDir),
+      (this._lightUniformShadow.light.envLightStrength = ctx.env?.light.strength ?? 0);
     this._lightUniformShadow.light.shadowCascades = shadowMapParams.numShadowCascades;
     this._lightUniformShadow.light.positionAndRange.set(light.positionAndRange);
     this._lightUniformShadow.light.directionAndCutoff.set(light.directionAndCutoff);
@@ -900,7 +907,12 @@ export class ShaderHelper {
    * @param NoL - NdotL vector
    * @returns Shadow of current fragment, 1 means no shadow and 0 means full shadowed.
    */
-  static calculateShadow(scope: PBInsideFunctionScope, worldPos: PBShaderExp, NoL: PBShaderExp, ctx: DrawContext): PBShaderExp {
+  static calculateShadow(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    NoL: PBShaderExp,
+    ctx: DrawContext
+  ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
     const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
@@ -923,7 +935,11 @@ export class ShaderHelper {
           this.$l.shadowVertex = pb.vec4();
           this.$for(pb.int('cascade'), 0, 4, function () {
             this.$if(pb.equal(this.cascade, this.split), function () {
-              this.shadowVertex = that.calculateShadowSpaceVertex(this, pb.vec4(this.worldPos, 1), this.cascade);
+              this.shadowVertex = that.calculateShadowSpaceVertex(
+                this,
+                pb.vec4(this.worldPos, 1),
+                this.cascade
+              );
               this.$break();
             });
           });

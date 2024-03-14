@@ -39,14 +39,23 @@ export class BlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinBlinnP
     const pb = scope.$builder;
     scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
     scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
-    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    ShaderHelper.setClipSpacePosition(
+      scope,
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+    );
     if (this.vertexNormal) {
       scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
       scope.$outputs.wNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
       if (this.vertexTangent) {
         scope.$l.oTangent = ShaderHelper.resolveVertexTangent(scope);
-        scope.$outputs.wTangent = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oTangent.xyz, 0)).xyz;
-        scope.$outputs.wBinormal = pb.mul(pb.cross(scope.$outputs.wNorm, scope.$outputs.wTangent), scope.oTangent.w);
+        scope.$outputs.wTangent = pb.mul(
+          ShaderHelper.getNormalMatrix(scope),
+          pb.vec4(scope.oTangent.xyz, 0)
+        ).xyz;
+        scope.$outputs.wBinormal = pb.mul(
+          pb.cross(scope.$outputs.wNorm, scope.$outputs.wTangent),
+          scope.oTangent.w
+        );
       }
     }
   }
@@ -58,9 +67,21 @@ export class BlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinBlinnP
       if (this.vertexColor) {
         scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope));
       }
-      scope.$l.normal = this.calculateNormal(scope, scope.$inputs.worldPos, scope.$inputs.wNorm, scope.$inputs.wTangent, scope.$inputs.wBinormal);
+      scope.$l.normal = this.calculateNormal(
+        scope,
+        scope.$inputs.worldPos,
+        scope.$inputs.wNorm,
+        scope.$inputs.wTangent,
+        scope.$inputs.wBinormal
+      );
       scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
-      scope.$l.litColor = this.blinnPhongLight(scope, scope.$inputs.worldPos, scope.normal, scope.viewVec, scope.albedo);
+      scope.$l.litColor = this.blinnPhongLight(
+        scope,
+        scope.$inputs.worldPos,
+        scope.normal,
+        scope.viewVec,
+        scope.albedo
+      );
       this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);

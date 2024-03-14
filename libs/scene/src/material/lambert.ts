@@ -34,14 +34,23 @@ export class LambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLigh
     const pb = scope.$builder;
     scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
     scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
-    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    ShaderHelper.setClipSpacePosition(
+      scope,
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+    );
     if (this.vertexNormal) {
       scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
       scope.$outputs.wNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
       if (this.vertexTangent) {
         scope.$l.oTangent = ShaderHelper.resolveVertexTangent(scope);
-        scope.$outputs.wTangent = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oTangent.xyz, 0)).xyz;
-        scope.$outputs.wBinormal = pb.mul(pb.cross(scope.$outputs.wNorm, scope.$outputs.wTangent), scope.oTangent.w);
+        scope.$outputs.wTangent = pb.mul(
+          ShaderHelper.getNormalMatrix(scope),
+          pb.vec4(scope.oTangent.xyz, 0)
+        ).xyz;
+        scope.$outputs.wBinormal = pb.mul(
+          pb.cross(scope.$outputs.wNorm, scope.$outputs.wTangent),
+          scope.oTangent.w
+        );
       }
     }
   }
@@ -55,13 +64,31 @@ export class LambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLigh
         scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope));
       }
       scope.$l.color = pb.vec3(0);
-      scope.$l.normal = this.calculateNormal(scope, scope.$inputs.worldPos, scope.$inputs.wNorm, scope.$inputs.wTangent, scope.$inputs.wBinormal);
+      scope.$l.normal = this.calculateNormal(
+        scope,
+        scope.$inputs.worldPos,
+        scope.$inputs.wNorm,
+        scope.$inputs.wTangent,
+        scope.$inputs.wBinormal
+      );
       if (this.needCalculateEnvLight()) {
         scope.color = pb.add(scope.color, this.getEnvLightIrradiance(scope, scope.normal));
       }
       this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, shadow) {
-        this.$l.lightAtten = that.calculateLightAttenuation(this, type, scope.$inputs.worldPos, posRange, dirCutoff);
-        this.$l.lightDir = that.calculateLightDirection(this, type, scope.$inputs.worldPos, posRange, dirCutoff);
+        this.$l.lightAtten = that.calculateLightAttenuation(
+          this,
+          type,
+          scope.$inputs.worldPos,
+          posRange,
+          dirCutoff
+        );
+        this.$l.lightDir = that.calculateLightDirection(
+          this,
+          type,
+          scope.$inputs.worldPos,
+          posRange,
+          dirCutoff
+        );
         this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
         this.$l.lightContrib = pb.mul(colorIntensity.rgb, colorIntensity.a, this.NoL, this.lightAtten);
         if (shadow) {

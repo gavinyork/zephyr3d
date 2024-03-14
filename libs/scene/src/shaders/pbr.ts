@@ -64,4 +64,3 @@ export function visGGX(
   });
   return pb.getGlobalScope()[funcName](NdotV, NdotL, alphaRoughness);
 }
-

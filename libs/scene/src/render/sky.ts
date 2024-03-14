@@ -346,7 +346,8 @@ export class SkyRenderer {
     if (this.drawScatteredFog(ctx)) {
       const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
       const alpha = Math.PI / 2 - Math.acos(Math.max(-1, Math.min(1, sunDir.y)));
-      const farPlane = ctx.camera.getFarPlane() * this._aerialPerspectiveDensity * this._aerialPerspectiveDensity;
+      const farPlane =
+        ctx.camera.getFarPlane() * this._aerialPerspectiveDensity * this._aerialPerspectiveDensity;
       return ScatteringLut.getAerialPerspectiveLut(alpha, farPlane);
     } else {
       return null;
@@ -418,7 +419,7 @@ export class SkyRenderer {
       if (this._fogType === 'scatter') {
         const sunDir = sunLight ? sunLight.directionAndCutoff.xyz().scaleBy(-1) : ShaderHelper.defaultSunDir;
         const alpha = Math.PI / 2 - Math.acos(Math.max(-1, Math.min(1, sunDir.y)));
-        const scale =  this._aerialPerspectiveDensity * this._aerialPerspectiveDensity;
+        const scale = this._aerialPerspectiveDensity * this._aerialPerspectiveDensity;
         const farPlane = ctx.camera.getFarPlane() * scale;
         bindgroup.setTexture('apLut', ScatteringLut.getAerialPerspectiveLut(alpha, farPlane));
         bindgroup.setValue('sliceDist', farPlane / ScatteringLut.aerialPerspectiveSliceZ);
