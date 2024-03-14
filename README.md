@@ -1,17 +1,17 @@
 <div align="center">
 
-<img alt="zephyr3d" src="./site/web/media/logo_i.svg" style="width:200px;">
+# Zephyr3d
 
-# WebGL & WebGPU rendering engine
+> WebGL & WebGPU rendering engine
 
-[Documentation](https://gavinyork.github.io/zephyr3d/) | [Demos](https://gavinyork.github.io/zephyr3d/demo.html)
+[User manual](https://gavinyork.github.io/zephyr3d/) | [API reference](https://gavinyork.github.io/zephyr3d/#/doc/markdown/index) | [Demos](https://gavinyork.github.io/zephyr3d/demo.html)
+
+</div>
 
 Zephyr3d is a 3D rendering engine for browsers, developed in TypeScript. It is easy to use and highly extensible, with seamless support for both WebGL and WebGPU.
 
 [![Test](https://github.com/gavinyork/zephyr3d/actions/workflows/ci.yml/badge.svg)](https://github.com/gavinyork/zephyr3d/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@zephyr3d/scene)](https://www.npmjs.com/package/@zephyr3d/scene)
-
-</div>
 
 ## Install
 
