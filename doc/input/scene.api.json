@@ -48984,7 +48984,7 @@
             },
             {
               "kind": "Content",
-              "text": "T extends [infer First, ...infer Rest] ? [\n    First extends string ? "
+              "text": "T extends [infer First, ...infer Rest] ? [First extends string ? "
             },
             {
               "kind": "Reference",
@@ -49002,7 +49002,7 @@
             },
             {
               "kind": "Content",
-              "text": "<First>> : never,\n    ..."
+              "text": "<First>> : never, ..."
             },
             {
               "kind": "Reference",
@@ -49011,7 +49011,7 @@
             },
             {
               "kind": "Content",
-              "text": "<Rest>\n] : []"
+              "text": "<Rest>] : []"
             },
             {
               "kind": "Content",

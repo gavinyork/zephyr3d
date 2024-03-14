@@ -9,10 +9,7 @@ ToMixedTextureType
 **Signature:**
 
 ```typescript
-type ToMixedTextureType<T> = T extends [infer First, ...infer Rest] ? [
-    First extends string ? ReturnType<typeof mixinTextureProps<First>> : never,
-    ...ToMixedTextureType<Rest>
-] : [];
+type ToMixedTextureType<T> = T extends [infer First, ...infer Rest] ? [First extends string ? ReturnType<typeof mixinTextureProps<First>> : never, ...ToMixedTextureType<Rest>] : [];
 ```
 **References:** [ToMixedTextureType](doc/markdown/./scene.tomixedtexturetype.md)
 
