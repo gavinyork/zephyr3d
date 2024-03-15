@@ -166,7 +166,7 @@ export class Material {
     this._materialBindGroup = null;
   }
   /** Unique identifier of the material */
-  get id(): number {
+  get instanceId(): number {
     return this._id;
   }
   get numPasses(): number {
@@ -231,7 +231,7 @@ export class Material {
    * @returns true if succeeded, otherwise false
    */
   beginDraw(pass: number, ctx: DrawContext): boolean {
-    const numInstances = ctx.instanceData?.worldMatrices?.length || 1;
+    const numInstances = ctx.instanceData?.data?.length || 1;
     const device = Application.instance.device;
     const programInfo = this.getOrCreateProgram(ctx, pass);
     if (programInfo) {
@@ -293,7 +293,7 @@ export class Material {
     const programMap = Material._programMap;
     const renderPassType = ctx.renderPass.type;
     const hash = `${this.getHash(renderPassType, pass)}:${!!ctx.target.getBoneMatrices()}:${Number(
-      !!(ctx.instanceData?.worldMatrices.length > 1)
+      !!(ctx.instanceData?.data.length > 1)
     )}:${ctx.renderPassHash}`;
     let programInfo = programMap[hash];
     if (!programInfo || programInfo.programs[renderPassType] === undefined) {
@@ -458,7 +458,7 @@ export class Material {
   /** @internal */
   private applyInstanceBindGroups(ctx: DrawContext, hash: string): void {
     const index = ctx.renderPass.type;
-    const offset = Material._instanceBindGroupPool.apply(hash, index, ctx.instanceData.worldMatrices);
+    const offset = Material._instanceBindGroupPool.apply(hash, index, ctx.instanceData.data);
     const bindGroup = this.getDrawableBindGroup(ctx, hash).bindGroup?.[index];
     if (bindGroup) {
       bindGroup.setValue(ShaderHelper.getInstanceBufferOffsetUniformName(), offset);
@@ -565,8 +565,8 @@ export class Material {
   drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number): void {
     if (numInstances > 0) {
       primitive.drawInstanced(numInstances);
-    } else if (ctx.instanceData?.worldMatrices.length > 1) {
-      primitive.drawInstanced(ctx.instanceData.worldMatrices.length);
+    } else if (ctx.instanceData?.data.length > 1) {
+      primitive.drawInstanced(ctx.instanceData.data.length);
     } else {
       primitive.draw();
     }

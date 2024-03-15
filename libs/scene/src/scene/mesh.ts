@@ -106,7 +106,7 @@ export class Mesh extends GraphNode implements BatchDrawable {
       }
       this._instanceHash =
         this._primitive && this._material
-          ? `${this.constructor.name}:${this._scene.id}:${this._primitive.id}:${this._material.id}`
+          ? `${this.constructor.name}:${this._scene.id}:${this._primitive.id}:${this._material.instanceId}`
           : null;
       this.invalidateBoundingVolume();
     }
@@ -120,7 +120,7 @@ export class Mesh extends GraphNode implements BatchDrawable {
       this._material = m;
       this._instanceHash =
         this._primitive && this._material
-          ? `${this.constructor.name}:${this._scene.id}:${this._primitive.id}:${this._material.id}`
+          ? `${this.constructor.name}:${this._scene.id}:${this._primitive.id}:${this._material.instanceId}`
           : null;
     }
   }

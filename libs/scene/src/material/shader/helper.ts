@@ -106,6 +106,11 @@ export class ShaderHelper {
    */
   static prepareFragmentShader(pb: ProgramBuilder, ctx: DrawContext) {
     this.setupGlobalUniforms(pb, ctx);
+    if (ctx.instanceData) {
+      const scope = pb.getGlobalScope();
+      scope[UNIFORM_NAME_INSTANCE_BUFFER_OFFSET] = pb.uint().uniform(1);
+      scope[UNIFORM_NAME_WORLD_MATRICES] = pb.vec4[65536 >> 4]().uniformBuffer(3);
+    }
   }
   /**
    * Prepares the vertex shader which is going to be used in our material system
@@ -391,14 +396,11 @@ export class ShaderHelper {
   }
   /** @internal */
   static prepareVertexShaderCommon(pb: ProgramBuilder, ctx: DrawContext) {
-    const instancing = ctx.instanceData?.worldMatrices?.length > 1;
     const skinning = !!ctx.target?.getBoneMatrices();
     const scope = pb.getGlobalScope();
-    if (instancing) {
-      const maxNumInstances =
-        Application.instance.device.getDeviceCaps().shaderCaps.maxUniformBufferSize >> 6;
+    if (ctx.instanceData) {
       scope[UNIFORM_NAME_INSTANCE_BUFFER_OFFSET] = pb.uint().uniform(1);
-      scope[UNIFORM_NAME_WORLD_MATRICES] = pb.mat4[maxNumInstances]().uniformBuffer(3);
+      scope[UNIFORM_NAME_WORLD_MATRICES] = pb.vec4[65536 >> 4]().uniformBuffer(3);
     } else {
       scope[UNIFORM_NAME_WORLD_MATRIX] = pb.mat4().uniform(1);
     }

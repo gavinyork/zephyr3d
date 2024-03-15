@@ -6,13 +6,52 @@ import type { DirectionalLight, PunctualLight } from '../scene/light';
 import type { RenderPass } from '.';
 import type { GraphNode } from '../scene';
 import { QUEUE_TRANSPARENT } from '../values';
+import { BindGroup } from '@zephyr3d/device';
+import { ShaderHelper } from '../material';
+
+const maxSize = 65536 >> 4;
+const instanceBindGroupPool: { bindGroup: BindGroup; freeSize: number }[] = [];
+let allocFrameStamp = -1;
+function allocateInstanceBindGroup(framestamp: number, count: number): { bindGroup: BindGroup, offset: number } {
+  // Reset if render frame changed
+  if (allocFrameStamp !== framestamp) {
+    allocFrameStamp = framestamp;
+    for (const info of instanceBindGroupPool) {
+      info.freeSize = maxSize;
+    }
+  }
+  for (const info of instanceBindGroupPool) {
+    if (info.freeSize >= count) {
+      const offset = maxSize - info.freeSize;
+      info.freeSize -= count;
+      return {
+        bindGroup: info.bindGroup,
+        offset
+      };
+    }
+  }
+  const bindGroup = Application.instance.device.createBindGroup({
+    entries: [{
+      name: ShaderHelper.getWorldMatricesUniformName(),
+      buffer: {
+        hasDynamicOffset: false,
+        type: 'uniform',
+        uniformLayout: {
+          byteSize: 65536,
+          entries: []
+        }
+      },
+      'binding'
+    }]
+  })
+}
 
 /**
  * Instance data
  * @public
  */
 export interface InstanceData {
-  worldMatrices: Matrix4x4[];
+  data: { worldMatrix: Matrix4x4, materialData: Float32Array }[];
   nodeList?: GraphNode[];
   instanceColorList?: Vector4[];
   hash: string;
@@ -142,18 +181,18 @@ export class RenderQueue {
         const instanceList = trans ? itemList.transInstanceList : itemList.opaqueInstanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         const index = instanceList[hash];
-        if (index === undefined || list[index].instanceData.worldMatrices.length === this.getMaxBatchSize()) {
+        if (index === undefined || list[index].instanceData.data.length === this.getMaxBatchSize()) {
           instanceList[hash] = list.length;
           list.push({
             drawable,
             sortDistance: drawable.getSortDistance(camera),
             instanceData: {
-              worldMatrices: [drawable.getXForm().worldMatrix],
+              data: [drawable.getXForm().worldMatrix],
               hash: hash
             }
           });
         } else {
-          list[index].instanceData.worldMatrices.push(drawable.getXForm().worldMatrix);
+          list[index].instanceData.data.push(drawable.getXForm().worldMatrix);
         }
       } else {
         list.push({
@@ -201,7 +240,7 @@ export class RenderQueue {
       for (const item of lists.opaqueList) {
         if (item.instanceColor) {
           item.instanceData.instanceColorList = [];
-          for (let i = 0; i < item.instanceData.worldMatrices.length; i++) {
+          for (let i = 0; i < item.instanceData.data.length; i++) {
             const v = item.drawable.getInstanceColor();
             this.encodeInstanceColor(id, v);
             nodes[id] = item.drawable.getPickTarget();
