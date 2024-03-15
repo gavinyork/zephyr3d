@@ -385,11 +385,11 @@ export class ShaderHelper {
         scope[UNIFORM_NAME_WORLD_MATRICES].at(
           pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex))),
         scope[UNIFORM_NAME_WORLD_MATRICES].at(
-          pb.add(pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex), 1))),
+          pb.add(pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex)), 1)),
         scope[UNIFORM_NAME_WORLD_MATRICES].at(
-          pb.add(pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex), 1))),
+          pb.add(pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex)), 2)),
         scope[UNIFORM_NAME_WORLD_MATRICES].at(
-          pb.add(pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex), 1)))
+          pb.add(pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex)), 3))
       )
     );
   }

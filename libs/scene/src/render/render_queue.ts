@@ -1,5 +1,5 @@
 import { Application } from '../app';
-import { Matrix4x4, Vector4 } from '@zephyr3d/base';
+import { Vector4 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';
 import type { Drawable } from './drawable';
 import type { DirectionalLight, PunctualLight } from '../scene/light';
@@ -12,8 +12,6 @@ type CachedBindGroup = {
   bindGroup: BindGroup,
   buffer: Float32Array
 };
-
-const tmpMatrix = new Matrix4x4();
 
 const maxUniformSize = 65536 >> 2;
 let instanceBindGroupLayout: BindGroupLayout = null;
@@ -192,8 +190,7 @@ export class RenderQueue {
         if (index === undefined || list[index].instanceData.currentSize === list[index].instanceData.maxSize) {
           instanceList[hash] = list.length;
           const bindGroup = allocateInstanceBindGroup(Application.instance.device.frameInfo.frameCounter);
-          Matrix4x4.transpose(drawable.getXForm().worldMatrix, tmpMatrix);
-          bindGroup.buffer.set(tmpMatrix);
+          bindGroup.buffer.set(drawable.getXForm().worldMatrix);
           let currentSize = 4;
           const instanceUniforms = drawable.getInstanceUniforms();
           if (instanceUniforms) {
@@ -214,14 +211,13 @@ export class RenderQueue {
           });
         } else {
           const instanceData = list[index].instanceData
-          Matrix4x4.transpose(drawable.getXForm().worldMatrix, tmpMatrix);
-          instanceData.bindGroup.buffer.set(tmpMatrix, instanceData.currentSize * 4);
+          instanceData.bindGroup.buffer.set(drawable.getXForm().worldMatrix, instanceData.currentSize * 4);
           instanceData.currentSize += 4;
           const instanceUniforms = drawable.getInstanceUniforms();
           if (instanceUniforms) {
             instanceData.bindGroup.buffer.set(instanceUniforms, instanceData.currentSize * 4);
+            instanceData.currentSize += instanceUniforms.length >> 2;
           }
-          instanceData.currentSize += instanceUniforms.length >> 2;
         }
       } else {
         list.push({
