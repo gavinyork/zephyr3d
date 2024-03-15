@@ -73,6 +73,12 @@ export class Mesh extends GraphNode implements BatchDrawable {
     return `${this._instanceHash}:${this.worldMatrixDet >= 0}`;
   }
   /**
+   * {@inheritDoc BatchDrawable.getInstanceUniformCount}
+   */
+  getInstanceUniforms(): Float32Array {
+    return this.material.$instanceUniforms;
+  }
+  /**
    * {@inheritDoc Drawable.getInstanceColor}
    */
   getInstanceColor(): Vector4 {

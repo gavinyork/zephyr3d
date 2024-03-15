@@ -1,49 +1,56 @@
 import { Application } from '../app';
-import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
+import { Matrix4x4, Vector4 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';
 import type { Drawable } from './drawable';
 import type { DirectionalLight, PunctualLight } from '../scene/light';
 import type { RenderPass } from '.';
-import type { GraphNode } from '../scene';
 import { QUEUE_TRANSPARENT } from '../values';
-import { BindGroup } from '@zephyr3d/device';
+import { BindGroup, BindGroupLayout, ProgramBuilder } from '@zephyr3d/device';
 import { ShaderHelper } from '../material';
 
-const maxSize = 65536 >> 4;
-const instanceBindGroupPool: { bindGroup: BindGroup; freeSize: number }[] = [];
+type CachedBindGroup = {
+  bindGroup: BindGroup,
+  buffer: Float32Array
+};
+
+const tmpMatrix = new Matrix4x4();
+
+const maxUniformSize = 65536 >> 2;
+let instanceBindGroupLayout: BindGroupLayout = null;
+const usedBindGroupList: CachedBindGroup[] = [];
+const freeBindGroupList: CachedBindGroup[] = [];
 let allocFrameStamp = -1;
-function allocateInstanceBindGroup(framestamp: number, count: number): { bindGroup: BindGroup, offset: number } {
+function allocateInstanceBindGroup(framestamp: number): CachedBindGroup {
   // Reset if render frame changed
   if (allocFrameStamp !== framestamp) {
     allocFrameStamp = framestamp;
-    for (const info of instanceBindGroupPool) {
-      info.freeSize = maxSize;
-    }
+    usedBindGroupList.push(...freeBindGroupList);
+    freeBindGroupList.length = 0;
   }
-  for (const info of instanceBindGroupPool) {
-    if (info.freeSize >= count) {
-      const offset = maxSize - info.freeSize;
-      info.freeSize -= count;
-      return {
-        bindGroup: info.bindGroup,
-        offset
-      };
-    }
-  }
-  const bindGroup = Application.instance.device.createBindGroup({
-    entries: [{
-      name: ShaderHelper.getWorldMatricesUniformName(),
-      buffer: {
-        hasDynamicOffset: false,
-        type: 'uniform',
-        uniformLayout: {
-          byteSize: 65536,
-          entries: []
+  let bindGroup = freeBindGroupList.pop();
+  if (!bindGroup) {
+    if (!instanceBindGroupLayout) {
+      const buildInfo = new ProgramBuilder(Application.instance.device).buildRender({
+        vertex(pb){
+          this[ShaderHelper.getWorldMatricesUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
+          pb.main(function(){
+          });
+        },
+        fragment(pb){
+          this[ShaderHelper.getWorldMatricesUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
+          pb.main(function(){
+          });
         }
-      },
-      'binding'
-    }]
-  })
+      });
+      instanceBindGroupLayout = buildInfo[2][3];
+    }
+    bindGroup = {
+      bindGroup: Application.instance.device.createBindGroup(instanceBindGroupLayout),
+      buffer: new Float32Array(65536 >> 2)
+    };
+  }
+  usedBindGroupList.push(bindGroup);
+  return bindGroup;
 }
 
 /**
@@ -51,9 +58,10 @@ function allocateInstanceBindGroup(framestamp: number, count: number): { bindGro
  * @public
  */
 export interface InstanceData {
-  data: { worldMatrix: Matrix4x4, materialData: Float32Array }[];
-  nodeList?: GraphNode[];
-  instanceColorList?: Vector4[];
+  bindGroup: CachedBindGroup;
+  stride: number;
+  currentSize: number;
+  maxSize: number;
   hash: string;
 }
 
@@ -181,18 +189,39 @@ export class RenderQueue {
         const instanceList = trans ? itemList.transInstanceList : itemList.opaqueInstanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         const index = instanceList[hash];
-        if (index === undefined || list[index].instanceData.data.length === this.getMaxBatchSize()) {
+        if (index === undefined || list[index].instanceData.currentSize === list[index].instanceData.maxSize) {
           instanceList[hash] = list.length;
+          const bindGroup = allocateInstanceBindGroup(Application.instance.device.frameInfo.frameCounter);
+          Matrix4x4.transpose(drawable.getXForm().worldMatrix, tmpMatrix);
+          bindGroup.buffer.set(tmpMatrix);
+          let currentSize = 4;
+          const instanceUniforms = drawable.getInstanceUniforms();
+          if (instanceUniforms) {
+            bindGroup.buffer.set(instanceUniforms, currentSize * 4);
+            currentSize += instanceUniforms.length >> 2;
+          }
+          const maxSize = Math.floor(maxUniformSize / currentSize);
           list.push({
             drawable,
             sortDistance: drawable.getSortDistance(camera),
             instanceData: {
-              data: [drawable.getXForm().worldMatrix],
+              bindGroup,
+              currentSize,
+              maxSize,
+              stride: currentSize,
               hash: hash
             }
           });
         } else {
-          list[index].instanceData.data.push(drawable.getXForm().worldMatrix);
+          const instanceData = list[index].instanceData
+          Matrix4x4.transpose(drawable.getXForm().worldMatrix, tmpMatrix);
+          instanceData.bindGroup.buffer.set(tmpMatrix, instanceData.currentSize * 4);
+          instanceData.currentSize += 4;
+          const instanceUniforms = drawable.getInstanceUniforms();
+          if (instanceUniforms) {
+            instanceData.bindGroup.buffer.set(instanceUniforms, instanceData.currentSize * 4);
+          }
+          instanceData.currentSize += instanceUniforms.length >> 2;
         }
       } else {
         list.push({
@@ -221,17 +250,16 @@ export class RenderQueue {
       list.transList.sort((a, b) => b.sortDistance - a.sortDistance);
     }
   }
+  /*
   private encodeInstanceColor(index: number, outColor: Float32Array) {
     outColor[0] = ((index >> 24) & 255) / 255;
     outColor[1] = ((index >> 16) & 255) / 255;
     outColor[2] = (index >> 8 && 255) / 255;
     outColor[3] = (index >> 0 && 255) / 255;
   }
-  /*
   private decodeInstanceColor(value: Float32Array): number {
     return (value[0] << 24) + (value[1] << 16) + (value[2] << 8) + value[3];
   }
-  */
   setInstanceColors(): GraphNode[] {
     const nodes: GraphNode[] = [];
     let id = 0;
@@ -252,4 +280,5 @@ export class RenderQueue {
     }
     return nodes;
   }
+  */
 }

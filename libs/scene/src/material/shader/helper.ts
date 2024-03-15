@@ -24,7 +24,7 @@ const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
 const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'Z_UniformLightIndexTex';
 const UNIFORM_NAME_AERIALPERSPECTIVE_LUT = 'Z_UniformAerialPerspectiveLUT';
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
-const UNIFORM_NAME_INSTANCE_BUFFER_OFFSET = 'Z_UniformInstanceBufferOffset';
+const UNIFORM_NAME_INSTANCE_BUFFER_STRIDE = 'Z_UniformInstanceBufferStride';
 const UNIFORM_NAME_WORLD_MATRIX = 'Z_UniformWorldMatrix';
 const UNIFORM_NAME_WORLD_MATRICES = 'Z_UniformWorldMatrices';
 const UNIFORM_NAME_BONE_MATRICES = 'Z_UniformBoneMatrices';
@@ -80,8 +80,8 @@ export class ShaderHelper {
   static getWorldMatricesUniformName(): string {
     return UNIFORM_NAME_WORLD_MATRICES;
   }
-  static getInstanceBufferOffsetUniformName(): string {
-    return UNIFORM_NAME_INSTANCE_BUFFER_OFFSET;
+  static getInstanceBufferStrideUniformName(): string {
+    return UNIFORM_NAME_INSTANCE_BUFFER_STRIDE;
   }
   static getBoneMatricesUniformName(): string {
     return UNIFORM_NAME_BONE_MATRICES;
@@ -108,7 +108,7 @@ export class ShaderHelper {
     this.setupGlobalUniforms(pb, ctx);
     if (ctx.instanceData) {
       const scope = pb.getGlobalScope();
-      scope[UNIFORM_NAME_INSTANCE_BUFFER_OFFSET] = pb.uint().uniform(1);
+      scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE] = pb.uint().uniform(1);
       scope[UNIFORM_NAME_WORLD_MATRICES] = pb.vec4[65536 >> 4]().uniformBuffer(3);
     }
   }
@@ -381,8 +381,15 @@ export class ShaderHelper {
     const pb = scope.$builder;
     return (
       scope[UNIFORM_NAME_WORLD_MATRIX] ??
-      scope[UNIFORM_NAME_WORLD_MATRICES].at(
-        pb.add(scope[UNIFORM_NAME_INSTANCE_BUFFER_OFFSET], pb.uint(scope.$builtins.instanceIndex))
+      pb.mat4(
+        scope[UNIFORM_NAME_WORLD_MATRICES].at(
+          pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex))),
+        scope[UNIFORM_NAME_WORLD_MATRICES].at(
+          pb.add(pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex), 1))),
+        scope[UNIFORM_NAME_WORLD_MATRICES].at(
+          pb.add(pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex), 1))),
+        scope[UNIFORM_NAME_WORLD_MATRICES].at(
+          pb.add(pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex), 1)))
       )
     );
   }
@@ -399,7 +406,7 @@ export class ShaderHelper {
     const skinning = !!ctx.target?.getBoneMatrices();
     const scope = pb.getGlobalScope();
     if (ctx.instanceData) {
-      scope[UNIFORM_NAME_INSTANCE_BUFFER_OFFSET] = pb.uint().uniform(1);
+      scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE] = pb.uint().uniform(1);
       scope[UNIFORM_NAME_WORLD_MATRICES] = pb.vec4[65536 >> 4]().uniformBuffer(3);
     } else {
       scope[UNIFORM_NAME_WORLD_MATRIX] = pb.mat4().uniform(1);

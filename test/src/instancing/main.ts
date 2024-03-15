@@ -62,7 +62,7 @@ instancingApp.ready().then(async () => {
     for (let y = -20; y <= 20; y += 2) {
       for (let z = -20; z <= 20; z += 2) {
         const instance = new Mesh(scene, box);
-        instance.material = boxMaterial;
+        instance.material = boxMaterial.createInstance();
         instance.position.setXYZ(x, y, z);
       }
     }

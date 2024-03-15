@@ -120,4 +120,8 @@ export interface BatchDrawable extends Drawable {
    * @param renderPass - The render pass to which current drawing task belongs
    */
   getInstanceId(renderPass: RenderPass): string;
+  /**
+   * Gets the instance uniforms count
+   */
+  getInstanceUniforms(): Float32Array;
 }

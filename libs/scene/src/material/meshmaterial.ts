@@ -182,7 +182,7 @@ export class MeshMaterial extends Material {
     const handler: ProxyHandler<this> = {
       get(target, prop, receiver){
         if (prop === 'isBatchable') {
-          return ()=>batchable && target.isBatchable();
+          return ()=>batchable;
         } else if (prop === '$instanceUniforms') {
           return uniformsHolder;
         } else if (prop === '$isInstance') {
@@ -229,20 +229,6 @@ export class MeshMaterial extends Material {
       }
     }
     return new Proxy(this, handler);
-  }
-  /**
-   * True if this is a material instance
-   * @internal
-   **/
-  get $isInstance() {
-    return false;
-  }
-  /**
-   * Returns the instance uniforms if this is a material instance
-   * @internal
-   **/
-  get $instanceUniforms(): Float32Array {
-    return null;
   }
   /** Draw context for shader creation */
   get drawContext(): DrawContext {
