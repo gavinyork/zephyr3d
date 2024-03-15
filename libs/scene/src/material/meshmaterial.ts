@@ -137,9 +137,10 @@ export class MeshMaterial extends Material {
     return this.INSTANCE_UNIFORMS.length - 1;
   }
   /** Create material instance */
-  createInstance<T extends this>(): this {
+  createInstance(): this {
     const instanceUniforms = (this.constructor as typeof MeshMaterial).INSTANCE_UNIFORMS;
     const uniformsHolder = instanceUniforms.length > 0 ? new Float32Array(4 * instanceUniforms.length) : null;
+    const batchable = Application.instance.device.type !== 'webgl';
     // Copy original uniform values
     for (let i = 0; i < instanceUniforms.length; i++) {
       const [prop, type] = instanceUniforms[i];
@@ -178,12 +179,27 @@ export class MeshMaterial extends Material {
         }
       }
     }
-    const handler: ProxyHandler<T> = {
+    const handler: ProxyHandler<this> = {
       get(target, prop, receiver){
-        if (prop === '$instanceUniforms') {
+        if (prop === 'isBatchable') {
+          return ()=>batchable && target.isBatchable();
+        } else if (prop === '$instanceUniforms') {
           return uniformsHolder;
         } else if (prop === '$isInstance') {
           return true;
+        } else if (prop === 'beginDraw') {
+          if (!batchable || !target.isBatchable()) {
+            for (let i = 0; i < instanceUniforms.length; i++) {
+              const name = instanceUniforms[i][0];
+              const type = instanceUniforms[i][1];
+              switch(type) {
+                case 'float': target[name] = uniformsHolder[i * 4]; break;
+                case 'vec2': target[name] = new Vector2(uniformsHolder[i*4], uniformsHolder[i*4+1]); break;
+                case 'vec3': target[name] = new Vector3(uniformsHolder[i*4], uniformsHolder[i*4+1], uniformsHolder[i*4+2]);
+                case 'vec4': target[name] = new Vector4(uniformsHolder[i*4], uniformsHolder[i*4+1], uniformsHolder[i*4+2], uniformsHolder[i*4+3]);
+              }
+            }
+          }
         } else if (typeof prop === 'string') {
           const index = instanceUniforms.findIndex(val => val[0] === prop);
           if (index >= 0) {

@@ -208,7 +208,7 @@ export class Material {
   }
   /** Returns true if this material supports geometry instancing  */
   isBatchable(): boolean {
-    return true;
+    return false;
   }
   /**
    * Draws a primitive using this material
