@@ -22,8 +22,8 @@ function allocateInstanceBindGroup(framestamp: number): CachedBindGroup {
   // Reset if render frame changed
   if (allocFrameStamp !== framestamp) {
     allocFrameStamp = framestamp;
-    usedBindGroupList.push(...freeBindGroupList);
-    freeBindGroupList.length = 0;
+    freeBindGroupList.push(...usedBindGroupList);
+    usedBindGroupList.length = 0;
   }
   let bindGroup = freeBindGroupList.pop();
   if (!bindGroup) {
