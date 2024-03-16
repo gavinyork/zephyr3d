@@ -382,16 +382,22 @@ export class ShaderHelper {
     return (
       scope[UNIFORM_NAME_WORLD_MATRIX] ??
       pb.mat4(
-        scope[UNIFORM_NAME_WORLD_MATRICES].at(
-          pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex))),
-        scope[UNIFORM_NAME_WORLD_MATRICES].at(
-          pb.add(pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex)), 1)),
-        scope[UNIFORM_NAME_WORLD_MATRICES].at(
-          pb.add(pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex)), 2)),
-        scope[UNIFORM_NAME_WORLD_MATRICES].at(
-          pb.add(pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex)), 3))
+        this.getInstancedUniform(scope, 0),
+        this.getInstancedUniform(scope, 1),
+        this.getInstancedUniform(scope, 2),
+        this.getInstancedUniform(scope, 3),
       )
     );
+  }
+  /**
+   * Gets the instance uniform value of type vec4 by uniform index
+   * @param scope - Current shader scope
+   * @returns instance uniform value
+   */
+  static getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShaderExp {
+    const pb = scope.$builder;
+    return scope[UNIFORM_NAME_WORLD_MATRICES].at(
+      pb.add(pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex)), uniformIndex))
   }
   /**
    * Gets the uniform variable of type mat4 which holds the normal matrix of current object to be drawn

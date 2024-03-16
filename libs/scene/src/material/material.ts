@@ -185,7 +185,6 @@ export class Material {
    * @returns true if succeeded, otherwise false
    */
   beginDraw(pass: number, ctx: DrawContext): boolean {
-    const numInstances = ctx.instanceData ? ctx.instanceData.currentSize / ctx.instanceData.stride : 1;
     const device = Application.instance.device;
     const programInfo = this.getOrCreateProgram(ctx, pass);
     if (programInfo) {
@@ -198,7 +197,7 @@ export class Material {
       }
       this._materialBindGroup = this.applyMaterialBindGroups(ctx, hash, pass);
       if (pass === 0) {
-        if (numInstances > 1) {
+        if (ctx.instanceData) {
           this.applyInstanceBindGroups(ctx, hash);
         } else {
           this.applyDrawableBindGroups(ctx, hash);

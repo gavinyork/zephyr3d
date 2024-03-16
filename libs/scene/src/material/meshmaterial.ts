@@ -136,6 +136,15 @@ export class MeshMaterial extends Material {
     this.INSTANCE_UNIFORMS = [...this.INSTANCE_UNIFORMS, [prop, type]];
     return this.INSTANCE_UNIFORMS.length - 1;
   }
+  getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShaderExp {
+    //return ShaderHelper.getInstancedUniform(scope, 4 + uniformIndex);
+    const pb = scope.$builder;
+    const instanceID = pb.shaderKind === 'vertex' ? scope.$builtins.instanceIndex : scope.$inputs.zInstanceID;
+    const uniformName = ShaderHelper.getWorldMatricesUniformName();
+    const strideName = ShaderHelper.getInstanceBufferStrideUniformName();
+    return scope[uniformName].at(
+      pb.add(pb.mul(scope[strideName], instanceID), 4 + uniformIndex))
+  }
   /** Create material instance */
   createInstance(): this {
     const instanceUniforms = (this.constructor as typeof MeshMaterial).INSTANCE_UNIFORMS;
@@ -216,7 +225,6 @@ export class MeshMaterial extends Material {
       set(target, prop, value, receiver) {
         const i = instanceUniforms.findIndex(val => val[0] === prop);
         if (i >= 0) {
-          const value = target[prop];
           if (typeof value === 'number') {
             uniformsHolder[i*4 + 0] = value;
           } else if (value instanceof Float32Array) {
@@ -433,6 +441,9 @@ export class MeshMaterial extends Material {
     if (this.drawContext.target.getBoneMatrices()) {
       scope.$inputs.zBlendIndices = pb.vec4().attrib('blendIndices');
       scope.$inputs.zBlendWeights = pb.vec4().attrib('blendWeights');
+    }
+    if (this.drawContext.instanceData) {
+      scope.$outputs.zInstanceID = scope.$builtins.instanceIndex;
     }
   }
   /**

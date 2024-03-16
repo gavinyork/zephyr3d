@@ -62,7 +62,9 @@ instancingApp.ready().then(async () => {
     for (let y = -20; y <= 20; y += 2) {
       for (let z = -20; z <= 20; z += 2) {
         const instance = new Mesh(scene, box);
-        instance.material = boxMaterial.createInstance();
+        const instanceMaterial = boxMaterial.createInstance();
+        instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
+        instance.material = instanceMaterial;
         instance.position.setXYZ(x, y, z);
       }
     }

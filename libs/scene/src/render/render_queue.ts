@@ -187,7 +187,7 @@ export class RenderQueue {
         const instanceList = trans ? itemList.transInstanceList : itemList.opaqueInstanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         const index = instanceList[hash];
-        if (index === undefined || list[index].instanceData.currentSize === list[index].instanceData.maxSize) {
+        if (index === undefined || list[index].instanceData.currentSize + list[index].instanceData.stride > list[index].instanceData.maxSize) {
           instanceList[hash] = list.length;
           const bindGroup = allocateInstanceBindGroup(Application.instance.device.frameInfo.frameCounter);
           bindGroup.buffer.set(drawable.getXForm().worldMatrix);
