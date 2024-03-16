@@ -146,7 +146,7 @@ export class GLTFViewer {
   async loadModel(url: string) {
     this._modelNode?.remove();
     this._assetManager.purgeCache();
-    this._assetManager.fetchModel(this._scene, url, null).then((info) => {
+    this._assetManager.fetchModel(this._scene, url).then((info) => {
       this._modelNode?.dispose();
       this._modelNode = info.group;
       this._animationSet?.dispose();

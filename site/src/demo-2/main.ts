@@ -129,7 +129,7 @@ lightApp.ready().then(async () => {
     const fileMap = await readZip(zipContent);
     assetManager.httpRequest.urlResolver = url => fileMap.get(url) || url;
 
-    assetManager.fetchModel(scene, '/sponza/Sponza.gltf', null).then((info) => {
+    assetManager.fetchModel(scene, '/sponza/Sponza.gltf').then((info) => {
       message = '';
       function traverseModel(group: SceneNode, func: (node: SceneNode) => void, context?: any) {
         if (group) {

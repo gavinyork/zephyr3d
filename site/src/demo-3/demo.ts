@@ -250,7 +250,9 @@ export class Demo {
       const z = prng.get() * terrain.scaledHeight;
       const y = terrain.getElevation(x, z);
       const index = Math.min(Math.floor(prng.get() / f), trees.length - 1);
-      const tree = await assetManager.fetchModel(scene, trees[index].url, null, this.replaceMaterials);
+      const tree = await assetManager.fetchModel(scene, trees[index].url, {
+        postProcess: this.replaceMaterials
+      });
       tree.group.parent = terrain;
       tree.group.pickMode = SceneNode.PICK_DISABLED;
       tree.group.position.setXYZ(x, y, z);
