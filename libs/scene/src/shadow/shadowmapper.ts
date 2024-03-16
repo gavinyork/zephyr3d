@@ -515,7 +515,9 @@ export class ShadowMapper {
   protected createLightCameraPoint(lightCamera: Camera): void {
     //lightCamera.reparent(this._light);
     lightCamera.reparent(lightCamera.scene.rootNode);
-    lightCamera.resetTransform();
+    lightCamera.position.setXYZ(0, 0, 0);
+    lightCamera.rotation.identity();
+    lightCamera.scale.setXYZ(1, 1, 1);
     lightCamera.setPerspective(
       Math.PI / 2,
       1,
@@ -527,7 +529,9 @@ export class ShadowMapper {
   /** @internal */
   protected createLightCameraSpot(lightCamera: Camera): void {
     lightCamera.reparent(this._light);
-    lightCamera.resetTransform();
+    lightCamera.position.setXYZ(0, 0, 0);
+    lightCamera.rotation.identity();
+    lightCamera.scale.setXYZ(1, 1, 1);
     lightCamera.setPerspective(
       2 * (this._light as SpotLight).cutoff,
       1,
@@ -692,7 +696,9 @@ export class ShadowMapper {
     } else {
       const camera = cameras.pop();
       camera.parent = scene.rootNode;
-      camera.resetTransform();
+      camera.position.setXYZ(0, 0, 0);
+      camera.rotation.identity();
+      camera.scale.setXYZ(1, 1, 1);
       camera.clipMask = 0;
       return camera;
     }

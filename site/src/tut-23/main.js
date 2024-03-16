@@ -31,7 +31,7 @@ myApp.ready().then(async () => {
   const box = new BoxShape();
   const floor = new Mesh(scene, box);
   floor.scale.setXYZ(2000, 10, 2000);
-  floor.position.setXYZ(-1000, -10, -1000);
+  floor.position.setXYZ(0, -5, 0);
   floor.material = material;
 
   for (let i = -40; i <= 40; i++) {

@@ -30,21 +30,21 @@ export class XForm<T extends XForm<T> = XForm<any>> {
   protected _tmpWorldMatrix: Matrix4x4;
   /** @internal */
   protected _transformTag: number;
+  /** @internal */
+  protected _transformChangeCallback: () => void;
   /**
    * Creates an instance of XForm
    */
   constructor() {
     this._parent = null;
     this._children = [];
-    const cb = () => {
-      this._onTransformChanged(true);
-    };
+    this._transformChangeCallback = () => this._onTransformChanged(true);
     this._position = new ObservableVector3(0, 0, 0);
-    this._position.callback = cb;
+    this._position.callback = this._transformChangeCallback;
     this._scaling = new ObservableVector3(1, 1, 1);
-    this._scaling.callback = cb;
+    this._scaling.callback = this._transformChangeCallback;
     this._rotation = new ObservableQuaternion();
-    this._rotation.callback = cb;
+    this._rotation.callback = this._transformChangeCallback;
     this._worldMatrix = null;
     this._worldMatrixDet = null;
     this._invWorldMatrix = null;
@@ -68,23 +68,49 @@ export class XForm<T extends XForm<T> = XForm<any>> {
     return this._children;
   }
   /**
-   * Resets the transformation matrix
-   * @returns self
-   */
-  resetTransform(): this {
-    this._position.setXYZ(0, 0, 0);
-    this._rotation.identity();
-    this._scaling.setXYZ(1, 1, 1);
-    return this;
-  }
-  /**
    * Position of the xform relative to it's parent
    */
   get position(): Vector3 {
+    if (!this._position) {
+      this.syncTRS();
+    }
     return this._position;
   }
   set position(val: Vector3) {
+    if (!this._position) {
+      this.syncTRS();
+    }
     this._position.setXYZ(val[0], val[1], val[2]);
+  }
+  /**
+   * Scaling of the xform
+   */
+  get scale(): Vector3 {
+    if (!this._scaling) {
+      this.syncTRS();
+    }
+    return this._scaling;
+  }
+  set scale(val: Vector3) {
+    if (!this._scaling) {
+      this.syncTRS();
+    }
+    this._scaling.setXYZ(val[0], val[1], val[2]);
+  }
+  /**
+   * Rotation of the xform
+   */
+  get rotation() {
+    if (!this._rotation) {
+      this.syncTRS();
+    }
+    return this._rotation;
+  }
+  set rotation(val: Quaternion) {
+    if (!this._rotation) {
+      this.syncTRS();
+    }
+    this._rotation.setXYZW(val[0], val[1], val[2], val[3]);
   }
   /**
    * Transform world coordinate to local space
@@ -174,30 +200,16 @@ export class XForm<T extends XForm<T> = XForm<any>> {
     return this;
   }
   /**
-   * Scaling of the xform
-   */
-  get scale(): Vector3 {
-    return this._scaling;
-  }
-  set scale(val: Vector3) {
-    this._scaling.setXYZ(val[0], val[1], val[2]);
-  }
-  /**
-   * Rotation of the xform
-   */
-  get rotation() {
-    return this._rotation;
-  }
-  set rotation(val: Quaternion) {
-    this._rotation.setXYZW(val[0], val[1], val[2], val[3]);
-  }
-  /**
    * Sets the local transform matrix of the xform
-   * @param m - The transform matrix to set
+   * @param matrix - The transform matrix to set
    * @returns self
    */
-  setLocalTransform(m: Matrix4x4): this {
-    m.decompose(this._scaling, this._rotation, this._position);
+  setLocalTransform(matrix: Matrix4x4): this {
+    this._localMatrix = matrix;
+    this._position = null;
+    this._rotation = null;
+    this._scaling = null;
+    this._onTransformChanged(false);
     return this;
   }
   /** Local transformation matrix of the xform */
@@ -210,6 +222,9 @@ export class XForm<T extends XForm<T> = XForm<any>> {
         .translateLeft(this._position);
     }
     return this._localMatrix;
+  }
+  set localMatrix(matrix: Matrix4x4) {
+    this.setLocalTransform(matrix);
   }
   /** World transformation matrix of the xform */
   get worldMatrix() {
@@ -260,6 +275,16 @@ export class XForm<T extends XForm<T> = XForm<any>> {
   /** @internal */
   getTag(): number {
     return this._transformTag;
+  }
+  /** @internal */
+  private syncTRS(): void {
+    this._position = new ObservableVector3();
+    this._rotation = new ObservableQuaternion();
+    this._scaling = new ObservableVector3();
+    this._localMatrix.decompose(this._scaling, this._rotation, this._position);
+    this._position.callback = this._transformChangeCallback;
+    this._rotation.callback = this._transformChangeCallback;
+    this._scaling.callback = this._transformChangeCallback;
   }
   /** @internal */
   protected _onTransformChanged(invalidateLocal: boolean) {

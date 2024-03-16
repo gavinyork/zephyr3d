@@ -21,7 +21,8 @@
     "outDir": "dist",
     "stripInternal": true,
     "sourceRoot": "./src",
-    "typeRoots": ["./node_modules/@webgpu/types"]
+    "typeRoots": ["./node_modules/@webgpu/types", "./types"],
+    "types": ["ammo-wasm"]
   },
   "include": ["./src"],
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.d.ts"]

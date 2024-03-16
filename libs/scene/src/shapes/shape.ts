@@ -29,6 +29,12 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     this._options = this.createDefaultOptions();
     this.create(options);
   }
+  /**
+   * Creation options
+   */
+  get options() {
+    return this._options;
+  }
   /** @internal */
   create(options?: T): boolean {
     if (options) {

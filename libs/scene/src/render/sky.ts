@@ -817,7 +817,7 @@ export class SkyRenderer {
       });
     }
     if (!this._primitiveSky) {
-      this._primitiveSky = new BoxShape({ size: 8, anchorX: 0.5, anchorY: 0.5, anchorZ: 0.5 });
+      this._primitiveSky = new BoxShape({ size: 8 });
     }
   }
   /** @internal */

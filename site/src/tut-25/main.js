@@ -10,7 +10,7 @@ const myApp = new Application({
 myApp.ready().then(async () => {
   const scene = new Scene();
 
-  const box = new Mesh(scene, new BoxShape({ anchorX: 0.5, anchorY: 0.5, anchorZ: 0.5 }), new LambertMaterial())
+  const box = new Mesh(scene, new BoxShape(), new LambertMaterial())
   const animationSet = new AnimationSet(scene);
   const animationClip = new AnimationClip('move');
   animationClip.addTrack(box, new TranslationTrack('linear', [{

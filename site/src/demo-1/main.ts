@@ -141,7 +141,7 @@ myApp.ready().then(async function () {
   parallaxMaterial.maxParallaxLayers = 120;
   parallaxMaterial.albedoTexture = rocksTex;
   parallaxMaterial.normalTexture = rocksNHTex;
-  const parallaxMesh = new Mesh(scene, new BoxShape({ size: 4, anchorX: 0.5, anchorY: 0.5, anchorZ: 0.5 }), parallaxMaterial);
+  const parallaxMesh = new Mesh(scene, new BoxShape({ size: 4 }), parallaxMaterial);
   meshes.push({ node: parallaxMesh, material: parallaxMaterial, name: 'ParallaxMap' });
 
   // Wood material

@@ -26,7 +26,7 @@ myApp.ready().then(function () {
   const boxShape = new BoxShape({ size: 6 });
   for (let i = 0; i < 16; i++) {
     const box = new Mesh(scene, boxShape, boxMaterial);
-    box.position.setXYZ(Math.random() * 50 - 25, 0, Math.random() * 50 - 25);
+    box.position.setXYZ(Math.random() * 50 - 25, 3, Math.random() * 50 - 25);
   }
   // Create floor
   const floorMaterial = new LambertMaterial();
