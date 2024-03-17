@@ -91,7 +91,7 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
   get boundingBox(): AABB {
     this.updateNodePlacement(this._octree, this._nodePlaceList);
     // this._syncBVChangedList();
-    return this._octree.getRootNode().getBox() || this._octree.getRootNode().getBoxLoosed();
+    return this._octree.getRootNode().getBoxLoosed();
   }
   /**
    * The environment of the scene

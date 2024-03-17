@@ -114,13 +114,6 @@ export class OctreeNode {
     return this._position;
   }
   /**
-   * Invalidates the cached box
-   */
-  invalidateBox(): void {
-    this._box = null;
-    this.getParent()?.invalidateBox();
-  }
-  /**
    * Get the bounding box of the octree node
    * @returns The bounding box of the octree node
    */
@@ -135,15 +128,6 @@ export class OctreeNode {
           if (childBox) {
             box.extend(childBox.minPoint);
             box.extend(childBox.maxPoint);
-          }
-        }
-      }
-      for (const node of this._nodes) {
-        if (!node.isLight()) {
-          const bv = node.getWorldBoundingVolume()?.toAABB();
-          if (bv) {
-            box.extend(bv.minPoint);
-            box.extend(bv.maxPoint);
           }
         }
       }
@@ -727,8 +711,6 @@ export class Octree {
       curNode?.removeNode(node);
       locatedNode?.addNode(node);
       this._nodeMap.set(node, locatedNode);
-      curNode?.invalidateBox();
-      locatedNode?.invalidateBox();
     }
   }
   /**
@@ -740,7 +722,6 @@ export class Octree {
       const curNode = this._nodeMap.get(node) || null;
       if (curNode) {
         curNode.removeNode(node);
-        curNode.invalidateBox();
         this._nodeMap.delete(node);
       }
     }

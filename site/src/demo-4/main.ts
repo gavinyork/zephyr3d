@@ -10,6 +10,7 @@ import {
   BoxShape,
   Mesh,
   SphereShape,
+  GraphNode,
 } from '@zephyr3d/scene';
 import type { DeviceBackend } from '@zephyr3d/device';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
@@ -57,11 +58,12 @@ PhysicsApp.ready().then(async () => {
     .setCastShadow(false);
   light.lookAt(new Vector3(0, 0, 0), new Vector3(0.5, -0.707, -0.5), Vector3.axisPY());
   light.castShadow = true;
+  light.shadow.numShadowCascades = 4;
 
   const physicsParams: Map<Mesh, MeshPhysicsParams> = new Map();
   const floorMaterial = new LambertMaterial();
   floorMaterial.albedoColor = new Vector4(0.3, 0.2, 0.2, 1);
-  const box = new BoxShape({ sizeX: 20, sizeY: 1, sizeZ: 20 });
+  const box = new BoxShape({ sizeX: 200, sizeY: 1, sizeZ: 200 });
   const floor = new Mesh(scene, box);
   floor.material = floorMaterial;
   physicsParams.set(floor, { mass: 0 });
@@ -70,7 +72,7 @@ PhysicsApp.ready().then(async () => {
   const boxShape = new BoxShape();
   const sphereShape = new SphereShape();
   let h = 50;
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 800; i++) {
     const instanceMaterial = objMaterial.createInstance();
     instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
     const box = new Mesh(scene, boxShape, instanceMaterial);
@@ -104,5 +106,6 @@ PhysicsApp.ready().then(async () => {
   await physicsWorld.initWithScene(scene, physicsParams);
   physicsWorld.start();
 
+  setInterval(() => console.log(PhysicsApp.device.frameInfo.FPS), 1000);
   PhysicsApp.run();
 });
