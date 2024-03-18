@@ -1,4 +1,7 @@
-import { Vector3, Vector4, Quaternion } from '@zephyr3d/base';
+import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { backendWebGPU } from '@zephyr3d/backend-webgpu';
+import { Vector3, Vector4 } from '@zephyr3d/base';
+import { DeviceBackend } from '@zephyr3d/device';
 import {
   Scene,
   OrbitCameraController,
@@ -11,10 +14,33 @@ import {
   PBRMetallicRoughnessMaterial,
   BatchGroup
 } from '@zephyr3d/scene';
-import * as common from '../common';
+
+function getQueryString(name: string) {
+  return new URL(window.location.toString()).searchParams.get(name) || null;
+}
+
+function getBackend(): DeviceBackend {
+  const type = getQueryString('dev') || 'webgl';
+  if (type === 'webgpu') {
+    if (backendWebGPU.supported()) {
+      return backendWebGPU;
+    } else {
+      console.warn('No WebGPU support, fall back to WebGL2');
+    }
+  }
+  if (type === 'webgl2') {
+    if (backendWebGL2.supported()) {
+      return backendWebGL2;
+    } else {
+      console.warn('No WebGL2 support, fall back to WebGL1');
+    }
+  }
+  return backendWebGL1;
+}
+
 
 const instancingApp = new Application({
-  backend: common.getBackend(),
+  backend: getBackend(),
   canvas: document.querySelector('#canvas')
 });
 
@@ -38,7 +64,7 @@ instancingApp.ready().then(async () => {
   const batchGroup = new BatchGroup(scene);
   const assetManager = new AssetManager();
   for (let i = 0; i < 2000; i++) {
-    assetManager.fetchModel(scene, 'assets/stone1.glb', { disableInstancing: false }).then(info => {
+    assetManager.fetchModel(scene, 'assets/models/stone1.glb', { disableInstancing: false }).then(info => {
       info.group.parent = batchGroup;
       info.group.position.setXYZ(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50);
       info.group.iterate(node => {
@@ -47,7 +73,7 @@ instancingApp.ready().then(async () => {
         }
       });
     });
-    assetManager.fetchModel(scene, 'assets/stone2.glb', { disableInstancing: false }).then(info => {
+    assetManager.fetchModel(scene, 'assets/models/stone2.glb', { disableInstancing: false }).then(info => {
       info.group.parent = batchGroup;
       info.group.position.setXYZ(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50);
       info.group.iterate(node => {

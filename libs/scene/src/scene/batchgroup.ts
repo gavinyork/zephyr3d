@@ -28,24 +28,27 @@ export class BatchGroup extends GraphNode {
     this._transformHandler = (node: SceneNode) => {
       if (node.isGraphNode() && node.isBatchable()) {
         const lightInstanceInfo = node.getInstanceDataBuffer(SceneRenderer.sceneRenderPass);
-        if (lightInstanceInfo?.buffer) {
-          lightInstanceInfo.buffer.set(node.worldMatrix, lightInstanceInfo.offset);
+        if (lightInstanceInfo?.bindGroup) {
+          lightInstanceInfo.bindGroup.buffer.set(node.worldMatrix, lightInstanceInfo.offset);
+          lightInstanceInfo.bindGroup.dirty = true;
         }
         const depthInstanceInfo = node.getInstanceDataBuffer(SceneRenderer.depthRenderPass);
-        if (depthInstanceInfo?.buffer) {
-          depthInstanceInfo.buffer.set(node.worldMatrix, depthInstanceInfo.offset);
+        if (depthInstanceInfo?.bindGroup) {
+          depthInstanceInfo.bindGroup.buffer.set(node.worldMatrix, depthInstanceInfo.offset);
+          depthInstanceInfo.bindGroup.dirty = true;
         }
         const shadowMapInstanceInfo = node.getInstanceDataBuffer(SceneRenderer.shadowMapRenderPass);
-        if (shadowMapInstanceInfo?.buffer) {
-          shadowMapInstanceInfo.buffer.set(node.worldMatrix, shadowMapInstanceInfo.offset);
+        if (shadowMapInstanceInfo?.bindGroup.buffer) {
+          shadowMapInstanceInfo.bindGroup.buffer.set(node.worldMatrix, shadowMapInstanceInfo.offset);
+          shadowMapInstanceInfo.bindGroup.dirty = true;
         }
       }
     };
     this.on('nodeattached', node => {
       node.iterate(child => {
         if (child.isGraphNode()) {
-          if (!node.isMesh()) {
-            console.error('Only batch node can be added to batch group');
+          if (!child.isMesh()) {
+            console.error('Only mesh node can be added to batch group');
           }
           child.on('transformchanged', this._transformHandler);
           child.placeToOctree = false;

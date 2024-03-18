@@ -34,7 +34,7 @@ export class PhysicsWorld {
     const broadphase = new this._ammo.btDbvtBroadphase();
     const solver = new this._ammo.btSequentialImpulseConstraintSolver();
     this._world = new this._ammo.btDiscreteDynamicsWorld( dispatcher, broadphase, solver, collisionConfiguration );
-    this._world.setGravity( new this._ammo.btVector3( 0, -1, 0 ) );
+    this._world.setGravity( new this._ammo.btVector3( 0, -3, 0 ) );
     this._tmpTransform = new this._ammo.btTransform();
     this._tmpVector3 = new this._ammo.btVector3();
     this._tmpQuaternion = new this._ammo.btQuaternion(0, 0, 0, 1);

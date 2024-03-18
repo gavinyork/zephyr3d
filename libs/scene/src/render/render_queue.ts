@@ -8,9 +8,11 @@ import { QUEUE_TRANSPARENT } from '../values';
 import { BindGroup, BindGroupLayout, ProgramBuilder } from '@zephyr3d/device';
 import { ShaderHelper } from '../material';
 
-type CachedBindGroup = {
+/** @internal */
+export type CachedBindGroup = {
   bindGroup: BindGroup,
-  buffer: Float32Array
+  buffer: Float32Array,
+  dirty: boolean;
 };
 
 export class InstanceBindGroupAllocator {
@@ -49,7 +51,8 @@ export class InstanceBindGroupAllocator {
       }
       bindGroup = {
         bindGroup: Application.instance.device.createBindGroup(InstanceBindGroupAllocator._instanceBindGroupLayout),
-        buffer: new Float32Array(65536 >> 2)
+        buffer: new Float32Array(65536 >> 2),
+        dirty: true
       };
     }
     this._usedBindGroupList.push(bindGroup);
@@ -227,7 +230,7 @@ export class RenderQueue {
         if (index === undefined || list[index].instanceData.currentSize + list[index].instanceData.stride > list[index].instanceData.maxSize) {
           instanceList[hash] = list.length;
           const bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(Application.instance.device.frameInfo.frameCounter);
-          drawable.setInstanceDataBuffer(this._renderPass, bindGroup.buffer, 0)
+          drawable.setInstanceDataBuffer(this._renderPass, bindGroup, 0)
           bindGroup.buffer.set(drawable.getXForm().worldMatrix);
           let currentSize = 4;
           const instanceUniforms = drawable.getInstanceUniforms();
@@ -249,7 +252,7 @@ export class RenderQueue {
           });
         } else {
           const instanceData = list[index].instanceData
-          drawable.setInstanceDataBuffer(this._renderPass, instanceData.bindGroup.buffer, instanceData.currentSize * 4)
+          drawable.setInstanceDataBuffer(this._renderPass, instanceData.bindGroup, instanceData.currentSize * 4)
           instanceData.bindGroup.buffer.set(drawable.getXForm().worldMatrix, instanceData.currentSize * 4);
           instanceData.currentSize += 4;
           const instanceUniforms = drawable.getInstanceUniforms();

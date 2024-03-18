@@ -4,7 +4,7 @@ import { GraphNode } from './graph_node';
 import { BoxFrameShape } from '../shapes';
 import type { Material } from '../material';
 import { LambertMaterial } from '../material';
-import type { RenderPass, Primitive, BatchDrawable, DrawContext } from '../render';
+import type { RenderPass, Primitive, BatchDrawable, DrawContext, CachedBindGroup } from '../render';
 import { Application } from '../app';
 import type { Texture2D } from '@zephyr3d/device';
 import type { XForm } from './xform';
@@ -40,7 +40,7 @@ export class Mesh extends GraphNode implements BatchDrawable {
   /** @internal */
   protected _instanceColor: Vector4;
   /** @internal */
-  protected _instanceBufferInfo: Map<RenderPass, { buffer: Float32Array, offset: number }>;
+  protected _instanceBufferInfo: Map<RenderPass, { bindGroup: CachedBindGroup, offset: number }>;
   /**
    * Creates an instance of mesh node
    * @param scene - The scene to which the mesh node belongs
@@ -232,18 +232,18 @@ export class Mesh extends GraphNode implements BatchDrawable {
   /**
    * {@inheritDoc BatchDrawable.setInstanceDataBuffer}
    */
-  setInstanceDataBuffer(renderPass: RenderPass, buffer: Float32Array, offset: number) {
+  setInstanceDataBuffer(renderPass: RenderPass, bindGroup: CachedBindGroup, offset: number) {
     const info = this._instanceBufferInfo.get(renderPass);
     if (!info) {
-      if (buffer) {
+      if (bindGroup) {
         this._instanceBufferInfo.set(renderPass, {
-          buffer,
+          bindGroup,
           offset
         });
       }
     } else {
-      if (buffer) {
-        info.buffer = buffer;
+      if (bindGroup) {
+        info.bindGroup = bindGroup;
         info.offset = offset;
       } else {
         this._instanceBufferInfo.delete(renderPass);
@@ -253,7 +253,7 @@ export class Mesh extends GraphNode implements BatchDrawable {
   /**
    * {@inheritDoc BatchDrawable.getInstanceDataBuffer}
    */
-  getInstanceDataBuffer(renderPass: RenderPass): { buffer: Float32Array, offset: number } {
+  getInstanceDataBuffer(renderPass: RenderPass): { bindGroup: CachedBindGroup, offset: number } {
     return this._instanceBufferInfo.get(renderPass) ?? null;
   }
   /** @internal */

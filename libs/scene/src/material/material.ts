@@ -411,13 +411,16 @@ export class Material {
   /** @internal */
   private applyInstanceBindGroups(ctx: DrawContext, hash: string): void {
     if (ctx.instanceData)  {
-      ctx.instanceData.bindGroup.bindGroup.setRawData(
-        ShaderHelper.getWorldMatricesUniformName(),
-        0,
-        ctx.instanceData.bindGroup.buffer,
-        0,
-        ctx.instanceData.currentSize * 4
-      );
+      if (ctx.instanceData.bindGroup.dirty) {
+        ctx.instanceData.bindGroup.bindGroup.setRawData(
+          ShaderHelper.getWorldMatricesUniformName(),
+          0,
+          ctx.instanceData.bindGroup.buffer,
+          0,
+          ctx.instanceData.currentSize * 4
+        );
+        ctx.instanceData.bindGroup.dirty = false;
+      }
       Application.instance.device.setBindGroup(3, ctx.instanceData.bindGroup.bindGroup ?? null);
     } else {
       Application.instance.device.setBindGroup(3, null);
