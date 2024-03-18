@@ -6,6 +6,7 @@ import type { Camera } from '../camera/camera';
 import type { Terrain } from './terrain/terrain';
 import type { PunctualLight, BaseLight } from './light';
 import type { BoundingVolume } from '../utility/bounding_volume';
+import type { BatchGroup } from './batchgroup';
 
 /**
  * Base interface for all scene node visitors
@@ -14,6 +15,12 @@ import type { BoundingVolume } from '../utility/bounding_volume';
 export interface SceneNodeVisitor {
   visit(target: SceneNode): unknown;
 }
+
+/**
+ * Scene node visible state
+ * @public
+ */
+export type SceneNodeVisible = 'visible'|'inherit'|'hidden';
 
 /**
  * The base class for any kind of scene objects
@@ -28,29 +35,25 @@ export interface SceneNodeVisitor {
  * @public
  */
 export class SceneNode extends XForm<SceneNode> {
-  static readonly CLIP_INHERITED = -1;
-  static readonly CLIP_DISABLED = 0;
-  static readonly CLIP_ENABLED = 1;
-  static readonly SHOW_INHERITED = -1;
-  static readonly SHOW_HIDE = 0;
-  static readonly SHOW_DEFAULT = 1;
+  /*
   static readonly PICK_INHERITED = -1;
   static readonly PICK_DISABLED = 0;
   static readonly PICK_ENABLED = 1;
+  */
   static readonly BBOXDRAW_INHERITED = -1;
   static readonly BBOXDRAW_DISABLED = 0;
   static readonly BBOXDRAW_LOCAL = 1;
   static readonly BBOXDRAW_WORLD = 2;
   /** @internal */
-  protected _clipMode: number;
+  protected _clipMode: boolean;
   /** @internal */
   protected _renderOrder: number;
   /** @internal */
   protected _boxDrawMode: number;
   /** @internal */
-  protected _visible: number;
+  protected _visible: SceneNodeVisible;
   /** @internal */
-  protected _pickMode: number;
+  protected _pickMode: boolean;
   /** @internal */
   protected _name: string;
   /** @internal */
@@ -61,6 +64,8 @@ export class SceneNode extends XForm<SceneNode> {
   protected _bvDirty: boolean;
   /** @internal */
   protected _bvWorld: BoundingVolume;
+  /** @internal */
+  private _placeToOctree: boolean;
   /**
    * Creates a new scene node
    * @param scene - Which scene the node belongs to
@@ -72,12 +77,26 @@ export class SceneNode extends XForm<SceneNode> {
     this._bv = null;
     this._bvWorld = null;
     this._bvDirty = true;
-    this._clipMode = SceneNode.CLIP_ENABLED;
+    this._clipMode = true;
     this._boxDrawMode = SceneNode.BBOXDRAW_DISABLED;
-    this._visible = SceneNode.SHOW_INHERITED;
-    this._pickMode = SceneNode.PICK_DISABLED;
+    this._visible = 'inherit';
+    this._pickMode = false;
+    this._placeToOctree = true;
     if (scene && this !== scene.rootNode) {
       this.reparent(scene.rootNode);
+    }
+  }
+  /** @internal */
+  get placeToOctree(): boolean {
+    return this._placeToOctree;
+  }
+  /** @internal */
+  set placeToOctree(val: boolean) {
+    if (!!val !== this._placeToOctree) {
+      this._placeToOctree = !!val;
+      if (this.isGraphNode()) {
+        this.scene.invalidateNodePlacement(this);
+      }
     }
   }
   /**
@@ -172,6 +191,10 @@ export class SceneNode extends XForm<SceneNode> {
   isMesh(): this is Mesh {
     return false;
   }
+  /** true if this is a batch group, false otherwise */
+  isBatchGroup(): this is BatchGroup {
+    return false;
+  }
   /** true if this is a terrain node, false otherwise */
   isTerrain(): this is Terrain {
     return false;
@@ -233,46 +256,43 @@ export class SceneNode extends XForm<SceneNode> {
    */
   invalidateBoundingVolume() {
     this._bvDirty = true;
-    this.invalidateWorldBoundingVolume();
+    this.invalidateWorldBoundingVolume(false);
   }
   /** Force the world space bounding volume to be recalculated */
-  invalidateWorldBoundingVolume() {
+  invalidateWorldBoundingVolume(transformChanged: boolean) {
     this._bvWorld = null;
-    this._scene?.invalidateNodePlacement(this);
-  }
-  /**
-   * Computed value of clip mode
-   */
-  get computedClipMode(): number {
-    if (this._clipMode === SceneNode.CLIP_INHERITED) {
-      let parent = this.parent;
-      while (parent && !parent.isGraphNode()) {
-        parent = parent.parent;
+    if (this._scene) {
+      if (transformChanged) {
+        this.iterate(node => {
+          if (node.isGraphNode()) {
+            this._scene.invalidateNodePlacement(node);
+          }
+        });
+      } else if (this.isGraphNode()) {
+        this._scene.invalidateNodePlacement(this);
       }
-      return parent?.computedClipMode ?? SceneNode.CLIP_ENABLED;
     }
-    return this._clipMode;
   }
   /** Clip mode */
-  get clipMode(): number {
+  get clipTestEnabled(): boolean {
     return this._clipMode;
   }
-  set clipMode(val: number) {
+  set clipTestEnabled(val: boolean) {
     this._clipMode = val;
   }
   /** Computed value of show state */
   get hidden(): boolean {
     let node: SceneNode = this;
-    while (node && node._visible === SceneNode.SHOW_INHERITED) {
+    while (node && node._visible === 'inherit') {
       node = node.parent;
     }
-    return node ? node._visible === SceneNode.SHOW_HIDE : false;
+    return node ? node._visible === 'hidden' : false;
   }
   /** Show state */
-  get showState() {
+  get showState(): SceneNodeVisible {
     return this._visible;
   }
-  set showState(val: number) {
+  set showState(val: SceneNodeVisible) {
     if (val !== this._visible) {
       const prevHidden = this.hidden;
       this._visible = val;
@@ -283,18 +303,10 @@ export class SceneNode extends XForm<SceneNode> {
   }
   /** Computed value of pick mode */
   get pickable(): boolean {
-    let node: SceneNode = this;
-    while (node && node._pickMode === SceneNode.PICK_INHERITED) {
-      node = node.parent;
-    }
-    return node ? node._pickMode === SceneNode.PICK_ENABLED : false;
-  }
-  /** Pick mode */
-  get pickMode(): number {
     return this._pickMode;
   }
-  set pickMode(val: number) {
-    this._pickMode = val;
+  set pickable(val: boolean) {
+    this._pickMode = !!val;
   }
   /** Computed value for bounding box draw mode */
   get computedBoundingBoxDrawMode(): number {
@@ -316,22 +328,33 @@ export class SceneNode extends XForm<SceneNode> {
   }
   /** @internal */
   protected _setParent(p: SceneNode): void {
-    if (p !== this._parent) {
+    let lastParent = this._parent;
+    let newParent = p;
+    if (newParent !== lastParent) {
       const sceneLast = this.attached ? this.scene : null;
-      const sceneNew = p?.attached ? p.scene : null;
+      const sceneNew = newParent?.attached ? newParent.scene : null;
       const willDetach = sceneLast && sceneLast !== sceneNew;
       const willAttach = sceneNew && sceneLast !== sceneNew;
       willDetach && this._willDetach();
       willAttach && this._willAttach();
-      super._setParent(p);
+      super._setParent(newParent);
       willDetach && this._detached();
       willAttach && this._attached();
+    }
+    while (lastParent) {
+      lastParent.dispatchEvent(this, 'noderemoved');
+      lastParent = lastParent.parent;
+    }
+    while (newParent) {
+      newParent.dispatchEvent(this, 'nodeattached');
+      newParent = newParent.parent;
     }
   }
   /** @internal */
   protected _onTransformChanged(invalidateLocal: boolean): void {
     super._onTransformChanged(invalidateLocal);
-    this.invalidateWorldBoundingVolume();
+    this.invalidateWorldBoundingVolume(true);
+    this.dispatchEvent(this, 'transformchanged');
   }
   /** @internal */
   protected _willAttach(): void {}
@@ -345,7 +368,7 @@ export class SceneNode extends XForm<SceneNode> {
   notifyHiddenChanged() {
     this._visibleChanged();
     for (const child of this._children) {
-      if (child.showState === SceneNode.SHOW_INHERITED) {
+      if (child.showState === 'inherit') {
         child.notifyHiddenChanged();
       }
     }

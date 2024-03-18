@@ -68,6 +68,7 @@ export class OctreeNode {
   addNode(node: GraphNode): void {
     if (node && this._nodes.indexOf(node) < 0) {
       this._nodes.push(node);
+      node.octreeNode = this;
     }
   }
   /**
@@ -78,10 +79,14 @@ export class OctreeNode {
     const index = this._nodes.indexOf(node);
     if (index >= 0) {
       this._nodes.splice(index, 1);
+      node.octreeNode = null;
     }
   }
   /** Removes all the scene nodes that this octree node contains */
   clearNodes() {
+    for (const node of this._nodes) {
+      node.octreeNode = null;
+    }
     this._nodes = [];
   }
   /**
@@ -698,7 +703,7 @@ export class Octree {
   placeNode(node: GraphNode): void {
     const curNode = this._nodeMap.get(node) || null;
     let locatedNode: OctreeNode = this.getRootNode();
-    if (node.computedClipMode === GraphNode.CLIP_ENABLED) {
+    if (node.clipTestEnabled) {
       const bbox = node.getWorldBoundingVolume()?.toAABB();
       if (bbox && bbox.isValid()) {
         const center = bbox.center;

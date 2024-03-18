@@ -10,7 +10,9 @@ import {
   BoxShape,
   Mesh,
   SphereShape,
-  GraphNode,
+  BatchGroup,
+  Compositor,
+  Tonemap,
 } from '@zephyr3d/scene';
 import type { DeviceBackend } from '@zephyr3d/device';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
@@ -60,11 +62,13 @@ PhysicsApp.ready().then(async () => {
   light.castShadow = true;
   light.shadow.numShadowCascades = 4;
 
+  const batchGroup = new BatchGroup(scene);
   const physicsParams: Map<Mesh, MeshPhysicsParams> = new Map();
   const floorMaterial = new LambertMaterial();
   floorMaterial.albedoColor = new Vector4(0.3, 0.2, 0.2, 1);
   const box = new BoxShape({ sizeX: 200, sizeY: 1, sizeZ: 200 });
   const floor = new Mesh(scene, box);
+  floor.parent = batchGroup;
   floor.material = floorMaterial;
   physicsParams.set(floor, { mass: 0 });
 
@@ -76,9 +80,11 @@ PhysicsApp.ready().then(async () => {
     const instanceMaterial = objMaterial.createInstance();
     instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
     const box = new Mesh(scene, boxShape, instanceMaterial);
+    box.parent = batchGroup;
     box.position.setXYZ(Math.random() * 1 - 0.5, h++, Math.random() * 1 - 0.5);
     physicsParams.set(box, { mass: 1 });
     const sphere = new Mesh(scene, sphereShape, instanceMaterial);
+    sphere.parent = batchGroup;
     sphere.position.setXYZ(Math.random() * 1 - 0.5, h++, Math.random() * 1 - 0.5);
     physicsParams.set(sphere, { mass: 1 });
   }
@@ -94,12 +100,15 @@ PhysicsApp.ready().then(async () => {
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
   PhysicsApp.inputManager.use(camera.handleEvent.bind(camera));
 
+  const compositor = new Compositor();
+  compositor.appendPostEffect(new Tonemap());
+
   PhysicsApp.on('resize', (ev) => {
     camera.aspect = ev.width / ev.height;
   });
   PhysicsApp.on('tick', () => {
     camera.updateController();
-    camera.render(scene);
+    camera.render(scene, compositor);
   });
 
   const physicsWorld = new PhysicsWorld();

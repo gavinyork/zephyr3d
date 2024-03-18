@@ -207,7 +207,6 @@ lightApp.ready().then(async () => {
             .setCastShadow(false);
           pointlight.position.set(randomPoint(bbox));
           const ball = new Mesh(scene, sphere);
-          ball.pickMode = GraphNode.PICK_DISABLED;
           ball.scale.setXYZ(0.02, 0.02, 0.02);
           ball.castShadow = false;
           ball.material = ballMaterial;

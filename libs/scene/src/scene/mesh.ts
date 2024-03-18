@@ -39,6 +39,8 @@ export class Mesh extends GraphNode implements BatchDrawable {
   protected _boundingBoxNode: Mesh;
   /** @internal */
   protected _instanceColor: Vector4;
+  /** @internal */
+  protected _instanceBufferInfo: Map<RenderPass, { buffer: Float32Array, offset: number }>;
   /**
    * Creates an instance of mesh node
    * @param scene - The scene to which the mesh node belongs
@@ -53,6 +55,7 @@ export class Mesh extends GraphNode implements BatchDrawable {
     this._invBindMatrix = null;
     this._instanceHash = null;
     this._boundingBoxNode = null;
+    this._instanceBufferInfo = new Map();
     this._instanceColor = Vector4.zero();
     this._batchable = Application.instance.deviceType !== 'webgl';
     this._bboxChangeCallback = this._onBoundingboxChange.bind(this);
@@ -225,6 +228,33 @@ export class Mesh extends GraphNode implements BatchDrawable {
   getXForm(): XForm {
     // mesh transform should be ignored when skinned
     return this;
+  }
+  /**
+   * {@inheritDoc BatchDrawable.setInstanceDataBuffer}
+   */
+  setInstanceDataBuffer(renderPass: RenderPass, buffer: Float32Array, offset: number) {
+    const info = this._instanceBufferInfo.get(renderPass);
+    if (!info) {
+      if (buffer) {
+        this._instanceBufferInfo.set(renderPass, {
+          buffer,
+          offset
+        });
+      }
+    } else {
+      if (buffer) {
+        info.buffer = buffer;
+        info.offset = offset;
+      } else {
+        this._instanceBufferInfo.delete(renderPass);
+      }
+    }
+  }
+  /**
+   * {@inheritDoc BatchDrawable.getInstanceDataBuffer}
+   */
+  getInstanceDataBuffer(renderPass: RenderPass): { buffer: Float32Array, offset: number } {
+    return this._instanceBufferInfo.get(renderPass) ?? null;
   }
   /** @internal */
   computeBoundingVolume(bv: BoundingVolume): BoundingVolume {

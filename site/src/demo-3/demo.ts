@@ -149,7 +149,7 @@ export class Demo {
       this._camera.lookAt(eyePos, destPos, Vector3.axisPY());
       this._camera.controller = new OrbitCameraController({ center: destPos });
       // loaded
-      this._terrain.showState = GraphNode.SHOW_DEFAULT;
+      this._terrain.showState = 'visible';
       this._scene.env.sky.wind.setXY(700, 350);
       this._loaded = true;
     });
@@ -193,7 +193,7 @@ export class Demo {
       linearColorSpace: true
     });
     const terrain = new Terrain(scene);
-    terrain.showState = GraphNode.SHOW_HIDE;
+    terrain.showState = 'hidden';
     terrain.create(mapWidth, mapHeight, heightsF32, new Vector3(1, 100, 1), 33, {
       splatMap,
       detailMaps: {
@@ -234,7 +234,7 @@ export class Demo {
     });
     terrain.maxPixelError = 6;
     terrain.castShadow = true;
-    terrain.pickMode = GraphNode.PICK_ENABLED;
+    terrain.pickable = true;
 
     // Distribute some trees
     const PY = Vector3.axisPY();
@@ -254,7 +254,7 @@ export class Demo {
         postProcess: this.replaceMaterials
       });
       tree.group.parent = terrain;
-      tree.group.pickMode = SceneNode.PICK_DISABLED;
+      tree.group.pickable = false;
       tree.group.position.setXYZ(x, y, z);
       tree.group.scale.setXYZ(trees[index].scale, trees[index].scale, trees[index].scale);
       tree.group.rotation = Quaternion.fromAxisAngle(PY, prng.get() * 2 * Math.PI);

@@ -1,11 +1,16 @@
 import type { Quaternion } from '@zephyr3d/base';
-import { Vector3, Matrix4x4, ObservableVector3, ObservableQuaternion, Vector4 } from '@zephyr3d/base';
+import { Vector3, Matrix4x4, ObservableVector3, ObservableQuaternion, Vector4, makeEventTarget } from '@zephyr3d/base';
+import type { SceneNode } from './scene_node';
 
 /**
  * Presents a transformation from one space to another
  * @public
  */
-export class XForm<T extends XForm<T> = XForm<any>> {
+export class XForm<T extends XForm<T> = XForm<any>> extends makeEventTarget(Object)<{ 
+  nodeattached: SceneNode,
+  noderemoved: SceneNode,
+  transformchanged: SceneNode
+}>() {
   /** @internal */
   protected _parent: T;
   /** @internal */
@@ -36,6 +41,7 @@ export class XForm<T extends XForm<T> = XForm<any>> {
    * Creates an instance of XForm
    */
   constructor() {
+    super();
     this._parent = null;
     this._children = [];
     this._transformChangeCallback = () => this._onTransformChanged(true);

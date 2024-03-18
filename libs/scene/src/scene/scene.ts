@@ -36,7 +36,7 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
   /** @internal */
   protected _octree: Octree;
   /** @internal */
-  protected _nodePlaceList: Set<SceneNode>;
+  protected _nodePlaceList: Set<GraphNode>;
   /** @internal */
   protected _env: Environment;
   /** @internal */
@@ -160,14 +160,10 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
     return new Ray(vEye, vDir);
   }
   /** @internal */
-  invalidateNodePlacement(node: SceneNode) {
-    if (node.isGraphNode() || node.children.length > 0) {
+  invalidateNodePlacement(node: GraphNode) {
+    if (node.placeToOctree || node.octreeNode) {
       this._nodePlaceList.add(node);
     }
-  }
-  /** @internal */
-  _xformChanged(node: SceneNode) {
-    this._nodePlaceList.add(node);
   }
   /** @internal */
   frameUpdate() {
@@ -210,19 +206,12 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
   /**
    * Update node placement in the octree
    */
-  updateNodePlacement(octree: Octree, list: Set<SceneNode>) {
-    function placeNode(node: SceneNode, attached: boolean) {
-      if (node.isGraphNode()) {
-        if (attached && !node.hidden) {
-          octree.placeNode(node);
-        } else {
-          octree.removeNode(node);
-        }
-      }
-      for (const child of node.children) {
-        if (child.isGraphNode()) {
-          placeNode(child, attached);
-        }
+  updateNodePlacement(octree: Octree, list: Set<GraphNode>) {
+    function placeNode(node: GraphNode, attached: boolean) {
+      if (attached && !node.hidden && node.placeToOctree) {
+        octree.placeNode(node);
+      } else {
+        octree.removeNode(node);
       }
       list.delete(node);
     }

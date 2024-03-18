@@ -11,6 +11,7 @@ import type { PunctualLight } from '../scene/light';
 import type { Visitor } from '../scene/visitor';
 import type { Camera } from '../camera/camera';
 import type { SceneNode } from '../scene/scene_node';
+import { BatchGroup } from '../scene/batchgroup';
 
 /**
  * Node visitor for culling
@@ -48,6 +49,13 @@ export class CullVisitor implements Visitor {
   set camera(camera: Camera) {
     this._camera = camera || null;
   }
+  /** true if cull with frustum culling, otherwise false. default is true */
+  get frustumCulling(): boolean {
+    return !this._skipClipTest;
+  }
+  set frustumCulling(val: boolean) {
+    this._skipClipTest = !val;
+  }
   /** The camera position of the primary render pass */
   get primaryCamera() {
     return this._primaryCamera;
@@ -60,6 +68,9 @@ export class CullVisitor implements Visitor {
   get renderQueue() {
     return this._renderQueue;
   }
+  set renderQueue(renderQueue: RenderQueue) {
+    this._renderQueue = renderQueue;
+  }
   /** Frustum for culling */
   get frustum() {
     return this._camera?.frustum || null;
@@ -67,6 +78,10 @@ export class CullVisitor implements Visitor {
   /** @internal */
   push(camera: Camera, drawable: Drawable, renderOrder: number) {
     this.renderQueue.push(camera, drawable, renderOrder);
+  }
+  /** @internal */
+  pushRenderQueue(renderQueue: RenderQueue) {
+    this.renderQueue.pushRenderQueue(renderQueue);
   }
   /**
    * Visits a node
@@ -81,6 +96,8 @@ export class CullVisitor implements Visitor {
       return this.visitTerrain(target);
     } else if (target.isPunctualLight()) {
       return this.visitPunctualLight(target);
+    } else if (target.isBatchGroup()) {
+      return this.visitBatchGroup(target);
     }
   }
   /** @internal */
@@ -105,6 +122,15 @@ export class CullVisitor implements Visitor {
     return false;
   }
   /** @internal */
+  visitBatchGroup(node: BatchGroup) {
+    if (!node.hidden) {
+      const renderQueue = node.getRenderQueue(this);
+      this.pushRenderQueue(renderQueue);
+      return true;
+    }
+    return false;
+  }
+  /** @internal */
   visitMesh(node: Mesh) {
     if (!node.hidden && (node.castShadow || this._renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP)) {
       const clipState = this.getClipStateWithNode(node);
@@ -121,7 +147,7 @@ export class CullVisitor implements Visitor {
       node.getLevel() > 0 ? this.getClipStateWithAABB(node.getBoxLoosed()) : ClipState.CLIPPED;
     if (clipState !== ClipState.NOT_CLIPPED) {
       const saveSkipFlag = this._skipClipTest;
-      this._skipClipTest = clipState === ClipState.A_INSIDE_B;
+      this._skipClipTest = this._skipClipTest || clipState === ClipState.A_INSIDE_B;
       const nodes = node.getNodes();
       for (let i = 0; i < nodes.length; i++) {
         this.visit(nodes[i]);
@@ -136,7 +162,7 @@ export class CullVisitor implements Visitor {
     let clipState: ClipState;
     if (this._skipClipTest) {
       clipState = ClipState.A_INSIDE_B;
-    } else if (node.computedClipMode === GraphNode.CLIP_DISABLED) {
+    } else if (!node.clipTestEnabled) {
       clipState = ClipState.CLIPPED;
     } else {
       const bv = node.getWorldBoundingVolume();

@@ -114,7 +114,7 @@ export class Panel {
   }
   updateMeshShowState() {
     for (let i = 0; i < this._meshes.length; i++) {
-      this._meshes[i].node.showState = i === this._index ? GraphNode.SHOW_DEFAULT : GraphNode.SHOW_HIDE;
+      this._meshes[i].node.showState = i === this._index ? 'visible' : 'hidden';
     }
   }
   css2rgb(css: string): Vector3 {

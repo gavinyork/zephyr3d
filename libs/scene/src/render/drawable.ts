@@ -124,4 +124,12 @@ export interface BatchDrawable extends Drawable {
    * Gets the instance uniforms count
    */
   getInstanceUniforms(): Float32Array;
+  /**
+   * Sets the uniform data buffer and offset
+   */
+  setInstanceDataBuffer(renderPass: RenderPass, buffer: Float32Array, offset: number);
+  /**
+   * Gets the uniform data buffer offset
+   */
+  getInstanceDataBuffer(renderPass: RenderPass): { buffer: Float32Array, offset: number };
 }

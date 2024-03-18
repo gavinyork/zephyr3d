@@ -12,7 +12,6 @@ import { AnimationClip } from '../animation/animation';
 import { BoundingBox } from '../utility/bounding_volume';
 import { CopyBlitter } from '../blitter';
 import { getSheenLutLoader, getTestCubemapLoader } from './builtin';
-import { GraphNode } from '../scene/graph_node';
 import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT, BUILTIN_ASSET_TEST_CUBEMAP } from '../values';
 import { Application } from '../app';
 import { AnimationSet } from '../animation/animationset';
@@ -631,9 +630,8 @@ export class AssetManager {
       for (const subMesh of meshData.subMeshes) {
         const meshNode = new Mesh(scene);
         meshNode.name = subMesh.name;
-        meshNode.clipMode = GraphNode.CLIP_INHERITED;
-        meshNode.showState = GraphNode.SHOW_INHERITED;
-        meshNode.pickMode = GraphNode.PICK_INHERITED;
+        meshNode.clipTestEnabled = true;
+        meshNode.showState = 'inherit';
         meshNode.primitive = subMesh.primitive;
         meshNode.material = instancing ? subMesh.material.createInstance() : subMesh.material
         // meshNode.drawBoundingBox = true;

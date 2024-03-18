@@ -13,43 +13,52 @@ type CachedBindGroup = {
   buffer: Float32Array
 };
 
-const maxUniformSize = 65536 >> 2;
-let instanceBindGroupLayout: BindGroupLayout = null;
-const usedBindGroupList: CachedBindGroup[] = [];
-const freeBindGroupList: CachedBindGroup[] = [];
-let allocFrameStamp = -1;
-function allocateInstanceBindGroup(framestamp: number): CachedBindGroup {
-  // Reset if render frame changed
-  if (allocFrameStamp !== framestamp) {
-    allocFrameStamp = framestamp;
-    freeBindGroupList.push(...usedBindGroupList);
-    usedBindGroupList.length = 0;
+export class InstanceBindGroupAllocator {
+  private static _instanceBindGroupLayout: BindGroupLayout = null;
+  _usedBindGroupList: CachedBindGroup[] = [];
+  _freeBindGroupList: CachedBindGroup[] = [];
+  private _allocFrameStamp: number;
+  constructor() {
+    this._allocFrameStamp = -1;
+    this._usedBindGroupList = [];
+    this._freeBindGroupList = [];
   }
-  let bindGroup = freeBindGroupList.pop();
-  if (!bindGroup) {
-    if (!instanceBindGroupLayout) {
-      const buildInfo = new ProgramBuilder(Application.instance.device).buildRender({
-        vertex(pb){
-          this[ShaderHelper.getWorldMatricesUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
-          pb.main(function(){
-          });
-        },
-        fragment(pb){
-          this[ShaderHelper.getWorldMatricesUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
-          pb.main(function(){
-          });
-        }
-      });
-      instanceBindGroupLayout = buildInfo[2][3];
+  allocateInstanceBindGroup(framestamp: number): CachedBindGroup {
+    // Reset if render frame changed
+    if (this._allocFrameStamp !== framestamp) {
+      this._allocFrameStamp = framestamp;
+      this._freeBindGroupList.push(...this._usedBindGroupList);
+      this._usedBindGroupList.length = 0;
     }
-    bindGroup = {
-      bindGroup: Application.instance.device.createBindGroup(instanceBindGroupLayout),
-      buffer: new Float32Array(65536 >> 2)
-    };
+    let bindGroup = this._freeBindGroupList.pop();
+    if (!bindGroup) {
+      if (!InstanceBindGroupAllocator._instanceBindGroupLayout) {
+        const buildInfo = new ProgramBuilder(Application.instance.device).buildRender({
+          vertex(pb){
+            this[ShaderHelper.getWorldMatricesUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
+            pb.main(function(){
+            });
+          },
+          fragment(pb){
+            this[ShaderHelper.getWorldMatricesUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
+            pb.main(function(){
+            });
+          }
+        });
+        InstanceBindGroupAllocator._instanceBindGroupLayout = buildInfo[2][3];
+      }
+      bindGroup = {
+        bindGroup: Application.instance.device.createBindGroup(InstanceBindGroupAllocator._instanceBindGroupLayout),
+        buffer: new Float32Array(65536 >> 2)
+      };
+    }
+    this._usedBindGroupList.push(bindGroup);
+    return bindGroup;
   }
-  usedBindGroupList.push(bindGroup);
-  return bindGroup;
 }
+
+const maxUniformSize = 65536 >> 2;
+const defaultInstanceBindGroupAlloator = new InstanceBindGroupAllocator();
 
 /**
  * Instance data
@@ -100,11 +109,14 @@ export class RenderQueue {
   private _unshadowedLightList: PunctualLight[];
   /** @internal */
   private _sunLight: DirectionalLight;
+  /** @internal */
+  private _bindGroupAllocator: InstanceBindGroupAllocator;
   /**
    * Creates an instance of a render queue
    * @param renderPass - The render pass to which the render queue belongs
    */
-  constructor(renderPass: RenderPass) {
+  constructor(renderPass: RenderPass, bindGroupAllocator?: InstanceBindGroupAllocator) {
+    this._bindGroupAllocator = bindGroupAllocator ?? defaultInstanceBindGroupAlloator;
     this._itemLists = {};
     this._renderPass = renderPass;
     this._shadowedLightList = [];
@@ -164,6 +176,31 @@ export class RenderQueue {
     }
   }
   /**
+   * Push items from another render queue
+   * @param queue - The render queue to be pushed
+   */
+  pushRenderQueue(queue: RenderQueue) {
+    if (queue && queue !== this) {
+      for (const k in queue._itemLists) {
+        const l = queue._itemLists[k];
+        if (l) {
+          let list = this._itemLists[k];
+          if (!list) {
+            list = {
+              opaqueList: [],
+              opaqueInstanceList: {},
+              transList: [],
+              transInstanceList: {}
+            };
+            this._itemLists[k] = list;
+          }
+          list.opaqueList.push(...l.opaqueList);
+          list.transList.push(...l.transList);
+        }
+      }
+    }
+  }
+  /**
    * Push an item to the render queue
    * @param camera - The camera for drawing the item
    * @param drawable - The object to be drawn
@@ -189,7 +226,8 @@ export class RenderQueue {
         const index = instanceList[hash];
         if (index === undefined || list[index].instanceData.currentSize + list[index].instanceData.stride > list[index].instanceData.maxSize) {
           instanceList[hash] = list.length;
-          const bindGroup = allocateInstanceBindGroup(Application.instance.device.frameInfo.frameCounter);
+          const bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(Application.instance.device.frameInfo.frameCounter);
+          drawable.setInstanceDataBuffer(this._renderPass, bindGroup.buffer, 0)
           bindGroup.buffer.set(drawable.getXForm().worldMatrix);
           let currentSize = 4;
           const instanceUniforms = drawable.getInstanceUniforms();
@@ -211,6 +249,7 @@ export class RenderQueue {
           });
         } else {
           const instanceData = list[index].instanceData
+          drawable.setInstanceDataBuffer(this._renderPass, instanceData.bindGroup.buffer, instanceData.currentSize * 4)
           instanceData.bindGroup.buffer.set(drawable.getXForm().worldMatrix, instanceData.currentSize * 4);
           instanceData.currentSize += 4;
           const instanceUniforms = drawable.getInstanceUniforms();
@@ -231,7 +270,7 @@ export class RenderQueue {
   /**
    * Removes all items in the render queue
    */
-  clear() {
+  reset() {
     this._itemLists = {};
     this._shadowedLightList = [];
     this._unshadowedLightList = [];

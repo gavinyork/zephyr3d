@@ -133,7 +133,6 @@ export class ShaderHelper {
       pb.vec4('clipPlane'),
       pb.mat4('viewProjectionMatrix'),
       pb.mat4('viewMatrix'),
-      pb.mat4('rotationMatrix'),
       pb.mat4('projectionMatrix'),
       pb.vec4('params')
     ]);
@@ -431,7 +430,6 @@ export class ShaderHelper {
       clipPlane: ctx.camera.clipPlane ?? Vector4.zero(),
       viewProjectionMatrix: ctx.camera.viewProjectionMatrix,
       viewMatrix: ctx.camera.viewMatrix,
-      rotationMatrix: ctx.camera.getRotationMatrix(),
       projectionMatrix: ctx.camera.getProjectionMatrix(),
       params: new Vector4(
         ctx.camera.getNearPlane(),
@@ -747,14 +745,6 @@ export class ShaderHelper {
    */
   static getProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_GLOBAL].camera.projectionMatrix;
-  }
-  /**
-   * Gets the uniform variable of type mat4 which holds the view projection matrix of current camera
-   * @param scope - Current shader scope
-   * @returns The view projection matrix of current camera
-   */
-  static getCameraRotationMatrix(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.rotationMatrix;
   }
   /** @internal */
   static getCascadeDistances(scope: PBInsideFunctionScope): PBShaderExp {
