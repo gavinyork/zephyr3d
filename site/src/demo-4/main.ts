@@ -56,10 +56,11 @@ PhysicsApp.ready().then(async () => {
   const scene = new Scene();
   const light = new DirectionalLight(scene)
     .setColor(new Vector4(1, 1, 1, 1))
-    .setIntensity(5)
     .setCastShadow(false);
   light.lookAt(new Vector3(0, 0, 0), new Vector3(0.5, -0.707, -0.5), Vector3.axisPY());
   light.castShadow = true;
+  light.shadow.mode = 'pcf-opt';
+  light.shadow.pcfKernelSize = 3;
   light.shadow.numShadowCascades = 4;
 
   const batchGroup = new BatchGroup(scene);
