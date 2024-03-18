@@ -54,6 +54,8 @@ export class InstanceBindGroupAllocator {
         buffer: new Float32Array(65536 >> 2),
         dirty: true
       };
+    } else {
+      bindGroup.dirty = true;
     }
     this._usedBindGroupList.push(bindGroup);
     return bindGroup;
