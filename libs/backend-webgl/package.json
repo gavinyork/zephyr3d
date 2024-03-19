@@ -1,7 +1,7 @@
 {
   "name": "@zephyr3d/backend-webgl",
   "version": "0.1.0",
-  "description": "The WebGL backend of zephyr3d",
+  "description": "The WebGL device backend of zephyr3d",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
   "main": "./dist/index.js",
