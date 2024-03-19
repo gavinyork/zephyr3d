@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add material instancing",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
