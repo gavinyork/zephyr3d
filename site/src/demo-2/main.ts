@@ -197,6 +197,7 @@ lightApp.ready().then(async () => {
         light.shadow.shadowMapSize = 1024;
         light.shadow.mode = 'pcf-opt';
         const bbox = getBoundingBox(model);
+        light.shadow.shadowRegion = bbox;
         const sphere = new SphereShape();
         for (let i = 0; i < 255; i++) {
           const color = Vector3.normalize(new Vector3(Math.random(), Math.random(), Math.random()));

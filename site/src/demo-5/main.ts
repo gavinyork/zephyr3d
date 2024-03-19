@@ -14,6 +14,11 @@ import {
   PBRMetallicRoughnessMaterial,
   BatchGroup
 } from '@zephyr3d/scene';
+import { Panel } from './ui';
+
+let instanceCount = 0;
+let vertexCount = 0;
+let faceCount = 0;
 
 function getQueryString(name: string) {
   return new URL(window.location.toString()).searchParams.get(name) || null;
@@ -63,26 +68,33 @@ instancingApp.ready().then(async () => {
 
   const batchGroup = new BatchGroup(scene);
   const assetManager = new AssetManager();
-  for (let i = 0; i < 2000; i++) {
-    assetManager.fetchModel(scene, 'assets/models/stone1.glb', { disableInstancing: false }).then(info => {
-      info.group.parent = batchGroup;
-      info.group.position.setXYZ(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50);
-      info.group.iterate(node => {
+  (async function(){
+    for (let i = 0; i < 2000; i++) {
+      const stone1 = await assetManager.fetchModel(scene, 'assets/models/stone1.glb', { disableInstancing: false });
+      stone1.group.parent = batchGroup;
+      stone1.group.position.setXYZ(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50);
+      stone1.group.iterate(node => {
         if (node.isMesh()) {
           (node.material as PBRMetallicRoughnessMaterial).albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
+          vertexCount += node.primitive.getNumVertices();
+          faceCount += node.primitive.getNumFaces();
         }
       });
-    });
-    assetManager.fetchModel(scene, 'assets/models/stone2.glb', { disableInstancing: false }).then(info => {
-      info.group.parent = batchGroup;
-      info.group.position.setXYZ(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50);
-      info.group.iterate(node => {
+      instanceCount++;
+      const stone2 = await assetManager.fetchModel(scene, 'assets/models/stone2.glb', { disableInstancing: false });
+      stone2.group.parent = batchGroup;
+      stone2.group.position.setXYZ(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50);
+      stone2.group.iterate(node => {
         if (node.isMesh()) {
           (node.material as PBRMetallicRoughnessMaterial).albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
+          vertexCount += node.primitive.getNumVertices();
+          faceCount += node.primitive.getNumFaces();
         }
       });
-    });
-  }
+      instanceCount++;
+    }
+    new Panel(instanceCount, vertexCount, faceCount);
+  })();
 
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());

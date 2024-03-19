@@ -1,4 +1,4 @@
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { AABB, Vector3, Vector4 } from '@zephyr3d/base';
 
 import {
   Scene,
@@ -62,6 +62,7 @@ PhysicsApp.ready().then(async () => {
   light.shadow.mode = 'pcf-opt';
   light.shadow.pcfKernelSize = 3;
   light.shadow.numShadowCascades = 4;
+  light.shadow.shadowRegion = new AABB(new Vector3(-100, -1, -100), new Vector3(100, 50, 100));
 
   const batchGroup = new BatchGroup(scene);
   const physicsParams: Map<Mesh, MeshPhysicsParams> = new Map();
@@ -116,6 +117,7 @@ PhysicsApp.ready().then(async () => {
   await physicsWorld.initWithScene(scene, physicsParams);
   physicsWorld.start();
 
+  setInterval
   setInterval(() => console.log(PhysicsApp.device.frameInfo.FPS), 1000);
   PhysicsApp.run();
 });

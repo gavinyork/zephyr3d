@@ -53,7 +53,7 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
   constructor() {
     super();
     this._id = ++Scene._nextId;
-    this._octree = new Octree(this, 2048, 64);
+    this._octree = new Octree(this, 8, 8);
     this._nodePlaceList = new Set();
     this._env = new Environment();
     this._updateEvent = new SceneUpdateEvent(this);

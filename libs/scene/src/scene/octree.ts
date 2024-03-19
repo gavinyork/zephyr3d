@@ -1,4 +1,4 @@
-import { Vector3, AABB } from '@zephyr3d/base';
+import { Vector3, AABB, nextPowerOf2 } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import type { Scene } from './scene';
 import type { Visitor } from './visitor';
@@ -29,8 +29,6 @@ export class OctreeNode {
   /** @internal */
   private _position: number;
   /** @internal */
-  private _references: number;
-  /** @internal */
   private _nodes: GraphNode[];
   /** @internal */
   private _box: AABB;
@@ -42,7 +40,6 @@ export class OctreeNode {
   constructor() {
     this._chunk = null;
     this._position = 0;
-    this._references = 0;
     this._nodes = [];
     this._box = null;
     this._boxLoosed = null;
@@ -216,13 +213,6 @@ export class OctreeNode {
     return this.getMaxPoint().addBy(new Vector3(halfNodeSize, halfNodeSize, halfNodeSize));
   }
   /**
-   * Get reference of the node
-   * @returns Reference of the node
-   */
-  getReference(): number {
-    return this._references;
-  }
-  /**
    * Gets the child node by a given placement
    * @param placement - The placement
    * @returns Child node at the given placement
@@ -274,24 +264,6 @@ export class OctreeNode {
     this.getOrCreateChild(OctreePlacement.NNN);
   }
   /**
-   * Free up all empty children
-   * @returns true if some children were freed
-   */
-  tidy(): boolean {
-    this._references = 8;
-    for (let i = 0; i < 8; i++) {
-      const node = this.getChild(i);
-      if (!node || node.tidy()) {
-        --this._references;
-      }
-    }
-    if (this._nodes.length === 0 && this._references === 0) {
-      this._chunk.freeNodeByIndex(this._position);
-      return true;
-    }
-    return false;
-  }
-  /**
    * Traverse this node by a visitor
    * @param v - The visitor
    */
@@ -339,6 +311,10 @@ export class OctreeNodeChunk {
     this._prev = null;
     this._nodeMap = new Map();
   }
+  /** @internal */
+  get nodeMap() {
+    return this._nodeMap;
+  }
   /**
    * Gets an octree node at a given index
    * @param index - Index of the node
@@ -373,27 +349,6 @@ export class OctreeNodeChunk {
       this._prev.getOrCreateNodeChain(this.getParentIndex(index));
     }
     return node;
-  }
-  /**
-   * Removes an octree node at given index
-   * @param index - Index of the node
-   */
-  freeNodeByIndex(index: number): void {
-    const node = this._nodeMap.get(index);
-    if (node) {
-      node.clearNodes();
-      this._nodeMap.delete(index);
-    }
-  }
-  /**
-   * Removes an octree node
-   * @param node - The octree node to be removed
-   */
-  freeNode(node: OctreeNode): void {
-    if (node) {
-      console.assert(node.getChunk() === this, 'Invalid chunk');
-      this.freeNodeByIndex(node.getPosition());
-    }
   }
   /**
    * Removes all octree nodes of this chunk
@@ -595,10 +550,9 @@ export class Octree {
    * @param leafSize - Leaf size of the octree
    */
   initialize(rootSize: number, leafSize: number) {
-    console.assert(rootSize >= leafSize && leafSize > 0, 'Invalid rootSize or leafSize for octree');
     this.finalize();
-    this._rootSize = rootSize;
     this._leafSize = leafSize;
+    this._rootSize = Math.max(leafSize, rootSize);
     let n = 1;
     for (; rootSize >= leafSize * 2; leafSize *= 2, ++n);
     for (let i = 0; i < n; ++i, rootSize *= 0.5) {
@@ -615,6 +569,7 @@ export class Octree {
   }
   /** Free up the octree */
   finalize() {
+    this._chunks.forEach(chunk => chunk.clearNodes());
     this._chunks = [];
     this._rootSize = 0;
     this._leafSize = 0;
@@ -660,10 +615,7 @@ export class Octree {
     let py = Math.floor((center.y + this._rootSize * 0.5) * inv_node_size);
     let pz = Math.floor((center.z + this._rootSize * 0.5) * inv_node_size);
     if (px >= dim || py >= dim || pz >= dim) {
-      level = 0;
-      px = 0;
-      py = 0;
-      pz = 0;
+      return null;
     }
     const index = px + py * dim + pz * dim * dim;
     if (candidate && candidate.getChunk().getLevel() === level && candidate.getPosition() === index) {
@@ -709,7 +661,14 @@ export class Octree {
         const center = bbox.center;
         const extents = bbox.extents;
         const size = Math.max(Math.max(extents.x, extents.y), extents.z);
-        locatedNode = this.locateNodeChain(curNode, center, size) || this.getRootNode();
+        locatedNode = this.locateNodeChain(curNode, center, size);
+        if (!locatedNode) {
+          const d = Math.max(...Vector3.abs(bbox.minPoint), ...Vector3.abs(bbox.maxPoint));
+          // nodeSize >= 4 * size & octreeSize >= 2 * d
+          this.resize(Math.max(d * 2, 4 * size));
+          this.placeNode(node);
+          return;
+        }
       }
     }
     if (curNode !== locatedNode) {
@@ -729,6 +688,22 @@ export class Octree {
         curNode.removeNode(node);
         this._nodeMap.delete(node);
       }
+    }
+  }
+  resize(size: number) {
+    size = Math.max(nextPowerOf2(size), this._leafSize);
+    if (size === this._rootSize) {
+      return;
+    }
+    const nodes: GraphNode[] = [];
+    for (const chunk of this._chunks) {
+      chunk.nodeMap.forEach(node => {
+        nodes.push(...node.getNodes());
+      });
+    }
+    this.initialize(size, this._leafSize);
+    for (const node of nodes) {
+      this.placeNode(node);
     }
   }
 }

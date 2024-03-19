@@ -11,7 +11,11 @@ export class OctreeUpdateVisitor implements Visitor {
   }
   visit(node: unknown) {
     if (node instanceof GraphNode) {
-      this._octree.placeNode(node);
+      if (node.placeToOctree) {
+        this._octree.placeNode(node);
+      } else {
+        this._octree.removeNode(node);
+      }
     }
   }
 }

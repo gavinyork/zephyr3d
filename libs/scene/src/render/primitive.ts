@@ -1,15 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Ray, TypedArray } from '@zephyr3d/base';
-import type {
-  VertexStepMode,
-  VertexLayout,
-  VertexLayoutOptions,
-  PrimitiveType,
-  StructuredBuffer,
-  IndexBuffer,
-  VertexSemantic,
-  VertexAttribFormat,
-  VertexBufferInfo
+import {
+  type VertexStepMode,
+  type VertexLayout,
+  type VertexLayoutOptions,
+  type PrimitiveType,
+  type StructuredBuffer,
+  type IndexBuffer,
+  type VertexSemantic,
+  type VertexAttribFormat,
+  type VertexBufferInfo,
+  PBPrimitiveType
 } from '@zephyr3d/device';
 import { Application } from '../app';
 import type { BoundingVolume } from '../utility/bounding_volume';
@@ -103,6 +104,34 @@ export class Primitive {
   }
   set indexCount(val) {
     this._indexCount = val;
+  }
+  /**
+   * Query total vertex count
+   * @returns Total vertex count, 0 if no position vertex buffer set
+   */
+  getNumVertices(): number {
+    const posInfo = this.getVertexBufferInfo('position');
+    return posInfo?.buffer ? (posInfo.buffer.byteLength / posInfo.stride) >> 0 : 0;
+  }
+  /**
+   * Query total face count
+   * @returns Total face count
+   */
+  getNumFaces(): number {
+    const ib = this.getIndexBuffer();
+    const count = ib ? ib.byteLength >> (ib.indexType.primitiveType === PBPrimitiveType.U16 ? 1 : 2) : this.getNumVertices();
+    switch (this.primitiveType) {
+      case 'line-list': return count >> 1;
+      case 'point-list': return count;
+      case 'line-strip': return count - 1;
+      case 'triangle-fan': return count - 2;
+      case 'triangle-strip': return count - 2;
+      case 'triangle-list': return (count / 3) >> 0;
+      default: return 0;
+    }
+    const vbPos = this.getVertexBuffer('position');
+    const vertexSize = vbPos.structure.toBufferLayout(0, 'packed').byteSize;
+    return (vbPos.byteLength / vertexSize) >> 0;
   }
   /**
    * Removes a vertex buffer from the primitive
