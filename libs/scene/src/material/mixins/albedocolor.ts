@@ -27,6 +27,7 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
     return BaseCls as T & { new (...args: any[]): IMixinAlbedoColor };
   }
   const S = applyMaterialMixins(BaseCls, mixinTextureProps('albedo'));
+  const ALBEDO_COLOR_UNIFORM = S.defineInstanceUniform('albedoColor', 'vec4');
   return class extends S {
     static albedoColorMixed = true;
     private _albedoColor: Vector4;
@@ -42,6 +43,9 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
       this._albedoColor.set(val);
       this.uniformChanged();
     }
+    getUniformValueAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp {
+      return this.drawContext.instanceData ? this.getInstancedUniform(scope, ALBEDO_COLOR_UNIFORM) : scope.zAlbedo;
+    }
     calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
       if (!this.needFragmentColor()) {
@@ -50,7 +54,7 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
         );
         return pb.vec4(1);
       }
-      let color = scope.zAlbedo;
+      let color = this.getUniformValueAlbedoColor(scope);
       if (this.albedoTexture) {
         color = pb.mul(color, this.sampleAlbedoTexture(scope, uv));
       }

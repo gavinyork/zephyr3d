@@ -3,7 +3,7 @@ import type { Texture2D, TextureFormat } from '@zephyr3d/device';
 import type { XForm } from '../scene/xform';
 import type { Camera } from '../camera/camera';
 import type { RenderPass } from '.';
-import type { InstanceData } from './render_queue';
+import type { CachedBindGroup, InstanceData } from './render_queue';
 import type { ShadowMapParams } from '../shadow';
 import type { Environment } from '../scene/environment';
 import type { DirectionalLight, GraphNode, PunctualLight, Scene } from '../scene';
@@ -120,4 +120,16 @@ export interface BatchDrawable extends Drawable {
    * @param renderPass - The render pass to which current drawing task belongs
    */
   getInstanceId(renderPass: RenderPass): string;
+  /**
+   * Gets the instance uniforms count
+   */
+  getInstanceUniforms(): Float32Array;
+  /**
+   * Sets the uniform data buffer and offset
+   */
+  setInstanceDataBuffer(renderPass: RenderPass, bindGroup: CachedBindGroup, offset: number);
+  /**
+   * Gets the uniform data buffer offset
+   */
+  getInstanceDataBuffer(renderPass: RenderPass): { bindGroup: CachedBindGroup, offset: number };
 }

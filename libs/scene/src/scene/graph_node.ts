@@ -5,6 +5,7 @@ import type { XForm } from './xform';
 import type { BatchDrawable } from '../render/drawable';
 import type { Scene } from './scene';
 import type { Camera } from '../camera/camera';
+import type { OctreeNode } from '.';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 /**
@@ -16,6 +17,7 @@ import type { Camera } from '../camera/camera';
  * @public
  */
 export class GraphNode extends SceneNode {
+  private _octreeNode: OctreeNode;
   /**
    * Creates a graph node
    * @param scene - The scene to which the node belongs
@@ -23,6 +25,15 @@ export class GraphNode extends SceneNode {
   constructor(scene: Scene) {
     super(scene);
     this._renderOrder = 0;
+    this._octreeNode = null;
+  }
+  /** @internal */
+  get octreeNode(): OctreeNode {
+    return this._octreeNode;
+  }
+  /** @internal */
+  set octreeNode(node: OctreeNode) {
+    this._octreeNode = node;
   }
   /**
    * Render order of the node

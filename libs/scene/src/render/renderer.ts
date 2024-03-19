@@ -29,6 +29,18 @@ export class SceneRenderer {
   private static _enableDepthPass = false;
   /** @internal */
   private static _clusters: ClusteredLight[] = [];
+  /** lighting render pass */
+  static get sceneRenderPass(): LightPass {
+    return this._scenePass;
+  }
+  /** depth render pass */
+  static get depthRenderPass(): DepthPass {
+    return this._depthPass;
+  }
+  /** shadow map render pass */
+  static get shadowMapRenderPass(): ShadowMapPass {
+    return this._shadowMapPass;
+  }
   /** @internal */
   static setClearColor(color: Vector4): void {
     this._scenePass.clearColor = color;

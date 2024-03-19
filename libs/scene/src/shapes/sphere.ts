@@ -46,6 +46,10 @@ export class SphereShape extends Shape<SphereCreationOptions> {
     }
     return a - Math.sqrt(rSquared - bSquared);
   }
+  /** Sphere radius */
+  get radius(): number {
+    return this._options.radius ?? 1;
+  }
   /** @internal */
   protected createDefaultOptions() {
     const options = super.createDefaultOptions();

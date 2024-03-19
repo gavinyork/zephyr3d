@@ -18,12 +18,6 @@ export interface CylinderCreationOptions extends ShapeCreationOptions {
   heightDetail?: number;
   /** Radial detail, default is 20*/
   radialDetail?: number;
-  /** Anchor point of axis x, default is 0.5 */
-  anchorX?: number;
-  /** Anchor point of axis y, default is 0 */
-  anchorY?: number;
-  /** Anchor point of axis z, default is 0.5 */
-  anchorZ?: number;
 }
 
 /**
@@ -46,9 +40,6 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
     options.heightDetail = 1;
     options.radialDetail = 20;
     options.height = 1;
-    options.anchorX = 0.5;
-    options.anchorY = 0;
-    options.anchorZ = 0.5;
     return options;
   }
   /** @internal */
@@ -72,7 +63,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
         const sinTheta = Math.sin(theta);
         const cosTheta = Math.cos(theta);
         const m = 1 / Math.sqrt(sinTheta * sinTheta + slope * slope + cosTheta * cosTheta);
-        vertices.push(radius * sinTheta, v * this._options.height, radius * cosTheta);
+        vertices.push(radius * sinTheta, (v - 0.5) * this._options.height, radius * cosTheta);
         normals.push(sinTheta * m, slope * m, cosTheta * m);
         uvs.push(u, 1 - v);
         if (y < this._options.heightDetail && x < this._options.radialDetail) {

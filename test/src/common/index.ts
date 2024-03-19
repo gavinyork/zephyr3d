@@ -982,9 +982,9 @@ export class Inspector {
   private editLight(light: PunctualLight) {
     ImGui.Checkbox('Enabled', (val?: boolean) => {
       if (val === undefined) {
-        val = light.showState !== GraphNode.SHOW_HIDE;
+        val = light.showState !== 'hidden';
       } else {
-        light.showState = val ? GraphNode.SHOW_DEFAULT : GraphNode.SHOW_HIDE;
+        light.showState = val ? 'visible' : 'hidden';
       }
       return val;
     });

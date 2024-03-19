@@ -129,7 +129,7 @@ lightApp.ready().then(async () => {
     const fileMap = await readZip(zipContent);
     assetManager.httpRequest.urlResolver = url => fileMap.get(url) || url;
 
-    assetManager.fetchModel(scene, '/sponza/Sponza.gltf', null).then((info) => {
+    assetManager.fetchModel(scene, '/sponza/Sponza.gltf').then((info) => {
       message = '';
       function traverseModel(group: SceneNode, func: (node: SceneNode) => void, context?: any) {
         if (group) {
@@ -197,6 +197,7 @@ lightApp.ready().then(async () => {
         light.shadow.shadowMapSize = 1024;
         light.shadow.mode = 'pcf-opt';
         const bbox = getBoundingBox(model);
+        light.shadow.shadowRegion = bbox;
         const sphere = new SphereShape();
         for (let i = 0; i < 255; i++) {
           const color = Vector3.normalize(new Vector3(Math.random(), Math.random(), Math.random()));
@@ -207,7 +208,6 @@ lightApp.ready().then(async () => {
             .setCastShadow(false);
           pointlight.position.set(randomPoint(bbox));
           const ball = new Mesh(scene, sphere);
-          ball.pickMode = GraphNode.PICK_DISABLED;
           ball.scale.setXYZ(0.02, 0.02, 0.02);
           ball.castShadow = false;
           ball.material = ballMaterial;

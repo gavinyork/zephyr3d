@@ -146,12 +146,12 @@ export class GLTFViewer {
   async loadModel(url: string) {
     this._modelNode?.remove();
     this._assetManager.purgeCache();
-    this._assetManager.fetchModel(this._scene, url, null).then((info) => {
+    this._assetManager.fetchModel(this._scene, url).then((info) => {
       this._modelNode?.dispose();
       this._modelNode = info.group;
       this._animationSet?.dispose();
       this._animationSet = info.animationSet;
-      this._modelNode.pickMode = GraphNode.PICK_ENABLED;
+      this._modelNode.pickable = true;
       this._currentAnimation = null;
       if (this._animationSet) {
         const animations = this._animationSet.getAnimationNames();
@@ -222,11 +222,11 @@ export class GLTFViewer {
     }
   }
   get punctualLightEnabled(): boolean {
-    return this._light0.showState !== GraphNode.SHOW_HIDE;
+    return this._light0.showState !== 'hidden';
   }
   set punctualLightEnabled(enable: boolean) {
-    this._light0.showState = enable ? GraphNode.SHOW_DEFAULT : GraphNode.SHOW_HIDE;
-    this._light1.showState = enable ? GraphNode.SHOW_DEFAULT : GraphNode.SHOW_HIDE;
+    this._light0.showState = enable ? 'visible' : 'hidden';
+    this._light1.showState = enable ? 'visible' : 'hidden';
   }
   get environmentLightEnabled(): boolean {
     return this._scene.env.light.type === 'ibl';

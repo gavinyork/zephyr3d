@@ -16,12 +16,6 @@ export interface BoxCreationOptions extends ShapeCreationOptions {
   sizeY?: number;
   /** Size of axis z, default 1 */
   sizeZ?: number;
-  /** Anchor point of axis x, relative to the size of axis x, default 0 */
-  anchorX?: number;
-  /** Anchor point of axis y, relative to the size of axis y, default 0 */
-  anchorY?: number;
-  /** Anchor point of axis z, relative to the size of axis z, default 0 */
-  anchorZ?: number;
 }
 
 /**
@@ -132,6 +126,18 @@ export class BoxShape extends Shape<BoxCreationOptions> {
     needUV && uvs && uvs.push(...uv, ...uv, ...uv, ...uv, ...uv, ...uv);
     this.primitiveType = 'triangle-list';
   }
+  /** Box width */
+  get width(): number {
+    return this._options.sizeX ?? this._options.size ?? 1;
+  }
+  /** Box height */
+  get height(): number {
+    return this._options.sizeY ?? this._options.size ?? 1;
+  }
+  /** Box depth */
+  get depth(): number {
+    return this._options.sizeZ ?? this._options.size ?? 1;
+  }
   /** @internal */
   protected _create(): boolean {
     const needNormal = this._options.needNormal;
@@ -139,9 +145,9 @@ export class BoxShape extends Shape<BoxCreationOptions> {
     const sizeX = this._options.sizeX ?? this._options.size ?? 1;
     const sizeY = this._options.sizeY ?? this._options.size ?? 1;
     const sizeZ = this._options.sizeZ ?? this._options.size ?? 1;
-    const anchorX = this._options.anchorX ?? 0;
-    const anchorY = this._options.anchorY ?? 0;
-    const anchorZ = this._options.anchorZ ?? 0;
+    const anchorX = 0.5;
+    const anchorY = 0.5;
+    const anchorZ = 0.5;
     const minx = -anchorX * sizeX;
     const maxx = minx + sizeX;
     const miny = -anchorY * sizeY;
@@ -206,9 +212,9 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> {
     const sizeX = this._options.sizeX ?? this._options.size ?? 1;
     const sizeY = this._options.sizeY ?? this._options.size ?? 1;
     const sizeZ = this._options.sizeZ ?? this._options.size ?? 1;
-    const anchorX = this._options.anchorX ?? 0;
-    const anchorY = this._options.anchorY ?? 0;
-    const anchorZ = this._options.anchorZ ?? 0;
+    const anchorX = 0.5;
+    const anchorY = 0.5;
+    const anchorZ = 0.5;
     const minx = -anchorX * sizeX;
     const maxx = minx + sizeX;
     const miny = -anchorY * sizeY;

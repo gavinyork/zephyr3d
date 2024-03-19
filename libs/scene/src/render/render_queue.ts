@@ -1,20 +1,79 @@
 import { Application } from '../app';
-import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
+import { Vector4 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';
 import type { Drawable } from './drawable';
 import type { DirectionalLight, PunctualLight } from '../scene/light';
 import type { RenderPass } from '.';
-import type { GraphNode } from '../scene';
 import { QUEUE_TRANSPARENT } from '../values';
+import { BindGroup, BindGroupLayout, ProgramBuilder } from '@zephyr3d/device';
+import { ShaderHelper } from '../material';
+
+/** @internal */
+export type CachedBindGroup = {
+  bindGroup: BindGroup,
+  buffer: Float32Array,
+  dirty: boolean;
+};
+
+export class InstanceBindGroupAllocator {
+  private static _instanceBindGroupLayout: BindGroupLayout = null;
+  _usedBindGroupList: CachedBindGroup[] = [];
+  _freeBindGroupList: CachedBindGroup[] = [];
+  private _allocFrameStamp: number;
+  constructor() {
+    this._allocFrameStamp = -1;
+    this._usedBindGroupList = [];
+    this._freeBindGroupList = [];
+  }
+  allocateInstanceBindGroup(framestamp: number): CachedBindGroup {
+    // Reset if render frame changed
+    if (this._allocFrameStamp !== framestamp) {
+      this._allocFrameStamp = framestamp;
+      this._freeBindGroupList.push(...this._usedBindGroupList);
+      this._usedBindGroupList.length = 0;
+    }
+    let bindGroup = this._freeBindGroupList.pop();
+    if (!bindGroup) {
+      if (!InstanceBindGroupAllocator._instanceBindGroupLayout) {
+        const buildInfo = new ProgramBuilder(Application.instance.device).buildRender({
+          vertex(pb){
+            this[ShaderHelper.getWorldMatricesUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
+            pb.main(function(){
+            });
+          },
+          fragment(pb){
+            this[ShaderHelper.getWorldMatricesUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
+            pb.main(function(){
+            });
+          }
+        });
+        InstanceBindGroupAllocator._instanceBindGroupLayout = buildInfo[2][3];
+      }
+      bindGroup = {
+        bindGroup: Application.instance.device.createBindGroup(InstanceBindGroupAllocator._instanceBindGroupLayout),
+        buffer: new Float32Array(65536 >> 2),
+        dirty: true
+      };
+    } else {
+      bindGroup.dirty = true;
+    }
+    this._usedBindGroupList.push(bindGroup);
+    return bindGroup;
+  }
+}
+
+const maxUniformSize = 65536 >> 2;
+const defaultInstanceBindGroupAlloator = new InstanceBindGroupAllocator();
 
 /**
  * Instance data
  * @public
  */
 export interface InstanceData {
-  worldMatrices: Matrix4x4[];
-  nodeList?: GraphNode[];
-  instanceColorList?: Vector4[];
+  bindGroup: CachedBindGroup;
+  stride: number;
+  currentSize: number;
+  maxSize: number;
   hash: string;
 }
 
@@ -55,11 +114,14 @@ export class RenderQueue {
   private _unshadowedLightList: PunctualLight[];
   /** @internal */
   private _sunLight: DirectionalLight;
+  /** @internal */
+  private _bindGroupAllocator: InstanceBindGroupAllocator;
   /**
    * Creates an instance of a render queue
    * @param renderPass - The render pass to which the render queue belongs
    */
-  constructor(renderPass: RenderPass) {
+  constructor(renderPass: RenderPass, bindGroupAllocator?: InstanceBindGroupAllocator) {
+    this._bindGroupAllocator = bindGroupAllocator ?? defaultInstanceBindGroupAlloator;
     this._itemLists = {};
     this._renderPass = renderPass;
     this._shadowedLightList = [];
@@ -119,6 +181,31 @@ export class RenderQueue {
     }
   }
   /**
+   * Push items from another render queue
+   * @param queue - The render queue to be pushed
+   */
+  pushRenderQueue(queue: RenderQueue) {
+    if (queue && queue !== this) {
+      for (const k in queue._itemLists) {
+        const l = queue._itemLists[k];
+        if (l) {
+          let list = this._itemLists[k];
+          if (!list) {
+            list = {
+              opaqueList: [],
+              opaqueInstanceList: {},
+              transList: [],
+              transInstanceList: {}
+            };
+            this._itemLists[k] = list;
+          }
+          list.opaqueList.push(...l.opaqueList);
+          list.transList.push(...l.transList);
+        }
+      }
+    }
+  }
+  /**
    * Push an item to the render queue
    * @param camera - The camera for drawing the item
    * @param drawable - The object to be drawn
@@ -142,18 +229,39 @@ export class RenderQueue {
         const instanceList = trans ? itemList.transInstanceList : itemList.opaqueInstanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         const index = instanceList[hash];
-        if (index === undefined || list[index].instanceData.worldMatrices.length === this.getMaxBatchSize()) {
+        if (index === undefined || list[index].instanceData.currentSize + list[index].instanceData.stride > list[index].instanceData.maxSize) {
           instanceList[hash] = list.length;
+          const bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(Application.instance.device.frameInfo.frameCounter);
+          drawable.setInstanceDataBuffer(this._renderPass, bindGroup, 0)
+          bindGroup.buffer.set(drawable.getXForm().worldMatrix);
+          let currentSize = 4;
+          const instanceUniforms = drawable.getInstanceUniforms();
+          if (instanceUniforms) {
+            bindGroup.buffer.set(instanceUniforms, currentSize * 4);
+            currentSize += instanceUniforms.length >> 2;
+          }
+          const maxSize = Math.floor(maxUniformSize / currentSize);
           list.push({
             drawable,
             sortDistance: drawable.getSortDistance(camera),
             instanceData: {
-              worldMatrices: [drawable.getXForm().worldMatrix],
+              bindGroup,
+              currentSize,
+              maxSize,
+              stride: currentSize,
               hash: hash
             }
           });
         } else {
-          list[index].instanceData.worldMatrices.push(drawable.getXForm().worldMatrix);
+          const instanceData = list[index].instanceData
+          drawable.setInstanceDataBuffer(this._renderPass, instanceData.bindGroup, instanceData.currentSize * 4)
+          instanceData.bindGroup.buffer.set(drawable.getXForm().worldMatrix, instanceData.currentSize * 4);
+          instanceData.currentSize += 4;
+          const instanceUniforms = drawable.getInstanceUniforms();
+          if (instanceUniforms) {
+            instanceData.bindGroup.buffer.set(instanceUniforms, instanceData.currentSize * 4);
+            instanceData.currentSize += instanceUniforms.length >> 2;
+          }
         }
       } else {
         list.push({
@@ -167,7 +275,7 @@ export class RenderQueue {
   /**
    * Removes all items in the render queue
    */
-  clear() {
+  reset() {
     this._itemLists = {};
     this._shadowedLightList = [];
     this._unshadowedLightList = [];
@@ -182,17 +290,16 @@ export class RenderQueue {
       list.transList.sort((a, b) => b.sortDistance - a.sortDistance);
     }
   }
+  /*
   private encodeInstanceColor(index: number, outColor: Float32Array) {
     outColor[0] = ((index >> 24) & 255) / 255;
     outColor[1] = ((index >> 16) & 255) / 255;
     outColor[2] = (index >> 8 && 255) / 255;
     outColor[3] = (index >> 0 && 255) / 255;
   }
-  /*
   private decodeInstanceColor(value: Float32Array): number {
     return (value[0] << 24) + (value[1] << 16) + (value[2] << 8) + value[3];
   }
-  */
   setInstanceColors(): GraphNode[] {
     const nodes: GraphNode[] = [];
     let id = 0;
@@ -201,7 +308,7 @@ export class RenderQueue {
       for (const item of lists.opaqueList) {
         if (item.instanceColor) {
           item.instanceData.instanceColorList = [];
-          for (let i = 0; i < item.instanceData.worldMatrices.length; i++) {
+          for (let i = 0; i < item.instanceData.data.length; i++) {
             const v = item.drawable.getInstanceColor();
             this.encodeInstanceColor(id, v);
             nodes[id] = item.drawable.getPickTarget();
@@ -213,4 +320,5 @@ export class RenderQueue {
     }
     return nodes;
   }
+  */
 }

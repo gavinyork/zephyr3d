@@ -12,7 +12,6 @@ import { AnimationClip } from '../animation/animation';
 import { BoundingBox } from '../utility/bounding_volume';
 import { CopyBlitter } from '../blitter';
 import { getSheenLutLoader, getTestCubemapLoader } from './builtin';
-import { GraphNode } from '../scene/graph_node';
 import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT, BUILTIN_ASSET_TEST_CUBEMAP } from '../values';
 import { Application } from '../app';
 import { AnimationSet } from '../animation/animationset';
@@ -30,6 +29,16 @@ export type TextureFetchOptions<T extends BaseTexture> = {
   linearColorSpace?: boolean;
   texture?: T;
   samplerOptions?: SamplerOptions;
+};
+
+/**
+ * Options for model fetching
+ * @public
+ **/
+export type ModelFetchOptions = {
+  mimeType?: string;
+  disableInstancing?: boolean;
+  postProcess?: (model: SharedModel) => SharedModel  
 };
 
 /**
@@ -242,8 +251,7 @@ export class AssetManager {
    * Fetches a model resource from a given URL and adds it to a scene
    * @param scene - The scene to which the model node belongs
    * @param url - The URL from where to fetch the resource
-   * @param mimeType - The MIME type of the model resource, if not provided, model type will be determined by file extension
-   * @param postProcess - A function that will be involved when the model was loaded.
+   * @param options - Options for model fetching
    *
    * @remarks
    * If a model has already been loaded, the function will ignore the
@@ -253,14 +261,9 @@ export class AssetManager {
    *
    * @returns The created model node
    */
-  async fetchModel(
-    scene: Scene,
-    url: string,
-    mimeType?: string,
-    postProcess?: (model: SharedModel) => SharedModel
-  ): Promise<ModelInfo> {
-    const sharedModel = await this.fetchModelData(scene, url, mimeType, postProcess);
-    return this.createSceneNode(scene, sharedModel);
+  async fetchModel(scene: Scene, url: string, options?: ModelFetchOptions): Promise<ModelInfo> {
+    const sharedModel = await this.fetchModelData(scene, url, options?.mimeType, options?.postProcess);
+    return this.createSceneNode(scene, sharedModel, !options?.disableInstancing);
   }
   /** @internal */
   async loadTextData(url: string, postProcess?: (text: string) => string): Promise<string> {
@@ -461,29 +464,16 @@ export class AssetManager {
     }
   }
   /** @internal */
-  private createSceneNode(
-    scene: Scene,
-    model: SharedModel,
-    sceneIndex?: number
-  ): { group: SceneNode; animationSet: AnimationSet } {
+  private createSceneNode(scene: Scene, model: SharedModel, instancing: boolean): { group: SceneNode; animationSet: AnimationSet } {
     const group = new SceneNode(scene);
     group.name = model.name;
     let animationSet = new AnimationSet(scene);
     for (let i = 0; i < model.scenes.length; i++) {
-      if (typeof sceneIndex === 'number' && sceneIndex >= 0 && i !== sceneIndex) {
-        continue;
-      } else if (
-        (sceneIndex === undefined || sceneIndex === null) &&
-        model.activeScene >= 0 &&
-        i !== model.activeScene
-      ) {
-        continue;
-      }
       const assetScene = model.scenes[i];
       const skeletonMeshMap: Map<AssetSkeleton, { mesh: Mesh[]; bounding: AssetSubMeshData[] }> = new Map();
       const nodeMap: Map<AssetHierarchyNode, SceneNode> = new Map();
       for (let k = 0; k < assetScene.rootNodes.length; k++) {
-        this.setAssetNodeToSceneNode(scene, group, model, assetScene.rootNodes[k], skeletonMeshMap, nodeMap);
+        this.setAssetNodeToSceneNode(scene, group, model, assetScene.rootNodes[k], skeletonMeshMap, nodeMap, instancing);
       }
       for (const animationData of model.animations) {
         const animation = new AnimationClip(animationData.name, group);
@@ -625,7 +615,8 @@ export class AssetManager {
     model: SharedModel,
     assetNode: AssetHierarchyNode,
     skeletonMeshMap: Map<AssetSkeleton, { mesh: Mesh[]; bounding: AssetSubMeshData[] }>,
-    nodeMap: Map<AssetHierarchyNode, SceneNode>
+    nodeMap: Map<AssetHierarchyNode, SceneNode>,
+    instancing: boolean
   ) {
     const node: SceneNode = new SceneNode(scene);
     nodeMap.set(assetNode, node);
@@ -639,11 +630,10 @@ export class AssetManager {
       for (const subMesh of meshData.subMeshes) {
         const meshNode = new Mesh(scene);
         meshNode.name = subMesh.name;
-        meshNode.clipMode = GraphNode.CLIP_INHERITED;
-        meshNode.showState = GraphNode.SHOW_INHERITED;
-        meshNode.pickMode = GraphNode.PICK_INHERITED;
+        meshNode.clipTestEnabled = true;
+        meshNode.showState = 'inherit';
         meshNode.primitive = subMesh.primitive;
-        meshNode.material = subMesh.material;
+        meshNode.material = instancing ? subMesh.material.createInstance() : subMesh.material
         // meshNode.drawBoundingBox = true;
         meshNode.reparent(node);
         if (skeleton) {
@@ -658,7 +648,7 @@ export class AssetManager {
     }
     node.reparent(parent);
     for (const child of assetNode.children) {
-      this.setAssetNodeToSceneNode(scene, node, model, child, skeletonMeshMap, nodeMap);
+      this.setAssetNodeToSceneNode(scene, node, model, child, skeletonMeshMap, nodeMap, instancing);
     }
   }
   private getHash<T extends BaseTexture>(type: string, url: string, options: TextureFetchOptions<T>): string {

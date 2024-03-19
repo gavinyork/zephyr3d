@@ -6,6 +6,7 @@ export * from './mesh';
 export * from './model';
 export * from './octree';
 export * from './scene_node';
+export * from './batchgroup';
 export * from './scene';
 export * from './terrain';
 export * from './xform';

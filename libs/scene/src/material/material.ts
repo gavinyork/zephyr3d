@@ -1,4 +1,4 @@
-import type { Matrix4x4, ListIterator } from '@zephyr3d/base';
+import type { ListIterator } from '@zephyr3d/base';
 import { List } from '@zephyr3d/base';
 import type {
   BindGroup,
@@ -41,52 +41,6 @@ type ProgramInfo = {
   hash: string;
 };
 
-class InstanceBindGroupPool {
-  private _bindGroups: { bindGroup: BindGroup; freeSize: number }[];
-  private _frameStamp: number;
-  constructor() {
-    this._bindGroups = [];
-    this._frameStamp = -1;
-  }
-  apply(hash: string, index: number, worldMatrices: Matrix4x4[]): number {
-    const device = Application.instance.device;
-    const maxSize = device.getDeviceCaps().shaderCaps.maxUniformBufferSize;
-    if (device.frameInfo.frameCounter !== this._frameStamp) {
-      this._frameStamp = device.frameInfo.frameCounter;
-      for (const bindGroup of this._bindGroups) {
-        bindGroup.freeSize = maxSize;
-      }
-    }
-    let bindGroupIndex = -1;
-    for (let i = 0; i < this._bindGroups.length; i++) {
-      if (this._bindGroups[i].freeSize >= worldMatrices.length * 64) {
-        bindGroupIndex = i;
-        break;
-      }
-    }
-    if (bindGroupIndex < 0) {
-      const program = Material.getProgramByHashIndex(hash, index);
-      const bindGroup = program?.bindGroupLayouts[3]
-        ? device.createBindGroup(program.bindGroupLayouts[3])
-        : null;
-      this._bindGroups.push({ bindGroup: bindGroup, freeSize: maxSize });
-      bindGroupIndex = this._bindGroups.length - 1;
-    }
-    const bindGroup = this._bindGroups[bindGroupIndex];
-    const offset = (maxSize - bindGroup.freeSize) / 64;
-    for (const matrix of worldMatrices) {
-      bindGroup.bindGroup.setRawData(
-        ShaderHelper.getWorldMatricesUniformName(),
-        maxSize - bindGroup.freeSize,
-        matrix
-      );
-      bindGroup.freeSize -= 64;
-    }
-    device.setBindGroup(3, bindGroup.bindGroup);
-    return offset;
-  }
-}
-
 /**
  * Base class for any kind of materials
  *
@@ -121,7 +75,7 @@ export class Material {
   /** @internal */
   private static _boneMatrixTextureSampler: TextureSampler = null;
   /** @internal */
-  private static _instanceBindGroupPool: InstanceBindGroupPool = new InstanceBindGroupPool();
+  //private static _instanceBindGroupPool: InstanceBindGroupPool = new InstanceBindGroupPool();
   /** @internal */
   private static _drawableBindGroupMap: WeakMap<
     Drawable,
@@ -166,7 +120,7 @@ export class Material {
     this._materialBindGroup = null;
   }
   /** Unique identifier of the material */
-  get id(): number {
+  get instanceId(): number {
     return this._id;
   }
   get numPasses(): number {
@@ -208,7 +162,7 @@ export class Material {
   }
   /** Returns true if this material supports geometry instancing  */
   isBatchable(): boolean {
-    return true;
+    return false;
   }
   /**
    * Draws a primitive using this material
@@ -231,7 +185,6 @@ export class Material {
    * @returns true if succeeded, otherwise false
    */
   beginDraw(pass: number, ctx: DrawContext): boolean {
-    const numInstances = ctx.instanceData?.worldMatrices?.length || 1;
     const device = Application.instance.device;
     const programInfo = this.getOrCreateProgram(ctx, pass);
     if (programInfo) {
@@ -244,7 +197,7 @@ export class Material {
       }
       this._materialBindGroup = this.applyMaterialBindGroups(ctx, hash, pass);
       if (pass === 0) {
-        if (numInstances > 1) {
+        if (ctx.instanceData) {
           this.applyInstanceBindGroups(ctx, hash);
         } else {
           this.applyDrawableBindGroups(ctx, hash);
@@ -293,7 +246,7 @@ export class Material {
     const programMap = Material._programMap;
     const renderPassType = ctx.renderPass.type;
     const hash = `${this.getHash(renderPassType, pass)}:${!!ctx.target.getBoneMatrices()}:${Number(
-      !!(ctx.instanceData?.worldMatrices.length > 1)
+      !!ctx.instanceData
     )}:${ctx.renderPassHash}`;
     let programInfo = programMap[hash];
     if (!programInfo || programInfo.programs[renderPassType] === undefined) {
@@ -457,11 +410,26 @@ export class Material {
   }
   /** @internal */
   private applyInstanceBindGroups(ctx: DrawContext, hash: string): void {
-    const index = ctx.renderPass.type;
-    const offset = Material._instanceBindGroupPool.apply(hash, index, ctx.instanceData.worldMatrices);
-    const bindGroup = this.getDrawableBindGroup(ctx, hash).bindGroup?.[index];
+    if (ctx.instanceData)  {
+      if (ctx.instanceData.bindGroup.dirty) {
+        ctx.instanceData.bindGroup.bindGroup.setRawData(
+          ShaderHelper.getWorldMatricesUniformName(),
+          0,
+          ctx.instanceData.bindGroup.buffer,
+          0,
+          ctx.instanceData.currentSize * 4
+        );
+        ctx.instanceData.bindGroup.dirty = false;
+      }
+      Application.instance.device.setBindGroup(3, ctx.instanceData.bindGroup.bindGroup ?? null);
+    } else {
+      Application.instance.device.setBindGroup(3, null);
+    }
+    const bindGroup = this.getDrawableBindGroup(ctx, hash).bindGroup?.[ctx.renderPass.type];
     if (bindGroup) {
-      bindGroup.setValue(ShaderHelper.getInstanceBufferOffsetUniformName(), offset);
+      if (ctx.instanceData) {
+        bindGroup.setValue(ShaderHelper.getInstanceBufferStrideUniformName(), ctx.instanceData.stride);
+      }
       Application.instance.device.setBindGroup(1, bindGroup);
     } else {
       Application.instance.device.setBindGroup(1, null);
@@ -565,8 +533,8 @@ export class Material {
   drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number): void {
     if (numInstances > 0) {
       primitive.drawInstanced(numInstances);
-    } else if (ctx.instanceData?.worldMatrices.length > 1) {
-      primitive.drawInstanced(ctx.instanceData.worldMatrices.length);
+    } else if (ctx.instanceData) {
+      primitive.drawInstanced(ctx.instanceData.currentSize / ctx.instanceData.stride);
     } else {
       primitive.draw();
     }
@@ -602,5 +570,19 @@ export class Material {
    */
   protected _createHash(renderPassType: number): string {
     return '';
+  }
+  /**
+   * True if this is a material instance
+   * @internal
+   **/
+  get $isInstance() {
+    return false;
+  }
+  /**
+   * Returns the instance uniforms if this is a material instance
+   * @internal
+   **/
+  get $instanceUniforms(): Float32Array {
+    return null;
   }
 }

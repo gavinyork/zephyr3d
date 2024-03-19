@@ -24,7 +24,7 @@ const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
 const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'Z_UniformLightIndexTex';
 const UNIFORM_NAME_AERIALPERSPECTIVE_LUT = 'Z_UniformAerialPerspectiveLUT';
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
-const UNIFORM_NAME_INSTANCE_BUFFER_OFFSET = 'Z_UniformInstanceBufferOffset';
+const UNIFORM_NAME_INSTANCE_BUFFER_STRIDE = 'Z_UniformInstanceBufferStride';
 const UNIFORM_NAME_WORLD_MATRIX = 'Z_UniformWorldMatrix';
 const UNIFORM_NAME_WORLD_MATRICES = 'Z_UniformWorldMatrices';
 const UNIFORM_NAME_BONE_MATRICES = 'Z_UniformBoneMatrices';
@@ -80,8 +80,8 @@ export class ShaderHelper {
   static getWorldMatricesUniformName(): string {
     return UNIFORM_NAME_WORLD_MATRICES;
   }
-  static getInstanceBufferOffsetUniformName(): string {
-    return UNIFORM_NAME_INSTANCE_BUFFER_OFFSET;
+  static getInstanceBufferStrideUniformName(): string {
+    return UNIFORM_NAME_INSTANCE_BUFFER_STRIDE;
   }
   static getBoneMatricesUniformName(): string {
     return UNIFORM_NAME_BONE_MATRICES;
@@ -106,6 +106,11 @@ export class ShaderHelper {
    */
   static prepareFragmentShader(pb: ProgramBuilder, ctx: DrawContext) {
     this.setupGlobalUniforms(pb, ctx);
+    if (ctx.instanceData) {
+      const scope = pb.getGlobalScope();
+      scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE] = pb.uint().uniform(1);
+      scope[UNIFORM_NAME_WORLD_MATRICES] = pb.vec4[65536 >> 4]().uniformBuffer(3);
+    }
   }
   /**
    * Prepares the vertex shader which is going to be used in our material system
@@ -128,7 +133,6 @@ export class ShaderHelper {
       pb.vec4('clipPlane'),
       pb.mat4('viewProjectionMatrix'),
       pb.mat4('viewMatrix'),
-      pb.mat4('rotationMatrix'),
       pb.mat4('projectionMatrix'),
       pb.vec4('params')
     ]);
@@ -376,10 +380,23 @@ export class ShaderHelper {
     const pb = scope.$builder;
     return (
       scope[UNIFORM_NAME_WORLD_MATRIX] ??
-      scope[UNIFORM_NAME_WORLD_MATRICES].at(
-        pb.add(scope[UNIFORM_NAME_INSTANCE_BUFFER_OFFSET], pb.uint(scope.$builtins.instanceIndex))
+      pb.mat4(
+        this.getInstancedUniform(scope, 0),
+        this.getInstancedUniform(scope, 1),
+        this.getInstancedUniform(scope, 2),
+        this.getInstancedUniform(scope, 3),
       )
     );
+  }
+  /**
+   * Gets the instance uniform value of type vec4 by uniform index
+   * @param scope - Current shader scope
+   * @returns instance uniform value
+   */
+  static getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShaderExp {
+    const pb = scope.$builder;
+    return scope[UNIFORM_NAME_WORLD_MATRICES].at(
+      pb.add(pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex)), uniformIndex))
   }
   /**
    * Gets the uniform variable of type mat4 which holds the normal matrix of current object to be drawn
@@ -391,14 +408,11 @@ export class ShaderHelper {
   }
   /** @internal */
   static prepareVertexShaderCommon(pb: ProgramBuilder, ctx: DrawContext) {
-    const instancing = ctx.instanceData?.worldMatrices?.length > 1;
     const skinning = !!ctx.target?.getBoneMatrices();
     const scope = pb.getGlobalScope();
-    if (instancing) {
-      const maxNumInstances =
-        Application.instance.device.getDeviceCaps().shaderCaps.maxUniformBufferSize >> 6;
-      scope[UNIFORM_NAME_INSTANCE_BUFFER_OFFSET] = pb.uint().uniform(1);
-      scope[UNIFORM_NAME_WORLD_MATRICES] = pb.mat4[maxNumInstances]().uniformBuffer(3);
+    if (ctx.instanceData) {
+      scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE] = pb.uint().uniform(1);
+      scope[UNIFORM_NAME_WORLD_MATRICES] = pb.vec4[65536 >> 4]().uniformBuffer(3);
     } else {
       scope[UNIFORM_NAME_WORLD_MATRIX] = pb.mat4().uniform(1);
     }
@@ -416,7 +430,6 @@ export class ShaderHelper {
       clipPlane: ctx.camera.clipPlane ?? Vector4.zero(),
       viewProjectionMatrix: ctx.camera.viewProjectionMatrix,
       viewMatrix: ctx.camera.viewMatrix,
-      rotationMatrix: ctx.camera.getRotationMatrix(),
       projectionMatrix: ctx.camera.getProjectionMatrix(),
       params: new Vector4(
         ctx.camera.getNearPlane(),
@@ -732,14 +745,6 @@ export class ShaderHelper {
    */
   static getProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_GLOBAL].camera.projectionMatrix;
-  }
-  /**
-   * Gets the uniform variable of type mat4 which holds the view projection matrix of current camera
-   * @param scope - Current shader scope
-   * @returns The view projection matrix of current camera
-   */
-  static getCameraRotationMatrix(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.rotationMatrix;
   }
   /** @internal */
   static getCascadeDistances(scope: PBInsideFunctionScope): PBShaderExp {

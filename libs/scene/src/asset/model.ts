@@ -2,7 +2,7 @@ import type { Vector4, TypedArray, Interpolator } from '@zephyr3d/base';
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { Texture2D, TextureSampler } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
-import type { Material } from '../material';
+import type { MeshMaterial } from '../material';
 
 /**
  * Named object interface for model loading
@@ -132,7 +132,7 @@ export interface AssetPBRMaterialSG extends AssetPBRMaterialCommon {
  */
 export interface AssetSubMeshData {
   primitive: Primitive;
-  material: Material;
+  material: MeshMaterial;
   rawPositions: Float32Array;
   rawBlendIndices: TypedArray;
   rawJointWeights: TypedArray;

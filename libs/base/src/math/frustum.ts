@@ -2,81 +2,16 @@ import { Plane } from './plane';
 import { Matrix4x4, Vector3 } from './vector';
 import { BoxSide } from './types';
 
-const npn = [-1, 1, -1];
-const npp = [-1, 1, 1];
-const ppp = [1, 1, 1];
-const ppn = [1, 1, -1];
 const nnn = [-1, -1, -1];
 const nnp = [-1, -1, 1];
-const pnp = [1, -1, 1];
+const npn = [-1, 1, -1];
+const npp = [-1, 1, 1];
 const pnn = [1, -1, -1];
+const pnp = [1, -1, 1];
+const ppn = [1, 1, -1];
+const ppp = [1, 1, 1];
 
-class BoundingBoxData {
-  static readonly ndcVertices = [npn, npp, ppp, ppn, nnn, nnp, pnp, pnn];
-  static generateVertexData(v: number[][]): number[] {
-    return [
-      ...v[0],
-      ...v[1],
-      ...v[2],
-      ...v[3],
-      ...v[1],
-      ...v[5],
-      ...v[6],
-      ...v[2],
-      ...v[2],
-      ...v[6],
-      ...v[7],
-      ...v[3],
-      ...v[3],
-      ...v[7],
-      ...v[4],
-      ...v[0],
-      ...v[0],
-      ...v[4],
-      ...v[5],
-      ...v[1],
-      ...v[5],
-      ...v[4],
-      ...v[7],
-      ...v[6]
-    ];
-  }
-  static readonly ndcBoxVertices = new Float32Array([
-    ...npn,
-    ...npp,
-    ...ppp,
-    ...ppn,
-    ...npp,
-    ...nnp,
-    ...pnp,
-    ...ppp,
-    ...ppp,
-    ...pnp,
-    ...pnn,
-    ...ppn,
-    ...ppn,
-    ...pnn,
-    ...nnn,
-    ...npn,
-    ...npn,
-    ...nnn,
-    ...nnp,
-    ...npp,
-    ...nnp,
-    ...nnn,
-    ...pnn,
-    ...pnp
-  ]);
-  static readonly boxBarycentric = new Float32Array([
-    1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1,
-    0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0,
-    1, 0
-  ]);
-  static readonly boxIndices = new Uint16Array([
-    0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19,
-    20, 21, 22, 20, 22, 23
-  ]);
-}
+const ndcVertices = [nnn, nnp, npn, npp, pnn, pnp, ppn, ppp];
 
 /**
  * The frustum class
@@ -84,14 +19,14 @@ class BoundingBoxData {
  * @public
  */
 export class Frustum {
-  static readonly CORNER_LEFT_TOP_NEAR = 0;
-  static readonly CORNER_LEFT_TOP_FAR = 1;
-  static readonly CORNER_RIGHT_TOP_FAR = 2;
-  static readonly CORNER_RIGHT_TOP_NEAR = 3;
-  static readonly CORNER_LEFT_BOTTOM_NEAR = 4;
-  static readonly CORNER_LEFT_BOTTOM_FAR = 5;
-  static readonly CORNER_RIGHT_BOTTOM_FAR = 6;
-  static readonly CORNER_RIGHT_BOTTOM_NEAR = 7;
+  static readonly CORNER_LEFT_TOP_NEAR = 0b000;
+  static readonly CORNER_LEFT_TOP_FAR = 0b001;
+  static readonly CORNER_LEFT_BOTTOM_NEAR = 0b010;
+  static readonly CORNER_LEFT_BOTTOM_FAR = 0b011;
+  static readonly CORNER_RIGHT_TOP_NEAR = 0b100;
+  static readonly CORNER_RIGHT_TOP_FAR = 0b101;
+  static readonly CORNER_RIGHT_BOTTOM_NEAR = 0b110;
+  static readonly CORNER_RIGHT_BOTTOM_FAR = 0b111;
   /** @internal */
   private _planes: Plane[];
   /** @internal */
@@ -157,9 +92,9 @@ export class Frustum {
    * @param pt - The point to test.
    * @returns true if the point is inside the frustum, otherwise false
    */
-  containsPoint(pt: Vector3): boolean {
+  containsPoint(pt: Vector3, epsl = 1e-6): boolean {
     for (const p of this.planes) {
-      if (p.distanceToPoint(pt) < 0) {
+      if (p.distanceToPoint(pt) < -epsl) {
         return false;
       }
     }
@@ -221,10 +156,10 @@ export class Frustum {
       )
       .inplaceNormalize();
     const invMatrix = Matrix4x4.invert(transform);
-    const ndcVertices: Vector3[] = BoundingBoxData.ndcVertices.map((v) => new Vector3(v[0], v[1], v[2]));
+    const vertices: Vector3[] = ndcVertices.map((v) => new Vector3(v[0], v[1], v[2]));
     this._corners = this._corners || [];
     for (let i = 0; i < 8; i++) {
-      const v = invMatrix.transformPoint(ndcVertices[i]);
+      const v = invMatrix.transformPoint(vertices[i]);
       this._corners[i] = v.scaleBy(1 / v.w).xyz();
     }
     return this;

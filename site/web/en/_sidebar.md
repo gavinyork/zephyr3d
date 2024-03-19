@@ -46,6 +46,8 @@
     - [Sky](en/sky.md)
     - [Fog](en/fog.md)
     - [Water](en/water.md)
+  - Geometry instancing
+    - [Introduction](en/instancing-intro.md)
   - Custom material
     - [Basics](en/user-material.md)
     - [Unlit material](en/user-material-unlit.md)

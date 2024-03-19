@@ -121,6 +121,8 @@ export class ShadowMapper {
   protected _esmBlurRadius: number;
   /** @internal */
   protected _esmDepthScale: number;
+  /** @internal */
+  protected _shadowRegion: AABB;
   /**
    * Creates an instance of ShadowMapper
    * @param light - The light that is used to generate shadow map
@@ -149,6 +151,7 @@ export class ShadowMapper {
     this._esmBlurKernelSize = 5;
     this._esmBlurRadius = 4;
     this._esmDepthScale = 200;
+    this._shadowRegion = null;
     this.applyMode(this._shadowMode);
   }
   /** The light that is used to generate shadow map */
@@ -168,6 +171,13 @@ export class ShadowMapper {
       this._config.shadowMapSize = num;
       this._resourceDirty = true;
     }
+  }
+  /** Shadow region for directional light */
+  get shadowRegion(): AABB {
+    return this._shadowRegion;
+  }
+  set shadowRegion(region: AABB) {
+    this._shadowRegion = region;
   }
   /** Maximum distance from the camera, shadow will not be rendered beyond this range */
   get shadowDistance(): number {
@@ -515,7 +525,9 @@ export class ShadowMapper {
   protected createLightCameraPoint(lightCamera: Camera): void {
     //lightCamera.reparent(this._light);
     lightCamera.reparent(lightCamera.scene.rootNode);
-    lightCamera.resetTransform();
+    lightCamera.position.setXYZ(0, 0, 0);
+    lightCamera.rotation.identity();
+    lightCamera.scale.setXYZ(1, 1, 1);
     lightCamera.setPerspective(
       Math.PI / 2,
       1,
@@ -527,7 +539,9 @@ export class ShadowMapper {
   /** @internal */
   protected createLightCameraSpot(lightCamera: Camera): void {
     lightCamera.reparent(this._light);
-    lightCamera.resetTransform();
+    lightCamera.position.setXYZ(0, 0, 0);
+    lightCamera.rotation.identity();
+    lightCamera.scale.setXYZ(1, 1, 1);
     lightCamera.setPerspective(
       2 * (this._light as SpotLight).cutoff,
       1,
@@ -692,7 +706,9 @@ export class ShadowMapper {
     } else {
       const camera = cameras.pop();
       camera.parent = scene.rootNode;
-      camera.resetTransform();
+      camera.position.setXYZ(0, 0, 0);
+      camera.rotation.identity();
+      camera.scale.setXYZ(1, 1, 1);
       camera.clipMask = 0;
       return camera;
     }
@@ -767,6 +783,7 @@ export class ShadowMapper {
         : new Vector4(0, 0, 0, 1)
       : null;
     const depthScale = this._impl.getDepthScale();
+    const shadowRegion = this._light.isDirectionLight() && this._shadowRegion && this._shadowRegion.isValid() ? this._shadowRegion : scene.boundingBox;
     if (this._light.isPointLight()) {
       const shadowMapRenderCamera = ShadowMapper.fetchCameraForScene(scene);
       this.createLightCameraPoint(shadowMapRenderCamera);
@@ -819,14 +836,14 @@ export class ShadowMapper {
           const snapMatrix = ShadowMapper._snapMatrix;
           const border = shadowMapParams.impl.getShadowMapBorder(shadowMapParams); //20 / this._config.shadowMapSize;
           this.createLightCameraDirectional(
-            ctx.scene.boundingBox,
+            shadowRegion,
             cascadeCamera,
             shadowMapRenderCamera,
             snapMatrix,
             border
           );
           this.createLightCameraDirectional(
-            ctx.scene.boundingBox,
+            shadowRegion,
             cascadeCamera,
             shadowMapCullCamera,
             null,
@@ -910,7 +927,7 @@ export class ShadowMapper {
         shadowMapRenderCamera.clipMask = AABB.ClipLeft | AABB.ClipRight | AABB.ClipBottom | AABB.ClipTop;
         if (this._light.isDirectionLight()) {
           this.createLightCameraDirectional(
-            ctx.scene.boundingBox,
+            shadowRegion,
             camera,
             shadowMapRenderCamera,
             snapMatrix,

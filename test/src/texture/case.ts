@@ -41,7 +41,7 @@ export abstract class TextureTestCase {
     this.program = this.createProgram();
     this.texture = await this.createTexture();
     this.bindgroup = this.createBindGroup();
-    this.box = new BoxShape({ size: 2, anchorX: 0.5, anchorY: 0.5, anchorZ: 0.5 });
+    this.box = new BoxShape({ size: 2 });
     this.renderStates = Application.instance.device.createRenderStateSet();
     this.renderStates.useDepthState().enableTest(true);
   }
