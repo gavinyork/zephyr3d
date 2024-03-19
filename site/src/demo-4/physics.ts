@@ -37,7 +37,7 @@ export class PhysicsWorld {
         shape.calculateLocalInertia(mass, this._tmpVector3);
         const rbInfo = new this._ammo.btRigidBodyConstructionInfo(mass, motionState, shape, this._tmpVector3);
         body = new this._ammo.btRigidBody(rbInfo);
-        body.setRestitution(0.2);
+        body.setRestitution(0.6);
         this._world.addRigidBody(body);
         this._bodyMap.set(node, body);
       }

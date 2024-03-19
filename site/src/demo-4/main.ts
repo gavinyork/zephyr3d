@@ -18,8 +18,9 @@ import type { DeviceBackend } from '@zephyr3d/device';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { PhysicsWorld } from './physics';
+import { Panel } from './ui';
 
-const objectCount = 400;
+const objectCount = 800;
 
 function getQueryString(name: string) {
   return new URL(window.location.toString()).searchParams.get(name) || null;
@@ -100,7 +101,7 @@ PhysicsApp.ready().then(async () => {
   physicsWorld.positionMesh(floor, 0, 0, -10, 0);
 
   const objMaterial = new LambertMaterial();
-  const boxShape = new BoxShape();
+  const boxShape = new BoxShape({ size: 2 });
   const sphereShape = new SphereShape();
   for (let i = 0; i < objectCount >> 1; i++) {
     let instanceMaterial = objMaterial.createInstance();
@@ -124,5 +125,6 @@ PhysicsApp.ready().then(async () => {
     physicsWorld.positionMesh(mesh, 1, Math.random() * 8 - 4, 50, Math.random() * 8 - 4);
   }, 50);
 
+  new Panel();
   PhysicsApp.run();
 });
