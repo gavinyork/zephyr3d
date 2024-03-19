@@ -55,11 +55,11 @@
     "@zip.js/zip.js": "^2.7.35",
     "ts-keycode-enum": "^1.0.6",
     "gl-matrix": "^3.4.3",
-    "@zephyr3d/base": "workspace:^0.1.2",
-    "@zephyr3d/device": "workspace:^0.2.0",
-    "@zephyr3d/scene": "workspace:^0.2.0",
+    "@zephyr3d/base": "workspace:^0.1.3",
+    "@zephyr3d/device": "workspace:^0.2.1",
+    "@zephyr3d/scene": "workspace:^0.3.0",
     "@zephyr3d/imgui": "workspace:^0.1.3",
-    "@zephyr3d/backend-webgl": "workspace:^0.1.3",
-    "@zephyr3d/backend-webgpu": "workspace:^0.1.3"
+    "@zephyr3d/backend-webgl": "workspace:^0.1.4",
+    "@zephyr3d/backend-webgpu": "workspace:^0.1.4"
   }
 }

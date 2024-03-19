@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/base
 
-This log was last generated on Thu, 08 Feb 2024 10:49:24 GMT and should not be manually modified.
+This log was last generated on Tue, 19 Mar 2024 19:55:21 GMT and should not be manually modified.
+
+## 0.1.3
+Tue, 19 Mar 2024 19:55:21 GMT
+
+### Patches
+
+- Upate documentation
 
 ## 0.1.2
 Thu, 08 Feb 2024 10:49:24 GMT

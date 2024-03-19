@@ -2,6 +2,32 @@
   "name": "@zephyr3d/backend-webgl",
   "entries": [
     {
+      "version": "0.1.4",
+      "tag": "@zephyr3d/backend-webgl_v0.1.4",
+      "date": "Tue, 19 Mar 2024 19:55:21 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Update documentation"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.1.2` to `^0.1.3`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.0` to `^0.2.1`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.1.2` to `^0.1.3`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.0` to `^0.2.1`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.3",
       "tag": "@zephyr3d/backend-webgl_v0.1.3",
       "date": "Mon, 11 Mar 2024 18:19:27 GMT",

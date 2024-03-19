@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/backend-webgl
 
-This log was last generated on Mon, 11 Mar 2024 18:19:27 GMT and should not be manually modified.
+This log was last generated on Tue, 19 Mar 2024 19:55:21 GMT and should not be manually modified.
+
+## 0.1.4
+Tue, 19 Mar 2024 19:55:21 GMT
+
+### Patches
+
+- Update documentation
 
 ## 0.1.3
 Mon, 11 Mar 2024 18:19:27 GMT
