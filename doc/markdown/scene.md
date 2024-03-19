@@ -19,6 +19,7 @@
 |  [AssetScene](doc/markdown/./scene.assetscene.md) | Scene for model loading |
 |  [AssetSkeleton](doc/markdown/./scene.assetskeleton.md) | Skeleton information for model loading |
 |  [BaseCameraController](doc/markdown/./scene.basecameracontroller.md) | Base class for any kind of camera controllers |
+|  [BatchGroup](doc/markdown/./scene.batchgroup.md) | Batch group node |
 |  [BlinnMaterial](doc/markdown/./scene.blinnmaterial.md) | Blinn material |
 |  [Bloom](doc/markdown/./scene.bloom.md) | The bloom post effect |
 |  [BoundingBox](doc/markdown/./scene.boundingbox.md) | The bounding box class |
@@ -45,6 +46,7 @@
 |  [GraphNode](doc/markdown/./scene.graphnode.md) | Graph scene node |
 |  [GrassMaterial](doc/markdown/./scene.grassmaterial.md) | Terrain grass material |
 |  [Grayscale](doc/markdown/./scene.grayscale.md) | Grayscale post effect |
+|  [InstanceBindGroupAllocator](doc/markdown/./scene.instancebindgroupallocator.md) |  |
 |  [LambertMaterial](doc/markdown/./scene.lambertmaterial.md) | Lambert material |
 |  [Material](doc/markdown/./scene.material.md) | Base class for any kind of materials |
 |  [Mesh](doc/markdown/./scene.mesh.md) | Mesh node |
@@ -222,8 +224,10 @@
 |  [IMixinPBRSpecularGlossiness](doc/markdown/./scene.imixinpbrspecularglossiness.md) |  |
 |  [LogMode](doc/markdown/./scene.logmode.md) | Log mode |
 |  [MaterialGCOptions](doc/markdown/./scene.materialgcoptions.md) | Garbage collection options for material |
+|  [ModelFetchOptions](doc/markdown/./scene.modelfetchoptions.md) | Options for model fetching |
 |  [ModelInfo](doc/markdown/./scene.modelinfo.md) | Data structure returned by AssetManager.fetchModel() |
 |  [NumberTrackHandler](doc/markdown/./scene.numbertrackhandler.md) | Track handler type for numeric or vector keyframe values |
+|  [SceneNodeVisible](doc/markdown/./scene.scenenodevisible.md) | Scene node visible state |
 |  [ShadowMode](doc/markdown/./scene.shadowmode.md) | Shadow mapping mode |
 |  [SkyType](doc/markdown/./scene.skytype.md) | Type of sky |
 |  [TerrainDetailMapInfo](doc/markdown/./scene.terraindetailmapinfo.md) | Terrain detail map information |

@@ -33,4 +33,5 @@ declare class Octree
 |  [locateNodeChain(candidate, center, radius)](doc/markdown/./scene.octree.locatenodechain.md) |  | Locates a node chain in the octree by a sphere |
 |  [placeNode(node)](doc/markdown/./scene.octree.placenode.md) |  | Place a scene node into the octree |
 |  [removeNode(node)](doc/markdown/./scene.octree.removenode.md) |  | Removes a scene node from the octree |
+|  [resize(size)](doc/markdown/./scene.octree.resize.md) |  |  |
 

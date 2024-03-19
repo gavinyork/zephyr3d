@@ -9,8 +9,9 @@ Presents a transformation from one space to another
 **Signature:**
 
 ```typescript
-declare class XForm<T extends XForm<T> = XForm<any>> 
+declare class XForm<T extends XForm<T> = XForm<any>> extends XForm_base 
 ```
+**Extends:** XForm\_base
 
 ## Constructors
 
@@ -24,7 +25,7 @@ declare class XForm<T extends XForm<T> = XForm<any>>
 |  --- | --- | --- | --- |
 |  [children](doc/markdown/./scene.xform.children.md) | <code>readonly</code> | T\[\] | Children of this xform |
 |  [invWorldMatrix](doc/markdown/./scene.xform.invworldmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | Inverse of the world transformation matrix of the xform |
-|  [localMatrix](doc/markdown/./scene.xform.localmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | Local transformation matrix of the xform |
+|  [localMatrix](doc/markdown/./scene.xform.localmatrix.md) |  | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | Local transformation matrix of the xform |
 |  [parent](doc/markdown/./scene.xform.parent.md) |  | T | Parent of the xform |
 |  [position](doc/markdown/./scene.xform.position.md) |  | [Vector3](doc/markdown/./base.vector3.md) | Position of the xform relative to it's parent |
 |  [rotation](doc/markdown/./scene.xform.rotation.md) |  | [Quaternion](doc/markdown/./base.quaternion.md) | Rotation of the xform |
@@ -42,9 +43,8 @@ declare class XForm<T extends XForm<T> = XForm<any>>
 |  [otherToThis(other, v, result)](doc/markdown/./scene.xform.othertothis.md) |  | Transform coordinate in other coordinate space to local space |
 |  [otherToThis(other, v, result)](doc/markdown/./scene.xform.othertothis_1.md) |  |  |
 |  [reparent(p)](doc/markdown/./scene.xform.reparent.md) |  | Removes this node from it's parent and add this node to another parent node if required |
-|  [resetTransform()](doc/markdown/./scene.xform.resettransform.md) |  | Resets the transformation matrix |
 |  [scaleBy(factor)](doc/markdown/./scene.xform.scaleby.md) |  | Scales the xform by a given scale factor |
-|  [setLocalTransform(m)](doc/markdown/./scene.xform.setlocaltransform.md) |  | Sets the local transform matrix of the xform |
+|  [setLocalTransform(matrix)](doc/markdown/./scene.xform.setlocaltransform.md) |  | Sets the local transform matrix of the xform |
 |  [thisToOther(other, v, result)](doc/markdown/./scene.xform.thistoother.md) |  | Transform local space coordinate to other coordinate space |
 |  [thisToOther(other, v, result)](doc/markdown/./scene.xform.thistoother_1.md) |  |  |
 |  [thisToWorld(v, result)](doc/markdown/./scene.xform.thistoworld.md) |  | Transform local coordinate to world space |

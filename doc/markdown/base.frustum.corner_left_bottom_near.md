@@ -7,5 +7,5 @@
 **Signature:**
 
 ```typescript
-static readonly CORNER_LEFT_BOTTOM_NEAR = 4;
+static readonly CORNER_LEFT_BOTTOM_NEAR = 2;
 ```

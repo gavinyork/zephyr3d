@@ -16,7 +16,7 @@ interface AssetSubMeshData
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
-|  [material](doc/markdown/./scene.assetsubmeshdata.material.md) |  | [Material](doc/markdown/./scene.material.md) |  |
+|  [material](doc/markdown/./scene.assetsubmeshdata.material.md) |  | [MeshMaterial](doc/markdown/./scene.meshmaterial.md) |  |
 |  [name](doc/markdown/./scene.assetsubmeshdata.name.md) |  | string |  |
 |  [primitive](doc/markdown/./scene.assetsubmeshdata.primitive.md) |  | [Primitive](doc/markdown/./scene.primitive.md) |  |
 |  [rawBlendIndices](doc/markdown/./scene.assetsubmeshdata.rawblendindices.md) |  | [TypedArray](doc/markdown/./base.typedarray.md) |  |

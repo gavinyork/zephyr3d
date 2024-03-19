@@ -9,14 +9,14 @@ Sets the local transform matrix of the xform
 **Signature:**
 
 ```typescript
-setLocalTransform(m: Matrix4x4): this;
+setLocalTransform(matrix: Matrix4x4): this;
 ```
 
 ## Parameters
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  m | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The transform matrix to set |
+|  matrix | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The transform matrix to set |
 
 **Returns:**
 

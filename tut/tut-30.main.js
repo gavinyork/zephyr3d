@@ -21,7 +21,7 @@ myApp.ready().then(function () {
   material.metallic = 0.1;
   material.roughness = 0.9;
   const box = new Mesh(scene, new BoxShape({ size: 10 }), material);
-  box.position.setXYZ(16, 0, -12);
+  box.position.setXYZ(16, 5, -12);
   const floor = new Mesh(scene, new PlaneShape({ size: 60 }), material);
   floor.position.x = -30;
   floor.position.z = -30;

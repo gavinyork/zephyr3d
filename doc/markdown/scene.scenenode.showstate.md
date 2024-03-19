@@ -9,7 +9,7 @@ Show state
 **Signature:**
 
 ```typescript
-get showState(): number;
+get showState(): SceneNodeVisible;
 
-set showState(val: number);
+set showState(val: SceneNodeVisible);
 ```

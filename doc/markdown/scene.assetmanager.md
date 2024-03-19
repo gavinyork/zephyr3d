@@ -33,7 +33,7 @@ declare class AssetManager
 |  [clearCache()](doc/markdown/./scene.assetmanager.clearcache.md) |  | Removes all cached assets |
 |  [fetchBinaryData(url, postProcess)](doc/markdown/./scene.assetmanager.fetchbinarydata.md) |  | Fetches a binary resource from a given URL |
 |  [fetchBuiltinTexture(name, texture)](doc/markdown/./scene.assetmanager.fetchbuiltintexture.md) |  | Fetches a built-in texture |
-|  [fetchModel(scene, url, mimeType, postProcess)](doc/markdown/./scene.assetmanager.fetchmodel.md) |  | Fetches a model resource from a given URL and adds it to a scene |
+|  [fetchModel(scene, url, options)](doc/markdown/./scene.assetmanager.fetchmodel.md) |  | Fetches a model resource from a given URL and adds it to a scene |
 |  [fetchTextData(url, postProcess)](doc/markdown/./scene.assetmanager.fetchtextdata.md) |  | Fetches a text resource from a given URL |
 |  [fetchTexture(url, options)](doc/markdown/./scene.assetmanager.fetchtexture.md) |  | Fetches a texture resource from a given URL |
 |  [purgeCache()](doc/markdown/./scene.assetmanager.purgecache.md) |  | Remove and dispose all cached assets |

@@ -37,9 +37,12 @@ declare class MeshMaterial extends Material
 |  --- | --- | --- |
 |  [applyUniformValues(bindGroup, ctx, pass)](doc/markdown/./scene.meshmaterial.applyuniformvalues.md) |  | Submit Uniform values before rendering with this material. |
 |  [beginDraw(pass, ctx)](doc/markdown/./scene.meshmaterial.begindraw.md) |  | Prepares for drawing |
+|  [createInstance()](doc/markdown/./scene.meshmaterial.createinstance.md) |  | Create material instance |
 |  [defineFeature()](doc/markdown/./scene.meshmaterial.definefeature.md) | <code>static</code> | Define feature index |
+|  [defineInstanceUniform(prop, type)](doc/markdown/./scene.meshmaterial.defineinstanceuniform.md) | <code>static</code> | Define instance uniform index |
 |  [featureUsed(feature)](doc/markdown/./scene.meshmaterial.featureused.md) |  | Check if a feature is in use for given render pass type. |
 |  [fragmentShader(scope)](doc/markdown/./scene.meshmaterial.fragmentshader.md) |  | Fragment shader implementation of this material |
+|  [getInstancedUniform(scope, uniformIndex)](doc/markdown/./scene.meshmaterial.getinstanceduniform.md) |  |  |
 |  [getQueueType()](doc/markdown/./scene.meshmaterial.getqueuetype.md) |  | Determine which queue should be used to render this material. |
 |  [isTransparentPass(pass)](doc/markdown/./scene.meshmaterial.istransparentpass.md) |  | Determine if a certain pass of this material is translucent. |
 |  [needFragmentColor(ctx)](doc/markdown/./scene.meshmaterial.needfragmentcolor.md) |  | Check if the color should be computed in fragment shader, this is required for forward render pass or alpha test is in use or alpha to coverage is in use. |

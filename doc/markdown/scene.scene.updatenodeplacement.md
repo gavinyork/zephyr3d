@@ -9,7 +9,7 @@ Update node placement in the octree
 **Signature:**
 
 ```typescript
-updateNodePlacement(octree: Octree, list: Set<SceneNode>): void;
+updateNodePlacement(octree: Octree, list: Set<GraphNode>): void;
 ```
 
 ## Parameters
@@ -17,7 +17,7 @@ updateNodePlacement(octree: Octree, list: Set<SceneNode>): void;
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  octree | [Octree](doc/markdown/./scene.octree.md) |  |
-|  list | Set&lt;[SceneNode](doc/markdown/./scene.scenenode.md)<!-- -->&gt; |  |
+|  list | Set&lt;[GraphNode](doc/markdown/./scene.graphnode.md)<!-- -->&gt; |  |
 
 **Returns:**
 

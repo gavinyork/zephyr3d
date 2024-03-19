@@ -16,8 +16,9 @@ interface InstanceData
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
+|  [bindGroup](doc/markdown/./scene.instancedata.bindgroup.md) |  | CachedBindGroup |  |
+|  [currentSize](doc/markdown/./scene.instancedata.currentsize.md) |  | number |  |
 |  [hash](doc/markdown/./scene.instancedata.hash.md) |  | string |  |
-|  [instanceColorList?](doc/markdown/./scene.instancedata.instancecolorlist.md) |  | [Vector4](doc/markdown/./base.vector4.md)<!-- -->\[\] | _(Optional)_ |
-|  [nodeList?](doc/markdown/./scene.instancedata.nodelist.md) |  | [GraphNode](doc/markdown/./scene.graphnode.md)<!-- -->\[\] | _(Optional)_ |
-|  [worldMatrices](doc/markdown/./scene.instancedata.worldmatrices.md) |  | [Matrix4x4](doc/markdown/./base.matrix4x4.md)<!-- -->\[\] |  |
+|  [maxSize](doc/markdown/./scene.instancedata.maxsize.md) |  | number |  |
+|  [stride](doc/markdown/./scene.instancedata.stride.md) |  | number |  |
 

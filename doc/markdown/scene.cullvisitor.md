@@ -25,9 +25,10 @@ declare class CullVisitor implements Visitor
 |  --- | --- | --- | --- |
 |  [camera](doc/markdown/./scene.cullvisitor.camera.md) |  | [Camera](doc/markdown/./scene.camera.md) | The camera that will be used for culling |
 |  [frustum](doc/markdown/./scene.cullvisitor.frustum.md) | <code>readonly</code> | [\_zephyr3d\_base.Frustum](doc/markdown/./base.frustum.md) | Frustum for culling |
+|  [frustumCulling](doc/markdown/./scene.cullvisitor.frustumculling.md) |  | boolean | true if cull with frustum culling, otherwise false. default is true |
 |  [primaryCamera](doc/markdown/./scene.cullvisitor.primarycamera.md) | <code>readonly</code> | [Camera](doc/markdown/./scene.camera.md) | The camera position of the primary render pass |
 |  [renderPass](doc/markdown/./scene.cullvisitor.renderpass.md) | <code>readonly</code> | [RenderPass](doc/markdown/./scene.renderpass.md) | Render pass for the culling task |
-|  [renderQueue](doc/markdown/./scene.cullvisitor.renderqueue.md) | <code>readonly</code> | [RenderQueue](doc/markdown/./scene.renderqueue.md) | The result of culling |
+|  [renderQueue](doc/markdown/./scene.cullvisitor.renderqueue.md) |  | [RenderQueue](doc/markdown/./scene.renderqueue.md) | The result of culling |
 
 ## Methods
 

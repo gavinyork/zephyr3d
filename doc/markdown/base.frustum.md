@@ -38,7 +38,7 @@ declare class Frustum
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [containsPoint(pt)](doc/markdown/./base.frustum.containspoint.md) |  | Tests if a point is inside the frustum. |
+|  [containsPoint(pt, epsl)](doc/markdown/./base.frustum.containspoint.md) |  | Tests if a point is inside the frustum. |
 |  [getCorner(pos)](doc/markdown/./base.frustum.getcorner.md) |  | Get the point of a given corner. |
 |  [initWithMatrix(transform)](doc/markdown/./base.frustum.initwithmatrix.md) |  | Initialize the frustum by given model-view matrix |
 

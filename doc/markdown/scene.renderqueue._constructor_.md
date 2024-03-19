@@ -9,7 +9,7 @@ Creates an instance of a render queue
 **Signature:**
 
 ```typescript
-constructor(renderPass: RenderPass);
+constructor(renderPass: RenderPass, bindGroupAllocator?: InstanceBindGroupAllocator);
 ```
 
 ## Parameters
@@ -17,4 +17,5 @@ constructor(renderPass: RenderPass);
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  renderPass | [RenderPass](doc/markdown/./scene.renderpass.md) | The render pass to which the render queue belongs |
+|  bindGroupAllocator | [InstanceBindGroupAllocator](doc/markdown/./scene.instancebindgroupallocator.md) | _(Optional)_ |
 

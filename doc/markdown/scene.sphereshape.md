@@ -19,6 +19,12 @@ declare class SphereShape extends Shape<SphereCreationOptions>
 |  --- | --- | --- |
 |  [(constructor)(options)](doc/markdown/./scene.sphereshape._constructor_.md) |  | Creates an instance of sphere shape |
 
+## Properties
+
+|  Property | Modifiers | Type | Description |
+|  --- | --- | --- | --- |
+|  [radius](doc/markdown/./scene.sphereshape.radius.md) | <code>readonly</code> | number | Sphere radius |
+
 ## Methods
 
 |  Method | Modifiers | Description |

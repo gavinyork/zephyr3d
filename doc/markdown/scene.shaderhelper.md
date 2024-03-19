@@ -44,13 +44,13 @@ declare class ShaderHelper
 |  [getCameraClipPlaneFlag(scope)](doc/markdown/./scene.shaderhelper.getcameraclipplaneflag.md) | <code>static</code> | Gets the clip plane flag |
 |  [getCameraParams(scope)](doc/markdown/./scene.shaderhelper.getcameraparams.md) | <code>static</code> | Gets the uniform variable of type vec4 which holds the camera parameters |
 |  [getCameraPosition(scope)](doc/markdown/./scene.shaderhelper.getcameraposition.md) | <code>static</code> | Gets the uniform variable of type vec3 which holds the camera position |
-|  [getCameraRotationMatrix(scope)](doc/markdown/./scene.shaderhelper.getcamerarotationmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the view projection matrix of current camera |
 |  [getEnvLightStrength(scope)](doc/markdown/./scene.shaderhelper.getenvlightstrength.md) | <code>static</code> | Gets the uniform variable of type float which holds the strength of the environment light |
 |  [getFogColor(scope)](doc/markdown/./scene.shaderhelper.getfogcolor.md) | <code>static</code> | Gets the uniform variable of type vec4 which holds the fog color |
 |  [getFogParams(scope)](doc/markdown/./scene.shaderhelper.getfogparams.md) | <code>static</code> | Gets the uniform variable of type vec4 which holds the fog parameters |
 |  [getFogType(scope)](doc/markdown/./scene.shaderhelper.getfogtype.md) | <code>static</code> | Gets the uniform variable of type vec4 which holds the fog color |
 |  [getGlobalUniforms(scope)](doc/markdown/./scene.shaderhelper.getglobaluniforms.md) | <code>static</code> | Get global uniforms |
-|  [getInstanceBufferOffsetUniformName()](doc/markdown/./scene.shaderhelper.getinstancebufferoffsetuniformname.md) | <code>static</code> |  |
+|  [getInstanceBufferStrideUniformName()](doc/markdown/./scene.shaderhelper.getinstancebufferstrideuniformname.md) | <code>static</code> |  |
+|  [getInstancedUniform(scope, uniformIndex)](doc/markdown/./scene.shaderhelper.getinstanceduniform.md) | <code>static</code> | Gets the instance uniform value of type vec4 by uniform index |
 |  [getLightBufferUniformName()](doc/markdown/./scene.shaderhelper.getlightbufferuniformname.md) | <code>static</code> |  |
 |  [getNormalMatrix(scope)](doc/markdown/./scene.shaderhelper.getnormalmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the normal matrix of current object to be drawn |
 |  [getProjectionMatrix(scope)](doc/markdown/./scene.shaderhelper.getprojectionmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the projection matrix of current camera |

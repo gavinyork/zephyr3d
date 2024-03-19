@@ -17,9 +17,6 @@ interface CylinderCreationOptions extends ShapeCreationOptions
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
-|  [anchorX?](doc/markdown/./scene.cylindercreationoptions.anchorx.md) |  | number | _(Optional)_ Anchor point of axis x, default is 0.5 |
-|  [anchorY?](doc/markdown/./scene.cylindercreationoptions.anchory.md) |  | number | _(Optional)_ Anchor point of axis y, default is 0 |
-|  [anchorZ?](doc/markdown/./scene.cylindercreationoptions.anchorz.md) |  | number | _(Optional)_ Anchor point of axis z, default is 0.5 |
 |  [bottomRadius?](doc/markdown/./scene.cylindercreationoptions.bottomradius.md) |  | number | _(Optional)_ Bottom radius, default is 1.0 |
 |  [height?](doc/markdown/./scene.cylindercreationoptions.height.md) |  | number | _(Optional)_ Height, default is 1.0 |
 |  [heightDetail?](doc/markdown/./scene.cylindercreationoptions.heightdetail.md) |  | number | _(Optional)_ Height detail, default is 1 |

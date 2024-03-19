@@ -9,7 +9,7 @@ Fetches a model resource from a given URL and adds it to a scene
 **Signature:**
 
 ```typescript
-fetchModel(scene: Scene, url: string, mimeType?: string, postProcess?: (model: SharedModel) => SharedModel): Promise<ModelInfo>;
+fetchModel(scene: Scene, url: string, options?: ModelFetchOptions): Promise<ModelInfo>;
 ```
 
 ## Parameters
@@ -18,8 +18,7 @@ fetchModel(scene: Scene, url: string, mimeType?: string, postProcess?: (model: S
 |  --- | --- | --- |
 |  scene | [Scene](doc/markdown/./scene.scene.md) | The scene to which the model node belongs |
 |  url | string | The URL from where to fetch the resource |
-|  mimeType | string | _(Optional)_ The MIME type of the model resource, if not provided, model type will be determined by file extension |
-|  postProcess | (model: [SharedModel](doc/markdown/./scene.sharedmodel.md)<!-- -->) =&gt; [SharedModel](doc/markdown/./scene.sharedmodel.md) | _(Optional)_ A function that will be involved when the model was loaded. |
+|  options | [ModelFetchOptions](doc/markdown/./scene.modelfetchoptions.md) | _(Optional)_ Options for model fetching |
 
 **Returns:**
 

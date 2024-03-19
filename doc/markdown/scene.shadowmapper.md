@@ -37,6 +37,7 @@ declare class ShadowMapper
 |  [pdSampleRadius](doc/markdown/./scene.shadowmapper.pdsampleradius.md) |  | number | Radius for poisson disc PCF |
 |  [shadowDistance](doc/markdown/./scene.shadowmapper.shadowdistance.md) |  | number | Maximum distance from the camera, shadow will not be rendered beyond this range |
 |  [shadowMapSize](doc/markdown/./scene.shadowmapper.shadowmapsize.md) |  | number | Size of the shadow map |
+|  [shadowRegion](doc/markdown/./scene.shadowmapper.shadowregion.md) |  | [AABB](doc/markdown/./base.aabb.md) | Shadow region for directional light |
 |  [splitLambda](doc/markdown/./scene.shadowmapper.splitlambda.md) |  | number | The split lambda for cascaded shadow mapping |
 |  [vsmBlurKernelSize](doc/markdown/./scene.shadowmapper.vsmblurkernelsize.md) |  | number | Kernel size of VSM |
 |  [vsmBlurRadius](doc/markdown/./scene.shadowmapper.vsmblurradius.md) |  | number | Blur radius for VSM |

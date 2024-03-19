@@ -9,8 +9,15 @@ Force the world space bounding volume to be recalculated
 **Signature:**
 
 ```typescript
-invalidateWorldBoundingVolume(): void;
+invalidateWorldBoundingVolume(transformChanged: boolean): void;
 ```
+
+## Parameters
+
+|  Parameter | Type | Description |
+|  --- | --- | --- |
+|  transformChanged | boolean |  |
+
 **Returns:**
 
 void

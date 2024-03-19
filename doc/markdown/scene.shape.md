@@ -19,3 +19,9 @@ declare abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOptio
 |  --- | --- | --- |
 |  [(constructor)(options)](doc/markdown/./scene.shape._constructor_.md) |  | Creates an instance of shape |
 
+## Properties
+
+|  Property | Modifiers | Type | Description |
+|  --- | --- | --- | --- |
+|  [options](doc/markdown/./scene.shape.options.md) | <code>readonly</code> | T | Creation options |
+

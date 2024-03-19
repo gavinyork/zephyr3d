@@ -17,9 +17,6 @@ interface BoxCreationOptions extends ShapeCreationOptions
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
-|  [anchorX?](doc/markdown/./scene.boxcreationoptions.anchorx.md) |  | number | _(Optional)_ Anchor point of axis x, relative to the size of axis x, default 0 |
-|  [anchorY?](doc/markdown/./scene.boxcreationoptions.anchory.md) |  | number | _(Optional)_ Anchor point of axis y, relative to the size of axis y, default 0 |
-|  [anchorZ?](doc/markdown/./scene.boxcreationoptions.anchorz.md) |  | number | _(Optional)_ Anchor point of axis z, relative to the size of axis z, default 0 |
 |  [size?](doc/markdown/./scene.boxcreationoptions.size.md) |  | number | _(Optional)_ Size of all axises, default 1 |
 |  [sizeX?](doc/markdown/./scene.boxcreationoptions.sizex.md) |  | number | _(Optional)_ Size of axis x, default 1 |
 |  [sizeY?](doc/markdown/./scene.boxcreationoptions.sizey.md) |  | number | _(Optional)_ Size of axis y, default 1 |

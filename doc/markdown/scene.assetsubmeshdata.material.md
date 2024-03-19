@@ -7,5 +7,5 @@
 **Signature:**
 
 ```typescript
-material: Material;
+material: MeshMaterial;
 ```

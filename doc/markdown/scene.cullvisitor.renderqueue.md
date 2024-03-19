@@ -10,4 +10,6 @@ The result of culling
 
 ```typescript
 get renderQueue(): RenderQueue;
+
+set renderQueue(renderQueue: RenderQueue);
 ```

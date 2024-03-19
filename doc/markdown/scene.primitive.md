@@ -37,6 +37,8 @@ declare class Primitive
 |  [drawInstanced(numInstances)](doc/markdown/./scene.primitive.drawinstanced.md) |  | Draw multiple instances of the primitive |
 |  [getBoundingVolume()](doc/markdown/./scene.primitive.getboundingvolume.md) |  | Gets the bounding volume of the primitive |
 |  [getIndexBuffer()](doc/markdown/./scene.primitive.getindexbuffer.md) |  | Gets the index buffer of the primitive |
+|  [getNumFaces()](doc/markdown/./scene.primitive.getnumfaces.md) |  | Query total face count |
+|  [getNumVertices()](doc/markdown/./scene.primitive.getnumvertices.md) |  | Query total vertex count |
 |  [getVertexBuffer(semantic)](doc/markdown/./scene.primitive.getvertexbuffer.md) |  | Gets the vertex buffer by a given semantic |
 |  [getVertexBufferInfo(semantic)](doc/markdown/./scene.primitive.getvertexbufferinfo.md) |  | Gets the vertex buffer information by a given semantic |
 |  [raycast(ray)](doc/markdown/./scene.primitive.raycast.md) |  | Ray intersection test |

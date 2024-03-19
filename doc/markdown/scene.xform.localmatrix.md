@@ -10,4 +10,6 @@ Local transformation matrix of the xform
 
 ```typescript
 get localMatrix(): Matrix4x4;
+
+set localMatrix(matrix: Matrix4x4);
 ```

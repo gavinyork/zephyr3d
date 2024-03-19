@@ -39,11 +39,8 @@ declare class OctreeNode
 |  [getOrCreateParent()](doc/markdown/./scene.octreenode.getorcreateparent.md) |  | Gets or creates the parent node |
 |  [getParent()](doc/markdown/./scene.octreenode.getparent.md) |  | Gets parent of the node |
 |  [getPosition()](doc/markdown/./scene.octreenode.getposition.md) |  | Gets the position of the octree node |
-|  [getReference()](doc/markdown/./scene.octreenode.getreference.md) |  | Get reference of the node |
-|  [invalidateBox()](doc/markdown/./scene.octreenode.invalidatebox.md) |  | Invalidates the cached box |
 |  [removeNode(node)](doc/markdown/./scene.octreenode.removenode.md) |  | Removes a scene node from this node |
 |  [setChunk(chunk)](doc/markdown/./scene.octreenode.setchunk.md) |  | Sets the octree chunk |
 |  [setPosition(index)](doc/markdown/./scene.octreenode.setposition.md) |  | Sets the position of the node |
-|  [tidy()](doc/markdown/./scene.octreenode.tidy.md) |  | Free up all empty children |
 |  [traverse(v)](doc/markdown/./scene.octreenode.traverse.md) |  | Traverse this node by a visitor |
 

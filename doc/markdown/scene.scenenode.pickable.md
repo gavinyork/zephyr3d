@@ -10,4 +10,6 @@ Computed value of pick mode
 
 ```typescript
 get pickable(): boolean;
+
+set pickable(val: boolean);
 ```

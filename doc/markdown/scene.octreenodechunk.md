@@ -24,8 +24,6 @@ declare class OctreeNodeChunk
 |  --- | --- | --- |
 |  [clearNodes()](doc/markdown/./scene.octreenodechunk.clearnodes.md) |  | Removes all octree nodes of this chunk |
 |  [empty()](doc/markdown/./scene.octreenodechunk.empty.md) |  | Check if this chunk is empty |
-|  [freeNode(node)](doc/markdown/./scene.octreenodechunk.freenode.md) |  | Removes an octree node |
-|  [freeNodeByIndex(index)](doc/markdown/./scene.octreenodechunk.freenodebyindex.md) |  | Removes an octree node at given index |
 |  [getChildIndex(index, placement)](doc/markdown/./scene.octreenodechunk.getchildindex.md) |  | Gets the index of a child node at given placement |
 |  [getDimension()](doc/markdown/./scene.octreenodechunk.getdimension.md) |  | Gets the dimension of this chunk |
 |  [getLevel()](doc/markdown/./scene.octreenodechunk.getlevel.md) |  | Gets the level index of this chunk |

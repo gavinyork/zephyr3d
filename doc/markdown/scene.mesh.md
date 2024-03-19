@@ -38,7 +38,9 @@ declare class Mesh extends GraphNode implements BatchDrawable
 |  [draw(ctx)](doc/markdown/./scene.mesh.draw.md) |  | Draw the object |
 |  [getBoneMatrices()](doc/markdown/./scene.mesh.getbonematrices.md) |  | Gets the texture that contains the bone matrices of the object |
 |  [getInstanceColor()](doc/markdown/./scene.mesh.getinstancecolor.md) |  | Gets the instance color |
+|  [getInstanceDataBuffer(renderPass)](doc/markdown/./scene.mesh.getinstancedatabuffer.md) |  | Gets the uniform data buffer offset |
 |  [getInstanceId(renderPass)](doc/markdown/./scene.mesh.getinstanceid.md) |  | Gets the instance id of the object |
+|  [getInstanceUniforms()](doc/markdown/./scene.mesh.getinstanceuniforms.md) |  |  |
 |  [getInvBindMatrix()](doc/markdown/./scene.mesh.getinvbindmatrix.md) |  | Gets the inversed bind matrix for skeleton animation |
 |  [getName()](doc/markdown/./scene.mesh.getname.md) |  | Gets name of the drawable object |
 |  [getPickTarget()](doc/markdown/./scene.mesh.getpicktarget.md) |  | If set, the pick target will be returned as the pick result |
@@ -49,5 +51,6 @@ declare class Mesh extends GraphNode implements BatchDrawable
 |  [isUnlit()](doc/markdown/./scene.mesh.isunlit.md) |  | true if the shading of this object is independent of lighting |
 |  [setAnimatedBoundingBox(bbox)](doc/markdown/./scene.mesh.setanimatedboundingbox.md) |  | Sets the bounding box for animation |
 |  [setBoneMatrices(matrices)](doc/markdown/./scene.mesh.setbonematrices.md) |  | Sets the texture that contains the bone matrices for skeletal animation |
+|  [setInstanceDataBuffer(renderPass, bindGroup, offset)](doc/markdown/./scene.mesh.setinstancedatabuffer.md) |  | Sets the uniform data buffer and offset |
 |  [setInvBindMatrix(matrix)](doc/markdown/./scene.mesh.setinvbindmatrix.md) |  | Sets the inverse bind matrix for skeletal animation |
 

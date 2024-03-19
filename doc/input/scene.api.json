@@ -4756,7 +4756,7 @@
             {
               "kind": "Method",
               "canonicalReference": "@zephyr3d/scene!AssetManager#fetchModel:member(1)",
-              "docComment": "/**\n * Fetches a model resource from a given URL and adds it to a scene\n *\n * @remarks\n *\n * If a model has already been loaded, the function will ignore the postProcess parameter and directly return the model loaded previously. To load the same model with different postProcess parameters, use different AssetManager instances separately.\n *\n * @param scene - The scene to which the model node belongs\n *\n * @param url - The URL from where to fetch the resource\n *\n * @param mimeType - The MIME type of the model resource, if not provided, model type will be determined by file extension\n *\n * @param postProcess - A function that will be involved when the model was loaded.\n *\n * @returns The created model node\n */\n",
+              "docComment": "/**\n * Fetches a model resource from a given URL and adds it to a scene\n *\n * @remarks\n *\n * If a model has already been loaded, the function will ignore the postProcess parameter and directly return the model loaded previously. To load the same model with different postProcess parameters, use different AssetManager instances separately.\n *\n * @param scene - The scene to which the model node belongs\n *\n * @param url - The URL from where to fetch the resource\n *\n * @param options - Options for model fetching\n *\n * @returns The created model node\n */\n",
               "excerptTokens": [
                 {
                   "kind": "Content",
@@ -4777,33 +4777,12 @@
                 },
                 {
                   "kind": "Content",
-                  "text": ", mimeType?: "
-                },
-                {
-                  "kind": "Content",
-                  "text": "string"
-                },
-                {
-                  "kind": "Content",
-                  "text": ", postProcess?: "
-                },
-                {
-                  "kind": "Content",
-                  "text": "(model: "
+                  "text": ", options?: "
                 },
                 {
                   "kind": "Reference",
-                  "text": "SharedModel",
-                  "canonicalReference": "@zephyr3d/scene!SharedModel:class"
-                },
-                {
-                  "kind": "Content",
-                  "text": ") => "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "SharedModel",
-                  "canonicalReference": "@zephyr3d/scene!SharedModel:class"
+                  "text": "ModelFetchOptions",
+                  "canonicalReference": "@zephyr3d/scene!ModelFetchOptions:type"
                 },
                 {
                   "kind": "Content",
@@ -4834,8 +4813,8 @@
               ],
               "isStatic": false,
               "returnTypeTokenRange": {
-                "startIndex": 12,
-                "endIndex": 16
+                "startIndex": 7,
+                "endIndex": 11
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -4858,18 +4837,10 @@
                   "isOptional": false
                 },
                 {
-                  "parameterName": "mimeType",
+                  "parameterName": "options",
                   "parameterTypeTokenRange": {
                     "startIndex": 5,
                     "endIndex": 6
-                  },
-                  "isOptional": true
-                },
-                {
-                  "parameterName": "postProcess",
-                  "parameterTypeTokenRange": {
-                    "startIndex": 7,
-                    "endIndex": 11
                   },
                   "isOptional": true
                 }
@@ -7172,8 +7143,8 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Material",
-                  "canonicalReference": "@zephyr3d/scene!Material:class"
+                  "text": "MeshMaterial",
+                  "canonicalReference": "@zephyr3d/scene!MeshMaterial:class"
                 },
                 {
                   "kind": "Content",
@@ -8459,6 +8430,61 @@
           "members": [
             {
               "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/scene!BatchDrawable#getInstanceDataBuffer:member(1)",
+              "docComment": "/**\n * Gets the uniform data buffer offset\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getInstanceDataBuffer(renderPass: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "RenderPass",
+                  "canonicalReference": "@zephyr3d/scene!RenderPass:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "{\n        bindGroup: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "CachedBindGroup",
+                  "canonicalReference": "@zephyr3d/scene!CachedBindGroup:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";\n        offset: number;\n    }"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 6
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "renderPass",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "name": "getInstanceDataBuffer"
+            },
+            {
+              "kind": "MethodSignature",
               "canonicalReference": "@zephyr3d/scene!BatchDrawable#getInstanceId:member(1)",
               "docComment": "/**\n * Gets the instance id of the object\n *\n * @param renderPass - The render pass to which current drawing task belongs\n */\n",
               "excerptTokens": [
@@ -8502,6 +8528,114 @@
                 }
               ],
               "name": "getInstanceId"
+            },
+            {
+              "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/scene!BatchDrawable#getInstanceUniforms:member(1)",
+              "docComment": "/**\n * Gets the instance uniforms count\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getInstanceUniforms(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Float32Array",
+                  "canonicalReference": "!Float32Array:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [],
+              "name": "getInstanceUniforms"
+            },
+            {
+              "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/scene!BatchDrawable#setInstanceDataBuffer:member(1)",
+              "docComment": "/**\n * Sets the uniform data buffer and offset\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "setInstanceDataBuffer(renderPass: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "RenderPass",
+                  "canonicalReference": "@zephyr3d/scene!RenderPass:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", bindGroup: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "CachedBindGroup",
+                  "canonicalReference": "@zephyr3d/scene!CachedBindGroup:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", offset: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 7,
+                "endIndex": 8
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "renderPass",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "bindGroup",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 4
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "offset",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 5,
+                    "endIndex": 6
+                  },
+                  "isOptional": false
+                }
+              ],
+              "name": "setInstanceDataBuffer"
             }
           ],
           "extendsTokenRanges": [
@@ -8510,6 +8644,183 @@
               "endIndex": 2
             }
           ]
+        },
+        {
+          "kind": "Class",
+          "canonicalReference": "@zephyr3d/scene!BatchGroup:class",
+          "docComment": "/**\n * Batch group node\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "declare class BatchGroup extends "
+            },
+            {
+              "kind": "Reference",
+              "text": "GraphNode",
+              "canonicalReference": "@zephyr3d/scene!GraphNode:class"
+            },
+            {
+              "kind": "Content",
+              "text": " "
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "releaseTag": "Public",
+          "isAbstract": false,
+          "name": "BatchGroup",
+          "preserveMemberOrder": false,
+          "members": [
+            {
+              "kind": "Constructor",
+              "canonicalReference": "@zephyr3d/scene!BatchGroup:constructor(1)",
+              "docComment": "/**\n * Creates an instance of mesh node\n *\n * @param scene - The scene to which the mesh node belongs\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "constructor(scene: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Scene",
+                  "canonicalReference": "@zephyr3d/scene!Scene:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ");"
+                }
+              ],
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "scene",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ]
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!BatchGroup#getName:member(1)",
+              "docComment": "/**\n * Gets name of the drawable object\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getName(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "string"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "getName"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!BatchGroup#getRenderQueue:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getRenderQueue(cullVisitor: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "CullVisitor",
+                  "canonicalReference": "@zephyr3d/scene!CullVisitor:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "RenderQueue",
+                  "canonicalReference": "@zephyr3d/scene!RenderQueue:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "cullVisitor",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "getRenderQueue"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!BatchGroup#isBatchGroup:member(1)",
+              "docComment": "/**\n * true if this is a batch group, false otherwise\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "isBatchGroup(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "isBatchGroup"
+            }
+          ],
+          "extendsTokenRange": {
+            "startIndex": 1,
+            "endIndex": 2
+          },
+          "implementsTokenRanges": []
         },
         {
           "kind": "TypeAlias",
@@ -11447,87 +11758,6 @@
           "members": [
             {
               "kind": "PropertySignature",
-              "canonicalReference": "@zephyr3d/scene!BoxCreationOptions#anchorX:member",
-              "docComment": "/**\n * Anchor point of axis x, relative to the size of axis x, default 0\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "anchorX?: "
-                },
-                {
-                  "kind": "Content",
-                  "text": "number"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": false,
-              "isOptional": true,
-              "releaseTag": "Public",
-              "name": "anchorX",
-              "propertyTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              }
-            },
-            {
-              "kind": "PropertySignature",
-              "canonicalReference": "@zephyr3d/scene!BoxCreationOptions#anchorY:member",
-              "docComment": "/**\n * Anchor point of axis y, relative to the size of axis y, default 0\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "anchorY?: "
-                },
-                {
-                  "kind": "Content",
-                  "text": "number"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": false,
-              "isOptional": true,
-              "releaseTag": "Public",
-              "name": "anchorY",
-              "propertyTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              }
-            },
-            {
-              "kind": "PropertySignature",
-              "canonicalReference": "@zephyr3d/scene!BoxCreationOptions#anchorZ:member",
-              "docComment": "/**\n * Anchor point of axis z, relative to the size of axis z, default 0\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "anchorZ?: "
-                },
-                {
-                  "kind": "Content",
-                  "text": "number"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": false,
-              "isOptional": true,
-              "releaseTag": "Public",
-              "name": "anchorZ",
-              "propertyTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              }
-            },
-            {
-              "kind": "PropertySignature",
               "canonicalReference": "@zephyr3d/scene!BoxCreationOptions#size:member",
               "docComment": "/**\n * Size of all axises, default 1\n */\n",
               "excerptTokens": [
@@ -12226,6 +12456,96 @@
                   "isOptional": true
                 }
               ]
+            },
+            {
+              "kind": "Property",
+              "canonicalReference": "@zephyr3d/scene!BoxShape#depth:member",
+              "docComment": "/**\n * Box depth\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "get depth(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": true,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "depth",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
+            },
+            {
+              "kind": "Property",
+              "canonicalReference": "@zephyr3d/scene!BoxShape#height:member",
+              "docComment": "/**\n * Box height\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "get height(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": true,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "height",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
+            },
+            {
+              "kind": "Property",
+              "canonicalReference": "@zephyr3d/scene!BoxShape#width:member",
+              "docComment": "/**\n * Box width\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "get width(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": true,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "width",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
             }
           ],
           "extendsTokenRange": {
@@ -14434,6 +14754,36 @@
             },
             {
               "kind": "Property",
+              "canonicalReference": "@zephyr3d/scene!CullVisitor#frustumCulling:member",
+              "docComment": "/**\n * true if cull with frustum culling, otherwise false. default is true\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "get frustumCulling(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";\n\nset frustumCulling(val: boolean);"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "frustumCulling",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
+            },
+            {
+              "kind": "Property",
               "canonicalReference": "@zephyr3d/scene!CullVisitor#primaryCamera:member",
               "docComment": "/**\n * The camera position of the primary render pass\n */\n",
               "excerptTokens": [
@@ -14510,10 +14860,19 @@
                 },
                 {
                   "kind": "Content",
-                  "text": ";"
+                  "text": ";\n\nset renderQueue(renderQueue: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "RenderQueue",
+                  "canonicalReference": "@zephyr3d/scene!RenderQueue:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ");"
                 }
               ],
-              "isReadonly": true,
+              "isReadonly": false,
               "isOptional": false,
               "releaseTag": "Public",
               "name": "renderQueue",
@@ -14615,87 +14974,6 @@
           "name": "CylinderCreationOptions",
           "preserveMemberOrder": false,
           "members": [
-            {
-              "kind": "PropertySignature",
-              "canonicalReference": "@zephyr3d/scene!CylinderCreationOptions#anchorX:member",
-              "docComment": "/**\n * Anchor point of axis x, default is 0.5\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "anchorX?: "
-                },
-                {
-                  "kind": "Content",
-                  "text": "number"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": false,
-              "isOptional": true,
-              "releaseTag": "Public",
-              "name": "anchorX",
-              "propertyTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              }
-            },
-            {
-              "kind": "PropertySignature",
-              "canonicalReference": "@zephyr3d/scene!CylinderCreationOptions#anchorY:member",
-              "docComment": "/**\n * Anchor point of axis y, default is 0\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "anchorY?: "
-                },
-                {
-                  "kind": "Content",
-                  "text": "number"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": false,
-              "isOptional": true,
-              "releaseTag": "Public",
-              "name": "anchorY",
-              "propertyTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              }
-            },
-            {
-              "kind": "PropertySignature",
-              "canonicalReference": "@zephyr3d/scene!CylinderCreationOptions#anchorZ:member",
-              "docComment": "/**\n * Anchor point of axis z, default is 0.5\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "anchorZ?: "
-                },
-                {
-                  "kind": "Content",
-                  "text": "number"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": false,
-              "isOptional": true,
-              "releaseTag": "Public",
-              "name": "anchorZ",
-              "propertyTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              }
-            },
             {
               "kind": "PropertySignature",
               "canonicalReference": "@zephyr3d/scene!CylinderCreationOptions#bottomRadius:member",
@@ -23606,6 +23884,159 @@
           "extendsTokenRanges": []
         },
         {
+          "kind": "Class",
+          "canonicalReference": "@zephyr3d/scene!InstanceBindGroupAllocator:class",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "declare class InstanceBindGroupAllocator "
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "releaseTag": "Public",
+          "isAbstract": false,
+          "name": "InstanceBindGroupAllocator",
+          "preserveMemberOrder": false,
+          "members": [
+            {
+              "kind": "Property",
+              "canonicalReference": "@zephyr3d/scene!InstanceBindGroupAllocator#_freeBindGroupList:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "_freeBindGroupList: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "CachedBindGroup",
+                  "canonicalReference": "@zephyr3d/scene!CachedBindGroup:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": "[]"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "_freeBindGroupList",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 3
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
+            },
+            {
+              "kind": "Property",
+              "canonicalReference": "@zephyr3d/scene!InstanceBindGroupAllocator#_usedBindGroupList:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "_usedBindGroupList: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "CachedBindGroup",
+                  "canonicalReference": "@zephyr3d/scene!CachedBindGroup:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": "[]"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "_usedBindGroupList",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 3
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
+            },
+            {
+              "kind": "Constructor",
+              "canonicalReference": "@zephyr3d/scene!InstanceBindGroupAllocator:constructor(1)",
+              "docComment": "/**\n * Constructs a new instance of the `InstanceBindGroupAllocator` class\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "constructor();"
+                }
+              ],
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": []
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!InstanceBindGroupAllocator#allocateInstanceBindGroup:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "allocateInstanceBindGroup(framestamp: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "CachedBindGroup",
+                  "canonicalReference": "@zephyr3d/scene!CachedBindGroup:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "framestamp",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "allocateInstanceBindGroup"
+            }
+          ],
+          "implementsTokenRanges": []
+        },
+        {
           "kind": "Interface",
           "canonicalReference": "@zephyr3d/scene!InstanceData:interface",
           "docComment": "/**\n * Instance data\n *\n * @public\n */\n",
@@ -23620,6 +24051,61 @@
           "name": "InstanceData",
           "preserveMemberOrder": false,
           "members": [
+            {
+              "kind": "PropertySignature",
+              "canonicalReference": "@zephyr3d/scene!InstanceData#bindGroup:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "bindGroup: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "CachedBindGroup",
+                  "canonicalReference": "@zephyr3d/scene!CachedBindGroup:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "bindGroup",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              }
+            },
+            {
+              "kind": "PropertySignature",
+              "canonicalReference": "@zephyr3d/scene!InstanceData#currentSize:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "currentSize: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "currentSize",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              }
+            },
             {
               "kind": "PropertySignature",
               "canonicalReference": "@zephyr3d/scene!InstanceData#hash:member",
@@ -23649,85 +24135,16 @@
             },
             {
               "kind": "PropertySignature",
-              "canonicalReference": "@zephyr3d/scene!InstanceData#instanceColorList:member",
+              "canonicalReference": "@zephyr3d/scene!InstanceData#maxSize:member",
               "docComment": "",
               "excerptTokens": [
                 {
                   "kind": "Content",
-                  "text": "instanceColorList?: "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "Vector4",
-                  "canonicalReference": "@zephyr3d/base!Vector4:class"
+                  "text": "maxSize: "
                 },
                 {
                   "kind": "Content",
-                  "text": "[]"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": false,
-              "isOptional": true,
-              "releaseTag": "Public",
-              "name": "instanceColorList",
-              "propertyTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 3
-              }
-            },
-            {
-              "kind": "PropertySignature",
-              "canonicalReference": "@zephyr3d/scene!InstanceData#nodeList:member",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "nodeList?: "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "GraphNode",
-                  "canonicalReference": "@zephyr3d/scene!GraphNode:class"
-                },
-                {
-                  "kind": "Content",
-                  "text": "[]"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": false,
-              "isOptional": true,
-              "releaseTag": "Public",
-              "name": "nodeList",
-              "propertyTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 3
-              }
-            },
-            {
-              "kind": "PropertySignature",
-              "canonicalReference": "@zephyr3d/scene!InstanceData#worldMatrices:member",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "worldMatrices: "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "Matrix4x4",
-                  "canonicalReference": "@zephyr3d/base!Matrix4x4:class"
-                },
-                {
-                  "kind": "Content",
-                  "text": "[]"
+                  "text": "number"
                 },
                 {
                   "kind": "Content",
@@ -23737,10 +24154,37 @@
               "isReadonly": false,
               "isOptional": false,
               "releaseTag": "Public",
-              "name": "worldMatrices",
+              "name": "maxSize",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
-                "endIndex": 3
+                "endIndex": 2
+              }
+            },
+            {
+              "kind": "PropertySignature",
+              "canonicalReference": "@zephyr3d/scene!InstanceData#stride:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "stride: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "stride",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
               }
             }
           ],
@@ -25105,12 +25549,12 @@
             },
             {
               "kind": "Property",
-              "canonicalReference": "@zephyr3d/scene!Material#id:member",
+              "canonicalReference": "@zephyr3d/scene!Material#instanceId:member",
               "docComment": "/**\n * Unique identifier of the material\n */\n",
               "excerptTokens": [
                 {
                   "kind": "Content",
-                  "text": "get id(): "
+                  "text": "get instanceId(): "
                 },
                 {
                   "kind": "Content",
@@ -25124,7 +25568,7 @@
               "isReadonly": true,
               "isOptional": false,
               "releaseTag": "Public",
-              "name": "id",
+              "name": "instanceId",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
                 "endIndex": 2
@@ -25902,6 +26346,64 @@
             },
             {
               "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!Mesh#getInstanceDataBuffer:member(1)",
+              "docComment": "/**\n * Gets the uniform data buffer offset\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getInstanceDataBuffer(renderPass: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "RenderPass",
+                  "canonicalReference": "@zephyr3d/scene!RenderPass:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "{\n        bindGroup: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "CachedBindGroup",
+                  "canonicalReference": "@zephyr3d/scene!CachedBindGroup:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";\n        offset: number;\n    }"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 6
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "renderPass",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "getInstanceDataBuffer"
+            },
+            {
+              "kind": "Method",
               "canonicalReference": "@zephyr3d/scene!Mesh#getInstanceId:member(1)",
               "docComment": "/**\n * Gets the instance id of the object\n *\n * @param renderPass - The render pass to which current drawing task belongs\n */\n",
               "excerptTokens": [
@@ -25948,6 +26450,38 @@
               "isOptional": false,
               "isAbstract": false,
               "name": "getInstanceId"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!Mesh#getInstanceUniforms:member(1)",
+              "docComment": "/**\n * {@inheritDoc BatchDrawable.getInstanceUniformCount}\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getInstanceUniforms(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Float32Array",
+                  "canonicalReference": "!Float32Array:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "getInstanceUniforms"
             },
             {
               "kind": "Method",
@@ -26385,6 +26919,88 @@
             },
             {
               "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!Mesh#setInstanceDataBuffer:member(1)",
+              "docComment": "/**\n * Sets the uniform data buffer and offset\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "setInstanceDataBuffer(renderPass: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "RenderPass",
+                  "canonicalReference": "@zephyr3d/scene!RenderPass:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", bindGroup: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "CachedBindGroup",
+                  "canonicalReference": "@zephyr3d/scene!CachedBindGroup:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", offset: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "void"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 7,
+                "endIndex": 8
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "renderPass",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "bindGroup",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 4
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "offset",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 5,
+                    "endIndex": 6
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "setInstanceDataBuffer"
+            },
+            {
+              "kind": "Method",
               "canonicalReference": "@zephyr3d/scene!Mesh#setInvBindMatrix:member(1)",
               "docComment": "/**\n * Sets the inverse bind matrix for skeletal animation\n *\n * @param matrix - The matrix to set\n */\n",
               "excerptTokens": [
@@ -26749,6 +27365,37 @@
               "isAbstract": false
             },
             {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!MeshMaterial#createInstance:member(1)",
+              "docComment": "/**\n * Create material instance\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "createInstance(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "this"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "createInstance"
+            },
+            {
               "kind": "Property",
               "canonicalReference": "@zephyr3d/scene!MeshMaterial#cullMode:member",
               "docComment": "/**\n * Cull mode\n */\n",
@@ -26818,6 +27465,71 @@
               "isOptional": false,
               "isAbstract": false,
               "name": "defineFeature"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!MeshMaterial.defineInstanceUniform:member(1)",
+              "docComment": "/**\n * Define instance uniform index\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "static defineInstanceUniform(prop: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "string"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", type: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "InstanceUniformType",
+                  "canonicalReference": "@zephyr3d/scene!InstanceUniformType:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": true,
+              "returnTypeTokenRange": {
+                "startIndex": 5,
+                "endIndex": 6
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "prop",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "type",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 4
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "defineInstanceUniform"
             },
             {
               "kind": "Property",
@@ -26967,6 +27679,72 @@
               "isOptional": false,
               "isAbstract": false,
               "name": "fragmentShader"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!MeshMaterial#getInstancedUniform:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getInstancedUniform(scope: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "PBInsideFunctionScope",
+                  "canonicalReference": "@zephyr3d/device!PBInsideFunctionScope:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", uniformIndex: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "PBShaderExp",
+                  "canonicalReference": "@zephyr3d/device!PBShaderExp:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 5,
+                "endIndex": 6
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "scope",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "uniformIndex",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 4
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "getInstancedUniform"
             },
             {
               "kind": "Method",
@@ -28685,6 +29463,50 @@
         },
         {
           "kind": "TypeAlias",
+          "canonicalReference": "@zephyr3d/scene!ModelFetchOptions:type",
+          "docComment": "/**\n * Options for model fetching\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "type ModelFetchOptions = "
+            },
+            {
+              "kind": "Content",
+              "text": "{\n    mimeType?: string;\n    disableInstancing?: boolean;\n    postProcess?: (model: "
+            },
+            {
+              "kind": "Reference",
+              "text": "SharedModel",
+              "canonicalReference": "@zephyr3d/scene!SharedModel:class"
+            },
+            {
+              "kind": "Content",
+              "text": ") => "
+            },
+            {
+              "kind": "Reference",
+              "text": "SharedModel",
+              "canonicalReference": "@zephyr3d/scene!SharedModel:class"
+            },
+            {
+              "kind": "Content",
+              "text": ";\n}"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "releaseTag": "Public",
+          "name": "ModelFetchOptions",
+          "typeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 6
+          }
+        },
+        {
+          "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!ModelInfo:type",
           "docComment": "/**\n * Data structure returned by AssetManager.fetchModel()\n *\n * @public\n */\n",
           "excerptTokens": [
@@ -29541,6 +30363,54 @@
               "isOptional": false,
               "isAbstract": false,
               "name": "removeNode"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!Octree#resize:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "resize(size: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "void"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "size",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "resize"
             }
           ],
           "implementsTokenRanges": []
@@ -30175,68 +31045,6 @@
             },
             {
               "kind": "Method",
-              "canonicalReference": "@zephyr3d/scene!OctreeNode#getReference:member(1)",
-              "docComment": "/**\n * Get reference of the node\n *\n * @returns Reference of the node\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "getReference(): "
-                },
-                {
-                  "kind": "Content",
-                  "text": "number"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isStatic": false,
-              "returnTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "releaseTag": "Public",
-              "isProtected": false,
-              "overloadIndex": 1,
-              "parameters": [],
-              "isOptional": false,
-              "isAbstract": false,
-              "name": "getReference"
-            },
-            {
-              "kind": "Method",
-              "canonicalReference": "@zephyr3d/scene!OctreeNode#invalidateBox:member(1)",
-              "docComment": "/**\n * Invalidates the cached box\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "invalidateBox(): "
-                },
-                {
-                  "kind": "Content",
-                  "text": "void"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isStatic": false,
-              "returnTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "releaseTag": "Public",
-              "isProtected": false,
-              "overloadIndex": 1,
-              "parameters": [],
-              "isOptional": false,
-              "isAbstract": false,
-              "name": "invalidateBox"
-            },
-            {
-              "kind": "Method",
               "canonicalReference": "@zephyr3d/scene!OctreeNode#removeNode:member(1)",
               "docComment": "/**\n * Removes a scene node from this node\n *\n * @param node - The scene node to be removed\n */\n",
               "excerptTokens": [
@@ -30380,37 +31188,6 @@
               "isOptional": false,
               "isAbstract": false,
               "name": "setPosition"
-            },
-            {
-              "kind": "Method",
-              "canonicalReference": "@zephyr3d/scene!OctreeNode#tidy:member(1)",
-              "docComment": "/**\n * Free up all empty children\n *\n * @returns true if some children were freed\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "tidy(): "
-                },
-                {
-                  "kind": "Content",
-                  "text": "boolean"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isStatic": false,
-              "returnTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "releaseTag": "Public",
-              "isProtected": false,
-              "overloadIndex": 1,
-              "parameters": [],
-              "isOptional": false,
-              "isAbstract": false,
-              "name": "tidy"
             },
             {
               "kind": "Method",
@@ -30574,103 +31351,6 @@
               "isOptional": false,
               "isAbstract": false,
               "name": "empty"
-            },
-            {
-              "kind": "Method",
-              "canonicalReference": "@zephyr3d/scene!OctreeNodeChunk#freeNode:member(1)",
-              "docComment": "/**\n * Removes an octree node\n *\n * @param node - The octree node to be removed\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "freeNode(node: "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "OctreeNode",
-                  "canonicalReference": "@zephyr3d/scene!OctreeNode:class"
-                },
-                {
-                  "kind": "Content",
-                  "text": "): "
-                },
-                {
-                  "kind": "Content",
-                  "text": "void"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isStatic": false,
-              "returnTypeTokenRange": {
-                "startIndex": 3,
-                "endIndex": 4
-              },
-              "releaseTag": "Public",
-              "isProtected": false,
-              "overloadIndex": 1,
-              "parameters": [
-                {
-                  "parameterName": "node",
-                  "parameterTypeTokenRange": {
-                    "startIndex": 1,
-                    "endIndex": 2
-                  },
-                  "isOptional": false
-                }
-              ],
-              "isOptional": false,
-              "isAbstract": false,
-              "name": "freeNode"
-            },
-            {
-              "kind": "Method",
-              "canonicalReference": "@zephyr3d/scene!OctreeNodeChunk#freeNodeByIndex:member(1)",
-              "docComment": "/**\n * Removes an octree node at given index\n *\n * @param index - Index of the node\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "freeNodeByIndex(index: "
-                },
-                {
-                  "kind": "Content",
-                  "text": "number"
-                },
-                {
-                  "kind": "Content",
-                  "text": "): "
-                },
-                {
-                  "kind": "Content",
-                  "text": "void"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isStatic": false,
-              "returnTypeTokenRange": {
-                "startIndex": 3,
-                "endIndex": 4
-              },
-              "releaseTag": "Public",
-              "isProtected": false,
-              "overloadIndex": 1,
-              "parameters": [
-                {
-                  "parameterName": "index",
-                  "parameterTypeTokenRange": {
-                    "startIndex": 1,
-                    "endIndex": 2
-                  },
-                  "isOptional": false
-                }
-              ],
-              "isOptional": false,
-              "isAbstract": false,
-              "name": "freeNodeByIndex"
             },
             {
               "kind": "Method",
@@ -35429,6 +36109,68 @@
             },
             {
               "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!Primitive#getNumFaces:member(1)",
+              "docComment": "/**\n * Query total face count\n *\n * @returns Total face count\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getNumFaces(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "getNumFaces"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!Primitive#getNumVertices:member(1)",
+              "docComment": "/**\n * Query total vertex count\n *\n * @returns Total vertex count, 0 if no position vertex buffer set\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getNumVertices(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "getNumVertices"
+            },
+            {
+              "kind": "Method",
               "canonicalReference": "@zephyr3d/scene!Primitive#getVertexBuffer:member(1)",
               "docComment": "/**\n * Gets the vertex buffer by a given semantic\n *\n * @param semantic - The semantic of the vertex buffer\n *\n * @returns The vertex buffer which semantic matches the given value\n */\n",
               "excerptTokens": [
@@ -36998,6 +37740,15 @@
                 },
                 {
                   "kind": "Content",
+                  "text": ", bindGroupAllocator?: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "InstanceBindGroupAllocator",
+                  "canonicalReference": "@zephyr3d/scene!InstanceBindGroupAllocator:class"
+                },
+                {
+                  "kind": "Content",
                   "text": ");"
                 }
               ],
@@ -37012,39 +37763,16 @@
                     "endIndex": 2
                   },
                   "isOptional": false
+                },
+                {
+                  "parameterName": "bindGroupAllocator",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 4
+                  },
+                  "isOptional": true
                 }
               ]
-            },
-            {
-              "kind": "Method",
-              "canonicalReference": "@zephyr3d/scene!RenderQueue#clear:member(1)",
-              "docComment": "/**\n * Removes all items in the render queue\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "clear(): "
-                },
-                {
-                  "kind": "Content",
-                  "text": "void"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isStatic": false,
-              "returnTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "releaseTag": "Public",
-              "isProtected": false,
-              "overloadIndex": 1,
-              "parameters": [],
-              "isOptional": false,
-              "isAbstract": false,
-              "name": "clear"
             },
             {
               "kind": "Property",
@@ -37222,6 +37950,55 @@
               "name": "pushLight"
             },
             {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!RenderQueue#pushRenderQueue:member(1)",
+              "docComment": "/**\n * Push items from another render queue\n *\n * @param queue - The render queue to be pushed\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "pushRenderQueue(queue: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "RenderQueue",
+                  "canonicalReference": "@zephyr3d/scene!RenderQueue:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "void"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "queue",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "pushRenderQueue"
+            },
+            {
               "kind": "Property",
               "canonicalReference": "@zephyr3d/scene!RenderQueue#renderPass:member",
               "docComment": "/**\n * The render pass to which the render queue belongs\n */\n",
@@ -37254,21 +38031,16 @@
             },
             {
               "kind": "Method",
-              "canonicalReference": "@zephyr3d/scene!RenderQueue#setInstanceColors:member(1)",
-              "docComment": "",
+              "canonicalReference": "@zephyr3d/scene!RenderQueue#reset:member(1)",
+              "docComment": "/**\n * Removes all items in the render queue\n */\n",
               "excerptTokens": [
                 {
                   "kind": "Content",
-                  "text": "setInstanceColors(): "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "GraphNode",
-                  "canonicalReference": "@zephyr3d/scene!GraphNode:class"
+                  "text": "reset(): "
                 },
                 {
                   "kind": "Content",
-                  "text": "[]"
+                  "text": "void"
                 },
                 {
                   "kind": "Content",
@@ -37278,7 +38050,7 @@
               "isStatic": false,
               "returnTypeTokenRange": {
                 "startIndex": 1,
-                "endIndex": 3
+                "endIndex": 2
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -37286,7 +38058,7 @@
               "parameters": [],
               "isOptional": false,
               "isAbstract": false,
-              "name": "setInstanceColors"
+              "name": "reset"
             },
             {
               "kind": "Property",
@@ -39173,8 +39945,8 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "SceneNode",
-                  "canonicalReference": "@zephyr3d/scene!SceneNode:class"
+                  "text": "GraphNode",
+                  "canonicalReference": "@zephyr3d/scene!GraphNode:class"
                 },
                 {
                   "kind": "Content",
@@ -39499,128 +40271,26 @@
             },
             {
               "kind": "Property",
-              "canonicalReference": "@zephyr3d/scene!SceneNode.CLIP_DISABLED:member",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "static readonly CLIP_DISABLED = "
-                },
-                {
-                  "kind": "Content",
-                  "text": "0"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": true,
-              "isOptional": false,
-              "releaseTag": "Public",
-              "name": "CLIP_DISABLED",
-              "propertyTypeTokenRange": {
-                "startIndex": 0,
-                "endIndex": 0
-              },
-              "initializerTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "isStatic": true,
-              "isProtected": false,
-              "isAbstract": false
-            },
-            {
-              "kind": "Property",
-              "canonicalReference": "@zephyr3d/scene!SceneNode.CLIP_ENABLED:member",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "static readonly CLIP_ENABLED = "
-                },
-                {
-                  "kind": "Content",
-                  "text": "1"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": true,
-              "isOptional": false,
-              "releaseTag": "Public",
-              "name": "CLIP_ENABLED",
-              "propertyTypeTokenRange": {
-                "startIndex": 0,
-                "endIndex": 0
-              },
-              "initializerTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "isStatic": true,
-              "isProtected": false,
-              "isAbstract": false
-            },
-            {
-              "kind": "Property",
-              "canonicalReference": "@zephyr3d/scene!SceneNode.CLIP_INHERITED:member",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "static readonly CLIP_INHERITED = "
-                },
-                {
-                  "kind": "Content",
-                  "text": "-1"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": true,
-              "isOptional": false,
-              "releaseTag": "Public",
-              "name": "CLIP_INHERITED",
-              "propertyTypeTokenRange": {
-                "startIndex": 0,
-                "endIndex": 0
-              },
-              "initializerTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "isStatic": true,
-              "isProtected": false,
-              "isAbstract": false
-            },
-            {
-              "kind": "Property",
-              "canonicalReference": "@zephyr3d/scene!SceneNode#clipMode:member",
+              "canonicalReference": "@zephyr3d/scene!SceneNode#clipTestEnabled:member",
               "docComment": "/**\n * Clip mode\n */\n",
               "excerptTokens": [
                 {
                   "kind": "Content",
-                  "text": "get clipMode(): "
+                  "text": "get clipTestEnabled(): "
                 },
                 {
                   "kind": "Content",
-                  "text": "number"
+                  "text": "boolean"
                 },
                 {
                   "kind": "Content",
-                  "text": ";\n\nset clipMode(val: number);"
+                  "text": ";\n\nset clipTestEnabled(val: boolean);"
                 }
               ],
               "isReadonly": false,
               "isOptional": false,
               "releaseTag": "Public",
-              "name": "clipMode",
+              "name": "clipTestEnabled",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
                 "endIndex": 2
@@ -39701,36 +40371,6 @@
               "isOptional": false,
               "releaseTag": "Public",
               "name": "computedBoundingBoxDrawMode",
-              "propertyTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "isStatic": false,
-              "isProtected": false,
-              "isAbstract": false
-            },
-            {
-              "kind": "Property",
-              "canonicalReference": "@zephyr3d/scene!SceneNode#computedClipMode:member",
-              "docComment": "/**\n * Computed value of clip mode\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "get computedClipMode(): "
-                },
-                {
-                  "kind": "Content",
-                  "text": "number"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": true,
-              "isOptional": false,
-              "releaseTag": "Public",
-              "name": "computedClipMode",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
                 "endIndex": 2
@@ -39951,7 +40591,15 @@
               "excerptTokens": [
                 {
                   "kind": "Content",
-                  "text": "invalidateWorldBoundingVolume(): "
+                  "text": "invalidateWorldBoundingVolume(transformChanged: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
                 },
                 {
                   "kind": "Content",
@@ -39964,8 +40612,53 @@
               ],
               "isStatic": false,
               "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "transformChanged",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "invalidateWorldBoundingVolume"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!SceneNode#isBatchGroup:member(1)",
+              "docComment": "/**\n * true if this is a batch group, false otherwise\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "isBatchGroup(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "this is "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "BatchGroup",
+                  "canonicalReference": "@zephyr3d/scene!BatchGroup:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
                 "startIndex": 1,
-                "endIndex": 2
+                "endIndex": 3
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -39973,7 +40666,7 @@
               "parameters": [],
               "isOptional": false,
               "isAbstract": false,
-              "name": "invalidateWorldBoundingVolume"
+              "name": "isBatchGroup"
             },
             {
               "kind": "Method",
@@ -40329,108 +41022,6 @@
             },
             {
               "kind": "Property",
-              "canonicalReference": "@zephyr3d/scene!SceneNode.PICK_DISABLED:member",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "static readonly PICK_DISABLED = "
-                },
-                {
-                  "kind": "Content",
-                  "text": "0"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": true,
-              "isOptional": false,
-              "releaseTag": "Public",
-              "name": "PICK_DISABLED",
-              "propertyTypeTokenRange": {
-                "startIndex": 0,
-                "endIndex": 0
-              },
-              "initializerTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "isStatic": true,
-              "isProtected": false,
-              "isAbstract": false
-            },
-            {
-              "kind": "Property",
-              "canonicalReference": "@zephyr3d/scene!SceneNode.PICK_ENABLED:member",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "static readonly PICK_ENABLED = "
-                },
-                {
-                  "kind": "Content",
-                  "text": "1"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": true,
-              "isOptional": false,
-              "releaseTag": "Public",
-              "name": "PICK_ENABLED",
-              "propertyTypeTokenRange": {
-                "startIndex": 0,
-                "endIndex": 0
-              },
-              "initializerTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "isStatic": true,
-              "isProtected": false,
-              "isAbstract": false
-            },
-            {
-              "kind": "Property",
-              "canonicalReference": "@zephyr3d/scene!SceneNode.PICK_INHERITED:member",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "static readonly PICK_INHERITED = "
-                },
-                {
-                  "kind": "Content",
-                  "text": "-1"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": true,
-              "isOptional": false,
-              "releaseTag": "Public",
-              "name": "PICK_INHERITED",
-              "propertyTypeTokenRange": {
-                "startIndex": 0,
-                "endIndex": 0
-              },
-              "initializerTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "isStatic": true,
-              "isProtected": false,
-              "isAbstract": false
-            },
-            {
-              "kind": "Property",
               "canonicalReference": "@zephyr3d/scene!SceneNode#pickable:member",
               "docComment": "/**\n * Computed value of pick mode\n */\n",
               "excerptTokens": [
@@ -40444,43 +41035,13 @@
                 },
                 {
                   "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": true,
-              "isOptional": false,
-              "releaseTag": "Public",
-              "name": "pickable",
-              "propertyTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "isStatic": false,
-              "isProtected": false,
-              "isAbstract": false
-            },
-            {
-              "kind": "Property",
-              "canonicalReference": "@zephyr3d/scene!SceneNode#pickMode:member",
-              "docComment": "/**\n * Pick mode\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "get pickMode(): "
-                },
-                {
-                  "kind": "Content",
-                  "text": "number"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";\n\nset pickMode(val: number);"
+                  "text": ";\n\nset pickable(val: boolean);"
                 }
               ],
               "isReadonly": false,
               "isOptional": false,
               "releaseTag": "Public",
-              "name": "pickMode",
+              "name": "pickable",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
                 "endIndex": 2
@@ -40633,108 +41194,6 @@
             },
             {
               "kind": "Property",
-              "canonicalReference": "@zephyr3d/scene!SceneNode.SHOW_DEFAULT:member",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "static readonly SHOW_DEFAULT = "
-                },
-                {
-                  "kind": "Content",
-                  "text": "1"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": true,
-              "isOptional": false,
-              "releaseTag": "Public",
-              "name": "SHOW_DEFAULT",
-              "propertyTypeTokenRange": {
-                "startIndex": 0,
-                "endIndex": 0
-              },
-              "initializerTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "isStatic": true,
-              "isProtected": false,
-              "isAbstract": false
-            },
-            {
-              "kind": "Property",
-              "canonicalReference": "@zephyr3d/scene!SceneNode.SHOW_HIDE:member",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "static readonly SHOW_HIDE = "
-                },
-                {
-                  "kind": "Content",
-                  "text": "0"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": true,
-              "isOptional": false,
-              "releaseTag": "Public",
-              "name": "SHOW_HIDE",
-              "propertyTypeTokenRange": {
-                "startIndex": 0,
-                "endIndex": 0
-              },
-              "initializerTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "isStatic": true,
-              "isProtected": false,
-              "isAbstract": false
-            },
-            {
-              "kind": "Property",
-              "canonicalReference": "@zephyr3d/scene!SceneNode.SHOW_INHERITED:member",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "static readonly SHOW_INHERITED = "
-                },
-                {
-                  "kind": "Content",
-                  "text": "-1"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": true,
-              "isOptional": false,
-              "releaseTag": "Public",
-              "name": "SHOW_INHERITED",
-              "propertyTypeTokenRange": {
-                "startIndex": 0,
-                "endIndex": 0
-              },
-              "initializerTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "isStatic": true,
-              "isProtected": false,
-              "isAbstract": false
-            },
-            {
-              "kind": "Property",
               "canonicalReference": "@zephyr3d/scene!SceneNode#showState:member",
               "docComment": "/**\n * Show state\n */\n",
               "excerptTokens": [
@@ -40743,12 +41202,22 @@
                   "text": "get showState(): "
                 },
                 {
-                  "kind": "Content",
-                  "text": "number"
+                  "kind": "Reference",
+                  "text": "SceneNodeVisible",
+                  "canonicalReference": "@zephyr3d/scene!SceneNodeVisible:type"
                 },
                 {
                   "kind": "Content",
-                  "text": ";\n\nset showState(val: number);"
+                  "text": ";\n\nset showState(val: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "SceneNodeVisible",
+                  "canonicalReference": "@zephyr3d/scene!SceneNodeVisible:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": ");"
                 }
               ],
               "isReadonly": false,
@@ -40834,6 +41303,32 @@
             "endIndex": 5
           },
           "implementsTokenRanges": []
+        },
+        {
+          "kind": "TypeAlias",
+          "canonicalReference": "@zephyr3d/scene!SceneNodeVisible:type",
+          "docComment": "/**\n * Scene node visible state\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "type SceneNodeVisible = "
+            },
+            {
+              "kind": "Content",
+              "text": "'visible' | 'inherit' | 'hidden'"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "releaseTag": "Public",
+          "name": "SceneNodeVisible",
+          "typeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 2
+          }
         },
         {
           "kind": "Interface",
@@ -42275,56 +42770,6 @@
             },
             {
               "kind": "Method",
-              "canonicalReference": "@zephyr3d/scene!ShaderHelper.getCameraRotationMatrix:member(1)",
-              "docComment": "/**\n * Gets the uniform variable of type mat4 which holds the view projection matrix of current camera\n *\n * @param scope - Current shader scope\n *\n * @returns The view projection matrix of current camera\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "static getCameraRotationMatrix(scope: "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "PBInsideFunctionScope",
-                  "canonicalReference": "@zephyr3d/device!PBInsideFunctionScope:class"
-                },
-                {
-                  "kind": "Content",
-                  "text": "): "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "PBShaderExp",
-                  "canonicalReference": "@zephyr3d/device!PBShaderExp:class"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isStatic": true,
-              "returnTypeTokenRange": {
-                "startIndex": 3,
-                "endIndex": 4
-              },
-              "releaseTag": "Public",
-              "isProtected": false,
-              "overloadIndex": 1,
-              "parameters": [
-                {
-                  "parameterName": "scope",
-                  "parameterTypeTokenRange": {
-                    "startIndex": 1,
-                    "endIndex": 2
-                  },
-                  "isOptional": false
-                }
-              ],
-              "isOptional": false,
-              "isAbstract": false,
-              "name": "getCameraRotationMatrix"
-            },
-            {
-              "kind": "Method",
               "canonicalReference": "@zephyr3d/scene!ShaderHelper.getEnvLightStrength:member(1)",
               "docComment": "/**\n * Gets the uniform variable of type float which holds the strength of the environment light\n *\n * @remarks\n *\n * This function can only be used in the fragment shader\n *\n * @param scope - Current shader scope\n *\n * @returns The uniform variable of which presents the strength of the environment light\n */\n",
               "excerptTokens": [
@@ -42575,12 +43020,12 @@
             },
             {
               "kind": "Method",
-              "canonicalReference": "@zephyr3d/scene!ShaderHelper.getInstanceBufferOffsetUniformName:member(1)",
+              "canonicalReference": "@zephyr3d/scene!ShaderHelper.getInstanceBufferStrideUniformName:member(1)",
               "docComment": "",
               "excerptTokens": [
                 {
                   "kind": "Content",
-                  "text": "static getInstanceBufferOffsetUniformName(): "
+                  "text": "static getInstanceBufferStrideUniformName(): "
                 },
                 {
                   "kind": "Content",
@@ -42602,7 +43047,73 @@
               "parameters": [],
               "isOptional": false,
               "isAbstract": false,
-              "name": "getInstanceBufferOffsetUniformName"
+              "name": "getInstanceBufferStrideUniformName"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/scene!ShaderHelper.getInstancedUniform:member(1)",
+              "docComment": "/**\n * Gets the instance uniform value of type vec4 by uniform index\n *\n * @param scope - Current shader scope\n *\n * @returns instance uniform value\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "static getInstancedUniform(scope: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "PBInsideFunctionScope",
+                  "canonicalReference": "@zephyr3d/device!PBInsideFunctionScope:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", uniformIndex: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "PBShaderExp",
+                  "canonicalReference": "@zephyr3d/device!PBShaderExp:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": true,
+              "returnTypeTokenRange": {
+                "startIndex": 5,
+                "endIndex": 6
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "scope",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "uniformIndex",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 4
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "getInstancedUniform"
             },
             {
               "kind": "Method",
@@ -44299,6 +44810,46 @@
             },
             {
               "kind": "Property",
+              "canonicalReference": "@zephyr3d/scene!ShadowMapper#shadowRegion:member",
+              "docComment": "/**\n * Shadow region for directional light\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "get shadowRegion(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "AABB",
+                  "canonicalReference": "@zephyr3d/base!AABB:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";\n\nset shadowRegion(region: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "AABB",
+                  "canonicalReference": "@zephyr3d/base!AABB:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ");"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "shadowRegion",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
+            },
+            {
+              "kind": "Property",
               "canonicalReference": "@zephyr3d/scene!ShadowMapper#splitLambda:member",
               "docComment": "/**\n * The split lambda for cascaded shadow mapping\n */\n",
               "excerptTokens": [
@@ -44533,6 +45084,36 @@
                   "isOptional": true
                 }
               ]
+            },
+            {
+              "kind": "Property",
+              "canonicalReference": "@zephyr3d/scene!Shape#options:member",
+              "docComment": "/**\n * Creation options\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "get options(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "T"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": true,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "options",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
             }
           ],
           "extendsTokenRange": {
@@ -46359,6 +46940,36 @@
                   "isOptional": true
                 }
               ]
+            },
+            {
+              "kind": "Property",
+              "canonicalReference": "@zephyr3d/scene!SphereShape#radius:member",
+              "docComment": "/**\n * Sphere radius\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "get radius(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": true,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "radius",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
             },
             {
               "kind": "Method",
@@ -50446,7 +51057,16 @@
             },
             {
               "kind": "Content",
-              "text": "> "
+              "text": "> extends "
+            },
+            {
+              "kind": "Reference",
+              "text": "XForm_base",
+              "canonicalReference": "@zephyr3d/scene!~XForm_base"
+            },
+            {
+              "kind": "Content",
+              "text": " "
             }
           ],
           "fileUrlPath": "dist/index.d.ts",
@@ -50592,10 +51212,19 @@
                 },
                 {
                   "kind": "Content",
-                  "text": ";"
+                  "text": ";\n\nset localMatrix(matrix: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Matrix4x4",
+                  "canonicalReference": "@zephyr3d/base!Matrix4x4:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ");"
                 }
               ],
-              "isReadonly": true,
+              "isReadonly": false,
               "isOptional": false,
               "releaseTag": "Public",
               "name": "localMatrix",
@@ -51026,37 +51655,6 @@
               "name": "reparent"
             },
             {
-              "kind": "Method",
-              "canonicalReference": "@zephyr3d/scene!XForm#resetTransform:member(1)",
-              "docComment": "/**\n * Resets the transformation matrix\n *\n * @returns self\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "resetTransform(): "
-                },
-                {
-                  "kind": "Content",
-                  "text": "this"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isStatic": false,
-              "returnTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "releaseTag": "Public",
-              "isProtected": false,
-              "overloadIndex": 1,
-              "parameters": [],
-              "isOptional": false,
-              "isAbstract": false,
-              "name": "resetTransform"
-            },
-            {
               "kind": "Property",
               "canonicalReference": "@zephyr3d/scene!XForm#rotation:member",
               "docComment": "/**\n * Rotation of the xform\n */\n",
@@ -51188,11 +51786,11 @@
             {
               "kind": "Method",
               "canonicalReference": "@zephyr3d/scene!XForm#setLocalTransform:member(1)",
-              "docComment": "/**\n * Sets the local transform matrix of the xform\n *\n * @param m - The transform matrix to set\n *\n * @returns self\n */\n",
+              "docComment": "/**\n * Sets the local transform matrix of the xform\n *\n * @param matrix - The transform matrix to set\n *\n * @returns self\n */\n",
               "excerptTokens": [
                 {
                   "kind": "Content",
-                  "text": "setLocalTransform(m: "
+                  "text": "setLocalTransform(matrix: "
                 },
                 {
                   "kind": "Reference",
@@ -51222,7 +51820,7 @@
               "overloadIndex": 1,
               "parameters": [
                 {
-                  "parameterName": "m",
+                  "parameterName": "matrix",
                   "parameterTypeTokenRange": {
                     "startIndex": 1,
                     "endIndex": 2
@@ -51732,6 +52330,10 @@
               "name": "worldToThis"
             }
           ],
+          "extendsTokenRange": {
+            "startIndex": 7,
+            "endIndex": 8
+          },
           "implementsTokenRanges": []
         }
       ]

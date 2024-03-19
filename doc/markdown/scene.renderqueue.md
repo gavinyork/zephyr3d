@@ -16,7 +16,7 @@ declare class RenderQueue
 
 |  Constructor | Modifiers | Description |
 |  --- | --- | --- |
-|  [(constructor)(renderPass)](doc/markdown/./scene.renderqueue._constructor_.md) |  | Creates an instance of a render queue |
+|  [(constructor)(renderPass, bindGroupAllocator)](doc/markdown/./scene.renderqueue._constructor_.md) |  | Creates an instance of a render queue |
 
 ## Properties
 
@@ -32,9 +32,9 @@ declare class RenderQueue
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [clear()](doc/markdown/./scene.renderqueue.clear.md) |  | Removes all items in the render queue |
 |  [push(camera, drawable, renderOrder)](doc/markdown/./scene.renderqueue.push.md) |  | Push an item to the render queue |
 |  [pushLight(light)](doc/markdown/./scene.renderqueue.pushlight.md) |  | Push a punctual light |
-|  [setInstanceColors()](doc/markdown/./scene.renderqueue.setinstancecolors.md) |  |  |
+|  [pushRenderQueue(queue)](doc/markdown/./scene.renderqueue.pushrenderqueue.md) |  | Push items from another render queue |
+|  [reset()](doc/markdown/./scene.renderqueue.reset.md) |  | Removes all items in the render queue |
 |  [sortItems()](doc/markdown/./scene.renderqueue.sortitems.md) |  | Sorts the items in the render queue for rendering |
 

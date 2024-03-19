@@ -22,7 +22,7 @@ declare class Material
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
-|  [id](doc/markdown/./scene.material.id.md) | <code>readonly</code> | number | Unique identifier of the material |
+|  [instanceId](doc/markdown/./scene.material.instanceid.md) | <code>readonly</code> | number | Unique identifier of the material |
 |  [numPasses](doc/markdown/./scene.material.numpasses.md) |  | number |  |
 |  [stateSet](doc/markdown/./scene.material.stateset.md) |  | [RenderStateSet](doc/markdown/./device.renderstateset.md) | Render states associated to this material |
 

@@ -9,7 +9,7 @@ Tests if a point is inside the frustum.
 **Signature:**
 
 ```typescript
-containsPoint(pt: Vector3): boolean;
+containsPoint(pt: Vector3, epsl?: number): boolean;
 ```
 
 ## Parameters
@@ -17,6 +17,7 @@ containsPoint(pt: Vector3): boolean;
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  pt | [Vector3](doc/markdown/./base.vector3.md) | The point to test. |
+|  epsl | number | _(Optional)_ |
 
 **Returns:**
 

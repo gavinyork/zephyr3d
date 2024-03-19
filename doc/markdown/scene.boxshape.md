@@ -19,3 +19,11 @@ declare class BoxShape extends Shape<BoxCreationOptions>
 |  --- | --- | --- |
 |  [(constructor)(options)](doc/markdown/./scene.boxshape._constructor_.md) |  | Creates an instance of box shape |
 
+## Properties
+
+|  Property | Modifiers | Type | Description |
+|  --- | --- | --- | --- |
+|  [depth](doc/markdown/./scene.boxshape.depth.md) | <code>readonly</code> | number | Box depth |
+|  [height](doc/markdown/./scene.boxshape.height.md) | <code>readonly</code> | number | Box height |
+|  [width](doc/markdown/./scene.boxshape.width.md) | <code>readonly</code> | number | Box width |
+
