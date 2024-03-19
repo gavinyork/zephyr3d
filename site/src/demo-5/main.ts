@@ -25,7 +25,7 @@ function getQueryString(name: string) {
 }
 
 function getBackend(): DeviceBackend {
-  const type = getQueryString('dev') || 'webgl';
+  const type = getQueryString('dev');
   if (type === 'webgpu') {
     if (backendWebGPU.supported()) {
       return backendWebGPU;
@@ -33,17 +33,10 @@ function getBackend(): DeviceBackend {
       console.warn('No WebGPU support, fall back to WebGL2');
     }
   }
-  if (type === 'webgl2') {
-    if (backendWebGL2.supported()) {
-      return backendWebGL2;
-    } else {
-      console.warn('No WebGL2 support, fall back to WebGL1');
-    }
-  }
-  return backendWebGL1;
+  return backendWebGL2.supported() ? backendWebGL2 : backendWebGL1;
 }
 
-
+const showUI = !!getQueryString('ui');
 const instancingApp = new Application({
   backend: getBackend(),
   canvas: document.querySelector('#canvas')
@@ -93,7 +86,9 @@ instancingApp.ready().then(async () => {
       });
       instanceCount++;
     }
-    new Panel(instanceCount, vertexCount, faceCount);
+    if (showUI) {
+      new Panel(instanceCount, vertexCount, faceCount);
+    }
   })();
 
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));

@@ -5,5 +5,50 @@
 几何结构和材质，但可以有不同的位置、不同的旋转和缩放以及不同的材质属性，从而显著减少了
 内存占用和提高了渲染效率。
 
-对于WebGL2和WebGPU设备，zephyr3d为实例化渲染提供了支持。目前
+Zephyr3d对于WebGL2和WebGPU设备提供了实例化渲染的支持。在同一场景中，引擎会自动将使用
+了相同的几何体和材质的Mesh合并到一个或几个渲染调用。在代码中，你需要为作为实例渲染的对
+象赋予相同的几何体和同一材质的副本。之所以需要材质副本是因为即使是同一材质，每一个渲染
+实例也可能需要分别设置不同的材质属性。
 
+以下代码创建了若干盒子，通过共享相同的几何体和材质来进行实例化渲染。
+
+```javascript
+
+// 创建几何体
+const boxShape = new BoxShape();
+
+// 创建材质
+const material = new LambertMaterial();
+
+// 创建几个盒子
+for (let i = 0; i < 10; i++) {
+  const box = new Mesh(scene);
+  // 共享几何体
+  box.primitive = boxShape;
+  // 同一材质创建不同的副本
+  box.material = material.createInstance();
+  // 为材质副本设置颜色
+  box.material.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
+  // 设置实例的位置
+  box.position.setXYZ(1, 2, 3);
+}
+
+```
+
+以下是个完整的示例：
+
+<div class="showcase" case="tut-44"></div>
+
+## 动态合批
+
+通过以上代码创建的Mesh对象在渲染过程中需要逐一进行视锥剪裁，并将其中可见的对象动态合并为一个渲染调用。
+这种方式的好处在于通过视锥剪裁控制了实例的数量，缺点在于如果实例数量庞大，剪裁和合并操作将会带来可观
+的性能损失。在这种情况下，可以选择静态合批。
+
+## 静态合批
+
+静态合批是通过缓存实例合批的结果达到加速的效果。对于静态批次，实例将不再进行视锥剪裁和动态合并。静态
+批次里的对象可以改变位置缩放和旋转，材质副本的属性改变将不再生效。静态合批的使用也很简单，只需要创建
+一个BatchGroup节点作为所有渲染实例的父节点即可。
+
+<div class="showcase" case="tut-45"></div>

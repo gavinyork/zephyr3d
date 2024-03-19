@@ -103,7 +103,7 @@
       const iframe = document.querySelector('iframe');
       const linkCallback = function () {
         const id = this.id;
-        iframe.src = 'tut/' + id + '.html' + '?dev=webgl2';
+        iframe.src = 'tut/' + id + '.html' + '?dev=webgl2&ui=1';
         const links = document.querySelectorAll('li');
         for (const link of links) {
           if (link === this) {
