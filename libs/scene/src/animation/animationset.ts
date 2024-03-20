@@ -1,5 +1,9 @@
+import { Matrix4x4 } from '@zephyr3d/base';
 import type { Scene } from '../scene';
 import type { AnimationClip } from './animation';
+import { Skeleton } from './skeleton';
+import { Application } from '../app';
+import { Texture2D } from '@zephyr3d/device';
 
 /**
  * Animation set
@@ -103,5 +107,61 @@ export class AnimationSet {
       this._animations[k].dispose();
     }
     this._animations = {};
+  }
+  /** @internal */
+  protected _createAnimationTexture(numKeyframesPerSecond: number, skeleton: Skeleton) {
+    const textureSize = this.calculateAnimationTextureSize(numKeyframesPerSecond, skeleton);
+    const data = new Float32Array(textureSize * textureSize * 4);
+    const numMatrices = (textureSize * textureSize) >> 2;
+    const matrices: Matrix4x4[] = [];
+    for (let i = 0; i < numMatrices; i++) {
+      matrices.push(new Matrix4x4(data.buffer, i * 16 * 4));
+    }
+    const animationTexInfo: {
+      texture: Texture2D,
+      numJoints: number,
+      offsets: Record<string, number>
+    } = {
+      texture: null,
+      numJoints: skeleton.numJoints,
+      offsets: {}
+    };
+    let offset = 0;
+    for (const k in this._animations) {
+      const animation = this._animations[k];
+      if (animation.isSkeletonUsed(skeleton)) {
+        animationTexInfo.offsets[k] = offset * 4;
+        const numKeyframes = Math.ceil(animation.timeDuration) * numKeyframesPerSecond;
+        for (let i = 0; i < numKeyframes; i++) {
+          const t = animation.timeDuration * (i / Math.max(numKeyframes - 1, 1));
+          animation.updateTracks(t * animation.timeDuration);
+          skeleton.computeJointMatrices(matrices, offset, false);
+          offset += skeleton.numJoints;
+        }
+      }
+    }
+    animationTexInfo.texture = Application.instance.device.createTexture2D('rgba32f', textureSize, textureSize, {
+      samplerOptions: {
+        magFilter: 'nearest',
+        minFilter: 'nearest',
+        mipFilter: 'none',
+      }
+    });
+    return animationTexInfo;
+  }
+  /** @internal */
+  private calculateAnimationTextureSize(numKeyframesPerSecond: number, skeleton: Skeleton): number {
+    let totalKeyframes = 0;
+    for (const k in this._animations) {
+      const animation = this._animations[k];
+      if (animation.isSkeletonUsed(skeleton)) {
+        totalKeyframes += Math.ceil(animation.timeDuration) * numKeyframesPerSecond;
+      }
+    }
+    let size = 8;
+    while (size * size < totalKeyframes * skeleton.numJoints * 4) {
+      size *= 2;
+    }
+    return size;
   }
 }

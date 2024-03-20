@@ -53,6 +53,12 @@ export class Skeleton {
     this._jointMatrixArray = null;
   }
   /**
+   * Number of joints
+   */
+  get numJoints(): number {
+    return this._joints.length;
+  }
+  /**
    * The joint transform matrices
    */
   get jointMatrices(): Matrix4x4[] {
@@ -65,14 +71,29 @@ export class Skeleton {
     return this._jointTexture;
   }
   /** @internal */
-  updateJointMatrices(jointTransforms?: Matrix4x4[]) {
+  updateJointMatrices(bindPose: boolean) {
     if (!this._jointTexture) {
       this._createJointTexture();
     }
+    this.computeJointMatrices(this._jointMatrices, 0, bindPose);
+  }
+  /** @internal */
+  computeJointMatrices(matrices: Matrix4x4[], offset: number, bindPose: boolean) {
     for (let i = 0; i < this._joints.length; i++) {
-      const mat = this._jointMatrices[i];
+      const mat = matrices[i + offset];
       Matrix4x4.multiply(
-        jointTransforms ? jointTransforms[i] : this._joints[i].worldMatrix,
+        bindPose ? this._bindPoseMatrices[i] : this._joints[i].worldMatrix,
+        this._inverseBindMatrices[i],
+        mat
+      );
+    }
+  }
+  /** @internal */
+  computeJointBindPoseMatrices(matrices: Matrix4x4[], offset: number) {
+    for (let i = 0; i < this._joints.length; i++) {
+      const mat = matrices[i + offset];
+      Matrix4x4.multiply(
+        this._bindPoseMatrices[i],
         this._inverseBindMatrices[i],
         mat
       );
@@ -80,7 +101,7 @@ export class Skeleton {
   }
   /** @internal */
   computeBindPose() {
-    this.updateJointMatrices(this._bindPoseMatrices);
+    this.updateJointMatrices(true);
     this._jointTexture.update(
       this._jointMatrixArray,
       0,
@@ -91,7 +112,7 @@ export class Skeleton {
   }
   /** @internal */
   computeJoints() {
-    this.updateJointMatrices();
+    this.updateJointMatrices(false);
     this._jointTexture.update(
       this._jointMatrixArray,
       0,

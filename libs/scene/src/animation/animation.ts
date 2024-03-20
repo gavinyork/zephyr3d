@@ -98,6 +98,10 @@ export class AnimationClip {
   get timeDuration(): number {
     return this._duration;
   }
+  /** Whether given skeleton is used in this animation */
+  isSkeletonUsed(skeleton: Skeleton): boolean {
+    return this._skeletons.has(skeleton);
+  }
   /**
    * Adds a skeleton to the animation
    * @param skeleton - The skeleton to be added
@@ -146,6 +150,17 @@ export class AnimationClip {
     return this._isPlaying;
   }
   /**
+   * Update tracks
+   * @param t - play time
+   */
+  updateTracks(t: number) {
+    this._tracks.forEach((trackInfo, node) => {
+      for (const track of trackInfo.tracks) {
+        track.apply(node, t, this._duration);
+      }
+    });
+  }
+  /**
    * Updates the animation state
    */
   update(): void {
@@ -154,11 +169,7 @@ export class AnimationClip {
       return;
     }
     this._lastUpdateFrame = device.frameInfo.frameCounter;
-    this._tracks.forEach((trackInfo, node) => {
-      for (const track of trackInfo.tracks) {
-        track.apply(node, this._currentPlayTime, this._duration);
-      }
-    });
+    this.updateTracks(this._currentPlayTime);
     this._skeletons.forEach((meshes, skeleton) => {
       skeleton.computeJoints();
       for (const mesh of meshes) {

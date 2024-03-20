@@ -509,7 +509,7 @@ export class AssetManager {
               sk.inverseBindMatrices,
               sk.bindPoseMatrices
             );
-            skeleton.updateJointMatrices();
+            skeleton.updateJointMatrices(true);
             animation.addSkeleton(
               skeleton,
               nodes.mesh,
