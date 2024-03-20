@@ -38,7 +38,7 @@ export type TextureFetchOptions<T extends BaseTexture> = {
 export type ModelFetchOptions = {
   mimeType?: string;
   disableInstancing?: boolean;
-  postProcess?: (model: SharedModel) => SharedModel  
+  postProcess?: (model: SharedModel) => SharedModel;
 };
 
 /**
@@ -464,7 +464,11 @@ export class AssetManager {
     }
   }
   /** @internal */
-  private createSceneNode(scene: Scene, model: SharedModel, instancing: boolean): { group: SceneNode; animationSet: AnimationSet } {
+  private createSceneNode(
+    scene: Scene,
+    model: SharedModel,
+    instancing: boolean
+  ): { group: SceneNode; animationSet: AnimationSet } {
     const group = new SceneNode(scene);
     group.name = model.name;
     let animationSet = new AnimationSet(scene);
@@ -473,7 +477,15 @@ export class AssetManager {
       const skeletonMeshMap: Map<AssetSkeleton, { mesh: Mesh[]; bounding: AssetSubMeshData[] }> = new Map();
       const nodeMap: Map<AssetHierarchyNode, SceneNode> = new Map();
       for (let k = 0; k < assetScene.rootNodes.length; k++) {
-        this.setAssetNodeToSceneNode(scene, group, model, assetScene.rootNodes[k], skeletonMeshMap, nodeMap, instancing);
+        this.setAssetNodeToSceneNode(
+          scene,
+          group,
+          model,
+          assetScene.rootNodes[k],
+          skeletonMeshMap,
+          nodeMap,
+          instancing
+        );
       }
       for (const animationData of model.animations) {
         const animation = new AnimationClip(animationData.name, group);
@@ -633,7 +645,7 @@ export class AssetManager {
         meshNode.clipTestEnabled = true;
         meshNode.showState = 'inherit';
         meshNode.primitive = subMesh.primitive;
-        meshNode.material = instancing ? subMesh.material.createInstance() : subMesh.material
+        meshNode.material = instancing ? subMesh.material.createInstance() : subMesh.material;
         // meshNode.drawBoundingBox = true;
         meshNode.reparent(node);
         if (skeleton) {

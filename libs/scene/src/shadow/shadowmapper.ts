@@ -783,7 +783,10 @@ export class ShadowMapper {
         : new Vector4(0, 0, 0, 1)
       : null;
     const depthScale = this._impl.getDepthScale();
-    const shadowRegion = this._light.isDirectionLight() && this._shadowRegion && this._shadowRegion.isValid() ? this._shadowRegion : scene.boundingBox;
+    const shadowRegion =
+      this._light.isDirectionLight() && this._shadowRegion && this._shadowRegion.isValid()
+        ? this._shadowRegion
+        : scene.boundingBox;
     if (this._light.isPointLight()) {
       const shadowMapRenderCamera = ShadowMapper.fetchCameraForScene(scene);
       this.createLightCameraPoint(shadowMapRenderCamera);
@@ -842,13 +845,7 @@ export class ShadowMapper {
             snapMatrix,
             border
           );
-          this.createLightCameraDirectional(
-            shadowRegion,
-            cascadeCamera,
-            shadowMapCullCamera,
-            null,
-            border
-          );
+          this.createLightCameraDirectional(shadowRegion, cascadeCamera, shadowMapCullCamera, null, border);
           this.calcDepthBiasParams(
             shadowMapRenderCamera,
             this._config.shadowMapSize,

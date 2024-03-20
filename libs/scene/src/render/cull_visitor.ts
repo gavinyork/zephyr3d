@@ -2,7 +2,7 @@ import type { AABB } from '@zephyr3d/base';
 import { ClipState } from '@zephyr3d/base';
 import { OctreeNode } from '../scene/octree';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../values';
-import { GraphNode } from '../scene/graph_node';
+import type { GraphNode } from '../scene/graph_node';
 import type { RenderQueue } from './render_queue';
 import type { RenderPass, Drawable } from '.';
 import type { Mesh } from '../scene/mesh';
@@ -11,7 +11,7 @@ import type { PunctualLight } from '../scene/light';
 import type { Visitor } from '../scene/visitor';
 import type { Camera } from '../camera/camera';
 import type { SceneNode } from '../scene/scene_node';
-import { BatchGroup } from '../scene/batchgroup';
+import type { BatchGroup } from '../scene/batchgroup';
 
 /**
  * Node visitor for culling

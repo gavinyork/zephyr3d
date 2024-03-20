@@ -10,6 +10,10 @@ import { Vector4 } from '@zephyr3d/base';
 import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
 
+/**
+ * Interface for PBRSpecularGlossiness mixin
+ * @public
+ */
 export type IMixinPBRSpecularGlossiness = {
   specularFactor: Vector4;
   glossinessFactor: number;
@@ -32,6 +36,14 @@ export type IMixinPBRSpecularGlossiness = {
   IMixinLight &
   TextureMixinInstanceTypes<['specular']>;
 
+/**
+ * PBRSpecularGlossiness mixin
+ *
+ * @param BaseCls - Base class to mix in
+ * @returns Mixed class
+ *
+ * @public
+ */
 export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).pbrSpecularGlossnessMixed) {
     return BaseCls as T & { new (...args: any[]): IMixinPBRSpecularGlossiness };

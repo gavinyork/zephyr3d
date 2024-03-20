@@ -1,18 +1,22 @@
 import { GraphNode } from './graph_node';
-import { RenderQueue, CullVisitor, RenderPass, InstanceBindGroupAllocator, SceneRenderer } from '../render';
+import type { CullVisitor, RenderPass } from '../render';
+import { RenderQueue, InstanceBindGroupAllocator, SceneRenderer } from '../render';
 import type { Scene } from './scene';
 import type { BoundingVolume } from '../utility/bounding_volume';
-import { SceneNode } from '.';
+import type { SceneNode } from '.';
 
 /**
  * Batch group node
  * @public
  */
 export class BatchGroup extends GraphNode {
-  private _renderQueueMap: WeakMap<RenderPass, {
-    queue: RenderQueue,
-    tag: number
-  }>;
+  private _renderQueueMap: WeakMap<
+    RenderPass,
+    {
+      queue: RenderQueue;
+      tag: number;
+    }
+  >;
   private _bindGroupAllocator: InstanceBindGroupAllocator;
   private _transformHandler: (node: SceneNode) => void;
   private _changeTag: number;
@@ -44,8 +48,8 @@ export class BatchGroup extends GraphNode {
         }
       }
     };
-    this.on('nodeattached', node => {
-      node.iterate(child => {
+    this.on('nodeattached', (node) => {
+      node.iterate((child) => {
         if (child.isGraphNode()) {
           if (!child.isMesh()) {
             console.error('Only mesh node can be added to batch group');
@@ -61,8 +65,8 @@ export class BatchGroup extends GraphNode {
       });
       this._changeTag++;
     });
-    this.on('noderemoved', node => {
-      node.iterate(child => {
+    this.on('noderemoved', (node) => {
+      node.iterate((child) => {
         if (child.isGraphNode()) {
           child.off('transformchanged', this._transformHandler);
           child.placeToOctree = true;
@@ -93,7 +97,7 @@ export class BatchGroup extends GraphNode {
       queueInfo = {
         queue: new RenderQueue(cullVisitor.renderPass, this._bindGroupAllocator),
         tag: -1
-      }
+      };
       this._renderQueueMap.set(cullVisitor.renderPass, queueInfo);
     }
     if (queueInfo.tag !== this._changeTag) {
@@ -103,7 +107,7 @@ export class BatchGroup extends GraphNode {
       const renderQueue = cullVisitor.renderQueue;
       cullVisitor.frustumCulling = false;
       cullVisitor.renderQueue = queueInfo.queue;
-      this.iterate(node => {
+      this.iterate((node) => {
         if (node.isMesh()) {
           cullVisitor.visit(node);
         }

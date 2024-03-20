@@ -44,7 +44,9 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
       this.uniformChanged();
     }
     getUniformValueAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp {
-      return this.drawContext.instanceData ? this.getInstancedUniform(scope, ALBEDO_COLOR_UNIFORM) : scope.zAlbedo;
+      return this.drawContext.instanceData
+        ? this.getInstancedUniform(scope, ALBEDO_COLOR_UNIFORM)
+        : scope.zAlbedo;
     }
     calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;

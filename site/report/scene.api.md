@@ -320,7 +320,7 @@ export class AssetManager {
     doLoadTexture(loader: AbstractTextureLoader, url: string, mimeType: string, data: ArrayBuffer, srgb: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<BaseTexture>;
     fetchBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer>;
     fetchBuiltinTexture<T extends BaseTexture>(name: string, texture?: BaseTexture): Promise<T>;
-    fetchModel(scene: Scene, url: string, mimeType?: string, postProcess?: (model: SharedModel) => SharedModel): Promise<ModelInfo>;
+    fetchModel(scene: Scene, url: string, options?: ModelFetchOptions): Promise<ModelInfo>;
     // @internal (undocumented)
     fetchModelData(scene: Scene, url: string, mimeType?: string, postProcess?: (model: SharedModel) => SharedModel): Promise<SharedModel>;
     fetchTextData(url: string, postProcess?: (text: string) => string): Promise<string>;
@@ -495,7 +495,7 @@ export class AssetSkeleton extends NamedObject {
 // @public
 export interface AssetSubMeshData {
     // (undocumented)
-    material: Material;
+    material: MeshMaterial;
     // (undocumented)
     name: string;
     // (undocumented)
@@ -588,7 +588,25 @@ export abstract class BaseLight extends GraphNode {
 
 // @public
 export interface BatchDrawable extends Drawable {
+    getInstanceDataBuffer(renderPass: RenderPass): {
+        bindGroup: CachedBindGroup;
+        offset: number;
+    };
     getInstanceId(renderPass: RenderPass): string;
+    getInstanceUniforms(): Float32Array;
+    // Warning: (ae-incompatible-release-tags) The symbol "setInstanceDataBuffer" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
+    setInstanceDataBuffer(renderPass: RenderPass, bindGroup: CachedBindGroup, offset: number): any;
+}
+
+// @public
+export class BatchGroup extends GraphNode {
+    constructor(scene: Scene);
+    // @internal (undocumented)
+    computeBoundingVolume(bv: BoundingVolume): BoundingVolume;
+    getName(): string;
+    // (undocumented)
+    getRenderQueue(cullVisitor: CullVisitor): RenderQueue;
+    isBatchGroup(): boolean;
 }
 
 // @public
@@ -724,9 +742,6 @@ export interface BoundingVolume {
 
 // @public
 export interface BoxCreationOptions extends ShapeCreationOptions {
-    anchorX?: number;
-    anchorY?: number;
-    anchorZ?: number;
     size?: number;
     sizeX?: number;
     sizeY?: number;
@@ -782,6 +797,9 @@ export class BoxShape extends Shape<BoxCreationOptions> {
     protected _createArrays(vertices: number[], normals: number[], uvs: number[], indices: number[], minx: number, miny: number, minz: number, maxx: number, maxy: number, maxz: number): void;
     // @internal (undocumented)
     protected createDefaultOptions(): BoxCreationOptions;
+    get depth(): number;
+    get height(): number;
+    get width(): number;
 }
 
 // @public
@@ -789,6 +807,15 @@ export const BUILTIN_ASSET_TEST_CUBEMAP = "TEST_Cubemap";
 
 // @public
 export const BUILTIN_ASSET_TEXTURE_SHEEN_LUT = "LUT_Sheen";
+
+// Warning: (ae-internal-missing-underscore) The name "CachedBindGroup" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export type CachedBindGroup = {
+    bindGroup: BindGroup;
+    buffer: Float32Array;
+    dirty: boolean;
+};
 
 // @public
 export class Camera extends SceneNode {
@@ -1024,6 +1051,8 @@ export class CullVisitor implements Visitor {
     get camera(): Camera;
     set camera(camera: Camera);
     get frustum(): _zephyr3d_base.Frustum;
+    get frustumCulling(): boolean;
+    set frustumCulling(val: boolean);
     // @internal (undocumented)
     protected getClipStateWithAABB(aabb: AABB): ClipState;
     // @internal (undocumented)
@@ -1031,9 +1060,14 @@ export class CullVisitor implements Visitor {
     get primaryCamera(): Camera;
     // @internal (undocumented)
     push(camera: Camera, drawable: Drawable, renderOrder: number): void;
+    // @internal (undocumented)
+    pushRenderQueue(renderQueue: RenderQueue): void;
     get renderPass(): RenderPass;
     get renderQueue(): RenderQueue;
+    set renderQueue(renderQueue: RenderQueue);
     visit(target: SceneNode | OctreeNode): unknown;
+    // @internal (undocumented)
+    visitBatchGroup(node: BatchGroup): boolean;
     // @internal (undocumented)
     visitMesh(node: Mesh): boolean;
     // @internal (undocumented)
@@ -1046,9 +1080,6 @@ export class CullVisitor implements Visitor {
 
 // @public
 export interface CylinderCreationOptions extends ShapeCreationOptions {
-    anchorX?: number;
-    anchorY?: number;
-    anchorZ?: number;
     bottomRadius?: number;
     height?: number;
     heightDetail?: number;
@@ -1496,6 +1527,9 @@ export class GraphNode extends SceneNode {
     isBatchable(): this is BatchDrawable;
     // @override
     isGraphNode(): this is GraphNode;
+    // @internal (undocumented)
+    get octreeNode(): OctreeNode;
+    set octreeNode(node: OctreeNode);
     get renderOrder(): number;
     set renderOrder(val: number);
     // @internal (undocumented)
@@ -1709,7 +1743,7 @@ export type IMixinPBRMetallicRoughness = {
     calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
 } & IMixinPBRCommon & IMixinLight & TextureMixinInstanceTypes<['metallicRoughness', 'occlusion', 'specular', 'specularColor']>;
 
-// @public (undocumented)
+// @public
 export type IMixinPBRSpecularGlossiness = {
     specularFactor: Vector4;
     glossinessFactor: number;
@@ -1725,17 +1759,39 @@ export interface IMixinVertexColor {
     vertexColor: boolean;
 }
 
+// Warning: (ae-internal-missing-underscore) The name "InstanceBindGroupAllocator" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export class InstanceBindGroupAllocator {
+    constructor();
+    // (undocumented)
+    allocateInstanceBindGroup(framestamp: number): CachedBindGroup;
+    // (undocumented)
+    _freeBindGroupList: CachedBindGroup[];
+    // (undocumented)
+    _usedBindGroupList: CachedBindGroup[];
+}
+
 // @public
 export interface InstanceData {
+    // Warning: (ae-incompatible-release-tags) The symbol "bindGroup" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
+    //
+    // (undocumented)
+    bindGroup: CachedBindGroup;
+    // (undocumented)
+    currentSize: number;
     // (undocumented)
     hash: string;
     // (undocumented)
-    instanceColorList?: Vector4[];
+    maxSize: number;
     // (undocumented)
-    nodeList?: GraphNode[];
-    // (undocumented)
-    worldMatrices: Matrix4x4[];
+    stride: number;
 }
+
+// Warning: (ae-internal-missing-underscore) The name "InstanceUniformType" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export type InstanceUniformType = 'float' | 'vec2' | 'vec3' | 'vec4';
 
 // Warning: (ae-forgotten-export) The symbol "LambertMaterial_base" needs to be exported by the entry point index.d.ts
 //
@@ -1793,6 +1849,10 @@ export type LogMode = 'info' | 'warn' | 'error' | 'debug';
 
 // @public
 export class Material {
+    // @internal
+    get $instanceUniforms(): Float32Array;
+    // @internal
+    get $isInstance(): boolean;
     constructor();
     applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number): void;
     protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
@@ -1827,7 +1887,7 @@ export class Material {
     getQueueType(): number;
     // @internal (undocumented)
     protected _hash: string[][];
-    get id(): number;
+    get instanceId(): number;
     isBatchable(): boolean;
     isTransparentPass(pass: number): boolean;
     // (undocumented)
@@ -1895,12 +1955,22 @@ export class Mesh extends GraphNode implements BatchDrawable {
     set drawBoundingBox(val: boolean);
     getBoneMatrices(): Texture2D;
     getInstanceColor(): Vector4;
+    getInstanceDataBuffer(renderPass: RenderPass): {
+        bindGroup: CachedBindGroup;
+        offset: number;
+    };
     getInstanceId(renderPass: RenderPass): string;
+    getInstanceUniforms(): Float32Array;
     getInvBindMatrix(): Matrix4x4;
     getName(): string;
     getPickTarget(): GraphNode;
     getQueueType(): number;
     getXForm(): XForm;
+    // @internal (undocumented)
+    protected _instanceBufferInfo: Map<RenderPass, {
+        bindGroup: CachedBindGroup;
+        offset: number;
+    }>;
     // @internal (undocumented)
     protected _instanceColor: Vector4;
     // @internal (undocumented)
@@ -1916,6 +1986,8 @@ export class Mesh extends GraphNode implements BatchDrawable {
     set primitive(prim: Primitive);
     setAnimatedBoundingBox(bbox: BoundingBox): void;
     setBoneMatrices(matrices: Texture2D): void;
+    // Warning: (ae-incompatible-release-tags) The symbol "setInstanceDataBuffer" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
+    setInstanceDataBuffer(renderPass: RenderPass, bindGroup: CachedBindGroup, offset: number): void;
     setInvBindMatrix(matrix: Matrix4x4): void;
 }
 
@@ -1935,6 +2007,7 @@ export class MeshMaterial extends Material {
     set blendMode(val: BlendMode);
     // @internal @override
     protected _createHash(renderPassType: number): string;
+    createInstance(): this;
     // @internal (undocumented)
     protected createProgram(ctx: DrawContext, pass: number): GPUProgram;
     // @internal @override
@@ -1942,10 +2015,16 @@ export class MeshMaterial extends Material {
     get cullMode(): FaceMode;
     set cullMode(val: FaceMode);
     static defineFeature(): number;
+    // Warning: (ae-incompatible-release-tags) The symbol "defineInstanceUniform" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
+    static defineInstanceUniform(prop: string, type: InstanceUniformType): number;
     get drawContext(): DrawContext;
     featureUsed<T = unknown>(feature: number): T;
     fragmentShader(scope: PBFunctionScope): void;
+    // (undocumented)
+    getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShaderExp;
     getQueueType(): number;
+    // @internal (undocumented)
+    static INSTANCE_UNIFORMS: [string, InstanceUniformType][];
     isTransparentPass(pass: number): boolean;
     needFragmentColor(ctx?: DrawContext): boolean;
     // @internal (undocumented)
@@ -1982,7 +2061,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T): T & (
 // @public
 export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinPBRMetallicRoughness);
 
-// @public (undocumented)
+// @public
 export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinPBRSpecularGlossiness);
 
 // @public
@@ -2002,6 +2081,13 @@ export class Model extends GraphNode {
     stopAnimation(name: string): void;
     update(): void;
 }
+
+// @public
+export type ModelFetchOptions = {
+    mimeType?: string;
+    disableInstancing?: boolean;
+    postProcess?: (model: SharedModel) => SharedModel;
+};
 
 // @public
 export type ModelInfo = {
@@ -2062,6 +2148,8 @@ export class Octree {
     locateNodeChain(candidate: OctreeNode, center: Vector3, radius: number): OctreeNode;
     placeNode(node: GraphNode): void;
     removeNode(node: GraphNode): void;
+    // (undocumented)
+    resize(size: number): void;
 }
 
 // @public
@@ -2084,12 +2172,9 @@ export class OctreeNode {
     getOrCreateParent(): OctreeNode;
     getParent(): OctreeNode;
     getPosition(): number;
-    getReference(): number;
-    invalidateBox(): void;
     removeNode(node: GraphNode): void;
     setChunk(chunk: OctreeNodeChunk): void;
     setPosition(index: number): void;
-    tidy(): boolean;
     traverse(v: Visitor): void;
 }
 
@@ -2098,8 +2183,6 @@ export class OctreeNodeChunk {
     constructor(octree: Octree);
     clearNodes(): void;
     empty(): boolean;
-    freeNode(node: OctreeNode): void;
-    freeNodeByIndex(index: number): void;
     getChildIndex(index: number, placement: OctreePlacement): number;
     getDimension(): number;
     getLevel(): number;
@@ -2112,6 +2195,8 @@ export class OctreeNodeChunk {
     getParentIndex(index: number): number;
     getPrev(): OctreeNodeChunk;
     getWorldSize(): number;
+    // @internal (undocumented)
+    get nodeMap(): Map<number, OctreeNode>;
     setDimension(dimension: number): void;
     setLevel(level: number): void;
     setNext(chunk: OctreeNodeChunk): void;
@@ -2470,6 +2555,8 @@ export class Primitive {
     drawInstanced(numInstances: number): void;
     getBoundingVolume(): BoundingVolume;
     getIndexBuffer(): IndexBuffer;
+    getNumFaces(): number;
+    getNumVertices(): number;
     getVertexBuffer(semantic: VertexSemantic): StructuredBuffer;
     getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo;
     // @internal
@@ -2678,17 +2765,17 @@ export abstract class RenderPass {
 
 // @public
 export class RenderQueue {
-    constructor(renderPass: RenderPass);
-    clear(): void;
+    // Warning: (ae-incompatible-release-tags) The symbol "__constructor" is marked as @public, but its signature references "InstanceBindGroupAllocator" which is marked as @internal
+    constructor(renderPass: RenderPass, bindGroupAllocator?: InstanceBindGroupAllocator);
     // @internal
     getMaxBatchSize(): number;
     // Warning: (ae-forgotten-export) The symbol "RenderItemList" needs to be exported by the entry point index.d.ts
     get items(): Record<number, RenderItemList>;
     push(camera: Camera, drawable: Drawable, renderOrder: number): void;
     pushLight(light: PunctualLight): void;
+    pushRenderQueue(queue: RenderQueue): void;
     get renderPass(): RenderPass;
-    // (undocumented)
-    setInstanceColors(): GraphNode[];
+    reset(): void;
     get shadowedLights(): PunctualLight[];
     sortItems(): void;
     get sunLight(): DirectionalLight;
@@ -2797,9 +2884,9 @@ export class Scene extends Scene_base {
     // @internal (undocumented)
     protected _id: number;
     // @internal (undocumented)
-    invalidateNodePlacement(node: SceneNode): void;
+    invalidateNodePlacement(node: GraphNode): void;
     // @internal (undocumented)
-    protected _nodePlaceList: Set<SceneNode>;
+    protected _nodePlaceList: Set<GraphNode>;
     get octree(): Octree;
     // @internal (undocumented)
     protected _octree: Octree;
@@ -2815,9 +2902,7 @@ export class Scene extends Scene_base {
     protected _updateEvent: SceneUpdateEvent;
     // @internal (undocumented)
     protected _updateFrame: number;
-    updateNodePlacement(octree: Octree, list: Set<SceneNode>): void;
-    // @internal (undocumented)
-    _xformChanged(node: SceneNode): void;
+    updateNodePlacement(octree: Octree, list: Set<GraphNode>): void;
 }
 
 // @public
@@ -2844,19 +2929,12 @@ export class SceneNode extends XForm<SceneNode> {
     protected _bvDirty: boolean;
     // @internal (undocumented)
     protected _bvWorld: BoundingVolume;
-    // (undocumented)
-    static readonly CLIP_DISABLED = 0;
-    // (undocumented)
-    static readonly CLIP_ENABLED = 1;
-    // (undocumented)
-    static readonly CLIP_INHERITED = -1;
-    get clipMode(): number;
-    set clipMode(val: number);
     // @internal (undocumented)
-    protected _clipMode: number;
+    protected _clipMode: boolean;
+    get clipTestEnabled(): boolean;
+    set clipTestEnabled(val: boolean);
     computeBoundingVolume(bv: BoundingVolume): BoundingVolume;
     get computedBoundingBoxDrawMode(): number;
-    get computedClipMode(): number;
     // @internal (undocumented)
     protected _detached(): void;
     dispose(): void;
@@ -2865,7 +2943,8 @@ export class SceneNode extends XForm<SceneNode> {
     hasChild(child: SceneNode): boolean;
     get hidden(): boolean;
     invalidateBoundingVolume(): void;
-    invalidateWorldBoundingVolume(): void;
+    invalidateWorldBoundingVolume(transformChanged: boolean): void;
+    isBatchGroup(): this is BatchGroup;
     isCamera(): this is Camera;
     isGraphNode(): this is GraphNode;
     isLight(): this is BaseLight;
@@ -2882,17 +2961,13 @@ export class SceneNode extends XForm<SceneNode> {
     notifyHiddenChanged(): void;
     // @internal (undocumented)
     protected _onTransformChanged(invalidateLocal: boolean): void;
-    // (undocumented)
-    static readonly PICK_DISABLED = 0;
-    // (undocumented)
-    static readonly PICK_ENABLED = 1;
-    // (undocumented)
-    static readonly PICK_INHERITED = -1;
     get pickable(): boolean;
-    get pickMode(): number;
-    set pickMode(val: number);
+    set pickable(val: boolean);
     // @internal (undocumented)
-    protected _pickMode: number;
+    protected _pickMode: boolean;
+    // @internal (undocumented)
+    get placeToOctree(): boolean;
+    set placeToOctree(val: boolean);
     remove(): this;
     removeChildren(): void;
     // @internal (undocumented)
@@ -2903,17 +2978,11 @@ export class SceneNode extends XForm<SceneNode> {
     setBoundingVolume(bv: BoundingVolume): void;
     // @internal (undocumented)
     protected _setParent(p: SceneNode): void;
-    // (undocumented)
-    static readonly SHOW_DEFAULT = 1;
-    // (undocumented)
-    static readonly SHOW_HIDE = 0;
-    // (undocumented)
-    static readonly SHOW_INHERITED = -1;
-    get showState(): number;
-    set showState(val: number);
+    get showState(): SceneNodeVisible;
+    set showState(val: SceneNodeVisible);
     traverse(v: SceneNodeVisitor, inverse?: boolean): void;
     // @internal (undocumented)
-    protected _visible: number;
+    protected _visible: SceneNodeVisible;
     // @internal (undocumented)
     protected _visibleChanged(): void;
     // @internal (undocumented)
@@ -2921,6 +2990,9 @@ export class SceneNode extends XForm<SceneNode> {
     // @internal (undocumented)
     protected _willDetach(): void;
 }
+
+// @public
+export type SceneNodeVisible = 'visible' | 'inherit' | 'hidden';
 
 // @public
 export interface SceneNodeVisitor {
@@ -2932,6 +3004,7 @@ export interface SceneNodeVisitor {
 //
 // @internal
 export class SceneRenderer {
+    static get depthRenderPass(): DepthPass;
     // (undocumented)
     static freeClusteredLight(clusteredLight: ClusteredLight): void;
     // (undocumented)
@@ -2941,8 +3014,10 @@ export class SceneRenderer {
     protected static _renderScene(ctx: DrawContext): void;
     // (undocumented)
     protected static _renderSceneDepth(ctx: DrawContext, renderQueue: RenderQueue, depthFramebuffer: FrameBuffer): void;
+    static get sceneRenderPass(): LightPass;
     // (undocumented)
     static setClearColor(color: Vector4): void;
+    static get shadowMapRenderPass(): ShadowMapPass;
 }
 
 // @public
@@ -2996,7 +3071,6 @@ export class ShaderHelper {
     static getCameraClipPlaneFlag(scope: PBInsideFunctionScope): PBShaderExp;
     static getCameraParams(scope: PBInsideFunctionScope): PBShaderExp;
     static getCameraPosition(scope: PBInsideFunctionScope): PBShaderExp;
-    static getCameraRotationMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     // @internal (undocumented)
     static getCascadeDistances(scope: PBInsideFunctionScope): PBShaderExp;
     // @internal (undocumented)
@@ -3015,7 +3089,8 @@ export class ShaderHelper {
     static getFogType(scope: PBInsideFunctionScope): PBShaderExp;
     static getGlobalUniforms(scope: PBInsideFunctionScope): PBShaderExp;
     // (undocumented)
-    static getInstanceBufferOffsetUniformName(): string;
+    static getInstanceBufferStrideUniformName(): string;
+    static getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShaderExp;
     // (undocumented)
     static getLightBufferUniformName(): string;
     // @internal (undocumented)
@@ -3215,6 +3290,10 @@ export class ShadowMapper {
     set shadowMapSize(num: number);
     // @internal (undocumented)
     protected _shadowMode: ShadowMode;
+    get shadowRegion(): AABB;
+    set shadowRegion(region: AABB);
+    // @internal (undocumented)
+    protected _shadowRegion: AABB;
     get splitLambda(): number;
     set splitLambda(val: number);
     // @internal (undocumented)
@@ -3250,6 +3329,7 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     protected abstract _create(): boolean;
     // @internal (undocumented)
     protected createDefaultOptions(): T;
+    get options(): T;
     // @internal (undocumented)
     protected _options: T;
 }
@@ -3394,6 +3474,7 @@ export class SphereShape extends Shape<SphereCreationOptions> {
     protected _create(): boolean;
     // @internal (undocumented)
     protected createDefaultOptions(): SphereCreationOptions;
+    get radius(): number;
     // @override
     raycast(ray: Ray): number;
 }
@@ -3652,10 +3733,7 @@ export type TexturePropUniforms<U extends string> = {
 };
 
 // @public
-export type ToMixedTextureType<T> = T extends [infer First, ...infer Rest] ? [
-First extends string ? ReturnType<typeof mixinTextureProps<First>> : never,
-...ToMixedTextureType<Rest>
-] : [];
+export type ToMixedTextureType<T> = T extends [infer First, ...infer Rest] ? [First extends string ? ReturnType<typeof mixinTextureProps<First>> : never, ...ToMixedTextureType<Rest>] : [];
 
 // @public
 export class Tonemap extends AbstractPostEffect {
@@ -3871,8 +3949,10 @@ export function worleyFBM(scope: PBInsideFunctionScope, p: PBShaderExp, freq: PB
 // @public
 export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq: PBShaderExp | number): PBShaderExp;
 
+// Warning: (ae-forgotten-export) The symbol "XForm_base" needs to be exported by the entry point index.d.ts
+//
 // @public
-export class XForm<T extends XForm<T> = XForm<any>> {
+export class XForm<T extends XForm<T> = XForm<any>> extends XForm_base {
     constructor();
     get children(): T[];
     // @internal (undocumented)
@@ -3884,6 +3964,7 @@ export class XForm<T extends XForm<T> = XForm<any>> {
     // @internal (undocumented)
     protected _invWorldMatrix: Matrix4x4;
     get localMatrix(): Matrix4x4;
+    set localMatrix(matrix: Matrix4x4);
     // @internal (undocumented)
     protected _localMatrix: Matrix4x4;
     lookAt(eye: Vector3, target: Vector3, up: Vector3): this;
@@ -3902,7 +3983,6 @@ export class XForm<T extends XForm<T> = XForm<any>> {
     // @internal (undocumented)
     protected _position: ObservableVector3;
     reparent(p?: T): this;
-    resetTransform(): this;
     get rotation(): Quaternion;
     set rotation(val: Quaternion);
     // @internal (undocumented)
@@ -3912,7 +3992,7 @@ export class XForm<T extends XForm<T> = XForm<any>> {
     scaleBy(factor: Vector3): this;
     // @internal (undocumented)
     protected _scaling: ObservableVector3;
-    setLocalTransform(m: Matrix4x4): this;
+    setLocalTransform(matrix: Matrix4x4): this;
     // @internal (undocumented)
     protected _setParent(p: T): void;
     thisToOther(other: XForm, v: Vector3, result?: Vector3): Vector3;
@@ -3926,6 +4006,8 @@ export class XForm<T extends XForm<T> = XForm<any>> {
     // @internal (undocumented)
     protected _tmpWorldMatrix: Matrix4x4;
     // @internal (undocumented)
+    protected _transformChangeCallback: () => void;
+    // @internal (undocumented)
     protected _transformTag: number;
     get worldMatrix(): Matrix4x4;
     // @internal (undocumented)
@@ -3937,6 +4019,11 @@ export class XForm<T extends XForm<T> = XForm<any>> {
     // (undocumented)
     worldToThis(v: Vector4, result?: Vector4): Vector4;
 }
+
+// Warnings were encountered during analysis:
+//
+// dist/index.d.ts:3515:9 - (ae-incompatible-release-tags) The symbol "bindGroup" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
+// dist/index.d.ts:4827:9 - (ae-incompatible-release-tags) The symbol "bindGroup" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
 
 // (No @packageDocumentation comment for this package)
 

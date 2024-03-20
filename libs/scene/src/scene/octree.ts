@@ -1,5 +1,5 @@
 import { Vector3, AABB, nextPowerOf2 } from '@zephyr3d/base';
-import { GraphNode } from './graph_node';
+import type { GraphNode } from './graph_node';
 import type { Scene } from './scene';
 import type { Visitor } from './visitor';
 
@@ -569,7 +569,7 @@ export class Octree {
   }
   /** Free up the octree */
   finalize() {
-    this._chunks.forEach(chunk => chunk.clearNodes());
+    this._chunks.forEach((chunk) => chunk.clearNodes());
     this._chunks = [];
     this._rootSize = 0;
     this._leafSize = 0;
@@ -611,9 +611,9 @@ export class Octree {
     }
     const dim = this._chunks[level].getDimension();
     const inv_node_size = 1 / this._chunks[level].getNodeSize();
-    let px = Math.floor((center.x + this._rootSize * 0.5) * inv_node_size);
-    let py = Math.floor((center.y + this._rootSize * 0.5) * inv_node_size);
-    let pz = Math.floor((center.z + this._rootSize * 0.5) * inv_node_size);
+    const px = Math.floor((center.x + this._rootSize * 0.5) * inv_node_size);
+    const py = Math.floor((center.y + this._rootSize * 0.5) * inv_node_size);
+    const pz = Math.floor((center.z + this._rootSize * 0.5) * inv_node_size);
     if (px >= dim || py >= dim || pz >= dim) {
       return null;
     }
@@ -697,7 +697,7 @@ export class Octree {
     }
     const nodes: GraphNode[] = [];
     for (const chunk of this._chunks) {
-      chunk.nodeMap.forEach(node => {
+      chunk.nodeMap.forEach((node) => {
         nodes.push(...node.getNodes());
       });
     }

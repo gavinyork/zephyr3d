@@ -40,7 +40,7 @@ export class Mesh extends GraphNode implements BatchDrawable {
   /** @internal */
   protected _instanceColor: Vector4;
   /** @internal */
-  protected _instanceBufferInfo: Map<RenderPass, { bindGroup: CachedBindGroup, offset: number }>;
+  protected _instanceBufferInfo: Map<RenderPass, { bindGroup: CachedBindGroup; offset: number }>;
   /**
    * Creates an instance of mesh node
    * @param scene - The scene to which the mesh node belongs
@@ -76,7 +76,7 @@ export class Mesh extends GraphNode implements BatchDrawable {
     return `${this._instanceHash}:${this.worldMatrixDet >= 0}`;
   }
   /**
-   * {@inheritDoc BatchDrawable.getInstanceUniformCount}
+   * {@inheritDoc BatchDrawable.getInstanceUniforms}
    */
   getInstanceUniforms(): Float32Array {
     return this.material.$instanceUniforms;
@@ -253,7 +253,7 @@ export class Mesh extends GraphNode implements BatchDrawable {
   /**
    * {@inheritDoc BatchDrawable.getInstanceDataBuffer}
    */
-  getInstanceDataBuffer(renderPass: RenderPass): { bindGroup: CachedBindGroup, offset: number } {
+  getInstanceDataBuffer(renderPass: RenderPass): { bindGroup: CachedBindGroup; offset: number } {
     return this._instanceBufferInfo.get(renderPass) ?? null;
   }
   /** @internal */

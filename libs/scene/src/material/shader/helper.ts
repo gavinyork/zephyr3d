@@ -384,7 +384,7 @@ export class ShaderHelper {
         this.getInstancedUniform(scope, 0),
         this.getInstancedUniform(scope, 1),
         this.getInstancedUniform(scope, 2),
-        this.getInstancedUniform(scope, 3),
+        this.getInstancedUniform(scope, 3)
       )
     );
   }
@@ -396,7 +396,11 @@ export class ShaderHelper {
   static getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShaderExp {
     const pb = scope.$builder;
     return scope[UNIFORM_NAME_WORLD_MATRICES].at(
-      pb.add(pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex)), uniformIndex))
+      pb.add(
+        pb.mul(scope[UNIFORM_NAME_INSTANCE_BUFFER_STRIDE], pb.uint(scope.$builtins.instanceIndex)),
+        uniformIndex
+      )
+    );
   }
   /**
    * Gets the uniform variable of type mat4 which holds the normal matrix of current object to be drawn
