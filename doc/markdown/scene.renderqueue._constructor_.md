@@ -17,5 +17,5 @@ constructor(renderPass: RenderPass, bindGroupAllocator?: InstanceBindGroupAlloca
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  renderPass | [RenderPass](doc/markdown/./scene.renderpass.md) | The render pass to which the render queue belongs |
-|  bindGroupAllocator | [InstanceBindGroupAllocator](doc/markdown/./scene.instancebindgroupallocator.md) | _(Optional)_ |
+|  bindGroupAllocator | InstanceBindGroupAllocator | _(Optional)_ |
 

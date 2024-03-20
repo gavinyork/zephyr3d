@@ -4,7 +4,7 @@
 
 ## BatchDrawable.getInstanceUniforms() method
 
-Gets the instance uniforms count
+Gets the instance uniforms
 
 **Signature:**
 

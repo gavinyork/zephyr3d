@@ -19,6 +19,6 @@ interface BatchDrawable extends Drawable
 |  --- | --- |
 |  [getInstanceDataBuffer(renderPass)](doc/markdown/./scene.batchdrawable.getinstancedatabuffer.md) | Gets the uniform data buffer offset |
 |  [getInstanceId(renderPass)](doc/markdown/./scene.batchdrawable.getinstanceid.md) | Gets the instance id of the object |
-|  [getInstanceUniforms()](doc/markdown/./scene.batchdrawable.getinstanceuniforms.md) | Gets the instance uniforms count |
+|  [getInstanceUniforms()](doc/markdown/./scene.batchdrawable.getinstanceuniforms.md) | Gets the instance uniforms |
 |  [setInstanceDataBuffer(renderPass, bindGroup, offset)](doc/markdown/./scene.batchdrawable.setinstancedatabuffer.md) | Sets the uniform data buffer and offset |
 

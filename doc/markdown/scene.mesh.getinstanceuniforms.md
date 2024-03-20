@@ -4,6 +4,7 @@
 
 ## Mesh.getInstanceUniforms() method
 
+Gets the instance uniforms
 
 **Signature:**
 

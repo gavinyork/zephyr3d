@@ -4,6 +4,8 @@
 
 ## IMixinPBRSpecularGlossiness type
 
+Interface for PBRSpecularGlossiness mixin
+
 **Signature:**
 
 ```typescript

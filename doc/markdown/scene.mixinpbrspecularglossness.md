@@ -4,6 +4,8 @@
 
 ## mixinPBRSpecularGlossness() function
 
+PBRSpecularGlossiness mixin
+
 **Signature:**
 
 ```typescript
@@ -14,9 +16,11 @@ declare function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCl
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  BaseCls | T |  |
+|  BaseCls | T | Base class to mix in |
 
 **Returns:**
 
 T &amp; (new (...args: any\[\]) =&gt; [IMixinPBRSpecularGlossiness](doc/markdown/./scene.imixinpbrspecularglossiness.md)<!-- -->)
+
+Mixed class
 

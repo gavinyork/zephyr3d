@@ -8532,7 +8532,7 @@
             {
               "kind": "MethodSignature",
               "canonicalReference": "@zephyr3d/scene!BatchDrawable#getInstanceUniforms:member(1)",
-              "docComment": "/**\n * Gets the instance uniforms count\n */\n",
+              "docComment": "/**\n * Gets the instance uniforms\n */\n",
               "excerptTokens": [
                 {
                   "kind": "Content",
@@ -23625,7 +23625,7 @@
         {
           "kind": "TypeAlias",
           "canonicalReference": "@zephyr3d/scene!IMixinPBRSpecularGlossiness:type",
-          "docComment": "",
+          "docComment": "/**\n * Interface for PBRSpecularGlossiness mixin\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -23882,159 +23882,6 @@
             }
           ],
           "extendsTokenRanges": []
-        },
-        {
-          "kind": "Class",
-          "canonicalReference": "@zephyr3d/scene!InstanceBindGroupAllocator:class",
-          "docComment": "",
-          "excerptTokens": [
-            {
-              "kind": "Content",
-              "text": "declare class InstanceBindGroupAllocator "
-            }
-          ],
-          "fileUrlPath": "dist/index.d.ts",
-          "releaseTag": "Public",
-          "isAbstract": false,
-          "name": "InstanceBindGroupAllocator",
-          "preserveMemberOrder": false,
-          "members": [
-            {
-              "kind": "Property",
-              "canonicalReference": "@zephyr3d/scene!InstanceBindGroupAllocator#_freeBindGroupList:member",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "_freeBindGroupList: "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "CachedBindGroup",
-                  "canonicalReference": "@zephyr3d/scene!CachedBindGroup:type"
-                },
-                {
-                  "kind": "Content",
-                  "text": "[]"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": false,
-              "isOptional": false,
-              "releaseTag": "Public",
-              "name": "_freeBindGroupList",
-              "propertyTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 3
-              },
-              "isStatic": false,
-              "isProtected": false,
-              "isAbstract": false
-            },
-            {
-              "kind": "Property",
-              "canonicalReference": "@zephyr3d/scene!InstanceBindGroupAllocator#_usedBindGroupList:member",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "_usedBindGroupList: "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "CachedBindGroup",
-                  "canonicalReference": "@zephyr3d/scene!CachedBindGroup:type"
-                },
-                {
-                  "kind": "Content",
-                  "text": "[]"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isReadonly": false,
-              "isOptional": false,
-              "releaseTag": "Public",
-              "name": "_usedBindGroupList",
-              "propertyTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 3
-              },
-              "isStatic": false,
-              "isProtected": false,
-              "isAbstract": false
-            },
-            {
-              "kind": "Constructor",
-              "canonicalReference": "@zephyr3d/scene!InstanceBindGroupAllocator:constructor(1)",
-              "docComment": "/**\n * Constructs a new instance of the `InstanceBindGroupAllocator` class\n */\n",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "constructor();"
-                }
-              ],
-              "releaseTag": "Public",
-              "isProtected": false,
-              "overloadIndex": 1,
-              "parameters": []
-            },
-            {
-              "kind": "Method",
-              "canonicalReference": "@zephyr3d/scene!InstanceBindGroupAllocator#allocateInstanceBindGroup:member(1)",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "allocateInstanceBindGroup(framestamp: "
-                },
-                {
-                  "kind": "Content",
-                  "text": "number"
-                },
-                {
-                  "kind": "Content",
-                  "text": "): "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "CachedBindGroup",
-                  "canonicalReference": "@zephyr3d/scene!CachedBindGroup:type"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isStatic": false,
-              "returnTypeTokenRange": {
-                "startIndex": 3,
-                "endIndex": 4
-              },
-              "releaseTag": "Public",
-              "isProtected": false,
-              "overloadIndex": 1,
-              "parameters": [
-                {
-                  "parameterName": "framestamp",
-                  "parameterTypeTokenRange": {
-                    "startIndex": 1,
-                    "endIndex": 2
-                  },
-                  "isOptional": false
-                }
-              ],
-              "isOptional": false,
-              "isAbstract": false,
-              "name": "allocateInstanceBindGroup"
-            }
-          ],
-          "implementsTokenRanges": []
         },
         {
           "kind": "Interface",
@@ -26454,7 +26301,7 @@
             {
               "kind": "Method",
               "canonicalReference": "@zephyr3d/scene!Mesh#getInstanceUniforms:member(1)",
-              "docComment": "/**\n * {@inheritDoc BatchDrawable.getInstanceUniformCount}\n */\n",
+              "docComment": "/**\n * Gets the instance uniforms\n */\n",
               "excerptTokens": [
                 {
                   "kind": "Content",
@@ -28667,7 +28514,7 @@
         {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/scene!mixinPBRCommon:function(1)",
-          "docComment": "/**\n * PBR common stuff mixin\n *\n * @param BaseCls - Class to mix in\n *\n * @returns Mixed class\n */\n",
+          "docComment": "/**\n * PBR common stuff mixin\n *\n * @param BaseCls - Class to mix in\n *\n * @returns Mixed class\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -28827,7 +28674,7 @@
         {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/scene!mixinPBRSpecularGlossness:function(1)",
-          "docComment": "",
+          "docComment": "/**\n * PBRSpecularGlossiness mixin\n *\n * @param BaseCls - Base class to mix in\n *\n * @returns Mixed class\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -29000,7 +28847,7 @@
         {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/scene!mixinVertexColor:function(1)",
-          "docComment": "/**\n * Vertex color mixin\n *\n * @param BaseCls - Base class to mix in\n *\n * @returns Mixed class\n */\n",
+          "docComment": "/**\n * Vertex color mixin\n *\n * @param BaseCls - Base class to mix in\n *\n * @returns Mixed class\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",

@@ -40,7 +40,7 @@ declare class Mesh extends GraphNode implements BatchDrawable
 |  [getInstanceColor()](doc/markdown/./scene.mesh.getinstancecolor.md) |  | Gets the instance color |
 |  [getInstanceDataBuffer(renderPass)](doc/markdown/./scene.mesh.getinstancedatabuffer.md) |  | Gets the uniform data buffer offset |
 |  [getInstanceId(renderPass)](doc/markdown/./scene.mesh.getinstanceid.md) |  | Gets the instance id of the object |
-|  [getInstanceUniforms()](doc/markdown/./scene.mesh.getinstanceuniforms.md) |  |  |
+|  [getInstanceUniforms()](doc/markdown/./scene.mesh.getinstanceuniforms.md) |  | Gets the instance uniforms |
 |  [getInvBindMatrix()](doc/markdown/./scene.mesh.getinvbindmatrix.md) |  | Gets the inversed bind matrix for skeleton animation |
 |  [getName()](doc/markdown/./scene.mesh.getname.md) |  | Gets name of the drawable object |
 |  [getPickTarget()](doc/markdown/./scene.mesh.getpicktarget.md) |  | If set, the pick target will be returned as the pick result |

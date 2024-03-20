@@ -46,7 +46,6 @@
 |  [GraphNode](doc/markdown/./scene.graphnode.md) | Graph scene node |
 |  [GrassMaterial](doc/markdown/./scene.grassmaterial.md) | Terrain grass material |
 |  [Grayscale](doc/markdown/./scene.grayscale.md) | Grayscale post effect |
-|  [InstanceBindGroupAllocator](doc/markdown/./scene.instancebindgroupallocator.md) |  |
 |  [LambertMaterial](doc/markdown/./scene.lambertmaterial.md) | Lambert material |
 |  [Material](doc/markdown/./scene.material.md) | Base class for any kind of materials |
 |  [Mesh](doc/markdown/./scene.mesh.md) | Mesh node |
@@ -131,7 +130,7 @@
 |  [mixinLight(BaseCls)](doc/markdown/./scene.mixinlight.md) | Light mixin |
 |  [mixinPBRCommon(BaseCls)](doc/markdown/./scene.mixinpbrcommon.md) | PBR common stuff mixin |
 |  [mixinPBRMetallicRoughness(BaseCls)](doc/markdown/./scene.mixinpbrmetallicroughness.md) | PBRMetallicRoughness lighting model mixin |
-|  [mixinPBRSpecularGlossness(BaseCls)](doc/markdown/./scene.mixinpbrspecularglossness.md) |  |
+|  [mixinPBRSpecularGlossness(BaseCls)](doc/markdown/./scene.mixinpbrspecularglossness.md) | PBRSpecularGlossiness mixin |
 |  [mixinTextureProps(name)](doc/markdown/./scene.mixintextureprops.md) | Texture property mixin |
 |  [mixinVertexColor(BaseCls)](doc/markdown/./scene.mixinvertexcolor.md) | Vertex color mixin |
 |  [noise3D(scope, p)](doc/markdown/./scene.noise3d.md) | Calculate 3d noise by a 3d position |
@@ -221,7 +220,7 @@
 |  [IMixinLight](doc/markdown/./scene.imixinlight.md) | Interface for light mixin |
 |  [IMixinPBRCommon](doc/markdown/./scene.imixinpbrcommon.md) | Interface for common PBR mixin |
 |  [IMixinPBRMetallicRoughness](doc/markdown/./scene.imixinpbrmetallicroughness.md) | Interface for PBRMetallicRoughness lighting model mixin |
-|  [IMixinPBRSpecularGlossiness](doc/markdown/./scene.imixinpbrspecularglossiness.md) |  |
+|  [IMixinPBRSpecularGlossiness](doc/markdown/./scene.imixinpbrspecularglossiness.md) | Interface for PBRSpecularGlossiness mixin |
 |  [LogMode](doc/markdown/./scene.logmode.md) | Log mode |
 |  [MaterialGCOptions](doc/markdown/./scene.materialgcoptions.md) | Garbage collection options for material |
 |  [ModelFetchOptions](doc/markdown/./scene.modelfetchoptions.md) | Options for model fetching |
