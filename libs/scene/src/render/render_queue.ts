@@ -1,20 +1,22 @@
 import { Application } from '../app';
-import { Vector4 } from '@zephyr3d/base';
+import type { Vector4 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';
 import type { Drawable } from './drawable';
 import type { DirectionalLight, PunctualLight } from '../scene/light';
 import type { RenderPass } from '.';
 import { QUEUE_TRANSPARENT } from '../values';
-import { BindGroup, BindGroupLayout, ProgramBuilder } from '@zephyr3d/device';
+import type { BindGroup, BindGroupLayout } from '@zephyr3d/device';
+import { ProgramBuilder } from '@zephyr3d/device';
 import { ShaderHelper } from '../material';
 
 /** @internal */
 export type CachedBindGroup = {
-  bindGroup: BindGroup,
-  buffer: Float32Array,
+  bindGroup: BindGroup;
+  buffer: Float32Array;
   dirty: boolean;
 };
 
+/** @internal */
 export class InstanceBindGroupAllocator {
   private static _instanceBindGroupLayout: BindGroupLayout = null;
   _usedBindGroupList: CachedBindGroup[] = [];
@@ -36,21 +38,21 @@ export class InstanceBindGroupAllocator {
     if (!bindGroup) {
       if (!InstanceBindGroupAllocator._instanceBindGroupLayout) {
         const buildInfo = new ProgramBuilder(Application.instance.device).buildRender({
-          vertex(pb){
+          vertex(pb) {
             this[ShaderHelper.getWorldMatricesUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
-            pb.main(function(){
-            });
+            pb.main(function () {});
           },
-          fragment(pb){
+          fragment(pb) {
             this[ShaderHelper.getWorldMatricesUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
-            pb.main(function(){
-            });
+            pb.main(function () {});
           }
         });
         InstanceBindGroupAllocator._instanceBindGroupLayout = buildInfo[2][3];
       }
       bindGroup = {
-        bindGroup: Application.instance.device.createBindGroup(InstanceBindGroupAllocator._instanceBindGroupLayout),
+        bindGroup: Application.instance.device.createBindGroup(
+          InstanceBindGroupAllocator._instanceBindGroupLayout
+        ),
         buffer: new Float32Array(65536 >> 2),
         dirty: true
       };
@@ -229,10 +231,16 @@ export class RenderQueue {
         const instanceList = trans ? itemList.transInstanceList : itemList.opaqueInstanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         const index = instanceList[hash];
-        if (index === undefined || list[index].instanceData.currentSize + list[index].instanceData.stride > list[index].instanceData.maxSize) {
+        if (
+          index === undefined ||
+          list[index].instanceData.currentSize + list[index].instanceData.stride >
+            list[index].instanceData.maxSize
+        ) {
           instanceList[hash] = list.length;
-          const bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(Application.instance.device.frameInfo.frameCounter);
-          drawable.setInstanceDataBuffer(this._renderPass, bindGroup, 0)
+          const bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(
+            Application.instance.device.frameInfo.frameCounter
+          );
+          drawable.setInstanceDataBuffer(this._renderPass, bindGroup, 0);
           bindGroup.buffer.set(drawable.getXForm().worldMatrix);
           let currentSize = 4;
           const instanceUniforms = drawable.getInstanceUniforms();
@@ -253,8 +261,12 @@ export class RenderQueue {
             }
           });
         } else {
-          const instanceData = list[index].instanceData
-          drawable.setInstanceDataBuffer(this._renderPass, instanceData.bindGroup, instanceData.currentSize * 4)
+          const instanceData = list[index].instanceData;
+          drawable.setInstanceDataBuffer(
+            this._renderPass,
+            instanceData.bindGroup,
+            instanceData.currentSize * 4
+          );
           instanceData.bindGroup.buffer.set(drawable.getXForm().worldMatrix, instanceData.currentSize * 4);
           instanceData.currentSize += 4;
           const instanceUniforms = drawable.getInstanceUniforms();

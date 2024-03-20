@@ -75,7 +75,7 @@ let FEATURE_ALPHABLEND = 0;
 let FEATURE_ALPHATOCOVERAGE = 0;
 
 /** @internal */
-export type InstanceUniformType = 'float'|'vec2'|'vec3'|'vec4';
+export type InstanceUniformType = 'float' | 'vec2' | 'vec3' | 'vec4';
 
 /**
  * Base class for any kind of mesh materials
@@ -127,7 +127,7 @@ export class MeshMaterial extends Material {
   }
   /** Define instance uniform index */
   static defineInstanceUniform(prop: string, type: InstanceUniformType): number {
-    if (this.INSTANCE_UNIFORMS.findIndex(val => val[0] === prop) >= 0) {
+    if (this.INSTANCE_UNIFORMS.findIndex((val) => val[0] === prop) >= 0) {
       throw new Error(`${this.name}.defineInstanceUniform(): ${prop} was already defined`);
     }
     if (type !== 'float' && type !== 'vec2' && type !== 'vec3' && type !== 'vec4') {
@@ -142,8 +142,7 @@ export class MeshMaterial extends Material {
     const instanceID = pb.shaderKind === 'vertex' ? scope.$builtins.instanceIndex : scope.$inputs.zInstanceID;
     const uniformName = ShaderHelper.getWorldMatricesUniformName();
     const strideName = ShaderHelper.getInstanceBufferStrideUniformName();
-    return scope[uniformName].at(
-      pb.add(pb.mul(scope[strideName], instanceID), 4 + uniformIndex))
+    return scope[uniformName].at(pb.add(pb.mul(scope[strideName], instanceID), 4 + uniformIndex));
   }
   /** Create material instance */
   createInstance(): this {
@@ -154,44 +153,44 @@ export class MeshMaterial extends Material {
     for (let i = 0; i < instanceUniforms.length; i++) {
       const [prop, type] = instanceUniforms[i];
       const value = this[prop];
-      switch(type) {
+      switch (type) {
         case 'float': {
-          uniformsHolder[i*4] = Number(value);
+          uniformsHolder[i * 4] = Number(value);
           break;
         }
         case 'vec2': {
           if (!(value instanceof Vector2)) {
             throw new Error(`Instance uniform property ${prop} must be of type Vector2`);
           }
-          uniformsHolder[i*4] = value.x;
-          uniformsHolder[i*4+1] = value.y;
+          uniformsHolder[i * 4] = value.x;
+          uniformsHolder[i * 4 + 1] = value.y;
           break;
         }
         case 'vec3': {
           if (!(value instanceof Vector3)) {
             throw new Error(`Instance uniform property ${prop} must be of type Vector3`);
           }
-          uniformsHolder[i*4] = value.x;
-          uniformsHolder[i*4+1] = value.y;
-          uniformsHolder[i*4+2] = value.z;
+          uniformsHolder[i * 4] = value.x;
+          uniformsHolder[i * 4 + 1] = value.y;
+          uniformsHolder[i * 4 + 2] = value.z;
           break;
         }
         case 'vec4': {
           if (!(value instanceof Vector4)) {
             throw new Error(`Instance uniform property ${prop} must be of type Vector4`);
           }
-          uniformsHolder[i*4] = value.x;
-          uniformsHolder[i*4+1] = value.y;
-          uniformsHolder[i*4+2] = value.z;
-          uniformsHolder[i*4+3] = value.w;
+          uniformsHolder[i * 4] = value.x;
+          uniformsHolder[i * 4 + 1] = value.y;
+          uniformsHolder[i * 4 + 2] = value.z;
+          uniformsHolder[i * 4 + 3] = value.w;
           break;
         }
       }
     }
     const handler: ProxyHandler<this> = {
-      get(target, prop, receiver){
+      get(target, prop, receiver) {
         if (prop === 'isBatchable') {
-          return ()=>batchable;
+          return () => batchable;
         } else if (prop === '$instanceUniforms') {
           return uniformsHolder;
         } else if (prop === '$isInstance') {
@@ -201,32 +200,60 @@ export class MeshMaterial extends Material {
             for (let i = 0; i < instanceUniforms.length; i++) {
               const name = instanceUniforms[i][0];
               const type = instanceUniforms[i][1];
-              switch(type) {
-                case 'float': target[name] = uniformsHolder[i * 4]; break;
-                case 'vec2': target[name] = new Vector2(uniformsHolder[i*4], uniformsHolder[i*4+1]); break;
-                case 'vec3': target[name] = new Vector3(uniformsHolder[i*4], uniformsHolder[i*4+1], uniformsHolder[i*4+2]);
-                case 'vec4': target[name] = new Vector4(uniformsHolder[i*4], uniformsHolder[i*4+1], uniformsHolder[i*4+2], uniformsHolder[i*4+3]);
+              switch (type) {
+                case 'float':
+                  target[name] = uniformsHolder[i * 4];
+                  break;
+                case 'vec2':
+                  target[name] = new Vector2(uniformsHolder[i * 4], uniformsHolder[i * 4 + 1]);
+                  break;
+                case 'vec3':
+                  target[name] = new Vector3(
+                    uniformsHolder[i * 4],
+                    uniformsHolder[i * 4 + 1],
+                    uniformsHolder[i * 4 + 2]
+                  );
+                case 'vec4':
+                  target[name] = new Vector4(
+                    uniformsHolder[i * 4],
+                    uniformsHolder[i * 4 + 1],
+                    uniformsHolder[i * 4 + 2],
+                    uniformsHolder[i * 4 + 3]
+                  );
               }
             }
           }
         } else if (typeof prop === 'string') {
-          const index = instanceUniforms.findIndex(val => val[0] === prop);
+          const index = instanceUniforms.findIndex((val) => val[0] === prop);
           if (index >= 0) {
-            switch(instanceUniforms[index][1]) {
-              case 'float': return uniformsHolder[index * 4];
-              case 'vec2': return new Vector2(uniformsHolder[index*4], uniformsHolder[index*4+1]);
-              case 'vec3': return new Vector3(uniformsHolder[index*4], uniformsHolder[index*4+1], uniformsHolder[index*4+2]);
-              case 'vec4': return new Vector4(uniformsHolder[index*4], uniformsHolder[index*4+1], uniformsHolder[index*4+2], uniformsHolder[index*4+3]);
+            switch (instanceUniforms[index][1]) {
+              case 'float':
+                return uniformsHolder[index * 4];
+              case 'vec2':
+                return new Vector2(uniformsHolder[index * 4], uniformsHolder[index * 4 + 1]);
+              case 'vec3':
+                return new Vector3(
+                  uniformsHolder[index * 4],
+                  uniformsHolder[index * 4 + 1],
+                  uniformsHolder[index * 4 + 2]
+                );
+              case 'vec4':
+                return new Vector4(
+                  uniformsHolder[index * 4],
+                  uniformsHolder[index * 4 + 1],
+                  uniformsHolder[index * 4 + 2],
+                  uniformsHolder[index * 4 + 3]
+                );
             }
           }
         }
         return Reflect.get(target, prop, receiver);
       },
       set(target, prop, value, receiver) {
-        const i = instanceUniforms.findIndex(val => val[0] === prop);
+        const i = instanceUniforms.findIndex((val) => val[0] === prop);
         if (i >= 0) {
           if (typeof value === 'number') {
-            uniformsHolder[i*4 + 0] = value;
+            uniformsHolder[i * 4 + 0] = value;
           } else if (value instanceof Float32Array) {
             uniformsHolder.set(value);
           }
@@ -235,7 +262,7 @@ export class MeshMaterial extends Material {
           return Reflect.set(target, prop, value, receiver);
         }
       }
-    }
+    };
     return new Proxy(this, handler);
   }
   /** Draw context for shader creation */

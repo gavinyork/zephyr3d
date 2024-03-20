@@ -13,7 +13,6 @@ import {
   PunctualLight,
   AssetManager,
   Application,
-  GraphNode,
   panoramaToCubemap,
   prefilterCubemap,
   Tonemap,

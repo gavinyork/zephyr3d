@@ -88,6 +88,8 @@ export type IMixinPBRCommon = {
  * PBR common stuff mixin
  * @param BaseCls - Class to mix in
  * @returns Mixed class
+ *
+ * @public
  */
 export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).pbrCommonMixed) {

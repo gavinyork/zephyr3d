@@ -119,15 +119,24 @@ export class Primitive {
    */
   getNumFaces(): number {
     const ib = this.getIndexBuffer();
-    const count = ib ? ib.byteLength >> (ib.indexType.primitiveType === PBPrimitiveType.U16 ? 1 : 2) : this.getNumVertices();
+    const count = ib
+      ? ib.byteLength >> (ib.indexType.primitiveType === PBPrimitiveType.U16 ? 1 : 2)
+      : this.getNumVertices();
     switch (this.primitiveType) {
-      case 'line-list': return count >> 1;
-      case 'point-list': return count;
-      case 'line-strip': return count - 1;
-      case 'triangle-fan': return count - 2;
-      case 'triangle-strip': return count - 2;
-      case 'triangle-list': return (count / 3) >> 0;
-      default: return 0;
+      case 'line-list':
+        return count >> 1;
+      case 'point-list':
+        return count;
+      case 'line-strip':
+        return count - 1;
+      case 'triangle-fan':
+        return count - 2;
+      case 'triangle-strip':
+        return count - 2;
+      case 'triangle-list':
+        return (count / 3) >> 0;
+      default:
+        return 0;
     }
     const vbPos = this.getVertexBuffer('position');
     const vertexSize = vbPos.structure.toBufferLayout(0, 'packed').byteSize;

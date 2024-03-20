@@ -16,6 +16,8 @@ export interface IMixinVertexColor {
  *
  * @param BaseCls - Base class to mix in
  * @returns Mixed class
+ *
+ * @public
  */
 function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).vertexColorMixed) {

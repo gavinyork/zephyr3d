@@ -1,4 +1,5 @@
-import { Vector3, Vector4, Quaternion } from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
+import type { PBRMetallicRoughnessMaterial } from '@zephyr3d/scene';
 import {
   Scene,
   OrbitCameraController,
@@ -8,7 +9,6 @@ import {
   PerspectiveCamera,
   Compositor,
   Tonemap,
-  PBRMetallicRoughnessMaterial,
   BatchGroup
 } from '@zephyr3d/scene';
 import * as common from '../common';
@@ -38,21 +38,39 @@ instancingApp.ready().then(async () => {
   const batchGroup = new BatchGroup(scene);
   const assetManager = new AssetManager();
   for (let i = 0; i < 2000; i++) {
-    assetManager.fetchModel(scene, 'assets/stone1.glb', { disableInstancing: false }).then(info => {
+    assetManager.fetchModel(scene, 'assets/stone1.glb', { disableInstancing: false }).then((info) => {
       info.group.parent = batchGroup;
-      info.group.position.setXYZ(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50);
-      info.group.iterate(node => {
+      info.group.position.setXYZ(
+        Math.random() * 100 - 50,
+        Math.random() * 100 - 50,
+        Math.random() * 100 - 50
+      );
+      info.group.iterate((node) => {
         if (node.isMesh()) {
-          (node.material as PBRMetallicRoughnessMaterial).albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
+          (node.material as PBRMetallicRoughnessMaterial).albedoColor = new Vector4(
+            Math.random(),
+            Math.random(),
+            Math.random(),
+            1
+          );
         }
       });
     });
-    assetManager.fetchModel(scene, 'assets/stone2.glb', { disableInstancing: false }).then(info => {
+    assetManager.fetchModel(scene, 'assets/stone2.glb', { disableInstancing: false }).then((info) => {
       info.group.parent = batchGroup;
-      info.group.position.setXYZ(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50);
-      info.group.iterate(node => {
+      info.group.position.setXYZ(
+        Math.random() * 100 - 50,
+        Math.random() * 100 - 50,
+        Math.random() * 100 - 50
+      );
+      info.group.iterate((node) => {
         if (node.isMesh()) {
-          (node.material as PBRMetallicRoughnessMaterial).albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
+          (node.material as PBRMetallicRoughnessMaterial).albedoColor = new Vector4(
+            Math.random(),
+            Math.random(),
+            Math.random(),
+            1
+          );
         }
       });
     });

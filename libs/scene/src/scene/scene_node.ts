@@ -20,7 +20,7 @@ export interface SceneNodeVisitor {
  * Scene node visible state
  * @public
  */
-export type SceneNodeVisible = 'visible'|'inherit'|'hidden';
+export type SceneNodeVisible = 'visible' | 'inherit' | 'hidden';
 
 /**
  * The base class for any kind of scene objects
@@ -263,7 +263,7 @@ export class SceneNode extends XForm<SceneNode> {
     this._bvWorld = null;
     if (this._scene) {
       if (transformChanged) {
-        this.iterate(node => {
+        this.iterate((node) => {
           if (node.isGraphNode()) {
             this._scene.invalidateNodePlacement(node);
           }

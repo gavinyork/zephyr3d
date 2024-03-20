@@ -108,23 +108,23 @@ export function floatToHalf(val: number): number;
 export class Frustum {
     constructor(transform: Matrix4x4);
     constructor(other: Frustum);
-    containsPoint(pt: Vector3): boolean;
+    containsPoint(pt: Vector3, epsl?: number): boolean;
     // (undocumented)
-    static readonly CORNER_LEFT_BOTTOM_FAR = 5;
+    static readonly CORNER_LEFT_BOTTOM_FAR = 3;
     // (undocumented)
-    static readonly CORNER_LEFT_BOTTOM_NEAR = 4;
+    static readonly CORNER_LEFT_BOTTOM_NEAR = 2;
     // (undocumented)
     static readonly CORNER_LEFT_TOP_FAR = 1;
     // (undocumented)
     static readonly CORNER_LEFT_TOP_NEAR = 0;
     // (undocumented)
-    static readonly CORNER_RIGHT_BOTTOM_FAR = 6;
+    static readonly CORNER_RIGHT_BOTTOM_FAR = 7;
     // (undocumented)
-    static readonly CORNER_RIGHT_BOTTOM_NEAR = 7;
+    static readonly CORNER_RIGHT_BOTTOM_NEAR = 6;
     // (undocumented)
-    static readonly CORNER_RIGHT_TOP_FAR = 2;
+    static readonly CORNER_RIGHT_TOP_FAR = 5;
     // (undocumented)
-    static readonly CORNER_RIGHT_TOP_NEAR = 3;
+    static readonly CORNER_RIGHT_TOP_NEAR = 4;
     get corners(): Vector3[];
     getCorner(pos: number): Vector3;
     initWithMatrix(transform: Matrix4x4): this;

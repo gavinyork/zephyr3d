@@ -410,7 +410,7 @@ export class Material {
   }
   /** @internal */
   private applyInstanceBindGroups(ctx: DrawContext, hash: string): void {
-    if (ctx.instanceData)  {
+    if (ctx.instanceData) {
       if (ctx.instanceData.bindGroup.dirty) {
         ctx.instanceData.bindGroup.bindGroup.setRawData(
           ShaderHelper.getWorldMatricesUniformName(),
