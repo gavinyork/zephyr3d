@@ -48,6 +48,8 @@
     - [Water](en/water.md)
   - Geometry instancing
     - [Introduction](en/instancing-intro.md)
+  - Multi-viewport Rendering
+    - [Introduction](en/multi-views.md)
   - Custom material
     - [Basics](en/user-material.md)
     - [Unlit material](en/user-material-unlit.md)

@@ -44,6 +44,8 @@
     - [水面渲染](zh-cn/water.md)
   - 几何体实例化
     - [概述](zh-cn/instancing-intro.md)
+  - 多视口渲染
+    - [概述](zh-cn/multi-views.md)
   - 自定义材质
     - [材质基础](zh-cn/user-material.md)
     - [无光照材质](zh-cn/user-material-unlit.md)
