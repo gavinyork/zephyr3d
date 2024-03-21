@@ -5,6 +5,16 @@ import { Skeleton } from './skeleton';
 import { Application } from '../app';
 import { Texture2D } from '@zephyr3d/device';
 
+/** @internal */
+export type AnimationTexInfo = {
+  texture: Texture2D,
+  offsets: Record<string, {
+    duration: number,
+    offset: number,
+    numKeyframes: number
+  }>
+};
+
 /**
  * Animation set
  * @public
@@ -14,6 +24,8 @@ export class AnimationSet {
   private _animations: Record<string, AnimationClip>;
   /** @internal */
   private _scene: Scene;
+  /** @internal */
+  private _animationTexInfo: Map<Skeleton, AnimationTexInfo>;
   /**
    * Creates an instance of AnimationSet
    * @param scene - The scene to which the animation set belongs
@@ -22,6 +34,7 @@ export class AnimationSet {
     this._scene = scene;
     this._scene.animationSet.push(this);
     this._animations = {};
+    this._animationTexInfo = null;
   }
   /**
    * How many animations in this set
@@ -54,7 +67,7 @@ export class AnimationSet {
    */
   update(): void {
     for (const k in this._animations) {
-      this._animations[k].update();
+      this._animations[k].update(this._animationTexInfo);
     }
   }
   /**
@@ -109,7 +122,21 @@ export class AnimationSet {
     this._animations = {};
   }
   /** @internal */
-  protected _createAnimationTexture(numKeyframesPerSecond: number, skeleton: Skeleton) {
+  createAnimationTextures(numKeyframesPerSecond: number): void {
+    const map = new Map<Skeleton, AnimationTexInfo>();
+    for (const k in this._animations) {
+      const animation = this._animations[k];
+      const skeletons = animation.getSkeletons();
+      for (const skeleton of skeletons) {
+        if (!map.get(skeleton)) {
+          map.set(skeleton, this._createAnimationTexture(numKeyframesPerSecond, skeleton));
+        }
+      }
+    }
+    this._animationTexInfo = map;
+  }
+  /** @internal */
+  protected _createAnimationTexture(numKeyframesPerSecond: number, skeleton: Skeleton): AnimationTexInfo {
     const textureSize = this.calculateAnimationTextureSize(numKeyframesPerSecond, skeleton);
     const data = new Float32Array(textureSize * textureSize * 4);
     const numMatrices = (textureSize * textureSize) >> 2;
@@ -117,23 +144,21 @@ export class AnimationSet {
     for (let i = 0; i < numMatrices; i++) {
       matrices.push(new Matrix4x4(data.buffer, i * 16 * 4));
     }
-    const animationTexInfo: {
-      texture: Texture2D,
-      numJoints: number,
-      offsets: Record<string, number>
-    } = {
+    const animationTexInfo: AnimationTexInfo = {
       texture: null,
-      numJoints: skeleton.numJoints,
       offsets: {}
     };
     let offset = 0;
     for (const k in this._animations) {
       const animation = this._animations[k];
       if (animation.isSkeletonUsed(skeleton)) {
-        animationTexInfo.offsets[k] = offset * 4;
-        const numKeyframes = Math.ceil(animation.timeDuration) * numKeyframesPerSecond;
+        const numKeyframes = Math.ceil(animation.timeDuration * numKeyframesPerSecond);
+        animationTexInfo.offsets[k] = { offset: offset * 4, numKeyframes, duration: animation.timeDuration };
+        // bindpose
+        skeleton.computeJointMatrices(matrices, offset, true);
+        offset += skeleton.numJoints;
         for (let i = 0; i < numKeyframes; i++) {
-          const t = animation.timeDuration * (i / Math.max(numKeyframes - 1, 1));
+          const t = i * animation.timeDuration / numKeyframes;
           animation.updateTracks(t * animation.timeDuration);
           skeleton.computeJointMatrices(matrices, offset, false);
           offset += skeleton.numJoints;
@@ -155,7 +180,9 @@ export class AnimationSet {
     for (const k in this._animations) {
       const animation = this._animations[k];
       if (animation.isSkeletonUsed(skeleton)) {
-        totalKeyframes += Math.ceil(animation.timeDuration) * numKeyframesPerSecond;
+        totalKeyframes += Math.ceil(animation.timeDuration * numKeyframesPerSecond);
+        // bindpose
+        totalKeyframes++;
       }
     }
     let size = 8;

@@ -38,6 +38,7 @@ export type TextureFetchOptions<T extends BaseTexture> = {
 export type ModelFetchOptions = {
   mimeType?: string;
   disableInstancing?: boolean;
+  gpuJointTransform?: boolean;
   postProcess?: (model: SharedModel) => SharedModel;
 };
 
@@ -263,7 +264,7 @@ export class AssetManager {
    */
   async fetchModel(scene: Scene, url: string, options?: ModelFetchOptions): Promise<ModelInfo> {
     const sharedModel = await this.fetchModelData(scene, url, options?.mimeType, options?.postProcess);
-    return this.createSceneNode(scene, sharedModel, !options?.disableInstancing);
+    return this.createSceneNode(scene, sharedModel, !options?.disableInstancing, !!options?.gpuJointTransform);
   }
   /** @internal */
   async loadTextData(url: string, postProcess?: (text: string) => string): Promise<string> {
@@ -467,7 +468,8 @@ export class AssetManager {
   private createSceneNode(
     scene: Scene,
     model: SharedModel,
-    instancing: boolean
+    instancing: boolean,
+    gpuJointTransform: boolean
   ): { group: SceneNode; animationSet: AnimationSet } {
     const group = new SceneNode(scene);
     group.name = model.name;
@@ -523,6 +525,9 @@ export class AssetManager {
     if (animationSet.numAnimations === 0) {
       animationSet.dispose();
       animationSet = null;
+    }
+    if (animationSet && gpuJointTransform) {
+      animationSet.createAnimationTextures(4);
     }
     return { group, animationSet };
   }

@@ -5,6 +5,7 @@ import { Application } from '../app';
 import type { SceneNode } from '../scene/scene_node';
 import type { Skeleton } from './skeleton';
 import type { Mesh } from '../scene/mesh';
+import { AnimationTexInfo } from './animationset';
 
 /**
  * Bounding box information for a skeleton
@@ -102,6 +103,10 @@ export class AnimationClip {
   isSkeletonUsed(skeleton: Skeleton): boolean {
     return this._skeletons.has(skeleton);
   }
+  /** Get skeletons of this animation */
+  getSkeletons(): IterableIterator<Skeleton> {
+    return this._skeletons.keys();
+  }
   /**
    * Adds a skeleton to the animation
    * @param skeleton - The skeleton to be added
@@ -163,7 +168,7 @@ export class AnimationClip {
   /**
    * Updates the animation state
    */
-  update(): void {
+  update(animationTexInfo?: Map<Skeleton, AnimationTexInfo>): void {
     const device = Application.instance.device;
     if (!this._isPlaying || this._lastUpdateFrame === device.frameInfo.frameCounter) {
       return;
@@ -171,12 +176,29 @@ export class AnimationClip {
     this._lastUpdateFrame = device.frameInfo.frameCounter;
     this.updateTracks(this._currentPlayTime);
     this._skeletons.forEach((meshes, skeleton) => {
-      skeleton.computeJoints();
-      for (const mesh of meshes) {
-        skeleton.computeBoundingBox(mesh.bounding, mesh.mesh.invWorldMatrix);
-        mesh.mesh.setBoneMatrices(skeleton.jointTexture);
-        mesh.mesh.setInvBindMatrix(mesh.mesh.invWorldMatrix);
-        mesh.mesh.setAnimatedBoundingBox(mesh.bounding.boundingBox);
+      if (animationTexInfo) {
+        const info = animationTexInfo.get(skeleton);
+        const offsets = info.offsets[this._name];
+        const delta = this._duration / offsets.numKeyframes;
+        const t0 = Math.floor(this._currentPlayTime / delta);
+        const t1 = t0 + 1;
+        const f = (this._currentPlayTime - t0 * delta) / delta;
+        const offset0 = offsets.offset + t0 * skeleton.numJoints * 4;
+        const offset1 = offsets.offset + (t1 % offsets.numKeyframes) * skeleton.numJoints * 4;
+        for (const mesh of meshes) {
+          skeleton.computeBoundingBox(mesh.bounding, mesh.mesh.invWorldMatrix);
+          mesh.mesh.setBoneMatrices(skeleton.jointTexture);
+          mesh.mesh.setInvBindMatrix(mesh.mesh.invWorldMatrix);
+          mesh.mesh.setAnimatedBoundingBox(mesh.bounding.boundingBox);
+        }
+      } else {
+        skeleton.computeJoints();
+        for (const mesh of meshes) {
+          skeleton.computeBoundingBox(mesh.bounding, mesh.mesh.invWorldMatrix);
+          mesh.mesh.setBoneMatrices(skeleton.jointTexture);
+          mesh.mesh.setInvBindMatrix(mesh.mesh.invWorldMatrix);
+          mesh.mesh.setAnimatedBoundingBox(mesh.bounding.boundingBox);
+        }
       }
     });
     const timeAdvance = device.frameInfo.elapsedFrame * 0.001 * this._speedRatio;
