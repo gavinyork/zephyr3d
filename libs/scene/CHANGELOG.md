@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Tue, 19 Mar 2024 19:55:21 GMT and should not be manually modified.
+This log was last generated on Fri, 22 Mar 2024 12:38:57 GMT and should not be manually modified.
+
+## 0.3.1
+Fri, 22 Mar 2024 12:38:57 GMT
+
+### Patches
+
+- AssetManger.fetchModel() by default do not use instancing.
 
 ## 0.3.0
 Tue, 19 Mar 2024 19:55:21 GMT
