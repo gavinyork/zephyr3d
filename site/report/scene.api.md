@@ -2085,7 +2085,7 @@ export class Model extends GraphNode {
 // @public
 export type ModelFetchOptions = {
     mimeType?: string;
-    disableInstancing?: boolean;
+    enableInstancing?: boolean;
     postProcess?: (model: SharedModel) => SharedModel;
 };
 
@@ -2295,7 +2295,7 @@ export class PBRMetallicRoughnessMaterial extends PBRMetallicRoughnessMaterial_b
 
 // Warning: (ae-forgotten-export) The symbol "PBRSpecularGlossinessMaterial_base" needs to be exported by the entry point index.d.ts
 //
-// @public (undocumented)
+// @public
 export class PBRSpecularGlossinessMaterial extends PBRSpecularGlossinessMaterial_base {
     constructor();
     // (undocumented)
@@ -4022,8 +4022,8 @@ export class XForm<T extends XForm<T> = XForm<any>> extends XForm_base {
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:3515:9 - (ae-incompatible-release-tags) The symbol "bindGroup" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
-// dist/index.d.ts:4827:9 - (ae-incompatible-release-tags) The symbol "bindGroup" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
+// dist/index.d.ts:3525:9 - (ae-incompatible-release-tags) The symbol "bindGroup" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
+// dist/index.d.ts:4837:9 - (ae-incompatible-release-tags) The symbol "bindGroup" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
 
 // (No @packageDocumentation comment for this package)
 

@@ -36,8 +36,11 @@ export type TextureFetchOptions<T extends BaseTexture> = {
  * @public
  **/
 export type ModelFetchOptions = {
+  /** MIME type of the model, if not specified, model type will be determined by file extension */
   mimeType?: string;
-  disableInstancing?: boolean;
+  /** True if the model need to be rendered instanced, the default value is false */
+  enableInstancing?: boolean;
+  /** PostProcess loading function for the mesh  */
   postProcess?: (model: SharedModel) => SharedModel;
 };
 
@@ -263,7 +266,7 @@ export class AssetManager {
    */
   async fetchModel(scene: Scene, url: string, options?: ModelFetchOptions): Promise<ModelInfo> {
     const sharedModel = await this.fetchModelData(scene, url, options?.mimeType, options?.postProcess);
-    return this.createSceneNode(scene, sharedModel, !options?.disableInstancing);
+    return this.createSceneNode(scene, sharedModel, !!options?.enableInstancing);
   }
   /** @internal */
   async loadTextData(url: string, postProcess?: (text: string) => string): Promise<string> {

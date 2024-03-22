@@ -5,7 +5,7 @@ import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughn
 import { ShaderHelper } from './shader/helper';
 
 /**
- * PBRMetallicRoughness material class
+ * PBRMetallicRoughnessMaterial class
  * @public
  */
 export class PBRMetallicRoughnessMaterial extends applyMaterialMixins(
