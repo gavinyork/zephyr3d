@@ -59,3 +59,35 @@ effect. Using static batching is also straightforward; simply create a BatchGrou
 node of all instances.
 
 <div class="showcase" case="tut-45"></div>
+
+## Loading models
+
+For models loaded with AssetManager, instanced rendering of the model can be enabled through the
+[enableInstancing](/doc/markdown/./scene.modelfetchoptions) attribute in the loading options. Once
+this attribute is added, the material will automatically call the createInstance() method.
+
+```javascript
+
+  const instancedModels = [];
+  const nonInstancedModels = [];
+  // model URL
+  const modelUrl = 'http://model/path';
+  for (let i = 0; i < 100; i++) {
+    // Loading the same model and setting the enableInstancing property to true
+    // automatically utilizes instanced rendering for these models.
+    instancedModels.push(await assetManager.fetchModel(scene, url, {
+      enableInstancing: true
+    }));
+  }
+  for (let i = 0; i < 100; i++) {
+    // Loading the same model without setting the enableInstancing property to true
+    // will not use instanced rendering
+    nonInstancedModels.push(await assetManager.fetchModel(scene, url));
+  }
+
+```
+
+## Important Notice:
+
+**Do not invoke the createInstance method of a material if instance rendering is not required. This is because createInstance creates a Proxy of the original material, and the Proxy's get() method is very slow, significantly impacting performance.**
+

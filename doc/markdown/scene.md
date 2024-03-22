@@ -57,8 +57,8 @@
 |  [OctreeNodeChunk](doc/markdown/./scene.octreenodechunk.md) | Octree node chunk |
 |  [OrbitCameraController](doc/markdown/./scene.orbitcameracontroller.md) | Orbit camera controller |
 |  [OrthoCamera](doc/markdown/./scene.orthocamera.md) | Orthogonal camera class |
-|  [PBRMetallicRoughnessMaterial](doc/markdown/./scene.pbrmetallicroughnessmaterial.md) | PBRMetallicRoughness material class |
-|  [PBRSpecularGlossinessMaterial](doc/markdown/./scene.pbrspecularglossinessmaterial.md) |  |
+|  [PBRMetallicRoughnessMaterial](doc/markdown/./scene.pbrmetallicroughnessmaterial.md) | PBRMetallicRoughnessMaterial class |
+|  [PBRSpecularGlossinessMaterial](doc/markdown/./scene.pbrspecularglossinessmaterial.md) | PBRSpecularGlossinessMaterial class |
 |  [PerspectiveCamera](doc/markdown/./scene.perspectivecamera.md) | Perspective camera class |
 |  [PlaneShape](doc/markdown/./scene.planeshape.md) | The plane shape |
 |  [PointLight](doc/markdown/./scene.pointlight.md) | Point light |

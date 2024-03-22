@@ -11,7 +11,7 @@ Options for model fetching
 ```typescript
 type ModelFetchOptions = {
     mimeType?: string;
-    disableInstancing?: boolean;
+    enableInstancing?: boolean;
     postProcess?: (model: SharedModel) => SharedModel;
 };
 ```

@@ -4,7 +4,7 @@
 
 ## PBRMetallicRoughnessMaterial class
 
-PBRMetallicRoughness material class
+PBRMetallicRoughnessMaterial class
 
 **Signature:**
 

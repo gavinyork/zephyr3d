@@ -29319,7 +29319,7 @@
             },
             {
               "kind": "Content",
-              "text": "{\n    mimeType?: string;\n    disableInstancing?: boolean;\n    postProcess?: (model: "
+              "text": "{\n    mimeType?: string;\n    enableInstancing?: boolean;\n    postProcess?: (model: "
             },
             {
               "kind": "Reference",
@@ -33290,7 +33290,7 @@
         {
           "kind": "Class",
           "canonicalReference": "@zephyr3d/scene!PBRMetallicRoughnessMaterial:class",
-          "docComment": "/**\n * PBRMetallicRoughness material class\n *\n * @public\n */\n",
+          "docComment": "/**\n * PBRMetallicRoughnessMaterial class\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -33495,7 +33495,7 @@
         {
           "kind": "Class",
           "canonicalReference": "@zephyr3d/scene!PBRSpecularGlossinessMaterial:class",
-          "docComment": "",
+          "docComment": "/**\n * PBRSpecularGlossinessMaterial class\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
@@ -33520,7 +33520,7 @@
             {
               "kind": "Constructor",
               "canonicalReference": "@zephyr3d/scene!PBRSpecularGlossinessMaterial:constructor(1)",
-              "docComment": "/**\n * Constructs a new instance of the `PBRSpecularGlossinessMaterial` class\n */\n",
+              "docComment": "/**\n * Creates an instance of PBRSpecularGlossinessMaterial class\n */\n",
               "excerptTokens": [
                 {
                   "kind": "Content",

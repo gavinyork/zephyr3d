@@ -4,7 +4,7 @@
 
 ## PBRSpecularGlossinessMaterial.(constructor)
 
-Constructs a new instance of the `PBRSpecularGlossinessMaterial` class
+Creates an instance of PBRSpecularGlossinessMaterial class
 
 **Signature:**
 

@@ -4,6 +4,8 @@
 
 ## PBRSpecularGlossinessMaterial class
 
+PBRSpecularGlossinessMaterial class
+
 **Signature:**
 
 ```typescript
@@ -15,7 +17,7 @@ declare class PBRSpecularGlossinessMaterial extends PBRSpecularGlossinessMateria
 
 |  Constructor | Modifiers | Description |
 |  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.pbrspecularglossinessmaterial._constructor_.md) |  | Constructs a new instance of the <code>PBRSpecularGlossinessMaterial</code> class |
+|  [(constructor)()](doc/markdown/./scene.pbrspecularglossinessmaterial._constructor_.md) |  | Creates an instance of PBRSpecularGlossinessMaterial class |
 
 ## Properties
 
