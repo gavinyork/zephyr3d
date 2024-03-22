@@ -52,3 +52,31 @@ for (let i = 0; i < 10; i++) {
 一个BatchGroup节点作为所有渲染实例的父节点即可。
 
 <div class="showcase" case="tut-45"></div>
+
+## 载入模型
+
+对于使用AssetManager加载的模型，可以通过加载选项的[enableInstancing](/doc/markdown/./scene.modelfetchoptions)属性来允许实例化渲染该模型。
+添加了该属性，材质会自动调用createInstance()方法。
+
+```javascript
+
+  const instancedModels = [];
+  const nonInstancedModels = [];
+  // 模型地址
+  const modelUrl = 'http://model/path';
+  for (let i = 0; i < 100; i++) {
+    // 加载相同的模型并设置enableInstancing属性为true，这些模型自动使用实例化渲染
+    instancedModels.push(await assetManager.fetchModel(scene, url, {
+      enableInstancing: true
+    }));
+  }
+  for (let i = 0; i < 100; i++) {
+    // 加载相同的模型但未设置enableInstancing属性为true，这些模型不会使用实例化渲染
+    nonInstancedModels.push(await assetManager.fetchModel(scene, url));
+  }
+
+```
+
+## 重要说明
+
+**如果不需要实例化渲染，请勿调用材质的createInstance方法，因为createInstance会创建原材质的一个Proxy，而Proxy的get()方法非常慢，将会严重影响运行效率。**

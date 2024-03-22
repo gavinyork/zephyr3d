@@ -4,13 +4,22 @@ import type { PBFunctionScope } from '@zephyr3d/device';
 import { mixinPBRSpecularGlossness } from './mixins/lightmodel/pbrspecularglossness';
 import { ShaderHelper } from './shader/helper';
 
+/**
+ * PBRSpecularGlossinessMaterial class
+ * @public
+ */
 export class PBRSpecularGlossinessMaterial extends applyMaterialMixins(
   MeshMaterial,
   mixinPBRSpecularGlossness,
   mixinVertexColor
 ) {
+  /** @internal */
   private static FEATURE_VERTEX_NORMAL = this.defineFeature();
+  /** @internal */
   private static FEATURE_VERTEX_TANGENT = this.defineFeature();
+  /**
+   * Creates an instance of PBRSpecularGlossinessMaterial class
+   */
   constructor() {
     super();
     this.useFeature(PBRSpecularGlossinessMaterial.FEATURE_VERTEX_NORMAL, true);
