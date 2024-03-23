@@ -164,6 +164,10 @@ export class Material {
   isBatchable(): boolean {
     return false;
   }
+  /** @internal */
+  get coreMaterial(): this {
+    return this;
+  }
   /**
    * Draws a primitive using this material
    *

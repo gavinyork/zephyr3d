@@ -149,10 +149,11 @@ export class MeshMaterial extends Material {
     const instanceUniforms = (this.constructor as typeof MeshMaterial).INSTANCE_UNIFORMS;
     const uniformsHolder = instanceUniforms.length > 0 ? new Float32Array(4 * instanceUniforms.length) : null;
     const batchable = Application.instance.device.type !== 'webgl';
+    const coreMaterial = this.coreMaterial;
     // Copy original uniform values
     for (let i = 0; i < instanceUniforms.length; i++) {
       const [prop, type] = instanceUniforms[i];
-      const value = this[prop];
+      const value = coreMaterial[prop];
       switch (type) {
         case 'float': {
           uniformsHolder[i * 4] = Number(value);
@@ -223,6 +224,8 @@ export class MeshMaterial extends Material {
               }
             }
           }
+        } else if (prop === 'coreMaterial') {
+          return target;
         } else if (typeof prop === 'string') {
           const index = instanceUniforms.findIndex((val) => val[0] === prop);
           if (index >= 0) {
@@ -263,7 +266,7 @@ export class MeshMaterial extends Material {
         }
       }
     };
-    return new Proxy(this, handler);
+    return new Proxy(coreMaterial, handler);
   }
   /** Draw context for shader creation */
   get drawContext(): DrawContext {

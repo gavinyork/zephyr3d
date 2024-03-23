@@ -38,7 +38,7 @@ instancingApp.ready().then(async () => {
   const batchGroup = new BatchGroup(scene);
   const assetManager = new AssetManager();
   for (let i = 0; i < 2000; i++) {
-    assetManager.fetchModel(scene, 'assets/stone1.glb', { disableInstancing: false }).then((info) => {
+    assetManager.fetchModel(scene, 'assets/stone1.glb', { enableInstancing: true }).then((info) => {
       info.group.parent = batchGroup;
       info.group.position.setXYZ(
         Math.random() * 100 - 50,
@@ -56,7 +56,7 @@ instancingApp.ready().then(async () => {
         }
       });
     });
-    assetManager.fetchModel(scene, 'assets/stone2.glb', { disableInstancing: false }).then((info) => {
+    assetManager.fetchModel(scene, 'assets/stone2.glb', { enableInstancing: true }).then((info) => {
       info.group.parent = batchGroup;
       info.group.position.setXYZ(
         Math.random() * 100 - 50,
