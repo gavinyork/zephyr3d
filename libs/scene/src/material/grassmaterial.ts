@@ -56,6 +56,13 @@ export class GrassMaterial extends applyMaterialMixins(
   supportLighting(): boolean {
     return true;
   }
+  /**
+   * {@inheritDoc Material.supportInstancing}
+   * @override
+   */
+  supportInstancing(): boolean {
+    return false;
+  }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
     bindGroup.setTexture('terrainNormalMap', this._terrainNormalMap);

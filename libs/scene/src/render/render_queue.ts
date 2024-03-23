@@ -13,58 +13,61 @@ import { ShaderHelper } from '../material';
 export type CachedBindGroup = {
   bindGroup: BindGroup;
   buffer: Float32Array;
+  offset: number;
   dirty: boolean;
 };
+
+const maxBufferSizeInFloats = 65536 / 4;
 
 /** @internal */
 export class InstanceBindGroupAllocator {
   private static _instanceBindGroupLayout: BindGroupLayout = null;
-  _usedBindGroupList: CachedBindGroup[] = [];
-  _freeBindGroupList: CachedBindGroup[] = [];
+  _bindGroupList: CachedBindGroup[] = [];
   private _allocFrameStamp: number;
   constructor() {
     this._allocFrameStamp = -1;
-    this._usedBindGroupList = [];
-    this._freeBindGroupList = [];
+    this._bindGroupList = [];
   }
-  allocateInstanceBindGroup(framestamp: number): CachedBindGroup {
+  allocateInstanceBindGroup(framestamp: number, sizeInFloats: number): CachedBindGroup {
     // Reset if render frame changed
     if (this._allocFrameStamp !== framestamp) {
       this._allocFrameStamp = framestamp;
-      this._freeBindGroupList.push(...this._usedBindGroupList);
-      this._usedBindGroupList.length = 0;
-    }
-    let bindGroup = this._freeBindGroupList.pop();
-    if (!bindGroup) {
-      if (!InstanceBindGroupAllocator._instanceBindGroupLayout) {
-        const buildInfo = new ProgramBuilder(Application.instance.device).buildRender({
-          vertex(pb) {
-            this[ShaderHelper.getWorldMatricesUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
-            pb.main(function () {});
-          },
-          fragment(pb) {
-            this[ShaderHelper.getWorldMatricesUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
-            pb.main(function () {});
-          }
-        });
-        InstanceBindGroupAllocator._instanceBindGroupLayout = buildInfo[2][3];
+      for (const k of this._bindGroupList) {
+        k.offset = 0;
       }
-      bindGroup = {
-        bindGroup: Application.instance.device.createBindGroup(
-          InstanceBindGroupAllocator._instanceBindGroupLayout
-        ),
-        buffer: new Float32Array(65536 >> 2),
-        dirty: true
-      };
-    } else {
-      bindGroup.dirty = true;
     }
-    this._usedBindGroupList.push(bindGroup);
+    for (const k of this._bindGroupList) {
+      if (k.offset + sizeInFloats <= maxBufferSizeInFloats) {
+        k.dirty = true;
+        return k;
+      }
+    }
+    if (!InstanceBindGroupAllocator._instanceBindGroupLayout) {
+      const buildInfo = new ProgramBuilder(Application.instance.device).buildRender({
+        vertex(pb) {
+          this[ShaderHelper.getInstanceDataUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
+          pb.main(function () {});
+        },
+        fragment(pb) {
+          this[ShaderHelper.getInstanceDataUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
+          pb.main(function () {});
+        }
+      });
+      InstanceBindGroupAllocator._instanceBindGroupLayout = buildInfo[2][3];
+    }
+    const bindGroup = {
+      bindGroup: Application.instance.device.createBindGroup(
+        InstanceBindGroupAllocator._instanceBindGroupLayout
+      ),
+      buffer: new Float32Array(maxBufferSizeInFloats),
+      offset: 0,
+      dirty: true
+    };
+    this._bindGroupList.push(bindGroup);
     return bindGroup;
   }
 }
 
-const maxUniformSize = 65536 >> 2;
 const defaultInstanceBindGroupAlloator = new InstanceBindGroupAllocator();
 
 /**
@@ -74,8 +77,8 @@ const defaultInstanceBindGroupAlloator = new InstanceBindGroupAllocator();
 export interface InstanceData {
   bindGroup: CachedBindGroup;
   stride: number;
-  currentSize: number;
-  maxSize: number;
+  offset: number;
+  numInstances: number;
   hash: string;
 }
 
@@ -231,49 +234,46 @@ export class RenderQueue {
         const instanceList = trans ? itemList.transInstanceList : itemList.opaqueInstanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         const index = instanceList[hash];
-        if (
-          index === undefined ||
-          list[index].instanceData.currentSize + list[index].instanceData.stride >
-            list[index].instanceData.maxSize
-        ) {
+        const instanceUniforms = drawable.getInstanceUniforms();
+        const instanceUniformsSize = instanceUniforms?.length ?? 0;
+        const stride = 16 + instanceUniformsSize;
+        if (index === undefined || list[index].instanceData.bindGroup.offset + stride > maxBufferSizeInFloats) {
           instanceList[hash] = list.length;
           const bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(
-            Application.instance.device.frameInfo.frameCounter
+            Application.instance.device.frameInfo.frameCounter,
+            stride
           );
-          drawable.setInstanceDataBuffer(this._renderPass, bindGroup, 0);
-          bindGroup.buffer.set(drawable.getXForm().worldMatrix);
-          let currentSize = 4;
+          drawable.setInstanceDataBuffer(this._renderPass, bindGroup, bindGroup.offset);
+          bindGroup.buffer.set(drawable.getXForm().worldMatrix, bindGroup.offset);
           const instanceUniforms = drawable.getInstanceUniforms();
           if (instanceUniforms) {
-            bindGroup.buffer.set(instanceUniforms, currentSize * 4);
-            currentSize += instanceUniforms.length >> 2;
+            bindGroup.buffer.set(instanceUniforms, bindGroup.offset + 16);
           }
-          const maxSize = Math.floor(maxUniformSize / currentSize);
           list.push({
             drawable,
             sortDistance: drawable.getSortDistance(camera),
             instanceData: {
               bindGroup,
-              currentSize,
-              maxSize,
-              stride: currentSize,
+              offset: bindGroup.offset,
+              numInstances: 1,
+              stride,
               hash: hash
             }
           });
+          bindGroup.offset += stride;
         } else {
           const instanceData = list[index].instanceData;
           drawable.setInstanceDataBuffer(
             this._renderPass,
             instanceData.bindGroup,
-            instanceData.currentSize * 4
+            instanceData.bindGroup.offset
           );
-          instanceData.bindGroup.buffer.set(drawable.getXForm().worldMatrix, instanceData.currentSize * 4);
-          instanceData.currentSize += 4;
-          const instanceUniforms = drawable.getInstanceUniforms();
+          instanceData.bindGroup.buffer.set(drawable.getXForm().worldMatrix, instanceData.bindGroup.offset);
           if (instanceUniforms) {
-            instanceData.bindGroup.buffer.set(instanceUniforms, instanceData.currentSize * 4);
-            instanceData.currentSize += instanceUniforms.length >> 2;
+            instanceData.bindGroup.buffer.set(instanceUniforms, instanceData.bindGroup.offset + 16);
           }
+          instanceData.bindGroup.offset += stride;
+          instanceData.numInstances++;
         }
       } else {
         list.push({

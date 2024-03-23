@@ -187,6 +187,13 @@ export class TerrainMaterial extends applyMaterialMixins(
     return true;
   }
   /**
+   * {@inheritDoc Material.supportInstancing}
+   * @override
+   */
+  supportInstancing(): boolean {
+    return false;
+  }
+  /**
    * {@inheritDoc Material.isBatchable}
    * @override
    */

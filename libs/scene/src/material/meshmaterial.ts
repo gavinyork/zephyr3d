@@ -140,15 +140,16 @@ export class MeshMaterial extends Material {
     //return ShaderHelper.getInstancedUniform(scope, 4 + uniformIndex);
     const pb = scope.$builder;
     const instanceID = pb.shaderKind === 'vertex' ? scope.$builtins.instanceIndex : scope.$inputs.zInstanceID;
-    const uniformName = ShaderHelper.getWorldMatricesUniformName();
-    const strideName = ShaderHelper.getInstanceBufferStrideUniformName();
-    return scope[uniformName].at(pb.add(pb.mul(scope[strideName], instanceID), 4 + uniformIndex));
+    const uniformName = ShaderHelper.getInstanceDataUniformName();
+    const strideName = ShaderHelper.getInstanceDataStrideUniformName();
+    const offsetName = ShaderHelper.getInstanceDataOffsetUniformName();
+    return scope[uniformName].at(pb.add(pb.mul(scope[strideName], instanceID), 4 + uniformIndex, scope[offsetName]));
   }
   /** Create material instance */
   createInstance(): this {
     const instanceUniforms = (this.constructor as typeof MeshMaterial).INSTANCE_UNIFORMS;
     const uniformsHolder = instanceUniforms.length > 0 ? new Float32Array(4 * instanceUniforms.length) : null;
-    const batchable = Application.instance.device.type !== 'webgl';
+    const batchable = Application.instance.device.type !== 'webgl' && this.supportInstancing();
     const coreMaterial = this.coreMaterial;
     // Copy original uniform values
     for (let i = 0; i < instanceUniforms.length; i++) {

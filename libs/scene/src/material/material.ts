@@ -152,12 +152,16 @@ export class Material {
   getQueueType(): number {
     return QUEUE_OPAQUE;
   }
-  /** Returns true if this is a transparency material */
+  /** Returns true if given pass is transparent */
   isTransparentPass(pass: number): boolean {
     return false;
   }
   /** Returns true if shading of the material will be affected by lights  */
   supportLighting(): boolean {
+    return true;
+  }
+  /** Returns true if this material supports geometry instancing  */
+  supportInstancing(): boolean {
     return true;
   }
   /** Returns true if this material supports geometry instancing  */
@@ -417,11 +421,11 @@ export class Material {
     if (ctx.instanceData) {
       if (ctx.instanceData.bindGroup.dirty) {
         ctx.instanceData.bindGroup.bindGroup.setRawData(
-          ShaderHelper.getWorldMatricesUniformName(),
+          ShaderHelper.getInstanceDataUniformName(),
           0,
           ctx.instanceData.bindGroup.buffer,
           0,
-          ctx.instanceData.currentSize * 4
+          ctx.instanceData.bindGroup.offset
         );
         ctx.instanceData.bindGroup.dirty = false;
       }
@@ -432,7 +436,8 @@ export class Material {
     const bindGroup = this.getDrawableBindGroup(ctx, hash).bindGroup?.[ctx.renderPass.type];
     if (bindGroup) {
       if (ctx.instanceData) {
-        bindGroup.setValue(ShaderHelper.getInstanceBufferStrideUniformName(), ctx.instanceData.stride);
+        bindGroup.setValue(ShaderHelper.getInstanceDataStrideUniformName(), ctx.instanceData.stride >> 2);
+        bindGroup.setValue(ShaderHelper.getInstanceDataOffsetUniformName(), ctx.instanceData.offset >> 2);
       }
       Application.instance.device.setBindGroup(1, bindGroup);
     } else {
@@ -538,7 +543,7 @@ export class Material {
     if (numInstances > 0) {
       primitive.drawInstanced(numInstances);
     } else if (ctx.instanceData) {
-      primitive.drawInstanced(ctx.instanceData.currentSize / ctx.instanceData.stride);
+      primitive.drawInstanced(ctx.instanceData.numInstances);
     } else {
       primitive.draw();
     }
