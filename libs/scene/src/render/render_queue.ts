@@ -1,7 +1,7 @@
 import { Application } from '../app';
 import type { Vector4 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';
-import type { Drawable } from './drawable';
+import type { BatchDrawable, Drawable } from './drawable';
 import type { DirectionalLight, PunctualLight } from '../scene/light';
 import type { RenderPass } from '.';
 import { QUEUE_TRANSPARENT } from '../values';
@@ -79,7 +79,6 @@ export interface InstanceData {
   stride: number;
   offset: number;
   numInstances: number;
-  hash: string;
 }
 
 /**
@@ -99,9 +98,9 @@ export interface RenderQueueItem {
  */
 interface RenderItemList {
   opaqueList: RenderQueueItem[];
-  opaqueInstanceList: Record<string, number>;
+  opaqueInstanceList: Record<string, BatchDrawable[]>;
   transList: RenderQueueItem[];
-  transInstanceList: Record<string, number>;
+  transInstanceList: Record<string, BatchDrawable[]>;
 }
 
 /**
@@ -233,48 +232,12 @@ export class RenderQueue {
       if (drawable.isBatchable()) {
         const instanceList = trans ? itemList.transInstanceList : itemList.opaqueInstanceList;
         const hash = drawable.getInstanceId(this._renderPass);
-        const index = instanceList[hash];
-        const instanceUniforms = drawable.getInstanceUniforms();
-        const instanceUniformsSize = instanceUniforms?.length ?? 0;
-        const stride = 16 + instanceUniformsSize;
-        if (index === undefined || list[index].instanceData.bindGroup.offset + stride > maxBufferSizeInFloats) {
-          instanceList[hash] = list.length;
-          const bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(
-            Application.instance.device.frameInfo.frameCounter,
-            stride
-          );
-          drawable.setInstanceDataBuffer(this._renderPass, bindGroup, bindGroup.offset);
-          bindGroup.buffer.set(drawable.getXForm().worldMatrix, bindGroup.offset);
-          const instanceUniforms = drawable.getInstanceUniforms();
-          if (instanceUniforms) {
-            bindGroup.buffer.set(instanceUniforms, bindGroup.offset + 16);
-          }
-          list.push({
-            drawable,
-            sortDistance: drawable.getSortDistance(camera),
-            instanceData: {
-              bindGroup,
-              offset: bindGroup.offset,
-              numInstances: 1,
-              stride,
-              hash: hash
-            }
-          });
-          bindGroup.offset += stride;
-        } else {
-          const instanceData = list[index].instanceData;
-          drawable.setInstanceDataBuffer(
-            this._renderPass,
-            instanceData.bindGroup,
-            instanceData.bindGroup.offset
-          );
-          instanceData.bindGroup.buffer.set(drawable.getXForm().worldMatrix, instanceData.bindGroup.offset);
-          if (instanceUniforms) {
-            instanceData.bindGroup.buffer.set(instanceUniforms, instanceData.bindGroup.offset + 16);
-          }
-          instanceData.bindGroup.offset += stride;
-          instanceData.numInstances++;
+        let drawableList = instanceList[hash];
+        if (!drawableList) {
+          drawableList = [];
+          instanceList[hash] = drawableList;
         }
+        drawableList.push(drawable);
       } else {
         list.push({
           drawable,
@@ -292,6 +255,51 @@ export class RenderQueue {
     this._shadowedLightList = [];
     this._unshadowedLightList = [];
     this._sunLight = null;
+  }
+  end(): this {
+    const frameCounter = Application.instance.device.frameInfo.frameCounter;
+    for (const k in this._itemLists) {
+      const itemList = this._itemLists[k];
+      const lists = [itemList.opaqueList, itemList.transList];
+      const instanceLists = [itemList.opaqueInstanceList, itemList.transInstanceList];
+      for (let i = 0; i < 2; i++) {
+        const list = lists[i];
+        const instanceList = instanceLists[i];
+        for (const x in instanceList) {
+          const drawables = instanceList[x];
+          let bindGroup: CachedBindGroup = null;
+          let item: RenderQueueItem = null;
+          for (let i = 0; i < drawables.length; i++) {
+            const drawable = drawables[i];
+            const instanceUniforms = drawable.getInstanceUniforms();
+            const instanceUniformsSize = instanceUniforms?.length ?? 0;
+            const stride = 16 + instanceUniformsSize;
+            if (!bindGroup || bindGroup.offset + stride > maxBufferSizeInFloats) {
+              bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(frameCounter, stride);
+              item = {
+                drawable,
+                sortDistance: 0,
+                instanceData: {
+                  bindGroup,
+                  offset: bindGroup.offset,
+                  numInstances: 0,
+                  stride
+                }
+              }
+              list.push(item);
+            }
+            drawable.setInstanceDataBuffer(this._renderPass, bindGroup, bindGroup.offset);
+            bindGroup.buffer.set(drawable.getXForm().worldMatrix, bindGroup.offset);
+            if (instanceUniforms) {
+              bindGroup.buffer.set(instanceUniforms, bindGroup.offset + 16);
+            }
+            bindGroup.offset += stride;
+            item.instanceData.numInstances++;
+          }
+        }
+      }
+    }
+    return this;
   }
   /**
    * Sorts the items in the render queue for rendering

@@ -27,7 +27,7 @@ export class LightPass extends RenderPass {
     return `${this._shadowMapHash}:${ctx.env.getHash(ctx)}`;
   }
   /** @internal */
-  protected renderLightPass(ctx: DrawContext, items: RenderQueueItem[], lights: PunctualLight[]) {
+  protected renderLightPass(ctx: DrawContext, items: RenderQueueItem[], lights: PunctualLight[], flags: any) {
     const device = Application.instance.device;
     const baseLightPass = !ctx.lightBlending;
     ctx.drawEnvLight =
@@ -36,7 +36,10 @@ export class LightPass extends RenderPass {
       (ctx.env.light.envLight.hasRadiance() || ctx.env.light.envLight.hasIrradiance());
     ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
     const info = this.getGlobalBindGroupInfo(ctx);
-    ShaderHelper.setCameraUniforms(info.bindGroup, ctx, !!device.getFramebuffer());
+    if (!flags[ctx.renderPassHash]) {
+      ShaderHelper.setCameraUniforms(info.bindGroup, ctx.camera, ctx.flip, !!device.getFramebuffer());
+      flags[ctx.renderPassHash] = 1;
+    }
     if (ctx.currentShadowLight) {
       ShaderHelper.setLightUniformsShadow(info.bindGroup, ctx, lights[0]);
     } else {
@@ -80,6 +83,7 @@ export class LightPass extends RenderPass {
     ctx.flip = this.isAutoFlip();
     renderQueue.sortItems();
 
+    const flags = {};
     const orders = Object.keys(renderQueue.items)
       .map((val) => Number(val))
       .sort((a, b) => a - b);
@@ -96,7 +100,7 @@ export class LightPass extends RenderPass {
             ctx.currentShadowLight = k;
             ctx.lightBlending = lightIndex > 0;
             this._shadowMapHash = ctx.shadowMapInfo.get(k).shaderHash;
-            this.renderLightPass(ctx, list, [k]);
+            this.renderLightPass(ctx, list, [k], flags);
             lightIndex++;
           }
         }
@@ -104,7 +108,7 @@ export class LightPass extends RenderPass {
           ctx.currentShadowLight = null;
           ctx.lightBlending = lightIndex > 0;
           this._shadowMapHash = '';
-          this.renderLightPass(ctx, list, renderQueue.unshadowedLights);
+          this.renderLightPass(ctx, list, renderQueue.unshadowedLights, flags);
         }
       }
       if (i === 0) {

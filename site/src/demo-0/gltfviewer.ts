@@ -1,10 +1,9 @@
 import * as zip from '@zip.js/zip.js';
 import { Vector4, Vector3 } from '@zephyr3d/base';
-import type { SceneNode, Scene, AnimationSet } from '@zephyr3d/scene';
+import { SceneNode, Scene, AnimationSet, BatchGroup } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
 import {
   BoundingBox,
-  GraphNode,
   Material,
   AssetManager,
   DirectionalLight,
@@ -37,6 +36,7 @@ export class GLTFViewer {
   private _fov: number;
   private _nearPlane: number;
   private _envMaps: EnvMaps;
+  private _batchGroup: BatchGroup;
   //private _ui: UI;
   private _ui: Panel;
   private _compositor: Compositor;
@@ -46,6 +46,7 @@ export class GLTFViewer {
     this._animationSet = null;
     this._scene = scene;
     this._envMaps = new EnvMaps();
+    this._batchGroup = new BatchGroup(scene);
     //this._ui = new UI(this);
     this._assetManager = new AssetManager();
     this._tonemap = new Tonemap();
@@ -146,9 +147,10 @@ export class GLTFViewer {
   async loadModel(url: string) {
     this._modelNode?.remove();
     this._assetManager.purgeCache();
-    this._assetManager.fetchModel(this._scene, url).then((info) => {
+    this._assetManager.fetchModel(this._scene, url, { enableInstancing: false }).then((info) => {
       this._modelNode?.dispose();
       this._modelNode = info.group;
+      this._modelNode.parent = this._batchGroup;
       this._animationSet?.dispose();
       this._animationSet = info.animationSet;
       this._modelNode.pickable = true;

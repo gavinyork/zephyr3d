@@ -20,7 +20,7 @@ import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { PhysicsWorld } from './physics';
 import { Panel } from './ui';
 
-const objectCount = 18;
+const objectCount = 800;
 
 function getQueryString(name: string) {
   return new URL(window.location.toString()).searchParams.get(name) || null;

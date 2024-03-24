@@ -149,15 +149,58 @@ export class MeshMaterial extends Material {
   createInstance(): this {
     const instanceUniforms = (this.constructor as typeof MeshMaterial).INSTANCE_UNIFORMS;
     const uniformsHolder = instanceUniforms.length > 0 ? new Float32Array(4 * instanceUniforms.length) : null;
-    const batchable = Application.instance.device.type !== 'webgl' && this.supportInstancing();
-    const coreMaterial = this.coreMaterial;
+    const isWebGL1 = Application.instance.device.type === 'webgl';
+
+    const instance = {} as any;
+    const that = this;
+    instance.isBatchable = () => !isWebGL1 && that.supportInstancing();
+    instance.$instanceUniforms = uniformsHolder;
+    instance.$isInstance = true;
+    instance.beginDraw = function(pass: number, ctx: DrawContext){
+      if (isWebGL1 || !that.supportInstancing()) {
+        for (let i = 0; i < instanceUniforms.length; i++) {
+          const name = instanceUniforms[i][0];
+          const type = instanceUniforms[i][1];
+          switch (type) {
+            case 'float':
+              that[name] = uniformsHolder[i * 4];
+              break;
+            case 'vec2':
+              that[name] = new Vector2(uniformsHolder[i * 4], uniformsHolder[i * 4 + 1]);
+              break;
+            case 'vec3':
+              that[name] = new Vector3(
+                uniformsHolder[i * 4],
+                uniformsHolder[i * 4 + 1],
+                uniformsHolder[i * 4 + 2]
+              );
+            case 'vec4':
+              that[name] = new Vector4(
+                uniformsHolder[i * 4],
+                uniformsHolder[i * 4 + 1],
+                uniformsHolder[i * 4 + 2],
+                uniformsHolder[i * 4 + 3]
+              );
+          }
+        }
+      }
+      return that.beginDraw(pass, ctx);
+    }
     // Copy original uniform values
     for (let i = 0; i < instanceUniforms.length; i++) {
       const [prop, type] = instanceUniforms[i];
-      const value = coreMaterial[prop];
+      const value = that[prop];
       switch (type) {
         case 'float': {
           uniformsHolder[i * 4] = Number(value);
+          Object.defineProperty(instance, prop, {
+            get() {
+              return uniformsHolder[i * 4];
+            },
+            set(value) {
+              uniformsHolder[i * 4 + 0] = value;
+            }
+          });
           break;
         }
         case 'vec2': {
@@ -166,6 +209,14 @@ export class MeshMaterial extends Material {
           }
           uniformsHolder[i * 4] = value.x;
           uniformsHolder[i * 4 + 1] = value.y;
+          Object.defineProperty(instance, prop, {
+            get() {
+              return new Vector2(uniformsHolder[i * 4], uniformsHolder[i * 4 + 1]);
+            },
+            set(value) {
+              uniformsHolder.set(value);
+            }
+          });
           break;
         }
         case 'vec3': {
@@ -175,6 +226,18 @@ export class MeshMaterial extends Material {
           uniformsHolder[i * 4] = value.x;
           uniformsHolder[i * 4 + 1] = value.y;
           uniformsHolder[i * 4 + 2] = value.z;
+          Object.defineProperty(instance, prop, {
+            get() {
+              return new Vector3(
+                uniformsHolder[i * 4],
+                uniformsHolder[i * 4 + 1],
+                uniformsHolder[i * 4 + 2]
+              );
+            },
+            set(value) {
+              uniformsHolder.set(value);
+            }
+          });
           break;
         }
         case 'vec4': {
@@ -185,89 +248,25 @@ export class MeshMaterial extends Material {
           uniformsHolder[i * 4 + 1] = value.y;
           uniformsHolder[i * 4 + 2] = value.z;
           uniformsHolder[i * 4 + 3] = value.w;
+          Object.defineProperty(instance, prop, {
+            get() {
+              return new Vector4(
+                uniformsHolder[i * 4],
+                uniformsHolder[i * 4 + 1],
+                uniformsHolder[i * 4 + 2],
+                uniformsHolder[i * 4 + 3]
+              );
+            },
+            set(value) {
+              uniformsHolder.set(value);
+            }
+          });
           break;
         }
       }
     }
-    const handler: ProxyHandler<this> = {
-      get(target, prop, receiver) {
-        if (prop === 'isBatchable') {
-          return () => batchable;
-        } else if (prop === '$instanceUniforms') {
-          return uniformsHolder;
-        } else if (prop === '$isInstance') {
-          return true;
-        } else if (prop === 'beginDraw') {
-          if (!batchable || !target.isBatchable()) {
-            for (let i = 0; i < instanceUniforms.length; i++) {
-              const name = instanceUniforms[i][0];
-              const type = instanceUniforms[i][1];
-              switch (type) {
-                case 'float':
-                  target[name] = uniformsHolder[i * 4];
-                  break;
-                case 'vec2':
-                  target[name] = new Vector2(uniformsHolder[i * 4], uniformsHolder[i * 4 + 1]);
-                  break;
-                case 'vec3':
-                  target[name] = new Vector3(
-                    uniformsHolder[i * 4],
-                    uniformsHolder[i * 4 + 1],
-                    uniformsHolder[i * 4 + 2]
-                  );
-                case 'vec4':
-                  target[name] = new Vector4(
-                    uniformsHolder[i * 4],
-                    uniformsHolder[i * 4 + 1],
-                    uniformsHolder[i * 4 + 2],
-                    uniformsHolder[i * 4 + 3]
-                  );
-              }
-            }
-          }
-        } else if (prop === 'coreMaterial') {
-          return target;
-        } else if (typeof prop === 'string') {
-          const index = instanceUniforms.findIndex((val) => val[0] === prop);
-          if (index >= 0) {
-            switch (instanceUniforms[index][1]) {
-              case 'float':
-                return uniformsHolder[index * 4];
-              case 'vec2':
-                return new Vector2(uniformsHolder[index * 4], uniformsHolder[index * 4 + 1]);
-              case 'vec3':
-                return new Vector3(
-                  uniformsHolder[index * 4],
-                  uniformsHolder[index * 4 + 1],
-                  uniformsHolder[index * 4 + 2]
-                );
-              case 'vec4':
-                return new Vector4(
-                  uniformsHolder[index * 4],
-                  uniformsHolder[index * 4 + 1],
-                  uniformsHolder[index * 4 + 2],
-                  uniformsHolder[index * 4 + 3]
-                );
-            }
-          }
-        }
-        return Reflect.get(target, prop, receiver);
-      },
-      set(target, prop, value, receiver) {
-        const i = instanceUniforms.findIndex((val) => val[0] === prop);
-        if (i >= 0) {
-          if (typeof value === 'number') {
-            uniformsHolder[i * 4 + 0] = value;
-          } else if (value instanceof Float32Array) {
-            uniformsHolder.set(value);
-          }
-          return true;
-        } else {
-          return Reflect.set(target, prop, value, receiver);
-        }
-      }
-    };
-    return new Proxy(coreMaterial, handler);
+    Object.setPrototypeOf(instance, that);
+    return instance;
   }
   /** Draw context for shader creation */
   get drawContext(): DrawContext {

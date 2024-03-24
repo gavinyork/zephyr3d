@@ -18,6 +18,7 @@ import type {
 } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
 import { linearToGamma } from '../../shaders';
+import { Camera } from '../../camera';
 
 const UNIFORM_NAME_GLOBAL = 'Z_UniformGlobal';
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
@@ -434,18 +435,18 @@ export class ShaderHelper {
     }
   }
   /** @internal */
-  static setCameraUniforms(bindGroup: BindGroup, ctx: DrawContext, linear: boolean) {
-    const pos = ctx.camera.getWorldPosition();
+  static setCameraUniforms(bindGroup: BindGroup, camera: Camera, flip: boolean, linear: boolean) {
+    const pos = camera.getWorldPosition();
     const cameraStruct = {
-      position: new Vector4(pos.x, pos.y, pos.z, ctx.camera.clipPlane ? 1 : 0),
-      clipPlane: ctx.camera.clipPlane ?? Vector4.zero(),
-      viewProjectionMatrix: ctx.camera.viewProjectionMatrix,
-      viewMatrix: ctx.camera.viewMatrix,
-      projectionMatrix: ctx.camera.getProjectionMatrix(),
+      position: new Vector4(pos.x, pos.y, pos.z, camera.clipPlane ? 1 : 0),
+      clipPlane: camera.clipPlane ?? Vector4.zero(),
+      viewProjectionMatrix: camera.viewProjectionMatrix,
+      viewMatrix: camera.viewMatrix,
+      projectionMatrix: camera.getProjectionMatrix(),
       params: new Vector4(
-        ctx.camera.getNearPlane(),
-        ctx.camera.getFarPlane(),
-        ctx.flip ? -1 : 1,
+        camera.getNearPlane(),
+        camera.getFarPlane(),
+        flip ? -1 : 1,
         linear ? 0 : 1
       )
     };

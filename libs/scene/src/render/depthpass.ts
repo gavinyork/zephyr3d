@@ -34,7 +34,7 @@ export class DepthPass extends RenderPass {
     const device = Application.instance.device;
     const bindGroup = this.getGlobalBindGroupInfo(ctx).bindGroup;
     device.setBindGroup(0, bindGroup);
-    ShaderHelper.setCameraUniforms(bindGroup, ctx, true);
+    ShaderHelper.setCameraUniforms(bindGroup, ctx.camera, ctx.flip, true);
     ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
     const reverseWinding = ctx.camera.worldMatrixDet < 0;
     for (const order of Object.keys(renderQueue.items)
