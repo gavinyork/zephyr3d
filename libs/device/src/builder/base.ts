@@ -175,6 +175,8 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
   $declareType: DeclareType;
   /** @internal */
   $isBuffer: boolean;
+  /** @internal */
+  $dynamicOffset: boolean;
   [name: string]: any;
   /** @internal */
   constructor(str: string, typeInfo: PBTypeInfo) {
@@ -197,6 +199,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$_group = null;
     this.$declareType = DeclareType.DECLARE_TYPE_NONE;
     this.$isBuffer = false;
+    this.$dynamicOffset = false;
     if (typeInfo.isTextureType()) {
       if (typeInfo.isDepthTexture()) {
         this.$sampleType = 'depth';
@@ -237,7 +240,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param group - The bind group index
    * @returns self
    */
-  uniformBuffer(group: number): PBShaderExp {
+  uniformBuffer(group: number, dynamicOffset = false): PBShaderExp {
     if (
       !this.$typeinfo.isPrimitiveType() &&
       !this.$typeinfo.isArrayType() &&
@@ -251,6 +254,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$declareType = DeclareType.DECLARE_TYPE_UNIFORM;
     this.$group = group;
     this.$isBuffer = true;
+    this.$dynamicOffset = !!dynamicOffset;
     return this;
   }
   /**
@@ -284,7 +288,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param group - The bind group index
    * @returns self
    */
-  storageBuffer(group: number): PBShaderExp {
+  storageBuffer(group: number, dynamicOffset = false): PBShaderExp {
     if (
       !this.$typeinfo.isPrimitiveType() &&
       !this.$typeinfo.isArrayType() &&
@@ -298,6 +302,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$declareType = DeclareType.DECLARE_TYPE_STORAGE;
     this.$group = group;
     this.$isBuffer = true;
+    this.$dynamicOffset = !!dynamicOffset;
     return this;
   }
   inout(): PBShaderExp {

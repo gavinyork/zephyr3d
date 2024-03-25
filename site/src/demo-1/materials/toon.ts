@@ -34,12 +34,12 @@ export class ToonMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoC
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
-    if (this.needFragmentColor(ctx)){
-      if (pass > 0) {
+    if (pass > 0) {
+      if (this.needFragmentColor(ctx)) {
         bindGroup.setValue('bands', this._bands);
-      } else {
-        bindGroup.setValue('edge', this._edgeThickness);
       }
+    } else {
+      bindGroup.setValue('edge', this._edgeThickness);
     }
   }
   vertexShader(scope: PBFunctionScope): void {

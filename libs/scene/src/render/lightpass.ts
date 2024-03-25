@@ -36,23 +36,26 @@ export class LightPass extends RenderPass {
       (ctx.env.light.envLight.hasRadiance() || ctx.env.light.envLight.hasIrradiance());
     ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
     const info = this.getGlobalBindGroupInfo(ctx);
-    if (!flags[ctx.renderPassHash]) {
+    if (!flags.cameraSet[ctx.renderPassHash]) {
       ShaderHelper.setCameraUniforms(info.bindGroup, ctx.camera, ctx.flip, !!device.getFramebuffer());
-      flags[ctx.renderPassHash] = 1;
+      flags.cameraSet[ctx.renderPassHash] = 1;
     }
     if (ctx.currentShadowLight) {
       ShaderHelper.setLightUniformsShadow(info.bindGroup, ctx, lights[0]);
     } else {
-      ShaderHelper.setLightUniforms(
-        info.bindGroup,
-        ctx,
-        ctx.clusteredLight.clusterParam,
-        ctx.clusteredLight.countParam,
-        ctx.clusteredLight.lightBuffer,
-        ctx.clusteredLight.lightIndexTexture
-      );
+      if (!flags.lightSet[ctx.renderPassHash]) {
+        ShaderHelper.setLightUniforms(
+          info.bindGroup,
+          ctx,
+          ctx.clusteredLight.clusterParam,
+          ctx.clusteredLight.countParam,
+          ctx.clusteredLight.lightBuffer,
+          ctx.clusteredLight.lightIndexTexture
+        );
+        flags.lightSet[ctx.renderPassHash] = 1;
+      }
     }
-    if (ctx.applyFog) {
+    if (ctx.applyFog && !flags.fogSet[ctx.renderPassHash]) {
       ShaderHelper.setFogUniforms(
         info.bindGroup,
         ctx.env.sky.mappedFogType,
@@ -61,6 +64,7 @@ export class LightPass extends RenderPass {
         ctx.env.sky.aerialPerspectiveDensity * ctx.env.sky.aerialPerspectiveDensity,
         ctx.env.sky.getAerialPerspectiveLUT(ctx)
       );
+      flags.fogSet[ctx.renderPassHash] = 1;
     }
     device.setBindGroup(0, info.bindGroup);
     const reverseWinding = ctx.camera.worldMatrixDet < 0;
@@ -83,7 +87,11 @@ export class LightPass extends RenderPass {
     ctx.flip = this.isAutoFlip();
     renderQueue.sortItems();
 
-    const flags = {};
+    const flags: any = {
+      lightSet: {},
+      cameraSet: {},
+      fogSet: {}
+    };
     const orders = Object.keys(renderQueue.items)
       .map((val) => Number(val))
       .sort((a, b) => a - b);

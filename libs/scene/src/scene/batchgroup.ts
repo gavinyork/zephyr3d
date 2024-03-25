@@ -112,7 +112,7 @@ export class BatchGroup extends GraphNode {
           cullVisitor.visit(node);
         }
       });
-      queueInfo.queue.end();
+      queueInfo.queue.end(cullVisitor.camera);
       cullVisitor.frustumCulling = frustumCulling;
       cullVisitor.renderQueue = renderQueue;
     }

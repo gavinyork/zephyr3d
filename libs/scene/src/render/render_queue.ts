@@ -256,7 +256,7 @@ export class RenderQueue {
     this._unshadowedLightList = [];
     this._sunLight = null;
   }
-  end(): this {
+  end(camera: Camera): this {
     const frameCounter = Application.instance.device.frameInfo.frameCounter;
     for (const k in this._itemLists) {
       const itemList = this._itemLists[k];
@@ -267,34 +267,42 @@ export class RenderQueue {
         const instanceList = instanceLists[i];
         for (const x in instanceList) {
           const drawables = instanceList[x];
-          let bindGroup: CachedBindGroup = null;
-          let item: RenderQueueItem = null;
-          for (let i = 0; i < drawables.length; i++) {
-            const drawable = drawables[i];
-            const instanceUniforms = drawable.getInstanceUniforms();
-            const instanceUniformsSize = instanceUniforms?.length ?? 0;
-            const stride = 16 + instanceUniformsSize;
-            if (!bindGroup || bindGroup.offset + stride > maxBufferSizeInFloats) {
-              bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(frameCounter, stride);
-              item = {
-                drawable,
-                sortDistance: 0,
-                instanceData: {
-                  bindGroup,
-                  offset: bindGroup.offset,
-                  numInstances: 0,
-                  stride
+          if (drawables.length === 1) {
+            list.push({
+              drawable: drawables[0],
+              sortDistance: drawables[0].getSortDistance(camera),
+              instanceData: null
+            });
+          } else {
+            let bindGroup: CachedBindGroup = null;
+            let item: RenderQueueItem = null;
+            for (let i = 0; i < drawables.length; i++) {
+              const drawable = drawables[i];
+              const instanceUniforms = drawable.getInstanceUniforms();
+              const instanceUniformsSize = instanceUniforms?.length ?? 0;
+              const stride = 16 + instanceUniformsSize;
+              if (!bindGroup || bindGroup.offset + stride > maxBufferSizeInFloats) {
+                bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(frameCounter, stride);
+                item = {
+                  drawable,
+                  sortDistance: drawable.getSortDistance(camera),
+                  instanceData: {
+                    bindGroup,
+                    offset: bindGroup.offset,
+                    numInstances: 0,
+                    stride
+                  }
                 }
+                list.push(item);
               }
-              list.push(item);
+              drawable.setInstanceDataBuffer(this._renderPass, bindGroup, bindGroup.offset);
+              bindGroup.buffer.set(drawable.getXForm().worldMatrix, bindGroup.offset);
+              if (instanceUniforms) {
+                bindGroup.buffer.set(instanceUniforms, bindGroup.offset + 16);
+              }
+              bindGroup.offset += stride;
+              item.instanceData.numInstances++;
             }
-            drawable.setInstanceDataBuffer(this._renderPass, bindGroup, bindGroup.offset);
-            bindGroup.buffer.set(drawable.getXForm().worldMatrix, bindGroup.offset);
-            if (instanceUniforms) {
-              bindGroup.buffer.set(instanceUniforms, bindGroup.offset + 16);
-            }
-            bindGroup.offset += stride;
-            item.instanceData.numInstances++;
           }
         }
       }

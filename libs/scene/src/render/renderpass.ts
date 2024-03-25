@@ -149,7 +149,7 @@ export abstract class RenderPass {
       } else {
         ctx.scene.rootNode.traverse(cullVisitor);
       }
-      return renderQueue.end();
+      return renderQueue.end(cullCamera);
     }
     return null;
   }

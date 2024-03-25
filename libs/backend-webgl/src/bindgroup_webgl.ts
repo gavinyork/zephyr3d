@@ -16,7 +16,7 @@ import type { WebGLGPUProgram } from './gpuprogram_webgl';
 import type { WebGLTextureSampler } from './sampler_webgl';
 import type { TypedArray } from '@zephyr3d/base';
 import type { WebGLDevice } from './device_webgl';
-import type { WebGLGPUBuffer } from './buffer_webgl';
+import { WebGLGPUBuffer } from './buffer_webgl';
 
 export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup {
   private _layout: BindGroupLayout;
@@ -126,7 +126,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
     for (let i = 0; i < this._layout.entries.length; i++) {
       const entry = this._layout.entries[i];
       const res = this._resources[entry.name];
-      if (res instanceof WebGLStructuredBuffer) {
+      if (res instanceof WebGLGPUBuffer) {
         if (webgl2) {
           if (entry.buffer.hasDynamicOffset) {
             const offset = offsets?.[dynamicOffsetIndex] || 0;
@@ -135,7 +135,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
           } else {
             program.setBlock((entry.type as PBStructTypeInfo).structName, res, 0);
           }
-        } else {
+        } else if (res instanceof WebGLStructuredBuffer) {
           program.setUniform(entry.name, res.getUniformData().uniforms);
         }
       } else if (Array.isArray(res)) {

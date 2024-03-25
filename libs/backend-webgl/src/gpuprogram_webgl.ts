@@ -16,7 +16,6 @@ import type { WebGLTextureSampler } from './sampler_webgl';
 import type { WebGLBaseTexture } from './basetexture_webgl';
 import type { WebGLGPUBuffer } from './buffer_webgl';
 import type { WebGLDevice } from './device_webgl';
-import type { WebGLStructuredBuffer } from './structuredbuffer_webgl';
 
 type TypedArray = Int8Array | Uint8Array | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array;
 type TypedArrayConstructor<T extends TypedArray = any> = {
@@ -147,7 +146,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
       }
     }
   }
-  setBlock(name: string, value: WebGLStructuredBuffer, offset: number) {
+  setBlock(name: string, value: WebGLGPUBuffer, offset: number) {
     const info = this._blockInfo[name];
     if (info) {
       if (offset) {

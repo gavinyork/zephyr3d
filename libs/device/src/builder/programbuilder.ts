@@ -2132,6 +2132,7 @@ export class ProgramBuilder {
         const exp = new PBShaderExp(u.block.exp.$str, u.block.exp.$ast.getType());
         exp.$declareType = u.block.exp.$declareType;
         exp.$isBuffer = u.block.exp.$isBuffer;
+        exp.$dynamicOffset = u.block.exp.$dynamicOffset;
         uniformList[u.group].push({ member: exp, uniform: i });
       }
     }
@@ -2165,9 +2166,9 @@ export class ProgramBuilder {
             );
             const exp = t();
             if (i === 0) {
-              exp.uniformBuffer(Number(k));
+              exp.uniformBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
             } else {
-              exp.storageBuffer(Number(k));
+              exp.storageBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
             }
             globalScope[uname] = exp;
             const index = this._uniforms.findIndex((val) => val.block?.name === uname);
@@ -2235,6 +2236,7 @@ export class ProgramBuilder {
           const exp = new PBShaderExp(u.block.exp.$str, u.block.exp.$ast.getType());
           exp.$declareType = u.block.exp.$declareType;
           exp.$isBuffer = u.block.exp.$isBuffer;
+          exp.$dynamicOffset = u.block.exp.$dynamicOffset;
           sharedUniformList[u.group].push({ member: exp, uniform: i });
           //sharedUniformList[u.group].uniforms.push(i);
         } else if (v) {
@@ -2244,6 +2246,7 @@ export class ProgramBuilder {
           const exp = new PBShaderExp(u.block.exp.$str, u.block.exp.$ast.getType());
           exp.$declareType = u.block.exp.$declareType;
           exp.$isBuffer = u.block.exp.$isBuffer;
+          exp.$dynamicOffset = u.block.exp.$dynamicOffset;
           vertexUniformList[u.group].push({ member: exp, uniform: i });
           //vertexUniformList[u.group].uniforms.push(i);
         } else if (f) {
@@ -2253,6 +2256,7 @@ export class ProgramBuilder {
           const exp = new PBShaderExp(u.block.exp.$str, u.block.exp.$ast.getType());
           exp.$declareType = u.block.exp.$declareType;
           exp.$isBuffer = u.block.exp.$isBuffer;
+          exp.$dynamicOffset = u.block.exp.$dynamicOffset;
           fragUniformList[u.group].push({ member: exp, uniform: i }); //members.push(exp);
           //fragUniformList[u.group].uniforms.push(i);
         }
@@ -2298,18 +2302,18 @@ export class ProgramBuilder {
               if (maskList[i] & ShaderType.Vertex) {
                 const exp = t();
                 if (j === 0) {
-                  exp.uniformBuffer(Number(k));
+                  exp.uniformBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
                 } else {
-                  exp.storageBuffer(Number(k));
+                  exp.storageBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
                 }
                 globalScopeVertex[uname] = exp;
               }
               if (maskList[i] & ShaderType.Fragment) {
                 const exp = t();
                 if (j === 0) {
-                  exp.uniformBuffer(Number(k));
+                  exp.uniformBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
                 } else {
-                  exp.storageBuffer(Number(k));
+                  exp.storageBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
                 }
                 globalScopeFragmet[uname] = exp;
               }
@@ -2762,7 +2766,7 @@ export class PBScope extends Proxiable<PBScope> {
     } else {
       uniformInfo.block = {
         name: name,
-        dynamicOffset: false,
+        dynamicOffset: variable.$dynamicOffset,
         exp: variable
       };
       // throw new Error(`unsupported uniform type: ${name}`);
@@ -3032,6 +3036,7 @@ export class PBLocalScope extends PBScope {
       if (value instanceof PBShaderExp && !this.$_scope.$parent) {
         exp.$declareType = value.$declareType;
         exp.$isBuffer = value.$isBuffer;
+        exp.$dynamicOffset = value.$dynamicOffset;
         exp.$group = value.$group;
         exp.$attrib = value.$attrib;
         exp.$sampleType = value.$sampleType;
