@@ -16,6 +16,7 @@ import type { SceneNode } from './scene_node';
 export class XForm<T extends XForm<T> = XForm<any>> extends makeEventTarget(Object)<{
   nodeattached: SceneNode;
   noderemoved: SceneNode;
+  visiblechanged: SceneNode;
   transformchanged: SceneNode;
 }>() {
   /** @internal */

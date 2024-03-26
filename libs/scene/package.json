@@ -65,6 +65,6 @@
     "@zephyr3d/device": "workspace:^0.1.0"
   },
   "dependencies": {
-    "@webgpu/types": "^0.1.31"
+    "@webgpu/types": "^0.1.40"
   }
 }

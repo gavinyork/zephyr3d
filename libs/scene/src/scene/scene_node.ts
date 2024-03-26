@@ -367,6 +367,7 @@ export class SceneNode extends XForm<SceneNode> {
   /** @internal */
   notifyHiddenChanged() {
     this._visibleChanged();
+    this.dispatchEvent(this, 'visiblechanged');
     for (const child of this._children) {
       if (child.showState === 'inherit') {
         child.notifyHiddenChanged();

@@ -19,6 +19,7 @@ export class BatchGroup extends GraphNode {
   >;
   private _bindGroupAllocator: InstanceBindGroupAllocator;
   private _transformHandler: (node: SceneNode) => void;
+  private _visibleHandler: (node: SceneNode) => void;
   private _changeTag: number;
   /**
    * Creates an instance of mesh node
@@ -48,6 +49,14 @@ export class BatchGroup extends GraphNode {
         }
       }
     };
+    this._visibleHandler = (node: SceneNode) => {
+      if (node.hidden) {
+        node.off('transformchanged', this._transformHandler);
+      } else {
+        node.on('transformchanged', this._transformHandler);
+      }
+      this._changeTag++;
+    }
     this.on('nodeattached', (node) => {
       node.iterate((child) => {
         if (child.isGraphNode()) {
@@ -55,6 +64,7 @@ export class BatchGroup extends GraphNode {
             console.error('Only mesh node can be added to batch group');
           }
           child.on('transformchanged', this._transformHandler);
+          child.on('visiblechanged', this._visibleHandler);
           child.placeToOctree = false;
           if (child.isBatchable()) {
             child.setInstanceDataBuffer(SceneRenderer.sceneRenderPass, null, 0);
@@ -69,9 +79,15 @@ export class BatchGroup extends GraphNode {
       node.iterate((child) => {
         if (child.isGraphNode()) {
           child.off('transformchanged', this._transformHandler);
+          child.off('visiblechanged', this._visibleHandler);
           child.placeToOctree = true;
+          if (child.isBatchable()) {
+            child.setInstanceDataBuffer(SceneRenderer.sceneRenderPass, null, 0);
+            child.setInstanceDataBuffer(SceneRenderer.depthRenderPass, null, 0);
+            child.setInstanceDataBuffer(SceneRenderer.shadowMapRenderPass, null, 0);
+          }
         }
-      });
+    });
       this._changeTag++;
     });
   }
