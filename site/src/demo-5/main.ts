@@ -62,7 +62,7 @@ instancingApp.ready().then(async () => {
   const batchGroup = new BatchGroup(scene);
   const assetManager = new AssetManager();
   await (async function(){
-    for (let i = 0; i < 4000; i++) {
+    for (let i = 0; i < 2000; i++) {
       const stone1 = await assetManager.fetchModel(scene, 'assets/models/stone1.glb', { enableInstancing: true });
       stone1.group.parent = batchGroup;
       stone1.group.position.setXYZ(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50);
@@ -74,7 +74,6 @@ instancingApp.ready().then(async () => {
         }
       });
       instanceCount++;
-      /*
       const stone2 = await assetManager.fetchModel(scene, 'assets/models/stone2.glb', { enableInstancing: true });
       stone2.group.parent = batchGroup;
       stone2.group.position.setXYZ(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50);
@@ -86,7 +85,6 @@ instancingApp.ready().then(async () => {
         }
       });
       instanceCount++;
-      */
     }
     if (showUI) {
       new Panel(instanceCount, vertexCount, faceCount);
