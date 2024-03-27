@@ -83,6 +83,17 @@ export class WebGPUTextureVideo
     if (!this._device.isContextLost()) {
       if (element.readyState > 2) {
         this._object = this._device.gpuImportExternalTexture(element);
+        const that = this;
+        this._device.runNextFrame(function updateVideoFrame() {
+          if (!that.disposed) {
+            if (that._source.readyState > 2) {
+              const videoFrame = new (window as any).VideoFrame(that._source);
+              videoFrame.close();
+              that._object = that._device.gpuImportExternalTexture(that._source);
+            }
+            that._device.runNextFrame(updateVideoFrame);
+          }
+        });
       }
     }
     return !!this._object;

@@ -36,7 +36,8 @@ import type {
   PBStructTypeInfo,
   DeviceBackend,
   DeviceEventMap,
-  AbstractDevice
+  AbstractDevice,
+  RenderBundle
 } from '@zephyr3d/device';
 import {
   hasAlphaChannel,
@@ -90,6 +91,18 @@ declare global {
 
 type VAOObject = WebGLVertexArrayObject | WebGLVertexArrayObjectOES;
 
+type WebGLRenderBundle = {
+  program: WebGLGPUProgram,
+  bindGroups: WebGLBindGroup[],
+  bindGroupOffsets: Iterable<number>[],
+  vertexLayout: WebGLVertexLayout,
+  primitiveType: PrimitiveType,
+  renderStateSet: RenderStateSet,
+  first: number,
+  count: number,
+  numInstances: number
+}[];
+
 export interface VertexArrayObjectEXT {
   createVertexArray: () => VAOObject;
   bindVertexArray: (arrayObject: VAOObject) => void;
@@ -138,10 +151,12 @@ export class WebGLDevice extends BaseDevice {
   private _currentScissorRect: DeviceViewport;
   private _samplerCache: SamplerCache;
   private _textureSamplerMap: WeakMap<BaseTexture, WebGLTextureSampler>;
+  private _captureRenderBundle: WebGLRenderBundle;
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend);
     this._dpr = Math.max(1, Math.floor(options?.dpr ?? window.devicePixelRatio));
     this._isRendering = false;
+    this._captureRenderBundle = null;
     this._msaaSampleCount = options?.msaa ? 4 : 1;
     let context: WebGLContext = null;
     context = this.canvas.getContext(backend === backend1 ? 'webgl' : 'webgl2', {
@@ -761,6 +776,35 @@ export class WebGLDevice extends BaseDevice {
       }
     }
   }
+  beginCapture(): void {
+    if (this._captureRenderBundle) {
+      throw new Error('Device.beginCapture() failed: device is already capturing draw commands');
+    }
+    this._captureRenderBundle = [];
+  }
+  endCapture(): unknown {
+    if (!this._captureRenderBundle) {
+      throw new Error('Device.endCapture() failed: device is not capturing draw commands');
+    }
+    const result = this._captureRenderBundle;
+    this._captureRenderBundle = null;
+    return result;
+  }
+  executeRenderBundle(renderBundle: RenderBundle) {
+    for (const drawcall of (renderBundle as WebGLRenderBundle)) {
+      this.setProgram(drawcall.program);
+      this.setVertexLayout(drawcall.vertexLayout);
+      this.setRenderStates(drawcall.renderStateSet);
+      for (let i = 0; i < 4; i++) {
+        this.setBindGroup(i, drawcall.bindGroups[i], drawcall.bindGroupOffsets[i]);
+      }
+      if (drawcall.numInstances === 0) {
+        this.draw(drawcall.primitiveType, drawcall.first, drawcall.count);
+      } else {
+        this.drawInstanced(drawcall.primitiveType, drawcall.first, drawcall.count, drawcall.numInstances);
+      }
+    }
+  }
   /** @internal */
   protected onBeginFrame(): boolean {
     if (this._contextLost) {
@@ -812,6 +856,19 @@ export class WebGLDevice extends BaseDevice {
       }
       (this._context._currentFramebuffer as WebGLFrameBuffer)?.tagDraw();
     }
+    if (this._captureRenderBundle) {
+      this._captureRenderBundle.push({
+        bindGroups: [...this._currentBindGroups],
+        bindGroupOffsets: this._currentBindGroupOffsets.map(val => val ? [...val] : null),
+        program: this._currentProgram,
+        vertexLayout: this._currentVertexData,
+        primitiveType: primitiveType,
+        renderStateSet: this._currentStateSet?.clone() ?? null,
+        count,
+        first,
+        numInstances: 0
+      });
+    }
   }
   /** @internal */
   protected _drawInstanced(
@@ -853,6 +910,19 @@ export class WebGLDevice extends BaseDevice {
         );
       }
       (this._context._currentFramebuffer as WebGLFrameBuffer)?.tagDraw();
+    }
+    if (this._captureRenderBundle) {
+      this._captureRenderBundle.push({
+        bindGroups: [...this._currentBindGroups],
+        bindGroupOffsets: this._currentBindGroupOffsets.map(val => val ? [...val] : null),
+        program: this._currentProgram,
+        vertexLayout: this._currentVertexData,
+        primitiveType: primitiveType,
+        renderStateSet: this._currentStateSet?.clone() ?? null,
+        count,
+        first,
+        numInstances
+      });
     }
   }
   /** @internal */

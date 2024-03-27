@@ -39,16 +39,6 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
   get gpuUsage(): number {
     return this._gpuUsage;
   }
-  getPendingUploads(): UploadBuffer[] {
-    return this._pendingUploads;
-  }
-  clearPendingUploads() {
-    if (this._pendingUploads.length > 0) {
-      this._pendingUploads = [];
-      this.beginSyncChanges(null);
-      this.endSyncChanges();
-    }
-  }
   bufferSubData(dstByteOffset: number, data: TypedArray, srcOffset?: number, srcLength?: number): void {
     srcOffset = Number(srcOffset) || 0;
     dstByteOffset = Number(dstByteOffset) || 0;
@@ -88,16 +78,6 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
         } else {
           const start = Math.min(dstByteOffset, upload.uploadOffset);
           const end = Math.max(dstByteOffset + uploadSize, upload.uploadOffset + upload.uploadSize);
-          if (
-            end - start < uploadSize + upload.uploadSize &&
-            this._device.currentPass?.isBufferUploading(this)
-          ) {
-            // data overlaps and previous data is in use, refresh data by restarting current render pass or compute pass
-            this._device.currentPass.end();
-            // now, the pending uploads should be cleared
-            newPendings = [];
-            break;
-          }
           dstByteOffset = start;
           uploadSize = end - start;
         }
@@ -235,12 +215,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
   }
   private sync() {
     if (this._pendingUploads) {
-      if (this._device.isBufferUploading(this)) {
-        this._device.currentPass.end();
-      } else {
-        this.beginSyncChanges(null);
-        this.endSyncChanges();
-      }
+      this._device.flushUploads();
     }
   }
   private pushUpload(
@@ -268,5 +243,6 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
       uploadOffset: dstByteOffset,
       uploadBuffer: this._object
     });
+    this._device.bufferUpload(this);
   }
 }

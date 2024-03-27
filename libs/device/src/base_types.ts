@@ -12,6 +12,7 @@ import type {
   GPUObject,
   GPUProgram,
   IndexBuffer,
+  RenderBundle,
   SamplerOptions,
   StructuredBuffer,
   Texture2D,
@@ -1432,6 +1433,8 @@ export interface FrameInfo {
   computeCalls: number;
   /** @internal */
   nextFrameCall: (() => void)[];
+  /** @internal */
+  nextFrameCallNext: (() => void)[];
 }
 
 /**
@@ -2067,6 +2070,20 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param buffer - The output buffer
    */
   readPixelsToBuffer(index: number, x: number, y: number, w: number, h: number, buffer: GPUDataBuffer): void;
+  /**
+   * Begin capture draw commands
+   */
+  beginCapture(): void;
+  /**
+   * Executes render bundle
+   * @param renderBundle - RenderBundle to be execute
+   */
+  executeRenderBundle(renderBundle: RenderBundle);
+  /**
+   * End capture draw commands
+   * @returns A RenderBundle that holds the captured draw commands
+   */
+  endCapture(): RenderBundle;
   /** Get the video memory usage in bytes */
   videoMemoryUsage: number;
   /** Get the current frame information */
@@ -2162,12 +2179,6 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param f - The function to be scheduled
    */
   runNextFrame(f: () => void): void;
-  /**
-   * Canels a pre scheduled function
-   *
-   * @param f - The function to be cancled
-   */
-  cancelNextFrameCall(f: () => void): void;
   /** Exits from current rendering loop */
   exitLoop(): void;
   /**

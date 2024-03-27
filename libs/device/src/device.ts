@@ -28,7 +28,8 @@ import type {
   VertexSemantic,
   VertexAttribFormat,
   VertexLayoutOptions,
-  BaseTexture
+  BaseTexture,
+  RenderBundle
 } from './gpuobject';
 import {
   GPUResourceUsageFlags,
@@ -128,7 +129,8 @@ export abstract class BaseDevice {
       FPS: 0,
       drawCalls: 0,
       computeCalls: 0,
-      nextFrameCall: []
+      nextFrameCall: [],
+      nextFrameCallNext: []
     };
     this._programBuilder = new ProgramBuilder(this);
     this._cpuTimer = new CPUTimer();
@@ -258,6 +260,9 @@ export abstract class BaseDevice {
     h: number,
     buffer: GPUDataBuffer
   ): void;
+  abstract beginCapture(): void;
+  abstract endCapture(): RenderBundle;
+  abstract executeRenderBundle(renderBundle: RenderBundle);
   abstract looseContext(): void;
   abstract restoreContext(): void;
   protected abstract _draw(primitiveType: PrimitiveType, first: number, count: number): void;
@@ -439,12 +444,6 @@ export abstract class BaseDevice {
       this._frameInfo.nextFrameCall.push(f);
     }
   }
-  cancelNextFrameCall(f: () => void) {
-    const index = this._frameInfo.nextFrameCall.indexOf(f);
-    if (index >= 0) {
-      this._frameInfo.nextFrameCall.splice(index, 1);
-    }
-  }
   exitLoop() {
     if (this._runningLoop) {
       cancelAnimationFrame(this._runningLoop);
@@ -620,7 +619,10 @@ export abstract class BaseDevice {
         this._frameInfo.elapsedTimeCPU = cpuTime;
       }
     }
-    for (const f of this._frameInfo.nextFrameCall) {
+    const tmp = this._frameInfo.nextFrameCall;
+    this._frameInfo.nextFrameCall = this._frameInfo.nextFrameCallNext;
+    this._frameInfo.nextFrameCallNext = tmp;
+    for (const f of this._frameInfo.nextFrameCallNext) {
       f();
     }
     this._frameInfo.nextFrameCall.length = 0;

@@ -121,69 +121,33 @@ export class WebGPUMipmapGenerator {
   static _mipmapGenerationProgram: WebGPUProgram = null;
   static _mipmapGenerationBindGroup: WeakMap<WebGPUBaseTexture, WebGPUBindGroup[][]> = new WeakMap();
   static _mipmapGenerationStateSet: WebGPURenderStateSet = null;
-  static generateMipmap(device: WebGPUDevice, tex: WebGPUBaseTexture) {
+  static generateMipmap(device: WebGPUDevice, tex: WebGPUBaseTexture, cmdEncoder?: GPUCommandEncoder) {
+    if (!tex.isRenderable()) {
+      return;
+    }
     if (!this._mipmapGenerationProgram) {
       this.initMipmapGeneration(device);
     }
-    const cmdEncoder = device.device.createCommandEncoder();
+    const encoder = cmdEncoder ?? device.device.createCommandEncoder();
     const miplevels = tex.mipLevelCount;
     const numLayers = tex.isTextureCube() ? 6 : tex.isTexture2DArray() ? tex.depth : 1;
-    let tmpTex = tex.object;
-    if (!tex.isRenderable()) {
-      tmpTex = device.gpuCreateTexture({
-        size: {
-          width: tex.width,
-          height: tex.height,
-          depthOrArrayLayers: numLayers
-        },
-        format: tex.gpuFormat,
-        mipLevelCount: tex.mipLevelCount,
-        sampleCount: 1,
-        dimension: '2d',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC
-      });
-    }
     tex.setMipmapDirty(false);
     for (let face = 0; face < numLayers; face++) {
       for (let level = 1; level < miplevels; level++) {
         this.generateMiplevel(
           device,
-          cmdEncoder,
+          encoder,
           tex,
-          tmpTex,
+          tex.object,
           tex.gpuFormat,
-          tmpTex === tex.object ? level : level - 1,
+          level,
           level,
           face
         );
       }
     }
-    if (tmpTex !== tex.object) {
-      let width = tex.width;
-      let height = tex.height;
-      for (let level = 1; level < miplevels; level++) {
-        cmdEncoder.copyTextureToTexture(
-          {
-            texture: tmpTex,
-            mipLevel: level - 1
-          },
-          {
-            texture: tex.object,
-            mipLevel: level
-          },
-          {
-            width: width,
-            height: height,
-            depthOrArrayLayers: numLayers
-          }
-        );
-        width = Math.ceil(width / 2);
-        height = Math.ceil(height / 2);
-      }
-    }
-    device.device.queue.submit([cmdEncoder.finish()]);
-    if (tmpTex !== tex.object) {
-      tmpTex.destroy();
+    if (!cmdEncoder) {
+      device.device.queue.submit([encoder.finish()]);
     }
   }
   static generateMipmapsForBindGroups(device: WebGPUDevice, bindGroups: WebGPUBindGroup[]) {

@@ -1451,6 +1451,9 @@ export interface BindGroup extends GPUObject<unknown> {
   setSampler(name: string, sampler: TextureSampler);
 }
 
+/** Render bundle */
+export type RenderBundle = unknown;
+
 /**
  * Creates the default name for the type of given gpu object
  * @param obj - The gpu object
