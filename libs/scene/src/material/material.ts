@@ -92,7 +92,7 @@ export class Material {
   /** @internal */
   protected _hash: string[][];
   /** @internal */
-  protected _renderStateSet: RenderStateSet;
+  protected _renderStateSets: RenderStateSet[];
   /** @internal */
   private _bindGroupMap: {
     [hash: string]: {
@@ -104,8 +104,6 @@ export class Material {
   /** @internal */
   private _optionTag: number;
   /** @internal */
-  private _materialBindGroup: BindGroup;
-  /** @internal */
   private _id: number;
   /**
    * Creates an instance of material
@@ -114,10 +112,9 @@ export class Material {
     this._id = ++Material._nextId;
     this._numPasses = 1;
     this._hash = [[]];
-    this._renderStateSet = null;
+    this._renderStateSets = [];
     this._bindGroupMap = {};
     this._optionTag = 0;
-    this._materialBindGroup = null;
   }
   /** Unique identifier of the material */
   get instanceId(): number {
@@ -130,6 +127,9 @@ export class Material {
     while (this._hash.length < val) {
       this._hash.push([]);
     }
+    if (this._renderStateSets.length > val) {
+      this._renderStateSets.length = val;
+    }
     this._numPasses = val;
   }
   /** @internal */
@@ -140,14 +140,14 @@ export class Material {
     return this._hash[pass][renderPassType];
   }
   /** Render states associated to this material */
-  get stateSet(): RenderStateSet {
-    if (!this._renderStateSet) {
-      this._renderStateSet = this.createRenderStateSet();
+  getRenderStateSet(pass: number): RenderStateSet {
+    if (pass < 0 || pass >= this._numPasses) {
+      return null;
     }
-    return this._renderStateSet;
-  }
-  set stateSet(stateset: RenderStateSet) {
-    this._renderStateSet = stateset;
+    if (!this._renderStateSets[pass]) {
+      this._renderStateSets[pass] = this.createRenderStateSet();
+    }
+    return this._renderStateSets[pass];
   }
   getQueueType(): number {
     return QUEUE_OPAQUE;
@@ -187,6 +187,11 @@ export class Material {
       }
     }
   }
+  preDraw(ctx: DrawContext) {
+    for (let i = 0; i < this._numPasses; i++) {
+      this.beginDraw(i, ctx);
+    }
+  }
   /**
    * Prepares for drawing
    * @param ctx - The context of current drawing task
@@ -203,7 +208,7 @@ export class Material {
       if (pass > 0) {
         this.optionChanged(false);
       }
-      this._materialBindGroup = this.applyMaterialBindGroups(ctx, hash, pass);
+      this.applyMaterialBindGroups(ctx, hash, pass);
       if (pass === 0) {
         if (ctx.instanceData) {
           this.applyInstanceBindGroups(ctx, hash);
@@ -211,7 +216,7 @@ export class Material {
           this.applyDrawableBindGroups(ctx, hash);
         }
       }
-      ctx.renderPass.applyRenderStates(device, this.stateSet, ctx);
+      ctx.renderPass.applyRenderStates(device, this.getRenderStateSet(pass), ctx);
       device.setProgram(programInfo.programs[ctx.renderPass.type]);
       Material._drawableTimestamps.set(ctx.target, ctx.timestamp);
       Material.lruPutDrawable(ctx.target);
@@ -225,14 +230,6 @@ export class Material {
    * Ends drawing a primitive
    */
   endDraw(pass: number): void {
-    this._materialBindGroup = null;
-  }
-  /**
-   * Gets the bind group of this material
-   * @returns The bind group of this material
-   */
-  getMaterialBindGroup(): BindGroup {
-    return this._materialBindGroup;
   }
   /**
    * Sets all uniform values to the bind group of the material if needed

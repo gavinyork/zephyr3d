@@ -73,6 +73,15 @@ export class LightPass extends RenderPass {
       if (!ctx.lightBlending || !item.drawable.isUnlit()) {
         ctx.instanceData = item.instanceData;
         ctx.target = item.drawable;
+        item.drawable.preDraw(ctx);
+        //this.drawItem(device, item, ctx, reverseWinding);
+      }
+    }
+    for (const item of items) {
+      // unlit objects should only be drawn once
+      if (!ctx.lightBlending || !item.drawable.isUnlit()) {
+        ctx.instanceData = item.instanceData;
+        ctx.target = item.drawable;
         this.drawItem(device, item, ctx, reverseWinding);
       }
     }

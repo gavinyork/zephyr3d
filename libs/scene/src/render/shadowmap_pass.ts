@@ -74,6 +74,11 @@ export class ShadowMapPass extends RenderPass {
       for (const item of renderItems.opaqueList) {
         ctx.instanceData = item.instanceData;
         ctx.target = item.drawable;
+        item.drawable.preDraw(ctx);
+      }
+      for (const item of renderItems.opaqueList) {
+        ctx.instanceData = item.instanceData;
+        ctx.target = item.drawable;
         this.drawItem(device, item, ctx, reverseWinding);
       }
     }

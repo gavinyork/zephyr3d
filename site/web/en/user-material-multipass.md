@@ -34,7 +34,7 @@ class CartoonMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
     // The default implementation must be called.
     super.updateRenderStates(pass, ctx);
     // Cull front face in the first pass, and the back face in the second pass.
-    this.stateSet.useRasterizerState().cullMode = pass === 0 ? 'front' : 'back';
+    this.getRenderStateSet(pass).useRasterizerState().cullMode = pass === 0 ? 'front' : 'back';
   }
   applyUniformValues(bindGroup, ctx, pass) {
     super.applyUniformValues(bindGroup, ctx, pass);

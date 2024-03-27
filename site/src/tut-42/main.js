@@ -22,7 +22,7 @@ class CartoonMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
     // 必须调用默认实现
     super.updateRenderStates(pass, ctx);
     // 第一遍剔除正面，第二遍剔除背面
-    this.stateSet.useRasterizerState().cullMode = pass === 0 ? 'front' : 'back';
+    this.getRenderStateSet(pass).useRasterizerState().cullMode = pass === 0 ? 'front' : 'back';
   }
   // 提交Uniform常量
   applyUniformValues(bindGroup, ctx, pass) {

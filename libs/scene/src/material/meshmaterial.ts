@@ -332,10 +332,11 @@ export class MeshMaterial extends Material {
    * @param ctx - Draw context
    */
   protected updateRenderStates(pass: number, ctx: DrawContext): void {
+    const stateSet = this.getRenderStateSet(pass);
     const blending = this.featureUsed<boolean>(FEATURE_ALPHABLEND) || ctx.lightBlending;
     const a2c = this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
     if (blending || a2c) {
-      const blendingState = this.stateSet.useBlendingState();
+      const blendingState = stateSet.useBlendingState();
       if (blending) {
         blendingState.enable(true);
         blendingState.setBlendFuncAlpha('zero', 'one');
@@ -350,18 +351,18 @@ export class MeshMaterial extends Material {
       }
       blendingState.enableAlphaToCoverage(a2c);
       if (blendingState.enabled) {
-        this.stateSet.useDepthState().enableTest(true).enableWrite(false);
+        stateSet.useDepthState().enableTest(true).enableWrite(false);
       } else {
-        this.stateSet.defaultDepthState();
+        stateSet.defaultDepthState();
       }
-    } else if (this.stateSet.blendingState?.enabled && !blending) {
-      this.stateSet.defaultBlendingState();
-      this.stateSet.defaultDepthState();
+    } else if (stateSet.blendingState?.enabled && !blending) {
+      stateSet.defaultBlendingState();
+      stateSet.defaultDepthState();
     }
     if (this._cullMode !== 'back') {
-      this.stateSet.useRasterizerState().cullMode = this._cullMode;
+      stateSet.useRasterizerState().cullMode = this._cullMode;
     } else {
-      this.stateSet.defaultRasterizerState();
+      stateSet.defaultRasterizerState();
     }
   }
   /**

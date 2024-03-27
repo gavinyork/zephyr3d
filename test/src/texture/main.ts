@@ -17,7 +17,7 @@ const test3D = true;
 const testCube = true;
 const testCubeSH = true;
 const test2DArray = true;
-const testVideo = false;
+const testVideo = true;
 
 const testValues = [
   [1, 1, 1],

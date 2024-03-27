@@ -244,6 +244,7 @@ export abstract class WebGPUBaseTexture<
   }
   generateMipmaps() {
     this._mipmapDirty = true;
+    this._device.textureUpload(this as WebGPUBaseTexture);
   }
   beginSyncChanges(encoder: GPUCommandEncoder) {
     if (!this.isTextureVideo() && this._pendingUploads.length > 0 && this._object) {

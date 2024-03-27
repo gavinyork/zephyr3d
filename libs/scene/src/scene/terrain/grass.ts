@@ -33,7 +33,7 @@ export class GrassCluster implements Drawable {
     this._terrain = terrain;
     this._numInstances = grassData.length >> 2;
     this._material = material;
-    this._material.stateSet.useRasterizerState().setCullMode('none');
+    this._material.getRenderStateSet(0).useRasterizerState().setCullMode('none');
   }
   getName() {
     return 'GrassCluster';
@@ -65,10 +65,13 @@ export class GrassCluster implements Drawable {
   isBatchable(): this is BatchDrawable {
     return false;
   }
-  draw(ctx: DrawContext) {
+  preDraw(ctx: DrawContext) {
     this._material.alphaToCoverage = Application.instance.device.getFrameBufferSampleCount() > 1;
     this._material.alphaCutoff = this._material.alphaToCoverage ? 1 : 0.8;
-    this._material.draw(this._primitive, ctx, this._numInstances);
+    this._material.preDraw(ctx);
+  }
+  draw(ctx: DrawContext) {
+    this._material.drawPrimitive(0, this._primitive, ctx, this._numInstances);
   }
 }
 

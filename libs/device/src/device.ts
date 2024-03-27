@@ -625,7 +625,7 @@ export abstract class BaseDevice {
     for (const f of this._frameInfo.nextFrameCallNext) {
       f();
     }
-    this._frameInfo.nextFrameCall.length = 0;
+    this._frameInfo.nextFrameCallNext.length = 0;
   }
   private getGPUObjectList(obj: GPUObject): GPUObject[] {
     let list: GPUObject[] = null;

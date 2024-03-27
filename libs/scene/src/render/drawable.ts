@@ -100,6 +100,11 @@ export interface Drawable {
   /** true if the shading of this object is independent of lighting */
   isUnlit(): boolean;
   /**
+   * Prepare drawing
+   * @param ctx - Context of the drawing task
+   */
+  preDraw(ctx: DrawContext);
+  /**
    * Draw the object
    * @param ctx - Context of the drawing task
    */

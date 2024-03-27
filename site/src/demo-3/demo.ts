@@ -274,7 +274,7 @@ export class Demo {
             newMaterial.textureHeight = material.albedoTexture.height;
             newMaterial.blendMode = 'none';
             newMaterial.alphaCutoff = 0.8;
-            newMaterial.stateSet.useRasterizerState().setCullMode('none');
+            newMaterial.getRenderStateSet(0).useRasterizerState().setCullMode('none');
             newMaterial.ior = material.ior;
             newMaterial.specularFactor = material.specularFactor;
             newMaterial.albedoColor = material.albedoColor;
@@ -312,7 +312,7 @@ export class Demo {
             newMaterial.textureHeight = material.albedoTexture.height;
             newMaterial.blendMode = 'none';
             newMaterial.alphaCutoff = 0.8;
-            newMaterial.stateSet.useRasterizerState().setCullMode('none');
+            newMaterial.getRenderStateSet(0).useRasterizerState().setCullMode('none');
             newMaterial.ior = material.ior;
             newMaterial.specularFactor = material.specularFactor;
             newMaterial.albedoColor = material.albedoColor;

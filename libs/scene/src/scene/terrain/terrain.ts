@@ -256,7 +256,7 @@ export class Terrain extends GraphNode {
         grassTexture
       );
     }
-    this._grassMaterial.stateSet.useRasterizerState().setCullMode('none');
+    this._grassMaterial.getRenderStateSet(0).useRasterizerState().setCullMode('none');
     this._grassManager.addGrassLayer(
       Application.instance.device,
       this,

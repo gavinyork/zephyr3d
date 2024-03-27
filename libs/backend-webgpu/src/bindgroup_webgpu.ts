@@ -51,6 +51,9 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   get textureList(): WebGPUBaseTexture[] {
     return this._textures;
   }
+  invalidate() {
+    this._bindGroup = null;
+  }
   getLayout(): BindGroupLayout {
     return this._layout;
   }
@@ -72,7 +75,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
             console.log(`setBuffer() failed: buffer resource '${name}' must be type '${entry.buffer.type}'`);
           } else if (buffer !== this._resources[entry.name]) {
             this._resources[entry.name] = buffer as WebGPUBuffer;
-            this._bindGroup = null;
+            this.invalidate();
           }
         }
         return;
@@ -154,7 +157,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
         const view = (value as WebGPUBaseTexture).getView(level, face, mipCount);
         if (!t || t[1] !== view) {
           this._resources[name] = [value as WebGPUBaseTexture, view];
-          this._bindGroup = null;
+          this.invalidate();
         }
         if (entry.texture?.autoBindSampler) {
           const samplerEntry = this._findSamplerLayout(entry.texture.autoBindSampler);
@@ -168,7 +171,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
           ) as WebGPUTextureSampler;
           if (s.object !== this._resources[entry.texture.autoBindSampler]) {
             this._resources[entry.texture.autoBindSampler] = s.object;
-            this._bindGroup = null;
+            this.invalidate();
           }
         }
         if (entry.texture?.autoBindSamplerComparison) {
@@ -183,7 +186,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
           ) as WebGPUTextureSampler;
           if (s.object !== this._resources[entry.texture.autoBindSamplerComparison]) {
             this._resources[entry.texture.autoBindSamplerComparison] = s.object;
-            this._bindGroup = null;
+            this.invalidate();
           }
         }
       } else {
@@ -205,8 +208,14 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
             );
           }
           if (!t || t !== value) {
+            if (t) {
+              (t as WebGPUTextureVideo).removeBindGroupReference(this);
+            }
+            if (value) {
+              (value as WebGPUTextureVideo).addBindGroupReference(this);
+            }
             this._resources[name] = value as WebGPUTextureVideo;
-            this._bindGroup = null;
+            this.invalidate();
             this._videoTextures = [];
             for (const entry of this._layout.entries) {
               if (entry.externalTexture) {
@@ -229,7 +238,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
           }
           if (!t || t[0] !== value) {
             this._resources[name] = [value as WebGPUBaseTexture, view];
-            this._bindGroup = null;
+            this.invalidate();
           }
         }
         const autoBindSampler = entry.texture?.autoBindSampler || entry.externalTexture?.autoBindSampler;
@@ -245,7 +254,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
           ) as WebGPUTextureSampler;
           if (s.object !== this._resources[autoBindSampler]) {
             this._resources[autoBindSampler] = s.object;
-            this._bindGroup = null;
+            this.invalidate();
           }
         }
         const autoBindSamplerComparison = entry.texture?.autoBindSamplerComparison;
@@ -261,7 +270,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
           ) as WebGPUTextureSampler;
           if (s.object !== this._resources[autoBindSamplerComparison]) {
             this._resources[autoBindSamplerComparison] = s.object;
-            this._bindGroup = null;
+            this.invalidate();
           }
         }
       } else {
@@ -278,12 +287,12 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
         console.log(`WebGPUBindGroup.setSampler() failed: no sampler uniform named '${name}'`);
       } else {
         this._resources[name] = sampler;
-        this._bindGroup = null;
+        this.invalidate();
       }
     }
   }
   destroy() {
-    this._bindGroup = null;
+    this.invalidate();
     this._resources = {};
     this._buffers = [];
     this._textures = [];
@@ -291,7 +300,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     this._object = null;
   }
   async restore() {
-    this._bindGroup = null;
+    this.invalidate();
     this._object = {};
   }
   isBindGroup(): this is BindGroup {
@@ -301,7 +310,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   updateVideoTextures() {
     this._videoTextures?.forEach((t) => {
       if (t.updateVideoFrame()) {
-        this._bindGroup = null;
+        this.invalidate();
       }
     });
   }

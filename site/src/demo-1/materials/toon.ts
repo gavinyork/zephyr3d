@@ -30,7 +30,7 @@ export class ToonMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoC
   }
   protected updateRenderStates(pass: number, ctx: DrawContext): void {
     super.updateRenderStates(pass, ctx);
-    this.stateSet.useRasterizerState().cullMode = pass === 0 ? 'front' : 'back';
+    this.getRenderStateSet(pass).useRasterizerState().cullMode = pass === 0 ? 'front' : 'back';
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
