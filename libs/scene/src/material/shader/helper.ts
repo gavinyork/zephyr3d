@@ -14,7 +14,8 @@ import type {
   PBShaderExp,
   PBInsideFunctionScope,
   StructuredBuffer,
-  Texture2D
+  Texture2D,
+  PBGlobalScope
 } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
 import { linearToGamma } from '../../shaders';
@@ -111,12 +112,7 @@ export class ShaderHelper {
    */
   static prepareFragmentShader(pb: ProgramBuilder, ctx: DrawContext) {
     this.setupGlobalUniforms(pb, ctx);
-    if (ctx.instanceData) {
-      const scope = pb.getGlobalScope();
-      scope[UNIFORM_NAME_INSTANCE_DATA_STRIDE] = pb.uint().uniform(1);
-      scope[UNIFORM_NAME_INSTANCE_DATA_OFFSET] = pb.uint().uniform(1);
-      scope[UNIFORM_NAME_INSTANCE_DATA] = pb.vec4[65536 >> 4]().uniformBuffer(3);
-    }
+    this.fragmentShaderDrawableStuff(pb.getGlobalScope(), !!ctx.instanceData);
   }
   /**
    * Prepares the vertex shader which is going to be used in our material system
@@ -411,14 +407,53 @@ export class ShaderHelper {
   }
   /**
    * Gets the uniform variable of type mat4 which holds the normal matrix of current object to be drawn
+   * 
    * @param scope - Current shader scope
    * @returns The normal matrix of current object to be drawn
    */
   static getNormalMatrix(scope: PBInsideFunctionScope): PBShaderExp {
     return this.getWorldMatrix(scope);
   }
+  /**
+   * Vertex shader drawable stuff
+   * 
+   * @param scope - Current shader scope
+   * @param skinning - true if skinning is used, otherwise false.
+   * @param instanced - true if instancing is used, otherwise false.
+   */
+  static vertexShaderDrawableStuff(scope: PBGlobalScope, skinning: boolean, instanced: boolean): void {
+    const pb = scope.$builder;
+    if (instanced) {
+      scope[UNIFORM_NAME_INSTANCE_DATA_STRIDE] = pb.uint().uniform(1);
+      scope[UNIFORM_NAME_INSTANCE_DATA_OFFSET] = pb.uint().uniform(1);
+      scope[UNIFORM_NAME_INSTANCE_DATA] = pb.vec4[65536 >> 4]().uniformBuffer(3);
+    } else {
+      scope[UNIFORM_NAME_WORLD_MATRIX] = pb.mat4().uniform(1);
+    }
+    if (skinning) {
+      scope[UNIFORM_NAME_BONE_MATRICES] = pb.tex2D().uniform(1).sampleType('unfilterable-float');
+      scope[UNIFORM_NAME_BONE_INV_BIND_MATRIX] = pb.mat4().uniform(1);
+      scope[UNIFORM_NAME_BONE_TEXTURE_SIZE] = pb.int().uniform(1);
+    }
+  }
+  /**
+   * fragment shader drawable stuff
+   * 
+   * @param scope - Current shader scope
+   * @param instanced - true if instancing is used, otherwise false.
+   */
+  static fragmentShaderDrawableStuff(scope: PBGlobalScope, instanced: boolean): void {
+    const pb = scope.$builder;
+    if (instanced) {
+      scope[UNIFORM_NAME_INSTANCE_DATA_STRIDE] = pb.uint().uniform(1);
+      scope[UNIFORM_NAME_INSTANCE_DATA_OFFSET] = pb.uint().uniform(1);
+      scope[UNIFORM_NAME_INSTANCE_DATA] = pb.vec4[65536 >> 4]().uniformBuffer(3);
+    }
+  }
   /** @internal */
   static prepareVertexShaderCommon(pb: ProgramBuilder, ctx: DrawContext) {
+    this.vertexShaderDrawableStuff(pb.getGlobalScope(), !!ctx.target?.getBoneMatrices(), !!ctx.instanceData);
+    /*
     const skinning = !!ctx.target?.getBoneMatrices();
     const scope = pb.getGlobalScope();
     if (ctx.instanceData) {
@@ -433,6 +468,7 @@ export class ShaderHelper {
       scope[UNIFORM_NAME_BONE_INV_BIND_MATRIX] = pb.mat4().uniform(1);
       scope[UNIFORM_NAME_BONE_TEXTURE_SIZE] = pb.int().uniform(1);
     }
+    */
   }
   /** @internal */
   static setCameraUniforms(bindGroup: BindGroup, camera: Camera, flip: boolean, linear: boolean) {

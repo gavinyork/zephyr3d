@@ -19,21 +19,13 @@ import type { DrawContext, ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA } from '../shaders';
 import { Application } from '../app';
 import { ShaderHelper } from './shader/helper';
-import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import { Vector2, Vector3, Vector4, applyMixins } from '@zephyr3d/base';
 
 /**
  * Blending mode for mesh material
  * @public
  */
 export type BlendMode = 'none' | 'blend' | 'additive';
-
-/**
- * Convert union type to intersection
- * @public
- */
-export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void
-  ? I
-  : never;
 
 /**
  * Extract mixin return type
@@ -63,11 +55,7 @@ export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
   target: T,
   ...mixins: M
 ): ExtractMixinType<M> {
-  let r: any = target;
-  for (const m of mixins) {
-    r = m(r);
-  }
-  return r;
+  return applyMixins(target, ...mixins);
 }
 
 let FEATURE_ALPHATEST = 0;
