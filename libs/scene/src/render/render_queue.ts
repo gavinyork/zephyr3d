@@ -1,3 +1,47 @@
+/*
+Add to render queue => {
+  标记在RenderQueue里，设置所在的Instance bindGroup和offset
+  更新drawable bindgroup 和instance bindGroup
+}
+
+Transform changed => {
+  如果在RenderQueue里面，如果是instance更新instance bindGroup，否则更新drawable bindGroup
+}
+
+Uniform changed => {
+  如果在RenderQueue里面，如果是instance更新instance bindGroup，否则更新material BindGroup
+}
+
+Tobe Rendered => {
+  如果Hash != RenderQueue.Hash则重新生成
+}
+
+BatchGroup = {
+  [hash: string]: RenderQueue;
+}
+
+Drawable => {
+  queueRef: { queue: RenderQueue }
+}
+
+RenderQueue = {
+  materials: Set<Material>;
+  instanceInfo: Map<Drawable, { bindGroup: CachedBindGroup, offset: number }>;
+  renderBundles: { [hash: string]: RenderBundle }
+  queueRef: { queue: RenderQueue }
+  render(order: number, unlit: boolean, hash: string) {
+    this.materials.forEach(mat => mat.update(hash));
+    if (!renderBundles[hash]) {
+      startCapture();
+      renderItems();
+      renderBundles[hash] = endCapture(;
+    } else {
+      renderBundles[hash].render();
+    }
+  }
+}
+ */
+
 import { Application } from '../app';
 import type { Vector4 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';

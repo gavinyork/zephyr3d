@@ -1,8 +1,8 @@
 import { GenericConstructor } from "@zephyr3d/base";
 import { ProgramBuilder, type BindGroup, AbstractDevice } from "@zephyr3d/device";
 import { DrawContext, Drawable } from "./drawable";
-import { Application } from "../app";
 import { ShaderHelper } from "../material";
+import { CachedBindGroup } from "./render_queue";
 
 export interface IMixinDrawable {
 
@@ -14,6 +14,9 @@ export function mixinDrawable<T extends GenericConstructor<Drawable>>(baseCls: T
     private _md_bindGroupSlot1: BindGroupInfo;
     private _md_bindGroupSlot1Instanced: BindGroupInfo;
     private _md_bindGroupSlot1Skin: BindGroupInfo;
+    private _md_inQueue: boolean;
+    private _md_instanceBindGroupInfo: CachedBindGroup;
+    private _md_
     constructor(...args: any[]) {
       super(...args);
       this._md_bindGroupSlot1 = null;
