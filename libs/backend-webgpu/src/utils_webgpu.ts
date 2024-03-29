@@ -36,7 +36,7 @@ export class WebGPUClearQuad {
       .useStencilState()
       .enable(bClearStencil)
       .setReference(bClearStencil ? clearStencil : 0);
-    renderPass.draw(
+    renderPass.getDevice().commandQueue.draw(
       program.program,
       null,
       this._clearStateSet,

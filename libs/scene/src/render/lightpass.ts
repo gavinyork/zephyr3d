@@ -2,7 +2,7 @@ import { RenderPass } from './renderpass';
 import { QUEUE_OPAQUE, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '../values';
 import { Application } from '../app';
 import { Vector4 } from '@zephyr3d/base';
-import type { RenderQueueItem } from './render_queue';
+import type { RenderQueueItemList } from './render_queue';
 import type { RenderQueue } from './render_queue';
 import type { PunctualLight } from '../scene/light';
 import type { DrawContext } from './drawable';
@@ -27,7 +27,7 @@ export class LightPass extends RenderPass {
     return `${this._shadowMapHash}:${ctx.env.getHash(ctx)}`;
   }
   /** @internal */
-  protected renderLightPass(ctx: DrawContext, items: RenderQueueItem[], lights: PunctualLight[], flags: any) {
+  protected renderLightPass(ctx: DrawContext, items: RenderQueueItemList, itemsUnlit: RenderQueueItemList, lights: PunctualLight[], flags: any) {
     const device = Application.instance.device;
     const baseLightPass = !ctx.lightBlending;
     ctx.drawEnvLight =
@@ -68,22 +68,9 @@ export class LightPass extends RenderPass {
     }
     device.setBindGroup(0, info.bindGroup);
     const reverseWinding = ctx.camera.worldMatrixDet < 0;
-    for (const item of items) {
-      // unlit objects should only be drawn once
-      if (!ctx.lightBlending || !item.drawable.isUnlit()) {
-        ctx.instanceData = item.instanceData;
-        ctx.target = item.drawable;
-        item.drawable.preDraw(ctx);
-        //this.drawItem(device, item, ctx, reverseWinding);
-      }
-    }
-    for (const item of items) {
-      // unlit objects should only be drawn once
-      if (!ctx.lightBlending || !item.drawable.isUnlit()) {
-        ctx.instanceData = item.instanceData;
-        ctx.target = item.drawable;
-        this.drawItem(device, item, ctx, reverseWinding);
-      }
+    this.drawItemList(device, items, ctx, reverseWinding)
+    if (!ctx.lightBlending) {
+      this.drawItemList(device, itemsUnlit, ctx, reverseWinding);
     }
   }
   /** @internal */
@@ -109,15 +96,14 @@ export class LightPass extends RenderPass {
       ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
       for (const order of orders) {
         const items = renderQueue.items[order];
-        const lists = [items.opaqueList, items.transList];
-        const list = lists[i];
+        const lists = [items.opaqueList, items.opaqueListUnlit, items.transList, items.transListUnlit];
         let lightIndex = 0;
         if (ctx.shadowMapInfo) {
           for (const k of ctx.shadowMapInfo.keys()) {
             ctx.currentShadowLight = k;
             ctx.lightBlending = lightIndex > 0;
             this._shadowMapHash = ctx.shadowMapInfo.get(k).shaderHash;
-            this.renderLightPass(ctx, list, [k], flags);
+            this.renderLightPass(ctx, lists[i * 2], lists[i * 2 + 1], [k], flags);
             lightIndex++;
           }
         }
@@ -125,7 +111,7 @@ export class LightPass extends RenderPass {
           ctx.currentShadowLight = null;
           ctx.lightBlending = lightIndex > 0;
           this._shadowMapHash = '';
-          this.renderLightPass(ctx, list, renderQueue.unshadowedLights, flags);
+          this.renderLightPass(ctx, lists[i * 2], lists[i * 2 + 1], renderQueue.unshadowedLights, flags);
         }
       }
       if (i === 0) {

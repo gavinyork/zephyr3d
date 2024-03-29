@@ -187,11 +187,6 @@ export class Material {
       }
     }
   }
-  preDraw(ctx: DrawContext) {
-    for (let i = 0; i < this._numPasses; i++) {
-      this.beginDraw(i, ctx);
-    }
-  }
   /**
    * Prepares for drawing
    * @param ctx - The context of current drawing task

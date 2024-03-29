@@ -504,8 +504,14 @@ export class WebGPURenderPass {
           if (!bindGroup) {
             return false;
           }
-          renderPassEncoder.setBindGroup(i, bindGroup, bindGroupOffsets?.[i] || undefined);
-          renderBundleEncoder?.setBindGroup(i, bindGroup, bindGroupOffsets?.[i] || undefined);
+          const bindGroupOffset = bindGroupOffsets?.[i];
+          if (bindGroupOffset) {
+            renderPassEncoder.setBindGroup(i, bindGroup, bindGroupOffset);
+            renderBundleEncoder?.setBindGroup(i, bindGroup, bindGroupOffset);
+          } else {
+            renderPassEncoder.setBindGroup(i, bindGroup);
+            renderBundleEncoder?.setBindGroup(i, bindGroup);
+          }
         } else {
           renderPassEncoder.setBindGroup(i, this._device.emptyBindGroup);
           renderBundleEncoder?.setBindGroup(i, this._device.emptyBindGroup);

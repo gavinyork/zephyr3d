@@ -1,17 +1,11 @@
-import { Vector3, Vector4 } from '@zephyr3d/base';
-import type { PBRMetallicRoughnessMaterial } from '@zephyr3d/scene';
 import {
   Scene,
   OrbitCameraController,
-  AssetManager,
-  DirectionalLight,
   Application,
   PerspectiveCamera,
-  Compositor,
-  Tonemap,
-  BatchGroup
 } from '@zephyr3d/scene';
 import * as common from '../common';
+import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 
 const instancingApp = new Application({
   backend: common.getBackend(),
@@ -20,6 +14,7 @@ const instancingApp = new Application({
 
 instancingApp.ready().then(async () => {
   const device = instancingApp.device;
+  await imGuiInit(device);
   const scene = new Scene();
   const camera = new PerspectiveCamera(
     scene,
@@ -30,8 +25,10 @@ instancingApp.ready().then(async () => {
   );
   camera.position.setXYZ(0, 0, 60);
   camera.controller = new OrbitCameraController();
+  instancingApp.inputManager.use(imGuiInjectEvent);
   instancingApp.inputManager.use(camera.handleEvent.bind(camera));
-
+  const inspector = new common.Inspector(scene, null, camera);
+/*
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
 
@@ -78,13 +75,16 @@ instancingApp.ready().then(async () => {
 
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
-
-  instancingApp.on('resize', (ev) => {
+*/
+instancingApp.on('resize', (ev) => {
     camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane());
   });
   instancingApp.on('tick', (ev) => {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
+    imGuiNewFrame();
+    inspector.render();
+    imGuiEndFrame();
   });
   instancingApp.run();
 });

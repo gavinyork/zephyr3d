@@ -41,16 +41,8 @@ export class DepthPass extends RenderPass {
       .map((val) => Number(val))
       .sort((a, b) => a - b)) {
       const renderItems = renderQueue.items[order];
-      for (const item of renderItems.opaqueList) {
-        ctx.instanceData = item.instanceData;
-        ctx.target = item.drawable;
-        item.drawable.preDraw(ctx);
-      }
-      for (const item of renderItems.opaqueList) {
-        ctx.instanceData = item.instanceData;
-        ctx.target = item.drawable;
-        this.drawItem(device, item, ctx, reverseWinding);
-      }
+      this.drawItemList(device, renderItems.opaqueList, ctx, reverseWinding);
+      this.drawItemList(device, renderItems.opaqueListUnlit, ctx, reverseWinding);
     }
   }
 }

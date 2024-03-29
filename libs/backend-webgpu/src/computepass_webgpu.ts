@@ -52,7 +52,12 @@ export class WebGPUComputePass {
           if (!bindGroup) {
             return false;
           }
-          computePassEncoder.setBindGroup(i, bindGroup, bindGroupOffsets?.[i] || undefined);
+          const bindGroupOffset = bindGroupOffsets?.[i];
+          if (bindGroupOffset) {
+            computePassEncoder.setBindGroup(i, bindGroup, bindGroupOffset);
+          } else {
+            computePassEncoder.setBindGroup(i, bindGroup);
+          }
         } else {
           computePassEncoder.setBindGroup(i, this._device.emptyBindGroup);
         }

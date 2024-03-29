@@ -102,9 +102,6 @@ export class TerrainPatch implements Drawable {
   getPickTarget(): GraphNode {
     return this._terrain;
   }
-  preDraw(ctx: DrawContext) {
-    this._quadtree.getTerrain().material.preDraw(ctx);
-  }
   draw(ctx: DrawContext) {
     const isShadowMapPass = ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP;
     const primitive =
@@ -115,7 +112,7 @@ export class TerrainPatch implements Drawable {
     if (isShadowMapPass) {
       material.getRenderStateSet(0).useRasterizerState().setCullMode('front');
     }
-    this._quadtree.getTerrain().material.drawPrimitive(0, primitive, ctx, 0);
+    this._quadtree.getTerrain().material.draw(primitive, ctx);
     if (isShadowMapPass) {
       material.getRenderStateSet(0).defaultRasterizerState();
     }

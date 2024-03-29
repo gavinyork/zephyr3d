@@ -137,14 +137,26 @@ export interface RenderQueueItem {
 }
 
 /**
+ * Render queue item list
+ * @public
+ */
+export interface RenderQueueItemList {
+  items: RenderQueueItem[];
+}
+
+/**
  * Item list of render queue
  * @public
  */
 interface RenderItemList {
-  opaqueList: RenderQueueItem[];
+  opaqueList: RenderQueueItemList;
   opaqueInstanceList: Record<string, BatchDrawable[]>;
-  transList: RenderQueueItem[];
+  opaqueListUnlit: RenderQueueItemList;
+  opaqueInstanceListUnlit: Record<string, BatchDrawable[]>;
+  transList: RenderQueueItemList;
   transInstanceList: Record<string, BatchDrawable[]>;
+  transListUnlit: RenderQueueItemList;
+  transInstanceListUnlit: Record<string, BatchDrawable[]>;
 }
 
 /**
@@ -240,15 +252,21 @@ export class RenderQueue {
           let list = this._itemLists[k];
           if (!list) {
             list = {
-              opaqueList: [],
+              opaqueList: { items: [] },
               opaqueInstanceList: {},
-              transList: [],
-              transInstanceList: {}
+              opaqueListUnlit: { items: [] },
+              opaqueInstanceListUnlit: {},
+              transList: { items: [] },
+              transInstanceList: {},
+              transListUnlit: { items: [] },
+              transInstanceListUnlit: {},
             };
             this._itemLists[k] = list;
           }
-          list.opaqueList.push(...l.opaqueList);
-          list.transList.push(...l.transList);
+          list.opaqueList.items.push(...l.opaqueList.items);
+          list.opaqueListUnlit.items.push(...l.opaqueListUnlit.items);
+          list.transList.items.push(...l.transList.items);
+          list.transListUnlit.items.push(...l.transListUnlit.items);
         }
       }
     }
@@ -264,17 +282,27 @@ export class RenderQueue {
       let itemList = this._itemLists[renderOrder];
       if (!itemList) {
         itemList = {
-          opaqueList: [],
+          opaqueList: { items: [] },
           opaqueInstanceList: {},
-          transList: [],
-          transInstanceList: {}
+          opaqueListUnlit: { items: [] },
+          opaqueInstanceListUnlit: {},
+          transList: { items: [] },
+          transInstanceList: {},
+          transListUnlit: { items: [] },
+          transInstanceListUnlit: {}
         };
         this._itemLists[renderOrder] = itemList;
       }
       const trans = drawable.getQueueType() === QUEUE_TRANSPARENT;
-      const list = trans ? itemList.transList : itemList.opaqueList;
+      const unlit = drawable.isUnlit();
       if (drawable.isBatchable()) {
-        const instanceList = trans ? itemList.transInstanceList : itemList.opaqueInstanceList;
+        const instanceList = trans
+          ? unlit
+            ? itemList.transInstanceListUnlit
+            : itemList.transInstanceList
+          : unlit
+            ? itemList.opaqueInstanceListUnlit
+            : itemList.opaqueInstanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         let drawableList = instanceList[hash];
         if (!drawableList) {
@@ -283,7 +311,14 @@ export class RenderQueue {
         }
         drawableList.push(drawable);
       } else {
-        list.push({
+        const list = trans
+        ? unlit
+          ? itemList.transListUnlit
+          : itemList.transList
+        : unlit
+          ? itemList.opaqueListUnlit
+          : itemList.opaqueList;
+        list.items.push({
           drawable,
           sortDistance: drawable.getSortDistance(camera),
           instanceData: null
@@ -304,15 +339,15 @@ export class RenderQueue {
     const frameCounter = Application.instance.device.frameInfo.frameCounter;
     for (const k in this._itemLists) {
       const itemList = this._itemLists[k];
-      const lists = [itemList.opaqueList, itemList.transList];
-      const instanceLists = [itemList.opaqueInstanceList, itemList.transInstanceList];
-      for (let i = 0; i < 2; i++) {
+      const lists = [itemList.opaqueList, itemList.opaqueListUnlit, itemList.transList, itemList.transListUnlit];
+      const instanceLists = [itemList.opaqueInstanceList, itemList.opaqueInstanceListUnlit, itemList.transInstanceList, itemList.transInstanceListUnlit];
+      for (let i = 0; i < 4; i++) {
         const list = lists[i];
         const instanceList = instanceLists[i];
         for (const x in instanceList) {
           const drawables = instanceList[x];
           if (drawables.length === 1) {
-            list.push({
+            list.items.push({
               drawable: drawables[0],
               sortDistance: drawables[0].getSortDistance(camera),
               instanceData: null
@@ -337,7 +372,7 @@ export class RenderQueue {
                     stride
                   }
                 }
-                list.push(item);
+                list.items.push(item);
               }
               drawable.setInstanceDataBuffer(this._renderPass, bindGroup, bindGroup.offset);
               bindGroup.buffer.set(drawable.getXForm().worldMatrix, bindGroup.offset);
@@ -358,8 +393,10 @@ export class RenderQueue {
    */
   sortItems() {
     for (const list of Object.values(this._itemLists)) {
-      list.opaqueList.sort((a, b) => a.sortDistance - b.sortDistance);
-      list.transList.sort((a, b) => b.sortDistance - a.sortDistance);
+      list.opaqueList.items.sort((a, b) => a.sortDistance - b.sortDistance);
+      list.opaqueListUnlit.items.sort((a, b) => a.sortDistance - b.sortDistance);
+      list.transList.items.sort((a, b) => b.sortDistance - a.sortDistance);
+      list.transListUnlit.items.sort((a, b) => b.sortDistance - a.sortDistance);
     }
   }
   /*

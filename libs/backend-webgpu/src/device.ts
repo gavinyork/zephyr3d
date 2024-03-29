@@ -135,6 +135,9 @@ export class WebGPUDevice extends BaseDevice {
   get adapter(): GPUAdapter {
     return this._adapter;
   }
+  get commandQueue(): CommandQueueImmediate {
+    return this._commandQueue;
+  }
   get drawingBufferWidth() {
     return this.getDrawingBufferWidth();
   }

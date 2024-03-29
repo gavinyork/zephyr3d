@@ -205,19 +205,10 @@ export class Mesh extends GraphNode implements BatchDrawable {
     return !this.material?.supportLighting();
   }
   /**
-   * {@inheritDoc Drawable.preDraw}
-   */
-  preDraw(ctx: DrawContext) {
-    this._material.preDraw(ctx);
-  }
-  /**
    * {@inheritDoc Drawable.draw}
    */
   draw(ctx: DrawContext) {
-    //this.material.draw(this.primitive, ctx);
-    for (let i = 0; i < this.material.numPasses; i++) {
-      this.material.drawPrimitive(i, this.primitive, ctx, 0);
-    }
+    this.material.draw(this.primitive, ctx);
   }
   /**
    * {@inheritDoc Drawable.getBoneMatrices}

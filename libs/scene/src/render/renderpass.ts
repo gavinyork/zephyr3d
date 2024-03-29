@@ -2,7 +2,7 @@ import { Vector4 } from '@zephyr3d/base';
 import { CullVisitor } from './cull_visitor';
 import { Material } from '../material';
 import { Application } from '../app';
-import type { RenderQueueItem } from './render_queue';
+import type { RenderQueueItem, RenderQueueItemList } from './render_queue';
 import { RenderQueue } from './render_queue';
 import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
@@ -167,6 +167,28 @@ export abstract class RenderPass {
     item.drawable.draw(ctx);
     if (reverse) {
       device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+    }
+  }
+  /** @internal */
+  protected drawItemList(
+    device: AbstractDevice,
+    itemList: RenderQueueItemList,
+    ctx: DrawContext,
+    reverseWinding: boolean
+  ) {
+    if (itemList) {
+      for (const item of itemList.items) {
+        ctx.instanceData = item.instanceData;
+        ctx.target = item.drawable;
+        const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
+        if (reverse) {
+          device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+        }
+        item.drawable.draw(ctx);
+        if (reverse) {
+          device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+        }
+      }
     }
   }
   /** @internal */

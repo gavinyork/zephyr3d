@@ -60,9 +60,11 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     const writeSize = uploadSize;
     if (this._pendingUploads.length === 0) {
       this.pushUpload(this._pendingUploads, data.buffer, uploadOffset, dstByteOffset, uploadSize);
+      this._device.bufferUpload(this);
     } else {
       let newPendings: UploadBuffer[] = [];
       let added = false;
+      let commit = false;
       for (let i = 0; i < this._pendingUploads.length; i++) {
         const upload = this._pendingUploads[i];
         if (upload.uploadOffset + upload.uploadSize < dstByteOffset) {
@@ -78,6 +80,13 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
         } else {
           const start = Math.min(dstByteOffset, upload.uploadOffset);
           const end = Math.max(dstByteOffset + uploadSize, upload.uploadOffset + upload.uploadSize);
+          if (end - start < uploadSize + upload.uploadSize) {
+            // Flush last uploads if overlapped
+            this._device.bufferUpload(this);
+            newPendings = [];
+            commit = true;
+            break;
+          }
           dstByteOffset = start;
           uploadSize = end - start;
         }
@@ -89,8 +98,13 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
       new Uint8Array(this._pendingUploads[0].mappedBuffer.mappedRange, writeOffset, writeSize).set(
         new Uint8Array(data.buffer, uploadOffset, writeSize)
       );
+      if (commit) {
+        this._device.bufferUpload(this);
+      }
     }
-  }
+    if (this._pendingUploads.length === 1) {
+    }
+}
   async getBufferSubData(
     dstBuffer?: Uint8Array,
     offsetInBytes?: number,
@@ -243,6 +257,5 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
       uploadOffset: dstByteOffset,
       uploadBuffer: this._object
     });
-    this._device.bufferUpload(this);
   }
 }
