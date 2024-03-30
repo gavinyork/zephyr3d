@@ -73,10 +73,9 @@ export class SceneRenderer {
       logger,
       queue: 0,
       lightBlending: false,
-      target: null,
       renderPass: null,
       renderPassHash: null,
-      applyFog: false,
+      applyFog: null,
       flip: false,
       drawEnvLight: false,
       env: null
@@ -237,6 +236,8 @@ export class SceneRenderer {
     ctx.compositor?.begin(ctx);
     this._scenePass.render(ctx, null, renderQueue);
     ctx.compositor?.end(ctx);
+
+    renderQueue.dispose();
 
     if (tempFramebuffer && tempFramebuffer !== finalFramebuffer) {
       const blitter = new CopyBlitter();

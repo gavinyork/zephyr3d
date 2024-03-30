@@ -50,14 +50,14 @@ export class ShadowMapPass extends RenderPass {
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return ctx.shadowMapInfo.get(this.light).shaderHash;
+    return `sm:${ctx.shadowMapInfo.get(this.light).shaderHash}`;
   }
   /** @internal */
   protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {
-    ctx.target = null;
+    ctx.renderQueue = renderQueue;
     ctx.drawEnvLight = false;
     ctx.env = null;
-    ctx.applyFog = false;
+    ctx.applyFog = null;
     ctx.renderPassHash = null;
     ctx.flip = this.isAutoFlip();
     const device = Application.instance.device;
@@ -71,8 +71,9 @@ export class ShadowMapPass extends RenderPass {
       .map((val) => Number(val))
       .sort((a, b) => a - b)) {
       const renderItems = renderQueue.items[order];
-      this.drawItemList(device, renderItems.opaqueList, ctx, reverseWinding);
-      this.drawItemList(device, renderItems.opaqueListUnlit, ctx, reverseWinding);
+      this.drawItemList(device, renderItems.opaque.lit, ctx, reverseWinding);
+      this.drawItemList(device, renderItems.opaque.unlit, ctx, reverseWinding);
     }
+    ctx.renderQueue = null;
   }
 }

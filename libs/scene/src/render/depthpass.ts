@@ -21,12 +21,12 @@ export class DepthPass extends RenderPass {
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return '';
+    return 'dp';
   }
   /** @internal */
   protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {
-    ctx.target = null;
-    ctx.applyFog = false;
+    ctx.renderQueue = renderQueue;
+    ctx.applyFog = null;
     ctx.drawEnvLight = false;
     ctx.env = null;
     ctx.renderPassHash = null;
@@ -41,8 +41,9 @@ export class DepthPass extends RenderPass {
       .map((val) => Number(val))
       .sort((a, b) => a - b)) {
       const renderItems = renderQueue.items[order];
-      this.drawItemList(device, renderItems.opaqueList, ctx, reverseWinding);
-      this.drawItemList(device, renderItems.opaqueListUnlit, ctx, reverseWinding);
+      this.drawItemList(device, renderItems.opaque.lit, ctx, reverseWinding);
+      this.drawItemList(device, renderItems.opaque.unlit, ctx, reverseWinding);
     }
+    ctx.renderQueue = null;
   }
 }

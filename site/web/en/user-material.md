@@ -61,7 +61,7 @@ After inheriting from MeshMaterial,custom materials may need to override some cl
 
     This is where the fragment shader implementation for the material goes, which also requires overriding. Make sure to call its default implementation when overriding.
 
-  - [MeshMaterial.updateRenderStates(pass, ctx)](/doc/markdown/./scene.meshmaterial.updaterenderstates)
+  - [MeshMaterial.updateRenderStates(pass, stateSet, ctx)](/doc/markdown/./scene.meshmaterial.updaterenderstates)
 
     Called within the beginDraw() method to set the material's rendering states. When overriding, you must call its default implementation.
     

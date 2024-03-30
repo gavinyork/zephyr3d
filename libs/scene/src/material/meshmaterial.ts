@@ -1,10 +1,12 @@
 import type {
+  AbstractDevice,
   BindGroup,
   FaceMode,
   GPUProgram,
   PBFunctionScope,
   PBInsideFunctionScope,
-  PBShaderExp
+  PBShaderExp,
+  RenderStateSet
 } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
 import {
@@ -135,17 +137,20 @@ export class MeshMaterial extends Material {
   }
   /** Create material instance */
   createInstance(): this {
+    if (this.$isInstance) {
+      return this.coreMaterial.createInstance();
+    }
     const instanceUniforms = (this.constructor as typeof MeshMaterial).INSTANCE_UNIFORMS;
     const uniformsHolder = instanceUniforms.length > 0 ? new Float32Array(4 * instanceUniforms.length) : null;
     const isWebGL1 = Application.instance.device.type === 'webgl';
-
     const instance = {} as any;
     const that = this;
     instance.isBatchable = () => !isWebGL1 && that.supportInstancing();
     instance.$instanceUniforms = uniformsHolder;
     instance.$isInstance = true;
-    instance.beginDraw = function(pass: number, ctx: DrawContext){
-      if (isWebGL1 || !that.supportInstancing()) {
+    instance.coreMaterial = that;
+    instance.bind = function(ctx: DrawContext, pass: number, device: AbstractDevice){
+      if (pass === 0 && (isWebGL1 || !that.supportInstancing())) {
         for (let i = 0; i < instanceUniforms.length; i++) {
           const name = instanceUniforms[i][0];
           const type = instanceUniforms[i][1];
@@ -172,7 +177,7 @@ export class MeshMaterial extends Material {
           }
         }
       }
-      return that.beginDraw(pass, ctx);
+      return that.bind(ctx, pass, device);
     }
     // Copy original uniform values
     for (let i = 0; i < instanceUniforms.length; i++) {
@@ -315,12 +320,9 @@ export class MeshMaterial extends Material {
     return true;
   }
   /**
-   * Update render states according to draw context and current material pass
-   * @param pass - Current material pass
-   * @param ctx - Draw context
+   * {@inheritDoc Material.updateRenderStates}
    */
-  protected updateRenderStates(pass: number, ctx: DrawContext): void {
-    const stateSet = this.getRenderStateSet(pass);
+  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
     const blending = this.featureUsed<boolean>(FEATURE_ALPHABLEND) || ctx.lightBlending;
     const a2c = this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
     if (blending || a2c) {
@@ -383,13 +385,6 @@ export class MeshMaterial extends Material {
   isTransparentPass(pass: number): boolean {
     return this.featureUsed(FEATURE_ALPHABLEND);
   }
-  /**
-   * {@inheritdoc Material.beginDraw}
-   */
-  beginDraw(pass: number, ctx: DrawContext): boolean {
-    this.updateRenderStates(pass, ctx);
-    return super.beginDraw(pass, ctx);
-  }
   /** @internal */
   protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
     const pb = new ProgramBuilder(Application.instance.device);
@@ -426,7 +421,7 @@ export class MeshMaterial extends Material {
    *
    * @internal
    */
-  protected _createHash(renderPassType: number): string {
+  protected _createHash(): string {
     return this._featureStates.map((val) => (val === undefined ? '' : val)).join('|');
   }
   /**
@@ -457,7 +452,7 @@ export class MeshMaterial extends Material {
   vertexShader(scope: PBFunctionScope): void {
     const pb = scope.$builder;
     ShaderHelper.prepareVertexShader(pb, this.drawContext);
-    if (this.drawContext.target.getBoneMatrices()) {
+    if (this.drawContext.skinAnimation) {
       scope.$inputs.zBlendIndices = pb.vec4().attrib('blendIndices');
       scope.$inputs.zBlendWeights = pb.vec4().attrib('blendWeights');
     }

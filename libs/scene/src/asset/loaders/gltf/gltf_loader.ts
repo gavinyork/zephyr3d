@@ -512,8 +512,7 @@ export class GLTFLoader extends AbstractModelLoader {
         unlitMaterial.alphaCutoff = assetMaterial.common.alphaCutoff;
       }
       if (assetMaterial.common.doubleSided) {
-        const rasterizerState = unlitMaterial.getRenderStateSet(0).useRasterizerState();
-        rasterizerState.setCullMode('none');
+        unlitMaterial.cullMode = 'none';
       }
       return unlitMaterial;
     } else if (assetMaterial.type === 'pbrSpecularGlossiness') {
@@ -570,8 +569,7 @@ export class GLTFLoader extends AbstractModelLoader {
         pbrMaterial.alphaCutoff = assetPBRMaterial.common.alphaCutoff;
       }
       if (assetPBRMaterial.common.doubleSided) {
-        const rasterizerState = pbrMaterial.getRenderStateSet(0).useRasterizerState();
-        rasterizerState.setCullMode('none');
+        pbrMaterial.cullMode = 'none';
       }
       pbrMaterial.vertexNormal = !!assetMaterial.common.vertexNormal;
       return pbrMaterial;
@@ -679,8 +677,7 @@ export class GLTFLoader extends AbstractModelLoader {
         pbrMaterial.alphaCutoff = assetPBRMaterial.common.alphaCutoff;
       }
       if (assetPBRMaterial.common.doubleSided) {
-        const rasterizerState = pbrMaterial.getRenderStateSet(0).useRasterizerState();
-        rasterizerState.setCullMode('none');
+        pbrMaterial.cullMode = 'none';
       }
       pbrMaterial.vertexNormal = !!assetMaterial.common.vertexNormal;
       return pbrMaterial;

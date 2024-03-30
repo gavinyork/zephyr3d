@@ -5,6 +5,7 @@ import type {
   PBFunctionScope,
   PBInsideFunctionScope,
   PBShaderExp,
+  RenderStateSet,
   Texture2D,
   Texture2DArray
 } from '@zephyr3d/device';
@@ -15,6 +16,7 @@ import { Application } from '../app';
 import { Vector4 } from '@zephyr3d/base';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { ShaderHelper } from './shader/helper';
+import { RENDER_PASS_TYPE_SHADOWMAP } from '../values';
 
 /**
  * Terrain detail map information
@@ -433,5 +435,14 @@ export class TerrainMaterial extends applyMaterialMixins(
     device.popDeviceStates();
     fb.dispose();
     return tex;
+  }
+  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
+    super.updateRenderStates(pass, stateSet, ctx);
+    const isShadowMapPass = ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP;
+    if (isShadowMapPass) {
+      stateSet.useRasterizerState().setCullMode('front');
+    } else {
+      stateSet.defaultRasterizerState();
+    }
   }
 }

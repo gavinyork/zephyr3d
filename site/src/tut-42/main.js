@@ -18,11 +18,11 @@ class CartoonMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
     this.numPasses = 2;
   }
   // 重写此方法自定义每个Pass的渲染状态
-  updateRenderStates(pass, ctx) {
+  updateRenderStates(pass, stateSet, ctx) {
     // 必须调用默认实现
-    super.updateRenderStates(pass, ctx);
+    super.updateRenderStates(pass, stateSet, ctx);
     // 第一遍剔除正面，第二遍剔除背面
-    this.getRenderStateSet(pass).useRasterizerState().cullMode = pass === 0 ? 'front' : 'back';
+    stateSet.useRasterizerState().cullMode = pass === 0 ? 'front' : 'back';
   }
   // 提交Uniform常量
   applyUniformValues(bindGroup, ctx, pass) {

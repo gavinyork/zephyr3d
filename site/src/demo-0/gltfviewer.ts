@@ -80,12 +80,6 @@ export class GLTFViewer {
     this._light1.shadow.shadowMapSize = 1024;
     this._light1.lookAt(new Vector3(0, 0, 0), new Vector3(-0.5, 0.707, 0.5), Vector3.axisPY());
     this._envMaps.selectById(this._envMaps.getIdList()[0], this.scene);
-    Material.setGCOptions({
-      drawableCountThreshold: 0,
-      materialCountThreshold: 0,
-      inactiveTimeDuration: 10000,
-      verbose: true
-    });
     this._ui = new Panel(this);
   }
   get envMaps(): EnvMaps {

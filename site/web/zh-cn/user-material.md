@@ -66,7 +66,7 @@
     这里是该材质的fragmentShader实现，必需重写。
     重写此方法必须调用其默认实现。
 
-  - [MeshMaterial.updateRenderStates(pass, ctx)](/doc/markdown/./scene.meshmaterial.updaterenderstates)
+  - [MeshMaterial.updateRenderStates(pass, stateSet, ctx)](/doc/markdown/./scene.meshmaterial.updaterenderstates)
 
     在beginDraw()方法中调用，用于设置材质的渲染状态。
     重写此方法必须调用其默认实现。

@@ -131,7 +131,7 @@ export class SkyRenderer {
   }
   /** @internal */
   getHash(ctx: DrawContext): string {
-    return ctx.applyFog ? (this._fogType === 'none' ? '0' : this.drawScatteredFog(ctx) ? '1' : '2') : '';
+    return ctx.applyFog === 'scatter' ? '1' : ctx.applyFog ? '2' : '0';
   }
   /** Which type of the sky should be rendered */
   get skyType(): SkyType {

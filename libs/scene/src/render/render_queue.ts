@@ -51,7 +51,7 @@ import type { RenderPass } from '.';
 import { QUEUE_TRANSPARENT } from '../values';
 import type { BindGroup, BindGroupLayout } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
-import { ShaderHelper } from '../material';
+import { Material, ShaderHelper } from '../material';
 
 /** @internal */
 export type CachedBindGroup = {
@@ -127,7 +127,7 @@ export interface InstanceData {
 
 /**
  * Render queue item
- * @public
+ * @internal
  */
 export interface RenderQueueItem {
   drawable: Drawable;
@@ -136,27 +136,45 @@ export interface RenderQueueItem {
   instanceData: InstanceData;
 }
 
-/**
- * Render queue item list
- * @public
- */
-export interface RenderQueueItemList {
-  items: RenderQueueItem[];
+/** @internal */
+export interface RenderItemListInfo {
+  itemList: RenderQueueItem[],
+  skinItemList: RenderQueueItem[],
+  instanceItemList: RenderQueueItem[],
+  instanceList: Record<string, BatchDrawable[]>;
+  materialList: Set<Material>;
+}
+
+/** @internal */
+export interface RenderItemListBundle {
+  lit: RenderItemListInfo,
+  unlit: RenderItemListInfo
 }
 
 /**
  * Item list of render queue
- * @public
+ * @internal
  */
-interface RenderItemList {
-  opaqueList: RenderQueueItemList;
-  opaqueInstanceList: Record<string, BatchDrawable[]>;
-  opaqueListUnlit: RenderQueueItemList;
-  opaqueInstanceListUnlit: Record<string, BatchDrawable[]>;
-  transList: RenderQueueItemList;
-  transInstanceList: Record<string, BatchDrawable[]>;
-  transListUnlit: RenderQueueItemList;
-  transInstanceListUnlit: Record<string, BatchDrawable[]>;
+export interface RenderItemList {
+  opaque: RenderItemListBundle,
+  transparent: RenderItemListBundle
+}
+
+/**
+ * Render queue reference
+ * @internal
+ */
+export interface RenderQueueRef {
+  ref: RenderQueue;
+}
+
+/**
+ * Drawable instance information
+ * @internal
+ */
+export interface DrawableInstanceInfo {
+  bindGroup: CachedBindGroup,
+  offset: number
 }
 
 /**
@@ -176,6 +194,10 @@ export class RenderQueue {
   private _sunLight: DirectionalLight;
   /** @internal */
   private _bindGroupAllocator: InstanceBindGroupAllocator;
+  /** @internal */
+  private _ref: RenderQueueRef;
+  /** @internal */
+  private _instanceInfo: Map<Drawable, DrawableInstanceInfo>;
   /**
    * Creates an instance of a render queue
    * @param renderPass - The render pass to which the render queue belongs
@@ -187,6 +209,8 @@ export class RenderQueue {
     this._shadowedLightList = [];
     this._unshadowedLightList = [];
     this._sunLight = null;
+    this._ref = { ref: this };
+    this._instanceInfo = new Map();
   }
   /** The sun light */
   get sunLight(): DirectionalLight {
@@ -216,6 +240,14 @@ export class RenderQueue {
    */
   get unshadowedLights() {
     return this._unshadowedLightList;
+  }
+  /**
+   * Gets the instance information for given drawable object
+   * @param drawable - The drawable object
+   * @returns The instane information for given drawable object, null if no exists
+   */
+  getInstanceInfo(drawable: Drawable) {
+    return this._instanceInfo.get(drawable);
   }
   /**
    * Gets the maximum batch size of a given device
@@ -251,22 +283,25 @@ export class RenderQueue {
         if (l) {
           let list = this._itemLists[k];
           if (!list) {
-            list = {
-              opaqueList: { items: [] },
-              opaqueInstanceList: {},
-              opaqueListUnlit: { items: [] },
-              opaqueInstanceListUnlit: {},
-              transList: { items: [] },
-              transInstanceList: {},
-              transListUnlit: { items: [] },
-              transInstanceListUnlit: {},
-            };
+            list = this.newRenderItemList();
             this._itemLists[k] = list;
           }
-          list.opaqueList.items.push(...l.opaqueList.items);
-          list.opaqueListUnlit.items.push(...l.opaqueListUnlit.items);
-          list.transList.items.push(...l.transList.items);
-          list.transListUnlit.items.push(...l.transListUnlit.items);
+          list.opaque.lit.itemList.push(...l.opaque.lit.itemList);
+          list.opaque.lit.skinItemList.push(...l.opaque.lit.skinItemList);
+          list.opaque.lit.instanceItemList.push(...l.opaque.lit.instanceItemList);
+          l.opaque.lit.materialList.forEach(val => list.opaque.lit.materialList.add(val));
+          list.opaque.unlit.itemList.push(...l.opaque.unlit.itemList);
+          list.opaque.unlit.skinItemList.push(...l.opaque.unlit.skinItemList);
+          list.opaque.unlit.instanceItemList.push(...l.opaque.unlit.instanceItemList);
+          l.opaque.unlit.materialList.forEach(val => list.opaque.unlit.materialList.add(val));
+          list.transparent.lit.itemList.push(...l.transparent.lit.itemList);
+          list.transparent.lit.skinItemList.push(...l.transparent.lit.skinItemList);
+          list.transparent.lit.instanceItemList.push(...l.transparent.lit.instanceItemList);
+          l.transparent.lit.materialList.forEach(val => list.transparent.lit.materialList.add(val));
+          list.transparent.unlit.itemList.push(...l.transparent.unlit.itemList);
+          list.transparent.unlit.skinItemList.push(...l.transparent.unlit.skinItemList);
+          list.transparent.unlit.instanceItemList.push(...l.transparent.unlit.instanceItemList);
+          l.transparent.unlit.materialList.forEach(val => list.transparent.unlit.materialList.add(val));
         }
       }
     }
@@ -281,16 +316,7 @@ export class RenderQueue {
     if (drawable) {
       let itemList = this._itemLists[renderOrder];
       if (!itemList) {
-        itemList = {
-          opaqueList: { items: [] },
-          opaqueInstanceList: {},
-          opaqueListUnlit: { items: [] },
-          opaqueInstanceListUnlit: {},
-          transList: { items: [] },
-          transInstanceList: {},
-          transListUnlit: { items: [] },
-          transInstanceListUnlit: {}
-        };
+        itemList = this.newRenderItemList();
         this._itemLists[renderOrder] = itemList;
       }
       const trans = drawable.getQueueType() === QUEUE_TRANSPARENT;
@@ -298,11 +324,11 @@ export class RenderQueue {
       if (drawable.isBatchable()) {
         const instanceList = trans
           ? unlit
-            ? itemList.transInstanceListUnlit
-            : itemList.transInstanceList
+            ? itemList.transparent.unlit.instanceList
+            : itemList.transparent.lit.instanceList
           : unlit
-            ? itemList.opaqueInstanceListUnlit
-            : itemList.opaqueInstanceList;
+            ? itemList.opaque.unlit.instanceList
+            : itemList.opaque.lit.instanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         let drawableList = instanceList[hash];
         if (!drawableList) {
@@ -313,17 +339,23 @@ export class RenderQueue {
       } else {
         const list = trans
         ? unlit
-          ? itemList.transListUnlit
-          : itemList.transList
+          ? itemList.transparent.unlit
+          : itemList.transparent.lit
         : unlit
-          ? itemList.opaqueListUnlit
-          : itemList.opaqueList;
-        list.items.push({
+          ? itemList.opaque.unlit
+          : itemList.opaque.lit;
+        (drawable.getBoneMatrices() ? list.skinItemList : list.itemList).push({
           drawable,
           sortDistance: drawable.getSortDistance(camera),
           instanceData: null
         });
+        drawable.applyTransformUniforms();
+        const mat = drawable.getMaterial();
+        if (mat) {
+          list.materialList.add(mat.coreMaterial);
+        }
       }
+      drawable.pushRenderQueueRef(this._ref);
     }
   }
   /**
@@ -335,23 +367,33 @@ export class RenderQueue {
     this._unshadowedLightList = [];
     this._sunLight = null;
   }
+  /** @internal */
+  dispose() {
+    this._ref.ref = null;
+    this._ref = null;
+    this.reset();
+  }
   end(camera: Camera): this {
     const frameCounter = Application.instance.device.frameInfo.frameCounter;
     for (const k in this._itemLists) {
       const itemList = this._itemLists[k];
-      const lists = [itemList.opaqueList, itemList.opaqueListUnlit, itemList.transList, itemList.transListUnlit];
-      const instanceLists = [itemList.opaqueInstanceList, itemList.opaqueInstanceListUnlit, itemList.transInstanceList, itemList.transInstanceListUnlit];
+      const lists = [itemList.opaque.lit, itemList.opaque.unlit, itemList.transparent.lit, itemList.transparent.unlit];
       for (let i = 0; i < 4; i++) {
         const list = lists[i];
-        const instanceList = instanceLists[i];
+        const instanceList = list.instanceList
         for (const x in instanceList) {
           const drawables = instanceList[x];
           if (drawables.length === 1) {
-            list.items.push({
+            (drawables[0].getBoneMatrices() ? list.skinItemList : list.itemList).push({
               drawable: drawables[0],
               sortDistance: drawables[0].getSortDistance(camera),
               instanceData: null
             });
+            drawables[0].applyTransformUniforms();
+            const mat = drawables[0].getMaterial();
+            if (mat) {
+              list.materialList.add(mat.coreMaterial);
+            }
           } else {
             let bindGroup: CachedBindGroup = null;
             let item: RenderQueueItem = null;
@@ -372,15 +414,19 @@ export class RenderQueue {
                     stride
                   }
                 }
-                list.items.push(item);
+                list.instanceItemList.push(item);
+                drawable.applyInstanceOffsetAndStride(stride, bindGroup.offset);
               }
-              drawable.setInstanceDataBuffer(this._renderPass, bindGroup, bindGroup.offset);
-              bindGroup.buffer.set(drawable.getXForm().worldMatrix, bindGroup.offset);
-              if (instanceUniforms) {
-                bindGroup.buffer.set(instanceUniforms, bindGroup.offset + 16);
-              }
+              const instanceInfo = { bindGroup, offset: bindGroup.offset };
+              this._instanceInfo.set(drawable, instanceInfo);
+              drawable.applyTransformUniforms(instanceInfo);
+              drawable.applyMaterialUniforms(instanceInfo);
               bindGroup.offset += stride;
               item.instanceData.numInstances++;
+              const mat = drawable.getMaterial();
+              if (mat) {
+                list.materialList.add(mat.coreMaterial);
+              }
             }
           }
         }
@@ -393,11 +439,47 @@ export class RenderQueue {
    */
   sortItems() {
     for (const list of Object.values(this._itemLists)) {
-      list.opaqueList.items.sort((a, b) => a.sortDistance - b.sortDistance);
-      list.opaqueListUnlit.items.sort((a, b) => a.sortDistance - b.sortDistance);
-      list.transList.items.sort((a, b) => b.sortDistance - a.sortDistance);
-      list.transListUnlit.items.sort((a, b) => b.sortDistance - a.sortDistance);
+      list.transparent.lit.itemList.sort((a, b) => b.sortDistance - a.sortDistance);
+      list.transparent.lit.skinItemList.sort((a, b) => b.sortDistance - a.sortDistance);
+      list.transparent.unlit.itemList.sort((a, b) => b.sortDistance - a.sortDistance);
+      list.transparent.unlit.skinItemList.sort((a, b) => b.sortDistance - a.sortDistance);
     }
+  }
+  private newRenderItemList(): RenderItemList {
+    return {
+      opaque: {
+        lit: {
+          itemList: [],
+          skinItemList: [],
+          instanceItemList: [],
+          materialList: new Set(),
+          instanceList: {}
+        },
+        unlit: {
+          itemList: [],
+          skinItemList: [],
+          instanceItemList: [],
+          materialList: new Set(),
+          instanceList: {}
+        }
+      },
+      transparent: {
+        lit: {
+          itemList: [],
+          skinItemList: [],
+          instanceItemList: [],
+          materialList: new Set(),
+          instanceList: {}
+        },
+        unlit: {
+          itemList: [],
+          skinItemList: [],
+          instanceItemList: [],
+          materialList: new Set(),
+          instanceList: {}
+        }
+      }
+    };
   }
   /*
   private encodeInstanceColor(index: number, outColor: Float32Array) {

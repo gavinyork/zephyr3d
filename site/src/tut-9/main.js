@@ -13,7 +13,7 @@ myApp.ready().then(function () {
   // Create an unlit material
   const material = new UnlitMaterial();
   // Disable backface culling
-  material.getRenderStateSet(0).useRasterizerState().setCullMode('none');
+  material.cullMode = 'none';
   // Use vertex color
   material.vertexColor = true;
   // Fill the triangle data

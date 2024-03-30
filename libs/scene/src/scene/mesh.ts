@@ -1,5 +1,5 @@
 import type { Matrix4x4 } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { Vector4, applyMixins } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import { BoxFrameShape } from '../shapes';
 import type { Material } from '../material';
@@ -11,12 +11,14 @@ import type { XForm } from './xform';
 import type { Scene } from './scene';
 import type { BoundingBox, BoundingVolume } from '../utility/bounding_volume';
 import { QUEUE_OPAQUE } from '../values';
+import { mixinDrawable } from '../render/drawable_mixin';
 
 /**
  * Mesh node
  * @public
  */
-export class Mesh extends GraphNode implements BatchDrawable {
+export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements BatchDrawable {
+  static X: typeof GraphNode = this;
   /** @internal */
   private _primitive: Primitive;
   /** @internal */
@@ -208,7 +210,14 @@ export class Mesh extends GraphNode implements BatchDrawable {
    * {@inheritDoc Drawable.draw}
    */
   draw(ctx: DrawContext) {
-    this.material.draw(this.primitive, ctx);
+    this.bind(Application.instance.device, ctx);
+    this.material.draw(this.primitive, ctx, !!this.getBoneMatrices(), !!ctx.instanceData);
+  }
+  /**
+   * {@inheritDoc Drawable.getMaterial}
+   */
+  getMaterial(): Material {
+    return this.material;
   }
   /**
    * {@inheritDoc Drawable.getBoneMatrices}

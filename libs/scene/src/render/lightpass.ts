@@ -2,8 +2,7 @@ import { RenderPass } from './renderpass';
 import { QUEUE_OPAQUE, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '../values';
 import { Application } from '../app';
 import { Vector4 } from '@zephyr3d/base';
-import type { RenderQueueItemList } from './render_queue';
-import type { RenderQueue } from './render_queue';
+import type { RenderItemListBundle, RenderQueue } from './render_queue';
 import type { PunctualLight } from '../scene/light';
 import type { DrawContext } from './drawable';
 import { ShaderHelper } from '../material/shader/helper';
@@ -24,10 +23,10 @@ export class LightPass extends RenderPass {
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return `${this._shadowMapHash}:${ctx.env.getHash(ctx)}`;
+    return `lp:${this._shadowMapHash}:${ctx.env.getHash(ctx)}`;
   }
   /** @internal */
-  protected renderLightPass(ctx: DrawContext, items: RenderQueueItemList, itemsUnlit: RenderQueueItemList, lights: PunctualLight[], flags: any) {
+  protected renderLightPass(ctx: DrawContext, itemList: RenderItemListBundle, lights: PunctualLight[], flags: any) {
     const device = Application.instance.device;
     const baseLightPass = !ctx.lightBlending;
     ctx.drawEnvLight =
@@ -68,15 +67,15 @@ export class LightPass extends RenderPass {
     }
     device.setBindGroup(0, info.bindGroup);
     const reverseWinding = ctx.camera.worldMatrixDet < 0;
-    this.drawItemList(device, items, ctx, reverseWinding)
+    this.drawItemList(device, itemList.lit, ctx, reverseWinding)
     if (!ctx.lightBlending) {
-      this.drawItemList(device, itemsUnlit, ctx, reverseWinding);
+      this.drawItemList(device, itemList.unlit, ctx, reverseWinding);
     }
   }
   /** @internal */
   protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {
-    ctx.applyFog = false;
-    ctx.target = null;
+    ctx.applyFog = null;
+    ctx.renderQueue = renderQueue;
     ctx.renderPassHash = null;
     ctx.env = ctx.scene.env;
     ctx.drawEnvLight = false;
@@ -92,18 +91,18 @@ export class LightPass extends RenderPass {
       .map((val) => Number(val))
       .sort((a, b) => a - b);
     for (let i = 0; i < 2; i++) {
-      ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none';
+      ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none' ? ctx.env.sky.fogType : null;
       ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
       for (const order of orders) {
         const items = renderQueue.items[order];
-        const lists = [items.opaqueList, items.opaqueListUnlit, items.transList, items.transListUnlit];
+        const lists = [items.opaque, items.transparent];
         let lightIndex = 0;
         if (ctx.shadowMapInfo) {
           for (const k of ctx.shadowMapInfo.keys()) {
             ctx.currentShadowLight = k;
             ctx.lightBlending = lightIndex > 0;
             this._shadowMapHash = ctx.shadowMapInfo.get(k).shaderHash;
-            this.renderLightPass(ctx, lists[i * 2], lists[i * 2 + 1], [k], flags);
+            this.renderLightPass(ctx, lists[i], [k], flags);
             lightIndex++;
           }
         }
@@ -111,7 +110,7 @@ export class LightPass extends RenderPass {
           ctx.currentShadowLight = null;
           ctx.lightBlending = lightIndex > 0;
           this._shadowMapHash = '';
-          this.renderLightPass(ctx, lists[i * 2], lists[i * 2 + 1], renderQueue.unshadowedLights, flags);
+          this.renderLightPass(ctx, lists[i], renderQueue.unshadowedLights, flags);
         }
       }
       if (i === 0) {
@@ -123,5 +122,6 @@ export class LightPass extends RenderPass {
         ctx.env.sky.renderFog(ctx);
       }
     }
+    ctx.renderQueue = null;
   }
 }

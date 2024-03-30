@@ -1,8 +1,7 @@
 import { Vector4 } from '@zephyr3d/base';
 import { CullVisitor } from './cull_visitor';
-import { Material } from '../material';
 import { Application } from '../app';
-import type { RenderQueueItem, RenderQueueItemList } from './render_queue';
+import type { RenderItemListInfo, RenderQueueItem } from './render_queue';
 import { RenderQueue } from './render_queue';
 import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
@@ -109,9 +108,6 @@ export abstract class RenderPass {
    * Disposes the render pass
    */
   dispose() {
-    for (const k in this._globalBindGroups) {
-      Material.bindGroupGarbageCollect(this._globalBindGroups[k].bindGroup);
-    }
     this._globalBindGroups = {};
   }
   /** @internal */
@@ -126,12 +122,15 @@ export abstract class RenderPass {
   protected drawScene(ctx: DrawContext, cullCamera: Camera, renderQueue?: RenderQueue) {
     const device = Application.instance.device;
     this.clearFramebuffer();
-    renderQueue = renderQueue ?? this.cullScene(ctx, cullCamera);
-    if (renderQueue) {
+    const rq = renderQueue ?? this.cullScene(ctx, cullCamera);
+    if (rq) {
       const windingReversed = device.isWindingOrderReversed();
       device.reverseVertexWindingOrder(this.isAutoFlip() ? !windingReversed : windingReversed);
       this.renderItems(ctx, renderQueue);
       device.reverseVertexWindingOrder(windingReversed);
+      if (rq !== renderQueue) {
+        rq.dispose();
+      }
     }
   }
   /**
@@ -172,21 +171,58 @@ export abstract class RenderPass {
   /** @internal */
   protected drawItemList(
     device: AbstractDevice,
-    itemList: RenderQueueItemList,
+    itemList: RenderItemListInfo,
     ctx: DrawContext,
     reverseWinding: boolean
   ) {
     if (itemList) {
-      for (const item of itemList.items) {
-        ctx.instanceData = item.instanceData;
-        ctx.target = item.drawable;
-        const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
-        if (reverse) {
-          device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+      if (itemList.itemList.length > 0) {
+        ctx.skinAnimation = false;
+        ctx.instancing = false;
+        ctx.instanceData = null;
+        itemList.materialList.forEach(mat => mat.apply(ctx));
+        for (const item of itemList.itemList) {
+          const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
+          if (reverse) {
+            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+          }
+          item.drawable.draw(ctx);
+          if (reverse) {
+            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+          }
         }
-        item.drawable.draw(ctx);
-        if (reverse) {
-          device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+      }
+      if (itemList.skinItemList.length > 0) {
+        ctx.skinAnimation = true;
+        ctx.instancing = false;
+        ctx.instanceData = null;
+        itemList.materialList.forEach(mat => mat.apply(ctx));
+        for (const item of itemList.skinItemList) {
+          ctx.instanceData = item.instanceData;
+          const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
+          if (reverse) {
+            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+          }
+          item.drawable.draw(ctx);
+          if (reverse) {
+            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+          }
+        }
+      }
+      if (itemList.instanceItemList.length > 0) {
+        ctx.skinAnimation = false;
+        ctx.instancing = true;
+        itemList.materialList.forEach(mat => mat.apply(ctx));
+        for (const item of itemList.instanceItemList) {
+          ctx.instanceData = item.instanceData;
+          const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
+          if (reverse) {
+            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+          }
+          item.drawable.draw(ctx);
+          if (reverse) {
+            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+          }
         }
       }
     }

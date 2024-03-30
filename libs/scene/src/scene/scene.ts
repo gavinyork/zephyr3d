@@ -3,7 +3,6 @@ import { Vector3, Vector4, Ray, makeEventTarget, nextPowerOf2 } from '@zephyr3d/
 import { SceneNode } from './scene_node';
 import { Octree } from './octree';
 import { OctreeUpdateVisitor } from './octree_update_visitor';
-import { Material } from '../material';
 import { RaycastVisitor } from './raycast_visitor';
 import { Application } from '../app';
 import { Environment } from './environment';
@@ -170,10 +169,6 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
     const frameInfo = Application.instance.device.frameInfo;
     if (frameInfo.frameCounter !== this._updateFrame) {
       this._updateFrame = frameInfo.frameCounter;
-      // uniform buffer garbage collect
-      if (!Material.getGCOptions().disabled) {
-        Material.garbageCollect(frameInfo.frameTimestamp);
-      }
       for (const an of this._animationSet) {
         an.update();
       }

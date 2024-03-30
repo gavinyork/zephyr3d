@@ -1,4 +1,4 @@
-import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope, RenderStateSet } from '@zephyr3d/device';
 import { DrawContext, MeshMaterial, ShaderHelper, applyMaterialMixins, mixinAlbedoColor, mixinLambert } from '@zephyr3d/scene';
 
 export class ToonMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor, mixinLambert) {
@@ -28,9 +28,9 @@ export class ToonMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoC
       this.uniformChanged();
     }
   }
-  protected updateRenderStates(pass: number, ctx: DrawContext): void {
-    super.updateRenderStates(pass, ctx);
-    this.getRenderStateSet(pass).useRasterizerState().cullMode = pass === 0 ? 'front' : 'back';
+  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
+    super.updateRenderStates(pass, stateSet, ctx);
+    stateSet.useRasterizerState().cullMode = pass === 0 ? 'front' : 'back';
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);

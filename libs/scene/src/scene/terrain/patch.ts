@@ -1,5 +1,5 @@
 import type { Matrix4x4 } from '@zephyr3d/base';
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Vector3, Vector4, applyMixins } from '@zephyr3d/base';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { Primitive } from '../../render/primitive';
 import { Application } from '../../app';
@@ -11,10 +11,20 @@ import type { Quadtree } from './quadtree';
 import type { Terrain } from './terrain';
 import type { GraphNode } from '../graph_node';
 import { QUEUE_OPAQUE, RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
+import { mixinDrawable } from '../../render/drawable_mixin';
+import { Material } from '../../material';
 
+export class TerrainPatchBase {
+  protected _terrain: Terrain;
+  constructor(terrain: Terrain) {
+    this._terrain = terrain;
+  }
+  getXForm(): XForm<XForm<any>> {
+    return this._terrain;
+  }
+}
 /** @internal */
-export class TerrainPatch implements Drawable {
-  private _terrain: Terrain;
+export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) implements Drawable {
   private _geometry: Primitive;
   private _geometryLines: Primitive;
   private _quadtree: Quadtree;
@@ -28,7 +38,7 @@ export class TerrainPatch implements Drawable {
   private _parent: TerrainPatch;
   private _offsetScale: Vector4;
   constructor(terrain: Terrain) {
-    this._terrain = terrain;
+    super(terrain);
     this._geometry = null;
     this._geometryLines = null;
     this._mipLevel = 0;
@@ -102,20 +112,17 @@ export class TerrainPatch implements Drawable {
   getPickTarget(): GraphNode {
     return this._terrain;
   }
+  getMaterial(): Material {
+    return this._terrain.material;
+  }
   draw(ctx: DrawContext) {
     const isShadowMapPass = ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP;
     const primitive =
       this._quadtree.getTerrain().wireframe && !isShadowMapPass
         ? this.getGeometryWireframe()
         : this.getGeometry();
-    const material = this._quadtree.getTerrain().material;
-    if (isShadowMapPass) {
-      material.getRenderStateSet(0).useRasterizerState().setCullMode('front');
-    }
-    this._quadtree.getTerrain().material.draw(primitive, ctx);
-    if (isShadowMapPass) {
-      material.getRenderStateSet(0).defaultRasterizerState();
-    }
+    this.bind(Application.instance.device, ctx);
+    this._terrain.material.draw(primitive, ctx, !!this.getBoneMatrices(), !!ctx.instanceData);
   }
   setupCamera(viewportH: number, tanHalfFovy: number, maxPixelError: number): void {
     if (maxPixelError > 0 && tanHalfFovy > 0) {
@@ -126,9 +133,6 @@ export class TerrainPatch implements Drawable {
   }
   getName(): string {
     return 'TerrainPatch';
-  }
-  getXForm(): XForm<XForm<any>> {
-    return this._quadtree.getTerrain();
   }
   getBoneMatrices(): Texture2D<unknown> {
     return null;
