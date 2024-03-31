@@ -112,7 +112,6 @@ export class ShaderHelper {
    */
   static prepareFragmentShader(pb: ProgramBuilder, ctx: DrawContext) {
     this.setupGlobalUniforms(pb, ctx);
-    this.fragmentShaderDrawableStuff(pb.getGlobalScope(), !!ctx.instanceData);
   }
   /**
    * Prepares the vertex shader which is going to be used in our material system
@@ -434,20 +433,6 @@ export class ShaderHelper {
       scope[UNIFORM_NAME_BONE_MATRICES] = pb.tex2D().uniform(1).sampleType('unfilterable-float');
       scope[UNIFORM_NAME_BONE_INV_BIND_MATRIX] = pb.mat4().uniform(1);
       scope[UNIFORM_NAME_BONE_TEXTURE_SIZE] = pb.int().uniform(1);
-    }
-  }
-  /**
-   * fragment shader drawable stuff
-   *
-   * @param scope - Current shader scope
-   * @param instanced - true if instancing is used, otherwise false.
-   */
-  static fragmentShaderDrawableStuff(scope: PBGlobalScope, instanced: boolean): void {
-    const pb = scope.$builder;
-    if (instanced) {
-      scope[UNIFORM_NAME_INSTANCE_DATA_STRIDE] = pb.uint().uniform(1);
-      scope[UNIFORM_NAME_INSTANCE_DATA_OFFSET] = pb.uint().uniform(1);
-      scope[UNIFORM_NAME_INSTANCE_DATA] = pb.vec4[65536 >> 4]().uniformBuffer(3);
     }
   }
   /** @internal */

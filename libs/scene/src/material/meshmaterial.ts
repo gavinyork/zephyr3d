@@ -127,9 +127,8 @@ export class MeshMaterial extends Material {
     return this.INSTANCE_UNIFORMS.length - 1;
   }
   getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShaderExp {
-    //return ShaderHelper.getInstancedUniform(scope, 4 + uniformIndex);
     const pb = scope.$builder;
-    const instanceID = pb.shaderKind === 'vertex' ? scope.$builtins.instanceIndex : scope.$inputs.zInstanceID;
+    const instanceID = scope.$builtins.instanceIndex;
     const uniformName = ShaderHelper.getInstanceDataUniformName();
     const strideName = ShaderHelper.getInstanceDataStrideUniformName();
     const offsetName = ShaderHelper.getInstanceDataOffsetUniformName();
@@ -455,9 +454,6 @@ export class MeshMaterial extends Material {
     if (this.drawContext.skinAnimation) {
       scope.$inputs.zBlendIndices = pb.vec4().attrib('blendIndices');
       scope.$inputs.zBlendWeights = pb.vec4().attrib('blendWeights');
-    }
-    if (this.drawContext.instanceData) {
-      scope.$outputs.zInstanceID = scope.$builtins.instanceIndex;
     }
   }
   /**

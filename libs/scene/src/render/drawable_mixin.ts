@@ -105,7 +105,6 @@ export function mixinDrawable<T extends GenericConstructor<{
             pb.main(function () {});
           },
           fragment(pb) {
-            ShaderHelper.fragmentShaderDrawableStuff(this, instancing);
             pb.main(function () {});
           }
         });

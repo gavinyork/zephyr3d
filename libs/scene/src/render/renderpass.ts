@@ -126,11 +126,18 @@ export abstract class RenderPass {
     if (rq) {
       const windingReversed = device.isWindingOrderReversed();
       device.reverseVertexWindingOrder(this.isAutoFlip() ? !windingReversed : windingReversed);
-      this.renderItems(ctx, renderQueue);
+      this.recursiveRenderItems(ctx, rq);
       device.reverseVertexWindingOrder(windingReversed);
       if (rq !== renderQueue) {
         rq.dispose();
       }
+    }
+  }
+  /** @internal */
+  private recursiveRenderItems(ctx: DrawContext, renderQueue: RenderQueue) {
+    this.renderItems(ctx, renderQueue);
+    for (const subQueue of renderQueue.getSubRenderQueues()) {
+      this.recursiveRenderItems(ctx, subQueue.ref);
     }
   }
   /**

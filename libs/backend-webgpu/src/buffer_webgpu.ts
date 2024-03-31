@@ -103,6 +103,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
       }
     }
     if (this._pendingUploads.length === 1) {
+      this._device.bufferUpload(this);
     }
 }
   async getBufferSubData(

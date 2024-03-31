@@ -60,7 +60,7 @@ PhysicsApp.ready().then(async () => {
     .setColor(new Vector4(1, 1, 1, 1))
     .setCastShadow(false);
   light.lookAt(new Vector3(0, 0, 0), new Vector3(0.5, -0.707, -0.5), Vector3.axisPY());
-  light.castShadow = true;
+  light.castShadow = false;
   light.shadow.mode = 'pcf-opt';
   light.shadow.pcfKernelSize = 3;
   light.shadow.numShadowCascades = 4;
@@ -108,13 +108,13 @@ PhysicsApp.ready().then(async () => {
     instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
     const box = new Mesh(scene, boxShape, instanceMaterial);
     box.position.setXYZ(0, 50, 0);
-    box.parent = batchGroup;
+    //box.parent = batchGroup;
     queue.push(box);
     instanceMaterial = objMaterial.createInstance();
     instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
     const sphere = new Mesh(scene, sphereShape, instanceMaterial);
     sphere.position.setXYZ(0, 50, 0);
-    sphere.parent = batchGroup;
+    //sphere.parent = batchGroup;
     queue.push(sphere);
   }
   physicsWorld.start();

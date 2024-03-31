@@ -93,7 +93,6 @@ export class InstanceBindGroupAllocator {
           pb.main(function () {});
         },
         fragment(pb) {
-          this[ShaderHelper.getInstanceDataUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
           pb.main(function () {});
         }
       });
@@ -147,8 +146,8 @@ export interface RenderItemListInfo {
 
 /** @internal */
 export interface RenderItemListBundle {
-  lit: RenderItemListInfo,
-  unlit: RenderItemListInfo
+  lit: RenderItemListInfo[],
+  unlit: RenderItemListInfo[]
 }
 
 /**
@@ -198,6 +197,8 @@ export class RenderQueue {
   private _ref: RenderQueueRef;
   /** @internal */
   private _instanceInfo: Map<Drawable, DrawableInstanceInfo>;
+  /** @internal */
+  private _subRenderQueues: RenderQueueRef[];
   /**
    * Creates an instance of a render queue
    * @param renderPass - The render pass to which the render queue belongs
@@ -211,6 +212,7 @@ export class RenderQueue {
     this._sunLight = null;
     this._ref = { ref: this };
     this._instanceInfo = new Map();
+    this._subRenderQueues = [];
   }
   /** The sun light */
   get sunLight(): DirectionalLight {
@@ -242,12 +244,22 @@ export class RenderQueue {
     return this._unshadowedLightList;
   }
   /**
+   * Gets the indirect reference of this
+   */
+  get ref(): RenderQueueRef {
+    return this._ref;
+  }
+  /**
    * Gets the instance information for given drawable object
    * @param drawable - The drawable object
    * @returns The instane information for given drawable object, null if no exists
    */
   getInstanceInfo(drawable: Drawable) {
     return this._instanceInfo.get(drawable);
+  }
+  /** @internal */
+  getSubRenderQueues(): RenderQueueRef[] {
+    return this._subRenderQueues;
   }
   /**
    * Gets the maximum batch size of a given device
@@ -277,34 +289,29 @@ export class RenderQueue {
    * @param queue - The render queue to be pushed
    */
   pushRenderQueue(queue: RenderQueue) {
-    if (queue && queue !== this) {
-      for (const k in queue._itemLists) {
-        const l = queue._itemLists[k];
-        if (l) {
-          let list = this._itemLists[k];
-          if (!list) {
-            list = this.newRenderItemList();
-            this._itemLists[k] = list;
-          }
-          list.opaque.lit.itemList.push(...l.opaque.lit.itemList);
-          list.opaque.lit.skinItemList.push(...l.opaque.lit.skinItemList);
-          list.opaque.lit.instanceItemList.push(...l.opaque.lit.instanceItemList);
-          l.opaque.lit.materialList.forEach(val => list.opaque.lit.materialList.add(val));
-          list.opaque.unlit.itemList.push(...l.opaque.unlit.itemList);
-          list.opaque.unlit.skinItemList.push(...l.opaque.unlit.skinItemList);
-          list.opaque.unlit.instanceItemList.push(...l.opaque.unlit.instanceItemList);
-          l.opaque.unlit.materialList.forEach(val => list.opaque.unlit.materialList.add(val));
-          list.transparent.lit.itemList.push(...l.transparent.lit.itemList);
-          list.transparent.lit.skinItemList.push(...l.transparent.lit.skinItemList);
-          list.transparent.lit.instanceItemList.push(...l.transparent.lit.instanceItemList);
-          l.transparent.lit.materialList.forEach(val => list.transparent.lit.materialList.add(val));
-          list.transparent.unlit.itemList.push(...l.transparent.unlit.itemList);
-          list.transparent.unlit.skinItemList.push(...l.transparent.unlit.skinItemList);
-          list.transparent.unlit.instanceItemList.push(...l.transparent.unlit.instanceItemList);
-          l.transparent.unlit.materialList.forEach(val => list.transparent.unlit.materialList.add(val));
-        }
+    for (const order in queue._itemLists) {
+      let itemLists = this._itemLists[order];
+      if (!itemLists) {
+        itemLists = this.newRenderItemList();
+        this._itemLists[order] = itemLists;
+      }
+      const newItemLists = queue._itemLists[order];
+      itemLists.opaque.lit.push(...newItemLists.opaque.lit);
+      itemLists.opaque.unlit.push(...newItemLists.opaque.unlit);
+      itemLists.transparent.lit.push(...newItemLists.transparent.lit);
+      itemLists.transparent.unlit.push(...newItemLists.transparent.unlit);
+    }
+    // Remove expired queues
+    let i = 0;
+    while (i < this._subRenderQueues.length) {
+      if (!this._subRenderQueues[i].ref) {
+        this._subRenderQueues[i] = this._subRenderQueues[this._subRenderQueues.length - 1];
+        this._subRenderQueues.pop();
+      } else {
+        i++;
       }
     }
+    this._subRenderQueues.push(queue.ref);
   }
   /**
    * Push an item to the render queue
@@ -324,11 +331,11 @@ export class RenderQueue {
       if (drawable.isBatchable()) {
         const instanceList = trans
           ? unlit
-            ? itemList.transparent.unlit.instanceList
-            : itemList.transparent.lit.instanceList
+            ? itemList.transparent.unlit[0].instanceList
+            : itemList.transparent.lit[0].instanceList
           : unlit
-            ? itemList.opaque.unlit.instanceList
-            : itemList.opaque.lit.instanceList;
+            ? itemList.opaque.unlit[0].instanceList
+            : itemList.opaque.lit[0].instanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         let drawableList = instanceList[hash];
         if (!drawableList) {
@@ -339,11 +346,11 @@ export class RenderQueue {
       } else {
         const list = trans
         ? unlit
-          ? itemList.transparent.unlit
-          : itemList.transparent.lit
+          ? itemList.transparent.unlit[0]
+          : itemList.transparent.lit[0]
         : unlit
-          ? itemList.opaque.unlit
-          : itemList.opaque.lit;
+          ? itemList.opaque.unlit[0]
+          : itemList.opaque.lit[0];
         (drawable.getBoneMatrices() ? list.skinItemList : list.itemList).push({
           drawable,
           sortDistance: drawable.getSortDistance(camera),
@@ -377,7 +384,7 @@ export class RenderQueue {
     const frameCounter = Application.instance.device.frameInfo.frameCounter;
     for (const k in this._itemLists) {
       const itemList = this._itemLists[k];
-      const lists = [itemList.opaque.lit, itemList.opaque.unlit, itemList.transparent.lit, itemList.transparent.unlit];
+      const lists = [itemList.opaque.lit[0], itemList.opaque.unlit[0], itemList.transparent.lit[0], itemList.transparent.unlit[0]];
       for (let i = 0; i < 4; i++) {
         const list = lists[i];
         const instanceList = list.instanceList
@@ -439,45 +446,45 @@ export class RenderQueue {
    */
   sortItems() {
     for (const list of Object.values(this._itemLists)) {
-      list.transparent.lit.itemList.sort((a, b) => b.sortDistance - a.sortDistance);
-      list.transparent.lit.skinItemList.sort((a, b) => b.sortDistance - a.sortDistance);
-      list.transparent.unlit.itemList.sort((a, b) => b.sortDistance - a.sortDistance);
-      list.transparent.unlit.skinItemList.sort((a, b) => b.sortDistance - a.sortDistance);
+      list.transparent.lit[0].itemList.sort((a, b) => b.sortDistance - a.sortDistance);
+      list.transparent.lit[0].skinItemList.sort((a, b) => b.sortDistance - a.sortDistance);
+      list.transparent.unlit[0].itemList.sort((a, b) => b.sortDistance - a.sortDistance);
+      list.transparent.unlit[0].skinItemList.sort((a, b) => b.sortDistance - a.sortDistance);
     }
   }
   private newRenderItemList(): RenderItemList {
     return {
       opaque: {
-        lit: {
+        lit: [{
           itemList: [],
           skinItemList: [],
           instanceItemList: [],
           materialList: new Set(),
           instanceList: {}
-        },
-        unlit: {
+        }],
+        unlit: [{
           itemList: [],
           skinItemList: [],
           instanceItemList: [],
           materialList: new Set(),
           instanceList: {}
-        }
+        }]
       },
       transparent: {
-        lit: {
+        lit: [{
           itemList: [],
           skinItemList: [],
           instanceItemList: [],
           materialList: new Set(),
           instanceList: {}
-        },
-        unlit: {
+        }],
+        unlit: [{
           itemList: [],
           skinItemList: [],
           instanceItemList: [],
           materialList: new Set(),
           instanceList: {}
-        }
+        }]
       }
     };
   }

@@ -219,25 +219,6 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
           list.delete(node);
         }
       }
-      if (octree) {
-        const worldBox = octree.getRootNode().getBox();
-        if (worldBox) {
-          const radius = Math.max(
-            Math.abs(worldBox.minPoint.x),
-            Math.abs(worldBox.minPoint.y),
-            Math.abs(worldBox.minPoint.z),
-            Math.abs(worldBox.maxPoint.x),
-            Math.abs(worldBox.maxPoint.y),
-            Math.abs(worldBox.maxPoint.z)
-          );
-          const rootSize = nextPowerOf2(radius * 2);
-          if (rootSize > octree.getRootSize()) {
-            octree.initialize(rootSize, octree.getLeafSize());
-            const v = new OctreeUpdateVisitor(octree);
-            this._rootNode.traverse(v);
-          }
-        }
-      }
     }
   }
 }
