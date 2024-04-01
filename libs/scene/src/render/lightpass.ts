@@ -67,9 +67,13 @@ export class LightPass extends RenderPass {
     }
     device.setBindGroup(0, info.bindGroup);
     const reverseWinding = ctx.camera.worldMatrixDet < 0;
-    this.drawItemList(device, itemList.lit, ctx, reverseWinding)
+    for (const lit of itemList.lit) {
+      this.drawItemList(device, lit, ctx, reverseWinding)
+    }
     if (!ctx.lightBlending) {
-      this.drawItemList(device, itemList.unlit, ctx, reverseWinding);
+      for (const unlit of itemList.unlit) {
+        this.drawItemList(device, unlit, ctx, reverseWinding);
+      }
     }
   }
   /** @internal */

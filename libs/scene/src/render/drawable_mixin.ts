@@ -83,10 +83,9 @@ export function mixinDrawable<T extends GenericConstructor<{
     }
     /** @internal */
     bind(device: AbstractDevice, ctx: DrawContext): void {
-      const instanceInfo = ctx.renderQueue.getInstanceInfo(this as unknown as Drawable);
-      const drawableBindGroup = this.getDrawableBindGroup(device, !!instanceInfo);
+      const drawableBindGroup = this.getDrawableBindGroup(device, !!ctx.instanceData);
       device.setBindGroup(1, drawableBindGroup);
-      device.setBindGroup(3, instanceInfo?.bindGroup.bindGroup ?? null);
+      device.setBindGroup(3, ctx.instanceData ? ctx.instanceData.bindGroup.bindGroup : null);
       if (ctx.skinAnimation) {
         const boneTexture = (this as unknown as Mesh).getBoneMatrices();
         drawableBindGroup.setTexture(ShaderHelper.getBoneMatricesUniformName(), boneTexture);

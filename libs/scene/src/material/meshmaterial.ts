@@ -1,5 +1,4 @@
 import type {
-  AbstractDevice,
   BindGroup,
   FaceMode,
   GPUProgram,
@@ -148,8 +147,8 @@ export class MeshMaterial extends Material {
     instance.$instanceUniforms = uniformsHolder;
     instance.$isInstance = true;
     instance.coreMaterial = that;
-    instance.bind = function(ctx: DrawContext, pass: number, device: AbstractDevice){
-      if (pass === 0 && (isWebGL1 || !that.supportInstancing())) {
+    instance.apply = function(ctx: DrawContext){
+      if (!ctx.instanceData) {
         for (let i = 0; i < instanceUniforms.length; i++) {
           const name = instanceUniforms[i][0];
           const type = instanceUniforms[i][1];
@@ -176,7 +175,7 @@ export class MeshMaterial extends Material {
           }
         }
       }
-      return that.bind(ctx, pass, device);
+      return that.apply(ctx);
     }
     // Copy original uniform values
     for (let i = 0; i < instanceUniforms.length; i++) {

@@ -71,8 +71,12 @@ export class ShadowMapPass extends RenderPass {
       .map((val) => Number(val))
       .sort((a, b) => a - b)) {
       const renderItems = renderQueue.items[order];
-      this.drawItemList(device, renderItems.opaque.lit, ctx, reverseWinding);
-      this.drawItemList(device, renderItems.opaque.unlit, ctx, reverseWinding);
+      for (const lit of renderItems.opaque.lit) {
+        this.drawItemList(device, lit, ctx, reverseWinding);
+      }
+      for (const unlit of renderItems.opaque.unlit) {
+        this.drawItemList(device, unlit, ctx, reverseWinding);
+      }
     }
     ctx.renderQueue = null;
   }

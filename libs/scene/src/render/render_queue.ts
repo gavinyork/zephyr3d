@@ -197,8 +197,6 @@ export class RenderQueue {
   private _ref: RenderQueueRef;
   /** @internal */
   private _instanceInfo: Map<Drawable, DrawableInstanceInfo>;
-  /** @internal */
-  private _subRenderQueues: RenderQueueRef[];
   /**
    * Creates an instance of a render queue
    * @param renderPass - The render pass to which the render queue belongs
@@ -212,7 +210,6 @@ export class RenderQueue {
     this._sunLight = null;
     this._ref = { ref: this };
     this._instanceInfo = new Map();
-    this._subRenderQueues = [];
   }
   /** The sun light */
   get sunLight(): DirectionalLight {
@@ -257,10 +254,6 @@ export class RenderQueue {
   getInstanceInfo(drawable: Drawable) {
     return this._instanceInfo.get(drawable);
   }
-  /** @internal */
-  getSubRenderQueues(): RenderQueueRef[] {
-    return this._subRenderQueues;
-  }
   /**
    * Gets the maximum batch size of a given device
    * @returns The maximum batch size of the device
@@ -301,17 +294,6 @@ export class RenderQueue {
       itemLists.transparent.lit.push(...newItemLists.transparent.lit);
       itemLists.transparent.unlit.push(...newItemLists.transparent.unlit);
     }
-    // Remove expired queues
-    let i = 0;
-    while (i < this._subRenderQueues.length) {
-      if (!this._subRenderQueues[i].ref) {
-        this._subRenderQueues[i] = this._subRenderQueues[this._subRenderQueues.length - 1];
-        this._subRenderQueues.pop();
-      } else {
-        i++;
-      }
-    }
-    this._subRenderQueues.push(queue.ref);
   }
   /**
    * Push an item to the render queue
@@ -390,7 +372,7 @@ export class RenderQueue {
         const instanceList = list.instanceList
         for (const x in instanceList) {
           const drawables = instanceList[x];
-          if (drawables.length === 1) {
+          if (false && drawables.length === 1) {
             (drawables[0].getBoneMatrices() ? list.skinItemList : list.itemList).push({
               drawable: drawables[0],
               sortDistance: drawables[0].getSortDistance(camera),

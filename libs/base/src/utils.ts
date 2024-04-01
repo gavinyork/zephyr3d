@@ -396,7 +396,7 @@ export type ExtractMixinType<M> = M extends [infer First]
 export function applyMixins<M extends ((target: any) => any)[], T>(
   target: T,
   ...mixins: M
-): ExtractMixinType<M> {
+): T & ExtractMixinType<M> {
   let r: any = target;
   for (const m of mixins) {
     r = m(r);

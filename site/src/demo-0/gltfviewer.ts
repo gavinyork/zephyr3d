@@ -4,7 +4,6 @@ import { SceneNode, Scene, AnimationSet, BatchGroup } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
 import {
   BoundingBox,
-  Material,
   AssetManager,
   DirectionalLight,
   OrbitCameraController,
@@ -75,6 +74,7 @@ export class GLTFViewer {
     this._camera.controller = new OrbitCameraController();
     this._light0 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
     this._light0.shadow.shadowMapSize = 1024;
+    this._light0.castShadow = true;
     this._light0.lookAt(new Vector3(0, 0, 0), new Vector3(0, -1, 1), Vector3.axisPY());
     this._light1 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
     this._light1.shadow.shadowMapSize = 1024;

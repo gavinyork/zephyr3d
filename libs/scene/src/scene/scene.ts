@@ -1,8 +1,7 @@
 import type { Matrix4x4, AABB } from '@zephyr3d/base';
-import { Vector3, Vector4, Ray, makeEventTarget, nextPowerOf2 } from '@zephyr3d/base';
+import { Vector3, Vector4, Ray, makeEventTarget } from '@zephyr3d/base';
 import { SceneNode } from './scene_node';
 import { Octree } from './octree';
-import { OctreeUpdateVisitor } from './octree_update_visitor';
 import { RaycastVisitor } from './raycast_visitor';
 import { Application } from '../app';
 import { Environment } from './environment';

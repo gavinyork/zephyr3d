@@ -47,8 +47,10 @@ instancingApp.ready().then(async () => {
   const boxShape = new BoxShape();
   const mat = new LambertMaterial();
   const boxMesh = new Mesh(scene, boxShape, mat.createInstance());
+  boxMesh.position.setXYZ(5, 0, 0);
   boxMesh.parent = batchGroup;
   const boxMesh2 = new Mesh(scene, boxShape, mat.createInstance());
+  boxMesh2.position.setXYZ(-5, 0, 0);
   boxMesh2.parent = batchGroup;
 
   /*
@@ -94,14 +96,12 @@ instancingApp.ready().then(async () => {
 */
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
+  light.castShadow = true;
 
   instancingApp.on('resize', (ev) => {
     camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane());
   });
   instancingApp.on('tick', (ev) => {
-    boxMesh.position.y = Math.sin(instancingApp.device.frameInfo.elapsedOverall * 0.001 * Math.PI * 2) * 6;
-    boxMesh.position.y += 1;
-    boxMesh2.position.y = -boxMesh.position.y;
     camera.updateController();
     camera.render(scene);
     imGuiNewFrame();

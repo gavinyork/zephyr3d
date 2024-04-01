@@ -18,7 +18,6 @@ import { mixinDrawable } from '../render/drawable_mixin';
  * @public
  */
 export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements BatchDrawable {
-  static X: typeof GraphNode = this;
   /** @internal */
   private _primitive: Primitive;
   /** @internal */
