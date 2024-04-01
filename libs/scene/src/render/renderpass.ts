@@ -175,6 +175,7 @@ export abstract class RenderPass {
     ctx: DrawContext,
     reverseWinding: boolean
   ) {
+    ctx.renderQueue = itemList.renderQueue;
     if (itemList) {
       if (itemList.itemList.length > 0) {
         ctx.skinAnimation = false;
@@ -226,6 +227,7 @@ export abstract class RenderPass {
         }
       }
     }
+    ctx.renderQueue = null;
   }
   /** @internal */
   private clearFramebuffer() {

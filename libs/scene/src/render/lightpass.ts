@@ -79,7 +79,6 @@ export class LightPass extends RenderPass {
   /** @internal */
   protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {
     ctx.applyFog = null;
-    ctx.renderQueue = renderQueue;
     ctx.renderPassHash = null;
     ctx.env = ctx.scene.env;
     ctx.drawEnvLight = false;
@@ -126,6 +125,5 @@ export class LightPass extends RenderPass {
         ctx.env.sky.renderFog(ctx);
       }
     }
-    ctx.renderQueue = null;
   }
 }

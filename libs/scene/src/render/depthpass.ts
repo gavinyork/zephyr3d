@@ -25,7 +25,6 @@ export class DepthPass extends RenderPass {
   }
   /** @internal */
   protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {
-    ctx.renderQueue = renderQueue;
     ctx.applyFog = null;
     ctx.drawEnvLight = false;
     ctx.env = null;
@@ -48,6 +47,5 @@ export class DepthPass extends RenderPass {
         this.drawItemList(device, unlit, ctx, reverseWinding);
       }
     }
-    ctx.renderQueue = null;
   }
 }

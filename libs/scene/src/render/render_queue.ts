@@ -142,6 +142,7 @@ export interface RenderItemListInfo {
   instanceItemList: RenderQueueItem[],
   instanceList: Record<string, BatchDrawable[]>;
   materialList: Set<Material>;
+  renderQueue: RenderQueue;
 }
 
 /** @internal */
@@ -338,7 +339,7 @@ export class RenderQueue {
           sortDistance: drawable.getSortDistance(camera),
           instanceData: null
         });
-        drawable.applyTransformUniforms();
+        drawable.applyTransformUniforms(this);
         const mat = drawable.getMaterial();
         if (mat) {
           list.materialList.add(mat.coreMaterial);
@@ -378,7 +379,7 @@ export class RenderQueue {
               sortDistance: drawables[0].getSortDistance(camera),
               instanceData: null
             });
-            drawables[0].applyTransformUniforms();
+            drawables[0].applyTransformUniforms(this);
             const mat = drawables[0].getMaterial();
             if (mat) {
               list.materialList.add(mat.coreMaterial);
@@ -404,11 +405,11 @@ export class RenderQueue {
                   }
                 }
                 list.instanceItemList.push(item);
-                drawable.applyInstanceOffsetAndStride(stride, bindGroup.offset);
+                drawable.applyInstanceOffsetAndStride(this, stride, bindGroup.offset);
               }
               const instanceInfo = { bindGroup, offset: bindGroup.offset };
               this._instanceInfo.set(drawable, instanceInfo);
-              drawable.applyTransformUniforms(instanceInfo);
+              drawable.applyTransformUniforms(this);
               drawable.applyMaterialUniforms(instanceInfo);
               bindGroup.offset += stride;
               item.instanceData.numInstances++;
@@ -442,14 +443,16 @@ export class RenderQueue {
           skinItemList: [],
           instanceItemList: [],
           materialList: new Set(),
-          instanceList: {}
+          instanceList: {},
+          renderQueue: this
         }],
         unlit: [{
           itemList: [],
           skinItemList: [],
           instanceItemList: [],
           materialList: new Set(),
-          instanceList: {}
+          instanceList: {},
+          renderQueue: this
         }]
       },
       transparent: {
@@ -458,14 +461,16 @@ export class RenderQueue {
           skinItemList: [],
           instanceItemList: [],
           materialList: new Set(),
-          instanceList: {}
+          instanceList: {},
+          renderQueue: this
         }],
         unlit: [{
           itemList: [],
           skinItemList: [],
           instanceItemList: [],
           materialList: new Set(),
-          instanceList: {}
+          instanceList: {},
+          renderQueue: this
         }]
       }
     };

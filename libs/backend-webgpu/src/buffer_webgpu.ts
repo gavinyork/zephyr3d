@@ -58,7 +58,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     const uploadOffset = data.byteOffset + srcOffset * data.BYTES_PER_ELEMENT;
     const writeOffset = dstByteOffset;
     const writeSize = uploadSize;
-    if (this._pendingUploads.length === 0) {
+    if (false || this._pendingUploads.length === 0) {
       this.pushUpload(this._pendingUploads, data.buffer, uploadOffset, dstByteOffset, uploadSize);
       this._device.bufferUpload(this);
     } else {
@@ -101,9 +101,9 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
       if (commit) {
         this._device.bufferUpload(this);
       }
-    }
-    if (this._pendingUploads.length === 1) {
-      this._device.bufferUpload(this);
+      if (this._pendingUploads.length === 1) {
+        this._device.bufferUpload(this);
+      }
     }
 }
   async getBufferSubData(

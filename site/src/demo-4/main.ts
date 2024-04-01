@@ -20,7 +20,7 @@ import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { PhysicsWorld } from './physics';
 import { Panel } from './ui';
 
-const objectCount = 600;
+const objectCount = 10;
 
 function getQueryString(name: string) {
   return new URL(window.location.toString()).searchParams.get(name) || null;
@@ -56,9 +56,7 @@ PhysicsApp.ready().then(async () => {
   device.setFont('24px arial');
 
   const scene = new Scene();
-  const light = new DirectionalLight(scene)
-    .setColor(new Vector4(1, 1, 1, 1))
-    .setCastShadow(true);
+  const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(true);
   light.lookAt(new Vector3(0, 0, 0), new Vector3(0.5, -0.707, -0.5), Vector3.axisPY());
   light.shadow.mode = 'pcf-opt';
   light.shadow.pcfKernelSize = 3;
@@ -110,7 +108,7 @@ PhysicsApp.ready().then(async () => {
   for (let i = 0; i < objectCount; i++) {
     {
       let instanceMaterial = objMaterial.createInstance();
-      //instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
+      instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
       const sphere = new Mesh(scene, sphereShape, instanceMaterial);
       sphere.position.setXYZ(0, 50, 0);
       sphere.parent = batchGroup;
@@ -118,12 +116,12 @@ PhysicsApp.ready().then(async () => {
     }
     {
       let instanceMaterial = objMaterial.createInstance();
-      //instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
+      instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
       const box = new Mesh(scene, boxShape, instanceMaterial);
-      box.position.setXYZ(0, 0, 0);
+      box.position.setXYZ(0, 50, 0);
       box.parent = batchGroup;
       queue.push(box);
-    }    
+    }
   }
   physicsWorld.start();
 
@@ -131,8 +129,7 @@ PhysicsApp.ready().then(async () => {
     const mesh = queue.shift();
     queue.push(mesh);
     physicsWorld.positionMesh(mesh, 1, Math.random() * 8 - 4, 50, Math.random() * 8 - 4);
-    console.log('Position mesh');
-  }, 200);
+  }, 300);
 
   new Panel();
   PhysicsApp.run();

@@ -108,7 +108,7 @@ export interface Drawable {
   getMaterial(): Material;
   /** Set render queue reference */
   pushRenderQueueRef(ref: RenderQueueRef);
-  applyTransformUniforms(instanceInfo?: DrawableInstanceInfo): void;
+  applyTransformUniforms(renderQueue: RenderQueue): void;
   /**
    * Draw the object
    * @param ctx - Context of the drawing task
@@ -134,6 +134,6 @@ export interface BatchDrawable extends Drawable {
    * Gets the instance uniforms
    */
   getInstanceUniforms(): Float32Array;
-  applyInstanceOffsetAndStride(stride: number, offset: number): void;
+  applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void;
   applyMaterialUniforms(instanceInfo: DrawableInstanceInfo);
 }

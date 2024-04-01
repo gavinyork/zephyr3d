@@ -54,7 +54,6 @@ export class ShadowMapPass extends RenderPass {
   }
   /** @internal */
   protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {
-    ctx.renderQueue = renderQueue;
     ctx.drawEnvLight = false;
     ctx.env = null;
     ctx.applyFog = null;
@@ -78,6 +77,5 @@ export class ShadowMapPass extends RenderPass {
         this.drawItemList(device, unlit, ctx, reverseWinding);
       }
     }
-    ctx.renderQueue = null;
   }
 }
