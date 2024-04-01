@@ -110,7 +110,7 @@ PhysicsApp.ready().then(async () => {
   for (let i = 0; i < objectCount; i++) {
     {
       let instanceMaterial = objMaterial.createInstance();
-      instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
+      //instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
       const sphere = new Mesh(scene, sphereShape, instanceMaterial);
       sphere.position.setXYZ(0, 50, 0);
       sphere.parent = batchGroup;
@@ -118,9 +118,9 @@ PhysicsApp.ready().then(async () => {
     }
     {
       let instanceMaterial = objMaterial.createInstance();
-      instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
+      //instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
       const box = new Mesh(scene, boxShape, instanceMaterial);
-      box.position.setXYZ(0, 50, 0);
+      box.position.setXYZ(0, 0, 0);
       box.parent = batchGroup;
       queue.push(box);
     }    
