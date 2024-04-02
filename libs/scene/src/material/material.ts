@@ -35,6 +35,8 @@ export class Material {
   private _optionTag: number;
   /** @internal */
   private _id: number;
+  /** @internal */
+  private _currentHash: string[];
   /**
    * Creates an instance of material
    */
@@ -44,6 +46,7 @@ export class Material {
     this._numPasses = 1;
     this._hash = [null];
     this._optionTag = 0;
+    this._currentHash = [];
   }
   /** Unique identifier of the material */
   get instanceId(): number {
@@ -110,20 +113,21 @@ export class Material {
       }
       this.applyUniforms(state.bindGroup, ctx, state.materialTag !== this._optionTag, pass);
       state.materialTag = this._optionTag;
+      this.updateRenderStates(pass, state.renderStateSet, ctx);
+      this._currentHash[pass] = hash;
     }
   }
   /** @internal */
   bind(ctx: DrawContext, pass: number, device: AbstractDevice): boolean {
-    const hash = this.calcGlobalHash(ctx, pass);
+    const hash = this._currentHash[pass];
     let state = this._states[hash];
     if (!state) {
-      this.apply(ctx);
-      state = this._states[hash];
-    }
-    if (!state || !state.program) {
+      console.error('Material.bind() failed: state not found');
       return false;
     }
-    this.updateRenderStates(pass, state.renderStateSet, ctx);
+    if (!state.program) {
+      return false;
+    }
     device.setProgram(state.program);
     device.setBindGroup(2, state.bindGroup);
     device.setRenderStates(state.renderStateSet);
