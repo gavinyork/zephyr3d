@@ -364,7 +364,7 @@ export class MeshMaterial extends Material {
     if (this.featureUsed(FEATURE_ALPHATEST)) {
       bindGroup.setValue('zAlphaCutoff', this._alphaCutoff);
     }
-    if (this.featureUsed(FEATURE_ALPHABLEND)) {
+    if (this.isTransparentPass(pass)) {
       bindGroup.setValue('zOpacity', this._opacity);
     }
   }
@@ -501,6 +501,9 @@ export class MeshMaterial extends Material {
     }
     */
     return program;
+  }
+  doAlphaTest(scope: PBInsideFunctionScope, color: PBShaderExp) {
+
   }
   /**
    * Calculate final fragment color for output.
