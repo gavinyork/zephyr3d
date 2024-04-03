@@ -6,16 +6,13 @@ export class RenderBundleWrapper {
   constructor() {
     this._renderBundles = {};
   }
-  getRenderBundle(windingOrderReversed: boolean) {
-    return this._renderBundles[this.calculateHash(windingOrderReversed)] ?? null;
+  getRenderBundle(hash: string) {
+    return this._renderBundles[hash] ?? null;
   }
   beginRenderBundle() {
     Application.instance.device.beginCapture();
   }
-  endRenderBundle(windingOrderReversed: boolean) {
-    this._renderBundles[this.calculateHash(windingOrderReversed)] = Application.instance.device.endCapture();
-  }
-  calculateHash(windingOrderReversed: boolean) {
-    return `${windingOrderReversed ? 1 : 0}-${Application.instance.device.getFramebuffer()?.getHash() ?? ''}`;
+  endRenderBundle(hash: string) {
+    this._renderBundles[hash] = Application.instance.device.endCapture();
   }
 }

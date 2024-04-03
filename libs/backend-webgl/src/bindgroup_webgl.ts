@@ -28,6 +28,9 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
     this._resources = {};
     this._object = {};
   }
+  getGPUId(): string {
+    return String(this._uid);
+  }
   getLayout(): BindGroupLayout {
     return this._layout;
   }

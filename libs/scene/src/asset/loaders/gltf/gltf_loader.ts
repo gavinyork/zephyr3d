@@ -92,7 +92,6 @@ export class GLTFLoader extends AbstractModelLoader {
     return null;
   }
   async loadJson(url: string, gltf: GLTFContent): Promise<SharedModel> {
-    console.log(`GLTF extensions used: ${gltf.extensionsUsed || []}`);
     gltf._accessors = [];
     gltf._bufferCache = {};
     gltf._textureCache = {};

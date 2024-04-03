@@ -25,6 +25,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   private _bindGroup: GPUBindGroup;
   private _buffers: WebGPUBuffer[];
   private _textures: WebGPUBaseTexture[];
+  private _gpuId: number;
   private _videoTextures: WebGPUTextureVideo[];
   private _resources: {
     [name: string]: WebGPUBuffer | WebGPUTextureVideo | [WebGPUBaseTexture, GPUTextureView] | GPUSampler;
@@ -34,6 +35,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     this._device = device;
     this._layout = layout;
     this._bindGroup = null;
+    this._gpuId = 0;
     this._resources = {};
     this._buffers = [];
     this._textures = [];
@@ -45,6 +47,9 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     }
     return this._bindGroup;
   }
+  getGPUId(): string {
+    return `${this._uid}:${this._gpuId}`;
+  }
   get bufferList(): WebGPUBuffer[] {
     return this._buffers;
   }
@@ -53,6 +58,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   }
   invalidate() {
     this._bindGroup = null;
+    this._gpuId++;
   }
   getLayout(): BindGroupLayout {
     return this._layout;

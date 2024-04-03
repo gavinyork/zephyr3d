@@ -170,9 +170,9 @@ export abstract class RenderPass {
     }
   }
   /** @internal */
-  private internalDrawItemList(device: AbstractDevice, ctx: DrawContext, items: RenderQueueItem[], renderBundle: RenderBundleWrapper, reverseWinding: boolean) {
+  private internalDrawItemList(device: AbstractDevice, ctx: DrawContext, items: RenderQueueItem[], renderBundle: RenderBundleWrapper, reverseWinding: boolean, hash: string) {
     if (renderBundle) {
-      const bundle = renderBundle.getRenderBundle(reverseWinding);
+      const bundle = renderBundle.getRenderBundle(hash);
       if (bundle) {
         device.executeRenderBundle(bundle);
         return;
@@ -191,7 +191,7 @@ export abstract class RenderPass {
       }
     }
     if (renderBundle) {
-      renderBundle.endRenderBundle(reverseWinding);
+      renderBundle.endRenderBundle(hash);
     }
   }
   /** @internal */
@@ -203,12 +203,16 @@ export abstract class RenderPass {
   ) {
     ctx.renderQueue = itemList.renderQueue;
     ctx.instanceData = null;
+    const windingHash = reverseWinding ? '1' : '0';
+    const bindGroupHash = device.getBindGroup(0)[0].getGPUId();
+    const framebufferHash = device.getFramebuffer()?.getHash() ?? '';
+    const hash = `${windingHash}-${bindGroupHash}-${framebufferHash}-${ctx.renderPassHash}`;
     if (itemList) {
       if (itemList.itemList.length > 0) {
         ctx.skinAnimation = false;
         ctx.instancing = false;
         itemList.materialList.forEach(mat => mat.apply(ctx));
-        this.internalDrawItemList(device, ctx, itemList.itemList, itemList.renderBundle, reverseWinding);
+        this.internalDrawItemList(device, ctx, itemList.itemList, itemList.renderBundle, reverseWinding, hash);
         /*
         for (const item of itemList.itemList) {
           const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
@@ -226,7 +230,7 @@ export abstract class RenderPass {
         ctx.skinAnimation = true;
         ctx.instancing = false;
         itemList.materialList.forEach(mat => mat.apply(ctx));
-        this.internalDrawItemList(device, ctx, itemList.skinItemList, itemList.skinRenderBundle, reverseWinding);
+        this.internalDrawItemList(device, ctx, itemList.skinItemList, itemList.skinRenderBundle, reverseWinding, hash);
         /*
         for (const item of itemList.skinItemList) {
           ctx.instanceData = item.instanceData;
@@ -245,7 +249,7 @@ export abstract class RenderPass {
         ctx.skinAnimation = false;
         ctx.instancing = true;
         itemList.materialList.forEach(mat => mat.apply(ctx));
-        this.internalDrawItemList(device, ctx, itemList.instanceItemList, itemList.instanceRenderBundle, reverseWinding);
+        this.internalDrawItemList(device, ctx, itemList.instanceItemList, itemList.instanceRenderBundle, reverseWinding, hash);
         /*
         for (const item of itemList.instanceItemList) {
           ctx.instanceData = item.instanceData;

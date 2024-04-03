@@ -57,7 +57,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
       super.applyUniformValues(bindGroup, ctx, pass);
-      if (this.needFragmentColor()) {
+      if (this.needFragmentColor(ctx)) {
         bindGroup.setValue('zShininess', this._shininess);
       }
     }

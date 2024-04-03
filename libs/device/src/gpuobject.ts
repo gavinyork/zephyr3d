@@ -1435,6 +1435,7 @@ export type StructuredValue = number | TypedArray | VectorBase | { [name: string
  */
 export interface BindGroup extends GPUObject<unknown> {
   getLayout(): BindGroupLayout;
+  getGPUId(): string;
   getBuffer(name: string): GPUDataBuffer;
   getTexture(name: string): BaseTexture;
   setBuffer(name: string, buffer: GPUDataBuffer): void;

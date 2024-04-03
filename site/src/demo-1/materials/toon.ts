@@ -59,8 +59,8 @@ export class ToonMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoC
     super.fragmentShader(scope);
     const that = this;
     const pb = scope.$builder;
-    scope.$l.albedo = that.calculateAlbedoColor(scope, scope.texCoords);
     if (this.needFragmentColor()){
+      scope.$l.albedo = that.calculateAlbedoColor(scope, scope.texCoords);
       if (this.pass === 0) {
         this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(0, 0, 0, scope.albedo.a));
       } else {
