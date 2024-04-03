@@ -148,7 +148,7 @@ export class MeshMaterial extends Material {
     instance.$isInstance = true;
     instance.coreMaterial = that;
     instance.apply = function(ctx: DrawContext){
-      if (!ctx.instanceData) {
+      if (!ctx.instancing) {
         for (let i = 0; i < instanceUniforms.length; i++) {
           const name = instanceUniforms[i][0];
           const type = instanceUniforms[i][1];

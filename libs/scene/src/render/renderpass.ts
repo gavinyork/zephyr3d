@@ -7,6 +7,7 @@ import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
 import type { AbstractDevice, BindGroup, BindGroupLayout, RenderStateSet } from '@zephyr3d/device';
 import { ShaderHelper } from '../material/shader/helper';
+import { RenderBundleWrapper } from './renderbundle_wrapper';
 
 /**
  * Base class for any kind of render passes
@@ -169,6 +170,31 @@ export abstract class RenderPass {
     }
   }
   /** @internal */
+  private internalDrawItemList(device: AbstractDevice, ctx: DrawContext, items: RenderQueueItem[], renderBundle: RenderBundleWrapper, reverseWinding: boolean) {
+    if (renderBundle) {
+      const bundle = renderBundle.getRenderBundle(reverseWinding);
+      if (bundle) {
+        device.executeRenderBundle(bundle);
+        return;
+      }
+      renderBundle.beginRenderBundle();
+    }
+    for (const item of items) {
+      ctx.instanceData = item.instanceData;
+      const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
+      if (reverse) {
+        device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+      }
+      item.drawable.draw(ctx);
+      if (reverse) {
+        device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+      }
+    }
+    if (renderBundle) {
+      renderBundle.endRenderBundle(reverseWinding);
+    }
+  }
+  /** @internal */
   protected drawItemList(
     device: AbstractDevice,
     itemList: RenderItemListInfo,
@@ -176,12 +202,14 @@ export abstract class RenderPass {
     reverseWinding: boolean
   ) {
     ctx.renderQueue = itemList.renderQueue;
+    ctx.instanceData = null;
     if (itemList) {
       if (itemList.itemList.length > 0) {
         ctx.skinAnimation = false;
         ctx.instancing = false;
-        ctx.instanceData = null;
         itemList.materialList.forEach(mat => mat.apply(ctx));
+        this.internalDrawItemList(device, ctx, itemList.itemList, itemList.renderBundle, reverseWinding);
+        /*
         for (const item of itemList.itemList) {
           const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
           if (reverse) {
@@ -192,12 +220,14 @@ export abstract class RenderPass {
             device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
           }
         }
+        */
       }
       if (itemList.skinItemList.length > 0) {
         ctx.skinAnimation = true;
         ctx.instancing = false;
-        ctx.instanceData = null;
         itemList.materialList.forEach(mat => mat.apply(ctx));
+        this.internalDrawItemList(device, ctx, itemList.skinItemList, itemList.skinRenderBundle, reverseWinding);
+        /*
         for (const item of itemList.skinItemList) {
           ctx.instanceData = item.instanceData;
           const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
@@ -209,11 +239,14 @@ export abstract class RenderPass {
             device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
           }
         }
+        */
       }
       if (itemList.instanceItemList.length > 0) {
         ctx.skinAnimation = false;
         ctx.instancing = true;
         itemList.materialList.forEach(mat => mat.apply(ctx));
+        this.internalDrawItemList(device, ctx, itemList.instanceItemList, itemList.instanceRenderBundle, reverseWinding);
+        /*
         for (const item of itemList.instanceItemList) {
           ctx.instanceData = item.instanceData;
           const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
@@ -225,6 +258,7 @@ export abstract class RenderPass {
             device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
           }
         }
+        */
       }
     }
     ctx.renderQueue = null;

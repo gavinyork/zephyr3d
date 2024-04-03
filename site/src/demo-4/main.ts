@@ -20,7 +20,7 @@ import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { PhysicsWorld } from './physics';
 import { Panel } from './ui';
 
-const objectCount = 300;
+const objectCount = 400;
 
 function getQueryString(name: string) {
   return new URL(window.location.toString()).searchParams.get(name) || null;
@@ -127,8 +127,10 @@ PhysicsApp.ready().then(async () => {
 
   setInterval(() => {
     const mesh = queue.shift();
-    queue.push(mesh);
-    physicsWorld.positionMesh(mesh, 1, Math.random() * 8 - 4, 50, Math.random() * 8 - 4);
+    if (mesh) {
+      queue.push(mesh);
+      physicsWorld.positionMesh(mesh, 1, Math.random() * 8 - 4, 50, Math.random() * 8 - 4);
+    }
   }, 300);
 
   new Panel();

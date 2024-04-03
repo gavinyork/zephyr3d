@@ -79,7 +79,7 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
       super.applyUniformValues(bindGroup, ctx, pass);
-      if (this.needFragmentColor(ctx) && !this.drawContext.instanceData) {
+      if (this.needFragmentColor(ctx) && !this.drawContext.instancing) {
         bindGroup.setValue('zAlbedo', this._albedoColor);
       }
     }

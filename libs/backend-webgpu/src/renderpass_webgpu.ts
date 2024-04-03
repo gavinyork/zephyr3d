@@ -26,7 +26,6 @@ const typeU16 = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U16);
 
 export class WebGPURenderPass {
   private _device: WebGPUDevice;
-  private _frameBuffer: WebGPUFrameBuffer;
   private _renderCommandEncoder: GPUCommandEncoder;
   private _renderPassEncoder: GPURenderPassEncoder;
   private _fbBindFlag: number;
@@ -37,25 +36,48 @@ export class WebGPURenderPass {
     this._device = device;
     this._renderCommandEncoder = this._device.device.createCommandEncoder();
     this._renderPassEncoder = null;
-    this._frameBuffer = null;
     this._fbBindFlag = null;
     this._currentViewport = null;
     this._currentScissor = null;
-    this._frameBufferInfo = null;
+    this._frameBufferInfo = this.createFrameBufferInfo(null);
   }
   get active(): boolean {
     return !!this._renderPassEncoder;
   }
+  private createFrameBufferInfo(fb: WebGPUFrameBuffer): FrameBufferInfo {
+    const info: FrameBufferInfo = !fb ? {
+      frameBuffer: null,
+      colorFormats: [this._device.backbufferFormat],
+      depthFormat: this._device.backbufferDepthFormat,
+      sampleCount: this._device.sampleCount,
+      hash: null,
+      clearHash: 'f'
+    } : {
+      frameBuffer: fb,
+      colorFormats: fb.getColorAttachments().map((val) => (val as WebGPUBaseTexture).gpuFormat),
+      depthFormat: (fb.getDepthAttachment() as WebGPUBaseTexture)?.gpuFormat,
+      sampleCount: fb.getOptions().sampleCount,
+      hash: null,
+      clearHash: fb.getColorAttachments()
+        .map((val) => {
+          const fmt = textureFormatInvMap[(val as WebGPUBaseTexture).gpuFormat];
+          return isIntegerTextureFormat(fmt) ? (isSignedTextureFormat(fmt) ? 'i' : 'u') : 'f';
+        })
+        .join('')
+    };
+    info.hash = `${info.colorFormats.join('-')}:${info.depthFormat}:${info.sampleCount}`;
+    return info;
+  }
   setFramebuffer(fb: WebGPUFrameBuffer): void {
-    if (this._frameBuffer !== fb) {
+    if (this._frameBufferInfo.frameBuffer !== fb) {
       this.end();
-      this._frameBuffer = fb;
+      this._frameBufferInfo = this.createFrameBufferInfo(fb);
       this.setViewport(null);
       this.setScissor(null);
     }
   }
   getFramebuffer(): WebGPUFrameBuffer {
-    return this._frameBuffer;
+    return this._frameBufferInfo.frameBuffer;
   }
   setViewport(vp?: number[] | DeviceViewport) {
     if (!vp || (!Array.isArray(vp) && vp.default)) {
@@ -212,15 +234,8 @@ export class WebGPURenderPass {
       return;
     }
     this._renderCommandEncoder = this._device.device.createCommandEncoder();
-    if (!this._frameBuffer) {
-      const fmt = textureFormatInvMap[this._device.backbufferFormat];
-      this._frameBufferInfo = {
-        colorFormats: [this._device.backbufferFormat],
-        depthFormat: this._device.backbufferDepthFormat,
-        sampleCount: this._device.sampleCount,
-        hash: `${this._device.backbufferFormat}:${this._device.backbufferDepthFormat}:${this._device.sampleCount}`,
-        clearHash: isIntegerTextureFormat(fmt) ? (isSignedTextureFormat(fmt) ? 'i' : 'u') : 'f'
-      };
+    const frameBuffer = this._frameBufferInfo.frameBuffer;
+    if (!frameBuffer) {
       const mainPassDesc = this._device.defaultRenderPassDesc;
       const colorAttachmentDesc = this._device.defaultRenderPassDesc.colorAttachments[0];
       if (this._frameBufferInfo.sampleCount > 1) {
@@ -237,12 +252,11 @@ export class WebGPURenderPass {
       depthAttachmentDesc.stencilClearValue = stencil;
       this._renderPassEncoder = this._renderCommandEncoder.beginRenderPass(mainPassDesc);
     } else {
-      const colorAttachmentTextures = this._frameBuffer.getColorAttachments() as WebGPUBaseTexture[];
-      const depthAttachmentTexture = this._frameBuffer.getDepthAttachment() as WebGPUBaseTexture;
+      const depthAttachmentTexture = frameBuffer.getDepthAttachment() as WebGPUBaseTexture;
       let depthTextureView: GPUTextureView;
       if (depthAttachmentTexture) {
         depthAttachmentTexture._markAsCurrentFB(true);
-        const attachment = this._frameBuffer.getOptions().depthAttachment;
+        const attachment = frameBuffer.getOptions().depthAttachment;
         const layer =
           depthAttachmentTexture.isTexture2DArray() || depthAttachmentTexture.isTexture3D()
             ? attachment.layer
@@ -251,27 +265,12 @@ export class WebGPURenderPass {
             : 0;
         depthTextureView = depthAttachmentTexture.getView(0, layer ?? 0, 1);
       }
-      this._frameBufferInfo = {
-        colorFormats: colorAttachmentTextures.map((val) => val.gpuFormat),
-        depthFormat: depthAttachmentTexture?.gpuFormat,
-        sampleCount: this._frameBuffer.getOptions().sampleCount,
-        hash: null,
-        clearHash: colorAttachmentTextures
-          .map((val) => {
-            const fmt = textureFormatInvMap[val.gpuFormat];
-            return isIntegerTextureFormat(fmt) ? (isSignedTextureFormat(fmt) ? 'i' : 'u') : 'f';
-          })
-          .join('')
-      };
-      this._frameBufferInfo.hash = `${this._frameBufferInfo.colorFormats.join('-')}:${
-        this._frameBufferInfo.depthFormat
-      }:${this._frameBufferInfo.sampleCount}`;
-      this._fbBindFlag = this._frameBuffer.bindFlag;
+      this._fbBindFlag = frameBuffer.bindFlag;
 
       const passDesc: GPURenderPassDescriptor = {
         label: `customRenderPass:${this._frameBufferInfo.hash}`,
         colorAttachments:
-          this._frameBuffer.getOptions().colorAttachments?.map((attachment, index) => {
+          frameBuffer.getOptions().colorAttachments?.map((attachment, index) => {
             const tex = attachment.texture as WebGPUBaseTexture;
             if (tex) {
               tex._markAsCurrentFB(true);
@@ -281,7 +280,7 @@ export class WebGPURenderPass {
                   : tex.isTextureCube()
                   ? attachment.face
                   : 0;
-              if (this._frameBuffer.getOptions().sampleCount === 1) {
+              if (frameBuffer.getOptions().sampleCount === 1) {
                 return {
                   view: tex.getView(attachment.level ?? 0, layer ?? 0, 1),
                   loadOp: color ? 'clear' : 'load',
@@ -289,7 +288,7 @@ export class WebGPURenderPass {
                   storeOp: 'store'
                 } as GPURenderPassColorAttachment;
               } else {
-                const msaaTexture = this._frameBuffer.getMSAAColorAttacments()[index];
+                const msaaTexture = frameBuffer.getMSAAColorAttacments()[index];
                 const msaaView = this._device.gpuCreateTextureView(msaaTexture, {
                   dimension: '2d',
                   baseMipLevel: attachment.level ?? 0,
@@ -310,7 +309,7 @@ export class WebGPURenderPass {
             }
           }) ?? [],
         depthStencilAttachment: depthAttachmentTexture
-          ? this._frameBuffer.getOptions().sampleCount === 1
+          ? frameBuffer.getOptions().sampleCount === 1
             ? {
                 view: depthTextureView,
                 depthLoadOp: typeof depth === 'number' ? 'clear' : 'load',
@@ -325,7 +324,7 @@ export class WebGPURenderPass {
                 stencilStoreOp: hasStencilChannel(depthAttachmentTexture.format) ? 'store' : undefined
               }
             : {
-                view: this._frameBuffer.getMSAADepthAttachment().createView(),
+                view: frameBuffer.getMSAADepthAttachment().createView(),
                 depthLoadOp: typeof depth === 'number' ? 'clear' : 'load',
                 depthClearValue: depth,
                 depthStoreOp: 'store',
@@ -358,8 +357,8 @@ export class WebGPURenderPass {
       this._renderCommandEncoder = null;
     }
   // unmark render target flags and generate render target mipmaps if needed
-    if (this._frameBuffer) {
-      const options = this._frameBuffer.getOptions();
+    if (this._frameBufferInfo.frameBuffer) {
+      const options = this._frameBufferInfo.frameBuffer.getOptions();
       if (options.colorAttachments) {
         for (const attachment of options.colorAttachments) {
           (attachment.texture as WebGPUBaseTexture)._markAsCurrentFB(false);
@@ -485,7 +484,7 @@ export class WebGPURenderPass {
         }
       }
     }
-    if (this._frameBuffer && this._frameBuffer.bindFlag !== this._fbBindFlag) {
+    if (this._frameBufferInfo.frameBuffer && this._frameBufferInfo.frameBuffer.bindFlag !== this._fbBindFlag) {
       validation |= VALIDATION_NEED_NEW_PASS;
     }
     return validation;

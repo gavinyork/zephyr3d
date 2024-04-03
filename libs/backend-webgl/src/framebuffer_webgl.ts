@@ -39,6 +39,7 @@ export class WebGLFrameBuffer
   private _height: number;
   private _isMRT: boolean;
   private _drawBuffers: number[];
+  private _hash: string;
   private _depthAttachmentTarget: number;
   private _colorAttachmentsAA: WebGLRenderbuffer[];
   private _depthAttachmentAA: WebGLRenderbuffer;
@@ -121,6 +122,9 @@ export class WebGLFrameBuffer
     } else {
       this._depthAttachmentTarget = WebGLEnum.NONE;
     }
+    const colorAttachmentHash = this._options.colorAttachments?.map(tex => tex.texture.format).join(':') ?? '';
+    const depthAttachmentHash = this._options.depthAttachment?.texture.format ?? '';
+    this._hash = `${colorAttachmentHash}-${depthAttachmentHash}-${this._options.sampleCount ?? 1}`;
     this._init();
   }
   tagDraw() {
@@ -136,6 +140,9 @@ export class WebGLFrameBuffer
   getHeight(): number {
     const attachment = this._options.colorAttachments?.[0] ?? this._options.depthAttachment;
     return Math.max(attachment.texture.height >> attachment.level, 1);
+  }
+  getHash(): string {
+    return this._hash;
   }
   async restore() {
     if (!this._object && !this._device.isContextLost()) {

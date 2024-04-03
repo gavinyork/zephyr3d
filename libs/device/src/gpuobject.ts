@@ -1396,6 +1396,7 @@ export interface FrameBuffer<T = unknown> extends GPUObject<T> {
   getWidth(): number;
   getHeight(): number;
   getSampleCount(): number;
+  getHash(): string;
   setColorAttachmentCubeFace(index: number, face: CubeFace): void;
   setColorAttachmentMipLevel(index: number, level: number): void;
   setColorAttachmentLayer(index: number, layer: number): void;

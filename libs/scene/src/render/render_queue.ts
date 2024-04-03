@@ -1,47 +1,3 @@
-/*
-Add to render queue => {
-  标记在RenderQueue里，设置所在的Instance bindGroup和offset
-  更新drawable bindgroup 和instance bindGroup
-}
-
-Transform changed => {
-  如果在RenderQueue里面，如果是instance更新instance bindGroup，否则更新drawable bindGroup
-}
-
-Uniform changed => {
-  如果在RenderQueue里面，如果是instance更新instance bindGroup，否则更新material BindGroup
-}
-
-Tobe Rendered => {
-  如果Hash != RenderQueue.Hash则重新生成
-}
-
-BatchGroup = {
-  [hash: string]: RenderQueue;
-}
-
-Drawable => {
-  queueRef: { queue: RenderQueue }
-}
-
-RenderQueue = {
-  materials: Set<Material>;
-  instanceInfo: Map<Drawable, { bindGroup: CachedBindGroup, offset: number }>;
-  renderBundles: { [hash: string]: RenderBundle }
-  queueRef: { queue: RenderQueue }
-  render(order: number, unlit: boolean, hash: string) {
-    this.materials.forEach(mat => mat.update(hash));
-    if (!renderBundles[hash]) {
-      startCapture();
-      renderItems();
-      renderBundles[hash] = endCapture(;
-    } else {
-      renderBundles[hash].render();
-    }
-  }
-}
- */
-
 import { Application } from '../app';
 import type { Vector4 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';
@@ -52,6 +8,7 @@ import { QUEUE_TRANSPARENT } from '../values';
 import type { BindGroup, BindGroupLayout } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
 import { Material, ShaderHelper } from '../material';
+import { RenderBundleWrapper } from './renderbundle_wrapper';
 
 /** @internal */
 export type CachedBindGroup = {
@@ -138,8 +95,11 @@ export interface RenderQueueItem {
 /** @internal */
 export interface RenderItemListInfo {
   itemList: RenderQueueItem[],
+  renderBundle?: RenderBundleWrapper;
   skinItemList: RenderQueueItem[],
+  skinRenderBundle?: RenderBundleWrapper;
   instanceItemList: RenderQueueItem[],
+  instanceRenderBundle?: RenderBundleWrapper;
   instanceList: Record<string, BatchDrawable[]>;
   materialList: Set<Material>;
   renderQueue: RenderQueue;
@@ -286,7 +246,7 @@ export class RenderQueue {
     for (const order in queue._itemLists) {
       let itemLists = this._itemLists[order];
       if (!itemLists) {
-        itemLists = this.newRenderItemList();
+        itemLists = this.newRenderItemList(true);
         this._itemLists[order] = itemLists;
       }
       const newItemLists = queue._itemLists[order];
@@ -306,7 +266,7 @@ export class RenderQueue {
     if (drawable) {
       let itemList = this._itemLists[renderOrder];
       if (!itemList) {
-        itemList = this.newRenderItemList();
+        itemList = this.newRenderItemList(false);
         this._itemLists[renderOrder] = itemList;
       }
       const trans = drawable.getQueueType() === QUEUE_TRANSPARENT;
@@ -363,28 +323,20 @@ export class RenderQueue {
     this._ref = null;
     this.reset();
   }
-  end(camera: Camera): this {
+  end(camera: Camera, createRenderBundles?: boolean): this {
     const frameCounter = Application.instance.device.frameInfo.frameCounter;
     for (const k in this._itemLists) {
       const itemList = this._itemLists[k];
-      const lists = [itemList.opaque.lit[0], itemList.opaque.unlit[0], itemList.transparent.lit[0], itemList.transparent.unlit[0]];
+      const lists = [itemList.opaque.lit, itemList.opaque.unlit, itemList.transparent.lit, itemList.transparent.unlit];
       for (let i = 0; i < 4; i++) {
         const list = lists[i];
-        const instanceList = list.instanceList
-        for (const x in instanceList) {
-          const drawables = instanceList[x];
-          if (false && drawables.length === 1) {
-            (drawables[0].getBoneMatrices() ? list.skinItemList : list.itemList).push({
-              drawable: drawables[0],
-              sortDistance: drawables[0].getSortDistance(camera),
-              instanceData: null
-            });
-            drawables[0].applyTransformUniforms(this);
-            const mat = drawables[0].getMaterial();
-            if (mat) {
-              list.materialList.add(mat.coreMaterial);
-            }
-          } else {
+        for (const info of list) {
+          if (info.renderQueue !== this) {
+            continue;
+          }
+          const instanceList = info.instanceList
+          for (const x in instanceList) {
+            const drawables = instanceList[x];
             let bindGroup: CachedBindGroup = null;
             let item: RenderQueueItem = null;
             for (let i = 0; i < drawables.length; i++) {
@@ -404,7 +356,7 @@ export class RenderQueue {
                     stride
                   }
                 }
-                list.instanceItemList.push(item);
+                info.instanceItemList.push(item);
                 drawable.applyInstanceOffsetAndStride(this, stride, bindGroup.offset);
               }
               const instanceInfo = { bindGroup, offset: bindGroup.offset };
@@ -415,8 +367,20 @@ export class RenderQueue {
               item.instanceData.numInstances++;
               const mat = drawable.getMaterial();
               if (mat) {
-                list.materialList.add(mat.coreMaterial);
+                info.materialList.add(mat.coreMaterial);
               }
+            }
+          }
+          info.instanceList = {}
+          if (createRenderBundles) {
+            if (info.itemList.length > 0) {
+              info.renderBundle = new RenderBundleWrapper();
+            }
+            if (info.skinItemList.length > 0) {
+              info.skinRenderBundle = new RenderBundleWrapper();
+            }
+            if (info.instanceItemList.length > 0) {
+              info.instanceRenderBundle = new RenderBundleWrapper();
             }
           }
         }
@@ -435,10 +399,10 @@ export class RenderQueue {
       list.transparent.unlit[0].skinItemList.sort((a, b) => b.sortDistance - a.sortDistance);
     }
   }
-  private newRenderItemList(): RenderItemList {
+  private newRenderItemList(empty: boolean): RenderItemList {
     return {
       opaque: {
-        lit: [{
+        lit: empty ? [] : [{
           itemList: [],
           skinItemList: [],
           instanceItemList: [],
@@ -446,7 +410,7 @@ export class RenderQueue {
           instanceList: {},
           renderQueue: this
         }],
-        unlit: [{
+        unlit: empty ? [] : [{
           itemList: [],
           skinItemList: [],
           instanceItemList: [],
@@ -456,7 +420,7 @@ export class RenderQueue {
         }]
       },
       transparent: {
-        lit: [{
+        lit: empty ? [] : [{
           itemList: [],
           skinItemList: [],
           instanceItemList: [],
@@ -464,7 +428,7 @@ export class RenderQueue {
           instanceList: {},
           renderQueue: this
         }],
-        unlit: [{
+        unlit: empty ? [] : [{
           itemList: [],
           skinItemList: [],
           instanceItemList: [],
