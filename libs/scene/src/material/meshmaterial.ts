@@ -147,36 +147,6 @@ export class MeshMaterial extends Material {
     instance.$instanceUniforms = uniformsHolder;
     instance.$isInstance = true;
     instance.coreMaterial = that;
-    instance.apply = function(ctx: DrawContext){
-      if (!ctx.instancing) {
-        for (let i = 0; i < instanceUniforms.length; i++) {
-          const name = instanceUniforms[i][0];
-          const type = instanceUniforms[i][1];
-          switch (type) {
-            case 'float':
-              that[name] = uniformsHolder[i * 4];
-              break;
-            case 'vec2':
-              that[name] = new Vector2(uniformsHolder[i * 4], uniformsHolder[i * 4 + 1]);
-              break;
-            case 'vec3':
-              that[name] = new Vector3(
-                uniformsHolder[i * 4],
-                uniformsHolder[i * 4 + 1],
-                uniformsHolder[i * 4 + 2]
-              );
-            case 'vec4':
-              that[name] = new Vector4(
-                uniformsHolder[i * 4],
-                uniformsHolder[i * 4 + 1],
-                uniformsHolder[i * 4 + 2],
-                uniformsHolder[i * 4 + 3]
-              );
-          }
-        }
-      }
-      return that.apply(ctx);
-    }
     // Copy original uniform values
     for (let i = 0; i < instanceUniforms.length; i++) {
       const [prop, type] = instanceUniforms[i];
@@ -190,6 +160,7 @@ export class MeshMaterial extends Material {
             },
             set(value) {
               uniformsHolder[i * 4 + 0] = value;
+              that[prop] = value;
             }
           });
           break;
@@ -206,6 +177,7 @@ export class MeshMaterial extends Material {
             },
             set(value) {
               uniformsHolder.set(value);
+              that[prop] = value;
             }
           });
           break;
@@ -227,6 +199,7 @@ export class MeshMaterial extends Material {
             },
             set(value) {
               uniformsHolder.set(value);
+              that[prop] = value;
             }
           });
           break;
@@ -250,6 +223,7 @@ export class MeshMaterial extends Material {
             },
             set(value) {
               uniformsHolder.set(value);
+              that[prop] = value;
             }
           });
           break;

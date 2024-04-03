@@ -337,37 +337,50 @@ export class RenderQueue {
           const instanceList = info.instanceList
           for (const x in instanceList) {
             const drawables = instanceList[x];
-            let bindGroup: CachedBindGroup = null;
-            let item: RenderQueueItem = null;
-            for (let i = 0; i < drawables.length; i++) {
-              const drawable = drawables[i];
-              const instanceUniforms = drawable.getInstanceUniforms();
-              const instanceUniformsSize = instanceUniforms?.length ?? 0;
-              const stride = 16 + instanceUniformsSize;
-              if (!bindGroup || bindGroup.offset + stride > maxBufferSizeInFloats) {
-                bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(frameCounter, stride);
-                item = {
-                  drawable,
-                  sortDistance: drawable.getSortDistance(camera),
-                  instanceData: {
-                    bindGroup,
-                    offset: bindGroup.offset,
-                    numInstances: 0,
-                    stride
-                  }
-                }
-                info.instanceItemList.push(item);
-                drawable.applyInstanceOffsetAndStride(this, stride, bindGroup.offset);
-              }
-              const instanceInfo = { bindGroup, offset: bindGroup.offset };
-              this._instanceInfo.set(drawable, instanceInfo);
-              drawable.applyTransformUniforms(this);
-              drawable.applyMaterialUniforms(instanceInfo);
-              bindGroup.offset += stride;
-              item.instanceData.numInstances++;
-              const mat = drawable.getMaterial();
+            if (drawables.length === 1) {
+              info.itemList.push({
+                drawable: drawables[0],
+                sortDistance: drawables[0].getSortDistance(camera),
+                instanceData: null
+              });
+              drawables[0].applyTransformUniforms(this);
+              const mat = drawables[0].getMaterial();
               if (mat) {
                 info.materialList.add(mat.coreMaterial);
+              }
+            } else {
+              let bindGroup: CachedBindGroup = null;
+              let item: RenderQueueItem = null;
+              for (let i = 0; i < drawables.length; i++) {
+                const drawable = drawables[i];
+                const instanceUniforms = drawable.getInstanceUniforms();
+                const instanceUniformsSize = instanceUniforms?.length ?? 0;
+                const stride = 16 + instanceUniformsSize;
+                if (!bindGroup || bindGroup.offset + stride > maxBufferSizeInFloats) {
+                  bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(frameCounter, stride);
+                  item = {
+                    drawable,
+                    sortDistance: drawable.getSortDistance(camera),
+                    instanceData: {
+                      bindGroup,
+                      offset: bindGroup.offset,
+                      numInstances: 0,
+                      stride
+                    }
+                  }
+                  info.instanceItemList.push(item);
+                  drawable.applyInstanceOffsetAndStride(this, stride, bindGroup.offset);
+                }
+                const instanceInfo = { bindGroup, offset: bindGroup.offset };
+                this._instanceInfo.set(drawable, instanceInfo);
+                drawable.applyTransformUniforms(this);
+                drawable.applyMaterialUniforms(instanceInfo);
+                bindGroup.offset += stride;
+                item.instanceData.numInstances++;
+                const mat = drawable.getMaterial();
+                if (mat) {
+                  info.materialList.add(mat.coreMaterial);
+                }
               }
             }
           }
@@ -385,6 +398,12 @@ export class RenderQueue {
           }
         }
       }
+      itemList.opaque.lit.forEach(info => {
+        info.itemList.sort((a, b) => (a.drawable.getMaterial()?.instanceId ?? 0) - (b.drawable.getMaterial()?.instanceId ?? 0))
+      });
+      itemList.opaque.unlit.forEach(info => {
+        info.itemList.sort((a, b) => (a.drawable.getMaterial()?.instanceId ?? 0) - (b.drawable.getMaterial()?.instanceId ?? 0))
+      });
     }
     return this;
   }

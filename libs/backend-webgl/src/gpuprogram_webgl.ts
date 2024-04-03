@@ -456,11 +456,6 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     }
     return uniformSetters;
   }
-  private getUniformSetterf(location: WebGLUniformLocation) {
-    return (value: number) => {
-      this._device.context.uniform1f(location, value);
-    };
-  }
   private getUniformSetterfv(location: WebGLUniformLocation) {
     return (value: any) => {
       this._device.context.uniform1fv(location, value);
@@ -481,11 +476,6 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
       this._device.context.uniform4fv(location, value);
     };
   }
-  private getUniformSetteri(location: WebGLUniformLocation) {
-    return (value: number) => {
-      this._device.context.uniform1i(location, value);
-    };
-  }
   private getUniformSetteriv(location: WebGLUniformLocation) {
     return (value: any) => {
       this._device.context.uniform1iv(location, value);
@@ -504,11 +494,6 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
   private getUniformSetter4iv(location: WebGLUniformLocation) {
     return (value: any) => {
       this._device.context.uniform4iv(location, value);
-    };
-  }
-  private getUniformSetterui(location: WebGLUniformLocation) {
-    return (value: number) => {
-      (this._device.context as WebGL2RenderingContext).uniform1ui(location, value);
     };
   }
   private getUniformSetteruiv(location: WebGLUniformLocation) {
@@ -592,7 +577,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
           const sampler = texture?.[1] ?? null;
           gl.uniform1i(location, unit);
           gl.activeTexture(this._device.context.TEXTURE0 + unit);
-          gl.bindTexture(target, texture?.[0]?.object || null);
+          gl.bindTexture(target, tex?.object ?? null);
           if (tex && sampler && this._device.getCurrentSamplerForTexture(tex) !== sampler) {
             const fallback = tex.isWebGL1Fallback;
             this._device.setCurrentSamplerForTexture(tex, sampler);
