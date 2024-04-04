@@ -588,14 +588,14 @@ export abstract class BaseLight extends GraphNode {
 
 // @public
 export interface BatchDrawable extends Drawable {
-    getInstanceDataBuffer(renderPass: RenderPass): {
-        bindGroup: CachedBindGroup;
-        offset: number;
-    };
+    // (undocumented)
+    applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void;
+    // Warning: (ae-incompatible-release-tags) The symbol "applyMaterialUniforms" is marked as @public, but its signature references "DrawableInstanceInfo" which is marked as @internal
+    //
+    // (undocumented)
+    applyMaterialUniforms(instanceInfo: DrawableInstanceInfo): any;
     getInstanceId(renderPass: RenderPass): string;
     getInstanceUniforms(): Float32Array;
-    // Warning: (ae-incompatible-release-tags) The symbol "setInstanceDataBuffer" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
-    setInstanceDataBuffer(renderPass: RenderPass, bindGroup: CachedBindGroup, offset: number): any;
 }
 
 // @public
@@ -814,6 +814,7 @@ export const BUILTIN_ASSET_TEXTURE_SHEEN_LUT = "LUT_Sheen";
 export type CachedBindGroup = {
     bindGroup: BindGroup;
     buffer: Float32Array;
+    offset: number;
     dirty: boolean;
 };
 
@@ -1139,10 +1140,13 @@ export class DirectionalLight extends PunctualLight {
 
 // @public
 export interface Drawable {
+    // (undocumented)
+    applyTransformUniforms(renderQueue: RenderQueue): void;
     draw(ctx: DrawContext): any;
     getBoneMatrices(): Texture2D;
     getInstanceColor(): Vector4;
     getInvBindMatrix(): Matrix4x4;
+    getMaterial(): Material;
     getName(): string;
     getPickTarget(): GraphNode;
     getQueueType(): number;
@@ -1150,11 +1154,23 @@ export interface Drawable {
     getXForm(): XForm;
     isBatchable(): this is BatchDrawable;
     isUnlit(): boolean;
+    // Warning: (ae-incompatible-release-tags) The symbol "pushRenderQueueRef" is marked as @public, but its signature references "RenderQueueRef" which is marked as @internal
+    pushRenderQueueRef(ref: RenderQueueRef): any;
+}
+
+// Warning: (ae-internal-missing-underscore) The name "DrawableInstanceInfo" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export interface DrawableInstanceInfo {
+    // (undocumented)
+    bindGroup: CachedBindGroup;
+    // (undocumented)
+    offset: number;
 }
 
 // @public
 export interface DrawContext {
-    applyFog: boolean;
+    applyFog: FogType;
     camera: Camera;
     // Warning: (ae-forgotten-export) The symbol "ClusteredLight" needs to be exported by the entry point index.d.ts
     clusteredLight?: ClusteredLight;
@@ -1169,6 +1185,7 @@ export interface DrawContext {
     env: Environment;
     flip: boolean;
     instanceData?: InstanceData;
+    instancing?: boolean;
     lightBlending: boolean;
     linearDepthTexture?: Texture2D;
     logger?: RenderLogger;
@@ -1176,11 +1193,12 @@ export interface DrawContext {
     queue: number;
     renderPass: RenderPass;
     renderPassHash: string;
+    renderQueue?: RenderQueue;
     scene: Scene;
     // @internal (undocumented)
     shadowMapInfo?: Map<PunctualLight, ShadowMapParams>;
+    skinAnimation?: boolean;
     sunLight?: DirectionalLight;
-    target: Drawable;
     timestamp: number;
     viewportHeight?: number;
     viewportWidth?: number;
@@ -1542,13 +1560,19 @@ export class GraphNode extends SceneNode {
 export class GrassMaterial extends GrassMaterial_base {
     constructor(terrainSize: Vector2, normalMap: Texture2D, grassTexture?: Texture2D);
     // (undocumented)
+    apply(ctx: DrawContext): boolean;
+    // (undocumented)
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
     // (undocumented)
     fragmentShader(scope: PBFunctionScope): void;
     // @override
     isTransparentPass(pass: number): boolean;
     // @override
+    supportInstancing(): boolean;
+    // @override
     supportLighting(): boolean;
+    // (undocumented)
+    protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void;
     // (undocumented)
     vertexShader(scope: PBFunctionScope): void;
 }
@@ -1765,11 +1789,9 @@ export interface IMixinVertexColor {
 export class InstanceBindGroupAllocator {
     constructor();
     // (undocumented)
-    allocateInstanceBindGroup(framestamp: number): CachedBindGroup;
+    allocateInstanceBindGroup(framestamp: number, sizeInFloats: number): CachedBindGroup;
     // (undocumented)
-    _freeBindGroupList: CachedBindGroup[];
-    // (undocumented)
-    _usedBindGroupList: CachedBindGroup[];
+    _bindGroupList: CachedBindGroup[];
 }
 
 // @public
@@ -1779,11 +1801,9 @@ export interface InstanceData {
     // (undocumented)
     bindGroup: CachedBindGroup;
     // (undocumented)
-    currentSize: number;
+    numInstances: number;
     // (undocumented)
-    hash: string;
-    // (undocumented)
-    maxSize: number;
+    offset: number;
     // (undocumented)
     stride: number;
 }
@@ -1830,7 +1850,7 @@ export class LightPass extends RenderPass {
     // (undocumented)
     protected renderItems(ctx: DrawContext, renderQueue: RenderQueue): void;
     // (undocumented)
-    protected renderLightPass(ctx: DrawContext, items: RenderQueueItem[], lights: PunctualLight[]): void;
+    protected renderLightPass(ctx: DrawContext, itemList: RenderItemListBundle, lights: PunctualLight[], flags: any): void;
     // (undocumented)
     protected _shadowMapHash: string;
 }
@@ -1854,39 +1874,28 @@ export class Material {
     // @internal
     get $isInstance(): boolean;
     constructor();
+    apply(ctx: DrawContext): boolean;
     applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number): void;
     protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
-    beginDraw(pass: number, ctx: DrawContext): boolean;
     // @internal (undocumented)
-    static bindGroupGarbageCollect(bindGroup: BindGroup): void;
+    bind(device: AbstractDevice, pass: number): boolean;
     // @internal (undocumented)
-    clearBindGroupCache(): number;
+    get coreMaterial(): this;
     // @internal (undocumented)
-    createHash(renderPassType: number, pass: number): string;
-    protected _createHash(renderPassType: number): string;
+    createHash(pass: number): string;
+    protected _createHash(): string;
     // @internal (undocumented)
     protected createProgram(ctx: DrawContext, pass: number): GPUProgram;
     protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram;
-    // @internal (undocumented)
-    protected createRenderStateSet(): RenderStateSet;
-    // (undocumented)
-    dispose(): void;
+    // @internal
     draw(primitive: Primitive, ctx: DrawContext, numInstances?: number): void;
     drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number): void;
-    endDraw(pass: number): void;
-    static garbageCollect(ts: number): number;
-    static getGCOptions(): MaterialGCOptions;
     // @internal (undocumented)
-    protected getHash(renderPassType: number, pass: number): string;
-    getMaterialBindGroup(): BindGroup;
-    // Warning: (ae-forgotten-export) The symbol "ProgramInfo" needs to be exported by the entry point index.d.ts
-    getOrCreateProgram(ctx: DrawContext, pass: number): ProgramInfo;
-    // @internal (undocumented)
-    static getProgramByHashIndex(hash: string, index: number): GPUProgram<unknown>;
+    protected getHash(pass: number): string;
     // (undocumented)
     getQueueType(): number;
     // @internal (undocumented)
-    protected _hash: string[][];
+    protected _hash: string[];
     get instanceId(): number;
     isBatchable(): boolean;
     isTransparentPass(pass: number): boolean;
@@ -1898,22 +1907,10 @@ export class Material {
     // @internal (undocumented)
     optionChanged(changeHash: boolean): void;
     passToHash(pass: number): string;
-    // @internal (undocumented)
-    protected _renderStateSet: RenderStateSet;
-    static setGCOptions(opt: MaterialGCOptions): void;
-    get stateSet(): RenderStateSet;
-    set stateSet(stateset: RenderStateSet);
+    supportInstancing(): boolean;
     supportLighting(): boolean;
+    protected updateRenderStates(pass: number, renderStates: RenderStateSet, ctx: DrawContext): void;
 }
-
-// @public
-export type MaterialGCOptions = {
-    disabled?: boolean;
-    drawableCountThreshold?: number;
-    materialCountThreshold?: number;
-    inactiveTimeDuration?: number;
-    verbose?: boolean;
-};
 
 // @public
 export interface MaterialTextureInfo {
@@ -1930,8 +1927,10 @@ export interface MaterialTextureInfo {
 // @public
 export const MAX_CLUSTERED_LIGHTS = 255;
 
+// Warning: (ae-forgotten-export) The symbol "Mesh_base" needs to be exported by the entry point index.d.ts
+//
 // @public
-export class Mesh extends GraphNode implements BatchDrawable {
+export class Mesh extends Mesh_base implements BatchDrawable {
     constructor(scene: Scene, primitive?: Primitive, material?: Material);
     // @internal (undocumented)
     protected _animatedBoundingBox: BoundingBox;
@@ -1955,6 +1954,9 @@ export class Mesh extends GraphNode implements BatchDrawable {
     set drawBoundingBox(val: boolean);
     getBoneMatrices(): Texture2D;
     getInstanceColor(): Vector4;
+    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: No member was found with name "getInstanceDataBuffer"
+    //
+    // (undocumented)
     getInstanceDataBuffer(renderPass: RenderPass): {
         bindGroup: CachedBindGroup;
         offset: number;
@@ -1962,6 +1964,7 @@ export class Mesh extends GraphNode implements BatchDrawable {
     getInstanceId(renderPass: RenderPass): string;
     getInstanceUniforms(): Float32Array;
     getInvBindMatrix(): Matrix4x4;
+    getMaterial(): Material;
     getName(): string;
     getPickTarget(): GraphNode;
     getQueueType(): number;
@@ -1987,6 +1990,9 @@ export class Mesh extends GraphNode implements BatchDrawable {
     setAnimatedBoundingBox(bbox: BoundingBox): void;
     setBoneMatrices(matrices: Texture2D): void;
     // Warning: (ae-incompatible-release-tags) The symbol "setInstanceDataBuffer" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
+    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: No member was found with name "setInstanceDataBuffer"
+    //
+    // (undocumented)
     setInstanceDataBuffer(renderPass: RenderPass, bindGroup: CachedBindGroup, offset: number): void;
     setInvBindMatrix(matrix: Matrix4x4): void;
 }
@@ -2002,11 +2008,10 @@ export class MeshMaterial extends Material {
     // @internal @override
     protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
-    beginDraw(pass: number, ctx: DrawContext): boolean;
     get blendMode(): BlendMode;
     set blendMode(val: BlendMode);
     // @internal @override
-    protected _createHash(renderPassType: number): string;
+    protected _createHash(): string;
     createInstance(): this;
     // @internal (undocumented)
     protected createProgram(ctx: DrawContext, pass: number): GPUProgram;
@@ -2017,6 +2022,8 @@ export class MeshMaterial extends Material {
     static defineFeature(): number;
     // Warning: (ae-incompatible-release-tags) The symbol "defineInstanceUniform" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
     static defineInstanceUniform(prop: string, type: InstanceUniformType): number;
+    // (undocumented)
+    doAlphaTest(scope: PBInsideFunctionScope, color: PBShaderExp): void;
     get drawContext(): DrawContext;
     featureUsed<T = unknown>(feature: number): T;
     fragmentShader(scope: PBFunctionScope): void;
@@ -2035,7 +2042,7 @@ export class MeshMaterial extends Material {
     get pass(): number;
     supportLighting(): boolean;
     uniformChanged(): void;
-    protected updateRenderStates(pass: number, ctx: DrawContext): void;
+    protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void;
     useFeature(feature: number, use: unknown): void;
     vertexShader(scope: PBFunctionScope): void;
 }
@@ -2716,6 +2723,52 @@ export const RENDER_PASS_TYPE_LIGHT = 0;
 // @public
 export const RENDER_PASS_TYPE_SHADOWMAP = 1;
 
+// Warning: (ae-internal-missing-underscore) The name "RenderItemList" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export interface RenderItemList {
+    // (undocumented)
+    opaque: RenderItemListBundle;
+    // (undocumented)
+    transparent: RenderItemListBundle;
+}
+
+// Warning: (ae-internal-missing-underscore) The name "RenderItemListBundle" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export interface RenderItemListBundle {
+    // (undocumented)
+    lit: RenderItemListInfo[];
+    // (undocumented)
+    unlit: RenderItemListInfo[];
+}
+
+// Warning: (ae-internal-missing-underscore) The name "RenderItemListInfo" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export interface RenderItemListInfo {
+    // (undocumented)
+    instanceItemList: RenderQueueItem[];
+    // (undocumented)
+    instanceList: Record<string, BatchDrawable[]>;
+    // (undocumented)
+    instanceRenderBundle?: RenderBundleWrapper;
+    // (undocumented)
+    itemList: RenderQueueItem[];
+    // (undocumented)
+    materialList: Set<Material>;
+    // Warning: (ae-forgotten-export) The symbol "RenderBundleWrapper" needs to be exported by the entry point index.d.ts
+    //
+    // (undocumented)
+    renderBundle?: RenderBundleWrapper;
+    // (undocumented)
+    renderQueue: RenderQueue;
+    // (undocumented)
+    skinItemList: RenderQueueItem[];
+    // (undocumented)
+    skinRenderBundle?: RenderBundleWrapper;
+}
+
 // @public
 export abstract class RenderPass {
     constructor(type: number);
@@ -2737,6 +2790,8 @@ export abstract class RenderPass {
     dispose(): void;
     // @internal (undocumented)
     protected drawItem(device: AbstractDevice, item: RenderQueueItem, ctx: DrawContext, reverseWinding: boolean): void;
+    // @internal (undocumented)
+    protected drawItemList(device: AbstractDevice, itemList: RenderItemListInfo, ctx: DrawContext, reverseWinding: boolean): void;
     // @internal (undocumented)
     protected drawScene(ctx: DrawContext, cullCamera: Camera, renderQueue?: RenderQueue): void;
     // @internal (undocumented)
@@ -2767,13 +2822,21 @@ export abstract class RenderPass {
 export class RenderQueue {
     // Warning: (ae-incompatible-release-tags) The symbol "__constructor" is marked as @public, but its signature references "InstanceBindGroupAllocator" which is marked as @internal
     constructor(renderPass: RenderPass, bindGroupAllocator?: InstanceBindGroupAllocator);
+    // @internal (undocumented)
+    dispose(): void;
+    // (undocumented)
+    end(camera: Camera, createRenderBundles?: boolean): this;
+    // Warning: (ae-incompatible-release-tags) The symbol "getInstanceInfo" is marked as @public, but its signature references "DrawableInstanceInfo" which is marked as @internal
+    getInstanceInfo(drawable: Drawable): DrawableInstanceInfo;
     // @internal
     getMaxBatchSize(): number;
-    // Warning: (ae-forgotten-export) The symbol "RenderItemList" needs to be exported by the entry point index.d.ts
+    // Warning: (ae-incompatible-release-tags) The symbol "items" is marked as @public, but its signature references "RenderItemList" which is marked as @internal
     get items(): Record<number, RenderItemList>;
     push(camera: Camera, drawable: Drawable, renderOrder: number): void;
     pushLight(light: PunctualLight): void;
     pushRenderQueue(queue: RenderQueue): void;
+    // Warning: (ae-incompatible-release-tags) The symbol "ref" is marked as @public, but its signature references "RenderQueueRef" which is marked as @internal
+    get ref(): RenderQueueRef;
     get renderPass(): RenderPass;
     reset(): void;
     get shadowedLights(): PunctualLight[];
@@ -2783,7 +2846,9 @@ export class RenderQueue {
     get unshadowedLights(): PunctualLight[];
 }
 
-// @public
+// Warning: (ae-internal-missing-underscore) The name "RenderQueueItem" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
 export interface RenderQueueItem {
     // (undocumented)
     drawable: Drawable;
@@ -2793,6 +2858,14 @@ export interface RenderQueueItem {
     instanceData: InstanceData;
     // (undocumented)
     sortDistance: number;
+}
+
+// Warning: (ae-internal-missing-underscore) The name "RenderQueueRef" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export interface RenderQueueRef {
+    // (undocumented)
+    ref: RenderQueue;
 }
 
 // @public
@@ -3089,7 +3162,11 @@ export class ShaderHelper {
     static getFogType(scope: PBInsideFunctionScope): PBShaderExp;
     static getGlobalUniforms(scope: PBInsideFunctionScope): PBShaderExp;
     // (undocumented)
-    static getInstanceBufferStrideUniformName(): string;
+    static getInstanceDataOffsetUniformName(): string;
+    // (undocumented)
+    static getInstanceDataStrideUniformName(): string;
+    // (undocumented)
+    static getInstanceDataUniformName(): string;
     static getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShaderExp;
     // (undocumented)
     static getLightBufferUniformName(): string;
@@ -3118,8 +3195,6 @@ export class ShaderHelper {
     static getSunLightDir(scope: PBInsideFunctionScope): PBShaderExp;
     static getViewMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     static getViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp;
-    // (undocumented)
-    static getWorldMatricesUniformName(): string;
     static getWorldMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     // (undocumented)
     static getWorldMatrixUniformName(): string;
@@ -3135,7 +3210,7 @@ export class ShaderHelper {
     static resolveVertexPosition(scope: PBInsideFunctionScope, pos?: PBShaderExp): PBShaderExp;
     static resolveVertexTangent(scope: PBInsideFunctionScope, tangent?: PBShaderExp): PBShaderExp;
     // @internal (undocumented)
-    static setCameraUniforms(bindGroup: BindGroup, ctx: DrawContext, linear: boolean): void;
+    static setCameraUniforms(bindGroup: BindGroup, camera: Camera, flip: boolean, linear: boolean): void;
     static setClipSpacePosition(scope: PBInsideFunctionScope, pos: PBShaderExp): void;
     // @internal (undocumented)
     static setFogUniforms(bindGroup: BindGroup, fogType: number, fogColor: Vector4, fogParams: Vector4, apDensity: number, aerialPerspectiveLUT?: Texture2D): void;
@@ -3145,6 +3220,7 @@ export class ShaderHelper {
     static setLightUniformsShadow(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight): void;
     // @internal (undocumented)
     static setLightUniformsShadowMap(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight): void;
+    static vertexShaderDrawableStuff(scope: PBGlobalScope, skinning: boolean, instanced: boolean): void;
 }
 
 // Warning: (ae-internal-missing-underscore) The name "ShadowConfig" should be prefixed with an underscore because the declaration is marked as @internal
@@ -3614,10 +3690,14 @@ export class TerrainMaterial extends TerrainMaterial_base {
     // (undocumented)
     sampleDetailNormalMap(scope: PBInsideFunctionScope, tex: PBShaderExp, texCoord: PBShaderExp, normalScale: PBShaderExp, TBN: PBShaderExp): PBShaderExp;
     // @override
+    supportInstancing(): boolean;
+    // @override
     supportLighting(): boolean;
     // (undocumented)
     get terrainInfo(): Vector4;
     set terrainInfo(val: Vector4);
+    // (undocumented)
+    protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void;
     // (undocumented)
     vertexShader(scope: PBFunctionScope): void;
 }
@@ -3629,10 +3709,11 @@ export type TerrainMaterialOptions = {
     detailMaps?: TerrainDetailMapInfo;
 };
 
+// Warning: (ae-forgotten-export) The symbol "TerrainPatch_base" needs to be exported by the entry point index.d.ts
 // Warning: (ae-internal-missing-underscore) The name "TerrainPatch" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
-export class TerrainPatch implements Drawable {
+export class TerrainPatch extends TerrainPatch_base implements Drawable {
     constructor(terrain: Terrain);
     // (undocumented)
     computeBoundingBox(box: BoundingBox): void;
@@ -3665,6 +3746,8 @@ export class TerrainPatch implements Drawable {
     // (undocumented)
     getLODDistance(): number;
     // (undocumented)
+    getMaterial(): Material;
+    // (undocumented)
     getMipLevel(): number;
     // (undocumented)
     getName(): string;
@@ -3683,8 +3766,6 @@ export class TerrainPatch implements Drawable {
     // (undocumented)
     getStep(): number;
     // (undocumented)
-    getXForm(): XForm<XForm<any>>;
-    // (undocumented)
     initialize(quadtree: Quadtree, parent: TerrainPatch, rowIndex: number, colIndex: number, baseVertices: Float32Array, normals: Vector3[], heightScale: number, elevations: Float32Array): boolean;
     // (undocumented)
     isBatchable(): this is BatchDrawable;
@@ -3702,6 +3783,15 @@ export class TerrainPatch implements Drawable {
     sqrDistancePointToTriangle(P: Vector3, t0: Vector3, t1: Vector3, t2: Vector3): number;
     // (undocumented)
     sqrDistanceToPoint(point: Vector3): number;
+}
+
+// @public (undocumented)
+export class TerrainPatchBase {
+    constructor(terrain: Terrain);
+    // (undocumented)
+    getXForm(): XForm<XForm<any>>;
+    // (undocumented)
+    protected _terrain: Terrain;
 }
 
 // @public
@@ -3775,9 +3865,6 @@ export class TranslationTrack extends AnimationTrack {
     }[]);
     apply(node: SceneNode, currentTime: number, duration: number): boolean;
 }
-
-// @public
-export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never;
 
 // Warning: (ae-forgotten-export) The symbol "UnlitMaterial_base" needs to be exported by the entry point index.d.ts
 //
@@ -4022,8 +4109,7 @@ export class XForm<T extends XForm<T> = XForm<any>> extends XForm_base {
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:3525:9 - (ae-incompatible-release-tags) The symbol "bindGroup" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
-// dist/index.d.ts:4837:9 - (ae-incompatible-release-tags) The symbol "bindGroup" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
+// dist/index.d.ts:3910:9 - (ae-incompatible-release-tags) The symbol "bindGroup" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
 
 // (No @packageDocumentation comment for this package)
 

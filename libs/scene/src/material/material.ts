@@ -91,7 +91,11 @@ export class Material {
   get coreMaterial(): this {
     return this;
   }
-  /** @internal */
+  /**
+   * Apply material
+   * @param ctx - Draw context
+   * @returns true if no error, otherwise false
+   */
   apply(ctx: DrawContext): boolean {
     for (let pass = 0; pass < this._numPasses; pass++) {
       const hash = this.calcGlobalHash(ctx, pass);
@@ -118,7 +122,7 @@ export class Material {
     }
   }
   /** @internal */
-  bind(ctx: DrawContext, pass: number, device: AbstractDevice): boolean {
+  bind(device: AbstractDevice, pass: number): boolean {
     const hash = this._currentHash[pass];
     let state = this._states[hash];
     if (!state) {
@@ -138,15 +142,16 @@ export class Material {
   }
   /**
    * Draws a primitive using this material
+   * @internal
    *
    * @param primitive - The prmitive to be drawn
    * @param ctx - The context of current drawing task
    * @param numInstances - How many instances should be drawn. if zero, the instance count will be automatically detected.
    */
-  draw(primitive: Primitive, ctx: DrawContext, skinAnimation: boolean, instancing: boolean, numInstances = 0) {
+  draw(primitive: Primitive, ctx: DrawContext, numInstances = 0) {
     const device = Application.instance.device;
     for (let pass = 0; pass < this._numPasses; pass++) {
-      this.bind(ctx, pass, device);
+      this.bind(device, pass);
       this.drawPrimitive(pass, primitive, ctx, numInstances);
     }
   }

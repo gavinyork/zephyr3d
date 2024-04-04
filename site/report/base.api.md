@@ -43,7 +43,7 @@ export class AABB {
 }
 
 // @public
-export function applyMixins(derivedCtor: any, baseCtors: any[]): void;
+export function applyMixins<M extends ((target: any) => any)[], T>(target: T, ...mixins: M): T & ExtractMixinType<M>;
 
 // @public
 export enum BoxSide {
@@ -100,6 +100,12 @@ export type EventMap = Record<string, any>;
 
 // @public
 export type EventType<T extends EventMap> = T[keyof T];
+
+// @public
+export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ? R : never;
+
+// @public
+export type ExtractMixinType<M> = M extends [infer First] ? ExtractMixinReturnType<First> : M extends [infer First, ...infer Rest] ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]> : never;
 
 // @public
 export function floatToHalf(val: number): number;
@@ -712,6 +718,9 @@ export type TypedArrayConstructor<T extends TypedArray = any> = {
     new (buffer: ArrayBuffer, byteOffset: number, length: number): T;
     BYTES_PER_ELEMENT: number;
 };
+
+// @public
+export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never;
 
 // @public
 export function unpackFloat3<T extends number[] | Float32Array>(pk: number, result: T): void;

@@ -122,7 +122,7 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
         ? this.getGeometryWireframe()
         : this.getGeometry();
     this.bind(Application.instance.device, ctx);
-    this._terrain.material.draw(primitive, ctx, !!this.getBoneMatrices(), !!ctx.instanceData);
+    this._terrain.material.draw(primitive, ctx);
   }
   setupCamera(viewportH: number, tanHalfFovy: number, maxPixelError: number): void {
     if (maxPixelError > 0 && tanHalfFovy > 0) {

@@ -294,7 +294,7 @@ export class RenderQueue {
         : unlit
           ? itemList.opaque.unlit[0]
           : itemList.opaque.lit[0];
-        (drawable.getBoneMatrices() ? list.skinItemList : list.itemList).push({
+        this.binaryInsert((drawable.getBoneMatrices() ? list.skinItemList : list.itemList), {
           drawable,
           sortDistance: drawable.getSortDistance(camera),
           instanceData: null
@@ -323,6 +323,7 @@ export class RenderQueue {
     this._ref = null;
     this.reset();
   }
+  /** @internal */
   end(camera: Camera, createRenderBundles?: boolean): this {
     const frameCounter = Application.instance.device.frameInfo.frameCounter;
     for (const k in this._itemLists) {
@@ -338,7 +339,7 @@ export class RenderQueue {
           for (const x in instanceList) {
             const drawables = instanceList[x];
             if (drawables.length === 1) {
-              info.itemList.push({
+              this.binaryInsert(info.itemList, {
                 drawable: drawables[0],
                 sortDistance: drawables[0].getSortDistance(camera),
                 instanceData: null
@@ -368,7 +369,7 @@ export class RenderQueue {
                       stride
                     }
                   }
-                  info.instanceItemList.push(item);
+                  this.binaryInsert(info.instanceItemList, item);
                   drawable.applyInstanceOffsetAndStride(this, stride, bindGroup.offset);
                 }
                 const instanceInfo = { bindGroup, offset: bindGroup.offset };
@@ -398,14 +399,34 @@ export class RenderQueue {
           }
         }
       }
+      /*
       itemList.opaque.lit.forEach(info => {
         info.itemList.sort((a, b) => (a.drawable.getMaterial()?.instanceId ?? 0) - (b.drawable.getMaterial()?.instanceId ?? 0))
       });
       itemList.opaque.unlit.forEach(info => {
         info.itemList.sort((a, b) => (a.drawable.getMaterial()?.instanceId ?? 0) - (b.drawable.getMaterial()?.instanceId ?? 0))
       });
+      */
     }
     return this;
+  }
+  binaryInsert(itemList: RenderQueueItem[], item: RenderQueueItem) {
+    let left = 0;
+    let right = itemList.length - 1;
+    const newInstanceId = item.drawable.getMaterial().instanceId;
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      const instanceId = itemList[mid].drawable.getMaterial().instanceId;
+      if (instanceId === newInstanceId) {
+        itemList.splice(mid + 1, 0, item);
+        return;
+      } else if (instanceId < newInstanceId) {
+        left = mid + 1;
+      } else {
+        right = mid - 1;
+      }
+    }
+    itemList.splice(left, 0, item);
   }
   /**
    * Sorts the items in the render queue for rendering

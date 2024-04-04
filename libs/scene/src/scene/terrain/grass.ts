@@ -77,7 +77,7 @@ export class GrassCluster extends applyMixins(GrassClusterBase, mixinDrawable) i
   }
   draw(ctx: DrawContext) {
     this.bind(Application.instance.device, ctx);
-    this._material.draw(this._primitive, ctx, !!this.getBoneMatrices(), !!ctx.instanceData, this._numInstances);
+    this._material.draw(this._primitive, ctx, this._numInstances);
   }
 }
 

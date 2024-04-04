@@ -63,17 +63,14 @@ After inheriting from MeshMaterial,custom materials may need to override some cl
 
   - [MeshMaterial.updateRenderStates(pass, stateSet, ctx)](/doc/markdown/./scene.meshmaterial.updaterenderstates)
 
-    Called within the beginDraw() method to set the material's rendering states. When overriding, you must call its default implementation.
+    Will be called before the objects that uses this material being rendered. When overriding, you must call its default implementation.
     
-  - [MeshMaterial.beginDraw(pass, ctx)](/doc/markdown/./scene.material.begindraw)
+  - [MeshMaterial.apply(ctx)](/doc/markdown/./scene.material.apply)
 
-    Called before rendering a pass of the material, it sets up Shaders and uniform constants as needed. Returning true allows the pass to be rendered, while false skips it. When overriding, you must call its default implementation.
+    Will be called while applying the material. it sets up Shaders and uniform constants as needed. When overriding, you must call its default implementation.
 
-  - [MeshMaterial.endDraw(pass, ctx)](/doc/markdown/./scene.material.begindraw)
 
-    Called after a Pass of the material has been rendered. When overriding, you must call its default implementation.
-
-类[ShaderHelper](/doc/markdown/./scene.shaderhelper)提供了编写材质需要的诸多工具函数。
+The [ShaderHelper](/doc/markdown/./scene.shaderhelper) class provides numerous utility functions necessary for writing materials.
 
 ## System desgin
 

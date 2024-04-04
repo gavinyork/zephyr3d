@@ -12,10 +12,10 @@ import { VectorBase } from '@zephyr3d/base';
 
 // @public
 export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
+    beginCapture(): void;
     beginFrame(): boolean;
     buildComputeProgram(options: PBComputeOptions): GPUProgram;
     buildRenderProgram(options: PBRenderOptions): GPUProgram;
-    cancelNextFrameCall(f: () => void): void;
     canvas: HTMLCanvasElement;
     clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number): any;
     compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number): void;
@@ -45,7 +45,9 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     draw(primitiveType: PrimitiveType, first: number, count: number): void;
     drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number): void;
     drawText(text: string, x: number, y: number, color: string): any;
+    endCapture(): RenderBundle;
     endFrame(): void;
+    executeRenderBundle(renderBundle: RenderBundle): any;
     exitLoop(): void;
     flush(): void;
     frameInfo: FrameInfo;
@@ -135,6 +137,8 @@ export abstract class BaseDevice {
     // (undocumented)
     protected _backend: DeviceBackend;
     // (undocumented)
+    abstract beginCapture(): void;
+    // (undocumented)
     beginFrame(): boolean;
     // (undocumented)
     protected _beginFrameCounter: number;
@@ -144,8 +148,6 @@ export abstract class BaseDevice {
     buildComputeProgram(options: PBComputeOptions): GPUProgram;
     // (undocumented)
     buildRenderProgram(options: PBRenderOptions): GPUProgram;
-    // (undocumented)
-    cancelNextFrameCall(f: () => void): void;
     // (undocumented)
     get canvas(): HTMLCanvasElement;
     // (undocumented)
@@ -227,9 +229,13 @@ export abstract class BaseDevice {
     // (undocumented)
     enableGPUTimeRecording(enable: boolean): void;
     // (undocumented)
+    abstract endCapture(): RenderBundle;
+    // (undocumented)
     endFrame(): void;
     // (undocumented)
     protected _endFrameTime: number;
+    // (undocumented)
+    abstract executeRenderBundle(renderBundle: RenderBundle): any;
     // (undocumented)
     exitLoop(): void;
     // (undocumented)
@@ -411,6 +417,8 @@ export interface BaseTexture<T = unknown> extends GPUObject<T> {
 export interface BindGroup extends GPUObject<unknown> {
     // (undocumented)
     getBuffer(name: string): GPUDataBuffer;
+    // (undocumented)
+    getGPUId(): string;
     // (undocumented)
     getLayout(): BindGroupLayout;
     // (undocumented)
@@ -700,6 +708,8 @@ export interface FrameBuffer<T = unknown> extends GPUObject<T> {
     getColorAttachments(): BaseTexture[];
     // (undocumented)
     getDepthAttachment(): BaseTexture;
+    // (undocumented)
+    getHash(): string;
     // (undocumented)
     getHeight(): number;
     // (undocumented)
@@ -1413,10 +1423,10 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     sampleType(type: 'float' | 'unfilterable-float' | 'sint' | 'uint' | 'depth'): PBShaderExp;
     setAt(index: number | PBShaderExp, val: number | boolean | PBShaderExp): void;
     storage(group: number): PBShaderExp;
-    storageBuffer(group: number): PBShaderExp;
+    storageBuffer(group: number, dynamicOffset?: boolean): PBShaderExp;
     tag(...args: ShaderExpTagValue[]): PBShaderExp;
     uniform(group: number): PBShaderExp;
-    uniformBuffer(group: number): PBShaderExp;
+    uniformBuffer(group: number, dynamicOffset?: boolean): PBShaderExp;
     workgroup(): PBShaderExp;
 }
 
@@ -2017,6 +2027,9 @@ export interface RasterizerState {
 }
 
 // @public
+export type RenderBundle = unknown;
+
+// @public
 export interface RenderProgramConstructParams {
     bindGroupLayouts: BindGroupLayout[];
     fs: string;
@@ -2028,6 +2041,7 @@ export interface RenderProgramConstructParams {
 export interface RenderStateSet {
     apply(force?: boolean): void;
     readonly blendingState: BlendingState;
+    clone(): RenderStateSet;
     readonly colorState: ColorState;
     copyFrom(stateSet: RenderStateSet): void;
     defaultBlendingState(): void;
