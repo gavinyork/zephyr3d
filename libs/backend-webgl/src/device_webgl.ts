@@ -73,10 +73,11 @@ import { GPUTimer } from './gpu_timer';
 import { WebGLTextureCaps, WebGLFramebufferCaps, WebGLMiscCaps, WebGLShaderCaps } from './capabilities_webgl';
 import { WebGLBindGroup } from './bindgroup_webgl';
 import { WebGLGPUProgram } from './gpuprogram_webgl';
-import { primitiveTypeMap, typeMap } from './constants_webgl';
+import { primitiveTypeMap, textureMagFilterToWebGL, textureMinFilterToWebGL, textureWrappingMap, typeMap } from './constants_webgl';
 import { SamplerCache } from './sampler_cache';
 import { WebGLStructuredBuffer } from './structuredbuffer_webgl';
 import type { WebGLTextureSampler } from './sampler_webgl';
+import { WebGLBaseTexture } from './basetexture_webgl';
 
 declare global {
   interface WebGLRenderingContext {
@@ -132,6 +133,7 @@ const tempUint32Array = new Uint32Array(4);
 
 export class WebGLDevice extends BaseDevice {
   private _context: WebGLContext;
+  private _isWebGL2: boolean;
   private _msaaSampleCount: number;
   private _loseContextExtension: WEBGL_lose_context;
   private _contextLost: boolean;
@@ -152,6 +154,10 @@ export class WebGLDevice extends BaseDevice {
   private _samplerCache: SamplerCache;
   private _textureSamplerMap: WeakMap<BaseTexture, WebGLTextureSampler>;
   private _captureRenderBundle: WebGLRenderBundle;
+  private _deviceUniformBuffers: WebGLBuffer[];
+  private _deviceUniformBufferOffsets: number[];
+  private _bindTextures: Record<number, WebGLTexture[]>;
+  private _bindSamplers: WebGLSampler[];
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend);
     this._dpr = Math.max(1, Math.floor(options?.dpr ?? window.devicePixelRatio));
@@ -168,6 +174,7 @@ export class WebGLDevice extends BaseDevice {
     if (!context) {
       throw new Error('Invalid argument or no webgl support');
     }
+    this._isWebGL2 = isWebGL2(context);
     this._contextLost = false;
     this._reverseWindingOrder = false;
     this._deviceCaps = null;
@@ -179,6 +186,15 @@ export class WebGLDevice extends BaseDevice {
     this._currentBindGroupOffsets = [];
     this._currentViewport = null;
     this._currentScissorRect = null;
+    this._deviceUniformBuffers = [];
+    this._deviceUniformBufferOffsets = [];
+    this._bindTextures = {
+      [WebGLEnum.TEXTURE_2D]: [],
+      [WebGLEnum.TEXTURE_CUBE_MAP]: [],
+      [WebGLEnum.TEXTURE_3D]: [],
+      [WebGLEnum.TEXTURE_2D_ARRAY]: []
+    };
+    this._bindSamplers = [];
     this._samplerCache = new SamplerCache(this);
     this._textureSamplerMap = new WeakMap();
     this._loseContextExtension = this._context.getExtension('WEBGL_lose_context');
@@ -207,7 +223,7 @@ export class WebGLDevice extends BaseDevice {
     return this.getFramebuffer()?.getSampleCount() ?? this._msaaSampleCount;
   }
   get isWebGL2(): boolean {
-    return this._context && isWebGL2(this._context);
+    return this._isWebGL2;
   }
   get drawingBufferWidth() {
     return this.getDrawingBufferWidth();
@@ -250,6 +266,77 @@ export class WebGLDevice extends BaseDevice {
   }
   getBackBufferHeight(): number {
     return this.canvas.height;
+  }
+  invalidateBindingTextures() {
+    this._bindTextures = {
+      [WebGLEnum.TEXTURE_2D]: [],
+      [WebGLEnum.TEXTURE_CUBE_MAP]: [],
+      [WebGLEnum.TEXTURE_3D]: [],
+      [WebGLEnum.TEXTURE_2D_ARRAY]: []
+    };
+  }
+  bindTexture(target: number, layer: number, texture: WebGLBaseTexture, sampler?: WebGLTextureSampler) {
+    const tex = texture?.object ?? null;
+    const gl = this._context;
+    gl.activeTexture(WebGLEnum.TEXTURE0 + layer);
+    if (this._bindTextures[target][layer] !== tex) {
+      gl.bindTexture(target, tex);
+      this._bindTextures[target][layer] = tex;
+    }
+    if (this._isWebGL2) {
+      const samp = sampler?.object ?? null;
+      if (samp && this._bindSamplers[layer] !== samp) {
+        (gl as WebGL2RenderingContext).bindSampler(layer, samp);
+        this._bindSamplers[layer] = samp;
+      }
+    } else if (texture && sampler && this._textureSamplerMap.get(texture) !== sampler) {
+      const fallback = texture.isWebGL1Fallback;
+      this._textureSamplerMap.set(texture, sampler);
+      gl.texParameteri(
+        target,
+        WebGLEnum.TEXTURE_WRAP_S,
+        textureWrappingMap[false && fallback ? 'clamp' : sampler.addressModeU]
+      );
+      gl.texParameteri(
+        target,
+        WebGLEnum.TEXTURE_WRAP_T,
+        textureWrappingMap[false && fallback ? 'clamp' : sampler.addressModeV]
+      );
+      gl.texParameteri(
+        target,
+        WebGLEnum.TEXTURE_MAG_FILTER,
+        textureMagFilterToWebGL(sampler.magFilter)
+      );
+      gl.texParameteri(
+        target,
+        WebGLEnum.TEXTURE_MIN_FILTER,
+        textureMinFilterToWebGL(sampler.minFilter, fallback ? 'none' : sampler.mipFilter)
+      );
+      if (this.getDeviceCaps().textureCaps.supportAnisotropicFiltering) {
+        gl.texParameterf(target, WebGLEnum.TEXTURE_MAX_ANISOTROPY, sampler.maxAnisotropy);
+      }
+    }
+  }
+  bindUniformBuffer(index: number, buffer: WebGLGPUBuffer, offset: number) {
+    if (this._deviceUniformBuffers[index] !== buffer.object || this._deviceUniformBufferOffsets[index] !== offset) {
+      if (offset) {
+        (this.context as WebGL2RenderingContext).bindBufferRange(
+          WebGLEnum.UNIFORM_BUFFER,
+          index,
+          buffer.object,
+          offset,
+          buffer.byteLength - offset
+        );
+      } else {
+        (this.context as WebGL2RenderingContext).bindBufferBase(
+          WebGLEnum.UNIFORM_BUFFER,
+          index,
+          buffer.object
+        );
+      }
+      this._deviceUniformBuffers[index] = buffer.object;
+      this._deviceUniformBufferOffsets[index] = offset;
+    }
   }
   async initContext() {
     this.initContextState();
@@ -1035,6 +1122,15 @@ export class WebGLDevice extends BaseDevice {
     this.enableGPUTimeRecording(true);
     this._context._currentFramebuffer = undefined;
     this._context._currentProgram = undefined;
+    this._deviceUniformBuffers = [];
+    this._deviceUniformBufferOffsets = [];
+    this._bindTextures = {
+      [WebGLEnum.TEXTURE_2D]: [],
+      [WebGLEnum.TEXTURE_CUBE_MAP]: [],
+      [WebGLEnum.TEXTURE_3D]: [],
+      [WebGLEnum.TEXTURE_2D_ARRAY]: []
+    };
+    this._bindSamplers = [];
   }
   /** @internal */
   clearErrors() {

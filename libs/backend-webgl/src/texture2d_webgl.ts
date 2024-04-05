@@ -30,7 +30,8 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
       this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
     }
     const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
-    this._device.context.bindTexture(textureTargetMap[this._target], this._object);
+    this._device.bindTexture(textureTargetMap[this._target], 0, this)
+    //this._device.context.bindTexture(textureTargetMap[this._target], this._object);
     this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
     this._device.context.texSubImage2D(
       textureTargetMap[this._target],
@@ -63,7 +64,8 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
       this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
     }
     const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
-    this._device.context.bindTexture(textureTargetMap[this._target], this._object);
+    this._device.bindTexture(textureTargetMap[this._target], 0, this);
+    //this._device.context.bindTexture(textureTargetMap[this._target], this._object);
     this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
     if (x === 0 && y === 0 && width === data.width && height === data.height) {
       this._device.context.texSubImage2D(
@@ -169,7 +171,8 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
   generateMipmaps() {
     if (this._object && this._mipLevelCount > 1) {
       const target = textureTargetMap[this._target];
-      this._device.context.bindTexture(target, this._object);
+      this._device.bindTexture(target, 0, this);
+      //this._device.context.bindTexture(target, this._object);
       this._device.context.generateMipmap(target);
     }
   }
@@ -216,7 +219,8 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
     if (!this._device.isContextLost()) {
       const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
       const target = textureTargetMap[this._target];
-      this._device.context.bindTexture(target, this._object);
+      this._device.bindTexture(target, 0, this);
+      //this._device.context.bindTexture(target, this._object);
       (this.device as WebGLDevice).clearErrors();
       for (let i = 0; i < this._mipLevelCount; i++) {
         if (levels.isCompressed) {
@@ -266,7 +270,8 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
       const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
       (this.device as WebGLDevice).clearErrors();
       const target = textureTargetMap[this._target];
-      this._device.context.bindTexture(target, this._object);
+      this._device.bindTexture(target, 0, this);
+      //this._device.context.bindTexture(target, this._object);
       this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 4);
       this._device.context.texSubImage2D(target, 0, 0, 0, params.glFormat, params.glType[0], element);
       const err = (this.device as WebGLDevice).getError();

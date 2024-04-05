@@ -6,6 +6,8 @@ import { WebGLEnum } from './webgl_enum';
 import { cubeMapFaceMap } from './constants_webgl';
 import type { WebGLTextureCaps } from './capabilities_webgl';
 import type { WebGLDevice } from './device_webgl';
+import { WebGLTexture2D } from './texture2d_webgl';
+import { WebGLTextureCube } from './texturecube_webgl';
 
 type FrameBufferTextureAttachment = {
   texture: BaseTexture;
@@ -182,6 +184,7 @@ export class WebGLFrameBuffer
           for (const rb of entry[1]) {
             if (rb) {
               this._device.context.deleteTexture(rb.texture);
+              this._device.invalidateBindingTextures();
             }
           }
         }
@@ -318,7 +321,8 @@ export class WebGLFrameBuffer
                 0
               );
               if (tex.isTexture2D()) {
-                this._device.context.bindTexture(WebGLEnum.TEXTURE_2D, tex.object);
+                this._device.bindTexture(WebGLEnum.TEXTURE_2D, 0, (tex as WebGLTexture2D))
+                //this._device.context.bindTexture(WebGLEnum.TEXTURE_2D, tex.object);
                 this._device.context.copyTexSubImage2D(
                   WebGLEnum.TEXTURE_2D,
                   attachment.level,
@@ -330,7 +334,8 @@ export class WebGLFrameBuffer
                   texture.height
                 );
               } else if (tex.isTextureCube()) {
-                this._device.context.bindTexture(WebGLEnum.TEXTURE_CUBE_MAP, tex.object);
+                this._device.bindTexture(WebGLEnum.TEXTURE_CUBE_MAP, 0, tex as WebGLTextureCube);
+                //this._device.context.bindTexture(WebGLEnum.TEXTURE_CUBE_MAP, tex.object);
                 this._device.context.copyTexSubImage2D(
                   cubeMapFaceMap[attachment.face ?? CubeFace.PX],
                   attachment.level,
@@ -456,6 +461,7 @@ export class WebGLFrameBuffer
             this.device.getDeviceCaps().textureCaps as WebGLTextureCaps
           ).getTextureFormatInfo(info.texture.format);
           intermediateTexture = this._device.context.createTexture();
+          this._device.context.activeTexture(WebGLEnum.TEXTURE0);
           this._device.context.bindTexture(WebGLEnum.TEXTURE_2D, intermediateTexture);
           this._device.context.texImage2D(
             WebGLEnum.TEXTURE_2D,
@@ -469,6 +475,7 @@ export class WebGLFrameBuffer
             null
           );
           intermediateAttachments[info.level] = { texture: intermediateTexture, width, height };
+          this._device.bindTexture(WebGLEnum.TEXTURE_2D, 0, null);
         } else {
           intermediateTexture = intermediateAttachments[info.level].texture;
         }

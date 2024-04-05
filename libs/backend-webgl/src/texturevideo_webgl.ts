@@ -75,7 +75,8 @@ export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<
     if (!this._device.isContextLost()) {
       const target = textureTargetMap[this._target];
       const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
-      this._device.context.bindTexture(target, this._object);
+      this._device.bindTexture(target, 0, this);
+      //this._device.context.bindTexture(target, this._object);
       this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
       this._device.context.texImage2D(
         target,

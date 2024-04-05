@@ -11,7 +11,6 @@ import type {
   ShaderKind
 } from '@zephyr3d/device';
 import { semanticList } from '@zephyr3d/device';
-import { textureMagFilterToWebGL, textureMinFilterToWebGL, textureWrappingMap } from './constants_webgl';
 import type { WebGLTextureSampler } from './sampler_webgl';
 import type { WebGLBaseTexture } from './basetexture_webgl';
 import type { WebGLGPUBuffer } from './buffer_webgl';
@@ -149,6 +148,8 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
   setBlock(name: string, value: WebGLGPUBuffer, offset: number) {
     const info = this._blockInfo[name];
     if (info) {
+      this._device.bindUniformBuffer(info.index, value, offset);
+      /*
       if (offset) {
         (this._device.context as WebGL2RenderingContext).bindBufferRange(
           WebGLEnum.UNIFORM_BUFFER,
@@ -164,6 +165,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
           value.object
         );
       }
+      */
     } else {
       console.error(`Block not found: ${name}`);
     }
@@ -194,8 +196,10 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
       if (!this.checkLoad()) {
         return false;
       }
+      /*
       this._device.context._currentProgram = this;
       this._device.context.useProgram(this._object);
+      */
     }
     return true;
   }
@@ -265,13 +269,19 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
         this._object = null;
         return false;
       }
+      this._device.context._currentProgram = this;
+      this._device.context.useProgram(this._object);
       this._uniformSetters = this.createUniformSetters();
+    } else {
+      this._device.context._currentProgram = this;
+      this._device.context.useProgram(this._object);
     }
     return true;
   }
   private createUniformSetter(info: ProgramUniformInfo) {
     const loc = info.location;
     const isArray = info.isArray;
+    const gl = this._device.context;
     switch (info.type) {
       case WebGLEnum.FLOAT:
         return this.getUniformSetterfv(loc);
@@ -330,6 +340,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
         const unit = this._unitCounter;
         this._unitCounter += info.size;
         if (!isArray) {
+          gl.uniform1i(loc, unit);
           return this.getSamplerSetter(loc, WebGLEnum.TEXTURE_2D, unit);
         }
       }
@@ -340,6 +351,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
         const unit = this._unitCounter;
         this._unitCounter += info.size;
         if (!isArray) {
+          gl.uniform1i(loc, unit);
           return this.getSamplerSetter(loc, WebGLEnum.TEXTURE_2D_ARRAY, unit);
         }
       }
@@ -350,6 +362,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
         const unit = this._unitCounter;
         this._unitCounter += info.size;
         if (!isArray) {
+          gl.uniform1i(loc, unit);
           return this.getSamplerSetter(loc, WebGLEnum.TEXTURE_CUBE_MAP, unit);
         }
       }
@@ -359,6 +372,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
         const unit = this._unitCounter;
         this._unitCounter += info.size;
         if (!isArray) {
+          gl.uniform1i(loc, unit);
           return this.getSamplerSetter(loc, WebGLEnum.TEXTURE_3D, unit);
         }
       }
@@ -562,12 +576,14 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     };
   }
   private getSamplerSetter(location: WebGLUniformLocation, target: number, unit: number) {
+    return (texture: [WebGLBaseTexture, WebGLTextureSampler]) => this._device.bindTexture(target, unit, texture[0], texture[1]);
+    /*
     const gl = this._device.context;
     return isWebGL2(gl)
       ? (texture: [WebGLBaseTexture, WebGLTextureSampler]) => {
           const tex = texture?.[0].object ?? null;
           const sampler = texture?.[1].object ?? null;
-          gl.uniform1i(location, unit);
+          //gl.uniform1i(location, unit);
           gl.activeTexture(this._device.context.TEXTURE0 + unit);
           gl.bindTexture(target, tex);
           gl.bindSampler(unit, sampler);
@@ -575,7 +591,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
       : (texture: [WebGLBaseTexture, WebGLTextureSampler]) => {
           const tex = texture?.[0] ?? null;
           const sampler = texture?.[1] ?? null;
-          gl.uniform1i(location, unit);
+          //gl.uniform1i(location, unit);
           gl.activeTexture(this._device.context.TEXTURE0 + unit);
           gl.bindTexture(target, tex?.object ?? null);
           if (tex && sampler && this._device.getCurrentSamplerForTexture(tex) !== sampler) {
@@ -606,6 +622,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
             }
           }
         };
+    */
   }
   private getTypedArrayInfo(type: number): {
     ctor: TypedArrayConstructor<UniformBlockArray>;

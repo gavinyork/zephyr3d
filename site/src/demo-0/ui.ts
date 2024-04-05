@@ -8,6 +8,7 @@ interface GUIParams {
   iblLighting: boolean;
   punctualLighting: boolean;
   tonemap: boolean;
+  water: boolean;
   bloom: boolean;
   fxaa: boolean;
   FPS: string;
@@ -30,6 +31,7 @@ export class Panel {
       iblLighting: this._viewer.environmentLightEnabled,
       punctualLighting: this._viewer.punctualLightEnabled,
       tonemap: this._viewer.tonemapEnabled(),
+      water: this._viewer.waterEnabled(),
       bloom: this._viewer.bloomEnabled(),
       fxaa: this._viewer.FXAAEnabled(),
       FPS: ''
@@ -108,6 +110,11 @@ export class Panel {
     .name('FXAA')
     .onChange(value=>{
       this._viewer.enableFXAA(value);
+    });
+    ppSettings.add(this._params, 'water')
+    .name('Water')
+    .onChange(value=>{
+      this._viewer.enableWater(value);
     });
 
     const perfSettings = this._gui.addFolder('Performance');
