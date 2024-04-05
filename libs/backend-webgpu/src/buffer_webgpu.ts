@@ -46,7 +46,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     while (left <= right) {
       const mid = Math.floor((left + right) / 2);
       const upload = this._pendingUploads[mid];
-      if (upload.uploadOffset + upload.uploadSize < dstByteOffset) {
+      if (upload.uploadOffset < dstByteOffset) {
         left = mid + 1;
       } else {
         insertIndex = mid;

@@ -944,13 +944,24 @@ export class WebGLDevice extends BaseDevice {
       (this._context._currentFramebuffer as WebGLFrameBuffer)?.tagDraw();
     }
     if (this._captureRenderBundle) {
+      const rs = this._currentStateSet?.clone() ?? this.createRenderStateSet();
+      if (this._reverseWindingOrder) {
+        const rasterState = rs.rasterizerState;
+        if (!rasterState) {
+          rs.useRasterizerState().setCullMode('front');
+        } else if (rasterState.cullMode === 'back') {
+          rasterState.cullMode = 'front';
+        } else if (rasterState.cullMode === 'front') {
+          rasterState.cullMode = 'back';
+        }
+      }
       this._captureRenderBundle.push({
         bindGroups: [...this._currentBindGroups],
         bindGroupOffsets: this._currentBindGroupOffsets.map(val => val ? [...val] : null),
         program: this._currentProgram,
         vertexLayout: this._currentVertexData,
         primitiveType: primitiveType,
-        renderStateSet: this._currentStateSet?.clone() ?? null,
+        renderStateSet: rs,
         count,
         first,
         numInstances: 0
