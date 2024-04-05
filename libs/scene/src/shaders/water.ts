@@ -26,13 +26,13 @@ export function createProgramOcean(impl?: WaterShaderImpl) {
       this.$outputs.uv2 = pb.vec2();
       this.flip = pb.int().uniform(0);
       this.viewProjMatrix = pb.mat4().uniform(0);
-      this.modelMatrix = pb.mat4().uniform(0);
-      this.gridScale = pb.float().uniform(0);
+      this.modelMatrix = pb.mat4().uniform(1);
+      this.gridScale = pb.float().uniform(1);
       this.level = pb.float().uniform(0);
       this.sizes = pb.vec4().uniform(0);
       this.croppinesses = pb.vec4().uniform(0);
-      this.offset = pb.vec2().uniform(0);
-      this.scale = pb.float().uniform(0);
+      this.offset = pb.vec2().uniform(1);
+      this.scale = pb.float().uniform(1);
       this.dx_hy_dz_dxdz0 = pb.tex2D().uniform(0);
       this.sx_sz_dxdx_dzdz0 = pb.tex2D().uniform(0);
       this.dx_hy_dz_dxdz1 = pb.tex2D().uniform(0);
