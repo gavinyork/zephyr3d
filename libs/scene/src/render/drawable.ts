@@ -10,7 +10,8 @@ import type { DirectionalLight, GraphNode, PunctualLight, Scene } from '../scene
 import type { Compositor, CompositorContext } from '../posteffect';
 import type { RenderLogger } from '../logger/logger';
 import type { ClusteredLight } from './cluster_light';
-import { Material } from '../material';
+import type { Material } from '../material';
+import type { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 
 /**
  * The context for drawing objects
@@ -21,6 +22,8 @@ export interface DrawContext {
   primaryCamera: Camera;
   /** The render queue which is currently being rendered */
   renderQueue?: RenderQueue;
+  /** Global bind group allocator */
+  globalBindGroupAllocator: GlobalBindGroupAllocator;
   /** The camera for current drawing task */
   camera: Camera;
   /** The scene that is currently been drawing */

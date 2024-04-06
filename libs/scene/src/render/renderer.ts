@@ -13,6 +13,7 @@ import type { Camera } from '../camera';
 import type { Compositor } from '../posteffect';
 import type { RenderLogger } from '../logger/logger';
 import { ClusteredLight } from './cluster_light';
+import { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 
 /**
  * Forward render scheme
@@ -67,6 +68,7 @@ export class SceneRenderer {
     const ctx: DrawContext = {
       scene,
       primaryCamera: camera,
+      globalBindGroupAllocator: GlobalBindGroupAllocator.get(),
       camera,
       compositor: compositor?.needDrawPostEffects() ? compositor : null,
       timestamp: device.frameInfo.frameTimestamp,
@@ -84,6 +86,7 @@ export class SceneRenderer {
     if (camera && !device.isContextLost()) {
       this._renderScene(ctx);
     }
+    GlobalBindGroupAllocator.release(ctx.globalBindGroupAllocator);
   }
   /** @internal */
   protected static _renderSceneDepth(

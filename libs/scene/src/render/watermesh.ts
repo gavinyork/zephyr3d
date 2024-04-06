@@ -131,7 +131,6 @@ type Programs = {
   postfft2Program: GPUProgram;
   postfft2Program2: GPUProgram;
   postfft2Program4: GPUProgram;
-  waterProgram: GPUProgram;
 };
 
 type Globales = {
@@ -210,6 +209,7 @@ export class WaterMesh {
   private _dataTextureFormat: TextureFormat;
   private _renderMode: number;
   private _updateFrameStamp: number;
+  private _waterProgram: GPUProgram;
   constructor(device: AbstractDevice, impl?: WaterShaderImpl) {
     const renderTargetFloat32 = device.getDeviceCaps().textureCaps.supportFloatColorBuffer;
     const linearFloat32 = renderTargetFloat32 && device.getDeviceCaps().textureCaps.supportLinearFloatTexture;
@@ -260,12 +260,12 @@ export class WaterMesh {
           postfft2Program: this._renderMode === RENDER_NORMAL ? createProgramPostFFT2() : null,
           postfft2Program2: this._renderMode === RENDER_TWO_PASS ? createProgramPostFFT2(2) : null,
           postfft2Program4: this._renderMode === RENDER_TWO_PASS ? createProgramPostFFT2(4) : null,
-          waterProgram: createProgramOcean(impl)
         },
         quad: WaterMesh.createQuad(device),
         noiseTextures: new Map(),
         butterflyTextures: new Map()
       };
+      this._waterProgram = createProgramOcean(impl);
       this._params = defaultBuildParams;
       const programs = WaterMesh._globals.programs;
       this._h0BindGroup = device.createBindGroup(programs.h0Program.bindGroupLayouts[0]);
@@ -302,7 +302,7 @@ export class WaterMesh {
         ? device.createBindGroup(WaterMesh._globals.programs.postfft2Program4.bindGroupLayouts[0])
         : null;
       this._waterBindGroup = device.createBindGroup(
-        WaterMesh._globals.programs.waterProgram.bindGroupLayouts[0]
+        this._waterProgram.bindGroupLayouts[0]
       );
       this._instanceData = null;
       this._ifftTextures = null;
@@ -463,7 +463,7 @@ export class WaterMesh {
   getClipmapBindGroup(device: AbstractDevice) {
     let bindGroup = this._usedClipmapBindGroups.pop();
     if (!bindGroup) {
-      bindGroup = device.createBindGroup(WaterMesh._globals.programs.waterProgram.bindGroupLayouts[1]);
+      bindGroup = device.createBindGroup(this._waterProgram.bindGroupLayouts[1]);
     }
     this._freeClipmapBindGroups.push(bindGroup);
     return bindGroup;
@@ -481,7 +481,7 @@ export class WaterMesh {
     device.popDeviceStates();
     const cameraPos = camera.getWorldPosition();
     const instanceData = this.getInstanceData();
-    device.setProgram(WaterMesh._globals.programs.waterProgram);
+    device.setProgram(this._waterProgram);
     device.setBindGroup(0, this._waterBindGroup);
     device.setRenderStates(this._waterRenderStates);
     const sampler = this._linearRepeatSampler;

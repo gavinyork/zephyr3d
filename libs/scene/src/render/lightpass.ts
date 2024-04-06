@@ -34,17 +34,17 @@ export class LightPass extends RenderPass {
       ctx.env.light.type !== 'none' &&
       (ctx.env.light.envLight.hasRadiance() || ctx.env.light.envLight.hasIrradiance());
     ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
-    const info = this.getGlobalBindGroupInfo(ctx);
+    const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
     if (!flags.cameraSet[ctx.renderPassHash]) {
-      ShaderHelper.setCameraUniforms(info.bindGroup, ctx.camera, ctx.flip, !!device.getFramebuffer());
+      ShaderHelper.setCameraUniforms(bindGroup, ctx.camera, ctx.flip, !!device.getFramebuffer());
       flags.cameraSet[ctx.renderPassHash] = 1;
     }
     if (ctx.currentShadowLight) {
-      ShaderHelper.setLightUniformsShadow(info.bindGroup, ctx, lights[0]);
+      ShaderHelper.setLightUniformsShadow(bindGroup, ctx, lights[0]);
     } else {
       if (!flags.lightSet[ctx.renderPassHash]) {
         ShaderHelper.setLightUniforms(
-          info.bindGroup,
+          bindGroup,
           ctx,
           ctx.clusteredLight.clusterParam,
           ctx.clusteredLight.countParam,
@@ -56,7 +56,7 @@ export class LightPass extends RenderPass {
     }
     if (ctx.applyFog && !flags.fogSet[ctx.renderPassHash]) {
       ShaderHelper.setFogUniforms(
-        info.bindGroup,
+        bindGroup,
         ctx.env.sky.mappedFogType,
         baseLightPass ? ctx.env.sky.fogColor : Vector4.zero(),
         ctx.env.sky.fogParams,
@@ -65,7 +65,7 @@ export class LightPass extends RenderPass {
       );
       flags.fogSet[ctx.renderPassHash] = 1;
     }
-    device.setBindGroup(0, info.bindGroup);
+    device.setBindGroup(0, bindGroup);
     const reverseWinding = ctx.camera.worldMatrixDet < 0;
     for (const lit of itemList.lit) {
       this.drawItemList(device, lit, ctx, reverseWinding)

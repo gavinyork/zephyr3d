@@ -5,7 +5,7 @@ import type { RenderItemListInfo, RenderQueueItem } from './render_queue';
 import { RenderQueue } from './render_queue';
 import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
-import type { AbstractDevice, BindGroup, BindGroupLayout, RenderStateSet } from '@zephyr3d/device';
+import type { AbstractDevice, BindGroup, RenderStateSet } from '@zephyr3d/device';
 import { ShaderHelper } from '../material/shader/helper';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
 
@@ -17,7 +17,7 @@ export abstract class RenderPass {
   /** @internal */
   protected _type: number;
   /** @internal */
-  protected _globalBindGroups: Record<string, { bindGroup: BindGroup; layout: BindGroupLayout }>;
+  protected _globalBindGroups: Record<string, BindGroup>;
   /** @internal */
   protected _clearColor: Vector4;
   /** @internal */
@@ -79,7 +79,7 @@ export abstract class RenderPass {
     device.setRenderStates(stateSet);
   }
   /** @internal */
-  protected getGlobalBindGroupInfo(ctx: DrawContext): { bindGroup: BindGroup; layout: BindGroupLayout } {
+  protected getGlobalBindGroup(ctx: DrawContext): BindGroup {
     const hash = this.getGlobalBindGroupHash(ctx);
     let bindGroup = this._globalBindGroups[hash];
     if (!bindGroup) {
@@ -94,14 +94,8 @@ export abstract class RenderPass {
           pb.main(function () {});
         }
       });
-      bindGroup = {
-        bindGroup: Application.instance.device.createBindGroup(ret[2][0]),
-        layout: ret[2][0]
-      };
+      bindGroup =  Application.instance.device.createBindGroup(ret[2][0]);
       this._globalBindGroups[hash] = bindGroup;
-    }
-    if (bindGroup.bindGroup.disposed) {
-      bindGroup.bindGroup.reload();
     }
     return bindGroup;
   }

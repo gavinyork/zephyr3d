@@ -367,7 +367,6 @@ export class PostWater extends AbstractPostEffect {
       'targetSize',
       new Vector2(device.getViewport().width, device.getViewport().height)
     );
-    waterMesh.bindGroup.setValue('envLightStrength', ctx.env.light.strength);
     waterMesh.bindGroup.setValue('waterLevel', this._elevation);
     waterMesh.bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
     if (ctx.sunLight) {
@@ -375,7 +374,10 @@ export class PostWater extends AbstractPostEffect {
       waterMesh.bindGroup.setValue('lightShininess', 0.7);
       waterMesh.bindGroup.setValue('lightDiffuseAndIntensity', ctx.sunLight.diffuseAndIntensity);
     }
-    ctx.env.light.envLight.updateBindGroup(waterMesh.bindGroup);
+    if (ctx.env.light.envLight) {
+      waterMesh.bindGroup.setValue('envLightStrength', ctx.env.light.strength);
+      ctx.env.light.envLight.updateBindGroup(waterMesh.bindGroup);
+    }
     waterMesh.render(ctx.camera, this.needFlip(device));
     TemporalCache.releaseFramebuffer(fbRefl);
   }
@@ -424,7 +426,6 @@ export class PostWater extends AbstractPostEffect {
             scope.cameraPos = pb.vec3().uniform(0);
             scope.invViewProj = pb.mat4().uniform(0);
             scope.targetSize = pb.vec2().uniform(0);
-            scope.envLightStrength = pb.float().uniform(0);
             scope.waterLevel = pb.float().uniform(0);
             scope.srgbOut = pb.int().uniform(0);
             if (ctx.sunLight) {
@@ -433,7 +434,10 @@ export class PostWater extends AbstractPostEffect {
               scope.lightDiffuseAndIntensity = pb.vec4().uniform(0);
             }
           }
-          ctx.env.light.envLight.initShaderBindings(pb);
+          if (ctx.env.light.envLight) {
+            scope.envLightStrength = pb.float().uniform(0);
+            ctx.env.light.envLight.initShaderBindings(pb);
+          }
         },
         shading(
           scope: PBInsideFunctionScope,
@@ -548,10 +552,12 @@ export class PostWater extends AbstractPostEffect {
                 );
                 this.finalColor = pb.add(this.finalColor, this.specular);
               }
-              const irradiance = ctx.env.light.envLight.getIrradiance(this, this.myNormal);
-              if (irradiance) {
-                this.$l.sss = pb.mul(this.getScattering(this.depth), irradiance, this.envLightStrength);
-                this.finalColor = pb.add(this.finalColor, this.sss);
+              if (ctx.env.light.envLight) {
+                const irradiance = ctx.env.light.envLight.getIrradiance(this, this.myNormal);
+                if (irradiance) {
+                  this.$l.sss = pb.mul(this.getScattering(this.depth), irradiance, this.envLightStrength);
+                  this.finalColor = pb.add(this.finalColor, this.sss);
+                }
               }
               this.$if(pb.notEqual(this.srgbOut, 0), function () {
                 this.finalColor = linearToGamma(this, this.finalColor);
