@@ -9,6 +9,8 @@ import type { Scene } from '../scene/scene';
 import type { BaseCameraController } from './base';
 import type { RenderLogger } from '../logger/logger';
 
+export type OITType = 'none'|'weighted-blended';
+
 /**
  * The camera node class
  * @public
@@ -46,6 +48,8 @@ export class Camera extends SceneNode {
   protected _clearColor: Vector4;
   /** @internal */
   protected _clipMask: number;
+  /** @internal */
+  protected _oitType: OITType;
   /**
    * Creates a new camera node
    * @param scene - The scene that the camera belongs to
@@ -68,6 +72,7 @@ export class Camera extends SceneNode {
     this._sampleCount = 1;
     this._frustum = null;
     this._frustumV = null;
+    this._oitType = 'none';
   }
   /** Clip plane in camera space */
   get clipPlane(): Plane {
@@ -92,6 +97,13 @@ export class Camera extends SceneNode {
     } else {
       this._sampleCount = val;
     }
+  }
+  /** OIT type */
+  get oitType(): OITType {
+    return this._oitType;
+  }
+  set oitType(val: OITType) {
+    this._oitType = val;
   }
   /** Clip plane mask */
   get clipMask(): number {

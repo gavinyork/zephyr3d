@@ -68,6 +68,7 @@ export class SceneRenderer {
     const ctx: DrawContext = {
       scene,
       primaryCamera: camera,
+      oitType: 'none',
       globalBindGroupAllocator: GlobalBindGroupAllocator.get(),
       camera,
       compositor: compositor?.needDrawPostEffects() ? compositor : null,
@@ -147,6 +148,7 @@ export class SceneRenderer {
       this._enableDepthPass ||
       oversizedViewport ||
       ctx.scene.env.needSceneDepthTexture() ||
+      ctx.primaryCamera.oitType !== 'none',
       ctx.compositor?.requireLinearDepth()
     ) {
       const format: TextureFormat = device.type === 'webgl' ? 'rgba8unorm' : 'r32f';

@@ -1,0 +1,110 @@
+import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, PBInsideFunctionScope, PBShaderExp, RenderStateSet, Texture2D } from "@zephyr3d/device";
+import { OIT } from "./oit";
+import { DrawContext } from "./drawable";
+import { Application } from "../app";
+import { drawFullscreenQuad } from "./fullscreenquad";
+
+export class WeightedBlendedOIT extends OIT {
+  private static _compositeProgram: GPUProgram;
+  private static _compositeBindGroup: BindGroup;
+  private static _compositeRenderStates: RenderStateSet;
+  private _accumBuffer: FrameBuffer;
+  constructor() {
+    super();
+    this._accumBuffer = null;
+  }
+  getNumPasses(): number {
+    return 1;
+  }
+  begin(ctx: DrawContext) {
+    const device = Application.instance.device;
+    const accumBuffer = this.getAccumFramebuffer(ctx, device);
+    device.pushDeviceStates();
+    device.setFramebuffer(accumBuffer);
+  }
+  end(ctx: DrawContext) {
+    const device = Application.instance.device;
+    const accumBuffer = device.getFramebuffer();
+    device.popDeviceStates();
+    const accumTargets = accumBuffer.getColorAttachments();
+    this.composite(ctx, device, accumTargets[0] as Texture2D, accumTargets[1] as Texture2D);
+  }
+  outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp, pass: number) {
+    const pb = scope.$builder;
+    pb.func('Z_WBOIT_depthWeight', [pb.float('z'), pb.float('a')], function(){
+      this.$return(pb.clamp(pb.mul(pb.pow(pb.add(pb.min(1, pb.mul(this.a, 10)), 0.01), 3), 1e8, pb.pow(pb.sub(1, pb.mul(this.z, 0.9)), 2)), 1e-2, 3e3));
+    });
+    pb.func('Z_WBOIT_output', [pb.vec4('color')], function(){
+      this.$l.w = this.Z_WBOIT_depthWeight(this.$builtins.fragCoord.z, this.color.a);
+      this.$outputs[0] = pb.vec4(pb.mul(this.color.rgb, this.w), this.color.a);
+      this.$outputs[1] = pb.vec4(pb.mul(this.color.a, this.w));
+    });
+    scope.Z_WBOIT_output(color);
+  }
+  setRenderStates(rs: RenderStateSet) {
+    const blendingState = rs.useBlendingState();
+    blendingState.setBlendEquation('add', 'add');
+    blendingState.setBlendFuncRGB('one', 'one');
+    blendingState.setBlendFuncAlpha('zero', 'inv-src-alpha');
+    const depthState = rs.useDepthState();
+    depthState.enableWrite(false).enableTest(true);
+  }
+  private composite(ctx: DrawContext, device: AbstractDevice, accumColor: Texture2D, accumAlpha: Texture2D) {
+    device.setProgram(WeightedBlendedOIT.getCompositeProgram(device))
+    WeightedBlendedOIT._compositeBindGroup.setTexture('accumColorTex', accumColor);
+    WeightedBlendedOIT._compositeBindGroup.setTexture('accumAlphaTex', accumAlpha);
+    device.setBindGroup(0, WeightedBlendedOIT._compositeBindGroup);
+    drawFullscreenQuad(WeightedBlendedOIT._compositeRenderStates);
+  }
+  private getAccumFramebuffer(ctx: DrawContext, device: AbstractDevice) {
+    const vp = device.getViewport();
+    const width = device.screenToDevice(vp.width);
+    const height = device.screenToDevice(vp.height);
+    if (this._accumBuffer) {
+      if (this._accumBuffer.getWidth() !== width || this._accumBuffer.getHeight() !== height || this._accumBuffer.getDepthAttachment() !== ctx.depthTexture) {
+        this._accumBuffer.dispose();
+        this._accumBuffer = null;
+      }
+    }
+    if (!this._accumBuffer) {
+      const accumColor = device.createTexture2D('rgba16f', width, height, { samplerOptions: { mipFilter: 'none' }});
+      const accumAlpha = device.createTexture2D(device.type === 'webgl' ? 'rgba16f' : 'r16f', width, height, { samplerOptions: { mipFilter: 'none' }});
+      this._accumBuffer = device.createFrameBuffer([accumColor, accumAlpha], ctx.depthTexture);
+    }
+    return this._accumBuffer;
+  }
+  private static getCompositeProgram(device: AbstractDevice) {
+    if (!this._compositeProgram) {
+      this._compositeProgram = device.buildRenderProgram({
+        vertex(pb){
+          this.$inputs.pos = pb.vec2().attrib('position');
+          this.$outputs.uv = pb.vec2();
+          pb.main(function () {
+            this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+            if (device.type === 'webgpu') {
+              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+            }
+          });
+        },
+        fragment(pb){
+          this.$outputs.outColor = pb.vec4();
+          this.accumColorTex = pb.tex2D().uniform(0);
+          this.accumAlphaTex = pb.tex2D().uniform(0);
+          pb.main(function () {
+            this.$l.accumColor = pb.textureSample(this.accumColorTex, this.$inputs.uv);
+            this.$l.accumAlpha = pb.textureSample(this.accumAlphaTes, this.$inputs.uv);
+            this.$l.a = pb.sub(1, this.accumColor.a);
+            this.accumColor.a = this.accumAlpha.r;
+            this.$outputs.outColor = pb.vec4(pb.div(pb.mul(this.accumColor.rgb, this.a), pb.clamp(this.accumColor.a, 0.001, 50000)), this.a);
+          });
+        }
+      });
+      this._compositeBindGroup = device.createBindGroup(this._compositeProgram.bindGroupLayouts[0]);
+      this._compositeRenderStates = device.createRenderStateSet();
+      this._compositeRenderStates.useBlendingState().setBlendFuncRGB('one', 'inv-src-alpha').setBlendFuncAlpha('zero', 'one');
+      this._compositeRenderStates.useDepthState().enableTest(true).enableWrite(false);
+    }
+    return this._compositeProgram;
+  }
+}

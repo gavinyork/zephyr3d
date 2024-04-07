@@ -96,6 +96,7 @@ export class LightPass extends RenderPass {
     for (let i = 0; i < 2; i++) {
       ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none' ? ctx.env.sky.fogType : null;
       ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
+      ctx.oitType = i === 0 ? 'none' : ctx.primaryCamera.oitType;
       for (const order of orders) {
         const items = renderQueue.items[order];
         const lists = [items.opaque, items.transparent];

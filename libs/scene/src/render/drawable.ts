@@ -1,7 +1,7 @@
 import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
 import type { Texture2D, TextureFormat } from '@zephyr3d/device';
 import type { XForm } from '../scene/xform';
-import type { Camera } from '../camera/camera';
+import type { Camera, OITType } from '../camera/camera';
 import type { FogType, RenderPass } from '.';
 import type { DrawableInstanceInfo, InstanceData, RenderQueue, RenderQueueRef } from './render_queue';
 import type { ShadowMapParams } from '../shadow';
@@ -26,6 +26,8 @@ export interface DrawContext {
   globalBindGroupAllocator: GlobalBindGroupAllocator;
   /** The camera for current drawing task */
   camera: Camera;
+  /** OIT type */
+  oitType: OITType;
   /** The scene that is currently been drawing */
   scene: Scene;
   /** The render pass to which the current drawing task belongs */

@@ -1792,21 +1792,23 @@ export class ProgramBuilder {
     variable.$location = location;
     variable.$declareType = AST.DeclareType.DECLARE_TYPE_OUT;
     this._outputs[location] = [name, new AST.ASTDeclareVar(new AST.ASTPrimitive(variable))];
-    Object.defineProperty(this._outputScope, name, {
-      get: function (this: PBOutputScope) {
-        return variable;
-      },
-      set: function (this: PBOutputScope, v) {
-        getCurrentProgramBuilder()
-          .getCurrentScope()
-          .$ast.statements.push(
-            new AST.ASTAssignment(
-              new AST.ASTLValueScalar(variable.$ast),
-              v instanceof PBShaderExp ? v.$ast : v
-            )
-          );
-      }
-    });
+    for (const prop of [name, String(location)]) {
+      Object.defineProperty(this._outputScope, prop, {
+        get: function (this: PBOutputScope) {
+          return variable;
+        },
+        set: function (this: PBOutputScope, v) {
+          getCurrentProgramBuilder()
+            .getCurrentScope()
+            .$ast.statements.push(
+              new AST.ASTAssignment(
+                new AST.ASTLValueScalar(variable.$ast),
+                v instanceof PBShaderExp ? v.$ast : v
+              )
+            );
+        }
+      });
+    }
   }
   /** @internal */
   getDefaultSampler(t: PBShaderExp, comparison: boolean): PBShaderExp {
