@@ -1,6 +1,6 @@
 import * as zip from '@zip.js/zip.js';
 import { Vector4, Vector3 } from '@zephyr3d/base';
-import { SceneNode, Scene, AnimationSet, BatchGroup } from '@zephyr3d/scene';
+import { SceneNode, Scene, AnimationSet, BatchGroup, PostWater } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
 import {
   BoundingBox,
@@ -25,9 +25,11 @@ export class GLTFViewer {
   private _assetManager: AssetManager;
   private _scene: Scene;
   private _tonemap: Tonemap;
+  private _water: PostWater;
   private _bloom: Bloom;
   private _fxaa: FXAA;
   private _doTonemap: boolean;
+  private _doWater: boolean;
   private _doBloom: boolean;
   private _doFXAA: boolean;
   private _camera: PerspectiveCamera;
@@ -50,11 +52,13 @@ export class GLTFViewer {
     //this._ui = new UI(this);
     this._assetManager = new AssetManager();
     this._tonemap = new Tonemap();
+    this._water = new PostWater(0);
     this._bloom = new Bloom();
     this._bloom.threshold = 0.85;
     this._bloom.intensity = 1.5;
     this._fxaa = new FXAA();
     this._doTonemap = true;
+    this._doWater = false;
     this._doBloom = true;
     this._doFXAA = true;
     this._fov = Math.PI / 3;
@@ -208,11 +212,17 @@ export class GLTFViewer {
   tonemapEnabled(): boolean {
     return this._doTonemap;
   }
+  waterEnabled(): boolean {
+    return this._doWater;
+  }
   FXAAEnabled(): boolean {
     return this._doFXAA;
   }
   syncPostEffects() {
     this._compositor.clear();
+    if (this._doWater) {
+      this._compositor.appendPostEffect(this._water);
+    }
     if (this._doTonemap) {
       this._compositor.appendPostEffect(this._tonemap);
     }
@@ -245,6 +255,12 @@ export class GLTFViewer {
   enableTonemap(enable: boolean) {
     if (!!enable !== this._doTonemap) {
       this._doTonemap = !!enable;
+      this.syncPostEffects();
+    }
+  }
+  enableWater(enable: boolean){
+    if (!!enable !== this._doWater) {
+      this._doWater = !!enable;
       this.syncPostEffects();
     }
   }

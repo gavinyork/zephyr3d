@@ -8,9 +8,10 @@ interface GUIParams {
   iblLighting: boolean;
   punctualLighting: boolean;
   tonemap: boolean;
+  water: boolean;
   bloom: boolean;
   fxaa: boolean;
-  FPS: number;
+  FPS: string;
   animation?: string;
 }
 
@@ -30,9 +31,10 @@ export class Panel {
       iblLighting: this._viewer.environmentLightEnabled,
       punctualLighting: this._viewer.punctualLightEnabled,
       tonemap: this._viewer.tonemapEnabled(),
+      water: this._viewer.waterEnabled(),
       bloom: this._viewer.bloomEnabled(),
       fxaa: this._viewer.FXAAEnabled(),
-      FPS: 0
+      FPS: ''
     };
     this._animationController = null;
     this.create();
@@ -109,42 +111,16 @@ export class Panel {
     .onChange(value=>{
       this._viewer.enableFXAA(value);
     });
-  }
-  /*
-  renderSettings(){
-    ImGui.SetNextWindowPos(new ImGui.ImVec2(0, 0), ImGui.Cond.Always);
-    ImGui.SetNextWindowSize(new ImGui.ImVec2(300, Math.min(500, Application.instance.device.getViewport().height)), ImGui.Cond.Always);
-    if (ImGui.Begin('Settings')){
-      ImGui.EndSection(1);
+    ppSettings.add(this._params, 'water')
+    .name('Water')
+    .onChange(value=>{
+      this._viewer.enableWater(value);
+    });
 
-      const animations = this._viewer.animationSet?.getAnimationNames() ?? [];
-      if (animations.length > 0) {
-        ImGui.BeginSection('Animation');
-        const index = [animations.findIndex(ani => this._viewer.animationSet.isPlayingAnimation(ani))] as [number];
-        ImGui.SetNextItemWidth(150);
-        if (ImGui.Combo('Animation', index, animations)){
-          this._viewer.animationSet.playAnimation(animations[index[0]]);
-        }
-        ImGui.EndSection(1);
-      }
-      if (ImGui.BeginChild('')) {
-        ImGui.TextWrapped('Usage:');
-        ImGui.TextWrapped('Drag GLTF/GLB/ZIP to view model.');
-        ImGui.TextWrapped('Drag HDR to change environment.');
-        ImGui.TextWrapped('Note:')
-        ImGui.TextWrapped('Morph target animation currently not supported.');
-      }
-      ImGui.EndChild();
-    }
-    ImGui.End();
+    const perfSettings = this._gui.addFolder('Performance');
+    perfSettings.add(this._params, 'FPS').name('FPS').disable(true).listen();
+    setInterval(() => {
+      this._params.FPS = Application.instance.device.frameInfo.FPS.toFixed(2);
+    }, 1000);
   }
-  private renderStatusBar() {
-    if (ImGui.BeginStatusBar()) {
-      ImGui.Text(`Device: ${Application.instance.device.type}`);
-      ImGui.Text(`FPS: ${Application.instance.device.frameInfo.FPS.toFixed(2)}`);
-      ImGui.Text(`DrawCall: ${Application.instance.device.frameInfo.drawCalls}`);
-      ImGui.EndStatusBar();
-    }
-  }
-  */
 }
