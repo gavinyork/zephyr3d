@@ -23,7 +23,7 @@ export class LightPass extends RenderPass {
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return `lp:${this._shadowMapHash}:${ctx.env.getHash(ctx)}`;
+    return `lp:${this._shadowMapHash}:${ctx.oit?.calculateHash() ?? ''}:${ctx.env.getHash(ctx)}`;
   }
   /** @internal */
   protected renderLightPass(ctx: DrawContext, itemList: RenderItemListBundle, lights: PunctualLight[], flags: any) {
@@ -83,8 +83,9 @@ export class LightPass extends RenderPass {
     ctx.env = ctx.scene.env;
     ctx.drawEnvLight = false;
     ctx.flip = this.isAutoFlip();
-    renderQueue.sortItems();
-
+    if (!ctx.primaryCamera.oit) {
+      renderQueue.sortTransparentItems();
+    }
     const flags: any = {
       lightSet: {},
       cameraSet: {},
@@ -96,25 +97,34 @@ export class LightPass extends RenderPass {
     for (let i = 0; i < 2; i++) {
       ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none' ? ctx.env.sky.fogType : null;
       ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
-      ctx.oitType = i === 0 ? 'none' : ctx.primaryCamera.oitType;
-      for (const order of orders) {
-        const items = renderQueue.items[order];
-        const lists = [items.opaque, items.transparent];
-        let lightIndex = 0;
-        if (ctx.shadowMapInfo) {
-          for (const k of ctx.shadowMapInfo.keys()) {
-            ctx.currentShadowLight = k;
+      ctx.oit = i === 0 ? null : ctx.primaryCamera.oit;
+      const oitPass = ctx.oit ? ctx.oit.getNumPasses() : 1;
+      for (let p = 0; p < oitPass; p++) {
+        if (ctx.oit) {
+          ctx.oit.begin(ctx, p);
+        }
+        for (const order of orders) {
+          const items = renderQueue.items[order];
+          const lists = [items.opaque, items.transparent];
+          let lightIndex = 0;
+          if (ctx.shadowMapInfo) {
+            for (const k of ctx.shadowMapInfo.keys()) {
+              ctx.currentShadowLight = k;
+              ctx.lightBlending = lightIndex > 0;
+              this._shadowMapHash = ctx.shadowMapInfo.get(k).shaderHash;
+              this.renderLightPass(ctx, lists[i], [k], flags);
+              lightIndex++;
+            }
+          }
+          if (lightIndex === 0 || renderQueue.unshadowedLights.length > 0) {
+            ctx.currentShadowLight = null;
             ctx.lightBlending = lightIndex > 0;
-            this._shadowMapHash = ctx.shadowMapInfo.get(k).shaderHash;
-            this.renderLightPass(ctx, lists[i], [k], flags);
-            lightIndex++;
+            this._shadowMapHash = '';
+            this.renderLightPass(ctx, lists[i], renderQueue.unshadowedLights, flags);
           }
         }
-        if (lightIndex === 0 || renderQueue.unshadowedLights.length > 0) {
-          ctx.currentShadowLight = null;
-          ctx.lightBlending = lightIndex > 0;
-          this._shadowMapHash = '';
-          this.renderLightPass(ctx, lists[i], renderQueue.unshadowedLights, flags);
+        if (ctx.oit) {
+          ctx.oit.end(ctx, p);
         }
       }
       if (i === 0) {

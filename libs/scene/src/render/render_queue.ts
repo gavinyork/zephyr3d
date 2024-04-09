@@ -431,7 +431,7 @@ export class RenderQueue {
   /**
    * Sorts the items in the render queue for rendering
    */
-  sortItems() {
+  sortTransparentItems() {
     for (const list of Object.values(this._itemLists)) {
       list.transparent.lit[0].itemList.sort((a, b) => b.sortDistance - a.sortDistance);
       list.transparent.lit[0].skinItemList.sort((a, b) => b.sortDistance - a.sortDistance);

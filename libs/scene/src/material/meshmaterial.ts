@@ -326,6 +326,9 @@ export class MeshMaterial extends Material {
     } else {
       stateSet.defaultRasterizerState();
     }
+    if (ctx.oit) {
+      ctx.oit.setRenderStates(stateSet);
+    }
   }
   /**
    * Submit Uniform values before rendering with this material.
@@ -462,7 +465,11 @@ export class MeshMaterial extends Material {
         });
       },
       fragment(pb) {
-        this.$outputs.zFragmentOutput = pb.vec4();
+        if (that.drawContext.oit) {
+          that.drawContext.oit.setupFragmentOutput(this);
+        } else {
+          this.$outputs.zFragmentOutput = pb.vec4();
+        }
         pb.main(function () {
           that.fragmentShader(this);
         });
@@ -506,7 +513,11 @@ export class MeshMaterial extends Material {
           });
         }
         if (that.isTransparentPass(that.pass)) {
-          this.outColor = pb.vec4(pb.mul(this.outColor.rgb, this.outColor.a), this.outColor.a);
+          if (that.drawContext.oit) {
+            that.drawContext.oit.outputFragmentColor(this, this.outColor);
+          } else {
+            this.outColor = pb.vec4(pb.mul(this.outColor.rgb, this.outColor.a), this.outColor.a);
+          }
         }
         ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext);
         this.$outputs.zFragmentOutput = ShaderHelper.encodeColorOutput(this, this.outColor);

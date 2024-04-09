@@ -6,13 +6,11 @@ import {
   Compositor,
   Tonemap,
   BatchGroup,
-  AssetManager,
-  PBRMetallicRoughnessMaterial,
   DirectionalLight,
   BoxShape,
   LambertMaterial,
   Mesh,
-  InstanceBindGroupAllocator,
+  WeightedBlendedOIT,
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
@@ -27,6 +25,7 @@ instancingApp.ready().then(async () => {
   const device = instancingApp.device;
   await imGuiInit(device);
   const scene = new Scene();
+  scene.env.sky.fogType = 'none';
   const camera = new PerspectiveCamera(
     scene,
     Math.PI / 3,
@@ -36,6 +35,8 @@ instancingApp.ready().then(async () => {
   );
   camera.position.setXYZ(0, 0, 10);
   camera.controller = new OrbitCameraController();
+  camera.oit = new WeightedBlendedOIT();
+
   instancingApp.inputManager.use(imGuiInjectEvent);
   instancingApp.inputManager.use(camera.handleEvent.bind(camera));
   const inspector = new common.Inspector(scene, null, camera);
@@ -46,16 +47,21 @@ instancingApp.ready().then(async () => {
   const batchGroup = new BatchGroup(scene);
   const boxShape = new BoxShape();
   const mat = new LambertMaterial();
-  const boxMesh = new Mesh(scene, boxShape, mat.createInstance());
-  boxMesh.position.setXYZ(5, 0, 0);
+  mat.blendMode = 'blend';
+  const mat1 = mat.createInstance();
+  mat1.albedoColor = new Vector4(0, 1, 0, 0.02);
+  const boxMesh = new Mesh(scene, boxShape, mat1);
+  boxMesh.position.setXYZ(1, 0, 0);
   boxMesh.parent = batchGroup;
-  const boxMesh2 = new Mesh(scene, boxShape, mat.createInstance());
-  boxMesh2.position.setXYZ(-5, 0, 0);
+  const mat2 = mat.createInstance();
+  mat2.albedoColor = new Vector4(1, 0, 0, 0.98);
+  const boxMesh2 = new Mesh(scene, boxShape, mat2);
+  boxMesh2.position.setXYZ(-1, 0, 0);
   boxMesh2.parent = batchGroup;
 
   /*
   const assetManager = new AssetManager();
-  for (let i = 0; i < 2000; i++) {
+  for (let i = 0; i < 2; i++) {
     assetManager.fetchModel(scene, 'assets/stone1.glb', { enableInstancing: true }).then((info) => {
       info.group.parent = batchGroup;
       info.group.position.setXYZ(
@@ -103,7 +109,7 @@ instancingApp.ready().then(async () => {
   });
   instancingApp.on('tick', (ev) => {
     camera.updateController();
-    camera.render(scene);
+    camera.render(scene, compositor);
     imGuiNewFrame();
     inspector.render();
     imGuiEndFrame();

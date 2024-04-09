@@ -8,6 +8,7 @@ import type { Compositor } from '../posteffect';
 import type { Scene } from '../scene/scene';
 import type { BaseCameraController } from './base';
 import type { RenderLogger } from '../logger/logger';
+import type { OIT } from '../render/oit';
 
 export type OITType = 'none'|'weighted-blended';
 
@@ -49,7 +50,7 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _clipMask: number;
   /** @internal */
-  protected _oitType: OITType;
+  protected _oit: OIT;
   /**
    * Creates a new camera node
    * @param scene - The scene that the camera belongs to
@@ -72,7 +73,7 @@ export class Camera extends SceneNode {
     this._sampleCount = 1;
     this._frustum = null;
     this._frustumV = null;
-    this._oitType = 'none';
+    this._oit = null;
   }
   /** Clip plane in camera space */
   get clipPlane(): Plane {
@@ -98,12 +99,12 @@ export class Camera extends SceneNode {
       this._sampleCount = val;
     }
   }
-  /** OIT type */
-  get oitType(): OITType {
-    return this._oitType;
+  /** OIT */
+  get oit(): OIT {
+    return this._oit;
   }
-  set oitType(val: OITType) {
-    this._oitType = val;
+  set oit(val: OIT) {
+    this._oit = val;
   }
   /** Clip plane mask */
   get clipMask(): number {
