@@ -84,7 +84,7 @@ export class LightPass extends RenderPass {
     ctx.drawEnvLight = false;
     ctx.flip = this.isAutoFlip();
     if (!ctx.primaryCamera.oit) {
-      renderQueue.sortTransparentItems();
+      renderQueue.sortTransparentItems(ctx.primaryCamera.getWorldPosition());
     }
     const flags: any = {
       lightSet: {},

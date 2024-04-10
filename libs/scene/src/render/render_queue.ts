@@ -1,5 +1,5 @@
 import { Application } from '../app';
-import type { Vector4 } from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';
 import type { BatchDrawable, Drawable } from './drawable';
 import type { DirectionalLight, PunctualLight } from '../scene/light';
@@ -431,13 +431,17 @@ export class RenderQueue {
   /**
    * Sorts the items in the render queue for rendering
    */
-  sortTransparentItems() {
+  sortTransparentItems(cameraPos: Vector3) {
     for (const list of Object.values(this._itemLists)) {
-      list.transparent.lit[0].itemList.sort((a, b) => b.sortDistance - a.sortDistance);
-      list.transparent.lit[0].skinItemList.sort((a, b) => b.sortDistance - a.sortDistance);
-      list.transparent.unlit[0].itemList.sort((a, b) => b.sortDistance - a.sortDistance);
-      list.transparent.unlit[0].skinItemList.sort((a, b) => b.sortDistance - a.sortDistance);
+      list.transparent.lit[0].itemList.sort((a, b) => this.drawableDistanceToCamera(b.drawable, cameraPos) - this.drawableDistanceToCamera(a.drawable, cameraPos));
+      list.transparent.lit[0].skinItemList.sort((a, b) => this.drawableDistanceToCamera(b.drawable, cameraPos) - this.drawableDistanceToCamera(a.drawable, cameraPos));
+      list.transparent.unlit[0].itemList.sort((a, b) => this.drawableDistanceToCamera(b.drawable, cameraPos) - this.drawableDistanceToCamera(a.drawable, cameraPos));
+      list.transparent.unlit[0].skinItemList.sort((a, b) => this.drawableDistanceToCamera(b.drawable, cameraPos) - this.drawableDistanceToCamera(a.drawable, cameraPos));
     }
+  }
+  private drawableDistanceToCamera(drawable: Drawable, cameraPos: Vector3) {
+    const drawablePos = drawable.getXForm().position;
+    return Vector3.distanceSq(drawablePos, cameraPos);
   }
   private newRenderItemList(empty: boolean): RenderItemList {
     return {
