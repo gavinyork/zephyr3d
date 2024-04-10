@@ -149,7 +149,7 @@ export class SceneRenderer {
       this._enableDepthPass ||
       oversizedViewport ||
       ctx.scene.env.needSceneDepthTexture() ||
-      ctx.primaryCamera.oit,
+      ctx.primaryCamera.oit ||
       ctx.compositor?.requireLinearDepth()
     ) {
       const format: TextureFormat = device.type === 'webgl' ? 'rgba8unorm' : 'r32f';

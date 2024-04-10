@@ -33,7 +33,7 @@ instancingApp.ready().then(async () => {
     1,
     1000
   );
-  camera.position.setXYZ(0, 0, 10);
+  camera.position.setXYZ(0, 0, 30);
   camera.controller = new OrbitCameraController();
   camera.oit = new WeightedBlendedOIT();
 
@@ -48,16 +48,20 @@ instancingApp.ready().then(async () => {
   const boxShape = new BoxShape();
   const mat = new LambertMaterial();
   mat.blendMode = 'blend';
-  const mat1 = mat.createInstance();
-  mat1.albedoColor = new Vector4(0, 1, 0, 0.02);
-  const boxMesh = new Mesh(scene, boxShape, mat1);
-  boxMesh.position.setXYZ(1, 0, 0);
-  boxMesh.parent = batchGroup;
-  const mat2 = mat.createInstance();
-  mat2.albedoColor = new Vector4(1, 0, 0, 0.98);
-  const boxMesh2 = new Mesh(scene, boxShape, mat2);
-  boxMesh2.position.setXYZ(-1, 0, 0);
-  boxMesh2.parent = batchGroup;
+  for (let i = 0; i < 100; i++) {
+    const instanceMat = mat.createInstance();
+    instanceMat.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), Math.random());
+    const boxMesh = new Mesh(scene, boxShape, instanceMat);
+    boxMesh.position.setXYZ(Math.random() * 5 - 2.5, Math.random() * 5 - 2.5, Math.random() * 5 - 2.5);
+    boxMesh.parent = batchGroup;
+  }
+  const mat2 = new LambertMaterial();
+  mat2.albedoColor = new Vector4(1,0,0,1);
+  const mesh2 = new Mesh(scene, boxShape, mat2);
+  mesh2.scale = new Vector3(4, 4, 4);
+  mesh2.parent = batchGroup;
+
+
 
   /*
   const assetManager = new AssetManager();
