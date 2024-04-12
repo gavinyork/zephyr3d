@@ -329,6 +329,8 @@ export abstract class WebGPUBaseTexture<
   abstract createView(level?: number, face?: number, mipCount?: number): GPUTextureView;
   /** @internal */
   private sync() {
+    this._device.flush();
+    /*
     if (this._pendingUploads) {
       if (this._device.isTextureUploading(this as WebGPUBaseTexture)) {
         this._device.currentPass.end();
@@ -337,6 +339,7 @@ export abstract class WebGPUBaseTexture<
         this.endSyncChanges();
       }
     }
+    */
   }
   /** @internal */
   protected _calcMipLevelCount(format: TextureFormat, width: number, height: number, depth: number): number {

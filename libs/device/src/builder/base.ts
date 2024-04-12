@@ -292,7 +292,9 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     if (
       !this.$typeinfo.isPrimitiveType() &&
       !this.$typeinfo.isArrayType() &&
-      !this.$typeinfo.isStructType()
+      !this.$typeinfo.isStructType() &&
+      !this.$typeinfo.isAtomicI32() &&
+      !this.$typeinfo.isAtomicU32()
     ) {
       throw new PBASTError(
         this.$ast,

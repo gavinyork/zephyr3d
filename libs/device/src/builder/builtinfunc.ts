@@ -1381,6 +1381,74 @@ const builtinFunctionsAll = {
         typeinfo.typeI32
       ]),
       ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage1D_bgra8unorm,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage1D_r32float,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeI32Vec4, [
+        typeinfo.typeTexStorage1D_r32sint,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeU32Vec4, [
+        typeinfo.typeTexStorage1D_r32uint,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage1D_rg32float,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeI32Vec4, [
+        typeinfo.typeTexStorage1D_rg32sint,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeU32Vec4, [
+        typeinfo.typeTexStorage1D_rg32uint,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage1D_rgba16float,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeI32Vec4, [
+        typeinfo.typeTexStorage1D_rgba16sint,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeU32Vec4, [
+        typeinfo.typeTexStorage1D_rgba16uint,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage1D_rgba32float,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeI32Vec4, [
+        typeinfo.typeTexStorage1D_rgba32sint,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeU32Vec4, [
+        typeinfo.typeTexStorage1D_rgba32uint,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeI32Vec4, [
+        typeinfo.typeTexStorage1D_rgba8sint,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeU32Vec4, [
+        typeinfo.typeTexStorage1D_rgba8uint,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage1D_rgba8snorm,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage1D_rgba8unorm,
+        typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
         typeinfo.typeTex2D,
         typeinfo.typeI32Vec2,
         typeinfo.typeI32
@@ -1396,6 +1464,74 @@ const builtinFunctionsAll = {
         typeinfo.typeI32
       ]),
       ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage2D_bgra8unorm,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage2D_r32float,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeI32Vec4, [
+        typeinfo.typeTexStorage2D_r32sint,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeU32Vec4, [
+        typeinfo.typeTexStorage2D_r32uint,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage2D_rg32float,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeI32Vec4, [
+        typeinfo.typeTexStorage2D_rg32sint,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeU32Vec4, [
+        typeinfo.typeTexStorage2D_rg32uint,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage2D_rgba16float,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeI32Vec4, [
+        typeinfo.typeTexStorage2D_rgba16sint,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeU32Vec4, [
+        typeinfo.typeTexStorage2D_rgba16uint,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage2D_rgba32float,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeI32Vec4, [
+        typeinfo.typeTexStorage2D_rgba32sint,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeU32Vec4, [
+        typeinfo.typeTexStorage2D_rgba32uint,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeI32Vec4, [
+        typeinfo.typeTexStorage2D_rgba8sint,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeU32Vec4, [
+        typeinfo.typeTexStorage2D_rgba8uint,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage2D_rgba8snorm,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage2D_rgba8unorm,
+        typeinfo.typeI32Vec2
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
         typeinfo.typeTex3D,
         typeinfo.typeI32Vec3,
         typeinfo.typeI32
@@ -1409,6 +1545,74 @@ const builtinFunctionsAll = {
         typeinfo.typeUTex3D,
         typeinfo.typeI32Vec3,
         typeinfo.typeI32
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage3D_bgra8unorm,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage3D_r32float,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeI32Vec4, [
+        typeinfo.typeTexStorage3D_r32sint,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeU32Vec4, [
+        typeinfo.typeTexStorage3D_r32uint,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage3D_rg32float,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeI32Vec4, [
+        typeinfo.typeTexStorage3D_rg32sint,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeU32Vec4, [
+        typeinfo.typeTexStorage3D_rg32uint,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage3D_rgba16float,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeI32Vec4, [
+        typeinfo.typeTexStorage3D_rgba16sint,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeU32Vec4, [
+        typeinfo.typeTexStorage3D_rgba16uint,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage3D_rgba32float,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeI32Vec4, [
+        typeinfo.typeTexStorage3D_rgba32sint,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeU32Vec4, [
+        typeinfo.typeTexStorage3D_rgba32uint,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeI32Vec4, [
+        typeinfo.typeTexStorage3D_rgba8sint,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeU32Vec4, [
+        typeinfo.typeTexStorage3D_rgba8uint,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage3D_rgba8snorm,
+        typeinfo.typeI32Vec3
+      ]),
+      ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
+        typeinfo.typeTexStorage3D_rgba8unorm,
+        typeinfo.typeI32Vec3
       ]),
       ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
         typeinfo.typeTexMultisampled2D,
@@ -1524,8 +1728,13 @@ const builtinFunctionsAll = {
           }
           args[1] = pb.ivec2(args[1], 0);
         }
-      } else if (pb.getDevice().type === 'webgpu' && texType.isExternalTexture()) {
-        args = args.slice(0, 2);
+      } else if (pb.getDevice().type === 'webgpu') {
+        if (texType.isExternalTexture()) {
+          args = args.slice(0, 2);
+        }
+        if (texType.isStorageTexture()) {
+          texType.readable = true;
+        }
       }
       return callBuiltin(pb, name, ...args);
     }
@@ -1741,6 +1950,11 @@ const builtinFunctionsAll = {
         typeinfo.typeU32Vec4
       ]),
       ...genType('textureStore', MASK_WEBGPU, typeinfo.typeVoid, [
+        typeinfo.typeTexStorage2D_r32uint,
+        typeinfo.typeI32Vec2,
+        typeinfo.typeU32Vec4
+      ]),
+      ...genType('textureStore', MASK_WEBGPU, typeinfo.typeVoid, [
         typeinfo.typeTexStorage2D_r32sint,
         typeinfo.typeU32Vec2,
         typeinfo.typeI32Vec4
@@ -1830,7 +2044,19 @@ const builtinFunctionsAll = {
         typeinfo.typeU32Vec3,
         typeinfo.typeF32Vec4
       ])
-    ]
+    ],
+    normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
+      if (pb.getDevice().type === 'webgpu') {
+        const tex = args[0];
+        if (tex instanceof PBShaderExp) {
+          const texType = tex.$ast.getType();
+          if (texType?.isTextureType() && texType.isStorageTexture()) {
+            texType.writable = true;
+          }
+        }
+      }
+      return callBuiltin(pb, name, ...args);
+    }
   },
   // textureArrayStore(tex: PBShaderExp, coords: PBShaderExp, arrayIndex: number|PBShaderExp, value: PBShaderExp);
   textureArrayStore: {
@@ -2918,7 +3144,8 @@ for (const name of [
   'atomicMin',
   'atomicAnd',
   'atomicOr',
-  'atomicXor'
+  'atomicXor',
+  'atomicExchange'
 ]) {
   builtinFunctionsAll[name] = {
     overloades: [],

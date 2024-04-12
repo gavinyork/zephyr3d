@@ -1537,9 +1537,15 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
   get readable(): boolean {
     return this.detail.readable;
   }
+  set readable(val: boolean) {
+    this.detail.readable = !!val;
+  }
   /** Returns true if this is a writable storage texture type */
   get writable(): boolean {
     return this.detail.writable;
+  }
+  set writable(val: boolean) {
+    this.detail.writable = !!val;
   }
   /** @internal */
   isStorable(): boolean {
@@ -1600,7 +1606,7 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
       if (this.isStorageTexture()) {
         const storageTexelFormat = storageTexelFormatMap[this.storageTexelFormat];
         // storage textures currently only support 'write' access control
-        const accessMode = 'write'; //this.readable ? (this.writable ? 'read_write' : 'read') : 'write';
+        const accessMode = this.writable ? this.readable ? 'read_write' : 'write' : 'read';// this.readable ? (this.writable ? 'read_write' : 'read') : 'write';
         typename = `${typename}<${storageTexelFormat}, ${accessMode}>`;
       }
       return varName ? `${varName}: ${typename}` : typename;

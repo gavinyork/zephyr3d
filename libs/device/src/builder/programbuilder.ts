@@ -216,6 +216,14 @@ export interface ProgramBuilder {
    * @returns the 'referenceOf' expression
    */
   referenceOf(ptr: PBShaderExp): PBShaderExp;
+  /** Atomic int type variable constructors */
+  atomic_int: {
+    (): PBShaderExp;
+  };
+  /** Atomic uint type variable constructors */
+  atomic_uint: {
+    (): PBShaderExp;
+  }
   /** float type variable constructors */
   float: {
     (): PBShaderExp;
@@ -981,6 +989,8 @@ export interface ProgramBuilder {
   atomicOr(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
   /** atomicXor, only valid for WebGPU device */
   atomicXor(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
+  /** atomicExchange, only valid for WebGPU device */
+  atomicExchange(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
 }
 
 /**

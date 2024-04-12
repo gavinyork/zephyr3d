@@ -1,6 +1,6 @@
 import * as zip from '@zip.js/zip.js';
 import { Vector4, Vector3 } from '@zephyr3d/base';
-import { SceneNode, Scene, AnimationSet, BatchGroup, PostWater } from '@zephyr3d/scene';
+import { SceneNode, Scene, AnimationSet, BatchGroup, PostWater, WeightedBlendedOIT } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
 import {
   BoundingBox,
@@ -74,6 +74,7 @@ export class GLTFViewer {
       1,
       160
     );
+    this._camera.oit = new WeightedBlendedOIT();
     this._camera.position.setXYZ(0, 0, 15);
     this._camera.controller = new OrbitCameraController();
     this._light0 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);

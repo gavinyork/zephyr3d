@@ -52,7 +52,7 @@ instancingApp.ready().then(async () => {
     const instanceMat = mat.createInstance();
     instanceMat.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), Math.random());
     const boxMesh = new Mesh(scene, boxShape, instanceMat);
-    boxMesh.position.setXYZ(Math.random() * 5 - 2.5, Math.random() * 5 - 2.5, Math.random() * 5 - 2.5);
+    boxMesh.position.setXYZ(Math.random() * 5 - 2.5, Math.random() * 5, Math.random() * 5 - 2.5);
     boxMesh.parent = batchGroup;
   }
   const mat2 = new LambertMaterial();
