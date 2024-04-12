@@ -43,6 +43,9 @@ export class WeightedBlendedOIT extends OIT {
   calculateHash(): string {
     return this.getType();
   }
+  applyUniforms(ctx: DrawContext, bindGroup: BindGroup) {
+    return;
+  }
   outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp) {
     const pb = scope.$builder;
     pb.func('Z_WBOIT_depthWeight', [pb.float('z'), pb.float('a')], function(){
@@ -118,7 +121,7 @@ export class WeightedBlendedOIT extends OIT {
       this._compositeBindGroup = device.createBindGroup(this._compositeProgram.bindGroupLayouts[0]);
       this._compositeRenderStates = device.createRenderStateSet();
       this._compositeRenderStates.useBlendingState().enable(true).setBlendFuncRGB('inv-src-alpha', 'src-alpha').setBlendFuncAlpha('zero', 'one');
-      this._compositeRenderStates.useDepthState().enableTest(false).enableWrite(false);
+      this._compositeRenderStates.useDepthState().enableTest(true).enableWrite(false);
     }
     return this._compositeProgram;
   }

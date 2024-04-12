@@ -51,6 +51,8 @@ export class Camera extends SceneNode {
   protected _clipMask: number;
   /** @internal */
   protected _oit: OIT;
+  /** @internal */
+  protected _depthPrePass: boolean;
   /**
    * Creates a new camera node
    * @param scene - The scene that the camera belongs to
@@ -74,6 +76,7 @@ export class Camera extends SceneNode {
     this._frustum = null;
     this._frustumV = null;
     this._oit = null;
+    this._depthPrePass = false;
   }
   /** Clip plane in camera space */
   get clipPlane(): Plane {
@@ -82,6 +85,13 @@ export class Camera extends SceneNode {
   set clipPlane(plane: Plane) {
     this._clipPlane = plane;
     this._invalidate(false);
+  }
+  /** Whether draw depth pass */
+  get depthPrePass(): boolean {
+    return this._depthPrePass;
+  }
+  set depthPrePass(val: boolean) {
+    this._depthPrePass = !!val;
   }
   /**
    * Sample count for MSAA

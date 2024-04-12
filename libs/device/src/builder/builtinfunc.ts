@@ -2338,6 +2338,9 @@ const builtinFunctionsAll = {
         throw new PBParamTypeError('textureSample', 'texture');
       }
       if (pb.getDevice().type === 'webgpu') {
+        if (texType.isStorageTexture()) {
+          throw new PBParamTypeError('textureSample', 'texture');
+        }
         const sampler = pb.getDefaultSampler(tex, false);
         const coords = args[1];
         const ret = callBuiltin(pb, name, tex, sampler, coords);

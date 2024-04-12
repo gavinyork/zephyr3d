@@ -27,8 +27,6 @@ export class SceneRenderer {
   /** @internal */
   private static _shadowMapPass = new ShadowMapPass();
   /** @internal */
-  private static _enableDepthPass = false;
-  /** @internal */
   private static _clusters: ClusteredLight[] = [];
   /** lighting render pass */
   static get sceneRenderPass(): LightPass {
@@ -146,7 +144,7 @@ export class SceneRenderer {
     this.renderShadowMaps(ctx, renderQueue.shadowedLights);
     const sampleCount = ctx.compositor ? 1 : ctx.primaryCamera.sampleCount;
     if (
-      this._enableDepthPass ||
+      ctx.primaryCamera.depthPrePass ||
       oversizedViewport ||
       ctx.scene.env.needSceneDepthTexture() ||
       ctx.primaryCamera.oit ||

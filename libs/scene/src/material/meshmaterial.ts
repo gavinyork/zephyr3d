@@ -344,6 +344,9 @@ export class MeshMaterial extends Material {
     if (this.isTransparentPass(pass)) {
       bindGroup.setValue('zOpacity', this._opacity);
     }
+    if (ctx.oit) {
+      ctx.oit.applyUniforms(ctx, bindGroup);
+    }
   }
   /**
    * Determine which queue should be used to render this material.

@@ -15,6 +15,7 @@ import {
 import * as common from '../common';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { Vector3, Vector4 } from '@zephyr3d/base';
+import { LinearDepthMaterial } from './materal';
 
 const instancingApp = new Application({
   backend: common.getBackend(),
@@ -36,6 +37,7 @@ instancingApp.ready().then(async () => {
   camera.position.setXYZ(0, 0, 30);
   camera.controller = new OrbitCameraController();
   camera.oit = new WeightedBlendedOIT();
+  camera.depthPrePass = true;
 
   instancingApp.inputManager.use(imGuiInjectEvent);
   instancingApp.inputManager.use(camera.handleEvent.bind(camera));
@@ -46,6 +48,7 @@ instancingApp.ready().then(async () => {
 
   const batchGroup = new BatchGroup(scene);
   const boxShape = new BoxShape();
+  /*
   const mat = new LambertMaterial();
   mat.blendMode = 'blend';
   for (let i = 0; i < 100; i++) {
@@ -55,8 +58,8 @@ instancingApp.ready().then(async () => {
     boxMesh.position.setXYZ(Math.random() * 5 - 2.5, Math.random() * 5, Math.random() * 5 - 2.5);
     boxMesh.parent = batchGroup;
   }
-  const mat2 = new LambertMaterial();
-  mat2.albedoColor = new Vector4(1,0,0,1);
+  */
+  const mat2 = new LinearDepthMaterial();
   const mesh2 = new Mesh(scene, boxShape, mat2);
   mesh2.scale = new Vector3(4, 4, 4);
   mesh2.parent = batchGroup;
