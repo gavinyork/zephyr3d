@@ -2075,7 +2075,7 @@ export class ASTDeclareVar extends ShaderAST {
         break;
       case DeclareType.DECLARE_TYPE_STORAGE:
         prefix = `@group(${this.group}) @binding(${this.binding}) var<storage, ${
-          this.value.isWritable() ? 'read_write' : 'read'
+          this.value.isWritable() || this.value.getType().haveAtomicMembers() ? 'read_write' : 'read'
         }> `;
         break;
       case DeclareType.DECLARE_TYPE_WORKGROUP:

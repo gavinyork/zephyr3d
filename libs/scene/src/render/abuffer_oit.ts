@@ -37,6 +37,9 @@ import { ShaderHelper } from "../material";
 
 export class ABufferOIT extends OIT {
   public static readonly type = 'ab';
+  private static _clearProgram: GPUProgram;
+  private static _clearBindGroup: BindGroup;
+  private static _clearRenderStates: RenderStateSet;
   private static _compositeProgram: GPUProgram;
   private static _compositeBindGroup: BindGroup;
   private static _compositeRenderStates: RenderStateSet;
@@ -70,6 +73,19 @@ export class ABufferOIT extends OIT {
     scope.Z_AB_depthTexture = pb.tex2D().uniform(2);
     scope.$outputs.outColor = pb.vec4();
   }
+  clearHeadBuffer(device: AbstractDevice) {
+    const program = ABufferOIT.getClearProgram(device);
+    const bindGroup = ABufferOIT._clearBindGroup;
+    bindGroup.setValue('screenWidth', this._screenSize[0]);
+    bindGroup.setBuffer('headBuffer', this._nodeHeadImage);
+    const lastBindGroup = device.getBindGroup(0);
+    device.pushDeviceStates();
+    device.setProgram(program);
+    device.setBindGroup(0, bindGroup);
+    drawFullscreenQuad(ABufferOIT._clearRenderStates);
+    device.popDeviceStates();
+    device.setBindGroup(0, lastBindGroup[0], lastBindGroup[1]);
+  }
   begin(ctx: DrawContext, pass: number) {
     const device = Application.instance.device;
     const viewport = device.getViewport();
@@ -89,6 +105,7 @@ export class ABufferOIT extends OIT {
       this._counterBuffer = device.createBuffer(4, { storage: true, usage: 'uniform' });
     }
     this._counterBuffer.bufferSubData(0, new Uint8Array(4));
+    this.clearHeadBuffer(device);
   }
   end(ctx: DrawContext, pass: number) {
     //const device = Application.instance.device;
@@ -159,6 +176,32 @@ export class ABufferOIT extends OIT {
       this._nodeBuffer = device.createBuffer(size, { storage: true, usage: 'uniform' });
     }
     return this._nodeBuffer;
+  }
+  private static getClearProgram(device: AbstractDevice) {
+    if (!this._clearProgram) {
+      this._clearProgram = device.buildRenderProgram({
+        vertex(pb){
+          this.$inputs.pos = pb.vec2().attrib('position');
+          pb.main(function() {
+            this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          });
+        },
+        fragment(pb){
+          this.$outputs.color = pb.vec4();
+          this.screenWidth = pb.uint().uniform(0);
+          this.headBuffer = pb.atomic_uint[0]().storageBuffer(0);
+          pb.main(function(){
+            this.$l.offset = pb.add(pb.mul(pb.uint(this.$builtins.fragCoord.y), this.screenWidth), pb.uint(this.$builtins.fragCoord.x));
+            pb.atomicExchange(this.headBuffer.at(this.offset), 0);
+            pb.discard();
+          });
+        }
+      });
+      this._clearBindGroup = device.createBindGroup(this._clearProgram.bindGroupLayouts[0]);
+      this._clearRenderStates = device.createRenderStateSet();
+      this._clearRenderStates.useDepthState().enableTest(false).enableWrite(false);
+    }
+    return this._clearProgram;
   }
   private static getCompositeProgram(device: AbstractDevice) {
     if (!this._compositeProgram) {

@@ -154,7 +154,7 @@ export function setConstructors(cls: typeof ProgramBuilder) {
   Object.keys(texStorageCtors).forEach((k) => {
     cls.prototype[k] = makeStorageTextureCtor(texStorageCtors[k]);
   });
-  cls.prototype['atomic_int'] = function (this: ProgramBuilder, ...args: any[]): PBShaderExp {
+  cls.prototype['atomic_int'] = makeConstructor(function (this: ProgramBuilder, ...args: any[]): PBShaderExp {
     if (args.length > 1) {
       throw new errors.PBParamLengthError('atomic_int');
     }
@@ -168,8 +168,8 @@ export function setConstructors(cls: typeof ProgramBuilder) {
       exp.$ast = new AST.ASTShaderExpConstructor(exp.$typeinfo, []);
       return exp;
     }
-  };
-  cls.prototype['atomic_uint'] = function (this: ProgramBuilder, ...args: any[]): PBShaderExp {
+  } as ShaderTypeFunc, typeinfo.typeAtomicI32);
+  cls.prototype['atomic_uint'] = makeConstructor(function (this: ProgramBuilder, ...args: any[]): PBShaderExp {
     if (args.length > 1) {
       throw new errors.PBParamLengthError('atomic_uint');
     }
@@ -192,7 +192,7 @@ export function setConstructors(cls: typeof ProgramBuilder) {
       return exp;
     }
     return null;
-  };
+  } as ShaderTypeFunc, typeinfo.typeAtomicU32);
 }
 
 /*

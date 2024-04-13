@@ -219,10 +219,22 @@ export interface ProgramBuilder {
   /** Atomic int type variable constructors */
   atomic_int: {
     (): PBShaderExp;
+    (rhs: number): PBShaderExp;
+    (rhs: boolean): PBShaderExp;
+    (rhs: PBShaderExp): PBShaderExp;
+    (name: string): PBShaderExp;
+    ptr: ShaderTypeFunc;
+    [dim: number]: ShaderTypeFunc;
   };
   /** Atomic uint type variable constructors */
   atomic_uint: {
     (): PBShaderExp;
+    (rhs: number): PBShaderExp;
+    (rhs: boolean): PBShaderExp;
+    (rhs: PBShaderExp): PBShaderExp;
+    (name: string): PBShaderExp;
+    ptr: ShaderTypeFunc;
+    [dim: number]: ShaderTypeFunc;
   }
   /** float type variable constructors */
   float: {

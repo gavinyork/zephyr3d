@@ -58,7 +58,7 @@ export type ShaderTypeFunc = {
 };
 
 /** @internal */
-export function makeConstructor(typeFunc: ShaderTypeFunc, elementType: PBTypeInfo): ShaderTypeFunc {
+export function makeConstructor<T>(typeFunc: ShaderTypeFunc, elementType: PBTypeInfo<T>): ShaderTypeFunc {
   const wrappedTypeFunc = new Proxy(typeFunc, {
     get: function (target, prop) {
       if (typeof prop === 'symbol' || prop in target) {
@@ -71,7 +71,7 @@ export function makeConstructor(typeFunc: ShaderTypeFunc, elementType: PBTypeInf
       }
       let ctor = entries[prop];
       if (!ctor) {
-        if (elementType.isPrimitiveType() || elementType.isStructType() || elementType.isArrayType()) {
+        if (elementType.isPrimitiveType() || elementType.isStructType() || elementType.isArrayType() || elementType.isAtomicI32() || elementType.isAtomicU32()) {
           if (prop === 'ptr') {
             const pointerType = new PBPointerTypeInfo(elementType, PBAddressSpace.FUNCTION);
             ctor = function pointerCtor(this: ProgramBuilder, ...args: any[]) {
