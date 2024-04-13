@@ -627,6 +627,16 @@ export class WebGLDevice extends BaseDevice {
   createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer {
     return new WebGLGPUBuffer(this, this.parseBufferOptions(options), sizeInBytes);
   }
+  copyBuffer(sourceBuffer: GPUDataBuffer<unknown>, destBuffer: GPUDataBuffer<unknown>, srcOffset: number, dstOffset: number, bytes: number) {
+    if (!this.isWebGL2) {
+      console.error(`copyBuffer() is not supported for current device`);
+      return;
+    }
+    const gl = this._context as WebGL2RenderingContext;
+    gl.bindBuffer(gl.COPY_READ_BUFFER, sourceBuffer.object);
+    gl.bindBuffer(gl.COPY_WRITE_BUFFER, destBuffer.object);
+    gl.copyBufferSubData(gl.COPY_READ_BUFFER, gl.COPY_WRITE_BUFFER, srcOffset, dstOffset, bytes);
+  }
   createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer {
     return new WebGLIndexBuffer(this, data, this.parseBufferOptions(options, 'index'));
   }

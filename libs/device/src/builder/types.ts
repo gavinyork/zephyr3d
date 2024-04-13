@@ -1081,18 +1081,6 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
     }
   }
   /** @internal */
-  isWritable(): boolean {
-    for (const member of this.structMembers) {
-      if (member.type.isAtomicI32() || member.type.isAtomicU32()) {
-        return true;
-      }
-      if (member.type.isStructType() && member.type.isWritable()) {
-        return true;
-      }
-    }
-    return false;
-  }
-  /** @internal */
   getLayoutAlignment(layout: PBStructLayout): number {
     if (layout === 'packed') {
       return 1;

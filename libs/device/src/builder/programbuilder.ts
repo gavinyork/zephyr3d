@@ -810,13 +810,13 @@ export interface ProgramBuilder {
   arrayLength(x: PBShaderExp): PBShaderExp;
   /** Same as the select builtin function in WGSL, only valid for WebGPU device */
   select(x: number | PBShaderExp, y: number | PBShaderExp, cond: boolean | PBShaderExp): PBShaderExp;
-  /** Same as floatBitsToInt builtin function in GLSL, only valid for WebGL2 device */
+  /** Same as floatBitsToInt builtin function in GLSL, only valid for WebGL2 device and WebGPU device */
   floatBitsToInt(x: number | PBShaderExp): PBShaderExp;
-  /** Same as floatBitsToUint builtin function in GLSL, only valid for WebGL2 device */
+  /** Same as floatBitsToUint builtin function in GLSL, only valid for WebGL2 device and WebGPU device */
   floatBitsToUint(x: number | PBShaderExp): PBShaderExp;
-  /** Same as intBitsToFloat builtin function in GLSL, only valid for WebGL2 device */
+  /** Same as intBitsToFloat builtin function in GLSL, only valid for WebGL2 device and WebGPU device */
   intBitsToFloat(x: number | PBShaderExp): PBShaderExp;
-  /** Same as uintBitsToFloat builtin function in GLSL, only valid for WebGL2 device */
+  /** Same as uintBitsToFloat builtin function in GLSL, only valid for WebGL2 device and WebGPU device */
   uintBitsToFloat(x: number | PBShaderExp): PBShaderExp;
   /** Same as pack4x8snorm builtin function in WGSL, only valid for WebGPU device */
   pack4x8snorm(x: PBShaderExp): PBShaderExp;

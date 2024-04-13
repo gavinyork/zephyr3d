@@ -842,10 +842,98 @@ const builtinFunctionsAll = {
       ...genType('mix', MASK_WEBGL2, 2, [2, 2, 3])
     ]
   },
-  floatBitsToInt: { overloads: genType('floatBitsToInt', MASK_WEBGL2, 1, [0]) },
-  floatBitsToUint: { overloads: genType('floatBitsToUint', MASK_WEBGL2, 2, [0]) },
-  intBitsToFloat: { overloads: genType('intBitsToFloat', MASK_WEBGL2, 0, [1]) },
-  uintBitsToFloat: { overloads: genType('uintBitsToFloat', MASK_WEBGL2, 0, [2]) },
+  floatBitsToInt: {
+    overloads: genType('floatBitsToInt', MASK_WEBGL2, 1, [0]),
+    normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
+      if (args.length !== 1) {
+        throw new PBParamLengthError('floatBitsToInt');
+      }
+      if (!(args[0] instanceof PBShaderExp)) {
+        if (typeof args[0] !== 'number') {
+          throw new PBParamValueError('floatBitsToInt', 'x');
+        }
+      } else {
+        const type = args[0].$ast.getType();
+        if (type.typeId !== typeinfo.typeF32.typeId) {
+          throw new PBParamTypeError('floatBitsToInt', 'x');
+        }
+      }
+      if (pb.getDevice().type === 'webgpu') {
+        return pb.$callFunctionNoCheck('bitcast<i32>', [args[0] instanceof PBShaderExp ? args[0].$ast : new ASTScalar(args[0], typeinfo.typeF32)], typeinfo.typeI32);
+      } else {
+        return callBuiltin(pb, name, ...args);
+      }
+    }
+  },
+  floatBitsToUint: {
+    overloads: genType('floatBitsToUint', MASK_WEBGL2, 2, [0]),
+    normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
+      if (args.length !== 1) {
+        throw new PBParamLengthError('floatBitsToUint');
+      }
+      if (!(args[0] instanceof PBShaderExp)) {
+        if (typeof args[0] !== 'number') {
+          throw new PBParamValueError('floatBitsToUint', 'x');
+        }
+      } else {
+        const type = args[0].$ast.getType();
+        if (type.typeId !== typeinfo.typeF32.typeId) {
+          throw new PBParamTypeError('floatBitsToUint', 'x');
+        }
+      }
+      if (pb.getDevice().type === 'webgpu') {
+        return pb.$callFunctionNoCheck('bitcast<u32>', [args[0] instanceof PBShaderExp ? args[0].$ast : new ASTScalar(args[0], typeinfo.typeF32)], typeinfo.typeU32);
+      } else {
+        return callBuiltin(pb, name, ...args);
+      }
+    }
+  },
+  intBitsToFloat: {
+    overloads: genType('intBitsToFloat', MASK_WEBGL2, 0, [1]),
+    normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
+      if (args.length !== 1) {
+        throw new PBParamLengthError('intBitsToFloat');
+      }
+      if (!(args[0] instanceof PBShaderExp)) {
+        if (typeof args[0] !== 'number') {
+          throw new PBParamValueError('intBitsToFloat', 'x');
+        }
+      } else {
+        const type = args[0].$ast.getType();
+        if (type.typeId !== typeinfo.typeI32.typeId) {
+          throw new PBParamTypeError('intBitsToFloat', 'x');
+        }
+      }
+      if (pb.getDevice().type === 'webgpu') {
+        return pb.$callFunctionNoCheck('bitcast<f32>', [args[0] instanceof PBShaderExp ? args[0].$ast : new ASTScalar(args[0], typeinfo.typeI32)], typeinfo.typeF32);
+      } else {
+        return callBuiltin(pb, name, ...args);
+      }
+    }
+  },
+  uintBitsToFloat: {
+    overloads: genType('uintBitsToFloat', MASK_WEBGL2, 0, [2]),
+    normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
+      if (args.length !== 1) {
+        throw new PBParamLengthError('uintBitsToFloat');
+      }
+      if (!(args[0] instanceof PBShaderExp)) {
+        if (typeof args[0] !== 'number') {
+          throw new PBParamValueError('uintBitsToFloat', 'x');
+        }
+      } else {
+        const type = args[0].$ast.getType();
+        if (type.typeId !== typeinfo.typeU32.typeId) {
+          throw new PBParamTypeError('uintBitsToFloat', 'x');
+        }
+      }
+      if (pb.getDevice().type === 'webgpu') {
+        return pb.$callFunctionNoCheck('bitcast<f32>', [args[0] instanceof PBShaderExp ? args[0].$ast : new ASTScalar(args[0], typeinfo.typeU32)], typeinfo.typeF32);
+      } else {
+        return callBuiltin(pb, name, ...args);
+      }
+    }
+  },
   pack4x8snorm: { overloads: genType('pack4x8snorm', MASK_WEBGPU, typeinfo.typeU32, [typeinfo.typeF32Vec4]) },
   unpack4x8snorm: {
     overloads: genType('unpack4x8snorm', MASK_WEBGPU, typeinfo.typeF32Vec4, [typeinfo.typeU32])

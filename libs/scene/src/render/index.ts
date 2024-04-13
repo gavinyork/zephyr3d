@@ -15,3 +15,4 @@ export * from './temporalcache';
 export * from './watermesh';
 export * from './oit';
 export * from './weightedblended_oit';
+export * from './abuffer_oit';

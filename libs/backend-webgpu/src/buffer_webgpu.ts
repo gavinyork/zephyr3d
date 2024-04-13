@@ -192,11 +192,11 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
           label += '[index]';
         }
         if (this._usage & GPUResourceUsageFlags.BF_UNIFORM) {
-          this._gpuUsage |= GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST;
+          this._gpuUsage |= GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
           label += '[uniform]';
         }
         if (this._usage & GPUResourceUsageFlags.BF_STORAGE) {
-          this._gpuUsage |= GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST;
+          this._gpuUsage |= GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
           label += '[storage]';
         }
         if (this._usage & GPUResourceUsageFlags.BF_READ) {

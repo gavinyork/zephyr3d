@@ -483,6 +483,9 @@ export class WebGPUDevice extends BaseDevice {
   createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer {
     return new WebGPUBuffer(this, this.parseBufferOptions(options), sizeInBytes);
   }
+  copyBuffer(sourceBuffer: GPUDataBuffer<unknown>, destBuffer: GPUDataBuffer<unknown>, srcOffset: number, dstOffset: number, bytes: number) {
+    this._commandQueue.copyBuffer(sourceBuffer as WebGPUBuffer, destBuffer as WebGPUBuffer, srcOffset, dstOffset, bytes);
+  }
   createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer<unknown> {
     return new WebGPUIndexBuffer(this, data, this.parseBufferOptions(options, 'index'));
   }

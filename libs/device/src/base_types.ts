@@ -1946,6 +1946,15 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    */
   createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer;
   /**
+   * Copies a buffer to another buffer
+   * @param sourceBuffer - Source buffer
+   * @param destBuffer - destination buffer
+   * @param srcOffset - Source offset in bytes
+   * @param dstOffset - Destination offset in bytes
+   * @param bytes - How many bytes to be copy
+   */
+  copyBuffer(sourceBuffer: GPUDataBuffer, destBuffer: GPUDataBuffer, srcOffset: number, dstOffset: number, bytes: number);
+  /**
    * Creates an index buffer
    * @param data - Data of the index buffer
    * @param options - The creation options

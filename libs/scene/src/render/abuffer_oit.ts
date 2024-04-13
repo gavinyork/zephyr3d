@@ -28,7 +28,7 @@ function over(t, d) {
 }
 */
 
-import type { AbstractDevice, BindGroup, GPUDataBuffer, GPUProgram, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, RenderStateSet, Texture2D } from "@zephyr3d/device";
+import type { AbstractDevice, BindGroup, GPUDataBuffer, GPUProgram, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, RenderStateSet } from "@zephyr3d/device";
 import { OIT } from "./oit";
 import { DrawContext } from "./drawable";
 import { Application } from "../app";
@@ -37,6 +37,7 @@ import { ShaderHelper } from "../material";
 
 export class ABufferOIT extends OIT {
   public static readonly type = 'ab';
+  private static MAX_FRAGMENT_LAYERS = 75;
   private static _clearProgram: GPUProgram;
   private static _clearBindGroup: BindGroup;
   private static _clearRenderStates: RenderStateSet;
@@ -49,6 +50,7 @@ export class ABufferOIT extends OIT {
   private _numLayers: number;
   private _screenSize: Uint32Array;
   private _hash: string;
+  private _debug: boolean;
   constructor() {
     super();
     this._nodeBuffer = null;
@@ -57,6 +59,7 @@ export class ABufferOIT extends OIT {
     this._numLayers = 10;
     this._screenSize = new Uint32Array([0xffffffff, 0xffffffff]);
     this._hash = null;
+    this._debug = false;
   }
   getType(): string {
     return ABufferOIT.type;
@@ -69,7 +72,7 @@ export class ABufferOIT extends OIT {
     scope.Z_AB_nodeBuffer = pb.uvec4[0]().storageBuffer(2);
     scope.Z_AB_headImage = pb.atomic_uint[0]().storageBuffer(2);
     scope.Z_AB_counter = pb.atomic_uint().storageBuffer(2);
-    scope.Z_AB_screenSize = pb.vec2().storage(2);
+    scope.Z_AB_screenSize = pb.uvec2().storage(2);
     scope.Z_AB_depthTexture = pb.tex2D().uniform(2);
     scope.$outputs.outColor = pb.vec4();
   }
@@ -91,25 +94,59 @@ export class ABufferOIT extends OIT {
     const viewport = device.getViewport();
     const screenWidth = device.screenToDevice(viewport.width);
     const screenHeight = device.screenToDevice(viewport.height);
-    if (screenWidth !== this._screenSize[0] || screenHeight !== this._screenSize[1]) {
-      this._screenSize[0] = screenWidth;
-      this._screenSize[1] = screenHeight;
+    this._screenSize[0] = screenWidth;
+    this._screenSize[1] = screenHeight;
+    const size = screenWidth * screenHeight * 4;
+    const nodeBufferSize = size * 4 * this._numLayers;
+    if (!this._nodeBuffer || nodeBufferSize > this._nodeBuffer.byteLength) {
       this._nodeBuffer?.dispose();
-      const size = screenWidth * screenHeight * 4;
-      this._nodeBuffer = device.createBuffer(size * 4 * this._numLayers, { storage: true, usage: 'uniform' });
+      this._nodeBuffer = device.createBuffer(nodeBufferSize, { storage: true, usage: 'uniform', });
+    }
+    if (!this._nodeHeadImage || size > this._nodeHeadImage.byteLength) {
       this._nodeHeadImage?.dispose();
       this._nodeHeadImage = device.createBuffer(size, { storage: true, usage: 'uniform' });
-      this._hash = `${this.getType()}#${this._nodeBuffer.uid}#${this._nodeHeadImage.uid}`;
     }
+    if (this._debug) {
+      const data = new Uint8Array(this._nodeHeadImage.byteLength);
+      for (let i = 0; i < data.length; i++) {
+        data[i] = 1;
+      }
+    }
+    this._hash = `${this.getType()}#${this._nodeBuffer.uid}#${this._nodeHeadImage.uid}`;
     if (!this._counterBuffer) {
       this._counterBuffer = device.createBuffer(4, { storage: true, usage: 'uniform' });
     }
     this._counterBuffer.bufferSubData(0, new Uint8Array(4));
     this.clearHeadBuffer(device);
+    if (this._debug) {
+      const data = new Uint8Array(this._nodeHeadImage.byteLength);
+      const readBuffer = device.createBuffer(this._nodeHeadImage.byteLength, { usage: 'read' });
+      device.copyBuffer(this._nodeHeadImage, readBuffer, 0, 0, this._nodeHeadImage.byteLength);
+      readBuffer.getBufferSubData(data).then(() => {
+        const uint = new Uint32Array(data.buffer);
+        for (let i = 0; i < uint.length; i++) {
+          if (uint[i] !== 0) {
+            console.error('Clear head buffer failed');
+            break;
+          }
+        }
+        readBuffer.dispose();
+      });
+    }
   }
   end(ctx: DrawContext, pass: number) {
-    //const device = Application.instance.device;
-    //this.composite(ctx, device, accumTargets[0] as Texture2D, accumTargets[1] as Texture2D);
+    const device = Application.instance.device;
+    const lastBindGroup = device.getBindGroup(0);
+    device.pushDeviceStates();
+    device.setProgram(ABufferOIT.getCompositeProgram(device))
+    const bindGroup = ABufferOIT._compositeBindGroup;
+    bindGroup.setBuffer('headBuffer', this._nodeHeadImage);
+    bindGroup.setBuffer('nodeBuffer', this._nodeBuffer);
+    bindGroup.setValue('screenWidth', this._screenSize[0]);
+    device.setBindGroup(0, bindGroup);
+    drawFullscreenQuad(ABufferOIT._compositeRenderStates);
+    device.popDeviceStates();
+    device.setBindGroup(0, lastBindGroup[0], lastBindGroup[1]);
   }
   calculateHash(): string {
     return this._hash;
@@ -129,31 +166,21 @@ export class ABufferOIT extends OIT {
     scope.$l.linearDepth = pb.textureLoad(scope.Z_AB_depthTexture, pb.ivec2(scope.$builtins.fragCoord.xy), 0).r;
     // saved to buffer only if nothing is infront
     scope.$if(pb.lessThan(scope.fragDepth, scope.linearDepth), function(){
-      scope.$l.Z_AB_pixelCount = pb.atomicAdd(scope.Z_AB_counter, 1);
-      scope.$l.Z_AB_nodeOffset = pb.mul(scope.Z_AB_pixelCount, 4);
+      this.$l.Z_AB_pixelCount = pb.atomicAdd(this.Z_AB_counter, 1);
+      this.$l.Z_AB_nodeOffset = this.Z_AB_pixelCount;
       // save if index not exceeded
-      scope.$if(pb.lessThan(scope.Z_AB_nodeOffset, pb.arrayLength(scope.Z_AB_nodeBuffer)), function(){
-        scope.$l.Z_AB_headOffset = pb.add(pb.mul(scope.Z_AB_screenSize.x, pb.uint(scope.$builtins.fragCoord.y)), pb.uint(scope.$builtins.fragCoord.x));
-        scope.$l.Z_AB_oldHead = pb.atomicExchange(scope.Z_AB_headImage.at(scope.Z_AB_headOffset), scope.Z_AB_nodeOffset);
-        scope.$l.Z_AB_colorScale = pb.floatBitsToUint(pb.length(color));
-        scope.$l.Z_AB_color = pb.pack4x8unorm(pb.normalize(color));
-        scope.$l.Z_AB_depth = pb.floatBitsToUint(scope.fragDepth);
-        scope.Z_AB_nodeBuffer.setAt(scope.Z_AB_nodeOffset, scope.Z_AB_color);
-        scope.Z_AB_nodeBuffer.setAt(pb.add(scope.Z_AB_nodeOffset, 1), scope.Z_AB_colorScale);
-        scope.Z_AB_nodeBuffer.setAt(pb.add(scope.Z_AB_nodeOffset, 2), scope.Z_AB_depth);
-        scope.Z_AB_nodeBuffer.setAt(pb.add(scope.Z_AB_nodeOffset, 3), scope.oldHead);
+      this.$if(pb.lessThan(this.Z_AB_nodeOffset, pb.arrayLength(this.Z_AB_nodeBuffer)), function(){
+        this.$l.Z_AB_headOffset = pb.add(pb.mul(this.Z_AB_screenSize.x, pb.uint(this.$builtins.fragCoord.y)), pb.uint(this.$builtins.fragCoord.x));
+        this.$l.Z_AB_oldHead = pb.atomicExchange(this.Z_AB_headImage.at(this.Z_AB_headOffset), this.Z_AB_nodeOffset);
+        this.$l.Z_AB_colorScale = pb.floatBitsToUint(pb.length(color.rgb));
+        this.$l.Z_AB_color = pb.pack4x8unorm(pb.vec4(pb.normalize(color.rgb), pb.clamp(color.a, 0, 1)));
+        this.$l.Z_AB_depth = pb.floatBitsToUint(this.fragDepth);
+        this.Z_AB_nodeBuffer.setAt(this.Z_AB_nodeOffset, pb.uvec4(this.Z_AB_color, this.Z_AB_colorScale, this.Z_AB_depth, this.Z_AB_oldHead));
         pb.discard;
       });
     });
   }
   setRenderStates(rs: RenderStateSet) {
-  }
-  private composite(ctx: DrawContext, device: AbstractDevice, accumColor: Texture2D, accumAlpha: Texture2D) {
-    device.setProgram(ABufferOIT.getCompositeProgram(device))
-    ABufferOIT._compositeBindGroup.setTexture('accumColorTex', accumColor);
-    ABufferOIT._compositeBindGroup.setTexture('accumAlphaTex', accumAlpha);
-    device.setBindGroup(0, ABufferOIT._compositeBindGroup);
-    drawFullscreenQuad(ABufferOIT._compositeRenderStates);
   }
   getCounterBuffer(device: AbstractDevice) {
     if (!this._counterBuffer) {
@@ -219,20 +246,55 @@ export class ABufferOIT extends OIT {
         },
         fragment(pb){
           this.$outputs.outColor = pb.vec4();
-          this.accumColorTex = pb.tex2D().uniform(0);
-          this.accumAlphaTex = pb.tex2D().uniform(0);
+          this.headBuffer = pb.uint[0]().storageBuffer(0);
+          this.nodeBuffer = pb.uvec4[0]().storageBuffer(0);
+          this.screenWidth = pb.uint().uniform(0);
+          pb.func('unpackColor', [pb.uvec4('x')], function(){
+            this.$l.colorNorm = pb.unpack4x8unorm(this.x.x);
+            this.$l.colorScale = pb.uintBitsToFloat(this.x.y);
+            this.$return(pb.vec4(pb.mul(this.colorNorm.rgb, this.colorScale), this.colorNorm.a));
+          });
           pb.main(function () {
-            this.$l.accumColor = pb.textureSample(this.accumColorTex, this.$inputs.uv);
-            this.$l.accumAlpha = pb.textureSample(this.accumAlphaTex, this.$inputs.uv);
-            this.$l.r = this.accumColor.a;
-            this.accumColor.a = this.accumAlpha.r;
-            this.$outputs.outColor = pb.vec4(pb.div(this.accumColor.rgb, pb.clamp(this.accumColor.a, 0.0001, 50000)), this.r);
+            this.$l.fragmentArray = pb.uvec4[ABufferOIT.MAX_FRAGMENT_LAYERS]();
+            this.$l.fragmentArrayLen = pb.uint(0);
+            this.$l.offset = pb.add(pb.mul(this.screenWidth, pb.uint(this.$builtins.fragCoord.y)), pb.uint(this.$builtins.fragCoord.x));
+            this.$l.head = this.headBuffer.at(this.offset);
+            this.$while(pb.notEqual(this.head, 0), function(){
+              this.fragmentArray.setAt(this.fragmentArrayLen, this.nodeBuffer.at(this.head));
+              this.head = this.fragmentArray.at(this.fragmentArrayLen).w;
+              this.fragmentArrayLen = pb.add(this.fragmentArrayLen, 1);
+            });
+            this.$if(pb.equal(this.fragmentArrayLen, 0), function(){
+              this.$outputs.outColor = pb.vec4(0, 0, 0, 1);
+            }).$else(function(){
+              // bubble sort
+              this.$for(pb.uint('i'), 0, pb.sub(this.fragmentArrayLen, 1), function(){
+                this.$for(pb.uint('j'), 0, pb.sub(pb.sub(this.fragmentArrayLen, 1), this.i), function(){
+                  this.$l.a = this.fragmentArray.at(this.j);
+                  this.$l.b = this.fragmentArray.at(pb.add(this.j, 1));
+                  this.$if(pb.greaterThan(this.a.z, this.b.z), function(){
+                    this.fragmentArray.setAt(this.j, this.b);
+                    this.fragmentArray.setAt(pb.add(this.j, 1), this.a);
+                  });
+                });
+              });
+              // under operator blending
+              this.$l.c0 = this.unpackColor(this.fragmentArray[0]);
+              this.$l.c_dst = pb.mul(this.c0.rgb, this.c0.a);
+              this.$l.a_dst = pb.sub(1, this.c0.a);
+              this.$for(pb.uint('i'), 1, this.fragmentArrayLen, function(){
+                this.$l.c = this.unpackColor(this.fragmentArray.at(this.i));
+                this.c_dst = pb.add(pb.mul(this.c.rgb, this.c.a, this.a_dst), this.c_dst);
+                this.a_dst = pb.mul(this.a_dst, pb.sub(1, this.c.a));
+              });
+              this.$outputs.outColor = pb.vec4(this.c_dst, this.a_dst);
+            });
           });
         }
       });
       this._compositeBindGroup = device.createBindGroup(this._compositeProgram.bindGroupLayouts[0]);
       this._compositeRenderStates = device.createRenderStateSet();
-      this._compositeRenderStates.useBlendingState().enable(true).setBlendFuncRGB('inv-src-alpha', 'src-alpha').setBlendFuncAlpha('zero', 'one');
+      this._compositeRenderStates.useBlendingState().enable(true).setBlendFuncRGB('one', 'src-alpha').setBlendFuncAlpha('zero', 'one');
       this._compositeRenderStates.useDepthState().enableTest(false).enableWrite(false);
     }
     return this._compositeProgram;

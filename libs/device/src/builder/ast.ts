@@ -636,7 +636,7 @@ export class ASTPrimitive extends ASTExpression {
   isWritable(): boolean {
     const type = this.getType();
     return (
-      this.writable || type.isAtomicI32() || type.isAtomicU32() || (type.isStructType() && type.isWritable())
+      this.writable || type.isAtomicI32() || type.isAtomicU32() || (type.isStructType() && type.haveAtomicMembers())
     );
   }
   getAddressSpace(): PBAddressSpace {

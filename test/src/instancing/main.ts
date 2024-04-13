@@ -11,6 +11,7 @@ import {
   LambertMaterial,
   Mesh,
   WeightedBlendedOIT,
+  ABufferOIT,
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
@@ -36,7 +37,7 @@ instancingApp.ready().then(async () => {
   );
   camera.position.setXYZ(0, 0, 30);
   camera.controller = new OrbitCameraController();
-  camera.oit = new WeightedBlendedOIT();
+  camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
   camera.depthPrePass = true;
 
   instancingApp.inputManager.use(imGuiInjectEvent);
@@ -48,7 +49,7 @@ instancingApp.ready().then(async () => {
 
   const batchGroup = new BatchGroup(scene);
   const boxShape = new BoxShape();
-  /*
+
   const mat = new LambertMaterial();
   mat.blendMode = 'blend';
   for (let i = 0; i < 100; i++) {
@@ -58,7 +59,7 @@ instancingApp.ready().then(async () => {
     boxMesh.position.setXYZ(Math.random() * 5 - 2.5, Math.random() * 5, Math.random() * 5 - 2.5);
     boxMesh.parent = batchGroup;
   }
-  */
+
   const mat2 = new LinearDepthMaterial();
   const mesh2 = new Mesh(scene, boxShape, mat2);
   mesh2.scale = new Vector3(4, 4, 4);
@@ -113,6 +114,7 @@ instancingApp.ready().then(async () => {
   instancingApp.on('resize', (ev) => {
     camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane());
   });
+
   instancingApp.on('tick', (ev) => {
     camera.updateController();
     camera.render(scene, compositor);
