@@ -516,9 +516,7 @@ export class MeshMaterial extends Material {
           });
         }
         if (that.isTransparentPass(that.pass)) {
-          if (that.drawContext.oit) {
-            that.drawContext.oit.outputFragmentColor(this, this.outColor);
-          } else {
+          if (!that.drawContext.oit || !that.drawContext.oit.outputFragmentColor(this, this.outColor)) {
             this.outColor = pb.vec4(pb.mul(this.outColor.rgb, this.outColor.a), this.outColor.a);
           }
         }

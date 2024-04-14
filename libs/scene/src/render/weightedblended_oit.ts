@@ -57,6 +57,7 @@ export class WeightedBlendedOIT extends OIT {
       this.$outputs[1] = pb.getDevice().type === 'webgl' ? pb.vec4(pb.mul(this.color.a, this.w)) : pb.mul(this.color.a, this.w);
     });
     scope.Z_WBOIT_output(color);
+    return true;
   }
   setRenderStates(rs: RenderStateSet) {
     const blendingState = rs.useBlendingState();

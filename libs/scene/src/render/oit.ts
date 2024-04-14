@@ -6,7 +6,7 @@ export abstract class OIT {
   abstract getNumPasses(): number;
   abstract begin(ctx: DrawContext, pass: number);
   abstract setupFragmentOutput(scope: PBGlobalScope);
-  abstract outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp);
+  abstract outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp): boolean;
   abstract applyUniforms(ctx: DrawContext, bindGroup: BindGroup);
   abstract end(ctx: DrawContext, pass: number);
   abstract calculateHash(): string;

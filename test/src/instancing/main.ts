@@ -35,7 +35,7 @@ instancingApp.ready().then(async () => {
     1,
     1000
   );
-  camera.position.setXYZ(0, 0, 30);
+  camera.position.setXYZ(0, 0, 6);
   camera.controller = new OrbitCameraController();
   camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
   camera.depthPrePass = true;
@@ -56,7 +56,7 @@ instancingApp.ready().then(async () => {
     const instanceMat = mat.createInstance();
     instanceMat.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), Math.random());
     const boxMesh = new Mesh(scene, boxShape, instanceMat);
-    boxMesh.position.setXYZ(Math.random() * 5 - 2.5, Math.random() * 5, Math.random() * 5 - 2.5);
+    boxMesh.position.setXYZ(Math.random() * 5 - 2.5, Math.random() * 5 - 2.5, Math.random() * 5 - 2.5);
     boxMesh.parent = batchGroup;
   }
 

@@ -2157,6 +2157,7 @@ export class ProgramBuilder {
         exp.$declareType = u.block.exp.$declareType;
         exp.$isBuffer = u.block.exp.$isBuffer;
         exp.$dynamicOffset = u.block.exp.$dynamicOffset;
+        exp.$readonly = u.block.exp.$readonly;
         uniformList[u.group].push({ member: exp, uniform: i });
       }
     }
@@ -2188,11 +2189,13 @@ export class ProgramBuilder {
               false,
               ...allLists[p].map((val) => val.member)
             );
+            const readonly = i > 0 ? allLists[p].findIndex(val => !val.member.$readonly) < 0 : true;
             const exp = t();
             if (i === 0) {
               exp.uniformBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
             } else {
               exp.storageBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
+              exp.$readonly = readonly;
             }
             globalScope[uname] = exp;
             const index = this._uniforms.findIndex((val) => val.block?.name === uname);
@@ -2261,6 +2264,7 @@ export class ProgramBuilder {
           exp.$declareType = u.block.exp.$declareType;
           exp.$isBuffer = u.block.exp.$isBuffer;
           exp.$dynamicOffset = u.block.exp.$dynamicOffset;
+          exp.$readonly = u.block.exp.$readonly;
           sharedUniformList[u.group].push({ member: exp, uniform: i });
           //sharedUniformList[u.group].uniforms.push(i);
         } else if (v) {
@@ -2271,6 +2275,7 @@ export class ProgramBuilder {
           exp.$declareType = u.block.exp.$declareType;
           exp.$isBuffer = u.block.exp.$isBuffer;
           exp.$dynamicOffset = u.block.exp.$dynamicOffset;
+          exp.$readonly = u.block.exp.$readonly;
           vertexUniformList[u.group].push({ member: exp, uniform: i });
           //vertexUniformList[u.group].uniforms.push(i);
         } else if (f) {
@@ -2281,6 +2286,7 @@ export class ProgramBuilder {
           exp.$declareType = u.block.exp.$declareType;
           exp.$isBuffer = u.block.exp.$isBuffer;
           exp.$dynamicOffset = u.block.exp.$dynamicOffset;
+          exp.$readonly = u.block.exp.$readonly;
           fragUniformList[u.group].push({ member: exp, uniform: i }); //members.push(exp);
           //fragUniformList[u.group].uniforms.push(i);
         }
@@ -2323,12 +2329,17 @@ export class ProgramBuilder {
                 false,
                 ...allLists[p].map((val) => val.member)
               );
+              const readonly = j > 0 ? allLists[p].findIndex(val => !val.member.$readonly) < 0 : true;
               if (maskList[i] & ShaderType.Vertex) {
                 const exp = t();
+                if (j > 0 && !readonly) {
+                  throw new Error(`Storage buffer in vertex shader must be read-only`);
+                }
                 if (j === 0) {
                   exp.uniformBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
                 } else {
                   exp.storageBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
+                  exp.$readonly = readonly;
                 }
                 globalScopeVertex[uname] = exp;
               }
@@ -2338,6 +2349,7 @@ export class ProgramBuilder {
                   exp.uniformBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
                 } else {
                   exp.storageBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
+                  exp.$readonly = readonly;
                 }
                 globalScopeFragmet[uname] = exp;
               }
@@ -2434,9 +2446,9 @@ export class ProgramBuilder {
         const isStorage = uniformInfo.block.exp.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE;
         entry.buffer = {
           type: isStorage
-            ? (uniformInfo.block.exp.$ast as AST.ASTPrimitive).isWritable()
-              ? 'storage'
-              : 'read-only-storage'
+            ? uniformInfo.block.exp.$readonly
+              ? 'read-only-storage'
+              : 'storage'
             : 'uniform',
           hasDynamicOffset: uniformInfo.block.dynamicOffset,
           uniformLayout: entry.type.toBufferLayout(0, (entry.type as PBStructTypeInfo).layout)
@@ -3044,7 +3056,7 @@ export class PBLocalScope extends PBScope {
       value instanceof PBShaderExp &&
       (value.isConstructor() ||
         (value.$typeinfo.isTextureType() && value.$ast instanceof AST.ASTPrimitive && !value.$ast.name)) &&
-      value.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM
+      (value.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM || value.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE)
     ) {
       // We are setting uniform a uniform, should invoke in the global scope
       this.$g[prop] = value;
@@ -3061,6 +3073,7 @@ export class PBLocalScope extends PBScope {
         exp.$declareType = value.$declareType;
         exp.$isBuffer = value.$isBuffer;
         exp.$dynamicOffset = value.$dynamicOffset;
+        exp.$readonly = value.$readonly;
         exp.$group = value.$group;
         exp.$attrib = value.$attrib;
         exp.$sampleType = value.$sampleType;

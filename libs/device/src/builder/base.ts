@@ -176,6 +176,8 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
   /** @internal */
   $isBuffer: boolean;
   /** @internal */
+  $readonly: boolean;
+  /** @internal */
   $dynamicOffset: boolean;
   [name: string]: any;
   /** @internal */
@@ -200,6 +202,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$declareType = DeclareType.DECLARE_TYPE_NONE;
     this.$isBuffer = false;
     this.$dynamicOffset = false;
+    this.$readonly = false;
     if (typeInfo.isTextureType()) {
       if (typeInfo.isDepthTexture()) {
         this.$sampleType = 'depth';
@@ -281,6 +284,17 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$declareType = DeclareType.DECLARE_TYPE_STORAGE;
     this.$group = group;
     this.$isBuffer = false;
+    this.$readonly = false;
+    return this;
+  }
+  /**
+   * Point out that the variable is read-only and should be in storage address space
+   * @param group - The bind group index
+   * @returns self
+   */
+  storageReadonly(group: number): PBShaderExp {
+    this.storage(group);
+    this.$readonly = true;
     return this;
   }
   /**
@@ -305,6 +319,17 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$group = group;
     this.$isBuffer = true;
     this.$dynamicOffset = !!dynamicOffset;
+    this.$readonly = false;
+    return this;
+  }
+  /**
+   * Point out that the variable is read-only and should be a storage buffer
+   * @param group - The bind group index
+   * @returns self
+   */
+  storageBufferReadonly(group: number, dynamicOffset = false): PBShaderExp {
+    this.storageBuffer(group, dynamicOffset);
+    this.$readonly = true;
     return this;
   }
   inout(): PBShaderExp {
