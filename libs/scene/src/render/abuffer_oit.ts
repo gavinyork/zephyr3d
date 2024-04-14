@@ -147,7 +147,7 @@ export class ABufferOIT extends OIT {
       readBuffer.getBufferSubData(data).then(() => {
         for (let i = 0; i < this._nodeHeadImage.byteLength >> 2; i++) {
           if (debugArray[i] !== 0) {
-            console.log(data[i]);
+            console.log(debugArray[i]);
           }
         }
         readBuffer.dispose();
@@ -186,7 +186,8 @@ export class ABufferOIT extends OIT {
     scope.$l.Z_AB_pixelCount = pb.atomicAdd(scope.Z_AB_counter, 1);
     scope.$l.Z_AB_nodeOffset = scope.Z_AB_pixelCount;
     scope.$l.Z_AB_headOffset = pb.add(pb.mul(scope.Z_AB_screenSize.x, pb.uint(scope.$builtins.fragCoord.y)), pb.uint(scope.$builtins.fragCoord.x));
-    scope.$l.Z_AB_oldHead = pb.atomicExchange(scope.Z_AB_headImage.at(scope.Z_AB_headOffset), scope.Z_AB_nodeOffset);
+    //scope.$l.Z_AB_oldHead = pb.atomicExchange(scope.Z_AB_headImage.at(scope.Z_AB_headOffset), scope.Z_AB_nodeOffset);
+    pb.atomicAdd(scope.Z_AB_headImage.at(scope.Z_AB_headOffset), 1);
     scope.$outputs.outColor = color;
     return true;
     scope.$if(pb.lessThan(scope.fragDepth, scope.linearDepth), function(){
