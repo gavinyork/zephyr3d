@@ -213,7 +213,8 @@ export class WebGPUDevice extends BaseDevice {
       console.warn('using a fallback adapter');
     }
     this._device = await this._adapter.requestDevice({
-      requiredFeatures: [...this._adapter.features] as GPUFeatureName[]
+      requiredFeatures: [...this._adapter.features] as GPUFeatureName[],
+      requiredLimits: {...this._adapter.limits} as any
     });
     console.log('WebGPU device features:');
     for (const feature of this._device.features) {

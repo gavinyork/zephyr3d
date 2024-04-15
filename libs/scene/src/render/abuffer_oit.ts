@@ -35,7 +35,6 @@ import { Application } from "../app";
 import { drawFullscreenQuad } from "./fullscreenquad";
 import { ShaderHelper } from "../material";
 
-const debugArray = new Uint32Array(2000 * 2000);
 let debugOnce = false;
 export class ABufferOIT extends OIT {
   public static readonly type = 'ab';
@@ -118,7 +117,7 @@ export class ABufferOIT extends OIT {
     if (!this._counterBuffer) {
       this._counterBuffer = device.createBuffer(4, { storage: true, usage: 'uniform' });
     }
-    this._counterBuffer.bufferSubData(0, new Uint8Array(4));
+    this._counterBuffer.bufferSubData(0, new Uint32Array(1));
     this.clearHeadBuffer(device);
     if (this._debug) {
       const data = new Uint8Array(this._nodeHeadImage.byteLength);
@@ -139,21 +138,25 @@ export class ABufferOIT extends OIT {
   end(ctx: DrawContext, pass: number) {
     const device = Application.instance.device;
     ABufferOIT.getCompositeProgram(device);
-    if (!debugOnce) {
+    if (false && !debugOnce) {
       debugOnce = true;
-      const data = new Uint8Array(debugArray.buffer);
+      const data = new Uint8Array(this._nodeHeadImage.byteLength);
       const readBuffer = device.createBuffer(this._nodeHeadImage.byteLength, { usage: 'read' });
       device.copyBuffer(this._nodeHeadImage, readBuffer, 0, 0, this._nodeHeadImage.byteLength);
       readBuffer.getBufferSubData(data).then(() => {
-        for (let i = 0; i < this._nodeHeadImage.byteLength >> 2; i++) {
-          if (debugArray[i] !== 0) {
-            console.log(debugArray[i]);
-          }
-        }
+        const nodeReadBuffer = device.createBuffer(this._nodeBuffer.byteLength, { usage: 'read' });
+        device.copyBuffer(this._nodeBuffer, nodeReadBuffer, 0, 0, this._nodeBuffer.byteLength);
+        const nodeData = new Uint8Array(this._nodeBuffer.byteLength);
+        nodeReadBuffer.getBufferSubData(nodeData).then(() => {
+          const nodes = new Uint32Array(nodeData.buffer);
+          const heads = new Uint32Array(data.buffer);
+          (window as any).__test_nodes = nodes;
+          (window as any).__test_heads = heads;
+          nodeReadBuffer.dispose();
+        });
         readBuffer.dispose();
       });
     }
-    return;
     const lastBindGroup = device.getBindGroup(0);
     device.pushDeviceStates();
     device.setProgram(ABufferOIT.getCompositeProgram(device))
@@ -181,21 +184,11 @@ export class ABufferOIT extends OIT {
     // linear depth of current fragment
     scope.$l.fragDepth = ShaderHelper.nonLinearDepthToLinearNormalized(scope, scope.$builtins.fragCoord.z) ;
     // linear depth in depth texture
-    scope.$l.linearDepth = pb.float(8);//pb.textureLoad(scope.Z_AB_depthTexture, pb.ivec2(scope.$builtins.fragCoord.xy), 0).r;
+    scope.$l.linearDepth = pb.textureLoad(scope.Z_AB_depthTexture, pb.ivec2(scope.$builtins.fragCoord.xy), 0).r;
     // saved to buffer only if nothing is infront
-    scope.$l.Z_AB_pixelCount = pb.atomicAdd(scope.Z_AB_counter, 1);
-    scope.$l.Z_AB_nodeOffset = scope.Z_AB_pixelCount;
-    scope.$l.Z_AB_headOffset = pb.add(pb.mul(scope.Z_AB_screenSize.x, pb.uint(scope.$builtins.fragCoord.y)), pb.uint(scope.$builtins.fragCoord.x));
-    //scope.$l.Z_AB_oldHead = pb.atomicExchange(scope.Z_AB_headImage.at(scope.Z_AB_headOffset), scope.Z_AB_nodeOffset);
-    pb.atomicAdd(scope.Z_AB_headImage.at(scope.Z_AB_headOffset), 1);
-    scope.$outputs.outColor = color;
-    return true;
     scope.$if(pb.lessThan(scope.fragDepth, scope.linearDepth), function(){
       this.$l.Z_AB_pixelCount = pb.atomicAdd(this.Z_AB_counter, 1);
       this.$l.Z_AB_nodeOffset = this.Z_AB_pixelCount;
-      this.$l.Z_AB_headOffset = pb.add(pb.mul(this.Z_AB_screenSize.x, pb.uint(this.$builtins.fragCoord.y)), pb.uint(this.$builtins.fragCoord.x));
-      this.$l.Z_AB_oldHead = pb.atomicExchange(this.Z_AB_headImage.at(this.Z_AB_headOffset), this.Z_AB_nodeOffset);
-      return;
       // save if index not exceeded
       this.$if(pb.lessThan(this.Z_AB_nodeOffset, pb.arrayLength(this.Z_AB_nodeBuffer)), function(){
         this.$l.Z_AB_headOffset = pb.add(pb.mul(this.Z_AB_screenSize.x, pb.uint(this.$builtins.fragCoord.y)), pb.uint(this.$builtins.fragCoord.x));
@@ -207,7 +200,7 @@ export class ABufferOIT extends OIT {
         pb.discard;
       });
     });
-    return false;
+    return true;
   }
   setRenderStates(rs: RenderStateSet) {
   }
@@ -248,7 +241,7 @@ export class ABufferOIT extends OIT {
           this.headBuffer = pb.atomic_uint[0]().storageBuffer(0);
           pb.main(function(){
             this.$l.offset = pb.add(pb.mul(pb.uint(this.$builtins.fragCoord.y), this.screenWidth), pb.uint(this.$builtins.fragCoord.x));
-            pb.atomicExchange(this.headBuffer.at(this.offset), 0);
+            pb.atomicExchange(this.headBuffer.at(this.offset), 0xffffffff);
             pb.discard();
           });
         }
@@ -256,6 +249,7 @@ export class ABufferOIT extends OIT {
       this._clearBindGroup = device.createBindGroup(this._clearProgram.bindGroupLayouts[0]);
       this._clearRenderStates = device.createRenderStateSet();
       this._clearRenderStates.useDepthState().enableTest(false).enableWrite(false);
+      this._clearRenderStates.useRasterizerState().setCullMode('none');
     }
     return this._clearProgram;
   }
@@ -288,12 +282,11 @@ export class ABufferOIT extends OIT {
             this.$l.fragmentArrayLen = pb.uint(0);
             this.$l.offset = pb.add(pb.mul(this.screenWidth, pb.uint(this.$builtins.fragCoord.y)), pb.uint(this.$builtins.fragCoord.x));
             this.$l.head = this.headBuffer.at(this.offset);
-            this.$while(pb.notEqual(this.head, 0), function(){
+            this.$while(pb.notEqual(this.head, 0xffffffff), function(){
               this.fragmentArray.setAt(this.fragmentArrayLen, this.nodeBuffer.at(this.head));
               this.head = this.fragmentArray.at(this.fragmentArrayLen).w;
               this.fragmentArrayLen = pb.add(this.fragmentArrayLen, 1);
             });
-            this.$outputs.outColor = pb.vec4(0, 0, 0, 1);
             this.$if(pb.equal(this.fragmentArrayLen, 0), function(){
               this.$outputs.outColor = pb.vec4(0, 0, 0, 1);
             }).$else(function(){
@@ -308,8 +301,6 @@ export class ABufferOIT extends OIT {
                   });
                 });
               });
-              this.$outputs.outColor = pb.vec4(0,0,0,1);
-              return;
               // under operator blending
               this.$l.c0 = this.unpackColor(this.fragmentArray[0]);
               this.$l.c_dst = pb.mul(this.c0.rgb, this.c0.a);
