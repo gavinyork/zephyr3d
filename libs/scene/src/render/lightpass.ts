@@ -98,7 +98,7 @@ export class LightPass extends RenderPass {
       ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none' ? ctx.env.sky.fogType : null;
       ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
       ctx.oit = i === 0 ? null : ctx.primaryCamera.oit;
-      const oitPass = ctx.oit ? ctx.oit.getNumPasses() : 1;
+      const oitPass = ctx.oit ? ctx.oit.getNumPasses(ctx) : 1;
       for (let p = 0; p < oitPass; p++) {
         if (ctx.oit) {
           ctx.oit.begin(ctx, p);

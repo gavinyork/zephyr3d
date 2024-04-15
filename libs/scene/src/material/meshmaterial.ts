@@ -326,6 +326,8 @@ export class MeshMaterial extends Material {
     } else {
       stateSet.defaultRasterizerState();
     }
+    stateSet.defaultColorState();
+    stateSet.defaultStencilState();
     if (ctx.oit) {
       ctx.oit.setRenderStates(stateSet);
     }

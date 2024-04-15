@@ -3,7 +3,7 @@ import { DrawContext } from "./drawable";
 
 export abstract class OIT {
   abstract getType(): string;
-  abstract getNumPasses(): number;
+  abstract getNumPasses(ctx: DrawContext): number;
   abstract begin(ctx: DrawContext, pass: number);
   abstract setupFragmentOutput(scope: PBGlobalScope);
   abstract outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp): boolean;

@@ -122,7 +122,7 @@ export class WeightedBlendedOIT extends OIT {
       this._compositeBindGroup = device.createBindGroup(this._compositeProgram.bindGroupLayouts[0]);
       this._compositeRenderStates = device.createRenderStateSet();
       this._compositeRenderStates.useBlendingState().enable(true).setBlendFuncRGB('inv-src-alpha', 'src-alpha').setBlendFuncAlpha('zero', 'one');
-      this._compositeRenderStates.useDepthState().enableTest(true).enableWrite(false);
+      this._compositeRenderStates.useDepthState().enableTest(false).enableWrite(false);
     }
     return this._compositeProgram;
   }

@@ -60,7 +60,8 @@ instancingApp.ready().then(async () => {
     boxMesh.parent = batchGroup;
   }
 
-  const mat2 = new LinearDepthMaterial();
+  const mat2 = new LambertMaterial();
+  mat2.albedoColor = new Vector4(1, 0, 0, 1);
   const mesh2 = new Mesh(scene, boxShape, mat2);
   mesh2.scale = new Vector3(4, 4, 4);
   mesh2.parent = batchGroup;

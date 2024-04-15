@@ -28,7 +28,7 @@ function over(t, d) {
 }
 */
 
-import type { AbstractDevice, BindGroup, GPUDataBuffer, GPUProgram, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, RenderStateSet } from "@zephyr3d/device";
+import type { AbstractDevice, BindGroup, DeviceViewport, GPUDataBuffer, GPUProgram, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, RenderStateSet } from "@zephyr3d/device";
 import { OIT } from "./oit";
 import { DrawContext } from "./drawable";
 import { Application } from "../app";
@@ -52,6 +52,8 @@ export class ABufferOIT extends OIT {
   private _screenSize: Uint32Array;
   private _hash: string;
   private _debug: boolean;
+  private _scissors: number[];
+  private _savedScissor: DeviceViewport;
   constructor() {
     super();
     this._nodeBuffer = null;
@@ -61,12 +63,26 @@ export class ABufferOIT extends OIT {
     this._screenSize = new Uint32Array([0xffffffff, 0xffffffff]);
     this._hash = null;
     this._debug = false;
+    this._scissors = [];
+    this._savedScissor = null;
   }
   getType(): string {
     return ABufferOIT.type;
   }
   getNumPasses(): number {
-    return 1;
+    const device = Application.instance.device;
+    const maxBufferSize = device.getDeviceCaps().shaderCaps.maxStorageBufferSize;
+    const viewport = device.getViewport();
+    const viewportWidth = viewport.width;
+    const viewportHeight = Math.max(viewport.height, 1);
+    const bytesPerLine = viewportWidth * 4 * 4 * this._numLayers;
+    const sliceHeight = (maxBufferSize / bytesPerLine) >> 0;
+    const numSlices = Math.ceil(viewportHeight / sliceHeight);
+    this._scissors.length = 0;
+    for (let i = 0; i < numSlices; i++) {
+      this._scissors.push(Math.min(sliceHeight, viewportHeight - i * sliceHeight));
+    }
+    return numSlices;
   }
   setupFragmentOutput(scope: PBGlobalScope) {
     const pb = scope.$builder;
@@ -92,9 +108,10 @@ export class ABufferOIT extends OIT {
   }
   begin(ctx: DrawContext, pass: number) {
     const device = Application.instance.device;
+    this._savedScissor = device.getScissor();
     const viewport = device.getViewport();
     const screenWidth = device.screenToDevice(viewport.width);
-    const screenHeight = device.screenToDevice(viewport.height);
+    const screenHeight = this._scissors[pass];
     this._screenSize[0] = screenWidth;
     this._screenSize[1] = screenHeight;
     const size = screenWidth * screenHeight * 4;
@@ -137,26 +154,8 @@ export class ABufferOIT extends OIT {
   }
   end(ctx: DrawContext, pass: number) {
     const device = Application.instance.device;
+    device.setScissor(this._savedScissor);
     ABufferOIT.getCompositeProgram(device);
-    if (false && !debugOnce) {
-      debugOnce = true;
-      const data = new Uint8Array(this._nodeHeadImage.byteLength);
-      const readBuffer = device.createBuffer(this._nodeHeadImage.byteLength, { usage: 'read' });
-      device.copyBuffer(this._nodeHeadImage, readBuffer, 0, 0, this._nodeHeadImage.byteLength);
-      readBuffer.getBufferSubData(data).then(() => {
-        const nodeReadBuffer = device.createBuffer(this._nodeBuffer.byteLength, { usage: 'read' });
-        device.copyBuffer(this._nodeBuffer, nodeReadBuffer, 0, 0, this._nodeBuffer.byteLength);
-        const nodeData = new Uint8Array(this._nodeBuffer.byteLength);
-        nodeReadBuffer.getBufferSubData(nodeData).then(() => {
-          const nodes = new Uint32Array(nodeData.buffer);
-          const heads = new Uint32Array(data.buffer);
-          (window as any).__test_nodes = nodes;
-          (window as any).__test_heads = heads;
-          nodeReadBuffer.dispose();
-        });
-        readBuffer.dispose();
-      });
-    }
     const lastBindGroup = device.getBindGroup(0);
     device.pushDeviceStates();
     device.setProgram(ABufferOIT.getCompositeProgram(device))
@@ -203,6 +202,14 @@ export class ABufferOIT extends OIT {
     return true;
   }
   setRenderStates(rs: RenderStateSet) {
+    const stencilStates = rs.useStencilState();
+    stencilStates.enable(true);
+    stencilStates.setFrontCompareFunc('always');
+    stencilStates.setBackCompareFunc('always');
+    stencilStates.setFrontOp('keep', 'keep', 'replace');
+    stencilStates.setBackOp('keep', 'keep', 'replace');
+    stencilStates.setReference(1);
+    stencilStates.setReadMask(0xFF);
   }
   getCounterBuffer(device: AbstractDevice) {
     if (!this._counterBuffer) {
@@ -319,6 +326,14 @@ export class ABufferOIT extends OIT {
       this._compositeRenderStates = device.createRenderStateSet();
       this._compositeRenderStates.useBlendingState().enable(true).setBlendFuncRGB('one', 'src-alpha').setBlendFuncAlpha('zero', 'one');
       this._compositeRenderStates.useDepthState().enableTest(false).enableWrite(false);
+      const stencilStates = this._compositeRenderStates.useStencilState();
+      stencilStates.enable(true);
+      stencilStates.setFrontCompareFunc('always');
+      stencilStates.setBackCompareFunc('always');
+      stencilStates.setFrontOp('keep', 'keep', 'replace');
+      stencilStates.setBackOp('keep', 'keep', 'replace');
+      stencilStates.setReference(0);
+      stencilStates.setReadMask(0xFF);
       console.log(this._compositeProgram.getShaderSource('fragment'));
     }
     return this._compositeProgram;
