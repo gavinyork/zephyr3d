@@ -18,22 +18,25 @@ export class WeightedBlendedOIT extends OIT {
   getType(): string {
     return WeightedBlendedOIT.type;
   }
-  getNumPasses(): number {
+  begin(ctx: DrawContext): number {
     return 1;
+  }
+  end(ctx: DrawContext) {
+    return;
   }
   setupFragmentOutput(scope: PBGlobalScope) {
     const pb = scope.$builder;
     scope.$outputs.outColor = pb.vec4();
     scope.$outputs.outAlpha = pb.getDevice().type === 'webgl' ? pb.vec4() : pb.float();
   }
-  begin(ctx: DrawContext, pass: number) {
+  beginPass(ctx: DrawContext, pass: number) {
     const device = Application.instance.device;
     const accumBuffer = this.getAccumFramebuffer(ctx, device);
     device.pushDeviceStates();
     device.setFramebuffer(accumBuffer);
     device.clearFrameBuffer(new Vector4(0, 0, 0, 1), null, null);
   }
-  end(ctx: DrawContext, pass: number) {
+  endPass(ctx: DrawContext, pass: number) {
     const device = Application.instance.device;
     const accumBuffer = device.getFramebuffer();
     device.popDeviceStates();

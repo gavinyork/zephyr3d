@@ -1528,6 +1528,10 @@ export interface ShaderCaps {
   maxUniformBufferSize: number;
   /** The uniform buffer offset alignment */
   uniformBufferOffsetAlignment: number;
+  /** The maximum number of bytes of storage buffer */
+  maxStorageBufferSize: number;
+  /** The storage buffer offset alignment */
+  storageBufferOffsetAlignment: number;
 }
 
 /**

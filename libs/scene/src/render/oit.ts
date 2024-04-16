@@ -3,12 +3,13 @@ import { DrawContext } from "./drawable";
 
 export abstract class OIT {
   abstract getType(): string;
-  abstract getNumPasses(ctx: DrawContext): number;
-  abstract begin(ctx: DrawContext, pass: number);
+  abstract begin(ctx: DrawContext): number;
+  abstract end(ctx: DrawContext);
+  abstract beginPass(ctx: DrawContext, pass: number);
   abstract setupFragmentOutput(scope: PBGlobalScope);
   abstract outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp): boolean;
   abstract applyUniforms(ctx: DrawContext, bindGroup: BindGroup);
-  abstract end(ctx: DrawContext, pass: number);
+  abstract endPass(ctx: DrawContext, pass: number);
   abstract calculateHash(): string;
   abstract setRenderStates(rs: RenderStateSet);
 }

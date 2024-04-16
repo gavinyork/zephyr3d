@@ -1036,6 +1036,8 @@ export interface BufferBindingLayout {
   uniformLayout: UniformBufferLayout;
   /** minimum binding size of the buffer */
   minBindingSize?: number;
+  /** dynamic offset index */
+  dynamicOffsetIndex: number;
 }
 
 /**
@@ -1435,10 +1437,11 @@ export type StructuredValue = number | TypedArray | VectorBase | { [name: string
  */
 export interface BindGroup extends GPUObject<unknown> {
   getLayout(): BindGroupLayout;
+  getDynamicOffsets(): number[];
   getGPUId(): string;
   getBuffer(name: string): GPUDataBuffer;
   getTexture(name: string): BaseTexture;
-  setBuffer(name: string, buffer: GPUDataBuffer): void;
+  setBuffer(name: string, buffer: GPUDataBuffer, offset?: number): void;
   setValue(name: string, value: StructuredValue);
   setRawData(name: string, byteOffset: number, data: TypedArray, srcPos?: number, srcLength?: number);
   setTexture(name: string, texture: BaseTexture, sampler?: TextureSampler);

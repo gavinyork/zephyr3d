@@ -509,7 +509,7 @@ export class WebGPUDevice extends BaseDevice {
   }
   setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>) {
     this._currentBindGroups[index] = bindGroup as WebGPUBindGroup;
-    this._currentBindGroupOffsets[index] = dynamicOffsets || null;
+    this._currentBindGroupOffsets[index] = dynamicOffsets ?? bindGroup?.getDynamicOffsets() ?? null;
   }
   getBindGroup(index: number): [BindGroup, Iterable<number>] {
     return [this._currentBindGroups[index], this._currentBindGroupOffsets[index]];

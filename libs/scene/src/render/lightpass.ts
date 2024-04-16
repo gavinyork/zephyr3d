@@ -98,10 +98,10 @@ export class LightPass extends RenderPass {
       ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none' ? ctx.env.sky.fogType : null;
       ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
       ctx.oit = i === 0 ? null : ctx.primaryCamera.oit;
-      const oitPass = ctx.oit ? ctx.oit.getNumPasses(ctx) : 1;
-      for (let p = 0; p < oitPass; p++) {
+      const numOitPasses = ctx.oit ? ctx.oit.begin(ctx) : 1;
+      for (let p = 0; p < numOitPasses; p++) {
         if (ctx.oit) {
-          ctx.oit.begin(ctx, p);
+          ctx.oit.beginPass(ctx, p);
         }
         for (const order of orders) {
           const items = renderQueue.items[order];
@@ -124,8 +124,11 @@ export class LightPass extends RenderPass {
           }
         }
         if (ctx.oit) {
-          ctx.oit.end(ctx, p);
+          ctx.oit.endPass(ctx, p);
         }
+      }
+      if (ctx.oit) {
+        ctx.oit.end(ctx);
       }
       if (i === 0) {
         ctx.env.sky.skyWorldMatrix = ctx.scene.rootNode.worldMatrix;

@@ -2421,6 +2421,7 @@ export class ProgramBuilder {
   /** @internal */
   private createBindGroupLayouts(label: string): BindGroupLayout[] {
     const layouts: BindGroupLayout[] = [];
+    const dynamicOffsetIndex = [0, 0, 0, 0];
     for (const uniformInfo of this._uniforms) {
       let layout = layouts[uniformInfo.group];
       if (!layout) {
@@ -2451,7 +2452,8 @@ export class ProgramBuilder {
               : 'storage'
             : 'uniform',
           hasDynamicOffset: uniformInfo.block.dynamicOffset,
-          uniformLayout: entry.type.toBufferLayout(0, (entry.type as PBStructTypeInfo).layout)
+          uniformLayout: entry.type.toBufferLayout(0, (entry.type as PBStructTypeInfo).layout),
+          dynamicOffsetIndex: uniformInfo.block.dynamicOffset ? dynamicOffsetIndex[uniformInfo.group]++ : -1
         };
         entry.name = uniformInfo.block.name;
       } else if (uniformInfo.texture) {

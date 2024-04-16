@@ -27,6 +27,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   private _textures: WebGPUBaseTexture[];
   private _gpuId: number;
   private _videoTextures: WebGPUTextureVideo[];
+  private _dynamicOffsets: number[];
   private _resources: {
     [name: string]: WebGPUBuffer | WebGPUTextureVideo | [WebGPUBaseTexture, GPUTextureView] | GPUSampler;
   };
@@ -35,11 +36,20 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     this._device = device;
     this._layout = layout;
     this._bindGroup = null;
+    this._dynamicOffsets = null;
     this._gpuId = 0;
     this._resources = {};
     this._buffers = [];
     this._textures = [];
     this._videoTextures = null;
+    for (const entry of this._layout.entries) {
+      if (entry.buffer && entry.buffer.hasDynamicOffset) {
+        if (!this._dynamicOffsets) {
+          this._dynamicOffsets = [];
+        }
+        this._dynamicOffsets[entry.buffer.dynamicOffsetIndex] = 0;
+      }
+    }
   }
   get bindGroup() {
     if (!this._bindGroup) {
@@ -63,10 +73,13 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   getLayout(): BindGroupLayout {
     return this._layout;
   }
+  getDynamicOffsets(): number[] {
+    return this._dynamicOffsets;
+  }
   getBuffer(name: string): GPUDataBuffer {
     return this._getBuffer(name, GPUResourceUsageFlags.BF_UNIFORM | GPUResourceUsageFlags.BF_STORAGE, true);
   }
-  setBuffer(name: string, buffer: GPUDataBuffer) {
+  setBuffer(name: string, buffer: GPUDataBuffer, offset?: number) {
     const bindName = this._layout.nameMap?.[name] ?? name;
     for (const entry of this._layout.entries) {
       if (entry.name === bindName) {
@@ -82,6 +95,9 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
           } else if (buffer !== this._resources[entry.name]) {
             this._resources[entry.name] = buffer as WebGPUBuffer;
             this.invalidate();
+          }
+          if (entry.buffer.hasDynamicOffset) {
+            this._dynamicOffsets[entry.buffer.dynamicOffsetIndex] = offset ?? 0;
           }
         }
         return;
