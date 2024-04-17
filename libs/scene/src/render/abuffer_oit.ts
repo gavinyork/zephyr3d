@@ -1,3 +1,7 @@
+// FIXME:
+// scissor incorrectly flipped
+// consider devicePixelRatio
+
 import type { AbstractDevice, BindGroup, DeviceViewport, GPUDataBuffer, GPUProgram, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, RenderStateSet } from "@zephyr3d/device";
 import { OIT } from "./oit";
 import { DrawContext } from "./drawable";
@@ -8,12 +12,14 @@ import { ShaderHelper } from "../material";
 export class ABufferOIT extends OIT {
   public static readonly type = 'ab';
   private static MAX_FRAGMENT_LAYERS = 75;
-  private static _clearProgram: GPUProgram;
-  private static _clearBindGroup: BindGroup;
-  private static _clearRenderStates: RenderStateSet;
-  private static _compositeProgram: GPUProgram;
-  private static _compositeBindGroup: BindGroup;
-  private static _compositeRenderStates: RenderStateSet;
+  private static _clearProgram: GPUProgram = null;
+  private static _clearBindGroup: BindGroup = null;
+  private static _clearRenderStates: RenderStateSet = null;
+  private static _compositeProgram: GPUProgram = null;
+  private static _compositeBindGroup: BindGroup = null;
+  private static _compositeRenderStates: RenderStateSet = null;
+  private static _ubAlignment = 0;
+  private static _sbAlignment = 0;
   private _nodeBuffer: GPUDataBuffer;
   private _counterBuffer: GPUDataBuffer;
   private _nodeHeadImage: GPUDataBuffer;
@@ -49,7 +55,8 @@ export class ABufferOIT extends OIT {
   begin(ctx: DrawContext): number {
     const device = Application.instance.device;
     this._savedScissor = device.getScissor();
-    const alignment = device.getDeviceCaps().shaderCaps.uniformBufferOffsetAlignment;
+    const ubAlignment = ABufferOIT._ubAlignment = device.getDeviceCaps().shaderCaps.uniformBufferOffsetAlignment;
+    const sbAlignment = ABufferOIT._sbAlignment = device.getDeviceCaps().shaderCaps.storageBufferOffsetAlignment;
     const viewport = device.getViewport();
     const screenWidth = device.screenToDevice(viewport.width);
     const screenHeight = Math.max(device.screenToDevice(viewport.height), 1);
@@ -62,10 +69,10 @@ export class ABufferOIT extends OIT {
       const bytesPerLine = screenWidth * 4 * 4 * this._numLayers;
       this._scissorHeight = (maxBufferSize / bytesPerLine) >> 0;
       this._scissorSlices = Math.ceil(screenHeight / this._scissorHeight);
-      const offsetBufferSize = alignment * this._scissorSlices;
+      const offsetBufferSize = ubAlignment * this._scissorSlices;
       const offsetBuffer = new Uint32Array(offsetBufferSize >> 2);
       for (let i = 0; i < this._scissorSlices; i++) {
-        offsetBuffer[i * (alignment >> 2)] = i * this._scissorHeight;
+        offsetBuffer[i * (ubAlignment >> 2)] = i * this._scissorHeight;
       }
       if (!this._scissorOffsetBuffer || this._scissorOffsetBuffer.byteLength < offsetBuffer.byteLength) {
         this._scissorOffsetBuffer?.dispose();
@@ -87,17 +94,19 @@ export class ABufferOIT extends OIT {
         clearBuffer.fill(0xffffffff);
         this._nodeHeadImage.bufferSubData(0, clearBuffer);
       }
+      // resize counter buffer if needed
+      const counterBufferSize = sbAlignment * this._scissorSlices;
+      if (!this._offsetBuffer || this._offsetBuffer.byteLength < counterBufferSize) {
+        this._offsetBuffer = new Uint32Array(counterBufferSize >> 2);
+      }
+      if (!this._counterBuffer || this._counterBuffer.byteLength < counterBufferSize) {
+        this._counterBuffer?.dispose();
+        this._counterBuffer = device.createBuffer(counterBufferSize, { storage: true, usage: 'uniform' });
+      }
     }
-    // resize counter buffer if needed
-    const counterBufferSize = alignment * this._scissorSlices;
-    if (!this._offsetBuffer || this._offsetBuffer.byteLength < counterBufferSize) {
-      this._offsetBuffer = new Uint32Array(counterBufferSize >> 2);
-    }
-    // Make sure counter buffer is created
-    if (!this._counterBuffer || this._counterBuffer.byteLength < counterBufferSize) {
-      this._counterBuffer?.dispose();
-      this._counterBuffer = device.createBuffer(counterBufferSize, { storage: true, usage: 'uniform' });
-    }
+    // Always clear counter buffer
+    this._counterBuffer.bufferSubData(0, this._offsetBuffer);
+
     return this._scissorSlices;
   }
   end(ctx: DrawContext) {
@@ -106,10 +115,10 @@ export class ABufferOIT extends OIT {
   }
   setupFragmentOutput(scope: PBGlobalScope) {
     const pb = scope.$builder;
-    scope.Z_AB_scissorOffset = pb.uint().uniformBuffer(2, true);
+    scope.Z_AB_scissorOffset = pb.uint().uniformBuffer(2);
     scope.Z_AB_nodeBuffer = pb.uvec4[0]().storageBuffer(2);
     scope.Z_AB_headImage = pb.atomic_uint[0]().storageBuffer(2);
-    scope.Z_AB_counter = pb.atomic_uint().storageBuffer(2, true);
+    scope.Z_AB_counter = pb.atomic_uint().storageBuffer(2);
     scope.Z_AB_screenSize = pb.uint().uniform(2);
     scope.Z_AB_depthTexture = pb.tex2D().uniform(2);
     scope.$outputs.outColor = pb.vec4();
@@ -128,10 +137,12 @@ export class ABufferOIT extends OIT {
     device.setBindGroup(0, lastBindGroup[0], lastBindGroup[1]);
   }
   beginPass(ctx: DrawContext, pass: number) {
+    if (pass > 0) {
+      return false;
+    }
     this._currentPass = pass;
     const device = Application.instance.device;
     device.setScissor([0, pass * this._scissorHeight, this._screenSize[0], Math.min((pass + 1) * this._scissorHeight, this._screenSize[1]) - pass * this._scissorHeight])
-    this._counterBuffer.bufferSubData(0, this._offsetBuffer);
     //this.clearHeadBuffer(device);
     // Update render hash
     this._hash = `${this.getType()}#${this._nodeBuffer.uid}#${this._nodeHeadImage.uid}#${this._scissorOffsetBuffer.uid}#${pass}`;
@@ -150,15 +161,15 @@ export class ABufferOIT extends OIT {
         readBuffer.dispose();
       });
     }
+    return true;
   }
   endPass(ctx: DrawContext, pass: number) {
     const device = Application.instance.device;
     ABufferOIT.getCompositeProgram(device);
     const lastBindGroup = device.getBindGroup(0);
     device.setProgram(ABufferOIT.getCompositeProgram(device))
-    const offset = pass * Application.instance.device.getDeviceCaps().shaderCaps.storageBufferOffsetAlignment;
     const bindGroup = ABufferOIT._compositeBindGroup;
-    bindGroup.setBuffer('scissorOffset', this._scissorOffsetBuffer, offset);
+    bindGroup.setBuffer('scissorOffset', this._scissorOffsetBuffer, 0, pass * ABufferOIT._ubAlignment, ABufferOIT._ubAlignment);
     bindGroup.setBuffer('headBuffer', this._nodeHeadImage);
     bindGroup.setBuffer('nodeBuffer', this._nodeBuffer);
     bindGroup.setValue('screenWidth', this._screenSize[0]);
@@ -170,10 +181,9 @@ export class ABufferOIT extends OIT {
     return this._hash;
   }
   applyUniforms(ctx: DrawContext, bindGroup: BindGroup) {
-    const offset = this._currentPass * Application.instance.device.getDeviceCaps().shaderCaps.storageBufferOffsetAlignment;
     bindGroup.setBuffer('Z_AB_nodeBuffer', this._nodeBuffer);
-    bindGroup.setBuffer('Z_AB_counter', this._counterBuffer, offset);
-    bindGroup.setBuffer('Z_AB_scissorOffset', this._scissorOffsetBuffer, offset);
+    bindGroup.setBuffer('Z_AB_counter', this._counterBuffer, 0, this._currentPass * ABufferOIT._sbAlignment, ABufferOIT._sbAlignment);
+    bindGroup.setBuffer('Z_AB_scissorOffset', this._scissorOffsetBuffer, 0, this._currentPass * ABufferOIT._ubAlignment, ABufferOIT._ubAlignment);
     bindGroup.setBuffer('Z_AB_headImage', this._nodeHeadImage);
     bindGroup.setValue('Z_AB_screenSize', this._screenSize[0]);
     bindGroup.setTexture('Z_AB_depthTexture', ctx.linearDepthTexture);
@@ -254,7 +264,7 @@ export class ABufferOIT extends OIT {
         },
         fragment(pb){
           this.$outputs.outColor = pb.vec4();
-          this.scissorOffset = pb.uint().uniformBuffer(0, true);
+          this.scissorOffset = pb.uint().uniformBuffer(0);
           this.headBuffer = pb.atomic_uint[0]().storageBuffer(0);
           this.nodeBuffer = pb.uvec4[0]().storageBuffer(0);
           this.screenWidth = pb.uint().uniform(0);

@@ -651,7 +651,7 @@ export class WebGPUDevice extends BaseDevice {
     return this._samplerCache.fetchSampler(options);
   }
   /** @internal */
-  fetchBindGroupLayout(desc: BindGroupLayout): GPUBindGroupLayout {
+  fetchBindGroupLayout(desc: BindGroupLayout): [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout] {
     return this._bindGroupCache.fetchBindGroupLayout(desc);
   }
   flush(): void {

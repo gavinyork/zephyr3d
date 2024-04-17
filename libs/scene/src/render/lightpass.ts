@@ -101,7 +101,9 @@ export class LightPass extends RenderPass {
       const numOitPasses = ctx.oit ? ctx.oit.begin(ctx) : 1;
       for (let p = 0; p < numOitPasses; p++) {
         if (ctx.oit) {
-          ctx.oit.beginPass(ctx, p);
+          if (!ctx.oit.beginPass(ctx, p)) {
+            continue;
+          }
         }
         for (const order of orders) {
           const items = renderQueue.items[order];

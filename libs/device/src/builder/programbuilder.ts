@@ -57,7 +57,7 @@ interface UniformInfo {
   mask: number;
   block?: {
     name: string;
-    dynamicOffset: boolean;
+    bindingSize: number;
     exp: PBShaderExp;
   };
   texture?: {
@@ -2156,7 +2156,7 @@ export class ProgramBuilder {
         const exp = new PBShaderExp(u.block.exp.$str, u.block.exp.$ast.getType());
         exp.$declareType = u.block.exp.$declareType;
         exp.$isBuffer = u.block.exp.$isBuffer;
-        exp.$dynamicOffset = u.block.exp.$dynamicOffset;
+        exp.$bindingSize = u.block.exp.$bindingSize;
         exp.$readonly = u.block.exp.$readonly;
         uniformList[u.group].push({ member: exp, uniform: i });
       }
@@ -2192,9 +2192,9 @@ export class ProgramBuilder {
             const readonly = i > 0 ? allLists[p].findIndex(val => !val.member.$readonly) < 0 : true;
             const exp = t();
             if (i === 0) {
-              exp.uniformBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
+              exp.uniformBuffer(Number(k), p > 0 ? allLists[p][0].member.$bindingSize : 0);
             } else {
-              exp.storageBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
+              exp.storageBuffer(Number(k), p > 0 ? allLists[p][0].member.$bindingSize : 0);
               exp.$readonly = readonly;
             }
             globalScope[uname] = exp;
@@ -2263,7 +2263,7 @@ export class ProgramBuilder {
           const exp = new PBShaderExp(u.block.exp.$str, u.block.exp.$ast.getType());
           exp.$declareType = u.block.exp.$declareType;
           exp.$isBuffer = u.block.exp.$isBuffer;
-          exp.$dynamicOffset = u.block.exp.$dynamicOffset;
+          exp.$bindingSize = u.block.exp.$bindingSize;
           exp.$readonly = u.block.exp.$readonly;
           sharedUniformList[u.group].push({ member: exp, uniform: i });
           //sharedUniformList[u.group].uniforms.push(i);
@@ -2274,7 +2274,7 @@ export class ProgramBuilder {
           const exp = new PBShaderExp(u.block.exp.$str, u.block.exp.$ast.getType());
           exp.$declareType = u.block.exp.$declareType;
           exp.$isBuffer = u.block.exp.$isBuffer;
-          exp.$dynamicOffset = u.block.exp.$dynamicOffset;
+          exp.$bindingSize = u.block.exp.$bindingSize;
           exp.$readonly = u.block.exp.$readonly;
           vertexUniformList[u.group].push({ member: exp, uniform: i });
           //vertexUniformList[u.group].uniforms.push(i);
@@ -2285,7 +2285,7 @@ export class ProgramBuilder {
           const exp = new PBShaderExp(u.block.exp.$str, u.block.exp.$ast.getType());
           exp.$declareType = u.block.exp.$declareType;
           exp.$isBuffer = u.block.exp.$isBuffer;
-          exp.$dynamicOffset = u.block.exp.$dynamicOffset;
+          exp.$bindingSize = u.block.exp.$bindingSize;
           exp.$readonly = u.block.exp.$readonly;
           fragUniformList[u.group].push({ member: exp, uniform: i }); //members.push(exp);
           //fragUniformList[u.group].uniforms.push(i);
@@ -2336,9 +2336,9 @@ export class ProgramBuilder {
                   throw new Error(`Storage buffer in vertex shader must be read-only`);
                 }
                 if (j === 0) {
-                  exp.uniformBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
+                  exp.uniformBuffer(Number(k), p > 0 ? allLists[p][0].member.$bindingSize : 0);
                 } else {
-                  exp.storageBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
+                  exp.storageBuffer(Number(k), p > 0 ? allLists[p][0].member.$bindingSize : 0);
                   exp.$readonly = readonly;
                 }
                 globalScopeVertex[uname] = exp;
@@ -2346,9 +2346,9 @@ export class ProgramBuilder {
               if (maskList[i] & ShaderType.Fragment) {
                 const exp = t();
                 if (j === 0) {
-                  exp.uniformBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
+                  exp.uniformBuffer(Number(k), p > 0 ? allLists[p][0].member.$bindingSize : 0);
                 } else {
-                  exp.storageBuffer(Number(k), p > 0 && allLists[p][0].member.$dynamicOffset);
+                  exp.storageBuffer(Number(k), p > 0 ? allLists[p][0].member.$bindingSize : 0);
                   exp.$readonly = readonly;
                 }
                 globalScopeFragmet[uname] = exp;
@@ -2451,9 +2451,10 @@ export class ProgramBuilder {
               ? 'read-only-storage'
               : 'storage'
             : 'uniform',
-          hasDynamicOffset: uniformInfo.block.dynamicOffset,
+          minBindingSize: uniformInfo.block.bindingSize,
+          hasDynamicOffset: !!uniformInfo.block.bindingSize,
           uniformLayout: entry.type.toBufferLayout(0, (entry.type as PBStructTypeInfo).layout),
-          dynamicOffsetIndex: uniformInfo.block.dynamicOffset ? dynamicOffsetIndex[uniformInfo.group]++ : -1
+          dynamicOffsetIndex: !!uniformInfo.block.bindingSize ? dynamicOffsetIndex[uniformInfo.group]++ : -1
         };
         entry.name = uniformInfo.block.name;
       } else if (uniformInfo.texture) {
@@ -2804,7 +2805,7 @@ export class PBScope extends Proxiable<PBScope> {
     } else {
       uniformInfo.block = {
         name: name,
-        dynamicOffset: variable.$dynamicOffset,
+        bindingSize: variable.$bindingSize,
         exp: variable
       };
       // throw new Error(`unsupported uniform type: ${name}`);
@@ -3074,7 +3075,7 @@ export class PBLocalScope extends PBScope {
       if (value instanceof PBShaderExp && !this.$_scope.$parent) {
         exp.$declareType = value.$declareType;
         exp.$isBuffer = value.$isBuffer;
-        exp.$dynamicOffset = value.$dynamicOffset;
+        exp.$bindingSize = value.$bindingSize;
         exp.$readonly = value.$readonly;
         exp.$group = value.$group;
         exp.$attrib = value.$attrib;

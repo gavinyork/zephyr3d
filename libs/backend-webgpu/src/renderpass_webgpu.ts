@@ -503,7 +503,7 @@ export class WebGPURenderPass {
           if (!bindGroup) {
             return false;
           }
-          const bindGroupOffset = bindGroupOffsets?.[i];
+          const bindGroupOffset = bindGroups[i].getDynamicOffsets() ?? bindGroupOffsets?.[i];
           if (bindGroupOffset) {
             renderPassEncoder.setBindGroup(i, bindGroup, bindGroupOffset);
             renderBundleEncoder?.setBindGroup(i, bindGroup, bindGroupOffset);

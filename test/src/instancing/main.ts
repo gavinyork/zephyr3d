@@ -16,7 +16,6 @@ import {
 import * as common from '../common';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { LinearDepthMaterial } from './materal';
 
 const instancingApp = new Application({
   backend: common.getBackend(),
@@ -28,6 +27,7 @@ instancingApp.ready().then(async () => {
   await imGuiInit(device);
   const scene = new Scene();
   scene.env.sky.fogType = 'none';
+  //scene.env.sky.skyType = 'none';
   const camera = new PerspectiveCamera(
     scene,
     Math.PI / 3,
@@ -59,13 +59,13 @@ instancingApp.ready().then(async () => {
     boxMesh.position.setXYZ(Math.random() * 5 - 2.5, Math.random() * 5 - 2.5, Math.random() * 5 - 2.5);
     boxMesh.parent = batchGroup;
   }
-
+/*
   const mat2 = new LambertMaterial();
   mat2.albedoColor = new Vector4(1, 0, 0, 1);
   const mesh2 = new Mesh(scene, boxShape, mat2);
   mesh2.scale = new Vector3(4, 4, 4);
   mesh2.parent = batchGroup;
-
+*/
 
 
   /*
@@ -118,10 +118,12 @@ instancingApp.ready().then(async () => {
 
   instancingApp.on('tick', (ev) => {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
+    /*
     imGuiNewFrame();
     inspector.render();
     imGuiEndFrame();
+    */
   });
   instancingApp.run();
 });

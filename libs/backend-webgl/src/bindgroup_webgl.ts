@@ -50,7 +50,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
   getDynamicOffsets(): number[] {
     return this._dynamicOffsets;
   }
-  setBuffer(name: string, buffer: GPUDataBuffer, offset?: number) {
+  setBuffer(name: string, buffer: GPUDataBuffer, offset?: number, bindOffset?: number, bindSize?: number) {
     const bindName = this._layout.nameMap?.[name] ?? name;
     for (const entry of this._layout.entries) {
       if (entry.name === bindName) {

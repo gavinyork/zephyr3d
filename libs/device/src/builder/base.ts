@@ -178,7 +178,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
   /** @internal */
   $readonly: boolean;
   /** @internal */
-  $dynamicOffset: boolean;
+  $bindingSize: number;
   [name: string]: any;
   /** @internal */
   constructor(str: string, typeInfo: PBTypeInfo) {
@@ -201,7 +201,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$_group = null;
     this.$declareType = DeclareType.DECLARE_TYPE_NONE;
     this.$isBuffer = false;
-    this.$dynamicOffset = false;
+    this.$bindingSize = 0;
     this.$readonly = false;
     if (typeInfo.isTextureType()) {
       if (typeInfo.isDepthTexture()) {
@@ -243,7 +243,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param group - The bind group index
    * @returns self
    */
-  uniformBuffer(group: number, dynamicOffset = false): PBShaderExp {
+  uniformBuffer(group: number, bindingSize = 0): PBShaderExp {
     if (
       !this.$typeinfo.isPrimitiveType() &&
       !this.$typeinfo.isArrayType() &&
@@ -257,7 +257,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$declareType = DeclareType.DECLARE_TYPE_UNIFORM;
     this.$group = group;
     this.$isBuffer = true;
-    this.$dynamicOffset = !!dynamicOffset;
+    this.$bindingSize = bindingSize;
     return this;
   }
   /**
@@ -302,7 +302,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param group - The bind group index
    * @returns self
    */
-  storageBuffer(group: number, dynamicOffset = false): PBShaderExp {
+  storageBuffer(group: number, bindingSize = 0): PBShaderExp {
     if (
       !this.$typeinfo.isPrimitiveType() &&
       !this.$typeinfo.isArrayType() &&
@@ -318,7 +318,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$declareType = DeclareType.DECLARE_TYPE_STORAGE;
     this.$group = group;
     this.$isBuffer = true;
-    this.$dynamicOffset = !!dynamicOffset;
+    this.$bindingSize = bindingSize;
     this.$readonly = false;
     return this;
   }
@@ -327,8 +327,8 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param group - The bind group index
    * @returns self
    */
-  storageBufferReadonly(group: number, dynamicOffset = false): PBShaderExp {
-    this.storageBuffer(group, dynamicOffset);
+  storageBufferReadonly(group: number, bindingSize = 0): PBShaderExp {
+    this.storageBuffer(group, bindingSize);
     this.$readonly = true;
     return this;
   }

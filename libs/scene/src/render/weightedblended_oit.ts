@@ -29,12 +29,13 @@ export class WeightedBlendedOIT extends OIT {
     scope.$outputs.outColor = pb.vec4();
     scope.$outputs.outAlpha = pb.getDevice().type === 'webgl' ? pb.vec4() : pb.float();
   }
-  beginPass(ctx: DrawContext, pass: number) {
+  beginPass(ctx: DrawContext, pass: number): boolean {
     const device = Application.instance.device;
     const accumBuffer = this.getAccumFramebuffer(ctx, device);
     device.pushDeviceStates();
     device.setFramebuffer(accumBuffer);
     device.clearFrameBuffer(new Vector4(0, 0, 0, 1), null, null);
+    return true;
   }
   endPass(ctx: DrawContext, pass: number) {
     const device = Application.instance.device;

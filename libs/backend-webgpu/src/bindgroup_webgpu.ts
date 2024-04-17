@@ -22,6 +22,8 @@ import type { WebGPUBuffer } from './buffer_webgpu';
 
 export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup {
   private _layout: BindGroupLayout;
+  private _layoutDesc: GPUBindGroupLayoutDescriptor;
+  private _entries: GPUBindGroupEntry[];
   private _bindGroup: GPUBindGroup;
   private _buffers: WebGPUBuffer[];
   private _textures: WebGPUBaseTexture[];
@@ -29,12 +31,14 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   private _videoTextures: WebGPUTextureVideo[];
   private _dynamicOffsets: number[];
   private _resources: {
-    [name: string]: WebGPUBuffer | WebGPUTextureVideo | [WebGPUBaseTexture, GPUTextureView] | GPUSampler;
+    [name: string]: [WebGPUBuffer, number, number] | WebGPUTextureVideo | [WebGPUBaseTexture, GPUTextureView] | GPUSampler;
   };
   constructor(device: WebGPUDevice, layout: BindGroupLayout) {
     super(device);
     this._device = device;
     this._layout = layout;
+    this._layoutDesc = null;
+    this._entries = null;
     this._bindGroup = null;
     this._dynamicOffsets = null;
     this._gpuId = 0;
@@ -56,6 +60,18 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
       this._bindGroup = this._create();
     }
     return this._bindGroup;
+  }
+  get layoutDescriptor(): GPUBindGroupLayoutDescriptor {
+    if (!this._bindGroup) {
+      this._bindGroup = this._create();
+    }
+    return this._layoutDesc;
+  }
+  get entries(): GPUBindGroupEntry[] {
+    if (!this._bindGroup) {
+      this._bindGroup = this._create();
+    }
+    return this._entries;
   }
   getGPUId(): string {
     return `${this._uid}:${this._gpuId}`;
@@ -79,31 +95,28 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   getBuffer(name: string): GPUDataBuffer {
     return this._getBuffer(name, GPUResourceUsageFlags.BF_UNIFORM | GPUResourceUsageFlags.BF_STORAGE, true);
   }
-  setBuffer(name: string, buffer: GPUDataBuffer, offset?: number) {
+  setBuffer(name: string, buffer: GPUDataBuffer, offset?: number, bindOffset?: number, bindSize?: number) {
     const bindName = this._layout.nameMap?.[name] ?? name;
     for (const entry of this._layout.entries) {
       if (entry.name === bindName) {
         if (!entry.buffer) {
           console.log(`setBuffer() failed: resource '${name}' is not buffer`);
         } else {
+          bindOffset = bindOffset ?? 0;
+          bindSize = bindSize ?? (buffer ? Math.max(0, buffer.byteLength - bindOffset) : 0);
+          const info = this._resources[entry.name] as [WebGPUBuffer, number, number];
           const bufferUsage =
             entry.buffer.type === 'uniform'
               ? GPUResourceUsageFlags.BF_UNIFORM
               : GPUResourceUsageFlags.BF_STORAGE;
-          if (buffer && !(buffer.usage & bufferUsage)) {
+          if (!buffer || !(buffer.usage & bufferUsage)) {
             console.log(`setBuffer() failed: buffer resource '${name}' must be type '${entry.buffer.type}'`);
-          } else if (buffer !== this._resources[entry.name]) {
-            this._resources[entry.name] = buffer as WebGPUBuffer;
+          } else if (buffer !== info?.[0] || bindOffset !== info?.[1] || bindSize !== info?.[2]) {
+            this._resources[entry.name] = [buffer as WebGPUBuffer, bindOffset, bindSize];
             this.invalidate();
           }
           if (entry.buffer.hasDynamicOffset) {
-            offset = offset ?? 0;
-            this._dynamicOffsets[entry.buffer.dynamicOffsetIndex] = offset;
-            const bindingSize = buffer.byteLength - offset;
-            if (bindingSize !== entry.buffer.minBindingSize) {
-              entry.buffer.minBindingSize = buffer.byteLength - offset;
-              this.invalidate();
-            }
+            this._dynamicOffsets[entry.buffer.dynamicOffsetIndex] = offset ?? 0;
           }
         }
         return;
@@ -362,6 +375,11 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   }
   /** @internal */
   private _getBuffer(name: string, usage: number, nocreate = false): GPUDataBuffer {
+    const info = this._getBufferInfo(name, usage, nocreate);
+    return info?.[0] ?? null;
+  }
+  /** @internal */
+  private _getBufferInfo(name: string, usage: number, nocreate = false): [WebGPUBuffer, number, number] {
     const bindName = this._layout.nameMap?.[name] ?? name;
     for (const entry of this._layout.entries) {
       if (entry.buffer && entry.name === bindName) {
@@ -372,20 +390,21 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
         if (!(usage & bufferUsage)) {
           return null;
         }
-        let buffer = this._resources[entry.name];
-        if (!buffer && !nocreate) {
+        let buffer = this._resources[entry.name] as [WebGPUBuffer, number, number];
+        if ((!buffer || !buffer[0]) && !nocreate) {
           const options: BufferCreationOptions = {
             usage: bufferUsage === GPUResourceUsageFlags.BF_UNIFORM ? 'uniform' : null,
             storage: bufferUsage === GPUResourceUsageFlags.BF_STORAGE,
             dynamic: true
           };
-          buffer = this._device.createStructuredBuffer(
+          const gpuBuffer = this._device.createStructuredBuffer(
             entry.type as PBStructTypeInfo,
             options
           ) as WebGPUStructuredBuffer;
+          buffer = [gpuBuffer, 0, gpuBuffer.byteLength]
           this._resources[entry.name] = buffer;
         }
-        return buffer as GPUDataBuffer;
+        return buffer;
       }
     }
     return null;
@@ -393,6 +412,8 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   /** @internal */
   private _create(): GPUBindGroup {
     let bindGroup = null;
+    this._layoutDesc = null;
+    this._entries = null;
     this._textures = [];
     this._buffers = [];
     const entries = [] as GPUBindGroupEntry[];
@@ -400,27 +421,27 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     for (const entry of this._layout.entries) {
       const ge = { binding: entry.binding } as GPUBindGroupEntry;
       if (entry.buffer) {
-        const buffer = this._getBuffer(
+        const buffer = this._getBufferInfo(
           entry.name,
           entry.buffer.type === 'uniform'
             ? GPUResourceUsageFlags.BF_UNIFORM
             : GPUResourceUsageFlags.BF_STORAGE,
           true
-        ) as WebGPUBuffer;
+        );
         if (!buffer) {
           throw new Error(
             `Uniform buffer '${entry.name}' not exists, maybe you forgot settings some uniform values`
           );
         }
-        if (this._buffers.indexOf(buffer) < 0) {
-          this._buffers.push(buffer);
+        if (this._buffers.indexOf(buffer[0]) < 0) {
+          this._buffers.push(buffer[0]);
         }
         ge.resource = {
-          buffer: buffer.object,
-          offset: 0,
-          size: buffer.byteLength
+          buffer: buffer[0].object,
+          offset: buffer[1],
+          size: buffer[2]
         };
-        resourceOk = resourceOk && !!buffer.object;
+        resourceOk = resourceOk && !!buffer[0].object;
       } else if (entry.texture || entry.storageTexture) {
         const t = this._resources[entry.name] as [WebGPUBaseTexture, GPUTextureView];
         if (!t) {
@@ -447,9 +468,9 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     if (!resourceOk) {
       return null;
     }
-    const layout = this._device.fetchBindGroupLayout(this._layout);
+    const [desc, layout] = this._device.fetchBindGroupLayout(this._layout);
     const descriptor: GPUBindGroupDescriptor = {
-      layout,
+      layout: layout,
       entries
     };
     if (layout.label) {
@@ -459,6 +480,8 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     if (!bindGroup) {
       console.log('Create bindgroup failed');
     }
+    this._layoutDesc = desc;
+    this._entries = entries;
     return bindGroup;
   }
 }
