@@ -97,7 +97,13 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
             this.invalidate();
           }
           if (entry.buffer.hasDynamicOffset) {
-            this._dynamicOffsets[entry.buffer.dynamicOffsetIndex] = offset ?? 0;
+            offset = offset ?? 0;
+            this._dynamicOffsets[entry.buffer.dynamicOffsetIndex] = offset;
+            const bindingSize = buffer.byteLength - offset;
+            if (bindingSize !== entry.buffer.minBindingSize) {
+              entry.buffer.minBindingSize = buffer.byteLength - offset;
+              this.invalidate();
+            }
           }
         }
         return;

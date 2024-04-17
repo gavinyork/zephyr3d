@@ -103,7 +103,7 @@ export class Material {
       if (!state) {
         const device = Application.instance.device;
         const program = this.createProgram(ctx, pass) ?? null;
-        const bindGroup = device.createBindGroup(program.bindGroupLayouts[2]);
+        const bindGroup = program.bindGroupLayouts.length > 2 ? device.createBindGroup(program.bindGroupLayouts[2]) : null;
         state = {
           program,
           bindGroup,
