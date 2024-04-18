@@ -59,9 +59,8 @@ export class ShadowMapPass extends RenderPass {
     ctx.applyFog = null;
     ctx.flip = this.isAutoFlip();
     ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
-    const device = Application.instance.device;
     const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
-    device.setBindGroup(0, bindGroup);
+    ctx.device.setBindGroup(0, bindGroup);
     ShaderHelper.setLightUniformsShadowMap(bindGroup, ctx, this._currentLight);
     ShaderHelper.setCameraUniforms(bindGroup, ctx.camera, ctx.flip, true);
     const reverseWinding = ctx.camera.worldMatrixDet < 0;
@@ -70,10 +69,10 @@ export class ShadowMapPass extends RenderPass {
       .sort((a, b) => a - b)) {
       const renderItems = renderQueue.items[order];
       for (const lit of renderItems.opaque.lit) {
-        this.drawItemList(device, lit, ctx, reverseWinding);
+        this.drawItemList(lit, ctx, reverseWinding);
       }
       for (const unlit of renderItems.opaque.unlit) {
-        this.drawItemList(device, unlit, ctx, reverseWinding);
+        this.drawItemList(unlit, ctx, reverseWinding);
       }
     }
   }

@@ -3,6 +3,7 @@ import { DrawContext } from "./drawable";
 
 export abstract class OIT {
   abstract getType(): string;
+  abstract supportDevice(deviceType: string): boolean;
   abstract begin(ctx: DrawContext): number;
   abstract end(ctx: DrawContext);
   abstract beginPass(ctx: DrawContext, pass: number): boolean;

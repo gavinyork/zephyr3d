@@ -64,10 +64,10 @@ export class SceneRenderer {
   static renderScene(scene: Scene, camera: Camera, compositor?: Compositor, logger?: RenderLogger): void {
     const device = Application.instance.device;
     const ctx: DrawContext = {
+      device,
       scene,
       primaryCamera: camera,
       oit: null,
-      oitPass: 0,
       globalBindGroupAllocator: GlobalBindGroupAllocator.get(),
       camera,
       compositor: compositor?.needDrawPostEffects() ? compositor : null,

@@ -1,6 +1,5 @@
 import { RenderPass } from './renderpass';
 import { QUEUE_OPAQUE, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '../values';
-import { Application } from '../app';
 import { Vector4 } from '@zephyr3d/base';
 import type { RenderItemListBundle, RenderQueue } from './render_queue';
 import type { PunctualLight } from '../scene/light';
@@ -27,7 +26,6 @@ export class LightPass extends RenderPass {
   }
   /** @internal */
   protected renderLightPass(ctx: DrawContext, itemList: RenderItemListBundle, lights: PunctualLight[], flags: any) {
-    const device = Application.instance.device;
     const baseLightPass = !ctx.lightBlending;
     ctx.drawEnvLight =
       baseLightPass &&
@@ -36,7 +34,7 @@ export class LightPass extends RenderPass {
     ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
     const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
     if (!flags.cameraSet[ctx.renderPassHash]) {
-      ShaderHelper.setCameraUniforms(bindGroup, ctx.camera, ctx.flip, !!device.getFramebuffer());
+      ShaderHelper.setCameraUniforms(bindGroup, ctx.camera, ctx.flip, !!ctx.device.getFramebuffer());
       flags.cameraSet[ctx.renderPassHash] = 1;
     }
     if (ctx.currentShadowLight) {
@@ -65,14 +63,14 @@ export class LightPass extends RenderPass {
       );
       flags.fogSet[ctx.renderPassHash] = 1;
     }
-    device.setBindGroup(0, bindGroup);
+    ctx.device.setBindGroup(0, bindGroup);
     const reverseWinding = ctx.camera.worldMatrixDet < 0;
     for (const lit of itemList.lit) {
-      this.drawItemList(device, lit, ctx, reverseWinding)
+      this.drawItemList(lit, ctx, reverseWinding)
     }
     if (!ctx.lightBlending) {
       for (const unlit of itemList.unlit) {
-        this.drawItemList(device, unlit, ctx, reverseWinding);
+        this.drawItemList(unlit, ctx, reverseWinding);
       }
     }
   }
@@ -83,7 +81,8 @@ export class LightPass extends RenderPass {
     ctx.env = ctx.scene.env;
     ctx.drawEnvLight = false;
     ctx.flip = this.isAutoFlip();
-    if (!ctx.primaryCamera.oit) {
+    const oit = ctx.primaryCamera.oit && ctx.primaryCamera.oit.supportDevice(ctx.device.type) ? ctx.primaryCamera.oit : null;
+    if (!oit) {
       renderQueue.sortTransparentItems(ctx.primaryCamera.getWorldPosition());
     }
     const flags: any = {
@@ -97,7 +96,7 @@ export class LightPass extends RenderPass {
     for (let i = 0; i < 2; i++) {
       ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none' ? ctx.env.sky.fogType : null;
       ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
-      ctx.oit = i === 0 ? null : ctx.primaryCamera.oit;
+      ctx.oit = i === 0 ? null : oit;
       const numOitPasses = ctx.oit ? ctx.oit.begin(ctx) : 1;
       for (let p = 0; p < numOitPasses; p++) {
         if (ctx.oit) {

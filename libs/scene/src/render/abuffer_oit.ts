@@ -33,7 +33,7 @@ export class ABufferOIT extends OIT {
   private _scissorHeight: number;
   private _currentPass: number;
   private _savedScissor: DeviceViewport;
-  constructor() {
+  constructor(numLayers = 16) {
     super();
     this._nodeBuffer = null;
     this._counterBuffer = null;
@@ -41,7 +41,7 @@ export class ABufferOIT extends OIT {
     this._scissorOffsetBuffer = null;
     this._offsetBuffer = null;
     this._clearBuffer = null;
-    this._numLayers = 32;
+    this._numLayers = numLayers;
     this._screenSize = new Uint32Array([0xffffffff, 0xffffffff]);
     this._hash = null;
     this._debug = false;
@@ -53,6 +53,9 @@ export class ABufferOIT extends OIT {
   getType(): string {
     return ABufferOIT.type;
   }
+  supportDevice(deviceType: string): boolean {
+    return deviceType === 'webgpu';
+  }
   begin(ctx: DrawContext): number {
     const device = Application.instance.device;
     this._savedScissor = device.getScissor();
@@ -60,7 +63,7 @@ export class ABufferOIT extends OIT {
     const sbAlignment = ABufferOIT._sbAlignment = device.getDeviceCaps().shaderCaps.storageBufferOffsetAlignment;
     const viewport = device.getViewport();
     const screenWidth = device.screenToDevice(viewport.width);
-    const screenHeight = Math.max(device.screenToDevice(viewport.height), 1);
+    const screenHeight = device.screenToDevice(Math.max(viewport.height, 1));
     if (screenWidth !== this._screenSize[0] || screenHeight !== this._screenSize[1]) {
       // Resize buffers if viewport was changed
       this._screenSize[0] = screenWidth;
@@ -95,7 +98,6 @@ export class ABufferOIT extends OIT {
       if (!this._nodeHeadImage || size > this._nodeHeadImage.byteLength) {
         this._nodeHeadImage?.dispose();
         this._nodeHeadImage = device.createBuffer(size, { storage: true, usage: 'uniform' });
-        this._nodeHeadImage.bufferSubData(0, this._clearBuffer);
       }
       // resize counter buffer if needed
       const counterBufferSize = sbAlignment * this._scissorSlices;
@@ -107,9 +109,6 @@ export class ABufferOIT extends OIT {
         this._counterBuffer = device.createBuffer(counterBufferSize, { storage: true, usage: 'uniform' });
       }
     }
-    // Always clear counter buffer
-    this._counterBuffer.bufferSubData(0, this._offsetBuffer);
-
     return this._scissorSlices;
   }
   end(ctx: DrawContext) {
@@ -144,7 +143,7 @@ export class ABufferOIT extends OIT {
     const device = Application.instance.device;
     const scissorY = pass * this._scissorHeight;
     const scissorH = Math.min((pass + 1) * this._scissorHeight, this._screenSize[1]) - pass * this._scissorHeight;
-    device.setScissor([0, this._screenSize[1] - scissorY - scissorH, this._screenSize[0], scissorH])
+    device.setScissor([0, device.deviceToScreen(this._screenSize[1] - scissorY - scissorH), device.deviceToScreen(this._screenSize[0]), device.deviceToScreen(scissorH)])
     this._nodeHeadImage.bufferSubData(0, this._clearBuffer);
     this._counterBuffer.bufferSubData(0, this._offsetBuffer);
     //this.clearHeadBuffer(device);

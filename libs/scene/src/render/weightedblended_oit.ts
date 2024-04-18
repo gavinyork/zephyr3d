@@ -18,6 +18,9 @@ export class WeightedBlendedOIT extends OIT {
   getType(): string {
     return WeightedBlendedOIT.type;
   }
+  supportDevice(deviceType: string): boolean {
+    return true;
+  }
   begin(ctx: DrawContext): number {
     return 1;
   }

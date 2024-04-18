@@ -1,5 +1,5 @@
 import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
-import type { Texture2D, TextureFormat } from '@zephyr3d/device';
+import type { AbstractDevice, Texture2D, TextureFormat } from '@zephyr3d/device';
 import type { XForm } from '../scene/xform';
 import type { Camera } from '../camera/camera';
 import type { FogType, RenderPass } from '.';
@@ -19,6 +19,8 @@ import type { OIT } from './oit';
  * @public
  */
 export interface DrawContext {
+  /** Render device */
+  device: AbstractDevice;
   /** The camera position of the primary render pass */
   primaryCamera: Camera;
   /** The render queue which is currently being rendered */
@@ -29,8 +31,6 @@ export interface DrawContext {
   camera: Camera;
   /** OIT */
   oit: OIT;
-  /** OIT pass */
-  oitPass: number;
   /** The scene that is currently been drawing */
   scene: Scene;
   /** The render pass to which the current drawing task belongs */
