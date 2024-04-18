@@ -119,11 +119,9 @@ instancingApp.ready().then(async () => {
   instancingApp.on('tick', (ev) => {
     camera.updateController();
     camera.render(scene);
-    /*
     imGuiNewFrame();
     inspector.render();
     imGuiEndFrame();
-    */
   });
   instancingApp.run();
 });
