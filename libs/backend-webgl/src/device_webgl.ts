@@ -73,11 +73,17 @@ import { GPUTimer } from './gpu_timer';
 import { WebGLTextureCaps, WebGLFramebufferCaps, WebGLMiscCaps, WebGLShaderCaps } from './capabilities_webgl';
 import { WebGLBindGroup } from './bindgroup_webgl';
 import { WebGLGPUProgram } from './gpuprogram_webgl';
-import { primitiveTypeMap, textureMagFilterToWebGL, textureMinFilterToWebGL, textureWrappingMap, typeMap } from './constants_webgl';
+import {
+  primitiveTypeMap,
+  textureMagFilterToWebGL,
+  textureMinFilterToWebGL,
+  textureWrappingMap,
+  typeMap
+} from './constants_webgl';
 import { SamplerCache } from './sampler_cache';
 import { WebGLStructuredBuffer } from './structuredbuffer_webgl';
 import type { WebGLTextureSampler } from './sampler_webgl';
-import { WebGLBaseTexture } from './basetexture_webgl';
+import type { WebGLBaseTexture } from './basetexture_webgl';
 
 declare global {
   interface WebGLRenderingContext {
@@ -93,15 +99,15 @@ declare global {
 type VAOObject = WebGLVertexArrayObject | WebGLVertexArrayObjectOES;
 
 type WebGLRenderBundle = {
-  program: WebGLGPUProgram,
-  bindGroups: WebGLBindGroup[],
-  bindGroupOffsets: Iterable<number>[],
-  vertexLayout: WebGLVertexLayout,
-  primitiveType: PrimitiveType,
-  renderStateSet: RenderStateSet,
-  first: number,
-  count: number,
-  numInstances: number
+  program: WebGLGPUProgram;
+  bindGroups: WebGLBindGroup[];
+  bindGroupOffsets: Iterable<number>[];
+  vertexLayout: WebGLVertexLayout;
+  primitiveType: PrimitiveType;
+  renderStateSet: RenderStateSet;
+  first: number;
+  count: number;
+  numInstances: number;
 }[];
 
 export interface VertexArrayObjectEXT {
@@ -302,11 +308,7 @@ export class WebGLDevice extends BaseDevice {
         WebGLEnum.TEXTURE_WRAP_T,
         textureWrappingMap[false && fallback ? 'clamp' : sampler.addressModeV]
       );
-      gl.texParameteri(
-        target,
-        WebGLEnum.TEXTURE_MAG_FILTER,
-        textureMagFilterToWebGL(sampler.magFilter)
-      );
+      gl.texParameteri(target, WebGLEnum.TEXTURE_MAG_FILTER, textureMagFilterToWebGL(sampler.magFilter));
       gl.texParameteri(
         target,
         WebGLEnum.TEXTURE_MIN_FILTER,
@@ -318,7 +320,10 @@ export class WebGLDevice extends BaseDevice {
     }
   }
   bindUniformBuffer(index: number, buffer: WebGLGPUBuffer, offset: number) {
-    if (this._deviceUniformBuffers[index] !== buffer.object || this._deviceUniformBufferOffsets[index] !== offset) {
+    if (
+      this._deviceUniformBuffers[index] !== buffer.object ||
+      this._deviceUniformBufferOffsets[index] !== offset
+    ) {
       if (offset) {
         (this.context as WebGL2RenderingContext).bindBufferRange(
           WebGLEnum.UNIFORM_BUFFER,
@@ -627,7 +632,13 @@ export class WebGLDevice extends BaseDevice {
   createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer {
     return new WebGLGPUBuffer(this, this.parseBufferOptions(options), sizeInBytes);
   }
-  copyBuffer(sourceBuffer: GPUDataBuffer<unknown>, destBuffer: GPUDataBuffer<unknown>, srcOffset: number, dstOffset: number, bytes: number) {
+  copyBuffer(
+    sourceBuffer: GPUDataBuffer<unknown>,
+    destBuffer: GPUDataBuffer<unknown>,
+    srcOffset: number,
+    dstOffset: number,
+    bytes: number
+  ) {
     if (!this.isWebGL2) {
       console.error(`copyBuffer() is not supported for current device`);
       return;
@@ -888,7 +899,7 @@ export class WebGLDevice extends BaseDevice {
     return result;
   }
   executeRenderBundle(renderBundle: RenderBundle) {
-    for (const drawcall of (renderBundle as WebGLRenderBundle)) {
+    for (const drawcall of renderBundle as WebGLRenderBundle) {
       this.setProgram(drawcall.program);
       this.setVertexLayout(drawcall.vertexLayout);
       this.setRenderStates(drawcall.renderStateSet);
@@ -967,7 +978,7 @@ export class WebGLDevice extends BaseDevice {
       }
       this._captureRenderBundle.push({
         bindGroups: [...this._currentBindGroups],
-        bindGroupOffsets: this._currentBindGroupOffsets.map(val => val ? [...val] : null),
+        bindGroupOffsets: this._currentBindGroupOffsets.map((val) => (val ? [...val] : null)),
         program: this._currentProgram,
         vertexLayout: this._currentVertexData,
         primitiveType: primitiveType,
@@ -1022,7 +1033,7 @@ export class WebGLDevice extends BaseDevice {
     if (this._captureRenderBundle) {
       this._captureRenderBundle.push({
         bindGroups: [...this._currentBindGroups],
-        bindGroupOffsets: this._currentBindGroupOffsets.map(val => val ? [...val] : null),
+        bindGroupOffsets: this._currentBindGroupOffsets.map((val) => (val ? [...val] : null)),
         program: this._currentProgram,
         vertexLayout: this._currentVertexData,
         primitiveType: primitiveType,

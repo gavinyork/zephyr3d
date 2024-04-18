@@ -43,7 +43,7 @@ export class BatchGroup extends GraphNode {
         if (child.isGraphNode()) {
           child.placeToOctree = true;
         }
-    });
+      });
       this._changeTag++;
     });
   }

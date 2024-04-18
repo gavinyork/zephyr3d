@@ -1441,7 +1441,13 @@ export interface BindGroup extends GPUObject<unknown> {
   getGPUId(): string;
   getBuffer(name: string): GPUDataBuffer;
   getTexture(name: string): BaseTexture;
-  setBuffer(name: string, buffer: GPUDataBuffer, offset?: number, bindOffset?: number, bindSize?: number): void;
+  setBuffer(
+    name: string,
+    buffer: GPUDataBuffer,
+    offset?: number,
+    bindOffset?: number,
+    bindSize?: number
+  ): void;
   setValue(name: string, value: StructuredValue);
   setRawData(name: string, byteOffset: number, data: TypedArray, srcPos?: number, srcLength?: number);
   setTexture(name: string, texture: BaseTexture, sampler?: TextureSampler);

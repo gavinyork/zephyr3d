@@ -1,5 +1,4 @@
 import { Vector2 } from '@zephyr3d/base';
-import { Application } from '../app';
 import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import type { AbstractDevice, BindGroup, GPUProgram, Texture2D, TextureSampler } from '@zephyr3d/device';
@@ -39,7 +38,7 @@ export class FXAA extends AbstractPostEffect {
   }
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
-    const device = Application.instance.device;
+    const device = ctx.device;
     this._prepare(device);
     this._invTexSize.setXY(1 / inputColorTexture.width, 1 / inputColorTexture.height);
     this._bindgroup.setTexture('srcTex', inputColorTexture, FXAA._sampler);

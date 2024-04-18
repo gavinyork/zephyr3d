@@ -1,22 +1,25 @@
-import { GenericConstructor } from "@zephyr3d/base";
-import { ProgramBuilder, type BindGroup, AbstractDevice } from "@zephyr3d/device";
-import { BatchDrawable, DrawContext, Drawable } from "./drawable";
-import { ShaderHelper } from "../material";
-import type { DrawableInstanceInfo, RenderQueue, RenderQueueRef } from "./render_queue";
-import { Application } from "../app";
-import { Mesh, XForm } from "../scene";
+import type { GenericConstructor } from '@zephyr3d/base';
+import type { AbstractDevice } from '@zephyr3d/device';
+import { ProgramBuilder, type BindGroup } from '@zephyr3d/device';
+import type { BatchDrawable, DrawContext, Drawable } from './drawable';
+import { ShaderHelper } from '../material';
+import type { DrawableInstanceInfo, RenderQueue, RenderQueueRef } from './render_queue';
+import { Application } from '../app';
+import type { Mesh, XForm } from '../scene';
 
 export interface IMixinDrawable {
   pushRenderQueueRef(ref: RenderQueueRef): void;
   applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void;
   applyTransformUniforms(renderQueue: RenderQueue): void;
   applyMaterialUniforms(instanceInfo: DrawableInstanceInfo): void;
-  bind(device: AbstractDevice, ctx: DrawContext): void;
+  bind(ctx: DrawContext): void;
 }
 
-export function mixinDrawable<T extends GenericConstructor<{
-  getXForm(): XForm
-}>>(baseCls?: T):  T & { new (...args: any[]): IMixinDrawable } {
+export function mixinDrawable<
+  T extends GenericConstructor<{
+    getXForm(): XForm;
+  }>
+>(baseCls?: T): T & { new (...args: any[]): IMixinDrawable } {
   const cls = class extends baseCls {
     private _mdRenderQueueRef: RenderQueueRef[];
     private _mdDrawableBindGroup: BindGroup;
@@ -28,7 +31,7 @@ export function mixinDrawable<T extends GenericConstructor<{
       this._mdDrawableBindGroup = null;
       this._mdDrawableBindGroupInstanced = new Map();
       this._mdDrawableBindGroupSkin = null;
-      this.getXForm().on('transformchanged', node => {
+      this.getXForm().on('transformchanged', (node) => {
         for (const ref of this._mdRenderQueueRef) {
           if (ref.ref) {
             this.applyTransformUniforms(ref.ref);
@@ -41,7 +44,7 @@ export function mixinDrawable<T extends GenericConstructor<{
       this._mdRenderQueueRef.push(ref);
     }
     renderQueueRefPrune() {
-      while(this._mdRenderQueueRef.length > 0) {
+      while (this._mdRenderQueueRef.length > 0) {
         const ref = this._mdRenderQueueRef[this._mdRenderQueueRef.length - 1].ref;
         if (!ref) {
           this._mdRenderQueueRef.pop();
@@ -58,7 +61,11 @@ export function mixinDrawable<T extends GenericConstructor<{
     }
     applyTransformUniforms(renderQueue: RenderQueue): void {
       const instanceInfo = renderQueue.getInstanceInfo(this as unknown as Drawable);
-      const drawableBindGroup = this.getDrawableBindGroup(Application.instance.device, !!instanceInfo, renderQueue);
+      const drawableBindGroup = this.getDrawableBindGroup(
+        Application.instance.device,
+        !!instanceInfo,
+        renderQueue
+      );
       if (instanceInfo) {
         instanceInfo.bindGroup.bindGroup.setRawData(
           ShaderHelper.getInstanceDataUniformName(),
@@ -84,21 +91,29 @@ export function mixinDrawable<T extends GenericConstructor<{
       }
     }
     /** @internal */
-    bind(device: AbstractDevice, ctx: DrawContext): void {
+    bind(ctx: DrawContext): void {
+      const device = ctx.device;
       const drawableBindGroup = this.getDrawableBindGroup(device, !!ctx.instanceData, ctx.renderQueue);
       device.setBindGroup(1, drawableBindGroup);
       device.setBindGroup(3, ctx.instanceData ? ctx.instanceData.bindGroup.bindGroup : null);
       if (ctx.skinAnimation) {
         const boneTexture = (this as unknown as Mesh).getBoneMatrices();
         drawableBindGroup.setTexture(ShaderHelper.getBoneMatricesUniformName(), boneTexture);
-        drawableBindGroup.setValue(ShaderHelper.getBoneInvBindMatrixUniformName(), (this as unknown as Mesh).getInvBindMatrix());
+        drawableBindGroup.setValue(
+          ShaderHelper.getBoneInvBindMatrixUniformName(),
+          (this as unknown as Mesh).getInvBindMatrix()
+        );
         drawableBindGroup.setValue(ShaderHelper.getBoneTextureSizeUniformName(), boneTexture.width);
       }
     }
     /** @internal */
     getDrawableBindGroup(device: AbstractDevice, instancing: boolean, renderQueue: RenderQueue): BindGroup {
       const skinning = !!(this as unknown as Drawable).getBoneMatrices();
-      let bindGroup = skinning ? this._mdDrawableBindGroupSkin : instancing ? this._mdDrawableBindGroupInstanced.get(renderQueue) : this._mdDrawableBindGroup;
+      let bindGroup = skinning
+        ? this._mdDrawableBindGroupSkin
+        : instancing
+        ? this._mdDrawableBindGroupInstanced.get(renderQueue)
+        : this._mdDrawableBindGroup;
       if (!bindGroup) {
         const buildInfo = new ProgramBuilder(device).buildRender({
           vertex(pb) {

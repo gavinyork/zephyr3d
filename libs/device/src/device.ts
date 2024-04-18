@@ -215,7 +215,13 @@ export abstract class BaseDevice {
   abstract createGPUProgram(params: GPUProgramConstructParams): GPUProgram;
   abstract createBindGroup(layout: BindGroupLayout): BindGroup;
   abstract createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer;
-  abstract copyBuffer(sourceBuffer: GPUDataBuffer, destBuffer: GPUDataBuffer, srcOffset: number, dstOffset: number, bytes: number);
+  abstract copyBuffer(
+    sourceBuffer: GPUDataBuffer,
+    destBuffer: GPUDataBuffer,
+    srcOffset: number,
+    dstOffset: number,
+    bytes: number
+  );
   abstract createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer;
   abstract createStructuredBuffer(
     structureType: PBStructTypeInfo,

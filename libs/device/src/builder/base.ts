@@ -71,7 +71,13 @@ export function makeConstructor<T>(typeFunc: ShaderTypeFunc, elementType: PBType
       }
       let ctor = entries[prop];
       if (!ctor) {
-        if (elementType.isPrimitiveType() || elementType.isStructType() || elementType.isArrayType() || elementType.isAtomicI32() || elementType.isAtomicU32()) {
+        if (
+          elementType.isPrimitiveType() ||
+          elementType.isStructType() ||
+          elementType.isArrayType() ||
+          elementType.isAtomicI32() ||
+          elementType.isAtomicU32()
+        ) {
           if (prop === 'ptr') {
             const pointerType = new PBPointerTypeInfo(elementType, PBAddressSpace.FUNCTION);
             ctor = function pointerCtor(this: ProgramBuilder, ...args: any[]) {

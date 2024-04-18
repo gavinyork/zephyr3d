@@ -12,7 +12,7 @@ import type { Terrain } from './terrain';
 import type { GraphNode } from '../graph_node';
 import { QUEUE_OPAQUE, RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import { mixinDrawable } from '../../render/drawable_mixin';
-import { Material } from '../../material';
+import type { Material } from '../../material';
 
 export class TerrainPatchBase {
   protected _terrain: Terrain;
@@ -121,7 +121,7 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
       this._quadtree.getTerrain().wireframe && !isShadowMapPass
         ? this.getGeometryWireframe()
         : this.getGeometry();
-    this.bind(Application.instance.device, ctx);
+    this.bind(ctx);
     this._terrain.material.draw(primitive, ctx);
   }
   setupCamera(viewportH: number, tanHalfFovy: number, maxPixelError: number): void {

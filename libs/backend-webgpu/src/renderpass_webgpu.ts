@@ -45,26 +45,29 @@ export class WebGPURenderPass {
     return !!this._renderPassEncoder;
   }
   private createFrameBufferInfo(fb: WebGPUFrameBuffer): FrameBufferInfo {
-    const info: FrameBufferInfo = !fb ? {
-      frameBuffer: null,
-      colorFormats: [this._device.backbufferFormat],
-      depthFormat: this._device.backbufferDepthFormat,
-      sampleCount: this._device.sampleCount,
-      hash: null,
-      clearHash: 'f'
-    } : {
-      frameBuffer: fb,
-      colorFormats: fb.getColorAttachments().map((val) => (val as WebGPUBaseTexture).gpuFormat),
-      depthFormat: (fb.getDepthAttachment() as WebGPUBaseTexture)?.gpuFormat,
-      sampleCount: fb.getOptions().sampleCount,
-      hash: null,
-      clearHash: fb.getColorAttachments()
-        .map((val) => {
-          const fmt = textureFormatInvMap[(val as WebGPUBaseTexture).gpuFormat];
-          return isIntegerTextureFormat(fmt) ? (isSignedTextureFormat(fmt) ? 'i' : 'u') : 'f';
-        })
-        .join('')
-    };
+    const info: FrameBufferInfo = !fb
+      ? {
+          frameBuffer: null,
+          colorFormats: [this._device.backbufferFormat],
+          depthFormat: this._device.backbufferDepthFormat,
+          sampleCount: this._device.sampleCount,
+          hash: null,
+          clearHash: 'f'
+        }
+      : {
+          frameBuffer: fb,
+          colorFormats: fb.getColorAttachments().map((val) => (val as WebGPUBaseTexture).gpuFormat),
+          depthFormat: (fb.getDepthAttachment() as WebGPUBaseTexture)?.gpuFormat,
+          sampleCount: fb.getOptions().sampleCount,
+          hash: null,
+          clearHash: fb
+            .getColorAttachments()
+            .map((val) => {
+              const fmt = textureFormatInvMap[(val as WebGPUBaseTexture).gpuFormat];
+              return isIntegerTextureFormat(fmt) ? (isSignedTextureFormat(fmt) ? 'i' : 'u') : 'f';
+            })
+            .join('')
+        };
     info.hash = `${info.colorFormats.join('-')}:${info.depthFormat}:${info.sampleCount}`;
     return info;
   }
@@ -351,12 +354,10 @@ export class WebGPURenderPass {
     }
     // render commands
     if (this._renderCommandEncoder) {
-      this._device.device.queue.submit([
-        this._renderCommandEncoder.finish()
-      ]);
+      this._device.device.queue.submit([this._renderCommandEncoder.finish()]);
       this._renderCommandEncoder = null;
     }
-  // unmark render target flags and generate render target mipmaps if needed
+    // unmark render target flags and generate render target mipmaps if needed
     if (this._frameBufferInfo.frameBuffer) {
       const options = this._frameBufferInfo.frameBuffer.getOptions();
       if (options.colorAttachments) {
@@ -409,7 +410,15 @@ export class WebGPURenderPass {
     numInstances: number,
     renderBundleEncoder?: GPURenderBundleEncoder
   ): void {
-    if (this.setBindGroupsForRender(renderPassEncoder, program, bindGroups, bindGroupOffsets, renderBundleEncoder)) {
+    if (
+      this.setBindGroupsForRender(
+        renderPassEncoder,
+        program,
+        bindGroups,
+        bindGroupOffsets,
+        renderBundleEncoder
+      )
+    ) {
       const pipeline = this._device.pipelineCache.fetchRenderPipeline(
         program,
         vertexData,
@@ -439,7 +448,7 @@ export class WebGPURenderPass {
             renderBundleEncoder?.setIndexBuffer(
               indexBuffer.object,
               indexBuffer.indexType === typeU16 ? 'uint16' : 'uint32'
-            )
+            );
             renderPassEncoder.drawIndexed(count, numInstances, first);
             renderBundleEncoder?.drawIndexed(count, numInstances, first);
           } else {
@@ -453,10 +462,7 @@ export class WebGPURenderPass {
       }
     }
   }
-  private validateDraw(
-    program: WebGPUProgram,
-    bindGroups: WebGPUBindGroup[]
-  ): number {
+  private validateDraw(program: WebGPUProgram, bindGroups: WebGPUBindGroup[]): number {
     let validation = 0;
     if (bindGroups) {
       for (let i = 0; i < program.bindGroupLayouts.length; i++) {
@@ -484,7 +490,10 @@ export class WebGPURenderPass {
         }
       }
     }
-    if (this._frameBufferInfo.frameBuffer && this._frameBufferInfo.frameBuffer.bindFlag !== this._fbBindFlag) {
+    if (
+      this._frameBufferInfo.frameBuffer &&
+      this._frameBufferInfo.frameBuffer.bindFlag !== this._fbBindFlag
+    ) {
       validation |= VALIDATION_NEED_NEW_PASS;
     }
     return validation;

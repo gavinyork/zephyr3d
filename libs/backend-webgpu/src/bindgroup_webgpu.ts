@@ -31,7 +31,11 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   private _videoTextures: WebGPUTextureVideo[];
   private _dynamicOffsets: number[];
   private _resources: {
-    [name: string]: [WebGPUBuffer, number, number] | WebGPUTextureVideo | [WebGPUBaseTexture, GPUTextureView] | GPUSampler;
+    [name: string]:
+      | [WebGPUBuffer, number, number]
+      | WebGPUTextureVideo
+      | [WebGPUBaseTexture, GPUTextureView]
+      | GPUSampler;
   };
   constructor(device: WebGPUDevice, layout: BindGroupLayout) {
     super(device);
@@ -401,7 +405,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
             entry.type as PBStructTypeInfo,
             options
           ) as WebGPUStructuredBuffer;
-          buffer = [gpuBuffer, 0, gpuBuffer.byteLength]
+          buffer = [gpuBuffer, 0, gpuBuffer.byteLength];
           this._resources[entry.name] = buffer;
         }
         return buffer;

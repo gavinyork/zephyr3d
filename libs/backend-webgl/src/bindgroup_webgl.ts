@@ -148,7 +148,11 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
       if (res instanceof WebGLGPUBuffer) {
         if (webgl2) {
           if (entry.buffer.hasDynamicOffset) {
-            program.setBlock((entry.type as PBStructTypeInfo).structName, res, dynamicOffsets[entry.buffer.dynamicOffsetIndex]);
+            program.setBlock(
+              (entry.type as PBStructTypeInfo).structName,
+              res,
+              dynamicOffsets[entry.buffer.dynamicOffsetIndex]
+            );
           } else {
             program.setBlock((entry.type as PBStructTypeInfo).structName, res, 0);
           }

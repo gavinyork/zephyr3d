@@ -436,11 +436,11 @@ export class WebGLRenderStateSet implements RenderStateSet {
   }
   clone(): RenderStateSet {
     const newStateSet = new WebGLRenderStateSet(this._gl);
-    newStateSet.colorState = this.colorState?.clone() as WebGLColorState ?? null;
-    newStateSet.blendingState = this.blendingState?.clone() as WebGLBlendingState ?? null;
-    newStateSet.rasterizerState = this.rasterizerState?.clone() as WebGLRasterizerState ?? null;
-    newStateSet.depthState = this.depthState?.clone() as WebGLDepthState ?? null;
-    newStateSet.stencilState = this.stencilState?.clone() as WebGLStencilState ?? null;
+    newStateSet.colorState = (this.colorState?.clone() as WebGLColorState) ?? null;
+    newStateSet.blendingState = (this.blendingState?.clone() as WebGLBlendingState) ?? null;
+    newStateSet.rasterizerState = (this.rasterizerState?.clone() as WebGLRasterizerState) ?? null;
+    newStateSet.depthState = (this.depthState?.clone() as WebGLDepthState) ?? null;
+    newStateSet.stencilState = (this.stencilState?.clone() as WebGLStencilState) ?? null;
     return newStateSet;
   }
   copyFrom(stateSet: RenderStateSet): void {

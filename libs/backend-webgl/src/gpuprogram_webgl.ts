@@ -576,7 +576,8 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     };
   }
   private getSamplerSetter(location: WebGLUniformLocation, target: number, unit: number) {
-    return (texture: [WebGLBaseTexture, WebGLTextureSampler]) => this._device.bindTexture(target, unit, texture[0], texture[1]);
+    return (texture: [WebGLBaseTexture, WebGLTextureSampler]) =>
+      this._device.bindTexture(target, unit, texture[0], texture[1]);
     /*
     const gl = this._device.context;
     return isWebGL2(gl)

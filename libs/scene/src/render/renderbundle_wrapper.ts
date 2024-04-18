@@ -1,5 +1,5 @@
-import type { RenderBundle } from "@zephyr3d/device";
-import { Application } from "../app";
+import type { RenderBundle } from '@zephyr3d/device';
+import { Application } from '../app';
 
 export class RenderBundleWrapper {
   private _renderBundles: Record<string, RenderBundle>;

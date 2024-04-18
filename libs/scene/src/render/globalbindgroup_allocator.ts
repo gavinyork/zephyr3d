@@ -1,7 +1,6 @@
-import { BindGroup, BindGroupLayout } from "@zephyr3d/device";
-import { Application } from "../app";
-import { DrawContext } from "./drawable";
-import { ShaderHelper } from "../material";
+import type { BindGroup, BindGroupLayout } from '@zephyr3d/device';
+import type { DrawContext } from './drawable';
+import { ShaderHelper } from '../material';
 
 export class GlobalBindGroupAllocator {
   static _layouts: Record<string, BindGroupLayout> = {};
@@ -27,7 +26,7 @@ export class GlobalBindGroupAllocator {
     if (!bindGroup) {
       let layout = GlobalBindGroupAllocator._layouts[hash];
       if (!layout) {
-        const ret = Application.instance.device.programBuilder.buildRender({
+        const ret = ctx.device.programBuilder.buildRender({
           vertex(pb) {
             ShaderHelper.prepareVertexShader(pb, ctx);
             pb.main(function () {});
@@ -40,7 +39,7 @@ export class GlobalBindGroupAllocator {
         layout = ret[2][0];
         GlobalBindGroupAllocator._layouts[hash] = layout;
       }
-      bindGroup = Application.instance.device.createBindGroup(layout);
+      bindGroup = ctx.device.createBindGroup(layout);
       this._bindGroups[hash] = bindGroup;
     }
     return bindGroup;

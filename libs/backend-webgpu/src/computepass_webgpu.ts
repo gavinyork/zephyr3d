@@ -77,9 +77,7 @@ export class WebGPUComputePass {
     if (this.active) {
       this._computePassEncoder.end();
       this._computePassEncoder = null;
-      this._device.device.queue.submit([
-        this._computeCommandEncoder.finish()
-      ]);
+      this._device.device.queue.submit([this._computeCommandEncoder.finish()]);
       this._computeCommandEncoder = null;
     }
   }

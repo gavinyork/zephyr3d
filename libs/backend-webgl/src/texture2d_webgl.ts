@@ -30,7 +30,7 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
       this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
     }
     const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
-    this._device.bindTexture(textureTargetMap[this._target], 0, this)
+    this._device.bindTexture(textureTargetMap[this._target], 0, this);
     //this._device.context.bindTexture(textureTargetMap[this._target], this._object);
     this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
     this._device.context.texSubImage2D(

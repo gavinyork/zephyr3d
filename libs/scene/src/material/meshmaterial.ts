@@ -131,7 +131,9 @@ export class MeshMaterial extends Material {
     const uniformName = ShaderHelper.getInstanceDataUniformName();
     const strideName = ShaderHelper.getInstanceDataStrideUniformName();
     const offsetName = ShaderHelper.getInstanceDataOffsetUniformName();
-    return scope[uniformName].at(pb.add(pb.mul(scope[strideName], instanceID), 4 + uniformIndex, scope[offsetName]));
+    return scope[uniformName].at(
+      pb.add(pb.mul(scope[strideName], instanceID), 4 + uniformIndex, scope[offsetName])
+    );
   }
   /** Create material instance */
   createInstance(): this {
@@ -191,11 +193,7 @@ export class MeshMaterial extends Material {
           uniformsHolder[i * 4 + 2] = value.z;
           Object.defineProperty(instance, prop, {
             get() {
-              return new Vector3(
-                uniformsHolder[i * 4],
-                uniformsHolder[i * 4 + 1],
-                uniformsHolder[i * 4 + 2]
-              );
+              return new Vector3(uniformsHolder[i * 4], uniformsHolder[i * 4 + 1], uniformsHolder[i * 4 + 2]);
             },
             set(value) {
               uniformsHolder.set(value);
@@ -367,7 +365,7 @@ export class MeshMaterial extends Material {
   }
   /** @internal */
   protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
-    const pb = new ProgramBuilder(Application.instance.device);
+    const pb = new ProgramBuilder(ctx.device);
     if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
       const shadowMapParams = ctx.shadowMapInfo.get((ctx.renderPass as ShadowMapPass).light);
       pb.emulateDepthClamp = !!shadowMapParams.depthClampEnabled;
@@ -488,9 +486,7 @@ export class MeshMaterial extends Material {
     */
     return program;
   }
-  doAlphaTest(scope: PBInsideFunctionScope, color: PBShaderExp) {
-
-  }
+  doAlphaTest(scope: PBInsideFunctionScope, color: PBShaderExp) {}
   /**
    * Calculate final fragment color for output.
    *
@@ -532,7 +528,7 @@ export class MeshMaterial extends Material {
         }
         ShaderHelper.discardIfClipped(this, this.worldPos);
         this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
-        if (Application.instance.device.type === 'webgl') {
+        if (that.drawContext.device.type === 'webgl') {
           this.$outputs.zFragmentOutput = encodeNormalizedFloatToRGBA(this, this.depth);
         } else {
           this.$outputs.zFragmentOutput = pb.vec4(this.depth, 0, 0, 1);

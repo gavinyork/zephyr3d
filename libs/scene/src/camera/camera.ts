@@ -10,7 +10,7 @@ import type { BaseCameraController } from './base';
 import type { RenderLogger } from '../logger/logger';
 import type { OIT } from '../render/oit';
 
-export type OITType = 'none'|'weighted-blended';
+export type OITType = 'none' | 'weighted-blended';
 
 /**
  * The camera node class

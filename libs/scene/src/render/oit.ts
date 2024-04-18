@@ -1,5 +1,11 @@
-import { BindGroup, PBGlobalScope, PBInsideFunctionScope, PBShaderExp, RenderStateSet } from "@zephyr3d/device";
-import { DrawContext } from "./drawable";
+import type {
+  BindGroup,
+  PBGlobalScope,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  RenderStateSet
+} from '@zephyr3d/device';
+import type { DrawContext } from './drawable';
 
 export abstract class OIT {
   abstract getType(): string;
@@ -14,4 +20,3 @@ export abstract class OIT {
   abstract calculateHash(): string;
   abstract setRenderStates(rs: RenderStateSet);
 }
-

@@ -27,7 +27,7 @@ export class DepthPass extends RenderPass {
     ctx.applyFog = null;
     ctx.drawEnvLight = false;
     ctx.env = null;
-    ctx.flip = this.isAutoFlip();
+    ctx.flip = this.isAutoFlip(ctx);
     ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
     const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
     ctx.device.setBindGroup(0, bindGroup);

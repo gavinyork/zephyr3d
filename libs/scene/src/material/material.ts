@@ -1,13 +1,7 @@
-import type {
-  AbstractDevice,
-  BindGroup,
-  GPUProgram,
-  RenderStateSet,
-} from '@zephyr3d/device';
+import type { AbstractDevice, BindGroup, GPUProgram, RenderStateSet } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
 import type { DrawContext } from '../render/drawable';
-import { Application } from '../app';
 import { QUEUE_OPAQUE } from '../values';
 
 type MaterialState = {
@@ -101,15 +95,17 @@ export class Material {
       const hash = this.calcGlobalHash(ctx, pass);
       let state = this._states[hash];
       if (!state) {
-        const device = Application.instance.device;
         const program = this.createProgram(ctx, pass) ?? null;
-        const bindGroup = program.bindGroupLayouts.length > 2 ? device.createBindGroup(program.bindGroupLayouts[2]) : null;
+        const bindGroup =
+          program.bindGroupLayouts.length > 2
+            ? ctx.device.createBindGroup(program.bindGroupLayouts[2])
+            : null;
         state = {
           program,
           bindGroup,
-          renderStateSet: device.createRenderStateSet(),
-          materialTag: -1,
-        }
+          renderStateSet: ctx.device.createRenderStateSet(),
+          materialTag: -1
+        };
         this._states[hash] = state;
       }
       if (!state.program) {
@@ -124,7 +120,7 @@ export class Material {
   /** @internal */
   bind(device: AbstractDevice, pass: number): boolean {
     const hash = this._currentHash[pass];
-    let state = this._states[hash];
+    const state = this._states[hash];
     if (!state) {
       console.error('Material.bind() failed: state not found');
       return false;
@@ -138,7 +134,9 @@ export class Material {
   }
   /** @internal */
   private calcGlobalHash(ctx: DrawContext, pass: number): string {
-    return `${this.getHash(pass)}:${Number(!!ctx.skinAnimation)}:${Number(!!ctx.instancing)}:${ctx.renderPassHash}`;
+    return `${this.getHash(pass)}:${Number(!!ctx.skinAnimation)}:${Number(!!ctx.instancing)}:${
+      ctx.renderPassHash
+    }`;
   }
   /**
    * Draws a primitive using this material
@@ -149,9 +147,8 @@ export class Material {
    * @param numInstances - How many instances should be drawn. if zero, the instance count will be automatically detected.
    */
   draw(primitive: Primitive, ctx: DrawContext, numInstances = 0) {
-    const device = Application.instance.device;
     for (let pass = 0; pass < this._numPasses; pass++) {
-      this.bind(device, pass);
+      this.bind(ctx.device, pass);
       this.drawPrimitive(pass, primitive, ctx, numInstances);
     }
   }
@@ -204,7 +201,7 @@ export class Material {
   }
   /** @internal */
   protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
-    const pb = new ProgramBuilder(Application.instance.device);
+    const pb = new ProgramBuilder(ctx.device);
     return this._createProgram(pb, ctx, pass);
   }
   /**
@@ -229,9 +226,8 @@ export class Material {
    * @param renderStates - Render state set to be updated
    * @param ctx - Draw context
    */
-  protected updateRenderStates(pass: number, renderStates: RenderStateSet, ctx: DrawContext): void {
-  }
-    /**
+  protected updateRenderStates(pass: number, renderStates: RenderStateSet, ctx: DrawContext): void {}
+  /**
    * Calculates the hash code of the shader program
    * @returns The hash code
    */

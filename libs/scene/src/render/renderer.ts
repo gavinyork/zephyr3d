@@ -94,7 +94,7 @@ export class SceneRenderer {
     renderQueue: RenderQueue,
     depthFramebuffer: FrameBuffer
   ) {
-    const device = Application.instance.device;
+    const device = ctx.device;
     device.pushDeviceStates();
     device.setFramebuffer(depthFramebuffer);
     this._depthPass.clearColor = device.type === 'webgl' ? new Vector4(0, 0, 0, 1) : new Vector4(1, 1, 1, 1);
@@ -103,7 +103,7 @@ export class SceneRenderer {
   }
   /** @internal */
   protected static _renderScene(ctx: DrawContext): void {
-    const device = Application.instance.device;
+    const device = ctx.device;
     const vp = ctx.camera.viewport;
     const scissor = ctx.camera.scissor;
     const finalFramebuffer = device.getFramebuffer();
@@ -276,10 +276,10 @@ export class SceneRenderer {
   /** @internal */
   private static renderShadowMaps(ctx: DrawContext, lights: PunctualLight[]) {
     ctx.renderPass = this._shadowMapPass;
-    Application.instance.device.pushDeviceStates();
+    ctx.device.pushDeviceStates();
     for (const light of lights) {
       light.shadow.render(ctx, this._shadowMapPass);
     }
-    Application.instance.device.popDeviceStates();
+    ctx.device.popDeviceStates();
   }
 }

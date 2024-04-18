@@ -6,7 +6,6 @@ import {
   RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_SHADOWMAP
 } from '../../values';
-import { Application } from '../../app';
 import { ScatteringLut } from '../../render/scatteringlut';
 import type {
   ProgramBuilder,
@@ -19,7 +18,7 @@ import type {
 } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
 import { linearToGamma } from '../../shaders';
-import { Camera } from '../../camera';
+import type { Camera } from '../../camera';
 
 const UNIFORM_NAME_GLOBAL = 'Z_UniformGlobal';
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
@@ -206,9 +205,8 @@ export class ShaderHelper {
           : scope.$builder.tex2DArray();
         if (
           !shadowMapParams.shadowMap.isDepth() &&
-          !Application.instance.device
-            .getDeviceCaps()
-            .textureCaps.getTextureFormatInfo(shadowMapParams.shadowMap.format).filterable
+          !ctx.device.getDeviceCaps().textureCaps.getTextureFormatInfo(shadowMapParams.shadowMap.format)
+            .filterable
         ) {
           tex.sampleType('unfilterable-float');
         }
@@ -464,12 +462,7 @@ export class ShaderHelper {
       viewProjectionMatrix: camera.viewProjectionMatrix,
       viewMatrix: camera.viewMatrix,
       projectionMatrix: camera.getProjectionMatrix(),
-      params: new Vector4(
-        camera.getNearPlane(),
-        camera.getFarPlane(),
-        flip ? -1 : 1,
-        linear ? 0 : 1
-      )
+      params: new Vector4(camera.getNearPlane(), camera.getFarPlane(), flip ? -1 : 1, linear ? 0 : 1)
     };
     bindGroup.setValue(UNIFORM_NAME_GLOBAL, {
       camera: cameraStruct
@@ -874,53 +867,6 @@ export class ShaderHelper {
       scope.$builtins.position = pos;
     }
   }
-  /** @internal */
-  static getSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp {
-    const pb = scope.$builder;
-    const funcNameGetBoneMatrixFromTexture = 'Z_getBoneMatrixFromTexture';
-    pb.func(funcNameGetBoneMatrixFromTexture, [pb.int('boneIndex')], function () {
-      const boneTexture = this[UNIFORM_NAME_BONE_MATRICES];
-      this.$l.w = pb.float(this[UNIFORM_NAME_BONE_TEXTURE_SIZE]);
-      this.$l.pixelIndex = pb.float(pb.mul(this.boneIndex, 4));
-      this.$l.xIndex = pb.mod(this.pixelIndex, this.w);
-      this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.w));
-      this.$l.u1 = pb.div(pb.add(this.xIndex, 0.5), this.w);
-      this.$l.u2 = pb.div(pb.add(this.xIndex, 1.5), this.w);
-      this.$l.u3 = pb.div(pb.add(this.xIndex, 2.5), this.w);
-      this.$l.u4 = pb.div(pb.add(this.xIndex, 3.5), this.w);
-      this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.w);
-      if (Application.instance.device.type !== 'webgl') {
-        this.$l.row1 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u1, this.v), 0);
-        this.$l.row2 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u2, this.v), 0);
-        this.$l.row3 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u3, this.v), 0);
-        this.$l.row4 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u4, this.v), 0);
-      } else {
-        this.$l.row1 = pb.textureSample(boneTexture, pb.vec2(this.u1, this.v));
-        this.$l.row2 = pb.textureSample(boneTexture, pb.vec2(this.u2, this.v));
-        this.$l.row3 = pb.textureSample(boneTexture, pb.vec2(this.u3, this.v));
-        this.$l.row4 = pb.textureSample(boneTexture, pb.vec2(this.u4, this.v));
-      }
-      this.$return(pb.mat4(this.row1, this.row2, this.row3, this.row4));
-    });
-    const funcNameGetSkinningMatrix = 'Z_getSkinningMatrix';
-    pb.func(funcNameGetSkinningMatrix, [], function () {
-      const invBindMatrix = this[UNIFORM_NAME_BONE_INV_BIND_MATRIX];
-      const blendIndices = pb.getGlobalScope().$getVertexAttrib('blendIndices');
-      const blendWeights = pb.getGlobalScope().$getVertexAttrib('blendWeights');
-      this.$l.m0 = pb.getGlobalScope()[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[0]));
-      this.$l.m1 = pb.getGlobalScope()[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[1]));
-      this.$l.m2 = pb.getGlobalScope()[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[2]));
-      this.$l.m3 = pb.getGlobalScope()[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[3]));
-      this.$l.m = pb.add(
-        pb.mul(this.m0, blendWeights.x),
-        pb.mul(this.m1, blendWeights.y),
-        pb.mul(this.m2, blendWeights.z),
-        pb.mul(this.m3, blendWeights.w)
-      );
-      this.$return(pb.mul(invBindMatrix, this.m));
-    });
-    return pb.getGlobalScope()[funcNameGetSkinningMatrix]();
-  }
   /**
    * Get global uniforms
    *
@@ -969,7 +915,7 @@ export class ShaderHelper {
           pb.float(pb.greaterThan(this.shadowCascades, 3))
         );
         this.$l.split = pb.int(pb.dot(this.comparison, this.cascadeFlags));
-        if (Application.instance.device.type === 'webgl') {
+        if (ctx.device.type === 'webgl') {
           this.$l.shadowVertex = pb.vec4();
           this.$for(pb.int('cascade'), 0, 4, function () {
             this.$if(pb.equal(this.cascade, this.split), function () {
@@ -1045,11 +991,7 @@ export class ShaderHelper {
         this.$l.factor = pb.sub(pb.div(this.distance, this.sliceDist), this.slice0);
         this.$l.viewNormal = pb.normalize(this.viewDir);
         this.$l.horizonAngle = pb.acos(
-          pb.clamp(
-            pb.dot(pb.normalize(that.getSunLightDir(this).xz), pb.normalize(this.viewNormal.xz)),
-            0,
-            1
-          )
+          pb.clamp(pb.dot(pb.normalize(that.getSunLightDir(this).xz), pb.normalize(this.viewNormal.xz)), 0, 1)
         );
         this.$l.zenithAngle = pb.asin(this.viewNormal.y);
         this.$l.sliceU = pb.max(

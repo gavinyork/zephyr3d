@@ -65,7 +65,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     if (dstByteOffset + srcLength * data.BYTES_PER_ELEMENT > this.byteLength) {
       throw new Error('bufferSubData() failed: dest buffer is too small');
     }
-    let uploadSize = srcLength * data.BYTES_PER_ELEMENT;
+    const uploadSize = srcLength * data.BYTES_PER_ELEMENT;
     if ((dstByteOffset & 3) !== 0 || (uploadSize & 3) !== 0) {
       throw new Error(
         'bufferSubData() failed: destination byte offset or upload size must be 4 bytes aligned'
@@ -75,7 +75,10 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     const insertIndex = this.searchInsertPosition(dstByteOffset);
     if (insertIndex < this._pendingUploads.length) {
       const upload = this._pendingUploads[insertIndex];
-      if (upload.uploadOffset < dstByteOffset + uploadSize && upload.uploadOffset + upload.uploadSize > dstByteOffset) {
+      if (
+        upload.uploadOffset < dstByteOffset + uploadSize &&
+        upload.uploadOffset + upload.uploadSize > dstByteOffset
+      ) {
         // Flush if overlapped
         this._device.bufferUpload(this);
       }
@@ -87,7 +90,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     } else {
       let start = dstByteOffset;
       let end = dstByteOffset + uploadSize;
-      while(insertIndex < this._pendingUploads.length) {
+      while (insertIndex < this._pendingUploads.length) {
         const upload = this._pendingUploads[insertIndex];
         const uploadStart = upload.uploadOffset;
         const uploadEnd = uploadStart + upload.uploadSize;
@@ -235,11 +238,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
       this._device.flushUploads();
     }
   }
-  private pushUpload(
-    dstByteOffset: number,
-    byteSize: number,
-    insertIndex: number
-  ) {
+  private pushUpload(dstByteOffset: number, byteSize: number, insertIndex: number) {
     const bufferMapped = this._ringBuffer.fetchBufferMapped(byteSize, true);
     this._pendingUploads.splice(insertIndex, 0, {
       mappedBuffer: {

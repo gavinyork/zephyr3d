@@ -22,10 +22,17 @@ export class LightPass extends RenderPass {
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return `lp:${this._shadowMapHash}:${ctx.linearDepthTexture?.uid ?? ''}:${ctx.oit?.calculateHash() ?? ''}:${ctx.env.getHash(ctx)}`;
+    return `lp:${this._shadowMapHash}:${ctx.linearDepthTexture?.uid ?? ''}:${
+      ctx.oit?.calculateHash() ?? ''
+    }:${ctx.env.getHash(ctx)}`;
   }
   /** @internal */
-  protected renderLightPass(ctx: DrawContext, itemList: RenderItemListBundle, lights: PunctualLight[], flags: any) {
+  protected renderLightPass(
+    ctx: DrawContext,
+    itemList: RenderItemListBundle,
+    lights: PunctualLight[],
+    flags: any
+  ) {
     const baseLightPass = !ctx.lightBlending;
     ctx.drawEnvLight =
       baseLightPass &&
@@ -66,7 +73,7 @@ export class LightPass extends RenderPass {
     ctx.device.setBindGroup(0, bindGroup);
     const reverseWinding = ctx.camera.worldMatrixDet < 0;
     for (const lit of itemList.lit) {
-      this.drawItemList(lit, ctx, reverseWinding)
+      this.drawItemList(lit, ctx, reverseWinding);
     }
     if (!ctx.lightBlending) {
       for (const unlit of itemList.unlit) {
@@ -80,8 +87,11 @@ export class LightPass extends RenderPass {
     ctx.renderPassHash = null;
     ctx.env = ctx.scene.env;
     ctx.drawEnvLight = false;
-    ctx.flip = this.isAutoFlip();
-    const oit = ctx.primaryCamera.oit && ctx.primaryCamera.oit.supportDevice(ctx.device.type) ? ctx.primaryCamera.oit : null;
+    ctx.flip = this.isAutoFlip(ctx);
+    const oit =
+      ctx.primaryCamera.oit && ctx.primaryCamera.oit.supportDevice(ctx.device.type)
+        ? ctx.primaryCamera.oit
+        : null;
     if (!oit) {
       renderQueue.sortTransparentItems(ctx.primaryCamera.getWorldPosition());
     }

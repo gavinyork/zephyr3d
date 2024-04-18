@@ -6,8 +6,8 @@ import { WebGLEnum } from './webgl_enum';
 import { cubeMapFaceMap } from './constants_webgl';
 import type { WebGLTextureCaps } from './capabilities_webgl';
 import type { WebGLDevice } from './device_webgl';
-import { WebGLTexture2D } from './texture2d_webgl';
-import { WebGLTextureCube } from './texturecube_webgl';
+import type { WebGLTexture2D } from './texture2d_webgl';
+import type { WebGLTextureCube } from './texturecube_webgl';
 
 type FrameBufferTextureAttachment = {
   texture: BaseTexture;
@@ -124,7 +124,8 @@ export class WebGLFrameBuffer
     } else {
       this._depthAttachmentTarget = WebGLEnum.NONE;
     }
-    const colorAttachmentHash = this._options.colorAttachments?.map(tex => tex.texture.format).join(':') ?? '';
+    const colorAttachmentHash =
+      this._options.colorAttachments?.map((tex) => tex.texture.format).join(':') ?? '';
     const depthAttachmentHash = this._options.depthAttachment?.texture.format ?? '';
     this._hash = `${colorAttachmentHash}-${depthAttachmentHash}-${this._options.sampleCount ?? 1}`;
     this._init();
@@ -321,7 +322,7 @@ export class WebGLFrameBuffer
                 0
               );
               if (tex.isTexture2D()) {
-                this._device.bindTexture(WebGLEnum.TEXTURE_2D, 0, (tex as WebGLTexture2D))
+                this._device.bindTexture(WebGLEnum.TEXTURE_2D, 0, tex as WebGLTexture2D);
                 //this._device.context.bindTexture(WebGLEnum.TEXTURE_2D, tex.object);
                 this._device.context.copyTexSubImage2D(
                   WebGLEnum.TEXTURE_2D,

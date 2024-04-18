@@ -1,4 +1,3 @@
-import { Application } from '../app';
 import { linearToGamma } from '../shaders/misc';
 import type { DrawContext } from '../render';
 import { TemporalCache } from '../render';
@@ -112,7 +111,7 @@ export class Compositor {
   }
   /** @internal */
   begin(ctx: DrawContext) {
-    const device = Application.instance.device;
+    const device = ctx.device;
     const format = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
     const finalFramebuffer = device.getFramebuffer();
     const depth = finalFramebuffer?.getDepthAttachment() as Texture2D;
@@ -220,7 +219,7 @@ export class Compositor {
   drawPostEffects(ctx: DrawContext, opaque: boolean, sceneDepthTexture: Texture2D) {
     const postEffects = opaque ? this._postEffectsOpaque : this._postEffectsTransparency;
     if (postEffects.length > 0) {
-      const device = Application.instance.device;
+      const device = ctx.device;
       for (let i = 0; i < postEffects.length; i++) {
         const postEffect = postEffects[i];
         if (!postEffect.enabled) {
@@ -246,7 +245,7 @@ export class Compositor {
   }
   /** @internal */
   end(ctx: DrawContext) {
-    const device = Application.instance.device;
+    const device = ctx.device;
     if (device.getFramebuffer() !== ctx.compositorContex.finalFramebuffer) {
       const srcTex = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
       device.setFramebuffer(ctx.compositorContex.finalFramebuffer);

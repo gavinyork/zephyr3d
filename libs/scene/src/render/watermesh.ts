@@ -259,7 +259,7 @@ export class WaterMesh {
           fft2vProgram4: this._renderMode === RENDER_TWO_PASS ? createProgramFFT2V(4) : null,
           postfft2Program: this._renderMode === RENDER_NORMAL ? createProgramPostFFT2() : null,
           postfft2Program2: this._renderMode === RENDER_TWO_PASS ? createProgramPostFFT2(2) : null,
-          postfft2Program4: this._renderMode === RENDER_TWO_PASS ? createProgramPostFFT2(4) : null,
+          postfft2Program4: this._renderMode === RENDER_TWO_PASS ? createProgramPostFFT2(4) : null
         },
         quad: WaterMesh.createQuad(device),
         noiseTextures: new Map(),
@@ -281,17 +281,17 @@ export class WaterMesh {
       this._fft2hBindGroup = programs.fft2hProgram
         ? device.createBindGroup(WaterMesh._globals.programs.fft2hProgram.bindGroupLayouts[0])
         : null;
-        this._fft2vBindGroup = programs.fft2vProgram
+      this._fft2vBindGroup = programs.fft2vProgram
         ? device.createBindGroup(WaterMesh._globals.programs.fft2vProgram.bindGroupLayouts[0])
         : null;
-      this._fft2hBindGroup2Used = [[],[]];
-      this._fft2hBindGroup2Free = [[],[]];
-      this._fft2hBindGroup4Used = [[],[]];
-      this._fft2hBindGroup4Free = [[],[]];
-      this._fft2vBindGroup2Used = [[],[]];
-      this._fft2vBindGroup2Free = [[],[]];
-      this._fft2vBindGroup4Used = [[],[]];
-      this._fft2vBindGroup4Free = [[],[]];
+      this._fft2hBindGroup2Used = [[], []];
+      this._fft2hBindGroup2Free = [[], []];
+      this._fft2hBindGroup4Used = [[], []];
+      this._fft2hBindGroup4Free = [[], []];
+      this._fft2vBindGroup2Used = [[], []];
+      this._fft2vBindGroup2Free = [[], []];
+      this._fft2vBindGroup4Used = [[], []];
+      this._fft2vBindGroup4Free = [[], []];
       this._postfft2BindGroup = programs.postfft2Program
         ? device.createBindGroup(WaterMesh._globals.programs.postfft2Program.bindGroupLayouts[0])
         : null;
@@ -301,9 +301,7 @@ export class WaterMesh {
       this._postfft2BindGroup4 = programs.postfft2Program4
         ? device.createBindGroup(WaterMesh._globals.programs.postfft2Program4.bindGroupLayouts[0])
         : null;
-      this._waterBindGroup = device.createBindGroup(
-        this._waterProgram.bindGroupLayouts[0]
-      );
+      this._waterBindGroup = device.createBindGroup(this._waterProgram.bindGroupLayouts[0]);
       this._instanceData = null;
       this._ifftTextures = null;
       this._wireframe = false;
@@ -693,7 +691,7 @@ export class WaterMesh {
         );
       }
       WaterMesh._globals.quad.draw();
-      pingPong = 1 - pingPong;//(pingPong + 1) % 2;
+      pingPong = 1 - pingPong; //(pingPong + 1) % 2;
     }
 
     // vertical ifft
@@ -737,7 +735,7 @@ export class WaterMesh {
   private getFFT2hBindGroup4(device: AbstractDevice, pingpong: number): BindGroup {
     let bindGroup = this._fft2hBindGroup4Used[pingpong].pop();
     if (!bindGroup) {
-      bindGroup = device.createBindGroup(WaterMesh._globals.programs.fft2hProgram4.bindGroupLayouts[0])
+      bindGroup = device.createBindGroup(WaterMesh._globals.programs.fft2hProgram4.bindGroupLayouts[0]);
     }
     this._fft2hBindGroup4Free[pingpong].push(bindGroup);
     return bindGroup;
@@ -753,7 +751,7 @@ export class WaterMesh {
   private getFFT2vBindGroup4(device: AbstractDevice, pingpong: number): BindGroup {
     let bindGroup = this._fft2vBindGroup4Used[pingpong].pop();
     if (!bindGroup) {
-      bindGroup = device.createBindGroup(WaterMesh._globals.programs.fft2vProgram4.bindGroupLayouts[0])
+      bindGroup = device.createBindGroup(WaterMesh._globals.programs.fft2vProgram4.bindGroupLayouts[0]);
     }
     this._fft2vBindGroup4Free[pingpong].push(bindGroup);
     return bindGroup;
@@ -785,26 +783,10 @@ export class WaterMesh {
       device.setBindGroup(0, fft2hBindGroup4);
       fft2hBindGroup4.setTexture('butterfly', butterflyTex, this._nearestRepeatSampler);
       fft2hBindGroup4.setValue('phase', phase);
-      fft2hBindGroup4.setTexture(
-        'spectrum0',
-        pingPongTextures[pingPong][0],
-        this._nearestRepeatSampler
-      );
-      fft2hBindGroup4.setTexture(
-        'spectrum1',
-        pingPongTextures[pingPong][1],
-        this._nearestRepeatSampler
-      );
-      fft2hBindGroup4.setTexture(
-        'spectrum2',
-        pingPongTextures[pingPong][2],
-        this._nearestRepeatSampler
-      );
-      fft2hBindGroup4.setTexture(
-        'spectrum3',
-        pingPongTextures[pingPong][3],
-        this._nearestRepeatSampler
-      );
+      fft2hBindGroup4.setTexture('spectrum0', pingPongTextures[pingPong][0], this._nearestRepeatSampler);
+      fft2hBindGroup4.setTexture('spectrum1', pingPongTextures[pingPong][1], this._nearestRepeatSampler);
+      fft2hBindGroup4.setTexture('spectrum2', pingPongTextures[pingPong][2], this._nearestRepeatSampler);
+      fft2hBindGroup4.setTexture('spectrum3', pingPongTextures[pingPong][3], this._nearestRepeatSampler);
       if (device.type === 'webgl') {
         fft2hBindGroup4.setValue(
           'texSize',
@@ -823,16 +805,8 @@ export class WaterMesh {
       device.setBindGroup(0, fft2hBindGroup2);
       fft2hBindGroup2.setTexture('butterfly', butterflyTex, this._nearestRepeatSampler);
       fft2hBindGroup2.setValue('phase', phase);
-      fft2hBindGroup2.setTexture(
-        'spectrum4',
-        pingPongTextures[pingPong][4],
-        this._nearestRepeatSampler
-      );
-      fft2hBindGroup2.setTexture(
-        'spectrum5',
-        pingPongTextures[pingPong][5],
-        this._nearestRepeatSampler
-      );
+      fft2hBindGroup2.setTexture('spectrum4', pingPongTextures[pingPong][4], this._nearestRepeatSampler);
+      fft2hBindGroup2.setTexture('spectrum5', pingPongTextures[pingPong][5], this._nearestRepeatSampler);
       if (device.type === 'webgl') {
         fft2hBindGroup2.setValue(
           'texSize',
@@ -856,26 +830,10 @@ export class WaterMesh {
       device.setBindGroup(0, fft2vBindGroup4);
       fft2vBindGroup4.setTexture('butterfly', butterflyTex, this._nearestRepeatSampler);
       fft2vBindGroup4.setValue('phase', phase);
-      fft2vBindGroup4.setTexture(
-        'spectrum0',
-        pingPongTextures[pingPong][0],
-        this._nearestRepeatSampler
-      );
-      fft2vBindGroup4.setTexture(
-        'spectrum1',
-        pingPongTextures[pingPong][1],
-        this._nearestRepeatSampler
-      );
-      fft2vBindGroup4.setTexture(
-        'spectrum2',
-        pingPongTextures[pingPong][2],
-        this._nearestRepeatSampler
-      );
-      fft2vBindGroup4.setTexture(
-        'spectrum3',
-        pingPongTextures[pingPong][3],
-        this._nearestRepeatSampler
-      );
+      fft2vBindGroup4.setTexture('spectrum0', pingPongTextures[pingPong][0], this._nearestRepeatSampler);
+      fft2vBindGroup4.setTexture('spectrum1', pingPongTextures[pingPong][1], this._nearestRepeatSampler);
+      fft2vBindGroup4.setTexture('spectrum2', pingPongTextures[pingPong][2], this._nearestRepeatSampler);
+      fft2vBindGroup4.setTexture('spectrum3', pingPongTextures[pingPong][3], this._nearestRepeatSampler);
       if (device.type === 'webgl') {
         fft2vBindGroup4.setValue(
           'texSize',
@@ -894,16 +852,8 @@ export class WaterMesh {
       device.setBindGroup(0, fft2vBindGroup2);
       fft2vBindGroup2.setTexture('butterfly', butterflyTex, this._nearestRepeatSampler);
       fft2vBindGroup2.setValue('phase', phase);
-      fft2vBindGroup2.setTexture(
-        'spectrum4',
-        pingPongTextures[pingPong][4],
-        this._nearestRepeatSampler
-      );
-      fft2vBindGroup2.setTexture(
-        'spectrum5',
-        pingPongTextures[pingPong][5],
-        this._nearestRepeatSampler
-      );
+      fft2vBindGroup2.setTexture('spectrum4', pingPongTextures[pingPong][4], this._nearestRepeatSampler);
+      fft2vBindGroup2.setTexture('spectrum5', pingPongTextures[pingPong][5], this._nearestRepeatSampler);
       if (device.type === 'webgl') {
         fft2vBindGroup2.setValue(
           'texSize',

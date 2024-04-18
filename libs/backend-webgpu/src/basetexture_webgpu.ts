@@ -513,7 +513,7 @@ export abstract class WebGPUBaseTexture<
     offsetZ: number,
     miplevel: number
   ) {
-    if(this.isTextureVideo()) {
+    if (this.isTextureVideo()) {
       console.error('BaseTexture.uploadRaw(): Cannot upload to video texture');
       return;
     }

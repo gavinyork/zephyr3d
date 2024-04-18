@@ -2,7 +2,7 @@ import type { TypedArray } from '@zephyr3d/base';
 import type { GPUDataBuffer, TextureVideo } from '@zephyr3d/device';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPUDevice } from './device';
-import { WebGPUBindGroup } from './bindgroup_webgpu';
+import type { WebGPUBindGroup } from './bindgroup_webgpu';
 
 export class WebGPUTextureVideo
   extends WebGPUBaseTexture<GPUExternalTexture>

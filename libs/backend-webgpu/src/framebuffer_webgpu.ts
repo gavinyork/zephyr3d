@@ -84,7 +84,8 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
     this._bindFlag = 0;
     this._msaaColorTextures = null;
     this._msaaDepthTexture = null;
-    const colorAttachmentHash = this._options.colorAttachments?.map(tex => tex.texture.format).join(':') ?? '';
+    const colorAttachmentHash =
+      this._options.colorAttachments?.map((tex) => tex.texture.format).join(':') ?? '';
     const depthAttachmentHash = this._options.depthAttachment?.texture.format ?? '';
     this._hash = `${colorAttachmentHash}-${depthAttachmentHash}-${this._options.sampleCount ?? 1}`;
     this._init();

@@ -489,7 +489,13 @@ export interface StructTypeDetail {
  */
 export interface ArrayTypeDetail {
   /** Type of array elements */
-  elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo;
+  elementType:
+    | PBPrimitiveTypeInfo
+    | PBArrayTypeInfo
+    | PBStructTypeInfo
+    | PBAnyTypeInfo
+    | PBAtomicI32TypeInfo
+    | PBAtomicU32TypeInfo;
   /** Array dimension */
   dimension: number;
 }
@@ -1201,7 +1207,13 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
  */
 export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
   constructor(
-    elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo,
+    elementType:
+      | PBPrimitiveTypeInfo
+      | PBArrayTypeInfo
+      | PBStructTypeInfo
+      | PBAnyTypeInfo
+      | PBAtomicI32TypeInfo
+      | PBAtomicU32TypeInfo,
     dimension?: number
   ) {
     super(PBTypeClass.ARRAY, {
@@ -1210,7 +1222,13 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
     });
   }
   /** Get the element type */
-  get elementType(): PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo {
+  get elementType():
+    | PBPrimitiveTypeInfo
+    | PBArrayTypeInfo
+    | PBStructTypeInfo
+    | PBAnyTypeInfo
+    | PBAtomicI32TypeInfo
+    | PBAtomicU32TypeInfo {
     return this.detail.elementType;
   }
   /** Get dimension of the array type */
@@ -1630,7 +1648,7 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
       if (this.isStorageTexture()) {
         const storageTexelFormat = storageTexelFormatMap[this.storageTexelFormat];
         // storage textures currently only support 'write' access control
-        const accessMode = this.writable ? this.readable ? 'read_write' : 'write' : 'read';// this.readable ? (this.writable ? 'read_write' : 'read') : 'write';
+        const accessMode = this.writable ? (this.readable ? 'read_write' : 'write') : 'read'; // this.readable ? (this.writable ? 'read_write' : 'read') : 'write';
         typename = `${typename}<${storageTexelFormat}, ${accessMode}>`;
       }
       return varName ? `${varName}: ${typename}` : typename;

@@ -209,7 +209,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    * {@inheritDoc Drawable.draw}
    */
   draw(ctx: DrawContext) {
-    this.bind(Application.instance.device, ctx);
+    this.bind(ctx);
     this.material.draw(this.primitive, ctx);
   }
   /**

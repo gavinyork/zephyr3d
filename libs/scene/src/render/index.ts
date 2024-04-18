@@ -1,4 +1,3 @@
-export * from './renderscheme';
 export * from './drawable';
 export * from './renderpass';
 export * from './renderer';

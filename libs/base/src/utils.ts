@@ -386,7 +386,7 @@ export type ExtractMixinType<M> = M extends [infer First]
 
 /**
  * Applies mixins to a constructor function.
- * 
+ *
  * @param target - The constructor function of the class that will receive the mixins.
  * @param mixins - mixins
  * @returns Mixed class
@@ -411,4 +411,3 @@ export function applyMixins<M extends ((target: any) => any)[], T>(
 export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void
   ? I
   : never;
-

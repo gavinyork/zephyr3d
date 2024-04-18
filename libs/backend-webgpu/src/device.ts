@@ -214,7 +214,7 @@ export class WebGPUDevice extends BaseDevice {
     }
     this._device = await this._adapter.requestDevice({
       requiredFeatures: [...this._adapter.features] as GPUFeatureName[],
-      requiredLimits: {...this._adapter.limits} as any
+      requiredLimits: { ...this._adapter.limits } as any
     });
     console.log('WebGPU device features:');
     for (const feature of this._device.features) {
@@ -484,8 +484,20 @@ export class WebGPUDevice extends BaseDevice {
   createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer {
     return new WebGPUBuffer(this, this.parseBufferOptions(options), sizeInBytes);
   }
-  copyBuffer(sourceBuffer: GPUDataBuffer<unknown>, destBuffer: GPUDataBuffer<unknown>, srcOffset: number, dstOffset: number, bytes: number) {
-    this._commandQueue.copyBuffer(sourceBuffer as WebGPUBuffer, destBuffer as WebGPUBuffer, srcOffset, dstOffset, bytes);
+  copyBuffer(
+    sourceBuffer: GPUDataBuffer<unknown>,
+    destBuffer: GPUDataBuffer<unknown>,
+    srcOffset: number,
+    dstOffset: number,
+    bytes: number
+  ) {
+    this._commandQueue.copyBuffer(
+      sourceBuffer as WebGPUBuffer,
+      destBuffer as WebGPUBuffer,
+      srcOffset,
+      dstOffset,
+      bytes
+    );
   }
   createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer<unknown> {
     return new WebGPUIndexBuffer(this, data, this.parseBufferOptions(options, 'index'));

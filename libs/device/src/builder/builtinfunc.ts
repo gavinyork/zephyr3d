@@ -859,7 +859,11 @@ const builtinFunctionsAll = {
         }
       }
       if (pb.getDevice().type === 'webgpu') {
-        return pb.$callFunctionNoCheck('bitcast<i32>', [args[0] instanceof PBShaderExp ? args[0].$ast : new ASTScalar(args[0], typeinfo.typeF32)], typeinfo.typeI32);
+        return pb.$callFunctionNoCheck(
+          'bitcast<i32>',
+          [args[0] instanceof PBShaderExp ? args[0].$ast : new ASTScalar(args[0], typeinfo.typeF32)],
+          typeinfo.typeI32
+        );
       } else {
         return callBuiltin(pb, name, ...args);
       }
@@ -882,7 +886,11 @@ const builtinFunctionsAll = {
         }
       }
       if (pb.getDevice().type === 'webgpu') {
-        return pb.$callFunctionNoCheck('bitcast<u32>', [args[0] instanceof PBShaderExp ? args[0].$ast : new ASTScalar(args[0], typeinfo.typeF32)], typeinfo.typeU32);
+        return pb.$callFunctionNoCheck(
+          'bitcast<u32>',
+          [args[0] instanceof PBShaderExp ? args[0].$ast : new ASTScalar(args[0], typeinfo.typeF32)],
+          typeinfo.typeU32
+        );
       } else {
         return callBuiltin(pb, name, ...args);
       }
@@ -905,7 +913,11 @@ const builtinFunctionsAll = {
         }
       }
       if (pb.getDevice().type === 'webgpu') {
-        return pb.$callFunctionNoCheck('bitcast<f32>', [args[0] instanceof PBShaderExp ? args[0].$ast : new ASTScalar(args[0], typeinfo.typeI32)], typeinfo.typeF32);
+        return pb.$callFunctionNoCheck(
+          'bitcast<f32>',
+          [args[0] instanceof PBShaderExp ? args[0].$ast : new ASTScalar(args[0], typeinfo.typeI32)],
+          typeinfo.typeF32
+        );
       } else {
         return callBuiltin(pb, name, ...args);
       }
@@ -928,7 +940,11 @@ const builtinFunctionsAll = {
         }
       }
       if (pb.getDevice().type === 'webgpu') {
-        return pb.$callFunctionNoCheck('bitcast<f32>', [args[0] instanceof PBShaderExp ? args[0].$ast : new ASTScalar(args[0], typeinfo.typeU32)], typeinfo.typeF32);
+        return pb.$callFunctionNoCheck(
+          'bitcast<f32>',
+          [args[0] instanceof PBShaderExp ? args[0].$ast : new ASTScalar(args[0], typeinfo.typeU32)],
+          typeinfo.typeF32
+        );
       } else {
         return callBuiltin(pb, name, ...args);
       }

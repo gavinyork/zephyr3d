@@ -398,7 +398,7 @@ export class SkyRenderer {
   renderFog(ctx: DrawContext) {
     const camera = ctx.camera;
     const sceneDepthTexture = ctx.linearDepthTexture;
-    const device = Application.instance.device;
+    const device = ctx.device;
     const savedRenderStates = device.getRenderStates();
     this._prepareSkyBox(device);
     const sunLight = ctx.sunLight;

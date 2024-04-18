@@ -59,8 +59,7 @@ export class CommandQueueImmediate {
   get currentPass(): WebGPURenderPass | WebGPUComputePass {
     return this._renderPass.active ? this._renderPass : this._computePass.active ? this._computePass : null;
   }
-  beginFrame(): void {
-  }
+  beginFrame(): void {}
   endFrame(): void {
     this.flush();
   }
@@ -101,7 +100,13 @@ export class CommandQueueImmediate {
       this._textureUploads.set(tex, this._drawcallCounter);
     }
   }
-  copyBuffer(srcBuffer: WebGPUBuffer, dstBuffer: WebGPUBuffer, srcOffset: number, dstOffset: number, bytes: number) {
+  copyBuffer(
+    srcBuffer: WebGPUBuffer,
+    dstBuffer: WebGPUBuffer,
+    srcOffset: number,
+    dstOffset: number,
+    bytes: number
+  ) {
     this.flushUploads();
     const copyCommandEncoder = this._device.device.createCommandEncoder();
     copyCommandEncoder.copyBufferToBuffer(srcBuffer.object, srcOffset, dstBuffer.object, dstOffset, bytes);

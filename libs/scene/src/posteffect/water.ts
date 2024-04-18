@@ -9,7 +9,6 @@ import type { DrawContext } from '../render';
 import { TemporalCache, WaterMesh } from '../render';
 import { AbstractPostEffect } from './posteffect';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders';
-import { Application } from '../app';
 import { Interpolator, Matrix4x4, Plane, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import { Camera } from '../camera';
 import { CopyBlitter } from '../blitter';
@@ -79,7 +78,6 @@ export class PostWater extends AbstractPostEffect {
       new Float32Array([0, 0, 0, 0.08, 0.41, 0.34, 0.13, 0.4, 0.45, 0.21, 0.5, 0.6])
     );
     this._rampTex = null;
-    this.addIntermediateFramebuffer('reflection', 'temporal');
     this._foamWidth = 1.2;
     this._foamContrast = 7.2;
     this._waterWireframe = false;
@@ -286,7 +284,7 @@ export class PostWater extends AbstractPostEffect {
   }
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
-    const device = Application.instance.device;
+    const device = ctx.device;
     const rampTex = this._getRampTexture(device);
     this._copyBlitter.srgbOut = srgbOutput;
     this._copyBlitter.blit(
@@ -410,7 +408,7 @@ export class PostWater extends AbstractPostEffect {
     const hash = `${ctx.sunLight ? 1 : 0}:${ctx.env.light.getHash(ctx)}`;
     let waterMesh = this._waterMeshes[hash];
     if (!waterMesh) {
-      const device = Application.instance.device;
+      const device = ctx.device;
       waterMesh = new WaterMesh(device, {
         setupUniforms(scope: PBGlobalScope) {
           const pb = scope.$builder;

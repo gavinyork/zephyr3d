@@ -6,7 +6,6 @@ import type { DrawContext } from '../render';
 import { RENDER_PASS_TYPE_LIGHT } from '../values';
 import { ShaderHelper } from './shader/helper';
 import { mixinFoliage } from './mixins/foliage';
-import { Application } from '../app';
 
 /**
  * Terrain grass material
@@ -135,7 +134,7 @@ export class GrassMaterial extends applyMaterialMixins(
     }
   }
   apply(ctx: DrawContext): boolean {
-    this.alphaToCoverage = Application.instance.device.getFrameBufferSampleCount() > 1;
+    this.alphaToCoverage = ctx.device.getFrameBufferSampleCount() > 1;
     this.alphaCutoff = this.alphaToCoverage ? 1 : 0.8;
     return super.apply(ctx);
   }

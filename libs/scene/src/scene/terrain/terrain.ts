@@ -1,6 +1,6 @@
 import type { Ray } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
-import type { RenderStateSet, Texture2D } from '@zephyr3d/device';
+import type { Texture2D } from '@zephyr3d/device';
 import { Quadtree } from './quadtree';
 import { GraphNode } from '../graph_node';
 import { Application } from '../../app';
@@ -50,8 +50,6 @@ export class Terrain extends GraphNode {
   private _castShadow: boolean;
   /** @internal */
   private _instanceColor: Vector4;
-  /** @internal */
-  private _overridenStateSet: RenderStateSet;
   /**
    * Creates an instance of Terrain
    * @param scene - The scene to which the terrain belongs
@@ -74,7 +72,6 @@ export class Terrain extends GraphNode {
     this._viewPoint = null;
     this._castShadow = true;
     this._instanceColor = Vector4.zero();
-    this._overridenStateSet = null;
   }
   /** @internal */
   get quadtree(): Quadtree {
@@ -159,10 +156,6 @@ export class Terrain extends GraphNode {
   get normalMap(): Texture2D {
     return this._quadtree.normalMap;
   }
-  /** @internal */
-  get overridenStateSet(): RenderStateSet {
-    return this._overridenStateSet;
-  }
   /**
    * Creates the terrain
    *
@@ -197,8 +190,6 @@ export class Terrain extends GraphNode {
     this._material.normalTexture = this._quadtree.normalMap;
     this._material.normalTexCoordIndex = -1;
     this._material.terrainInfo = new Vector4(this.scaledWidth, this.scaledHeight, 0, 0);
-    this._overridenStateSet = Application.instance.device.createRenderStateSet();
-    this._overridenStateSet.useRasterizerState().setCullMode('front');
     this.invalidateBoundingVolume();
     // create grass layers
     if (options?.splatMap && options?.detailMaps?.grass) {

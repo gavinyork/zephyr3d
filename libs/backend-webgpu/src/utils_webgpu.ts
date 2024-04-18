@@ -36,17 +36,19 @@ export class WebGPUClearQuad {
       .useStencilState()
       .enable(bClearStencil)
       .setReference(bClearStencil ? clearStencil : 0);
-    renderPass.getDevice().commandQueue.draw(
-      program.program,
-      null,
-      this._clearStateSet,
-      [program.bindGroup],
-      null,
-      'triangle-strip',
-      0,
-      4,
-      1
-    );
+    renderPass
+      .getDevice()
+      .commandQueue.draw(
+        program.program,
+        null,
+        this._clearStateSet,
+        [program.bindGroup],
+        null,
+        'triangle-strip',
+        0,
+        4,
+        1
+      );
   }
   private static getClearProgram(
     device: WebGPUDevice,
@@ -134,16 +136,7 @@ export class WebGPUMipmapGenerator {
     tex.setMipmapDirty(false);
     for (let face = 0; face < numLayers; face++) {
       for (let level = 1; level < miplevels; level++) {
-        this.generateMiplevel(
-          device,
-          encoder,
-          tex,
-          tex.object,
-          tex.gpuFormat,
-          level,
-          level,
-          face
-        );
+        this.generateMiplevel(device, encoder, tex, tex.object, tex.gpuFormat, level, level, face);
       }
     }
     if (!cmdEncoder) {

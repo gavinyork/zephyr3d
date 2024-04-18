@@ -154,45 +154,51 @@ export function setConstructors(cls: typeof ProgramBuilder) {
   Object.keys(texStorageCtors).forEach((k) => {
     cls.prototype[k] = makeStorageTextureCtor(texStorageCtors[k]);
   });
-  cls.prototype['atomic_int'] = makeConstructor(function (this: ProgramBuilder, ...args: any[]): PBShaderExp {
-    if (args.length > 1) {
-      throw new errors.PBParamLengthError('atomic_int');
-    }
-    if (args.length === 1) {
-      if (typeof args[0] !== 'string') {
-        throw new errors.PBParamTypeError('atomic_int', 'name');
+  cls.prototype['atomic_int'] = makeConstructor(
+    function (this: ProgramBuilder, ...args: any[]): PBShaderExp {
+      if (args.length > 1) {
+        throw new errors.PBParamLengthError('atomic_int');
       }
-      return new PBShaderExp(args[0], typeinfo.typeAtomicI32);
-    } else {
-      const exp = new PBShaderExp('', typeinfo.typeAtomicI32);
-      exp.$ast = new AST.ASTShaderExpConstructor(exp.$typeinfo, []);
-      return exp;
-    }
-  } as ShaderTypeFunc, typeinfo.typeAtomicI32);
-  cls.prototype['atomic_uint'] = makeConstructor(function (this: ProgramBuilder, ...args: any[]): PBShaderExp {
-    if (args.length > 1) {
-      throw new errors.PBParamLengthError('atomic_uint');
-    }
-    if (args.length === 1 && typeof args[0] === 'string') {
-      return new PBShaderExp(args[0], typeinfo.typeAtomicU32);
-    } else if (args.length === 0) {
-      const exp = new PBShaderExp('', typeinfo.typeAtomicU32);
-      exp.$ast = new AST.ASTShaderExpConstructor(exp.$typeinfo, []);
-      return exp;
-    }
-    const arg = args[0];
-    if (
-      (typeof arg === 'number' && Number.isInteger(arg)) ||
-      (arg instanceof PBShaderExp && arg.$ast.getType().typeId === typeinfo.typeU32.typeId)
-    ) {
-      const exp = new PBShaderExp('', typeinfo.typeAtomicU32);
-      exp.$ast = new AST.ASTShaderExpConstructor(exp.$typeinfo, [
-        arg instanceof PBShaderExp ? arg.$ast : arg
-      ]);
-      return exp;
-    }
-    return null;
-  } as ShaderTypeFunc, typeinfo.typeAtomicU32);
+      if (args.length === 1) {
+        if (typeof args[0] !== 'string') {
+          throw new errors.PBParamTypeError('atomic_int', 'name');
+        }
+        return new PBShaderExp(args[0], typeinfo.typeAtomicI32);
+      } else {
+        const exp = new PBShaderExp('', typeinfo.typeAtomicI32);
+        exp.$ast = new AST.ASTShaderExpConstructor(exp.$typeinfo, []);
+        return exp;
+      }
+    } as ShaderTypeFunc,
+    typeinfo.typeAtomicI32
+  );
+  cls.prototype['atomic_uint'] = makeConstructor(
+    function (this: ProgramBuilder, ...args: any[]): PBShaderExp {
+      if (args.length > 1) {
+        throw new errors.PBParamLengthError('atomic_uint');
+      }
+      if (args.length === 1 && typeof args[0] === 'string') {
+        return new PBShaderExp(args[0], typeinfo.typeAtomicU32);
+      } else if (args.length === 0) {
+        const exp = new PBShaderExp('', typeinfo.typeAtomicU32);
+        exp.$ast = new AST.ASTShaderExpConstructor(exp.$typeinfo, []);
+        return exp;
+      }
+      const arg = args[0];
+      if (
+        (typeof arg === 'number' && Number.isInteger(arg)) ||
+        (arg instanceof PBShaderExp && arg.$ast.getType().typeId === typeinfo.typeU32.typeId)
+      ) {
+        const exp = new PBShaderExp('', typeinfo.typeAtomicU32);
+        exp.$ast = new AST.ASTShaderExpConstructor(exp.$typeinfo, [
+          arg instanceof PBShaderExp ? arg.$ast : arg
+        ]);
+        return exp;
+      }
+      return null;
+    } as ShaderTypeFunc,
+    typeinfo.typeAtomicU32
+  );
 }
 
 /*

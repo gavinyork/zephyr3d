@@ -5,9 +5,9 @@ import type { RenderItemListInfo, RenderQueueItem } from './render_queue';
 import { RenderQueue } from './render_queue';
 import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
-import type { AbstractDevice, BindGroup, RenderStateSet } from '@zephyr3d/device';
+import type { AbstractDevice, BindGroup } from '@zephyr3d/device';
 import { ShaderHelper } from '../material/shader/helper';
-import { RenderBundleWrapper } from './renderbundle_wrapper';
+import type { RenderBundleWrapper } from './renderbundle_wrapper';
 
 /**
  * Base class for any kind of render passes
@@ -63,8 +63,8 @@ export abstract class RenderPass {
     return this._type;
   }
   /** @internal */
-  isAutoFlip(): boolean {
-    return !!(Application.instance.device.getFramebuffer() && Application.instance.device.type === 'webgpu');
+  isAutoFlip(ctx: DrawContext): boolean {
+    return !!(ctx.device.getFramebuffer() && ctx.device.type === 'webgpu');
   }
   /**
    * Renders a scene
@@ -75,16 +75,11 @@ export abstract class RenderPass {
     this.drawScene(ctx, cullCamera ?? ctx.camera, renderQueue);
   }
   /** @internal */
-  applyRenderStates(device: AbstractDevice, stateSet: RenderStateSet, ctx: DrawContext) {
-    device.setRenderStates(stateSet);
-  }
-  /** @internal */
   protected getGlobalBindGroup(ctx: DrawContext): BindGroup {
     const hash = this.getGlobalBindGroupHash(ctx);
     let bindGroup = this._globalBindGroups[hash];
     if (!bindGroup) {
-      //const programBuilder = new ProgramBuilder(Application.instance.device);
-      const ret = Application.instance.device.programBuilder.buildRender({
+      const ret = ctx.device.programBuilder.buildRender({
         vertex(pb) {
           ShaderHelper.prepareVertexShader(pb, ctx);
           pb.main(function () {});
@@ -94,7 +89,7 @@ export abstract class RenderPass {
           pb.main(function () {});
         }
       });
-      bindGroup =  Application.instance.device.createBindGroup(ret[2][0]);
+      bindGroup = ctx.device.createBindGroup(ret[2][0]);
       this._globalBindGroups[hash] = bindGroup;
     }
     return bindGroup;
@@ -115,12 +110,12 @@ export abstract class RenderPass {
   protected abstract renderItems(ctx: DrawContext, renderQueue: RenderQueue);
   /** @internal */
   protected drawScene(ctx: DrawContext, cullCamera: Camera, renderQueue?: RenderQueue) {
-    const device = Application.instance.device;
+    const device = ctx.device;
     this.clearFramebuffer();
     const rq = renderQueue ?? this.cullScene(ctx, cullCamera);
     if (rq) {
       const windingReversed = device.isWindingOrderReversed();
-      device.reverseVertexWindingOrder(this.isAutoFlip() ? !windingReversed : windingReversed);
+      device.reverseVertexWindingOrder(this.isAutoFlip(ctx) ? !windingReversed : windingReversed);
       this.renderItems(ctx, rq);
       device.reverseVertexWindingOrder(windingReversed);
       if (rq !== renderQueue) {
@@ -164,7 +159,13 @@ export abstract class RenderPass {
     }
   }
   /** @internal */
-  private internalDrawItemList(ctx: DrawContext, items: RenderQueueItem[], renderBundle: RenderBundleWrapper, reverseWinding: boolean, hash: string) {
+  private internalDrawItemList(
+    ctx: DrawContext,
+    items: RenderQueueItem[],
+    renderBundle: RenderBundleWrapper,
+    reverseWinding: boolean,
+    hash: string
+  ) {
     if (renderBundle) {
       const bundle = renderBundle.getRenderBundle(hash);
       if (bundle) {
@@ -189,11 +190,7 @@ export abstract class RenderPass {
     }
   }
   /** @internal */
-  protected drawItemList(
-    itemList: RenderItemListInfo,
-    ctx: DrawContext,
-    reverseWinding: boolean
-  ) {
+  protected drawItemList(itemList: RenderItemListInfo, ctx: DrawContext, reverseWinding: boolean) {
     ctx.renderQueue = itemList.renderQueue;
     ctx.instanceData = null;
     const windingHash = reverseWinding ? '1' : '0';
@@ -204,7 +201,7 @@ export abstract class RenderPass {
       if (itemList.itemList.length > 0) {
         ctx.skinAnimation = false;
         ctx.instancing = false;
-        itemList.materialList.forEach(mat => mat.apply(ctx));
+        itemList.materialList.forEach((mat) => mat.apply(ctx));
         this.internalDrawItemList(ctx, itemList.itemList, itemList.renderBundle, reverseWinding, hash);
         /*
         for (const item of itemList.itemList) {
@@ -222,8 +219,14 @@ export abstract class RenderPass {
       if (itemList.skinItemList.length > 0) {
         ctx.skinAnimation = true;
         ctx.instancing = false;
-        itemList.materialList.forEach(mat => mat.apply(ctx));
-        this.internalDrawItemList(ctx, itemList.skinItemList, itemList.skinRenderBundle, reverseWinding, hash);
+        itemList.materialList.forEach((mat) => mat.apply(ctx));
+        this.internalDrawItemList(
+          ctx,
+          itemList.skinItemList,
+          itemList.skinRenderBundle,
+          reverseWinding,
+          hash
+        );
         /*
         for (const item of itemList.skinItemList) {
           ctx.instanceData = item.instanceData;
@@ -241,8 +244,14 @@ export abstract class RenderPass {
       if (itemList.instanceItemList.length > 0) {
         ctx.skinAnimation = false;
         ctx.instancing = true;
-        itemList.materialList.forEach(mat => mat.apply(ctx));
-        this.internalDrawItemList(ctx, itemList.instanceItemList, itemList.instanceRenderBundle, reverseWinding, hash);
+        itemList.materialList.forEach((mat) => mat.apply(ctx));
+        this.internalDrawItemList(
+          ctx,
+          itemList.instanceItemList,
+          itemList.instanceRenderBundle,
+          reverseWinding,
+          hash
+        );
         /*
         for (const item of itemList.instanceItemList) {
           ctx.instanceData = item.instanceData;
