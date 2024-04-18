@@ -1462,7 +1462,10 @@ export interface BindGroup extends GPUObject<unknown> {
   setSampler(name: string, sampler: TextureSampler);
 }
 
-/** Render bundle */
+/**
+ * Render bundle
+ * @public
+ */
 export type RenderBundle = unknown;
 
 /**

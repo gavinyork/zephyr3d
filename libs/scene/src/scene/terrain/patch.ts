@@ -14,6 +14,7 @@ import { QUEUE_OPAQUE, RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import { mixinDrawable } from '../../render/drawable_mixin';
 import type { Material } from '../../material';
 
+/** @internal */
 export class TerrainPatchBase {
   protected _terrain: Terrain;
   constructor(terrain: Terrain) {

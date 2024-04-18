@@ -4,7 +4,7 @@ import { GraphNode } from './graph_node';
 import { BoxFrameShape } from '../shapes';
 import type { Material } from '../material';
 import { LambertMaterial } from '../material';
-import type { RenderPass, Primitive, BatchDrawable, DrawContext, CachedBindGroup } from '../render';
+import type { RenderPass, Primitive, BatchDrawable, DrawContext } from '../render';
 import { Application } from '../app';
 import type { Texture2D } from '@zephyr3d/device';
 import type { XForm } from './xform';
@@ -40,8 +40,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   protected _boundingBoxNode: Mesh;
   /** @internal */
   protected _instanceColor: Vector4;
-  /** @internal */
-  protected _instanceBufferInfo: Map<RenderPass, { bindGroup: CachedBindGroup; offset: number }>;
   /**
    * Creates an instance of mesh node
    * @param scene - The scene to which the mesh node belongs
@@ -56,7 +54,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._invBindMatrix = null;
     this._instanceHash = null;
     this._boundingBoxNode = null;
-    this._instanceBufferInfo = new Map();
     this._instanceColor = Vector4.zero();
     this._batchable = Application.instance.deviceType !== 'webgl';
     this._bboxChangeCallback = this._onBoundingboxChange.bind(this);
@@ -236,33 +233,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   getXForm(): XForm {
     // mesh transform should be ignored when skinned
     return this;
-  }
-  /**
-   * {@inheritDoc BatchDrawable.setInstanceDataBuffer}
-   */
-  setInstanceDataBuffer(renderPass: RenderPass, bindGroup: CachedBindGroup, offset: number) {
-    const info = this._instanceBufferInfo.get(renderPass);
-    if (!info) {
-      if (bindGroup) {
-        this._instanceBufferInfo.set(renderPass, {
-          bindGroup,
-          offset
-        });
-      }
-    } else {
-      if (bindGroup) {
-        info.bindGroup = bindGroup;
-        info.offset = offset;
-      } else {
-        this._instanceBufferInfo.delete(renderPass);
-      }
-    }
-  }
-  /**
-   * {@inheritDoc BatchDrawable.getInstanceDataBuffer}
-   */
-  getInstanceDataBuffer(renderPass: RenderPass): { bindGroup: CachedBindGroup; offset: number } {
-    return this._instanceBufferInfo.get(renderPass) ?? null;
   }
   /** @internal */
   computeBoundingVolume(bv: BoundingVolume): BoundingVolume {

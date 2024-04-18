@@ -1,6 +1,3 @@
-// FIXME:
-// consider devicePixelRatio
-
 import type {
   AbstractDevice,
   BindGroup,
@@ -17,39 +14,45 @@ import type { DrawContext } from './drawable';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { ShaderHelper } from '../material';
 
+/**
+ * per-pixel linked list OIT renderer using ABuffer.
+ *
+ * @remarks
+ * The ABuffer OIT renderer only supports WebGPU device.
+ *
+ * @public
+ */
 export class ABufferOIT extends OIT {
+  /** Type name of ABufferOIT */
   public static readonly type = 'ab';
   private static MAX_FRAGMENT_LAYERS = 75;
-  private static _clearProgram: GPUProgram = null;
-  private static _clearBindGroup: BindGroup = null;
-  private static _clearRenderStates: RenderStateSet = null;
   private static _compositeProgram: GPUProgram = null;
   private static _compositeBindGroup: BindGroup = null;
   private static _compositeRenderStates: RenderStateSet = null;
   private static _ubAlignment = 0;
-  private static _sbAlignment = 0;
   private _nodeBuffer: GPUDataBuffer;
-  private _counterBuffer: GPUDataBuffer;
-  private _nodeHeadImage: GPUDataBuffer;
+  private _headStagingBuffer: GPUDataBuffer;
+  private _headBuffer: GPUDataBuffer;
   private _scissorOffsetBuffer: GPUDataBuffer;
   private _numLayers: number;
   private _screenSize: Uint32Array;
-  private _offsetBuffer: Uint32Array;
-  private _clearBuffer: Uint32Array;
   private _hash: string;
   private _debug: boolean;
   private _scissorSlices: number;
   private _scissorHeight: number;
   private _currentPass: number;
   private _savedScissor: DeviceViewport;
+  /**
+   * Creates an instance of ABufferOIT class
+   *
+   * @param numLayers - How many transparent layers, default is 16
+   */
   constructor(numLayers = 16) {
     super();
     this._nodeBuffer = null;
-    this._counterBuffer = null;
-    this._nodeHeadImage = null;
+    this._headStagingBuffer = null;
+    this._headBuffer = null;
     this._scissorOffsetBuffer = null;
-    this._offsetBuffer = null;
-    this._clearBuffer = null;
     this._numLayers = numLayers;
     this._screenSize = new Uint32Array([0xffffffff, 0xffffffff]);
     this._hash = null;
@@ -59,19 +62,41 @@ export class ABufferOIT extends OIT {
     this._savedScissor = null;
     this._currentPass = 0;
   }
+  /**
+   * {@inheritDoc OIT.getType}
+   */
   getType(): string {
     return ABufferOIT.type;
   }
+  /**
+   * {@inheritDoc OIT.supportDevice}
+   */
   supportDevice(deviceType: string): boolean {
     return deviceType === 'webgpu';
   }
+  /**
+   * {@inheritDoc OIT.dispose}
+   */
+  dispose() {
+    this._nodeBuffer?.dispose();
+    this._nodeBuffer = null;
+    this._headStagingBuffer?.dispose();
+    this._headStagingBuffer = null;
+    this._headBuffer?.dispose();
+    this._headBuffer = null;
+    this._scissorOffsetBuffer?.dispose();
+    this._scissorOffsetBuffer = null;
+    this._hash = null;
+    this._savedScissor = null;
+  }
+  /**
+   * {@inheritDoc OIT.begin}
+   */
   begin(ctx: DrawContext): number {
     const device = ctx.device;
     this._savedScissor = device.getScissor();
     const ubAlignment = (ABufferOIT._ubAlignment =
       device.getDeviceCaps().shaderCaps.uniformBufferOffsetAlignment);
-    const sbAlignment = (ABufferOIT._sbAlignment =
-      device.getDeviceCaps().shaderCaps.storageBufferOffsetAlignment);
     const viewport = device.getViewport();
     const screenWidth = device.screenToDevice(viewport.width);
     const screenHeight = device.screenToDevice(Math.max(viewport.height, 1));
@@ -101,54 +126,42 @@ export class ABufferOIT extends OIT {
         this._nodeBuffer?.dispose();
         this._nodeBuffer = device.createBuffer(nodeBufferSize, { storage: true, usage: 'uniform' });
       }
-      if (!this._clearBuffer || this._clearBuffer.byteLength < size >> 2) {
-        this._clearBuffer = new Uint32Array(size >> 2);
-        this._clearBuffer.fill(0xffffffff);
-      }
-      // resize head buffer and clear
-      if (!this._nodeHeadImage || size > this._nodeHeadImage.byteLength) {
-        this._nodeHeadImage?.dispose();
-        this._nodeHeadImage = device.createBuffer(size, { storage: true, usage: 'uniform' });
-      }
-      // resize counter buffer if needed
-      const counterBufferSize = sbAlignment * this._scissorSlices;
-      if (!this._offsetBuffer || this._offsetBuffer.byteLength < counterBufferSize) {
-        this._offsetBuffer = new Uint32Array(counterBufferSize >> 2);
-      }
-      if (!this._counterBuffer || this._counterBuffer.byteLength < counterBufferSize) {
-        this._counterBuffer?.dispose();
-        this._counterBuffer = device.createBuffer(counterBufferSize, { storage: true, usage: 'uniform' });
+      // resize head buffer
+      const headBufferSize = size + 4;
+      if (!this._headBuffer || headBufferSize > this._headBuffer.byteLength) {
+        this._headBuffer?.dispose();
+        this._headBuffer = device.createBuffer(headBufferSize, { storage: true, usage: 'uniform' });
+        this._headStagingBuffer?.dispose();
+        this._headStagingBuffer = device.createBuffer(headBufferSize, { storage: true, usage: 'uniform' });
+        const tmpArray = new Uint32Array(headBufferSize >> 2);
+        tmpArray.fill(0xffffffff);
+        this._headStagingBuffer.bufferSubData(0, tmpArray);
       }
     }
     return this._scissorSlices;
   }
+  /**
+   * {@inheritDoc OIT.end}
+   */
   end(ctx: DrawContext) {
     // Restore scissor rect
     ctx.device.setScissor(this._savedScissor);
   }
+  /**
+   * {@inheritDoc OIT.setupFragmentOutput}
+   */
   setupFragmentOutput(scope: PBGlobalScope) {
     const pb = scope.$builder;
     scope.Z_AB_scissorOffset = pb.uint().uniformBuffer(2);
     scope.Z_AB_nodeBuffer = pb.uvec4[0]().storageBuffer(2);
     scope.Z_AB_headImage = pb.atomic_uint[0]().storageBuffer(2);
-    scope.Z_AB_counter = pb.atomic_uint().storageBuffer(2);
     scope.Z_AB_screenSize = pb.uint().uniform(2);
     scope.Z_AB_depthTexture = pb.tex2D().uniform(2);
     scope.$outputs.outColor = pb.vec4();
   }
-  clearHeadBuffer(device: AbstractDevice) {
-    const program = ABufferOIT.getClearProgram(device);
-    const bindGroup = ABufferOIT._clearBindGroup;
-    bindGroup.setValue('screenWidth', this._screenSize[0]);
-    bindGroup.setBuffer('headBuffer', this._nodeHeadImage);
-    const lastBindGroup = device.getBindGroup(0);
-    device.pushDeviceStates();
-    device.setProgram(program);
-    device.setBindGroup(0, bindGroup);
-    drawFullscreenQuad(ABufferOIT._clearRenderStates);
-    device.popDeviceStates();
-    device.setBindGroup(0, lastBindGroup[0], lastBindGroup[1]);
-  }
+  /**
+   * {@inheritDoc OIT.beginPass}
+   */
   beginPass(ctx: DrawContext, pass: number) {
     this._currentPass = pass;
     const device = ctx.device;
@@ -161,17 +174,15 @@ export class ABufferOIT extends OIT {
       device.deviceToScreen(this._screenSize[0]),
       device.deviceToScreen(scissorH)
     ]);
-    this._nodeHeadImage.bufferSubData(0, this._clearBuffer);
-    this._counterBuffer.bufferSubData(0, this._offsetBuffer);
-    //this.clearHeadBuffer(device);
+    device.copyBuffer(this._headStagingBuffer, this._headBuffer, 0, 0, this._headStagingBuffer.byteLength);
     // Update render hash
-    this._hash = `${this.getType()}#${this._nodeBuffer.uid}#${this._nodeHeadImage.uid}#${
+    this._hash = `${this.getType()}#${this._nodeBuffer.uid}#${this._headBuffer.uid}#${
       this._scissorOffsetBuffer.uid
     }#${pass}`;
     if (this._debug) {
-      const data = new Uint8Array(this._nodeHeadImage.byteLength);
-      const readBuffer = device.createBuffer(this._nodeHeadImage.byteLength, { usage: 'read' });
-      device.copyBuffer(this._nodeHeadImage, readBuffer, 0, 0, this._nodeHeadImage.byteLength);
+      const data = new Uint8Array(this._headBuffer.byteLength);
+      const readBuffer = device.createBuffer(this._headBuffer.byteLength, { usage: 'read' });
+      device.copyBuffer(this._headBuffer, readBuffer, 0, 0, this._headBuffer.byteLength);
       readBuffer.getBufferSubData(data).then(() => {
         const uint = new Uint32Array(data.buffer);
         for (let i = 0; i < uint.length; i++) {
@@ -185,6 +196,9 @@ export class ABufferOIT extends OIT {
     }
     return true;
   }
+  /**
+   * {@inheritDoc OIT.endPass}
+   */
   endPass(ctx: DrawContext, pass: number) {
     const device = ctx.device;
     ABufferOIT.getCompositeProgram(device);
@@ -198,25 +212,24 @@ export class ABufferOIT extends OIT {
       pass * ABufferOIT._ubAlignment,
       ABufferOIT._ubAlignment
     );
-    bindGroup.setBuffer('headBuffer', this._nodeHeadImage);
+    bindGroup.setBuffer('headBuffer', this._headBuffer);
     bindGroup.setBuffer('nodeBuffer', this._nodeBuffer);
     bindGroup.setValue('screenWidth', this._screenSize[0]);
     device.setBindGroup(0, bindGroup);
     drawFullscreenQuad(ABufferOIT._compositeRenderStates);
     device.setBindGroup(0, lastBindGroup[0], lastBindGroup[1]);
   }
+  /**
+   * {@inheritDoc OIT.calculateHash}
+   */
   calculateHash(): string {
     return this._hash;
   }
+  /**
+   * {@inheritDoc OIT.applyUniforms}
+   */
   applyUniforms(ctx: DrawContext, bindGroup: BindGroup) {
     bindGroup.setBuffer('Z_AB_nodeBuffer', this._nodeBuffer);
-    bindGroup.setBuffer(
-      'Z_AB_counter',
-      this._counterBuffer,
-      0,
-      this._currentPass * ABufferOIT._sbAlignment,
-      ABufferOIT._sbAlignment
-    );
     bindGroup.setBuffer(
       'Z_AB_scissorOffset',
       this._scissorOffsetBuffer,
@@ -224,10 +237,13 @@ export class ABufferOIT extends OIT {
       this._currentPass * ABufferOIT._ubAlignment,
       ABufferOIT._ubAlignment
     );
-    bindGroup.setBuffer('Z_AB_headImage', this._nodeHeadImage);
+    bindGroup.setBuffer('Z_AB_headImage', this._headBuffer);
     bindGroup.setValue('Z_AB_screenSize', this._screenSize[0]);
     bindGroup.setTexture('Z_AB_depthTexture', ctx.linearDepthTexture);
   }
+  /**
+   * {@inheritDoc OIT.outputFragmentColor}
+   */
   outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp) {
     const pb = scope.$builder;
     // linear depth of current fragment
@@ -240,7 +256,7 @@ export class ABufferOIT extends OIT {
     ).r;
     // saved to buffer only if nothing is infront
     scope.$if(pb.lessThan(scope.fragDepth, scope.linearDepth), function () {
-      this.$l.Z_AB_pixelCount = pb.atomicAdd(this.Z_AB_counter, 1);
+      this.$l.Z_AB_pixelCount = pb.atomicAdd(this.Z_AB_headImage.at(0), 1);
       this.$l.Z_AB_nodeOffset = this.Z_AB_pixelCount;
       // save if index not exceeded
       this.$if(pb.lessThan(this.Z_AB_nodeOffset, pb.arrayLength(this.Z_AB_nodeBuffer)), function () {
@@ -249,7 +265,7 @@ export class ABufferOIT extends OIT {
           pb.uint(this.$builtins.fragCoord.x)
         );
         this.$l.Z_AB_oldHead = pb.atomicExchange(
-          this.Z_AB_headImage.at(this.Z_AB_headOffset),
+          this.Z_AB_headImage.at(pb.add(this.Z_AB_headOffset, 1)),
           this.Z_AB_nodeOffset
         );
         this.$l.Z_AB_colorScale = pb.floatBitsToUint(pb.length(color.rgb));
@@ -264,6 +280,9 @@ export class ABufferOIT extends OIT {
     });
     return true;
   }
+  /**
+   * {@inheritDoc OIT.setRenderStates}
+   */
   setRenderStates(rs: RenderStateSet) {
     const stencilStates = rs.useStencilState();
     stencilStates.enable(true);
@@ -274,36 +293,7 @@ export class ABufferOIT extends OIT {
     stencilStates.setReference(1);
     stencilStates.setReadMask(0xff);
   }
-  private static getClearProgram(device: AbstractDevice) {
-    if (!this._clearProgram) {
-      this._clearProgram = device.buildRenderProgram({
-        vertex(pb) {
-          this.$inputs.pos = pb.vec2().attrib('position');
-          pb.main(function () {
-            this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
-          });
-        },
-        fragment(pb) {
-          this.$outputs.color = pb.vec4();
-          this.screenWidth = pb.uint().uniform(0);
-          this.headBuffer = pb.atomic_uint[0]().storageBuffer(0);
-          pb.main(function () {
-            this.$l.offset = pb.add(
-              pb.mul(pb.uint(this.$builtins.fragCoord.y), this.screenWidth),
-              pb.uint(this.$builtins.fragCoord.x)
-            );
-            pb.atomicExchange(this.headBuffer.at(this.offset), 0xffffffff);
-            pb.discard();
-          });
-        }
-      });
-      this._clearBindGroup = device.createBindGroup(this._clearProgram.bindGroupLayouts[0]);
-      this._clearRenderStates = device.createRenderStateSet();
-      this._clearRenderStates.useDepthState().enableTest(false).enableWrite(false);
-      this._clearRenderStates.useRasterizerState().setCullMode('none');
-    }
-    return this._clearProgram;
-  }
+  /** @internal */
   private static getCompositeProgram(device: AbstractDevice) {
     if (!this._compositeProgram) {
       this._compositeProgram = device.buildRenderProgram({
@@ -321,7 +311,7 @@ export class ABufferOIT extends OIT {
         fragment(pb) {
           this.$outputs.outColor = pb.vec4();
           this.scissorOffset = pb.uint().uniformBuffer(0);
-          this.headBuffer = pb.atomic_uint[0]().storageBuffer(0);
+          this.headBuffer = pb.uint[0]().storageBuffer(0);
           this.nodeBuffer = pb.uvec4[0]().storageBuffer(0);
           this.screenWidth = pb.uint().uniform(0);
           pb.func('unpackColor', [pb.uvec4('x')], function () {
@@ -337,7 +327,7 @@ export class ABufferOIT extends OIT {
               pb.uint(this.$builtins.fragCoord.x)
             );
             //this.$l.head = this.headBuffer.at(this.offset);
-            this.$l.head = pb.atomicExchange(this.headBuffer.at(this.offset), 0xffffffff);
+            this.$l.head = this.headBuffer.at(pb.add(this.offset, 1));
             this.$while(
               pb.and(
                 pb.lessThan(this.fragmentArrayLen, ABufferOIT.MAX_FRAGMENT_LAYERS),
@@ -349,18 +339,6 @@ export class ABufferOIT extends OIT {
                 this.fragmentArrayLen = pb.add(this.fragmentArrayLen, 1);
               }
             );
-            /*
-            this.$if(pb.equal(this.fragmentArrayLen, 0), function(){
-              this.$if(pb.greaterThan(this.scissorOffset, 0), function(){
-                this.$outputs.outColor = pb.vec4(0, 1, 0, 0);
-              }).$else(function(){
-                this.$outputs.outColor = pb.vec4(0, 0, 1, 0);
-              })
-            }).$else(function() {
-              this.$outputs.outColor = pb.vec4(pb.div(pb.float(this.fragmentArrayLen), pb.float(100)), 0, 0, 0);
-            });
-            return;
-            */
             this.$if(pb.equal(this.fragmentArrayLen, 0), function () {
               this.$outputs.outColor = pb.vec4(0, 0, 0, 1);
             }).$else(function () {

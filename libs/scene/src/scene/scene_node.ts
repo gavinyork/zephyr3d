@@ -90,7 +90,6 @@ export class SceneNode extends XForm<SceneNode> {
   get placeToOctree(): boolean {
     return this._placeToOctree;
   }
-  /** @internal */
   set placeToOctree(val: boolean) {
     if (!!val !== this._placeToOctree) {
       this._placeToOctree = !!val;

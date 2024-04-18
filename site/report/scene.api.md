@@ -75,7 +75,6 @@ export class AABBTree {
 // @public
 export abstract class AbstractPostEffect {
     constructor();
-    protected addIntermediateFramebuffer(name: string, depth: 'none' | 'current' | 'temporal'): void;
     abstract apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean): void;
     // @internal (undocumented)
     protected createRenderStates(device: AbstractDevice): RenderStateSet;
@@ -87,14 +86,6 @@ export abstract class AbstractPostEffect {
     set enabled(val: boolean);
     // (undocumented)
     protected _enabled: boolean;
-    protected getIntermediateFramebuffer(name: string, format: TextureFormat, width: number, height: number): FrameBuffer;
-    // (undocumented)
-    protected _intermediateFramebuffers: {
-        [name: string]: {
-            framebuffer: FrameBuffer;
-            depth: 'none' | 'current' | 'temporal';
-        };
-    };
     needFlip(device: AbstractDevice): boolean;
     get opaque(): boolean;
     // (undocumented)
@@ -107,6 +98,23 @@ export abstract class AbstractPostEffect {
     protected _quadVertexLayout: VertexLayout;
     abstract requireDepthAttachment(): boolean;
     abstract requireLinearDepthTexture(): boolean;
+}
+
+// @public
+export class ABufferOIT extends OIT {
+    constructor(numLayers?: number);
+    applyUniforms(ctx: DrawContext, bindGroup: BindGroup): void;
+    begin(ctx: DrawContext): number;
+    beginPass(ctx: DrawContext, pass: number): boolean;
+    calculateHash(): string;
+    dispose(): void;
+    end(ctx: DrawContext): void;
+    endPass(ctx: DrawContext, pass: number): void;
+    getType(): string;
+    outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp): boolean;
+    setRenderStates(rs: RenderStateSet): void;
+    setupFragmentOutput(scope: PBGlobalScope): void;
+    supportDevice(deviceType: string): boolean;
 }
 
 // @public
@@ -841,6 +849,10 @@ export class Camera extends SceneNode {
     set controller(controller: BaseCameraController);
     // @internal (undocumented)
     protected _controller: BaseCameraController;
+    get depthPrePass(): boolean;
+    set depthPrePass(val: boolean);
+    // @internal (undocumented)
+    protected _depthPrePass: boolean;
     // @internal (undocumented)
     protected _dirty: boolean;
     dispose(): void;
@@ -872,6 +884,10 @@ export class Camera extends SceneNode {
     isCamera(): this is Camera;
     lookAt(eye: Vector3, target: Vector3, up: Vector3): this;
     lookAtCubeFace(face: CubeFace, position?: Vector3): this;
+    get oit(): OIT;
+    set oit(val: OIT);
+    // @internal (undocumented)
+    protected _oit: OIT;
     // @internal (undocumented)
     protected _onTransformChanged(invalidateLocal: boolean): void;
     // @internal (undocumented)
@@ -1181,14 +1197,18 @@ export interface DrawContext {
     defaultViewport?: boolean;
     depthFormat?: TextureFormat;
     depthTexture?: Texture2D;
+    device: AbstractDevice;
     drawEnvLight: boolean;
     env: Environment;
     flip: boolean;
+    // Warning: (ae-forgotten-export) The symbol "GlobalBindGroupAllocator" needs to be exported by the entry point index.d.ts
+    globalBindGroupAllocator: GlobalBindGroupAllocator;
     instanceData?: InstanceData;
     instancing?: boolean;
     lightBlending: boolean;
     linearDepthTexture?: Texture2D;
     logger?: RenderLogger;
+    oit: OIT;
     primaryCamera: Camera;
     queue: number;
     renderPass: RenderPass;
@@ -1954,13 +1974,6 @@ export class Mesh extends Mesh_base implements BatchDrawable {
     set drawBoundingBox(val: boolean);
     getBoneMatrices(): Texture2D;
     getInstanceColor(): Vector4;
-    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: No member was found with name "getInstanceDataBuffer"
-    //
-    // (undocumented)
-    getInstanceDataBuffer(renderPass: RenderPass): {
-        bindGroup: CachedBindGroup;
-        offset: number;
-    };
     getInstanceId(renderPass: RenderPass): string;
     getInstanceUniforms(): Float32Array;
     getInvBindMatrix(): Matrix4x4;
@@ -1969,11 +1982,6 @@ export class Mesh extends Mesh_base implements BatchDrawable {
     getPickTarget(): GraphNode;
     getQueueType(): number;
     getXForm(): XForm;
-    // @internal (undocumented)
-    protected _instanceBufferInfo: Map<RenderPass, {
-        bindGroup: CachedBindGroup;
-        offset: number;
-    }>;
     // @internal (undocumented)
     protected _instanceColor: Vector4;
     // @internal (undocumented)
@@ -1989,11 +1997,6 @@ export class Mesh extends Mesh_base implements BatchDrawable {
     set primitive(prim: Primitive);
     setAnimatedBoundingBox(bbox: BoundingBox): void;
     setBoneMatrices(matrices: Texture2D): void;
-    // Warning: (ae-incompatible-release-tags) The symbol "setInstanceDataBuffer" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
-    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: No member was found with name "setInstanceDataBuffer"
-    //
-    // (undocumented)
-    setInstanceDataBuffer(renderPass: RenderPass, bindGroup: CachedBindGroup, offset: number): void;
     setInvBindMatrix(matrix: Matrix4x4): void;
 }
 
@@ -2229,6 +2232,22 @@ export enum OctreePlacement {
     PPN = 1,
     // (undocumented)
     PPP = 0
+}
+
+// @public
+export abstract class OIT {
+    abstract applyUniforms(ctx: DrawContext, bindGroup: BindGroup): any;
+    abstract begin(ctx: DrawContext): number;
+    abstract beginPass(ctx: DrawContext, pass: number): boolean;
+    abstract calculateHash(): string;
+    abstract dispose(): void;
+    abstract end(ctx: DrawContext): any;
+    abstract endPass(ctx: DrawContext, pass: number): any;
+    abstract getType(): string;
+    abstract outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp): boolean;
+    abstract setRenderStates(rs: RenderStateSet): any;
+    abstract setupFragmentOutput(scope: PBGlobalScope): any;
+    abstract supportDevice(deviceType: string): boolean;
 }
 
 // @public
@@ -2772,8 +2791,6 @@ export interface RenderItemListInfo {
 // @public
 export abstract class RenderPass {
     constructor(type: number);
-    // @internal (undocumented)
-    applyRenderStates(device: AbstractDevice, stateSet: RenderStateSet, ctx: DrawContext): void;
     get clearColor(): Vector4;
     set clearColor(color: Vector4);
     // @internal (undocumented)
@@ -2791,25 +2808,19 @@ export abstract class RenderPass {
     // @internal (undocumented)
     protected drawItem(device: AbstractDevice, item: RenderQueueItem, ctx: DrawContext, reverseWinding: boolean): void;
     // @internal (undocumented)
-    protected drawItemList(device: AbstractDevice, itemList: RenderItemListInfo, ctx: DrawContext, reverseWinding: boolean): void;
+    protected drawItemList(itemList: RenderItemListInfo, ctx: DrawContext, reverseWinding: boolean): void;
     // @internal (undocumented)
     protected drawScene(ctx: DrawContext, cullCamera: Camera, renderQueue?: RenderQueue): void;
+    // @internal (undocumented)
+    protected getGlobalBindGroup(ctx: DrawContext): BindGroup;
     // @internal (undocumented)
     getGlobalBindGroupHash(ctx: DrawContext): string;
     // @internal (undocumented)
     protected abstract _getGlobalBindGroupHash(ctx: DrawContext): any;
     // @internal (undocumented)
-    protected getGlobalBindGroupInfo(ctx: DrawContext): {
-        bindGroup: BindGroup;
-        layout: BindGroupLayout;
-    };
+    protected _globalBindGroups: Record<string, BindGroup>;
     // @internal (undocumented)
-    protected _globalBindGroups: Record<string, {
-        bindGroup: BindGroup;
-        layout: BindGroupLayout;
-    }>;
-    // @internal (undocumented)
-    isAutoFlip(): boolean;
+    isAutoFlip(ctx: DrawContext): boolean;
     render(ctx: DrawContext, cullCamera?: Camera, renderQueue?: RenderQueue): void;
     // @internal (undocumented)
     protected abstract renderItems(ctx: DrawContext, renderQueue: RenderQueue): any;
@@ -2822,9 +2833,13 @@ export abstract class RenderPass {
 export class RenderQueue {
     // Warning: (ae-incompatible-release-tags) The symbol "__constructor" is marked as @public, but its signature references "InstanceBindGroupAllocator" which is marked as @internal
     constructor(renderPass: RenderPass, bindGroupAllocator?: InstanceBindGroupAllocator);
+    // Warning: (ae-incompatible-release-tags) The symbol "binaryInsert" is marked as @public, but its signature references "RenderQueueItem" which is marked as @internal
+    //
+    // (undocumented)
+    binaryInsert(itemList: RenderQueueItem[], item: RenderQueueItem): void;
     // @internal (undocumented)
     dispose(): void;
-    // (undocumented)
+    // @internal (undocumented)
     end(camera: Camera, createRenderBundles?: boolean): this;
     // Warning: (ae-incompatible-release-tags) The symbol "getInstanceInfo" is marked as @public, but its signature references "DrawableInstanceInfo" which is marked as @internal
     getInstanceInfo(drawable: Drawable): DrawableInstanceInfo;
@@ -2840,7 +2855,7 @@ export class RenderQueue {
     get renderPass(): RenderPass;
     reset(): void;
     get shadowedLights(): PunctualLight[];
-    sortItems(): void;
+    sortTransparentItems(cameraPos: Vector3): void;
     get sunLight(): DirectionalLight;
     set sunLight(light: DirectionalLight);
     get unshadowedLights(): PunctualLight[];
@@ -2866,29 +2881,6 @@ export interface RenderQueueItem {
 export interface RenderQueueRef {
     // (undocumented)
     ref: RenderQueue;
-}
-
-// @public
-export abstract class RenderScheme {
-    constructor();
-    get currentScene(): Scene;
-    // @internal (undocumented)
-    protected _currentScene: Scene;
-    dispose(): void;
-    // @internal (undocumented)
-    protected abstract _dispose(): void;
-    // @internal (undocumented)
-    protected _enableDepthPass: boolean;
-    getShadowMapFormat(): TextureFormat;
-    renderScene(scene: Scene, camera: Camera, compositor?: Compositor): void;
-    // @internal (undocumented)
-    protected abstract _renderScene(ctx: DrawContext): void;
-    get requireDepthPass(): boolean;
-    set requireDepthPass(val: boolean);
-    // @internal (undocumented)
-    abstract setClearParams(color: Vector4, depth: number, stencil: number): void;
-    // @internal (undocumented)
-    protected _shadowMapFormat: TextureFormat;
 }
 
 // @public
@@ -3190,8 +3182,6 @@ export class ShaderHelper {
     static getShadowCameraParams(scope: PBInsideFunctionScope): PBShaderExp;
     static getShadowMap(scope: PBInsideFunctionScope): PBShaderExp;
     // @internal (undocumented)
-    static getSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp;
-    // @internal (undocumented)
     static getSunLightDir(scope: PBInsideFunctionScope): PBShaderExp;
     static getViewMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     static getViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp;
@@ -3265,8 +3255,6 @@ export type ShadowMapParams = {
 export class ShadowMapPass extends RenderPass {
     constructor();
     // @internal (undocumented)
-    applyRenderStates(device: AbstractDevice, stateSet: RenderStateSet, ctx: DrawContext): void;
-    // @internal (undocumented)
     protected _currentLight: PunctualLight;
     // @internal (undocumented)
     protected _getGlobalBindGroupHash(ctx: DrawContext): string;
@@ -3274,8 +3262,6 @@ export class ShadowMapPass extends RenderPass {
     set light(light: PunctualLight);
     // @internal (undocumented)
     protected renderItems(ctx: DrawContext, renderQueue: RenderQueue): void;
-    // @internal (undocumented)
-    protected _stateOverriden: RenderStateSet;
 }
 
 // @public
@@ -3633,8 +3619,6 @@ export class Terrain extends GraphNode {
     set maxPixelError(val: number);
     get normalMap(): Texture2D;
     // @internal (undocumented)
-    get overridenStateSet(): RenderStateSet;
-    // @internal (undocumented)
     get patchSize(): number;
     // @internal (undocumented)
     get quadtree(): Quadtree;
@@ -3785,7 +3769,9 @@ export class TerrainPatch extends TerrainPatch_base implements Drawable {
     sqrDistanceToPoint(point: Vector3): number;
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "TerrainPatchBase" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export class TerrainPatchBase {
     constructor(terrain: Terrain);
     // (undocumented)
@@ -3980,6 +3966,8 @@ export class WaterMesh {
     get foamWidth(): number;
     set foamWidth(val: number);
     // (undocumented)
+    getClipmapBindGroup(device: AbstractDevice): BindGroup;
+    // (undocumented)
     getWaveCroppiness(cascade: number): number;
     // (undocumented)
     getWaveLength(cascade: number): number;
@@ -4028,6 +4016,23 @@ export interface WaterShaderImpl {
     setupUniforms(scope: PBGlobalScope): void;
     // (undocumented)
     shading(scope: PBInsideFunctionScope, worldPos: PBShaderExp, worldNormal: PBShaderExp, foamFactor: PBShaderExp): PBShaderExp;
+}
+
+// @public
+export class WeightedBlendedOIT extends OIT {
+    constructor();
+    applyUniforms(ctx: DrawContext, bindGroup: BindGroup): void;
+    begin(ctx: DrawContext): number;
+    beginPass(ctx: DrawContext, pass: number): boolean;
+    calculateHash(): string;
+    dispose(): void;
+    end(ctx: DrawContext): void;
+    endPass(ctx: DrawContext, pass: number): void;
+    getType(): string;
+    outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp): boolean;
+    setRenderStates(rs: RenderStateSet): void;
+    setupFragmentOutput(scope: PBGlobalScope): void;
+    supportDevice(deviceType: string): boolean;
 }
 
 // @public
@@ -4106,10 +4111,6 @@ export class XForm<T extends XForm<T> = XForm<any>> extends XForm_base {
     // (undocumented)
     worldToThis(v: Vector4, result?: Vector4): Vector4;
 }
-
-// Warnings were encountered during analysis:
-//
-// dist/index.d.ts:3910:9 - (ae-incompatible-release-tags) The symbol "bindGroup" is marked as @public, but its signature references "CachedBindGroup" which is marked as @internal
 
 // (No @packageDocumentation comment for this package)
 

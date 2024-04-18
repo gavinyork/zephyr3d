@@ -1,6 +1,6 @@
 import * as zip from '@zip.js/zip.js';
 import { Vector4, Vector3 } from '@zephyr3d/base';
-import { SceneNode, Scene, AnimationSet, BatchGroup, PostWater, WeightedBlendedOIT } from '@zephyr3d/scene';
+import { SceneNode, Scene, AnimationSet, BatchGroup, PostWater, WeightedBlendedOIT, OIT, ABufferOIT } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
 import {
   BoundingBox,
@@ -27,6 +27,7 @@ export class GLTFViewer {
   private _bloom: Bloom;
   private _fxaa: FXAA;
   private _water: PostWater;
+  private _oit: OIT;
   private _doTonemap: boolean;
   private _doBloom: boolean;
   private _doFXAA: boolean;
@@ -38,17 +39,16 @@ export class GLTFViewer {
   private _nearPlane: number;
   private _envMaps: EnvMaps;
   private _batchGroup: BatchGroup;
-  //private _ui: UI;
   private _ui: Panel;
   private _compositor: Compositor;
   constructor(scene: Scene) {
+    const device = Application.instance.device;
     this._currentAnimation = null;
     this._modelNode = null;
     this._animationSet = null;
     this._scene = scene;
     this._envMaps = new EnvMaps();
     this._batchGroup = new BatchGroup(scene);
-    //this._ui = new UI(this);
     this._assetManager = new AssetManager();
     this._tonemap = new Tonemap();
     this._water = new PostWater(0);
@@ -60,6 +60,7 @@ export class GLTFViewer {
     this._doBloom = true;
     this._doFXAA = true;
     this._doWater = false;
+    this._oit = new WeightedBlendedOIT();
     this._fov = Math.PI / 3;
     this._nearPlane = 1;
     this._compositor = new Compositor();
@@ -69,12 +70,12 @@ export class GLTFViewer {
     this._camera = new PerspectiveCamera(
       scene,
       Math.PI / 3,
-      Application.instance.device.getDrawingBufferWidth() /
-        Application.instance.device.getDrawingBufferHeight(),
+      device.getDrawingBufferWidth() /
+        device.getDrawingBufferHeight(),
       1,
       160
     );
-    this._camera.oit = new WeightedBlendedOIT();
+    this._camera.oit = this._oit;
     this._camera.position.setXYZ(0, 0, 15);
     this._camera.controller = new OrbitCameraController();
     this._light0 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
@@ -211,6 +212,22 @@ export class GLTFViewer {
   }
   FXAAEnabled(): boolean {
     return this._doFXAA;
+  }
+  getOITType(): string {
+    return this._oit?.getType() ?? '';
+  }
+  setOITType(val: string) {
+    if (this._oit?.getType() !== val) {
+      this._oit?.dispose();
+      if (val === WeightedBlendedOIT.type) {
+        this._oit = new WeightedBlendedOIT();
+      } else if (val === ABufferOIT.type) {
+        this._oit = new ABufferOIT();
+      } else {
+        this._oit = null;
+      }
+      this._camera.oit = this._oit;
+    }
   }
   syncPostEffects() {
     this._compositor.clear();

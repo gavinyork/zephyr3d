@@ -14,33 +14,69 @@ import type { DrawContext } from './drawable';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { Vector4 } from '@zephyr3d/base';
 
+/**
+ * Weighted-blended OIT renderer.
+ *
+ * @remarks
+ * The weighed-blended OIT renderer supports both WebGL, WebGL2 and WebGPU device.
+ *
+ * @public
+ */
 export class WeightedBlendedOIT extends OIT {
+  /** Type name of WeightedBlendedOIT */
   public static readonly type = 'wb';
   private static _compositeProgram: GPUProgram;
   private static _compositeBindGroup: BindGroup;
   private static _compositeRenderStates: RenderStateSet;
   private _accumBuffer: FrameBuffer;
+  /**
+   * Creates an instance of WeightedBlendedOIT class.
+   */
   constructor() {
     super();
     this._accumBuffer = null;
   }
+  /**
+   * {@inheritDoc OIT.getType}
+   */
   getType(): string {
     return WeightedBlendedOIT.type;
   }
+  /**
+   * {@inheritDoc OIT.supportDevice}
+   */
   supportDevice(deviceType: string): boolean {
     return true;
   }
+  /**
+   * {@inheritDoc OIT.dispose}
+   */
+  dispose() {
+    return;
+  }
+  /**
+   * {@inheritDoc OIT.begin}
+   */
   begin(ctx: DrawContext): number {
     return 1;
   }
+  /**
+   * {@inheritDoc OIT.end}
+   */
   end(ctx: DrawContext) {
     return;
   }
+  /**
+   * {@inheritDoc OIT.setupFragmentOutput}
+   */
   setupFragmentOutput(scope: PBGlobalScope) {
     const pb = scope.$builder;
     scope.$outputs.outColor = pb.vec4();
     scope.$outputs.outAlpha = pb.getDevice().type === 'webgl' ? pb.vec4() : pb.float();
   }
+  /**
+   * {@inheritDoc OIT.beginPass}
+   */
   beginPass(ctx: DrawContext, pass: number): boolean {
     const device = ctx.device;
     const accumBuffer = this.getAccumFramebuffer(ctx, device);
@@ -49,6 +85,9 @@ export class WeightedBlendedOIT extends OIT {
     device.clearFrameBuffer(new Vector4(0, 0, 0, 1), null, null);
     return true;
   }
+  /**
+   * {@inheritDoc OIT.endPass}
+   */
   endPass(ctx: DrawContext, pass: number) {
     const device = ctx.device;
     const accumBuffer = device.getFramebuffer();
@@ -56,12 +95,21 @@ export class WeightedBlendedOIT extends OIT {
     const accumTargets = accumBuffer.getColorAttachments();
     this.composite(ctx, device, accumTargets[0] as Texture2D, accumTargets[1] as Texture2D);
   }
+  /**
+   * {@inheritDoc OIT.calculateHash}
+   */
   calculateHash(): string {
     return this.getType();
   }
+  /**
+   * {@inheritDoc OIT.applyUniforms}
+   */
   applyUniforms(ctx: DrawContext, bindGroup: BindGroup) {
     return;
   }
+  /**
+   * {@inheritDoc OIT.outputFragmentColor}
+   */
   outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp) {
     const pb = scope.$builder;
     pb.func('Z_WBOIT_depthWeight', [pb.float('z'), pb.float('a')], function () {
@@ -88,6 +136,9 @@ export class WeightedBlendedOIT extends OIT {
     scope.Z_WBOIT_output(color);
     return true;
   }
+  /**
+   * {@inheritDoc OIT.setRenderStates}
+   */
   setRenderStates(rs: RenderStateSet) {
     const blendingState = rs.useBlendingState();
     blendingState.enable(true);
@@ -97,6 +148,7 @@ export class WeightedBlendedOIT extends OIT {
     const depthState = rs.useDepthState();
     depthState.enableWrite(false).enableTest(true);
   }
+  /** @internal */
   private composite(ctx: DrawContext, device: AbstractDevice, accumColor: Texture2D, accumAlpha: Texture2D) {
     device.setProgram(WeightedBlendedOIT.getCompositeProgram(device));
     WeightedBlendedOIT._compositeBindGroup.setTexture('accumColorTex', accumColor);
@@ -104,6 +156,7 @@ export class WeightedBlendedOIT extends OIT {
     device.setBindGroup(0, WeightedBlendedOIT._compositeBindGroup);
     drawFullscreenQuad(WeightedBlendedOIT._compositeRenderStates);
   }
+  /** @internal */
   private getAccumFramebuffer(ctx: DrawContext, device: AbstractDevice) {
     const vp = device.getViewport();
     const width = device.screenToDevice(vp.width);
@@ -129,6 +182,7 @@ export class WeightedBlendedOIT extends OIT {
     }
     return this._accumBuffer;
   }
+  /** @internal */
   private static getCompositeProgram(device: AbstractDevice) {
     if (!this._compositeProgram) {
       this._compositeProgram = device.buildRenderProgram({
