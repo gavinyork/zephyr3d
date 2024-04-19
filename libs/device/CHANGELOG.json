@@ -2,6 +2,21 @@
   "name": "@zephyr3d/device",
   "entries": [
     {
+      "version": "0.2.2",
+      "tag": "@zephyr3d/device_v0.2.2",
+      "date": "Fri, 19 Apr 2024 18:09:58 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Implement uniform buffer with dynamic offset"
+          },
+          {
+            "comment": "Add render bundle support"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.1",
       "tag": "@zephyr3d/device_v0.2.1",
       "date": "Tue, 19 Mar 2024 19:55:21 GMT",

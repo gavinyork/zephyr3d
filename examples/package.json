@@ -58,9 +58,9 @@
     "colors": "^1.4.0",
     "diff": "^5.0.0",
     "@zephyr3d/base": "workspace:^0.1.3",
-    "@zephyr3d/device": "workspace:^0.2.1",
+    "@zephyr3d/device": "workspace:^0.2.2",
     "@zephyr3d/imgui": "workspace:^0.1.3",
-    "@zephyr3d/backend-webgl": "workspace:^0.1.4",
-    "@zephyr3d/backend-webgpu": "workspace:^0.1.4"
+    "@zephyr3d/backend-webgl": "workspace:^0.1.5",
+    "@zephyr3d/backend-webgpu": "workspace:^0.1.5"
   }
 }

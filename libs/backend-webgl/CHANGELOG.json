@@ -2,6 +2,26 @@
   "name": "@zephyr3d/backend-webgl",
   "entries": [
     {
+      "version": "0.1.5",
+      "tag": "@zephyr3d/backend-webgl_v0.1.5",
+      "date": "Fri, 19 Apr 2024 18:09:58 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "implement render bundle"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.1` to `^0.2.2`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.1` to `^0.2.2`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.4",
       "tag": "@zephyr3d/backend-webgl_v0.1.4",
       "date": "Tue, 19 Mar 2024 19:55:21 GMT",

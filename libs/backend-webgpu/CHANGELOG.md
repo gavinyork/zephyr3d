@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/backend-webgpu
 
-This log was last generated on Tue, 19 Mar 2024 19:55:21 GMT and should not be manually modified.
+This log was last generated on Fri, 19 Apr 2024 18:09:58 GMT and should not be manually modified.
+
+## 0.1.5
+Fri, 19 Apr 2024 18:09:58 GMT
+
+### Patches
+
+- Add render bundle support
 
 ## 0.1.4
 Tue, 19 Mar 2024 19:55:21 GMT

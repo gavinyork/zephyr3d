@@ -1,6 +1,17 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Fri, 22 Mar 2024 12:38:57 GMT and should not be manually modified.
+This log was last generated on Fri, 19 Apr 2024 18:09:58 GMT and should not be manually modified.
+
+## 0.4.0
+Fri, 19 Apr 2024 18:09:58 GMT
+
+### Minor changes
+
+- Add support for command buffer reuse optimization
+
+### Patches
+
+- Improve rendering performance for geometry instancing
 
 ## 0.3.1
 Fri, 22 Mar 2024 12:38:57 GMT
