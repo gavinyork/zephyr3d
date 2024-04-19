@@ -842,6 +842,10 @@ export class Camera extends SceneNode {
     set clipPlane(plane: Plane);
     // @internal (undocumented)
     protected _clipPlane: Plane;
+    get commandBufferReuse(): boolean;
+    set commandBufferReuse(val: boolean);
+    // @internal (undocumented)
+    protected _commandBufferReuse: boolean;
     // @internal (undocumented)
     protected _compute(): void;
     // @internal (undocumented)
