@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Add render bundle support",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}
