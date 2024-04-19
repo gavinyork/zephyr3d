@@ -87,7 +87,13 @@ this attribute is added, the material will automatically call the createInstance
 
 ```
 
-## Important Notice:
+## Transparent Objects
 
-**Do not invoke the createInstance method of a material if instance rendering is not required. This is because createInstance creates a Proxy of the original material, and the Proxy's get() method is very slow, significantly impacting performance.**
+In most cases, transparent objects need to be rendered from far to near, but if geometry instancing is used,
+distance sorting is not possible. When using geometry instancing for transparent objects, it is recommended
+to use Order-Independent Transparency (OIT) rendering techniques. We currently support two OIT rendering methods:
 
+1. Weighted Blended, suitable for WebGL, WebGL2, and WebGPU devices
+2. Per-Pixel Linked List, only applicable to WebGPU devices
+
+For more details, refer to: [OIT Rendering](en/oit.md)

@@ -43,7 +43,7 @@
 
 |  Function | Description |
 |  --- | --- |
-|  [applyMixins(derivedCtor, baseCtors)](doc/markdown/./base.applymixins.md) | <p>Applies mixins to a constructor function.</p><p>This function takes a constructor function of a class (derivedCtor) and an array of constructor functions from which to inherit or "mix in" properties and methods. It effectively adds the properties and methods from the base constructors (baseCtors) to the prototype of the derived constructor, allowing the derived class to inherit features from multiple sources.</p> |
+|  [applyMixins(target, mixins)](doc/markdown/./base.applymixins.md) | Applies mixins to a constructor function. |
 |  [floatToHalf(val)](doc/markdown/./base.floattohalf.md) | Converts float value to half float |
 |  [halfToFloat(val)](doc/markdown/./base.halftofloat.md) | Converts half float value to float |
 |  [isPowerOf2(value)](doc/markdown/./base.ispowerof2.md) | Check if a number is a power of 2. |
@@ -71,6 +71,8 @@
 |  [EventListener\_2](doc/markdown/./base.eventlistener_2.md) | Event handler type |
 |  [EventMap](doc/markdown/./base.eventmap.md) | Mapping table of event types and their constructors |
 |  [EventType](doc/markdown/./base.eventtype.md) | Get the constructor type bye event type |
+|  [ExtractMixinReturnType](doc/markdown/./base.extractmixinreturntype.md) | Extract mixin return type |
+|  [ExtractMixinType](doc/markdown/./base.extractmixintype.md) | Extract mixin type |
 |  [GenericConstructor](doc/markdown/./base.genericconstructor.md) | A generic constructor type |
 |  [InterpolationMode](doc/markdown/./base.interpolationmode.md) | The interpolation mode |
 |  [InterpolationTarget](doc/markdown/./base.interpolationtarget.md) | Target of interpolation |
@@ -78,4 +80,5 @@
 |  [REventHandlerOptions](doc/markdown/./base.reventhandleroptions.md) | Options of event handler |
 |  [TypedArray](doc/markdown/./base.typedarray.md) | Typed array |
 |  [TypedArrayConstructor](doc/markdown/./base.typedarrayconstructor.md) | Type of a typed array constructor |
+|  [UnionToIntersection](doc/markdown/./base.uniontointersection.md) | Convert union type to intersection |
 

@@ -9,15 +9,8 @@ Calculates the hash code of the shader program
 **Signature:**
 
 ```typescript
-protected _createHash(renderPassType: number): string;
+protected _createHash(): string;
 ```
-
-## Parameters
-
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  renderPassType | number |  |
-
 **Returns:**
 
 string

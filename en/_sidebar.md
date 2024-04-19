@@ -48,6 +48,8 @@
     - [Water](en/water.md)
   - Geometry instancing
     - [Introduction](en/instancing-intro.md)
+  - Order-Independent Transparency
+    - [Introduction](en/oit.md)
   - Multi-viewport Rendering
     - [Introduction](en/multi-views.md)
   - Custom material

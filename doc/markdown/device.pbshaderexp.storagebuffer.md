@@ -9,7 +9,7 @@ Point out that the variable should be a storage buffer
 **Signature:**
 
 ```typescript
-storageBuffer(group: number): PBShaderExp;
+storageBuffer(group: number, bindingSize?: number): PBShaderExp;
 ```
 
 ## Parameters
@@ -17,6 +17,7 @@ storageBuffer(group: number): PBShaderExp;
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  group | number | The bind group index |
+|  bindingSize | number | _(Optional)_ |
 
 **Returns:**
 

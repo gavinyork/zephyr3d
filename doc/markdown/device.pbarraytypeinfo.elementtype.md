@@ -9,5 +9,5 @@ Get the element type
 **Signature:**
 
 ```typescript
-get elementType(): PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo;
+get elementType(): PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo;
 ```

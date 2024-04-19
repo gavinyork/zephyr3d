@@ -9,7 +9,7 @@ Point out that the variable should be an uniform buffer
 **Signature:**
 
 ```typescript
-uniformBuffer(group: number): PBShaderExp;
+uniformBuffer(group: number, bindingSize?: number): PBShaderExp;
 ```
 
 ## Parameters
@@ -17,6 +17,7 @@ uniformBuffer(group: number): PBShaderExp;
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  group | number | The bind group index |
+|  bindingSize | number | _(Optional)_ |
 
 **Returns:**
 

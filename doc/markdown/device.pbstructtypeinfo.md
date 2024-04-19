@@ -32,6 +32,7 @@ declare class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail>
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
 |  [extends(name, members)](doc/markdown/./device.pbstructtypeinfo.extends.md) |  | Creates a new struct type by extending this type |
+|  [haveAtomicMembers()](doc/markdown/./device.pbstructtypeinfo.haveatomicmembers.md) |  | Whether this struct has atomic members |
 |  [isStructType()](doc/markdown/./device.pbstructtypeinfo.isstructtype.md) |  | returns true if this is a struct type |
 |  [toBufferLayout(offset, layout)](doc/markdown/./device.pbstructtypeinfo.tobufferlayout.md) |  | Creates a buffer layout from this type |
 

@@ -95,6 +95,8 @@
           <li id="demo-3"><span>Terrain</span><img src="./media/terrain.jpg" alt="Terrain"></li>
           <li id="demo-5"><span>Instancing</span><img src="./media/instancing.jpg" alt="Instancing"></li>
           <li id="demo-4"><span>Physics</span><img src="./media/physics.jpg" alt="Physics"></li>
+          <li id="demo-6" dev="webgpu"><span>CommandBuffer Reuse</span><img src="./media/commandbufferreuse.jpg" alt="Command buffer reuse"></li>
+          <li id="demo-7" dev="webgpu"><span>OIT</span><img src="./media/oit.jpg" alt="Order-independent-transparency"></li>
         </ul>
       </nav>
       <iframe class="maximized fit" style="border-width: 0" title="render window" scrolling="no"></iframe>
@@ -103,7 +105,8 @@
       const iframe = document.querySelector('iframe');
       const linkCallback = function () {
         const id = this.id;
-        iframe.src = 'tut/' + id + '.html' + '?dev=webgl2&ui=1';
+        const dev = this.getAttribute('dev');
+        iframe.src = 'tut/' + id + '.html' + '?dev=' + (dev || 'webgl2') + '&ui=1';
         const links = document.querySelectorAll('li');
         for (const link of links) {
           if (link === this) {

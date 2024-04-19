@@ -4,7 +4,7 @@
 
 ## RenderStateSet.copyFrom() method
 
-Creates a new RenderStateSet by copying this one
+Shallow copy existing RenderStateSet object to this
 
 **Signature:**
 

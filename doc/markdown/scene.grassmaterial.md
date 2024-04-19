@@ -23,9 +23,12 @@ declare class GrassMaterial extends GrassMaterial_base
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
+|  [apply(ctx)](doc/markdown/./scene.grassmaterial.apply.md) |  |  |
 |  [applyUniformValues(bindGroup, ctx, pass)](doc/markdown/./scene.grassmaterial.applyuniformvalues.md) |  |  |
 |  [fragmentShader(scope)](doc/markdown/./scene.grassmaterial.fragmentshader.md) |  |  |
 |  [isTransparentPass(pass)](doc/markdown/./scene.grassmaterial.istransparentpass.md) |  | Determine if a certain pass of this material is translucent. |
+|  [supportInstancing()](doc/markdown/./scene.grassmaterial.supportinstancing.md) |  | Returns true if this material supports geometry instancing |
 |  [supportLighting()](doc/markdown/./scene.grassmaterial.supportlighting.md) |  | Returns true if shading of the material will be affected by lights |
+|  [updateRenderStates(pass, stateSet, ctx)](doc/markdown/./scene.grassmaterial.updaterenderstates.md) | <code>protected</code> |  |
 |  [vertexShader(scope)](doc/markdown/./scene.grassmaterial.vertexshader.md) |  |  |
 

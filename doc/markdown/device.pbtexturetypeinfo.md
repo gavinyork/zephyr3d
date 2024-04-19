@@ -23,10 +23,10 @@ declare class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail>
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
-|  [readable](doc/markdown/./device.pbtexturetypeinfo.readable.md) | <code>readonly</code> | boolean | Returns true if this is a readable storage texture type |
+|  [readable](doc/markdown/./device.pbtexturetypeinfo.readable.md) |  | boolean | Returns true if this is a readable storage texture type |
 |  [storageTexelFormat](doc/markdown/./device.pbtexturetypeinfo.storagetexelformat.md) | <code>readonly</code> | [TextureFormat](doc/markdown/./device.textureformat.md) | Get texture format if this is a storage texture |
 |  [textureType](doc/markdown/./device.pbtexturetypeinfo.texturetype.md) | <code>readonly</code> | [PBTextureType](doc/markdown/./device.pbtexturetype.md) | Get the texture type |
-|  [writable](doc/markdown/./device.pbtexturetypeinfo.writable.md) | <code>readonly</code> | boolean | Returns true if this is a writable storage texture type |
+|  [writable](doc/markdown/./device.pbtexturetypeinfo.writable.md) |  | boolean | Returns true if this is a writable storage texture type |
 
 ## Methods
 

@@ -4,7 +4,7 @@
 
 ## ProgramBuilder.intBitsToFloat() method
 
-Same as intBitsToFloat builtin function in GLSL, only valid for WebGL2 device
+Same as intBitsToFloat builtin function in GLSL, only valid for WebGL2 device and WebGPU device
 
 **Signature:**
 

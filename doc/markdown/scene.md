@@ -9,6 +9,7 @@
 |  Class | Description |
 |  --- | --- |
 |  [AABBTree](doc/markdown/./scene.aabbtree.md) | Axis-Aligned Bounding Box Tree |
+|  [ABufferOIT](doc/markdown/./scene.abufferoit.md) | per-pixel linked list OIT renderer using ABuffer. |
 |  [AnimationClip](doc/markdown/./scene.animationclip.md) | Animation that contains multiple tracks |
 |  [AnimationSet](doc/markdown/./scene.animationset.md) | Animation set |
 |  [Application](doc/markdown/./scene.application.md) | Application class |
@@ -86,6 +87,7 @@
 |  [TranslationTrack](doc/markdown/./scene.translationtrack.md) | Translate animation track |
 |  [UnlitMaterial](doc/markdown/./scene.unlitmaterial.md) | Unlit material |
 |  [UserTrack](doc/markdown/./scene.usertrack.md) | User-defined animation track |
+|  [WeightedBlendedOIT](doc/markdown/./scene.weightedblendedoit.md) | Weighted-blended OIT renderer. |
 |  [XForm](doc/markdown/./scene.xform.md) | Presents a transformation from one space to another |
 
 ## Abstract Classes
@@ -97,9 +99,9 @@
 |  [BaseLight](doc/markdown/./scene.baselight.md) | Base class for any kind of light node |
 |  [Blitter](doc/markdown/./scene.blitter.md) | Base class for any kind of blitters |
 |  [EnvironmentLighting](doc/markdown/./scene.environmentlighting.md) | Base class for any kind of environment light |
+|  [OIT](doc/markdown/./scene.oit.md) | <p>Abstract class for order-independent transparency renderers.</p><p>Order-independent transparency (OIT) renderers allow for rendering of transparent objects in any order, regardless of their depth.</p><p>This abstract class defines the common interface for all OIT renderers. Specific implementations of OIT renderers should extend this class and provide concrete implementations for the abstract methods.</p> |
 |  [PunctualLight](doc/markdown/./scene.punctuallight.md) | Base class for any kind of puncual light |
 |  [RenderPass](doc/markdown/./scene.renderpass.md) | Base class for any kind of render passes |
-|  [RenderScheme](doc/markdown/./scene.renderscheme.md) | Base class for any kind of render scheme |
 |  [Shape](doc/markdown/./scene.shape.md) | Abstract base class for any kind of shapes |
 
 ## Enumerations
@@ -178,7 +180,6 @@
 |  [MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md) | Texture information for model loading |
 |  [OrbitCameraControllerOptions](doc/markdown/./scene.orbitcameracontrolleroptions.md) | Creation options for OrbitCameraController |
 |  [PlaneCreationOptions](doc/markdown/./scene.planecreationoptions.md) | Creation options for plane shapes |
-|  [RenderQueueItem](doc/markdown/./scene.renderqueueitem.md) | Render queue item |
 |  [SceneNodeVisitor](doc/markdown/./scene.scenenodevisitor.md) | Base interface for all scene node visitors |
 |  [ShapeCreationOptions](doc/markdown/./scene.shapecreationoptions.md) | Base class for creation options of any kind of shapes |
 |  [SkinnedBoundingBox](doc/markdown/./scene.skinnedboundingbox.md) | Bounding box information for a skeleton |
@@ -222,7 +223,6 @@
 |  [IMixinPBRMetallicRoughness](doc/markdown/./scene.imixinpbrmetallicroughness.md) | Interface for PBRMetallicRoughness lighting model mixin |
 |  [IMixinPBRSpecularGlossiness](doc/markdown/./scene.imixinpbrspecularglossiness.md) | Interface for PBRSpecularGlossiness mixin |
 |  [LogMode](doc/markdown/./scene.logmode.md) | Log mode |
-|  [MaterialGCOptions](doc/markdown/./scene.materialgcoptions.md) | Garbage collection options for material |
 |  [ModelFetchOptions](doc/markdown/./scene.modelfetchoptions.md) | Options for model fetching |
 |  [ModelInfo](doc/markdown/./scene.modelinfo.md) | Data structure returned by AssetManager.fetchModel() |
 |  [NumberTrackHandler](doc/markdown/./scene.numbertrackhandler.md) | Track handler type for numeric or vector keyframe values |
@@ -237,5 +237,4 @@
 |  [TextureProp](doc/markdown/./scene.textureprop.md) | TextureProp |
 |  [TexturePropUniforms](doc/markdown/./scene.texturepropuniforms.md) | TexturePropUniforms |
 |  [ToMixedTextureType](doc/markdown/./scene.tomixedtexturetype.md) | ToMixedTextureType |
-|  [UnionToIntersection](doc/markdown/./scene.uniontointersection.md) | Convert union type to intersection |
 

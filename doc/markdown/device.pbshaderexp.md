@@ -37,9 +37,11 @@ declare class PBShaderExp extends Proxiable<PBShaderExp>
 |  [sampleType(type)](doc/markdown/./device.pbshaderexp.sampletype.md) |  | Set sample type for the variable if the variable is of type texture |
 |  [setAt(index, val)](doc/markdown/./device.pbshaderexp.setat.md) |  | Set element in the array by index |
 |  [storage(group)](doc/markdown/./device.pbshaderexp.storage.md) |  | Point out that the variable should be in storage address space |
-|  [storageBuffer(group)](doc/markdown/./device.pbshaderexp.storagebuffer.md) |  | Point out that the variable should be a storage buffer |
+|  [storageBuffer(group, bindingSize)](doc/markdown/./device.pbshaderexp.storagebuffer.md) |  | Point out that the variable should be a storage buffer |
+|  [storageBufferReadonly(group, bindingSize)](doc/markdown/./device.pbshaderexp.storagebufferreadonly.md) |  | Point out that the variable is read-only and should be a storage buffer |
+|  [storageReadonly(group)](doc/markdown/./device.pbshaderexp.storagereadonly.md) |  | Point out that the variable is read-only and should be in storage address space |
 |  [tag(args)](doc/markdown/./device.pbshaderexp.tag.md) |  | Create tags for the variable |
 |  [uniform(group)](doc/markdown/./device.pbshaderexp.uniform.md) |  | Point out that the variable should be in uniform address space |
-|  [uniformBuffer(group)](doc/markdown/./device.pbshaderexp.uniformbuffer.md) |  | Point out that the variable should be an uniform buffer |
+|  [uniformBuffer(group, bindingSize)](doc/markdown/./device.pbshaderexp.uniformbuffer.md) |  | Point out that the variable should be an uniform buffer |
 |  [workgroup()](doc/markdown/./device.pbshaderexp.workgroup.md) |  | Point out that the variable should be in workgroup address space |
 

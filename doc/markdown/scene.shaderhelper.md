@@ -49,7 +49,9 @@ declare class ShaderHelper
 |  [getFogParams(scope)](doc/markdown/./scene.shaderhelper.getfogparams.md) | <code>static</code> | Gets the uniform variable of type vec4 which holds the fog parameters |
 |  [getFogType(scope)](doc/markdown/./scene.shaderhelper.getfogtype.md) | <code>static</code> | Gets the uniform variable of type vec4 which holds the fog color |
 |  [getGlobalUniforms(scope)](doc/markdown/./scene.shaderhelper.getglobaluniforms.md) | <code>static</code> | Get global uniforms |
-|  [getInstanceBufferStrideUniformName()](doc/markdown/./scene.shaderhelper.getinstancebufferstrideuniformname.md) | <code>static</code> |  |
+|  [getInstanceDataOffsetUniformName()](doc/markdown/./scene.shaderhelper.getinstancedataoffsetuniformname.md) | <code>static</code> |  |
+|  [getInstanceDataStrideUniformName()](doc/markdown/./scene.shaderhelper.getinstancedatastrideuniformname.md) | <code>static</code> |  |
+|  [getInstanceDataUniformName()](doc/markdown/./scene.shaderhelper.getinstancedatauniformname.md) | <code>static</code> |  |
 |  [getInstancedUniform(scope, uniformIndex)](doc/markdown/./scene.shaderhelper.getinstanceduniform.md) | <code>static</code> | Gets the instance uniform value of type vec4 by uniform index |
 |  [getLightBufferUniformName()](doc/markdown/./scene.shaderhelper.getlightbufferuniformname.md) | <code>static</code> |  |
 |  [getNormalMatrix(scope)](doc/markdown/./scene.shaderhelper.getnormalmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the normal matrix of current object to be drawn |
@@ -57,7 +59,6 @@ declare class ShaderHelper
 |  [getShadowMap(scope)](doc/markdown/./scene.shaderhelper.getshadowmap.md) | <code>static</code> | Get shadow map uniform value |
 |  [getViewMatrix(scope)](doc/markdown/./scene.shaderhelper.getviewmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the view matrix of current camera |
 |  [getViewProjectionMatrix(scope)](doc/markdown/./scene.shaderhelper.getviewprojectionmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the view projection matrix of current camera |
-|  [getWorldMatricesUniformName()](doc/markdown/./scene.shaderhelper.getworldmatricesuniformname.md) | <code>static</code> |  |
 |  [getWorldMatrix(scope)](doc/markdown/./scene.shaderhelper.getworldmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the world matrix of current object to be drawn |
 |  [getWorldMatrixUniformName()](doc/markdown/./scene.shaderhelper.getworldmatrixuniformname.md) | <code>static</code> |  |
 |  [hasSkinning(scope)](doc/markdown/./scene.shaderhelper.hasskinning.md) | <code>static</code> | This function checks if the shader needs to process skeletal animation. |
@@ -70,4 +71,5 @@ declare class ShaderHelper
 |  [resolveVertexPosition(scope, pos)](doc/markdown/./scene.shaderhelper.resolvevertexposition.md) | <code>static</code> | Calculates the vertex position of type vec3 in object space |
 |  [resolveVertexTangent(scope, tangent)](doc/markdown/./scene.shaderhelper.resolvevertextangent.md) | <code>static</code> | Calculates the tangent vector of type vec3 in object space |
 |  [setClipSpacePosition(scope, pos)](doc/markdown/./scene.shaderhelper.setclipspaceposition.md) | <code>static</code> | Sets the clip space position in vertex shader |
+|  [vertexShaderDrawableStuff(scope, skinning, instanced)](doc/markdown/./scene.shaderhelper.vertexshaderdrawablestuff.md) | <code>static</code> | Vertex shader drawable stuff |
 

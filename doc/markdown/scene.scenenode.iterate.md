@@ -22,3 +22,7 @@ iterate(callback: (node: SceneNode) => void): void;
 
 void
 
+## Remarks
+
+DO NOT remove child duration iteration!
+

@@ -9,7 +9,7 @@ Update render states according to draw context and current material pass
 **Signature:**
 
 ```typescript
-protected updateRenderStates(pass: number, ctx: DrawContext): void;
+protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void;
 ```
 
 ## Parameters
@@ -17,6 +17,7 @@ protected updateRenderStates(pass: number, ctx: DrawContext): void;
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  pass | number | Current material pass |
+|  stateSet | [RenderStateSet](doc/markdown/./device.renderstateset.md) |  |
 |  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | Draw context |
 
 **Returns:**

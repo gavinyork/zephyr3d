@@ -22,6 +22,7 @@ declare abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetail
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
+|  [haveAtomicMembers()](doc/markdown/./device.pbtypeinfo.haveatomicmembers.md) |  | Wether this type have atomic members |
 |  [isAnyType()](doc/markdown/./device.pbtypeinfo.isanytype.md) |  | returns true if this is an any type |
 |  [isArrayType()](doc/markdown/./device.pbtypeinfo.isarraytype.md) |  | returns true if this is an array type |
 |  [isAtomicI32()](doc/markdown/./device.pbtypeinfo.isatomici32.md) |  | returns true if this is an atomic int type |

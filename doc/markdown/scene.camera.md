@@ -26,11 +26,14 @@ declare class Camera extends SceneNode
 |  [clearColor](doc/markdown/./scene.camera.clearcolor.md) |  | [Vector4](doc/markdown/./base.vector4.md) | Color value used to clear color buffer before rendering, if null, color buffer will not be cleared |
 |  [clipMask](doc/markdown/./scene.camera.clipmask.md) |  | number | Clip plane mask |
 |  [clipPlane](doc/markdown/./scene.camera.clipplane.md) |  | [Plane](doc/markdown/./base.plane.md) | Clip plane in camera space |
+|  [commandBufferReuse](doc/markdown/./scene.camera.commandbufferreuse.md) |  | boolean | Whether to allow command buffer reuse optimization |
 |  [controller](doc/markdown/./scene.camera.controller.md) |  | [BaseCameraController](doc/markdown/./scene.basecameracontroller.md) | The camera controller |
+|  [depthPrePass](doc/markdown/./scene.camera.depthprepass.md) |  | boolean | Whether to perform a depth pass |
 |  [framebuffer](doc/markdown/./scene.camera.framebuffer.md) |  | [FrameBuffer](doc/markdown/./device.framebuffer.md) | Framebuffer object into which the scene will be rendered |
 |  [frustum](doc/markdown/./scene.camera.frustum.md) | <code>readonly</code> | [Frustum](doc/markdown/./base.frustum.md) | Gets the frustum of the camera |
 |  [frustumViewSpace](doc/markdown/./scene.camera.frustumviewspace.md) | <code>readonly</code> | [Frustum](doc/markdown/./base.frustum.md) |  |
 |  [invViewProjectionMatrix](doc/markdown/./scene.camera.invviewprojectionmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The inverse-view-projection matrix of the camera |
+|  [oit](doc/markdown/./scene.camera.oit.md) |  | [OIT](doc/markdown/./scene.oit.md) | OIT |
 |  [sampleCount](doc/markdown/./scene.camera.samplecount.md) |  | number | Sample count for MSAA |
 |  [scissor](doc/markdown/./scene.camera.scissor.md) |  | number\[\] | Scissor rectangle used for rendering, if null, use viewport value |
 |  [viewMatrix](doc/markdown/./scene.camera.viewmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | View matrix of the camera |

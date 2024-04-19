@@ -10,4 +10,6 @@ Returns true if this is a writable storage texture type
 
 ```typescript
 get writable(): boolean;
+
+set writable(val: boolean);
 ```

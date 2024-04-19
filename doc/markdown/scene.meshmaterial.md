@@ -36,10 +36,10 @@ declare class MeshMaterial extends Material
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
 |  [applyUniformValues(bindGroup, ctx, pass)](doc/markdown/./scene.meshmaterial.applyuniformvalues.md) |  | Submit Uniform values before rendering with this material. |
-|  [beginDraw(pass, ctx)](doc/markdown/./scene.meshmaterial.begindraw.md) |  | Prepares for drawing |
 |  [createInstance()](doc/markdown/./scene.meshmaterial.createinstance.md) |  | Create material instance |
 |  [defineFeature()](doc/markdown/./scene.meshmaterial.definefeature.md) | <code>static</code> | Define feature index |
 |  [defineInstanceUniform(prop, type)](doc/markdown/./scene.meshmaterial.defineinstanceuniform.md) | <code>static</code> | Define instance uniform index |
+|  [doAlphaTest(scope, color)](doc/markdown/./scene.meshmaterial.doalphatest.md) |  |  |
 |  [featureUsed(feature)](doc/markdown/./scene.meshmaterial.featureused.md) |  | Check if a feature is in use for given render pass type. |
 |  [fragmentShader(scope)](doc/markdown/./scene.meshmaterial.fragmentshader.md) |  | Fragment shader implementation of this material |
 |  [getInstancedUniform(scope, uniformIndex)](doc/markdown/./scene.meshmaterial.getinstanceduniform.md) |  |  |
@@ -49,7 +49,7 @@ declare class MeshMaterial extends Material
 |  [outputFragmentColor(scope, worldPos, color)](doc/markdown/./scene.meshmaterial.outputfragmentcolor.md) |  | Calculate final fragment color for output. |
 |  [supportLighting()](doc/markdown/./scene.meshmaterial.supportlighting.md) |  | Returns true if shading of the material will be affected by lights |
 |  [uniformChanged()](doc/markdown/./scene.meshmaterial.uniformchanged.md) |  | Indicate that the uniform has changed and needs to be resubmitted. |
-|  [updateRenderStates(pass, ctx)](doc/markdown/./scene.meshmaterial.updaterenderstates.md) | <code>protected</code> | Update render states according to draw context and current material pass |
+|  [updateRenderStates(pass, stateSet, ctx)](doc/markdown/./scene.meshmaterial.updaterenderstates.md) | <code>protected</code> | Update render states according to draw context and current material pass |
 |  [useFeature(feature, use)](doc/markdown/./scene.meshmaterial.usefeature.md) |  | Use or unuse a feature of the material, this will cause the shader to be rebuild. |
 |  [vertexShader(scope)](doc/markdown/./scene.meshmaterial.vertexshader.md) |  | Vertex shader implementation of this material |
 

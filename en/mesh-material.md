@@ -88,7 +88,7 @@ Below, we'll create an unlit triangle mesh by manually populating the vertex dat
   // Creates an unlit material
   const material = new UnlitMaterial();
   // Disable backface culling
-  material.stateSet.useRasterizerState().setCullMode('none');
+  material.getRenderStateSet(0).useRasterizerState().setCullMode('none');
   // Use vertex color
   material.vertexColor = true;
 

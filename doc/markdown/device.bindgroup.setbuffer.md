@@ -7,7 +7,7 @@
 **Signature:**
 
 ```typescript
-setBuffer(name: string, buffer: GPUDataBuffer): void;
+setBuffer(name: string, buffer: GPUDataBuffer, offset?: number, bindOffset?: number, bindSize?: number): void;
 ```
 
 ## Parameters
@@ -16,6 +16,9 @@ setBuffer(name: string, buffer: GPUDataBuffer): void;
 |  --- | --- | --- |
 |  name | string |  |
 |  buffer | [GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md) |  |
+|  offset | number | _(Optional)_ |
+|  bindOffset | number | _(Optional)_ |
+|  bindSize | number | _(Optional)_ |
 
 **Returns:**
 

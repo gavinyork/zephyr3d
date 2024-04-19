@@ -29,12 +29,13 @@ interface AbstractDevice extends IEventTarget<DeviceEventMap>
 
 |  Method | Description |
 |  --- | --- |
+|  [beginCapture()](doc/markdown/./device.abstractdevice.begincapture.md) | Begin capture draw commands |
 |  [beginFrame()](doc/markdown/./device.abstractdevice.beginframe.md) | Begins a frame for rendering |
 |  [buildComputeProgram(options)](doc/markdown/./device.abstractdevice.buildcomputeprogram.md) | Builds compute program |
 |  [buildRenderProgram(options)](doc/markdown/./device.abstractdevice.buildrenderprogram.md) | Builds render program |
-|  [cancelNextFrameCall(f)](doc/markdown/./device.abstractdevice.cancelnextframecall.md) | Canels a pre scheduled function |
 |  [clearFrameBuffer(clearColor, clearDepth, clearStencil)](doc/markdown/./device.abstractdevice.clearframebuffer.md) | Clears the current frame buffer |
 |  [compute(workgroupCountX, workgroupCountY, workgroupCountZ)](doc/markdown/./device.abstractdevice.compute.md) | Dispatches a compute task to the GPU |
+|  [copyBuffer(sourceBuffer, destBuffer, srcOffset, dstOffset, bytes)](doc/markdown/./device.abstractdevice.copybuffer.md) | Copies a buffer to another buffer |
 |  [createBindGroup(layout)](doc/markdown/./device.abstractdevice.createbindgroup.md) | Creates a bind group |
 |  [createBuffer(sizeInBytes, options)](doc/markdown/./device.abstractdevice.createbuffer.md) | Creates a gpu buffer |
 |  [createCubeTexture(format, size, options)](doc/markdown/./device.abstractdevice.createcubetexture.md) | Creates a cube texture |
@@ -61,7 +62,9 @@ interface AbstractDevice extends IEventTarget<DeviceEventMap>
 |  [draw(primitiveType, first, count)](doc/markdown/./device.abstractdevice.draw.md) | Draw primitives |
 |  [drawInstanced(primitiveType, first, count, numInstances)](doc/markdown/./device.abstractdevice.drawinstanced.md) | Draw multiple instances of primitives |
 |  [drawText(text, x, y, color)](doc/markdown/./device.abstractdevice.drawtext.md) | Draw a string |
+|  [endCapture()](doc/markdown/./device.abstractdevice.endcapture.md) | End capture draw commands |
 |  [endFrame()](doc/markdown/./device.abstractdevice.endframe.md) | Ends a frame for rendering |
+|  [executeRenderBundle(renderBundle)](doc/markdown/./device.abstractdevice.executerenderbundle.md) | Executes render bundle |
 |  [exitLoop()](doc/markdown/./device.abstractdevice.exitloop.md) | Exits from current rendering loop |
 |  [flush()](doc/markdown/./device.abstractdevice.flush.md) | Flush the gpu command buffer |
 |  [getBackBufferHeight()](doc/markdown/./device.abstractdevice.getbackbufferheight.md) | Get the height of back buffer |

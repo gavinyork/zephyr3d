@@ -18,9 +18,11 @@ interface BindGroup extends GPUObject<unknown>
 |  Method | Description |
 |  --- | --- |
 |  [getBuffer(name)](doc/markdown/./device.bindgroup.getbuffer.md) |  |
+|  [getDynamicOffsets()](doc/markdown/./device.bindgroup.getdynamicoffsets.md) |  |
+|  [getGPUId()](doc/markdown/./device.bindgroup.getgpuid.md) |  |
 |  [getLayout()](doc/markdown/./device.bindgroup.getlayout.md) |  |
 |  [getTexture(name)](doc/markdown/./device.bindgroup.gettexture.md) |  |
-|  [setBuffer(name, buffer)](doc/markdown/./device.bindgroup.setbuffer.md) |  |
+|  [setBuffer(name, buffer, offset, bindOffset, bindSize)](doc/markdown/./device.bindgroup.setbuffer.md) |  |
 |  [setRawData(name, byteOffset, data, srcPos, srcLength)](doc/markdown/./device.bindgroup.setrawdata.md) |  |
 |  [setSampler(name, sampler)](doc/markdown/./device.bindgroup.setsampler.md) |  |
 |  [setTexture(name, texture, sampler)](doc/markdown/./device.bindgroup.settexture.md) |  |

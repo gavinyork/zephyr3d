@@ -4,7 +4,7 @@
 
 ## Material.isTransparentPass() method
 
-Returns true if this is a transparency material
+Returns true if given pass is transparent
 
 **Signature:**
 

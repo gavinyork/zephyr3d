@@ -1579,23 +1579,31 @@
         {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/base!applyMixins:function(1)",
-          "docComment": "/**\n * Applies mixins to a constructor function.\n *\n * This function takes a constructor function of a class (derivedCtor) and an array of constructor functions from which to inherit or \"mix in\" properties and methods. It effectively adds the properties and methods from the base constructors (baseCtors) to the prototype of the derived constructor, allowing the derived class to inherit features from multiple sources.\n *\n * @param derivedCtor - The constructor function of the class that will receive the mixins.\n *\n * @param baseCtors - An array of constructor functions that will be mixed into the derivedCtor.\n */\n",
+          "docComment": "/**\n * Applies mixins to a constructor function.\n *\n * @param target - The constructor function of the class that will receive the mixins.\n *\n * @param mixins - mixins\n *\n * @returns Mixed class\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "declare function applyMixins(derivedCtor: "
+              "text": "declare function applyMixins<M extends "
             },
             {
               "kind": "Content",
-              "text": "any"
+              "text": "((target: any) => any)[]"
             },
             {
               "kind": "Content",
-              "text": ", baseCtors: "
+              "text": ", T>(target: "
             },
             {
               "kind": "Content",
-              "text": "any[]"
+              "text": "T"
+            },
+            {
+              "kind": "Content",
+              "text": ", ...mixins: "
+            },
+            {
+              "kind": "Content",
+              "text": "M"
             },
             {
               "kind": "Content",
@@ -1603,7 +1611,16 @@
             },
             {
               "kind": "Content",
-              "text": "void"
+              "text": "T & "
+            },
+            {
+              "kind": "Reference",
+              "text": "ExtractMixinType",
+              "canonicalReference": "@zephyr3d/base!ExtractMixinType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<M>"
             },
             {
               "kind": "Content",
@@ -1612,27 +1629,51 @@
           ],
           "fileUrlPath": "dist/index.d.ts",
           "returnTypeTokenRange": {
-            "startIndex": 5,
-            "endIndex": 6
+            "startIndex": 7,
+            "endIndex": 10
           },
           "releaseTag": "Public",
           "overloadIndex": 1,
           "parameters": [
             {
-              "parameterName": "derivedCtor",
-              "parameterTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 2
-              },
-              "isOptional": false
-            },
-            {
-              "parameterName": "baseCtors",
+              "parameterName": "target",
               "parameterTypeTokenRange": {
                 "startIndex": 3,
                 "endIndex": 4
               },
               "isOptional": false
+            },
+            {
+              "parameterName": "mixins",
+              "parameterTypeTokenRange": {
+                "startIndex": 5,
+                "endIndex": 6
+              },
+              "isOptional": false
+            }
+          ],
+          "typeParameters": [
+            {
+              "typeParameterName": "M",
+              "constraintTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "defaultTypeTokenRange": {
+                "startIndex": 0,
+                "endIndex": 0
+              }
+            },
+            {
+              "typeParameterName": "T",
+              "constraintTokenRange": {
+                "startIndex": 0,
+                "endIndex": 0
+              },
+              "defaultTypeTokenRange": {
+                "startIndex": 0,
+                "endIndex": 0
+              }
             }
           ],
           "name": "applyMixins"
@@ -2303,6 +2344,111 @@
           "typeTokenRange": {
             "startIndex": 3,
             "endIndex": 4
+          }
+        },
+        {
+          "kind": "TypeAlias",
+          "canonicalReference": "@zephyr3d/base!ExtractMixinReturnType:type",
+          "docComment": "/**\n * Extract mixin return type\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "type ExtractMixinReturnType<M> = "
+            },
+            {
+              "kind": "Content",
+              "text": "M extends (target: infer A) => infer R ? R : never"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "releaseTag": "Public",
+          "name": "ExtractMixinReturnType",
+          "typeParameters": [
+            {
+              "typeParameterName": "M",
+              "constraintTokenRange": {
+                "startIndex": 0,
+                "endIndex": 0
+              },
+              "defaultTypeTokenRange": {
+                "startIndex": 0,
+                "endIndex": 0
+              }
+            }
+          ],
+          "typeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 2
+          }
+        },
+        {
+          "kind": "TypeAlias",
+          "canonicalReference": "@zephyr3d/base!ExtractMixinType:type",
+          "docComment": "/**\n * Extract mixin type\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "type ExtractMixinType<M> = "
+            },
+            {
+              "kind": "Content",
+              "text": "M extends [infer First] ? "
+            },
+            {
+              "kind": "Reference",
+              "text": "ExtractMixinReturnType",
+              "canonicalReference": "@zephyr3d/base!ExtractMixinReturnType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<First> : M extends [infer First, ...infer Rest] ? "
+            },
+            {
+              "kind": "Reference",
+              "text": "ExtractMixinReturnType",
+              "canonicalReference": "@zephyr3d/base!ExtractMixinReturnType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<First> & "
+            },
+            {
+              "kind": "Reference",
+              "text": "ExtractMixinType",
+              "canonicalReference": "@zephyr3d/base!ExtractMixinType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<[...Rest]> : never"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "releaseTag": "Public",
+          "name": "ExtractMixinType",
+          "typeParameters": [
+            {
+              "typeParameterName": "M",
+              "constraintTokenRange": {
+                "startIndex": 0,
+                "endIndex": 0
+              },
+              "defaultTypeTokenRange": {
+                "startIndex": 0,
+                "endIndex": 0
+              }
+            }
+          ],
+          "typeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 8
           }
         },
         {
@@ -23444,6 +23590,45 @@
           "typeTokenRange": {
             "startIndex": 5,
             "endIndex": 12
+          }
+        },
+        {
+          "kind": "TypeAlias",
+          "canonicalReference": "@zephyr3d/base!UnionToIntersection:type",
+          "docComment": "/**\n * Convert union type to intersection\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "type UnionToIntersection<U> = "
+            },
+            {
+              "kind": "Content",
+              "text": "(U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "releaseTag": "Public",
+          "name": "UnionToIntersection",
+          "typeParameters": [
+            {
+              "typeParameterName": "U",
+              "constraintTokenRange": {
+                "startIndex": 0,
+                "endIndex": 0
+              },
+              "defaultTypeTokenRange": {
+                "startIndex": 0,
+                "endIndex": 0
+              }
+            }
+          ],
+          "typeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 2
           }
         },
         {

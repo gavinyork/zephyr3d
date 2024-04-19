@@ -23,5 +23,6 @@ declare class PBAtomicU32TypeInfo extends PBTypeInfo<null>
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
+|  [haveAtomicMembers()](doc/markdown/./device.pbatomicu32typeinfo.haveatomicmembers.md) |  | returns true if this is a pointer type |
 |  [toBufferLayout(offset)](doc/markdown/./device.pbatomicu32typeinfo.tobufferlayout.md) |  | Creates a buffer layout from this type |
 

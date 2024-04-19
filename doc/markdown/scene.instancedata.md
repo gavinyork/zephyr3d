@@ -17,8 +17,7 @@ interface InstanceData
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
 |  [bindGroup](doc/markdown/./scene.instancedata.bindgroup.md) |  | CachedBindGroup |  |
-|  [currentSize](doc/markdown/./scene.instancedata.currentsize.md) |  | number |  |
-|  [hash](doc/markdown/./scene.instancedata.hash.md) |  | string |  |
-|  [maxSize](doc/markdown/./scene.instancedata.maxsize.md) |  | number |  |
+|  [numInstances](doc/markdown/./scene.instancedata.numinstances.md) |  | number |  |
+|  [offset](doc/markdown/./scene.instancedata.offset.md) |  | number |  |
 |  [stride](doc/markdown/./scene.instancedata.stride.md) |  | number |  |
 

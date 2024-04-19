@@ -9,5 +9,5 @@ Whether should apply fog to fragment
 **Signature:**
 
 ```typescript
-applyFog: boolean;
+applyFog: FogType;
 ```

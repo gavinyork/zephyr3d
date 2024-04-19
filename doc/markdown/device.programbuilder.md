@@ -16,6 +16,8 @@ interface ProgramBuilder
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
+|  [atomic\_int](doc/markdown/./device.programbuilder.atomic_int.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: boolean): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | Atomic int type variable constructors |
+|  [atomic\_uint](doc/markdown/./device.programbuilder.atomic_uint.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: boolean): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | Atomic uint type variable constructors |
 |  [bool](doc/markdown/./device.programbuilder.bool.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | boolean type variable constructors |
 |  [bvec2](doc/markdown/./device.programbuilder.bvec2.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | bvec2 type variable constructors |
 |  [bvec3](doc/markdown/./device.programbuilder.bvec3.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | bvec3 type variable constructors |
@@ -69,6 +71,7 @@ interface ProgramBuilder
 |  [atanh(val)](doc/markdown/./device.programbuilder.atanh.md) | Same as atanh builtin function in GLSL and WGSL |
 |  [atomicAdd(ptr, value)](doc/markdown/./device.programbuilder.atomicadd.md) | atomicAdd, only valid for WebGPU device |
 |  [atomicAnd(ptr, value)](doc/markdown/./device.programbuilder.atomicand.md) | atomicAnd, only valid for WebGPU device |
+|  [atomicExchange(ptr, value)](doc/markdown/./device.programbuilder.atomicexchange.md) | atomicExchange, only valid for WebGPU device |
 |  [atomicLoad(ptr)](doc/markdown/./device.programbuilder.atomicload.md) | atomicLoad, only valid for WebGPU device |
 |  [atomicMax(ptr, value)](doc/markdown/./device.programbuilder.atomicmax.md) | atomicMax, only valid for WebGPU device |
 |  [atomicMin(ptr, value)](doc/markdown/./device.programbuilder.atomicmin.md) | atomicMin, only valid for WebGPU device |
@@ -108,8 +111,8 @@ interface ProgramBuilder
 |  [exp(val)](doc/markdown/./device.programbuilder.exp.md) | Same as exp builtin function in GLSL and WGSL |
 |  [exp2(val)](doc/markdown/./device.programbuilder.exp2.md) | Same as exp2 builtin function in GLSL and WGSL |
 |  [faceForward(x, y, z)](doc/markdown/./device.programbuilder.faceforward.md) | Same as faceForward builtin function in WGSL, only valid for WebGPU device |
-|  [floatBitsToInt(x)](doc/markdown/./device.programbuilder.floatbitstoint.md) | Same as floatBitsToInt builtin function in GLSL, only valid for WebGL2 device |
-|  [floatBitsToUint(x)](doc/markdown/./device.programbuilder.floatbitstouint.md) | Same as floatBitsToUint builtin function in GLSL, only valid for WebGL2 device |
+|  [floatBitsToInt(x)](doc/markdown/./device.programbuilder.floatbitstoint.md) | Same as floatBitsToInt builtin function in GLSL, only valid for WebGL2 device and WebGPU device |
+|  [floatBitsToUint(x)](doc/markdown/./device.programbuilder.floatbitstouint.md) | Same as floatBitsToUint builtin function in GLSL, only valid for WebGL2 device and WebGPU device |
 |  [floor(val)](doc/markdown/./device.programbuilder.floor.md) | Same as floor builtin function in GLSL and WGSL |
 |  [fma(x, y, z)](doc/markdown/./device.programbuilder.fma.md) | Same as fma builtin function in WGSL, only valid for WebGPU device |
 |  [fract(val)](doc/markdown/./device.programbuilder.fract.md) | Same as fract builtin function in GLSL and WGSL |
@@ -121,7 +124,7 @@ interface ProgramBuilder
 |  [getGlobalScope()](doc/markdown/./device.programbuilder.getglobalscope.md) | Gets the global scope |
 |  [greaterThan(x, y)](doc/markdown/./device.programbuilder.greaterthan.md) | return true if x is greater than y, otherwise false, per component |
 |  [greaterThanEqual(x, y)](doc/markdown/./device.programbuilder.greaterthanequal.md) | return true if x is greater than or equals y, otherwise false, per component |
-|  [intBitsToFloat(x)](doc/markdown/./device.programbuilder.intbitstofloat.md) | Same as intBitsToFloat builtin function in GLSL, only valid for WebGL2 device |
+|  [intBitsToFloat(x)](doc/markdown/./device.programbuilder.intbitstofloat.md) | Same as intBitsToFloat builtin function in GLSL, only valid for WebGL2 device and WebGPU device |
 |  [inverse(mat)](doc/markdown/./device.programbuilder.inverse.md) | Same as inverse builtin function in GLSL, only valid for WebGL2 device |
 |  [inverseSqrt(val)](doc/markdown/./device.programbuilder.inversesqrt.md) | Same as inversesqrt builtin function in GLSL and WGSL |
 |  [isinf(x)](doc/markdown/./device.programbuilder.isinf.md) | Same as isinf builtin function in GLSL, only valid for WebGL2 device |
@@ -217,7 +220,7 @@ interface ProgramBuilder
 |  [textureStore(tex, coords, value)](doc/markdown/./device.programbuilder.texturestore.md) | Same as textureStore builtin function in WGSL, only valid for WebGPU device |
 |  [transpose(mat)](doc/markdown/./device.programbuilder.transpose.md) | Same as transpose builtin function in GLSL and WGSL, only valid for WebGL2 and WebGPU device |
 |  [trunc(val)](doc/markdown/./device.programbuilder.trunc.md) | Same as trunc builtin function in WGSL, only valid for WebGPU device |
-|  [uintBitsToFloat(x)](doc/markdown/./device.programbuilder.uintbitstofloat.md) | Same as uintBitsToFloat builtin function in GLSL, only valid for WebGL2 device |
+|  [uintBitsToFloat(x)](doc/markdown/./device.programbuilder.uintbitstofloat.md) | Same as uintBitsToFloat builtin function in GLSL, only valid for WebGL2 device and WebGPU device |
 |  [unpack2x16float(x)](doc/markdown/./device.programbuilder.unpack2x16float.md) | Same as unpack2x16float builtin function in WGSL, only valid for WebGPU device |
 |  [unpack2x16snorm(x)](doc/markdown/./device.programbuilder.unpack2x16snorm.md) | Same as unpack2x16snorm builtin function in WGSL, only valid for WebGPU device |
 |  [unpack2x16unorm(x)](doc/markdown/./device.programbuilder.unpack2x16unorm.md) | Same as unpack2x16unorm builtin function in WGSL, only valid for WebGPU device |

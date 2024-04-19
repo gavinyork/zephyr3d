@@ -30,6 +30,7 @@ declare class PBPointerTypeInfo extends PBTypeInfo<PointerTypeDetail>
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
+|  [haveAtomicMembers()](doc/markdown/./device.pbpointertypeinfo.haveatomicmembers.md) |  | Wether this type have atomic members |
 |  [isPointerType()](doc/markdown/./device.pbpointertypeinfo.ispointertype.md) |  | returns true if this is a pointer type |
 |  [toBufferLayout(offset)](doc/markdown/./device.pbpointertypeinfo.tobufferlayout.md) |  | Creates a buffer layout from this type |
 

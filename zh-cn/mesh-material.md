@@ -89,7 +89,7 @@ assetManager.fetchTexture('assets/images/earthnormal.png', {
   // 创建一个无光照材质
   const material = new UnlitMaterial();
   // 禁止背面剔除
-  material.stateSet.useRasterizerState().setCullMode('none');
+  material.getRenderStateSet(0).useRasterizerState().setCullMode('none');
   // 使用顶点色
   material.vertexColor = true;
 

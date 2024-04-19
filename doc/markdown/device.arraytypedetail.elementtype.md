@@ -9,5 +9,5 @@ Type of array elements
 **Signature:**
 
 ```typescript
-elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo;
+elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo;
 ```

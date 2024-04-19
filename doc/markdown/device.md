@@ -193,6 +193,7 @@
 |  [PBReflectionTagGetter](doc/markdown/./device.pbreflectiontaggetter.md) | Shader variable getter function type |
 |  [PBStructLayout](doc/markdown/./device.pbstructlayout.md) | Struct layout types |
 |  [PrimitiveType](doc/markdown/./device.primitivetype.md) | The primitive type |
+|  [RenderBundle](doc/markdown/./device.renderbundle.md) | Render bundle |
 |  [ShaderExpTagValue](doc/markdown/./device.shaderexptagvalue.md) |  |
 |  [ShaderKind](doc/markdown/./device.shaderkind.md) | Shader kind |
 |  [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md) | type of a shader variable constructor |

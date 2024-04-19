@@ -39,6 +39,8 @@ declare class TerrainMaterial extends TerrainMaterial_base
 |  [isBatchable()](doc/markdown/./scene.terrainmaterial.isbatchable.md) |  | Returns true if this material supports geometry instancing |
 |  [isTransparentPass(pass)](doc/markdown/./scene.terrainmaterial.istransparentpass.md) |  | Determine if a certain pass of this material is translucent. |
 |  [sampleDetailNormalMap(scope, tex, texCoord, normalScale, TBN)](doc/markdown/./scene.terrainmaterial.sampledetailnormalmap.md) |  |  |
+|  [supportInstancing()](doc/markdown/./scene.terrainmaterial.supportinstancing.md) |  | Returns true if this material supports geometry instancing |
 |  [supportLighting()](doc/markdown/./scene.terrainmaterial.supportlighting.md) |  | Returns true if shading of the material will be affected by lights |
+|  [updateRenderStates(pass, stateSet, ctx)](doc/markdown/./scene.terrainmaterial.updaterenderstates.md) | <code>protected</code> |  |
 |  [vertexShader(scope)](doc/markdown/./scene.terrainmaterial.vertexshader.md) |  |  |
 

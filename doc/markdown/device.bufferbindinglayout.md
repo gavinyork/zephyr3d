@@ -16,6 +16,7 @@ interface BufferBindingLayout
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
+|  [dynamicOffsetIndex](doc/markdown/./device.bufferbindinglayout.dynamicoffsetindex.md) |  | number | dynamic offset index |
 |  [hasDynamicOffset](doc/markdown/./device.bufferbindinglayout.hasdynamicoffset.md) |  | boolean | Whether the buffer should be accessed by a dynamic offset |
 |  [minBindingSize?](doc/markdown/./device.bufferbindinglayout.minbindingsize.md) |  | number | _(Optional)_ minimum binding size of the buffer |
 |  [type?](doc/markdown/./device.bufferbindinglayout.type.md) |  | 'uniform' \| 'storage' \| 'read-only-storage' | _(Optional)_ The bind type |

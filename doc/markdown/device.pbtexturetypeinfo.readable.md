@@ -10,4 +10,6 @@ Returns true if this is a readable storage texture type
 
 ```typescript
 get readable(): boolean;
+
+set readable(val: boolean);
 ```

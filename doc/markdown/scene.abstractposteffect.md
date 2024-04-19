@@ -23,7 +23,6 @@ declare abstract class AbstractPostEffect
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
 |  [\_enabled](doc/markdown/./scene.abstractposteffect._enabled.md) | <code>protected</code> | boolean |  |
-|  [\_intermediateFramebuffers](doc/markdown/./scene.abstractposteffect._intermediateframebuffers.md) | <code>protected</code> | { \[name: string\]: { framebuffer: [FrameBuffer](doc/markdown/./device.framebuffer.md)<!-- -->; depth: 'none' \| 'current' \| 'temporal'; }; } |  |
 |  [\_opaque](doc/markdown/./scene.abstractposteffect._opaque.md) | <code>protected</code> | boolean |  |
 |  [\_outputTexture](doc/markdown/./scene.abstractposteffect._outputtexture.md) | <code>protected</code> | [Texture2D](doc/markdown/./device.texture2d.md) |  |
 |  [\_quadRenderStateSet](doc/markdown/./scene.abstractposteffect._quadrenderstateset.md) | <code>protected</code> | [RenderStateSet](doc/markdown/./device.renderstateset.md) |  |
@@ -35,11 +34,9 @@ declare abstract class AbstractPostEffect
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [addIntermediateFramebuffer(name, depth)](doc/markdown/./scene.abstractposteffect.addintermediateframebuffer.md) | <code>protected</code> | Adds an intermediate frame buffer |
 |  [apply(ctx, inputColorTexture, sceneDepthTexture, srgbOutput)](doc/markdown/./scene.abstractposteffect.apply.md) | <code>abstract</code> | Apply the post effect |
 |  [dispose()](doc/markdown/./scene.abstractposteffect.dispose.md) |  | Disposes the post effect. |
 |  [drawFullscreenQuad(renderStateSet)](doc/markdown/./scene.abstractposteffect.drawfullscreenquad.md) | <code>protected</code> | Draws a fullscreen quad |
-|  [getIntermediateFramebuffer(name, format, width, height)](doc/markdown/./scene.abstractposteffect.getintermediateframebuffer.md) | <code>protected</code> | Gets the intermediate frame buffer by name |
 |  [needFlip(device)](doc/markdown/./scene.abstractposteffect.needflip.md) |  | Check if the post effect should be rendered upside down. |
 |  [requireDepthAttachment()](doc/markdown/./scene.abstractposteffect.requiredepthattachment.md) | <code>abstract</code> | Checks whether this post effect requires the scene depth buffer |
 |  [requireLinearDepthTexture()](doc/markdown/./scene.abstractposteffect.requirelineardepthtexture.md) | <code>abstract</code> | Checks whether this post effect requires the linear depth texture |

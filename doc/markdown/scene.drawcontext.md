@@ -16,7 +16,7 @@ interface DrawContext
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
-|  [applyFog](doc/markdown/./scene.drawcontext.applyfog.md) |  | boolean | Whether should apply fog to fragment |
+|  [applyFog](doc/markdown/./scene.drawcontext.applyfog.md) |  | [FogType](doc/markdown/./scene.fogtype.md) | Whether should apply fog to fragment |
 |  [camera](doc/markdown/./scene.drawcontext.camera.md) |  | [Camera](doc/markdown/./scene.camera.md) | The camera for current drawing task |
 |  [clusteredLight?](doc/markdown/./scene.drawcontext.clusteredlight.md) |  | ClusteredLight | _(Optional)_ clustered light index |
 |  [compositor?](doc/markdown/./scene.drawcontext.compositor.md) |  | [Compositor](doc/markdown/./scene.compositor.md) | _(Optional)_ The compositor used to apply postprocessing effects |
@@ -24,20 +24,25 @@ interface DrawContext
 |  [defaultViewport?](doc/markdown/./scene.drawcontext.defaultviewport.md) |  | boolean | _(Optional)_ whether render to default viewport |
 |  [depthFormat?](doc/markdown/./scene.drawcontext.depthformat.md) |  | [TextureFormat](doc/markdown/./device.textureformat.md) | _(Optional)_ Default depth buffer format |
 |  [depthTexture?](doc/markdown/./scene.drawcontext.depthtexture.md) |  | [Texture2D](doc/markdown/./device.texture2d.md) | _(Optional)_ Depth texture |
+|  [device](doc/markdown/./scene.drawcontext.device.md) |  | [AbstractDevice](doc/markdown/./device.abstractdevice.md) | Render device |
 |  [drawEnvLight](doc/markdown/./scene.drawcontext.drawenvlight.md) |  | boolean | Whether current render pass is base light pass |
 |  [env](doc/markdown/./scene.drawcontext.env.md) |  | [Environment](doc/markdown/./scene.environment.md) | The scene environment |
 |  [flip](doc/markdown/./scene.drawcontext.flip.md) |  | boolean | Wether should flip upside down |
+|  [globalBindGroupAllocator](doc/markdown/./scene.drawcontext.globalbindgroupallocator.md) |  | GlobalBindGroupAllocator | Global bind group allocator |
 |  [instanceData?](doc/markdown/./scene.drawcontext.instancedata.md) |  | [InstanceData](doc/markdown/./scene.instancedata.md) | _(Optional)_ Instance data for current drawing task |
+|  [instancing?](doc/markdown/./scene.drawcontext.instancing.md) |  | boolean | _(Optional)_ Whehter instance rendering is used |
 |  [lightBlending](doc/markdown/./scene.drawcontext.lightblending.md) |  | boolean | whether is blending light |
 |  [linearDepthTexture?](doc/markdown/./scene.drawcontext.lineardepthtexture.md) |  | [Texture2D](doc/markdown/./device.texture2d.md) | _(Optional)_ Linear depth texture |
 |  [logger?](doc/markdown/./scene.drawcontext.logger.md) |  | RenderLogger | _(Optional)_ render logger |
+|  [oit](doc/markdown/./scene.drawcontext.oit.md) |  | [OIT](doc/markdown/./scene.oit.md) | OIT |
 |  [primaryCamera](doc/markdown/./scene.drawcontext.primarycamera.md) |  | [Camera](doc/markdown/./scene.camera.md) | The camera position of the primary render pass |
 |  [queue](doc/markdown/./scene.drawcontext.queue.md) |  | number | current queue |
 |  [renderPass](doc/markdown/./scene.drawcontext.renderpass.md) |  | [RenderPass](doc/markdown/./scene.renderpass.md) | The render pass to which the current drawing task belongs |
 |  [renderPassHash](doc/markdown/./scene.drawcontext.renderpasshash.md) |  | string | Hash value for the drawing task |
+|  [renderQueue?](doc/markdown/./scene.drawcontext.renderqueue.md) |  | [RenderQueue](doc/markdown/./scene.renderqueue.md) | _(Optional)_ The render queue which is currently being rendered |
 |  [scene](doc/markdown/./scene.drawcontext.scene.md) |  | [Scene](doc/markdown/./scene.scene.md) | The scene that is currently been drawing |
+|  [skinAnimation?](doc/markdown/./scene.drawcontext.skinanimation.md) |  | boolean | _(Optional)_ Whether skin animation is used |
 |  [sunLight?](doc/markdown/./scene.drawcontext.sunlight.md) |  | [DirectionalLight](doc/markdown/./scene.directionallight.md) | _(Optional)_ the sun light |
-|  [target](doc/markdown/./scene.drawcontext.target.md) |  | [Drawable](doc/markdown/./scene.drawable.md) | The object that is currently being drawn |
 |  [timestamp](doc/markdown/./scene.drawcontext.timestamp.md) |  | number | Timestamp |
 |  [viewportHeight?](doc/markdown/./scene.drawcontext.viewportheight.md) |  | number | _(Optional)_ viewport height |
 |  [viewportWidth?](doc/markdown/./scene.drawcontext.viewportwidth.md) |  | number | _(Optional)_ viewport width |

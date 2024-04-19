@@ -16,7 +16,9 @@ interface ShaderCaps
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
+|  [maxStorageBufferSize](doc/markdown/./device.shadercaps.maxstoragebuffersize.md) |  | number | The maximum number of bytes of storage buffer |
 |  [maxUniformBufferSize](doc/markdown/./device.shadercaps.maxuniformbuffersize.md) |  | number | The maximum number of bytes of uniform buffer |
+|  [storageBufferOffsetAlignment](doc/markdown/./device.shadercaps.storagebufferoffsetalignment.md) |  | number | The storage buffer offset alignment |
 |  [supportFragmentDepth](doc/markdown/./device.shadercaps.supportfragmentdepth.md) |  | boolean | True if the device supports writing depth value in a fragment shader |
 |  [supportHighPrecisionFloat](doc/markdown/./device.shadercaps.supporthighprecisionfloat.md) |  | boolean | True if the device supports high precison float number for shader programs |
 |  [supportHighPrecisionInt](doc/markdown/./device.shadercaps.supporthighprecisionint.md) |  | boolean | True if the device supports high precison integer number for shader programs |

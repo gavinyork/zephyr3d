@@ -24,29 +24,22 @@ declare class Material
 |  --- | --- | --- | --- |
 |  [instanceId](doc/markdown/./scene.material.instanceid.md) | <code>readonly</code> | number | Unique identifier of the material |
 |  [numPasses](doc/markdown/./scene.material.numpasses.md) |  | number |  |
-|  [stateSet](doc/markdown/./scene.material.stateset.md) |  | [RenderStateSet](doc/markdown/./device.renderstateset.md) | Render states associated to this material |
 
 ## Methods
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
 |  [\_applyUniforms(bindGroup, ctx, pass)](doc/markdown/./scene.material._applyuniforms.md) | <code>protected</code> | Applies uniform values |
-|  [\_createHash(renderPassType)](doc/markdown/./scene.material._createhash.md) | <code>protected</code> | Calculates the hash code of the shader program |
+|  [\_createHash()](doc/markdown/./scene.material._createhash.md) | <code>protected</code> | Calculates the hash code of the shader program |
 |  [\_createProgram(pb, ctx, pass)](doc/markdown/./scene.material._createprogram.md) | <code>protected</code> | Creates the shader program |
+|  [apply(ctx)](doc/markdown/./scene.material.apply.md) |  | Apply material |
 |  [applyUniforms(bindGroup, ctx, needUpdate, pass)](doc/markdown/./scene.material.applyuniforms.md) |  | Sets all uniform values to the bind group of the material if needed |
-|  [beginDraw(pass, ctx)](doc/markdown/./scene.material.begindraw.md) |  | Prepares for drawing |
-|  [dispose()](doc/markdown/./scene.material.dispose.md) |  |  |
-|  [draw(primitive, ctx, numInstances)](doc/markdown/./scene.material.draw.md) |  | Draws a primitive using this material |
 |  [drawPrimitive(pass, primitive, ctx, numInstances)](doc/markdown/./scene.material.drawprimitive.md) |  | Draw primitve |
-|  [endDraw(pass)](doc/markdown/./scene.material.enddraw.md) |  | Ends drawing a primitive |
-|  [garbageCollect(ts)](doc/markdown/./scene.material.garbagecollect.md) | <code>static</code> | Performs a garbage collection for this material |
-|  [getGCOptions()](doc/markdown/./scene.material.getgcoptions.md) | <code>static</code> | Gets the options of garbage collection |
-|  [getMaterialBindGroup()](doc/markdown/./scene.material.getmaterialbindgroup.md) |  | Gets the bind group of this material |
-|  [getOrCreateProgram(ctx, pass)](doc/markdown/./scene.material.getorcreateprogram.md) |  | Fetch the gpu program of the material for drawing |
 |  [getQueueType()](doc/markdown/./scene.material.getqueuetype.md) |  |  |
 |  [isBatchable()](doc/markdown/./scene.material.isbatchable.md) |  | Returns true if this material supports geometry instancing |
-|  [isTransparentPass(pass)](doc/markdown/./scene.material.istransparentpass.md) |  | Returns true if this is a transparency material |
+|  [isTransparentPass(pass)](doc/markdown/./scene.material.istransparentpass.md) |  | Returns true if given pass is transparent |
 |  [passToHash(pass)](doc/markdown/./scene.material.passtohash.md) |  | Convert pass to hash |
-|  [setGCOptions(opt)](doc/markdown/./scene.material.setgcoptions.md) | <code>static</code> | Sets the options of garbage collection |
+|  [supportInstancing()](doc/markdown/./scene.material.supportinstancing.md) |  | Returns true if this material supports geometry instancing |
 |  [supportLighting()](doc/markdown/./scene.material.supportlighting.md) |  | Returns true if shading of the material will be affected by lights |
+|  [updateRenderStates(pass, renderStates, ctx)](doc/markdown/./scene.material.updaterenderstates.md) | <code>protected</code> | Update render states according to draw context and current material pass |
 

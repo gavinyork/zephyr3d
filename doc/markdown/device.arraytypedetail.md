@@ -17,5 +17,5 @@ interface ArrayTypeDetail
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
 |  [dimension](doc/markdown/./device.arraytypedetail.dimension.md) |  | number | Array dimension |
-|  [elementType](doc/markdown/./device.arraytypedetail.elementtype.md) |  | [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) \| [PBAnyTypeInfo](doc/markdown/./device.pbanytypeinfo.md) | Type of array elements |
+|  [elementType](doc/markdown/./device.arraytypedetail.elementtype.md) |  | [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) \| [PBAnyTypeInfo](doc/markdown/./device.pbanytypeinfo.md) \| [PBAtomicI32TypeInfo](doc/markdown/./device.pbatomici32typeinfo.md) \| [PBAtomicU32TypeInfo](doc/markdown/./device.pbatomicu32typeinfo.md) | Type of array elements |
 

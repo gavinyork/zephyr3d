@@ -9,13 +9,13 @@ Constructs a new instance of the `PBArrayTypeInfo` class
 **Signature:**
 
 ```typescript
-constructor(elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo, dimension?: number);
+constructor(elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo, dimension?: number);
 ```
 
 ## Parameters
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  elementType | [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) \| [PBAnyTypeInfo](doc/markdown/./device.pbanytypeinfo.md) |  |
+|  elementType | [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) \| [PBAnyTypeInfo](doc/markdown/./device.pbanytypeinfo.md) \| [PBAtomicI32TypeInfo](doc/markdown/./device.pbatomici32typeinfo.md) \| [PBAtomicU32TypeInfo](doc/markdown/./device.pbatomicu32typeinfo.md) |  |
 |  dimension | number | _(Optional)_ |
 

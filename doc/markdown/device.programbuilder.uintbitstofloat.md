@@ -4,7 +4,7 @@
 
 ## ProgramBuilder.uintBitsToFloat() method
 
-Same as uintBitsToFloat builtin function in GLSL, only valid for WebGL2 device
+Same as uintBitsToFloat builtin function in GLSL, only valid for WebGL2 device and WebGPU device
 
 **Signature:**
 

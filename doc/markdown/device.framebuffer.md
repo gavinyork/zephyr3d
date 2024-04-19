@@ -20,6 +20,7 @@ interface FrameBuffer<T = unknown> extends GPUObject<T>
 |  [bind()](doc/markdown/./device.framebuffer.bind.md) |  |
 |  [getColorAttachments()](doc/markdown/./device.framebuffer.getcolorattachments.md) |  |
 |  [getDepthAttachment()](doc/markdown/./device.framebuffer.getdepthattachment.md) |  |
+|  [getHash()](doc/markdown/./device.framebuffer.gethash.md) |  |
 |  [getHeight()](doc/markdown/./device.framebuffer.getheight.md) |  |
 |  [getSampleCount()](doc/markdown/./device.framebuffer.getsamplecount.md) |  |
 |  [getWidth()](doc/markdown/./device.framebuffer.getwidth.md) |  |

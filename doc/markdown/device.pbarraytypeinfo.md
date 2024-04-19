@@ -24,12 +24,13 @@ declare class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail>
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
 |  [dimension](doc/markdown/./device.pbarraytypeinfo.dimension.md) | <code>readonly</code> | number | Get dimension of the array type |
-|  [elementType](doc/markdown/./device.pbarraytypeinfo.elementtype.md) | <code>readonly</code> | [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) \| [PBAnyTypeInfo](doc/markdown/./device.pbanytypeinfo.md) | Get the element type |
+|  [elementType](doc/markdown/./device.pbarraytypeinfo.elementtype.md) | <code>readonly</code> | [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) \| [PBAnyTypeInfo](doc/markdown/./device.pbanytypeinfo.md) \| [PBAtomicI32TypeInfo](doc/markdown/./device.pbatomici32typeinfo.md) \| [PBAtomicU32TypeInfo](doc/markdown/./device.pbatomicu32typeinfo.md) | Get the element type |
 
 ## Methods
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
+|  [haveAtomicMembers()](doc/markdown/./device.pbarraytypeinfo.haveatomicmembers.md) |  | Wether array have atomic members |
 |  [isArrayType()](doc/markdown/./device.pbarraytypeinfo.isarraytype.md) |  | returns true if this is an array type |
 |  [isCompatibleType(other)](doc/markdown/./device.pbarraytypeinfo.iscompatibletype.md) |  |  |
 |  [toBufferLayout(offset)](doc/markdown/./device.pbarraytypeinfo.tobufferlayout.md) |  | Creates a buffer layout from this type |

@@ -27,7 +27,8 @@ interface RenderStateSet
 |  Method | Description |
 |  --- | --- |
 |  [apply(force)](doc/markdown/./device.renderstateset.apply.md) | Applis the render statements to current device |
-|  [copyFrom(stateSet)](doc/markdown/./device.renderstateset.copyfrom.md) | Creates a new RenderStateSet by copying this one |
+|  [clone()](doc/markdown/./device.renderstateset.clone.md) | Creates a new RenderStateSet object by deep copy from this object |
+|  [copyFrom(stateSet)](doc/markdown/./device.renderstateset.copyfrom.md) | Shallow copy existing RenderStateSet object to this |
 |  [defaultBlendingState()](doc/markdown/./device.renderstateset.defaultblendingstate.md) | Deletes the BlendingState that was allocated by [RenderStateSet.useBlendingState()](doc/markdown/./device.renderstateset.useblendingstate.md)<!-- -->, so that the default value will be used |
 |  [defaultColorState()](doc/markdown/./device.renderstateset.defaultcolorstate.md) | Deletes the ColorState that was allocated by [RenderStateSet.useColorState()](doc/markdown/./device.renderstateset.usecolorstate.md)<!-- -->, so that the default value will be used |
 |  [defaultDepthState()](doc/markdown/./device.renderstateset.defaultdepthstate.md) | Deletes the DepthState that was allocated by [RenderStateSet.useDepthState()](doc/markdown/./device.renderstateset.usedepthstate.md)<!-- -->, so that the default value will be used |

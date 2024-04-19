@@ -16,10 +16,12 @@ interface Drawable
 
 |  Method | Description |
 |  --- | --- |
+|  [applyTransformUniforms(renderQueue)](doc/markdown/./scene.drawable.applytransformuniforms.md) |  |
 |  [draw(ctx)](doc/markdown/./scene.drawable.draw.md) | Draw the object |
 |  [getBoneMatrices()](doc/markdown/./scene.drawable.getbonematrices.md) | Gets the texture that contains the bone matrices of the object |
 |  [getInstanceColor()](doc/markdown/./scene.drawable.getinstancecolor.md) | Gets the instance color |
 |  [getInvBindMatrix()](doc/markdown/./scene.drawable.getinvbindmatrix.md) | Gets the inversed bind matrix for skeleton animation |
+|  [getMaterial()](doc/markdown/./scene.drawable.getmaterial.md) | Gets the associated material |
 |  [getName()](doc/markdown/./scene.drawable.getname.md) | Gets name of the drawable object |
 |  [getPickTarget()](doc/markdown/./scene.drawable.getpicktarget.md) | If set, the pick target will be returned as the pick result |
 |  [getQueueType()](doc/markdown/./scene.drawable.getqueuetype.md) | Gets the type of render queue |
@@ -27,4 +29,5 @@ interface Drawable
 |  [getXForm()](doc/markdown/./scene.drawable.getxform.md) | Gets the XForm of the object |
 |  [isBatchable()](doc/markdown/./scene.drawable.isbatchable.md) | returns true if the object is batchable |
 |  [isUnlit()](doc/markdown/./scene.drawable.isunlit.md) | true if the shading of this object is independent of lighting |
+|  [pushRenderQueueRef(ref)](doc/markdown/./scene.drawable.pushrenderqueueref.md) | Set render queue reference |
 

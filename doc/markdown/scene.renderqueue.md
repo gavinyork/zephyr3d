@@ -23,6 +23,7 @@ declare class RenderQueue
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
 |  [items](doc/markdown/./scene.renderqueue.items.md) | <code>readonly</code> | Record&lt;number, RenderItemList&gt; | Gets the items of the render queue |
+|  [ref](doc/markdown/./scene.renderqueue.ref.md) | <code>readonly</code> | RenderQueueRef | Gets the indirect reference of this |
 |  [renderPass](doc/markdown/./scene.renderqueue.renderpass.md) | <code>readonly</code> | [RenderPass](doc/markdown/./scene.renderpass.md) | The render pass to which the render queue belongs |
 |  [shadowedLights](doc/markdown/./scene.renderqueue.shadowedlights.md) | <code>readonly</code> | [PunctualLight](doc/markdown/./scene.punctuallight.md)<!-- -->\[\] | Gets the shadowed lights |
 |  [sunLight](doc/markdown/./scene.renderqueue.sunlight.md) |  | [DirectionalLight](doc/markdown/./scene.directionallight.md) | The sun light |
@@ -32,9 +33,11 @@ declare class RenderQueue
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
+|  [binaryInsert(itemList, item)](doc/markdown/./scene.renderqueue.binaryinsert.md) |  |  |
+|  [getInstanceInfo(drawable)](doc/markdown/./scene.renderqueue.getinstanceinfo.md) |  | Gets the instance information for given drawable object |
 |  [push(camera, drawable, renderOrder)](doc/markdown/./scene.renderqueue.push.md) |  | Push an item to the render queue |
 |  [pushLight(light)](doc/markdown/./scene.renderqueue.pushlight.md) |  | Push a punctual light |
 |  [pushRenderQueue(queue)](doc/markdown/./scene.renderqueue.pushrenderqueue.md) |  | Push items from another render queue |
 |  [reset()](doc/markdown/./scene.renderqueue.reset.md) |  | Removes all items in the render queue |
-|  [sortItems()](doc/markdown/./scene.renderqueue.sortitems.md) |  | Sorts the items in the render queue for rendering |
+|  [sortTransparentItems(cameraPos)](doc/markdown/./scene.renderqueue.sorttransparentitems.md) |  | Sorts the items in the render queue for rendering |
 

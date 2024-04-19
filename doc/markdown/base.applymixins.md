@@ -6,22 +6,22 @@
 
 Applies mixins to a constructor function.
 
-This function takes a constructor function of a class (derivedCtor) and an array of constructor functions from which to inherit or "mix in" properties and methods. It effectively adds the properties and methods from the base constructors (baseCtors) to the prototype of the derived constructor, allowing the derived class to inherit features from multiple sources.
-
 **Signature:**
 
 ```typescript
-declare function applyMixins(derivedCtor: any, baseCtors: any[]): void;
+declare function applyMixins<M extends ((target: any) => any)[], T>(target: T, ...mixins: M): T & ExtractMixinType<M>;
 ```
 
 ## Parameters
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  derivedCtor | any | The constructor function of the class that will receive the mixins. |
-|  baseCtors | any\[\] | An array of constructor functions that will be mixed into the derivedCtor. |
+|  target | T | The constructor function of the class that will receive the mixins. |
+|  mixins | M | mixins |
 
 **Returns:**
 
-void
+T &amp; [ExtractMixinType](doc/markdown/./base.extractmixintype.md)<!-- -->&lt;M&gt;
+
+Mixed class
 
