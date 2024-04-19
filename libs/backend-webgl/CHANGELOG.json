@@ -2,6 +2,18 @@
   "name": "@zephyr3d/backend-webgl",
   "entries": [
     {
+      "version": "0.1.6",
+      "tag": "@zephyr3d/backend-webgl_v0.1.6",
+      "date": "Fri, 19 Apr 2024 18:22:46 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "change keywords"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.5",
       "tag": "@zephyr3d/backend-webgl_v0.1.5",
       "date": "Fri, 19 Apr 2024 18:09:58 GMT",
