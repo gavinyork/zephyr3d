@@ -66,19 +66,14 @@
     这里是该材质的fragmentShader实现，必需重写。
     重写此方法必须调用其默认实现。
 
-  - [MeshMaterial.updateRenderStates(pass, ctx)](/doc/markdown/./scene.meshmaterial.updaterenderstates)
+  - [MeshMaterial.updateRenderStates(pass, stateSet, ctx)](/doc/markdown/./scene.meshmaterial.updaterenderstates)
 
-    在beginDraw()方法中调用，用于设置材质的渲染状态。
+    每次当使用该材质的渲染对象被渲染之前会调用，用于设置材质的渲染状态。
     重写此方法必须调用其默认实现。
     
-  - [MeshMaterial.beginDraw(pass, ctx)](/doc/markdown/./scene.material.begindraw)
+  - [MeshMaterial.apply(ctx)](/doc/markdown/./scene.material.apply)
 
-    当开始渲染材质的某一Pass之前调用，按需创建Shader设置uniform常量。返回true正常渲染，返回false则不渲染此Pass。
-    重写此方法必须调用其默认实现。
-
-  - [MeshMaterial.endDraw(pass, ctx)](/doc/markdown/./scene.material.begindraw)
-
-    材质的某一Pass渲染完成之后调用
+    当应用材质时调用，按需创建Shader设置uniform常量。
     重写此方法必须调用其默认实现。
 
 类[ShaderHelper](/doc/markdown/./scene.shaderhelper)提供了编写材质需要的诸多工具函数。

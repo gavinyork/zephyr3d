@@ -141,7 +141,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   private createPipelineLayout(bindGroupLayouts: BindGroupLayout[]): GPUPipelineLayout {
     const layouts: GPUBindGroupLayout[] = [];
     bindGroupLayouts.forEach((val) => {
-      layouts.push(this._device.fetchBindGroupLayout(val));
+      layouts.push(this._device.fetchBindGroupLayout(val)[1]);
     });
     return this._device.device.createPipelineLayout({
       bindGroupLayouts: layouts

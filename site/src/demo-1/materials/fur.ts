@@ -1,7 +1,7 @@
 import { Vector4 } from '@zephyr3d/base';
-import type { BindGroup, PBFunctionScope, Texture2D } from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope, RenderStateSet, Texture2D } from '@zephyr3d/device';
 import type { DrawContext, Primitive } from '@zephyr3d/scene';
-import { Application, MeshMaterial, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT, ShaderHelper, applyMaterialMixins, mixinLambert } from '@zephyr3d/scene';
+import { Application, MeshMaterial, QUEUE_TRANSPARENT, ShaderHelper, applyMaterialMixins, mixinLambert } from '@zephyr3d/scene';
 
 export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
   private _thickness: number;
@@ -84,19 +84,15 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
   isBatchable(): boolean {
     return false;
   }
-  beginDraw(pass: number, ctx: DrawContext): boolean {
+  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
     if (pass > 0) {
-      if (ctx.renderPass.type !== RENDER_PASS_TYPE_LIGHT) {
-        return false;
-      } else {
-        this.blendMode = 'blend';
-        this.cullMode = 'none';
-      }
+      this.blendMode = 'blend';
+      this.cullMode = 'none';
     } else {
-      this.blendMode = 'none';
+      this.blendMode ='none';
       this.cullMode = 'back';
     }
-    return super.beginDraw(pass, ctx);
+    super.updateRenderStates(pass, stateSet, ctx);
   }
   drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number): void {
     if (pass === 0 || !this._instancing) {

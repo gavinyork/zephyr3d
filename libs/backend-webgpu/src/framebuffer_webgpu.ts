@@ -24,6 +24,7 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
   private _width: number;
   private _height: number;
   private _bindFlag: number;
+  private _hash: string;
   private _msaaColorTextures: GPUTexture[];
   private _msaaDepthTexture: GPUTexture;
   constructor(
@@ -83,6 +84,10 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
     this._bindFlag = 0;
     this._msaaColorTextures = null;
     this._msaaDepthTexture = null;
+    const colorAttachmentHash =
+      this._options.colorAttachments?.map((tex) => tex.texture.format).join(':') ?? '';
+    const depthAttachmentHash = this._options.depthAttachment?.texture.format ?? '';
+    this._hash = `${colorAttachmentHash}-${depthAttachmentHash}-${this._options.sampleCount ?? 1}`;
     this._init();
   }
   getOptions(): Readonly<WebGPUFrameBufferOptions> {
@@ -90,6 +95,9 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
   }
   get bindFlag(): number {
     return this._bindFlag;
+  }
+  getHash(): string {
+    return this._hash;
   }
   getWidth(): number {
     const attachment = this._options.colorAttachments?.[0] ?? this._options.depthAttachment;

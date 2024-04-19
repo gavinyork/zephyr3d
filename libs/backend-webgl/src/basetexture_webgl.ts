@@ -94,6 +94,7 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
   destroy(): void {
     if (this._object) {
       this._device.context.deleteTexture(this._object);
+      this._device.invalidateBindingTextures();
       this._object = null;
       this._device.updateVideoMemoryCost(-this._memCost);
       this._memCost = 0;
@@ -191,6 +192,7 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
       const obj = this._object;
       this._device.runNextFrame(() => {
         this._device.context.deleteTexture(obj);
+        this._device.invalidateBindingTextures();
       });
       this._object = null;
     }
@@ -203,7 +205,8 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
       if (!this._device.isContextLost()) {
         this._object = this._device.context.createTexture();
         const gl = this._device.context;
-        gl.bindTexture(textureTargetMap[this._target], this._object);
+        this._device.bindTexture(textureTargetMap[this._target], 0, this);
+        //gl.bindTexture(textureTargetMap[this._target], this._object);
         const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
         if (isWebGL2(gl) && !this.isTextureVideo()) {
           if (!this.isTexture3D() && !this.isTexture2DArray()) {

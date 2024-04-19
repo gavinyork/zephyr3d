@@ -576,6 +576,15 @@ export class WebGPURenderStateSet implements RenderStateSet {
     this.depthState = null;
     this.stencilState = null;
   }
+  clone(): RenderStateSet {
+    const newStateSet = new WebGPURenderStateSet(this._device);
+    newStateSet.colorState = (this.colorState?.clone() as WebGPUColorState) ?? null;
+    newStateSet.blendingState = (this.blendingState?.clone() as WebGPUBlendingState) ?? null;
+    newStateSet.rasterizerState = (this.rasterizerState?.clone() as WebGPURasterizerState) ?? null;
+    newStateSet.depthState = (this.depthState?.clone() as WebGPUDepthState) ?? null;
+    newStateSet.stencilState = (this.stencilState?.clone() as WebGPUStencilState) ?? null;
+    return newStateSet;
+  }
   copyFrom(stateSet: RenderStateSet): void {
     this.colorState = stateSet.colorState as WebGPUColorState;
     this.blendingState = stateSet.blendingState as WebGPUBlendingState;

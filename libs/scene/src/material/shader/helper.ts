@@ -6,7 +6,6 @@ import {
   RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_SHADOWMAP
 } from '../../values';
-import { Application } from '../../app';
 import { ScatteringLut } from '../../render/scatteringlut';
 import type {
   ProgramBuilder,
@@ -14,11 +13,12 @@ import type {
   PBShaderExp,
   PBInsideFunctionScope,
   StructuredBuffer,
-  Texture2D
+  Texture2D,
+  PBGlobalScope
 } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
 import { linearToGamma } from '../../shaders';
-import { Camera } from '../../camera';
+import type { Camera } from '../../camera';
 
 const UNIFORM_NAME_GLOBAL = 'Z_UniformGlobal';
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
@@ -111,12 +111,6 @@ export class ShaderHelper {
    */
   static prepareFragmentShader(pb: ProgramBuilder, ctx: DrawContext) {
     this.setupGlobalUniforms(pb, ctx);
-    if (ctx.instanceData) {
-      const scope = pb.getGlobalScope();
-      scope[UNIFORM_NAME_INSTANCE_DATA_STRIDE] = pb.uint().uniform(1);
-      scope[UNIFORM_NAME_INSTANCE_DATA_OFFSET] = pb.uint().uniform(1);
-      scope[UNIFORM_NAME_INSTANCE_DATA] = pb.vec4[65536 >> 4]().uniformBuffer(3);
-    }
   }
   /**
    * Prepares the vertex shader which is going to be used in our material system
@@ -192,7 +186,7 @@ export class ShaderHelper {
           pb.getDevice().type === 'webgl' ? pb.tex2D() : pb.utex2D()
         ).uniform(0);
       }
-      if (ctx.applyFog && ctx.scene.env.sky.drawScatteredFog(ctx)) {
+      if (ctx.applyFog === 'scatter') {
         scope[UNIFORM_NAME_AERIALPERSPECTIVE_LUT] = pb.tex2D().uniform(0);
       }
       if (ctx.currentShadowLight) {
@@ -211,9 +205,8 @@ export class ShaderHelper {
           : scope.$builder.tex2DArray();
         if (
           !shadowMapParams.shadowMap.isDepth() &&
-          !Application.instance.device
-            .getDeviceCaps()
-            .textureCaps.getTextureFormatInfo(shadowMapParams.shadowMap.format).filterable
+          !ctx.device.getDeviceCaps().textureCaps.getTextureFormatInfo(shadowMapParams.shadowMap.format)
+            .filterable
         ) {
           tex.sampleType('unfilterable-float');
         }
@@ -411,14 +404,39 @@ export class ShaderHelper {
   }
   /**
    * Gets the uniform variable of type mat4 which holds the normal matrix of current object to be drawn
+   *
    * @param scope - Current shader scope
    * @returns The normal matrix of current object to be drawn
    */
   static getNormalMatrix(scope: PBInsideFunctionScope): PBShaderExp {
     return this.getWorldMatrix(scope);
   }
+  /**
+   * Vertex shader drawable stuff
+   *
+   * @param scope - Current shader scope
+   * @param skinning - true if skinning is used, otherwise false.
+   * @param instanced - true if instancing is used, otherwise false.
+   */
+  static vertexShaderDrawableStuff(scope: PBGlobalScope, skinning: boolean, instanced: boolean): void {
+    const pb = scope.$builder;
+    if (instanced) {
+      scope[UNIFORM_NAME_INSTANCE_DATA_STRIDE] = pb.uint().uniform(1);
+      scope[UNIFORM_NAME_INSTANCE_DATA_OFFSET] = pb.uint().uniform(1);
+      scope[UNIFORM_NAME_INSTANCE_DATA] = pb.vec4[65536 >> 4]().uniformBuffer(3);
+    } else {
+      scope[UNIFORM_NAME_WORLD_MATRIX] = pb.mat4().uniform(1);
+    }
+    if (skinning) {
+      scope[UNIFORM_NAME_BONE_MATRICES] = pb.tex2D().uniform(1).sampleType('unfilterable-float');
+      scope[UNIFORM_NAME_BONE_INV_BIND_MATRIX] = pb.mat4().uniform(1);
+      scope[UNIFORM_NAME_BONE_TEXTURE_SIZE] = pb.int().uniform(1);
+    }
+  }
   /** @internal */
   static prepareVertexShaderCommon(pb: ProgramBuilder, ctx: DrawContext) {
+    this.vertexShaderDrawableStuff(pb.getGlobalScope(), !!ctx.skinAnimation, !!ctx.instancing);
+    /*
     const skinning = !!ctx.target?.getBoneMatrices();
     const scope = pb.getGlobalScope();
     if (ctx.instanceData) {
@@ -433,6 +451,7 @@ export class ShaderHelper {
       scope[UNIFORM_NAME_BONE_INV_BIND_MATRIX] = pb.mat4().uniform(1);
       scope[UNIFORM_NAME_BONE_TEXTURE_SIZE] = pb.int().uniform(1);
     }
+    */
   }
   /** @internal */
   static setCameraUniforms(bindGroup: BindGroup, camera: Camera, flip: boolean, linear: boolean) {
@@ -443,12 +462,7 @@ export class ShaderHelper {
       viewProjectionMatrix: camera.viewProjectionMatrix,
       viewMatrix: camera.viewMatrix,
       projectionMatrix: camera.getProjectionMatrix(),
-      params: new Vector4(
-        camera.getNearPlane(),
-        camera.getFarPlane(),
-        flip ? -1 : 1,
-        linear ? 0 : 1
-      )
+      params: new Vector4(camera.getNearPlane(), camera.getFarPlane(), flip ? -1 : 1, linear ? 0 : 1)
     };
     bindGroup.setValue(UNIFORM_NAME_GLOBAL, {
       camera: cameraStruct
@@ -853,53 +867,6 @@ export class ShaderHelper {
       scope.$builtins.position = pos;
     }
   }
-  /** @internal */
-  static getSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp {
-    const pb = scope.$builder;
-    const funcNameGetBoneMatrixFromTexture = 'Z_getBoneMatrixFromTexture';
-    pb.func(funcNameGetBoneMatrixFromTexture, [pb.int('boneIndex')], function () {
-      const boneTexture = this[UNIFORM_NAME_BONE_MATRICES];
-      this.$l.w = pb.float(this[UNIFORM_NAME_BONE_TEXTURE_SIZE]);
-      this.$l.pixelIndex = pb.float(pb.mul(this.boneIndex, 4));
-      this.$l.xIndex = pb.mod(this.pixelIndex, this.w);
-      this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.w));
-      this.$l.u1 = pb.div(pb.add(this.xIndex, 0.5), this.w);
-      this.$l.u2 = pb.div(pb.add(this.xIndex, 1.5), this.w);
-      this.$l.u3 = pb.div(pb.add(this.xIndex, 2.5), this.w);
-      this.$l.u4 = pb.div(pb.add(this.xIndex, 3.5), this.w);
-      this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.w);
-      if (Application.instance.device.type !== 'webgl') {
-        this.$l.row1 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u1, this.v), 0);
-        this.$l.row2 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u2, this.v), 0);
-        this.$l.row3 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u3, this.v), 0);
-        this.$l.row4 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u4, this.v), 0);
-      } else {
-        this.$l.row1 = pb.textureSample(boneTexture, pb.vec2(this.u1, this.v));
-        this.$l.row2 = pb.textureSample(boneTexture, pb.vec2(this.u2, this.v));
-        this.$l.row3 = pb.textureSample(boneTexture, pb.vec2(this.u3, this.v));
-        this.$l.row4 = pb.textureSample(boneTexture, pb.vec2(this.u4, this.v));
-      }
-      this.$return(pb.mat4(this.row1, this.row2, this.row3, this.row4));
-    });
-    const funcNameGetSkinningMatrix = 'Z_getSkinningMatrix';
-    pb.func(funcNameGetSkinningMatrix, [], function () {
-      const invBindMatrix = this[UNIFORM_NAME_BONE_INV_BIND_MATRIX];
-      const blendIndices = pb.getGlobalScope().$getVertexAttrib('blendIndices');
-      const blendWeights = pb.getGlobalScope().$getVertexAttrib('blendWeights');
-      this.$l.m0 = pb.getGlobalScope()[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[0]));
-      this.$l.m1 = pb.getGlobalScope()[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[1]));
-      this.$l.m2 = pb.getGlobalScope()[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[2]));
-      this.$l.m3 = pb.getGlobalScope()[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[3]));
-      this.$l.m = pb.add(
-        pb.mul(this.m0, blendWeights.x),
-        pb.mul(this.m1, blendWeights.y),
-        pb.mul(this.m2, blendWeights.z),
-        pb.mul(this.m3, blendWeights.w)
-      );
-      this.$return(pb.mul(invBindMatrix, this.m));
-    });
-    return pb.getGlobalScope()[funcNameGetSkinningMatrix]();
-  }
   /**
    * Get global uniforms
    *
@@ -948,7 +915,7 @@ export class ShaderHelper {
           pb.float(pb.greaterThan(this.shadowCascades, 3))
         );
         this.$l.split = pb.int(pb.dot(this.comparison, this.cascadeFlags));
-        if (Application.instance.device.type === 'webgl') {
+        if (ctx.device.type === 'webgl') {
           this.$l.shadowVertex = pb.vec4();
           this.$for(pb.int('cascade'), 0, 4, function () {
             this.$if(pb.equal(this.cascade, this.split), function () {
@@ -1007,63 +974,57 @@ export class ShaderHelper {
     return pb.getGlobalScope()[funcName](worldPos, NoL);
   }
   static applyFog(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: PBShaderExp, ctx: DrawContext) {
-    if (ctx.applyFog) {
-      const pb = scope.$builder;
-      const that = this;
-      if (ctx.env.sky.drawScatteredFog(ctx)) {
-        const funcName = 'Z_applySkyFog';
-        pb.func(funcName, [pb.vec3('worldPos'), pb.vec4('color').inout()], function () {
-          this.$l.viewDir = pb.sub(this.worldPos, that.getCameraPosition(this));
-          this.viewDir.y = pb.max(this.viewDir.y, 0);
-          this.$l.distance = pb.mul(pb.length(this.viewDir), that.getAPDensity(this));
-          this.$l.sliceDist = pb.div(
-            pb.mul(that.getCameraParams(this).y, that.getAPDensity(this)),
-            ScatteringLut.aerialPerspectiveSliceZ
-          );
-          this.$l.slice0 = pb.floor(pb.div(this.distance, this.sliceDist));
-          this.$l.slice1 = pb.add(this.slice0, 1);
-          this.$l.factor = pb.sub(pb.div(this.distance, this.sliceDist), this.slice0);
-          this.$l.viewNormal = pb.normalize(this.viewDir);
-          this.$l.horizonAngle = pb.acos(
-            pb.clamp(
-              pb.dot(pb.normalize(that.getSunLightDir(this).xz), pb.normalize(this.viewNormal.xz)),
-              0,
-              1
-            )
-          );
-          this.$l.zenithAngle = pb.asin(this.viewNormal.y);
-          this.$l.sliceU = pb.max(
-            pb.div(this.horizonAngle, Math.PI * 2),
-            0.5 / ScatteringLut.aerialPerspectiveSliceZ
-          );
-          this.$l.u0 = pb.div(pb.add(this.slice0, this.sliceU), ScatteringLut.aerialPerspectiveSliceZ);
-          this.$l.u1 = pb.add(this.u0, 1 / ScatteringLut.aerialPerspectiveSliceZ);
-          this.$l.v = pb.div(this.zenithAngle, Math.PI / 2);
-          this.$l.t0 = pb.textureSampleLevel(that.getAerialPerspectiveLUT(this), pb.vec2(this.u0, this.v), 0);
-          this.$l.t1 = pb.textureSampleLevel(that.getAerialPerspectiveLUT(this), pb.vec2(this.u1, this.v), 0);
-          this.$l.t = pb.mix(this.t0, this.t1, this.factor);
+    const pb = scope.$builder;
+    const that = this;
+    if (ctx.applyFog === 'scatter') {
+      const funcName = 'Z_applySkyFog';
+      pb.func(funcName, [pb.vec3('worldPos'), pb.vec4('color').inout()], function () {
+        this.$l.viewDir = pb.sub(this.worldPos, that.getCameraPosition(this));
+        this.viewDir.y = pb.max(this.viewDir.y, 0);
+        this.$l.distance = pb.mul(pb.length(this.viewDir), that.getAPDensity(this));
+        this.$l.sliceDist = pb.div(
+          pb.mul(that.getCameraParams(this).y, that.getAPDensity(this)),
+          ScatteringLut.aerialPerspectiveSliceZ
+        );
+        this.$l.slice0 = pb.floor(pb.div(this.distance, this.sliceDist));
+        this.$l.slice1 = pb.add(this.slice0, 1);
+        this.$l.factor = pb.sub(pb.div(this.distance, this.sliceDist), this.slice0);
+        this.$l.viewNormal = pb.normalize(this.viewDir);
+        this.$l.horizonAngle = pb.acos(
+          pb.clamp(pb.dot(pb.normalize(that.getSunLightDir(this).xz), pb.normalize(this.viewNormal.xz)), 0, 1)
+        );
+        this.$l.zenithAngle = pb.asin(this.viewNormal.y);
+        this.$l.sliceU = pb.max(
+          pb.div(this.horizonAngle, Math.PI * 2),
+          0.5 / ScatteringLut.aerialPerspectiveSliceZ
+        );
+        this.$l.u0 = pb.div(pb.add(this.slice0, this.sliceU), ScatteringLut.aerialPerspectiveSliceZ);
+        this.$l.u1 = pb.add(this.u0, 1 / ScatteringLut.aerialPerspectiveSliceZ);
+        this.$l.v = pb.div(this.zenithAngle, Math.PI / 2);
+        this.$l.t0 = pb.textureSampleLevel(that.getAerialPerspectiveLUT(this), pb.vec2(this.u0, this.v), 0);
+        this.$l.t1 = pb.textureSampleLevel(that.getAerialPerspectiveLUT(this), pb.vec2(this.u1, this.v), 0);
+        this.$l.t = pb.mix(this.t0, this.t1, this.factor);
 
-          this.color = pb.vec4(pb.add(pb.mul(this.color.rgb, this.t.a), this.t.rgb), this.color.a);
-          //this.color = pb.vec4(pb.vec3(pb.mix(this.u0, this.u1, this.factor)), this.color.a);
-        });
-        scope[funcName](worldPos, color);
-      } else {
-        const funcName = 'Z_applyFog';
-        pb.func(funcName, [pb.vec3('worldPos'), pb.vec4('color').inout()], function () {
-          this.$l.viewDir = pb.sub(this.worldPos, that.getCameraPosition(this));
-          this.$l.fogFactor = that.computeFogFactor(
-            this,
-            this.viewDir,
-            that.getFogType(this),
-            that.getFogParams(this)
-          );
-          this.color = pb.vec4(
-            pb.mix(this.color.rgb, that.getFogColor(this).rgb, this.fogFactor),
-            this.color.a
-          );
-        });
-        scope[funcName](worldPos, color);
-      }
+        this.color = pb.vec4(pb.add(pb.mul(this.color.rgb, this.t.a), this.t.rgb), this.color.a);
+        //this.color = pb.vec4(pb.vec3(pb.mix(this.u0, this.u1, this.factor)), this.color.a);
+      });
+      scope[funcName](worldPos, color);
+    } else if (ctx.applyFog) {
+      const funcName = 'Z_applyFog';
+      pb.func(funcName, [pb.vec3('worldPos'), pb.vec4('color').inout()], function () {
+        this.$l.viewDir = pb.sub(this.worldPos, that.getCameraPosition(this));
+        this.$l.fogFactor = that.computeFogFactor(
+          this,
+          this.viewDir,
+          that.getFogType(this),
+          that.getFogParams(this)
+        );
+        this.color = pb.vec4(
+          pb.mix(this.color.rgb, that.getFogColor(this).rgb, this.fogFactor),
+          this.color.a
+        );
+      });
+      scope[funcName](worldPos, color);
     }
   }
   /**

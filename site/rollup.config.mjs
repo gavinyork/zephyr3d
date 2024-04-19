@@ -81,7 +81,11 @@ if (!deepEqual(cachedZephr3d, dict)){
   buildCache['@zephyr3d'] = dict;
   invalidAll = true;
 }
+const pattern = process.env.SITE_TUT ? process.env.SITE_TUT.split(';') : null;
 fs.readdirSync(srcdir).filter((dir) => {
+  if (pattern && pattern.indexOf(dir) < 0) {
+    return;
+  }
   const fullpath = path.join(srcdir, dir);
   if (fs.statSync(fullpath).isDirectory()) {
     let main = path.join(fullpath, 'main.js');
@@ -183,6 +187,7 @@ function getTutTarget(input, output) {
 }
 
 export default (args) => {
+  console.log(JSON.stringify(srcfiles));
   const tutTargets = srcfiles.map((f) => getTutTarget(f[0], f[1]));
   return [...tutTargets, getCacheTarget()];
 };

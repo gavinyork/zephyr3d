@@ -242,9 +242,13 @@ export class WebGLShaderCaps implements ShaderCaps {
   supportHighPrecisionInt: boolean;
   maxUniformBufferSize: number;
   uniformBufferOffsetAlignment: number;
+  maxStorageBufferSize: number;
+  storageBufferOffsetAlignment: number;
   constructor(gl: WebGLContext) {
     this._extFragDepth = null;
     this._extStandardDerivatives = null;
+    this.maxStorageBufferSize = 0;
+    this.storageBufferOffsetAlignment = 0;
     if (isWebGL2(gl)) {
       this.supportFragmentDepth = true;
       this.supportStandardDerivatives = true;

@@ -20,7 +20,7 @@ import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { PhysicsWorld } from './physics';
 import { Panel } from './ui';
 
-const objectCount = 800;
+const objectCount = 400;
 
 function getQueryString(name: string) {
   return new URL(window.location.toString()).searchParams.get(name) || null;
@@ -56,11 +56,8 @@ PhysicsApp.ready().then(async () => {
   device.setFont('24px arial');
 
   const scene = new Scene();
-  const light = new DirectionalLight(scene)
-    .setColor(new Vector4(1, 1, 1, 1))
-    .setCastShadow(false);
+  const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(true);
   light.lookAt(new Vector3(0, 0, 0), new Vector3(0.5, -0.707, -0.5), Vector3.axisPY());
-  light.castShadow = true;
   light.shadow.mode = 'pcf-opt';
   light.shadow.pcfKernelSize = 3;
   light.shadow.numShadowCascades = 4;
@@ -83,6 +80,11 @@ PhysicsApp.ready().then(async () => {
   PhysicsApp.on('resize', (ev) => {
     camera.aspect = ev.width / ev.height;
   });
+  PhysicsApp.on('keydown', (ev) => {
+    if (ev.code === 'Space') {
+      light.castShadow = !light.castShadow;
+    }
+  })
   PhysicsApp.on('tick', () => {
     camera.updateController();
     camera.render(scene, compositor);
@@ -103,27 +105,33 @@ PhysicsApp.ready().then(async () => {
   const objMaterial = new LambertMaterial();
   const boxShape = new BoxShape({ size: 2 });
   const sphereShape = new SphereShape();
-  for (let i = 0; i < objectCount >> 1; i++) {
-    let instanceMaterial = objMaterial.createInstance();
-    instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
-    const box = new Mesh(scene, boxShape, instanceMaterial);
-    box.position.setXYZ(0, 50, 0);
-    box.parent = batchGroup;
-    queue.push(box);
-    instanceMaterial = objMaterial.createInstance();
-    instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
-    const sphere = new Mesh(scene, sphereShape, instanceMaterial);
-    sphere.position.setXYZ(0, 50, 0);
-    sphere.parent = batchGroup;
-    queue.push(sphere);
+  for (let i = 0; i < objectCount; i++) {
+    {
+      let instanceMaterial = objMaterial.createInstance();
+      instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
+      const sphere = new Mesh(scene, sphereShape, instanceMaterial);
+      sphere.position.setXYZ(0, 50, 0);
+      sphere.parent = batchGroup;
+      queue.push(sphere);
+    }
+    {
+      let instanceMaterial = objMaterial.createInstance();
+      instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
+      const box = new Mesh(scene, boxShape, instanceMaterial);
+      box.position.setXYZ(0, 50, 0);
+      box.parent = batchGroup;
+      queue.push(box);
+    }
   }
   physicsWorld.start();
 
   setInterval(() => {
     const mesh = queue.shift();
-    queue.push(mesh);
-    physicsWorld.positionMesh(mesh, 1, Math.random() * 8 - 4, 50, Math.random() * 8 - 4);
-  }, 50);
+    if (mesh) {
+      queue.push(mesh);
+      physicsWorld.positionMesh(mesh, 1, Math.random() * 8 - 4, 50, Math.random() * 8 - 4);
+    }
+  }, 300);
 
   new Panel();
   PhysicsApp.run();

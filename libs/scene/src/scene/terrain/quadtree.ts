@@ -372,7 +372,15 @@ export class Quadtree {
   cull(visitor: CullVisitor, viewPoint: Vector3, worldMatrix: Matrix4x4): number {
     if (this._rootNode && this._terrain) {
       const frustum = new Frustum(Matrix4x4.multiply(visitor.camera.viewProjectionMatrix, worldMatrix));
-      return this.cull_r(visitor, this._rootNode, viewPoint, worldMatrix, frustum, visitor.frustumCulling, false);
+      return this.cull_r(
+        visitor,
+        this._rootNode,
+        viewPoint,
+        worldMatrix,
+        frustum,
+        visitor.frustumCulling,
+        false
+      );
     }
     return 0;
   }

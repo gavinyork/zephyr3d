@@ -13,6 +13,7 @@ import type { WebGPUVertexLayout } from './vertexlayout_webgpu';
 import type { WebGPUProgram } from './gpuprogram_webgpu';
 import type { WebGPUDevice } from './device';
 import type { WebGPURenderStateSet } from './renderstates_webgpu';
+import type { WebGPUFrameBuffer } from './framebuffer_webgpu';
 
 const typeU16 = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U16);
 const stencilFormats = ['stencil8', 'depth24plus-stencil8', 'depth24unorm-stencil8', 'depth32float-stencil8'];
@@ -25,6 +26,7 @@ const depthFormats = [
   'depth32float-stencil8'
 ];
 export type FrameBufferInfo = {
+  frameBuffer: WebGPUFrameBuffer;
   colorFormats: GPUTextureFormat[];
   depthFormat: GPUTextureFormat;
   sampleCount: number;

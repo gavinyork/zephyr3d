@@ -90,7 +90,6 @@ export class SceneNode extends XForm<SceneNode> {
   get placeToOctree(): boolean {
     return this._placeToOctree;
   }
-  /** @internal */
   set placeToOctree(val: boolean) {
     if (!!val !== this._placeToOctree) {
       this._placeToOctree = !!val;
@@ -171,6 +170,10 @@ export class SceneNode extends XForm<SceneNode> {
   }
   /**
    * Iterate self and all of the children
+   * 
+   * @remarks
+   * DO NOT remove child duration iteration!
+   * 
    * @param callback - callback function that will be called on each node
    */
   iterate(callback: (node: SceneNode) => void) {

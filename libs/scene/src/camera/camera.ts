@@ -8,6 +8,7 @@ import type { Compositor } from '../posteffect';
 import type { Scene } from '../scene/scene';
 import type { BaseCameraController } from './base';
 import type { RenderLogger } from '../logger/logger';
+import type { OIT } from '../render/oit';
 
 /**
  * The camera node class
@@ -46,6 +47,12 @@ export class Camera extends SceneNode {
   protected _clearColor: Vector4;
   /** @internal */
   protected _clipMask: number;
+  /** @internal */
+  protected _oit: OIT;
+  /** @internal */
+  protected _depthPrePass: boolean;
+  /** @internal */
+  protected _commandBufferReuse: boolean;
   /**
    * Creates a new camera node
    * @param scene - The scene that the camera belongs to
@@ -68,6 +75,9 @@ export class Camera extends SceneNode {
     this._sampleCount = 1;
     this._frustum = null;
     this._frustumV = null;
+    this._oit = null;
+    this._depthPrePass = false;
+    this._commandBufferReuse = true;
   }
   /** Clip plane in camera space */
   get clipPlane(): Plane {
@@ -76,6 +86,20 @@ export class Camera extends SceneNode {
   set clipPlane(plane: Plane) {
     this._clipPlane = plane;
     this._invalidate(false);
+  }
+  /** Whether to perform a depth pass */
+  get depthPrePass(): boolean {
+    return this._depthPrePass;
+  }
+  set depthPrePass(val: boolean) {
+    this._depthPrePass = !!val;
+  }
+  /** Whether to allow command buffer reuse optimization */
+  get commandBufferReuse(): boolean {
+    return this._commandBufferReuse;
+  }
+  set commandBufferReuse(val: boolean) {
+    this._commandBufferReuse = !!val;
   }
   /**
    * Sample count for MSAA
@@ -92,6 +116,13 @@ export class Camera extends SceneNode {
     } else {
       this._sampleCount = val;
     }
+  }
+  /** OIT */
+  get oit(): OIT {
+    return this._oit;
+  }
+  set oit(val: OIT) {
+    this._oit = val;
   }
   /** Clip plane mask */
   get clipMask(): number {

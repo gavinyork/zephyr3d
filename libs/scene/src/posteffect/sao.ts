@@ -7,7 +7,6 @@ import type {
   TextureSampler
 } from '@zephyr3d/device';
 import { isFloatTextureFormat } from '@zephyr3d/device';
-import { Application } from '../app';
 import { AbstractPostEffect } from './posteffect';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
@@ -64,8 +63,6 @@ export class SAO extends AbstractPostEffect {
     this._blitterV.kernelRadius = 8;
     this._blitterV.stdDev = 10;
     this._copyBlitter = new CopyBlitter();
-    this.addIntermediateFramebuffer('ao', 'current');
-    this.addIntermediateFramebuffer('blur', 'current');
   }
   /** Scale value */
   get scale(): number {
@@ -136,7 +133,7 @@ export class SAO extends AbstractPostEffect {
   }
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
-    const device = Application.instance.device;
+    const device = ctx.device;
     const viewport = device.getViewport();
     this._prepare(device, inputColorTexture);
     this._copyBlitter.srgbOut = srgbOutput;

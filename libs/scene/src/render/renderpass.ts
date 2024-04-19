@@ -1,13 +1,13 @@
 import { Vector4 } from '@zephyr3d/base';
 import { CullVisitor } from './cull_visitor';
-import { Material } from '../material';
 import { Application } from '../app';
-import type { RenderQueueItem } from './render_queue';
+import type { RenderItemListInfo, RenderQueueItem } from './render_queue';
 import { RenderQueue } from './render_queue';
 import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
-import type { AbstractDevice, BindGroup, BindGroupLayout, RenderStateSet } from '@zephyr3d/device';
+import type { AbstractDevice, BindGroup } from '@zephyr3d/device';
 import { ShaderHelper } from '../material/shader/helper';
+import type { RenderBundleWrapper } from './renderbundle_wrapper';
 
 /**
  * Base class for any kind of render passes
@@ -17,7 +17,7 @@ export abstract class RenderPass {
   /** @internal */
   protected _type: number;
   /** @internal */
-  protected _globalBindGroups: Record<string, { bindGroup: BindGroup; layout: BindGroupLayout }>;
+  protected _globalBindGroups: Record<string, BindGroup>;
   /** @internal */
   protected _clearColor: Vector4;
   /** @internal */
@@ -63,8 +63,8 @@ export abstract class RenderPass {
     return this._type;
   }
   /** @internal */
-  isAutoFlip(): boolean {
-    return !!(Application.instance.device.getFramebuffer() && Application.instance.device.type === 'webgpu');
+  isAutoFlip(ctx: DrawContext): boolean {
+    return !!(ctx.device.getFramebuffer() && ctx.device.type === 'webgpu');
   }
   /**
    * Renders a scene
@@ -75,16 +75,11 @@ export abstract class RenderPass {
     this.drawScene(ctx, cullCamera ?? ctx.camera, renderQueue);
   }
   /** @internal */
-  applyRenderStates(device: AbstractDevice, stateSet: RenderStateSet, ctx: DrawContext) {
-    device.setRenderStates(stateSet);
-  }
-  /** @internal */
-  protected getGlobalBindGroupInfo(ctx: DrawContext): { bindGroup: BindGroup; layout: BindGroupLayout } {
+  protected getGlobalBindGroup(ctx: DrawContext): BindGroup {
     const hash = this.getGlobalBindGroupHash(ctx);
     let bindGroup = this._globalBindGroups[hash];
     if (!bindGroup) {
-      //const programBuilder = new ProgramBuilder(Application.instance.device);
-      const ret = Application.instance.device.programBuilder.buildRender({
+      const ret = ctx.device.programBuilder.buildRender({
         vertex(pb) {
           ShaderHelper.prepareVertexShader(pb, ctx);
           pb.main(function () {});
@@ -94,14 +89,8 @@ export abstract class RenderPass {
           pb.main(function () {});
         }
       });
-      bindGroup = {
-        bindGroup: Application.instance.device.createBindGroup(ret[2][0]),
-        layout: ret[2][0]
-      };
+      bindGroup = ctx.device.createBindGroup(ret[2][0]);
       this._globalBindGroups[hash] = bindGroup;
-    }
-    if (bindGroup.bindGroup.disposed) {
-      bindGroup.bindGroup.reload();
     }
     return bindGroup;
   }
@@ -109,9 +98,6 @@ export abstract class RenderPass {
    * Disposes the render pass
    */
   dispose() {
-    for (const k in this._globalBindGroups) {
-      Material.bindGroupGarbageCollect(this._globalBindGroups[k].bindGroup);
-    }
     this._globalBindGroups = {};
   }
   /** @internal */
@@ -124,14 +110,17 @@ export abstract class RenderPass {
   protected abstract renderItems(ctx: DrawContext, renderQueue: RenderQueue);
   /** @internal */
   protected drawScene(ctx: DrawContext, cullCamera: Camera, renderQueue?: RenderQueue) {
-    const device = Application.instance.device;
+    const device = ctx.device;
     this.clearFramebuffer();
-    renderQueue = renderQueue ?? this.cullScene(ctx, cullCamera);
-    if (renderQueue) {
+    const rq = renderQueue ?? this.cullScene(ctx, cullCamera);
+    if (rq) {
       const windingReversed = device.isWindingOrderReversed();
-      device.reverseVertexWindingOrder(this.isAutoFlip() ? !windingReversed : windingReversed);
-      this.renderItems(ctx, renderQueue);
+      device.reverseVertexWindingOrder(this.isAutoFlip(ctx) ? !windingReversed : windingReversed);
+      this.renderItems(ctx, rq);
       device.reverseVertexWindingOrder(windingReversed);
+      if (rq !== renderQueue) {
+        rq.dispose();
+      }
     }
   }
   /**
@@ -168,6 +157,105 @@ export abstract class RenderPass {
     if (reverse) {
       device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
     }
+  }
+  /** @internal */
+  private internalDrawItemList(
+    ctx: DrawContext,
+    items: RenderQueueItem[],
+    renderBundle: RenderBundleWrapper,
+    reverseWinding: boolean,
+    hash: string
+  ) {
+    if (renderBundle && ctx.primaryCamera.commandBufferReuse) {
+      const bundle = renderBundle.getRenderBundle(hash);
+      if (bundle) {
+        ctx.device.executeRenderBundle(bundle);
+        return;
+      }
+      renderBundle.beginRenderBundle();
+    }
+    for (const item of items) {
+      ctx.instanceData = item.instanceData;
+      const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
+      if (reverse) {
+        ctx.device.reverseVertexWindingOrder(!ctx.device.isWindingOrderReversed());
+      }
+      item.drawable.draw(ctx);
+      if (reverse) {
+        ctx.device.reverseVertexWindingOrder(!ctx.device.isWindingOrderReversed());
+      }
+    }
+    if (renderBundle && ctx.primaryCamera.commandBufferReuse) {
+      renderBundle.endRenderBundle(hash);
+    }
+  }
+  /** @internal */
+  protected drawItemList(itemList: RenderItemListInfo, ctx: DrawContext, reverseWinding: boolean) {
+    ctx.renderQueue = itemList.renderQueue;
+    ctx.instanceData = null;
+    const windingHash = reverseWinding ? '1' : '0';
+    const bindGroupHash = ctx.device.getBindGroup(0)[0].getGPUId();
+    const framebufferHash = ctx.device.getFramebuffer()?.getHash() ?? '';
+    const hash = `${windingHash}-${bindGroupHash}-${framebufferHash}-${ctx.renderPassHash}`;
+    if (itemList) {
+      if (itemList.itemList.length > 0) {
+        ctx.skinAnimation = false;
+        ctx.instancing = false;
+        itemList.materialList.forEach((mat) => mat.apply(ctx));
+        this.internalDrawItemList(ctx, itemList.itemList, itemList.renderBundle, reverseWinding, hash);
+      }
+      if (itemList.skinItemList.length > 0) {
+        ctx.skinAnimation = true;
+        ctx.instancing = false;
+        itemList.materialList.forEach((mat) => mat.apply(ctx));
+        this.internalDrawItemList(
+          ctx,
+          itemList.skinItemList,
+          itemList.skinRenderBundle,
+          reverseWinding,
+          hash
+        );
+        /*
+        for (const item of itemList.skinItemList) {
+          ctx.instanceData = item.instanceData;
+          const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
+          if (reverse) {
+            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+          }
+          item.drawable.draw(ctx);
+          if (reverse) {
+            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+          }
+        }
+        */
+      }
+      if (itemList.instanceItemList.length > 0) {
+        ctx.skinAnimation = false;
+        ctx.instancing = true;
+        itemList.materialList.forEach((mat) => mat.apply(ctx));
+        this.internalDrawItemList(
+          ctx,
+          itemList.instanceItemList,
+          itemList.instanceRenderBundle,
+          reverseWinding,
+          hash
+        );
+        /*
+        for (const item of itemList.instanceItemList) {
+          ctx.instanceData = item.instanceData;
+          const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
+          if (reverse) {
+            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+          }
+          item.drawable.draw(ctx);
+          if (reverse) {
+            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
+          }
+        }
+        */
+      }
+    }
+    ctx.renderQueue = null;
   }
   /** @internal */
   private clearFramebuffer() {

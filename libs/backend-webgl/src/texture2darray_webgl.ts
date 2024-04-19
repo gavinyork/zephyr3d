@@ -42,7 +42,8 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
     }
     const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
     const gl = this._device.context as WebGL2RenderingContext;
-    gl.bindTexture(textureTargetMap[this._target], this._object);
+    this._device.bindTexture(textureTargetMap[this._target], 0, this);
+    //gl.bindTexture(textureTargetMap[this._target], this._object);
     gl.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
     gl.texSubImage3D(
       textureTargetMap[this._target],
@@ -93,7 +94,8 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
     if (!this._device.isContextLost()) {
       const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
       const gl = this._device.context as WebGL2RenderingContext;
-      gl.bindTexture(textureTargetMap[this._target], this._object);
+      this._device.bindTexture(textureTargetMap[this._target], 0, this);
+      //gl.bindTexture(textureTargetMap[this._target], this._object);
       (this.device as WebGLDevice).clearErrors();
       for (let layer = 0; layer < levels.arraySize; layer++) {
         if (levels.mipDatas[layer].length !== levels.mipLevels) {
@@ -159,7 +161,8 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
     }
     const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
     const gl = this._device.context as WebGL2RenderingContext;
-    gl.bindTexture(textureTargetMap[this._target], this._object);
+    this._device.bindTexture(textureTargetMap[this._target], 0, this);
+    //gl.bindTexture(textureTargetMap[this._target], this._object);
     gl.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
     if (x === 0 && y === 0 && width === data.width && height === data.height) {
       gl.texSubImage3D(
@@ -218,7 +221,8 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
   generateMipmaps() {
     if (this._object && this._mipLevelCount > 1) {
       const target = textureTargetMap[this._target];
-      this._device.context.bindTexture(target, this._object);
+      this._device.bindTexture(target, 0, this);
+      //this._device.context.bindTexture(target, this._object);
       this._device.context.generateMipmap(target);
     }
   }

@@ -11,27 +11,65 @@ import type { WebGPUFrameBuffer } from './framebuffer_webgpu';
 import type { FrameBufferInfo } from './pipeline_cache';
 import type { WebGPUBuffer } from './buffer_webgpu';
 import type { WebGPUBaseTexture } from './basetexture_webgpu';
+import { WebGPUMipmapGenerator } from './utils_webgpu';
 
 export class CommandQueueImmediate {
   protected _renderPass: WebGPURenderPass;
   protected _computePass: WebGPUComputePass;
+  private _bufferUploads: Map<WebGPUBuffer, number>;
+  private _textureUploads: Map<WebGPUBaseTexture, number>;
+  private _device: WebGPUDevice;
+  private _drawcallCounter: number;
   constructor(device: WebGPUDevice) {
+    this._device = device;
+    this._bufferUploads = new Map();
+    this._textureUploads = new Map();
     this._renderPass = new WebGPURenderPass(device);
     this._computePass = new WebGPUComputePass(device);
+    this._drawcallCounter = 0;
+  }
+  isBufferUploading(buffer: WebGPUBuffer): boolean {
+    return !!this._bufferUploads.has(buffer);
+  }
+  isTextureUploading(tex: WebGPUBaseTexture): boolean {
+    return !!this._textureUploads.has(tex);
+  }
+  flushUploads() {
+    if (this._bufferUploads.size > 0 || this._textureUploads.size > 0) {
+      this._drawcallCounter = 0;
+      const bufferUploads = this._bufferUploads;
+      this._bufferUploads = new Map();
+      const textureUploads = this._textureUploads;
+      this._textureUploads = new Map();
+      const uploadCommandEncoder = this._device.device.createCommandEncoder();
+      bufferUploads.forEach((_, buffer) => buffer.beginSyncChanges(uploadCommandEncoder));
+      textureUploads.forEach((_, tex) => {
+        tex.beginSyncChanges(uploadCommandEncoder);
+        if (tex.isMipmapDirty()) {
+          WebGPUMipmapGenerator.generateMipmap(this._device, tex, uploadCommandEncoder);
+        }
+      });
+      this._device.device.queue.submit([uploadCommandEncoder.finish()]);
+      bufferUploads.forEach((_, buffer) => buffer.endSyncChanges());
+      textureUploads.forEach((_, tex) => tex.endSyncChanges());
+      this._renderPass.end();
+      this._computePass.end();
+    }
   }
   get currentPass(): WebGPURenderPass | WebGPUComputePass {
     return this._renderPass.active ? this._renderPass : this._computePass.active ? this._computePass : null;
   }
   beginFrame(): void {}
   endFrame(): void {
-    this._renderPass.end();
-    this._computePass.end();
+    this.flush();
   }
   flush() {
+    this.flushUploads();
     this._renderPass.end();
     this._computePass.end();
   }
   setFramebuffer(fb: WebGPUFrameBuffer): void {
+    this.flushUploads();
     this._renderPass.setFramebuffer(fb);
   }
   getFramebuffer(): WebGPUFrameBuffer {
@@ -39,6 +77,40 @@ export class CommandQueueImmediate {
   }
   getFramebufferInfo(): FrameBufferInfo {
     return this._renderPass.getFrameBufferInfo();
+  }
+  executeRenderBundle(renderBundle: GPURenderBundle) {
+    this._computePass.end();
+    this._renderPass.executeRenderBundle(renderBundle);
+  }
+  bufferUpload(buffer: WebGPUBuffer) {
+    if (this._bufferUploads.has(buffer)) {
+      if (this._drawcallCounter > this._bufferUploads.get(buffer)) {
+        this.flushUploads();
+      }
+    } else {
+      this._bufferUploads.set(buffer, this._drawcallCounter);
+    }
+  }
+  textureUpload(tex: WebGPUBaseTexture) {
+    if (this._textureUploads.has(tex)) {
+      if (this._drawcallCounter > this._textureUploads.get(tex)) {
+        this.flushUploads();
+      }
+    } else {
+      this._textureUploads.set(tex, this._drawcallCounter);
+    }
+  }
+  copyBuffer(
+    srcBuffer: WebGPUBuffer,
+    dstBuffer: WebGPUBuffer,
+    srcOffset: number,
+    dstOffset: number,
+    bytes: number
+  ) {
+    this.flushUploads();
+    const copyCommandEncoder = this._device.device.createCommandEncoder();
+    copyCommandEncoder.copyBufferToBuffer(srcBuffer.object, srcOffset, dstBuffer.object, dstOffset, bytes);
+    this._device.device.queue.submit([copyCommandEncoder.finish()]);
   }
   compute(
     program: WebGPUProgram,
@@ -48,6 +120,7 @@ export class CommandQueueImmediate {
     workgroupCountY: number,
     workgroupCountZ: number
   ) {
+    this._drawcallCounter++;
     this._renderPass.end();
     this._computePass.compute(
       program,
@@ -69,8 +142,36 @@ export class CommandQueueImmediate {
     count: number,
     numInstances: number
   ): void {
+    this._drawcallCounter++;
     this._computePass.end();
     this._renderPass.draw(
+      program,
+      vertexData,
+      stateSet,
+      bindGroups,
+      bindGroupOffsets,
+      primitiveType,
+      first,
+      count,
+      numInstances
+    );
+  }
+  capture(
+    renderBundleEncoder: GPURenderBundleEncoder,
+    program: WebGPUProgram,
+    vertexData: WebGPUVertexLayout,
+    stateSet: WebGPURenderStateSet,
+    bindGroups: WebGPUBindGroup[],
+    bindGroupOffsets: Iterable<number>[],
+    primitiveType: PrimitiveType,
+    first: number,
+    count: number,
+    numInstances: number
+  ): void {
+    this._drawcallCounter++;
+    this._computePass.end();
+    this._renderPass.capture(
+      renderBundleEncoder,
       program,
       vertexData,
       stateSet,
@@ -96,11 +197,5 @@ export class CommandQueueImmediate {
   }
   clear(color: Vector4, depth: number, stencil: number): void {
     this._renderPass.clear(color, depth, stencil);
-  }
-  isBufferUploading(buffer: WebGPUBuffer): boolean {
-    return this._renderPass.isBufferUploading(buffer) || this._computePass.isBufferUploading(buffer);
-  }
-  isTextureUploading(tex: WebGPUBaseTexture): boolean {
-    return this._renderPass.isTextureUploading(tex) || this._computePass.isTextureUploading(tex);
   }
 }

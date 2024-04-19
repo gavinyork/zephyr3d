@@ -1,7 +1,7 @@
 import { Vector2, Vector4 } from '@zephyr3d/base';
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
-import type { BindGroup, PBFunctionScope, Texture2D } from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope, RenderStateSet, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { RENDER_PASS_TYPE_LIGHT } from '../values';
 import { ShaderHelper } from './shader/helper';
@@ -132,5 +132,14 @@ export class GrassMaterial extends applyMaterialMixins(
     } else {
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
+  }
+  apply(ctx: DrawContext): boolean {
+    this.alphaToCoverage = ctx.device.getFrameBufferSampleCount() > 1;
+    this.alphaCutoff = this.alphaToCoverage ? 1 : 0.8;
+    return super.apply(ctx);
+  }
+  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
+    super.updateRenderStates(pass, stateSet, ctx);
+    stateSet.useRasterizerState().setCullMode('none');
   }
 }

@@ -1,19 +1,29 @@
 import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
-import { Vector2, nextPowerOf2 } from '@zephyr3d/base';
+import { Vector2, applyMixins, nextPowerOf2 } from '@zephyr3d/base';
 import { Primitive } from '../../render/primitive';
 import type { BatchDrawable, Drawable, DrawContext } from '../../render/drawable';
 import type { XForm } from '../xform';
 import type { QuadtreeNode } from './quadtree';
-import { Application } from '../../app';
 import type { Camera } from '../../camera/camera';
 import type { AbstractDevice, IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
 import type { Terrain } from './terrain';
 import type { GraphNode } from '../graph_node';
 import { GrassMaterial } from '../../material/grassmaterial';
+import { mixinDrawable } from '../../render/drawable_mixin';
+import type { Material } from '../../material';
 
-export class GrassCluster implements Drawable {
+export class GrassClusterBase {
+  protected _terrain;
+  constructor(terrain: Terrain) {
+    this._terrain = terrain;
+  }
+  getXForm(): XForm<XForm<any>> {
+    return this._terrain;
+  }
+}
+
+export class GrassCluster extends applyMixins(GrassClusterBase, mixinDrawable) implements Drawable {
   private _primitive: Primitive;
-  private _terrain: Terrain;
   private _numInstances: number;
   private _material: GrassMaterial;
   constructor(
@@ -24,22 +34,21 @@ export class GrassCluster implements Drawable {
     material: GrassMaterial,
     grassData: Float32Array
   ) {
+    super(terrain);
     this._primitive = new Primitive();
     const instanceVertexBuffer = device.createVertexBuffer('tex1_f32x4', grassData);
     this._primitive.setVertexBuffer(baseVertexBuffer, 'vertex');
     this._primitive.setVertexBuffer(instanceVertexBuffer, 'instance');
     this._primitive.setIndexBuffer(indexBuffer);
     this._primitive.primitiveType = 'triangle-list';
-    this._terrain = terrain;
     this._numInstances = grassData.length >> 2;
     this._material = material;
-    this._material.stateSet.useRasterizerState().setCullMode('none');
   }
   getName() {
     return 'GrassCluster';
   }
-  getXForm(): XForm<XForm<any>> {
-    return this._terrain;
+  getMaterial(): Material {
+    return this._material;
   }
   getInstanceColor(): Vector4 {
     return this._terrain.getInstanceColor();
@@ -66,8 +75,7 @@ export class GrassCluster implements Drawable {
     return false;
   }
   draw(ctx: DrawContext) {
-    this._material.alphaToCoverage = Application.instance.device.getFrameBufferSampleCount() > 1;
-    this._material.alphaCutoff = this._material.alphaToCoverage ? 1 : 0.8;
+    this.bind(ctx);
     this._material.draw(this._primitive, ctx, this._numInstances);
   }
 }

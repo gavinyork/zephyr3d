@@ -12,13 +12,14 @@ import { VectorBase } from '@zephyr3d/base';
 
 // @public
 export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
+    beginCapture(): void;
     beginFrame(): boolean;
     buildComputeProgram(options: PBComputeOptions): GPUProgram;
     buildRenderProgram(options: PBRenderOptions): GPUProgram;
-    cancelNextFrameCall(f: () => void): void;
     canvas: HTMLCanvasElement;
     clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number): any;
     compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number): void;
+    copyBuffer(sourceBuffer: GPUDataBuffer, destBuffer: GPUDataBuffer, srcOffset: number, dstOffset: number, bytes: number): any;
     createBindGroup(layout: BindGroupLayout): BindGroup;
     createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer;
     createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube;
@@ -45,7 +46,9 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     draw(primitiveType: PrimitiveType, first: number, count: number): void;
     drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number): void;
     drawText(text: string, x: number, y: number, color: string): any;
+    endCapture(): RenderBundle;
     endFrame(): void;
+    executeRenderBundle(renderBundle: RenderBundle): any;
     exitLoop(): void;
     flush(): void;
     frameInfo: FrameInfo;
@@ -94,7 +97,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
 // @public
 export interface ArrayTypeDetail {
     dimension: number;
-    elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo;
+    elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo;
 }
 
 // @public
@@ -135,6 +138,8 @@ export abstract class BaseDevice {
     // (undocumented)
     protected _backend: DeviceBackend;
     // (undocumented)
+    abstract beginCapture(): void;
+    // (undocumented)
     beginFrame(): boolean;
     // (undocumented)
     protected _beginFrameCounter: number;
@@ -144,8 +149,6 @@ export abstract class BaseDevice {
     buildComputeProgram(options: PBComputeOptions): GPUProgram;
     // (undocumented)
     buildRenderProgram(options: PBRenderOptions): GPUProgram;
-    // (undocumented)
-    cancelNextFrameCall(f: () => void): void;
     // (undocumented)
     get canvas(): HTMLCanvasElement;
     // (undocumented)
@@ -160,6 +163,8 @@ export abstract class BaseDevice {
     compute(workgroupCountX: any, workgroupCountY: any, workgroupCountZ: any): void;
     // (undocumented)
     protected abstract _compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number): void;
+    // (undocumented)
+    abstract copyBuffer(sourceBuffer: GPUDataBuffer, destBuffer: GPUDataBuffer, srcOffset: number, dstOffset: number, bytes: number): any;
     // (undocumented)
     protected _cpuTimer: CPUTimer;
     // (undocumented)
@@ -227,9 +232,13 @@ export abstract class BaseDevice {
     // (undocumented)
     enableGPUTimeRecording(enable: boolean): void;
     // (undocumented)
+    abstract endCapture(): RenderBundle;
+    // (undocumented)
     endFrame(): void;
     // (undocumented)
     protected _endFrameTime: number;
+    // (undocumented)
+    abstract executeRenderBundle(renderBundle: RenderBundle): any;
     // (undocumented)
     exitLoop(): void;
     // (undocumented)
@@ -412,11 +421,15 @@ export interface BindGroup extends GPUObject<unknown> {
     // (undocumented)
     getBuffer(name: string): GPUDataBuffer;
     // (undocumented)
+    getDynamicOffsets(): number[];
+    // (undocumented)
+    getGPUId(): string;
+    // (undocumented)
     getLayout(): BindGroupLayout;
     // (undocumented)
     getTexture(name: string): BaseTexture;
     // (undocumented)
-    setBuffer(name: string, buffer: GPUDataBuffer): void;
+    setBuffer(name: string, buffer: GPUDataBuffer, offset?: number, bindOffset?: number, bindSize?: number): void;
     // (undocumented)
     setRawData(name: string, byteOffset: number, data: TypedArray, srcPos?: number, srcLength?: number): any;
     // (undocumented)
@@ -486,6 +499,7 @@ export interface BlendingState {
 
 // @public
 export interface BufferBindingLayout {
+    dynamicOffsetIndex: number;
     hasDynamicOffset: boolean;
     minBindingSize?: number;
     type?: 'uniform' | 'storage' | 'read-only-storage';
@@ -700,6 +714,8 @@ export interface FrameBuffer<T = unknown> extends GPUObject<T> {
     getColorAttachments(): BaseTexture[];
     // (undocumented)
     getDepthAttachment(): BaseTexture;
+    // (undocumented)
+    getHash(): string;
     // (undocumented)
     getHeight(): number;
     // (undocumented)
@@ -1025,9 +1041,10 @@ export class PBAnyTypeInfo extends PBTypeInfo<null> {
 
 // @public
 export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
-    constructor(elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo, dimension?: number);
+    constructor(elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo, dimension?: number);
     get dimension(): number;
-    get elementType(): PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo;
+    get elementType(): PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo;
+    haveAtomicMembers(): boolean;
     isArrayType(): this is PBArrayTypeInfo;
     // (undocumented)
     isCompatibleType(other: PBTypeInfo<TypeDetailInfo>): boolean;
@@ -1037,12 +1054,14 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
 // @public
 export class PBAtomicI32TypeInfo extends PBTypeInfo<null> {
     constructor();
+    haveAtomicMembers(): boolean;
     toBufferLayout(offset: number): UniformBufferLayout;
 }
 
 // @public
 export class PBAtomicU32TypeInfo extends PBTypeInfo<null> {
     constructor();
+    haveAtomicMembers(): boolean;
     toBufferLayout(offset: number): UniformBufferLayout;
 }
 
@@ -1170,6 +1189,7 @@ export class PBPointerTypeInfo extends PBTypeInfo<PointerTypeDetail> {
     constructor(pointerType: PBTypeInfo, addressSpace: PBAddressSpace);
     get addressSpace(): PBAddressSpace;
     set addressSpace(val: PBAddressSpace);
+    haveAtomicMembers(): boolean;
     isPointerType(): this is PBPointerTypeInfo;
     get pointerType(): PBTypeInfo;
     toBufferLayout(offset: number): UniformBufferLayout;
@@ -1413,10 +1433,12 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     sampleType(type: 'float' | 'unfilterable-float' | 'sint' | 'uint' | 'depth'): PBShaderExp;
     setAt(index: number | PBShaderExp, val: number | boolean | PBShaderExp): void;
     storage(group: number): PBShaderExp;
-    storageBuffer(group: number): PBShaderExp;
+    storageBuffer(group: number, bindingSize?: number): PBShaderExp;
+    storageBufferReadonly(group: number, bindingSize?: number): PBShaderExp;
+    storageReadonly(group: number): PBShaderExp;
     tag(...args: ShaderExpTagValue[]): PBShaderExp;
     uniform(group: number): PBShaderExp;
-    uniformBuffer(group: number): PBShaderExp;
+    uniformBuffer(group: number, bindingSize?: number): PBShaderExp;
     workgroup(): PBShaderExp;
 }
 
@@ -1433,6 +1455,7 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
         name: string;
         type: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo;
     }[]): PBStructTypeInfo;
+    haveAtomicMembers(): boolean;
     isStructType(): this is PBStructTypeInfo;
     get layout(): PBStructLayout;
     get structMembers(): {
@@ -1528,14 +1551,17 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
     isStorageTexture(): boolean;
     isUIntTexture(): boolean;
     get readable(): boolean;
+    set readable(val: boolean);
     get storageTexelFormat(): TextureFormat;
     get textureType(): PBTextureType;
     toBufferLayout(offset: number): UniformBufferLayout;
     get writable(): boolean;
+    set writable(val: boolean);
 }
 
 // @public
 export abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetailInfo> {
+    haveAtomicMembers(): boolean;
     isAnyType(): this is PBAnyTypeInfo;
     isArrayType(): this is PBArrayTypeInfo;
     isAtomicI32(): this is PBAtomicI32TypeInfo;
@@ -1596,8 +1622,27 @@ export interface ProgramBuilder {
     atan(val: number | PBShaderExp): PBShaderExp;
     atan2(y: number | PBShaderExp, x: number | PBShaderExp): PBShaderExp;
     atanh(val: number | PBShaderExp): PBShaderExp;
+    atomic_int: {
+        (): PBShaderExp;
+        (rhs: number): PBShaderExp;
+        (rhs: boolean): PBShaderExp;
+        (rhs: PBShaderExp): PBShaderExp;
+        (name: string): PBShaderExp;
+        ptr: ShaderTypeFunc;
+        [dim: number]: ShaderTypeFunc;
+    };
+    atomic_uint: {
+        (): PBShaderExp;
+        (rhs: number): PBShaderExp;
+        (rhs: boolean): PBShaderExp;
+        (rhs: PBShaderExp): PBShaderExp;
+        (name: string): PBShaderExp;
+        ptr: ShaderTypeFunc;
+        [dim: number]: ShaderTypeFunc;
+    };
     atomicAdd(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
     atomicAnd(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
+    atomicExchange(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
     atomicLoad(ptr: PBShaderExp): any;
     atomicMax(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
     atomicMin(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
@@ -2017,6 +2062,9 @@ export interface RasterizerState {
 }
 
 // @public
+export type RenderBundle = unknown;
+
+// @public
 export interface RenderProgramConstructParams {
     bindGroupLayouts: BindGroupLayout[];
     fs: string;
@@ -2028,6 +2076,7 @@ export interface RenderProgramConstructParams {
 export interface RenderStateSet {
     apply(force?: boolean): void;
     readonly blendingState: BlendingState;
+    clone(): RenderStateSet;
     readonly colorState: ColorState;
     copyFrom(stateSet: RenderStateSet): void;
     defaultBlendingState(): void;
@@ -2084,7 +2133,9 @@ export const semanticList: string[];
 
 // @public
 export interface ShaderCaps {
+    maxStorageBufferSize: number;
     maxUniformBufferSize: number;
+    storageBufferOffsetAlignment: number;
     supportFragmentDepth: boolean;
     supportHighPrecisionFloat: boolean;
     supportHighPrecisionInt: boolean;

@@ -1,26 +1,34 @@
-import { Vector3, Vector4 } from '@zephyr3d/base';
-import type { PBRMetallicRoughnessMaterial } from '@zephyr3d/scene';
 import {
   Scene,
   OrbitCameraController,
-  AssetManager,
-  DirectionalLight,
   Application,
   PerspectiveCamera,
   Compositor,
   Tonemap,
-  BatchGroup
+  BatchGroup,
+  DirectionalLight,
+  BoxShape,
+  LambertMaterial,
+  Mesh,
+  WeightedBlendedOIT,
+  ABufferOIT,
 } from '@zephyr3d/scene';
 import * as common from '../common';
+import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 
 const instancingApp = new Application({
   backend: common.getBackend(),
-  canvas: document.querySelector('#canvas')
+  canvas: document.querySelector('#canvas'),
+  pixelRatio: 1
 });
 
 instancingApp.ready().then(async () => {
   const device = instancingApp.device;
+  await imGuiInit(device);
   const scene = new Scene();
+  scene.env.sky.fogType = 'none';
+  //scene.env.sky.skyType = 'none';
   const camera = new PerspectiveCamera(
     scene,
     Math.PI / 3,
@@ -28,16 +36,39 @@ instancingApp.ready().then(async () => {
     1,
     1000
   );
-  camera.position.setXYZ(0, 0, 60);
+  camera.position.setXYZ(0, 0, 6);
   camera.controller = new OrbitCameraController();
+  camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
+  camera.depthPrePass = true;
+
+  instancingApp.inputManager.use(imGuiInjectEvent);
   instancingApp.inputManager.use(camera.handleEvent.bind(camera));
+  const inspector = new common.Inspector(scene, null, camera);
 
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
 
   const batchGroup = new BatchGroup(scene);
+  const boxShape = new BoxShape();
+
+  const mat = new LambertMaterial();
+  mat.blendMode = 'blend';
+  for (let i = 0; i < 100; i++) {
+    const instanceMat = mat.createInstance();
+    instanceMat.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), Math.random());
+    const boxMesh = new Mesh(scene, boxShape, instanceMat);
+    boxMesh.position.setXYZ(Math.random() * 5 - 2.5, Math.random() * 5 - 2.5, Math.random() * 5 - 2.5);
+    boxMesh.parent = batchGroup;
+  }
+  const mat2 = new LambertMaterial();
+  mat2.albedoColor = new Vector4(1, 0, 0, 1);
+  const mesh2 = new Mesh(scene, boxShape, mat2);
+  mesh2.scale = new Vector3(4, 4, 4);
+  mesh2.parent = batchGroup;
+
+  /*
   const assetManager = new AssetManager();
-  for (let i = 0; i < 2000; i++) {
+  for (let i = 0; i < 2; i++) {
     assetManager.fetchModel(scene, 'assets/stone1.glb', { enableInstancing: true }).then((info) => {
       info.group.parent = batchGroup;
       info.group.position.setXYZ(
@@ -75,16 +106,20 @@ instancingApp.ready().then(async () => {
       });
     });
   }
-
+*/
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
   instancingApp.on('resize', (ev) => {
     camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane());
   });
+
   instancingApp.on('tick', (ev) => {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
+    imGuiNewFrame();
+    inspector.render();
+    imGuiEndFrame();
   });
   instancingApp.run();
 });

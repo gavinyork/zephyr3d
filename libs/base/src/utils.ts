@@ -369,20 +369,45 @@ export function parseColor(input: string): ColorRGBA {
   return v;
 }
 /**
+ * Extract mixin return type
+ * @public
+ */
+export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ? R : never;
+
+/**
+ * Extract mixin type
+ * @public
+ */
+export type ExtractMixinType<M> = M extends [infer First]
+  ? ExtractMixinReturnType<First>
+  : M extends [infer First, ...infer Rest]
+  ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]>
+  : never;
+
+/**
  * Applies mixins to a constructor function.
  *
- * This function takes a constructor function of a class (derivedCtor) and an array of constructor functions
- * from which to inherit or "mix in" properties and methods. It effectively adds the properties and methods
- * from the base constructors (baseCtors) to the prototype of the derived constructor, allowing the derived
- * class to inherit features from multiple sources.
+ * @param target - The constructor function of the class that will receive the mixins.
+ * @param mixins - mixins
+ * @returns Mixed class
  *
- * @param derivedCtor - The constructor function of the class that will receive the mixins.
- * @param baseCtors - An array of constructor functions that will be mixed into the derivedCtor.
+ * @public
  */
-export function applyMixins(derivedCtor: any, baseCtors: any[]) {
-  baseCtors.forEach((baseCtor) => {
-    Object.getOwnPropertyNames(baseCtor.prototype).forEach((name) => {
-      derivedCtor.prototype[name] = baseCtor.prototype[name];
-    });
-  });
+export function applyMixins<M extends ((target: any) => any)[], T>(
+  target: T,
+  ...mixins: M
+): T & ExtractMixinType<M> {
+  let r: any = target;
+  for (const m of mixins) {
+    r = m(r);
+  }
+  return r;
 }
+
+/**
+ * Convert union type to intersection
+ * @public
+ */
+export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void
+  ? I
+  : never;

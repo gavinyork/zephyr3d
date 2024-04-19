@@ -13,6 +13,7 @@ import type { Camera } from '../camera';
 import type { Compositor } from '../posteffect';
 import type { RenderLogger } from '../logger/logger';
 import { ClusteredLight } from './cluster_light';
+import { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 
 /**
  * Forward render scheme
@@ -25,8 +26,6 @@ export class SceneRenderer {
   private static _depthPass = new DepthPass();
   /** @internal */
   private static _shadowMapPass = new ShadowMapPass();
-  /** @internal */
-  private static _enableDepthPass = false;
   /** @internal */
   private static _clusters: ClusteredLight[] = [];
   /** lighting render pass */
@@ -65,18 +64,20 @@ export class SceneRenderer {
   static renderScene(scene: Scene, camera: Camera, compositor?: Compositor, logger?: RenderLogger): void {
     const device = Application.instance.device;
     const ctx: DrawContext = {
+      device,
       scene,
       primaryCamera: camera,
+      oit: null,
+      globalBindGroupAllocator: GlobalBindGroupAllocator.get(),
       camera,
       compositor: compositor?.needDrawPostEffects() ? compositor : null,
       timestamp: device.frameInfo.frameTimestamp,
       logger,
       queue: 0,
       lightBlending: false,
-      target: null,
       renderPass: null,
       renderPassHash: null,
-      applyFog: false,
+      applyFog: null,
       flip: false,
       drawEnvLight: false,
       env: null
@@ -85,6 +86,7 @@ export class SceneRenderer {
     if (camera && !device.isContextLost()) {
       this._renderScene(ctx);
     }
+    GlobalBindGroupAllocator.release(ctx.globalBindGroupAllocator);
   }
   /** @internal */
   protected static _renderSceneDepth(
@@ -92,7 +94,7 @@ export class SceneRenderer {
     renderQueue: RenderQueue,
     depthFramebuffer: FrameBuffer
   ) {
-    const device = Application.instance.device;
+    const device = ctx.device;
     device.pushDeviceStates();
     device.setFramebuffer(depthFramebuffer);
     this._depthPass.clearColor = device.type === 'webgl' ? new Vector4(0, 0, 0, 1) : new Vector4(1, 1, 1, 1);
@@ -101,7 +103,7 @@ export class SceneRenderer {
   }
   /** @internal */
   protected static _renderScene(ctx: DrawContext): void {
-    const device = Application.instance.device;
+    const device = ctx.device;
     const vp = ctx.camera.viewport;
     const scissor = ctx.camera.scissor;
     const finalFramebuffer = device.getFramebuffer();
@@ -142,9 +144,10 @@ export class SceneRenderer {
     this.renderShadowMaps(ctx, renderQueue.shadowedLights);
     const sampleCount = ctx.compositor ? 1 : ctx.primaryCamera.sampleCount;
     if (
-      this._enableDepthPass ||
+      ctx.primaryCamera.depthPrePass ||
       oversizedViewport ||
       ctx.scene.env.needSceneDepthTexture() ||
+      ctx.primaryCamera.oit ||
       ctx.compositor?.requireLinearDepth()
     ) {
       const format: TextureFormat = device.type === 'webgl' ? 'rgba8unorm' : 'r32f';
@@ -238,6 +241,8 @@ export class SceneRenderer {
     this._scenePass.render(ctx, null, renderQueue);
     ctx.compositor?.end(ctx);
 
+    renderQueue.dispose();
+
     if (tempFramebuffer && tempFramebuffer !== finalFramebuffer) {
       const blitter = new CopyBlitter();
       if (oversizedViewport) {
@@ -271,10 +276,10 @@ export class SceneRenderer {
   /** @internal */
   private static renderShadowMaps(ctx: DrawContext, lights: PunctualLight[]) {
     ctx.renderPass = this._shadowMapPass;
-    Application.instance.device.pushDeviceStates();
+    ctx.device.pushDeviceStates();
     for (const light of lights) {
       light.shadow.render(ctx, this._shadowMapPass);
     }
-    Application.instance.device.popDeviceStates();
+    ctx.device.popDeviceStates();
   }
 }

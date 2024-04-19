@@ -63,7 +63,7 @@ for (let i = 0; i < 10; i++) {
   const instancedModels = [];
   const nonInstancedModels = [];
   // 模型地址
-  const modelUrl = 'http://model/path';
+  const modelUrl = 'http://foo/bar.glb';
   for (let i = 0; i < 100; i++) {
     // 加载相同的模型并设置enableInstancing属性为true，这些模型自动使用实例化渲染
     instancedModels.push(await assetManager.fetchModel(scene, url, {
@@ -77,6 +77,16 @@ for (let i = 0; i < 10; i++) {
 
 ```
 
-## 重要说明
+## 透明物体
 
-**如果不需要实例化渲染，请勿调用材质的createInstance方法，因为createInstance会创建原材质的一个Proxy，而Proxy的get()方法非常慢，将会严重影响运行效率。**
+通常情况下，透明物体需要由远及近渲染，但是如果使用了几何体实例化，则无法通过距离排序。
+如果你对透明物体使用几何体实例化，推荐使用顺序无关的透明物体渲染技术(OIT)。我们目前
+支持两种OIT渲染方式.
+
+1. Weighted Blended，适用于WebGL,WebGL2和WebGPU设备
+2. Per-Pixel Linked List，仅适用于WebGPU设备
+
+具体参见：[OIT渲染](zh-cn/oit.md)
+
+
+

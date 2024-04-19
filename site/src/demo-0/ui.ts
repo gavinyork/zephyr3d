@@ -1,6 +1,6 @@
 import { GUI } from 'lil-gui';
 import { GLTFViewer } from './gltfviewer';
-import { Application } from '@zephyr3d/scene';
+import { ABufferOIT, Application, WeightedBlendedOIT } from '@zephyr3d/scene';
 
 interface GUIParams {
   deviceType: string;
@@ -12,18 +12,23 @@ interface GUIParams {
   bloom: boolean;
   fxaa: boolean;
   FPS: string;
+  oitType: string;
   animation?: string;
 }
 
 export class Panel {
   private _viewer: GLTFViewer;
   private _deviceList: string[];
+  private _oitTypes: string[];
+  private _oitNames: string[];
   private _params: GUIParams;
   private _gui: GUI;
   private _animationController: GUI;
   constructor(viewer: GLTFViewer){
     this._viewer = viewer;
     this._deviceList = ['WebGL', 'WebGL2', 'WebGPU'];
+    this._oitTypes = ['', WeightedBlendedOIT.type, ABufferOIT.type];
+    this._oitNames = ['None', 'weighted-blended', 'per-pixel linked list'];
     this._gui = new GUI({ container: document.body });
     this._params = {
       deviceType: this._deviceList[this._deviceList.findIndex(val => val.toLowerCase() === Application.instance.device.type)],
@@ -34,7 +39,8 @@ export class Panel {
       water: this._viewer.waterEnabled(),
       bloom: this._viewer.bloomEnabled(),
       fxaa: this._viewer.FXAAEnabled(),
-      FPS: ''
+      FPS: '',
+      oitType: this._oitNames[this._oitTypes.indexOf(this._viewer.getOITType())]
     };
     this._animationController = null;
     this.create();
@@ -69,6 +75,7 @@ export class Panel {
     desc2.style.color = '#ffff00';
     desc2.innerText = 'Drag HDR to change environment';
     this._gui.domElement.append(desc1, desc2);
+
     const systemSettings = this._gui.addFolder('System');
     systemSettings.add(this._params, 'deviceType', this._deviceList)
     .name('Select device')
@@ -93,6 +100,14 @@ export class Panel {
     .name('Punctual lighting')
     .onChange(value=>{
       this._viewer.punctualLightEnabled = value;
+    });
+
+    const oitSettings = this._gui.addFolder('OIT');
+    oitSettings.add(this._params, 'oitType', this._oitNames)
+    .name('Select OIT type')
+    .onChange(value=>{
+      const index = this._oitNames.indexOf(value);
+      this._viewer.setOITType(this._oitTypes[index]);
     });
 
     const ppSettings = this._gui.addFolder('PostProcess');
