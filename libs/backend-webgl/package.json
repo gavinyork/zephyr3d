@@ -31,7 +31,7 @@
     "webgpu",
     "canvas",
     "zephyr3d",
-    "device"
+    "typescript"
   ],
   "license": "MIT",
   "bugs": {
