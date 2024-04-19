@@ -58,7 +58,7 @@ export type ShaderTypeFunc = {
 };
 
 /** @internal */
-export function makeConstructor(typeFunc: ShaderTypeFunc, elementType: PBTypeInfo): ShaderTypeFunc {
+export function makeConstructor<T>(typeFunc: ShaderTypeFunc, elementType: PBTypeInfo<T>): ShaderTypeFunc {
   const wrappedTypeFunc = new Proxy(typeFunc, {
     get: function (target, prop) {
       if (typeof prop === 'symbol' || prop in target) {
@@ -71,7 +71,13 @@ export function makeConstructor(typeFunc: ShaderTypeFunc, elementType: PBTypeInf
       }
       let ctor = entries[prop];
       if (!ctor) {
-        if (elementType.isPrimitiveType() || elementType.isStructType() || elementType.isArrayType()) {
+        if (
+          elementType.isPrimitiveType() ||
+          elementType.isStructType() ||
+          elementType.isArrayType() ||
+          elementType.isAtomicI32() ||
+          elementType.isAtomicU32()
+        ) {
           if (prop === 'ptr') {
             const pointerType = new PBPointerTypeInfo(elementType, PBAddressSpace.FUNCTION);
             ctor = function pointerCtor(this: ProgramBuilder, ...args: any[]) {
@@ -175,6 +181,10 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
   $declareType: DeclareType;
   /** @internal */
   $isBuffer: boolean;
+  /** @internal */
+  $readonly: boolean;
+  /** @internal */
+  $bindingSize: number;
   [name: string]: any;
   /** @internal */
   constructor(str: string, typeInfo: PBTypeInfo) {
@@ -197,6 +207,8 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$_group = null;
     this.$declareType = DeclareType.DECLARE_TYPE_NONE;
     this.$isBuffer = false;
+    this.$bindingSize = 0;
+    this.$readonly = false;
     if (typeInfo.isTextureType()) {
       if (typeInfo.isDepthTexture()) {
         this.$sampleType = 'depth';
@@ -237,7 +249,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param group - The bind group index
    * @returns self
    */
-  uniformBuffer(group: number): PBShaderExp {
+  uniformBuffer(group: number, bindingSize = 0): PBShaderExp {
     if (
       !this.$typeinfo.isPrimitiveType() &&
       !this.$typeinfo.isArrayType() &&
@@ -251,6 +263,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$declareType = DeclareType.DECLARE_TYPE_UNIFORM;
     this.$group = group;
     this.$isBuffer = true;
+    this.$bindingSize = bindingSize;
     return this;
   }
   /**
@@ -277,6 +290,17 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$declareType = DeclareType.DECLARE_TYPE_STORAGE;
     this.$group = group;
     this.$isBuffer = false;
+    this.$readonly = false;
+    return this;
+  }
+  /**
+   * Point out that the variable is read-only and should be in storage address space
+   * @param group - The bind group index
+   * @returns self
+   */
+  storageReadonly(group: number): PBShaderExp {
+    this.storage(group);
+    this.$readonly = true;
     return this;
   }
   /**
@@ -284,11 +308,13 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param group - The bind group index
    * @returns self
    */
-  storageBuffer(group: number): PBShaderExp {
+  storageBuffer(group: number, bindingSize = 0): PBShaderExp {
     if (
       !this.$typeinfo.isPrimitiveType() &&
       !this.$typeinfo.isArrayType() &&
-      !this.$typeinfo.isStructType()
+      !this.$typeinfo.isStructType() &&
+      !this.$typeinfo.isAtomicI32() &&
+      !this.$typeinfo.isAtomicU32()
     ) {
       throw new PBASTError(
         this.$ast,
@@ -298,6 +324,18 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$declareType = DeclareType.DECLARE_TYPE_STORAGE;
     this.$group = group;
     this.$isBuffer = true;
+    this.$bindingSize = bindingSize;
+    this.$readonly = false;
+    return this;
+  }
+  /**
+   * Point out that the variable is read-only and should be a storage buffer
+   * @param group - The bind group index
+   * @returns self
+   */
+  storageBufferReadonly(group: number, bindingSize = 0): PBShaderExp {
+    this.storageBuffer(group, bindingSize);
+    this.$readonly = true;
     return this;
   }
   inout(): PBShaderExp {

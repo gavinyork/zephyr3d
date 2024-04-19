@@ -16,7 +16,7 @@ import type {
 import { SharedModel, AssetSkeleton, AssetScene } from '../../model';
 import { BoundingBox } from '../../../utility/bounding_volume';
 import { Primitive } from '../../../render/primitive';
-import type { Material as M } from '../../../material';
+import type { MeshMaterial as M } from '../../../material/meshmaterial';
 import { UnlitMaterial } from '../../../material';
 import { ComponentType, GLTFAccessor } from './helpers';
 import { AbstractModelLoader } from '../loader';
@@ -92,7 +92,6 @@ export class GLTFLoader extends AbstractModelLoader {
     return null;
   }
   async loadJson(url: string, gltf: GLTFContent): Promise<SharedModel> {
-    console.log(`GLTF extensions used: ${gltf.extensionsUsed || []}`);
     gltf._accessors = [];
     gltf._bufferCache = {};
     gltf._textureCache = {};
@@ -512,8 +511,7 @@ export class GLTFLoader extends AbstractModelLoader {
         unlitMaterial.alphaCutoff = assetMaterial.common.alphaCutoff;
       }
       if (assetMaterial.common.doubleSided) {
-        const rasterizerState = unlitMaterial.stateSet.useRasterizerState();
-        rasterizerState.setCullMode('none');
+        unlitMaterial.cullMode = 'none';
       }
       return unlitMaterial;
     } else if (assetMaterial.type === 'pbrSpecularGlossiness') {
@@ -570,8 +568,7 @@ export class GLTFLoader extends AbstractModelLoader {
         pbrMaterial.alphaCutoff = assetPBRMaterial.common.alphaCutoff;
       }
       if (assetPBRMaterial.common.doubleSided) {
-        const rasterizerState = pbrMaterial.stateSet.useRasterizerState();
-        rasterizerState.setCullMode('none');
+        pbrMaterial.cullMode = 'none';
       }
       pbrMaterial.vertexNormal = !!assetMaterial.common.vertexNormal;
       return pbrMaterial;
@@ -679,8 +676,7 @@ export class GLTFLoader extends AbstractModelLoader {
         pbrMaterial.alphaCutoff = assetPBRMaterial.common.alphaCutoff;
       }
       if (assetPBRMaterial.common.doubleSided) {
-        const rasterizerState = pbrMaterial.stateSet.useRasterizerState();
-        rasterizerState.setCullMode('none');
+        pbrMaterial.cullMode = 'none';
       }
       pbrMaterial.vertexNormal = !!assetMaterial.common.vertexNormal;
       return pbrMaterial;

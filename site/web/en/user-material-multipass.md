@@ -30,11 +30,11 @@ class CartoonMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
     this.numPasses = 2;
   }
   // Customize the rendering state for each Pass by overriding this method.
-  updateRenderStates(pass, ctx) {
+  updateRenderStates(pass, stateSet, ctx) {
     // The default implementation must be called.
-    super.updateRenderStates(pass, ctx);
+    super.updateRenderStates(pass, stateSet, ctx);
     // Cull front face in the first pass, and the back face in the second pass.
-    this.stateSet.useRasterizerState().cullMode = pass === 0 ? 'front' : 'back';
+    stateSet.useRasterizerState().cullMode = pass === 0 ? 'front' : 'back';
   }
   applyUniformValues(bindGroup, ctx, pass) {
     super.applyUniformValues(bindGroup, ctx, pass);

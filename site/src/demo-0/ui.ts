@@ -1,6 +1,6 @@
 import { GUI } from 'lil-gui';
 import { GLTFViewer } from './gltfviewer';
-import { Application } from '@zephyr3d/scene';
+import { ABufferOIT, Application, WeightedBlendedOIT } from '@zephyr3d/scene';
 
 interface GUIParams {
   deviceType: string;
@@ -8,21 +8,27 @@ interface GUIParams {
   iblLighting: boolean;
   punctualLighting: boolean;
   tonemap: boolean;
+  water: boolean;
   bloom: boolean;
   fxaa: boolean;
-  FPS: number;
+  FPS: string;
+  oitType: string;
   animation?: string;
 }
 
 export class Panel {
   private _viewer: GLTFViewer;
   private _deviceList: string[];
+  private _oitTypes: string[];
+  private _oitNames: string[];
   private _params: GUIParams;
   private _gui: GUI;
   private _animationController: GUI;
   constructor(viewer: GLTFViewer){
     this._viewer = viewer;
     this._deviceList = ['WebGL', 'WebGL2', 'WebGPU'];
+    this._oitTypes = ['', WeightedBlendedOIT.type, ABufferOIT.type];
+    this._oitNames = ['None', 'weighted-blended', 'per-pixel linked list'];
     this._gui = new GUI({ container: document.body });
     this._params = {
       deviceType: this._deviceList[this._deviceList.findIndex(val => val.toLowerCase() === Application.instance.device.type)],
@@ -30,9 +36,11 @@ export class Panel {
       iblLighting: this._viewer.environmentLightEnabled,
       punctualLighting: this._viewer.punctualLightEnabled,
       tonemap: this._viewer.tonemapEnabled(),
+      water: this._viewer.waterEnabled(),
       bloom: this._viewer.bloomEnabled(),
       fxaa: this._viewer.FXAAEnabled(),
-      FPS: 0
+      FPS: '',
+      oitType: this._oitNames[this._oitTypes.indexOf(this._viewer.getOITType())]
     };
     this._animationController = null;
     this.create();
@@ -67,6 +75,7 @@ export class Panel {
     desc2.style.color = '#ffff00';
     desc2.innerText = 'Drag HDR to change environment';
     this._gui.domElement.append(desc1, desc2);
+
     const systemSettings = this._gui.addFolder('System');
     systemSettings.add(this._params, 'deviceType', this._deviceList)
     .name('Select device')
@@ -93,6 +102,14 @@ export class Panel {
       this._viewer.punctualLightEnabled = value;
     });
 
+    const oitSettings = this._gui.addFolder('OIT');
+    oitSettings.add(this._params, 'oitType', this._oitNames)
+    .name('Select OIT type')
+    .onChange(value=>{
+      const index = this._oitNames.indexOf(value);
+      this._viewer.setOITType(this._oitTypes[index]);
+    });
+
     const ppSettings = this._gui.addFolder('PostProcess');
     ppSettings.add(this._params, 'tonemap')
     .name('Tonemap')
@@ -109,42 +126,16 @@ export class Panel {
     .onChange(value=>{
       this._viewer.enableFXAA(value);
     });
-  }
-  /*
-  renderSettings(){
-    ImGui.SetNextWindowPos(new ImGui.ImVec2(0, 0), ImGui.Cond.Always);
-    ImGui.SetNextWindowSize(new ImGui.ImVec2(300, Math.min(500, Application.instance.device.getViewport().height)), ImGui.Cond.Always);
-    if (ImGui.Begin('Settings')){
-      ImGui.EndSection(1);
+    ppSettings.add(this._params, 'water')
+    .name('Water')
+    .onChange(value=>{
+      this._viewer.enableWater(value);
+    });
 
-      const animations = this._viewer.animationSet?.getAnimationNames() ?? [];
-      if (animations.length > 0) {
-        ImGui.BeginSection('Animation');
-        const index = [animations.findIndex(ani => this._viewer.animationSet.isPlayingAnimation(ani))] as [number];
-        ImGui.SetNextItemWidth(150);
-        if (ImGui.Combo('Animation', index, animations)){
-          this._viewer.animationSet.playAnimation(animations[index[0]]);
-        }
-        ImGui.EndSection(1);
-      }
-      if (ImGui.BeginChild('')) {
-        ImGui.TextWrapped('Usage:');
-        ImGui.TextWrapped('Drag GLTF/GLB/ZIP to view model.');
-        ImGui.TextWrapped('Drag HDR to change environment.');
-        ImGui.TextWrapped('Note:')
-        ImGui.TextWrapped('Morph target animation currently not supported.');
-      }
-      ImGui.EndChild();
-    }
-    ImGui.End();
+    const perfSettings = this._gui.addFolder('Performance');
+    perfSettings.add(this._params, 'FPS').name('FPS').disable(true).listen();
+    setInterval(() => {
+      this._params.FPS = Application.instance.device.frameInfo.FPS.toFixed(2);
+    }, 1000);
   }
-  private renderStatusBar() {
-    if (ImGui.BeginStatusBar()) {
-      ImGui.Text(`Device: ${Application.instance.device.type}`);
-      ImGui.Text(`FPS: ${Application.instance.device.frameInfo.FPS.toFixed(2)}`);
-      ImGui.Text(`DrawCall: ${Application.instance.device.frameInfo.drawCalls}`);
-      ImGui.EndStatusBar();
-    }
-  }
-  */
 }

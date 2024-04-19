@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Improve rendering performance for geometry instancing",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

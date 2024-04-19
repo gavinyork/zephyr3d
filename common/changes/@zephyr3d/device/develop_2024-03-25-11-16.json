@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Implement uniform buffer with dynamic offset",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}

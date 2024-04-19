@@ -4,7 +4,8 @@ import type {
   GPUProgram,
   PBFunctionScope,
   PBInsideFunctionScope,
-  PBShaderExp
+  PBShaderExp,
+  RenderStateSet
 } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
 import {
@@ -19,21 +20,13 @@ import type { DrawContext, ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA } from '../shaders';
 import { Application } from '../app';
 import { ShaderHelper } from './shader/helper';
-import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import { Vector2, Vector3, Vector4, applyMixins } from '@zephyr3d/base';
 
 /**
  * Blending mode for mesh material
  * @public
  */
 export type BlendMode = 'none' | 'blend' | 'additive';
-
-/**
- * Convert union type to intersection
- * @public
- */
-export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void
-  ? I
-  : never;
 
 /**
  * Extract mixin return type
@@ -63,11 +56,7 @@ export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
   target: T,
   ...mixins: M
 ): ExtractMixinType<M> {
-  let r: any = target;
-  for (const m of mixins) {
-    r = m(r);
-  }
-  return r;
+  return applyMixins(target, ...mixins);
 }
 
 let FEATURE_ALPHATEST = 0;
@@ -137,26 +126,45 @@ export class MeshMaterial extends Material {
     return this.INSTANCE_UNIFORMS.length - 1;
   }
   getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShaderExp {
-    //return ShaderHelper.getInstancedUniform(scope, 4 + uniformIndex);
     const pb = scope.$builder;
-    const instanceID = pb.shaderKind === 'vertex' ? scope.$builtins.instanceIndex : scope.$inputs.zInstanceID;
-    const uniformName = ShaderHelper.getWorldMatricesUniformName();
-    const strideName = ShaderHelper.getInstanceBufferStrideUniformName();
-    return scope[uniformName].at(pb.add(pb.mul(scope[strideName], instanceID), 4 + uniformIndex));
+    const instanceID = scope.$builtins.instanceIndex;
+    const uniformName = ShaderHelper.getInstanceDataUniformName();
+    const strideName = ShaderHelper.getInstanceDataStrideUniformName();
+    const offsetName = ShaderHelper.getInstanceDataOffsetUniformName();
+    return scope[uniformName].at(
+      pb.add(pb.mul(scope[strideName], instanceID), 4 + uniformIndex, scope[offsetName])
+    );
   }
   /** Create material instance */
   createInstance(): this {
+    if (this.$isInstance) {
+      return this.coreMaterial.createInstance();
+    }
     const instanceUniforms = (this.constructor as typeof MeshMaterial).INSTANCE_UNIFORMS;
     const uniformsHolder = instanceUniforms.length > 0 ? new Float32Array(4 * instanceUniforms.length) : null;
-    const batchable = Application.instance.device.type !== 'webgl';
-    const coreMaterial = this.coreMaterial;
+    const isWebGL1 = Application.instance.device.type === 'webgl';
+    const instance = {} as any;
+    const that = this;
+    instance.isBatchable = () => !isWebGL1 && that.supportInstancing();
+    instance.$instanceUniforms = uniformsHolder;
+    instance.$isInstance = true;
+    instance.coreMaterial = that;
     // Copy original uniform values
     for (let i = 0; i < instanceUniforms.length; i++) {
       const [prop, type] = instanceUniforms[i];
-      const value = coreMaterial[prop];
+      const value = that[prop];
       switch (type) {
         case 'float': {
           uniformsHolder[i * 4] = Number(value);
+          Object.defineProperty(instance, prop, {
+            get() {
+              return uniformsHolder[i * 4];
+            },
+            set(value) {
+              uniformsHolder[i * 4 + 0] = value;
+              that[prop] = value;
+            }
+          });
           break;
         }
         case 'vec2': {
@@ -165,6 +173,15 @@ export class MeshMaterial extends Material {
           }
           uniformsHolder[i * 4] = value.x;
           uniformsHolder[i * 4 + 1] = value.y;
+          Object.defineProperty(instance, prop, {
+            get() {
+              return new Vector2(uniformsHolder[i * 4], uniformsHolder[i * 4 + 1]);
+            },
+            set(value) {
+              uniformsHolder.set(value);
+              that[prop] = value;
+            }
+          });
           break;
         }
         case 'vec3': {
@@ -174,6 +191,15 @@ export class MeshMaterial extends Material {
           uniformsHolder[i * 4] = value.x;
           uniformsHolder[i * 4 + 1] = value.y;
           uniformsHolder[i * 4 + 2] = value.z;
+          Object.defineProperty(instance, prop, {
+            get() {
+              return new Vector3(uniformsHolder[i * 4], uniformsHolder[i * 4 + 1], uniformsHolder[i * 4 + 2]);
+            },
+            set(value) {
+              uniformsHolder.set(value);
+              that[prop] = value;
+            }
+          });
           break;
         }
         case 'vec4': {
@@ -184,89 +210,26 @@ export class MeshMaterial extends Material {
           uniformsHolder[i * 4 + 1] = value.y;
           uniformsHolder[i * 4 + 2] = value.z;
           uniformsHolder[i * 4 + 3] = value.w;
+          Object.defineProperty(instance, prop, {
+            get() {
+              return new Vector4(
+                uniformsHolder[i * 4],
+                uniformsHolder[i * 4 + 1],
+                uniformsHolder[i * 4 + 2],
+                uniformsHolder[i * 4 + 3]
+              );
+            },
+            set(value) {
+              uniformsHolder.set(value);
+              that[prop] = value;
+            }
+          });
           break;
         }
       }
     }
-    const handler: ProxyHandler<this> = {
-      get(target, prop, receiver) {
-        if (prop === 'isBatchable') {
-          return () => batchable;
-        } else if (prop === '$instanceUniforms') {
-          return uniformsHolder;
-        } else if (prop === '$isInstance') {
-          return true;
-        } else if (prop === 'beginDraw') {
-          if (!batchable || !target.isBatchable()) {
-            for (let i = 0; i < instanceUniforms.length; i++) {
-              const name = instanceUniforms[i][0];
-              const type = instanceUniforms[i][1];
-              switch (type) {
-                case 'float':
-                  target[name] = uniformsHolder[i * 4];
-                  break;
-                case 'vec2':
-                  target[name] = new Vector2(uniformsHolder[i * 4], uniformsHolder[i * 4 + 1]);
-                  break;
-                case 'vec3':
-                  target[name] = new Vector3(
-                    uniformsHolder[i * 4],
-                    uniformsHolder[i * 4 + 1],
-                    uniformsHolder[i * 4 + 2]
-                  );
-                case 'vec4':
-                  target[name] = new Vector4(
-                    uniformsHolder[i * 4],
-                    uniformsHolder[i * 4 + 1],
-                    uniformsHolder[i * 4 + 2],
-                    uniformsHolder[i * 4 + 3]
-                  );
-              }
-            }
-          }
-        } else if (prop === 'coreMaterial') {
-          return target;
-        } else if (typeof prop === 'string') {
-          const index = instanceUniforms.findIndex((val) => val[0] === prop);
-          if (index >= 0) {
-            switch (instanceUniforms[index][1]) {
-              case 'float':
-                return uniformsHolder[index * 4];
-              case 'vec2':
-                return new Vector2(uniformsHolder[index * 4], uniformsHolder[index * 4 + 1]);
-              case 'vec3':
-                return new Vector3(
-                  uniformsHolder[index * 4],
-                  uniformsHolder[index * 4 + 1],
-                  uniformsHolder[index * 4 + 2]
-                );
-              case 'vec4':
-                return new Vector4(
-                  uniformsHolder[index * 4],
-                  uniformsHolder[index * 4 + 1],
-                  uniformsHolder[index * 4 + 2],
-                  uniformsHolder[index * 4 + 3]
-                );
-            }
-          }
-        }
-        return Reflect.get(target, prop, receiver);
-      },
-      set(target, prop, value, receiver) {
-        const i = instanceUniforms.findIndex((val) => val[0] === prop);
-        if (i >= 0) {
-          if (typeof value === 'number') {
-            uniformsHolder[i * 4 + 0] = value;
-          } else if (value instanceof Float32Array) {
-            uniformsHolder.set(value);
-          }
-          return true;
-        } else {
-          return Reflect.set(target, prop, value, receiver);
-        }
-      }
-    };
-    return new Proxy(coreMaterial, handler);
+    Object.setPrototypeOf(instance, that);
+    return instance;
   }
   /** Draw context for shader creation */
   get drawContext(): DrawContext {
@@ -327,15 +290,13 @@ export class MeshMaterial extends Material {
     return true;
   }
   /**
-   * Update render states according to draw context and current material pass
-   * @param pass - Current material pass
-   * @param ctx - Draw context
+   * {@inheritDoc Material.updateRenderStates}
    */
-  protected updateRenderStates(pass: number, ctx: DrawContext): void {
+  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
     const blending = this.featureUsed<boolean>(FEATURE_ALPHABLEND) || ctx.lightBlending;
     const a2c = this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
     if (blending || a2c) {
-      const blendingState = this.stateSet.useBlendingState();
+      const blendingState = stateSet.useBlendingState();
       if (blending) {
         blendingState.enable(true);
         blendingState.setBlendFuncAlpha('zero', 'one');
@@ -350,18 +311,23 @@ export class MeshMaterial extends Material {
       }
       blendingState.enableAlphaToCoverage(a2c);
       if (blendingState.enabled) {
-        this.stateSet.useDepthState().enableTest(true).enableWrite(false);
+        stateSet.useDepthState().enableTest(true).enableWrite(false);
       } else {
-        this.stateSet.defaultDepthState();
+        stateSet.defaultDepthState();
       }
-    } else if (this.stateSet.blendingState?.enabled && !blending) {
-      this.stateSet.defaultBlendingState();
-      this.stateSet.defaultDepthState();
+    } else if (stateSet.blendingState?.enabled && !blending) {
+      stateSet.defaultBlendingState();
+      stateSet.defaultDepthState();
     }
     if (this._cullMode !== 'back') {
-      this.stateSet.useRasterizerState().cullMode = this._cullMode;
+      stateSet.useRasterizerState().cullMode = this._cullMode;
     } else {
-      this.stateSet.defaultRasterizerState();
+      stateSet.defaultRasterizerState();
+    }
+    stateSet.defaultColorState();
+    stateSet.defaultStencilState();
+    if (ctx.oit) {
+      ctx.oit.setRenderStates(stateSet);
     }
   }
   /**
@@ -375,8 +341,11 @@ export class MeshMaterial extends Material {
     if (this.featureUsed(FEATURE_ALPHATEST)) {
       bindGroup.setValue('zAlphaCutoff', this._alphaCutoff);
     }
-    if (this.featureUsed(FEATURE_ALPHABLEND)) {
+    if (this.isTransparentPass(pass)) {
       bindGroup.setValue('zOpacity', this._opacity);
+    }
+    if (ctx.oit) {
+      ctx.oit.applyUniforms(ctx, bindGroup);
     }
   }
   /**
@@ -394,16 +363,9 @@ export class MeshMaterial extends Material {
   isTransparentPass(pass: number): boolean {
     return this.featureUsed(FEATURE_ALPHABLEND);
   }
-  /**
-   * {@inheritdoc Material.beginDraw}
-   */
-  beginDraw(pass: number, ctx: DrawContext): boolean {
-    this.updateRenderStates(pass, ctx);
-    return super.beginDraw(pass, ctx);
-  }
   /** @internal */
   protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
-    const pb = new ProgramBuilder(Application.instance.device);
+    const pb = new ProgramBuilder(ctx.device);
     if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
       const shadowMapParams = ctx.shadowMapInfo.get((ctx.renderPass as ShadowMapPass).light);
       pb.emulateDepthClamp = !!shadowMapParams.depthClampEnabled;
@@ -437,7 +399,7 @@ export class MeshMaterial extends Material {
    *
    * @internal
    */
-  protected _createHash(renderPassType: number): string {
+  protected _createHash(): string {
     return this._featureStates.map((val) => (val === undefined ? '' : val)).join('|');
   }
   /**
@@ -468,12 +430,9 @@ export class MeshMaterial extends Material {
   vertexShader(scope: PBFunctionScope): void {
     const pb = scope.$builder;
     ShaderHelper.prepareVertexShader(pb, this.drawContext);
-    if (this.drawContext.target.getBoneMatrices()) {
+    if (this.drawContext.skinAnimation) {
       scope.$inputs.zBlendIndices = pb.vec4().attrib('blendIndices');
       scope.$inputs.zBlendWeights = pb.vec4().attrib('blendWeights');
-    }
-    if (this.drawContext.instanceData) {
-      scope.$outputs.zInstanceID = scope.$builtins.instanceIndex;
     }
   }
   /**
@@ -509,7 +468,11 @@ export class MeshMaterial extends Material {
         });
       },
       fragment(pb) {
-        this.$outputs.zFragmentOutput = pb.vec4();
+        if (that.drawContext.oit) {
+          that.drawContext.oit.setupFragmentOutput(this);
+        } else {
+          this.$outputs.zFragmentOutput = pb.vec4();
+        }
         pb.main(function () {
           that.fragmentShader(this);
         });
@@ -523,6 +486,7 @@ export class MeshMaterial extends Material {
     */
     return program;
   }
+  doAlphaTest(scope: PBInsideFunctionScope, color: PBShaderExp) {}
   /**
    * Calculate final fragment color for output.
    *
@@ -550,7 +514,9 @@ export class MeshMaterial extends Material {
           });
         }
         if (that.isTransparentPass(that.pass)) {
-          this.outColor = pb.vec4(pb.mul(this.outColor.rgb, this.outColor.a), this.outColor.a);
+          if (!that.drawContext.oit || !that.drawContext.oit.outputFragmentColor(this, this.outColor)) {
+            this.outColor = pb.vec4(pb.mul(this.outColor.rgb, this.outColor.a), this.outColor.a);
+          }
         }
         ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext);
         this.$outputs.zFragmentOutput = ShaderHelper.encodeColorOutput(this, this.outColor);
@@ -562,7 +528,7 @@ export class MeshMaterial extends Material {
         }
         ShaderHelper.discardIfClipped(this, this.worldPos);
         this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
-        if (Application.instance.device.type === 'webgl') {
+        if (that.drawContext.device.type === 'webgl') {
           this.$outputs.zFragmentOutput = encodeNormalizedFloatToRGBA(this, this.depth);
         } else {
           this.$outputs.zFragmentOutput = pb.vec4(this.depth, 0, 0, 1);

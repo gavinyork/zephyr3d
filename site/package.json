@@ -54,7 +54,7 @@
   "dependencies": {
     "@types/colors": "^1.2.1",
     "@types/diff": "^5.0.2",
-    "@webgpu/types": "^0.1.31",
+    "@webgpu/types": "^0.1.40",
     "colors": "^1.4.0",
     "diff": "^5.0.0",
     "highlight.js": "^11.8.0",

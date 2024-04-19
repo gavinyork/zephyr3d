@@ -16,17 +16,30 @@ import type { WebGLGPUProgram } from './gpuprogram_webgl';
 import type { WebGLTextureSampler } from './sampler_webgl';
 import type { TypedArray } from '@zephyr3d/base';
 import type { WebGLDevice } from './device_webgl';
-import type { WebGLGPUBuffer } from './buffer_webgl';
+import { WebGLGPUBuffer } from './buffer_webgl';
 
 export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup {
   private _layout: BindGroupLayout;
+  private _dynamicOffsets: number[];
   private _resources: Record<string, WebGLGPUBuffer | [WebGLBaseTexture, WebGLTextureSampler]>;
   constructor(device: WebGLDevice, layout: BindGroupLayout) {
     super(device);
     this._device = device;
     this._layout = layout;
+    this._dynamicOffsets = null;
     this._resources = {};
     this._object = {};
+    for (const entry of this._layout.entries) {
+      if (entry.buffer && entry.buffer.hasDynamicOffset) {
+        if (!this._dynamicOffsets) {
+          this._dynamicOffsets = [];
+        }
+        this._dynamicOffsets[entry.buffer.dynamicOffsetIndex] = 0;
+      }
+    }
+  }
+  getGPUId(): string {
+    return String(this._uid);
   }
   getLayout(): BindGroupLayout {
     return this._layout;
@@ -34,7 +47,10 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
   getBuffer(name: string): GPUDataBuffer {
     return this._getBuffer(name, true);
   }
-  setBuffer(name: string, buffer: GPUDataBuffer) {
+  getDynamicOffsets(): number[] {
+    return this._dynamicOffsets;
+  }
+  setBuffer(name: string, buffer: GPUDataBuffer, offset?: number, bindOffset?: number, bindSize?: number) {
     const bindName = this._layout.nameMap?.[name] ?? name;
     for (const entry of this._layout.entries) {
       if (entry.name === bindName) {
@@ -45,6 +61,9 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
             console.log(`setBuffer() failed: buffer resource '${name}' must be type '${entry.buffer.type}'`);
           } else if (buffer !== this._resources[entry.name]) {
             this._resources[entry.name] = buffer as WebGLGPUBuffer;
+          }
+          if (entry.buffer.hasDynamicOffset) {
+            this._dynamicOffsets[entry.buffer.dynamicOffsetIndex] = offset ?? 0;
           }
         }
         return;
@@ -122,20 +141,22 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
   }
   apply(program: WebGLGPUProgram, offsets?: Iterable<number>) {
     const webgl2 = this._device.isWebGL2;
-    let dynamicOffsetIndex = 0;
+    const dynamicOffsets = offsets ?? this.getDynamicOffsets();
     for (let i = 0; i < this._layout.entries.length; i++) {
       const entry = this._layout.entries[i];
       const res = this._resources[entry.name];
-      if (res instanceof WebGLStructuredBuffer) {
+      if (res instanceof WebGLGPUBuffer) {
         if (webgl2) {
           if (entry.buffer.hasDynamicOffset) {
-            const offset = offsets?.[dynamicOffsetIndex] || 0;
-            dynamicOffsetIndex++;
-            program.setBlock((entry.type as PBStructTypeInfo).structName, res, offset);
+            program.setBlock(
+              (entry.type as PBStructTypeInfo).structName,
+              res,
+              dynamicOffsets[entry.buffer.dynamicOffsetIndex]
+            );
           } else {
             program.setBlock((entry.type as PBStructTypeInfo).structName, res, 0);
           }
-        } else {
+        } else if (res instanceof WebGLStructuredBuffer) {
           program.setUniform(entry.name, res.getUniformData().uniforms);
         }
       } else if (Array.isArray(res)) {

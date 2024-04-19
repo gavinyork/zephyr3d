@@ -31,7 +31,6 @@ export class GraphNode extends SceneNode {
   get octreeNode(): OctreeNode {
     return this._octreeNode;
   }
-  /** @internal */
   set octreeNode(node: OctreeNode) {
     this._octreeNode = node;
   }

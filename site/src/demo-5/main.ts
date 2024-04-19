@@ -61,7 +61,7 @@ instancingApp.ready().then(async () => {
 
   const batchGroup = new BatchGroup(scene);
   const assetManager = new AssetManager();
-  (async function(){
+  await (async function(){
     for (let i = 0; i < 2000; i++) {
       const stone1 = await assetManager.fetchModel(scene, 'assets/models/stone1.glb', { enableInstancing: true });
       stone1.group.parent = batchGroup;

@@ -489,7 +489,13 @@ export interface StructTypeDetail {
  */
 export interface ArrayTypeDetail {
   /** Type of array elements */
-  elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo;
+  elementType:
+    | PBPrimitiveTypeInfo
+    | PBArrayTypeInfo
+    | PBStructTypeInfo
+    | PBAnyTypeInfo
+    | PBAtomicI32TypeInfo
+    | PBAtomicU32TypeInfo;
   /** Array dimension */
   dimension: number;
 }
@@ -590,6 +596,10 @@ export abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetailI
   }
   /** returns true if this is a primitive type */
   isPrimitiveType(): this is PBPrimitiveTypeInfo {
+    return false;
+  }
+  /** Wether this type have atomic members */
+  haveAtomicMembers(): boolean {
     return false;
   }
   /** returns true if this is a struct type */
@@ -1013,6 +1023,18 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
   get structMembers() {
     return this.detail.structMembers;
   }
+  /** Whether this struct has atomic members */
+  haveAtomicMembers(): boolean {
+    for (const member of this.structMembers) {
+      if (member.type.isStructType() && member.type.haveAtomicMembers()) {
+        return true;
+      } else if (member.type.isArrayType() && member.type.haveAtomicMembers()) {
+        return true;
+      } else {
+        return member.type.isAtomicI32() || member.type.isAtomicU32();
+      }
+    }
+  }
   /**
    * Creates a new struct type by extending this type
    * @param name - Name of the new struct type
@@ -1063,18 +1085,6 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
     } else {
       return varName ? `${this.structName} ${varName}` : this.structName;
     }
-  }
-  /** @internal */
-  isWritable(): boolean {
-    for (const member of this.structMembers) {
-      if (member.type.isAtomicI32() || member.type.isAtomicU32()) {
-        return true;
-      }
-      if (member.type.isStructType() && member.type.isWritable()) {
-        return true;
-      }
-    }
-    return false;
   }
   /** @internal */
   getLayoutAlignment(layout: PBStructLayout): number {
@@ -1197,7 +1207,13 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
  */
 export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
   constructor(
-    elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo,
+    elementType:
+      | PBPrimitiveTypeInfo
+      | PBArrayTypeInfo
+      | PBStructTypeInfo
+      | PBAnyTypeInfo
+      | PBAtomicI32TypeInfo
+      | PBAtomicU32TypeInfo,
     dimension?: number
   ) {
     super(PBTypeClass.ARRAY, {
@@ -1206,12 +1222,26 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
     });
   }
   /** Get the element type */
-  get elementType(): PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo {
+  get elementType():
+    | PBPrimitiveTypeInfo
+    | PBArrayTypeInfo
+    | PBStructTypeInfo
+    | PBAnyTypeInfo
+    | PBAtomicI32TypeInfo
+    | PBAtomicU32TypeInfo {
     return this.detail.elementType;
   }
   /** Get dimension of the array type */
   get dimension(): number {
     return this.detail.dimension;
+  }
+  /** Wether array have atomic members */
+  haveAtomicMembers(): boolean {
+    if (this.elementType.isStructType() || this.elementType.isArrayType()) {
+      return this.elementType.haveAtomicMembers();
+    } else {
+      return this.elementType.isAtomicI32() || this.elementType.isAtomicU32();
+    }
   }
   /** {@inheritDoc PBTypeInfo.isArrayType} */
   isArrayType(): this is PBArrayTypeInfo {
@@ -1324,6 +1354,10 @@ export class PBPointerTypeInfo extends PBTypeInfo<PointerTypeDetail> {
       this.id = null;
     }
   }
+  /** {@inheritDoc PBTypeInfo.haveAtomicMembers} */
+  haveAtomicMembers(): boolean {
+    return this.pointerType.haveAtomicMembers();
+  }
   /** {@inheritDoc PBTypeInfo.isPointerType} */
   isPointerType(): this is PBPointerTypeInfo {
     return true;
@@ -1366,6 +1400,10 @@ export class PBPointerTypeInfo extends PBTypeInfo<PointerTypeDetail> {
 export class PBAtomicI32TypeInfo extends PBTypeInfo<null> {
   constructor() {
     super(PBTypeClass.ATOMIC_I32, null);
+  }
+  /** {@inheritDoc PBTypeInfo.isPointerType} */
+  haveAtomicMembers(): boolean {
+    return true;
   }
   /** @internal */
   isAtomicI32(): this is PBAtomicI32TypeInfo {
@@ -1417,6 +1455,10 @@ export class PBAtomicI32TypeInfo extends PBTypeInfo<null> {
 export class PBAtomicU32TypeInfo extends PBTypeInfo<null> {
   constructor() {
     super(PBTypeClass.ATOMIC_U32, null);
+  }
+  /** {@inheritDoc PBTypeInfo.isPointerType} */
+  haveAtomicMembers(): boolean {
+    return true;
   }
   /** @internal */
   isAtomicU32(): this is PBAtomicU32TypeInfo {
@@ -1537,9 +1579,15 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
   get readable(): boolean {
     return this.detail.readable;
   }
+  set readable(val: boolean) {
+    this.detail.readable = !!val;
+  }
   /** Returns true if this is a writable storage texture type */
   get writable(): boolean {
     return this.detail.writable;
+  }
+  set writable(val: boolean) {
+    this.detail.writable = !!val;
   }
   /** @internal */
   isStorable(): boolean {
@@ -1600,7 +1648,7 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
       if (this.isStorageTexture()) {
         const storageTexelFormat = storageTexelFormatMap[this.storageTexelFormat];
         // storage textures currently only support 'write' access control
-        const accessMode = 'write'; //this.readable ? (this.writable ? 'read_write' : 'read') : 'write';
+        const accessMode = this.writable ? (this.readable ? 'read_write' : 'write') : 'read'; // this.readable ? (this.writable ? 'read_write' : 'read') : 'write';
         typename = `${typename}<${storageTexelFormat}, ${accessMode}>`;
       }
       return varName ? `${varName}: ${typename}` : typename;

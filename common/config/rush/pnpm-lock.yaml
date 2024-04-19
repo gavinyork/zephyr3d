@@ -72,7 +72,7 @@ importers:
     dependencies:
       '@types/colors': 1.2.1
       '@types/diff': 5.0.3
-      '@webgpu/types': 0.1.34
+      '@webgpu/types': 0.1.40
       '@zephyr3d/backend-webgl': link:../libs/backend-webgl
       '@zephyr3d/backend-webgpu': link:../libs/backend-webgpu
       '@zephyr3d/base': link:../libs/base
@@ -134,7 +134,7 @@ importers:
       typescript: ^5.1.3
     dependencies:
       '@types/node': 18.17.6
-      '@webgpu/types': 0.1.34
+      '@webgpu/types': 0.1.40
     devDependencies:
       '@babel/core': 7.22.10
       '@babel/preset-env': 7.22.10_@babel+core@7.22.10
@@ -179,7 +179,7 @@ importers:
       typescript: ^5.1.3
     dependencies:
       '@types/node': 18.17.6
-      '@webgpu/types': 0.1.34
+      '@webgpu/types': 0.1.40
     devDependencies:
       '@babel/core': 7.22.10
       '@babel/preset-env': 7.22.10_@babel+core@7.22.10
@@ -262,7 +262,7 @@ importers:
       typescript: ^5.1.3
     dependencies:
       '@types/node': 18.17.6
-      '@webgpu/types': 0.1.34
+      '@webgpu/types': 0.1.40
     devDependencies:
       '@babel/core': 7.22.10
       '@babel/preset-env': 7.22.10_@babel+core@7.22.10
@@ -309,7 +309,7 @@ importers:
     dependencies:
       '@types/emscripten': 1.39.7
       '@types/node': 18.17.6
-      '@webgpu/types': 0.1.34
+      '@webgpu/types': 0.1.40
     devDependencies:
       '@babel/core': 7.22.10
       '@babel/preset-env': 7.22.10_@babel+core@7.22.10
@@ -353,7 +353,7 @@ importers:
       shx: ^0.3.4
       typescript: ^5.1.3
     dependencies:
-      '@webgpu/types': 0.1.34
+      '@webgpu/types': 0.1.40
     devDependencies:
       '@babel/core': 7.22.10
       '@babel/preset-env': 7.22.10_@babel+core@7.22.10
@@ -424,7 +424,7 @@ importers:
       '@popperjs/core': 2.11.8
       '@types/colors': 1.2.1
       '@types/diff': 5.0.3
-      '@webgpu/types': 0.1.34
+      '@webgpu/types': 0.1.40
       '@zephyr3d/backend-webgl': link:../libs/backend-webgl
       '@zephyr3d/backend-webgpu': link:../libs/backend-webgpu
       '@zephyr3d/base': link:../libs/base
@@ -509,7 +509,7 @@ importers:
     dependencies:
       '@types/colors': 1.2.1
       '@types/diff': 5.0.3
-      '@webgpu/types': 0.1.34
+      '@webgpu/types': 0.1.40
       '@zephyr3d/backend-webgl': link:../libs/backend-webgl
       '@zephyr3d/backend-webgpu': link:../libs/backend-webgpu
       '@zephyr3d/base': link:../libs/base
@@ -2612,8 +2612,8 @@ packages:
       parse5: 6.0.1
     dev: true
 
-  /@webgpu/types/0.1.34:
-    resolution: {integrity: sha512-9mXtH+CC8q+Ku7Z+1XazNIte81FvfdXwR2lLRO7Ykzjd/hh1J1krJa0gtnkF1kvP11psUmKEPKo7iMTeEcUpNA==}
+  /@webgpu/types/0.1.40:
+    resolution: {integrity: sha512-/BBkHLS6/eQjyWhY2H7Dx5DHcVrS2ICj9owvSRdgtQT6KcafLZA86tPze0xAOsd4FbsYKCUBUQyNi87q7gV7kw==}
     dev: false
 
   /@zip.js/zip.js/2.7.35:

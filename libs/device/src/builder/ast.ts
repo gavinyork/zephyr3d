@@ -636,7 +636,10 @@ export class ASTPrimitive extends ASTExpression {
   isWritable(): boolean {
     const type = this.getType();
     return (
-      this.writable || type.isAtomicI32() || type.isAtomicU32() || (type.isStructType() && type.isWritable())
+      this.writable ||
+      type.isAtomicI32() ||
+      type.isAtomicU32() ||
+      (type.isStructType() && type.haveAtomicMembers())
     );
   }
   getAddressSpace(): PBAddressSpace {
@@ -2068,14 +2071,11 @@ export class ASTDeclareVar extends ShaderAST {
         // prefix = `@location(${this.value.value.$location}) var<out> `;
         throw new Error(`Internal error`);
       case DeclareType.DECLARE_TYPE_UNIFORM:
-        if (this.group === undefined) {
-          debugger;
-        }
         prefix = `@group(${this.group}) @binding(${this.binding}) var${isBlock ? '<uniform>' : ''} `;
         break;
       case DeclareType.DECLARE_TYPE_STORAGE:
         prefix = `@group(${this.group}) @binding(${this.binding}) var<storage, ${
-          this.value.isWritable() ? 'read_write' : 'read'
+          this.value.value.$readonly ? 'read' : 'read_write' //this.value.isWritable() || this.value.getType().haveAtomicMembers() ? 'read_write' : 'read'
         }> `;
         break;
       case DeclareType.DECLARE_TYPE_WORKGROUP:

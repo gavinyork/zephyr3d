@@ -13,12 +13,12 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) 
     // 漫反射贴图，该帖图是否存在会生成两个shader变体
     this.diffuseTexture = null;
   }
-  // 每次渲染之前更新变体值
-  beginDraw(pass, ctx) {
+  // 每次应用之前更新变体值
+  apply(ctx) {
     // 有无diffuseTexture形成两个变体
     this.useFeature(MyLambertMaterial.featureDiffuseTexture, !!this.diffuseTexture);
     // 默认实现必须调用
-    return super.beginDraw(pass, ctx);
+    return super.apply(ctx);
   }
   // 受光照影响
   supportLighting() {

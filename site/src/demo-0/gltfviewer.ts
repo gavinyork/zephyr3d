@@ -1,11 +1,9 @@
 import * as zip from '@zip.js/zip.js';
 import { Vector4, Vector3 } from '@zephyr3d/base';
-import type { SceneNode, Scene, AnimationSet } from '@zephyr3d/scene';
+import { SceneNode, Scene, AnimationSet, BatchGroup, PostWater, WeightedBlendedOIT, OIT, ABufferOIT } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
 import {
   BoundingBox,
-  GraphNode,
-  Material,
   AssetManager,
   DirectionalLight,
   OrbitCameraController,
@@ -26,36 +24,46 @@ export class GLTFViewer {
   private _assetManager: AssetManager;
   private _scene: Scene;
   private _tonemap: Tonemap;
+  private _water: PostWater;
   private _bloom: Bloom;
   private _fxaa: FXAA;
+  private _water: PostWater;
+  private _oit: OIT;
   private _doTonemap: boolean;
+  private _doWater: boolean;
   private _doBloom: boolean;
   private _doFXAA: boolean;
+  private _doWater: boolean;
   private _camera: PerspectiveCamera;
   private _light0: DirectionalLight;
   private _light1: DirectionalLight;
   private _fov: number;
   private _nearPlane: number;
   private _envMaps: EnvMaps;
-  //private _ui: UI;
+  private _batchGroup: BatchGroup;
   private _ui: Panel;
   private _compositor: Compositor;
   constructor(scene: Scene) {
+    const device = Application.instance.device;
     this._currentAnimation = null;
     this._modelNode = null;
     this._animationSet = null;
     this._scene = scene;
     this._envMaps = new EnvMaps();
-    //this._ui = new UI(this);
+    this._batchGroup = new BatchGroup(scene);
     this._assetManager = new AssetManager();
     this._tonemap = new Tonemap();
+    this._water = new PostWater(0);
     this._bloom = new Bloom();
     this._bloom.threshold = 0.85;
     this._bloom.intensity = 1.5;
     this._fxaa = new FXAA();
     this._doTonemap = true;
+    this._doWater = false;
     this._doBloom = true;
     this._doFXAA = true;
+    this._doWater = false;
+    this._oit = new WeightedBlendedOIT();
     this._fov = Math.PI / 3;
     this._nearPlane = 1;
     this._compositor = new Compositor();
@@ -65,11 +73,12 @@ export class GLTFViewer {
     this._camera = new PerspectiveCamera(
       scene,
       Math.PI / 3,
-      Application.instance.device.getDrawingBufferWidth() /
-        Application.instance.device.getDrawingBufferHeight(),
+      device.getDrawingBufferWidth() /
+        device.getDrawingBufferHeight(),
       1,
       160
     );
+    this._camera.oit = this._oit;
     this._camera.position.setXYZ(0, 0, 15);
     this._camera.controller = new OrbitCameraController();
     this._light0 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
@@ -79,12 +88,6 @@ export class GLTFViewer {
     this._light1.shadow.shadowMapSize = 1024;
     this._light1.lookAt(new Vector3(0, 0, 0), new Vector3(-0.5, 0.707, 0.5), Vector3.axisPY());
     this._envMaps.selectById(this._envMaps.getIdList()[0], this.scene);
-    Material.setGCOptions({
-      drawableCountThreshold: 0,
-      materialCountThreshold: 0,
-      inactiveTimeDuration: 10000,
-      verbose: true
-    });
     this._ui = new Panel(this);
   }
   get envMaps(): EnvMaps {
@@ -146,9 +149,10 @@ export class GLTFViewer {
   async loadModel(url: string) {
     this._modelNode?.remove();
     this._assetManager.purgeCache();
-    this._assetManager.fetchModel(this._scene, url).then((info) => {
+    this._assetManager.fetchModel(this._scene, url, { enableInstancing: true }).then((info) => {
       this._modelNode?.dispose();
       this._modelNode = info.group;
+      this._modelNode.parent = this._batchGroup;
       this._animationSet?.dispose();
       this._animationSet = info.animationSet;
       this._modelNode.pickable = true;
@@ -206,11 +210,33 @@ export class GLTFViewer {
   tonemapEnabled(): boolean {
     return this._doTonemap;
   }
+  waterEnabled(): boolean {
+    return this._doWater;
+  }
   FXAAEnabled(): boolean {
     return this._doFXAA;
   }
+  getOITType(): string {
+    return this._oit?.getType() ?? '';
+  }
+  setOITType(val: string) {
+    if (this._oit?.getType() !== val) {
+      this._oit?.dispose();
+      if (val === WeightedBlendedOIT.type) {
+        this._oit = new WeightedBlendedOIT();
+      } else if (val === ABufferOIT.type) {
+        this._oit = new ABufferOIT();
+      } else {
+        this._oit = null;
+      }
+      this._camera.oit = this._oit;
+    }
+  }
   syncPostEffects() {
     this._compositor.clear();
+    if (this._doWater) {
+      this._compositor.appendPostEffect(this._water);
+    }
     if (this._doTonemap) {
       this._compositor.appendPostEffect(this._tonemap);
     }
@@ -243,6 +269,12 @@ export class GLTFViewer {
   enableTonemap(enable: boolean) {
     if (!!enable !== this._doTonemap) {
       this._doTonemap = !!enable;
+      this.syncPostEffects();
+    }
+  }
+  enableWater(enable: boolean) {
+    if (!!enable !== this._doWater) {
+      this._doWater = !!enable;
       this.syncPostEffects();
     }
   }

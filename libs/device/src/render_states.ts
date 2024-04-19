@@ -282,7 +282,9 @@ export interface StencilState {
  * @public
  */
 export interface RenderStateSet {
-  /** Creates a new RenderStateSet by copying this one */
+  /** Creates a new RenderStateSet object by deep copy from this object */
+  clone(): RenderStateSet;
+  /** Shallow copy existing RenderStateSet object to this */
   copyFrom(stateSet: RenderStateSet): void;
   /** Fragment output related render statements or null if the default values should be used */
   readonly colorState: ColorState;

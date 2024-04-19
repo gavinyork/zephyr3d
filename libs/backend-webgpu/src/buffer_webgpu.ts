@@ -39,15 +39,21 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
   get gpuUsage(): number {
     return this._gpuUsage;
   }
-  getPendingUploads(): UploadBuffer[] {
-    return this._pendingUploads;
-  }
-  clearPendingUploads() {
-    if (this._pendingUploads.length > 0) {
-      this._pendingUploads = [];
-      this.beginSyncChanges(null);
-      this.endSyncChanges();
+  private searchInsertPosition(dstByteOffset: number): number {
+    let left = 0;
+    let right = this._pendingUploads.length - 1;
+    let insertIndex = this._pendingUploads.length;
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      const upload = this._pendingUploads[mid];
+      if (upload.uploadOffset < dstByteOffset) {
+        left = mid + 1;
+      } else {
+        insertIndex = mid;
+        right = mid - 1;
+      }
     }
+    return insertIndex;
   }
   bufferSubData(dstByteOffset: number, data: TypedArray, srcOffset?: number, srcLength?: number): void {
     srcOffset = Number(srcOffset) || 0;
@@ -59,56 +65,50 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     if (dstByteOffset + srcLength * data.BYTES_PER_ELEMENT > this.byteLength) {
       throw new Error('bufferSubData() failed: dest buffer is too small');
     }
-    let uploadSize = srcLength * data.BYTES_PER_ELEMENT;
+    const uploadSize = srcLength * data.BYTES_PER_ELEMENT;
     if ((dstByteOffset & 3) !== 0 || (uploadSize & 3) !== 0) {
       throw new Error(
         'bufferSubData() failed: destination byte offset or upload size must be 4 bytes aligned'
       );
     }
     const uploadOffset = data.byteOffset + srcOffset * data.BYTES_PER_ELEMENT;
-    const writeOffset = dstByteOffset;
-    const writeSize = uploadSize;
+    const insertIndex = this.searchInsertPosition(dstByteOffset);
+    if (insertIndex < this._pendingUploads.length) {
+      const upload = this._pendingUploads[insertIndex];
+      if (
+        upload.uploadOffset < dstByteOffset + uploadSize &&
+        upload.uploadOffset + upload.uploadSize > dstByteOffset
+      ) {
+        // Flush if overlapped
+        this._device.bufferUpload(this);
+      }
+    }
+    let commit = false;
     if (this._pendingUploads.length === 0) {
-      this.pushUpload(this._pendingUploads, data.buffer, uploadOffset, dstByteOffset, uploadSize);
+      this.pushUpload(dstByteOffset, uploadSize, 0);
+      commit = true;
     } else {
-      let newPendings: UploadBuffer[] = [];
-      let added = false;
-      for (let i = 0; i < this._pendingUploads.length; i++) {
-        const upload = this._pendingUploads[i];
-        if (upload.uploadOffset + upload.uploadSize < dstByteOffset) {
-          // current upload in front of new upload
-          newPendings.push(upload);
-        } else if (upload.uploadOffset > dstByteOffset + uploadSize) {
-          // current upload behind of new upload
-          if (!added) {
-            added = true;
-            this.pushUpload(newPendings, null, 0, dstByteOffset, uploadSize);
-          }
-          newPendings.push(upload);
+      let start = dstByteOffset;
+      let end = dstByteOffset + uploadSize;
+      while (insertIndex < this._pendingUploads.length) {
+        const upload = this._pendingUploads[insertIndex];
+        const uploadStart = upload.uploadOffset;
+        const uploadEnd = uploadStart + upload.uploadSize;
+        if (uploadStart < end && uploadEnd > start) {
+          start = Math.min(start, uploadStart);
+          end = Math.max(end, uploadEnd);
+          this._pendingUploads.splice(insertIndex, 1);
         } else {
-          const start = Math.min(dstByteOffset, upload.uploadOffset);
-          const end = Math.max(dstByteOffset + uploadSize, upload.uploadOffset + upload.uploadSize);
-          if (
-            end - start < uploadSize + upload.uploadSize &&
-            this._device.currentPass?.isBufferUploading(this)
-          ) {
-            // data overlaps and previous data is in use, refresh data by restarting current render pass or compute pass
-            this._device.currentPass.end();
-            // now, the pending uploads should be cleared
-            newPendings = [];
-            break;
-          }
-          dstByteOffset = start;
-          uploadSize = end - start;
+          break;
         }
       }
-      if (!added) {
-        this.pushUpload(newPendings, null, 0, dstByteOffset, uploadSize);
-      }
-      this._pendingUploads = newPendings;
-      new Uint8Array(this._pendingUploads[0].mappedBuffer.mappedRange, writeOffset, writeSize).set(
-        new Uint8Array(data.buffer, uploadOffset, writeSize)
-      );
+      this.pushUpload(start, end - start, insertIndex);
+    }
+    new Uint8Array(this._pendingUploads[0].mappedBuffer.mappedRange, dstByteOffset, uploadSize).set(
+      new Uint8Array(data.buffer, uploadOffset, uploadSize)
+    );
+    if (commit) {
+      this._device.bufferUpload(this);
     }
   }
   async getBufferSubData(
@@ -195,11 +195,11 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
           label += '[index]';
         }
         if (this._usage & GPUResourceUsageFlags.BF_UNIFORM) {
-          this._gpuUsage |= GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST;
+          this._gpuUsage |= GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
           label += '[uniform]';
         }
         if (this._usage & GPUResourceUsageFlags.BF_STORAGE) {
-          this._gpuUsage |= GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST;
+          this._gpuUsage |= GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
           label += '[storage]';
         }
         if (this._usage & GPUResourceUsageFlags.BF_READ) {
@@ -235,28 +235,12 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
   }
   private sync() {
     if (this._pendingUploads) {
-      if (this._device.isBufferUploading(this)) {
-        this._device.currentPass.end();
-      } else {
-        this.beginSyncChanges(null);
-        this.endSyncChanges();
-      }
+      this._device.flushUploads();
     }
   }
-  private pushUpload(
-    pending: UploadBuffer[],
-    data: ArrayBuffer,
-    srcByteOffset: number,
-    dstByteOffset: number,
-    byteSize: number
-  ) {
+  private pushUpload(dstByteOffset: number, byteSize: number, insertIndex: number) {
     const bufferMapped = this._ringBuffer.fetchBufferMapped(byteSize, true);
-    if (data) {
-      new Uint8Array(bufferMapped.mappedRange, dstByteOffset, byteSize).set(
-        new Uint8Array(data, srcByteOffset, byteSize)
-      );
-    }
-    pending.push({
+    this._pendingUploads.splice(insertIndex, 0, {
       mappedBuffer: {
         buffer: bufferMapped.buffer,
         size: bufferMapped.size,

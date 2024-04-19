@@ -131,7 +131,7 @@ export class SkyRenderer {
   }
   /** @internal */
   getHash(ctx: DrawContext): string {
-    return ctx.applyFog ? (this._fogType === 'none' ? '0' : this.drawScatteredFog(ctx) ? '1' : '2') : '';
+    return ctx.applyFog === 'scatter' ? '1' : ctx.applyFog ? '2' : '0';
   }
   /** Which type of the sky should be rendered */
   get skyType(): SkyType {
@@ -398,7 +398,7 @@ export class SkyRenderer {
   renderFog(ctx: DrawContext) {
     const camera = ctx.camera;
     const sceneDepthTexture = ctx.linearDepthTexture;
-    const device = Application.instance.device;
+    const device = ctx.device;
     const savedRenderStates = device.getRenderStates();
     this._prepareSkyBox(device);
     const sunLight = ctx.sunLight;

@@ -7,7 +7,6 @@ import type {
   Texture2D,
   TextureSampler
 } from '@zephyr3d/device';
-import { Application } from '../app';
 import { AbstractPostEffect } from './posteffect';
 import { TemporalCache, type DrawContext } from '../render';
 import { Vector2, Vector4 } from '@zephyr3d/base';
@@ -100,7 +99,7 @@ export class Bloom extends AbstractPostEffect {
   }
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
-    const device = Application.instance.device;
+    const device = ctx.device;
     const downsampleFramebuffers: FrameBuffer[] = [];
     this._prepare(device, inputColorTexture);
     device.pushDeviceStates();

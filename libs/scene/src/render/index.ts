@@ -1,4 +1,3 @@
-export * from './renderscheme';
 export * from './drawable';
 export * from './renderpass';
 export * from './renderer';
@@ -13,3 +12,6 @@ export * from './primitive';
 export * from './cull_visitor';
 export * from './temporalcache';
 export * from './watermesh';
+export * from './oit';
+export * from './weightedblended_oit';
+export * from './abuffer_oit';

@@ -1,35 +1,44 @@
 import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
-import type { Texture2D, TextureFormat } from '@zephyr3d/device';
+import type { AbstractDevice, Texture2D, TextureFormat } from '@zephyr3d/device';
 import type { XForm } from '../scene/xform';
 import type { Camera } from '../camera/camera';
-import type { RenderPass } from '.';
-import type { CachedBindGroup, InstanceData } from './render_queue';
+import type { FogType, RenderPass } from '.';
+import type { DrawableInstanceInfo, InstanceData, RenderQueue, RenderQueueRef } from './render_queue';
 import type { ShadowMapParams } from '../shadow';
 import type { Environment } from '../scene/environment';
 import type { DirectionalLight, GraphNode, PunctualLight, Scene } from '../scene';
 import type { Compositor, CompositorContext } from '../posteffect';
 import type { RenderLogger } from '../logger/logger';
 import type { ClusteredLight } from './cluster_light';
+import type { Material } from '../material';
+import type { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
+import type { OIT } from './oit';
 
 /**
  * The context for drawing objects
  * @public
  */
 export interface DrawContext {
+  /** Render device */
+  device: AbstractDevice;
   /** The camera position of the primary render pass */
   primaryCamera: Camera;
+  /** The render queue which is currently being rendered */
+  renderQueue?: RenderQueue;
+  /** Global bind group allocator */
+  globalBindGroupAllocator: GlobalBindGroupAllocator;
   /** The camera for current drawing task */
   camera: Camera;
+  /** OIT */
+  oit: OIT;
   /** The scene that is currently been drawing */
   scene: Scene;
-  /** The object that is currently being drawn */
-  target: Drawable;
   /** The render pass to which the current drawing task belongs */
   renderPass: RenderPass;
   /** Hash value for the drawing task */
   renderPassHash: string;
   /** Whether should apply fog to fragment */
-  applyFog: boolean;
+  applyFog: FogType;
   /** Wether should flip upside down */
   flip: boolean;
   /** Whether current render pass is base light pass */
@@ -74,6 +83,10 @@ export interface DrawContext {
   clusteredLight?: ClusteredLight;
   /** render logger */
   logger?: RenderLogger;
+  /** Whether skin animation is used */
+  skinAnimation?: boolean;
+  /** Whehter instance rendering is used */
+  instancing?: boolean;
 }
 
 /**
@@ -99,6 +112,11 @@ export interface Drawable {
   getQueueType(): number;
   /** true if the shading of this object is independent of lighting */
   isUnlit(): boolean;
+  /** Gets the associated material */
+  getMaterial(): Material;
+  /** Set render queue reference */
+  pushRenderQueueRef(ref: RenderQueueRef);
+  applyTransformUniforms(renderQueue: RenderQueue): void;
   /**
    * Draw the object
    * @param ctx - Context of the drawing task
@@ -124,12 +142,6 @@ export interface BatchDrawable extends Drawable {
    * Gets the instance uniforms
    */
   getInstanceUniforms(): Float32Array;
-  /**
-   * Sets the uniform data buffer and offset
-   */
-  setInstanceDataBuffer(renderPass: RenderPass, bindGroup: CachedBindGroup, offset: number);
-  /**
-   * Gets the uniform data buffer offset
-   */
-  getInstanceDataBuffer(renderPass: RenderPass): { bindGroup: CachedBindGroup; offset: number };
+  applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void;
+  applyMaterialUniforms(instanceInfo: DrawableInstanceInfo);
 }

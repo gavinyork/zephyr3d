@@ -46,11 +46,11 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) 
     // Diffuse texture，default to null
     this.diffuseTexture = null;
   }
-  // Update variant values before each render
-  beginDraw(pass, ctx) {
+  // Update variant values before applying material
+  apply(ctx) {
     this.useFeature(MyLambertMaterial.featureDiffuseTexture, !!this.diffuseTexture);
     // Default implementation must be invoked.
-    return super.beginDraw(pass, ctx);
+    return super.apply(ctx);
   }
   supportLighting() {
     return true;

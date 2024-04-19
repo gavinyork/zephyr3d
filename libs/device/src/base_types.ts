@@ -12,6 +12,7 @@ import type {
   GPUObject,
   GPUProgram,
   IndexBuffer,
+  RenderBundle,
   SamplerOptions,
   StructuredBuffer,
   Texture2D,
@@ -1432,6 +1433,8 @@ export interface FrameInfo {
   computeCalls: number;
   /** @internal */
   nextFrameCall: (() => void)[];
+  /** @internal */
+  nextFrameCallNext: (() => void)[];
 }
 
 /**
@@ -1525,6 +1528,10 @@ export interface ShaderCaps {
   maxUniformBufferSize: number;
   /** The uniform buffer offset alignment */
   uniformBufferOffsetAlignment: number;
+  /** The maximum number of bytes of storage buffer */
+  maxStorageBufferSize: number;
+  /** The storage buffer offset alignment */
+  storageBufferOffsetAlignment: number;
 }
 
 /**
@@ -1943,6 +1950,21 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    */
   createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer;
   /**
+   * Copies a buffer to another buffer
+   * @param sourceBuffer - Source buffer
+   * @param destBuffer - destination buffer
+   * @param srcOffset - Source offset in bytes
+   * @param dstOffset - Destination offset in bytes
+   * @param bytes - How many bytes to be copy
+   */
+  copyBuffer(
+    sourceBuffer: GPUDataBuffer,
+    destBuffer: GPUDataBuffer,
+    srcOffset: number,
+    dstOffset: number,
+    bytes: number
+  );
+  /**
    * Creates an index buffer
    * @param data - Data of the index buffer
    * @param options - The creation options
@@ -2067,6 +2089,20 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param buffer - The output buffer
    */
   readPixelsToBuffer(index: number, x: number, y: number, w: number, h: number, buffer: GPUDataBuffer): void;
+  /**
+   * Begin capture draw commands
+   */
+  beginCapture(): void;
+  /**
+   * Executes render bundle
+   * @param renderBundle - RenderBundle to be execute
+   */
+  executeRenderBundle(renderBundle: RenderBundle);
+  /**
+   * End capture draw commands
+   * @returns A RenderBundle that holds the captured draw commands
+   */
+  endCapture(): RenderBundle;
   /** Get the video memory usage in bytes */
   videoMemoryUsage: number;
   /** Get the current frame information */
@@ -2162,12 +2198,6 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param f - The function to be scheduled
    */
   runNextFrame(f: () => void): void;
-  /**
-   * Canels a pre scheduled function
-   *
-   * @param f - The function to be cancled
-   */
-  cancelNextFrameCall(f: () => void): void;
   /** Exits from current rendering loop */
   exitLoop(): void;
   /**

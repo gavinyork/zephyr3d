@@ -31,7 +31,8 @@ import type {
   TextureFormat,
   DeviceBackend,
   DeviceViewport,
-  BaseTexture
+  BaseTexture,
+  RenderBundle
 } from '@zephyr3d/device';
 import { getTextureFormatBlockSize, DeviceResizeEvent, BaseDevice } from '@zephyr3d/device';
 import type { WebGPUTextureSampler } from './sampler_webgpu';
@@ -93,6 +94,7 @@ export class WebGPUDevice extends BaseDevice {
   private _defaultRenderPassDesc: GPURenderPassDescriptor;
   private _sampleCount: number;
   private _emptyBindGroup: GPUBindGroup;
+  private _captureRenderBundle: GPURenderBundleEncoder;
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend);
     this._dpr = Math.max(1, Math.floor(options?.dpr ?? window.devicePixelRatio));
@@ -118,6 +120,7 @@ export class WebGPUDevice extends BaseDevice {
     this._gpuObjectHasher = new WeakMap();
     this._gpuObjectHashCounter = 1;
     this._emptyBindGroup = null;
+    this._captureRenderBundle = null;
     this._samplerCache = new SamplerCache(this);
   }
   get context() {
@@ -131,6 +134,9 @@ export class WebGPUDevice extends BaseDevice {
   }
   get adapter(): GPUAdapter {
     return this._adapter;
+  }
+  get commandQueue(): CommandQueueImmediate {
+    return this._commandQueue;
   }
   get drawingBufferWidth() {
     return this.getDrawingBufferWidth();
@@ -207,7 +213,8 @@ export class WebGPUDevice extends BaseDevice {
       console.warn('using a fallback adapter');
     }
     this._device = await this._adapter.requestDevice({
-      requiredFeatures: [...this._adapter.features] as GPUFeatureName[]
+      requiredFeatures: [...this._adapter.features] as GPUFeatureName[],
+      requiredLimits: { ...this._adapter.limits } as any
     });
     console.log('WebGPU device features:');
     for (const feature of this._device.features) {
@@ -477,6 +484,21 @@ export class WebGPUDevice extends BaseDevice {
   createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer {
     return new WebGPUBuffer(this, this.parseBufferOptions(options), sizeInBytes);
   }
+  copyBuffer(
+    sourceBuffer: GPUDataBuffer<unknown>,
+    destBuffer: GPUDataBuffer<unknown>,
+    srcOffset: number,
+    dstOffset: number,
+    bytes: number
+  ) {
+    this._commandQueue.copyBuffer(
+      sourceBuffer as WebGPUBuffer,
+      destBuffer as WebGPUBuffer,
+      srcOffset,
+      dstOffset,
+      bytes
+    );
+  }
   createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer<unknown> {
     return new WebGPUIndexBuffer(this, data, this.parseBufferOptions(options, 'index'));
   }
@@ -499,7 +521,7 @@ export class WebGPUDevice extends BaseDevice {
   }
   setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>) {
     this._currentBindGroups[index] = bindGroup as WebGPUBindGroup;
-    this._currentBindGroupOffsets[index] = dynamicOffsets || null;
+    this._currentBindGroupOffsets[index] = dynamicOffsets ?? bindGroup?.getDynamicOffsets() ?? null;
   }
   getBindGroup(index: number): [BindGroup, Iterable<number>] {
     return [this._currentBindGroups[index], this._currentBindGroupOffsets[index]];
@@ -641,7 +663,7 @@ export class WebGPUDevice extends BaseDevice {
     return this._samplerCache.fetchSampler(options);
   }
   /** @internal */
-  fetchBindGroupLayout(desc: BindGroupLayout): GPUBindGroupLayout {
+  fetchBindGroupLayout(desc: BindGroupLayout): [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout] {
     return this._bindGroupCache.fetchBindGroupLayout(desc);
   }
   flush(): void {
@@ -714,6 +736,38 @@ export class WebGPUDevice extends BaseDevice {
   restoreContext(): void {
     // not implemented
   }
+  beginCapture(): void {
+    if (this._captureRenderBundle) {
+      throw new Error('Device.beginCapture() failed: device is already capturing draw commands');
+    }
+    const frameBuffer = this.getFramebufferInfo();
+    const desc: GPURenderBundleEncoderDescriptor = {
+      colorFormats: frameBuffer.colorFormats,
+      depthStencilFormat: frameBuffer.depthFormat,
+      sampleCount: frameBuffer.sampleCount
+    };
+    this._captureRenderBundle = this._device.createRenderBundleEncoder(desc);
+  }
+  endCapture(): RenderBundle {
+    if (!this._captureRenderBundle) {
+      throw new Error('Device.endCapture() failed: device is not capturing draw commands');
+    }
+    const renderBundle = this._captureRenderBundle.finish();
+    this._captureRenderBundle = null;
+    return renderBundle;
+  }
+  executeRenderBundle(renderBundle: RenderBundle) {
+    this._commandQueue.executeRenderBundle(renderBundle as GPURenderBundle);
+  }
+  bufferUpload(buffer: WebGPUBuffer) {
+    this._commandQueue.bufferUpload(buffer);
+  }
+  textureUpload(tex: WebGPUBaseTexture) {
+    this._commandQueue.textureUpload(tex);
+  }
+  flushUploads() {
+    this._commandQueue.flushUploads();
+  }
   /** @internal */
   protected onBeginFrame(): boolean {
     if (this._canRender) {
@@ -740,6 +794,20 @@ export class WebGPUDevice extends BaseDevice {
       count,
       1
     );
+    if (this._captureRenderBundle) {
+      this._commandQueue.capture(
+        this._captureRenderBundle,
+        this._currentProgram,
+        this._currentVertexData,
+        this._currentStateSet,
+        this._currentBindGroups,
+        this._currentBindGroupOffsets,
+        primitiveType,
+        first,
+        count,
+        1
+      );
+    }
   }
   /** @internal */
   protected _drawInstanced(
@@ -759,6 +827,20 @@ export class WebGPUDevice extends BaseDevice {
       count,
       numInstances
     );
+    if (this._captureRenderBundle) {
+      this._commandQueue.capture(
+        this._captureRenderBundle,
+        this._currentProgram,
+        this._currentVertexData,
+        this._currentStateSet,
+        this._currentBindGroups,
+        this._currentBindGroupOffsets,
+        primitiveType,
+        first,
+        count,
+        numInstances
+      );
+    }
   }
   /** @internal */
   protected _compute(workgroupCountX, workgroupCountY, workgroupCountZ): void {

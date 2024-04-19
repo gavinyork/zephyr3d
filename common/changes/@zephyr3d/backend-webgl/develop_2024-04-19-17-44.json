@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-webgl",
+      "comment": "implement render bundle",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-webgl"
+}

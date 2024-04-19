@@ -1,9 +1,7 @@
 import type { Matrix4x4, AABB } from '@zephyr3d/base';
-import { Vector3, Vector4, Ray, makeEventTarget, nextPowerOf2 } from '@zephyr3d/base';
+import { Vector3, Vector4, Ray, makeEventTarget } from '@zephyr3d/base';
 import { SceneNode } from './scene_node';
 import { Octree } from './octree';
-import { OctreeUpdateVisitor } from './octree_update_visitor';
-import { Material } from '../material';
 import { RaycastVisitor } from './raycast_visitor';
 import { Application } from '../app';
 import { Environment } from './environment';
@@ -170,10 +168,6 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
     const frameInfo = Application.instance.device.frameInfo;
     if (frameInfo.frameCounter !== this._updateFrame) {
       this._updateFrame = frameInfo.frameCounter;
-      // uniform buffer garbage collect
-      if (!Material.getGCOptions().disabled) {
-        Material.garbageCollect(frameInfo.frameTimestamp);
-      }
       for (const an of this._animationSet) {
         an.update();
       }
@@ -222,25 +216,6 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
           placeNode(node, node.attached);
         } else {
           list.delete(node);
-        }
-      }
-      if (octree) {
-        const worldBox = octree.getRootNode().getBox();
-        if (worldBox) {
-          const radius = Math.max(
-            Math.abs(worldBox.minPoint.x),
-            Math.abs(worldBox.minPoint.y),
-            Math.abs(worldBox.minPoint.z),
-            Math.abs(worldBox.maxPoint.x),
-            Math.abs(worldBox.maxPoint.y),
-            Math.abs(worldBox.maxPoint.z)
-          );
-          const rootSize = nextPowerOf2(radius * 2);
-          if (rootSize > octree.getRootSize()) {
-            octree.initialize(rootSize, octree.getLeafSize());
-            const v = new OctreeUpdateVisitor(octree);
-            this._rootNode.traverse(v);
-          }
         }
       }
     }

@@ -5,12 +5,12 @@ import type { WebGPUDevice } from './device';
 
 export class BindGroupCache {
   private _device: WebGPUDevice;
-  private _bindGroupLayoutCache: Record<string, GPUBindGroupLayout>;
+  private _bindGroupLayoutCache: Record<string, [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout]>;
   constructor(device: WebGPUDevice) {
     this._device = device;
     this._bindGroupLayoutCache = {};
   }
-  fetchBindGroupLayout(desc: BindGroupLayout): GPUBindGroupLayout {
+  fetchBindGroupLayout(desc: BindGroupLayout): [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout] {
     const hash = desc ? this.getLayoutHash(desc) : '';
     let bgl = this._bindGroupLayoutCache[hash];
     if (!bgl) {
@@ -44,7 +44,7 @@ export class BindGroupCache {
     }
     return hash;
   }
-  private createBindGroupLayout(desc: BindGroupLayout): GPUBindGroupLayout {
+  private createBindGroupLayout(desc: BindGroupLayout): [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout] {
     const layoutDescriptor: GPUBindGroupLayoutDescriptor = {
       entries:
         desc?.entries.map((entry) => {
@@ -101,6 +101,6 @@ export class BindGroupCache {
     if (desc?.label) {
       layoutDescriptor.label = desc.label;
     }
-    return this._device.device.createBindGroupLayout(layoutDescriptor);
+    return [layoutDescriptor, this._device.device.createBindGroupLayout(layoutDescriptor)];
   }
 }

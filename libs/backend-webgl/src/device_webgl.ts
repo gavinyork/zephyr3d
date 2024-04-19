@@ -36,7 +36,8 @@ import type {
   PBStructTypeInfo,
   DeviceBackend,
   DeviceEventMap,
-  AbstractDevice
+  AbstractDevice,
+  RenderBundle
 } from '@zephyr3d/device';
 import {
   hasAlphaChannel,
@@ -72,10 +73,17 @@ import { GPUTimer } from './gpu_timer';
 import { WebGLTextureCaps, WebGLFramebufferCaps, WebGLMiscCaps, WebGLShaderCaps } from './capabilities_webgl';
 import { WebGLBindGroup } from './bindgroup_webgl';
 import { WebGLGPUProgram } from './gpuprogram_webgl';
-import { primitiveTypeMap, typeMap } from './constants_webgl';
+import {
+  primitiveTypeMap,
+  textureMagFilterToWebGL,
+  textureMinFilterToWebGL,
+  textureWrappingMap,
+  typeMap
+} from './constants_webgl';
 import { SamplerCache } from './sampler_cache';
 import { WebGLStructuredBuffer } from './structuredbuffer_webgl';
 import type { WebGLTextureSampler } from './sampler_webgl';
+import type { WebGLBaseTexture } from './basetexture_webgl';
 
 declare global {
   interface WebGLRenderingContext {
@@ -89,6 +97,18 @@ declare global {
 }
 
 type VAOObject = WebGLVertexArrayObject | WebGLVertexArrayObjectOES;
+
+type WebGLRenderBundle = {
+  program: WebGLGPUProgram;
+  bindGroups: WebGLBindGroup[];
+  bindGroupOffsets: Iterable<number>[];
+  vertexLayout: WebGLVertexLayout;
+  primitiveType: PrimitiveType;
+  renderStateSet: RenderStateSet;
+  first: number;
+  count: number;
+  numInstances: number;
+}[];
 
 export interface VertexArrayObjectEXT {
   createVertexArray: () => VAOObject;
@@ -119,6 +139,7 @@ const tempUint32Array = new Uint32Array(4);
 
 export class WebGLDevice extends BaseDevice {
   private _context: WebGLContext;
+  private _isWebGL2: boolean;
   private _msaaSampleCount: number;
   private _loseContextExtension: WEBGL_lose_context;
   private _contextLost: boolean;
@@ -138,10 +159,16 @@ export class WebGLDevice extends BaseDevice {
   private _currentScissorRect: DeviceViewport;
   private _samplerCache: SamplerCache;
   private _textureSamplerMap: WeakMap<BaseTexture, WebGLTextureSampler>;
+  private _captureRenderBundle: WebGLRenderBundle;
+  private _deviceUniformBuffers: WebGLBuffer[];
+  private _deviceUniformBufferOffsets: number[];
+  private _bindTextures: Record<number, WebGLTexture[]>;
+  private _bindSamplers: WebGLSampler[];
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend);
     this._dpr = Math.max(1, Math.floor(options?.dpr ?? window.devicePixelRatio));
     this._isRendering = false;
+    this._captureRenderBundle = null;
     this._msaaSampleCount = options?.msaa ? 4 : 1;
     let context: WebGLContext = null;
     context = this.canvas.getContext(backend === backend1 ? 'webgl' : 'webgl2', {
@@ -153,6 +180,7 @@ export class WebGLDevice extends BaseDevice {
     if (!context) {
       throw new Error('Invalid argument or no webgl support');
     }
+    this._isWebGL2 = isWebGL2(context);
     this._contextLost = false;
     this._reverseWindingOrder = false;
     this._deviceCaps = null;
@@ -164,6 +192,15 @@ export class WebGLDevice extends BaseDevice {
     this._currentBindGroupOffsets = [];
     this._currentViewport = null;
     this._currentScissorRect = null;
+    this._deviceUniformBuffers = [];
+    this._deviceUniformBufferOffsets = [];
+    this._bindTextures = {
+      [WebGLEnum.TEXTURE_2D]: [],
+      [WebGLEnum.TEXTURE_CUBE_MAP]: [],
+      [WebGLEnum.TEXTURE_3D]: [],
+      [WebGLEnum.TEXTURE_2D_ARRAY]: []
+    };
+    this._bindSamplers = [];
     this._samplerCache = new SamplerCache(this);
     this._textureSamplerMap = new WeakMap();
     this._loseContextExtension = this._context.getExtension('WEBGL_lose_context');
@@ -192,7 +229,7 @@ export class WebGLDevice extends BaseDevice {
     return this.getFramebuffer()?.getSampleCount() ?? this._msaaSampleCount;
   }
   get isWebGL2(): boolean {
-    return this._context && isWebGL2(this._context);
+    return this._isWebGL2;
   }
   get drawingBufferWidth() {
     return this.getDrawingBufferWidth();
@@ -235,6 +272,76 @@ export class WebGLDevice extends BaseDevice {
   }
   getBackBufferHeight(): number {
     return this.canvas.height;
+  }
+  invalidateBindingTextures() {
+    this._bindTextures = {
+      [WebGLEnum.TEXTURE_2D]: [],
+      [WebGLEnum.TEXTURE_CUBE_MAP]: [],
+      [WebGLEnum.TEXTURE_3D]: [],
+      [WebGLEnum.TEXTURE_2D_ARRAY]: []
+    };
+  }
+  bindTexture(target: number, layer: number, texture: WebGLBaseTexture, sampler?: WebGLTextureSampler) {
+    const tex = texture?.object ?? null;
+    const gl = this._context;
+    gl.activeTexture(WebGLEnum.TEXTURE0 + layer);
+    if (this._bindTextures[target][layer] !== tex) {
+      gl.bindTexture(target, tex);
+      this._bindTextures[target][layer] = tex;
+    }
+    if (this._isWebGL2) {
+      const samp = sampler?.object ?? null;
+      if (samp && this._bindSamplers[layer] !== samp) {
+        (gl as WebGL2RenderingContext).bindSampler(layer, samp);
+        this._bindSamplers[layer] = samp;
+      }
+    } else if (texture && sampler && this._textureSamplerMap.get(texture) !== sampler) {
+      const fallback = texture.isWebGL1Fallback;
+      this._textureSamplerMap.set(texture, sampler);
+      gl.texParameteri(
+        target,
+        WebGLEnum.TEXTURE_WRAP_S,
+        textureWrappingMap[false && fallback ? 'clamp' : sampler.addressModeU]
+      );
+      gl.texParameteri(
+        target,
+        WebGLEnum.TEXTURE_WRAP_T,
+        textureWrappingMap[false && fallback ? 'clamp' : sampler.addressModeV]
+      );
+      gl.texParameteri(target, WebGLEnum.TEXTURE_MAG_FILTER, textureMagFilterToWebGL(sampler.magFilter));
+      gl.texParameteri(
+        target,
+        WebGLEnum.TEXTURE_MIN_FILTER,
+        textureMinFilterToWebGL(sampler.minFilter, fallback ? 'none' : sampler.mipFilter)
+      );
+      if (this.getDeviceCaps().textureCaps.supportAnisotropicFiltering) {
+        gl.texParameterf(target, WebGLEnum.TEXTURE_MAX_ANISOTROPY, sampler.maxAnisotropy);
+      }
+    }
+  }
+  bindUniformBuffer(index: number, buffer: WebGLGPUBuffer, offset: number) {
+    if (
+      this._deviceUniformBuffers[index] !== buffer.object ||
+      this._deviceUniformBufferOffsets[index] !== offset
+    ) {
+      if (offset) {
+        (this.context as WebGL2RenderingContext).bindBufferRange(
+          WebGLEnum.UNIFORM_BUFFER,
+          index,
+          buffer.object,
+          offset,
+          buffer.byteLength - offset
+        );
+      } else {
+        (this.context as WebGL2RenderingContext).bindBufferBase(
+          WebGLEnum.UNIFORM_BUFFER,
+          index,
+          buffer.object
+        );
+      }
+      this._deviceUniformBuffers[index] = buffer.object;
+      this._deviceUniformBufferOffsets[index] = offset;
+    }
   }
   async initContext() {
     this.initContextState();
@@ -525,6 +632,22 @@ export class WebGLDevice extends BaseDevice {
   createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer {
     return new WebGLGPUBuffer(this, this.parseBufferOptions(options), sizeInBytes);
   }
+  copyBuffer(
+    sourceBuffer: GPUDataBuffer<unknown>,
+    destBuffer: GPUDataBuffer<unknown>,
+    srcOffset: number,
+    dstOffset: number,
+    bytes: number
+  ) {
+    if (!this.isWebGL2) {
+      console.error(`copyBuffer() is not supported for current device`);
+      return;
+    }
+    const gl = this._context as WebGL2RenderingContext;
+    gl.bindBuffer(gl.COPY_READ_BUFFER, sourceBuffer.object);
+    gl.bindBuffer(gl.COPY_WRITE_BUFFER, destBuffer.object);
+    gl.copyBufferSubData(gl.COPY_READ_BUFFER, gl.COPY_WRITE_BUFFER, srcOffset, dstOffset, bytes);
+  }
   createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer {
     return new WebGLIndexBuffer(this, data, this.parseBufferOptions(options, 'index'));
   }
@@ -761,6 +884,35 @@ export class WebGLDevice extends BaseDevice {
       }
     }
   }
+  beginCapture(): void {
+    if (this._captureRenderBundle) {
+      throw new Error('Device.beginCapture() failed: device is already capturing draw commands');
+    }
+    this._captureRenderBundle = [];
+  }
+  endCapture(): unknown {
+    if (!this._captureRenderBundle) {
+      throw new Error('Device.endCapture() failed: device is not capturing draw commands');
+    }
+    const result = this._captureRenderBundle;
+    this._captureRenderBundle = null;
+    return result;
+  }
+  executeRenderBundle(renderBundle: RenderBundle) {
+    for (const drawcall of renderBundle as WebGLRenderBundle) {
+      this.setProgram(drawcall.program);
+      this.setVertexLayout(drawcall.vertexLayout);
+      this.setRenderStates(drawcall.renderStateSet);
+      for (let i = 0; i < 4; i++) {
+        this.setBindGroup(i, drawcall.bindGroups[i], drawcall.bindGroupOffsets[i]);
+      }
+      if (drawcall.numInstances === 0) {
+        this.draw(drawcall.primitiveType, drawcall.first, drawcall.count);
+      } else {
+        this.drawInstanced(drawcall.primitiveType, drawcall.first, drawcall.count, drawcall.numInstances);
+      }
+    }
+  }
   /** @internal */
   protected onBeginFrame(): boolean {
     if (this._contextLost) {
@@ -812,6 +964,30 @@ export class WebGLDevice extends BaseDevice {
       }
       (this._context._currentFramebuffer as WebGLFrameBuffer)?.tagDraw();
     }
+    if (this._captureRenderBundle) {
+      const rs = this._currentStateSet?.clone() ?? this.createRenderStateSet();
+      if (this._reverseWindingOrder) {
+        const rasterState = rs.rasterizerState;
+        if (!rasterState) {
+          rs.useRasterizerState().setCullMode('front');
+        } else if (rasterState.cullMode === 'back') {
+          rasterState.cullMode = 'front';
+        } else if (rasterState.cullMode === 'front') {
+          rasterState.cullMode = 'back';
+        }
+      }
+      this._captureRenderBundle.push({
+        bindGroups: [...this._currentBindGroups],
+        bindGroupOffsets: this._currentBindGroupOffsets.map((val) => (val ? [...val] : null)),
+        program: this._currentProgram,
+        vertexLayout: this._currentVertexData,
+        primitiveType: primitiveType,
+        renderStateSet: rs,
+        count,
+        first,
+        numInstances: 0
+      });
+    }
   }
   /** @internal */
   protected _drawInstanced(
@@ -853,6 +1029,19 @@ export class WebGLDevice extends BaseDevice {
         );
       }
       (this._context._currentFramebuffer as WebGLFrameBuffer)?.tagDraw();
+    }
+    if (this._captureRenderBundle) {
+      this._captureRenderBundle.push({
+        bindGroups: [...this._currentBindGroups],
+        bindGroupOffsets: this._currentBindGroupOffsets.map((val) => (val ? [...val] : null)),
+        program: this._currentProgram,
+        vertexLayout: this._currentVertexData,
+        primitiveType: primitiveType,
+        renderStateSet: this._currentStateSet?.clone() ?? null,
+        count,
+        first,
+        numInstances
+      });
     }
   }
   /** @internal */
@@ -965,6 +1154,15 @@ export class WebGLDevice extends BaseDevice {
     this.enableGPUTimeRecording(true);
     this._context._currentFramebuffer = undefined;
     this._context._currentProgram = undefined;
+    this._deviceUniformBuffers = [];
+    this._deviceUniformBufferOffsets = [];
+    this._bindTextures = {
+      [WebGLEnum.TEXTURE_2D]: [],
+      [WebGLEnum.TEXTURE_CUBE_MAP]: [],
+      [WebGLEnum.TEXTURE_3D]: [],
+      [WebGLEnum.TEXTURE_2D_ARRAY]: []
+    };
+    this._bindSamplers = [];
   }
   /** @internal */
   clearErrors() {

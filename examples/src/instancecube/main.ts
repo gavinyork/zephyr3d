@@ -1,7 +1,7 @@
 import { Matrix4x4, Quaternion, Vector4 } from '@zephyr3d/base';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
-import type { DeviceBackend } from '@zephyr3d/device';
+import type { DeviceBackend, RenderBundle } from '@zephyr3d/device';
 import { DrawText } from '@zephyr3d/device';
 
 (async function () {
@@ -106,6 +106,7 @@ import { DrawText } from '@zephyr3d/device';
   // create bind group
   const bindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
 
+  let renderBundle: RenderBundle = null;
   // start render loop
   device.runLoop((device) => {
     const t = device.frameInfo.elapsedOverall * 0.002;
@@ -117,11 +118,16 @@ import { DrawText } from '@zephyr3d/device';
     );
 
     device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
-    device.setProgram(program);
-    device.setVertexLayout(vertexLayout);
-    device.setBindGroup(0, bindGroup);
-    device.drawInstanced('triangle-list', 0, 36, 16);
-
+    if (!renderBundle) {
+      device.beginCapture();
+      device.setProgram(program);
+      device.setVertexLayout(vertexLayout);
+      device.setBindGroup(0, bindGroup);
+      device.drawInstanced('triangle-list', 0, 36, 16);
+      renderBundle = device.endCapture();
+    } else {
+      device.executeRenderBundle(renderBundle);
+    }
     DrawText.drawText(device, `Device: ${device.type}`, '#ffffff', 30, 30);
     DrawText.drawText(device, `FPS: ${device.frameInfo.FPS.toFixed(2)}`, '#ffff00', 30, 50);
   });

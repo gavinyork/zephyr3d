@@ -57,7 +57,7 @@ interface UniformInfo {
   mask: number;
   block?: {
     name: string;
-    dynamicOffset: boolean;
+    bindingSize: number;
     exp: PBShaderExp;
   };
   texture?: {
@@ -216,6 +216,26 @@ export interface ProgramBuilder {
    * @returns the 'referenceOf' expression
    */
   referenceOf(ptr: PBShaderExp): PBShaderExp;
+  /** Atomic int type variable constructors */
+  atomic_int: {
+    (): PBShaderExp;
+    (rhs: number): PBShaderExp;
+    (rhs: boolean): PBShaderExp;
+    (rhs: PBShaderExp): PBShaderExp;
+    (name: string): PBShaderExp;
+    ptr: ShaderTypeFunc;
+    [dim: number]: ShaderTypeFunc;
+  };
+  /** Atomic uint type variable constructors */
+  atomic_uint: {
+    (): PBShaderExp;
+    (rhs: number): PBShaderExp;
+    (rhs: boolean): PBShaderExp;
+    (rhs: PBShaderExp): PBShaderExp;
+    (name: string): PBShaderExp;
+    ptr: ShaderTypeFunc;
+    [dim: number]: ShaderTypeFunc;
+  };
   /** float type variable constructors */
   float: {
     (): PBShaderExp;
@@ -790,13 +810,13 @@ export interface ProgramBuilder {
   arrayLength(x: PBShaderExp): PBShaderExp;
   /** Same as the select builtin function in WGSL, only valid for WebGPU device */
   select(x: number | PBShaderExp, y: number | PBShaderExp, cond: boolean | PBShaderExp): PBShaderExp;
-  /** Same as floatBitsToInt builtin function in GLSL, only valid for WebGL2 device */
+  /** Same as floatBitsToInt builtin function in GLSL, only valid for WebGL2 device and WebGPU device */
   floatBitsToInt(x: number | PBShaderExp): PBShaderExp;
-  /** Same as floatBitsToUint builtin function in GLSL, only valid for WebGL2 device */
+  /** Same as floatBitsToUint builtin function in GLSL, only valid for WebGL2 device and WebGPU device */
   floatBitsToUint(x: number | PBShaderExp): PBShaderExp;
-  /** Same as intBitsToFloat builtin function in GLSL, only valid for WebGL2 device */
+  /** Same as intBitsToFloat builtin function in GLSL, only valid for WebGL2 device and WebGPU device */
   intBitsToFloat(x: number | PBShaderExp): PBShaderExp;
-  /** Same as uintBitsToFloat builtin function in GLSL, only valid for WebGL2 device */
+  /** Same as uintBitsToFloat builtin function in GLSL, only valid for WebGL2 device and WebGPU device */
   uintBitsToFloat(x: number | PBShaderExp): PBShaderExp;
   /** Same as pack4x8snorm builtin function in WGSL, only valid for WebGPU device */
   pack4x8snorm(x: PBShaderExp): PBShaderExp;
@@ -981,6 +1001,8 @@ export interface ProgramBuilder {
   atomicOr(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
   /** atomicXor, only valid for WebGPU device */
   atomicXor(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
+  /** atomicExchange, only valid for WebGPU device */
+  atomicExchange(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
 }
 
 /**
@@ -1792,21 +1814,23 @@ export class ProgramBuilder {
     variable.$location = location;
     variable.$declareType = AST.DeclareType.DECLARE_TYPE_OUT;
     this._outputs[location] = [name, new AST.ASTDeclareVar(new AST.ASTPrimitive(variable))];
-    Object.defineProperty(this._outputScope, name, {
-      get: function (this: PBOutputScope) {
-        return variable;
-      },
-      set: function (this: PBOutputScope, v) {
-        getCurrentProgramBuilder()
-          .getCurrentScope()
-          .$ast.statements.push(
-            new AST.ASTAssignment(
-              new AST.ASTLValueScalar(variable.$ast),
-              v instanceof PBShaderExp ? v.$ast : v
-            )
-          );
-      }
-    });
+    for (const prop of [name, String(location)]) {
+      Object.defineProperty(this._outputScope, prop, {
+        get: function (this: PBOutputScope) {
+          return variable;
+        },
+        set: function (this: PBOutputScope, v) {
+          getCurrentProgramBuilder()
+            .getCurrentScope()
+            .$ast.statements.push(
+              new AST.ASTAssignment(
+                new AST.ASTLValueScalar(variable.$ast),
+                v instanceof PBShaderExp ? v.$ast : v
+              )
+            );
+        }
+      });
+    }
   }
   /** @internal */
   getDefaultSampler(t: PBShaderExp, comparison: boolean): PBShaderExp {
@@ -2132,6 +2156,8 @@ export class ProgramBuilder {
         const exp = new PBShaderExp(u.block.exp.$str, u.block.exp.$ast.getType());
         exp.$declareType = u.block.exp.$declareType;
         exp.$isBuffer = u.block.exp.$isBuffer;
+        exp.$bindingSize = u.block.exp.$bindingSize;
+        exp.$readonly = u.block.exp.$readonly;
         uniformList[u.group].push({ member: exp, uniform: i });
       }
     }
@@ -2163,11 +2189,13 @@ export class ProgramBuilder {
               false,
               ...allLists[p].map((val) => val.member)
             );
+            const readonly = i > 0 ? allLists[p].findIndex((val) => !val.member.$readonly) < 0 : true;
             const exp = t();
             if (i === 0) {
-              exp.uniformBuffer(Number(k));
+              exp.uniformBuffer(Number(k), p > 0 ? allLists[p][0].member.$bindingSize : 0);
             } else {
-              exp.storageBuffer(Number(k));
+              exp.storageBuffer(Number(k), p > 0 ? allLists[p][0].member.$bindingSize : 0);
+              exp.$readonly = readonly;
             }
             globalScope[uname] = exp;
             const index = this._uniforms.findIndex((val) => val.block?.name === uname);
@@ -2235,6 +2263,8 @@ export class ProgramBuilder {
           const exp = new PBShaderExp(u.block.exp.$str, u.block.exp.$ast.getType());
           exp.$declareType = u.block.exp.$declareType;
           exp.$isBuffer = u.block.exp.$isBuffer;
+          exp.$bindingSize = u.block.exp.$bindingSize;
+          exp.$readonly = u.block.exp.$readonly;
           sharedUniformList[u.group].push({ member: exp, uniform: i });
           //sharedUniformList[u.group].uniforms.push(i);
         } else if (v) {
@@ -2244,6 +2274,8 @@ export class ProgramBuilder {
           const exp = new PBShaderExp(u.block.exp.$str, u.block.exp.$ast.getType());
           exp.$declareType = u.block.exp.$declareType;
           exp.$isBuffer = u.block.exp.$isBuffer;
+          exp.$bindingSize = u.block.exp.$bindingSize;
+          exp.$readonly = u.block.exp.$readonly;
           vertexUniformList[u.group].push({ member: exp, uniform: i });
           //vertexUniformList[u.group].uniforms.push(i);
         } else if (f) {
@@ -2253,6 +2285,8 @@ export class ProgramBuilder {
           const exp = new PBShaderExp(u.block.exp.$str, u.block.exp.$ast.getType());
           exp.$declareType = u.block.exp.$declareType;
           exp.$isBuffer = u.block.exp.$isBuffer;
+          exp.$bindingSize = u.block.exp.$bindingSize;
+          exp.$readonly = u.block.exp.$readonly;
           fragUniformList[u.group].push({ member: exp, uniform: i }); //members.push(exp);
           //fragUniformList[u.group].uniforms.push(i);
         }
@@ -2295,21 +2329,27 @@ export class ProgramBuilder {
                 false,
                 ...allLists[p].map((val) => val.member)
               );
+              const readonly = j > 0 ? allLists[p].findIndex((val) => !val.member.$readonly) < 0 : true;
               if (maskList[i] & ShaderType.Vertex) {
                 const exp = t();
+                if (j > 0 && !readonly) {
+                  throw new Error(`Storage buffer in vertex shader must be read-only`);
+                }
                 if (j === 0) {
-                  exp.uniformBuffer(Number(k));
+                  exp.uniformBuffer(Number(k), p > 0 ? allLists[p][0].member.$bindingSize : 0);
                 } else {
-                  exp.storageBuffer(Number(k));
+                  exp.storageBuffer(Number(k), p > 0 ? allLists[p][0].member.$bindingSize : 0);
+                  exp.$readonly = readonly;
                 }
                 globalScopeVertex[uname] = exp;
               }
               if (maskList[i] & ShaderType.Fragment) {
                 const exp = t();
                 if (j === 0) {
-                  exp.uniformBuffer(Number(k));
+                  exp.uniformBuffer(Number(k), p > 0 ? allLists[p][0].member.$bindingSize : 0);
                 } else {
-                  exp.storageBuffer(Number(k));
+                  exp.storageBuffer(Number(k), p > 0 ? allLists[p][0].member.$bindingSize : 0);
+                  exp.$readonly = readonly;
                 }
                 globalScopeFragmet[uname] = exp;
               }
@@ -2381,6 +2421,7 @@ export class ProgramBuilder {
   /** @internal */
   private createBindGroupLayouts(label: string): BindGroupLayout[] {
     const layouts: BindGroupLayout[] = [];
+    const dynamicOffsetIndex = [0, 0, 0, 0];
     for (const uniformInfo of this._uniforms) {
       let layout = layouts[uniformInfo.group];
       if (!layout) {
@@ -2405,13 +2446,11 @@ export class ProgramBuilder {
         );
         const isStorage = uniformInfo.block.exp.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE;
         entry.buffer = {
-          type: isStorage
-            ? (uniformInfo.block.exp.$ast as AST.ASTPrimitive).isWritable()
-              ? 'storage'
-              : 'read-only-storage'
-            : 'uniform',
-          hasDynamicOffset: uniformInfo.block.dynamicOffset,
-          uniformLayout: entry.type.toBufferLayout(0, (entry.type as PBStructTypeInfo).layout)
+          type: isStorage ? (uniformInfo.block.exp.$readonly ? 'read-only-storage' : 'storage') : 'uniform',
+          minBindingSize: uniformInfo.block.bindingSize,
+          hasDynamicOffset: !!uniformInfo.block.bindingSize,
+          uniformLayout: entry.type.toBufferLayout(0, (entry.type as PBStructTypeInfo).layout),
+          dynamicOffsetIndex: !!uniformInfo.block.bindingSize ? dynamicOffsetIndex[uniformInfo.group]++ : -1
         };
         entry.name = uniformInfo.block.name;
       } else if (uniformInfo.texture) {
@@ -2762,7 +2801,7 @@ export class PBScope extends Proxiable<PBScope> {
     } else {
       uniformInfo.block = {
         name: name,
-        dynamicOffset: false,
+        bindingSize: variable.$bindingSize,
         exp: variable
       };
       // throw new Error(`unsupported uniform type: ${name}`);
@@ -3016,7 +3055,8 @@ export class PBLocalScope extends PBScope {
       value instanceof PBShaderExp &&
       (value.isConstructor() ||
         (value.$typeinfo.isTextureType() && value.$ast instanceof AST.ASTPrimitive && !value.$ast.name)) &&
-      value.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM
+      (value.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM ||
+        value.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE)
     ) {
       // We are setting uniform a uniform, should invoke in the global scope
       this.$g[prop] = value;
@@ -3032,6 +3072,8 @@ export class PBLocalScope extends PBScope {
       if (value instanceof PBShaderExp && !this.$_scope.$parent) {
         exp.$declareType = value.$declareType;
         exp.$isBuffer = value.$isBuffer;
+        exp.$bindingSize = value.$bindingSize;
+        exp.$readonly = value.$readonly;
         exp.$group = value.$group;
         exp.$attrib = value.$attrib;
         exp.$sampleType = value.$sampleType;

@@ -131,10 +131,6 @@ export abstract class WebGPUBaseTexture<
     return true;
   }
   /** @internal */
-  getPendingUploads(): (UploadTexture | UploadImage)[] {
-    return this._pendingUploads;
-  }
-  /** @internal */
   clearPendingUploads() {
     if (this._pendingUploads.length > 0) {
       this._pendingUploads = [];
@@ -248,6 +244,7 @@ export abstract class WebGPUBaseTexture<
   }
   generateMipmaps() {
     this._mipmapDirty = true;
+    this._device.textureUpload(this as WebGPUBaseTexture);
   }
   beginSyncChanges(encoder: GPUCommandEncoder) {
     if (!this.isTextureVideo() && this._pendingUploads.length > 0 && this._object) {
@@ -332,6 +329,8 @@ export abstract class WebGPUBaseTexture<
   abstract createView(level?: number, face?: number, mipCount?: number): GPUTextureView;
   /** @internal */
   private sync() {
+    this._device.flush();
+    /*
     if (this._pendingUploads) {
       if (this._device.isTextureUploading(this as WebGPUBaseTexture)) {
         this._device.currentPass.end();
@@ -340,6 +339,7 @@ export abstract class WebGPUBaseTexture<
         this.endSyncChanges();
       }
     }
+    */
   }
   /** @internal */
   protected _calcMipLevelCount(format: TextureFormat, width: number, height: number, depth: number): number {
@@ -513,6 +513,10 @@ export abstract class WebGPUBaseTexture<
     offsetZ: number,
     miplevel: number
   ) {
+    if (this.isTextureVideo()) {
+      console.error('BaseTexture.uploadRaw(): Cannot upload to video texture');
+      return;
+    }
     const data = new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.byteLength);
     const info = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
     const blockWidth = info.blockWidth || 1;
@@ -576,6 +580,7 @@ export abstract class WebGPUBaseTexture<
         bufferStride: bufferStride,
         mipLevel: miplevel
       });
+      this._device.textureUpload(this as WebGPUBaseTexture);
     }
   }
   /** @internal */
@@ -590,6 +595,10 @@ export abstract class WebGPUBaseTexture<
     miplevel: number,
     layer: number
   ) {
+    if (this.isTextureVideo()) {
+      console.error('BaseTexture.uploadImageData(): Cannot upload to video texture');
+      return;
+    }
     if (
       false &&
       !this._device.isTextureUploading(this as any) &&
@@ -612,24 +621,6 @@ export abstract class WebGPUBaseTexture<
         depthOrArrayLayers: 1
       });
     } else {
-      /*
-      // can not use getImageData() because it is not accurate
-      const tmpCanvas = document.createElement('canvas');
-      let gl = tmpCanvas.getContext("webgl2");
-      gl.activeTexture(gl.TEXTURE0);
-      let texture = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      const framebuffer = gl.createFramebuffer();
-      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, data);
-      gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
-      let pixels = new Uint8Array(width * height * 4);
-      gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-      this.uploadRaw(pixels, width, height, 1, offsetX, offsetY, faceIndex, miplevel);
-      tmpCanvas.width = 0;
-      tmpCanvas.height = 0;
-      */
       this._pendingUploads.push({
         image: data,
         offsetX: destX,
@@ -643,6 +634,7 @@ export abstract class WebGPUBaseTexture<
         depth: 1,
         mipLevel: miplevel ?? 0
       });
+      this._device.textureUpload(this as WebGPUBaseTexture);
     }
   }
   /** @internal */

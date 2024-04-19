@@ -1,4 +1,3 @@
-import { Application } from '../app';
 import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import type { AbstractDevice, BindGroup, GPUProgram, Texture2D, TextureSampler } from '@zephyr3d/device';
@@ -36,7 +35,7 @@ export class Grayscale extends AbstractPostEffect {
   }
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
-    const device = Application.instance.device;
+    const device = ctx.device;
     this._prepare(device);
     this._bindgroup.setTexture('srcTex', inputColorTexture, Grayscale._sampler);
     this._bindgroup.setValue('flip', this.needFlip(device) ? 1 : 0);

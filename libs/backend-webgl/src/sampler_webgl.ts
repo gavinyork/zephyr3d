@@ -81,7 +81,8 @@ export class WebGLTextureSampler
     if (texture?.object && !this._device.isWebGL2 && !this._device.isContextLost()) {
       const gl = this._device.context;
       const target = textureTargetMap[texture.target];
-      gl.bindTexture(target, texture.object);
+      this._device.bindTexture(target, 0, texture);
+      //gl.bindTexture(target, texture.object);
       gl.texParameteri(target, WebGLEnum.TEXTURE_WRAP_S, textureWrappingMap[this._options.addressU]);
       gl.texParameteri(target, WebGLEnum.TEXTURE_WRAP_T, textureWrappingMap[this._options.addressV]);
       gl.texParameteri(
