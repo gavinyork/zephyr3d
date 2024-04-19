@@ -115,6 +115,7 @@ export class ABufferOIT extends OIT {
     setRenderStates(rs: RenderStateSet): void;
     setupFragmentOutput(scope: PBGlobalScope): void;
     supportDevice(deviceType: string): boolean;
+    static readonly type = "ab";
 }
 
 // @public
@@ -4033,6 +4034,7 @@ export class WeightedBlendedOIT extends OIT {
     setRenderStates(rs: RenderStateSet): void;
     setupFragmentOutput(scope: PBGlobalScope): void;
     supportDevice(deviceType: string): boolean;
+    static readonly type = "wb";
 }
 
 // @public

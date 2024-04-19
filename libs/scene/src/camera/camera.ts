@@ -51,6 +51,8 @@ export class Camera extends SceneNode {
   protected _oit: OIT;
   /** @internal */
   protected _depthPrePass: boolean;
+  /** @internal */
+  protected _commandBufferReuse: boolean;
   /**
    * Creates a new camera node
    * @param scene - The scene that the camera belongs to
@@ -75,6 +77,7 @@ export class Camera extends SceneNode {
     this._frustumV = null;
     this._oit = null;
     this._depthPrePass = false;
+    this._commandBufferReuse = true;
   }
   /** Clip plane in camera space */
   get clipPlane(): Plane {
@@ -84,12 +87,19 @@ export class Camera extends SceneNode {
     this._clipPlane = plane;
     this._invalidate(false);
   }
-  /** Whether draw depth pass */
+  /** Whether to perform a depth pass */
   get depthPrePass(): boolean {
     return this._depthPrePass;
   }
   set depthPrePass(val: boolean) {
     this._depthPrePass = !!val;
+  }
+  /** Whether to allow command buffer reuse optimization */
+  get commandBufferReuse(): boolean {
+    return this._commandBufferReuse;
+  }
+  set commandBufferReuse(val: boolean) {
+    this._commandBufferReuse = !!val;
   }
   /**
    * Sample count for MSAA

@@ -166,7 +166,7 @@ export abstract class RenderPass {
     reverseWinding: boolean,
     hash: string
   ) {
-    if (renderBundle) {
+    if (renderBundle && ctx.primaryCamera.commandBufferReuse) {
       const bundle = renderBundle.getRenderBundle(hash);
       if (bundle) {
         ctx.device.executeRenderBundle(bundle);
@@ -185,7 +185,7 @@ export abstract class RenderPass {
         ctx.device.reverseVertexWindingOrder(!ctx.device.isWindingOrderReversed());
       }
     }
-    if (renderBundle) {
+    if (renderBundle && ctx.primaryCamera.commandBufferReuse) {
       renderBundle.endRenderBundle(hash);
     }
   }
@@ -203,18 +203,6 @@ export abstract class RenderPass {
         ctx.instancing = false;
         itemList.materialList.forEach((mat) => mat.apply(ctx));
         this.internalDrawItemList(ctx, itemList.itemList, itemList.renderBundle, reverseWinding, hash);
-        /*
-        for (const item of itemList.itemList) {
-          const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
-          if (reverse) {
-            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
-          }
-          item.drawable.draw(ctx);
-          if (reverse) {
-            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
-          }
-        }
-        */
       }
       if (itemList.skinItemList.length > 0) {
         ctx.skinAnimation = true;
