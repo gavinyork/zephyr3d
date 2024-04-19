@@ -44,7 +44,7 @@ importers:
       '@typescript-eslint/eslint-plugin': ^5.51.0
       '@typescript-eslint/parser': ^5.51.0
       '@web/dev-server': ^0.1.35
-      '@webgpu/types': ^0.1.31
+      '@webgpu/types': ^0.1.40
       '@zephyr3d/backend-webgl': workspace:^0.1.2
       '@zephyr3d/backend-webgpu': workspace:^0.1.2
       '@zephyr3d/base': workspace:^0.1.2
@@ -121,7 +121,7 @@ importers:
       '@rollup/pluginutils': ^5.0.2
       '@swc/core': ^1.3.62
       '@types/node': ^18.13.0
-      '@webgpu/types': ^0.1.31
+      '@webgpu/types': ^0.1.40
       '@zephyr3d/base': workspace:^0.1.2
       '@zephyr3d/device': workspace:^0.1.2
       cross-env: ^7.0.3
@@ -166,7 +166,7 @@ importers:
       '@rollup/pluginutils': ^5.0.2
       '@swc/core': ^1.3.62
       '@types/node': ^18.13.0
-      '@webgpu/types': ^0.1.31
+      '@webgpu/types': ^0.1.40
       '@zephyr3d/base': workspace:^0.1.2
       '@zephyr3d/device': workspace:^0.1.2
       cross-env: ^7.0.3
@@ -250,7 +250,7 @@ importers:
       '@rollup/pluginutils': ^5.0.2
       '@swc/core': ^1.3.62
       '@types/node': ^18.13.0
-      '@webgpu/types': ^0.1.31
+      '@webgpu/types': ^0.1.40
       '@zephyr3d/base': workspace:^0.1.2
       cross-env: ^7.0.3
       rollup: ^3.15.0
@@ -295,7 +295,7 @@ importers:
       '@swc/core': ^1.3.62
       '@types/emscripten': ^1.39.6
       '@types/node': ^18.13.0
-      '@webgpu/types': ^0.1.31
+      '@webgpu/types': ^0.1.40
       '@zephyr3d/base': workspace:^0.1.2
       '@zephyr3d/device': workspace:^0.1.2
       cross-env: ^7.0.3
@@ -341,7 +341,7 @@ importers:
       '@rollup/plugin-terser': ^0.4.0
       '@rollup/pluginutils': ^5.0.2
       '@swc/core': ^1.3.62
-      '@webgpu/types': ^0.1.31
+      '@webgpu/types': ^0.1.40
       '@zephyr3d/base': workspace:^0.1.2
       '@zephyr3d/device': workspace:^0.1.2
       cross-env: ^7.0.3
@@ -391,7 +391,7 @@ importers:
       '@types/colors': ^1.2.1
       '@types/diff': ^5.0.2
       '@web/dev-server': ^0.1.35
-      '@webgpu/types': ^0.1.31
+      '@webgpu/types': ^0.1.40
       '@zephyr3d/backend-webgl': workspace:^0.1.2
       '@zephyr3d/backend-webgpu': workspace:^0.1.2
       '@zephyr3d/base': workspace:^0.1.2
@@ -480,7 +480,7 @@ importers:
       '@types/colors': ^1.2.1
       '@types/diff': ^5.0.2
       '@web/dev-server': ^0.1.35
-      '@webgpu/types': ^0.1.31
+      '@webgpu/types': ^0.1.40
       '@zephyr3d/backend-webgl': workspace:^0.1.2
       '@zephyr3d/backend-webgpu': workspace:^0.1.2
       '@zephyr3d/base': workspace:^0.1.2

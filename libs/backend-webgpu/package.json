@@ -65,12 +65,7 @@
     "@zephyr3d/device": "workspace:^0.2.1"
   },
   "dependencies": {
-<<<<<<< HEAD
     "@types/node": "^18.13.0",
-    "@webgpu/types": "^0.1.31"
-=======
-    "@webgpu/types": "^0.1.40",
-    "@types/node": "^18.13.0"
->>>>>>> develop
+    "@webgpu/types": "^0.1.40"
   }
 }
