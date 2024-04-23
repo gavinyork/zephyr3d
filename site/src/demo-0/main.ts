@@ -40,6 +40,7 @@ gltfApp.ready().then(async () => {
   const scene = new Scene();
   scene.env.sky.fogType = 'exp';
   const gltfViewer = new GLTFViewer(scene);
+  await gltfViewer.ready();
   gltfViewer.loadModel('./assets/models/DamagedHelmet.glb');
   gltfApp.inputManager.use(gltfViewer.camera.handleEvent.bind(gltfViewer.camera));
   gltfApp.on('drop', (ev) => {

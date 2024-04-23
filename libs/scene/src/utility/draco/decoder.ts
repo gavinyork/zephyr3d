@@ -5,20 +5,21 @@ export class DracoMeshDecoder {
   private _module: DecoderModule;
   private _decoder: Decoder;
   private _mesh: Mesh;
-  constructor(data: ArrayBuffer, decoderModule: DecoderModule) {
+  constructor(data: Int8Array, decoderModule: DecoderModule) {
     this._module = decoderModule;
     this._decoder = new this._module.Decoder();
     const buffer = new this._module.DecoderBuffer();
-    buffer.Init(new Int8Array(data), data.byteLength);
+    buffer.Init(data, data.byteLength);
     const geometryType = this._decoder.GetEncodedGeometryType(buffer);
-    this._module.destroy(buffer);
     if (geometryType !== this._module.TRIANGULAR_MESH) {
+      this._module.destroy(buffer);
       this._module.destroy(this._decoder);
       this._decoder = null;
       throw new Error(`Unsupported geometry type: ${geometryType}`);
     }
     this._mesh = new this._module.Mesh();
     const status = this._decoder.DecodeBufferToMesh(buffer, this._mesh);
+    this._module.destroy(buffer);
     if (!status.ok() || this._mesh.ptr === 0) {
       this._module.destroy(this._decoder);
       this._decoder = null;

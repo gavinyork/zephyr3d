@@ -1,6 +1,7 @@
 import type { BaseTexture, SamplerOptions } from '@zephyr3d/device';
 import type { AssetManager } from '../assetmanager';
 import type { SharedModel } from '../model';
+import type { DecoderModule } from 'draco3d';
 
 /**
  * Base interface for any kind loaders
@@ -109,5 +110,5 @@ export abstract class AbstractModelLoader extends LoaderBase {
    * @param data - The model data
    * @returns The loaded model
    */
-  abstract load(assetManager: AssetManager, url: string, mimeType: string, data: Blob): Promise<SharedModel>;
+  abstract load(assetManager: AssetManager, url: string, mimeType: string, data: Blob, dracoDecoderModule?: DecoderModule): Promise<SharedModel>;
 }

@@ -1,5 +1,6 @@
 import { swc } from 'rollup-plugin-swc3';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
+import commonjs from '@rollup/plugin-commonjs';
 import terser from '@rollup/plugin-terser';
 import fs from 'fs';
 import crypto from 'crypto';
@@ -159,6 +160,7 @@ function getTutTarget(input, output) {
     plugins: [
       nodeResolve(),
       swc(),
+      commonjs(),
       /*
       terser({
         module: true,

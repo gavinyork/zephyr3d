@@ -392,6 +392,7 @@ importers:
       '@swc/core': ^1.3.62
       '@types/colors': ^1.2.1
       '@types/diff': ^5.0.2
+      '@types/draco3d': ^1.4.9
       '@web/dev-server': ^0.1.35
       '@webgpu/types': ^0.1.40
       '@zephyr3d/backend-webgl': workspace:^0.1.0
@@ -407,6 +408,7 @@ importers:
       cross-env: ^7.0.3
       cross-spawn: ^7.0.3
       diff: ^5.0.0
+      draco3d: ^1.5.7
       highlight.js: ^11.8.0
       lil-gui: ^0.19.2
       prettier: ^2.8.4
@@ -426,6 +428,7 @@ importers:
       '@popperjs/core': 2.11.8
       '@types/colors': 1.2.1
       '@types/diff': 5.0.3
+      '@types/draco3d': 1.4.9
       '@webgpu/types': 0.1.40
       '@zephyr3d/backend-webgl': link:../libs/backend-webgl
       '@zephyr3d/backend-webgpu': link:../libs/backend-webgpu
@@ -437,6 +440,7 @@ importers:
       bootstrap: 5.3.1_@popperjs+core@2.11.8
       colors: 1.4.0
       diff: 5.1.0
+      draco3d: 1.5.7
       highlight.js: 11.8.0
       lil-gui: 0.19.2
     devDependencies:
@@ -3197,6 +3201,10 @@ packages:
     dependencies:
       esutils: 2.0.3
     dev: true
+
+  /draco3d/1.5.7:
+    resolution: {integrity: sha512-m6WCKt/erDXcw+70IJXnG7M3awwQPAsZvJGX5zY7beBqpELw6RDGkYVU0W43AFxye4pDZ5i2Lbyc/NNGqwjUVQ==}
+    dev: false
 
   /ee-first/1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}

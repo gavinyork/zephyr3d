@@ -1,4 +1,5 @@
 import * as zip from '@zip.js/zip.js';
+import * as draco3d from 'draco3d';
 import { Vector4, Vector3 } from '@zephyr3d/base';
 import { SceneNode, Scene, AnimationSet, BatchGroup, PostWater, WeightedBlendedOIT, OIT, ABufferOIT } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
@@ -17,6 +18,10 @@ import {
 import { EnvMaps } from './envmap';
 import { Panel } from './ui';
 
+declare global {
+  var DracoDecoderModule: draco3d.DracoDecoderModule;
+}
+
 export class GLTFViewer {
   private _currentAnimation: string;
   private _modelNode: SceneNode;
@@ -27,13 +32,11 @@ export class GLTFViewer {
   private _water: PostWater;
   private _bloom: Bloom;
   private _fxaa: FXAA;
-  private _water: PostWater;
   private _oit: OIT;
   private _doTonemap: boolean;
   private _doWater: boolean;
   private _doBloom: boolean;
   private _doFXAA: boolean;
-  private _doWater: boolean;
   private _camera: PerspectiveCamera;
   private _light0: DirectionalLight;
   private _light1: DirectionalLight;
@@ -43,6 +46,7 @@ export class GLTFViewer {
   private _batchGroup: BatchGroup;
   private _ui: Panel;
   private _compositor: Compositor;
+  private _dracoModule: draco3d.DecoderModule;
   constructor(scene: Scene) {
     const device = Application.instance.device;
     this._currentAnimation = null;
@@ -89,6 +93,17 @@ export class GLTFViewer {
     this._light1.lookAt(new Vector3(0, 0, 0), new Vector3(-0.5, 0.707, 0.5), Vector3.axisPY());
     this._envMaps.selectById(this._envMaps.getIdList()[0], this.scene);
     this._ui = new Panel(this);
+    this._dracoModule = null;
+  }
+  async ready() {
+    return new Promise<void>(resolve => {
+      DracoDecoderModule({
+        onModuleLoaded: (module) => {
+          this._dracoModule = module;
+          resolve();
+        }
+      })
+    });
   }
   get envMaps(): EnvMaps {
     return this._envMaps;
@@ -149,7 +164,10 @@ export class GLTFViewer {
   async loadModel(url: string) {
     this._modelNode?.remove();
     this._assetManager.purgeCache();
-    this._assetManager.fetchModel(this._scene, url, { enableInstancing: true }).then((info) => {
+    this._assetManager.fetchModel(this._scene, url, {
+      enableInstancing: true,
+      dracoDecoderModule: this._dracoModule
+    }).then((info) => {
       this._modelNode?.dispose();
       this._modelNode = info.group;
       this._modelNode.parent = this._batchGroup;

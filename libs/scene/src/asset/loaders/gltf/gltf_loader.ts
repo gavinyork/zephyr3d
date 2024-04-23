@@ -1,4 +1,5 @@
-import type { InterpolationMode } from '@zephyr3d/base';
+import type { DecoderModule } from 'draco3d';
+import type { InterpolationMode, TypedArray } from '@zephyr3d/base';
 import { Vector3, Vector4, Matrix4x4, Quaternion, Interpolator } from '@zephyr3d/base';
 import type {
   AssetHierarchyNode,
@@ -35,6 +36,7 @@ import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } 
 import { Application } from '../../../app';
 import { PBRMetallicRoughnessMaterial } from '../../../material/pbrmr';
 import { PBRSpecularGlossinessMaterial } from '../../../material/pbrsg';
+import { DracoMeshDecoder } from '../../../utility/draco/decoder';
 /** @internal */
 export interface GLTFContent extends GlTf {
   _manager: AssetManager;
@@ -42,10 +44,10 @@ export interface GLTFContent extends GlTf {
   _accessors: GLTFAccessor[];
   _bufferCache: Record<string, GPUDataBuffer>;
   _textureCache: Record<string, Texture2D>;
-  _primitiveCache: Record<string, Primitive>;
   _materialCache: Record<string, M>;
   _nodes: AssetHierarchyNode[];
   _meshes: AssetMeshData[];
+  _dracoModule?: DecoderModule;
 }
 
 /**
@@ -59,17 +61,17 @@ export class GLTFLoader extends AbstractModelLoader {
   supportMIMEType(mimeType: string): boolean {
     return mimeType === 'model/gltf+json' || mimeType === 'model/gltf-binary';
   }
-  async load(assetManager: AssetManager, url: string, mimeType: string, data: Blob) {
+  async load(assetManager: AssetManager, url: string, mimeType: string, data: Blob, decoderModule?: DecoderModule) {
     const buffer = await data.arrayBuffer();
     if (this.isGLB(buffer)) {
-      return this.loadBinary(assetManager, url, buffer);
+      return this.loadBinary(assetManager, url, buffer, decoderModule);
     }
     const gltf = (await new Response(data).json()) as GLTFContent;
     gltf._manager = assetManager;
     gltf._loadedBuffers = null;
-    return this.loadJson(url, gltf);
+    return this.loadJson(url, gltf, decoderModule);
   }
-  async loadBinary(assetManager: AssetManager, url: string, buffer: ArrayBuffer): Promise<SharedModel> {
+  async loadBinary(assetManager: AssetManager, url: string, buffer: ArrayBuffer, decoderModule?: DecoderModule): Promise<SharedModel> {
     const jsonChunkType = 0x4e4f534a;
     const binaryChunkType = 0x004e4942;
     let gltf: GLTFContent = null;
@@ -87,15 +89,20 @@ export class GLTFLoader extends AbstractModelLoader {
     if (gltf) {
       gltf._manager = assetManager;
       gltf._loadedBuffers = buffers;
-      return this.loadJson(url, gltf);
+      return this.loadJson(url, gltf, decoderModule);
     }
     return null;
   }
-  async loadJson(url: string, gltf: GLTFContent): Promise<SharedModel> {
+  async loadJson(url: string, gltf: GLTFContent, dracoDecoderModule?: DecoderModule): Promise<SharedModel> {
+    // check extensions
+    if (!dracoDecoderModule && gltf.extensionsRequired && gltf.extensionsRequired.indexOf('KHR_draco_mesh_compression') >= 0) {
+      console.error('Draco3d is required for loading model');
+      return null;
+    }
+    gltf._dracoModule = dracoDecoderModule;
     gltf._accessors = [];
     gltf._bufferCache = {};
     gltf._textureCache = {};
-    gltf._primitiveCache = {};
     gltf._materialCache = {};
     gltf._nodes = [];
     gltf._meshes = [];
@@ -445,28 +452,33 @@ export class GLTFLoader extends AbstractModelLoader {
             rawBlendIndices: null,
             rawJointWeights: null
           };
-          const hash = `(${Object.getOwnPropertyNames(p.attributes)
-            .sort()
-            .map((k) => `${k}:${p.attributes[k]}`)
-            .join(',')})-(${p.indices})-(${p.mode})`;
-          let primitive: Primitive = p.targets ? null : gltf._primitiveCache[hash];
-          if (!primitive) {
-            primitive = new Primitive();
-            const attributes = p.attributes;
-            for (const attrib in attributes) {
-              this._loadVertexBuffer(gltf, attrib, attributes[attrib], primitive, subMeshData);
+          let primitive = new Primitive();
+          const attributes = p.attributes;
+          const dracoExtension = gltf._dracoModule ? p.extensions?.['KHR_draco_mesh_compression'] : null;
+          let dracoMeshDecoder: DracoMeshDecoder = null;
+          if (dracoExtension) {
+            const bufferView = gltf.bufferViews && gltf.bufferViews[dracoExtension.bufferView];
+            if (!bufferView) {
+              throw new Error('Draco buffer view not set');
             }
-            const indices = p.indices;
-            if (typeof indices === 'number') {
-              this._loadIndexBuffer(gltf, indices, primitive, subMeshData);
+            const arrayBuffer = gltf._loadedBuffers && gltf._loadedBuffers[bufferView.buffer];
+            if (!arrayBuffer) {
+              throw new Error('Draco buffer view does not point to a valid ArrayBuffer');
             }
-            let primitiveType = p.mode;
-            if (typeof primitiveType !== 'number') {
-              primitiveType = 4;
-            }
-            primitive.primitiveType = this._primitiveType(primitiveType);
-            gltf._primitiveCache[hash] = primitive;
+            dracoMeshDecoder = new DracoMeshDecoder(new Int8Array(arrayBuffer, bufferView.byteOffset ?? 0, bufferView.byteLength), gltf._dracoModule);
           }
+          for (const attrib in attributes) {
+            this._loadVertexBuffer(gltf, attrib, attributes[attrib], primitive, subMeshData, dracoExtension, dracoMeshDecoder);
+          }
+          const indices = p.indices;
+          if (typeof indices === 'number') {
+            this._loadIndexBuffer(gltf, indices, primitive, subMeshData, dracoExtension, dracoMeshDecoder);
+          }
+          let primitiveType = p.mode;
+          if (typeof primitiveType !== 'number') {
+            primitiveType = 4;
+          }
+          primitive.primitiveType = this._primitiveType(primitiveType);
           const hasVertexNormal = !!primitive.getVertexBuffer('normal');
           const hasVertexColor = !!primitive.getVertexBuffer('diffuse');
           const hasVertexTangent = !!primitive.getVertexBuffer('tangent');
@@ -1022,8 +1034,31 @@ export class GLTFLoader extends AbstractModelLoader {
     gltf: GLTFContent,
     accessorIndex: number,
     primitive: Primitive,
-    meshData: AssetSubMeshData
+    meshData: AssetSubMeshData,
+    dracoExtension?: any,
+    dracoMeshDecoder?: DracoMeshDecoder
   ) {
+    const accessor = gltf._accessors[accessorIndex];
+    if (dracoMeshDecoder) {
+      const indices = dracoMeshDecoder.getIndexBuffer();
+      if (!indices || indices.length !== accessor.count) {
+        throw new Error(`Decode index buffer failed`);
+      }
+      if (indices.length !== accessor.count) {
+        throw new Error(`Decode index buffer failed`);
+      }
+      gltf._loadedBuffers.push(indices.buffer);
+      if (!gltf.bufferViews) {
+        gltf.bufferViews = [];
+      }
+      gltf.bufferViews.push({
+        buffer: gltf._loadedBuffers.length - 1,
+        byteOffset: 0,
+        byteLength: indices.byteLength
+      });
+      accessor.componentType = ComponentType.UINT;
+      accessor.bufferView = gltf.bufferViews.length - 1;
+    }
     this._setBuffer(gltf, accessorIndex, primitive, null, meshData);
   }
   /** @internal */
@@ -1032,8 +1067,54 @@ export class GLTFLoader extends AbstractModelLoader {
     attribName: string,
     accessorIndex: number,
     primitive: Primitive,
-    subMeshData: AssetSubMeshData
+    subMeshData: AssetSubMeshData,
+    dracoExtension?: any,
+    dracoMeshDecoder?: DracoMeshDecoder
   ) {
+    const dracoId = dracoExtension?.attributes?.[attribName];
+    if (dracoId !== undefined) {
+      const accessor = gltf._accessors[accessorIndex];
+      let buffer: TypedArray = null;
+      const numElements = accessor.count * accessor.getComponentCount(accessor.type);
+      switch(accessor.componentType) {
+        case ComponentType.FLOAT:
+          buffer = new Float32Array(numElements);
+          break;
+        case ComponentType.BYTE:
+          buffer = new Int8Array(numElements);
+          break;
+        case ComponentType.SHORT:
+          buffer = new Int16Array(numElements);
+          break;
+        case ComponentType.INT:
+          buffer = new Int32Array(numElements);
+          break;
+        case ComponentType.UBYTE:
+          buffer = new Uint8Array(numElements);
+          break;
+        case ComponentType.USHORT:
+          buffer = new Uint16Array(numElements);
+          break;
+        case ComponentType.UINT:
+          buffer = new Uint32Array(numElements);
+          break;
+        default:
+          throw new Error(`Invalid component type: ${accessor.componentType}`);
+      }
+      if (!dracoMeshDecoder.getAttributeBuffer(dracoId, buffer)) {
+        throw new Error(`Decode draco mesh failed`);
+      }
+      gltf._loadedBuffers.push(buffer.buffer);
+      if (!gltf.bufferViews) {
+        gltf.bufferViews = [];
+      }
+      gltf.bufferViews.push({
+        buffer: gltf._loadedBuffers.length - 1,
+        byteOffset: 0,
+        byteLength: buffer.byteLength,
+      });
+      accessor.bufferView = gltf.bufferViews.length - 1;
+    }
     let semantic: VertexSemantic = null;
     switch (attribName) {
       case 'POSITION':
@@ -1081,6 +1162,7 @@ export class GLTFLoader extends AbstractModelLoader {
       default:
         return;
     }
+
     this._setBuffer(gltf, accessorIndex, primitive, semantic, subMeshData);
   }
   /** @internal */

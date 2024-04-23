@@ -55,6 +55,8 @@
     "@types/colors": "^1.2.1",
     "@types/diff": "^5.0.2",
     "@webgpu/types": "^0.1.40",
+    "@types/draco3d": "^1.4.9",
+    "draco3d": "^1.5.7",
     "colors": "^1.4.0",
     "diff": "^5.0.0",
     "highlight.js": "^11.8.0",

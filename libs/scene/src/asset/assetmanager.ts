@@ -1,3 +1,4 @@
+import type { DecoderModule } from 'draco3d';
 import { Vector3, isPowerOf2, nextPowerOf2, HttpRequest } from '@zephyr3d/base';
 import type { AssetHierarchyNode, AssetSkeleton, AssetSubMeshData, SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
@@ -38,6 +39,8 @@ export type TextureFetchOptions<T extends BaseTexture> = {
 export type ModelFetchOptions = {
   /** MIME type of the model, if not specified, model type will be determined by file extension */
   mimeType?: string;
+  /** Draco module */
+  dracoDecoderModule?: DecoderModule;
   /** True if the model need to be rendered instanced, the default value is false */
   enableInstancing?: boolean;
   /** PostProcess loading function for the mesh  */
@@ -240,12 +243,11 @@ export class AssetManager {
   async fetchModelData(
     scene: Scene,
     url: string,
-    mimeType?: string,
-    postProcess?: (model: SharedModel) => SharedModel
+    options?: ModelFetchOptions
   ): Promise<SharedModel> {
     let P = this._models[url];
     if (!P) {
-      P = this.loadModel(url, mimeType, postProcess);
+      P = this.loadModel(url, options);
       this._models[url] = P;
     }
     return P;
@@ -265,7 +267,7 @@ export class AssetManager {
    * @returns The created model node
    */
   async fetchModel(scene: Scene, url: string, options?: ModelFetchOptions): Promise<ModelInfo> {
-    const sharedModel = await this.fetchModelData(scene, url, options?.mimeType, options?.postProcess);
+    const sharedModel = await this.fetchModelData(scene, url, options);
     return this.createSceneNode(scene, sharedModel, !!options?.enableInstancing);
   }
   /** @internal */
@@ -411,8 +413,7 @@ export class AssetManager {
   /** @internal */
   async loadModel(
     url: string,
-    mimeType?: string,
-    postProcess?: (model: SharedModel) => SharedModel
+    options?: ModelFetchOptions
   ): Promise<SharedModel> {
     const data = await this.httpRequest.requestBlob(url);
     const filename = new URL(url, new URL(location.href).origin).pathname
@@ -422,16 +423,16 @@ export class AssetManager {
     const p = filename ? filename.lastIndexOf('.') : -1;
     const ext = p >= 0 ? filename.substring(p) : null;
     for (const loader of this._modelLoaders) {
-      if (!loader.supportExtension(ext) && !loader.supportMIMEType(mimeType || data.type)) {
+      if (!loader.supportExtension(ext) && !loader.supportMIMEType(options?.mimeType || data.type)) {
         continue;
       }
-      let model = await loader.load(this, url, mimeType || data.type, data);
+      let model = await loader.load(this, url, options?.mimeType || data.type, data, options?.dracoDecoderModule);
       if (!model) {
         throw new Error(`Load asset failed: ${url}`);
       }
-      if (postProcess) {
+      if (options?.postProcess) {
         try {
-          model = postProcess(model);
+          model = options.postProcess(model);
         } catch (err) {
           throw new Error(`Model loader post process failed: ${err}`);
         }

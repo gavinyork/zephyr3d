@@ -12,6 +12,7 @@ import {
   Mesh,
   WeightedBlendedOIT,
   ABufferOIT,
+  AssetManager,
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
@@ -67,7 +68,6 @@ instancingApp.ready().then(async () => {
   mesh2.parent = batchGroup;
 
   /*
-  const assetManager = new AssetManager();
   for (let i = 0; i < 2; i++) {
     assetManager.fetchModel(scene, 'assets/stone1.glb', { enableInstancing: true }).then((info) => {
       info.group.parent = batchGroup;
