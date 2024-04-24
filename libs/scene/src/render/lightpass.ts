@@ -100,23 +100,20 @@ export class LightPass extends RenderPass {
       cameraSet: {},
       fogSet: {}
     };
-    const orders = Object.keys(renderQueue.items)
-      .map((val) => Number(val))
-      .sort((a, b) => a - b);
+    const items = renderQueue.itemList;
+    const lists = [items?.opaque, items?.transparent];
     for (let i = 0; i < 2; i++) {
-      ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none' ? ctx.env.sky.fogType : null;
-      ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
-      ctx.oit = i === 0 ? null : oit;
-      const numOitPasses = ctx.oit ? ctx.oit.begin(ctx) : 1;
-      for (let p = 0; p < numOitPasses; p++) {
-        if (ctx.oit) {
-          if (!ctx.oit.beginPass(ctx, p)) {
-            continue;
+      if (lists[i]) {
+        ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none' ? ctx.env.sky.fogType : null;
+        ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
+        ctx.oit = i === 0 || !items ? null : oit;
+        const numOitPasses = ctx.oit ? ctx.oit.begin(ctx) : 1;
+        for (let p = 0; p < numOitPasses; p++) {
+          if (ctx.oit) {
+            if (!ctx.oit.beginPass(ctx, p)) {
+              continue;
+            }
           }
-        }
-        for (const order of orders) {
-          const items = renderQueue.items[order];
-          const lists = [items.opaque, items.transparent];
           let lightIndex = 0;
           if (ctx.shadowMapInfo) {
             for (const k of ctx.shadowMapInfo.keys()) {
@@ -133,13 +130,13 @@ export class LightPass extends RenderPass {
             this._shadowMapHash = '';
             this.renderLightPass(ctx, lists[i], renderQueue.unshadowedLights, flags);
           }
+          if (ctx.oit) {
+            ctx.oit.endPass(ctx, p);
+          }
         }
         if (ctx.oit) {
-          ctx.oit.endPass(ctx, p);
+          ctx.oit.end(ctx);
         }
-      }
-      if (ctx.oit) {
-        ctx.oit.end(ctx);
       }
       if (i === 0) {
         ctx.env.sky.skyWorldMatrix = ctx.scene.rootNode.worldMatrix;

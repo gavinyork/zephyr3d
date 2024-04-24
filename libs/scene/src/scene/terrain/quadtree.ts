@@ -416,7 +416,7 @@ export class Quadtree {
       const eyeDistSq = ld >= 0 ? node.getPatch().sqrDistanceToPoint(viewPoint) : 0;
       if (eyeDistSq >= lodDistance || !node.getChild(0)) {
         if (!node.getPatch().isDummy()) {
-          visitor.push(camera, node.getPatch(), this._terrain.renderOrder);
+          visitor.push(camera, node.getPatch());
           ignorePatch = true;
           ret = 1;
         }
@@ -424,7 +424,7 @@ export class Quadtree {
     }
     if (node.grassClusters.length > 0 && visitor.renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP) {
       for (const grass of node.grassClusters) {
-        visitor.push(camera, grass, this._terrain.renderOrder);
+        visitor.push(camera, grass);
       }
     }
     for (let i = 0; i < 4; i++) {

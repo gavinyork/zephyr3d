@@ -145,7 +145,7 @@ export interface DrawableInstanceInfo {
  */
 export class RenderQueue {
   /** @internal */
-  private _itemLists: Record<number, RenderItemList>;
+  private _itemList: RenderItemList;
   /** @internal */
   private _renderPass: RenderPass;
   /** @internal */
@@ -166,7 +166,7 @@ export class RenderQueue {
    */
   constructor(renderPass: RenderPass, bindGroupAllocator?: InstanceBindGroupAllocator) {
     this._bindGroupAllocator = bindGroupAllocator ?? defaultInstanceBindGroupAlloator;
-    this._itemLists = {};
+    this._itemList = null;
     this._renderPass = renderPass;
     this._shadowedLightList = [];
     this._unshadowedLightList = [];
@@ -188,8 +188,8 @@ export class RenderQueue {
   /**
    * Gets the items of the render queue
    */
-  get items() {
-    return this._itemLists;
+  get itemList() {
+    return this._itemList;
   }
   /**
    * Gets the shadowed lights
@@ -245,42 +245,38 @@ export class RenderQueue {
    * @param queue - The render queue to be pushed
    */
   pushRenderQueue(queue: RenderQueue) {
-    for (const order in queue._itemLists) {
-      let itemLists = this._itemLists[order];
-      if (!itemLists) {
-        itemLists = this.newRenderItemList(true);
-        this._itemLists[order] = itemLists;
-      }
-      const newItemLists = queue._itemLists[order];
-      itemLists.opaque.lit.push(...newItemLists.opaque.lit);
-      itemLists.opaque.unlit.push(...newItemLists.opaque.unlit);
-      itemLists.transparent.lit.push(...newItemLists.transparent.lit);
-      itemLists.transparent.unlit.push(...newItemLists.transparent.unlit);
+    const newItemLists = queue._itemList;
+    if (!newItemLists) {
+      return;
     }
+    if (!this._itemList) {
+      this._itemList = this.newRenderItemList();
+    }
+    this._itemList.opaque.lit.push(...newItemLists.opaque.lit);
+    this._itemList.opaque.unlit.push(...newItemLists.opaque.unlit);
+    this._itemList.transparent.lit.push(...newItemLists.transparent.lit);
+    this._itemList.transparent.unlit.push(...newItemLists.transparent.unlit);
   }
   /**
    * Push an item to the render queue
    * @param camera - The camera for drawing the item
    * @param drawable - The object to be drawn
-   * @param renderOrder - Render order of the object
    */
-  push(camera: Camera, drawable: Drawable, renderOrder: number): void {
+  push(camera: Camera, drawable: Drawable): void {
     if (drawable) {
-      let itemList = this._itemLists[renderOrder];
-      if (!itemList) {
-        itemList = this.newRenderItemList(false);
-        this._itemLists[renderOrder] = itemList;
+      if (!this._itemList) {
+        this._itemList = this.newRenderItemList();
       }
       const trans = drawable.getQueueType() === QUEUE_TRANSPARENT;
       const unlit = drawable.isUnlit();
       if (drawable.isBatchable()) {
         const instanceList = trans
           ? unlit
-            ? itemList.transparent.unlit[0].instanceList
-            : itemList.transparent.lit[0].instanceList
+            ? this._itemList.transparent.unlit[0].instanceList
+            : this._itemList.transparent.lit[0].instanceList
           : unlit
-          ? itemList.opaque.unlit[0].instanceList
-          : itemList.opaque.lit[0].instanceList;
+          ? this._itemList.opaque.unlit[0].instanceList
+          : this._itemList.opaque.lit[0].instanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         let drawableList = instanceList[hash];
         if (!drawableList) {
@@ -291,11 +287,11 @@ export class RenderQueue {
       } else {
         const list = trans
           ? unlit
-            ? itemList.transparent.unlit[0]
-            : itemList.transparent.lit[0]
+            ? this._itemList.transparent.unlit[0]
+            : this._itemList.transparent.lit[0]
           : unlit
-          ? itemList.opaque.unlit[0]
-          : itemList.opaque.lit[0];
+          ? this._itemList.opaque.unlit[0]
+          : this._itemList.opaque.lit[0];
         this.binaryInsert(drawable.getBoneMatrices() ? list.skinItemList : list.itemList, {
           drawable,
           sortDistance: drawable.getSortDistance(camera),
@@ -314,7 +310,7 @@ export class RenderQueue {
    * Removes all items in the render queue
    */
   reset() {
-    this._itemLists = {};
+    this._itemList = null;
     this._shadowedLightList = [];
     this._unshadowedLightList = [];
     this._sunLight = null;
@@ -328,92 +324,85 @@ export class RenderQueue {
   /** @internal */
   end(camera: Camera, createRenderBundles?: boolean): this {
     const frameCounter = Application.instance.device.frameInfo.frameCounter;
-    for (const k in this._itemLists) {
-      const itemList = this._itemLists[k];
-      const lists = [
-        itemList.opaque.lit,
-        itemList.opaque.unlit,
-        itemList.transparent.lit,
-        itemList.transparent.unlit
-      ];
-      for (let i = 0; i < 4; i++) {
-        const list = lists[i];
-        for (const info of list) {
-          if (info.renderQueue !== this) {
-            continue;
-          }
-          const instanceList = info.instanceList;
-          for (const x in instanceList) {
-            const drawables = instanceList[x];
-            if (drawables.length === 1) {
-              this.binaryInsert(info.itemList, {
-                drawable: drawables[0],
-                sortDistance: drawables[0].getSortDistance(camera),
-                instanceData: null
-              });
-              drawables[0].applyTransformUniforms(this);
-              const mat = drawables[0].getMaterial();
+    const itemList = this._itemList;
+    if (!this.itemList) {
+      return this;
+    }
+    const lists = [
+      itemList.opaque.lit,
+      itemList.opaque.unlit,
+      itemList.transparent.lit,
+      itemList.transparent.unlit
+    ];
+    for (let i = 0; i < 4; i++) {
+      const list = lists[i];
+      for (const info of list) {
+        if (info.renderQueue !== this) {
+          continue;
+        }
+        const instanceList = info.instanceList;
+        for (const x in instanceList) {
+          const drawables = instanceList[x];
+          if (drawables.length === 1) {
+            this.binaryInsert(info.itemList, {
+              drawable: drawables[0],
+              sortDistance: drawables[0].getSortDistance(camera),
+              instanceData: null
+            });
+            drawables[0].applyTransformUniforms(this);
+            const mat = drawables[0].getMaterial();
+            if (mat) {
+              info.materialList.add(mat.coreMaterial);
+            }
+          } else {
+            let bindGroup: CachedBindGroup = null;
+            let item: RenderQueueItem = null;
+            for (let i = 0; i < drawables.length; i++) {
+              const drawable = drawables[i];
+              const instanceUniforms = drawable.getInstanceUniforms();
+              const instanceUniformsSize = instanceUniforms?.length ?? 0;
+              const stride = 16 + instanceUniformsSize;
+              if (!bindGroup || bindGroup.offset + stride > maxBufferSizeInFloats) {
+                bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(frameCounter, stride);
+                item = {
+                  drawable,
+                  sortDistance: drawable.getSortDistance(camera),
+                  instanceData: {
+                    bindGroup,
+                    offset: bindGroup.offset,
+                    numInstances: 0,
+                    stride
+                  }
+                };
+                this.binaryInsert(info.instanceItemList, item);
+                drawable.applyInstanceOffsetAndStride(this, stride, bindGroup.offset);
+              }
+              const instanceInfo = { bindGroup, offset: bindGroup.offset };
+              this._instanceInfo.set(drawable, instanceInfo);
+              drawable.applyTransformUniforms(this);
+              drawable.applyMaterialUniforms(instanceInfo);
+              bindGroup.offset += stride;
+              item.instanceData.numInstances++;
+              const mat = drawable.getMaterial();
               if (mat) {
                 info.materialList.add(mat.coreMaterial);
               }
-            } else {
-              let bindGroup: CachedBindGroup = null;
-              let item: RenderQueueItem = null;
-              for (let i = 0; i < drawables.length; i++) {
-                const drawable = drawables[i];
-                const instanceUniforms = drawable.getInstanceUniforms();
-                const instanceUniformsSize = instanceUniforms?.length ?? 0;
-                const stride = 16 + instanceUniformsSize;
-                if (!bindGroup || bindGroup.offset + stride > maxBufferSizeInFloats) {
-                  bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(frameCounter, stride);
-                  item = {
-                    drawable,
-                    sortDistance: drawable.getSortDistance(camera),
-                    instanceData: {
-                      bindGroup,
-                      offset: bindGroup.offset,
-                      numInstances: 0,
-                      stride
-                    }
-                  };
-                  this.binaryInsert(info.instanceItemList, item);
-                  drawable.applyInstanceOffsetAndStride(this, stride, bindGroup.offset);
-                }
-                const instanceInfo = { bindGroup, offset: bindGroup.offset };
-                this._instanceInfo.set(drawable, instanceInfo);
-                drawable.applyTransformUniforms(this);
-                drawable.applyMaterialUniforms(instanceInfo);
-                bindGroup.offset += stride;
-                item.instanceData.numInstances++;
-                const mat = drawable.getMaterial();
-                if (mat) {
-                  info.materialList.add(mat.coreMaterial);
-                }
-              }
-            }
-          }
-          info.instanceList = {};
-          if (createRenderBundles) {
-            if (info.itemList.length > 0) {
-              info.renderBundle = new RenderBundleWrapper();
-            }
-            if (info.skinItemList.length > 0) {
-              info.skinRenderBundle = new RenderBundleWrapper();
-            }
-            if (info.instanceItemList.length > 0) {
-              info.instanceRenderBundle = new RenderBundleWrapper();
             }
           }
         }
+        info.instanceList = {};
+        if (createRenderBundles) {
+          if (info.itemList.length > 0) {
+            info.renderBundle = new RenderBundleWrapper();
+          }
+          if (info.skinItemList.length > 0) {
+            info.skinRenderBundle = new RenderBundleWrapper();
+          }
+          if (info.instanceItemList.length > 0) {
+            info.instanceRenderBundle = new RenderBundleWrapper();
+          }
+        }
       }
-      /*
-      itemList.opaque.lit.forEach(info => {
-        info.itemList.sort((a, b) => (a.drawable.getMaterial()?.instanceId ?? 0) - (b.drawable.getMaterial()?.instanceId ?? 0))
-      });
-      itemList.opaque.unlit.forEach(info => {
-        info.itemList.sort((a, b) => (a.drawable.getMaterial()?.instanceId ?? 0) - (b.drawable.getMaterial()?.instanceId ?? 0))
-      });
-      */
     }
     return this;
   }
@@ -439,23 +428,23 @@ export class RenderQueue {
    * Sorts the items in the render queue for rendering
    */
   sortTransparentItems(cameraPos: Vector3) {
-    for (const list of Object.values(this._itemLists)) {
-      list.transparent.lit[0].itemList.sort(
+    if (this._itemList) {
+      this._itemList.transparent.lit[0].itemList.sort(
         (a, b) =>
           this.drawableDistanceToCamera(b.drawable, cameraPos) -
           this.drawableDistanceToCamera(a.drawable, cameraPos)
       );
-      list.transparent.lit[0].skinItemList.sort(
+      this._itemList.transparent.lit[0].skinItemList.sort(
         (a, b) =>
           this.drawableDistanceToCamera(b.drawable, cameraPos) -
           this.drawableDistanceToCamera(a.drawable, cameraPos)
       );
-      list.transparent.unlit[0].itemList.sort(
+      this._itemList.transparent.unlit[0].itemList.sort(
         (a, b) =>
           this.drawableDistanceToCamera(b.drawable, cameraPos) -
           this.drawableDistanceToCamera(a.drawable, cameraPos)
       );
-      list.transparent.unlit[0].skinItemList.sort(
+      this._itemList.transparent.unlit[0].skinItemList.sort(
         (a, b) =>
           this.drawableDistanceToCamera(b.drawable, cameraPos) -
           this.drawableDistanceToCamera(a.drawable, cameraPos)
@@ -466,59 +455,51 @@ export class RenderQueue {
     const drawablePos = drawable.getXForm().position;
     return Vector3.distanceSq(drawablePos, cameraPos);
   }
-  private newRenderItemList(empty: boolean): RenderItemList {
+  private newRenderItemList(): RenderItemList {
     return {
       opaque: {
-        lit: empty
-          ? []
-          : [
-              {
-                itemList: [],
-                skinItemList: [],
-                instanceItemList: [],
-                materialList: new Set(),
-                instanceList: {},
-                renderQueue: this
-              }
-            ],
-        unlit: empty
-          ? []
-          : [
-              {
-                itemList: [],
-                skinItemList: [],
-                instanceItemList: [],
-                materialList: new Set(),
-                instanceList: {},
-                renderQueue: this
-              }
-            ]
+        lit: [
+          {
+            itemList: [],
+            skinItemList: [],
+            instanceItemList: [],
+            materialList: new Set(),
+            instanceList: {},
+            renderQueue: this
+          }
+        ],
+        unlit: [
+          {
+            itemList: [],
+            skinItemList: [],
+            instanceItemList: [],
+            materialList: new Set(),
+            instanceList: {},
+            renderQueue: this
+          }
+        ]
       },
       transparent: {
-        lit: empty
-          ? []
-          : [
-              {
-                itemList: [],
-                skinItemList: [],
-                instanceItemList: [],
-                materialList: new Set(),
-                instanceList: {},
-                renderQueue: this
-              }
-            ],
-        unlit: empty
-          ? []
-          : [
-              {
-                itemList: [],
-                skinItemList: [],
-                instanceItemList: [],
-                materialList: new Set(),
-                instanceList: {},
-                renderQueue: this
-              }
-            ]
+        lit: [
+          {
+            itemList: [],
+            skinItemList: [],
+            instanceItemList: [],
+            materialList: new Set(),
+            instanceList: {},
+            renderQueue: this
+          }
+        ],
+        unlit: [
+          {
+            itemList: [],
+            skinItemList: [],
+            instanceItemList: [],
+            materialList: new Set(),
+            instanceList: {},
+            renderQueue: this
+          }
+        ]
       }
     };
   }

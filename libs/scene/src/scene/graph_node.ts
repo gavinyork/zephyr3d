@@ -24,7 +24,6 @@ export class GraphNode extends SceneNode {
    */
   constructor(scene: Scene) {
     super(scene);
-    this._renderOrder = 0;
     this._octreeNode = null;
   }
   /** @internal */
@@ -33,15 +32,6 @@ export class GraphNode extends SceneNode {
   }
   set octreeNode(node: OctreeNode) {
     this._octreeNode = node;
-  }
-  /**
-   * Render order of the node
-   */
-  get renderOrder() {
-    return this._renderOrder;
-  }
-  set renderOrder(val: number) {
-    this._renderOrder = val;
   }
   /** Gets the name */
   getName(): string {
