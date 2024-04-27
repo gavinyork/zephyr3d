@@ -81,6 +81,10 @@ export class Material {
   isBatchable(): boolean {
     return false;
   }
+  /** Return true if this material requires the scene color texture */
+  needSceneColor(): boolean {
+    return false;
+  }
   /** @internal */
   get coreMaterial(): this {
     return this;

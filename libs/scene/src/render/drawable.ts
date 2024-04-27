@@ -110,12 +110,15 @@ export interface Drawable {
   getSortDistance(camera: Camera): number;
   /** Gets the type of render queue */
   getQueueType(): number;
+  /** Need scene color */
+  needSceneColor(): boolean;
   /** true if the shading of this object is independent of lighting */
   isUnlit(): boolean;
   /** Gets the associated material */
   getMaterial(): Material;
   /** Set render queue reference */
   pushRenderQueueRef(ref: RenderQueueRef);
+  /** Apply transform uniforms */
   applyTransformUniforms(renderQueue: RenderQueue): void;
   /**
    * Draw the object

@@ -119,6 +119,7 @@ export interface RenderItemListBundle {
  */
 export interface RenderItemList {
   opaque: RenderItemListBundle;
+  transmission: RenderItemListBundle;
   transparent: RenderItemListBundle;
 }
 
@@ -160,6 +161,8 @@ export class RenderQueue {
   private _ref: RenderQueueRef;
   /** @internal */
   private _instanceInfo: Map<Drawable, DrawableInstanceInfo>;
+  /** @internal */
+  private _needSceneColor: boolean;
   /**
    * Creates an instance of a render queue
    * @param renderPass - The render pass to which the render queue belongs
@@ -173,6 +176,7 @@ export class RenderQueue {
     this._sunLight = null;
     this._ref = { ref: this };
     this._instanceInfo = new Map();
+    this._needSceneColor = false;
   }
   /** The sun light */
   get sunLight(): DirectionalLight {
@@ -180,6 +184,10 @@ export class RenderQueue {
   }
   set sunLight(light: DirectionalLight) {
     this._sunLight = light;
+  }
+  /** Whether this render queue requires scene color pass */
+  get needSceneColor(): boolean {
+    return this._needSceneColor;
   }
   /** The render pass to which the render queue belongs */
   get renderPass(): RenderPass {
@@ -254,8 +262,11 @@ export class RenderQueue {
     }
     this._itemList.opaque.lit.push(...newItemLists.opaque.lit);
     this._itemList.opaque.unlit.push(...newItemLists.opaque.unlit);
+    this._itemList.transmission.lit.push(...newItemLists.transmission.lit);
+    this._itemList.transmission.unlit.push(...newItemLists.transmission.unlit);
     this._itemList.transparent.lit.push(...newItemLists.transparent.lit);
     this._itemList.transparent.unlit.push(...newItemLists.transparent.unlit);
+    this._needSceneColor ||= queue._needSceneColor;
   }
   /**
    * Push an item to the render queue
@@ -269,14 +280,20 @@ export class RenderQueue {
       }
       const trans = drawable.getQueueType() === QUEUE_TRANSPARENT;
       const unlit = drawable.isUnlit();
+      const transmission = !trans && drawable.needSceneColor();
+      this._needSceneColor ||= transmission;
       if (drawable.isBatchable()) {
         const instanceList = trans
           ? unlit
             ? this._itemList.transparent.unlit[0].instanceList
             : this._itemList.transparent.lit[0].instanceList
           : unlit
-          ? this._itemList.opaque.unlit[0].instanceList
-          : this._itemList.opaque.lit[0].instanceList;
+            ? transmission
+              ? this._itemList.transmission.unlit[0].instanceList
+              : this._itemList.opaque.unlit[0].instanceList
+            : transmission
+              ? this._itemList.transmission.lit[0].instanceList
+              : this._itemList.opaque.lit[0].instanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         let drawableList = instanceList[hash];
         if (!drawableList) {
@@ -290,8 +307,12 @@ export class RenderQueue {
             ? this._itemList.transparent.unlit[0]
             : this._itemList.transparent.lit[0]
           : unlit
-          ? this._itemList.opaque.unlit[0]
-          : this._itemList.opaque.lit[0];
+            ? transmission
+              ? this._itemList.transmission.unlit[0]
+              : this._itemList.opaque.unlit[0]
+            : transmission
+              ? this._itemList.transmission.lit[0]
+              : this._itemList.opaque.lit[0];
         this.binaryInsert(drawable.getBoneMatrices() ? list.skinItemList : list.itemList, {
           drawable,
           sortDistance: drawable.getSortDistance(camera),
@@ -314,6 +335,7 @@ export class RenderQueue {
     this._shadowedLightList = [];
     this._unshadowedLightList = [];
     this._sunLight = null;
+    this._needSceneColor = false;
   }
   /** @internal */
   dispose() {
@@ -331,6 +353,8 @@ export class RenderQueue {
     const lists = [
       itemList.opaque.lit,
       itemList.opaque.unlit,
+      itemList.transmission.lit,
+      itemList.transmission.unlit,
       itemList.transparent.lit,
       itemList.transparent.unlit
     ];
@@ -458,6 +482,28 @@ export class RenderQueue {
   private newRenderItemList(): RenderItemList {
     return {
       opaque: {
+        lit: [
+          {
+            itemList: [],
+            skinItemList: [],
+            instanceItemList: [],
+            materialList: new Set(),
+            instanceList: {},
+            renderQueue: this
+          }
+        ],
+        unlit: [
+          {
+            itemList: [],
+            skinItemList: [],
+            instanceItemList: [],
+            materialList: new Set(),
+            instanceList: {},
+            renderQueue: this
+          }
+        ]
+      },
+      transmission: {
         lit: [
           {
             itemList: [],

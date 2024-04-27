@@ -71,6 +71,9 @@ export class GrassCluster extends applyMixins(GrassClusterBase, mixinDrawable) i
   isUnlit(): boolean {
     return !this._terrain.grassMaterial.supportLighting();
   }
+  needSceneColor(): boolean {
+    return false;
+  }
   isBatchable(): this is BatchDrawable {
     return false;
   }

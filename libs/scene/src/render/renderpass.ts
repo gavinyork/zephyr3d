@@ -5,9 +5,11 @@ import type { RenderItemListInfo, RenderQueueItem } from './render_queue';
 import { RenderQueue } from './render_queue';
 import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
-import type { AbstractDevice, BindGroup } from '@zephyr3d/device';
+import type { AbstractDevice, BindGroup, FrameBuffer, TextureFormat } from '@zephyr3d/device';
 import { ShaderHelper } from '../material/shader/helper';
 import type { RenderBundleWrapper } from './renderbundle_wrapper';
+import { TextureFetchOptions } from '../asset';
+import { TemporalCache } from './temporalcache';
 
 /**
  * Base class for any kind of render passes
@@ -187,6 +189,28 @@ export abstract class RenderPass {
     }
     if (renderBundle && ctx.primaryCamera.commandBufferReuse) {
       renderBundle.endRenderBundle(hash);
+    }
+  }
+  /** @internal */
+  protected getTemporalFramebuffer(ctx: DrawContext, colorFmt: TextureFormat, sampleCount: number): FrameBuffer {
+    if (ctx.defaultViewport) {
+      return TemporalCache.getFramebufferVariantSizeWithDepth(
+        ctx.depthTexture,
+        1,
+        colorFmt,
+        '2d',
+        false,
+        sampleCount
+      );
+    } else {
+      return TemporalCache.getFramebufferFixedSizeWithDepth(
+        ctx.depthTexture,
+        1,
+        colorFmt,
+        '2d',
+        false,
+        sampleCount
+      );
     }
   }
   /** @internal */
