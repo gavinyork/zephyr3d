@@ -54,6 +54,7 @@ import type {
   DeviceViewport
 } from './base_types';
 import { DrawText } from './helpers';
+import { Pool } from './pool';
 
 /**
  * The device backend interface
@@ -98,6 +99,7 @@ export abstract class BaseDevice {
   protected _backend: DeviceBackend;
   protected _beginFrameCounter: number;
   protected _programBuilder: ProgramBuilder;
+  protected _pool: Pool;
   private _stateStack: DeviceState[];
   constructor(cvs: HTMLCanvasElement, backend: DeviceBackend) {
     this._backend = backend;
@@ -139,6 +141,7 @@ export abstract class BaseDevice {
     this._fpsCounter = { time: 0, frame: 0 };
     this._stateStack = [];
     this._beginFrameCounter = 0;
+    this._pool = new Pool(this);
     this._registerEventHandlers();
   }
   abstract getFrameBufferSampleCount(): number;
@@ -301,6 +304,9 @@ export abstract class BaseDevice {
   }
   get type(): string {
     return this._backend.typeName();
+  }
+  get pool(): Pool {
+    return this._pool;
   }
   get runLoopFunction(): (device: AbstractDevice) => void {
     return this._runLoopFunc;

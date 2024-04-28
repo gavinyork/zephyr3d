@@ -64,6 +64,9 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
   get depth() {
     return this._depth;
   }
+  get memCost(): number {
+    return this._memCost;
+  }
   get format() {
     return this._format;
   }

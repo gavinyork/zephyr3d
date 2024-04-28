@@ -30,6 +30,7 @@ import type {
   VertexSemantic
 } from './gpuobject';
 import type { RenderStateSet } from './render_states';
+import type { Pool } from './pool';
 
 /**
  * The webgl context type
@@ -1763,6 +1764,8 @@ export type DeviceViewport = {
  * @public
  */
 export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
+  /** Get pool object */
+  pool: Pool;
   /** Get sample count of current frame buffer */
   getFrameBufferSampleCount(): number;
   /** Returns true if device context is lost. */

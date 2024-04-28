@@ -1214,6 +1214,7 @@ export interface BaseTexture<T = unknown> extends GPUObject<T> {
   readonly depth: number;
   readonly format: TextureFormat;
   readonly mipLevelCount: number;
+  readonly memCost: number;
   samplerOptions: SamplerOptions;
   init(): void;
   generateMipmaps(): void;
