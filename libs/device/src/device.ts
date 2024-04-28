@@ -361,6 +361,7 @@ export abstract class BaseDevice {
     this._beginFrameCounter++;
     this._beginFrameTime = this._cpuTimer.now();
     this.updateFrameInfo();
+    this._pool.autoRelease();
     return this.onBeginFrame();
   }
   endFrame(): void {

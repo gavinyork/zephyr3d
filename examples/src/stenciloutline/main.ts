@@ -123,6 +123,84 @@ import { DrawText } from '@zephyr3d/device';
   renderStatesOutline.useStencilState().enable(true).setFrontCompareFunc('eq').setReference(0);
   renderStatesOutline.useDepthState().enableWrite(false);
 
+  (function (){
+    const tex1 = device.pool.fetchTemporalTexture2D(false, 'rgba8unorm', 1, 1, false);
+    const tex2 = device.pool.fetchTemporalTexture2D(false, 'rgba8unorm', 1, 1, false);
+    const tex3 = device.pool.fetchTemporalTexture2D(false, 'd24s8', 1, 1, false);
+    const fb1 = device.pool.fetchTemporalFramebuffer(false, [tex1, tex2], tex3);
+    device.pool.releaseFrameBuffer(fb1);
+    device.pool.releaseTexture(tex1);
+    device.pool.releaseTexture(tex2);
+    device.pool.releaseTexture(tex3);
+    device.pool.purge();
+  })();
+  (function (){
+    const tex1 = device.pool.fetchTemporalTexture2D(false, 'rgba8unorm', 1, 1, false);
+    const tex2 = device.pool.fetchTemporalTexture2D(false, 'rgba8unorm', 1, 1, false);
+    const tex3 = device.pool.fetchTemporalTexture2D(false, 'd24s8', 1, 1, false);
+    const fb1 = device.pool.fetchTemporalFramebuffer(false, [tex1, tex2], tex3);
+    device.pool.releaseTexture(tex1);
+    device.pool.releaseTexture(tex2);
+    device.pool.releaseTexture(tex3);
+    device.pool.releaseFrameBuffer(fb1);
+    device.pool.purge();
+  })();
+  (function (){
+    const tex1 = device.pool.fetchTemporalTexture2D(false, 'rgba8unorm', 1, 1, false);
+    const tex2 = device.pool.fetchTemporalTexture2D(false, 'rgba8unorm', 1, 1, false);
+    const tex3 = device.pool.fetchTemporalTexture2D(false, 'd24s8', 1, 1, false);
+    const fb1 = device.pool.fetchTemporalFramebuffer(false, [tex1, tex2], tex3);
+    device.pool.disposeFrameBuffer(fb1);
+    device.pool.releaseTexture(tex1);
+    device.pool.releaseTexture(tex2);
+    device.pool.releaseTexture(tex3);
+    device.pool.purge();
+  })();
+  (function (){
+    const tex1 = device.pool.fetchTemporalTexture2D(false, 'rgba8unorm', 1, 1, false);
+    const tex2 = device.pool.fetchTemporalTexture2D(false, 'rgba8unorm', 1, 1, false);
+    const tex3 = device.pool.fetchTemporalTexture2D(false, 'd24s8', 1, 1, false);
+    const fb1 = device.pool.fetchTemporalFramebuffer(false, [tex1, tex2], tex3);
+    device.pool.releaseTexture(tex1);
+    device.pool.releaseTexture(tex2);
+    device.pool.releaseTexture(tex3);
+    device.pool.disposeFrameBuffer(fb1);
+    device.pool.purge();
+  })();
+  (function (){
+    const tex1 = device.pool.fetchTemporalTexture2D(false, 'rgba8unorm', 1, 1, false);
+    const tex2 = device.pool.fetchTemporalTexture2D(false, 'rgba8unorm', 1, 1, false);
+    const tex3 = device.pool.fetchTemporalTexture2D(false, 'd24s8', 1, 1, false);
+    const fb1 = device.pool.fetchTemporalFramebuffer(false, [tex1, tex2], tex3);
+    device.pool.releaseFrameBuffer(fb1);
+    device.pool.disposeTexture(tex1);
+    device.pool.disposeTexture(tex2);
+    device.pool.disposeTexture(tex3);
+    device.pool.purge();
+  })();
+  (function (){
+    const tex1 = device.pool.fetchTemporalTexture2D(false, 'rgba8unorm', 1, 1, false);
+    const tex2 = device.pool.fetchTemporalTexture2D(false, 'rgba8unorm', 1, 1, false);
+    const tex3 = device.pool.fetchTemporalTexture2D(false, 'd24s8', 1, 1, false);
+    const fb1 = device.pool.fetchTemporalFramebuffer(false, [tex1, tex2], tex3);
+    device.pool.disposeTexture(tex1);
+    device.pool.disposeTexture(tex2);
+    device.pool.disposeTexture(tex3);
+    device.pool.releaseFrameBuffer(fb1);
+    device.pool.purge();
+  })();
+  (function (){
+    const tex1 = device.pool.fetchTemporalTexture2D(false, 'rgba8unorm', 1, 1, false);
+    const tex2 = device.pool.fetchTemporalTexture2D(false, 'rgba8unorm', 1, 1, false);
+    const tex3 = device.pool.fetchTemporalTexture2D(false, 'd24s8', 1, 1, false);
+    const fb1 = device.pool.fetchTemporalFramebuffer(false, [tex1, tex2], tex3);
+    device.pool.disposeFrameBuffer(fb1);
+    device.pool.disposeTexture(tex1);
+    device.pool.disposeTexture(tex2);
+    device.pool.disposeTexture(tex3);
+    device.pool.purge();
+  })();
+
   // start render loop
   device.runLoop((device) => {
     const t = device.frameInfo.elapsedOverall * 0.002;

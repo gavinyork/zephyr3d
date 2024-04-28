@@ -41,7 +41,7 @@ export class Pool {
     this._memCost = 0;
   }
   /** @internal */
-  frameUpdate() {
+  autoRelease() {
     // auto release objects
     for (const tex of this._autoReleaseTextures) {
       this.releaseTexture(tex);
@@ -92,7 +92,7 @@ export class Pool {
    * @param ignoreDepthStencil - Whether to ignore depth stencil.
    * @returns The fetched FrameBuffer object.
    */
-  createTemporalFramebuffer(autoRelease: boolean, colorAttachments: BaseTexture[], depthAttachment?: BaseTexture, sampleCount?: number, ignoreDepthStencil?: boolean) {
+  fetchTemporalFramebuffer(autoRelease: boolean, colorAttachments: BaseTexture[], depthAttachment?: BaseTexture, sampleCount?: number, ignoreDepthStencil?: boolean) {
     let hash = `${depthAttachment?.uid ?? 0}:${sampleCount ?? 1}:${ignoreDepthStencil ? 1 : 0}`;
     for (const tex of colorAttachments) {
       hash += `:${tex.uid}`;
