@@ -51,7 +51,7 @@ export class SAO extends AbstractPostEffect {
     this._opaque = true;
     this._saoScale = 10;
     this._saoBias = 1;
-    this._saoIntensity = 0.05;
+    this._saoIntensity = 0.025;
     this._saoRadius = 100;
     this._saoMinResolution = 0;
     this._saoRandomSeed = 0;
@@ -143,6 +143,7 @@ export class SAO extends AbstractPostEffect {
     }
     const fmt = this._getIntermediateTextureFormat(device);
     const depth = device.getFramebuffer().getDepthAttachment() as Texture2D;
+
     const fbao = ctx.defaultViewport
       ? TemporalCache.getFramebufferVariantSizeWithDepth(depth, 1, fmt, '2d', false)
       : TemporalCache.getFramebufferFixedSizeWithDepth(depth, 1, fmt, '2d', false);

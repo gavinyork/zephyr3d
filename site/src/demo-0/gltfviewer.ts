@@ -1,7 +1,7 @@
 import * as zip from '@zip.js/zip.js';
 import * as draco3d from 'draco3d';
 import { Vector4, Vector3 } from '@zephyr3d/base';
-import { SceneNode, Scene, AnimationSet, BatchGroup, PostWater, WeightedBlendedOIT, OIT, ABufferOIT } from '@zephyr3d/scene';
+import { SceneNode, Scene, AnimationSet, BatchGroup, PostWater, WeightedBlendedOIT, OIT, ABufferOIT, SAO } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
 import {
   BoundingBox,
@@ -32,11 +32,13 @@ export class GLTFViewer {
   private _water: PostWater;
   private _bloom: Bloom;
   private _fxaa: FXAA;
+  private _sao: SAO;
   private _oit: OIT;
   private _doTonemap: boolean;
   private _doWater: boolean;
   private _doBloom: boolean;
   private _doFXAA: boolean;
+  private _doSAO: boolean;
   private _camera: PerspectiveCamera;
   private _light0: DirectionalLight;
   private _light1: DirectionalLight;
@@ -59,6 +61,8 @@ export class GLTFViewer {
     this._tonemap = new Tonemap();
     this._water = new PostWater(0);
     this._bloom = new Bloom();
+    this._sao = new SAO();
+    this._sao.intensity = 0.025;
     this._bloom.threshold = 0.85;
     this._bloom.intensity = 1.5;
     this._fxaa = new FXAA();
@@ -67,6 +71,7 @@ export class GLTFViewer {
     this._doBloom = true;
     this._doFXAA = true;
     this._doWater = false;
+    this._doSAO = false;
     this._oit = new WeightedBlendedOIT();
     this._fov = Math.PI / 3;
     this._nearPlane = 1;
@@ -234,6 +239,9 @@ export class GLTFViewer {
   FXAAEnabled(): boolean {
     return this._doFXAA;
   }
+  SAOEnabled(): boolean {
+    return this._doSAO;
+  }
   getOITType(): string {
     return this._oit?.getType() ?? '';
   }
@@ -252,6 +260,9 @@ export class GLTFViewer {
   }
   syncPostEffects() {
     this._compositor.clear();
+    if (this._doSAO) {
+      this._compositor.appendPostEffect(this._sao);
+    }
     if (this._doWater) {
       this._compositor.appendPostEffect(this._water);
     }
@@ -299,6 +310,12 @@ export class GLTFViewer {
   enableFXAA(enable: boolean) {
     if (!!enable !== this._doFXAA) {
       this._doFXAA = !!enable;
+      this.syncPostEffects();
+    }
+  }
+  enableSAO(enable: boolean) {
+    if (!!enable !== this._doSAO) {
+      this._doSAO = !!enable;
       this.syncPostEffects();
     }
   }

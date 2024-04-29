@@ -1,6 +1,5 @@
 import { linearToGamma } from '../shaders/misc';
 import type { DrawContext } from '../render';
-import { TemporalCache } from '../render';
 import type {
   AbstractDevice,
   BindGroup,
@@ -117,87 +116,20 @@ export class Compositor {
     const depth = finalFramebuffer?.getDepthAttachment() as Texture2D;
     let pingpongFramebuffers: FrameBuffer[];
     let msFramebuffer: FrameBuffer = null;
+    const w = depth ? depth.width : ctx.viewportWidth;
+    const h = depth ? depth.height : ctx.viewportHeight;
     if (ctx.primaryCamera.sampleCount > 1) {
-      msFramebuffer = depth
-        ? TemporalCache.getFramebufferVariantSizeWithDepth(
-            depth,
-            1,
-            format,
-            '2d',
-            false,
-            ctx.primaryCamera.sampleCount
-          )
-        : TemporalCache.getFramebufferVariantSize(
-            ctx.viewportWidth,
-            ctx.viewportHeight,
-            1,
-            format,
-            ctx.depthFormat,
-            '2d',
-            '2d',
-            false,
-            ctx.primaryCamera.sampleCount
-          );
+      const tex = device.pool.fetchTemporalTexture2D(true, format, w, h, false);
+      msFramebuffer = device.pool.fetchTemporalFramebuffer(true, [tex], depth, ctx.primaryCamera.sampleCount);
     }
-    if (ctx.defaultViewport) {
-      pingpongFramebuffers = [
-        depth
-          ? TemporalCache.getFramebufferVariantSizeWithDepth(depth, 1, format, '2d', false, 1)
-          : TemporalCache.getFramebufferVariantSize(
-              ctx.viewportWidth,
-              ctx.viewportHeight,
-              1,
-              format,
-              ctx.depthFormat,
-              '2d',
-              '2d',
-              false,
-              1
-            ),
-        depth
-          ? TemporalCache.getFramebufferVariantSizeWithDepth(depth, 1, format, '2d', false, 1)
-          : TemporalCache.getFramebufferVariantSize(
-              ctx.viewportWidth,
-              ctx.viewportHeight,
-              1,
-              format,
-              ctx.depthFormat,
-              '2d',
-              '2d',
-              false,
-              1
-            )
-      ];
-    } else {
-      pingpongFramebuffers = [
-        depth
-          ? TemporalCache.getFramebufferFixedSizeWithDepth(depth, 1, format, '2d', false, 4)
-          : TemporalCache.getFramebufferFixedSize(
-              ctx.viewportWidth,
-              ctx.viewportHeight,
-              1,
-              format,
-              ctx.depthFormat,
-              '2d',
-              '2d',
-              false,
-              4
-            ),
-        depth
-          ? TemporalCache.getFramebufferFixedSizeWithDepth(depth, 1, format, '2d', false, 4)
-          : TemporalCache.getFramebufferFixedSize(
-              ctx.viewportWidth,
-              ctx.viewportHeight,
-              1,
-              format,
-              ctx.depthFormat,
-              '2d',
-              '2d',
-              false,
-              4
-            )
-      ];
-    }
+    pingpongFramebuffers = [
+      device.pool.fetchTemporalFramebuffer(true, [
+        device.pool.fetchTemporalTexture2D(true, format, w, h, false)
+      ], depth),
+      device.pool.fetchTemporalFramebuffer(true, [
+        device.pool.fetchTemporalTexture2D(true, format, w, h, false)
+      ], depth),
+    ]
     let writeIndex: number;
     if (msFramebuffer) {
       writeIndex = 3;
@@ -252,11 +184,6 @@ export class Compositor {
       device.setViewport(null);
       device.setScissor(null);
       Compositor._blit(device, srcTex, !ctx.compositorContex.finalFramebuffer);
-    }
-    TemporalCache.releaseFramebuffer(ctx.compositorContex.pingpongFramebuffers[0]);
-    TemporalCache.releaseFramebuffer(ctx.compositorContex.pingpongFramebuffers[1]);
-    if (ctx.compositorContex.msFramebuffer) {
-      TemporalCache.releaseFramebuffer(ctx.compositorContex.msFramebuffer);
     }
     ctx.compositorContex = null;
   }

@@ -11,6 +11,7 @@ interface GUIParams {
   water: boolean;
   bloom: boolean;
   fxaa: boolean;
+  sao: boolean;
   FPS: string;
   oitType: string;
   animation?: string;
@@ -39,6 +40,7 @@ export class Panel {
       water: this._viewer.waterEnabled(),
       bloom: this._viewer.bloomEnabled(),
       fxaa: this._viewer.FXAAEnabled(),
+      sao: this._viewer.SAOEnabled(),
       FPS: '',
       oitType: this._oitNames[this._oitTypes.indexOf(this._viewer.getOITType())]
     };
@@ -125,6 +127,11 @@ export class Panel {
     .name('FXAA')
     .onChange(value=>{
       this._viewer.enableFXAA(value);
+    });
+    ppSettings.add(this._params, 'sao')
+    .name('SSAO')
+    .onChange(value=>{
+      this._viewer.enableSAO(value);
     });
     ppSettings.add(this._params, 'water')
     .name('Water')
