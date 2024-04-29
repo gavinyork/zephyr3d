@@ -1,5 +1,6 @@
 import { linearToGamma } from '../shaders/misc';
 import type { DrawContext } from '../render';
+import { TemporalCache } from '../render';
 import type {
   AbstractDevice,
   BindGroup,
@@ -125,10 +126,10 @@ export class Compositor {
     pingpongFramebuffers = [
       device.pool.fetchTemporalFramebuffer(true, [
         device.pool.fetchTemporalTexture2D(true, format, w, h, false)
-      ], depth),
+      ], depth ?? device.pool.fetchTemporalTexture2D(true, ctx.depthFormat, w, h, false)),
       device.pool.fetchTemporalFramebuffer(true, [
         device.pool.fetchTemporalTexture2D(true, format, w, h, false)
-      ], depth),
+      ], depth ?? device.pool.fetchTemporalTexture2D(true, ctx.depthFormat, w, h, false)),
     ]
     let writeIndex: number;
     if (msFramebuffer) {
@@ -184,6 +185,11 @@ export class Compositor {
       device.setViewport(null);
       device.setScissor(null);
       Compositor._blit(device, srcTex, !ctx.compositorContex.finalFramebuffer);
+    }
+    TemporalCache.releaseFramebuffer(ctx.compositorContex.pingpongFramebuffers[0]);
+    TemporalCache.releaseFramebuffer(ctx.compositorContex.pingpongFramebuffers[1]);
+    if (ctx.compositorContex.msFramebuffer) {
+      TemporalCache.releaseFramebuffer(ctx.compositorContex.msFramebuffer);
     }
     ctx.compositorContex = null;
   }

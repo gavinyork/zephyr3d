@@ -3,6 +3,7 @@ import { mixinVertexColor } from './mixins/vertexcolor';
 import type { PBFunctionScope } from '@zephyr3d/device';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 import { ShaderHelper } from './shader/helper';
+import { RENDER_PASS_TYPE_LIGHT } from '../values';
 
 /**
  * PBRMetallicRoughnessMaterial class
@@ -71,23 +72,27 @@ export class PBRMetallicRoughnessMaterial extends applyMaterialMixins(
       if (this.vertexColor) {
         scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope));
       }
-      scope.$l.normalInfo = this.calculateNormalAndTBN(
-        scope,
-        scope.$inputs.worldPos,
-        scope.$inputs.wNorm,
-        scope.$inputs.wTangent,
-        scope.$inputs.wBinormal
-      );
-      scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
-      scope.$l.litColor = this.PBRLight(
-        scope,
-        scope.$inputs.worldPos,
-        scope.normalInfo.normal,
-        scope.viewVec,
-        scope.albedo,
-        scope.normalInfo.TBN
-      );
-      this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
+      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+        scope.$l.normalInfo = this.calculateNormalAndTBN(
+          scope,
+          scope.$inputs.worldPos,
+          scope.$inputs.wNorm,
+          scope.$inputs.wTangent,
+          scope.$inputs.wBinormal
+        );
+        scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
+        scope.$l.litColor = this.PBRLight(
+          scope,
+          scope.$inputs.worldPos,
+          scope.normalInfo.normal,
+          scope.viewVec,
+          scope.albedo,
+          scope.normalInfo.TBN
+        );
+        this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
+      } else {
+        this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.albedo);
+      }
     } else {
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
