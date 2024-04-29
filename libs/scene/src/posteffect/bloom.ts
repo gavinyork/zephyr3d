@@ -8,7 +8,7 @@ import type {
   TextureSampler
 } from '@zephyr3d/device';
 import { AbstractPostEffect } from './posteffect';
-import { TemporalCache, type DrawContext } from '../render';
+import type { DrawContext } from '../render';
 import { Vector2, Vector4 } from '@zephyr3d/base';
 
 /**
@@ -105,16 +105,8 @@ export class Bloom extends AbstractPostEffect {
     device.pushDeviceStates();
     const w = Math.max(inputColorTexture.width >> 1, 1);
     const h = Math.max(inputColorTexture.height >> 1, 1);
-    const prefilterFramebuffer = TemporalCache.getFramebufferFixedSize(
-      w,
-      h,
-      1,
-      inputColorTexture.format,
-      null,
-      '2d',
-      null,
-      false
-    );
+    const colorTex = device.pool.fetchTemporalTexture2D(false, inputColorTexture.format, w, h, false);
+    const prefilterFramebuffer = device.pool.fetchTemporalFramebuffer(false, [colorTex]);
     this.prefilter(device, inputColorTexture, prefilterFramebuffer);
     this.downsample(
       device,
@@ -129,9 +121,10 @@ export class Bloom extends AbstractPostEffect {
       downsampleFramebuffers[0].getColorAttachments()[0] as Texture2D
     );
     for (const fb of downsampleFramebuffers) {
-      TemporalCache.releaseFramebuffer(fb);
+      device.pool.releaseFrameBuffer(fb);
     }
-    TemporalCache.releaseFramebuffer(prefilterFramebuffer);
+    device.pool.releaseTexture(colorTex);
+    device.pool.releaseFrameBuffer(prefilterFramebuffer);
   }
   /** @internal */
   prefilter(device: AbstractDevice, srcTexture: Texture2D, fb: FrameBuffer) {
@@ -179,27 +172,13 @@ export class Bloom extends AbstractPostEffect {
     this._bindgroupDownsampleH.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     this._bindgroupDownsampleV.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     while ((w >= t || h >= t) && maxLevels > 0) {
-      const fb = TemporalCache.getFramebufferFixedSize(
-        w,
-        h,
-        1,
-        inputColorTexture.format,
-        null,
-        '2d',
-        '2d',
-        false
-      );
-      const fbMiddle = TemporalCache.getFramebufferFixedSize(
-        w,
-        h,
-        1,
-        inputColorTexture.format,
-        null,
-        '2d',
-        '2d',
-        false
-      );
+      const tex = device.pool.fetchTemporalTexture2D(false, inputColorTexture.format, w, h, false);
+      const fb = device.pool.fetchTemporalFramebuffer(false, [tex]);
+      device.pool.releaseTexture(tex);
       framebuffers.push(fb);
+
+      const texMiddle = device.pool.fetchTemporalTexture2D(false, inputColorTexture.format, w, h, false);
+      const fbMiddle = device.pool.fetchTemporalFramebuffer(false, [texMiddle]);
 
       // horizonal blur
       this._invTexSize.setXY(1 / sourceTex.width, 1 / sourceTex.height);
@@ -224,7 +203,9 @@ export class Bloom extends AbstractPostEffect {
       w = Math.max(1, w >> 1);
       h = Math.max(1, h >> 1);
       sourceTex = fb.getColorAttachments()[0] as Texture2D;
-      TemporalCache.releaseFramebuffer(fbMiddle);
+
+      device.pool.releaseTexture(texMiddle);
+      device.pool.releaseFrameBuffer(fbMiddle);
     }
   }
   /** @internal */

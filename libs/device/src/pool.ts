@@ -40,7 +40,6 @@ export class Pool {
     this._autoReleaseFramebuffers = new Set();
     this._memCost = 0;
   }
-  /** @internal */
   autoRelease() {
     // auto release objects
     for (const tex of this._autoReleaseTextures) {
@@ -100,17 +99,6 @@ export class Pool {
     let fb: FrameBuffer = null;
     const list = this._freeFramebuffers[hash];
     if (!list) {
-      // Mark referenced textures
-      const info = this._allocatedTextures.get(depthAttachment);
-      if (info) {
-        info.refcount++;
-      }
-      for (const tex of colorAttachments) {
-        const info = this._allocatedTextures.get(tex);
-        if (info) {
-          info.refcount++;
-        }
-      }
       fb = this._device.createFrameBuffer(colorAttachments, depthAttachment, {
         ignoreDepthStencil,
         sampleCount
@@ -119,6 +107,17 @@ export class Pool {
       fb = list.pop();
       if (list.length === 0) {
         delete this._freeFramebuffers[hash];
+      }
+    }
+    // Mark referenced textures
+    const info = this._allocatedTextures.get(depthAttachment);
+    if (info) {
+      info.refcount++;
+    }
+    for (const tex of colorAttachments) {
+      const info = this._allocatedTextures.get(tex);
+      if (info) {
+        info.refcount++;
       }
     }
     this._allocatedFramebuffers.set(fb, hash);
