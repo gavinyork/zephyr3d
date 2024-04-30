@@ -203,6 +203,12 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     return !this.material?.supportLighting();
   }
   /**
+   * {@inheritDoc Drawable.needSceneColor}
+   */
+  needSceneColor(): boolean {
+    return this.material?.needSceneColor();
+  }
+  /**
    * {@inheritDoc Drawable.draw}
    */
   draw(ctx: DrawContext) {

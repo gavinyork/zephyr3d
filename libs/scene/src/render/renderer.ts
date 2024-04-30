@@ -146,6 +146,7 @@ export class SceneRenderer {
     if (
       ctx.primaryCamera.depthPrePass ||
       oversizedViewport ||
+      renderQueue.needSceneColor ||
       ctx.scene.env.needSceneDepthTexture() ||
       ctx.primaryCamera.oit ||
       ctx.compositor?.requireLinearDepth()
