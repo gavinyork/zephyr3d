@@ -8,7 +8,6 @@ import type { DrawContext } from './drawable';
 import type { AbstractDevice, BindGroup, FrameBuffer, TextureFormat } from '@zephyr3d/device';
 import { ShaderHelper } from '../material/shader/helper';
 import type { RenderBundleWrapper } from './renderbundle_wrapper';
-import { TextureFetchOptions } from '../asset';
 import { TemporalCache } from './temporalcache';
 
 /**
