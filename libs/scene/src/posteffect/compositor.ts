@@ -18,7 +18,7 @@ import type { AbstractPostEffect } from './posteffect';
  * @public
  */
 export interface CompositorContext {
-  msFramebuffer?: FrameBuffer;
+  msTexture?: FrameBuffer;
   pingpongFramebuffers: FrameBuffer[];
   finalFramebuffer: FrameBuffer;
   writeIndex: number;
@@ -121,13 +121,13 @@ export class Compositor {
     const h = depth ? depth.height : ctx.viewportHeight;
     if (ctx.primaryCamera.sampleCount > 1) {
       const tex = device.pool.fetchTemporalTexture2D(true, format, w, h, false);
-      msFramebuffer = device.pool.fetchTemporalFramebuffer(true, [tex], depth, ctx.primaryCamera.sampleCount);
+      msFramebuffer = device.pool.createTemporalFramebuffer(true, [tex], depth, ctx.primaryCamera.sampleCount);
     }
     pingpongFramebuffers = [
-      device.pool.fetchTemporalFramebuffer(true, [
+      device.pool.createTemporalFramebuffer(true, [
         device.pool.fetchTemporalTexture2D(true, format, w, h, false)
       ], depth ?? device.pool.fetchTemporalTexture2D(true, ctx.depthFormat, w, h, false)),
-      device.pool.fetchTemporalFramebuffer(true, [
+      device.pool.createTemporalFramebuffer(true, [
         device.pool.fetchTemporalTexture2D(true, format, w, h, false)
       ], depth ?? device.pool.fetchTemporalTexture2D(true, ctx.depthFormat, w, h, false)),
     ]
@@ -144,7 +144,7 @@ export class Compositor {
     ctx.compositorContex = {
       finalFramebuffer,
       pingpongFramebuffers,
-      msFramebuffer,
+      msTexture: msFramebuffer,
       writeIndex
     };
   }
@@ -188,8 +188,8 @@ export class Compositor {
     }
     TemporalCache.releaseFramebuffer(ctx.compositorContex.pingpongFramebuffers[0]);
     TemporalCache.releaseFramebuffer(ctx.compositorContex.pingpongFramebuffers[1]);
-    if (ctx.compositorContex.msFramebuffer) {
-      TemporalCache.releaseFramebuffer(ctx.compositorContex.msFramebuffer);
+    if (ctx.compositorContex.msTexture) {
+      TemporalCache.releaseFramebuffer(ctx.compositorContex.msTexture);
     }
     ctx.compositorContex = null;
   }

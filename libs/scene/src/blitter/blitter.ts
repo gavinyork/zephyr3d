@@ -384,7 +384,7 @@ export abstract class Blitter {
         throw new Error('Blitter.blit() failed: invalid texture type');
       }
     } else {
-      const framebuffer = dest.isFramebuffer() ? dest : device.createFrameBuffer([dest], null);
+      const framebuffer = dest.isFramebuffer() ? dest : device.pool.createTemporalFramebuffer(false, [dest], null);
       const destTexture = dest.isFramebuffer() ? dest.getColorAttachments()?.[0] : dest;
       if (source.isTexture2D()) {
         if (!destTexture?.isTexture2D() && !destTexture?.isTexture2DArray()) {
@@ -428,7 +428,7 @@ export abstract class Blitter {
         throw new Error('Blitter.blit() failed: invalid texture type');
       }
       if (framebuffer && framebuffer !== dest) {
-        framebuffer.dispose();
+        device.pool.releaseFrameBuffer(framebuffer);
       }
     }
     device.popDeviceStates();

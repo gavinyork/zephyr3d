@@ -2041,11 +2041,24 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /** Get current render states */
   getRenderStates(): RenderStateSet;
   /**
-   * Set current frame buffer
-   *
-   * @param rt - The frame buffer
+   * Sets the current framebuffer to the specified FrameBuffer object.
+   * 
+   * @param rt - The FrameBuffer object to set as the current framebuffer.
    */
-  setFramebuffer(rt: FrameBuffer): void;
+  setFramebuffer(rt: FrameBuffer)
+  /**
+   * Sets the current framebuffer specifying complex color attachments, an optional depth attachment, MIP level, face, and sample count.
+   * 
+   * @param color - An array of BaseTextures or objects containing a BaseTexture and optional properties. Each BaseTexture or object will serve as a color attachment.
+   *                - If an object is provided, it can specify:
+   *                  - `texture`: The BaseTexture to use.
+   *                  - `miplevel`: Optional MIP level for this specific texture. default is 0.
+   *                  - `face`: Optional face index for cube map textures, specifying the cube face this texture is attached to. default is 0.
+   *                  - `layer`: Optional layer index, useful for texture arrays. default is 0.
+   * @param depth - Optional BaseTexture to serve as the depth attachment.
+   * @param sampleCount - Optional sample count defining the number of samples for multisampling.
+   */
+  setFramebuffer(color: (BaseTexture|{texture:BaseTexture,miplevel?:number,face?:number,layer?:number})[], depth?: BaseTexture, miplevel?: number, face?: number, sampleCount?: number);
   /** Get current frame buffer */
   getFramebuffer(): FrameBuffer;
   /**

@@ -91,7 +91,7 @@ export class Pool {
    * @param ignoreDepthStencil - Whether to ignore depth stencil.
    * @returns The fetched FrameBuffer object.
    */
-  fetchTemporalFramebuffer(autoRelease: boolean, colorAttachments: BaseTexture[], depthAttachment?: BaseTexture, sampleCount?: number, ignoreDepthStencil?: boolean) {
+  createTemporalFramebuffer(autoRelease: boolean, colorAttachments: BaseTexture[], depthAttachment?: BaseTexture, sampleCount?: number, ignoreDepthStencil?: boolean) {
     let hash = `${depthAttachment?.uid ?? 0}:${sampleCount ?? 1}:${ignoreDepthStencil ? 1 : 0}`;
     for (const tex of colorAttachments) {
       hash += `:${tex.uid}`;

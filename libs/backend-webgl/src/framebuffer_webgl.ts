@@ -50,6 +50,7 @@ export class WebGLFrameBuffer
     { texture: WebGLTexture; width: number; height: number }[]
   >;
   private _framebufferAA: WebGLFramebuffer;
+  private _initialized: boolean;
   constructor(
     device: WebGLDevice,
     colorAttachments: BaseTexture[],
@@ -128,7 +129,7 @@ export class WebGLFrameBuffer
       this._options.colorAttachments?.map((tex) => tex.texture.format).join(':') ?? '';
     const depthAttachmentHash = this._options.depthAttachment?.texture.format ?? '';
     this._hash = `${colorAttachmentHash}-${depthAttachmentHash}-${this._options.sampleCount ?? 1}`;
-    this._init();
+    this._initialized = false;
   }
   tagDraw() {
     this._drawTags++;
@@ -271,6 +272,10 @@ export class WebGLFrameBuffer
     return this._options.colorAttachments?.map((val) => val.texture || null) || [];
   }
   bind(): boolean {
+    if (!this._initialized) {
+      this._init();
+      this._initialized = true;
+    }
     if (this._object) {
       this._device.context._currentFramebuffer = this;
       this._lastDrawTag = -1;

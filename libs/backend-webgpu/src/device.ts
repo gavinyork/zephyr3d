@@ -557,9 +557,6 @@ export class WebGPUDevice extends BaseDevice {
   getRenderStates(): RenderStateSet {
     return this._currentStateSet;
   }
-  setFramebuffer(rt: FrameBuffer): void {
-    this._commandQueue.setFramebuffer(rt as WebGPUFrameBuffer);
-  }
   getFramebuffer(): FrameBuffer {
     return this._commandQueue.getFramebuffer() ?? null;
   }
@@ -767,6 +764,10 @@ export class WebGPUDevice extends BaseDevice {
   }
   flushUploads() {
     this._commandQueue.flushUploads();
+  }
+  /** @internal */
+  protected _setFramebuffer(rt: FrameBuffer): void {
+    this._commandQueue.setFramebuffer(rt as WebGPUFrameBuffer);
   }
   /** @internal */
   protected onBeginFrame(): boolean {

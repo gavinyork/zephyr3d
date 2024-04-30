@@ -135,7 +135,6 @@ import { DrawText } from '@zephyr3d/device';
   // create render target
   const renderTargetColorTexture = device.createTexture2D('rgba8unorm', 512, 512);
   const renderTargetDepthTexture = device.createTexture2D('d16', 512, 512);
-  const framebuffer = device.createFrameBuffer([renderTargetColorTexture], renderTargetDepthTexture);
   const bindGroupTextured = device.createBindGroup(programTextured.bindGroupLayouts[0]);
 
   // start render loop
@@ -146,7 +145,7 @@ import { DrawText } from '@zephyr3d/device';
     device.setVertexLayout(vertexLayout);
 
     // render to texture
-    device.setFramebuffer(framebuffer);
+    device.setFramebuffer([renderTargetColorTexture], renderTargetDepthTexture);
     device.clearFrameBuffer(new Vector4(0.5, 0, 0, 1), 1, 0);
     bindGroup.setValue('worldMatrix', worldMatrix);
     bindGroup.setValue(

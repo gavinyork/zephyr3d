@@ -666,10 +666,7 @@ export class WebGLDevice extends BaseDevice {
     depthAttachement: BaseTexture,
     options?: FrameBufferOptions
   ): FrameBuffer {
-    this.pushDeviceStates();
-    const fb = new WebGLFrameBuffer(this, colorAttachments, depthAttachement, options);
-    this.popDeviceStates();
-    return fb;
+    return new WebGLFrameBuffer(this, colorAttachments, depthAttachement, options);
   }
   setBindGroup(index: number, bindGroup: BindGroup, bindGroupOffsets?: Iterable<number>) {
     if (bindGroupOffsets && !isWebGL2(this._context)) {
@@ -763,12 +760,6 @@ export class WebGLDevice extends BaseDevice {
   }
   getRenderStates(): RenderStateSet {
     return this._currentStateSet;
-  }
-  setFramebuffer(rt: FrameBuffer): void {
-    if (rt !== this._context._currentFramebuffer) {
-      this._context._currentFramebuffer?.unbind();
-      rt?.bind();
-    }
   }
   getFramebuffer(): FrameBuffer {
     return this._context._currentFramebuffer ?? null;
@@ -911,6 +902,13 @@ export class WebGLDevice extends BaseDevice {
       } else {
         this.drawInstanced(drawcall.primitiveType, drawcall.first, drawcall.count, drawcall.numInstances);
       }
+    }
+  }
+  /** @internal */
+  protected _setFramebuffer(rt: FrameBuffer): void {
+    if (rt !== this._context._currentFramebuffer) {
+      this._context._currentFramebuffer?.unbind();
+      rt?.bind();
     }
   }
   /** @internal */

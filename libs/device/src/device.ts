@@ -100,6 +100,7 @@ export abstract class BaseDevice {
   protected _beginFrameCounter: number;
   protected _programBuilder: ProgramBuilder;
   protected _pool: Pool;
+  protected _temporalFramebuffer: boolean;
   private _stateStack: DeviceState[];
   constructor(cvs: HTMLCanvasElement, backend: DeviceBackend) {
     this._backend = backend;
@@ -142,6 +143,7 @@ export abstract class BaseDevice {
     this._stateStack = [];
     this._beginFrameCounter = 0;
     this._pool = new Pool(this);
+    this._temporalFramebuffer = false;
     this._registerEventHandlers();
   }
   abstract getFrameBufferSampleCount(): number;
@@ -248,7 +250,6 @@ export abstract class BaseDevice {
   abstract getVertexLayout(): VertexLayout;
   abstract setRenderStates(renderStates: RenderStateSet): void;
   abstract getRenderStates(): RenderStateSet;
-  abstract setFramebuffer(rt: FrameBuffer): void;
   abstract getFramebuffer(): FrameBuffer;
   abstract setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>);
   abstract getBindGroup(index: number): [BindGroup, Iterable<number>];
@@ -319,6 +320,33 @@ export abstract class BaseDevice {
   }
   drawText(text: string, x: number, y: number, color: string) {
     DrawText.drawText(this, text, color, x, y);
+  }
+  setFramebuffer(rt: FrameBuffer)
+  setFramebuffer(color: (BaseTexture|{texture:BaseTexture,miplevel?:number,face?:number,layer?:number})[], depth?: BaseTexture, sampleCount?: number)
+  setFramebuffer(colorOrRT: (BaseTexture|{texture:BaseTexture,miplevel?:number,face?:number,layer?:number})[]|FrameBuffer, depth?: BaseTexture, sampleCount?: number) {
+    let newRT: FrameBuffer = null;
+    let temporal = false;
+    if (!Array.isArray(colorOrRT)) {
+      newRT = colorOrRT ?? null;
+    } else {
+      const colorAttachments = colorOrRT.map(val => (val as any).texture ?? val) as BaseTexture[];
+      newRT = this._pool.createTemporalFramebuffer(false, colorAttachments, depth, sampleCount, true);
+      for (let i = 0; i < colorOrRT.length; i++) {
+        const rt = colorOrRT[i];
+        newRT.setColorAttachmentMipLevel(i, (rt as any).texture ? ((rt as any).miplevel ?? 0) : 0)
+        newRT.setColorAttachmentLayer(i, (rt as any).texture ? ((rt as any).face ?? 0) : 0)
+        newRT.setColorAttachmentCubeFace(i, (rt as any).texture ? ((rt as any).layer ?? 0) : 0)
+      }
+      temporal = true;
+    }
+    const currentRT = this.getFramebuffer();
+    if (currentRT !== newRT) {
+      if (this._temporalFramebuffer) {
+        this._pool.releaseFrameBuffer(currentRT);
+      }
+      this._temporalFramebuffer = temporal;
+      this._setFramebuffer(newRT);
+    }
   }
   disposeObject(obj: GPUObject, remove = true) {
     if (obj) {
@@ -567,6 +595,7 @@ export abstract class BaseDevice {
   }
   protected abstract onBeginFrame(): boolean;
   protected abstract onEndFrame(): void;
+  protected abstract _setFramebuffer(fb: FrameBuffer);
   private _onresize() {
     if (
       this._canvasClientWidth !== this._canvas.clientWidth ||

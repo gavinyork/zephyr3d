@@ -1,7 +1,6 @@
 import type {
   AbstractDevice,
   BindGroup,
-  FrameBuffer,
   GPUProgram,
   RenderStateSet,
   Texture2D,
@@ -100,40 +99,34 @@ export class Bloom extends AbstractPostEffect {
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const device = ctx.device;
-    const downsampleFramebuffers: FrameBuffer[] = [];
+    const downsampleTextures: Texture2D[] = [];
     this._prepare(device, inputColorTexture);
     device.pushDeviceStates();
     const w = Math.max(inputColorTexture.width >> 1, 1);
     const h = Math.max(inputColorTexture.height >> 1, 1);
     const colorTex = device.pool.fetchTemporalTexture2D(false, inputColorTexture.format, w, h, false);
-    const prefilterFramebuffer = device.pool.fetchTemporalFramebuffer(false, [colorTex]);
-    this.prefilter(device, inputColorTexture, prefilterFramebuffer);
-    this.downsample(
-      device,
-      prefilterFramebuffer.getColorAttachments()[0] as Texture2D,
-      downsampleFramebuffers
-    );
-    this.upsample(device, downsampleFramebuffers);
+    this.prefilter(device, inputColorTexture, colorTex);
+    this.downsample(device, colorTex, downsampleTextures);
+    this.upsample(device, downsampleTextures);
     device.popDeviceStates();
     this.finalCompose(
       device,
       inputColorTexture,
-      downsampleFramebuffers[0].getColorAttachments()[0] as Texture2D
+      downsampleTextures[0]
     );
-    for (const fb of downsampleFramebuffers) {
-      device.pool.releaseFrameBuffer(fb);
+    for (const tex of downsampleTextures) {
+      device.pool.releaseTexture(tex);
     }
     device.pool.releaseTexture(colorTex);
-    device.pool.releaseFrameBuffer(prefilterFramebuffer);
   }
   /** @internal */
-  prefilter(device: AbstractDevice, srcTexture: Texture2D, fb: FrameBuffer) {
+  prefilter(device: AbstractDevice, srcTexture: Texture2D, rt: Texture2D) {
     this._thresholdValue.x = this._threshold * this._threshold;
     this._thresholdValue.y = this._thresholdValue.x * this._thresholdKnee;
     this._thresholdValue.z = 2 * this._thresholdValue.y;
     this._thresholdValue.w = 0.25 / (this._thresholdValue.y + 0.00001);
     this._thresholdValue.y -= this._thresholdValue.x;
-    device.setFramebuffer(fb);
+    device.setFramebuffer([rt]);
     device.setProgram(Bloom._programPrefilter);
     device.setBindGroup(0, this._bindgroupPrefilter);
     this._bindgroupPrefilter.setTexture('tex', srcTexture);
@@ -152,18 +145,18 @@ export class Bloom extends AbstractPostEffect {
     this.drawFullscreenQuad();
   }
   /** @internal */
-  upsample(device: AbstractDevice, framebuffers: FrameBuffer[]) {
+  upsample(device: AbstractDevice, textures: Texture2D[]) {
     device.setProgram(Bloom._programUpsample);
     device.setBindGroup(0, this._bindgroupUpsample);
     this._bindgroupUpsample.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-    for (let i = framebuffers.length - 2; i >= 0; i--) {
-      this._bindgroupUpsample.setTexture('tex', framebuffers[i + 1].getColorAttachments()[0]);
-      device.setFramebuffer(framebuffers[i]);
+    for (let i = textures.length - 2; i >= 0; i--) {
+      this._bindgroupUpsample.setTexture('tex', textures[i + 1]);
+      device.setFramebuffer([textures[i]]);
       this.drawFullscreenQuad(Bloom._renderStateAdditive);
     }
   }
   /** @internal */
-  downsample(device: AbstractDevice, inputColorTexture: Texture2D, framebuffers: FrameBuffer[]) {
+  downsample(device: AbstractDevice, inputColorTexture: Texture2D, textures: Texture2D[]) {
     const t = Math.max(2, this._downsampleLimit);
     let w = Math.max(t, inputColorTexture.width >> 1);
     let h = Math.max(t, inputColorTexture.height >> 1);
@@ -173,16 +166,13 @@ export class Bloom extends AbstractPostEffect {
     this._bindgroupDownsampleV.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     while ((w >= t || h >= t) && maxLevels > 0) {
       const tex = device.pool.fetchTemporalTexture2D(false, inputColorTexture.format, w, h, false);
-      const fb = device.pool.fetchTemporalFramebuffer(false, [tex]);
-      device.pool.releaseTexture(tex);
-      framebuffers.push(fb);
+      textures.push(tex);
 
       const texMiddle = device.pool.fetchTemporalTexture2D(false, inputColorTexture.format, w, h, false);
-      const fbMiddle = device.pool.fetchTemporalFramebuffer(false, [texMiddle]);
 
       // horizonal blur
       this._invTexSize.setXY(1 / sourceTex.width, 1 / sourceTex.height);
-      device.setFramebuffer(fbMiddle);
+      device.setFramebuffer([texMiddle]);
       device.setProgram(Bloom._programDownsampleH);
       device.setBindGroup(0, this._bindgroupDownsampleH);
       this._bindgroupDownsampleH.setTexture('tex', sourceTex);
@@ -190,22 +180,20 @@ export class Bloom extends AbstractPostEffect {
       this.drawFullscreenQuad();
 
       // vertical blur
-      const midTex = fbMiddle.getColorAttachments()[0];
-      this._invTexSize.setXY(1 / midTex.width, 1 / midTex.height);
-      device.setFramebuffer(fb);
+      this._invTexSize.setXY(1 / texMiddle.width, 1 / texMiddle.height);
+      device.setFramebuffer([tex]);
       device.setProgram(Bloom._programDownsampleV);
       device.setBindGroup(0, this._bindgroupDownsampleV);
-      this._bindgroupDownsampleV.setTexture('tex', midTex);
+      this._bindgroupDownsampleV.setTexture('tex', texMiddle);
       this._bindgroupDownsampleV.setValue('invTexSize', this._invTexSize);
       this.drawFullscreenQuad();
 
       maxLevels--;
       w = Math.max(1, w >> 1);
       h = Math.max(1, h >> 1);
-      sourceTex = fb.getColorAttachments()[0] as Texture2D;
+      sourceTex = tex;
 
       device.pool.releaseTexture(texMiddle);
-      device.pool.releaseFrameBuffer(fbMiddle);
     }
   }
   /** @internal */
