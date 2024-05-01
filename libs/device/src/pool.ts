@@ -85,6 +85,27 @@ export class Pool {
   /**
    * Fetch a temporal framebuffer from the object pool.
    * @param autoRelease - Whether the framebuffer should be automatically released at the next frame.
+   * @param colorFormat - Texture format for color attachment.
+   * @param depthFormat - Texture format for depth attachment.
+   * @param sampleCount - The sample count for the framebuffer.
+   * @param ignoreDepthStencil - Whether to ignore depth stencil.
+   * @returns The fetched FrameBuffer object.
+   */
+  fetchTemporalFramebuffer(autoRelease: boolean, width: number, height: number, colorFormat: TextureFormat, depthFormat?: TextureFormat, sampleCount?: number, ignoreDepthStencil?: boolean) {
+    const colorAttachments = colorFormat ? [this.fetchTemporalTexture2D(false, colorFormat, width, height, false)] : [];
+    const depthAttachment = depthFormat ? this.fetchTemporalTexture2D(false, depthFormat, width, height, false) : null;
+    const fb = this.createTemporalFramebuffer(autoRelease, colorAttachments, depthAttachment, sampleCount, ignoreDepthStencil);
+    if (colorFormat) {
+      this.releaseTexture(colorAttachments[0]);
+    }
+    if (depthFormat) {
+      this.releaseTexture(depthAttachment);
+    }
+    return fb;
+  }
+  /**
+   * Creates a temporal framebuffer from the object pool.
+   * @param autoRelease - Whether the framebuffer should be automatically released at the next frame.
    * @param colorAttachments - Array of color attachments for the framebuffer.
    * @param depthAttachment - Depth attachment for the framebuffer.
    * @param sampleCount - The sample count for the framebuffer.

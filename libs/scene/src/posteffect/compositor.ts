@@ -1,6 +1,5 @@
 import { linearToGamma } from '../shaders/misc';
 import type { DrawContext } from '../render';
-import { TemporalCache } from '../render';
 import type {
   AbstractDevice,
   BindGroup,
@@ -185,11 +184,6 @@ export class Compositor {
       device.setViewport(null);
       device.setScissor(null);
       Compositor._blit(device, srcTex, !ctx.compositorContex.finalFramebuffer);
-    }
-    TemporalCache.releaseFramebuffer(ctx.compositorContex.pingpongFramebuffers[0]);
-    TemporalCache.releaseFramebuffer(ctx.compositorContex.pingpongFramebuffers[1]);
-    if (ctx.compositorContex.msTexture) {
-      TemporalCache.releaseFramebuffer(ctx.compositorContex.msTexture);
     }
     ctx.compositorContex = null;
   }
