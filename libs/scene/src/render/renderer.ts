@@ -185,10 +185,35 @@ export class SceneRenderer {
     }
     this._scenePass.clearDepth = 1; //ctx.depthTexture ? null : 1;
     this._scenePass.clearStencil = 0; //ctx.depthTexture ? null : 0;
+    this._scenePass.transmission = false; // transmission
+    if (renderQueue.needSceneColor) {
+      const sceneColorFramebuffer = device.pool.fetchTemporalFramebuffer(true, ctx.depthTexture.width, ctx.depthTexture.height, colorFmt, ctx.depthTexture);
+      device.pushDeviceStates();
+      device.setFramebuffer(sceneColorFramebuffer);
+    }
     ctx.compositor?.begin(ctx);
     this._scenePass.render(ctx, null, renderQueue);
     ctx.compositor?.end(ctx);
-
+    if (renderQueue.needSceneColor) {
+      ctx.sceneColorTexture = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
+      device.popDeviceStates();
+      new CopyBlitter().blit(
+        ctx.sceneColorTexture,
+        device.getFramebuffer() ?? null,
+        device.createSampler({
+          magFilter: 'nearest',
+          minFilter: 'nearest',
+          mipFilter: 'none'
+        })
+      );
+      this._scenePass.transmission = true;
+      this._scenePass.clearColor = null;
+      this._scenePass.clearDepth = null;
+      this._scenePass.clearStencil = null;
+      ctx.compositor?.begin(ctx);
+      this._scenePass.render(ctx, null, renderQueue);
+      ctx.compositor?.end(ctx);
+    }
     renderQueue.dispose();
 
     if (tempFramebuffer && tempFramebuffer !== finalFramebuffer) {

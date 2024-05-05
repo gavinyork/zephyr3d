@@ -358,7 +358,7 @@ export class RenderQueue {
       itemList.transparent.lit,
       itemList.transparent.unlit
     ];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < lists.length; i++) {
       const list = lists[i];
       for (const info of list) {
         if (info.renderQueue !== this) {

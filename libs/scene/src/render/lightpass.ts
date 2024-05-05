@@ -13,12 +13,21 @@ import { ShaderHelper } from '../material/shader/helper';
 export class LightPass extends RenderPass {
   /** @internal */
   protected _shadowMapHash: string;
+  /** @internal */
+  protected _transmission: boolean;
   /**
    * Creates an instance of ForwardRenderPass
    */
   constructor() {
     super(RENDER_PASS_TYPE_LIGHT);
     this._shadowMapHash = null;
+  }
+  /** @internal */
+  get transmission(): boolean {
+    return this._transmission;
+  }
+  set transmission(val: boolean) {
+    this._transmission = val;
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
@@ -101,7 +110,7 @@ export class LightPass extends RenderPass {
       fogSet: {}
     };
     const items = renderQueue.itemList;
-    const lists = [items?.opaque, items?.transparent];
+    const lists = [this._transmission ? items?.transmission : items?.opaque, items?.transparent];
     for (let i = 0; i < 2; i++) {
       if (lists[i]) {
         ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none' ? ctx.env.sky.fogType : null;

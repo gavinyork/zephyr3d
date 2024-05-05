@@ -54,6 +54,8 @@ export interface DrawContext {
   depthTexture?: Texture2D;
   /** Linear depth texture */
   linearDepthTexture?: Texture2D;
+  /** Scene color texture */
+  sceneColorTexture?: Texture2D;
   /** viewport X */
   viewportX?: number;
   /** viewport Y */
