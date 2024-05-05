@@ -119,16 +119,11 @@ export class Compositor {
     const w = depth ? depth.width : ctx.viewportWidth;
     const h = depth ? depth.height : ctx.viewportHeight;
     if (ctx.primaryCamera.sampleCount > 1) {
-      const tex = device.pool.fetchTemporalTexture2D(true, format, w, h, false);
-      msFramebuffer = device.pool.createTemporalFramebuffer(true, [tex], depth, ctx.primaryCamera.sampleCount);
+      msFramebuffer = device.pool.fetchTemporalFramebuffer(true, w, h, format, depth, false, ctx.primaryCamera.sampleCount);
     }
     pingpongFramebuffers = [
-      device.pool.createTemporalFramebuffer(true, [
-        device.pool.fetchTemporalTexture2D(true, format, w, h, false)
-      ], depth ?? device.pool.fetchTemporalTexture2D(true, ctx.depthFormat, w, h, false)),
-      device.pool.createTemporalFramebuffer(true, [
-        device.pool.fetchTemporalTexture2D(true, format, w, h, false)
-      ], depth ?? device.pool.fetchTemporalTexture2D(true, ctx.depthFormat, w, h, false)),
+      device.pool.fetchTemporalFramebuffer(true, w, h, format, depth ?? ctx.depthFormat, false),
+      device.pool.fetchTemporalFramebuffer(true, w, h, format, depth ?? ctx.depthFormat, false)
     ]
     let writeIndex: number;
     if (msFramebuffer) {

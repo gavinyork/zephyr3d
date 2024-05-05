@@ -1,5 +1,5 @@
 import { AbstractDevice, TextureFormat } from "./base_types";
-import type { BaseTexture, FrameBuffer, Texture2D } from "./gpuobject";
+import type { BaseTexture, FrameBuffer, Texture2D, Texture2DArray, TextureCube } from "./gpuobject";
 
 /**
  * ObjectPool class is responsible for managing and reusing textures and framebuffers.
@@ -61,6 +61,7 @@ export class Pool {
    * @param format - The format of the texture.
    * @param width - The width of the texture.
    * @param height - The height of the texture.
+   * @param mipmapping - Whether this texture support mipmapping
    * @returns The fetched Texture2D object.
    */
   fetchTemporalTexture2D(autoRelease: boolean, format: TextureFormat, width: number, height: number, mipmapping: boolean): Texture2D {
@@ -83,6 +84,62 @@ export class Pool {
     return texture as Texture2D;
   }
   /**
+   * Fetch a temporal 2D array texture from the object pool.
+   * @param autoRelease - Whether the texture should be automatically released at the next frame.
+   * @param format - Format of the texture.
+   * @param width - Width of the texture.
+   * @param height - Height of the texture.
+   * @param numLayers - Layer count of the texture
+   * @param mipmapping - Whether this texture support mipmapping
+   * @returns The fetched Texture2DArray object.
+   */
+  fetchTemporalTexture2DArray(autoRelease: boolean, format: TextureFormat, width: number, height: number, numLayers: number, mipmapping: boolean): Texture2DArray {
+    const hash = `2darray:${format}:${width}:${height}:${numLayers}:${mipmapping?1:0}`;
+    let texture: BaseTexture = null;
+    const list = this._freeTextures[hash];
+    if (!list) {
+      texture = this._device.createTexture2DArray(format, width, height, numLayers, mipmapping ? {} : { samplerOptions: { mipFilter: 'none' } });
+      this._memCost += texture.memCost;
+    } else {
+      texture = list.pop();
+      if (list.length === 0) {
+        delete this._freeTextures[hash];
+      }
+    }
+    this._allocatedTextures.set(texture, { hash, refcount: 1, dispose: false });
+    if (autoRelease) {
+      this._autoReleaseTextures.add(texture);
+    }
+    return texture as Texture2DArray;
+  }
+  /**
+   * Fetch a temporal Cube texture from the object pool.
+   * @param autoRelease - Whether the texture should be automatically released at the next frame.
+   * @param format - Format of the texture.
+   * @param size - size of the texture.
+   * @param mipmapping - Whether this texture support mipmapping
+   * @returns The fetched TextureCube object.
+   */
+  fetchTemporalTextureCube(autoRelease: boolean, format: TextureFormat, size: number, mipmapping: boolean): TextureCube {
+    const hash = `cube:${format}:${size}:${mipmapping?1:0}`;
+    let texture: BaseTexture = null;
+    const list = this._freeTextures[hash];
+    if (!list) {
+      texture = this._device.createCubeTexture(format, size, mipmapping ? {} : { samplerOptions: { mipFilter: 'none' } });
+      this._memCost += texture.memCost;
+    } else {
+      texture = list.pop();
+      if (list.length === 0) {
+        delete this._freeTextures[hash];
+      }
+    }
+    this._allocatedTextures.set(texture, { hash, refcount: 1, dispose: false });
+    if (autoRelease) {
+      this._autoReleaseTextures.add(texture);
+    }
+    return texture as TextureCube;
+  }
+  /**
    * Fetch a temporal framebuffer from the object pool.
    * @param autoRelease - Whether the framebuffer should be automatically released at the next frame.
    * @param colorFormat - Texture format for color attachment.
@@ -91,14 +148,59 @@ export class Pool {
    * @param ignoreDepthStencil - Whether to ignore depth stencil.
    * @returns The fetched FrameBuffer object.
    */
-  fetchTemporalFramebuffer(autoRelease: boolean, width: number, height: number, colorFormat: TextureFormat, depthFormat?: TextureFormat, sampleCount?: number, ignoreDepthStencil?: boolean) {
-    const colorAttachments = colorFormat ? [this.fetchTemporalTexture2D(false, colorFormat, width, height, false)] : [];
-    const depthAttachment = depthFormat ? this.fetchTemporalTexture2D(false, depthFormat, width, height, false) : null;
+  fetchTemporalFramebuffer(autoRelease: boolean, width: number, height: number, colorFormat: TextureFormat, depthFormat?: TextureFormat, mipmapping?: boolean, sampleCount?: number, ignoreDepthStencil?: boolean);
+  /**
+   * Fetch a temporal framebuffer from the object pool.
+   * @param autoRelease - Whether the framebuffer should be automatically released at the next frame.
+   * @param colorFormat - Texture format for color attachment.
+   * @param depthTex - depth attachment.
+   * @param sampleCount - The sample count for the framebuffer.
+   * @param ignoreDepthStencil - Whether to ignore depth stencil.
+   * @returns The fetched FrameBuffer object.
+   */
+  fetchTemporalFramebuffer<T extends BaseTexture<unknown>>(autoRelease: boolean, width: number, height: number, colorFormat: TextureFormat, depthTex?: T, mipmapping?: boolean, sampleCount?: number, ignoreDepthStencil?: boolean);
+  /**
+   * Fetch a temporal framebuffer from the object pool.
+   * @param autoRelease - Whether the framebuffer should be automatically released at the next frame.
+   * @param colorTex - color attachment.
+   * @param depthFormat - Texture format for depth attachment.
+   * @param sampleCount - The sample count for the framebuffer.
+   * @param ignoreDepthStencil - Whether to ignore depth stencil.
+   * @returns The fetched FrameBuffer object.
+   */
+  fetchTemporalFramebuffer<T extends BaseTexture<unknown>>(autoRelease: boolean, width: number, height: number, colorTex: T, depthFormat?: TextureFormat, mipmapping?: boolean, sampleCount?: number, ignoreDepthStencil?: boolean);
+  /**
+   * Fetch a temporal framebuffer from the object pool.
+   * @param autoRelease - Whether the framebuffer should be automatically released at the next frame.
+   * @param colorTex - color attachment.
+   * @param depthTex - depth attachment.
+   * @param sampleCount - The sample count for the framebuffer.
+   * @param ignoreDepthStencil - Whether to ignore depth stencil.
+   * @returns The fetched FrameBuffer object.
+   */
+  fetchTemporalFramebuffer<T extends BaseTexture<unknown>>(autoRelease: boolean, width: number, height: number, colorTex: T, depthTex?: T, mipmapping?: boolean, sampleCount?: number, ignoreDepthStencil?: boolean);
+  /**
+   * Fetch a temporal framebuffer from the object pool.
+   * @param autoRelease - Whether the framebuffer should be automatically released at the next frame.
+   * @param colorTexOrFormat - color attachment or texture format.
+   * @param depthTexOrFormat - depth attachment or texture format.
+   * @param sampleCount - The sample count for the framebuffer.
+   * @param ignoreDepthStencil - Whether to ignore depth stencil.
+   * @returns The fetched FrameBuffer object.
+   */
+  fetchTemporalFramebuffer<T extends BaseTexture<unknown>>(autoRelease: boolean, width: number, height: number, colorTexOrFormat: TextureFormat|T, depthTexOrFormat?: TextureFormat|T, mipmapping?: boolean, sampleCount?: number, ignoreDepthStencil?: boolean);
+  fetchTemporalFramebuffer<T extends BaseTexture<unknown>>(autoRelease: boolean, width: number, height: number, colorTexOrFormat: TextureFormat|T, depthTexOrFormat?: TextureFormat|T, mipmapping?: boolean, sampleCount?: number, ignoreDepthStencil?: boolean) {
+    const colorAttachments = typeof colorTexOrFormat === 'string'
+      ? [this.fetchTemporalTexture2D(false, colorTexOrFormat, width, height, mipmapping)]
+      : colorTexOrFormat
+        ? [colorTexOrFormat]
+        : null;
+    const depthAttachment = typeof depthTexOrFormat === 'string' ? this.fetchTemporalTexture2D(false, depthTexOrFormat, width, height, false) : depthTexOrFormat;
     const fb = this.createTemporalFramebuffer(autoRelease, colorAttachments, depthAttachment, sampleCount, ignoreDepthStencil);
-    if (colorFormat) {
+    if (typeof colorTexOrFormat === 'string') {
       this.releaseTexture(colorAttachments[0]);
     }
-    if (depthFormat) {
+    if (typeof depthTexOrFormat === 'string') {
       this.releaseTexture(depthAttachment);
     }
     return fb;
@@ -113,6 +215,7 @@ export class Pool {
    * @returns The fetched FrameBuffer object.
    */
   createTemporalFramebuffer(autoRelease: boolean, colorAttachments: BaseTexture[], depthAttachment?: BaseTexture, sampleCount?: number, ignoreDepthStencil?: boolean) {
+    colorAttachments = colorAttachments ?? [];
     let hash = `${depthAttachment?.uid ?? 0}:${sampleCount ?? 1}:${ignoreDepthStencil ? 1 : 0}`;
     for (const tex of colorAttachments) {
       hash += `:${tex.uid}`;

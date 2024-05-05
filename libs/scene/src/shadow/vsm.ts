@@ -14,7 +14,6 @@ import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper'
 import { ShadowMapper } from './shadowmapper';
 import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encode2HalfToRGBA } from '../shaders/misc';
 import { Application } from '../app';
-import { TemporalCache } from '../render';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
 
@@ -244,31 +243,13 @@ export class VSM extends ShadowImpl {
   }
   doUpdateResources(shadowMapParams: ShadowMapParams) {
     const colorFormat = this.getShadowMapColorFormat(shadowMapParams);
-    const target = shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0].target;
+    //const target = shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0].target;
     const shadowMapWidth = shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0].width;
     const shadowMapHeight = shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0].height;
     if (this._blur) {
       shadowMapParams.implData = {
-        blurFramebuffer: TemporalCache.getFramebufferFixedSize(
-          shadowMapWidth,
-          shadowMapHeight,
-          shadowMapParams.numShadowCascades,
-          colorFormat,
-          null,
-          target,
-          null,
-          false
-        ),
-        blurFramebuffer2: TemporalCache.getFramebufferFixedSize(
-          shadowMapWidth,
-          shadowMapHeight,
-          shadowMapParams.numShadowCascades,
-          colorFormat,
-          null,
-          target,
-          null,
-          this._mipmap
-        )
+        blurFramebuffer: ShadowMapper.fetchTemporalFramebuffer(true, shadowMapParams.lightType, shadowMapParams.numShadowCascades, shadowMapWidth, shadowMapHeight, colorFormat, null, false),
+        blurFramebuffer2: ShadowMapper.fetchTemporalFramebuffer(true, shadowMapParams.lightType, shadowMapParams.numShadowCascades, shadowMapWidth, shadowMapHeight, colorFormat, null, this._mipmap),
       };
     }
     shadowMapParams.shadowMap = this.getShadowMap(shadowMapParams);
@@ -294,11 +275,7 @@ export class VSM extends ShadowImpl {
     }
   }
   releaseTemporalResources(shadowMapParams: ShadowMapParams) {
-    const implData = shadowMapParams.implData as VSMImplData;
-    if (implData) {
-      TemporalCache.releaseFramebuffer(implData.blurFramebuffer);
-      TemporalCache.releaseFramebuffer(implData.blurFramebuffer2);
-    }
+    return;
   }
   getShaderHash(): string {
     return '';

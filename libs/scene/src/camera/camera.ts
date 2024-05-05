@@ -7,7 +7,6 @@ import type { FrameBuffer } from '@zephyr3d/device';
 import type { Compositor } from '../posteffect';
 import type { Scene } from '../scene/scene';
 import type { BaseCameraController } from './base';
-import type { RenderLogger } from '../logger/logger';
 import type { OIT } from '../render/oit';
 
 /**
@@ -358,13 +357,13 @@ export class Camera extends SceneNode {
    * @param scene - The scene to be rendered
    * @param compositor - Compositor instance that will be used to apply postprocess effects
    */
-  render(scene: Scene, compositor?: Compositor, logger?: RenderLogger) {
+  render(scene: Scene, compositor?: Compositor) {
     const device = Application.instance.device;
     device.pushDeviceStates();
     device.reverseVertexWindingOrder(false);
     device.setFramebuffer(this._framebuffer);
     SceneRenderer.setClearColor(this._clearColor);
-    SceneRenderer.renderScene(scene, this, compositor, logger);
+    SceneRenderer.renderScene(scene, this, compositor);
     device.popDeviceStates();
   }
   /**

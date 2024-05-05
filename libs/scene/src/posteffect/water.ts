@@ -6,7 +6,7 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import { TemporalCache, WaterMesh } from '../render';
+import { WaterMesh } from '../render';
 import { AbstractPostEffect } from './posteffect';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders';
 import { Interpolator, Matrix4x4, Plane, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
@@ -303,16 +303,7 @@ export class PostWater extends AbstractPostEffect {
     }
 
     this._renderingReflections = true;
-    const fbRefl = TemporalCache.getFramebufferFixedSize(
-      this._reflectSize,
-      this._reflectSize,
-      1,
-      inputColorTexture.format,
-      ctx.depthFormat,
-      '2d',
-      '2d',
-      false
-    );
+    const fbRefl = ctx.device.pool.fetchTemporalFramebuffer(true, this._reflectSize, this._reflectSize, inputColorTexture.format, ctx.depthFormat, false);
     const plane = new Plane(0, -1, 0, this._elevation);
     const clipPlane = new Plane(0, -1, 0, this._elevation - this._antiReflectanceLeak);
     const matReflectionR = Matrix4x4.invert(Matrix4x4.reflection(-plane.a, -plane.b, -plane.c, -plane.d));
@@ -377,7 +368,6 @@ export class PostWater extends AbstractPostEffect {
       ctx.env.light.envLight.updateBindGroup(waterMesh.bindGroup);
     }
     waterMesh.render(ctx.camera, this.needFlip(device));
-    TemporalCache.releaseFramebuffer(fbRefl);
   }
   /** @internal */
   private _getRampTexture(device: AbstractDevice) {

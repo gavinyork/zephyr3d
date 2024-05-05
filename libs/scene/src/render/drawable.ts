@@ -8,7 +8,6 @@ import type { ShadowMapParams } from '../shadow';
 import type { Environment } from '../scene/environment';
 import type { DirectionalLight, GraphNode, PunctualLight, Scene } from '../scene';
 import type { Compositor, CompositorContext } from '../posteffect';
-import type { RenderLogger } from '../logger/logger';
 import type { ClusteredLight } from './cluster_light';
 import type { Material } from '../material';
 import type { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
@@ -81,8 +80,6 @@ export interface DrawContext {
   sunLight?: DirectionalLight;
   /** clustered light index */
   clusteredLight?: ClusteredLight;
-  /** render logger */
-  logger?: RenderLogger;
   /** Whether skin animation is used */
   skinAnimation?: boolean;
   /** Whehter instance rendering is used */

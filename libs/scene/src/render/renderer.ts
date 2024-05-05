@@ -5,14 +5,12 @@ import { Vector4 } from '@zephyr3d/base';
 import type { FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
 import { Application } from '../app';
 import { CopyBlitter } from '../blitter';
-//import { TemporalCache } from '.';
 import type { DrawContext } from './drawable';
 import { ShadowMapper } from '../shadow';
 import type { RenderQueue } from './render_queue';
 import type { PunctualLight, Scene } from '../scene';
 import type { Camera } from '../camera';
 import type { Compositor } from '../posteffect';
-import type { RenderLogger } from '../logger/logger';
 import { ClusteredLight } from './cluster_light';
 import { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 
@@ -62,7 +60,7 @@ export class SceneRenderer {
    * @param camera - The camera that will be used to render the scene
    * @param compositor - The compositor that will be used to apply postprocess effects
    */
-  static renderScene(scene: Scene, camera: Camera, compositor?: Compositor, logger?: RenderLogger): void {
+  static renderScene(scene: Scene, camera: Camera, compositor?: Compositor): void {
     const device = Application.instance.device;
     const ctx: DrawContext = {
       device,
@@ -73,7 +71,6 @@ export class SceneRenderer {
       camera,
       compositor: compositor?.needDrawPostEffects() ? compositor : null,
       timestamp: device.frameInfo.frameTimestamp,
-      logger,
       queue: 0,
       lightBlending: false,
       renderPass: null,
@@ -158,22 +155,8 @@ export class SceneRenderer {
       } else {
         const originDepth = finalFramebuffer?.getDepthAttachment();
         depthFramebuffer = originDepth?.isTexture2D()
-          ? device.pool.createTemporalFramebuffer(true, [
-            device.pool.fetchTemporalTexture2D(true, format, originDepth.width, originDepth.height, false)
-          ], originDepth)// TemporalCache.getFramebufferFixedSizeWithDepth(originDepth, 1, format, '2d', false)
-          : device.pool.fetchTemporalFramebuffer(true, ctx.viewportWidth, ctx.viewportHeight, format, ctx.depthFormat)
-          /*
-              TemporalCache.getFramebufferFixedSize(
-              ctx.viewportWidth,
-              ctx.viewportHeight,
-              1,
-              format,
-              ctx.depthFormat,
-              '2d',
-              '2d',
-              false
-            );
-          */
+          ? device.pool.fetchTemporalFramebuffer(true, originDepth.width, originDepth.height, format, originDepth, false)
+          : device.pool.fetchTemporalFramebuffer(true, ctx.viewportWidth, ctx.viewportHeight, format, ctx.depthFormat, false)
       }
       this._renderSceneDepth(ctx, renderQueue, depthFramebuffer);
       ctx.linearDepthTexture = depthFramebuffer.getColorAttachments()[0] as Texture2D;
@@ -181,34 +164,8 @@ export class SceneRenderer {
       if (ctx.depthTexture === finalFramebuffer?.getDepthAttachment()) {
         tempFramebuffer = finalFramebuffer;
       } else {
-        tempFramebuffer = device.pool.fetchTemporalFramebuffer(true, ctx.depthTexture.width, ctx.depthTexture.height, colorFmt, ctx.depthFormat, sampleCount);
-        /*
-        if (ctx.defaultViewport) {
-          tempFramebuffer = TemporalCache.getFramebufferVariantSize(
-            ctx.depthTexture.width,
-            ctx.depthTexture.height,
-            1,
-            colorFmt,
-            ctx.depthFormat,
-            '2d',
-            '2d',
-            false,
-            sampleCount
-          );
-        } else {
-          tempFramebuffer = TemporalCache.getFramebufferFixedSize(
-            ctx.depthTexture.width,
-            ctx.depthTexture.height,
-            1,
-            colorFmt,
-            ctx.depthFormat,
-            '2d',
-            '2d',
-            false,
-            sampleCount
-          );
-        }
-        */
+        // TODO: fetch resizable framebuffer if ctx.defaultViewport is true
+        tempFramebuffer = device.pool.fetchTemporalFramebuffer(true, ctx.depthTexture.width, ctx.depthTexture.height, colorFmt, ctx.depthFormat, false, sampleCount);
       }
     } else {
       ctx.linearDepthTexture = null;
@@ -216,20 +173,7 @@ export class SceneRenderer {
       if (!vp) {
         tempFramebuffer = finalFramebuffer;
       } else {
-        tempFramebuffer = device.pool.fetchTemporalFramebuffer(true, ctx.viewportWidth, ctx.viewportHeight, colorFmt, ctx.depthFormat, sampleCount);
-        /*
-        tempFramebuffer = TemporalCache.getFramebufferFixedSize(
-          ctx.viewportWidth,
-          ctx.viewportHeight,
-          1,
-          colorFmt,
-          ctx.depthFormat,
-          '2d',
-          '2d',
-          false,
-          sampleCount
-        );
-        */
+        tempFramebuffer = device.pool.fetchTemporalFramebuffer(true, ctx.viewportWidth, ctx.viewportHeight, colorFmt, ctx.depthFormat, false, sampleCount);
       }
     }
     if (tempFramebuffer && tempFramebuffer !== finalFramebuffer) {
@@ -268,14 +212,6 @@ export class SceneRenderer {
       );
       device.popDeviceStates();
     }
-    /*
-    if (depthFramebuffer) {
-      TemporalCache.releaseFramebuffer(depthFramebuffer);
-    }
-    if (tempFramebuffer && tempFramebuffer !== finalFramebuffer) {
-      TemporalCache.releaseFramebuffer(tempFramebuffer);
-    }
-    */
     ShadowMapper.releaseTemporalResources(ctx);
     this.freeClusteredLight(ctx.clusteredLight);
   }

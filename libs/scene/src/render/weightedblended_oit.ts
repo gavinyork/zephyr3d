@@ -1,7 +1,6 @@
 import type {
   AbstractDevice,
   BindGroup,
-  FrameBuffer,
   GPUProgram,
   PBGlobalScope,
   PBInsideFunctionScope,
@@ -28,13 +27,11 @@ export class WeightedBlendedOIT extends OIT {
   private static _compositeProgram: GPUProgram;
   private static _compositeBindGroup: BindGroup;
   private static _compositeRenderStates: RenderStateSet;
-  private _accumBuffer: FrameBuffer;
   /**
    * Creates an instance of WeightedBlendedOIT class.
    */
   constructor() {
     super();
-    this._accumBuffer = null;
   }
   /**
    * {@inheritDoc OIT.getType}
@@ -158,29 +155,14 @@ export class WeightedBlendedOIT extends OIT {
   }
   /** @internal */
   private getAccumFramebuffer(ctx: DrawContext, device: AbstractDevice) {
-    const vp = device.getViewport();
-    const width = device.screenToDevice(vp.width);
-    const height = device.screenToDevice(vp.height);
-    if (this._accumBuffer) {
-      if (
-        this._accumBuffer.getWidth() !== width ||
-        this._accumBuffer.getHeight() !== height ||
-        this._accumBuffer.getDepthAttachment() !== ctx.depthTexture
-      ) {
-        this._accumBuffer.dispose();
-        this._accumBuffer = null;
-      }
-    }
-    if (!this._accumBuffer) {
-      const accumColor = device.createTexture2D('rgba16f', width, height, {
-        samplerOptions: { mipFilter: 'none' }
-      });
-      const accumAlpha = device.createTexture2D(device.type === 'webgl' ? 'rgba16f' : 'r16f', width, height, {
-        samplerOptions: { mipFilter: 'none' }
-      });
-      this._accumBuffer = device.createFrameBuffer([accumColor, accumAlpha], ctx.depthTexture);
-    }
-    return this._accumBuffer;
+    const width = ctx.depthTexture.width;
+    const height = ctx.depthTexture.height;
+    const accumColor = device.pool.fetchTemporalTexture2D(false, 'rgba16f', width, height, false);
+    const accumAlpha = device.pool.fetchTemporalTexture2D(false, device.type === 'webgl' ? 'rgba16f' : 'r16f', width, height, false);
+    const fb = device.pool.createTemporalFramebuffer(true, [accumColor, accumAlpha], ctx.depthTexture)
+    device.pool.releaseTexture(accumColor);
+    device.pool.releaseTexture(accumAlpha);
+    return fb;
   }
   /** @internal */
   private static getCompositeProgram(device: AbstractDevice) {
