@@ -98,10 +98,12 @@ export class LightPass extends RenderPass {
     ctx.drawEnvLight = false;
     ctx.flip = this.isAutoFlip(ctx);
     const oit =
-      ctx.primaryCamera.oit && ctx.primaryCamera.oit.supportDevice(ctx.device.type)
+      renderQueue.drawTransparent &&
+      ctx.primaryCamera.oit &&
+      ctx.primaryCamera.oit.supportDevice(ctx.device.type)
         ? ctx.primaryCamera.oit
         : null;
-    if (!oit) {
+    if (!oit && renderQueue.drawTransparent) {
       renderQueue.sortTransparentItems(ctx.primaryCamera.getWorldPosition());
     }
     const flags: any = {
@@ -147,13 +149,15 @@ export class LightPass extends RenderPass {
           ctx.oit.end(ctx);
         }
       }
-      if (i === 0) {
+      if (i === 0 && !ctx.sceneColorTexture) {
         ctx.env.sky.skyWorldMatrix = ctx.scene.rootNode.worldMatrix;
         ctx.env.sky.renderSky(ctx);
       }
-      ctx.compositor?.drawPostEffects(ctx, i === 0, ctx.linearDepthTexture);
-      if (i === 0) {
-        ctx.env.sky.renderFog(ctx);
+      if (!renderQueue.needSceneColor || ctx.sceneColorTexture) {
+        if (i === 0) {
+          ctx.env.sky.renderFog(ctx);
+        }
+        ctx.compositor?.drawPostEffects(ctx, i === 0, ctx.linearDepthTexture);
       }
     }
   }

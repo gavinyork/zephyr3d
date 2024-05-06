@@ -682,6 +682,26 @@ export class GLTFLoader extends AbstractModelLoader {
           pbrMaterial.sheenRoughnessTexCoordMatrix = sheen.sheenRoughnessMap.transform;
         }
       }
+      if (assetPBRMaterial.transmission) {
+        const transmission = assetPBRMaterial.transmission;
+        pbrMaterial.transmission = true;
+        pbrMaterial.transmissionFactor = transmission.transmissionFactor;
+        if (transmission.transmissionMap) {
+          pbrMaterial.transmissionTexture = transmission.transmissionMap.texture;
+          pbrMaterial.transmissionTextureSampler = transmission.transmissionMap.sampler;
+          pbrMaterial.transmissionTexCoordIndex = transmission.transmissionMap.texCoord;
+          pbrMaterial.transmissionTexCoordMatrix = transmission.transmissionMap.transform;
+        }
+        pbrMaterial.thicknessFactor = transmission.thicknessFactor;
+        if (transmission.thicknessMap) {
+          pbrMaterial.thicknessTexture = transmission.thicknessMap.texture;
+          pbrMaterial.thicknessTextureSampler = transmission.thicknessMap.sampler;
+          pbrMaterial.thicknessTexCoordIndex = transmission.thicknessMap.texCoord;
+          pbrMaterial.thicknessTexCoordMatrix = transmission.thicknessMap.transform;
+        }
+        pbrMaterial.attenuationDistance = transmission.attenuationDistance;
+        pbrMaterial.attenuationColor = transmission.attenuationColor;
+      }
       if (assetPBRMaterial.clearcoat) {
         const cc = assetPBRMaterial.clearcoat;
         pbrMaterial.clearcoat = true;
@@ -856,6 +876,30 @@ export class GLTFLoader extends AbstractModelLoader {
             true
           )
         : null;
+      // KHR_material_transmission
+      const transmission = materialInfo?.extensions?.KHR_materials_transmission;
+      if (transmission) {
+        pbrMetallicRoughness.transmission = {
+          transmissionFactor: transmission.transmissionFactor ?? 0,
+          transmissionMap: transmission.transmissionTexture
+            ? await this._loadTexture(gltf, transmission.transmissionTexture, false)
+            : null,
+          thicknessFactor: 0,
+          thicknessMap: null,
+          attenuationDistance: 99999,
+          attenuationColor: Vector3.one()
+        };
+        const volume = materialInfo?.extensions?.KHR_materials_volume;
+        if (volume) {
+          pbrMetallicRoughness.transmission.thicknessFactor = volume.thicknessFactor ?? 0;
+          pbrMetallicRoughness.transmission.thicknessMap = volume.thicknessTexture
+            ? await this._loadTexture(gltf, volume.thicknessTexture, false)
+            : null;
+          pbrMetallicRoughness.transmission.attenuationDistance = volume.attenuationDistance ?? 99999;
+          const attenuationColor = (volume.attenuationColor ?? [1, 1, 1]) as [number, number, number];
+          pbrMetallicRoughness.transmission.attenuationColor = new Vector3(...attenuationColor);
+        }
+      }
       // KHR_materials_sheen
       const sheen = materialInfo?.extensions?.KHR_materials_sheen;
       if (sheen) {

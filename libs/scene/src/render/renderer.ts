@@ -190,7 +190,7 @@ export class SceneRenderer {
           ctx.depthTexture.width,
           ctx.depthTexture.height,
           colorFmt,
-          ctx.depthFormat,
+          ctx.depthTexture,
           false,
           sampleCount
         );

@@ -163,6 +163,8 @@ export class RenderQueue {
   private _instanceInfo: Map<Drawable, DrawableInstanceInfo>;
   /** @internal */
   private _needSceneColor: boolean;
+  /** @internal */
+  private _drawTransparent: boolean;
   /**
    * Creates an instance of a render queue
    * @param renderPass - The render pass to which the render queue belongs
@@ -177,6 +179,7 @@ export class RenderQueue {
     this._ref = { ref: this };
     this._instanceInfo = new Map();
     this._needSceneColor = false;
+    this._drawTransparent = false;
   }
   /** The sun light */
   get sunLight(): DirectionalLight {
@@ -188,6 +191,10 @@ export class RenderQueue {
   /** Whether this render queue requires scene color pass */
   get needSceneColor(): boolean {
     return this._needSceneColor;
+  }
+  /** Whether this render queue has transparent objects to be drawn */
+  get drawTransparent(): boolean {
+    return this._drawTransparent;
   }
   /** The render pass to which the render queue belongs */
   get renderPass(): RenderPass {
@@ -267,6 +274,7 @@ export class RenderQueue {
     this._itemList.transparent.lit.push(...newItemLists.transparent.lit);
     this._itemList.transparent.unlit.push(...newItemLists.transparent.unlit);
     this._needSceneColor ||= queue._needSceneColor;
+    this._drawTransparent ||= queue._drawTransparent;
   }
   /**
    * Push an item to the render queue
@@ -282,6 +290,7 @@ export class RenderQueue {
       const unlit = drawable.isUnlit();
       const transmission = !trans && drawable.needSceneColor();
       this._needSceneColor ||= transmission;
+      this._drawTransparent ||= trans;
       if (drawable.isBatchable()) {
         const instanceList = trans
           ? unlit
@@ -336,6 +345,7 @@ export class RenderQueue {
     this._unshadowedLightList = [];
     this._sunLight = null;
     this._needSceneColor = false;
+    this._drawTransparent = false;
   }
   /** @internal */
   dispose() {

@@ -92,6 +92,19 @@ export interface AssetMaterialClearcoat {
 }
 
 /**
+ * Transmission related material properties for model loading
+ * @public
+ */
+export interface AssetMaterialTransmission {
+  transmissionFactor?: number;
+  transmissionMap?: MaterialTextureInfo;
+  thicknessFactor?: number;
+  thicknessMap?: MaterialTextureInfo;
+  attenuationColor?: Vector3;
+  attenuationDistance?: number;
+}
+
+/**
  * PBR related material properties for model loading
  * @public
  */
@@ -114,6 +127,7 @@ export interface AssetPBRMaterialMR extends AssetPBRMaterialCommon {
   specularFactor?: Vector4;
   sheen?: AssetMaterialSheen;
   clearcoat?: AssetMaterialClearcoat;
+  transmission?: AssetMaterialTransmission;
 }
 
 /**
