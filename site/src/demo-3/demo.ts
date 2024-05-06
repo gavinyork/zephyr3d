@@ -1,6 +1,22 @@
 import { PRNG, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
-import { Texture2D } from '@zephyr3d/device';
-import { Application, AssetHierarchyNode, AssetManager, Bloom, Compositor, DirectionalLight, FXAA, MeshMaterial, ModelInfo, OrbitCameraController, PBRMetallicRoughnessMaterial, PBRSpecularGlossinessMaterial, PerspectiveCamera, Scene, SceneNode, SharedModel, Terrain, Tonemap } from '@zephyr3d/scene';
+import type { Texture2D } from '@zephyr3d/device';
+import type { AssetHierarchyNode, MeshMaterial, ModelInfo, SharedModel } from '@zephyr3d/scene';
+import {
+  Application,
+  AssetManager,
+  Bloom,
+  Compositor,
+  DirectionalLight,
+  FXAA,
+  OrbitCameraController,
+  PBRMetallicRoughnessMaterial,
+  PBRSpecularGlossinessMaterial,
+  PerspectiveCamera,
+  Scene,
+  SceneNode,
+  Terrain,
+  Tonemap
+} from '@zephyr3d/scene';
 import * as zip from '@zip.js/zip.js';
 import { TreeMaterialMetallicRoughness } from './treematerial';
 import { Panel } from './ui';
@@ -20,7 +36,7 @@ export class Demo {
   private _loaded: boolean;
   private _loadPercent: number;
   private _ui: Panel;
-  constructor(){
+  constructor() {
     this._terrain = null;
     this._axisPZ = Vector3.axisPZ();
     this._actorTarget = new Vector3();
@@ -68,7 +84,7 @@ export class Demo {
       receivedBytes += value.length;
       progressCallback(Math.floor((receivedBytes / totalBytes) * 100));
       return read();
-    }
+    };
     await read();
     return new Blob([data]);
   }
@@ -117,7 +133,8 @@ export class Demo {
     const camera = new PerspectiveCamera(
       scene,
       Math.PI / 3,
-      Application.instance.device.getDrawingBufferWidth() / Application.instance.device.getDrawingBufferHeight(),
+      Application.instance.device.getDrawingBufferWidth() /
+        Application.instance.device.getDrawingBufferHeight(),
       1,
       1500
     );
@@ -126,12 +143,12 @@ export class Demo {
   async load() {
     this._loaded = false;
     this._loadPercent = 0;
-    const zipContent = await this.fetchAssetArchive('./assets/terrain_assets.zip', percent => {
+    const zipContent = await this.fetchAssetArchive('./assets/terrain_assets.zip', (percent) => {
       this._loadPercent = percent;
     });
     Application.instance.device.runNextFrame(async () => {
       const fileMap = await this.readZip(zipContent);
-      this._assetManager.httpRequest.urlResolver = url => fileMap.get(url) || url;
+      this._assetManager.httpRequest.urlResolver = (url) => fileMap.get(url) || url;
 
       // load world
       this._terrain = await this.loadTerrain(this._scene, this._assetManager);
@@ -238,10 +255,12 @@ export class Demo {
 
     // Distribute some trees
     const PY = Vector3.axisPY();
-    const trees = [{
-      url: '/assets/models/stylized_tree.glb',
-      scale: 1.5
-    }];
+    const trees = [
+      {
+        url: '/assets/models/stylized_tree.glb',
+        scale: 1.5
+      }
+    ];
     const f = 1 / trees.length;
     const seed = 0;
     const prng = new PRNG(seed);
@@ -306,7 +325,11 @@ export class Demo {
             newMaterial.metallic = 0;
             newMaterial.roughness = 1;
             subMesh.material = newMaterial;
-          } else if (material instanceof PBRSpecularGlossinessMaterial && material.albedoTexture && needChange) {
+          } else if (
+            material instanceof PBRSpecularGlossinessMaterial &&
+            material.albedoTexture &&
+            needChange
+          ) {
             const newMaterial = new TreeMaterialMetallicRoughness();
             newMaterial.textureWidth = material.albedoTexture.width;
             newMaterial.textureHeight = material.albedoTexture.height;
@@ -343,7 +366,7 @@ export class Demo {
         recusivelyReplaceMaterial(child);
       }
     }
-    for(const node of model.nodes) {
+    for (const node of model.nodes) {
       recusivelyReplaceMaterial(node);
     }
     return model;
@@ -357,9 +380,15 @@ export class Demo {
       this._terrain.invWorldMatrix.transformPointAffine(obj.point, this._actorTarget);
       if (button === 2) {
         this._actorDirection.set(
-          Vector3.mul(Vector3.sub(this._actorTarget, this._character.group.position), new Vector3(1, 0, 1)).inplaceNormalize()
+          Vector3.mul(
+            Vector3.sub(this._actorTarget, this._character.group.position),
+            new Vector3(1, 0, 1)
+          ).inplaceNormalize()
         );
-        this._character.group.rotation = Quaternion.unitVectorToUnitVector(this._axisPZ, this._actorDirection);
+        this._character.group.rotation = Quaternion.unitVectorToUnitVector(
+          this._axisPZ,
+          this._actorDirection
+        );
         this._character.animationSet.playAnimation('run_front', 0);
         this._actorRunning = true;
       }
@@ -377,7 +406,10 @@ export class Demo {
         movement = distance;
         this._character.animationSet.playAnimation('idle01_yindao', 0);
       }
-      const newPos = Vector3.add(this._character.group.position, Vector3.scale(this._actorDirection, movement));
+      const newPos = Vector3.add(
+        this._character.group.position,
+        Vector3.scale(this._actorDirection, movement)
+      );
       newPos.y = this._terrain.getElevation(newPos.x, newPos.z);
       this._character.group.position.set(newPos);
       (this._camera.controller as OrbitCameraController).center = newPos;

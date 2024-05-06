@@ -1,9 +1,10 @@
-import type { Texture2D, TextureCube } from "@zephyr3d/device";
-import { Application, AssetManager, Scene, panoramaToCubemap, prefilterCubemap } from "@zephyr3d/scene";
+import type { Texture2D, TextureCube } from '@zephyr3d/device';
+import type { Scene } from '@zephyr3d/scene';
+import { Application, AssetManager, panoramaToCubemap, prefilterCubemap } from '@zephyr3d/scene';
 
 type EnvMapInfo = {
-  path: string,
-  maps?: Promise<TextureCube[]>,
+  path: string;
+  maps?: Promise<TextureCube[]>;
 };
 
 export class EnvMaps {
@@ -11,19 +12,19 @@ export class EnvMaps {
   private _assetManager: AssetManager;
   private _assetManagerEx: AssetManager;
   private _currentId: string;
-  constructor(){
+  constructor() {
     this._envMaps = {
-      'tower': {
-        path: 'assets/images/environments/tower.hdr',
+      tower: {
+        path: 'assets/images/environments/tower.hdr'
       },
-      'doge2': {
-        path: 'assets/images/environments/doge2.hdr',
+      doge2: {
+        path: 'assets/images/environments/doge2.hdr'
       },
       'Street night': {
-        path: 'assets/images/environments/street_night.hdr',
+        path: 'assets/images/environments/street_night.hdr'
       },
-      'forest': {
-        path: 'assets/images/environments/forest.hdr',
+      forest: {
+        path: 'assets/images/environments/forest.hdr'
       }
     };
     this._assetManager = new AssetManager();
@@ -46,7 +47,7 @@ export class EnvMaps {
       panoramaToCubemap(panorama, maps[0]);
       prefilterCubemap(maps[0], 'ggx', maps[1]);
       prefilterCubemap(maps[0], 'lambertian', maps[2]);
-    } catch(err) {
+    } catch (err) {
       console.error(err);
     }
     return maps;
@@ -72,7 +73,7 @@ export class EnvMaps {
     scene.env.light.radianceMap = maps[1];
     scene.env.light.irradianceMap = maps[2];
   }
-  async selectById(id: string, scene: Scene){
+  async selectById(id: string, scene: Scene) {
     const info = this._envMaps[id];
     if (!info) {
       console.error(`Environment map id not found: ${id}`);

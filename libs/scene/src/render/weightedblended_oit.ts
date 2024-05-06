@@ -158,8 +158,14 @@ export class WeightedBlendedOIT extends OIT {
     const width = ctx.depthTexture.width;
     const height = ctx.depthTexture.height;
     const accumColor = device.pool.fetchTemporalTexture2D(false, 'rgba16f', width, height, false);
-    const accumAlpha = device.pool.fetchTemporalTexture2D(false, device.type === 'webgl' ? 'rgba16f' : 'r16f', width, height, false);
-    const fb = device.pool.createTemporalFramebuffer(true, [accumColor, accumAlpha], ctx.depthTexture)
+    const accumAlpha = device.pool.fetchTemporalTexture2D(
+      false,
+      device.type === 'webgl' ? 'rgba16f' : 'r16f',
+      width,
+      height,
+      false
+    );
+    const fb = device.pool.createTemporalFramebuffer(true, [accumColor, accumAlpha], ctx.depthTexture);
     device.pool.releaseTexture(accumColor);
     device.pool.releaseTexture(accumAlpha);
     return fb;

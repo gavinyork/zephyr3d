@@ -240,11 +240,7 @@ export class AssetManager {
     }
   }
   /** @internal */
-  async fetchModelData(
-    scene: Scene,
-    url: string,
-    options?: ModelFetchOptions
-  ): Promise<SharedModel> {
+  async fetchModelData(scene: Scene, url: string, options?: ModelFetchOptions): Promise<SharedModel> {
     let P = this._models[url];
     if (!P) {
       P = this.loadModel(url, options);
@@ -411,10 +407,7 @@ export class AssetManager {
     }
   }
   /** @internal */
-  async loadModel(
-    url: string,
-    options?: ModelFetchOptions
-  ): Promise<SharedModel> {
+  async loadModel(url: string, options?: ModelFetchOptions): Promise<SharedModel> {
     const data = await this.httpRequest.requestBlob(url);
     const filename = new URL(url, new URL(location.href).origin).pathname
       .split('/')
@@ -426,7 +419,13 @@ export class AssetManager {
       if (!loader.supportExtension(ext) && !loader.supportMIMEType(options?.mimeType || data.type)) {
         continue;
       }
-      let model = await loader.load(this, url, options?.mimeType || data.type, data, options?.dracoDecoderModule);
+      let model = await loader.load(
+        this,
+        url,
+        options?.mimeType || data.type,
+        data,
+        options?.dracoDecoderModule
+      );
       if (!model) {
         throw new Error(`Load asset failed: ${url}`);
       }

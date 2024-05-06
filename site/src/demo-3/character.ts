@@ -1,4 +1,5 @@
-import { AnimationSet, AssetManager, Scene, SceneNode } from '@zephyr3d/scene';
+import type { AnimationSet, Scene, SceneNode } from '@zephyr3d/scene';
+import { AssetManager } from '@zephyr3d/scene';
 import * as zip from '@zip.js/zip.js';
 
 export class Character {
@@ -47,7 +48,7 @@ export class Character {
   async load(): Promise<SceneNode> {
     const fileMap = await this.readZip('./assets/models/alice_shellfire.zip');
     const assetManager = new AssetManager();
-    assetManager.httpRequest.urlResolver = url => fileMap.get(url) || url;
+    assetManager.httpRequest.urlResolver = (url) => fileMap.get(url) || url;
     const modelFile = Array.from(fileMap.keys()).find((val) => /(\.gltf|\.glb)$/i.test(val));
     const modelInfo = await assetManager.fetchModel(this._scene, modelFile);
     this._node = modelInfo.group;

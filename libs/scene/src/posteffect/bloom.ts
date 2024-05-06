@@ -109,11 +109,7 @@ export class Bloom extends AbstractPostEffect {
     this.downsample(device, colorTex, downsampleTextures);
     this.upsample(device, downsampleTextures);
     device.popDeviceStates();
-    this.finalCompose(
-      device,
-      inputColorTexture,
-      downsampleTextures[0]
-    );
+    this.finalCompose(device, inputColorTexture, downsampleTextures[0]);
     for (const tex of downsampleTextures) {
       device.pool.releaseTexture(tex);
     }

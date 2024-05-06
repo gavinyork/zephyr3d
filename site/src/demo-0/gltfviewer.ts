@@ -1,7 +1,8 @@
 import * as zip from '@zip.js/zip.js';
-import * as draco3d from 'draco3d';
+import type * as draco3d from 'draco3d';
 import { Vector4, Vector3 } from '@zephyr3d/base';
-import { SceneNode, Scene, AnimationSet, BatchGroup, PostWater, WeightedBlendedOIT, OIT, ABufferOIT, SAO } from '@zephyr3d/scene';
+import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
+import { BatchGroup, PostWater, WeightedBlendedOIT, ABufferOIT, SAO } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
 import {
   BoundingBox,
@@ -19,7 +20,7 @@ import { EnvMaps } from './envmap';
 import { Panel } from './ui';
 
 declare global {
-  var DracoDecoderModule: draco3d.DracoDecoderModule;
+  const DracoDecoderModule: draco3d.DracoDecoderModule;
 }
 
 export class GLTFViewer {
@@ -82,8 +83,7 @@ export class GLTFViewer {
     this._camera = new PerspectiveCamera(
       scene,
       Math.PI / 3,
-      device.getDrawingBufferWidth() /
-        device.getDrawingBufferHeight(),
+      device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
       1,
       160
     );
@@ -101,13 +101,13 @@ export class GLTFViewer {
     this._dracoModule = null;
   }
   async ready() {
-    return new Promise<void>(resolve => {
+    return new Promise<void>((resolve) => {
       DracoDecoderModule({
         onModuleLoaded: (module) => {
           this._dracoModule = module;
           resolve();
         }
-      })
+      });
     });
   }
   get envMaps(): EnvMaps {
@@ -169,39 +169,41 @@ export class GLTFViewer {
   async loadModel(url: string) {
     this._modelNode?.remove();
     this._assetManager.purgeCache();
-    this._assetManager.fetchModel(this._scene, url, {
-      enableInstancing: true,
-      dracoDecoderModule: this._dracoModule
-    }).then((info) => {
-      this._modelNode?.dispose();
-      this._modelNode = info.group;
-      this._modelNode.parent = this._batchGroup;
-      this._animationSet?.dispose();
-      this._animationSet = info.animationSet;
-      this._modelNode.pickable = true;
-      this._currentAnimation = null;
-      if (this._animationSet) {
-        const animations = this._animationSet.getAnimationNames();
-        if (animations.length > 0) {
-          this._animationSet.playAnimation(animations[0], 0);
+    this._assetManager
+      .fetchModel(this._scene, url, {
+        enableInstancing: true,
+        dracoDecoderModule: this._dracoModule
+      })
+      .then((info) => {
+        this._modelNode?.dispose();
+        this._modelNode = info.group;
+        this._modelNode.parent = this._batchGroup;
+        this._animationSet?.dispose();
+        this._animationSet = info.animationSet;
+        this._modelNode.pickable = true;
+        this._currentAnimation = null;
+        if (this._animationSet) {
+          const animations = this._animationSet.getAnimationNames();
+          if (animations.length > 0) {
+            this._animationSet.playAnimation(animations[0], 0);
+          }
         }
-      }
-      this._ui.update();
-      this.lookAt();
-    });
+        this._ui.update();
+        this.lookAt();
+      });
   }
   async handleDrop(data: DataTransfer) {
     this.resolveDraggedItems(data).then(async (fileMap) => {
-      if (fileMap){
+      if (fileMap) {
         this._assetManager.httpRequest.urlResolver = (url) => {
           return fileMap.get(url) || url;
         };
         if (fileMap.size === 1 && /\.zip$/i.test(Array.from(fileMap.keys())[0])) {
-          fileMap = await this.readZip(fileMap.get(Array.from(fileMap.keys())[0]))
+          fileMap = await this.readZip(fileMap.get(Array.from(fileMap.keys())[0]));
         }
         if (fileMap.size === 1 && /\.hdr$/i.test(Array.from(fileMap.keys())[0])) {
           const hdrFile = Array.from(fileMap.keys())[0];
-          this._envMaps.selectByPath(hdrFile, this.scene, url => fileMap.get(url) || url);
+          this._envMaps.selectByPath(hdrFile, this.scene, (url) => fileMap.get(url) || url);
         } else {
           const modelFile = Array.from(fileMap.keys()).find((val) => /(\.gltf|\.glb)$/i.test(val));
           await this.loadModel(modelFile);

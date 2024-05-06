@@ -1,5 +1,6 @@
-import { BoxShape, Mesh, SphereShape } from "@zephyr3d/scene";
-import AmmoType from '../../types/ammo-wasm';
+import type { Mesh } from '@zephyr3d/scene';
+import { BoxShape, SphereShape } from '@zephyr3d/scene';
+import type AmmoType from '../../types/ammo-wasm';
 
 declare global {
   var Ammo: typeof AmmoType;
@@ -42,28 +43,33 @@ export class PhysicsWorld {
         this._bodyMap.set(node, body);
       }
     } else {
-			body.setAngularVelocity( new this._ammo.btVector3( 0, 0, 0 ) );
-			body.setLinearVelocity( new this._ammo.btVector3( 0, 0, 0 ) );
-			this._tmpTransform.setIdentity();
-			this._tmpTransform.setOrigin( new this._ammo.btVector3(x, y, z));
-			body.setWorldTransform(this._tmpTransform);
+      body.setAngularVelocity(new this._ammo.btVector3(0, 0, 0));
+      body.setLinearVelocity(new this._ammo.btVector3(0, 0, 0));
+      this._tmpTransform.setIdentity();
+      this._tmpTransform.setOrigin(new this._ammo.btVector3(x, y, z));
+      body.setWorldTransform(this._tmpTransform);
     }
   }
   async init() {
     this._ammo = await Ammo();
     const collisionConfiguration = new this._ammo.btDefaultCollisionConfiguration();
-    const dispatcher = new this._ammo.btCollisionDispatcher( collisionConfiguration );
+    const dispatcher = new this._ammo.btCollisionDispatcher(collisionConfiguration);
     const broadphase = new this._ammo.btDbvtBroadphase();
     const solver = new this._ammo.btSequentialImpulseConstraintSolver();
-    this._world = new this._ammo.btDiscreteDynamicsWorld( dispatcher, broadphase, solver, collisionConfiguration );
-    this._world.setGravity( new this._ammo.btVector3( 0, -9.8, 0 ) );
+    this._world = new this._ammo.btDiscreteDynamicsWorld(
+      dispatcher,
+      broadphase,
+      solver,
+      collisionConfiguration
+    );
+    this._world.setGravity(new this._ammo.btVector3(0, -9.8, 0));
     this._tmpTransform = new this._ammo.btTransform();
     this._tmpVector3 = new this._ammo.btVector3();
   }
-  step(){
+  step() {
     const time = performance.now();
     if (this._lastTime > 0) {
-      const delta = 1/30;//(time - this._lastTime) / 1000;
+      const delta = 1 / 30; //(time - this._lastTime) / 1000;
       this._world.stepSimulation(delta, 10);
       this._bodyMap.forEach((body, mesh) => {
         const motionState = body.getMotionState();
@@ -83,7 +89,7 @@ export class PhysicsWorld {
   start() {
     setInterval(() => {
       this.step();
-    }, 1000/this._frameRate);
+    }, 1000 / this._frameRate);
   }
   private createShapeFromMesh(mesh: Mesh) {
     const primitive = mesh.primitive;

@@ -1,7 +1,8 @@
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { DeviceBackend } from '@zephyr3d/device';
+import type { DeviceBackend } from '@zephyr3d/device';
+import type { PBRMetallicRoughnessMaterial } from '@zephyr3d/scene';
 import {
   Scene,
   OrbitCameraController,
@@ -11,7 +12,6 @@ import {
   PerspectiveCamera,
   Compositor,
   Tonemap,
-  PBRMetallicRoughnessMaterial,
   BatchGroup
 } from '@zephyr3d/scene';
 import { Panel } from './ui';
@@ -61,25 +61,47 @@ instancingApp.ready().then(async () => {
 
   const batchGroup = new BatchGroup(scene);
   const assetManager = new AssetManager();
-  await (async function(){
+  await (async function () {
     for (let i = 0; i < 2000; i++) {
-      const stone1 = await assetManager.fetchModel(scene, 'assets/models/stone1.glb', { enableInstancing: true });
+      const stone1 = await assetManager.fetchModel(scene, 'assets/models/stone1.glb', {
+        enableInstancing: true
+      });
       stone1.group.parent = batchGroup;
-      stone1.group.position.setXYZ(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50);
-      stone1.group.iterate(node => {
+      stone1.group.position.setXYZ(
+        Math.random() * 100 - 50,
+        Math.random() * 100 - 50,
+        Math.random() * 100 - 50
+      );
+      stone1.group.iterate((node) => {
         if (node.isMesh()) {
-          (node.material as PBRMetallicRoughnessMaterial).albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
+          (node.material as PBRMetallicRoughnessMaterial).albedoColor = new Vector4(
+            Math.random(),
+            Math.random(),
+            Math.random(),
+            1
+          );
           vertexCount += node.primitive.getNumVertices();
           faceCount += node.primitive.getNumFaces();
         }
       });
       instanceCount++;
-      const stone2 = await assetManager.fetchModel(scene, 'assets/models/stone2.glb', { enableInstancing: true });
+      const stone2 = await assetManager.fetchModel(scene, 'assets/models/stone2.glb', {
+        enableInstancing: true
+      });
       stone2.group.parent = batchGroup;
-      stone2.group.position.setXYZ(Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50);
-      stone2.group.iterate(node => {
+      stone2.group.position.setXYZ(
+        Math.random() * 100 - 50,
+        Math.random() * 100 - 50,
+        Math.random() * 100 - 50
+      );
+      stone2.group.iterate((node) => {
         if (node.isMesh()) {
-          (node.material as PBRMetallicRoughnessMaterial).albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
+          (node.material as PBRMetallicRoughnessMaterial).albedoColor = new Vector4(
+            Math.random(),
+            Math.random(),
+            Math.random(),
+            1
+          );
           vertexCount += node.primitive.getNumVertices();
           faceCount += node.primitive.getNumFaces();
         }

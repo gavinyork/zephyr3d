@@ -1,7 +1,7 @@
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { DeviceBackend } from '@zephyr3d/device';
+import type { DeviceBackend } from '@zephyr3d/device';
 import {
   Scene,
   OrbitCameraController,
@@ -15,7 +15,7 @@ import {
   BoxShape,
   Mesh,
   ABufferOIT,
-  WeightedBlendedOIT,
+  WeightedBlendedOIT
 } from '@zephyr3d/scene';
 import { Panel } from './ui';
 

@@ -151,12 +151,32 @@ export class SceneRenderer {
     ) {
       const format: TextureFormat = device.type === 'webgl' ? 'rgba8unorm' : 'r32f';
       if (!finalFramebuffer && !vp) {
-        depthFramebuffer = device.pool.fetchTemporalFramebuffer(true, drawingBufferWidth, drawingBufferHeight, format, ctx.depthFormat);
+        depthFramebuffer = device.pool.fetchTemporalFramebuffer(
+          true,
+          drawingBufferWidth,
+          drawingBufferHeight,
+          format,
+          ctx.depthFormat
+        );
       } else {
         const originDepth = finalFramebuffer?.getDepthAttachment();
         depthFramebuffer = originDepth?.isTexture2D()
-          ? device.pool.fetchTemporalFramebuffer(true, originDepth.width, originDepth.height, format, originDepth, false)
-          : device.pool.fetchTemporalFramebuffer(true, ctx.viewportWidth, ctx.viewportHeight, format, ctx.depthFormat, false)
+          ? device.pool.fetchTemporalFramebuffer(
+              true,
+              originDepth.width,
+              originDepth.height,
+              format,
+              originDepth,
+              false
+            )
+          : device.pool.fetchTemporalFramebuffer(
+              true,
+              ctx.viewportWidth,
+              ctx.viewportHeight,
+              format,
+              ctx.depthFormat,
+              false
+            );
       }
       this._renderSceneDepth(ctx, renderQueue, depthFramebuffer);
       ctx.linearDepthTexture = depthFramebuffer.getColorAttachments()[0] as Texture2D;
@@ -165,7 +185,15 @@ export class SceneRenderer {
         tempFramebuffer = finalFramebuffer;
       } else {
         // TODO: fetch resizable framebuffer if ctx.defaultViewport is true
-        tempFramebuffer = device.pool.fetchTemporalFramebuffer(true, ctx.depthTexture.width, ctx.depthTexture.height, colorFmt, ctx.depthFormat, false, sampleCount);
+        tempFramebuffer = device.pool.fetchTemporalFramebuffer(
+          true,
+          ctx.depthTexture.width,
+          ctx.depthTexture.height,
+          colorFmt,
+          ctx.depthFormat,
+          false,
+          sampleCount
+        );
       }
     } else {
       ctx.linearDepthTexture = null;
@@ -173,7 +201,15 @@ export class SceneRenderer {
       if (!vp) {
         tempFramebuffer = finalFramebuffer;
       } else {
-        tempFramebuffer = device.pool.fetchTemporalFramebuffer(true, ctx.viewportWidth, ctx.viewportHeight, colorFmt, ctx.depthFormat, false, sampleCount);
+        tempFramebuffer = device.pool.fetchTemporalFramebuffer(
+          true,
+          ctx.viewportWidth,
+          ctx.viewportHeight,
+          colorFmt,
+          ctx.depthFormat,
+          false,
+          sampleCount
+        );
       }
     }
     if (tempFramebuffer && tempFramebuffer !== finalFramebuffer) {
@@ -187,7 +223,13 @@ export class SceneRenderer {
     this._scenePass.clearStencil = 0; //ctx.depthTexture ? null : 0;
     this._scenePass.transmission = false; // transmission
     if (renderQueue.needSceneColor) {
-      const sceneColorFramebuffer = device.pool.fetchTemporalFramebuffer(true, ctx.depthTexture.width, ctx.depthTexture.height, colorFmt, ctx.depthTexture);
+      const sceneColorFramebuffer = device.pool.fetchTemporalFramebuffer(
+        true,
+        ctx.depthTexture.width,
+        ctx.depthTexture.height,
+        colorFmt,
+        ctx.depthTexture
+      );
       device.pushDeviceStates();
       device.setFramebuffer(sceneColorFramebuffer);
     }

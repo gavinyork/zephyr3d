@@ -1,5 +1,6 @@
 import { GUI } from 'lil-gui';
-import { ABufferOIT, Application, Camera, WeightedBlendedOIT } from '@zephyr3d/scene';
+import type { Camera } from '@zephyr3d/scene';
+import { ABufferOIT, Application, WeightedBlendedOIT } from '@zephyr3d/scene';
 
 interface GUIParams {
   deviceType: string;
@@ -14,7 +15,7 @@ export class Panel {
   private _params: GUIParams;
   private _camera: Camera;
   private _gui: GUI;
-  constructor(camera: Camera){
+  constructor(camera: Camera) {
     this._camera = camera;
     this._deviceList = ['WebGL', 'WebGL2', 'WebGPU'];
     this._gui = new GUI({ container: document.body });
@@ -25,38 +26,43 @@ export class Panel {
       this._oitNames.push('per-pixel linked list');
     }
     this._params = {
-      deviceType: this._deviceList[this._deviceList.findIndex(val => val.toLowerCase() === Application.instance.device.type)],
+      deviceType:
+        this._deviceList[
+          this._deviceList.findIndex((val) => val.toLowerCase() === Application.instance.device.type)
+        ],
       FPS: '',
       oitType: this._oitNames[this._oitTypes.indexOf(this._camera.oit ? this._camera.oit.getType() : '')]
     };
     this.create();
   }
-  create(){
+  create() {
     const systemSettings = this._gui.addFolder('System');
-    systemSettings.add(this._params, 'deviceType', this._deviceList)
-    .name('Select device')
-    .onChange(value=>{
-      const url = new URL(window.location.href);
-      url.searchParams.set('dev', value.toLowerCase());
-      window.location.href = url.href;
-    });
+    systemSettings
+      .add(this._params, 'deviceType', this._deviceList)
+      .name('Select device')
+      .onChange((value) => {
+        const url = new URL(window.location.href);
+        url.searchParams.set('dev', value.toLowerCase());
+        window.location.href = url.href;
+      });
 
     const oitSettings = this._gui.addFolder('OIT');
-    oitSettings.add(this._params, 'oitType', this._oitNames)
-    .name('Select OIT type')
-    .onChange(value=>{
-      this._camera.oit?.dispose();
-      this._camera.oit = null;
-      const index = this._oitNames.indexOf(value);
-      switch(this._oitTypes[index]) {
-        case ABufferOIT.type:
-          this._camera.oit = new ABufferOIT();
-          break;
-        case WeightedBlendedOIT.type:
-          this._camera.oit = new WeightedBlendedOIT();
-          break;
-      }
-    });
+    oitSettings
+      .add(this._params, 'oitType', this._oitNames)
+      .name('Select OIT type')
+      .onChange((value) => {
+        this._camera.oit?.dispose();
+        this._camera.oit = null;
+        const index = this._oitNames.indexOf(value);
+        switch (this._oitTypes[index]) {
+          case ABufferOIT.type:
+            this._camera.oit = new ABufferOIT();
+            break;
+          case WeightedBlendedOIT.type:
+            this._camera.oit = new WeightedBlendedOIT();
+            break;
+        }
+      });
     const perfSettings = this._gui.addFolder('Performance');
     perfSettings.add(this._params, 'FPS').name('FPS').disable(true).listen();
     setInterval(() => {

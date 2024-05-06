@@ -42,12 +42,19 @@ export class PBRSpecularGlossinessMaterial extends applyMaterialMixins(
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
     const pb = scope.$builder;
+    const worldMatrix = ShaderHelper.getWorldMatrix(scope);
     scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
-    scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
-    ShaderHelper.setClipSpacePosition(
-      scope,
-      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
-    );
+    scope.$outputs.worldPos = pb.mul(worldMatrix, pb.vec4(scope.oPos, 1)).xyz;
+    scope.$l.csPos = pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1));
+    ShaderHelper.setClipSpacePosition(scope, scope.csPos);
+    if (this.transmission) {
+      scope.$outputs.screenUV = pb.add(pb.mul(pb.div(scope.csPos.xy, scope.csPos.w), 0.5), pb.vec2(0.5));
+      scope.$outputs.modelScale = pb.vec3(
+        pb.length(worldMatrix[0].xyz),
+        pb.length(worldMatrix[1].xyz),
+        pb.length(worldMatrix[2].xyz)
+      );
+    }
     if (this.vertexNormal) {
       scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
       scope.$outputs.wNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;

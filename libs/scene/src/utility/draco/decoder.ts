@@ -1,5 +1,5 @@
-import type { TypedArray, TypedArrayConstructor } from "@zephyr3d/base";
-import type { Decoder, Mesh, DecoderModule, DataType } from "draco3d";
+import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
+import type { Decoder, Mesh, DecoderModule, DataType } from 'draco3d';
 
 export class DracoMeshDecoder {
   private _module: DecoderModule;
@@ -59,8 +59,18 @@ export class DracoMeshDecoder {
       return null;
     }
     const ptr = this._module._malloc(buffer.byteLength);
-    this._decoder.GetAttributeDataArrayForAllPoints(this._mesh, attribute, this.getDracoDataType(buffer), buffer.byteLength, ptr);
-    const tmpBuffer = new (buffer.constructor as TypedArrayConstructor)(this.getDracoHeap(buffer).buffer, ptr, numValues);
+    this._decoder.GetAttributeDataArrayForAllPoints(
+      this._mesh,
+      attribute,
+      this.getDracoDataType(buffer),
+      buffer.byteLength,
+      ptr
+    );
+    const tmpBuffer = new (buffer.constructor as TypedArrayConstructor)(
+      this.getDracoHeap(buffer).buffer,
+      ptr,
+      numValues
+    );
     buffer.set(tmpBuffer);
     this._module._free(ptr);
     return buffer;

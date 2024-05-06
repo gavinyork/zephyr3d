@@ -114,17 +114,24 @@ export class Compositor {
     const format = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
     const finalFramebuffer = device.getFramebuffer();
     const depth = finalFramebuffer?.getDepthAttachment() as Texture2D;
-    let pingpongFramebuffers: FrameBuffer[];
     let msFramebuffer: FrameBuffer = null;
     const w = depth ? depth.width : ctx.viewportWidth;
     const h = depth ? depth.height : ctx.viewportHeight;
     if (ctx.primaryCamera.sampleCount > 1) {
-      msFramebuffer = device.pool.fetchTemporalFramebuffer(true, w, h, format, depth, false, ctx.primaryCamera.sampleCount);
+      msFramebuffer = device.pool.fetchTemporalFramebuffer(
+        true,
+        w,
+        h,
+        format,
+        depth,
+        false,
+        ctx.primaryCamera.sampleCount
+      );
     }
-    pingpongFramebuffers = [
+    const pingpongFramebuffers = [
       device.pool.fetchTemporalFramebuffer(true, w, h, format, depth ?? ctx.depthFormat, false),
       device.pool.fetchTemporalFramebuffer(true, w, h, format, depth ?? ctx.depthFormat, false)
-    ]
+    ];
     let writeIndex: number;
     if (msFramebuffer) {
       writeIndex = 3;

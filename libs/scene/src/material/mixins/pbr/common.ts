@@ -8,6 +8,7 @@ import type {
 import type { MeshMaterial } from '../../meshmaterial';
 import { applyMaterialMixins } from '../../meshmaterial';
 import type { Vector3 } from '@zephyr3d/base';
+import { Vector2 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../../render';
 import { getGGXLUT } from '../ggxlut';
@@ -25,6 +26,7 @@ export type IMixinPBRCommon = {
   emissiveColor: Vector3;
   emissiveStrength: number;
   occlusionStrength: number;
+  transmission: boolean;
   sheen: boolean;
   sheenColorFactor: Vector3;
   sheenRoughnessFactor: number;
@@ -93,7 +95,7 @@ export type IMixinPBRCommon = {
  */
 export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).pbrCommonMixed) {
-    return BaseCls as T & { new (...args: any[]): IMixinPBRCommon };
+    return BaseCls as T & { new (...args: any[]): IMixinPBRCommon; FEATURE_TRANSMISSION: number };
   }
   const S = applyMaterialMixins(
     BaseCls,
@@ -103,10 +105,14 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     mixinTextureProps('sheenRoughness'),
     mixinTextureProps('clearcoatIntensity'),
     mixinTextureProps('clearcoatRoughness'),
-    mixinTextureProps('clearcoatNormal')
+    mixinTextureProps('clearcoatNormal'),
+    mixinTextureProps('transmission'),
+    mixinTextureProps('thickness')
   );
   let FEATURE_SHEEN = 0;
   let FEATURE_CLEARCOAT = 0;
+  let FEATURE_TRANSMISSION = 0;
+
   const cls = class extends S {
     static readonly pbrCommonMixed = true;
     private _f0: Vector4;
@@ -114,6 +120,9 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     private _occlusionStrength: number;
     private _sheenFactor: Vector4;
     private _clearcoatFactor: Vector4;
+    private _transmissionFactor: number;
+    private _thicknessFactor: number;
+    private _sceneColorTexSize: Vector2;
     constructor() {
       super();
       this._f0 = new Vector4(0.04, 0.04, 0.04, 1.5);
@@ -121,6 +130,9 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       this._emissiveFactor = new Vector4(0, 0, 0, 1);
       this._sheenFactor = Vector4.zero();
       this._clearcoatFactor = new Vector4(0, 0, 1, 0);
+      this._transmissionFactor = 0;
+      this._thicknessFactor = 0;
+      this._sceneColorTexSize = new Vector2();
     }
     get ior(): number {
       return this._f0.w;
@@ -130,6 +142,24 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         let k = (val - 1) / (val + 1);
         k *= k;
         this._f0.setXYZW(k, k, k, val);
+        this.uniformChanged();
+      }
+    }
+    get transmissionFactor(): number {
+      return this._transmissionFactor;
+    }
+    set transmissionFactor(val: number) {
+      if (val !== this._transmissionFactor) {
+        this._transmissionFactor = val;
+        this.uniformChanged();
+      }
+    }
+    get thicknessFactor(): number {
+      return this._thicknessFactor;
+    }
+    set thicknessFactor(val: number) {
+      if (this._thicknessFactor !== val) {
+        this._thicknessFactor = val;
         this.uniformChanged();
       }
     }
@@ -165,6 +195,12 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         this._emissiveFactor.w = val;
         this.uniformChanged();
       }
+    }
+    get transmission(): boolean {
+      return this.featureUsed<boolean>(FEATURE_TRANSMISSION);
+    }
+    set transmission(val: boolean) {
+      this.useFeature(FEATURE_TRANSMISSION, !!val);
     }
     get clearcoat(): boolean {
       return this.featureUsed<boolean>(FEATURE_CLEARCOAT);
@@ -240,6 +276,12 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         if (this.clearcoat) {
           scope.zClearcoatFactor = pb.vec4().uniform(2);
         }
+        if (this.transmission) {
+          scope.zTransmissionFactor = pb.float().uniform(2);
+          scope.zThicknessFactor = pb.float().uniform(2);
+          scope.zSceneColorTex = pb.tex2D().uniform(2);
+          scope.zSceneColorTexSize = pb.vec2().uniform(2);
+        }
         if (this.drawContext.drawEnvLight) {
           scope.zGGXLut = pb.tex2D().uniform(2);
         }
@@ -258,6 +300,13 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         }
         if (this.clearcoat) {
           bindGroup.setValue('zClearcoatFactor', this._clearcoatFactor);
+        }
+        if (this.transmission) {
+          bindGroup.setValue('zTransmissionFactor', this._transmissionFactor);
+          bindGroup.setValue('zThicknessFactor', this._thicknessFactor);
+          bindGroup.setTexture('zSceneColorTex', ctx.sceneColorTexture);
+          this._sceneColorTexSize.setXY(ctx.sceneColorTexture.width, ctx.sceneColorTexture.height);
+          bindGroup.setValue('zSceneColorTexSize', this._sceneColorTexSize);
         }
         if (ctx.drawEnvLight) {
           bindGroup.setTexture('zGGXLut', getGGXLUT(1024));
@@ -281,7 +330,8 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           : []),
         ...(this.clearcoat
           ? [pb.vec4('ccFactor'), pb.vec3('ccNormal'), pb.float('ccNoV'), pb.float('ccFresnel')]
-          : [])
+          : []),
+        ...(this.transmission ? [pb.float('transmissionFactor'), pb.float('thicknessFactor')] : [])
       ]);
     }
     getCommonData(
@@ -348,6 +398,15 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           );
         }
       }
+      if (this.transmission) {
+        if (this.transmissionTexture) {
+          data.transmissionFactor = pb.mul(
+            this.sampleTransmissionTexture(scope).r,
+            scope.zTransmissionFactor
+          );
+          data.thicknessFactor = scope.zThicknessFactor;
+        }
+      }
     }
     calculateEmissiveColor(scope: PBInsideFunctionScope): PBShaderExp {
       const pb = scope.$builder;
@@ -388,6 +447,162 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         );
       });
       return scope.$g[funcNameVAshikhmin](NdotL, NdotV);
+    }
+    getVolumeTransmissionRay(
+      scope: PBInsideFunctionScope,
+      normal: PBShaderExp,
+      viewVec: PBShaderExp,
+      thickness: PBShaderExp,
+      ior: PBShaderExp
+    ): PBShaderExp {
+      const pb = scope.$builder;
+      const funcName = 'getVolumeTransmissionRay';
+      pb.func(
+        funcName,
+        [pb.vec3('normal'), pb.vec3('viewVec'), pb.float('thickness'), pb.float('ior')],
+        function () {
+          this.$l.refractionVector = pb.refract(pb.neg(this.viewVec), this.normal, pb.div(1, this.ior));
+          this.$return(pb.mul(this.refractionVector, this.$inputs.modelScale, this.thickness));
+        }
+      );
+      return pb.getGlobalScope()[funcName](normal, viewVec, thickness, ior);
+    }
+    getTransmissionSample(
+      scope: PBInsideFunctionScope,
+      fragCoord: PBShaderExp,
+      roughness: PBShaderExp,
+      ior: PBShaderExp
+    ): PBShaderExp {
+      const pb = scope.$builder;
+      const funcName = 'getTransmissionSample';
+      pb.func(funcName, [pb.vec2('fragCoord'), pb.float('roughness'), pb.float('ior')], function () {
+        this.$l.applyIorToRougness = pb.mul(
+          this.roughness,
+          pb.clamp(pb.sub(pb.mul(this.ior, 2), 2), 0.0, 1.0)
+        );
+        this.$l.framebufferLod = pb.mul(pb.log2(this.zSceneColorTexSize.x), this.applyIorToRoughness);
+        this.$return(pb.textureSampleLevel(this.zSceneColorTex, this.fragCoord, this.framebufferLod).rgb);
+      });
+      return pb.getGlobalScope()[funcName](fragCoord, roughness, ior);
+    }
+    applyVolumeAttenuation(
+      scope: PBInsideFunctionScope,
+      radiance: PBShaderExp,
+      transmissionDistance: PBShaderExp,
+      attenuationColor: PBShaderExp,
+      attenuationDistance: PBShaderExp
+    ): PBShaderExp {
+      const pb = scope.$builder;
+      const funcName = 'applyVolumeAttenuation';
+      pb.func(
+        funcName,
+        [
+          pb.vec3('radiance'),
+          pb.float('transmissionDistance'),
+          pb.vec3('attenuationColor'),
+          pb.float('attenuationDistance')
+        ],
+        function () {
+          this.$if(pb.equal(this.attenuationDistance, 0), function () {
+            this.$return(this.radiance);
+          }).$else(function () {
+            this.$l.attenuationCoefficient = pb.div(
+              pb.neg(pb.log(this.attenuationColor)),
+              this.attenuationDistance
+            );
+            this.$l.transmittance = pb.exp(
+              pb.mul(pb.neg(this.attenuationCoefficient), this.transmissionDistance)
+            );
+            this.$return(pb.mul(this.radiance, this.transmittance));
+          });
+        }
+      );
+      return pb
+        .getGlobalScope()
+        [funcName](radiance, transmissionDistance, attenuationColor, attenuationDistance);
+    }
+    getIBLVolumnRefraction(
+      scope: PBInsideFunctionScope,
+      brdf: PBShaderExp,
+      normal: PBShaderExp,
+      viewVec: PBShaderExp,
+      roughness: PBShaderExp,
+      baseColor: PBShaderExp,
+      f0: PBShaderExp,
+      f90: PBShaderExp,
+      position: PBShaderExp,
+      ior: PBShaderExp,
+      thickness: PBShaderExp,
+      attenuationColor: PBShaderExp,
+      attenuationDistance: PBShaderExp
+    ) {
+      const pb = scope.$builder;
+      const funcName = 'getIBLVolumeRefraction';
+      const that = this;
+      pb.func(
+        funcName,
+        [
+          pb.vec2('brdf'),
+          pb.vec3('normal'),
+          pb.vec3('viewVec'),
+          pb.float('roughness'),
+          pb.vec3('baseColor'),
+          pb.vec3('f0'),
+          pb.vec3('f90'),
+          pb.vec3('position'),
+          pb.float('ior'),
+          pb.float('thickness'),
+          pb.vec3('attenuationColor'),
+          pb.float('attenuationDistance')
+        ],
+        function () {
+          this.$l.transmissionRay = that.getVolumeTransmissionRay(
+            this,
+            this.normal,
+            this.viewVec,
+            this.thickness,
+            this.ior
+          );
+          this.$l.transmissionRayLength = pb.length(this.transmissionRay);
+          this.$l.refractedRayExit = pb.add(this.position, this.transmissionRay);
+          this.$l.ndcPos = pb.mul(
+            ShaderHelper.getViewProjectionMatrix(this),
+            pb.vec4(this.refractedRayExit, 1)
+          );
+          this.$l.refractionCoords = pb.add(pb.mul(pb.div(this.ndcPos.xy, this.ndcPos.w), 0.5), pb.vec2(0.5));
+          this.$l.transmittedLight = that.getTransmissionSample(
+            this,
+            this.refractionCoords,
+            this.roughness,
+            this.ior
+          );
+          this.$l.attenuationColor = that.applyVolumeAttenuation(
+            this,
+            this.transmittedLight,
+            this.transmissionRayLength,
+            this.attenuationColor,
+            this.attenuationDistance
+          );
+          this.$l.specularColor = pb.add(pb.mul(this.f0, this.brdf.x), pb.mul(this.f90, this.brdf.y));
+          this.$return(pb.mul(pb.sub(pb.vec3(1), this.specularColor), this.attenuationColor, this.baseColor));
+        }
+      );
+      return pb
+        .getGlobalScope()
+        [funcName](
+          brdf,
+          normal,
+          viewVec,
+          roughness,
+          baseColor,
+          f0,
+          f90,
+          position,
+          ior,
+          thickness,
+          attenuationColor,
+          attenuationDistance
+        );
     }
     directLighting(
       scope: PBInsideFunctionScope,
@@ -667,5 +882,6 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
   } as unknown as T & { new (...args: any[]): IMixinPBRCommon };
   FEATURE_SHEEN = cls.defineFeature();
   FEATURE_CLEARCOAT = cls.defineFeature();
+  FEATURE_TRANSMISSION = cls.defineFeature();
   return cls;
 }

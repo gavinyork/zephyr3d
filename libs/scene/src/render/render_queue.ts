@@ -288,12 +288,12 @@ export class RenderQueue {
             ? this._itemList.transparent.unlit[0].instanceList
             : this._itemList.transparent.lit[0].instanceList
           : unlit
-            ? transmission
-              ? this._itemList.transmission.unlit[0].instanceList
-              : this._itemList.opaque.unlit[0].instanceList
-            : transmission
-              ? this._itemList.transmission.lit[0].instanceList
-              : this._itemList.opaque.lit[0].instanceList;
+          ? transmission
+            ? this._itemList.transmission.unlit[0].instanceList
+            : this._itemList.opaque.unlit[0].instanceList
+          : transmission
+          ? this._itemList.transmission.lit[0].instanceList
+          : this._itemList.opaque.lit[0].instanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         let drawableList = instanceList[hash];
         if (!drawableList) {
@@ -307,12 +307,12 @@ export class RenderQueue {
             ? this._itemList.transparent.unlit[0]
             : this._itemList.transparent.lit[0]
           : unlit
-            ? transmission
-              ? this._itemList.transmission.unlit[0]
-              : this._itemList.opaque.unlit[0]
-            : transmission
-              ? this._itemList.transmission.lit[0]
-              : this._itemList.opaque.lit[0];
+          ? transmission
+            ? this._itemList.transmission.unlit[0]
+            : this._itemList.opaque.unlit[0]
+          : transmission
+          ? this._itemList.transmission.lit[0]
+          : this._itemList.opaque.lit[0];
         this.binaryInsert(drawable.getBoneMatrices() ? list.skinItemList : list.itemList, {
           drawable,
           sortDistance: drawable.getSortDistance(camera),

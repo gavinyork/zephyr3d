@@ -61,7 +61,13 @@ export class GLTFLoader extends AbstractModelLoader {
   supportMIMEType(mimeType: string): boolean {
     return mimeType === 'model/gltf+json' || mimeType === 'model/gltf-binary';
   }
-  async load(assetManager: AssetManager, url: string, mimeType: string, data: Blob, decoderModule?: DecoderModule) {
+  async load(
+    assetManager: AssetManager,
+    url: string,
+    mimeType: string,
+    data: Blob,
+    decoderModule?: DecoderModule
+  ) {
     const buffer = await data.arrayBuffer();
     if (this.isGLB(buffer)) {
       return this.loadBinary(assetManager, url, buffer, decoderModule);
@@ -71,7 +77,12 @@ export class GLTFLoader extends AbstractModelLoader {
     gltf._loadedBuffers = null;
     return this.loadJson(url, gltf, decoderModule);
   }
-  async loadBinary(assetManager: AssetManager, url: string, buffer: ArrayBuffer, decoderModule?: DecoderModule): Promise<SharedModel> {
+  async loadBinary(
+    assetManager: AssetManager,
+    url: string,
+    buffer: ArrayBuffer,
+    decoderModule?: DecoderModule
+  ): Promise<SharedModel> {
     const jsonChunkType = 0x4e4f534a;
     const binaryChunkType = 0x004e4942;
     let gltf: GLTFContent = null;
@@ -95,7 +106,11 @@ export class GLTFLoader extends AbstractModelLoader {
   }
   async loadJson(url: string, gltf: GLTFContent, dracoDecoderModule?: DecoderModule): Promise<SharedModel> {
     // check extensions
-    if (!dracoDecoderModule && gltf.extensionsRequired && gltf.extensionsRequired.indexOf('KHR_draco_mesh_compression') >= 0) {
+    if (
+      !dracoDecoderModule &&
+      gltf.extensionsRequired &&
+      gltf.extensionsRequired.indexOf('KHR_draco_mesh_compression') >= 0
+    ) {
       console.error('Draco3d is required for loading model');
       return null;
     }
@@ -452,7 +467,7 @@ export class GLTFLoader extends AbstractModelLoader {
             rawBlendIndices: null,
             rawJointWeights: null
           };
-          let primitive = new Primitive();
+          const primitive = new Primitive();
           const attributes = p.attributes;
           const dracoExtension = gltf._dracoModule ? p.extensions?.['KHR_draco_mesh_compression'] : null;
           let dracoMeshDecoder: DracoMeshDecoder = null;
@@ -465,10 +480,21 @@ export class GLTFLoader extends AbstractModelLoader {
             if (!arrayBuffer) {
               throw new Error('Draco buffer view does not point to a valid ArrayBuffer');
             }
-            dracoMeshDecoder = new DracoMeshDecoder(new Int8Array(arrayBuffer, bufferView.byteOffset ?? 0, bufferView.byteLength), gltf._dracoModule);
+            dracoMeshDecoder = new DracoMeshDecoder(
+              new Int8Array(arrayBuffer, bufferView.byteOffset ?? 0, bufferView.byteLength),
+              gltf._dracoModule
+            );
           }
           for (const attrib in attributes) {
-            this._loadVertexBuffer(gltf, attrib, attributes[attrib], primitive, subMeshData, dracoExtension, dracoMeshDecoder);
+            this._loadVertexBuffer(
+              gltf,
+              attrib,
+              attributes[attrib],
+              primitive,
+              subMeshData,
+              dracoExtension,
+              dracoMeshDecoder
+            );
           }
           const indices = p.indices;
           if (typeof indices === 'number') {
@@ -1076,7 +1102,7 @@ export class GLTFLoader extends AbstractModelLoader {
       const accessor = gltf._accessors[accessorIndex];
       let buffer: TypedArray = null;
       const numElements = accessor.count * accessor.getComponentCount(accessor.type);
-      switch(accessor.componentType) {
+      switch (accessor.componentType) {
         case ComponentType.FLOAT:
           buffer = new Float32Array(numElements);
           break;
@@ -1111,7 +1137,7 @@ export class GLTFLoader extends AbstractModelLoader {
       gltf.bufferViews.push({
         buffer: gltf._loadedBuffers.length - 1,
         byteOffset: 0,
-        byteLength: buffer.byteLength,
+        byteLength: buffer.byteLength
       });
       accessor.bufferView = gltf.bufferViews.length - 1;
     }

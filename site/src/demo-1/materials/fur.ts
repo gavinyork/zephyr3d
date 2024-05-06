@@ -1,7 +1,14 @@
 import { Vector4 } from '@zephyr3d/base';
 import type { BindGroup, PBFunctionScope, RenderStateSet, Texture2D } from '@zephyr3d/device';
 import type { DrawContext, Primitive } from '@zephyr3d/scene';
-import { Application, MeshMaterial, QUEUE_TRANSPARENT, ShaderHelper, applyMaterialMixins, mixinLambert } from '@zephyr3d/scene';
+import {
+  Application,
+  MeshMaterial,
+  QUEUE_TRANSPARENT,
+  ShaderHelper,
+  applyMaterialMixins,
+  mixinLambert
+} from '@zephyr3d/scene';
 
 export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
   private _thickness: number;
@@ -26,7 +33,7 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
     return this._thickness;
   }
   set thickness(val: number) {
-    if(val !== this._thickness) {
+    if (val !== this._thickness) {
       this._thickness = val;
       this.uniformChanged();
     }
@@ -89,7 +96,7 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
       this.blendMode = 'blend';
       this.cullMode = 'none';
     } else {
-      this.blendMode ='none';
+      this.blendMode = 'none';
       this.cullMode = 'back';
     }
     super.updateRenderStates(pass, stateSet, ctx);
@@ -106,7 +113,7 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
     if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('alphaRepeat', this._alphaRepeat);
       if (pass > 0) {
-        if (!this._instancing){
+        if (!this._instancing) {
           bindGroup.setValue('currentLayer', pass - 1);
         }
         bindGroup.setValue('layerThickness', this._thickness);
@@ -126,14 +133,14 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
       scope.$inputs.tex = pb.vec2().attrib('texCoord0');
       scope.$inputs.normal = pb.vec3().attrib('normal');
       if (this.pass > 0) {
-        if (!this._instancing){
+        if (!this._instancing) {
           scope.$l.currentLayer = pb.float().uniform(2);
         }
         scope.$l.layerThickness = pb.float().uniform(2);
         scope.$l.numLayers = pb.float().uniform(2);
         scope.$l.colorStart = pb.vec4().uniform(2);
         scope.$l.colorEnd = pb.vec4().uniform(2);
-        if(!this._instancing){
+        if (!this._instancing) {
           scope.$l.t = pb.div(scope.currentLayer, scope.numLayers);
           scope.$l.f = pb.mul(pb.add(scope.currentLayer, 1), scope.layerThickness);
         } else {
@@ -141,10 +148,13 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
           scope.$l.f = pb.mul(pb.float(pb.add(scope.$builtins.instanceIndex, 1)), scope.layerThickness);
         }
         vertexPos = pb.add(scope.$inputs.pos, pb.mul(scope.$inputs.normal, scope.f));
-        scope.$outputs.ao = pb.mix(scope.colorStart, scope.colorEnd, pb.sin(pb.mul(scope.t, Math.PI/2)));
+        scope.$outputs.ao = pb.mix(scope.colorStart, scope.colorEnd, pb.sin(pb.mul(scope.t, Math.PI / 2)));
       }
       scope.$outputs.tex = scope.$inputs.tex;
-      scope.$outputs.worldNormal = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.$inputs.normal, 0)).xyz;
+      scope.$outputs.worldNormal = pb.mul(
+        ShaderHelper.getNormalMatrix(scope),
+        pb.vec4(scope.$inputs.normal, 0)
+      ).xyz;
     }
     scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(vertexPos, 1)).xyz;
     ShaderHelper.setClipSpacePosition(
@@ -159,7 +169,10 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
       scope.alphaRepeat = pb.float().uniform(2);
       scope.$l.albedo = this.calculateAlbedoColor(scope);
       scope.$l.normal = this.calculateNormal(scope, scope.$inputs.worldPos, scope.$inputs.worldNormal);
-      scope.$l.color = pb.vec4(this.lambertLight(scope, scope.$inputs.worldPos, scope.normal, scope.albedo), scope.albedo.a);
+      scope.$l.color = pb.vec4(
+        this.lambertLight(scope, scope.$inputs.worldPos, scope.normal, scope.albedo),
+        scope.albedo.a
+      );
       if (this.pass > 0) {
         scope.alphaTex = pb.tex2D().uniform(2);
         scope.color = pb.mul(scope.color, scope.$inputs.ao);

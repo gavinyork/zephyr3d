@@ -248,8 +248,26 @@ export class VSM extends ShadowImpl {
     const shadowMapHeight = shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0].height;
     if (this._blur) {
       shadowMapParams.implData = {
-        blurFramebuffer: ShadowMapper.fetchTemporalFramebuffer(true, shadowMapParams.lightType, shadowMapParams.numShadowCascades, shadowMapWidth, shadowMapHeight, colorFormat, null, false),
-        blurFramebuffer2: ShadowMapper.fetchTemporalFramebuffer(true, shadowMapParams.lightType, shadowMapParams.numShadowCascades, shadowMapWidth, shadowMapHeight, colorFormat, null, this._mipmap),
+        blurFramebuffer: ShadowMapper.fetchTemporalFramebuffer(
+          true,
+          shadowMapParams.lightType,
+          shadowMapParams.numShadowCascades,
+          shadowMapWidth,
+          shadowMapHeight,
+          colorFormat,
+          null,
+          false
+        ),
+        blurFramebuffer2: ShadowMapper.fetchTemporalFramebuffer(
+          true,
+          shadowMapParams.lightType,
+          shadowMapParams.numShadowCascades,
+          shadowMapWidth,
+          shadowMapHeight,
+          colorFormat,
+          null,
+          this._mipmap
+        )
       };
     }
     shadowMapParams.shadowMap = this.getShadowMap(shadowMapParams);

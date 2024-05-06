@@ -321,21 +321,31 @@ export abstract class BaseDevice {
   drawText(text: string, x: number, y: number, color: string) {
     DrawText.drawText(this, text, color, x, y);
   }
-  setFramebuffer(rt: FrameBuffer)
-  setFramebuffer(color: (BaseTexture|{texture:BaseTexture,miplevel?:number,face?:number,layer?:number})[], depth?: BaseTexture, sampleCount?: number)
-  setFramebuffer(colorOrRT: (BaseTexture|{texture:BaseTexture,miplevel?:number,face?:number,layer?:number})[]|FrameBuffer, depth?: BaseTexture, sampleCount?: number) {
+  setFramebuffer(rt: FrameBuffer);
+  setFramebuffer(
+    color: (BaseTexture | { texture: BaseTexture; miplevel?: number; face?: number; layer?: number })[],
+    depth?: BaseTexture,
+    sampleCount?: number
+  );
+  setFramebuffer(
+    colorOrRT:
+      | (BaseTexture | { texture: BaseTexture; miplevel?: number; face?: number; layer?: number })[]
+      | FrameBuffer,
+    depth?: BaseTexture,
+    sampleCount?: number
+  ) {
     let newRT: FrameBuffer = null;
     let temporal = false;
     if (!Array.isArray(colorOrRT)) {
       newRT = colorOrRT ?? null;
     } else {
-      const colorAttachments = colorOrRT.map(val => (val as any).texture ?? val) as BaseTexture[];
+      const colorAttachments = colorOrRT.map((val) => (val as any).texture ?? val) as BaseTexture[];
       newRT = this._pool.createTemporalFramebuffer(false, colorAttachments, depth, sampleCount, true);
       for (let i = 0; i < colorOrRT.length; i++) {
         const rt = colorOrRT[i];
-        newRT.setColorAttachmentMipLevel(i, (rt as any).texture ? ((rt as any).miplevel ?? 0) : 0)
-        newRT.setColorAttachmentLayer(i, (rt as any).texture ? ((rt as any).face ?? 0) : 0)
-        newRT.setColorAttachmentCubeFace(i, (rt as any).texture ? ((rt as any).layer ?? 0) : 0)
+        newRT.setColorAttachmentMipLevel(i, (rt as any).texture ? (rt as any).miplevel ?? 0 : 0);
+        newRT.setColorAttachmentLayer(i, (rt as any).texture ? (rt as any).face ?? 0 : 0);
+        newRT.setColorAttachmentCubeFace(i, (rt as any).texture ? (rt as any).layer ?? 0 : 0);
       }
       temporal = true;
     }

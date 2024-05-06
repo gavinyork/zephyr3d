@@ -110,5 +110,11 @@ export abstract class AbstractModelLoader extends LoaderBase {
    * @param data - The model data
    * @returns The loaded model
    */
-  abstract load(assetManager: AssetManager, url: string, mimeType: string, data: Blob, dracoDecoderModule?: DecoderModule): Promise<SharedModel>;
+  abstract load(
+    assetManager: AssetManager,
+    url: string,
+    mimeType: string,
+    data: Blob,
+    dracoDecoderModule?: DecoderModule
+  ): Promise<SharedModel>;
 }

@@ -303,7 +303,14 @@ export class PostWater extends AbstractPostEffect {
     }
 
     this._renderingReflections = true;
-    const fbRefl = ctx.device.pool.fetchTemporalFramebuffer(true, this._reflectSize, this._reflectSize, inputColorTexture.format, ctx.depthFormat, false);
+    const fbRefl = ctx.device.pool.fetchTemporalFramebuffer(
+      true,
+      this._reflectSize,
+      this._reflectSize,
+      inputColorTexture.format,
+      ctx.depthFormat,
+      false
+    );
     const plane = new Plane(0, -1, 0, this._elevation);
     const clipPlane = new Plane(0, -1, 0, this._elevation - this._antiReflectanceLeak);
     const matReflectionR = Matrix4x4.invert(Matrix4x4.reflection(-plane.a, -plane.b, -plane.c, -plane.d));

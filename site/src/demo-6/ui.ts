@@ -1,5 +1,6 @@
 import { GUI } from 'lil-gui';
-import { Application, Camera } from "@zephyr3d/scene";
+import type { Camera } from '@zephyr3d/scene';
+import { Application } from '@zephyr3d/scene';
 
 interface GUIParams {
   numInstances: number;
@@ -14,7 +15,7 @@ export class Panel {
   private _params: GUIParams;
   private _camera: Camera;
   private _gui: GUI;
-  constructor(instanceCount: number, camera: Camera, addFunc: () => number, removeFunc: () => number){
+  constructor(instanceCount: number, camera: Camera, addFunc: () => number, removeFunc: () => number) {
     this._camera = camera;
     this._params = {
       numInstances: instanceCount,
@@ -31,7 +32,7 @@ export class Panel {
     this._gui = new GUI({ container: document.body });
     this.create();
   }
-  create(){
+  create() {
     const desc1 = document.createElement('p');
     desc1.style.marginTop = '1.5rem';
     desc1.style.padding = '0.5rem';
@@ -43,11 +44,14 @@ export class Panel {
     desc2.style.color = '#ffff00';
     desc2.innerText = 'The command buffer reuse optimization is only valid when used with a WebGPU device.';
     this._gui.domElement.append(desc1, desc2);
-    
+
     const stats = this._gui.addFolder('Stats');
-    stats.add(this._params, 'commandBufferReuse').name('Reuse commandbuffer').onChange(value=>{
-      this._camera.commandBufferReuse = value;
-    });
+    stats
+      .add(this._params, 'commandBufferReuse')
+      .name('Reuse commandbuffer')
+      .onChange((value) => {
+        this._camera.commandBufferReuse = value;
+      });
     stats.add(this._params, 'deviceType').name('Device').disable(true);
     stats.add(this._params, 'numInstances').name('Instance count').disable(true).listen();
     stats.add(this._params, 'add').name('Add 500 instances');
