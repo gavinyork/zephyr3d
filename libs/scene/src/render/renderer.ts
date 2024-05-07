@@ -228,7 +228,8 @@ export class SceneRenderer {
         ctx.depthTexture.width,
         ctx.depthTexture.height,
         colorFmt,
-        ctx.depthTexture
+        ctx.depthTexture,
+        true
       );
       device.pushDeviceStates();
       device.setFramebuffer(sceneColorFramebuffer);
