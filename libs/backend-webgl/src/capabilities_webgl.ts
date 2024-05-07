@@ -276,6 +276,7 @@ export class WebGLTextureCaps implements TextureCaps {
   private _isWebGL2: boolean;
   private _extS3TC: WEBGL_compressed_texture_s3tc;
   private _extS3TCSRGB: WEBGL_compressed_texture_s3tc_srgb;
+  private _extBPTC: EXT_texture_compression_bptc;
   private _extTextureFilterAnisotropic: EXT_texture_filter_anisotropic;
   private _extDepthTexture: WEBGL_depth_texture;
   private _extSRGB: EXT_sRGB;
@@ -290,6 +291,7 @@ export class WebGLTextureCaps implements TextureCaps {
   npo2Repeating: boolean;
   supportS3TC: boolean;
   supportS3TCSRGB: boolean;
+  supportBPTC: boolean;
   supportDepthTexture: boolean;
   support3DTexture: boolean;
   supportSRGBTexture: boolean;
@@ -359,6 +361,8 @@ export class WebGLTextureCaps implements TextureCaps {
     this.supportS3TC = !!this._extS3TC;
     this._extS3TCSRGB = gl.getExtension('WEBGL_compressed_texture_s3tc_srgb');
     this.supportS3TCSRGB = !!this._extS3TCSRGB;
+    this._extBPTC = gl.getExtension('EXT_texture_compression_bptc');
+    this.supportBPTC = !!this._extBPTC;
 
     this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
     this.maxCubeTextureSize = gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE);
@@ -425,6 +429,40 @@ export class WebGLTextureCaps implements TextureCaps {
       this._textureFormatInfos['dxt5-srgb'] = {
         glFormat: gl.NONE,
         glInternalFormat: this._extS3TCSRGB.COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT,
+        glType: [gl.NONE],
+        filterable: true,
+        renderable: false,
+        compressed: true
+      };
+    }
+    if (this.supportBPTC) {
+      this._textureFormatInfos['bc6h'] = {
+        glFormat: gl.NONE,
+        glInternalFormat: this._extBPTC.COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT_EXT,
+        glType: [gl.NONE],
+        filterable: true,
+        renderable: false,
+        compressed: true
+      };
+      this._textureFormatInfos['bc6h-signed'] = {
+        glFormat: gl.NONE,
+        glInternalFormat: this._extBPTC.COMPRESSED_RGB_BPTC_SIGNED_FLOAT_EXT,
+        glType: [gl.NONE],
+        filterable: true,
+        renderable: false,
+        compressed: true
+      };
+      this._textureFormatInfos['bc7'] = {
+        glFormat: gl.NONE,
+        glInternalFormat: this._extBPTC.COMPRESSED_RGBA_BPTC_UNORM_EXT,
+        glType: [gl.NONE],
+        filterable: true,
+        renderable: false,
+        compressed: true
+      };
+      this._textureFormatInfos['bc7-srgb'] = {
+        glFormat: gl.NONE,
+        glInternalFormat: this._extBPTC.COMPRESSED_SRGB_ALPHA_BPTC_UNORM_EXT,
         glType: [gl.NONE],
         filterable: true,
         renderable: false,

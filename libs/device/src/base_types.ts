@@ -102,6 +102,8 @@ const COMPRESSED_FORMAT_SHIFT = 24;
 const COMPRESSION_FORMAT_BC1 = 1 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC2 = 2 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC3 = 3 << COMPRESSED_FORMAT_SHIFT;
+const COMPRESSION_FORMAT_BC6H = 4 << COMPRESSED_FORMAT_SHIFT;
+const COMPRESSION_FORMAT_BC7 = 5 << COMPRESSED_FORMAT_SHIFT;
 /*
 const COMPRESSION_FORMAT_BC4 = 4 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC5 = 5 << COMPRESSED_FORMAT_SHIFT;
@@ -229,7 +231,11 @@ export type TextureFormat =
   | 'dxt3'
   | 'dxt3-srgb'
   | 'dxt5'
-  | 'dxt5-srgb';
+  | 'dxt5-srgb'
+  | 'bc7'
+  | 'bc7-srgb'
+  | 'bc6h'
+  | 'bc6h-signed';
 
 const textureFormatMap: Record<TextureFormat, number> = {
   unknown: 0,
@@ -998,6 +1004,74 @@ const textureFormatMap: Record<TextureFormat, number> = {
     4,
     4,
     16
+  ),
+  bc6h: makeTextureFormat(
+    COMPRESSION_FORMAT_BC6H,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    true,
+    false,
+    false,
+    false,
+    false,
+    4,
+    4,
+    16
+  ),
+  'bc6h-signed': makeTextureFormat(
+    COMPRESSION_FORMAT_BC6H,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    true,
+    false,
+    true,
+    false,
+    false,
+    4,
+    4,
+    16
+  ),
+  bc7: makeTextureFormat(
+    COMPRESSION_FORMAT_BC7,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    4,
+    4,
+    16
+  ),
+  'bc7-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_BC7,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    4,
+    4,
+    16
   )
 };
 
@@ -1019,6 +1093,8 @@ export function linearTextureFormatToSRGB(format: TextureFormat): TextureFormat 
       return 'dxt3-srgb';
     case 'dxt5':
       return 'dxt5-srgb';
+    case 'bc7':
+      return 'bc7-srgb';
     default:
       return format;
   }
@@ -1563,6 +1639,8 @@ export interface TextureCaps {
   npo2Repeating: boolean;
   /** True if device supports dxt1, dxt3, dxt5 texture format */
   supportS3TC: boolean;
+  /** True if device supports bptc texture format */
+  supportBPTC: boolean;
   /** True if device supports dxt1_srgb, dxt3-srgb, dxt5-srgb texture format */
   supportS3TCSRGB: boolean;
   /** True if device supports depth texture */

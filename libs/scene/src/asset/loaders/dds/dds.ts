@@ -313,7 +313,11 @@ const dxgiFormatMap: Record<number, TextureFormat> = {
   [74]: 'dxt3',
   [75]: 'dxt3-srgb',
   [77]: 'dxt5',
-  [78]: 'dxt5-srgb'
+  [78]: 'dxt5-srgb',
+  [95]: 'bc6h',
+  [96]: 'bc6h-signed',
+  [98]: 'bc7',
+  [99]: 'bc7-srgb'
 };
 
 const legacyDDSMap: {
@@ -542,7 +546,13 @@ function getMetaDataFromHeader(header: DDSHeader, metaData?: DDSMetaData): DDSMe
     return null;
   }
   metaData.isCompressed =
-    metaData.format === 'dxt1' || metaData.format === 'dxt3' || metaData.format === 'dxt5';
+    metaData.format === 'dxt1' ||
+    metaData.format === 'dxt3' ||
+    metaData.format === 'dxt5' ||
+    metaData.format === 'bc6h' ||
+    metaData.format === 'bc6h-signed' ||
+    metaData.format === 'bc7' ||
+    metaData.format === 'bc7-srgb';
   metaData.dataOffset = header.ddsHeaderDX10 ? 37 * 4 : 32 * 4;
   metaData.width = header.dwWidth;
   metaData.height = header.dwHeight;
@@ -556,7 +566,7 @@ function getMetaDataFromHeader(header: DDSHeader, metaData?: DDSMetaData): DDSMe
   } else if (header.dwCaps2 & DDSCAPS2_VOLUME) {
     metaData.isVolume = true;
     metaData.depth = header.dwDepth;
-  } else if (header.ddsHeaderDX10) {
+  } else if (header.ddsHeaderDX10 && header.ddsHeaderDX10.arraySize > 1) {
     metaData.isArray = true;
     metaData.depth = header.ddsHeaderDX10.arraySize;
   }
@@ -590,6 +600,10 @@ function getMipmapData(
       return new Uint8Array(dds, dataOffset, (((Math.max(4, width) / 4) * Math.max(4, height)) / 4) * 8);
     case 'dxt3':
     case 'dxt5':
+    case 'bc6h':
+    case 'bc6h-signed':
+    case 'bc7':
+    case 'bc7-srgb':
       return new Uint8Array(dds, dataOffset, (((Math.max(4, width) / 4) * Math.max(4, height)) / 4) * 16);
     default:
       return null;
