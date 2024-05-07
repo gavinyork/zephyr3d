@@ -278,6 +278,7 @@ export class WebGLTextureCaps implements TextureCaps {
   private _extS3TCSRGB: WEBGL_compressed_texture_s3tc_srgb;
   private _extBPTC: EXT_texture_compression_bptc;
   private _extRGTC: EXT_texture_compression_rgtc;
+  private _extASTC: WEBGL_compressed_texture_astc;
   private _extTextureFilterAnisotropic: EXT_texture_filter_anisotropic;
   private _extDepthTexture: WEBGL_depth_texture;
   private _extSRGB: EXT_sRGB;
@@ -294,6 +295,7 @@ export class WebGLTextureCaps implements TextureCaps {
   supportS3TCSRGB: boolean;
   supportBPTC: boolean;
   supportRGTC: boolean;
+  supportASTC: boolean;
   supportDepthTexture: boolean;
   support3DTexture: boolean;
   supportSRGBTexture: boolean;
@@ -367,6 +369,8 @@ export class WebGLTextureCaps implements TextureCaps {
     this.supportBPTC = !!this._extBPTC;
     this._extRGTC = gl.getExtension('EXT_texture_compression_rgtc');
     this.supportRGTC = !!this._extRGTC;
+    this._extASTC = gl.getExtension('WEBGL_compressed_texture_astc');
+    this.supportASTC = !!this._extASTC;
     this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
     this.maxCubeTextureSize = gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE);
     if (this._isWebGL2) {
@@ -386,6 +390,41 @@ export class WebGLTextureCaps implements TextureCaps {
         compressed: false
       }
     } as Record<TextureFormat, TextureFormatInfoWebGL>;
+    if (this.supportASTC) {
+      for (const k of [
+        '4x4',
+        '5x4',
+        '5x5',
+        '6x5',
+        '6x6',
+        '8x5',
+        '8x6',
+        '8x8',
+        '10x5',
+        '10x6',
+        '10x8',
+        '10x10',
+        '12x10',
+        '12x12'
+      ]) {
+        this._textureFormatInfos[`astc-${k}`] = {
+          glFormat: gl.NONE,
+          glInternalFormat: this._extASTC[`COMPRESSED_RGBA_ASTC_${k}_KHR`],
+          glType: [gl.NONE],
+          filterable: true,
+          renderable: false,
+          compressed: true
+        };
+        this._textureFormatInfos[`astc-${k}-srgb`] = {
+          glFormat: gl.NONE,
+          glInternalFormat: this._extASTC[`COMPRESSED_SRGB8_ALPHA8_ASTC_${k}_KHR`],
+          glType: [gl.NONE],
+          filterable: true,
+          renderable: false,
+          compressed: true
+        };
+      }
+    }
     if (this.supportS3TC) {
       this._textureFormatInfos['dxt1'] = {
         glFormat: gl.NONE,

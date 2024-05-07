@@ -94,6 +94,7 @@ export class WebGPUTextureCaps implements TextureCaps {
   supportS3TCSRGB: boolean;
   supportBPTC: boolean;
   supportRGTC: boolean;
+  supportASTC: boolean;
   supportDepthTexture: boolean;
   support3DTexture: boolean;
   supportSRGBTexture: boolean;
@@ -118,6 +119,7 @@ export class WebGPUTextureCaps implements TextureCaps {
     this.supportS3TCSRGB = this.supportS3TC;
     this.supportBPTC = this.supportS3TC;
     this.supportRGTC = this.supportS3TC;
+    this.supportASTC = device.device.features.has('texture-compression-astc');
     this.supportHalfFloatTexture = true;
     this.maxTextureSize = device.device.limits.maxTextureDimension2D;
     this.maxCubeTextureSize = device.device.limits.maxTextureDimension2D;
@@ -149,6 +151,46 @@ export class WebGPUTextureCaps implements TextureCaps {
         size: 4
       }
     } as Record<TextureFormat, TextureFormatInfoWebGPU>;
+    if (this.supportASTC) {
+      for (const k of [
+        '4x4',
+        '5x4',
+        '5x5',
+        '6x5',
+        '6x6',
+        '8x5',
+        '8x6',
+        '8x8',
+        '10x5',
+        '10x6',
+        '10x8',
+        '10x10',
+        '12x10',
+        '12x12'
+      ]) {
+        const [w, h] = k.split('x').map((val) => Number(val));
+        this._textureFormatInfos[`astc-${k}`] = {
+          gpuSampleType: 'float',
+          filterable: true,
+          renderable: false,
+          compressed: true,
+          size: 16,
+          writable: false,
+          blockWidth: w,
+          blockHeight: h
+        };
+        this._textureFormatInfos[`astc-${k}-srgb`] = {
+          gpuSampleType: 'float',
+          filterable: true,
+          renderable: false,
+          compressed: true,
+          size: 16,
+          writable: false,
+          blockWidth: w,
+          blockHeight: h
+        };
+      }
+    }
     if (this.supportS3TC) {
       this._textureFormatInfos['dxt1'] = {
         gpuSampleType: 'float',
