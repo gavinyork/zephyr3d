@@ -102,13 +102,11 @@ const COMPRESSED_FORMAT_SHIFT = 24;
 const COMPRESSION_FORMAT_BC1 = 1 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC2 = 2 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC3 = 3 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_BC6H = 4 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_BC7 = 5 << COMPRESSED_FORMAT_SHIFT;
-/*
 const COMPRESSION_FORMAT_BC4 = 4 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC5 = 5 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_BC6 = 6 << COMPRESSED_FORMAT_SHIFT;
+const COMPRESSION_FORMAT_BC6H = 6 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC7 = 7 << COMPRESSED_FORMAT_SHIFT;
+/*
 const COMPRESSION_FORMAT_ETC2_RGB8 = 8 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_ETC2_RGB8_A1 = 9 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_ETC2_RGBA8 = 10 << COMPRESSED_FORMAT_SHIFT;
@@ -232,6 +230,10 @@ export type TextureFormat =
   | 'dxt3-srgb'
   | 'dxt5'
   | 'dxt5-srgb'
+  | 'bc4'
+  | 'bc4-signed'
+  | 'bc5'
+  | 'bc5-signed'
   | 'bc7'
   | 'bc7-srgb'
   | 'bc6h'
@@ -1005,6 +1007,74 @@ const textureFormatMap: Record<TextureFormat, number> = {
     4,
     16
   ),
+  bc4: makeTextureFormat(
+    COMPRESSION_FORMAT_BC4,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    4,
+    4,
+    8
+  ),
+  'bc4-signed': makeTextureFormat(
+    COMPRESSION_FORMAT_BC4,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    false,
+    4,
+    4,
+    8
+  ),
+  bc5: makeTextureFormat(
+    COMPRESSION_FORMAT_BC5,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    4,
+    4,
+    16
+  ),
+  'bc5-signed': makeTextureFormat(
+    COMPRESSION_FORMAT_BC5,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    false,
+    4,
+    4,
+    16
+  ),
   bc6h: makeTextureFormat(
     COMPRESSION_FORMAT_BC6H,
     true,
@@ -1641,6 +1711,8 @@ export interface TextureCaps {
   supportS3TC: boolean;
   /** True if device supports bptc texture format */
   supportBPTC: boolean;
+  /** True if device supports rgtc texture format */
+  supportRGTC: boolean;
   /** True if device supports dxt1_srgb, dxt3-srgb, dxt5-srgb texture format */
   supportS3TCSRGB: boolean;
   /** True if device supports depth texture */

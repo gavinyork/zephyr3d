@@ -20,7 +20,7 @@ import {
 } from '@zephyr3d/scene';
 
 const panorama = './assets/images/cloudy.hdr';
-const texture = './assets/images/Di-3d-bc6h.dds';
+const texture = './assets/images/Di-3d-bc5s.dds';
 
 export abstract class TextureTestCase {
   protected assetManager: AssetManager;

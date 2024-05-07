@@ -93,6 +93,7 @@ export class WebGPUTextureCaps implements TextureCaps {
   supportS3TC: boolean;
   supportS3TCSRGB: boolean;
   supportBPTC: boolean;
+  supportRGTC: boolean;
   supportDepthTexture: boolean;
   support3DTexture: boolean;
   supportSRGBTexture: boolean;
@@ -116,6 +117,7 @@ export class WebGPUTextureCaps implements TextureCaps {
     this.supportS3TC = device.device.features.has('texture-compression-bc');
     this.supportS3TCSRGB = this.supportS3TC;
     this.supportBPTC = this.supportS3TC;
+    this.supportRGTC = this.supportS3TC;
     this.supportHalfFloatTexture = true;
     this.maxTextureSize = device.device.limits.maxTextureDimension2D;
     this.maxCubeTextureSize = device.device.limits.maxTextureDimension2D;
@@ -179,6 +181,48 @@ export class WebGPUTextureCaps implements TextureCaps {
         blockHeight: 4
       };
     }
+    if (this.supportRGTC) {
+      this._textureFormatInfos['bc4'] = {
+        gpuSampleType: 'float',
+        filterable: true,
+        renderable: false,
+        compressed: true,
+        size: 8,
+        writable: false,
+        blockWidth: 4,
+        blockHeight: 4
+      };
+      this._textureFormatInfos['bc4-signed'] = {
+        gpuSampleType: 'float',
+        filterable: true,
+        renderable: false,
+        compressed: true,
+        size: 8,
+        writable: false,
+        blockWidth: 4,
+        blockHeight: 4
+      };
+    }
+    this._textureFormatInfos['bc5'] = {
+      gpuSampleType: 'float',
+      filterable: true,
+      renderable: false,
+      compressed: true,
+      size: 16,
+      writable: false,
+      blockWidth: 4,
+      blockHeight: 4
+    };
+    this._textureFormatInfos['bc5-signed'] = {
+      gpuSampleType: 'float',
+      filterable: true,
+      renderable: false,
+      compressed: true,
+      size: 16,
+      writable: false,
+      blockWidth: 4,
+      blockHeight: 4
+    };
     if (this.supportBPTC) {
       this._textureFormatInfos['bc6h'] = {
         gpuSampleType: 'float',
