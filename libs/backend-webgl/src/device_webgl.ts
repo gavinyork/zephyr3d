@@ -921,6 +921,12 @@ export class WebGLDevice extends BaseDevice {
     }
     return !this._contextLost;
   }
+  nextFrame(callback: () => void): number {
+    return requestAnimationFrame(callback);
+  }
+  cancelNextFrame(handle: number) {
+    cancelAnimationFrame(handle);
+  }
   /** @internal */
   protected onEndFrame(): void {}
   /** @internal */

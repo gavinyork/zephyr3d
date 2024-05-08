@@ -198,4 +198,7 @@ export class CommandQueueImmediate {
   clear(color: Vector4, depth: number, stencil: number): void {
     this._renderPass.clear(color, depth, stencil);
   }
+  finish() {
+    return this._device.device.queue.onSubmittedWorkDone();
+  }
 }

@@ -2451,6 +2451,8 @@ export type DeviceViewport = {
 export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /** Get pool object */
   pool: Pool;
+  /** vSync */
+  vSync: boolean;
   /** Get sample count of current frame buffer */
   getFrameBufferSampleCount(): number;
   /** Returns true if device context is lost. */
@@ -2467,6 +2469,10 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   getBackBufferHeight(): number;
   /** Get the device capabilities */
   getDeviceCaps(): DeviceCaps;
+  /** Schedule next frame */
+  nextFrame(callback: () => void): number;
+  /** Cancel schedule next frame */
+  cancelNextFrame(handle: number);
   /** Set font for drawText function */
   setFont(fontName: string);
   /**

@@ -101,6 +101,7 @@ export abstract class BaseDevice {
   protected _programBuilder: ProgramBuilder;
   protected _pool: Pool;
   protected _temporalFramebuffer: boolean;
+  protected _vSync: boolean;
   private _stateStack: DeviceState[];
   constructor(cvs: HTMLCanvasElement, backend: DeviceBackend) {
     this._backend = backend;
@@ -144,6 +145,7 @@ export abstract class BaseDevice {
     this._beginFrameCounter = 0;
     this._pool = new Pool(this);
     this._temporalFramebuffer = false;
+    this._vSync = true;
     this._registerEventHandlers();
   }
   abstract getFrameBufferSampleCount(): number;
@@ -254,6 +256,8 @@ export abstract class BaseDevice {
   abstract setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>);
   abstract getBindGroup(index: number): [BindGroup, Iterable<number>];
   abstract flush(): void;
+  abstract nextFrame(callback: () => void): number;
+  abstract cancelNextFrame(handle: number);
   // misc
   abstract readPixels(
     index: number,
@@ -305,6 +309,12 @@ export abstract class BaseDevice {
   }
   get type(): string {
     return this._backend.typeName();
+  }
+  get vSync(): boolean {
+    return this._vSync;
+  }
+  set vSync(val: boolean) {
+    this._vSync = !!val;
   }
   get pool(): Pool {
     return this._pool;
@@ -497,8 +507,12 @@ export abstract class BaseDevice {
     }
   }
   exitLoop() {
-    if (this._runningLoop) {
-      cancelAnimationFrame(this._runningLoop);
+    if (this._runningLoop !== null) {
+      if (this._runningLoop !== 0) {
+        cancelAnimationFrame(this._runningLoop);
+      } else {
+        this.cancelNextFrame(this._runningLoop);
+      }
       this._runningLoop = null;
     }
   }
@@ -514,7 +528,15 @@ export abstract class BaseDevice {
     const that = this;
     that._runLoopFunc = func;
     (function entry() {
-      that._runningLoop = requestAnimationFrame(entry);
+      if (that._vSync) {
+        that._runningLoop = requestAnimationFrame(entry);
+      } else {
+        that._runningLoop = that.nextFrame(() => {
+          if (that._runningLoop !== null) {
+            entry();
+          }
+        });
+      }
       if (that.beginFrame()) {
         that._runLoopFunc(that as unknown as AbstractDevice);
         that.endFrame();

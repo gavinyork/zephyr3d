@@ -4,6 +4,7 @@ import { ABufferOIT, Application, WeightedBlendedOIT } from '@zephyr3d/scene';
 
 interface GUIParams {
   deviceType: string;
+  vSync: boolean;
   environment: string;
   iblLighting: boolean;
   punctualLighting: boolean;
@@ -36,6 +37,7 @@ export class Panel {
         this._deviceList[
           this._deviceList.findIndex((val) => val.toLowerCase() === Application.instance.device.type)
         ],
+      vSync: Application.instance.device.vSync,
       environment: this._viewer.envMaps.getCurrentId(),
       iblLighting: this._viewer.environmentLightEnabled,
       punctualLighting: this._viewer.punctualLightEnabled,
@@ -90,6 +92,12 @@ export class Panel {
         const url = new URL(window.location.href);
         url.searchParams.set('dev', value.toLowerCase());
         window.location.href = url.href;
+      });
+    systemSettings
+      .add(this._params, 'vSync')
+      .name('VSync')
+      .onChange((value) => {
+        Application.instance.device.vSync = value;
       });
 
     const lightSettings = this._gui.addFolder('Lighting');

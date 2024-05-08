@@ -50,42 +50,9 @@ gltfApp.ready().then(async () => {
       gltfViewer.handleDrop(ev.dataTransfer);
     }
   });
-  let movingSun = 0;
   Application.instance.device.canvas.addEventListener('contextmenu', function (ev) {
     ev.preventDefault();
     return false;
-  });
-  gltfApp.on('pointermove', (ev) => {
-    if (movingSun) {
-      const viewport = Application.instance.device.getViewport();
-      const ray = scene.constructRay(
-        gltfViewer.camera,
-        viewport.width,
-        viewport.height,
-        ev.offsetX,
-        ev.offsetY
-      );
-      gltfViewer.light0.lookAt(ray.direction, Vector3.zero(), Vector3.axisPY());
-    }
-  });
-  gltfApp.on('pointerdown', (ev) => {
-    if (ev.button === 2) {
-      const viewport = Application.instance.device.getViewport();
-      const ray = scene.constructRay(
-        gltfViewer.camera,
-        viewport.width,
-        viewport.height,
-        ev.offsetX,
-        ev.offsetY
-      );
-      gltfViewer.light0.lookAt(ray.direction, Vector3.zero(), Vector3.axisPY());
-      movingSun = 1;
-    }
-  });
-  gltfApp.on('pointerup', (ev) => {
-    if (ev.button === 2) {
-      movingSun = 0;
-    }
   });
   gltfApp.on('resize', (ev) => {
     gltfViewer.camera.aspect = ev.width / ev.height;

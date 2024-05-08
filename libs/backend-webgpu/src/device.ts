@@ -264,6 +264,13 @@ export class WebGPUDevice extends BaseDevice {
     });
     this.dispatchEvent(new DeviceResizeEvent(this.canvas.clientWidth, this.canvas.clientHeight));
   }
+  nextFrame(callback: () => void): number {
+    this._commandQueue.finish().then(callback);
+    return 0;
+  }
+  cancelNextFrame(handle: number) {
+    return;
+  }
   clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number) {
     this._commandQueue.clear(clearColor, clearDepth, clearStencil);
   }

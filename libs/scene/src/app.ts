@@ -100,9 +100,7 @@ export class Application extends makeEventTarget(Object)<appEventMap>() {
   private _options: AppOptions;
   private _device: AbstractDevice;
   private _inputManager: InputManager;
-  private _running: number;
   private _ready: boolean;
-  private _canRender: boolean;
   private _drawEvent: AppTickEvent;
   private _logger: Logger;
   private _elapsed: number;
@@ -124,9 +122,7 @@ export class Application extends makeEventTarget(Object)<appEventMap>() {
       canvas: opt.canvas
     };
     this._inputManager = new InputManager(this);
-    this._running = null;
     this._ready = false;
-    this._canRender = false;
     this._elapsed = 0;
     this._drawEvent = new AppTickEvent();
     this._logger = {
@@ -152,15 +148,6 @@ export class Application extends makeEventTarget(Object)<appEventMap>() {
   /** The options that was used to create the application */
   get options(): AppOptions {
     return this._options;
-  }
-  /**
-   * Query if the device is ok to render objects now.
-   *
-   * @remarks
-   * False will be returned if the device is lost.
-   */
-  get canRender(): boolean {
-    return this._canRender;
   }
   /**
    * Query time elapsed since last frame in seconds
@@ -212,32 +199,22 @@ export class Application extends makeEventTarget(Object)<appEventMap>() {
   /** Render one frame */
   frame() {
     if (this._ready) {
-      this._canRender = this.device.beginFrame();
       this._elapsed = this.device.frameInfo.elapsedFrame * 0.001;
       this.device.setFramebuffer(null);
       this.device.setViewport(null);
       this.device.setScissor(null);
       this.dispatchEvent(this._drawEvent);
-      this.device.endFrame();
     }
   }
   /** Start running the rendering loop */
   run() {
-    if (this._running) {
-      return;
-    }
-    const that = this;
-    (function entry() {
-      that._running = requestAnimationFrame(entry);
-      that.frame();
-    })();
+    this.device.runLoop(() => {
+      this.frame();
+    });
   }
   /** Stop running the rendering loop */
   stop() {
-    if (this._running) {
-      cancelAnimationFrame(this._running);
-      this._running = null;
-    }
+    this.device.exitLoop();
   }
   /** Message log */
   log(text: string, mode?: LogMode) {
