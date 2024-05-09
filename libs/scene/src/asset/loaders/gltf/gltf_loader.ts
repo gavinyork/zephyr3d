@@ -461,6 +461,8 @@ export class GLTFLoader extends AbstractModelLoader {
               TEXCOORD_0: 'tex0_f32x2',
               COLOR_0: 'diffuse_f32x4'
             };
+            let targetMin: Vector3 = null;
+            let targetMax: Vector3 = null;
             for (const target of p.targets) {
               for (const k in target) {
                 const t = targetMap[k];
@@ -468,10 +470,18 @@ export class GLTFLoader extends AbstractModelLoader {
                   targets[t] = targets[t] ?? [];
                   const accessorIndex = target[k] as number;
                   targets[t].push(gltf._accessors[accessorIndex].getNormalizedDeinterlacedView(gltf));
+                  if (k === 'POSITION') {
+                    const min = gltf._accessors[accessorIndex].min;
+                    const max = gltf._accessors[accessorIndex].max;
+                    targetMin = new Vector3(min[0], min[1], min[2]);
+                    targetMax = new Vector3(max[0], max[1], max[2]);
+                  }
                 }
               }
             }
             subMeshData.targets = targets;
+            subMeshData.targetMin = targetMin;
+            subMeshData.targetMax = targetMax;
           }
           const primitive = new Primitive();
           const attributes = p.attributes;

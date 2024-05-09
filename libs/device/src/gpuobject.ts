@@ -715,7 +715,7 @@ export enum GPUResourceUsageFlags {
 
 /**
  * Get vertex attribute index by semantic
- * @internal
+ * @public
  */
 export function getVertexAttribByName(name: VertexSemantic): number {
   return vertexAttribNameMap[name];
@@ -723,7 +723,7 @@ export function getVertexAttribByName(name: VertexSemantic): number {
 
 /**
  * Get vertex semantic by attribute index
- * @internal
+ * @public
  */
 export function getVertexAttribName(attrib: number): VertexSemantic {
   return vertexAttribNameRevMap[attrib];
@@ -731,10 +731,18 @@ export function getVertexAttribName(attrib: number): VertexSemantic {
 
 /**
  * Get byte size of specified vertex format
- * @internal
+ * @public
  */
 export function getVertexFormatSize(fmt: VertexAttribFormat): number {
   return vertexAttribFormatMap[fmt][2];
+}
+
+/**
+ * Get number of components of specified vertex format
+ * @public
+ */
+export function getVertexFormatComponentCount(fmt: VertexAttribFormat): number {
+  return vertexAttribFormatMap[fmt][4];
 }
 
 /**

@@ -499,6 +499,10 @@ export class AssetManager {
             animation.addTrack(nodeMap.get(track.node), new ScaleTrack(track.interpolator));
           } else if (track.type === 'rotation') {
             animation.addTrack(nodeMap.get(track.node), new RotationTrack(track.interpolator));
+          } else if (track.type === 'weights') {
+            for (const m of track.node.mesh.subMeshes) {
+              console.log(m.mesh);
+            }
           } else {
             console.error(`Invalid animation track type: ${track.type}`);
           }
@@ -652,8 +656,8 @@ export class AssetManager {
         meshNode.showState = 'inherit';
         meshNode.primitive = subMesh.primitive;
         meshNode.material = instancing ? subMesh.material.createInstance() : subMesh.material;
-        // meshNode.drawBoundingBox = true;
         meshNode.reparent(node);
+        subMesh.mesh = meshNode;
         if (skeleton) {
           if (!skeletonMeshMap.has(skeleton)) {
             skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });

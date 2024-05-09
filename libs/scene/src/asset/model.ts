@@ -2,7 +2,8 @@ import type { Vector4, TypedArray, Interpolator } from '@zephyr3d/base';
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { Texture2D, TextureSampler } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
-import type { MeshMaterial } from '../material';
+import type { MeshMaterial } from '../material/meshmaterial';
+import type { Mesh } from '../scene/mesh';
 
 /**
  * Named object interface for model loading
@@ -157,11 +158,14 @@ export type MorphTargetAttribute =
 export interface AssetSubMeshData {
   primitive: Primitive;
   material: MeshMaterial;
+  mesh?: Mesh;
   rawPositions: Float32Array;
   rawBlendIndices: TypedArray;
   rawJointWeights: TypedArray;
   name: string;
   targets?: Partial<Record<MorphTargetAttribute, Float32Array[]>>;
+  targetMin?: Vector3;
+  targetMax?: Vector3;
 }
 
 /**

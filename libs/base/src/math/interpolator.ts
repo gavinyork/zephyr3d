@@ -83,6 +83,10 @@ export class Interpolator {
   get target(): InterpolationTarget {
     return this._target;
   }
+  /** stride */
+  get stride(): number {
+    return this._stride;
+  }
   get maxTime(): number {
     return this._maxTime;
   }
