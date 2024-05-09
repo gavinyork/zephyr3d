@@ -12,7 +12,8 @@ import type {
   AssetPBRMaterialSG,
   AssetMaterialCommon,
   MaterialTextureInfo,
-  AssetPBRMaterialCommon
+  AssetPBRMaterialCommon,
+  AssetAnimationTrack
 } from '../../model';
 import { SharedModel, AssetSkeleton, AssetScene } from '../../model';
 import { BoundingBox } from '../../../utility/bounding_volume';
@@ -282,30 +283,6 @@ export class GLTFLoader extends AbstractModelLoader {
     return collect;
   }
   /** @internal */
-  private updateNodeTransform(
-    nodeTransforms: Map<
-      AssetHierarchyNode,
-      {
-        translate: Vector3;
-        scale: Vector3;
-        rotation: Quaternion;
-        worldTransform: Matrix4x4;
-      }
-    >,
-    node: AssetHierarchyNode
-  ) {
-    const transform = nodeTransforms.get(node);
-    if (!transform.worldTransform) {
-      transform.worldTransform = Matrix4x4.scaling(transform.scale)
-        .rotateLeft(transform.rotation)
-        .translateLeft(transform.translate);
-      if (node.parent) {
-        this.updateNodeTransform(nodeTransforms, node.parent);
-        transform.worldTransform.multiplyLeft(nodeTransforms.get(node.parent).worldTransform);
-      }
-    }
-  }
-  /** @internal */
   private getAnimationInfo(
     gltf: GLTFContent,
     index: number
@@ -313,7 +290,7 @@ export class GLTFLoader extends AbstractModelLoader {
     name: string;
     channels: AnimationChannel[];
     samplers: AnimationSampler[];
-    interpolatorTypes: ('translation' | 'scale' | 'rotation')[];
+    interpolatorTypes: ('translation' | 'scale' | 'rotation' | 'weights')[];
     interpolators: Interpolator[];
     maxTime: number;
     nodes: Map<
@@ -331,7 +308,7 @@ export class GLTFLoader extends AbstractModelLoader {
     const channels = animationInfo.channels;
     const samplers = animationInfo.samplers;
     const interpolators = [] as Interpolator[];
-    const interpolatorTypes = [] as ('translation' | 'scale' | 'rotation')[];
+    const interpolatorTypes = [] as ('translation' | 'scale' | 'rotation' | 'weights')[];
     const nodes = this.collectNodes(gltf);
     let maxTime = 0;
     for (let i = 0; i < channels.length; i++) {
@@ -354,6 +331,9 @@ export class GLTFLoader extends AbstractModelLoader {
       } else if (channel.target.path === 'scale') {
         interpolators.push(new Interpolator(mode, 'vec3', input, output));
         interpolatorTypes.push('scale');
+      } else if (channel.target.path === 'weights') {
+        interpolators.push(new Interpolator(mode, null, input, output));
+        interpolatorTypes.push('weights');
       } else {
         continue;
       }
@@ -375,11 +355,15 @@ export class GLTFLoader extends AbstractModelLoader {
     };
     for (let i = 0; i < animationInfo.channels.length; i++) {
       const targetNode = gltf._nodes[animationInfo.channels[i].target.node];
-      animationData.tracks.push({
+      const track: AssetAnimationTrack = {
         node: targetNode,
         type: animationInfo.interpolatorTypes[i],
         interpolator: animationInfo.interpolators[i]
-      });
+      };
+      if (track.type === 'weights') {
+        track.defaultMorphWeights = targetNode.weights;
+      }
+      animationData.tracks.push(track);
       if (animationData.nodes.indexOf(targetNode) < 0) {
         animationData.nodes.push(targetNode);
       }
@@ -411,6 +395,7 @@ export class GLTFLoader extends AbstractModelLoader {
       node = model.addNode(parent, nodeIndex, nodeInfo.name);
       if (typeof nodeInfo.mesh === 'number') {
         node.mesh = gltf._meshes[nodeInfo.mesh];
+        node.weights = nodeInfo.weights ?? gltf.meshes[nodeInfo.mesh].weights ?? null;
       }
       if (!(typeof nodeInfo.skin === 'number') || nodeInfo.skin < 0) {
         // GLTF spec: Only the joint transforms are applied to the skinned mesh; the transform of the skinned mesh node MUST be ignored.
@@ -467,6 +452,27 @@ export class GLTFLoader extends AbstractModelLoader {
             rawBlendIndices: null,
             rawJointWeights: null
           };
+          if (p.targets) {
+            const targets: AssetSubMeshData['targets'] = {};
+            const targetMap = {
+              POSITION: 'position_f32x3',
+              NORMAL: 'normal_f32x3',
+              TANGENT: 'tangent_f32x3',
+              TEXCOORD_0: 'tex0_f32x2',
+              COLOR_0: 'diffuse_f32x4'
+            };
+            for (const target of p.targets) {
+              for (const k in target) {
+                const t = targetMap[k];
+                if (t) {
+                  targets[t] = targets[t] ?? [];
+                  const accessorIndex = target[k] as number;
+                  targets[t].push(gltf._accessors[accessorIndex].getNormalizedDeinterlacedView(gltf));
+                }
+              }
+            }
+            subMeshData.targets = targets;
+          }
           const primitive = new Primitive();
           const attributes = p.attributes;
           const dracoExtension = gltf._dracoModule ? p.extensions?.['KHR_draco_mesh_compression'] : null;

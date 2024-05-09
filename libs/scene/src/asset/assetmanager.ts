@@ -492,7 +492,6 @@ export class AssetManager {
       }
       for (const animationData of model.animations) {
         const animation = new AnimationClip(animationData.name, group);
-        animationSet.add(animation);
         for (const track of animationData.tracks) {
           if (track.type === 'translation') {
             animation.addTrack(nodeMap.get(track.node), new TranslationTrack(track.interpolator));
@@ -504,6 +503,10 @@ export class AssetManager {
             console.error(`Invalid animation track type: ${track.type}`);
           }
         }
+        if (animation.tracks.size === 0) {
+          continue;
+        }
+        animationSet.add(animation);
         for (const sk of animationData.skeletons) {
           const nodes = skeletonMeshMap.get(sk);
           if (nodes) {

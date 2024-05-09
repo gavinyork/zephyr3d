@@ -141,6 +141,16 @@ export interface AssetPBRMaterialSG extends AssetPBRMaterialCommon {
 }
 
 /**
+ * Morph target attributes
+ */
+export type MorphTargetAttribute =
+  | 'position_f32x3'
+  | 'normal_f32x3'
+  | 'tangent_f32x3'
+  | 'diffuse_f32x4'
+  | 'tex0_f32x2';
+
+/**
  * Sub mesh data interface for model loading
  * @public
  */
@@ -151,6 +161,7 @@ export interface AssetSubMeshData {
   rawBlendIndices: TypedArray;
   rawJointWeights: TypedArray;
   name: string;
+  targets?: Partial<Record<MorphTargetAttribute, Float32Array[]>>;
 }
 
 /**
@@ -167,8 +178,9 @@ export interface AssetMeshData {
  */
 export interface AssetAnimationTrack {
   node: AssetHierarchyNode;
-  type: 'translation' | 'scale' | 'rotation';
+  type: 'translation' | 'scale' | 'rotation' | 'weights';
   interpolator: Interpolator;
+  defaultMorphWeights?: number[];
 }
 
 /**
@@ -234,6 +246,7 @@ export class AssetHierarchyNode extends NamedObject {
   private _meshAttached: boolean;
   private _matrix: Matrix4x4;
   private _worldMatrix: Matrix4x4;
+  private _weights: number[];
   private _children: AssetHierarchyNode[];
   /**
    * Creates an instance of AssetHierarchyNode
@@ -253,6 +266,7 @@ export class AssetHierarchyNode extends NamedObject {
     this._meshAttached = false;
     this._attachIndex = -1;
     this._matrix = null;
+    this._weights = null;
     this._worldMatrix = null;
     parent?.addChild(this);
   }
@@ -275,6 +289,13 @@ export class AssetHierarchyNode extends NamedObject {
   set mesh(data: AssetMeshData) {
     this._mesh = data;
     this.setMeshAttached();
+  }
+  /** Default morph target weights */
+  get weights(): number[] {
+    return this._weights;
+  }
+  set weights(val: number[]) {
+    this._weights = val;
   }
   /** The skeleton used to control the node */
   get skeleton(): AssetSkeleton {

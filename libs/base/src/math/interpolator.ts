@@ -72,7 +72,7 @@ export class Interpolator {
     this._outputs = outputs;
     this._mode = mode;
     this._target = target;
-    this._stride = strideMap[target] ?? 0;
+    this._stride = strideMap[target] ?? Math.floor(outputs.length / inputs.length);
     this._maxTime = inputs[inputs.length - 1];
   }
   /** Gets the interpolation mode */
@@ -126,8 +126,7 @@ export class Interpolator {
     const tn = (t - input[this._prevKey]) / keyDelta;
     if (this._target === 'quat') {
       if (this._mode === 'cubicspline') {
-        this.cubicSpline(this._prevKey, nextKey, keyDelta, tn, tmpQuat3);
-        result.set(tmpQuat3);
+        this.cubicSpline(this._prevKey, nextKey, keyDelta, tn, result);
         return result;
       } else if (this._mode === 'linear') {
         this.getQuat(this._prevKey, tmpQuat1);
