@@ -20,6 +20,7 @@ import type { BaseTexture, Texture2D, GPUObject, SamplerOptions } from '@zephyr3
 import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
+import { MorphTargetTrack } from '../animation/morphtrack';
 
 /**
  * Options for texture fetching
@@ -501,7 +502,8 @@ export class AssetManager {
             animation.addTrack(nodeMap.get(track.node), new RotationTrack(track.interpolator));
           } else if (track.type === 'weights') {
             for (const m of track.node.mesh.subMeshes) {
-              console.log(m.mesh);
+              const morphTrack = new MorphTargetTrack(track, m);
+              animation.addTrack(m.mesh, morphTrack);
             }
           } else {
             console.error(`Invalid animation track type: ${track.type}`);

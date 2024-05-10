@@ -54,9 +54,10 @@ export class MorphTargetTrack extends AnimationTrack {
     const textureData = new Float32Array(textureSize * textureSize * 4);
     for (const attrib of allMorphTargets) {
       const index = attributes.indexOf(String(attrib));
-      if (index >= 0) {
-        this._offsets.push(offset);
+      if (index < 0) {
+        continue;
       }
+      this._offsets.push(offset);
       const info = subMesh.targets[attrib];
       if (info.data.length !== this._numTargets) {
         console.error(`Invalid morph target data`);
