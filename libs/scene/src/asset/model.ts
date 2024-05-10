@@ -156,6 +156,7 @@ export interface AssetSubMeshData {
   targets?: Partial<Record<number, { numComponents: number; data: Float32Array[] }>>;
   targetMin?: Vector3;
   targetMax?: Vector3;
+  morphAttribCount?: number;
 }
 
 /**

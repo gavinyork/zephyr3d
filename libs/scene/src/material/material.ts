@@ -138,9 +138,9 @@ export class Material {
   }
   /** @internal */
   private calcGlobalHash(ctx: DrawContext, pass: number): string {
-    return `${this.getHash(pass)}:${Number(!!ctx.skinAnimation)}:${Number(!!ctx.instancing)}:${
-      ctx.renderPassHash
-    }`;
+    return `${this.getHash(pass)}:${Number(!!ctx.morphAnimation)}${Number(!!ctx.skinAnimation)}:${Number(
+      !!ctx.instancing
+    )}:${ctx.renderPassHash}`;
   }
   /**
    * Draws a primitive using this material

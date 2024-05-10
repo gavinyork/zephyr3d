@@ -73,7 +73,7 @@ export class AnimationSet {
   /**
    * Starts playing an animation of the model
    * @param name - Name of the animation to play
-   * @param repeat - The repeat times, 0 for always repeating, default is 1
+   * @param repeat - The repeat times, 0 for always repeating, default is 0
    * @param ratio - The speed ratio, default is 1. Use negative value to play backwards
    */
   playAnimation(name: string, repeat = 0, speedRatio = 1): void {

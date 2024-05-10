@@ -6,7 +6,7 @@ import type { Material } from '../material';
 import { LambertMaterial } from '../material';
 import type { RenderPass, Primitive, BatchDrawable, DrawContext } from '../render';
 import { Application } from '../app';
-import type { Texture2D } from '@zephyr3d/device';
+import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
 import type { XForm } from './xform';
 import type { Scene } from './scene';
 import type { BoundingBox, BoundingVolume } from '../utility/bounding_volume';
@@ -33,6 +33,10 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   protected _invBindMatrix: Matrix4x4;
   /** @internal */
+  protected _morphData: Texture2D;
+  /** @internal */
+  protected _morphInfo: GPUDataBuffer;
+  /** @internal */
   protected _instanceHash: string;
   /** @internal */
   protected _batchable: boolean;
@@ -52,6 +56,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._animatedBoundingBox = null;
     this._boneMatrices = null;
     this._invBindMatrix = null;
+    this._morphData = null;
+    this._morphInfo = null;
     this._instanceHash = null;
     this._boundingBoxNode = null;
     this._instanceColor = Vector4.zero();
@@ -177,6 +183,20 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    */
   setInvBindMatrix(matrix: Matrix4x4) {
     this._invBindMatrix = matrix;
+  }
+  /**
+   * Sets the texture that contains the morph target data
+   * @param data - The texture that contains the morph target data
+   */
+  setMorphData(data: Texture2D) {
+    this._morphData = data;
+  }
+  /**
+   * Sets the buffer that contains the morph target information
+   * @param info - The buffer that contains the morph target information
+   */
+  setMorphInfo(info: GPUDataBuffer) {
+    this._morphInfo = info;
   }
   /**
    * {@inheritDoc Drawable.isBatchable}

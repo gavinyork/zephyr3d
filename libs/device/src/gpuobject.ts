@@ -307,10 +307,28 @@ export type VertexAttribFormat =
   | 'tex7_u32x2'
   | 'tex7_u32x3'
   | 'tex7_u32x4'
+  | 'blendweights_f16x1'
+  | 'blendweights_f32x1'
+  | 'blendweights_f16x2'
+  | 'blendweights_f32x2'
+  | 'blendweights_f16x3'
+  | 'blendweights_f32x3'
   | 'blendweights_f16x4'
   | 'blendweights_f32x4'
-  | 'blendindices_u16x4'
+  | 'blendindices_f16x1'
+  | 'blendindices_u16x1'
+  | 'blendindices_f32x1'
+  | 'blendindices_u32x1'
+  | 'blendindices_f16x2'
+  | 'blendindices_u16x2'
+  | 'blendindices_f32x2'
+  | 'blendindices_u32x2'
+  | 'blendindices_f16x3'
+  | 'blendindices_u16x3'
+  | 'blendindices_f32x3'
+  | 'blendindices_u32x3'
   | 'blendindices_f16x4'
+  | 'blendindices_u16x4'
   | 'blendindices_f32x4'
   | 'blendindices_u32x4';
 
@@ -563,8 +581,26 @@ const vertexAttribFormatMap: Record<VertexAttribFormat, [number, PBPrimitiveType
   tex7_u32x2: [VERTEX_ATTRIB_TEXCOORD7, PBPrimitiveType.U32VEC2, 8, 'u32', 2],
   tex7_u32x3: [VERTEX_ATTRIB_TEXCOORD7, PBPrimitiveType.U32VEC3, 12, 'u32', 3],
   tex7_u32x4: [VERTEX_ATTRIB_TEXCOORD7, PBPrimitiveType.U32VEC4, 16, 'u32', 4],
+  blendweights_f16x1: [VERTEX_ATTRIB_BLEND_WEIGHT, PBPrimitiveType.F16, 2, 'f16', 1],
+  blendweights_f32x1: [VERTEX_ATTRIB_BLEND_WEIGHT, PBPrimitiveType.F32, 4, 'f32', 1],
+  blendweights_f16x2: [VERTEX_ATTRIB_BLEND_WEIGHT, PBPrimitiveType.F16VEC2, 4, 'f16', 2],
+  blendweights_f32x2: [VERTEX_ATTRIB_BLEND_WEIGHT, PBPrimitiveType.F32VEC2, 8, 'f32', 2],
+  blendweights_f16x3: [VERTEX_ATTRIB_BLEND_WEIGHT, PBPrimitiveType.F16VEC3, 6, 'f16', 3],
+  blendweights_f32x3: [VERTEX_ATTRIB_BLEND_WEIGHT, PBPrimitiveType.F32VEC3, 12, 'f32', 3],
   blendweights_f16x4: [VERTEX_ATTRIB_BLEND_WEIGHT, PBPrimitiveType.F16VEC4, 8, 'f16', 4],
   blendweights_f32x4: [VERTEX_ATTRIB_BLEND_WEIGHT, PBPrimitiveType.F32VEC4, 16, 'f32', 4],
+  blendindices_u16x1: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.U16, 2, 'u16', 1],
+  blendindices_f16x1: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.F16, 2, 'f16', 1],
+  blendindices_f32x1: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.F32, 4, 'f32', 1],
+  blendindices_u32x1: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.U32, 4, 'u32', 1],
+  blendindices_u16x2: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.U16VEC2, 4, 'u16', 2],
+  blendindices_f16x2: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.F16VEC2, 4, 'f16', 2],
+  blendindices_f32x2: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.F32VEC2, 8, 'f32', 2],
+  blendindices_u32x2: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.U32VEC2, 8, 'u32', 2],
+  blendindices_u16x3: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.U16VEC3, 6, 'u16', 3],
+  blendindices_f16x3: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.F16VEC3, 6, 'f16', 3],
+  blendindices_f32x3: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.F32VEC3, 12, 'f32', 3],
+  blendindices_u32x3: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.U32VEC3, 12, 'u32', 3],
   blendindices_u16x4: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.U16VEC4, 8, 'u16', 4],
   blendindices_f16x4: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.F16VEC4, 8, 'f16', 4],
   blendindices_f32x4: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.F32VEC4, 16, 'f32', 4],

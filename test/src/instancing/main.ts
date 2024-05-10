@@ -7,9 +7,6 @@ import {
   Tonemap,
   BatchGroup,
   DirectionalLight,
-  BoxShape,
-  LambertMaterial,
-  Mesh,
   WeightedBlendedOIT,
   ABufferOIT,
   AssetManager
@@ -53,6 +50,12 @@ instancingApp.ready().then(async () => {
   const assetManager = new AssetManager();
   assetManager.fetchModel(scene, 'assets/SimpleMorph.gltf', { enableInstancing: false }).then((info) => {
     info.group.parent = batchGroup;
+    if (info.animationSet) {
+      const animationNames = info.animationSet.getAnimationNames();
+      if (animationNames?.length > 0) {
+        info.animationSet.playAnimation(animationNames[0]);
+      }
+    }
   });
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());

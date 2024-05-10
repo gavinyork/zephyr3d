@@ -84,6 +84,8 @@ export interface DrawContext {
   clusteredLight?: ClusteredLight;
   /** Whether skin animation is used */
   skinAnimation?: boolean;
+  /** Whether morph animation is used */
+  morphAnimation?: boolean;
   /** Whehter instance rendering is used */
   instancing?: boolean;
 }

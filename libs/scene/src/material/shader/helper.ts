@@ -32,6 +32,8 @@ const UNIFORM_NAME_INSTANCE_DATA_OFFSET = 'Z_UniformInstanceDataOffset';
 const UNIFORM_NAME_BONE_MATRICES = 'Z_UniformBoneMatrices';
 const UNIFORM_NAME_BONE_TEXTURE_SIZE = 'Z_UniformBoneTexSize';
 const UNIFORM_NAME_BONE_INV_BIND_MATRIX = 'Z_UniformBoneInvBindMatrix';
+// const UNIFORM_NAME_MORPH_DATA = 'Z_UniformMorphData';
+// const UNIFORM_NAME_MORPH_INFO = 'Z_UniformMorphInfo';
 
 /**
  * Helper shader functions for the builtin material system

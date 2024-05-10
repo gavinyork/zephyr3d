@@ -206,6 +206,11 @@ export class AnimationClip {
         mesh.mesh.setAnimatedBoundingBox(mesh.bounding.boundingBox);
       }
     });
+    this._tracks.forEach((trackInfo, node) => {
+      for (const track of trackInfo.tracks) {
+        track.reset(node);
+      }
+    });
   }
   /**
    * Rewind the animation to the first frame

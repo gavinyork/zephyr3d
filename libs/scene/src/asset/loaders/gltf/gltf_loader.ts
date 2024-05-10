@@ -30,7 +30,8 @@ import type {
   IndexBuffer,
   StructuredBuffer,
   TextureAddressMode,
-  TextureFilterMode
+  TextureFilterMode,
+  VertexAttribFormat
 } from '@zephyr3d/device';
 import type { AssetManager } from '../../assetmanager';
 import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf';
@@ -459,39 +460,6 @@ export class GLTFLoader extends AbstractModelLoader {
             rawBlendIndices: null,
             rawJointWeights: null
           };
-          if (p.targets) {
-            const targets: AssetSubMeshData['targets'] = {};
-            const targetMap = {
-              POSITION: MORPH_TARGET_POSITION,
-              NORMAL: MORPH_TARGET_NORMAL,
-              TANGENT: MORPH_TARGET_TANGENT,
-              TEXCOORD_0: MORPH_TARGET_TEX0,
-              COLOR_0: MORPH_TARGET_COLOR
-            };
-            let targetMin: Vector3 = null;
-            let targetMax: Vector3 = null;
-            for (const target of p.targets) {
-              for (const k in target) {
-                const t = targetMap[k];
-                if (t) {
-                  targets[t] = targets[t] ?? { numComponents: 0, data: [] };
-                  const accessorIndex = target[k] as number;
-                  const accessor = gltf._accessors[accessorIndex];
-                  targets[t].numComponents = accessor.getComponentCount(accessor.type);
-                  targets[t].data.push(accessor.getNormalizedDeinterlacedView(gltf) as Float32Array);
-                  if (k === 'POSITION') {
-                    const min = accessor.min;
-                    const max = accessor.max;
-                    targetMin = new Vector3(min[0], min[1], min[2]);
-                    targetMax = new Vector3(max[0], max[1], max[2]);
-                  }
-                }
-              }
-            }
-            subMeshData.targets = targets;
-            subMeshData.targetMin = targetMin;
-            subMeshData.targetMax = targetMax;
-          }
           const primitive = new Primitive();
           const attributes = p.attributes;
           const dracoExtension = gltf._dracoModule ? p.extensions?.['KHR_draco_mesh_compression'] : null;
@@ -520,6 +488,61 @@ export class GLTFLoader extends AbstractModelLoader {
               dracoExtension,
               dracoMeshDecoder
             );
+          }
+          if (p.targets) {
+            if (Application.instance.device.type === 'webgl') {
+              // Emulate vertexID for WebGL1 device
+              if (attributes['TEXCOORD_7'] !== undefined) {
+                console.error(`Could not load morph target animation`);
+                p.targets = null;
+              } else {
+                const vertexIndices = new Float32Array(primitive.getNumVertices());
+                for (let i = 0; i < vertexIndices.length; i++) {
+                  vertexIndices[i] = i;
+                }
+                const vertexIndexBuffer = Application.instance.device.createVertexBuffer(
+                  'tex7_f32',
+                  vertexIndices
+                );
+                primitive.setVertexBuffer(vertexIndexBuffer);
+              }
+            }
+          }
+          if (p.targets) {
+            const targets: AssetSubMeshData['targets'] = {};
+            const targetMap = {
+              POSITION: MORPH_TARGET_POSITION,
+              NORMAL: MORPH_TARGET_NORMAL,
+              TANGENT: MORPH_TARGET_TANGENT,
+              TEXCOORD_0: MORPH_TARGET_TEX0,
+              COLOR_0: MORPH_TARGET_COLOR
+            };
+            let targetMin: Vector3 = null;
+            let targetMax: Vector3 = null;
+            const morphAttribSet = new Set<number>();
+            for (const target of p.targets) {
+              for (const k in target) {
+                const t = targetMap[k];
+                if (t) {
+                  targets[t] = targets[t] ?? { numComponents: 0, data: [] };
+                  const accessorIndex = target[k] as number;
+                  const accessor = gltf._accessors[accessorIndex];
+                  targets[t].numComponents = accessor.getComponentCount(accessor.type);
+                  targets[t].data.push(accessor.getNormalizedDeinterlacedView(gltf) as Float32Array);
+                  if (k === 'POSITION') {
+                    const min = accessor.min;
+                    const max = accessor.max;
+                    targetMin = new Vector3(min[0], min[1], min[2]);
+                    targetMax = new Vector3(max[0], max[1], max[2]);
+                  }
+                  morphAttribSet.add(t);
+                }
+              }
+            }
+            subMeshData.targets = targets;
+            subMeshData.targetMin = targetMin;
+            subMeshData.targetMax = targetMax;
+            subMeshData.morphAttribCount = morphAttribSet.size;
           }
           const indices = p.indices;
           if (typeof indices === 'number') {

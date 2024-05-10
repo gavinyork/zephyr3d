@@ -13,7 +13,7 @@ import { AnimationClip } from '../animation/animation';
 import { BoundingBox } from '../utility/bounding_volume';
 import { CopyBlitter } from '../blitter';
 import { getSheenLutLoader, getTestCubemapLoader } from './builtin';
-import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT, BUILTIN_ASSET_TEST_CUBEMAP } from '../values';
+import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT, BUILTIN_ASSET_TEST_CUBEMAP, MAX_MORPH_TARGETS } from '../values';
 import { Application } from '../app';
 import { AnimationSet } from '../animation/animationset';
 import type { BaseTexture, Texture2D, GPUObject, SamplerOptions } from '@zephyr3d/device';
@@ -502,8 +502,14 @@ export class AssetManager {
             animation.addTrack(nodeMap.get(track.node), new RotationTrack(track.interpolator));
           } else if (track.type === 'weights') {
             for (const m of track.node.mesh.subMeshes) {
-              const morphTrack = new MorphTargetTrack(track, m);
-              animation.addTrack(m.mesh, morphTrack);
+              if (track.interpolator.stride > MAX_MORPH_TARGETS) {
+                console.error(
+                  `Morph target too large: ${track.interpolator.stride}, the maximum is ${MAX_MORPH_TARGETS}`
+                );
+              } else {
+                const morphTrack = new MorphTargetTrack(track, m);
+                animation.addTrack(m.mesh, morphTrack);
+              }
             }
           } else {
             console.error(`Invalid animation track type: ${track.type}`);
