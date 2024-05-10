@@ -32,7 +32,6 @@ export class MorphTargetTrack extends AnimationTrack {
       assetTrack.defaultMorphWeights ?? Array.from({ length: this._numTargets }).map(() => 0);
     this._morphUniformBuffer = null;
     this.create(subMesh);
-    this.reset(subMesh.mesh);
   }
   get boundingBox(): BoundingBox {
     return this._boundingBox;

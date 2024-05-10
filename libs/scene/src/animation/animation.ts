@@ -136,6 +136,7 @@ export class AnimationClip {
     }
     trackInfo.tracks.push(track);
     this._duration = Math.max(this._duration, track.interpolator.maxTime);
+    track.reset(node);
     return this;
   }
   /**
