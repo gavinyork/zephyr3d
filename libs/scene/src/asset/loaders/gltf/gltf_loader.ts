@@ -38,6 +38,13 @@ import { Application } from '../../../app';
 import { PBRMetallicRoughnessMaterial } from '../../../material/pbrmr';
 import { PBRSpecularGlossinessMaterial } from '../../../material/pbrsg';
 import { DracoMeshDecoder } from '../../../utility/draco/decoder';
+import {
+  MORPH_TARGET_COLOR,
+  MORPH_TARGET_NORMAL,
+  MORPH_TARGET_POSITION,
+  MORPH_TARGET_TANGENT,
+  MORPH_TARGET_TEX0
+} from '../../../values';
 /** @internal */
 export interface GLTFContent extends GlTf {
   _manager: AssetManager;
@@ -455,11 +462,11 @@ export class GLTFLoader extends AbstractModelLoader {
           if (p.targets) {
             const targets: AssetSubMeshData['targets'] = {};
             const targetMap = {
-              POSITION: 'position_f32x3',
-              NORMAL: 'normal_f32x3',
-              TANGENT: 'tangent_f32x3',
-              TEXCOORD_0: 'tex0_f32x2',
-              COLOR_0: 'diffuse_f32x4'
+              POSITION: MORPH_TARGET_POSITION,
+              NORMAL: MORPH_TARGET_NORMAL,
+              TANGENT: MORPH_TARGET_TANGENT,
+              TEXCOORD_0: MORPH_TARGET_TEX0,
+              COLOR_0: MORPH_TARGET_COLOR
             };
             let targetMin: Vector3 = null;
             let targetMax: Vector3 = null;
@@ -467,12 +474,14 @@ export class GLTFLoader extends AbstractModelLoader {
               for (const k in target) {
                 const t = targetMap[k];
                 if (t) {
-                  targets[t] = targets[t] ?? [];
+                  targets[t] = targets[t] ?? { numComponents: 0, data: [] };
                   const accessorIndex = target[k] as number;
-                  targets[t].push(gltf._accessors[accessorIndex].getNormalizedDeinterlacedView(gltf));
+                  const accessor = gltf._accessors[accessorIndex];
+                  targets[t].numComponents = accessor.getComponentCount(accessor.type);
+                  targets[t].data.push(accessor.getNormalizedDeinterlacedView(gltf) as Float32Array);
                   if (k === 'POSITION') {
-                    const min = gltf._accessors[accessorIndex].min;
-                    const max = gltf._accessors[accessorIndex].max;
+                    const min = accessor.min;
+                    const max = accessor.max;
                     targetMin = new Vector3(min[0], min[1], min[2]);
                     targetMax = new Vector3(max[0], max[1], max[2]);
                   }

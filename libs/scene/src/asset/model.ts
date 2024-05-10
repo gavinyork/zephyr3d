@@ -142,16 +142,6 @@ export interface AssetPBRMaterialSG extends AssetPBRMaterialCommon {
 }
 
 /**
- * Morph target attributes
- */
-export type MorphTargetAttribute =
-  | 'position_f32x3'
-  | 'normal_f32x3'
-  | 'tangent_f32x3'
-  | 'diffuse_f32x4'
-  | 'tex0_f32x2';
-
-/**
  * Sub mesh data interface for model loading
  * @public
  */
@@ -163,7 +153,7 @@ export interface AssetSubMeshData {
   rawBlendIndices: TypedArray;
   rawJointWeights: TypedArray;
   name: string;
-  targets?: Partial<Record<MorphTargetAttribute, Float32Array[]>>;
+  targets?: Partial<Record<number, { numComponents: number; data: Float32Array[] }>>;
   targetMin?: Vector3;
   targetMax?: Vector3;
 }

@@ -67,3 +67,19 @@ export const QUEUE_OPAQUE = 1;
  * @public
  */
 export const QUEUE_TRANSPARENT = 2;
+
+/**
+ * Morph target attributes
+ */
+export const MORPH_TARGET_POSITION = 1 << 0;
+export const MORPH_TARGET_NORMAL = 1 << 1;
+export const MORPH_TARGET_TANGENT = 1 << 2;
+export const MORPH_TARGET_COLOR = 1 << 3;
+export const MORPH_TARGET_TEX0 = 1 << 4;
+export const allMorphTargets = [
+  MORPH_TARGET_POSITION,
+  MORPH_TARGET_NORMAL,
+  MORPH_TARGET_TANGENT,
+  MORPH_TARGET_TEX0,
+  MORPH_TARGET_COLOR
+];
