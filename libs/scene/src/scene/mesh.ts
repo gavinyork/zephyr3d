@@ -192,6 +192,12 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._morphData = data;
   }
   /**
+   * {@inheritDoc Drawable.getMorphData}
+   */
+  getMorphData(): Texture2D {
+    return this._morphData;
+  }
+  /**
    * Sets the buffer that contains the morph target information
    * @param info - The buffer that contains the morph target information
    */
@@ -199,10 +205,16 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._morphInfo = info;
   }
   /**
+   * {@inheritDoc Drawable.getMorphInfo}
+   */
+  getMorphInfo(): GPUDataBuffer<unknown> {
+    return this._morphInfo;
+  }
+  /**
    * {@inheritDoc Drawable.isBatchable}
    */
   isBatchable(): this is BatchDrawable {
-    return this._batchable && !this._boneMatrices && this._material?.isBatchable();
+    return this._batchable && !this._boneMatrices && !this._morphData && this._material?.isBatchable();
   }
   /** Disposes the mesh node */
   dispose() {

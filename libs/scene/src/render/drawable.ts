@@ -1,5 +1,5 @@
 import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
-import type { AbstractDevice, Texture2D, TextureFormat } from '@zephyr3d/device';
+import type { AbstractDevice, GPUDataBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
 import type { XForm } from '../scene/xform';
 import type { Camera } from '../camera/camera';
 import type { FogType, RenderPass } from '.';
@@ -107,6 +107,10 @@ export interface Drawable {
   getBoneMatrices(): Texture2D;
   /** Gets the inversed bind matrix for skeleton animation */
   getInvBindMatrix(): Matrix4x4;
+  /** Gets the morph texture */
+  getMorphData(): Texture2D;
+  /** Gets the morph information buffer */
+  getMorphInfo(): GPUDataBuffer;
   /** Gets the distance for object sorting */
   getSortDistance(camera: Camera): number;
   /** Gets the type of render queue */

@@ -2,6 +2,8 @@ import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render/drawable';
 import {
   MAX_CLUSTERED_LIGHTS,
+  MORPH_ATTRIBUTE_VECTOR_COUNT,
+  MORPH_WEIGHTS_VECTOR_COUNT,
   RENDER_PASS_TYPE_DEPTH,
   RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_SHADOWMAP
@@ -32,8 +34,8 @@ const UNIFORM_NAME_INSTANCE_DATA_OFFSET = 'Z_UniformInstanceDataOffset';
 const UNIFORM_NAME_BONE_MATRICES = 'Z_UniformBoneMatrices';
 const UNIFORM_NAME_BONE_TEXTURE_SIZE = 'Z_UniformBoneTexSize';
 const UNIFORM_NAME_BONE_INV_BIND_MATRIX = 'Z_UniformBoneInvBindMatrix';
-// const UNIFORM_NAME_MORPH_DATA = 'Z_UniformMorphData';
-// const UNIFORM_NAME_MORPH_INFO = 'Z_UniformMorphInfo';
+const UNIFORM_NAME_MORPH_DATA = 'Z_UniformMorphData';
+const UNIFORM_NAME_MORPH_INFO = 'Z_UniformMorphInfo';
 
 /**
  * Helper shader functions for the builtin material system
@@ -98,6 +100,12 @@ export class ShaderHelper {
   }
   static getBoneInvBindMatrixUniformName(): string {
     return UNIFORM_NAME_BONE_INV_BIND_MATRIX;
+  }
+  static getMorphDataUniformName(): string {
+    return UNIFORM_NAME_MORPH_DATA;
+  }
+  static getMorphInfoUniformName(): string {
+    return UNIFORM_NAME_MORPH_INFO;
   }
   static getLightBufferUniformName(): string {
     return UNIFORM_NAME_LIGHT_BUFFER;
@@ -226,6 +234,16 @@ export class ShaderHelper {
    */
   static hasSkinning(scope: PBInsideFunctionScope): boolean {
     return !!scope[UNIFORM_NAME_BONE_MATRICES];
+  }
+  /**
+   * This function checks if the shader needs to process morph target animation.
+   *
+   * @param scope - Current shader scope
+   *
+   * @returns true if the shader needs to process morph target animation, otherwise false.
+   */
+  static hasMorphing(scope: PBInsideFunctionScope): boolean {
+    return !!scope[UNIFORM_NAME_MORPH_DATA];
   }
   /**
    * Calculate skinning matrix for current vertex
@@ -420,7 +438,12 @@ export class ShaderHelper {
    * @param skinning - true if skinning is used, otherwise false.
    * @param instanced - true if instancing is used, otherwise false.
    */
-  static vertexShaderDrawableStuff(scope: PBGlobalScope, skinning: boolean, instanced: boolean): void {
+  static vertexShaderDrawableStuff(
+    scope: PBGlobalScope,
+    skinning: boolean,
+    morphing: boolean,
+    instanced: boolean
+  ): void {
     const pb = scope.$builder;
     if (instanced) {
       scope[UNIFORM_NAME_INSTANCE_DATA_STRIDE] = pb.uint().uniform(1);
@@ -434,10 +457,20 @@ export class ShaderHelper {
       scope[UNIFORM_NAME_BONE_INV_BIND_MATRIX] = pb.mat4().uniform(1);
       scope[UNIFORM_NAME_BONE_TEXTURE_SIZE] = pb.int().uniform(1);
     }
+    if (morphing) {
+      scope[UNIFORM_NAME_MORPH_DATA] = pb.tex2D().uniform(1).sampleType('unfilterable-float');
+      scope[UNIFORM_NAME_MORPH_INFO] =
+        pb.vec4[1 + MORPH_WEIGHTS_VECTOR_COUNT + MORPH_ATTRIBUTE_VECTOR_COUNT]().uniformBuffer(1);
+    }
   }
   /** @internal */
   static prepareVertexShaderCommon(pb: ProgramBuilder, ctx: DrawContext) {
-    this.vertexShaderDrawableStuff(pb.getGlobalScope(), !!ctx.skinAnimation, !!ctx.instancing);
+    this.vertexShaderDrawableStuff(
+      pb.getGlobalScope(),
+      !!ctx.skinAnimation,
+      !!ctx.morphAnimation,
+      !!ctx.instancing
+    );
     /*
     const skinning = !!ctx.target?.getBoneMatrices();
     const scope = pb.getGlobalScope();

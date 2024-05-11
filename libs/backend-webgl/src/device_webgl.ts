@@ -630,7 +630,7 @@ export class WebGLDevice extends BaseDevice {
     return new WebGLBindGroup(this, layout);
   }
   createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer {
-    return new WebGLGPUBuffer(this, this.parseBufferOptions(options), sizeInBytes);
+    return new WebGLGPUBuffer(this, this.parseBufferOptions(options), sizeInBytes, !this._isWebGL2);
   }
   copyBuffer(
     sourceBuffer: GPUDataBuffer<unknown>,

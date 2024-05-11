@@ -3,7 +3,7 @@ import { Vector3, Vector4, applyMixins } from '@zephyr3d/base';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { Primitive } from '../../render/primitive';
 import { Application } from '../../app';
-import type { Texture2D } from '@zephyr3d/device';
+import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
 import type { BatchDrawable, Drawable, DrawContext } from '../../render/drawable';
 import type { XForm } from '../xform';
 import type { Camera } from '../../camera/camera';
@@ -139,6 +139,12 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
     return null;
   }
   getInvBindMatrix(): Matrix4x4 {
+    return null;
+  }
+  getMorphData(): Texture2D {
+    return null;
+  }
+  getMorphInfo(): GPUDataBuffer {
     return null;
   }
   getSortDistance(camera: Camera): number {

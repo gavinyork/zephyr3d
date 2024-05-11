@@ -30,8 +30,7 @@ import type {
   IndexBuffer,
   StructuredBuffer,
   TextureAddressMode,
-  TextureFilterMode,
-  VertexAttribFormat
+  TextureFilterMode
 } from '@zephyr3d/device';
 import type { AssetManager } from '../../assetmanager';
 import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf';

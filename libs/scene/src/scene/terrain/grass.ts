@@ -5,7 +5,13 @@ import type { BatchDrawable, Drawable, DrawContext } from '../../render/drawable
 import type { XForm } from '../xform';
 import type { QuadtreeNode } from './quadtree';
 import type { Camera } from '../../camera/camera';
-import type { AbstractDevice, IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
+import type {
+  AbstractDevice,
+  GPUDataBuffer,
+  IndexBuffer,
+  StructuredBuffer,
+  Texture2D
+} from '@zephyr3d/device';
 import type { Terrain } from './terrain';
 import type { GraphNode } from '../graph_node';
 import { GrassMaterial } from '../../material/grassmaterial';
@@ -60,6 +66,12 @@ export class GrassCluster extends applyMixins(GrassClusterBase, mixinDrawable) i
     return null;
   }
   getInvBindMatrix(): Matrix4x4 {
+    return null;
+  }
+  getMorphData(): Texture2D {
+    return null;
+  }
+  getMorphInfo(): GPUDataBuffer {
     return null;
   }
   getSortDistance(camera: Camera): number {

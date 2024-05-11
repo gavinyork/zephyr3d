@@ -100,6 +100,10 @@ export interface RenderItemListInfo {
   renderBundle?: RenderBundleWrapper;
   skinItemList: RenderQueueItem[];
   skinRenderBundle?: RenderBundleWrapper;
+  morphItemList: RenderQueueItem[];
+  morphRenderBundle?: RenderBundleWrapper;
+  skinAndMorphItemList: RenderQueueItem[];
+  skinAndMorphRenderBundle?: RenderBundleWrapper;
   instanceItemList: RenderQueueItem[];
   instanceRenderBundle?: RenderBundleWrapper;
   instanceList: Record<string, BatchDrawable[]>;
@@ -322,7 +326,19 @@ export class RenderQueue {
           : transmission
           ? this._itemList.transmission.lit[0]
           : this._itemList.opaque.lit[0];
-        this.binaryInsert(drawable.getBoneMatrices() ? list.skinItemList : list.itemList, {
+        const skinAnimation = !!drawable.getBoneMatrices();
+        const morphAnimation = !!drawable.getMorphData();
+        let queue: RenderQueueItem[];
+        if (skinAnimation && morphAnimation) {
+          queue = list.skinAndMorphItemList;
+        } else if (skinAnimation) {
+          queue = list.skinItemList;
+        } else if (morphAnimation) {
+          queue = list.morphItemList;
+        } else {
+          queue = list.itemList;
+        }
+        this.binaryInsert(queue, {
           drawable,
           sortDistance: drawable.getSortDistance(camera),
           instanceData: null
@@ -432,6 +448,12 @@ export class RenderQueue {
           if (info.skinItemList.length > 0) {
             info.skinRenderBundle = new RenderBundleWrapper();
           }
+          if (info.morphItemList.length > 0) {
+            info.morphRenderBundle = new RenderBundleWrapper();
+          }
+          if (info.skinAndMorphItemList.length > 0) {
+            info.skinAndMorphRenderBundle = new RenderBundleWrapper();
+          }
           if (info.instanceItemList.length > 0) {
             info.instanceRenderBundle = new RenderBundleWrapper();
           }
@@ -473,6 +495,16 @@ export class RenderQueue {
           this.drawableDistanceToCamera(b.drawable, cameraPos) -
           this.drawableDistanceToCamera(a.drawable, cameraPos)
       );
+      this._itemList.transparent.lit[0].morphItemList.sort(
+        (a, b) =>
+          this.drawableDistanceToCamera(b.drawable, cameraPos) -
+          this.drawableDistanceToCamera(a.drawable, cameraPos)
+      );
+      this._itemList.transparent.lit[0].skinAndMorphItemList.sort(
+        (a, b) =>
+          this.drawableDistanceToCamera(b.drawable, cameraPos) -
+          this.drawableDistanceToCamera(a.drawable, cameraPos)
+      );
       this._itemList.transparent.unlit[0].itemList.sort(
         (a, b) =>
           this.drawableDistanceToCamera(b.drawable, cameraPos) -
@@ -483,80 +515,45 @@ export class RenderQueue {
           this.drawableDistanceToCamera(b.drawable, cameraPos) -
           this.drawableDistanceToCamera(a.drawable, cameraPos)
       );
+      this._itemList.transparent.unlit[0].morphItemList.sort(
+        (a, b) =>
+          this.drawableDistanceToCamera(b.drawable, cameraPos) -
+          this.drawableDistanceToCamera(a.drawable, cameraPos)
+      );
+      this._itemList.transparent.unlit[0].skinAndMorphItemList.sort(
+        (a, b) =>
+          this.drawableDistanceToCamera(b.drawable, cameraPos) -
+          this.drawableDistanceToCamera(a.drawable, cameraPos)
+      );
     }
   }
   private drawableDistanceToCamera(drawable: Drawable, cameraPos: Vector3) {
     const drawablePos = drawable.getXForm().position;
     return Vector3.distanceSq(drawablePos, cameraPos);
   }
+  private newRenderItemListInfo(): RenderItemListInfo {
+    return {
+      itemList: [],
+      skinItemList: [],
+      morphItemList: [],
+      skinAndMorphItemList: [],
+      instanceItemList: [],
+      materialList: new Set(),
+      instanceList: {},
+      renderQueue: this
+    };
+  }
+  private newRenderItemListBundle(): RenderItemListBundle {
+    return {
+      lit: [this.newRenderItemListInfo()],
+      unlit: [this.newRenderItemListInfo()]
+    };
+  }
   private newRenderItemList(): RenderItemList {
     return {
-      opaque: {
-        lit: [
-          {
-            itemList: [],
-            skinItemList: [],
-            instanceItemList: [],
-            materialList: new Set(),
-            instanceList: {},
-            renderQueue: this
-          }
-        ],
-        unlit: [
-          {
-            itemList: [],
-            skinItemList: [],
-            instanceItemList: [],
-            materialList: new Set(),
-            instanceList: {},
-            renderQueue: this
-          }
-        ]
-      },
-      transmission: {
-        lit: [
-          {
-            itemList: [],
-            skinItemList: [],
-            instanceItemList: [],
-            materialList: new Set(),
-            instanceList: {},
-            renderQueue: this
-          }
-        ],
-        unlit: [
-          {
-            itemList: [],
-            skinItemList: [],
-            instanceItemList: [],
-            materialList: new Set(),
-            instanceList: {},
-            renderQueue: this
-          }
-        ]
-      },
-      transparent: {
-        lit: [
-          {
-            itemList: [],
-            skinItemList: [],
-            instanceItemList: [],
-            materialList: new Set(),
-            instanceList: {},
-            renderQueue: this
-          }
-        ],
-        unlit: [
-          {
-            itemList: [],
-            skinItemList: [],
-            instanceItemList: [],
-            materialList: new Set(),
-            instanceList: {},
-            renderQueue: this
-          }
-        ]
-      }
+      opaque: this.newRenderItemListBundle(),
+      transmission: this.newRenderItemListBundle(),
+      transparent: this.newRenderItemListBundle()
     };
   }
   /*

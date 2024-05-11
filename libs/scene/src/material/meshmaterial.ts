@@ -434,6 +434,9 @@ export class MeshMaterial extends Material {
       scope.$inputs.zBlendIndices = pb.vec4().attrib('blendIndices');
       scope.$inputs.zBlendWeights = pb.vec4().attrib('blendWeights');
     }
+    if (this.drawContext.morphAnimation && this.drawContext.device.type === 'webgl') {
+      scope.$inputs.zFakeVertexID = pb.float().attrib('texCoord7');
+    }
   }
   /**
    * Fragment shader implementation of this material

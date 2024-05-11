@@ -105,10 +105,17 @@ export function mixinDrawable<
         );
         drawableBindGroup.setValue(ShaderHelper.getBoneTextureSizeUniformName(), boneTexture.width);
       }
+      if (ctx.morphAnimation) {
+        const morphData = (this as unknown as Mesh).getMorphData();
+        const morphInfo = (this as unknown as Mesh).getMorphInfo();
+        drawableBindGroup.setTexture(ShaderHelper.getMorphDataUniformName(), morphData);
+        drawableBindGroup.setBuffer(ShaderHelper.getMorphInfoUniformName(), morphInfo);
+      }
     }
     /** @internal */
     getDrawableBindGroup(device: AbstractDevice, instancing: boolean, renderQueue: RenderQueue): BindGroup {
       const skinning = !!(this as unknown as Drawable).getBoneMatrices();
+      const morphing = !!(this as unknown as Drawable).getMorphData();
       let bindGroup = skinning
         ? this._mdDrawableBindGroupSkin
         : instancing
@@ -117,7 +124,7 @@ export function mixinDrawable<
       if (!bindGroup) {
         const buildInfo = new ProgramBuilder(device).buildRender({
           vertex(pb) {
-            ShaderHelper.vertexShaderDrawableStuff(this, skinning, instancing);
+            ShaderHelper.vertexShaderDrawableStuff(this, skinning, morphing, instancing);
             pb.main(function () {});
           },
           fragment(pb) {

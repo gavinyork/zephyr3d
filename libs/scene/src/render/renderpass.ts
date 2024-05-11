@@ -206,6 +206,7 @@ export abstract class RenderPass {
       }
       if (itemList.skinItemList.length > 0) {
         ctx.skinAnimation = true;
+        ctx.morphAnimation = false;
         ctx.instancing = false;
         itemList.materialList.forEach((mat) => mat.apply(ctx));
         this.internalDrawItemList(
@@ -215,19 +216,32 @@ export abstract class RenderPass {
           reverseWinding,
           hash
         );
-        /*
-        for (const item of itemList.skinItemList) {
-          ctx.instanceData = item.instanceData;
-          const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
-          if (reverse) {
-            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
-          }
-          item.drawable.draw(ctx);
-          if (reverse) {
-            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
-          }
-        }
-        */
+      }
+      if (itemList.morphItemList.length > 0) {
+        ctx.skinAnimation = false;
+        ctx.morphAnimation = true;
+        ctx.instancing = false;
+        itemList.materialList.forEach((mat) => mat.apply(ctx));
+        this.internalDrawItemList(
+          ctx,
+          itemList.morphItemList,
+          itemList.morphRenderBundle,
+          reverseWinding,
+          hash
+        );
+      }
+      if (itemList.skinAndMorphItemList.length > 0) {
+        ctx.skinAnimation = true;
+        ctx.morphAnimation = true;
+        ctx.instancing = false;
+        itemList.materialList.forEach((mat) => mat.apply(ctx));
+        this.internalDrawItemList(
+          ctx,
+          itemList.skinAndMorphItemList,
+          itemList.skinAndMorphRenderBundle,
+          reverseWinding,
+          hash
+        );
       }
       if (itemList.instanceItemList.length > 0) {
         ctx.skinAnimation = false;
