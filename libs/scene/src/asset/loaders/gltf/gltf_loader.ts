@@ -43,7 +43,10 @@ import {
   MORPH_TARGET_NORMAL,
   MORPH_TARGET_POSITION,
   MORPH_TARGET_TANGENT,
-  MORPH_TARGET_TEX0
+  MORPH_TARGET_TEX0,
+  MORPH_TARGET_TEX1,
+  MORPH_TARGET_TEX2,
+  MORPH_TARGET_TEX3
 } from '../../../values';
 /** @internal */
 export interface GLTFContent extends GlTf {
@@ -509,38 +512,42 @@ export class GLTFLoader extends AbstractModelLoader {
           }
           if (p.targets) {
             const targets: AssetSubMeshData['targets'] = {};
+            const targetBox: AssetSubMeshData['targetBox'] = [];
             const targetMap = {
               POSITION: MORPH_TARGET_POSITION,
               NORMAL: MORPH_TARGET_NORMAL,
               TANGENT: MORPH_TARGET_TANGENT,
               TEXCOORD_0: MORPH_TARGET_TEX0,
+              TEXCOORD_1: MORPH_TARGET_TEX1,
+              TEXCOORD_2: MORPH_TARGET_TEX2,
+              TEXCOORD_3: MORPH_TARGET_TEX3,
               COLOR_0: MORPH_TARGET_COLOR
             };
-            let targetMin: Vector3 = null;
-            let targetMax: Vector3 = null;
             const morphAttribSet = new Set<number>();
             for (const target of p.targets) {
               for (const k in target) {
                 const t = targetMap[k];
-                if (t) {
+                if (t !== undefined) {
                   targets[t] = targets[t] ?? { numComponents: 0, data: [] };
                   const accessorIndex = target[k] as number;
                   const accessor = gltf._accessors[accessorIndex];
                   targets[t].numComponents = accessor.getComponentCount(accessor.type);
                   targets[t].data.push(accessor.getNormalizedDeinterlacedView(gltf) as Float32Array);
                   if (k === 'POSITION') {
-                    const min = accessor.min;
-                    const max = accessor.max;
-                    targetMin = new Vector3(min[0], min[1], min[2]);
-                    targetMax = new Vector3(max[0], max[1], max[2]);
+                    const min = accessor.min
+                      ? new Vector3(accessor.min[0], accessor.min[1], accessor.min[2])
+                      : Vector3.zero();
+                    const max = accessor.max
+                      ? new Vector3(accessor.max[0], accessor.max[1], accessor.max[2])
+                      : Vector3.zero();
+                    targetBox.push(new BoundingBox(min, max));
                   }
                   morphAttribSet.add(t);
                 }
               }
             }
             subMeshData.targets = targets;
-            subMeshData.targetMin = targetMin;
-            subMeshData.targetMax = targetMax;
+            subMeshData.targetBox = targetBox;
             subMeshData.morphAttribCount = morphAttribSet.size;
           }
           const indices = p.indices;

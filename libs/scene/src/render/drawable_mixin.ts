@@ -25,12 +25,16 @@ export function mixinDrawable<
     private _mdDrawableBindGroup: BindGroup;
     private _mdDrawableBindGroupInstanced: Map<RenderQueue, BindGroup>;
     private _mdDrawableBindGroupSkin: BindGroup;
+    private _mdDrawableBindGroupMorph: BindGroup;
+    private _mdDrawableBindGroupSkinMorph: BindGroup;
     constructor(...args: any[]) {
       super(...args);
       this._mdRenderQueueRef = [];
       this._mdDrawableBindGroup = null;
       this._mdDrawableBindGroupInstanced = new Map();
       this._mdDrawableBindGroupSkin = null;
+      this._mdDrawableBindGroupMorph = null;
+      this._mdDrawableBindGroupSkinMorph = null;
       this.getXForm().on('transformchanged', (node) => {
         for (const ref of this._mdRenderQueueRef) {
           if (ref.ref) {
@@ -116,10 +120,14 @@ export function mixinDrawable<
     getDrawableBindGroup(device: AbstractDevice, instancing: boolean, renderQueue: RenderQueue): BindGroup {
       const skinning = !!(this as unknown as Drawable).getBoneMatrices();
       const morphing = !!(this as unknown as Drawable).getMorphData();
-      let bindGroup = skinning
-        ? this._mdDrawableBindGroupSkin
-        : instancing
+      let bindGroup = instancing
         ? this._mdDrawableBindGroupInstanced.get(renderQueue)
+        : skinning && morphing
+        ? this._mdDrawableBindGroupSkinMorph
+        : skinning
+        ? this._mdDrawableBindGroupSkin
+        : morphing
+        ? this._mdDrawableBindGroupMorph
         : this._mdDrawableBindGroup;
       if (!bindGroup) {
         const buildInfo = new ProgramBuilder(device).buildRender({
@@ -132,10 +140,25 @@ export function mixinDrawable<
           }
         });
         bindGroup = device.createBindGroup(buildInfo[2][1]);
-        if (skinning) {
-          this._mdDrawableBindGroupSkin = bindGroup;
-        } else if (instancing) {
+        if (instancing) {
           this._mdDrawableBindGroupInstanced.set(renderQueue, bindGroup);
+        } else if (skinning && morphing) {
+          this._mdDrawableBindGroupSkinMorph = bindGroup;
+        } else if (skinning) {
+          this._mdDrawableBindGroupSkin = bindGroup;
+        } else if (morphing) {
+          const layout = buildInfo[2][1];
+          const bindName =
+            layout.nameMap?.[ShaderHelper.getMorphInfoUniformName()] ??
+            ShaderHelper.getMorphInfoUniformName();
+          for (let binding = 0; binding < layout.entries.length; binding++) {
+            const bindingPoint = layout.entries[binding];
+            if (bindingPoint.name === bindName) {
+              console.log(bindingPoint.type);
+              break;
+            }
+          }
+          this._mdDrawableBindGroupMorph = bindGroup;
         } else {
           this._mdDrawableBindGroup = bindGroup;
         }

@@ -3,6 +3,9 @@ import type { DrawContext } from '../../render/drawable';
 import {
   MAX_CLUSTERED_LIGHTS,
   MORPH_ATTRIBUTE_VECTOR_COUNT,
+  MORPH_TARGET_NORMAL,
+  MORPH_TARGET_POSITION,
+  MORPH_TARGET_TANGENT,
   MORPH_WEIGHTS_VECTOR_COUNT,
   RENDER_PASS_TYPE_DEPTH,
   RENDER_PASS_TYPE_LIGHT,
@@ -294,6 +297,78 @@ export class ShaderHelper {
     });
     return scope.$g[funcNameGetSkinningMatrix]();
   }
+  static calculateMorphDelta(scope: PBInsideFunctionScope, attrib: number): PBShaderExp {
+    const pb = scope.$builder;
+    const isWebGL1 = pb.getDevice().type === 'webgl';
+    if (pb.shaderKind !== 'vertex') {
+      throw new Error(`ShaderHelper.calculateMorphDelta(): must be called at vertex stage`);
+    }
+    const funcName = 'Z_calculateMorph';
+    const that = this;
+    pb.func(funcName, [pb.int('offset')], function () {
+      this.$if(pb.lessThan(this.offset, 0), function () {
+        this.$return(pb.vec4(0));
+      });
+      this.$l.vertexIndex = isWebGL1
+        ? pb.int(scope.$inputs.zFakeVertexID)
+        : pb.int(scope.$builtins.vertexIndex);
+      const morphInfo = scope[that.getMorphInfoUniformName()];
+      this.$l.metaData = pb.ivec4(morphInfo[0]);
+      this.$l.texWidth = pb.float(this.metaData.x);
+      this.$l.texHeight = pb.float(this.metaData.y);
+      this.$l.numVertices = this.metaData.z;
+      this.$l.numTargets = this.metaData.w;
+      this.$l.value = pb.vec4(0);
+      if (isWebGL1) {
+        this.$for(pb.int('i'), 0, MORPH_WEIGHTS_VECTOR_COUNT, function () {
+          this.$for(pb.int('j'), 0, 4, function () {
+            this.$l.index = pb.add(pb.mul(this.i, 4), this.j);
+            this.$if(pb.greaterThanEqual(this.index, this.numTargets), function () {
+              this.$return(this.value);
+            });
+            this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
+            this.$l.pixelIndex = pb.float(
+              pb.add(this.offset, pb.mul(this.index, this.numVertices), this.vertexIndex)
+            );
+            this.$l.xIndex = pb.mod(this.pixelIndex, this.texWidth);
+            this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.texWidth));
+            this.$l.u = pb.div(pb.add(this.xIndex, 0.5), this.texWidth);
+            this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.texHeight);
+            this.$l.morphValue = pb.textureSampleLevel(
+              this[that.getMorphDataUniformName()],
+              pb.vec2(this.u, this.v),
+              0
+            );
+            this.value = pb.add(this.value, pb.mul(this.morphValue, this.weight));
+          });
+        });
+      } else {
+        this.$for(pb.int('t'), 0, this.numTargets, function () {
+          this.$l.i = pb.sar(this.t, 2);
+          this.$l.j = pb.compAnd(this.t, 3);
+          this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
+          this.$l.pixelIndex = pb.float(
+            pb.add(this.offset, pb.mul(this.t, this.numVertices), this.vertexIndex)
+          );
+          this.$l.xIndex = pb.mod(this.pixelIndex, this.texWidth);
+          this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.texWidth));
+          this.$l.u = pb.div(pb.add(this.xIndex, 0.5), this.texWidth);
+          this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.texHeight);
+          this.$l.morphValue = pb.textureSampleLevel(
+            this[that.getMorphDataUniformName()],
+            pb.vec2(this.u, this.v),
+            0
+          );
+          this.value = pb.add(this.value, pb.mul(this.morphValue, this.weight));
+        });
+      }
+      this.$return(this.value);
+    });
+    const pos = 1 + MORPH_WEIGHTS_VECTOR_COUNT + (attrib >> 2);
+    const comp = attrib & 3;
+    const offset = scope[this.getMorphInfoUniformName()][pos][comp];
+    return scope[funcName](pb.int(offset));
+  }
   /**
    * Calculates the vertex position of type vec3 in object space
    *
@@ -316,6 +391,9 @@ export class ShaderHelper {
         scope.$inputs.Z_pos = pb.vec3().attrib('position');
       }
       pos = scope.$getVertexAttrib('position');
+    }
+    if (this.hasMorphing(scope)) {
+      pos = pb.add(pos, this.calculateMorphDelta(scope, MORPH_TARGET_POSITION).xyz);
     }
     if (this.hasSkinning(scope)) {
       if (!funcScope[this.SKIN_MATRIX_NAME]) {
@@ -349,6 +427,9 @@ export class ShaderHelper {
       }
       normal = scope.$getVertexAttrib('normal');
     }
+    if (this.hasMorphing(scope)) {
+      normal = pb.normalize(pb.add(normal, this.calculateMorphDelta(scope, MORPH_TARGET_NORMAL).xyz));
+    }
     if (this.hasSkinning(scope)) {
       if (!funcScope[this.SKIN_MATRIX_NAME]) {
         funcScope[this.SKIN_MATRIX_NAME] = this.calculateSkinMatrix(funcScope);
@@ -380,6 +461,11 @@ export class ShaderHelper {
         scope.$inputs.Z_tangent = pb.vec4().attrib('tangent');
       }
       tangent = scope.$getVertexAttrib('tangent');
+    }
+    if (this.hasMorphing(scope)) {
+      tangent = pb.normalize(
+        pb.add(tangent, pb.vec4(this.calculateMorphDelta(scope, MORPH_TARGET_TANGENT).xyz, 0))
+      );
     }
     if (this.hasSkinning(scope)) {
       if (!funcScope[this.SKIN_MATRIX_NAME]) {

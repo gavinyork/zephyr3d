@@ -71,19 +71,15 @@ export const QUEUE_TRANSPARENT = 2;
 /**
  * Morph target attributes
  */
-export const MORPH_TARGET_POSITION = 1 << 0;
-export const MORPH_TARGET_NORMAL = 1 << 1;
-export const MORPH_TARGET_TANGENT = 1 << 2;
-export const MORPH_TARGET_COLOR = 1 << 3;
-export const MORPH_TARGET_TEX0 = 1 << 4;
-export const allMorphTargets = [
-  MORPH_TARGET_POSITION,
-  MORPH_TARGET_NORMAL,
-  MORPH_TARGET_TANGENT,
-  MORPH_TARGET_TEX0,
-  MORPH_TARGET_COLOR
-];
-export const MORPH_WEIGHTS_VECTOR_COUNT = 64;
-export const MAX_MORPH_TARGETS = MORPH_WEIGHTS_VECTOR_COUNT * 4;
-export const MORPH_ATTRIBUTE_VECTOR_COUNT = 2;
-export const MAX_MORPH_ATTRIBUTES = MORPH_ATTRIBUTE_VECTOR_COUNT * 4;
+export const MORPH_TARGET_POSITION = 0;
+export const MORPH_TARGET_NORMAL = 1;
+export const MORPH_TARGET_TANGENT = 2;
+export const MORPH_TARGET_COLOR = 3;
+export const MORPH_TARGET_TEX0 = 4;
+export const MORPH_TARGET_TEX1 = 5;
+export const MORPH_TARGET_TEX2 = 6;
+export const MORPH_TARGET_TEX3 = 7;
+export const MAX_MORPH_ATTRIBUTES = 8;
+export const MAX_MORPH_TARGETS = 256;
+export const MORPH_WEIGHTS_VECTOR_COUNT = (MAX_MORPH_TARGETS + 3) >> 2;
+export const MORPH_ATTRIBUTE_VECTOR_COUNT = (MAX_MORPH_ATTRIBUTES + 3) >> 2;

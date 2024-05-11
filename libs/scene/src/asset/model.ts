@@ -4,6 +4,7 @@ import type { Texture2D, TextureSampler } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
 import type { MeshMaterial } from '../material/meshmaterial';
 import type { Mesh } from '../scene/mesh';
+import type { BoundingBox } from '../utility';
 
 /**
  * Named object interface for model loading
@@ -154,8 +155,7 @@ export interface AssetSubMeshData {
   rawJointWeights: TypedArray;
   name: string;
   targets?: Partial<Record<number, { numComponents: number; data: Float32Array[] }>>;
-  targetMin?: Vector3;
-  targetMax?: Vector3;
+  targetBox?: BoundingBox[];
   morphAttribCount?: number;
 }
 
