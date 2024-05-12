@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Support PBR iridescence",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
