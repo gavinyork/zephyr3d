@@ -107,6 +107,19 @@ export interface AssetMaterialTransmission {
 }
 
 /**
+ * Iridescence related material properties for model loading
+ * @public
+ */
+export interface AssetMaterialIridescence {
+  iridescenceFactor?: number;
+  iridescenceMap?: MaterialTextureInfo;
+  iridescenceIor?: number;
+  iridescenceThicknessMinimum?: number;
+  iridescenceThicknessMaximum?: number;
+  iridescenceThicknessMap?: MaterialTextureInfo;
+}
+
+/**
  * PBR related material properties for model loading
  * @public
  */
@@ -130,6 +143,7 @@ export interface AssetPBRMaterialMR extends AssetPBRMaterialCommon {
   sheen?: AssetMaterialSheen;
   clearcoat?: AssetMaterialClearcoat;
   transmission?: AssetMaterialTransmission;
+  iridescence?: AssetMaterialIridescence;
 }
 
 /**

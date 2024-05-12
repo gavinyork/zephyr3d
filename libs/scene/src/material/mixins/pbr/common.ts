@@ -38,15 +38,22 @@ export type IMixinPBRCommon = {
   clearcoatIntensity: number;
   clearcoatRoughnessFactor: number;
   clearcoatNormalScale: number;
+  iridescence: boolean;
+  iridescenceFactor: number;
+  iridescenceIor: number;
+  iridescenceThicknessMin: number;
+  iridescenceThicknessMax: number;
   getCommonData(
     scope: PBInsideFunctionScope,
     albedo: PBShaderExp,
+    normal: PBShaderExp,
     viewVec: PBShaderExp,
     TBN: PBShaderExp
   ): PBShaderExp;
   calculateCommonData(
     scope: PBInsideFunctionScope,
     albedo: PBShaderExp,
+    normal: PBShaderExp,
     viewVec: PBShaderExp,
     TBN: PBShaderExp,
     data: PBShaderExp
@@ -88,7 +95,9 @@ export type IMixinPBRCommon = {
     'clearcoatRoughness',
     'clearcoatNormal',
     'transmission',
-    'thickness'
+    'thickness',
+    'iridescence',
+    'iridescenceThickness'
   ]
 >;
 
@@ -113,11 +122,14 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     mixinTextureProps('clearcoatRoughness'),
     mixinTextureProps('clearcoatNormal'),
     mixinTextureProps('transmission'),
-    mixinTextureProps('thickness')
+    mixinTextureProps('thickness'),
+    mixinTextureProps('iridescence'),
+    mixinTextureProps('iridescenceThickness')
   );
   let FEATURE_SHEEN = 0;
   let FEATURE_CLEARCOAT = 0;
   let FEATURE_TRANSMISSION = 0;
+  let FEATURE_IRIDESCENCE = 0;
 
   const cls = class extends S {
     static readonly pbrCommonMixed = true;
@@ -130,6 +142,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     private _thicknessFactor: number;
     private _attenuationColor: Vector3;
     private _attenuationDistance: number;
+    private _iridescenceFactor: Vector4;
     private _sceneColorTexSize: Vector2;
     constructor() {
       super();
@@ -142,6 +155,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       this._thicknessFactor = 0;
       this._attenuationColor = Vector3.one();
       this._attenuationDistance = 99999;
+      this._iridescenceFactor = new Vector4(0, 1.3, 100, 400);
       this._sceneColorTexSize = new Vector2();
     }
     get ior(): number {
@@ -191,6 +205,42 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         this.uniformChanged();
       }
     }
+    get iridescenceFactor(): number {
+      return this._iridescenceFactor.x;
+    }
+    set iridescenceFactor(val: number) {
+      if (this._iridescenceFactor.x !== val) {
+        this._iridescenceFactor.x = val;
+        this.uniformChanged();
+      }
+    }
+    get iridescenceIor(): number {
+      return this._iridescenceFactor.y;
+    }
+    set iridescenceIor(val: number) {
+      if (this._iridescenceFactor.y !== val) {
+        this._iridescenceFactor.y = val;
+        this.uniformChanged();
+      }
+    }
+    get iridescenceThicknessMin(): number {
+      return this._iridescenceFactor.z;
+    }
+    set iridescenceThicknessMin(val: number) {
+      if (this._iridescenceFactor.z !== val) {
+        this._iridescenceFactor.z = val;
+        this.uniformChanged();
+      }
+    }
+    get iridescenceThicknessMax(): number {
+      return this._iridescenceFactor.w;
+    }
+    set iridescenceThicknessMax(val: number) {
+      if (this._iridescenceFactor.w !== val) {
+        this._iridescenceFactor.w = val;
+        this.uniformChanged();
+      }
+    }
     get occlusionStrength(): number {
       return this._occlusionStrength;
     }
@@ -229,6 +279,12 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     set transmission(val: boolean) {
       this.useFeature(FEATURE_TRANSMISSION, !!val);
+    }
+    get iridescence(): boolean {
+      return this.featureUsed<boolean>(FEATURE_IRIDESCENCE);
+    }
+    set iridescence(val: boolean) {
+      this.useFeature(FEATURE_IRIDESCENCE, !!val);
     }
     get clearcoat(): boolean {
       return this.featureUsed<boolean>(FEATURE_CLEARCOAT);
@@ -312,6 +368,9 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           scope.zSceneColorTex = pb.tex2D().uniform(2);
           scope.zSceneColorTexSize = pb.vec2().uniform(2);
         }
+        if (this.iridescence) {
+          scope.zIridescenceFactor = pb.vec4().uniform(2);
+        }
         if (this.drawContext.drawEnvLight) {
           scope.zGGXLut = pb.tex2D().uniform(2);
         }
@@ -343,6 +402,9 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           this._sceneColorTexSize.setXY(ctx.sceneColorTexture.width, ctx.sceneColorTexture.height);
           bindGroup.setValue('zSceneColorTexSize', this._sceneColorTexSize);
         }
+        if (this.iridescence) {
+          bindGroup.setValue('zIridescenceFactor', this._iridescenceFactor);
+        }
         if (ctx.drawEnvLight) {
           bindGroup.setTexture('zGGXLut', getGGXLUT(1024));
         }
@@ -373,28 +435,37 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
               pb.vec3('attenuationColor'),
               pb.float('attenuationDistance')
             ]
+          : []),
+        ...(this.iridescence
+          ? [pb.vec4('iridescenceFactor'), pb.vec3('iridescenceFresnel'), pb.vec3('iridescenceF0')]
           : [])
       ]);
     }
     getCommonData(
       scope: PBInsideFunctionScope,
       albedo: PBShaderExp,
+      normal: PBShaderExp,
       viewVec: PBShaderExp,
       TBN: PBShaderExp
     ): PBShaderExp {
       const pb = scope.$builder;
       const that = this;
       const funcName = 'Z_getCommonData';
-      pb.func(funcName, [pb.vec4('albedo'), pb.vec3('viewVec'), pb.mat3('TBN')], function () {
-        this.$l.data = that.getCommonDatasStruct(this)();
-        that.calculateCommonData(this, this.albedo, this.viewVec, this.TBN, this.data);
-        this.$return(this.data);
-      });
-      return scope.$g[funcName](albedo, viewVec, TBN);
+      pb.func(
+        funcName,
+        [pb.vec4('albedo'), pb.vec3('normal'), pb.vec3('viewVec'), pb.mat3('TBN')],
+        function () {
+          this.$l.data = that.getCommonDatasStruct(this)();
+          that.calculateCommonData(this, this.albedo, this.normal, this.viewVec, this.TBN, this.data);
+          this.$return(this.data);
+        }
+      );
+      return scope.$g[funcName](albedo, normal, viewVec, TBN);
     }
     calculateCommonData(
       scope: PBInsideFunctionScope,
       albedo: PBShaderExp,
+      normal: PBShaderExp,
       viewVec: PBShaderExp,
       TBN: PBShaderExp,
       data: PBShaderExp
@@ -456,6 +527,33 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         }
         data.attenuationColor = scope.zAttenuationColor;
         data.attenuationDistance = scope.zAttenuationDistance;
+      }
+      if (this.iridescence) {
+        data.iridescenceFactor = scope.zIridescenceFactor;
+        if (this.iridescenceTexture) {
+          data.iridescenceFactor.x = pb.mul(this.sampleIridescenceTexture(scope).r, data.iridescenceFactor.x);
+        }
+        if (this.iridescenceThicknessTexture) {
+          data.iridescenceFactor.w = pb.mix(
+            data.iridescenceFactor.z,
+            data.iridescenceFactor.w,
+            this.sampleIridescenceThicknessTexture(scope).g
+          );
+        }
+        data.iridescenceFresnel = this.evalIridescence(
+          scope,
+          1,
+          data.iridescenceFactor.y,
+          pb.clamp(pb.dot(normal, viewVec), 0, 1),
+          data.iridescenceFactor.w,
+          data.f0.rgb
+        );
+        data.iridescenceF0 = this.schlickToF0(
+          scope,
+          data.iridescenceFresnel,
+          pb.vec3(1),
+          pb.clamp(pb.dot(normal, viewVec), 0, 1)
+        );
       }
     }
     calculateEmissiveColor(scope: PBInsideFunctionScope): PBShaderExp {
@@ -742,7 +840,16 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$l.NoV = pb.clamp(pb.dot(this.normal, this.viewVec), 0, 1);
           this.$if(pb.greaterThan(this.NoL, 0), function () {
             this.$l.VoH = pb.clamp(pb.dot(this.viewVec, this.H), 0, 1);
-            this.$l.F = that.fresnelSchlick(this, this.VoH, this.data.f0.rgb, this.data.f90);
+            this.$l.schlickFresnel = that.fresnelSchlick(this, this.VoH, this.data.f0.rgb, this.data.f90);
+            if (that.iridescence) {
+              this.$l.F = pb.mix(
+                this.schlickFresnel,
+                this.data.iridescenceFresnel,
+                this.data.iridescenceFactor.x
+              );
+            } else {
+              this.$l.F = this.schlickFresnel;
+            }
             this.$l.alphaRoughness = pb.mul(this.data.roughness, this.data.roughness);
             this.$l.D = that.distributionGGX(this, this.NoH, this.alphaRoughness);
             this.$l.V = that.visGGX(this, this.NoV, this.NoL, this.alphaRoughness);
@@ -751,16 +858,20 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
               this.specular = pb.mul(this.specular, this.data.sheenAlbedoScaling);
             }
             this.outColor = pb.add(this.outColor, this.specular);
-            this.$l.diffuse = pb.mul(
-              this.lightColor,
-              pb.max(
-                pb.mul(
-                  pb.sub(pb.vec3(1), pb.mul(this.F, this.data.specularWeight)),
-                  pb.div(this.data.diffuse.rgb, Math.PI)
-                ),
-                pb.vec3(0)
-              )
+            if (that.iridescence) {
+              this.$l.iridescenceFresnelMax = pb.vec3(
+                pb.max(
+                  pb.max(this.data.iridescenceFresnel.r, this.data.iridescenceFresnel.g),
+                  this.data.iridescenceFresnel.b
+                )
+              );
+              this.F = pb.mix(this.schlickFresnel, this.iridescenceFresnelMax, this.data.iridescenceFactor.x);
+            }
+            this.$l.diffuseBRDF = pb.mul(
+              pb.sub(pb.vec3(1), pb.mul(this.F, this.data.specularWeight)),
+              pb.div(this.data.diffuse.rgb, Math.PI)
             );
+            this.$l.diffuse = pb.mul(this.lightColor, pb.max(this.diffuseBRDF, pb.vec3(0)));
             if (that.transmission) {
               this.$l.transmissionRay = that.getVolumeTransmissionRay(
                 this,
@@ -820,6 +931,192 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       );
       scope.$g[funcName](lightDir, lightColor, normal, viewVec, commonData, outColor);
     }
+    fresnel0ToIor(scope: PBInsideFunctionScope, fresnel0: PBShaderExp): PBShaderExp {
+      const pb = scope.$builder;
+      const funcName = 'Z_fresnel0ToIor';
+      pb.func(funcName, [pb.vec3('fresnel0')], function () {
+        this.$l.sqrtF0 = pb.sqrt(this.fresnel0);
+        this.$return(pb.div(pb.add(this.sqrtF0, pb.vec3(1)), pb.sub(pb.vec3(1), this.sqrtF0)));
+      });
+      return pb.getGlobalScope()[funcName](fresnel0);
+    }
+    iorToFresnel0v(
+      scope: PBInsideFunctionScope,
+      transmittedIor: PBShaderExp,
+      incidentIor: PBShaderExp
+    ): PBShaderExp {
+      const pb = scope.$builder;
+      const funcName = 'Z_iorToFresnel0v';
+      pb.func(funcName, [pb.vec3('transmittedIor'), pb.float('incidentIor')], function () {
+        this.$l.t = pb.div(
+          pb.sub(this.transmittedIor, pb.vec3(this.incidentIor)),
+          pb.add(this.transmittedIor, pb.vec3(this.incidentIor))
+        );
+        this.$return(pb.mul(this.t, this.t));
+      });
+      return pb.getGlobalScope()[funcName](transmittedIor, incidentIor);
+    }
+    iorToFresnel0(
+      scope: PBInsideFunctionScope,
+      transmittedIor: PBShaderExp,
+      incidentIor: PBShaderExp
+    ): PBShaderExp {
+      const pb = scope.$builder;
+      const funcName = 'Z_iorToFresnel0';
+      pb.func(funcName, [pb.float('transmittedIor'), pb.float('incidentIor')], function () {
+        this.$l.t = pb.div(
+          pb.sub(this.transmittedIor, this.incidentIor),
+          pb.add(this.transmittedIor, this.incidentIor)
+        );
+        this.$return(pb.mul(this.t, this.t));
+      });
+      return pb.getGlobalScope()[funcName](transmittedIor, incidentIor);
+    }
+    evalSensitivity(scope: PBInsideFunctionScope, OPD: PBShaderExp, shift: PBShaderExp): PBShaderExp {
+      const pb = scope.$builder;
+      const funcName = 'Z_evalSensitivity';
+      pb.func(funcName, [pb.float('OPD'), pb.vec3('shift')], function () {
+        this.$l.phase = pb.mul(Math.PI * 2, this.OPD, 1e-9);
+        this.$l.val = pb.vec3(5.4856e-13, 4.4201e-13, 5.2481e-13);
+        this.$l.pos = pb.vec3(1.681e6, 1.7953e6, 2.2084e6);
+        this.$l.va = pb.vec3(4.3278e9, 9.3046e9, 6.6121e9);
+        this.$l.xyz = pb.mul(
+          this.val,
+          pb.sqrt(pb.mul(Math.PI * 2, this.va)),
+          pb.cos(pb.add(pb.mul(this.pos, this.phase), this.shift)),
+          pb.exp(pb.neg(pb.mul(this.phase, this.phase, this.va)))
+        );
+        this.xyz.x = pb.add(
+          this.xyz.x,
+          pb.mul(
+            9.747e-14,
+            Math.sqrt(Math.PI * 2 * 4.5282e9),
+            pb.cos(pb.add(pb.mul(this.phase, 2.2399e6), this.shift.x)),
+            pb.exp(pb.mul(-4.5282e9, this.phase, this.phase))
+          )
+        );
+        this.xyz = pb.div(this.xyz, 1.0685e-7);
+        this.$return(
+          pb.mul(
+            pb.mat3(
+              3.2404542,
+              -0.969266,
+              0.0556434,
+              -1.5371385,
+              1.8760108,
+              -0.2040259,
+              -0.4985314,
+              0.041556,
+              1.0572252
+            ),
+            this.xyz
+          )
+        );
+      });
+      return pb.getGlobalScope()[funcName](OPD, shift);
+    }
+    schlickToF0(
+      scope: PBInsideFunctionScope,
+      f: PBShaderExp,
+      f90: PBShaderExp,
+      VdotH: PBShaderExp
+    ): PBShaderExp {
+      const pb = scope.$builder;
+      const funcName = 'Z_schlickToF0';
+      pb.func(funcName, [pb.vec3('f'), pb.vec3('f90'), pb.float('VdotH')], function () {
+        this.$l.x = pb.clamp(pb.sub(1, this.VdotH), 0, 1);
+        this.$l.x2 = pb.mul(this.x, this.x);
+        this.$l.x5 = pb.clamp(pb.mul(this.x, this.x2, this.x2), 0, 0.9999);
+        this.$return(pb.div(pb.sub(this.f, pb.mul(this.f90, this.x5)), pb.sub(1, this.x5)));
+      });
+      return pb.getGlobalScope()[funcName](f, f90, VdotH);
+    }
+    evalIridescence(
+      scope: PBInsideFunctionScope,
+      outsideIOR: PBShaderExp | number,
+      eta2: PBShaderExp,
+      cosTheta1: PBShaderExp,
+      thinFilmThickness: PBShaderExp,
+      baseF0: PBShaderExp
+    ) {
+      const pb = scope.$builder;
+      const that = this;
+      const funcName = 'Z_evalIridescence';
+      pb.func(
+        funcName,
+        [
+          pb.float('outsideIOR'),
+          pb.float('eta2'),
+          pb.float('cosTheta1'),
+          pb.float('thinFilmThickness'),
+          pb.vec3('baseF0')
+        ],
+        function () {
+          this.$l.iridescenceIor = pb.mix(
+            this.outsideIOR,
+            this.eta2,
+            pb.smoothStep(0, 0.03, this.thinFilmThickness)
+          );
+          this.$l.t = pb.div(this.outsideIOR, this.iridescenceIor);
+          this.$l.sinTheta2Sq = pb.mul(this.t, this.t, pb.sub(1, pb.mul(this.cosTheta1, this.cosTheta1)));
+          this.$l.cosTheta2Sq = pb.sub(1, this.sinTheta2Sq);
+          this.$if(pb.lessThan(this.cosTheta2Sq, 0), function () {
+            this.$return(pb.vec3(1));
+          });
+          this.$l.cosTheta2 = pb.sqrt(this.cosTheta2Sq);
+
+          this.$l.R0 = that.iorToFresnel0(this, this.iridescenceIor, this.outsideIOR);
+          this.$l.R12 = that.fresnelSchlick(this, this.cosTheta1, pb.vec3(this.R0), pb.vec3(1)).x;
+          this.$l.R21 = this.R12;
+          this.$l.T121 = pb.sub(1, this.R12);
+          this.$l.phi12 = pb.float(0);
+          this.$if(pb.lessThan(this.iridescenceIor, this.outsideIOR), function () {
+            this.phi12 = Math.PI;
+          });
+          this.$l.phi21 = pb.sub(Math.PI, this.phi12);
+
+          this.$l.baseIOR = that.fresnel0ToIor(this, pb.clamp(this.baseF0, pb.vec3(0), pb.vec3(0.9999)));
+          this.$l.R1 = that.iorToFresnel0v(this, this.baseIOR, this.iridescenceIor);
+          this.$l.R23 = that.fresnelSchlick(this, this.cosTheta2, this.R1, pb.vec3(1));
+          this.$l.phi23 = pb.vec3(0);
+          this.$if(pb.lessThan(this.baseIOR.x, this.iridescenceIor), function () {
+            this.phi23.x = Math.PI;
+          });
+          this.$if(pb.lessThan(this.baseIOR.y, this.iridescenceIor), function () {
+            this.phi23.y = Math.PI;
+          });
+          this.$if(pb.lessThan(this.baseIOR.z, this.iridescenceIor), function () {
+            this.phi23.z = Math.PI;
+          });
+
+          this.$l.OPD = pb.mul(this.iridescenceIor, this.thinFilmThickness, this.cosTheta2, 2);
+          this.$l.phi = pb.add(pb.vec3(this.phi21), this.phi23);
+
+          this.$l.R123 = pb.clamp(pb.mul(this.R12, this.R23), pb.vec3(1e-5), pb.vec3(0.9999));
+          this.$l.r123 = pb.sqrt(this.R123);
+          this.$l.Rs = pb.div(pb.mul(this.T121, this.T121, this.R23), pb.sub(pb.vec3(1), this.R123));
+
+          this.$l.C0 = pb.add(pb.vec3(this.R12), this.Rs);
+          this.$l.I = this.C0;
+
+          this.$l.Cm = pb.sub(this.Rs, pb.vec3(this.T121));
+          this.$for(pb.int('m'), 1, 3, function () {
+            this.Cm = pb.mul(this.Cm, this.r123);
+            this.$l.Sm = pb.mul(
+              that.evalSensitivity(
+                this,
+                pb.mul(this.OPD, pb.float(this.m)),
+                pb.mul(this.phi, pb.float(this.m))
+              ),
+              2
+            );
+            this.I = pb.add(this.I, pb.mul(this.Cm, this.Sm));
+          });
+          this.$return(pb.max(this.I, pb.vec3(0)));
+        }
+      );
+      return pb.getGlobalScope()[funcName](outsideIOR, eta2, cosTheta1, thinFilmThickness, baseF0);
+    }
     indirectLighting(
       scope: PBInsideFunctionScope,
       normal: PBShaderExp,
@@ -871,7 +1168,15 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             pb.max(pb.vec3(pb.sub(1, this.data.roughness)), this.data.f0.rgb),
             this.data.f0.rgb
           );
-          this.$l.k_S = pb.add(this.data.f0.rgb, pb.mul(this.Fr, pb.pow(pb.sub(1, this.NoV), 5)));
+          if (that.iridescence) {
+            this.$l.k_S = pb.mix(
+              pb.add(this.data.f0.rgb, pb.mul(this.Fr, pb.pow(pb.sub(1, this.NoV), 5))),
+              this.data.iridescenceFresnel,
+              this.data.iridescenceFactor.x
+            );
+          } else {
+            this.$l.k_S = pb.add(this.data.f0.rgb, pb.mul(this.Fr, pb.pow(pb.sub(1, this.NoV), 5)));
+          }
           if (ctx.env.light.envLight.hasRadiance()) {
             this.$l.radiance = ctx.env.light.envLight.getRadiance(
               this,
@@ -892,13 +1197,30 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           }
           if (ctx.env.light.envLight.hasIrradiance()) {
             this.$l.irradiance = ctx.env.light.envLight.getIrradiance(this, this.normal);
+            if (that.iridescence) {
+              this.$l.iridescenceF0Max = pb.vec3(
+                pb.max(
+                  pb.max(this.data.iridescenceF0.r, this.data.iridescenceF0.g),
+                  this.data.iridescenceF0.b
+                )
+              );
+              this.$l.mixedF0 = pb.mix(
+                this.data.f0.rgb,
+                this.iridescenceF0Max,
+                this.data.iridescenceFactor.x
+              );
+              this.Fr = pb.sub(pb.max(pb.vec3(pb.sub(1, this.data.roughness)), this.mixedF0), this.mixedF0);
+              this.k_S = pb.add(this.mixedF0, pb.mul(this.Fr, pb.pow(pb.sub(1, this.NoV), 5)));
+            } else {
+              this.$l.mixedF0 = this.data.f0.rgb;
+            }
             this.$l.FssEss = pb.add(
               pb.mul(this.k_S, this.f_ab.x, this.data.specularWeight),
               pb.vec3(this.f_ab.y)
             );
             this.$l.Ems = pb.sub(1, pb.add(this.f_ab.x, this.f_ab.y));
             this.$l.F_avg = pb.mul(
-              pb.add(this.data.f0.rgb, pb.div(pb.sub(pb.vec3(1), this.data.f0.rgb), 21)),
+              pb.add(this.mixedF0, pb.div(pb.sub(pb.vec3(1), this.mixedF0), 21)),
               this.data.specularWeight
             );
             this.$l.FmsEms = pb.div(
@@ -1042,5 +1364,6 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
   FEATURE_SHEEN = cls.defineFeature();
   FEATURE_CLEARCOAT = cls.defineFeature();
   FEATURE_TRANSMISSION = cls.defineFeature();
+  FEATURE_IRIDESCENCE = cls.defineFeature();
   return cls;
 }

@@ -743,6 +743,26 @@ export class GLTFLoader extends AbstractModelLoader {
           pbrMaterial.sheenRoughnessTexCoordMatrix = sheen.sheenRoughnessMap.transform;
         }
       }
+      if (assetPBRMaterial.iridescence) {
+        const iridescence = assetPBRMaterial.iridescence;
+        pbrMaterial.iridescence = true;
+        pbrMaterial.iridescenceFactor = iridescence.iridescenceFactor;
+        pbrMaterial.iridescenceIor = iridescence.iridescenceIor;
+        if (iridescence.iridescenceMap) {
+          pbrMaterial.iridescenceTexture = iridescence.iridescenceMap.texture;
+          pbrMaterial.iridescenceTextureSampler = iridescence.iridescenceMap.sampler;
+          pbrMaterial.iridescenceTexCoordIndex = iridescence.iridescenceMap.texCoord;
+          pbrMaterial.iridescenceTexCoordMatrix = iridescence.iridescenceMap.transform;
+        }
+        pbrMaterial.iridescenceThicknessMin = iridescence.iridescenceThicknessMinimum;
+        pbrMaterial.iridescenceThicknessMax = iridescence.iridescenceThicknessMaximum;
+        if (iridescence.iridescenceThicknessMap) {
+          pbrMaterial.iridescenceThicknessTexture = iridescence.iridescenceThicknessMap.texture;
+          pbrMaterial.iridescenceThicknessTextureSampler = iridescence.iridescenceThicknessMap.sampler;
+          pbrMaterial.iridescenceThicknessTexCoordIndex = iridescence.iridescenceThicknessMap.texCoord;
+          pbrMaterial.iridescenceThicknessTexCoordMatrix = iridescence.iridescenceThicknessMap.transform;
+        }
+      }
       if (assetPBRMaterial.transmission) {
         const transmission = assetPBRMaterial.transmission;
         pbrMaterial.transmission = true;
@@ -937,7 +957,23 @@ export class GLTFLoader extends AbstractModelLoader {
             true
           )
         : null;
-      // KHR_material_transmission
+      // KHR_materials_iridescence
+      const iridescence = materialInfo?.extensions?.KHR_materials_iridescence;
+      if (iridescence) {
+        pbrMetallicRoughness.iridescence = {
+          iridescenceFactor: iridescence.iridescenceFactor ?? 0,
+          iridescenceMap: iridescence.iridescenceTexture
+            ? await this._loadTexture(gltf, iridescence.iridescenceTexture, false)
+            : null,
+          iridescenceIor: iridescence.iridescenceIor ?? 1.3,
+          iridescenceThicknessMinimum: iridescence.iridescenceThicknessMinimum ?? 100,
+          iridescenceThicknessMaximum: iridescence.iridescenceThicknessMaximum ?? 400,
+          iridescenceThicknessMap: iridescence.iridescenceThicknessTexture
+            ? await this._loadTexture(gltf, iridescence.iridescenceThicknessTexture, false)
+            : null
+        };
+      }
+      // KHR_materials_transmission
       const transmission = materialInfo?.extensions?.KHR_materials_transmission;
       if (transmission) {
         pbrMetallicRoughness.transmission = {

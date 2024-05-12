@@ -106,7 +106,7 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
         funcName,
         [pb.vec3('worldPos'), pb.vec3('normal'), pb.mat3('TBN'), pb.vec3('viewVec'), pb.vec4('albedo')],
         function () {
-          this.$l.pbrData = that.getCommonData(this, this.albedo, this.viewVec, this.TBN);
+          this.$l.pbrData = that.getCommonData(this, this.albedo, this.normal, this.viewVec, this.TBN);
           this.$l.lightingColor = pb.vec3(0);
           this.$l.emissiveColor = that.calculateEmissiveColor(this);
           that.indirectLighting(this, this.normal, this.viewVec, this.pbrData, this.lightingColor);
@@ -144,11 +144,12 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
     calculateCommonData(
       scope: PBInsideFunctionScope,
       albedo: PBShaderExp,
+      normal: PBShaderExp,
       viewVec: PBShaderExp,
       TBN: PBShaderExp,
       data: PBShaderExp
     ): void {
-      super.calculateCommonData(scope, albedo, viewVec, TBN, data);
+      super.calculateCommonData(scope, albedo, normal, viewVec, TBN, data);
       const pb = scope.$builder;
       if (this.specularTexture) {
         scope.$l.specularTextureSample = this.sampleSpecularTexture(scope);
