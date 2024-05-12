@@ -154,6 +154,7 @@ export interface AssetSubMeshData {
   rawBlendIndices: TypedArray;
   rawJointWeights: TypedArray;
   name: string;
+  numTargets: number;
   targets?: Partial<Record<number, { numComponents: number; data: Float32Array[] }>>;
   targetBox?: BoundingBox[];
   morphAttribCount?: number;
@@ -164,6 +165,7 @@ export interface AssetSubMeshData {
  * @public
  */
 export interface AssetMeshData {
+  morphWeights?: number[];
   subMeshes: AssetSubMeshData[];
 }
 

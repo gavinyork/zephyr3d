@@ -21,6 +21,7 @@ import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
 import { MorphTargetTrack } from '../animation/morphtrack';
+import { processMorphData } from '../animation/morphtarget';
 
 /**
  * Options for texture fetching
@@ -666,6 +667,7 @@ export class AssetManager {
         meshNode.material = instancing ? subMesh.material.createInstance() : subMesh.material;
         meshNode.reparent(node);
         subMesh.mesh = meshNode;
+        processMorphData(subMesh, meshData.morphWeights);
         if (skeleton) {
           if (!skeletonMeshMap.has(skeleton)) {
             skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });

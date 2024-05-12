@@ -405,7 +405,9 @@ export class GLTFLoader extends AbstractModelLoader {
       node = model.addNode(parent, nodeIndex, nodeInfo.name);
       if (typeof nodeInfo.mesh === 'number') {
         node.mesh = gltf._meshes[nodeInfo.mesh];
-        node.weights = nodeInfo.weights ?? gltf.meshes[nodeInfo.mesh].weights ?? null;
+        if (node.weights) {
+          node.mesh.morphWeights = node.weights;
+        }
       }
       if (!(typeof nodeInfo.skin === 'number') || nodeInfo.skin < 0) {
         // GLTF spec: Only the joint transforms are applied to the skinned mesh; the transform of the skinned mesh node MUST be ignored.
@@ -448,7 +450,10 @@ export class GLTFLoader extends AbstractModelLoader {
     const meshInfo = gltf.meshes && gltf.meshes[meshIndex];
     let mesh: AssetMeshData = null;
     if (meshInfo) {
-      mesh = { subMeshes: [] };
+      mesh = {
+        morphWeights: meshInfo.weights ?? null,
+        subMeshes: []
+      };
       const primitives = meshInfo.primitives;
       const meshName = meshInfo.name || null;
       if (primitives) {
@@ -460,7 +465,8 @@ export class GLTFLoader extends AbstractModelLoader {
             material: null,
             rawPositions: null,
             rawBlendIndices: null,
-            rawJointWeights: null
+            rawJointWeights: null,
+            numTargets: 0
           };
           const primitive = new Primitive();
           const attributes = p.attributes;
@@ -546,6 +552,7 @@ export class GLTFLoader extends AbstractModelLoader {
                 }
               }
             }
+            subMeshData.numTargets = p.targets.length;
             subMeshData.targets = targets;
             subMeshData.targetBox = targetBox;
             subMeshData.morphAttribCount = morphAttribSet.size;
