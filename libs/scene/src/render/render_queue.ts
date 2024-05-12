@@ -448,11 +448,9 @@ export class RenderQueue {
           if (info.skinItemList.length > 0) {
             info.skinRenderBundle = new RenderBundleWrapper();
           }
-          /*
           if (info.morphItemList.length > 0) {
             info.morphRenderBundle = new RenderBundleWrapper();
           }
-          */
           if (info.skinAndMorphItemList.length > 0) {
             info.skinAndMorphRenderBundle = new RenderBundleWrapper();
           }
