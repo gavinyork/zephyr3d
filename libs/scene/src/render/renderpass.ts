@@ -196,7 +196,8 @@ export abstract class RenderPass {
     const windingHash = reverseWinding ? '1' : '0';
     const bindGroupHash = ctx.device.getBindGroup(0)[0].getGPUId();
     const framebufferHash = ctx.device.getFramebuffer()?.getHash() ?? '';
-    const hash = `${windingHash}-${bindGroupHash}-${framebufferHash}-${ctx.renderPassHash}`;
+    const ctxHash = `${ctx.sceneColorTexture?.uid ?? 0}-${ctx.linearDepthTexture?.uid ?? 0}`;
+    const hash = `${windingHash}-${bindGroupHash}-${framebufferHash}-${ctxHash}-${ctx.renderPassHash}`;
     if (itemList) {
       if (itemList.itemList.length > 0) {
         ctx.skinAnimation = false;

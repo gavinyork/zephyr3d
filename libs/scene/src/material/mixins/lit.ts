@@ -454,7 +454,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      *
      * @returns true if shadow should be computed, other wise false
      */
-    protected needCalucateShadow(): boolean {
+    protected needCalculateShadow(): boolean {
       return (
         this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && !!this.drawContext.currentShadowLight
       );
@@ -468,7 +468,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      */
     calculateShadow(scope: PBInsideFunctionScope, worldPos: PBShaderExp, NoL: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
-      if (!this.needCalucateShadow()) {
+      if (!this.needCalculateShadow()) {
         console.warn('calculateShadow(): No need to calculate shadow');
         return pb.float(1);
       }

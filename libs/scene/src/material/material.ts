@@ -20,6 +20,8 @@ export class Material {
   /** @internal */
   private static _nextId = 0;
   /** @internal */
+  private static _programCache: { [hash: string]: GPUProgram } = {};
+  /** @internal */
   private _states: { [hash: string]: MaterialState };
   /** @internal */
   protected _numPasses: number;
@@ -99,7 +101,12 @@ export class Material {
       const hash = this.calcGlobalHash(ctx, pass);
       let state = this._states[hash];
       if (!state) {
-        const program = this.createProgram(ctx, pass) ?? null;
+        const programHash = `${this.constructor.name}:${hash}`;
+        let program = Material._programCache[programHash];
+        if (!program) {
+          program = this.createProgram(ctx, pass) ?? null;
+          Material._programCache[programHash] = program;
+        }
         const bindGroup =
           program.bindGroupLayouts.length > 2
             ? ctx.device.createBindGroup(program.bindGroupLayouts[2])

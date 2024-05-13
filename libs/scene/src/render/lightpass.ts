@@ -31,9 +31,7 @@ export class LightPass extends RenderPass {
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return `lp:${this._shadowMapHash}:${ctx.linearDepthTexture?.uid ?? ''}:${
-      ctx.sceneColorTexture?.uid ?? ''
-    }:${ctx.oit?.calculateHash() ?? ''}:${ctx.env.getHash(ctx)}`;
+    return `lp:${this._shadowMapHash}:${ctx.oit?.calculateHash() ?? ''}:${ctx.env.getHash(ctx)}`;
   }
   /** @internal */
   protected renderLightPass(
