@@ -259,6 +259,7 @@ export class AssetHierarchyNode extends NamedObject {
   private _worldMatrix: Matrix4x4;
   private _weights: number[];
   private _children: AssetHierarchyNode[];
+  private _instances?: { t: Vector3; s: Vector3; r: Quaternion }[];
   /**
    * Creates an instance of AssetHierarchyNode
    * @param name - Name of the node
@@ -279,6 +280,7 @@ export class AssetHierarchyNode extends NamedObject {
     this._matrix = null;
     this._weights = null;
     this._worldMatrix = null;
+    this._instances = [];
     parent?.addChild(this);
   }
   /** Parent of the node */
@@ -300,6 +302,10 @@ export class AssetHierarchyNode extends NamedObject {
   set mesh(data: AssetMeshData) {
     this._mesh = data;
     this.setMeshAttached();
+  }
+  /** instances */
+  get instances(): { t: Vector3; s: Vector3; r: Quaternion }[] {
+    return this._instances;
   }
   /** Default morph target weights */
   get weights(): number[] {

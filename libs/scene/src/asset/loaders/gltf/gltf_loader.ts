@@ -408,6 +408,47 @@ export class GLTFLoader extends AbstractModelLoader {
         if (node.weights) {
           node.mesh.morphWeights = node.weights;
         }
+        const instancing = nodeInfo.extensions?.['EXT_mesh_gpu_instancing'];
+        if (instancing) {
+          const attributes = instancing.attributes;
+          if (attributes) {
+            const accessorTranslation =
+              typeof attributes.TRANSLATION === 'number' ? gltf._accessors[attributes.TRANSLATION] : null;
+            const accessorScale =
+              typeof attributes.SCALE === 'number' ? gltf._accessors[attributes.SCALE] : null;
+            const accessorRotation =
+              typeof attributes.ROTATION === 'number' ? gltf._accessors[attributes.ROTATION] : null;
+            const count = accessorTranslation?.count ?? accessorScale?.count ?? accessorRotation.count ?? 0;
+            const translationValues = accessorTranslation?.getNormalizedDeinterlacedView(
+              gltf
+            ) as Float32Array;
+            const scaleValues = accessorScale?.getNormalizedDeinterlacedView(gltf) as Float32Array;
+            const rotationValues = accessorRotation?.getNormalizedDeinterlacedView(gltf) as Float32Array;
+            for (let i = 0; i < count; i++) {
+              const t = translationValues
+                ? new Vector3(
+                    translationValues[i * 3],
+                    translationValues[i * 3 + 1],
+                    translationValues[i * 3 + 2]
+                  )
+                : Vector3.zero();
+              const s = scaleValues
+                ? new Vector3(scaleValues[i * 3], scaleValues[i * 3 + 1], scaleValues[i * 3 + 2])
+                : Vector3.one();
+              const r = rotationValues
+                ? new Quaternion(
+                    rotationValues[i * 4],
+                    rotationValues[i * 4 + 1],
+                    rotationValues[i * 4 + 2],
+                    rotationValues[i * 4 + 3]
+                  )
+                : Quaternion.identity();
+              node.instances.push({ t, s, r });
+            }
+          }
+        } else {
+          node.instances.push({ t: Vector3.zero(), s: Vector3.one(), r: Quaternion.identity() });
+        }
       }
       if (!(typeof nodeInfo.skin === 'number') || nodeInfo.skin < 0) {
         // GLTF spec: Only the joint transforms are applied to the skinned mesh; the transform of the skinned mesh node MUST be ignored.

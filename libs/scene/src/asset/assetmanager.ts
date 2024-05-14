@@ -659,21 +659,26 @@ export class AssetManager {
       const meshData = assetNode.mesh;
       const skeleton = assetNode.skeleton;
       for (const subMesh of meshData.subMeshes) {
-        const meshNode = new Mesh(scene);
-        meshNode.name = subMesh.name;
-        meshNode.clipTestEnabled = true;
-        meshNode.showState = 'inherit';
-        meshNode.primitive = subMesh.primitive;
-        meshNode.material = instancing ? subMesh.material.createInstance() : subMesh.material;
-        meshNode.reparent(node);
-        subMesh.mesh = meshNode;
-        processMorphData(subMesh, meshData.morphWeights);
-        if (skeleton) {
-          if (!skeletonMeshMap.has(skeleton)) {
-            skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });
-          } else {
-            skeletonMeshMap.get(skeleton).mesh.push(meshNode);
-            skeletonMeshMap.get(skeleton).bounding.push(subMesh);
+        for (const instance of assetNode.instances) {
+          const meshNode = new Mesh(scene);
+          meshNode.position = instance.t;
+          meshNode.scale = instance.s;
+          meshNode.rotation = instance.r;
+          meshNode.name = subMesh.name;
+          meshNode.clipTestEnabled = true;
+          meshNode.showState = 'inherit';
+          meshNode.primitive = subMesh.primitive;
+          meshNode.material = instancing ? subMesh.material.createInstance() : subMesh.material;
+          meshNode.reparent(node);
+          subMesh.mesh = meshNode;
+          processMorphData(subMesh, meshData.morphWeights);
+          if (skeleton) {
+            if (!skeletonMeshMap.has(skeleton)) {
+              skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });
+            } else {
+              skeletonMeshMap.get(skeleton).mesh.push(meshNode);
+              skeletonMeshMap.get(skeleton).bounding.push(subMesh);
+            }
           }
         }
       }
