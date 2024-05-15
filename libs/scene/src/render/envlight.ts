@@ -1,3 +1,4 @@
+import type { Vector3 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type {
   BindGroup,
@@ -12,7 +13,7 @@ import { Application } from '../app';
  * Environment light type
  * @public
  */
-export type EnvLightType = 'ibl' | 'hemisphere' | 'constant' | 'none';
+export type EnvLightType = 'ibl' | 'ibl-sh' | 'hemisphere' | 'constant' | 'none';
 
 /**
  * Base class for any kind of environment light
@@ -59,26 +60,202 @@ export abstract class EnvironmentLighting {
    * Returns whether this environment lighting supports diffuse light
    */
   abstract hasIrradiance(): boolean;
+}
+
+/**
+ * IBL with SH based environment lighting
+ * @public
+ */
+export class EnvShIBL extends EnvironmentLighting {
+  /** @internal */
+  public static readonly UNIFORM_NAME_IBL_RADIANCE_MAP = 'zIBLRadianceMap';
+  /** @internal */
+  public static readonly UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD = 'zIBLRadianceMapMaxLOD';
+  /** @internal */
+  public static readonly UNIFORM_NAME_IBL_IRRADIANCE_SH = 'zIBLIrradianceSH';
+  /** @internal */
+  private _radianceMap: TextureCube;
+  /** @internal */
+  private _irradianceSH: Float32Array;
   /**
-   * Whether this is an instance of EnvIBL
-   * @returns true if this is an instance of EnvIBL
+   * Creates an instance of EnvIBL
+   * @param radianceMap - The radiance map
+   * @param irradianceSH - The irradiance SH
    */
-  isIBL(): this is EnvIBL {
-    return false;
+  constructor(radianceMap?: TextureCube, irradianceSH?: (Vector4 | Vector3)[] | Float32Array) {
+    super();
+    this._radianceMap = radianceMap || null;
+    if (!irradianceSH) {
+      this._irradianceSH = null;
+    } else {
+      this._irradianceSH = new Float32Array(9 * 4);
+      if (irradianceSH instanceof Float32Array) {
+        if (irradianceSH.length !== 9 * 4) {
+          throw new Error(`3rd order SH coefficients expected`);
+        }
+        this._irradianceSH.set(irradianceSH);
+      } else {
+        if (irradianceSH.length !== 9) {
+          throw new Error(`3rd order SH coefficients expected`);
+        }
+        for (let i = 0; i < 9; i++) {
+          this._irradianceSH[i * 4 + 0] = irradianceSH[i].x;
+          this._irradianceSH[i * 4 + 1] = irradianceSH[i].y;
+          this._irradianceSH[i * 4 + 2] = irradianceSH[i].z;
+        }
+      }
+    }
   }
   /**
-   * Whether this is an instance of EnvConstantAmbient
-   * @returns true if this is an instance of EnvConstantAmbient
+   * {@inheritDoc EnvironmentLighting.getType}
+   * @override
    */
-  isConstant(): this is EnvConstantAmbient {
-    return false;
+  getType(): EnvLightType {
+    return 'ibl-sh';
+  }
+  /** The radiance map */
+  get radianceMap(): TextureCube {
+    return this._radianceMap;
+  }
+  set radianceMap(tex: TextureCube) {
+    this._radianceMap = tex;
+  }
+  /** The irradiance sh coeffecients */
+  get irradianceSH(): Float32Array {
+    return this._irradianceSH;
+  }
+  set irradianceSH(value: Float32Array) {
+    if (value && value.length < 36) {
+      throw new Error(`3rd order SH coefficients expected`);
+    }
+    this._irradianceSH = value;
   }
   /**
-   * Whether this is an instance of EnvHemisphericAmbient
-   * @returns true if this is an instance of EnvHemisphericAmbient
+   * {@inheritDoc EnvironmentLighting.initShaderBindings}
+   * @override
    */
-  isHemispheric(): this is EnvHemisphericAmbient {
-    return false;
+  initShaderBindings(pb: ProgramBuilder): void {
+    if (pb.shaderKind === 'fragment') {
+      if (this._radianceMap) {
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP] = pb.texCube().uniform(0);
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD] = pb.float().uniform(0);
+      }
+      if (this._irradianceSH) {
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = pb.vec4[9]().uniform(0);
+      }
+    }
+  }
+  /**
+   * {@inheritDoc EnvironmentLighting.updateBindGroup}
+   * @override
+   */
+  updateBindGroup(bg: BindGroup): void {
+    if (this._radianceMap) {
+      bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this._radianceMap.mipLevelCount - 1);
+      bg.setTexture(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this._radianceMap);
+    }
+    if (this._irradianceSH) {
+      bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH, this._irradianceSH);
+    }
+  }
+  /**
+   * {@inheritDoc EnvironmentLighting.getRadiance}
+   * @override
+   */
+  getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    return Application.instance.device.getDeviceCaps().shaderCaps.supportShaderTextureLod
+      ? pb.textureSampleLevel(
+          scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP],
+          refl,
+          pb.mul(roughness, scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD])
+        ).rgb
+      : pb.textureSample(scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP], refl).rgb;
+  }
+  /**
+   * {@inheritDoc EnvironmentLighting.getIrradiance}
+   * @override
+   */
+  getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    pb.func('Z_sh_Y0', [pb.vec3('v')], function () {
+      this.$return(0.2820947917);
+    });
+    pb.func('Z_sh_Y1', [pb.vec3('v')], function () {
+      this.$return(pb.mul(this.v.y, -0.4886025119));
+    });
+    pb.func('Z_sh_Y2', [pb.vec3('v')], function () {
+      this.$return(pb.mul(this.v.z, 0.4886025119));
+    });
+    pb.func('Z_sh_Y3', [pb.vec3('v')], function () {
+      this.$return(pb.mul(this.v.x, -0.4886025119));
+    });
+    pb.func('Z_sh_Y4', [pb.vec3('v')], function () {
+      this.$return(pb.mul(this.v.x, this.v.y, 1.0925484306));
+    });
+    pb.func('Z_sh_Y5', [pb.vec3('v')], function () {
+      this.$return(pb.mul(this.v.y, this.v.z, -1.0925484306));
+    });
+    pb.func('Z_sh_Y6', [pb.vec3('v')], function () {
+      this.$return(pb.mul(pb.sub(pb.mul(this.v.z, this.v.z, 3), 1), 0.3153915652));
+    });
+    pb.func('Z_sh_Y7', [pb.vec3('v')], function () {
+      this.$return(pb.mul(this.v.x, this.v.z, -1.0925484306));
+    });
+    pb.func('Z_sh_Y8', [pb.vec3('v')], function () {
+      this.$return(pb.mul(pb.sub(pb.mul(this.v.x, this.v.x), pb.mul(this.v.y, this.v.y)), 0.5462742153));
+    });
+    pb.func('Z_sh_eval', [pb.vec3('v')], function () {
+      this.$l.c = pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][0].xyz, this.Z_sh_Y0(this.v));
+      this.c = pb.add(
+        this.c,
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][1].xyz, this.Z_sh_Y1(this.v))
+      );
+      this.c = pb.add(
+        this.c,
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][2].xyz, this.Z_sh_Y2(this.v))
+      );
+      this.c = pb.add(
+        this.c,
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][3].xyz, this.Z_sh_Y3(this.v))
+      );
+      this.c = pb.add(
+        this.c,
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][4].xyz, this.Z_sh_Y4(this.v))
+      );
+      this.c = pb.add(
+        this.c,
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][5].xyz, this.Z_sh_Y5(this.v))
+      );
+      this.c = pb.add(
+        this.c,
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][6].xyz, this.Z_sh_Y6(this.v))
+      );
+      this.c = pb.add(
+        this.c,
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][7].xyz, this.Z_sh_Y7(this.v))
+      );
+      this.c = pb.add(
+        this.c,
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][8].xyz, this.Z_sh_Y8(this.v))
+      );
+      this.$return(this.c);
+    });
+    return pb.getGlobalScope().Z_sh_eval(normal);
+  }
+  /**
+   * {@inheritDoc EnvironmentLighting.hasRadiance}
+   * @override
+   */
+  hasRadiance(): boolean {
+    return !!this._radianceMap;
+  }
+  /**
+   * {@inheritDoc EnvironmentLighting.hasIrradiance}
+   * @override
+   */
+  hasIrradiance(): boolean {
+    return !!this._irradianceSH;
   }
 }
 
@@ -192,13 +369,6 @@ export class EnvIBL extends EnvironmentLighting {
   hasIrradiance(): boolean {
     return !!this._irradianceMap;
   }
-  /**
-   * {@inheritDoc EnvironmentLighting.isIBL}
-   * @override
-   */
-  isIBL(): this is EnvIBL {
-    return true;
-  }
 }
 
 /**
@@ -276,13 +446,6 @@ export class EnvConstantAmbient extends EnvironmentLighting {
    * @override
    */
   hasIrradiance(): boolean {
-    return true;
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.isConstant}
-   * @override
-   */
-  isConstant(): this is EnvConstantAmbient {
     return true;
   }
 }
@@ -385,13 +548,6 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
    * @override
    */
   hasIrradiance(): boolean {
-    return true;
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.isHemispheric}
-   * @override
-   */
-  isHemispheric(): this is EnvHemisphericAmbient {
     return true;
   }
 }
