@@ -285,12 +285,6 @@ export class GLTFViewer {
     this._light0.showState = enable ? 'visible' : 'hidden';
     this._light1.showState = enable ? 'visible' : 'hidden';
   }
-  get environmentLightEnabled(): boolean {
-    return this._scene.env.light.type === 'ibl';
-  }
-  set environmentLightEnabled(enable: boolean) {
-    this._scene.env.light.type = enable ? 'ibl' : 'none';
-  }
   enableBloom(enable: boolean) {
     if (!!enable !== this._doBloom) {
       this._doBloom = !!enable;

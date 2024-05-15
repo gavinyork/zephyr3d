@@ -1,10 +1,17 @@
 import type { Texture2D, TextureCube } from '@zephyr3d/device';
 import type { Scene } from '@zephyr3d/scene';
-import { Application, AssetManager, panoramaToCubemap, prefilterCubemap } from '@zephyr3d/scene';
+import {
+  Application,
+  AssetManager,
+  panoramaToCubemap,
+  prefilterCubemap,
+  projectCubemap
+} from '@zephyr3d/scene';
 
 type EnvMapInfo = {
   path: string;
-  maps?: Promise<TextureCube[]>;
+  maps?: Promise<{ maps: TextureCube[]; sh: Float32Array }>;
+  sh?: Float32Array;
 };
 
 export class EnvMaps {
@@ -40,17 +47,27 @@ export class EnvMaps {
   getCurrentId(): string {
     return this._currentId;
   }
-  async loadEnvMap(path: string, assetManager: AssetManager): Promise<TextureCube[]> {
+  async loadEnvMap(
+    path: string,
+    assetManager: AssetManager
+  ): Promise<{ maps: TextureCube[]; sh: Float32Array }> {
     const maps = this.createMaps();
+    const sh = new Float32Array(36);
     try {
       const panorama = await assetManager.fetchTexture<Texture2D>(path);
       panoramaToCubemap(panorama, maps[0]);
       prefilterCubemap(maps[0], 'ggx', maps[1]);
       prefilterCubemap(maps[0], 'lambertian', maps[2]);
+      const coeff = await projectCubemap(maps[2]);
+      for (let i = 0; i < 9; i++) {
+        sh[i * 4 + 0] = coeff[i].x;
+        sh[i * 4 + 1] = coeff[i].y;
+        sh[i * 4 + 2] = coeff[i].z;
+      }
     } catch (err) {
       console.error(err);
     }
-    return maps;
+    return { maps, sh };
   }
   createMaps(): TextureCube[] {
     return [
@@ -82,9 +99,10 @@ export class EnvMaps {
     this._currentId = id;
     const maps = await info.maps;
     scene.env.sky.skyType = 'skybox';
-    scene.env.sky.skyboxTexture = maps[0];
+    scene.env.sky.skyboxTexture = maps.maps[0];
     scene.env.sky.fogType = 'none';
-    scene.env.light.radianceMap = maps[1];
-    scene.env.light.irradianceMap = maps[2];
+    scene.env.light.radianceMap = maps.maps[1];
+    scene.env.light.irradianceMap = maps.maps[2];
+    scene.env.light.irradianceSH = maps.sh;
   }
 }
