@@ -5,7 +5,7 @@ import {
   AssetManager,
   panoramaToCubemap,
   prefilterCubemap,
-  projectCubemap
+  projectCubemapCPU
 } from '@zephyr3d/scene';
 
 type EnvMapInfo = {
@@ -58,7 +58,7 @@ export class EnvMaps {
       panoramaToCubemap(panorama, maps[0]);
       prefilterCubemap(maps[0], 'ggx', maps[1]);
       prefilterCubemap(maps[0], 'lambertian', maps[2]);
-      const coeff = await projectCubemap(maps[2]);
+      const coeff = await projectCubemapCPU(maps[2]);
       for (let i = 0; i < 9; i++) {
         sh[i * 4 + 0] = coeff[i].x;
         sh[i * 4 + 1] = coeff[i].y;
