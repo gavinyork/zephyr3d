@@ -12,7 +12,7 @@ import type { Terrain } from './terrain';
 import type { GraphNode } from '../graph_node';
 import { QUEUE_OPAQUE, RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import { mixinDrawable } from '../../render/drawable_mixin';
-import type { Material } from '../../material';
+import type { MeshMaterial } from '../../material';
 
 /** @internal */
 export class TerrainPatchBase {
@@ -113,7 +113,7 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   getPickTarget(): GraphNode {
     return this._terrain;
   }
-  getMaterial(): Material {
+  getMaterial(): MeshMaterial {
     return this._terrain.material;
   }
   draw(ctx: DrawContext) {

@@ -8,6 +8,7 @@ import type { Compositor } from '../posteffect';
 import type { Scene } from '../scene/scene';
 import type { BaseCameraController } from './base';
 import type { OIT } from '../render/oit';
+import type { GraphNode } from '../scene';
 
 /**
  * The camera node class
@@ -52,6 +53,14 @@ export class Camera extends SceneNode {
   protected _depthPrePass: boolean;
   /** @internal */
   protected _commandBufferReuse: boolean;
+  /** @internal */
+  protected _picking: boolean;
+  /** @internal */
+  protected _pickPosX: number;
+  /** @internal */
+  protected _pickPosY: number;
+  /** @internal */
+  protected _pickResult: GraphNode;
   /**
    * Creates a new camera node
    * @param scene - The scene that the camera belongs to
@@ -76,6 +85,9 @@ export class Camera extends SceneNode {
     this._frustumV = null;
     this._oit = null;
     this._depthPrePass = false;
+    this._pickPosX = 0;
+    this._pickPosY = 0;
+    this._pickResult = null;
     this._commandBufferReuse = true;
   }
   /** Clip plane in camera space */
@@ -99,6 +111,34 @@ export class Camera extends SceneNode {
   }
   set commandBufferReuse(val: boolean) {
     this._commandBufferReuse = !!val;
+  }
+  /** Whether GPU picking is enabled for this camera */
+  get picking(): boolean {
+    return this._picking;
+  }
+  set picking(enable: boolean) {
+    this._picking = !!enable;
+  }
+  /** X coordinate for picking related to viewport  */
+  get pickPosX(): number {
+    return this._pickPosX;
+  }
+  set pickPosX(val: number) {
+    this._pickPosX = val;
+  }
+  /** Y coordinate for picking related to viewport  */
+  get pickPosY(): number {
+    return this._pickPosY;
+  }
+  set pickPosY(val: number) {
+    this._pickPosY = val;
+  }
+  /** Pick result */
+  get pickResult(): GraphNode {
+    return this._pickResult;
+  }
+  set pickResult(val: GraphNode) {
+    this._pickResult = val;
   }
   /**
    * Sample count for MSAA

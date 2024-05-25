@@ -9,6 +9,7 @@ import {
   MORPH_WEIGHTS_VECTOR_COUNT,
   RENDER_PASS_TYPE_DEPTH,
   RENDER_PASS_TYPE_LIGHT,
+  RENDER_PASS_TYPE_OBJECT_COLOR,
   RENDER_PASS_TYPE_SHADOWMAP
 } from '../../values';
 import { ScatteringLut } from '../../render/scatteringlut';
@@ -159,7 +160,10 @@ export class ShaderHelper {
       ]);
       const globalStruct = pb.defineStruct([cameraStruct('camera'), lightStruct('light')]);
       scope[UNIFORM_NAME_GLOBAL] = globalStruct().uniform(0);
-    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
+    } else if (
+      ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH ||
+      ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR
+    ) {
       const globalStruct = pb.defineStruct([cameraStruct('camera')]);
       scope[UNIFORM_NAME_GLOBAL] = globalStruct().uniform(0);
     } else if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {

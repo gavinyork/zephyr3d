@@ -16,7 +16,7 @@ import type { Terrain } from './terrain';
 import type { GraphNode } from '../graph_node';
 import { GrassMaterial } from '../../material/grassmaterial';
 import { mixinDrawable } from '../../render/drawable_mixin';
-import type { Material } from '../../material';
+import type { MeshMaterial } from '../../material';
 
 export class GrassClusterBase {
   protected _terrain;
@@ -53,7 +53,7 @@ export class GrassCluster extends applyMixins(GrassClusterBase, mixinDrawable) i
   getName() {
     return 'GrassCluster';
   }
-  getMaterial(): Material {
+  getMaterial(): MeshMaterial {
     return this._material;
   }
   getInstanceColor(): Vector4 {

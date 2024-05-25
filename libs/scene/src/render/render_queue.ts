@@ -169,6 +169,8 @@ export class RenderQueue {
   private _needSceneColor: boolean;
   /** @internal */
   private _drawTransparent: boolean;
+  /** @internal */
+  private _objectColorMaps: Map<number, Drawable>[];
   /**
    * Creates an instance of a render queue
    * @param renderPass - The render pass to which the render queue belongs
@@ -184,6 +186,7 @@ export class RenderQueue {
     this._instanceInfo = new Map();
     this._needSceneColor = false;
     this._drawTransparent = false;
+    this._objectColorMaps = [new Map()];
   }
   /** The sun light */
   get sunLight(): DirectionalLight {
@@ -279,6 +282,7 @@ export class RenderQueue {
     this._itemList.transparent.unlit.push(...newItemLists.transparent.unlit);
     this._needSceneColor ||= queue._needSceneColor;
     this._drawTransparent ||= queue._drawTransparent;
+    this._objectColorMaps.push(...queue._objectColorMaps);
   }
   /**
    * Push an item to the render queue
@@ -295,6 +299,10 @@ export class RenderQueue {
       const transmission = !trans && drawable.needSceneColor();
       this._needSceneColor ||= transmission;
       this._drawTransparent ||= trans;
+      if (camera.picking) {
+        drawable.getMaterial().objectColor = drawable.getObjectColor();
+        this._objectColorMaps[0].set(drawable.getId(), drawable);
+      }
       if (drawable.isBatchable()) {
         const instanceList = trans
           ? unlit
@@ -351,6 +359,17 @@ export class RenderQueue {
       }
       drawable.pushRenderQueueRef(this._ref);
     }
+  }
+  /** @internal */
+  getDrawableByColor(c: Uint8Array) {
+    const id = (c[0] << 24) + (c[1] << 16) + (c[2] << 8) + c[3];
+    for (const m of this._objectColorMaps) {
+      const drawable = m.get(id);
+      if (drawable) {
+        return drawable.getPickTarget();
+      }
+    }
+    return null;
   }
   /**
    * Removes all items in the render queue

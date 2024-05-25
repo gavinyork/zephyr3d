@@ -1,4 +1,5 @@
 import type { GenericConstructor } from '@zephyr3d/base';
+import { Vector4 } from '@zephyr3d/base';
 import type { AbstractDevice } from '@zephyr3d/device';
 import { ProgramBuilder, type BindGroup } from '@zephyr3d/device';
 import type { BatchDrawable, DrawContext, Drawable } from './drawable';
@@ -8,12 +9,17 @@ import { Application } from '../app';
 import type { Mesh, XForm } from '../scene';
 
 export interface IMixinDrawable {
+  readonly objectColor: Vector4;
+  getId(): number;
   pushRenderQueueRef(ref: RenderQueueRef): void;
   applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void;
   applyTransformUniforms(renderQueue: RenderQueue): void;
   applyMaterialUniforms(instanceInfo: DrawableInstanceInfo): void;
+  getObjectColor(): Vector4;
   bind(ctx: DrawContext): void;
 }
+
+let _drawableId = 0;
 
 export function mixinDrawable<
   T extends GenericConstructor<{
@@ -27,8 +33,12 @@ export function mixinDrawable<
     private _mdDrawableBindGroupSkin: BindGroup;
     private _mdDrawableBindGroupMorph: BindGroup;
     private _mdDrawableBindGroupSkinMorph: BindGroup;
+    private _id: number;
+    private _objectColor: Vector4;
     constructor(...args: any[]) {
       super(...args);
+      this._id = ++_drawableId;
+      this._objectColor = null;
       this._mdRenderQueueRef = [];
       this._mdDrawableBindGroup = null;
       this._mdDrawableBindGroupInstanced = new Map();
@@ -42,6 +52,19 @@ export function mixinDrawable<
           }
         }
       });
+    }
+    getId(): number {
+      return this._id;
+    }
+    getObjectColor(): Vector4 {
+      if (!this._objectColor) {
+        const a = (this._id & 0xff) / 255;
+        const b = ((this._id >>> 8) & 0xff) / 255;
+        const g = ((this._id >>> 16) & 0xff) / 255;
+        const r = ((this._id >>> 24) & 0xff) / 255;
+        this._objectColor = new Vector4(r, g, b, a);
+      }
+      return this._objectColor;
     }
     pushRenderQueueRef(ref: RenderQueueRef): void {
       this.renderQueueRefPrune();

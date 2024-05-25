@@ -13,6 +13,10 @@ export const RENDER_PASS_TYPE_SHADOWMAP = 1;
  * @public
  */
 export const RENDER_PASS_TYPE_DEPTH = 2;
+/**
+ * Object color render pass type
+ */
+export const RENDER_PASS_TYPE_OBJECT_COLOR = 3;
 
 /**
  * Builtin texture name for sheen LUT

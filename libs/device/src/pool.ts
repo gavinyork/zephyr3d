@@ -191,7 +191,7 @@ export class Pool {
     mipmapping?: boolean,
     sampleCount?: number,
     ignoreDepthStencil?: boolean
-  );
+  ): FrameBuffer;
   /**
    * Fetch a temporal framebuffer from the object pool.
    * @param autoRelease - Whether the framebuffer should be automatically released at the next frame.
@@ -210,7 +210,7 @@ export class Pool {
     mipmapping?: boolean,
     sampleCount?: number,
     ignoreDepthStencil?: boolean
-  );
+  ): FrameBuffer;
   /**
    * Fetch a temporal framebuffer from the object pool.
    * @param autoRelease - Whether the framebuffer should be automatically released at the next frame.
@@ -229,7 +229,7 @@ export class Pool {
     mipmapping?: boolean,
     sampleCount?: number,
     ignoreDepthStencil?: boolean
-  );
+  ): FrameBuffer;
   /**
    * Fetch a temporal framebuffer from the object pool.
    * @param autoRelease - Whether the framebuffer should be automatically released at the next frame.
@@ -248,7 +248,7 @@ export class Pool {
     mipmapping?: boolean,
     sampleCount?: number,
     ignoreDepthStencil?: boolean
-  );
+  ): FrameBuffer;
   /**
    * Fetch a temporal framebuffer from the object pool.
    * @param autoRelease - Whether the framebuffer should be automatically released at the next frame.
@@ -267,7 +267,7 @@ export class Pool {
     mipmapping?: boolean,
     sampleCount?: number,
     ignoreDepthStencil?: boolean
-  );
+  ): FrameBuffer;
   fetchTemporalFramebuffer<T extends BaseTexture<unknown>>(
     autoRelease: boolean,
     width: number,
@@ -277,7 +277,7 @@ export class Pool {
     mipmapping?: boolean,
     sampleCount?: number,
     ignoreDepthStencil?: boolean
-  ) {
+  ): FrameBuffer {
     const colorAttachments =
       typeof colorTexOrFormat === 'string'
         ? [this.fetchTemporalTexture2D(false, colorTexOrFormat, width, height, mipmapping)]

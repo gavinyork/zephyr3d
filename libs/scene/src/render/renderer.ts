@@ -9,10 +9,11 @@ import type { DrawContext } from './drawable';
 import { ShadowMapper } from '../shadow';
 import type { RenderQueue } from './render_queue';
 import type { PunctualLight, Scene } from '../scene';
-import type { Camera } from '../camera';
+import { PerspectiveCamera, type Camera } from '../camera';
 import type { Compositor } from '../posteffect';
 import { ClusteredLight } from './cluster_light';
 import { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
+import { ObjectColorPass } from './objectcolorpass';
 
 /**
  * Forward render scheme
@@ -25,6 +26,8 @@ export class SceneRenderer {
   private static _depthPass = new DepthPass();
   /** @internal */
   private static _shadowMapPass = new ShadowMapPass();
+  /** @internal */
+  private static _objectColorPass = new ObjectColorPass();
   /** @internal */
   private static _clusters: ClusteredLight[] = [];
   /** lighting render pass */
@@ -66,6 +69,7 @@ export class SceneRenderer {
       device,
       scene,
       primaryCamera: camera,
+      picking: false,
       oit: null,
       globalBindGroupAllocator: GlobalBindGroupAllocator.get(),
       camera,
@@ -135,6 +139,11 @@ export class SceneRenderer {
       : 'rgba8unorm';
     let tempFramebuffer: FrameBuffer = null;
     let depthFramebuffer: FrameBuffer = null;
+
+    if (ctx.camera.picking) {
+      this.renderObjectColors(ctx);
+    }
+
     const renderQueue = this._scenePass.cullScene(ctx, ctx.camera);
     ctx.sunLight = renderQueue.sunLight;
     ctx.clusteredLight = this.getClusteredLight();
@@ -291,5 +300,43 @@ export class SceneRenderer {
       light.shadow.render(ctx, this._shadowMapPass);
     }
     ctx.device.popDeviceStates();
+  }
+  /** @internal */
+  private static renderObjectColors(ctx: DrawContext) {
+    if (!(ctx.camera instanceof PerspectiveCamera)) {
+      return;
+    }
+    ctx.renderPass = this._objectColorPass;
+    ctx.device.pushDeviceStates();
+    const fb = ctx.device.pool.fetchTemporalFramebuffer(false, 1, 1, 'rgba8unorm', ctx.depthFormat, false);
+    ctx.device.setViewport(ctx.camera.viewport);
+    const vp = ctx.device.getViewport();
+    const savedViewport = ctx.camera.viewport;
+    const savedScissor = ctx.camera.scissor;
+    const savedWindow = ctx.camera.window;
+    const windowX = ctx.camera.pickPosX / vp.width;
+    const windowY = (vp.height - ctx.camera.pickPosY - 1) / vp.height;
+    const windowW = 1 / vp.width;
+    const windowH = 1 / vp.height;
+    ctx.camera.viewport = null;
+    ctx.camera.scissor = null;
+    ctx.camera.window = [windowX, windowY, windowW, windowH];
+    ctx.device.setFramebuffer(fb);
+    this._objectColorPass.clearColor = Vector4.zero();
+    this._objectColorPass.clearDepth = 1;
+    const renderQueue = this._objectColorPass.cullScene(ctx, ctx.camera);
+    this._objectColorPass.render(ctx, ctx.camera, renderQueue);
+    ctx.camera.viewport = savedViewport;
+    ctx.camera.scissor = savedScissor;
+    ctx.camera.window = savedWindow;
+    ctx.device.popDeviceStates();
+    const tex = fb.getColorAttachments()[0];
+    const pixels = new Uint8Array(4);
+    const camera = ctx.camera;
+    const device = ctx.device;
+    tex.readPixels(0, 0, 1, 1, 0, 0, pixels).then(() => {
+      camera.pickResult = renderQueue.getDrawableByColor(pixels);
+      device.pool.releaseFrameBuffer(fb);
+    });
   }
 }
