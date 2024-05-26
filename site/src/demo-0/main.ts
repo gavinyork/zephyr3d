@@ -1,6 +1,5 @@
 import { Application, Scene } from '@zephyr3d/scene';
 import { GLTFViewer } from './gltfviewer';
-import { Vector3 } from '@zephyr3d/base';
 import { backendWebGL2, backendWebGL1 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import type { DeviceBackend } from '@zephyr3d/device';
@@ -35,6 +34,7 @@ const gltfApp = new Application({
 });
 
 gltfApp.ready().then(async () => {
+  console.log(gltfApp.device.getAdapterInfo());
   //await imGuiInit(gltfApp.device);
   //gltfApp.inputManager.use(imGuiInjectEvent);
   const scene = new Scene();

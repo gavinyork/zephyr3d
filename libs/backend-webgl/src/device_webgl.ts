@@ -164,6 +164,7 @@ export class WebGLDevice extends BaseDevice {
   private _deviceUniformBufferOffsets: number[];
   private _bindTextures: Record<number, WebGLTexture[]>;
   private _bindSamplers: WebGLSampler[];
+  private _adapterInfo: { vendor: string; renderer: string; version: string };
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend);
     this._dpr = Math.max(1, Math.floor(options?.dpr ?? window.devicePixelRatio));
@@ -181,6 +182,11 @@ export class WebGLDevice extends BaseDevice {
       throw new Error('Invalid argument or no webgl support');
     }
     this._isWebGL2 = isWebGL2(context);
+    this._adapterInfo = {
+      vendor: context.getParameter(context.VENDOR),
+      renderer: context.getParameter(context.RENDERER),
+      version: context.getParameter(context.VERSION)
+    };
     this._contextLost = false;
     this._reverseWindingOrder = false;
     this._deviceCaps = null;
@@ -224,6 +230,9 @@ export class WebGLDevice extends BaseDevice {
   }
   get context() {
     return this._context;
+  }
+  getAdapterInfo() {
+    return this._adapterInfo;
   }
   getFrameBufferSampleCount() {
     return this.getFramebuffer()?.getSampleCount() ?? this._msaaSampleCount;

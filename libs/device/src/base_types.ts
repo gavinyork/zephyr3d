@@ -2453,6 +2453,8 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   pool: Pool;
   /** vSync */
   vSync: boolean;
+  /** Get adapter information */
+  getAdapterInfo(): any;
   /** Get sample count of current frame buffer */
   getFrameBufferSampleCount(): number;
   /** Returns true if device context is lost. */

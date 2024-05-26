@@ -148,6 +148,7 @@ export abstract class BaseDevice {
     this._vSync = true;
     this._registerEventHandlers();
   }
+  abstract getAdapterInfo(): any;
   abstract getFrameBufferSampleCount(): number;
   abstract isContextLost(): boolean;
   abstract getScale(): number;
