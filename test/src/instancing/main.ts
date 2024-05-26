@@ -42,7 +42,7 @@ instancingApp.ready().then(async () => {
   camera.controller = new OrbitCameraController();
   camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
   camera.depthPrePass = true;
-  camera.picking = true;
+  camera.enablePicking = true;
 
   instancingApp.inputManager.use(imGuiInjectEvent);
   instancingApp.inputManager.use(camera.handleEvent.bind(camera));
@@ -96,7 +96,7 @@ instancingApp.ready().then(async () => {
     camera.window = null;
     camera.render(scene);
 */
-    if (camera.pickResult === mesh) {
+    if (camera.pickResult?.drawable === mesh) {
       mat.albedoColor = Vector4.one();
     } else {
       mat.albedoColor = new Vector4(1, 0, 0, 1);

@@ -309,8 +309,10 @@ export class MeshMaterial extends Material {
    * {@inheritDoc Material.updateRenderStates}
    */
   protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
-    const blending = this.featureUsed<boolean>(FEATURE_ALPHABLEND) || ctx.lightBlending;
-    const a2c = this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
+    const isObjectColorPass = ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR;
+    const blending =
+      !isObjectColorPass && (this.featureUsed<boolean>(FEATURE_ALPHABLEND) || ctx.lightBlending);
+    const a2c = !isObjectColorPass && this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
     if (blending || a2c) {
       const blendingState = stateSet.useBlendingState();
       if (blending) {

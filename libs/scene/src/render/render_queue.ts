@@ -299,7 +299,7 @@ export class RenderQueue {
       const transmission = !trans && drawable.needSceneColor();
       this._needSceneColor ||= transmission;
       this._drawTransparent ||= trans;
-      if (camera.picking) {
+      if (camera.enablePicking) {
         drawable.getMaterial().objectColor = drawable.getObjectColor();
         this._objectColorMaps[0].set(drawable.getId(), drawable);
       }
@@ -366,7 +366,7 @@ export class RenderQueue {
     for (const m of this._objectColorMaps) {
       const drawable = m.get(id);
       if (drawable) {
-        return drawable.getPickTarget();
+        return drawable;
       }
     }
     return null;

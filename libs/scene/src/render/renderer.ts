@@ -140,7 +140,7 @@ export class SceneRenderer {
     let tempFramebuffer: FrameBuffer = null;
     let depthFramebuffer: FrameBuffer = null;
 
-    if (ctx.camera.picking) {
+    if (ctx.camera.enablePicking) {
       this.renderObjectColors(ctx);
     }
 
@@ -335,7 +335,8 @@ export class SceneRenderer {
     const camera = ctx.camera;
     const device = ctx.device;
     tex.readPixels(0, 0, 1, 1, 0, 0, pixels).then(() => {
-      camera.pickResult = renderQueue.getDrawableByColor(pixels);
+      const drawable = renderQueue.getDrawableByColor(pixels);
+      camera.pickResult = drawable ? { drawable, node: drawable.getPickTarget() } : null;
       device.pool.releaseFrameBuffer(fb);
     });
   }

@@ -2,6 +2,7 @@ import type { CubeFace, Vector3, Plane } from '@zephyr3d/base';
 import { Matrix4x4, Frustum, Vector4 } from '@zephyr3d/base';
 import { SceneNode } from '../scene/scene_node';
 import { Application } from '../app';
+import type { Drawable } from '../render';
 import { SceneRenderer } from '../render';
 import type { FrameBuffer } from '@zephyr3d/device';
 import type { Compositor } from '../posteffect';
@@ -9,6 +10,14 @@ import type { Scene } from '../scene/scene';
 import type { BaseCameraController } from './base';
 import type { OIT } from '../render/oit';
 import type { GraphNode } from '../scene';
+
+/**
+ * Camera pick result
+ */
+export type PickResult = {
+  drawable: Drawable;
+  node: GraphNode;
+};
 
 /**
  * The camera node class
@@ -60,7 +69,7 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _pickPosY: number;
   /** @internal */
-  protected _pickResult: GraphNode;
+  protected _pickResult: PickResult;
   /**
    * Creates a new camera node
    * @param scene - The scene that the camera belongs to
@@ -113,10 +122,10 @@ export class Camera extends SceneNode {
     this._commandBufferReuse = !!val;
   }
   /** Whether GPU picking is enabled for this camera */
-  get picking(): boolean {
+  get enablePicking(): boolean {
     return this._picking;
   }
-  set picking(enable: boolean) {
+  set enablePicking(enable: boolean) {
     this._picking = !!enable;
   }
   /** X coordinate for picking related to viewport  */
@@ -134,10 +143,10 @@ export class Camera extends SceneNode {
     this._pickPosY = val;
   }
   /** Pick result */
-  get pickResult(): GraphNode {
+  get pickResult(): PickResult {
     return this._pickResult;
   }
-  set pickResult(val: GraphNode) {
+  set pickResult(val: PickResult) {
     this._pickResult = val;
   }
   /**
