@@ -90,18 +90,20 @@ export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLT
     if (mipLevel !== 0) {
       throw new Error(`Texture3D.readPixels(): parameter mipLevel must be 0`);
     }
-    return new Promise<void>((resolve) => {
-      const fb = this._device.createFrameBuffer([this], null);
-      fb.setColorAttachmentLayer(0, layer);
-      fb.setColorAttachmentGenerateMipmaps(0, false);
-      this._device.pushDeviceStates();
-      this._device.setFramebuffer(fb);
-      this._device.readPixels(0, x, y, w, h, buffer).then(() => {
-        fb.dispose();
-        resolve();
+    if (!this.device.isContextLost() && !this.disposed) {
+      return new Promise<void>((resolve) => {
+        const fb = this._device.createFrameBuffer([this], null);
+        fb.setColorAttachmentLayer(0, layer);
+        fb.setColorAttachmentGenerateMipmaps(0, false);
+        this._device.pushDeviceStates();
+        this._device.setFramebuffer(fb);
+        this._device.readPixels(0, x, y, w, h, buffer).then(() => {
+          fb.dispose();
+          resolve();
+        });
+        this._device.popDeviceStates();
       });
-      this._device.popDeviceStates();
-    });
+    }
   }
   readPixelsToBuffer(
     x: number,

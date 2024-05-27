@@ -1,5 +1,5 @@
-import type { CubeFace, Vector3, Plane } from '@zephyr3d/base';
-import { Matrix4x4, Frustum, Vector4 } from '@zephyr3d/base';
+import type { CubeFace, Plane } from '@zephyr3d/base';
+import { Matrix4x4, Frustum, Vector4, Vector3, Ray } from '@zephyr3d/base';
 import { SceneNode } from '../scene/scene_node';
 import { Application } from '../app';
 import type { Drawable } from '../render';
@@ -68,6 +68,8 @@ export class Camera extends SceneNode {
   protected _pickPosX: number;
   /** @internal */
   protected _pickPosY: number;
+  /** @internal */
+  protected _pickResultPromise: Promise<PickResult>;
   /** @internal */
   protected _pickResult: PickResult;
   /**
@@ -148,6 +150,13 @@ export class Camera extends SceneNode {
   }
   set pickResult(val: PickResult) {
     this._pickResult = val;
+  }
+  /** @internal */
+  get pickResultAsync(): Promise<PickResult> {
+    return this._pickResultPromise;
+  }
+  set pickResultAsync(val: Promise<PickResult>) {
+    this._pickResultPromise = val;
   }
   /**
    * Sample count for MSAA
@@ -239,6 +248,23 @@ export class Camera extends SceneNode {
       }
     }
     return handled;
+  }
+  /**
+   * Constructs a ray based on the given screen coordinates.
+   *
+   * @param x The x-component of the screen coordinates, relative to the top-left corner of the viewport.
+   * @param y The y-component of the screen coordinates, relative to the top-left corner of the viewport.
+   * @returns The ray originating from the camera position and passing through the given screen coordinates.
+   */
+  constructRay(x: number, y: number): Ray {
+    const width = this.viewport ? this.viewport[2] : Application.instance.device.getViewport().width;
+    const height = this.viewport ? this.viewport[3] : Application.instance.device.getViewport().height;
+    const vClip = new Vector4((2 * x) / width - 1, 1 - (2 * y) / height, 1, 1);
+    const vWorld = this.invViewProjectionMatrix.transform(vClip);
+    vWorld.scaleBy(1 / vWorld.w);
+    const vEye = this.getWorldPosition();
+    const vDir = Vector3.sub(vWorld.xyz(), vEye).inplaceNormalize();
+    return new Ray(vEye, vDir);
   }
   /**
    * Place the camera by specifying the camera position and the target point

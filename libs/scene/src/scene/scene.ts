@@ -105,20 +105,14 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
   }
   /**
    * Cast a ray into the scene to get the closest object hit by the ray
-   * @param camera - The camera used to compute the ray
-   * @param screenX - The x position on screen
-   * @param screenY - The y position on screen
+   *
+   * @param
+   * @param ray - The ray in world coordinate space
+   * @param length - Length of the ray
    * @returns The closest object hit by the ray
    */
-  raycast(
-    camera: Camera,
-    screenX: number,
-    screenY: number
-  ): { node: GraphNode; dist: number; point: Vector3 } {
-    const width = camera.viewport ? camera.viewport[2] : Application.instance.device.getViewport().width;
-    const height = camera.viewport ? camera.viewport[3] : Application.instance.device.getViewport().height;
-    const ray = this.constructRay(camera, width, height, screenX, screenY);
-    const raycastVisitor = new RaycastVisitor(ray, camera.getFarPlane());
+  raycast(ray: Ray, length = Infinity): { node: GraphNode; dist: number; point: Vector3 } {
+    const raycastVisitor = new RaycastVisitor(ray, length);
     this.octree.getRootNode().traverse(raycastVisitor);
     return raycastVisitor.intersected
       ? {

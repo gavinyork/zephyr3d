@@ -13,7 +13,6 @@ import {
   PBRSpecularGlossinessMaterial,
   PerspectiveCamera,
   Scene,
-  SceneNode,
   Terrain,
   Tonemap
 } from '@zephyr3d/scene';
@@ -375,7 +374,8 @@ export class Demo {
     if (!this._loaded) {
       return;
     }
-    const obj = this._scene.raycast(this._camera, x, y);
+    const ray = this._camera.constructRay(x, y);
+    const obj = this._scene.raycast(ray, this._camera.getFarPlane());
     if (obj && obj.node.isTerrain()) {
       this._terrain.invWorldMatrix.transformPointAffine(obj.point, this._actorTarget);
       if (button === 2) {

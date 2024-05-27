@@ -42,6 +42,8 @@
     - [天空渲染](zh-cn/sky.md)
     - [大气及雾效](zh-cn/fog.md)
     - [水面渲染](zh-cn/water.md)
+  - 场景拾取
+    - [概述](zh-cn/picking.md)
   - 几何体实例化
     - [概述](zh-cn/instancing-intro.md)
   - 顺序无关的透明度渲染

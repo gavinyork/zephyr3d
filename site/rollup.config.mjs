@@ -84,6 +84,7 @@ if (!deepEqual(cachedZephr3d, dict)) {
   invalidAll = true;
 }
 const pattern = process.env.SITE_TUT ? process.env.SITE_TUT.split(';') : null;
+console.log(`Build pattern: ${JSON.stringify(pattern)}`);
 if (process.env.SITE_NO_COMPRESS) {
   codeCompress = false;
 }

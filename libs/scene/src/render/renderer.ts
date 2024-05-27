@@ -9,6 +9,7 @@ import type { DrawContext } from './drawable';
 import { ShadowMapper } from '../shadow';
 import type { RenderQueue } from './render_queue';
 import type { PunctualLight, Scene } from '../scene';
+import type { PickResult } from '../camera';
 import { PerspectiveCamera, type Camera } from '../camera';
 import type { Compositor } from '../posteffect';
 import { ClusteredLight } from './cluster_light';
@@ -334,10 +335,29 @@ export class SceneRenderer {
     const pixels = new Uint8Array(4);
     const camera = ctx.camera;
     const device = ctx.device;
+    camera.pickResultAsync = new Promise<PickResult>((resolve, reject) => {
+      tex
+        .readPixels(0, 0, 1, 1, 0, 0, pixels)
+        .then(() => {
+          const drawable = renderQueue.getDrawableByColor(pixels);
+          camera.pickResult =
+            drawable && drawable.getPickTarget()?.pickable
+              ? { drawable, node: drawable.getPickTarget() }
+              : null;
+          device.pool.releaseFrameBuffer(fb);
+          resolve(camera.pickResult);
+        })
+        .catch((err) => {
+          reject(err);
+        });
+    });
+    /*
     tex.readPixels(0, 0, 1, 1, 0, 0, pixels).then(() => {
       const drawable = renderQueue.getDrawableByColor(pixels);
-      camera.pickResult = drawable ? { drawable, node: drawable.getPickTarget() } : null;
+      camera.pickResult =
+        drawable && drawable.getPickTarget()?.pickable ? { drawable, node: drawable.getPickTarget() } : null;
       device.pool.releaseFrameBuffer(fb);
     });
+    */
   }
 }

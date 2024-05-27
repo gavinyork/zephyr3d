@@ -58,6 +58,17 @@ export class VectorBase extends Float32Array {
     }
     return false;
   }
+  /**
+   * Generate random vector
+   *
+   * @param minValue - Minimum value of any component of the vector
+   * @param maxValue - Maximum value of any component of the vector
+   */
+  setRandom(minValue: number, maxValue: number) {
+    for (let i = 0; i < this.length; i++) {
+      this[i] = minValue + (maxValue - minValue) * Math.random();
+    }
+  }
 }
 
 /**
