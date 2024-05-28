@@ -46,6 +46,8 @@
     - [Sky](en/sky.md)
     - [Fog](en/fog.md)
     - [Water](en/water.md)
+  - Picking
+    - [Introduction](en/picking.md)
   - Geometry instancing
     - [Introduction](en/instancing-intro.md)
   - Order-Independent Transparency
