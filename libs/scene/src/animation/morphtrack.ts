@@ -28,9 +28,9 @@ export class MorphTargetTrack extends AnimationTrack {
       assetTrack.defaultMorphWeights ?? Array.from({ length: this._numTargets }).map(() => 0);
   }
   /** {@inheritDoc AnimationTrack.apply} */
-  apply(node: SceneNode, currentTime: number, duration: number): boolean {
+  apply(node: SceneNode, currentTime: number): boolean {
     // apply new weights
-    this._interpolator.interpolate(currentTime, duration, this._weights);
+    this._interpolator.interpolate(currentTime, this._weights);
     (node as Mesh).getMorphInfo().bufferSubData(4 * 4, this._weights);
     calculateMorphBoundingBox(
       this._animatedBoundingBox,

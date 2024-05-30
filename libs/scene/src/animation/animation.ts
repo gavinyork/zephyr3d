@@ -41,15 +41,7 @@ export class AnimationClip {
   /** @internal */
   protected _currentPlayTime: number;
   /** @internal */
-  protected _tracks: Map<
-    SceneNode,
-    {
-      poseTranslation: Vector3;
-      poseRotation: Quaternion;
-      poseScaling: Vector3;
-      tracks: AnimationTrack[];
-    }
-  >;
+  protected _tracks: Map<SceneNode, AnimationTrack[]>;
   /** @internal */
   protected _skeletons: Map<Skeleton, { mesh: Mesh; bounding: SkinnedBoundingBox; box: BoundingBox }[]>;
   /** @internal */
@@ -126,15 +118,10 @@ export class AnimationClip {
     }
     let trackInfo = this._tracks.get(node);
     if (!trackInfo) {
-      trackInfo = {
-        poseTranslation: new Vector3(node.position),
-        poseRotation: new Quaternion(node.rotation),
-        poseScaling: new Vector3(node.scale),
-        tracks: []
-      };
+      trackInfo = [];
       this._tracks.set(node, trackInfo);
     }
-    trackInfo.tracks.push(track);
+    trackInfo.push(track);
     this._duration = Math.max(this._duration, track.interpolator.maxTime);
     track.reset(node);
     return this;
@@ -156,8 +143,8 @@ export class AnimationClip {
     }
     this._lastUpdateFrame = device.frameInfo.frameCounter;
     this._tracks.forEach((trackInfo, node) => {
-      for (const track of trackInfo.tracks) {
-        track.apply(node, this._currentPlayTime, this._duration);
+      for (const track of trackInfo) {
+        track.apply(node, this._currentPlayTime);
       }
     });
     this._skeletons.forEach((meshes, skeleton) => {
@@ -208,7 +195,7 @@ export class AnimationClip {
       }
     });
     this._tracks.forEach((trackInfo, node) => {
-      for (const track of trackInfo.tracks) {
+      for (const track of trackInfo) {
         track.reset(node);
       }
     });

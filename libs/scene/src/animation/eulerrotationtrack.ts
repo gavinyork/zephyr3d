@@ -28,8 +28,8 @@ export class EulerRotationTrack extends AnimationTrack {
     super(interpolator);
   }
   /** {@inheritDoc AnimationTrack.apply} */
-  apply(node: SceneNode, currentTime: number, duration: number): boolean {
-    this._interpolator.interpolate(currentTime, duration, tmpVec3);
+  apply(node: SceneNode, currentTime: number): boolean {
+    this._interpolator.interpolate(currentTime, tmpVec3);
     node.rotation.set(tmpQuat.fromEulerAngle(tmpVec3.x, tmpVec3.y, tmpVec3.z, 'ZYX'));
     return true;
   }

@@ -389,7 +389,7 @@ export class PostWater extends AbstractPostEffect {
       const tmpcolor = new Vector3();
       for (let i = 0; i < numTexels; i++) {
         const grad = i >= numTexels / 2 ? this._scatterGrad : this._absorptionGrad;
-        grad.interpolate((i % width) / width, 1, tmpcolor);
+        grad.interpolate((i % width) / width, tmpcolor);
         data[i * 4 + 0] = (tmpcolor.x * 255) >> 0;
         data[i * 4 + 1] = (tmpcolor.y * 255) >> 0;
         data[i * 4 + 2] = (tmpcolor.z * 255) >> 0;

@@ -44,8 +44,8 @@ export class TranslationTrack extends AnimationTrack {
     }
   }
   /** {@inheritDoc AnimationTrack.apply} */
-  apply(node: SceneNode, currentTime: number, duration: number): boolean {
-    this._interpolator.interpolate(currentTime, duration, tmpVec3);
+  apply(node: SceneNode, currentTime: number): boolean {
+    this._interpolator.interpolate(currentTime, tmpVec3);
     node.position.set(tmpVec3);
     return true;
   }

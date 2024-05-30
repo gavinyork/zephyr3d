@@ -45,8 +45,8 @@ export class RotationTrack extends AnimationTrack {
     }
   }
   /** {@inheritDoc AnimationTrack.apply} */
-  apply(node: SceneNode, currentTime: number, duration: number): boolean {
-    this._interpolator.interpolate(currentTime, duration, tmpQuat);
+  apply(node: SceneNode, currentTime: number): boolean {
+    this._interpolator.interpolate(currentTime, tmpQuat);
     node.rotation.set(tmpQuat);
     return true;
   }

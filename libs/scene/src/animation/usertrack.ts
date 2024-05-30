@@ -53,8 +53,8 @@ export class UserTrack extends AnimationTrack {
     this._handler = handler;
   }
   /** {@inheritDoc AnimationTrack.apply} */
-  apply(node: SceneNode, currentTime: number, duration: number): boolean {
-    this._interpolator.interpolate(currentTime, duration, tmpValue);
+  apply(node: SceneNode, currentTime: number): boolean {
+    this._interpolator.interpolate(currentTime, tmpValue);
     this._handler && this._handler(node, tmpValue);
     return true;
   }

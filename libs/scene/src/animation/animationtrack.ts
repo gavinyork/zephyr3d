@@ -29,5 +29,5 @@ export abstract class AnimationTrack {
    * @param duration - Total animation duration
    * @returns true if applied, otherwise false
    */
-  abstract apply(node: SceneNode, currentTime: number, duration: number): boolean;
+  abstract apply(node: SceneNode, currentTime: number): boolean;
 }
