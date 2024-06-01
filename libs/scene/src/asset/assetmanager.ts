@@ -1,5 +1,5 @@
 import type { DecoderModule } from 'draco3d';
-import { Vector3, isPowerOf2, nextPowerOf2, HttpRequest } from '@zephyr3d/base';
+import { isPowerOf2, nextPowerOf2, HttpRequest } from '@zephyr3d/base';
 import type { AssetHierarchyNode, AssetSkeleton, AssetSubMeshData, SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
@@ -8,9 +8,7 @@ import { HDRLoader } from './loaders/hdr/hdr';
 import { SceneNode } from '../scene/scene_node';
 import { Mesh } from '../scene/mesh';
 import { RotationTrack, ScaleTrack, Skeleton, TranslationTrack } from '../animation';
-import type { SkinnedBoundingBox } from '../animation/animation';
 import { AnimationClip } from '../animation/animation';
-import { BoundingBox } from '../utility/bounding_volume';
 import { CopyBlitter } from '../blitter';
 import { getSheenLutLoader, getTestCubemapLoader } from './builtin';
 import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT, BUILTIN_ASSET_TEST_CUBEMAP, MAX_MORPH_TARGETS } from '../values';
@@ -476,7 +474,7 @@ export class AssetManager {
   ): { group: SceneNode; animationSet: AnimationSet } {
     const group = new SceneNode(scene);
     group.name = model.name;
-    let animationSet = new AnimationSet(scene);
+    let animationSet = new AnimationSet(scene, group);
     for (let i = 0; i < model.scenes.length; i++) {
       const assetScene = model.scenes[i];
       const skeletonMeshMap: Map<AssetSkeleton, { mesh: Mesh[]; bounding: AssetSubMeshData[] }> = new Map();
@@ -526,14 +524,11 @@ export class AssetManager {
             const skeleton = new Skeleton(
               sk.joints.map((val) => nodeMap.get(val)),
               sk.inverseBindMatrices,
-              sk.bindPoseMatrices
-            );
-            skeleton.updateJointMatrices();
-            animation.addSkeleton(
-              skeleton,
+              sk.bindPoseMatrices,
               nodes.mesh,
-              nodes.bounding.map((val) => this.getBoundingInfo(skeleton, val))
+              nodes.bounding
             );
+            animation.addSkeleton(skeleton);
           }
         }
         animation.stop();
@@ -559,85 +554,6 @@ export class AssetManager {
     } else {
       delete this._builtinTextureLoaders[name];
     }
-  }
-  /** @internal */
-  private getBoundingInfo(skeleton: Skeleton, meshData: AssetSubMeshData): SkinnedBoundingBox {
-    const indices = [0, 0, 0, 0, 0, 0];
-    let minx = Number.MAX_VALUE;
-    let maxx = -Number.MAX_VALUE;
-    let miny = Number.MAX_VALUE;
-    let maxy = -Number.MAX_VALUE;
-    let minz = Number.MAX_VALUE;
-    let maxz = -Number.MAX_VALUE;
-    const v = meshData.rawPositions;
-    const vert = new Vector3();
-    const tmpV0 = new Vector3();
-    const tmpV1 = new Vector3();
-    const tmpV2 = new Vector3();
-    const tmpV3 = new Vector3();
-    const numVertices = Math.floor(v.length / 3);
-    for (let i = 0; i < numVertices; i++) {
-      vert.setXYZ(v[i * 3], v[i * 3 + 1], v[i * 3 + 2]);
-      skeleton.jointMatrices[meshData.rawBlendIndices[i * 4 + 0]]
-        .transformPointAffine(vert, tmpV0)
-        .scaleBy(meshData.rawJointWeights[i * 4 + 0]);
-      skeleton.jointMatrices[meshData.rawBlendIndices[i * 4 + 1]]
-        .transformPointAffine(vert, tmpV1)
-        .scaleBy(meshData.rawJointWeights[i * 4 + 1]);
-      skeleton.jointMatrices[meshData.rawBlendIndices[i * 4 + 2]]
-        .transformPointAffine(vert, tmpV2)
-        .scaleBy(meshData.rawJointWeights[i * 4 + 2]);
-      skeleton.jointMatrices[meshData.rawBlendIndices[i * 4 + 3]]
-        .transformPointAffine(vert, tmpV3)
-        .scaleBy(meshData.rawJointWeights[i * 4 + 3]);
-      tmpV0.addBy(tmpV1).addBy(tmpV2).addBy(tmpV3);
-      if (tmpV0.x < minx) {
-        minx = tmpV0.x;
-        indices[0] = i;
-      }
-      if (tmpV0.x > maxx) {
-        maxx = tmpV0.x;
-        indices[1] = i;
-      }
-      if (tmpV0.y < miny) {
-        miny = tmpV0.y;
-        indices[2] = i;
-      }
-      if (tmpV0.y > maxy) {
-        maxy = tmpV0.y;
-        indices[3] = i;
-      }
-      if (tmpV0.z < minz) {
-        minz = tmpV0.z;
-        indices[4] = i;
-      }
-      if (tmpV0.z > maxz) {
-        maxz = tmpV0.z;
-        indices[5] = i;
-      }
-    }
-    const info: SkinnedBoundingBox = {
-      boundingVertexBlendIndices: new Float32Array(
-        Array.from({ length: 6 * 4 }).map(
-          (val, index) => meshData.rawBlendIndices[indices[index >> 2] * 4 + (index % 4)]
-        )
-      ),
-      boundingVertexJointWeights: new Float32Array(
-        Array.from({ length: 6 * 4 }).map(
-          (val, index) => meshData.rawJointWeights[indices[index >> 2] * 4 + (index % 4)]
-        )
-      ),
-      boundingVertices: Array.from({ length: 6 }).map(
-        (val, index) =>
-          new Vector3(
-            meshData.rawPositions[indices[index] * 3],
-            meshData.rawPositions[indices[index] * 3 + 1],
-            meshData.rawPositions[indices[index] * 3 + 2]
-          )
-      ),
-      boundingBox: new BoundingBox()
-    };
-    return info;
   }
   /** @internal */
   private setAssetNodeToSceneNode(

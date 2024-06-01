@@ -1,10 +1,9 @@
-import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
+import { Quaternion, Vector3 } from '@zephyr3d/base';
 import type { AnimationTrack } from './animationtrack';
-import { BoundingBox } from '../utility/bounding_volume';
+import type { BoundingBox } from '../utility/bounding_volume';
 import { Application } from '../app';
 import type { SceneNode } from '../scene/scene_node';
 import type { Skeleton } from './skeleton';
-import type { Mesh } from '../scene/mesh';
 
 /**
  * Bounding box information for a skeleton
@@ -43,13 +42,15 @@ export class AnimationClip {
   /** @internal */
   protected _tracks: Map<SceneNode, AnimationTrack[]>;
   /** @internal */
-  protected _skeletons: Map<Skeleton, { mesh: Mesh; bounding: SkinnedBoundingBox; box: BoundingBox }[]>;
+  protected _skeletons: Set<Skeleton>;
   /** @internal */
   protected _tmpPosition: Vector3;
   /** @internal */
   protected _tmpRotation: Quaternion;
   /** @internal */
   protected _tmpScale: Vector3;
+  /** @internal */
+  protected _weight: number;
   /**
    * Creates an animation instance
    * @param name - Name of the animation
@@ -66,7 +67,7 @@ export class AnimationClip {
     this._isPlaying = false;
     this._currentPlayTime = 0;
     this._lastUpdateFrame = 0;
-    this._skeletons = new Map();
+    this._skeletons = new Set();
     this._tmpRotation = new Quaternion();
     this._tmpPosition = new Vector3();
     this._tmpScale = new Vector3();
@@ -82,9 +83,20 @@ export class AnimationClip {
   get name(): string {
     return this._name;
   }
+  /** Gets weight of the animation */
+  get weight(): number {
+    return this._weight;
+  }
+  set weight(val: number) {
+    this._weight = val;
+  }
   /** Gets all the tracks of this animation */
   get tracks() {
     return this._tracks;
+  }
+  /** Gets all skeletons */
+  get skeletons() {
+    return this._skeletons;
   }
   /** The duration of the animation */
   get timeDuration(): number {
@@ -96,15 +108,8 @@ export class AnimationClip {
    * @param meshList - The meshes controlled by the skeleton
    * @param boundingBoxInfo - Bounding box information for the skeleton
    */
-  addSkeleton(skeleton: Skeleton, meshList: Mesh[], boundingBoxInfo: SkinnedBoundingBox[]) {
-    let meshes = this._skeletons.get(skeleton);
-    if (!meshes) {
-      meshes = [];
-      this._skeletons.set(skeleton, meshes);
-    }
-    for (let i = 0; i < meshList.length; i++) {
-      meshes.push({ mesh: meshList[i], bounding: boundingBoxInfo[i], box: new BoundingBox() });
-    }
+  addSkeleton(skeleton: Skeleton) {
+    this._skeletons.add(skeleton);
   }
   /**
    * Adds an animation track to the animation
@@ -116,6 +121,21 @@ export class AnimationClip {
     if (!track) {
       return;
     }
+    if (track.animation) {
+      if (track.animation === this) {
+        return;
+      } else {
+        console.error('Track is already in another animation');
+        return;
+      }
+    }
+    const blendId = track.getBlendId();
+    const tracks = this._tracks.get(node);
+    if (tracks && tracks.findIndex((track) => track.getBlendId() === blendId) >= 0) {
+      console.error('Tracks with same BlendId could not be added to same animation');
+      return;
+    }
+    track.animation = this;
     let trackInfo = this._tracks.get(node);
     if (!trackInfo) {
       trackInfo = [];
@@ -147,14 +167,8 @@ export class AnimationClip {
         track.apply(node, this._currentPlayTime);
       }
     });
-    this._skeletons.forEach((meshes, skeleton) => {
-      skeleton.computeJoints();
-      for (const mesh of meshes) {
-        skeleton.computeBoundingBox(mesh.bounding, mesh.mesh.invWorldMatrix);
-        mesh.mesh.setBoneMatrices(skeleton.jointTexture);
-        mesh.mesh.setInvBindMatrix(mesh.mesh.invWorldMatrix);
-        mesh.mesh.setAnimatedBoundingBox(mesh.bounding.boundingBox);
-      }
+    this._skeletons.forEach((skeleton) => {
+      skeleton.apply();
     });
     const timeAdvance = device.frameInfo.elapsedFrame * 0.001 * this._speedRatio;
     this._currentPlayTime += timeAdvance;
@@ -184,15 +198,8 @@ export class AnimationClip {
    */
   stop() {
     this._isPlaying = false;
-    this._skeletons.forEach((meshes, skeleton) => {
-      skeleton.computeBindPose();
-      for (const mesh of meshes) {
-        const invWorldMatrix = Matrix4x4.multiply(mesh.mesh.invWorldMatrix, this._model.worldMatrix);
-        skeleton.computeBoundingBox(mesh.bounding, invWorldMatrix);
-        mesh.mesh.setBoneMatrices(skeleton.jointTexture);
-        mesh.mesh.setInvBindMatrix(invWorldMatrix);
-        mesh.mesh.setAnimatedBoundingBox(mesh.bounding.boundingBox);
-      }
+    this._skeletons.forEach((skeleton) => {
+      skeleton.reset(this._model);
     });
     this._tracks.forEach((trackInfo, node) => {
       for (const track of trackInfo) {

@@ -8,7 +8,6 @@ import {
   MORPH_WEIGHTS_VECTOR_COUNT
 } from '../values';
 import { ShaderHelper } from '../material';
-import type { AABB } from '@zephyr3d/base';
 import { BoundingBox } from '../utility';
 
 export function processMorphData(subMesh: AssetSubMeshData, morphWeights?: number[]) {
@@ -81,11 +80,14 @@ export function processMorphData(subMesh: AssetSubMeshData, morphWeights?: numbe
   const morphBoundingBox = new BoundingBox();
   calculateMorphBoundingBox(
     morphBoundingBox,
-    subMesh.mesh.getBoundingVolume().toAABB(),
     subMesh.targetBox,
     weightsAndOffsets.subarray(4, 4 + MAX_MORPH_TARGETS),
     numTargets
   );
+  const meshAABB = subMesh.mesh.getBoundingVolume().toAABB();
+  morphBoundingBox.minPoint.addBy(meshAABB.minPoint);
+  morphBoundingBox.maxPoint.addBy(meshAABB.maxPoint);
+
   subMesh.mesh.setMorphData(morphTexture);
   subMesh.mesh.setMorphInfo(morphUniformBuffer);
   subMesh.mesh.setAnimatedBoundingBox(morphBoundingBox);
@@ -94,13 +96,12 @@ export function processMorphData(subMesh: AssetSubMeshData, morphWeights?: numbe
 /** @internal */
 export function calculateMorphBoundingBox(
   morphBoundingBox: BoundingBox,
-  originBoundingBox: AABB,
   keyframeBoundingBox: BoundingBox[],
   weights: Float32Array,
   numTargets: number
 ) {
-  morphBoundingBox.minPoint.set(originBoundingBox.minPoint);
-  morphBoundingBox.maxPoint.set(originBoundingBox.maxPoint);
+  morphBoundingBox.minPoint.setXYZ(0, 0, 0);
+  morphBoundingBox.maxPoint.setXYZ(0, 0, 0);
   for (let i = 0; i < numTargets; i++) {
     const weight = weights[i];
     const keyframeBox = keyframeBoundingBox[i];

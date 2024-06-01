@@ -3,14 +3,11 @@ import { Interpolator, Vector3 } from '@zephyr3d/base';
 import { AnimationTrack } from './animationtrack';
 import type { SceneNode } from '../scene';
 
-// Reduce gc
-const tmpVec3 = new Vector3();
-
 /**
  * Scale animation track
  * @public
  */
-export class ScaleTrack extends AnimationTrack {
+export class ScaleTrack extends AnimationTrack<Vector3> {
   /**
    * Create an instance of ScaleTrack from keyframe values
    * @param interpolator - Interpolator object that contains keyframe values
@@ -45,8 +42,27 @@ export class ScaleTrack extends AnimationTrack {
   }
   /** {@inheritDoc AnimationTrack.apply} */
   apply(node: SceneNode, currentTime: number): boolean {
-    this._interpolator.interpolate(currentTime, tmpVec3);
-    node.scale.set(tmpVec3);
+    const state = this.calculateState(currentTime);
+    this.applyState(node, state);
+    // this._interpolator.interpolate(currentTime, tmpVec3);
+    // node.scale.set(tmpVec3);
     return true;
+  }
+  calculateState(currentTime: number): Vector3 {
+    const v = new Vector3();
+    this._interpolator.interpolate(currentTime, v);
+    return v;
+  }
+  applyState(node: SceneNode, state: Vector3) {
+    node.scale.set(state);
+  }
+  mixState(a: Vector3, b: Vector3, t: number): Vector3 {
+    return new Vector3(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y), a.z + t * (b.z - a.z));
+  }
+  getState(node: SceneNode): Vector3 {
+    return node.scale;
+  }
+  getBlendId(): unknown {
+    return 'node-scale';
   }
 }

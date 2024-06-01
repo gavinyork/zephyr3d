@@ -15,7 +15,7 @@ const tmpValue = new Float32Array(4);
  * User-defined animation track
  * @public
  */
-export class UserTrack extends AnimationTrack {
+export abstract class UserTrack extends AnimationTrack {
   private _handler: NumberTrackHandler;
   /**
    * Create an instance of UserTrack

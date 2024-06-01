@@ -3,14 +3,11 @@ import { Interpolator, Quaternion } from '@zephyr3d/base';
 import { AnimationTrack } from './animationtrack';
 import type { SceneNode } from '../scene';
 
-// Reduce gc
-const tmpQuat = new Quaternion();
-
 /**
  * Rotation animation track
  * @public
  */
-export class RotationTrack extends AnimationTrack {
+export class RotationTrack extends AnimationTrack<Quaternion> {
   /**
    * Create an instance of RotationTrack from keyframe values
    * @param interpolator - Interpolator object that contains keyframe values
@@ -46,8 +43,27 @@ export class RotationTrack extends AnimationTrack {
   }
   /** {@inheritDoc AnimationTrack.apply} */
   apply(node: SceneNode, currentTime: number): boolean {
-    this._interpolator.interpolate(currentTime, tmpQuat);
-    node.rotation.set(tmpQuat);
+    const state = this.calculateState(currentTime);
+    this.applyState(node, state);
+    // this._interpolator.interpolate(currentTime, tmpQuat);
+    // node.rotation.set(tmpQuat);
     return true;
+  }
+  calculateState(currentTime: number): Quaternion {
+    const q = new Quaternion();
+    this._interpolator.interpolate(currentTime, q);
+    return q;
+  }
+  applyState(node: SceneNode, state: Quaternion) {
+    node.rotation.set(state);
+  }
+  mixState(a: Quaternion, b: Quaternion, t: number): Quaternion {
+    return Quaternion.slerp(a, b, t);
+  }
+  getState(node: SceneNode): Quaternion {
+    return node.rotation;
+  }
+  getBlendId(): unknown {
+    return 'node-rotation';
   }
 }

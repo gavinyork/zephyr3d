@@ -308,3 +308,27 @@ export function unpackFloat3<T extends number[] | Float32Array>(pk: number, resu
   tmpUint32Array[0] = ret[2];
   result[2] = tmpFloatArray[0];
 }
+
+/**
+ * Calculates the weighted average of a set of values.
+ *
+ * @template T - The type of the values.
+ * @param {number[]} weights - An array of weights for each value.
+ * @param {T[]} values - An array of values to be averaged.
+ * @param {(a: T, b: T, w: number) => T} funcLerp - A function that performs linear interpolation between two values of type T.
+ * @returns {T} The weighted average of the values.
+ *
+ */
+export function weightedAverage<T>(
+  weights: number[],
+  values: T[],
+  funcLerp: (a: T, b: T, w: number) => T
+): T {
+  let totalWeight = weights[0];
+  let t = values[0];
+  for (let i = 1; i < weights.length; i++) {
+    totalWeight += weights[i];
+    t = funcLerp(t, values[i], weights[i] / totalWeight);
+  }
+  return t;
+}
