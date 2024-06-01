@@ -477,7 +477,10 @@ export class AssetManager {
     let animationSet = new AnimationSet(scene, group);
     for (let i = 0; i < model.scenes.length; i++) {
       const assetScene = model.scenes[i];
-      const skeletonMeshMap: Map<AssetSkeleton, { mesh: Mesh[]; bounding: AssetSubMeshData[] }> = new Map();
+      const skeletonMeshMap: Map<
+        AssetSkeleton,
+        { mesh: Mesh[]; bounding: AssetSubMeshData[]; skeleton?: Skeleton }
+      > = new Map();
       const nodeMap: Map<AssetHierarchyNode, SceneNode> = new Map();
       for (let k = 0; k < assetScene.rootNodes.length; k++) {
         this.setAssetNodeToSceneNode(
@@ -521,14 +524,16 @@ export class AssetManager {
         for (const sk of animationData.skeletons) {
           const nodes = skeletonMeshMap.get(sk);
           if (nodes) {
-            const skeleton = new Skeleton(
-              sk.joints.map((val) => nodeMap.get(val)),
-              sk.inverseBindMatrices,
-              sk.bindPoseMatrices,
-              nodes.mesh,
-              nodes.bounding
-            );
-            animation.addSkeleton(skeleton);
+            if (!nodes.skeleton) {
+              nodes.skeleton = new Skeleton(
+                sk.joints.map((val) => nodeMap.get(val)),
+                sk.inverseBindMatrices,
+                sk.bindPoseMatrices,
+                nodes.mesh,
+                nodes.bounding
+              );
+            }
+            animation.addSkeleton(nodes.skeleton);
           }
         }
         animation.stop();

@@ -185,7 +185,7 @@ export class GLTFViewer {
         if (this._animationSet) {
           const animations = this._animationSet.getAnimationNames();
           if (animations.length > 0) {
-            this._animationSet.playAnimation(animations[0], 0);
+            this._animationSet.playAnimation(animations[0]);
           }
         }
         this._ui.update();
@@ -206,7 +206,11 @@ export class GLTFViewer {
           this._envMaps.selectByPath(hdrFile, this.scene, (url) => fileMap.get(url) || url);
         } else {
           const modelFile = Array.from(fileMap.keys()).find((val) => /(\.gltf|\.glb)$/i.test(val));
-          await this.loadModel(modelFile);
+          if (!modelFile) {
+            console.error('GLTF model not found');
+          } else {
+            await this.loadModel(modelFile);
+          }
         }
       }
     });
@@ -214,7 +218,7 @@ export class GLTFViewer {
   playAnimation(name: string) {
     if (this._currentAnimation !== name) {
       this.stopAnimation();
-      this._animationSet?.playAnimation(name, 0);
+      this._animationSet?.playAnimation(name);
       this._currentAnimation = name;
       this.lookAt();
     }

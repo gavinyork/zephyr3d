@@ -1,9 +1,27 @@
 import { weightedAverage } from '@zephyr3d/base';
-import { Application } from '../app';
 import type { Scene, SceneNode } from '../scene';
 import type { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
 import type { Skeleton } from './skeleton';
+import { Application } from '../app';
+
+/** Options for playing animation */
+export type PlayAnimationOptions = {
+  /** Repeat times, play forever if value is zero, default is zero */
+  repeat?: number;
+  /** Speed ratio, play backward if value is negative, default is 1 */
+  speedRatio?: number;
+  /** Weight for animation blending, default is 1 */
+  weight?: number;
+  /** Fade in duration in seconds, default is 0 which means do not fade in */
+  fadeIn?: number;
+};
+
+/** Options for stop playing animation */
+export type StopAnimationOptions = {
+  /** Fade out duration in seconds, default is 0 which means do not fade in */
+  fadeOut?: number;
+};
 
 /**
  * Animation set
@@ -30,6 +48,10 @@ export class AnimationSet {
       weight: number;
       speedRatio: number;
       firstFrame: boolean;
+      fadeIn: number;
+      fadeOut: number;
+      fadeOutStart: number;
+      animateTime: number;
     }
   >;
   /**
@@ -76,12 +98,16 @@ export class AnimationSet {
    */
   update(): void {
     this._activeAnimations.forEach((v, k) => {
+      if (v.fadeOut > 0 && v.fadeOutStart < 0) {
+        v.fadeOutStart = v.animateTime;
+      }
       // Update animation time
       if (v.firstFrame) {
         v.firstFrame = false;
       } else {
         const timeAdvance = Application.instance.device.frameInfo.elapsedFrame * 0.001 * v.speedRatio;
         v.currentTime += timeAdvance;
+        v.animateTime += timeAdvance;
         if (v.currentTime > k.timeDuration) {
           v.repeatCounter++;
           v.currentTime = 0;
@@ -91,6 +117,10 @@ export class AnimationSet {
         }
         if (v.repeat !== 0 && v.repeatCounter >= v.repeat) {
           this.stopAnimation(k.name);
+        } else if (v.fadeOut > 0) {
+          if (v.animateTime - v.fadeOutStart >= v.fadeOut) {
+            this.stopAnimation(k.name);
+          }
         }
       }
     });
@@ -99,7 +129,14 @@ export class AnimationSet {
       v.forEach((tracks) => {
         if (tracks.length > 0) {
           const weights = tracks.map((track) => {
-            return this._activeAnimations.get(track.animation).weight;
+            const info = this._activeAnimations.get(track.animation);
+            const weight = info.weight;
+            const fadeIn = info.fadeIn === 0 ? 1 : Math.min(1, info.animateTime / info.fadeIn);
+            let fadeOut = 1;
+            if (info.fadeOut !== 0) {
+              fadeOut = 1 - (info.animateTime - info.fadeOutStart) / info.fadeOut;
+            }
+            return weight * fadeIn * fadeOut;
           });
           const states = tracks.map((track) =>
             track.calculateState(this._activeAnimations.get(track.animation).currentTime)
@@ -130,16 +167,24 @@ export class AnimationSet {
    * @param repeat - The repeat times, 0 for always repeating, default is 0
    * @param ratio - The speed ratio, default is 1. Use negative value to play backwards
    */
-  playAnimation(name: string, repeat = 0, speedRatio = 1): void {
+  playAnimation(name: string, options?: PlayAnimationOptions): void {
     const ani = this._animations[name];
     if (ani && !this._activeAnimations.has(ani)) {
+      const repeat = options?.repeat ?? 0;
+      const speedRatio = options?.speedRatio ?? 1;
+      const weight = options?.weight ?? 1;
+      const fadeIn = Math.max(options?.fadeIn ?? 0, 0);
       this._activeAnimations.set(ani, {
-        repeat: repeat,
+        repeat,
+        weight,
+        speedRatio,
+        fadeIn,
+        fadeOut: 0,
         repeatCounter: 0,
         currentTime: speedRatio < 0 ? ani.timeDuration : 0,
-        firstFrame: true,
-        weight: 1,
-        speedRatio
+        animateTime: 0,
+        fadeOutStart: 0,
+        firstFrame: true
       });
       ani.play(repeat, speedRatio);
       ani.tracks?.forEach((v, k) => {
@@ -172,29 +217,35 @@ export class AnimationSet {
    * Stops playing an animation of the model
    * @param name - Name of the animation to stop playing
    */
-  stopAnimation(name: string): void {
+  stopAnimation(name: string, options?: StopAnimationOptions): void {
     const ani = this._animations[name];
-    if (this._activeAnimations.has(ani)) {
-      this._activeAnimations.delete(ani);
-      this._activeTracks.forEach((v, k) => {
-        v.forEach((tracks, id) => {
-          v.set(
-            id,
-            tracks.filter((track) => track.animation !== ani)
-          );
+    const info = this._activeAnimations.get(ani);
+    if (info) {
+      const fadeOut = Math.max(options?.fadeOut ?? 0, 0);
+      if (fadeOut !== 0) {
+        info.fadeOut = fadeOut;
+        info.fadeOutStart = -1;
+      } else {
+        this._activeAnimations.delete(ani);
+        this._activeTracks.forEach((v, k) => {
+          v.forEach((tracks, id) => {
+            v.set(
+              id,
+              tracks.filter((track) => track.animation !== ani)
+            );
+          });
         });
-      });
-      ani.skeletons?.forEach((v, k) => {
-        const refcount = this._activeSkeletons.get(k);
-        if (refcount === 1) {
-          k.reset(this._model);
-          this._activeSkeletons.delete(k);
-        } else {
-          this._activeSkeletons.set(k, refcount - 1);
-        }
-      });
+        ani.skeletons?.forEach((v, k) => {
+          const refcount = this._activeSkeletons.get(k);
+          if (refcount === 1) {
+            k.reset(this._model);
+            this._activeSkeletons.delete(k);
+          } else {
+            this._activeSkeletons.set(k, refcount - 1);
+          }
+        });
+      }
     }
-    this._animations[name]?.stop();
   }
   dispose() {
     const index = this._scene.animationSet.indexOf(this);

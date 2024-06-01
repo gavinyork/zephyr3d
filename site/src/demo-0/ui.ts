@@ -27,12 +27,14 @@ export class Panel {
   private _params: GUIParams;
   private _gui: GUI;
   private _animationController: GUI;
+  private _lastAnimation: string;
   constructor(viewer: GLTFViewer) {
     this._viewer = viewer;
     this._deviceList = ['WebGL', 'WebGL2', 'WebGPU'];
     this._oitTypes = ['', WeightedBlendedOIT.type, ABufferOIT.type];
     this._oitNames = ['None', 'weighted-blended', 'per-pixel linked list'];
     this._gui = new GUI({ container: document.body });
+    this._lastAnimation = null;
     this._params = {
       deviceType:
         this._deviceList[
@@ -70,7 +72,11 @@ export class Panel {
         .add(this._params, 'animation', animationNames)
         .name('Animation')
         .onChange((value) => {
-          this._viewer.animationSet.playAnimation(value);
+          if (this._lastAnimation) {
+            this._viewer.animationSet.stopAnimation(this._lastAnimation, { fadeOut: 0.3 });
+          }
+          this._viewer.animationSet.playAnimation(value, { fadeIn: 0.3 });
+          this._lastAnimation = value;
         });
     }
   }
