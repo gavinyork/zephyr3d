@@ -66,18 +66,8 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
     }
     return state;
   }
-  getState(node: SceneNode): MorphState {
-    return null;
-  }
   getBlendId(): unknown {
     return 'node-morph';
-  }
-  /** {@inheritDoc AnimationTrack.apply} */
-  apply(node: SceneNode, currentTime: number): boolean {
-    // apply new weights
-    const state = this.calculateState(currentTime);
-    this.applyState(node, state);
-    return true;
   }
   reset(node: SceneNode) {
     // apply default weights

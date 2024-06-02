@@ -26,14 +26,6 @@ export class EulerRotationTrack extends AnimationTrack<Quaternion> {
     const interpolator = new Interpolator(mode, 'vec3', inputs, outputs);
     super(interpolator);
   }
-  /** {@inheritDoc AnimationTrack.apply} */
-  apply(node: SceneNode, currentTime: number): boolean {
-    const state = this.calculateState(currentTime);
-    this.applyState(node, state);
-    // this._interpolator.interpolate(currentTime, tmpVec3);
-    // node.rotation.set(tmpQuat.fromEulerAngle(tmpVec3.x, tmpVec3.y, tmpVec3.z, 'ZYX'));
-    return true;
-  }
   calculateState(currentTime: number): Quaternion {
     this._interpolator.interpolate(currentTime, tmpVec3);
     return Quaternion.fromEulerAngle(tmpVec3.x, tmpVec3.y, tmpVec3.z, 'ZYX');
@@ -43,9 +35,6 @@ export class EulerRotationTrack extends AnimationTrack<Quaternion> {
   }
   mixState(a: Quaternion, b: Quaternion, t: number): Quaternion {
     return Quaternion.slerp(a, b, t);
-  }
-  getState(node: SceneNode): Quaternion {
-    return node.rotation;
   }
   getBlendId(): unknown {
     return 'node-rotation';

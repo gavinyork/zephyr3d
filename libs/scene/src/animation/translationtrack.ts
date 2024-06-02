@@ -40,14 +40,6 @@ export class TranslationTrack extends AnimationTrack<Vector3> {
       super(interpolator);
     }
   }
-  /** {@inheritDoc AnimationTrack.apply} */
-  apply(node: SceneNode, currentTime: number): boolean {
-    const state = this.calculateState(currentTime);
-    this.applyState(node, state);
-    // this._interpolator.interpolate(currentTime, tmpVec3);
-    // node.position.set(tmpVec3);
-    return true;
-  }
   calculateState(currentTime: number): Vector3 {
     const v = new Vector3();
     this._interpolator.interpolate(currentTime, v);
@@ -58,9 +50,6 @@ export class TranslationTrack extends AnimationTrack<Vector3> {
   }
   mixState(a: Vector3, b: Vector3, t: number): Vector3 {
     return new Vector3(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y), a.z + t * (b.z - a.z));
-  }
-  getState(node: SceneNode): Vector3 {
-    return node.position;
   }
   getBlendId(): unknown {
     return 'node-translation';

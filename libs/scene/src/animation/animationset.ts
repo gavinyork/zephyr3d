@@ -5,21 +5,62 @@ import type { AnimationTrack } from './animationtrack';
 import type { Skeleton } from './skeleton';
 import { Application } from '../app';
 
-/** Options for playing animation */
+/**
+ * Options for playing animation
+ * @public
+ **/
 export type PlayAnimationOptions = {
-  /** Repeat times, play forever if value is zero, default is zero */
+  /**
+   * Repeat times
+   *
+   * @remarks
+   * Number of loops, 0 for infinite loops. Default value is 0
+   **/
   repeat?: number;
-  /** Speed ratio, play backward if value is negative, default is 1 */
+  /**
+   * Speed factor
+   *
+   * @remarks
+   * The larger the absolute value, the faster the speed.
+   * If it is a negative value, it plays in reverse.
+   * Default value is 1
+   */
   speedRatio?: number;
-  /** Weight for animation blending, default is 1 */
+  /**
+   * Blending weight
+   *
+   * @remarks
+   * When multiple animations are playing at the same time,
+   * all animations are weighted and averaged using this weight.
+   * Default value is 1
+   */
   weight?: number;
-  /** Fade in duration in seconds, default is 0 which means do not fade in */
+  /**
+   * Fade-in time
+   *
+   * @remarks
+   * How long it takes for the animation weight to increase from 0 to weight,
+   * default is 0, indicating no fade-in effect. Usually used in conjunction
+   * with the fadeOut parameter of stopAnimation() for seamless transition
+   * between two animations
+   **/
   fadeIn?: number;
 };
 
-/** Options for stop playing animation */
+/**
+ * Options for stop playing animation
+ * @public
+ **/
 export type StopAnimationOptions = {
-  /** Fade out duration in seconds, default is 0 which means do not fade in */
+  /**
+   * Fade-out time
+   *
+   * @remarks
+   * How long it takes for the animation weight to decrease from current weight
+   * to 0, default is 0, indicating no fade-out effect. Usually used in conjunction
+   * with the fadeIn parameter of startAnimation() for seamless transition between
+   * two animations
+   */
   fadeOut?: number;
 };
 
@@ -162,18 +203,47 @@ export class AnimationSet {
     return name ? this._activeAnimations.has(this._animations[name]) : this._activeAnimations.size > 0;
   }
   /**
+   * Gets the weight of specific animation which is currently playing
+   * @param name - Name of the animation
+   * @returns Weight of the animation or 0 if this animation is not playing
+   */
+  getAnimationWeight(name: string): number {
+    const ani = this._animations[name];
+    const info = this._activeAnimations.get(ani);
+    return info?.weight ?? 0;
+  }
+  /**
+   * Sets the weight of specific animation which is currently playing
+   * @param name - Name of the animation
+   * @param weight - New weight value
+   */
+  setAnimationWeight(name: string, weight: number): void {
+    const ani = this._animations[name];
+    const info = this._activeAnimations.get(ani);
+    if (info) {
+      info.weight = weight;
+    }
+  }
+  /**
    * Starts playing an animation of the model
    * @param name - Name of the animation to play
-   * @param repeat - The repeat times, 0 for always repeating, default is 0
-   * @param ratio - The speed ratio, default is 1. Use negative value to play backwards
+   * @param options - Playing options
    */
   playAnimation(name: string, options?: PlayAnimationOptions): void {
     const ani = this._animations[name];
-    if (ani && !this._activeAnimations.has(ani)) {
+    if (!ani) {
+      console.error(`Animation ${name} not exists`);
+      return;
+    }
+    const fadeIn = Math.max(options?.fadeIn ?? 0, 0);
+    const info = this._activeAnimations.get(ani);
+    if (info) {
+      info.fadeOut = 0;
+      info.fadeIn = fadeIn;
+    } else {
       const repeat = options?.repeat ?? 0;
       const speedRatio = options?.speedRatio ?? 1;
       const weight = options?.weight ?? 1;
-      const fadeIn = Math.max(options?.fadeIn ?? 0, 0);
       this._activeAnimations.set(ani, {
         repeat,
         weight,
@@ -186,7 +256,6 @@ export class AnimationSet {
         fadeOutStart: 0,
         firstFrame: true
       });
-      ani.play(repeat, speedRatio);
       ani.tracks?.forEach((v, k) => {
         let nodeTracks = this._activeTracks.get(k);
         if (!nodeTracks) {

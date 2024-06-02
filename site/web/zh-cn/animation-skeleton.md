@@ -11,10 +11,16 @@ if（model.animationSet) {
   // AnimationSet.getAnimationNames()方法用来获取所有动画名字
   const animationNames = model.animationSet ? model.animationSet.getAnimationNames() : [];
   // 播放其中一个动画
-  // 第一个参数是动画名字
-  // 第二个参数是动画循环次数，如果为0则始终循环，不传默认值为0
-  // 第三个参数是动画播放速度系数，1为常规速度，如果是负值则为倒放，不传默认值为1
-  model.animationSet.playAnimation(animationNames[0], 0, 1);
+  model.animationSet.playAnimation(animationNames[0], {
+    // 循环次数，0为无限循环。默认值为0
+    repeat: 0,
+    // 速度因子，绝对值越大速度越快，如果为负值则反向播放。默认值为1
+    speedRatio: 1,
+    // 融合权值，当多个动画同时播放时，所有动画通过这个权值做加权平均，默认为1
+    weight: 1,
+    // 动画需要多长时间权值从0增长到weight，默认为0，表示无淡入效果，通常和stopAnimation()的fadeOut参数配合用于两个动画无缝切换
+    fadeIn: 0,
+  });
   // ...
   // 停止播放动画
   model.animationSet.stopAnimation(animationNames[0]);

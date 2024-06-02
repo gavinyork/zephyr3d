@@ -494,7 +494,7 @@ export class AssetManager {
         );
       }
       for (const animationData of model.animations) {
-        const animation = new AnimationClip(animationData.name, group);
+        const animation = new AnimationClip(animationData.name);
         for (const track of animationData.tracks) {
           if (track.type === 'translation') {
             animation.addTrack(nodeMap.get(track.node), new TranslationTrack(track.interpolator));
@@ -536,7 +536,6 @@ export class AssetManager {
             animation.addSkeleton(nodes.skeleton);
           }
         }
-        animation.stop();
       }
     }
     if (animationSet.numAnimations === 0) {

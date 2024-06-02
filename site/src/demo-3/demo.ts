@@ -35,6 +35,7 @@ export class Demo {
   private _loaded: boolean;
   private _loadPercent: number;
   private _ui: Panel;
+  private _lastAnimation: string;
   constructor() {
     this._terrain = null;
     this._axisPZ = Vector3.axisPZ();
@@ -54,6 +55,7 @@ export class Demo {
     this._loaded = false;
     this._loadPercent = 0;
     this._ui = null;
+    this._lastAnimation = null;
   }
   async fetchAssetArchive(url: string, progressCallback: (percent: number) => void): Promise<Blob> {
     progressCallback(0);
@@ -159,7 +161,8 @@ export class Demo {
       const z = this._terrain.scaledHeight * 0.19;
       const y = this._terrain.getElevation(x, z);
       this._character.group.position.setXYZ(x, y, z);
-      this._character.animationSet.playAnimation('idle01_yindao', 0);
+      this.idle();
+      //this._character.animationSet.playAnimation('idle01_yindao', 0);
       const eyePos = new Vector3(x + 1, y + 5, z - 21);
       const destPos = new Vector3(x, y, z);
       this._camera.lookAt(eyePos, destPos, Vector3.axisPY());
@@ -169,6 +172,21 @@ export class Demo {
       this._scene.env.sky.wind.setXY(700, 350);
       this._loaded = true;
     });
+  }
+  playAnimation(name: string) {
+    if (this._lastAnimation !== name) {
+      if (this._lastAnimation) {
+        this._character.animationSet.stopAnimation(this._lastAnimation, { fadeOut: 0.3 });
+      }
+      this._character.animationSet.playAnimation(name, { fadeIn: 0.3 });
+      this._lastAnimation = name;
+    }
+  }
+  idle() {
+    this.playAnimation('idle01_yindao');
+  }
+  run() {
+    this.playAnimation('run_front');
   }
   async loadCharacter(scene: Scene, assetManager: AssetManager) {
     const character = await assetManager.fetchModel(scene, '/assets/models/alice_shellfire/scene.gltf');
@@ -389,7 +407,7 @@ export class Demo {
           this._axisPZ,
           this._actorDirection
         );
-        this._character.animationSet.playAnimation('run_front', 0);
+        this.run();
         this._actorRunning = true;
       }
     }
@@ -404,7 +422,7 @@ export class Demo {
       if (movement >= distance) {
         this._actorRunning = false;
         movement = distance;
-        this._character.animationSet.playAnimation('idle01_yindao', 0);
+        this.idle();
       }
       const newPos = Vector3.add(
         this._character.group.position,

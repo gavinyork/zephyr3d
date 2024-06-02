@@ -106,7 +106,6 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
   /**
    * Cast a ray into the scene to get the closest object hit by the ray
    *
-   * @param
    * @param ray - The ray in world coordinate space
    * @param length - Length of the ray
    * @returns The closest object hit by the ray

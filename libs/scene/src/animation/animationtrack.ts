@@ -33,7 +33,7 @@ export abstract class AnimationTrack<StateType = unknown> {
   reset(node: SceneNode) {}
   /**
    * Calculates current animation state
-   * @param currentTime
+   * @param currentTime - At which time the animation state should be calculated.
    * @returns State object
    */
   abstract calculateState(currentTime: number): StateType;
@@ -52,12 +52,6 @@ export abstract class AnimationTrack<StateType = unknown> {
    */
   abstract mixState(a: StateType, b: StateType, t: number): StateType;
   /**
-   * Get animation state from scene node
-   * @param node - Scene node
-   * @returns animation state of the node
-   */
-  abstract getState(node: SceneNode): StateType;
-  /**
    * Get the blend ID
    * @returns Blend ID
    *
@@ -65,13 +59,4 @@ export abstract class AnimationTrack<StateType = unknown> {
    * Two tracks which have same blend ID can be blended together
    */
   abstract getBlendId(): unknown;
-  /**
-   * Apply animation to node
-   *
-   * @param node - To which node the track will apply
-   * @param currentTime - Current animation time
-   * @param duration - Total animation duration
-   * @returns true if applied, otherwise false
-   */
-  abstract apply(node: SceneNode, currentTime: number): boolean;
 }

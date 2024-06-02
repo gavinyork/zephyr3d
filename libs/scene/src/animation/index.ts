@@ -4,6 +4,5 @@ export * from './animationtrack';
 export * from './translationtrack';
 export * from './rotationtrack';
 export * from './eulerrotationtrack';
-export * from './usertrack';
 export * from './scaletrack';
 export * from './skeleton';

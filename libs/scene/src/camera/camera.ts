@@ -13,6 +13,7 @@ import type { GraphNode } from '../scene';
 
 /**
  * Camera pick result
+ * @public
  */
 export type PickResult = {
   drawable: Drawable;
@@ -252,8 +253,8 @@ export class Camera extends SceneNode {
   /**
    * Constructs a ray based on the given screen coordinates.
    *
-   * @param x The x-component of the screen coordinates, relative to the top-left corner of the viewport.
-   * @param y The y-component of the screen coordinates, relative to the top-left corner of the viewport.
+   * @param x - The x-component of the screen coordinates, relative to the top-left corner of the viewport.
+   * @param y - The y-component of the screen coordinates, relative to the top-left corner of the viewport.
    * @returns The ray originating from the camera position and passing through the given screen coordinates.
    */
   constructRay(x: number, y: number): Ray {

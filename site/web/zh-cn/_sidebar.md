@@ -30,6 +30,7 @@
     - [概述](zh-cn/animation-intro.md)
     - [骨骼动画](zh-cn/animation-skeleton.md)
     - [关键帧动画](zh-cn/animation-keyframe.md)
+    - [动画融合](zh-cn/animation-blending.md)
     - [自定义动画](zh-cn/animation-custom.md)
   - 后处理
     - [概述](zh-cn/posteffect-intro.md)

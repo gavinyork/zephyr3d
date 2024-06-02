@@ -34,6 +34,7 @@
     - [Introduction](en/animation-intro.md)
     - [Skeletal animation](en/animation-skeleton.md)
     - [Keyframe animation](en/animation-keyframe.md)
+    - [Animation blending](en/animation-blending.md)
     - [User animation](en/animation-custom.md)
   - PostProcessing
     - [Introduction](en/posteffect-intro.md)

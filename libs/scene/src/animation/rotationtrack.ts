@@ -41,14 +41,6 @@ export class RotationTrack extends AnimationTrack<Quaternion> {
       super(interpolator);
     }
   }
-  /** {@inheritDoc AnimationTrack.apply} */
-  apply(node: SceneNode, currentTime: number): boolean {
-    const state = this.calculateState(currentTime);
-    this.applyState(node, state);
-    // this._interpolator.interpolate(currentTime, tmpQuat);
-    // node.rotation.set(tmpQuat);
-    return true;
-  }
   calculateState(currentTime: number): Quaternion {
     const q = new Quaternion();
     this._interpolator.interpolate(currentTime, q);
@@ -59,9 +51,6 @@ export class RotationTrack extends AnimationTrack<Quaternion> {
   }
   mixState(a: Quaternion, b: Quaternion, t: number): Quaternion {
     return Quaternion.slerp(a, b, t);
-  }
-  getState(node: SceneNode): Quaternion {
-    return node.rotation;
   }
   getBlendId(): unknown {
     return 'node-rotation';

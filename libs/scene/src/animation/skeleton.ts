@@ -1,11 +1,17 @@
 import { Matrix4x4, Vector3, nextPowerOf2 } from '@zephyr3d/base';
-import type { SkinnedBoundingBox } from './animation';
 import { Application } from '../app';
 import type { Texture2D } from '@zephyr3d/device';
 import type { SceneNode } from '../scene/scene_node';
 import type { Mesh } from '../scene';
 import { BoundingBox } from '../utility';
 import type { AssetSubMeshData } from '../asset';
+
+interface SkinnedBoundingBox {
+  boundingVertices: Vector3[];
+  boundingVertexBlendIndices: Float32Array;
+  boundingVertexJointWeights: Float32Array;
+  boundingBox: BoundingBox;
+}
 
 const tmpV0 = new Vector3();
 const tmpV1 = new Vector3();
