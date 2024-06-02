@@ -116,6 +116,8 @@ enum D3DFormat {
   D3DFMT_DXT3 = FourCCToInt32('DXT3'),
   D3DFMT_DXT4 = FourCCToInt32('DXT4'),
   D3DFMT_DXT5 = FourCCToInt32('DXT5'),
+  D3DFMT_BC4 = FourCCToInt32('ATI1'),
+  D3DFMT_BC5 = FourCCToInt32('ATI2'),
   D3DFMT_R16F = 111,
   D3DFMT_RG16F = 112,
   D3DFMT_RGBA16F = 113,
@@ -313,7 +315,15 @@ const dxgiFormatMap: Record<number, TextureFormat> = {
   [74]: 'dxt3',
   [75]: 'dxt3-srgb',
   [77]: 'dxt5',
-  [78]: 'dxt5-srgb'
+  [78]: 'dxt5-srgb',
+  [80]: 'bc4',
+  [81]: 'bc4-signed',
+  [83]: 'bc5',
+  [84]: 'bc5-signed',
+  [95]: 'bc6h',
+  [96]: 'bc6h-signed',
+  [98]: 'bc7',
+  [99]: 'bc7-srgb'
 };
 
 const legacyDDSMap: {
@@ -343,6 +353,62 @@ const legacyDDSMap: {
     pf: {
       dwFlags: DDPF_FOURCC,
       dwFourCC: FourCCToInt32('DXT5')
+    }
+  },
+  {
+    format: 'bc4',
+    convertFlags: 0,
+    pf: {
+      dwFlags: DDPF_FOURCC,
+      dwFourCC: FourCCToInt32('ATI1')
+    }
+  },
+  {
+    format: 'bc4',
+    convertFlags: 0,
+    pf: {
+      dwFlags: DDPF_FOURCC,
+      dwFourCC: FourCCToInt32('BC4U')
+    }
+  },
+  {
+    format: 'bc4-signed',
+    convertFlags: 0,
+    pf: {
+      dwFlags: DDPF_FOURCC,
+      dwFourCC: FourCCToInt32('BC4S')
+    }
+  },
+  {
+    format: 'bc5',
+    convertFlags: 0,
+    pf: {
+      dwFlags: DDPF_FOURCC,
+      dwFourCC: FourCCToInt32('ATI2')
+    }
+  },
+  {
+    format: 'bc5',
+    convertFlags: 0,
+    pf: {
+      dwFlags: DDPF_FOURCC,
+      dwFourCC: FourCCToInt32('ATI2')
+    }
+  },
+  {
+    format: 'bc5',
+    convertFlags: 0,
+    pf: {
+      dwFlags: DDPF_FOURCC,
+      dwFourCC: FourCCToInt32('BC5U')
+    }
+  },
+  {
+    format: 'bc5-signed',
+    convertFlags: 0,
+    pf: {
+      dwFlags: DDPF_FOURCC,
+      dwFourCC: FourCCToInt32('BC5S')
     }
   },
   {
@@ -542,7 +608,17 @@ function getMetaDataFromHeader(header: DDSHeader, metaData?: DDSMetaData): DDSMe
     return null;
   }
   metaData.isCompressed =
-    metaData.format === 'dxt1' || metaData.format === 'dxt3' || metaData.format === 'dxt5';
+    metaData.format === 'dxt1' ||
+    metaData.format === 'dxt3' ||
+    metaData.format === 'dxt5' ||
+    metaData.format === 'bc4' ||
+    metaData.format === 'bc4-signed' ||
+    metaData.format === 'bc5' ||
+    metaData.format === 'bc5-signed' ||
+    metaData.format === 'bc6h' ||
+    metaData.format === 'bc6h-signed' ||
+    metaData.format === 'bc7' ||
+    metaData.format === 'bc7-srgb';
   metaData.dataOffset = header.ddsHeaderDX10 ? 37 * 4 : 32 * 4;
   metaData.width = header.dwWidth;
   metaData.height = header.dwHeight;
@@ -556,7 +632,7 @@ function getMetaDataFromHeader(header: DDSHeader, metaData?: DDSMetaData): DDSMe
   } else if (header.dwCaps2 & DDSCAPS2_VOLUME) {
     metaData.isVolume = true;
     metaData.depth = header.dwDepth;
-  } else if (header.ddsHeaderDX10) {
+  } else if (header.ddsHeaderDX10 && header.ddsHeaderDX10.arraySize > 1) {
     metaData.isArray = true;
     metaData.depth = header.ddsHeaderDX10.arraySize;
   }
@@ -587,9 +663,17 @@ function getMipmapData(
     case 'rgba32f':
       return new Float32Array(dds, dataOffset, width * height * 4);
     case 'dxt1':
+    case 'bc4':
+    case 'bc4-signed':
       return new Uint8Array(dds, dataOffset, (((Math.max(4, width) / 4) * Math.max(4, height)) / 4) * 8);
     case 'dxt3':
     case 'dxt5':
+    case 'bc5':
+    case 'bc5-signed':
+    case 'bc6h':
+    case 'bc6h-signed':
+    case 'bc7':
+    case 'bc7-srgb':
       return new Uint8Array(dds, dataOffset, (((Math.max(4, width) / 4) * Math.max(4, height)) / 4) * 16);
     default:
       return null;

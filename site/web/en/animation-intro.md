@@ -32,7 +32,3 @@ The following classes are related to animation playback:
 
   A class for animation tracks that control the scaling of scene nodes.
 
-- [UserTrack](/doc/markdown/./scene.usertrack)
-
-  A custom track type that allows users to specify keyframe data and implement custom animations through callback functions.
-

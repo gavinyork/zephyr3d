@@ -1,10 +1,11 @@
 import { Vector3 } from '@zephyr3d/base';
 import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
-import { DrawContext, MeshMaterial, ShaderHelper, applyMaterialMixins, mixinLambert } from '@zephyr3d/scene';
+import type { DrawContext } from '@zephyr3d/scene';
+import { MeshMaterial, ShaderHelper, applyMaterialMixins, mixinLambert } from '@zephyr3d/scene';
 
 export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
   private _distored: Vector3;
-  private _darkcolor: Vector3
+  private _darkcolor: Vector3;
   private _lightcolor: Vector3;
   private _density: number;
   constructor() {
@@ -18,7 +19,7 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
     return this._distored;
   }
   set distored(val: Vector3) {
-    if(!val.equalsTo(this._distored)){
+    if (!val.equalsTo(this._distored)) {
       this._distored.set(val);
       this.uniformChanged();
     }
@@ -27,7 +28,7 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
     return this._darkcolor;
   }
   set darkColor(val: Vector3) {
-    if (!val.equalsTo(this._darkcolor)){
+    if (!val.equalsTo(this._darkcolor)) {
       this._darkcolor.set(val);
       this.uniformChanged();
     }
@@ -36,7 +37,7 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
     return this._lightcolor;
   }
   set lightColor(val: Vector3) {
-    if (!val.equalsTo(this._lightcolor)){
+    if (!val.equalsTo(this._lightcolor)) {
       this._lightcolor.set(val);
       this.uniformChanged();
     }
@@ -52,7 +53,7 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
-    if (this.needFragmentColor(ctx)){
+    if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('distored', this._distored);
       bindGroup.setValue('darkColor', this._darkcolor);
       bindGroup.setValue('lightColor', this._lightcolor);
@@ -64,7 +65,10 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
     const pb = scope.$builder;
     scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
     scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
-    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    ShaderHelper.setClipSpacePosition(
+      scope,
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+    );
     scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
     scope.$outputs.wNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
     scope.$outputs.oPos = scope.oPos;
@@ -599,20 +603,32 @@ export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert
           pb.add(pb.pow(pb.add(pb.mul(pb.sin(this.x), 0.5), 0.5), 8), pb.mul(pb.cos(this.x), 0.7), 0.7)
         );
       });
-      pb.func('wood', [pb.vec3('p'), pb.vec3('distored'), pb.float('density'), pb.vec3('dark'), pb.vec3('light')], function () {
-        this.$l.a = this.noise3d(pb.mul(this.p, this.distored));
-        this.$l.b = this.noise3d(pb.add(pb.mul(this.p, pb.neg(this.distored)), pb.vec3(4.5678)));
-        this.$l.rings = pb.div(
-          this.repramp(pb.mul(pb.length(pb.add(this.p.xz, pb.mul(pb.vec2(this.a, this.b), 0.05))), this.density)),
-          1.8
-        );
-        this.rings = pb.sub(this.rings, pb.mul(this.noise3d(this.p), 0.75));
-        this.$l.color = pb.max(pb.vec3(0), pb.mix(this.dark, this.light, this.rings));
-        this.$l.rough = pb.add(pb.mul(this.noise3d(pb.mul(this.p, pb.vec3(1, 0.2, 1), 64)), 0.1), 0.9);
-        this.color = pb.clamp(pb.mul(this.color, this.rough), pb.vec3(0), pb.vec3(1));
-        this.$return(pb.vec4(this.color, 1));
-      });
-      scope.$l.albedo = scope.wood(scope.$inputs.oPos, scope.distored, scope.density, scope.darkColor, scope.lightColor);
+      pb.func(
+        'wood',
+        [pb.vec3('p'), pb.vec3('distored'), pb.float('density'), pb.vec3('dark'), pb.vec3('light')],
+        function () {
+          this.$l.a = this.noise3d(pb.mul(this.p, this.distored));
+          this.$l.b = this.noise3d(pb.add(pb.mul(this.p, pb.neg(this.distored)), pb.vec3(4.5678)));
+          this.$l.rings = pb.div(
+            this.repramp(
+              pb.mul(pb.length(pb.add(this.p.xz, pb.mul(pb.vec2(this.a, this.b), 0.05))), this.density)
+            ),
+            1.8
+          );
+          this.rings = pb.sub(this.rings, pb.mul(this.noise3d(this.p), 0.75));
+          this.$l.color = pb.max(pb.vec3(0), pb.mix(this.dark, this.light, this.rings));
+          this.$l.rough = pb.add(pb.mul(this.noise3d(pb.mul(this.p, pb.vec3(1, 0.2, 1), 64)), 0.1), 0.9);
+          this.color = pb.clamp(pb.mul(this.color, this.rough), pb.vec3(0), pb.vec3(1));
+          this.$return(pb.vec4(this.color, 1));
+        }
+      );
+      scope.$l.albedo = scope.wood(
+        scope.$inputs.oPos,
+        scope.distored,
+        scope.density,
+        scope.darkColor,
+        scope.lightColor
+      );
       scope.$l.normal = this.calculateNormal(scope, scope.$inputs.worldPos, scope.$inputs.wNorm);
       scope.$l.litColor = this.lambertLight(scope, scope.$inputs.worldPos, scope.normal, scope.albedo);
       this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, scope.albedo.a));

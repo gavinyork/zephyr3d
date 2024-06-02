@@ -13,7 +13,7 @@ export class DDSLoader extends AbstractTextureLoader {
     return ext === '.dds';
   }
   supportMIMEType(mimeType: string): boolean {
-    return mimeType === 'image/dds';
+    return mimeType === 'image/dds' || mimeType === 'image/x-dds';
   }
   async load(
     assetManager: AssetManager,

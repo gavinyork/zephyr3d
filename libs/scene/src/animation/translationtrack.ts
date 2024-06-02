@@ -3,14 +3,12 @@ import { Interpolator, Vector3 } from '@zephyr3d/base';
 import { AnimationTrack } from './animationtrack';
 import type { SceneNode } from '../scene';
 
-// Reduce gc
-const tmpVec3 = new Vector3();
-
 /**
  * Translate animation track
  * @public
  */
-export class TranslationTrack extends AnimationTrack {
+export class TranslationTrack extends AnimationTrack<Vector3> {
+  private _state: Vector3;
   /**
    * Create an instance of TranslationTrack from keyframe values
    * @param interpolator - Interpolator object that contains the keyframe values
@@ -42,11 +40,19 @@ export class TranslationTrack extends AnimationTrack {
       const interpolator = new Interpolator(modeOrInterpolator, 'vec3', inputs, outputs);
       super(interpolator);
     }
+    this._state = new Vector3();
   }
-  /** {@inheritDoc AnimationTrack.apply} */
-  apply(node: SceneNode, currentTime: number, duration: number): boolean {
-    this._interpolator.interpolate(currentTime, duration, tmpVec3);
-    node.position.set(tmpVec3);
-    return true;
+  calculateState(currentTime: number): Vector3 {
+    this._interpolator.interpolate(currentTime, this._state);
+    return this._state;
+  }
+  applyState(node: SceneNode, state: Vector3) {
+    node.position.set(state);
+  }
+  mixState(a: Vector3, b: Vector3, t: number): Vector3 {
+    return new Vector3(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y), a.z + t * (b.z - a.z));
+  }
+  getBlendId(): unknown {
+    return 'node-translation';
   }
 }

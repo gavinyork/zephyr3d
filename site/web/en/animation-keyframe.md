@@ -44,7 +44,7 @@ const animationSet = new AnimationSet(scene);
 animationSet.add(animation);
 
 // Start playing 
-animationSet.playAnimation('animation0', 0);
+animationSet.playAnimation('animation0');
 
 // Stop playing
 animationSet.stopAnimation('animation0');

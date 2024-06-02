@@ -1,4 +1,5 @@
-import { Vector3, isPowerOf2, nextPowerOf2, HttpRequest } from '@zephyr3d/base';
+import type { DecoderModule } from 'draco3d';
+import { isPowerOf2, nextPowerOf2, HttpRequest } from '@zephyr3d/base';
 import type { AssetHierarchyNode, AssetSkeleton, AssetSubMeshData, SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
@@ -7,18 +8,18 @@ import { HDRLoader } from './loaders/hdr/hdr';
 import { SceneNode } from '../scene/scene_node';
 import { Mesh } from '../scene/mesh';
 import { RotationTrack, ScaleTrack, Skeleton, TranslationTrack } from '../animation';
-import type { SkinnedBoundingBox } from '../animation/animation';
 import { AnimationClip } from '../animation/animation';
-import { BoundingBox } from '../utility/bounding_volume';
 import { CopyBlitter } from '../blitter';
 import { getSheenLutLoader, getTestCubemapLoader } from './builtin';
-import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT, BUILTIN_ASSET_TEST_CUBEMAP } from '../values';
+import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT, BUILTIN_ASSET_TEST_CUBEMAP, MAX_MORPH_TARGETS } from '../values';
 import { Application } from '../app';
 import { AnimationSet } from '../animation/animationset';
 import type { BaseTexture, Texture2D, GPUObject, SamplerOptions } from '@zephyr3d/device';
 import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
+import { MorphTargetTrack } from '../animation/morphtrack';
+import { processMorphData } from '../animation/morphtarget';
 
 /**
  * Options for texture fetching
@@ -38,6 +39,8 @@ export type TextureFetchOptions<T extends BaseTexture> = {
 export type ModelFetchOptions = {
   /** MIME type of the model, if not specified, model type will be determined by file extension */
   mimeType?: string;
+  /** Draco module */
+  dracoDecoderModule?: DecoderModule;
   /** True if the model need to be rendered instanced, the default value is false */
   enableInstancing?: boolean;
   /** PostProcess loading function for the mesh  */
@@ -237,15 +240,10 @@ export class AssetManager {
     }
   }
   /** @internal */
-  async fetchModelData(
-    scene: Scene,
-    url: string,
-    mimeType?: string,
-    postProcess?: (model: SharedModel) => SharedModel
-  ): Promise<SharedModel> {
+  async fetchModelData(scene: Scene, url: string, options?: ModelFetchOptions): Promise<SharedModel> {
     let P = this._models[url];
     if (!P) {
-      P = this.loadModel(url, mimeType, postProcess);
+      P = this.loadModel(url, options);
       this._models[url] = P;
     }
     return P;
@@ -265,7 +263,7 @@ export class AssetManager {
    * @returns The created model node
    */
   async fetchModel(scene: Scene, url: string, options?: ModelFetchOptions): Promise<ModelInfo> {
-    const sharedModel = await this.fetchModelData(scene, url, options?.mimeType, options?.postProcess);
+    const sharedModel = await this.fetchModelData(scene, url, options);
     return this.createSceneNode(scene, sharedModel, !!options?.enableInstancing);
   }
   /** @internal */
@@ -409,11 +407,7 @@ export class AssetManager {
     }
   }
   /** @internal */
-  async loadModel(
-    url: string,
-    mimeType?: string,
-    postProcess?: (model: SharedModel) => SharedModel
-  ): Promise<SharedModel> {
+  async loadModel(url: string, options?: ModelFetchOptions): Promise<SharedModel> {
     const data = await this.httpRequest.requestBlob(url);
     const filename = new URL(url, new URL(location.href).origin).pathname
       .split('/')
@@ -422,16 +416,22 @@ export class AssetManager {
     const p = filename ? filename.lastIndexOf('.') : -1;
     const ext = p >= 0 ? filename.substring(p) : null;
     for (const loader of this._modelLoaders) {
-      if (!loader.supportExtension(ext) && !loader.supportMIMEType(mimeType || data.type)) {
+      if (!loader.supportExtension(ext) && !loader.supportMIMEType(options?.mimeType || data.type)) {
         continue;
       }
-      let model = await loader.load(this, url, mimeType || data.type, data);
+      let model = await loader.load(
+        this,
+        url,
+        options?.mimeType || data.type,
+        data,
+        options?.dracoDecoderModule
+      );
       if (!model) {
         throw new Error(`Load asset failed: ${url}`);
       }
-      if (postProcess) {
+      if (options?.postProcess) {
         try {
-          model = postProcess(model);
+          model = options.postProcess(model);
         } catch (err) {
           throw new Error(`Model loader post process failed: ${err}`);
         }
@@ -474,10 +474,13 @@ export class AssetManager {
   ): { group: SceneNode; animationSet: AnimationSet } {
     const group = new SceneNode(scene);
     group.name = model.name;
-    let animationSet = new AnimationSet(scene);
+    let animationSet = new AnimationSet(scene, group);
     for (let i = 0; i < model.scenes.length; i++) {
       const assetScene = model.scenes[i];
-      const skeletonMeshMap: Map<AssetSkeleton, { mesh: Mesh[]; bounding: AssetSubMeshData[] }> = new Map();
+      const skeletonMeshMap: Map<
+        AssetSkeleton,
+        { mesh: Mesh[]; bounding: AssetSubMeshData[]; skeleton?: Skeleton }
+      > = new Map();
       const nodeMap: Map<AssetHierarchyNode, SceneNode> = new Map();
       for (let k = 0; k < assetScene.rootNodes.length; k++) {
         this.setAssetNodeToSceneNode(
@@ -491,8 +494,7 @@ export class AssetManager {
         );
       }
       for (const animationData of model.animations) {
-        const animation = new AnimationClip(animationData.name, group);
-        animationSet.add(animation);
+        const animation = new AnimationClip(animationData.name);
         for (const track of animationData.tracks) {
           if (track.type === 'translation') {
             animation.addTrack(nodeMap.get(track.node), new TranslationTrack(track.interpolator));
@@ -500,27 +502,40 @@ export class AssetManager {
             animation.addTrack(nodeMap.get(track.node), new ScaleTrack(track.interpolator));
           } else if (track.type === 'rotation') {
             animation.addTrack(nodeMap.get(track.node), new RotationTrack(track.interpolator));
+          } else if (track.type === 'weights') {
+            for (const m of track.node.mesh.subMeshes) {
+              if (track.interpolator.stride > MAX_MORPH_TARGETS) {
+                console.error(
+                  `Morph target too large: ${track.interpolator.stride}, the maximum is ${MAX_MORPH_TARGETS}`
+                );
+              } else {
+                const morphTrack = new MorphTargetTrack(track, m);
+                animation.addTrack(m.mesh, morphTrack);
+              }
+            }
           } else {
             console.error(`Invalid animation track type: ${track.type}`);
           }
         }
+        if (animation.tracks.size === 0) {
+          continue;
+        }
+        animationSet.add(animation);
         for (const sk of animationData.skeletons) {
           const nodes = skeletonMeshMap.get(sk);
           if (nodes) {
-            const skeleton = new Skeleton(
-              sk.joints.map((val) => nodeMap.get(val)),
-              sk.inverseBindMatrices,
-              sk.bindPoseMatrices
-            );
-            skeleton.updateJointMatrices();
-            animation.addSkeleton(
-              skeleton,
-              nodes.mesh,
-              nodes.bounding.map((val) => this.getBoundingInfo(skeleton, val))
-            );
+            if (!nodes.skeleton) {
+              nodes.skeleton = new Skeleton(
+                sk.joints.map((val) => nodeMap.get(val)),
+                sk.inverseBindMatrices,
+                sk.bindPoseMatrices,
+                nodes.mesh,
+                nodes.bounding
+              );
+            }
+            animation.addSkeleton(nodes.skeleton);
           }
         }
-        animation.stop();
       }
     }
     if (animationSet.numAnimations === 0) {
@@ -545,85 +560,6 @@ export class AssetManager {
     }
   }
   /** @internal */
-  private getBoundingInfo(skeleton: Skeleton, meshData: AssetSubMeshData): SkinnedBoundingBox {
-    const indices = [0, 0, 0, 0, 0, 0];
-    let minx = Number.MAX_VALUE;
-    let maxx = -Number.MAX_VALUE;
-    let miny = Number.MAX_VALUE;
-    let maxy = -Number.MAX_VALUE;
-    let minz = Number.MAX_VALUE;
-    let maxz = -Number.MAX_VALUE;
-    const v = meshData.rawPositions;
-    const vert = new Vector3();
-    const tmpV0 = new Vector3();
-    const tmpV1 = new Vector3();
-    const tmpV2 = new Vector3();
-    const tmpV3 = new Vector3();
-    const numVertices = Math.floor(v.length / 3);
-    for (let i = 0; i < numVertices; i++) {
-      vert.setXYZ(v[i * 3], v[i * 3 + 1], v[i * 3 + 2]);
-      skeleton.jointMatrices[meshData.rawBlendIndices[i * 4 + 0]]
-        .transformPointAffine(vert, tmpV0)
-        .scaleBy(meshData.rawJointWeights[i * 4 + 0]);
-      skeleton.jointMatrices[meshData.rawBlendIndices[i * 4 + 1]]
-        .transformPointAffine(vert, tmpV1)
-        .scaleBy(meshData.rawJointWeights[i * 4 + 1]);
-      skeleton.jointMatrices[meshData.rawBlendIndices[i * 4 + 2]]
-        .transformPointAffine(vert, tmpV2)
-        .scaleBy(meshData.rawJointWeights[i * 4 + 2]);
-      skeleton.jointMatrices[meshData.rawBlendIndices[i * 4 + 3]]
-        .transformPointAffine(vert, tmpV3)
-        .scaleBy(meshData.rawJointWeights[i * 4 + 3]);
-      tmpV0.addBy(tmpV1).addBy(tmpV2).addBy(tmpV3);
-      if (tmpV0.x < minx) {
-        minx = tmpV0.x;
-        indices[0] = i;
-      }
-      if (tmpV0.x > maxx) {
-        maxx = tmpV0.x;
-        indices[1] = i;
-      }
-      if (tmpV0.y < miny) {
-        miny = tmpV0.y;
-        indices[2] = i;
-      }
-      if (tmpV0.y > maxy) {
-        maxy = tmpV0.y;
-        indices[3] = i;
-      }
-      if (tmpV0.z < minz) {
-        minz = tmpV0.z;
-        indices[4] = i;
-      }
-      if (tmpV0.z > maxz) {
-        maxz = tmpV0.z;
-        indices[5] = i;
-      }
-    }
-    const info: SkinnedBoundingBox = {
-      boundingVertexBlendIndices: new Float32Array(
-        Array.from({ length: 6 * 4 }).map(
-          (val, index) => meshData.rawBlendIndices[indices[index >> 2] * 4 + (index % 4)]
-        )
-      ),
-      boundingVertexJointWeights: new Float32Array(
-        Array.from({ length: 6 * 4 }).map(
-          (val, index) => meshData.rawJointWeights[indices[index >> 2] * 4 + (index % 4)]
-        )
-      ),
-      boundingVertices: Array.from({ length: 6 }).map(
-        (val, index) =>
-          new Vector3(
-            meshData.rawPositions[indices[index] * 3],
-            meshData.rawPositions[indices[index] * 3 + 1],
-            meshData.rawPositions[indices[index] * 3 + 2]
-          )
-      ),
-      boundingBox: new BoundingBox()
-    };
-    return info;
-  }
-  /** @internal */
   private setAssetNodeToSceneNode(
     scene: Scene,
     parent: SceneNode,
@@ -643,20 +579,26 @@ export class AssetManager {
       const meshData = assetNode.mesh;
       const skeleton = assetNode.skeleton;
       for (const subMesh of meshData.subMeshes) {
-        const meshNode = new Mesh(scene);
-        meshNode.name = subMesh.name;
-        meshNode.clipTestEnabled = true;
-        meshNode.showState = 'inherit';
-        meshNode.primitive = subMesh.primitive;
-        meshNode.material = instancing ? subMesh.material.createInstance() : subMesh.material;
-        // meshNode.drawBoundingBox = true;
-        meshNode.reparent(node);
-        if (skeleton) {
-          if (!skeletonMeshMap.has(skeleton)) {
-            skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });
-          } else {
-            skeletonMeshMap.get(skeleton).mesh.push(meshNode);
-            skeletonMeshMap.get(skeleton).bounding.push(subMesh);
+        for (const instance of assetNode.instances) {
+          const meshNode = new Mesh(scene);
+          meshNode.position = instance.t;
+          meshNode.scale = instance.s;
+          meshNode.rotation = instance.r;
+          meshNode.name = subMesh.name;
+          meshNode.clipTestEnabled = true;
+          meshNode.showState = 'inherit';
+          meshNode.primitive = subMesh.primitive;
+          meshNode.material = instancing ? subMesh.material.createInstance() : subMesh.material;
+          meshNode.reparent(node);
+          subMesh.mesh = meshNode;
+          processMorphData(subMesh, meshData.morphWeights);
+          if (skeleton) {
+            if (!skeletonMeshMap.has(skeleton)) {
+              skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });
+            } else {
+              skeletonMeshMap.get(skeleton).mesh.push(meshNode);
+              skeletonMeshMap.get(skeleton).bounding.push(subMesh);
+            }
           }
         }
       }

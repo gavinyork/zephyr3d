@@ -65,6 +65,7 @@
     "@zephyr3d/device": "workspace:^0.2.2"
   },
   "dependencies": {
-    "@webgpu/types": "^0.1.40"
+    "@webgpu/types": "^0.1.40",
+    "@types/draco3d": "^1.4.9"
   }
 }

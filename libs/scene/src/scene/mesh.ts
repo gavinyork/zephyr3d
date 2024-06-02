@@ -2,11 +2,11 @@ import type { Matrix4x4 } from '@zephyr3d/base';
 import { Vector4, applyMixins } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import { BoxFrameShape } from '../shapes';
-import type { Material } from '../material';
+import type { MeshMaterial } from '../material';
 import { LambertMaterial } from '../material';
 import type { RenderPass, Primitive, BatchDrawable, DrawContext } from '../render';
 import { Application } from '../app';
-import type { Texture2D } from '@zephyr3d/device';
+import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
 import type { XForm } from './xform';
 import type { Scene } from './scene';
 import type { BoundingBox, BoundingVolume } from '../utility/bounding_volume';
@@ -21,7 +21,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   private _primitive: Primitive;
   /** @internal */
-  private _material: Material;
+  private _material: MeshMaterial;
   /** @internal */
   protected _castShadow: boolean;
   /** @internal */
@@ -32,6 +32,10 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   protected _boneMatrices: Texture2D;
   /** @internal */
   protected _invBindMatrix: Matrix4x4;
+  /** @internal */
+  protected _morphData: Texture2D;
+  /** @internal */
+  protected _morphInfo: GPUDataBuffer;
   /** @internal */
   protected _instanceHash: string;
   /** @internal */
@@ -44,7 +48,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    * Creates an instance of mesh node
    * @param scene - The scene to which the mesh node belongs
    */
-  constructor(scene: Scene, primitive?: Primitive, material?: Material) {
+  constructor(scene: Scene, primitive?: Primitive, material?: MeshMaterial) {
     super(scene);
     this._primitive = null;
     this._material = null;
@@ -52,6 +56,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._animatedBoundingBox = null;
     this._boneMatrices = null;
     this._invBindMatrix = null;
+    this._morphData = null;
+    this._morphInfo = null;
     this._instanceHash = null;
     this._boundingBoxNode = null;
     this._instanceColor = Vector4.zero();
@@ -119,10 +125,10 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     }
   }
   /** Material of the mesh */
-  get material(): Material {
+  get material(): MeshMaterial {
     return this._material;
   }
-  set material(m: Material) {
+  set material(m: MeshMaterial) {
     if (this._material !== m) {
       this._material = m;
       this._instanceHash =
@@ -179,10 +185,36 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._invBindMatrix = matrix;
   }
   /**
+   * Sets the texture that contains the morph target data
+   * @param data - The texture that contains the morph target data
+   */
+  setMorphData(data: Texture2D) {
+    this._morphData = data;
+  }
+  /**
+   * {@inheritDoc Drawable.getMorphData}
+   */
+  getMorphData(): Texture2D {
+    return this._morphData;
+  }
+  /**
+   * Sets the buffer that contains the morph target information
+   * @param info - The buffer that contains the morph target information
+   */
+  setMorphInfo(info: GPUDataBuffer) {
+    this._morphInfo = info;
+  }
+  /**
+   * {@inheritDoc Drawable.getMorphInfo}
+   */
+  getMorphInfo(): GPUDataBuffer<unknown> {
+    return this._morphInfo;
+  }
+  /**
    * {@inheritDoc Drawable.isBatchable}
    */
   isBatchable(): this is BatchDrawable {
-    return this._batchable && !this._boneMatrices && this._material?.isBatchable();
+    return this._batchable && !this._boneMatrices && !this._morphData && this._material?.isBatchable();
   }
   /** Disposes the mesh node */
   dispose() {
@@ -203,6 +235,12 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     return !this.material?.supportLighting();
   }
   /**
+   * {@inheritDoc Drawable.needSceneColor}
+   */
+  needSceneColor(): boolean {
+    return this.material?.needSceneColor();
+  }
+  /**
    * {@inheritDoc Drawable.draw}
    */
   draw(ctx: DrawContext) {
@@ -212,7 +250,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * {@inheritDoc Drawable.getMaterial}
    */
-  getMaterial(): Material {
+  getMaterial(): MeshMaterial {
     return this.material;
   }
   /**
@@ -254,11 +292,11 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this.invalidateBoundingVolume();
   }
   /** @internal */
-  private static _defaultMaterial: Material = null;
+  private static _defaultMaterial: MeshMaterial = null;
   /** @internal */
   private static _defaultBoxFrame: Primitive = null;
   /** @internal */
-  private static _getDefaultMaterial(): Material {
+  private static _getDefaultMaterial(): MeshMaterial {
     if (!this._defaultMaterial) {
       this._defaultMaterial = new LambertMaterial();
     }

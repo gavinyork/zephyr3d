@@ -13,6 +13,11 @@ export const RENDER_PASS_TYPE_SHADOWMAP = 1;
  * @public
  */
 export const RENDER_PASS_TYPE_DEPTH = 2;
+/**
+ * Object color render pass type
+ * @public
+ */
+export const RENDER_PASS_TYPE_OBJECT_COLOR = 3;
 
 /**
  * Builtin texture name for sheen LUT
@@ -67,3 +72,30 @@ export const QUEUE_OPAQUE = 1;
  * @public
  */
 export const QUEUE_TRANSPARENT = 2;
+
+// Morph target attributes
+
+/** @internal */
+export const MORPH_TARGET_POSITION = 0;
+/** @internal */
+export const MORPH_TARGET_NORMAL = 1;
+/** @internal */
+export const MORPH_TARGET_TANGENT = 2;
+/** @internal */
+export const MORPH_TARGET_COLOR = 3;
+/** @internal */
+export const MORPH_TARGET_TEX0 = 4;
+/** @internal */
+export const MORPH_TARGET_TEX1 = 5;
+/** @internal */
+export const MORPH_TARGET_TEX2 = 6;
+/** @internal */
+export const MORPH_TARGET_TEX3 = 7;
+/** @internal */
+export const MAX_MORPH_ATTRIBUTES = 8;
+/** @internal */
+export const MAX_MORPH_TARGETS = 256;
+/** @internal */
+export const MORPH_WEIGHTS_VECTOR_COUNT = (MAX_MORPH_TARGETS + 3) >> 2;
+/** @internal */
+export const MORPH_ATTRIBUTE_VECTOR_COUNT = (MAX_MORPH_ATTRIBUTES + 3) >> 2;

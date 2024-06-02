@@ -84,6 +84,9 @@ export abstract class WebGPUBaseTexture<
   get depth(): number {
     return this._depth;
   }
+  get memCost(): number {
+    return this._memCost;
+  }
   get format(): TextureFormat {
     return this._format;
   }

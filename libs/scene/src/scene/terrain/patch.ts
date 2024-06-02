@@ -3,7 +3,7 @@ import { Vector3, Vector4, applyMixins } from '@zephyr3d/base';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { Primitive } from '../../render/primitive';
 import { Application } from '../../app';
-import type { Texture2D } from '@zephyr3d/device';
+import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
 import type { BatchDrawable, Drawable, DrawContext } from '../../render/drawable';
 import type { XForm } from '../xform';
 import type { Camera } from '../../camera/camera';
@@ -12,7 +12,7 @@ import type { Terrain } from './terrain';
 import type { GraphNode } from '../graph_node';
 import { QUEUE_OPAQUE, RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import { mixinDrawable } from '../../render/drawable_mixin';
-import type { Material } from '../../material';
+import type { MeshMaterial } from '../../material';
 
 /** @internal */
 export class TerrainPatchBase {
@@ -113,7 +113,7 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   getPickTarget(): GraphNode {
     return this._terrain;
   }
-  getMaterial(): Material {
+  getMaterial(): MeshMaterial {
     return this._terrain.material;
   }
   draw(ctx: DrawContext) {
@@ -141,6 +141,12 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   getInvBindMatrix(): Matrix4x4 {
     return null;
   }
+  getMorphData(): Texture2D {
+    return null;
+  }
+  getMorphInfo(): GPUDataBuffer {
+    return null;
+  }
   getSortDistance(camera: Camera): number {
     return this._quadtree.getTerrain().getSortDistance(camera);
   }
@@ -148,6 +154,9 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
     return QUEUE_OPAQUE;
   }
   isUnlit(): boolean {
+    return false;
+  }
+  needSceneColor(): boolean {
     return false;
   }
   isBatchable(): this is BatchDrawable {

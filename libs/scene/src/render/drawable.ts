@@ -1,5 +1,5 @@
 import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
-import type { AbstractDevice, Texture2D, TextureFormat } from '@zephyr3d/device';
+import type { AbstractDevice, GPUDataBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
 import type { XForm } from '../scene/xform';
 import type { Camera } from '../camera/camera';
 import type { FogType, RenderPass } from '.';
@@ -8,9 +8,8 @@ import type { ShadowMapParams } from '../shadow';
 import type { Environment } from '../scene/environment';
 import type { DirectionalLight, GraphNode, PunctualLight, Scene } from '../scene';
 import type { Compositor, CompositorContext } from '../posteffect';
-import type { RenderLogger } from '../logger/logger';
 import type { ClusteredLight } from './cluster_light';
-import type { Material } from '../material';
+import type { MeshMaterial } from '../material';
 import type { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import type { OIT } from './oit';
 
@@ -49,12 +48,16 @@ export interface DrawContext {
   timestamp: number;
   /** current queue */
   queue: number;
+  /** whether GPU picking is enabled */
+  picking: boolean;
   /** whether is blending light */
   lightBlending: boolean;
   /** Depth texture */
   depthTexture?: Texture2D;
   /** Linear depth texture */
   linearDepthTexture?: Texture2D;
+  /** Scene color texture */
+  sceneColorTexture?: Texture2D;
   /** viewport X */
   viewportX?: number;
   /** viewport Y */
@@ -81,10 +84,10 @@ export interface DrawContext {
   sunLight?: DirectionalLight;
   /** clustered light index */
   clusteredLight?: ClusteredLight;
-  /** render logger */
-  logger?: RenderLogger;
   /** Whether skin animation is used */
   skinAnimation?: boolean;
+  /** Whether morph animation is used */
+  morphAnimation?: boolean;
   /** Whehter instance rendering is used */
   instancing?: boolean;
 }
@@ -96,6 +99,8 @@ export interface DrawContext {
 export interface Drawable {
   /** Gets name of the drawable object */
   getName(): string;
+  /** Gets unique id of the drawable object */
+  getId(): number;
   /** Gets the XForm of the object */
   getXForm(): XForm;
   /** Gets the instance color */
@@ -106,16 +111,25 @@ export interface Drawable {
   getBoneMatrices(): Texture2D;
   /** Gets the inversed bind matrix for skeleton animation */
   getInvBindMatrix(): Matrix4x4;
+  /** Gets the object color used for GPU picking */
+  getObjectColor(): Vector4;
+  /** Gets the morph texture */
+  getMorphData(): Texture2D;
+  /** Gets the morph information buffer */
+  getMorphInfo(): GPUDataBuffer;
   /** Gets the distance for object sorting */
   getSortDistance(camera: Camera): number;
   /** Gets the type of render queue */
   getQueueType(): number;
+  /** Need scene color */
+  needSceneColor(): boolean;
   /** true if the shading of this object is independent of lighting */
   isUnlit(): boolean;
   /** Gets the associated material */
-  getMaterial(): Material;
+  getMaterial(): MeshMaterial;
   /** Set render queue reference */
   pushRenderQueueRef(ref: RenderQueueRef);
+  /** Apply transform uniforms */
   applyTransformUniforms(renderQueue: RenderQueue): void;
   /**
    * Draw the object

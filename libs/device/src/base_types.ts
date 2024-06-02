@@ -30,6 +30,7 @@ import type {
   VertexSemantic
 } from './gpuobject';
 import type { RenderStateSet } from './render_states';
+import type { Pool } from './pool';
 
 /**
  * The webgl context type
@@ -101,11 +102,12 @@ const COMPRESSED_FORMAT_SHIFT = 24;
 const COMPRESSION_FORMAT_BC1 = 1 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC2 = 2 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC3 = 3 << COMPRESSED_FORMAT_SHIFT;
-/*
 const COMPRESSION_FORMAT_BC4 = 4 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC5 = 5 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_BC6 = 6 << COMPRESSED_FORMAT_SHIFT;
+const COMPRESSION_FORMAT_BC6H = 6 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC7 = 7 << COMPRESSED_FORMAT_SHIFT;
+const COMPRESSION_FORMAT_ASTC = 8 << COMPRESSED_FORMAT_SHIFT;
+/*
 const COMPRESSION_FORMAT_ETC2_RGB8 = 8 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_ETC2_RGB8_A1 = 9 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_ETC2_RGBA8 = 10 << COMPRESSED_FORMAT_SHIFT;
@@ -228,7 +230,43 @@ export type TextureFormat =
   | 'dxt3'
   | 'dxt3-srgb'
   | 'dxt5'
-  | 'dxt5-srgb';
+  | 'dxt5-srgb'
+  | 'bc4'
+  | 'bc4-signed'
+  | 'bc5'
+  | 'bc5-signed'
+  | 'bc7'
+  | 'bc7-srgb'
+  | 'bc6h'
+  | 'bc6h-signed'
+  | 'astc-4x4'
+  | 'astc-4x4-srgb'
+  | 'astc-5x4'
+  | 'astc-5x4-srgb'
+  | 'astc-5x5'
+  | 'astc-5x5-srgb'
+  | 'astc-6x5'
+  | 'astc-6x5-srgb'
+  | 'astc-6x6'
+  | 'astc-6x6-srgb'
+  | 'astc-8x5'
+  | 'astc-8x5-srgb'
+  | 'astc-8x6'
+  | 'astc-8x6-srgb'
+  | 'astc-8x8'
+  | 'astc-8x8-srgb'
+  | 'astc-10x5'
+  | 'astc-10x5-srgb'
+  | 'astc-10x6'
+  | 'astc-10x6-srgb'
+  | 'astc-10x8'
+  | 'astc-10x8-srgb'
+  | 'astc-10x10'
+  | 'astc-10x10-srgb'
+  | 'astc-12x10'
+  | 'astc-12x10-srgb'
+  | 'astc-12x12'
+  | 'astc-12x12-srgb';
 
 const textureFormatMap: Record<TextureFormat, number> = {
   unknown: 0,
@@ -997,6 +1035,618 @@ const textureFormatMap: Record<TextureFormat, number> = {
     4,
     4,
     16
+  ),
+  bc4: makeTextureFormat(
+    COMPRESSION_FORMAT_BC4,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    4,
+    4,
+    8
+  ),
+  'bc4-signed': makeTextureFormat(
+    COMPRESSION_FORMAT_BC4,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    false,
+    4,
+    4,
+    8
+  ),
+  bc5: makeTextureFormat(
+    COMPRESSION_FORMAT_BC5,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    4,
+    4,
+    16
+  ),
+  'bc5-signed': makeTextureFormat(
+    COMPRESSION_FORMAT_BC5,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    false,
+    4,
+    4,
+    16
+  ),
+  bc6h: makeTextureFormat(
+    COMPRESSION_FORMAT_BC6H,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    true,
+    false,
+    false,
+    false,
+    false,
+    4,
+    4,
+    16
+  ),
+  'bc6h-signed': makeTextureFormat(
+    COMPRESSION_FORMAT_BC6H,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    true,
+    false,
+    true,
+    false,
+    false,
+    4,
+    4,
+    16
+  ),
+  bc7: makeTextureFormat(
+    COMPRESSION_FORMAT_BC7,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    4,
+    4,
+    16
+  ),
+  'bc7-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_BC7,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    4,
+    4,
+    16
+  ),
+  'astc-4x4': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    4,
+    4,
+    16
+  ),
+  'astc-4x4-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    4,
+    4,
+    16
+  ),
+  'astc-5x4': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    5,
+    4,
+    16
+  ),
+  'astc-5x4-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    5,
+    4,
+    16
+  ),
+  'astc-5x5': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    5,
+    5,
+    16
+  ),
+  'astc-5x5-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    5,
+    5,
+    16
+  ),
+  'astc-6x5': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    6,
+    5,
+    16
+  ),
+  'astc-6x5-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    6,
+    5,
+    16
+  ),
+  'astc-6x6': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    6,
+    6,
+    16
+  ),
+  'astc-6x6-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    6,
+    6,
+    16
+  ),
+  'astc-8x5': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    8,
+    5,
+    16
+  ),
+  'astc-8x5-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    8,
+    5,
+    16
+  ),
+  'astc-8x6': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    8,
+    6,
+    16
+  ),
+  'astc-8x6-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    8,
+    6,
+    16
+  ),
+  'astc-8x8': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    8,
+    8,
+    16
+  ),
+  'astc-8x8-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    8,
+    8,
+    16
+  ),
+  'astc-10x5': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    10,
+    5,
+    16
+  ),
+  'astc-10x5-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    10,
+    5,
+    16
+  ),
+  'astc-10x6': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    10,
+    6,
+    16
+  ),
+  'astc-10x6-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    10,
+    6,
+    16
+  ),
+  'astc-10x8': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    10,
+    8,
+    16
+  ),
+  'astc-10x8-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    10,
+    8,
+    16
+  ),
+  'astc-10x10': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    10,
+    10,
+    16
+  ),
+  'astc-10x10-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    10,
+    10,
+    16
+  ),
+  'astc-12x10': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    12,
+    10,
+    16
+  ),
+  'astc-12x10-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    12,
+    10,
+    16
+  ),
+  'astc-12x12': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    12,
+    12,
+    16
+  ),
+  'astc-12x12-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ASTC,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    12,
+    12,
+    16
   )
 };
 
@@ -1018,6 +1668,36 @@ export function linearTextureFormatToSRGB(format: TextureFormat): TextureFormat 
       return 'dxt3-srgb';
     case 'dxt5':
       return 'dxt5-srgb';
+    case 'bc7':
+      return 'bc7-srgb';
+    case 'astc-4x4':
+      return 'astc-4x4-srgb';
+    case 'astc-5x4':
+      return 'astc-5x4-srgb';
+    case 'astc-5x5':
+      return 'astc-5x5-srgb';
+    case 'astc-6x5':
+      return 'astc-6x5-srgb';
+    case 'astc-6x6':
+      return 'astc-6x6-srgb';
+    case 'astc-8x5':
+      return 'astc-8x5-srgb';
+    case 'astc-8x6':
+      return 'astc-8x6-srgb';
+    case 'astc-8x8':
+      return 'astc-8x8-srgb';
+    case 'astc-10x5':
+      return 'astc-10x5-srgb';
+    case 'astc-10x6':
+      return 'astc-10x6-srgb';
+    case 'astc-10x8':
+      return 'astc-10x8-srgb';
+    case 'astc-10x10':
+      return 'astc-10x10-srgb';
+    case 'astc-12x10':
+      return 'astc-12x10-srgb';
+    case 'astc-12x12':
+      return 'astc-12x12-srgb';
     default:
       return format;
   }
@@ -1562,6 +2242,12 @@ export interface TextureCaps {
   npo2Repeating: boolean;
   /** True if device supports dxt1, dxt3, dxt5 texture format */
   supportS3TC: boolean;
+  /** True if device supports bptc texture format */
+  supportBPTC: boolean;
+  /** True if device supports rgtc texture format */
+  supportRGTC: boolean;
+  /** True if device supports astc texture format */
+  supportASTC: boolean;
   /** True if device supports dxt1_srgb, dxt3-srgb, dxt5-srgb texture format */
   supportS3TCSRGB: boolean;
   /** True if device supports depth texture */
@@ -1763,6 +2449,12 @@ export type DeviceViewport = {
  * @public
  */
 export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
+  /** Get pool object */
+  pool: Pool;
+  /** vSync */
+  vSync: boolean;
+  /** Get adapter information */
+  getAdapterInfo(): any;
   /** Get sample count of current frame buffer */
   getFrameBufferSampleCount(): number;
   /** Returns true if device context is lost. */
@@ -1779,6 +2471,10 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   getBackBufferHeight(): number;
   /** Get the device capabilities */
   getDeviceCaps(): DeviceCaps;
+  /** Schedule next frame */
+  nextFrame(callback: () => void): number;
+  /** Cancel schedule next frame */
+  cancelNextFrame(handle: number);
   /** Set font for drawText function */
   setFont(fontName: string);
   /**
@@ -2038,11 +2734,30 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /** Get current render states */
   getRenderStates(): RenderStateSet;
   /**
-   * Set current frame buffer
+   * Sets the current framebuffer to the specified FrameBuffer object.
    *
-   * @param rt - The frame buffer
+   * @param rt - The FrameBuffer object to set as the current framebuffer.
    */
-  setFramebuffer(rt: FrameBuffer): void;
+  setFramebuffer(rt: FrameBuffer);
+  /**
+   * Sets the current framebuffer specifying complex color attachments, an optional depth attachment, MIP level, face, and sample count.
+   *
+   * @param color - An array of BaseTextures or objects containing a BaseTexture and optional properties. Each BaseTexture or object will serve as a color attachment.
+   *                - If an object is provided, it can specify:
+   *                  - `texture`: The BaseTexture to use.
+   *                  - `miplevel`: Optional MIP level for this specific texture. default is 0.
+   *                  - `face`: Optional face index for cube map textures, specifying the cube face this texture is attached to. default is 0.
+   *                  - `layer`: Optional layer index, useful for texture arrays. default is 0.
+   * @param depth - Optional BaseTexture to serve as the depth attachment.
+   * @param sampleCount - Optional sample count defining the number of samples for multisampling.
+   */
+  setFramebuffer(
+    color: (BaseTexture | { texture: BaseTexture; miplevel?: number; face?: number; layer?: number })[],
+    depth?: BaseTexture,
+    miplevel?: number,
+    face?: number,
+    sampleCount?: number
+  );
   /** Get current frame buffer */
   getFramebuffer(): FrameBuffer;
   /**

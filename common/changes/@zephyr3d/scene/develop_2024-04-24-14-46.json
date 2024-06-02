@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add draco support for mesh loading",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

@@ -1,5 +1,6 @@
 import * as zip from '@zip.js/zip.js';
 import { Vector3, Vector4 } from '@zephyr3d/base';
+import type { SceneNode, Material, PBRMetallicRoughnessMaterial } from '@zephyr3d/scene';
 import {
   Scene,
   Application,
@@ -12,9 +13,6 @@ import {
   SphereShape,
   AssetManager,
   BoxShape,
-  SceneNode,
-  Material,
-  PBRMetallicRoughnessMaterial,
   TorusShape
 } from '@zephyr3d/scene';
 import { WoodMaterial } from './materials/wood';
@@ -25,6 +23,7 @@ import { ToonMaterial } from './materials/toon';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Panel } from './ui';
+import { SceneColorMaterial } from './materials/scenecolor';
 
 function getQueryString(name: string) {
   return new URL(window.location.toString()).searchParams.get(name) || null;
@@ -75,7 +74,7 @@ async function fetchModel(scene: Scene, url: string) {
   if (/(\.zip)$/i.test(url)) {
     const fileMap = await readZip(url);
     url = Array.from(fileMap.keys()).find((val) => /(\.gltf|\.glb)$/i.test(val));
-    assetManager.httpRequest.urlResolver = url => fileMap.get(url) || url;
+    assetManager.httpRequest.urlResolver = (url) => fileMap.get(url) || url;
   }
   return url ? await assetManager.fetchModel(scene, url) : null;
 }
@@ -97,8 +96,7 @@ myApp.ready().then(async function () {
   // light color
   dlight.color = new Vector4(1, 1, 1, 1);
 
-
-  const meshes: { node: SceneNode, material: Material, name: string }[] = [];
+  const meshes: { node: SceneNode; material: Material; name: string }[] = [];
   const assetManager = new AssetManager();
 
   // Fur material
@@ -154,13 +152,18 @@ myApp.ready().then(async function () {
   toonMaterial.bands = 2;
   toonMaterial.edgeThickness = 1;
   const toonMesh = await fetchModel(scene, 'assets/models/Duck.glb');
-  toonMesh.group.iterate(node => {
+  toonMesh.group.iterate((node) => {
     if (node.isMesh()) {
       toonMaterial.albedoTexture = (node.material as PBRMetallicRoughnessMaterial).albedoTexture;
       node.material = toonMaterial;
     }
   });
   meshes.push({ node: toonMesh.group, material: toonMaterial, name: 'Cartoon' });
+
+  // Scene color material
+  const sceneColorMaterial = new SceneColorMaterial();
+  const sceneColorMesh = new Mesh(scene, new SphereShape({ radius: 2 }), sceneColorMaterial);
+  meshes.push({ node: sceneColorMesh, material: sceneColorMaterial, name: 'SceneColor' });
 
   // Create camera
   const camera = new PerspectiveCamera(

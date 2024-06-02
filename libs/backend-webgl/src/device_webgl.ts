@@ -164,6 +164,7 @@ export class WebGLDevice extends BaseDevice {
   private _deviceUniformBufferOffsets: number[];
   private _bindTextures: Record<number, WebGLTexture[]>;
   private _bindSamplers: WebGLSampler[];
+  private _adapterInfo: { vendor: string; renderer: string; version: string };
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend);
     this._dpr = Math.max(1, Math.floor(options?.dpr ?? window.devicePixelRatio));
@@ -181,6 +182,11 @@ export class WebGLDevice extends BaseDevice {
       throw new Error('Invalid argument or no webgl support');
     }
     this._isWebGL2 = isWebGL2(context);
+    this._adapterInfo = {
+      vendor: context.getParameter(context.VENDOR),
+      renderer: context.getParameter(context.RENDERER),
+      version: context.getParameter(context.VERSION)
+    };
     this._contextLost = false;
     this._reverseWindingOrder = false;
     this._deviceCaps = null;
@@ -224,6 +230,9 @@ export class WebGLDevice extends BaseDevice {
   }
   get context() {
     return this._context;
+  }
+  getAdapterInfo() {
+    return this._adapterInfo;
   }
   getFrameBufferSampleCount() {
     return this.getFramebuffer()?.getSampleCount() ?? this._msaaSampleCount;
@@ -630,7 +639,7 @@ export class WebGLDevice extends BaseDevice {
     return new WebGLBindGroup(this, layout);
   }
   createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer {
-    return new WebGLGPUBuffer(this, this.parseBufferOptions(options), sizeInBytes);
+    return new WebGLGPUBuffer(this, this.parseBufferOptions(options), sizeInBytes, !this._isWebGL2);
   }
   copyBuffer(
     sourceBuffer: GPUDataBuffer<unknown>,
@@ -666,10 +675,7 @@ export class WebGLDevice extends BaseDevice {
     depthAttachement: BaseTexture,
     options?: FrameBufferOptions
   ): FrameBuffer {
-    this.pushDeviceStates();
-    const fb = new WebGLFrameBuffer(this, colorAttachments, depthAttachement, options);
-    this.popDeviceStates();
-    return fb;
+    return new WebGLFrameBuffer(this, colorAttachments, depthAttachement, options);
   }
   setBindGroup(index: number, bindGroup: BindGroup, bindGroupOffsets?: Iterable<number>) {
     if (bindGroupOffsets && !isWebGL2(this._context)) {
@@ -763,12 +769,6 @@ export class WebGLDevice extends BaseDevice {
   }
   getRenderStates(): RenderStateSet {
     return this._currentStateSet;
-  }
-  setFramebuffer(rt: FrameBuffer): void {
-    if (rt !== this._context._currentFramebuffer) {
-      this._context._currentFramebuffer?.unbind();
-      rt?.bind();
-    }
   }
   getFramebuffer(): FrameBuffer {
     return this._context._currentFramebuffer ?? null;
@@ -914,6 +914,13 @@ export class WebGLDevice extends BaseDevice {
     }
   }
   /** @internal */
+  protected _setFramebuffer(rt: FrameBuffer): void {
+    if (rt !== this._context._currentFramebuffer) {
+      this._context._currentFramebuffer?.unbind();
+      rt?.bind();
+    }
+  }
+  /** @internal */
   protected onBeginFrame(): boolean {
     if (this._contextLost) {
       if (!this._context.isContextLost()) {
@@ -922,6 +929,12 @@ export class WebGLDevice extends BaseDevice {
       }
     }
     return !this._contextLost;
+  }
+  nextFrame(callback: () => void): number {
+    return requestAnimationFrame(callback);
+  }
+  cancelNextFrame(handle: number) {
+    cancelAnimationFrame(handle);
   }
   /** @internal */
   protected onEndFrame(): void {}

@@ -72,7 +72,7 @@ export class Interpolator {
     this._outputs = outputs;
     this._mode = mode;
     this._target = target;
-    this._stride = strideMap[target] ?? 0;
+    this._stride = strideMap[target] ?? Math.floor(outputs.length / inputs.length);
     this._maxTime = inputs[inputs.length - 1];
   }
   /** Gets the interpolation mode */
@@ -83,12 +83,16 @@ export class Interpolator {
   get target(): InterpolationTarget {
     return this._target;
   }
+  /** stride */
+  get stride(): number {
+    return this._stride;
+  }
   get maxTime(): number {
     return this._maxTime;
   }
   /** @internal */
   private slerpQuat(q1: Quaternion, q2: Quaternion, t: number, result: Quaternion): Quaternion {
-    return Quaternion.slerp(Quaternion.normalize(q1), Quaternion.normalize(q2), t, result).inplaceNormalize();
+    return Quaternion.slerp(q1, q2, t, result).inplaceNormalize();
   }
   /**
    * Calculates the interpolated value at a given time
@@ -97,7 +101,7 @@ export class Interpolator {
    * @param result - The calculated interpolation value
    * @returns The calcuated interpolation value
    */
-  interpolate(t: number, maxTime: number, result: Float32Array): Float32Array {
+  interpolate(t: number, result: Float32Array): Float32Array {
     if (t === undefined) {
       return undefined;
     }
@@ -109,7 +113,7 @@ export class Interpolator {
       }
       return result;
     }
-    t = numberClamp(t % maxTime, input[0], input[input.length - 1]);
+    t = numberClamp(t % this._maxTime, input[0], input[input.length - 1]);
     if (this._prevT > t) {
       this._prevKey = 0;
     }
@@ -126,8 +130,7 @@ export class Interpolator {
     const tn = (t - input[this._prevKey]) / keyDelta;
     if (this._target === 'quat') {
       if (this._mode === 'cubicspline') {
-        this.cubicSpline(this._prevKey, nextKey, keyDelta, tn, tmpQuat3);
-        result.set(tmpQuat3);
+        this.cubicSpline(this._prevKey, nextKey, keyDelta, tn, result);
         return result;
       } else if (this._mode === 'linear') {
         this.getQuat(this._prevKey, tmpQuat1);

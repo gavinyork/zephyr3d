@@ -6,7 +6,7 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import { TemporalCache, WaterMesh } from '../render';
+import { WaterMesh } from '../render';
 import { AbstractPostEffect } from './posteffect';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders';
 import { Interpolator, Matrix4x4, Plane, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
@@ -303,14 +303,12 @@ export class PostWater extends AbstractPostEffect {
     }
 
     this._renderingReflections = true;
-    const fbRefl = TemporalCache.getFramebufferFixedSize(
+    const fbRefl = ctx.device.pool.fetchTemporalFramebuffer(
+      true,
       this._reflectSize,
       this._reflectSize,
-      1,
       inputColorTexture.format,
       ctx.depthFormat,
-      '2d',
-      '2d',
       false
     );
     const plane = new Plane(0, -1, 0, this._elevation);
@@ -377,7 +375,6 @@ export class PostWater extends AbstractPostEffect {
       ctx.env.light.envLight.updateBindGroup(waterMesh.bindGroup);
     }
     waterMesh.render(ctx.camera, this.needFlip(device));
-    TemporalCache.releaseFramebuffer(fbRefl);
   }
   /** @internal */
   private _getRampTexture(device: AbstractDevice) {
@@ -392,7 +389,7 @@ export class PostWater extends AbstractPostEffect {
       const tmpcolor = new Vector3();
       for (let i = 0; i < numTexels; i++) {
         const grad = i >= numTexels / 2 ? this._scatterGrad : this._absorptionGrad;
-        grad.interpolate((i % width) / width, 1, tmpcolor);
+        grad.interpolate((i % width) / width, tmpcolor);
         data[i * 4 + 0] = (tmpcolor.x * 255) >> 0;
         data[i * 4 + 1] = (tmpcolor.y * 255) >> 0;
         data[i * 4 + 2] = (tmpcolor.z * 255) >> 0;

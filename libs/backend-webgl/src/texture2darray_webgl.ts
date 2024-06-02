@@ -241,19 +241,21 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
     if (mipLevel < 0 || mipLevel >= this.mipLevelCount) {
       throw new Error(`Texture2DArray.readPixels(): invalid miplevel: ${mipLevel}`);
     }
-    return new Promise<void>((resolve) => {
-      const fb = this._device.createFrameBuffer([this], null);
-      fb.setColorAttachmentLayer(0, layer);
-      fb.setColorAttachmentMipLevel(0, mipLevel);
-      fb.setColorAttachmentGenerateMipmaps(0, false);
-      this._device.pushDeviceStates();
-      this._device.setFramebuffer(fb);
-      this._device.readPixels(0, x, y, w, h, buffer).then(() => {
-        fb.dispose();
-        resolve();
+    if (!this.device.isContextLost() && !this.disposed) {
+      return new Promise<void>((resolve) => {
+        const fb = this._device.createFrameBuffer([this], null);
+        fb.setColorAttachmentLayer(0, layer);
+        fb.setColorAttachmentMipLevel(0, mipLevel);
+        fb.setColorAttachmentGenerateMipmaps(0, false);
+        this._device.pushDeviceStates();
+        this._device.setFramebuffer(fb);
+        this._device.readPixels(0, x, y, w, h, buffer).then(() => {
+          fb.dispose();
+          resolve();
+        });
+        this._device.popDeviceStates();
       });
-      this._device.popDeviceStates();
-    });
+    }
   }
   readPixelsToBuffer(
     x: number,

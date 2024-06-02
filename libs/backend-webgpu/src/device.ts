@@ -95,6 +95,7 @@ export class WebGPUDevice extends BaseDevice {
   private _sampleCount: number;
   private _emptyBindGroup: GPUBindGroup;
   private _captureRenderBundle: GPURenderBundleEncoder;
+  private _adapterInfo: any;
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend);
     this._dpr = Math.max(1, Math.floor(options?.dpr ?? window.devicePixelRatio));
@@ -122,6 +123,7 @@ export class WebGPUDevice extends BaseDevice {
     this._emptyBindGroup = null;
     this._captureRenderBundle = null;
     this._samplerCache = new SamplerCache(this);
+    this._adapterInfo = {};
   }
   get context() {
     return this._context;
@@ -183,6 +185,9 @@ export class WebGPUDevice extends BaseDevice {
   getScale(): number {
     return this._dpr;
   }
+  getAdapterInfo() {
+    return this._adapterInfo;
+  }
   isContextLost(): boolean {
     return false;
   }
@@ -212,6 +217,9 @@ export class WebGPUDevice extends BaseDevice {
     if (this._adapter.isFallbackAdapter) {
       console.warn('using a fallback adapter');
     }
+    this._adapterInfo = this._adapter['requestAdapterInfo']
+      ? await this._adapter['requestAdapterInfo']()
+      : {};
     this._device = await this._adapter.requestDevice({
       requiredFeatures: [...this._adapter.features] as GPUFeatureName[],
       requiredLimits: { ...this._adapter.limits } as any
@@ -263,6 +271,13 @@ export class WebGPUDevice extends BaseDevice {
       }
     });
     this.dispatchEvent(new DeviceResizeEvent(this.canvas.clientWidth, this.canvas.clientHeight));
+  }
+  nextFrame(callback: () => void): number {
+    this._commandQueue.finish().then(callback);
+    return 0;
+  }
+  cancelNextFrame(handle: number) {
+    return;
   }
   clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number) {
     this._commandQueue.clear(clearColor, clearDepth, clearStencil);
@@ -557,9 +572,6 @@ export class WebGPUDevice extends BaseDevice {
   getRenderStates(): RenderStateSet {
     return this._currentStateSet;
   }
-  setFramebuffer(rt: FrameBuffer): void {
-    this._commandQueue.setFramebuffer(rt as WebGPUFrameBuffer);
-  }
   getFramebuffer(): FrameBuffer {
     return this._commandQueue.getFramebuffer() ?? null;
   }
@@ -767,6 +779,10 @@ export class WebGPUDevice extends BaseDevice {
   }
   flushUploads() {
     this._commandQueue.flushUploads();
+  }
+  /** @internal */
+  protected _setFramebuffer(rt: FrameBuffer): void {
+    this._commandQueue.setFramebuffer(rt as WebGPUFrameBuffer);
   }
   /** @internal */
   protected onBeginFrame(): boolean {

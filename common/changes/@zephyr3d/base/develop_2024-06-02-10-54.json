@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/base",
+      "comment": "Add weight-average functional.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/base"
+}

@@ -13,6 +13,8 @@ import { ShaderHelper } from '../material/shader/helper';
 export class LightPass extends RenderPass {
   /** @internal */
   protected _shadowMapHash: string;
+  /** @internal */
+  protected _transmission: boolean;
   /**
    * Creates an instance of ForwardRenderPass
    */
@@ -21,10 +23,15 @@ export class LightPass extends RenderPass {
     this._shadowMapHash = null;
   }
   /** @internal */
+  get transmission(): boolean {
+    return this._transmission;
+  }
+  set transmission(val: boolean) {
+    this._transmission = val;
+  }
+  /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return `lp:${this._shadowMapHash}:${ctx.linearDepthTexture?.uid ?? ''}:${
-      ctx.oit?.calculateHash() ?? ''
-    }:${ctx.env.getHash(ctx)}`;
+    return `lp:${this._shadowMapHash}:${ctx.oit?.calculateHash() ?? ''}:${ctx.env.getHash(ctx)}`;
   }
   /** @internal */
   protected renderLightPass(
@@ -89,10 +96,12 @@ export class LightPass extends RenderPass {
     ctx.drawEnvLight = false;
     ctx.flip = this.isAutoFlip(ctx);
     const oit =
-      ctx.primaryCamera.oit && ctx.primaryCamera.oit.supportDevice(ctx.device.type)
+      renderQueue.drawTransparent &&
+      ctx.primaryCamera.oit &&
+      ctx.primaryCamera.oit.supportDevice(ctx.device.type)
         ? ctx.primaryCamera.oit
         : null;
-    if (!oit) {
+    if (!oit && renderQueue.drawTransparent) {
       renderQueue.sortTransparentItems(ctx.primaryCamera.getWorldPosition());
     }
     const flags: any = {
@@ -100,23 +109,20 @@ export class LightPass extends RenderPass {
       cameraSet: {},
       fogSet: {}
     };
-    const orders = Object.keys(renderQueue.items)
-      .map((val) => Number(val))
-      .sort((a, b) => a - b);
+    const items = renderQueue.itemList;
+    const lists = [this._transmission ? items?.transmission : items?.opaque, items?.transparent];
     for (let i = 0; i < 2; i++) {
-      ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none' ? ctx.env.sky.fogType : null;
-      ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
-      ctx.oit = i === 0 ? null : oit;
-      const numOitPasses = ctx.oit ? ctx.oit.begin(ctx) : 1;
-      for (let p = 0; p < numOitPasses; p++) {
-        if (ctx.oit) {
-          if (!ctx.oit.beginPass(ctx, p)) {
-            continue;
+      if (lists[i]) {
+        ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none' ? ctx.env.sky.fogType : null;
+        ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
+        ctx.oit = i === 0 || !items ? null : oit;
+        const numOitPasses = ctx.oit ? ctx.oit.begin(ctx) : 1;
+        for (let p = 0; p < numOitPasses; p++) {
+          if (ctx.oit) {
+            if (!ctx.oit.beginPass(ctx, p)) {
+              continue;
+            }
           }
-        }
-        for (const order of orders) {
-          const items = renderQueue.items[order];
-          const lists = [items.opaque, items.transparent];
           let lightIndex = 0;
           if (ctx.shadowMapInfo) {
             for (const k of ctx.shadowMapInfo.keys()) {
@@ -133,21 +139,23 @@ export class LightPass extends RenderPass {
             this._shadowMapHash = '';
             this.renderLightPass(ctx, lists[i], renderQueue.unshadowedLights, flags);
           }
+          if (ctx.oit) {
+            ctx.oit.endPass(ctx, p);
+          }
         }
         if (ctx.oit) {
-          ctx.oit.endPass(ctx, p);
+          ctx.oit.end(ctx);
         }
       }
-      if (ctx.oit) {
-        ctx.oit.end(ctx);
-      }
-      if (i === 0) {
+      if (i === 0 && !ctx.sceneColorTexture) {
         ctx.env.sky.skyWorldMatrix = ctx.scene.rootNode.worldMatrix;
         ctx.env.sky.renderSky(ctx);
       }
-      ctx.compositor?.drawPostEffects(ctx, i === 0, ctx.linearDepthTexture);
-      if (i === 0) {
-        ctx.env.sky.renderFog(ctx);
+      if (!renderQueue.needSceneColor || ctx.sceneColorTexture) {
+        if (i === 0) {
+          ctx.env.sky.renderFog(ctx);
+        }
+        ctx.compositor?.drawPostEffects(ctx, i === 0, ctx.linearDepthTexture);
       }
     }
   }

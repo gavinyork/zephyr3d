@@ -1,6 +1,8 @@
 import * as zip from '@zip.js/zip.js';
+import type * as draco3d from 'draco3d';
 import { Vector4, Vector3 } from '@zephyr3d/base';
-import { SceneNode, Scene, AnimationSet, BatchGroup, PostWater, WeightedBlendedOIT, OIT, ABufferOIT } from '@zephyr3d/scene';
+import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
+import { BatchGroup, PostWater, WeightedBlendedOIT, ABufferOIT, SAO } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
 import {
   BoundingBox,
@@ -17,6 +19,10 @@ import {
 import { EnvMaps } from './envmap';
 import { Panel } from './ui';
 
+declare global {
+  const DracoDecoderModule: draco3d.DracoDecoderModule;
+}
+
 export class GLTFViewer {
   private _currentAnimation: string;
   private _modelNode: SceneNode;
@@ -27,13 +33,13 @@ export class GLTFViewer {
   private _water: PostWater;
   private _bloom: Bloom;
   private _fxaa: FXAA;
-  private _water: PostWater;
+  private _sao: SAO;
   private _oit: OIT;
   private _doTonemap: boolean;
   private _doWater: boolean;
   private _doBloom: boolean;
   private _doFXAA: boolean;
-  private _doWater: boolean;
+  private _doSAO: boolean;
   private _camera: PerspectiveCamera;
   private _light0: DirectionalLight;
   private _light1: DirectionalLight;
@@ -43,6 +49,7 @@ export class GLTFViewer {
   private _batchGroup: BatchGroup;
   private _ui: Panel;
   private _compositor: Compositor;
+  private _dracoModule: draco3d.DecoderModule;
   constructor(scene: Scene) {
     const device = Application.instance.device;
     this._currentAnimation = null;
@@ -55,6 +62,8 @@ export class GLTFViewer {
     this._tonemap = new Tonemap();
     this._water = new PostWater(0);
     this._bloom = new Bloom();
+    this._sao = new SAO();
+    this._sao.intensity = 0.025;
     this._bloom.threshold = 0.85;
     this._bloom.intensity = 1.5;
     this._fxaa = new FXAA();
@@ -63,6 +72,7 @@ export class GLTFViewer {
     this._doBloom = true;
     this._doFXAA = true;
     this._doWater = false;
+    this._doSAO = false;
     this._oit = new WeightedBlendedOIT();
     this._fov = Math.PI / 3;
     this._nearPlane = 1;
@@ -73,8 +83,7 @@ export class GLTFViewer {
     this._camera = new PerspectiveCamera(
       scene,
       Math.PI / 3,
-      device.getDrawingBufferWidth() /
-        device.getDrawingBufferHeight(),
+      device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
       1,
       160
     );
@@ -89,6 +98,17 @@ export class GLTFViewer {
     this._light1.lookAt(new Vector3(0, 0, 0), new Vector3(-0.5, 0.707, 0.5), Vector3.axisPY());
     this._envMaps.selectById(this._envMaps.getIdList()[0], this.scene);
     this._ui = new Panel(this);
+    this._dracoModule = null;
+  }
+  async ready() {
+    return new Promise<void>((resolve) => {
+      DracoDecoderModule({
+        onModuleLoaded: (module) => {
+          this._dracoModule = module;
+          resolve();
+        }
+      });
+    });
   }
   get envMaps(): EnvMaps {
     return this._envMaps;
@@ -149,39 +169,48 @@ export class GLTFViewer {
   async loadModel(url: string) {
     this._modelNode?.remove();
     this._assetManager.purgeCache();
-    this._assetManager.fetchModel(this._scene, url, { enableInstancing: true }).then((info) => {
-      this._modelNode?.dispose();
-      this._modelNode = info.group;
-      this._modelNode.parent = this._batchGroup;
-      this._animationSet?.dispose();
-      this._animationSet = info.animationSet;
-      this._modelNode.pickable = true;
-      this._currentAnimation = null;
-      if (this._animationSet) {
-        const animations = this._animationSet.getAnimationNames();
-        if (animations.length > 0) {
-          this._animationSet.playAnimation(animations[0], 0);
+    this._assetManager
+      .fetchModel(this._scene, url, {
+        enableInstancing: true,
+        dracoDecoderModule: this._dracoModule
+      })
+      .then((info) => {
+        this._modelNode?.dispose();
+        this._modelNode = info.group;
+        this._modelNode.parent = this._batchGroup;
+        this._animationSet?.dispose();
+        this._animationSet = info.animationSet;
+        this._modelNode.pickable = true;
+        this._currentAnimation = null;
+        if (this._animationSet) {
+          const animations = this._animationSet.getAnimationNames();
+          if (animations.length > 0) {
+            this._animationSet.playAnimation(animations[0]);
+          }
         }
-      }
-      this._ui.update();
-      this.lookAt();
-    });
+        this._ui.update();
+        this.lookAt();
+      });
   }
   async handleDrop(data: DataTransfer) {
     this.resolveDraggedItems(data).then(async (fileMap) => {
-      if (fileMap){
+      if (fileMap) {
         this._assetManager.httpRequest.urlResolver = (url) => {
           return fileMap.get(url) || url;
         };
         if (fileMap.size === 1 && /\.zip$/i.test(Array.from(fileMap.keys())[0])) {
-          fileMap = await this.readZip(fileMap.get(Array.from(fileMap.keys())[0]))
+          fileMap = await this.readZip(fileMap.get(Array.from(fileMap.keys())[0]));
         }
         if (fileMap.size === 1 && /\.hdr$/i.test(Array.from(fileMap.keys())[0])) {
           const hdrFile = Array.from(fileMap.keys())[0];
-          this._envMaps.selectByPath(hdrFile, this.scene, url => fileMap.get(url) || url);
+          this._envMaps.selectByPath(hdrFile, this.scene, (url) => fileMap.get(url) || url);
         } else {
           const modelFile = Array.from(fileMap.keys()).find((val) => /(\.gltf|\.glb)$/i.test(val));
-          await this.loadModel(modelFile);
+          if (!modelFile) {
+            console.error('GLTF model not found');
+          } else {
+            await this.loadModel(modelFile);
+          }
         }
       }
     });
@@ -189,7 +218,7 @@ export class GLTFViewer {
   playAnimation(name: string) {
     if (this._currentAnimation !== name) {
       this.stopAnimation();
-      this._animationSet?.playAnimation(name, 0);
+      this._animationSet?.playAnimation(name);
       this._currentAnimation = name;
       this.lookAt();
     }
@@ -216,6 +245,9 @@ export class GLTFViewer {
   FXAAEnabled(): boolean {
     return this._doFXAA;
   }
+  SAOEnabled(): boolean {
+    return this._doSAO;
+  }
   getOITType(): string {
     return this._oit?.getType() ?? '';
   }
@@ -234,6 +266,9 @@ export class GLTFViewer {
   }
   syncPostEffects() {
     this._compositor.clear();
+    if (this._doSAO) {
+      this._compositor.appendPostEffect(this._sao);
+    }
     if (this._doWater) {
       this._compositor.appendPostEffect(this._water);
     }
@@ -253,12 +288,6 @@ export class GLTFViewer {
   set punctualLightEnabled(enable: boolean) {
     this._light0.showState = enable ? 'visible' : 'hidden';
     this._light1.showState = enable ? 'visible' : 'hidden';
-  }
-  get environmentLightEnabled(): boolean {
-    return this._scene.env.light.type === 'ibl';
-  }
-  set environmentLightEnabled(enable: boolean) {
-    this._scene.env.light.type = enable ? 'ibl' : 'none';
   }
   enableBloom(enable: boolean) {
     if (!!enable !== this._doBloom) {
@@ -281,6 +310,12 @@ export class GLTFViewer {
   enableFXAA(enable: boolean) {
     if (!!enable !== this._doFXAA) {
       this._doFXAA = !!enable;
+      this.syncPostEffects();
+    }
+  }
+  enableSAO(enable: boolean) {
+    if (!!enable !== this._doSAO) {
+      this._doSAO = !!enable;
       this.syncPostEffects();
     }
   }

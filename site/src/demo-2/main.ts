@@ -74,7 +74,7 @@ async function fetchAssetArchive(url: string, progressCallback: (percent: number
     receivedBytes += value.length;
     progressCallback(Math.floor((receivedBytes / totalBytes) * 100));
     return read();
-  }
+  };
   await read();
   return new Blob([data]);
 }
@@ -121,13 +121,13 @@ lightApp.ready().then(async () => {
   const assetManager = new AssetManager();
   scene.env.light.strength = 0.3;
 
-  let loadPercent = 0;
+  const loadPercent = 0;
   let message = `Loading %${loadPercent} ...`;
-  fetchAssetArchive('./assets/sponza.zip', percent => {
+  fetchAssetArchive('./assets/sponza.zip', (percent) => {
     message = `Loading %${percent} ...`;
-  }).then(async zipContent => {
+  }).then(async (zipContent) => {
     const fileMap = await readZip(zipContent);
-    assetManager.httpRequest.urlResolver = url => fileMap.get(url) || url;
+    assetManager.httpRequest.urlResolver = (url) => fileMap.get(url) || url;
 
     assetManager.fetchModel(scene, '/sponza/Sponza.gltf').then((info) => {
       message = '';

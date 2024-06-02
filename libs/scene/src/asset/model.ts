@@ -2,7 +2,9 @@ import type { Vector4, TypedArray, Interpolator } from '@zephyr3d/base';
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { Texture2D, TextureSampler } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
-import type { MeshMaterial } from '../material';
+import type { MeshMaterial } from '../material/meshmaterial';
+import type { Mesh } from '../scene/mesh';
+import type { BoundingBox } from '../utility';
 
 /**
  * Named object interface for model loading
@@ -92,6 +94,32 @@ export interface AssetMaterialClearcoat {
 }
 
 /**
+ * Transmission related material properties for model loading
+ * @public
+ */
+export interface AssetMaterialTransmission {
+  transmissionFactor?: number;
+  transmissionMap?: MaterialTextureInfo;
+  thicknessFactor?: number;
+  thicknessMap?: MaterialTextureInfo;
+  attenuationColor?: Vector3;
+  attenuationDistance?: number;
+}
+
+/**
+ * Iridescence related material properties for model loading
+ * @public
+ */
+export interface AssetMaterialIridescence {
+  iridescenceFactor?: number;
+  iridescenceMap?: MaterialTextureInfo;
+  iridescenceIor?: number;
+  iridescenceThicknessMinimum?: number;
+  iridescenceThicknessMaximum?: number;
+  iridescenceThicknessMap?: MaterialTextureInfo;
+}
+
+/**
  * PBR related material properties for model loading
  * @public
  */
@@ -114,6 +142,8 @@ export interface AssetPBRMaterialMR extends AssetPBRMaterialCommon {
   specularFactor?: Vector4;
   sheen?: AssetMaterialSheen;
   clearcoat?: AssetMaterialClearcoat;
+  transmission?: AssetMaterialTransmission;
+  iridescence?: AssetMaterialIridescence;
 }
 
 /**
@@ -133,10 +163,15 @@ export interface AssetPBRMaterialSG extends AssetPBRMaterialCommon {
 export interface AssetSubMeshData {
   primitive: Primitive;
   material: MeshMaterial;
+  mesh?: Mesh;
   rawPositions: Float32Array;
   rawBlendIndices: TypedArray;
   rawJointWeights: TypedArray;
   name: string;
+  numTargets: number;
+  targets?: Partial<Record<number, { numComponents: number; data: Float32Array[] }>>;
+  targetBox?: BoundingBox[];
+  morphAttribCount?: number;
 }
 
 /**
@@ -144,6 +179,7 @@ export interface AssetSubMeshData {
  * @public
  */
 export interface AssetMeshData {
+  morphWeights?: number[];
   subMeshes: AssetSubMeshData[];
 }
 
@@ -153,8 +189,9 @@ export interface AssetMeshData {
  */
 export interface AssetAnimationTrack {
   node: AssetHierarchyNode;
-  type: 'translation' | 'scale' | 'rotation';
+  type: 'translation' | 'scale' | 'rotation' | 'weights';
   interpolator: Interpolator;
+  defaultMorphWeights?: number[];
 }
 
 /**
@@ -220,7 +257,9 @@ export class AssetHierarchyNode extends NamedObject {
   private _meshAttached: boolean;
   private _matrix: Matrix4x4;
   private _worldMatrix: Matrix4x4;
+  private _weights: number[];
   private _children: AssetHierarchyNode[];
+  private _instances?: { t: Vector3; s: Vector3; r: Quaternion }[];
   /**
    * Creates an instance of AssetHierarchyNode
    * @param name - Name of the node
@@ -239,7 +278,9 @@ export class AssetHierarchyNode extends NamedObject {
     this._meshAttached = false;
     this._attachIndex = -1;
     this._matrix = null;
+    this._weights = null;
     this._worldMatrix = null;
+    this._instances = [];
     parent?.addChild(this);
   }
   /** Parent of the node */
@@ -261,6 +302,17 @@ export class AssetHierarchyNode extends NamedObject {
   set mesh(data: AssetMeshData) {
     this._mesh = data;
     this.setMeshAttached();
+  }
+  /** instances */
+  get instances(): { t: Vector3; s: Vector3; r: Quaternion }[] {
+    return this._instances;
+  }
+  /** Default morph target weights */
+  get weights(): number[] {
+    return this._weights;
+  }
+  set weights(val: number[]) {
+    this._weights = val;
   }
   /** The skeleton used to control the node */
   get skeleton(): AssetSkeleton {

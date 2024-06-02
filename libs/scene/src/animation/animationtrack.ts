@@ -1,58 +1,62 @@
 import type { Interpolator } from '@zephyr3d/base';
 import type { SceneNode } from '../scene';
+import type { AnimationClip } from './animation';
 
 /**
  * Base class for any kind of animation track
  * @public
  */
-export abstract class AnimationTrack {
+export abstract class AnimationTrack<StateType = unknown> {
   /** @internal */
   protected _interpolator: Interpolator;
   /** @internal */
-  protected _currentPlayTime: number;
-  /** @internal */
-  protected _playing: boolean;
+  protected _animation: AnimationClip;
   /**
    * Creates a new animation track
    * @param interpolator - Interpolator for the track
    */
   constructor(interpolator: Interpolator) {
-    this._currentPlayTime = 0;
-    this._playing = false;
     this._interpolator = interpolator;
   }
   /** Gets the interpolator of the track */
   get interpolator(): Interpolator {
     return this._interpolator;
   }
-  /** Return true if the track is playing, otherwise false */
-  get playing(): boolean {
-    return this._playing;
+  /** Animation this track belongs to */
+  get animation(): AnimationClip {
+    return this._animation;
   }
-  /** Starts playing the track */
-  start() {
-    this._playing = true;
-  }
-  /** Stops playing the track */
-  stop() {
-    this._playing = false;
-  }
-  /** Rewinds the track to the first frame */
-  rewind() {
-    this._currentPlayTime = 0;
+  set animation(ani: AnimationClip) {
+    this._animation = ani;
   }
   /** Stops playing the track and rewind to the first frame */
-  reset() {
-    this.stop();
-    this._currentPlayTime = 0;
-  }
+  reset(node: SceneNode) {}
   /**
-   * Apply animation to node
-   *
-   * @param node - To which node the track will apply
-   * @param currentTime - Current animation time
-   * @param duration - Total animation duration
-   * @returns true if applied, otherwise false
+   * Calculates current animation state
+   * @param currentTime - At which time the animation state should be calculated.
+   * @returns State object
    */
-  abstract apply(node: SceneNode, currentTime: number, duration: number): boolean;
+  abstract calculateState(currentTime: number): StateType;
+  /**
+   * Applys animation state to node
+   * @param node - The scene node to which the state will be applied
+   * @param state - The animation state
+   */
+  abstract applyState(node: SceneNode, state: StateType);
+  /**
+   * Mixes two animation state according to specific weight value
+   * @param a - The first state object
+   * @param b - The second state object
+   * @param t - The weight value
+   * @returns The mixed state object
+   */
+  abstract mixState(a: StateType, b: StateType, t: number): StateType;
+  /**
+   * Get the blend ID
+   * @returns Blend ID
+   *
+   * @remarks
+   * Two tracks which have same blend ID can be blended together
+   */
+  abstract getBlendId(): unknown;
 }

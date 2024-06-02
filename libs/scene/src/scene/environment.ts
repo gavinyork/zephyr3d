@@ -1,5 +1,6 @@
 import { Vector4 } from '@zephyr3d/base';
 import type { DrawContext, EnvironmentLighting, EnvLightType } from '../render';
+import { EnvShIBL } from '../render';
 import { EnvConstantAmbient, EnvHemisphericAmbient, EnvIBL } from '../render';
 import { SkyRenderer } from '../render/sky';
 import type { TextureCube } from '@zephyr3d/device';
@@ -15,6 +16,7 @@ export class EnvLightWrapper {
   private _ambientUp: Vector4;
   private _radianceMap: TextureCube;
   private _irradianceMap: TextureCube;
+  private _irradianceSH: Float32Array;
   private _strength: number;
   /** @internal */
   constructor() {
@@ -83,6 +85,8 @@ export class EnvLightWrapper {
     this._radianceMap = tex ?? null;
     if (this.type === 'ibl') {
       (this._envLight as EnvIBL).radianceMap = this._radianceMap;
+    } else if (this.type === 'ibl-sh') {
+      (this._envLight as EnvShIBL).radianceMap = this._radianceMap;
     }
   }
   /** Irradiance map for environment light type ibl */
@@ -93,6 +97,16 @@ export class EnvLightWrapper {
     this._irradianceMap = tex ?? null;
     if (this.type === 'ibl') {
       (this._envLight as EnvIBL).irradianceMap = this._irradianceMap;
+    }
+  }
+  /** Irradiance SH for environment light type ibl-sh */
+  get irradianceSH(): Float32Array {
+    return this._irradianceSH;
+  }
+  set irradianceSH(value: Float32Array) {
+    this._irradianceSH = value ?? null;
+    if (this.type === 'ibl-sh') {
+      (this._envLight as EnvShIBL).irradianceSH = this._irradianceSH;
     }
   }
   /** The environment light type */
@@ -108,6 +122,15 @@ export class EnvLightWrapper {
         if (this._envLight?.getType() !== val) {
           this._envLight = new EnvIBL(this._radianceMap, this._irradianceMap);
         }
+        (this._envLight as EnvIBL).radianceMap = this.radianceMap;
+        (this._envLight as EnvIBL).irradianceMap = this.irradianceMap;
+        break;
+      case 'ibl-sh':
+        if (this._envLight?.getType() !== val) {
+          this._envLight = new EnvShIBL(this._radianceMap, this._irradianceSH);
+        }
+        (this._envLight as EnvShIBL).radianceMap = this.radianceMap;
+        (this._envLight as EnvShIBL).irradianceSH = this.irradianceSH;
         break;
       case 'constant':
         if (this._envLight?.getType() !== val) {

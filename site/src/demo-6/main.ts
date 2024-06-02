@@ -1,7 +1,7 @@
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
-import { DeviceBackend } from '@zephyr3d/device';
+import type { DeviceBackend } from '@zephyr3d/device';
 import {
   Scene,
   OrbitCameraController,
@@ -61,18 +61,22 @@ app.ready().then(async () => {
 
   const numMaterials = 8;
   const batchGroup = new BatchGroup(scene);
-  const materials = Array.from({length: numMaterials}).map(val => {
+  const materials = Array.from({ length: numMaterials }).map((val) => {
     const mat = new LambertMaterial();
     mat.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
     return mat;
   });
   const boxShape = new BoxShape();
 
-  const createNBoxes = function(n: number) {
+  const createNBoxes = function (n: number) {
     for (let i = 0; i < n; i++) {
       const mesh = new Mesh(scene, boxShape, materials[Math.floor(Math.random() * numMaterials)]);
-      const scale = 2 + Math.random() * 2 - 1.
-      mesh.position = new Vector3(Math.random() * 200 - 100, Math.random() * 200 - 100, Math.random() * 200 - 100);
+      const scale = 2 + Math.random() * 2 - 1;
+      mesh.position = new Vector3(
+        Math.random() * 200 - 100,
+        Math.random() * 200 - 100,
+        Math.random() * 200 - 100
+      );
       mesh.scale = new Vector3(scale, scale, scale);
       mesh.rotation = Quaternion.fromEulerAngle(Math.random(), Math.random(), Math.random(), 'ZYX');
       mesh.parent = batchGroup;
@@ -80,13 +84,13 @@ app.ready().then(async () => {
     instanceCount += n;
     return instanceCount;
   };
-  const removeNBoxes = function(n: number) {
+  const removeNBoxes = function (n: number) {
     for (let i = 0; i < Math.min(batchGroup.children.length, n); i++) {
       batchGroup.children[0].remove();
       instanceCount--;
     }
     return instanceCount;
-  }
+  };
 
   createNBoxes(5000);
 
@@ -103,11 +107,16 @@ app.ready().then(async () => {
   });
 
   if (showUI) {
-    new Panel(instanceCount, camera, () => {
-      return createNBoxes(500);
-    }, () => {
-      return removeNBoxes(500);
-    })
+    new Panel(
+      instanceCount,
+      camera,
+      () => {
+        return createNBoxes(500);
+      },
+      () => {
+        return removeNBoxes(500);
+      }
+    );
   }
 
   app.run();

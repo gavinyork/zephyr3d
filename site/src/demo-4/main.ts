@@ -12,7 +12,7 @@ import {
   SphereShape,
   BatchGroup,
   Compositor,
-  Tonemap,
+  Tonemap
 } from '@zephyr3d/scene';
 import type { DeviceBackend } from '@zephyr3d/device';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
@@ -84,7 +84,7 @@ PhysicsApp.ready().then(async () => {
     if (ev.code === 'Space') {
       light.castShadow = !light.castShadow;
     }
-  })
+  });
   PhysicsApp.on('tick', () => {
     camera.updateController();
     camera.render(scene, compositor);
@@ -107,7 +107,7 @@ PhysicsApp.ready().then(async () => {
   const sphereShape = new SphereShape();
   for (let i = 0; i < objectCount; i++) {
     {
-      let instanceMaterial = objMaterial.createInstance();
+      const instanceMaterial = objMaterial.createInstance();
       instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
       const sphere = new Mesh(scene, sphereShape, instanceMaterial);
       sphere.position.setXYZ(0, 50, 0);
@@ -115,7 +115,7 @@ PhysicsApp.ready().then(async () => {
       queue.push(sphere);
     }
     {
-      let instanceMaterial = objMaterial.createInstance();
+      const instanceMaterial = objMaterial.createInstance();
       instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
       const box = new Mesh(scene, boxShape, instanceMaterial);
       box.position.setXYZ(0, 50, 0);

@@ -47,8 +47,6 @@ export class SceneNode extends XForm<SceneNode> {
   /** @internal */
   protected _clipMode: boolean;
   /** @internal */
-  protected _renderOrder: number;
-  /** @internal */
   protected _boxDrawMode: number;
   /** @internal */
   protected _visible: SceneNodeVisible;
@@ -170,10 +168,10 @@ export class SceneNode extends XForm<SceneNode> {
   }
   /**
    * Iterate self and all of the children
-   * 
+   *
    * @remarks
    * DO NOT remove child duration iteration!
-   * 
+   *
    * @param callback - callback function that will be called on each node
    */
   iterate(callback: (node: SceneNode) => void) {

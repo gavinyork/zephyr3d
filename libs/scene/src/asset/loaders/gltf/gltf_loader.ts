@@ -1,4 +1,5 @@
-import type { InterpolationMode } from '@zephyr3d/base';
+import type { DecoderModule } from 'draco3d';
+import type { InterpolationMode, TypedArray } from '@zephyr3d/base';
 import { Vector3, Vector4, Matrix4x4, Quaternion, Interpolator } from '@zephyr3d/base';
 import type {
   AssetHierarchyNode,
@@ -11,7 +12,8 @@ import type {
   AssetPBRMaterialSG,
   AssetMaterialCommon,
   MaterialTextureInfo,
-  AssetPBRMaterialCommon
+  AssetPBRMaterialCommon,
+  AssetAnimationTrack
 } from '../../model';
 import { SharedModel, AssetSkeleton, AssetScene } from '../../model';
 import { BoundingBox } from '../../../utility/bounding_volume';
@@ -35,6 +37,17 @@ import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } 
 import { Application } from '../../../app';
 import { PBRMetallicRoughnessMaterial } from '../../../material/pbrmr';
 import { PBRSpecularGlossinessMaterial } from '../../../material/pbrsg';
+import { DracoMeshDecoder } from '../../../utility/draco/decoder';
+import {
+  MORPH_TARGET_COLOR,
+  MORPH_TARGET_NORMAL,
+  MORPH_TARGET_POSITION,
+  MORPH_TARGET_TANGENT,
+  MORPH_TARGET_TEX0,
+  MORPH_TARGET_TEX1,
+  MORPH_TARGET_TEX2,
+  MORPH_TARGET_TEX3
+} from '../../../values';
 /** @internal */
 export interface GLTFContent extends GlTf {
   _manager: AssetManager;
@@ -42,10 +55,10 @@ export interface GLTFContent extends GlTf {
   _accessors: GLTFAccessor[];
   _bufferCache: Record<string, GPUDataBuffer>;
   _textureCache: Record<string, Texture2D>;
-  _primitiveCache: Record<string, Primitive>;
   _materialCache: Record<string, M>;
   _nodes: AssetHierarchyNode[];
   _meshes: AssetMeshData[];
+  _dracoModule?: DecoderModule;
 }
 
 /**
@@ -59,17 +72,28 @@ export class GLTFLoader extends AbstractModelLoader {
   supportMIMEType(mimeType: string): boolean {
     return mimeType === 'model/gltf+json' || mimeType === 'model/gltf-binary';
   }
-  async load(assetManager: AssetManager, url: string, mimeType: string, data: Blob) {
+  async load(
+    assetManager: AssetManager,
+    url: string,
+    mimeType: string,
+    data: Blob,
+    decoderModule?: DecoderModule
+  ) {
     const buffer = await data.arrayBuffer();
     if (this.isGLB(buffer)) {
-      return this.loadBinary(assetManager, url, buffer);
+      return this.loadBinary(assetManager, url, buffer, decoderModule);
     }
     const gltf = (await new Response(data).json()) as GLTFContent;
     gltf._manager = assetManager;
     gltf._loadedBuffers = null;
-    return this.loadJson(url, gltf);
+    return this.loadJson(url, gltf, decoderModule);
   }
-  async loadBinary(assetManager: AssetManager, url: string, buffer: ArrayBuffer): Promise<SharedModel> {
+  async loadBinary(
+    assetManager: AssetManager,
+    url: string,
+    buffer: ArrayBuffer,
+    decoderModule?: DecoderModule
+  ): Promise<SharedModel> {
     const jsonChunkType = 0x4e4f534a;
     const binaryChunkType = 0x004e4942;
     let gltf: GLTFContent = null;
@@ -87,15 +111,24 @@ export class GLTFLoader extends AbstractModelLoader {
     if (gltf) {
       gltf._manager = assetManager;
       gltf._loadedBuffers = buffers;
-      return this.loadJson(url, gltf);
+      return this.loadJson(url, gltf, decoderModule);
     }
     return null;
   }
-  async loadJson(url: string, gltf: GLTFContent): Promise<SharedModel> {
+  async loadJson(url: string, gltf: GLTFContent, dracoDecoderModule?: DecoderModule): Promise<SharedModel> {
+    // check extensions
+    if (
+      !dracoDecoderModule &&
+      gltf.extensionsRequired &&
+      gltf.extensionsRequired.indexOf('KHR_draco_mesh_compression') >= 0
+    ) {
+      console.error('Draco3d is required for loading model');
+      return null;
+    }
+    gltf._dracoModule = dracoDecoderModule;
     gltf._accessors = [];
     gltf._bufferCache = {};
     gltf._textureCache = {};
-    gltf._primitiveCache = {};
     gltf._materialCache = {};
     gltf._nodes = [];
     gltf._meshes = [];
@@ -260,30 +293,6 @@ export class GLTFLoader extends AbstractModelLoader {
     return collect;
   }
   /** @internal */
-  private updateNodeTransform(
-    nodeTransforms: Map<
-      AssetHierarchyNode,
-      {
-        translate: Vector3;
-        scale: Vector3;
-        rotation: Quaternion;
-        worldTransform: Matrix4x4;
-      }
-    >,
-    node: AssetHierarchyNode
-  ) {
-    const transform = nodeTransforms.get(node);
-    if (!transform.worldTransform) {
-      transform.worldTransform = Matrix4x4.scaling(transform.scale)
-        .rotateLeft(transform.rotation)
-        .translateLeft(transform.translate);
-      if (node.parent) {
-        this.updateNodeTransform(nodeTransforms, node.parent);
-        transform.worldTransform.multiplyLeft(nodeTransforms.get(node.parent).worldTransform);
-      }
-    }
-  }
-  /** @internal */
   private getAnimationInfo(
     gltf: GLTFContent,
     index: number
@@ -291,7 +300,7 @@ export class GLTFLoader extends AbstractModelLoader {
     name: string;
     channels: AnimationChannel[];
     samplers: AnimationSampler[];
-    interpolatorTypes: ('translation' | 'scale' | 'rotation')[];
+    interpolatorTypes: ('translation' | 'scale' | 'rotation' | 'weights')[];
     interpolators: Interpolator[];
     maxTime: number;
     nodes: Map<
@@ -309,7 +318,7 @@ export class GLTFLoader extends AbstractModelLoader {
     const channels = animationInfo.channels;
     const samplers = animationInfo.samplers;
     const interpolators = [] as Interpolator[];
-    const interpolatorTypes = [] as ('translation' | 'scale' | 'rotation')[];
+    const interpolatorTypes = [] as ('translation' | 'scale' | 'rotation' | 'weights')[];
     const nodes = this.collectNodes(gltf);
     let maxTime = 0;
     for (let i = 0; i < channels.length; i++) {
@@ -332,6 +341,9 @@ export class GLTFLoader extends AbstractModelLoader {
       } else if (channel.target.path === 'scale') {
         interpolators.push(new Interpolator(mode, 'vec3', input, output));
         interpolatorTypes.push('scale');
+      } else if (channel.target.path === 'weights') {
+        interpolators.push(new Interpolator(mode, null, input, output));
+        interpolatorTypes.push('weights');
       } else {
         continue;
       }
@@ -353,11 +365,15 @@ export class GLTFLoader extends AbstractModelLoader {
     };
     for (let i = 0; i < animationInfo.channels.length; i++) {
       const targetNode = gltf._nodes[animationInfo.channels[i].target.node];
-      animationData.tracks.push({
+      const track: AssetAnimationTrack = {
         node: targetNode,
         type: animationInfo.interpolatorTypes[i],
         interpolator: animationInfo.interpolators[i]
-      });
+      };
+      if (track.type === 'weights') {
+        track.defaultMorphWeights = targetNode.weights;
+      }
+      animationData.tracks.push(track);
       if (animationData.nodes.indexOf(targetNode) < 0) {
         animationData.nodes.push(targetNode);
       }
@@ -389,6 +405,50 @@ export class GLTFLoader extends AbstractModelLoader {
       node = model.addNode(parent, nodeIndex, nodeInfo.name);
       if (typeof nodeInfo.mesh === 'number') {
         node.mesh = gltf._meshes[nodeInfo.mesh];
+        if (node.weights) {
+          node.mesh.morphWeights = node.weights;
+        }
+        const instancing = nodeInfo.extensions?.['EXT_mesh_gpu_instancing'];
+        if (instancing) {
+          const attributes = instancing.attributes;
+          if (attributes) {
+            const accessorTranslation =
+              typeof attributes.TRANSLATION === 'number' ? gltf._accessors[attributes.TRANSLATION] : null;
+            const accessorScale =
+              typeof attributes.SCALE === 'number' ? gltf._accessors[attributes.SCALE] : null;
+            const accessorRotation =
+              typeof attributes.ROTATION === 'number' ? gltf._accessors[attributes.ROTATION] : null;
+            const count = accessorTranslation?.count ?? accessorScale?.count ?? accessorRotation.count ?? 0;
+            const translationValues = accessorTranslation?.getNormalizedDeinterlacedView(
+              gltf
+            ) as Float32Array;
+            const scaleValues = accessorScale?.getNormalizedDeinterlacedView(gltf) as Float32Array;
+            const rotationValues = accessorRotation?.getNormalizedDeinterlacedView(gltf) as Float32Array;
+            for (let i = 0; i < count; i++) {
+              const t = translationValues
+                ? new Vector3(
+                    translationValues[i * 3],
+                    translationValues[i * 3 + 1],
+                    translationValues[i * 3 + 2]
+                  )
+                : Vector3.zero();
+              const s = scaleValues
+                ? new Vector3(scaleValues[i * 3], scaleValues[i * 3 + 1], scaleValues[i * 3 + 2])
+                : Vector3.one();
+              const r = rotationValues
+                ? new Quaternion(
+                    rotationValues[i * 4],
+                    rotationValues[i * 4 + 1],
+                    rotationValues[i * 4 + 2],
+                    rotationValues[i * 4 + 3]
+                  )
+                : Quaternion.identity();
+              node.instances.push({ t, s, r });
+            }
+          }
+        } else {
+          node.instances.push({ t: Vector3.zero(), s: Vector3.one(), r: Quaternion.identity() });
+        }
       }
       if (!(typeof nodeInfo.skin === 'number') || nodeInfo.skin < 0) {
         // GLTF spec: Only the joint transforms are applied to the skinned mesh; the transform of the skinned mesh node MUST be ignored.
@@ -431,7 +491,10 @@ export class GLTFLoader extends AbstractModelLoader {
     const meshInfo = gltf.meshes && gltf.meshes[meshIndex];
     let mesh: AssetMeshData = null;
     if (meshInfo) {
-      mesh = { subMeshes: [] };
+      mesh = {
+        morphWeights: meshInfo.weights ?? null,
+        subMeshes: []
+      };
       const primitives = meshInfo.primitives;
       const meshName = meshInfo.name || null;
       if (primitives) {
@@ -443,30 +506,107 @@ export class GLTFLoader extends AbstractModelLoader {
             material: null,
             rawPositions: null,
             rawBlendIndices: null,
-            rawJointWeights: null
+            rawJointWeights: null,
+            numTargets: 0
           };
-          const hash = `(${Object.getOwnPropertyNames(p.attributes)
-            .sort()
-            .map((k) => `${k}:${p.attributes[k]}`)
-            .join(',')})-(${p.indices})-(${p.mode})`;
-          let primitive: Primitive = p.targets ? null : gltf._primitiveCache[hash];
-          if (!primitive) {
-            primitive = new Primitive();
-            const attributes = p.attributes;
-            for (const attrib in attributes) {
-              this._loadVertexBuffer(gltf, attrib, attributes[attrib], primitive, subMeshData);
+          const primitive = new Primitive();
+          const attributes = p.attributes;
+          const dracoExtension = gltf._dracoModule ? p.extensions?.['KHR_draco_mesh_compression'] : null;
+          let dracoMeshDecoder: DracoMeshDecoder = null;
+          if (dracoExtension) {
+            const bufferView = gltf.bufferViews && gltf.bufferViews[dracoExtension.bufferView];
+            if (!bufferView) {
+              throw new Error('Draco buffer view not set');
             }
-            const indices = p.indices;
-            if (typeof indices === 'number') {
-              this._loadIndexBuffer(gltf, indices, primitive, subMeshData);
+            const arrayBuffer = gltf._loadedBuffers && gltf._loadedBuffers[bufferView.buffer];
+            if (!arrayBuffer) {
+              throw new Error('Draco buffer view does not point to a valid ArrayBuffer');
             }
-            let primitiveType = p.mode;
-            if (typeof primitiveType !== 'number') {
-              primitiveType = 4;
-            }
-            primitive.primitiveType = this._primitiveType(primitiveType);
-            gltf._primitiveCache[hash] = primitive;
+            dracoMeshDecoder = new DracoMeshDecoder(
+              new Int8Array(arrayBuffer, bufferView.byteOffset ?? 0, bufferView.byteLength),
+              gltf._dracoModule
+            );
           }
+          for (const attrib in attributes) {
+            this._loadVertexBuffer(
+              gltf,
+              attrib,
+              attributes[attrib],
+              primitive,
+              subMeshData,
+              dracoExtension,
+              dracoMeshDecoder
+            );
+          }
+          if (p.targets) {
+            if (Application.instance.device.type === 'webgl') {
+              // Emulate vertexID for WebGL1 device
+              if (attributes['TEXCOORD_7'] !== undefined) {
+                console.error(`Could not load morph target animation`);
+                p.targets = null;
+              } else {
+                const vertexIndices = new Float32Array(primitive.getNumVertices());
+                for (let i = 0; i < vertexIndices.length; i++) {
+                  vertexIndices[i] = i;
+                }
+                const vertexIndexBuffer = Application.instance.device.createVertexBuffer(
+                  'tex7_f32',
+                  vertexIndices
+                );
+                primitive.setVertexBuffer(vertexIndexBuffer);
+              }
+            }
+          }
+          if (p.targets) {
+            const targets: AssetSubMeshData['targets'] = {};
+            const targetBox: AssetSubMeshData['targetBox'] = [];
+            const targetMap = {
+              POSITION: MORPH_TARGET_POSITION,
+              NORMAL: MORPH_TARGET_NORMAL,
+              TANGENT: MORPH_TARGET_TANGENT,
+              TEXCOORD_0: MORPH_TARGET_TEX0,
+              TEXCOORD_1: MORPH_TARGET_TEX1,
+              TEXCOORD_2: MORPH_TARGET_TEX2,
+              TEXCOORD_3: MORPH_TARGET_TEX3,
+              COLOR_0: MORPH_TARGET_COLOR
+            };
+            const morphAttribSet = new Set<number>();
+            for (const target of p.targets) {
+              for (const k in target) {
+                const t = targetMap[k];
+                if (t !== undefined) {
+                  targets[t] = targets[t] ?? { numComponents: 0, data: [] };
+                  const accessorIndex = target[k] as number;
+                  const accessor = gltf._accessors[accessorIndex];
+                  targets[t].numComponents = accessor.getComponentCount(accessor.type);
+                  targets[t].data.push(accessor.getNormalizedDeinterlacedView(gltf) as Float32Array);
+                  if (k === 'POSITION') {
+                    const min = accessor.min
+                      ? new Vector3(accessor.min[0], accessor.min[1], accessor.min[2])
+                      : Vector3.zero();
+                    const max = accessor.max
+                      ? new Vector3(accessor.max[0], accessor.max[1], accessor.max[2])
+                      : Vector3.zero();
+                    targetBox.push(new BoundingBox(min, max));
+                  }
+                  morphAttribSet.add(t);
+                }
+              }
+            }
+            subMeshData.numTargets = p.targets.length;
+            subMeshData.targets = targets;
+            subMeshData.targetBox = targetBox;
+            subMeshData.morphAttribCount = morphAttribSet.size;
+          }
+          const indices = p.indices;
+          if (typeof indices === 'number') {
+            this._loadIndexBuffer(gltf, indices, primitive, subMeshData, dracoExtension, dracoMeshDecoder);
+          }
+          let primitiveType = p.mode;
+          if (typeof primitiveType !== 'number') {
+            primitiveType = 4;
+          }
+          primitive.primitiveType = this._primitiveType(primitiveType);
           const hasVertexNormal = !!primitive.getVertexBuffer('normal');
           const hasVertexColor = !!primitive.getVertexBuffer('diffuse');
           const hasVertexTangent = !!primitive.getVertexBuffer('tangent');
@@ -644,6 +784,46 @@ export class GLTFLoader extends AbstractModelLoader {
           pbrMaterial.sheenRoughnessTexCoordMatrix = sheen.sheenRoughnessMap.transform;
         }
       }
+      if (assetPBRMaterial.iridescence) {
+        const iridescence = assetPBRMaterial.iridescence;
+        pbrMaterial.iridescence = true;
+        pbrMaterial.iridescenceFactor = iridescence.iridescenceFactor;
+        pbrMaterial.iridescenceIor = iridescence.iridescenceIor;
+        if (iridescence.iridescenceMap) {
+          pbrMaterial.iridescenceTexture = iridescence.iridescenceMap.texture;
+          pbrMaterial.iridescenceTextureSampler = iridescence.iridescenceMap.sampler;
+          pbrMaterial.iridescenceTexCoordIndex = iridescence.iridescenceMap.texCoord;
+          pbrMaterial.iridescenceTexCoordMatrix = iridescence.iridescenceMap.transform;
+        }
+        pbrMaterial.iridescenceThicknessMin = iridescence.iridescenceThicknessMinimum;
+        pbrMaterial.iridescenceThicknessMax = iridescence.iridescenceThicknessMaximum;
+        if (iridescence.iridescenceThicknessMap) {
+          pbrMaterial.iridescenceThicknessTexture = iridescence.iridescenceThicknessMap.texture;
+          pbrMaterial.iridescenceThicknessTextureSampler = iridescence.iridescenceThicknessMap.sampler;
+          pbrMaterial.iridescenceThicknessTexCoordIndex = iridescence.iridescenceThicknessMap.texCoord;
+          pbrMaterial.iridescenceThicknessTexCoordMatrix = iridescence.iridescenceThicknessMap.transform;
+        }
+      }
+      if (assetPBRMaterial.transmission) {
+        const transmission = assetPBRMaterial.transmission;
+        pbrMaterial.transmission = true;
+        pbrMaterial.transmissionFactor = transmission.transmissionFactor;
+        if (transmission.transmissionMap) {
+          pbrMaterial.transmissionTexture = transmission.transmissionMap.texture;
+          pbrMaterial.transmissionTextureSampler = transmission.transmissionMap.sampler;
+          pbrMaterial.transmissionTexCoordIndex = transmission.transmissionMap.texCoord;
+          pbrMaterial.transmissionTexCoordMatrix = transmission.transmissionMap.transform;
+        }
+        pbrMaterial.thicknessFactor = transmission.thicknessFactor;
+        if (transmission.thicknessMap) {
+          pbrMaterial.thicknessTexture = transmission.thicknessMap.texture;
+          pbrMaterial.thicknessTextureSampler = transmission.thicknessMap.sampler;
+          pbrMaterial.thicknessTexCoordIndex = transmission.thicknessMap.texCoord;
+          pbrMaterial.thicknessTexCoordMatrix = transmission.thicknessMap.transform;
+        }
+        pbrMaterial.attenuationDistance = transmission.attenuationDistance;
+        pbrMaterial.attenuationColor = transmission.attenuationColor;
+      }
       if (assetPBRMaterial.clearcoat) {
         const cc = assetPBRMaterial.clearcoat;
         pbrMaterial.clearcoat = true;
@@ -818,6 +998,46 @@ export class GLTFLoader extends AbstractModelLoader {
             true
           )
         : null;
+      // KHR_materials_iridescence
+      const iridescence = materialInfo?.extensions?.KHR_materials_iridescence;
+      if (iridescence) {
+        pbrMetallicRoughness.iridescence = {
+          iridescenceFactor: iridescence.iridescenceFactor ?? 0,
+          iridescenceMap: iridescence.iridescenceTexture
+            ? await this._loadTexture(gltf, iridescence.iridescenceTexture, false)
+            : null,
+          iridescenceIor: iridescence.iridescenceIor ?? 1.3,
+          iridescenceThicknessMinimum: iridescence.iridescenceThicknessMinimum ?? 100,
+          iridescenceThicknessMaximum: iridescence.iridescenceThicknessMaximum ?? 400,
+          iridescenceThicknessMap: iridescence.iridescenceThicknessTexture
+            ? await this._loadTexture(gltf, iridescence.iridescenceThicknessTexture, false)
+            : null
+        };
+      }
+      // KHR_materials_transmission
+      const transmission = materialInfo?.extensions?.KHR_materials_transmission;
+      if (transmission) {
+        pbrMetallicRoughness.transmission = {
+          transmissionFactor: transmission.transmissionFactor ?? 0,
+          transmissionMap: transmission.transmissionTexture
+            ? await this._loadTexture(gltf, transmission.transmissionTexture, false)
+            : null,
+          thicknessFactor: 0,
+          thicknessMap: null,
+          attenuationDistance: 99999,
+          attenuationColor: Vector3.one()
+        };
+        const volume = materialInfo?.extensions?.KHR_materials_volume;
+        if (volume) {
+          pbrMetallicRoughness.transmission.thicknessFactor = volume.thicknessFactor ?? 0;
+          pbrMetallicRoughness.transmission.thicknessMap = volume.thicknessTexture
+            ? await this._loadTexture(gltf, volume.thicknessTexture, false)
+            : null;
+          pbrMetallicRoughness.transmission.attenuationDistance = volume.attenuationDistance ?? 99999;
+          const attenuationColor = (volume.attenuationColor ?? [1, 1, 1]) as [number, number, number];
+          pbrMetallicRoughness.transmission.attenuationColor = new Vector3(...attenuationColor);
+        }
+      }
       // KHR_materials_sheen
       const sheen = materialInfo?.extensions?.KHR_materials_sheen;
       if (sheen) {
@@ -1022,8 +1242,31 @@ export class GLTFLoader extends AbstractModelLoader {
     gltf: GLTFContent,
     accessorIndex: number,
     primitive: Primitive,
-    meshData: AssetSubMeshData
+    meshData: AssetSubMeshData,
+    dracoExtension?: any,
+    dracoMeshDecoder?: DracoMeshDecoder
   ) {
+    const accessor = gltf._accessors[accessorIndex];
+    if (dracoMeshDecoder) {
+      const indices = dracoMeshDecoder.getIndexBuffer();
+      if (!indices || indices.length !== accessor.count) {
+        throw new Error(`Decode index buffer failed`);
+      }
+      if (indices.length !== accessor.count) {
+        throw new Error(`Decode index buffer failed`);
+      }
+      gltf._loadedBuffers.push(indices.buffer);
+      if (!gltf.bufferViews) {
+        gltf.bufferViews = [];
+      }
+      gltf.bufferViews.push({
+        buffer: gltf._loadedBuffers.length - 1,
+        byteOffset: 0,
+        byteLength: indices.byteLength
+      });
+      accessor.componentType = ComponentType.UINT;
+      accessor.bufferView = gltf.bufferViews.length - 1;
+    }
     this._setBuffer(gltf, accessorIndex, primitive, null, meshData);
   }
   /** @internal */
@@ -1032,8 +1275,54 @@ export class GLTFLoader extends AbstractModelLoader {
     attribName: string,
     accessorIndex: number,
     primitive: Primitive,
-    subMeshData: AssetSubMeshData
+    subMeshData: AssetSubMeshData,
+    dracoExtension?: any,
+    dracoMeshDecoder?: DracoMeshDecoder
   ) {
+    const dracoId = dracoExtension?.attributes?.[attribName];
+    if (dracoId !== undefined) {
+      const accessor = gltf._accessors[accessorIndex];
+      let buffer: TypedArray = null;
+      const numElements = accessor.count * accessor.getComponentCount(accessor.type);
+      switch (accessor.componentType) {
+        case ComponentType.FLOAT:
+          buffer = new Float32Array(numElements);
+          break;
+        case ComponentType.BYTE:
+          buffer = new Int8Array(numElements);
+          break;
+        case ComponentType.SHORT:
+          buffer = new Int16Array(numElements);
+          break;
+        case ComponentType.INT:
+          buffer = new Int32Array(numElements);
+          break;
+        case ComponentType.UBYTE:
+          buffer = new Uint8Array(numElements);
+          break;
+        case ComponentType.USHORT:
+          buffer = new Uint16Array(numElements);
+          break;
+        case ComponentType.UINT:
+          buffer = new Uint32Array(numElements);
+          break;
+        default:
+          throw new Error(`Invalid component type: ${accessor.componentType}`);
+      }
+      if (!dracoMeshDecoder.getAttributeBuffer(dracoId, buffer)) {
+        throw new Error(`Decode draco mesh failed`);
+      }
+      gltf._loadedBuffers.push(buffer.buffer);
+      if (!gltf.bufferViews) {
+        gltf.bufferViews = [];
+      }
+      gltf.bufferViews.push({
+        buffer: gltf._loadedBuffers.length - 1,
+        byteOffset: 0,
+        byteLength: buffer.byteLength
+      });
+      accessor.bufferView = gltf.bufferViews.length - 1;
+    }
     let semantic: VertexSemantic = null;
     switch (attribName) {
       case 'POSITION':
@@ -1081,6 +1370,7 @@ export class GLTFLoader extends AbstractModelLoader {
       default:
         return;
     }
+
     this._setBuffer(gltf, accessorIndex, primitive, semantic, subMeshData);
   }
   /** @internal */

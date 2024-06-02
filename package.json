@@ -7,10 +7,11 @@
     "lint-test": "eslint \"test/**/*.ts\" -f compact",
     "lint-examples": "eslint \"examples/**/*.ts\" -f compact",
     "lint": "npm run lint-libs && npm run lint-test && npm run lint-examples",
+    "lint-fix-site": "eslint --fix \"site/src/**/*.ts\" -f compact",
     "lint-fix-libs": "eslint --fix \"libs/**/*.ts\" -f compact",
     "lint-fix-test": "eslint --fix \"test/**/*.ts\" -f compact",
     "lint-fix-examples": "eslint --fix \"examples/**/*.ts\" -f compact",
-    "lint-fix": "npm run lint-fix-libs && npm run lint-fix-test && npm run lint-fix-examples"
+    "lint-fix": "npm run lint-fix-libs && npm run lint-fix-test && npm run lint-fix-examples && npm run lint-fix-site"
   },
   "devDependencies": {
     "eslint": "^8.33.0",

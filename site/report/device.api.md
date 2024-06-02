@@ -16,6 +16,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     beginFrame(): boolean;
     buildComputeProgram(options: PBComputeOptions): GPUProgram;
     buildRenderProgram(options: PBRenderOptions): GPUProgram;
+    cancelNextFrame(handle: number): any;
     canvas: HTMLCanvasElement;
     clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number): any;
     compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number): void;
@@ -52,6 +53,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     exitLoop(): void;
     flush(): void;
     frameInfo: FrameInfo;
+    getAdapterInfo(): any;
     getBackBufferHeight(): number;
     getBackBufferWidth(): number;
     getBindGroup(index: number): [BindGroup, Iterable<number>];
@@ -72,6 +74,9 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     isContextLost(): boolean;
     isRendering: boolean;
     isWindingOrderReversed(): boolean;
+    nextFrame(callback: () => void): number;
+    // Warning: (ae-forgotten-export) The symbol "Pool" needs to be exported by the entry point index.d.ts
+    pool: Pool;
     popDeviceStates(): any;
     programBuilder: ProgramBuilder;
     pushDeviceStates(): any;
@@ -84,7 +89,13 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     screenToDevice(val: number): number;
     setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>): any;
     setFont(fontName: string): any;
-    setFramebuffer(rt: FrameBuffer): void;
+    setFramebuffer(rt: FrameBuffer): any;
+    setFramebuffer(color: (BaseTexture | {
+        texture: BaseTexture;
+        miplevel?: number;
+        face?: number;
+        layer?: number;
+    })[], depth?: BaseTexture, miplevel?: number, face?: number, sampleCount?: number): any;
     setProgram(program: GPUProgram): void;
     setRenderStates(renderStates: RenderStateSet): void;
     setScissor(scissor?: DeviceViewport | number[]): void;
@@ -92,6 +103,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     setViewport(vp?: DeviceViewport | number[]): void;
     type: string;
     videoMemoryUsage: number;
+    vSync: boolean;
 }
 
 // @public
@@ -149,6 +161,8 @@ export abstract class BaseDevice {
     buildComputeProgram(options: PBComputeOptions): GPUProgram;
     // (undocumented)
     buildRenderProgram(options: PBRenderOptions): GPUProgram;
+    // (undocumented)
+    abstract cancelNextFrame(handle: number): any;
     // (undocumented)
     get canvas(): HTMLCanvasElement;
     // (undocumented)
@@ -253,6 +267,8 @@ export abstract class BaseDevice {
     // (undocumented)
     protected _frameInfo: FrameInfo;
     // (undocumented)
+    abstract getAdapterInfo(): any;
+    // (undocumented)
     abstract getBackBufferHeight(): number;
     // (undocumented)
     abstract getBackBufferWidth(): number;
@@ -305,6 +321,8 @@ export abstract class BaseDevice {
     // (undocumented)
     abstract looseContext(): void;
     // (undocumented)
+    abstract nextFrame(callback: () => void): number;
+    // (undocumented)
     protected abstract onBeginFrame(): boolean;
     // (undocumented)
     protected abstract onEndFrame(): void;
@@ -312,6 +330,10 @@ export abstract class BaseDevice {
     protected parseBufferOptions(options: BufferCreationOptions, defaultUsage?: BufferUsage): number;
     // (undocumented)
     protected parseTextureOptions(options?: TextureCreationOptions): number;
+    // (undocumented)
+    get pool(): Pool;
+    // (undocumented)
+    protected _pool: Pool;
     // (undocumented)
     popDeviceStates(): void;
     // (undocumented)
@@ -351,7 +373,16 @@ export abstract class BaseDevice {
     // (undocumented)
     setFont(fontName: string): void;
     // (undocumented)
-    abstract setFramebuffer(rt: FrameBuffer): void;
+    setFramebuffer(rt: FrameBuffer): any;
+    // (undocumented)
+    setFramebuffer(color: (BaseTexture | {
+        texture: BaseTexture;
+        miplevel?: number;
+        face?: number;
+        layer?: number;
+    })[], depth?: BaseTexture, sampleCount?: number): any;
+    // (undocumented)
+    protected abstract _setFramebuffer(fb: FrameBuffer): any;
     // (undocumented)
     abstract setProgram(program: GPUProgram): void;
     // (undocumented)
@@ -363,11 +394,18 @@ export abstract class BaseDevice {
     // (undocumented)
     abstract setViewport(vp?: number[] | DeviceViewport): void;
     // (undocumented)
+    protected _temporalFramebuffer: boolean;
+    // (undocumented)
     get type(): string;
     // (undocumented)
     updateVideoMemoryCost(delta: number): void;
     // (undocumented)
     get videoMemoryUsage(): number;
+    // (undocumented)
+    get vSync(): boolean;
+    set vSync(val: boolean);
+    // (undocumented)
+    protected _vSync: boolean;
 }
 
 // @public
@@ -402,6 +440,8 @@ export interface BaseTexture<T = unknown> extends GPUObject<T> {
     isSignedFormat(): boolean;
     // (undocumented)
     isSRGBFormat(): boolean;
+    // (undocumented)
+    readonly memCost: number;
     // (undocumented)
     readonly mipLevelCount: number;
     // (undocumented)
@@ -799,7 +839,13 @@ export function getTextureFormatBlockSize(format: TextureFormat): number;
 export function getTextureFormatBlockWidth(format: TextureFormat): number;
 
 // @public
+export function getVertexAttribByName(name: VertexSemantic): number;
+
+// @public
 export function getVertexAttribFormat(semantic: VertexSemantic, type: DataType, count: number): VertexAttribFormat;
+
+// @public
+export function getVertexAttribName(attrib: number): VertexSemantic;
 
 // @public
 export function getVertexBufferAttribType(vertexBufferType: PBStructTypeInfo, attrib: number): PBPrimitiveTypeInfo;
@@ -812,6 +858,12 @@ export function getVertexBufferLength(vertexBufferType: PBStructTypeInfo): numbe
 
 // @public
 export function getVertexBufferStride(vertexBufferType: PBStructTypeInfo): number;
+
+// @public
+export function getVertexFormatComponentCount(fmt: VertexAttribFormat): number;
+
+// @public
+export function getVertexFormatSize(fmt: VertexAttribFormat): number;
 
 // @public
 export class GlyphManager extends TextureAtlasManager {
@@ -2306,6 +2358,8 @@ export interface TextureCaps {
     npo2Repeating: boolean;
     support3DTexture: boolean;
     supportAnisotropicFiltering: boolean;
+    supportASTC: boolean;
+    supportBPTC: boolean;
     supportDepthTexture: boolean;
     supportFloatBlending: boolean;
     supportFloatColorBuffer: boolean;
@@ -2314,6 +2368,7 @@ export interface TextureCaps {
     supportHalfFloatTexture: boolean;
     supportLinearFloatTexture: boolean;
     supportLinearHalfFloatTexture: boolean;
+    supportRGTC: boolean;
     supportS3TC: boolean;
     supportS3TCSRGB: boolean;
     supportSRGBTexture: boolean;
@@ -2346,7 +2401,7 @@ export interface TextureCube<T = unknown> extends BaseTexture<T> {
 export type TextureFilterMode = 'none' | 'nearest' | 'linear';
 
 // @public
-export type TextureFormat = 'unknown' | 'r8unorm' | 'r8snorm' | 'r16f' | 'r32f' | 'r8ui' | 'r8i' | 'r16ui' | 'r16i' | 'r32ui' | 'r32i' | 'rg8unorm' | 'rg8snorm' | 'rg16f' | 'rg32f' | 'rg8ui' | 'rg8i' | 'rg16ui' | 'rg16i' | 'rg32ui' | 'rg32i' | 'rgba8unorm' | 'rgba8unorm-srgb' | 'rgba8snorm' | 'bgra8unorm' | 'bgra8unorm-srgb' | 'rgba16f' | 'rgba32f' | 'rgba8ui' | 'rgba8i' | 'rgba16ui' | 'rgba16i' | 'rgba32ui' | 'rgba32i' | 'rg11b10uf' | 'd16' | 'd24' | 'd32f' | 'd24s8' | 'd32fs8' | 'dxt1' | 'dxt1-srgb' | 'dxt3' | 'dxt3-srgb' | 'dxt5' | 'dxt5-srgb';
+export type TextureFormat = 'unknown' | 'r8unorm' | 'r8snorm' | 'r16f' | 'r32f' | 'r8ui' | 'r8i' | 'r16ui' | 'r16i' | 'r32ui' | 'r32i' | 'rg8unorm' | 'rg8snorm' | 'rg16f' | 'rg32f' | 'rg8ui' | 'rg8i' | 'rg16ui' | 'rg16i' | 'rg32ui' | 'rg32i' | 'rgba8unorm' | 'rgba8unorm-srgb' | 'rgba8snorm' | 'bgra8unorm' | 'bgra8unorm-srgb' | 'rgba16f' | 'rgba32f' | 'rgba8ui' | 'rgba8i' | 'rgba16ui' | 'rgba16i' | 'rgba32ui' | 'rgba32i' | 'rg11b10uf' | 'd16' | 'd24' | 'd32f' | 'd24s8' | 'd32fs8' | 'dxt1' | 'dxt1-srgb' | 'dxt3' | 'dxt3-srgb' | 'dxt5' | 'dxt5-srgb' | 'bc4' | 'bc4-signed' | 'bc5' | 'bc5-signed' | 'bc7' | 'bc7-srgb' | 'bc6h' | 'bc6h-signed' | 'astc-4x4' | 'astc-4x4-srgb' | 'astc-5x4' | 'astc-5x4-srgb' | 'astc-5x5' | 'astc-5x5-srgb' | 'astc-6x5' | 'astc-6x5-srgb' | 'astc-6x6' | 'astc-6x6-srgb' | 'astc-8x5' | 'astc-8x5-srgb' | 'astc-8x6' | 'astc-8x6-srgb' | 'astc-8x8' | 'astc-8x8-srgb' | 'astc-10x5' | 'astc-10x5-srgb' | 'astc-10x6' | 'astc-10x6-srgb' | 'astc-10x8' | 'astc-10x8-srgb' | 'astc-10x10' | 'astc-10x10-srgb' | 'astc-12x10' | 'astc-12x10-srgb' | 'astc-12x12' | 'astc-12x12-srgb';
 
 // @public
 export interface TextureFormatInfo {
@@ -2443,7 +2498,7 @@ export interface UniformLayout {
 }
 
 // @public
-export type VertexAttribFormat = 'position_u8normx2' | 'position_u8normx4' | 'position_i8normx2' | 'position_i8normx4' | 'position_u16x2' | 'position_u16x4' | 'position_i16x2' | 'position_i16x4' | 'position_u16normx2' | 'position_u16normx4' | 'position_i16normx2' | 'position_i16normx4' | 'position_f16x2' | 'position_f16x4' | 'position_f32' | 'position_f32x2' | 'position_f32x3' | 'position_f32x4' | 'position_i32' | 'position_i32x2' | 'position_i32x3' | 'position_i32x4' | 'position_u32' | 'position_u32x2' | 'position_u32x3' | 'position_u32x4' | 'normal_f16x4' | 'normal_f32x3' | 'normal_f32x4' | 'diffuse_u8normx4' | 'diffuse_u16x4' | 'diffuse_u16normx4' | 'diffuse_f16x4' | 'diffuse_f32x3' | 'diffuse_f32x4' | 'diffuse_u32x3' | 'diffuse_u32x4' | 'tangent_f16x4' | 'tangent_f32x3' | 'tangent_f32x4' | 'tex0_u8normx2' | 'tex0_u8normx4' | 'tex0_i8normx2' | 'tex0_i8normx4' | 'tex0_u16x2' | 'tex0_u16x4' | 'tex0_i16x2' | 'tex0_i16x4' | 'tex0_u16normx2' | 'tex0_u16normx4' | 'tex0_i16normx2' | 'tex0_i16normx4' | 'tex0_f16x2' | 'tex0_f16x4' | 'tex0_f32' | 'tex0_f32x2' | 'tex0_f32x3' | 'tex0_f32x4' | 'tex0_i32' | 'tex0_i32x2' | 'tex0_i32x3' | 'tex0_i32x4' | 'tex0_u32' | 'tex0_u32x2' | 'tex0_u32x3' | 'tex0_u32x4' | 'tex1_u8normx2' | 'tex1_u8normx4' | 'tex1_i8normx2' | 'tex1_i8normx4' | 'tex1_u16x2' | 'tex1_u16x4' | 'tex1_i16x2' | 'tex1_i16x4' | 'tex1_u16normx2' | 'tex1_u16normx4' | 'tex1_i16normx2' | 'tex1_i16normx4' | 'tex1_f16x2' | 'tex1_f16x4' | 'tex1_f32' | 'tex1_f32x2' | 'tex1_f32x3' | 'tex1_f32x4' | 'tex1_i32' | 'tex1_i32x2' | 'tex1_i32x3' | 'tex1_i32x4' | 'tex1_u32' | 'tex1_u32x2' | 'tex1_u32x3' | 'tex1_u32x4' | 'tex2_u8normx2' | 'tex2_u8normx4' | 'tex2_i8normx2' | 'tex2_i8normx4' | 'tex2_u16x2' | 'tex2_u16x4' | 'tex2_i16x2' | 'tex2_i16x4' | 'tex2_u16normx2' | 'tex2_u16normx4' | 'tex2_i16normx2' | 'tex2_i16normx4' | 'tex2_f16x2' | 'tex2_f16x4' | 'tex2_f32' | 'tex2_f32x2' | 'tex2_f32x3' | 'tex2_f32x4' | 'tex2_i32' | 'tex2_i32x2' | 'tex2_i32x3' | 'tex2_i32x4' | 'tex2_u32' | 'tex2_u32x2' | 'tex2_u32x3' | 'tex2_u32x4' | 'tex3_u8normx2' | 'tex3_u8normx4' | 'tex3_i8normx2' | 'tex3_i8normx4' | 'tex3_u16x2' | 'tex3_u16x4' | 'tex3_i16x2' | 'tex3_i16x4' | 'tex3_u16normx2' | 'tex3_u16normx4' | 'tex3_i16normx2' | 'tex3_i16normx4' | 'tex3_f16x2' | 'tex3_f16x4' | 'tex3_f32' | 'tex3_f32x2' | 'tex3_f32x3' | 'tex3_f32x4' | 'tex3_i32' | 'tex3_i32x2' | 'tex3_i32x3' | 'tex3_i32x4' | 'tex3_u32' | 'tex3_u32x2' | 'tex3_u32x3' | 'tex3_u32x4' | 'tex4_u8normx2' | 'tex4_u8normx4' | 'tex4_i8normx2' | 'tex4_i8normx4' | 'tex4_u16x2' | 'tex4_u16x4' | 'tex4_i16x2' | 'tex4_i16x4' | 'tex4_u16normx2' | 'tex4_u16normx4' | 'tex4_i16normx2' | 'tex4_i16normx4' | 'tex4_f16x2' | 'tex4_f16x4' | 'tex4_f32' | 'tex4_f32x2' | 'tex4_f32x3' | 'tex4_f32x4' | 'tex4_i32' | 'tex4_i32x2' | 'tex4_i32x3' | 'tex4_i32x4' | 'tex4_u32' | 'tex4_u32x2' | 'tex4_u32x3' | 'tex4_u32x4' | 'tex5_u8normx2' | 'tex5_u8normx4' | 'tex5_i8normx2' | 'tex5_i8normx4' | 'tex5_u16x2' | 'tex5_u16x4' | 'tex5_i16x2' | 'tex5_i16x4' | 'tex5_u16normx2' | 'tex5_u16normx4' | 'tex5_i16normx2' | 'tex5_i16normx4' | 'tex5_f16x2' | 'tex5_f16x4' | 'tex5_f32' | 'tex5_f32x2' | 'tex5_f32x3' | 'tex5_f32x4' | 'tex5_i32' | 'tex5_i32x2' | 'tex5_i32x3' | 'tex5_i32x4' | 'tex5_u32' | 'tex5_u32x2' | 'tex5_u32x3' | 'tex5_u32x4' | 'tex6_u8normx2' | 'tex6_u8normx4' | 'tex6_i8normx2' | 'tex6_i8normx4' | 'tex6_u16x2' | 'tex6_u16x4' | 'tex6_i16x2' | 'tex6_i16x4' | 'tex6_u16normx2' | 'tex6_u16normx4' | 'tex6_i16normx2' | 'tex6_i16normx4' | 'tex6_f16x2' | 'tex6_f16x4' | 'tex6_f32' | 'tex6_f32x2' | 'tex6_f32x3' | 'tex6_f32x4' | 'tex6_i32' | 'tex6_i32x2' | 'tex6_i32x3' | 'tex6_i32x4' | 'tex6_u32' | 'tex6_u32x2' | 'tex6_u32x3' | 'tex6_u32x4' | 'tex7_u8normx2' | 'tex7_u8normx4' | 'tex7_i8normx2' | 'tex7_i8normx4' | 'tex7_u16x2' | 'tex7_u16x4' | 'tex7_i16x2' | 'tex7_i16x4' | 'tex7_u16normx2' | 'tex7_u16normx4' | 'tex7_i16normx2' | 'tex7_i16normx4' | 'tex7_f16x2' | 'tex7_f16x4' | 'tex7_f32' | 'tex7_f32x2' | 'tex7_f32x3' | 'tex7_f32x4' | 'tex7_i32' | 'tex7_i32x2' | 'tex7_i32x3' | 'tex7_i32x4' | 'tex7_u32' | 'tex7_u32x2' | 'tex7_u32x3' | 'tex7_u32x4' | 'blendweights_f16x4' | 'blendweights_f32x4' | 'blendindices_u16x4' | 'blendindices_f16x4' | 'blendindices_f32x4' | 'blendindices_u32x4';
+export type VertexAttribFormat = 'position_u8normx2' | 'position_u8normx4' | 'position_i8normx2' | 'position_i8normx4' | 'position_u16x2' | 'position_u16x4' | 'position_i16x2' | 'position_i16x4' | 'position_u16normx2' | 'position_u16normx4' | 'position_i16normx2' | 'position_i16normx4' | 'position_f16x2' | 'position_f16x4' | 'position_f32' | 'position_f32x2' | 'position_f32x3' | 'position_f32x4' | 'position_i32' | 'position_i32x2' | 'position_i32x3' | 'position_i32x4' | 'position_u32' | 'position_u32x2' | 'position_u32x3' | 'position_u32x4' | 'normal_f16x4' | 'normal_f32x3' | 'normal_f32x4' | 'diffuse_u8normx4' | 'diffuse_u16x4' | 'diffuse_u16normx4' | 'diffuse_f16x4' | 'diffuse_f32x3' | 'diffuse_f32x4' | 'diffuse_u32x3' | 'diffuse_u32x4' | 'tangent_f16x4' | 'tangent_f32x3' | 'tangent_f32x4' | 'tex0_u8normx2' | 'tex0_u8normx4' | 'tex0_i8normx2' | 'tex0_i8normx4' | 'tex0_u16x2' | 'tex0_u16x4' | 'tex0_i16x2' | 'tex0_i16x4' | 'tex0_u16normx2' | 'tex0_u16normx4' | 'tex0_i16normx2' | 'tex0_i16normx4' | 'tex0_f16x2' | 'tex0_f16x4' | 'tex0_f32' | 'tex0_f32x2' | 'tex0_f32x3' | 'tex0_f32x4' | 'tex0_i32' | 'tex0_i32x2' | 'tex0_i32x3' | 'tex0_i32x4' | 'tex0_u32' | 'tex0_u32x2' | 'tex0_u32x3' | 'tex0_u32x4' | 'tex1_u8normx2' | 'tex1_u8normx4' | 'tex1_i8normx2' | 'tex1_i8normx4' | 'tex1_u16x2' | 'tex1_u16x4' | 'tex1_i16x2' | 'tex1_i16x4' | 'tex1_u16normx2' | 'tex1_u16normx4' | 'tex1_i16normx2' | 'tex1_i16normx4' | 'tex1_f16x2' | 'tex1_f16x4' | 'tex1_f32' | 'tex1_f32x2' | 'tex1_f32x3' | 'tex1_f32x4' | 'tex1_i32' | 'tex1_i32x2' | 'tex1_i32x3' | 'tex1_i32x4' | 'tex1_u32' | 'tex1_u32x2' | 'tex1_u32x3' | 'tex1_u32x4' | 'tex2_u8normx2' | 'tex2_u8normx4' | 'tex2_i8normx2' | 'tex2_i8normx4' | 'tex2_u16x2' | 'tex2_u16x4' | 'tex2_i16x2' | 'tex2_i16x4' | 'tex2_u16normx2' | 'tex2_u16normx4' | 'tex2_i16normx2' | 'tex2_i16normx4' | 'tex2_f16x2' | 'tex2_f16x4' | 'tex2_f32' | 'tex2_f32x2' | 'tex2_f32x3' | 'tex2_f32x4' | 'tex2_i32' | 'tex2_i32x2' | 'tex2_i32x3' | 'tex2_i32x4' | 'tex2_u32' | 'tex2_u32x2' | 'tex2_u32x3' | 'tex2_u32x4' | 'tex3_u8normx2' | 'tex3_u8normx4' | 'tex3_i8normx2' | 'tex3_i8normx4' | 'tex3_u16x2' | 'tex3_u16x4' | 'tex3_i16x2' | 'tex3_i16x4' | 'tex3_u16normx2' | 'tex3_u16normx4' | 'tex3_i16normx2' | 'tex3_i16normx4' | 'tex3_f16x2' | 'tex3_f16x4' | 'tex3_f32' | 'tex3_f32x2' | 'tex3_f32x3' | 'tex3_f32x4' | 'tex3_i32' | 'tex3_i32x2' | 'tex3_i32x3' | 'tex3_i32x4' | 'tex3_u32' | 'tex3_u32x2' | 'tex3_u32x3' | 'tex3_u32x4' | 'tex4_u8normx2' | 'tex4_u8normx4' | 'tex4_i8normx2' | 'tex4_i8normx4' | 'tex4_u16x2' | 'tex4_u16x4' | 'tex4_i16x2' | 'tex4_i16x4' | 'tex4_u16normx2' | 'tex4_u16normx4' | 'tex4_i16normx2' | 'tex4_i16normx4' | 'tex4_f16x2' | 'tex4_f16x4' | 'tex4_f32' | 'tex4_f32x2' | 'tex4_f32x3' | 'tex4_f32x4' | 'tex4_i32' | 'tex4_i32x2' | 'tex4_i32x3' | 'tex4_i32x4' | 'tex4_u32' | 'tex4_u32x2' | 'tex4_u32x3' | 'tex4_u32x4' | 'tex5_u8normx2' | 'tex5_u8normx4' | 'tex5_i8normx2' | 'tex5_i8normx4' | 'tex5_u16x2' | 'tex5_u16x4' | 'tex5_i16x2' | 'tex5_i16x4' | 'tex5_u16normx2' | 'tex5_u16normx4' | 'tex5_i16normx2' | 'tex5_i16normx4' | 'tex5_f16x2' | 'tex5_f16x4' | 'tex5_f32' | 'tex5_f32x2' | 'tex5_f32x3' | 'tex5_f32x4' | 'tex5_i32' | 'tex5_i32x2' | 'tex5_i32x3' | 'tex5_i32x4' | 'tex5_u32' | 'tex5_u32x2' | 'tex5_u32x3' | 'tex5_u32x4' | 'tex6_u8normx2' | 'tex6_u8normx4' | 'tex6_i8normx2' | 'tex6_i8normx4' | 'tex6_u16x2' | 'tex6_u16x4' | 'tex6_i16x2' | 'tex6_i16x4' | 'tex6_u16normx2' | 'tex6_u16normx4' | 'tex6_i16normx2' | 'tex6_i16normx4' | 'tex6_f16x2' | 'tex6_f16x4' | 'tex6_f32' | 'tex6_f32x2' | 'tex6_f32x3' | 'tex6_f32x4' | 'tex6_i32' | 'tex6_i32x2' | 'tex6_i32x3' | 'tex6_i32x4' | 'tex6_u32' | 'tex6_u32x2' | 'tex6_u32x3' | 'tex6_u32x4' | 'tex7_u8normx2' | 'tex7_u8normx4' | 'tex7_i8normx2' | 'tex7_i8normx4' | 'tex7_u16x2' | 'tex7_u16x4' | 'tex7_i16x2' | 'tex7_i16x4' | 'tex7_u16normx2' | 'tex7_u16normx4' | 'tex7_i16normx2' | 'tex7_i16normx4' | 'tex7_f16x2' | 'tex7_f16x4' | 'tex7_f32' | 'tex7_f32x2' | 'tex7_f32x3' | 'tex7_f32x4' | 'tex7_i32' | 'tex7_i32x2' | 'tex7_i32x3' | 'tex7_i32x4' | 'tex7_u32' | 'tex7_u32x2' | 'tex7_u32x3' | 'tex7_u32x4' | 'blendweights_f16x1' | 'blendweights_f32x1' | 'blendweights_f16x2' | 'blendweights_f32x2' | 'blendweights_f16x3' | 'blendweights_f32x3' | 'blendweights_f16x4' | 'blendweights_f32x4' | 'blendindices_f16x1' | 'blendindices_u16x1' | 'blendindices_f32x1' | 'blendindices_u32x1' | 'blendindices_f16x2' | 'blendindices_u16x2' | 'blendindices_f32x2' | 'blendindices_u32x2' | 'blendindices_f16x3' | 'blendindices_u16x3' | 'blendindices_f32x3' | 'blendindices_u32x3' | 'blendindices_f16x4' | 'blendindices_u16x4' | 'blendindices_f32x4' | 'blendindices_u32x4';
 
 // @public
 export type VertexBufferInfo = {

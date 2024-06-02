@@ -1,13 +1,26 @@
-import { Vector2 } from "@zephyr3d/base";
-import { BindGroup, PBFunctionScope } from "@zephyr3d/device";
-import { DrawContext, MeshMaterial, RENDER_PASS_TYPE_LIGHT, ShaderHelper, applyMaterialMixins, mixinFoliage, mixinPBRMetallicRoughness, mixinPBRSpecularGlossness } from "@zephyr3d/scene";
+import { Vector2 } from '@zephyr3d/base';
+import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
+import type { DrawContext } from '@zephyr3d/scene';
+import {
+  MeshMaterial,
+  RENDER_PASS_TYPE_LIGHT,
+  ShaderHelper,
+  applyMaterialMixins,
+  mixinFoliage,
+  mixinPBRMetallicRoughness,
+  mixinPBRSpecularGlossness
+} from '@zephyr3d/scene';
 
 export type ITreeMaterial = {
   textureWidth: number;
   textureHeight: number;
-}
+};
 
-export class TreeMaterialMetallicRoughness extends applyMaterialMixins(MeshMaterial, mixinPBRMetallicRoughness, mixinFoliage) {
+export class TreeMaterialMetallicRoughness extends applyMaterialMixins(
+  MeshMaterial,
+  mixinPBRMetallicRoughness,
+  mixinFoliage
+) {
   private _textureSize: Vector2;
   constructor() {
     super();
@@ -42,7 +55,10 @@ export class TreeMaterialMetallicRoughness extends applyMaterialMixins(MeshMater
     const pb = scope.$builder;
     scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
     scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
-    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    ShaderHelper.setClipSpacePosition(
+      scope,
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+    );
     scope.$l.oNorm = pb.normalize(pb.mul(scope.oPos, pb.vec3(1, 0.5, 1)));
     //scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
     scope.$outputs.wNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
@@ -54,10 +70,18 @@ export class TreeMaterialMetallicRoughness extends applyMaterialMixins(MeshMater
     if (this.needFragmentColor()) {
       scope.albedoTextureSize = pb.vec2().uniform(2);
       scope.$l.albedo = this.calculateAlbedoColor(scope);
-      scope.albedo = that.calculateFoliageAlbedo(scope, scope.albedo, pb.mul(that.getAlbedoTexCoord(scope), scope.albedoTextureSize))
+      scope.albedo = that.calculateFoliageAlbedo(
+        scope,
+        scope.albedo,
+        pb.mul(that.getAlbedoTexCoord(scope), scope.albedoTextureSize)
+      );
       scope.$l.litColor = pb.vec3(0);
       if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
-        scope.$l.normalInfo = this.calculateNormalAndTBN(scope, scope.$inputs.worldPos, scope.$inputs.worldNorm);
+        scope.$l.normalInfo = this.calculateNormalAndTBN(
+          scope,
+          scope.$inputs.worldPos,
+          scope.$inputs.worldNorm
+        );
         scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
         scope.$l.litColor = this.PBRLight(
           scope,
@@ -75,7 +99,11 @@ export class TreeMaterialMetallicRoughness extends applyMaterialMixins(MeshMater
   }
 }
 
-export class TreeMaterialSpecularGlossiness extends applyMaterialMixins(MeshMaterial, mixinPBRSpecularGlossness, mixinFoliage) {
+export class TreeMaterialSpecularGlossiness extends applyMaterialMixins(
+  MeshMaterial,
+  mixinPBRSpecularGlossness,
+  mixinFoliage
+) {
   private _textureSize: Vector2;
   constructor() {
     super();
@@ -110,7 +138,10 @@ export class TreeMaterialSpecularGlossiness extends applyMaterialMixins(MeshMate
     const pb = scope.$builder;
     scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
     scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
-    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    ShaderHelper.setClipSpacePosition(
+      scope,
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+    );
     scope.$l.oNorm = pb.normalize(pb.mul(scope.oPos, pb.vec3(1, 0.5, 1)));
     //scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
     scope.$outputs.wNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
@@ -122,10 +153,18 @@ export class TreeMaterialSpecularGlossiness extends applyMaterialMixins(MeshMate
     if (this.needFragmentColor()) {
       scope.albedoTextureSize = pb.vec2().uniform(2);
       scope.$l.albedo = that.calculateAlbedoColor(scope);
-      scope.albedo = that.calculateFoliageAlbedo(scope, scope.albedo, pb.mul(that.getAlbedoTexCoord(scope), scope.albedoTextureSize))
+      scope.albedo = that.calculateFoliageAlbedo(
+        scope,
+        scope.albedo,
+        pb.mul(that.getAlbedoTexCoord(scope), scope.albedoTextureSize)
+      );
       scope.$l.litColor = pb.vec3(0);
       if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
-        scope.$l.normalInfo = this.calculateNormalAndTBN(scope, scope.$inputs.worldPos, scope.$inputs.worldNorm);
+        scope.$l.normalInfo = this.calculateNormalAndTBN(
+          scope,
+          scope.$inputs.worldPos,
+          scope.$inputs.worldNorm
+        );
         scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
         scope.$l.litColor = this.PBRLight(
           scope,

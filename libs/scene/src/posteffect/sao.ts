@@ -12,7 +12,7 @@ import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../s
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { AOBilateralBlurBlitter } from '../blitter/depthlimitedgaussion';
 import { CopyBlitter } from '../blitter';
-import { TemporalCache, type DrawContext } from '../render';
+import type { DrawContext } from '../render';
 
 const NUM_SAMPLES = 7;
 const NUM_RINGS = 4;
@@ -51,7 +51,7 @@ export class SAO extends AbstractPostEffect {
     this._opaque = true;
     this._saoScale = 10;
     this._saoBias = 1;
-    this._saoIntensity = 0.05;
+    this._saoIntensity = 0.025;
     this._saoRadius = 100;
     this._saoMinResolution = 0;
     this._saoRandomSeed = 0;
@@ -143,16 +143,13 @@ export class SAO extends AbstractPostEffect {
     }
     const fmt = this._getIntermediateTextureFormat(device);
     const depth = device.getFramebuffer().getDepthAttachment() as Texture2D;
-    const fbao = ctx.defaultViewport
-      ? TemporalCache.getFramebufferVariantSizeWithDepth(depth, 1, fmt, '2d', false)
-      : TemporalCache.getFramebufferFixedSizeWithDepth(depth, 1, fmt, '2d', false);
-    const fbblur = ctx.defaultViewport
-      ? TemporalCache.getFramebufferVariantSizeWithDepth(depth, 1, fmt, '2d', false)
-      : TemporalCache.getFramebufferFixedSizeWithDepth(depth, 1, fmt, '2d', false);
-    const packed = fbao.getColorAttachments()[0].format === 'rgba8unorm';
+
+    const fbao = device.pool.fetchTemporalTexture2D(false, fmt, depth.width, depth.height, false);
+    const fbblur = device.pool.fetchTemporalTexture2D(false, fmt, depth.width, depth.height, false);
+    const packed = fbao.format === 'rgba8unorm';
     const cameraNearFar = new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
     device.pushDeviceStates();
-    device.setFramebuffer(fbao);
+    device.setFramebuffer([fbao], depth);
     device.clearFrameBuffer(packed ? new Vector4(0, 0, 0, 1) : new Vector4(1, 0, 0, 1), null, null);
     const bindgroup = packed ? this._bindgroupPacked : this._bindgroup;
     bindgroup.setValue('flip', this.needFlip(device) ? 1 : 0);
@@ -185,11 +182,11 @@ export class SAO extends AbstractPostEffect {
     this._blitterV.packed = packed;
     this._blitterV.srgbOut = srgbOutput;
     this._blitterV.renderStates = SAO._renderStateBlend;
-    this._blitterH.blit(fbao.getColorAttachments()[0] as Texture2D, fbblur);
+    this._blitterH.blit(fbao, fbblur);
     device.popDeviceStates();
-    this._blitterV.blit(fbblur.getColorAttachments()[0] as Texture2D, device.getFramebuffer());
-    TemporalCache.releaseFramebuffer(fbao);
-    TemporalCache.releaseFramebuffer(fbblur);
+    this._blitterV.blit(fbblur, device.getFramebuffer());
+    device.pool.releaseTexture(fbao);
+    device.pool.releaseTexture(fbblur);
   }
   private _getIntermediateTextureFormat(device: AbstractDevice) {
     const texCaps = device.getDeviceCaps().textureCaps;

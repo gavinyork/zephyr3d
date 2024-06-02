@@ -4,13 +4,13 @@ import { AnimationTrack } from './animationtrack';
 import type { SceneNode } from '../scene';
 
 const tmpVec3 = new Vector3();
-const tmpQuat = new Quaternion();
 
 /**
  * Euler angle rotation animation track
  * @public
  */
-export class EulerRotationTrack extends AnimationTrack {
+export class EulerRotationTrack extends AnimationTrack<Quaternion> {
+  private _state: Quaternion;
   /**
    * Create an instance of EulerRotationTrack from keyframe values
    * @param mode - The interpolation mode of keyframes
@@ -26,11 +26,20 @@ export class EulerRotationTrack extends AnimationTrack {
     }
     const interpolator = new Interpolator(mode, 'vec3', inputs, outputs);
     super(interpolator);
+    this._state = new Quaternion();
   }
-  /** {@inheritDoc AnimationTrack.apply} */
-  apply(node: SceneNode, currentTime: number, duration: number): boolean {
-    this._interpolator.interpolate(currentTime, duration, tmpVec3);
-    node.rotation.set(tmpQuat.fromEulerAngle(tmpVec3.x, tmpVec3.y, tmpVec3.z, 'ZYX'));
-    return true;
+  calculateState(currentTime: number): Quaternion {
+    this._interpolator.interpolate(currentTime, tmpVec3);
+    this._state.fromEulerAngle(tmpVec3.x, tmpVec3.y, tmpVec3.z, 'ZYX');
+    return this._state;
+  }
+  applyState(node: SceneNode, state: Quaternion) {
+    node.rotation.set(state);
+  }
+  mixState(a: Quaternion, b: Quaternion, t: number): Quaternion {
+    return Quaternion.slerp(a, b, t);
+  }
+  getBlendId(): unknown {
+    return 'node-rotation';
   }
 }

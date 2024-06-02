@@ -12,7 +12,7 @@ export class TGALoader extends AbstractTextureLoader {
     return ext === '.tga';
   }
   supportMIMEType(mimeType: string): boolean {
-    return mimeType === 'image/tga';
+    return mimeType === 'image/tga' || mimeType === 'image/x-tga';
   }
   private parseTGA(content: ArrayBuffer, sRGB: boolean, noMipmap: boolean, texture: BaseTexture) {
     const dataView = new DataView(content);

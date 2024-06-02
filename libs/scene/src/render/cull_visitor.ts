@@ -76,8 +76,8 @@ export class CullVisitor implements Visitor {
     return this._camera?.frustum || null;
   }
   /** @internal */
-  push(camera: Camera, drawable: Drawable, renderOrder: number) {
-    this.renderQueue.push(camera, drawable, renderOrder);
+  push(camera: Camera, drawable: Drawable) {
+    this.renderQueue.push(camera, drawable);
   }
   /** @internal */
   pushRenderQueue(renderQueue: RenderQueue) {
@@ -135,7 +135,7 @@ export class CullVisitor implements Visitor {
     if (!node.hidden && (node.castShadow || this._renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP)) {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {
-        this.push(this._camera, node, node.renderOrder);
+        this.push(this._camera, node);
         return true;
       }
     }

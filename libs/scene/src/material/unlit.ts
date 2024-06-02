@@ -25,10 +25,14 @@ export class UnlitMaterial extends applyMaterialMixins(MeshMaterial, mixinVertex
   }
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
-    let color = this.calculateAlbedoColor(scope);
-    if (this.vertexColor) {
-      color = scope.$builder.mul(color, this.getVertexColor(scope));
+    if (this.needFragmentColor()) {
+      let color = this.calculateAlbedoColor(scope);
+      if (this.vertexColor) {
+        color = scope.$builder.mul(color, this.getVertexColor(scope));
+      }
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, color);
+    } else {
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
-    this.outputFragmentColor(scope, scope.$inputs.worldPos, this.needFragmentColor() ? color : null);
   }
 }

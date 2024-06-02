@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add support for PBR transmission",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

@@ -179,10 +179,11 @@ export type InterpolationTarget = 'number' | 'vec2' | 'vec3' | 'vec4' | 'quat';
 export class Interpolator {
     constructor(mode: InterpolationMode, target: InterpolationTarget, inputs: TypedArray, outputs: TypedArray);
     static getTargetStride(target: InterpolationTarget): number;
-    interpolate(t: number, maxTime: number, result: Float32Array): Float32Array;
+    interpolate(t: number, result: Float32Array): Float32Array;
     // (undocumented)
     get maxTime(): number;
     get mode(): InterpolationMode;
+    get stride(): number;
     get target(): InterpolationTarget;
 }
 
@@ -882,8 +883,12 @@ export class Vector4 extends VectorBase {
 export class VectorBase extends Float32Array {
     equalsTo(other: Float32Array, epsl?: number): boolean;
     isNaN(): boolean;
+    setRandom(minValue: number, maxValue: number): void;
     toString(): string;
 }
+
+// @public
+export function weightedAverage<T>(weights: number[], values: T[], funcLerp: (a: T, b: T, w: number) => T): T;
 
 // (No @packageDocumentation comment for this package)
 

@@ -11,17 +11,30 @@ const model = await assetManager.fetchModel(scene, 'assets/models/CesiumMan.glb'
 if（model.animationSet) {
   // The AnimationSet.getAnimationNames() method is used to get all animation names
   const animationNames = model.animationSet ? model.animationSet.getAnimationNames() : [];
-  /*
-    Play one of the animations
-    parameter 1: animation name
-    parameter 2: The number of animation loops, if it is 0, it will always loop, and the default value is 0
-    parameter 3: The animation playback speed, 1 is the normal speed, if it is negative, it is reversed, and the default value is 1 
-  */
- // Start play specific animation
-  model.animationSet.playAnimation(animationNames[0], 0, 1);
-  // ...
+  // Start play specific animation
+  model.animationSet.playAnimation(animationNames[0], {
+    // Number of loops, 0 for infinite loops. Default value is 0
+    repeat: 0,
+    // Speed factor, the larger the absolute value, the faster the speed.
+    // If it is a negative value, it plays in reverse. Default value is 1
+    speedRatio: 1,
+    // Blending weight, when multiple animations are playing at the same time,
+    // all animations are weighted and averaged using this weight. Default value is 1
+    weight: 1,
+    // How long it takes for the animation weight to increase from 0 to weight,
+    // default is 0, indicating no fade-in effect. Usually used in conjunction
+    // with the fadeOut parameter of stopAnimation() for seamless transition
+    // between two animations
+    fadeIn: 0, 
+  });
   // Stop playing specific animation
-  model.animationSet.stopAnimation(animationNames[0]);
+  model.animationSet.stopAnimation(animationNames[0], {
+    // How long it takes for the animation weight to decrease from current weight
+    // to 0, default is 0, indicating no fade-out effect. Usually used in conjunction
+    // with the fadeIn parameter of playAnimation() for seamless transition between
+    // two animations
+    fadeOut: 0
+  });
 }
 
 ```

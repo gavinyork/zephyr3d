@@ -13,6 +13,7 @@ import {
   QUEUE_TRANSPARENT,
   RENDER_PASS_TYPE_DEPTH,
   RENDER_PASS_TYPE_LIGHT,
+  RENDER_PASS_TYPE_OBJECT_COLOR,
   RENDER_PASS_TYPE_SHADOWMAP
 } from '../values';
 import { Material } from './material';
@@ -77,6 +78,8 @@ export class MeshMaterial extends Material {
   /** @internal */
   static NEXT_FEATURE_INDEX = 3;
   /** @internal */
+  static OBJECT_COLOR_UNIFORM = this.defineInstanceUniform('objectColor', 'vec4');
+  /** @internal */
   private _featureStates: unknown[];
   /** @internal */
   private _alphaCutoff: number;
@@ -86,6 +89,8 @@ export class MeshMaterial extends Material {
   private _cullMode: FaceMode;
   /** @internal */
   private _opacity: number;
+  /** @internal */
+  private _objectColor: Vector4;
   /** @internal */
   private _ctx: DrawContext;
   /** @internal */
@@ -101,6 +106,7 @@ export class MeshMaterial extends Material {
     this._blendMode = 'none';
     this._cullMode = 'back';
     this._opacity = 1;
+    this._objectColor = Vector4.one();
     this._ctx = null;
     this._materialPass = -1;
   }
@@ -285,6 +291,16 @@ export class MeshMaterial extends Material {
       this.uniformChanged();
     }
   }
+  /** Object color used for GPU picking */
+  get objectColor(): Vector4 {
+    return this._objectColor;
+  }
+  set objectColor(val: Vector4) {
+    if (val !== this._objectColor) {
+      this._objectColor = val;
+      this.uniformChanged();
+    }
+  }
   /** Returns true if shading of the material will be affected by lights  */
   supportLighting(): boolean {
     return true;
@@ -293,8 +309,10 @@ export class MeshMaterial extends Material {
    * {@inheritDoc Material.updateRenderStates}
    */
   protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
-    const blending = this.featureUsed<boolean>(FEATURE_ALPHABLEND) || ctx.lightBlending;
-    const a2c = this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
+    const isObjectColorPass = ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR;
+    const blending =
+      !isObjectColorPass && (this.featureUsed<boolean>(FEATURE_ALPHABLEND) || ctx.lightBlending);
+    const a2c = !isObjectColorPass && this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
     if (blending || a2c) {
       const blendingState = stateSet.useBlendingState();
       if (blending) {
@@ -346,6 +364,9 @@ export class MeshMaterial extends Material {
     }
     if (ctx.oit) {
       ctx.oit.applyUniforms(ctx, bindGroup);
+    }
+    if (!ctx.instancing && ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
+      bindGroup.setValue('zObjectColor', this._objectColor);
     }
   }
   /**
@@ -434,6 +455,12 @@ export class MeshMaterial extends Material {
       scope.$inputs.zBlendIndices = pb.vec4().attrib('blendIndices');
       scope.$inputs.zBlendWeights = pb.vec4().attrib('blendWeights');
     }
+    if (this.drawContext.morphAnimation && this.drawContext.device.type === 'webgl') {
+      scope.$inputs.zFakeVertexID = pb.float().attrib('texCoord7');
+    }
+    if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR && this.drawContext.instancing) {
+      scope.$outputs.zObjectColor = this.getInstancedUniform(scope, MeshMaterial.OBJECT_COLOR_UNIFORM);
+    }
   }
   /**
    * Fragment shader implementation of this material
@@ -449,6 +476,11 @@ export class MeshMaterial extends Material {
       if (this.isTransparentPass(this.pass)) {
         scope.zOpacity = pb.float().uniform(2);
       }
+    } else if (
+      this.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR &&
+      !this.drawContext.instancing
+    ) {
+      scope.zObjectColor = pb.vec4().uniform(2);
     }
   }
   /**
@@ -533,6 +565,16 @@ export class MeshMaterial extends Material {
         } else {
           this.$outputs.zFragmentOutput = pb.vec4(this.depth, 0, 0, 1);
         }
+      } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
+        if (color) {
+          this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
+            pb.discard();
+          });
+        }
+        ShaderHelper.discardIfClipped(this, this.worldPos);
+        this.$outputs.zFragmentOutput = that.drawContext.instancing
+          ? scope.$inputs.zObjectColor
+          : scope.zObjectColor;
       } /*if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP)*/ else {
         if (color) {
           this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {

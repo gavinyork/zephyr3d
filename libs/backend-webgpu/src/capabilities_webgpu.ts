@@ -92,6 +92,9 @@ export class WebGPUTextureCaps implements TextureCaps {
   npo2Repeating: boolean;
   supportS3TC: boolean;
   supportS3TCSRGB: boolean;
+  supportBPTC: boolean;
+  supportRGTC: boolean;
+  supportASTC: boolean;
   supportDepthTexture: boolean;
   support3DTexture: boolean;
   supportSRGBTexture: boolean;
@@ -114,6 +117,9 @@ export class WebGPUTextureCaps implements TextureCaps {
     this.supportFloatBlending = true;
     this.supportS3TC = device.device.features.has('texture-compression-bc');
     this.supportS3TCSRGB = this.supportS3TC;
+    this.supportBPTC = this.supportS3TC;
+    this.supportRGTC = this.supportS3TC;
+    this.supportASTC = device.device.features.has('texture-compression-astc');
     this.supportHalfFloatTexture = true;
     this.maxTextureSize = device.device.limits.maxTextureDimension2D;
     this.maxCubeTextureSize = device.device.limits.maxTextureDimension2D;
@@ -145,6 +151,46 @@ export class WebGPUTextureCaps implements TextureCaps {
         size: 4
       }
     } as Record<TextureFormat, TextureFormatInfoWebGPU>;
+    if (this.supportASTC) {
+      for (const k of [
+        '4x4',
+        '5x4',
+        '5x5',
+        '6x5',
+        '6x6',
+        '8x5',
+        '8x6',
+        '8x8',
+        '10x5',
+        '10x6',
+        '10x8',
+        '10x10',
+        '12x10',
+        '12x12'
+      ]) {
+        const [w, h] = k.split('x').map((val) => Number(val));
+        this._textureFormatInfos[`astc-${k}`] = {
+          gpuSampleType: 'float',
+          filterable: true,
+          renderable: false,
+          compressed: true,
+          size: 16,
+          writable: false,
+          blockWidth: w,
+          blockHeight: h
+        };
+        this._textureFormatInfos[`astc-${k}-srgb`] = {
+          gpuSampleType: 'float',
+          filterable: true,
+          renderable: false,
+          compressed: true,
+          size: 16,
+          writable: false,
+          blockWidth: w,
+          blockHeight: h
+        };
+      }
+    }
     if (this.supportS3TC) {
       this._textureFormatInfos['dxt1'] = {
         gpuSampleType: 'float',
@@ -167,6 +213,90 @@ export class WebGPUTextureCaps implements TextureCaps {
         blockHeight: 4
       };
       this._textureFormatInfos['dxt5'] = {
+        gpuSampleType: 'float',
+        filterable: true,
+        renderable: false,
+        compressed: true,
+        size: 16,
+        writable: false,
+        blockWidth: 4,
+        blockHeight: 4
+      };
+    }
+    if (this.supportRGTC) {
+      this._textureFormatInfos['bc4'] = {
+        gpuSampleType: 'float',
+        filterable: true,
+        renderable: false,
+        compressed: true,
+        size: 8,
+        writable: false,
+        blockWidth: 4,
+        blockHeight: 4
+      };
+      this._textureFormatInfos['bc4-signed'] = {
+        gpuSampleType: 'float',
+        filterable: true,
+        renderable: false,
+        compressed: true,
+        size: 8,
+        writable: false,
+        blockWidth: 4,
+        blockHeight: 4
+      };
+    }
+    this._textureFormatInfos['bc5'] = {
+      gpuSampleType: 'float',
+      filterable: true,
+      renderable: false,
+      compressed: true,
+      size: 16,
+      writable: false,
+      blockWidth: 4,
+      blockHeight: 4
+    };
+    this._textureFormatInfos['bc5-signed'] = {
+      gpuSampleType: 'float',
+      filterable: true,
+      renderable: false,
+      compressed: true,
+      size: 16,
+      writable: false,
+      blockWidth: 4,
+      blockHeight: 4
+    };
+    if (this.supportBPTC) {
+      this._textureFormatInfos['bc6h'] = {
+        gpuSampleType: 'float',
+        filterable: true,
+        renderable: false,
+        compressed: true,
+        size: 16,
+        writable: false,
+        blockWidth: 4,
+        blockHeight: 4
+      };
+      this._textureFormatInfos['bc6h-signed'] = {
+        gpuSampleType: 'float',
+        filterable: true,
+        renderable: false,
+        compressed: true,
+        size: 16,
+        writable: false,
+        blockWidth: 4,
+        blockHeight: 4
+      };
+      this._textureFormatInfos['bc7'] = {
+        gpuSampleType: 'float',
+        filterable: true,
+        renderable: false,
+        compressed: true,
+        size: 16,
+        writable: false,
+        blockWidth: 4,
+        blockHeight: 4
+      };
+      this._textureFormatInfos['bc7-srgb'] = {
         gpuSampleType: 'float',
         filterable: true,
         renderable: false,

@@ -3,6 +3,7 @@ import { mixinVertexColor } from './mixins/vertexcolor';
 import type { PBFunctionScope } from '@zephyr3d/device';
 import { mixinPBRSpecularGlossness } from './mixins/lightmodel/pbrspecularglossness';
 import { ShaderHelper } from './shader/helper';
+import { RENDER_PASS_TYPE_LIGHT } from '../values';
 
 /**
  * PBRSpecularGlossinessMaterial class
@@ -41,12 +42,19 @@ export class PBRSpecularGlossinessMaterial extends applyMaterialMixins(
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
     const pb = scope.$builder;
+    const worldMatrix = ShaderHelper.getWorldMatrix(scope);
     scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
-    scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
-    ShaderHelper.setClipSpacePosition(
-      scope,
-      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
-    );
+    scope.$outputs.worldPos = pb.mul(worldMatrix, pb.vec4(scope.oPos, 1)).xyz;
+    scope.$l.csPos = pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1));
+    ShaderHelper.setClipSpacePosition(scope, scope.csPos);
+    if (this.transmission) {
+      scope.$outputs.screenUV = pb.add(pb.mul(pb.div(scope.csPos.xy, scope.csPos.w), 0.5), pb.vec2(0.5));
+      scope.$outputs.modelScale = pb.vec3(
+        pb.length(worldMatrix[0].xyz),
+        pb.length(worldMatrix[1].xyz),
+        pb.length(worldMatrix[2].xyz)
+      );
+    }
     if (this.vertexNormal) {
       scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
       scope.$outputs.wNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
@@ -71,27 +79,27 @@ export class PBRSpecularGlossinessMaterial extends applyMaterialMixins(
       if (this.vertexColor) {
         scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope));
       }
-      scope.$l.albedo = this.calculateAlbedoColor(scope);
-      if (this.vertexColor) {
-        scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope));
+      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+        scope.$l.normalInfo = this.calculateNormalAndTBN(
+          scope,
+          scope.$inputs.worldPos,
+          scope.$inputs.wNorm,
+          scope.$inputs.wTangent,
+          scope.$inputs.wBinormal
+        );
+        scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
+        scope.$l.litColor = this.PBRLight(
+          scope,
+          scope.$inputs.worldPos,
+          scope.normalInfo.normal,
+          scope.viewVec,
+          scope.albedo,
+          scope.normalInfo.TBN
+        );
+        this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
+      } else {
+        this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.albedo);
       }
-      scope.$l.normalInfo = this.calculateNormalAndTBN(
-        scope,
-        scope.$inputs.worldPos,
-        scope.$inputs.wNorm,
-        scope.$inputs.wTangent,
-        scope.$inputs.wBinormal
-      );
-      scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
-      scope.$l.litColor = this.PBRLight(
-        scope,
-        scope.$inputs.worldPos,
-        scope.normalInfo.normal,
-        scope.viewVec,
-        scope.albedo,
-        scope.normalInfo.TBN
-      );
-      this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
     } else {
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }

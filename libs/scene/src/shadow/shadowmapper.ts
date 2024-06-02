@@ -23,8 +23,8 @@ import type { PointLight, PunctualLight, SpotLight } from '../scene/light';
 import type { ShadowMapPass } from '../render/shadowmap_pass';
 import type { Scene } from '../scene/scene';
 import type { ShadowImpl } from './shadow_impl';
-import { TemporalCache, type DrawContext } from '../render';
-import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_NONE } from '../values';
+import type { DrawContext } from '../render';
+import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_NONE, LIGHT_TYPE_POINT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
 
 const tmpMatrix = new Matrix4x4();
@@ -401,7 +401,7 @@ export class ShadowMapper {
     if (ctx.shadowMapInfo) {
       for (const k of ctx.shadowMapInfo.keys()) {
         const shadowMapParams = ctx.shadowMapInfo.get(k);
-        TemporalCache.releaseFramebuffer(shadowMapParams.shadowMapFramebuffer);
+        ctx.device.pool.releaseFrameBuffer(shadowMapParams.shadowMapFramebuffer);
         shadowMapParams.impl.releaseTemporalResources(shadowMapParams);
         shadowMapParams.lightType = LIGHT_TYPE_NONE;
         shadowMapParams.depthClampEnabled = false;
@@ -495,6 +495,51 @@ export class ShadowMapper {
     }
   }
   /** @internal */
+  static fetchTemporalFramebuffer(
+    autoRelease: boolean,
+    lightType: number,
+    numCascades: number,
+    width: number,
+    height: number,
+    colorFormat: TextureFormat,
+    depthFormat: TextureFormat,
+    mipmapping?: boolean
+  ) {
+    const device = Application.instance.device;
+    const useTextureArray = numCascades > 1 && device.type !== 'webgl';
+    const colorAttachments = colorFormat
+      ? useTextureArray
+        ? [
+            device.pool.fetchTemporalTexture2DArray(
+              false,
+              colorFormat,
+              width,
+              height,
+              numCascades,
+              mipmapping
+            )
+          ]
+        : lightType === LIGHT_TYPE_POINT
+        ? [device.pool.fetchTemporalTextureCube(false, colorFormat, width, mipmapping)]
+        : [device.pool.fetchTemporalTexture2D(false, colorFormat, width, height, mipmapping)]
+      : null;
+    const depthAttachment = depthFormat
+      ? useTextureArray
+        ? device.pool.fetchTemporalTexture2DArray(false, depthFormat, width, height, numCascades, false)
+        : device.type !== 'webgl' && lightType === LIGHT_TYPE_POINT
+        ? device.pool.fetchTemporalTextureCube(false, depthFormat, width, false)
+        : device.pool.fetchTemporalTexture2D(false, depthFormat, width, height, false)
+      : null;
+    const fb = device.pool.createTemporalFramebuffer(autoRelease, colorAttachments, depthAttachment);
+    if (colorAttachments) {
+      device.pool.releaseTexture(colorAttachments[0]);
+    }
+    if (depthAttachment) {
+      device.pool.releaseTexture(depthAttachment);
+    }
+    return fb;
+  }
+  /** @internal */
   protected updateResources(shadowMapParams: ShadowMapParams) {
     const device = Application.instance.device;
     const colorFormat = shadowMapParams.impl.getShadowMapColorFormat(shadowMapParams);
@@ -505,18 +550,37 @@ export class ShadowMapper {
       numCascades > 1 && !useTextureArray ? 2 * this._config.shadowMapSize : this._config.shadowMapSize;
     const shadowMapHeight =
       numCascades > 2 && !useTextureArray ? 2 * this._config.shadowMapSize : this._config.shadowMapSize;
-    const colorTarget: TextureType = useTextureArray ? '2darray' : this._light.isPointLight() ? 'cube' : '2d';
-    const depthTarget: TextureType = device.type === 'webgl' ? '2d' : colorTarget;
-    shadowMapParams.shadowMapFramebuffer = TemporalCache.getFramebufferFixedSize(
+    /*
+    const colorAttachments = colorFormat
+      ? useTextureArray
+        ? [device.pool.fetchTemporalTexture2DArray(false, colorFormat, shadowMapWidth, shadowMapHeight, numCascades, false)]
+        : this._light.isPointLight()
+          ? [device.pool.fetchTemporalTextureCube(false, colorFormat, shadowMapWidth, false)]
+          : [device.pool.fetchTemporalTexture2D(false, colorFormat, shadowMapWidth, shadowMapHeight, false)]
+      : null;
+    const depthAttachment = depthFormat
+      ? useTextureArray
+        ? device.pool.fetchTemporalTexture2DArray(false, depthFormat, shadowMapWidth, shadowMapHeight, numCascades, false)
+        : device.type !== 'webgl' && this._light.isPointLight()
+          ? device.pool.fetchTemporalTextureCube(false, depthFormat, shadowMapWidth, false)
+          : device.pool.fetchTemporalTexture2D(false, depthFormat, shadowMapWidth, shadowMapHeight, false)
+      : null;
+    shadowMapParams.shadowMapFramebuffer = device.pool.createTemporalFramebuffer(false, colorAttachments, depthAttachment);
+    if (colorAttachments) {
+      device.pool.releaseTexture(colorAttachments[0]);
+    }
+    if (depthAttachment) {
+      device.pool.releaseTexture(depthAttachment);
+    }
+    */
+    shadowMapParams.shadowMapFramebuffer = ShadowMapper.fetchTemporalFramebuffer(
+      false,
+      this._light.lightType,
+      numCascades,
       shadowMapWidth,
       shadowMapHeight,
-      numCascades,
       colorFormat,
-      depthFormat,
-      colorTarget,
-      depthTarget,
-      false,
-      1
+      depthFormat
     );
     shadowMapParams.impl = this._impl;
     this._impl.updateResources(shadowMapParams);

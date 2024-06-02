@@ -30,6 +30,7 @@
     - [概述](zh-cn/animation-intro.md)
     - [骨骼动画](zh-cn/animation-skeleton.md)
     - [关键帧动画](zh-cn/animation-keyframe.md)
+    - [动画融合](zh-cn/animation-blending.md)
     - [自定义动画](zh-cn/animation-custom.md)
   - 后处理
     - [概述](zh-cn/posteffect-intro.md)
@@ -42,6 +43,8 @@
     - [天空渲染](zh-cn/sky.md)
     - [大气及雾效](zh-cn/fog.md)
     - [水面渲染](zh-cn/water.md)
+  - 场景拾取
+    - [概述](zh-cn/picking.md)
   - 几何体实例化
     - [概述](zh-cn/instancing-intro.md)
   - 顺序无关的透明度渲染

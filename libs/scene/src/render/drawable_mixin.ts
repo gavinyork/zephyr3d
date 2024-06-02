@@ -1,4 +1,5 @@
 import type { GenericConstructor } from '@zephyr3d/base';
+import { Vector4 } from '@zephyr3d/base';
 import type { AbstractDevice } from '@zephyr3d/device';
 import { ProgramBuilder, type BindGroup } from '@zephyr3d/device';
 import type { BatchDrawable, DrawContext, Drawable } from './drawable';
@@ -8,12 +9,17 @@ import { Application } from '../app';
 import type { Mesh, XForm } from '../scene';
 
 export interface IMixinDrawable {
+  readonly objectColor: Vector4;
+  getId(): number;
   pushRenderQueueRef(ref: RenderQueueRef): void;
   applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void;
   applyTransformUniforms(renderQueue: RenderQueue): void;
   applyMaterialUniforms(instanceInfo: DrawableInstanceInfo): void;
+  getObjectColor(): Vector4;
   bind(ctx: DrawContext): void;
 }
+
+let _drawableId = 0;
 
 export function mixinDrawable<
   T extends GenericConstructor<{
@@ -25,12 +31,20 @@ export function mixinDrawable<
     private _mdDrawableBindGroup: BindGroup;
     private _mdDrawableBindGroupInstanced: Map<RenderQueue, BindGroup>;
     private _mdDrawableBindGroupSkin: BindGroup;
+    private _mdDrawableBindGroupMorph: BindGroup;
+    private _mdDrawableBindGroupSkinMorph: BindGroup;
+    private _id: number;
+    private _objectColor: Vector4;
     constructor(...args: any[]) {
       super(...args);
+      this._id = ++_drawableId;
+      this._objectColor = null;
       this._mdRenderQueueRef = [];
       this._mdDrawableBindGroup = null;
       this._mdDrawableBindGroupInstanced = new Map();
       this._mdDrawableBindGroupSkin = null;
+      this._mdDrawableBindGroupMorph = null;
+      this._mdDrawableBindGroupSkinMorph = null;
       this.getXForm().on('transformchanged', (node) => {
         for (const ref of this._mdRenderQueueRef) {
           if (ref.ref) {
@@ -38,6 +52,19 @@ export function mixinDrawable<
           }
         }
       });
+    }
+    getId(): number {
+      return this._id;
+    }
+    getObjectColor(): Vector4 {
+      if (!this._objectColor) {
+        const a = (this._id & 0xff) / 255;
+        const b = ((this._id >>> 8) & 0xff) / 255;
+        const g = ((this._id >>> 16) & 0xff) / 255;
+        const r = ((this._id >>> 24) & 0xff) / 255;
+        this._objectColor = new Vector4(r, g, b, a);
+      }
+      return this._objectColor;
     }
     pushRenderQueueRef(ref: RenderQueueRef): void {
       this.renderQueueRefPrune();
@@ -105,19 +132,30 @@ export function mixinDrawable<
         );
         drawableBindGroup.setValue(ShaderHelper.getBoneTextureSizeUniformName(), boneTexture.width);
       }
+      if (ctx.morphAnimation) {
+        const morphData = (this as unknown as Mesh).getMorphData();
+        const morphInfo = (this as unknown as Mesh).getMorphInfo();
+        drawableBindGroup.setTexture(ShaderHelper.getMorphDataUniformName(), morphData);
+        drawableBindGroup.setBuffer(ShaderHelper.getMorphInfoUniformName(), morphInfo);
+      }
     }
     /** @internal */
     getDrawableBindGroup(device: AbstractDevice, instancing: boolean, renderQueue: RenderQueue): BindGroup {
       const skinning = !!(this as unknown as Drawable).getBoneMatrices();
-      let bindGroup = skinning
-        ? this._mdDrawableBindGroupSkin
-        : instancing
+      const morphing = !!(this as unknown as Drawable).getMorphData();
+      let bindGroup = instancing
         ? this._mdDrawableBindGroupInstanced.get(renderQueue)
+        : skinning && morphing
+        ? this._mdDrawableBindGroupSkinMorph
+        : skinning
+        ? this._mdDrawableBindGroupSkin
+        : morphing
+        ? this._mdDrawableBindGroupMorph
         : this._mdDrawableBindGroup;
       if (!bindGroup) {
         const buildInfo = new ProgramBuilder(device).buildRender({
           vertex(pb) {
-            ShaderHelper.vertexShaderDrawableStuff(this, skinning, instancing);
+            ShaderHelper.vertexShaderDrawableStuff(this, skinning, morphing, instancing);
             pb.main(function () {});
           },
           fragment(pb) {
@@ -125,10 +163,25 @@ export function mixinDrawable<
           }
         });
         bindGroup = device.createBindGroup(buildInfo[2][1]);
-        if (skinning) {
-          this._mdDrawableBindGroupSkin = bindGroup;
-        } else if (instancing) {
+        if (instancing) {
           this._mdDrawableBindGroupInstanced.set(renderQueue, bindGroup);
+        } else if (skinning && morphing) {
+          this._mdDrawableBindGroupSkinMorph = bindGroup;
+        } else if (skinning) {
+          this._mdDrawableBindGroupSkin = bindGroup;
+        } else if (morphing) {
+          const layout = buildInfo[2][1];
+          const bindName =
+            layout.nameMap?.[ShaderHelper.getMorphInfoUniformName()] ??
+            ShaderHelper.getMorphInfoUniformName();
+          for (let binding = 0; binding < layout.entries.length; binding++) {
+            const bindingPoint = layout.entries[binding];
+            if (bindingPoint.name === bindName) {
+              console.log(bindingPoint.type);
+              break;
+            }
+          }
+          this._mdDrawableBindGroupMorph = bindGroup;
         } else {
           this._mdDrawableBindGroup = bindGroup;
         }

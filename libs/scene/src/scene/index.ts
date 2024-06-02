@@ -3,7 +3,6 @@ export * from './environment';
 export * from './graph_node';
 export * from './light';
 export * from './mesh';
-export * from './model';
 export * from './octree';
 export * from './scene_node';
 export * from './batchgroup';
