@@ -146,9 +146,11 @@ export class AnimationSet {
     dispose(): void;
     get(name: string): AnimationClip;
     getAnimationNames(): string[];
+    getAnimationWeight(name: string): number;
     isPlayingAnimation(name?: string): boolean;
     get numAnimations(): number;
     playAnimation(name: string, options?: PlayAnimationOptions): void;
+    setAnimationWeight(name: string, weight: number): void;
     stopAnimation(name: string, options?: StopAnimationOptions): void;
     update(): void;
 }
@@ -4302,7 +4304,7 @@ export class XForm<T extends XForm<T> = XForm<any>> extends XForm_base {
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:5619:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:5620:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 
