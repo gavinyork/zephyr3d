@@ -16,26 +16,22 @@ declare class AnimationClip
 
 |  Constructor | Modifiers | Description |
 |  --- | --- | --- |
-|  [(constructor)(name, model)](doc/markdown/./scene.animationclip._constructor_.md) |  | Creates an animation instance |
+|  [(constructor)(name)](doc/markdown/./scene.animationclip._constructor_.md) |  | Creates an animation instance |
 
 ## Properties
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
 |  [name](doc/markdown/./scene.animationclip.name.md) | <code>readonly</code> | string | Gets the name of the animation |
+|  [skeletons](doc/markdown/./scene.animationclip.skeletons.md) | <code>readonly</code> | Set&lt;[Skeleton](doc/markdown/./scene.skeleton.md)<!-- -->&gt; | Gets all skeletons |
 |  [timeDuration](doc/markdown/./scene.animationclip.timeduration.md) | <code>readonly</code> | number | The duration of the animation |
-|  [tracks](doc/markdown/./scene.animationclip.tracks.md) | <code>readonly</code> | Map&lt;[SceneNode](doc/markdown/./scene.scenenode.md)<!-- -->, { poseTranslation: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; poseRotation: [Quaternion](doc/markdown/./base.quaternion.md)<!-- -->; poseScaling: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; tracks: [AnimationTrack](doc/markdown/./scene.animationtrack.md)<!-- -->\[\]; }&gt; | Gets all the tracks of this animation |
+|  [tracks](doc/markdown/./scene.animationclip.tracks.md) | <code>readonly</code> | Map&lt;[SceneNode](doc/markdown/./scene.scenenode.md)<!-- -->, [AnimationTrack](doc/markdown/./scene.animationtrack.md)<!-- -->&lt;unknown&gt;\[\]&gt; | Gets all the tracks of this animation |
 
 ## Methods
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [addSkeleton(skeleton, meshList, boundingBoxInfo)](doc/markdown/./scene.animationclip.addskeleton.md) |  | Adds a skeleton to the animation |
+|  [addSkeleton(skeleton)](doc/markdown/./scene.animationclip.addskeleton.md) |  | Adds a skeleton to the animation |
 |  [addTrack(node, track)](doc/markdown/./scene.animationclip.addtrack.md) |  | Adds an animation track to the animation |
 |  [dispose()](doc/markdown/./scene.animationclip.dispose.md) |  | Disposes self |
-|  [isPlaying()](doc/markdown/./scene.animationclip.isplaying.md) |  | Check if the animation is playing |
-|  [play(repeat, speedRatio)](doc/markdown/./scene.animationclip.play.md) |  | Starts playing the animation |
-|  [rewind()](doc/markdown/./scene.animationclip.rewind.md) |  | Rewind the animation to the first frame |
-|  [stop()](doc/markdown/./scene.animationclip.stop.md) |  | Stops the animation |
-|  [update()](doc/markdown/./scene.animationclip.update.md) |  | Updates the animation state |
 

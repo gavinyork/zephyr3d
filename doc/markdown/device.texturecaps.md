@@ -22,6 +22,8 @@ interface TextureCaps
 |  [npo2Repeating](doc/markdown/./device.texturecaps.npo2repeating.md) |  | boolean | True if repeat address mode is supported for non power of 2 textures |
 |  [support3DTexture](doc/markdown/./device.texturecaps.support3dtexture.md) |  | boolean | True if device supports 3d texture |
 |  [supportAnisotropicFiltering](doc/markdown/./device.texturecaps.supportanisotropicfiltering.md) |  | boolean | True if device supports anisotropic filtering |
+|  [supportASTC](doc/markdown/./device.texturecaps.supportastc.md) |  | boolean | True if device supports astc texture format |
+|  [supportBPTC](doc/markdown/./device.texturecaps.supportbptc.md) |  | boolean | True if device supports bptc texture format |
 |  [supportDepthTexture](doc/markdown/./device.texturecaps.supportdepthtexture.md) |  | boolean | True if device supports depth texture |
 |  [supportFloatBlending](doc/markdown/./device.texturecaps.supportfloatblending.md) |  | boolean | True if device supports alpha blending with floating-point frame buffer |
 |  [supportFloatColorBuffer](doc/markdown/./device.texturecaps.supportfloatcolorbuffer.md) |  | boolean | True if device supports rendering into a 32bit floating-point frame buffer |
@@ -30,6 +32,7 @@ interface TextureCaps
 |  [supportHalfFloatTexture](doc/markdown/./device.texturecaps.supporthalffloattexture.md) |  | boolean | True if device supports 16bit floating-point texture |
 |  [supportLinearFloatTexture](doc/markdown/./device.texturecaps.supportlinearfloattexture.md) |  | boolean | True if device supports linear filtering on 32bit floating-point textures |
 |  [supportLinearHalfFloatTexture](doc/markdown/./device.texturecaps.supportlinearhalffloattexture.md) |  | boolean | True if device supports linear filtering on 16bit floating-point textures |
+|  [supportRGTC](doc/markdown/./device.texturecaps.supportrgtc.md) |  | boolean | True if device supports rgtc texture format |
 |  [supportS3TC](doc/markdown/./device.texturecaps.supports3tc.md) |  | boolean | True if device supports dxt1, dxt3, dxt5 texture format |
 |  [supportS3TCSRGB](doc/markdown/./device.texturecaps.supports3tcsrgb.md) |  | boolean | True if device supports dxt1\_srgb, dxt3-srgb, dxt5-srgb texture format |
 |  [supportSRGBTexture](doc/markdown/./device.texturecaps.supportsrgbtexture.md) |  | boolean | True if device supports sRGB texture |

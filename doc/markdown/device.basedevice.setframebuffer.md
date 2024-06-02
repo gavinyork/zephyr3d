@@ -7,7 +7,7 @@
 **Signature:**
 
 ```typescript
-abstract setFramebuffer(rt: FrameBuffer): void;
+setFramebuffer(rt: FrameBuffer): any;
 ```
 
 ## Parameters
@@ -18,5 +18,5 @@ abstract setFramebuffer(rt: FrameBuffer): void;
 
 **Returns:**
 
-void
+any
 

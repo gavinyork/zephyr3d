@@ -28,6 +28,7 @@ declare class MeshMaterial extends Material
 |  [blendMode](doc/markdown/./scene.meshmaterial.blendmode.md) |  | [BlendMode](doc/markdown/./scene.blendmode.md) | Blending mode |
 |  [cullMode](doc/markdown/./scene.meshmaterial.cullmode.md) |  | [FaceMode](doc/markdown/./device.facemode.md) | Cull mode |
 |  [drawContext](doc/markdown/./scene.meshmaterial.drawcontext.md) | <code>readonly</code> | [DrawContext](doc/markdown/./scene.drawcontext.md) | Draw context for shader creation |
+|  [objectColor](doc/markdown/./scene.meshmaterial.objectcolor.md) |  | [Vector4](doc/markdown/./base.vector4.md) | Object color used for GPU picking |
 |  [opacity](doc/markdown/./scene.meshmaterial.opacity.md) |  | number | A value between 0 and 1, presents the opacity |
 |  [pass](doc/markdown/./scene.meshmaterial.pass.md) | <code>readonly</code> | number | Current material pass |
 

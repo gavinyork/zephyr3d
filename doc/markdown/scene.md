@@ -40,6 +40,7 @@
 |  [EnvIBL](doc/markdown/./scene.envibl.md) | IBL based environment lighting |
 |  [Environment](doc/markdown/./scene.environment.md) | Environment of scene |
 |  [EnvLightWrapper](doc/markdown/./scene.envlightwrapper.md) | Wrapper for environmant lighting |
+|  [EnvShIBL](doc/markdown/./scene.envshibl.md) | IBL with SH based environment lighting |
 |  [EulerRotationTrack](doc/markdown/./scene.eulerrotationtrack.md) | Euler angle rotation animation track |
 |  [FPSCameraController](doc/markdown/./scene.fpscameracontroller.md) | FPS camera controller |
 |  [FXAA](doc/markdown/./scene.fxaa.md) | FXAA post effect |
@@ -51,7 +52,6 @@
 |  [Material](doc/markdown/./scene.material.md) | Base class for any kind of materials |
 |  [Mesh](doc/markdown/./scene.mesh.md) | Mesh node |
 |  [MeshMaterial](doc/markdown/./scene.meshmaterial.md) | Base class for any kind of mesh materials |
-|  [Model](doc/markdown/./scene.model.md) | Model node |
 |  [NamedObject](doc/markdown/./scene.namedobject.md) | Named object interface for model loading |
 |  [Octree](doc/markdown/./scene.octree.md) | Octree class |
 |  [OctreeNode](doc/markdown/./scene.octreenode.md) | Octree node |
@@ -86,7 +86,6 @@
 |  [TorusShape](doc/markdown/./scene.torusshape.md) | Torus shape |
 |  [TranslationTrack](doc/markdown/./scene.translationtrack.md) | Translate animation track |
 |  [UnlitMaterial](doc/markdown/./scene.unlitmaterial.md) | Unlit material |
-|  [UserTrack](doc/markdown/./scene.usertrack.md) | User-defined animation track |
 |  [WeightedBlendedOIT](doc/markdown/./scene.weightedblendedoit.md) | Weighted-blended OIT renderer. |
 |  [XForm](doc/markdown/./scene.xform.md) | Presents a transformation from one space to another |
 
@@ -154,7 +153,9 @@
 |  [AssetMaterial](doc/markdown/./scene.assetmaterial.md) | Base material properties for model loading |
 |  [AssetMaterialClearcoat](doc/markdown/./scene.assetmaterialclearcoat.md) | Clearcoat related material properties for model loading |
 |  [AssetMaterialCommon](doc/markdown/./scene.assetmaterialcommon.md) | Common properties of material for model loading |
+|  [AssetMaterialIridescence](doc/markdown/./scene.assetmaterialiridescence.md) | Iridescence related material properties for model loading |
 |  [AssetMaterialSheen](doc/markdown/./scene.assetmaterialsheen.md) | Sheen related material properties for model loading |
+|  [AssetMaterialTransmission](doc/markdown/./scene.assetmaterialtransmission.md) | Transmission related material properties for model loading |
 |  [AssetMeshData](doc/markdown/./scene.assetmeshdata.md) | Mesh data interface for model loading |
 |  [AssetPBRMaterialCommon](doc/markdown/./scene.assetpbrmaterialcommon.md) | PBR related material properties for model loading |
 |  [AssetPBRMaterialMR](doc/markdown/./scene.assetpbrmaterialmr.md) | PBR of Metallic-Roughness workflow related material properties for model loading |
@@ -182,7 +183,6 @@
 |  [PlaneCreationOptions](doc/markdown/./scene.planecreationoptions.md) | Creation options for plane shapes |
 |  [SceneNodeVisitor](doc/markdown/./scene.scenenodevisitor.md) | Base interface for all scene node visitors |
 |  [ShapeCreationOptions](doc/markdown/./scene.shapecreationoptions.md) | Base class for creation options of any kind of shapes |
-|  [SkinnedBoundingBox](doc/markdown/./scene.skinnedboundingbox.md) | Bounding box information for a skeleton |
 |  [SphereCreationOptions](doc/markdown/./scene.spherecreationoptions.md) | Creation options for sphere shape |
 |  [TorusCreationOptions](doc/markdown/./scene.toruscreationoptions.md) | Creation options for torus shape |
 |  [Visitor](doc/markdown/./scene.visitor.md) | Visior |
@@ -202,6 +202,7 @@
 |  [QUEUE\_TRANSPARENT](doc/markdown/./scene.queue_transparent.md) | Transparent render queue type |
 |  [RENDER\_PASS\_TYPE\_DEPTH](doc/markdown/./scene.render_pass_type_depth.md) | Depth only render pass type |
 |  [RENDER\_PASS\_TYPE\_LIGHT](doc/markdown/./scene.render_pass_type_light.md) | Forward render pass type |
+|  [RENDER\_PASS\_TYPE\_OBJECT\_COLOR](doc/markdown/./scene.render_pass_type_object_color.md) | Object color render pass type |
 |  [RENDER\_PASS\_TYPE\_SHADOWMAP](doc/markdown/./scene.render_pass_type_shadowmap.md) | Shadow map render pass type |
 
 ## Type Aliases
@@ -225,10 +226,12 @@
 |  [LogMode](doc/markdown/./scene.logmode.md) | Log mode |
 |  [ModelFetchOptions](doc/markdown/./scene.modelfetchoptions.md) | Options for model fetching |
 |  [ModelInfo](doc/markdown/./scene.modelinfo.md) | Data structure returned by AssetManager.fetchModel() |
-|  [NumberTrackHandler](doc/markdown/./scene.numbertrackhandler.md) | Track handler type for numeric or vector keyframe values |
+|  [PickResult](doc/markdown/./scene.pickresult.md) | Camera pick result |
+|  [PlayAnimationOptions](doc/markdown/./scene.playanimationoptions.md) | Options for playing animation |
 |  [SceneNodeVisible](doc/markdown/./scene.scenenodevisible.md) | Scene node visible state |
 |  [ShadowMode](doc/markdown/./scene.shadowmode.md) | Shadow mapping mode |
 |  [SkyType](doc/markdown/./scene.skytype.md) | Type of sky |
+|  [StopAnimationOptions](doc/markdown/./scene.stopanimationoptions.md) | Options for stop playing animation |
 |  [TerrainDetailMapInfo](doc/markdown/./scene.terraindetailmapinfo.md) | Terrain detail map information |
 |  [TerrainMaterialOptions](doc/markdown/./scene.terrainmaterialoptions.md) | Terrain material options |
 |  [TextureFetchOptions](doc/markdown/./scene.texturefetchoptions.md) | Options for texture fetching |

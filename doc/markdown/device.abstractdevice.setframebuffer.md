@@ -4,21 +4,21 @@
 
 ## AbstractDevice.setFramebuffer() method
 
-Set current frame buffer
+Sets the current framebuffer to the specified FrameBuffer object.
 
 **Signature:**
 
 ```typescript
-setFramebuffer(rt: FrameBuffer): void;
+setFramebuffer(rt: FrameBuffer): any;
 ```
 
 ## Parameters
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  rt | [FrameBuffer](doc/markdown/./device.framebuffer.md) | The frame buffer |
+|  rt | [FrameBuffer](doc/markdown/./device.framebuffer.md) | The FrameBuffer object to set as the current framebuffer. |
 
 **Returns:**
 
-void
+any
 

@@ -9,7 +9,7 @@ Starts playing an animation of the model
 **Signature:**
 
 ```typescript
-playAnimation(name: string, repeat?: number, speedRatio?: number): void;
+playAnimation(name: string, options?: PlayAnimationOptions): void;
 ```
 
 ## Parameters
@@ -17,8 +17,7 @@ playAnimation(name: string, repeat?: number, speedRatio?: number): void;
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  name | string | Name of the animation to play |
-|  repeat | number | _(Optional)_ The repeat times, 0 for always repeating, default is 1 |
-|  speedRatio | number | _(Optional)_ |
+|  options | [PlayAnimationOptions](doc/markdown/./scene.playanimationoptions.md) | _(Optional)_ Playing options |
 
 **Returns:**
 

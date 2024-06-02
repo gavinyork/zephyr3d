@@ -17,7 +17,7 @@ interface CompositorContext
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
 |  [finalFramebuffer](doc/markdown/./scene.compositorcontext.finalframebuffer.md) |  | [FrameBuffer](doc/markdown/./device.framebuffer.md) |  |
-|  [msFramebuffer?](doc/markdown/./scene.compositorcontext.msframebuffer.md) |  | [FrameBuffer](doc/markdown/./device.framebuffer.md) | _(Optional)_ |
+|  [msTexture?](doc/markdown/./scene.compositorcontext.mstexture.md) |  | [FrameBuffer](doc/markdown/./device.framebuffer.md) | _(Optional)_ |
 |  [pingpongFramebuffers](doc/markdown/./scene.compositorcontext.pingpongframebuffers.md) |  | [FrameBuffer](doc/markdown/./device.framebuffer.md)<!-- -->\[\] |  |
 |  [writeIndex](doc/markdown/./scene.compositorcontext.writeindex.md) |  | number |  |
 

@@ -7,5 +7,5 @@
 **Signature:**
 
 ```typescript
-type: 'translation' | 'scale' | 'rotation';
+type: 'translation' | 'scale' | 'rotation' | 'weights';
 ```

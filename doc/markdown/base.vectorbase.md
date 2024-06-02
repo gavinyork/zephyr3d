@@ -19,5 +19,6 @@ declare class VectorBase extends Float32Array
 |  --- | --- | --- |
 |  [equalsTo(other, epsl)](doc/markdown/./base.vectorbase.equalsto.md) |  | Check if all data is close enough to another |
 |  [isNaN()](doc/markdown/./base.vectorbase.isnan.md) |  | Check the data for the presence of NaN. |
+|  [setRandom(minValue, maxValue)](doc/markdown/./base.vectorbase.setrandom.md) |  | Generate random vector |
 |  [toString()](doc/markdown/./base.vectorbase.tostring.md) |  | Convert this to string object. |
 

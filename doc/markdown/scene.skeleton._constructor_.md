@@ -9,7 +9,7 @@ Creates an instance of skeleton
 **Signature:**
 
 ```typescript
-constructor(joints: SceneNode[], inverseBindMatrices: Matrix4x4[], bindPoseMatrices: Matrix4x4[]);
+constructor(joints: SceneNode[], inverseBindMatrices: Matrix4x4[], bindPoseMatrices: Matrix4x4[], meshes: Mesh[], bounding: AssetSubMeshData[]);
 ```
 
 ## Parameters
@@ -19,4 +19,6 @@ constructor(joints: SceneNode[], inverseBindMatrices: Matrix4x4[], bindPoseMatri
 |  joints | [SceneNode](doc/markdown/./scene.scenenode.md)<!-- -->\[\] | The joint nodes |
 |  inverseBindMatrices | [Matrix4x4](doc/markdown/./base.matrix4x4.md)<!-- -->\[\] | The inverse binding matrices of the joints |
 |  bindPoseMatrices | [Matrix4x4](doc/markdown/./base.matrix4x4.md)<!-- -->\[\] | The binding pose matrices of the joints |
+|  meshes | [Mesh](doc/markdown/./scene.mesh.md)<!-- -->\[\] |  |
+|  bounding | [AssetSubMeshData](doc/markdown/./scene.assetsubmeshdata.md)<!-- -->\[\] |  |
 

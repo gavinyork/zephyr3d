@@ -14,6 +14,11 @@ type IMixinPBRCommon = {
     emissiveColor: Vector3;
     emissiveStrength: number;
     occlusionStrength: number;
+    transmission: boolean;
+    transmissionFactor: number;
+    thicknessFactor: number;
+    attenuationColor: Vector3;
+    attenuationDistance: number;
     sheen: boolean;
     sheenColorFactor: Vector3;
     sheenRoughnessFactor: number;
@@ -21,8 +26,13 @@ type IMixinPBRCommon = {
     clearcoatIntensity: number;
     clearcoatRoughnessFactor: number;
     clearcoatNormalScale: number;
-    getCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp): PBShaderExp;
-    calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
+    iridescence: boolean;
+    iridescenceFactor: number;
+    iridescenceIor: number;
+    iridescenceThicknessMin: number;
+    iridescenceThicknessMax: number;
+    getCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp): PBShaderExp;
+    calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
     fresnelSchlick(scope: PBInsideFunctionScope, cosTheta: PBShaderExp, F0: PBShaderExp): PBShaderExp;
     distributionGGX(scope: PBInsideFunctionScope, NdotH: PBShaderExp, alphaRoughness: PBShaderExp): PBShaderExp;
     visGGX(scope: PBInsideFunctionScope, NdotV: PBShaderExp, NdotL: PBShaderExp, alphaRoughness: PBShaderExp): PBShaderExp;
@@ -38,7 +48,11 @@ type IMixinPBRCommon = {
     'sheenRoughness',
     'clearcoatIntensity',
     'clearcoatRoughness',
-    'clearcoatNormal'
+    'clearcoatNormal',
+    'transmission',
+    'thickness',
+    'iridescence',
+    'iridescenceThickness'
 ]>;
 ```
 **References:** [Vector3](doc/markdown/./base.vector3.md)<!-- -->, [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)<!-- -->, [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->, [TextureMixinInstanceTypes](doc/markdown/./scene.texturemixininstancetypes.md)

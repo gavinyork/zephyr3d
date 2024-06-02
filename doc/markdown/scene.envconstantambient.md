@@ -35,6 +35,5 @@ declare class EnvConstantAmbient extends EnvironmentLighting
 |  [hasIrradiance()](doc/markdown/./scene.envconstantambient.hasirradiance.md) |  | Returns whether this environment lighting supports diffuse light |
 |  [hasRadiance()](doc/markdown/./scene.envconstantambient.hasradiance.md) |  | Returns whether this environment lighting supports reflective light |
 |  [initShaderBindings(pb)](doc/markdown/./scene.envconstantambient.initshaderbindings.md) |  | Initialize shader bindings |
-|  [isConstant()](doc/markdown/./scene.envconstantambient.isconstant.md) |  | Whether this is an instance of EnvConstantAmbient |
 |  [updateBindGroup(bg)](doc/markdown/./scene.envconstantambient.updatebindgroup.md) |  | Updates the uniform values |
 

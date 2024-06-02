@@ -20,6 +20,7 @@ interface BaseTexture<T = unknown> extends GPUObject<T>
 |  [depth](doc/markdown/./device.basetexture.depth.md) | <code>readonly</code> | number |  |
 |  [format](doc/markdown/./device.basetexture.format.md) | <code>readonly</code> | [TextureFormat](doc/markdown/./device.textureformat.md) |  |
 |  [height](doc/markdown/./device.basetexture.height.md) | <code>readonly</code> | number |  |
+|  [memCost](doc/markdown/./device.basetexture.memcost.md) | <code>readonly</code> | number |  |
 |  [mipLevelCount](doc/markdown/./device.basetexture.miplevelcount.md) | <code>readonly</code> | number |  |
 |  [samplerOptions](doc/markdown/./device.basetexture.sampleroptions.md) |  | [SamplerOptions](doc/markdown/./device.sampleroptions.md) |  |
 |  [target](doc/markdown/./device.basetexture.target.md) | <code>readonly</code> | [TextureType](doc/markdown/./device.texturetype.md) |  |

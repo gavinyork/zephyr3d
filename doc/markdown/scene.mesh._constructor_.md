@@ -9,7 +9,7 @@ Creates an instance of mesh node
 **Signature:**
 
 ```typescript
-constructor(scene: Scene, primitive?: Primitive, material?: Material);
+constructor(scene: Scene, primitive?: Primitive, material?: MeshMaterial);
 ```
 
 ## Parameters
@@ -18,5 +18,5 @@ constructor(scene: Scene, primitive?: Primitive, material?: Material);
 |  --- | --- | --- |
 |  scene | [Scene](doc/markdown/./scene.scene.md) | The scene to which the mesh node belongs |
 |  primitive | [Primitive](doc/markdown/./scene.primitive.md) | _(Optional)_ |
-|  material | [Material](doc/markdown/./scene.material.md) | _(Optional)_ |
+|  material | [MeshMaterial](doc/markdown/./scene.meshmaterial.md) | _(Optional)_ |
 

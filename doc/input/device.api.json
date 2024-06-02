@@ -361,6 +361,51 @@
               "name": "buildRenderProgram"
             },
             {
+              "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!AbstractDevice#cancelNextFrame:member(1)",
+              "docComment": "/**\n * Cancel schedule next frame\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "cancelNextFrame(handle: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "handle",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "name": "cancelNextFrame"
+            },
+            {
               "kind": "PropertySignature",
               "canonicalReference": "@zephyr3d/device!AbstractDevice#canvas:member",
               "docComment": "/**\n * Get the canvas element for this device\n */\n",
@@ -2800,6 +2845,34 @@
             },
             {
               "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!AbstractDevice#getAdapterInfo:member(1)",
+              "docComment": "/**\n * Get adapter information\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getAdapterInfo(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [],
+              "name": "getAdapterInfo"
+            },
+            {
+              "kind": "MethodSignature",
               "canonicalReference": "@zephyr3d/device!AbstractDevice#getBackBufferHeight:member(1)",
               "docComment": "/**\n * Get the height of back buffer\n */\n",
               "excerptTokens": [
@@ -3469,6 +3542,79 @@
               "overloadIndex": 1,
               "parameters": [],
               "name": "isWindingOrderReversed"
+            },
+            {
+              "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!AbstractDevice#nextFrame:member(1)",
+              "docComment": "/**\n * Schedule next frame\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "nextFrame(callback: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "() => void"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "callback",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "name": "nextFrame"
+            },
+            {
+              "kind": "PropertySignature",
+              "canonicalReference": "@zephyr3d/device!AbstractDevice#pool:member",
+              "docComment": "/**\n * Get pool object\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "pool: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Pool",
+                  "canonicalReference": "@zephyr3d/device!~Pool:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "pool",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              }
             },
             {
               "kind": "MethodSignature",
@@ -4167,7 +4313,7 @@
             {
               "kind": "MethodSignature",
               "canonicalReference": "@zephyr3d/device!AbstractDevice#setFramebuffer:member(1)",
-              "docComment": "/**\n * Set current frame buffer\n *\n * @param rt - The frame buffer\n */\n",
+              "docComment": "/**\n * Sets the current framebuffer to the specified FrameBuffer object.\n *\n * @param rt - The FrameBuffer object to set as the current framebuffer.\n */\n",
               "excerptTokens": [
                 {
                   "kind": "Content",
@@ -4184,7 +4330,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "void"
+                  "text": "any"
                 },
                 {
                   "kind": "Content",
@@ -4206,6 +4352,134 @@
                     "endIndex": 2
                   },
                   "isOptional": false
+                }
+              ],
+              "name": "setFramebuffer"
+            },
+            {
+              "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!AbstractDevice#setFramebuffer:member(2)",
+              "docComment": "/**\n * Sets the current framebuffer specifying complex color attachments, an optional depth attachment, MIP level, face, and sample count.\n *\n * @param color - An array of BaseTextures or objects containing a BaseTexture and optional properties. Each BaseTexture or object will serve as a color attachment. - If an object is provided, it can specify: - `texture`: The BaseTexture to use. - `miplevel`: Optional MIP level for this specific texture. default is 0. - `face`: Optional face index for cube map textures, specifying the cube face this texture is attached to. default is 0. - `layer`: Optional layer index, useful for texture arrays. default is 0.\n *\n * @param depth - Optional BaseTexture to serve as the depth attachment.\n *\n * @param sampleCount - Optional sample count defining the number of samples for multisampling.\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "setFramebuffer(color: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "("
+                },
+                {
+                  "kind": "Reference",
+                  "text": "BaseTexture",
+                  "canonicalReference": "@zephyr3d/device!BaseTexture:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": " | {\n        texture: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "BaseTexture",
+                  "canonicalReference": "@zephyr3d/device!BaseTexture:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";\n        miplevel?: number;\n        face?: number;\n        layer?: number;\n    })[]"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", depth?: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "BaseTexture",
+                  "canonicalReference": "@zephyr3d/device!BaseTexture:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", miplevel?: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", face?: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", sampleCount?: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 15,
+                "endIndex": 16
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 2,
+              "parameters": [
+                {
+                  "parameterName": "color",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 6
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "depth",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 7,
+                    "endIndex": 8
+                  },
+                  "isOptional": true
+                },
+                {
+                  "parameterName": "miplevel",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 9,
+                    "endIndex": 10
+                  },
+                  "isOptional": true
+                },
+                {
+                  "parameterName": "face",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 11,
+                    "endIndex": 12
+                  },
+                  "isOptional": true
+                },
+                {
+                  "parameterName": "sampleCount",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 13,
+                    "endIndex": 14
+                  },
+                  "isOptional": true
                 }
               ],
               "name": "setFramebuffer"
@@ -4497,6 +4771,33 @@
               "isOptional": false,
               "releaseTag": "Public",
               "name": "videoMemoryUsage",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              }
+            },
+            {
+              "kind": "PropertySignature",
+              "canonicalReference": "@zephyr3d/device!AbstractDevice#vSync:member",
+              "docComment": "/**\n * vSync\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "vSync: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "vSync",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
                 "endIndex": 2
@@ -5633,6 +5934,37 @@
             },
             {
               "kind": "Property",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#_pool:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "protected _pool: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Pool",
+                  "canonicalReference": "@zephyr3d/device!~Pool:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "_pool",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": true,
+              "isAbstract": false
+            },
+            {
+              "kind": "Property",
               "canonicalReference": "@zephyr3d/device!BaseDevice#_programBuilder:member",
               "docComment": "",
               "excerptTokens": [
@@ -5723,6 +6055,115 @@
               "isOptional": false,
               "releaseTag": "Public",
               "name": "_runningLoop",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": true,
+              "isAbstract": false
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#_setFramebuffer:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "protected abstract _setFramebuffer(fb: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "FrameBuffer",
+                  "canonicalReference": "@zephyr3d/device!FrameBuffer:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "isProtected": true,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "fb",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": true,
+              "name": "_setFramebuffer"
+            },
+            {
+              "kind": "Property",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#_temporalFramebuffer:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "protected _temporalFramebuffer: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "_temporalFramebuffer",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": true,
+              "isAbstract": false
+            },
+            {
+              "kind": "Property",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#_vSync:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "protected _vSync: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "_vSync",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
                 "endIndex": 2
@@ -6022,6 +6463,54 @@
               "isOptional": false,
               "isAbstract": false,
               "name": "buildRenderProgram"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#cancelNextFrame:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "abstract cancelNextFrame(handle: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "handle",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": true,
+              "name": "cancelNextFrame"
             },
             {
               "kind": "Property",
@@ -8707,6 +9196,37 @@
             },
             {
               "kind": "Method",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#getAdapterInfo:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "abstract getAdapterInfo(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": true,
+              "name": "getAdapterInfo"
+            },
+            {
+              "kind": "Method",
               "canonicalReference": "@zephyr3d/device!BaseDevice#getBackBufferHeight:member(1)",
               "docComment": "",
               "excerptTokens": [
@@ -9537,6 +10057,54 @@
             },
             {
               "kind": "Method",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#nextFrame:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "abstract nextFrame(callback: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "() => void"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "callback",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": true,
+              "name": "nextFrame"
+            },
+            {
+              "kind": "Method",
               "canonicalReference": "@zephyr3d/device!BaseDevice#onBeginFrame:member(1)",
               "docComment": "",
               "excerptTokens": [
@@ -9711,6 +10279,37 @@
               "isOptional": false,
               "isAbstract": false,
               "name": "parseTextureOptions"
+            },
+            {
+              "kind": "Property",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#pool:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "get pool(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Pool",
+                  "canonicalReference": "@zephyr3d/device!~Pool:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": true,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "pool",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
             },
             {
               "kind": "Method",
@@ -10619,7 +11218,7 @@
               "excerptTokens": [
                 {
                   "kind": "Content",
-                  "text": "abstract setFramebuffer(rt: "
+                  "text": "setFramebuffer(rt: "
                 },
                 {
                   "kind": "Reference",
@@ -10632,7 +11231,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "void"
+                  "text": "any"
                 },
                 {
                   "kind": "Content",
@@ -10658,7 +11257,106 @@
                 }
               ],
               "isOptional": false,
-              "isAbstract": true,
+              "isAbstract": false,
+              "name": "setFramebuffer"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#setFramebuffer:member(2)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "setFramebuffer(color: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "("
+                },
+                {
+                  "kind": "Reference",
+                  "text": "BaseTexture",
+                  "canonicalReference": "@zephyr3d/device!BaseTexture:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": " | {\n        texture: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "BaseTexture",
+                  "canonicalReference": "@zephyr3d/device!BaseTexture:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";\n        miplevel?: number;\n        face?: number;\n        layer?: number;\n    })[]"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", depth?: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "BaseTexture",
+                  "canonicalReference": "@zephyr3d/device!BaseTexture:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", sampleCount?: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 11,
+                "endIndex": 12
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 2,
+              "parameters": [
+                {
+                  "parameterName": "color",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 6
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "depth",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 7,
+                    "endIndex": 8
+                  },
+                  "isOptional": true
+                },
+                {
+                  "parameterName": "sampleCount",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 9,
+                    "endIndex": 10
+                  },
+                  "isOptional": true
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
               "name": "setFramebuffer"
             },
             {
@@ -11014,6 +11712,36 @@
               "isOptional": false,
               "releaseTag": "Public",
               "name": "videoMemoryUsage",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
+            },
+            {
+              "kind": "Property",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#vSync:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "get vSync(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";\n\nset vSync(val: boolean);"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "vSync",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
                 "endIndex": 2
@@ -11497,6 +12225,33 @@
               "overloadIndex": 1,
               "parameters": [],
               "name": "isSRGBFormat"
+            },
+            {
+              "kind": "PropertySignature",
+              "canonicalReference": "@zephyr3d/device!BaseTexture#memCost:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "readonly memCost: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": true,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "memCost",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              }
             },
             {
               "kind": "PropertySignature",
@@ -18719,6 +19474,52 @@
         },
         {
           "kind": "Function",
+          "canonicalReference": "@zephyr3d/device!getVertexAttribByName:function(1)",
+          "docComment": "/**\n * Get vertex attribute index by semantic\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "declare function getVertexAttribByName(name: "
+            },
+            {
+              "kind": "Reference",
+              "text": "VertexSemantic",
+              "canonicalReference": "@zephyr3d/device!VertexSemantic:type"
+            },
+            {
+              "kind": "Content",
+              "text": "): "
+            },
+            {
+              "kind": "Content",
+              "text": "number"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "returnTypeTokenRange": {
+            "startIndex": 3,
+            "endIndex": 4
+          },
+          "releaseTag": "Public",
+          "overloadIndex": 1,
+          "parameters": [
+            {
+              "parameterName": "name",
+              "parameterTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isOptional": false
+            }
+          ],
+          "name": "getVertexAttribByName"
+        },
+        {
+          "kind": "Function",
           "canonicalReference": "@zephyr3d/device!getVertexAttribFormat:function(1)",
           "docComment": "/**\n * Get vertex format by semantic and component type and component count\n *\n * @param semantic - The vertex semantic\n *\n * @param type - Data type of vertex component\n *\n * @param count - The count of vertex components\n *\n * @returns Vertex format\n *\n * @public\n */\n",
           "excerptTokens": [
@@ -18796,6 +19597,52 @@
             }
           ],
           "name": "getVertexAttribFormat"
+        },
+        {
+          "kind": "Function",
+          "canonicalReference": "@zephyr3d/device!getVertexAttribName:function(1)",
+          "docComment": "/**\n * Get vertex semantic by attribute index\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "declare function getVertexAttribName(attrib: "
+            },
+            {
+              "kind": "Content",
+              "text": "number"
+            },
+            {
+              "kind": "Content",
+              "text": "): "
+            },
+            {
+              "kind": "Reference",
+              "text": "VertexSemantic",
+              "canonicalReference": "@zephyr3d/device!VertexSemantic:type"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "returnTypeTokenRange": {
+            "startIndex": 3,
+            "endIndex": 4
+          },
+          "releaseTag": "Public",
+          "overloadIndex": 1,
+          "parameters": [
+            {
+              "parameterName": "attrib",
+              "parameterTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isOptional": false
+            }
+          ],
+          "name": "getVertexAttribName"
         },
         {
           "kind": "Function",
@@ -19015,6 +19862,98 @@
             }
           ],
           "name": "getVertexBufferStride"
+        },
+        {
+          "kind": "Function",
+          "canonicalReference": "@zephyr3d/device!getVertexFormatComponentCount:function(1)",
+          "docComment": "/**\n * Get number of components of specified vertex format\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "declare function getVertexFormatComponentCount(fmt: "
+            },
+            {
+              "kind": "Reference",
+              "text": "VertexAttribFormat",
+              "canonicalReference": "@zephyr3d/device!VertexAttribFormat:type"
+            },
+            {
+              "kind": "Content",
+              "text": "): "
+            },
+            {
+              "kind": "Content",
+              "text": "number"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "returnTypeTokenRange": {
+            "startIndex": 3,
+            "endIndex": 4
+          },
+          "releaseTag": "Public",
+          "overloadIndex": 1,
+          "parameters": [
+            {
+              "parameterName": "fmt",
+              "parameterTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isOptional": false
+            }
+          ],
+          "name": "getVertexFormatComponentCount"
+        },
+        {
+          "kind": "Function",
+          "canonicalReference": "@zephyr3d/device!getVertexFormatSize:function(1)",
+          "docComment": "/**\n * Get byte size of specified vertex format\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "declare function getVertexFormatSize(fmt: "
+            },
+            {
+              "kind": "Reference",
+              "text": "VertexAttribFormat",
+              "canonicalReference": "@zephyr3d/device!VertexAttribFormat:type"
+            },
+            {
+              "kind": "Content",
+              "text": "): "
+            },
+            {
+              "kind": "Content",
+              "text": "number"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "returnTypeTokenRange": {
+            "startIndex": 3,
+            "endIndex": 4
+          },
+          "releaseTag": "Public",
+          "overloadIndex": 1,
+          "parameters": [
+            {
+              "parameterName": "fmt",
+              "parameterTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isOptional": false
+            }
+          ],
+          "name": "getVertexFormatSize"
         },
         {
           "kind": "Class",
@@ -53980,6 +54919,60 @@
             },
             {
               "kind": "PropertySignature",
+              "canonicalReference": "@zephyr3d/device!TextureCaps#supportASTC:member",
+              "docComment": "/**\n * True if device supports astc texture format\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "supportASTC: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "supportASTC",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              }
+            },
+            {
+              "kind": "PropertySignature",
+              "canonicalReference": "@zephyr3d/device!TextureCaps#supportBPTC:member",
+              "docComment": "/**\n * True if device supports bptc texture format\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "supportBPTC: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "supportBPTC",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              }
+            },
+            {
+              "kind": "PropertySignature",
               "canonicalReference": "@zephyr3d/device!TextureCaps#supportDepthTexture:member",
               "docComment": "/**\n * True if device supports depth texture\n */\n",
               "excerptTokens": [
@@ -54189,6 +55182,33 @@
               "isOptional": false,
               "releaseTag": "Public",
               "name": "supportLinearHalfFloatTexture",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              }
+            },
+            {
+              "kind": "PropertySignature",
+              "canonicalReference": "@zephyr3d/device!TextureCaps#supportRGTC:member",
+              "docComment": "/**\n * True if device supports rgtc texture format\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "supportRGTC: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "supportRGTC",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
                 "endIndex": 2
@@ -54876,7 +55896,7 @@
             },
             {
               "kind": "Content",
-              "text": "'unknown' | 'r8unorm' | 'r8snorm' | 'r16f' | 'r32f' | 'r8ui' | 'r8i' | 'r16ui' | 'r16i' | 'r32ui' | 'r32i' | 'rg8unorm' | 'rg8snorm' | 'rg16f' | 'rg32f' | 'rg8ui' | 'rg8i' | 'rg16ui' | 'rg16i' | 'rg32ui' | 'rg32i' | 'rgba8unorm' | 'rgba8unorm-srgb' | 'rgba8snorm' | 'bgra8unorm' | 'bgra8unorm-srgb' | 'rgba16f' | 'rgba32f' | 'rgba8ui' | 'rgba8i' | 'rgba16ui' | 'rgba16i' | 'rgba32ui' | 'rgba32i' | 'rg11b10uf' | 'd16' | 'd24' | 'd32f' | 'd24s8' | 'd32fs8' | 'dxt1' | 'dxt1-srgb' | 'dxt3' | 'dxt3-srgb' | 'dxt5' | 'dxt5-srgb'"
+              "text": "'unknown' | 'r8unorm' | 'r8snorm' | 'r16f' | 'r32f' | 'r8ui' | 'r8i' | 'r16ui' | 'r16i' | 'r32ui' | 'r32i' | 'rg8unorm' | 'rg8snorm' | 'rg16f' | 'rg32f' | 'rg8ui' | 'rg8i' | 'rg16ui' | 'rg16i' | 'rg32ui' | 'rg32i' | 'rgba8unorm' | 'rgba8unorm-srgb' | 'rgba8snorm' | 'bgra8unorm' | 'bgra8unorm-srgb' | 'rgba16f' | 'rgba32f' | 'rgba8ui' | 'rgba8i' | 'rgba16ui' | 'rgba16i' | 'rgba32ui' | 'rgba32i' | 'rg11b10uf' | 'd16' | 'd24' | 'd32f' | 'd24s8' | 'd32fs8' | 'dxt1' | 'dxt1-srgb' | 'dxt3' | 'dxt3-srgb' | 'dxt5' | 'dxt5-srgb' | 'bc4' | 'bc4-signed' | 'bc5' | 'bc5-signed' | 'bc7' | 'bc7-srgb' | 'bc6h' | 'bc6h-signed' | 'astc-4x4' | 'astc-4x4-srgb' | 'astc-5x4' | 'astc-5x4-srgb' | 'astc-5x5' | 'astc-5x5-srgb' | 'astc-6x5' | 'astc-6x5-srgb' | 'astc-6x6' | 'astc-6x6-srgb' | 'astc-8x5' | 'astc-8x5-srgb' | 'astc-8x6' | 'astc-8x6-srgb' | 'astc-8x8' | 'astc-8x8-srgb' | 'astc-10x5' | 'astc-10x5-srgb' | 'astc-10x6' | 'astc-10x6-srgb' | 'astc-10x8' | 'astc-10x8-srgb' | 'astc-10x10' | 'astc-10x10-srgb' | 'astc-12x10' | 'astc-12x10-srgb' | 'astc-12x12' | 'astc-12x12-srgb'"
             },
             {
               "kind": "Content",
@@ -56412,7 +57432,7 @@
             },
             {
               "kind": "Content",
-              "text": "'position_u8normx2' | 'position_u8normx4' | 'position_i8normx2' | 'position_i8normx4' | 'position_u16x2' | 'position_u16x4' | 'position_i16x2' | 'position_i16x4' | 'position_u16normx2' | 'position_u16normx4' | 'position_i16normx2' | 'position_i16normx4' | 'position_f16x2' | 'position_f16x4' | 'position_f32' | 'position_f32x2' | 'position_f32x3' | 'position_f32x4' | 'position_i32' | 'position_i32x2' | 'position_i32x3' | 'position_i32x4' | 'position_u32' | 'position_u32x2' | 'position_u32x3' | 'position_u32x4' | 'normal_f16x4' | 'normal_f32x3' | 'normal_f32x4' | 'diffuse_u8normx4' | 'diffuse_u16x4' | 'diffuse_u16normx4' | 'diffuse_f16x4' | 'diffuse_f32x3' | 'diffuse_f32x4' | 'diffuse_u32x3' | 'diffuse_u32x4' | 'tangent_f16x4' | 'tangent_f32x3' | 'tangent_f32x4' | 'tex0_u8normx2' | 'tex0_u8normx4' | 'tex0_i8normx2' | 'tex0_i8normx4' | 'tex0_u16x2' | 'tex0_u16x4' | 'tex0_i16x2' | 'tex0_i16x4' | 'tex0_u16normx2' | 'tex0_u16normx4' | 'tex0_i16normx2' | 'tex0_i16normx4' | 'tex0_f16x2' | 'tex0_f16x4' | 'tex0_f32' | 'tex0_f32x2' | 'tex0_f32x3' | 'tex0_f32x4' | 'tex0_i32' | 'tex0_i32x2' | 'tex0_i32x3' | 'tex0_i32x4' | 'tex0_u32' | 'tex0_u32x2' | 'tex0_u32x3' | 'tex0_u32x4' | 'tex1_u8normx2' | 'tex1_u8normx4' | 'tex1_i8normx2' | 'tex1_i8normx4' | 'tex1_u16x2' | 'tex1_u16x4' | 'tex1_i16x2' | 'tex1_i16x4' | 'tex1_u16normx2' | 'tex1_u16normx4' | 'tex1_i16normx2' | 'tex1_i16normx4' | 'tex1_f16x2' | 'tex1_f16x4' | 'tex1_f32' | 'tex1_f32x2' | 'tex1_f32x3' | 'tex1_f32x4' | 'tex1_i32' | 'tex1_i32x2' | 'tex1_i32x3' | 'tex1_i32x4' | 'tex1_u32' | 'tex1_u32x2' | 'tex1_u32x3' | 'tex1_u32x4' | 'tex2_u8normx2' | 'tex2_u8normx4' | 'tex2_i8normx2' | 'tex2_i8normx4' | 'tex2_u16x2' | 'tex2_u16x4' | 'tex2_i16x2' | 'tex2_i16x4' | 'tex2_u16normx2' | 'tex2_u16normx4' | 'tex2_i16normx2' | 'tex2_i16normx4' | 'tex2_f16x2' | 'tex2_f16x4' | 'tex2_f32' | 'tex2_f32x2' | 'tex2_f32x3' | 'tex2_f32x4' | 'tex2_i32' | 'tex2_i32x2' | 'tex2_i32x3' | 'tex2_i32x4' | 'tex2_u32' | 'tex2_u32x2' | 'tex2_u32x3' | 'tex2_u32x4' | 'tex3_u8normx2' | 'tex3_u8normx4' | 'tex3_i8normx2' | 'tex3_i8normx4' | 'tex3_u16x2' | 'tex3_u16x4' | 'tex3_i16x2' | 'tex3_i16x4' | 'tex3_u16normx2' | 'tex3_u16normx4' | 'tex3_i16normx2' | 'tex3_i16normx4' | 'tex3_f16x2' | 'tex3_f16x4' | 'tex3_f32' | 'tex3_f32x2' | 'tex3_f32x3' | 'tex3_f32x4' | 'tex3_i32' | 'tex3_i32x2' | 'tex3_i32x3' | 'tex3_i32x4' | 'tex3_u32' | 'tex3_u32x2' | 'tex3_u32x3' | 'tex3_u32x4' | 'tex4_u8normx2' | 'tex4_u8normx4' | 'tex4_i8normx2' | 'tex4_i8normx4' | 'tex4_u16x2' | 'tex4_u16x4' | 'tex4_i16x2' | 'tex4_i16x4' | 'tex4_u16normx2' | 'tex4_u16normx4' | 'tex4_i16normx2' | 'tex4_i16normx4' | 'tex4_f16x2' | 'tex4_f16x4' | 'tex4_f32' | 'tex4_f32x2' | 'tex4_f32x3' | 'tex4_f32x4' | 'tex4_i32' | 'tex4_i32x2' | 'tex4_i32x3' | 'tex4_i32x4' | 'tex4_u32' | 'tex4_u32x2' | 'tex4_u32x3' | 'tex4_u32x4' | 'tex5_u8normx2' | 'tex5_u8normx4' | 'tex5_i8normx2' | 'tex5_i8normx4' | 'tex5_u16x2' | 'tex5_u16x4' | 'tex5_i16x2' | 'tex5_i16x4' | 'tex5_u16normx2' | 'tex5_u16normx4' | 'tex5_i16normx2' | 'tex5_i16normx4' | 'tex5_f16x2' | 'tex5_f16x4' | 'tex5_f32' | 'tex5_f32x2' | 'tex5_f32x3' | 'tex5_f32x4' | 'tex5_i32' | 'tex5_i32x2' | 'tex5_i32x3' | 'tex5_i32x4' | 'tex5_u32' | 'tex5_u32x2' | 'tex5_u32x3' | 'tex5_u32x4' | 'tex6_u8normx2' | 'tex6_u8normx4' | 'tex6_i8normx2' | 'tex6_i8normx4' | 'tex6_u16x2' | 'tex6_u16x4' | 'tex6_i16x2' | 'tex6_i16x4' | 'tex6_u16normx2' | 'tex6_u16normx4' | 'tex6_i16normx2' | 'tex6_i16normx4' | 'tex6_f16x2' | 'tex6_f16x4' | 'tex6_f32' | 'tex6_f32x2' | 'tex6_f32x3' | 'tex6_f32x4' | 'tex6_i32' | 'tex6_i32x2' | 'tex6_i32x3' | 'tex6_i32x4' | 'tex6_u32' | 'tex6_u32x2' | 'tex6_u32x3' | 'tex6_u32x4' | 'tex7_u8normx2' | 'tex7_u8normx4' | 'tex7_i8normx2' | 'tex7_i8normx4' | 'tex7_u16x2' | 'tex7_u16x4' | 'tex7_i16x2' | 'tex7_i16x4' | 'tex7_u16normx2' | 'tex7_u16normx4' | 'tex7_i16normx2' | 'tex7_i16normx4' | 'tex7_f16x2' | 'tex7_f16x4' | 'tex7_f32' | 'tex7_f32x2' | 'tex7_f32x3' | 'tex7_f32x4' | 'tex7_i32' | 'tex7_i32x2' | 'tex7_i32x3' | 'tex7_i32x4' | 'tex7_u32' | 'tex7_u32x2' | 'tex7_u32x3' | 'tex7_u32x4' | 'blendweights_f16x4' | 'blendweights_f32x4' | 'blendindices_u16x4' | 'blendindices_f16x4' | 'blendindices_f32x4' | 'blendindices_u32x4'"
+              "text": "'position_u8normx2' | 'position_u8normx4' | 'position_i8normx2' | 'position_i8normx4' | 'position_u16x2' | 'position_u16x4' | 'position_i16x2' | 'position_i16x4' | 'position_u16normx2' | 'position_u16normx4' | 'position_i16normx2' | 'position_i16normx4' | 'position_f16x2' | 'position_f16x4' | 'position_f32' | 'position_f32x2' | 'position_f32x3' | 'position_f32x4' | 'position_i32' | 'position_i32x2' | 'position_i32x3' | 'position_i32x4' | 'position_u32' | 'position_u32x2' | 'position_u32x3' | 'position_u32x4' | 'normal_f16x4' | 'normal_f32x3' | 'normal_f32x4' | 'diffuse_u8normx4' | 'diffuse_u16x4' | 'diffuse_u16normx4' | 'diffuse_f16x4' | 'diffuse_f32x3' | 'diffuse_f32x4' | 'diffuse_u32x3' | 'diffuse_u32x4' | 'tangent_f16x4' | 'tangent_f32x3' | 'tangent_f32x4' | 'tex0_u8normx2' | 'tex0_u8normx4' | 'tex0_i8normx2' | 'tex0_i8normx4' | 'tex0_u16x2' | 'tex0_u16x4' | 'tex0_i16x2' | 'tex0_i16x4' | 'tex0_u16normx2' | 'tex0_u16normx4' | 'tex0_i16normx2' | 'tex0_i16normx4' | 'tex0_f16x2' | 'tex0_f16x4' | 'tex0_f32' | 'tex0_f32x2' | 'tex0_f32x3' | 'tex0_f32x4' | 'tex0_i32' | 'tex0_i32x2' | 'tex0_i32x3' | 'tex0_i32x4' | 'tex0_u32' | 'tex0_u32x2' | 'tex0_u32x3' | 'tex0_u32x4' | 'tex1_u8normx2' | 'tex1_u8normx4' | 'tex1_i8normx2' | 'tex1_i8normx4' | 'tex1_u16x2' | 'tex1_u16x4' | 'tex1_i16x2' | 'tex1_i16x4' | 'tex1_u16normx2' | 'tex1_u16normx4' | 'tex1_i16normx2' | 'tex1_i16normx4' | 'tex1_f16x2' | 'tex1_f16x4' | 'tex1_f32' | 'tex1_f32x2' | 'tex1_f32x3' | 'tex1_f32x4' | 'tex1_i32' | 'tex1_i32x2' | 'tex1_i32x3' | 'tex1_i32x4' | 'tex1_u32' | 'tex1_u32x2' | 'tex1_u32x3' | 'tex1_u32x4' | 'tex2_u8normx2' | 'tex2_u8normx4' | 'tex2_i8normx2' | 'tex2_i8normx4' | 'tex2_u16x2' | 'tex2_u16x4' | 'tex2_i16x2' | 'tex2_i16x4' | 'tex2_u16normx2' | 'tex2_u16normx4' | 'tex2_i16normx2' | 'tex2_i16normx4' | 'tex2_f16x2' | 'tex2_f16x4' | 'tex2_f32' | 'tex2_f32x2' | 'tex2_f32x3' | 'tex2_f32x4' | 'tex2_i32' | 'tex2_i32x2' | 'tex2_i32x3' | 'tex2_i32x4' | 'tex2_u32' | 'tex2_u32x2' | 'tex2_u32x3' | 'tex2_u32x4' | 'tex3_u8normx2' | 'tex3_u8normx4' | 'tex3_i8normx2' | 'tex3_i8normx4' | 'tex3_u16x2' | 'tex3_u16x4' | 'tex3_i16x2' | 'tex3_i16x4' | 'tex3_u16normx2' | 'tex3_u16normx4' | 'tex3_i16normx2' | 'tex3_i16normx4' | 'tex3_f16x2' | 'tex3_f16x4' | 'tex3_f32' | 'tex3_f32x2' | 'tex3_f32x3' | 'tex3_f32x4' | 'tex3_i32' | 'tex3_i32x2' | 'tex3_i32x3' | 'tex3_i32x4' | 'tex3_u32' | 'tex3_u32x2' | 'tex3_u32x3' | 'tex3_u32x4' | 'tex4_u8normx2' | 'tex4_u8normx4' | 'tex4_i8normx2' | 'tex4_i8normx4' | 'tex4_u16x2' | 'tex4_u16x4' | 'tex4_i16x2' | 'tex4_i16x4' | 'tex4_u16normx2' | 'tex4_u16normx4' | 'tex4_i16normx2' | 'tex4_i16normx4' | 'tex4_f16x2' | 'tex4_f16x4' | 'tex4_f32' | 'tex4_f32x2' | 'tex4_f32x3' | 'tex4_f32x4' | 'tex4_i32' | 'tex4_i32x2' | 'tex4_i32x3' | 'tex4_i32x4' | 'tex4_u32' | 'tex4_u32x2' | 'tex4_u32x3' | 'tex4_u32x4' | 'tex5_u8normx2' | 'tex5_u8normx4' | 'tex5_i8normx2' | 'tex5_i8normx4' | 'tex5_u16x2' | 'tex5_u16x4' | 'tex5_i16x2' | 'tex5_i16x4' | 'tex5_u16normx2' | 'tex5_u16normx4' | 'tex5_i16normx2' | 'tex5_i16normx4' | 'tex5_f16x2' | 'tex5_f16x4' | 'tex5_f32' | 'tex5_f32x2' | 'tex5_f32x3' | 'tex5_f32x4' | 'tex5_i32' | 'tex5_i32x2' | 'tex5_i32x3' | 'tex5_i32x4' | 'tex5_u32' | 'tex5_u32x2' | 'tex5_u32x3' | 'tex5_u32x4' | 'tex6_u8normx2' | 'tex6_u8normx4' | 'tex6_i8normx2' | 'tex6_i8normx4' | 'tex6_u16x2' | 'tex6_u16x4' | 'tex6_i16x2' | 'tex6_i16x4' | 'tex6_u16normx2' | 'tex6_u16normx4' | 'tex6_i16normx2' | 'tex6_i16normx4' | 'tex6_f16x2' | 'tex6_f16x4' | 'tex6_f32' | 'tex6_f32x2' | 'tex6_f32x3' | 'tex6_f32x4' | 'tex6_i32' | 'tex6_i32x2' | 'tex6_i32x3' | 'tex6_i32x4' | 'tex6_u32' | 'tex6_u32x2' | 'tex6_u32x3' | 'tex6_u32x4' | 'tex7_u8normx2' | 'tex7_u8normx4' | 'tex7_i8normx2' | 'tex7_i8normx4' | 'tex7_u16x2' | 'tex7_u16x4' | 'tex7_i16x2' | 'tex7_i16x4' | 'tex7_u16normx2' | 'tex7_u16normx4' | 'tex7_i16normx2' | 'tex7_i16normx4' | 'tex7_f16x2' | 'tex7_f16x4' | 'tex7_f32' | 'tex7_f32x2' | 'tex7_f32x3' | 'tex7_f32x4' | 'tex7_i32' | 'tex7_i32x2' | 'tex7_i32x3' | 'tex7_i32x4' | 'tex7_u32' | 'tex7_u32x2' | 'tex7_u32x3' | 'tex7_u32x4' | 'blendweights_f16x1' | 'blendweights_f32x1' | 'blendweights_f16x2' | 'blendweights_f32x2' | 'blendweights_f16x3' | 'blendweights_f32x3' | 'blendweights_f16x4' | 'blendweights_f32x4' | 'blendindices_f16x1' | 'blendindices_u16x1' | 'blendindices_f32x1' | 'blendindices_u32x1' | 'blendindices_f16x2' | 'blendindices_u16x2' | 'blendindices_f32x2' | 'blendindices_u32x2' | 'blendindices_f16x3' | 'blendindices_u16x3' | 'blendindices_f32x3' | 'blendindices_u32x3' | 'blendindices_f16x4' | 'blendindices_u16x4' | 'blendindices_f32x4' | 'blendindices_u32x4'"
             },
             {
               "kind": "Content",

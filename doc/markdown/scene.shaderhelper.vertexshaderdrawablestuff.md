@@ -9,7 +9,7 @@ Vertex shader drawable stuff
 **Signature:**
 
 ```typescript
-static vertexShaderDrawableStuff(scope: PBGlobalScope, skinning: boolean, instanced: boolean): void;
+static vertexShaderDrawableStuff(scope: PBGlobalScope, skinning: boolean, morphing: boolean, instanced: boolean): void;
 ```
 
 ## Parameters
@@ -18,6 +18,7 @@ static vertexShaderDrawableStuff(scope: PBGlobalScope, skinning: boolean, instan
 |  --- | --- | --- |
 |  scope | [PBGlobalScope](doc/markdown/./device.pbglobalscope.md) | Current shader scope |
 |  skinning | boolean | true if skinning is used, otherwise false. |
+|  morphing | boolean |  |
 |  instanced | boolean | true if instancing is used, otherwise false. |
 
 **Returns:**

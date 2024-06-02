@@ -9,9 +9,9 @@ Rotation animation track
 **Signature:**
 
 ```typescript
-declare class RotationTrack extends AnimationTrack 
+declare class RotationTrack extends AnimationTrack<Quaternion> 
 ```
-**Extends:** [AnimationTrack](doc/markdown/./scene.animationtrack.md)
+**Extends:** [AnimationTrack](doc/markdown/./scene.animationtrack.md)<!-- -->&lt;[Quaternion](doc/markdown/./base.quaternion.md)<!-- -->&gt;
 
 ## Constructors
 
@@ -24,5 +24,8 @@ declare class RotationTrack extends AnimationTrack
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [apply(node, currentTime, duration)](doc/markdown/./scene.rotationtrack.apply.md) |  | Apply animation to node |
+|  [applyState(node, state)](doc/markdown/./scene.rotationtrack.applystate.md) |  |  |
+|  [calculateState(currentTime)](doc/markdown/./scene.rotationtrack.calculatestate.md) |  |  |
+|  [getBlendId()](doc/markdown/./scene.rotationtrack.getblendid.md) |  |  |
+|  [mixState(a, b, t)](doc/markdown/./scene.rotationtrack.mixstate.md) |  |  |
 

@@ -9,8 +9,15 @@ Stops playing the track and rewind to the first frame
 **Signature:**
 
 ```typescript
-reset(): void;
+reset(node: SceneNode): void;
 ```
+
+## Parameters
+
+|  Parameter | Type | Description |
+|  --- | --- | --- |
+|  node | [SceneNode](doc/markdown/./scene.scenenode.md) |  |
+
 **Returns:**
 
 void

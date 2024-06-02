@@ -9,7 +9,7 @@ Push an item to the render queue
 **Signature:**
 
 ```typescript
-push(camera: Camera, drawable: Drawable, renderOrder: number): void;
+push(camera: Camera, drawable: Drawable): void;
 ```
 
 ## Parameters
@@ -18,7 +18,6 @@ push(camera: Camera, drawable: Drawable, renderOrder: number): void;
 |  --- | --- | --- |
 |  camera | [Camera](doc/markdown/./scene.camera.md) | The camera for drawing the item |
 |  drawable | [Drawable](doc/markdown/./scene.drawable.md) | The object to be drawn |
-|  renderOrder | number | Render order of the object |
 
 **Returns:**
 

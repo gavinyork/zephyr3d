@@ -9,10 +9,5 @@ Gets all the tracks of this animation
 **Signature:**
 
 ```typescript
-get tracks(): Map<SceneNode, {
-        poseTranslation: Vector3;
-        poseRotation: Quaternion;
-        poseScaling: Vector3;
-        tracks: AnimationTrack[];
-    }>;
+get tracks(): Map<SceneNode, AnimationTrack<unknown>[]>;
 ```

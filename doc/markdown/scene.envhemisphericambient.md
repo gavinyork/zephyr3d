@@ -36,6 +36,5 @@ declare class EnvHemisphericAmbient extends EnvironmentLighting
 |  [hasIrradiance()](doc/markdown/./scene.envhemisphericambient.hasirradiance.md) |  | Returns whether this environment lighting supports diffuse light |
 |  [hasRadiance()](doc/markdown/./scene.envhemisphericambient.hasradiance.md) |  | Returns whether this environment lighting supports reflective light |
 |  [initShaderBindings(pb)](doc/markdown/./scene.envhemisphericambient.initshaderbindings.md) |  | Initialize shader bindings |
-|  [isHemispheric()](doc/markdown/./scene.envhemisphericambient.ishemispheric.md) |  | Whether this is an instance of EnvHemisphericAmbient |
 |  [updateBindGroup(bg)](doc/markdown/./scene.envhemisphericambient.updatebindgroup.md) |  | Updates the uniform values |
 

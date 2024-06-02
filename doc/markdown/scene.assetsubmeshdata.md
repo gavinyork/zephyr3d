@@ -17,9 +17,14 @@ interface AssetSubMeshData
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
 |  [material](doc/markdown/./scene.assetsubmeshdata.material.md) |  | [MeshMaterial](doc/markdown/./scene.meshmaterial.md) |  |
+|  [mesh?](doc/markdown/./scene.assetsubmeshdata.mesh.md) |  | [Mesh](doc/markdown/./scene.mesh.md) | _(Optional)_ |
+|  [morphAttribCount?](doc/markdown/./scene.assetsubmeshdata.morphattribcount.md) |  | number | _(Optional)_ |
 |  [name](doc/markdown/./scene.assetsubmeshdata.name.md) |  | string |  |
+|  [numTargets](doc/markdown/./scene.assetsubmeshdata.numtargets.md) |  | number |  |
 |  [primitive](doc/markdown/./scene.assetsubmeshdata.primitive.md) |  | [Primitive](doc/markdown/./scene.primitive.md) |  |
 |  [rawBlendIndices](doc/markdown/./scene.assetsubmeshdata.rawblendindices.md) |  | [TypedArray](doc/markdown/./base.typedarray.md) |  |
 |  [rawJointWeights](doc/markdown/./scene.assetsubmeshdata.rawjointweights.md) |  | [TypedArray](doc/markdown/./base.typedarray.md) |  |
 |  [rawPositions](doc/markdown/./scene.assetsubmeshdata.rawpositions.md) |  | Float32Array |  |
+|  [targetBox?](doc/markdown/./scene.assetsubmeshdata.targetbox.md) |  | [BoundingBox](doc/markdown/./scene.boundingbox.md)<!-- -->\[\] | _(Optional)_ |
+|  [targets?](doc/markdown/./scene.assetsubmeshdata.targets.md) |  | Partial&lt;Record&lt;number, { numComponents: number; data: Float32Array\[\]; }&gt;&gt; | _(Optional)_ |
 

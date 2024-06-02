@@ -14,7 +14,7 @@ type IMixinPBRMetallicRoughness = {
     roughness: number;
     specularFactor: Vector4;
     PBRLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp, TBN?: PBShaderExp): PBShaderExp;
-    calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
+    calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
 } & IMixinPBRCommon & IMixinLight & TextureMixinInstanceTypes<['metallicRoughness', 'occlusion', 'specular', 'specularColor']>;
 ```
 **References:** [Vector4](doc/markdown/./base.vector4.md)<!-- -->, [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)<!-- -->, [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, [IMixinPBRCommon](doc/markdown/./scene.imixinpbrcommon.md)<!-- -->, [IMixinLight](doc/markdown/./scene.imixinlight.md)<!-- -->, [TextureMixinInstanceTypes](doc/markdown/./scene.texturemixininstancetypes.md)

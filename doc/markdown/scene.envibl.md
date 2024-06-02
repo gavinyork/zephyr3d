@@ -36,6 +36,5 @@ declare class EnvIBL extends EnvironmentLighting
 |  [hasIrradiance()](doc/markdown/./scene.envibl.hasirradiance.md) |  | Returns whether this environment lighting supports diffuse light |
 |  [hasRadiance()](doc/markdown/./scene.envibl.hasradiance.md) |  | Returns whether this environment lighting supports reflective light |
 |  [initShaderBindings(pb)](doc/markdown/./scene.envibl.initshaderbindings.md) |  | Initialize shader bindings |
-|  [isIBL()](doc/markdown/./scene.envibl.isibl.md) |  | Whether this is an instance of EnvIBL |
 |  [updateBindGroup(bg)](doc/markdown/./scene.envibl.updatebindgroup.md) |  | Updates the uniform values |
 

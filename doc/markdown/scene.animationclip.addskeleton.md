@@ -9,7 +9,7 @@ Adds a skeleton to the animation
 **Signature:**
 
 ```typescript
-addSkeleton(skeleton: Skeleton, meshList: Mesh[], boundingBoxInfo: SkinnedBoundingBox[]): void;
+addSkeleton(skeleton: Skeleton): void;
 ```
 
 ## Parameters
@@ -17,8 +17,6 @@ addSkeleton(skeleton: Skeleton, meshList: Mesh[], boundingBoxInfo: SkinnedBoundi
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  skeleton | [Skeleton](doc/markdown/./scene.skeleton.md) | The skeleton to be added |
-|  meshList | [Mesh](doc/markdown/./scene.mesh.md)<!-- -->\[\] | The meshes controlled by the skeleton |
-|  boundingBoxInfo | [SkinnedBoundingBox](doc/markdown/./scene.skinnedboundingbox.md)<!-- -->\[\] | Bounding box information for the skeleton |
 
 **Returns:**
 

@@ -35,6 +35,6 @@ declare class Scene extends Scene_base
 |  --- | --- | --- |
 |  [constructRay(camera, viewportWidth, viewportHeight, screenX, screenY, invModelMatrix)](doc/markdown/./scene.scene.constructray.md) |  | Constructs a ray by a given camera and the position on screen |
 |  [dispose()](doc/markdown/./scene.scene.dispose.md) |  | Disposes the scene |
-|  [raycast(camera, screenX, screenY)](doc/markdown/./scene.scene.raycast.md) |  | Cast a ray into the scene to get the closest object hit by the ray |
+|  [raycast(ray, length)](doc/markdown/./scene.scene.raycast.md) |  | Cast a ray into the scene to get the closest object hit by the ray |
 |  [updateNodePlacement(octree, list)](doc/markdown/./scene.scene.updatenodeplacement.md) |  | Update node placement in the octree |
 

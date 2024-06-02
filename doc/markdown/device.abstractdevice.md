@@ -20,10 +20,12 @@ interface AbstractDevice extends IEventTarget<DeviceEventMap>
 |  [canvas](doc/markdown/./device.abstractdevice.canvas.md) |  | HTMLCanvasElement | Get the canvas element for this device |
 |  [frameInfo](doc/markdown/./device.abstractdevice.frameinfo.md) |  | [FrameInfo](doc/markdown/./device.frameinfo.md) | Get the current frame information |
 |  [isRendering](doc/markdown/./device.abstractdevice.isrendering.md) |  | boolean | Check if the device is running a rendering loop by calling [AbstractDevice.runLoop()](doc/markdown/./device.abstractdevice.runloop.md) |
+|  [pool](doc/markdown/./device.abstractdevice.pool.md) |  | Pool | Get pool object |
 |  [programBuilder](doc/markdown/./device.abstractdevice.programbuilder.md) |  | [ProgramBuilder](doc/markdown/./device.programbuilder.md) | Get the program builder |
 |  [runLoopFunction](doc/markdown/./device.abstractdevice.runloopfunction.md) |  | (device: [AbstractDevice](doc/markdown/./device.abstractdevice.md)<!-- -->) =&gt; void | Get the run loop callback function |
 |  [type](doc/markdown/./device.abstractdevice.type.md) |  | string | Get the device type |
 |  [videoMemoryUsage](doc/markdown/./device.abstractdevice.videomemoryusage.md) |  | number | Get the video memory usage in bytes |
+|  [vSync](doc/markdown/./device.abstractdevice.vsync.md) |  | boolean | vSync |
 
 ## Methods
 
@@ -33,6 +35,7 @@ interface AbstractDevice extends IEventTarget<DeviceEventMap>
 |  [beginFrame()](doc/markdown/./device.abstractdevice.beginframe.md) | Begins a frame for rendering |
 |  [buildComputeProgram(options)](doc/markdown/./device.abstractdevice.buildcomputeprogram.md) | Builds compute program |
 |  [buildRenderProgram(options)](doc/markdown/./device.abstractdevice.buildrenderprogram.md) | Builds render program |
+|  [cancelNextFrame(handle)](doc/markdown/./device.abstractdevice.cancelnextframe.md) | Cancel schedule next frame |
 |  [clearFrameBuffer(clearColor, clearDepth, clearStencil)](doc/markdown/./device.abstractdevice.clearframebuffer.md) | Clears the current frame buffer |
 |  [compute(workgroupCountX, workgroupCountY, workgroupCountZ)](doc/markdown/./device.abstractdevice.compute.md) | Dispatches a compute task to the GPU |
 |  [copyBuffer(sourceBuffer, destBuffer, srcOffset, dstOffset, bytes)](doc/markdown/./device.abstractdevice.copybuffer.md) | Copies a buffer to another buffer |
@@ -67,6 +70,7 @@ interface AbstractDevice extends IEventTarget<DeviceEventMap>
 |  [executeRenderBundle(renderBundle)](doc/markdown/./device.abstractdevice.executerenderbundle.md) | Executes render bundle |
 |  [exitLoop()](doc/markdown/./device.abstractdevice.exitloop.md) | Exits from current rendering loop |
 |  [flush()](doc/markdown/./device.abstractdevice.flush.md) | Flush the gpu command buffer |
+|  [getAdapterInfo()](doc/markdown/./device.abstractdevice.getadapterinfo.md) | Get adapter information |
 |  [getBackBufferHeight()](doc/markdown/./device.abstractdevice.getbackbufferheight.md) | Get the height of back buffer |
 |  [getBackBufferWidth()](doc/markdown/./device.abstractdevice.getbackbufferwidth.md) | Get the width of back buffer |
 |  [getBindGroup(index)](doc/markdown/./device.abstractdevice.getbindgroup.md) | Get current bind group |
@@ -86,6 +90,7 @@ interface AbstractDevice extends IEventTarget<DeviceEventMap>
 |  [getViewport()](doc/markdown/./device.abstractdevice.getviewport.md) | Get current viewport as \[x, y, width, height\] |
 |  [isContextLost()](doc/markdown/./device.abstractdevice.iscontextlost.md) | Returns true if device context is lost. |
 |  [isWindingOrderReversed()](doc/markdown/./device.abstractdevice.iswindingorderreversed.md) | Check if the current winding order is reversed. |
+|  [nextFrame(callback)](doc/markdown/./device.abstractdevice.nextframe.md) | Schedule next frame |
 |  [popDeviceStates()](doc/markdown/./device.abstractdevice.popdevicestates.md) | Pops last FrameBuffer state |
 |  [pushDeviceStates()](doc/markdown/./device.abstractdevice.pushdevicestates.md) | Pushes current FrameBuffer state |
 |  [readPixels(index, x, y, w, h, buffer)](doc/markdown/./device.abstractdevice.readpixels.md) | Read pixel values from current frame buffer |
@@ -96,7 +101,8 @@ interface AbstractDevice extends IEventTarget<DeviceEventMap>
 |  [screenToDevice(val)](doc/markdown/./device.abstractdevice.screentodevice.md) | Calculates the actual position of current frame buffer from screen position. |
 |  [setBindGroup(index, bindGroup, dynamicOffsets)](doc/markdown/./device.abstractdevice.setbindgroup.md) | Set current bind group |
 |  [setFont(fontName)](doc/markdown/./device.abstractdevice.setfont.md) | Set font for drawText function |
-|  [setFramebuffer(rt)](doc/markdown/./device.abstractdevice.setframebuffer.md) | Set current frame buffer |
+|  [setFramebuffer(rt)](doc/markdown/./device.abstractdevice.setframebuffer.md) | Sets the current framebuffer to the specified FrameBuffer object. |
+|  [setFramebuffer(color, depth, miplevel, face, sampleCount)](doc/markdown/./device.abstractdevice.setframebuffer_1.md) | Sets the current framebuffer specifying complex color attachments, an optional depth attachment, MIP level, face, and sample count. |
 |  [setProgram(program)](doc/markdown/./device.abstractdevice.setprogram.md) | Set current GPU program |
 |  [setRenderStates(renderStates)](doc/markdown/./device.abstractdevice.setrenderstates.md) | Set current render states |
 |  [setScissor(scissor)](doc/markdown/./device.abstractdevice.setscissor.md) | Set scissor rectangle from an array that contains the position and size |

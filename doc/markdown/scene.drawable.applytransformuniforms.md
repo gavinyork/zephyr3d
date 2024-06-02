@@ -4,6 +4,8 @@
 
 ## Drawable.applyTransformUniforms() method
 
+Apply transform uniforms
+
 **Signature:**
 
 ```typescript

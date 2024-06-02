@@ -9,9 +9,9 @@ Scale animation track
 **Signature:**
 
 ```typescript
-declare class ScaleTrack extends AnimationTrack 
+declare class ScaleTrack extends AnimationTrack<Vector3> 
 ```
-**Extends:** [AnimationTrack](doc/markdown/./scene.animationtrack.md)
+**Extends:** [AnimationTrack](doc/markdown/./scene.animationtrack.md)<!-- -->&lt;[Vector3](doc/markdown/./base.vector3.md)<!-- -->&gt;
 
 ## Constructors
 
@@ -24,5 +24,8 @@ declare class ScaleTrack extends AnimationTrack
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [apply(node, currentTime, duration)](doc/markdown/./scene.scaletrack.apply.md) |  | Apply animation to node |
+|  [applyState(node, state)](doc/markdown/./scene.scaletrack.applystate.md) |  |  |
+|  [calculateState(currentTime)](doc/markdown/./scene.scaletrack.calculatestate.md) |  |  |
+|  [getBlendId()](doc/markdown/./scene.scaletrack.getblendid.md) |  |  |
+|  [mixState(a, b, t)](doc/markdown/./scene.scaletrack.mixstate.md) |  |  |
 

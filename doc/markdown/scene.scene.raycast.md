@@ -9,7 +9,7 @@ Cast a ray into the scene to get the closest object hit by the ray
 **Signature:**
 
 ```typescript
-raycast(camera: Camera, screenX: number, screenY: number): {
+raycast(ray: Ray, length?: number): {
         node: GraphNode;
         dist: number;
         point: Vector3;
@@ -20,9 +20,8 @@ raycast(camera: Camera, screenX: number, screenY: number): {
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  camera | [Camera](doc/markdown/./scene.camera.md) | The camera used to compute the ray |
-|  screenX | number | The x position on screen |
-|  screenY | number | The y position on screen |
+|  ray | [Ray](doc/markdown/./base.ray.md) | The ray in world coordinate space |
+|  length | number | _(Optional)_ Length of the ray |
 
 **Returns:**
 

@@ -11,6 +11,7 @@ Options for model fetching
 ```typescript
 type ModelFetchOptions = {
     mimeType?: string;
+    dracoDecoderModule?: DecoderModule;
     enableInstancing?: boolean;
     postProcess?: (model: SharedModel) => SharedModel;
 };

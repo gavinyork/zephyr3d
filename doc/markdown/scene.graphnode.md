@@ -23,12 +23,6 @@ Graph node is the base class of any kind of scene node that will be placed into 
 |  --- | --- | --- |
 |  [(constructor)(scene)](doc/markdown/./scene.graphnode._constructor_.md) |  | Creates a graph node |
 
-## Properties
-
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [renderOrder](doc/markdown/./scene.graphnode.renderorder.md) |  | number | Render order of the node |
-
 ## Methods
 
 |  Method | Modifiers | Description |

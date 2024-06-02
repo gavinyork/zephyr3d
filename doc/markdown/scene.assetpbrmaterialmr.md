@@ -18,6 +18,7 @@ interface AssetPBRMaterialMR extends AssetPBRMaterialCommon
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
 |  [clearcoat?](doc/markdown/./scene.assetpbrmaterialmr.clearcoat.md) |  | [AssetMaterialClearcoat](doc/markdown/./scene.assetmaterialclearcoat.md) | _(Optional)_ |
+|  [iridescence?](doc/markdown/./scene.assetpbrmaterialmr.iridescence.md) |  | [AssetMaterialIridescence](doc/markdown/./scene.assetmaterialiridescence.md) | _(Optional)_ |
 |  [metallic?](doc/markdown/./scene.assetpbrmaterialmr.metallic.md) |  | number | _(Optional)_ |
 |  [metallicIndex?](doc/markdown/./scene.assetpbrmaterialmr.metallicindex.md) |  | number | _(Optional)_ |
 |  [metallicMap?](doc/markdown/./scene.assetpbrmaterialmr.metallicmap.md) |  | [MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md) | _(Optional)_ |
@@ -27,4 +28,5 @@ interface AssetPBRMaterialMR extends AssetPBRMaterialCommon
 |  [specularColorMap?](doc/markdown/./scene.assetpbrmaterialmr.specularcolormap.md) |  | [MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md) | _(Optional)_ |
 |  [specularFactor?](doc/markdown/./scene.assetpbrmaterialmr.specularfactor.md) |  | [Vector4](doc/markdown/./base.vector4.md) | _(Optional)_ |
 |  [specularMap?](doc/markdown/./scene.assetpbrmaterialmr.specularmap.md) |  | [MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md) | _(Optional)_ |
+|  [transmission?](doc/markdown/./scene.assetpbrmaterialmr.transmission.md) |  | [AssetMaterialTransmission](doc/markdown/./scene.assetmaterialtransmission.md) | _(Optional)_ |
 

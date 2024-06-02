@@ -9,9 +9,9 @@ Gets the associated material
 **Signature:**
 
 ```typescript
-getMaterial(): Material;
+getMaterial(): MeshMaterial;
 ```
 **Returns:**
 
-[Material](doc/markdown/./scene.material.md)
+[MeshMaterial](doc/markdown/./scene.meshmaterial.md)
 

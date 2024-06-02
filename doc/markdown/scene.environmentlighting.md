@@ -22,8 +22,5 @@ declare abstract class EnvironmentLighting
 |  [hasIrradiance()](doc/markdown/./scene.environmentlighting.hasirradiance.md) | <code>abstract</code> | Returns whether this environment lighting supports diffuse light |
 |  [hasRadiance()](doc/markdown/./scene.environmentlighting.hasradiance.md) | <code>abstract</code> | Returns whether this environment lighting supports reflective light |
 |  [initShaderBindings(pb)](doc/markdown/./scene.environmentlighting.initshaderbindings.md) | <code>abstract</code> | Initialize shader bindings |
-|  [isConstant()](doc/markdown/./scene.environmentlighting.isconstant.md) |  | Whether this is an instance of EnvConstantAmbient |
-|  [isHemispheric()](doc/markdown/./scene.environmentlighting.ishemispheric.md) |  | Whether this is an instance of EnvHemisphericAmbient |
-|  [isIBL()](doc/markdown/./scene.environmentlighting.isibl.md) |  | Whether this is an instance of EnvIBL |
 |  [updateBindGroup(bg)](doc/markdown/./scene.environmentlighting.updatebindgroup.md) | <code>abstract</code> | Updates the uniform values |
 

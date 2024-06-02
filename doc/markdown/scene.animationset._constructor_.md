@@ -9,7 +9,7 @@ Creates an instance of AnimationSet
 **Signature:**
 
 ```typescript
-constructor(scene: Scene);
+constructor(scene: Scene, model: SceneNode);
 ```
 
 ## Parameters
@@ -17,4 +17,5 @@ constructor(scene: Scene);
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  scene | [Scene](doc/markdown/./scene.scene.md) | The scene to which the animation set belongs |
+|  model | [SceneNode](doc/markdown/./scene.scenenode.md) |  |
 

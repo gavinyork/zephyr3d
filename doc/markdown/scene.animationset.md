@@ -16,7 +16,7 @@ declare class AnimationSet
 
 |  Constructor | Modifiers | Description |
 |  --- | --- | --- |
-|  [(constructor)(scene)](doc/markdown/./scene.animationset._constructor_.md) |  | Creates an instance of AnimationSet |
+|  [(constructor)(scene, model)](doc/markdown/./scene.animationset._constructor_.md) |  | Creates an instance of AnimationSet |
 
 ## Properties
 
@@ -32,8 +32,10 @@ declare class AnimationSet
 |  [dispose()](doc/markdown/./scene.animationset.dispose.md) |  |  |
 |  [get(name)](doc/markdown/./scene.animationset.get.md) |  | Gets an animation clip by name |
 |  [getAnimationNames()](doc/markdown/./scene.animationset.getanimationnames.md) |  | Gets names of all the animations of the model |
+|  [getAnimationWeight(name)](doc/markdown/./scene.animationset.getanimationweight.md) |  | Gets the weight of specific animation which is currently playing |
 |  [isPlayingAnimation(name)](doc/markdown/./scene.animationset.isplayinganimation.md) |  | Checks whether an animation is playing |
-|  [playAnimation(name, repeat, speedRatio)](doc/markdown/./scene.animationset.playanimation.md) |  | Starts playing an animation of the model |
-|  [stopAnimation(name)](doc/markdown/./scene.animationset.stopanimation.md) |  | Stops playing an animation of the model |
+|  [playAnimation(name, options)](doc/markdown/./scene.animationset.playanimation.md) |  | Starts playing an animation of the model |
+|  [setAnimationWeight(name, weight)](doc/markdown/./scene.animationset.setanimationweight.md) |  | Sets the weight of specific animation which is currently playing |
+|  [stopAnimation(name, options)](doc/markdown/./scene.animationset.stopanimation.md) |  | Stops playing an animation of the model |
 |  [update()](doc/markdown/./scene.animationset.update.md) |  | Updates all animations of the model |
 

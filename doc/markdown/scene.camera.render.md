@@ -9,7 +9,7 @@ Renders a scene
 **Signature:**
 
 ```typescript
-render(scene: Scene, compositor?: Compositor, logger?: RenderLogger): void;
+render(scene: Scene, compositor?: Compositor): void;
 ```
 
 ## Parameters
@@ -18,7 +18,6 @@ render(scene: Scene, compositor?: Compositor, logger?: RenderLogger): void;
 |  --- | --- | --- |
 |  scene | [Scene](doc/markdown/./scene.scene.md) | The scene to be rendered |
 |  compositor | [Compositor](doc/markdown/./scene.compositor.md) | _(Optional)_ Compositor instance that will be used to apply postprocess effects |
-|  logger | RenderLogger | _(Optional)_ |
 
 **Returns:**
 

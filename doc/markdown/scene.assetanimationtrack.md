@@ -16,7 +16,8 @@ interface AssetAnimationTrack
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
+|  [defaultMorphWeights?](doc/markdown/./scene.assetanimationtrack.defaultmorphweights.md) |  | number\[\] | _(Optional)_ |
 |  [interpolator](doc/markdown/./scene.assetanimationtrack.interpolator.md) |  | [Interpolator](doc/markdown/./base.interpolator.md) |  |
 |  [node](doc/markdown/./scene.assetanimationtrack.node.md) |  | [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md) |  |
-|  [type](doc/markdown/./scene.assetanimationtrack.type.md) |  | 'translation' \| 'scale' \| 'rotation' |  |
+|  [type](doc/markdown/./scene.assetanimationtrack.type.md) |  | 'translation' \| 'scale' \| 'rotation' \| 'weights' |  |
 

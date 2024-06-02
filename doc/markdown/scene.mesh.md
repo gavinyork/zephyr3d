@@ -27,7 +27,7 @@ declare class Mesh extends Mesh_base implements BatchDrawable
 |  --- | --- | --- | --- |
 |  [castShadow](doc/markdown/./scene.mesh.castshadow.md) |  | boolean | Wether the mesh node casts shadows |
 |  [drawBoundingBox](doc/markdown/./scene.mesh.drawboundingbox.md) |  | boolean | Wether to draw the bounding box of the mesh node |
-|  [material](doc/markdown/./scene.mesh.material.md) |  | [Material](doc/markdown/./scene.material.md) | Material of the mesh |
+|  [material](doc/markdown/./scene.mesh.material.md) |  | [MeshMaterial](doc/markdown/./scene.meshmaterial.md) | Material of the mesh |
 |  [primitive](doc/markdown/./scene.mesh.primitive.md) |  | [Primitive](doc/markdown/./scene.primitive.md) | Primitive of the mesh |
 
 ## Methods
@@ -42,6 +42,8 @@ declare class Mesh extends Mesh_base implements BatchDrawable
 |  [getInstanceUniforms()](doc/markdown/./scene.mesh.getinstanceuniforms.md) |  | Gets the instance uniforms |
 |  [getInvBindMatrix()](doc/markdown/./scene.mesh.getinvbindmatrix.md) |  | Gets the inversed bind matrix for skeleton animation |
 |  [getMaterial()](doc/markdown/./scene.mesh.getmaterial.md) |  | Gets the associated material |
+|  [getMorphData()](doc/markdown/./scene.mesh.getmorphdata.md) |  | Gets the morph texture |
+|  [getMorphInfo()](doc/markdown/./scene.mesh.getmorphinfo.md) |  | Gets the morph information buffer |
 |  [getName()](doc/markdown/./scene.mesh.getname.md) |  | Gets name of the drawable object |
 |  [getPickTarget()](doc/markdown/./scene.mesh.getpicktarget.md) |  | If set, the pick target will be returned as the pick result |
 |  [getQueueType()](doc/markdown/./scene.mesh.getqueuetype.md) |  | Gets the type of render queue |
@@ -49,7 +51,10 @@ declare class Mesh extends Mesh_base implements BatchDrawable
 |  [isBatchable()](doc/markdown/./scene.mesh.isbatchable.md) |  | returns true if the object is batchable |
 |  [isMesh()](doc/markdown/./scene.mesh.ismesh.md) |  | true if this is a mesh node, false otherwise |
 |  [isUnlit()](doc/markdown/./scene.mesh.isunlit.md) |  | true if the shading of this object is independent of lighting |
+|  [needSceneColor()](doc/markdown/./scene.mesh.needscenecolor.md) |  | Need scene color |
 |  [setAnimatedBoundingBox(bbox)](doc/markdown/./scene.mesh.setanimatedboundingbox.md) |  | Sets the bounding box for animation |
 |  [setBoneMatrices(matrices)](doc/markdown/./scene.mesh.setbonematrices.md) |  | Sets the texture that contains the bone matrices for skeletal animation |
 |  [setInvBindMatrix(matrix)](doc/markdown/./scene.mesh.setinvbindmatrix.md) |  | Sets the inverse bind matrix for skeletal animation |
+|  [setMorphData(data)](doc/markdown/./scene.mesh.setmorphdata.md) |  | Sets the texture that contains the morph target data |
+|  [setMorphInfo(info)](doc/markdown/./scene.mesh.setmorphinfo.md) |  | Sets the buffer that contains the morph target information |
 

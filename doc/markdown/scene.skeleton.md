@@ -16,7 +16,7 @@ declare class Skeleton
 
 |  Constructor | Modifiers | Description |
 |  --- | --- | --- |
-|  [(constructor)(joints, inverseBindMatrices, bindPoseMatrices)](doc/markdown/./scene.skeleton._constructor_.md) |  | Creates an instance of skeleton |
+|  [(constructor)(joints, inverseBindMatrices, bindPoseMatrices, meshes, bounding)](doc/markdown/./scene.skeleton._constructor_.md) |  | Creates an instance of skeleton |
 
 ## Properties
 

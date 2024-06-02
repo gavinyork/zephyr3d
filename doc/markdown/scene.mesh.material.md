@@ -9,7 +9,7 @@ Material of the mesh
 **Signature:**
 
 ```typescript
-get material(): Material;
+get material(): MeshMaterial;
 
-set material(m: Material);
+set material(m: MeshMaterial);
 ```

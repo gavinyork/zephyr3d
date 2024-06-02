@@ -38,6 +38,7 @@ declare class Material
 |  [getQueueType()](doc/markdown/./scene.material.getqueuetype.md) |  |  |
 |  [isBatchable()](doc/markdown/./scene.material.isbatchable.md) |  | Returns true if this material supports geometry instancing |
 |  [isTransparentPass(pass)](doc/markdown/./scene.material.istransparentpass.md) |  | Returns true if given pass is transparent |
+|  [needSceneColor()](doc/markdown/./scene.material.needscenecolor.md) |  | Return true if this material requires the scene color texture |
 |  [passToHash(pass)](doc/markdown/./scene.material.passtohash.md) |  | Convert pass to hash |
 |  [supportInstancing()](doc/markdown/./scene.material.supportinstancing.md) |  | Returns true if this material supports geometry instancing |
 |  [supportLighting()](doc/markdown/./scene.material.supportlighting.md) |  | Returns true if shading of the material will be affected by lights |

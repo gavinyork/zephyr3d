@@ -76,11 +76,15 @@
 |  [getTextureFormatBlockHeight(format)](doc/markdown/./device.gettextureformatblockheight.md) | Get block height of given texture format |
 |  [getTextureFormatBlockSize(format)](doc/markdown/./device.gettextureformatblocksize.md) | Get block size of given texture format |
 |  [getTextureFormatBlockWidth(format)](doc/markdown/./device.gettextureformatblockwidth.md) | Get block width of given texture format |
+|  [getVertexAttribByName(name)](doc/markdown/./device.getvertexattribbyname.md) | Get vertex attribute index by semantic |
 |  [getVertexAttribFormat(semantic, type, count)](doc/markdown/./device.getvertexattribformat.md) | Get vertex format by semantic and component type and component count |
+|  [getVertexAttribName(attrib)](doc/markdown/./device.getvertexattribname.md) | Get vertex semantic by attribute index |
 |  [getVertexBufferAttribType(vertexBufferType, attrib)](doc/markdown/./device.getvertexbufferattribtype.md) | Get primitive type of a vertex attribute by specified vertex attribute index |
 |  [getVertexBufferAttribTypeBySemantic(vertexBufferType, semantic)](doc/markdown/./device.getvertexbufferattribtypebysemantic.md) | Get primitive type of a vertex attribute by specified vertex semantic |
 |  [getVertexBufferLength(vertexBufferType)](doc/markdown/./device.getvertexbufferlength.md) | Get the length of a vertex buffer by specified structure type of the vertex buffer |
 |  [getVertexBufferStride(vertexBufferType)](doc/markdown/./device.getvertexbufferstride.md) | Get byte stride of a vertex buffer by specified structure type of the vertex buffer |
+|  [getVertexFormatComponentCount(fmt)](doc/markdown/./device.getvertexformatcomponentcount.md) | Get number of components of specified vertex format |
+|  [getVertexFormatSize(fmt)](doc/markdown/./device.getvertexformatsize.md) | Get byte size of specified vertex format |
 |  [hasAlphaChannel(format)](doc/markdown/./device.hasalphachannel.md) | Check if a given texture format contains an alpha channel. |
 |  [hasBlueChannel(format)](doc/markdown/./device.hasbluechannel.md) | Check if a given texture format contains a blue channel. |
 |  [hasDepthChannel(format)](doc/markdown/./device.hasdepthchannel.md) | Check if a given texture format contains a depth channel. |

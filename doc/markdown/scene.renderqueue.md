@@ -22,7 +22,9 @@ declare class RenderQueue
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
-|  [items](doc/markdown/./scene.renderqueue.items.md) | <code>readonly</code> | Record&lt;number, RenderItemList&gt; | Gets the items of the render queue |
+|  [drawTransparent](doc/markdown/./scene.renderqueue.drawtransparent.md) | <code>readonly</code> | boolean | Whether this render queue has transparent objects to be drawn |
+|  [itemList](doc/markdown/./scene.renderqueue.itemlist.md) | <code>readonly</code> | RenderItemList | Gets the items of the render queue |
+|  [needSceneColor](doc/markdown/./scene.renderqueue.needscenecolor.md) | <code>readonly</code> | boolean | Whether this render queue requires scene color pass |
 |  [ref](doc/markdown/./scene.renderqueue.ref.md) | <code>readonly</code> | RenderQueueRef | Gets the indirect reference of this |
 |  [renderPass](doc/markdown/./scene.renderqueue.renderpass.md) | <code>readonly</code> | [RenderPass](doc/markdown/./scene.renderpass.md) | The render pass to which the render queue belongs |
 |  [shadowedLights](doc/markdown/./scene.renderqueue.shadowedlights.md) | <code>readonly</code> | [PunctualLight](doc/markdown/./scene.punctuallight.md)<!-- -->\[\] | Gets the shadowed lights |
@@ -35,7 +37,7 @@ declare class RenderQueue
 |  --- | --- | --- |
 |  [binaryInsert(itemList, item)](doc/markdown/./scene.renderqueue.binaryinsert.md) |  |  |
 |  [getInstanceInfo(drawable)](doc/markdown/./scene.renderqueue.getinstanceinfo.md) |  | Gets the instance information for given drawable object |
-|  [push(camera, drawable, renderOrder)](doc/markdown/./scene.renderqueue.push.md) |  | Push an item to the render queue |
+|  [push(camera, drawable)](doc/markdown/./scene.renderqueue.push.md) |  | Push an item to the render queue |
 |  [pushLight(light)](doc/markdown/./scene.renderqueue.pushlight.md) |  | Push a punctual light |
 |  [pushRenderQueue(queue)](doc/markdown/./scene.renderqueue.pushrenderqueue.md) |  | Push items from another render queue |
 |  [reset()](doc/markdown/./scene.renderqueue.reset.md) |  | Removes all items in the render queue |

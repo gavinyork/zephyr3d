@@ -29,11 +29,15 @@ declare class Camera extends SceneNode
 |  [commandBufferReuse](doc/markdown/./scene.camera.commandbufferreuse.md) |  | boolean | Whether to allow command buffer reuse optimization |
 |  [controller](doc/markdown/./scene.camera.controller.md) |  | [BaseCameraController](doc/markdown/./scene.basecameracontroller.md) | The camera controller |
 |  [depthPrePass](doc/markdown/./scene.camera.depthprepass.md) |  | boolean | Whether to perform a depth pass |
+|  [enablePicking](doc/markdown/./scene.camera.enablepicking.md) |  | boolean | Whether GPU picking is enabled for this camera |
 |  [framebuffer](doc/markdown/./scene.camera.framebuffer.md) |  | [FrameBuffer](doc/markdown/./device.framebuffer.md) | Framebuffer object into which the scene will be rendered |
 |  [frustum](doc/markdown/./scene.camera.frustum.md) | <code>readonly</code> | [Frustum](doc/markdown/./base.frustum.md) | Gets the frustum of the camera |
 |  [frustumViewSpace](doc/markdown/./scene.camera.frustumviewspace.md) | <code>readonly</code> | [Frustum](doc/markdown/./base.frustum.md) |  |
 |  [invViewProjectionMatrix](doc/markdown/./scene.camera.invviewprojectionmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The inverse-view-projection matrix of the camera |
 |  [oit](doc/markdown/./scene.camera.oit.md) |  | [OIT](doc/markdown/./scene.oit.md) | OIT |
+|  [pickPosX](doc/markdown/./scene.camera.pickposx.md) |  | number | X coordinate for picking related to viewport |
+|  [pickPosY](doc/markdown/./scene.camera.pickposy.md) |  | number | Y coordinate for picking related to viewport |
+|  [pickResult](doc/markdown/./scene.camera.pickresult.md) |  | [PickResult](doc/markdown/./scene.pickresult.md) | Pick result |
 |  [sampleCount](doc/markdown/./scene.camera.samplecount.md) |  | number | Sample count for MSAA |
 |  [scissor](doc/markdown/./scene.camera.scissor.md) |  | number\[\] | Scissor rectangle used for rendering, if null, use viewport value |
 |  [viewMatrix](doc/markdown/./scene.camera.viewmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | View matrix of the camera |
@@ -44,6 +48,7 @@ declare class Camera extends SceneNode
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
+|  [constructRay(x, y)](doc/markdown/./scene.camera.constructray.md) |  | Constructs a ray based on the given screen coordinates. |
 |  [dispose()](doc/markdown/./scene.camera.dispose.md) |  | Disposes the node |
 |  [getAspect()](doc/markdown/./scene.camera.getaspect.md) |  | Gets the aspect ratio |
 |  [getFarPlane()](doc/markdown/./scene.camera.getfarplane.md) |  | Gets the far clip plane of the camera |
@@ -56,7 +61,7 @@ declare class Camera extends SceneNode
 |  [isCamera()](doc/markdown/./scene.camera.iscamera.md) |  | true if this is a camera node, false otherwise |
 |  [lookAt(eye, target, up)](doc/markdown/./scene.camera.lookat.md) |  | Place the camera by specifying the camera position and the target point |
 |  [lookAtCubeFace(face, position)](doc/markdown/./scene.camera.lookatcubeface.md) |  | Place the camera to look at a given cube face at a given camera position |
-|  [render(scene, compositor, logger)](doc/markdown/./scene.camera.render.md) |  | Renders a scene |
+|  [render(scene, compositor)](doc/markdown/./scene.camera.render.md) |  | Renders a scene |
 |  [resetController()](doc/markdown/./scene.camera.resetcontroller.md) |  | Reset the controller |
 |  [setOrtho(left, right, bottom, top, near, far)](doc/markdown/./scene.camera.setortho.md) |  | Setup a orthogonal projection matrix for the camera |
 |  [setPerspective(fovY, aspect, zNear, zFar)](doc/markdown/./scene.camera.setperspective.md) |  | Setup a perspective projection matrix for the camera |

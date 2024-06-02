@@ -9,9 +9,9 @@ Euler angle rotation animation track
 **Signature:**
 
 ```typescript
-declare class EulerRotationTrack extends AnimationTrack 
+declare class EulerRotationTrack extends AnimationTrack<Quaternion> 
 ```
-**Extends:** [AnimationTrack](doc/markdown/./scene.animationtrack.md)
+**Extends:** [AnimationTrack](doc/markdown/./scene.animationtrack.md)<!-- -->&lt;[Quaternion](doc/markdown/./base.quaternion.md)<!-- -->&gt;
 
 ## Constructors
 
@@ -23,5 +23,8 @@ declare class EulerRotationTrack extends AnimationTrack
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [apply(node, currentTime, duration)](doc/markdown/./scene.eulerrotationtrack.apply.md) |  | Apply animation to node |
+|  [applyState(node, state)](doc/markdown/./scene.eulerrotationtrack.applystate.md) |  |  |
+|  [calculateState(currentTime)](doc/markdown/./scene.eulerrotationtrack.calculatestate.md) |  |  |
+|  [getBlendId()](doc/markdown/./scene.eulerrotationtrack.getblendid.md) |  |  |
+|  [mixState(a, b, t)](doc/markdown/./scene.eulerrotationtrack.mixstate.md) |  |  |
 

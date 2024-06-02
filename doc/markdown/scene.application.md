@@ -27,7 +27,6 @@ This is the entry point of your application. The Application is responsible for 
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
-|  [canRender](doc/markdown/./scene.application.canrender.md) | <code>readonly</code> | boolean | Query if the device is ok to render objects now. |
 |  [device](doc/markdown/./scene.application.device.md) | <code>readonly</code> | [AbstractDevice](doc/markdown/./device.abstractdevice.md) | The rendering device that was initialized by the application |
 |  [deviceType](doc/markdown/./scene.application.devicetype.md) | <code>readonly</code> | string | Gets the device type |
 |  [inputManager](doc/markdown/./scene.application.inputmanager.md) | <code>readonly</code> | InputManager | The input manager instance |

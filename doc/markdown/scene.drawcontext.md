@@ -33,14 +33,16 @@ interface DrawContext
 |  [instancing?](doc/markdown/./scene.drawcontext.instancing.md) |  | boolean | _(Optional)_ Whehter instance rendering is used |
 |  [lightBlending](doc/markdown/./scene.drawcontext.lightblending.md) |  | boolean | whether is blending light |
 |  [linearDepthTexture?](doc/markdown/./scene.drawcontext.lineardepthtexture.md) |  | [Texture2D](doc/markdown/./device.texture2d.md) | _(Optional)_ Linear depth texture |
-|  [logger?](doc/markdown/./scene.drawcontext.logger.md) |  | RenderLogger | _(Optional)_ render logger |
+|  [morphAnimation?](doc/markdown/./scene.drawcontext.morphanimation.md) |  | boolean | _(Optional)_ Whether morph animation is used |
 |  [oit](doc/markdown/./scene.drawcontext.oit.md) |  | [OIT](doc/markdown/./scene.oit.md) | OIT |
+|  [picking](doc/markdown/./scene.drawcontext.picking.md) |  | boolean | whether GPU picking is enabled |
 |  [primaryCamera](doc/markdown/./scene.drawcontext.primarycamera.md) |  | [Camera](doc/markdown/./scene.camera.md) | The camera position of the primary render pass |
 |  [queue](doc/markdown/./scene.drawcontext.queue.md) |  | number | current queue |
 |  [renderPass](doc/markdown/./scene.drawcontext.renderpass.md) |  | [RenderPass](doc/markdown/./scene.renderpass.md) | The render pass to which the current drawing task belongs |
 |  [renderPassHash](doc/markdown/./scene.drawcontext.renderpasshash.md) |  | string | Hash value for the drawing task |
 |  [renderQueue?](doc/markdown/./scene.drawcontext.renderqueue.md) |  | [RenderQueue](doc/markdown/./scene.renderqueue.md) | _(Optional)_ The render queue which is currently being rendered |
 |  [scene](doc/markdown/./scene.drawcontext.scene.md) |  | [Scene](doc/markdown/./scene.scene.md) | The scene that is currently been drawing |
+|  [sceneColorTexture?](doc/markdown/./scene.drawcontext.scenecolortexture.md) |  | [Texture2D](doc/markdown/./device.texture2d.md) | _(Optional)_ Scene color texture |
 |  [skinAnimation?](doc/markdown/./scene.drawcontext.skinanimation.md) |  | boolean | _(Optional)_ Whether skin animation is used |
 |  [sunLight?](doc/markdown/./scene.drawcontext.sunlight.md) |  | [DirectionalLight](doc/markdown/./scene.directionallight.md) | _(Optional)_ the sun light |
 |  [timestamp](doc/markdown/./scene.drawcontext.timestamp.md) |  | number | Timestamp |

@@ -24,6 +24,7 @@ declare class Interpolator
 |  --- | --- | --- | --- |
 |  [maxTime](doc/markdown/./base.interpolator.maxtime.md) | <code>readonly</code> | number |  |
 |  [mode](doc/markdown/./base.interpolator.mode.md) | <code>readonly</code> | [InterpolationMode](doc/markdown/./base.interpolationmode.md) | Gets the interpolation mode |
+|  [stride](doc/markdown/./base.interpolator.stride.md) | <code>readonly</code> | number | stride |
 |  [target](doc/markdown/./base.interpolator.target.md) | <code>readonly</code> | [InterpolationTarget](doc/markdown/./base.interpolationtarget.md) | Gets the interpolation target |
 
 ## Methods
@@ -31,5 +32,5 @@ declare class Interpolator
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
 |  [getTargetStride(target)](doc/markdown/./base.interpolator.gettargetstride.md) | <code>static</code> | Interpolation target to stride |
-|  [interpolate(t, maxTime, result)](doc/markdown/./base.interpolator.interpolate.md) |  | Calculates the interpolated value at a given time |
+|  [interpolate(t, result)](doc/markdown/./base.interpolator.interpolate.md) |  | Calculates the interpolated value at a given time |
 

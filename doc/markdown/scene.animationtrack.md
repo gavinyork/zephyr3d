@@ -9,7 +9,7 @@ Base class for any kind of animation track
 **Signature:**
 
 ```typescript
-declare abstract class AnimationTrack 
+declare abstract class AnimationTrack<StateType = unknown> 
 ```
 
 ## Constructors
@@ -22,16 +22,16 @@ declare abstract class AnimationTrack
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
+|  [animation](doc/markdown/./scene.animationtrack.animation.md) |  | [AnimationClip](doc/markdown/./scene.animationclip.md) | Animation this track belongs to |
 |  [interpolator](doc/markdown/./scene.animationtrack.interpolator.md) | <code>readonly</code> | [Interpolator](doc/markdown/./base.interpolator.md) | Gets the interpolator of the track |
-|  [playing](doc/markdown/./scene.animationtrack.playing.md) | <code>readonly</code> | boolean | Return true if the track is playing, otherwise false |
 
 ## Methods
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [apply(node, currentTime, duration)](doc/markdown/./scene.animationtrack.apply.md) | <code>abstract</code> | Apply animation to node |
-|  [reset()](doc/markdown/./scene.animationtrack.reset.md) |  | Stops playing the track and rewind to the first frame |
-|  [rewind()](doc/markdown/./scene.animationtrack.rewind.md) |  | Rewinds the track to the first frame |
-|  [start()](doc/markdown/./scene.animationtrack.start.md) |  | Starts playing the track |
-|  [stop()](doc/markdown/./scene.animationtrack.stop.md) |  | Stops playing the track |
+|  [applyState(node, state)](doc/markdown/./scene.animationtrack.applystate.md) | <code>abstract</code> | Applys animation state to node |
+|  [calculateState(currentTime)](doc/markdown/./scene.animationtrack.calculatestate.md) | <code>abstract</code> | Calculates current animation state |
+|  [getBlendId()](doc/markdown/./scene.animationtrack.getblendid.md) | <code>abstract</code> | Get the blend ID |
+|  [mixState(a, b, t)](doc/markdown/./scene.animationtrack.mixstate.md) | <code>abstract</code> | Mixes two animation state according to specific weight value |
+|  [reset(node)](doc/markdown/./scene.animationtrack.reset.md) |  | Stops playing the track and rewind to the first frame |
 

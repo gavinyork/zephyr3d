@@ -9,7 +9,7 @@ Creates an animation instance
 **Signature:**
 
 ```typescript
-constructor(name: string, model?: SceneNode);
+constructor(name: string);
 ```
 
 ## Parameters
@@ -17,5 +17,4 @@ constructor(name: string, model?: SceneNode);
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  name | string | Name of the animation |
-|  model | [SceneNode](doc/markdown/./scene.scenenode.md) | _(Optional)_ Parent node if this is a skeleton animation |
 

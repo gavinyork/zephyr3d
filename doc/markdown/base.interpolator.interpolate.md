@@ -9,7 +9,7 @@ Calculates the interpolated value at a given time
 **Signature:**
 
 ```typescript
-interpolate(t: number, maxTime: number, result: Float32Array): Float32Array;
+interpolate(t: number, result: Float32Array): Float32Array;
 ```
 
 ## Parameters
@@ -17,7 +17,6 @@ interpolate(t: number, maxTime: number, result: Float32Array): Float32Array;
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  t | number | The time to calcuate interpolation |
-|  maxTime | number | The maxmium time duration |
 |  result | Float32Array | The calculated interpolation value |
 
 **Returns:**

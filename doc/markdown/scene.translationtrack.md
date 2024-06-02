@@ -9,9 +9,9 @@ Translate animation track
 **Signature:**
 
 ```typescript
-declare class TranslationTrack extends AnimationTrack 
+declare class TranslationTrack extends AnimationTrack<Vector3> 
 ```
-**Extends:** [AnimationTrack](doc/markdown/./scene.animationtrack.md)
+**Extends:** [AnimationTrack](doc/markdown/./scene.animationtrack.md)<!-- -->&lt;[Vector3](doc/markdown/./base.vector3.md)<!-- -->&gt;
 
 ## Constructors
 
@@ -24,5 +24,8 @@ declare class TranslationTrack extends AnimationTrack
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [apply(node, currentTime, duration)](doc/markdown/./scene.translationtrack.apply.md) |  | Apply animation to node |
+|  [applyState(node, state)](doc/markdown/./scene.translationtrack.applystate.md) |  |  |
+|  [calculateState(currentTime)](doc/markdown/./scene.translationtrack.calculatestate.md) |  |  |
+|  [getBlendId()](doc/markdown/./scene.translationtrack.getblendid.md) |  |  |
+|  [mixState(a, b, t)](doc/markdown/./scene.translationtrack.mixstate.md) |  |  |
 

@@ -9,7 +9,7 @@ Stops playing an animation of the model
 **Signature:**
 
 ```typescript
-stopAnimation(name: string): void;
+stopAnimation(name: string, options?: StopAnimationOptions): void;
 ```
 
 ## Parameters
@@ -17,6 +17,7 @@ stopAnimation(name: string): void;
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  name | string | Name of the animation to stop playing |
+|  options | [StopAnimationOptions](doc/markdown/./scene.stopanimationoptions.md) | _(Optional)_ |
 
 **Returns:**
 

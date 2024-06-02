@@ -29,6 +29,7 @@ declare class ShaderHelper
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
 |  [applyFog(scope, worldPos, color, ctx)](doc/markdown/./scene.shaderhelper.applyfog.md) | <code>static</code> |  |
+|  [calculateMorphDelta(scope, attrib)](doc/markdown/./scene.shaderhelper.calculatemorphdelta.md) | <code>static</code> |  |
 |  [calculateShadow(scope, worldPos, NoL, ctx)](doc/markdown/./scene.shaderhelper.calculateshadow.md) | <code>static</code> | Calculates shadow of current fragment |
 |  [calculateSkinMatrix(scope)](doc/markdown/./scene.shaderhelper.calculateskinmatrix.md) | <code>static</code> | Calculate skinning matrix for current vertex |
 |  [computeFogFactor(scope, viewDir, fogType, fogParams)](doc/markdown/./scene.shaderhelper.computefogfactor.md) | <code>static</code> | Computes the fog factor for a given view vector |
@@ -54,6 +55,8 @@ declare class ShaderHelper
 |  [getInstanceDataUniformName()](doc/markdown/./scene.shaderhelper.getinstancedatauniformname.md) | <code>static</code> |  |
 |  [getInstancedUniform(scope, uniformIndex)](doc/markdown/./scene.shaderhelper.getinstanceduniform.md) | <code>static</code> | Gets the instance uniform value of type vec4 by uniform index |
 |  [getLightBufferUniformName()](doc/markdown/./scene.shaderhelper.getlightbufferuniformname.md) | <code>static</code> |  |
+|  [getMorphDataUniformName()](doc/markdown/./scene.shaderhelper.getmorphdatauniformname.md) | <code>static</code> |  |
+|  [getMorphInfoUniformName()](doc/markdown/./scene.shaderhelper.getmorphinfouniformname.md) | <code>static</code> |  |
 |  [getNormalMatrix(scope)](doc/markdown/./scene.shaderhelper.getnormalmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the normal matrix of current object to be drawn |
 |  [getProjectionMatrix(scope)](doc/markdown/./scene.shaderhelper.getprojectionmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the projection matrix of current camera |
 |  [getShadowMap(scope)](doc/markdown/./scene.shaderhelper.getshadowmap.md) | <code>static</code> | Get shadow map uniform value |
@@ -61,6 +64,7 @@ declare class ShaderHelper
 |  [getViewProjectionMatrix(scope)](doc/markdown/./scene.shaderhelper.getviewprojectionmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the view projection matrix of current camera |
 |  [getWorldMatrix(scope)](doc/markdown/./scene.shaderhelper.getworldmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the world matrix of current object to be drawn |
 |  [getWorldMatrixUniformName()](doc/markdown/./scene.shaderhelper.getworldmatrixuniformname.md) | <code>static</code> |  |
+|  [hasMorphing(scope)](doc/markdown/./scene.shaderhelper.hasmorphing.md) | <code>static</code> | This function checks if the shader needs to process morph target animation. |
 |  [hasSkinning(scope)](doc/markdown/./scene.shaderhelper.hasskinning.md) | <code>static</code> | This function checks if the shader needs to process skeletal animation. |
 |  [linearDepthToNonLinear(scope, depth, nearFar)](doc/markdown/./scene.shaderhelper.lineardepthtononlinear.md) | <code>static</code> | Calculates the non-linear depth from linear depth |
 |  [nonLinearDepthToLinear(scope, depth, nearFar)](doc/markdown/./scene.shaderhelper.nonlineardepthtolinear.md) | <code>static</code> | Calculates the linear depth from non-linear depth |
@@ -71,5 +75,5 @@ declare class ShaderHelper
 |  [resolveVertexPosition(scope, pos)](doc/markdown/./scene.shaderhelper.resolvevertexposition.md) | <code>static</code> | Calculates the vertex position of type vec3 in object space |
 |  [resolveVertexTangent(scope, tangent)](doc/markdown/./scene.shaderhelper.resolvevertextangent.md) | <code>static</code> | Calculates the tangent vector of type vec3 in object space |
 |  [setClipSpacePosition(scope, pos)](doc/markdown/./scene.shaderhelper.setclipspaceposition.md) | <code>static</code> | Sets the clip space position in vertex shader |
-|  [vertexShaderDrawableStuff(scope, skinning, instanced)](doc/markdown/./scene.shaderhelper.vertexshaderdrawablestuff.md) | <code>static</code> | Vertex shader drawable stuff |
+|  [vertexShaderDrawableStuff(scope, skinning, morphing, instanced)](doc/markdown/./scene.shaderhelper.vertexshaderdrawablestuff.md) | <code>static</code> | Vertex shader drawable stuff |
 

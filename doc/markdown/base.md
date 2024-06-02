@@ -53,6 +53,7 @@
 |  [parseColor(input)](doc/markdown/./base.parsecolor.md) | parse a css color value to RGBA color type. |
 |  [toFloat(val)](doc/markdown/./base.tofloat.md) | Convert a number to 32 bit float value |
 |  [unpackFloat3(pk, result)](doc/markdown/./base.unpackfloat3.md) | Decompresses the three floats that was compressed to R11F\_G11F\_B10F format |
+|  [weightedAverage(weights, values, funcLerp)](doc/markdown/./base.weightedaverage.md) | Calculates the weighted average of a set of values. |
 
 ## Interfaces
 

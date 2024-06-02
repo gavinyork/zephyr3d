@@ -24,6 +24,7 @@ The constructor for this class is marked as internal. Third-party code should no
 |  [ambientDown](doc/markdown/./scene.envlightwrapper.ambientdown.md) |  | [Vector4](doc/markdown/./base.vector4.md) | Down color for environment light type hemisphere |
 |  [ambientUp](doc/markdown/./scene.envlightwrapper.ambientup.md) |  | [Vector4](doc/markdown/./base.vector4.md) | Up color for environment light type hemisphere |
 |  [irradianceMap](doc/markdown/./scene.envlightwrapper.irradiancemap.md) |  | [TextureCube](doc/markdown/./device.texturecube.md) | Irradiance map for environment light type ibl |
+|  [irradianceSH](doc/markdown/./scene.envlightwrapper.irradiancesh.md) |  | Float32Array | Irradiance SH for environment light type ibl-sh |
 |  [radianceMap](doc/markdown/./scene.envlightwrapper.radiancemap.md) |  | [TextureCube](doc/markdown/./device.texturecube.md) | Radiance map for environment light type ibl |
 |  [strength](doc/markdown/./scene.envlightwrapper.strength.md) |  | number | The strength of environment lighting |
 |  [type](doc/markdown/./scene.envlightwrapper.type.md) |  | [EnvLightType](doc/markdown/./scene.envlighttype.md) | The environment light type |
