@@ -1,6 +1,14 @@
 # Change Log - @zephyr3d/backend-webgpu
 
-This log was last generated on Fri, 19 Apr 2024 18:09:58 GMT and should not be manually modified.
+This log was last generated on Sun, 02 Jun 2024 11:21:22 GMT and should not be manually modified.
+
+## 0.1.6
+Sun, 02 Jun 2024 11:21:22 GMT
+
+### Patches
+
+- Add device object pool
+- Allow v-sync to be turned off.
 
 ## 0.1.5
 Fri, 19 Apr 2024 18:09:58 GMT

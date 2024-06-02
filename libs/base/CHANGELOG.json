@@ -2,6 +2,18 @@
   "name": "@zephyr3d/base",
   "entries": [
     {
+      "version": "0.1.4",
+      "tag": "@zephyr3d/base_v0.1.4",
+      "date": "Sun, 02 Jun 2024 11:21:22 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add weight-average functional."
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.3",
       "tag": "@zephyr3d/base_v0.1.3",
       "date": "Tue, 19 Mar 2024 19:55:21 GMT",

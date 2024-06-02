@@ -2,6 +2,55 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.5.0",
+      "tag": "@zephyr3d/scene_v0.5.0",
+      "date": "Sun, 02 Jun 2024 11:21:22 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add draco support for mesh loading"
+          },
+          {
+            "comment": "Add support for PBR transmission"
+          },
+          {
+            "comment": "Add support for morph target animation"
+          },
+          {
+            "comment": "Support PBR iridescence"
+          },
+          {
+            "comment": "Fixed stuttering caused by shader pool invalidation."
+          },
+          {
+            "comment": "Add support for GLTF extension: EXT_mesh_gpu_instancing."
+          },
+          {
+            "comment": "Add support for GPU based object picking."
+          }
+        ],
+        "minor": [
+          {
+            "comment": "Add animation blending support."
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.1.3` to `^0.1.4`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.2` to `^0.2.3`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.1.3` to `^0.1.4`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.2` to `^0.2.3`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.4.0",
       "tag": "@zephyr3d/scene_v0.4.0",
       "date": "Fri, 19 Apr 2024 18:09:58 GMT",

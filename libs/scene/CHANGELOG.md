@@ -1,6 +1,23 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Fri, 19 Apr 2024 18:09:58 GMT and should not be manually modified.
+This log was last generated on Sun, 02 Jun 2024 11:21:22 GMT and should not be manually modified.
+
+## 0.5.0
+Sun, 02 Jun 2024 11:21:22 GMT
+
+### Minor changes
+
+- Add animation blending support.
+
+### Patches
+
+- Add draco support for mesh loading
+- Add support for PBR transmission
+- Add support for morph target animation
+- Support PBR iridescence
+- Fixed stuttering caused by shader pool invalidation.
+- Add support for GLTF extension: EXT_mesh_gpu_instancing.
+- Add support for GPU based object picking.
 
 ## 0.4.0
 Fri, 19 Apr 2024 18:09:58 GMT

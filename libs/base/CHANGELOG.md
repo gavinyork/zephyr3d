@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/base
 
-This log was last generated on Tue, 19 Mar 2024 19:55:21 GMT and should not be manually modified.
+This log was last generated on Sun, 02 Jun 2024 11:21:22 GMT and should not be manually modified.
+
+## 0.1.4
+Sun, 02 Jun 2024 11:21:22 GMT
+
+### Patches
+
+- Add weight-average functional.
 
 ## 0.1.3
 Tue, 19 Mar 2024 19:55:21 GMT
