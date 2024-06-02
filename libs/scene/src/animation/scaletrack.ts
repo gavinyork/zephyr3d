@@ -8,6 +8,7 @@ import type { SceneNode } from '../scene';
  * @public
  */
 export class ScaleTrack extends AnimationTrack<Vector3> {
+  private _state: Vector3;
   /**
    * Create an instance of ScaleTrack from keyframe values
    * @param interpolator - Interpolator object that contains keyframe values
@@ -39,11 +40,11 @@ export class ScaleTrack extends AnimationTrack<Vector3> {
       const interpolator = new Interpolator(modeOrInterpolator, 'vec3', inputs, outputs);
       super(interpolator);
     }
+    this._state = new Vector3();
   }
   calculateState(currentTime: number): Vector3 {
-    const v = new Vector3();
-    this._interpolator.interpolate(currentTime, v);
-    return v;
+    this._interpolator.interpolate(currentTime, this._state);
+    return this._state;
   }
   applyState(node: SceneNode, state: Vector3) {
     node.scale.set(state);

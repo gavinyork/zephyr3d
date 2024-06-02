@@ -8,6 +8,7 @@ import type { SceneNode } from '../scene';
  * @public
  */
 export class RotationTrack extends AnimationTrack<Quaternion> {
+  private _state: Quaternion;
   /**
    * Create an instance of RotationTrack from keyframe values
    * @param interpolator - Interpolator object that contains keyframe values
@@ -40,11 +41,11 @@ export class RotationTrack extends AnimationTrack<Quaternion> {
       const interpolator = new Interpolator(modeOrInterpolator, 'quat', inputs, outputs);
       super(interpolator);
     }
+    this._state = new Quaternion();
   }
   calculateState(currentTime: number): Quaternion {
-    const q = new Quaternion();
-    this._interpolator.interpolate(currentTime, q);
-    return q;
+    this._interpolator.interpolate(currentTime, this._state);
+    return this._state;
   }
   applyState(node: SceneNode, state: Quaternion) {
     node.rotation.set(state);

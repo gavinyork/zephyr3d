@@ -10,6 +10,7 @@ const tmpVec3 = new Vector3();
  * @public
  */
 export class EulerRotationTrack extends AnimationTrack<Quaternion> {
+  private _state: Quaternion;
   /**
    * Create an instance of EulerRotationTrack from keyframe values
    * @param mode - The interpolation mode of keyframes
@@ -25,10 +26,12 @@ export class EulerRotationTrack extends AnimationTrack<Quaternion> {
     }
     const interpolator = new Interpolator(mode, 'vec3', inputs, outputs);
     super(interpolator);
+    this._state = new Quaternion();
   }
   calculateState(currentTime: number): Quaternion {
     this._interpolator.interpolate(currentTime, tmpVec3);
-    return Quaternion.fromEulerAngle(tmpVec3.x, tmpVec3.y, tmpVec3.z, 'ZYX');
+    this._state.fromEulerAngle(tmpVec3.x, tmpVec3.y, tmpVec3.z, 'ZYX');
+    return this._state;
   }
   applyState(node: SceneNode, state: Quaternion) {
     node.rotation.set(state);
