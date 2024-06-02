@@ -75,6 +75,7 @@ export class Camera extends SceneNode {
   protected _pickResult: PickResult;
   /**
    * Creates a new camera node
+   *
    * @param scene - The scene that the camera belongs to
    * @param projectionMatrix - Projection matrix for this camera
    */
