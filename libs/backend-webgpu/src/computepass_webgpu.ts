@@ -29,15 +29,14 @@ export class WebGPUComputePass {
     if (validation & VALIDATION_FAILED) {
       return;
     }
-    if (!this._computePassEncoder) {
-      this.begin();
-    }
+    this.begin();
     this.setBindGroupsForCompute(this._computePassEncoder, program, bindGroups, bindGroupOffsets);
     const pipeline = this._device.pipelineCache.fetchComputePipeline(program);
     if (pipeline) {
       this._computePassEncoder.setPipeline(pipeline);
       this._computePassEncoder.dispatchWorkgroups(workgroupCountX, workgroupCountY, workgroupCountZ);
     }
+    this.end();
   }
   private setBindGroupsForCompute(
     computePassEncoder: GPUComputePassEncoder,
