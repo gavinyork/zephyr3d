@@ -63,6 +63,7 @@ export class GLTFViewer {
     this._water = new PostWater(0);
     this._bloom = new Bloom();
     this._sao = new SAO();
+    this._sao.radius = 10;
     this._sao.intensity = 0.025;
     this._bloom.threshold = 0.85;
     this._bloom.intensity = 1.5;
