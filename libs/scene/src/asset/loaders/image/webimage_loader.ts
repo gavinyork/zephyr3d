@@ -33,18 +33,36 @@ export class WebImageLoader extends AbstractTextureLoader {
       img.onload = function () {
         createImageBitmap(img, {
           premultiplyAlpha: 'none'
-        }).then((bm) => {
-          const options: TextureCreationOptions = {
-            texture: texture,
-            samplerOptions
-          };
-          const tex = Application.instance.device.createTexture2DFromImage(bm, srgb, options);
-          if (tex) {
-            resolve(tex);
-          } else {
-            reject('create texture from image element failed');
-          }
-        });
+        })
+          .then((bm) => {
+            const options: TextureCreationOptions = {
+              texture: texture,
+              samplerOptions
+            };
+            const tex = Application.instance.device.createTexture2DFromImage(bm, srgb, options);
+            if (tex) {
+              resolve(tex);
+            } else {
+              reject('create texture from image element failed');
+            }
+          })
+          .catch((reason) => {
+            const cvs = document.createElement('canvas');
+            cvs.width = img.width;
+            cvs.height = img.height;
+            const ctx = cvs.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const options: TextureCreationOptions = {
+              texture: texture,
+              samplerOptions
+            };
+            const tex = Application.instance.device.createTexture2DFromImage(cvs, srgb, options);
+            if (tex) {
+              resolve(tex);
+            } else {
+              reject('create texture from image element failed');
+            }
+          });
       };
       img.onerror = (err) => {
         reject(err);
