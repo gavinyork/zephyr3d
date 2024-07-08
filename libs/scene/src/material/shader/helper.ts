@@ -14,17 +14,19 @@ import {
 } from '../../values';
 import { ScatteringLut } from '../../render/scatteringlut';
 import type {
-  ProgramBuilder,
   BindGroup,
   PBShaderExp,
   PBInsideFunctionScope,
   StructuredBuffer,
   Texture2D,
-  PBGlobalScope
+  PBGlobalScope,
+  BindGroupLayout
 } from '@zephyr3d/device';
+import { ProgramBuilder } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
 import { linearToGamma } from '../../shaders';
 import type { Camera } from '../../camera';
+import { Application } from '../../app';
 
 const UNIFORM_NAME_GLOBAL = 'Z_UniformGlobal';
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
@@ -57,6 +59,8 @@ export class ShaderHelper {
   static defaultSunDir = Vector3.one().inplaceNormalize();
   /** @internal */
   private static readonly SKIN_MATRIX_NAME = 'Z_SkinMatrix';
+  /** @internal */
+  private static _drawableBindGroupLayouts: Record<string, BindGroupLayout> = {};
   /** @internal */
   private static _lightUniformShadow = {
     light: {
@@ -113,6 +117,25 @@ export class ShaderHelper {
   }
   static getLightBufferUniformName(): string {
     return UNIFORM_NAME_LIGHT_BUFFER;
+  }
+  static getDrawableBindGroupLayout(skinning: boolean, morphing: boolean, instancing: boolean) {
+    const hash = `${skinning ? 1 : 0}${morphing ? 1 : 0}${instancing ? 1 : 0}`;
+    let bindGroupLayout = this._drawableBindGroupLayouts[hash];
+    if (!bindGroupLayout) {
+      const device = Application.instance.device;
+      const buildInfo = new ProgramBuilder(device).buildRender({
+        vertex(pb) {
+          ShaderHelper.vertexShaderDrawableStuff(this, skinning, morphing, instancing);
+          pb.main(function () {});
+        },
+        fragment(pb) {
+          pb.main(function () {});
+        }
+      });
+      bindGroupLayout = buildInfo[2][1];
+      this._drawableBindGroupLayouts[hash] = bindGroupLayout;
+    }
+    return bindGroupLayout;
   }
   /**
    * Prepares the fragment shader which is going to be used in our material system

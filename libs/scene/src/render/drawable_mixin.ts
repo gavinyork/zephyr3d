@@ -1,7 +1,7 @@
 import type { GenericConstructor } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type { AbstractDevice } from '@zephyr3d/device';
-import { ProgramBuilder, type BindGroup } from '@zephyr3d/device';
+import type { BindGroup } from '@zephyr3d/device';
 import type { BatchDrawable, DrawContext, Drawable } from './drawable';
 import { ShaderHelper } from '../material';
 import type { DrawableInstanceInfo, RenderQueue, RenderQueueRef } from './render_queue';
@@ -153,16 +153,8 @@ export function mixinDrawable<
         ? this._mdDrawableBindGroupMorph
         : this._mdDrawableBindGroup;
       if (!bindGroup) {
-        const buildInfo = new ProgramBuilder(device).buildRender({
-          vertex(pb) {
-            ShaderHelper.vertexShaderDrawableStuff(this, skinning, morphing, instancing);
-            pb.main(function () {});
-          },
-          fragment(pb) {
-            pb.main(function () {});
-          }
-        });
-        bindGroup = device.createBindGroup(buildInfo[2][1]);
+        const layout = ShaderHelper.getDrawableBindGroupLayout(skinning, morphing, instancing);
+        bindGroup = device.createBindGroup(layout);
         if (instancing) {
           this._mdDrawableBindGroupInstanced.set(renderQueue, bindGroup);
         } else if (skinning && morphing) {
@@ -170,7 +162,6 @@ export function mixinDrawable<
         } else if (skinning) {
           this._mdDrawableBindGroupSkin = bindGroup;
         } else if (morphing) {
-          const layout = buildInfo[2][1];
           const bindName =
             layout.nameMap?.[ShaderHelper.getMorphInfoUniformName()] ??
             ShaderHelper.getMorphInfoUniformName();
