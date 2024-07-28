@@ -56,7 +56,7 @@ export class BatchGroup extends GraphNode {
   /**
    * {@inheritDoc SceneNode.isBatchGroup}
    */
-  isBatchGroup(): boolean {
+  isBatchGroup(): this is BatchGroup {
     return true;
   }
   /** @internal */
