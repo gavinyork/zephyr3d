@@ -18,6 +18,7 @@ export class XForm<T extends XForm<T> = XForm<any>> extends makeEventTarget(Obje
   noderemoved: SceneNode;
   visiblechanged: SceneNode;
   transformchanged: SceneNode;
+  bvchanged: SceneNode;
 }>() {
   /** @internal */
   protected _parent: T;

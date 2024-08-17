@@ -159,7 +159,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * {@inheritDoc SceneNode.isMesh}
    */
-  isMesh(): boolean {
+  isMesh(): this is Mesh {
     return true;
   }
   /**
@@ -273,7 +273,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     return this;
   }
   /** @internal */
-  computeBoundingVolume(bv: BoundingVolume): BoundingVolume {
+  computeBoundingVolume(): BoundingVolume {
     let bbox: BoundingVolume;
     if (this._animatedBoundingBox) {
       bbox = this._animatedBoundingBox;

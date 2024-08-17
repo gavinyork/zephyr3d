@@ -1,6 +1,5 @@
 import type { Vector3, Matrix4x4, Plane } from '@zephyr3d/base';
 import { Frustum, AABB, ClipState } from '@zephyr3d/base';
-import { AABBTree } from './aabbtree';
 
 /**
  * Base interface for any kind of bounding volumes
@@ -85,74 +84,3 @@ export class BoundingBox extends AABB implements BoundingVolume {
   }
 }
 
-/**
- * Bounding box tree
- * @public
- */
-export class BoundingBoxTree extends AABBTree implements BoundingVolume {
-  /**
-   * Creates an empty bounding box tree
-   */
-  constructor();
-  /**
-   * Creates a bounding box tree from an AABB tree
-   * @param aabbtree - The AABB tree to be copied from
-   */
-  constructor(aabbtree: AABBTree);
-  constructor(arg?: AABBTree) {
-    super(arg);
-  }
-  /** {@inheritDoc BoundingVolume.clone} */
-  clone(): BoundingVolume {
-    return new BoundingBoxTree(this);
-  }
-  /** {@inheritDoc BoundingVolume.transform} */
-  transform(matrix: Matrix4x4): BoundingVolume {
-    const newBV = new BoundingBoxTree(this);
-    newBV.transform(matrix);
-    return newBV;
-  }
-  /** {@inheritDoc BoundingVolume.behindPlane} */
-  behindPlane(plane: Plane): boolean {
-    return this.toAABB().behindPlane(plane);
-  }
-  /** {@inheritDoc BoundingVolume.outsideFrustum} */
-  outsideFrustum(frustum: Frustum | Matrix4x4): boolean {
-    const aabb = this.getTopLevelAABB();
-    if (aabb) {
-      return (
-        (frustum instanceof Frustum ? aabb.getClipStateWithFrustum(frustum) : aabb.getClipState(frustum)) ===
-        ClipState.NOT_CLIPPED
-      );
-    } else {
-      return false;
-    }
-  }
-  /** {@inheritDoc BoundingVolume.toAABB} */
-  toAABB(): AABB {
-    return this.getTopLevelAABB();
-  }
-}
-
-/*
-export class BoundingFrustum implements BoundingVolume {
-    protected _frustum: Frustum;
-    constructor ();
-    constructor (other: BoundingFrustum|Frustum|Matrix4x4);
-    constructor (arg0?: BoundingFrustum|Frustum|Matrix4x4) {
-        if (arg0 instanceof BoundingFrustum) {
-            this._frustum = arg0._frustum ? new Frustum (arg0._frustum) : null;
-        } else if (arg0 instanceof Frustum) {
-            this._frustum = new Frustum (arg0);
-        } else if (arg0 instanceof Matrix4x4) {
-            this._frustum = new Frustum (arg0);
-        } else {
-            this._frustum = null;
-        }
-    }
-    clone (): BoundingVolume {
-        return new BoundingFrustum (this);
-    }
-    transform (matrix: Matrix4x4)
-}
-*/

@@ -17,7 +17,7 @@ import type { BatchGroup } from '../scene/batchgroup';
  * Node visitor for culling
  * @public
  */
-export class CullVisitor implements Visitor {
+export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   /** @internal */
   private _primaryCamera: Camera;
   /** @internal */
@@ -124,9 +124,12 @@ export class CullVisitor implements Visitor {
   /** @internal */
   visitBatchGroup(node: BatchGroup) {
     if (!node.hidden) {
-      const renderQueue = node.getRenderQueue(this);
-      this.pushRenderQueue(renderQueue);
-      return true;
+      const clipState = this.getClipStateWithNode(node);
+      if (clipState !== ClipState.NOT_CLIPPED) {
+        const renderQueue = node.getRenderQueue(this);
+        this.pushRenderQueue(renderQueue);
+        return true;
+      }
     }
     return false;
   }

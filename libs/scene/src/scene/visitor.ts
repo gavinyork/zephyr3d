@@ -2,6 +2,6 @@
  * Visior
  * @public
  */
-export interface Visitor {
-  visit(target: unknown): unknown;
+export interface Visitor<T> {
+  visit(target: T): unknown;
 }

@@ -273,7 +273,7 @@ export class Terrain extends GraphNode {
    * {@inheritDoc SceneNode.computeBoundingVolume}
    * @override
    */
-  computeBoundingVolume(bv: BoundingVolume): BoundingVolume {
+  computeBoundingVolume(): BoundingVolume {
     return this._quadtree ? this._quadtree.getHeightField().getBBoxTree().getRootNode().bbox : null;
   }
   /**

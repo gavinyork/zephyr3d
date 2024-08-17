@@ -7,7 +7,7 @@ import type { Visitor } from './visitor';
 import type { SceneNode } from './scene_node';
 
 /** @internal */
-export class RaycastVisitor implements Visitor {
+export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
   /** @internal */
   private _ray: Ray;
   /** @internal */
