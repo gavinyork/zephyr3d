@@ -347,6 +347,9 @@ export class WebGPURenderPass {
     this.setScissor(this._currentScissor);
   }
   end() {
+    if (!this.active) {
+      return;
+    }
     // finish current render pass command
     if (this._renderPassEncoder) {
       this._renderPassEncoder.end();

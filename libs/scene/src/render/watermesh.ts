@@ -161,6 +161,8 @@ const RENDER_NONE = 0;
 const RENDER_NORMAL = 1;
 const RENDER_TWO_PASS = 2;
 
+const THREAD_GROUP_SIZE = 16;
+
 /** @internal */
 export class WaterMesh {
   private static _globals: Globales = null;
@@ -247,7 +249,7 @@ export class WaterMesh {
     if (this._renderMode !== RENDER_NONE) {
       WaterMesh._globals = WaterMesh._globals ?? {
         programs: {
-          h0Program: createProgramH0(),
+          h0Program: device.type === 'webgpu' ? createProgramH0(true, THREAD_GROUP_SIZE, this._h0TextureFormat) : createProgramH0(),
           hkProgram: this._renderMode === RENDER_NORMAL ? createProgramHk() : null,
           hkProgram2: this._renderMode === RENDER_TWO_PASS ? createProgramHk(2) : null,
           hkProgram4: this._renderMode === RENDER_TWO_PASS ? createProgramHk(4) : null,
@@ -556,6 +558,7 @@ export class WaterMesh {
     }
     if (this._paramsChanged) {
       this.generateInitialSpectrum();
+      //this.generateInitialSpectrum();
     }
     this._resolutionChanged = false;
     this._paramsChanged = false;
@@ -583,7 +586,7 @@ export class WaterMesh {
       this._instanceData.pingpongTextures = null;
       this._instanceData.spectrumTextures.forEach((tex) => tex.dispose());
       this._instanceData.spectrumTextures = null;
-      this._instanceData.h0Framebuffer.dispose();
+      this._instanceData.h0Framebuffer?.dispose();
       this._instanceData.pingpongFramebuffer?.dispose();
       this._instanceData.pingpongFramebuffer2?.dispose();
       this._instanceData.pingpongFramebuffer4?.dispose();
@@ -939,10 +942,11 @@ export class WaterMesh {
     size: number,
     num: number,
     name: string,
-    linear: boolean
+    linear: boolean,
+    storage = false
   ): Texture2D[] {
     return Array.from({ length: num }).map((val, index) => {
-      const tex = device.createTexture2D(format, size, size, { samplerOptions: { mipFilter: 'none' } });
+      const tex = device.createTexture2D(format, size, size, { samplerOptions: { mipFilter: 'none' }, writable: !!storage });
       tex.name = `${name}-${index}`;
       tex.samplerOptions = {
         minFilter: linear ? 'linear' : 'nearest',
@@ -963,7 +967,8 @@ export class WaterMesh {
         this._params.resolution,
         3,
         'Water-h0',
-        false
+        false,
+        device.type === 'webgpu'
       );
       const dataTextures = this.createNTextures(
         device,
@@ -994,7 +999,7 @@ export class WaterMesh {
         h0Textures: h0Textures,
         pingpongTextures: pingpongTextures,
         spectrumTextures: spectrumTextures,
-        h0Framebuffer: device.createFrameBuffer(h0Textures, null),
+        h0Framebuffer: device.type === 'webgpu' ? null : device.createFrameBuffer(h0Textures, null),
         spectrumFramebuffer:
           this._renderMode === RENDER_NORMAL ? device.createFrameBuffer(spectrumTextures, null) : null,
         spectrumFramebuffer2:
@@ -1058,8 +1063,6 @@ export class WaterMesh {
   private generateInitialSpectrum(): void {
     const device = Application.instance.device;
     const instanceData = this.getInstanceData();
-    device.setFramebuffer(instanceData.h0Framebuffer);
-    device.clearFrameBuffer(Vector4.zero(), null, null);
     device.setProgram(WaterMesh._globals.programs.h0Program);
     device.setBindGroup(0, this._h0BindGroup);
     this._h0BindGroup.setTexture(
@@ -1081,7 +1084,17 @@ export class WaterMesh {
     this._h0BindGroup.setValue('cascade0', this._cascades[0]);
     this._h0BindGroup.setValue('cascade1', this._cascades[1]);
     this._h0BindGroup.setValue('cascade2', this._cascades[2]);
-    WaterMesh._globals.quad.draw();
+    if (device.type === 'webgpu') {
+      this._h0BindGroup.setTexture('spectrum0', instanceData.h0Textures[0]);
+      this._h0BindGroup.setTexture('spectrum1', instanceData.h0Textures[1]);
+      this._h0BindGroup.setTexture('spectrum2', instanceData.h0Textures[2]);
+      device.compute(this.params.resolution / THREAD_GROUP_SIZE, this.params.resolution / THREAD_GROUP_SIZE, 1);
+      device.compute(this.params.resolution / THREAD_GROUP_SIZE, this.params.resolution / THREAD_GROUP_SIZE, 1);
+    } else {
+      device.setFramebuffer(instanceData.h0Framebuffer);
+      device.clearFrameBuffer(Vector4.zero(), null, null);
+      WaterMesh._globals.quad.draw();
+    }
   }
   private getNoiseTexture(size: number, randomSeed: number): Texture2D {
     const device = Application.instance.device;

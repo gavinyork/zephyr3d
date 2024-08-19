@@ -1,7 +1,11 @@
 // copy from: https://github.com/codeagent/webgl-ocean/
 
-import type { PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import type { PBGlobalScope, PBInsideFunctionScope, PBShaderExp, ProgramBuilder, TextureFormat } from '@zephyr3d/device';
 import { Application } from '../app';
+
+function getFragCoord(scope: PBGlobalScope, useComputeShader: boolean) {
+  return useComputeShader ? scope.$builtins.globalInvocationId.xy : scope.$builtins.fragCoord.xy;
+}
 
 /** @internal */
 export interface WaterShaderImpl {
@@ -398,18 +402,18 @@ export function createProgramHk(limit?: 4 | 2) {
 }
 
 /** @internal */
-export function createProgramH0() {
-  return Application.instance.device.buildRenderProgram({
-    vertex(pb) {
-      this.$inputs.position = pb.vec3().attrib('position');
-      pb.main(function () {
-        this.$builtins.position = pb.vec4(this.$inputs.position, 1);
-      });
-    },
-    fragment(pb) {
-      this.$outputs.spectrum0 = pb.vec4();
-      this.$outputs.spectrum1 = pb.vec4();
-      this.$outputs.spectrum2 = pb.vec4();
+export function createProgramH0(useComputeShader = false, threadGroupSize = 8, targetFormat: TextureFormat = 'rgba32f') {
+  function getComputeFunc(useComputeShader = false, fmt: TextureFormat): (this: PBGlobalScope, pb: ProgramBuilder) => void {
+    return function(this: PBGlobalScope, pb: ProgramBuilder) {
+      if (useComputeShader) {
+        this.spectrum0 = fmt === 'rgba32f' ? pb.texStorage2D.rgba32float().storage(0) : pb.texStorage2D.rgba16float().storage(0);
+        this.spectrum1 = fmt === 'rgba32f' ? pb.texStorage2D.rgba32float().storage(0) : pb.texStorage2D.rgba16float().storage(0);
+        this.spectrum2 = fmt === 'rgba32f' ? pb.texStorage2D.rgba32float().storage(0) : pb.texStorage2D.rgba16float().storage(0);
+      } else {
+        this.$outputs.spectrum0 = pb.vec4();
+        this.$outputs.spectrum1 = pb.vec4();
+        this.$outputs.spectrum2 = pb.vec4();
+      }
       this.noise = pb.tex2D().uniform(0);
       this.resolution = pb.int().uniform(0);
       this.wind = pb.vec2().uniform(0);
@@ -468,25 +472,56 @@ export function createProgramH0() {
       });
       pb.main(function () {
         this.$l.x = pb.vec2(
-          pb.sub(pb.ivec2(this.$builtins.fragCoord.xy), pb.ivec2(pb.div(this.resolution, 2)))
+          pb.sub(pb.ivec2(getFragCoord(this, useComputeShader)), pb.ivec2(pb.div(this.resolution, 2)))
         );
         this.$l.k = pb.mul(pb.vec2(Math.PI * 2), this.x);
-        this.$l.rnd = this.gauss(pb.ivec2(this.$builtins.fragCoord.xy));
-        this.$outputs.spectrum0 = pb.mul(
-          this.phillips(pb.div(this.k, this.cascade0.x), this.cascade0.y, this.cascade0.z, this.cascade0.w),
-          this.rnd
-        );
-        this.$outputs.spectrum1 = pb.mul(
-          this.phillips(pb.div(this.k, this.cascade1.x), this.cascade1.y, this.cascade1.z, this.cascade1.w),
-          this.rnd
-        );
-        this.$outputs.spectrum2 = pb.mul(
-          this.phillips(pb.div(this.k, this.cascade2.x), this.cascade2.y, this.cascade2.z, this.cascade2.w),
-          this.rnd
-        );
+        this.$l.rnd = this.gauss(pb.ivec2(getFragCoord(this, useComputeShader)));
+        if (useComputeShader) {
+          pb.textureStore(this.spectrum0, this.$builtins.globalInvocationId.xy, pb.mul(
+            this.phillips(pb.div(this.k, this.cascade0.x), this.cascade0.y, this.cascade0.z, this.cascade0.w),
+            this.rnd
+          ));
+          pb.textureStore(this.spectrum1, this.$builtins.globalInvocationId.xy, pb.mul(
+            this.phillips(pb.div(this.k, this.cascade1.x), this.cascade1.y, this.cascade1.z, this.cascade1.w),
+            this.rnd
+          ));
+          pb.textureStore(this.spectrum2, this.$builtins.globalInvocationId.xy, pb.mul(
+            this.phillips(pb.div(this.k, this.cascade2.x), this.cascade2.y, this.cascade2.z, this.cascade2.w),
+            this.rnd
+          ));
+        } else {
+          this.$outputs.spectrum0 = pb.mul(
+            this.phillips(pb.div(this.k, this.cascade0.x), this.cascade0.y, this.cascade0.z, this.cascade0.w),
+            this.rnd
+          );
+          this.$outputs.spectrum1 = pb.mul(
+            this.phillips(pb.div(this.k, this.cascade1.x), this.cascade1.y, this.cascade1.z, this.cascade1.w),
+            this.rnd
+          );
+          this.$outputs.spectrum2 = pb.mul(
+            this.phillips(pb.div(this.k, this.cascade2.x), this.cascade2.y, this.cascade2.z, this.cascade2.w),
+            this.rnd
+          );
+        }
       });
-    }
-  });
+    };
+  }
+  if (useComputeShader) {
+    return Application.instance.device.buildComputeProgram({
+      workgroupSize: [threadGroupSize, threadGroupSize, 1],
+      compute: getComputeFunc(useComputeShader, targetFormat)
+    })
+  } else {
+    return Application.instance.device.buildRenderProgram({
+      vertex(pb) {
+        this.$inputs.position = pb.vec3().attrib('position');
+        pb.main(function () {
+          this.$builtins.position = pb.vec4(this.$inputs.position, 1);
+        });
+      },
+      fragment: getComputeFunc(useComputeShader, targetFormat)
+    });
+  }
 }
 
 /** @internal */

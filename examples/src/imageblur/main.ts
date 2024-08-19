@@ -69,7 +69,7 @@ import { ImGui, imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from
       const structFlip = pb.defineStruct([pb.uint('value')]);
       this.params = structParams().uniform(0);
       this.inputTex = pb.tex2D().uniform(1);
-      this.outputTex = pb.texStorage2D.rgba8unorm().uniform(1);
+      this.outputTex = pb.texStorage2D.rgba8unorm().storage(1);
       this.flip = structFlip().uniform(1);
       this.tile = pb.vec3[128][4]().workgroup();
       pb.main(function () {

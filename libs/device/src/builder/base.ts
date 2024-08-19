@@ -285,6 +285,12 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    */
   storage(group: number): PBShaderExp {
     if (!this.$typeinfo.isHostSharable()) {
+      if (this.$typeinfo.isTextureType()) {
+        if (!this.$typeinfo.isStorageTexture()) {
+          throw new PBASTError(this.$ast, 'type cannot be declared as storage texture');
+        }
+        return this.uniform(group);
+      }
       throw new PBASTError(this.$ast, 'type cannot be declared in storage address space');
     }
     this.$declareType = DeclareType.DECLARE_TYPE_STORAGE;
