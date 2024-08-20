@@ -238,7 +238,7 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
     }
     this._object = {};
   }
-  isFramebuffer(): boolean {
+  isFramebuffer(): this is FrameBuffer {
     return true;
   }
   getSampleCount(): number {

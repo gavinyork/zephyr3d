@@ -52,8 +52,6 @@ export class CommandQueueImmediate {
       this._device.device.queue.submit([uploadCommandEncoder.finish()]);
       bufferUploads.forEach((_, buffer) => buffer.endSyncChanges());
       textureUploads.forEach((_, tex) => tex.endSyncChanges());
-      this._renderPass.end();
-      this._computePass.end();
     }
   }
   get currentPass(): WebGPURenderPass | WebGPUComputePass {
@@ -69,7 +67,9 @@ export class CommandQueueImmediate {
     this._computePass.end();
   }
   setFramebuffer(fb: WebGPUFrameBuffer): void {
-    this.flushUploads();
+    if (this._renderPass.active) {
+      this.flushUploads();
+    }
     this._renderPass.setFramebuffer(fb);
   }
   getFramebuffer(): WebGPUFrameBuffer {
@@ -108,6 +108,12 @@ export class CommandQueueImmediate {
     bytes: number
   ) {
     this.flushUploads();
+    if (this._renderPass.active) {
+      this._renderPass.end();
+    }
+    if (this._computePass.active) {
+      this._computePass.end();
+    }
     const copyCommandEncoder = this._device.device.createCommandEncoder();
     copyCommandEncoder.copyBufferToBuffer(srcBuffer.object, srcOffset, dstBuffer.object, dstOffset, bytes);
     this._device.device.queue.submit([copyCommandEncoder.finish()]);

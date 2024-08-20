@@ -557,8 +557,8 @@ export class WaterMesh {
       this.disposeInstanceData();
     }
     if (this._paramsChanged) {
-      this.generateInitialSpectrum();
-      //this.generateInitialSpectrum();
+      this.generateInitialSpectrum(0);
+      this.generateInitialSpectrum(1);
     }
     this._resolutionChanged = false;
     this._paramsChanged = false;
@@ -1060,35 +1060,38 @@ export class WaterMesh {
     }
     return tex;
   }
-  private generateInitialSpectrum(): void {
+  private generateInitialSpectrum(t: number): void {
     const device = Application.instance.device;
     const instanceData = this.getInstanceData();
     device.setProgram(WaterMesh._globals.programs.h0Program);
     device.setBindGroup(0, this._h0BindGroup);
-    this._h0BindGroup.setTexture(
-      'noise',
-      this.getNoiseTexture(this._params.resolution, this._params.randomSeed),
-      this._nearestRepeatSampler
-    );
-    this._h0BindGroup.setValue('resolution', this._params.resolution);
-    this._h0BindGroup.setValue('wind', this._params.wind);
-    this._h0BindGroup.setValue('alignment', this._params.alignment);
-    for (let i = 0; i < this._params.cascades.length; i++) {
-      this._cascades[i].x = this._params.cascades[i].size;
-      this._cascades[i].y =
-        (this._params.cascades[i].strength * 0.081) /
-        (this._params.cascades[i].size * this._params.cascades[i].size);
-      this._cascades[i].z = (2 * Math.PI) / this._params.cascades[i].maxWave;
-      this._cascades[i].w = (2 * Math.PI) / this._params.cascades[i].minWave;
+    if (t === 0) {
+      this._h0BindGroup.setTexture(
+        'noise',
+        this.getNoiseTexture(this._params.resolution, this._params.randomSeed),
+        this._nearestRepeatSampler
+      );
+      this._h0BindGroup.setValue('resolution', this._params.resolution);
+      this._h0BindGroup.setValue('wind', this._params.wind);
+      this._h0BindGroup.setValue('alignment', this._params.alignment);
+      for (let i = 0; i < this._params.cascades.length; i++) {
+        this._cascades[i].x = this._params.cascades[i].size;
+        this._cascades[i].y =
+          (this._params.cascades[i].strength * 0.081) /
+          (this._params.cascades[i].size * this._params.cascades[i].size);
+        this._cascades[i].z = (2 * Math.PI) / this._params.cascades[i].maxWave;
+        this._cascades[i].w = (2 * Math.PI) / this._params.cascades[i].minWave;
+      }
+      this._h0BindGroup.setValue('cascade0', this._cascades[0]);
+      this._h0BindGroup.setValue('cascade1', this._cascades[1]);
+      this._h0BindGroup.setValue('cascade2', this._cascades[2]);
     }
-    this._h0BindGroup.setValue('cascade0', this._cascades[0]);
-    this._h0BindGroup.setValue('cascade1', this._cascades[1]);
-    this._h0BindGroup.setValue('cascade2', this._cascades[2]);
     if (device.type === 'webgpu') {
-      this._h0BindGroup.setTexture('spectrum0', instanceData.h0Textures[0]);
-      this._h0BindGroup.setTexture('spectrum1', instanceData.h0Textures[1]);
-      this._h0BindGroup.setTexture('spectrum2', instanceData.h0Textures[2]);
-      device.compute(this.params.resolution / THREAD_GROUP_SIZE, this.params.resolution / THREAD_GROUP_SIZE, 1);
+      if (t === 0) {
+        this._h0BindGroup.setTexture('spectrum0', instanceData.h0Textures[0]);
+        this._h0BindGroup.setTexture('spectrum1', instanceData.h0Textures[1]);
+        this._h0BindGroup.setTexture('spectrum2', instanceData.h0Textures[2]);
+      }
       device.compute(this.params.resolution / THREAD_GROUP_SIZE, this.params.resolution / THREAD_GROUP_SIZE, 1);
     } else {
       device.setFramebuffer(instanceData.h0Framebuffer);

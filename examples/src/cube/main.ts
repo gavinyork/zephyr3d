@@ -93,23 +93,27 @@ import { DrawText } from '@zephyr3d/device';
   // create bind group
   const bindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
 
+  let x = 0;
   // start render loop
   device.runLoop((device) => {
-    const t = device.frameInfo.elapsedOverall * 0.002;
-    const rotateMatrix = Quaternion.fromEulerAngle(t, t, 0, 'XYZ').toMatrix4x4();
-    bindGroup.setValue('worldMatrix', Matrix4x4.translateLeft(rotateMatrix, new Vector3(0, 0, -4)));
-    bindGroup.setValue(
-      'projMatrix',
-      Matrix4x4.perspective(1.5, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 50)
-    );
+    if (x === 0) {
+      x++;
+      const t = device.frameInfo.elapsedOverall * 0.002;
+      const rotateMatrix = Quaternion.fromEulerAngle(t, t, 0, 'XYZ').toMatrix4x4();
+      bindGroup.setValue('worldMatrix', Matrix4x4.translateLeft(rotateMatrix, new Vector3(0, 0, -4)));
+      bindGroup.setValue(
+        'projMatrix',
+        Matrix4x4.perspective(1.5, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 50)
+      );
 
-    device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
-    device.setProgram(program);
-    device.setVertexLayout(vertexLayout);
-    device.setBindGroup(0, bindGroup);
-    device.draw('triangle-list', 0, 36);
+      device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
+      device.setProgram(program);
+      device.setVertexLayout(vertexLayout);
+      device.setBindGroup(0, bindGroup);
+      device.draw('triangle-list', 0, 36);
+    }
 
-    DrawText.drawText(device, `Device: ${device.type}`, '#ffffff', 30, 30);
-    DrawText.drawText(device, `FPS: ${device.frameInfo.FPS.toFixed(2)}`, '#ffff00', 30, 50);
+    //DrawText.drawText(device, `Device: ${device.type}`, '#ffffff', 30, 30);
+    //DrawText.drawText(device, `FPS: ${device.frameInfo.FPS.toFixed(2)}`, '#ffff00', 30, 50);
   });
 })();

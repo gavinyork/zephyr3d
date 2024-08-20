@@ -69,7 +69,6 @@ export class GLTFViewer {
     this._bloom.intensity = 1.5;
     this._fxaa = new FXAA();
     this._doTonemap = true;
-    this._doWater = false;
     this._doBloom = true;
     this._doFXAA = true;
     this._doWater = false;

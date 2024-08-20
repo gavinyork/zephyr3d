@@ -442,7 +442,7 @@ export class WebGPURenderPass {
             renderPassEncoder.setVertexBuffer(index, val.buffer.object as GPUBuffer, val.drawOffset);
             renderBundleEncoder?.setVertexBuffer(index, val.buffer.object as GPUBuffer, val.drawOffset);
           });
-          const indexBuffer = vertexData.getIndexBuffer() as WebGPUIndexBuffer;
+          const indexBuffer = vertexData.getIndexBuffer() as unknown as WebGPUIndexBuffer;
           if (indexBuffer) {
             renderPassEncoder.setIndexBuffer(
               indexBuffer.object,

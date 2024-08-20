@@ -121,7 +121,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
       this._load();
     }
   }
-  isProgram(): boolean {
+  isProgram(): this is GPUProgram {
     return true;
   }
   createUniformBuffer(uniform: string): StructuredBuffer<unknown> {
