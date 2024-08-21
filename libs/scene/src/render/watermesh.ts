@@ -558,7 +558,6 @@ export class WaterMesh {
     }
     if (this._paramsChanged) {
       this.generateInitialSpectrum(0);
-      this.generateInitialSpectrum(1);
     }
     this._resolutionChanged = false;
     this._paramsChanged = false;

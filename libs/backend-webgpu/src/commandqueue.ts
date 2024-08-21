@@ -63,8 +63,12 @@ export class CommandQueueImmediate {
   }
   flush() {
     this.flushUploads();
-    this._renderPass.end();
-    this._computePass.end();
+    if (this._renderPass.active) {
+      this._renderPass.end();
+    }
+    if (this._computePass.active) {
+      this._computePass.end();
+    }
   }
   setFramebuffer(fb: WebGPUFrameBuffer): void {
     if (this._renderPass.active) {
@@ -79,13 +83,16 @@ export class CommandQueueImmediate {
     return this._renderPass.getFrameBufferInfo();
   }
   executeRenderBundle(renderBundle: GPURenderBundle) {
-    this._computePass.end();
+    if (this._computePass.active) {
+      this.flushUploads();
+      this._computePass.end();
+    }
     this._renderPass.executeRenderBundle(renderBundle);
   }
   bufferUpload(buffer: WebGPUBuffer) {
     if (this._bufferUploads.has(buffer)) {
       if (this._drawcallCounter > this._bufferUploads.get(buffer)) {
-        this.flushUploads();
+        this.flush();
       }
     } else {
       this._bufferUploads.set(buffer, this._drawcallCounter);
@@ -94,7 +101,7 @@ export class CommandQueueImmediate {
   textureUpload(tex: WebGPUBaseTexture) {
     if (this._textureUploads.has(tex)) {
       if (this._drawcallCounter > this._textureUploads.get(tex)) {
-        this.flushUploads();
+        this.flush();
       }
     } else {
       this._textureUploads.set(tex, this._drawcallCounter);
@@ -107,13 +114,7 @@ export class CommandQueueImmediate {
     dstOffset: number,
     bytes: number
   ) {
-    this.flushUploads();
-    if (this._renderPass.active) {
-      this._renderPass.end();
-    }
-    if (this._computePass.active) {
-      this._computePass.end();
-    }
+    this.flush();
     const copyCommandEncoder = this._device.device.createCommandEncoder();
     copyCommandEncoder.copyBufferToBuffer(srcBuffer.object, srcOffset, dstBuffer.object, dstOffset, bytes);
     this._device.device.queue.submit([copyCommandEncoder.finish()]);
@@ -127,7 +128,10 @@ export class CommandQueueImmediate {
     workgroupCountZ: number
   ) {
     this._drawcallCounter++;
-    this._renderPass.end();
+    if (this._renderPass.active) {
+      this.flushUploads();
+      this._renderPass.end();
+    }
     this._computePass.compute(
       program,
       bindGroups,
@@ -148,8 +152,11 @@ export class CommandQueueImmediate {
     count: number,
     numInstances: number
   ): void {
+    if (this._computePass.active) {
+      this.flushUploads();
+      this._computePass.end();
+    }
     this._drawcallCounter++;
-    this._computePass.end();
     this._renderPass.draw(
       program,
       vertexData,
@@ -175,7 +182,10 @@ export class CommandQueueImmediate {
     numInstances: number
   ): void {
     this._drawcallCounter++;
-    this._computePass.end();
+    if (this._computePass.active) {
+      this.flushUploads();
+      this._computePass.end();
+    }
     this._renderPass.capture(
       renderBundleEncoder,
       program,
