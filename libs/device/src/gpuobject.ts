@@ -1120,7 +1120,7 @@ export interface StorageTextureBindingLayout {
   /** The texture format */
   format: TextureFormat;
   /** View dimension */
-  viewDimension: '1d' | '2d';
+  viewDimension: '1d' | '2d' | '2d-array' | 'cube' | 'cube-array' | '3d';
 }
 
 /**

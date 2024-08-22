@@ -74,8 +74,8 @@ export class BindGroupCache {
             : undefined;
           const storageTexture: GPUStorageTextureBindingLayout = entry.storageTexture
             ? {
-                access: 'write-only',
-                viewDimension: '2d',
+                access: entry.storageTexture.access,
+                viewDimension: entry.storageTexture.viewDimension,
                 format: textureFormatMap[entry.storageTexture.format]
               }
             : undefined;

@@ -1,4 +1,4 @@
-import { Vector2, Vector3, Vector4, PRNG } from '@zephyr3d/base';
+import { Vector2, Vector4, PRNG, Vector3 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   GPUProgram,
@@ -269,7 +269,7 @@ export class WaterMesh {
         noiseTextures: new Map(),
         butterflyTextures: new Map()
       };
-      this._waterProgram = createProgramOcean(impl);
+      this._waterProgram = createProgramOcean(this._useComputeShader, impl);
       this._params = defaultBuildParams;
       const programs = WaterMesh._globals.programs;
       this._h0BindGroup = device.createBindGroup(programs.h0Program.bindGroupLayouts[0]);
@@ -487,24 +487,28 @@ export class WaterMesh {
     device.setBindGroup(0, this._waterBindGroup);
     device.setRenderStates(this._waterRenderStates);
     const sampler = this._linearRepeatSampler;
-    this._waterBindGroup.setTexture('dx_hy_dz_dxdz0', instanceData.dataTextures[0], sampler);
-    this._waterBindGroup.setTexture('sx_sz_dxdx_dzdz0', instanceData.dataTextures[1], sampler);
-    this._waterBindGroup.setTexture('dx_hy_dz_dxdz1', instanceData.dataTextures[2], sampler);
-    this._waterBindGroup.setTexture(
-      'sx_sz_dxdx_dzdz1',
-      instanceData.dataTextures[3],
-      this._linearRepeatSampler
-    );
-    this._waterBindGroup.setTexture(
-      'dx_hy_dz_dxdz2',
-      instanceData.dataTextures[4],
-      this._linearRepeatSampler
-    );
-    this._waterBindGroup.setTexture(
-      'sx_sz_dxdx_dzdz2',
-      instanceData.dataTextures[5],
-      this._linearRepeatSampler
-    );
+    if (this._useComputeShader) {
+      this._waterBindGroup.setTexture('dataTexture', instanceData.dataTextures as Texture2DArray, sampler);
+    } else {
+      this._waterBindGroup.setTexture('dx_hy_dz_dxdz0', instanceData.dataTextures[0], sampler);
+      this._waterBindGroup.setTexture('sx_sz_dxdx_dzdz0', instanceData.dataTextures[1], sampler);
+      this._waterBindGroup.setTexture('dx_hy_dz_dxdz1', instanceData.dataTextures[2], sampler);
+      this._waterBindGroup.setTexture(
+        'sx_sz_dxdx_dzdz1',
+        instanceData.dataTextures[3],
+        this._linearRepeatSampler
+      );
+      this._waterBindGroup.setTexture(
+        'dx_hy_dz_dxdz2',
+        instanceData.dataTextures[4],
+        this._linearRepeatSampler
+      );
+      this._waterBindGroup.setTexture(
+        'sx_sz_dxdx_dzdz2',
+        instanceData.dataTextures[5],
+        this._linearRepeatSampler
+      );
+    }
     this._waterBindGroup.setValue('foamParams', this._params.foamParams);
     this._waterBindGroup.setValue('sizes', this._sizes);
     this._waterBindGroup.setValue('regionMin', this._regionMin);
@@ -694,7 +698,7 @@ export class WaterMesh {
     for (let phase = 0; phase < phases; phase++) {
       this._fft2hBindGroup.setValue('phase', phase);
       if (this._useComputeShader) {
-        this._fft2hBindGroup.setTexture('spectrum', pingPongTextures[pingPong] as Texture2DArray);
+        this._fft2hBindGroup.setTexture('spectrum', pingPongTextures[pingPong] as Texture2DArray, this._nearestRepeatSampler);
         this._fft2hBindGroup.setTexture('ifft', pingPongFramebuffers[pingPong] as Texture2DArray);
         device.compute(
           this.params.resolution / THREAD_GROUP_SIZE,
@@ -756,7 +760,7 @@ export class WaterMesh {
     for (let phase = 0; phase < phases; phase++) {
       this._fft2vBindGroup.setValue('phase', phase);
       if (this._useComputeShader) {
-        this._fft2vBindGroup.setTexture('spectrum', pingPongTextures[pingPong] as Texture2DArray);
+        this._fft2vBindGroup.setTexture('spectrum', pingPongTextures[pingPong] as Texture2DArray, this._nearestRepeatSampler);
         this._fft2vBindGroup.setTexture('ifft', pingPongFramebuffers[pingPong] as Texture2DArray);
       } else {
         device.setFramebuffer(pingPongFramebuffers[pingPong] as FrameBuffer);
@@ -972,7 +976,7 @@ export class WaterMesh {
     this._postfft2BindGroup.setValue('N2', this._params.resolution * this._params.resolution);
     if (this._useComputeShader) {
       this._postfft2BindGroup.setTexture('output', instanceData.dataTextures as Texture2DArray);
-      this._postfft2BindGroup.setTexture('ifft', this._ifftTextures as Texture2DArray);
+      this._postfft2BindGroup.setTexture('ifft', this._ifftTextures as Texture2DArray, this._nearestRepeatSampler);
       device.compute(
         this.params.resolution / THREAD_GROUP_SIZE,
         this.params.resolution / THREAD_GROUP_SIZE,
@@ -1033,8 +1037,7 @@ export class WaterMesh {
     size: number,
     num: number,
     name: string,
-    linear: boolean,
-    storage = false
+    linear: boolean
   ): Texture2D[] | Texture2DArray {
     const options: TextureCreationOptions = {
       samplerOptions: {
@@ -1044,9 +1047,9 @@ export class WaterMesh {
         addressU: 'repeat',
         addressV: 'repeat'
       },
-      writable: !!storage
+      writable: !!this._useComputeShader
     };
-    if (storage) {
+    if (this._useComputeShader) {
       const tex = device.createTexture2DArray(format, size, size, num, options);
       tex.name = name;
       return tex;
@@ -1068,7 +1071,6 @@ export class WaterMesh {
         3,
         'Water-h0',
         false,
-        device.type === 'webgpu'
       );
       const dataTextures = this.createNTextures(
         device,

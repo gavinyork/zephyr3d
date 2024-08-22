@@ -25,7 +25,7 @@ export interface WaterShaderImpl {
 }
 
 /** @internal */
-export function createProgramOcean(impl?: WaterShaderImpl) {
+export function createProgramOcean(useComputeShader: boolean, impl?: WaterShaderImpl) {
   return Application.instance.device.buildRenderProgram({
     vertex(pb) {
       this.$inputs.position = pb.vec3().attrib('position');
@@ -43,12 +43,16 @@ export function createProgramOcean(impl?: WaterShaderImpl) {
       this.croppinesses = pb.vec4().uniform(0);
       this.offset = pb.vec2().uniform(1);
       this.scale = pb.float().uniform(1);
-      this.dx_hy_dz_dxdz0 = pb.tex2D().uniform(0);
-      this.sx_sz_dxdx_dzdz0 = pb.tex2D().uniform(0);
-      this.dx_hy_dz_dxdz1 = pb.tex2D().uniform(0);
-      this.sx_sz_dxdx_dzdz1 = pb.tex2D().uniform(0);
-      this.dx_hy_dz_dxdz2 = pb.tex2D().uniform(0);
-      this.sx_sz_dxdx_dzdz2 = pb.tex2D().uniform(0);
+      if (useComputeShader) {
+        this.dataTexture = pb.tex2DArray().uniform(0);
+      } else {
+        this.dx_hy_dz_dxdz0 = pb.tex2D().uniform(0);
+        this.sx_sz_dxdx_dzdz0 = pb.tex2D().uniform(0);
+        this.dx_hy_dz_dxdz1 = pb.tex2D().uniform(0);
+        this.sx_sz_dxdx_dzdz1 = pb.tex2D().uniform(0);
+        this.dx_hy_dz_dxdz2 = pb.tex2D().uniform(0);
+        this.sx_sz_dxdx_dzdz2 = pb.tex2D().uniform(0);
+      }
       impl?.setupUniforms(this);
       pb.main(function () {
         this.$l.xz = pb.mul(
@@ -61,18 +65,33 @@ export function createProgramOcean(impl?: WaterShaderImpl) {
         this.$outputs.uv0 = pb.div(this.xz, this.sizes.x);
         this.$outputs.uv1 = pb.div(this.xz, this.sizes.y);
         this.$outputs.uv2 = pb.div(this.xz, this.sizes.z);
-        this.$l.a = pb.mul(
-          pb.textureSampleLevel(this.dx_hy_dz_dxdz0, this.$outputs.uv0, 0).rgb,
-          pb.vec3(this.croppinesses.x, 1, this.croppinesses.x)
-        );
-        this.$l.b = pb.mul(
-          pb.textureSampleLevel(this.dx_hy_dz_dxdz1, this.$outputs.uv1, 0).rgb,
-          pb.vec3(this.croppinesses.y, 1, this.croppinesses.y)
-        );
-        this.$l.c = pb.mul(
-          pb.textureSampleLevel(this.dx_hy_dz_dxdz2, this.$outputs.uv2, 0).rgb,
-          pb.vec3(this.croppinesses.z, 1, this.croppinesses.z)
-        );
+        if (useComputeShader) {
+          this.$l.a = pb.mul(
+            pb.textureArraySampleLevel(this.dataTexture, this.$outputs.uv0, 0, 0).rgb,
+            pb.vec3(this.croppinesses.x, 1, this.croppinesses.x)
+          );
+          this.$l.b = pb.mul(
+            pb.textureArraySampleLevel(this.dataTexture, this.$outputs.uv1, 2, 0).rgb,
+            pb.vec3(this.croppinesses.y, 1, this.croppinesses.y)
+          );
+          this.$l.c = pb.mul(
+            pb.textureArraySampleLevel(this.dataTexture, this.$outputs.uv2, 4, 0).rgb,
+            pb.vec3(this.croppinesses.z, 1, this.croppinesses.z)
+          );
+        } else {
+          this.$l.a = pb.mul(
+            pb.textureSampleLevel(this.dx_hy_dz_dxdz0, this.$outputs.uv0, 0).rgb,
+            pb.vec3(this.croppinesses.x, 1, this.croppinesses.x)
+          );
+          this.$l.b = pb.mul(
+            pb.textureSampleLevel(this.dx_hy_dz_dxdz1, this.$outputs.uv1, 0).rgb,
+            pb.vec3(this.croppinesses.y, 1, this.croppinesses.y)
+          );
+          this.$l.c = pb.mul(
+            pb.textureSampleLevel(this.dx_hy_dz_dxdz2, this.$outputs.uv2, 0).rgb,
+            pb.vec3(this.croppinesses.z, 1, this.croppinesses.z)
+          );
+        }
         this.$l.displacement = pb.add(this.a, this.b, this.c);
         this.$outputs.outPos = pb.add(pb.vec3(this.xz.x, this.level, this.xz.y), this.displacement);
         this.$outputs.outXZ = this.xz;
@@ -90,12 +109,16 @@ export function createProgramOcean(impl?: WaterShaderImpl) {
       this.foamParams = pb.vec2().uniform(0);
       this.sizes = pb.vec4().uniform(0);
       this.croppinesses = pb.vec4().uniform(0);
-      this.dx_hy_dz_dxdz0 = pb.tex2D().uniform(0);
-      this.sx_sz_dxdx_dzdz0 = pb.tex2D().uniform(0);
-      this.dx_hy_dz_dxdz1 = pb.tex2D().uniform(0);
-      this.sx_sz_dxdx_dzdz1 = pb.tex2D().uniform(0);
-      this.dx_hy_dz_dxdz2 = pb.tex2D().uniform(0);
-      this.sx_sz_dxdx_dzdz2 = pb.tex2D().uniform(0);
+      if (useComputeShader) {
+        this.dataTexture = pb.tex2DArray().uniform(0);
+      } else {
+        this.dx_hy_dz_dxdz0 = pb.tex2D().uniform(0);
+        this.sx_sz_dxdx_dzdz0 = pb.tex2D().uniform(0);
+        this.dx_hy_dz_dxdz1 = pb.tex2D().uniform(0);
+        this.sx_sz_dxdx_dzdz1 = pb.tex2D().uniform(0);
+        this.dx_hy_dz_dxdz2 = pb.tex2D().uniform(0);
+        this.sx_sz_dxdx_dzdz2 = pb.tex2D().uniform(0);
+      }
       impl?.setupUniforms(this);
       pb.func('jacobian', [pb.float('dxdx'), pb.float('dxdz'), pb.float('dzdz')], function () {
         this.$l.Jxx = pb.add(this.dxdx, 1);
@@ -112,9 +135,15 @@ export function createProgramOcean(impl?: WaterShaderImpl) {
         this.$l.uv0 = pb.div(this.xz, this.sizes.x);
         this.$l.uv1 = pb.div(this.xz, this.sizes.y);
         this.$l.uv2 = pb.div(this.xz, this.sizes.z);
-        this.$l._sx_sz_dxdx_dzdz0 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz0, this.uv0, 0);
-        this.$l._sx_sz_dxdx_dzdz1 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz1, this.uv1, 0);
-        this.$l._sx_sz_dxdx_dzdz2 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz2, this.uv2, 0);
+        if (useComputeShader) {
+          this.$l._sx_sz_dxdx_dzdz0 = pb.textureArraySampleLevel(this.dataTexture, this.uv0, 1, 0);
+          this.$l._sx_sz_dxdx_dzdz1 = pb.textureArraySampleLevel(this.dataTexture, this.uv1, 3, 0);
+          this.$l._sx_sz_dxdx_dzdz2 = pb.textureArraySampleLevel(this.dataTexture, this.uv2, 5, 0);
+        } else {
+          this.$l._sx_sz_dxdx_dzdz0 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz0, this.uv0, 0);
+          this.$l._sx_sz_dxdx_dzdz1 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz1, this.uv1, 0);
+          this.$l._sx_sz_dxdx_dzdz2 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz2, this.uv2, 0);
+        }
         this.$l.sx = pb.add(this._sx_sz_dxdx_dzdz0.x, this._sx_sz_dxdx_dzdz1.x, this._sx_sz_dxdx_dzdz2.x);
         this.$l.sz = pb.add(this._sx_sz_dxdx_dzdz0.y, this._sx_sz_dxdx_dzdz1.y, this._sx_sz_dxdx_dzdz2.y);
         this.$l.dxdx_dzdz = pb.add(
@@ -132,9 +161,15 @@ export function createProgramOcean(impl?: WaterShaderImpl) {
         this.$l.dxdx_dzdz0 = this._sx_sz_dxdx_dzdz0.zw;
         this.$l.dxdx_dzdz1 = this._sx_sz_dxdx_dzdz1.zw;
         this.$l.dxdx_dzdz2 = this._sx_sz_dxdx_dzdz2.zw;
-        this.$l.dxdz0 = pb.textureSampleLevel(this.dx_hy_dz_dxdz0, this.uv0, 0).w;
-        this.$l.dxdz1 = pb.textureSampleLevel(this.dx_hy_dz_dxdz1, this.uv1, 0).w;
-        this.$l.dxdz2 = pb.textureSampleLevel(this.dx_hy_dz_dxdz2, this.uv2, 0).w;
+        if (useComputeShader) {
+          this.$l.dxdz0 = pb.textureArraySampleLevel(this.dataTexture, this.uv0, 0, 0).w;
+          this.$l.dxdz1 = pb.textureArraySampleLevel(this.dataTexture, this.uv1, 2, 0).w;
+          this.$l.dxdz2 = pb.textureArraySampleLevel(this.dataTexture, this.uv2, 4, 0).w;
+        } else {
+          this.$l.dxdz0 = pb.textureSampleLevel(this.dx_hy_dz_dxdz0, this.uv0, 0).w;
+          this.$l.dxdz1 = pb.textureSampleLevel(this.dx_hy_dz_dxdz1, this.uv1, 0).w;
+          this.$l.dxdz2 = pb.textureSampleLevel(this.dx_hy_dz_dxdz2, this.uv2, 0).w;
+        }
         this.$l.dxdz = pb.add(
           pb.mul(this.dxdz0, this.croppinesses.x),
           pb.mul(this.dxdz1, this.croppinesses.y),

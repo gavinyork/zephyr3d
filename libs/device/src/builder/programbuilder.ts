@@ -2459,9 +2459,21 @@ export class ProgramBuilder {
           throw new Error('internal error');
         }
         if (entry.type.isStorageTexture()) {
+          let viewDimension: typeof entry.texture.viewDimension;
+          if (entry.type.isArrayTexture()) {
+            viewDimension = entry.type.isCubeTexture() ? 'cube-array' : '2d-array';
+          } else if (entry.type.is3DTexture()) {
+            viewDimension = '3d';
+          } else if (entry.type.isCubeTexture()) {
+            viewDimension = 'cube';
+          } else if (entry.type.is1DTexture()) {
+            viewDimension = '1d';
+          } else {
+            viewDimension = '2d';
+          }
           entry.storageTexture = {
             access: 'write-only',
-            viewDimension: entry.type.is1DTexture() ? '1d' : '2d',
+            viewDimension: viewDimension,
             format: entry.type.storageTexelFormat
           };
         } else if (entry.type.isExternalTexture()) {

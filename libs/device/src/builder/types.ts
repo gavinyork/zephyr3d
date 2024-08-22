@@ -1666,7 +1666,7 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
   }
   /** @internal */
   protected genTypeId(): string {
-    return `TEXTURE:${this.textureType}`;
+    return `TEXTURE:${this.textureType}:${(this.textureType & BITFLAG_STORAGE) ? this.storageTexelFormat : ''}`;
   }
 }
 
