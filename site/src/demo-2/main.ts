@@ -12,7 +12,6 @@ import {
   PointLight,
   UnlitMaterial,
   Mesh,
-  GraphNode,
   DirectionalLight,
   PerspectiveCamera,
   SphereShape,

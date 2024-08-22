@@ -3,7 +3,7 @@ import { BoxShape, SphereShape } from '@zephyr3d/scene';
 import type AmmoType from '../../types/ammo-wasm';
 
 declare global {
-  var Ammo: typeof AmmoType;
+  const Ammo: typeof AmmoType;
 }
 
 export class PhysicsWorld {

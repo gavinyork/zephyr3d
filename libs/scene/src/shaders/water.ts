@@ -1,6 +1,12 @@
 // copy from: https://github.com/codeagent/webgl-ocean/
 
-import type { PBGlobalScope, PBInsideFunctionScope, PBShaderExp, ProgramBuilder, TextureFormat } from '@zephyr3d/device';
+import type {
+  PBGlobalScope,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  ProgramBuilder,
+  TextureFormat
+} from '@zephyr3d/device';
 import { Application } from '../app';
 
 function getFragCoord(scope: PBGlobalScope, useComputeShader: boolean) {
@@ -162,45 +168,52 @@ export function createProgramOcean(impl?: WaterShaderImpl) {
 }
 
 /** @internal */
-export function createProgramPostFFT2(limit?: 4 | 2) {
-  return Application.instance.device.buildRenderProgram({
-    vertex(pb) {
-      this.$inputs.position = pb.vec3().attrib('position');
-      pb.main(function () {
-        this.$builtins.position = pb.vec4(this.$inputs.position, 1);
-      });
-    },
-    fragment(pb) {
-      if (!limit || limit === 4) {
-        this.$outputs.dx_hy_dz_dxdz0 = pb.vec4();
-        this.$outputs.sx_sz_dxdx_dzdz0 = pb.vec4();
-        this.$outputs.dx_hy_dz_dxdz1 = pb.vec4();
-        this.$outputs.sx_sz_dxdx_dzdz1 = pb.vec4();
-      }
-      if (!limit || limit === 2) {
-        this.$outputs.dx_hy_dz_dxdz2 = pb.vec4();
-        this.$outputs.sx_sz_dxdx_dzdz2 = pb.vec4();
-      }
+export function createProgramPostFFT2(
+  useComputeShader = false,
+  threadGroupSize: number,
+  targetFormat: TextureFormat = 'rgba32f',
+  limit?: 4 | 2
+) {
+  function getComputeFunc(
+    useComputeShader: boolean,
+    fmt: TextureFormat
+  ): (this: PBGlobalScope, pb: ProgramBuilder) => void {
+    return function (this: PBGlobalScope, pb: ProgramBuilder) {
       this.N2 = pb.float().uniform(0);
-      if (!limit || limit === 4) {
-        this.ifft0 = pb.tex2D().uniform(0);
-        this.ifft1 = pb.tex2D().uniform(0);
-        this.ifft2 = pb.tex2D().uniform(0);
-        this.ifft3 = pb.tex2D().uniform(0);
-      }
-      if (!limit || limit === 2) {
-        this.ifft4 = pb.tex2D().uniform(0);
-        this.ifft5 = pb.tex2D().uniform(0);
+      if (useComputeShader) {
+        this.output =
+          fmt === 'rgba32f'
+            ? pb.texStorage2DArray.rgba32float().storage(0)
+            : pb.texStorage2DArray.rgba16float().storage(0);
+        this.ifft = pb.tex2DArray().uniform(0);
+      } else {
+        if (!limit || limit === 4) {
+          this.$outputs.dx_hy_dz_dxdz0 = pb.vec4();
+          this.$outputs.sx_sz_dxdx_dzdz0 = pb.vec4();
+          this.$outputs.dx_hy_dz_dxdz1 = pb.vec4();
+          this.$outputs.sx_sz_dxdx_dzdz1 = pb.vec4();
+          this.ifft0 = pb.tex2D().uniform(0);
+          this.ifft1 = pb.tex2D().uniform(0);
+          this.ifft2 = pb.tex2D().uniform(0);
+          this.ifft3 = pb.tex2D().uniform(0);
+        }
+        if (!limit || limit === 2) {
+          this.$outputs.dx_hy_dz_dxdz2 = pb.vec4();
+          this.$outputs.sx_sz_dxdx_dzdz2 = pb.vec4();
+          this.ifft4 = pb.tex2D().uniform(0);
+          this.ifft5 = pb.tex2D().uniform(0);
+        }
       }
       if (pb.getDevice().type === 'webgl') {
         this.ifftTexSize = pb.vec2().uniform(0);
       }
       pb.main(function () {
-        this.$l.p = pb.float(pb.add(this.$builtins.fragCoord.x, this.$builtins.fragCoord.y));
+        this.$l.fragPos = getFragCoord(this, useComputeShader);
+        this.$l.p = pb.float(pb.add(this.fragPos.x, this.fragPos.y));
         this.$l.s = pb.sub(pb.mul(pb.sub(1, pb.mod(this.p, 2)), 2), 1);
         this.$l.m = pb.mul(this.s, this.N2);
         if (pb.getDevice().type === 'webgl') {
-          this.$l.uv = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.ifftTexSize);
+          this.$l.uv = pb.div(pb.vec2(this.fragPos), this.ifftTexSize);
           if (!limit || limit === 4) {
             this.$outputs.dx_hy_dz_dxdz0 = pb.mul(pb.textureSampleLevel(this.ifft0, this.uv, 0), this.m);
             this.$outputs.sx_sz_dxdx_dzdz0 = pb.mul(pb.textureSampleLevel(this.ifft1, this.uv, 0), this.m);
@@ -211,8 +224,18 @@ export function createProgramPostFFT2(limit?: 4 | 2) {
             this.$outputs.dx_hy_dz_dxdz2 = pb.mul(pb.textureSampleLevel(this.ifft4, this.uv, 0), this.m);
             this.$outputs.sx_sz_dxdx_dzdz2 = pb.mul(pb.textureSampleLevel(this.ifft5, this.uv, 0), this.m);
           }
+        } else if (useComputeShader) {
+          this.$l.uv = pb.ivec2(this.fragPos);
+          for (let i = 0; i < 6; i++) {
+            pb.textureArrayStore(
+              this.output,
+              this.$builtins.globalInvocationId.xy,
+              i,
+              pb.mul(pb.textureArrayLoad(this.ifft, this.uv, i, 0), this.m)
+            );
+          }
         } else {
-          this.$l.uv = pb.ivec2(this.$builtins.fragCoord.xy);
+          this.$l.uv = pb.ivec2(this.fragPos);
           if (!limit || limit === 4) {
             this.$outputs.dx_hy_dz_dxdz0 = pb.mul(pb.textureLoad(this.ifft0, this.uv, 0), this.m);
             this.$outputs.sx_sz_dxdx_dzdz0 = pb.mul(pb.textureLoad(this.ifft1, this.uv, 0), this.m);
@@ -225,39 +248,68 @@ export function createProgramPostFFT2(limit?: 4 | 2) {
           }
         }
       });
-    }
-  });
+    };
+  }
+  if (useComputeShader) {
+    return Application.instance.device.buildComputeProgram({
+      workgroupSize: [threadGroupSize, threadGroupSize, 1],
+      compute: getComputeFunc(useComputeShader, targetFormat)
+    });
+  } else {
+    return Application.instance.device.buildRenderProgram({
+      vertex(pb) {
+        this.$inputs.position = pb.vec3().attrib('position');
+        pb.main(function () {
+          this.$builtins.position = pb.vec4(this.$inputs.position, 1);
+        });
+      },
+      fragment: getComputeFunc(useComputeShader, targetFormat)
+    });
+  }
 }
 
 /** @internal */
-export function createProgramHk(limit?: 4 | 2) {
-  return Application.instance.device.buildRenderProgram({
-    vertex(pb) {
-      this.$inputs.position = pb.vec3().attrib('position');
-      pb.main(function () {
-        this.$builtins.position = pb.vec4(this.$inputs.position, 1);
-      });
-    },
-    fragment(pb) {
-      if (!limit || limit === 4) {
-        this.$outputs.spectrum0 = pb.vec4();
-        this.$outputs.spectrum1 = pb.vec4();
-        this.$outputs.spectrum2 = pb.vec4();
-        this.$outputs.spectrum3 = pb.vec4();
-      }
-      if (!limit || limit === 2) {
-        this.$outputs.spectrum4 = pb.vec4();
-        this.$outputs.spectrum5 = pb.vec4();
+export function createProgramHk(
+  useComputeShader = false,
+  threadGroupSize = 8,
+  targetFormat: TextureFormat = 'rgba32f',
+  limit?: 4 | 2
+) {
+  function getComputeFunc(
+    useComputeShader = false,
+    fmt: TextureFormat
+  ): (this: PBGlobalScope, pb: ProgramBuilder) => void {
+    return function (this: PBGlobalScope, pb: ProgramBuilder) {
+      if (useComputeShader) {
+        this.spectrum =
+          fmt === 'rgba32f'
+            ? pb.texStorage2DArray.rgba32float().storage(0)
+            : pb.texStorage2DArray.rgba16float().storage(0);
+      } else {
+        if (!limit || limit === 4) {
+          this.$outputs.spectrum0 = pb.vec4();
+          this.$outputs.spectrum1 = pb.vec4();
+          this.$outputs.spectrum2 = pb.vec4();
+          this.$outputs.spectrum3 = pb.vec4();
+        }
+        if (!limit || limit === 2) {
+          this.$outputs.spectrum4 = pb.vec4();
+          this.$outputs.spectrum5 = pb.vec4();
+        }
       }
       this.resolution = pb.int().uniform(0);
       this.sizes = pb.vec4().uniform(0);
       this.t = pb.float().uniform(0);
-      if (!limit || limit === 4) {
-        this.h0Texture0 = pb.tex2D().uniform(0);
-        this.h0Texture1 = pb.tex2D().uniform(0);
-      }
-      if (!limit || limit === 2) {
-        this.h0Texture2 = pb.tex2D().uniform(0);
+      if (useComputeShader) {
+        this.h0Texture = pb.tex2DArray().uniform(0);
+      } else {
+        if (!limit || limit === 4) {
+          this.h0Texture0 = pb.tex2D().uniform(0);
+          this.h0Texture1 = pb.tex2D().uniform(0);
+        }
+        if (!limit || limit === 2) {
+          this.h0Texture2 = pb.tex2D().uniform(0);
+        }
       }
       if (pb.getDevice().type === 'webgl') {
         this.h0TexSize = pb.vec2().uniform(0);
@@ -332,6 +384,8 @@ export function createProgramHk(limit?: 4 | 2) {
                 pb.div(pb.vec2(this.fragCoord), this.h0TexSize),
                 0
               );
+            } else if (useComputeShader) {
+              this.$l.h0Texel = pb.textureArrayLoad(this.h0Texture, this.fragCoord, x, 0);
             } else {
               this.$l.h0Texel = pb.textureLoad(this[`h0Texture${x}`], this.fragCoord, 0);
             }
@@ -372,43 +426,79 @@ export function createProgramHk(limit?: 4 | 2) {
         }
       );
       pb.main(function () {
-        this.fragXY = pb.ivec2(this.$builtins.fragCoord.xy);
+        this.fragXY = pb.ivec2(getFragCoord(this, useComputeShader));
         this.$l.x = pb.vec2(pb.sub(this.fragXY, pb.ivec2(pb.div(this.resolution, 2))));
-        if (!limit || limit === 4) {
-          this.$l.spectrum0 = pb.vec4();
-          this.$l.spectrum1 = pb.vec4();
-          this.$l.spectrum2 = pb.vec4();
-          this.$l.spectrum3 = pb.vec4();
+        if (useComputeShader || !limit || limit === 4) {
+          this.$l.s0 = pb.vec4();
+          this.$l.s1 = pb.vec4();
+          this.$l.s2 = pb.vec4();
+          this.$l.s3 = pb.vec4();
           this.$l.spec0 = this.getSpectrum0(this.x, this.sizes.x, this.fragXY);
           this.$l.spec1 = this.getSpectrum1(this.x, this.sizes.y, this.fragXY);
-          this.compressSpectrum(this.spec0, this.spectrum0, this.spectrum1);
-          this.compressSpectrum(this.spec1, this.spectrum2, this.spectrum3);
-          this.$outputs.spectrum0 = this.spectrum0;
-          this.$outputs.spectrum1 = this.spectrum1;
-          this.$outputs.spectrum2 = this.spectrum2;
-          this.$outputs.spectrum3 = this.spectrum3;
+          this.compressSpectrum(this.spec0, this.s0, this.s1);
+          this.compressSpectrum(this.spec1, this.s2, this.s3);
+          if (useComputeShader) {
+            pb.textureArrayStore(this.spectrum, this.$builtins.globalInvocationId.xy, 0, this.s0);
+            pb.textureArrayStore(this.spectrum, this.$builtins.globalInvocationId.xy, 1, this.s1);
+            pb.textureArrayStore(this.spectrum, this.$builtins.globalInvocationId.xy, 2, this.s2);
+            pb.textureArrayStore(this.spectrum, this.$builtins.globalInvocationId.xy, 3, this.s3);
+          } else {
+            this.$outputs.spectrum0 = this.s0;
+            this.$outputs.spectrum1 = this.s1;
+            this.$outputs.spectrum2 = this.s2;
+            this.$outputs.spectrum3 = this.s3;
+          }
         }
-        if (!limit || limit === 2) {
-          this.$l.spectrum4 = pb.vec4();
-          this.$l.spectrum5 = pb.vec4();
+        if (useComputeShader || !limit || limit === 2) {
+          this.$l.s4 = pb.vec4();
+          this.$l.s5 = pb.vec4();
           this.$l.spec2 = this.getSpectrum2(this.x, this.sizes.z, this.fragXY);
-          this.compressSpectrum(this.spec2, this.spectrum4, this.spectrum5);
-          this.$outputs.spectrum4 = this.spectrum4;
-          this.$outputs.spectrum5 = this.spectrum5;
+          this.compressSpectrum(this.spec2, this.s4, this.s5);
+          if (useComputeShader) {
+            pb.textureArrayStore(this.spectrum, this.$builtins.globalInvocationId.xy, 4, this.s4);
+            pb.textureArrayStore(this.spectrum, this.$builtins.globalInvocationId.xy, 5, this.s5);
+          } else {
+            this.$outputs.spectrum4 = this.s4;
+            this.$outputs.spectrum5 = this.s5;
+          }
         }
       });
-    }
-  });
+    };
+  }
+  if (useComputeShader) {
+    return Application.instance.device.buildComputeProgram({
+      workgroupSize: [threadGroupSize, threadGroupSize, 1],
+      compute: getComputeFunc(useComputeShader, targetFormat)
+    });
+  } else {
+    return Application.instance.device.buildRenderProgram({
+      vertex(pb) {
+        this.$inputs.position = pb.vec3().attrib('position');
+        pb.main(function () {
+          this.$builtins.position = pb.vec4(this.$inputs.position, 1);
+        });
+      },
+      fragment: getComputeFunc(useComputeShader, targetFormat)
+    });
+  }
 }
 
 /** @internal */
-export function createProgramH0(useComputeShader = false, threadGroupSize = 8, targetFormat: TextureFormat = 'rgba32f') {
-  function getComputeFunc(useComputeShader = false, fmt: TextureFormat): (this: PBGlobalScope, pb: ProgramBuilder) => void {
-    return function(this: PBGlobalScope, pb: ProgramBuilder) {
+export function createProgramH0(
+  useComputeShader = false,
+  threadGroupSize = 8,
+  targetFormat: TextureFormat = 'rgba32f'
+) {
+  function getComputeFunc(
+    useComputeShader = false,
+    fmt: TextureFormat
+  ): (this: PBGlobalScope, pb: ProgramBuilder) => void {
+    return function (this: PBGlobalScope, pb: ProgramBuilder) {
       if (useComputeShader) {
-        this.spectrum0 = fmt === 'rgba32f' ? pb.texStorage2D.rgba32float().storage(0) : pb.texStorage2D.rgba16float().storage(0);
-        this.spectrum1 = fmt === 'rgba32f' ? pb.texStorage2D.rgba32float().storage(0) : pb.texStorage2D.rgba16float().storage(0);
-        this.spectrum2 = fmt === 'rgba32f' ? pb.texStorage2D.rgba32float().storage(0) : pb.texStorage2D.rgba16float().storage(0);
+        this.spectrum =
+          fmt === 'rgba32f'
+            ? pb.texStorage2DArray.rgba32float().storage(0)
+            : pb.texStorage2DArray.rgba16float().storage(0);
       } else {
         this.$outputs.spectrum0 = pb.vec4();
         this.$outputs.spectrum1 = pb.vec4();
@@ -477,18 +567,48 @@ export function createProgramH0(useComputeShader = false, threadGroupSize = 8, t
         this.$l.k = pb.mul(pb.vec2(Math.PI * 2), this.x);
         this.$l.rnd = this.gauss(pb.ivec2(getFragCoord(this, useComputeShader)));
         if (useComputeShader) {
-          pb.textureStore(this.spectrum0, this.$builtins.globalInvocationId.xy, pb.mul(
-            this.phillips(pb.div(this.k, this.cascade0.x), this.cascade0.y, this.cascade0.z, this.cascade0.w),
-            this.rnd
-          ));
-          pb.textureStore(this.spectrum1, this.$builtins.globalInvocationId.xy, pb.mul(
-            this.phillips(pb.div(this.k, this.cascade1.x), this.cascade1.y, this.cascade1.z, this.cascade1.w),
-            this.rnd
-          ));
-          pb.textureStore(this.spectrum2, this.$builtins.globalInvocationId.xy, pb.mul(
-            this.phillips(pb.div(this.k, this.cascade2.x), this.cascade2.y, this.cascade2.z, this.cascade2.w),
-            this.rnd
-          ));
+          pb.textureArrayStore(
+            this.spectrum,
+            this.$builtins.globalInvocationId.xy,
+            0,
+            pb.mul(
+              this.phillips(
+                pb.div(this.k, this.cascade0.x),
+                this.cascade0.y,
+                this.cascade0.z,
+                this.cascade0.w
+              ),
+              this.rnd
+            )
+          );
+          pb.textureArrayStore(
+            this.spectrum,
+            this.$builtins.globalInvocationId.xy,
+            1,
+            pb.mul(
+              this.phillips(
+                pb.div(this.k, this.cascade1.x),
+                this.cascade1.y,
+                this.cascade1.z,
+                this.cascade1.w
+              ),
+              this.rnd
+            )
+          );
+          pb.textureArrayStore(
+            this.spectrum,
+            this.$builtins.globalInvocationId.xy,
+            2,
+            pb.mul(
+              this.phillips(
+                pb.div(this.k, this.cascade2.x),
+                this.cascade2.y,
+                this.cascade2.z,
+                this.cascade2.w
+              ),
+              this.rnd
+            )
+          );
         } else {
           this.$outputs.spectrum0 = pb.mul(
             this.phillips(pb.div(this.k, this.cascade0.x), this.cascade0.y, this.cascade0.z, this.cascade0.w),
@@ -510,7 +630,7 @@ export function createProgramH0(useComputeShader = false, threadGroupSize = 8, t
     return Application.instance.device.buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
-    })
+    });
   } else {
     return Application.instance.device.buildRenderProgram({
       vertex(pb) {
@@ -525,30 +645,40 @@ export function createProgramH0(useComputeShader = false, threadGroupSize = 8, t
 }
 
 /** @internal */
-export function createProgramFFT2V(limit?: 4 | 2) {
-  return Application.instance.device.buildRenderProgram({
-    vertex(pb) {
-      this.$inputs.position = pb.vec3().attrib('position');
-      pb.main(function () {
-        this.$builtins.position = pb.vec4(this.$inputs.position, 1);
-      });
-    },
-    fragment(pb) {
-      if (!limit || limit === 4) {
-        this.$outputs.ifft0 = pb.vec4();
-        this.$outputs.ifft1 = pb.vec4();
-        this.$outputs.ifft2 = pb.vec4();
-        this.$outputs.ifft3 = pb.vec4();
-        this.spectrum0 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-        this.spectrum1 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-        this.spectrum2 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-        this.spectrum3 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-      }
-      if (!limit || limit === 2) {
-        this.$outputs.ifft4 = pb.vec4();
-        this.$outputs.ifft5 = pb.vec4();
-        this.spectrum4 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-        this.spectrum5 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+export function createProgramFFT2V(
+  useComputeShader = false,
+  threadGroupSize: number,
+  targetFormat: TextureFormat = 'rgba32f',
+  limit?: 4 | 2
+) {
+  function getComputeFunc(
+    useComputeShader: boolean,
+    fmt: TextureFormat
+  ): (this: PBGlobalScope, pb: ProgramBuilder) => void {
+    return function (this: PBGlobalScope, pb: ProgramBuilder) {
+      if (useComputeShader) {
+        this.spectrum = pb.tex2DArray().sampleType('unfilterable-float').uniform(0);
+        this.ifft =
+          fmt === 'rgba32f'
+            ? pb.texStorage2DArray.rgba32float().storage(0)
+            : pb.texStorage2DArray.rgba16float().storage(0);
+      } else {
+        if (!limit || limit === 4) {
+          this.$outputs.ifft0 = pb.vec4();
+          this.$outputs.ifft1 = pb.vec4();
+          this.$outputs.ifft2 = pb.vec4();
+          this.$outputs.ifft3 = pb.vec4();
+          this.spectrum0 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.spectrum1 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.spectrum2 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.spectrum3 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+        }
+        if (!limit || limit === 2) {
+          this.$outputs.ifft4 = pb.vec4();
+          this.$outputs.ifft5 = pb.vec4();
+          this.spectrum4 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.spectrum5 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+        }
       }
       this.butterfly = pb.tex2D().sampleType('unfilterable-float').uniform(0);
       if (pb.getDevice().type === 'webgl') {
@@ -589,6 +719,19 @@ export function createProgramFFT2V(limit?: 4 | 2) {
               pb.div(pb.vec2(pb.float(this.x), this.texelButt.a), this.texSize.xy),
               0
             );
+          } else if (useComputeShader) {
+            this.$l.texelA = pb.textureArrayLoad(
+              this.spectrum,
+              pb.ivec2(this.x, pb.int(this.texelButt.b)),
+              x,
+              0
+            );
+            this.$l.texelB = pb.textureArrayLoad(
+              this.spectrum,
+              pb.ivec2(this.x, pb.int(this.texelButt.a)),
+              x,
+              0
+            );
           } else {
             this.$l.texelA = pb.textureLoad(
               this[`spectrum${x}`],
@@ -612,8 +755,8 @@ export function createProgramFFT2V(limit?: 4 | 2) {
         });
       }
       pb.main(function () {
-        this.$l.x = pb.int(this.$builtins.fragCoord.x);
-        this.$l.y = pb.int(this.$builtins.fragCoord.y);
+        this.$l.x = pb.int(getFragCoord(this, useComputeShader).x);
+        this.$l.y = pb.int(getFragCoord(this, useComputeShader).y);
         if (pb.getDevice().type === 'webgl') {
           this.$l.texelButt = pb.textureSampleLevel(
             this.butterfly,
@@ -623,46 +766,111 @@ export function createProgramFFT2V(limit?: 4 | 2) {
         } else {
           this.$l.texelButt = pb.textureLoad(this.butterfly, pb.ivec2(this.phase, this.y), 0);
         }
-        if (!limit || limit === 4) {
-          this.$outputs.ifft0 = this.twiddle0(this.texelButt, this.x);
-          this.$outputs.ifft1 = this.twiddle1(this.texelButt, this.x);
-          this.$outputs.ifft2 = this.twiddle2(this.texelButt, this.x);
-          this.$outputs.ifft3 = this.twiddle3(this.texelButt, this.x);
-        }
-        if (!limit || limit === 2) {
-          this.$outputs.ifft4 = this.twiddle4(this.texelButt, this.x);
-          this.$outputs.ifft5 = this.twiddle5(this.texelButt, this.x);
+        if (useComputeShader) {
+          pb.textureArrayStore(
+            this.ifft,
+            this.$builtins.globalInvocationId.xy,
+            0,
+            this.twiddle0(this.texelButt, this.x)
+          );
+          pb.textureArrayStore(
+            this.ifft,
+            this.$builtins.globalInvocationId.xy,
+            1,
+            this.twiddle1(this.texelButt, this.x)
+          );
+          pb.textureArrayStore(
+            this.ifft,
+            this.$builtins.globalInvocationId.xy,
+            2,
+            this.twiddle2(this.texelButt, this.x)
+          );
+          pb.textureArrayStore(
+            this.ifft,
+            this.$builtins.globalInvocationId.xy,
+            3,
+            this.twiddle3(this.texelButt, this.x)
+          );
+          pb.textureArrayStore(
+            this.ifft,
+            this.$builtins.globalInvocationId.xy,
+            4,
+            this.twiddle4(this.texelButt, this.x)
+          );
+          pb.textureArrayStore(
+            this.ifft,
+            this.$builtins.globalInvocationId.xy,
+            5,
+            this.twiddle5(this.texelButt, this.x)
+          );
+        } else {
+          if (!limit || limit === 4) {
+            this.$outputs.ifft0 = this.twiddle0(this.texelButt, this.x);
+            this.$outputs.ifft1 = this.twiddle1(this.texelButt, this.x);
+            this.$outputs.ifft2 = this.twiddle2(this.texelButt, this.x);
+            this.$outputs.ifft3 = this.twiddle3(this.texelButt, this.x);
+          }
+          if (!limit || limit === 2) {
+            this.$outputs.ifft4 = this.twiddle4(this.texelButt, this.x);
+            this.$outputs.ifft5 = this.twiddle5(this.texelButt, this.x);
+          }
         }
       });
-    }
-  });
+    };
+  }
+  if (useComputeShader) {
+    return Application.instance.device.buildComputeProgram({
+      workgroupSize: [threadGroupSize, threadGroupSize, 1],
+      compute: getComputeFunc(useComputeShader, targetFormat)
+    });
+  } else {
+    return Application.instance.device.buildRenderProgram({
+      vertex(pb) {
+        this.$inputs.position = pb.vec3().attrib('position');
+        pb.main(function () {
+          this.$builtins.position = pb.vec4(this.$inputs.position, 1);
+        });
+      },
+      fragment: getComputeFunc(useComputeShader, targetFormat)
+    });
+  }
 }
 
 /** @internal */
-export function createProgramFFT2H(limit?: 4 | 2) {
-  return Application.instance.device.buildRenderProgram({
-    vertex(pb) {
-      this.$inputs.position = pb.vec3().attrib('position');
-      pb.main(function () {
-        this.$builtins.position = pb.vec4(this.$inputs.position, 1);
-      });
-    },
-    fragment(pb) {
-      if (!limit || limit === 4) {
-        this.$outputs.ifft0 = pb.vec4();
-        this.$outputs.ifft1 = pb.vec4();
-        this.$outputs.ifft2 = pb.vec4();
-        this.$outputs.ifft3 = pb.vec4();
-        this.spectrum0 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-        this.spectrum1 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-        this.spectrum2 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-        this.spectrum3 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-      }
-      if (!limit || limit === 2) {
-        this.$outputs.ifft4 = pb.vec4();
-        this.$outputs.ifft5 = pb.vec4();
-        this.spectrum4 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-        this.spectrum5 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+export function createProgramFFT2H(
+  useComputeShader = false,
+  threadGroupSize: number,
+  targetFormat: TextureFormat = 'rgba32f',
+  limit?: 4 | 2
+) {
+  function getComputeFunc(
+    useComputeShader: boolean,
+    fmt: TextureFormat
+  ): (this: PBGlobalScope, pb: ProgramBuilder) => void {
+    return function (this: PBGlobalScope, pb: ProgramBuilder) {
+      if (useComputeShader) {
+        this.spectrum = pb.tex2DArray().sampleType('unfilterable-float').uniform(0);
+        this.ifft =
+          fmt === 'rgba32f'
+            ? pb.texStorage2DArray.rgba32float().storage(0)
+            : pb.texStorage2DArray.rgba16float().storage(0);
+      } else {
+        if (!limit || limit === 4) {
+          this.$outputs.ifft0 = pb.vec4();
+          this.$outputs.ifft1 = pb.vec4();
+          this.$outputs.ifft2 = pb.vec4();
+          this.$outputs.ifft3 = pb.vec4();
+          this.spectrum0 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.spectrum1 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.spectrum2 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.spectrum3 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+        }
+        if (!limit || limit === 2) {
+          this.$outputs.ifft4 = pb.vec4();
+          this.$outputs.ifft5 = pb.vec4();
+          this.spectrum4 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.spectrum5 = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+        }
       }
       this.butterfly = pb.tex2D().sampleType('unfilterable-float').uniform(0);
       this.phase = pb.int().uniform(0);
@@ -703,6 +911,19 @@ export function createProgramFFT2H(limit?: 4 | 2) {
               pb.div(pb.vec2(this.texelButt.a, pb.float(this.y)), this.texSize.xy),
               0
             );
+          } else if (useComputeShader) {
+            this.$l.texelA = pb.textureArrayLoad(
+              this.spectrum,
+              pb.ivec2(pb.int(this.texelButt.b), this.y),
+              x,
+              0
+            );
+            this.$l.texelB = pb.textureArrayLoad(
+              this.spectrum,
+              pb.ivec2(pb.int(this.texelButt.a), this.y),
+              x,
+              0
+            );
           } else {
             this.$l.texelA = pb.textureLoad(
               this[`spectrum${x}`],
@@ -726,8 +947,8 @@ export function createProgramFFT2H(limit?: 4 | 2) {
         });
       }
       pb.main(function () {
-        this.$l.x = pb.int(this.$builtins.fragCoord.x);
-        this.$l.y = pb.int(this.$builtins.fragCoord.y);
+        this.$l.x = pb.int(getFragCoord(this, useComputeShader).x);
+        this.$l.y = pb.int(getFragCoord(this, useComputeShader).y);
         if (pb.getDevice().type === 'webgl') {
           this.$l.texelButt = pb.textureSampleLevel(
             this.butterfly,
@@ -737,17 +958,72 @@ export function createProgramFFT2H(limit?: 4 | 2) {
         } else {
           this.$l.texelButt = pb.textureLoad(this.butterfly, pb.ivec2(this.phase, this.x), 0);
         }
-        if (!limit || limit === 4) {
-          this.$outputs.ifft0 = this.twiddle0(this.texelButt, this.y);
-          this.$outputs.ifft1 = this.twiddle1(this.texelButt, this.y);
-          this.$outputs.ifft2 = this.twiddle2(this.texelButt, this.y);
-          this.$outputs.ifft3 = this.twiddle3(this.texelButt, this.y);
-        }
-        if (!limit || limit === 2) {
-          this.$outputs.ifft4 = this.twiddle4(this.texelButt, this.y);
-          this.$outputs.ifft5 = this.twiddle5(this.texelButt, this.y);
+        if (useComputeShader) {
+          pb.textureArrayStore(
+            this.ifft,
+            this.$builtins.globalInvocationId.xy,
+            0,
+            this.twiddle0(this.texelButt, this.y)
+          );
+          pb.textureArrayStore(
+            this.ifft,
+            this.$builtins.globalInvocationId.xy,
+            1,
+            this.twiddle1(this.texelButt, this.y)
+          );
+          pb.textureArrayStore(
+            this.ifft,
+            this.$builtins.globalInvocationId.xy,
+            2,
+            this.twiddle2(this.texelButt, this.y)
+          );
+          pb.textureArrayStore(
+            this.ifft,
+            this.$builtins.globalInvocationId.xy,
+            3,
+            this.twiddle3(this.texelButt, this.y)
+          );
+          pb.textureArrayStore(
+            this.ifft,
+            this.$builtins.globalInvocationId.xy,
+            4,
+            this.twiddle4(this.texelButt, this.y)
+          );
+          pb.textureArrayStore(
+            this.ifft,
+            this.$builtins.globalInvocationId.xy,
+            5,
+            this.twiddle5(this.texelButt, this.y)
+          );
+        } else {
+          if (!limit || limit === 4) {
+            this.$outputs.ifft0 = this.twiddle0(this.texelButt, this.y);
+            this.$outputs.ifft1 = this.twiddle1(this.texelButt, this.y);
+            this.$outputs.ifft2 = this.twiddle2(this.texelButt, this.y);
+            this.$outputs.ifft3 = this.twiddle3(this.texelButt, this.y);
+          }
+          if (!limit || limit === 2) {
+            this.$outputs.ifft4 = this.twiddle4(this.texelButt, this.y);
+            this.$outputs.ifft5 = this.twiddle5(this.texelButt, this.y);
+          }
         }
       });
-    }
-  });
+    };
+  }
+  if (useComputeShader) {
+    return Application.instance.device.buildComputeProgram({
+      workgroupSize: [threadGroupSize, threadGroupSize, 1],
+      compute: getComputeFunc(useComputeShader, targetFormat)
+    });
+  } else {
+    return Application.instance.device.buildRenderProgram({
+      vertex(pb) {
+        this.$inputs.position = pb.vec3().attrib('position');
+        pb.main(function () {
+          this.$builtins.position = pb.vec4(this.$inputs.position, 1);
+        });
+      },
+      fragment: getComputeFunc(useComputeShader, targetFormat)
+    });
+  }
 }

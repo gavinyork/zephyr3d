@@ -1,4 +1,3 @@
-import { Vector2 } from '@zephyr3d/base';
 import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
 import type { DrawContext } from '@zephyr3d/scene';
 import { MeshMaterial, ShaderHelper, applyMaterialMixins, mixinLambert } from '@zephyr3d/scene';

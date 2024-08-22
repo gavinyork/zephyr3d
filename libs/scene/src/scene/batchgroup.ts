@@ -32,7 +32,7 @@ export class BatchGroup extends GraphNode {
     this._changeTag = 0;
     this._bindGroupAllocator = new InstanceBindGroupAllocator();
     this._staticBV = false;
-    const bvCallback = function(this: BatchGroup) {
+    const bvCallback = function (this: BatchGroup) {
       if (!this._staticBV) {
         this.invalidateBoundingVolume();
       }
@@ -88,7 +88,7 @@ export class BatchGroup extends GraphNode {
     const bv = new BoundingBox();
     const invWorldMatrix = Matrix4x4.invertAffine(this.worldMatrix);
     bv.beginExtend();
-    this.iterate(node => {
+    this.iterate((node) => {
       if (node.isMesh()) {
         Matrix4x4.multiplyAffine(invWorldMatrix, node.worldMatrix, tmpMatrix);
         const wb = node.getBoundingVolume().transform(tmpMatrix).toAABB();

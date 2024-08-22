@@ -7,7 +7,9 @@ import type {
   FrameBuffer,
   TextureSampler,
   TextureFormat,
-  RenderStateSet
+  RenderStateSet,
+  TextureCreationOptions,
+  Texture2DArray
 } from '@zephyr3d/device';
 import { Application } from '../app';
 import { Clipmap } from './clipmap';
@@ -142,19 +144,19 @@ type Globales = {
 
 type WaterInstanceData = {
   h0Framebuffer: FrameBuffer;
-  h0Textures: Texture2D[];
+  h0Textures: Texture2D[] | Texture2DArray;
   spectrumFramebuffer: FrameBuffer;
   spectrumFramebuffer2: FrameBuffer;
   spectrumFramebuffer4: FrameBuffer;
-  spectrumTextures: Texture2D[];
+  spectrumTextures: Texture2D[] | Texture2DArray;
   pingpongFramebuffer: FrameBuffer;
   pingpongFramebuffer2: FrameBuffer;
   pingpongFramebuffer4: FrameBuffer;
-  pingpongTextures: Texture2D[];
+  pingpongTextures: Texture2D[] | Texture2DArray;
   postIfft2Framebuffer: FrameBuffer;
   postIfft2Framebuffer2: FrameBuffer;
   postIfft2Framebuffer4: FrameBuffer;
-  dataTextures: Texture2D[];
+  dataTextures: Texture2D[] | Texture2DArray;
 };
 
 const RENDER_NONE = 0;
@@ -166,6 +168,7 @@ const THREAD_GROUP_SIZE = 16;
 /** @internal */
 export class WaterMesh {
   private static _globals: Globales = null;
+  private _useComputeShader: boolean;
   private _h0BindGroup: BindGroup;
   private _hkBindGroup: BindGroup;
   private _hkBindGroup2: BindGroup;
@@ -200,7 +203,7 @@ export class WaterMesh {
   private _croppinesses: Vector4;
   private _params: OceanFieldBuildParams;
   private _instanceData: WaterInstanceData;
-  private _ifftTextures: Texture2D[];
+  private _ifftTextures: Texture2D[] | Texture2DArray;
   private _clipmap: Clipmap;
   private _aabbExtents: Vector2;
   private _cascades: Vector4[];
@@ -213,55 +216,54 @@ export class WaterMesh {
   private _updateFrameStamp: number;
   private _waterProgram: GPUProgram;
   constructor(device: AbstractDevice, impl?: WaterShaderImpl) {
-    const renderTargetFloat32 = device.getDeviceCaps().textureCaps.supportFloatColorBuffer;
-    const linearFloat32 = renderTargetFloat32 && device.getDeviceCaps().textureCaps.supportLinearFloatTexture;
+    //const renderTargetFloat32 = device.getDeviceCaps().textureCaps.supportFloatColorBuffer;
+    //const linearFloat32 = renderTargetFloat32 && device.getDeviceCaps().textureCaps.supportLinearFloatTexture;
     const renderTargetFloat16 = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer;
     const maxDrawBuffers = /*device.type !== 'webgl' && */ renderTargetFloat16
       ? device.getDeviceCaps().framebufferCaps.maxDrawBuffers
       : 0;
+    this._textureFormat = 'rgba16f';
+    this._h0TextureFormat = 'rgba16f';
+    this._dataTextureFormat = 'rgba16f';
+    this._useComputeShader = device.type === 'webgpu';
     const maxSampleBytes = device.getDeviceCaps().framebufferCaps.maxColorAttachmentBytesPerSample;
-    if (maxDrawBuffers >= 6 && maxSampleBytes >= 96) {
-      this._renderMode = RENDER_NORMAL;
-      this._textureFormat = renderTargetFloat32 ? 'rgba32f' : 'rgba16f';
-      this._h0TextureFormat = renderTargetFloat32 ? 'rgba32f' : 'rgba16f';
-      this._dataTextureFormat = linearFloat32 ? 'rgba32f' : 'rgba16f';
-    } else if (maxDrawBuffers >= 6 && maxSampleBytes >= 48) {
-      this._renderMode = RENDER_NORMAL;
-      this._textureFormat = 'rgba16f';
-      this._h0TextureFormat = renderTargetFloat32 ? 'rgba32f' : 'rgba16f';
-      this._dataTextureFormat = 'rgba16f';
-    } else if (maxDrawBuffers >= 4 && maxSampleBytes >= 64) {
-      this._renderMode = RENDER_TWO_PASS;
-      this._textureFormat = renderTargetFloat32 ? 'rgba32f' : 'rgba16f';
-      this._h0TextureFormat = renderTargetFloat32 ? 'rgba32f' : 'rgba16f';
-      this._dataTextureFormat = renderTargetFloat32 && linearFloat32 ? 'rgba32f' : 'rgba16f';
-    } else if (maxDrawBuffers >= 4 && maxSampleBytes >= 32) {
-      this._renderMode = RENDER_TWO_PASS;
-      this._textureFormat = 'rgba16f';
-      this._h0TextureFormat = 'rgba16f';
-      this._dataTextureFormat = 'rgba16f';
-    } else {
+    if (maxDrawBuffers === 0) {
       this._renderMode = RENDER_NONE;
-      this._textureFormat = null;
-      this._h0TextureFormat = null;
-      this._dataTextureFormat = null;
+    } else if (this._useComputeShader || maxSampleBytes >= 48) {
+      this._renderMode = RENDER_NORMAL;
+    } else {
+      this._renderMode = RENDER_TWO_PASS;
     }
     if (this._renderMode !== RENDER_NONE) {
       WaterMesh._globals = WaterMesh._globals ?? {
         programs: {
-          h0Program: device.type === 'webgpu' ? createProgramH0(true, THREAD_GROUP_SIZE, this._h0TextureFormat) : createProgramH0(),
-          hkProgram: this._renderMode === RENDER_NORMAL ? createProgramHk() : null,
-          hkProgram2: this._renderMode === RENDER_TWO_PASS ? createProgramHk(2) : null,
-          hkProgram4: this._renderMode === RENDER_TWO_PASS ? createProgramHk(4) : null,
-          fft2hProgram: this._renderMode === RENDER_NORMAL ? createProgramFFT2H() : null,
-          fft2hProgram2: this._renderMode === RENDER_TWO_PASS ? createProgramFFT2H(2) : null,
-          fft2hProgram4: this._renderMode === RENDER_TWO_PASS ? createProgramFFT2H(4) : null,
-          fft2vProgram: this._renderMode === RENDER_NORMAL ? createProgramFFT2V() : null,
-          fft2vProgram2: this._renderMode === RENDER_TWO_PASS ? createProgramFFT2V(2) : null,
-          fft2vProgram4: this._renderMode === RENDER_TWO_PASS ? createProgramFFT2V(4) : null,
-          postfft2Program: this._renderMode === RENDER_NORMAL ? createProgramPostFFT2() : null,
-          postfft2Program2: this._renderMode === RENDER_TWO_PASS ? createProgramPostFFT2(2) : null,
-          postfft2Program4: this._renderMode === RENDER_TWO_PASS ? createProgramPostFFT2(4) : null
+          h0Program: createProgramH0(this._useComputeShader, THREAD_GROUP_SIZE, this._h0TextureFormat),
+          hkProgram:
+            this._renderMode === RENDER_NORMAL
+              ? createProgramHk(this._useComputeShader, THREAD_GROUP_SIZE, this._dataTextureFormat)
+              : null,
+          hkProgram2: this._renderMode === RENDER_TWO_PASS ? createProgramHk(false, 0, null, 2) : null,
+          hkProgram4: this._renderMode === RENDER_TWO_PASS ? createProgramHk(false, 0, null, 4) : null,
+          fft2hProgram:
+            this._renderMode === RENDER_NORMAL
+              ? createProgramFFT2H(this._useComputeShader, THREAD_GROUP_SIZE, this._dataTextureFormat)
+              : null,
+          fft2hProgram2: this._renderMode === RENDER_TWO_PASS ? createProgramFFT2H(false, 0, null, 2) : null,
+          fft2hProgram4: this._renderMode === RENDER_TWO_PASS ? createProgramFFT2H(false, 0, null, 4) : null,
+          fft2vProgram:
+            this._renderMode === RENDER_NORMAL
+              ? createProgramFFT2V(this._useComputeShader, THREAD_GROUP_SIZE, this._dataTextureFormat)
+              : null,
+          fft2vProgram2: this._renderMode === RENDER_TWO_PASS ? createProgramFFT2V(false, 0, null, 2) : null,
+          fft2vProgram4: this._renderMode === RENDER_TWO_PASS ? createProgramFFT2V(false, 0, null, 4) : null,
+          postfft2Program:
+            this._renderMode === RENDER_NORMAL
+              ? createProgramPostFFT2(this._useComputeShader, THREAD_GROUP_SIZE, this._dataTextureFormat)
+              : null,
+          postfft2Program2:
+            this._renderMode === RENDER_TWO_PASS ? createProgramPostFFT2(false, 0, null, 2) : null,
+          postfft2Program4:
+            this._renderMode === RENDER_TWO_PASS ? createProgramPostFFT2(false, 0, null, 4) : null
         },
         quad: WaterMesh.createQuad(device),
         noiseTextures: new Map(),
@@ -557,7 +559,7 @@ export class WaterMesh {
       this.disposeInstanceData();
     }
     if (this._paramsChanged) {
-      this.generateInitialSpectrum(0);
+      this.generateInitialSpectrum();
     }
     this._resolutionChanged = false;
     this._paramsChanged = false;
@@ -575,15 +577,22 @@ export class WaterMesh {
       this.postIfft2TwoPass();
     }
   }
+  disposeNTextures(texture: Texture2D[] | Texture2DArray) {
+    if (Array.isArray(texture)) {
+      texture.forEach((tex) => tex.dispose());
+    } else if (texture) {
+      texture.dispose();
+    }
+  }
   disposeInstanceData(): void {
     if (this._instanceData) {
-      this._instanceData.dataTextures.forEach((tex) => tex.dispose());
+      this.disposeNTextures(this._instanceData.dataTextures);
       this._instanceData.dataTextures = null;
-      this._instanceData.h0Textures.forEach((tex) => tex.dispose());
+      this.disposeNTextures(this._instanceData.h0Textures);
       this._instanceData.h0Textures = null;
-      this._instanceData.pingpongTextures.forEach((tex) => tex.dispose());
+      this.disposeNTextures(this._instanceData.pingpongTextures);
       this._instanceData.pingpongTextures = null;
-      this._instanceData.spectrumTextures.forEach((tex) => tex.dispose());
+      this.disposeNTextures(this._instanceData.spectrumTextures);
       this._instanceData.spectrumTextures = null;
       this._instanceData.h0Framebuffer?.dispose();
       this._instanceData.pingpongFramebuffer?.dispose();
@@ -603,20 +612,30 @@ export class WaterMesh {
     const instanceData = this.getInstanceData();
     device.setProgram(WaterMesh._globals.programs.hkProgram);
     device.setBindGroup(0, this._hkBindGroup);
+    this._hkBindGroup.setValue('t', time);
     this._hkBindGroup.setValue('resolution', this._params.resolution);
     this._hkBindGroup.setValue('sizes', this._sizes);
-    this._hkBindGroup.setTexture('h0Texture0', instanceData.h0Textures[0], this._nearestRepeatSampler);
-    this._hkBindGroup.setTexture('h0Texture1', instanceData.h0Textures[1], this._nearestRepeatSampler);
-    this._hkBindGroup.setTexture('h0Texture2', instanceData.h0Textures[2], this._nearestRepeatSampler);
-    this._hkBindGroup.setValue('t', time);
-    if (device.type === 'webgl') {
-      this._hkBindGroup.setValue(
-        'h0TexSize',
-        new Vector2(instanceData.h0Textures[0].width, instanceData.h0Textures[0].height)
+    if (this._useComputeShader) {
+      this._hkBindGroup.setTexture('h0Texture', instanceData.h0Textures as Texture2DArray);
+      this._hkBindGroup.setTexture('spectrum', instanceData.spectrumTextures as Texture2DArray);
+      device.compute(
+        this.params.resolution / THREAD_GROUP_SIZE,
+        this.params.resolution / THREAD_GROUP_SIZE,
+        1
       );
+    } else {
+      this._hkBindGroup.setTexture('h0Texture0', instanceData.h0Textures[0], this._nearestRepeatSampler);
+      this._hkBindGroup.setTexture('h0Texture1', instanceData.h0Textures[1], this._nearestRepeatSampler);
+      this._hkBindGroup.setTexture('h0Texture2', instanceData.h0Textures[2], this._nearestRepeatSampler);
+      if (device.type === 'webgl') {
+        this._hkBindGroup.setValue(
+          'h0TexSize',
+          new Vector2(instanceData.h0Textures[0].width, instanceData.h0Textures[0].height)
+        );
+      }
+      device.setFramebuffer(instanceData.spectrumFramebuffer);
+      WaterMesh._globals.quad.draw();
     }
-    device.setFramebuffer(instanceData.spectrumFramebuffer);
-    WaterMesh._globals.quad.draw();
   }
   private generateSpectrumTwoPass(time: number): void {
     const device = Application.instance.device;
@@ -657,14 +676,14 @@ export class WaterMesh {
     const device = Application.instance.device;
     const instanceData = this.getInstanceData();
     const phases = Math.log2(this._params.resolution);
-    const pingPongTextures: [Texture2D[], Texture2D[]] = [
+    const pingPongTextures: [Texture2D[] | Texture2DArray, Texture2D[] | Texture2DArray] = [
       instanceData.spectrumTextures,
       instanceData.pingpongTextures
     ];
-    const pingPongFramebuffers: [FrameBuffer, FrameBuffer] = [
-      instanceData.pingpongFramebuffer,
-      instanceData.spectrumFramebuffer
-    ];
+    const pingPongFramebuffers: [FrameBuffer | Texture2DArray, FrameBuffer | Texture2DArray] = this
+      ._useComputeShader
+      ? [instanceData.pingpongTextures as Texture2DArray, instanceData.spectrumTextures as Texture2DArray]
+      : [instanceData.pingpongFramebuffer, instanceData.spectrumFramebuffer];
     const butterflyTex = this.getButterflyTexture(this._params.resolution);
 
     // horizontal ifft
@@ -673,26 +692,60 @@ export class WaterMesh {
     device.setBindGroup(0, this._fft2hBindGroup);
     this._fft2hBindGroup.setTexture('butterfly', butterflyTex, this._nearestRepeatSampler);
     for (let phase = 0; phase < phases; phase++) {
-      device.setFramebuffer(pingPongFramebuffers[pingPong]);
       this._fft2hBindGroup.setValue('phase', phase);
-      this._fft2hBindGroup.setTexture('spectrum0', pingPongTextures[pingPong][0], this._nearestRepeatSampler);
-      this._fft2hBindGroup.setTexture('spectrum1', pingPongTextures[pingPong][1], this._nearestRepeatSampler);
-      this._fft2hBindGroup.setTexture('spectrum2', pingPongTextures[pingPong][2], this._nearestRepeatSampler);
-      this._fft2hBindGroup.setTexture('spectrum3', pingPongTextures[pingPong][3], this._nearestRepeatSampler);
-      this._fft2hBindGroup.setTexture('spectrum4', pingPongTextures[pingPong][4], this._nearestRepeatSampler);
-      this._fft2hBindGroup.setTexture('spectrum5', pingPongTextures[pingPong][5], this._nearestRepeatSampler);
-      if (device.type === 'webgl') {
-        this._fft2hBindGroup.setValue(
-          'texSize',
-          new Vector4(
-            pingPongTextures[pingPong][0].width,
-            pingPongTextures[pingPong][0].height,
-            butterflyTex.width,
-            butterflyTex.height
-          )
+      if (this._useComputeShader) {
+        this._fft2hBindGroup.setTexture('spectrum', pingPongTextures[pingPong] as Texture2DArray);
+        this._fft2hBindGroup.setTexture('ifft', pingPongFramebuffers[pingPong] as Texture2DArray);
+        device.compute(
+          this.params.resolution / THREAD_GROUP_SIZE,
+          this.params.resolution / THREAD_GROUP_SIZE,
+          1
         );
+      } else {
+        device.setFramebuffer(pingPongFramebuffers[pingPong] as FrameBuffer);
+        this._fft2hBindGroup.setTexture(
+          'spectrum0',
+          pingPongTextures[pingPong][0],
+          this._nearestRepeatSampler
+        );
+        this._fft2hBindGroup.setTexture(
+          'spectrum1',
+          pingPongTextures[pingPong][1],
+          this._nearestRepeatSampler
+        );
+        this._fft2hBindGroup.setTexture(
+          'spectrum2',
+          pingPongTextures[pingPong][2],
+          this._nearestRepeatSampler
+        );
+        this._fft2hBindGroup.setTexture(
+          'spectrum3',
+          pingPongTextures[pingPong][3],
+          this._nearestRepeatSampler
+        );
+        this._fft2hBindGroup.setTexture(
+          'spectrum4',
+          pingPongTextures[pingPong][4],
+          this._nearestRepeatSampler
+        );
+        this._fft2hBindGroup.setTexture(
+          'spectrum5',
+          pingPongTextures[pingPong][5],
+          this._nearestRepeatSampler
+        );
+        if (device.type === 'webgl') {
+          this._fft2hBindGroup.setValue(
+            'texSize',
+            new Vector4(
+              pingPongTextures[pingPong][0].width,
+              pingPongTextures[pingPong][0].height,
+              butterflyTex.width,
+              butterflyTex.height
+            )
+          );
+        }
+        WaterMesh._globals.quad.draw();
       }
-      WaterMesh._globals.quad.draw();
       pingPong = 1 - pingPong; //(pingPong + 1) % 2;
     }
 
@@ -701,26 +754,55 @@ export class WaterMesh {
     device.setBindGroup(0, this._fft2vBindGroup);
     this._fft2vBindGroup.setTexture('butterfly', butterflyTex, this._nearestRepeatSampler);
     for (let phase = 0; phase < phases; phase++) {
-      device.setFramebuffer(pingPongFramebuffers[pingPong]);
       this._fft2vBindGroup.setValue('phase', phase);
-      this._fft2vBindGroup.setTexture('spectrum0', pingPongTextures[pingPong][0], this._nearestRepeatSampler);
-      this._fft2vBindGroup.setTexture('spectrum1', pingPongTextures[pingPong][1], this._nearestRepeatSampler);
-      this._fft2vBindGroup.setTexture('spectrum2', pingPongTextures[pingPong][2], this._nearestRepeatSampler);
-      this._fft2vBindGroup.setTexture('spectrum3', pingPongTextures[pingPong][3], this._nearestRepeatSampler);
-      this._fft2vBindGroup.setTexture('spectrum4', pingPongTextures[pingPong][4], this._nearestRepeatSampler);
-      this._fft2vBindGroup.setTexture('spectrum5', pingPongTextures[pingPong][5], this._nearestRepeatSampler);
-      if (device.type === 'webgl') {
-        this._fft2vBindGroup.setValue(
-          'texSize',
-          new Vector4(
-            pingPongTextures[pingPong][0].width,
-            pingPongTextures[pingPong][0].height,
-            butterflyTex.width,
-            butterflyTex.height
-          )
+      if (this._useComputeShader) {
+        this._fft2vBindGroup.setTexture('spectrum', pingPongTextures[pingPong] as Texture2DArray);
+        this._fft2vBindGroup.setTexture('ifft', pingPongFramebuffers[pingPong] as Texture2DArray);
+      } else {
+        device.setFramebuffer(pingPongFramebuffers[pingPong] as FrameBuffer);
+        this._fft2vBindGroup.setTexture(
+          'spectrum0',
+          pingPongTextures[pingPong][0],
+          this._nearestRepeatSampler
         );
+        this._fft2vBindGroup.setTexture(
+          'spectrum1',
+          pingPongTextures[pingPong][1],
+          this._nearestRepeatSampler
+        );
+        this._fft2vBindGroup.setTexture(
+          'spectrum2',
+          pingPongTextures[pingPong][2],
+          this._nearestRepeatSampler
+        );
+        this._fft2vBindGroup.setTexture(
+          'spectrum3',
+          pingPongTextures[pingPong][3],
+          this._nearestRepeatSampler
+        );
+        this._fft2vBindGroup.setTexture(
+          'spectrum4',
+          pingPongTextures[pingPong][4],
+          this._nearestRepeatSampler
+        );
+        this._fft2vBindGroup.setTexture(
+          'spectrum5',
+          pingPongTextures[pingPong][5],
+          this._nearestRepeatSampler
+        );
+        if (device.type === 'webgl') {
+          this._fft2vBindGroup.setValue(
+            'texSize',
+            new Vector4(
+              pingPongTextures[pingPong][0].width,
+              pingPongTextures[pingPong][0].height,
+              butterflyTex.width,
+              butterflyTex.height
+            )
+          );
+        }
+        WaterMesh._globals.quad.draw();
       }
-      WaterMesh._globals.quad.draw();
       pingPong = (pingPong + 1) % 2;
     }
 
@@ -762,9 +844,9 @@ export class WaterMesh {
     const device = Application.instance.device;
     const instanceData = this.getInstanceData();
     const phases = Math.log2(this._params.resolution);
-    const pingPongTextures: [Texture2D[], Texture2D[]] = [
-      instanceData.spectrumTextures,
-      instanceData.pingpongTextures
+    const pingPongTextures = [
+      instanceData.spectrumTextures as Texture2D[],
+      instanceData.pingpongTextures as Texture2D[]
     ];
     const pingPongFramebuffers4: [FrameBuffer, FrameBuffer] = [
       instanceData.pingpongFramebuffer4,
@@ -885,23 +967,33 @@ export class WaterMesh {
   private postIfft2(): void {
     const device = Application.instance.device;
     const instanceData = this.getInstanceData();
-    device.setFramebuffer(instanceData.postIfft2Framebuffer);
     device.setProgram(WaterMesh._globals.programs.postfft2Program);
     device.setBindGroup(0, this._postfft2BindGroup);
     this._postfft2BindGroup.setValue('N2', this._params.resolution * this._params.resolution);
-    this._postfft2BindGroup.setTexture('ifft0', this._ifftTextures[0], this._nearestRepeatSampler);
-    this._postfft2BindGroup.setTexture('ifft1', this._ifftTextures[1], this._nearestRepeatSampler);
-    this._postfft2BindGroup.setTexture('ifft2', this._ifftTextures[2], this._nearestRepeatSampler);
-    this._postfft2BindGroup.setTexture('ifft3', this._ifftTextures[3], this._nearestRepeatSampler);
-    this._postfft2BindGroup.setTexture('ifft4', this._ifftTextures[4], this._nearestRepeatSampler);
-    this._postfft2BindGroup.setTexture('ifft5', this._ifftTextures[5], this._nearestRepeatSampler);
-    if (device.type === 'webgl') {
-      this._postfft2BindGroup.setValue(
-        'ifftTexSize',
-        new Vector2(this._ifftTextures[0].width, this._ifftTextures[0].height)
+    if (this._useComputeShader) {
+      this._postfft2BindGroup.setTexture('output', instanceData.dataTextures as Texture2DArray);
+      this._postfft2BindGroup.setTexture('ifft', this._ifftTextures as Texture2DArray);
+      device.compute(
+        this.params.resolution / THREAD_GROUP_SIZE,
+        this.params.resolution / THREAD_GROUP_SIZE,
+        1
       );
+    } else {
+      device.setFramebuffer(instanceData.postIfft2Framebuffer);
+      this._postfft2BindGroup.setTexture('ifft0', this._ifftTextures[0], this._nearestRepeatSampler);
+      this._postfft2BindGroup.setTexture('ifft1', this._ifftTextures[1], this._nearestRepeatSampler);
+      this._postfft2BindGroup.setTexture('ifft2', this._ifftTextures[2], this._nearestRepeatSampler);
+      this._postfft2BindGroup.setTexture('ifft3', this._ifftTextures[3], this._nearestRepeatSampler);
+      this._postfft2BindGroup.setTexture('ifft4', this._ifftTextures[4], this._nearestRepeatSampler);
+      this._postfft2BindGroup.setTexture('ifft5', this._ifftTextures[5], this._nearestRepeatSampler);
+      if (device.type === 'webgl') {
+        this._postfft2BindGroup.setValue(
+          'ifftTexSize',
+          new Vector2(this._ifftTextures[0].width, this._ifftTextures[0].height)
+        );
+      }
+      WaterMesh._globals.quad.draw();
     }
-    WaterMesh._globals.quad.draw();
   }
   private postIfft2TwoPass(): void {
     const device = Application.instance.device;
@@ -943,19 +1035,28 @@ export class WaterMesh {
     name: string,
     linear: boolean,
     storage = false
-  ): Texture2D[] {
-    return Array.from({ length: num }).map((val, index) => {
-      const tex = device.createTexture2D(format, size, size, { samplerOptions: { mipFilter: 'none' }, writable: !!storage });
-      tex.name = `${name}-${index}`;
-      tex.samplerOptions = {
+  ): Texture2D[] | Texture2DArray {
+    const options: TextureCreationOptions = {
+      samplerOptions: {
         minFilter: linear ? 'linear' : 'nearest',
         magFilter: linear ? 'linear' : 'nearest',
         mipFilter: 'none',
         addressU: 'repeat',
         addressV: 'repeat'
-      };
+      },
+      writable: !!storage
+    };
+    if (storage) {
+      const tex = device.createTexture2DArray(format, size, size, num, options);
+      tex.name = name;
       return tex;
-    });
+    } else {
+      return Array.from({ length: num }).map((val, index) => {
+        const tex = device.createTexture2D(format, size, size, options);
+        tex.name = `${name}-${index}`;
+        return tex;
+      });
+    }
   }
   private getInstanceData(): WaterInstanceData {
     if (!this._instanceData) {
@@ -983,7 +1084,7 @@ export class WaterMesh {
         this._params.resolution,
         6,
         'Water-spectrum',
-        false
+        true
       );
       const pingpongTextures = this.createNTextures(
         device,
@@ -998,34 +1099,44 @@ export class WaterMesh {
         h0Textures: h0Textures,
         pingpongTextures: pingpongTextures,
         spectrumTextures: spectrumTextures,
-        h0Framebuffer: device.type === 'webgpu' ? null : device.createFrameBuffer(h0Textures, null),
+        h0Framebuffer: this._useComputeShader
+          ? null
+          : device.createFrameBuffer(h0Textures as Texture2D[], null),
         spectrumFramebuffer:
-          this._renderMode === RENDER_NORMAL ? device.createFrameBuffer(spectrumTextures, null) : null,
+          !this._useComputeShader && this._renderMode === RENDER_NORMAL
+            ? device.createFrameBuffer(spectrumTextures as Texture2D[], null)
+            : null,
         spectrumFramebuffer2:
           this._renderMode === RENDER_TWO_PASS
-            ? device.createFrameBuffer(spectrumTextures.slice(4, 6), null)
+            ? device.createFrameBuffer((spectrumTextures as Texture2D[]).slice(4, 6), null)
             : null,
         spectrumFramebuffer4:
           this._renderMode === RENDER_TWO_PASS
-            ? device.createFrameBuffer(spectrumTextures.slice(0, 4), null)
+            ? device.createFrameBuffer((spectrumTextures as Texture2D[]).slice(0, 4), null)
             : null,
-        pingpongFramebuffer: device.createFrameBuffer(pingpongTextures, null),
+        pingpongFramebuffer:
+          !this._useComputeShader && this._renderMode === RENDER_NORMAL
+            ? device.createFrameBuffer(pingpongTextures as Texture2D[], null)
+            : null,
         pingpongFramebuffer2:
           this._renderMode === RENDER_TWO_PASS
-            ? device.createFrameBuffer(pingpongTextures.slice(4, 6), null)
+            ? device.createFrameBuffer((pingpongTextures as Texture2D[]).slice(4, 6), null)
             : null,
         pingpongFramebuffer4:
           this._renderMode === RENDER_TWO_PASS
-            ? device.createFrameBuffer(pingpongTextures.slice(0, 4), null)
+            ? device.createFrameBuffer((pingpongTextures as Texture2D[]).slice(0, 4), null)
             : null,
-        postIfft2Framebuffer: device.createFrameBuffer(dataTextures, null),
+        postIfft2Framebuffer:
+          !this._useComputeShader && this._renderMode === RENDER_NORMAL
+            ? device.createFrameBuffer(dataTextures as Texture2D[], null)
+            : null,
         postIfft2Framebuffer2:
           this._renderMode === RENDER_TWO_PASS
-            ? device.createFrameBuffer(dataTextures.slice(4, 6), null)
+            ? device.createFrameBuffer((dataTextures as Texture2D[]).slice(4, 6), null)
             : null,
         postIfft2Framebuffer4:
           this._renderMode === RENDER_TWO_PASS
-            ? device.createFrameBuffer(dataTextures.slice(0, 4), null)
+            ? device.createFrameBuffer((dataTextures as Texture2D[]).slice(0, 4), null)
             : null
       };
     }
@@ -1059,39 +1170,37 @@ export class WaterMesh {
     }
     return tex;
   }
-  private generateInitialSpectrum(t: number): void {
+  private generateInitialSpectrum(): void {
     const device = Application.instance.device;
     const instanceData = this.getInstanceData();
     device.setProgram(WaterMesh._globals.programs.h0Program);
     device.setBindGroup(0, this._h0BindGroup);
-    if (t === 0) {
-      this._h0BindGroup.setTexture(
-        'noise',
-        this.getNoiseTexture(this._params.resolution, this._params.randomSeed),
-        this._nearestRepeatSampler
-      );
-      this._h0BindGroup.setValue('resolution', this._params.resolution);
-      this._h0BindGroup.setValue('wind', this._params.wind);
-      this._h0BindGroup.setValue('alignment', this._params.alignment);
-      for (let i = 0; i < this._params.cascades.length; i++) {
-        this._cascades[i].x = this._params.cascades[i].size;
-        this._cascades[i].y =
-          (this._params.cascades[i].strength * 0.081) /
-          (this._params.cascades[i].size * this._params.cascades[i].size);
-        this._cascades[i].z = (2 * Math.PI) / this._params.cascades[i].maxWave;
-        this._cascades[i].w = (2 * Math.PI) / this._params.cascades[i].minWave;
-      }
-      this._h0BindGroup.setValue('cascade0', this._cascades[0]);
-      this._h0BindGroup.setValue('cascade1', this._cascades[1]);
-      this._h0BindGroup.setValue('cascade2', this._cascades[2]);
+    this._h0BindGroup.setTexture(
+      'noise',
+      this.getNoiseTexture(this._params.resolution, this._params.randomSeed),
+      this._nearestRepeatSampler
+    );
+    this._h0BindGroup.setValue('resolution', this._params.resolution);
+    this._h0BindGroup.setValue('wind', this._params.wind);
+    this._h0BindGroup.setValue('alignment', this._params.alignment);
+    for (let i = 0; i < this._params.cascades.length; i++) {
+      this._cascades[i].x = this._params.cascades[i].size;
+      this._cascades[i].y =
+        (this._params.cascades[i].strength * 0.081) /
+        (this._params.cascades[i].size * this._params.cascades[i].size);
+      this._cascades[i].z = (2 * Math.PI) / this._params.cascades[i].maxWave;
+      this._cascades[i].w = (2 * Math.PI) / this._params.cascades[i].minWave;
     }
+    this._h0BindGroup.setValue('cascade0', this._cascades[0]);
+    this._h0BindGroup.setValue('cascade1', this._cascades[1]);
+    this._h0BindGroup.setValue('cascade2', this._cascades[2]);
     if (device.type === 'webgpu') {
-      if (t === 0) {
-        this._h0BindGroup.setTexture('spectrum0', instanceData.h0Textures[0]);
-        this._h0BindGroup.setTexture('spectrum1', instanceData.h0Textures[1]);
-        this._h0BindGroup.setTexture('spectrum2', instanceData.h0Textures[2]);
-      }
-      device.compute(this.params.resolution / THREAD_GROUP_SIZE, this.params.resolution / THREAD_GROUP_SIZE, 1);
+      this._h0BindGroup.setTexture('spectrum', instanceData.h0Textures as Texture2DArray);
+      device.compute(
+        this.params.resolution / THREAD_GROUP_SIZE,
+        this.params.resolution / THREAD_GROUP_SIZE,
+        1
+      );
     } else {
       device.setFramebuffer(instanceData.h0Framebuffer);
       device.clearFrameBuffer(Vector4.zero(), null, null);

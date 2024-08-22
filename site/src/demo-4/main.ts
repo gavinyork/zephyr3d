@@ -95,7 +95,9 @@ PhysicsApp.ready().then(async () => {
   await physicsWorld.init();
   const queue: Mesh[] = [];
   const batchGroup = new BatchGroup(scene);
-  batchGroup.setBoundingVolume(new BoundingBox(new Vector3(-1000, 100, -1000), new Vector3(1000, -500, 1000)));
+  batchGroup.setBoundingVolume(
+    new BoundingBox(new Vector3(-1000, 100, -1000), new Vector3(1000, -500, 1000))
+  );
   const floorMaterial = new LambertMaterial();
   floorMaterial.albedoColor = new Vector4(0.3, 0.2, 0.2, 1);
   const box = new BoxShape({ sizeX: 200, sizeY: 1, sizeZ: 200 });

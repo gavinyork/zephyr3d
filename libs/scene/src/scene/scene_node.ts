@@ -7,7 +7,7 @@ import type { Terrain } from './terrain/terrain';
 import type { PunctualLight, BaseLight } from './light';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import type { BatchGroup } from './batchgroup';
-import { Visitor } from './visitor';
+import type { Visitor } from './visitor';
 
 /**
  * Scene node visible state

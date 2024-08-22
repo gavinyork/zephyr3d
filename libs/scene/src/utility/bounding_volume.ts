@@ -83,4 +83,3 @@ export class BoundingBox extends AABB implements BoundingVolume {
     return this;
   }
 }
-
