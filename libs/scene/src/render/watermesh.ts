@@ -690,15 +690,20 @@ export class WaterMesh {
       : [instanceData.pingpongFramebuffer, instanceData.spectrumFramebuffer];
     const butterflyTex = this.getButterflyTexture(this._params.resolution);
 
-    // horizontal ifft
     let pingPong = 0;
+
+    // horizontal ifft
     device.setProgram(WaterMesh._globals.programs.fft2hProgram);
     device.setBindGroup(0, this._fft2hBindGroup);
     this._fft2hBindGroup.setTexture('butterfly', butterflyTex, this._nearestRepeatSampler);
     for (let phase = 0; phase < phases; phase++) {
       this._fft2hBindGroup.setValue('phase', phase);
       if (this._useComputeShader) {
-        this._fft2hBindGroup.setTexture('spectrum', pingPongTextures[pingPong] as Texture2DArray, this._nearestRepeatSampler);
+        this._fft2hBindGroup.setTexture(
+          'spectrum',
+          pingPongTextures[pingPong] as Texture2DArray,
+          this._nearestRepeatSampler
+        );
         this._fft2hBindGroup.setTexture('ifft', pingPongFramebuffers[pingPong] as Texture2DArray);
         device.compute(
           this.params.resolution / THREAD_GROUP_SIZE,
@@ -752,7 +757,6 @@ export class WaterMesh {
       }
       pingPong = 1 - pingPong; //(pingPong + 1) % 2;
     }
-
     // vertical ifft
     device.setProgram(WaterMesh._globals.programs.fft2vProgram);
     device.setBindGroup(0, this._fft2vBindGroup);
@@ -760,8 +764,17 @@ export class WaterMesh {
     for (let phase = 0; phase < phases; phase++) {
       this._fft2vBindGroup.setValue('phase', phase);
       if (this._useComputeShader) {
-        this._fft2vBindGroup.setTexture('spectrum', pingPongTextures[pingPong] as Texture2DArray, this._nearestRepeatSampler);
+        this._fft2vBindGroup.setTexture(
+          'spectrum',
+          pingPongTextures[pingPong] as Texture2DArray,
+          this._nearestRepeatSampler
+        );
         this._fft2vBindGroup.setTexture('ifft', pingPongFramebuffers[pingPong] as Texture2DArray);
+        device.compute(
+          this.params.resolution / THREAD_GROUP_SIZE,
+          this.params.resolution / THREAD_GROUP_SIZE,
+          1
+        );
       } else {
         device.setFramebuffer(pingPongFramebuffers[pingPong] as FrameBuffer);
         this._fft2vBindGroup.setTexture(
@@ -807,9 +820,8 @@ export class WaterMesh {
         }
         WaterMesh._globals.quad.draw();
       }
-      pingPong = (pingPong + 1) % 2;
+      pingPong = 1 - pingPong;
     }
-
     this._ifftTextures = pingPongTextures[pingPong];
   }
   private getFFT2hBindGroup2(device: AbstractDevice, pingpong: number): BindGroup {
@@ -976,7 +988,11 @@ export class WaterMesh {
     this._postfft2BindGroup.setValue('N2', this._params.resolution * this._params.resolution);
     if (this._useComputeShader) {
       this._postfft2BindGroup.setTexture('output', instanceData.dataTextures as Texture2DArray);
-      this._postfft2BindGroup.setTexture('ifft', this._ifftTextures as Texture2DArray, this._nearestRepeatSampler);
+      this._postfft2BindGroup.setTexture(
+        'ifft',
+        this._ifftTextures as Texture2DArray,
+        this._nearestRepeatSampler
+      );
       device.compute(
         this.params.resolution / THREAD_GROUP_SIZE,
         this.params.resolution / THREAD_GROUP_SIZE,
@@ -1070,7 +1086,7 @@ export class WaterMesh {
         this._params.resolution,
         3,
         'Water-h0',
-        false,
+        false
       );
       const dataTextures = this.createNTextures(
         device,

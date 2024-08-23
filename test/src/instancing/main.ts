@@ -11,7 +11,8 @@ import {
   ABufferOIT,
   SphereShape,
   UnlitMaterial,
-  Mesh
+  Mesh,
+  PostWater
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
@@ -50,6 +51,7 @@ instancingApp.ready().then(async () => {
 
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
+  compositor.appendPostEffect(new PostWater(0));
 
   const batchGroup = new BatchGroup(scene);
   const sphere = new SphereShape();
@@ -78,29 +80,7 @@ instancingApp.ready().then(async () => {
     camera.updateController();
     camera.viewport = null;
     camera.window = null;
-    camera.render(scene);
-    /*
-    instancingApp.device.setViewport(null);
-    const vp = instancingApp.device.getViewport();
-    const w = vp.width;
-    const h = vp.height;
-    const windowX = mouseX / w;
-    const windowY = (h - mouseY - 1) / h;
-    const windowW = 1 / w;
-    const windowH = 1 / h;
-    camera.window = [windowX, windowY, windowW, windowH];
-    camera.viewport = [100, 100, 1, 1];
-    camera.render(scene);
-
-    camera.viewport = [100, 200, 100, 100];
-    camera.window = null;
-    camera.render(scene);
-*/
-    if (camera.pickResult?.drawable === mesh) {
-      mat.albedoColor = Vector4.one();
-    } else {
-      mat.albedoColor = new Vector4(1, 0, 0, 1);
-    }
+    camera.render(scene, compositor);
     imGuiNewFrame();
     inspector.render();
     imGuiEndFrame();
