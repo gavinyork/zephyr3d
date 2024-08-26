@@ -633,7 +633,7 @@ export class WebGLFrameBuffer
     }
     this._load();
   }
-  isFramebuffer(): boolean {
+  isFramebuffer(): this is FrameBuffer {
     return true;
   }
   getSampleCount(): number {

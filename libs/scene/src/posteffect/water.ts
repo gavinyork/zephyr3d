@@ -1,5 +1,6 @@
 import type {
   AbstractDevice,
+  FrameBuffer,
   PBGlobalScope,
   PBInsideFunctionScope,
   PBShaderExp,
@@ -48,6 +49,7 @@ export class PostWater extends AbstractPostEffect {
   private _waveStrength2: number;
   private _waveCroppiness2: number;
   private _currentWaterMesh: WaterMesh;
+  private _targetSize: Vector4;
   private _envMap: TextureCube;
   private _ssr: boolean;
   private _ssrParams: Vector4;
@@ -86,6 +88,7 @@ export class PostWater extends AbstractPostEffect {
     this._foamContrast = 7.2;
     this._waterWireframe = false;
     this._waterAlignment = 1;
+    this._targetSize = new Vector4();
     this._waterWind = new Vector2(2, 2);
     this._waveLength0 = 400;
     this._waveStrength0 = 0.4;
@@ -99,7 +102,7 @@ export class PostWater extends AbstractPostEffect {
     this._currentWaterMesh = null;
     this._envMap = null;
     this._ssr = true;
-    this._ssrParams = new Vector4(32, 0.5, 0.5, 6);
+    this._ssrParams = new Vector4(32, 80, 0.5, 6);
     this._waterMeshes = {};
   }
   get wireframe() {
@@ -110,6 +113,30 @@ export class PostWater extends AbstractPostEffect {
     if (this._currentWaterMesh) {
       this._currentWaterMesh.wireframe = this._waterWireframe;
     }
+  }
+  get ssrMaxDistance(): number {
+    return this._ssrParams.x;
+  }
+  set ssrMaxDistance(val: number) {
+    this._ssrParams.x = val;
+  }
+  get ssrIterations(): number {
+    return this._ssrParams.y;
+  }
+  set ssrIterations(val: number) {
+    this._ssrParams.y = val;
+  }
+  get ssrThickness(): number {
+    return this._ssrParams.z;
+  }
+  set ssrThickness(val: number) {
+    this._ssrParams.z = val;
+  }
+  get ssrBinarySearchSteps() {
+    return this._ssrParams.w >> 0;
+  }
+  set ssrBinarySearchSteps(val: number) {
+    this._ssrParams.w = val >> 0;
   }
   get alignment() {
     return this._waterAlignment;
@@ -319,35 +346,36 @@ export class PostWater extends AbstractPostEffect {
         addressV: 'clamp'
       })
     );
-    if (this._renderingReflections) {
-      return;
+    let fbRefl: FrameBuffer;
+    if (!this._ssr) {
+      if (this._renderingReflections) {
+        return;
+      }
+      this._renderingReflections = true;
+      fbRefl = ctx.device.pool.fetchTemporalFramebuffer(
+        true,
+        this._reflectSize,
+        this._reflectSize,
+        inputColorTexture.format,
+        ctx.depthFormat,
+        false
+      );
+      const plane = new Plane(0, -1, 0, this._elevation);
+      const clipPlane = new Plane(0, -1, 0, this._elevation - this._antiReflectanceLeak);
+      const matReflectionR = Matrix4x4.invert(Matrix4x4.reflection(-plane.a, -plane.b, -plane.c, -plane.d));
+      const reflCamera = new Camera(ctx.scene);
+      reflCamera.framebuffer = fbRefl;
+      Matrix4x4.multiply(matReflectionR, ctx.camera.worldMatrix).decompose(
+        reflCamera.scale,
+        reflCamera.rotation,
+        reflCamera.position
+      );
+      reflCamera.setProjectionMatrix(ctx.camera.getProjectionMatrix());
+      reflCamera.clipPlane = clipPlane;
+      reflCamera.render(ctx.scene, ctx.compositor);
+      reflCamera.remove();
+      this._renderingReflections = false;
     }
-
-    this._renderingReflections = true;
-    const fbRefl = ctx.device.pool.fetchTemporalFramebuffer(
-      true,
-      this._reflectSize,
-      this._reflectSize,
-      inputColorTexture.format,
-      ctx.depthFormat,
-      false
-    );
-    const plane = new Plane(0, -1, 0, this._elevation);
-    const clipPlane = new Plane(0, -1, 0, this._elevation - this._antiReflectanceLeak);
-    const matReflectionR = Matrix4x4.invert(Matrix4x4.reflection(-plane.a, -plane.b, -plane.c, -plane.d));
-    const reflCamera = new Camera(ctx.scene);
-    reflCamera.framebuffer = fbRefl;
-    Matrix4x4.multiply(matReflectionR, ctx.camera.worldMatrix).decompose(
-      reflCamera.scale,
-      reflCamera.rotation,
-      reflCamera.position
-    );
-    reflCamera.setProjectionMatrix(ctx.camera.getProjectionMatrix());
-    reflCamera.clipPlane = clipPlane;
-    reflCamera.render(ctx.scene, ctx.compositor);
-    reflCamera.remove();
-    this._renderingReflections = false;
-
     const cameraNearFar = new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
     const waterMesh = this._getWaterMesh(ctx);
     waterMesh.regionMin.setXY(this._region.x, this._region.y);
@@ -374,9 +402,7 @@ export class PostWater extends AbstractPostEffect {
     waterMesh.bindGroup.setTexture('depthTex', sceneDepthTexture);
     waterMesh.bindGroup.setTexture('rampTex', rampTex);
     if (this._ssr) {
-      if (this._envMap) {
-        waterMesh.bindGroup.setTexture('envMap', this._envMap);
-      }
+      waterMesh.bindGroup.setTexture('envMap', this._envMap ?? ctx.scene.env.sky.bakedSkyTexture);
       waterMesh.bindGroup.setValue('ssrParams', this._ssrParams);
     } else {
       waterMesh.bindGroup.setTexture('reflectionTex', fbRefl.getColorAttachments()[0]);
@@ -389,12 +415,17 @@ export class PostWater extends AbstractPostEffect {
     }
     waterMesh.bindGroup.setValue('cameraNearFar', cameraNearFar);
     waterMesh.bindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
-    waterMesh.bindGroup.setValue('displace', this._displace / fbRefl.getColorAttachments()[0].width);
+    waterMesh.bindGroup.setValue('displace', this._displace / inputColorTexture.width);
     waterMesh.bindGroup.setValue('depthMulti', this._depthMulti);
     waterMesh.bindGroup.setValue('refractionStrength', this._refractionStrength);
     waterMesh.bindGroup.setValue(
       'targetSize',
-      new Vector2(device.getViewport().width, device.getViewport().height)
+      this._targetSize.setXYZW(
+        device.getFramebuffer().getWidth(),
+        device.getFramebuffer().getHeight(),
+        inputColorTexture.width,
+        inputColorTexture.height
+      )
     );
     waterMesh.bindGroup.setValue('waterLevel', this._elevation);
     waterMesh.bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
@@ -436,11 +467,10 @@ export class PostWater extends AbstractPostEffect {
   /** @internal */
   private _getWaterMesh(ctx: DrawContext) {
     const ssr = ctx.device.type === 'webgl' ? false : this._ssr;
-    const hash = `${ctx.sunLight ? 1 : 0}:${ctx.env.light.getHash(ctx)}:${ssr}:${!!this._envMap}`;
+    const hash = `${ctx.sunLight ? 1 : 0}:${ctx.env.light.getHash(ctx)}:${ssr}`;
     let waterMesh = this._waterMeshes[hash];
     if (!waterMesh) {
       const device = ctx.device;
-      const that = this;
       waterMesh = new WaterMesh(device, {
         setupUniforms(scope: PBGlobalScope) {
           const pb = scope.$builder;
@@ -449,9 +479,7 @@ export class PostWater extends AbstractPostEffect {
             scope.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
             scope.rampTex = pb.tex2D().uniform(0);
             if (ssr) {
-              if (that._envMap) {
-                scope.envMap = pb.texCube().uniform(0);
-              }
+              scope.envMap = pb.texCube().uniform(0);
               scope.ssrParams = pb.vec4().uniform(0);
             } else {
               scope.reflectionTex = pb.tex2D().uniform(0);
@@ -467,7 +495,7 @@ export class PostWater extends AbstractPostEffect {
               scope.projMatrix = pb.mat4().uniform(0);
               scope.invProjMatrix = pb.mat4().uniform(0);
             }
-            scope.targetSize = pb.vec2().uniform(0);
+            scope.targetSize = pb.vec4().uniform(0);
             scope.waterLevel = pb.float().uniform(0);
             scope.srgbOut = pb.int().uniform(0);
             if (ctx.sunLight) {
@@ -544,7 +572,7 @@ export class PostWater extends AbstractPostEffect {
               pb.vec3('viewPos'),
               pb.vec3('viewNormal'),
               pb.float('maxDistance'),
-              pb.float('resolution'),
+              pb.float('iteration'),
               pb.float('thickness'),
               pb.int('binarySearchSteps')
             ],
@@ -555,12 +583,12 @@ export class PostWater extends AbstractPostEffect {
               this.$l.fragStartH = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));
               this.$l.fragStart = pb.mul(
                 pb.add(pb.mul(pb.div(this.fragStartH.xy, this.fragStartH.w), 0.5), pb.vec2(0.5)),
-                this.targetSize
+                this.targetSize.xy
               );
               this.$l.fragEndH = pb.mul(this.projMatrix, pb.vec4(this.viewPosEnd, 1));
               this.$l.fragEnd = pb.mul(
                 pb.add(pb.mul(pb.div(this.fragEndH.xy, this.fragEndH.w), 0.5), pb.vec2(0.5)),
-                this.targetSize
+                this.targetSize.xy
               );
               this.$l.frag = this.fragStart.xy;
               this.$l.deltaX = pb.sub(this.fragEnd.x, this.fragStart.x);
@@ -570,10 +598,7 @@ export class PostWater extends AbstractPostEffect {
                 pb.float(1),
                 pb.float(0)
               );
-              this.$l.delta = pb.mul(
-                pb.mix(pb.abs(this.deltaY), pb.abs(this.deltaX), this.useX),
-                pb.clamp(this.resolution, 0, 1)
-              );
+              this.$l.delta = this.iteration;
               this.$l.increment = pb.div(pb.vec2(this.deltaX, this.deltaY), pb.max(this.delta, 0.001));
               this.$l.search0 = pb.float(0);
               this.$l.search1 = pb.float(0);
@@ -582,9 +607,9 @@ export class PostWater extends AbstractPostEffect {
               this.$l.uv = pb.vec2(0);
               this.$l.depth = pb.float(0);
               this.$l.positionTo = pb.vec3(0);
-              this.$for(pb.int('i'), 0, pb.min(50, pb.int(this.delta)), function () {
+              this.$for(pb.int('i'), 0, pb.int(this.delta), function () {
                 this.frag = pb.add(this.frag, this.increment);
-                this.uv = pb.div(this.frag, this.targetSize);
+                this.uv = pb.div(this.frag, this.targetSize.xy);
                 this.positionTo = this.getPositionVS(this.uv);
                 this.search1 = pb.clamp(
                   pb.mix(
@@ -614,7 +639,7 @@ export class PostWater extends AbstractPostEffect {
               this.$l.steps = pb.mul(this.binarySearchSteps, this.hit0);
               this.$for(pb.int('i'), 0, this.steps, function () {
                 this.$l.frag = pb.mix(this.fragStart.xy, this.fragEnd.xy, this.search1);
-                this.uv = pb.div(this.frag, this.targetSize);
+                this.uv = pb.div(this.frag, this.targetSize.xy);
                 this.positionTo = this.getPositionVS(this.uv);
                 this.$l.viewDistance = pb.div(
                   pb.mul(this.viewPos.z, this.viewPosEnd.z),
@@ -637,10 +662,12 @@ export class PostWater extends AbstractPostEffect {
                 pb.float(this.hit1),
                 pb.sub(1, pb.max(pb.dot(pb.neg(this.normalizedViewPos), this.reflectVec), 0)),
                 pb.sub(1, pb.clamp(pb.div(this.depth, this.thickness), 0, 1)),
+
                 pb.sub(
                   1,
                   pb.clamp(pb.div(pb.distance(this.positionTo, this.viewPos), this.maxDistance), 0, 1)
                 ),
+
                 this.$choice(
                   pb.or(pb.lessThan(this.uv.x, 0), pb.greaterThan(this.uv.x, 1)),
                   pb.float(0),
@@ -660,7 +687,7 @@ export class PostWater extends AbstractPostEffect {
             'waterShading',
             [pb.vec3('worldPos'), pb.vec3('worldNormal'), pb.float('foamFactor')],
             function () {
-              this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize);
+              this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
               this.$l.dist = pb.length(pb.sub(this.worldPos, this.cameraPos));
               this.$l.normalScale = pb.pow(pb.clamp(pb.div(100, this.dist), 0, 1), 4);
               this.$l.myNormal = pb.normalize(
@@ -693,22 +720,20 @@ export class PostWater extends AbstractPostEffect {
                   pb.int(this.ssrParams.w)
                 );
                 this.$if(pb.greaterThan(this.hitInfo.z, 0), function () {
+                  /*
+                  this.reflectance = pb.textureSampleLevel(this.tex, this.hitInfo.xy, 0).rgb;
+                  */
                   this.reflectance = pb.mix(
                     this.refraction,
                     pb.textureSampleLevel(this.tex, this.hitInfo.xy, 0).rgb,
-                    this.hitInfo.z
+                    1 /*this.hitInfo.z*/
                   );
                 }).$else(function () {
-                  if (that._envMap) {
-                    this.reflectance = pb.mix(
-                      this.refraction,
-                      pb.textureSampleLevel(this.envMap, this.myNormal, 0).rgb,
-                      this.hitInfo.z
-                    );
-                  } else {
-                    this.reflectance = pb.vec3(1, 0, 0);
-                    //this.reflectance = this.refraction;
-                  }
+                  this.$l.refl = pb.reflect(
+                    pb.normalize(pb.sub(this.surfacePoint, this.cameraPos)),
+                    this.myNormal
+                  );
+                  this.reflectance = pb.textureSampleLevel(this.envMap, this.refl, 0).rgb;
                 });
               } else {
                 this.$l.reflectance = pb.textureSampleLevel(

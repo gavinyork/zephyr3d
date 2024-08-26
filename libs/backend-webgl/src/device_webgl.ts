@@ -87,12 +87,12 @@ import type { WebGLBaseTexture } from './basetexture_webgl';
 
 declare global {
   interface WebGLRenderingContext {
-    _currentFramebuffer: FrameBuffer;
-    _currentProgram: GPUProgram;
+    _currentFramebuffer: WebGLFrameBuffer;
+    _currentProgram: WebGLGPUProgram;
   }
   interface WebGL2RenderingContext {
-    _currentFramebuffer: FrameBuffer;
-    _currentProgram: GPUProgram;
+    _currentFramebuffer: WebGLFrameBuffer;
+    _currentProgram: WebGLGPUProgram;
   }
 }
 
@@ -419,7 +419,7 @@ export class WebGLDevice extends BaseDevice {
     return new WebGLRenderStateSet(this._context);
   }
   createSampler(options: SamplerOptions): TextureSampler {
-    return this._samplerCache.fetchSampler(options);
+    return this._samplerCache.fetchSampler(options) as TextureSampler;
   }
   createTextureFromMipmapData<T extends BaseTexture>(
     data: TextureMipmapData,

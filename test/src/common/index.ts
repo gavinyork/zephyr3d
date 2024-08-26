@@ -335,15 +335,37 @@ export class Inspector {
         (val?: number) => {
           return (water.elevation = val = val ?? water.elevation);
         },
-        0,
+        -100,
         100
       );
       ImGui.SliderFloat4('Region##water', water.boundary, -1000, 1000);
       ImGui.SliderFloat(
+        'SSRMaxDistance##water',
+        (val?: number) => (water.ssrMaxDistance = val = val ?? water.ssrMaxDistance),
+        0,
+        1000
+      );
+      ImGui.SliderInt(
+        'SSRIterations##water',
+        (val?: number) => (water.ssrIterations = val = val ?? water.ssrIterations),
+        1,
+        200
+      );
+      ImGui.SliderFloat(
+        'SSRThickness##water',
+        (val?: number) => (water.ssrThickness = val = val ?? water.ssrThickness),
+        0,
+        5
+      );
+      ImGui.SliderInt(
+        'SSRBinarySearchSteps##water',
+        (val?: number) => (water.ssrBinarySearchSteps = val = val ?? water.ssrBinarySearchSteps),
+        0,
+        16
+      );
+      ImGui.SliderFloat(
         'AntiReflectanceLeak##water',
-        (val?: number) => {
-          return (water.antiReflectanceLeak = val = val ?? water.antiReflectanceLeak);
-        },
+        (val?: number) => (water.antiReflectanceLeak = val = val ?? water.antiReflectanceLeak),
         0,
         10
       );

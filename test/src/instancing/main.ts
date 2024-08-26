@@ -47,16 +47,16 @@ instancingApp.ready().then(async () => {
 
   instancingApp.inputManager.use(imGuiInjectEvent);
   instancingApp.inputManager.use(camera.handleEvent.bind(camera));
-  const inspector = new common.Inspector(scene, null, camera);
 
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
   compositor.appendPostEffect(new PostWater(0));
+  const inspector = new common.Inspector(scene, compositor, camera);
 
   const batchGroup = new BatchGroup(scene);
   const sphere = new SphereShape();
   const mat = new UnlitMaterial();
-  mat.albedoColor = new Vector4(1, 0, 0, 1);
+  mat.albedoColor = new Vector4(0, 1, 0, 1);
   const mesh = new Mesh(scene, sphere, mat);
   mesh.parent = batchGroup;
 

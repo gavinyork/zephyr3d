@@ -1,6 +1,6 @@
 import * as zip from '@zip.js/zip.js';
 import type * as draco3d from 'draco3d';
-import { Vector4, Vector3 } from '@zephyr3d/base';
+import { Vector4, Vector3, Vector2 } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
 import { BatchGroup, PostWater, WeightedBlendedOIT, ABufferOIT, SAO } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
@@ -61,6 +61,7 @@ export class GLTFViewer {
     this._assetManager = new AssetManager();
     this._tonemap = new Tonemap();
     this._water = new PostWater(0);
+    this._water.wind = Vector2.zero();
     this._bloom = new Bloom();
     this._sao = new SAO();
     this._sao.radius = 10;
@@ -191,6 +192,10 @@ export class GLTFViewer {
         this._ui.update();
         this.lookAt();
       });
+    this._water.ssrMaxDistance = Vector3.distance(
+      this._scene.boundingBox.minPoint,
+      this._scene.boundingBox.maxPoint
+    );
   }
   async handleDrop(data: DataTransfer) {
     this.resolveDraggedItems(data).then(async (fileMap) => {

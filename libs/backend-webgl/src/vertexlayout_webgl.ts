@@ -84,7 +84,7 @@ export class WebGLVertexLayout
     this._device.setVertexLayout(this);
     this._device.drawInstanced(primitiveType, first, count, numInstances);
   }
-  isVertexLayout(): boolean {
+  isVertexLayout(): this is VertexLayout {
     return true;
   }
   private load(): void {

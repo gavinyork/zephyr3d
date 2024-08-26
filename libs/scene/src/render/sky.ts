@@ -150,6 +150,16 @@ export class SkyRenderer {
   set drawGround(val: boolean) {
     this._drawGround = !!val;
   }
+  /** Baked sky texture */
+  get bakedSkyTexture(): TextureCube {
+    if (this._skyType === 'skybox' && this._skyboxTexture) {
+      return this._skyboxTexture;
+    }
+    if (!this._scatterSkyboxFramebuffer) {
+      this.updateIBLMaps(this._lastSunDir);
+    }
+    return this._scatterSkyboxFramebuffer.getColorAttachments()[0] as TextureCube;
+  }
   /**
    * Wether the IBL maps should be updated automatically.
    *
@@ -443,6 +453,7 @@ export class SkyRenderer {
     const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
     if (!sunDir.equalsTo(this._lastSunDir)) {
       this._radianceMapDirty = true;
+      this._lastSunDir.set(sunDir);
     }
     this._renderSky(
       ctx.camera,
@@ -458,7 +469,6 @@ export class SkyRenderer {
           ctx.env.light.irradianceMap === this._irradianceMap)
       ) {
         this._radianceMapDirty = false;
-        this._lastSunDir.set(sunDir);
         this.updateIBLMaps(sunDir);
       }
     }
