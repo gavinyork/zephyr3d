@@ -2622,11 +2622,24 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @remarks
    * The two textures must have the same size and format
    *
-   * @param src - Texture that will be copied form.
-   * @param dst - Texture that bill be copied to.
-   * @param level - Which mipmap level to be copied, if not specified, all mipmap levels will be copied.
+   * @param src - Texture that will be copied from.
+   * @param srcLevel - Which mipmap level to be copied from.
+   * @param dst - Texture that will be copied to.
+   * @param dstLevel - Which mipmap level to be copied to.
    */
-  copyTexture2D(src: Texture2D, dst: Texture2D, level?: number);
+  copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number);
+  /**
+   * Copies a color attachment of a framebuffer to a mipmap level of a texture.
+   *
+   * @remarks
+   * The color attachment and the mipmap level must have the same size and format
+   *
+   * @param src - Framebuffer that will be copied from.
+   * @param index - Color attachment index of the framebuffer.
+   * @param dst - Texture that will be copied to.
+   * @param level - Which mipmap level should be copied to.
+   */
+  copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number);
   /**
    * Set wether to reverse the winding order
    *

@@ -141,6 +141,9 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
       k.generateMipmaps = !!generateMipmaps;
     }
   }
+  getColorAttachmentGenerateMipmaps(index: number): boolean {
+    return this._options.colorAttachments?.[index]?.generateMipmaps;
+  }
   setColorAttachmentCubeFace(index: number, face: CubeFace) {
     const k = this._options.colorAttachments?.[index];
     if (k && k.face !== face) {
@@ -148,12 +151,18 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
       this._bindFlag++;
     }
   }
-  setColorAttachmentMipLevel(index: number, level: number) {
+  getColorAttachmentCubeFace(index: number): CubeFace {
+    return this._options.colorAttachments?.[index].face;
+  }
+  setColorAttachmentMipLevel(index: number, level: number): void {
     const k = this._options.colorAttachments?.[index];
     if (k && k.level !== level) {
       k.level = level;
       this._bindFlag++;
     }
+  }
+  getColorAttachmentMipLevel(index: number): number {
+    return this._options.colorAttachments?.[index].level;
   }
   setColorAttachmentLayer(index: number, layer: number) {
     const k = this._options.colorAttachments?.[index];
@@ -162,6 +171,9 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
       this._bindFlag++;
     }
   }
+  getColorAttachmentLayer(index: number): number {
+    return this._options.colorAttachments?.[index].layer;
+  }
   setDepthAttachmentCubeFace(face: CubeFace): void {
     const k = this._options.depthAttachment;
     if (k && k.face !== face) {
@@ -169,12 +181,18 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
       this._bindFlag++;
     }
   }
+  getDepthAttachmentCubeFace(): CubeFace {
+    return this._options.depthAttachment?.face;
+  }
   setDepthAttachmentLayer(layer: number) {
     const k = this._options.depthAttachment;
     if (k && k.layer !== layer) {
       k.layer = layer;
       this._bindFlag++;
     }
+  }
+  getDepthAttachmentLayer(): number {
+    return this._options.depthAttachment?.layer;
   }
   getDepthAttachment(): BaseTexture {
     return this._options?.depthAttachment?.texture || null;

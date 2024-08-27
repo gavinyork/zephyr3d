@@ -33,33 +33,37 @@ function buildHZBProgram(device: AbstractDevice): GPUProgram {
     fragment(pb) {
       this.$outputs.color = pb.vec4();
       this.srcTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-      this.srcSize = pb.vec2().uniform(0);
-      this.srcMipLevel = pb.float().uniform(0);
+      if (device.type !== 'webgpu') {
+        this.srcSize = pb.ivec2().uniform(0);
+        this.srcMipLevel = pb.int().uniform(0);
+      }
       pb.main(function () {
-        this.$l.sizeMin = pb.ivec2(0);
-        this.$l.sizeMax = pb.sub(pb.ivec2(pb.textureDimensions(this.srcTex, 0)), pb.ivec2(1));
         this.$l.coord = pb.mul(pb.ivec2(this.$builtins.fragCoord.xy), 2);
-        this.$l.d0 = pb.textureLoad(
-          this.srcTex,
-          pb.clamp(pb.add(this.coord, pb.ivec2(0, 0)), this.sizeMin, this.sizeMax),
-          device.type === 'webgpu' ? 0 : this.srcMipLevel
-        ).r;
-        this.$l.d1 = pb.textureLoad(
-          this.srcTex,
-          pb.clamp(pb.add(this.coord, pb.ivec2(1, 0)), this.sizeMin, this.sizeMax),
-          device.type === 'webgpu' ? 0 : this.srcMipLevel
-        ).r;
-        this.$l.d2 = pb.textureLoad(
-          this.srcTex,
-          pb.clamp(pb.add(this.coord, pb.ivec2(1, 1)), this.sizeMin, this.sizeMax),
-          device.type === 'webgpu' ? 0 : this.srcMipLevel
-        ).r;
-        this.$l.d3 = pb.textureLoad(
-          this.srcTex,
-          pb.clamp(pb.add(this.coord, pb.ivec2(0, 1)), this.sizeMin, this.sizeMax),
-          device.type === 'webgpu' ? 0 : this.srcMipLevel
-        ).r;
-        this.$l.d = pb.min(pb.min(this.d0, this.d1), pb.min(this.d2, this.d3));
+        if (device.type !== 'webgpu') {
+          this.$l.d = pb.textureLoad(this.srcTex, pb.ivec2(0, 0), this.srcMipLevel).r;
+        } else {
+          this.$l.d0 = pb.textureLoad(
+            this.srcTex,
+            pb.add(this.coord, pb.ivec2(0, 0)),
+            device.type === 'webgpu' ? 0 : this.srcMipLevel
+          ).r;
+          this.$l.d1 = pb.textureLoad(
+            this.srcTex,
+            pb.add(this.coord, pb.ivec2(1, 0)),
+            device.type === 'webgpu' ? 0 : this.srcMipLevel
+          ).r;
+          this.$l.d2 = pb.textureLoad(
+            this.srcTex,
+            pb.add(this.coord, pb.ivec2(1, 1)),
+            device.type === 'webgpu' ? 0 : this.srcMipLevel
+          ).r;
+          this.$l.d3 = pb.textureLoad(
+            this.srcTex,
+            pb.add(this.coord, pb.ivec2(0, 1)),
+            device.type === 'webgpu' ? 0 : this.srcMipLevel
+          ).r;
+          this.$l.d = pb.min(pb.min(this.d0, this.d1), pb.min(this.d2, this.d3));
+        }
         this.$outputs.color = pb.vec4(this.d, 0, 0, 1);
       });
     }
@@ -79,16 +83,18 @@ function buildHiZLevel(
   const h = Math.max(srcTexture.height >> miplevel, 1);
   if (device.type === 'webgpu') {
     hzbBindGroup.setTextureView('srcTex', srcTexture, miplevel, 0, 1, hzbSampler);
-    hzbBindGroup.setValue('srcMipLevel', miplevel);
   } else {
     hzbBindGroup.setTexture('srcTex', srcTexture, hzbSampler);
     hzbBindGroup.setValue('srcMipLevel', miplevel);
+    hzbBindGroup.setValue('srcSize', new Vector2(w, h));
   }
-  hzbBindGroup.setValue('srcSize', new Vector2(w, h));
   device.setProgram(hzbProgram);
   device.setBindGroup(0, hzbBindGroup);
   device.setFramebuffer(framebuffer);
   drawFullscreenQuad();
+  if (srcTexture !== dstTexture) {
+    device.copyFramebufferToTexture2D(framebuffer, 0, srcTexture, miplevel + 1);
+  }
 }
 
 export function buildHiZ(sourceTex: Texture2D, HiZFrameBuffer: FrameBuffer) {
@@ -108,8 +114,24 @@ export function buildHiZ(sourceTex: Texture2D, HiZFrameBuffer: FrameBuffer) {
   blitter.blit(sourceTex, HiZFrameBuffer, hzbSampler);
   device.pushDeviceStates();
   const srcTex = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
-  for (let i = 0; i < srcTex.mipLevelCount - 1; i++) {
-    buildHiZLevel(device, i, srcTex, srcTex);
+  if (device.type === 'webgpu') {
+    for (let i = 0; i < srcTex.mipLevelCount - 1; i++) {
+      buildHiZLevel(device, i, srcTex, srcTex);
+    }
+  } else {
+    const tmpFramebuffer = device.pool.fetchTemporalFramebuffer(
+      false,
+      HiZFrameBuffer.getWidth(),
+      HiZFrameBuffer.getHeight(),
+      HiZFrameBuffer.getColorAttachments()[0].format,
+      null,
+      true
+    );
+    const dstTex = tmpFramebuffer.getColorAttachments()[0] as Texture2D;
+    for (let i = 0; i < srcTex.mipLevelCount - 1; i++) {
+      buildHiZLevel(device, i, srcTex, dstTex);
+    }
+    device.pool.releaseFrameBuffer(tmpFramebuffer);
   }
   device.popDeviceStates();
 }

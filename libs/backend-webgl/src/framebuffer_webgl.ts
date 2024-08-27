@@ -42,6 +42,7 @@ export class WebGLFrameBuffer
   private _isMRT: boolean;
   private _drawBuffers: number[];
   private _hash: string;
+  private _needGenerateMipmaps: boolean;
   private _depthAttachmentTarget: number;
   private _colorAttachmentsAA: WebGLRenderbuffer[];
   private _depthAttachmentAA: WebGLRenderbuffer;
@@ -129,6 +130,7 @@ export class WebGLFrameBuffer
       this._options.colorAttachments?.map((tex) => tex.texture.format).join(':') ?? '';
     const depthAttachmentHash = this._options.depthAttachment?.texture.format ?? '';
     this._hash = `${colorAttachmentHash}-${depthAttachmentHash}-${this._options.sampleCount ?? 1}`;
+    this._needGenerateMipmaps = false;
     this._initialized = false;
   }
   tagDraw() {
@@ -136,6 +138,9 @@ export class WebGLFrameBuffer
   }
   isMRT(): boolean {
     return this._isMRT;
+  }
+  invalidateMipmaps() {
+    this._needGenerateMipmaps = true;
   }
   getWidth(): number {
     const attachment = this._options.colorAttachments?.[0] ?? this._options.depthAttachment;
@@ -200,6 +205,9 @@ export class WebGLFrameBuffer
       k.generateMipmaps = !!generateMipmaps;
     }
   }
+  getColorAttachmentGenerateMipmaps(index: number): boolean {
+    return this._options.colorAttachments?.[index]?.generateMipmaps;
+  }
   setColorAttachmentCubeFace(index: number, face: CubeFace) {
     const k = this._options.colorAttachments?.[index];
     if (k && k.face !== face) {
@@ -212,6 +220,9 @@ export class WebGLFrameBuffer
         k.face = face;
       }
     }
+  }
+  getColorAttachmentCubeFace(index: number): CubeFace {
+    return this._options.colorAttachments?.[index]?.face;
   }
   setColorAttachmentMipLevel(index: number, level: number) {
     const k = this._options.colorAttachments?.[index];
@@ -226,6 +237,9 @@ export class WebGLFrameBuffer
       }
     }
   }
+  getColorAttachmentMipLevel(index: number): number {
+    return this._options.colorAttachments?.[index]?.level;
+  }
   setColorAttachmentLayer(index: number, layer: number) {
     const k = this._options.colorAttachments?.[index];
     if (k && k.layer !== layer) {
@@ -238,6 +252,9 @@ export class WebGLFrameBuffer
         k.layer = layer;
       }
     }
+  }
+  getColorAttachmentLayer(index: number) {
+    return this._options?.colorAttachments?.[index]?.layer;
   }
   setDepthAttachmentCubeFace(face: CubeFace): void {
     const k = this._options.depthAttachment;
@@ -252,6 +269,9 @@ export class WebGLFrameBuffer
       }
     }
   }
+  getDepthAttachmentCubeFace(): CubeFace {
+    return this._options.depthAttachment?.face;
+  }
   setDepthAttachmentLayer(layer: number) {
     const k = this._options.depthAttachment;
     if (k && k.layer !== layer) {
@@ -264,6 +284,9 @@ export class WebGLFrameBuffer
         k.layer = layer;
       }
     }
+  }
+  getDepthAttachmentLayer() {
+    return this._options.depthAttachment?.layer;
   }
   getDepthAttachment(): BaseTexture {
     return this._options?.depthAttachment?.texture || null;
@@ -296,6 +319,7 @@ export class WebGLFrameBuffer
       }
       this._device.setViewport(null);
       this._device.setScissor(null);
+      this._needGenerateMipmaps = false;
       return true;
     }
     return false;
@@ -357,7 +381,7 @@ export class WebGLFrameBuffer
               this._device.context.deleteFramebuffer(tmpFramebuffer);
             }
           }
-          if (attachment.generateMipmaps && tex.mipLevelCount > 1) {
+          if (this._needGenerateMipmaps && attachment.generateMipmaps && tex.mipLevelCount > 1) {
             tex.generateMipmaps();
           }
         }

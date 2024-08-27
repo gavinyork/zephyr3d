@@ -490,48 +490,64 @@ export class WebGPUDevice extends BaseDevice {
     tex.samplerOptions = samplerOptions ?? null;
     return tex;
   }
-  copyTexture2D(src: Texture2D, dst: Texture2D, level?: number) {
-    if (!src || !src.object || !dst || !dst.object) {
+  copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number) {
+    if (!src?.isFramebuffer() || !dst?.isTexture2D()) {
+      console.error('copyFramebufferToTexture2D(): invalid texture');
+      return;
+    }
+    const srcTex = src.getColorAttachments()?.[index];
+    if (!srcTex || !srcTex.isTexture2D()) {
+      console.error('copyFramebufferToTexture2D(): Color attachment is not a 2D texture');
+      return;
+    }
+    this.copyTexture2D(srcTex, src.getColorAttachmentMipLevel(index), dst, level);
+  }
+  copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number) {
+    if (!src?.isTexture2D() || !dst?.isTexture2D()) {
       console.error('CopyTexture2D(): invalid texture');
       return;
     }
-    if (src.width !== dst.width || src.height !== dst.height) {
-      console.error('CopyTexture2D(): Source texture must have same size with destination texture');
+    if (!Number.isInteger(srcLevel) || srcLevel < 0 || srcLevel >= src.mipLevelCount) {
+      console.error('CopyTexture2D(): invalid source mipmap level');
+      return;
+    }
+    if (!Number.isInteger(dstLevel) || dstLevel < 0 || dstLevel >= dst.mipLevelCount) {
+      console.error('CopyTexture2D(): invalid destination mipmap level');
+      return;
+    }
+    const srcWidth = Math.max(src.width >> srcLevel, 1);
+    const srcHeight = Math.max(src.height >> srcLevel, 1);
+    const dstWidth = Math.max(dst.width >> dstLevel, 1);
+    const dstHeight = Math.max(dst.height >> dstLevel, 1);
+    if (srcWidth !== dstWidth || srcHeight !== dstHeight) {
+      console.error('Source texture and destination texture must have same size');
       return;
     }
     if (src.format !== dst.format) {
-      console.error('CopyTexture2D(): Source texture must have same format with destination texture');
+      console.error('CopyTexture2D(): Source texture and destination texture must have same format');
       return;
     }
     this.flush();
-    const start = level ?? 0;
-    const end = level ?? Math.min(src.mipLevelCount, dst.mipLevelCount) - 1;
-    if (end >= src.mipLevelCount || end >= dst.mipLevelCount) {
-      console.error('CopyTexture2D(): invalid mipmap level');
-      return;
-    }
     const srcTex = src as WebGPUTexture2D;
     const dstTex = dst as WebGPUTexture2D;
     const commandEncoder = this._device.createCommandEncoder();
-    for (let i = start; i <= end; i++) {
-      commandEncoder.copyTextureToTexture(
-        {
-          texture: srcTex.object,
-          mipLevel: i,
-          origin: { x: 0, y: 0, z: 0 }
-        },
-        {
-          texture: dstTex.object,
-          mipLevel: i,
-          origin: { x: 0, y: 0, z: 0 }
-        },
-        {
-          width: srcTex.width >> i,
-          height: srcTex.height >> i,
-          depthOrArrayLayers: 1
-        }
-      );
-    }
+    commandEncoder.copyTextureToTexture(
+      {
+        texture: srcTex.object,
+        mipLevel: srcLevel,
+        origin: { x: 0, y: 0, z: 0 }
+      },
+      {
+        texture: dstTex.object,
+        mipLevel: dstLevel,
+        origin: { x: 0, y: 0, z: 0 }
+      },
+      {
+        width: srcWidth,
+        height: srcHeight,
+        depthOrArrayLayers: 1
+      }
+    );
     this._device.queue.submit([commandEncoder.finish()]);
   }
   createGPUProgram(params: GPUProgramConstructParams): GPUProgram {

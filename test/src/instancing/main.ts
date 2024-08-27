@@ -10,11 +10,13 @@ import {
   SphereShape,
   UnlitMaterial,
   Mesh,
-  FPSCameraController
+  FPSCameraController,
+  AssetManager
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { Vector3, Vector4 } from '@zephyr3d/base';
+import type { Texture2D } from '@zephyr3d/device';
 
 const instancingApp = new Application({
   backend: common.getBackend(),
@@ -75,6 +77,13 @@ instancingApp.ready().then(async () => {
     camera.pickPosY = mouseY;
   });
 
+  const assetManager = new AssetManager();
+  const tex = await assetManager.fetchTexture<Texture2D>('./assets/images/Di-3d.png');
+  tex.name = 'CopySource';
+  const tex2 = instancingApp.device.createTexture2D(tex.format, tex.width, tex.height);
+  tex2.name = 'CopyDest';
+  instancingApp.device.copyTexture2D(tex, 0, tex2, 0);
+  instancingApp.device.copyTexture2D(tex, 1, tex2, 1);
   instancingApp.on('tick', (ev) => {
     camera.updateController();
     camera.viewport = null;
