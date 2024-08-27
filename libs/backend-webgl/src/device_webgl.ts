@@ -622,6 +622,40 @@ export class WebGLDevice extends BaseDevice {
     tex.samplerOptions = samplerOptions ?? null;
     return tex;
   }
+  copyTexture2D(src: Texture2D, dst: Texture2D, level?: number) {
+    if (!src || !src.object || !dst || !dst.object) {
+      console.error('CopyTexture2D(): invalid texture');
+      return;
+    }
+    if (src.width !== dst.width || src.height !== dst.height) {
+      console.error('CopyTexture2D(): Source texture must have same size with destination texture');
+      return;
+    }
+    if (src.format !== dst.format) {
+      console.error('CopyTexture2D(): Source texture must have same format with destination texture');
+      return;
+    }
+    const start = level ?? 0;
+    const end = level ?? Math.min(src.mipLevelCount, dst.mipLevelCount) - 1;
+    if (end >= src.mipLevelCount || end >= dst.mipLevelCount) {
+      console.error('CopyTexture2D(): invalid mipmap level');
+      return;
+    }
+    this.pushDeviceStates();
+    const fb = this.createFrameBuffer([src], null);
+    fb.setColorAttachmentGenerateMipmaps(0, false);
+    this.setFramebuffer(fb);
+    const gl = this._context;
+    for (let i = start; i <= end; i++) {
+      const w = src.width >> i;
+      const h = src.height >> i;
+      fb.setColorAttachmentMipLevel(0, i);
+      this.bindTexture(gl.TEXTURE_2D, 0, dst as WebGLTexture2D);
+      this._context.copyTexSubImage2D(gl.TEXTURE_2D, i, 0, 0, 0, 0, w, h);
+    }
+    fb.dispose();
+    this.popDeviceStates();
+  }
   createGPUProgram(params: GPUProgramConstructParams): GPUProgram {
     if (params.type === 'compute') {
       throw new Error('device does not support compute shader');

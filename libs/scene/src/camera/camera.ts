@@ -64,6 +64,8 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _commandBufferReuse: boolean;
   /** @internal */
+  protected _HiZ: boolean;
+  /** @internal */
   protected _picking: boolean;
   /** @internal */
   protected _pickPosX: number;
@@ -100,6 +102,7 @@ export class Camera extends SceneNode {
     this._depthPrePass = false;
     this._pickPosX = 0;
     this._pickPosY = 0;
+    this._HiZ = false;
     this._pickResult = null;
     this._commandBufferReuse = true;
   }
@@ -110,6 +113,13 @@ export class Camera extends SceneNode {
   set clipPlane(plane: Plane) {
     this._clipPlane = plane;
     this._invalidate(false);
+  }
+  /** Whether hierarchical depth should be generated */
+  get HiZ(): boolean {
+    return this._HiZ;
+  }
+  set HiZ(val: boolean) {
+    this._HiZ = !!val;
   }
   /** Whether to perform a depth pass */
   get depthPrePass(): boolean {

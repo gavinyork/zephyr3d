@@ -490,6 +490,50 @@ export class WebGPUDevice extends BaseDevice {
     tex.samplerOptions = samplerOptions ?? null;
     return tex;
   }
+  copyTexture2D(src: Texture2D, dst: Texture2D, level?: number) {
+    if (!src || !src.object || !dst || !dst.object) {
+      console.error('CopyTexture2D(): invalid texture');
+      return;
+    }
+    if (src.width !== dst.width || src.height !== dst.height) {
+      console.error('CopyTexture2D(): Source texture must have same size with destination texture');
+      return;
+    }
+    if (src.format !== dst.format) {
+      console.error('CopyTexture2D(): Source texture must have same format with destination texture');
+      return;
+    }
+    this.flush();
+    const start = level ?? 0;
+    const end = level ?? Math.min(src.mipLevelCount, dst.mipLevelCount) - 1;
+    if (end >= src.mipLevelCount || end >= dst.mipLevelCount) {
+      console.error('CopyTexture2D(): invalid mipmap level');
+      return;
+    }
+    const srcTex = src as WebGPUTexture2D;
+    const dstTex = dst as WebGPUTexture2D;
+    const commandEncoder = this._device.createCommandEncoder();
+    for (let i = start; i <= end; i++) {
+      commandEncoder.copyTextureToTexture(
+        {
+          texture: srcTex.object,
+          mipLevel: i,
+          origin: { x: 0, y: 0, z: 0 }
+        },
+        {
+          texture: dstTex.object,
+          mipLevel: i,
+          origin: { x: 0, y: 0, z: 0 }
+        },
+        {
+          width: srcTex.width >> i,
+          height: srcTex.height >> i,
+          depthOrArrayLayers: 1
+        }
+      );
+    }
+    this._device.queue.submit([commandEncoder.finish()]);
+  }
   createGPUProgram(params: GPUProgramConstructParams): GPUProgram {
     return new WebGPUProgram(this, params);
   }

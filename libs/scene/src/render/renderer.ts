@@ -1,7 +1,7 @@
 import { LightPass } from './lightpass';
 import { ShadowMapPass } from './shadowmap_pass';
 import { DepthPass } from './depthpass';
-import { Vector4 } from '@zephyr3d/base';
+import { isPowerOf2, nextPowerOf2, Vector4 } from '@zephyr3d/base';
 import type { FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
 import { Application } from '../app';
 import { CopyBlitter } from '../blitter';
@@ -15,6 +15,7 @@ import type { Compositor } from '../posteffect';
 import { ClusteredLight } from './cluster_light';
 import { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import { ObjectColorPass } from './objectcolorpass';
+import { buildHiZ } from './hzb';
 
 /**
  * Forward render scheme
@@ -72,6 +73,8 @@ export class SceneRenderer {
       primaryCamera: camera,
       picking: false,
       oit: null,
+      HiZ: camera.HiZ && device.type !== 'webgl',
+      HiZTexture: null,
       globalBindGroupAllocator: GlobalBindGroupAllocator.get(),
       camera,
       compositor: compositor?.needDrawPostEffects() ? compositor : null,
@@ -144,7 +147,7 @@ export class SceneRenderer {
     if (ctx.camera.enablePicking) {
       this.renderObjectColors(ctx);
     }
-
+    let HiZFrameBuffer: FrameBuffer = null;
     const renderQueue = this._scenePass.cullScene(ctx, ctx.camera);
     ctx.sunLight = renderQueue.sunLight;
     ctx.clusteredLight = this.getClusteredLight();
@@ -156,6 +159,7 @@ export class SceneRenderer {
       oversizedViewport ||
       renderQueue.needSceneColor ||
       ctx.scene.env.needSceneDepthTexture() ||
+      ctx.HiZ ||
       ctx.primaryCamera.oit ||
       ctx.compositor?.requireLinearDepth()
     ) {
@@ -166,7 +170,8 @@ export class SceneRenderer {
           drawingBufferWidth,
           drawingBufferHeight,
           format,
-          ctx.depthFormat
+          ctx.depthFormat,
+          ctx.HiZ
         );
       } else {
         const originDepth = finalFramebuffer?.getDepthAttachment();
@@ -177,7 +182,7 @@ export class SceneRenderer {
               originDepth.height,
               format,
               originDepth,
-              false
+              ctx.HiZ
             )
           : device.pool.fetchTemporalFramebuffer(
               true,
@@ -185,12 +190,30 @@ export class SceneRenderer {
               ctx.viewportHeight,
               format,
               ctx.depthFormat,
-              false
+              ctx.HiZ
             );
       }
       this._renderSceneDepth(ctx, renderQueue, depthFramebuffer);
       ctx.linearDepthTexture = depthFramebuffer.getColorAttachments()[0] as Texture2D;
       ctx.depthTexture = depthFramebuffer.getDepthAttachment() as Texture2D;
+      if (ctx.HiZ) {
+        const w = isPowerOf2(ctx.linearDepthTexture.width)
+          ? ctx.linearDepthTexture.width
+          : nextPowerOf2(ctx.linearDepthTexture.width);
+        const h = isPowerOf2(ctx.linearDepthTexture.height)
+          ? ctx.linearDepthTexture.height
+          : nextPowerOf2(ctx.linearDepthTexture.height);
+        HiZFrameBuffer = device.pool.fetchTemporalFramebuffer(
+          true,
+          w,
+          h,
+          ctx.linearDepthTexture.format,
+          null,
+          true
+        );
+        buildHiZ(ctx.linearDepthTexture, HiZFrameBuffer);
+        ctx.HiZTexture = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
+      }
       if (ctx.depthTexture === finalFramebuffer?.getDepthAttachment()) {
         tempFramebuffer = finalFramebuffer;
       } else {

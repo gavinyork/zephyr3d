@@ -30,6 +30,10 @@ export interface DrawContext {
   camera: Camera;
   /** OIT */
   oit: OIT;
+  /** hierarchical depth */
+  HiZ: boolean;
+  /** hierarchical depth buffer */
+  HiZTexture: Texture2D;
   /** The scene that is currently been drawing */
   scene: Scene;
   /** The render pass to which the current drawing task belongs */

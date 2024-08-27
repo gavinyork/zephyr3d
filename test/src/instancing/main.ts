@@ -1,10 +1,8 @@
 import {
   Scene,
-  OrbitCameraController,
   Application,
   PerspectiveCamera,
   Compositor,
-  Tonemap,
   BatchGroup,
   DirectionalLight,
   WeightedBlendedOIT,
@@ -12,7 +10,7 @@ import {
   SphereShape,
   UnlitMaterial,
   Mesh,
-  PostWater
+  FPSCameraController
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
@@ -37,20 +35,21 @@ instancingApp.ready().then(async () => {
     Math.PI / 3,
     device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
     1,
-    1000
+    10
   );
   camera.position.setXYZ(0, 0, 6);
-  camera.controller = new OrbitCameraController();
+  camera.controller = new FPSCameraController();
   camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
   camera.depthPrePass = true;
   camera.enablePicking = true;
+  camera.HiZ = true;
 
   instancingApp.inputManager.use(imGuiInjectEvent);
   instancingApp.inputManager.use(camera.handleEvent.bind(camera));
 
   const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
-  compositor.appendPostEffect(new PostWater(0));
+  //compositor.appendPostEffect(new Tonemap());
+  //compositor.appendPostEffect(new PostWater(0));
   const inspector = new common.Inspector(scene, compositor, camera);
 
   const batchGroup = new BatchGroup(scene);

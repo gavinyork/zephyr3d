@@ -219,6 +219,7 @@ export abstract class BaseDevice {
   abstract createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo;
   abstract reverseVertexWindingOrder(reverse: boolean): void;
   abstract isWindingOrderReversed(): boolean;
+  abstract copyTexture2D(src: Texture2D, dst: Texture2D, level?: number);
   // program
   abstract createGPUProgram(params: GPUProgramConstructParams): GPUProgram;
   abstract createBindGroup(layout: BindGroupLayout): BindGroup;

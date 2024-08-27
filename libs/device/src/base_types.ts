@@ -2617,6 +2617,17 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    */
   createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo;
   /**
+   * Copies a 2d texture to another texture.
+   *
+   * @remarks
+   * The two textures must have the same size and format
+   *
+   * @param src - Texture that will be copied form.
+   * @param dst - Texture that bill be copied to.
+   * @param level - Which mipmap level to be copied, if not specified, all mipmap levels will be copied.
+   */
+  copyTexture2D(src: Texture2D, dst: Texture2D, level?: number);
+  /**
    * Set wether to reverse the winding order
    *
    * @remarks
