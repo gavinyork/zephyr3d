@@ -198,6 +198,7 @@ export class WaterMesh {
   private _waterRenderStates: RenderStateSet;
   private _wireframe: boolean;
   private _gridScale: number;
+  private _speed: number;
   private _level: number;
   private _tileSize: number;
   private _regionMin: Vector2;
@@ -316,6 +317,7 @@ export class WaterMesh {
       this._ifftTextures = null;
       this._wireframe = false;
       this._gridScale = 1;
+      this._speed = 1.5;
       this._level = 0;
       this._regionMin = new Vector2(-99999, -99999);
       this._regionMax = new Vector2(99999, 99999);
@@ -351,6 +353,12 @@ export class WaterMesh {
       this._usedClipmapBindGroups = [];
       this._freeClipmapBindGroups = [];
     }
+  }
+  get speed() {
+    return this._speed;
+  }
+  set speed(val: number) {
+    this._speed = val;
   }
   get params() {
     return this._params;
@@ -506,7 +514,7 @@ export class WaterMesh {
     device.pushDeviceStates();
     if (true || device.frameInfo.frameCounter !== this._updateFrameStamp) {
       this._updateFrameStamp = device.frameInfo.frameCounter;
-      this.update(device, device.frameInfo.elapsedOverall * 0.002);
+      this.update(device, device.frameInfo.elapsedOverall * 0.001 * this._speed);
     }
     device.popDeviceStates();
     const cameraPos = camera.getWorldPosition();

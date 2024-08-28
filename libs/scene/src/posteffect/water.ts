@@ -23,7 +23,6 @@ import { Application } from '../app';
  * @public
  */
 export class PostWater extends AbstractPostEffect {
-  private _elevation: number;
   private _region: Vector4;
   private _reflectSize: number;
   private _copyBlitter: CopyBlitter;
@@ -47,7 +46,6 @@ export class PostWater extends AbstractPostEffect {
    */
   constructor(elevation: number) {
     super();
-    this._elevation = elevation ?? 0;
     this._region = new Vector4(-1000, -1000, 1000, 1000);
     this._reflectSize = 512;
     this._antiReflectanceLeak = 0.5;
@@ -82,6 +80,7 @@ export class PostWater extends AbstractPostEffect {
     this._waterMesh.alignment = 1;
     this._waterMesh.wind = new Vector2(2, 2);
     this._waterMesh.gridScale = 1;
+    this._waterMesh.level = elevation;
     this._waterMesh.setWaveLength(0, 400);
     this._waterMesh.setWaveStrength(0, 0.4);
     this._waterMesh.setWaveCroppiness(0, -1.5);
@@ -216,10 +215,10 @@ export class PostWater extends AbstractPostEffect {
   }
   /** Water elevation in world space */
   get elevation(): number {
-    return this._elevation;
+    return this._waterMesh.level;
   }
   set elevation(val: number) {
-    this._elevation = val;
+    this._waterMesh.level = val;
   }
   /** Water boundary in world space ( minX, minZ, maxX, maxZ ) */
   get boundary(): Vector4 {
@@ -235,6 +234,13 @@ export class PostWater extends AbstractPostEffect {
   }
   set gridScale(val: number) {
     this._waterMesh.gridScale = val;
+  }
+  /** Water animation speed factor */
+  get speed(): number {
+    return this._waterMesh.speed;
+  }
+  set speed(val: number) {
+    this._waterMesh.speed = val;
   }
   /** The amount for increasing the water elevation to reduce leaking artifact */
   get antiReflectanceLeak() {
@@ -302,8 +308,8 @@ export class PostWater extends AbstractPostEffect {
         ctx.depthFormat,
         false
       );
-      const plane = new Plane(0, -1, 0, this._elevation);
-      const clipPlane = new Plane(0, -1, 0, this._elevation - this._antiReflectanceLeak);
+      const plane = new Plane(0, -1, 0, this._waterMesh.level);
+      const clipPlane = new Plane(0, -1, 0, this._waterMesh.level - this._antiReflectanceLeak);
       const matReflectionR = Matrix4x4.invert(Matrix4x4.reflection(-plane.a, -plane.b, -plane.c, -plane.d));
       const reflCamera = new Camera(ctx.scene);
       reflCamera.framebuffer = fbRefl;
@@ -349,7 +355,7 @@ export class PostWater extends AbstractPostEffect {
         inputColorTexture.height
       )
     );
-    waterMesh.bindGroup.setValue('waterLevel', this._elevation);
+    waterMesh.bindGroup.setValue('waterLevel', this._waterMesh.level);
     waterMesh.bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
     if (ctx.sunLight) {
       waterMesh.bindGroup.setValue('lightDir', ctx.sunLight.directionAndCutoff.xyz());

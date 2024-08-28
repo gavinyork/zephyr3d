@@ -335,6 +335,14 @@ export class Inspector {
         1
       );
       ImGui.SliderFloat(
+        'Speed##water',
+        (val?: number) => {
+          return (water.speed = val = val ?? water.speed);
+        },
+        0,
+        10
+      );
+      ImGui.SliderFloat(
         'Elevation##water',
         (val?: number) => {
           return (water.elevation = val = val ?? water.elevation);
