@@ -411,7 +411,8 @@ export class Clipmap {
       Math.abs(context.position.y - context.maxWorldPos.y)
     );
     const maxDist = Math.min(Math.max(distX, distY), context.camera.getFarPlane());
-    const mipLevels = Math.ceil(Math.log2(maxDist / (this._tileResolution * context.gridScale))) + 1;
+    const mipLevels =
+      Math.max(Math.ceil(Math.log2(maxDist / (this._tileResolution * context.gridScale))), 0) + 1;
 
     const snappedPos = new Vector2();
     const tileSize = new Vector2();

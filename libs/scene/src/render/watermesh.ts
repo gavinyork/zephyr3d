@@ -88,36 +88,38 @@ export interface OceanFieldBuildParams {
 }
 
 /** @internal */
-export const defaultBuildParams: OceanFieldBuildParams = {
-  cascades: [
-    {
-      size: 450.0,
-      strength: 0.8,
-      croppiness: -1.2,
-      minWave: 0,
-      maxWave: 100
-    },
-    {
-      size: 103.0,
-      strength: 0.8,
-      croppiness: -1.5,
-      minWave: 0,
-      maxWave: 100
-    },
-    {
-      size: 13,
-      strength: 0.9,
-      croppiness: -1.5,
-      minWave: 0,
-      maxWave: 7
-    }
-  ],
-  resolution: 256,
-  wind: new Vector2(2, 2),
-  alignment: 0.01,
-  foamParams: new Vector2(1, 2),
-  randomSeed: 0
-};
+export function getDefaultBuildParams(): OceanFieldBuildParams {
+  return {
+    cascades: [
+      {
+        size: 450.0,
+        strength: 0.8,
+        croppiness: -1.2,
+        minWave: 0,
+        maxWave: 100
+      },
+      {
+        size: 103.0,
+        strength: 0.8,
+        croppiness: -1.5,
+        minWave: 0,
+        maxWave: 100
+      },
+      {
+        size: 13,
+        strength: 0.9,
+        croppiness: -1.5,
+        minWave: 0,
+        maxWave: 7
+      }
+    ],
+    resolution: 256,
+    wind: new Vector2(2, 2),
+    alignment: 0.01,
+    foamParams: new Vector2(1, 2),
+    randomSeed: 0
+  };
+}
 
 type Programs = {
   h0Program: GPUProgram;
@@ -169,6 +171,7 @@ const THREAD_GROUP_SIZE = 16;
 export class WaterMesh {
   private static _globals: Globales = null;
   private _useComputeShader: boolean;
+  private _impl: WaterShaderImpl;
   private _h0BindGroup: BindGroup;
   private _hkBindGroup: BindGroup;
   private _hkBindGroup2: BindGroup;
@@ -215,7 +218,7 @@ export class WaterMesh {
   private _renderMode: number;
   private _updateFrameStamp: number;
   private _waterProgram: GPUProgram;
-  constructor(device: AbstractDevice, impl?: WaterShaderImpl) {
+  constructor(device: AbstractDevice, params?: OceanFieldBuildParams, impl?: WaterShaderImpl) {
     //const renderTargetFloat32 = device.getDeviceCaps().textureCaps.supportFloatColorBuffer;
     //const linearFloat32 = renderTargetFloat32 && device.getDeviceCaps().textureCaps.supportLinearFloatTexture;
     const renderTargetFloat16 = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer;
@@ -234,6 +237,7 @@ export class WaterMesh {
     } else {
       this._renderMode = RENDER_TWO_PASS;
     }
+    this._impl = impl ?? null;
     if (this._renderMode !== RENDER_NONE) {
       WaterMesh._globals = WaterMesh._globals ?? {
         programs: {
@@ -269,8 +273,11 @@ export class WaterMesh {
         noiseTextures: new Map(),
         butterflyTextures: new Map()
       };
-      this._waterProgram = createProgramOcean(this._useComputeShader, impl);
-      this._params = defaultBuildParams;
+      this._waterProgram = this._impl ? createProgramOcean(this._useComputeShader, this._impl) : null;
+      this._waterBindGroup = this._waterProgram
+        ? device.createBindGroup(this._waterProgram.bindGroupLayouts[0])
+        : null;
+      this._params = params ?? getDefaultBuildParams();
       const programs = WaterMesh._globals.programs;
       this._h0BindGroup = device.createBindGroup(programs.h0Program.bindGroupLayouts[0]);
       this._hkBindGroup = programs.hkProgram
@@ -305,7 +312,6 @@ export class WaterMesh {
       this._postfft2BindGroup4 = programs.postfft2Program4
         ? device.createBindGroup(WaterMesh._globals.programs.postfft2Program4.bindGroupLayouts[0])
         : null;
-      this._waterBindGroup = device.createBindGroup(this._waterProgram.bindGroupLayouts[0]);
       this._instanceData = null;
       this._ifftTextures = null;
       this._wireframe = false;
@@ -348,6 +354,28 @@ export class WaterMesh {
   }
   get params() {
     return this._params;
+  }
+  set params(val: OceanFieldBuildParams) {
+    if (val && val !== this._params) {
+      this._params = val;
+      this.paramsChanged();
+    }
+  }
+  /** @internal */
+  get impl(): WaterShaderImpl {
+    return this._impl;
+  }
+  /** @internal */
+  set impl(val: WaterShaderImpl) {
+    if (val && val !== this._impl) {
+      this._waterProgram?.dispose();
+      this._waterBindGroup?.dispose();
+      this._impl = val;
+      this._waterProgram = createProgramOcean(this._useComputeShader, this._impl);
+      this._waterBindGroup = Application.instance.device.createBindGroup(
+        this._waterProgram.bindGroupLayouts[0]
+      );
+    }
   }
   private paramsChanged() {
     this._paramsChanged = true;
@@ -471,14 +499,14 @@ export class WaterMesh {
     return bindGroup;
   }
   render(camera: Camera, flip?: boolean) {
-    if (this._renderMode === RENDER_NONE) {
+    if (this._renderMode === RENDER_NONE || !this._waterProgram) {
       return;
     }
     const device = Application.instance.device;
     device.pushDeviceStates();
     if (true || device.frameInfo.frameCounter !== this._updateFrameStamp) {
       this._updateFrameStamp = device.frameInfo.frameCounter;
-      this.update(device, device.frameInfo.elapsedOverall * 0.001);
+      this.update(device, device.frameInfo.elapsedOverall * 0.002);
     }
     device.popDeviceStates();
     const cameraPos = camera.getWorldPosition();

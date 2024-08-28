@@ -319,8 +319,12 @@ export class Inspector {
   private renderPostWater(water: PostWater) {
     if (ImGui.Begin('PostWater')) {
       const wireframe = [water.wireframe] as [boolean];
-      if (ImGui.Checkbox('Wireframe', wireframe)) {
+      if (ImGui.Checkbox('Wireframe##water', wireframe)) {
         water.wireframe = wireframe[0];
+      }
+      const ssr = [water.ssr] as [boolean];
+      if (ImGui.Checkbox('SSR##water', ssr)) {
+        water.ssr = ssr[0];
       }
       ImGui.SliderFloat(
         'GridScale##water',
@@ -394,7 +398,7 @@ export class Inspector {
         1
       );
       const tmpWind = new Vector2(water.wind);
-      if (ImGui.SliderFloat2('Wind', tmpWind, 0, 32)) {
+      if (ImGui.SliderFloat2('Wind', tmpWind, 0, 64)) {
         water.wind = tmpWind;
       }
       ImGui.SliderFloat(

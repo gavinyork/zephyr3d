@@ -11,7 +11,8 @@ import {
   UnlitMaterial,
   Mesh,
   FPSCameraController,
-  AssetManager
+  AssetManager,
+  PostWater
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
@@ -51,7 +52,7 @@ instancingApp.ready().then(async () => {
 
   const compositor = new Compositor();
   //compositor.appendPostEffect(new Tonemap());
-  //compositor.appendPostEffect(new PostWater(0));
+  compositor.appendPostEffect(new PostWater(0));
   const inspector = new common.Inspector(scene, compositor, camera);
 
   const batchGroup = new BatchGroup(scene);
