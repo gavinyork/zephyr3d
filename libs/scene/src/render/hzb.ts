@@ -9,12 +9,12 @@ import type {
 import { drawFullscreenQuad } from './fullscreenquad';
 import { Application } from '../app';
 import { CopyBlitter } from '../blitter';
-import { Vector2 } from '@zephyr3d/base';
 
 let hzbProgram: GPUProgram = null;
 let hzbBindGroup: BindGroup = null;
 let hzbSampler: TextureSampler = null;
 let blitter: CopyBlitter = null;
+let srcSize: Int32Array = null;
 
 function buildHZBProgram(device: AbstractDevice): GPUProgram {
   return device.buildRenderProgram({
@@ -33,37 +33,22 @@ function buildHZBProgram(device: AbstractDevice): GPUProgram {
     fragment(pb) {
       this.$outputs.color = pb.vec4();
       this.srcTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+      this.srcSize = pb.ivec2().uniform(0);
       if (device.type !== 'webgpu') {
-        this.srcSize = pb.ivec2().uniform(0);
         this.srcMipLevel = pb.int().uniform(0);
       }
       pb.main(function () {
         this.$l.coord = pb.mul(pb.ivec2(this.$builtins.fragCoord.xy), 2);
-        if (device.type !== 'webgpu') {
-          this.$l.d = pb.textureLoad(this.srcTex, pb.ivec2(0, 0), this.srcMipLevel).r;
-        } else {
-          this.$l.d0 = pb.textureLoad(
+        this.$l.minCoord = pb.ivec2(0, 0);
+        this.$l.maxCoord = pb.sub(this.srcSize, pb.ivec2(1, 1));
+        for (let i = 0; i < 4; i++) {
+          this.$l[`d${i}`] = pb.textureLoad(
             this.srcTex,
-            pb.add(this.coord, pb.ivec2(0, 0)),
+            pb.clamp(pb.add(this.coord, pb.ivec2(i >> 1, i & 1)), this.minCoord, this.maxCoord),
             device.type === 'webgpu' ? 0 : this.srcMipLevel
           ).r;
-          this.$l.d1 = pb.textureLoad(
-            this.srcTex,
-            pb.add(this.coord, pb.ivec2(1, 0)),
-            device.type === 'webgpu' ? 0 : this.srcMipLevel
-          ).r;
-          this.$l.d2 = pb.textureLoad(
-            this.srcTex,
-            pb.add(this.coord, pb.ivec2(1, 1)),
-            device.type === 'webgpu' ? 0 : this.srcMipLevel
-          ).r;
-          this.$l.d3 = pb.textureLoad(
-            this.srcTex,
-            pb.add(this.coord, pb.ivec2(0, 1)),
-            device.type === 'webgpu' ? 0 : this.srcMipLevel
-          ).r;
-          this.$l.d = pb.min(pb.min(this.d0, this.d1), pb.min(this.d2, this.d3));
         }
+        this.$l.d = pb.min(pb.min(this.d0, this.d1), pb.min(this.d2, this.d3));
         this.$outputs.color = pb.vec4(this.d, 0, 0, 1);
       });
     }
@@ -79,14 +64,14 @@ function buildHiZLevel(
   const framebuffer = device.createFrameBuffer([dstTexture], null);
   framebuffer.setColorAttachmentMipLevel(0, miplevel + 1);
   framebuffer.setColorAttachmentGenerateMipmaps(0, false);
-  const w = Math.max(srcTexture.width >> miplevel, 1);
-  const h = Math.max(srcTexture.height >> miplevel, 1);
+  srcSize[0] = Math.max(srcTexture.width >> miplevel, 1);
+  srcSize[1] = Math.max(srcTexture.height >> miplevel, 1);
+  hzbBindGroup.setValue('srcSize', srcSize);
   if (device.type === 'webgpu') {
     hzbBindGroup.setTextureView('srcTex', srcTexture, miplevel, 0, 1, hzbSampler);
   } else {
     hzbBindGroup.setTexture('srcTex', srcTexture, hzbSampler);
     hzbBindGroup.setValue('srcMipLevel', miplevel);
-    hzbBindGroup.setValue('srcSize', new Vector2(w, h));
   }
   device.setProgram(hzbProgram);
   device.setBindGroup(0, hzbBindGroup);
@@ -106,10 +91,11 @@ export function buildHiZ(sourceTex: Texture2D, HiZFrameBuffer: FrameBuffer) {
       addressU: 'clamp',
       addressV: 'clamp',
       magFilter: 'nearest',
-      mipFilter: 'none',
+      mipFilter: 'nearest',
       minFilter: 'nearest'
     });
     blitter = new CopyBlitter();
+    srcSize = new Int32Array(2);
   }
   blitter.blit(sourceTex, HiZFrameBuffer, hzbSampler);
   device.pushDeviceStates();
