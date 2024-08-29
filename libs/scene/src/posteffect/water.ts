@@ -5,7 +5,8 @@ import type {
   PBInsideFunctionScope,
   PBShaderExp,
   Texture2D,
-  TextureCube
+  TextureCube,
+  TextureSampler
 } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { WaterMesh } from '../render';
@@ -40,6 +41,7 @@ export class PostWater extends AbstractPostEffect {
   private _ssrParams: Vector4;
   private _waterImpls: Record<string, WaterShaderImpl>;
   private _waterMesh: WaterMesh;
+  private _depthTexSampler: TextureSampler;
   /**
    * Creates an instance of PostWater.
    * @param elevation - Elevation of the water
@@ -72,6 +74,13 @@ export class PostWater extends AbstractPostEffect {
     this._envMap = null;
     this._ssr = true;
     this._ssrParams = new Vector4(32, 80, 0.5, 6);
+    this._depthTexSampler = Application.instance.device.createSampler({
+      magFilter: 'nearest',
+      minFilter: 'nearest',
+      mipFilter: 'nearest',
+      addressU: 'clamp',
+      addressV: 'clamp'
+    });
     this._waterImpls = {};
     this._waterMesh = new WaterMesh(Application.instance.device);
     this._waterMesh.foamWidth = 1.2;
@@ -281,6 +290,7 @@ export class PostWater extends AbstractPostEffect {
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const device = ctx.device;
+    const ssr = ctx.device.type === 'webgl' ? false : this._ssr;
     const rampTex = this._getRampTexture(device);
     this._copyBlitter.srgbOut = srgbOutput;
     this._copyBlitter.blit(
@@ -295,7 +305,7 @@ export class PostWater extends AbstractPostEffect {
       })
     );
     let fbRefl: FrameBuffer;
-    if (!this._ssr) {
+    if (!ssr) {
       if (this._renderingReflections) {
         return;
       }
@@ -327,16 +337,23 @@ export class PostWater extends AbstractPostEffect {
     const cameraNearFar = new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
     const waterMesh = this._getWaterMesh(ctx);
     waterMesh.bindGroup.setTexture('tex', inputColorTexture);
-    waterMesh.bindGroup.setTexture('depthTex', sceneDepthTexture);
+    waterMesh.bindGroup.setTexture(
+      'depthTex',
+      ssr && !!ctx.HiZTexture ? ctx.HiZTexture : sceneDepthTexture,
+      this._depthTexSampler
+    );
+    if (ctx.HiZTexture) {
+      waterMesh.bindGroup.setValue('depthMipLevels', ctx.HiZTexture.mipLevelCount);
+    }
     waterMesh.bindGroup.setTexture('rampTex', rampTex);
-    if (this._ssr) {
+    if (ssr) {
       waterMesh.bindGroup.setTexture('envMap', this._envMap ?? ctx.scene.env.sky.bakedSkyTexture);
       waterMesh.bindGroup.setValue('ssrParams', this._ssrParams);
     } else {
       waterMesh.bindGroup.setTexture('reflectionTex', fbRefl.getColorAttachments()[0]);
     }
     waterMesh.bindGroup.setValue('invViewProj', ctx.camera.invViewProjectionMatrix);
-    if (this._ssr) {
+    if (ssr) {
       waterMesh.bindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
       waterMesh.bindGroup.setValue('projMatrix', ctx.camera.getProjectionMatrix());
       waterMesh.bindGroup.setValue('invProjMatrix', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
@@ -395,7 +412,8 @@ export class PostWater extends AbstractPostEffect {
   /** @internal */
   private _getWaterMesh(ctx: DrawContext): WaterMesh {
     const ssr = ctx.device.type === 'webgl' ? false : this._ssr;
-    const hash = `${ctx.sunLight ? 1 : 0}:${ctx.env.light.getHash()}:${ssr}`;
+    const HiZ = ssr && !!ctx.HiZTexture;
+    const hash = `${ctx.sunLight ? 1 : 0}:${ctx.env.light.getHash()}:${ssr}:${HiZ}`;
     const device = ctx.device;
     let impl = this._waterImpls[hash];
     if (!impl) {
@@ -409,6 +427,9 @@ export class PostWater extends AbstractPostEffect {
             if (ssr) {
               scope.envMap = pb.texCube().uniform(0);
               scope.ssrParams = pb.vec4().uniform(0);
+              if (HiZ) {
+                scope.depthMipLevels = pb.int().uniform(0);
+              }
             } else {
               scope.reflectionTex = pb.tex2D().uniform(0);
             }
@@ -460,13 +481,17 @@ export class PostWater extends AbstractPostEffect {
             ).rgb;
             this.$return(pb.mul(this.c, this.c));
           });
-          pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
-            this.$l.depthValue = pb.textureSampleLevel(this.depthTex, this.uv, 0);
+          pb.func('getLinearDepth', [pb.vec2('uv'), pb.float('level')], function () {
+            this.$l.depthValue = pb.textureSampleLevel(this.depthTex, this.uv, this.level);
             if (device.type === 'webgl') {
               this.$l.linearDepth = decodeNormalizedFloatFromRGBA(this, this.depthValue);
             } else {
               this.$l.linearDepth = this.depthValue.r;
             }
+            this.$return(this.linearDepth);
+          });
+          pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
+            this.$l.linearDepth = this.getLinearDepth(this.uv, 0);
             this.$l.nonLinearDepth = pb.div(
               pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
               pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
@@ -489,126 +514,326 @@ export class PostWater extends AbstractPostEffect {
             );
           });
           if (ssr) {
-            pb.func(
-              'ssr',
-              [
-                pb.vec3('viewPos'),
-                pb.vec3('viewNormal'),
-                pb.float('maxDistance'),
-                pb.float('iteration'),
-                pb.float('thickness'),
-                pb.int('binarySearchSteps')
-              ],
-              function () {
-                this.$l.normalizedViewPos = pb.normalize(this.viewPos);
-                this.$l.reflectVec = pb.reflect(this.normalizedViewPos, this.viewNormal);
-                this.$if(pb.greaterThan(this.reflectVec.z, 0), function () {
-                  this.$return(pb.vec3(0));
-                });
-                this.$l.viewPosEnd = pb.add(this.viewPos, pb.mul(this.reflectVec, this.maxDistance));
-                this.$l.fragStartH = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));
-                this.$l.fragStart = pb.mul(
-                  pb.add(pb.mul(pb.div(this.fragStartH.xy, this.fragStartH.w), 0.5), pb.vec2(0.5)),
-                  this.targetSize.xy
-                );
-                this.$l.fragEndH = pb.mul(this.projMatrix, pb.vec4(this.viewPosEnd, 1));
-                this.$l.fragEnd = pb.mul(
-                  pb.add(pb.mul(pb.div(this.fragEndH.xy, this.fragEndH.w), 0.5), pb.vec2(0.5)),
-                  this.targetSize.xy
-                );
-                this.$l.frag = this.fragStart.xy;
-                this.$l.deltaX = pb.sub(this.fragEnd.x, this.fragStart.x);
-                this.$l.deltaY = pb.sub(this.fragEnd.y, this.fragStart.y);
-                this.$l.useX = this.$choice(
-                  pb.greaterThan(pb.abs(this.deltaX), pb.abs(this.deltaY)),
-                  pb.float(1),
-                  pb.float(0)
-                );
-                this.$l.delta = this.iteration;
-                this.$l.increment = pb.div(pb.vec2(this.deltaX, this.deltaY), pb.max(this.delta, 0.001));
-                this.$l.search0 = pb.float(0);
-                this.$l.search1 = pb.float(0);
-                this.$l.hit0 = pb.int(0);
-                this.$l.hit1 = pb.int(0);
-                this.$l.uv = pb.vec2(0);
-                this.$l.depth = pb.float(0);
-                this.$l.positionTo = pb.vec3(0);
-                this.$for(pb.int('i'), 0, pb.int(this.delta), function () {
-                  this.frag = pb.add(this.frag, this.increment);
-                  this.uv = pb.div(this.frag, this.targetSize.xy);
-                  this.positionTo = this.getPosition(this.uv, this.invProjMatrix);
-                  this.search1 = pb.clamp(
-                    pb.mix(
-                      pb.div(pb.sub(this.frag.y, this.fragStart.y), this.deltaY),
-                      pb.div(pb.sub(this.frag.x, this.fragStart.x), this.deltaX),
-                      this.useX
-                    ),
-                    0,
-                    1
-                  );
-                  this.$l.viewDistance = pb.div(
-                    pb.mul(this.viewPos.z, this.viewPosEnd.z),
-                    pb.mix(pb.neg(this.viewPosEnd.z), pb.neg(this.viewPos.z), this.search1)
-                  );
-                  this.depth = pb.add(this.viewDistance, this.positionTo.z);
-                  this.$if(
-                    pb.and(pb.greaterThan(this.depth, 0), pb.lessThan(this.depth, this.thickness)),
-                    function () {
-                      this.hit0 = 1;
-                      this.$break();
-                    }
-                  ).$else(function () {
-                    this.search0 = this.search1;
-                  });
-                });
-                this.search1 = pb.add(this.search0, pb.div(pb.sub(this.search1, this.search0), 2));
-                this.$l.steps = pb.mul(this.binarySearchSteps, this.hit0);
-                this.$for(pb.int('i'), 0, this.steps, function () {
-                  this.$l.frag = pb.mix(this.fragStart.xy, this.fragEnd.xy, this.search1);
-                  this.uv = pb.div(this.frag, this.targetSize.xy);
-                  this.positionTo = this.getPosition(this.uv, this.invProjMatrix);
-                  this.$l.viewDistance = pb.div(
-                    pb.mul(this.viewPos.z, this.viewPosEnd.z),
-                    pb.mix(pb.neg(this.viewPosEnd.z), pb.neg(this.viewPos.z), this.search1)
-                  );
-                  this.depth = pb.add(this.viewDistance, this.positionTo.z);
-                  this.$if(
-                    pb.and(pb.greaterThan(this.depth, 0), pb.lessThan(this.depth, this.thickness)),
-                    function () {
-                      this.hit1 = 1;
-                      this.search1 = pb.add(this.search0, pb.div(pb.sub(this.search1, this.search0), 2));
-                    }
-                  ).$else(function () {
-                    this.$l.tmp = this.search1;
-                    this.search1 = pb.add(this.search1, pb.div(pb.sub(this.search1, this.search0), 2));
-                    this.search0 = this.tmp;
-                  });
-                });
-                this.$l.vis = pb.mul(
-                  pb.float(this.hit1),
-                  pb.sub(1, pb.max(pb.dot(pb.neg(this.normalizedViewPos), this.reflectVec), 0)),
-                  pb.sub(1, pb.clamp(pb.div(this.depth, this.thickness), 0, 1)),
-
-                  pb.sub(
-                    1,
-                    pb.clamp(pb.div(pb.distance(this.positionTo, this.viewPos), this.maxDistance), 0, 1)
-                  ),
-
-                  this.$choice(
-                    pb.or(pb.lessThan(this.uv.x, 0), pb.greaterThan(this.uv.x, 1)),
-                    pb.float(0),
-                    pb.float(1)
-                  ),
-                  this.$choice(
-                    pb.or(pb.lessThan(this.uv.y, 0), pb.greaterThan(this.uv.y, 1)),
-                    pb.float(0),
-                    pb.float(1)
+            if (HiZ) {
+              pb.func('intersectDepthPlane', [pb.vec3('o'), pb.vec3('d'), pb.float('z')], function () {
+                this.$return(pb.add(this.o, pb.mul(this.d, this.z)));
+              });
+              pb.func('getCell', [pb.vec2('pos'), pb.vec2('cell_count')], function () {
+                this.$return(pb.vec2(pb.floor(pb.mul(this.pos, this.cell_count))));
+              });
+              pb.func(
+                'intersectCellBoundary',
+                [
+                  pb.vec3('o'),
+                  pb.vec3('d'),
+                  pb.vec2('cell'),
+                  pb.vec2('cell_count'),
+                  pb.vec2('crossStep'),
+                  pb.vec2('crossOffset')
+                ],
+                function () {
+                  this.$l.index = pb.add(this.cell, this.crossStep);
+                  this.$l.boundary = pb.add(pb.div(this.index, this.cell_count), this.crossOffset);
+                  this.$l.delta = pb.div(pb.sub(this.boundary, this.o.xy), this.d.xy);
+                  this.$l.t = pb.min(this.delta.x, this.delta.y);
+                  this.$return(this.intersectDepthPlane(this.o, this.d, this.t));
+                }
+              );
+              pb.func('getCellCount', [pb.int('level')], function () {
+                this.$return(pb.vec2(pb.textureDimensions(this.depthTex, this.level)));
+              });
+              pb.func('crossedCellBoundary', [pb.vec2('oldCellIndex'), pb.vec2('newCellIndex')], function () {
+                this.$return(
+                  pb.or(
+                    pb.notEqual(this.oldCellIndex.x, this.newCellIndex.x),
+                    pb.notEqual(this.oldCellIndex.y, this.newCellIndex.y)
                   )
                 );
-                this.vis = pb.clamp(this.vis, 0, 1);
-                this.$return(pb.vec3(this.uv, this.vis));
-              }
-            );
+              });
+              pb.func(
+                'HiZTracing',
+                [
+                  pb.vec3('samplePosInTS'),
+                  pb.vec3('reflectVecInTS'),
+                  pb.float('maxDistance'),
+                  pb.int('maxIteration')
+                ],
+                function () {
+                  this.$l.maxLevel = pb.sub(this.depthMipLevels, 1);
+                  this.$l.crossStep = pb.vec2(
+                    this.$choice(pb.greaterThanEqual(this.reflectVecInTS.x, 0), pb.float(1), pb.float(-1)),
+                    this.$choice(pb.greaterThanEqual(this.reflectVecInTS.y, 0), pb.float(1), pb.float(-1))
+                  );
+                  this.$l.crossOffset = pb.div(pb.div(this.crossStep, this.targetSize.xy), 128);
+                  this.crossStep = pb.clamp(this.crossStep, pb.vec2(0), pb.vec2(1));
+                  this.$l.ray = this.samplePosInTS;
+                  this.$l.minZ = this.ray.z;
+                  this.$l.maxZ = pb.add(this.minZ, pb.mul(this.reflectVecInTS.z, this.maxDistance));
+                  this.$l.deltaZ = pb.sub(this.maxZ, this.minZ);
+                  this.$l.o = this.ray;
+                  this.$l.d = pb.mul(this.reflectVecInTS, this.maxDistance);
+                  this.$l.startLevel = pb.int(2);
+                  this.$l.stopLevel = pb.int(0);
+                  this.$l.startCellCount = this.getCellCount(this.startLevel);
+                  this.$l.rayCell = this.getCell(this.ray.xy, this.startCellCount);
+                  this.ray = this.intersectCellBoundary(
+                    this.o,
+                    this.d,
+                    this.rayCell,
+                    this.startCellCount,
+                    this.crossStep,
+                    this.crossOffset
+                  );
+                  this.$l.level = this.startLevel;
+                  this.$l.iter = pb.int(0);
+                  this.$l.isBackwardRay = pb.lessThan(this.reflectVecInTS.z, 0);
+                  this.$l.rayDir = this.$choice(this.isBackwardRay, pb.float(-1), pb.float(1));
+                  this.$while(
+                    pb.and(
+                      pb.greaterThanEqual(this.level, this.stopLevel),
+                      pb.lessThanEqual(pb.mul(this.ray.z, this.rayDir), pb.mul(this.maxZ, this.rayDir)),
+                      pb.lessThan(this.iter, this.maxIteration)
+                    ),
+                    function () {
+                      this.$l.cellCount = this.getCellCount(this.level);
+                      this.$l.oldCellIndex = this.getCell(this.ray.xy, this.cellCount);
+                      this.$l.cell_minZ = pb.mul(
+                        this.getLinearDepth(
+                          pb.div(pb.add(this.oldCellIndex, pb.vec2(0.5)), this.cellCount),
+                          pb.float(this.level)
+                        ),
+                        this.cameraNearFar.y
+                      );
+                      this.cell_minZ = pb.div(-1, this.cell_minZ);
+                      this.$l.tmpRay = this.$choice(
+                        pb.and(pb.greaterThan(this.cell_minZ, this.ray.z), pb.not(this.isBackwardRay)),
+                        this.intersectDepthPlane(
+                          this.o,
+                          this.d,
+                          pb.div(pb.sub(this.cell_minZ, this.minZ), this.deltaZ)
+                        ),
+                        this.ray
+                      );
+                      this.$l.newCellIndex = this.getCell(this.tmpRay.xy, this.cellCount);
+                      this.$l.thickness = this.$choice(
+                        pb.equal(this.level, 0),
+                        pb.sub(this.ray.z, this.cell_minZ),
+                        0
+                      );
+                      this.$l.crossed = pb.or(
+                        pb.and(this.isBackwardRay, pb.greaterThan(this.cell_minZ, this.ray.z)),
+                        pb.greaterThan(this.thickness, 0.001),
+                        this.crossedCellBoundary(this.oldCellIndex, this.newCellIndex)
+                      );
+                      this.ray = this.$choice(
+                        this.crossed,
+                        this.intersectCellBoundary(
+                          this.o,
+                          this.d,
+                          this.oldCellIndex,
+                          this.cellCount,
+                          this.crossStep,
+                          this.crossOffset
+                        ),
+                        this.tmpRay
+                      );
+                      this.level = this.$choice(
+                        this.crossed,
+                        pb.min(this.maxLevel, pb.add(this.level, 1)),
+                        pb.sub(this.level, 1)
+                      );
+                      this.iter = pb.add(this.iter, 1);
+                    }
+                  );
+                  this.$l.intersected = pb.lessThan(this.level, this.stopLevel);
+                  this.$return(
+                    pb.vec3(this.ray.xy, this.$choice(this.intersected, pb.float(1), pb.float(0)))
+                  );
+                }
+              );
+              pb.func(
+                'ssr',
+                [
+                  pb.vec3('viewPos'),
+                  pb.vec3('viewNormal'),
+                  pb.float('maxDistance'),
+                  pb.float('iteration'),
+                  pb.float('thickness'),
+                  pb.int('binarySearchSteps')
+                ],
+                function () {
+                  this.$l.normalizedViewPos = pb.normalize(this.viewPos);
+                  this.$l.reflectVec = pb.reflect(this.normalizedViewPos, this.viewNormal);
+                  this.$if(pb.greaterThan(this.reflectVec.z, 0), function () {
+                    this.$return(pb.vec3(0));
+                  });
+                  this.$l.maxDist = pb.float(1000);
+                  this.$l.viewPosEnd = pb.add(this.viewPos, pb.mul(this.reflectVec, this.maxDist));
+                  this.$l.fragStartH = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));
+                  this.$l.fragStart = pb.vec3(
+                    pb.mul(
+                      pb.add(pb.mul(pb.div(this.fragStartH.xy, this.fragStartH.w), 0.5), pb.vec2(0.5)),
+                      this.targetSize.xy
+                    ),
+                    pb.div(1, this.viewPos.z)
+                  );
+                  this.$l.fragEndH = pb.mul(this.projMatrix, pb.vec4(this.viewPosEnd, 1));
+                  this.$l.fragEnd = pb.vec3(
+                    pb.mul(
+                      pb.add(pb.mul(pb.div(this.fragEndH.xy, this.fragEndH.w), 0.5), pb.vec2(0.5)),
+                      this.targetSize.xy
+                    ),
+                    pb.div(1, this.viewPosEnd.z)
+                  );
+                  this.$l.samplePosInTS = this.fragStart;
+                  this.$l.reflectRayInTS = pb.normalize(pb.sub(this.fragEnd, this.fragStart));
+                  this.maxDist = this.$choice(
+                    pb.greaterThanEqual(this.reflectRayInTS.x, 0),
+                    pb.div(pb.sub(1, this.samplePosInTS.x), this.reflectRayInTS.x),
+                    pb.div(pb.neg(this.samplePosInTS.x), this.reflectRayInTS.x)
+                  );
+                  this.maxDist = pb.min(
+                    this.maxDist,
+                    this.$choice(
+                      pb.lessThan(this.reflectRayInTS.y, 0),
+                      pb.div(pb.neg(this.samplePosInTS.y), this.reflectRayInTS.y),
+                      pb.div(pb.sub(1, this.samplePosInTS.y), this.reflectRayInTS.y)
+                    )
+                  );
+                  this.maxDist = pb.min(
+                    this.maxDist,
+                    this.$choice(
+                      pb.lessThan(this.reflectRayInTS.z, 0),
+                      pb.div(pb.neg(this.samplePosInTS.z), this.reflectRayInTS.z),
+                      pb.div(pb.sub(1, this.samplePosInTS.z), this.reflectRayInTS.z)
+                    )
+                  );
+                  this.$return(
+                    this.HiZTracing(
+                      this.samplePosInTS,
+                      this.reflectRayInTS,
+                      this.maxDist,
+                      pb.int(this.iteration)
+                    )
+                  );
+                }
+              );
+            } else {
+              pb.func(
+                'ssr',
+                [
+                  pb.vec3('viewPos'),
+                  pb.vec3('viewNormal'),
+                  pb.float('maxDistance'),
+                  pb.float('iteration'),
+                  pb.float('thickness'),
+                  pb.int('binarySearchSteps')
+                ],
+                function () {
+                  this.$l.normalizedViewPos = pb.normalize(this.viewPos);
+                  this.$l.reflectVec = pb.reflect(this.normalizedViewPos, this.viewNormal);
+                  this.$if(pb.greaterThan(this.reflectVec.z, 0), function () {
+                    this.$return(pb.vec3(0));
+                  });
+                  this.$l.viewPosEnd = pb.add(this.viewPos, pb.mul(this.reflectVec, this.maxDistance));
+                  this.$l.fragStartH = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));
+                  this.$l.fragStart = pb.mul(
+                    pb.add(pb.mul(pb.div(this.fragStartH.xy, this.fragStartH.w), 0.5), pb.vec2(0.5)),
+                    this.targetSize.xy
+                  );
+                  this.$l.fragEndH = pb.mul(this.projMatrix, pb.vec4(this.viewPosEnd, 1));
+                  this.$l.fragEnd = pb.mul(
+                    pb.add(pb.mul(pb.div(this.fragEndH.xy, this.fragEndH.w), 0.5), pb.vec2(0.5)),
+                    this.targetSize.xy
+                  );
+                  this.$l.frag = this.fragStart.xy;
+                  this.$l.deltaX = pb.sub(this.fragEnd.x, this.fragStart.x);
+                  this.$l.deltaY = pb.sub(this.fragEnd.y, this.fragStart.y);
+                  this.$l.useX = this.$choice(
+                    pb.greaterThan(pb.abs(this.deltaX), pb.abs(this.deltaY)),
+                    pb.float(1),
+                    pb.float(0)
+                  );
+                  this.$l.delta = this.iteration;
+                  this.$l.increment = pb.div(pb.vec2(this.deltaX, this.deltaY), pb.max(this.delta, 0.001));
+                  this.$l.search0 = pb.float(0);
+                  this.$l.search1 = pb.float(0);
+                  this.$l.hit0 = pb.int(0);
+                  this.$l.hit1 = pb.int(0);
+                  this.$l.uv = pb.vec2(0);
+                  this.$l.depth = pb.float(0);
+                  this.$l.positionTo = pb.float(0);
+                  this.$for(pb.int('i'), 0, pb.int(this.delta), function () {
+                    this.frag = pb.add(this.frag, this.increment);
+                    this.uv = pb.div(this.frag, this.targetSize.xy);
+                    this.positionTo = pb.mul(this.getLinearDepth(this.uv, 0), this.cameraNearFar.y);
+                    this.search1 = pb.clamp(
+                      pb.mix(
+                        pb.div(pb.sub(this.frag.y, this.fragStart.y), this.deltaY),
+                        pb.div(pb.sub(this.frag.x, this.fragStart.x), this.deltaX),
+                        this.useX
+                      ),
+                      0,
+                      1
+                    );
+                    this.$l.viewDistance = pb.div(
+                      pb.mul(this.viewPos.z, this.viewPosEnd.z),
+                      pb.mix(pb.neg(this.viewPosEnd.z), pb.neg(this.viewPos.z), this.search1)
+                    );
+                    this.depth = pb.sub(this.viewDistance, this.positionTo);
+                    this.$if(
+                      pb.and(pb.greaterThan(this.depth, 0), pb.lessThan(this.depth, this.thickness)),
+                      function () {
+                        this.hit0 = 1;
+                        this.$break();
+                      }
+                    ).$else(function () {
+                      this.search0 = this.search1;
+                    });
+                  });
+                  this.search1 = pb.add(this.search0, pb.div(pb.sub(this.search1, this.search0), 2));
+                  this.$l.steps = pb.mul(this.binarySearchSteps, this.hit0);
+                  this.$for(pb.int('i'), 0, this.steps, function () {
+                    this.$l.frag = pb.mix(this.fragStart.xy, this.fragEnd.xy, this.search1);
+                    this.uv = pb.div(this.frag, this.targetSize.xy);
+                    this.positionTo = pb.mul(this.getLinearDepth(this.uv, 0), this.cameraNearFar.y);
+                    this.$l.viewDistance = pb.div(
+                      pb.mul(this.viewPos.z, this.viewPosEnd.z),
+                      pb.mix(pb.neg(this.viewPosEnd.z), pb.neg(this.viewPos.z), this.search1)
+                    );
+                    this.depth = pb.sub(this.viewDistance, this.positionTo);
+                    this.$if(
+                      pb.and(pb.greaterThan(this.depth, 0), pb.lessThan(this.depth, this.thickness)),
+                      function () {
+                        this.hit1 = 1;
+                        this.search1 = pb.add(this.search0, pb.div(pb.sub(this.search1, this.search0), 2));
+                      }
+                    ).$else(function () {
+                      this.$l.tmp = this.search1;
+                      this.search1 = pb.add(this.search1, pb.div(pb.sub(this.search1, this.search0), 2));
+                      this.search0 = this.tmp;
+                    });
+                  });
+                  this.$l.vis = pb.mul(
+                    pb.float(this.hit1),
+                    pb.sub(1, pb.max(pb.dot(pb.neg(this.normalizedViewPos), this.reflectVec), 0)),
+                    pb.sub(1, pb.clamp(pb.div(this.depth, this.thickness), 0, 1)),
+                    this.$choice(
+                      pb.or(pb.lessThan(this.uv.x, 0), pb.greaterThan(this.uv.x, 1)),
+                      pb.float(0),
+                      pb.float(1)
+                    ),
+                    this.$choice(
+                      pb.or(pb.lessThan(this.uv.y, 0), pb.greaterThan(this.uv.y, 1)),
+                      pb.float(0),
+                      pb.float(1)
+                    )
+                  );
+                  this.vis = pb.clamp(this.vis, 0, 1);
+                  this.$return(pb.vec3(this.uv, this.vis));
+                }
+              );
+            }
           }
           pb.func(
             'waterShading',
