@@ -32,13 +32,13 @@ instancingApp.ready().then(async () => {
   scene.env.sky.skyType = 'color';
   scene.env.sky.skyColor = new Vector4(0, 0, 1, 1);
   scene.env.sky.fogType = 'none';
-  //scene.env.sky.skyType = 'none';
+  scene.env.sky.skyType = 'scatter';
   const camera = new PerspectiveCamera(
     scene,
     Math.PI / 3,
     device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
     1,
-    10
+    300
   );
   camera.position.setXYZ(0, 0, 6);
   camera.controller = new FPSCameraController();
@@ -52,7 +52,7 @@ instancingApp.ready().then(async () => {
 
   const compositor = new Compositor();
   //compositor.appendPostEffect(new Tonemap());
-  compositor.appendPostEffect(new PostWater(0));
+  compositor.appendPostEffect(new PostWater(-1));
   const inspector = new common.Inspector(scene, compositor, camera);
 
   const batchGroup = new BatchGroup(scene);
