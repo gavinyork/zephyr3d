@@ -665,9 +665,11 @@ export class PostWater extends AbstractPostEffect {
                 function () {
                   this.$l.normalizedViewPos = pb.normalize(this.viewPos);
                   this.$l.reflectVec = pb.reflect(this.normalizedViewPos, this.viewNormal);
+                  /*
                   this.$if(pb.greaterThan(this.reflectVec.z, 0), function () {
                     this.$return(pb.vec3(0));
                   });
+                  */
                   this.$l.maxDist = pb.float(100);
                   this.$l.viewPosEnd = pb.add(this.viewPos, pb.mul(this.reflectVec, this.maxDist));
                   this.$l.fragStartH = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));

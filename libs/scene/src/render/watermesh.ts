@@ -208,7 +208,6 @@ export class WaterMesh {
   private _instanceData: WaterInstanceData;
   private _ifftTextures: Texture2D[] | Texture2DArray;
   private _clipmap: Clipmap;
-  private _aabbExtents: Vector2;
   private _cascades: Vector4[];
   private _paramsChanged: boolean;
   private _resolutionChanged: boolean;
@@ -344,7 +343,6 @@ export class WaterMesh {
       this._waterRenderStates.useRasterizerState().setCullMode('none');
       this._waterRenderStates.useDepthState().enableTest(true).enableWrite(true).setCompareFunc('le');
       this._clipmap = new Clipmap(this._tileSize);
-      this._aabbExtents = new Vector2();
       this._paramsChanged = true;
       this._resolutionChanged = true;
       this._updateFrameStamp = -1;
@@ -552,15 +550,19 @@ export class WaterMesh {
     const maxDist = Math.min(Math.max(distX, distY), camera.getFarPlane());
     const gridScale = Math.max(0.01, this._gridScale);
     const mipLevels = Math.ceil(Math.log2(maxDist / (this._tileSize * gridScale))) + 1;
-    const disturb = Math.max(Math.abs(this.wind.x), Math.abs(this.wind.y), 2);
-    this._aabbExtents.setXY(disturb * 2, disturb * 8 + Math.abs(this._level));
     this._clipmap.draw(
       {
         camera,
         position,
         minMaxWorldPos: this._region,
         gridScale: gridScale,
-        AABBExtents: this._aabbExtents,
+        userData: this,
+        calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
+          const wm = userData as WaterMesh;
+          const disturb = Math.max(Math.abs(wm.wind.x), Math.abs(wm.wind.y), 2);
+          outAABB.minPoint.setXYZ(minX - 8 * disturb, wm.level - 8 * disturb, minZ - 8 * disturb);
+          outAABB.maxPoint.setXYZ(maxX + 8 * disturb, wm.level + 8 * disturb, maxZ + 8 * disturb);
+        },
         drawPrimitive(prim, modelMatrix, offset, scale, gridScale) {
           const clipmapBindGroup = that.getClipmapBindGroup(device);
           clipmapBindGroup.setValue('modelMatrix', modelMatrix);

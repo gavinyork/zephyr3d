@@ -3,10 +3,11 @@
  */
 
 import type { Vector4 } from '@zephyr3d/base';
-import { AABB, Matrix4x4, Vector2, Vector3 } from '@zephyr3d/base';
+import { AABB, ClipState, Matrix4x4, Vector2, Vector3 } from '@zephyr3d/base';
 import type { Camera } from '../camera';
 import { Primitive } from './primitive';
 
+const tmpAABB = new AABB();
 const modelMatrices = [
   Matrix4x4.identity(),
   // rotation z 270
@@ -26,7 +27,8 @@ export type ClipmapDrawContext = {
   position: Vector3;
   gridScale: number;
   minMaxWorldPos: Vector4;
-  AABBExtents?: Vector2;
+  userData: unknown;
+  calcAABB(userData: unknown, minX: number, maxX: number, minZ: number, maxZ: number, outAABB: AABB);
   drawPrimitive(prim: Primitive, modelMatrix: Matrix4x4, offset: Vector2, scale: number, gridScale: number);
 };
 
@@ -375,6 +377,28 @@ export class Clipmap {
   private intervalsOverlap(a0: number, a1: number, b0: number, b1: number) {
     return a0 <= b1 && b0 <= a1;
   }
+  private visible(
+    ctx: ClipmapDrawContext,
+    aabb: AABB,
+    camera: Camera,
+    modelMatrix: Matrix4x4,
+    offset: Vector2,
+    scale: number,
+    gridScale: number
+  ) {
+    if (!modelMatrix) {
+      tmpAABB.minPoint.set(aabb.minPoint);
+      tmpAABB.maxPoint.set(aabb.maxPoint);
+    } else {
+      AABB.transform(aabb, modelMatrix, tmpAABB);
+    }
+    const minX = (tmpAABB.minPoint.x * scale + offset.x) * gridScale;
+    const maxX = (tmpAABB.maxPoint.x * scale + offset.x) * gridScale;
+    const minZ = (tmpAABB.minPoint.y * scale + offset.y) * gridScale;
+    const maxZ = (tmpAABB.maxPoint.y * scale + offset.y) * gridScale;
+    ctx.calcAABB(ctx.userData, minX, maxX, minZ, maxZ, tmpAABB);
+    return tmpAABB.getClipStateWithFrustum(camera.frustum) !== ClipState.NOT_CLIPPED;
+  }
   draw(context: ClipmapDrawContext, numMipmaps: number): number {
     let drawn = 0;
     const distX = Math.max(
@@ -399,8 +423,10 @@ export class Clipmap {
 
     // draw cross
     snappedPos.setXY(Math.floor(posX), Math.floor(posY));
-    context.drawPrimitive(this._crossMesh, modelMatrices[0], snappedPos, 1, context.gridScale);
-    drawn++;
+    if (this.visible(context, this._crossMeshAABB, context.camera, null, snappedPos, 1, context.gridScale)) {
+      context.drawPrimitive(this._crossMesh, modelMatrices[0], snappedPos, 1, context.gridScale);
+      drawn++;
+    }
 
     for (let l = 0; l < mipLevels; l++) {
       const scale = 1 << l;
@@ -433,14 +459,38 @@ export class Clipmap {
               context.minMaxWorldPos.w
             )
           ) {
-            context.drawPrimitive(this._tileMesh, modelMatrices[0], offset, scale, context.gridScale);
-            drawn++;
+            if (
+              this.visible(
+                context,
+                this._tileMeshBBox,
+                context.camera,
+                null,
+                offset,
+                scale,
+                context.gridScale
+              )
+            ) {
+              context.drawPrimitive(this._tileMesh, modelMatrices[0], offset, scale, context.gridScale);
+              drawn++;
+            }
           }
         }
       }
       // draw filler
-      context.drawPrimitive(this._fillerMesh, modelMatrices[0], snappedPos, scale, context.gridScale);
-      drawn++;
+      if (
+        this.visible(
+          context,
+          this._fillerMeshAABB,
+          context.camera,
+          null,
+          snappedPos,
+          scale,
+          context.gridScale
+        )
+      ) {
+        context.drawPrimitive(this._fillerMesh, modelMatrices[0], snappedPos, scale, context.gridScale);
+        drawn++;
+      }
 
       if (l !== numMipmaps - 1) {
         const nextScale = scale * 2;
@@ -454,15 +504,31 @@ export class Clipmap {
         let r = 0;
         r |= d.x >= scale ? 0 : 2;
         r |= d.y >= scale ? 0 : 1;
-        context.drawPrimitive(this._trimMesh, modelMatrices[r], tileCentre, scale, context.gridScale);
-        drawn++;
+        if (
+          this.visible(
+            context,
+            this._trimMeshAABB,
+            context.camera,
+            r === 0 ? null : modelMatrices[r],
+            tileCentre,
+            scale,
+            context.gridScale
+          )
+        ) {
+          context.drawPrimitive(this._trimMesh, modelMatrices[r], tileCentre, scale, context.gridScale);
+          drawn++;
+        }
         // draw seam
         const nextBase = new Vector2(
           nextSnappedPos.x - (this._tileResolution << (l + 1)),
           nextSnappedPos.y - (this._tileResolution << (l + 1))
         );
-        context.drawPrimitive(this._seamMesh, modelMatrices[0], nextBase, scale, context.gridScale);
-        drawn++;
+        if (
+          this.visible(context, this._seamMeshAABB, context.camera, null, nextBase, scale, context.gridScale)
+        ) {
+          context.drawPrimitive(this._seamMesh, modelMatrices[0], nextBase, scale, context.gridScale);
+          drawn++;
+        }
       }
     }
     return drawn;
