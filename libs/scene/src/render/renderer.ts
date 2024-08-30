@@ -211,7 +211,7 @@ export class SceneRenderer {
           null,
           true
         );
-        buildHiZ(ctx.linearDepthTexture, HiZFrameBuffer);
+        buildHiZ(ctx.depthTexture, HiZFrameBuffer);
         ctx.HiZTexture = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
       }
       if (ctx.depthTexture === finalFramebuffer?.getDepthAttachment()) {

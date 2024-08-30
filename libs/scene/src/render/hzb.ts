@@ -17,6 +17,105 @@ let blitter: CopyBlitter = null;
 let srcSize: Int32Array = null;
 
 /*
+vec3 trace_ray(vec3 ray_start, vec3 ray_dir)
+{
+
+    if (ray_dir.z < 0.0) {
+        return vec3(0);
+    }
+
+    ray_dir = normalize(ray_dir);
+    ivec2 work_size = SCREEN_SIZE_INT;
+
+    const int loop_max = 150;
+    int mipmap = 0;
+    int max_iter = loop_max;
+
+    vec3 pos = ray_start;
+
+    // Move pos by a small bias
+    pos += ray_dir * 0.008;
+
+    float hit_bias = 0.0017;
+
+    while (mipmap > -1 && max_iter --> 0)
+    {
+
+        // Check if we are out of screen bounds, if so, return
+        if (pos.x < 0.0 || pos.y < 0.0 || pos.x > 1.0 || pos.y > 1.0 || pos.z < 0.0 || pos.z > 1.0)
+        {
+            return vec3(0,0,0);
+        }
+
+        // Fetch the current minimum cell plane height
+        float cell_z = textureLod(DownscaledDepth, pos.xy, mipmap).x;
+
+        // Compute the fractional part of the coordinate (scaled by the working size)
+        // so the values will be between 0.0 and 1.0
+        vec2 fract_coord = mod(pos.xy * work_size, 1.0);
+
+        // Modify fract coord based on which direction we are stepping in.
+        // Fract coord now contains the percentage how far we moved already in
+        // the current cell in each direction.  
+        fract_coord.x = ray_dir.x > 0.0 ? fract_coord.x : 1.0 - fract_coord.x;
+        fract_coord.y = ray_dir.y > 0.0 ? fract_coord.y : 1.0 - fract_coord.y;
+
+        // Compute maximum k and minimum k for which the ray would still be
+        // inside of the cell.
+        vec2 max_k_v = (1.0 / abs(ray_dir.xy)) / work_size.xy;
+        vec2 min_k_v = -max_k_v * fract_coord.xy;
+
+        // Scale the maximum k by the percentage we already processed in the current cell,
+        // since e.g. if we already moved 50%, we can only move another 50%.
+        max_k_v *= 1.0 - fract_coord.xy;
+
+        // The maximum k is the minimum of the both sub-k's since if one component-maximum
+        // is reached, the ray is out of the cell
+        float max_k = min(max_k_v.x, max_k_v.y);
+
+        // Same applies to the min_k, but because min_k is negative we have to use max()
+        float min_k = max(min_k_v.x, min_k_v.y);
+
+        // Check if the ray intersects with the cell plane. We have the following
+        // equation: 
+        // pos.z + k * ray_dir.z = cell.z
+        // So k is:
+        float k = (cell_z - pos.z) / ray_dir.z;
+
+        // Optional: Abort when ray didn't exactly intersect:
+        // if (k < min_k && mipmap <= 0) {
+        //     return vec3(0);
+        // } 
+
+        // Check if we intersected the cell
+        if (k < max_k + hit_bias)
+        {
+            // Clamp k
+            k = max(min_k, k);
+
+            if (mipmap < 1) {
+                pos += k * ray_dir;
+                return pos;
+            }
+
+            // If we hit anything at a higher mipmap, step up to a higher detailed
+            // mipmap:
+            mipmap -= 2;
+            work_size *= 4;
+        } else {
+
+            // If we hit nothing, move to the next cell, with a small bias
+            pos += max_k * ray_dir * 1.04;
+        }
+
+        mipmap += 1;
+        work_size /= 2;
+    }
+
+    return vec3(0);
+}
+*/
+/*
 float2 cell(float2 ray, float2 cell_count, uint camera) {
  return floor(ray.xy * cell_count);
 }

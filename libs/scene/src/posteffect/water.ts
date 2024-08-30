@@ -530,6 +530,30 @@ export class PostWater extends AbstractPostEffect {
                   pb.vec2('crossOffset')
                 ],
                 function () {
+                  this.$l.cell_size = pb.div(pb.vec2(1), this.cell_count);
+                  this.$l.planes = pb.add(
+                    pb.div(this.cell, this.cell_count),
+                    pb.mul(this.cell_size, this.crossStep)
+                  );
+                  this.$l.solutions = pb.div(pb.sub(this.planes, this.o.xy), this.d.xy);
+                  this.$l.intersection_pos = pb.add(
+                    this.o,
+                    pb.mul(this.d, pb.min(this.solutions.x, this.solutions.y))
+                  );
+                  this.$return(
+                    pb.vec3(
+                      pb.add(
+                        this.intersection_pos.xy,
+                        this.$choice(
+                          pb.lessThan(this.solutions.x, this.solutions.y),
+                          pb.vec2(this.crossOffset.x, 0),
+                          pb.vec2(0, this.crossOffset.y)
+                        )
+                      ),
+                      this.intersection_pos.z
+                    )
+                  );
+                  /*
                   this.$l.index = pb.add(this.cell, this.crossStep);
                   this.$l.boundary = pb.add(
                     pb.div(this.index, this.cell_count),
@@ -538,12 +562,13 @@ export class PostWater extends AbstractPostEffect {
                   this.$l.delta = pb.div(pb.sub(this.boundary, this.o.xy), this.d.xy);
                   this.$l.t = pb.min(this.delta.x, this.delta.y);
                   this.$return(this.intersectDepthPlane(this.o, this.d, this.t));
+                  */
                 }
               );
               pb.func('getCellCount', [pb.int('level')], function () {
-                this.x = pb.sal(pb.ivec2(1), pb.uvec2(pb.uint(this.level)));
-                this.$return(pb.vec2(this.x));
-                //this.$return(pb.vec2(pb.textureDimensions(this.depthTex, this.level)));
+                //this.x = pb.sal(pb.ivec2(1), pb.uvec2(pb.uint(this.level)));
+                //this.$return(pb.vec2(this.x));
+                this.$return(pb.vec2(pb.textureDimensions(this.hizTex, this.level)));
               });
               pb.func('crossedCellBoundary', [pb.vec2('oldCellIndex'), pb.vec2('newCellIndex')], function () {
                 this.$return(
@@ -554,13 +579,90 @@ export class PostWater extends AbstractPostEffect {
                 );
               });
               pb.func('getMinimumDepth', [pb.vec2('uv'), pb.float('level')], function () {
-                this.$l.linearDepth = pb.textureSampleLevel(this.hizTex, this.uv, this.level).r;
+                this.$l.depth = pb.textureSampleLevel(this.hizTex, this.uv, this.level).r;
+                /*
                 this.$l.depth = pb.div(
                   pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
                   pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
                 );
+                */
                 this.$return(this.depth);
               });
+              pb.func(
+                'HiZTracing2',
+                [
+                  pb.vec3('samplePosInTS'),
+                  pb.vec3('reflectVecInTS'),
+                  pb.float('maxDistance'),
+                  pb.int('maxIteration')
+                ],
+                function () {
+                  this.$if(pb.lessThan(this.reflectVecInTS.z, 0), function () {
+                    this.$return(pb.vec3(0));
+                  });
+                  this.$l.ray_dir = pb.normalize(this.reflectVecInTS);
+                  this.$l.work_size = pb.ivec2(pb.textureDimensions(this.hizTex, 0));
+                  this.$l.mipmap = pb.int(0);
+                  this.$l.pos = this.samplePosInTS;
+                  this.pos = pb.add(this.pos, pb.mul(this.ray_dir, 0.008));
+                  this.$l.hit_bias = pb.float(0.0017);
+                  this.$l.max_iter = this.maxIteration;
+                  this.$while(
+                    pb.and(pb.greaterThanEqual(this.mipmap, 0), pb.greaterThan(this.max_iter, 0)),
+                    function () {
+                      this.$if(
+                        pb.or(
+                          pb.lessThan(this.pos.x, 0),
+                          pb.lessThan(this.pos.y, 0),
+                          pb.lessThan(this.pos.z, 0),
+                          pb.greaterThan(this.pos.x, 1),
+                          pb.greaterThan(this.pos.y, 1),
+                          pb.greaterThan(this.pos.z, 1)
+                        ),
+                        function () {
+                          this.$return(pb.vec3(0));
+                        }
+                      );
+                      this.$l.cell_z = this.getMinimumDepth(this.pos.xy, pb.float(this.mipmap));
+                      this.$l.fract_coord = pb.mod(pb.mul(this.pos.xy, pb.vec2(this.work_size)), pb.vec2(1));
+                      this.fract_coord.x = this.$choice(
+                        pb.greaterThan(this.ray_dir.x, 0),
+                        this.fract_coord.x,
+                        pb.sub(1, this.fract_coord.x)
+                      );
+                      this.fract_coord.y = this.$choice(
+                        pb.greaterThan(this.ray_dir.y, 0),
+                        this.fract_coord.y,
+                        pb.sub(1, this.fract_coord.y)
+                      );
+                      this.$l.max_k_v = pb.div(
+                        pb.div(pb.vec2(1), pb.abs(this.ray_dir.xy)),
+                        pb.vec2(this.work_size)
+                      );
+                      this.$l.min_k_v = pb.mul(pb.neg(this.max_k_v), this.fract_coord.xy);
+                      this.max_k_v = pb.mul(this.max_k_v, pb.sub(pb.vec2(1), this.fract_coord.xy));
+                      this.$l.max_k = pb.min(this.max_k_v.x, this.max_k_v.y);
+                      this.$l.min_k = pb.max(this.min_k_v.x, this.min_k_v.y);
+                      this.$l.k = pb.div(pb.sub(this.cell_z, this.pos.z), this.ray_dir.z);
+                      this.$if(pb.lessThan(this.k, pb.add(this.max_k, this.hit_bias)), function () {
+                        this.k = pb.max(this.min_k, this.k);
+                        this.$if(pb.lessThan(this.mipmap, 1), function () {
+                          this.pos = pb.add(this.pos, pb.mul(this.ray_dir, this.k));
+                          this.$return(pb.vec3(this.pos.xy, 1));
+                        });
+                        this.mipmap = pb.sub(this.mipmap, 2);
+                        this.work_size = pb.mul(this.work_size, 4);
+                      }).$else(function () {
+                        this.pos = pb.add(this.pos, pb.mul(this.max_k, this.ray_dir, 1.04));
+                      });
+                      this.mipmap = pb.add(this.mipmap, 1);
+                      this.work_size = pb.div(this.work_size, 2);
+                      this.max_iter = pb.sub(this.max_iter, 1);
+                    }
+                  );
+                  this.$return(pb.vec3(0));
+                }
+              );
               pb.func(
                 'HiZTracing',
                 [
@@ -583,7 +685,7 @@ export class PostWater extends AbstractPostEffect {
                   this.$l.deltaZ = pb.sub(this.maxZ, this.minZ);
                   this.$l.o = this.ray;
                   this.$l.d = pb.mul(this.reflectVecInTS, this.maxDistance);
-                  this.$l.startLevel = pb.int(0); //this.maxLevel; //pb.int(2);
+                  this.$l.startLevel = pb.int(8);
                   this.$l.stopLevel = pb.int(0);
                   this.$l.startCellCount = this.getCellCount(this.startLevel);
                   this.$l.rayCell = this.getCell(this.ray.xy, this.startCellCount);
@@ -682,14 +784,14 @@ export class PostWater extends AbstractPostEffect {
                   this.$l.fragEndCS = pb.div(this.fragEndH.xyz, this.fragEndH.w);
                   this.$l.reflectVecCS = pb.normalize(pb.sub(this.fragEndCS, this.fragStartCS));
                   this.$l.fragStartTS = pb.add(
-                    pb.mul(this.fragStartCS, pb.vec3(0.5, 0.5, 1)),
-                    pb.vec3(0.5, 0.5, 0)
+                    pb.mul(this.fragStartCS, pb.vec3(0.5, 0.5, 0.5)),
+                    pb.vec3(0.5, 0.5, 0.5)
                   );
                   this.$l.fragEndTS = pb.add(
-                    pb.mul(this.fragEndCS, pb.vec3(0.5, 0.5, 1)),
-                    pb.vec3(0.5, 0.5, 0)
+                    pb.mul(this.fragEndCS, pb.vec3(0.5, 0.5, 0.5)),
+                    pb.vec3(0.5, 0.5, 0.5)
                   );
-                  this.$l.reflectVecTS = pb.mul(this.reflectVecCS, pb.vec3(0.5, 0.5, 1));
+                  this.$l.reflectVecTS = pb.mul(this.reflectVecCS, pb.vec3(0.5, 0.5, 0.5));
                   this.maxDist = this.$choice(
                     pb.greaterThanEqual(this.reflectVecTS.x, 0),
                     pb.div(pb.sub(1, this.fragStartTS.x), this.reflectVecTS.x),
@@ -872,7 +974,8 @@ export class PostWater extends AbstractPostEffect {
                 this.$if(pb.greaterThan(this.hitInfo.z, 0), function () {
                   this.reflectance = pb.mix(
                     this.refraction,
-                    pb.textureSampleLevel(this.tex, this.hitInfo.xy, 0).rgb,
+                    pb.vec3(1, 0, 0),
+                    //pb.textureSampleLevel(this.tex, this.hitInfo.xy, 0).rgb,
                     1 /*this.hitInfo.z*/
                   );
                 }).$else(function () {

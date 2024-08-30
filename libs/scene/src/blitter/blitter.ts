@@ -139,10 +139,10 @@ export abstract class Blitter {
     srcTex: PBShaderExp,
     uv: PBShaderExp,
     srcLayer: PBShaderExp,
-    sampleType: 'float' | 'int' | 'uint'
+    sampleType: 'float' | 'int' | 'uint' | 'depth'
   ): PBShaderExp {
     const pb = scope.$builder;
-    if (sampleType === 'float') {
+    if (sampleType === 'float' || sampleType === 'depth') {
       switch (type) {
         case '2d':
         case 'cube':
@@ -209,7 +209,7 @@ export abstract class Blitter {
     srcTex: PBShaderExp,
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
-    sampeType: 'float' | 'int' | 'uint'
+    sampeType: 'float' | 'int' | 'uint' | 'depth'
   ): PBShaderExp;
   /**
    * Calculates the hash code
@@ -472,7 +472,7 @@ function getBlitProgram(
   type: BlitType,
   filter: Blitter,
   bilinearFiltering: boolean,
-  sampleType: 'int' | 'uint' | 'float',
+  sampleType: 'int' | 'uint' | 'float' | 'depth',
   flip: boolean
 ): BlitProgramInfo {
   const hash = `${type}:${filter.hash}:${bilinearFiltering}:${sampleType}:${flip ? 1 : 0}`;
@@ -489,7 +489,7 @@ function createBlitProgram(
   type: BlitType,
   filter: Blitter,
   bilinearFiltering: boolean,
-  st: 'int' | 'uint' | 'float',
+  st: 'int' | 'uint' | 'float' | 'depth',
   flip: boolean,
   scaleBias: boolean
 ): BlitProgramInfo {
@@ -523,6 +523,8 @@ function createBlitProgram(
             this.srcTex = pb.itex2D().sampleType('sint').uniform(0);
           } else if (st === 'uint') {
             this.srcTex = pb.utex2D().sampleType('uint').uniform(0);
+          } else if (st === 'depth') {
+            this.srcTex = pb.tex2DShadow().uniform(0);
           } else {
             this.srcTex = pb
               .tex2D()
@@ -535,6 +537,8 @@ function createBlitProgram(
             this.srcTex = pb.itex2DArray().sampleType('sint').uniform(0);
           } else if (st === 'uint') {
             this.srcTex = pb.utex2DArray().sampleType('uint').uniform(0);
+          } else if (st === 'depth') {
+            this.srcTex = pb.tex2DArrayShadow().uniform(0);
           } else {
             this.srcTex = pb
               .tex2DArray()
@@ -548,6 +552,8 @@ function createBlitProgram(
             this.srcTex = pb.itexCube().sampleType('sint').uniform(0);
           } else if (st === 'uint') {
             this.srcTex = pb.utexCube().sampleType('uint').uniform(0);
+          } else if (st === 'depth') {
+            this.srcTex = pb.texCubeShadow().uniform(0);
           } else {
             this.srcTex = pb
               .texCube()
