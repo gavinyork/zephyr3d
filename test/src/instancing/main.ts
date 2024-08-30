@@ -8,11 +8,12 @@ import {
   WeightedBlendedOIT,
   ABufferOIT,
   SphereShape,
-  UnlitMaterial,
   Mesh,
   FPSCameraController,
   AssetManager,
-  PostWater
+  PostWater,
+  Tonemap,
+  LambertMaterial
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
@@ -51,13 +52,23 @@ instancingApp.ready().then(async () => {
   instancingApp.inputManager.use(camera.handleEvent.bind(camera));
 
   const compositor = new Compositor();
-  //compositor.appendPostEffect(new Tonemap());
+  compositor.appendPostEffect(new Tonemap());
   compositor.appendPostEffect(new PostWater(-1));
   const inspector = new common.Inspector(scene, compositor, camera);
 
   const batchGroup = new BatchGroup(scene);
   const sphere = new SphereShape();
-  const mat = new UnlitMaterial();
+  const mat = new LambertMaterial();
+  for (let i = 0; i < 100; i++) {
+    const instanceMat = mat.createInstance();
+    instanceMat.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
+    const mesh = new Mesh(scene, sphere, instanceMat);
+    mesh.position.x = Math.random() * 300 - 150;
+    mesh.position.y = Math.random() * 20 - 10;
+    mesh.position.z = Math.random() * 300 - 150;
+    const scale = 1 + Math.random() * 10;
+    mesh.scale.setXYZ(scale, scale, scale);
+  }
   mat.albedoColor = new Vector4(0, 1, 0, 1);
   const mesh = new Mesh(scene, sphere, mat);
   mesh.parent = batchGroup;

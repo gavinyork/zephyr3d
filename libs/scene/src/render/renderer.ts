@@ -197,12 +197,14 @@ export class SceneRenderer {
       ctx.linearDepthTexture = depthFramebuffer.getColorAttachments()[0] as Texture2D;
       ctx.depthTexture = depthFramebuffer.getDepthAttachment() as Texture2D;
       if (ctx.HiZ) {
-        const w = isPowerOf2(ctx.linearDepthTexture.width)
+        let w = isPowerOf2(ctx.linearDepthTexture.width)
           ? ctx.linearDepthTexture.width
           : nextPowerOf2(ctx.linearDepthTexture.width);
-        const h = isPowerOf2(ctx.linearDepthTexture.height)
+        let h = isPowerOf2(ctx.linearDepthTexture.height)
           ? ctx.linearDepthTexture.height
           : nextPowerOf2(ctx.linearDepthTexture.height);
+        w = Math.max(1, w >> 1);
+        h = Math.max(1, h >> 1);
         HiZFrameBuffer = device.pool.fetchTemporalFramebuffer(
           true,
           w,

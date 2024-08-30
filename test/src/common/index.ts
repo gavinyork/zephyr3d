@@ -350,7 +350,10 @@ export class Inspector {
         -100,
         100
       );
-      ImGui.SliderFloat4('Region##water', water.boundary, -1000, 1000);
+      const region = Array.from(water.boundary) as [number, number, number, number];
+      if (ImGui.SliderFloat4('Region##water', region, -1000, 1000)) {
+        water.boundary.set(region);
+      }
       ImGui.SliderFloat(
         'SSRMaxDistance##water',
         (val?: number) => (water.ssrMaxDistance = val = val ?? water.ssrMaxDistance),

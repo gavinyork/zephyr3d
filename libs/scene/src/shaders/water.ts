@@ -104,8 +104,7 @@ export function createProgramOcean(useComputeShader: boolean, impl?: WaterShader
     fragment(pb) {
       this.$outputs.outColor = pb.vec4();
       this.pos = pb.vec3().uniform(0);
-      this.regionMin = pb.vec2().uniform(0);
-      this.regionMax = pb.vec2().uniform(0);
+      this.region = pb.vec4().uniform(0);
       this.foamParams = pb.vec2().uniform(0);
       this.sizes = pb.vec4().uniform(0);
       this.croppinesses = pb.vec4().uniform(0);
@@ -184,8 +183,8 @@ export function createProgramOcean(useComputeShader: boolean, impl?: WaterShader
       pb.main(function () {
         this.$if(
           pb.or(
-            pb.any(pb.lessThan(this.$inputs.outXZ, this.regionMin)),
-            pb.any(pb.greaterThan(this.$inputs.outXZ, this.regionMax))
+            pb.any(pb.lessThan(this.$inputs.outXZ, this.region.xy)),
+            pb.any(pb.greaterThan(this.$inputs.outXZ, this.region.zw))
           ),
           function () {
             pb.discard();

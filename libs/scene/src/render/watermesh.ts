@@ -201,8 +201,7 @@ export class WaterMesh {
   private _speed: number;
   private _level: number;
   private _tileSize: number;
-  private _regionMin: Vector2;
-  private _regionMax: Vector2;
+  private _region: Vector4;
   private _sizes: Vector4;
   private _croppinesses: Vector4;
   private _params: OceanFieldBuildParams;
@@ -319,8 +318,7 @@ export class WaterMesh {
       this._gridScale = 1;
       this._speed = 1.5;
       this._level = 0;
-      this._regionMin = new Vector2(-99999, -99999);
-      this._regionMax = new Vector2(99999, 99999);
+      this._region = new Vector4(-99999, -99999, 99999, 99999);
       this._sizes = new Vector4();
       this._tileSize = 32;
       this._croppinesses = new Vector4();
@@ -486,17 +484,11 @@ export class WaterMesh {
       }
     }
   }
-  get regionMin() {
-    return this._regionMin;
+  get region() {
+    return this._region;
   }
-  set regionMin(val: Vector2) {
-    this._regionMin.set(val);
-  }
-  get regionMax() {
-    return this._regionMax;
-  }
-  set regionMax(val: Vector2) {
-    this._regionMax.set(val);
+  set region(val: Vector4) {
+    this._region.set(val);
   }
   getClipmapBindGroup(device: AbstractDevice) {
     let bindGroup = this._usedClipmapBindGroups.pop();
@@ -547,8 +539,7 @@ export class WaterMesh {
     }
     this._waterBindGroup.setValue('foamParams', this._params.foamParams);
     this._waterBindGroup.setValue('sizes', this._sizes);
-    this._waterBindGroup.setValue('regionMin', this._regionMin);
-    this._waterBindGroup.setValue('regionMax', this._regionMax);
+    this._waterBindGroup.setValue('region', this._region);
     this._waterBindGroup.setValue('croppinesses', this._croppinesses);
     this._waterBindGroup.setValue('viewProjMatrix', camera.viewProjectionMatrix);
     this._waterBindGroup.setValue('level', this._level);
@@ -556,25 +547,18 @@ export class WaterMesh {
     this._waterBindGroup.setValue('flip', flip ? 1 : 0);
     const that = this;
     const position = new Vector3(cameraPos.x, cameraPos.z, 0);
-    const distX = Math.max(
-      Math.abs(position.x - this._regionMin.x),
-      Math.abs(position.x - this._regionMax.x)
-    );
-    const distY = Math.max(
-      Math.abs(position.y - this._regionMin.y),
-      Math.abs(position.y - this._regionMax.y)
-    );
+    const distX = Math.max(Math.abs(position.x - this._region.x), Math.abs(position.x - this._region.z));
+    const distY = Math.max(Math.abs(position.y - this._region.y), Math.abs(position.y - this._region.w));
     const maxDist = Math.min(Math.max(distX, distY), camera.getFarPlane());
     const gridScale = Math.max(0.01, this._gridScale);
     const mipLevels = Math.ceil(Math.log2(maxDist / (this._tileSize * gridScale))) + 1;
-    const disturb = Math.max(this.wind.x, this.wind.y, 2);
-    this._aabbExtents.setXY(disturb * 2, disturb * 8 + this._level);
+    const disturb = Math.max(Math.abs(this.wind.x), Math.abs(this.wind.y), 2);
+    this._aabbExtents.setXY(disturb * 2, disturb * 8 + Math.abs(this._level));
     this._clipmap.draw(
       {
         camera,
         position,
-        minWorldPos: this._regionMin,
-        maxWorldPos: this._regionMax,
+        minMaxWorldPos: this._region,
         gridScale: gridScale,
         AABBExtents: this._aabbExtents,
         drawPrimitive(prim, modelMatrix, offset, scale, gridScale) {
