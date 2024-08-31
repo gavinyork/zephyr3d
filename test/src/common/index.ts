@@ -701,6 +701,14 @@ export class Inspector {
   }
   private renderPerspectiveCamera(camera: PerspectiveCamera) {
     if (ImGui.Begin('Camera')) {
+      ImGui.Checkbox('Generate HiZ', (val?: boolean) => {
+        if (val === undefined) {
+          val = camera.HiZ;
+        } else {
+          camera.HiZ = val;
+        }
+        return val;
+      });
       ImGui.SliderFloat(
         'NearPlane',
         (val?: number) => {

@@ -412,7 +412,7 @@ export class RenderQueue {
         const instanceList = info.instanceList;
         for (const x in instanceList) {
           const drawables = instanceList[x];
-          if (drawables.length === 1) {
+          if (false && drawables.length === 1) {
             this.binaryInsert(info.itemList, {
               drawable: drawables[0],
               sortDistance: drawables[0].getSortDistance(camera),
