@@ -287,7 +287,7 @@ export class PostWater extends AbstractPostEffect {
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const device = ctx.device;
-    const ssr = ctx.device.type === 'webgl' ? false : this._ssr;
+    const ssr = this._ssr; // ctx.device.type === 'webgl' ? false : this._ssr;
     const rampTex = this._getRampTexture(device);
     this._copyBlitter.srgbOut = srgbOutput;
     this._copyBlitter.blit(
@@ -405,7 +405,7 @@ export class PostWater extends AbstractPostEffect {
   }
   /** @internal */
   private _getWaterMesh(ctx: DrawContext): WaterMesh {
-    const ssr = ctx.device.type === 'webgl' ? false : this._ssr;
+    const ssr = this._ssr; // ctx.device.type === 'webgl' ? false : this._ssr;
     const HiZ = ssr && !!ctx.HiZTexture;
     const hash = `${ctx.sunLight ? 1 : 0}:${ctx.env.light.getHash()}:${ssr}:${HiZ}`;
     const device = ctx.device;
@@ -665,11 +665,9 @@ export class PostWater extends AbstractPostEffect {
                 function () {
                   this.$l.normalizedViewPos = pb.normalize(this.viewPos);
                   this.$l.reflectVec = pb.reflect(this.normalizedViewPos, this.viewNormal);
-                  /*
                   this.$if(pb.greaterThan(this.reflectVec.z, 0), function () {
                     this.$return(pb.vec3(0));
                   });
-                  */
                   this.$l.maxDist = pb.float(100);
                   this.$l.viewPosEnd = pb.add(this.viewPos, pb.mul(this.reflectVec, this.maxDist));
                   this.$l.fragStartH = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));
@@ -757,7 +755,12 @@ export class PostWater extends AbstractPostEffect {
                   this.$l.uv = pb.vec2(0);
                   this.$l.depth = pb.float(0);
                   this.$l.positionTo = pb.float(0);
-                  this.$for(pb.int('i'), 0, pb.int(this.delta), function () {
+                  this.$for(pb.int('i'), 0, device.type === 'webgl' ? 200 : pb.int(this.delta), function () {
+                    if (device.type === 'webgl') {
+                      this.$if(pb.greaterThanEqual(this.i, pb.int(this.delta)), function () {
+                        this.$break();
+                      });
+                    }
                     this.frag = pb.add(this.frag, this.increment);
                     this.uv = pb.div(this.frag, this.targetSize.xy);
                     this.positionTo = pb.mul(this.getLinearDepth(this.uv, 0), this.cameraNearFar.y);
@@ -787,7 +790,12 @@ export class PostWater extends AbstractPostEffect {
                   });
                   this.search1 = pb.add(this.search0, pb.div(pb.sub(this.search1, this.search0), 2));
                   this.$l.steps = pb.mul(this.binarySearchSteps, this.hit0);
-                  this.$for(pb.int('i'), 0, this.steps, function () {
+                  this.$for(pb.int('i'), 0, device.type === 'webgl' ? 10 : this.steps, function () {
+                    if (device.type === 'webgl') {
+                      this.$if(pb.greaterThanEqual(this.i, this.steps), function () {
+                        this.$break();
+                      });
+                    }
                     this.$l.frag = pb.mix(this.fragStart.xy, this.fragEnd.xy, this.search1);
                     this.uv = pb.div(this.frag, this.targetSize.xy);
                     this.positionTo = pb.mul(this.getLinearDepth(this.uv, 0), this.cameraNearFar.y);
