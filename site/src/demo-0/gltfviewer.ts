@@ -1,8 +1,15 @@
 import * as zip from '@zip.js/zip.js';
 import type * as draco3d from 'draco3d';
-import { Vector4, Vector3, Vector2 } from '@zephyr3d/base';
+import { Vector4, Vector3 } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
-import { BatchGroup, PostWater, WeightedBlendedOIT, ABufferOIT, SAO } from '@zephyr3d/scene';
+import {
+  BatchGroup,
+  PostWater,
+  WeightedBlendedOIT,
+  ABufferOIT,
+  SAO,
+  FPSCameraController
+} from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
 import {
   BoundingBox,
@@ -61,7 +68,8 @@ export class GLTFViewer {
     this._assetManager = new AssetManager();
     this._tonemap = new Tonemap();
     this._water = new PostWater(0);
-    this._water.wind = Vector2.zero();
+    this._water.elevation = 2;
+    this._water.ssr = true;
     this._bloom = new Bloom();
     this._sao = new SAO();
     this._sao.radius = 10;
@@ -90,7 +98,7 @@ export class GLTFViewer {
     );
     this._camera.oit = this._oit;
     this._camera.position.setXYZ(0, 0, 15);
-    this._camera.controller = new OrbitCameraController();
+    this._camera.controller = void new OrbitCameraController() ?? new FPSCameraController();
     this._light0 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
     this._light0.shadow.shadowMapSize = 1024;
     this._light0.lookAt(new Vector3(0, 0, 0), new Vector3(0, -1, 1), Vector3.axisPY());
@@ -286,6 +294,7 @@ export class GLTFViewer {
     if (this._doFXAA) {
       this._compositor.appendPostEffect(this._fxaa);
     }
+    this.camera.HiZ = this._doWater;
   }
   get punctualLightEnabled(): boolean {
     return this._light0.showState !== 'hidden';

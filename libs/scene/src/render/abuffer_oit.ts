@@ -383,7 +383,6 @@ export class ABufferOIT extends OIT {
       stencilStates.setBackOp('keep', 'keep', 'replace');
       stencilStates.setReference(0);
       stencilStates.setReadMask(0xff);
-      console.log(this._compositeProgram.getShaderSource('fragment'));
     }
     return this._compositeProgram;
   }
