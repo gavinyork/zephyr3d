@@ -18,6 +18,11 @@ import { Camera } from '../camera';
 import { CopyBlitter } from '../blitter';
 import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
 import { Application } from '../app';
+import {
+  screenSpaceRayTracing_HiZ,
+  //screenSpaceRayTracing_Linear,
+  screenSpaceRayTracing_VS
+} from '../shaders/ssr';
 
 /**
  * The post water effect
@@ -548,9 +553,17 @@ export class PostWater extends AbstractPostEffect {
                   )
                 );
               });
-              pb.func('getMinimumDepth', [pb.vec2('uv'), pb.float('level')], function () {
-                this.$return(pb.textureSampleLevel(this.hizTex, this.uv, this.level).r);
-              });
+              function getMinimumDepth(
+                scope: PBInsideFunctionScope,
+                hizTex: PBShaderExp,
+                uv: PBShaderExp,
+                level: PBShaderExp
+              ) {
+                pb.func('getMinimumDepth', [pb.vec2('uv'), pb.float('level')], function () {
+                  this.$return(pb.textureSampleLevel(hizTex, this.uv, this.level).r);
+                });
+                return scope.getMinimumDepth(uv, level);
+              }
               pb.func(
                 'HiZTracing',
                 [
@@ -599,7 +612,9 @@ export class PostWater extends AbstractPostEffect {
                     function () {
                       this.$l.cellCount = this.getCellCount(this.level);
                       this.$l.oldCellIndex = this.getCell(this.ray.xy, this.cellCount);
-                      this.cell_minZ = this.getMinimumDepth(
+                      this.cell_minZ = getMinimumDepth(
+                        this,
+                        this.hizTex,
                         pb.div(pb.add(this.oldCellIndex, pb.vec2(0.5)), this.cellCount),
                         pb.float(this.level)
                       );
@@ -854,31 +869,36 @@ export class PostWater extends AbstractPostEffect {
               this.$l.surfacePoint = this.worldPos;
               this.$l.depth = pb.length(pb.sub(this.wPos.xyz, this.surfacePoint));
               this.$l.wPosRefract = this.getPosition(this.displacedTexCoord, this.invViewProj);
-              this.$l.refractionTexCoord = this.$choice(
-                pb.greaterThan(this.wPos.y, this.waterLevel),
-                this.screenUV,
-                this.displacedTexCoord
-              );
-              this.$l.refraction = pb.textureSampleLevel(this.tex, this.refractionTexCoord, 0).rgb;
-              this.refraction = pb.mul(this.refraction, this.getAbsorption(this.depth));
               if (ssr) {
                 this.$l.viewPos = pb.mul(this.viewMatrix, pb.vec4(this.worldPos, 1)).xyz;
                 this.$l.viewNormal = pb.mul(this.viewMatrix, pb.vec4(this.myNormal, 0)).xyz;
+                this.$l.viewPosNorm = pb.normalize(this.viewPos);
+                this.$l.reflectVec = pb.reflect(this.viewPosNorm, this.viewNormal);
                 this.$l.reflectance = pb.vec3();
-                this.$l.hitInfo = this.ssr(
-                  this.viewPos,
-                  this.viewNormal,
-                  this.ssrParams.x,
-                  this.ssrParams.y,
-                  this.ssrParams.z,
-                  pb.int(this.ssrParams.w)
-                );
+                this.$l.hitInfo = HiZ
+                  ? screenSpaceRayTracing_HiZ(
+                      this,
+                      this.viewPos,
+                      this.reflectVec,
+                      this.projMatrix,
+                      this.ssrParams.x,
+                      this.ssrParams.y,
+                      this.hizTex
+                    )
+                  : screenSpaceRayTracing_VS(
+                      this,
+                      this.viewPos,
+                      this.viewNormal,
+                      this.projMatrix,
+                      this.cameraNearFar.y,
+                      this.ssrParams.x,
+                      this.ssrParams.y,
+                      this.ssrParams.z,
+                      pb.int(this.ssrParams.w),
+                      this.depthTex
+                    );
                 this.$if(pb.greaterThan(this.hitInfo.z, 0), function () {
-                  this.reflectance = pb.mix(
-                    this.refraction,
-                    pb.textureSampleLevel(this.tex, this.hitInfo.xy, 0).rgb,
-                    1 /*this.hitInfo.z*/
-                  );
+                  this.reflectance = pb.textureSampleLevel(this.tex, this.hitInfo.xy, 0).rgb;
                 }).$else(function () {
                   this.$l.refl = pb.reflect(
                     pb.normalize(pb.sub(this.surfacePoint, this.cameraPos)),
@@ -887,13 +907,40 @@ export class PostWater extends AbstractPostEffect {
                   this.refl.y = pb.max(this.refl.y, 0.1);
                   this.reflectance = pb.textureSampleLevel(this.envMap, this.refl, 0).rgb;
                 });
+                this.$l.refractVec = pb.refract(this.viewPosNorm, this.viewNormal, 1.33);
+                this.$l.refraction = pb.vec3();
+                this.$l.hitInfo = screenSpaceRayTracing_VS(
+                  this,
+                  this.viewPos,
+                  this.refractVec,
+                  this.projMatrix,
+                  this.cameraNearFar.y,
+                  pb.add(pb.mul(this.depth, 2), 10),
+                  20,
+                  999,
+                  pb.int(this.ssrParams.w),
+                  this.depthTex
+                );
+                this.$l.refractUV = this.$choice(
+                  pb.greaterThan(this.hitInfo.z, 0),
+                  this.hitInfo.xy,
+                  this.screenUV
+                );
+                this.refraction = pb.textureSampleLevel(this.tex, this.refractUV, 0).rgb;
               } else {
+                this.$l.refractionTexCoord = this.$choice(
+                  pb.greaterThan(this.wPos.y, this.waterLevel),
+                  this.screenUV,
+                  this.displacedTexCoord
+                );
+                this.$l.refraction = pb.textureSampleLevel(this.tex, this.refractionTexCoord, 0).rgb;
                 this.$l.reflectance = pb.textureSampleLevel(
                   this.reflectionTex,
                   pb.clamp(this.displacedTexCoord, pb.vec2(0.01), pb.vec2(0.99)),
                   0
                 ).rgb;
               }
+              this.refraction = pb.mul(this.refraction, this.getAbsorption(this.depth));
               this.$l.fresnelTerm = this.fresnel(
                 this.myNormal,
                 pb.normalize(pb.sub(this.cameraPos, this.surfacePoint))
