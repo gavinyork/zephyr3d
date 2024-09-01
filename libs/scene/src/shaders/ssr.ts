@@ -36,11 +36,7 @@ export function screenSpaceRayTracing_VS(
       pb.int('binarySearchSteps')
     ],
     function () {
-      //this.$l.normalizedViewPos = pb.normalize(this.viewPos);
       this.$l.reflectVec = this.traceRay;
-      // this.$if(pb.greaterThan(this.reflectVec.z, 0), function () {
-      //   this.$return(pb.vec3(0));
-      // });
       this.$l.maxIterations = pb.max(this.iteration, 1);
       this.$l.reflectVecNorm = pb.normalize(this.reflectVec);
       this.$l.reflectVecEnd = pb.add(this.viewPos, pb.mul(this.reflectVecNorm, this.maxDistance));
@@ -66,10 +62,10 @@ export function screenSpaceRayTracing_VS(
           this.$l.pos = pb.add(this.viewPos, pb.mul(this.step, pb.float(this.i)));
           this.$l.fragH = pb.mul(this.projMatrix, pb.vec4(this.pos, 1));
           this.uv = pb.add(pb.mul(pb.div(this.fragH.xy, this.fragH.w), 0.5), pb.vec2(0.5));
-          this.positionTo = pb.mul(this.SSR_VS_getDepth(this.uv, 0), this.cameraFar);
+          this.positionTo = this.SSR_VS_getDepth(this.uv, 0);
           this.search1 = pb.clamp(pb.div(pb.float(this.i), this.maxIterations), 0, 1);
           this.$l.viewDistance = pb.neg(this.pos.z);
-          this.depth = pb.sub(this.viewDistance, this.positionTo);
+          this.depth = pb.sub(this.viewDistance, pb.mul(this.positionTo, this.cameraFar));
           this.$if(
             pb.and(pb.greaterThan(this.depth, 0), pb.lessThan(this.depth, this.thickness)),
             function () {
@@ -92,9 +88,9 @@ export function screenSpaceRayTracing_VS(
         this.$l.pos = pb.mix(this.viewPos, this.reflectVecEnd, this.search1);
         this.$l.fragH = pb.mul(this.projMatrix, pb.vec4(this.pos, 1));
         this.uv = pb.add(pb.mul(pb.div(this.fragH.xy, this.fragH.w), 0.5), pb.vec2(0.5));
-        this.positionTo = pb.mul(this.SSR_VS_getDepth(this.uv, 0), this.cameraFar);
+        this.positionTo = this.SSR_VS_getDepth(this.uv, 0);
         this.$l.viewDistance = pb.neg(this.pos.z);
-        this.depth = pb.sub(this.viewDistance, this.positionTo);
+        this.depth = pb.sub(this.viewDistance, pb.mul(this.positionTo, this.cameraFar));
         this.$if(pb.and(pb.greaterThan(this.depth, 0), pb.lessThan(this.depth, this.thickness)), function () {
           this.hit1 = 1;
           this.search1 = pb.add(this.search0, pb.div(pb.sub(this.search1, this.search0), 2));
@@ -116,7 +112,7 @@ export function screenSpaceRayTracing_VS(
         this.$choice(pb.or(pb.lessThan(this.uv.y, 0), pb.greaterThan(this.uv.y, 1)), pb.float(0), pb.float(1))
       );
       this.vis = pb.clamp(this.vis, 0, 1);
-      this.$return(pb.vec3(this.uv, this.vis));
+      this.$return(pb.vec4(this.uv, this.positionTo, this.vis));
     }
   );
   return scope.SSR_VS(
@@ -169,7 +165,7 @@ export function screenSpaceRayTracing_Linear(
       //this.$l.normalizedViewPos = pb.normalize(this.viewPos);
       this.$l.reflectVec = this.traceRay;
       this.$if(pb.greaterThan(this.reflectVec.z, 0), function () {
-        this.$return(pb.vec3(0));
+        this.$return(pb.vec4(0));
       });
       this.$l.viewPosEnd = pb.add(this.viewPos, pb.mul(this.reflectVec, this.maxDistance));
       this.$l.fragStartH = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));
@@ -207,7 +203,7 @@ export function screenSpaceRayTracing_Linear(
         }
         this.frag = pb.add(this.frag, this.increment);
         this.uv = pb.div(this.frag, this.targetSize.xy);
-        this.positionTo = pb.mul(this.SSR_Linear_getDepth(this.uv, 0), this.cameraFar);
+        this.positionTo = this.SSR_Linear_getDepth(this.uv, 0);
         this.search1 = pb.clamp(
           pb.mix(
             pb.div(pb.sub(this.frag.y, this.fragStart.y), this.deltaY),
@@ -221,7 +217,7 @@ export function screenSpaceRayTracing_Linear(
           pb.mul(this.viewPos.z, this.viewPosEnd.z),
           pb.mix(pb.neg(this.viewPosEnd.z), pb.neg(this.viewPos.z), this.search1)
         );
-        this.depth = pb.sub(this.viewDistance, this.positionTo);
+        this.depth = pb.sub(this.viewDistance, pb.mul(this.positionTo, this.cameraFar));
         this.$if(pb.and(pb.greaterThan(this.depth, 0), pb.lessThan(this.depth, this.thickness)), function () {
           this.hit0 = 1;
           this.$break();
@@ -239,12 +235,12 @@ export function screenSpaceRayTracing_Linear(
         }
         this.$l.frag = pb.mix(this.fragStart.xy, this.fragEnd.xy, this.search1);
         this.uv = pb.div(this.frag, this.targetSize.xy);
-        this.positionTo = pb.mul(this.SSR_Linear_getDepth(this.uv, 0), this.cameraFar);
+        this.positionTo = this.SSR_Linear_getDepth(this.uv, 0);
         this.$l.viewDistance = pb.div(
           pb.mul(this.viewPos.z, this.viewPosEnd.z),
           pb.mix(pb.neg(this.viewPosEnd.z), pb.neg(this.viewPos.z), this.search1)
         );
-        this.depth = pb.sub(this.viewDistance, this.positionTo);
+        this.depth = pb.sub(this.viewDistance, pb.mul(this.positionTo, this.cameraFar));
         this.$if(pb.and(pb.greaterThan(this.depth, 0), pb.lessThan(this.depth, this.thickness)), function () {
           this.hit1 = 1;
           this.search1 = pb.add(this.search0, pb.div(pb.sub(this.search1, this.search0), 2));
@@ -266,7 +262,7 @@ export function screenSpaceRayTracing_Linear(
         this.$choice(pb.or(pb.lessThan(this.uv.y, 0), pb.greaterThan(this.uv.y, 1)), pb.float(0), pb.float(1))
       );
       this.vis = pb.clamp(this.vis, 0, 1);
-      this.$return(pb.vec3(this.uv, this.vis));
+      this.$return(pb.vec4(this.uv, this.positionTo, this.vis));
     }
   );
   return scope.SSR_Linear(
@@ -416,7 +412,9 @@ export function screenSpaceRayTracing_HiZ(
         }
       );
       this.$l.intersected = pb.and(pb.lessThan(this.cell_minZ, 1), pb.lessThan(this.level, this.stopLevel));
-      this.$return(pb.vec3(this.ray.xy, this.$choice(this.intersected, pb.float(1), pb.float(0))));
+      this.$return(
+        pb.vec4(this.ray.xy, this.cell_minZ, this.$choice(this.intersected, pb.float(1), pb.float(0)))
+      );
     }
   );
   pb.func(
@@ -432,7 +430,7 @@ export function screenSpaceRayTracing_HiZ(
       //this.$l.normalizedViewPos = pb.normalize(this.viewPos);
       this.$l.reflectVec = this.traceRay;
       this.$if(pb.greaterThan(this.reflectVec.z, 0), function () {
-        this.$return(pb.vec3(0));
+        this.$return(pb.vec4(0));
       });
       this.$l.maxDist = pb.float(100);
       this.$l.viewPosEnd = pb.add(this.viewPos, pb.mul(this.reflectVec, this.maxDist));

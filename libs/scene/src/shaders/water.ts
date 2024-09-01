@@ -13,15 +13,78 @@ function getFragCoord(scope: PBGlobalScope, useComputeShader: boolean) {
   return useComputeShader ? scope.$builtins.globalInvocationId.xy : scope.$builtins.fragCoord.xy;
 }
 
-/** @internal */
-export interface WaterShaderImpl {
-  setupUniforms(scope: PBGlobalScope): void;
+export type WaterVertexFunc = (
+  this: WaterShaderImpl,
+  scope: PBInsideFunctionScope,
+  pos: PBShaderExp,
+  xz: PBShaderExp,
+  useComputeShader: boolean
+) => void;
+export type WaterShadingFunc = (
+  scope: PBInsideFunctionScope,
+  worldPos: PBShaderExp,
+  worldNormal: PBShaderExp,
+  foamFactor: PBShaderExp
+) => PBShaderExp;
+export type WaterSetupUniformFunc = (this: WaterShaderImpl, scope: PBGlobalScope) => void;
+export class WaterShaderImpl {
+  private _vertexFunc: WaterVertexFunc;
+  private _shadingFunc: WaterShadingFunc;
+  private _setupUniformsFunc: WaterSetupUniformFunc;
+  constructor(
+    setupUniformsFunc: WaterSetupUniformFunc,
+    vertexFunc: WaterVertexFunc,
+    shadingFunc: WaterShadingFunc
+  ) {
+    this._vertexFunc = vertexFunc;
+    this._shadingFunc = shadingFunc;
+    this._setupUniformsFunc = setupUniformsFunc;
+  }
+  setupUniforms(scope: PBGlobalScope): void {
+    this._setupUniformsFunc?.call(this, scope);
+  }
+  vertex(scope: PBInsideFunctionScope, pos: PBShaderExp, xz: PBShaderExp, useComputeShader: boolean) {
+    this._vertexFunc?.call(this, scope, pos, xz, useComputeShader);
+  }
+  getVertexNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, useComputeShader: boolean): PBShaderExp {
+    const pb = scope.$builder;
+    pb.func('getVertexNormal', [pb.vec2('xz')], function () {
+      this.$l.uv0 = pb.div(this.xz, this.sizes.x);
+      this.$l.uv1 = pb.div(this.xz, this.sizes.y);
+      this.$l.uv2 = pb.div(this.xz, this.sizes.z);
+      if (useComputeShader) {
+        this.$l._sx_sz_dxdx_dzdz0 = pb.textureArraySampleLevel(this.dataTexture, this.uv0, 1, 0);
+        this.$l._sx_sz_dxdx_dzdz1 = pb.textureArraySampleLevel(this.dataTexture, this.uv1, 3, 0);
+        this.$l._sx_sz_dxdx_dzdz2 = pb.textureArraySampleLevel(this.dataTexture, this.uv2, 5, 0);
+      } else {
+        this.$l._sx_sz_dxdx_dzdz0 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz0, this.uv0, 0);
+        this.$l._sx_sz_dxdx_dzdz1 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz1, this.uv1, 0);
+        this.$l._sx_sz_dxdx_dzdz2 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz2, this.uv2, 0);
+      }
+      this.$l.sx = pb.add(this._sx_sz_dxdx_dzdz0.x, this._sx_sz_dxdx_dzdz1.x, this._sx_sz_dxdx_dzdz2.x);
+      this.$l.sz = pb.add(this._sx_sz_dxdx_dzdz0.y, this._sx_sz_dxdx_dzdz1.y, this._sx_sz_dxdx_dzdz2.y);
+      this.$l.dxdx_dzdz = pb.add(
+        pb.mul(this._sx_sz_dxdx_dzdz0.zw, this.croppinesses.x),
+        pb.mul(this._sx_sz_dxdx_dzdz1.zw, this.croppinesses.y),
+        pb.mul(this._sx_sz_dxdx_dzdz2.zw, this.croppinesses.z)
+      );
+      this.$l.slope = pb.vec2(
+        pb.div(this.sx, pb.add(1.0, this.dxdx_dzdz.x)),
+        pb.div(this.sz, pb.add(1.0, this.dxdx_dzdz.y))
+      );
+      this.$l.normal = pb.normalize(pb.vec3(pb.neg(this.slope.x), 1.0, pb.neg(this.slope.y)));
+      this.$return(this.normal);
+    });
+    return scope.getVertexNormal(xz);
+  }
   shading(
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp,
     worldNormal: PBShaderExp,
     foamFactor: PBShaderExp
-  ): PBShaderExp;
+  ): PBShaderExp {
+    return this._shadingFunc?.call(this, scope, worldPos, worldNormal, foamFactor);
+  }
 }
 
 /** @internal */
@@ -99,6 +162,7 @@ export function createProgramOcean(useComputeShader: boolean, impl?: WaterShader
         this.$if(pb.notEqual(this.flip, 0), function () {
           this.$builtins.position.y = pb.neg(this.$builtins.position.y);
         });
+        impl?.vertex(this, this.$outputs.outPos, this.$outputs.outXZ, useComputeShader);
       });
     },
     fragment(pb) {
