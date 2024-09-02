@@ -13,7 +13,8 @@ import {
   AssetManager,
   PostWater,
   Tonemap,
-  LambertMaterial
+  LambertMaterial,
+  PlaneShape
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
@@ -68,10 +69,14 @@ instancingApp.ready().then(async () => {
     mesh.position.z = Math.random() * 300 - 150;
     const scale = 1 + Math.random() * 10;
     mesh.scale.setXYZ(scale, scale, scale);
+    mesh.parent = batchGroup;
   }
-  mat.albedoColor = new Vector4(0, 1, 0, 1);
-  const mesh = new Mesh(scene, sphere, mat);
-  mesh.parent = batchGroup;
+
+  const planeMat = new LambertMaterial();
+  planeMat.albedoColor = new Vector4(1, 1, 0, 1);
+  const ground = new Mesh(scene, new PlaneShape({ size: 1000 }), planeMat);
+  ground.position.setXYZ(-500, -40, -500);
+  ground.parent = batchGroup;
 
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());

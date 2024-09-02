@@ -541,7 +541,7 @@ export class PostWater extends AbstractPostEffect {
               this.$l.wPosRefract = this.getPosition(this.displacedTexCoord, this.invViewProj);
               if (ssr) {
                 this.$l.viewPos = pb.mul(this.viewMatrix, pb.vec4(this.worldPos, 1)).xyz;
-                this.$l.viewNormal = pb.mul(this.viewMatrix, pb.vec4(this.myNormal, 0)).xyz;
+                this.$l.viewNormal = pb.mul(this.viewMatrix, pb.vec4(this.worldNormal, 0)).xyz;
                 this.$l.viewPosNorm = pb.normalize(this.viewPos);
                 this.$l.reflectVec = pb.reflect(this.viewPosNorm, this.viewNormal);
                 this.$l.reflectance = pb.vec3();
