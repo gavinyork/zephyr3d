@@ -1,8 +1,19 @@
-import type { PBFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { decodeNormalizedFloatFromRGBA } from './misc';
 
+export function sampleLinearDepth(
+  scope: PBInsideFunctionScope,
+  tex: PBShaderExp,
+  uv: PBShaderExp,
+  level: PBShaderExp | number
+): PBShaderExp {
+  const pb = scope.$builder;
+  const depth = pb.textureSampleLevel(tex, uv, level);
+  return pb.getDevice().type === 'webgl' ? decodeNormalizedFloatFromRGBA(scope, depth) : depth.r;
+}
+
 export function screenSpaceRayTracing_VS(
-  scope: PBFunctionScope,
+  scope: PBInsideFunctionScope,
   viewPos: PBShaderExp,
   traceRay: PBShaderExp,
   projMatrix: PBShaderExp,
@@ -14,15 +25,6 @@ export function screenSpaceRayTracing_VS(
   linearDepthTex: PBShaderExp
 ) {
   const pb = scope.$builder;
-  pb.func('SSR_VS_getDepth', [pb.vec2('uv'), pb.float('level')], function () {
-    this.$l.depthValue = pb.textureSampleLevel(linearDepthTex, this.uv, this.level);
-    if (pb.getDevice().type === 'webgl') {
-      this.$l.linearDepth = decodeNormalizedFloatFromRGBA(this, this.depthValue);
-    } else {
-      this.$l.linearDepth = this.depthValue.r;
-    }
-    this.$return(this.linearDepth);
-  });
   pb.func(
     'SSR_VS',
     [
@@ -62,7 +64,7 @@ export function screenSpaceRayTracing_VS(
           this.$l.pos = pb.add(this.viewPos, pb.mul(this.step, pb.float(this.i)));
           this.$l.fragH = pb.mul(this.projMatrix, pb.vec4(this.pos, 1));
           this.uv = pb.add(pb.mul(pb.div(this.fragH.xy, this.fragH.w), 0.5), pb.vec2(0.5));
-          this.positionTo = this.SSR_VS_getDepth(this.uv, 0);
+          this.positionTo = sampleLinearDepth(this, linearDepthTex, this.uv, 0);
           this.search1 = pb.clamp(pb.div(pb.float(this.i), this.maxIterations), 0, 1);
           this.$l.viewDistance = pb.neg(this.pos.z);
           this.depth = pb.sub(this.viewDistance, pb.mul(this.positionTo, this.cameraFar));
@@ -88,7 +90,7 @@ export function screenSpaceRayTracing_VS(
         this.$l.pos = pb.mix(this.viewPos, this.reflectVecEnd, this.search1);
         this.$l.fragH = pb.mul(this.projMatrix, pb.vec4(this.pos, 1));
         this.uv = pb.add(pb.mul(pb.div(this.fragH.xy, this.fragH.w), 0.5), pb.vec2(0.5));
-        this.positionTo = this.SSR_VS_getDepth(this.uv, 0);
+        this.positionTo = sampleLinearDepth(this, linearDepthTex, this.uv, 0);
         this.$l.viewDistance = pb.neg(this.pos.z);
         this.depth = pb.sub(this.viewDistance, pb.mul(this.positionTo, this.cameraFar));
         this.$if(pb.and(pb.greaterThan(this.depth, 0), pb.lessThan(this.depth, this.thickness)), function () {
@@ -128,7 +130,7 @@ export function screenSpaceRayTracing_VS(
 }
 
 export function screenSpaceRayTracing_Linear(
-  scope: PBFunctionScope,
+  scope: PBInsideFunctionScope,
   viewPos: PBShaderExp,
   traceRay: PBShaderExp,
   projMatrix: PBShaderExp,
@@ -140,15 +142,6 @@ export function screenSpaceRayTracing_Linear(
   linearDepthTex: PBShaderExp
 ) {
   const pb = scope.$builder;
-  pb.func('SSR_Linear_getDepth', [pb.vec2('uv'), pb.float('level')], function () {
-    this.$l.depthValue = pb.textureSampleLevel(linearDepthTex, this.uv, this.level);
-    if (pb.getDevice().type === 'webgl') {
-      this.$l.linearDepth = decodeNormalizedFloatFromRGBA(this, this.depthValue);
-    } else {
-      this.$l.linearDepth = this.depthValue.r;
-    }
-    this.$return(this.linearDepth);
-  });
   pb.func(
     'SSR_Linear',
     [
@@ -203,7 +196,7 @@ export function screenSpaceRayTracing_Linear(
         }
         this.frag = pb.add(this.frag, this.increment);
         this.uv = pb.div(this.frag, this.targetSize.xy);
-        this.positionTo = this.SSR_Linear_getDepth(this.uv, 0);
+        this.positionTo = sampleLinearDepth(this, linearDepthTex, this.uv, 0);
         this.search1 = pb.clamp(
           pb.mix(
             pb.div(pb.sub(this.frag.y, this.fragStart.y), this.deltaY),
@@ -235,7 +228,7 @@ export function screenSpaceRayTracing_Linear(
         }
         this.$l.frag = pb.mix(this.fragStart.xy, this.fragEnd.xy, this.search1);
         this.uv = pb.div(this.frag, this.targetSize.xy);
-        this.positionTo = this.SSR_Linear_getDepth(this.uv, 0);
+        this.positionTo = sampleLinearDepth(this, linearDepthTex, this.uv, 0);
         this.$l.viewDistance = pb.div(
           pb.mul(this.viewPos.z, this.viewPosEnd.z),
           pb.mix(pb.neg(this.viewPosEnd.z), pb.neg(this.viewPos.z), this.search1)
@@ -278,7 +271,7 @@ export function screenSpaceRayTracing_Linear(
 }
 
 export function screenSpaceRayTracing_HiZ(
-  scope: PBFunctionScope,
+  scope: PBInsideFunctionScope,
   viewPos: PBShaderExp,
   traceRay: PBShaderExp,
   projMatrix: PBShaderExp,

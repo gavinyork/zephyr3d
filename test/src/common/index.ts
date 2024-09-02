@@ -405,7 +405,7 @@ export class Inspector {
         (val?: number) => {
           return (water.refractionStrength = val = val ?? water.refractionStrength);
         },
-        0,
+        -1,
         1
       );
       const tmpWind = new Vector2(water.wind);

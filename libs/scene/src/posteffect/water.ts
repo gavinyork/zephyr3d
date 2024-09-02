@@ -12,18 +12,13 @@ import type { DrawContext } from '../render';
 import { WaterMesh } from '../render';
 import { AbstractPostEffect } from './posteffect';
 import { WaterShaderImpl } from '../shaders';
-import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders';
+import { linearToGamma } from '../shaders';
 import { Interpolator, Matrix4x4, Plane, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import { Camera } from '../camera';
 import { CopyBlitter } from '../blitter';
 import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
 import { Application } from '../app';
-import {
-  screenSpaceRayTracing_HiZ,
-  screenSpaceRayTracing_Linear,
-  //screenSpaceRayTracing_Linear,
-  screenSpaceRayTracing_VS
-} from '../shaders/ssr';
+import { sampleLinearDepth, screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear } from '../shaders/ssr';
 
 /**
  * The post water effect
@@ -353,10 +348,10 @@ export class PostWater extends AbstractPostEffect {
       waterMesh.bindGroup.setTexture('reflectionTex', fbRefl.getColorAttachments()[0]);
     }
     waterMesh.bindGroup.setValue('invViewProj', ctx.camera.invViewProjectionMatrix);
+    waterMesh.bindGroup.setValue('invProjMatrix', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
+    waterMesh.bindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
     if (ssr) {
-      waterMesh.bindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
       waterMesh.bindGroup.setValue('projMatrix', ctx.camera.getProjectionMatrix());
-      waterMesh.bindGroup.setValue('invProjMatrix', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
     }
     waterMesh.bindGroup.setValue('cameraNearFar', cameraNearFar);
     waterMesh.bindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
@@ -414,7 +409,6 @@ export class PostWater extends AbstractPostEffect {
     const ssr = this._ssr; // ctx.device.type === 'webgl' ? false : this._ssr;
     const HiZ = ssr && !!ctx.HiZTexture;
     const hash = `${ctx.sunLight ? 1 : 0}:${ctx.env.light.getHash()}:${ssr}:${HiZ}`;
-    const device = ctx.device;
     let impl = this._waterImpls[hash];
     if (!impl) {
       impl = new WaterShaderImpl(
@@ -440,10 +434,10 @@ export class PostWater extends AbstractPostEffect {
             scope.cameraNearFar = pb.vec2().uniform(0);
             scope.cameraPos = pb.vec3().uniform(0);
             scope.invViewProj = pb.mat4().uniform(0);
+            scope.invProjMatrix = pb.mat4().uniform(0);
+            scope.viewMatrix = pb.mat4().uniform(0);
             if (ssr) {
-              scope.viewMatrix = pb.mat4().uniform(0);
               scope.projMatrix = pb.mat4().uniform(0);
-              scope.invProjMatrix = pb.mat4().uniform(0);
             }
             scope.targetSize = pb.vec4().uniform(0);
             scope.waterLevel = pb.float().uniform(0);
@@ -490,17 +484,8 @@ export class PostWater extends AbstractPostEffect {
             ).rgb;
             this.$return(pb.mul(this.c, this.c));
           });
-          pb.func('getLinearDepth', [pb.vec2('uv'), pb.float('level')], function () {
-            this.$l.depthValue = pb.textureSampleLevel(this.depthTex, this.uv, this.level);
-            if (device.type === 'webgl') {
-              this.$l.linearDepth = decodeNormalizedFloatFromRGBA(this, this.depthValue);
-            } else {
-              this.$l.linearDepth = this.depthValue.r;
-            }
-            this.$return(this.linearDepth);
-          });
           pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
-            this.$l.linearDepth = this.getLinearDepth(this.uv, 0);
+            this.$l.linearDepth = sampleLinearDepth(this, this.depthTex, this.uv, 0);
             this.$l.nonLinearDepth = pb.div(
               pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
               pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
@@ -511,7 +496,7 @@ export class PostWater extends AbstractPostEffect {
               1
             );
             this.$l.wPos = pb.mul(this.mat, this.clipSpacePos);
-            this.$return(pb.div(this.wPos.xyz, this.wPos.w));
+            this.$return(pb.vec4(pb.div(this.wPos.xyz, this.wPos.w), this.linearDepth));
           });
           pb.func('fresnel', [pb.vec3('normal'), pb.vec3('eyeVec')], function () {
             this.$return(
@@ -529,97 +514,81 @@ export class PostWater extends AbstractPostEffect {
               this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
               this.$l.dist = pb.length(pb.sub(this.worldPos, this.cameraPos));
               this.$l.normalScale = pb.pow(pb.clamp(pb.div(100, this.dist), 0, 1), 2);
-              this.$l.myNormal = pb.normalize(
+              this.$l.normal = pb.normalize(
                 pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
               );
-              this.$l.displacedTexCoord = pb.add(this.screenUV, pb.mul(this.myNormal.xz, this.displace));
-              this.$l.wPos = this.getPosition(this.displacedTexCoord, this.invViewProj);
-              this.$l.eyeVec = pb.sub(this.wPos.xyz, this.cameraPos);
+              this.$l.displacedTexCoord = pb.add(this.screenUV, pb.mul(this.normal.xz, this.displace));
+              this.$l.wPos = this.getPosition(this.screenUV, this.invViewProj).xyz;
+              this.$l.eyeVec = pb.sub(this.worldPos.xyz, this.cameraPos);
               this.$l.eyeVecNorm = pb.normalize(this.eyeVec);
-              this.$l.surfacePoint = this.worldPos;
-              this.$l.depth = pb.length(pb.sub(this.wPos.xyz, this.surfacePoint));
-              this.$l.wPosRefract = this.getPosition(this.displacedTexCoord, this.invViewProj);
+              this.$l.depth = pb.length(pb.sub(this.wPos.xyz, this.worldPos));
+              this.$l.viewPos = pb.mul(this.viewMatrix, pb.vec4(this.worldPos, 1)).xyz;
               if (ssr) {
-                this.$l.viewPos = pb.mul(this.viewMatrix, pb.vec4(this.worldPos, 1)).xyz;
-                this.$l.viewNormal = pb.mul(this.viewMatrix, pb.vec4(this.worldNormal, 0)).xyz;
+                this.incidentVec = pb.normalize(pb.sub(this.worldPos, this.cameraPos));
+                this.reflectVecW = pb.reflect(this.incidentVec, this.normal);
+                /*
+                this.$l.viewNormal = pb.mul(this.viewMatrix, pb.vec4(this.normal, 0)).xyz;
                 this.$l.viewPosNorm = pb.normalize(this.viewPos);
                 this.$l.reflectVec = pb.reflect(this.viewPosNorm, this.viewNormal);
+                */
                 this.$l.reflectance = pb.vec3();
-                this.$l.hitInfo = HiZ
-                  ? screenSpaceRayTracing_HiZ(
-                      this,
-                      this.viewPos,
-                      this.reflectVec,
-                      this.projMatrix,
-                      this.ssrParams.x,
-                      this.ssrParams.y,
-                      this.hizTex
-                    )
-                  : screenSpaceRayTracing_Linear(
-                      this,
-                      this.viewPos,
-                      this.reflectVec,
-                      this.projMatrix,
-                      this.cameraNearFar.y,
-                      this.ssrParams.x,
-                      this.ssrParams.y,
-                      this.ssrParams.z,
-                      pb.int(this.ssrParams.w),
-                      this.depthTex
-                    );
+                this.$l.hitInfo = pb.vec4(0);
+                this.$if(pb.greaterThan(this.reflectVecW.y, 0), function () {
+                  this.reflectVec = pb.mul(this.viewMatrix, pb.vec4(this.reflectVecW, 0)).xyz;
+                  this.hitInfo = HiZ
+                    ? screenSpaceRayTracing_HiZ(
+                        this,
+                        this.viewPos,
+                        this.reflectVec,
+                        this.projMatrix,
+                        this.ssrParams.x,
+                        this.ssrParams.y,
+                        this.hizTex
+                      )
+                    : screenSpaceRayTracing_Linear(
+                        this,
+                        this.viewPos,
+                        this.reflectVec,
+                        this.projMatrix,
+                        this.cameraNearFar.y,
+                        this.ssrParams.x,
+                        this.ssrParams.y,
+                        this.ssrParams.z,
+                        pb.int(this.ssrParams.w),
+                        this.depthTex
+                      );
+                });
                 this.$if(pb.greaterThan(this.hitInfo.w, 0), function () {
                   this.reflectance = pb.textureSampleLevel(this.tex, this.hitInfo.xy, 0).rgb;
                 }).$else(function () {
-                  this.$l.refl = pb.reflect(
-                    pb.normalize(pb.sub(this.surfacePoint, this.cameraPos)),
-                    this.myNormal
-                  );
+                  this.$l.refl = pb.reflect(pb.normalize(pb.sub(this.worldPos, this.cameraPos)), this.normal);
                   this.refl.y = pb.max(this.refl.y, 0.1);
                   this.reflectance = pb.textureSampleLevel(this.envMap, this.refl, 0).rgb;
                 });
-                this.$l.t = pb.min(pb.div(this.screenUV.y, 0.5), 1);
-                this.$l.refractVec = pb.mix(
-                  this.viewPosNorm,
-                  pb.refract(this.viewPosNorm, this.viewNormal, 1 / 1.33),
-                  this.t
-                );
-                this.$l.refraction = pb.vec3();
-                this.$l.hitInfo = screenSpaceRayTracing_VS(
-                  this,
-                  this.viewPos,
-                  this.refractVec,
-                  this.projMatrix,
-                  this.cameraNearFar.y,
-                  pb.add(pb.mul(this.depth, 2), 10),
-                  20,
-                  999,
-                  pb.int(this.ssrParams.w),
-                  this.depthTex
-                );
-                this.$l.refractUV = this.$choice(
-                  pb.greaterThan(this.hitInfo.w, 0),
-                  this.hitInfo.xy,
-                  this.screenUV
-                );
-                this.refraction = pb.textureSampleLevel(this.tex, this.refractUV, 0).rgb;
               } else {
-                this.$l.refractionTexCoord = this.$choice(
-                  pb.greaterThan(this.wPos.y, this.waterLevel),
-                  this.screenUV,
-                  this.displacedTexCoord
-                );
-                this.$l.refraction = pb.textureSampleLevel(this.tex, this.refractionTexCoord, 0).rgb;
                 this.$l.reflectance = pb.textureSampleLevel(
                   this.reflectionTex,
                   pb.clamp(this.displacedTexCoord, pb.vec2(0.01), pb.vec2(0.99)),
                   0
                 ).rgb;
               }
+              this.refractUV = this.displacedTexCoord;
+              this.displacedPos = this.getPosition(this.refractUV, this.invProjMatrix);
+              this.$if(
+                pb.or(
+                  pb.greaterThanEqual(this.displacedPos.w, 0.99999),
+                  pb.greaterThan(this.displacedPos.z, this.viewPos.z)
+                ),
+                function () {
+                  this.refractUV = this.screenUV;
+                }
+              ).$else(function () {
+                this.depth = pb.length(pb.sub(this.displacedPos.xyz, this.viewPos));
+              });
+              this.$l.refraction = pb.textureSampleLevel(this.tex, this.refractUV, 0).rgb;
               this.refraction = pb.mul(this.refraction, this.getAbsorption(this.depth));
-              this.$l.fresnelTerm = this.fresnel(
-                this.myNormal,
-                pb.normalize(pb.sub(this.cameraPos, this.surfacePoint))
-              );
+
+              this.$l.fresnelTerm = this.fresnel(this.normal, pb.neg(this.eyeVecNorm));
               this.$l.finalColor = pb.mix(
                 pb.mix(this.refraction, this.reflectance, this.fresnelTerm),
                 pb.vec3(1),
@@ -632,10 +601,10 @@ export class PostWater extends AbstractPostEffect {
                 this.$l.L = pb.neg(this.lightDir);
                 this.$l.V = pb.neg(this.eyeVecNorm);
                 this.$l.halfVec = pb.normalize(pb.add(this.L, this.V));
-                this.$l.NoH = pb.clamp(pb.dot(this.myNormal, this.halfVec), 0, 1);
-                this.$l.NoL = pb.clamp(pb.dot(this.myNormal, this.L), 0, 1);
+                this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
+                this.$l.NoL = pb.clamp(pb.dot(this.normal, this.L), 0, 1);
                 this.$l.VoH = pb.clamp(pb.dot(this.V, this.halfVec), 0, 1);
-                this.$l.NoV = pb.clamp(pb.dot(this.myNormal, this.V), 0, 1);
+                this.$l.NoV = pb.clamp(pb.dot(this.normal, this.V), 0, 1);
                 this.$l.F = fresnelSchlick(this, this.VoH, this.f0, this.f90);
                 this.$l.alphaRoughness = pb.mul(this.roughness, this.roughness);
                 this.$l.D = distributionGGX(this, this.NoH, this.alphaRoughness);
@@ -650,7 +619,7 @@ export class PostWater extends AbstractPostEffect {
                 this.finalColor = pb.add(this.finalColor, this.specular);
               }
               if (ctx.env.light.envLight) {
-                const irradiance = ctx.env.light.envLight.getIrradiance(this, this.myNormal);
+                const irradiance = ctx.env.light.envLight.getIrradiance(this, this.normal);
                 if (irradiance) {
                   this.$l.sss = pb.mul(this.getScattering(this.depth), irradiance, this.envLightStrength);
                   this.finalColor = pb.add(this.finalColor, this.sss);
