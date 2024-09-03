@@ -526,15 +526,20 @@ export class PostWater extends AbstractPostEffect {
               if (ssr) {
                 this.incidentVec = pb.normalize(pb.sub(this.worldPos, this.cameraPos));
                 this.reflectVecW = pb.reflect(this.incidentVec, this.normal);
-                /*
-                this.$l.viewNormal = pb.mul(this.viewMatrix, pb.vec4(this.normal, 0)).xyz;
-                this.$l.viewPosNorm = pb.normalize(this.viewPos);
-                this.$l.reflectVec = pb.reflect(this.viewPosNorm, this.viewNormal);
-                */
                 this.$l.reflectance = pb.vec3();
                 this.$l.hitInfo = pb.vec4(0);
                 this.$if(pb.greaterThan(this.reflectVecW.y, 0), function () {
                   this.reflectVec = pb.mul(this.viewMatrix, pb.vec4(this.reflectVecW, 0)).xyz;
+                  this.$l.thicknessFactor = pb.add(
+                    pb.mul(pb.dot(this.incidentVec, this.reflectVecW), 0.5),
+                    0.5
+                  );
+                  this.thicknessFactor = pb.div(
+                    this.thicknessFactor,
+                    pb.max(pb.mul(pb.length(this.viewPos), 5), 1)
+                  );
+                  this.thicknessFactor = pb.mul(this.thicknessFactor, 50);
+                  this.$l.thickness = pb.mul(this.thicknessFactor, this.ssrParams.z);
                   this.hitInfo = HiZ
                     ? screenSpaceRayTracing_HiZ(
                         this,
@@ -543,6 +548,7 @@ export class PostWater extends AbstractPostEffect {
                         this.projMatrix,
                         this.ssrParams.x,
                         this.ssrParams.y,
+                        this.thickness,
                         this.hizTex
                       )
                     : screenSpaceRayTracing_Linear(
@@ -553,18 +559,31 @@ export class PostWater extends AbstractPostEffect {
                         this.cameraNearFar.y,
                         this.ssrParams.x,
                         this.ssrParams.y,
-                        this.ssrParams.z,
+                        this.thickness,
                         pb.int(this.ssrParams.w),
                         this.depthTex
                       );
                 });
+                this.$l.refl = pb.reflect(pb.normalize(pb.sub(this.worldPos, this.cameraPos)), this.normal);
+                this.refl.y = pb.max(this.refl.y, 0.1);
+                this.reflectance = pb.mix(
+                  pb.textureSampleLevel(this.envMap, this.refl, 0).rgb,
+                  pb.textureSampleLevel(this.tex, this.hitInfo.xy, 0).rgb,
+                  this.hitInfo.w
+                );
+                /*
                 this.$if(pb.greaterThan(this.hitInfo.w, 0), function () {
-                  this.reflectance = pb.textureSampleLevel(this.tex, this.hitInfo.xy, 0).rgb;
+                  this.reflectance = pb.mix(
+                    this.reflectance,
+                    pb.textureSampleLevel(this.tex, this.hitInfo.xy, 0).rgb,
+                    this.hitInfo.w
+                  );
                 }).$else(function () {
                   this.$l.refl = pb.reflect(pb.normalize(pb.sub(this.worldPos, this.cameraPos)), this.normal);
                   this.refl.y = pb.max(this.refl.y, 0.1);
                   this.reflectance = pb.textureSampleLevel(this.envMap, this.refl, 0).rgb;
                 });
+                */
               } else {
                 this.$l.reflectance = pb.textureSampleLevel(
                   this.reflectionTex,

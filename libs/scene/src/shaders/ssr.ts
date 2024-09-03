@@ -1,6 +1,22 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { decodeNormalizedFloatFromRGBA } from './misc';
 
+/** @internal */
+function screenEdgeFading(scope: PBInsideFunctionScope, uv: PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  pb.func('SSR_edgeFading', [pb.vec2('uv')], function () {
+    this.$l.cs = pb.sub(pb.mul(this.uv, 2), pb.vec2(1));
+    this.$l.diff = pb.sub(pb.vec2(1), pb.abs(this.cs));
+    this.$if(pb.and(pb.lessThan(this.diff.x, 0), pb.lessThan(this.diff.y, 0)), function () {
+      this.$return(pb.float(0));
+    });
+    this.$l.t1 = pb.smoothStep(0, 0.1, this.diff.x);
+    this.$l.t2 = pb.smoothStep(0, 0.2, this.diff.y);
+    this.$return(pb.clamp(pb.mul(this.t1, this.t2), 0, 1));
+  });
+  return scope.SSR_edgeFading(uv);
+}
+
 export function sampleLinearDepth(
   scope: PBInsideFunctionScope,
   tex: PBShaderExp,
@@ -277,6 +293,7 @@ export function screenSpaceRayTracing_HiZ(
   projMatrix: PBShaderExp,
   maxDistance: PBShaderExp | number,
   maxIteraions: PBShaderExp | number,
+  thickness: PBShaderExp | number,
   HiZTexture: PBShaderExp
 ): PBShaderExp {
   const pb = scope.$builder;
@@ -323,7 +340,13 @@ export function screenSpaceRayTracing_HiZ(
   });
   pb.func(
     'SSR_HiZ_tracing',
-    [pb.vec3('samplePosInTS'), pb.vec3('reflectVecInTS'), pb.float('maxDistance'), pb.int('maxIteration')],
+    [
+      pb.vec3('samplePosInTS'),
+      pb.vec3('reflectVecInTS'),
+      pb.float('maxDistance'),
+      pb.float('thickness'),
+      pb.int('maxIteration')
+    ],
     function () {
       this.$l.maxLevel = pb.sub(this.depthMipLevels, 1);
       this.$l.crossStep = pb.vec2(
@@ -378,10 +401,10 @@ export function screenSpaceRayTracing_HiZ(
             this.ray
           );
           this.$l.newCellIndex = this.SSR_HiZ_getCell(this.tmpRay.xy, this.cellCount);
-          this.$l.thickness = this.$choice(pb.equal(this.level, 0), pb.sub(this.ray.z, this.cell_minZ), 0);
+          this.$l.thick = this.$choice(pb.equal(this.level, 0), pb.sub(this.ray.z, this.cell_minZ), 0);
           this.$l.crossed = pb.or(
             pb.and(this.isBackwardRay, pb.greaterThan(this.cell_minZ, this.ray.z)),
-            pb.greaterThan(this.thickness, 0.0001),
+            pb.greaterThan(this.thick, pb.mul(this.thickness, 0.001)),
             this.SSR_HiZ_crossedCellBoundary(this.oldCellIndex, this.newCellIndex)
           );
           this.ray = this.$choice(
@@ -404,10 +427,13 @@ export function screenSpaceRayTracing_HiZ(
           this.iter = pb.add(this.iter, 1);
         }
       );
-      this.$l.intersected = pb.and(pb.lessThan(this.cell_minZ, 1), pb.lessThan(this.level, this.stopLevel));
-      this.$return(
-        pb.vec4(this.ray.xy, this.cell_minZ, this.$choice(this.intersected, pb.float(1), pb.float(0)))
+      this.$l.vis = this.$choice(
+        pb.and(pb.lessThan(this.cell_minZ, 1), pb.lessThan(this.level, this.stopLevel)),
+        pb.float(1),
+        pb.float(0)
       );
+      this.$l.vis = pb.mul(this.vis, screenEdgeFading(this, this.ray.xy));
+      this.$return(pb.vec4(this.ray.xy, this.cell_minZ, this.vis));
     }
   );
   pb.func(
@@ -417,7 +443,8 @@ export function screenSpaceRayTracing_HiZ(
       pb.vec3('traceRay'),
       pb.mat4('projMatrix'),
       pb.float('maxDistance'),
-      pb.float('iteration')
+      pb.float('iteration'),
+      pb.float('thickness')
     ],
     function () {
       //this.$l.normalizedViewPos = pb.normalize(this.viewPos);
@@ -457,9 +484,15 @@ export function screenSpaceRayTracing_HiZ(
         )
       );
       this.$return(
-        this.SSR_HiZ_tracing(this.fragStartTS, this.reflectVecTS, this.maxDist, pb.int(this.iteration))
+        this.SSR_HiZ_tracing(
+          this.fragStartTS,
+          this.reflectVecTS,
+          this.maxDist,
+          this.thickness,
+          pb.int(this.iteration)
+        )
       );
     }
   );
-  return scope.SSR_HiZ(viewPos, traceRay, projMatrix, maxDistance, maxIteraions);
+  return scope.SSR_HiZ(viewPos, traceRay, projMatrix, maxDistance, maxIteraions, thickness);
 }
