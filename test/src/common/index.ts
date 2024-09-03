@@ -7,7 +7,8 @@ import type {
   ShadowMode,
   Compositor,
   AbstractPostEffect,
-  Camera
+  Camera,
+  FFTWaveGenerator
 } from '@zephyr3d/scene';
 import {
   PunctualLight,
@@ -318,6 +319,7 @@ export class Inspector {
   }
   private renderPostWater(water: PostWater) {
     if (ImGui.Begin('PostWater')) {
+      const g = water.waveGenerator as FFTWaveGenerator;
       const wireframe = [water.wireframe] as [boolean];
       if (ImGui.Checkbox('Wireframe##water', wireframe)) {
         water.wireframe = wireframe[0];
@@ -408,14 +410,14 @@ export class Inspector {
         -1,
         1
       );
-      const tmpWind = new Vector2(water.wind);
+      const tmpWind = new Vector2(g.wind);
       if (ImGui.SliderFloat2('Wind', tmpWind, 0, 64)) {
-        water.wind = tmpWind;
+        g.wind = tmpWind;
       }
       ImGui.SliderFloat(
         'FoamWidth##water',
         (val?: number) => {
-          return (water.foamWidth = val = val ?? water.foamWidth);
+          return (g.foamWidth = val = val ?? g.foamWidth);
         },
         0,
         2
@@ -423,27 +425,27 @@ export class Inspector {
       ImGui.SliderFloat(
         'FoamContrast##water',
         (val?: number) => {
-          return (water.foamContrast = val = val ?? water.foamContrast);
+          return (g.foamContrast = val = val ?? g.foamContrast);
         },
         0,
         8
       );
-      const alignment = [water.alignment] as [number];
+      const alignment = [g.alignment] as [number];
       if (ImGui.SliderFloat('alignment', alignment, 0, 4)) {
-        water.alignment = alignment[0];
+        g.alignment = alignment[0];
       }
       for (let i = 0; i < 3; i++) {
-        const size = [water[`waveLength${i}`]] as [number];
+        const size = [g.getWaveLength(i)] as [number];
         if (ImGui.SliderFloat(`Size${i}`, size, 0, 1000)) {
-          water[`waveLength${i}`] = size[0];
+          g.setWaveLength(i, size[0]);
         }
-        const strength = [water[`waveStrength${i}`]] as [number];
+        const strength = [g.getWaveStrength(i)] as [number];
         if (ImGui.SliderFloat(`Strength${i}`, strength, 0, 10)) {
-          water[`waveStrength${i}`] = strength[0];
+          g.setWaveStrength(i, strength[0]);
         }
-        const croppiness = [water[`waveCroppiness${i}`]] as [number];
+        const croppiness = [g.getWaveCroppiness(i)] as [number];
         if (ImGui.SliderFloat(`Croppiness${i}`, croppiness, -2, 2)) {
-          water[`waveCroppiness${i}`] = croppiness[0];
+          g.setWaveCroppiness(i, croppiness[0]);
         }
       }
     }

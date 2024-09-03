@@ -14,3 +14,5 @@ export * from './watermesh';
 export * from './oit';
 export * from './weightedblended_oit';
 export * from './abuffer_oit';
+export * from './wavegenerator';
+export * from './fft_wavegenerator';

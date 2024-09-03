@@ -14,7 +14,8 @@ import {
   PostWater,
   Tonemap,
   LambertMaterial,
-  PlaneShape
+  PlaneShape,
+  FFTWaveGenerator
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
@@ -54,7 +55,7 @@ instancingApp.ready().then(async () => {
 
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
-  compositor.appendPostEffect(new PostWater(-1));
+  compositor.appendPostEffect(new PostWater(-1, new FFTWaveGenerator()));
   const inspector = new common.Inspector(scene, compositor, camera);
 
   const batchGroup = new BatchGroup(scene);

@@ -19,6 +19,7 @@ import { CopyBlitter } from '../blitter';
 import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
 import { Application } from '../app';
 import { sampleLinearDepth, screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear } from '../shaders/ssr';
+import type { WaveGenerator } from '../render/wavegenerator';
 
 /**
  * The post water effect
@@ -46,7 +47,7 @@ export class PostWater extends AbstractPostEffect {
    * Creates an instance of PostWater.
    * @param elevation - Elevation of the water
    */
-  constructor(elevation: number) {
+  constructor(elevation: number, waveGenerator: WaveGenerator) {
     super();
     this._reflectSize = 512;
     this._antiReflectanceLeak = 0.5;
@@ -81,23 +82,14 @@ export class PostWater extends AbstractPostEffect {
       addressV: 'clamp'
     });
     this._waterImpls = {};
-    this._waterMesh = new WaterMesh(Application.instance.device);
-    this._waterMesh.foamWidth = 1.2;
-    this._waterMesh.foamContrast = 7.2;
+    this._waterMesh = new WaterMesh();
+    this._waterMesh.waveImpl = waveGenerator;
     this._waterMesh.wireframe = false;
-    this._waterMesh.alignment = 1;
-    this._waterMesh.wind = new Vector2(2, 2);
     this._waterMesh.gridScale = 1;
     this._waterMesh.level = elevation;
-    this._waterMesh.setWaveLength(0, 400);
-    this._waterMesh.setWaveStrength(0, 0.4);
-    this._waterMesh.setWaveCroppiness(0, -1.5);
-    this._waterMesh.setWaveLength(1, 100);
-    this._waterMesh.setWaveStrength(1, 0.4);
-    this._waterMesh.setWaveCroppiness(1, -1.2);
-    this._waterMesh.setWaveLength(2, 15);
-    this._waterMesh.setWaveStrength(2, 0.2);
-    this._waterMesh.setWaveCroppiness(2, -0.5);
+  }
+  get waveGenerator(): WaveGenerator {
+    return this._waterMesh.waveImpl;
   }
   get wireframe() {
     return this._waterMesh.wireframe;
@@ -128,84 +120,6 @@ export class PostWater extends AbstractPostEffect {
   }
   set ssrBinarySearchSteps(val: number) {
     this._ssrParams.w = val >> 0;
-  }
-  get alignment() {
-    return this._waterMesh.alignment;
-  }
-  set alignment(val: number) {
-    this._waterMesh.alignment = val;
-  }
-  get wind(): Vector2 {
-    return this._waterMesh.wind;
-  }
-  set wind(val: Vector2) {
-    this._waterMesh.wind = val;
-  }
-  get foamWidth() {
-    return this._waterMesh.foamWidth;
-  }
-  set foamWidth(val: number) {
-    this._waterMesh.foamWidth = val;
-  }
-  get foamContrast() {
-    return this._waterMesh.foamContrast;
-  }
-  set foamContrast(val: number) {
-    this._waterMesh.foamContrast = val;
-  }
-  get waveLength0() {
-    return this._waterMesh.getWaveLength(0);
-  }
-  set waveLength0(val: number) {
-    this._waterMesh.setWaveLength(0, val);
-  }
-  get waveStrength0() {
-    return this._waterMesh.getWaveStrength(0);
-  }
-  set waveStrength0(val: number) {
-    this._waterMesh.setWaveStrength(0, val);
-  }
-  get waveCroppiness0() {
-    return this._waterMesh.getWaveCroppiness(0);
-  }
-  set waveCroppiness0(val: number) {
-    this._waterMesh.setWaveCroppiness(0, val);
-  }
-  get waveLength1() {
-    return this._waterMesh.getWaveLength(1);
-  }
-  set waveLength1(val: number) {
-    this._waterMesh.setWaveLength(1, val);
-  }
-  get waveStrength1() {
-    return this._waterMesh.getWaveStrength(1);
-  }
-  set waveStrength1(val: number) {
-    this._waterMesh.setWaveStrength(1, val);
-  }
-  get waveCroppiness1() {
-    return this._waterMesh.getWaveCroppiness(1);
-  }
-  set waveCroppiness1(val: number) {
-    this._waterMesh.setWaveCroppiness(1, val);
-  }
-  get waveLength2() {
-    return this._waterMesh.getWaveLength(2);
-  }
-  set waveLength2(val: number) {
-    this._waterMesh.setWaveLength(2, val);
-  }
-  get waveStrength2() {
-    return this._waterMesh.getWaveStrength(2);
-  }
-  set waveStrength2(val: number) {
-    this._waterMesh.setWaveStrength(2, val);
-  }
-  get waveCroppiness2() {
-    return this._waterMesh.getWaveCroppiness(2);
-  }
-  set waveCroppiness2(val: number) {
-    this._waterMesh.setWaveCroppiness(2, val);
   }
   /** Refraction strength */
   get refractionStrength(): number {
@@ -334,31 +248,31 @@ export class PostWater extends AbstractPostEffect {
     }
     const cameraNearFar = new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
     const waterMesh = this._getWaterMesh(ctx);
-    waterMesh.bindGroup.setTexture('tex', inputColorTexture);
-    waterMesh.bindGroup.setTexture('depthTex', ctx.linearDepthTexture);
-    waterMesh.bindGroup.setTexture('rampTex', rampTex);
-    waterMesh.bindGroup.setTexture('envMap', this._envMap ?? ctx.scene.env.sky.bakedSkyTexture);
+    waterMesh.waterBindGroup.setTexture('tex', inputColorTexture);
+    waterMesh.waterBindGroup.setTexture('depthTex', ctx.linearDepthTexture);
+    waterMesh.waterBindGroup.setTexture('rampTex', rampTex);
+    waterMesh.waterBindGroup.setTexture('envMap', this._envMap ?? ctx.scene.env.sky.bakedSkyTexture);
     if (ssr) {
-      waterMesh.bindGroup.setValue('ssrParams', this._ssrParams);
+      waterMesh.waterBindGroup.setValue('ssrParams', this._ssrParams);
       if (ctx.HiZTexture) {
-        waterMesh.bindGroup.setTexture('hizTex', ctx.HiZTexture, this._hizdepthTexSampler);
-        waterMesh.bindGroup.setValue('depthMipLevels', ctx.HiZTexture.mipLevelCount);
+        waterMesh.waterBindGroup.setTexture('hizTex', ctx.HiZTexture, this._hizdepthTexSampler);
+        waterMesh.waterBindGroup.setValue('depthMipLevels', ctx.HiZTexture.mipLevelCount);
       }
     } else {
-      waterMesh.bindGroup.setTexture('reflectionTex', fbRefl.getColorAttachments()[0]);
+      waterMesh.waterBindGroup.setTexture('reflectionTex', fbRefl.getColorAttachments()[0]);
     }
-    waterMesh.bindGroup.setValue('invViewProj', ctx.camera.invViewProjectionMatrix);
-    waterMesh.bindGroup.setValue('invProjMatrix', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
-    waterMesh.bindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
+    waterMesh.waterBindGroup.setValue('invViewProj', ctx.camera.invViewProjectionMatrix);
+    waterMesh.waterBindGroup.setValue('invProjMatrix', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
+    waterMesh.waterBindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
     if (ssr) {
-      waterMesh.bindGroup.setValue('projMatrix', ctx.camera.getProjectionMatrix());
+      waterMesh.waterBindGroup.setValue('projMatrix', ctx.camera.getProjectionMatrix());
     }
-    waterMesh.bindGroup.setValue('cameraNearFar', cameraNearFar);
-    waterMesh.bindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
-    waterMesh.bindGroup.setValue('displace', this._displace / inputColorTexture.width);
-    waterMesh.bindGroup.setValue('depthMulti', this._depthMulti);
-    waterMesh.bindGroup.setValue('refractionStrength', this._refractionStrength);
-    waterMesh.bindGroup.setValue(
+    waterMesh.waterBindGroup.setValue('cameraNearFar', cameraNearFar);
+    waterMesh.waterBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
+    waterMesh.waterBindGroup.setValue('displace', this._displace / inputColorTexture.width);
+    waterMesh.waterBindGroup.setValue('depthMulti', this._depthMulti);
+    waterMesh.waterBindGroup.setValue('refractionStrength', this._refractionStrength);
+    waterMesh.waterBindGroup.setValue(
       'targetSize',
       this._targetSize.setXYZW(
         device.getFramebuffer().getWidth(),
@@ -367,16 +281,16 @@ export class PostWater extends AbstractPostEffect {
         inputColorTexture.height
       )
     );
-    waterMesh.bindGroup.setValue('waterLevel', this._waterMesh.level);
-    waterMesh.bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
+    waterMesh.waterBindGroup.setValue('waterLevel', this._waterMesh.level);
+    waterMesh.waterBindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
     if (ctx.sunLight) {
-      waterMesh.bindGroup.setValue('lightDir', ctx.sunLight.directionAndCutoff.xyz());
-      waterMesh.bindGroup.setValue('lightShininess', 0.7);
-      waterMesh.bindGroup.setValue('lightDiffuseAndIntensity', ctx.sunLight.diffuseAndIntensity);
+      waterMesh.waterBindGroup.setValue('lightDir', ctx.sunLight.directionAndCutoff.xyz());
+      waterMesh.waterBindGroup.setValue('lightShininess', 0.7);
+      waterMesh.waterBindGroup.setValue('lightDiffuseAndIntensity', ctx.sunLight.diffuseAndIntensity);
     }
     if (ctx.env.light.envLight) {
-      waterMesh.bindGroup.setValue('envLightStrength', ctx.env.light.strength);
-      ctx.env.light.envLight.updateBindGroup(waterMesh.bindGroup);
+      waterMesh.waterBindGroup.setValue('envLightStrength', ctx.env.light.strength);
+      ctx.env.light.envLight.updateBindGroup(waterMesh.waterBindGroup);
     }
     waterMesh.render(ctx.camera, this.needFlip(device));
   }
@@ -453,19 +367,14 @@ export class PostWater extends AbstractPostEffect {
             ctx.env.light.envLight.initShaderBindings(pb);
           }
         },
-        function (
-          this: WaterShaderImpl,
-          scope: PBInsideFunctionScope,
-          pos: PBShaderExp,
-          xz: PBShaderExp,
-          useComputeShader: boolean
-        ) {},
+        null, //function (this: WaterShaderImpl, scope: PBInsideFunctionScope, pos: PBShaderExp, xz: PBShaderExp) {},
         function (
           this: WaterShaderImpl,
           scope: PBInsideFunctionScope,
           worldPos: PBShaderExp,
           worldNormal: PBShaderExp,
-          foamFactor: PBShaderExp
+          foamFactor: PBShaderExp,
+          discardable: PBShaderExp
         ) {
           const pb = scope.$builder;
           pb.func('getAbsorption', [pb.float('depth')], function () {
@@ -650,12 +559,15 @@ export class PostWater extends AbstractPostEffect {
               this.$return(pb.vec4(this.finalColor, 1));
             }
           );
+          scope.$if(discardable, function () {
+            pb.discard();
+          });
           return pb.getGlobalScope()['waterShading'](worldPos, worldNormal, foamFactor);
         }
       );
       this._waterImpls[hash] = impl;
     }
-    this._waterMesh.impl = impl;
+    this._waterMesh.shadingImpl = impl;
 
     return this._waterMesh;
   }

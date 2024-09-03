@@ -8,6 +8,7 @@ import type {
   TextureFormat
 } from '@zephyr3d/device';
 import { Application } from '../app';
+import type { WaveGenerator } from '../render/wavegenerator';
 
 function getFragCoord(scope: PBGlobalScope, useComputeShader: boolean) {
   return useComputeShader ? scope.$builtins.globalInvocationId.xy : scope.$builtins.fragCoord.xy;
@@ -17,14 +18,14 @@ export type WaterVertexFunc = (
   this: WaterShaderImpl,
   scope: PBInsideFunctionScope,
   pos: PBShaderExp,
-  xz: PBShaderExp,
-  useComputeShader: boolean
+  xz: PBShaderExp
 ) => void;
 export type WaterShadingFunc = (
   scope: PBInsideFunctionScope,
   worldPos: PBShaderExp,
   worldNormal: PBShaderExp,
-  foamFactor: PBShaderExp
+  foamFactor: PBShaderExp,
+  discardable: PBShaderExp
 ) => PBShaderExp;
 export type WaterSetupUniformFunc = (this: WaterShaderImpl, scope: PBGlobalScope) => void;
 export class WaterShaderImpl {
@@ -43,8 +44,8 @@ export class WaterShaderImpl {
   setupUniforms(scope: PBGlobalScope): void {
     this._setupUniformsFunc?.call(this, scope);
   }
-  vertex(scope: PBInsideFunctionScope, pos: PBShaderExp, xz: PBShaderExp, useComputeShader: boolean) {
-    this._vertexFunc?.call(this, scope, pos, xz, useComputeShader);
+  vertex(scope: PBInsideFunctionScope, pos: PBShaderExp, xz: PBShaderExp) {
+    this._vertexFunc?.call(this, scope, pos, xz);
   }
   getVertexNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, useComputeShader: boolean): PBShaderExp {
     const pb = scope.$builder;
@@ -81,42 +82,28 @@ export class WaterShaderImpl {
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp,
     worldNormal: PBShaderExp,
-    foamFactor: PBShaderExp
+    foamFactor: PBShaderExp,
+    discardable: PBShaderExp
   ): PBShaderExp {
-    return this._shadingFunc?.call(this, scope, worldPos, worldNormal, foamFactor);
+    return this._shadingFunc?.call(this, scope, worldPos, worldNormal, foamFactor, discardable);
   }
 }
 
 /** @internal */
-export function createProgramOcean(useComputeShader: boolean, impl?: WaterShaderImpl) {
+export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: WaterShaderImpl) {
   return Application.instance.device.buildRenderProgram({
     vertex(pb) {
       this.$inputs.position = pb.vec3().attrib('position');
       this.$outputs.outPos = pb.vec3();
       this.$outputs.outXZ = pb.vec2();
-      this.$outputs.uv0 = pb.vec2();
-      this.$outputs.uv1 = pb.vec2();
-      this.$outputs.uv2 = pb.vec2();
       this.flip = pb.int().uniform(0);
       this.viewProjMatrix = pb.mat4().uniform(0);
       this.modelMatrix = pb.mat4().uniform(1);
       this.gridScale = pb.float().uniform(1);
       this.level = pb.float().uniform(0);
-      this.sizes = pb.vec4().uniform(0);
-      this.croppinesses = pb.vec4().uniform(0);
       this.offset = pb.vec2().uniform(1);
       this.scale = pb.float().uniform(1);
-      if (useComputeShader) {
-        this.dataTexture = pb.tex2DArray().uniform(0);
-      } else {
-        this.dx_hy_dz_dxdz0 = pb.tex2D().uniform(0);
-        this.sx_sz_dxdx_dzdz0 = pb.tex2D().uniform(0);
-        this.dx_hy_dz_dxdz1 = pb.tex2D().uniform(0);
-        this.sx_sz_dxdx_dzdz1 = pb.tex2D().uniform(0);
-        this.dx_hy_dz_dxdz2 = pb.tex2D().uniform(0);
-        this.sx_sz_dxdx_dzdz2 = pb.tex2D().uniform(0);
-      }
-      impl?.setupUniforms(this);
+      shadingImpl.setupUniforms(this);
       pb.main(function () {
         this.$l.xz = pb.mul(
           pb.add(
@@ -125,141 +112,37 @@ export function createProgramOcean(useComputeShader: boolean, impl?: WaterShader
           ),
           this.gridScale
         );
-        this.$outputs.uv0 = pb.div(this.xz, this.sizes.x);
-        this.$outputs.uv1 = pb.div(this.xz, this.sizes.y);
-        this.$outputs.uv2 = pb.div(this.xz, this.sizes.z);
-        if (useComputeShader) {
-          this.$l.a = pb.mul(
-            pb.textureArraySampleLevel(this.dataTexture, this.$outputs.uv0, 0, 0).rgb,
-            pb.vec3(this.croppinesses.x, 1, this.croppinesses.x)
-          );
-          this.$l.b = pb.mul(
-            pb.textureArraySampleLevel(this.dataTexture, this.$outputs.uv1, 2, 0).rgb,
-            pb.vec3(this.croppinesses.y, 1, this.croppinesses.y)
-          );
-          this.$l.c = pb.mul(
-            pb.textureArraySampleLevel(this.dataTexture, this.$outputs.uv2, 4, 0).rgb,
-            pb.vec3(this.croppinesses.z, 1, this.croppinesses.z)
-          );
-        } else {
-          this.$l.a = pb.mul(
-            pb.textureSampleLevel(this.dx_hy_dz_dxdz0, this.$outputs.uv0, 0).rgb,
-            pb.vec3(this.croppinesses.x, 1, this.croppinesses.x)
-          );
-          this.$l.b = pb.mul(
-            pb.textureSampleLevel(this.dx_hy_dz_dxdz1, this.$outputs.uv1, 0).rgb,
-            pb.vec3(this.croppinesses.y, 1, this.croppinesses.y)
-          );
-          this.$l.c = pb.mul(
-            pb.textureSampleLevel(this.dx_hy_dz_dxdz2, this.$outputs.uv2, 0).rgb,
-            pb.vec3(this.croppinesses.z, 1, this.croppinesses.z)
-          );
-        }
-        this.$l.displacement = pb.add(this.a, this.b, this.c);
-        this.$outputs.outPos = pb.add(pb.vec3(this.xz.x, this.level, this.xz.y), this.displacement);
+        this.$l.outPos = pb.vec3();
+        this.$l.outNormal = pb.vec3();
+        waveGenerator.calcVertexPositionAndNormal(
+          this,
+          pb.vec3(this.xz.x, this.level, this.xz.y),
+          this.outPos,
+          this.outNormal
+        );
+        this.$outputs.outPos = this.outPos;
         this.$outputs.outXZ = this.xz;
         this.$builtins.position = pb.mul(this.viewProjMatrix, pb.vec4(this.$outputs.outPos, 1));
         this.$if(pb.notEqual(this.flip, 0), function () {
           this.$builtins.position.y = pb.neg(this.$builtins.position.y);
         });
-        impl?.vertex(this, this.$outputs.outPos, this.$outputs.outXZ, useComputeShader);
+        shadingImpl.vertex(this, this.$outputs.outPos, this.$outputs.outXZ);
       });
     },
     fragment(pb) {
       this.$outputs.outColor = pb.vec4();
       this.pos = pb.vec3().uniform(0);
       this.region = pb.vec4().uniform(0);
-      this.foamParams = pb.vec2().uniform(0);
-      this.sizes = pb.vec4().uniform(0);
-      this.croppinesses = pb.vec4().uniform(0);
-      if (useComputeShader) {
-        this.dataTexture = pb.tex2DArray().uniform(0);
-      } else {
-        this.dx_hy_dz_dxdz0 = pb.tex2D().uniform(0);
-        this.sx_sz_dxdx_dzdz0 = pb.tex2D().uniform(0);
-        this.dx_hy_dz_dxdz1 = pb.tex2D().uniform(0);
-        this.sx_sz_dxdx_dzdz1 = pb.tex2D().uniform(0);
-        this.dx_hy_dz_dxdz2 = pb.tex2D().uniform(0);
-        this.sx_sz_dxdx_dzdz2 = pb.tex2D().uniform(0);
-      }
-      impl?.setupUniforms(this);
-      pb.func('jacobian', [pb.float('dxdx'), pb.float('dxdz'), pb.float('dzdz')], function () {
-        this.$l.Jxx = pb.add(this.dxdx, 1);
-        this.$l.Jxz = this.dxdz;
-        this.$l.Jzz = pb.add(this.dzdz, 1);
-        this.$return(pb.vec4(this.Jxx, this.Jxz, this.Jxz, this.Jzz));
-      });
-      pb.func('det', [pb.vec4('jacobian')], function () {
-        this.$return(
-          pb.sub(pb.mul(this.jacobian.x, this.jacobian.w), pb.mul(this.jacobian.y, this.jacobian.z))
-        );
-      });
-      pb.func('getNormalAndFoam', [pb.vec2('xz')], function () {
-        this.$l.uv0 = pb.div(this.xz, this.sizes.x);
-        this.$l.uv1 = pb.div(this.xz, this.sizes.y);
-        this.$l.uv2 = pb.div(this.xz, this.sizes.z);
-        if (useComputeShader) {
-          this.$l._sx_sz_dxdx_dzdz0 = pb.textureArraySampleLevel(this.dataTexture, this.uv0, 1, 0);
-          this.$l._sx_sz_dxdx_dzdz1 = pb.textureArraySampleLevel(this.dataTexture, this.uv1, 3, 0);
-          this.$l._sx_sz_dxdx_dzdz2 = pb.textureArraySampleLevel(this.dataTexture, this.uv2, 5, 0);
-        } else {
-          this.$l._sx_sz_dxdx_dzdz0 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz0, this.uv0, 0);
-          this.$l._sx_sz_dxdx_dzdz1 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz1, this.uv1, 0);
-          this.$l._sx_sz_dxdx_dzdz2 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz2, this.uv2, 0);
-        }
-        this.$l.sx = pb.add(this._sx_sz_dxdx_dzdz0.x, this._sx_sz_dxdx_dzdz1.x, this._sx_sz_dxdx_dzdz2.x);
-        this.$l.sz = pb.add(this._sx_sz_dxdx_dzdz0.y, this._sx_sz_dxdx_dzdz1.y, this._sx_sz_dxdx_dzdz2.y);
-        this.$l.dxdx_dzdz = pb.add(
-          pb.mul(this._sx_sz_dxdx_dzdz0.zw, this.croppinesses.x),
-          pb.mul(this._sx_sz_dxdx_dzdz1.zw, this.croppinesses.y),
-          pb.mul(this._sx_sz_dxdx_dzdz2.zw, this.croppinesses.z)
-        );
-        this.$l.slope = pb.vec2(
-          pb.div(this.sx, pb.add(1.0, this.dxdx_dzdz.x)),
-          pb.div(this.sz, pb.add(1.0, this.dxdx_dzdz.y))
-        );
-        this.$l.normal = pb.normalize(pb.vec3(pb.neg(this.slope.x), 1.0, pb.neg(this.slope.y)));
-
-        // foam
-        this.$l.dxdx_dzdz0 = this._sx_sz_dxdx_dzdz0.zw;
-        this.$l.dxdx_dzdz1 = this._sx_sz_dxdx_dzdz1.zw;
-        this.$l.dxdx_dzdz2 = this._sx_sz_dxdx_dzdz2.zw;
-        if (useComputeShader) {
-          this.$l.dxdz0 = pb.textureArraySampleLevel(this.dataTexture, this.uv0, 0, 0).w;
-          this.$l.dxdz1 = pb.textureArraySampleLevel(this.dataTexture, this.uv1, 2, 0).w;
-          this.$l.dxdz2 = pb.textureArraySampleLevel(this.dataTexture, this.uv2, 4, 0).w;
-        } else {
-          this.$l.dxdz0 = pb.textureSampleLevel(this.dx_hy_dz_dxdz0, this.uv0, 0).w;
-          this.$l.dxdz1 = pb.textureSampleLevel(this.dx_hy_dz_dxdz1, this.uv1, 0).w;
-          this.$l.dxdz2 = pb.textureSampleLevel(this.dx_hy_dz_dxdz2, this.uv2, 0).w;
-        }
-        this.$l.dxdz = pb.add(
-          pb.mul(this.dxdz0, this.croppinesses.x),
-          pb.mul(this.dxdz1, this.croppinesses.y),
-          pb.mul(this.dxdz2, this.croppinesses.z)
-        );
-        this.$l.val = this.det(this.jacobian(this.dxdx_dzdz.x, this.dxdz, this.dxdx_dzdz.y));
-        this.$l.foam = pb.abs(
-          pb.pow(pb.neg(pb.min(0, pb.sub(this.val, this.foamParams.x))), this.foamParams.y)
-        );
-        this.$return(pb.vec4(this.normal, this.foam));
-      });
+      shadingImpl.setupUniforms(this);
       pb.main(function () {
-        this.$if(
-          pb.or(
-            pb.any(pb.lessThan(this.$inputs.outXZ, this.region.xy)),
-            pb.any(pb.greaterThan(this.$inputs.outXZ, this.region.zw))
-          ),
-          function () {
-            pb.discard();
-          }
+        this.$l.discardable = pb.or(
+          pb.any(pb.lessThan(this.$inputs.outXZ, this.region.xy)),
+          pb.any(pb.greaterThan(this.$inputs.outXZ, this.region.zw))
         );
-
-        this.$l.n = this.getNormalAndFoam(this.$inputs.outXZ);
+        this.$l.n = waveGenerator.calcFragmentNormalAndFoam(this, this.$inputs.outXZ);
         this.$outputs.outColor =
-          impl?.shading(this, this.$inputs.outPos, this.n.xyz, this.n.w) ??
+          shadingImpl.shading(this, this.$inputs.outPos, this.n.xyz, this.n.w, this.discardable) ??
           pb.vec4(pb.add(pb.mul(this.n.xyz, 0.5), pb.vec3(0.5)), 1);
-        //this.$outputs.outColor = pb.vec4(pb.fract(this.$inputs.uv0), 0, 1);
       });
     }
   });
