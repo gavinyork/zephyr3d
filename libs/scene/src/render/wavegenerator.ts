@@ -1,5 +1,5 @@
 import type { AABB } from '@zephyr3d/base';
-import type { BindGroup, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import type { AbstractDevice, BindGroup, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 
 export abstract class WaveGenerator {
   abstract calcVertexPositionAndNormal(
@@ -8,7 +8,11 @@ export abstract class WaveGenerator {
     outPos: PBShaderExp,
     outNormal: PBShaderExp
   ): void;
-  abstract calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp;
+  abstract calcFragmentNormalAndFoam(
+    scope: PBInsideFunctionScope,
+    xz: PBShaderExp,
+    vertexNormal: PBShaderExp
+  ): PBShaderExp;
   abstract applyWaterBindGroup(bindGroup: BindGroup): void;
   abstract calcClipmapTileAABB(
     minX: number,
@@ -19,6 +23,7 @@ export abstract class WaveGenerator {
     outAABB: AABB
   );
   abstract update(timeInSeconds: number): void;
-  abstract isOk(): boolean;
+  abstract getHash(device: AbstractDevice): string;
+  abstract isOk(device: AbstractDevice): boolean;
   abstract dispose(): void;
 }

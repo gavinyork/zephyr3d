@@ -1274,4 +1274,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     outAABB.minPoint.setXYZ(minX - 8 * disturb, y - 8 * disturb, minZ - 8 * disturb);
     outAABB.maxPoint.setXYZ(maxX + 8 * disturb, y + 8 * disturb, maxZ + 8 * disturb);
   }
+  getHash(): string {
+    return '';
+  }
 }

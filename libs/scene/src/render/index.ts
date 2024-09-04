@@ -16,3 +16,4 @@ export * from './weightedblended_oit';
 export * from './abuffer_oit';
 export * from './wavegenerator';
 export * from './fft_wavegenerator';
+export * from './gerstner_wavegenerator';

@@ -248,31 +248,32 @@ export class PostWater extends AbstractPostEffect {
     }
     const cameraNearFar = new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
     const waterMesh = this._getWaterMesh(ctx);
-    waterMesh.waterBindGroup.setTexture('tex', inputColorTexture);
-    waterMesh.waterBindGroup.setTexture('depthTex', ctx.linearDepthTexture);
-    waterMesh.waterBindGroup.setTexture('rampTex', rampTex);
-    waterMesh.waterBindGroup.setTexture('envMap', this._envMap ?? ctx.scene.env.sky.bakedSkyTexture);
+    const waterBindGroup = waterMesh.getWaterBindGroup(ctx.device);
+    waterBindGroup.setTexture('tex', inputColorTexture);
+    waterBindGroup.setTexture('depthTex', ctx.linearDepthTexture);
+    waterBindGroup.setTexture('rampTex', rampTex);
+    waterBindGroup.setTexture('envMap', this._envMap ?? ctx.scene.env.sky.bakedSkyTexture);
     if (ssr) {
-      waterMesh.waterBindGroup.setValue('ssrParams', this._ssrParams);
+      waterBindGroup.setValue('ssrParams', this._ssrParams);
       if (ctx.HiZTexture) {
-        waterMesh.waterBindGroup.setTexture('hizTex', ctx.HiZTexture, this._hizdepthTexSampler);
-        waterMesh.waterBindGroup.setValue('depthMipLevels', ctx.HiZTexture.mipLevelCount);
+        waterBindGroup.setTexture('hizTex', ctx.HiZTexture, this._hizdepthTexSampler);
+        waterBindGroup.setValue('depthMipLevels', ctx.HiZTexture.mipLevelCount);
       }
     } else {
-      waterMesh.waterBindGroup.setTexture('reflectionTex', fbRefl.getColorAttachments()[0]);
+      waterBindGroup.setTexture('reflectionTex', fbRefl.getColorAttachments()[0]);
     }
-    waterMesh.waterBindGroup.setValue('invViewProj', ctx.camera.invViewProjectionMatrix);
-    waterMesh.waterBindGroup.setValue('invProjMatrix', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
-    waterMesh.waterBindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
+    waterBindGroup.setValue('invViewProj', ctx.camera.invViewProjectionMatrix);
+    waterBindGroup.setValue('invProjMatrix', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
+    waterBindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
     if (ssr) {
-      waterMesh.waterBindGroup.setValue('projMatrix', ctx.camera.getProjectionMatrix());
+      waterBindGroup.setValue('projMatrix', ctx.camera.getProjectionMatrix());
     }
-    waterMesh.waterBindGroup.setValue('cameraNearFar', cameraNearFar);
-    waterMesh.waterBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
-    waterMesh.waterBindGroup.setValue('displace', this._displace / inputColorTexture.width);
-    waterMesh.waterBindGroup.setValue('depthMulti', this._depthMulti);
-    waterMesh.waterBindGroup.setValue('refractionStrength', this._refractionStrength);
-    waterMesh.waterBindGroup.setValue(
+    waterBindGroup.setValue('cameraNearFar', cameraNearFar);
+    waterBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
+    waterBindGroup.setValue('displace', this._displace / inputColorTexture.width);
+    waterBindGroup.setValue('depthMulti', this._depthMulti);
+    waterBindGroup.setValue('refractionStrength', this._refractionStrength);
+    waterBindGroup.setValue(
       'targetSize',
       this._targetSize.setXYZW(
         device.getFramebuffer().getWidth(),
@@ -281,18 +282,18 @@ export class PostWater extends AbstractPostEffect {
         inputColorTexture.height
       )
     );
-    waterMesh.waterBindGroup.setValue('waterLevel', this._waterMesh.level);
-    waterMesh.waterBindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
+    waterBindGroup.setValue('waterLevel', this._waterMesh.level);
+    waterBindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
     if (ctx.sunLight) {
-      waterMesh.waterBindGroup.setValue('lightDir', ctx.sunLight.directionAndCutoff.xyz());
-      waterMesh.waterBindGroup.setValue('lightShininess', 0.7);
-      waterMesh.waterBindGroup.setValue('lightDiffuseAndIntensity', ctx.sunLight.diffuseAndIntensity);
+      waterBindGroup.setValue('lightDir', ctx.sunLight.directionAndCutoff.xyz());
+      waterBindGroup.setValue('lightShininess', 0.7);
+      waterBindGroup.setValue('lightDiffuseAndIntensity', ctx.sunLight.diffuseAndIntensity);
     }
     if (ctx.env.light.envLight) {
-      waterMesh.waterBindGroup.setValue('envLightStrength', ctx.env.light.strength);
-      ctx.env.light.envLight.updateBindGroup(waterMesh.waterBindGroup);
+      waterBindGroup.setValue('envLightStrength', ctx.env.light.strength);
+      ctx.env.light.envLight.updateBindGroup(waterBindGroup);
     }
-    waterMesh.render(ctx.camera, this.needFlip(device));
+    waterMesh.render(ctx.device, ctx.camera, this.needFlip(device));
   }
   /** @internal */
   private _getRampTexture(device: AbstractDevice) {

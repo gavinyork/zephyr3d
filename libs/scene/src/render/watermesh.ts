@@ -24,6 +24,7 @@ export class WaterMesh {
   private _clipmap: Clipmap;
   private _updateFrameStamp: number;
   private _waterProgram: GPUProgram;
+  private _waveGeneratorHash: string;
   constructor() {
     this._waterProgram = null; //this._impl ? createProgramOcean(this._useComputeShader, this._impl) : null;
     this._waterBindGroup = null; //this._waterProgram ? device.createBindGroup(this._waterProgram.bindGroupLayouts[0]) : null;
@@ -40,6 +41,7 @@ export class WaterMesh {
     this._updateFrameStamp = -1;
     this._usedClipmapBindGroups = [];
     this._freeClipmapBindGroups = [];
+    this._waveGeneratorHash = '';
   }
   get speed() {
     return this._speed;
@@ -76,24 +78,31 @@ export class WaterMesh {
     }
   }
   /** @internal */
-  get waterProgram(): GPUProgram {
-    if (!this._waterProgram && this._impl && this._waveGenerator) {
-      this._waterProgram = createProgramOcean(this._waveGenerator, this._impl);
-      this._waterBindGroup = Application.instance.device.createBindGroup(
-        this._waterProgram.bindGroupLayouts[0]
-      );
-    }
-    return this._waterProgram;
+  getWaterBindGroup(device: AbstractDevice): BindGroup {
+    return this.prepareForRender(device) ? this._waterBindGroup : null;
   }
   /** @internal */
-  get waterBindGroup(): BindGroup {
-    if (!this._waterProgram && this._impl && this._waveGenerator) {
-      this._waterProgram = createProgramOcean(this._waveGenerator, this._impl);
-      this._waterBindGroup = Application.instance.device.createBindGroup(
-        this._waterProgram.bindGroupLayouts[0]
-      );
+  prepareForRender(device: AbstractDevice): boolean {
+    if (!this._impl || !this._waveGenerator?.isOk(device)) {
+      return false;
     }
-    return this._waterBindGroup;
+    if (this._waterProgram && this._waveGeneratorHash !== this._waveGenerator.getHash(device)) {
+      this._waterProgram.dispose();
+      this._waterProgram = null;
+      this._waterBindGroup.dispose();
+      this._waterBindGroup = null;
+    }
+    if (!this._waterProgram) {
+      this._waterProgram = createProgramOcean(this._waveGenerator, this._impl);
+      this._waterBindGroup = device.createBindGroup(this._waterProgram.bindGroupLayouts[0]);
+      this._waveGeneratorHash = this._waveGenerator.getHash(device);
+    }
+    if (!this._waterRenderStates) {
+      this._waterRenderStates = device.createRenderStateSet();
+      this._waterRenderStates.useRasterizerState().setCullMode('none');
+      this._waterRenderStates.useDepthState().enableTest(true).enableWrite(true).setCompareFunc('le');
+    }
+    return true;
   }
   get level() {
     return this._level;
@@ -140,30 +149,24 @@ export class WaterMesh {
     this._freeClipmapBindGroups.push(bindGroup);
     return bindGroup;
   }
-  render(camera: Camera, flip?: boolean) {
-    if (!this._waveGenerator || !this._waveGenerator.isOk()) {
+  render(device: AbstractDevice, camera: Camera, flip?: boolean) {
+    if (!this.prepareForRender(device)) {
       return;
     }
-    const program = this.waterProgram;
-    const bindGroup = this.waterBindGroup;
-    if (!program || !bindGroup) {
-      return;
-    }
-    const device = Application.instance.device;
     if (device.frameInfo.frameCounter !== this._updateFrameStamp) {
       this._updateFrameStamp = device.frameInfo.frameCounter;
       this._waveGenerator.update(device.frameInfo.elapsedOverall * 0.001 * this._speed);
     }
     const cameraPos = camera.getWorldPosition();
-    device.setProgram(program);
-    device.setBindGroup(0, bindGroup);
+    device.setProgram(this._waterProgram);
+    device.setBindGroup(0, this._waterBindGroup);
     device.setRenderStates(this._waterRenderStates);
-    this._waveGenerator.applyWaterBindGroup(bindGroup);
-    bindGroup.setValue('region', this._region);
-    bindGroup.setValue('viewProjMatrix', camera.viewProjectionMatrix);
-    bindGroup.setValue('level', this._level);
-    bindGroup.setValue('pos', cameraPos);
-    bindGroup.setValue('flip', flip ? 1 : 0);
+    this._waveGenerator.applyWaterBindGroup(this._waterBindGroup);
+    this._waterBindGroup.setValue('region', this._region);
+    this._waterBindGroup.setValue('viewProjMatrix', camera.viewProjectionMatrix);
+    this._waterBindGroup.setValue('level', this._level);
+    this._waterBindGroup.setValue('pos', cameraPos);
+    this._waterBindGroup.setValue('flip', flip ? 1 : 0);
     const that = this;
     const position = new Vector3(cameraPos.x, cameraPos.z, 0);
     const distX = Math.max(Math.abs(position.x - this._region.x), Math.abs(position.x - this._region.z));

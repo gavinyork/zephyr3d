@@ -95,6 +95,7 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
     vertex(pb) {
       this.$inputs.position = pb.vec3().attrib('position');
       this.$outputs.outPos = pb.vec3();
+      this.$outputs.outNormal = pb.vec3();
       this.$outputs.outXZ = pb.vec2();
       this.flip = pb.int().uniform(0);
       this.viewProjMatrix = pb.mat4().uniform(0);
@@ -121,6 +122,7 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
           this.outNormal
         );
         this.$outputs.outPos = this.outPos;
+        this.$outputs.outNormal = this.outNormal;
         this.$outputs.outXZ = this.xz;
         this.$builtins.position = pb.mul(this.viewProjMatrix, pb.vec4(this.$outputs.outPos, 1));
         this.$if(pb.notEqual(this.flip, 0), function () {
@@ -139,7 +141,7 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
           pb.any(pb.lessThan(this.$inputs.outXZ, this.region.xy)),
           pb.any(pb.greaterThan(this.$inputs.outXZ, this.region.zw))
         );
-        this.$l.n = waveGenerator.calcFragmentNormalAndFoam(this, this.$inputs.outXZ);
+        this.$l.n = waveGenerator.calcFragmentNormalAndFoam(this, this.$inputs.outXZ, this.$inputs.outNormal);
         this.$outputs.outColor =
           shadingImpl.shading(this, this.$inputs.outPos, this.n.xyz, this.n.w, this.discardable) ??
           pb.vec4(pb.add(pb.mul(this.n.xyz, 0.5), pb.vec3(0.5)), 1);

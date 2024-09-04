@@ -7,9 +7,9 @@ import type {
   ShadowMode,
   Compositor,
   AbstractPostEffect,
-  Camera,
-  FFTWaveGenerator
+  Camera
 } from '@zephyr3d/scene';
+import { FFTWaveGenerator, GerstnerWaveGenerator } from '@zephyr3d/scene';
 import {
   PunctualLight,
   AssetManager,
@@ -317,139 +317,174 @@ export class Inspector {
       }
     }
   }
+  private renderPostWaterCommon(water: PostWater) {
+    const wireframe = [water.wireframe] as [boolean];
+    if (ImGui.Checkbox('Wireframe##water', wireframe)) {
+      water.wireframe = wireframe[0];
+    }
+    const ssr = [water.ssr] as [boolean];
+    if (ImGui.Checkbox('SSR##water', ssr)) {
+      water.ssr = ssr[0];
+    }
+    ImGui.SliderFloat(
+      'GridScale##water',
+      (val?: number) => {
+        return (water.gridScale = val = val ?? water.gridScale);
+      },
+      0,
+      1
+    );
+    ImGui.SliderFloat(
+      'Speed##water',
+      (val?: number) => {
+        return (water.speed = val = val ?? water.speed);
+      },
+      0,
+      10
+    );
+    ImGui.SliderFloat(
+      'Elevation##water',
+      (val?: number) => {
+        return (water.elevation = val = val ?? water.elevation);
+      },
+      -100,
+      100
+    );
+    const region = Array.from(water.boundary) as [number, number, number, number];
+    if (ImGui.SliderFloat4('Region##water', region, -1000, 1000)) {
+      water.boundary.set(region);
+    }
+    ImGui.SliderFloat(
+      'SSRMaxDistance##water',
+      (val?: number) => (water.ssrMaxDistance = val = val ?? water.ssrMaxDistance),
+      0,
+      1000
+    );
+    ImGui.SliderInt(
+      'SSRIterations##water',
+      (val?: number) => (water.ssrIterations = val = val ?? water.ssrIterations),
+      1,
+      200
+    );
+    ImGui.SliderFloat(
+      'SSRThickness##water',
+      (val?: number) => (water.ssrThickness = val = val ?? water.ssrThickness),
+      0,
+      5
+    );
+    ImGui.SliderInt(
+      'SSRBinarySearchSteps##water',
+      (val?: number) => (water.ssrBinarySearchSteps = val = val ?? water.ssrBinarySearchSteps),
+      0,
+      16
+    );
+    ImGui.SliderFloat(
+      'AntiReflectanceLeak##water',
+      (val?: number) => (water.antiReflectanceLeak = val = val ?? water.antiReflectanceLeak),
+      0,
+      10
+    );
+    ImGui.SliderFloat(
+      'Displace##water',
+      (val?: number) => {
+        return (water.displace = val = val ?? water.displace);
+      },
+      1,
+      100
+    );
+    ImGui.SliderFloat(
+      'DepthMulti##water',
+      (val?: number) => {
+        return (water.depthMulti = val = val ?? water.depthMulti);
+      },
+      0,
+      1
+    );
+    ImGui.SliderFloat(
+      'RefractionStrength##water',
+      (val?: number) => {
+        return (water.refractionStrength = val = val ?? water.refractionStrength);
+      },
+      -1,
+      1
+    );
+  }
   private renderPostWater(water: PostWater) {
     if (ImGui.Begin('PostWater')) {
-      const g = water.waveGenerator as FFTWaveGenerator;
-      const wireframe = [water.wireframe] as [boolean];
-      if (ImGui.Checkbox('Wireframe##water', wireframe)) {
-        water.wireframe = wireframe[0];
-      }
-      const ssr = [water.ssr] as [boolean];
-      if (ImGui.Checkbox('SSR##water', ssr)) {
-        water.ssr = ssr[0];
-      }
-      ImGui.SliderFloat(
-        'GridScale##water',
-        (val?: number) => {
-          return (water.gridScale = val = val ?? water.gridScale);
-        },
-        0,
-        1
-      );
-      ImGui.SliderFloat(
-        'Speed##water',
-        (val?: number) => {
-          return (water.speed = val = val ?? water.speed);
-        },
-        0,
-        10
-      );
-      ImGui.SliderFloat(
-        'Elevation##water',
-        (val?: number) => {
-          return (water.elevation = val = val ?? water.elevation);
-        },
-        -100,
-        100
-      );
-      const region = Array.from(water.boundary) as [number, number, number, number];
-      if (ImGui.SliderFloat4('Region##water', region, -1000, 1000)) {
-        water.boundary.set(region);
-      }
-      ImGui.SliderFloat(
-        'SSRMaxDistance##water',
-        (val?: number) => (water.ssrMaxDistance = val = val ?? water.ssrMaxDistance),
-        0,
-        1000
-      );
-      ImGui.SliderInt(
-        'SSRIterations##water',
-        (val?: number) => (water.ssrIterations = val = val ?? water.ssrIterations),
-        1,
-        200
-      );
-      ImGui.SliderFloat(
-        'SSRThickness##water',
-        (val?: number) => (water.ssrThickness = val = val ?? water.ssrThickness),
-        0,
-        5
-      );
-      ImGui.SliderInt(
-        'SSRBinarySearchSteps##water',
-        (val?: number) => (water.ssrBinarySearchSteps = val = val ?? water.ssrBinarySearchSteps),
-        0,
-        16
-      );
-      ImGui.SliderFloat(
-        'AntiReflectanceLeak##water',
-        (val?: number) => (water.antiReflectanceLeak = val = val ?? water.antiReflectanceLeak),
-        0,
-        10
-      );
-      ImGui.SliderFloat(
-        'Displace##water',
-        (val?: number) => {
-          return (water.displace = val = val ?? water.displace);
-        },
-        1,
-        100
-      );
-      ImGui.SliderFloat(
-        'DepthMulti##water',
-        (val?: number) => {
-          return (water.depthMulti = val = val ?? water.depthMulti);
-        },
-        0,
-        1
-      );
-      ImGui.SliderFloat(
-        'RefractionStrength##water',
-        (val?: number) => {
-          return (water.refractionStrength = val = val ?? water.refractionStrength);
-        },
-        -1,
-        1
-      );
-      const tmpWind = new Vector2(g.wind);
-      if (ImGui.SliderFloat2('Wind', tmpWind, 0, 64)) {
-        g.wind = tmpWind;
-      }
-      ImGui.SliderFloat(
-        'FoamWidth##water',
-        (val?: number) => {
-          return (g.foamWidth = val = val ?? g.foamWidth);
-        },
-        0,
-        2
-      );
-      ImGui.SliderFloat(
-        'FoamContrast##water',
-        (val?: number) => {
-          return (g.foamContrast = val = val ?? g.foamContrast);
-        },
-        0,
-        8
-      );
-      const alignment = [g.alignment] as [number];
-      if (ImGui.SliderFloat('alignment', alignment, 0, 4)) {
-        g.alignment = alignment[0];
-      }
-      for (let i = 0; i < 3; i++) {
-        const size = [g.getWaveLength(i)] as [number];
-        if (ImGui.SliderFloat(`Size${i}`, size, 0, 1000)) {
-          g.setWaveLength(i, size[0]);
-        }
-        const strength = [g.getWaveStrength(i)] as [number];
-        if (ImGui.SliderFloat(`Strength${i}`, strength, 0, 10)) {
-          g.setWaveStrength(i, strength[0]);
-        }
-        const croppiness = [g.getWaveCroppiness(i)] as [number];
-        if (ImGui.SliderFloat(`Croppiness${i}`, croppiness, -2, 2)) {
-          g.setWaveCroppiness(i, croppiness[0]);
-        }
+      this.renderPostWaterCommon(water);
+      if (water.waveGenerator instanceof FFTWaveGenerator) {
+        this.renderPostWaterFFT(water);
+      } else if (water.waveGenerator instanceof GerstnerWaveGenerator) {
+        this.renderPostWaterGerstner(water);
       }
     }
     ImGui.End();
+  }
+  private renderPostWaterGerstner(water: PostWater) {
+    const t = water.waveGenerator as GerstnerWaveGenerator;
+    const numWaves = [t.numWaves] as [number];
+    if (ImGui.SliderInt('WaveCount##water', numWaves, 1, 64)) {
+      t.numWaves = numWaves[0];
+    }
+    for (let i = 0; i < t.numWaves; i++) {
+      ImGui.PushID(i);
+      if (ImGui.CollapsingHeader(`Wave${i}`)) {
+        const direction = [t.getWaveDirectionX(i), t.getWaveDirectionY(i)] as [number, number];
+        if (ImGui.SliderFloat2(`Direction##Wave${i}`, direction, -1, 1)) {
+          t.setWaveDirection(i, direction[0], direction[1]);
+        }
+        const steepness = [t.getWaveAmplitude(i)] as [number];
+        if (ImGui.SliderFloat(`Steepness##Wave${i}`, steepness, 0, 1)) {
+          t.setWaveAmplitude(i, steepness[0]);
+        }
+        const waveLength = [t.getWaveLength(i)] as [number];
+        if (ImGui.SliderFloat(`WaveLength##Wave${i}`, waveLength, 0, 100)) {
+          t.setWaveLength(i, waveLength[0]);
+        }
+      }
+      ImGui.PopID();
+    }
+  }
+  private renderPostWaterFFT(water: PostWater) {
+    const g = water.waveGenerator as FFTWaveGenerator;
+    const tmpWind = new Vector2(g.wind);
+    if (ImGui.SliderFloat2('Wind', tmpWind, 0, 64)) {
+      g.wind = tmpWind;
+    }
+    ImGui.SliderFloat(
+      'FoamWidth##water',
+      (val?: number) => {
+        return (g.foamWidth = val = val ?? g.foamWidth);
+      },
+      0,
+      2
+    );
+    ImGui.SliderFloat(
+      'FoamContrast##water',
+      (val?: number) => {
+        return (g.foamContrast = val = val ?? g.foamContrast);
+      },
+      0,
+      8
+    );
+    const alignment = [g.alignment] as [number];
+    if (ImGui.SliderFloat('alignment', alignment, 0, 4)) {
+      g.alignment = alignment[0];
+    }
+    for (let i = 0; i < 3; i++) {
+      const size = [g.getWaveLength(i)] as [number];
+      if (ImGui.SliderFloat(`Size${i}`, size, 0, 1000)) {
+        g.setWaveLength(i, size[0]);
+      }
+      const strength = [g.getWaveStrength(i)] as [number];
+      if (ImGui.SliderFloat(`Strength${i}`, strength, 0, 10)) {
+        g.setWaveStrength(i, strength[0]);
+      }
+      const croppiness = [g.getWaveCroppiness(i)] as [number];
+      if (ImGui.SliderFloat(`Croppiness${i}`, croppiness, -2, 2)) {
+        g.setWaveCroppiness(i, croppiness[0]);
+      }
+    }
   }
   private renderSAO(sao: SAO) {
     if (ImGui.Begin('SAO')) {
