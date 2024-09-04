@@ -18,14 +18,16 @@ export type WaterVertexFunc = (
   this: WaterShaderImpl,
   scope: PBInsideFunctionScope,
   pos: PBShaderExp,
-  xz: PBShaderExp
+  xz: PBShaderExp,
+  waveGenerator: WaveGenerator
 ) => void;
 export type WaterShadingFunc = (
   scope: PBInsideFunctionScope,
   worldPos: PBShaderExp,
   worldNormal: PBShaderExp,
   foamFactor: PBShaderExp,
-  discardable: PBShaderExp
+  discardable: PBShaderExp,
+  waveGenerator: WaveGenerator
 ) => PBShaderExp;
 export type WaterSetupUniformFunc = (this: WaterShaderImpl, scope: PBGlobalScope) => void;
 export class WaterShaderImpl {
@@ -44,8 +46,8 @@ export class WaterShaderImpl {
   setupUniforms(scope: PBGlobalScope): void {
     this._setupUniformsFunc?.call(this, scope);
   }
-  vertex(scope: PBInsideFunctionScope, pos: PBShaderExp, xz: PBShaderExp) {
-    this._vertexFunc?.call(this, scope, pos, xz);
+  vertex(scope: PBInsideFunctionScope, pos: PBShaderExp, xz: PBShaderExp, waveGenerator: WaveGenerator) {
+    this._vertexFunc?.call(this, scope, pos, xz, waveGenerator);
   }
   getVertexNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, useComputeShader: boolean): PBShaderExp {
     const pb = scope.$builder;
@@ -83,9 +85,18 @@ export class WaterShaderImpl {
     worldPos: PBShaderExp,
     worldNormal: PBShaderExp,
     foamFactor: PBShaderExp,
-    discardable: PBShaderExp
+    discardable: PBShaderExp,
+    waveGenerator: WaveGenerator
   ): PBShaderExp {
-    return this._shadingFunc?.call(this, scope, worldPos, worldNormal, foamFactor, discardable);
+    return this._shadingFunc?.call(
+      this,
+      scope,
+      worldPos,
+      worldNormal,
+      foamFactor,
+      discardable,
+      waveGenerator
+    );
   }
 }
 
@@ -105,6 +116,7 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
       this.offset = pb.vec2().uniform(1);
       this.scale = pb.float().uniform(1);
       shadingImpl.setupUniforms(this);
+      waveGenerator.setupUniforms(this);
       pb.main(function () {
         this.$l.xz = pb.mul(
           pb.add(
@@ -128,7 +140,7 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
         this.$if(pb.notEqual(this.flip, 0), function () {
           this.$builtins.position.y = pb.neg(this.$builtins.position.y);
         });
-        shadingImpl.vertex(this, this.$outputs.outPos, this.$outputs.outXZ);
+        shadingImpl.vertex(this, this.$outputs.outPos, this.$outputs.outXZ, waveGenerator);
       });
     },
     fragment(pb) {
@@ -136,6 +148,7 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
       this.pos = pb.vec3().uniform(0);
       this.region = pb.vec4().uniform(0);
       shadingImpl.setupUniforms(this);
+      waveGenerator.setupUniforms(this);
       pb.main(function () {
         this.$l.discardable = pb.or(
           pb.any(pb.lessThan(this.$inputs.outXZ, this.region.xy)),
@@ -143,8 +156,14 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
         );
         this.$l.n = waveGenerator.calcFragmentNormalAndFoam(this, this.$inputs.outXZ, this.$inputs.outNormal);
         this.$outputs.outColor =
-          shadingImpl.shading(this, this.$inputs.outPos, this.n.xyz, this.n.w, this.discardable) ??
-          pb.vec4(pb.add(pb.mul(this.n.xyz, 0.5), pb.vec3(0.5)), 1);
+          shadingImpl.shading(
+            this,
+            this.$inputs.outPos,
+            this.n.xyz,
+            this.n.w,
+            this.discardable,
+            waveGenerator
+          ) ?? pb.vec4(pb.add(pb.mul(this.n.xyz, 0.5), pb.vec3(0.5)), 1);
       });
     }
   });

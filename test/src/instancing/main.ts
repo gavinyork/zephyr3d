@@ -15,7 +15,8 @@ import {
   Tonemap,
   LambertMaterial,
   PlaneShape,
-  GerstnerWaveGenerator
+  GerstnerWaveGenerator,
+  FFTWaveGenerator
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
@@ -55,19 +56,22 @@ instancingApp.ready().then(async () => {
 
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
-  //compositor.appendPostEffect(new PostWater(-1, new FFTWaveGenerator()));
-  const g = new GerstnerWaveGenerator();
-  g.numWaves = 3;
-  g.setWaveAmplitude(0, 0.02);
-  g.setWaveLength(0, 15);
-  g.setWaveDirection(0, 1, 1);
-  g.setWaveAmplitude(1, 0.01);
-  g.setWaveLength(1, 6);
-  g.setWaveDirection(1, 0, 1);
-  g.setWaveAmplitude(2, 0.02);
-  g.setWaveLength(2, 0.5);
-  g.setWaveDirection(2, -1, 1);
-  compositor.appendPostEffect(new PostWater(-1, g));
+  if (0) {
+    compositor.appendPostEffect(new PostWater(-1, new FFTWaveGenerator()));
+  } else {
+    const g = new GerstnerWaveGenerator();
+    g.numWaves = 3;
+    g.setWaveAmplitude(0, 0.02);
+    g.setWaveLength(0, 15);
+    g.setWaveDirection(0, 1, 1);
+    g.setWaveAmplitude(1, 0.01);
+    g.setWaveLength(1, 6);
+    g.setWaveDirection(1, 0, 1);
+    g.setWaveAmplitude(2, 0.02);
+    g.setWaveLength(2, 0.5);
+    g.setWaveDirection(2, -1, 1);
+    compositor.appendPostEffect(new PostWater(-1, g));
+  }
   const inspector = new common.Inspector(scene, compositor, camera);
 
   const batchGroup = new BatchGroup(scene);

@@ -33,6 +33,7 @@ export class PostWater extends AbstractPostEffect {
   private _displace: number;
   private _depthMulti: number;
   private _refractionStrength: number;
+  private _causticsParams: Vector4;
   private _absorptionGrad: Interpolator;
   private _scatterGrad: Interpolator;
   private _rampTex: Texture2D;
@@ -55,6 +56,7 @@ export class PostWater extends AbstractPostEffect {
     this._displace = 16;
     this._depthMulti = 0.1;
     this._refractionStrength = 0;
+    this._causticsParams = new Vector4(0.8, 1.0, 1, 100);
     this._copyBlitter = new CopyBlitter();
     this._renderingReflections = false;
     this._absorptionGrad = new Interpolator(
@@ -102,6 +104,30 @@ export class PostWater extends AbstractPostEffect {
   }
   set ssrMaxDistance(val: number) {
     this._ssrParams.x = val;
+  }
+  get causticsSlopeMin(): number {
+    return this._causticsParams.x;
+  }
+  set causticsSlopeMin(val: number) {
+    this._causticsParams.x = val;
+  }
+  get causticsSlopeMax(): number {
+    return this._causticsParams.y;
+  }
+  set causticsSlopeMax(val: number) {
+    this._causticsParams.y = val;
+  }
+  get causticsFalloff(): number {
+    return this._causticsParams.z;
+  }
+  set causticsFalloff(val: number) {
+    this._causticsParams.z = val;
+  }
+  get causticsIntensity(): number {
+    return this._causticsParams.w;
+  }
+  set causticsIntensity(val: number) {
+    this._causticsParams.w = val;
   }
   get ssrIterations(): number {
     return this._ssrParams.y;
@@ -249,6 +275,9 @@ export class PostWater extends AbstractPostEffect {
     const cameraNearFar = new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
     const waterMesh = this._getWaterMesh(ctx);
     const waterBindGroup = waterMesh.getWaterBindGroup(ctx.device);
+    if (!waterBindGroup) {
+      return;
+    }
     waterBindGroup.setTexture('tex', inputColorTexture);
     waterBindGroup.setTexture('depthTex', ctx.linearDepthTexture);
     waterBindGroup.setTexture('rampTex', rampTex);
@@ -273,6 +302,7 @@ export class PostWater extends AbstractPostEffect {
     waterBindGroup.setValue('displace', this._displace / inputColorTexture.width);
     waterBindGroup.setValue('depthMulti', this._depthMulti);
     waterBindGroup.setValue('refractionStrength', this._refractionStrength);
+    waterBindGroup.setValue('causticsParams', this._causticsParams);
     waterBindGroup.setValue(
       'targetSize',
       this._targetSize.setXYZW(
@@ -346,6 +376,7 @@ export class PostWater extends AbstractPostEffect {
             scope.displace = pb.float().uniform(0);
             scope.depthMulti = pb.float().uniform(0);
             scope.refractionStrength = pb.float().uniform(0);
+            scope.causticsParams = pb.vec4().uniform(0);
             scope.cameraNearFar = pb.vec2().uniform(0);
             scope.cameraPos = pb.vec3().uniform(0);
             scope.invViewProj = pb.mat4().uniform(0);
@@ -375,7 +406,8 @@ export class PostWater extends AbstractPostEffect {
           worldPos: PBShaderExp,
           worldNormal: PBShaderExp,
           foamFactor: PBShaderExp,
-          discardable: PBShaderExp
+          discardable: PBShaderExp,
+          waveGenerator: WaveGenerator
         ) {
           const pb = scope.$builder;
           pb.func('getAbsorption', [pb.float('depth')], function () {
@@ -481,19 +513,6 @@ export class PostWater extends AbstractPostEffect {
                   pb.textureSampleLevel(this.tex, this.hitInfo.xy, 0).rgb,
                   this.hitInfo.w
                 );
-                /*
-                this.$if(pb.greaterThan(this.hitInfo.w, 0), function () {
-                  this.reflectance = pb.mix(
-                    this.reflectance,
-                    pb.textureSampleLevel(this.tex, this.hitInfo.xy, 0).rgb,
-                    this.hitInfo.w
-                  );
-                }).$else(function () {
-                  this.$l.refl = pb.reflect(pb.normalize(pb.sub(this.worldPos, this.cameraPos)), this.normal);
-                  this.refl.y = pb.max(this.refl.y, 0.1);
-                  this.reflectance = pb.textureSampleLevel(this.envMap, this.refl, 0).rgb;
-                });
-                */
               } else {
                 this.$l.reflectance = pb.textureSampleLevel(
                   this.reflectionTex,
@@ -502,6 +521,7 @@ export class PostWater extends AbstractPostEffect {
                 ).rgb;
               }
               this.refractUV = this.displacedTexCoord;
+              this.$l.caustics = pb.float(0);
               this.displacedPos = this.getPosition(this.refractUV, this.invProjMatrix);
               this.$if(
                 pb.or(
@@ -513,9 +533,24 @@ export class PostWater extends AbstractPostEffect {
                 }
               ).$else(function () {
                 this.depth = pb.length(pb.sub(this.displacedPos.xyz, this.viewPos));
+                this.$l.worldPos = this.getPosition(this.refractUV, this.invViewProj);
+                this.$l.unprojectedNormal = waveGenerator.calcFragmentNormal(
+                  this,
+                  pb.add(this.worldPos.xz, pb.mul(pb.vec2(this.depth), 0.2)),
+                  this.normal
+                );
+                this.caustics = pb.sub(
+                  1,
+                  pb.smoothStep(this.causticsParams.x, this.causticsParams.y, this.unprojectedNormal.y)
+                );
+                this.caustics = pb.pow(this.caustics, this.causticsParams.z);
+                this.caustics = pb.mul(this.caustics, this.causticsParams.w);
               });
               this.$l.refraction = pb.textureSampleLevel(this.tex, this.refractUV, 0).rgb;
-              this.refraction = pb.mul(this.refraction, this.getAbsorption(this.depth));
+              this.refraction = pb.mul(
+                pb.add(this.refraction, pb.vec3(this.caustics)),
+                this.getAbsorption(this.depth)
+              );
 
               this.$l.fresnelTerm = this.fresnel(this.normal, pb.neg(this.eyeVecNorm));
               this.$l.finalColor = pb.mix(

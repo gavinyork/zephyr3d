@@ -408,6 +408,27 @@ export class Inspector {
       -1,
       1
     );
+    const slope = [water.causticsSlopeMin, water.causticsSlopeMax] as [number, number];
+    if (ImGui.SliderFloat2('CausticsSlope##water', slope, 0, 1)) {
+      water.causticsSlopeMin = slope[0];
+      water.causticsSlopeMax = slope[1];
+    }
+    ImGui.SliderFloat(
+      'CausticsFalloff##water',
+      (val?: number) => {
+        return (water.causticsFalloff = val = val ?? water.causticsFalloff);
+      },
+      0,
+      32
+    );
+    ImGui.SliderFloat(
+      'CausticsIntensity##water',
+      (val?: number) => {
+        return (water.causticsIntensity = val = val ?? water.causticsIntensity);
+      },
+      0,
+      1000
+    );
   }
   private renderPostWater(water: PostWater) {
     if (ImGui.Begin('PostWater')) {

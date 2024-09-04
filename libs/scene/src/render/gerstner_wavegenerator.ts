@@ -1,6 +1,12 @@
 import type { AABB } from '@zephyr3d/base';
 import { WaveGenerator } from './wavegenerator';
-import type { AbstractDevice, BindGroup, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import type {
+  AbstractDevice,
+  BindGroup,
+  PBGlobalScope,
+  PBInsideFunctionScope,
+  PBShaderExp
+} from '@zephyr3d/device';
 
 const MAX_NUM_WAVES = 64;
 
@@ -107,20 +113,26 @@ export class GerstnerWaveGenerator extends WaveGenerator {
     outAABB.minPoint.setXYZ(minX, y, minZ);
     outAABB.maxPoint.setXYZ(maxX, y + maxHeight, maxZ);
   }
-  calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
+  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
-    scope.time = pb.float().uniform(0);
-    scope.numWaves = pb.int().uniform(0);
-    scope.waveParams = pb.vec4[MAX_NUM_WAVES * 2]().uniform(0);
-    pb.func('calcNormalAndFoam', [pb.vec2('xz')], function () {
+    pb.func('calcFragmentNormal', [pb.vec2('xz')], function () {
       this.$l.inPos = pb.vec3(this.xz.x, 0, this.xz.y);
       this.$l.outPos = pb.vec3();
       this.$l.outNormal = pb.vec3();
       that.calcNormalAndPos(this, this.inPos, this.outPos, this.outNormal);
-      this.$return(pb.vec4(this.outNormal, 0));
+      this.$return(this.outNormal);
     });
-    return scope.calcNormalAndFoam(xz);
+    return scope.calcFragmentNormal(xz);
+  }
+  calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
+    return scope.$builder.vec4(this.calcFragmentNormal(scope, xz), 0);
+  }
+  setupUniforms(scope: PBGlobalScope): void {
+    const pb = scope.$builder;
+    scope.time = pb.float().uniform(0);
+    scope.numWaves = pb.int().uniform(0);
+    scope.waveParams = pb.vec4[MAX_NUM_WAVES * 2]().uniform(0);
   }
   private gerstnerWave(
     scope: PBInsideFunctionScope,
@@ -230,10 +242,6 @@ export class GerstnerWaveGenerator extends WaveGenerator {
     outPos: PBShaderExp,
     outNormal: PBShaderExp
   ): void {
-    const pb = scope.$builder;
-    scope.time = pb.float().uniform(0);
-    scope.numWaves = pb.int().uniform(0);
-    scope.waveParams = pb.vec4[MAX_NUM_WAVES * 2]().uniform(0);
     this.calcNormalAndPos(scope, inPos, outPos, outNormal);
   }
   applyWaterBindGroup(bindGroup: BindGroup): void {

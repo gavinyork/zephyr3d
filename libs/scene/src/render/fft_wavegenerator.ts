@@ -6,6 +6,7 @@ import type {
   BindGroup,
   FrameBuffer,
   GPUProgram,
+  PBGlobalScope,
   PBInsideFunctionScope,
   PBShaderExp,
   RenderStateSet,
@@ -1105,17 +1106,11 @@ export class FFTWaveGenerator extends WaveGenerator {
     }
     FFTWaveGenerator._globals.quad.draw();
   }
-  calcVertexPositionAndNormal(
-    scope: PBInsideFunctionScope,
-    inPos: PBShaderExp,
-    outPos: PBShaderExp,
-    outNormal: PBShaderExp
-  ): void {
+  setupUniforms(scope: PBGlobalScope): void {
     const pb = scope.$builder;
-    const that = this;
     scope.sizes = pb.vec4().uniform(0);
     scope.croppinesses = pb.vec4().uniform(0);
-    if (that._useComputeShader) {
+    if (this._useComputeShader) {
       scope.dataTexture = pb.tex2DArray().uniform(0);
     } else {
       scope.dx_hy_dz_dxdz0 = pb.tex2D().uniform(0);
@@ -1125,6 +1120,18 @@ export class FFTWaveGenerator extends WaveGenerator {
       scope.dx_hy_dz_dxdz2 = pb.tex2D().uniform(0);
       scope.sx_sz_dxdx_dzdz2 = pb.tex2D().uniform(0);
     }
+    if (pb.shaderKind === 'fragment') {
+      scope.foamParams = pb.vec2().uniform(0);
+    }
+  }
+  calcVertexPositionAndNormal(
+    scope: PBInsideFunctionScope,
+    inPos: PBShaderExp,
+    outPos: PBShaderExp,
+    outNormal: PBShaderExp
+  ): void {
+    const pb = scope.$builder;
+    const that = this;
     pb.func(
       'calcPositionAndNormal',
       [pb.vec3('inPos'), pb.vec3('outPos').out(), pb.vec3('outNormal').out()],
@@ -1167,22 +1174,41 @@ export class FFTWaveGenerator extends WaveGenerator {
     );
     scope.calcPositionAndNormal(inPos, outPos, outNormal);
   }
+  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, vertexNormal: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    const that = this;
+    pb.func('calcFragmentNormal', [pb.vec2('xz')], function () {
+      this.$l.uv0 = pb.div(this.xz, this.sizes.x);
+      this.$l.uv1 = pb.div(this.xz, this.sizes.y);
+      this.$l.uv2 = pb.div(this.xz, this.sizes.z);
+      if (that._useComputeShader) {
+        this.$l._sx_sz_dxdx_dzdz0 = pb.textureArraySampleLevel(this.dataTexture, this.uv0, 1, 0);
+        this.$l._sx_sz_dxdx_dzdz1 = pb.textureArraySampleLevel(this.dataTexture, this.uv1, 3, 0);
+        this.$l._sx_sz_dxdx_dzdz2 = pb.textureArraySampleLevel(this.dataTexture, this.uv2, 5, 0);
+      } else {
+        this.$l._sx_sz_dxdx_dzdz0 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz0, this.uv0, 0);
+        this.$l._sx_sz_dxdx_dzdz1 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz1, this.uv1, 0);
+        this.$l._sx_sz_dxdx_dzdz2 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz2, this.uv2, 0);
+      }
+      this.$l.sx = pb.add(this._sx_sz_dxdx_dzdz0.x, this._sx_sz_dxdx_dzdz1.x, this._sx_sz_dxdx_dzdz2.x);
+      this.$l.sz = pb.add(this._sx_sz_dxdx_dzdz0.y, this._sx_sz_dxdx_dzdz1.y, this._sx_sz_dxdx_dzdz2.y);
+      this.$l.dxdx_dzdz = pb.add(
+        pb.mul(this._sx_sz_dxdx_dzdz0.zw, this.croppinesses.x),
+        pb.mul(this._sx_sz_dxdx_dzdz1.zw, this.croppinesses.y),
+        pb.mul(this._sx_sz_dxdx_dzdz2.zw, this.croppinesses.z)
+      );
+      this.$l.slope = pb.vec2(
+        pb.div(this.sx, pb.add(1.0, this.dxdx_dzdz.x)),
+        pb.div(this.sz, pb.add(1.0, this.dxdx_dzdz.y))
+      );
+      this.$l.normal = pb.normalize(pb.vec3(pb.neg(this.slope.x), 1.0, pb.neg(this.slope.y)));
+      this.$return(this.normal);
+    });
+    return scope.calcFragmentNormal(xz);
+  }
   calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
-    scope.foamParams = pb.vec2().uniform(0);
-    scope.sizes = pb.vec4().uniform(0);
-    scope.croppinesses = pb.vec4().uniform(0);
-    if (that._useComputeShader) {
-      scope.dataTexture = pb.tex2DArray().uniform(0);
-    } else {
-      scope.dx_hy_dz_dxdz0 = pb.tex2D().uniform(0);
-      scope.sx_sz_dxdx_dzdz0 = pb.tex2D().uniform(0);
-      scope.dx_hy_dz_dxdz1 = pb.tex2D().uniform(0);
-      scope.sx_sz_dxdx_dzdz1 = pb.tex2D().uniform(0);
-      scope.dx_hy_dz_dxdz2 = pb.tex2D().uniform(0);
-      scope.sx_sz_dxdx_dzdz2 = pb.tex2D().uniform(0);
-    }
     pb.func('jacobian', [pb.float('dxdx'), pb.float('dxdz'), pb.float('dzdz')], function () {
       this.$l.Jxx = pb.add(this.dxdx, 1);
       this.$l.Jxz = this.dxdz;
