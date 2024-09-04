@@ -429,9 +429,20 @@ export class Inspector {
     for (let i = 0; i < t.numWaves; i++) {
       ImGui.PushID(i);
       if (ImGui.CollapsingHeader(`Wave${i}`)) {
-        const direction = [t.getWaveDirectionX(i), t.getWaveDirectionY(i)] as [number, number];
-        if (ImGui.SliderFloat2(`Direction##Wave${i}`, direction, -1, 1)) {
-          t.setWaveDirection(i, direction[0], direction[1]);
+        const omni = [t.isOmniWave(i)] as [boolean];
+        if (ImGui.Checkbox(`Omni##Wave${i}`, omni)) {
+          t.setOmniWave(i, omni[0]);
+        }
+        if (omni[0]) {
+          const origin = [t.getOriginX(i), t.getOriginZ(i)] as [number, number];
+          if (ImGui.SliderFloat2(`Origin##Wave${i}`, origin, -500, 500)) {
+            t.setOrigin(i, origin[0], origin[1]);
+          }
+        } else {
+          const direction = [t.getWaveDirectionX(i), t.getWaveDirectionY(i)] as [number, number];
+          if (ImGui.SliderFloat2(`Direction##Wave${i}`, direction, -1, 1)) {
+            t.setWaveDirection(i, direction[0], direction[1]);
+          }
         }
         const steepness = [t.getWaveAmplitude(i)] as [number];
         if (ImGui.SliderFloat(`Steepness##Wave${i}`, steepness, 0, 1)) {
