@@ -66,6 +66,8 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _HiZ: boolean;
   /** @internal */
+  protected _SSR: boolean;
+  /** @internal */
   protected _picking: boolean;
   /** @internal */
   protected _pickPosX: number;
@@ -103,6 +105,7 @@ export class Camera extends SceneNode {
     this._pickPosX = 0;
     this._pickPosY = 0;
     this._HiZ = false;
+    this._SSR = false;
     this._pickResult = null;
     this._commandBufferReuse = true;
   }
@@ -120,6 +123,13 @@ export class Camera extends SceneNode {
   }
   set HiZ(val: boolean) {
     this._HiZ = !!val;
+  }
+  /** Whether ScreenSpaceReflections should be enabled */
+  get SSR(): boolean {
+    return this._SSR;
+  }
+  set SSR(val: boolean) {
+    this._SSR = !!val;
   }
   /** Whether to perform a depth pass */
   get depthPrePass(): boolean {

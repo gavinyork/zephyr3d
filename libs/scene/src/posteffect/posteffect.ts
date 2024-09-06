@@ -46,12 +46,12 @@ export abstract class AbstractPostEffect {
    * Checks whether this post effect requires the linear depth texture
    * @returns true if the linear depth texture is required.
    */
-  abstract requireLinearDepthTexture(): boolean;
+  abstract requireLinearDepthTexture(ctx: DrawContext): boolean;
   /**
    * Checks whether this post effect requires the scene depth buffer
    * @returns true if the scene depth buffer is required.
    */
-  abstract requireDepthAttachment(): boolean;
+  abstract requireDepthAttachment(ctx: DrawContext): boolean;
   /**
    * Apply the post effect
    * @param camera - Camera used the render the scene

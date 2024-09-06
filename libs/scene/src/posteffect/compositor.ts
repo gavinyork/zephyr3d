@@ -49,14 +49,14 @@ export class Compositor {
     this._postEffectsTransparency = [];
   }
   /** @internal */
-  requireLinearDepth(): boolean {
+  requireLinearDepth(ctx: DrawContext): boolean {
     for (const postEffect of this._postEffectsOpaque) {
-      if (postEffect.requireLinearDepthTexture()) {
+      if (postEffect.requireLinearDepthTexture(ctx)) {
         return true;
       }
     }
     for (const postEffect of this._postEffectsTransparency) {
-      if (postEffect.requireLinearDepthTexture()) {
+      if (postEffect.requireLinearDepthTexture(ctx)) {
         return true;
       }
     }
@@ -162,7 +162,7 @@ export class Compositor {
         const inputTexture = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
         const isLast = this.isLastPostEffect(opaque, i);
         const finalEffect =
-          isLast && (!postEffect.requireDepthAttachment() || !!ctx.compositorContex.finalFramebuffer);
+          isLast && (!postEffect.requireDepthAttachment(ctx) || !!ctx.compositorContex.finalFramebuffer);
         if (finalEffect) {
           device.setFramebuffer(ctx.compositorContex.finalFramebuffer);
           device.setViewport(null);

@@ -16,6 +16,7 @@ import { ClusteredLight } from './cluster_light';
 import { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import { ObjectColorPass } from './objectcolorpass';
 import { buildHiZ } from './hzb';
+import { MaterialVaryingFlags } from '../values';
 
 /**
  * Forward render scheme
@@ -162,7 +163,7 @@ export class SceneRenderer {
       ctx.scene.env.needSceneDepthTexture() ||
       ctx.HiZ ||
       ctx.primaryCamera.oit ||
-      ctx.compositor?.requireLinearDepth()
+      ctx.compositor?.requireLinearDepth(ctx)
     ) {
       const format: TextureFormat = device.type === 'webgl' ? 'rgba8unorm' : 'r32f';
       if (!finalFramebuffer && !vp) {
@@ -270,6 +271,9 @@ export class SceneRenderer {
       device.pushDeviceStates();
       device.setFramebuffer(sceneColorFramebuffer);
     }
+    if (ctx.camera.SSR && !renderQueue.needSceneColor) {
+      ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
+    }
     ctx.compositor?.begin(ctx);
     this._scenePass.render(ctx, null, renderQueue);
     ctx.compositor?.end(ctx);
@@ -289,11 +293,15 @@ export class SceneRenderer {
       this._scenePass.clearColor = null;
       this._scenePass.clearDepth = null;
       this._scenePass.clearStencil = null;
+      if (ctx.camera.SSR) {
+        ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
+      }
       ctx.compositor?.begin(ctx);
       this._scenePass.render(ctx, null, renderQueue);
       ctx.compositor?.end(ctx);
     }
     renderQueue.dispose();
+    ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
 
     if (tempFramebuffer && tempFramebuffer !== finalFramebuffer) {
       const blitter = new CopyBlitter();

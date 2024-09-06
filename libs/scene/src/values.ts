@@ -107,5 +107,6 @@ export const MORPH_ATTRIBUTE_VECTOR_COUNT = (MAX_MORPH_ATTRIBUTES + 3) >> 2;
 export const enum MaterialVaryingFlags {
   MORPH_ANIMATION = 1 << 0,
   SKIN_ANIMATION = 1 << 1,
-  INSTANCING = 1 << 2
+  INSTANCING = 1 << 2,
+  SSR_STORE_ROUGHNESS = 1 << 3
 }
