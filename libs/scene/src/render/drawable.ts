@@ -88,12 +88,8 @@ export interface DrawContext {
   sunLight?: DirectionalLight;
   /** clustered light index */
   clusteredLight?: ClusteredLight;
-  /** Whether skin animation is used */
-  skinAnimation?: boolean;
-  /** Whether morph animation is used */
-  morphAnimation?: boolean;
-  /** Whehter instance rendering is used */
-  instancing?: boolean;
+  /** Material varying flags */
+  materialFlags: number;
 }
 
 /**

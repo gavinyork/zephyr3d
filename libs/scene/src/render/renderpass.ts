@@ -8,6 +8,7 @@ import type { DrawContext } from './drawable';
 import type { AbstractDevice, BindGroup } from '@zephyr3d/device';
 import { ShaderHelper } from '../material/shader/helper';
 import type { RenderBundleWrapper } from './renderbundle_wrapper';
+import { MaterialVaryingFlags } from '../values';
 
 /**
  * Base class for any kind of render passes
@@ -200,15 +201,17 @@ export abstract class RenderPass {
     const hash = `${windingHash}-${bindGroupHash}-${framebufferHash}-${ctxHash}-${ctx.renderPassHash}`;
     if (itemList) {
       if (itemList.itemList.length > 0) {
-        ctx.skinAnimation = false;
-        ctx.instancing = false;
+        ctx.materialFlags &= ~(
+          MaterialVaryingFlags.SKIN_ANIMATION |
+          MaterialVaryingFlags.INSTANCING |
+          MaterialVaryingFlags.MORPH_ANIMATION
+        );
         itemList.materialList.forEach((mat) => mat.apply(ctx));
         this.internalDrawItemList(ctx, itemList.itemList, itemList.renderBundle, reverseWinding, hash);
       }
       if (itemList.skinItemList.length > 0) {
-        ctx.skinAnimation = true;
-        ctx.morphAnimation = false;
-        ctx.instancing = false;
+        ctx.materialFlags |= MaterialVaryingFlags.SKIN_ANIMATION;
+        ctx.materialFlags &= ~(MaterialVaryingFlags.MORPH_ANIMATION | MaterialVaryingFlags.INSTANCING);
         itemList.materialList.forEach((mat) => mat.apply(ctx));
         this.internalDrawItemList(
           ctx,
@@ -219,9 +222,8 @@ export abstract class RenderPass {
         );
       }
       if (itemList.morphItemList.length > 0) {
-        ctx.skinAnimation = false;
-        ctx.morphAnimation = true;
-        ctx.instancing = false;
+        ctx.materialFlags |= MaterialVaryingFlags.MORPH_ANIMATION;
+        ctx.materialFlags &= ~(MaterialVaryingFlags.SKIN_ANIMATION | MaterialVaryingFlags.INSTANCING);
         itemList.materialList.forEach((mat) => mat.apply(ctx));
         this.internalDrawItemList(
           ctx,
@@ -232,9 +234,8 @@ export abstract class RenderPass {
         );
       }
       if (itemList.skinAndMorphItemList.length > 0) {
-        ctx.skinAnimation = true;
-        ctx.morphAnimation = true;
-        ctx.instancing = false;
+        ctx.materialFlags |= MaterialVaryingFlags.SKIN_ANIMATION | MaterialVaryingFlags.MORPH_ANIMATION;
+        ctx.materialFlags &= ~MaterialVaryingFlags.INSTANCING;
         itemList.materialList.forEach((mat) => mat.apply(ctx));
         this.internalDrawItemList(
           ctx,
@@ -245,8 +246,8 @@ export abstract class RenderPass {
         );
       }
       if (itemList.instanceItemList.length > 0) {
-        ctx.skinAnimation = false;
-        ctx.instancing = true;
+        ctx.materialFlags |= MaterialVaryingFlags.INSTANCING;
+        ctx.materialFlags &= ~(MaterialVaryingFlags.SKIN_ANIMATION | MaterialVaryingFlags.MORPH_ANIMATION);
         itemList.materialList.forEach((mat) => mat.apply(ctx));
         this.internalDrawItemList(
           ctx,

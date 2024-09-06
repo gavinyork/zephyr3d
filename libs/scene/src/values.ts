@@ -99,3 +99,13 @@ export const MAX_MORPH_TARGETS = 256;
 export const MORPH_WEIGHTS_VECTOR_COUNT = (MAX_MORPH_TARGETS + 3) >> 2;
 /** @internal */
 export const MORPH_ATTRIBUTE_VECTOR_COUNT = (MAX_MORPH_ATTRIBUTES + 3) >> 2;
+
+/**
+ * Material varying flags
+ * @public
+ */
+export const enum MaterialVaryingFlags {
+  MORPH_ANIMATION = 1 << 0,
+  SKIN_ANIMATION = 1 << 1,
+  INSTANCING = 1 << 2
+}

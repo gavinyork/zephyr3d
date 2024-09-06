@@ -86,7 +86,8 @@ export class SceneRenderer {
       applyFog: null,
       flip: false,
       drawEnvLight: false,
-      env: null
+      env: null,
+      materialFlags: 0
     };
     scene.frameUpdate();
     if (camera && !device.isContextLost()) {

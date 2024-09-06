@@ -1,6 +1,7 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render/drawable';
 import {
+  MaterialVaryingFlags,
   MAX_CLUSTERED_LIGHTS,
   MORPH_ATTRIBUTE_VECTOR_COUNT,
   MORPH_TARGET_NORMAL,
@@ -580,9 +581,9 @@ export class ShaderHelper {
   static prepareVertexShaderCommon(pb: ProgramBuilder, ctx: DrawContext) {
     this.vertexShaderDrawableStuff(
       pb.getGlobalScope(),
-      !!ctx.skinAnimation,
-      !!ctx.morphAnimation,
-      !!ctx.instancing
+      !!(ctx.materialFlags & MaterialVaryingFlags.SKIN_ANIMATION),
+      !!(ctx.materialFlags & MaterialVaryingFlags.MORPH_ANIMATION),
+      !!(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)
     );
     /*
     const skinning = !!ctx.target?.getBoneMatrices();

@@ -7,6 +7,7 @@ import { ShaderHelper } from '../material';
 import type { DrawableInstanceInfo, RenderQueue, RenderQueueRef } from './render_queue';
 import { Application } from '../app';
 import type { Mesh, XForm } from '../scene';
+import { MaterialVaryingFlags } from '../values';
 
 export interface IMixinDrawable {
   readonly objectColor: Vector4;
@@ -123,7 +124,7 @@ export function mixinDrawable<
       const drawableBindGroup = this.getDrawableBindGroup(device, !!ctx.instanceData, ctx.renderQueue);
       device.setBindGroup(1, drawableBindGroup);
       device.setBindGroup(3, ctx.instanceData ? ctx.instanceData.bindGroup.bindGroup : null);
-      if (ctx.skinAnimation) {
+      if (ctx.materialFlags & MaterialVaryingFlags.SKIN_ANIMATION) {
         const boneTexture = (this as unknown as Mesh).getBoneMatrices();
         drawableBindGroup.setTexture(ShaderHelper.getBoneMatricesUniformName(), boneTexture);
         drawableBindGroup.setValue(
@@ -132,7 +133,7 @@ export function mixinDrawable<
         );
         drawableBindGroup.setValue(ShaderHelper.getBoneTextureSizeUniformName(), boneTexture.width);
       }
-      if (ctx.morphAnimation) {
+      if (ctx.materialFlags & MaterialVaryingFlags.MORPH_ANIMATION) {
         const morphData = (this as unknown as Mesh).getMorphData();
         const morphInfo = (this as unknown as Mesh).getMorphInfo();
         drawableBindGroup.setTexture(ShaderHelper.getMorphDataUniformName(), morphData);

@@ -9,6 +9,7 @@ import type {
 } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
 import {
+  MaterialVaryingFlags,
   QUEUE_OPAQUE,
   QUEUE_TRANSPARENT,
   RENDER_PASS_TYPE_DEPTH,
@@ -17,7 +18,7 @@ import {
   RENDER_PASS_TYPE_SHADOWMAP
 } from '../values';
 import { Material } from './material';
-import type { DrawContext, ShadowMapPass } from '../render';
+import { type DrawContext, type ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA } from '../shaders';
 import { Application } from '../app';
 import { ShaderHelper } from './shader/helper';
@@ -365,7 +366,10 @@ export class MeshMaterial extends Material {
     if (ctx.oit) {
       ctx.oit.applyUniforms(ctx, bindGroup);
     }
-    if (!ctx.instancing && ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
+    if (
+      !(ctx.materialFlags & MaterialVaryingFlags.INSTANCING) &&
+      ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR
+    ) {
       bindGroup.setValue('zObjectColor', this._objectColor);
     }
   }
@@ -451,14 +455,20 @@ export class MeshMaterial extends Material {
   vertexShader(scope: PBFunctionScope): void {
     const pb = scope.$builder;
     ShaderHelper.prepareVertexShader(pb, this.drawContext);
-    if (this.drawContext.skinAnimation) {
+    if (this.drawContext.materialFlags & MaterialVaryingFlags.SKIN_ANIMATION) {
       scope.$inputs.zBlendIndices = pb.vec4().attrib('blendIndices');
       scope.$inputs.zBlendWeights = pb.vec4().attrib('blendWeights');
     }
-    if (this.drawContext.morphAnimation && this.drawContext.device.type === 'webgl') {
+    if (
+      this.drawContext.materialFlags & MaterialVaryingFlags.MORPH_ANIMATION &&
+      this.drawContext.device.type === 'webgl'
+    ) {
       scope.$inputs.zFakeVertexID = pb.float().attrib('texCoord7');
     }
-    if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR && this.drawContext.instancing) {
+    if (
+      this.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR &&
+      this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
+    ) {
       scope.$outputs.zObjectColor = this.getInstancedUniform(scope, MeshMaterial.OBJECT_COLOR_UNIFORM);
     }
   }
@@ -478,7 +488,7 @@ export class MeshMaterial extends Material {
       }
     } else if (
       this.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR &&
-      !this.drawContext.instancing
+      !(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)
     ) {
       scope.zObjectColor = pb.vec4().uniform(2);
     }
@@ -572,9 +582,10 @@ export class MeshMaterial extends Material {
           });
         }
         ShaderHelper.discardIfClipped(this, this.worldPos);
-        this.$outputs.zFragmentOutput = that.drawContext.instancing
-          ? scope.$inputs.zObjectColor
-          : scope.zObjectColor;
+        this.$outputs.zFragmentOutput =
+          that.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
+            ? scope.$inputs.zObjectColor
+            : scope.zObjectColor;
       } /*if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP)*/ else {
         if (color) {
           this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
