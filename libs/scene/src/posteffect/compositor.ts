@@ -12,6 +12,7 @@ import type {
 } from '@zephyr3d/device';
 import type { AbstractPostEffect } from './posteffect';
 import { MaterialVaryingFlags } from '../values';
+import { SSR } from './ssr';
 
 /**
  * Posteffect rendering context
@@ -28,6 +29,8 @@ export interface CompositorContext {
  * @public
  */
 export class Compositor {
+  /** @internal */
+  private static _SSRPostEffect: SSR = null;
   /** @internal */
   protected _postEffectsOpaque: AbstractPostEffect[];
   /** @internal */
@@ -159,6 +162,13 @@ export class Compositor {
       msTexture: msFramebuffer,
       writeIndex
     };
+    if (ssr) {
+      if (!Compositor._SSRPostEffect) {
+        Compositor._SSRPostEffect = new SSR();
+      }
+      Compositor._SSRPostEffect.roughnessTexture = msFramebuffer.getColorAttachments()[1] as Texture2D;
+      this._postEffectsOpaque.unshift(Compositor._SSRPostEffect);
+    }
   }
   /** @internal */
   drawPostEffects(ctx: DrawContext, opaque: boolean, sceneDepthTexture: Texture2D) {
@@ -200,6 +210,9 @@ export class Compositor {
         Compositor._blit(device, srcTex, !ctx.compositorContex.finalFramebuffer);
       }
       ctx.compositorContex = null;
+    }
+    if (this._postEffectsOpaque[0] === Compositor._SSRPostEffect) {
+      this._postEffectsOpaque.shift();
     }
   }
   /** @internal */

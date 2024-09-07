@@ -40,7 +40,6 @@ terrainApp.ready().then(async () => {
     ev.preventDefault();
     return false;
   });
-  terrainApp.inputManager.use(demo.camera.handleEvent.bind(demo.camera));
 
   terrainApp.on('pointerup', (ev) => {
     demo.handlePointerUp(ev.button, ev.offsetX, ev.offsetY);

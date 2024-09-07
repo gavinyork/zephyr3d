@@ -45,11 +45,11 @@ importers:
       '@typescript-eslint/parser': ^5.51.0
       '@web/dev-server': ^0.1.35
       '@webgpu/types': ^0.1.40
-      '@zephyr3d/backend-webgl': workspace:^0.1.0
-      '@zephyr3d/backend-webgpu': workspace:^0.1.0
-      '@zephyr3d/base': workspace:^0.1.0
-      '@zephyr3d/device': workspace:^0.1.0
-      '@zephyr3d/imgui': workspace:^0.1.0
+      '@zephyr3d/backend-webgl': workspace:*
+      '@zephyr3d/backend-webgpu': workspace:*
+      '@zephyr3d/base': workspace:*
+      '@zephyr3d/device': workspace:*
+      '@zephyr3d/imgui': workspace:*
       colors: ^1.4.0
       cross-env: ^7.0.3
       diff: ^5.0.0
@@ -122,8 +122,8 @@ importers:
       '@swc/core': ^1.3.62
       '@types/node': ^18.13.0
       '@webgpu/types': ^0.1.40
-      '@zephyr3d/base': workspace:^0.1.0
-      '@zephyr3d/device': workspace:^0.1.0
+      '@zephyr3d/base': workspace:*
+      '@zephyr3d/device': workspace:*
       cross-env: ^7.0.3
       rollup: ^3.15.0
       rollup-plugin-copy: ^3.4.0
@@ -135,6 +135,8 @@ importers:
     dependencies:
       '@types/node': 18.17.6
       '@webgpu/types': 0.1.40
+      '@zephyr3d/base': link:../base
+      '@zephyr3d/device': link:../device
     devDependencies:
       '@babel/core': 7.22.10
       '@babel/preset-env': 7.22.10_@babel+core@7.22.10
@@ -144,8 +146,6 @@ importers:
       '@rollup/plugin-terser': 0.4.3_rollup@3.28.0
       '@rollup/pluginutils': 5.0.3_rollup@3.28.0
       '@swc/core': 1.3.78
-      '@zephyr3d/base': link:../base
-      '@zephyr3d/device': link:../device
       cross-env: 7.0.3
       rollup: 3.28.0
       rollup-plugin-copy: 3.4.0
@@ -167,8 +167,8 @@ importers:
       '@swc/core': ^1.3.62
       '@types/node': ^18.13.0
       '@webgpu/types': ^0.1.40
-      '@zephyr3d/base': workspace:^0.1.0
-      '@zephyr3d/device': workspace:^0.1.0
+      '@zephyr3d/base': workspace:*
+      '@zephyr3d/device': workspace:*
       cross-env: ^7.0.3
       rollup: ^3.15.0
       rollup-plugin-copy: ^3.4.0
@@ -180,6 +180,8 @@ importers:
     dependencies:
       '@types/node': 18.17.6
       '@webgpu/types': 0.1.40
+      '@zephyr3d/base': link:../base
+      '@zephyr3d/device': link:../device
     devDependencies:
       '@babel/core': 7.22.10
       '@babel/preset-env': 7.22.10_@babel+core@7.22.10
@@ -189,8 +191,6 @@ importers:
       '@rollup/plugin-terser': 0.4.3_rollup@3.28.0
       '@rollup/pluginutils': 5.0.3_rollup@3.28.0
       '@swc/core': 1.3.78
-      '@zephyr3d/base': link:../base
-      '@zephyr3d/device': link:../device
       cross-env: 7.0.3
       rollup: 3.28.0
       rollup-plugin-copy: 3.4.0
@@ -251,7 +251,7 @@ importers:
       '@swc/core': ^1.3.62
       '@types/node': ^18.13.0
       '@webgpu/types': ^0.1.40
-      '@zephyr3d/base': workspace:^0.1.0
+      '@zephyr3d/base': workspace:*
       cross-env: ^7.0.3
       rollup: ^3.15.0
       rollup-plugin-copy: ^3.4.0
@@ -263,6 +263,7 @@ importers:
     dependencies:
       '@types/node': 18.17.6
       '@webgpu/types': 0.1.40
+      '@zephyr3d/base': link:../base
     devDependencies:
       '@babel/core': 7.22.10
       '@babel/preset-env': 7.22.10_@babel+core@7.22.10
@@ -272,7 +273,6 @@ importers:
       '@rollup/plugin-terser': 0.4.3_rollup@3.28.0
       '@rollup/pluginutils': 5.0.3_rollup@3.28.0
       '@swc/core': 1.3.78
-      '@zephyr3d/base': link:../base
       cross-env: 7.0.3
       rollup: 3.28.0
       rollup-plugin-copy: 3.4.0
@@ -296,8 +296,8 @@ importers:
       '@types/emscripten': ^1.39.6
       '@types/node': ^18.13.0
       '@webgpu/types': ^0.1.40
-      '@zephyr3d/base': workspace:^0.1.0
-      '@zephyr3d/device': workspace:^0.1.0
+      '@zephyr3d/base': workspace:*
+      '@zephyr3d/device': workspace:*
       cross-env: ^7.0.3
       rollup: ^3.15.0
       rollup-plugin-copy: ^3.4.0
@@ -310,6 +310,8 @@ importers:
       '@types/emscripten': 1.39.7
       '@types/node': 18.17.6
       '@webgpu/types': 0.1.40
+      '@zephyr3d/base': link:../base
+      '@zephyr3d/device': link:../device
     devDependencies:
       '@babel/core': 7.22.10
       '@babel/preset-env': 7.22.10_@babel+core@7.22.10
@@ -320,8 +322,55 @@ importers:
       '@rollup/plugin-terser': 0.4.3_rollup@3.28.0
       '@rollup/pluginutils': 5.0.3_rollup@3.28.0
       '@swc/core': 1.3.78
+      cross-env: 7.0.3
+      rollup: 3.28.0
+      rollup-plugin-copy: 3.4.0
+      rollup-plugin-dts: 5.3.1_rollup@3.28.0+typescript@5.2.2
+      rollup-plugin-swc3: 0.8.2_@swc+core@1.3.78+rollup@3.28.0
+      rollup-plugin-typescript2: 0.34.1_rollup@3.28.0+typescript@5.2.2
+      shx: 0.3.4
+      typescript: 5.2.2
+
+  ../../libs/inspector:
+    specifiers:
+      '@babel/core': ^7.20.12
+      '@babel/preset-env': ^7.20.2
+      '@rollup/plugin-babel': ^6.0.3
+      '@rollup/plugin-node-resolve': ^15.0.1
+      '@rollup/plugin-strip': ^3.0.2
+      '@rollup/plugin-terser': ^0.4.0
+      '@rollup/pluginutils': ^5.0.2
+      '@swc/core': ^1.3.62
+      '@types/draco3d': ^1.4.9
+      '@webgpu/types': ^0.1.40
+      '@zephyr3d/base': workspace:*
+      '@zephyr3d/device': workspace:*
+      '@zephyr3d/imgui': workspace:*
+      '@zephyr3d/scene': workspace:*
+      cross-env: ^7.0.3
+      rollup: ^3.15.0
+      rollup-plugin-copy: ^3.4.0
+      rollup-plugin-dts: ^5.2.0
+      rollup-plugin-swc3: ^0.8.2
+      rollup-plugin-typescript2: ^0.34.1
+      shx: ^0.3.4
+      typescript: ^5.1.3
+    dependencies:
+      '@types/draco3d': 1.4.9
+      '@webgpu/types': 0.1.40
       '@zephyr3d/base': link:../base
       '@zephyr3d/device': link:../device
+      '@zephyr3d/imgui': link:../imgui
+      '@zephyr3d/scene': link:../scene
+    devDependencies:
+      '@babel/core': 7.22.10
+      '@babel/preset-env': 7.22.10_@babel+core@7.22.10
+      '@rollup/plugin-babel': 6.0.3_42a3c8103c1fc4305380d97146598442
+      '@rollup/plugin-node-resolve': 15.2.0_rollup@3.28.0
+      '@rollup/plugin-strip': 3.0.2_rollup@3.28.0
+      '@rollup/plugin-terser': 0.4.3_rollup@3.28.0
+      '@rollup/pluginutils': 5.0.3_rollup@3.28.0
+      '@swc/core': 1.3.78
       cross-env: 7.0.3
       rollup: 3.28.0
       rollup-plugin-copy: 3.4.0
@@ -343,8 +392,8 @@ importers:
       '@swc/core': ^1.3.62
       '@types/draco3d': ^1.4.9
       '@webgpu/types': ^0.1.40
-      '@zephyr3d/base': workspace:^0.1.0
-      '@zephyr3d/device': workspace:^0.1.0
+      '@zephyr3d/base': workspace:*
+      '@zephyr3d/device': workspace:*
       cross-env: ^7.0.3
       rollup: ^3.15.0
       rollup-plugin-copy: ^3.4.0
@@ -356,6 +405,8 @@ importers:
     dependencies:
       '@types/draco3d': 1.4.9
       '@webgpu/types': 0.1.40
+      '@zephyr3d/base': link:../base
+      '@zephyr3d/device': link:../device
     devDependencies:
       '@babel/core': 7.22.10
       '@babel/preset-env': 7.22.10_@babel+core@7.22.10
@@ -365,8 +416,6 @@ importers:
       '@rollup/plugin-terser': 0.4.3_rollup@3.28.0
       '@rollup/pluginutils': 5.0.3_rollup@3.28.0
       '@swc/core': 1.3.78
-      '@zephyr3d/base': link:../base
-      '@zephyr3d/device': link:../device
       cross-env: 7.0.3
       rollup: 3.28.0
       rollup-plugin-copy: 3.4.0
@@ -395,12 +444,13 @@ importers:
       '@types/draco3d': ^1.4.9
       '@web/dev-server': ^0.1.35
       '@webgpu/types': ^0.1.40
-      '@zephyr3d/backend-webgl': workspace:^0.1.0
-      '@zephyr3d/backend-webgpu': workspace:^0.1.0
-      '@zephyr3d/base': workspace:^0.1.0
-      '@zephyr3d/device': workspace:^0.1.0
-      '@zephyr3d/imgui': workspace:^0.1.0
-      '@zephyr3d/scene': workspace:^0.1.0
+      '@zephyr3d/backend-webgl': workspace:*
+      '@zephyr3d/backend-webgpu': workspace:*
+      '@zephyr3d/base': workspace:*
+      '@zephyr3d/device': workspace:*
+      '@zephyr3d/imgui': workspace:*
+      '@zephyr3d/inspector': workspace:*
+      '@zephyr3d/scene': workspace:*
       '@zip.js/zip.js': ^2.7.35
       bootstrap: ^5.3.1
       chalk: ^5.2.0
@@ -435,6 +485,7 @@ importers:
       '@zephyr3d/base': link:../libs/base
       '@zephyr3d/device': link:../libs/device
       '@zephyr3d/imgui': link:../libs/imgui
+      '@zephyr3d/inspector': link:../libs/inspector
       '@zephyr3d/scene': link:../libs/scene
       '@zip.js/zip.js': 2.7.35
       bootstrap: 5.3.1_@popperjs+core@2.11.8
@@ -487,12 +538,12 @@ importers:
       '@types/diff': ^5.0.2
       '@web/dev-server': ^0.1.35
       '@webgpu/types': ^0.1.40
-      '@zephyr3d/backend-webgl': workspace:^0.1.0
-      '@zephyr3d/backend-webgpu': workspace:^0.1.0
-      '@zephyr3d/base': workspace:^0.1.0
-      '@zephyr3d/device': workspace:^0.1.0
-      '@zephyr3d/imgui': workspace:^0.1.0
-      '@zephyr3d/scene': workspace:^0.1.0
+      '@zephyr3d/backend-webgl': workspace:*
+      '@zephyr3d/backend-webgpu': workspace:*
+      '@zephyr3d/base': workspace:*
+      '@zephyr3d/device': workspace:*
+      '@zephyr3d/imgui': workspace:*
+      '@zephyr3d/scene': workspace:*
       '@zip.js/zip.js': ^2.7.35
       colors: ^1.4.0
       cross-env: ^7.0.3

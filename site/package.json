@@ -64,11 +64,12 @@
     "lil-gui": "^0.19.2",
     "@zip.js/zip.js": "^2.7.35",
     "@popperjs/core": "^2.11.8",
-    "@zephyr3d/base": "workspace:^0.1.0",
-    "@zephyr3d/device": "workspace:^0.1.0",
-    "@zephyr3d/scene": "workspace:^0.1.0",
-    "@zephyr3d/imgui": "workspace:^0.1.0",
-    "@zephyr3d/backend-webgl": "workspace:^0.1.0",
-    "@zephyr3d/backend-webgpu": "workspace:^0.1.0"
+    "@zephyr3d/base": "workspace:*",
+    "@zephyr3d/device": "workspace:*",
+    "@zephyr3d/scene": "workspace:*",
+    "@zephyr3d/imgui": "workspace:*",
+    "@zephyr3d/backend-webgl": "workspace:*",
+    "@zephyr3d/backend-webgpu": "workspace:*",
+    "@zephyr3d/inspector": "workspace:*"
   }
 }

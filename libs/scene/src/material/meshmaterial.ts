@@ -540,7 +540,12 @@ export class MeshMaterial extends Material {
    *
    * @returns The final fragment color
    */
-  outputFragmentColor(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: PBShaderExp) {
+  outputFragmentColor(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    color: PBShaderExp,
+    roughness?: PBShaderExp
+  ) {
     const pb = scope.$builder;
     const that = this;
     const funcName = 'Z_outputFragmentColor';
@@ -565,9 +570,6 @@ export class MeshMaterial extends Material {
         }
         ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext);
         this.$outputs.zFragmentOutput = ShaderHelper.encodeColorOutput(this, this.outColor);
-        if (that.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
-          this.$outputs.zSSRRoughness = pb.vec4(1, 0, 0, 1);
-        }
       } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
         if (color) {
           this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
@@ -610,6 +612,9 @@ export class MeshMaterial extends Material {
       }
     });
     color ? pb.getGlobalScope()[funcName](worldPos, color) : pb.getGlobalScope()[funcName](worldPos);
+    if (that.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
+      scope.$outputs.zSSRRoughness = roughness ?? pb.vec4(1, 0, 0, 1);
+    }
   }
 }
 FEATURE_ALPHATEST = MeshMaterial.defineFeature();

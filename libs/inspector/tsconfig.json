@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "downlevelIteration": true,
+    "moduleResolution": "node",
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": ["es2020", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noImplicitAny": false,
+    "preserveConstEnums": false,
+    "listEmittedFiles": true,
+    "noUnusedLocals": true,
+    "strictNullChecks": false,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": false,
+    "emitDecoratorMetadata": false,
+    "sourceMap": true,
+    "stripInternal": false,
+    "keyofStringsOnly": false,
+    "rootDir": "./src",
+    "declaration": true,
+    "importHelpers": false,
+    "typeRoots": ["./node_modules/@types"]
+  },
+  "include": ["./src"],
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.d.ts", "tests"]
+}

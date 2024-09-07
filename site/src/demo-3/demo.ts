@@ -4,14 +4,16 @@ import type { AssetHierarchyNode, MeshMaterial, ModelInfo, SharedModel } from '@
 import {
   Application,
   AssetManager,
-  Bloom,
+  //Bloom,
   Compositor,
   DirectionalLight,
+  FFTWaveGenerator,
   FXAA,
   OrbitCameraController,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
   PerspectiveCamera,
+  PostWater,
   Scene,
   Terrain,
   Tonemap
@@ -48,7 +50,7 @@ export class Demo {
     this._camera = this.createCamera(this._scene);
     this._compositor = new Compositor();
     this._compositor.appendPostEffect(new Tonemap());
-    this._compositor.appendPostEffect(new Bloom());
+    //this._compositor.appendPostEffect(new Bloom());
     this._compositor.appendPostEffect(new FXAA());
     Application.instance.device.setFont('24px arial');
     this.render();
@@ -167,9 +169,33 @@ export class Demo {
       const destPos = new Vector3(x, y, z);
       this._camera.lookAt(eyePos, destPos, Vector3.axisPY());
       this._camera.controller = new OrbitCameraController({ center: destPos });
+      //create water
+      const waveGenerator = new FFTWaveGenerator();
+      waveGenerator.alignment = 1;
+      waveGenerator.setWaveLength(0, 400);
+      waveGenerator.setWaveStrength(0, 0.2);
+      waveGenerator.setWaveCroppiness(0, -1.5);
+      waveGenerator.setWaveLength(1, 200);
+      waveGenerator.setWaveStrength(1, 0.1);
+      waveGenerator.setWaveCroppiness(1, -1.2);
+      waveGenerator.setWaveLength(2, 40);
+      waveGenerator.setWaveStrength(2, 0.03);
+      waveGenerator.setWaveCroppiness(2, -0.5);
+      const water = new PostWater(40, waveGenerator);
+      water.causticsIntensity = 0;
+      water.depthMulti = 0.03;
+      water.boundary = new Vector4(0, 0, 1000, 1000);
+      if (Application.instance.device.type === 'webgl') {
+        water.ssr = false;
+        water.displace = 80;
+      } else {
+        this._camera.HiZ = true;
+      }
+      this._compositor.appendPostEffect(water);
       // loaded
       this._terrain.showState = 'visible';
       this._scene.env.sky.wind.setXY(700, 350);
+      Application.instance.inputManager.use(this._camera.handleEvent.bind(this._camera));
       this._loaded = true;
     });
   }

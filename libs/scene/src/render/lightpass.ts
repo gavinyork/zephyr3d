@@ -147,16 +147,16 @@ export class LightPass extends RenderPass {
           ctx.oit.end(ctx);
         }
       }
-      const tmpFramebuffer =
-        ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS
-          ? ctx.device.pool.fetchTemporalFramebuffer(
-              false,
-              ctx.device.getDrawingBufferWidth(),
-              ctx.device.getDrawingBufferHeight(),
-              ctx.device.getFramebuffer().getColorAttachments()[0],
-              ctx.device.getFramebuffer().getDepthAttachment()
-            )
-          : null;
+      const ssr = !!(ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS);
+      const tmpFramebuffer = ssr
+        ? ctx.device.pool.fetchTemporalFramebuffer(
+            false,
+            ctx.device.getDrawingBufferWidth(),
+            ctx.device.getDrawingBufferHeight(),
+            ctx.device.getFramebuffer().getColorAttachments()[0],
+            ctx.device.getFramebuffer().getDepthAttachment()
+          )
+        : null;
       if (i === 0 && !ctx.sceneColorTexture) {
         if (tmpFramebuffer) {
           ctx.device.pushDeviceStates();
