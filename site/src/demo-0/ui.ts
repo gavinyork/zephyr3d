@@ -16,6 +16,7 @@ interface GUIParams {
   sao: boolean;
   FPS: string;
   oitType: string;
+  SSR: boolean;
   animation?: string;
 }
 
@@ -50,6 +51,7 @@ export class Panel {
       fxaa: this._viewer.FXAAEnabled(),
       sao: this._viewer.SAOEnabled(),
       FPS: '',
+      SSR: this._viewer.camera.SSR,
       oitType: this._oitNames[this._oitTypes.indexOf(this._viewer.getOITType())]
     };
     this._animationController = null;
@@ -134,6 +136,12 @@ export class Panel {
       .name('Punctual lighting')
       .onChange((value) => {
         this._viewer.punctualLightEnabled = value;
+      });
+    lightSettings
+      .add(this._params, 'SSR')
+      .name('ScreenSpaceReflections')
+      .onChange((value) => {
+        this._viewer.camera.SSR = value;
       });
 
     const oitSettings = this._gui.addFolder('OIT');

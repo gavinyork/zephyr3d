@@ -256,30 +256,30 @@ export class SceneRenderer {
       device.setViewport(vp);
       device.setScissor(scissor);
     }
-    this._scenePass.clearDepth = 1; //ctx.depthTexture ? null : 1;
-    this._scenePass.clearStencil = 0; //ctx.depthTexture ? null : 0;
     this._scenePass.transmission = false; // transmission
+    this._scenePass.clearDepth = ctx.depthTexture ? null : 1;
+    this._scenePass.clearStencil = ctx.depthTexture ? null : 0;
+    if (ctx.camera.SSR && !renderQueue.needSceneColor) {
+      ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
+    }
+    ctx.compositor?.begin(ctx);
     if (renderQueue.needSceneColor) {
       const sceneColorFramebuffer = device.pool.fetchTemporalFramebuffer(
         true,
         ctx.depthTexture.width,
         ctx.depthTexture.height,
-        colorFmt,
+        ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS
+          ? [colorFmt, device.getFramebuffer().getColorAttachments()[1]]
+          : colorFmt,
         ctx.depthTexture,
         true
       );
       device.pushDeviceStates();
       device.setFramebuffer(sceneColorFramebuffer);
-    }
-    if (ctx.camera.SSR && !renderQueue.needSceneColor) {
-      ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
-    }
-    ctx.compositor?.begin(ctx);
-    this._scenePass.render(ctx, null, renderQueue);
-    ctx.compositor?.end(ctx);
-    if (renderQueue.needSceneColor) {
-      ctx.sceneColorTexture = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
+      this._scenePass.transmission = false;
+      this._scenePass.render(ctx, null, renderQueue);
       device.popDeviceStates();
+      ctx.sceneColorTexture = sceneColorFramebuffer.getColorAttachments()[0] as Texture2D;
       new CopyBlitter().blit(
         ctx.sceneColorTexture,
         device.getFramebuffer() ?? null,
@@ -293,13 +293,9 @@ export class SceneRenderer {
       this._scenePass.clearColor = null;
       this._scenePass.clearDepth = null;
       this._scenePass.clearStencil = null;
-      if (ctx.camera.SSR) {
-        ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
-      }
-      ctx.compositor?.begin(ctx);
-      this._scenePass.render(ctx, null, renderQueue);
-      ctx.compositor?.end(ctx);
     }
+    this._scenePass.render(ctx, null, renderQueue);
+    ctx.compositor?.end(ctx);
     renderQueue.dispose();
     ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
 

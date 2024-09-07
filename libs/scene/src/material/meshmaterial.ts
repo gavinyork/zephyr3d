@@ -514,6 +514,9 @@ export class MeshMaterial extends Material {
           that.drawContext.oit.setupFragmentOutput(this);
         } else {
           this.$outputs.zFragmentOutput = pb.vec4();
+          if (ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
+            this.$outputs.zSSRRoughness = pb.vec4();
+          }
         }
         pb.main(function () {
           that.fragmentShader(this);
@@ -562,6 +565,9 @@ export class MeshMaterial extends Material {
         }
         ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext);
         this.$outputs.zFragmentOutput = ShaderHelper.encodeColorOutput(this, this.outColor);
+        if (that.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
+          this.$outputs.zSSRRoughness = pb.vec4(1, 0, 0, 1);
+        }
       } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
         if (color) {
           this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {

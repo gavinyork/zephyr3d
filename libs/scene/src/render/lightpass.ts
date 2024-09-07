@@ -1,5 +1,5 @@
 import { RenderPass } from './renderpass';
-import { QUEUE_OPAQUE, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '../values';
+import { MaterialVaryingFlags, QUEUE_OPAQUE, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '../values';
 import { Vector4 } from '@zephyr3d/base';
 import type { RenderItemListBundle, RenderQueue } from './render_queue';
 import type { PunctualLight } from '../scene/light';
@@ -147,15 +147,42 @@ export class LightPass extends RenderPass {
           ctx.oit.end(ctx);
         }
       }
+      const tmpFramebuffer =
+        ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS
+          ? ctx.device.pool.fetchTemporalFramebuffer(
+              false,
+              ctx.device.getDrawingBufferWidth(),
+              ctx.device.getDrawingBufferHeight(),
+              ctx.device.getFramebuffer().getColorAttachments()[0],
+              ctx.device.getFramebuffer().getDepthAttachment()
+            )
+          : null;
       if (i === 0 && !ctx.sceneColorTexture) {
+        if (tmpFramebuffer) {
+          ctx.device.pushDeviceStates();
+          ctx.device.setFramebuffer(tmpFramebuffer);
+        }
         ctx.env.sky.skyWorldMatrix = ctx.scene.rootNode.worldMatrix;
         ctx.env.sky.renderSky(ctx);
+        if (tmpFramebuffer) {
+          ctx.device.popDeviceStates();
+        }
       }
       if (!renderQueue.needSceneColor || ctx.sceneColorTexture) {
         if (i === 0) {
+          if (tmpFramebuffer) {
+            ctx.device.pushDeviceStates();
+            ctx.device.setFramebuffer(tmpFramebuffer);
+          }
           ctx.env.sky.renderFog(ctx);
+          if (tmpFramebuffer) {
+            ctx.device.popDeviceStates();
+          }
         }
         ctx.compositor?.drawPostEffects(ctx, i === 0, ctx.linearDepthTexture);
+      }
+      if (tmpFramebuffer) {
+        ctx.device.pool.releaseFrameBuffer(tmpFramebuffer);
       }
     }
   }

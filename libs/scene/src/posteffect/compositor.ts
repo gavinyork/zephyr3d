@@ -11,6 +11,7 @@ import type {
   VertexLayout
 } from '@zephyr3d/device';
 import type { AbstractPostEffect } from './posteffect';
+import { MaterialVaryingFlags } from '../values';
 
 /**
  * Posteffect rendering context
@@ -110,6 +111,16 @@ export class Compositor {
   }
   /** @internal */
   begin(ctx: DrawContext) {
+    const ssr = !!(ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS);
+    if (
+      this._postEffectsOpaque.length === 0 &&
+      this._postEffectsTransparency.length === 0 &&
+      ctx.primaryCamera.sampleCount === 1 &&
+      !ssr
+    ) {
+      ctx.compositorContex = null;
+      return;
+    }
     const device = ctx.device;
     const format = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
     const finalFramebuffer = device.getFramebuffer();
@@ -117,12 +128,12 @@ export class Compositor {
     let msFramebuffer: FrameBuffer = null;
     const w = depth ? depth.width : ctx.viewportWidth;
     const h = depth ? depth.height : ctx.viewportHeight;
-    if (ctx.primaryCamera.sampleCount > 1) {
+    if (ctx.primaryCamera.sampleCount > 1 || ssr) {
       msFramebuffer = device.pool.fetchTemporalFramebuffer(
         true,
         w,
         h,
-        format,
+        ssr ? [format, 'rgba8unorm'] : format,
         depth,
         false,
         ctx.primaryCamera.sampleCount
@@ -179,15 +190,17 @@ export class Compositor {
   }
   /** @internal */
   end(ctx: DrawContext) {
-    const device = ctx.device;
-    if (device.getFramebuffer() !== ctx.compositorContex.finalFramebuffer) {
-      const srcTex = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
-      device.setFramebuffer(ctx.compositorContex.finalFramebuffer);
-      device.setViewport(null);
-      device.setScissor(null);
-      Compositor._blit(device, srcTex, !ctx.compositorContex.finalFramebuffer);
+    if (ctx.compositorContex) {
+      const device = ctx.device;
+      if (device.getFramebuffer() !== ctx.compositorContex.finalFramebuffer) {
+        const srcTex = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
+        device.setFramebuffer(ctx.compositorContex.finalFramebuffer);
+        device.setViewport(null);
+        device.setScissor(null);
+        Compositor._blit(device, srcTex, !ctx.compositorContex.finalFramebuffer);
+      }
+      ctx.compositorContex = null;
     }
-    ctx.compositorContex = null;
   }
   /** @internal */
   private isLastPostEffect(opaque: boolean, index: number) {
