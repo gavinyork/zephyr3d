@@ -516,6 +516,7 @@ export class MeshMaterial extends Material {
           this.$outputs.zFragmentOutput = pb.vec4();
           if (ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
             this.$outputs.zSSRRoughness = pb.vec4();
+            this.$outputs.zSSRNormal = pb.vec4();
           }
         }
         pb.main(function () {
@@ -544,7 +545,8 @@ export class MeshMaterial extends Material {
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp,
     color: PBShaderExp,
-    roughness?: PBShaderExp
+    ssrRoughness?: PBShaderExp,
+    ssrNormal?: PBShaderExp
   ) {
     const pb = scope.$builder;
     const that = this;
@@ -613,7 +615,8 @@ export class MeshMaterial extends Material {
     });
     color ? pb.getGlobalScope()[funcName](worldPos, color) : pb.getGlobalScope()[funcName](worldPos);
     if (that.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
-      scope.$outputs.zSSRRoughness = roughness ?? pb.vec4(1, 0, 0, 1);
+      scope.$outputs.zSSRRoughness = ssrRoughness ?? pb.vec4(1, 0, 0, 1);
+      scope.$outputs.zSSRNormal = ssrNormal ?? pb.vec4(0);
     }
   }
 }

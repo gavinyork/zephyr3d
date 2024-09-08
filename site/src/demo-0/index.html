@@ -29,36 +29,40 @@
       }
       .lil-gui {
         position: relative;
-        z-index: 99;
+        margin-left: auto;
+        z-index: 1000;
       }
     </style>
   </head>
 
   <body>
-    <div style="left:0;top:0;position:absolute;width:100%;height:100%;">
-      <canvas id="canvas" style="position:absolute;left:0;top:0;width:100%;height:100%;outline:none;"></canvas>
+    <div style="left: 0; top: 0; position: absolute; width: 100%; height: 100%">
+      <canvas
+        id="canvas"
+        style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; outline: none"
+      ></canvas>
       <div id="drophint">Drag and drop GLTF/GLB/Folder/Zip here</div>
     </div>
     <script>
-      document.addEventListener('DOMContentLoaded', function(){
+      document.addEventListener('DOMContentLoaded', function () {
         const cvs = document.querySelector('#canvas');
         const dropHint = document.querySelector('#drophint');
-        cvs.addEventListener('dragenter', function(e){
+        cvs.addEventListener('dragenter', function (e) {
           dropHint.style.display = 'block';
           e.preventDefault();
         });
-        cvs.addEventListener('dragover', function(e){
+        cvs.addEventListener('dragover', function (e) {
           e.preventDefault();
         });
-        dropHint.addEventListener('dragover', function(e){
+        dropHint.addEventListener('dragover', function (e) {
           e.preventDefault();
         });
-        cvs.addEventListener('dragleave', function(e){
+        cvs.addEventListener('dragleave', function (e) {
           if (e.target === canvas) {
             dropHint.style.display = 'none';
           }
         });
-        cvs.addEventListener('drop', function(e){
+        cvs.addEventListener('drop', function (e) {
           dropHint.style.display = 'none';
           e.preventDefault();
         });

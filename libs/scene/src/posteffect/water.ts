@@ -308,8 +308,8 @@ export class PostWater extends AbstractPostEffect {
       this._targetSize.setXYZW(
         device.getFramebuffer().getWidth(),
         device.getFramebuffer().getHeight(),
-        inputColorTexture.width,
-        inputColorTexture.height
+        ctx.linearDepthTexture.width,
+        ctx.linearDepthTexture.height
       )
     );
     waterBindGroup.setValue('waterLevel', this._waterMesh.level);
@@ -491,7 +491,8 @@ export class PostWater extends AbstractPostEffect {
                         this.ssrParams.x,
                         this.ssrParams.y,
                         this.thickness,
-                        this.hizTex
+                        this.hizTex,
+                        this.depthMipLevels
                       )
                     : screenSpaceRayTracing_Linear(
                         this,
@@ -503,7 +504,8 @@ export class PostWater extends AbstractPostEffect {
                         this.ssrParams.y,
                         this.thickness,
                         pb.int(this.ssrParams.w),
-                        this.depthTex
+                        this.depthTex,
+                        this.targetSize.zw
                       );
                 });
                 this.$l.refl = pb.reflect(pb.normalize(pb.sub(this.worldPos, this.cameraPos)), this.normal);

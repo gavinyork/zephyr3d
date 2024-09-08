@@ -56,7 +56,7 @@ instancingApp.ready().then(async () => {
 
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
-  if (0) {
+  if (1) {
     compositor.appendPostEffect(new PostWater(-1, new FFTWaveGenerator()));
   } else {
     const g = new GerstnerWaveGenerator();

@@ -10,8 +10,8 @@ function screenEdgeFading(scope: PBInsideFunctionScope, uv: PBShaderExp): PBShad
     this.$if(pb.and(pb.lessThan(this.diff.x, 0), pb.lessThan(this.diff.y, 0)), function () {
       this.$return(pb.float(0));
     });
-    this.$l.t1 = pb.smoothStep(0, 0.1, this.diff.x);
-    this.$l.t2 = pb.smoothStep(0, 0.2, this.diff.y);
+    this.$l.t1 = pb.smoothStep(0, 0.2, this.diff.x);
+    this.$l.t2 = pb.smoothStep(0, 0.3, this.diff.y);
     this.$return(pb.clamp(pb.mul(this.t1, this.t2), 0, 1));
   });
   return scope.SSR_edgeFading(uv);
@@ -155,7 +155,8 @@ export function screenSpaceRayTracing_Linear(
   maxIterations: PBShaderExp | number,
   thickness: PBShaderExp | number,
   binarySearchSteps: PBShaderExp | number,
-  linearDepthTex: PBShaderExp
+  linearDepthTex: PBShaderExp,
+  targetSize: PBShaderExp
 ) {
   const pb = scope.$builder;
   pb.func(
@@ -168,7 +169,8 @@ export function screenSpaceRayTracing_Linear(
       pb.float('maxDistance'),
       pb.float('iteration'),
       pb.float('thickness'),
-      pb.int('binarySearchSteps')
+      pb.int('binarySearchSteps'),
+      pb.vec2('targetSize')
     ],
     function () {
       //this.$l.normalizedViewPos = pb.normalize(this.viewPos);
@@ -282,7 +284,8 @@ export function screenSpaceRayTracing_Linear(
     maxDistance,
     maxIterations,
     thickness,
-    binarySearchSteps
+    binarySearchSteps,
+    targetSize
   );
 }
 
@@ -294,7 +297,8 @@ export function screenSpaceRayTracing_HiZ(
   maxDistance: PBShaderExp | number,
   maxIteraions: PBShaderExp | number,
   thickness: PBShaderExp | number,
-  HiZTexture: PBShaderExp
+  HiZTexture: PBShaderExp,
+  HiZTextureMipLevels: PBShaderExp | number
 ): PBShaderExp {
   const pb = scope.$builder;
   pb.func('SSR_HiZ_intersectDepthPlane', [pb.vec3('o'), pb.vec3('d'), pb.float('z')], function () {
@@ -345,7 +349,8 @@ export function screenSpaceRayTracing_HiZ(
       pb.vec3('reflectVecInTS'),
       pb.float('maxDistance'),
       pb.float('thickness'),
-      pb.int('maxIteration')
+      pb.int('maxIteration'),
+      pb.int('depthMipLevels')
     ],
     function () {
       this.$l.maxLevel = pb.sub(this.depthMipLevels, 1);
@@ -374,7 +379,7 @@ export function screenSpaceRayTracing_HiZ(
         this.crossOffset
       );
       this.$l.level = this.startLevel;
-      this.$l.iter = pb.int(0);
+      this.$l.iter = pb.int(1);
       this.$l.isBackwardRay = pb.lessThan(this.reflectVecInTS.z, 0);
       this.$l.rayDir = this.$choice(this.isBackwardRay, pb.float(-1), pb.float(1));
       this.$l.cell_minZ = pb.float();
@@ -444,7 +449,8 @@ export function screenSpaceRayTracing_HiZ(
       pb.mat4('projMatrix'),
       pb.float('maxDistance'),
       pb.float('iteration'),
-      pb.float('thickness')
+      pb.float('thickness'),
+      pb.int('depthMipLevels')
     ],
     function () {
       //this.$l.normalizedViewPos = pb.normalize(this.viewPos);
@@ -489,10 +495,19 @@ export function screenSpaceRayTracing_HiZ(
           this.reflectVecTS,
           this.maxDist,
           this.thickness,
-          pb.int(this.iteration)
+          pb.int(this.iteration),
+          this.depthMipLevels
         )
       );
     }
   );
-  return scope.SSR_HiZ(viewPos, traceRay, projMatrix, maxDistance, maxIteraions, thickness);
+  return scope.SSR_HiZ(
+    viewPos,
+    traceRay,
+    projMatrix,
+    maxDistance,
+    maxIteraions,
+    thickness,
+    HiZTextureMipLevels
+  );
 }

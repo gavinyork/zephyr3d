@@ -99,11 +99,18 @@ export class PBRSpecularGlossinessMaterial extends applyMaterialMixins(
             scope.normalInfo.TBN,
             scope.outRoughness
           );
+          /*
+          scope.outRoughness = pb.vec4(
+            pb.add(pb.mul(scope.normalInfo.normal, 0.5), pb.vec3(0.5)),
+            scope.outRoughness.a
+          );
+          */
           this.outputFragmentColor(
             scope,
             scope.$inputs.worldPos,
             pb.vec4(scope.litColor, scope.albedo.a),
-            scope.outRoughness
+            scope.outRoughness,
+            pb.vec4(pb.add(pb.mul(scope.normalInfo.normal, 0.5), pb.vec3(0.5)), 1)
           );
         } else {
           scope.$l.litColor = this.PBRLight(

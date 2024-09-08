@@ -38,7 +38,8 @@ export abstract class EnvironmentLighting {
    * Get radiance for a fragment
    *
    * @param scope - The shader scope
-   * @param surfaceData - surface data of the fragment
+   * @param refl - Reflection vector
+   * @param roughness - Surface roughness
    *
    * @returns The radiance for the fragment
    */
@@ -47,7 +48,7 @@ export abstract class EnvironmentLighting {
    * Get irradiance for a fragment
    *
    * @param scope - The shader scope
-   * @param surfaceData - surface data of the fragment
+   * @param normal - surface normal
    *
    * @returns The radiance for the fragment
    */

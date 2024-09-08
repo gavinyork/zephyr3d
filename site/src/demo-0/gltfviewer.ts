@@ -26,6 +26,8 @@ import {
 } from '@zephyr3d/scene';
 import { EnvMaps } from './envmap';
 import { Panel } from './ui';
+import { imGuiInit, imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
+import { Inspector } from '@zephyr3d/inspector';
 
 declare global {
   const DracoDecoderModule: draco3d.DracoDecoderModule;
@@ -58,6 +60,7 @@ export class GLTFViewer {
   private _ui: Panel;
   private _compositor: Compositor;
   private _dracoModule: draco3d.DecoderModule;
+  private _inspector: Inspector;
   constructor(scene: Scene) {
     const device = Application.instance.device;
     this._currentAnimation = null;
@@ -109,13 +112,18 @@ export class GLTFViewer {
     this._envMaps.selectById(this._envMaps.getIdList()[0], this.scene);
     this._ui = new Panel(this);
     this._dracoModule = null;
+    this._inspector = new Inspector(this._scene, this._compositor, this._camera);
   }
   async ready() {
     return new Promise<void>((resolve) => {
       DracoDecoderModule({
         onModuleLoaded: (module) => {
           this._dracoModule = module;
-          resolve();
+          imGuiInit(Application.instance.device).then(() => {
+            Application.instance.inputManager.use(imGuiInjectEvent);
+            Application.instance.inputManager.use(this._camera.handleEvent.bind(this._camera));
+            resolve();
+          });
         }
       });
     });
@@ -336,6 +344,10 @@ export class GLTFViewer {
   }
   render() {
     this._camera.render(this._scene, this._compositor);
+    imGuiNewFrame();
+    this._inspector.render();
+    imGuiEndFrame();
+
     //this._ui.render();
   }
   lookAt() {

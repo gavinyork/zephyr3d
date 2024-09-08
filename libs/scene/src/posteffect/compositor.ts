@@ -136,7 +136,7 @@ export class Compositor {
         true,
         w,
         h,
-        ssr ? [format, 'rgba8unorm'] : format,
+        ssr ? [format, 'rgba8unorm', 'rgba8unorm'] : format,
         depth,
         false,
         ctx.primaryCamera.sampleCount
@@ -167,6 +167,7 @@ export class Compositor {
         Compositor._SSRPostEffect = new SSR();
       }
       Compositor._SSRPostEffect.roughnessTexture = msFramebuffer.getColorAttachments()[1] as Texture2D;
+      Compositor._SSRPostEffect.normalTexture = msFramebuffer.getColorAttachments()[2] as Texture2D;
       this._postEffectsOpaque.unshift(Compositor._SSRPostEffect);
     }
   }

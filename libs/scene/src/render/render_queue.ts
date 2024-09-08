@@ -125,6 +125,7 @@ export interface RenderItemList {
   opaque: RenderItemListBundle;
   transmission: RenderItemListBundle;
   transparent: RenderItemListBundle;
+  transmission_trans: RenderItemListBundle;
 }
 
 /**
@@ -280,6 +281,8 @@ export class RenderQueue {
     this._itemList.transmission.unlit.push(...newItemLists.transmission.unlit);
     this._itemList.transparent.lit.push(...newItemLists.transparent.lit);
     this._itemList.transparent.unlit.push(...newItemLists.transparent.unlit);
+    this._itemList.transmission_trans.lit.push(...newItemLists.transmission_trans.lit);
+    this._itemList.transmission_trans.unlit.push(...newItemLists.transmission_trans.unlit);
     this._needSceneColor ||= queue._needSceneColor;
     this._drawTransparent ||= queue._drawTransparent;
     this._objectColorMaps.push(...queue._objectColorMaps);
@@ -296,7 +299,7 @@ export class RenderQueue {
       }
       const trans = drawable.getQueueType() === QUEUE_TRANSPARENT;
       const unlit = drawable.isUnlit();
-      const transmission = !trans && drawable.needSceneColor();
+      const transmission = drawable.needSceneColor();
       this._needSceneColor ||= transmission;
       this._drawTransparent ||= trans;
       if (camera.enablePicking) {
@@ -305,15 +308,19 @@ export class RenderQueue {
       }
       if (drawable.isBatchable()) {
         const instanceList = trans
-          ? unlit
+          ? transmission
+            ? unlit
+              ? this._itemList.transmission_trans.unlit[0].instanceList
+              : this._itemList.transmission_trans.lit[0].instanceList
+            : unlit
             ? this._itemList.transparent.unlit[0].instanceList
             : this._itemList.transparent.lit[0].instanceList
-          : unlit
-          ? transmission
-            ? this._itemList.transmission.unlit[0].instanceList
-            : this._itemList.opaque.unlit[0].instanceList
           : transmission
-          ? this._itemList.transmission.lit[0].instanceList
+          ? unlit
+            ? this._itemList.transmission.unlit[0].instanceList
+            : this._itemList.transmission.lit[0].instanceList
+          : unlit
+          ? this._itemList.opaque.unlit[0].instanceList
           : this._itemList.opaque.lit[0].instanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         let drawableList = instanceList[hash];
@@ -324,15 +331,19 @@ export class RenderQueue {
         drawableList.push(drawable);
       } else {
         const list = trans
-          ? unlit
+          ? transmission
+            ? unlit
+              ? this._itemList.transmission_trans.unlit[0]
+              : this._itemList.transmission_trans.lit[0]
+            : unlit
             ? this._itemList.transparent.unlit[0]
             : this._itemList.transparent.lit[0]
-          : unlit
-          ? transmission
-            ? this._itemList.transmission.unlit[0]
-            : this._itemList.opaque.unlit[0]
           : transmission
-          ? this._itemList.transmission.lit[0]
+          ? unlit
+            ? this._itemList.transmission.unlit[0]
+            : this._itemList.transmission.lit[0]
+          : unlit
+          ? this._itemList.opaque.unlit[0]
           : this._itemList.opaque.lit[0];
         const skinAnimation = !!drawable.getBoneMatrices();
         const morphAnimation = !!drawable.getMorphData();
@@ -401,7 +412,9 @@ export class RenderQueue {
       itemList.transmission.lit,
       itemList.transmission.unlit,
       itemList.transparent.lit,
-      itemList.transparent.unlit
+      itemList.transparent.unlit,
+      itemList.transmission_trans.lit,
+      itemList.transmission_trans.unlit
     ];
     for (let i = 0; i < lists.length; i++) {
       const list = lists[i];
@@ -559,7 +572,8 @@ export class RenderQueue {
     return {
       opaque: this.newRenderItemListBundle(),
       transmission: this.newRenderItemListBundle(),
-      transparent: this.newRenderItemListBundle()
+      transparent: this.newRenderItemListBundle(),
+      transmission_trans: this.newRenderItemListBundle()
     };
   }
   /*

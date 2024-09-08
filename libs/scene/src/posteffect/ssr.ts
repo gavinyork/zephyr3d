@@ -1,7 +1,9 @@
 import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
-import type { AbstractDevice, BindGroup, GPUProgram, Texture2D, TextureSampler } from '@zephyr3d/device';
+import type { BindGroup, GPUProgram, Texture2D, TextureSampler } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
+import { sampleLinearDepth, screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear } from '../shaders/ssr';
+import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 
 /**
  * SSR post effect
@@ -12,18 +14,21 @@ import type { DrawContext } from '../render';
  * @internal
  */
 export class SSR extends AbstractPostEffect {
-  private static _program: GPUProgram = null;
-  private static _sampler: TextureSampler = null;
+  private static _programs: Record<string, GPUProgram> = {};
+  private static _sampler: TextureSampler = undefined;
   private _roughnessTex: Texture2D;
-  private _bindgroup: BindGroup;
+  private _normalTex: Texture2D;
+  private _bindgroups: Record<string, BindGroup>;
+  private _ssrParams: Vector4;
   /**
    * Creates an instance of SSR post effect
    */
   constructor() {
     super();
     this._opaque = true;
-    this._bindgroup = null;
+    this._bindgroups = {};
     this._roughnessTex = null;
+    this._ssrParams = new Vector4(32, 80, 0.5, 6);
   }
   get roughnessTexture() {
     return this._roughnessTex;
@@ -31,11 +36,11 @@ export class SSR extends AbstractPostEffect {
   set roughnessTexture(tex: Texture2D) {
     this._roughnessTex = tex;
   }
-  /** {@inheritDoc AbstractPostEffect.dispose} */
-  dispose() {
-    super.dispose();
-    this._bindgroup?.dispose();
-    this._bindgroup = null;
+  get normalTexture() {
+    return this._normalTex;
+  }
+  set normalTexture(tex: Texture2D) {
+    this._normalTex = tex;
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
   requireLinearDepthTexture(): boolean {
@@ -48,58 +53,187 @@ export class SSR extends AbstractPostEffect {
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const device = ctx.device;
-    this._prepare(device);
-    this._bindgroup.setTexture('colorTex', inputColorTexture, SSR._sampler);
-    this._bindgroup.setTexture('roughnessTex', this._roughnessTex, SSR._sampler);
-    this._bindgroup.setValue('flip', this.needFlip(device) ? 1 : 0);
-    this._bindgroup.setValue('srgbOut', srgbOutput ? 1 : 0);
-    device.setProgram(SSR._program);
-    device.setBindGroup(0, this._bindgroup);
+    const hash = `${ctx.env.light.envLight ? ctx.env.light.getHash() : ''}:${!!ctx.HiZTexture}`;
+    let program = SSR._programs[hash];
+    if (!program) {
+      program = this._createProgram(ctx);
+      SSR._programs[hash] = program;
+    }
+    let bindGroup = this._bindgroups[hash];
+    if (!bindGroup) {
+      bindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
+      this._bindgroups[hash] = bindGroup;
+    }
+    if (!program || !bindGroup) {
+      device.clearFrameBuffer(new Vector4(1, 1, 0, 1), null, null);
+      return;
+    }
+    bindGroup.setTexture('colorTex', inputColorTexture, SSR._sampler);
+    bindGroup.setTexture('roughnessTex', this._roughnessTex, SSR._sampler);
+    bindGroup.setTexture('normalTex', this._normalTex, SSR._sampler);
+    bindGroup.setTexture('depthTex', sceneDepthTexture, SSR._sampler);
+    bindGroup.setValue('cameraNearFar', new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane()));
+    bindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
+    bindGroup.setValue('invProjMatrix', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
+    bindGroup.setValue('projMatrix', ctx.camera.getProjectionMatrix());
+    bindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
+    bindGroup.setValue('invViewMatrix', ctx.camera.worldMatrix);
+    bindGroup.setValue('ssrParams', this._ssrParams);
+    bindGroup.setValue(
+      'targetSize',
+      new Vector4(
+        device.getDrawingBufferWidth(),
+        device.getDrawingBufferHeight(),
+        sceneDepthTexture.width,
+        sceneDepthTexture.height
+      )
+    );
+    if (ctx.HiZTexture) {
+      bindGroup.setTexture('hizTex', ctx.HiZTexture, SSR._sampler);
+      bindGroup.setValue('depthMipLevels', ctx.HiZTexture.mipLevelCount);
+    }
+    bindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
+    bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
+    if (ctx.env.light.envLight) {
+      bindGroup.setValue('envLightStrength', ctx.env.light.strength);
+      ctx.env.light.envLight.updateBindGroup(bindGroup);
+    }
+    device.setProgram(program);
+    device.setBindGroup(0, bindGroup);
     this.drawFullscreenQuad();
   }
   /** @internal */
-  private _prepare(device: AbstractDevice) {
-    if (!SSR._program) {
-      SSR._program = device.buildRenderProgram({
-        vertex(pb) {
-          this.flip = pb.int().uniform(0);
-          this.$inputs.pos = pb.vec2().attrib('position');
-          this.$outputs.uv = pb.vec2();
-          pb.main(function () {
-            this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
-            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-            this.$if(pb.notEqual(this.flip, 0), function () {
-              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
-            });
-          });
-        },
-        fragment(pb) {
-          this.colorTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-          this.roughnessTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-          this.srgbOut = pb.int().uniform(0);
-          this.$outputs.outColor = pb.vec4();
-          pb.main(function () {
-            this.$l.color = pb.textureSample(this.roughnessTex, this.$inputs.uv);
-            this.$if(pb.equal(this.srgbOut, 0), function () {
-              this.$outputs.outColor = this.color;
-            }).$else(function () {
-              this.$outputs.outColor = pb.vec4(linearToGamma(this, this.color.rgb), this.color.a);
-            });
-          });
+  private _createProgram(ctx: DrawContext): GPUProgram {
+    return ctx.device.buildRenderProgram({
+      vertex(pb) {
+        this.flip = pb.int().uniform(0);
+        this.$inputs.pos = pb.vec2().attrib('position');
+        this.$outputs.uv = pb.vec2();
+        if (ctx.env.light.envLight) {
+          ctx.env.light.envLight.initShaderBindings(pb);
         }
-      });
-    }
-    if (!SSR._sampler) {
-      SSR._sampler = device.createSampler({
-        magFilter: 'nearest',
-        minFilter: 'nearest',
-        mipFilter: 'none',
-        addressU: 'clamp',
-        addressV: 'clamp'
-      });
-    }
-    if (!this._bindgroup) {
-      this._bindgroup = device.createBindGroup(SSR._program.bindGroupLayouts[0]);
-    }
+        pb.main(function () {
+          this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+          this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+          this.$if(pb.notEqual(this.flip, 0), function () {
+            this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+          });
+        });
+      },
+      fragment(pb) {
+        this.colorTex = pb.tex2D().uniform(0);
+        this.roughnessTex = pb.tex2D().uniform(0);
+        this.normalTex = pb.tex2D().uniform(0);
+        this.depthTex = pb.tex2D().uniform(0);
+        this.cameraNearFar = pb.vec2().uniform(0);
+        this.cameraPos = pb.vec3().uniform(0);
+        this.invProjMatrix = pb.mat4().uniform(0);
+        this.projMatrix = pb.mat4().uniform(0);
+        this.viewMatrix = pb.mat4().uniform(0);
+        this.invViewMatrix = pb.mat4().uniform(0);
+        this.ssrParams = pb.vec4().uniform(0);
+        this.targetSize = pb.vec4().uniform(0);
+        if (ctx.env.light.envLight) {
+          this.envLightStrength = pb.float().uniform(0);
+          ctx.env.light.envLight.initShaderBindings(pb);
+        }
+        if (ctx.HiZTexture) {
+          this.hizTex = pb.tex2D().uniform(0);
+          this.depthMipLevels = pb.int().uniform(0);
+        }
+        this.srgbOut = pb.int().uniform(0);
+        this.$outputs.outColor = pb.vec4();
+        pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
+          this.$l.linearDepth = sampleLinearDepth(this, this.depthTex, this.uv, 0);
+          this.$l.nonLinearDepth = pb.div(
+            pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
+            pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
+          );
+          this.$l.clipSpacePos = pb.vec4(
+            pb.sub(pb.mul(this.uv, 2), pb.vec2(1)),
+            pb.sub(pb.mul(pb.clamp(this.nonLinearDepth, 0, 1), 2), 1),
+            1
+          );
+          this.$l.wPos = pb.mul(this.mat, this.clipSpacePos);
+          this.$return(pb.vec4(pb.div(this.wPos.xyz, this.wPos.w), this.linearDepth));
+        });
+        pb.main(function () {
+          this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
+          this.$l.sceneColor = pb.textureSampleLevel(this.colorTex, this.screenUV, 0).rgb;
+          this.$l.roughnessFactor = pb.textureSampleLevel(this.roughnessTex, this.screenUV, 0);
+          this.$l.viewPos = this.getPosition(this.screenUV, this.invProjMatrix).xyz;
+          this.$l.worldNormal = pb.sub(
+            pb.mul(pb.textureSampleLevel(this.normalTex, this.screenUV, 0).rgb, 2),
+            pb.vec3(1)
+          );
+          this.$l.viewNormal = pb.mul(this.viewMatrix, pb.vec4(this.worldNormal, 0)).xyz;
+          //this.$l.viewNormal = pb.normalize(pb.cross(pb.dpdx(this.viewPos), pb.dpdy(this.viewPos)));
+          this.$l.incidentVec = pb.normalize(this.viewPos);
+          this.$l.reflectVec = pb.reflect(this.incidentVec, this.viewNormal);
+          this.$l.hitInfo = pb.vec4(0);
+          this.$l.thicknessFactor = pb.add(pb.mul(pb.dot(this.incidentVec, this.reflectVec), 0.5), 0.5);
+          this.thicknessFactor = pb.div(this.thicknessFactor, pb.max(pb.mul(pb.length(this.viewPos), 5), 1));
+          this.thicknessFactor = pb.mul(this.thicknessFactor, 50);
+          this.$l.thickness = pb.mul(this.thicknessFactor, this.ssrParams.z);
+          this.viewPos = pb.add(this.viewPos, pb.mul(this.reflectVec, 0.1));
+          this.$if(
+            pb.and(pb.lessThan(this.roughnessFactor.a, 1), pb.lessThan(this.reflectVec.z, 0)),
+            function () {
+              this.hitInfo = ctx.HiZTexture
+                ? screenSpaceRayTracing_HiZ(
+                    this,
+                    this.viewPos,
+                    this.reflectVec,
+                    this.projMatrix,
+                    this.ssrParams.x,
+                    this.ssrParams.y,
+                    this.thickness,
+                    this.hizTex,
+                    this.depthMipLevels
+                  )
+                : screenSpaceRayTracing_Linear(
+                    this,
+                    this.viewPos,
+                    this.reflectVec,
+                    this.projMatrix,
+                    this.cameraNearFar.y,
+                    this.ssrParams.x,
+                    this.ssrParams.y,
+                    this.thickness,
+                    pb.int(this.ssrParams.w),
+                    this.depthTex,
+                    this.targetSize.zw
+                  );
+            }
+          );
+          this.$l.refl = pb.mul(this.invViewMatrix, pb.vec4(this.reflectVec, 0)).xyz;
+          this.$l.env = ctx.env.light.envLight
+            ? pb.mul(
+                ctx.env.light.envLight.getRadiance(this, this.refl, this.roughnessFactor.a),
+                this.envLightStrength
+              )
+            : pb.vec3(0);
+          this.reflectance = pb.mix(
+            this.env,
+            pb.textureSampleLevel(this.colorTex, this.hitInfo.xy, 0).rgb,
+            this.hitInfo.w
+          );
+          this.$l.color = pb.add(pb.mul(this.roughnessFactor.xyz, this.reflectance), this.sceneColor);
+          /*
+          this.$l.color = this.hitInfo.xyz; // pb.add(pb.mul(this.roughnessFactor.xyz, this.reflectance), this.sceneColor);
+          this.$l.color = pb.add(
+            pb.mul(pb.mul(this.invViewMatrix, pb.vec4(this.viewNormal, 0)).xyz, 0.5),
+            pb.vec3(0.5)
+          );
+          */
+
+          this.$if(pb.equal(this.srgbOut, 0), function () {
+            this.$outputs.outColor = pb.vec4(this.color, 1);
+          }).$else(function () {
+            this.$outputs.outColor = pb.vec4(linearToGamma(this, this.color), 1);
+          });
+        });
+      }
+    });
   }
 }

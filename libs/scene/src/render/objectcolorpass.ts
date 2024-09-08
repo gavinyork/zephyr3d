@@ -33,7 +33,7 @@ export class ObjectColorPass extends RenderPass {
       ctx.device.setBindGroup(0, bindGroup);
       ShaderHelper.setCameraUniforms(bindGroup, ctx.camera, ctx.flip, true);
       const reverseWinding = ctx.camera.worldMatrixDet < 0;
-      for (const list of [items.opaque, items.transmission, items.transparent]) {
+      for (const list of [items.opaque, items.transmission, items.transparent, items.transmission_trans]) {
         if (list) {
           for (const lit of list.lit) {
             this.drawItemList(lit, ctx, reverseWinding);

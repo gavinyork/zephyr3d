@@ -42,7 +42,6 @@ gltfApp.ready().then(async () => {
   const gltfViewer = new GLTFViewer(scene);
   await gltfViewer.ready();
   gltfViewer.loadModel('./assets/models/DamagedHelmet.glb');
-  gltfApp.inputManager.use(gltfViewer.camera.handleEvent.bind(gltfViewer.camera));
   gltfApp.on('drop', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();

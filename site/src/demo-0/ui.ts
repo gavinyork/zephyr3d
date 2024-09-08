@@ -142,6 +142,7 @@ export class Panel {
       .name('ScreenSpaceReflections')
       .onChange((value) => {
         this._viewer.camera.SSR = value;
+        this._viewer.camera.HiZ = value;
       });
 
     const oitSettings = this._gui.addFolder('OIT');
