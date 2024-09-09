@@ -138,7 +138,7 @@ export class Compositor {
         h,
         ssr ? [format, 'rgba8unorm', 'rgba8unorm'] : format,
         depth,
-        false,
+        ssr,
         ctx.primaryCamera.sampleCount
       );
     }

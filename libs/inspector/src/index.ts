@@ -824,6 +824,42 @@ export class Inspector {
           camera.window = null;
         }
       }
+      ImGui.BeginSection('ScreenSpaceReflection');
+      ImGui.Checkbox('Enabled', (val?: boolean) => {
+        if (val === undefined) {
+          val = camera.SSR;
+        } else {
+          camera.SSR = val;
+        }
+        return val;
+      });
+      if (camera.SSR) {
+        ImGui.SliderFloat(
+          'SSRMaxDistance##Camera',
+          (val?: number) => (camera.ssrMaxDistance = val = val ?? camera.ssrMaxDistance),
+          0,
+          1000
+        );
+        ImGui.SliderInt(
+          'SSRIterations##Camera',
+          (val?: number) => (camera.ssrIterations = val = val ?? camera.ssrIterations),
+          1,
+          200
+        );
+        ImGui.SliderFloat(
+          'SSRThickness##Camera',
+          (val?: number) => (camera.ssrThickness = val = val ?? camera.ssrThickness),
+          0,
+          5
+        );
+        ImGui.SliderInt(
+          'SSRBinarySearchSteps##Camera',
+          (val?: number) => (camera.ssrBinarySearchSteps = val = val ?? camera.ssrBinarySearchSteps),
+          0,
+          16
+        );
+      }
+      ImGui.EndSection(1);
     }
     ImGui.End();
   }

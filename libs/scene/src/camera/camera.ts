@@ -68,6 +68,8 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _SSR: boolean;
   /** @internal */
+  protected _ssrParams: Vector4;
+  /** @internal */
   protected _picking: boolean;
   /** @internal */
   protected _pickPosX: number;
@@ -106,6 +108,7 @@ export class Camera extends SceneNode {
     this._pickPosY = 0;
     this._HiZ = false;
     this._SSR = false;
+    this._ssrParams = new Vector4(32, 80, 0.5, 6);
     this._pickResult = null;
     this._commandBufferReuse = true;
   }
@@ -130,6 +133,33 @@ export class Camera extends SceneNode {
   }
   set SSR(val: boolean) {
     this._SSR = !!val;
+  }
+  get ssrMaxDistance(): number {
+    return this._ssrParams.x;
+  }
+  set ssrMaxDistance(val: number) {
+    this._ssrParams.x = val;
+  }
+  get ssrIterations(): number {
+    return this._ssrParams.y;
+  }
+  set ssrIterations(val: number) {
+    this._ssrParams.y = val;
+  }
+  get ssrThickness(): number {
+    return this._ssrParams.z;
+  }
+  set ssrThickness(val: number) {
+    this._ssrParams.z = val;
+  }
+  get ssrBinarySearchSteps() {
+    return this._ssrParams.w >> 0;
+  }
+  set ssrBinarySearchSteps(val: number) {
+    this._ssrParams.w = val >> 0;
+  }
+  get ssrParams(): Vector4 {
+    return this._ssrParams;
   }
   /** Whether to perform a depth pass */
   get depthPrePass(): boolean {

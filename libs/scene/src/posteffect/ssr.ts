@@ -15,11 +15,11 @@ import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
  */
 export class SSR extends AbstractPostEffect {
   private static _programs: Record<string, GPUProgram> = {};
-  private static _sampler: TextureSampler = undefined;
+  private static _samplerNearest: TextureSampler = undefined;
+  private static _samplerLinear: TextureSampler = undefined;
   private _roughnessTex: Texture2D;
   private _normalTex: Texture2D;
   private _bindgroups: Record<string, BindGroup>;
-  private _ssrParams: Vector4;
   /**
    * Creates an instance of SSR post effect
    */
@@ -28,7 +28,6 @@ export class SSR extends AbstractPostEffect {
     this._opaque = true;
     this._bindgroups = {};
     this._roughnessTex = null;
-    this._ssrParams = new Vector4(32, 80, 0.5, 6);
   }
   get roughnessTexture() {
     return this._roughnessTex;
@@ -64,21 +63,36 @@ export class SSR extends AbstractPostEffect {
       bindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
       this._bindgroups[hash] = bindGroup;
     }
+    if (!SSR._samplerNearest) {
+      SSR._samplerNearest = device.createSampler({
+        minFilter: 'nearest',
+        magFilter: 'nearest',
+        mipFilter: 'nearest'
+      });
+    }
+    if (!SSR._samplerLinear) {
+      SSR._samplerLinear = device.createSampler({
+        minFilter: 'linear',
+        magFilter: 'linear',
+        mipFilter: 'linear'
+      });
+    }
     if (!program || !bindGroup) {
       device.clearFrameBuffer(new Vector4(1, 1, 0, 1), null, null);
       return;
     }
-    bindGroup.setTexture('colorTex', inputColorTexture, SSR._sampler);
-    bindGroup.setTexture('roughnessTex', this._roughnessTex, SSR._sampler);
-    bindGroup.setTexture('normalTex', this._normalTex, SSR._sampler);
-    bindGroup.setTexture('depthTex', sceneDepthTexture, SSR._sampler);
+    bindGroup.setTexture('colorTex', inputColorTexture, SSR._samplerLinear);
+    bindGroup.setValue('colorTexMiplevels', inputColorTexture.mipLevelCount - 1);
+    bindGroup.setTexture('roughnessTex', this._roughnessTex, SSR._samplerNearest);
+    bindGroup.setTexture('normalTex', this._normalTex, SSR._samplerNearest);
+    bindGroup.setTexture('depthTex', sceneDepthTexture, SSR._samplerNearest);
     bindGroup.setValue('cameraNearFar', new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane()));
     bindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
     bindGroup.setValue('invProjMatrix', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
     bindGroup.setValue('projMatrix', ctx.camera.getProjectionMatrix());
     bindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
     bindGroup.setValue('invViewMatrix', ctx.camera.worldMatrix);
-    bindGroup.setValue('ssrParams', this._ssrParams);
+    bindGroup.setValue('ssrParams', ctx.camera.ssrParams);
     bindGroup.setValue(
       'targetSize',
       new Vector4(
@@ -89,7 +103,7 @@ export class SSR extends AbstractPostEffect {
       )
     );
     if (ctx.HiZTexture) {
-      bindGroup.setTexture('hizTex', ctx.HiZTexture, SSR._sampler);
+      bindGroup.setTexture('hizTex', ctx.HiZTexture, SSR._samplerNearest);
       bindGroup.setValue('depthMipLevels', ctx.HiZTexture.mipLevelCount);
     }
     bindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
@@ -122,6 +136,7 @@ export class SSR extends AbstractPostEffect {
       },
       fragment(pb) {
         this.colorTex = pb.tex2D().uniform(0);
+        this.colorTexMiplevels = pb.float().uniform(0);
         this.roughnessTex = pb.tex2D().uniform(0);
         this.normalTex = pb.tex2D().uniform(0);
         this.depthTex = pb.tex2D().uniform(0);
@@ -161,7 +176,9 @@ export class SSR extends AbstractPostEffect {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
           this.$l.sceneColor = pb.textureSampleLevel(this.colorTex, this.screenUV, 0).rgb;
           this.$l.roughnessFactor = pb.textureSampleLevel(this.roughnessTex, this.screenUV, 0);
-          this.$l.viewPos = this.getPosition(this.screenUV, this.invProjMatrix).xyz;
+          this.$l.pos = this.getPosition(this.screenUV, this.invProjMatrix);
+          this.$l.viewPos = this.pos.xyz;
+          this.$l.linearDepth = this.pos.w;
           this.$l.worldNormal = pb.sub(
             pb.mul(pb.textureSampleLevel(this.normalTex, this.screenUV, 0).rgb, 2),
             pb.vec3(1)
@@ -171,9 +188,7 @@ export class SSR extends AbstractPostEffect {
           this.$l.incidentVec = pb.normalize(this.viewPos);
           this.$l.reflectVec = pb.reflect(this.incidentVec, this.viewNormal);
           this.$l.hitInfo = pb.vec4(0);
-          this.$l.thicknessFactor = pb.add(pb.mul(pb.dot(this.incidentVec, this.reflectVec), 0.5), 0.5);
-          this.thicknessFactor = pb.div(this.thicknessFactor, pb.max(pb.mul(pb.length(this.viewPos), 5), 1));
-          this.thicknessFactor = pb.mul(this.thicknessFactor, 50);
+          this.$l.thicknessFactor = pb.sub(1, this.linearDepth);
           this.$l.thickness = pb.mul(this.thicknessFactor, this.ssrParams.z);
           this.viewPos = pb.add(this.viewPos, pb.mul(this.reflectVec, 0.1));
           this.$if(
@@ -215,7 +230,11 @@ export class SSR extends AbstractPostEffect {
             : pb.vec3(0);
           this.reflectance = pb.mix(
             this.env,
-            pb.textureSampleLevel(this.colorTex, this.hitInfo.xy, 0).rgb,
+            pb.textureSampleLevel(
+              this.colorTex,
+              this.hitInfo.xy,
+              pb.mul(this.colorTexMiplevels, this.roughnessFactor.a)
+            ).rgb,
             this.hitInfo.w
           );
           this.$l.color = pb.add(pb.mul(this.roughnessFactor.xyz, this.reflectance), this.sceneColor);

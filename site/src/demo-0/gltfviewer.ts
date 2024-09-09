@@ -103,6 +103,7 @@ export class GLTFViewer {
     this._camera.oit = this._oit;
     this._camera.position.setXYZ(0, 0, 15);
     this._camera.controller = void new OrbitCameraController() ?? new FPSCameraController();
+    this._camera.HiZ = Application.instance.device.type !== 'webgl';
     this._light0 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
     this._light0.shadow.shadowMapSize = 1024;
     this._light0.lookAt(new Vector3(0, 0, 0), new Vector3(0, -1, 1), Vector3.axisPY());
@@ -303,7 +304,6 @@ export class GLTFViewer {
     if (this._doFXAA) {
       this._compositor.appendPostEffect(this._fxaa);
     }
-    this.camera.HiZ = this._doWater;
   }
   get punctualLightEnabled(): boolean {
     return this._light0.showState !== 'hidden';

@@ -17,6 +17,7 @@ interface GUIParams {
   FPS: string;
   oitType: string;
   SSR: boolean;
+  HiZ: boolean;
   animation?: string;
 }
 
@@ -52,6 +53,7 @@ export class Panel {
       sao: this._viewer.SAOEnabled(),
       FPS: '',
       SSR: this._viewer.camera.SSR,
+      HiZ: this._viewer.camera.HiZ,
       oitType: this._oitNames[this._oitTypes.indexOf(this._viewer.getOITType())]
     };
     this._animationController = null;
@@ -109,6 +111,14 @@ export class Panel {
       .onChange((value) => {
         Application.instance.device.vSync = value;
       });
+    if (Application.instance.device.type !== 'webgl') {
+      systemSettings
+        .add(this._params, 'HiZ')
+        .name('HiZ')
+        .onChange((value) => {
+          this._viewer.camera.HiZ = value;
+        });
+      }
 
     const lightSettings = this._gui.addFolder('Lighting');
     lightSettings
@@ -136,13 +146,6 @@ export class Panel {
       .name('Punctual lighting')
       .onChange((value) => {
         this._viewer.punctualLightEnabled = value;
-      });
-    lightSettings
-      .add(this._params, 'SSR')
-      .name('ScreenSpaceReflections')
-      .onChange((value) => {
-        this._viewer.camera.SSR = value;
-        this._viewer.camera.HiZ = value;
       });
 
     const oitSettings = this._gui.addFolder('OIT');
@@ -178,6 +181,12 @@ export class Panel {
       .name('SSAO')
       .onChange((value) => {
         this._viewer.enableSAO(value);
+      });
+    ppSettings
+      .add(this._params, 'SSR')
+      .name('SSR')
+      .onChange((value) => {
+        this._viewer.camera.SSR = value;
       });
     ppSettings
       .add(this._params, 'water')
