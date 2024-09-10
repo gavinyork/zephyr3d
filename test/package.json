@@ -59,6 +59,7 @@
     "@zephyr3d/device": "workspace:*",
     "@zephyr3d/scene": "workspace:*",
     "@zephyr3d/imgui": "workspace:*",
+    "@zephyr3d/inspector": "workspace:*",
     "@zephyr3d/backend-webgl": "workspace:*",
     "@zephyr3d/backend-webgpu": "workspace:*"
   }

@@ -543,6 +543,7 @@ importers:
       '@zephyr3d/base': workspace:*
       '@zephyr3d/device': workspace:*
       '@zephyr3d/imgui': workspace:*
+      '@zephyr3d/inspector': workspace:*
       '@zephyr3d/scene': workspace:*
       '@zip.js/zip.js': ^2.7.35
       colors: ^1.4.0
@@ -572,6 +573,7 @@ importers:
       '@zephyr3d/base': link:../libs/base
       '@zephyr3d/device': link:../libs/device
       '@zephyr3d/imgui': link:../libs/imgui
+      '@zephyr3d/inspector': link:../libs/inspector
       '@zephyr3d/scene': link:../libs/scene
       '@zip.js/zip.js': 2.7.35
       colors: 1.4.0

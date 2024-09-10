@@ -56,6 +56,10 @@ instancingApp.ready().then(async () => {
 
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
+  void PostWater;
+  void FFTWaveGenerator;
+  void GerstnerWaveGenerator;
+  /*
   if (1) {
     compositor.appendPostEffect(new PostWater(-1, new FFTWaveGenerator()));
   } else {
@@ -72,6 +76,7 @@ instancingApp.ready().then(async () => {
     g.setWaveDirection(2, -1, 1);
     compositor.appendPostEffect(new PostWater(-1, g));
   }
+  */
   const inspector = new common.Inspector(scene, compositor, camera);
 
   const batchGroup = new BatchGroup(scene);
