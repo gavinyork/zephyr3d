@@ -130,6 +130,7 @@ export function screenSpaceRayTracing_VS(
         this.$choice(pb.or(pb.lessThan(this.uv.y, 0), pb.greaterThan(this.uv.y, 1)), pb.float(0), pb.float(1))
       );
       this.vis = pb.clamp(this.vis, 0, 1);
+      this.vis = pb.mul(this.vis, screenEdgeFading(this, this.uv));
       this.$return(pb.vec4(this.uv, this.positionTo, this.vis));
     }
   );

@@ -2,7 +2,12 @@ import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import type { BindGroup, GPUProgram, Texture2D, TextureSampler } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import { sampleLinearDepth, screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear } from '../shaders/ssr';
+import {
+  sampleLinearDepth,
+  screenSpaceRayTracing_HiZ,
+  screenSpaceRayTracing_Linear,
+  screenSpaceRayTracing_VS
+} from '../shaders/ssr';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 
 /**
@@ -188,12 +193,27 @@ export class SSR extends AbstractPostEffect {
           this.$l.incidentVec = pb.normalize(this.viewPos);
           this.$l.reflectVec = pb.reflect(this.incidentVec, this.viewNormal);
           this.$l.hitInfo = pb.vec4(0);
+          this.$l.thickness = this.ssrParams.z;
+          /*
           this.$l.thicknessFactor = pb.sub(1, this.linearDepth);
           this.$l.thickness = pb.mul(this.thicknessFactor, this.ssrParams.z);
+          */
           this.viewPos = pb.add(this.viewPos, pb.mul(this.reflectVec, 0.1));
-          this.$if(
-            pb.and(pb.lessThan(this.roughnessFactor.a, 1), pb.lessThan(this.reflectVec.z, 0)),
-            function () {
+          this.$if(pb.lessThan(this.roughnessFactor.a, 1), function () {
+            this.$if(pb.greaterThan(this.reflectVec.z, 0), function () {
+              this.hitInfo = screenSpaceRayTracing_VS(
+                this,
+                this.viewPos,
+                this.reflectVec,
+                this.projMatrix,
+                this.cameraNearFar.y,
+                this.ssrParams.x,
+                this.ssrParams.y,
+                this.thickness,
+                pb.int(this.ssrParams.w),
+                this.depthTex
+              );
+            }).$else(function () {
               this.hitInfo = ctx.HiZTexture
                 ? screenSpaceRayTracing_HiZ(
                     this,
@@ -219,8 +239,8 @@ export class SSR extends AbstractPostEffect {
                     this.depthTex,
                     this.targetSize.zw
                   );
-            }
-          );
+            });
+          });
           this.$l.refl = pb.mul(this.invViewMatrix, pb.vec4(this.reflectVec, 0)).xyz;
           this.$l.env = ctx.env.light.envLight
             ? pb.mul(
