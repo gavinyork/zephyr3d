@@ -4,7 +4,8 @@ import type { BindGroup, GPUProgram, Texture2D, TextureSampler } from '@zephyr3d
 import type { DrawContext } from '../render';
 import {
   sampleLinearDepth,
-  screenSpaceRayTracing_HiZ,
+  //screenSpaceRayTracing_HiZ,
+  screenSpaceRayTracing_HiZ2,
   screenSpaceRayTracing_Linear,
   screenSpaceRayTracing_VS
 } from '../shaders/ssr';
@@ -215,6 +216,19 @@ export class SSR extends AbstractPostEffect {
               );
             }).$else(function () {
               this.hitInfo = ctx.HiZTexture
+                ? screenSpaceRayTracing_HiZ2(
+                    this,
+                    this.viewPos,
+                    this.reflectVec,
+                    this.viewMatrix,
+                    this.projMatrix,
+                    this.invProjMatrix,
+                    pb.int(this.ssrParams.y),
+                    this.ssrParams.z,
+                    this.hizTex,
+                    this.normalTex
+                  )
+                : /*
                 ? screenSpaceRayTracing_HiZ(
                     this,
                     this.viewPos,
@@ -226,7 +240,8 @@ export class SSR extends AbstractPostEffect {
                     this.hizTex,
                     this.depthMipLevels
                   )
-                : screenSpaceRayTracing_Linear(
+              */
+                  screenSpaceRayTracing_Linear(
                     this,
                     this.viewPos,
                     this.reflectVec,

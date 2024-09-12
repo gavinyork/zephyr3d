@@ -1,6 +1,8 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { decodeNormalizedFloatFromRGBA } from './misc';
 
+const MAX_FLOAT_VALUE = 3.402823466e38;
+
 /** @internal */
 function screenEdgeFading(scope: PBInsideFunctionScope, uv: PBShaderExp): PBShaderExp {
   const pb = scope.$builder;
@@ -289,6 +291,273 @@ export function screenSpaceRayTracing_Linear(
     binarySearchSteps,
     targetSize
   );
+}
+
+export function screenSpaceRayTracing_HiZ2(
+  scope: PBInsideFunctionScope,
+  viewPos: PBShaderExp,
+  traceRay: PBShaderExp,
+  viewMatrix: PBShaderExp,
+  projMatrix: PBShaderExp,
+  invProjMatrix: PBShaderExp,
+  maxIteraions: PBShaderExp | number,
+  thickness: PBShaderExp | number,
+  HiZTexture: PBShaderExp,
+  normalTexture: PBShaderExp
+): PBShaderExp {
+  const pb = scope.$builder;
+  pb.func('getMipResolution', [pb.int('mipLevel')], function () {
+    this.$return(pb.vec2(pb.textureDimensions(HiZTexture, this.mipLevel)));
+  });
+  pb.func('SSR_loadDepth', [pb.vec2('uv'), pb.float('level')], function () {
+    this.$return(pb.textureSampleLevel(HiZTexture, this.uv, this.level).r);
+  });
+  pb.func('invProjectPosition', [pb.vec3('p'), pb.mat4('mat')], function () {
+    this.$l.c = pb.sub(pb.mul(this.p, 2), pb.vec3(1));
+    this.$l.u = pb.mul(this.mat, pb.vec4(this.c, 1));
+    this.u = pb.div(this.u, this.u.w);
+    this.$return(this.u.xyz);
+  });
+  pb.func('projectPosition', [pb.vec3('p'), pb.mat4('mat')], function () {
+    this.$l.projected = pb.mul(this.mat, pb.vec4(this.p, 1));
+    this.projected = pb.div(this.projected, this.projected.w);
+    this.projected = pb.add(pb.mul(this.projected, 0.5), pb.vec4(0.5));
+    this.$return(this.projected.xyz);
+  });
+  pb.func(
+    'projectDirection',
+    [pb.vec3('p'), pb.vec3('d'), pb.vec3('screenSpacePos'), pb.mat4('mat')],
+    function () {
+      this.$return(pb.sub(this.projectPosition(pb.add(this.p, this.d), this.mat), this.screenSpacePos));
+    }
+  );
+  pb.func(
+    'SSR_initialAdvanceRay',
+    [
+      pb.vec3('origin'),
+      pb.vec3('direction'),
+      pb.vec3('invDirection'),
+      pb.vec2('currentMipResolution'),
+      pb.vec2('invCurrentMipResolution'),
+      pb.vec2('floorOffset'),
+      pb.vec2('uvOffset'),
+      pb.vec3('position').out(),
+      pb.float('currentT').out()
+    ],
+    function () {
+      this.$l.currentMipPosition = pb.mul(this.currentMipResolution, this.origin.xy);
+      this.$l.xyPlane = pb.add(pb.floor(this.currentMipPosition), this.floorOffset);
+      this.xyPlane = pb.add(pb.mul(this.xyPlane, this.invCurrentMipResolution), this.uvOffset);
+      this.$l.t = pb.mul(pb.sub(this.xyPlane, this.origin.xy), this.invDirection.xy);
+      this.currentT = pb.min(this.t.x, this.t.y);
+      this.position = pb.add(this.origin, pb.mul(this.direction, this.currentT));
+    }
+  );
+  pb.func(
+    'SSR_advanceRay',
+    [
+      pb.vec3('origin'),
+      pb.vec3('direction'),
+      pb.vec3('invDirection'),
+      pb.vec2('currentMipPosition'),
+      pb.vec2('invCurrentMipResolution'),
+      pb.vec2('floorOffset'),
+      pb.vec2('uvOffset'),
+      pb.float('surfaceZ'),
+      pb.vec3('position').inout(),
+      pb.float('currentT').inout()
+    ],
+    function () {
+      this.$l.xyPlane = pb.add(pb.floor(this.currentMipPosition), this.floorOffset);
+      this.xyPlane = pb.add(pb.mul(this.xyPlane, this.invCurrentMipResolution), this.uvOffset);
+      this.$l.boundaryPlanes = pb.vec3(this.xyPlane, this.surfaceZ);
+      this.$l.t = pb.mul(pb.sub(this.boundaryPlanes, this.origin), this.invDirection);
+      this.t.z = this.$choice(pb.greaterThan(this.direction.z, 0), this.t.z, MAX_FLOAT_VALUE);
+      this.$l.tMin = pb.min(pb.min(this.t.x, this.t.y), this.t.z);
+      this.$l.aboveSurface = pb.greaterThan(this.surfaceZ, this.position.z);
+      this.$l.skippedTile = pb.and(
+        pb.notEqual(pb.floatBitsToUint(this.tMin), pb.floatBitsToUint(this.t.z)),
+        this.aboveSurface
+      );
+      this.currentT = this.$choice(this.aboveSurface, this.tMin, this.currentT);
+      this.position = pb.add(this.origin, pb.mul(this.direction, this.currentT));
+      this.$return(this.skippedTile);
+    }
+  );
+  pb.func(
+    'SSR_RaymarchHiZ',
+    [
+      pb.vec3('screenSpacePos'),
+      pb.vec3('screenSpaceDirection'),
+      pb.int('mostDetailMip'),
+      pb.int('maxIterations')
+    ],
+    function () {
+      this.$l.invDirection = pb.div(pb.vec3(1), this.screenSpaceDirection);
+      this.$l.currentMip = this.mostDetailMip;
+      this.$l.currentMipResolution = this.getMipResolution(this.currentMip);
+      this.$l.invCurrentMipResolution = pb.div(pb.vec2(1), this.currentMipResolution);
+      this.$l.uvOffset = pb.div(
+        pb.mul(pb.exp2(pb.float(this.mostDetailMip)), 0.005),
+        pb.vec2(pb.textureDimensions(HiZTexture, this.mostDetailMip))
+      );
+      this.uvOffset = pb.vec2(
+        this.$choice(pb.lessThan(this.screenSpaceDirection.x, 0), pb.neg(this.uvOffset.x), this.uvOffset.x),
+        this.$choice(pb.lessThan(this.screenSpaceDirection.y, 0), pb.neg(this.uvOffset.y), this.uvOffset.y)
+      );
+      this.$l.floorOffset = pb.vec2(
+        this.$choice(pb.lessThan(this.screenSpaceDirection.x, 0), pb.float(0), pb.float(1)),
+        this.$choice(pb.lessThan(this.screenSpaceDirection.y, 0), pb.float(0), pb.float(1))
+      );
+      this.$l.currentT = pb.float();
+      this.$l.position = pb.vec3();
+      this.SSR_initialAdvanceRay(
+        this.screenSpacePos,
+        this.screenSpaceDirection,
+        this.invDirection,
+        this.currentMipResolution,
+        this.invCurrentMipResolution,
+        this.floorOffset,
+        this.uvOffset,
+        this.position,
+        this.currentT
+      );
+      this.$l.i = pb.int(0);
+      this.$while(
+        pb.and(
+          pb.lessThan(this.i, this.maxIterations),
+          pb.greaterThanEqual(this.currentMip, this.mostDetailMip)
+        ),
+        function () {
+          this.$l.currentMipPosition = pb.mul(this.currentMipResolution, this.position.xy);
+          this.$l.surfaceZ = pb.textureLoad(HiZTexture, pb.ivec2(this.currentMipPosition), this.currentMip).r;
+          this.$l.skippedTile = this.SSR_advanceRay(
+            this.screenSpacePos,
+            this.screenSpaceDirection,
+            this.invDirection,
+            this.currentMipPosition,
+            this.invCurrentMipResolution,
+            this.floorOffset,
+            this.uvOffset,
+            this.surfaceZ,
+            this.position,
+            this.currentT
+          );
+          this.currentMip = pb.add(this.currentMip, this.$choice(this.skippedTile, pb.int(1), pb.int(-1)));
+          this.currentMipResolution = pb.mul(
+            this.currentMipResolution,
+            this.$choice(this.skippedTile, 0.5, 2)
+          );
+          this.invCurrentMipResolution = pb.mul(
+            this.invCurrentMipResolution,
+            this.$choice(this.skippedTile, 2, 0.5)
+          );
+          this.i = pb.add(this.i, 1);
+        }
+      );
+      this.$l.validHit = this.$choice(pb.lessThanEqual(this.i, this.maxIterations), pb.float(1), pb.float(0));
+      this.$return(pb.vec4(this.position, this.validHit));
+    }
+  );
+  pb.func(
+    'SSR_validateHit',
+    [
+      pb.vec3('hit'),
+      pb.vec2('uv'),
+      pb.vec3('viewSpaceRayDirection'),
+      pb.mat4('viewMatrix'),
+      pb.mat4('invProjMatrix'),
+      pb.float('thickness')
+    ],
+    function () {
+      this.$if(
+        pb.or(pb.any(pb.lessThan(this.hit.xy, pb.vec2(0))), pb.any(pb.greaterThan(this.hit.xy, pb.vec2(1)))),
+        function () {
+          this.$return(pb.float(0));
+        }
+      );
+      this.$l.manhattanDist = pb.abs(pb.sub(this.hit.xy, this.uv));
+      this.$l.screenSize = pb.vec2(pb.textureDimensions(HiZTexture, 0));
+      this.$if(
+        pb.all(pb.lessThan(this.manhattanDist, pb.vec2(pb.div(pb.vec2(2), this.screenSize)))),
+        function () {
+          this.$return(pb.float(0));
+        }
+      );
+      this.$l.texCoord = pb.ivec2(pb.mul(pb.vec2(pb.textureDimensions(HiZTexture, 0)), this.hit.xy));
+      this.$l.surfaceZ = pb.textureLoad(HiZTexture, pb.div(this.texCoord, 2), 1).r;
+      this.$if(pb.equal(this.surfaceZ, 1), function () {
+        this.$return(pb.float(0));
+      });
+      this.$l.hitNormalWS = pb.sub(
+        pb.mul(pb.textureSampleLevel(normalTexture, this.hit.xy, 0).rgb, 2),
+        pb.vec3(1)
+      );
+      this.$l.hitNormalVS = pb.mul(this.viewMatrix, pb.vec4(this.hitNormalWS, 0)).xyz;
+      this.$if(pb.greaterThan(pb.dot(this.hitNormalVS, this.viewSpaceRayDirection), 0), function () {
+        this.$return(pb.float(0));
+      });
+      this.$l.viewSpaceSurface = this.invProjectPosition(
+        pb.vec3(this.hit.xy, this.surfaceZ),
+        this.invProjMatrix
+      );
+      this.$l.viewSpaceHit = this.invProjectPosition(this.hit, this.invProjMatrix);
+      this.$l.distance = pb.length(pb.sub(this.viewSpaceSurface, this.viewSpaceHit));
+      this.$l.fov = pb.mul(pb.vec2(pb.div(this.screenSize.y, this.screenSize.x), 1), 0.05);
+      this.$l.border = pb.mul(
+        pb.smoothStep(pb.vec2(0), this.fov, this.hit.xy),
+        pb.sub(pb.vec2(1), pb.smoothStep(pb.sub(pb.vec2(1), this.fov), pb.vec2(1), this.hit.xy))
+      );
+      this.$l.vignette = pb.mul(this.border.x, this.border.y);
+      this.$l.confidence = pb.sub(1, pb.smoothStep(0, this.thickness, this.distance));
+      this.confidence = pb.mul(this.confidence, this.confidence);
+
+      this.$return(pb.mul(this.vignette, this.confidence));
+    }
+  );
+  pb.func(
+    'SSR_HiZ',
+    [
+      pb.vec3('viewPos'),
+      pb.vec3('traceRay'),
+      pb.mat4('viewMatrix'),
+      pb.mat4('projMatrix'),
+      pb.mat4('invProjMatrix'),
+      pb.float('thickness'),
+      pb.int('maxIterations')
+    ],
+    function () {
+      this.$l.originH = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));
+      this.$l.originCS = pb.div(this.originH.xyz, this.originH.w);
+      this.$l.originTS = pb.add(pb.mul(this.originCS, 0.5), pb.vec3(0.5));
+      this.$l.directionTS = this.projectDirection(
+        this.viewPos,
+        this.traceRay,
+        this.originTS,
+        this.projMatrix
+      );
+      this.$l.mostDetailMip = pb.int(0);
+      this.$l.hit = this.SSR_RaymarchHiZ(
+        this.originTS,
+        this.directionTS,
+        this.mostDetailMip,
+        this.maxIterations
+      );
+      this.$l.confidence = pb.float(0);
+      this.$if(pb.notEqual(this.hit.w, 0), function () {
+        this.confidence = this.SSR_validateHit(
+          this.hit.xyz,
+          this.originTS.xy,
+          this.traceRay,
+          this.viewMatrix,
+          this.invProjMatrix,
+          this.thickness
+        );
+      });
+      this.$return(pb.vec4(this.hit.xyz, this.confidence));
+    }
+  );
+  return scope.SSR_HiZ(viewPos, traceRay, viewMatrix, projMatrix, invProjMatrix, thickness, maxIteraions);
 }
 
 export function screenSpaceRayTracing_HiZ(
