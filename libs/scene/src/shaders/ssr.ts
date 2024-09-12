@@ -178,9 +178,11 @@ export function screenSpaceRayTracing_Linear(
     function () {
       //this.$l.normalizedViewPos = pb.normalize(this.viewPos);
       this.$l.reflectVec = this.traceRay;
+      /*
       this.$if(pb.greaterThan(this.reflectVec.z, 0), function () {
         this.$return(pb.vec4(0));
       });
+      */
       this.$l.viewPosEnd = pb.add(this.viewPos, pb.mul(this.reflectVec, this.maxDistance));
       this.$l.fragStartH = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));
       this.$l.fragStart = pb.mul(

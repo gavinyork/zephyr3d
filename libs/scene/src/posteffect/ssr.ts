@@ -201,60 +201,45 @@ export class SSR extends AbstractPostEffect {
           */
           this.viewPos = pb.add(this.viewPos, pb.mul(this.reflectVec, 0.1));
           this.$if(pb.lessThan(this.roughnessFactor.a, 1), function () {
-            this.$if(pb.greaterThan(this.reflectVec.z, 0), function () {
-              this.hitInfo = screenSpaceRayTracing_VS(
-                this,
-                this.viewPos,
-                this.reflectVec,
-                this.projMatrix,
-                this.cameraNearFar.y,
-                this.ssrParams.x,
-                this.ssrParams.y,
-                this.thickness,
-                pb.int(this.ssrParams.w),
-                this.depthTex
-              );
-            }).$else(function () {
-              this.hitInfo = ctx.HiZTexture
-                ? screenSpaceRayTracing_HiZ2(
-                    this,
-                    this.viewPos,
-                    this.reflectVec,
-                    this.viewMatrix,
-                    this.projMatrix,
-                    this.invProjMatrix,
-                    pb.int(this.ssrParams.y),
-                    this.ssrParams.z,
-                    this.hizTex,
-                    this.normalTex
-                  )
-                : /*
-                ? screenSpaceRayTracing_HiZ(
-                    this,
-                    this.viewPos,
-                    this.reflectVec,
-                    this.projMatrix,
-                    this.ssrParams.x,
-                    this.ssrParams.y,
-                    this.thickness,
-                    this.hizTex,
-                    this.depthMipLevels
-                  )
-              */
-                  screenSpaceRayTracing_Linear(
-                    this,
-                    this.viewPos,
-                    this.reflectVec,
-                    this.projMatrix,
-                    this.cameraNearFar.y,
-                    this.ssrParams.x,
-                    this.ssrParams.y,
-                    this.thickness,
-                    pb.int(this.ssrParams.w),
-                    this.depthTex,
-                    this.targetSize.zw
-                  );
-            });
+            this.hitInfo = ctx.HiZTexture
+              ? screenSpaceRayTracing_HiZ2(
+                  this,
+                  this.viewPos,
+                  this.reflectVec,
+                  this.viewMatrix,
+                  this.projMatrix,
+                  this.invProjMatrix,
+                  pb.int(this.ssrParams.y),
+                  this.ssrParams.z,
+                  this.hizTex,
+                  this.normalTex
+                )
+              : /*
+              ? screenSpaceRayTracing_HiZ(
+                  this,
+                  this.viewPos,
+                  this.reflectVec,
+                  this.projMatrix,
+                  this.ssrParams.x,
+                  this.ssrParams.y,
+                  this.thickness,
+                  this.hizTex,
+                  this.depthMipLevels
+                )
+            */
+                screenSpaceRayTracing_Linear(
+                  this,
+                  this.viewPos,
+                  this.reflectVec,
+                  this.projMatrix,
+                  this.cameraNearFar.y,
+                  this.ssrParams.x,
+                  this.ssrParams.y,
+                  this.thickness,
+                  pb.int(this.ssrParams.w),
+                  this.depthTex,
+                  this.targetSize.zw
+                );
           });
           this.$l.refl = pb.mul(this.invViewMatrix, pb.vec4(this.reflectVec, 0)).xyz;
           this.$l.env = ctx.env.light.envLight
