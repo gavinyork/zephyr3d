@@ -207,8 +207,8 @@ export class SceneRenderer {
         let h = isPowerOf2(ctx.linearDepthTexture.height)
           ? ctx.linearDepthTexture.height
           : nextPowerOf2(ctx.linearDepthTexture.height);
-        w = Math.max(1, w >> 0);
-        h = Math.max(1, h >> 0);
+        w = Math.max(1, w >> 1);
+        h = Math.max(1, h >> 1);
         HiZFrameBuffer = device.pool.fetchTemporalFramebuffer(
           true,
           w,

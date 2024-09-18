@@ -498,14 +498,16 @@ export class PostWater extends AbstractPostEffect {
                         this,
                         this.viewPos,
                         this.reflectVec,
+                        this.viewMatrix,
                         this.projMatrix,
+                        this.invProjMatrix,
                         this.cameraNearFar.y,
                         this.ssrParams.x,
                         this.ssrParams.y,
                         this.thickness,
                         pb.int(this.ssrParams.w),
-                        this.depthTex,
-                        this.targetSize.zw
+                        this.targetSize,
+                        this.depthTex
                       );
                 });
                 this.$l.refl = pb.reflect(pb.normalize(pb.sub(this.worldPos, this.cameraPos)), this.normal);

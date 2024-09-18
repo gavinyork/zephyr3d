@@ -121,7 +121,7 @@ export class Demo {
     scene.env.sky.aerialPerspectiveDensity = 10;
     scene.env.sky.cloudy = 0.6;
 
-    const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1));
+    const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1)).setIntensity(25);
     light.lookAt(new Vector3(1, 1, 1), new Vector3(0, 0, 0), Vector3.axisPY());
     light.intensity = 4;
     light.shadow.shadowMapSize = 2048;

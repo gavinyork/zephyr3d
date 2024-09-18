@@ -200,3 +200,20 @@ export function smoothNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBS
   });
   return pb.getGlobalScope()[funcName](p);
 }
+
+/**
+ * Calculate interleaved gradient noise
+ *
+ * @param scope - current shader scope
+ * @param c - 2d position at where to calculate noise
+ * @returns noise value
+ *
+ * @public
+ */
+export function interleavedGradientNoise(scope: PBInsideFunctionScope, c: PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  const x = 0.06711056;
+  const y = 0.00583715;
+  const z = 52.9829189;
+  return pb.fract(pb.mul(z, pb.fract(pb.dot(c, pb.vec2(x, y)))));
+}

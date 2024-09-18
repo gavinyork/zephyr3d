@@ -70,6 +70,8 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _ssrParams: Vector4;
   /** @internal */
+  protected _ssrIntensity: number;
+  /** @internal */
   protected _picking: boolean;
   /** @internal */
   protected _pickPosX: number;
@@ -109,6 +111,7 @@ export class Camera extends SceneNode {
     this._HiZ = false;
     this._SSR = false;
     this._ssrParams = new Vector4(32, 80, 0.5, 6);
+    this._ssrIntensity = 1;
     this._pickResult = null;
     this._commandBufferReuse = true;
   }
@@ -133,6 +136,12 @@ export class Camera extends SceneNode {
   }
   set SSR(val: boolean) {
     this._SSR = !!val;
+  }
+  get ssrIntensity(): number {
+    return this._ssrIntensity;
+  }
+  set ssrIntensity(val: number) {
+    this._ssrIntensity = val;
   }
   get ssrMaxDistance(): number {
     return this._ssrParams.x;

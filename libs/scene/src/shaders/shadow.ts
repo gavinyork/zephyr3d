@@ -4,6 +4,7 @@ import { Application } from '../app';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from './misc';
 import { ShaderHelper } from '../material/shader/helper';
+import { interleavedGradientNoise } from './noise';
 
 /*
   const PCF_KERNEL_3x3 = [
@@ -210,16 +211,6 @@ export function computeReceiverPlaneDepthBias(
   return pb.getGlobalScope()[funcNameComputeReceiverPlaneDepthBias](texCoord);
 }
 
-// reference: github.com/google/filament
-function interleavedGradientNoise(scope: PBInsideFunctionScope, c: PBShaderExp): PBShaderExp {
-  const pb = scope.$builder;
-  const x = 0.06711056;
-  const y = 0.00583715;
-  const z = 52.9829189;
-  return pb.fract(pb.mul(z, pb.fract(pb.dot(c, pb.vec2(x, y)))));
-}
-
-// reference: github.com/google/filament
 function getRandomRotationMatrix(scope: PBInsideFunctionScope, fragCoord: PBShaderExp): PBShaderExp {
   const funcNameGetRandomRotationMatrix = 'lib_getRandomRotationMatrix';
   const pb = scope.$builder;

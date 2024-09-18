@@ -2,13 +2,7 @@ import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import type { BindGroup, GPUProgram, Texture2D, TextureSampler } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import {
-  sampleLinearDepth,
-  //screenSpaceRayTracing_HiZ,
-  screenSpaceRayTracing_HiZ2,
-  screenSpaceRayTracing_Linear,
-  screenSpaceRayTracing_VS
-} from '../shaders/ssr';
+import { sampleLinearDepth, screenSpaceRayTracing_HiZ2, screenSpaceRayTracing_VS } from '../shaders/ssr';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 
 /**
@@ -99,18 +93,29 @@ export class SSR extends AbstractPostEffect {
     bindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
     bindGroup.setValue('invViewMatrix', ctx.camera.worldMatrix);
     bindGroup.setValue('ssrParams', ctx.camera.ssrParams);
-    bindGroup.setValue(
-      'targetSize',
-      new Vector4(
-        device.getDrawingBufferWidth(),
-        device.getDrawingBufferHeight(),
-        sceneDepthTexture.width,
-        sceneDepthTexture.height
-      )
-    );
+    bindGroup.setValue('ssrIntensity', ctx.camera.ssrIntensity);
     if (ctx.HiZTexture) {
       bindGroup.setTexture('hizTex', ctx.HiZTexture, SSR._samplerNearest);
       bindGroup.setValue('depthMipLevels', ctx.HiZTexture.mipLevelCount);
+      bindGroup.setValue(
+        'targetSize',
+        new Vector4(
+          device.getDrawingBufferWidth(),
+          device.getDrawingBufferHeight(),
+          ctx.HiZTexture.width,
+          ctx.HiZTexture.height
+        )
+      );
+    } else {
+      bindGroup.setValue(
+        'targetSize',
+        new Vector4(
+          device.getDrawingBufferWidth(),
+          device.getDrawingBufferHeight(),
+          sceneDepthTexture.width,
+          sceneDepthTexture.height
+        )
+      );
     }
     bindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
@@ -153,6 +158,7 @@ export class SSR extends AbstractPostEffect {
         this.viewMatrix = pb.mat4().uniform(0);
         this.invViewMatrix = pb.mat4().uniform(0);
         this.ssrParams = pb.vec4().uniform(0);
+        this.ssrIntensity = pb.float().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
         if (ctx.env.light.envLight) {
           this.envLightStrength = pb.float().uniform(0);
@@ -211,6 +217,7 @@ export class SSR extends AbstractPostEffect {
                   this.invProjMatrix,
                   pb.int(this.ssrParams.y),
                   this.ssrParams.z,
+                  this.targetSize,
                   this.hizTex,
                   this.normalTex
                 )
@@ -227,18 +234,39 @@ export class SSR extends AbstractPostEffect {
                   this.depthMipLevels
                 )
             */
+                /*
                 screenSpaceRayTracing_Linear(
                   this,
                   this.viewPos,
                   this.reflectVec,
+                  this.viewMatrix,
                   this.projMatrix,
+                  this.invProjMatrix,
                   this.cameraNearFar.y,
                   this.ssrParams.x,
                   this.ssrParams.y,
                   this.thickness,
                   pb.int(this.ssrParams.w),
+                  this.targetSize,
                   this.depthTex,
-                  this.targetSize.zw
+                  this.normalTex
+                );
+          */
+                screenSpaceRayTracing_VS(
+                  this,
+                  this.viewPos,
+                  this.reflectVec,
+                  this.viewMatrix,
+                  this.projMatrix,
+                  this.invProjMatrix,
+                  this.cameraNearFar.y,
+                  this.ssrParams.x,
+                  this.ssrParams.y,
+                  this.thickness,
+                  pb.int(this.ssrParams.w),
+                  this.targetSize,
+                  this.depthTex,
+                  this.normalTex
                 );
           });
           this.$l.refl = pb.mul(this.invViewMatrix, pb.vec4(this.reflectVec, 0)).xyz;
@@ -253,11 +281,14 @@ export class SSR extends AbstractPostEffect {
             pb.textureSampleLevel(
               this.colorTex,
               this.hitInfo.xy,
-              pb.mul(this.colorTexMiplevels, this.roughnessFactor.a)
+              pb.min(4, pb.mul(this.colorTexMiplevels, this.roughnessFactor.a))
             ).rgb,
             this.hitInfo.w
           );
-          this.$l.color = pb.add(pb.mul(this.roughnessFactor.xyz, this.reflectance), this.sceneColor);
+          this.$l.color = pb.add(
+            pb.mul(this.roughnessFactor.xyz, pb.mul(this.reflectance, this.ssrIntensity)),
+            this.sceneColor
+          );
           /*
           this.$l.color = this.hitInfo.xyz; // pb.add(pb.mul(this.roughnessFactor.xyz, this.reflectance), this.sceneColor);
           this.$l.color = pb.add(

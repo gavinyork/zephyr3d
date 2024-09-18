@@ -835,6 +835,12 @@ export class Inspector {
       });
       if (camera.SSR) {
         ImGui.SliderFloat(
+          'SSRIntensity',
+          (val?: number) => (camera.ssrIntensity = val = val ?? camera.ssrIntensity),
+          0,
+          10
+        );
+        ImGui.SliderFloat(
           'SSRMaxDistance##Camera',
           (val?: number) => (camera.ssrMaxDistance = val = val ?? camera.ssrMaxDistance),
           0,
@@ -844,7 +850,7 @@ export class Inspector {
           'SSRIterations##Camera',
           (val?: number) => (camera.ssrIterations = val = val ?? camera.ssrIterations),
           1,
-          200
+          500
         );
         ImGui.SliderFloat(
           'SSRThickness##Camera',
@@ -856,7 +862,7 @@ export class Inspector {
           'SSRBinarySearchSteps##Camera',
           (val?: number) => (camera.ssrBinarySearchSteps = val = val ?? camera.ssrBinarySearchSteps),
           0,
-          16
+          32
         );
       }
       ImGui.EndSection(1);
