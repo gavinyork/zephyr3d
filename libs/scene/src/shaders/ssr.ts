@@ -334,7 +334,7 @@ export function screenSpaceRayTracing_Linear2D(
       );
       this.$l.rayEnd = pb.add(this.rayOrigin, pb.mul(this.rayDirection, this.rayLen));
       this.$l.rayOriginH = pb.mul(this.projMatrix, pb.vec4(this.rayOrigin, 1));
-      this.$l.rayEndH = pb.mul(this.projMatrix, this.vec4(this.rayEnd, 1));
+      this.$l.rayEndH = pb.mul(this.projMatrix, pb.vec4(this.rayEnd, 1));
       this.$l.k0 = pb.div(1, this.rayOriginH.w);
       this.$l.k1 = pb.div(1, this.rayEndH.w);
       this.$l.Q0 = pb.mul(this.rayOrigin, this.k0);
