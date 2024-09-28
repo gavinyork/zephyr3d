@@ -3559,7 +3559,17 @@ export class PBGlobalScope extends PBScope {
             );
             const funcType = pb._getFunctionOverload(name, argsNonArray);
             if (!funcType) {
-              throw new Error(`ERROR: no matching overloads for function ${name}`);
+              throw new Error(
+                `ERROR: no matching overloads for function ${name}(${argsNonArray
+                  .map((val) => {
+                    if (val instanceof PBShaderExp) {
+                      return val.$ast?.getType()?.toTypeName() ?? '?';
+                    } else {
+                      return typeof val;
+                    }
+                  })
+                  .join(', ')})`
+              );
             }
             return getCurrentProgramBuilder().$callFunction(name, funcType[1], funcType[0]);
           };

@@ -2,7 +2,13 @@ import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import type { BindGroup, GPUProgram, Texture2D, TextureSampler } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import { sampleLinearDepth, screenSpaceRayTracing_HiZ2, screenSpaceRayTracing_VS } from '../shaders/ssr';
+import {
+  sampleLinearDepth,
+  screenSpaceRayTracing_HiZ2,
+  screenSpaceRayTracing_Linear,
+  screenSpaceRayTracing_Linear2D,
+  screenSpaceRayTracing_VS
+} from '../shaders/ssr';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 
 /**
@@ -54,9 +60,12 @@ export class SSR extends AbstractPostEffect {
     const device = ctx.device;
     const hash = `${ctx.env.light.envLight ? ctx.env.light.getHash() : ''}:${!!ctx.HiZTexture}`;
     let program = SSR._programs[hash];
-    if (!program) {
+    if (program === undefined) {
       program = this._createProgram(ctx);
       SSR._programs[hash] = program;
+    }
+    if (!program) {
+      return;
     }
     let bindGroup = this._bindgroups[hash];
     if (!bindGroup) {
@@ -221,21 +230,8 @@ export class SSR extends AbstractPostEffect {
                   this.hizTex,
                   this.normalTex
                 )
-              : /*
-              ? screenSpaceRayTracing_HiZ(
-                  this,
-                  this.viewPos,
-                  this.reflectVec,
-                  this.projMatrix,
-                  this.ssrParams.x,
-                  this.ssrParams.y,
-                  this.thickness,
-                  this.hizTex,
-                  this.depthMipLevels
-                )
-            */
-                /*
-                screenSpaceRayTracing_Linear(
+              : false
+              ? screenSpaceRayTracing_Linear(
                   this,
                   this.viewPos,
                   this.reflectVec,
@@ -250,9 +246,25 @@ export class SSR extends AbstractPostEffect {
                   this.targetSize,
                   this.depthTex,
                   this.normalTex
-                );
-          */
-                screenSpaceRayTracing_VS(
+                )
+              : true
+              ? screenSpaceRayTracing_Linear2D(
+                  this,
+                  this.viewPos,
+                  this.reflectVec,
+                  this.viewMatrix,
+                  this.projMatrix,
+                  this.invProjMatrix,
+                  this.cameraNearFar,
+                  this.ssrParams.x,
+                  this.ssrParams.y,
+                  this.thickness,
+                  this.ssrParams.w,
+                  this.targetSize,
+                  this.depthTex,
+                  this.normalTex
+                )
+              : screenSpaceRayTracing_VS(
                   this,
                   this.viewPos,
                   this.reflectVec,

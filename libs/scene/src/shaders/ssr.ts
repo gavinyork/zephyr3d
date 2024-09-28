@@ -276,7 +276,7 @@ export function screenSpaceRayTracing_Linear2D(
   viewMatrix: PBShaderExp,
   projMatrix: PBShaderExp,
   invProjMatrix: PBShaderExp,
-  cameraFarPlane: PBShaderExp | number,
+  cameraNearFar: PBShaderExp,
   maxDistance: PBShaderExp | number,
   maxIterations: PBShaderExp | number,
   thickness: PBShaderExp | number,
@@ -292,16 +292,16 @@ export function screenSpaceRayTracing_Linear2D(
   });
   pb.func(
     'rayIntersectDepth',
-    [pb.float('zA'), pb.float('zB'), pb.vec2('uv'), pb.float('cameraFar')],
+    [pb.float('zA'), pb.float('zB'), pb.float('thickness'), pb.vec2('uv'), pb.float('cameraFar')],
     function () {
       this.$l.sceneZMax01 = sampleLinearDepth(this, linearDepthTex, this.uv, 0);
-      this.$if(pb.lessThan(this.sceneZMax01, 1), function () {
-        this.sceneZMax = pb.neg(pb.mul(this.sceneZMax, this.cameraFar));
-        this.intersected = pb.and(
+      this.sceneZMax = pb.neg(pb.mul(this.sceneZMax01, this.cameraFar));
+      this.$return(
+        pb.and(
           pb.greaterThanEqual(this.zA, pb.sub(this.sceneZMax, this.thickness)),
           pb.lessThanEqual(this.zB, this.sceneZMax)
-        );
-      });
+        )
+      );
     }
   );
   pb.func(
@@ -334,7 +334,7 @@ export function screenSpaceRayTracing_Linear2D(
       );
       this.$l.rayEnd = pb.add(this.rayOrigin, pb.mul(this.rayDirection, this.rayLen));
       this.$l.rayOriginH = pb.mul(this.projMatrix, pb.vec4(this.rayOrigin, 1));
-      this.$l.rayEndH = pb.mul(this.projMatrix, this.vec4(this.rayEnd, 1));
+      this.$l.rayEndH = pb.mul(this.projMatrix, pb.vec4(this.rayEnd, 1));
       this.$l.k0 = pb.div(1, this.rayOriginH.w);
       this.$l.k1 = pb.div(1, this.rayEndH.w);
       this.$l.Q0 = pb.mul(this.rayOrigin, this.k0);
@@ -394,7 +394,7 @@ export function screenSpaceRayTracing_Linear2D(
       this.$l.zA = pb.float(0);
       this.$l.zB = pb.float(0);
       this.$l.pqk = pb.vec4(this.P0, this.Q0.z, this.k0);
-      this.$l.dpqk = pb.vec4(this.dP, this.dQ.z, this.dk);
+      this.$l.dpqk = pb.vec4(this.dP, this.dQ.z, this.dK);
       this.$l.invRenderTargetSize = pb.div(pb.vec2(1), this.textureSize.zw);
       this.$l.intersected = false;
       this.numIterations = 0;
@@ -421,7 +421,13 @@ export function screenSpaceRayTracing_Linear2D(
         });
         this.hit2D = this.$choice(this.permute, this.pqk.yx, this.pqk.xy);
         this.hit2D = pb.mul(this.hit2D, this.invRenderTargetSize);
-        this.intersected = this.rayIntersectDepth(this.zA, this.zB, this.hit2D, this.cameraNearFar.y);
+        this.intersected = this.rayIntersectDepth(
+          this.zA,
+          this.zB,
+          this.thickness,
+          this.hit2D,
+          this.cameraNearFar.y
+        );
       });
       this.$if(pb.and(this.intersected, pb.greaterThan(this.pixelStride, 1)), function () {
         this.pqk = pb.sub(this.pqk, this.dpqk);
@@ -453,7 +459,13 @@ export function screenSpaceRayTracing_Linear2D(
             });
             this.hit2D = this.$choice(this.permute, this.pqk.yx, this.pqk.xy);
             this.hit2D = pb.mul(this.hit2D, this.invRenderTargetSize);
-            this.$l.intersect = this.rayIntersectDepth(this.zA, this.zB, this.hit2D, this.cameraNearFar.y);
+            this.$l.intersect = this.rayIntersectDepth(
+              this.zA,
+              this.zB,
+              this.thickness,
+              this.hit2D,
+              this.cameraNearFar.y
+            );
             this.stride = this.$choice(this.intersect, pb.neg(this.originalStride), this.originalStride);
           }
         );
@@ -462,6 +474,60 @@ export function screenSpaceRayTracing_Linear2D(
       this.hit3D = pb.div(this.Q0, this.pqk.w);
       this.$return(this.intersected);
     }
+  );
+  pb.func(
+    'SSR_Linear2D',
+    [
+      pb.vec3('rayOrigin'),
+      pb.vec3('rayDirection'),
+      pb.float('jitter'),
+      pb.float('stride'),
+      pb.float('strideZCutoff'),
+      pb.float('maxDistance'),
+      pb.float('maxIterations'),
+      pb.float('binarySearchSteps'),
+      pb.float('thickness'),
+      pb.vec2('cameraNearFar'),
+      pb.mat4('projMatrix'),
+      pb.vec4('textureSize')
+    ],
+    function () {
+      this.$l.hit2D = pb.vec2();
+      this.$l.hit3D = pb.vec3();
+      this.$l.numIterations = pb.float();
+      this.$l.intersected = this.traceRayLinear2D(
+        this.rayOrigin,
+        this.rayDirection,
+        this.jitter,
+        this.stride,
+        this.strideZCutoff,
+        this.maxDistance,
+        this.maxIterations,
+        this.binarySearchSteps,
+        this.thickness,
+        this.cameraNearFar,
+        this.projMatrix,
+        this.textureSize,
+        this.hit2D,
+        this.hit3D,
+        this.numIterations
+      );
+      this.$return(pb.vec4(this.hit2D, 0, this.$choice(this.intersected, pb.float(1), pb.float(0))));
+    }
+  );
+  return scope.SSR_Linear2D(
+    viewPos,
+    traceRay,
+    0,
+    3,
+    100,
+    maxDistance,
+    maxIterations,
+    binarySearchSteps,
+    thickness,
+    cameraNearFar,
+    projMatrix,
+    textureSize
   );
 }
 
