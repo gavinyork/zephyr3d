@@ -334,6 +334,8 @@ export function screenSpaceRayTracing_Linear2D(
         this.maxDistance
       );
       this.$l.rayEnd = pb.add(this.rayOrigin, pb.mul(this.rayDirection, this.rayLen));
+      this.$l.zMin = pb.min(this.rayOrigin.z, this.rayEnd.z);
+      this.$l.zMax = pb.max(this.rayOrigin.z, this.rayEnd.z);
       this.$l.rayOriginH = pb.mul(this.projMatrix, pb.vec4(this.rayOrigin, 1));
       this.$l.rayEndH = pb.mul(this.projMatrix, pb.vec4(this.rayEnd, 1));
       this.$l.k0 = pb.div(1, this.rayOriginH.w);
@@ -384,17 +386,18 @@ export function screenSpaceRayTracing_Linear2D(
       this.$l.dQ = pb.mul(pb.sub(this.Q1, this.Q0), this.invdx);
       this.$l.dK = pb.mul(pb.sub(this.k1, this.k0), this.invdx);
       this.$l.dP = pb.vec2(this.stepDir, pb.mul(this.delta.y, this.invdx));
-      this.$l.strideScalar = pb.sub(1, pb.min(1, pb.div(pb.neg(this.rayOrigin.z), this.strideZCutoff)));
-      this.$l.pixelStride = pb.add(1, pb.mul(this.strideScalar, this.stride));
+      //this.$l.strideScalar = pb.sub(1, pb.min(1, pb.div(pb.neg(this.rayOrigin.z), this.strideZCutoff)));
+      //this.$l.pixelStride = pb.add(1, pb.mul(this.strideScalar, this.stride));
+      this.$l.pixelStride = this.stride;
       this.dP = pb.mul(this.dP, this.pixelStride);
       this.dQ = pb.mul(this.dQ, this.pixelStride);
       this.dK = pb.mul(this.dK, this.pixelStride);
       this.P0 = pb.add(this.P0, pb.mul(this.dP, this.jitter));
       this.Q0 = pb.add(this.Q0, pb.mul(this.dQ, this.jitter));
       this.k0 = pb.add(this.k0, pb.mul(this.dK, this.jitter));
-
-      this.$l.zA = pb.float(0);
-      this.$l.zB = pb.float(0);
+      this.$l.prevZMaxEstimate = this.rayOrigin.z;
+      this.$l.zA = this.prevZMaxEstimate;
+      this.$l.zB = this.prevZMaxEstimate;
       this.$l.pqk = pb.vec4(this.P0, this.Q0.z, this.k0);
       this.$l.dpqk = pb.vec4(this.dP, this.dQ.z, this.dK);
       this.$l.invRenderTargetSize = pb.div(pb.vec2(1), this.textureSize.zw);
@@ -413,11 +416,13 @@ export function screenSpaceRayTracing_Linear2D(
           this.$break();
         });
         this.pqk = pb.add(this.pqk, this.dpqk);
-        this.zA = this.zB;
+        this.zA = this.prevZMaxEstimate;
         this.zB = pb.div(
           pb.add(pb.mul(this.dpqk.z, 0.5), this.pqk.z),
           pb.add(pb.mul(this.dpqk.w, 0.5), this.pqk.w)
         );
+        this.zB = pb.clamp(this.zB, this.zMin, this.zMax);
+        this.prevZMaxEstimate = this.zB;
         this.hitZ = this.zB;
         this.$if(pb.greaterThan(this.zB, this.zA), function () {
           this.$l.t = this.zB;
@@ -554,7 +559,7 @@ export function screenSpaceRayTracing_Linear2D(
     projMatrix,
     invProjMatrix,
     0,
-    3,
+    2,
     100,
     maxDistance,
     maxIterations,
