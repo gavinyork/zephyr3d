@@ -314,6 +314,7 @@ export class MeshMaterial extends Material {
     const blending =
       !isObjectColorPass && (this.featureUsed<boolean>(FEATURE_ALPHABLEND) || ctx.lightBlending);
     const a2c = !isObjectColorPass && this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
+    const ztestEq = ctx.queue === QUEUE_OPAQUE && !!ctx.depthTexture;
     if (blending || a2c) {
       const blendingState = stateSet.useBlendingState();
       if (blending) {
@@ -329,14 +330,20 @@ export class MeshMaterial extends Material {
         blendingState.enable(false);
       }
       blendingState.enableAlphaToCoverage(a2c);
-      if (blendingState.enabled) {
+      if (ztestEq) {
+        stateSet.useDepthState().setCompareFunc('eq').enableTest(true).enableWrite(false);
+      } else if (blendingState.enabled) {
         stateSet.useDepthState().enableTest(true).enableWrite(false);
       } else {
         stateSet.defaultDepthState();
       }
     } else if (stateSet.blendingState?.enabled && !blending) {
       stateSet.defaultBlendingState();
-      stateSet.defaultDepthState();
+      if (ztestEq) {
+        stateSet.useDepthState().setCompareFunc('eq').enableTest(true).enableWrite(false);
+      } else {
+        stateSet.defaultDepthState();
+      }
     }
     if (this._cullMode !== 'back') {
       stateSet.useRasterizerState().cullMode = this._cullMode;
