@@ -1,5 +1,6 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { decodeNormalizedFloatFromRGBA } from './misc';
+import { ShaderHelper } from '../material';
 
 const MAX_FLOAT_VALUE = 3.402823466e38;
 
@@ -24,6 +25,7 @@ function validateHit(
   traceRay: PBShaderExp,
   viewMatrix: PBShaderExp,
   invProjMatrix: PBShaderExp,
+  cameraNearFar: PBShaderExp,
   thickness: PBShaderExp,
   textureSize: PBShaderExp,
   depthTexture: PBShaderExp,
@@ -39,6 +41,7 @@ function validateHit(
       pb.vec3('viewSpaceRayDirection'),
       pb.mat4('viewMatrix'),
       pb.mat4('invProjMatrix'),
+      pb.vec2('cameraNearFar'),
       pb.float('thickness'),
       pb.vec4('textureSize')
     ],
@@ -57,10 +60,15 @@ function validateHit(
         }
       );
       //this.$l.texCoord = pb.mul(this.textureSize.zw, this.hit.xy);
-      this.$l.surfaceZ = pb.textureSampleLevel(depthTexture, this.hit2d, 0).r;
-      this.$if(pb.equal(this.surfaceZ, 1), function () {
+      this.$l.surfaceZ01 = sampleLinearDepth(this, depthTexture, this.hit2d, 0);
+      this.$if(pb.equal(this.surfaceZ01, 1), function () {
         this.$return(pb.float(0));
       });
+      this.$l.surfaceZ = ShaderHelper.linearDepthToNonLinear(
+        this,
+        pb.mul(this.surfaceZ01, this.cameraNearFar.y),
+        this.cameraNearFar
+      );
       if (normalTexture) {
         this.$l.hitNormalWS = pb.sub(
           pb.mul(pb.textureSampleLevel(normalTexture, this.hit2d, 0).rgb, 2),
@@ -90,7 +98,17 @@ function validateHit(
       this.$return(pb.mul(this.vignette, this.confidence));
     }
   );
-  return scope.SSR_validateHit(hit2D, hit3D, uv, traceRay, viewMatrix, invProjMatrix, thickness, textureSize);
+  return scope.SSR_validateHit(
+    hit2D,
+    hit3D,
+    uv,
+    traceRay,
+    viewMatrix,
+    invProjMatrix,
+    cameraNearFar,
+    thickness,
+    textureSize
+  );
 }
 
 export function sampleLinearDepth(
@@ -111,7 +129,7 @@ export function screenSpaceRayTracing_VS(
   viewMatrix: PBShaderExp,
   projMatrix: PBShaderExp,
   invProjMatrix: PBShaderExp,
-  cameraFarPlane: PBShaderExp | number,
+  cameraNearFar: PBShaderExp,
   maxDistance: PBShaderExp | number,
   maxIterations: PBShaderExp | number,
   thickness: PBShaderExp | number,
@@ -217,6 +235,7 @@ export function screenSpaceRayTracing_VS(
         this.traceRay,
         this.viewMatrix,
         this.invProjMatrix,
+        this.cameraNearFar,
         this.thickness,
         this.textureSize,
         linearDepthTex,
@@ -247,7 +266,7 @@ export function screenSpaceRayTracing_VS(
     viewMatrix,
     projMatrix,
     invProjMatrix,
-    cameraFarPlane,
+    cameraNearFar.y,
     maxDistance,
     maxIterations,
     thickness,
@@ -394,7 +413,6 @@ export function screenSpaceRayTracing_Linear2D(
       this.$l.hitZ = pb.float();
       this.numIterations = 0;
       this.$for(pb.float('i'), 0, pb.getDevice().type === 'webgl' ? 1000 : this.maxIterations, function () {
-        this.numIterations = pb.add(this.numIterations, 1);
         if (pb.getDevice().type === 'webgl') {
           this.$if(pb.greaterThanEqual(this.i, this.maxIterations), function () {
             this.$break();
@@ -403,6 +421,7 @@ export function screenSpaceRayTracing_Linear2D(
         this.$if(this.intersected, function () {
           this.$break();
         });
+        this.numIterations = pb.add(this.numIterations, 1);
         this.pqk = pb.add(this.pqk, this.dpqk);
         this.zA = this.prevZMaxEstimate;
         this.zB = pb.div(
@@ -537,6 +556,7 @@ export function screenSpaceRayTracing_Linear2D(
         this.rayDirection,
         this.viewMatrix,
         this.invProjMatrix,
+        this.cameraNearFar,
         this.thickness,
         this.textureSize,
         linearDepthTex,
@@ -570,6 +590,7 @@ export function screenSpaceRayTracing_HiZ(
   viewMatrix: PBShaderExp,
   projMatrix: PBShaderExp,
   invProjMatrix: PBShaderExp,
+  cameraNearFar: PBShaderExp,
   maxIterations: PBShaderExp | number,
   thickness: PBShaderExp | number,
   textureSize: PBShaderExp,
@@ -738,6 +759,7 @@ export function screenSpaceRayTracing_HiZ(
       pb.mat4('viewMatrix'),
       pb.mat4('projMatrix'),
       pb.mat4('invProjMatrix'),
+      pb.vec2('cameraNearFar'),
       pb.float('thickness'),
       pb.vec4('textureSize'),
       pb.float('maxIterations')
@@ -764,11 +786,23 @@ export function screenSpaceRayTracing_HiZ(
         this.confidence = validateHit(
           this,
           this.hit.xy,
-          invProjectPosition(this, this.hit.xyz, this.invProjMatrix),
+          invProjectPosition(
+            this,
+            pb.vec3(
+              this.hit.xy,
+              ShaderHelper.linearDepthToNonLinear(
+                this,
+                pb.mul(this.hit.z, this.cameraNearFar.y),
+                this.cameraNearFar
+              )
+            ),
+            this.invProjMatrix
+          ),
           this.originTS.xy,
           this.traceRay,
           this.viewMatrix,
           this.invProjMatrix,
+          this.cameraNearFar,
           this.thickness,
           this.textureSize,
           HiZTexture,
@@ -784,6 +818,7 @@ export function screenSpaceRayTracing_HiZ(
     viewMatrix,
     projMatrix,
     invProjMatrix,
+    cameraNearFar,
     thickness,
     textureSize,
     maxIterations

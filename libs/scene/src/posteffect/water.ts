@@ -492,6 +492,7 @@ export class PostWater extends AbstractPostEffect {
                         this.viewMatrix,
                         this.projMatrix,
                         this.invProjMatrix,
+                        this.cameraNearFar,
                         this.ssrParams.y,
                         this.ssrParams.z,
                         this.targetSize,
