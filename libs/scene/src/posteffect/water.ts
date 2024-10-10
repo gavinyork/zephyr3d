@@ -18,7 +18,7 @@ import { Camera } from '../camera';
 import { CopyBlitter } from '../blitter';
 import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
 import { Application } from '../app';
-import { sampleLinearDepth, screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear } from '../shaders/ssr';
+import { sampleLinearDepth, screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
 import type { WaveGenerator } from '../render/wavegenerator';
 
 /**
@@ -472,6 +472,7 @@ export class PostWater extends AbstractPostEffect {
                 this.$l.hitInfo = pb.vec4(0);
                 this.$if(pb.greaterThan(this.reflectVecW.y, 0), function () {
                   this.reflectVec = pb.mul(this.viewMatrix, pb.vec4(this.reflectVecW, 0)).xyz;
+                  /*
                   this.$l.thicknessFactor = pb.add(
                     pb.mul(pb.dot(this.incidentVec, this.reflectVecW), 0.5),
                     0.5
@@ -482,30 +483,32 @@ export class PostWater extends AbstractPostEffect {
                   );
                   this.thicknessFactor = pb.mul(this.thicknessFactor, 50);
                   this.$l.thickness = pb.mul(this.thicknessFactor, this.ssrParams.z);
+                  */
                   this.hitInfo = HiZ
                     ? screenSpaceRayTracing_HiZ(
-                        this,
-                        this.viewPos,
-                        this.reflectVec,
-                        this.projMatrix,
-                        this.ssrParams.x,
-                        this.ssrParams.y,
-                        this.thickness,
-                        this.hizTex,
-                        this.depthMipLevels
-                      )
-                    : screenSpaceRayTracing_Linear(
                         this,
                         this.viewPos,
                         this.reflectVec,
                         this.viewMatrix,
                         this.projMatrix,
                         this.invProjMatrix,
-                        this.cameraNearFar.y,
+                        this.ssrParams.y,
+                        this.ssrParams.z,
+                        this.targetSize,
+                        this.hizTex
+                      )
+                    : screenSpaceRayTracing_Linear2D(
+                        this,
+                        this.viewPos,
+                        this.reflectVec,
+                        this.viewMatrix,
+                        this.projMatrix,
+                        this.invProjMatrix,
+                        this.cameraNearFar,
                         this.ssrParams.x,
                         this.ssrParams.y,
-                        this.thickness,
-                        pb.int(this.ssrParams.w),
+                        this.ssrParams.z,
+                        this.ssrParams.w,
                         this.targetSize,
                         this.depthTex
                       );

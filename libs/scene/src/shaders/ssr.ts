@@ -4,22 +4,6 @@ import { decodeNormalizedFloatFromRGBA } from './misc';
 const MAX_FLOAT_VALUE = 3.402823466e38;
 
 /** @internal */
-function screenEdgeFading(scope: PBInsideFunctionScope, uv: PBShaderExp): PBShaderExp {
-  const pb = scope.$builder;
-  pb.func('SSR_edgeFading', [pb.vec2('uv')], function () {
-    this.$l.cs = pb.sub(pb.mul(this.uv, 2), pb.vec2(1));
-    this.$l.diff = pb.sub(pb.vec2(1), pb.abs(this.cs));
-    this.$if(pb.and(pb.lessThan(this.diff.x, 0), pb.lessThan(this.diff.y, 0)), function () {
-      this.$return(pb.float(0));
-    });
-    this.$l.t1 = pb.smoothStep(0, 0.2, this.diff.x);
-    this.$l.t2 = pb.smoothStep(0, 0.3, this.diff.y);
-    this.$return(pb.clamp(pb.mul(this.t1, this.t2), 0, 1));
-  });
-  return scope.SSR_edgeFading(uv);
-}
-
-/** @internal */
 function invProjectPosition(scope: PBInsideFunctionScope, pos: PBShaderExp, mat: PBShaderExp) {
   const pb = scope.$builder;
   pb.func('invProjectPosition', [pb.vec3('p'), pb.mat4('mat')], function () {
@@ -34,7 +18,8 @@ function invProjectPosition(scope: PBInsideFunctionScope, pos: PBShaderExp, mat:
 /** @internal */
 function validateHit(
   scope: PBInsideFunctionScope,
-  hit: PBShaderExp,
+  hit2D: PBShaderExp,
+  hit3D: PBShaderExp,
   uv: PBShaderExp,
   traceRay: PBShaderExp,
   viewMatrix: PBShaderExp,
@@ -48,7 +33,8 @@ function validateHit(
   pb.func(
     'SSR_validateHit',
     [
-      pb.vec3('hit'),
+      pb.vec2('hit2d'),
+      pb.vec3('hit3d'),
       pb.vec2('uv'),
       pb.vec3('viewSpaceRayDirection'),
       pb.mat4('viewMatrix'),
@@ -58,12 +44,12 @@ function validateHit(
     ],
     function () {
       this.$if(
-        pb.or(pb.any(pb.lessThan(this.hit.xy, pb.vec2(0))), pb.any(pb.greaterThan(this.hit.xy, pb.vec2(1)))),
+        pb.or(pb.any(pb.lessThan(this.hit2d, pb.vec2(0))), pb.any(pb.greaterThan(this.hit2d, pb.vec2(1)))),
         function () {
           this.$return(pb.float(0));
         }
       );
-      this.$l.manhattanDist = pb.abs(pb.sub(this.hit.xy, this.uv));
+      this.$l.manhattanDist = pb.abs(pb.sub(this.hit2d, this.uv));
       this.$if(
         pb.all(pb.lessThan(this.manhattanDist, pb.vec2(pb.div(pb.vec2(4), this.textureSize.xy)))),
         function () {
@@ -71,13 +57,13 @@ function validateHit(
         }
       );
       //this.$l.texCoord = pb.mul(this.textureSize.zw, this.hit.xy);
-      this.$l.surfaceZ = pb.textureSampleLevel(depthTexture, this.hit.xy, 0).r;
+      this.$l.surfaceZ = pb.textureSampleLevel(depthTexture, this.hit2d, 0).r;
       this.$if(pb.equal(this.surfaceZ, 1), function () {
         this.$return(pb.float(0));
       });
       if (normalTexture) {
         this.$l.hitNormalWS = pb.sub(
-          pb.mul(pb.textureSampleLevel(normalTexture, this.hit.xy, 0).rgb, 2),
+          pb.mul(pb.textureSampleLevel(normalTexture, this.hit2d, 0).rgb, 2),
           pb.vec3(1)
         );
         this.$l.hitNormalVS = pb.mul(this.viewMatrix, pb.vec4(this.hitNormalWS, 0)).xyz;
@@ -87,15 +73,15 @@ function validateHit(
       }
       this.$l.viewSpaceSurface = invProjectPosition(
         this,
-        pb.vec3(this.hit.xy, this.surfaceZ),
+        pb.vec3(this.hit2d, this.surfaceZ),
         this.invProjMatrix
       );
-      this.$l.viewSpaceHit = invProjectPosition(this, this.hit, this.invProjMatrix);
+      this.$l.viewSpaceHit = this.hit3d; // invProjectPosition(this, this.hit, this.invProjMatrix);
       this.$l.distance = pb.length(pb.sub(this.viewSpaceSurface, this.viewSpaceHit));
       this.$l.fov = pb.mul(pb.vec2(pb.div(this.textureSize.y, this.textureSize.x), 1), 0.05);
       this.$l.border = pb.mul(
-        pb.smoothStep(pb.vec2(0), this.fov, this.hit.xy),
-        pb.sub(pb.vec2(1), pb.smoothStep(pb.sub(pb.vec2(1), this.fov), pb.vec2(1), this.hit.xy))
+        pb.smoothStep(pb.vec2(0), this.fov, this.hit2d),
+        pb.sub(pb.vec2(1), pb.smoothStep(pb.sub(pb.vec2(1), this.fov), pb.vec2(1), this.hit2d))
       );
       this.$l.vignette = pb.mul(this.border.x, this.border.y);
       this.$l.confidence = pb.sub(1, pb.smoothStep(0, this.thickness, this.distance));
@@ -104,7 +90,7 @@ function validateHit(
       this.$return(pb.mul(this.vignette, this.confidence));
     }
   );
-  return scope.SSR_validateHit(hit, uv, traceRay, viewMatrix, invProjMatrix, thickness, textureSize);
+  return scope.SSR_validateHit(hit2D, hit3D, uv, traceRay, viewMatrix, invProjMatrix, thickness, textureSize);
 }
 
 export function sampleLinearDepth(
@@ -225,7 +211,8 @@ export function screenSpaceRayTracing_VS(
       });
       this.$l.confidence = validateHit(
         this,
-        pb.vec3(this.uv, this.positionTo),
+        this.uv,
+        invProjectPosition(this, pb.vec3(this.uv, this.positionTo), this.invProjMatrix),
         this.origin,
         this.traceRay,
         this.viewMatrix,
@@ -298,6 +285,7 @@ export function screenSpaceRayTracing_Linear2D(
       this.sceneZMax = pb.neg(pb.mul(this.sceneZMax01, this.cameraFar));
       this.$return(
         pb.and(
+          pb.lessThan(this.sceneZMax01, 1),
           pb.greaterThanEqual(this.zA, pb.sub(this.sceneZMax, this.thickness)),
           pb.lessThanEqual(this.zB, this.sceneZMax)
         )
@@ -439,6 +427,7 @@ export function screenSpaceRayTracing_Linear2D(
           this.cameraNearFar.y
         );
       });
+      /*
       this.$if(pb.and(this.intersected, pb.greaterThan(this.pixelStride, 1)), function () {
         this.pqk = pb.sub(this.pqk, this.dpqk);
         this.dpqk = pb.div(this.dpqk, this.pixelStride);
@@ -481,6 +470,7 @@ export function screenSpaceRayTracing_Linear2D(
           }
         );
       });
+      */
       this.Q0 = pb.vec3(pb.add(this.Q0.xy, pb.mul(this.dQ.xy, this.numIterations)), this.pqk.z);
       this.hit2D = pb.vec3(this.hitUV, this.hitZ);
       this.hit3D = pb.div(this.Q0, this.pqk.w);
@@ -530,6 +520,7 @@ export function screenSpaceRayTracing_Linear2D(
       );
       this.$if(
         pb.or(
+          pb.not(this.intersected),
           pb.any(pb.lessThan(this.hit2D.xy, pb.vec2(0))),
           pb.any(pb.greaterThan(this.hit2D.xy, pb.vec2(1)))
         ),
@@ -539,7 +530,9 @@ export function screenSpaceRayTracing_Linear2D(
       );
       this.$l.confidence = validateHit(
         this,
-        this.hit2D,
+        this.hit2D.xy,
+        //invProjectPosition(this, this.hit2D, this.invProjMatrix),
+        this.hit3D,
         this.origin,
         this.rayDirection,
         this.viewMatrix,
@@ -549,7 +542,7 @@ export function screenSpaceRayTracing_Linear2D(
         linearDepthTex,
         normalTexture
       );
-      this.$return(pb.vec4(this.hit2D, this.$choice(this.intersected, pb.float(1), pb.float(0))));
+      this.$return(pb.vec4(this.hit2D, this.confidence));
     }
   );
   return scope.SSR_Linear2D(
@@ -570,192 +563,18 @@ export function screenSpaceRayTracing_Linear2D(
   );
 }
 
-export function screenSpaceRayTracing_Linear(
+export function screenSpaceRayTracing_HiZ(
   scope: PBInsideFunctionScope,
   viewPos: PBShaderExp,
   traceRay: PBShaderExp,
   viewMatrix: PBShaderExp,
   projMatrix: PBShaderExp,
   invProjMatrix: PBShaderExp,
-  cameraFarPlane: PBShaderExp | number,
-  maxDistance: PBShaderExp | number,
   maxIterations: PBShaderExp | number,
-  thickness: PBShaderExp | number,
-  binarySearchSteps: PBShaderExp | number,
-  textureSize: PBShaderExp,
-  linearDepthTex: PBShaderExp,
-  normalTexture?: PBShaderExp
-) {
-  const pb = scope.$builder;
-  pb.func(
-    'SSR_Linear',
-    [
-      pb.vec3('viewPos'),
-      pb.vec3('traceRay'),
-      pb.mat4('viewMatrix'),
-      pb.mat4('projMatrix'),
-      pb.mat4('invProjMatrix'),
-      pb.float('cameraFar'),
-      pb.float('maxDistance'),
-      pb.float('iteration'),
-      pb.float('thickness'),
-      pb.int('binarySearchSteps'),
-      pb.vec4('textureSize')
-    ],
-    function () {
-      //this.$l.normalizedViewPos = pb.normalize(this.viewPos);
-      this.$l.reflectVec = this.traceRay;
-      /*
-      this.$if(pb.greaterThan(this.reflectVec.z, 0), function () {
-        this.$return(pb.vec4(0));
-      });
-      */
-      this.$l.targetSize = this.textureSize.zw;
-      this.$l.viewPosEnd = pb.add(this.viewPos, pb.mul(this.reflectVec, this.maxDistance));
-      this.$l.fragStartH = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));
-      this.$l.origin = pb.add(pb.mul(pb.div(this.fragStartH.xy, this.fragStartH.w), 0.5), pb.vec2(0.5));
-      this.$l.fragStart = pb.mul(this.origin, this.targetSize);
-      this.$l.fragEndH = pb.mul(this.projMatrix, pb.vec4(this.viewPosEnd, 1));
-      this.$l.fragEnd = pb.mul(
-        pb.add(pb.mul(pb.div(this.fragEndH.xy, this.fragEndH.w), 0.5), pb.vec2(0.5)),
-        this.targetSize
-      );
-      this.$l.frag = this.fragStart.xy;
-      this.$l.deltaX = pb.sub(this.fragEnd.x, this.fragStart.x);
-      this.$l.deltaY = pb.sub(this.fragEnd.y, this.fragStart.y);
-      this.$l.useX = this.$choice(
-        pb.greaterThan(pb.abs(this.deltaX), pb.abs(this.deltaY)),
-        pb.float(1),
-        pb.float(0)
-      );
-      this.$l.delta = this.iteration;
-      this.$l.increment = pb.div(pb.vec2(this.deltaX, this.deltaY), pb.max(this.delta, 0.001));
-      this.$l.search0 = pb.float(0);
-      this.$l.search1 = pb.float(0);
-      this.$l.hit0 = pb.int(0);
-      this.$l.hit1 = pb.int(0);
-      this.$l.uv = pb.vec2(0);
-      this.$l.depth = pb.float(0);
-      this.$l.positionTo = pb.float(0);
-      this.$for(pb.int('i'), 0, pb.getDevice().type === 'webgl' ? 200 : pb.int(this.delta), function () {
-        if (pb.getDevice().type === 'webgl') {
-          this.$if(pb.greaterThanEqual(this.i, pb.int(this.delta)), function () {
-            this.$break();
-          });
-        }
-        this.frag = pb.add(this.frag, this.increment);
-        this.uv = pb.div(this.frag, this.targetSize);
-        this.positionTo = sampleLinearDepth(this, linearDepthTex, this.uv, 0);
-        this.search1 = pb.clamp(
-          pb.mix(
-            pb.div(pb.sub(this.frag.y, this.fragStart.y), this.deltaY),
-            pb.div(pb.sub(this.frag.x, this.fragStart.x), this.deltaX),
-            this.useX
-          ),
-          0,
-          1
-        );
-        this.$l.viewDistance = pb.div(
-          pb.mul(this.viewPos.z, this.viewPosEnd.z),
-          pb.mix(pb.neg(this.viewPosEnd.z), pb.neg(this.viewPos.z), this.search1)
-        );
-        this.depth = pb.sub(this.viewDistance, pb.mul(this.positionTo, this.cameraFar));
-        this.$if(pb.and(pb.greaterThan(this.depth, 0), pb.lessThan(this.depth, this.thickness)), function () {
-          this.hit0 = 1;
-          this.$break();
-        }).$else(function () {
-          this.search0 = this.search1;
-        });
-      });
-      this.search1 = pb.add(this.search0, pb.div(pb.sub(this.search1, this.search0), 2));
-      this.$l.steps = pb.mul(this.binarySearchSteps, this.hit0);
-      this.$for(pb.int('i'), 0, pb.getDevice().type === 'webgl' ? 10 : this.steps, function () {
-        if (pb.getDevice().type === 'webgl') {
-          this.$if(pb.greaterThanEqual(this.i, this.steps), function () {
-            this.$break();
-          });
-        }
-        this.$l.frag = pb.mix(this.fragStart.xy, this.fragEnd.xy, this.search1);
-        this.uv = pb.div(this.frag, this.targetSize);
-        this.positionTo = sampleLinearDepth(this, linearDepthTex, this.uv, 0);
-        this.$l.viewDistance = pb.div(
-          pb.mul(this.viewPos.z, this.viewPosEnd.z),
-          pb.mix(pb.neg(this.viewPosEnd.z), pb.neg(this.viewPos.z), this.search1)
-        );
-        this.depth = pb.sub(this.viewDistance, pb.mul(this.positionTo, this.cameraFar));
-        this.$if(pb.and(pb.greaterThan(this.depth, 0), pb.lessThan(this.depth, this.thickness)), function () {
-          this.hit1 = 1;
-          this.search1 = pb.add(this.search0, pb.div(pb.sub(this.search1, this.search0), 2));
-        }).$else(function () {
-          this.$l.tmp = this.search1;
-          this.search1 = pb.add(this.search1, pb.div(pb.sub(this.search1, this.search0), 2));
-          this.search0 = this.tmp;
-        });
-      });
-      this.$if(pb.equal(this.hit1, 0), function () {
-        this.$return(pb.vec4(0));
-      });
-      this.$if(pb.or(pb.lessThan(this.uv.y, 0), pb.greaterThan(this.uv.y, 1)), function () {
-        this.$return(pb.vec4(0));
-      });
-      this.$l.confidence = validateHit(
-        this,
-        pb.vec3(this.uv, this.positionTo),
-        this.origin,
-        this.traceRay,
-        this.viewMatrix,
-        this.invProjMatrix,
-        this.thickness,
-        this.textureSize,
-        linearDepthTex,
-        normalTexture
-      );
-      this.$return(pb.vec4(this.uv, this.positionTo, this.confidence));
-      /*
-      this.$l.vis = pb.mul(
-        pb.float(this.hit1),
-        //pb.sub(1, pb.max(pb.dot(pb.neg(this.normalizedViewPos), this.reflectVec), 0)),
-        pb.sub(1, pb.clamp(pb.div(this.depth, this.thickness), 0, 1)),
-        this.$choice(
-          pb.or(pb.lessThan(this.uv.x, 0), pb.greaterThan(this.uv.x, 1)),
-          pb.float(0),
-          pb.float(1)
-        ),
-        this.$choice(pb.or(pb.lessThan(this.uv.y, 0), pb.greaterThan(this.uv.y, 1)), pb.float(0), pb.float(1))
-      );
-      this.vis = pb.clamp(this.vis, 0, 1);
-      this.vis = pb.mul(this.vis, screenEdgeFading(this, this.uv));
-      this.$return(pb.vec4(this.uv, this.positionTo, this.vis));
-      */
-    }
-  );
-  return scope.SSR_Linear(
-    viewPos,
-    traceRay,
-    viewMatrix,
-    projMatrix,
-    invProjMatrix,
-    cameraFarPlane,
-    maxDistance,
-    maxIterations,
-    thickness,
-    binarySearchSteps,
-    textureSize
-  );
-}
-
-export function screenSpaceRayTracing_HiZ2(
-  scope: PBInsideFunctionScope,
-  viewPos: PBShaderExp,
-  traceRay: PBShaderExp,
-  viewMatrix: PBShaderExp,
-  projMatrix: PBShaderExp,
-  invProjMatrix: PBShaderExp,
-  maxIteraions: PBShaderExp | number,
   thickness: PBShaderExp | number,
   textureSize: PBShaderExp,
   HiZTexture: PBShaderExp,
-  normalTexture: PBShaderExp
+  normalTexture?: PBShaderExp
 ): PBShaderExp {
   const pb = scope.$builder;
   pb.func('getMipResolution', [pb.int('mipLevel')], function () {
@@ -842,7 +661,7 @@ export function screenSpaceRayTracing_HiZ2(
       pb.vec3('screenSpacePos'),
       pb.vec3('screenSpaceDirection'),
       pb.int('mostDetailMip'),
-      pb.int('maxIterations')
+      pb.float('maxIterations')
     ],
     function () {
       this.$l.invDirection = pb.div(pb.vec3(1), this.screenSpaceDirection);
@@ -874,7 +693,7 @@ export function screenSpaceRayTracing_HiZ2(
         this.position,
         this.currentT
       );
-      this.$l.i = pb.int(0);
+      this.$l.i = pb.float(0);
       this.$while(
         pb.and(
           pb.lessThan(this.i, this.maxIterations),
@@ -911,64 +730,6 @@ export function screenSpaceRayTracing_HiZ2(
       this.$return(pb.vec4(this.position, this.validHit));
     }
   );
-  /*
-  pb.func(
-    'SSR_validateHit',
-    [
-      pb.vec3('hit'),
-      pb.vec2('uv'),
-      pb.vec3('viewSpaceRayDirection'),
-      pb.mat4('viewMatrix'),
-      pb.mat4('invProjMatrix'),
-      pb.float('thickness')
-    ],
-    function () {
-      this.$if(
-        pb.or(pb.any(pb.lessThan(this.hit.xy, pb.vec2(0))), pb.any(pb.greaterThan(this.hit.xy, pb.vec2(1)))),
-        function () {
-          this.$return(pb.float(0));
-        }
-      );
-      this.$l.manhattanDist = pb.abs(pb.sub(this.hit.xy, this.uv));
-      this.$l.screenSize = pb.vec2(pb.textureDimensions(HiZTexture, 0));
-      this.$if(
-        pb.all(pb.lessThan(this.manhattanDist, pb.vec2(pb.div(pb.vec2(2), this.screenSize)))),
-        function () {
-          this.$return(pb.float(0));
-        }
-      );
-      this.$l.texCoord = pb.ivec2(pb.mul(pb.vec2(pb.textureDimensions(HiZTexture, 0)), this.hit.xy));
-      this.$l.surfaceZ = pb.textureLoad(HiZTexture, pb.div(this.texCoord, 2), 1).r;
-      this.$if(pb.equal(this.surfaceZ, 1), function () {
-        this.$return(pb.float(0));
-      });
-      this.$l.hitNormalWS = pb.sub(
-        pb.mul(pb.textureSampleLevel(normalTexture, this.hit.xy, 0).rgb, 2),
-        pb.vec3(1)
-      );
-      this.$l.hitNormalVS = pb.mul(this.viewMatrix, pb.vec4(this.hitNormalWS, 0)).xyz;
-      this.$if(pb.greaterThan(pb.dot(this.hitNormalVS, this.viewSpaceRayDirection), 0), function () {
-        this.$return(pb.float(0));
-      });
-      this.$l.viewSpaceSurface = this.invProjectPosition(
-        pb.vec3(this.hit.xy, this.surfaceZ),
-        this.invProjMatrix
-      );
-      this.$l.viewSpaceHit = this.invProjectPosition(this.hit, this.invProjMatrix);
-      this.$l.distance = pb.length(pb.sub(this.viewSpaceSurface, this.viewSpaceHit));
-      this.$l.fov = pb.mul(pb.vec2(pb.div(this.screenSize.y, this.screenSize.x), 1), 0.05);
-      this.$l.border = pb.mul(
-        pb.smoothStep(pb.vec2(0), this.fov, this.hit.xy),
-        pb.sub(pb.vec2(1), pb.smoothStep(pb.sub(pb.vec2(1), this.fov), pb.vec2(1), this.hit.xy))
-      );
-      this.$l.vignette = pb.mul(this.border.x, this.border.y);
-      this.$l.confidence = pb.sub(1, pb.smoothStep(0, this.thickness, this.distance));
-      this.confidence = pb.mul(this.confidence, this.confidence);
-
-      this.$return(pb.mul(this.vignette, this.confidence));
-    }
-  );
-  */
   pb.func(
     'SSR_HiZ',
     [
@@ -979,7 +740,7 @@ export function screenSpaceRayTracing_HiZ2(
       pb.mat4('invProjMatrix'),
       pb.float('thickness'),
       pb.vec4('textureSize'),
-      pb.int('maxIterations')
+      pb.float('maxIterations')
     ],
     function () {
       this.$l.originH = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));
@@ -1002,7 +763,8 @@ export function screenSpaceRayTracing_HiZ2(
       this.$if(pb.notEqual(this.hit.w, 0), function () {
         this.confidence = validateHit(
           this,
-          this.hit.xyz,
+          this.hit.xy,
+          invProjectPosition(this, this.hit.xyz, this.invProjMatrix),
           this.originTS.xy,
           this.traceRay,
           this.viewMatrix,
@@ -1024,229 +786,6 @@ export function screenSpaceRayTracing_HiZ2(
     invProjMatrix,
     thickness,
     textureSize,
-    maxIteraions
-  );
-}
-
-export function screenSpaceRayTracing_HiZ(
-  scope: PBInsideFunctionScope,
-  viewPos: PBShaderExp,
-  traceRay: PBShaderExp,
-  projMatrix: PBShaderExp,
-  maxDistance: PBShaderExp | number,
-  maxIteraions: PBShaderExp | number,
-  thickness: PBShaderExp | number,
-  HiZTexture: PBShaderExp,
-  HiZTextureMipLevels: PBShaderExp | number
-): PBShaderExp {
-  const pb = scope.$builder;
-  pb.func('SSR_HiZ_intersectDepthPlane', [pb.vec3('o'), pb.vec3('d'), pb.float('z')], function () {
-    this.$return(pb.add(this.o, pb.mul(this.d, this.z)));
-  });
-  pb.func('SSR_HiZ_getCell', [pb.vec2('pos'), pb.vec2('cell_count')], function () {
-    this.$return(pb.floor(pb.mul(this.pos, this.cell_count)));
-  });
-  pb.func(
-    'SSR_HiZ_intersectCellBoundary',
-    [
-      pb.vec3('o'),
-      pb.vec3('d'),
-      pb.vec2('cell'),
-      pb.vec2('cell_count'),
-      pb.vec2('crossStep'),
-      pb.vec2('crossOffset')
-    ],
-    function () {
-      this.$l.index = pb.add(this.cell, this.crossStep);
-      this.$l.boundary = pb.add(
-        pb.div(this.index, this.cell_count),
-        pb.div(this.crossOffset, this.cell_count)
-      );
-      this.$l.delta = pb.div(pb.sub(this.boundary, this.o.xy), this.d.xy);
-      this.$l.t = pb.min(this.delta.x, this.delta.y);
-      this.$return(this.SSR_HiZ_intersectDepthPlane(this.o, this.d, this.t));
-    }
-  );
-  pb.func('SSR_HiZ_getCellCount', [pb.int('level')], function () {
-    this.$return(pb.vec2(pb.textureDimensions(HiZTexture, this.level)));
-  });
-  pb.func('SSR_HiZ_crossedCellBoundary', [pb.vec2('oldCellIndex'), pb.vec2('newCellIndex')], function () {
-    this.$return(
-      pb.or(
-        pb.notEqual(this.oldCellIndex.x, this.newCellIndex.x),
-        pb.notEqual(this.oldCellIndex.y, this.newCellIndex.y)
-      )
-    );
-  });
-  pb.func('SSR_HiZ_getMinimumDepth', [pb.vec2('uv'), pb.float('level')], function () {
-    this.$return(pb.textureSampleLevel(HiZTexture, this.uv, this.level).r);
-  });
-  pb.func(
-    'SSR_HiZ_tracing',
-    [
-      pb.vec3('samplePosInTS'),
-      pb.vec3('reflectVecInTS'),
-      pb.float('maxDistance'),
-      pb.float('thickness'),
-      pb.int('maxIteration'),
-      pb.int('depthMipLevels')
-    ],
-    function () {
-      this.$l.maxLevel = pb.sub(this.depthMipLevels, 1);
-      this.$l.crossStep = pb.vec2(
-        this.$choice(pb.greaterThanEqual(this.reflectVecInTS.x, 0), pb.float(1), pb.float(-1)),
-        this.$choice(pb.greaterThanEqual(this.reflectVecInTS.y, 0), pb.float(1), pb.float(-1))
-      );
-      this.$l.crossOffset = pb.mul(this.crossStep, 0.00001);
-      this.crossStep = pb.clamp(this.crossStep, pb.vec2(0), pb.vec2(1));
-      this.$l.ray = this.samplePosInTS;
-      this.$l.minZ = this.ray.z;
-      this.$l.maxZ = pb.add(this.minZ, pb.mul(this.reflectVecInTS.z, this.maxDistance));
-      this.$l.deltaZ = pb.sub(this.maxZ, this.minZ);
-      this.$l.o = this.ray;
-      this.$l.d = pb.mul(this.reflectVecInTS, this.maxDistance);
-      this.$l.startLevel = pb.int(0);
-      this.$l.stopLevel = pb.int(0);
-      this.$l.startCellCount = this.SSR_HiZ_getCellCount(this.startLevel);
-      this.$l.rayCell = this.SSR_HiZ_getCell(this.ray.xy, this.startCellCount);
-      this.ray = this.SSR_HiZ_intersectCellBoundary(
-        this.o,
-        this.d,
-        this.rayCell,
-        this.startCellCount,
-        this.crossStep,
-        this.crossOffset
-      );
-      this.$l.level = this.startLevel;
-      this.$l.iter = pb.int(1);
-      this.$l.isBackwardRay = pb.lessThan(this.reflectVecInTS.z, 0);
-      this.$l.rayDir = this.$choice(this.isBackwardRay, pb.float(-1), pb.float(1));
-      this.$l.cell_minZ = pb.float();
-      this.$while(
-        pb.and(
-          pb.greaterThanEqual(this.level, this.stopLevel),
-          pb.lessThanEqual(pb.mul(this.ray.z, this.rayDir), pb.mul(this.maxZ, this.rayDir)),
-          pb.lessThan(this.iter, this.maxIteration)
-        ),
-        function () {
-          this.$l.cellCount = this.SSR_HiZ_getCellCount(this.level);
-          this.$l.oldCellIndex = this.SSR_HiZ_getCell(this.ray.xy, this.cellCount);
-          this.cell_minZ = this.SSR_HiZ_getMinimumDepth(
-            pb.div(pb.add(this.oldCellIndex, pb.vec2(0.5)), this.cellCount),
-            pb.float(this.level)
-          );
-          this.$l.tmpRay = this.$choice(
-            pb.and(pb.greaterThan(this.cell_minZ, this.ray.z), pb.not(this.isBackwardRay)),
-            this.SSR_HiZ_intersectDepthPlane(
-              this.o,
-              this.d,
-              pb.div(pb.sub(this.cell_minZ, this.minZ), this.deltaZ)
-            ),
-            this.ray
-          );
-          this.$l.newCellIndex = this.SSR_HiZ_getCell(this.tmpRay.xy, this.cellCount);
-          this.$l.thick = this.$choice(pb.equal(this.level, 0), pb.sub(this.ray.z, this.cell_minZ), 0);
-          this.$l.crossed = pb.or(
-            pb.and(this.isBackwardRay, pb.greaterThan(this.cell_minZ, this.ray.z)),
-            pb.greaterThan(this.thick, pb.mul(this.thickness, 0.001)),
-            this.SSR_HiZ_crossedCellBoundary(this.oldCellIndex, this.newCellIndex)
-          );
-          this.ray = this.$choice(
-            this.crossed,
-            this.SSR_HiZ_intersectCellBoundary(
-              this.o,
-              this.d,
-              this.oldCellIndex,
-              this.cellCount,
-              this.crossStep,
-              this.crossOffset
-            ),
-            this.tmpRay
-          );
-          this.level = this.$choice(
-            this.crossed,
-            pb.min(this.maxLevel, pb.add(this.level, 1)),
-            pb.sub(this.level, 1)
-          );
-          this.iter = pb.add(this.iter, 1);
-        }
-      );
-      this.$l.vis = this.$choice(
-        pb.and(pb.lessThan(this.cell_minZ, 1), pb.lessThan(this.level, this.stopLevel)),
-        pb.float(1),
-        pb.float(0)
-      );
-      this.vis = pb.mul(this.vis, screenEdgeFading(this, this.ray.xy));
-      this.$return(pb.vec4(this.ray.xy, this.cell_minZ, this.vis));
-    }
-  );
-  pb.func(
-    'SSR_HiZ',
-    [
-      pb.vec3('viewPos'),
-      pb.vec3('traceRay'),
-      pb.mat4('projMatrix'),
-      pb.float('maxDistance'),
-      pb.float('iteration'),
-      pb.float('thickness'),
-      pb.int('depthMipLevels')
-    ],
-    function () {
-      //this.$l.normalizedViewPos = pb.normalize(this.viewPos);
-      this.$l.reflectVec = this.traceRay;
-      this.$if(pb.greaterThan(this.reflectVec.z, 0), function () {
-        this.$return(pb.vec4(0));
-      });
-      this.$l.maxDist = pb.float(100);
-      this.$l.viewPosEnd = pb.add(this.viewPos, pb.mul(this.reflectVec, this.maxDist));
-      this.$l.fragStartH = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));
-      this.$l.fragEndH = pb.mul(this.projMatrix, pb.vec4(this.viewPosEnd, 1));
-      this.$l.fragStartCS = pb.div(this.fragStartH.xyz, this.fragStartH.w);
-      this.$l.fragEndCS = pb.div(this.fragEndH.xyz, this.fragEndH.w);
-      this.$l.reflectVecCS = pb.normalize(pb.sub(this.fragEndCS, this.fragStartCS));
-      this.$l.fragStartTS = pb.add(pb.mul(this.fragStartCS, pb.vec3(0.5, 0.5, 0.5)), pb.vec3(0.5, 0.5, 0.5));
-      this.$l.fragEndTS = pb.add(pb.mul(this.fragEndCS, pb.vec3(0.5, 0.5, 0.5)), pb.vec3(0.5, 0.5, 0.5));
-      this.$l.reflectVecTS = pb.mul(this.reflectVecCS, pb.vec3(0.5, 0.5, 0.5));
-      this.maxDist = this.$choice(
-        pb.greaterThanEqual(this.reflectVecTS.x, 0),
-        pb.div(pb.sub(1, this.fragStartTS.x), this.reflectVecTS.x),
-        pb.div(pb.neg(this.fragStartTS.x), this.reflectVecTS.x)
-      );
-      this.maxDist = pb.min(
-        this.maxDist,
-        this.$choice(
-          pb.lessThan(this.reflectVecTS.y, 0),
-          pb.div(pb.neg(this.fragStartTS.y), this.reflectVecTS.y),
-          pb.div(pb.sub(1, this.fragStartTS.y), this.reflectVecTS.y)
-        )
-      );
-      this.maxDist = pb.min(
-        this.maxDist,
-        this.$choice(
-          pb.lessThan(this.reflectVecTS.z, 0),
-          pb.div(pb.neg(this.fragStartTS.z), this.reflectVecTS.z),
-          pb.div(pb.sub(1, this.fragStartTS.z), this.reflectVecTS.z)
-        )
-      );
-      this.$return(
-        this.SSR_HiZ_tracing(
-          this.fragStartTS,
-          this.reflectVecTS,
-          this.maxDist,
-          this.thickness,
-          pb.int(this.iteration),
-          this.depthMipLevels
-        )
-      );
-    }
-  );
-  return scope.SSR_HiZ(
-    viewPos,
-    traceRay,
-    projMatrix,
-    maxDistance,
-    maxIteraions,
-    thickness,
-    HiZTextureMipLevels
+    maxIterations
   );
 }

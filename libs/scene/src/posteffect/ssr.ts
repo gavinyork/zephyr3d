@@ -2,13 +2,7 @@ import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import type { BindGroup, GPUProgram, Texture2D, TextureSampler } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import {
-  sampleLinearDepth,
-  screenSpaceRayTracing_HiZ2,
-  screenSpaceRayTracing_Linear,
-  screenSpaceRayTracing_Linear2D,
-  screenSpaceRayTracing_VS
-} from '../shaders/ssr';
+import { sampleLinearDepth, screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 
 /**
@@ -217,38 +211,20 @@ export class SSR extends AbstractPostEffect {
           this.viewPos = pb.add(this.viewPos, pb.mul(this.reflectVec, 0.1));
           this.$if(pb.lessThan(this.roughnessFactor.a, 1), function () {
             this.hitInfo = ctx.HiZTexture
-              ? screenSpaceRayTracing_HiZ2(
+              ? screenSpaceRayTracing_HiZ(
                   this,
                   this.viewPos,
                   this.reflectVec,
                   this.viewMatrix,
                   this.projMatrix,
                   this.invProjMatrix,
-                  pb.int(this.ssrParams.y),
+                  this.ssrParams.y,
                   this.ssrParams.z,
                   this.targetSize,
                   this.hizTex,
                   this.normalTex
                 )
-              : false
-              ? screenSpaceRayTracing_Linear(
-                  this,
-                  this.viewPos,
-                  this.reflectVec,
-                  this.viewMatrix,
-                  this.projMatrix,
-                  this.invProjMatrix,
-                  this.cameraNearFar.y,
-                  this.ssrParams.x,
-                  this.ssrParams.y,
-                  this.thickness,
-                  pb.int(this.ssrParams.w),
-                  this.targetSize,
-                  this.depthTex,
-                  this.normalTex
-                )
-              : true
-              ? screenSpaceRayTracing_Linear2D(
+              : screenSpaceRayTracing_Linear2D(
                   this,
                   this.viewPos,
                   this.reflectVec,
@@ -260,22 +236,6 @@ export class SSR extends AbstractPostEffect {
                   this.ssrParams.y,
                   this.thickness,
                   this.ssrParams.w,
-                  this.targetSize,
-                  this.depthTex,
-                  this.normalTex
-                )
-              : screenSpaceRayTracing_VS(
-                  this,
-                  this.viewPos,
-                  this.reflectVec,
-                  this.viewMatrix,
-                  this.projMatrix,
-                  this.invProjMatrix,
-                  this.cameraNearFar.y,
-                  this.ssrParams.x,
-                  this.ssrParams.y,
-                  this.thickness,
-                  pb.int(this.ssrParams.w),
                   this.targetSize,
                   this.depthTex,
                   this.normalTex
