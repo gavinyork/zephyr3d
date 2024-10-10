@@ -20,7 +20,6 @@ function invProjectPosition(scope: PBInsideFunctionScope, pos: PBShaderExp, mat:
 function validateHit(
   scope: PBInsideFunctionScope,
   hit2D: PBShaderExp,
-  hit3D: PBShaderExp,
   uv: PBShaderExp,
   traceRay: PBShaderExp,
   viewMatrix: PBShaderExp,
@@ -36,7 +35,6 @@ function validateHit(
     'SSR_validateHit',
     [
       pb.vec2('hit2d'),
-      pb.vec3('hit3d'),
       pb.vec2('uv'),
       pb.vec3('viewSpaceRayDirection'),
       pb.mat4('viewMatrix'),
@@ -84,23 +82,16 @@ function validateHit(
         pb.vec3(this.hit2d, this.surfaceZ),
         this.invProjMatrix
       );
-      this.$l.viewSpaceHit = this.hit3d; // invProjectPosition(this, this.hit, this.invProjMatrix);
-      this.$l.distance = pb.length(pb.sub(this.viewSpaceSurface, this.viewSpaceHit));
       this.$l.fov = pb.mul(pb.vec2(pb.div(this.textureSize.y, this.textureSize.x), 1), 0.05);
       this.$l.border = pb.mul(
         pb.smoothStep(pb.vec2(0), this.fov, this.hit2d),
         pb.sub(pb.vec2(1), pb.smoothStep(pb.sub(pb.vec2(1), this.fov), pb.vec2(1), this.hit2d))
       );
-      this.$l.vignette = pb.mul(this.border.x, this.border.y);
-      this.$l.confidence = pb.sub(1, pb.smoothStep(0, this.thickness, this.distance));
-      this.confidence = pb.mul(this.confidence, this.confidence);
-
-      this.$return(pb.mul(this.vignette, this.confidence));
+      this.$return(pb.mul(this.border.x, this.border.y));
     }
   );
   return scope.SSR_validateHit(
     hit2D,
-    hit3D,
     uv,
     traceRay,
     viewMatrix,
@@ -230,7 +221,6 @@ export function screenSpaceRayTracing_VS(
       this.$l.confidence = validateHit(
         this,
         this.uv,
-        invProjectPosition(this, pb.vec3(this.uv, this.positionTo), this.invProjMatrix),
         this.origin,
         this.traceRay,
         this.viewMatrix,
@@ -446,53 +436,68 @@ export function screenSpaceRayTracing_Linear2D(
           this.cameraNearFar.y
         );
       });
-      /*
-      this.$if(pb.and(this.intersected, pb.greaterThan(this.pixelStride, 1)), function () {
-        this.pqk = pb.sub(this.pqk, this.dpqk);
-        this.dpqk = pb.div(this.dpqk, this.pixelStride);
-        this.$l.originalStride = pb.mul(this.pixelStride, 0.5);
-        this.$l.stride = this.originalStride;
-        this.zA = pb.div(this.pqk.z, this.pqk.w);
-        this.zB = this.zA;
-        this.$for(
-          pb.float('j'),
-          0,
-          pb.getDevice().type === 'webgl' ? 32 : this.binarySearchSteps,
-          function () {
-            if (pb.getDevice().type === 'webgl') {
-              this.$if(pb.greaterThanEqual(this.j, this.binarySearchSteps), function () {
-                this.$break();
+      this.$if(
+        pb.and(
+          this.intersected,
+          pb.greaterThanEqual(this.binarySearchSteps, 1),
+          pb.greaterThan(this.pixelStride, 1)
+        ),
+        function () {
+          this.pqk = pb.sub(this.pqk, this.dpqk);
+          this.dpqk = pb.div(this.dpqk, this.pixelStride);
+          this.$l.originalStride = pb.mul(this.pixelStride, 0.5);
+          this.$l.stride = this.originalStride;
+          this.zA = pb.div(this.pqk.z, this.pqk.w);
+          this.zB = this.zA;
+          this.$for(
+            pb.float('j'),
+            0,
+            pb.getDevice().type === 'webgl' ? 32 : this.binarySearchSteps,
+            function () {
+              if (pb.getDevice().type === 'webgl') {
+                this.$if(pb.greaterThanEqual(this.j, this.binarySearchSteps), function () {
+                  this.$break();
+                });
+              }
+              this.pqk = pb.add(this.pqk, pb.mul(this.dpqk, this.stride));
+              this.zA = this.zB;
+              this.zB = pb.div(
+                pb.sub(this.pqk.z, pb.mul(this.dpqk.z, 0.5)),
+                pb.sub(this.pqk.w, pb.mul(this.dpqk.w, 0.5))
+              );
+              this.hitZ = this.zB;
+              this.$if(pb.greaterThan(this.zB, this.zA), function () {
+                this.$l.t = this.zB;
+                this.zB = this.zA;
+                this.zA = this.t;
               });
+              this.hitUV = this.$choice(this.permute, this.pqk.yx, this.pqk.xy);
+              this.hitUV = pb.mul(this.hitUV, this.invRenderTargetSize);
+              this.$l.intersect = this.rayIntersectDepth(
+                this.zA,
+                this.zB,
+                this.thickness,
+                this.hitUV,
+                this.cameraNearFar.y
+              );
+              this.originalStride = pb.mul(this.originalStride, 0.5);
+              this.stride = this.$choice(this.intersect, pb.neg(this.originalStride), this.originalStride);
             }
-            this.pqk = pb.add(this.pqk, pb.mul(this.dpqk, this.stride));
-            this.zA = this.zB;
-            this.zB = pb.div(
-              pb.sub(this.pqk.z, pb.mul(this.dpqk.z, 0.5)),
-              pb.sub(this.pqk.w, pb.mul(this.dpqk.w, 0.5))
-            );
-            this.hitZ = this.zB;
-            this.$if(pb.greaterThan(this.zB, this.zA), function () {
-              this.$l.t = this.zB;
-              this.zB = this.zA;
-              this.zA = this.t;
-            });
-            this.hitUV = this.$choice(this.permute, this.pqk.yx, this.pqk.xy);
-            this.hitUV = pb.mul(this.hitUV, this.invRenderTargetSize);
-            this.$l.intersect = this.rayIntersectDepth(
-              this.zA,
-              this.zB,
-              this.thickness,
+          );
+          this.hit3D = invProjectPosition(
+            this,
+            pb.vec3(
               this.hitUV,
-              this.cameraNearFar.y
-            );
-            this.stride = this.$choice(this.intersect, pb.neg(this.originalStride), this.originalStride);
-          }
-        );
+              ShaderHelper.linearDepthToNonLinear(this, pb.abs(this.hitZ), this.cameraNearFar)
+            ),
+            this.invProjMatrix
+          );
+        }
+      ).$else(function () {
+        this.Q0 = pb.vec3(pb.add(this.Q0.xy, pb.mul(this.dQ.xy, this.numIterations)), this.pqk.z);
+        this.hit3D = pb.div(this.Q0, this.pqk.w);
       });
-      */
-      this.Q0 = pb.vec3(pb.add(this.Q0.xy, pb.mul(this.dQ.xy, this.numIterations)), this.pqk.z);
       this.hit2D = pb.vec3(this.hitUV, this.hitZ);
-      this.hit3D = pb.div(this.Q0, this.pqk.w);
       this.$return(this.intersected);
     }
   );
@@ -551,7 +556,7 @@ export function screenSpaceRayTracing_Linear2D(
         this,
         this.hit2D.xy,
         //invProjectPosition(this, this.hit2D, this.invProjMatrix),
-        this.hit3D,
+        //this.hit3D,
         this.origin,
         this.rayDirection,
         this.viewMatrix,
@@ -572,7 +577,7 @@ export function screenSpaceRayTracing_Linear2D(
     projMatrix,
     invProjMatrix,
     0,
-    2,
+    4,
     100,
     maxDistance,
     maxIterations,
@@ -786,18 +791,6 @@ export function screenSpaceRayTracing_HiZ(
         this.confidence = validateHit(
           this,
           this.hit.xy,
-          invProjectPosition(
-            this,
-            pb.vec3(
-              this.hit.xy,
-              ShaderHelper.linearDepthToNonLinear(
-                this,
-                pb.mul(this.hit.z, this.cameraNearFar.y),
-                this.cameraNearFar
-              )
-            ),
-            this.invProjMatrix
-          ),
           this.originTS.xy,
           this.traceRay,
           this.viewMatrix,
