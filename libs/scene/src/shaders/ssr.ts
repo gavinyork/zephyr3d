@@ -113,158 +113,6 @@ export function sampleLinearDepth(
   return pb.getDevice().type === 'webgl' ? decodeNormalizedFloatFromRGBA(scope, depth) : depth.r;
 }
 
-export function screenSpaceRayTracing_VS(
-  scope: PBInsideFunctionScope,
-  viewPos: PBShaderExp,
-  traceRay: PBShaderExp,
-  viewMatrix: PBShaderExp,
-  projMatrix: PBShaderExp,
-  invProjMatrix: PBShaderExp,
-  cameraNearFar: PBShaderExp,
-  maxDistance: PBShaderExp | number,
-  maxIterations: PBShaderExp | number,
-  thickness: PBShaderExp | number,
-  binarySearchSteps: PBShaderExp | number,
-  targetSize: PBShaderExp,
-  linearDepthTex: PBShaderExp,
-  normalTexture: PBShaderExp
-) {
-  const pb = scope.$builder;
-  pb.func(
-    'SSR_VS',
-    [
-      pb.vec3('viewPos'),
-      pb.vec3('traceRay'),
-      pb.mat4('viewMatrix'),
-      pb.mat4('projMatrix'),
-      pb.mat4('invProjMatrix'),
-      pb.float('cameraFar'),
-      pb.float('maxDistance'),
-      pb.float('iteration'),
-      pb.float('thickness'),
-      pb.int('binarySearchSteps'),
-      pb.vec4('textureSize')
-    ],
-    function () {
-      this.$l.fragStartH = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));
-      this.$l.origin = pb.add(pb.mul(pb.div(this.fragStartH.xy, this.fragStartH.w), 0.5), pb.vec2(0.5));
-      this.$l.reflectVec = this.traceRay;
-      this.$l.maxIterations = pb.max(this.iteration, 1);
-      this.$l.reflectVecNorm = pb.normalize(this.reflectVec);
-      this.$l.reflectVecEnd = pb.add(this.viewPos, pb.mul(this.reflectVecNorm, this.maxDistance));
-      this.$l.rayDelta = pb.mul(this.reflectVecNorm, this.maxDistance);
-      this.$l.step = pb.div(this.rayDelta, this.maxIterations);
-      this.$l.search0 = pb.float(0);
-      this.$l.search1 = pb.float(0);
-      this.$l.hit0 = pb.int(0);
-      this.$l.hit1 = pb.int(0);
-      this.$l.uv = pb.vec2(0);
-      this.$l.depth = pb.float(0);
-      this.$l.positionTo = pb.float(0);
-      this.$for(
-        pb.int('i'),
-        0,
-        pb.getDevice().type === 'webgl' ? 500 : pb.int(this.maxIterations),
-        function () {
-          if (pb.getDevice().type === 'webgl') {
-            this.$if(pb.greaterThanEqual(this.i, pb.int(this.maxIterations)), function () {
-              this.$break();
-            });
-          }
-          this.$l.pos = pb.add(this.viewPos, pb.mul(this.step, pb.float(this.i)));
-          this.$l.fragH = pb.mul(this.projMatrix, pb.vec4(this.pos, 1));
-          this.uv = pb.add(pb.mul(pb.div(this.fragH.xy, this.fragH.w), 0.5), pb.vec2(0.5));
-          this.positionTo = sampleLinearDepth(this, linearDepthTex, this.uv, 0);
-          this.search1 = pb.clamp(pb.div(pb.float(this.i), this.maxIterations), 0, 1);
-          this.$l.viewDistance = pb.neg(this.pos.z);
-          this.depth = pb.sub(this.viewDistance, pb.mul(this.positionTo, this.cameraFar));
-          this.$if(
-            pb.and(pb.greaterThan(this.depth, 0), pb.lessThan(this.depth, this.thickness)),
-            function () {
-              this.hit0 = 1;
-              this.$break();
-            }
-          ).$else(function () {
-            this.search0 = this.search1;
-          });
-        }
-      );
-      this.search1 = pb.add(this.search0, pb.div(pb.sub(this.search1, this.search0), 2));
-      this.$l.steps = pb.mul(this.binarySearchSteps, this.hit0);
-      this.$for(pb.int('i'), 0, pb.getDevice().type === 'webgl' ? 32 : this.steps, function () {
-        if (pb.getDevice().type === 'webgl') {
-          this.$if(pb.greaterThanEqual(this.i, this.steps), function () {
-            this.$break();
-          });
-        }
-        this.$l.pos = pb.mix(this.viewPos, this.reflectVecEnd, this.search1);
-        this.$l.fragH = pb.mul(this.projMatrix, pb.vec4(this.pos, 1));
-        this.uv = pb.add(pb.mul(pb.div(this.fragH.xy, this.fragH.w), 0.5), pb.vec2(0.5));
-        this.positionTo = sampleLinearDepth(this, linearDepthTex, this.uv, 0);
-        this.$l.viewDistance = pb.neg(this.pos.z);
-        this.depth = pb.sub(this.viewDistance, pb.mul(this.positionTo, this.cameraFar));
-        this.$if(pb.and(pb.greaterThan(this.depth, 0), pb.lessThan(this.depth, this.thickness)), function () {
-          this.hit1 = 1;
-          this.search1 = pb.add(this.search0, pb.div(pb.sub(this.search1, this.search0), 2));
-        }).$else(function () {
-          this.$l.tmp = this.search1;
-          this.search1 = pb.add(this.search1, pb.div(pb.sub(this.search1, this.search0), 2));
-          this.search0 = this.tmp;
-        });
-      });
-      this.$if(pb.equal(this.hit1, 0), function () {
-        this.$return(pb.vec4(0));
-      });
-      this.$if(pb.or(pb.lessThan(this.uv.y, 0), pb.greaterThan(this.uv.y, 1)), function () {
-        this.$return(pb.vec4(0));
-      });
-      this.$l.confidence = validateHit(
-        this,
-        this.uv,
-        this.origin,
-        this.traceRay,
-        this.viewMatrix,
-        this.invProjMatrix,
-        this.cameraNearFar,
-        this.thickness,
-        this.textureSize,
-        linearDepthTex,
-        normalTexture
-      );
-      this.$return(pb.vec4(this.uv, this.positionTo, this.confidence));
-      /*
-      this.$l.vis = pb.mul(
-        pb.float(this.hit1),
-        //pb.sub(1, pb.max(pb.dot(pb.neg(this.normalizedViewPos), this.reflectVec), 0)),
-        pb.sub(1, pb.clamp(pb.div(this.depth, this.thickness), 0, 1)),
-        this.$choice(
-          pb.or(pb.lessThan(this.uv.x, 0), pb.greaterThan(this.uv.x, 1)),
-          pb.float(0),
-          pb.float(1)
-        ),
-        this.$choice(pb.or(pb.lessThan(this.uv.y, 0), pb.greaterThan(this.uv.y, 1)), pb.float(0), pb.float(1))
-      );
-      this.vis = pb.clamp(this.vis, 0, 1);
-      this.vis = pb.mul(this.vis, screenEdgeFading(this, this.uv));
-      this.$return(pb.vec4(this.uv, this.positionTo, this.vis));
-      */
-    }
-  );
-  return scope.SSR_VS(
-    viewPos,
-    traceRay,
-    viewMatrix,
-    projMatrix,
-    invProjMatrix,
-    cameraNearFar.y,
-    maxDistance,
-    maxIterations,
-    thickness,
-    binarySearchSteps,
-    targetSize
-  );
-}
-
 export function screenSpaceRayTracing_Linear2D(
   scope: PBInsideFunctionScope,
   viewPos: PBShaderExp,
@@ -276,7 +124,7 @@ export function screenSpaceRayTracing_Linear2D(
   maxDistance: PBShaderExp | number,
   maxIterations: PBShaderExp | number,
   thickness: PBShaderExp | number,
-  binarySearchSteps: PBShaderExp | number,
+  stride: PBShaderExp | number,
   textureSize: PBShaderExp,
   linearDepthTex: PBShaderExp,
   normalTexture?: PBShaderExp
@@ -311,7 +159,6 @@ export function screenSpaceRayTracing_Linear2D(
       pb.float('strideZCutoff'),
       pb.float('maxDistance'),
       pb.float('maxIterations'),
-      pb.float('binarySearchSteps'),
       pb.float('thickness'),
       pb.vec2('cameraNearFar'),
       pb.mat4('projMatrix'),
@@ -436,68 +283,9 @@ export function screenSpaceRayTracing_Linear2D(
           this.cameraNearFar.y
         );
       });
-      this.$if(
-        pb.and(
-          this.intersected,
-          pb.greaterThanEqual(this.binarySearchSteps, 1),
-          pb.greaterThan(this.pixelStride, 1)
-        ),
-        function () {
-          this.pqk = pb.sub(this.pqk, this.dpqk);
-          this.dpqk = pb.div(this.dpqk, this.pixelStride);
-          this.$l.originalStride = pb.mul(this.pixelStride, 0.5);
-          this.$l.stride = this.originalStride;
-          this.zA = pb.div(this.pqk.z, this.pqk.w);
-          this.zB = this.zA;
-          this.$for(
-            pb.float('j'),
-            0,
-            pb.getDevice().type === 'webgl' ? 32 : this.binarySearchSteps,
-            function () {
-              if (pb.getDevice().type === 'webgl') {
-                this.$if(pb.greaterThanEqual(this.j, this.binarySearchSteps), function () {
-                  this.$break();
-                });
-              }
-              this.pqk = pb.add(this.pqk, pb.mul(this.dpqk, this.stride));
-              this.zA = this.zB;
-              this.zB = pb.div(
-                pb.sub(this.pqk.z, pb.mul(this.dpqk.z, 0.5)),
-                pb.sub(this.pqk.w, pb.mul(this.dpqk.w, 0.5))
-              );
-              this.hitZ = this.zB;
-              this.$if(pb.greaterThan(this.zB, this.zA), function () {
-                this.$l.t = this.zB;
-                this.zB = this.zA;
-                this.zA = this.t;
-              });
-              this.hitUV = this.$choice(this.permute, this.pqk.yx, this.pqk.xy);
-              this.hitUV = pb.mul(this.hitUV, this.invRenderTargetSize);
-              this.$l.intersect = this.rayIntersectDepth(
-                this.zA,
-                this.zB,
-                this.thickness,
-                this.hitUV,
-                this.cameraNearFar.y
-              );
-              this.originalStride = pb.mul(this.originalStride, 0.5);
-              this.stride = this.$choice(this.intersect, pb.neg(this.originalStride), this.originalStride);
-            }
-          );
-          this.hit3D = invProjectPosition(
-            this,
-            pb.vec3(
-              this.hitUV,
-              ShaderHelper.linearDepthToNonLinear(this, pb.abs(this.hitZ), this.cameraNearFar)
-            ),
-            this.invProjMatrix
-          );
-        }
-      ).$else(function () {
-        this.Q0 = pb.vec3(pb.add(this.Q0.xy, pb.mul(this.dQ.xy, this.numIterations)), this.pqk.z);
-        this.hit3D = pb.div(this.Q0, this.pqk.w);
-      });
       this.hit2D = pb.vec3(this.hitUV, this.hitZ);
+      this.Q0 = pb.vec3(pb.add(this.Q0.xy, pb.mul(this.dQ.xy, this.numIterations)), this.pqk.z);
+      this.hit3D = pb.div(this.Q0, this.pqk.w);
       this.$return(this.intersected);
     }
   );
@@ -514,7 +302,6 @@ export function screenSpaceRayTracing_Linear2D(
       pb.float('strideZCutoff'),
       pb.float('maxDistance'),
       pb.float('maxIterations'),
-      pb.float('binarySearchSteps'),
       pb.float('thickness'),
       pb.vec2('cameraNearFar'),
       pb.vec4('textureSize')
@@ -532,7 +319,6 @@ export function screenSpaceRayTracing_Linear2D(
         this.strideZCutoff,
         this.maxDistance,
         this.maxIterations,
-        this.binarySearchSteps,
         this.thickness,
         this.cameraNearFar,
         this.projMatrix,
@@ -555,8 +341,6 @@ export function screenSpaceRayTracing_Linear2D(
       this.$l.confidence = validateHit(
         this,
         this.hit2D.xy,
-        //invProjectPosition(this, this.hit2D, this.invProjMatrix),
-        //this.hit3D,
         this.origin,
         this.rayDirection,
         this.viewMatrix,
@@ -567,6 +351,8 @@ export function screenSpaceRayTracing_Linear2D(
         linearDepthTex,
         normalTexture
       );
+      this.$l.iterationAttenuation = pb.smoothStep(this.maxIterations, 1, this.numIterations);
+      this.confidence = pb.mul(this.confidence, this.iterationAttenuation);
       this.$return(pb.vec4(this.hit2D, this.confidence));
     }
   );
@@ -577,11 +363,10 @@ export function screenSpaceRayTracing_Linear2D(
     projMatrix,
     invProjMatrix,
     0,
-    4,
+    stride,
     100,
     maxDistance,
     maxIterations,
-    binarySearchSteps,
     thickness,
     cameraNearFar,
     textureSize

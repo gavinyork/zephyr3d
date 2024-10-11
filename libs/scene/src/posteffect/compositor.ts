@@ -7,6 +7,7 @@ import type {
   GPUProgram,
   RenderStateSet,
   Texture2D,
+  TextureFormat,
   TextureSampler,
   VertexLayout
 } from '@zephyr3d/device';
@@ -132,11 +133,12 @@ export class Compositor {
     const w = depth ? depth.width : ctx.viewportWidth;
     const h = depth ? depth.height : ctx.viewportHeight;
     if (ctx.primaryCamera.sampleCount > 1 || ssr) {
+      const fmt2: TextureFormat = ssr ? (device.type === 'webgl' ? format : 'rgba8unorm') : format;
       msFramebuffer = device.pool.fetchTemporalFramebuffer(
         true,
         w,
         h,
-        ssr ? [format, 'rgba8unorm', 'rgba8unorm'] : format,
+        ssr ? [format, fmt2, fmt2] : format,
         depth,
         ssr,
         ctx.primaryCamera.sampleCount

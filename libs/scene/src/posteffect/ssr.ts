@@ -110,6 +110,7 @@ export class SSR extends AbstractPostEffect {
         )
       );
     } else {
+      bindGroup.setValue('ssrStride', ctx.camera.ssrStride);
       bindGroup.setValue(
         'targetSize',
         new Vector4(
@@ -170,6 +171,8 @@ export class SSR extends AbstractPostEffect {
         if (ctx.HiZTexture) {
           this.hizTex = pb.tex2D().uniform(0);
           this.depthMipLevels = pb.int().uniform(0);
+        } else {
+          this.ssrStride = pb.float().uniform(0);
         }
         this.srgbOut = pb.int().uniform(0);
         this.$outputs.outColor = pb.vec4();
@@ -236,7 +239,7 @@ export class SSR extends AbstractPostEffect {
                   this.ssrParams.x,
                   this.ssrParams.y,
                   this.thickness,
-                  this.ssrParams.w,
+                  this.ssrStride,
                   this.targetSize,
                   this.depthTex,
                   this.normalTex

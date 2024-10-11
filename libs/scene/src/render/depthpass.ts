@@ -12,15 +12,31 @@ import { ShaderHelper } from '../material/shader/helper';
  * @public
  */
 export class DepthPass extends RenderPass {
+  private _renderBackface: boolean;
+  private _encodeDepth: boolean;
   /**
    * Creates an instance of DepthRenderPass
    */
   constructor() {
     super(RENDER_PASS_TYPE_DEPTH);
+    this._renderBackface = false;
+    this._encodeDepth = false;
+  }
+  get renderBackface(): boolean {
+    return this._renderBackface;
+  }
+  set renderBackface(val: boolean) {
+    this._renderBackface = !!val;
+  }
+  get encodeDepth(): boolean {
+    return this._encodeDepth;
+  }
+  set encodeDepth(val: boolean) {
+    this._encodeDepth = !!val;
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return '';
+    return `${Number(this._renderBackface)}:${Number(this._encodeDepth)}`;
   }
   /** @internal */
   protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {

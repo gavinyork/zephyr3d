@@ -44,7 +44,6 @@ ssrApp.ready().then(async () => {
   camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
   camera.depthPrePass = true;
   camera.enablePicking = true;
-  camera.HiZ = true;
 
   ssrApp.inputManager.use(imGuiInjectEvent);
   ssrApp.inputManager.use(camera.handleEvent.bind(camera));

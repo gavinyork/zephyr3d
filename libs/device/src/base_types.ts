@@ -29,7 +29,14 @@ import type {
   VertexLayoutOptions,
   VertexSemantic
 } from './gpuobject';
-import type { RenderStateSet } from './render_states';
+import type {
+  BlendingState,
+  ColorState,
+  DepthState,
+  RasterizerState,
+  RenderStateSet,
+  StencilState
+} from './render_states';
 import type { Pool } from './pool';
 
 /**
@@ -2494,6 +2501,16 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number);
   /** Creates a render state set object */
   createRenderStateSet(): RenderStateSet;
+  /** Creates a blending state object */
+  createBlendingState(): BlendingState;
+  /** Creates a color state object */
+  createColorState(): ColorState;
+  /** Creates a rasterizer state object */
+  createRasterizerState(): RasterizerState;
+  /** Creates a depth state object */
+  createDepthState(): DepthState;
+  /** Creates a stencil state object */
+  createStencilState(): StencilState;
   /**
    * Creates a texture sampler object
    * @param options - The creation options

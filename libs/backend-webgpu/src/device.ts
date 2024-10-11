@@ -32,7 +32,12 @@ import type {
   DeviceBackend,
   DeviceViewport,
   BaseTexture,
-  RenderBundle
+  RenderBundle,
+  BlendingState,
+  ColorState,
+  RasterizerState,
+  DepthState,
+  StencilState
 } from '@zephyr3d/device';
 import { getTextureFormatBlockSize, DeviceResizeEvent, BaseDevice } from '@zephyr3d/device';
 import type { WebGPUTextureSampler } from './sampler_webgpu';
@@ -51,7 +56,14 @@ import {
 } from './capabilities_webgpu';
 import { WebGPUVertexLayout } from './vertexlayout_webgpu';
 import { PipelineCache } from './pipeline_cache';
-import { WebGPURenderStateSet } from './renderstates_webgpu';
+import {
+  WebGPUBlendingState,
+  WebGPUColorState,
+  WebGPUDepthState,
+  WebGPURasterizerState,
+  WebGPURenderStateSet,
+  WebGPUStencilState
+} from './renderstates_webgpu';
 import { WebGPUBuffer } from './buffer_webgpu';
 import { WebGPUFrameBuffer } from './framebuffer_webgpu';
 import { WebGPUIndexBuffer } from './indexbuffer_webgpu';
@@ -289,6 +301,21 @@ export class WebGPUDevice extends BaseDevice {
   }
   createRenderStateSet(): RenderStateSet {
     return new WebGPURenderStateSet(this);
+  }
+  createBlendingState(): BlendingState {
+    return new WebGPUBlendingState();
+  }
+  createColorState(): ColorState {
+    return new WebGPUColorState();
+  }
+  createRasterizerState(): RasterizerState {
+    return new WebGPURasterizerState();
+  }
+  createDepthState(): DepthState {
+    return new WebGPUDepthState();
+  }
+  createStencilState(): StencilState {
+    return new WebGPUStencilState();
   }
   createSampler(options: SamplerOptions): TextureSampler {
     return this.fetchSampler(options);

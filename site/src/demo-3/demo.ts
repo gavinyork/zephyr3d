@@ -188,8 +188,6 @@ export class Demo {
       if (Application.instance.device.type === 'webgl') {
         water.ssr = false;
         water.displace = 80;
-      } else {
-        this._camera.HiZ = true;
       }
       this._compositor.appendPostEffect(water);
       // loaded

@@ -2,7 +2,7 @@ import { LightPass } from './lightpass';
 import { ShadowMapPass } from './shadowmap_pass';
 import { DepthPass } from './depthpass';
 import { isPowerOf2, nextPowerOf2, Vector4 } from '@zephyr3d/base';
-import type { FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
+import type { ColorState, FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
 import { Application } from '../app';
 import { CopyBlitter } from '../blitter';
 import type { DrawContext } from './drawable';
@@ -33,6 +33,10 @@ export class SceneRenderer {
   private static _shadowMapPass = new ShadowMapPass();
   /** @internal */
   private static _objectColorPass = new ObjectColorPass();
+  /** @internal */
+  private static _frontDepthColorState: ColorState = null;
+  /** @internal */
+  private static _backDepthColorState: ColorState = null;
   /** @internal */
   private static _clusters: ClusteredLight[] = [];
   /** lighting render pass */
@@ -102,18 +106,39 @@ export class SceneRenderer {
   protected static _renderSceneDepth(
     ctx: DrawContext,
     renderQueue: RenderQueue,
-    depthFramebuffer: FrameBuffer
+    depthFramebuffer: FrameBuffer,
+    renderBackfaceDepth?: boolean
   ) {
     const device = ctx.device;
     device.pushDeviceStates();
     device.setFramebuffer(depthFramebuffer);
-    this._depthPass.clearColor = device.type === 'webgl' ? new Vector4(0, 0, 0, 1) : new Vector4(1, 1, 1, 1);
+    this._depthPass.encodeDepth = depthFramebuffer.getColorAttachments()[0].format === 'rgba8unorm';
+    this._depthPass.clearColor = this._depthPass.encodeDepth
+      ? new Vector4(0, 0, 0, 1)
+      : new Vector4(1, 1, 1, 1);
+    if (renderBackfaceDepth) {
+      if (!this._backDepthColorState) {
+        this._backDepthColorState = device.createColorState().setColorMask(false, true, false, false);
+      }
+      if (!this._frontDepthColorState) {
+        this._frontDepthColorState = device.createColorState().setColorMask(true, false, false, false);
+      }
+      ctx.forceColorState = this._backDepthColorState;
+      ctx.forceCullMode = 'front';
+      this._depthPass.render(ctx, null, renderQueue);
+      this._depthPass.clearColor = null;
+      ctx.forceColorState = this._frontDepthColorState;
+      ctx.forceCullMode = null;
+    }
     this._depthPass.render(ctx, null, renderQueue);
+    ctx.forceColorState = null;
     device.popDeviceStates();
   }
   /** @internal */
   protected static _renderScene(ctx: DrawContext): void {
     const device = ctx.device;
+    const SSR = ctx.primaryCamera.SSR;
+    const SSRCalcThickness = ctx.primaryCamera.ssrCalcThickness;
     const vp = ctx.camera.viewport;
     const scissor = ctx.camera.scissor;
     const finalFramebuffer = device.getFramebuffer();
@@ -159,15 +184,23 @@ export class SceneRenderer {
     this.renderShadowMaps(ctx, renderQueue.shadowedLights);
     const sampleCount = ctx.compositor ? 1 : ctx.primaryCamera.sampleCount;
     if (
+      SSR ||
       ctx.primaryCamera.depthPrePass ||
       oversizedViewport ||
       renderQueue.needSceneColor ||
       ctx.scene.env.needSceneDepthTexture() ||
       ctx.HiZ ||
       ctx.primaryCamera.oit ||
-      ctx.compositor?.requireLinearDepth(ctx)
+      ctx.compositor.requireLinearDepth(ctx)
     ) {
-      const format: TextureFormat = device.type === 'webgl' ? 'rgba8unorm' : 'r32f';
+      const format: TextureFormat =
+        device.type === 'webgl'
+          ? SSR && SSRCalcThickness
+            ? 'rgba16f'
+            : 'rgba8unorm'
+          : SSR && SSRCalcThickness
+          ? 'rg32f'
+          : 'r32f';
       if (!finalFramebuffer && !vp) {
         depthFramebuffer = device.pool.fetchTemporalFramebuffer(
           true,
@@ -197,7 +230,7 @@ export class SceneRenderer {
               ctx.HiZ
             );
       }
-      this._renderSceneDepth(ctx, renderQueue, depthFramebuffer);
+      this._renderSceneDepth(ctx, renderQueue, depthFramebuffer, SSR && SSRCalcThickness);
       ctx.linearDepthTexture = depthFramebuffer.getColorAttachments()[0] as Texture2D;
       ctx.depthTexture = depthFramebuffer.getDepthAttachment() as Texture2D;
       if (ctx.HiZ) {
@@ -261,7 +294,7 @@ export class SceneRenderer {
     this._scenePass.transmission = false; // transmission
     this._scenePass.clearDepth = ctx.depthTexture ? null : 1;
     this._scenePass.clearStencil = ctx.depthTexture ? null : 0;
-    if (ctx.camera.SSR && !renderQueue.needSceneColor) {
+    if (SSR && !renderQueue.needSceneColor) {
       ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
     }
     ctx.compositor?.begin(ctx);

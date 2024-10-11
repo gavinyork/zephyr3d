@@ -1,5 +1,12 @@
 import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
-import type { AbstractDevice, GPUDataBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
+import type {
+  AbstractDevice,
+  ColorState,
+  FaceMode,
+  GPUDataBuffer,
+  Texture2D,
+  TextureFormat
+} from '@zephyr3d/device';
 import type { XForm } from '../scene/xform';
 import type { Camera } from '../camera/camera';
 import type { FogType, RenderPass } from '.';
@@ -90,6 +97,10 @@ export interface DrawContext {
   clusteredLight?: ClusteredLight;
   /** Material varying flags */
   materialFlags: number;
+  /** Force cull mode */
+  forceCullMode?: FaceMode;
+  /** Force color mask state */
+  forceColorState?: ColorState;
 }
 
 /**

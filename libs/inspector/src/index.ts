@@ -358,12 +358,6 @@ export class Inspector {
       0,
       5
     );
-    ImGui.SliderInt(
-      'SSRBinarySearchSteps##water',
-      (val?: number) => (water.ssrBinarySearchSteps = val = val ?? water.ssrBinarySearchSteps),
-      0,
-      16
-    );
     ImGui.SliderFloat(
       'AntiReflectanceLeak##water',
       (val?: number) => (water.antiReflectanceLeak = val = val ?? water.antiReflectanceLeak),
@@ -840,6 +834,12 @@ export class Inspector {
           0,
           10
         );
+        ImGui.SliderInt(
+          'SSRStride',
+          (val?: number) => (camera.ssrStride = val = val ?? camera.ssrStride),
+          1,
+          16
+        );
         ImGui.SliderFloat(
           'SSRMaxDistance##Camera',
           (val?: number) => (camera.ssrMaxDistance = val = val ?? camera.ssrMaxDistance),
@@ -858,12 +858,14 @@ export class Inspector {
           0,
           5
         );
-        ImGui.SliderInt(
-          'SSRBinarySearchSteps##Camera',
-          (val?: number) => (camera.ssrBinarySearchSteps = val = val ?? camera.ssrBinarySearchSteps),
-          0,
-          32
-        );
+        ImGui.Checkbox('SSRCalcThickness##Camera', (val?: boolean) => {
+          if (val === undefined) {
+            val = camera.ssrCalcThickness;
+          } else {
+            camera.ssrCalcThickness = val;
+          }
+          return val;
+        });
       }
       ImGui.EndSection(1);
     }

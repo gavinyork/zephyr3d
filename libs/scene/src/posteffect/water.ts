@@ -141,12 +141,6 @@ export class PostWater extends AbstractPostEffect {
   set ssrThickness(val: number) {
     this._ssrParams.z = val;
   }
-  get ssrBinarySearchSteps() {
-    return this._ssrParams.w >> 0;
-  }
-  set ssrBinarySearchSteps(val: number) {
-    this._ssrParams.w = val >> 0;
-  }
   /** Refraction strength */
   get refractionStrength(): number {
     return this._refractionStrength;
@@ -509,7 +503,7 @@ export class PostWater extends AbstractPostEffect {
                         this.ssrParams.x,
                         this.ssrParams.y,
                         this.ssrParams.z,
-                        this.ssrParams.w,
+                        4,
                         this.targetSize,
                         this.depthTex
                       );

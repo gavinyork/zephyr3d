@@ -72,6 +72,10 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _ssrIntensity: number;
   /** @internal */
+  protected _ssrStride: number;
+  /** @internal */
+  protected _ssrCalcThickness: boolean;
+  /** @internal */
   protected _picking: boolean;
   /** @internal */
   protected _pickPosX: number;
@@ -110,8 +114,10 @@ export class Camera extends SceneNode {
     this._pickPosY = 0;
     this._HiZ = false;
     this._SSR = false;
-    this._ssrParams = new Vector4(32, 80, 0.5, 6);
+    this._ssrParams = new Vector4(32, 120, 0.5, 0);
     this._ssrIntensity = 1;
+    this._ssrStride = 2;
+    this._ssrCalcThickness = false;
     this._pickResult = null;
     this._commandBufferReuse = true;
   }
@@ -143,6 +149,12 @@ export class Camera extends SceneNode {
   set ssrIntensity(val: number) {
     this._ssrIntensity = val;
   }
+  get ssrStride(): number {
+    return this._ssrStride;
+  }
+  set ssrStride(val: number) {
+    this._ssrStride = val;
+  }
   get ssrMaxDistance(): number {
     return this._ssrParams.x;
   }
@@ -161,11 +173,11 @@ export class Camera extends SceneNode {
   set ssrThickness(val: number) {
     this._ssrParams.z = val;
   }
-  get ssrBinarySearchSteps() {
-    return this._ssrParams.w >> 0;
+  get ssrCalcThickness(): boolean {
+    return this._ssrCalcThickness;
   }
-  set ssrBinarySearchSteps(val: number) {
-    this._ssrParams.w = val >> 0;
+  set ssrCalcThickness(val: boolean) {
+    this._ssrCalcThickness = !!val;
   }
   get ssrParams(): Vector4 {
     return this._ssrParams;

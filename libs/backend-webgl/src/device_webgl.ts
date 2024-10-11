@@ -37,7 +37,12 @@ import type {
   DeviceBackend,
   DeviceEventMap,
   AbstractDevice,
-  RenderBundle
+  RenderBundle,
+  BlendingState,
+  ColorState,
+  RasterizerState,
+  DepthState,
+  StencilState
 } from '@zephyr3d/device';
 import {
   hasAlphaChannel,
@@ -68,7 +73,14 @@ import { WebGLVertexLayout } from './vertexlayout_webgl';
 import { WebGLGPUBuffer } from './buffer_webgl';
 import { WebGLIndexBuffer } from './indexbuffer_webgl';
 import { WebGLFrameBuffer } from './framebuffer_webgl';
-import { WebGLDepthState, WebGLRenderStateSet } from './renderstate_webgl';
+import {
+  WebGLBlendingState,
+  WebGLColorState,
+  WebGLDepthState,
+  WebGLRasterizerState,
+  WebGLRenderStateSet,
+  WebGLStencilState
+} from './renderstate_webgl';
 import { GPUTimer } from './gpu_timer';
 import { WebGLTextureCaps, WebGLFramebufferCaps, WebGLMiscCaps, WebGLShaderCaps } from './capabilities_webgl';
 import { WebGLBindGroup } from './bindgroup_webgl';
@@ -417,6 +429,21 @@ export class WebGLDevice extends BaseDevice {
   }
   createRenderStateSet(): RenderStateSet {
     return new WebGLRenderStateSet(this._context);
+  }
+  createBlendingState(): BlendingState {
+    return new WebGLBlendingState();
+  }
+  createColorState(): ColorState {
+    return new WebGLColorState();
+  }
+  createRasterizerState(): RasterizerState {
+    return new WebGLRasterizerState();
+  }
+  createDepthState(): DepthState {
+    return new WebGLDepthState();
+  }
+  createStencilState(): StencilState {
+    return new WebGLStencilState();
   }
   createSampler(options: SamplerOptions): TextureSampler {
     return this._samplerCache.fetchSampler(options) as TextureSampler;

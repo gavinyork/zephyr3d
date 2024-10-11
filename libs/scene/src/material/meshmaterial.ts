@@ -18,6 +18,7 @@ import {
   RENDER_PASS_TYPE_SHADOWMAP
 } from '../values';
 import { Material } from './material';
+import type { DepthPass } from '../render';
 import { type DrawContext, type ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA } from '../shaders';
 import { Application } from '../app';
@@ -345,12 +346,16 @@ export class MeshMaterial extends Material {
         stateSet.defaultDepthState();
       }
     }
-    if (this._cullMode !== 'back') {
-      stateSet.useRasterizerState().cullMode = this._cullMode;
+    if (ctx.forceCullMode || this._cullMode !== 'back') {
+      stateSet.useRasterizerState().cullMode = ctx.forceCullMode || this._cullMode;
     } else {
       stateSet.defaultRasterizerState();
     }
-    stateSet.defaultColorState();
+    if (ctx.forceColorState) {
+      stateSet.useColorState(ctx.forceColorState);
+    } else {
+      stateSet.defaultColorState();
+    }
     stateSet.defaultStencilState();
     if (ctx.oit) {
       ctx.oit.setRenderStates(stateSet);
@@ -586,9 +591,12 @@ export class MeshMaterial extends Material {
           });
         }
         ShaderHelper.discardIfClipped(this, this.worldPos);
+        const depthPass = that.drawContext.renderPass as DepthPass;
         this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
-        if (that.drawContext.device.type === 'webgl') {
+        if (depthPass.encodeDepth) {
           this.$outputs.zFragmentOutput = encodeNormalizedFloatToRGBA(this, this.depth);
+        } else if (depthPass.renderBackface) {
+          this.$outputs.zFragmentOutput = pb.vec4(0, this.depth, 0, 1);
         } else {
           this.$outputs.zFragmentOutput = pb.vec4(this.depth, 0, 0, 1);
         }
