@@ -116,6 +116,7 @@ export class SceneRenderer {
     this._depthPass.clearColor = this._depthPass.encodeDepth
       ? new Vector4(0, 0, 0, 1)
       : new Vector4(1, 1, 1, 1);
+    this._depthPass.clearDepth = 1;
     if (renderBackfaceDepth) {
       if (!this._backDepthColorState) {
         this._backDepthColorState = device.createColorState().setColorMask(false, true, false, false);
@@ -125,8 +126,10 @@ export class SceneRenderer {
       }
       ctx.forceColorState = this._backDepthColorState;
       ctx.forceCullMode = 'front';
+      this._depthPass.renderBackface = true;
       this._depthPass.render(ctx, null, renderQueue);
       this._depthPass.clearColor = null;
+      this._depthPass.renderBackface = false;
       ctx.forceColorState = this._frontDepthColorState;
       ctx.forceCullMode = null;
     }

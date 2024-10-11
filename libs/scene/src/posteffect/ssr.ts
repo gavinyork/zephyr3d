@@ -52,7 +52,8 @@ export class SSR extends AbstractPostEffect {
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const device = ctx.device;
-    const hash = `${ctx.env.light.envLight ? ctx.env.light.getHash() : ''}:${!!ctx.HiZTexture}`;
+    const hash = `${ctx.env.light.envLight ? ctx.env.light.getHash() : ''}:${!!ctx.HiZTexture}:${!!ctx
+      .primaryCamera.ssrCalcThickness}`;
     let program = SSR._programs[hash];
     if (program === undefined) {
       program = this._createProgram(ctx);
@@ -195,76 +196,78 @@ export class SSR extends AbstractPostEffect {
           this.$l.sceneColor = pb.textureSampleLevel(this.colorTex, this.screenUV, 0).rgb;
           this.$l.roughnessFactor = pb.textureSampleLevel(this.roughnessTex, this.screenUV, 0);
           this.$l.pos = this.getPosition(this.screenUV, this.invProjMatrix);
-          this.$l.viewPos = this.pos.xyz;
           this.$l.linearDepth = this.pos.w;
-          this.$l.worldNormal = pb.sub(
-            pb.mul(pb.textureSampleLevel(this.normalTex, this.screenUV, 0).rgb, 2),
-            pb.vec3(1)
-          );
-          this.$l.viewNormal = pb.mul(this.viewMatrix, pb.vec4(this.worldNormal, 0)).xyz;
-          //this.$l.viewNormal = pb.normalize(pb.cross(pb.dpdx(this.viewPos), pb.dpdy(this.viewPos)));
-          this.$l.incidentVec = pb.normalize(this.viewPos);
-          this.$l.reflectVec = pb.reflect(this.incidentVec, this.viewNormal);
-          this.$l.hitInfo = pb.vec4(0);
-          this.$l.thickness = this.ssrParams.z;
-          /*
-          this.$l.thicknessFactor = pb.sub(1, this.linearDepth);
-          this.$l.thickness = pb.mul(this.thicknessFactor, this.ssrParams.z);
-          */
-          this.viewPos = pb.add(this.viewPos, pb.mul(this.reflectVec, 0.1));
-          this.$if(pb.lessThan(this.roughnessFactor.a, 1), function () {
-            this.hitInfo = ctx.HiZTexture
-              ? screenSpaceRayTracing_HiZ(
-                  this,
-                  this.viewPos,
-                  this.reflectVec,
-                  this.viewMatrix,
-                  this.projMatrix,
-                  this.invProjMatrix,
-                  this.cameraNearFar,
-                  this.ssrParams.y,
-                  this.ssrParams.z,
-                  this.targetSize,
-                  this.hizTex,
-                  this.normalTex
-                )
-              : screenSpaceRayTracing_Linear2D(
-                  this,
-                  this.viewPos,
-                  this.reflectVec,
-                  this.viewMatrix,
-                  this.projMatrix,
-                  this.invProjMatrix,
-                  this.cameraNearFar,
-                  this.ssrParams.x,
-                  this.ssrParams.y,
-                  this.thickness,
-                  this.ssrStride,
-                  this.targetSize,
-                  this.depthTex,
-                  this.normalTex
-                );
+          this.$l.color = pb.vec3();
+          this.$if(
+            pb.and(pb.lessThan(this.linearDepth, 1), pb.lessThan(this.roughnessFactor.a, 1)),
+            function () {
+              this.$l.viewPos = this.pos.xyz;
+              this.$l.worldNormal = pb.sub(
+                pb.mul(pb.textureSampleLevel(this.normalTex, this.screenUV, 0).rgb, 2),
+                pb.vec3(1)
+              );
+              this.$l.viewNormal = pb.mul(this.viewMatrix, pb.vec4(this.worldNormal, 0)).xyz;
+              this.$l.incidentVec = pb.normalize(this.viewPos);
+              this.$l.reflectVec = pb.reflect(this.incidentVec, this.viewNormal);
+              this.$l.hitInfo = pb.vec4(0);
+              this.$l.thickness = this.ssrParams.z;
+              this.viewPos = pb.add(this.viewPos, pb.mul(this.reflectVec, 0.1));
+              this.hitInfo = ctx.HiZTexture
+                ? screenSpaceRayTracing_HiZ(
+                    this,
+                    this.viewPos,
+                    this.reflectVec,
+                    this.viewMatrix,
+                    this.projMatrix,
+                    this.invProjMatrix,
+                    this.cameraNearFar,
+                    this.ssrParams.y,
+                    this.ssrParams.z,
+                    this.targetSize,
+                    this.hizTex,
+                    this.normalTex
+                  )
+                : screenSpaceRayTracing_Linear2D(
+                    this,
+                    this.viewPos,
+                    this.reflectVec,
+                    this.viewMatrix,
+                    this.projMatrix,
+                    this.invProjMatrix,
+                    this.cameraNearFar,
+                    this.ssrParams.x,
+                    this.ssrParams.y,
+                    this.thickness,
+                    this.ssrStride,
+                    this.targetSize,
+                    this.depthTex,
+                    this.normalTex,
+                    !!ctx.primaryCamera.ssrCalcThickness
+                  );
+              this.$l.refl = pb.mul(this.invViewMatrix, pb.vec4(this.reflectVec, 0)).xyz;
+              this.$l.env = ctx.env.light.envLight
+                ? pb.mul(
+                    ctx.env.light.envLight.getRadiance(this, this.refl, this.roughnessFactor.a),
+                    this.envLightStrength
+                  )
+                : pb.vec3(0);
+              this.reflectance = pb.mix(
+                this.env,
+                pb.textureSampleLevel(
+                  this.colorTex,
+                  this.hitInfo.xy,
+                  pb.min(4, pb.mul(this.colorTexMiplevels, this.roughnessFactor.a))
+                ).rgb,
+                this.hitInfo.w
+              );
+              this.color = pb.add(
+                pb.mul(this.roughnessFactor.xyz, pb.mul(this.reflectance, this.ssrIntensity)),
+                this.sceneColor
+              );
+            }
+          ).$else(function () {
+            this.color = this.sceneColor;
           });
-          this.$l.refl = pb.mul(this.invViewMatrix, pb.vec4(this.reflectVec, 0)).xyz;
-          this.$l.env = ctx.env.light.envLight
-            ? pb.mul(
-                ctx.env.light.envLight.getRadiance(this, this.refl, this.roughnessFactor.a),
-                this.envLightStrength
-              )
-            : pb.vec3(0);
-          this.reflectance = pb.mix(
-            this.env,
-            pb.textureSampleLevel(
-              this.colorTex,
-              this.hitInfo.xy,
-              pb.min(4, pb.mul(this.colorTexMiplevels, this.roughnessFactor.a))
-            ).rgb,
-            this.hitInfo.w
-          );
-          this.$l.color = pb.add(
-            pb.mul(this.roughnessFactor.xyz, pb.mul(this.reflectance, this.ssrIntensity)),
-            this.sceneColor
-          );
           /*
           this.$l.color = this.hitInfo.xyz; // pb.add(pb.mul(this.roughnessFactor.xyz, this.reflectance), this.sceneColor);
           this.$l.color = pb.add(

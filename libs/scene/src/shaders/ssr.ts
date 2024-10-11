@@ -25,7 +25,6 @@ function validateHit(
   viewMatrix: PBShaderExp,
   invProjMatrix: PBShaderExp,
   cameraNearFar: PBShaderExp,
-  thickness: PBShaderExp,
   textureSize: PBShaderExp,
   depthTexture: PBShaderExp,
   normalTexture?: PBShaderExp
@@ -40,7 +39,6 @@ function validateHit(
       pb.mat4('viewMatrix'),
       pb.mat4('invProjMatrix'),
       pb.vec2('cameraNearFar'),
-      pb.float('thickness'),
       pb.vec4('textureSize')
     ],
     function () {
@@ -90,16 +88,7 @@ function validateHit(
       this.$return(pb.mul(this.border.x, this.border.y));
     }
   );
-  return scope.SSR_validateHit(
-    hit2D,
-    uv,
-    traceRay,
-    viewMatrix,
-    invProjMatrix,
-    cameraNearFar,
-    thickness,
-    textureSize
-  );
+  return scope.SSR_validateHit(hit2D, uv, traceRay, viewMatrix, invProjMatrix, cameraNearFar, textureSize);
 }
 
 export function sampleLinearDepth(
@@ -111,6 +100,16 @@ export function sampleLinearDepth(
   const pb = scope.$builder;
   const depth = pb.textureSampleLevel(tex, uv, level);
   return pb.getDevice().type === 'webgl' ? decodeNormalizedFloatFromRGBA(scope, depth) : depth.r;
+}
+
+export function sampleLinearDepthWithBackface(
+  scope: PBInsideFunctionScope,
+  tex: PBShaderExp,
+  uv: PBShaderExp,
+  level: PBShaderExp | number
+): PBShaderExp {
+  const pb = scope.$builder;
+  return pb.textureSampleLevel(tex, uv, level).rg;
 }
 
 export function screenSpaceRayTracing_Linear2D(
@@ -127,7 +126,8 @@ export function screenSpaceRayTracing_Linear2D(
   stride: PBShaderExp | number,
   textureSize: PBShaderExp,
   linearDepthTex: PBShaderExp,
-  normalTexture?: PBShaderExp
+  normalTexture?: PBShaderExp,
+  useBackfaceDepth?: boolean
 ) {
   const pb = scope.$builder;
   pb.func('distanceSquared', [pb.vec2('a'), pb.vec2('b')], function () {
@@ -138,12 +138,19 @@ export function screenSpaceRayTracing_Linear2D(
     'rayIntersectDepth',
     [pb.float('zA'), pb.float('zB'), pb.float('thickness'), pb.vec2('uv'), pb.float('cameraFar')],
     function () {
-      this.$l.sceneZMax01 = sampleLinearDepth(this, linearDepthTex, this.uv, 0);
+      let thickness = this.thickness;
+      if (useBackfaceDepth) {
+        this.$l.sceneZ = sampleLinearDepthWithBackface(this, linearDepthTex, this.uv, 0);
+        this.$l.sceneZMax01 = this.sceneZ.x;
+        thickness = pb.max(this.thickness, pb.mul(pb.sub(this.sceneZ.y, this.sceneZ.x), this.cameraFar));
+      } else {
+        this.$l.sceneZMax01 = sampleLinearDepth(this, linearDepthTex, this.uv, 0);
+      }
       this.sceneZMax = pb.neg(pb.mul(this.sceneZMax01, this.cameraFar));
       this.$return(
         pb.and(
           pb.lessThan(this.sceneZMax01, 1),
-          pb.greaterThanEqual(this.zA, pb.sub(this.sceneZMax, this.thickness)),
+          pb.greaterThanEqual(this.zA, pb.sub(this.sceneZMax, thickness)),
           pb.lessThanEqual(this.zB, this.sceneZMax)
         )
       );
@@ -346,7 +353,6 @@ export function screenSpaceRayTracing_Linear2D(
         this.viewMatrix,
         this.invProjMatrix,
         this.cameraNearFar,
-        this.thickness,
         this.textureSize,
         linearDepthTex,
         normalTexture
@@ -581,7 +587,6 @@ export function screenSpaceRayTracing_HiZ(
           this.viewMatrix,
           this.invProjMatrix,
           this.cameraNearFar,
-          this.thickness,
           this.textureSize,
           HiZTexture,
           normalTexture
