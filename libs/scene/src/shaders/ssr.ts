@@ -256,13 +256,14 @@ export function screenSpaceRayTracing_Linear2D(
       this.$l.hitUV = pb.vec2();
       this.$l.hitZ = pb.float();
       this.numIterations = 0;
+      this.skippedIterations = pb.min(this.maxIterations, 2);
       this.$for(pb.float('i'), 0, pb.getDevice().type === 'webgl' ? 1000 : this.maxIterations, function () {
         if (pb.getDevice().type === 'webgl') {
           this.$if(pb.greaterThanEqual(this.i, this.maxIterations), function () {
             this.$break();
           });
         }
-        this.$if(this.intersected, function () {
+        this.$if(pb.and(this.intersected, pb.greaterThanEqual(this.i, this.skippedIterations)), function () {
           this.$break();
         });
         this.numIterations = pb.add(this.numIterations, 1);

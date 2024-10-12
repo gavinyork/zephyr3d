@@ -11,7 +11,8 @@ import {
   FPSCameraController,
   Tonemap,
   PBRMetallicRoughnessMaterial,
-  BoxShape
+  BoxShape,
+  SphereShape
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { Inspector } from '@zephyr3d/inspector';
@@ -70,6 +71,16 @@ ssrApp.ready().then(async () => {
   const wall = new Mesh(scene, boxShape2, mat2);
   wall.position.setXYZ(0, 0, -150);
   wall.parent = batchGroup;
+
+  const mat3 = new PBRMetallicRoughnessMaterial();
+  mat3.albedoColor = new Vector4(1, 1, 0, 1);
+  mat3.metallic = 0.1;
+  mat3.roughness = 0.8;
+
+  const sphereShape = new SphereShape({ radius: 10 });
+  const sphere = new Mesh(scene, sphereShape, mat3);
+  sphere.position.setXYZ(-30, 20, -150);
+  sphere.parent = batchGroup;
 
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());

@@ -206,13 +206,11 @@ export class SSR extends AbstractPostEffect {
                 pb.mul(pb.textureSampleLevel(this.normalTex, this.screenUV, 0).rgb, 2),
                 pb.vec3(1)
               );
-              this.$l.viewNormal = pb.mul(this.viewMatrix, pb.vec4(this.worldNormal, 0)).xyz;
-              this.$l.incidentVec = pb.normalize(this.viewPos);
-              this.$l.reflectVec = pb.reflect(this.incidentVec, this.viewNormal);
-              this.$l.hitInfo = pb.vec4(0);
-              this.$l.thickness = this.ssrParams.z;
-              this.viewPos = pb.add(this.viewPos, pb.mul(this.reflectVec, 0.1));
-              this.hitInfo = ctx.HiZTexture
+              this.$l.reflectVec = pb.reflect(
+                pb.normalize(this.viewPos),
+                pb.mul(this.viewMatrix, pb.vec4(this.worldNormal, 0)).xyz
+              );
+              this.$l.hitInfo = ctx.HiZTexture
                 ? screenSpaceRayTracing_HiZ(
                     this,
                     this.viewPos,
@@ -237,7 +235,7 @@ export class SSR extends AbstractPostEffect {
                     this.cameraNearFar,
                     this.ssrParams.x,
                     this.ssrParams.y,
-                    this.thickness,
+                    this.ssrParams.z,
                     this.ssrStride,
                     this.targetSize,
                     this.depthTex,
@@ -260,22 +258,22 @@ export class SSR extends AbstractPostEffect {
                 ).rgb,
                 this.hitInfo.w
               );
+              this.$l.t = pb.sub(1, pb.div(1, pb.add(this.ssrIntensity, 1)));
+              this.color = pb.mix(
+                this.sceneColor,
+                pb.mul(this.roughnessFactor.xyz, this.reflectance),
+                this.t
+              );
+              /*
               this.color = pb.add(
                 pb.mul(this.roughnessFactor.xyz, pb.mul(this.reflectance, this.ssrIntensity)),
                 this.sceneColor
               );
+              */
             }
           ).$else(function () {
             this.color = this.sceneColor;
           });
-          /*
-          this.$l.color = this.hitInfo.xyz; // pb.add(pb.mul(this.roughnessFactor.xyz, this.reflectance), this.sceneColor);
-          this.$l.color = pb.add(
-            pb.mul(pb.mul(this.invViewMatrix, pb.vec4(this.viewNormal, 0)).xyz, 0.5),
-            pb.vec3(0.5)
-          );
-          */
-
           this.$if(pb.equal(this.srgbOut, 0), function () {
             this.$outputs.outColor = pb.vec4(this.color, 1);
           }).$else(function () {

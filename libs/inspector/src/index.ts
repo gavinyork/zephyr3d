@@ -750,6 +750,8 @@ export class Inspector {
   }
   private renderPerspectiveCamera(camera: PerspectiveCamera) {
     if (ImGui.Begin('Camera')) {
+      const pos = camera.getWorldPosition();
+      ImGui.Text(`${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}`);
       ImGui.Checkbox('Generate HiZ', (val?: boolean) => {
         if (val === undefined) {
           val = camera.HiZ;

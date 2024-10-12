@@ -49,7 +49,7 @@ instancingApp.ready().then(async () => {
   camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
   camera.depthPrePass = true;
   camera.enablePicking = true;
-  
+
   instancingApp.inputManager.use(imGuiInjectEvent);
   instancingApp.inputManager.use(camera.handleEvent.bind(camera));
 

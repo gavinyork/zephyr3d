@@ -11,7 +11,7 @@ import { Vector3 } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../../render';
-import { getGGXLUT } from '../ggxlut';
+import { getGGXLUT } from '../../../utility/textures/ggxlut';
 import type { TextureMixinInstanceTypes } from '../texture';
 import { mixinTextureProps } from '../texture';
 import { ShaderHelper } from '../../shader/helper';
