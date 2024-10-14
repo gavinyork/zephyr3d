@@ -2,12 +2,7 @@ import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import type { BindGroup, GPUProgram, Texture2D, TextureSampler } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import {
-  sampleLinearDepth,
-  screenSpaceRayTracing_HiZ,
-  screenSpaceRayTracing_HiZ_old,
-  screenSpaceRayTracing_Linear2D
-} from '../shaders/ssr';
+import { sampleLinearDepth, screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 
 /**
@@ -230,25 +225,7 @@ export class SSR extends AbstractPostEffect {
                     this.hizTex,
                     this.normalTex
                   )
-                : /*
-                  screenSpaceRayTracing_HiZ_old(
-                    this,
-                    this.viewPos,
-                    this.reflectVec,
-                    this.viewMatrix,
-                    this.projMatrix,
-                    this.invProjMatrix,
-                    this.cameraNearFar,
-                    this.ssrParams.x,
-                    this.ssrParams.y,
-                    this.ssrParams.z,
-                    this.targetSize,
-                    this.depthMipLevels,
-                    this.hizTex,
-                    this.normalTex
-                  )
-                    */
-                  screenSpaceRayTracing_Linear2D(
+                : screenSpaceRayTracing_Linear2D(
                     this,
                     this.viewPos,
                     this.reflectVec,

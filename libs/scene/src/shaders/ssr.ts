@@ -478,6 +478,7 @@ export function screenSpaceRayTracing_HiZ(
     [
       pb.vec3('screenSpacePos'),
       pb.vec3('screenSpaceDirection'),
+      pb.vec2('cameraNearFar'),
       pb.int('mostDetailMip'),
       pb.float('maxIterations')
     ],
@@ -579,6 +580,7 @@ export function screenSpaceRayTracing_HiZ(
       this.$l.hit = this.SSR_RaymarchHiZ(
         this.originTS,
         this.directionTS,
+        this.cameraNearFar,
         this.mostDetailMip,
         this.maxIterations
       );
@@ -634,7 +636,7 @@ export function screenSpaceRayTracing_HiZ_old(
     this.$return(pb.add(this.o, pb.mul(this.d, this.z)));
   });
   pb.func('SSR_HiZ_getCell', [pb.vec2('pos'), pb.vec2('cell_count')], function () {
-    this.$return(pb.mul(this.pos, this.cell_count));
+    this.$return(pb.floor(pb.mul(this.pos, this.cell_count)));
   });
   pb.func(
     'SSR_HiZ_intersectCellBoundary',
@@ -647,21 +649,28 @@ export function screenSpaceRayTracing_HiZ_old(
       pb.vec2('crossOffset')
     ],
     function () {
-      this.$l.index = pb.add(this.cell, this.crossStep);
-      this.$l.boundary = pb.add(pb.div(this.index, this.cell_count), this.crossOffset);
-      this.$l.delta = pb.div(pb.sub(this.boundary, this.o.xy), this.d.xy);
-      this.$l.t = pb.min(this.delta.x, this.delta.y);
-      this.$return(this.SSR_HiZ_intersectDepthPlane(this.o, this.d, this.t));
+      this.$l.cell_size = pb.div(pb.vec2(1), this.cell_count);
+      this.$l.planes = pb.add(pb.div(this.cell, this.cell_count), pb.mul(this.cell_size, this.crossStep));
+      this.$l.solutions = pb.div(pb.sub(this.planes, this.o.xy), this.d.xy);
+      this.$l.intersection_pos = pb.add(this.o, pb.mul(this.d, pb.min(this.solutions.x, this.solutions.y)));
+      this.$l.p = this.$choice(
+        pb.lessThan(this.solutions.x, this.solutions.y),
+        pb.vec2(this.crossOffset.x, 0),
+        pb.vec2(0, this.crossOffset.y)
+      );
+      this.$return(pb.vec3(pb.add(this.intersection_pos.xy, this.p), this.intersection_pos.z));
     }
   );
-  pb.func('SSR_HiZ_getCellCount', [pb.int('level')], function () {
-    this.$return(pb.vec2(pb.textureDimensions(HiZTexture, this.level)));
+  pb.func('SSR_HiZ_getCellCount', [pb.vec2('fullSize'), pb.int('level')], function () {
+    this.$return(
+      pb.div(this.fullSize, this.$choice(pb.equal(this.level, 0), pb.float(1), pb.exp2(pb.float(this.level))))
+    );
   });
   pb.func('SSR_HiZ_crossedCellBoundary', [pb.vec2('oldCellIndex'), pb.vec2('newCellIndex')], function () {
     this.$return(
       pb.or(
-        pb.notEqual(this.oldCellIndex.x, this.newCellIndex.x),
-        pb.notEqual(this.oldCellIndex.y, this.newCellIndex.y)
+        pb.notEqual(pb.int(this.oldCellIndex.x), pb.int(this.newCellIndex.x)),
+        pb.notEqual(pb.int(this.oldCellIndex.y), pb.int(this.newCellIndex.y))
       )
     );
   });
@@ -676,15 +685,112 @@ export function screenSpaceRayTracing_HiZ_old(
       pb.float('maxDistance'),
       pb.float('thickness'),
       pb.int('maxIteration'),
-      pb.int('depthMipLevels')
+      pb.int('depthMipLevels'),
+      pb.vec2('depthFullSize')
     ],
     function () {
+      this.$l.HIZ_START_LEVEL = pb.float(0);
+      this.$l.HIZ_STOP_LEVEL = pb.float(0);
+      this.$l.HIZ_MAX_LEVEL = pb.float(pb.sub(this.depthMipLevels, 1));
+
+      this.$l.level = this.HIZ_START_LEVEL;
+      this.$l.d = pb.mul(this.reflectVecInTS, this.maxDistance);
+      this.$l.v_z = pb.div(this.d, this.d.z);
+      this.$l.hi_z_size = this.SSR_HiZ_getCellCount(this.depthFullSize, this.level);
+      this.$l.ray = this.samplePosInTS;
+      this.$l.cross_step = pb.vec2(
+        this.$choice(pb.greaterThanEqual(this.reflectVecInTS.x, 0), pb.float(1), pb.float(-1)),
+        this.$choice(pb.greaterThanEqual(this.reflectVecInTS.y, 0), pb.float(1), pb.float(-1))
+      );
+      this.$l.cross_offset = pb.mul(this.cross_step, pb.div(pb.vec2(0.5), this.depthFullSize));
+      this.cross_step = pb.clamp(this.cross_step, pb.vec2(0), pb.vec2(1));
+      this.$l.ray_cell = this.SSR_HiZ_getCell(this.ray.xy, this.hi_z_size.xy);
+      this.ray = this.SSR_HiZ_intersectCellBoundary(
+        this.ray,
+        this.d,
+        this.ray_cell,
+        this.hi_z_size,
+        this.cross_step,
+        this.cross_offset
+      );
+      this.$l.iterations = pb.int(0);
+      this.min_z = pb.float(0);
+      this.$while(
+        pb.and(
+          pb.greaterThanEqual(this.level, this.HIZ_STOP_LEVEL),
+          pb.lessThan(this.iterations, this.maxIteration)
+        ),
+        function () {
+          this.$l.current_cell_count = this.SSR_HiZ_getCellCount(this.depthFullSize, this.level);
+          this.$l.old_cell_id = this.SSR_HiZ_getCell(this.ray.xy, this.current_cell_count);
+          this.min_z = this.SSR_HiZ_getMinimumDepth(this.ray.xy, this.level);
+          this.$l.tmp_ray = this.ray;
+          this.$if(pb.greaterThan(this.reflectVecInTS.z, 0), function () {
+            this.$l.min_minus_ray = pb.sub(this.min_z, this.ray.z);
+            this.tmp_ray = this.$choice(
+              pb.greaterThan(this.min_minus_ray, 0),
+              pb.add(this.ray, pb.mul(this.v_z, this.min_minus_ray)),
+              this.tmp_ray
+            );
+            this.$l.new_cell_id = this.SSR_HiZ_getCell(this.tmp_ray.xy, this.current_cell_count);
+            this.$if(this.SSR_HiZ_crossedCellBoundary(this.old_cell_id, this.new_cell_id), function () {
+              this.tmp_ray = this.SSR_HiZ_intersectCellBoundary(
+                this.ray,
+                this.d,
+                this.old_cell_id,
+                this.current_cell_count,
+                this.cross_step,
+                this.cross_offset
+              );
+              this.level = pb.min(this.HIZ_MAX_LEVEL, pb.add(this.level, 2));
+            }).$else(function () {
+              this.$if(
+                pb.and(pb.equal(this.level, 1), pb.greaterThan(pb.abs(this.min_minus_ray), this.thickness)),
+                function () {
+                  this.tmp_ray = this.SSR_HiZ_intersectCellBoundary(
+                    this.ray,
+                    this.d,
+                    this.old_cell_id,
+                    this.current_cell_count,
+                    this.cross_step,
+                    this.cross_offset
+                  );
+                  this.level = 2;
+                }
+              );
+            });
+          }).$elseif(pb.lessThan(this.ray.z, this.min_z), function () {
+            this.tmp_ray = this.SSR_HiZ_intersectCellBoundary(
+              this.ray,
+              this.d,
+              this.old_cell_id,
+              this.current_cell_count,
+              this.cross_step,
+              this.cross_offset
+            );
+            this.level = pb.min(this.HIZ_MAX_LEVEL, pb.add(this.level, 2));
+          });
+          this.ray = this.tmp_ray;
+          this.level = pb.sub(this.level, 1);
+          this.iterations = pb.add(this.iterations);
+        }
+      );
+      this.$l.vis = this.$choice(
+        pb.and(
+          pb.greaterThanEqual(this.level, this.HIZ_STOP_LEVEL),
+          pb.lessThan(this.iterations, this.maxIteration)
+        ),
+        pb.float(1),
+        pb.float(0)
+      );
+      this.$return(pb.vec4(this.ray.xy, this.min_z, this.vis));
+      /*
       this.$l.maxLevel = pb.sub(this.depthMipLevels, 1);
       this.$l.crossStep = pb.vec2(
         this.$choice(pb.greaterThanEqual(this.reflectVecInTS.x, 0), pb.float(1), pb.float(-1)),
         this.$choice(pb.greaterThanEqual(this.reflectVecInTS.y, 0), pb.float(1), pb.float(-1))
       );
-      this.$l.crossOffset = pb.mul(this.crossStep, 0.00001);
+      this.$l.crossOffset = pb.mul(this.crossStep, 0.0001);
       this.crossStep = pb.clamp(this.crossStep, pb.vec2(0), pb.vec2(1));
       this.$l.ray = this.samplePosInTS;
       this.$l.minZ = this.ray.z;
@@ -764,6 +870,7 @@ export function screenSpaceRayTracing_HiZ_old(
         pb.float(0)
       );
       this.$return(pb.vec4(this.ray.xy, this.cell_minZ, this.vis));
+      */
     }
   );
   pb.func(
@@ -824,7 +931,8 @@ export function screenSpaceRayTracing_HiZ_old(
         this.maxDist,
         this.thickness,
         pb.int(this.iteration),
-        this.depthMipLevels
+        this.depthMipLevels,
+        this.textureSize.zw
       );
       this.$l.confidence = pb.float(0);
       this.$if(pb.notEqual(this.hit.w, 0), function () {
@@ -840,7 +948,7 @@ export function screenSpaceRayTracing_HiZ_old(
           HiZTexture,
           normalTexture
         );
-        this.confidence = 1;
+        //this.confidence = 1;
       });
       this.$return(pb.vec4(this.hit.xyz, this.confidence));
     }
