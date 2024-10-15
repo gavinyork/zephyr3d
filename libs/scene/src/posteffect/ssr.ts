@@ -219,6 +219,7 @@ export class SSR extends AbstractPostEffect {
                     this.projMatrix,
                     this.invProjMatrix,
                     this.cameraNearFar,
+                    this.depthMipLevels,
                     this.ssrParams.y,
                     this.ssrParams.z,
                     this.targetSize,

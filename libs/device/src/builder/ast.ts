@@ -1488,6 +1488,15 @@ export class ASTSelect extends ASTExpression {
     second: ASTExpression | number | boolean
   ) {
     super();
+    if (condition instanceof ASTCallFunction) {
+      condition.isStatement = false;
+    }
+    if (first instanceof ASTCallFunction) {
+      first.isStatement = false;
+    }
+    if (second instanceof ASTCallFunction) {
+      second.isStatement = false;
+    }
     this.condition = condition instanceof ASTExpression ? condition : new ASTScalar(condition, typeBool);
     let firstType: PBTypeInfo = null;
     let secondType: PBTypeInfo = null;

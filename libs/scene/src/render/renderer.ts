@@ -245,6 +245,8 @@ export class SceneRenderer {
           : nextPowerOf2(ctx.linearDepthTexture.height);
         w = Math.max(1, w >> 1);
         h = Math.max(1, h >> 1);
+        w = ctx.linearDepthTexture.width;
+        h = ctx.linearDepthTexture.height;
         HiZFrameBuffer = device.pool.fetchTemporalFramebuffer(
           true,
           w,
