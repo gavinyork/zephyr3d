@@ -20,25 +20,29 @@ function invProjectPosition(scope: PBInsideFunctionScope, pos: PBShaderExp, mat:
 function validateHit(
   scope: PBInsideFunctionScope,
   hit2D: PBShaderExp,
+  hit3D: PBShaderExp,
+  surfaceZ: PBShaderExp,
+  thickness: PBShaderExp,
   uv: PBShaderExp,
   traceRay: PBShaderExp,
   viewMatrix: PBShaderExp,
   invProjMatrix: PBShaderExp,
-  cameraNearFar: PBShaderExp,
   textureSize: PBShaderExp,
-  depthTexture: PBShaderExp,
   normalTexture?: PBShaderExp
 ) {
   const pb = scope.$builder;
+  const funcName = hit3D ? 'SSR_validateHit_HiZ' : 'SSR_validateHit';
   pb.func(
-    'SSR_validateHit',
+    funcName,
     [
       pb.vec2('hit2d'),
+      ...(hit3D ? [pb.vec3('hit3d')] : []),
+      ...(hit3D ? [pb.float('thickness')] : []),
+      pb.float('surfaceZ'),
       pb.vec2('uv'),
       pb.vec3('viewSpaceRayDirection'),
       pb.mat4('viewMatrix'),
       pb.mat4('invProjMatrix'),
-      pb.vec2('cameraNearFar'),
       pb.vec4('textureSize')
     ],
     function () {
@@ -50,20 +54,10 @@ function validateHit(
       );
       this.$l.manhattanDist = pb.abs(pb.sub(this.hit2d, this.uv));
       this.$if(
-        pb.all(pb.lessThan(this.manhattanDist, pb.vec2(pb.div(pb.vec2(4), this.textureSize.xy)))),
+        pb.all(pb.lessThan(this.manhattanDist, pb.vec2(pb.div(pb.vec2(2), this.textureSize.xy)))),
         function () {
           this.$return(pb.float(0));
         }
-      );
-      //this.$l.texCoord = pb.mul(this.textureSize.zw, this.hit.xy);
-      this.$l.surfaceZ01 = sampleLinearDepth(this, depthTexture, this.hit2d, 0);
-      this.$if(pb.equal(this.surfaceZ01, 1), function () {
-        this.$return(pb.float(0));
-      });
-      this.$l.surfaceZ = ShaderHelper.linearDepthToNonLinear(
-        this,
-        pb.mul(this.surfaceZ01, this.cameraNearFar.y),
-        this.cameraNearFar
       );
       if (normalTexture) {
         this.$l.hitNormalWS = pb.sub(
@@ -85,10 +79,19 @@ function validateHit(
         pb.smoothStep(pb.vec2(0), this.fov, this.hit2d),
         pb.sub(pb.vec2(1), pb.smoothStep(pb.sub(pb.vec2(1), this.fov), pb.vec2(1), this.hit2d))
       );
-      this.$return(pb.mul(this.border.x, this.border.y));
+      this.$l.vignette = pb.mul(this.border.x, this.border.y);
+      if (this.hit3d) {
+        this.$l.distance = pb.distance(this.viewSpaceSurface, this.hit3d);
+        this.$l.confidence = pb.sub(1, pb.smoothStep(0, this.thickness, this.distance));
+        this.$return(pb.mul(this.vignette, this.confidence, this.confidence));
+      } else {
+        this.$return(this.vignette);
+      }
     }
   );
-  return scope.SSR_validateHit(hit2D, uv, traceRay, viewMatrix, invProjMatrix, cameraNearFar, textureSize);
+  return hit3D
+    ? scope[funcName](hit2D, hit3D, thickness, surfaceZ, uv, traceRay, viewMatrix, invProjMatrix, textureSize)
+    : scope[funcName](hit2D, surfaceZ, uv, traceRay, viewMatrix, invProjMatrix, textureSize);
 }
 
 export function sampleLinearDepth(
@@ -336,29 +339,33 @@ export function screenSpaceRayTracing_Linear2D(
         this.origin,
         this.numIterations
       );
-      this.$if(
-        pb.or(
-          pb.not(this.intersected),
-          pb.any(pb.lessThan(this.hit2D.xy, pb.vec2(0))),
-          pb.any(pb.greaterThan(this.hit2D.xy, pb.vec2(1)))
-        ),
-        function () {
-          this.$return(pb.vec4(0));
-        }
+      this.$if(pb.not(this.intersected), function () {
+        this.$return(pb.vec4(0));
+      });
+      this.$l.surfaceZ01 = sampleLinearDepth(this, linearDepthTex, this.hit2D.xy, 0);
+      this.$if(pb.equal(this.surfaceZ01, 1), function () {
+        this.$return(pb.vec4(0));
+      });
+      this.$l.surfaceZ = ShaderHelper.linearDepthToNonLinear(
+        this,
+        pb.mul(this.surfaceZ01, this.cameraNearFar.y),
+        this.cameraNearFar
       );
       this.$l.confidence = validateHit(
         this,
         this.hit2D.xy,
+        null,
+        this.surfaceZ,
+        null,
         this.origin,
         this.rayDirection,
         this.viewMatrix,
         this.invProjMatrix,
-        this.cameraNearFar,
         this.textureSize,
-        linearDepthTex,
         normalTexture
       );
-      this.$l.iterationAttenuation = pb.smoothStep(this.maxIterations, 1, this.numIterations);
+      this.$l.iterationAttenuation = pb.sub(1, pb.smoothStep(0, this.maxIterations, this.numIterations));
+      //this.$l.iterationAttenuation = pb.smoothStep(this.maxIterations, 1, this.numIterations);
       this.confidence = pb.mul(this.confidence, this.iterationAttenuation);
       this.$return(pb.vec4(this.hit2D, this.confidence));
     }
@@ -612,20 +619,27 @@ export function screenSpaceRayTracing_HiZ(
       );
       this.$l.confidence = pb.float(0);
       this.$if(pb.notEqual(this.hit.w, 0), function () {
+        this.$l.surfaceZ = pb.textureSampleLevel(HiZTexture, this.hit.xy, 0).r;
+        this.$if(pb.equal(this.surfaceZ, 1), function () {
+          this.$return(pb.vec4(0));
+        });
+        this.$l.hit3D = invProjectPosition(this, this.hit.xyz, this.invProjMatrix);
         this.confidence = validateHit(
           this,
           this.hit.xy,
+          this.hit3D,
+          this.surfaceZ,
+          this.thickness,
           this.originTS.xy,
           this.traceRay,
           this.viewMatrix,
           this.invProjMatrix,
-          this.cameraNearFar,
           this.textureSize,
-          HiZTexture,
           normalTexture
         );
       });
-      this.$l.iterationAttenuation = pb.smoothStep(this.maxIterations, 1, this.numIterations);
+      this.$l.iterationAttenuation = pb.sub(1, pb.smoothStep(0, this.maxIterations, this.numIterations));
+      //this.$l.iterationAttenuation = pb.smoothStep(this.maxIterations, 1, this.numIterations);
       this.confidence = pb.mul(this.confidence, this.iterationAttenuation);
       this.$return(pb.vec4(this.hit.xyz, this.confidence));
     }
@@ -641,358 +655,5 @@ export function screenSpaceRayTracing_HiZ(
     textureSize,
     pb.sub(maxMipLevel, 1),
     maxIterations
-  );
-}
-
-export function screenSpaceRayTracing_HiZ_old(
-  scope: PBInsideFunctionScope,
-  viewPos: PBShaderExp,
-  traceRay: PBShaderExp,
-  viewMatrix: PBShaderExp,
-  projMatrix: PBShaderExp,
-  invProjMatrix: PBShaderExp,
-  cameraNearFar: PBShaderExp,
-  maxDistance: PBShaderExp | number,
-  maxIteraions: PBShaderExp | number,
-  thickness: PBShaderExp | number,
-  textureSize: PBShaderExp,
-  HiZTextureMipLevels: PBShaderExp | number,
-  HiZTexture: PBShaderExp,
-  normalTexture?: PBShaderExp
-): PBShaderExp {
-  const pb = scope.$builder;
-  pb.func('SSR_HiZ_intersectDepthPlane', [pb.vec3('o'), pb.vec3('d'), pb.float('z')], function () {
-    this.$return(pb.add(this.o, pb.mul(this.d, this.z)));
-  });
-  pb.func('SSR_HiZ_getCell', [pb.vec2('pos'), pb.vec2('cell_count')], function () {
-    this.$return(pb.floor(pb.mul(this.pos, this.cell_count)));
-  });
-  pb.func(
-    'SSR_HiZ_intersectCellBoundary',
-    [
-      pb.vec3('o'),
-      pb.vec3('d'),
-      pb.vec2('cell'),
-      pb.vec2('cell_count'),
-      pb.vec2('crossStep'),
-      pb.vec2('crossOffset')
-    ],
-    function () {
-      this.$l.cell_size = pb.div(pb.vec2(1), this.cell_count);
-      this.$l.planes = pb.add(pb.div(this.cell, this.cell_count), pb.mul(this.cell_size, this.crossStep));
-      this.$l.solutions = pb.div(pb.sub(this.planes, this.o.xy), this.d.xy);
-      this.$l.intersection_pos = pb.add(this.o, pb.mul(this.d, pb.min(this.solutions.x, this.solutions.y)));
-      this.$l.p = this.$choice(
-        pb.lessThan(this.solutions.x, this.solutions.y),
-        pb.vec2(this.crossOffset.x, 0),
-        pb.vec2(0, this.crossOffset.y)
-      );
-      this.$return(pb.vec3(pb.add(this.intersection_pos.xy, this.p), this.intersection_pos.z));
-    }
-  );
-  pb.func('SSR_HiZ_getCellCount', [pb.vec2('fullSize'), pb.int('level')], function () {
-    this.$return(
-      pb.div(this.fullSize, this.$choice(pb.equal(this.level, 0), pb.float(1), pb.exp2(pb.float(this.level))))
-    );
-  });
-  pb.func('SSR_HiZ_crossedCellBoundary', [pb.vec2('oldCellIndex'), pb.vec2('newCellIndex')], function () {
-    this.$return(
-      pb.or(
-        pb.notEqual(pb.int(this.oldCellIndex.x), pb.int(this.newCellIndex.x)),
-        pb.notEqual(pb.int(this.oldCellIndex.y), pb.int(this.newCellIndex.y))
-      )
-    );
-  });
-  pb.func('SSR_HiZ_getMinimumDepth', [pb.vec2('uv'), pb.float('level')], function () {
-    this.$return(pb.textureSampleLevel(HiZTexture, this.uv, this.level).r);
-  });
-  pb.func(
-    'SSR_HiZ_tracing',
-    [
-      pb.vec3('samplePosInTS'),
-      pb.vec3('reflectVecInTS'),
-      pb.float('maxDistance'),
-      pb.float('thickness'),
-      pb.int('maxIteration'),
-      pb.int('depthMipLevels'),
-      pb.vec2('depthFullSize')
-    ],
-    function () {
-      this.$l.HIZ_START_LEVEL = pb.float(0);
-      this.$l.HIZ_STOP_LEVEL = pb.float(0);
-      this.$l.HIZ_MAX_LEVEL = pb.float(pb.sub(this.depthMipLevels, 1));
-
-      this.$l.level = this.HIZ_START_LEVEL;
-      this.$l.d = pb.mul(this.reflectVecInTS, this.maxDistance);
-      this.$l.v_z = pb.div(this.d, this.d.z);
-      this.$l.hi_z_size = this.SSR_HiZ_getCellCount(this.depthFullSize, this.level);
-      this.$l.ray = this.samplePosInTS;
-      this.$l.cross_step = pb.vec2(
-        this.$choice(pb.greaterThanEqual(this.reflectVecInTS.x, 0), pb.float(1), pb.float(-1)),
-        this.$choice(pb.greaterThanEqual(this.reflectVecInTS.y, 0), pb.float(1), pb.float(-1))
-      );
-      this.$l.cross_offset = pb.mul(this.cross_step, pb.div(pb.vec2(0.5), this.depthFullSize));
-      this.cross_step = pb.clamp(this.cross_step, pb.vec2(0), pb.vec2(1));
-      this.$l.ray_cell = this.SSR_HiZ_getCell(this.ray.xy, this.hi_z_size.xy);
-      this.ray = this.SSR_HiZ_intersectCellBoundary(
-        this.ray,
-        this.d,
-        this.ray_cell,
-        this.hi_z_size,
-        this.cross_step,
-        this.cross_offset
-      );
-      this.$l.iterations = pb.int(0);
-      this.min_z = pb.float(0);
-      this.$while(
-        pb.and(
-          pb.greaterThanEqual(this.level, this.HIZ_STOP_LEVEL),
-          pb.lessThan(this.iterations, this.maxIteration)
-        ),
-        function () {
-          this.$l.current_cell_count = this.SSR_HiZ_getCellCount(this.depthFullSize, this.level);
-          this.$l.old_cell_id = this.SSR_HiZ_getCell(this.ray.xy, this.current_cell_count);
-          this.min_z = this.SSR_HiZ_getMinimumDepth(this.ray.xy, this.level);
-          this.$l.tmp_ray = this.ray;
-          this.$if(pb.greaterThan(this.reflectVecInTS.z, 0), function () {
-            this.$l.min_minus_ray = pb.sub(this.min_z, this.ray.z);
-            this.tmp_ray = this.$choice(
-              pb.greaterThan(this.min_minus_ray, 0),
-              pb.add(this.ray, pb.mul(this.v_z, this.min_minus_ray)),
-              this.tmp_ray
-            );
-            this.$l.new_cell_id = this.SSR_HiZ_getCell(this.tmp_ray.xy, this.current_cell_count);
-            this.$if(this.SSR_HiZ_crossedCellBoundary(this.old_cell_id, this.new_cell_id), function () {
-              this.tmp_ray = this.SSR_HiZ_intersectCellBoundary(
-                this.ray,
-                this.d,
-                this.old_cell_id,
-                this.current_cell_count,
-                this.cross_step,
-                this.cross_offset
-              );
-              this.level = pb.min(this.HIZ_MAX_LEVEL, pb.add(this.level, 2));
-            }).$else(function () {
-              this.$if(
-                pb.and(pb.equal(this.level, 1), pb.greaterThan(pb.abs(this.min_minus_ray), this.thickness)),
-                function () {
-                  this.tmp_ray = this.SSR_HiZ_intersectCellBoundary(
-                    this.ray,
-                    this.d,
-                    this.old_cell_id,
-                    this.current_cell_count,
-                    this.cross_step,
-                    this.cross_offset
-                  );
-                  this.level = 2;
-                }
-              );
-            });
-          }).$elseif(pb.lessThan(this.ray.z, this.min_z), function () {
-            this.tmp_ray = this.SSR_HiZ_intersectCellBoundary(
-              this.ray,
-              this.d,
-              this.old_cell_id,
-              this.current_cell_count,
-              this.cross_step,
-              this.cross_offset
-            );
-            this.level = pb.min(this.HIZ_MAX_LEVEL, pb.add(this.level, 2));
-          });
-          this.ray = this.tmp_ray;
-          this.level = pb.sub(this.level, 1);
-          this.iterations = pb.add(this.iterations);
-        }
-      );
-      this.$l.vis = this.$choice(
-        pb.and(
-          pb.greaterThanEqual(this.level, this.HIZ_STOP_LEVEL),
-          pb.lessThan(this.iterations, this.maxIteration)
-        ),
-        pb.float(1),
-        pb.float(0)
-      );
-      this.$return(pb.vec4(this.ray.xy, this.min_z, this.vis));
-      /*
-      this.$l.maxLevel = pb.sub(this.depthMipLevels, 1);
-      this.$l.crossStep = pb.vec2(
-        this.$choice(pb.greaterThanEqual(this.reflectVecInTS.x, 0), pb.float(1), pb.float(-1)),
-        this.$choice(pb.greaterThanEqual(this.reflectVecInTS.y, 0), pb.float(1), pb.float(-1))
-      );
-      this.$l.crossOffset = pb.mul(this.crossStep, 0.0001);
-      this.crossStep = pb.clamp(this.crossStep, pb.vec2(0), pb.vec2(1));
-      this.$l.ray = this.samplePosInTS;
-      this.$l.minZ = this.ray.z;
-      this.$l.maxZ = pb.add(this.minZ, pb.mul(this.reflectVecInTS.z, this.maxDistance));
-      this.$l.deltaZ = pb.sub(this.maxZ, this.minZ);
-      this.$l.o = this.ray;
-      this.$l.d = pb.mul(this.reflectVecInTS, this.maxDistance);
-      this.$l.startLevel = pb.int(0);
-      this.$l.stopLevel = pb.int(0);
-      this.$l.startCellCount = this.SSR_HiZ_getCellCount(this.startLevel);
-      this.$l.rayCell = this.SSR_HiZ_getCell(this.ray.xy, this.startCellCount);
-      this.ray = this.SSR_HiZ_intersectCellBoundary(
-        this.o,
-        this.d,
-        this.rayCell,
-        this.startCellCount,
-        this.crossStep,
-        pb.mul(this.crossOffset, 64)
-      );
-      this.$l.level = this.startLevel;
-      this.$l.iter = pb.int(0);
-      this.$l.isBackwardRay = pb.lessThan(this.reflectVecInTS.z, 0);
-      this.$l.rayDir = this.$choice(this.isBackwardRay, pb.float(-1), pb.float(1));
-      this.$l.cell_minZ = pb.float();
-      this.$while(
-        pb.and(
-          pb.greaterThanEqual(this.level, this.stopLevel),
-          pb.lessThanEqual(pb.mul(this.ray.z, this.rayDir), pb.mul(this.maxZ, this.rayDir)),
-          pb.lessThan(this.iter, this.maxIteration)
-        ),
-        function () {
-          this.$l.cellCount = this.SSR_HiZ_getCellCount(this.level);
-          this.$l.oldCellIndex = this.SSR_HiZ_getCell(this.ray.xy, this.cellCount);
-          this.cell_minZ = this.SSR_HiZ_getMinimumDepth(
-            pb.div(pb.add(this.oldCellIndex, pb.vec2(0.5)), this.cellCount),
-            pb.float(this.level)
-          );
-          this.$l.tmpRay = this.$choice(
-            pb.and(pb.greaterThan(this.cell_minZ, this.ray.z), pb.not(this.isBackwardRay)),
-            this.SSR_HiZ_intersectDepthPlane(
-              this.o,
-              this.d,
-              pb.div(pb.sub(this.cell_minZ, this.minZ), this.deltaZ)
-            ),
-            this.ray
-          );
-          this.$l.newCellIndex = this.SSR_HiZ_getCell(this.tmpRay.xy, this.cellCount);
-          this.$l.thick = this.$choice(pb.equal(this.level, 0), pb.sub(this.ray.z, this.cell_minZ), 0);
-          this.$l.crossed = pb.or(
-            pb.and(this.isBackwardRay, pb.greaterThan(this.cell_minZ, this.ray.z)),
-            pb.greaterThan(this.thick, this.thickness),
-            this.SSR_HiZ_crossedCellBoundary(this.oldCellIndex, this.newCellIndex)
-          );
-          this.ray = this.$choice(
-            this.crossed,
-            this.SSR_HiZ_intersectCellBoundary(
-              this.o,
-              this.d,
-              this.oldCellIndex,
-              this.cellCount,
-              this.crossStep,
-              this.crossOffset
-            ),
-            this.tmpRay
-          );
-          this.level = this.$choice(
-            this.crossed,
-            pb.min(this.maxLevel, pb.add(this.level, 1)),
-            pb.sub(this.level, 1)
-          );
-          this.iter = pb.add(this.iter, 1);
-        }
-      );
-      this.$l.vis = this.$choice(
-        pb.and(pb.lessThan(this.cell_minZ, 1), pb.lessThan(this.level, this.stopLevel)),
-        pb.float(1),
-        pb.float(0)
-      );
-      this.$return(pb.vec4(this.ray.xy, this.cell_minZ, this.vis));
-      */
-    }
-  );
-  pb.func(
-    'SSR_HiZ',
-    [
-      pb.vec3('viewPos'),
-      pb.vec3('traceRay'),
-      pb.mat4('viewMatrix'),
-      pb.mat4('projMatrix'),
-      pb.mat4('invProjMatrix'),
-      pb.vec2('cameraNearFar'),
-      pb.float('maxDistance'),
-      pb.float('iteration'),
-      pb.float('thickness'),
-      pb.vec4('textureSize'),
-      pb.int('depthMipLevels')
-    ],
-    function () {
-      //this.$l.normalizedViewPos = pb.normalize(this.viewPos);
-      this.$l.reflectVec = this.traceRay;
-      this.$if(pb.greaterThan(this.reflectVec.z, 0), function () {
-        this.$return(pb.vec4(0));
-      });
-      this.$l.maxDist = pb.float(100);
-      this.$l.viewPosEnd = pb.add(this.viewPos, pb.mul(this.reflectVec, this.maxDist));
-      this.$l.fragStartH = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));
-      this.$l.fragEndH = pb.mul(this.projMatrix, pb.vec4(this.viewPosEnd, 1));
-      this.$l.fragStartCS = pb.div(this.fragStartH.xyz, this.fragStartH.w);
-      this.$l.fragEndCS = pb.div(this.fragEndH.xyz, this.fragEndH.w);
-      this.$l.reflectVecCS = pb.normalize(pb.sub(this.fragEndCS, this.fragStartCS));
-      this.$l.fragStartTS = pb.add(pb.mul(this.fragStartCS, pb.vec3(0.5, 0.5, 0.5)), pb.vec3(0.5, 0.5, 0.5));
-      this.$l.fragEndTS = pb.add(pb.mul(this.fragEndCS, pb.vec3(0.5, 0.5, 0.5)), pb.vec3(0.5, 0.5, 0.5));
-      this.$l.reflectVecTS = pb.mul(this.reflectVecCS, pb.vec3(0.5, 0.5, 0.5));
-      this.maxDist = this.$choice(
-        pb.greaterThanEqual(this.reflectVecTS.x, 0),
-        pb.div(pb.sub(1, this.fragStartTS.x), this.reflectVecTS.x),
-        pb.div(pb.neg(this.fragStartTS.x), this.reflectVecTS.x)
-      );
-      this.maxDist = pb.min(
-        this.maxDist,
-        this.$choice(
-          pb.lessThan(this.reflectVecTS.y, 0),
-          pb.div(pb.neg(this.fragStartTS.y), this.reflectVecTS.y),
-          pb.div(pb.sub(1, this.fragStartTS.y), this.reflectVecTS.y)
-        )
-      );
-      this.maxDist = pb.min(
-        this.maxDist,
-        this.$choice(
-          pb.lessThan(this.reflectVecTS.z, 0),
-          pb.div(pb.neg(this.fragStartTS.z), this.reflectVecTS.z),
-          pb.div(pb.sub(1, this.fragStartTS.z), this.reflectVecTS.z)
-        )
-      );
-      this.$l.hit = this.SSR_HiZ_tracing(
-        this.fragStartTS,
-        this.reflectVecTS,
-        this.maxDist,
-        this.thickness,
-        pb.int(this.iteration),
-        this.depthMipLevels,
-        this.textureSize.zw
-      );
-      this.$l.confidence = pb.float(0);
-      this.$if(pb.notEqual(this.hit.w, 0), function () {
-        this.confidence = validateHit(
-          this,
-          this.hit.xy,
-          this.fragStartTS.xy,
-          this.traceRay,
-          this.viewMatrix,
-          this.invProjMatrix,
-          this.cameraNearFar,
-          this.textureSize,
-          HiZTexture,
-          normalTexture
-        );
-        //this.confidence = 1;
-      });
-      this.$return(pb.vec4(this.hit.xyz, this.confidence));
-    }
-  );
-  return scope.SSR_HiZ(
-    viewPos,
-    traceRay,
-    viewMatrix,
-    projMatrix,
-    invProjMatrix,
-    cameraNearFar,
-    maxDistance,
-    maxIteraions,
-    thickness,
-    textureSize,
-    HiZTextureMipLevels
   );
 }
