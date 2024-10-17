@@ -831,6 +831,18 @@ export class Inspector {
       });
       if (camera.SSR) {
         ImGui.SliderFloat(
+          'SSRMaxRoughness',
+          (val?: number) => (camera.ssrMaxRoughness = val = val ?? camera.ssrMaxRoughness),
+          0,
+          1
+        );
+        ImGui.SliderFloat(
+          'SSRRoughnessFactor',
+          (val?: number) => (camera.ssrRoughnessFactor = val = val ?? camera.ssrRoughnessFactor),
+          0,
+          1
+        );
+        ImGui.SliderFloat(
           'SSRIntensity',
           (val?: number) => (camera.ssrIntensity = val = val ?? camera.ssrIntensity),
           0,

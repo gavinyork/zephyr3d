@@ -5,6 +5,68 @@ import { ShaderHelper } from '../material';
 const MAX_FLOAT_VALUE = 3.402823466e38;
 
 /** @internal */
+// source: https://github.com/blender/blender/blob/594f47ecd2d5367ca936cf6fc6ec8168c2b360d0/source/blender/gpu/shaders/material/gpu_shader_material_fresnel.glsl
+export function SSR_fresnel(
+  scope: PBInsideFunctionScope,
+  viewVec: PBShaderExp,
+  normal: PBShaderExp,
+  eta: PBShaderExp | number = 1.5
+) {
+  const pb = scope.$builder;
+  pb.func('SSR_fresnel', [pb.vec3('viewVec'), pb.vec3('viewNormal'), pb.float('eta')], function () {
+    this.$l.cos = pb.dot(this.viewVec, this.viewNormal);
+    this.$l.c = pb.abs(this.cos);
+    this.$l.g = pb.add(pb.sub(pb.mul(this.eta, this.eta), 1), pb.mul(this.c, this.c));
+    this.$l.r = pb.float();
+    this.$if(pb.greaterThan(this.g, 0), function () {
+      this.g = pb.sqrt(this.g);
+      this.$l.A = pb.div(pb.sub(this.g, this.c), pb.add(this.g, this.c));
+      this.$l.B = pb.div(
+        pb.sub(pb.mul(this.c, pb.add(this.g, this.c)), 1),
+        pb.add(pb.mul(this.c, pb.sub(this.g, this.c)), 1)
+      );
+      this.r = pb.mul(this.A, this.A, 0.5, pb.add(pb.mul(this.B, this.B), 1));
+    }).$else(function () {
+      this.r = 1;
+    });
+    this.$return(pb.min(1, pb.mul(this.r, 5)));
+  });
+  return scope.SSR_fresnel(viewVec, normal, eta);
+}
+
+/** @internal */
+function dither(scope: PBInsideFunctionScope, uv: PBShaderExp) {
+  const pb = scope.$builder;
+  if (pb.getDevice().type === 'webgl') {
+    return pb.float(0);
+  }
+  if (!pb.getGlobalScope().Z_dither) {
+    pb.getGlobalScope().Z_dither = [
+      pb.float(0),
+      pb.float(0.5),
+      pb.float(0.125),
+      pb.float(0.625),
+      pb.float(0.75),
+      pb.float(0.25),
+      pb.float(0.875),
+      pb.float(0.375),
+      pb.float(0.187),
+      pb.float(0.687),
+      pb.float(0.0625),
+      pb.float(0.562),
+      pb.float(0.937),
+      pb.float(0.437),
+      pb.float(0.812),
+      pb.float(0.312)
+    ];
+    pb.func('SSR_dither', [pb.vec2('uv')], function () {
+      this.$l.ditherUV = pb.mod(this.uv, pb.vec2(4));
+      this.$return(this.Z_dither.at(pb.uint(pb.add(pb.mul(this.ditherUV.x, 4), this.ditherUV.y))));
+    });
+    return scope.SSR_dither(uv);
+  }
+}
+/** @internal */
 function invProjectPosition(scope: PBInsideFunctionScope, pos: PBShaderExp, mat: PBShaderExp) {
   const pb = scope.$builder;
   pb.func('invProjectPosition', [pb.vec3('p'), pb.mat4('mat')], function () {
@@ -164,7 +226,6 @@ export function screenSpaceRayTracing_Linear2D(
     [
       pb.vec3('rayOrigin'),
       pb.vec3('rayDirection'),
-      pb.float('jitter'),
       pb.float('stride'),
       pb.float('strideZCutoff'),
       pb.float('maxDistance'),
@@ -246,6 +307,7 @@ export function screenSpaceRayTracing_Linear2D(
       this.dP = pb.mul(this.dP, this.pixelStride);
       this.dQ = pb.mul(this.dQ, this.pixelStride);
       this.dK = pb.mul(this.dK, this.pixelStride);
+      this.$l.jitter = dither(this, this.P0);
       this.P0 = pb.add(this.P0, pb.mul(this.dP, this.jitter));
       this.Q0 = pb.add(this.Q0, pb.mul(this.dQ, this.jitter));
       this.k0 = pb.add(this.k0, pb.mul(this.dK, this.jitter));
@@ -308,7 +370,6 @@ export function screenSpaceRayTracing_Linear2D(
       pb.mat4('viewMatrix'),
       pb.mat4('projMatrix'),
       pb.mat4('invProjMatrix'),
-      pb.float('jitter'),
       pb.float('stride'),
       pb.float('strideZCutoff'),
       pb.float('maxDistance'),
@@ -325,7 +386,6 @@ export function screenSpaceRayTracing_Linear2D(
       this.$l.intersected = this.traceRayLinear2D(
         this.rayOrigin,
         this.rayDirection,
-        this.jitter,
         this.stride,
         this.strideZCutoff,
         this.maxDistance,
@@ -376,7 +436,6 @@ export function screenSpaceRayTracing_Linear2D(
     viewMatrix,
     projMatrix,
     invProjMatrix,
-    0,
     stride,
     100,
     maxDistance,
@@ -639,8 +698,9 @@ export function screenSpaceRayTracing_HiZ(
         );
       });
       this.$l.iterationAttenuation = pb.sub(1, pb.smoothStep(0, this.maxIterations, this.numIterations));
+      this.$l.viewAttenuation = pb.sub(1, pb.smoothStep(-0.5, 0, this.traceRay.z));
       //this.$l.iterationAttenuation = pb.smoothStep(this.maxIterations, 1, this.numIterations);
-      this.confidence = pb.mul(this.confidence, this.iterationAttenuation);
+      this.confidence = pb.mul(this.confidence, this.iterationAttenuation, this.viewAttenuation);
       this.$return(pb.vec4(this.hit.xyz, this.confidence));
     }
   );
