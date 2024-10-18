@@ -1180,7 +1180,9 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           } else {
             this.$l.k_S = pb.add(this.data.f0.rgb, pb.mul(this.Fr, pb.pow(pb.sub(1, this.NoV), 5)));
           }
-          if (ctx.env.light.envLight.hasRadiance() || outRoughness) {
+          if (outRoughness) {
+            this.outRoughness = pb.vec4(this.data.f0.rgb, this.data.roughness);
+          } else if (ctx.env.light.envLight.hasRadiance()) {
             this.$l.radiance = ctx.env.light.envLight.getRadiance(
               this,
               pb.reflect(pb.neg(this.viewVec), this.normal),
@@ -1191,11 +1193,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             if (that.sheen) {
               this.specularFactor = pb.mul(this.specularFactor, this.data.sheenAlbedoScaling);
             }
-            if (outRoughness) {
-              this.outRoughness = pb.vec4(this.specularFactor, this.data.roughness);
-            } else {
-              this.outColor = pb.add(this.outColor, pb.mul(this.radiance, this.specularFactor));
-            }
+            this.outColor = pb.add(this.outColor, pb.mul(this.radiance, this.specularFactor));
           }
           if (ctx.env.light.envLight.hasIrradiance()) {
             this.$l.irradiance = ctx.env.light.envLight.getIrradiance(this, this.normal);

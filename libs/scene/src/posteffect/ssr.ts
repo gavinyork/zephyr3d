@@ -6,6 +6,7 @@ import {
   sampleLinearDepth,
   screenSpaceRayTracing_HiZ,
   screenSpaceRayTracing_Linear2D,
+  SSR_calcJitter,
   SSR_fresnel
 } from '../shaders/ssr';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
@@ -103,6 +104,7 @@ export class SSR extends AbstractPostEffect {
     bindGroup.setValue('invViewMatrix', ctx.camera.worldMatrix);
     bindGroup.setValue('ssrParams', ctx.camera.ssrParams);
     bindGroup.setValue('ssrIntensity', ctx.camera.ssrIntensity);
+    bindGroup.setValue('ssrFalloff', ctx.camera.ssrFalloff);
     bindGroup.setValue('ssrMaxRoughness', ctx.camera.ssrMaxRoughness);
     bindGroup.setValue('ssrRoughnessFactor', ctx.camera.ssrRoughnessFactor);
     if (ctx.HiZTexture) {
@@ -171,6 +173,7 @@ export class SSR extends AbstractPostEffect {
         this.invViewMatrix = pb.mat4().uniform(0);
         this.ssrParams = pb.vec4().uniform(0);
         this.ssrIntensity = pb.float().uniform(0);
+        this.ssrFalloff = pb.float().uniform(0);
         this.ssrMaxRoughness = pb.float().uniform(0);
         this.ssrRoughnessFactor = pb.float().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
@@ -219,6 +222,7 @@ export class SSR extends AbstractPostEffect {
               this.$l.viewVec = pb.normalize(this.viewPos);
               this.$l.viewNormal = pb.mul(this.viewMatrix, pb.vec4(this.worldNormal, 0)).xyz;
               this.$l.reflectVec = pb.reflect(this.viewVec, this.viewNormal);
+              this.reflectVec = pb.add(this.reflectVec, SSR_calcJitter(this, this.viewPos, this.roughness));
               this.$l.fresnel = SSR_fresnel(this, this.viewVec, this.viewNormal, 1.5);
               this.$l.hitInfo = ctx.HiZTexture
                 ? screenSpaceRayTracing_HiZ(
@@ -265,13 +269,22 @@ export class SSR extends AbstractPostEffect {
                 pb.textureSampleLevel(
                   this.colorTex,
                   this.hitInfo.xy,
-                  pb.min(4, pb.mul(this.colorTexMiplevels, this.roughness))
+                  0
+                  //pb.min(4, pb.mul(this.colorTexMiplevels, this.roughness))
                 ).rgb,
                 this.hitInfo.w
               );
-              this.reflectance = pb.mul(this.reflectance, this.fresnel, this.ssrIntensity);
+              this.reflectance = pb.mul(this.reflectance, this.fresnel);
               this.reflectance = pb.div(this.reflectance, pb.add(this.reflectance, pb.vec3(1)));
-              this.color = pb.add(this.sceneColor, this.reflectance);
+              this.$l.strength = pb.clamp(
+                pb.pow(pb.mul(this.roughnessValue.rgb, this.ssrIntensity), pb.vec3(this.ssrFalloff)),
+                pb.vec3(0),
+                pb.vec3(1)
+              );
+              this.color = pb.add(
+                pb.mul(this.reflectance, this.strength),
+                pb.mul(this.sceneColor, pb.sub(pb.vec3(1), this.strength))
+              );
               /*
               this.$l.t = pb.sub(1, pb.div(1, pb.add(this.ssrIntensity, 1)));
               this.color = pb.mix(

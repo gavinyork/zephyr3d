@@ -5,6 +5,19 @@ import { ShaderHelper } from '../material';
 const MAX_FLOAT_VALUE = 3.402823466e38;
 
 /** @internal */
+export function SSR_calcJitter(scope: PBInsideFunctionScope, viewPos: PBShaderExp, roughness: PBShaderExp) {
+  const pb = scope.$builder;
+  pb.func('SSR_calcJitter', [pb.vec3('viewPos'), pb.float('roughness')], function () {
+    this.$l.h = pb.fract(pb.mul(this.viewPos, 0.8));
+    this.h = pb.add(this.h, pb.dot(this.h, pb.add(this.h.yxz, pb.vec3(19.19))));
+    this.h = pb.fract(pb.mul(pb.add(this.h.xxy, this.h.yxx), this.h.zyx));
+    this.h = pb.sub(this.h, pb.vec3(0.5));
+    this.$return(pb.mix(pb.vec3(0), this.h, this.roughness));
+  });
+  return scope.SSR_calcJitter(viewPos, roughness);
+}
+
+/** @internal */
 // source: https://github.com/blender/blender/blob/594f47ecd2d5367ca936cf6fc6ec8168c2b360d0/source/blender/gpu/shaders/material/gpu_shader_material_fresnel.glsl
 export function SSR_fresnel(
   scope: PBInsideFunctionScope,
@@ -35,7 +48,7 @@ export function SSR_fresnel(
 }
 
 /** @internal */
-function dither(scope: PBInsideFunctionScope, uv: PBShaderExp) {
+export function SSR_dither(scope: PBInsideFunctionScope, uv: PBShaderExp) {
   const pb = scope.$builder;
   if (pb.getDevice().type === 'webgl') {
     return pb.float(0);
@@ -307,7 +320,7 @@ export function screenSpaceRayTracing_Linear2D(
       this.dP = pb.mul(this.dP, this.pixelStride);
       this.dQ = pb.mul(this.dQ, this.pixelStride);
       this.dK = pb.mul(this.dK, this.pixelStride);
-      this.$l.jitter = dither(this, this.P0);
+      this.$l.jitter = pb.float(1); //dither(this, this.P0);
       this.P0 = pb.add(this.P0, pb.mul(this.dP, this.jitter));
       this.Q0 = pb.add(this.Q0, pb.mul(this.dQ, this.jitter));
       this.k0 = pb.add(this.k0, pb.mul(this.dK, this.jitter));
