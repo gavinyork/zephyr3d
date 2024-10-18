@@ -68,6 +68,8 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _SSR: boolean;
   /** @internal */
+  protected _ssrDebug: 'roughness' | 'reflectance' | 'fresnel' | 'strength' | 'none';
+  /** @internal */
   protected _ssrParams: Vector4;
   /** @internal */
   protected _ssrIntensity: number;
@@ -122,11 +124,12 @@ export class Camera extends SceneNode {
     this._SSR = false;
     this._ssrParams = new Vector4(32, 120, 0.5, 0);
     this._ssrIntensity = 1;
-    this._ssrFalloff = 0;
+    this._ssrFalloff = 1;
     this._ssrMaxRoughness = 0.7;
     this._ssrRoughnessFactor = 1;
     this._ssrStride = 2;
     this._ssrCalcThickness = false;
+    this._ssrDebug = 'none';
     this._pickResult = null;
     this._commandBufferReuse = true;
   }
@@ -151,6 +154,12 @@ export class Camera extends SceneNode {
   }
   set SSR(val: boolean) {
     this._SSR = !!val;
+  }
+  get ssrDebug() {
+    return this._ssrDebug;
+  }
+  set ssrDebug(val) {
+    this._ssrDebug = val;
   }
   get ssrIntensity(): number {
     return this._ssrIntensity;

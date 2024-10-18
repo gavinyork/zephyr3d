@@ -6,8 +6,7 @@ import {
   sampleLinearDepth,
   screenSpaceRayTracing_HiZ,
   screenSpaceRayTracing_Linear2D,
-  SSR_calcJitter,
-  SSR_fresnel
+  SSR_calcJitter
 } from '../shaders/ssr';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 
@@ -25,6 +24,7 @@ export class SSR extends AbstractPostEffect {
   private static _samplerLinear: TextureSampler = undefined;
   private _roughnessTex: Texture2D;
   private _normalTex: Texture2D;
+  private _blur: boolean;
   private _bindgroups: Record<string, BindGroup>;
   /**
    * Creates an instance of SSR post effect
@@ -34,6 +34,7 @@ export class SSR extends AbstractPostEffect {
     this._opaque = true;
     this._bindgroups = {};
     this._roughnessTex = null;
+    this._blur = false;
   }
   get roughnessTexture() {
     return this._roughnessTex;
@@ -58,8 +59,9 @@ export class SSR extends AbstractPostEffect {
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const device = ctx.device;
-    const hash = `${ctx.env.light.envLight ? ctx.env.light.getHash() : ''}:${!!ctx.HiZTexture}:${!!ctx
-      .primaryCamera.ssrCalcThickness}`;
+    const hash = `${ctx.primaryCamera.ssrDebug}|${Number(this._blur)}:${
+      ctx.env.light.envLight ? ctx.env.light.getHash() : ''
+    }:${!!ctx.HiZTexture}:${!!ctx.primaryCamera.ssrCalcThickness}`;
     let program = SSR._programs[hash];
     if (program === undefined) {
       program = this._createProgram(ctx);
@@ -211,19 +213,29 @@ export class SSR extends AbstractPostEffect {
           this.$l.linearDepth = this.pos.w;
           this.$l.roughness = pb.mul(this.roughnessValue.a, this.ssrRoughnessFactor);
           this.$l.color = pb.vec3();
-          this.$if(
-            pb.and(pb.lessThan(this.linearDepth, 1), pb.lessThan(this.roughness, this.ssrMaxRoughness)),
-            function () {
-              this.$l.viewPos = this.pos.xyz;
-              this.$l.worldNormal = pb.sub(
-                pb.mul(pb.textureSampleLevel(this.normalTex, this.screenUV, 0).rgb, 2),
-                pb.vec3(1)
-              );
-              this.$l.viewVec = pb.normalize(this.viewPos);
-              this.$l.viewNormal = pb.mul(this.viewMatrix, pb.vec4(this.worldNormal, 0)).xyz;
-              this.$l.reflectVec = pb.reflect(this.viewVec, this.viewNormal);
-              this.reflectVec = pb.add(this.reflectVec, SSR_calcJitter(this, this.viewPos, this.roughness));
-              this.$l.fresnel = SSR_fresnel(this, this.viewVec, this.viewNormal, 1.5);
+          this.$if(pb.greaterThanEqual(this.linearDepth, 1), function () {
+            this.color = this.sceneColor;
+          }).$else(function () {
+            this.$l.viewPos = this.pos.xyz;
+            this.$l.worldNormal = pb.sub(
+              pb.mul(pb.textureSampleLevel(this.normalTex, this.screenUV, 0).rgb, 2),
+              pb.vec3(1)
+            );
+            this.$l.viewVec = pb.normalize(this.viewPos);
+            this.$l.viewNormal = pb.mul(this.viewMatrix, pb.vec4(this.worldNormal, 0)).xyz;
+            this.$l.reflectVec = pb.add(
+              pb.reflect(this.viewVec, this.viewNormal),
+              SSR_calcJitter(this, this.viewPos, this.roughness)
+            );
+            this.$l.reflectVecW = pb.mul(this.invViewMatrix, pb.vec4(this.reflectVec, 0)).xyz;
+            this.$l.env = ctx.env.light.envLight
+              ? pb.mul(
+                  ctx.env.light.envLight.getRadiance(this, this.reflectVecW, this.roughness),
+                  this.envLightStrength
+                )
+              : pb.vec3(0);
+            this.$l.reflectance = this.env;
+            this.$if(pb.lessThan(this.roughness, this.ssrMaxRoughness), function () {
               this.$l.hitInfo = ctx.HiZTexture
                 ? screenSpaceRayTracing_HiZ(
                     this,
@@ -257,51 +269,36 @@ export class SSR extends AbstractPostEffect {
                     this.normalTex,
                     !!ctx.primaryCamera.ssrCalcThickness
                   );
-              this.$l.refl = pb.mul(this.invViewMatrix, pb.vec4(this.reflectVec, 0)).xyz;
-              this.$l.env = ctx.env.light.envLight
-                ? pb.mul(
-                    ctx.env.light.envLight.getRadiance(this, this.refl, this.roughness),
-                    this.envLightStrength
-                  )
-                : pb.vec3(0);
               this.reflectance = pb.mix(
                 this.env,
-                pb.textureSampleLevel(
-                  this.colorTex,
-                  this.hitInfo.xy,
-                  0
-                  //pb.min(4, pb.mul(this.colorTexMiplevels, this.roughness))
-                ).rgb,
+                pb.textureSampleLevel(this.colorTex, this.hitInfo.xy, 0).rgb,
                 this.hitInfo.w
               );
-              this.reflectance = pb.mul(this.reflectance, this.fresnel);
-              this.reflectance = pb.div(this.reflectance, pb.add(this.reflectance, pb.vec3(1)));
-              this.$l.strength = pb.clamp(
-                pb.pow(pb.mul(this.roughnessValue.rgb, this.ssrIntensity), pb.vec3(this.ssrFalloff)),
-                pb.vec3(0),
-                pb.vec3(1)
-              );
+            });
+            // this.$l.fresnel = SSR_fresnel(this, this.viewVec, this.viewNormal, 1.5);
+            // this.reflectance = pb.mul(this.reflectance, this.fresnel);
+            this.reflectance = pb.div(this.reflectance, pb.add(this.reflectance, pb.vec3(1)));
+            this.$l.strength = pb.clamp(
+              pb.pow(pb.mul(this.roughnessValue.rgb, this.ssrIntensity), pb.vec3(this.ssrFalloff)),
+              pb.vec3(0),
+              pb.vec3(1)
+            );
+            if (ctx.primaryCamera.ssrDebug === 'none') {
               this.color = pb.add(
                 pb.mul(this.reflectance, this.strength),
                 pb.mul(this.sceneColor, pb.sub(pb.vec3(1), this.strength))
               );
-              /*
-              this.$l.t = pb.sub(1, pb.div(1, pb.add(this.ssrIntensity, 1)));
-              this.color = pb.mix(
-                this.sceneColor,
-                pb.mul(this.roughnessFactor.xyz, this.reflectance),
-                this.t
-              );
-              */
-              /*
-              this.color = pb.add(
-                pb.mul(this.roughnessFactor.xyz, pb.mul(this.reflectance, this.ssrIntensity)),
-                this.sceneColor
-              );
-              */
+            } else if (ctx.primaryCamera.ssrDebug === 'fresnel') {
+              this.color = pb.vec3(0); //pb.vec3(this.fresnel);
+            } else if (ctx.primaryCamera.ssrDebug === 'roughness') {
+              this.color = pb.vec3(this.roughness);
+            } else if (ctx.primaryCamera.ssrDebug === 'reflectance') {
+              this.color = this.reflectance;
+            } else if (ctx.primaryCamera.ssrDebug === 'strength') {
+              this.color = this.strength;
+            } else {
+              this.color = pb.vec3(0);
             }
-          ).$else(function () {
-            this.color = this.sceneColor;
           });
           this.$if(pb.equal(this.srgbOut, 0), function () {
             this.$outputs.outColor = pb.vec4(this.color, 1);
