@@ -440,7 +440,10 @@ export function screenSpaceRayTracing_Linear2D(
       this.$l.iterationAttenuation = pb.sub(1, pb.smoothStep(0, this.maxIterations, this.numIterations));
       //this.$l.iterationAttenuation = pb.smoothStep(this.maxIterations, 1, this.numIterations);
       this.confidence = pb.mul(this.confidence, this.iterationAttenuation);
-      this.$return(pb.vec4(this.hit2D, this.confidence));
+      this.$l.hitPixel = pb.mul(this.hit2D.xy, this.textureSize.zw);
+      this.$l.startPixel = pb.mul(this.origin.xy, this.textureSize.zw);
+      this.$l.hitDistance = pb.length(pb.sub(this.hitPixel, this.startPixel));
+      this.$return(pb.vec4(this.hit2D.xy, this.hitDistance, this.confidence));
     }
   );
   return scope.SSR_Linear2D(
@@ -714,7 +717,10 @@ export function screenSpaceRayTracing_HiZ(
       this.$l.viewAttenuation = pb.sub(1, pb.smoothStep(-0.5, 0, this.traceRay.z));
       //this.$l.iterationAttenuation = pb.smoothStep(this.maxIterations, 1, this.numIterations);
       this.confidence = pb.mul(this.confidence, this.iterationAttenuation, this.viewAttenuation);
-      this.$return(pb.vec4(this.hit.xyz, this.confidence));
+      this.$l.hitPixel = pb.mul(this.hit.xy, this.textureSize.zw);
+      this.$l.startPixel = pb.mul(this.originTS.xy, this.textureSize.zw);
+      this.$l.hitDistance = pb.length(pb.sub(this.hitPixel, this.startPixel));
+      this.$return(pb.vec4(this.hit.xy, this.hitDistance, this.confidence));
     }
   );
   return scope.SSR_HiZ(

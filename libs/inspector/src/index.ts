@@ -886,7 +886,15 @@ export class Inspector {
           }
           return val;
         });
-        const debugOptions = ['none', 'fresnel', 'roughness', 'reflectance', 'strength'] as const;
+        ImGui.Checkbox('SSRBlur##Camera', (val?: boolean) => {
+          if (val === undefined) {
+            val = camera.ssrBlur;
+          } else {
+            camera.ssrBlur = val;
+          }
+          return val;
+        });
+        const debugOptions = ['none', 'reflectBRDF', 'roughness', 'reflectance', 'strength'] as const;
         const currentDebug = [debugOptions.indexOf(camera.ssrDebug)] as [number];
         if (ImGui.Combo('Debug', currentDebug, debugOptions as unknown as string[])) {
           camera.ssrDebug = debugOptions[currentDebug[0]];

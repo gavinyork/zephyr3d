@@ -68,7 +68,7 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _SSR: boolean;
   /** @internal */
-  protected _ssrDebug: 'roughness' | 'reflectance' | 'fresnel' | 'strength' | 'none';
+  protected _ssrDebug: 'roughness' | 'reflectBRDF' | 'reflectance' | 'strength' | 'none';
   /** @internal */
   protected _ssrParams: Vector4;
   /** @internal */
@@ -83,6 +83,8 @@ export class Camera extends SceneNode {
   protected _ssrStride: number;
   /** @internal */
   protected _ssrCalcThickness: boolean;
+  /** @internal */
+  protected _ssrBlur: boolean;
   /** @internal */
   protected _picking: boolean;
   /** @internal */
@@ -129,6 +131,7 @@ export class Camera extends SceneNode {
     this._ssrRoughnessFactor = 1;
     this._ssrStride = 2;
     this._ssrCalcThickness = false;
+    this._ssrBlur = false;
     this._ssrDebug = 'none';
     this._pickResult = null;
     this._commandBufferReuse = true;
@@ -214,6 +217,12 @@ export class Camera extends SceneNode {
   }
   set ssrCalcThickness(val: boolean) {
     this._ssrCalcThickness = !!val;
+  }
+  get ssrBlur(): boolean {
+    return this._ssrBlur;
+  }
+  set ssrBlur(val: boolean) {
+    this._ssrBlur = !!val;
   }
   get ssrParams(): Vector4 {
     return this._ssrParams;
