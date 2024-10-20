@@ -1,7 +1,8 @@
 import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
-import type { AbstractDevice, BindGroup, GPUProgram, Texture2D, TextureSampler } from '@zephyr3d/device';
+import type { AbstractDevice, BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
+import { fetchSampler } from '../utility/misc';
 
 /**
  * Grayscale post effect
@@ -9,7 +10,6 @@ import type { DrawContext } from '../render';
  */
 export class Grayscale extends AbstractPostEffect {
   private static _program: GPUProgram = null;
-  private static _sampler: TextureSampler = null;
   private _bindgroup: BindGroup;
   /**
    * Creates an instance of grayscale post effect
@@ -37,7 +37,7 @@ export class Grayscale extends AbstractPostEffect {
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const device = ctx.device;
     this._prepare(device);
-    this._bindgroup.setTexture('srcTex', inputColorTexture, Grayscale._sampler);
+    this._bindgroup.setTexture('srcTex', inputColorTexture, fetchSampler('clamp_nearest_nomip'));
     this._bindgroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     this._bindgroup.setValue('srgbOut', srgbOutput ? 1 : 0);
     device.setProgram(Grayscale._program);
@@ -74,15 +74,6 @@ export class Grayscale extends AbstractPostEffect {
             });
           });
         }
-      });
-    }
-    if (!Grayscale._sampler) {
-      Grayscale._sampler = device.createSampler({
-        magFilter: 'nearest',
-        minFilter: 'nearest',
-        mipFilter: 'none',
-        addressU: 'clamp',
-        addressV: 'clamp'
       });
     }
     if (!this._bindgroup) {

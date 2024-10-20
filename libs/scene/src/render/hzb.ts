@@ -1,18 +1,11 @@
-import type {
-  AbstractDevice,
-  BindGroup,
-  FrameBuffer,
-  GPUProgram,
-  Texture2D,
-  TextureSampler
-} from '@zephyr3d/device';
+import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { Application } from '../app';
 import { CopyBlitter } from '../blitter';
+import { fetchSampler } from '../utility/misc';
 
 let hzbProgram: GPUProgram = null;
 let hzbBindGroup: BindGroup = null;
-let hzbSampler: TextureSampler = null;
 let blitter: CopyBlitter = null;
 let srcSize: Int32Array = null;
 
@@ -56,7 +49,7 @@ vec3 trace_ray(vec3 ray_start, vec3 ray_dir)
 
         // Modify fract coord based on which direction we are stepping in.
         // Fract coord now contains the percentage how far we moved already in
-        // the current cell in each direction.  
+        // the current cell in each direction.
         fract_coord.x = ray_dir.x > 0.0 ? fract_coord.x : 1.0 - fract_coord.x;
         fract_coord.y = ray_dir.y > 0.0 ? fract_coord.y : 1.0 - fract_coord.y;
 
@@ -77,7 +70,7 @@ vec3 trace_ray(vec3 ray_start, vec3 ray_dir)
         float min_k = max(min_k_v.x, min_k_v.y);
 
         // Check if the ray intersects with the cell plane. We have the following
-        // equation: 
+        // equation:
         // pos.z + k * ray_dir.z = cell.z
         // So k is:
         float k = (cell_z - pos.z) / ray_dir.z;
@@ -85,7 +78,7 @@ vec3 trace_ray(vec3 ray_start, vec3 ray_dir)
         // Optional: Abort when ray didn't exactly intersect:
         // if (k < min_k && mipmap <= 0) {
         //     return vec3(0);
-        // } 
+        // }
 
         // Check if we intersected the cell
         if (k < max_k + hit_bias)
@@ -240,6 +233,7 @@ function buildHiZLevel(
   srcTexture: Texture2D,
   dstTexture: Texture2D
 ): void {
+  const sampler = fetchSampler('clamp_nearest');
   const framebuffer = device.createFrameBuffer([dstTexture], null);
   framebuffer.setColorAttachmentMipLevel(0, miplevel + 1);
   framebuffer.setColorAttachmentGenerateMipmaps(0, false);
@@ -247,9 +241,9 @@ function buildHiZLevel(
   srcSize[1] = Math.max(srcTexture.height >> miplevel, 1);
   hzbBindGroup.setValue('srcSize', srcSize);
   if (device.type === 'webgpu') {
-    hzbBindGroup.setTextureView('srcTex', srcTexture, miplevel, 0, 1, hzbSampler);
+    hzbBindGroup.setTextureView('srcTex', srcTexture, miplevel, 0, 1, sampler);
   } else {
-    hzbBindGroup.setTexture('srcTex', srcTexture, hzbSampler);
+    hzbBindGroup.setTexture('srcTex', srcTexture, sampler);
     hzbBindGroup.setValue('srcMipLevel', miplevel);
   }
   device.setProgram(hzbProgram);
@@ -266,17 +260,10 @@ export function buildHiZ(sourceTex: Texture2D, HiZFrameBuffer: FrameBuffer) {
   if (!hzbProgram) {
     hzbProgram = buildHZBProgram(device);
     hzbBindGroup = device.createBindGroup(hzbProgram.bindGroupLayouts[0]);
-    hzbSampler = device.createSampler({
-      addressU: 'clamp',
-      addressV: 'clamp',
-      magFilter: 'nearest',
-      mipFilter: 'nearest',
-      minFilter: 'nearest'
-    });
     blitter = new CopyBlitter();
     srcSize = new Int32Array(2);
   }
-  blitter.blit(sourceTex, HiZFrameBuffer, hzbSampler);
+  blitter.blit(sourceTex, HiZFrameBuffer, fetchSampler('clamp_nearest'));
   device.pushDeviceStates();
   const srcTex = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
   if (device.type === 'webgpu') {

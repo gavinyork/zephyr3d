@@ -1,6 +1,6 @@
 import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
-import type { BindGroup, GPUProgram, Texture2D, TextureSampler } from '@zephyr3d/device';
+import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import {
   sampleLinearDepth,
@@ -10,6 +10,7 @@ import {
 } from '../shaders/ssr';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { CopyBlitter } from '../blitter';
+import { fetchSampler } from '../utility/misc';
 
 /**
  * SSR post effect
@@ -25,8 +26,6 @@ export class SSR extends AbstractPostEffect {
   private static _resolveProgram: GPUProgram = undefined;
   private static _combineProgram: GPUProgram = undefined;
 
-  private static _samplerNearest: TextureSampler = undefined;
-  private static _samplerLinear: TextureSampler = undefined;
   private _roughnessTex: Texture2D;
   private _normalTex: Texture2D;
   private _bindgroups: Record<string, BindGroup>;
@@ -84,11 +83,13 @@ export class SSR extends AbstractPostEffect {
     if (!this._resolveBindGroup) {
       this._resolveBindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
     }
-    this._resolveBindGroup.setTexture('colorTex', inputColorTexture, SSR._samplerLinear);
-    this._resolveBindGroup.setTexture('intersectTex', intersectTexture, SSR._samplerNearest);
-    this._resolveBindGroup.setTexture('roughnessTex', this._roughnessTex, SSR._samplerNearest);
-    this._resolveBindGroup.setTexture('normalTex', this._normalTex, SSR._samplerNearest);
-    this._resolveBindGroup.setTexture('depthTex', sceneDepthTexture, SSR._samplerNearest);
+    const nearestSampler = fetchSampler('clamp_nearest');
+    const linearSampler = fetchSampler('clamp_linear');
+    this._resolveBindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
+    this._resolveBindGroup.setTexture('intersectTex', intersectTexture, nearestSampler);
+    this._resolveBindGroup.setTexture('roughnessTex', this._roughnessTex, nearestSampler);
+    this._resolveBindGroup.setTexture('normalTex', this._normalTex, nearestSampler);
+    this._resolveBindGroup.setTexture('depthTex', sceneDepthTexture, nearestSampler);
     this._resolveBindGroup.setValue(
       'cameraNearFar',
       new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane())
@@ -144,26 +145,14 @@ export class SSR extends AbstractPostEffect {
       bindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
       this._bindgroups[hash] = bindGroup;
     }
-    if (!SSR._samplerNearest) {
-      SSR._samplerNearest = device.createSampler({
-        minFilter: 'nearest',
-        magFilter: 'nearest',
-        mipFilter: 'nearest'
-      });
-    }
-    if (!SSR._samplerLinear) {
-      SSR._samplerLinear = device.createSampler({
-        minFilter: 'linear',
-        magFilter: 'linear',
-        mipFilter: 'linear'
-      });
-    }
+    const nearestSampler = fetchSampler('clamp_nearest');
+    const linearSampler = fetchSampler('clamp_linear');
     if (!program || !bindGroup) {
       device.clearFrameBuffer(new Vector4(1, 1, 0, 1), null, null);
       return;
     }
     if (!blur) {
-      bindGroup.setTexture('colorTex', inputColorTexture, SSR._samplerLinear);
+      bindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
       bindGroup.setValue('ssrIntensity', ctx.camera.ssrIntensity);
       bindGroup.setValue('ssrFalloff', ctx.camera.ssrFalloff);
       if (ctx.env.light.envLight) {
@@ -171,9 +160,9 @@ export class SSR extends AbstractPostEffect {
         ctx.env.light.envLight.updateBindGroup(bindGroup);
       }
     }
-    bindGroup.setTexture('roughnessTex', this._roughnessTex, SSR._samplerNearest);
-    bindGroup.setTexture('normalTex', this._normalTex, SSR._samplerNearest);
-    bindGroup.setTexture('depthTex', sceneDepthTexture, SSR._samplerNearest);
+    bindGroup.setTexture('roughnessTex', this._roughnessTex, nearestSampler);
+    bindGroup.setTexture('normalTex', this._normalTex, nearestSampler);
+    bindGroup.setTexture('depthTex', sceneDepthTexture, nearestSampler);
     bindGroup.setValue('cameraNearFar', new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane()));
     bindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
     bindGroup.setValue('invProjMatrix', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
@@ -184,7 +173,7 @@ export class SSR extends AbstractPostEffect {
     bindGroup.setValue('ssrMaxRoughness', ctx.camera.ssrMaxRoughness);
     bindGroup.setValue('ssrRoughnessFactor', ctx.camera.ssrRoughnessFactor);
     if (ctx.HiZTexture) {
-      bindGroup.setTexture('hizTex', ctx.HiZTexture, SSR._samplerNearest);
+      bindGroup.setTexture('hizTex', ctx.HiZTexture, nearestSampler);
       bindGroup.setValue('depthMipLevels', ctx.HiZTexture.mipLevelCount);
       bindGroup.setValue(
         'targetSize',
@@ -372,54 +361,55 @@ export class SSR extends AbstractPostEffect {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
           this.$l.intersectSample = pb.textureSampleLevel(this.intersectTex, this.screenUV, 0);
           this.$l.roughnessInfo = pb.textureSampleLevel(this.roughnessTex, this.screenUV, 0);
+          this.$l.reflectance = pb.vec3();
           this.$if(pb.greaterThan(this.intersectSample.w, 0), function () {
             this.$l.indirectIntersectSample = pb.textureSampleLevel(
               this.intersectTex,
               this.intersectSample.xy,
               0
             );
-            this.$l.reflectance = pb.vec3();
             this.$l.indirectRoughnessInfo = pb.textureSampleLevel(
               this.roughnessTex,
               this.intersectSample.xy,
               0
             );
+            this.$l.indirectReflectance = pb.vec3();
             this.$if(pb.greaterThan(this.indirectIntersectSample.w, 0), function () {
               this.$l.indirectReflectSceneColor = pb.textureSampleLevel(
                 this.colorTex,
                 this.indirectIntersectSample.xy,
                 0
               ).rgb;
-              this.$l.indirectReflectance = this.resolveReflectance(
+              this.indirectReflectance = this.resolveReflectance(
                 this.intersectSample.xy,
                 this.indirectReflectSceneColor,
                 this.indirectRoughnessInfo,
                 this.indirectIntersectSample.w
               );
-              this.$l.reflectSceneColor = pb.textureSampleLevel(
-                this.colorTex,
+            }).$else(function () {
+              this.indirectReflectance = this.resolveEnvRadiance(
                 this.intersectSample.xy,
-                0
-              ).rgb;
-              this.$l.reflectSceneColor = this.resolveSample(
-                this.reflectSceneColor,
-                this.indirectReflectance,
                 this.indirectRoughnessInfo
               );
-              this.reflectance = this.resolveReflectance(
-                this.screenUV,
-                this.reflectSceneColor,
-                this.roughnessInfo,
-                this.intersectSample.w
-              );
-            }).$else(function () {
-              this.reflectance = this.resolveEnvRadiance(this.intersectSample.xy, this.indirectRoughnessInfo);
             });
-            this.$outputs.outColor = pb.vec4(this.reflectance, this.intersectSample.z);
+            this.$l.reflectSceneColor = pb.textureSampleLevel(this.colorTex, this.intersectSample.xy, 0).rgb;
+            this.$l.reflectSceneColor = this.resolveSample(
+              this.reflectSceneColor,
+              this.indirectReflectance,
+              this.indirectRoughnessInfo
+            );
+            this.reflectance = this.resolveReflectance(
+              this.screenUV,
+              this.reflectSceneColor,
+              this.roughnessInfo,
+              this.intersectSample.w
+            );
           }).$else(function () {
-            this.$l.env = this.resolveEnvRadiance(this.screenUV, this.roughnessInfo);
-            this.$outputs.outColor = pb.vec4(this.env, this.intersectSample.z);
+            this.reflectance = this.resolveEnvRadiance(this.screenUV, this.roughnessInfo);
           });
+          //this.$l.sceneColor = pb.textureSampleLevel(this.colorTex, this.screenUV, 0).rgb;
+          //this.reflectance = this.resolveSample(this.sceneColor, this.reflectance, this.roughnessInfo);
+          this.$outputs.outColor = pb.vec4(this.reflectance, this.intersectSample.z);
         });
       }
     });

@@ -1,8 +1,9 @@
 import { Vector2 } from '@zephyr3d/base';
 import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
-import type { AbstractDevice, BindGroup, GPUProgram, Texture2D, TextureSampler } from '@zephyr3d/device';
+import type { AbstractDevice, BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
+import { fetchSampler } from '../utility/misc';
 
 /**
  * FXAA post effect
@@ -10,7 +11,6 @@ import type { DrawContext } from '../render';
  */
 export class FXAA extends AbstractPostEffect {
   private static _program: GPUProgram = null;
-  private static _sampler: TextureSampler = null;
   private _bindgroup: BindGroup;
   private _invTexSize: Vector2;
   /**
@@ -41,7 +41,7 @@ export class FXAA extends AbstractPostEffect {
     const device = ctx.device;
     this._prepare(device);
     this._invTexSize.setXY(1 / inputColorTexture.width, 1 / inputColorTexture.height);
-    this._bindgroup.setTexture('srcTex', inputColorTexture, FXAA._sampler);
+    this._bindgroup.setTexture('srcTex', inputColorTexture, fetchSampler('clamp_linear_nomip'));
     this._bindgroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     this._bindgroup.setValue('srgbOut', srgbOutput ? 1 : 0);
     this._bindgroup.setValue('invTexSize', this._invTexSize);
@@ -309,15 +309,6 @@ export class FXAA extends AbstractPostEffect {
             });
           });
         }
-      });
-    }
-    if (!FXAA._sampler) {
-      FXAA._sampler = device.createSampler({
-        magFilter: 'linear',
-        minFilter: 'linear',
-        mipFilter: 'none',
-        addressU: 'clamp',
-        addressV: 'clamp'
       });
     }
     if (!this._bindgroup) {

@@ -19,6 +19,7 @@ import { Vector2 } from '@zephyr3d/base';
 export class AOBilateralBlurBlitter extends Blitter {
   private _depthTex: Texture2D;
   private _sampler: TextureSampler;
+  private _blurTex: Texture2D;
   private _kernelRadius: number;
   private _cameraNearFar: Vector2;
   private _depthCutoff: number;
@@ -33,6 +34,7 @@ export class AOBilateralBlurBlitter extends Blitter {
     this._depthTex = null;
     this._depthCutoff = 0.001;
     this._sampler = null;
+    this._blurTex = null;
     this._packed = false;
     this._kernelRadius = 8;
     this._cameraNearFar = Vector2.zero();

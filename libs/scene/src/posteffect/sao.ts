@@ -1,11 +1,4 @@
-import type {
-  AbstractDevice,
-  BindGroup,
-  GPUProgram,
-  RenderStateSet,
-  Texture2D,
-  TextureSampler
-} from '@zephyr3d/device';
+import type { AbstractDevice, BindGroup, GPUProgram, RenderStateSet, Texture2D } from '@zephyr3d/device';
 import { isFloatTextureFormat } from '@zephyr3d/device';
 import { AbstractPostEffect } from './posteffect';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
@@ -13,6 +6,7 @@ import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { AOBilateralBlurBlitter } from '../blitter/depthlimitedgaussion';
 import { CopyBlitter } from '../blitter';
 import type { DrawContext } from '../render';
+import { fetchSampler } from '../utility/misc';
 
 const NUM_SAMPLES = 7;
 const NUM_RINGS = 4;
@@ -22,7 +16,6 @@ const NUM_RINGS = 4;
  * @public
  */
 export class SAO extends AbstractPostEffect {
-  private static _nearestSampler: TextureSampler = null;
   private static _program: GPUProgram = null;
   private static _programPacked: GPUProgram = null;
   private static _renderState: RenderStateSet = null;
@@ -137,7 +130,7 @@ export class SAO extends AbstractPostEffect {
     const viewport = device.getViewport();
     this._prepare(device, inputColorTexture);
     this._copyBlitter.srgbOut = srgbOutput;
-    this._copyBlitter.blit(inputColorTexture, device.getFramebuffer(), SAO._nearestSampler);
+    this._copyBlitter.blit(inputColorTexture, device.getFramebuffer(), fetchSampler('clamp_nearest_nomip'));
     if (!this._supported) {
       return;
     }
@@ -170,14 +163,14 @@ export class SAO extends AbstractPostEffect {
     this._blitterH.size = new Vector2(inputColorTexture.width, inputColorTexture.height);
     this._blitterH.depthTex = sceneDepthTexture;
     this._blitterH.depthCutoff = this._saoBlurDepthCutoff / ctx.camera.getFarPlane();
-    this._blitterH.nearestSampler = SAO._nearestSampler;
+    this._blitterH.nearestSampler = fetchSampler('clamp_nearest_nomip');
     this._blitterH.cameraNearFar = cameraNearFar;
     this._blitterH.packed = packed;
     this._blitterH.renderStates = SAO._renderState;
     this._blitterV.size = new Vector2(inputColorTexture.width, inputColorTexture.height);
     this._blitterV.depthTex = sceneDepthTexture;
     this._blitterV.depthCutoff = this._saoBlurDepthCutoff / ctx.camera.getFarPlane();
-    this._blitterV.nearestSampler = SAO._nearestSampler;
+    this._blitterV.nearestSampler = fetchSampler('clamp_nearest_nomip');
     this._blitterV.cameraNearFar = cameraNearFar;
     this._blitterV.packed = packed;
     this._blitterV.srgbOut = srgbOutput;
@@ -203,15 +196,6 @@ export class SAO extends AbstractPostEffect {
     const isFloatFramebuffer = fb && isFloatTextureFormat(fb.getColorAttachments()[0].format);
     this._supported = !isFloatFramebuffer || device.getDeviceCaps().framebufferCaps.supportFloatBlending;
     if (this._supported) {
-      if (!SAO._nearestSampler) {
-        SAO._nearestSampler = device.createSampler({
-          magFilter: 'nearest',
-          minFilter: 'nearest',
-          mipFilter: 'none',
-          addressU: 'clamp',
-          addressV: 'clamp'
-        });
-      }
       if (!SAO._renderState) {
         SAO._renderState = device.createRenderStateSet();
         SAO._renderState.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('gt');

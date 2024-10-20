@@ -17,6 +17,7 @@ import { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import { ObjectColorPass } from './objectcolorpass';
 import { buildHiZ } from './hzb';
 import { MaterialVaryingFlags } from '../values';
+import { fetchSampler } from '../utility/misc';
 
 /**
  * Forward render scheme
@@ -327,11 +328,7 @@ export class SceneRenderer {
       new CopyBlitter().blit(
         ctx.sceneColorTexture,
         device.getFramebuffer() ?? null,
-        device.createSampler({
-          magFilter: 'nearest',
-          minFilter: 'nearest',
-          mipFilter: 'none'
-        })
+        fetchSampler('clamp_nearest_nomip')
       );
       this._scenePass.transmission = true;
       this._scenePass.clearColor = null;
@@ -353,15 +350,7 @@ export class SceneRenderer {
       blitter.scissor = scissor;
       blitter.srgbOut = !finalFramebuffer;
       const srcTex = tempFramebuffer.getColorAttachments()[0] as Texture2D;
-      blitter.blit(
-        srcTex,
-        finalFramebuffer ?? null,
-        device.createSampler({
-          magFilter: 'nearest',
-          minFilter: 'nearest',
-          mipFilter: 'none'
-        })
-      );
+      blitter.blit(srcTex, finalFramebuffer ?? null, fetchSampler('clamp_nearest_nomip'));
       device.popDeviceStates();
     }
     ShadowMapper.releaseTemporalResources(ctx);

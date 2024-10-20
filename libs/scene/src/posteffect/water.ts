@@ -5,8 +5,7 @@ import type {
   PBInsideFunctionScope,
   PBShaderExp,
   Texture2D,
-  TextureCube,
-  TextureSampler
+  TextureCube
 } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { WaterMesh } from '../render';
@@ -17,9 +16,9 @@ import { Interpolator, Matrix4x4, Plane, Vector2, Vector3, Vector4 } from '@zeph
 import { Camera } from '../camera';
 import { CopyBlitter } from '../blitter';
 import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
-import { Application } from '../app';
 import { sampleLinearDepth, screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
 import type { WaveGenerator } from '../render/wavegenerator';
+import { fetchSampler } from '../utility/misc';
 
 /**
  * The post water effect
@@ -43,7 +42,6 @@ export class PostWater extends AbstractPostEffect {
   private _ssrParams: Vector4;
   private _waterImpls: Record<string, WaterShaderImpl>;
   private _waterMesh: WaterMesh;
-  private _hizdepthTexSampler: TextureSampler;
   /**
    * Creates an instance of PostWater.
    * @param elevation - Elevation of the water
@@ -76,13 +74,6 @@ export class PostWater extends AbstractPostEffect {
     this._envMap = null;
     this._ssr = true;
     this._ssrParams = new Vector4(32, 80, 0.5, 6);
-    this._hizdepthTexSampler = Application.instance.device.createSampler({
-      magFilter: 'nearest',
-      minFilter: 'nearest',
-      mipFilter: 'nearest',
-      addressU: 'clamp',
-      addressV: 'clamp'
-    });
     this._waterImpls = {};
     this._waterMesh = new WaterMesh();
     this._waterMesh.waveImpl = waveGenerator;
@@ -225,17 +216,7 @@ export class PostWater extends AbstractPostEffect {
     const ssr = this._ssr; // ctx.device.type === 'webgl' ? false : this._ssr;
     const rampTex = this._getRampTexture(device);
     this._copyBlitter.srgbOut = srgbOutput;
-    this._copyBlitter.blit(
-      inputColorTexture,
-      device.getFramebuffer(),
-      device.createSampler({
-        magFilter: 'nearest',
-        minFilter: 'nearest',
-        mipFilter: 'none',
-        addressU: 'clamp',
-        addressV: 'clamp'
-      })
-    );
+    this._copyBlitter.blit(inputColorTexture, device.getFramebuffer(), fetchSampler('clamp_nearest_nomip'));
     let fbRefl: FrameBuffer;
     if (!ssr) {
       if (this._renderingReflections) {
@@ -279,7 +260,7 @@ export class PostWater extends AbstractPostEffect {
     if (ssr) {
       waterBindGroup.setValue('ssrParams', this._ssrParams);
       if (ctx.HiZTexture) {
-        waterBindGroup.setTexture('hizTex', ctx.HiZTexture, this._hizdepthTexSampler);
+        waterBindGroup.setTexture('hizTex', ctx.HiZTexture, fetchSampler('clamp_nearest'));
         waterBindGroup.setValue('depthMipLevels', ctx.HiZTexture.mipLevelCount);
       }
     } else {

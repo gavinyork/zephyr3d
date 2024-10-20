@@ -8,12 +8,12 @@ import type {
   RenderStateSet,
   Texture2D,
   TextureFormat,
-  TextureSampler,
   VertexLayout
 } from '@zephyr3d/device';
 import type { AbstractPostEffect } from './posteffect';
 import { MaterialVaryingFlags } from '../values';
 import { SSR } from './ssr';
+import { fetchSampler } from '../utility/misc';
 
 /**
  * Posteffect rendering context
@@ -36,8 +36,6 @@ export class Compositor {
   protected _postEffectsOpaque: AbstractPostEffect[];
   /** @internal */
   protected _postEffectsTransparency: AbstractPostEffect[];
-  /** @internal */
-  private static _blitSampler: TextureSampler = null;
   /** @internal */
   private static _blitProgram: GPUProgram = null;
   /** @internal */
@@ -288,18 +286,11 @@ export class Compositor {
           }
         ]
       });
-      this._blitSampler = device.createSampler({
-        minFilter: 'nearest',
-        magFilter: 'nearest',
-        mipFilter: 'none',
-        addressU: 'clamp',
-        addressV: 'clamp'
-      });
       this._blitRenderStates = device.createRenderStateSet();
       this._blitRenderStates.useRasterizerState().setCullMode('none');
       this._blitRenderStates.useDepthState().enableTest(false).enableWrite(false);
     }
-    this._blitBindgroup.setTexture('srcTex', srcTex, this._blitSampler);
+    this._blitBindgroup.setTexture('srcTex', srcTex, fetchSampler('clamp_nearest_nomip'));
     this._blitBindgroup.setValue('srgbOutput', srgbOutput ? 1 : 0);
     this._blitBindgroup.setValue('flip', device.type === 'webgpu' && !!device.getFramebuffer() ? 1 : 0);
     device.setRenderStates(this._blitRenderStates);

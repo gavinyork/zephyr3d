@@ -1,11 +1,4 @@
-import type {
-  AbstractDevice,
-  BindGroup,
-  GPUProgram,
-  RenderStateSet,
-  Texture2D,
-  TextureSampler
-} from '@zephyr3d/device';
+import type { AbstractDevice, BindGroup, GPUProgram, RenderStateSet, Texture2D } from '@zephyr3d/device';
 import { AbstractPostEffect } from './posteffect';
 import type { DrawContext } from '../render';
 import { Vector2, Vector4 } from '@zephyr3d/base';
@@ -15,7 +8,6 @@ import { Vector2, Vector4 } from '@zephyr3d/base';
  * @public
  */
 export class Bloom extends AbstractPostEffect {
-  private static _nearestSampler: TextureSampler = null;
   private static _programDownsampleH: GPUProgram = null;
   private static _programDownsampleV: GPUProgram = null;
   private static _programUpsample: GPUProgram = null;
@@ -372,15 +364,6 @@ export class Bloom extends AbstractPostEffect {
     }
     if (!this._bindgroupDownsampleV) {
       this._bindgroupDownsampleV = device.createBindGroup(Bloom._programDownsampleV.bindGroupLayouts[0]);
-    }
-    if (!Bloom._nearestSampler) {
-      Bloom._nearestSampler = device.createSampler({
-        magFilter: 'nearest',
-        minFilter: 'nearest',
-        mipFilter: 'none',
-        addressU: 'clamp',
-        addressV: 'clamp'
-      });
     }
     if (!Bloom._renderStateAdditive) {
       Bloom._renderStateAdditive = device.createRenderStateSet();
