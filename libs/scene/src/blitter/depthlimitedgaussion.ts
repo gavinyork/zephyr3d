@@ -9,33 +9,36 @@ import type {
 } from '@zephyr3d/device';
 import type { BlitType } from './blitter';
 import { Blitter } from './blitter';
-import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders';
+import { decodeNormalizedFloatFromRGBA } from '../shaders';
 import { Vector2 } from '@zephyr3d/base';
 
 /**
- * Bilateral blur blitter horizonal stage for ambient occlusion calculation
+ * Bilateral blur blitter
  * @public
  */
-export class AOBilateralBlurBlitter extends Blitter {
-  private _depthTex: Texture2D;
-  private _sampler: TextureSampler;
-  private _blurTex: Texture2D;
-  private _kernelRadius: number;
-  private _cameraNearFar: Vector2;
-  private _depthCutoff: number;
-  private _packed: boolean;
-  private _uvStep: Vector2;
-  private _size: Vector2;
-  private _stdDev: number;
-  private _offsetsAndWeights: Float32Array;
-  private _finalPhase: boolean;
+export class BilateralBlurBlitter extends Blitter {
+  protected _depthTex: Texture2D;
+  protected _sampler: TextureSampler;
+  protected _blurSizeTex: Texture2D;
+  protected _blurSizeScale: number;
+  protected _blurSizeIndex: number;
+  protected _kernelRadius: number;
+  protected _cameraNearFar: Vector2;
+  protected _depthCutoff: number;
+  protected _uvStep: Vector2;
+  protected _size: Vector2;
+  protected _stdDev: number;
+  protected _offsetsAndWeights: Float32Array;
+  protected _finalPhase: boolean;
   constructor(finalPhase: boolean) {
     super();
     this._depthTex = null;
     this._depthCutoff = 0.001;
+    this._blurSizeTex = null;
+    this._blurSizeScale = 1;
+    this._blurSizeIndex = 0;
     this._sampler = null;
-    this._blurTex = null;
-    this._packed = false;
+    this._blurSizeTex = null;
     this._kernelRadius = 8;
     this._cameraNearFar = Vector2.zero();
     this._size = Vector2.zero();
@@ -51,19 +54,28 @@ export class AOBilateralBlurBlitter extends Blitter {
   set depthTex(tex: Texture2D) {
     this._depthTex = tex;
   }
-  get packed(): boolean {
-    return this._packed;
+  get blurSizeTex(): Texture2D {
+    return this._blurSizeTex;
   }
-  set packed(val: boolean) {
-    if (this._packed !== !!val) {
-      this._packed = !!val;
-      this.invalidateHash();
-    }
+  set blurSizeTex(tex: Texture2D) {
+    this._blurSizeTex = tex;
   }
-  get nearestSampler(): TextureSampler {
+  get blurSizeIndex(): number {
+    return this._blurSizeIndex;
+  }
+  set blurSizeIndex(val: number) {
+    this._blurSizeIndex = val;
+  }
+  get blurSizeScale(): number {
+    return this._blurSizeScale;
+  }
+  set blurSizeScale(val: number) {
+    this._blurSizeScale = val;
+  }
+  get sampler(): TextureSampler {
     return this._sampler;
   }
-  set nearestSampler(sampler: TextureSampler) {
+  set sampler(sampler: TextureSampler) {
     this._sampler = sampler;
   }
   get cameraNearFar(): Vector2 {
@@ -105,7 +117,7 @@ export class AOBilateralBlurBlitter extends Blitter {
     }
   }
   protected calcHash(): string {
-    return `${this._kernelRadius}:${this._packed}:${this._finalPhase}`;
+    return `${Number(!!this._blurSizeTex)}:${this._blurSizeIndex}:${this._kernelRadius}:${this._finalPhase}`;
   }
   private calcGaussion() {
     for (let i = 0; i <= this.kernelRadius; i++) {
@@ -119,7 +131,11 @@ export class AOBilateralBlurBlitter extends Blitter {
     super.setup(scope, type);
     const pb = scope.$builder;
     if (pb.shaderKind === 'fragment') {
-      scope.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+      scope.depthTex = pb.tex2D().uniform(0);
+      if (this._blurSizeTex) {
+        scope.blurSizeTex = pb.tex2D().uniform(0);
+        scope.blurSizeScale = pb.float().uniform(0);
+      }
       scope.depthCutoff = pb.float().uniform(0);
       scope.offsetsAndWeights = pb.vec4[this._kernelRadius + 1]().uniform(0);
       scope.cameraNearFar = pb.vec2().uniform(0);
@@ -129,6 +145,10 @@ export class AOBilateralBlurBlitter extends Blitter {
   setUniforms(bindGroup: BindGroup, sourceTex: BaseTexture) {
     super.setUniforms(bindGroup, sourceTex);
     bindGroup.setTexture('depthTex', this._depthTex, this._sampler);
+    if (this._blurSizeTex) {
+      bindGroup.setTexture('blurSizeTex', this._blurSizeTex);
+      bindGroup.setValue('blurSizeScale', this._blurSizeScale);
+    }
     bindGroup.setValue('depthCutoff', this._depthCutoff);
     bindGroup.setValue('offsetsAndWeights', this._offsetsAndWeights);
     bindGroup.setValue('cameraNearFar', this._cameraNearFar);
@@ -155,36 +175,33 @@ export class AOBilateralBlurBlitter extends Blitter {
     scope.depth = scope.getLinearDepth(srcUV);
     scope.weightSum = scope.offsetsAndWeights[0].z;
     scope.srcTexel = that.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
-    scope.ao = that._packed ? decodeNormalizedFloatFromRGBA(scope, scope.srcTexel) : scope.srcTexel.r;
-    scope.colorSum = pb.mul(scope.ao, scope.weightSum);
+    scope.colorSum = pb.mul(scope.srcTexel, scope.weightSum);
+    if (this._blurSizeTex) {
+      scope.blurSize = pb.textureSample(scope.blurSizeTex, srcUV)['rgba'[this._blurSizeIndex]];
+    }
     scope.$for(pb.int('i'), 0, that._kernelRadius, function () {
       this.$l.offsetAndWeight = this.offsetsAndWeights.at(pb.add(this.i, 1));
       this.$l.weight = this.offsetAndWeight.z;
       this.$l.offset = pb.div(this.offsetAndWeight.xy, this.size);
+      if (this._blurSizeTex) {
+        this.offset = pb.mul(this.offset, this.blurSize, this.blurSizeScale);
+      }
       this.$l.uvRight = pb.add(srcUV, this.offset);
       this.$l.depthRight = this.getLinearDepth(this.uvRight);
       this.$if(pb.lessThan(pb.abs(pb.sub(this.depthRight, this.depth)), this.depthCutoff), function () {
         this.$l.srcTexelRight = that.readTexel(this, type, srcTex, this.uvRight, srcLayer, sampleType);
-        this.$l.aoRight = that._packed
-          ? decodeNormalizedFloatFromRGBA(this, this.srcTexelRight)
-          : this.srcTexelRight.r;
-        this.colorSum = pb.add(this.colorSum, pb.mul(this.aoRight, this.weight));
+        this.colorSum = pb.add(this.colorSum, pb.mul(this.srcTexelRight, this.weight));
         this.weightSum = pb.add(this.weightSum, this.weight);
       });
       this.$l.uvLeft = pb.sub(srcUV, this.offset);
       this.$l.depthLeft = this.getLinearDepth(this.uvLeft);
       this.$if(pb.lessThan(pb.abs(pb.sub(this.depthLeft, this.depth)), this.depthCutoff), function () {
         this.$l.srcTexelLeft = that.readTexel(this, type, srcTex, this.uvLeft, srcLayer, sampleType);
-        this.$l.aoLeft = that._packed
-          ? decodeNormalizedFloatFromRGBA(this, this.srcTexelLeft)
-          : this.srcTexelLeft.r;
-        this.colorSum = pb.add(this.colorSum, pb.mul(this.aoLeft, this.weight));
+        this.colorSum = pb.add(this.colorSum, pb.mul(this.srcTexelLeft, this.weight));
         this.weightSum = pb.add(this.weightSum, this.weight);
       });
     });
     scope.colorSum = pb.div(scope.colorSum, scope.weightSum);
-    return that._finalPhase || !that._packed
-      ? pb.vec4(scope.colorSum, scope.colorSum, scope.colorSum, 1)
-      : encodeNormalizedFloatToRGBA(scope, scope.colorSum);
+    return scope.colorSum;
   }
 }

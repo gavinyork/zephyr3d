@@ -1,6 +1,6 @@
 import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
-import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
+import type { BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import {
   sampleLinearDepth,
@@ -11,6 +11,7 @@ import {
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { CopyBlitter } from '../blitter';
 import { fetchSampler } from '../utility/misc';
+import { BilateralBlurBlitter } from '../blitter/depthlimitedgaussion';
 
 /**
  * SSR post effect
@@ -22,14 +23,14 @@ import { fetchSampler } from '../utility/misc';
  */
 export class SSR extends AbstractPostEffect {
   private static _programs: Record<string, GPUProgram> = {};
-  private static _blurProgram: GPUProgram = null;
   private static _resolveProgram: GPUProgram = undefined;
   private static _combineProgram: GPUProgram = undefined;
+  private static _blurBlitterH: BilateralBlurBlitter = null;
+  private static _blurBlitterV: BilateralBlurBlitter = null;
 
   private _roughnessTex: Texture2D;
   private _normalTex: Texture2D;
   private _bindgroups: Record<string, BindGroup>;
-  private _blurBindGroup: BindGroup;
   private _resolveBindGroup: BindGroup;
   private _combineBindGroup: BindGroup;
   /**
@@ -39,7 +40,6 @@ export class SSR extends AbstractPostEffect {
     super();
     this._opaque = true;
     this._bindgroups = {};
-    this._blurBindGroup = null;
     this._resolveBindGroup = null;
     this._combineBindGroup = null;
     this._roughnessTex = null;
@@ -63,6 +63,66 @@ export class SSR extends AbstractPostEffect {
   /** {@inheritDoc AbstractPostEffect.requireDepthAttachment} */
   requireDepthAttachment(): boolean {
     return false;
+  }
+  /** @internal */
+  blurPass(
+    ctx: DrawContext,
+    blitter: BilateralBlurBlitter,
+    blurSizeTex: Texture2D,
+    blurSizeIndex: number,
+    blurSizeScale: number,
+    kernelRadius: number,
+    stdDev: number,
+    depthCutoff: number,
+    fbFrom: FrameBuffer,
+    fbTo: FrameBuffer
+  ) {
+    const size = new Vector2(fbFrom.getWidth(), fbFrom.getHeight());
+    blitter.kernelRadius = kernelRadius;
+    blitter.stdDev = stdDev;
+    blitter.size = size;
+    blitter.depthTex = ctx.linearDepthTexture;
+    blitter.depthCutoff = depthCutoff;
+    blitter.blurSizeTex = blurSizeTex;
+    blitter.blurSizeIndex = blurSizeIndex;
+    blitter.blurSizeScale = blurSizeScale;
+    blitter.sampler = fetchSampler('clamp_nearest_nomip');
+    blitter.cameraNearFar.setXY(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
+    blitter.srgbOut = false;
+    blitter.blit(fbFrom.getColorAttachments()[0] as Texture2D, fbTo);
+  }
+  /** @internal */
+  combine(ctx: DrawContext, inputColorTexture: Texture2D, reflectanceTex: Texture2D) {
+    const device = ctx.device;
+    let program = SSR._combineProgram;
+    if (program === undefined) {
+      program = this._createCombineProgrm(ctx);
+      SSR._combineProgram = program;
+    }
+    if (!program) {
+      return;
+    }
+    if (!this._combineBindGroup) {
+      this._combineBindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
+    }
+    const linearSampler = fetchSampler('clamp_linear');
+    this._combineBindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
+    this._combineBindGroup.setTexture('reflectanceTex', reflectanceTex, linearSampler);
+    this._combineBindGroup.setTexture('roughnessTex', this._roughnessTex, linearSampler);
+    this._combineBindGroup.setValue('ssrIntensity', ctx.camera.ssrIntensity);
+    this._combineBindGroup.setValue('ssrFalloff', ctx.camera.ssrFalloff);
+    this._combineBindGroup.setValue(
+      'targetSize',
+      new Vector4(
+        device.getDrawingBufferWidth(),
+        device.getDrawingBufferHeight(),
+        device.getDrawingBufferWidth(),
+        device.getDrawingBufferHeight()
+      )
+    );
+    device.setProgram(program);
+    device.setBindGroup(0, this._combineBindGroup);
+    this.drawFullscreenQuad();
   }
   /** @internal */
   resolve(
@@ -114,10 +174,8 @@ export class SSR extends AbstractPostEffect {
       ctx.env.light.envLight.updateBindGroup(this._resolveBindGroup);
     }
     this._resolveBindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
-    this._resolveBindGroup.setValue('srgbOut', 0);
     device.setProgram(program);
     device.setBindGroup(0, this._resolveBindGroup);
-
     this.drawFullscreenQuad();
   }
   /** @internal */
@@ -208,6 +266,14 @@ export class SSR extends AbstractPostEffect {
     if (ctx.primaryCamera.ssrBlur) {
       const fb = device.getFramebuffer();
       device.pushDeviceStates();
+      const intersectFramebuffer = device.pool.fetchTemporalFramebuffer(
+        false,
+        inputColorTexture.width,
+        inputColorTexture.height,
+        'rgba16f',
+        null,
+        false
+      );
       const pingpongFramebuffer = [
         device.pool.fetchTemporalFramebuffer(
           false,
@@ -226,30 +292,109 @@ export class SSR extends AbstractPostEffect {
           false
         )
       ];
-      let k = 0;
-      device.setFramebuffer(pingpongFramebuffer[k]);
+      device.setFramebuffer(intersectFramebuffer);
       this.intersect(ctx, inputColorTexture, sceneDepthTexture, true, false);
-      k = 1 - k;
-      device.setFramebuffer(pingpongFramebuffer[k]);
-      this.resolve(
+      const intersectTex = intersectFramebuffer.getColorAttachments()[0] as Texture2D;
+      device.setFramebuffer(pingpongFramebuffer[0]);
+      this.resolve(ctx, inputColorTexture, sceneDepthTexture, intersectTex);
+      const blitterH = (SSR._blurBlitterH = SSR._blurBlitterH ?? new BilateralBlurBlitter(false));
+      this.blurPass(
         ctx,
-        inputColorTexture,
-        sceneDepthTexture,
-        pingpongFramebuffer[1 - k].getColorAttachments()[0] as Texture2D
+        blitterH,
+        intersectTex,
+        3,
+        255 / 8,
+        8,
+        5,
+        0.001,
+        pingpongFramebuffer[0],
+        pingpongFramebuffer[1]
       );
-      const blitter = new CopyBlitter();
-      const nearestSampler = device.createSampler({
-        magFilter: 'nearest',
-        minFilter: 'nearest',
-        mipFilter: 'none'
-      });
-      blitter.blit(pingpongFramebuffer[k].getColorAttachments()[0] as Texture2D, fb, nearestSampler);
+      const blitterV = (SSR._blurBlitterV = SSR._blurBlitterV ?? new BilateralBlurBlitter(true));
+      this.blurPass(
+        ctx,
+        blitterV,
+        intersectTex,
+        3,
+        255 / 8,
+        8,
+        5,
+        0.001,
+        pingpongFramebuffer[1],
+        pingpongFramebuffer[0]
+      );
+      device.popDeviceStates();
+      if (true) {
+        this.combine(ctx, inputColorTexture, pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D);
+      } else {
+        const blitter = new CopyBlitter();
+        const nearestSampler = device.createSampler({
+          magFilter: 'nearest',
+          minFilter: 'nearest',
+          mipFilter: 'none'
+        });
+        blitter.blit(pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D, fb, nearestSampler);
+      }
+      device.pool.releaseFrameBuffer(intersectFramebuffer);
       device.pool.releaseFrameBuffer(pingpongFramebuffer[0]);
       device.pool.releaseFrameBuffer(pingpongFramebuffer[1]);
-      device.popDeviceStates();
     } else {
       this.intersect(ctx, inputColorTexture, sceneDepthTexture, false, srgbOutput);
     }
+  }
+  /** @internal */
+  private _createCombineProgrm(ctx: DrawContext): GPUProgram {
+    return ctx.device.buildRenderProgram({
+      vertex(pb) {
+        this.flip = pb.int().uniform(0);
+        this.$inputs.pos = pb.vec2().attrib('position');
+        this.$outputs.uv = pb.vec2();
+        if (ctx.env.light.envLight) {
+          ctx.env.light.envLight.initShaderBindings(pb);
+        }
+        pb.main(function () {
+          this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+          this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+          this.$if(pb.notEqual(this.flip, 0), function () {
+            this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+          });
+        });
+      },
+      fragment(pb) {
+        this.colorTex = pb.tex2D().uniform(0);
+        this.reflectanceTex = pb.tex2D().uniform(0);
+        this.roughnessTex = pb.tex2D().uniform(0);
+        this.targetSize = pb.vec4().uniform(0);
+        this.ssrIntensity = pb.float().uniform(0);
+        this.ssrFalloff = pb.float().uniform(0);
+        this.$outputs.outColor = pb.vec4();
+        pb.func(
+          'resolveSample',
+          [pb.vec3('sceneColor'), pb.vec3('reflectance'), pb.vec4('roughnessValue')],
+          function () {
+            this.$l.r = pb.div(this.reflectance, pb.add(this.reflectance, pb.vec3(1)));
+            this.$l.strength = pb.clamp(
+              pb.pow(pb.mul(this.roughnessValue.rgb, this.ssrIntensity), pb.vec3(this.ssrFalloff)),
+              pb.vec3(0),
+              pb.vec3(1)
+            );
+            this.color = pb.add(
+              pb.mul(this.r, this.strength),
+              pb.mul(this.sceneColor, pb.sub(pb.vec3(1), this.strength))
+            );
+            this.$return(this.color);
+          }
+        );
+        pb.main(function () {
+          this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
+          this.$l.reflectance = pb.textureSampleLevel(this.reflectanceTex, this.screenUV, 0).rgb;
+          this.$l.sceneColor = pb.textureSampleLevel(this.colorTex, this.screenUV, 0).rgb;
+          this.$l.roughnessInfo = pb.textureSampleLevel(this.roughnessTex, this.screenUV, 0);
+          this.combined = this.resolveSample(this.sceneColor, this.reflectance, this.roughnessInfo);
+          this.$outputs.outColor = pb.vec4(this.combined, 1);
+        });
+      }
+    });
   }
   /** @internal */
   private _createResolveProgram(ctx: DrawContext): GPUProgram {
@@ -346,7 +491,7 @@ export class SSR extends AbstractPostEffect {
             ctx.env.light.envLight.getRadiance(this, this.reflectVecW, this.roughness2),
             this.envLightStrength
           );
-          this.$return(this.env);
+          this.$return(pb.min(this.env, pb.vec3(1)));
         });
         pb.func(
           'resolveReflectance',
@@ -412,24 +557,6 @@ export class SSR extends AbstractPostEffect {
           this.$outputs.outColor = pb.vec4(this.reflectance, this.intersectSample.z);
         });
       }
-    });
-  }
-  /** @internal */
-  private _createBlurProgram(ctx: DrawContext): GPUProgram {
-    return ctx.device.buildRenderProgram({
-      vertex(pb) {
-        this.flip = pb.int().uniform(0);
-        this.$inputs.pos = pb.vec2().attrib('position');
-        this.$outputs.uv = pb.vec2();
-        pb.main(function () {
-          this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
-          this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-          this.$if(pb.notEqual(this.flip, 0), function () {
-            this.$builtins.position.y = pb.neg(this.$builtins.position.y);
-          });
-        });
-      },
-      fragment(pb) {}
     });
   }
   /** @internal */
