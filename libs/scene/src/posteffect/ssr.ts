@@ -295,7 +295,6 @@ export class SSR extends AbstractPostEffect {
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const device = ctx.device;
-    const fb = device.getFramebuffer();
     device.pushDeviceStates();
     const intersectFramebuffer = device.pool.fetchTemporalFramebuffer(
       false,
