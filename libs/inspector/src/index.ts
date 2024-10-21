@@ -900,6 +900,19 @@ export class Inspector {
           1
         );
         ImGui.SliderFloat(
+          'SSRBlurDepthCutoff##Camera',
+          (val?: number) => {
+            if (val === undefined) {
+              val = camera.ssrBlurDepthCutoff;
+            } else {
+              camera.ssrBlurDepthCutoff = val;
+            }
+            return val;
+          },
+          0,
+          10
+        );
+        ImGui.SliderFloat(
           'SSRBlurKernelRadius##Camera',
           (val?: number) => {
             if (val === undefined) {

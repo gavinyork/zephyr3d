@@ -12,7 +12,8 @@ import {
   Tonemap,
   PBRMetallicRoughnessMaterial,
   BoxShape,
-  SphereShape
+  SphereShape,
+  BlinnMaterial
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { Inspector } from '@zephyr3d/inspector';
@@ -54,28 +55,25 @@ ssrApp.ready().then(async () => {
   const inspector = new Inspector(scene, compositor, camera);
 
   const batchGroup = new BatchGroup(scene);
-  const mat1 = new PBRMetallicRoughnessMaterial();
+  const mat1 = new BlinnMaterial();
   mat1.albedoColor = new Vector4(0.8, 0.8, 0.6, 1);
-  mat1.metallic = 0.8;
-  mat1.roughness = 0.3;
+  mat1.shininess = 64;
   const boxShape1 = new BoxShape({ sizeX: 300, sizeY: 1, sizeZ: 300 });
   const floor = new Mesh(scene, boxShape1, mat1);
   floor.position.setXYZ(-150, 0, -150);
   floor.parent = batchGroup;
 
-  const mat2 = new PBRMetallicRoughnessMaterial();
+  const mat2 = new BlinnMaterial();
   mat2.albedoColor = new Vector4(0.8, 0, 0, 1);
-  mat2.metallic = 0.1;
-  mat2.roughness = 0.3;
+  mat2.shininess = 128;
   const boxShape2 = new BoxShape({ sizeX: 1, sizeY: 100, sizeZ: 300 });
   const wall = new Mesh(scene, boxShape2, mat2);
   wall.position.setXYZ(0, 0, -150);
   wall.parent = batchGroup;
 
-  const mat3 = new PBRMetallicRoughnessMaterial();
+  const mat3 = new BlinnMaterial();
   mat3.albedoColor = new Vector4(1, 1, 0, 1);
-  mat3.metallic = 0.1;
-  mat3.roughness = 0.8;
+  mat3.shininess = 256;
 
   const sphereShape = new SphereShape({ radius: 10 });
   const sphere = new Mesh(scene, sphereShape, mat3);

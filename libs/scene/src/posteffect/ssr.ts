@@ -129,6 +129,7 @@ export class SSR extends AbstractPostEffect {
         device.getDrawingBufferHeight()
       )
     );
+    this._combineBindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     device.setProgram(program);
     device.setBindGroup(0, this._combineBindGroup);
     this.drawFullscreenQuad();
@@ -325,14 +326,15 @@ export class SSR extends AbstractPostEffect {
     device.setFramebuffer(intersectFramebuffer);
     this.intersect(ctx, inputColorTexture, sceneDepthTexture, true, false);
     const intersectTex = intersectFramebuffer.getColorAttachments()[0] as Texture2D;
-    this.debugTexture(intersectTex, 'SSR_Debug_intersect');
+    //this.debugTexture(intersectTex, 'SSR_Debug_intersect');
     device.setFramebuffer(pingpongFramebuffer[0]);
     this.resolve(ctx, inputColorTexture, sceneDepthTexture, intersectTex);
-    this.debugTexture(pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D, 'SSR_Debug_resolve');
+    //this.debugTexture(pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D, 'SSR_Debug_resolve');
     if (ctx.camera.ssrBlurriness > 0 && ctx.camera.ssrBlurKernelRadius > 0) {
       const blurSizeScale = 255 * ctx.camera.ssrBlurriness;
       const kernelRadius = ctx.camera.ssrBlurKernelRadius;
       const stdDev = ctx.camera.ssrBlurStdDev;
+      const depthCutoff = ctx.camera.ssrBlurDepthCutoff;
       const blitterH = (SSR._blurBlitterH = SSR._blurBlitterH ?? new BilateralBlurBlitter(false));
       this.blurPass(
         ctx,
@@ -342,11 +344,11 @@ export class SSR extends AbstractPostEffect {
         blurSizeScale,
         kernelRadius,
         stdDev,
-        0.001,
+        depthCutoff,
         pingpongFramebuffer[0],
         pingpongFramebuffer[1]
       );
-      this.debugTexture(pingpongFramebuffer[1].getColorAttachments()[0] as Texture2D, 'SSR_Debug_blurH');
+      //this.debugTexture(pingpongFramebuffer[1].getColorAttachments()[0] as Texture2D, 'SSR_Debug_blurH');
       const blitterV = (SSR._blurBlitterV = SSR._blurBlitterV ?? new BilateralBlurBlitter(true));
       this.blurPass(
         ctx,
@@ -356,24 +358,14 @@ export class SSR extends AbstractPostEffect {
         blurSizeScale,
         kernelRadius,
         stdDev,
-        0.001,
+        depthCutoff,
         pingpongFramebuffer[1],
         pingpongFramebuffer[0]
       );
     }
-    this.debugTexture(pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D, 'SSR_Debug_blurV');
+    //this.debugTexture(pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D, 'SSR_Debug_blurV');
     device.popDeviceStates();
-    if (true) {
-      this.combine(ctx, inputColorTexture, pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D);
-    } else {
-      const blitter = new CopyBlitter();
-      const nearestSampler = device.createSampler({
-        magFilter: 'nearest',
-        minFilter: 'nearest',
-        mipFilter: 'none'
-      });
-      blitter.blit(pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D, fb, nearestSampler);
-    }
+    this.combine(ctx, inputColorTexture, pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D);
     device.pool.releaseFrameBuffer(intersectFramebuffer);
     device.pool.releaseFrameBuffer(pingpongFramebuffer[0]);
     device.pool.releaseFrameBuffer(pingpongFramebuffer[1]);

@@ -85,6 +85,8 @@ export class Camera extends SceneNode {
   protected _ssrCalcThickness: boolean;
   /** @internal */
   protected _ssrBlurriness: number;
+  /** @inernal */
+  protected _ssrBlurDepthCutoff: number;
   /** @internal */
   protected _ssrBlurKernelRadius: number;
   /** @internal */
@@ -136,6 +138,7 @@ export class Camera extends SceneNode {
     this._ssrStride = 2;
     this._ssrCalcThickness = false;
     this._ssrBlurriness = 0;
+    this._ssrBlurDepthCutoff = 1;
     this._ssrBlurKernelRadius = 8;
     this._ssrBlurStdDev = 5;
     this._ssrDebug = 'none';
@@ -229,6 +232,12 @@ export class Camera extends SceneNode {
   }
   set ssrBlurriness(val: number) {
     this._ssrBlurriness = val;
+  }
+  get ssrBlurDepthCutoff(): number {
+    return this._ssrBlurDepthCutoff;
+  }
+  set ssrBlurDepthCutoff(val: number) {
+    this._ssrBlurDepthCutoff = val;
   }
   get ssrBlurKernelRadius(): number {
     return this._ssrBlurKernelRadius;

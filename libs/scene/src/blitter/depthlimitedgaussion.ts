@@ -190,9 +190,12 @@ export class BilateralBlurBlitter extends Blitter {
     pb.func('getLinearDepth', [pb.vec2('uv')], function () {
       this.$l.depthValue = pb.textureSample(this.depthTex, this.uv);
       this.$return(
-        pb.getDevice().type === 'webgl'
-          ? decodeNormalizedFloatFromRGBA(this, this.depthValue)
-          : this.depthValue.r
+        pb.mul(
+          pb.getDevice().type === 'webgl'
+            ? decodeNormalizedFloatFromRGBA(this, this.depthValue)
+            : this.depthValue.r,
+          this.cameraNearFar.y
+        )
       );
     });
     scope.depth = scope.getLinearDepth(srcUV);
