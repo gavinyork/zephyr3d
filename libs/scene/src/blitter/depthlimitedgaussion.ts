@@ -11,6 +11,7 @@ import type { BlitType } from './blitter';
 import { Blitter } from './blitter';
 import { decodeNormalizedFloatFromRGBA } from '../shaders';
 import { Vector2 } from '@zephyr3d/base';
+import { fetchSampler } from '../utility/misc';
 
 /**
  * Bilateral blur blitter
@@ -25,6 +26,7 @@ export class BilateralBlurBlitter extends Blitter {
   protected _kernelRadius: number;
   protected _cameraNearFar: Vector2;
   protected _depthCutoff: number;
+  protected _stepSize: number;
   protected _uvStep: Vector2;
   protected _size: Vector2;
   protected _stdDev: number;
@@ -42,9 +44,10 @@ export class BilateralBlurBlitter extends Blitter {
     this._kernelRadius = 8;
     this._cameraNearFar = Vector2.zero();
     this._size = Vector2.zero();
-    this._stdDev = 10;
+    this._stdDev = 2;
     this._offsetsAndWeights = new Float32Array(4 * (this._kernelRadius + 1));
     this._finalPhase = !!finalPhase;
+    this._stepSize = 1;
     this._uvStep = this._finalPhase ? new Vector2(1, 0) : new Vector2(0, 1);
     this.calcGaussion();
   }
@@ -96,6 +99,15 @@ export class BilateralBlurBlitter extends Blitter {
   set size(val: Vector2) {
     this._size.set(val);
   }
+  get stepSize(): number {
+    return this._stepSize;
+  }
+  set stepSize(val: number) {
+    if (val !== this._stepSize) {
+      this._stepSize = val;
+      this.calcGaussion();
+    }
+  }
   get stdDev(): number {
     return this._stdDev;
   }
@@ -109,6 +121,7 @@ export class BilateralBlurBlitter extends Blitter {
     return this._kernelRadius;
   }
   set kernelRadius(val: number) {
+    val = Math.max(val, 0) >> 0;
     if (val !== this._kernelRadius) {
       this._kernelRadius = val;
       this._offsetsAndWeights = new Float32Array(4 * (this._kernelRadius + 1));
@@ -120,11 +133,21 @@ export class BilateralBlurBlitter extends Blitter {
     return `${Number(!!this._blurSizeTex)}:${this._blurSizeIndex}:${this._kernelRadius}:${this._finalPhase}`;
   }
   private calcGaussion() {
+    const kernel: number[] = [];
+    const size = this.kernelRadius * 2 + 1;
+    let sum = 0;
+    for (let x = 0; x < size; x++) {
+      const value =
+        (1 / (Math.sqrt(2 * Math.PI) * this._stdDev)) *
+        Math.exp(-((x - this.kernelRadius) ** 2) / (2 * this._stdDev ** 2));
+      kernel.push(value);
+      sum += value;
+    }
     for (let i = 0; i <= this.kernelRadius; i++) {
       this._offsetsAndWeights[i * 4] = this._uvStep.x * i;
       this._offsetsAndWeights[i * 4 + 1] = this._uvStep.y * i;
-      this._offsetsAndWeights[i * 4 + 2] =
-        Math.exp(-(i * i) / (2 * (this._stdDev * this._stdDev))) / (Math.sqrt(2.0 * Math.PI) * this._stdDev);
+      this._offsetsAndWeights[i * 4 + 2] = kernel[this.kernelRadius - i] / sum;
+      this._offsetsAndWeights[i * 4 + 3] = this._stepSize;
     }
   }
   setup(scope: PBGlobalScope, type: BlitType) {
@@ -144,9 +167,9 @@ export class BilateralBlurBlitter extends Blitter {
   }
   setUniforms(bindGroup: BindGroup, sourceTex: BaseTexture) {
     super.setUniforms(bindGroup, sourceTex);
-    bindGroup.setTexture('depthTex', this._depthTex, this._sampler);
+    bindGroup.setTexture('depthTex', this._depthTex, this._sampler ?? fetchSampler('clamp_nearest_nomip'));
     if (this._blurSizeTex) {
-      bindGroup.setTexture('blurSizeTex', this._blurSizeTex);
+      bindGroup.setTexture('blurSizeTex', this._blurSizeTex, fetchSampler('clamp_linear_nomip'));
       bindGroup.setValue('blurSizeScale', this._blurSizeScale);
     }
     bindGroup.setValue('depthCutoff', this._depthCutoff);
@@ -176,16 +199,17 @@ export class BilateralBlurBlitter extends Blitter {
     scope.weightSum = scope.offsetsAndWeights[0].z;
     scope.srcTexel = that.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
     scope.colorSum = pb.mul(scope.srcTexel, scope.weightSum);
-    if (this._blurSizeTex) {
+    if (that._blurSizeTex) {
       scope.blurSize = pb.textureSample(scope.blurSizeTex, srcUV)['rgba'[this._blurSizeIndex]];
     }
     scope.$for(pb.int('i'), 0, that._kernelRadius, function () {
       this.$l.offsetAndWeight = this.offsetsAndWeights.at(pb.add(this.i, 1));
       this.$l.weight = this.offsetAndWeight.z;
-      this.$l.offset = pb.div(this.offsetAndWeight.xy, this.size);
-      if (this._blurSizeTex) {
+      this.$l.offset = this.offsetAndWeight.xy;
+      if (that._blurSizeTex) {
         this.offset = pb.mul(this.offset, this.blurSize, this.blurSizeScale);
       }
+      this.$l.offset = pb.div(this.offset, this.size);
       this.$l.uvRight = pb.add(srcUV, this.offset);
       this.$l.depthRight = this.getLinearDepth(this.uvRight);
       this.$if(pb.lessThan(pb.abs(pb.sub(this.depthRight, this.depth)), this.depthCutoff), function () {

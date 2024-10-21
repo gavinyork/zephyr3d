@@ -27,12 +27,20 @@ export class SSR extends AbstractPostEffect {
   private static _combineProgram: GPUProgram = undefined;
   private static _blurBlitterH: BilateralBlurBlitter = null;
   private static _blurBlitterV: BilateralBlurBlitter = null;
+  private static _weights = [
+    0.1847392078702266, 0.16595854345772326, 0.12031364177766891, 0.07038755277896766, 0.03322925565155569,
+    0.012657819729901945, 0.0038903040680094217, 0.0009646503390864025, 0.00019297087402915717,
+    0.000031139936308099136, 0.000004053309048174758, 4.255228059965837e-7, 3.602517634249573e-8,
+    2.4592560765896795e-9, 1.3534945386863618e-10, 0
+  ];
 
   private _roughnessTex: Texture2D;
   private _normalTex: Texture2D;
   private _bindgroups: Record<string, BindGroup>;
   private _resolveBindGroup: BindGroup;
   private _combineBindGroup: BindGroup;
+
+  private _debugFrameBuffer: Record<string, FrameBuffer>;
   /**
    * Creates an instance of SSR post effect
    */
@@ -43,6 +51,7 @@ export class SSR extends AbstractPostEffect {
     this._resolveBindGroup = null;
     this._combineBindGroup = null;
     this._roughnessTex = null;
+    this._debugFrameBuffer = {};
   }
   get roughnessTexture() {
     return this._roughnessTex;
@@ -89,7 +98,7 @@ export class SSR extends AbstractPostEffect {
     blitter.sampler = fetchSampler('clamp_nearest_nomip');
     blitter.cameraNearFar.setXY(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
     blitter.srgbOut = false;
-    blitter.blit(fbFrom.getColorAttachments()[0] as Texture2D, fbTo);
+    blitter.blit(fbFrom.getColorAttachments()[0] as Texture2D, fbTo, fetchSampler('clamp_linear_nomip'));
   }
   /** @internal */
   combine(ctx: DrawContext, inputColorTexture: Texture2D, reflectanceTex: Texture2D) {
@@ -260,87 +269,114 @@ export class SSR extends AbstractPostEffect {
     device.setBindGroup(0, bindGroup);
     this.drawFullscreenQuad();
   }
+  /** @internal */
+  debugTexture(tex: Texture2D, label: string) {
+    let fb = this._debugFrameBuffer[label];
+    if (!fb || fb.getWidth() !== tex.width || fb.getHeight() !== tex.height) {
+      fb?.getColorAttachments()[0]?.dispose();
+      fb?.dispose();
+      fb = tex.device.createFrameBuffer(
+        [
+          tex.device.createTexture2D(tex.format, tex.width, tex.height, {
+            samplerOptions: {
+              mipFilter: 'none'
+            }
+          })
+        ],
+        null
+      );
+      fb.getColorAttachments()[0].name = label ?? 'SSR_Debug';
+      this._debugFrameBuffer[label] = fb;
+    }
+    const blitter = new CopyBlitter();
+    blitter.blit(tex, fb, fetchSampler('clamp_nearest_nomip'));
+  }
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const device = ctx.device;
-    if (ctx.primaryCamera.ssrBlur) {
-      const fb = device.getFramebuffer();
-      device.pushDeviceStates();
-      const intersectFramebuffer = device.pool.fetchTemporalFramebuffer(
+    const fb = device.getFramebuffer();
+    device.pushDeviceStates();
+    const intersectFramebuffer = device.pool.fetchTemporalFramebuffer(
+      false,
+      inputColorTexture.width,
+      inputColorTexture.height,
+      'rgba16f',
+      null,
+      false
+    );
+    const pingpongFramebuffer = [
+      device.pool.fetchTemporalFramebuffer(
         false,
         inputColorTexture.width,
         inputColorTexture.height,
         'rgba16f',
         null,
         false
-      );
-      const pingpongFramebuffer = [
-        device.pool.fetchTemporalFramebuffer(
-          false,
-          inputColorTexture.width,
-          inputColorTexture.height,
-          'rgba16f',
-          null,
-          false
-        ),
-        device.pool.fetchTemporalFramebuffer(
-          false,
-          inputColorTexture.width,
-          inputColorTexture.height,
-          'rgba16f',
-          null,
-          false
-        )
-      ];
-      device.setFramebuffer(intersectFramebuffer);
-      this.intersect(ctx, inputColorTexture, sceneDepthTexture, true, false);
-      const intersectTex = intersectFramebuffer.getColorAttachments()[0] as Texture2D;
-      device.setFramebuffer(pingpongFramebuffer[0]);
-      this.resolve(ctx, inputColorTexture, sceneDepthTexture, intersectTex);
+      ),
+      device.pool.fetchTemporalFramebuffer(
+        false,
+        inputColorTexture.width,
+        inputColorTexture.height,
+        'rgba16f',
+        null,
+        false
+      )
+    ];
+    device.setFramebuffer(intersectFramebuffer);
+    this.intersect(ctx, inputColorTexture, sceneDepthTexture, true, false);
+    const intersectTex = intersectFramebuffer.getColorAttachments()[0] as Texture2D;
+    this.debugTexture(intersectTex, 'SSR_Debug_intersect');
+    device.setFramebuffer(pingpongFramebuffer[0]);
+    this.resolve(ctx, inputColorTexture, sceneDepthTexture, intersectTex);
+    this.debugTexture(pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D, 'SSR_Debug_resolve');
+    if (ctx.camera.ssrBlurriness > 0 && ctx.camera.ssrBlurKernelRadius > 0) {
+      const blurSizeScale = 255 * ctx.camera.ssrBlurriness;
+      const kernelRadius = ctx.camera.ssrBlurKernelRadius;
+      const stdDev = ctx.camera.ssrBlurStdDev;
       const blitterH = (SSR._blurBlitterH = SSR._blurBlitterH ?? new BilateralBlurBlitter(false));
       this.blurPass(
         ctx,
         blitterH,
         intersectTex,
-        3,
-        255 / 8,
-        8,
-        5,
+        2,
+        blurSizeScale,
+        kernelRadius,
+        stdDev,
         0.001,
         pingpongFramebuffer[0],
         pingpongFramebuffer[1]
       );
+      this.debugTexture(pingpongFramebuffer[1].getColorAttachments()[0] as Texture2D, 'SSR_Debug_blurH');
       const blitterV = (SSR._blurBlitterV = SSR._blurBlitterV ?? new BilateralBlurBlitter(true));
       this.blurPass(
         ctx,
         blitterV,
         intersectTex,
-        3,
-        255 / 8,
-        8,
-        5,
+        2,
+        blurSizeScale,
+        kernelRadius,
+        stdDev,
         0.001,
         pingpongFramebuffer[1],
         pingpongFramebuffer[0]
       );
-      device.popDeviceStates();
-      if (true) {
-        this.combine(ctx, inputColorTexture, pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D);
-      } else {
-        const blitter = new CopyBlitter();
-        const nearestSampler = device.createSampler({
-          magFilter: 'nearest',
-          minFilter: 'nearest',
-          mipFilter: 'none'
-        });
-        blitter.blit(pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D, fb, nearestSampler);
-      }
-      device.pool.releaseFrameBuffer(intersectFramebuffer);
-      device.pool.releaseFrameBuffer(pingpongFramebuffer[0]);
-      device.pool.releaseFrameBuffer(pingpongFramebuffer[1]);
-    } else {
-      this.intersect(ctx, inputColorTexture, sceneDepthTexture, false, srgbOutput);
     }
+    this.debugTexture(pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D, 'SSR_Debug_blurV');
+    device.popDeviceStates();
+    if (true) {
+      this.combine(ctx, inputColorTexture, pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D);
+    } else {
+      const blitter = new CopyBlitter();
+      const nearestSampler = device.createSampler({
+        magFilter: 'nearest',
+        minFilter: 'nearest',
+        mipFilter: 'none'
+      });
+      blitter.blit(pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D, fb, nearestSampler);
+    }
+    device.pool.releaseFrameBuffer(intersectFramebuffer);
+    device.pool.releaseFrameBuffer(pingpongFramebuffer[0]);
+    device.pool.releaseFrameBuffer(pingpongFramebuffer[1]);
   }
   /** @internal */
   private _createCombineProgrm(ctx: DrawContext): GPUProgram {
@@ -555,6 +591,37 @@ export class SSR extends AbstractPostEffect {
           //this.$l.sceneColor = pb.textureSampleLevel(this.colorTex, this.screenUV, 0).rgb;
           //this.reflectance = this.resolveSample(this.sceneColor, this.reflectance, this.roughnessInfo);
           this.$outputs.outColor = pb.vec4(this.reflectance, this.intersectSample.z);
+        });
+      }
+    });
+  }
+  /** @internal */
+  private _createBlurProgram(ctx: DrawContext): GPUProgram {
+    return ctx.device.buildRenderProgram({
+      vertex(pb) {
+        this.flip = pb.int().uniform(0);
+        this.$inputs.pos = pb.vec2().attrib('position');
+        this.$outputs.uv = pb.vec2();
+        pb.main(function () {
+          this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+          this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+          this.$if(pb.notEqual(this.flip, 0), function () {
+            this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+          });
+        });
+      },
+      fragment(pb) {
+        this.srcTex = pb.tex2D().uniform(0);
+        this.normalTex = pb.tex2D().uniform(0);
+        this.blurRadiusTex = pb.tex2D().uniform(0);
+        this.step = pb.vec2().uniform(0);
+        this.targetSize = pb.vec4().uniform(0);
+        if (pb.getDevice().type !== 'webgl') {
+          this.weights = [...SSR._weights.map((val) => pb.float(val))];
+        }
+        pb.main(function () {
+          this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
+          this.$l.centerTexel = pb.textureSampleLevel(this.srcTex, this.screenUV, 0);
         });
       }
     });

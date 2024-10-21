@@ -84,7 +84,11 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _ssrCalcThickness: boolean;
   /** @internal */
-  protected _ssrBlur: boolean;
+  protected _ssrBlurriness: number;
+  /** @internal */
+  protected _ssrBlurKernelRadius: number;
+  /** @internal */
+  protected _ssrBlurStdDev: number;
   /** @internal */
   protected _picking: boolean;
   /** @internal */
@@ -131,7 +135,9 @@ export class Camera extends SceneNode {
     this._ssrRoughnessFactor = 1;
     this._ssrStride = 2;
     this._ssrCalcThickness = false;
-    this._ssrBlur = false;
+    this._ssrBlurriness = 0;
+    this._ssrBlurKernelRadius = 8;
+    this._ssrBlurStdDev = 5;
     this._ssrDebug = 'none';
     this._pickResult = null;
     this._commandBufferReuse = true;
@@ -218,11 +224,23 @@ export class Camera extends SceneNode {
   set ssrCalcThickness(val: boolean) {
     this._ssrCalcThickness = !!val;
   }
-  get ssrBlur(): boolean {
-    return this._ssrBlur;
+  get ssrBlurriness(): number {
+    return this._ssrBlurriness;
   }
-  set ssrBlur(val: boolean) {
-    this._ssrBlur = !!val;
+  set ssrBlurriness(val: number) {
+    this._ssrBlurriness = val;
+  }
+  get ssrBlurKernelRadius(): number {
+    return this._ssrBlurKernelRadius;
+  }
+  set ssrBlurKernelRadius(val: number) {
+    this._ssrBlurKernelRadius = val;
+  }
+  get ssrBlurStdDev(): number {
+    return this._ssrBlurStdDev;
+  }
+  set ssrBlurStdDev(val: number) {
+    this._ssrBlurStdDev = val;
   }
   get ssrParams(): Vector4 {
     return this._ssrParams;
