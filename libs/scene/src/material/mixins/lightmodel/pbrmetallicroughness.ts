@@ -9,6 +9,7 @@ import type { DrawContext } from '../../../render';
 import { Vector4 } from '@zephyr3d/base';
 import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
+import { ShaderHelper } from '../../shader/helper';
 
 /**
  * Interface for PBRMetallicRoughness lighting model mixin
@@ -196,10 +197,14 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
       if (this.metallicRoughnessTexture) {
         scope.$l.metallicRoughnessSample = this.sampleMetallicRoughnessTexture(scope);
         data.metallic = pb.mul(scope.zMetallic, scope.metallicRoughnessSample.z);
-        data.roughness = pb.mul(scope.zRoughness, scope.metallicRoughnessSample.y);
+        data.roughness = pb.mul(
+          scope.zRoughness,
+          scope.metallicRoughnessSample.y,
+          ShaderHelper.getCameraRoughnessFactor(scope)
+        );
       } else {
         data.metallic = scope.zMetallic;
-        data.roughness = scope.zRoughness;
+        data.roughness = pb.mul(scope.zRoughness, ShaderHelper.getCameraRoughnessFactor(scope));
       }
       if (this.specularColorTexture) {
         scope.$l.specularColor = pb.mul(

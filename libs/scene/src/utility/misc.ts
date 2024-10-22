@@ -1,5 +1,12 @@
-import type { SamplerOptions, TextureSampler } from '@zephyr3d/device';
+import type {
+  BaseTexture,
+  FrameBuffer,
+  RenderStateSet,
+  SamplerOptions,
+  TextureSampler
+} from '@zephyr3d/device';
 import { Application } from '../app';
+import { CopyBlitter } from '../blitter';
 
 export type SamplerType =
   | 'clamp_linear'
@@ -71,6 +78,8 @@ const samplerOptions: Record<SamplerType, SamplerOptions> = {
 };
 
 const samplers: Partial<Record<SamplerType, TextureSampler>> = {};
+let copyBlitter: CopyBlitter = null;
+let defaultCopyRenderState: RenderStateSet = null;
 
 export function fetchSampler(type: SamplerType): TextureSampler {
   let sampler = samplers[type];
@@ -82,4 +91,23 @@ export function fetchSampler(type: SamplerType): TextureSampler {
     }
   }
   return sampler;
+}
+
+export function copyTexture(
+  src: BaseTexture,
+  dest: BaseTexture | FrameBuffer,
+  sampler?: TextureSampler,
+  renderState?: RenderStateSet,
+  layer?: number
+) {
+  if (!renderState && !defaultCopyRenderState) {
+    defaultCopyRenderState = src.device.createRenderStateSet();
+    defaultCopyRenderState.useDepthState().enableTest(false).enableWrite(false);
+    defaultCopyRenderState.useRasterizerState().setCullMode('none');
+  }
+  if (!copyBlitter) {
+    copyBlitter = new CopyBlitter();
+  }
+  copyBlitter.renderStates = renderState ?? defaultCopyRenderState;
+  copyBlitter.blit(src, dest, layer, sampler);
 }

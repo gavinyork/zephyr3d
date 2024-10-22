@@ -172,7 +172,8 @@ export class ShaderHelper {
       pb.mat4('viewProjectionMatrix'),
       pb.mat4('viewMatrix'),
       pb.mat4('projectionMatrix'),
-      pb.vec4('params')
+      pb.vec4('params'),
+      pb.float('roughnessFactor')
     ]);
     if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
       const lightStruct = pb.defineStruct([
@@ -611,7 +612,8 @@ export class ShaderHelper {
       viewProjectionMatrix: camera.viewProjectionMatrix,
       viewMatrix: camera.viewMatrix,
       projectionMatrix: camera.getProjectionMatrix(),
-      params: new Vector4(camera.getNearPlane(), camera.getFarPlane(), flip ? -1 : 1, linear ? 0 : 1)
+      params: new Vector4(camera.getNearPlane(), camera.getFarPlane(), flip ? -1 : 1, linear ? 0 : 1),
+      roughnessFactor: camera.SSR ? camera.ssrRoughnessFactor : 1
     };
     bindGroup.setValue(UNIFORM_NAME_GLOBAL, {
       camera: cameraStruct
@@ -715,6 +717,14 @@ export class ShaderHelper {
    */
   static getCameraPosition(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_GLOBAL].camera.position.xyz;
+  }
+  /**
+   * Gets the uniform variable of type float which holds the roughness factor
+   * @param scope - Current shader scope
+   * @returns The roughness factor
+   */
+  static getCameraRoughnessFactor(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].camera.roughnessFactor;
   }
   /**
    * Discard the fragment if it was clipped by the clip plane

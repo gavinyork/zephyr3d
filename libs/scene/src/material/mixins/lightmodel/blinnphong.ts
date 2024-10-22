@@ -4,6 +4,7 @@ import { applyMaterialMixins } from '../../meshmaterial';
 import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
 import type { DrawContext } from '../../../render';
+import { ShaderHelper } from '../../shader/helper';
 
 /**
  * Interface for blinn-phong lighting model mixin
@@ -118,7 +119,10 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
             this.$l.litColor = pb.add(pb.mul(this.albedo.rgb, this.diffuseColor), this.specularColor);
             if (outRoughness) {
               this.$l.roughness = pb.sqrt(pb.div(2, pb.add(this.zShininess, 2)));
-              this.outRoughness = pb.vec4(this.albedo.rgb, this.roughness);
+              this.outRoughness = pb.vec4(
+                this.albedo.rgb,
+                pb.mul(this.roughness, ShaderHelper.getCameraRoughnessFactor(this))
+              );
             }
             this.$return(this.litColor);
           }

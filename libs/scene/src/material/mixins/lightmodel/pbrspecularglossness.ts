@@ -9,6 +9,7 @@ import type { DrawContext } from '../../../render';
 import { Vector4 } from '@zephyr3d/base';
 import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
+import { ShaderHelper } from '../../shader/helper';
 
 /**
  * Interface for PBRSpecularGlossiness mixin
@@ -175,13 +176,19 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
       const pb = scope.$builder;
       if (this.specularTexture) {
         scope.$l.specularTextureSample = this.sampleSpecularTexture(scope);
-        data.roughness = pb.sub(1, pb.mul(scope.zGlossinessFactor, scope.specularTextureSample.a));
+        data.roughness = pb.mul(
+          pb.sub(1, pb.mul(scope.zGlossinessFactor, scope.specularTextureSample.a)),
+          ShaderHelper.getCameraRoughnessFactor(scope)
+        );
         data.f0 = pb.vec4(
           pb.mul(scope.specularTextureSample.rgb, scope.zSpecularFactor.rgb),
           this.getF0(scope).a
         );
       } else {
-        data.roughness = pb.sub(1, scope.zGlossinessFactor);
+        data.roughness = pb.mul(
+          pb.sub(1, scope.zGlossinessFactor),
+          ShaderHelper.getCameraRoughnessFactor(scope)
+        );
         data.f0 = pb.vec4(scope.zSpecularFactor.rgb, this.getF0(scope).a);
       }
       data.metallic = pb.max(pb.max(data.f0.r, data.f0.g), data.f0.b);

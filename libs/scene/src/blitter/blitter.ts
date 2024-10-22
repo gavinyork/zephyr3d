@@ -370,6 +370,12 @@ export abstract class Blitter {
     dest: BaseTexture | FrameBuffer,
     layer?: number | TextureSampler,
     sampler?: TextureSampler
+  ): void;
+  blit(
+    source: BaseTexture,
+    dest: BaseTexture | FrameBuffer,
+    layer?: number | TextureSampler,
+    sampler?: TextureSampler
   ): void {
     const device = Application.instance.device;
     device.pushDeviceStates();
