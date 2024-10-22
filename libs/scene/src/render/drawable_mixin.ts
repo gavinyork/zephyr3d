@@ -89,11 +89,6 @@ export function mixinDrawable<
     }
     applyTransformUniforms(renderQueue: RenderQueue): void {
       const instanceInfo = renderQueue.getInstanceInfo(this as unknown as Drawable);
-      const drawableBindGroup = this.getDrawableBindGroup(
-        Application.instance.device,
-        !!instanceInfo,
-        renderQueue
-      );
       if (instanceInfo) {
         instanceInfo.bindGroup.bindGroup.setRawData(
           ShaderHelper.getInstanceDataUniformName(),
@@ -103,6 +98,7 @@ export function mixinDrawable<
           16
         );
       } else {
+        const drawableBindGroup = this.getDrawableBindGroup(Application.instance.device, false, renderQueue);
         drawableBindGroup.setValue(ShaderHelper.getWorldMatrixUniformName(), this.getXForm().worldMatrix);
       }
     }
