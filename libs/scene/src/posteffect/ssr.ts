@@ -123,8 +123,6 @@ export class SSR extends AbstractPostEffect {
     this._combineBindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
     this._combineBindGroup.setTexture('reflectanceTex', reflectanceTex, linearSampler);
     this._combineBindGroup.setTexture('roughnessTex', this._roughnessTex, linearSampler);
-    this._combineBindGroup.setValue('ssrIntensity', ctx.camera.ssrIntensity);
-    this._combineBindGroup.setValue('ssrFalloff', ctx.camera.ssrFalloff);
     this._combineBindGroup.setValue(
       'targetSize',
       new Vector4(
@@ -179,8 +177,6 @@ export class SSR extends AbstractPostEffect {
     this._resolveBindGroup.setValue('invProjMatrix', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
     this._resolveBindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
     this._resolveBindGroup.setValue('invViewMatrix', ctx.camera.worldMatrix);
-    this._resolveBindGroup.setValue('ssrIntensity', ctx.camera.ssrIntensity);
-    this._resolveBindGroup.setValue('ssrFalloff', ctx.camera.ssrFalloff);
     if (ctx.env.light.envLight) {
       this._resolveBindGroup.setValue('envLightStrength', ctx.env.light.strength);
       ctx.env.light.envLight.updateBindGroup(this._resolveBindGroup);
@@ -216,8 +212,6 @@ export class SSR extends AbstractPostEffect {
     const linearSampler = fetchSampler('clamp_linear');
     if (!blur) {
       bindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
-      bindGroup.setValue('ssrIntensity', ctx.camera.ssrIntensity);
-      bindGroup.setValue('ssrFalloff', ctx.camera.ssrFalloff);
       if (ctx.env.light.envLight) {
         bindGroup.setValue('envLightStrength', ctx.env.light.strength);
         ctx.env.light.envLight.updateBindGroup(bindGroup);
@@ -412,8 +406,6 @@ export class SSR extends AbstractPostEffect {
         this.reflectanceTex = pb.tex2D().uniform(0);
         this.roughnessTex = pb.tex2D().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
-        this.ssrIntensity = pb.float().uniform(0);
-        this.ssrFalloff = pb.float().uniform(0);
         this.srgbOut = pb.int().uniform(0);
         this.$outputs.outColor = pb.vec4();
         pb.func(
@@ -421,11 +413,7 @@ export class SSR extends AbstractPostEffect {
           [pb.vec3('sceneColor'), pb.vec3('reflectance'), pb.vec4('roughnessValue')],
           function () {
             this.$l.r = pb.div(this.reflectance, pb.add(this.reflectance, pb.vec3(1)));
-            this.$l.strength = pb.clamp(
-              pb.pow(pb.mul(this.roughnessValue.rgb, this.ssrIntensity), pb.vec3(this.ssrFalloff)),
-              pb.vec3(0),
-              pb.vec3(1)
-            );
+            this.$l.strength = pb.clamp(this.roughnessValue.rgb, pb.vec3(0), pb.vec3(1));
             this.color = pb.add(
               pb.mul(this.r, this.strength),
               pb.mul(this.sceneColor, pb.sub(pb.vec3(1), this.strength))
@@ -478,8 +466,6 @@ export class SSR extends AbstractPostEffect {
         this.viewMatrix = pb.mat4().uniform(0);
         this.invViewMatrix = pb.mat4().uniform(0);
         this.invProjMatrix = pb.mat4().uniform(0);
-        this.ssrIntensity = pb.float().uniform(0);
-        this.ssrFalloff = pb.float().uniform(0);
         if (ctx.env.light.envLight) {
           this.envLightStrength = pb.float().uniform(0);
           ctx.env.light.envLight.initShaderBindings(pb);
@@ -504,11 +490,7 @@ export class SSR extends AbstractPostEffect {
           [pb.vec3('sceneColor'), pb.vec3('reflectance'), pb.vec4('roughnessValue')],
           function () {
             this.$l.r = pb.div(this.reflectance, pb.add(this.reflectance, pb.vec3(1)));
-            this.$l.strength = pb.clamp(
-              pb.pow(pb.mul(this.roughnessValue.rgb, this.ssrIntensity), pb.vec3(this.ssrFalloff)),
-              pb.vec3(0),
-              pb.vec3(1)
-            );
+            this.$l.strength = pb.clamp(this.roughnessValue.rgb, pb.vec3(0), pb.vec3(1));
             this.color = pb.add(
               pb.mul(this.r, this.strength),
               pb.mul(this.sceneColor, pb.sub(pb.vec3(1), this.strength))
@@ -663,8 +645,6 @@ export class SSR extends AbstractPostEffect {
       fragment(pb) {
         if (!blur) {
           this.colorTex = pb.tex2D().uniform(0);
-          this.ssrIntensity = pb.float().uniform(0);
-          this.ssrFalloff = pb.float().uniform(0);
           if (ctx.env.light.envLight) {
             this.envLightStrength = pb.float().uniform(0);
             ctx.env.light.envLight.initShaderBindings(pb);
@@ -803,11 +783,7 @@ export class SSR extends AbstractPostEffect {
                 this.hitInfo.w
               );
               this.reflectance = pb.div(this.reflectance, pb.add(this.reflectance, pb.vec3(1)));
-              this.$l.strength = pb.clamp(
-                pb.pow(pb.mul(this.roughnessValue.rgb, this.ssrIntensity), pb.vec3(this.ssrFalloff)),
-                pb.vec3(0),
-                pb.vec3(1)
-              );
+              this.$l.strength = pb.clamp(this.roughnessValue.rgb, pb.vec3(0), pb.vec3(1));
               if (ctx.primaryCamera.ssrDebug === 'none') {
                 this.color = pb.add(
                   pb.mul(this.reflectance, this.strength),

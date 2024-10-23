@@ -842,18 +842,6 @@ export class Inspector {
           0,
           1
         );
-        ImGui.SliderFloat(
-          'SSRIntensity',
-          (val?: number) => (camera.ssrIntensity = val = val ?? camera.ssrIntensity),
-          0,
-          100
-        );
-        ImGui.SliderFloat(
-          'SSRFalloff',
-          (val?: number) => (camera.ssrFalloff = val = val ?? camera.ssrFalloff),
-          0,
-          10
-        );
         ImGui.SliderInt(
           'SSRStride',
           (val?: number) => (camera.ssrStride = val = val ?? camera.ssrStride),
