@@ -1,6 +1,13 @@
 import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
-import type { BindGroup, FrameBuffer, GPUProgram, RenderStateSet, Texture2D } from '@zephyr3d/device';
+import type {
+  BaseTexture,
+  BindGroup,
+  FrameBuffer,
+  GPUProgram,
+  RenderStateSet,
+  Texture2D
+} from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import {
   sampleLinearDepth,
@@ -207,10 +214,6 @@ export class SSR extends AbstractPostEffect {
     }
     const nearestSampler = fetchSampler('clamp_nearest');
     const linearSampler = fetchSampler('clamp_linear');
-    if (!program || !bindGroup) {
-      device.clearFrameBuffer(new Vector4(1, 1, 0, 1), null, null);
-      return;
-    }
     if (!blur) {
       bindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
       bindGroup.setValue('ssrIntensity', ctx.camera.ssrIntensity);
@@ -262,7 +265,7 @@ export class SSR extends AbstractPostEffect {
     this.drawFullscreenQuad(this._getZTestGreaterRenderState(ctx));
   }
   /** @internal */
-  debugTexture(tex: Texture2D, label: string) {
+  debugTexture(tex: BaseTexture, label: string) {
     let fb = this._debugFrameBuffer[label];
     if (!fb || fb.getWidth() !== tex.width || fb.getHeight() !== tex.height) {
       fb?.getColorAttachments()[0]?.dispose();
@@ -319,11 +322,9 @@ export class SSR extends AbstractPostEffect {
       )
     ];
     device.setFramebuffer(intersectFramebuffer);
-    device.clearFrameBuffer(new Vector4(1, 0, 1, 1), null, null);
     this.intersect(ctx, inputColorTexture, sceneDepthTexture, true, false);
     const intersectTex = intersectFramebuffer.getColorAttachments()[0] as Texture2D;
     device.setFramebuffer(pingpongFramebuffer[0]);
-    device.clearFrameBuffer(new Vector4(1, 1, 0, 1), null, null);
     this.resolve(ctx, inputColorTexture, sceneDepthTexture, intersectTex);
     if (ctx.camera.ssrBlurriness > 0 && ctx.camera.ssrBlurKernelRadius > 0) {
       const blurSizeScale = 255 * ctx.camera.ssrBlurriness;

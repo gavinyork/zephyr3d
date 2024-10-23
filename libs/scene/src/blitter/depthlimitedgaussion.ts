@@ -35,7 +35,7 @@ export class BilateralBlurBlitter extends Blitter {
   constructor(finalPhase: boolean) {
     super();
     this._depthTex = null;
-    this._depthCutoff = 0.001;
+    this._depthCutoff = 2;
     this._blurSizeTex = null;
     this._blurSizeScale = 1;
     this._blurSizeIndex = 0;
@@ -189,14 +189,20 @@ export class BilateralBlurBlitter extends Blitter {
     const pb = scope.$builder;
     pb.func('getLinearDepth', [pb.vec2('uv')], function () {
       this.$l.depthValue = pb.textureSample(this.depthTex, this.uv);
-      this.$return(
+      this.$l.depth01 =
         pb.getDevice().type === 'webgl'
           ? decodeNormalizedFloatFromRGBA(this, this.depthValue)
-          : this.depthValue.r
-      );
+          : this.depthValue.r;
+      this.$return(pb.mul(this.depth01, this.cameraNearFar.y));
     });
-    scope.depth01 = scope.getLinearDepth(srcUV);
-    scope.depthCutoff01 = pb.div(this.depthCutoff, this.cameraNearFar.y);
+    pb.func('getLogDepth', [pb.float('linearDepth')], function () {
+      this.$return(pb.log(pb.add(this.linearDepth, 1)));
+    });
+    scope.centerDepth = scope.getLogDepth(scope.getLinearDepth(srcUV));
+    scope.depthDiff = pb.div(
+      scope.depthCutoff,
+      pb.sub(scope.getLogDepth(scope.cameraNearFar.y), scope.getLogDepth(scope.cameraNearFar.x))
+    );
     scope.weightSum = scope.offsetsAndWeights[0].z;
     scope.srcTexel = that.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
     scope.colorSum = pb.mul(scope.srcTexel, scope.weightSum);
@@ -212,32 +218,19 @@ export class BilateralBlurBlitter extends Blitter {
       }
       this.$l.offset = pb.div(this.offset, this.size);
       this.$l.uvRight = pb.add(srcUV, this.offset);
-      this.$l.depthRight01 = this.getLinearDepth(this.uvRight);
-      this.$if;
-      this.$if(
-        pb.and(
-          pb.lessThan(this.depthRight01, 0.999),
-          pb.lessThan(pb.abs(pb.sub(this.depthRight01, this.depth01)), this.depthCutoff01)
-        ),
-        function () {
-          this.$l.srcTexelRight = that.readTexel(this, type, srcTex, this.uvRight, srcLayer, sampleType);
-          this.colorSum = pb.add(this.colorSum, pb.mul(this.srcTexelRight, this.weight));
-          this.weightSum = pb.add(this.weightSum, this.weight);
-        }
-      );
+      this.$l.depthRight = this.getLogDepth(this.getLinearDepth(this.uvRight));
+      this.$if(pb.lessThan(pb.abs(pb.sub(this.depthRight, this.centerDepth)), this.depthDiff), function () {
+        this.$l.srcTexelRight = that.readTexel(this, type, srcTex, this.uvRight, srcLayer, sampleType);
+        this.colorSum = pb.add(this.colorSum, pb.mul(this.srcTexelRight, this.weight));
+        this.weightSum = pb.add(this.weightSum, this.weight);
+      });
       this.$l.uvLeft = pb.sub(srcUV, this.offset);
-      this.$l.depthLeft01 = this.getLinearDepth(this.uvLeft);
-      this.$if(
-        pb.and(
-          pb.lessThan(this.depthLeft01, 0.999),
-          pb.lessThan(pb.abs(pb.sub(this.depthLeft01, this.depth01)), this.depthCutoff01)
-        ),
-        function () {
-          this.$l.srcTexelLeft = that.readTexel(this, type, srcTex, this.uvLeft, srcLayer, sampleType);
-          this.colorSum = pb.add(this.colorSum, pb.mul(this.srcTexelLeft, this.weight));
-          this.weightSum = pb.add(this.weightSum, this.weight);
-        }
-      );
+      this.$l.depthLeft = this.getLogDepth(this.getLinearDepth(this.uvLeft));
+      this.$if(pb.lessThan(pb.abs(pb.sub(this.depthLeft, this.centerDepth)), this.depthDiff), function () {
+        this.$l.srcTexelLeft = that.readTexel(this, type, srcTex, this.uvLeft, srcLayer, sampleType);
+        this.colorSum = pb.add(this.colorSum, pb.mul(this.srcTexelLeft, this.weight));
+        this.weightSum = pb.add(this.weightSum, this.weight);
+      });
     });
     scope.colorSum = pb.div(scope.colorSum, scope.weightSum);
     return scope.colorSum;

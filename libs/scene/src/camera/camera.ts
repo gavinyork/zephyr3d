@@ -138,7 +138,7 @@ export class Camera extends SceneNode {
     this._ssrStride = 2;
     this._ssrCalcThickness = false;
     this._ssrBlurriness = 0;
-    this._ssrBlurDepthCutoff = 1;
+    this._ssrBlurDepthCutoff = 2;
     this._ssrBlurKernelRadius = 8;
     this._ssrBlurStdDev = 5;
     this._ssrDebug = 'none';
