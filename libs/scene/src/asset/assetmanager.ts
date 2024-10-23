@@ -129,8 +129,8 @@ export class AssetManager {
   purgeCache() {
     for (const k in this._textures) {
       this._textures[k].then((tex) => tex?.dispose()).catch((err) => {});
-      this._textures[k] = undefined;
     }
+    this._textures = {};
     this._models = {};
     this._binaryDatas = {};
     this._textDatas = {};
