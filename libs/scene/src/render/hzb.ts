@@ -234,8 +234,17 @@ function buildHiZLevel(
   dstTexture: Texture2D
 ): void {
   const sampler = fetchSampler('clamp_nearest');
-  const framebuffer = device.createFrameBuffer([dstTexture], null);
-  framebuffer.setColorAttachmentMipLevel(0, miplevel + 1);
+  const framebuffer = device.pool.fetchTemporalFramebuffer(
+    false,
+    0,
+    0,
+    [dstTexture],
+    null,
+    false,
+    1,
+    true,
+    miplevel + 1
+  );
   framebuffer.setColorAttachmentGenerateMipmaps(0, false);
   srcSize[0] = Math.max(srcTexture.width >> miplevel, 1);
   srcSize[1] = Math.max(srcTexture.height >> miplevel, 1);
@@ -253,6 +262,7 @@ function buildHiZLevel(
   if (srcTexture !== dstTexture) {
     device.copyFramebufferToTexture2D(framebuffer, 0, srcTexture, miplevel + 1);
   }
+  device.pool.releaseFrameBuffer(framebuffer);
 }
 
 export function buildHiZ(sourceTex: Texture2D, HiZFrameBuffer: FrameBuffer) {

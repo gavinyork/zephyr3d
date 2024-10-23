@@ -221,15 +221,23 @@ export class BilateralBlurBlitter extends Blitter {
       this.$l.depthRight = this.getLogDepth(this.getLinearDepth(this.uvRight));
       this.$if(pb.lessThan(pb.abs(pb.sub(this.depthRight, this.centerDepth)), this.depthDiff), function () {
         this.$l.srcTexelRight = that.readTexel(this, type, srcTex, this.uvRight, srcLayer, sampleType);
-        this.colorSum = pb.add(this.colorSum, pb.mul(this.srcTexelRight, this.weight));
-        this.weightSum = pb.add(this.weightSum, this.weight);
+        this.$l.colorWeight = pb.mul(
+          this.weight,
+          pb.exp(pb.neg(pb.distance(this.srcTexelRight.rgb, this.srcTexel.rgb)))
+        );
+        this.colorSum = pb.add(this.colorSum, pb.mul(this.srcTexelRight, this.colorWeight));
+        this.weightSum = pb.add(this.weightSum, this.colorWeight);
       });
       this.$l.uvLeft = pb.sub(srcUV, this.offset);
       this.$l.depthLeft = this.getLogDepth(this.getLinearDepth(this.uvLeft));
       this.$if(pb.lessThan(pb.abs(pb.sub(this.depthLeft, this.centerDepth)), this.depthDiff), function () {
         this.$l.srcTexelLeft = that.readTexel(this, type, srcTex, this.uvLeft, srcLayer, sampleType);
-        this.colorSum = pb.add(this.colorSum, pb.mul(this.srcTexelLeft, this.weight));
-        this.weightSum = pb.add(this.weightSum, this.weight);
+        this.$l.colorWeight = pb.mul(
+          this.weight,
+          pb.exp(pb.neg(pb.distance(this.srcTexelLeft.rgb, this.srcTexel.rgb)))
+        );
+        this.colorSum = pb.add(this.colorSum, pb.mul(this.srcTexelLeft, this.colorWeight));
+        this.weightSum = pb.add(this.weightSum, this.colorWeight);
       });
     });
     scope.colorSum = pb.div(scope.colorSum, scope.weightSum);

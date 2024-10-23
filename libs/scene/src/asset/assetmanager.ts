@@ -129,7 +129,7 @@ export class AssetManager {
   purgeCache() {
     for (const k in this._textures) {
       this._textures[k].then((tex) => tex?.dispose()).catch((err) => {});
-      delete this._textures[k];
+      this._textures[k] = undefined;
     }
     this._models = {};
     this._binaryDatas = {};
@@ -556,7 +556,7 @@ export class AssetManager {
     if (loader) {
       this._builtinTextureLoaders[name] = loader;
     } else {
-      delete this._builtinTextureLoaders[name];
+      this._builtinTextureLoaders[name] = undefined;
     }
   }
   /** @internal */

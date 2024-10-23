@@ -330,8 +330,8 @@ export class List<T = unknown> {
   private _remove(node: ListNodeImpl) {
     node.prev.next = node.next;
     node.next.prev = node.prev;
-    delete node.prev;
-    delete node.next;
+    node.prev = undefined;
+    node.next = undefined;
     this._length--;
   }
   /** @internal */

@@ -570,11 +570,13 @@ export class WebGLFrameBuffer
         return false;
       }
     }
-    for (let i = 0; i < this._options.colorAttachments?.length ?? 0; i++) {
-      const opt = this._options.colorAttachments[i];
-      if (opt.texture) {
-        if (!this._bindAttachment(WebGLEnum.COLOR_ATTACHMENT0 + i, opt)) {
-          return false;
+    if (this._options.colorAttachments) {
+      for (let i = 0; i < this._options.colorAttachments.length; i++) {
+        const opt = this._options.colorAttachments[i];
+        if (opt.texture) {
+          if (!this._bindAttachment(WebGLEnum.COLOR_ATTACHMENT0 + i, opt)) {
+            return false;
+          }
         }
       }
     }
@@ -620,18 +622,22 @@ export class WebGLFrameBuffer
         this._depthAttachmentAA
       );
     }
-    for (let i = 0; i < this._options.colorAttachments?.length ?? 0; i++) {
-      const opt = this._options.colorAttachments[i];
-      if (opt.texture) {
-        if (!this._colorAttachmentsAA[i]) {
-          this._colorAttachmentsAA[i] = this._createRenderbufferAA(this._options.colorAttachments[i].texture);
+    if (this._options.colorAttachments) {
+      for (let i = 0; i < this._options.colorAttachments.length; i++) {
+        const opt = this._options.colorAttachments[i];
+        if (opt.texture) {
+          if (!this._colorAttachmentsAA[i]) {
+            this._colorAttachmentsAA[i] = this._createRenderbufferAA(
+              this._options.colorAttachments[i].texture
+            );
+          }
+          this._device.context.framebufferRenderbuffer(
+            WebGLEnum.FRAMEBUFFER,
+            WebGLEnum.COLOR_ATTACHMENT0 + i,
+            WebGLEnum.RENDERBUFFER,
+            this._colorAttachmentsAA[i]
+          );
         }
-        this._device.context.framebufferRenderbuffer(
-          WebGLEnum.FRAMEBUFFER,
-          WebGLEnum.COLOR_ATTACHMENT0 + i,
-          WebGLEnum.RENDERBUFFER,
-          this._colorAttachmentsAA[i]
-        );
       }
     }
     if (this._statusAA === STATUS_UNCHECKED) {

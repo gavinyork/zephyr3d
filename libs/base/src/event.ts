@@ -157,7 +157,7 @@ export function makeEventTarget<C extends GenericConstructor | ObjectConstructor
           }
         }
         if (handlers.length === 0) {
-          delete listenerMap[type];
+          listenerMap[type] = undefined;
         }
       }
       /** @internal */
