@@ -10,7 +10,6 @@ import {
   Mesh,
   FPSCameraController,
   Tonemap,
-  PBRMetallicRoughnessMaterial,
   BoxShape,
   SphereShape,
   BlinnMaterial

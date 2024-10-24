@@ -1,4 +1,4 @@
-import { Vector2, Vector4 } from '@zephyr3d/base';
+import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type {
   SkyType,
   FogType,
@@ -750,8 +750,13 @@ export class Inspector {
   }
   private renderPerspectiveCamera(camera: PerspectiveCamera) {
     if (ImGui.Begin('Camera')) {
-      const pos = camera.getWorldPosition();
-      ImGui.Text(`${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}`);
+      const at = new Vector3();
+      const to = new Vector3();
+      const up = new Vector3();
+      camera.worldMatrix.decomposeLookAt(at, to, up);
+      ImGui.Text(`EYE:    (${at.x.toFixed(2)}, ${at.y.toFixed(2)}, ${at.z.toFixed(2)})`);
+      ImGui.Text(`TARGET: (${to.x.toFixed(2)}, ${to.y.toFixed(2)}, ${to.z.toFixed(2)})`);
+      ImGui.Text(`UP:     (${up.x.toFixed(2)}, ${up.y.toFixed(2)}, ${up.z.toFixed(2)})`);
       ImGui.Checkbox('Generate HiZ', (val?: boolean) => {
         if (val === undefined) {
           val = camera.HiZ;
