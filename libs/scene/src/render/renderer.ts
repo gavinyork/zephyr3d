@@ -141,8 +141,9 @@ export class SceneRenderer {
   /** @internal */
   protected static _renderScene(ctx: DrawContext): void {
     const device = ctx.device;
-    const SSR = ctx.primaryCamera.SSR;
-    const SSRCalcThickness = ctx.primaryCamera.ssrCalcThickness;
+    const SSR =
+      ctx.primaryCamera.SSR && ctx.scene.env.light.envLight && ctx.scene.env.light.envLight.hasRadiance();
+    const SSRCalcThickness = SSR && ctx.primaryCamera.ssrCalcThickness;
     const vp = ctx.camera.viewport;
     const scissor = ctx.camera.scissor;
     const finalFramebuffer = device.getFramebuffer();
@@ -199,10 +200,10 @@ export class SceneRenderer {
     ) {
       const format: TextureFormat =
         device.type === 'webgl'
-          ? SSR && SSRCalcThickness
+          ? SSRCalcThickness
             ? 'rgba16f'
             : 'rgba8unorm'
-          : SSR && SSRCalcThickness
+          : SSRCalcThickness
           ? 'rg32f'
           : 'r32f';
       if (!finalFramebuffer && !vp) {
@@ -234,7 +235,7 @@ export class SceneRenderer {
               ctx.HiZ
             );
       }
-      this._renderSceneDepth(ctx, renderQueue, depthFramebuffer, SSR && SSRCalcThickness);
+      this._renderSceneDepth(ctx, renderQueue, depthFramebuffer, SSRCalcThickness);
       ctx.linearDepthTexture = depthFramebuffer.getColorAttachments()[0] as Texture2D;
       ctx.depthTexture = depthFramebuffer.getDepthAttachment() as Texture2D;
       if (ctx.HiZ) {

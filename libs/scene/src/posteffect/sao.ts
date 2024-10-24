@@ -13,9 +13,8 @@ import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../s
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { BilateralBlurBlitter } from '../blitter/bilateralblur';
 import type { BlitType } from '../blitter';
-import { CopyBlitter } from '../blitter';
 import type { DrawContext } from '../render';
-import { fetchSampler } from '../utility/misc';
+import { copyTexture, fetchSampler } from '../utility/misc';
 
 const NUM_SAMPLES = 7;
 const NUM_RINGS = 4;
@@ -82,7 +81,6 @@ export class SAO extends AbstractPostEffect {
   private _saoBlurDepthCutoff: number;
   private _blitterH: DepthLimitAOBlurBlitter;
   private _blitterV: DepthLimitAOBlurBlitter;
-  private _copyBlitter: CopyBlitter;
   private _supported: boolean;
   /**
    * Creates an instance of SAO post effect
@@ -106,7 +104,6 @@ export class SAO extends AbstractPostEffect {
     this._blitterV = new DepthLimitAOBlurBlitter(true);
     this._blitterV.kernelRadius = 8;
     this._blitterV.stdDev = 10;
-    this._copyBlitter = new CopyBlitter();
   }
   /** Scale value */
   get scale(): number {
@@ -180,8 +177,14 @@ export class SAO extends AbstractPostEffect {
     const device = ctx.device;
     const viewport = device.getViewport();
     this._prepare(device, inputColorTexture);
-    this._copyBlitter.srgbOut = srgbOutput;
-    this._copyBlitter.blit(inputColorTexture, device.getFramebuffer(), fetchSampler('clamp_nearest_nomip'));
+    copyTexture(
+      inputColorTexture,
+      device.getFramebuffer(),
+      fetchSampler('clamp_nearest_nomip'),
+      null,
+      0,
+      srgbOutput
+    );
     if (!this._supported) {
       return;
     }

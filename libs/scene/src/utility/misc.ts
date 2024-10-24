@@ -96,9 +96,10 @@ export function fetchSampler(type: SamplerType): TextureSampler {
 export function copyTexture(
   src: BaseTexture,
   dest: BaseTexture | FrameBuffer,
-  sampler?: TextureSampler,
-  renderState?: RenderStateSet,
-  layer?: number
+  sampler: TextureSampler = null,
+  renderState: RenderStateSet = null,
+  layer = 0,
+  srgbOut = false
 ) {
   if (!renderState && !defaultCopyRenderState) {
     defaultCopyRenderState = src.device.createRenderStateSet();
@@ -109,5 +110,6 @@ export function copyTexture(
     copyBlitter = new CopyBlitter();
   }
   copyBlitter.renderStates = renderState ?? defaultCopyRenderState;
+  copyBlitter.srgbOut = srgbOut;
   copyBlitter.blit(src, dest, layer, sampler);
 }

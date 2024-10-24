@@ -29,7 +29,7 @@ import { BilateralBlurBlitter } from '../blitter/bilateralblur';
  */
 export class SSR extends AbstractPostEffect {
   private static _programs: Record<string, GPUProgram> = {};
-  private static _resolveProgram: GPUProgram = undefined;
+  private static _resolveProgram: Record<string, GPUProgram> = {};
   private static _combineProgram: GPUProgram = undefined;
   private static _renderStateZTestGreater: RenderStateSet = null;
   private static _renderStateZTestEqual: RenderStateSet = null;
@@ -45,7 +45,7 @@ export class SSR extends AbstractPostEffect {
   private _roughnessTex: Texture2D;
   private _normalTex: Texture2D;
   private _bindgroups: Record<string, BindGroup>;
-  private _resolveBindGroup: BindGroup;
+  private _resolveBindGroup: Record<string, BindGroup>;
   private _combineBindGroup: BindGroup;
 
   private _debugFrameBuffer: Record<string, FrameBuffer>;
@@ -56,7 +56,7 @@ export class SSR extends AbstractPostEffect {
     super();
     this._opaque = true;
     this._bindgroups = {};
-    this._resolveBindGroup = null;
+    this._resolveBindGroup = {};
     this._combineBindGroup = null;
     this._roughnessTex = null;
     this._debugFrameBuffer = {};
@@ -146,26 +146,26 @@ export class SSR extends AbstractPostEffect {
     intersectTexture: Texture2D
   ) {
     const device = ctx.device;
-    let program = SSR._resolveProgram;
+    const hash = ctx.env.light.envLight ? ctx.env.light.getHash() : '';
+    let program = SSR._resolveProgram[hash];
     if (program === undefined) {
       program = this._createResolveProgram(ctx);
-      SSR._resolveProgram = program;
+      SSR._resolveProgram[hash] = program;
     }
-    if (!this._resolveBindGroup) {
-      this._resolveBindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
+    let bindGroup = this._resolveBindGroup[hash];
+    if (!bindGroup) {
+      bindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
+      this._resolveBindGroup[hash] = bindGroup;
     }
     const nearestSampler = fetchSampler('clamp_nearest');
     const linearSampler = fetchSampler('clamp_linear');
-    this._resolveBindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
-    this._resolveBindGroup.setTexture('intersectTex', intersectTexture, nearestSampler);
-    this._resolveBindGroup.setTexture('roughnessTex', this._roughnessTex, nearestSampler);
-    this._resolveBindGroup.setTexture('normalTex', this._normalTex, nearestSampler);
-    this._resolveBindGroup.setTexture('depthTex', sceneDepthTexture, nearestSampler);
-    this._resolveBindGroup.setValue(
-      'cameraNearFar',
-      new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane())
-    );
-    this._resolveBindGroup.setValue(
+    bindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
+    bindGroup.setTexture('intersectTex', intersectTexture, nearestSampler);
+    bindGroup.setTexture('roughnessTex', this._roughnessTex, nearestSampler);
+    bindGroup.setTexture('normalTex', this._normalTex, nearestSampler);
+    bindGroup.setTexture('depthTex', sceneDepthTexture, nearestSampler);
+    bindGroup.setValue('cameraNearFar', new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane()));
+    bindGroup.setValue(
       'targetSize',
       new Vector4(
         device.getDrawingBufferWidth(),
@@ -174,16 +174,16 @@ export class SSR extends AbstractPostEffect {
         sceneDepthTexture.height
       )
     );
-    this._resolveBindGroup.setValue('invProjMatrix', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
-    this._resolveBindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
-    this._resolveBindGroup.setValue('invViewMatrix', ctx.camera.worldMatrix);
+    bindGroup.setValue('invProjMatrix', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
+    bindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
+    bindGroup.setValue('invViewMatrix', ctx.camera.worldMatrix);
     if (ctx.env.light.envLight) {
-      this._resolveBindGroup.setValue('envLightStrength', ctx.env.light.strength);
-      ctx.env.light.envLight.updateBindGroup(this._resolveBindGroup);
+      bindGroup.setValue('envLightStrength', ctx.env.light.strength);
+      ctx.env.light.envLight.updateBindGroup(bindGroup);
     }
-    this._resolveBindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
+    bindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     device.setProgram(program);
-    device.setBindGroup(0, this._resolveBindGroup);
+    device.setBindGroup(0, bindGroup);
     this.drawFullscreenQuad(this._getZTestGreaterRenderState(ctx));
   }
   /** @internal */
@@ -390,9 +390,6 @@ export class SSR extends AbstractPostEffect {
         this.flip = pb.int().uniform(0);
         this.$inputs.pos = pb.vec2().attrib('position');
         this.$outputs.uv = pb.vec2();
-        if (ctx.env.light.envLight) {
-          ctx.env.light.envLight.initShaderBindings(pb);
-        }
         pb.main(function () {
           this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
           this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
