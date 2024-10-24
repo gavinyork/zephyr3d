@@ -3,7 +3,7 @@ import { mixinVertexColor } from './mixins/vertexcolor';
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import type { PBFunctionScope } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
-import { RENDER_PASS_TYPE_LIGHT } from '../values';
+import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
 
 /**
  * Lambert material
@@ -100,7 +100,17 @@ export class LambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLigh
           this.color = pb.add(this.color, this.lightContrib);
         });
         scope.$l.litColor = pb.mul(scope.albedo, pb.vec4(scope.color, 1));
-        this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.litColor);
+        if (this.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
+          this.outputFragmentColor(
+            scope,
+            scope.$inputs.worldPos,
+            scope.litColor,
+            pb.vec4(0, 0, 0, 1),
+            pb.vec4(pb.add(pb.mul(scope.normal, 0.5), pb.vec3(0.5)), 1)
+          );
+        } else {
+          this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.litColor);
+        }
       } else {
         this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.albedo);
       }

@@ -68,8 +68,6 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _SSR: boolean;
   /** @internal */
-  protected _ssrDebug: 'roughness' | 'reflectBRDF' | 'reflectance' | 'strength' | 'none';
-  /** @internal */
   protected _ssrParams: Vector4;
   /** @internal */
   protected _ssrMaxRoughness: number;
@@ -84,7 +82,7 @@ export class Camera extends SceneNode {
   /** @inernal */
   protected _ssrBlurDepthCutoff: number;
   /** @internal */
-  protected _ssrBlurKernelRadius: number;
+  protected _ssrBlurKernelSize: number;
   /** @internal */
   protected _ssrBlurStdDev: number;
   /** @internal */
@@ -127,15 +125,14 @@ export class Camera extends SceneNode {
     this._HiZ = false;
     this._SSR = false;
     this._ssrParams = new Vector4(32, 120, 0.5, 0);
-    this._ssrMaxRoughness = 0.7;
+    this._ssrMaxRoughness = 0.8;
     this._ssrRoughnessFactor = 1;
     this._ssrStride = 2;
     this._ssrCalcThickness = false;
     this._ssrBlurriness = 0;
     this._ssrBlurDepthCutoff = 2;
-    this._ssrBlurKernelRadius = 8;
-    this._ssrBlurStdDev = 5;
-    this._ssrDebug = 'none';
+    this._ssrBlurKernelSize = 17;
+    this._ssrBlurStdDev = 10;
     this._pickResult = null;
     this._commandBufferReuse = true;
   }
@@ -147,92 +144,136 @@ export class Camera extends SceneNode {
     this._clipPlane = plane;
     this._invalidate(false);
   }
-  /** Whether hierarchical depth should be generated */
+  /**
+   * Gets whether Hi-Z acceleration is enabled.
+   * When enabled, it can significantly improve SSR performance with minimal quality impact.
+   */
   get HiZ(): boolean {
     return this._HiZ;
   }
   set HiZ(val: boolean) {
     this._HiZ = !!val;
   }
-  /** Whether ScreenSpaceReflections should be enabled */
+  /**
+   * Gets whether Screen Space Reflections (SSR) is enabled.
+   */
   get SSR(): boolean {
     return this._SSR;
   }
   set SSR(val: boolean) {
     this._SSR = !!val;
   }
-  get ssrDebug() {
-    return this._ssrDebug;
-  }
-  set ssrDebug(val) {
-    this._ssrDebug = val;
-  }
+  /**
+   * Gets the maximum roughness value for screen space reflections.
+   * Controls the cutoff point where surfaces are considered too rough for SSR.
+   */
   get ssrMaxRoughness(): number {
     return this._ssrMaxRoughness;
   }
   set ssrMaxRoughness(val: number) {
     this._ssrMaxRoughness = val;
   }
+  /**
+   * Gets the roughness factor for SSR calculations.
+   * Affects how surface roughness influences reflection clarity.
+   */
   get ssrRoughnessFactor(): number {
     return this._ssrRoughnessFactor;
   }
   set ssrRoughnessFactor(val: number) {
     this._ssrRoughnessFactor = val;
   }
+  /**
+   * Gets the stride value for SSR ray marching.
+   * Controls the step size during ray marching. Larger values improve performance but may miss details.
+   */
   get ssrStride(): number {
     return this._ssrStride;
   }
   set ssrStride(val: number) {
     this._ssrStride = val;
   }
+  /**
+   * Gets the maximum distance for SSR ray marching.
+   * Defines how far rays will travel when searching for reflection intersections.
+   */
   get ssrMaxDistance(): number {
     return this._ssrParams.x;
   }
   set ssrMaxDistance(val: number) {
     this._ssrParams.x = val;
   }
+  /**
+   * Gets the number of iterations for SSR ray marching.
+   * Higher values provide more accurate reflections but impact performance.
+   */
   get ssrIterations(): number {
     return this._ssrParams.y;
   }
   set ssrIterations(val: number) {
     this._ssrParams.y = val;
   }
+  /**
+   * Gets the thickness value for SSR calculations.
+   * Determines the thickness threshold for surfaces when calculating reflections.
+   */
   get ssrThickness(): number {
     return this._ssrParams.z;
   }
   set ssrThickness(val: number) {
     this._ssrParams.z = val;
   }
+  /**
+   * Gets whether SSR should calculate thickness automatically.
+   * When enabled, the system will dynamically compute surface thickness for reflections.
+   */
   get ssrCalcThickness(): boolean {
     return this._ssrCalcThickness;
   }
   set ssrCalcThickness(val: boolean) {
     this._ssrCalcThickness = !!val;
   }
-  get ssrBlurriness(): number {
+  /**
+   * Gets the blur scale factor for SSR.
+   * Controls the overall intensity of the blur effect applied to reflections.
+   */
+  get ssrBlurScale(): number {
     return this._ssrBlurriness;
   }
-  set ssrBlurriness(val: number) {
+  set ssrBlurScale(val: number) {
     this._ssrBlurriness = val;
   }
+  /**
+   * Gets the depth cutoff value for SSR blur.
+   * Determines at what depth difference the blur effect should be reduced or eliminated.
+   */
   get ssrBlurDepthCutoff(): number {
     return this._ssrBlurDepthCutoff;
   }
   set ssrBlurDepthCutoff(val: number) {
     this._ssrBlurDepthCutoff = val;
   }
-  get ssrBlurKernelRadius(): number {
-    return this._ssrBlurKernelRadius;
+  /**
+   * Gets the kernel size for the SSR blur effect.
+   * Defines the size of the blur kernel. Larger values create softer, more spread-out blur.
+   */
+  get ssrBlurKernelSize(): number {
+    return this._ssrBlurKernelSize;
   }
-  set ssrBlurKernelRadius(val: number) {
-    this._ssrBlurKernelRadius = val;
+  set ssrBlurKernelSize(val: number) {
+    this._ssrBlurKernelSize = val;
   }
+  /**
+   * Gets the standard deviation for the SSR Gaussian blur.
+   * Controls the distribution of the blur effect. Higher values create more pronounced blur.
+   */
   get ssrBlurStdDev(): number {
     return this._ssrBlurStdDev;
   }
   set ssrBlurStdDev(val: number) {
     this._ssrBlurStdDev = val;
   }
+  /** @internal */
   get ssrParams(): Vector4 {
     return this._ssrParams;
   }

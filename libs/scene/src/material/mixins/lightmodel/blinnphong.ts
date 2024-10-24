@@ -120,7 +120,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
             if (outRoughness) {
               this.$l.roughness = pb.sqrt(pb.div(2, pb.add(this.zShininess, 2)));
               this.outRoughness = pb.vec4(
-                this.albedo.rgb,
+                pb.mul(this.albedo.rgb, pb.sub(1, this.roughness)),
                 pb.mul(this.roughness, ShaderHelper.getCameraRoughnessFactor(this))
               );
             }

@@ -17,7 +17,7 @@ import {
 } from '../shaders/ssr';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { copyTexture, fetchSampler } from '../utility/misc';
-import { BilateralBlurBlitter } from '../blitter/depthlimitedgaussion';
+import { BilateralBlurBlitter } from '../blitter/bilateralblur';
 
 /**
  * SSR post effect
@@ -195,7 +195,7 @@ export class SSR extends AbstractPostEffect {
     srgbOut: boolean
   ) {
     const device = ctx.device;
-    const hash = `${Number(blur)}:${blur ? '' : ctx.primaryCamera.ssrDebug}:${
+    const hash = `${Number(blur)}:${
       ctx.env.light.envLight ? ctx.env.light.getHash() : ''
     }:${!!ctx.HiZTexture}:${!!ctx.primaryCamera.ssrCalcThickness}`;
     let program = SSR._programs[hash];
@@ -320,9 +320,9 @@ export class SSR extends AbstractPostEffect {
     const intersectTex = intersectFramebuffer.getColorAttachments()[0] as Texture2D;
     device.setFramebuffer(pingpongFramebuffer[0]);
     this.resolve(ctx, inputColorTexture, sceneDepthTexture, intersectTex);
-    if (ctx.camera.ssrBlurriness > 0 && ctx.camera.ssrBlurKernelRadius > 0) {
-      const blurSizeScale = 255 * ctx.camera.ssrBlurriness;
-      const kernelRadius = ctx.camera.ssrBlurKernelRadius;
+    if (ctx.camera.ssrBlurScale > 0 && ctx.camera.ssrBlurKernelSize > 0) {
+      const blurSizeScale = 255 * ctx.camera.ssrBlurScale;
+      const kernelRadius = (Math.max(1, ctx.camera.ssrBlurKernelSize >> 0) - 1) >> 1;
       const stdDev = ctx.camera.ssrBlurStdDev;
       const depthCutoff = ctx.camera.ssrBlurDepthCutoff;
       const blitterH = (SSR._blurBlitterH = SSR._blurBlitterH ?? new BilateralBlurBlitter(false));
@@ -784,22 +784,10 @@ export class SSR extends AbstractPostEffect {
               );
               this.reflectance = pb.div(this.reflectance, pb.add(this.reflectance, pb.vec3(1)));
               this.$l.strength = pb.clamp(this.roughnessValue.rgb, pb.vec3(0), pb.vec3(1));
-              if (ctx.primaryCamera.ssrDebug === 'none') {
-                this.color = pb.add(
-                  pb.mul(this.reflectance, this.strength),
-                  pb.mul(this.sceneColor, pb.sub(pb.vec3(1), this.strength))
-                );
-              } else if (ctx.primaryCamera.ssrDebug === 'reflectBRDF') {
-                this.color = this.roughnessValue.rgb;
-              } else if (ctx.primaryCamera.ssrDebug === 'roughness') {
-                this.color = pb.vec3(this.roughness);
-              } else if (ctx.primaryCamera.ssrDebug === 'reflectance') {
-                this.color = this.reflectance;
-              } else if (ctx.primaryCamera.ssrDebug === 'strength') {
-                this.color = this.strength;
-              } else {
-                this.color = pb.vec3(0);
-              }
+              this.color = pb.add(
+                pb.mul(this.reflectance, this.strength),
+                pb.mul(this.sceneColor, pb.sub(pb.vec3(1), this.strength))
+              );
             }
           });
           this.$if(pb.equal(this.srgbOut, 0), function () {

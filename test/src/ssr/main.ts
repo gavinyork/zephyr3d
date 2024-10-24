@@ -41,7 +41,7 @@ ssrApp.ready().then(async () => {
     1,
     300
   );
-  camera.position.setXYZ(0, 0, 6);
+  camera.lookAt(new Vector3(0, 6, 20), new Vector3(0, 6, 0), new Vector3(0, 1, 0));
   camera.controller = new FPSCameraController();
   camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
   camera.depthPrePass = true;
@@ -57,27 +57,19 @@ ssrApp.ready().then(async () => {
   const batchGroup = new BatchGroup(scene);
   const mat1 = new BlinnMaterial();
   mat1.albedoColor = new Vector4(0.8, 0.8, 0.6, 1);
-  mat1.shininess = 64;
-  const boxShape1 = new BoxShape({ sizeX: 300, sizeY: 1, sizeZ: 300 });
+  mat1.shininess = 256;
+  const boxShape1 = new BoxShape({ sizeX: 50, sizeY: 1, sizeZ: 50 });
   const floor = new Mesh(scene, boxShape1, mat1);
-  floor.position.setXYZ(-150, 0, -150);
+  //floor.position.setXYZ(-50, 0, -50);
   floor.parent = batchGroup;
-
-  const mat2 = new BlinnMaterial();
-  mat2.albedoColor = new Vector4(0.8, 0, 0, 1);
-  mat2.shininess = 128;
-  const boxShape2 = new BoxShape({ sizeX: 1, sizeY: 100, sizeZ: 300 });
-  const wall = new Mesh(scene, boxShape2, mat2);
-  wall.position.setXYZ(0, 0, -150);
-  wall.parent = batchGroup;
 
   const mat3 = new BlinnMaterial();
   mat3.albedoColor = new Vector4(1, 1, 0, 1);
-  mat3.shininess = 256;
+  mat3.shininess = 5;
 
-  const sphereShape = new SphereShape({ radius: 10 });
+  const sphereShape = new SphereShape({ radius: 4 });
   const sphere = new Mesh(scene, sphereShape, mat3);
-  sphere.position.setXYZ(-30, 20, -150);
+  sphere.position.setXYZ(0, 6, 0);
   sphere.parent = batchGroup;
 
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
@@ -85,15 +77,6 @@ ssrApp.ready().then(async () => {
 
   ssrApp.on('resize', (ev) => {
     camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane());
-  });
-
-  let mouseX = 0;
-  let mouseY = 0;
-  ssrApp.device.canvas.addEventListener('pointermove', (ev) => {
-    mouseX = ev.offsetX;
-    mouseY = ev.offsetY;
-    camera.pickPosX = mouseX;
-    camera.pickPosY = mouseY;
   });
 
   ssrApp.on('tick', (ev) => {

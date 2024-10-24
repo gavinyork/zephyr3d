@@ -11,7 +11,7 @@ import { isFloatTextureFormat } from '@zephyr3d/device';
 import { AbstractPostEffect } from './posteffect';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
-import { BilateralBlurBlitter } from '../blitter/depthlimitedgaussion';
+import { BilateralBlurBlitter } from '../blitter/bilateralblur';
 import type { BlitType } from '../blitter';
 import { CopyBlitter } from '../blitter';
 import type { DrawContext } from '../render';
