@@ -6,7 +6,7 @@ Using ShadowMap to create shadows may result in jagged edges due to the precisio
 
 The resolution of the ShadowMap texture can be adjusted using the ```light.shadow.shadowMapSize``` property.
 
-In the example below, the shadow texture resolution on the top half of the screen is set to 512 pixels, while the resolution on the bottom half is set to 1024 pixels.
+In the example below, the shadow texture resolution on the top half of the screen is set to 256 pixels, while the resolution on the bottom half is set to 1024 pixels.
 
 <div class="showcase" case="tut-19" style="width:600px;height:800px"></div>
 

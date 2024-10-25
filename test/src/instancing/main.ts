@@ -1,135 +1,79 @@
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Scene,
   Application,
+  OrbitCameraController,
   PerspectiveCamera,
-  Compositor,
-  BatchGroup,
-  DirectionalLight,
-  WeightedBlendedOIT,
-  ABufferOIT,
-  SphereShape,
-  Mesh,
-  FPSCameraController,
-  AssetManager,
-  PostWater,
-  Tonemap,
   LambertMaterial,
-  PlaneShape,
-  GerstnerWaveGenerator,
-  FFTWaveGenerator
+  Mesh,
+  SpotLight,
+  BoxShape,
+  PlaneShape
 } from '@zephyr3d/scene';
-import * as common from '../common';
+import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { Inspector } from '@zephyr3d/inspector';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
-import { Vector3, Vector4 } from '@zephyr3d/base';
-import type { Texture2D } from '@zephyr3d/device';
 
-const instancingApp = new Application({
-  backend: common.getBackend(),
-  canvas: document.querySelector('#canvas'),
-  pixelRatio: 1
+const myApp = new Application({
+  backend: backendWebGL2,
+  canvas: document.querySelector('#canvas')
 });
 
-instancingApp.ready().then(async () => {
-  const device = instancingApp.device;
-  await imGuiInit(device);
+myApp.ready().then(async function () {
+  await imGuiInit(myApp.device);
   const scene = new Scene();
-  scene.env.sky.skyType = 'color';
-  scene.env.sky.skyColor = new Vector4(0, 0, 1, 1);
-  scene.env.sky.fogType = 'none';
-  scene.env.sky.skyType = 'scatter';
+
+  // Turn off environment lighting
+  scene.env.light.type = 'none';
+
+  // Create a spot light
+  const spotLight = new SpotLight(scene);
+  spotLight.cutoff = Math.PI * 0.2;
+  spotLight.range = 200;
+  spotLight.position.setXYZ(0, 10, 0);
+  spotLight.castShadow = true;
+
+  // Create several boxes
+  const boxMaterial = new LambertMaterial();
+  boxMaterial.albedoColor = new Vector4(1, 1, 0, 1);
+  const boxShape = new BoxShape({ size: 6 });
+  for (let i = 0; i < 16; i++) {
+    const box = new Mesh(scene, boxShape, boxMaterial);
+    box.position.setXYZ(Math.random() * 50 - 25, 3, Math.random() * 50 - 25);
+  }
+  // Create floor
+  const floorMaterial = new LambertMaterial();
+  floorMaterial.albedoColor = new Vector4(0, 1, 1, 1);
+  const floor = new Mesh(scene, new PlaneShape({ size: 100 }), floorMaterial);
+  floor.position.x = -50;
+  floor.position.z = -50;
+
+  // Create camera
   const camera = new PerspectiveCamera(
     scene,
     Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
+    myApp.device.canvas.width / myApp.device.canvas.height,
     1,
-    300
+    600
   );
-  camera.position.setXYZ(0, 0, 6);
-  camera.controller = new FPSCameraController();
-  camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
-  camera.depthPrePass = true;
-  camera.enablePicking = true;
+  camera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
+  camera.controller = new OrbitCameraController();
 
-  instancingApp.inputManager.use(imGuiInjectEvent);
-  instancingApp.inputManager.use(camera.handleEvent.bind(camera));
+  myApp.inputManager.use(imGuiInjectEvent);
+  myApp.inputManager.use(camera.handleEvent.bind(camera));
 
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
-  void PostWater;
-  void FFTWaveGenerator;
-  void GerstnerWaveGenerator;
-  /*
-  if (1) {
-    compositor.appendPostEffect(new PostWater(-1, new FFTWaveGenerator()));
-  } else {
-    const g = new GerstnerWaveGenerator();
-    g.numWaves = 3;
-    g.setWaveAmplitude(0, 0.02);
-    g.setWaveLength(0, 15);
-    g.setWaveDirection(0, 1, 1);
-    g.setWaveAmplitude(1, 0.01);
-    g.setWaveLength(1, 6);
-    g.setWaveDirection(1, 0, 1);
-    g.setWaveAmplitude(2, 0.02);
-    g.setWaveLength(2, 0.5);
-    g.setWaveDirection(2, -1, 1);
-    compositor.appendPostEffect(new PostWater(-1, g));
-  }
-  */
-  const inspector = new common.Inspector(scene, compositor, camera);
+  const inspector = new Inspector(scene, null, camera);
 
-  const batchGroup = new BatchGroup(scene);
-  const sphere = new SphereShape();
-  const mat = new LambertMaterial();
-  for (let i = 0; i < 100; i++) {
-    const instanceMat = mat.createInstance();
-    instanceMat.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
-    const mesh = new Mesh(scene, sphere, instanceMat);
-    mesh.position.x = Math.random() * 300 - 150;
-    mesh.position.y = Math.random() * 20 - 10;
-    mesh.position.z = Math.random() * 300 - 150;
-    const scale = 1 + Math.random() * 10;
-    mesh.scale.setXYZ(scale, scale, scale);
-    mesh.parent = batchGroup;
-  }
+  myApp.on('tick', function () {
+    // light rotation
+    spotLight.rotation.fromEulerAngle(-Math.PI / 6, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
 
-  const planeMat = new LambertMaterial();
-  planeMat.albedoColor = new Vector4(1, 1, 0, 1);
-  const ground = new Mesh(scene, new PlaneShape({ size: 1000 }), planeMat);
-  ground.position.setXYZ(-500, -40, -500);
-  ground.parent = batchGroup;
-
-  const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
-  light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
-
-  instancingApp.on('resize', (ev) => {
-    camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane());
-  });
-
-  let mouseX = 0;
-  let mouseY = 0;
-  instancingApp.device.canvas.addEventListener('pointermove', (ev) => {
-    mouseX = ev.offsetX;
-    mouseY = ev.offsetY;
-    camera.pickPosX = mouseX;
-    camera.pickPosY = mouseY;
-  });
-
-  const assetManager = new AssetManager();
-  const tex = await assetManager.fetchTexture<Texture2D>('./assets/images/Di-3d.png');
-  tex.name = 'CopySource';
-  const tex2 = instancingApp.device.createTexture2D(tex.format, tex.width, tex.height);
-  tex2.name = 'CopyDest';
-  instancingApp.device.copyTexture2D(tex, 0, tex2, 0);
-  instancingApp.device.copyTexture2D(tex, 1, tex2, 1);
-  instancingApp.on('tick', (ev) => {
     camera.updateController();
-    camera.viewport = null;
-    camera.window = null;
-    camera.render(scene, compositor);
+    camera.render(scene);
     imGuiNewFrame();
     inspector.render();
     imGuiEndFrame();
   });
-  instancingApp.run();
+
+  myApp.run();
 });

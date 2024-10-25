@@ -1,5 +1,15 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, OrbitCameraController, PerspectiveCamera, LambertMaterial, Mesh, PointLight, BoxShape, PlaneShape } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  OrbitCameraController,
+  PerspectiveCamera,
+  LambertMaterial,
+  Mesh,
+  PointLight,
+  BoxShape,
+  PlaneShape
+} from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
@@ -19,6 +29,8 @@ myApp.ready().then(function () {
   pointLight.range = 60;
   // enable shadowing
   pointLight.castShadow = true;
+  pointLight.shadow.depthBias = 0;
+  pointLight.shadow.normalBias = 0.1;
 
   // Create several boxes
   const boxMaterial = new LambertMaterial();
@@ -36,7 +48,13 @@ myApp.ready().then(function () {
   floor.position.z = -50;
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 600);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    myApp.device.canvas.width / myApp.device.canvas.height,
+    1,
+    600
+  );
   camera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
 
@@ -44,7 +62,11 @@ myApp.ready().then(function () {
 
   myApp.on('tick', function () {
     // Light rotation
-    pointLight.position.setXYZ(20 * Math.cos(Date.now() * 0.001) - 10, 20, 20 * Math.sin(Date.now() * 0.001) - 10);
+    pointLight.position.setXYZ(
+      20 * Math.cos(Date.now() * 0.001) - 10,
+      20,
+      20 * Math.sin(Date.now() * 0.001) - 10
+    );
 
     camera.updateController();
     camera.render(scene);

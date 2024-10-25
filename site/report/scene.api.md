@@ -960,7 +960,7 @@ export class Camera extends SceneNode {
     protected _SSR: boolean;
     get ssrBlurDepthCutoff(): number;
     set ssrBlurDepthCutoff(val: number);
-    // (undocumented)
+    // @internal (undocumented)
     protected _ssrBlurDepthCutoff: number;
     get ssrBlurKernelSize(): number;
     set ssrBlurKernelSize(val: number);
