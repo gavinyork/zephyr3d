@@ -44,11 +44,11 @@ myApp.ready().then(async () => {
     1,
     500
   );
-  camera.lookAt(new Vector3(-2, 1.6, 1), new Vector3(-2, 1.5, 0), Vector3.axisPY());
+  camera.lookAt(new Vector3(-2, 1, 1), new Vector3(-2, 1, 0), Vector3.axisPY());
   camera.controller = new FPSCameraController();
   camera.HiZ = true;
   camera.SSR = true;
-  camera.ssrRoughnessFactor = 0.02;
+  camera.ssrRoughnessFactor = 0.01;
   camera.ssrBlurScale = 0.06;
 
   const compositor = new Compositor();

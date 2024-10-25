@@ -124,12 +124,12 @@ export class Camera extends SceneNode {
     this._pickPosY = 0;
     this._HiZ = false;
     this._SSR = false;
-    this._ssrParams = new Vector4(32, 120, 0.5, 0);
+    this._ssrParams = new Vector4(100, 120, 0.5, 0);
     this._ssrMaxRoughness = 0.8;
     this._ssrRoughnessFactor = 1;
     this._ssrStride = 2;
     this._ssrCalcThickness = false;
-    this._ssrBlurriness = 0;
+    this._ssrBlurriness = 0.05;
     this._ssrBlurDepthCutoff = 2;
     this._ssrBlurKernelSize = 17;
     this._ssrBlurStdDev = 10;

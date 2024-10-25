@@ -197,15 +197,12 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
       if (this.metallicRoughnessTexture) {
         scope.$l.metallicRoughnessSample = this.sampleMetallicRoughnessTexture(scope);
         data.metallic = pb.mul(scope.zMetallic, scope.metallicRoughnessSample.z);
-        data.roughness = pb.mul(
-          scope.zRoughness,
-          scope.metallicRoughnessSample.y,
-          ShaderHelper.getCameraRoughnessFactor(scope)
-        );
+        data.roughness = pb.mul(scope.zRoughness, scope.metallicRoughnessSample.y);
       } else {
         data.metallic = scope.zMetallic;
-        data.roughness = pb.mul(scope.zRoughness, ShaderHelper.getCameraRoughnessFactor(scope));
+        data.roughness = scope.zRoughness;
       }
+      data.roughness = pb.mul(data.roughness, ShaderHelper.getCameraRoughnessFactor(scope));
       if (this.specularColorTexture) {
         scope.$l.specularColor = pb.mul(
           scope.zSpecularFactor.rgb,

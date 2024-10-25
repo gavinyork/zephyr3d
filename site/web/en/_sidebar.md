@@ -42,6 +42,7 @@
     - [Bloom](en/posteffect-bloom.md)
     - [SSAO](en/posteffect-sao.md)
     - [FXAA](en/posteffect-fxaa.md)
+    - [SSR](en/posteffect-ssr.md)
   - Nature
     - [Terrain](en/terrain.md)
     - [Sky](en/sky.md)

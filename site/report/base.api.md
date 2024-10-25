@@ -460,6 +460,9 @@ export class Matrix4x4 extends VectorBase {
     transpose(): Matrix4x4;
 }
 
+// @public (undocumented)
+export type MaybeArray<T> = T[] | T;
+
 // @public
 export function nextPowerOf2(value: number): number;
 

@@ -6,6 +6,7 @@
 
 import { CubeFace } from '@zephyr3d/base';
 import { IEventTarget } from '@zephyr3d/base';
+import { MaybeArray } from '@zephyr3d/base';
 import { TypedArray } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import { VectorBase } from '@zephyr3d/base';
@@ -21,16 +22,23 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number): any;
     compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number): void;
     copyBuffer(sourceBuffer: GPUDataBuffer, destBuffer: GPUDataBuffer, srcOffset: number, dstOffset: number, bytes: number): any;
+    copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number): any;
+    copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number): any;
     createBindGroup(layout: BindGroupLayout): BindGroup;
+    createBlendingState(): BlendingState;
     createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer;
+    createColorState(): ColorState;
     createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube;
     createCubeTextureFromMipmapData(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): TextureCube;
+    createDepthState(): DepthState;
     createFrameBuffer(colorAttachments: BaseTexture[], depthAttachment: BaseTexture, options?: FrameBufferOptions): FrameBuffer;
     createGPUProgram(params: GPUProgramConstructParams): GPUProgram;
     createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer;
     createInterleavedVertexBuffer(attribFormats: VertexAttribFormat[], data: TypedArray, options?: BufferCreationOptions): StructuredBuffer;
+    createRasterizerState(): RasterizerState;
     createRenderStateSet(): RenderStateSet;
     createSampler(options: SamplerOptions): TextureSampler;
+    createStencilState(): StencilState;
     createStructuredBuffer(structureType: PBStructTypeInfo, options: BufferCreationOptions, data?: TypedArray): StructuredBuffer;
     createTexture2D(format: TextureFormat, width: number, height: number, options?: TextureCreationOptions): Texture2D;
     createTexture2DArray(format: TextureFormat, width: number, height: number, depth: number, options?: TextureCreationOptions): Texture2DArray;
@@ -180,15 +188,25 @@ export abstract class BaseDevice {
     // (undocumented)
     abstract copyBuffer(sourceBuffer: GPUDataBuffer, destBuffer: GPUDataBuffer, srcOffset: number, dstOffset: number, bytes: number): any;
     // (undocumented)
+    abstract copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number): any;
+    // (undocumented)
+    abstract copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number): any;
+    // (undocumented)
     protected _cpuTimer: CPUTimer;
     // (undocumented)
     abstract createBindGroup(layout: BindGroupLayout): BindGroup;
     // (undocumented)
+    abstract createBlendingState(): BlendingState;
+    // (undocumented)
     abstract createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer;
+    // (undocumented)
+    abstract createColorState(): ColorState;
     // (undocumented)
     abstract createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube;
     // (undocumented)
     abstract createCubeTextureFromMipmapData(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): TextureCube;
+    // (undocumented)
+    abstract createDepthState(): DepthState;
     // (undocumented)
     abstract createFrameBuffer(colorAttachments: BaseTexture[], depthAttachment: BaseTexture, options?: FrameBufferOptions): FrameBuffer;
     // (undocumented)
@@ -200,9 +218,13 @@ export abstract class BaseDevice {
     // (undocumented)
     createInterleavedVertexBuffer(attribFormats: VertexAttribFormat[], data: TypedArray, options?: BufferCreationOptions): StructuredBuffer;
     // (undocumented)
+    abstract createRasterizerState(): RasterizerState;
+    // (undocumented)
     abstract createRenderStateSet(): RenderStateSet;
     // (undocumented)
     abstract createSampler(options: SamplerOptions): TextureSampler;
+    // (undocumented)
+    abstract createStencilState(): StencilState;
     // (undocumented)
     abstract createStructuredBuffer(structureType: PBStructTypeInfo, options: BufferCreationOptions, data?: TypedArray): StructuredBuffer;
     // (undocumented)
@@ -751,9 +773,21 @@ export interface FrameBuffer<T = unknown> extends GPUObject<T> {
     // (undocumented)
     bind(): boolean;
     // (undocumented)
+    getColorAttachmentCubeFace(index: number): CubeFace;
+    // (undocumented)
+    getColorAttachmentGenerateMipmaps(index: number): boolean;
+    // (undocumented)
+    getColorAttachmentLayer(index: number): number;
+    // (undocumented)
+    getColorAttachmentMipLevel(index: number): number;
+    // (undocumented)
     getColorAttachments(): BaseTexture[];
     // (undocumented)
     getDepthAttachment(): BaseTexture;
+    // (undocumented)
+    getDepthAttachmentCubeFace(): CubeFace;
+    // (undocumented)
+    getDepthAttachmentLayer(): number;
     // (undocumented)
     getHash(): string;
     // (undocumented)
@@ -2257,7 +2291,7 @@ export interface StencilState {
 export interface StorageTextureBindingLayout {
     access: 'write-only';
     format: TextureFormat;
-    viewDimension: '1d' | '2d';
+    viewDimension: '1d' | '2d' | '2d-array' | 'cube' | 'cube-array' | '3d';
 }
 
 // @public

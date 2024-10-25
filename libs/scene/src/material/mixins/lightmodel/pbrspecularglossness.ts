@@ -176,21 +176,16 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
       const pb = scope.$builder;
       if (this.specularTexture) {
         scope.$l.specularTextureSample = this.sampleSpecularTexture(scope);
-        data.roughness = pb.mul(
-          pb.sub(1, pb.mul(scope.zGlossinessFactor, scope.specularTextureSample.a)),
-          ShaderHelper.getCameraRoughnessFactor(scope)
-        );
+        data.roughness = pb.sub(1, pb.mul(scope.zGlossinessFactor, scope.specularTextureSample.a));
         data.f0 = pb.vec4(
           pb.mul(scope.specularTextureSample.rgb, scope.zSpecularFactor.rgb),
           this.getF0(scope).a
         );
       } else {
-        data.roughness = pb.mul(
-          pb.sub(1, scope.zGlossinessFactor),
-          ShaderHelper.getCameraRoughnessFactor(scope)
-        );
+        data.roughness = pb.sub(1, scope.zGlossinessFactor);
         data.f0 = pb.vec4(scope.zSpecularFactor.rgb, this.getF0(scope).a);
       }
+      data.roughness = pb.mul(data.roughness, ShaderHelper.getCameraRoughnessFactor(scope));
       data.metallic = pb.max(pb.max(data.f0.r, data.f0.g), data.f0.b);
       data.diffuse = pb.vec4(pb.mul(albedo.rgb, pb.sub(1, data.metallic)), albedo.a);
       data.specularWeight = 1;
