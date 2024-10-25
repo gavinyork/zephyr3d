@@ -118,7 +118,7 @@ export class Panel {
         .onChange((value) => {
           this._viewer.camera.HiZ = value;
         });
-      }
+    }
 
     const lightSettings = this._gui.addFolder('Lighting');
     lightSettings

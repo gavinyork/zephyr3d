@@ -79,7 +79,7 @@ export class Camera extends SceneNode {
   protected _ssrCalcThickness: boolean;
   /** @internal */
   protected _ssrBlurriness: number;
-  /** @inernal */
+  /** @internal */
   protected _ssrBlurDepthCutoff: number;
   /** @internal */
   protected _ssrBlurKernelSize: number;
