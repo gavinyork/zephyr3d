@@ -27,7 +27,8 @@ import { BilateralBlurBlitter } from '../blitter/bilateralblur';
  *
  * @internal
  */
-export class SSR extends AbstractPostEffect {
+export class SSR extends AbstractPostEffect<'SSR'> {
+  static readonly className = 'SSR' as const;
   private static _programs: Record<string, GPUProgram> = {};
   private static _resolveProgram: Record<string, GPUProgram> = {};
   private static _combineProgram: GPUProgram = undefined;

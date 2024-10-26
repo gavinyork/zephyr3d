@@ -24,7 +24,8 @@ import { fetchSampler } from '../utility/misc';
  * The post water effect
  * @public
  */
-export class PostWater extends AbstractPostEffect {
+export class PostWater extends AbstractPostEffect<'PostWater'> {
+  static readonly className = 'PostWater' as const;
   private _reflectSize: number;
   private _copyBlitter: CopyBlitter;
   private _renderingReflections: boolean;

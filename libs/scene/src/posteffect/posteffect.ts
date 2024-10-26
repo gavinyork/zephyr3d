@@ -6,7 +6,8 @@ import { drawFullscreenQuad } from '../render/fullscreenquad';
  * Base class for any type of post effect
  * @public
  */
-export abstract class AbstractPostEffect {
+export abstract class AbstractPostEffect<ClassName extends string> {
+  static readonly className: string;
   protected _outputTexture: Texture2D;
   protected _quadVertexLayout: VertexLayout;
   protected _quadRenderStateSet: RenderStateSet;
@@ -22,6 +23,10 @@ export abstract class AbstractPostEffect {
     this._quadRenderStateSet = null;
     this._enabled = true;
     this._opaque = false;
+  }
+  /** Gets class name of this instance */
+  getClassName(): ClassName {
+    return (this.constructor as any).className as ClassName;
   }
   /** Whether this post effect is enabled */
   get enabled(): boolean {

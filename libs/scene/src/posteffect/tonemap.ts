@@ -8,7 +8,8 @@ import { fetchSampler } from '../utility/misc';
  * The tonemap post effect
  * @public
  */
-export class Tonemap extends AbstractPostEffect {
+export class Tonemap extends AbstractPostEffect<'Tonemap'> {
+  static readonly className = 'Tonemap' as const;
   private static _programTonemap: GPUProgram = null;
   private _bindgroupTonemap: BindGroup;
   private _exposure: number;
