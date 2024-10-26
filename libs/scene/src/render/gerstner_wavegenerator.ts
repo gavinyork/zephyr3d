@@ -17,9 +17,12 @@ export class GerstnerWaveGenerator extends WaveGenerator {
   constructor() {
     super();
     this._currentTime = 0;
-    this._numWaves = 1;
     this._waveParams = new Float32Array(8 * MAX_NUM_WAVES);
     this.randomWave(0);
+    this.randomWave(1);
+    this.randomWave(2);
+    this.randomWave(3);
+    this._numWaves = 4;
   }
   get numWaves(): number {
     return this._numWaves;
@@ -34,26 +37,20 @@ export class GerstnerWaveGenerator extends WaveGenerator {
     }
     this._numWaves = val;
   }
-  setWaveDirection(waveIndex: number, x: number, y: number) {
+  setWaveDirection(waveIndex: number, angle: number) {
     if (waveIndex < MAX_NUM_WAVES) {
-      this._waveParams[waveIndex * 8 + 0] = x;
-      this._waveParams[waveIndex * 8 + 1] = y;
+      this._waveParams[waveIndex * 8 + 0] = angle;
     }
   }
-  setWaveDirectionX(waveIndex: number, x: number) {
-    if (waveIndex < MAX_NUM_WAVES) {
-      this._waveParams[waveIndex * 8 + 0] = x;
-    }
-  }
-  getWaveDirectionX(waveIndex: number): number {
+  getWaveDirection(waveIndex: number): number {
     return waveIndex < MAX_NUM_WAVES ? this._waveParams[waveIndex * 8 + 0] : 0;
   }
-  setWaveDirectionY(waveIndex: number, y: number) {
+  setWaveSteepness(waveIndex: number, steepness: number) {
     if (waveIndex < MAX_NUM_WAVES) {
-      this._waveParams[waveIndex * 8 + 1] = y;
+      this._waveParams[waveIndex * 8 + 1] = steepness;
     }
   }
-  getWaveDirectionY(waveIndex: number): number {
+  getWaveSteepness(waveIndex: number): number {
     return waveIndex < MAX_NUM_WAVES ? this._waveParams[waveIndex * 8 + 1] : 0;
   }
   setWaveAmplitude(waveIndex: number, val: number) {
@@ -93,10 +90,13 @@ export class GerstnerWaveGenerator extends WaveGenerator {
     }
   }
   private randomWave(i: number) {
-    this._waveParams[i * 8 + 0] = Math.random() * 2 - 1;
-    this._waveParams[i * 8 + 1] = Math.random() * 2 - 1;
-    this._waveParams[i * 8 + 2] = Math.random() * 0.5;
-    this._waveParams[i * 8 + 3] = Math.random() * 50;
+    this._waveParams[i * 8 + 0] = Math.random() * Math.PI * 2;
+    this._waveParams[i * 8 + 1] = Math.random() * 0.5 + 0.5;
+    this._waveParams[i * 8 + 2] = Math.random() * 0.1;
+    this._waveParams[i * 8 + 3] = Math.random() * 10;
+    this._waveParams[i * 8 + 4] = Math.random() * 100 - 50;
+    this._waveParams[i * 8 + 5] = 0;
+    this._waveParams[i * 8 + 6] = Math.random() * 100 - 50;
     this._waveParams[i * 8 + 7] = 0;
   }
   update(timeInSeconds: number): void {
@@ -154,14 +154,14 @@ export class GerstnerWaveGenerator extends WaveGenerator {
         pb.vec3('outNormal').out()
       ],
       function () {
-        this.$l.amplitude = this.waveParam.z;
+        this.$l.amplitude = pb.max(this.waveParam.z, 0.01);
         this.$l.wavelength = this.waveParam.w;
-        this.$l.omniPos = this.omniParam.xy;
+        this.$l.omniPos = this.omniParam.xz;
         this.$l.omni = this.omniParam.w;
-        this.$l.direction = pb.normalize(this.waveParam.xy);
-        this.$l.w = pb.div(Math.PI * 2, this.wavelength);
+        this.$l.direction = pb.vec2(pb.sin(this.waveParam.x), pb.cos(this.waveParam.x));
+        this.$l.w = pb.max(0.001, pb.div(Math.PI * 2, this.wavelength));
         this.$l.wSpeed = pb.sqrt(pb.mul(9.8, this.w));
-        this.$l.peak = 1.5;
+        this.$l.peak = this.waveParam.y;
         this.$l.qi = pb.div(this.peak, pb.mul(this.amplitude, this.w, this.numWaves));
         this.$l.dirWaveInput = pb.mul(this.direction, pb.sub(1, this.omni));
         this.$l.omniWaveInput = pb.mul(pb.sub(this.inPos.xz, this.omniPos), this.omni);
