@@ -1762,6 +1762,8 @@ export class GerstnerWaveGenerator extends WaveGenerator {
     calcVertexPositionAndNormal(scope: PBInsideFunctionScope, inPos: PBShaderExp, outPos: PBShaderExp, outNormal: PBShaderExp): void;
     // (undocumented)
     dispose(): void;
+    // @internal (undocumented)
+    gerstnerWave(scope: PBInsideFunctionScope, waveParam: PBShaderExp, omniParam: PBShaderExp, time: PBShaderExp, inPos: PBShaderExp, outNormal: PBShaderExp): PBShaderExp;
     // (undocumented)
     getHash(device: AbstractDevice): string;
     // (undocumented)
@@ -1771,11 +1773,11 @@ export class GerstnerWaveGenerator extends WaveGenerator {
     // (undocumented)
     getWaveAmplitude(waveIndex: number): number;
     // (undocumented)
-    getWaveDirectionX(waveIndex: number): number;
-    // (undocumented)
-    getWaveDirectionY(waveIndex: number): number;
+    getWaveDirection(waveIndex: number): number;
     // (undocumented)
     getWaveLength(waveIndex: number): number;
+    // (undocumented)
+    getWaveSteepness(waveIndex: number): number;
     // (undocumented)
     isOk(): boolean;
     // (undocumented)
@@ -1792,13 +1794,11 @@ export class GerstnerWaveGenerator extends WaveGenerator {
     // (undocumented)
     setWaveAmplitude(waveIndex: number, val: number): void;
     // (undocumented)
-    setWaveDirection(waveIndex: number, x: number, y: number): void;
-    // (undocumented)
-    setWaveDirectionX(waveIndex: number, x: number): void;
-    // (undocumented)
-    setWaveDirectionY(waveIndex: number, y: number): void;
+    setWaveDirection(waveIndex: number, angle: number): void;
     // (undocumented)
     setWaveLength(waveIndex: number, val: number): void;
+    // (undocumented)
+    setWaveSteepness(waveIndex: number, steepness: number): void;
     // (undocumented)
     update(timeInSeconds: number): void;
 }
@@ -3653,7 +3653,7 @@ export class ShadowMapPass extends RenderPass {
 export class ShadowMapper {
     constructor(light: PunctualLight);
     // @internal (undocumented)
-    protected calcDepthBiasParams(shadowMapCamera: Camera, shadowMapSize: number, depthBias: number, normalBias: number, depthScale: number, result: Vector4): void;
+    protected calcDepthBiasParams(camera: Camera, shadowMapSize: number, depthBias: number, normalBias: number, depthScale: number, result: Vector4): void;
     // @internal (undocumented)
     calcSplitDistances(nearPlane: number, farPlane: number, numCascades: number): number[];
     // @internal (undocumented)
