@@ -9,7 +9,8 @@ import {
   ABufferOIT,
   SAO,
   FPSCameraController,
-  FFTWaveGenerator
+  FFTWaveGenerator,
+  GerstnerWaveGenerator
 } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
 import {
@@ -70,7 +71,7 @@ export class GLTFViewer {
     this._batchGroup = new BatchGroup(scene);
     this._assetManager = new AssetManager();
     this._tonemap = new Tonemap();
-    this._water = new PostWater(0, new FFTWaveGenerator());
+    this._water = new PostWater(0, new GerstnerWaveGenerator());
     this._water.elevation = 2;
     this._water.ssr = true;
     this._bloom = new Bloom();

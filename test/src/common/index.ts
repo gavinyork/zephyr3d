@@ -372,12 +372,6 @@ export class Inspector {
       0,
       5
     );
-    ImGui.SliderInt(
-      'SSRBinarySearchSteps##water',
-      (val?: number) => (water.ssrBinarySearchSteps = val = val ?? water.ssrBinarySearchSteps),
-      0,
-      16
-    );
     ImGui.SliderFloat(
       'AntiReflectanceLeak##water',
       (val?: number) => (water.antiReflectanceLeak = val = val ?? water.antiReflectanceLeak),

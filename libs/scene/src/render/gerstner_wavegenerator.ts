@@ -131,17 +131,17 @@ export class GerstnerWaveGenerator extends WaveGenerator {
   setupUniforms(scope: PBGlobalScope): void {
     const pb = scope.$builder;
     scope.time = pb.float().uniform(0);
-    scope.numWaves = pb.int().uniform(0);
+    scope.numWaves = pb.float().uniform(0);
     scope.waveParams = pb.vec4[MAX_NUM_WAVES * 2]().uniform(0);
   }
-  private gerstnerWave(
+  /** @internal */
+  gerstnerWave(
     scope: PBInsideFunctionScope,
     waveParam: PBShaderExp,
     omniParam: PBShaderExp,
     time: PBShaderExp,
     inPos: PBShaderExp,
-    tangent: PBShaderExp,
-    bitangent: PBShaderExp
+    outNormal: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
     pb.func(
@@ -151,10 +151,36 @@ export class GerstnerWaveGenerator extends WaveGenerator {
         pb.vec4('omniParam'),
         pb.float('time'),
         pb.vec3('inPos'),
-        pb.vec3('tangent').inout(),
-        pb.vec3('bitangent').inout()
+        pb.vec3('outNormal').out()
       ],
       function () {
+        this.$l.amplitude = this.waveParam.z;
+        this.$l.wavelength = this.waveParam.w;
+        this.$l.omniPos = this.omniParam.xy;
+        this.$l.omni = this.omniParam.w;
+        this.$l.direction = pb.normalize(this.waveParam.xy);
+        this.$l.w = pb.div(Math.PI * 2, this.wavelength);
+        this.$l.wSpeed = pb.sqrt(pb.mul(9.8, this.w));
+        this.$l.peak = 1.5;
+        this.$l.qi = pb.div(this.peak, pb.mul(this.amplitude, this.w, this.numWaves));
+        this.$l.dirWaveInput = pb.mul(this.direction, pb.sub(1, this.omni));
+        this.$l.omniWaveInput = pb.mul(pb.sub(this.inPos.xz, this.omniPos), this.omni);
+        this.$l.windDir = pb.normalize(pb.add(this.dirWaveInput, this.omniWaveInput));
+        this.$l.dir = pb.dot(this.windDir, pb.sub(this.inPos.xz, pb.mul(this.omniPos, this.omni)));
+        this.$l.calc = pb.sub(pb.mul(this.dir, this.w), pb.mul(this.wSpeed, this.time));
+        this.$l.cosCalc = pb.cos(this.calc);
+        this.$l.sinCalc = pb.sin(this.calc);
+        this.$l.waveXZ = pb.mul(this.windDir.xy, this.qi, this.amplitude, this.cosCalc);
+        this.$l.waveY = pb.div(pb.mul(this.sinCalc, this.amplitude), this.numWaves);
+        this.$l.wave = pb.vec3(this.waveXZ.x, this.waveY, this.waveXZ.y);
+        this.$l.wa = pb.mul(this.w, this.amplitude);
+        this.$l.n = pb.vec3(
+          pb.neg(pb.mul(this.windDir.xy, this.wa, this.cosCalc)),
+          pb.sub(1, pb.mul(this.qi, this.wa, this.sinCalc))
+        );
+        this.outNormal = pb.div(this.n.xzy, this.numWaves);
+        this.$return(pb.mul(this.wave, pb.clamp(pb.mul(this.amplitude, 10000), 0, 1)));
+        /*
         this.$l.pos = pb.vec3(0);
         this.$l.steepness = this.waveParam.z;
         this.$l.wavelength = this.waveParam.w;
@@ -187,9 +213,10 @@ export class GerstnerWaveGenerator extends WaveGenerator {
         this.pos.y = pb.mul(this.a, pb.sin(this.f));
         this.pos.z = pb.mul(this.d.y, this.a, pb.cos(this.f));
         this.$return(this.pos);
+*/
       }
     );
-    return scope.gerstnerWave(waveParam, omniParam, time, inPos, tangent, bitangent);
+    return scope.gerstnerWave(waveParam, omniParam, time, inPos, outNormal);
   }
   private calcNormalAndPos(
     scope: PBInsideFunctionScope,
@@ -203,11 +230,10 @@ export class GerstnerWaveGenerator extends WaveGenerator {
       'calcPositionAndNormal',
       [pb.vec3('inPos'), pb.vec3('outPos').out(), pb.vec3('outNormal').out()],
       function () {
-        this.$l.tangent = pb.vec3(1, 0, 0);
-        this.$l.bitangent = pb.vec3(0, 0, 1);
-        this.$l.wavePos = pb.vec3(0);
+        this.outPos = this.inPos;
+        this.outNormal = pb.vec3(0);
         this.$for(
-          pb.int('i'),
+          pb.float('i'),
           0,
           pb.getDevice().type === 'webgl' ? MAX_NUM_WAVES : this.numWaves,
           function () {
@@ -216,6 +242,18 @@ export class GerstnerWaveGenerator extends WaveGenerator {
                 this.$break();
               });
             }
+            this.$l.waveNormal = pb.vec3();
+            this.$l.wavePos = that.gerstnerWave(
+              this,
+              this.waveParams.at(pb.mul(this.i, 2)),
+              this.waveParams.at(pb.add(pb.mul(this.i, 2), 1)),
+              this.time,
+              this.inPos,
+              this.waveNormal
+            );
+            /*
+            this.wavePos = pb.add(this.wavePos, this.outPos);
+            this.waveNormal = pb.add(this.waveNormal, this.outNormal);
             this.wavePos = pb.add(
               this.wavePos,
               that.gerstnerWave(
@@ -228,10 +266,13 @@ export class GerstnerWaveGenerator extends WaveGenerator {
                 this.bitangent
               )
             );
-            this.outPos = pb.add(this.inPos, this.wavePos);
-            this.outNormal = pb.cross(pb.normalize(this.bitangent), pb.normalize(this.tangent));
+            */
+            this.outPos = pb.add(this.outPos, this.wavePos);
+            this.outNormal = pb.add(this.outNormal, this.waveNormal);
+            //this.outNormal = pb.normalize(this.waveNormal); // pb.cross(pb.normalize(this.bitangent), pb.normalize(this.tangent));
           }
         );
+        //this.outNormal = pb.normalize(this.outNormal);
       }
     );
     scope.calcPositionAndNormal(inPos, outPos, outNormal);
