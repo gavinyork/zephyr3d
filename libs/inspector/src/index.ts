@@ -110,7 +110,7 @@ export class Inspector {
   private _shadowMethods: ShadowMode[];
   private _skyTypes: SkyType[];
   private _fogTypes: FogType[];
-  private _renderPostEffects: Set<AbstractPostEffect>;
+  private _renderPostEffects: Set<AbstractPostEffect<any>>;
   private _assetManager: AssetManager;
   private _camera: Camera;
   constructor(scene: Scene, compositor: Compositor, camera?: Camera) {
@@ -272,7 +272,8 @@ export class Inspector {
         });
         if (postEffects.length > 0 && ImGui.BeginMenu('Compositor')) {
           for (const eff of postEffects) {
-            const name = eff.constructor.name;
+            const name = eff.getClassName();
+            console.log(`PostEffect constructor name: ${name}`);
             ImGui.MenuItem(name, null, (val?: boolean) => {
               if (val === undefined || val === null) {
                 val = this._renderPostEffects.has(eff);

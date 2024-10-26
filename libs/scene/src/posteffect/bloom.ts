@@ -7,7 +7,8 @@ import { Vector2, Vector4 } from '@zephyr3d/base';
  * The bloom post effect
  * @public
  */
-export class Bloom extends AbstractPostEffect {
+export class Bloom extends AbstractPostEffect<'Bloom'> {
+  static readonly className = 'Bloom' as const;
   private static _programDownsampleH: GPUProgram = null;
   private static _programDownsampleV: GPUProgram = null;
   private static _programUpsample: GPUProgram = null;

@@ -33,9 +33,9 @@ export class Compositor {
   /** @internal */
   private static _SSRPostEffect: SSR = null;
   /** @internal */
-  protected _postEffectsOpaque: AbstractPostEffect[];
+  protected _postEffectsOpaque: AbstractPostEffect<any>[];
   /** @internal */
-  protected _postEffectsTransparency: AbstractPostEffect[];
+  protected _postEffectsTransparency: AbstractPostEffect<any>[];
   /** @internal */
   private static _blitProgram: GPUProgram = null;
   /** @internal */
@@ -71,7 +71,7 @@ export class Compositor {
    * @param postEffect - The post effect to add
    * @param opaque - true if the post effect should be applied after the opaque pass and before the transparent pass, otherwise the post effect should be applied after the transparent pass
    */
-  appendPostEffect(postEffect: AbstractPostEffect): void {
+  appendPostEffect(postEffect: AbstractPostEffect<any>): void {
     if (postEffect) {
       if (
         this._postEffectsOpaque.indexOf(postEffect) >= 0 ||
@@ -89,7 +89,7 @@ export class Compositor {
    *
    * @param postEffect - The posteffect to be remove.
    */
-  removePostEffect(postEffect: AbstractPostEffect): void {
+  removePostEffect(postEffect: AbstractPostEffect<any>): void {
     for (const list of [this._postEffectsOpaque, this._postEffectsTransparency]) {
       const index = list.indexOf(postEffect);
       if (index >= 0) {
@@ -108,7 +108,7 @@ export class Compositor {
   /**
    * Gets all post effects
    */
-  getPostEffects(): AbstractPostEffect[] {
+  getPostEffects(): AbstractPostEffect<any>[] {
     return [...this._postEffectsOpaque, ...this._postEffectsTransparency];
   }
   /** @internal */

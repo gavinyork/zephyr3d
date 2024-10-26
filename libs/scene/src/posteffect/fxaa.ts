@@ -9,7 +9,8 @@ import { fetchSampler } from '../utility/misc';
  * FXAA post effect
  * @public
  */
-export class FXAA extends AbstractPostEffect {
+export class FXAA extends AbstractPostEffect<'FXAA'> {
+  static readonly className = 'FXAA' as const;
   private static _program: GPUProgram = null;
   private _bindgroup: BindGroup;
   private _invTexSize: Vector2;
