@@ -54,7 +54,7 @@ export class PostWater extends AbstractPostEffect {
     this._displace = 16;
     this._depthMulti = 0.1;
     this._refractionStrength = 0;
-    this._causticsParams = new Vector4(0.8, 1.0, 1, 100);
+    this._causticsParams = new Vector4(0.8, 1.0, 1, 0);
     this._copyBlitter = new CopyBlitter();
     this._renderingReflections = false;
     this._absorptionGrad = new Interpolator(
@@ -527,8 +527,8 @@ export class PostWater extends AbstractPostEffect {
                   1,
                   pb.smoothStep(this.causticsParams.x, this.causticsParams.y, this.unprojectedNormal.y)
                 );
-                this.caustics = pb.pow(this.caustics, this.causticsParams.z);
                 this.caustics = pb.mul(this.caustics, this.causticsParams.w);
+                this.caustics = pb.pow(this.caustics, this.causticsParams.z);
               });
               this.$l.refraction = pb.textureSampleLevel(this.tex, this.refractUV, 0).rgb;
               this.refraction = pb.mul(

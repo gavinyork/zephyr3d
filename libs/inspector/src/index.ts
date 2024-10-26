@@ -440,14 +440,18 @@ export class Inspector {
             t.setOrigin(i, origin[0], origin[1]);
           }
         } else {
-          const direction = [t.getWaveDirectionX(i), t.getWaveDirectionY(i)] as [number, number];
-          if (ImGui.SliderFloat2(`Direction##Wave${i}`, direction, -1, 1)) {
-            t.setWaveDirection(i, direction[0], direction[1]);
+          const direction = [t.getWaveDirection(i)] as [number];
+          if (ImGui.SliderFloat(`Direction##Wave${i}`, direction, 0, Math.PI * 2)) {
+            t.setWaveDirection(i, direction[0]);
           }
         }
-        const steepness = [t.getWaveAmplitude(i)] as [number];
-        if (ImGui.SliderFloat(`Steepness##Wave${i}`, steepness, 0, 1)) {
-          t.setWaveAmplitude(i, steepness[0]);
+        const amplitude = [t.getWaveAmplitude(i)] as [number];
+        if (ImGui.SliderFloat(`Amplitude##Wave${i}`, amplitude, 0, 5)) {
+          t.setWaveAmplitude(i, amplitude[0]);
+        }
+        const steepness = [t.getWaveSteepness(i)] as [number];
+        if (ImGui.SliderFloat(`Steepness##Wave${i}`, steepness, 0, 10)) {
+          t.setWaveSteepness(i, steepness[0]);
         }
         const waveLength = [t.getWaveLength(i)] as [number];
         if (ImGui.SliderFloat(`WaveLength##Wave${i}`, waveLength, 0, 100)) {
