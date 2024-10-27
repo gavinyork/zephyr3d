@@ -8,6 +8,7 @@ import type { DrawableInstanceInfo, RenderQueue, RenderQueueRef } from './render
 import { Application } from '../app';
 import type { Mesh, XForm } from '../scene';
 import { MaterialVaryingFlags } from '../values';
+import type { RenderBundleWrapper } from './renderbundle_wrapper';
 
 export interface IMixinDrawable {
   readonly objectColor: Vector4;
@@ -21,6 +22,28 @@ export interface IMixinDrawable {
 }
 
 let _drawableId = 0;
+const drawableRenderBundleMap = new WeakMap<Drawable, { wrapper: RenderBundleWrapper; hashes: string[] }[]>();
+
+/** @internal */
+export function addDrawableToRenderBundle(
+  drawable: Drawable,
+  renderBundle: RenderBundleWrapper,
+  hash: string
+): void {
+  let renderBundles = drawableRenderBundleMap.get(drawable);
+  if (!renderBundles) {
+    renderBundles = [];
+    drawableRenderBundleMap.set(drawable, renderBundles);
+  }
+  const index = renderBundles.findIndex((rb) => rb.wrapper === renderBundle);
+  if (index < 0) {
+    renderBundles.push({ wrapper: renderBundle, hashes: [hash] });
+    return;
+  }
+  if (!renderBundles[index].hashes.includes(hash)) {
+    renderBundles[index].hashes.push(hash);
+  }
+}
 
 export function mixinDrawable<
   T extends GenericConstructor<{
@@ -56,6 +79,21 @@ export function mixinDrawable<
     }
     getId(): number {
       return this._id;
+    }
+    changedInRenderBundle() {
+      const renderBundles = drawableRenderBundleMap.get(this as unknown as Drawable);
+      if (renderBundles) {
+        for (let i = renderBundles.length - 1; i >= 0; i--) {
+          const renderBundle = renderBundles[i].wrapper;
+          if (renderBundle.disposed) {
+            renderBundles.splice(i, 1);
+          } else {
+            for (const hash of renderBundles[i].hashes) {
+              renderBundles[i].wrapper.invalidate(hash);
+            }
+          }
+        }
+      }
     }
     getObjectColor(): Vector4 {
       if (!this._objectColor) {

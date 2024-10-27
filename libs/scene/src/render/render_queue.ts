@@ -386,7 +386,33 @@ export class RenderQueue {
    * Removes all items in the render queue
    */
   reset() {
-    this._itemList = null;
+    if (this._itemList) {
+      // Release all render bundles
+      for (const k in this._itemList) {
+        const itemListBundle: RenderItemListBundle = this._itemList[k];
+        for (const l in itemListBundle) {
+          const listInfo: RenderItemListInfo[] = itemListBundle[l];
+          for (const info of listInfo) {
+            if (info.renderBundle) {
+              info.renderBundle.dispose();
+            }
+            if (info.skinRenderBundle) {
+              info.skinRenderBundle.dispose();
+            }
+            if (info.morphRenderBundle) {
+              info.morphRenderBundle.dispose();
+            }
+            if (info.skinAndMorphRenderBundle) {
+              info.skinAndMorphRenderBundle.dispose();
+            }
+            if (info.instanceRenderBundle) {
+              info.instanceRenderBundle.dispose();
+            }
+          }
+        }
+      }
+      this._itemList = null;
+    }
     this._shadowedLightList = [];
     this._unshadowedLightList = [];
     this._sunLight = null;

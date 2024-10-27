@@ -20,11 +20,11 @@ export class RenderBundleWrapper {
   endRenderBundle(hash: string) {
     this._renderBundles[hash] = Application.instance.device.endCapture();
   }
-  invalidate() {
-    this._renderBundles = {};
+  invalidate(hash: string) {
+    this._renderBundles[hash] = undefined;
   }
   dispose() {
-    this.invalidate();
+    this._renderBundles = {};
     this._disposed = true;
   }
 }

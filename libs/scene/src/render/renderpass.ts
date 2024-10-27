@@ -9,6 +9,7 @@ import type { AbstractDevice, BindGroup } from '@zephyr3d/device';
 import { ShaderHelper } from '../material/shader/helper';
 import type { RenderBundleWrapper } from './renderbundle_wrapper';
 import { MaterialVaryingFlags } from '../values';
+import { addDrawableToRenderBundle } from './drawable_mixin';
 
 /**
  * Base class for any kind of render passes
@@ -167,12 +168,14 @@ export abstract class RenderPass {
     reverseWinding: boolean,
     hash: string
   ) {
+    let recording = false;
     if (renderBundle && ctx.primaryCamera.commandBufferReuse) {
       const bundle = renderBundle.getRenderBundle(hash);
       if (bundle) {
         ctx.device.executeRenderBundle(bundle);
         return;
       }
+      recording = true;
       renderBundle.beginRenderBundle();
     }
     for (const item of items) {
@@ -180,6 +183,9 @@ export abstract class RenderPass {
       const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
       if (reverse) {
         ctx.device.reverseVertexWindingOrder(!ctx.device.isWindingOrderReversed());
+      }
+      if (recording) {
+        addDrawableToRenderBundle(item.drawable, renderBundle);
       }
       item.drawable.draw(ctx);
       if (reverse) {
