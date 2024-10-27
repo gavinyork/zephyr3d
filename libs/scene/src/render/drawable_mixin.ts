@@ -13,6 +13,7 @@ import type { RenderBundleWrapper } from './renderbundle_wrapper';
 export interface IMixinDrawable {
   readonly objectColor: Vector4;
   getId(): number;
+  changedInRenderBundle(): void;
   pushRenderQueueRef(ref: RenderQueueRef): void;
   applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void;
   applyTransformUniforms(renderQueue: RenderQueue): void;

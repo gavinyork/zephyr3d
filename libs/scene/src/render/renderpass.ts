@@ -185,7 +185,7 @@ export abstract class RenderPass {
         ctx.device.reverseVertexWindingOrder(!ctx.device.isWindingOrderReversed());
       }
       if (recording) {
-        addDrawableToRenderBundle(item.drawable, renderBundle);
+        addDrawableToRenderBundle(item.drawable, renderBundle, hash);
       }
       item.drawable.draw(ctx);
       if (reverse) {
