@@ -1,4 +1,3 @@
-import type { Matrix4x4 } from '@zephyr3d/base';
 import { Vector4, applyMixins } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import { BoxFrameShape } from '../shapes';
@@ -31,8 +30,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   protected _boneMatrices: Texture2D;
   /** @internal */
-  protected _invBindMatrix: Matrix4x4;
-  /** @internal */
   protected _morphData: Texture2D;
   /** @internal */
   protected _morphInfo: GPUDataBuffer;
@@ -55,7 +52,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._castShadow = true;
     this._animatedBoundingBox = null;
     this._boneMatrices = null;
-    this._invBindMatrix = null;
     this._morphData = null;
     this._morphInfo = null;
     this._instanceHash = null;
@@ -178,13 +174,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._boneMatrices = matrices;
   }
   /**
-   * Sets the inverse bind matrix for skeletal animation
-   * @param matrix - The matrix to set
-   */
-  setInvBindMatrix(matrix: Matrix4x4) {
-    this._invBindMatrix = matrix;
-  }
-  /**
    * Sets the texture that contains the morph target data
    * @param data - The texture that contains the morph target data
    */
@@ -258,12 +247,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    */
   getBoneMatrices(): Texture2D {
     return this._boneMatrices;
-  }
-  /**
-   * {@inheritDoc Drawable.getInvBindMatrix}
-   */
-  getInvBindMatrix(): Matrix4x4 {
-    return this._invBindMatrix;
   }
   /**
    * {@inheritDoc Drawable.getXForm}

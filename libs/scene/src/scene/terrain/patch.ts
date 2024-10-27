@@ -1,4 +1,3 @@
-import type { Matrix4x4 } from '@zephyr3d/base';
 import { Vector3, Vector4, applyMixins } from '@zephyr3d/base';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { Primitive } from '../../render/primitive';
@@ -136,9 +135,6 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
     return 'TerrainPatch';
   }
   getBoneMatrices(): Texture2D<unknown> {
-    return null;
-  }
-  getInvBindMatrix(): Matrix4x4 {
     return null;
   }
   getMorphData(): Texture2D {

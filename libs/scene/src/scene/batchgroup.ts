@@ -39,30 +39,27 @@ export class BatchGroup extends GraphNode {
     }.bind(this);
     this.on('nodeattached', (node) => {
       node.iterate((child) => {
-        if (child.isGraphNode()) {
-          if (!child.isMesh()) {
-            console.error('Only mesh node can be added to batch group');
-          }
+        if (child.isMesh()) {
           child.placeToOctree = false;
           if (!this._staticBV) {
             this.invalidateBoundingVolume();
           }
           child.on('bvchanged', bvCallback);
+          this._changeTag++;
         }
       });
-      this._changeTag++;
     });
     this.on('noderemoved', (node) => {
       node.iterate((child) => {
-        if (child.isGraphNode()) {
+        if (child.isMesh()) {
           child.placeToOctree = true;
           if (!this._staticBV) {
             this.invalidateBoundingVolume();
           }
           child.off('bvchanged', bvCallback);
+          this._changeTag++;
         }
       });
-      this._changeTag++;
     });
   }
   /**
@@ -104,7 +101,7 @@ export class BatchGroup extends GraphNode {
     super.setBoundingVolume(bv);
   }
   /** @internal */
-  getRenderQueue(cullVisitor: CullVisitor) {
+  cull(cullVisitor: CullVisitor) {
     let queueInfo = this._renderQueueMap.get(cullVisitor.renderPass);
     if (!queueInfo) {
       queueInfo = {
@@ -129,6 +126,6 @@ export class BatchGroup extends GraphNode {
       cullVisitor.frustumCulling = frustumCulling;
       cullVisitor.renderQueue = renderQueue;
     }
-    return queueInfo.queue;
+    cullVisitor.pushRenderQueue(queueInfo.queue);
   }
 }

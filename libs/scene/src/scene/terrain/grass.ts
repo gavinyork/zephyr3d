@@ -1,4 +1,4 @@
-import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
+import type { Vector4 } from '@zephyr3d/base';
 import { Vector2, applyMixins, nextPowerOf2 } from '@zephyr3d/base';
 import { Primitive } from '../../render/primitive';
 import type { BatchDrawable, Drawable, DrawContext } from '../../render/drawable';
@@ -63,9 +63,6 @@ export class GrassCluster extends applyMixins(GrassClusterBase, mixinDrawable) i
     return this._terrain;
   }
   getBoneMatrices(): Texture2D<unknown> {
-    return null;
-  }
-  getInvBindMatrix(): Matrix4x4 {
     return null;
   }
   getMorphData(): Texture2D {

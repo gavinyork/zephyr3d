@@ -1,10 +1,11 @@
 import { PRNG, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import type { AssetHierarchyNode, MeshMaterial, ModelInfo, SharedModel } from '@zephyr3d/scene';
+import { BatchGroup, SceneNode } from '@zephyr3d/scene';
 import {
   Application,
   AssetManager,
-  //Bloom,
+  Bloom,
   Compositor,
   DirectionalLight,
   FFTWaveGenerator,
@@ -25,6 +26,7 @@ import { Panel } from './ui';
 export class Demo {
   private _assetManager: AssetManager;
   private _scene: Scene;
+  private _root: SceneNode;
   private _terrain: Terrain;
   private _camera: PerspectiveCamera;
   private _character: ModelInfo;
@@ -47,10 +49,11 @@ export class Demo {
     this._actorRunning = false;
     this._assetManager = new AssetManager();
     this._scene = this.createScene();
+    this._root = new BatchGroup(this._scene) ?? new SceneNode(this._scene);
     this._camera = this.createCamera(this._scene);
     this._compositor = new Compositor();
     this._compositor.appendPostEffect(new Tonemap());
-    //this._compositor.appendPostEffect(new Bloom());
+    this._compositor.appendPostEffect(new Bloom());
     this._compositor.appendPostEffect(new FXAA());
     Application.instance.device.setFont('24px arial');
     this.render();
@@ -155,10 +158,12 @@ export class Demo {
 
       // load world
       this._terrain = await this.loadTerrain(this._scene, this._assetManager);
+      this._terrain.parent = this._root;
       this._character = await this.loadCharacter(this._scene, this._assetManager);
       // initialize
       this._camera.parent = this._terrain;
       this._character.group.parent = this._terrain;
+      this._character.group.showState = 'visible';
       const x = this._terrain.scaledWidth * 0.37;
       const z = this._terrain.scaledHeight * 0.19;
       const y = this._terrain.getElevation(x, z);
@@ -295,6 +300,7 @@ export class Demo {
     terrain.pickable = true;
 
     // Distribute some trees
+    const numTrees = 500;
     const PY = Vector3.axisPY();
     const trees = [
       {
@@ -305,13 +311,14 @@ export class Demo {
     const f = 1 / trees.length;
     const seed = 0;
     const prng = new PRNG(seed);
-    for (let i = 0; i < 500; i++) {
+    for (let i = 0; i < numTrees; i++) {
       const x = prng.get() * terrain.scaledWidth;
       const z = prng.get() * terrain.scaledHeight;
       const y = terrain.getElevation(x, z);
       const index = Math.min(Math.floor(prng.get() / f), trees.length - 1);
       const tree = await assetManager.fetchModel(scene, trees[index].url, {
-        postProcess: this.replaceMaterials
+        postProcess: this.replaceMaterials,
+        enableInstancing: true
       });
       tree.group.parent = terrain;
       tree.group.pickable = false;
@@ -453,6 +460,12 @@ export class Demo {
         Vector3.scale(this._actorDirection, movement)
       );
       newPos.y = this._terrain.getElevation(newPos.x, newPos.z);
+      const oldPos = this._character.group.position;
+      console.log(
+        `(${oldPos.x.toFixed(2)},${oldPos.y.toFixed(2)},${oldPos.z.toFixed(2)})->(${newPos.x.toFixed(
+          2
+        )},${newPos.y.toFixed(2)},${newPos.z.toFixed(2)})`
+      );
       this._character.group.position.set(newPos);
       (this._camera.controller as OrbitCameraController).center = newPos;
     }

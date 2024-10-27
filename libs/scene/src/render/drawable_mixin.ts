@@ -100,6 +100,12 @@ export function mixinDrawable<
       } else {
         const drawableBindGroup = this.getDrawableBindGroup(Application.instance.device, false, renderQueue);
         drawableBindGroup.setValue(ShaderHelper.getWorldMatrixUniformName(), this.getXForm().worldMatrix);
+        if ((this as unknown as Drawable).getBoneMatrices()) {
+          drawableBindGroup.setValue(
+            ShaderHelper.getBoneInvBindMatrixUniformName(),
+            (this as unknown as Mesh).invWorldMatrix
+          );
+        }
       }
     }
     applyMaterialUniforms(instanceInfo: DrawableInstanceInfo): void {
@@ -125,7 +131,7 @@ export function mixinDrawable<
         drawableBindGroup.setTexture(ShaderHelper.getBoneMatricesUniformName(), boneTexture);
         drawableBindGroup.setValue(
           ShaderHelper.getBoneInvBindMatrixUniformName(),
-          (this as unknown as Mesh).getInvBindMatrix()
+          (this as unknown as Mesh).invWorldMatrix
         );
         drawableBindGroup.setValue(ShaderHelper.getBoneTextureSizeUniformName(), boneTexture.width);
       }

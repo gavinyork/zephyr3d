@@ -292,6 +292,9 @@ export class SceneNode extends XForm<SceneNode> {
       const prevHidden = this.hidden;
       this._visible = val;
       if (prevHidden !== this.hidden) {
+        if (this.isGraphNode()) {
+          this._scene.invalidateNodePlacement(this);
+        }
         this.notifyHiddenChanged();
       }
     }

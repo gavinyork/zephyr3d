@@ -1,4 +1,4 @@
-import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
+import type { Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   ColorState,
@@ -120,8 +120,6 @@ export interface Drawable {
   getPickTarget(): GraphNode;
   /** Gets the texture that contains the bone matrices of the object */
   getBoneMatrices(): Texture2D;
-  /** Gets the inversed bind matrix for skeleton animation */
-  getInvBindMatrix(): Matrix4x4;
   /** Gets the object color used for GPU picking */
   getObjectColor(): Vector4;
   /** Gets the morph texture */
