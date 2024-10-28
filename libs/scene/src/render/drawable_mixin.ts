@@ -8,12 +8,10 @@ import type { DrawableInstanceInfo, RenderQueue, RenderQueueRef } from './render
 import { Application } from '../app';
 import type { Mesh, XForm } from '../scene';
 import { MaterialVaryingFlags } from '../values';
-import type { RenderBundleWrapper } from './renderbundle_wrapper';
 
 export interface IMixinDrawable {
   readonly objectColor: Vector4;
   getId(): number;
-  changedInRenderBundle(): void;
   pushRenderQueueRef(ref: RenderQueueRef): void;
   applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void;
   applyTransformUniforms(renderQueue: RenderQueue): void;
@@ -23,28 +21,9 @@ export interface IMixinDrawable {
 }
 
 let _drawableId = 0;
-const drawableRenderBundleMap = new WeakMap<Drawable, { wrapper: RenderBundleWrapper; hashes: string[] }[]>();
 
-/** @internal */
-export function addDrawableToRenderBundle(
-  drawable: Drawable,
-  renderBundle: RenderBundleWrapper,
-  hash: string
-): void {
-  let renderBundles = drawableRenderBundleMap.get(drawable);
-  if (!renderBundles) {
-    renderBundles = [];
-    drawableRenderBundleMap.set(drawable, renderBundles);
-  }
-  const index = renderBundles.findIndex((rb) => rb.wrapper === renderBundle);
-  if (index < 0) {
-    renderBundles.push({ wrapper: renderBundle, hashes: [hash] });
-    return;
-  }
-  if (!renderBundles[index].hashes.includes(hash)) {
-    renderBundles[index].hashes.push(hash);
-  }
-}
+const instanceBindGroupTransfromTags = new WeakMap<DrawableInstanceInfo, number>();
+const drawableBindGroupTransfromTags = new WeakMap<BindGroup, number>();
 
 export function mixinDrawable<
   T extends GenericConstructor<{
@@ -81,21 +60,6 @@ export function mixinDrawable<
     getId(): number {
       return this._id;
     }
-    changedInRenderBundle() {
-      const renderBundles = drawableRenderBundleMap.get(this as unknown as Drawable);
-      if (renderBundles) {
-        for (let i = renderBundles.length - 1; i >= 0; i--) {
-          const renderBundle = renderBundles[i].wrapper;
-          if (renderBundle.disposed) {
-            renderBundles.splice(i, 1);
-          } else {
-            for (const hash of renderBundles[i].hashes) {
-              renderBundles[i].wrapper.invalidate(hash);
-            }
-          }
-        }
-      }
-    }
     getObjectColor(): Vector4 {
       if (!this._objectColor) {
         const a = (this._id & 0xff) / 255;
@@ -128,22 +92,31 @@ export function mixinDrawable<
     }
     applyTransformUniforms(renderQueue: RenderQueue): void {
       const instanceInfo = renderQueue.getInstanceInfo(this as unknown as Drawable);
+      const currentTag = this.getXForm().transformTag;
       if (instanceInfo) {
-        instanceInfo.bindGroup.bindGroup.setRawData(
-          ShaderHelper.getInstanceDataUniformName(),
-          instanceInfo.offset * 4,
-          this.getXForm().worldMatrix,
-          0,
-          16
-        );
+        const tag = instanceBindGroupTransfromTags.get(instanceInfo) ?? -1;
+        if (tag !== currentTag) {
+          instanceInfo.bindGroup.bindGroup.setRawData(
+            ShaderHelper.getInstanceDataUniformName(),
+            instanceInfo.offset * 4,
+            this.getXForm().worldMatrix,
+            0,
+            16
+          );
+          instanceBindGroupTransfromTags.set(instanceInfo, tag);
+        }
       } else {
         const drawableBindGroup = this.getDrawableBindGroup(Application.instance.device, false, renderQueue);
-        drawableBindGroup.setValue(ShaderHelper.getWorldMatrixUniformName(), this.getXForm().worldMatrix);
-        if ((this as unknown as Drawable).getBoneMatrices()) {
-          drawableBindGroup.setValue(
-            ShaderHelper.getBoneInvBindMatrixUniformName(),
-            (this as unknown as Mesh).invWorldMatrix
-          );
+        const tag = drawableBindGroupTransfromTags.get(drawableBindGroup) ?? -1;
+        if (tag !== currentTag) {
+          drawableBindGroup.setValue(ShaderHelper.getWorldMatrixUniformName(), this.getXForm().worldMatrix);
+          if ((this as unknown as Drawable).getBoneMatrices()) {
+            drawableBindGroup.setValue(
+              ShaderHelper.getBoneInvBindMatrixUniformName(),
+              (this as unknown as Mesh).invWorldMatrix
+            );
+          }
+          drawableBindGroupTransfromTags.set(drawableBindGroup, tag);
         }
       }
     }

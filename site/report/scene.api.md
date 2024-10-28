@@ -74,9 +74,11 @@ export class AABBTree {
 }
 
 // @public
-export abstract class AbstractPostEffect {
+export abstract class AbstractPostEffect<ClassName extends string> {
     constructor();
     abstract apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean): void;
+    // (undocumented)
+    static readonly className: string;
     // @internal (undocumented)
     protected createRenderStates(device: AbstractDevice): RenderStateSet;
     // @internal (undocumented)
@@ -87,6 +89,7 @@ export abstract class AbstractPostEffect {
     set enabled(val: boolean);
     // (undocumented)
     protected _enabled: boolean;
+    getClassName(): ClassName;
     needFlip(device: AbstractDevice): boolean;
     get opaque(): boolean;
     // (undocumented)
@@ -633,10 +636,14 @@ export interface BatchDrawable extends Drawable {
 export class BatchGroup extends GraphNode {
     constructor(scene: Scene);
     // @internal (undocumented)
-    computeBoundingVolume(): BoundingVolume;
-    getName(): string;
+    protected _attached(): void;
     // @internal (undocumented)
-    getRenderQueue(cullVisitor: CullVisitor): RenderQueue;
+    computeBoundingVolume(): BoundingVolume;
+    // @internal (undocumented)
+    cull(cullVisitor: CullVisitor): void;
+    // @internal (undocumented)
+    protected _detached(): void;
+    getName(): string;
     invalidate(): void;
     isBatchGroup(): this is BatchGroup;
     // @internal (undocumented)
@@ -718,9 +725,11 @@ export abstract class Blitter {
 export type BlitType = '2d' | '2d-array' | 'cube';
 
 // @public
-export class Bloom extends AbstractPostEffect {
+export class Bloom extends AbstractPostEffect<'Bloom'> {
     constructor();
     apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean): void;
+    // (undocumented)
+    static readonly className: "Bloom";
     dispose(): void;
     // @internal (undocumented)
     downsample(device: AbstractDevice, inputColorTexture: Texture2D, textures: Texture2D[]): void;
@@ -1082,7 +1091,7 @@ export type ClipmapDrawContext = {
 // @public
 export class Compositor {
     constructor();
-    appendPostEffect(postEffect: AbstractPostEffect): void;
+    appendPostEffect(postEffect: AbstractPostEffect<any>): void;
     // @internal (undocumented)
     begin(ctx: DrawContext): void;
     // @internal (undocumented)
@@ -1092,14 +1101,14 @@ export class Compositor {
     drawPostEffects(ctx: DrawContext, opaque: boolean, sceneDepthTexture: Texture2D): void;
     // @internal (undocumented)
     end(ctx: DrawContext): void;
-    getPostEffects(): AbstractPostEffect[];
+    getPostEffects(): AbstractPostEffect<any>[];
     // @internal (undocumented)
     needDrawPostEffects(): boolean;
     // @internal (undocumented)
-    protected _postEffectsOpaque: AbstractPostEffect[];
+    protected _postEffectsOpaque: AbstractPostEffect<any>[];
     // @internal (undocumented)
-    protected _postEffectsTransparency: AbstractPostEffect[];
-    removePostEffect(postEffect: AbstractPostEffect): void;
+    protected _postEffectsTransparency: AbstractPostEffect<any>[];
+    removePostEffect(postEffect: AbstractPostEffect<any>): void;
     // @internal (undocumented)
     requireLinearDepth(ctx: DrawContext): boolean;
 }
@@ -1254,7 +1263,6 @@ export interface Drawable {
     getBoneMatrices(): Texture2D;
     getId(): number;
     getInstanceColor(): Vector4;
-    getInvBindMatrix(): Matrix4x4;
     getMaterial(): MeshMaterial;
     getMorphData(): Texture2D;
     getMorphInfo(): GPUDataBuffer;
@@ -1695,9 +1703,11 @@ export interface FPSCameraControllerOptions {
 }
 
 // @public
-export class FXAA extends AbstractPostEffect {
+export class FXAA extends AbstractPostEffect<'FXAA'> {
     constructor();
     apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean): void;
+    // (undocumented)
+    static readonly className: "FXAA";
     dispose(): void;
     requireDepthAttachment(): boolean;
     requireLinearDepthTexture(): boolean;
@@ -1812,6 +1822,9 @@ export function getDefaultBuildParams(): OceanFieldBuildParams;
 export class GraphNode extends SceneNode {
     constructor(scene: Scene);
     getBoneMatrices(): Texture2D;
+    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: No member was found with name "getInvBindMatrix"
+    //
+    // (undocumented)
     getInvBindMatrix(): Matrix4x4;
     getName(): string;
     getSortDistance(camera: Camera): number;
@@ -1850,9 +1863,11 @@ export class GrassMaterial extends GrassMaterial_base {
 }
 
 // @public
-export class Grayscale extends AbstractPostEffect {
+export class Grayscale extends AbstractPostEffect<'Grayscale'> {
     constructor();
     apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean): void;
+    // (undocumented)
+    static readonly className: "Grayscale";
     dispose(): void;
     requireDepthAttachment(): boolean;
     requireLinearDepthTexture(): boolean;
@@ -2273,7 +2288,6 @@ export class Mesh extends Mesh_base implements BatchDrawable {
     getInstanceColor(): Vector4;
     getInstanceId(renderPass: RenderPass): string;
     getInstanceUniforms(): Float32Array;
-    getInvBindMatrix(): Matrix4x4;
     getMaterial(): MeshMaterial;
     getMorphData(): Texture2D;
     getMorphInfo(): GPUDataBuffer<unknown>;
@@ -2285,8 +2299,6 @@ export class Mesh extends Mesh_base implements BatchDrawable {
     protected _instanceColor: Vector4;
     // @internal (undocumented)
     protected _instanceHash: string;
-    // @internal (undocumented)
-    protected _invBindMatrix: Matrix4x4;
     isBatchable(): this is BatchDrawable;
     isMesh(): this is Mesh;
     isUnlit(): boolean;
@@ -2301,7 +2313,6 @@ export class Mesh extends Mesh_base implements BatchDrawable {
     set primitive(prim: Primitive);
     setAnimatedBoundingBox(bbox: BoundingBox): void;
     setBoneMatrices(matrices: Texture2D): void;
-    setInvBindMatrix(matrix: Matrix4x4): void;
     setMorphData(data: Texture2D): void;
     setMorphInfo(info: GPUDataBuffer): void;
 }
@@ -2855,7 +2866,7 @@ export class PointLight extends PunctualLight {
 }
 
 // @public
-export class PostWater extends AbstractPostEffect {
+export class PostWater extends AbstractPostEffect<'PostWater'> {
     constructor(elevation: number, waveGenerator: WaveGenerator);
     get antiReflectanceLeak(): number;
     set antiReflectanceLeak(val: number);
@@ -2874,6 +2885,8 @@ export class PostWater extends AbstractPostEffect {
     // (undocumented)
     get causticsSlopeMin(): number;
     set causticsSlopeMin(val: number);
+    // (undocumented)
+    static readonly className: "PostWater";
     get depthMulti(): number;
     set depthMulti(val: number);
     get displace(): number;
@@ -3270,7 +3283,7 @@ export class RotationTrack extends AnimationTrack<Quaternion> {
 }
 
 // @public
-export class SAO extends AbstractPostEffect {
+export class SAO extends AbstractPostEffect<'SAO'> {
     constructor();
     apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean): void;
     get bias(): number;
@@ -3281,6 +3294,8 @@ export class SAO extends AbstractPostEffect {
     set blurKernelSize(val: number);
     get blurStdDev(): number;
     set blurStdDev(val: number);
+    // (undocumented)
+    static readonly className: "SAO";
     dispose(): void;
     get intensity(): number;
     set intensity(val: number);
@@ -3814,7 +3829,7 @@ export class Skeleton {
     // @internal (undocumented)
     protected _bindPoseMatrices: Matrix4x4[];
     // @internal (undocumented)
-    computeBindPose(): void;
+    computeBindPose(model: SceneNode): void;
     // @internal (undocumented)
     computeBoundingBox(info: SkinnedBoundingBox, invWorldMatrix: Matrix4x4): void;
     // @internal (undocumented)
@@ -3841,7 +3856,7 @@ export class Skeleton {
     // @internal (undocumented)
     reset(model: SceneNode): void;
     // @internal (undocumented)
-    updateJointMatrices(jointTransforms?: Matrix4x4[]): void;
+    updateJointMatrices(jointTransforms?: Matrix4x4[], worldMatrix?: Matrix4x4): void;
 }
 
 // @public
@@ -4087,8 +4102,6 @@ export class TerrainPatch extends TerrainPatch_base implements Drawable {
     // (undocumented)
     getInstanceColor(): Vector4;
     // (undocumented)
-    getInvBindMatrix(): Matrix4x4;
-    // (undocumented)
     getLODDistance(): number;
     // (undocumented)
     getMaterial(): MeshMaterial;
@@ -4179,9 +4192,11 @@ export type TexturePropUniforms<U extends string> = {
 export type ToMixedTextureType<T> = T extends [infer First, ...infer Rest] ? [First extends string ? ReturnType<typeof mixinTextureProps<First>> : never, ...ToMixedTextureType<Rest>] : [];
 
 // @public
-export class Tonemap extends AbstractPostEffect {
+export class Tonemap extends AbstractPostEffect<'Tonemap'> {
     constructor();
     apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean): void;
+    // (undocumented)
+    static readonly className: "Tonemap";
     dispose(): void;
     get exposure(): number;
     set exposure(val: number);
@@ -4429,8 +4444,6 @@ export class XForm<T extends XForm<T> = XForm<any>> extends XForm_base {
     get children(): T[];
     // @internal (undocumented)
     protected _children: T[];
-    // @internal (undocumented)
-    getTag(): number;
     getWorldPosition(): Vector3;
     get invWorldMatrix(): Matrix4x4;
     // @internal (undocumented)
@@ -4480,6 +4493,8 @@ export class XForm<T extends XForm<T> = XForm<any>> extends XForm_base {
     // @internal (undocumented)
     protected _transformChangeCallback: () => void;
     // @internal (undocumented)
+    get transformTag(): number;
+    // @internal (undocumented)
     protected _transformTag: number;
     get worldMatrix(): Matrix4x4;
     // @internal (undocumented)
@@ -4494,7 +4509,7 @@ export class XForm<T extends XForm<T> = XForm<any>> extends XForm_base {
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:5705:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:5714:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

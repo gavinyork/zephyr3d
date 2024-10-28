@@ -138,9 +138,6 @@ export class Primitive {
       default:
         return 0;
     }
-    const vbPos = this.getVertexBuffer('position');
-    const vertexSize = vbPos.structure.toBufferLayout(0, 'packed').byteSize;
-    return (vbPos.byteLength / vertexSize) >> 0;
   }
   /**
    * Removes a vertex buffer from the primitive

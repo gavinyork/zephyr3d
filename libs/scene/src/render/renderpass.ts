@@ -7,9 +7,8 @@ import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
 import type { AbstractDevice, BindGroup } from '@zephyr3d/device';
 import { ShaderHelper } from '../material/shader/helper';
-import type { RenderBundleWrapper } from './renderbundle_wrapper';
+import { RenderBundleWrapper } from './renderbundle_wrapper';
 import { MaterialVaryingFlags } from '../values';
-import { addDrawableToRenderBundle } from './drawable_mixin';
 
 /**
  * Base class for any kind of render passes
@@ -185,7 +184,8 @@ export abstract class RenderPass {
         ctx.device.reverseVertexWindingOrder(!ctx.device.isWindingOrderReversed());
       }
       if (recording) {
-        addDrawableToRenderBundle(item.drawable, renderBundle, hash);
+        RenderBundleWrapper.addObject(item.drawable, renderBundle, hash);
+        RenderBundleWrapper.addObject(item.drawable.getMaterial(), renderBundle, hash);
       }
       item.drawable.draw(ctx);
       if (reverse) {

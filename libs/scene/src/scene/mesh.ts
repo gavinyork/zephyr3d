@@ -11,6 +11,7 @@ import type { Scene } from './scene';
 import type { BoundingBox, BoundingVolume } from '../utility/bounding_volume';
 import { QUEUE_OPAQUE } from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
+import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 
 /**
  * Mesh node
@@ -118,6 +119,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
           ? `${this.constructor.name}:${this._scene.id}:${this._primitive.id}:${this._material.instanceId}`
           : null;
       this.invalidateBoundingVolume();
+      RenderBundleWrapper.objectChanged(this);
     }
   }
   /** Material of the mesh */
@@ -131,6 +133,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
         this._primitive && this._material
           ? `${this.constructor.name}:${this._scene.id}:${this._primitive.id}:${this._material.instanceId}`
           : null;
+      RenderBundleWrapper.objectChanged(this);
     }
   }
   /** Wether to draw the bounding box of the mesh node */
@@ -171,14 +174,20 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    * @param matrices - The texture that contains the bone matrices
    */
   setBoneMatrices(matrices: Texture2D) {
-    this._boneMatrices = matrices;
+    if (this._boneMatrices !== matrices) {
+      this._boneMatrices = matrices;
+      RenderBundleWrapper.objectChanged(this);
+    }
   }
   /**
    * Sets the texture that contains the morph target data
    * @param data - The texture that contains the morph target data
    */
   setMorphData(data: Texture2D) {
-    this._morphData = data;
+    if (this._morphData !== data) {
+      this._morphData = data;
+      RenderBundleWrapper.objectChanged(this);
+    }
   }
   /**
    * {@inheritDoc Drawable.getMorphData}
@@ -191,7 +200,10 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    * @param info - The buffer that contains the morph target information
    */
   setMorphInfo(info: GPUDataBuffer) {
-    this._morphInfo = info;
+    if (this._morphInfo !== info) {
+      this._morphInfo = info;
+      RenderBundleWrapper.objectChanged(this);
+    }
   }
   /**
    * {@inheritDoc Drawable.getMorphInfo}
@@ -210,6 +222,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._primitive = null;
     this._material = null;
     super.dispose();
+    RenderBundleWrapper.objectChanged(this);
   }
   /**
    * {@inheritDoc Drawable.getQueueType}

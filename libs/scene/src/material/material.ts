@@ -3,6 +3,7 @@ import { ProgramBuilder } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
 import type { DrawContext } from '../render/drawable';
 import { QUEUE_OPAQUE } from '../values';
+import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 
 type MaterialState = {
   program: GPUProgram;
@@ -179,6 +180,7 @@ export class Material {
       for (let i = 0; i < this._numPasses; i++) {
         this._hash[i] = null;
       }
+      RenderBundleWrapper.objectChanged(this);
     }
   }
   /**

@@ -140,8 +140,6 @@ export interface Drawable {
   pushRenderQueueRef(ref: RenderQueueRef);
   /** Apply transform uniforms */
   applyTransformUniforms(renderQueue: RenderQueue): void;
-  /** Mark this object as changed so that the render bundles it belongs to will be rebuilt */
-  changedInRenderBundle();
   /**
    * Draw the object
    * @param ctx - Context of the drawing task
