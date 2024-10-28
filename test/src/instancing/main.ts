@@ -8,7 +8,8 @@ import {
   Mesh,
   SpotLight,
   BoxShape,
-  PlaneShape
+  PlaneShape,
+  BatchGroup
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Inspector } from '@zephyr3d/inspector';
@@ -23,6 +24,7 @@ myApp.ready().then(async function () {
   await imGuiInit(myApp.device);
   const scene = new Scene();
 
+  const batchGroup = new BatchGroup(scene);
   // Turn off environment lighting
   scene.env.light.type = 'none';
 
@@ -33,18 +35,31 @@ myApp.ready().then(async function () {
   spotLight.position.setXYZ(0, 10, 0);
   spotLight.castShadow = true;
 
+  //
+  const tex = myApp.device.createTexture2D('rgba8unorm', 1, 1);
+  const pixels = new Uint8Array([128, 128, 128, 255]);
+  tex.update(pixels, 0, 0, 1, 1);
+
   // Create several boxes
   const boxMaterial = new LambertMaterial();
   boxMaterial.albedoColor = new Vector4(1, 1, 0, 1);
   const boxShape = new BoxShape({ size: 6 });
   for (let i = 0; i < 16; i++) {
     const box = new Mesh(scene, boxShape, boxMaterial);
+    box.parent = batchGroup;
     box.position.setXYZ(Math.random() * 50 - 25, 3, Math.random() * 50 - 25);
   }
   // Create floor
   const floorMaterial = new LambertMaterial();
-  floorMaterial.albedoColor = new Vector4(0, 1, 1, 1);
+  floorMaterial.albedoColor = new Vector4(1, 0, 1, 1);
+  floorMaterial.albedoTexture = tex;
+
+  const floorMaterial2 = new LambertMaterial();
+  floorMaterial2.albedoColor = new Vector4(1, 1, 0, 1);
+  floorMaterial2.albedoTexture = tex;
+
   const floor = new Mesh(scene, new PlaneShape({ size: 100 }), floorMaterial);
+  floor.parent = batchGroup;
   floor.position.x = -50;
   floor.position.z = -50;
 
@@ -63,6 +78,18 @@ myApp.ready().then(async function () {
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
   const inspector = new Inspector(scene, null, camera);
+
+  myApp.on('pointerup', (ev) => {
+    if (ev.button === 2) {
+      if (floor.material === floorMaterial) {
+        floor.material = floorMaterial2;
+        floorMaterial.albedoTexture = floorMaterial.albedoTexture ? null : tex;
+      } else {
+        floor.material = floorMaterial;
+        floorMaterial2.albedoTexture = floorMaterial2.albedoTexture ? null : tex;
+      }
+    }
+  });
 
   myApp.on('tick', function () {
     // light rotation

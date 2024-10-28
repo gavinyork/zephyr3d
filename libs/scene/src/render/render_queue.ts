@@ -393,20 +393,22 @@ export class RenderQueue {
         for (const l in itemListBundle) {
           const listInfo: RenderItemListInfo[] = itemListBundle[l];
           for (const info of listInfo) {
-            if (info.renderBundle) {
-              info.renderBundle.dispose();
-            }
-            if (info.skinRenderBundle) {
-              info.skinRenderBundle.dispose();
-            }
-            if (info.morphRenderBundle) {
-              info.morphRenderBundle.dispose();
-            }
-            if (info.skinAndMorphRenderBundle) {
-              info.skinAndMorphRenderBundle.dispose();
-            }
-            if (info.instanceRenderBundle) {
-              info.instanceRenderBundle.dispose();
+            if (info.renderQueue === this) {
+              if (info.renderBundle) {
+                info.renderBundle.dispose();
+              }
+              if (info.skinRenderBundle) {
+                info.skinRenderBundle.dispose();
+              }
+              if (info.morphRenderBundle) {
+                info.morphRenderBundle.dispose();
+              }
+              if (info.skinAndMorphRenderBundle) {
+                info.skinAndMorphRenderBundle.dispose();
+              }
+              if (info.instanceRenderBundle) {
+                info.instanceRenderBundle.dispose();
+              }
             }
           }
         }
