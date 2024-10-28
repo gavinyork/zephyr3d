@@ -6,29 +6,36 @@ import type { Drawable } from './drawable';
 export class RenderBundleWrapper {
   private _renderBundles: Record<string, RenderBundle>;
   private _disposed: boolean;
-  private static _objectMap = new WeakMap<
-    Drawable | Material,
-    { wrapper: RenderBundleWrapper; hashes: string[] }[]
-  >();
+  private static _drawableContainer: WeakMap<Drawable, { wrapper: RenderBundleWrapper; hashes: string[] }[]> =
+    new WeakMap();
+  private static _materialContainer: WeakMap<Material, Set<Drawable>> = new WeakMap();
   /** @internal */
-  static addObject(object: Drawable | Material, renderBundle: RenderBundleWrapper, hash: string) {
-    if (object) {
-      let renderBundles = this._objectMap.get(object);
-      if (!renderBundles) {
-        renderBundles = [];
-        this._objectMap.set(object, renderBundles);
-      }
-      const index = renderBundles.findIndex((rb) => rb.wrapper === renderBundle);
-      if (index < 0) {
-        renderBundles.push({ wrapper: renderBundle, hashes: [hash] });
-      } else if (!renderBundles[index].hashes.includes(hash)) {
+  static addDrawable(drawable: Drawable, material: Material, wrapper: RenderBundleWrapper, hash: string) {
+    let renderBundles = this._drawableContainer.get(drawable);
+    if (!renderBundles) {
+      renderBundles = [];
+      this._drawableContainer.set(drawable, renderBundles);
+    }
+    const index = renderBundles.findIndex((rb) => rb.wrapper === wrapper);
+    if (index < 0) {
+      renderBundles.push({ wrapper: wrapper, hashes: [hash] });
+    } else {
+      if (!renderBundles[index].hashes.includes(hash)) {
         renderBundles[index].hashes.push(hash);
       }
     }
+    if (material) {
+      let ownDrawables = this._materialContainer.get(material);
+      if (!ownDrawables) {
+        ownDrawables = new Set();
+        this._materialContainer.set(material, ownDrawables);
+      }
+      ownDrawables.add(drawable);
+    }
   }
   /** @internal */
-  static objectChanged(object: Drawable | Material) {
-    const renderBundles = this._objectMap.get(object);
+  static drawableChanged(drawable: Drawable) {
+    const renderBundles = this._drawableContainer.get(drawable);
     if (renderBundles) {
       for (let i = renderBundles.length - 1; i >= 0; i--) {
         const renderBundle = renderBundles[i].wrapper;
@@ -40,6 +47,31 @@ export class RenderBundleWrapper {
           }
         }
       }
+    }
+  }
+  /** @internal */
+  static materialChanged(material: Material) {
+    const ownDrawables = this._materialContainer.get(material);
+    if (ownDrawables) {
+      for (const drawable of ownDrawables) {
+        this.drawableChanged(drawable);
+      }
+    }
+  }
+  /** @internal */
+  static materialAttached(material: Material, drawable: Drawable) {
+    const ownDrawables = this._materialContainer.get(material);
+    if (ownDrawables && !ownDrawables.has(drawable)) {
+      ownDrawables.add(drawable);
+      this.drawableChanged(drawable);
+    }
+  }
+  /** @internal */
+  static materialDetached(material: Material, drawable: Drawable) {
+    const ownDrawables = this._materialContainer.get(material);
+    if (ownDrawables && ownDrawables.has(drawable)) {
+      ownDrawables.delete(drawable);
+      this.drawableChanged(drawable);
     }
   }
   constructor() {

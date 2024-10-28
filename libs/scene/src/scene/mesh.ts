@@ -119,7 +119,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
           ? `${this.constructor.name}:${this._scene.id}:${this._primitive.id}:${this._material.instanceId}`
           : null;
       this.invalidateBoundingVolume();
-      RenderBundleWrapper.objectChanged(this);
+      RenderBundleWrapper.drawableChanged(this);
     }
   }
   /** Material of the mesh */
@@ -128,12 +128,18 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   }
   set material(m: MeshMaterial) {
     if (this._material !== m) {
+      if (this._material) {
+        RenderBundleWrapper.materialDetached(this._material.coreMaterial, this);
+      }
       this._material = m;
+      if (this._material) {
+        RenderBundleWrapper.materialAttached(this._material.coreMaterial, this);
+      }
       this._instanceHash =
         this._primitive && this._material
           ? `${this.constructor.name}:${this._scene.id}:${this._primitive.id}:${this._material.instanceId}`
           : null;
-      RenderBundleWrapper.objectChanged(this);
+      RenderBundleWrapper.drawableChanged(this);
     }
   }
   /** Wether to draw the bounding box of the mesh node */
@@ -176,7 +182,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   setBoneMatrices(matrices: Texture2D) {
     if (this._boneMatrices !== matrices) {
       this._boneMatrices = matrices;
-      RenderBundleWrapper.objectChanged(this);
+      RenderBundleWrapper.drawableChanged(this);
     }
   }
   /**
@@ -186,7 +192,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   setMorphData(data: Texture2D) {
     if (this._morphData !== data) {
       this._morphData = data;
-      RenderBundleWrapper.objectChanged(this);
+      RenderBundleWrapper.drawableChanged(this);
     }
   }
   /**
@@ -202,7 +208,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   setMorphInfo(info: GPUDataBuffer) {
     if (this._morphInfo !== info) {
       this._morphInfo = info;
-      RenderBundleWrapper.objectChanged(this);
+      RenderBundleWrapper.drawableChanged(this);
     }
   }
   /**
@@ -222,7 +228,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._primitive = null;
     this._material = null;
     super.dispose();
-    RenderBundleWrapper.objectChanged(this);
+    RenderBundleWrapper.drawableChanged(this);
   }
   /**
    * {@inheritDoc Drawable.getQueueType}
