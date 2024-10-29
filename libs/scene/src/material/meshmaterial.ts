@@ -159,17 +159,18 @@ export class MeshMaterial extends Material {
     instance.coreMaterial = that;
     // Copy original uniform values
     for (let i = 0; i < instanceUniforms.length; i++) {
-      const [prop, type] = instanceUniforms[i];
+      const instanceIndex = i;
+      const [prop, type] = instanceUniforms[instanceIndex];
       const value = that[prop];
       switch (type) {
         case 'float': {
-          uniformsHolder[i * 4] = Number(value);
+          uniformsHolder[instanceIndex * 4] = Number(value);
           Object.defineProperty(instance, prop, {
             get() {
-              return uniformsHolder[i * 4];
+              return uniformsHolder[instanceIndex * 4];
             },
             set(value) {
-              uniformsHolder[i * 4 + 0] = value;
+              uniformsHolder[instanceIndex * 4 + 0] = value;
               that[prop] = value;
             }
           });
@@ -179,14 +180,18 @@ export class MeshMaterial extends Material {
           if (!(value instanceof Vector2)) {
             throw new Error(`Instance uniform property ${prop} must be of type Vector2`);
           }
-          uniformsHolder[i * 4] = value.x;
-          uniformsHolder[i * 4 + 1] = value.y;
+          uniformsHolder[instanceIndex * 4] = value.x;
+          uniformsHolder[instanceIndex * 4 + 1] = value.y;
           Object.defineProperty(instance, prop, {
             get() {
-              return new Vector2(uniformsHolder[i * 4], uniformsHolder[i * 4 + 1]);
+              return new Vector2(uniformsHolder[instanceIndex * 4], uniformsHolder[instanceIndex * 4 + 1]);
             },
             set(value) {
-              uniformsHolder.set(value);
+              if (!(value instanceof Vector2)) {
+                throw new Error(`Instance uniform property ${prop} must be of type Vector2`);
+              }
+              uniformsHolder[instanceIndex * 4] = value.x;
+              uniformsHolder[instanceIndex * 4 + 1] = value.y;
               that[prop] = value;
             }
           });
@@ -196,15 +201,24 @@ export class MeshMaterial extends Material {
           if (!(value instanceof Vector3)) {
             throw new Error(`Instance uniform property ${prop} must be of type Vector3`);
           }
-          uniformsHolder[i * 4] = value.x;
-          uniformsHolder[i * 4 + 1] = value.y;
-          uniformsHolder[i * 4 + 2] = value.z;
+          uniformsHolder[instanceIndex * 4] = value.x;
+          uniformsHolder[instanceIndex * 4 + 1] = value.y;
+          uniformsHolder[instanceIndex * 4 + 2] = value.z;
           Object.defineProperty(instance, prop, {
             get() {
-              return new Vector3(uniformsHolder[i * 4], uniformsHolder[i * 4 + 1], uniformsHolder[i * 4 + 2]);
+              return new Vector3(
+                uniformsHolder[instanceIndex * 4],
+                uniformsHolder[instanceIndex * 4 + 1],
+                uniformsHolder[instanceIndex * 4 + 2]
+              );
             },
             set(value) {
-              uniformsHolder.set(value);
+              if (!(value instanceof Vector3)) {
+                throw new Error(`Instance uniform property ${prop} must be of type Vector3`);
+              }
+              uniformsHolder[instanceIndex * 4] = value.x;
+              uniformsHolder[instanceIndex * 4 + 1] = value.y;
+              uniformsHolder[instanceIndex * 4 + 2] = value.z;
               that[prop] = value;
             }
           });
@@ -214,21 +228,27 @@ export class MeshMaterial extends Material {
           if (!(value instanceof Vector4)) {
             throw new Error(`Instance uniform property ${prop} must be of type Vector4`);
           }
-          uniformsHolder[i * 4] = value.x;
-          uniformsHolder[i * 4 + 1] = value.y;
-          uniformsHolder[i * 4 + 2] = value.z;
-          uniformsHolder[i * 4 + 3] = value.w;
+          uniformsHolder[instanceIndex * 4] = value.x;
+          uniformsHolder[instanceIndex * 4 + 1] = value.y;
+          uniformsHolder[instanceIndex * 4 + 2] = value.z;
+          uniformsHolder[instanceIndex * 4 + 3] = value.w;
           Object.defineProperty(instance, prop, {
             get() {
               return new Vector4(
-                uniformsHolder[i * 4],
-                uniformsHolder[i * 4 + 1],
-                uniformsHolder[i * 4 + 2],
-                uniformsHolder[i * 4 + 3]
+                uniformsHolder[instanceIndex * 4],
+                uniformsHolder[instanceIndex * 4 + 1],
+                uniformsHolder[instanceIndex * 4 + 2],
+                uniformsHolder[instanceIndex * 4 + 3]
               );
             },
             set(value) {
-              uniformsHolder.set(value);
+              if (!(value instanceof Vector4)) {
+                throw new Error(`Instance uniform property ${prop} must be of type Vector4`);
+              }
+              uniformsHolder[instanceIndex * 4] = value.x;
+              uniformsHolder[instanceIndex * 4 + 1] = value.y;
+              uniformsHolder[instanceIndex * 4 + 2] = value.z;
+              uniformsHolder[instanceIndex * 4 + 3] = value.w;
               that[prop] = value;
             }
           });
