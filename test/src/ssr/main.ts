@@ -12,7 +12,8 @@ import {
   Tonemap,
   BoxShape,
   SphereShape,
-  BlinnMaterial
+  BlinnMaterial,
+  createGradientNoiseTexture
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { Inspector } from '@zephyr3d/inspector';
@@ -27,6 +28,8 @@ const ssrApp = new Application({
 
 ssrApp.ready().then(async () => {
   const device = ssrApp.device;
+  const noiseTex = createGradientNoiseTexture(device, 128, 50, false);
+  noiseTex.name = 'GradientNoiseTexture';
   await imGuiInit(device);
   const scene = new Scene();
   scene.env.sky.skyType = 'color';

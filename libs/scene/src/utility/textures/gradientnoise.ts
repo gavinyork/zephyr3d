@@ -1,10 +1,17 @@
 import type { AbstractDevice, BindGroup, GPUProgram } from '@zephyr3d/device';
 import { drawFullscreenQuad } from '../../render/fullscreenquad';
+import { perlinNoise3D } from '../../shaders';
 
 let gradientNoiseProgram: GPUProgram = null;
 let gradientNoiseBindGroup: BindGroup = null;
 
-export function createGradientNoiseTexture(device: AbstractDevice, size: number, uvscale: number) {
+export function createGradientNoiseTexture(
+  device: AbstractDevice,
+  size: number,
+  uvscale: number,
+  mono = false,
+  seed = 0
+) {
   if (!gradientNoiseProgram) {
     gradientNoiseProgram = device.buildRenderProgram({
       vertex(pb) {
@@ -19,33 +26,27 @@ export function createGradientNoiseTexture(device: AbstractDevice, size: number,
         });
       },
       fragment(pb) {
-        pb.func('grad', [pb.vec2('p')], function () {
-          this.$l.x = pb.mul(pb.fract(pb.add(pb.mul(this.p, 0.3183099), 0.1)), 17);
-          this.$l.a = pb.fract(pb.mul(this.x.x, this.x.y, pb.add(this.x.x, this.x.y)));
-          this.a = pb.mul(this.a, Math.PI * 2);
-          this.$return(pb.vec2(pb.sin(this.a), pb.cos(this.a)));
-        });
-        pb.func('noise', [pb.vec2('p')], function () {
-          this.$l.i = pb.floor(this.p);
-          this.$l.f = pb.fract(this.p);
-          this.$l.u = pb.mul(this.f, this.f, pb.sub(3, pb.mul(this.f, 2)));
-          this.$l.tl = pb.dot(this.grad(this.i), this.f);
-          this.$l.tr = pb.dot(this.grad(pb.add(this.i, pb.vec2(1, 0))), pb.sub(this.f, pb.vec2(1, 0)));
-          this.$l.bl = pb.dot(this.grad(pb.add(this.i, pb.vec2(0, 1))), pb.sub(this.f, pb.vec2(0, 1)));
-          this.$l.br = pb.dot(this.grad(pb.add(this.i, pb.vec2(1, 1))), pb.sub(this.f, pb.vec2(1, 1)));
-          this.$l.noise = pb.add(
-            pb.mul(
-              pb.mix(pb.mix(this.tl, this.tr, this.u.x), pb.mix(this.bl, this.br, this.u.x), this.u.y),
-              0.5
-            ),
-            0.5
-          );
-          this.$return(this.noise);
-        });
         this.$outputs.color = pb.vec4();
         this.uvScale = pb.float().uniform(0);
+        this.seed = pb.float().uniform(0);
+        this.mono = pb.int().uniform(0);
         pb.main(function () {
-          this.$outputs.color = pb.vec4(pb.vec3(this.noise(pb.mul(this.$inputs.uv, this.uvScale))), 1);
+          this.$l.p = pb.vec3(pb.mul(this.$inputs.uv, this.uvScale), this.seed);
+          this.$l.r = perlinNoise3D(this, this.p);
+          //this.$l.r = gradient(this, this.p.xy, this.p.z).x;
+          this.$if(pb.notEqual(this.mono, 0), function () {
+            this.$outputs.color = pb.vec4(pb.vec3(this.r), 1);
+          }).$else(function () {
+            this.$l.g = perlinNoise3D(
+              this,
+              pb.vec3(pb.mul(this.$inputs.uv, this.uvScale), pb.add(this.seed, 1.9))
+            );
+            this.$l.b = perlinNoise3D(
+              this,
+              pb.vec3(pb.mul(this.$inputs.uv, this.uvScale), pb.add(this.seed, 2.3))
+            );
+            this.$outputs.color = pb.vec4(this.r, this.g, this.b, 1);
+          });
         });
       }
     });
@@ -54,6 +55,8 @@ export function createGradientNoiseTexture(device: AbstractDevice, size: number,
   const tex = device.createTexture2D('rgba8unorm', size, size);
   const fb = device.createFrameBuffer([tex], null);
   gradientNoiseBindGroup.setValue('uvScale', uvscale);
+  gradientNoiseBindGroup.setValue('seed', seed);
+  gradientNoiseBindGroup.setValue('mono', mono ? 1 : 0);
   device.pushDeviceStates();
   device.setFramebuffer(fb);
   device.setProgram(gradientNoiseProgram);
