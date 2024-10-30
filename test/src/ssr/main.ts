@@ -13,8 +13,7 @@ import {
   BoxShape,
   SphereShape,
   BlinnMaterial,
-  createGradientNoiseTexture,
-  SceneNode
+  createGradientNoiseTexture
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { createAxisGroup, Inspector } from '@zephyr3d/inspector';
