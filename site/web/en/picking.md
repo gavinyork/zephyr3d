@@ -21,7 +21,7 @@ const ray = camera.constructRay(x, y);
 const pickResult = scene.raycast(ray);
 // Return the picked scene node, intersection distance, and intersection point; otherwise, return null.
 if (pickResult) {
-  console.log(`Node: ${pickResult.node}`);
+  console.log(`Node: ${pickResult.target.node}`);
   console.log(`Distance: ${pickResult.dist}`);
   console.log(`Intersection Point: ${pickResult.point}`);
 }
@@ -67,7 +67,7 @@ app.on('tick', () => {
     // drawable is the picked rendering object
     console.log(pickResult.drawable);
     // node is the picked node
-    console.log(pickResult.node);
+    console.log(pickResult.target.node);
   }
 });
 
@@ -100,7 +100,7 @@ app.on('tick', () => {
       // drawable is the picked rendering object
       console.log(pickResult.drawable);
       // node is the picked node
-      console.log(pickResult.node);
+      console.log(pickResult.target.node);
     }
   });
 });
