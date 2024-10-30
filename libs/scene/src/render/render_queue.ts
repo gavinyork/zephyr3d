@@ -604,35 +604,4 @@ export class RenderQueue {
       transmission_trans: this.newRenderItemListBundle()
     };
   }
-  /*
-  private encodeInstanceColor(index: number, outColor: Float32Array) {
-    outColor[0] = ((index >> 24) & 255) / 255;
-    outColor[1] = ((index >> 16) & 255) / 255;
-    outColor[2] = (index >> 8 && 255) / 255;
-    outColor[3] = (index >> 0 && 255) / 255;
-  }
-  private decodeInstanceColor(value: Float32Array): number {
-    return (value[0] << 24) + (value[1] << 16) + (value[2] << 8) + value[3];
-  }
-  setInstanceColors(): GraphNode[] {
-    const nodes: GraphNode[] = [];
-    let id = 0;
-    for (const k in this._itemLists) {
-      const lists = this._itemLists[k];
-      for (const item of lists.opaqueList) {
-        if (item.instanceColor) {
-          item.instanceData.instanceColorList = [];
-          for (let i = 0; i < item.instanceData.data.length; i++) {
-            const v = item.drawable.getInstanceColor();
-            this.encodeInstanceColor(id, v);
-            nodes[id] = item.drawable.getPickTarget();
-            item.instanceData.instanceColorList.push(v);
-            id++;
-          }
-        }
-      }
-    }
-    return nodes;
-  }
-  */
 }

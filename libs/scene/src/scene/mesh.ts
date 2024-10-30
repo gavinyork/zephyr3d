@@ -3,7 +3,7 @@ import { GraphNode } from './graph_node';
 import { BoxFrameShape } from '../shapes';
 import type { MeshMaterial } from '../material';
 import { LambertMaterial } from '../material';
-import type { RenderPass, Primitive, BatchDrawable, DrawContext } from '../render';
+import type { RenderPass, Primitive, BatchDrawable, DrawContext, PickTarget } from '../render';
 import { Application } from '../app';
 import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
 import type { XForm } from './xform';
@@ -12,6 +12,7 @@ import type { BoundingBox, BoundingVolume } from '../utility/bounding_volume';
 import { QUEUE_OPAQUE } from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
+import type { SceneNode } from './scene_node';
 
 /**
  * Mesh node
@@ -39,6 +40,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   protected _batchable: boolean;
   /** @internal */
+  protected _pickTarget: PickTarget;
+  /** @internal */
   protected _boundingBoxNode: Mesh;
   /** @internal */
   protected _instanceColor: Vector4;
@@ -56,6 +59,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._morphData = null;
     this._morphInfo = null;
     this._instanceHash = null;
+    this._pickTarget = { node: this };
     this._boundingBoxNode = null;
     this._instanceColor = Vector4.zero();
     this._batchable = Application.instance.deviceType !== 'webgl';
@@ -91,8 +95,11 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * {@inheritDoc Drawable.getPickTarget }
    */
-  getPickTarget(): GraphNode {
-    return this;
+  getPickTarget(): PickTarget {
+    return this._pickTarget;
+  }
+  setPickTarget(node: SceneNode, label?: string) {
+    this._pickTarget = { node, label };
   }
   /** Wether the mesh node casts shadows */
   get castShadow(): boolean {

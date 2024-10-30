@@ -425,7 +425,7 @@ export class Demo {
     }
     const ray = this._camera.constructRay(x, y);
     const obj = this._scene.raycast(ray, this._camera.getFarPlane());
-    if (obj && obj.node.isTerrain()) {
+    if (obj && obj.target.node.isTerrain()) {
       this._terrain.invWorldMatrix.transformPointAffine(obj.point, this._actorTarget);
       if (button === 2) {
         this._actorDirection.set(

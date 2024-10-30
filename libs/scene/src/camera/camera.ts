@@ -2,14 +2,13 @@ import type { CubeFace, Plane } from '@zephyr3d/base';
 import { Matrix4x4, Frustum, Vector4, Vector3, Ray } from '@zephyr3d/base';
 import { SceneNode } from '../scene/scene_node';
 import { Application } from '../app';
-import type { Drawable } from '../render';
+import type { Drawable, PickTarget } from '../render';
 import { SceneRenderer } from '../render';
 import type { FrameBuffer } from '@zephyr3d/device';
 import type { Compositor } from '../posteffect';
 import type { Scene } from '../scene/scene';
 import type { BaseCameraController } from './base';
 import type { OIT } from '../render/oit';
-import type { GraphNode } from '../scene';
 
 /**
  * Camera pick result
@@ -17,7 +16,7 @@ import type { GraphNode } from '../scene';
  */
 export type PickResult = {
   drawable: Drawable;
-  node: GraphNode;
+  target: PickTarget;
 };
 
 /**

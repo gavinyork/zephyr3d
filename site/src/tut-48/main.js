@@ -65,13 +65,13 @@ myApp.ready().then(async () => {
     camera.updateController();
     camera.render(scene);
     camera.pickResultAsync.then((pickResult) => {
-      if (lastPickResult !== pickResult?.node) {
+      if (lastPickResult !== pickResult?.target.node) {
         if (lastPickResult) {
           lastPickResult.material.emissiveColor = Vector3.zero();
           lastPickResult = null;
         }
         if (pickResult) {
-          lastPickResult = pickResult.node;
+          lastPickResult = pickResult.target.node;
           lastPickResult.material.emissiveColor = new Vector3(1, 1, 0);
         }
       }

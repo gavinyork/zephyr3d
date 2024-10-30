@@ -375,10 +375,10 @@ export class SceneRenderer {
     ctx.device.pushDeviceStates();
     const fb = ctx.device.pool.fetchTemporalFramebuffer(false, 1, 1, 'rgba8unorm', ctx.depthFormat, false);
     ctx.device.setViewport(ctx.camera.viewport);
-    const vp = ctx.device.getViewport();
     const savedViewport = ctx.camera.viewport;
     const savedScissor = ctx.camera.scissor;
     const savedWindow = ctx.camera.window;
+    const vp = ctx.device.getViewport();
     const windowX = ctx.camera.pickPosX / vp.width;
     const windowY = (vp.height - ctx.camera.pickPosY - 1) / vp.height;
     const windowW = 1 / vp.width;
@@ -405,8 +405,8 @@ export class SceneRenderer {
         .then(() => {
           const drawable = renderQueue.getDrawableByColor(pixels);
           camera.pickResult =
-            drawable && drawable.getPickTarget()?.pickable
-              ? { drawable, node: drawable.getPickTarget() }
+            drawable && drawable.getPickTarget()?.node?.pickable
+              ? { drawable, target: drawable.getPickTarget() }
               : null;
           device.pool.releaseFrameBuffer(fb);
           resolve(camera.pickResult);

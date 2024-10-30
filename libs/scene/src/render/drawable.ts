@@ -13,12 +13,15 @@ import type { FogType, RenderPass } from '.';
 import type { DrawableInstanceInfo, InstanceData, RenderQueue, RenderQueueRef } from './render_queue';
 import type { ShadowMapParams } from '../shadow';
 import type { Environment } from '../scene/environment';
-import type { DirectionalLight, GraphNode, PunctualLight, Scene } from '../scene';
+import type { DirectionalLight, PunctualLight, Scene, SceneNode } from '../scene';
 import type { Compositor, CompositorContext } from '../posteffect';
 import type { ClusteredLight } from './cluster_light';
 import type { MeshMaterial } from '../material';
 import type { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import type { OIT } from './oit';
+
+/** Pick target */
+export type PickTarget = { node: SceneNode; label?: string };
 
 /**
  * The context for drawing objects
@@ -117,7 +120,7 @@ export interface Drawable {
   /** Gets the instance color */
   getInstanceColor(): Vector4;
   /** If set, the pick target will be returned as the pick result  */
-  getPickTarget(): GraphNode;
+  getPickTarget(): PickTarget;
   /** Gets the texture that contains the bone matrices of the object */
   getBoneMatrices(): Texture2D;
   /** Gets the object color used for GPU picking */

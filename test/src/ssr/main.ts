@@ -14,12 +14,10 @@ import {
   SphereShape,
   BlinnMaterial,
   createGradientNoiseTexture,
-  SceneNode,
-  CylinderShape,
-  UnlitMaterial
+  SceneNode
 } from '@zephyr3d/scene';
 import * as common from '../common';
-import { Inspector } from '@zephyr3d/inspector';
+import { createAxisGroup, Inspector } from '@zephyr3d/inspector';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 
@@ -77,41 +75,7 @@ ssrApp.ready().then(async () => {
   sphere.position.setXYZ(0, 6, 0);
   sphere.parent = batchGroup;
 
-  const axisGroup = new SceneNode(scene);
-
-  const primitiveAxis = new CylinderShape({ topRadius: 1, bottomRadius: 1, height: 10, anchor: 0 });
-  const primitiveArrow = new CylinderShape({ topRadius: 0, bottomRadius: 2, height: 5, anchor: 0 });
-  const materialAxis = new UnlitMaterial();
-
-  const materialAxisX = materialAxis.createInstance();
-  materialAxisX.albedoColor = new Vector4(1, 0, 0, 1);
-  const axisXMesh = new Mesh(scene, primitiveAxis, materialAxisX);
-  const arrowXMesh = new Mesh(scene, primitiveArrow, materialAxisX);
-  arrowXMesh.parent = axisXMesh;
-  arrowXMesh.position.setXYZ(0, 10, 0);
-  axisXMesh.parent = axisGroup;
-  axisXMesh.scale.setXYZ(0.1, 1, 0.1);
-  axisXMesh.rotation.fromAxisAngle(new Vector3(0, 0, -1), Math.PI * 0.5);
-
-  const materialAxisY = materialAxis.createInstance();
-  materialAxisY.albedoColor = new Vector4(0, 1, 0, 1);
-  const axisYMesh = new Mesh(scene, primitiveAxis, materialAxisY);
-  const arrowYMesh = new Mesh(scene, primitiveArrow, materialAxisY);
-  arrowYMesh.parent = axisYMesh;
-  arrowYMesh.position.setXYZ(0, 10, 0);
-  axisYMesh.parent = axisGroup;
-  axisYMesh.scale.setXYZ(0.1, 1, 0.1);
-
-  const materialAxisZ = materialAxis.createInstance();
-  materialAxisZ.albedoColor = new Vector4(0, 0, 1, 1);
-  const axisZMesh = new Mesh(scene, primitiveAxis, materialAxisZ);
-  const arrowZMesh = new Mesh(scene, primitiveArrow, materialAxisZ);
-  arrowZMesh.parent = axisZMesh;
-  arrowZMesh.position.setXYZ(0, 10, 0);
-  axisZMesh.parent = axisGroup;
-  axisZMesh.scale.setXYZ(0.1, 1, 0.1);
-  axisZMesh.rotation.fromAxisAngle(new Vector3(1, 0, 0), Math.PI * 0.5);
-
+  const axisGroup = createAxisGroup(scene, 10, 1, 5, 2);
   axisGroup.parent = sphere;
 
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
@@ -121,12 +85,22 @@ ssrApp.ready().then(async () => {
     camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane());
   });
 
+  ssrApp.device.canvas.addEventListener('pointermove', (ev) => {
+    camera.pickPosX = ev.offsetX;
+    camera.pickPosY = ev.offsetY;
+  });
+
   ssrApp.on('tick', (ev) => {
     camera.updateController();
     camera.render(scene, compositor);
     imGuiNewFrame();
     inspector.render();
     imGuiEndFrame();
+    camera.pickResultAsync.then((pickResult) => {
+      if (pickResult?.target?.node?.isMesh()) {
+        console.log(`Mesh ${pickResult.target.node.name ?? '???'} picked`);
+      }
+    });
   });
   ssrApp.run();
 });

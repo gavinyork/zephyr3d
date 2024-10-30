@@ -1,10 +1,10 @@
 import { Ray, Vector3 } from '@zephyr3d/base';
-import type { GraphNode } from './graph_node';
 import { OctreeNode } from './octree';
 import type { Mesh } from './mesh';
 import type { Terrain } from './terrain';
 import type { Visitor } from './visitor';
 import type { SceneNode } from './scene_node';
+import type { PickTarget } from '../render';
 
 /** @internal */
 export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
@@ -13,7 +13,7 @@ export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
   /** @internal */
   private _rayLocal: Ray;
   /** @internal */
-  private _intersected: GraphNode;
+  private _intersected: PickTarget;
   /** @internal */
   private _intersectedDist: number;
   constructor(ray: Ray, length: number) {
@@ -22,7 +22,7 @@ export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
     this._intersected = null;
     this._intersectedDist = length;
   }
-  get intersected(): GraphNode {
+  get intersected(): PickTarget {
     return this._intersected;
   }
   get intersectedDist(): number {
@@ -48,7 +48,7 @@ export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
       const d = node.rayIntersect(this._rayLocal); // this._rayLocal.bboxIntersectionTestEx(node.getBoundingVolume().toAABB());
       if (d !== null && d < this._intersectedDist) {
         this._intersectedDist = d;
-        this._intersected = node;
+        this._intersected = { node };
         return true;
       }
     }
@@ -60,7 +60,7 @@ export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
       const d = node.primitive.raycast(this._rayLocal);
       if (d !== null && d < this._intersectedDist) {
         this._intersectedDist = d;
-        this._intersected = node.getPickTarget() ?? node;
+        this._intersected = node.getPickTarget();
         return true;
       }
     }

@@ -1,156 +1,74 @@
-import { Quaternion, Vector3 } from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Application, CylinderShape, Mesh, SceneNode, UnlitMaterial, type Scene } from '@zephyr3d/scene';
 
-export function createCylinder(
-  center: Vector3,
-  withCaps: boolean,
-  smoothLevel: number,
-  axis: Vector3,
-  radius: number,
-  height: number,
-  vertexbuffer: Float32Array,
-  indexbuffer: Uint16Array,
-  indexOffset: number
-): { numVertices: number; numIndices: number } {
-  if (smoothLevel < 3) {
-    smoothLevel = 3;
-  }
-  const numVerts = smoothLevel * 2;
-  let numTris = smoothLevel * 2;
-  if (withCaps) {
-    numTris += 2 * (smoothLevel - 2);
-  }
-  const numVertices = numVerts;
-  const numIndices = numTris * 3;
+export function createAxisGroup(
+  scene: Scene,
+  axisLength: number,
+  axisRadius: number,
+  arrowLength: number,
+  arrowRadius: number
+) {
+  const axisGroup = new SceneNode(scene);
 
-  if (!vertexbuffer && !indexbuffer) {
-    return { numVertices, numIndices };
-  }
+  const primitiveAxis = new CylinderShape({
+    topRadius: axisRadius,
+    bottomRadius: axisRadius,
+    height: axisLength,
+    anchor: 0
+  });
+  const primitiveArrow = new CylinderShape({
+    topRadius: 0,
+    bottomRadius: arrowRadius,
+    height: arrowLength,
+    anchor: 0
+  });
 
-  const theta = (Math.PI * 2) / smoothLevel;
+  const useInstancing = Application.instance.device.type !== 'webgl';
+  const materialAxis = useInstancing ? new UnlitMaterial() : null;
 
-  const axisY = new Vector3(axis);
-  axisY.inplaceNormalize();
+  const materialAxisX = useInstancing ? materialAxis.createInstance() : new UnlitMaterial();
+  materialAxisX.albedoColor = new Vector4(1, 0, 0, 1);
+  const axisXMesh = new Mesh(scene, primitiveAxis, materialAxisX);
+  axisXMesh.name = 'axisX';
+  axisXMesh.pickable = true;
+  const arrowXMesh = new Mesh(scene, primitiveArrow, materialAxisX);
+  arrowXMesh.name = 'arrowX';
+  arrowXMesh.pickable = true;
+  arrowXMesh.setPickTarget(axisXMesh);
+  arrowXMesh.parent = axisXMesh;
+  arrowXMesh.position.setXYZ(0, 10, 0);
+  axisXMesh.parent = axisGroup;
+  axisXMesh.scale.setXYZ(0.1, 1, 0.1);
+  axisXMesh.rotation.fromAxisAngle(new Vector3(0, 0, -1), Math.PI * 0.5);
 
-  const temp = new Vector3(0, 0, 0);
-  let idx = 0;
-  if (Math.abs(axisY[1]) < Math.abs(axisY[idx])) {
-    idx = 1;
-  }
-  if (Math.abs(axisY[2]) < Math.abs(axisY[idx])) {
-    idx = 2;
-  }
-  temp[idx] = 1;
+  const materialAxisY = useInstancing ? materialAxis.createInstance() : new UnlitMaterial();
+  materialAxisY.albedoColor = new Vector4(0, 1, 0, 1);
+  const axisYMesh = new Mesh(scene, primitiveAxis, materialAxisY);
+  axisYMesh.name = 'axisY';
+  axisYMesh.pickable = true;
+  const arrowYMesh = new Mesh(scene, primitiveArrow, materialAxisY);
+  arrowYMesh.name = 'arrowY';
+  arrowYMesh.pickable = true;
+  arrowYMesh.setPickTarget(axisYMesh);
+  arrowYMesh.parent = axisYMesh;
+  arrowYMesh.position.setXYZ(0, 10, 0);
+  axisYMesh.parent = axisGroup;
+  axisYMesh.scale.setXYZ(0.1, 1, 0.1);
 
-  const axisX = Vector3.cross(axisY, temp);
-  let vIndex = 0;
-  let iIndex = 0;
+  const materialAxisZ = useInstancing ? materialAxis.createInstance() : new UnlitMaterial();
+  materialAxisZ.albedoColor = new Vector4(0, 0, 1, 1);
+  const axisZMesh = new Mesh(scene, primitiveAxis, materialAxisZ);
+  axisZMesh.name = 'axisZ';
+  axisZMesh.pickable = true;
+  const arrowZMesh = new Mesh(scene, primitiveArrow, materialAxisZ);
+  arrowZMesh.name = 'arrowZ';
+  arrowZMesh.pickable = true;
+  arrowZMesh.setPickTarget(axisZMesh);
+  arrowZMesh.parent = axisZMesh;
+  arrowZMesh.position.setXYZ(0, 10, 0);
+  axisZMesh.parent = axisGroup;
+  axisZMesh.scale.setXYZ(0.1, 1, 0.1);
+  axisZMesh.rotation.fromAxisAngle(new Vector3(1, 0, 0), Math.PI * 0.5);
 
-  if (vertexbuffer) {
-    for (let i = 0; i < smoothLevel; ++i) {
-      const rotMatrix = Quaternion.fromAxisAngle(axisY, -i * theta).toMatrix4x4();
-      const point = rotMatrix.transformVectorAffine(axisX).scaleBy(radius);
-      vertexbuffer.set(Vector3.add(center, point), vIndex);
-      vIndex += 3;
-      vertexbuffer.set(Vector3.add(Vector3.add(center, point), Vector3.scale(axisY, height)), vIndex);
-      vIndex += 3;
-    }
-  }
-
-  if (indexbuffer) {
-    for (let i = 0; i < smoothLevel * 2; ++i) {
-      indexbuffer[iIndex++] = ((((i + 1) / 2) * 2) % (smoothLevel * 2)) + indexOffset;
-      indexbuffer[iIndex++] = (i / 2) * 2 + 1 + indexOffset;
-      indexbuffer[iIndex++] = ((i + 2) % (smoothLevel * 2)) + indexOffset;
-    }
-
-    if (withCaps) {
-      for (let i = 0; i < smoothLevel - 2; ++i) {
-        indexbuffer[iIndex++] = 0 + indexOffset;
-        indexbuffer[iIndex++] = (i + 1) * 2 + indexOffset;
-        indexbuffer[iIndex++] = (i + 2) * 2 + indexOffset;
-      }
-      for (let i = 0; i < smoothLevel - 2; ++i) {
-        indexbuffer[iIndex++] = (i + 1) * 2 + 1 + indexOffset;
-        indexbuffer[iIndex++] = 1 + indexOffset;
-        indexbuffer[iIndex++] = (i + 2) * 2 + 1 + indexOffset;
-      }
-    }
-  }
-  return { numVertices, numIndices };
-}
-
-export function createCone(
-  center: Vector3,
-  withCap: boolean,
-  smoothLevel: number,
-  axis: Vector3,
-  radius: number,
-  height: number,
-  vertexbuffer: Float32Array,
-  indexbuffer: Uint16Array,
-  indexOffset: number
-): { numVertices: number; numIndices: number } {
-  if (smoothLevel < 3) {
-    smoothLevel = 3;
-  }
-  const numVerts = smoothLevel + 1;
-  let numTris = smoothLevel;
-  if (withCap) {
-    numTris += smoothLevel - 2;
-  }
-  const numVertices = numVerts;
-  const numIndices = 3 * numTris;
-
-  if (!vertexbuffer && !indexbuffer) {
-    return { numVertices, numIndices };
-  }
-
-  const theta = (Math.PI * 2) / smoothLevel;
-
-  const axisY = new Vector3(axis);
-  axisY.inplaceNormalize();
-
-  const temp = new Vector3(0, 0, 0);
-  let idx = 0;
-  if (Math.abs(axisY[1]) < Math.abs(axisY[idx])) {
-    idx = 1;
-  }
-  if (Math.abs(axisY[2]) < Math.abs(axisY[idx])) {
-    idx = 2;
-  }
-  temp[idx] = 1;
-
-  const axisX = Vector3.cross(axisY, temp);
-  let vIndex = 0;
-  let iIndex = 0;
-
-  if (vertexbuffer) {
-    for (let i = 0; i < smoothLevel; ++i) {
-      const rotMatrix = Quaternion.fromAxisAngle(axisY, i * theta).toMatrix4x4();
-      const point = rotMatrix.transformVectorAffine(axisX);
-      point.scaleBy(radius);
-      vertexbuffer.set(Vector3.add(center, point), vIndex);
-      vIndex += 3;
-    }
-    vertexbuffer.set(Vector3.add(center, Vector3.scale(axisY, height)), vIndex);
-    vIndex += 3;
-  }
-
-  if (indexbuffer) {
-    for (let i = 0; i < smoothLevel; ++i) {
-      indexbuffer[iIndex++] = smoothLevel + indexOffset;
-      indexbuffer[iIndex++] = i + indexOffset;
-      indexbuffer[iIndex++] = ((i + 1) % smoothLevel) + indexOffset;
-    }
-
-    if (withCap) {
-      for (let i = 0; i < smoothLevel - 2; ++i) {
-        indexbuffer[iIndex++] = i + 1 + indexOffset;
-        indexbuffer[iIndex++] = 0 + indexOffset;
-        indexbuffer[iIndex++] = ((i + 2) % smoothLevel) + indexOffset;
-      }
-    }
-  }
-
-  return { numVertices, numIndices };
+  return axisGroup;
 }
