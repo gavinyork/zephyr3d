@@ -1133,6 +1133,9 @@ export class CopyBlitter extends Blitter {
     filter(scope: PBInsideFunctionScope, type: BlitType, srcTex: PBShaderExp, srcUV: PBShaderExp, srcLayer: PBShaderExp, sampleType: 'float' | 'int' | 'uint'): PBShaderExp;
 }
 
+// @public (undocumented)
+export function createGradientNoiseTexture(device: AbstractDevice, size: number, uvscale: number, mono?: boolean, seed?: number): _zephyr3d_device.Texture2D<unknown>;
+
 // Warning: (ae-internal-missing-underscore) The name "createProgramFFT2H" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
@@ -1162,6 +1165,9 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
 //
 // @internal (undocumented)
 export function createProgramPostFFT2(useComputeShader: boolean, threadGroupSize: number, targetFormat?: TextureFormat, limit?: 4 | 2): _zephyr3d_device.GPUProgram<unknown>;
+
+// @public (undocumented)
+export function createRandomNoiseTexture(device: AbstractDevice, size: number): _zephyr3d_device.Texture2D<unknown>;
 
 // @public
 export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
@@ -1198,6 +1204,7 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
 
 // @public
 export interface CylinderCreationOptions extends ShapeCreationOptions {
+    anchor?: number;
     bottomRadius?: number;
     height?: number;
     heightDetail?: number;
@@ -1268,7 +1275,7 @@ export interface Drawable {
     getMorphInfo(): GPUDataBuffer;
     getName(): string;
     getObjectColor(): Vector4;
-    getPickTarget(): GraphNode;
+    getPickTarget(): PickTarget;
     getQueueType(): number;
     getSortDistance(camera: Camera): number;
     getXForm(): XForm;
@@ -1819,6 +1826,9 @@ export class GerstnerWaveGenerator extends WaveGenerator {
 export function getDefaultBuildParams(): OceanFieldBuildParams;
 
 // @public
+export function gradient(scope: PBInsideFunctionScope, p: PBShaderExp, t: PBShaderExp | number): any;
+
+// @public
 export class GraphNode extends SceneNode {
     constructor(scene: Scene);
     getBoneMatrices(): Texture2D;
@@ -1872,6 +1882,9 @@ export class Grayscale extends AbstractPostEffect<'Grayscale'> {
     requireDepthAttachment(): boolean;
     requireLinearDepthTexture(): boolean;
 }
+
+// @public
+export function hash(scope: PBInsideFunctionScope, p: PBShaderExp): any;
 
 // Warning: (ae-internal-missing-underscore) The name "HeightField" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -2292,7 +2305,7 @@ export class Mesh extends Mesh_base implements BatchDrawable {
     getMorphData(): Texture2D;
     getMorphInfo(): GPUDataBuffer<unknown>;
     getName(): string;
-    getPickTarget(): GraphNode;
+    getPickTarget(): PickTarget;
     getQueueType(): number;
     getXForm(): XForm;
     // @internal (undocumented)
@@ -2309,12 +2322,16 @@ export class Mesh extends Mesh_base implements BatchDrawable {
     // @internal (undocumented)
     protected _morphInfo: GPUDataBuffer;
     needSceneColor(): boolean;
+    // @internal (undocumented)
+    protected _pickTarget: PickTarget;
     get primitive(): Primitive;
     set primitive(prim: Primitive);
     setAnimatedBoundingBox(bbox: BoundingBox): void;
     setBoneMatrices(matrices: Texture2D): void;
     setMorphData(data: Texture2D): void;
     setMorphInfo(info: GPUDataBuffer): void;
+    // (undocumented)
+    setPickTarget(node: SceneNode, label?: string): void;
 }
 
 // @public
@@ -2474,9 +2491,6 @@ export class NamedObject {
 
 // @public
 export function noise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp;
-
-// @public
-export function noisef(scope: PBInsideFunctionScope, p: PBShaderExp): any;
 
 // Warning: (ae-internal-missing-underscore) The name "OceanFieldBuildParams" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -2798,6 +2812,12 @@ export class PCFPD extends ShadowImpl {
 }
 
 // @public
+export function perlinNoise2D(scope: PBInsideFunctionScope, p: PBShaderExp): any;
+
+// @public
+export function perlinNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp): any;
+
+// @public
 export class PerspectiveCamera extends Camera {
     constructor(scene: Scene, fovY: number, aspect: number, near: number, far: number);
     get aspect(): number;
@@ -2820,7 +2840,13 @@ export class PerspectiveCamera extends Camera {
 // @public
 export type PickResult = {
     drawable: Drawable;
-    node: GraphNode;
+    target: PickTarget;
+};
+
+// @public
+export type PickTarget = {
+    node: SceneNode;
+    label?: string;
 };
 
 // @public
@@ -3354,7 +3380,7 @@ export class Scene extends Scene_base {
     // @internal (undocumented)
     protected _octree: Octree;
     raycast(ray: Ray, length?: number): {
-        node: GraphNode;
+        target: PickTarget;
         dist: number;
         point: Vector3;
     };
@@ -4120,7 +4146,7 @@ export class TerrainPatch extends TerrainPatch_base implements Drawable {
     // (undocumented)
     getOffsetZ(): number;
     // (undocumented)
-    getPickTarget(): GraphNode;
+    getPickTarget(): PickTarget;
     // (undocumented)
     getQueueType(): number;
     // (undocumented)
@@ -4509,7 +4535,7 @@ export class XForm<T extends XForm<T> = XForm<any>> extends XForm_base {
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:5721:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:5730:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

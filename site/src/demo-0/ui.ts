@@ -14,6 +14,7 @@ interface GUIParams {
   bloom: boolean;
   fxaa: boolean;
   sao: boolean;
+  rotate: boolean;
   FPS: string;
   oitType: string;
   SSR: boolean;
@@ -51,6 +52,7 @@ export class Panel {
       bloom: this._viewer.bloomEnabled(),
       fxaa: this._viewer.FXAAEnabled(),
       sao: this._viewer.SAOEnabled(),
+      rotate: this._viewer.rotateEnabled(),
       FPS: '',
       SSR: this._viewer.camera.SSR,
       HiZ: this._viewer.camera.HiZ,
@@ -119,6 +121,13 @@ export class Panel {
           this._viewer.camera.HiZ = value;
         });
     }
+    const viewSettings = this._gui.addFolder('View');
+    viewSettings
+      .add(this._params, 'rotate')
+      .name('Auto rotate')
+      .onChange((value) => {
+        this._viewer.enableRotate(value);
+      });
 
     const lightSettings = this._gui.addFolder('Lighting');
     lightSettings

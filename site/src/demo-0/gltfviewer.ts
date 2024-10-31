@@ -2,15 +2,15 @@ import * as zip from '@zip.js/zip.js';
 import type * as draco3d from 'draco3d';
 import { Vector4, Vector3 } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
+import { Mesh, PlaneShape, PBRMetallicRoughnessMaterial } from '@zephyr3d/scene';
 import {
   BatchGroup,
   PostWater,
   WeightedBlendedOIT,
   ABufferOIT,
   SAO,
-  FPSCameraController,
   FFTWaveGenerator,
-  GerstnerWaveGenerator
+  OrbitCameraController
 } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
 import {
@@ -57,23 +57,31 @@ export class GLTFViewer {
   private _nearPlane: number;
   private _envMaps: EnvMaps;
   private _batchGroup: BatchGroup;
+  private _floor: Mesh;
   private _ui: Panel;
+  private _autoRotate: boolean;
   private _compositor: Compositor;
   private _dracoModule: draco3d.DecoderModule;
   private _inspector: Inspector;
+  private _bboxNoScale: AABB;
   constructor(scene: Scene) {
     const device = Application.instance.device;
     this._currentAnimation = null;
     this._modelNode = null;
     this._animationSet = null;
     this._scene = scene;
+    this._scene.env.light.strength = 0.5;
     this._envMaps = new EnvMaps();
     this._batchGroup = new BatchGroup(scene);
     this._assetManager = new AssetManager();
     this._tonemap = new Tonemap();
-    this._water = new PostWater(0, new GerstnerWaveGenerator());
+    this._water = new PostWater(0, new FFTWaveGenerator());
     this._water.elevation = 2;
     this._water.ssr = true;
+    const floorMaterial = new PBRMetallicRoughnessMaterial();
+    floorMaterial.metallic = 0.1;
+    floorMaterial.roughness = 0.8;
+    this._floor = new Mesh(scene, new PlaneShape({ size: 100 }), floorMaterial);
     this._bloom = new Bloom();
     this._sao = new SAO();
     this._sao.radius = 10;
@@ -86,9 +94,11 @@ export class GLTFViewer {
     this._doFXAA = true;
     this._doWater = false;
     this._doSAO = false;
+    this._autoRotate = false;
     this._oit = new WeightedBlendedOIT();
     this._fov = Math.PI / 3;
     this._nearPlane = 1;
+    this._bboxNoScale = null;
     this._compositor = new Compositor();
     this._compositor.appendPostEffect(this._tonemap);
     this._compositor.appendPostEffect(this._bloom);
@@ -102,8 +112,8 @@ export class GLTFViewer {
     );
     this._camera.oit = this._oit;
     this._camera.position.setXYZ(0, 0, 15);
-    this._camera.controller = new FPSCameraController();
-    this._light0 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
+    this._camera.controller = new OrbitCameraController();
+    this._light0 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(true);
     this._light0.shadow.shadowMapSize = 1024;
     this._light0.lookAt(new Vector3(0, 0, 0), new Vector3(0, -1, 1), Vector3.axisPY());
     this._light1 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
@@ -136,15 +146,6 @@ export class GLTFViewer {
   }
   get light1(): DirectionalLight {
     return this._light1;
-  }
-  get FOV(): number {
-    return this._fov;
-  }
-  set FOV(val: number) {
-    if (val !== this._fov) {
-      this._fov = val;
-      this.lookAt();
-    }
   }
   get bloom(): Bloom {
     return this._bloom;
@@ -207,7 +208,11 @@ export class GLTFViewer {
           }
         }
         this._ui.update();
+        this._bboxNoScale = this.getBoundingBox();
+        this._floor.parent = this._modelNode;
+        this._floor.position.setXYZ(-50, this._bboxNoScale.minPoint.y, -50);
         this.lookAt();
+        this._light0.shadow.shadowRegion = this.getBoundingBox();
       });
     this._water.ssrMaxDistance = Vector3.distance(
       this._scene.boundingBox.minPoint,
@@ -251,6 +256,17 @@ export class GLTFViewer {
       this._currentAnimation = null;
       this.lookAt();
     }
+  }
+  enableRotate(enable: boolean) {
+    if (this._autoRotate !== enable) {
+      this._autoRotate = enable;
+      if (this._modelNode && !this._autoRotate) {
+        this._modelNode.rotation.identity();
+      }
+    }
+  }
+  rotateEnabled(): boolean {
+    return this._autoRotate;
   }
   enableShadow(enable: boolean) {
     this._light0.setCastShadow(enable);
@@ -342,15 +358,20 @@ export class GLTFViewer {
     }
   }
   render() {
+    if (this._modelNode && this._autoRotate) {
+      const angle = Application.instance.device.frameInfo.elapsedOverall * 0.001;
+      this._modelNode.rotation.fromAxisAngle(Vector3.axisPY(), angle);
+    }
     this._camera.render(this._scene, this._compositor);
-    imGuiNewFrame();
-    this._inspector.render();
-    imGuiEndFrame();
-
+    if (true || (window as any).__NOT_EXISTS__) {
+      imGuiNewFrame();
+      this._inspector.render();
+      imGuiEndFrame();
+    }
     //this._ui.render();
   }
   lookAt() {
-    const bbox = this.getBoundingBox();
+    const bbox = this._bboxNoScale;
     const minSize = 10;
     const maxSize = 100;
     if (bbox) {
@@ -373,14 +394,23 @@ export class GLTFViewer {
       );
       this._camera.near = Math.min(1, this._camera.near);
       this._camera.far = Math.max(1000, dist + extents.z + 100);
-      //(this._camera.controller as FPSCameraController).setOptions({ center });
+      (this._camera.controller as OrbitCameraController).setOptions({ center });
+    }
+  }
+  nextBackground() {
+    const idList = this._envMaps.getIdList();
+    if (idList?.length > 0) {
+      const currentId = this._envMaps.getCurrentId();
+      const index = idList.indexOf(currentId);
+      const newIndex = (index + 1) % idList.length;
+      this._envMaps.selectById(idList[newIndex], this._scene);
     }
   }
   private getBoundingBox(): AABB {
     const bbox = new BoundingBox();
     bbox.beginExtend();
     this.traverseModel((node) => {
-      if (node.isGraphNode()) {
+      if (node.isGraphNode() && node !== this._floor) {
         const aabb = node.getWorldBoundingVolume()?.toAABB();
         if (aabb && aabb.isValid()) {
           bbox.extend(aabb.minPoint);

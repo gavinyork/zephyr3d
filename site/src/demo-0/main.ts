@@ -56,6 +56,12 @@ gltfApp.ready().then(async () => {
   gltfApp.on('resize', (ev) => {
     gltfViewer.camera.aspect = ev.width / ev.height;
   });
+  gltfApp.on('keyup', (ev) => {
+    console.log(ev.code);
+    if (ev.code === 'KeyB') {
+      gltfViewer.nextBackground();
+    }
+  });
   gltfApp.on('tick', (ev) => {
     gltfViewer.camera.updateController();
     gltfViewer.render();

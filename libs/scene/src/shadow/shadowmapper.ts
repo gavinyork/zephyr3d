@@ -663,7 +663,14 @@ export class ShadowMapper {
     up.setXYZ(0, 1, 0);
     lightCamera.lookAt(center, target, up);
     lightCamera.position.set(center);
-    lightCamera.setOrtho(-radius, radius, -radius, radius, -radius, radius);
+    lightCamera.setOrtho(
+      -radius,
+      radius,
+      -radius,
+      radius,
+      -radius,
+      Math.max(Vector3.distance(center, sceneCamera.getWorldPosition()))
+    );
     center.setXYZ(0, 0, 0);
     lightCamera.viewProjectionMatrix.transformPointP(center, center);
     if (cropMatrix) {

@@ -111,7 +111,7 @@ lightApp.ready().then(async () => {
     1,
     260
   );
-  camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
+  camera.controller = new FPSCameraController({ moveSpeed: 0.05 });
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
 
