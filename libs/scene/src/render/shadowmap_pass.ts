@@ -51,6 +51,12 @@ export class ShadowMapPass extends RenderPass {
       for (const unlit of items.opaque.unlit) {
         this.drawItemList(unlit, ctx, reverseWinding);
       }
+      for (const lit of items.transmission.lit) {
+        this.drawItemList(lit, ctx, reverseWinding);
+      }
+      for (const unlit of items.transmission.unlit) {
+        this.drawItemList(unlit, ctx, reverseWinding);
+      }
     }
   }
 }

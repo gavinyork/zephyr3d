@@ -15,6 +15,7 @@ import { getGGXLUT } from '../../../utility/textures/ggxlut';
 import type { TextureMixinInstanceTypes } from '../texture';
 import { mixinTextureProps } from '../texture';
 import { ShaderHelper } from '../../shader/helper';
+import { RENDER_PASS_TYPE_LIGHT } from '../../../values';
 
 /**
  * Interface for common PBR mixin
@@ -361,7 +362,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         if (this.clearcoat) {
           scope.zClearcoatFactor = pb.vec4().uniform(2);
         }
-        if (this.transmission) {
+        if (this.transmission && this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
           scope.zTransmissionFactor = pb.float().uniform(2);
           scope.zThicknessFactor = pb.float().uniform(2);
           scope.zAttenuationColor = pb.vec3().uniform(2);
@@ -394,7 +395,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         if (this.clearcoat) {
           bindGroup.setValue('zClearcoatFactor', this._clearcoatFactor);
         }
-        if (this.transmission) {
+        if (this.transmission && ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
           bindGroup.setValue('zTransmissionFactor', this._transmissionFactor);
           bindGroup.setValue('zThicknessFactor', this._thicknessFactor);
           bindGroup.setValue('zAttenuationColor', this._attenuationColor);
@@ -429,7 +430,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         ...(this.clearcoat
           ? [pb.vec4('ccFactor'), pb.vec3('ccNormal'), pb.float('ccNoV'), pb.float('ccFresnel')]
           : []),
-        ...(this.transmission
+        ...(this.transmission && this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT
           ? [
               pb.float('transmissionFactor'),
               pb.float('thicknessFactor'),
@@ -512,7 +513,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           );
         }
       }
-      if (this.transmission) {
+      if (this.transmission && this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         if (this.transmissionTexture) {
           data.transmissionFactor = pb.mul(
             this.sampleTransmissionTexture(scope).r,
@@ -873,7 +874,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
               pb.div(this.data.diffuse.rgb, Math.PI)
             );
             this.$l.diffuse = pb.mul(this.lightColor, pb.max(this.diffuseBRDF, pb.vec3(0)));
-            if (that.transmission) {
+            if (that.transmission && that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
               this.$l.transmissionRay = that.getVolumeTransmissionRay(
                 this,
                 this.normal,
@@ -1234,7 +1235,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             if (that.sheen) {
               this.iblDiffuse = pb.mul(this.iblDiffuse, this.data.sheenAlbedoScaling);
             }
-            if (that.transmission) {
+            if (that.transmission && that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
               this.$l.iblTransmission = that.getIBLVolumnRefraction(
                 this,
                 this.ggxLutSample.rg,

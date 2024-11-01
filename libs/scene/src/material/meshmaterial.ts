@@ -368,6 +368,8 @@ export class MeshMaterial extends Material {
     }
     if (ctx.forceCullMode || this._cullMode !== 'back') {
       stateSet.useRasterizerState().cullMode = ctx.forceCullMode || this._cullMode;
+    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
+      stateSet.useRasterizerState().cullMode = 'none';
     } else {
       stateSet.defaultRasterizerState();
     }

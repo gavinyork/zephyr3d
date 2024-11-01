@@ -669,7 +669,7 @@ export class ShadowMapper {
       -radius,
       radius,
       -radius,
-      Math.max(Vector3.distance(center, sceneCamera.getWorldPosition()))
+      Math.max(Vector3.distance(center, sceneCamera.getWorldPosition()), sceneCamera.getFarPlane())
     );
     center.setXYZ(0, 0, 0);
     lightCamera.viewProjectionMatrix.transformPointP(center, center);

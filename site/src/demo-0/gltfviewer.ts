@@ -2,7 +2,7 @@ import * as zip from '@zip.js/zip.js';
 import type * as draco3d from 'draco3d';
 import { Vector4, Vector3 } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
-import { Mesh, PlaneShape, PBRMetallicRoughnessMaterial } from '@zephyr3d/scene';
+import { Mesh, PlaneShape, LambertMaterial } from '@zephyr3d/scene';
 import {
   BatchGroup,
   PostWater,
@@ -70,7 +70,8 @@ export class GLTFViewer {
     this._modelNode = null;
     this._animationSet = null;
     this._scene = scene;
-    this._scene.env.light.strength = 0.5;
+    this._scene.env.light.strength = 0.8;
+    this._scene.env.sky.drawGround = true;
     this._envMaps = new EnvMaps();
     this._batchGroup = new BatchGroup(scene);
     this._assetManager = new AssetManager();
@@ -78,10 +79,10 @@ export class GLTFViewer {
     this._water = new PostWater(0, new FFTWaveGenerator());
     this._water.elevation = 2;
     this._water.ssr = true;
-    const floorMaterial = new PBRMetallicRoughnessMaterial();
-    floorMaterial.metallic = 0.1;
-    floorMaterial.roughness = 0.8;
-    this._floor = new Mesh(scene, new PlaneShape({ size: 100 }), floorMaterial);
+    const floorMaterial = new LambertMaterial();
+    floorMaterial.albedoColor = new Vector4(0.8, 0.8, 0.8, 1);
+    this._floor = new Mesh(scene, new PlaneShape({ size: 1 }), floorMaterial);
+    this._floor.castShadow = false;
     this._bloom = new Bloom();
     this._sao = new SAO();
     this._sao.radius = 10;
@@ -113,9 +114,15 @@ export class GLTFViewer {
     this._camera.oit = this._oit;
     this._camera.position.setXYZ(0, 0, 15);
     this._camera.controller = new OrbitCameraController();
-    this._light0 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(true);
+    this._light0 = new DirectionalLight(this._scene)
+      .setColor(new Vector4(1, 1, 1, 1))
+      .setIntensity(8)
+      .setCastShadow(true);
     this._light0.shadow.shadowMapSize = 1024;
-    this._light0.lookAt(new Vector3(0, 0, 0), new Vector3(0, -1, 1), Vector3.axisPY());
+    this._light0.shadow.depthBias = 0.1;
+    this._light0.shadow.mode = 'pcf-opt';
+    this._light0.shadow.pcfKernelSize = 7;
+    this._light0.lookAt(new Vector3(0, 0, 0), new Vector3(1, -1, 1), Vector3.axisPY());
     this._light1 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
     this._light1.shadow.shadowMapSize = 1024;
     this._light1.lookAt(new Vector3(0, 0, 0), new Vector3(-0.5, 0.707, 0.5), Vector3.axisPY());
@@ -210,7 +217,11 @@ export class GLTFViewer {
         this._ui.update();
         this._bboxNoScale = this.getBoundingBox();
         this._floor.parent = this._modelNode;
-        this._floor.position.setXYZ(-50, this._bboxNoScale.minPoint.y, -50);
+        const scaleFactor =
+          Math.max(this._bboxNoScale.maxPoint.x, this._bboxNoScale.maxPoint.y, this._bboxNoScale.maxPoint.z) *
+          8;
+        this._floor.scale.setXYZ(scaleFactor, 1, scaleFactor);
+        this._floor.position.setXYZ(-0.5 * scaleFactor, this._bboxNoScale.minPoint.y, -0.5 * scaleFactor);
         this.lookAt();
         this._light0.shadow.shadowRegion = this.getBoundingBox();
       });
@@ -358,9 +369,14 @@ export class GLTFViewer {
     }
   }
   render() {
-    if (this._modelNode && this._autoRotate) {
-      const angle = Application.instance.device.frameInfo.elapsedOverall * 0.001;
-      this._modelNode.rotation.fromAxisAngle(Vector3.axisPY(), angle);
+    if (this._modelNode) {
+      if (this._autoRotate) {
+        const angle = Application.instance.device.frameInfo.elapsedOverall * 0.001;
+        this._modelNode.rotation.fromAxisAngle(Vector3.axisPY(), angle);
+      }
+      if (this._animationSet) {
+        this._light0.shadow.shadowRegion = this.getBoundingBox();
+      }
     }
     this._camera.render(this._scene, this._compositor);
     if (true || (window as any).__NOT_EXISTS__) {
@@ -492,6 +508,16 @@ export class GLTFViewer {
     );
     await Promise.all(promises);
     return result;
+  }
+  useScatter(use: boolean) {
+    if (use) {
+      this._scene.env.sky.skyType = 'scatter';
+      this._scene.env.sky.autoUpdateIBLMaps = true;
+      this._scene.env.light.radianceMap = this._scene.env.sky.radianceMap;
+      this._scene.env.light.irradianceMap = this._scene.env.sky.irradianceMap;
+    } else {
+      this._envMaps.selectById(this._envMaps.getCurrentId(), this._scene);
+    }
   }
   private async resolveDraggedItems(data: DataTransfer): Promise<Map<string, string>> {
     const files = Array.from(data.files);

@@ -60,6 +60,8 @@ gltfApp.ready().then(async () => {
     console.log(ev.code);
     if (ev.code === 'KeyB') {
       gltfViewer.nextBackground();
+    } else if (ev.code === 'KeyN') {
+      gltfViewer.useScatter(gltfViewer.scene.env.sky.skyType !== 'scatter');
     }
   });
   gltfApp.on('tick', (ev) => {
