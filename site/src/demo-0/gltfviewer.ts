@@ -221,7 +221,11 @@ export class GLTFViewer {
           Math.max(this._bboxNoScale.maxPoint.x, this._bboxNoScale.maxPoint.y, this._bboxNoScale.maxPoint.z) *
           8;
         this._floor.scale.setXYZ(scaleFactor, 1, scaleFactor);
-        this._floor.position.setXYZ(-0.5 * scaleFactor, this._bboxNoScale.minPoint.y, -0.5 * scaleFactor);
+        this._floor.position.setXYZ(
+          -0.5 * scaleFactor,
+          this._bboxNoScale.minPoint.y - this._bboxNoScale.extents.y * 0.01,
+          -0.5 * scaleFactor
+        );
         this.lookAt();
         this._light0.shadow.shadowRegion = this.getBoundingBox();
       });
