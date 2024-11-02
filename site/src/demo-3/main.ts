@@ -48,6 +48,14 @@ terrainApp.ready().then(async () => {
     ev.preventDefault();
     return false;
   });
+  terrainApp.on('keyup', (ev) => {
+    console.log(ev.code);
+    if (ev.code === 'Backquote') {
+      demo.toggleInspector();
+    } else if (ev.code === 'KeyT') {
+      demo.toggleGUI();
+    }
+  });
   terrainApp.on('resize', (ev) => {
     demo.camera.aspect = ev.width / ev.height;
   });

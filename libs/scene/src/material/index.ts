@@ -12,6 +12,7 @@ export * from './mixins/pbr/common';
 export * from './mixins/lightmodel/pbrmetallicroughness';
 export * from './mixins/lightmodel/pbrspecularglossness';
 export * from './mixins/lightmodel/blinnphong';
+export * from './mixins/lightmodel/lambert';
 export * from './mixins/albedocolor';
 export * from './mixins/lit';
 export * from './mixins/texture';
