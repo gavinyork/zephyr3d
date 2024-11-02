@@ -61,7 +61,17 @@ gltfApp.ready().then(async () => {
     if (ev.code === 'KeyB') {
       gltfViewer.nextBackground();
     } else if (ev.code === 'KeyN') {
-      gltfViewer.useScatter(gltfViewer.scene.env.sky.skyType !== 'scatter');
+      gltfViewer.toggleScatter();
+    } else if (ev.code === 'KeyF') {
+      gltfViewer.toggleFloor();
+    } else if (ev.code === 'Backquote') {
+      gltfViewer.toggleInspector();
+    } else if (ev.code === 'KeyT') {
+      gltfViewer.toggleGUI();
+    } else if (ev.code === 'KeyR') {
+      gltfViewer.enableRotate(!gltfViewer.rotateEnabled());
+    } else if (ev.code === 'KeyL') {
+      gltfViewer.randomLightDir();
     }
   });
   gltfApp.on('tick', (ev) => {

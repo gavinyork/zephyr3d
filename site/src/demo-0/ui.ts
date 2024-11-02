@@ -85,6 +85,9 @@ export class Panel {
         });
     }
   }
+  show(show: boolean) {
+    this._gui.show(show);
+  }
   create() {
     const desc1 = document.createElement('p');
     desc1.style.marginTop = '1.5rem';

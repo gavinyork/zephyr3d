@@ -94,10 +94,8 @@ export class LambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLigh
           this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
           this.$l.lightContrib = pb.mul(colorIntensity.rgb, colorIntensity.a, this.NoL, this.lightAtten);
           if (shadow) {
-            this.$if(pb.greaterThan(this.NoL, 0), function () {
-              this.$l.shadow = pb.vec3(that.calculateShadow(this, scope.$inputs.worldPos, this.NoL));
-              this.lightContrib = pb.mul(this.lightContrib, this.shadow);
-            });
+            this.$l.shadow = pb.vec3(that.calculateShadow(this, scope.$inputs.worldPos, this.NoL));
+            this.lightContrib = pb.mul(this.lightContrib, this.shadow);
           }
           this.color = pb.add(this.color, this.lightContrib);
         });

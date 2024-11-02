@@ -2,7 +2,7 @@ import * as zip from '@zip.js/zip.js';
 import type * as draco3d from 'draco3d';
 import { Vector4, Vector3 } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
-import { Mesh, PlaneShape, LambertMaterial } from '@zephyr3d/scene';
+import { Mesh, PlaneShape, LambertMaterial, FPSCameraController } from '@zephyr3d/scene';
 import {
   BatchGroup,
   PostWater,
@@ -59,6 +59,10 @@ export class GLTFViewer {
   private _batchGroup: BatchGroup;
   private _floor: Mesh;
   private _ui: Panel;
+  private _showGUI: boolean;
+  private _showFloor: boolean;
+  private _useScatter: boolean;
+  private _showInspector: boolean;
   private _autoRotate: boolean;
   private _compositor: Compositor;
   private _dracoModule: draco3d.DecoderModule;
@@ -113,7 +117,8 @@ export class GLTFViewer {
     );
     this._camera.oit = this._oit;
     this._camera.position.setXYZ(0, 0, 15);
-    this._camera.controller = new OrbitCameraController();
+    //this._camera.controller = new OrbitCameraController();
+    this._camera.controller = new FPSCameraController();
     this._light0 = new DirectionalLight(this._scene)
       .setColor(new Vector4(1, 1, 1, 1))
       .setIntensity(8)
@@ -128,16 +133,23 @@ export class GLTFViewer {
     this._light1.lookAt(new Vector3(0, 0, 0), new Vector3(-0.5, 0.707, 0.5), Vector3.axisPY());
     this._envMaps.selectById(this._envMaps.getIdList()[0], this.scene);
     this._ui = new Panel(this);
+    this._showGUI = true;
+    this._showFloor = false;
+    this._useScatter = false;
+    this._showInspector = false;
     this._dracoModule = null;
     this._inspector = new Inspector(this._scene, this._compositor, this._camera);
   }
   async ready() {
+    const that = this;
     return new Promise<void>((resolve) => {
       DracoDecoderModule({
         onModuleLoaded: (module) => {
           this._dracoModule = module;
           imGuiInit(Application.instance.device).then(() => {
-            Application.instance.inputManager.use(imGuiInjectEvent);
+            Application.instance.inputManager.use(function (ev: Event, type: string) {
+              return that._showInspector ? imGuiInjectEvent(ev, type) : false;
+            });
             Application.instance.inputManager.use(this._camera.handleEvent.bind(this._camera));
             resolve();
           });
@@ -216,7 +228,6 @@ export class GLTFViewer {
         }
         this._ui.update();
         this._bboxNoScale = this.getBoundingBox();
-        this._floor.parent = this._modelNode;
         const scaleFactor =
           Math.max(this._bboxNoScale.maxPoint.x, this._bboxNoScale.maxPoint.y, this._bboxNoScale.maxPoint.z) *
           8;
@@ -226,6 +237,7 @@ export class GLTFViewer {
           this._bboxNoScale.minPoint.y - this._bboxNoScale.extents.y * 0.01,
           -0.5 * scaleFactor
         );
+        this._floor.parent = this._showFloor ? this._modelNode : null;
         this.lookAt();
         this._light0.shadow.shadowRegion = this.getBoundingBox();
       });
@@ -383,7 +395,7 @@ export class GLTFViewer {
       }
     }
     this._camera.render(this._scene, this._compositor);
-    if (true || (window as any).__NOT_EXISTS__) {
+    if (this._showInspector) {
       imGuiNewFrame();
       this._inspector.render();
       imGuiEndFrame();
@@ -414,7 +426,9 @@ export class GLTFViewer {
       );
       this._camera.near = Math.min(1, this._camera.near);
       this._camera.far = Math.max(1000, dist + extents.z + 100);
-      (this._camera.controller as OrbitCameraController).setOptions({ center });
+      if (this._camera.controller instanceof OrbitCameraController) {
+        this._camera.controller.setOptions({ center });
+      }
     }
   }
   nextBackground() {
@@ -513,8 +527,9 @@ export class GLTFViewer {
     await Promise.all(promises);
     return result;
   }
-  useScatter(use: boolean) {
-    if (use) {
+  toggleScatter() {
+    this._useScatter = !this._useScatter;
+    if (this._useScatter) {
       this._scene.env.sky.skyType = 'scatter';
       this._scene.env.sky.autoUpdateIBLMaps = true;
       this._scene.env.light.radianceMap = this._scene.env.sky.radianceMap;
@@ -522,6 +537,24 @@ export class GLTFViewer {
     } else {
       this._envMaps.selectById(this._envMaps.getCurrentId(), this._scene);
     }
+  }
+  toggleFloor() {
+    this._showFloor = !this._showFloor;
+    this._floor.parent = this._showFloor ? this._modelNode : null;
+  }
+  toggleInspector() {
+    this._showInspector = !this._showInspector;
+  }
+  toggleGUI() {
+    this._showGUI = !this._showGUI;
+    this._ui.show(this._showGUI);
+  }
+  randomLightDir() {
+    this._light0.lookAt(
+      new Vector3(0, 0, 0),
+      new Vector3(Math.random() * 2 - 1, -1, Math.random() * 2 - 1),
+      Vector3.axisPY()
+    );
   }
   private async resolveDraggedItems(data: DataTransfer): Promise<Map<string, string>> {
     const files = Array.from(data.files);
