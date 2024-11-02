@@ -138,28 +138,35 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
           that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
             this.$l.diffuse = pb.vec3();
             this.$l.specular = pb.vec3();
-            this.$l.lightAtten = that.calculateLightAttenuation(
-              this,
-              type,
-              this.worldPos,
-              posRange,
-              dirCutoff
-            );
             this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
             this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
-            this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
-            if (shadow) {
-              this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.worldPos, this.NoL));
-            }
-            that.directLighting(
-              this,
-              this.lightDir,
-              this.lightColor,
-              this.normal,
-              this.viewVec,
-              this.pbrData,
-              this.lightingColor
-            );
+            this.$if(pb.greaterThan(this.NoL, 0), function () {
+              this.$l.lightAtten = that.calculateLightAttenuation(
+                this,
+                type,
+                this.worldPos,
+                posRange,
+                dirCutoff
+              );
+              this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
+              if (shadow) {
+                this.$if(pb.greaterThan(this.NoL, 0), function () {
+                  this.lightColor = pb.mul(
+                    this.lightColor,
+                    that.calculateShadow(this, this.worldPos, this.NoL)
+                  );
+                });
+              }
+              that.directLighting(
+                this,
+                this.lightDir,
+                this.lightColor,
+                this.normal,
+                this.viewVec,
+                this.pbrData,
+                this.lightingColor
+              );
+            });
           });
           this.$return(pb.add(this.lightingColor, this.emissiveColor));
         }
