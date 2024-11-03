@@ -316,15 +316,11 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         false
       )
     ];
-    this.debugTexture(inputColorTexture, 'SSR_Input');
-    this.debugTexture(this._normalTex, 'SSR_Normal');
     device.setFramebuffer(intersectFramebuffer);
     this.intersect(ctx, inputColorTexture, sceneDepthTexture, true, false);
     const intersectTex = intersectFramebuffer.getColorAttachments()[0] as Texture2D;
-    this.debugTexture(intersectTex, 'SSR_Intersect');
     device.setFramebuffer(pingpongFramebuffer[0]);
     this.resolve(ctx, inputColorTexture, sceneDepthTexture, intersectTex);
-    this.debugTexture(pingpongFramebuffer[0].getColorAttachments()[0], 'SSR_Resolve');
     if (ctx.camera.ssrBlurScale > 0 && ctx.camera.ssrBlurKernelSize > 0) {
       const blurSizeScale = 255 * ctx.camera.ssrBlurScale;
       const kernelRadius = (Math.max(1, ctx.camera.ssrBlurKernelSize >> 0) - 1) >> 1;

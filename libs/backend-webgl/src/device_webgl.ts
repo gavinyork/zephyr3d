@@ -268,7 +268,7 @@ export class WebGLDevice extends BaseDevice {
     return this._dpr;
   }
   isContextLost(): boolean {
-    return this._context.isContextLost();
+    return this._contextLost;
   }
   getDeviceCaps(): DeviceCaps {
     return this._deviceCaps;

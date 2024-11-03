@@ -95,6 +95,16 @@ export class LightPass extends RenderPass {
     ctx.env = ctx.scene.env;
     ctx.drawEnvLight = false;
     ctx.flip = this.isAutoFlip(ctx);
+    const ssr = !!(ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS);
+    const tmpFramebuffer = ssr
+      ? ctx.device.pool.fetchTemporalFramebuffer(
+          false,
+          ctx.device.getDrawingBufferWidth(),
+          ctx.device.getDrawingBufferHeight(),
+          ctx.device.getFramebuffer().getColorAttachments()[0],
+          ctx.device.getFramebuffer().getDepthAttachment()
+        )
+      : null;
     const oit =
       renderQueue.drawTransparent &&
       ctx.primaryCamera.oit &&
@@ -139,7 +149,16 @@ export class LightPass extends RenderPass {
             ctx.currentShadowLight = null;
             ctx.lightBlending = lightIndex > 0;
             this._shadowMapHash = '';
+            if (ctx.lightBlending && tmpFramebuffer) {
+              ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
+              ctx.device.pushDeviceStates();
+              ctx.device.setFramebuffer(tmpFramebuffer);
+            }
             this.renderLightPass(ctx, lists[i], renderQueue.unshadowedLights, flags);
+            if (ctx.lightBlending && tmpFramebuffer) {
+              ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
+              ctx.device.popDeviceStates();
+            }
           }
           if (ctx.oit) {
             ctx.oit.endPass(ctx, p);
@@ -149,16 +168,6 @@ export class LightPass extends RenderPass {
           ctx.oit.end(ctx);
         }
       }
-      const ssr = !!(ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS);
-      const tmpFramebuffer = ssr
-        ? ctx.device.pool.fetchTemporalFramebuffer(
-            false,
-            ctx.device.getDrawingBufferWidth(),
-            ctx.device.getDrawingBufferHeight(),
-            ctx.device.getFramebuffer().getColorAttachments()[0],
-            ctx.device.getFramebuffer().getDepthAttachment()
-          )
-        : null;
       if (i === 0 && !ctx.sceneColorTexture) {
         if (tmpFramebuffer) {
           ctx.device.pushDeviceStates();
@@ -183,9 +192,9 @@ export class LightPass extends RenderPass {
         }
         ctx.compositor?.drawPostEffects(ctx, i === 0, ctx.linearDepthTexture);
       }
-      if (tmpFramebuffer) {
-        ctx.device.pool.releaseFrameBuffer(tmpFramebuffer);
-      }
+    }
+    if (tmpFramebuffer) {
+      ctx.device.pool.releaseFrameBuffer(tmpFramebuffer);
     }
   }
 }
