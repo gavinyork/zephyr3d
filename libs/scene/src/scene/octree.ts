@@ -694,7 +694,7 @@ export class Octree {
     }
   }
   resize(size: number) {
-    size = Math.max(nextPowerOf2(size), this._leafSize);
+    size = Math.max(nextPowerOf2(Math.ceil(size)), this._leafSize);
     if (size === this._rootSize) {
       return;
     }

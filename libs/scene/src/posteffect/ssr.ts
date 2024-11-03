@@ -316,11 +316,15 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         false
       )
     ];
+    this.debugTexture(inputColorTexture, 'SSR_Input');
+    this.debugTexture(this._normalTex, 'SSR_Normal');
     device.setFramebuffer(intersectFramebuffer);
     this.intersect(ctx, inputColorTexture, sceneDepthTexture, true, false);
     const intersectTex = intersectFramebuffer.getColorAttachments()[0] as Texture2D;
+    this.debugTexture(intersectTex, 'SSR_Intersect');
     device.setFramebuffer(pingpongFramebuffer[0]);
     this.resolve(ctx, inputColorTexture, sceneDepthTexture, intersectTex);
+    this.debugTexture(pingpongFramebuffer[0].getColorAttachments()[0], 'SSR_Resolve');
     if (ctx.camera.ssrBlurScale > 0 && ctx.camera.ssrBlurKernelSize > 0) {
       const blurSizeScale = 255 * ctx.camera.ssrBlurScale;
       const kernelRadius = (Math.max(1, ctx.camera.ssrBlurKernelSize >> 0) - 1) >> 1;
@@ -584,40 +588,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
           }).$else(function () {
             this.reflectance = this.resolveEnvRadiance(this.screenUV, this.roughnessInfo);
           });
-          //this.$l.sceneColor = pb.textureSampleLevel(this.colorTex, this.screenUV, 0).rgb;
-          //this.reflectance = this.resolveSample(this.sceneColor, this.reflectance, this.roughnessInfo);
           this.$outputs.outColor = pb.vec4(this.reflectance, this.intersectSample.z);
-        });
-      }
-    });
-  }
-  /** @internal */
-  private _createBlurProgram(ctx: DrawContext): GPUProgram {
-    return ctx.device.buildRenderProgram({
-      vertex(pb) {
-        this.flip = pb.int().uniform(0);
-        this.$inputs.pos = pb.vec2().attrib('position');
-        this.$outputs.uv = pb.vec2();
-        pb.main(function () {
-          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
-          this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-          this.$if(pb.notEqual(this.flip, 0), function () {
-            this.$builtins.position.y = pb.neg(this.$builtins.position.y);
-          });
-        });
-      },
-      fragment(pb) {
-        this.srcTex = pb.tex2D().uniform(0);
-        this.normalTex = pb.tex2D().uniform(0);
-        this.blurRadiusTex = pb.tex2D().uniform(0);
-        this.step = pb.vec2().uniform(0);
-        this.targetSize = pb.vec4().uniform(0);
-        if (pb.getDevice().type !== 'webgl') {
-          this.weights = [...SSR._weights.map((val) => pb.float(val))];
-        }
-        pb.main(function () {
-          this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
-          this.$l.centerTexel = pb.textureSampleLevel(this.srcTex, this.screenUV, 0);
         });
       }
     });

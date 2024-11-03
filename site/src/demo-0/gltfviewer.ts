@@ -556,6 +556,9 @@ export class GLTFViewer {
       Vector3.axisPY()
     );
   }
+  toggleShadow() {
+    this._light0.castShadow = !this._light0.castShadow;
+  }
   private async resolveDraggedItems(data: DataTransfer): Promise<Map<string, string>> {
     const files = Array.from(data.files);
     const entries = Array.from(data.items).map((item) => item.webkitGetAsEntry());

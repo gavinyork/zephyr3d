@@ -98,7 +98,7 @@ export class SAO extends AbstractPostEffect<'SAO'> {
     this._saoRadius = 100;
     this._saoMinResolution = 0;
     this._saoRandomSeed = 0;
-    this._saoBlurDepthCutoff = 1;
+    this._saoBlurDepthCutoff = 2;
     this._blitterH = new DepthLimitAOBlurBlitter(false);
     this._blitterH.kernelRadius = 8;
     this._blitterH.stdDev = 10;
@@ -217,14 +217,14 @@ export class SAO extends AbstractPostEffect<'SAO'> {
     this.drawFullscreenQuad(SAO._renderState);
     this._blitterH.size = new Vector2(inputColorTexture.width, inputColorTexture.height);
     this._blitterH.depthTex = sceneDepthTexture;
-    this._blitterH.depthCutoff = this._saoBlurDepthCutoff / ctx.camera.getFarPlane();
+    this._blitterH.depthCutoff = this._saoBlurDepthCutoff;
     this._blitterH.sampler = fetchSampler('clamp_nearest_nomip');
     this._blitterH.cameraNearFar = cameraNearFar;
     this._blitterH.packed = packed;
     this._blitterH.renderStates = SAO._renderState;
     this._blitterV.size = new Vector2(inputColorTexture.width, inputColorTexture.height);
     this._blitterV.depthTex = sceneDepthTexture;
-    this._blitterV.depthCutoff = this._saoBlurDepthCutoff / ctx.camera.getFarPlane();
+    this._blitterV.depthCutoff = this._saoBlurDepthCutoff;
     this._blitterV.sampler = fetchSampler('clamp_nearest_nomip');
     this._blitterV.cameraNearFar = cameraNearFar;
     this._blitterV.packed = packed;

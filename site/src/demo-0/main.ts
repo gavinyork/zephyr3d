@@ -72,6 +72,10 @@ gltfApp.ready().then(async () => {
       gltfViewer.enableRotate(!gltfViewer.rotateEnabled());
     } else if (ev.code === 'KeyL') {
       gltfViewer.randomLightDir();
+    } else if (ev.code === 'KeyO') {
+      gltfViewer.enableWater(!gltfViewer.waterEnabled());
+    } else if (ev.code === 'KeyP') {
+      gltfViewer.toggleShadow();
     }
   });
   gltfApp.on('tick', (ev) => {

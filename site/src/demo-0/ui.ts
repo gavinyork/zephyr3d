@@ -10,7 +10,6 @@ interface GUIParams {
   useSH: boolean;
   punctualLighting: boolean;
   tonemap: boolean;
-  water: boolean;
   bloom: boolean;
   fxaa: boolean;
   sao: boolean;
@@ -48,7 +47,6 @@ export class Panel {
       useSH: false,
       punctualLighting: this._viewer.punctualLightEnabled,
       tonemap: this._viewer.tonemapEnabled(),
-      water: this._viewer.waterEnabled(),
       bloom: this._viewer.bloomEnabled(),
       fxaa: this._viewer.FXAAEnabled(),
       sao: this._viewer.SAOEnabled(),
@@ -199,12 +197,6 @@ export class Panel {
       .name('SSR')
       .onChange((value) => {
         this._viewer.camera.SSR = value;
-      });
-    ppSettings
-      .add(this._params, 'water')
-      .name('Water')
-      .onChange((value) => {
-        this._viewer.enableWater(value);
       });
 
     const perfSettings = this._gui.addFolder('Performance');
