@@ -22,8 +22,6 @@ import {
 import * as zip from '@zip.js/zip.js';
 import { TreeMaterialMetallicRoughness } from './treematerial';
 import { Panel } from './ui';
-import { imGuiInit, imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
-import { Inspector } from '@zephyr3d/inspector';
 
 export class Demo {
   private _assetManager: AssetManager;
@@ -42,8 +40,6 @@ export class Demo {
   private _loadPercent: number;
   private _showInspector: boolean;
   private _ui: Panel;
-  private _showUI: boolean;
-  private _inspector: Inspector;
   private _lastAnimation: string;
   constructor() {
     this._terrain = null;
@@ -65,7 +61,6 @@ export class Demo {
     this._loaded = false;
     this._loadPercent = 0;
     this._ui = null;
-    this._showUI = true;
     this._lastAnimation = null;
   }
   async fetchAssetArchive(url: string, progressCallback: (percent: number) => void): Promise<Blob> {
@@ -204,12 +199,7 @@ export class Demo {
       // loaded
       this._terrain.showState = 'visible';
       this._scene.env.sky.wind.setXY(700, 350);
-      await imGuiInit(Application.instance.device);
-      Application.instance.inputManager.use((ev: Event, type: string) => {
-        return this._showInspector ? imGuiInjectEvent(ev, type) : false;
-      });
       Application.instance.inputManager.use(this._camera.handleEvent.bind(this._camera));
-      this._inspector = new Inspector(this._scene, this._compositor, this._camera);
       this._loaded = true;
     });
   }
@@ -499,11 +489,6 @@ export class Demo {
     } else {
       if (!this._ui) {
         this._ui = new Panel();
-      }
-      if (this._showInspector) {
-        imGuiNewFrame();
-        this._inspector.render();
-        imGuiEndFrame();
       }
     }
   }
