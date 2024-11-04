@@ -20,7 +20,10 @@ import type { MeshMaterial } from '../material';
 import type { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import type { OIT } from './oit';
 
-/** Pick target */
+/**
+ * Pick target
+ * @public
+ */
 export type PickTarget = { node: SceneNode; label?: string };
 
 /**

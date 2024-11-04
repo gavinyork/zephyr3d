@@ -317,6 +317,7 @@ export function unpackFloat3<T extends number[] | Float32Array>(pk: number, resu
  * @param funcLerp - A function that performs linear interpolation between two values of type T.
  * @returns The weighted average of the values.
  *
+ * @public
  */
 export function weightedAverage<T>(
   weights: number[],

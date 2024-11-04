@@ -6,6 +6,8 @@ import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
  * @param scope - Current shader scope
  * @param p - random seed
  * @returns random float value
+ *
+ * @public
  */
 export function hash(scope: PBInsideFunctionScope, p: PBShaderExp) {
   const pb = scope.$builder;
@@ -23,6 +25,8 @@ export function hash(scope: PBInsideFunctionScope, p: PBShaderExp) {
  * @param scope - Current shader scope
  * @param p - random seed
  * @returns random float value
+ *
+ * @public
  */
 export function gradient(scope: PBInsideFunctionScope, p: PBShaderExp, t: PBShaderExp | number) {
   const pb = scope.$builder;

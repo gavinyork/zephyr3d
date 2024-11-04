@@ -26,8 +26,7 @@ import {
 } from '../shaders';
 import { fetchSampler } from '../utility/misc';
 
-/** @internal */
-export interface OceanFieldCascade {
+type OceanFieldCascade = {
   /** The size of simulated patch of field. (in meters) */
   size: number;
   /** How "croppy" this pattern would be */
@@ -38,10 +37,9 @@ export interface OceanFieldCascade {
   minWave: number;
   /** Max wave length. Kind of spectrum filter. */
   maxWave: number;
-}
+};
 
-/** @internal */
-export interface OceanFieldBuildParams {
+type OceanFieldBuildParams = {
   /** Size of generated texture. Must be power of 2 */
   resolution: number;
   /** Ocean field sub-pattern options. */
@@ -54,10 +52,9 @@ export interface OceanFieldBuildParams {
   foamParams: Vector2;
   /** Seed of random generator */
   randomSeed: number;
-}
+};
 
-/** @internal */
-export function getDefaultBuildParams(): OceanFieldBuildParams {
+function getDefaultBuildParams(): OceanFieldBuildParams {
   return {
     cascades: [
       {
@@ -136,6 +133,10 @@ const RENDER_TWO_PASS = 2;
 
 const THREAD_GROUP_SIZE = 16;
 
+/**
+ * This class generates a 2D ocean field using the Fast Fourier Transform (FFT) algorithm.
+ * @public
+ */
 export class FFTWaveGenerator extends WaveGenerator {
   private static _globals: Globales = null;
   private _useComputeShader: boolean;
@@ -169,6 +170,10 @@ export class FFTWaveGenerator extends WaveGenerator {
   private _h0TextureFormat: TextureFormat;
   private _dataTextureFormat: TextureFormat;
   private _renderMode: number;
+  /**
+   * Create a new instance of the FFTWaveGenerator class.
+   * @param params - Ocean field build parameters. If not provided, default parameters will be used.
+   */
   constructor(params?: OceanFieldBuildParams) {
     super();
     const device = Application.instance.device;
@@ -269,6 +274,7 @@ export class FFTWaveGenerator extends WaveGenerator {
       this._paramsChanged = true;
     }
   }
+  /*
   get params() {
     return this._params;
   }
@@ -278,15 +284,11 @@ export class FFTWaveGenerator extends WaveGenerator {
       this.paramsChanged();
     }
   }
+  */
   private paramsChanged() {
     this._paramsChanged = true;
   }
-  /*
-  private resolutionChanged() {
-    this._resolutionChanged = true;
-    this._paramsChanged = true;
-  }
-  */
+  /** Gets the wave alighment */
   get alignment(): number {
     return this._params.alignment;
   }
@@ -296,6 +298,7 @@ export class FFTWaveGenerator extends WaveGenerator {
       this.paramsChanged();
     }
   }
+  /** Gets the wind vector */
   get wind(): Vector2 {
     return this._params.wind;
   }
@@ -306,45 +309,66 @@ export class FFTWaveGenerator extends WaveGenerator {
       this.paramsChanged();
     }
   }
+  /** Gets the foam width */
   get foamWidth(): number {
     return this._params.foamParams.x;
   }
   set foamWidth(val: number) {
     this._params.foamParams.x = val;
   }
+  /** Gets the foam contrast */
   get foamContrast(): number {
     return this._params.foamParams.y;
   }
   set foamContrast(val: number) {
     this._params.foamParams.y = val;
   }
+  /** Gets the wave length for the specified cascade */
   getWaveLength(cascade: number) {
     return this._params.cascades[cascade].size;
   }
-  setWaveLength(cascade: number, size: number) {
-    if (this._params.cascades[cascade].size !== size) {
-      this._params.cascades[cascade].size = size;
+  /**
+   * Sets the wave length for the specified cascade
+   * @param cascade - The cascade index
+   * @param length - The new wave length for the specified cascade
+   */
+  setWaveLength(cascade: number, length: number) {
+    if (this._params.cascades[cascade].size !== length) {
+      this._params.cascades[cascade].size = length;
       this.paramsChanged();
     }
   }
+  /** Gets the wave strength for the specified cascade */
   getWaveStrength(cascade: number) {
     return this._params.cascades[cascade].strength;
   }
+  /**
+   * Sets the wave strength for the specified cascade
+   * @param cascade - The cascade index
+   * @param strength - The new wave strength for the specified cascade
+   */
   setWaveStrength(cascade: number, strength: number) {
     if (this._params.cascades[cascade].strength !== strength) {
       this._params.cascades[cascade].strength = strength;
       this.paramsChanged();
     }
   }
+  /** Gets the wave croppiness for the specified cascade */
   getWaveCroppiness(cascade: number) {
     return this._params.cascades[cascade].croppiness;
   }
+  /**
+   * Sets the wave croppiness for the specified cascade
+   * @param cascade - The cascade index
+   * @param croppiness - The new wave croppiness for the specified cascade
+   */
   setWaveCroppiness(cascade: number, croppiness: number) {
     if (this._params.cascades[cascade].croppiness !== croppiness) {
       this._params.cascades[cascade].croppiness = croppiness;
       this.paramsChanged();
     }
   }
+  /** @internal */
   private static createQuad(device: AbstractDevice): Primitive {
     const vertexData = new Float32Array([
       -1, -1, 0, 0.0, 0.0, 1, -1, 0, 1.0, 0.0, 1, 1, 0, 1.0, 1.0, -1, 1, 0, 0.0, 1.0
@@ -360,6 +384,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     prim.indexCount = ib.length;
     return prim;
   }
+  /** @internal */
   private getButterflyTexture(size: number) {
     const device = Application.instance.device;
     let tex = FFTWaveGenerator._globals.butterflyTextures.get(size);
@@ -373,6 +398,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     }
     return tex;
   }
+  /** @internal */
   private generateInitialSpectrum(): void {
     const device = Application.instance.device;
     const instanceData = this.getInstanceData();
@@ -400,8 +426,8 @@ export class FFTWaveGenerator extends WaveGenerator {
     if (device.type === 'webgpu') {
       this._h0BindGroup.setTexture('spectrum', instanceData.h0Textures as Texture2DArray);
       device.compute(
-        this.params.resolution / THREAD_GROUP_SIZE,
-        this.params.resolution / THREAD_GROUP_SIZE,
+        this._params.resolution / THREAD_GROUP_SIZE,
+        this._params.resolution / THREAD_GROUP_SIZE,
         1
       );
     } else {
@@ -410,6 +436,7 @@ export class FFTWaveGenerator extends WaveGenerator {
       FFTWaveGenerator._globals.quad.draw();
     }
   }
+  /** @internal */
   private getNoiseTexture(size: number, randomSeed: number): Texture2D {
     const device = Application.instance.device;
     let tex = FFTWaveGenerator._globals.noiseTextures.get(size);
@@ -423,6 +450,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     }
     return tex;
   }
+  /** @internal */
   private getNoise2d(size: number, randomSeed: number, rgba: boolean) {
     const rand = new PRNG(randomSeed);
     if (rgba) {
@@ -436,9 +464,11 @@ export class FFTWaveGenerator extends WaveGenerator {
       return Float32Array.from([...Array(size * size * 2)].map(() => rand.get()));
     }
   }
+  /** @internal */
   private reverseBits(v: number, width: number): number {
     return parseInt(v.toString(2).padStart(width, '0').split('').reverse().join(''), 2);
   }
+  /** @internal */
   private createButterflyTexture(size: number): Float32Array {
     const width = Math.log2(size);
     const height = size;
@@ -476,6 +506,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     }
     return texture;
   }
+  /** @internal */
   private getInstanceData(): WaterInstanceData {
     if (!this._instanceData) {
       const device = Application.instance.device;
@@ -559,6 +590,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     }
     return this._instanceData;
   }
+  /** @internal */
   private createNTextures(
     device: AbstractDevice,
     format: TextureFormat,
@@ -589,6 +621,7 @@ export class FFTWaveGenerator extends WaveGenerator {
       });
     }
   }
+  /** {@inheritDoc WaveGenerator.update} */
   update(time: number): void {
     const device = Application.instance.device;
     device.pushDeviceStates();
@@ -616,14 +649,16 @@ export class FFTWaveGenerator extends WaveGenerator {
     }
     device.popDeviceStates();
   }
-  disposeNTextures(texture: Texture2D[] | Texture2DArray) {
+  /** @internal */
+  private disposeNTextures(texture: Texture2D[] | Texture2DArray) {
     if (Array.isArray(texture)) {
       texture.forEach((tex) => tex.dispose());
     } else if (texture) {
       texture.dispose();
     }
   }
-  disposeInstanceData(): void {
+  /** @internal */
+  private disposeInstanceData(): void {
     if (this._instanceData) {
       this.disposeNTextures(this._instanceData.dataTextures);
       this._instanceData.dataTextures = null;
@@ -646,6 +681,7 @@ export class FFTWaveGenerator extends WaveGenerator {
       this._instanceData = null;
     }
   }
+  /** @internal */
   private generateSpectrum(time: number): void {
     const device = Application.instance.device;
     const instanceData = this.getInstanceData();
@@ -659,8 +695,8 @@ export class FFTWaveGenerator extends WaveGenerator {
       this._hkBindGroup.setTexture('h0Texture', instanceData.h0Textures as Texture2DArray);
       this._hkBindGroup.setTexture('spectrum', instanceData.spectrumTextures as Texture2DArray);
       device.compute(
-        this.params.resolution / THREAD_GROUP_SIZE,
-        this.params.resolution / THREAD_GROUP_SIZE,
+        this._params.resolution / THREAD_GROUP_SIZE,
+        this._params.resolution / THREAD_GROUP_SIZE,
         1
       );
     } else {
@@ -677,6 +713,7 @@ export class FFTWaveGenerator extends WaveGenerator {
       FFTWaveGenerator._globals.quad.draw();
     }
   }
+  /** @internal */
   private generateSpectrumTwoPass(time: number): void {
     const device = Application.instance.device;
     const instanceData = this.getInstanceData();
@@ -712,6 +749,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     device.setFramebuffer(instanceData.spectrumFramebuffer2);
     FFTWaveGenerator._globals.quad.draw();
   }
+  /** @internal */
   private ifft2(): void {
     const device = Application.instance.device;
     const instanceData = this.getInstanceData();
@@ -743,8 +781,8 @@ export class FFTWaveGenerator extends WaveGenerator {
         );
         this._fft2hBindGroup.setTexture('ifft', pingPongFramebuffers[pingPong] as Texture2DArray);
         device.compute(
-          this.params.resolution / THREAD_GROUP_SIZE,
-          this.params.resolution / THREAD_GROUP_SIZE,
+          this._params.resolution / THREAD_GROUP_SIZE,
+          this._params.resolution / THREAD_GROUP_SIZE,
           1
         );
       } else {
@@ -784,8 +822,8 @@ export class FFTWaveGenerator extends WaveGenerator {
         );
         this._fft2vBindGroup.setTexture('ifft', pingPongFramebuffers[pingPong] as Texture2DArray);
         device.compute(
-          this.params.resolution / THREAD_GROUP_SIZE,
-          this.params.resolution / THREAD_GROUP_SIZE,
+          this._params.resolution / THREAD_GROUP_SIZE,
+          this._params.resolution / THREAD_GROUP_SIZE,
           1
         );
       } else {
@@ -813,6 +851,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     }
     this._ifftTextures = pingPongTextures[pingPong];
   }
+  /** @internal */
   private getFFT2hBindGroup2(device: AbstractDevice, pingpong: number): BindGroup {
     let bindGroup = this._fft2hBindGroup2Used[pingpong].pop();
     if (!bindGroup) {
@@ -823,6 +862,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     this._fft2hBindGroup2Free[pingpong].push(bindGroup);
     return bindGroup;
   }
+  /** @internal */
   private getFFT2hBindGroup4(device: AbstractDevice, pingpong: number): BindGroup {
     let bindGroup = this._fft2hBindGroup4Used[pingpong].pop();
     if (!bindGroup) {
@@ -833,6 +873,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     this._fft2hBindGroup4Free[pingpong].push(bindGroup);
     return bindGroup;
   }
+  /** @internal */
   private getFFT2vBindGroup2(device: AbstractDevice, pingpong: number): BindGroup {
     let bindGroup = this._fft2vBindGroup2Used[pingpong].pop();
     if (!bindGroup) {
@@ -843,6 +884,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     this._fft2vBindGroup2Free[pingpong].push(bindGroup);
     return bindGroup;
   }
+  /** @internal */
   private getFFT2vBindGroup4(device: AbstractDevice, pingpong: number): BindGroup {
     let bindGroup = this._fft2vBindGroup4Used[pingpong].pop();
     if (!bindGroup) {
@@ -853,6 +895,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     this._fft2vBindGroup4Free[pingpong].push(bindGroup);
     return bindGroup;
   }
+  /** @internal */
   private ifft2TwoPass(): void {
     const device = Application.instance.device;
     const instanceData = this.getInstanceData();
@@ -978,6 +1021,7 @@ export class FFTWaveGenerator extends WaveGenerator {
       this._fft2vBindGroup4Free[i].length = 0;
     }
   }
+  /** @internal */
   private postIfft2(): void {
     const device = Application.instance.device;
     const instanceData = this.getInstanceData();
@@ -989,8 +1033,8 @@ export class FFTWaveGenerator extends WaveGenerator {
       this._postfft2BindGroup.setTexture('output', instanceData.dataTextures as Texture2DArray);
       this._postfft2BindGroup.setTexture('ifft', this._ifftTextures as Texture2DArray, nearestRepeatSampler);
       device.compute(
-        this.params.resolution / THREAD_GROUP_SIZE,
-        this.params.resolution / THREAD_GROUP_SIZE,
+        this._params.resolution / THREAD_GROUP_SIZE,
+        this._params.resolution / THREAD_GROUP_SIZE,
         1
       );
     } else {
@@ -1010,6 +1054,7 @@ export class FFTWaveGenerator extends WaveGenerator {
       FFTWaveGenerator._globals.quad.draw();
     }
   }
+  /** @internal */
   private postIfft2TwoPass(): void {
     const device = Application.instance.device;
     const instanceData = this.getInstanceData();
@@ -1043,6 +1088,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     }
     FFTWaveGenerator._globals.quad.draw();
   }
+  /** {@inheritDoc WaveGenerator.setupUniforms} */
   setupUniforms(scope: PBGlobalScope): void {
     const pb = scope.$builder;
     scope.sizes = pb.vec4().uniform(0);
@@ -1061,6 +1107,7 @@ export class FFTWaveGenerator extends WaveGenerator {
       scope.foamParams = pb.vec2().uniform(0);
     }
   }
+  /** {@inheritDoc WaveGenerator.calcVertexPositionAndNormal} */
   calcVertexPositionAndNormal(
     scope: PBInsideFunctionScope,
     inPos: PBShaderExp,
@@ -1111,6 +1158,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     );
     scope.calcPositionAndNormal(inPos, outPos, outNormal);
   }
+  /** {@inheritDoc WaveGenerator.calcFragmentNormal} */
   calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, vertexNormal: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
@@ -1143,6 +1191,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     });
     return scope.calcFragmentNormal(xz);
   }
+  /** {@inheritDoc WaveGenerator.calcFragmentNormalAndFoam} */
   calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
@@ -1209,9 +1258,11 @@ export class FFTWaveGenerator extends WaveGenerator {
     });
     return scope.calcNormalAndFoam(xz);
   }
+  /** {@inheritDoc WaveGenerator.isOk} */
   isOk(): boolean {
     return this._renderMode !== RENDER_NONE;
   }
+  /** {@inheritDoc WaveGenerator.applyWaterBindGroup} */
   applyWaterBindGroup(bindGroup: BindGroup): void {
     const instanceData = this.getInstanceData();
     const linearRepeatSampler = fetchSampler('repeat_linear_nomip');
@@ -1229,14 +1280,17 @@ export class FFTWaveGenerator extends WaveGenerator {
     bindGroup.setValue('sizes', this._sizes);
     bindGroup.setValue('croppinesses', this._croppinesses);
   }
+  /** {@inheritDoc WaveGenerator.dispose} */
   dispose() {
     this.disposeInstanceData();
   }
+  /** {@inheritDoc WaveGenerator.calcClipmapTileAABB} */
   calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB) {
     const disturb = Math.max(Math.abs(this.wind.x), Math.abs(this.wind.y), 2);
     outAABB.minPoint.setXYZ(minX - 8 * disturb, y - 8 * disturb, minZ - 8 * disturb);
     outAABB.maxPoint.setXYZ(maxX + 8 * disturb, y + 8 * disturb, maxZ + 8 * disturb);
   }
+  /** {@inheritDoc WaveGenerator.getHash} */
   getHash(): string {
     return '';
   }

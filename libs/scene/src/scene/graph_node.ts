@@ -1,4 +1,3 @@
-import type { Matrix4x4 } from '@zephyr3d/base';
 import { SceneNode } from './scene_node';
 import type { Texture2D } from '@zephyr3d/device';
 import type { XForm } from './xform';
@@ -54,12 +53,6 @@ export class GraphNode extends SceneNode {
    * {@inheritDoc Drawable.getBoneMatrices}
    */
   getBoneMatrices(): Texture2D {
-    return null;
-  }
-  /**
-   * {@inheritDoc Drawable.getInvBindMatrix}
-   */
-  getInvBindMatrix(): Matrix4x4 {
     return null;
   }
   /**

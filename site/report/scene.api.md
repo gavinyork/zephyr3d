@@ -1133,7 +1133,9 @@ export class CopyBlitter extends Blitter {
     filter(scope: PBInsideFunctionScope, type: BlitType, srcTex: PBShaderExp, srcUV: PBShaderExp, srcLayer: PBShaderExp, sampleType: 'float' | 'int' | 'uint'): PBShaderExp;
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "createGradientNoiseTexture" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function createGradientNoiseTexture(device: AbstractDevice, size: number, uvscale: number, mono?: boolean, seed?: number): _zephyr3d_device.Texture2D<unknown>;
 
 // Warning: (ae-internal-missing-underscore) The name "createProgramFFT2H" should be prefixed with an underscore because the declaration is marked as @internal
@@ -1166,7 +1168,9 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
 // @internal (undocumented)
 export function createProgramPostFFT2(useComputeShader: boolean, threadGroupSize: number, targetFormat?: TextureFormat, limit?: 4 | 2): _zephyr3d_device.GPUProgram<unknown>;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "createRandomNoiseTexture" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function createRandomNoiseTexture(device: AbstractDevice, size: number): _zephyr3d_device.Texture2D<unknown>;
 
 // @public
@@ -1609,65 +1613,39 @@ export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ?
 // @public
 export type ExtractMixinType<M> = M extends [infer First] ? ExtractMixinReturnType<First> : M extends [infer First, ...infer Rest] ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]> : never;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "fetchNormalizedFloatForDevice" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function fetchNormalizedFloatForDevice(scope: PBInsideFunctionScope, tex: PBShaderExp, uv: PBShaderExp, level?: PBShaderExp | number): PBShaderExp;
 
-// @public (undocumented)
+// @public
 export class FFTWaveGenerator extends WaveGenerator {
-    // Warning: (ae-incompatible-release-tags) The symbol "__constructor" is marked as @public, but its signature references "OceanFieldBuildParams" which is marked as @internal
+    // Warning: (ae-forgotten-export) The symbol "OceanFieldBuildParams" needs to be exported by the entry point index.d.ts
     constructor(params?: OceanFieldBuildParams);
-    // (undocumented)
     get alignment(): number;
     set alignment(val: number);
-    // (undocumented)
     applyWaterBindGroup(bindGroup: BindGroup): void;
     // (undocumented)
     calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB): void;
     // (undocumented)
     calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, vertexNormal: PBShaderExp): PBShaderExp;
-    // (undocumented)
     calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp;
-    // (undocumented)
     calcVertexPositionAndNormal(scope: PBInsideFunctionScope, inPos: PBShaderExp, outPos: PBShaderExp, outNormal: PBShaderExp): void;
-    // (undocumented)
     dispose(): void;
-    // (undocumented)
-    disposeInstanceData(): void;
-    // (undocumented)
-    disposeNTextures(texture: Texture2D[] | Texture2DArray): void;
-    // (undocumented)
     get foamContrast(): number;
     set foamContrast(val: number);
-    // (undocumented)
     get foamWidth(): number;
     set foamWidth(val: number);
-    // (undocumented)
     getHash(): string;
-    // (undocumented)
     getWaveCroppiness(cascade: number): number;
-    // (undocumented)
     getWaveLength(cascade: number): number;
-    // (undocumented)
     getWaveStrength(cascade: number): number;
-    // (undocumented)
     isOk(): boolean;
-    // Warning: (ae-incompatible-release-tags) The symbol "params" is marked as @public, but its signature references "OceanFieldBuildParams" which is marked as @internal
-    //
-    // (undocumented)
-    get params(): OceanFieldBuildParams;
-    // Warning: (ae-incompatible-release-tags) The symbol "params" is marked as @public, but its signature references "OceanFieldBuildParams" which is marked as @internal
-    set params(val: OceanFieldBuildParams);
-    // (undocumented)
     setupUniforms(scope: PBGlobalScope): void;
-    // (undocumented)
     setWaveCroppiness(cascade: number, croppiness: number): void;
-    // (undocumented)
-    setWaveLength(cascade: number, size: number): void;
-    // (undocumented)
+    setWaveLength(cascade: number, length: number): void;
     setWaveStrength(cascade: number, strength: number): void;
-    // (undocumented)
     update(time: number): void;
-    // (undocumented)
     get wind(): Vector2;
     set wind(val: Vector2);
 }
@@ -1764,66 +1742,37 @@ export class GaussianBlurBlitter extends Blitter {
     protected _sigma: number;
 }
 
-// @public (undocumented)
+// @public
 export class GerstnerWaveGenerator extends WaveGenerator {
     constructor();
-    // (undocumented)
     applyWaterBindGroup(bindGroup: BindGroup): void;
     // (undocumented)
     calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB): void;
     // (undocumented)
     calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp;
-    // (undocumented)
     calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp;
-    // (undocumented)
     calcVertexPositionAndNormal(scope: PBInsideFunctionScope, inPos: PBShaderExp, outPos: PBShaderExp, outNormal: PBShaderExp): void;
-    // (undocumented)
     dispose(): void;
-    // @internal (undocumented)
-    gerstnerWave(scope: PBInsideFunctionScope, waveParam: PBShaderExp, omniParam: PBShaderExp, time: PBShaderExp, inPos: PBShaderExp, outNormal: PBShaderExp): PBShaderExp;
-    // (undocumented)
     getHash(device: AbstractDevice): string;
-    // (undocumented)
     getOriginX(waveIndex: number): number;
-    // (undocumented)
     getOriginZ(waveIndex: number): number;
-    // (undocumented)
     getWaveAmplitude(waveIndex: number): number;
-    // (undocumented)
     getWaveDirection(waveIndex: number): number;
-    // (undocumented)
     getWaveLength(waveIndex: number): number;
-    // (undocumented)
     getWaveSteepness(waveIndex: number): number;
-    // (undocumented)
     isOk(): boolean;
-    // (undocumented)
     isOmniWave(waveIndex: number): boolean;
-    // (undocumented)
     get numWaves(): number;
     set numWaves(val: number);
-    // (undocumented)
     setOmniWave(waveIndex: number, isOmni: boolean): void;
-    // (undocumented)
     setOrigin(waveIndex: number, x: number, z: number): void;
-    // (undocumented)
     setupUniforms(scope: PBGlobalScope): void;
-    // (undocumented)
     setWaveAmplitude(waveIndex: number, val: number): void;
-    // (undocumented)
     setWaveDirection(waveIndex: number, angle: number): void;
-    // (undocumented)
     setWaveLength(waveIndex: number, val: number): void;
-    // (undocumented)
     setWaveSteepness(waveIndex: number, steepness: number): void;
-    // (undocumented)
     update(timeInSeconds: number): void;
 }
-
-// Warning: (ae-internal-missing-underscore) The name "getDefaultBuildParams" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal (undocumented)
-export function getDefaultBuildParams(): OceanFieldBuildParams;
 
 // @public
 export function gradient(scope: PBInsideFunctionScope, p: PBShaderExp, t: PBShaderExp | number): any;
@@ -1832,10 +1781,6 @@ export function gradient(scope: PBInsideFunctionScope, p: PBShaderExp, t: PBShad
 export class GraphNode extends SceneNode {
     constructor(scene: Scene);
     getBoneMatrices(): Texture2D;
-    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: No member was found with name "getInvBindMatrix"
-    //
-    // (undocumented)
-    getInvBindMatrix(): Matrix4x4;
     getName(): string;
     getSortDistance(camera: Camera): number;
     getXForm(): XForm;
@@ -2491,29 +2436,6 @@ export class NamedObject {
 
 // @public
 export function noise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp;
-
-// Warning: (ae-internal-missing-underscore) The name "OceanFieldBuildParams" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal (undocumented)
-export interface OceanFieldBuildParams {
-    alignment: number;
-    cascades: [OceanFieldCascade, OceanFieldCascade, OceanFieldCascade];
-    foamParams: Vector2;
-    randomSeed: number;
-    resolution: number;
-    wind: Vector2;
-}
-
-// Warning: (ae-internal-missing-underscore) The name "OceanFieldCascade" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal (undocumented)
-export interface OceanFieldCascade {
-    croppiness: number;
-    maxWave: number;
-    minWave: number;
-    size: number;
-    strength: number;
-}
 
 // @public
 export class Octree {
@@ -4392,10 +4314,14 @@ export class WaterMesh {
     set wireframe(val: boolean);
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "WaterSetupUniformFunc" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export type WaterSetupUniformFunc = (this: WaterShaderImpl, scope: PBGlobalScope) => void;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "WaterShaderImpl" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export class WaterShaderImpl {
     constructor(setupUniformsFunc: WaterSetupUniformFunc, vertexFunc: WaterVertexFunc, shadingFunc: WaterShadingFunc);
     // (undocumented)
@@ -4408,33 +4334,29 @@ export class WaterShaderImpl {
     vertex(scope: PBInsideFunctionScope, pos: PBShaderExp, xz: PBShaderExp, waveGenerator: WaveGenerator): void;
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "WaterShadingFunc" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export type WaterShadingFunc = (scope: PBInsideFunctionScope, worldPos: PBShaderExp, worldNormal: PBShaderExp, foamFactor: PBShaderExp, discardable: PBShaderExp, waveGenerator: WaveGenerator) => PBShaderExp;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "WaterVertexFunc" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export type WaterVertexFunc = (this: WaterShaderImpl, scope: PBInsideFunctionScope, pos: PBShaderExp, xz: PBShaderExp, waveGenerator: WaveGenerator) => void;
 
-// @public (undocumented)
+// @public
 export abstract class WaveGenerator {
-    // (undocumented)
     abstract applyWaterBindGroup(bindGroup: BindGroup): void;
     // (undocumented)
     abstract calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB): any;
     // (undocumented)
     abstract calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, vertexNormal: PBShaderExp): PBShaderExp;
-    // (undocumented)
     abstract calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp, vertexNormal: PBShaderExp): PBShaderExp;
-    // (undocumented)
     abstract calcVertexPositionAndNormal(scope: PBInsideFunctionScope, inPos: PBShaderExp, outPos: PBShaderExp, outNormal: PBShaderExp): void;
-    // (undocumented)
     abstract dispose(): void;
-    // (undocumented)
     abstract getHash(device: AbstractDevice): string;
-    // (undocumented)
     abstract isOk(device: AbstractDevice): boolean;
-    // (undocumented)
     abstract setupUniforms(scope: PBGlobalScope): void;
-    // (undocumented)
     abstract update(timeInSeconds: number): void;
 }
 
@@ -4535,7 +4457,7 @@ export class XForm<T extends XForm<T> = XForm<any>> extends XForm_base {
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:5730:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:5783:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

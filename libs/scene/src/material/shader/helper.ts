@@ -586,22 +586,6 @@ export class ShaderHelper {
       !!(ctx.materialFlags & MaterialVaryingFlags.MORPH_ANIMATION),
       !!(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)
     );
-    /*
-    const skinning = !!ctx.target?.getBoneMatrices();
-    const scope = pb.getGlobalScope();
-    if (ctx.instanceData) {
-      scope[UNIFORM_NAME_INSTANCE_DATA_STRIDE] = pb.uint().uniform(1);
-      scope[UNIFORM_NAME_INSTANCE_DATA_OFFSET] = pb.uint().uniform(1);
-      scope[UNIFORM_NAME_INSTANCE_DATA] = pb.vec4[65536 >> 4]().uniformBuffer(3);
-    } else {
-      scope[UNIFORM_NAME_WORLD_MATRIX] = pb.mat4().uniform(1);
-    }
-    if (skinning) {
-      scope[UNIFORM_NAME_BONE_MATRICES] = pb.tex2D().uniform(1).sampleType('unfilterable-float');
-      scope[UNIFORM_NAME_BONE_INV_BIND_MATRIX] = pb.mat4().uniform(1);
-      scope[UNIFORM_NAME_BONE_TEXTURE_SIZE] = pb.int().uniform(1);
-    }
-    */
   }
   /** @internal */
   static setCameraUniforms(bindGroup: BindGroup, camera: Camera, flip: boolean, linear: boolean) {

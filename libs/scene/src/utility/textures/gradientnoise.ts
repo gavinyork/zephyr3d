@@ -5,6 +5,7 @@ import { perlinNoise3D } from '../../shaders';
 let gradientNoiseProgram: GPUProgram = null;
 let gradientNoiseBindGroup: BindGroup = null;
 
+/** @internal */
 export function createGradientNoiseTexture(
   device: AbstractDevice,
   size: number,

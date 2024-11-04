@@ -304,6 +304,7 @@ export function linearToGamma(scope: PBInsideFunctionScope, color: PBShaderExp) 
   return pb.getGlobalScope()[funcName](color);
 }
 
+/** @internal */
 export function fetchNormalizedFloatForDevice(
   scope: PBInsideFunctionScope,
   tex: PBShaderExp,

@@ -14,6 +14,7 @@ function getFragCoord(scope: PBGlobalScope, useComputeShader: boolean) {
   return useComputeShader ? scope.$builtins.globalInvocationId.xy : scope.$builtins.fragCoord.xy;
 }
 
+/** @internal */
 export type WaterVertexFunc = (
   this: WaterShaderImpl,
   scope: PBInsideFunctionScope,
@@ -21,6 +22,8 @@ export type WaterVertexFunc = (
   xz: PBShaderExp,
   waveGenerator: WaveGenerator
 ) => void;
+
+/** @internal */
 export type WaterShadingFunc = (
   scope: PBInsideFunctionScope,
   worldPos: PBShaderExp,
@@ -29,7 +32,11 @@ export type WaterShadingFunc = (
   discardable: PBShaderExp,
   waveGenerator: WaveGenerator
 ) => PBShaderExp;
+
+/** @internal */
 export type WaterSetupUniformFunc = (this: WaterShaderImpl, scope: PBGlobalScope) => void;
+
+/** @internal */
 export class WaterShaderImpl {
   private _vertexFunc: WaterVertexFunc;
   private _shadingFunc: WaterShadingFunc;
