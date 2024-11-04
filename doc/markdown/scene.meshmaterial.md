@@ -47,7 +47,7 @@ declare class MeshMaterial extends Material
 |  [getQueueType()](doc/markdown/./scene.meshmaterial.getqueuetype.md) |  | Determine which queue should be used to render this material. |
 |  [isTransparentPass(pass)](doc/markdown/./scene.meshmaterial.istransparentpass.md) |  | Determine if a certain pass of this material is translucent. |
 |  [needFragmentColor(ctx)](doc/markdown/./scene.meshmaterial.needfragmentcolor.md) |  | Check if the color should be computed in fragment shader, this is required for forward render pass or alpha test is in use or alpha to coverage is in use. |
-|  [outputFragmentColor(scope, worldPos, color)](doc/markdown/./scene.meshmaterial.outputfragmentcolor.md) |  | Calculate final fragment color for output. |
+|  [outputFragmentColor(scope, worldPos, color, ssrRoughness, ssrNormal)](doc/markdown/./scene.meshmaterial.outputfragmentcolor.md) |  | Calculate final fragment color for output. |
 |  [supportLighting()](doc/markdown/./scene.meshmaterial.supportlighting.md) |  | Returns true if shading of the material will be affected by lights |
 |  [uniformChanged()](doc/markdown/./scene.meshmaterial.uniformchanged.md) |  | Indicate that the uniform has changed and needs to be resubmitted. |
 |  [updateRenderStates(pass, stateSet, ctx)](doc/markdown/./scene.meshmaterial.updaterenderstates.md) | <code>protected</code> | Update render states according to draw context and current material pass |

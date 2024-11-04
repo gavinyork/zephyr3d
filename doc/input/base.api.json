@@ -15991,6 +15991,45 @@
           "implementsTokenRanges": []
         },
         {
+          "kind": "TypeAlias",
+          "canonicalReference": "@zephyr3d/base!MaybeArray:type",
+          "docComment": "/**\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "type MaybeArray<T> = "
+            },
+            {
+              "kind": "Content",
+              "text": "T[] | T"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "releaseTag": "Public",
+          "name": "MaybeArray",
+          "typeParameters": [
+            {
+              "typeParameterName": "T",
+              "constraintTokenRange": {
+                "startIndex": 0,
+                "endIndex": 0
+              },
+              "defaultTypeTokenRange": {
+                "startIndex": 0,
+                "endIndex": 0
+              }
+            }
+          ],
+          "typeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 2
+          }
+        },
+        {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/base!nextPowerOf2:function(1)",
           "docComment": "/**\n * Given a number, find the next number power of 2.\n *\n * @param value - The given number.\n *\n * @returns The next number power of 2.\n *\n * @public\n */\n",
@@ -30742,7 +30781,7 @@
         {
           "kind": "Function",
           "canonicalReference": "@zephyr3d/base!weightedAverage:function(1)",
-          "docComment": "/**\n * Calculates the weighted average of a set of values.\n *\n * @param weights - An array of weights for each value.\n *\n * @param values - An array of values to be averaged.\n *\n * @param funcLerp - A function that performs linear interpolation between two values of type T.\n *\n * @returns The weighted average of the values.\n */\n",
+          "docComment": "/**\n * Calculates the weighted average of a set of values.\n *\n * @param weights - An array of weights for each value.\n *\n * @param values - An array of values to be averaged.\n *\n * @param funcLerp - A function that performs linear interpolation between two values of type T.\n *\n * @returns The weighted average of the values.\n *\n * @public\n */\n",
           "excerptTokens": [
             {
               "kind": "Content",

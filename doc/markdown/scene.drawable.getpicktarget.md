@@ -9,9 +9,9 @@ If set, the pick target will be returned as the pick result
 **Signature:**
 
 ```typescript
-getPickTarget(): GraphNode;
+getPickTarget(): PickTarget;
 ```
 **Returns:**
 
-[GraphNode](doc/markdown/./scene.graphnode.md)
+[PickTarget](doc/markdown/./scene.picktarget.md)
 

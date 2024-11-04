@@ -9,15 +9,21 @@ Grayscale post effect
 **Signature:**
 
 ```typescript
-declare class Grayscale extends AbstractPostEffect 
+declare class Grayscale extends AbstractPostEffect<'Grayscale'> 
 ```
-**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)
+**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)<!-- -->&lt;'Grayscale'&gt;
 
 ## Constructors
 
 |  Constructor | Modifiers | Description |
 |  --- | --- | --- |
 |  [(constructor)()](doc/markdown/./scene.grayscale._constructor_.md) |  | Creates an instance of grayscale post effect |
+
+## Properties
+
+|  Property | Modifiers | Type | Description |
+|  --- | --- | --- | --- |
+|  [className](doc/markdown/./scene.grayscale.classname.md) | <p><code>static</code></p><p><code>readonly</code></p> | "Grayscale" |  |
 
 ## Methods
 

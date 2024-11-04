@@ -9,7 +9,7 @@ Calculates the destination texel by the source texel
 **Signature:**
 
 ```typescript
-abstract filter(scope: PBInsideFunctionScope, type: BlitType, srcTex: PBShaderExp, srcUV: PBShaderExp, srcLayer: PBShaderExp, sampeType: 'float' | 'int' | 'uint'): PBShaderExp;
+abstract filter(scope: PBInsideFunctionScope, type: BlitType, srcTex: PBShaderExp, srcUV: PBShaderExp, srcLayer: PBShaderExp, sampeType: 'float' | 'int' | 'uint' | 'depth'): PBShaderExp;
 ```
 
 ## Parameters
@@ -21,7 +21,7 @@ abstract filter(scope: PBInsideFunctionScope, type: BlitType, srcTex: PBShaderEx
 |  srcTex | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The source texel |
 |  srcUV | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The texture coordinate of the source texel |
 |  srcLayer | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The layer of the source texture |
-|  sampeType | 'float' \| 'int' \| 'uint' |  |
+|  sampeType | 'float' \| 'int' \| 'uint' \| 'depth' |  |
 
 **Returns:**
 

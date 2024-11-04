@@ -9,9 +9,9 @@ The bloom post effect
 **Signature:**
 
 ```typescript
-declare class Bloom extends AbstractPostEffect 
+declare class Bloom extends AbstractPostEffect<'Bloom'> 
 ```
-**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)
+**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)<!-- -->&lt;'Bloom'&gt;
 
 ## Constructors
 
@@ -23,6 +23,7 @@ declare class Bloom extends AbstractPostEffect
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
+|  [className](doc/markdown/./scene.bloom.classname.md) | <p><code>static</code></p><p><code>readonly</code></p> | "Bloom" |  |
 |  [downsampleLimit](doc/markdown/./scene.bloom.downsamplelimit.md) |  | number | Downsample resolution limitation |
 |  [intensity](doc/markdown/./scene.bloom.intensity.md) |  | number | Bloom intensity |
 |  [maxDownsampleLevel](doc/markdown/./scene.bloom.maxdownsamplelevel.md) |  | number | The maximum downsample levels |

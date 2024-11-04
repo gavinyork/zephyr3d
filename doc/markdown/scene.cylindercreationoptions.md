@@ -17,9 +17,10 @@ interface CylinderCreationOptions extends ShapeCreationOptions
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
-|  [bottomRadius?](doc/markdown/./scene.cylindercreationoptions.bottomradius.md) |  | number | _(Optional)_ Bottom radius, default is 1.0 |
+|  [anchor?](doc/markdown/./scene.cylindercreationoptions.anchor.md) |  | number | _(Optional)_ Anchor point, default is 0 |
+|  [bottomRadius?](doc/markdown/./scene.cylindercreationoptions.bottomradius.md) |  | number | _(Optional)_ Top radius, default is 1.0 \* |
 |  [height?](doc/markdown/./scene.cylindercreationoptions.height.md) |  | number | _(Optional)_ Height, default is 1.0 |
 |  [heightDetail?](doc/markdown/./scene.cylindercreationoptions.heightdetail.md) |  | number | _(Optional)_ Height detail, default is 1 |
 |  [radialDetail?](doc/markdown/./scene.cylindercreationoptions.radialdetail.md) |  | number | _(Optional)_ Radial detail, default is 20 |
-|  [topRadius?](doc/markdown/./scene.cylindercreationoptions.topradius.md) |  | number | _(Optional)_ Top radius, default is 1.0 \* |
+|  [topRadius?](doc/markdown/./scene.cylindercreationoptions.topradius.md) |  | number | _(Optional)_ Bottom radius, default is 1.0 |
 

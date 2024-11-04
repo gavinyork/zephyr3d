@@ -18,5 +18,5 @@ interface StorageTextureBindingLayout
 |  --- | --- | --- | --- |
 |  [access](doc/markdown/./device.storagetexturebindinglayout.access.md) |  | 'write-only' | Access mode |
 |  [format](doc/markdown/./device.storagetexturebindinglayout.format.md) |  | [TextureFormat](doc/markdown/./device.textureformat.md) | The texture format |
-|  [viewDimension](doc/markdown/./device.storagetexturebindinglayout.viewdimension.md) |  | '1d' \| '2d' | View dimension |
+|  [viewDimension](doc/markdown/./device.storagetexturebindinglayout.viewdimension.md) |  | '1d' \| '2d' \| '2d-array' \| 'cube' \| 'cube-array' \| '3d' | View dimension |
 

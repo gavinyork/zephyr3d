@@ -10,7 +10,7 @@ Cast a ray into the scene to get the closest object hit by the ray
 
 ```typescript
 raycast(ray: Ray, length?: number): {
-        node: GraphNode;
+        target: PickTarget;
         dist: number;
         point: Vector3;
     };
@@ -25,7 +25,7 @@ raycast(ray: Ray, length?: number): {
 
 **Returns:**
 
-{ node: [GraphNode](doc/markdown/./scene.graphnode.md)<!-- -->; dist: number; point: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; }
+{ target: [PickTarget](doc/markdown/./scene.picktarget.md)<!-- -->; dist: number; point: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; }
 
 The closest object hit by the ray
 

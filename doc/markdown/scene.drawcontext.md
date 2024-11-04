@@ -28,12 +28,15 @@ interface DrawContext
 |  [drawEnvLight](doc/markdown/./scene.drawcontext.drawenvlight.md) |  | boolean | Whether current render pass is base light pass |
 |  [env](doc/markdown/./scene.drawcontext.env.md) |  | [Environment](doc/markdown/./scene.environment.md) | The scene environment |
 |  [flip](doc/markdown/./scene.drawcontext.flip.md) |  | boolean | Wether should flip upside down |
+|  [forceColorState?](doc/markdown/./scene.drawcontext.forcecolorstate.md) |  | [ColorState](doc/markdown/./device.colorstate.md) | _(Optional)_ Force color mask state |
+|  [forceCullMode?](doc/markdown/./scene.drawcontext.forcecullmode.md) |  | [FaceMode](doc/markdown/./device.facemode.md) | _(Optional)_ Force cull mode |
 |  [globalBindGroupAllocator](doc/markdown/./scene.drawcontext.globalbindgroupallocator.md) |  | GlobalBindGroupAllocator | Global bind group allocator |
+|  [HiZ](doc/markdown/./scene.drawcontext.hiz.md) |  | boolean | hierarchical depth |
+|  [HiZTexture](doc/markdown/./scene.drawcontext.hiztexture.md) |  | [Texture2D](doc/markdown/./device.texture2d.md) | hierarchical depth buffer |
 |  [instanceData?](doc/markdown/./scene.drawcontext.instancedata.md) |  | [InstanceData](doc/markdown/./scene.instancedata.md) | _(Optional)_ Instance data for current drawing task |
-|  [instancing?](doc/markdown/./scene.drawcontext.instancing.md) |  | boolean | _(Optional)_ Whehter instance rendering is used |
 |  [lightBlending](doc/markdown/./scene.drawcontext.lightblending.md) |  | boolean | whether is blending light |
 |  [linearDepthTexture?](doc/markdown/./scene.drawcontext.lineardepthtexture.md) |  | [Texture2D](doc/markdown/./device.texture2d.md) | _(Optional)_ Linear depth texture |
-|  [morphAnimation?](doc/markdown/./scene.drawcontext.morphanimation.md) |  | boolean | _(Optional)_ Whether morph animation is used |
+|  [materialFlags](doc/markdown/./scene.drawcontext.materialflags.md) |  | number | Material varying flags |
 |  [oit](doc/markdown/./scene.drawcontext.oit.md) |  | [OIT](doc/markdown/./scene.oit.md) | OIT |
 |  [picking](doc/markdown/./scene.drawcontext.picking.md) |  | boolean | whether GPU picking is enabled |
 |  [primaryCamera](doc/markdown/./scene.drawcontext.primarycamera.md) |  | [Camera](doc/markdown/./scene.camera.md) | The camera position of the primary render pass |
@@ -43,7 +46,6 @@ interface DrawContext
 |  [renderQueue?](doc/markdown/./scene.drawcontext.renderqueue.md) |  | [RenderQueue](doc/markdown/./scene.renderqueue.md) | _(Optional)_ The render queue which is currently being rendered |
 |  [scene](doc/markdown/./scene.drawcontext.scene.md) |  | [Scene](doc/markdown/./scene.scene.md) | The scene that is currently been drawing |
 |  [sceneColorTexture?](doc/markdown/./scene.drawcontext.scenecolortexture.md) |  | [Texture2D](doc/markdown/./device.texture2d.md) | _(Optional)_ Scene color texture |
-|  [skinAnimation?](doc/markdown/./scene.drawcontext.skinanimation.md) |  | boolean | _(Optional)_ Whether skin animation is used |
 |  [sunLight?](doc/markdown/./scene.drawcontext.sunlight.md) |  | [DirectionalLight](doc/markdown/./scene.directionallight.md) | _(Optional)_ the sun light |
 |  [timestamp](doc/markdown/./scene.drawcontext.timestamp.md) |  | number | Timestamp |
 |  [viewportHeight?](doc/markdown/./scene.drawcontext.viewportheight.md) |  | number | _(Optional)_ viewport height |

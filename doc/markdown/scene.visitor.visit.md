@@ -7,14 +7,14 @@
 **Signature:**
 
 ```typescript
-visit(target: unknown): unknown;
+visit(target: T): unknown;
 ```
 
 ## Parameters
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  target | unknown |  |
+|  target | T |  |
 
 **Returns:**
 

@@ -59,13 +59,13 @@ myApp.ready().then(async () => {
     const y = ev.offsetY;
     const ray = camera.constructRay(x, y);
     const pickResult = scene.raycast(ray);
-    if (lastPickResult !== pickResult?.node) {
+    if (lastPickResult !== pickResult?.target.node) {
       if (lastPickResult) {
         lastPickResult.material.emissiveColor = Vector3.zero();
         lastPickResult = null;
       }
       if (pickResult) {
-        lastPickResult = pickResult.node;
+        lastPickResult = pickResult.target.node;
         lastPickResult.material.emissiveColor = new Vector3(1, 1, 0);
       }
     }

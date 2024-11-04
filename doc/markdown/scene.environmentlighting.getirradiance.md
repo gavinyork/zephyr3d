@@ -17,7 +17,7 @@ abstract getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBSha
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | The shader scope |
-|  normal | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) |  |
+|  normal | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | surface normal |
 
 **Returns:**
 

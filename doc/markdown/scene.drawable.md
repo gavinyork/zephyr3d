@@ -21,7 +21,6 @@ interface Drawable
 |  [getBoneMatrices()](doc/markdown/./scene.drawable.getbonematrices.md) | Gets the texture that contains the bone matrices of the object |
 |  [getId()](doc/markdown/./scene.drawable.getid.md) | Gets unique id of the drawable object |
 |  [getInstanceColor()](doc/markdown/./scene.drawable.getinstancecolor.md) | Gets the instance color |
-|  [getInvBindMatrix()](doc/markdown/./scene.drawable.getinvbindmatrix.md) | Gets the inversed bind matrix for skeleton animation |
 |  [getMaterial()](doc/markdown/./scene.drawable.getmaterial.md) | Gets the associated material |
 |  [getMorphData()](doc/markdown/./scene.drawable.getmorphdata.md) | Gets the morph texture |
 |  [getMorphInfo()](doc/markdown/./scene.drawable.getmorphinfo.md) | Gets the morph information buffer |

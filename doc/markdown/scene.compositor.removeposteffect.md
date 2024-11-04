@@ -9,14 +9,14 @@ Removes a posteffect that was previously added
 **Signature:**
 
 ```typescript
-removePostEffect(postEffect: AbstractPostEffect): void;
+removePostEffect(postEffect: AbstractPostEffect<any>): void;
 ```
 
 ## Parameters
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  postEffect | [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md) | The posteffect to be remove. |
+|  postEffect | [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)<!-- -->&lt;any&gt; | The posteffect to be remove. |
 
 **Returns:**
 

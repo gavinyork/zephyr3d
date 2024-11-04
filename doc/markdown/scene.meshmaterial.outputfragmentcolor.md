@@ -9,7 +9,7 @@ Calculate final fragment color for output.
 **Signature:**
 
 ```typescript
-outputFragmentColor(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: PBShaderExp): void;
+outputFragmentColor(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: PBShaderExp, ssrRoughness?: PBShaderExp, ssrNormal?: PBShaderExp): void;
 ```
 
 ## Parameters
@@ -19,6 +19,8 @@ outputFragmentColor(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: 
 |  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | Shader scope |
 |  worldPos | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) |  |
 |  color | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | Lit fragment color |
+|  ssrRoughness | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | _(Optional)_ |
+|  ssrNormal | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | _(Optional)_ |
 
 **Returns:**
 

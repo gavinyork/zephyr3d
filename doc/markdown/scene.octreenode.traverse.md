@@ -9,14 +9,14 @@ Traverse this node by a visitor
 **Signature:**
 
 ```typescript
-traverse(v: Visitor): void;
+traverse(v: Visitor<OctreeNode>): void;
 ```
 
 ## Parameters
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  v | [Visitor](doc/markdown/./scene.visitor.md) | The visitor |
+|  v | [Visitor](doc/markdown/./scene.visitor.md)<!-- -->&lt;[OctreeNode](doc/markdown/./scene.octreenode.md)<!-- -->&gt; | The visitor |
 
 **Returns:**
 

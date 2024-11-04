@@ -24,6 +24,6 @@ declare class BatchGroup extends GraphNode
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
 |  [getName()](doc/markdown/./scene.batchgroup.getname.md) |  | Gets name of the drawable object |
-|  [getRenderQueue(cullVisitor)](doc/markdown/./scene.batchgroup.getrenderqueue.md) |  |  |
+|  [invalidate()](doc/markdown/./scene.batchgroup.invalidate.md) |  | Force the batch state to be rebuilt |
 |  [isBatchGroup()](doc/markdown/./scene.batchgroup.isbatchgroup.md) |  | true if this is a batch group, false otherwise |
 

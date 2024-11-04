@@ -24,7 +24,6 @@
 |  [BlinnMaterial](doc/markdown/./scene.blinnmaterial.md) | Blinn material |
 |  [Bloom](doc/markdown/./scene.bloom.md) | The bloom post effect |
 |  [BoundingBox](doc/markdown/./scene.boundingbox.md) | The bounding box class |
-|  [BoundingBoxTree](doc/markdown/./scene.boundingboxtree.md) | Bounding box tree |
 |  [BoxFilterBlitter](doc/markdown/./scene.boxfilterblitter.md) | Box-filter blitter |
 |  [BoxFrameShape](doc/markdown/./scene.boxframeshape.md) | Wireframe box shape |
 |  [BoxShape](doc/markdown/./scene.boxshape.md) | Box shape |
@@ -42,9 +41,11 @@
 |  [EnvLightWrapper](doc/markdown/./scene.envlightwrapper.md) | Wrapper for environmant lighting |
 |  [EnvShIBL](doc/markdown/./scene.envshibl.md) | IBL with SH based environment lighting |
 |  [EulerRotationTrack](doc/markdown/./scene.eulerrotationtrack.md) | Euler angle rotation animation track |
+|  [FFTWaveGenerator](doc/markdown/./scene.fftwavegenerator.md) | This class generates a 2D ocean field using the Fast Fourier Transform (FFT) algorithm. |
 |  [FPSCameraController](doc/markdown/./scene.fpscameracontroller.md) | FPS camera controller |
 |  [FXAA](doc/markdown/./scene.fxaa.md) | FXAA post effect |
 |  [GaussianBlurBlitter](doc/markdown/./scene.gaussianblurblitter.md) | Gaussian blur blitter |
+|  [GerstnerWaveGenerator](doc/markdown/./scene.gerstnerwavegenerator.md) | Gerstner wave generator. |
 |  [GraphNode](doc/markdown/./scene.graphnode.md) | Graph scene node |
 |  [GrassMaterial](doc/markdown/./scene.grassmaterial.md) | Terrain grass material |
 |  [Grayscale](doc/markdown/./scene.grayscale.md) | Grayscale post effect |
@@ -102,11 +103,13 @@
 |  [PunctualLight](doc/markdown/./scene.punctuallight.md) | Base class for any kind of puncual light |
 |  [RenderPass](doc/markdown/./scene.renderpass.md) | Base class for any kind of render passes |
 |  [Shape](doc/markdown/./scene.shape.md) | Abstract base class for any kind of shapes |
+|  [WaveGenerator](doc/markdown/./scene.wavegenerator.md) | Abstract class for wave generators. |
 
 ## Enumerations
 
 |  Enumeration | Description |
 |  --- | --- |
+|  [MaterialVaryingFlags](doc/markdown/./scene.materialvaryingflags.md) | Material varying flags |
 |  [OctreePlacement](doc/markdown/./scene.octreeplacement.md) | Octree placement |
 
 ## Functions
@@ -123,6 +126,9 @@
 |  [encodeNormalizedFloatToRGBA(scope, value)](doc/markdown/./scene.encodenormalizedfloattorgba.md) | Encodes a float into a rgba8unorm |
 |  [encodeRGBM(scope, rgb, maxRange)](doc/markdown/./scene.encodergbm.md) | Encodes a color value into RGBM format |
 |  [gammaToLinear(scope, color)](doc/markdown/./scene.gammatolinear.md) | Converts a vec3 color from gamma space to linear space |
+|  [gradient(scope, p, t)](doc/markdown/./scene.gradient.md) | Generate random float value from a vec2 |
+|  [hash(scope, p)](doc/markdown/./scene.hash.md) | Generate random float value from a vec2 |
+|  [interleavedGradientNoise(scope, c)](doc/markdown/./scene.interleavedgradientnoise.md) | Calculate interleaved gradient noise |
 |  [linearToGamma(scope, color)](doc/markdown/./scene.lineartogamma.md) | Converts a vec3 color from linear space to gamma space |
 |  [mixinAlbedoColor(BaseCls)](doc/markdown/./scene.mixinalbedocolor.md) | Albedo color mixin |
 |  [mixinBlinnPhong(BaseCls)](doc/markdown/./scene.mixinblinnphong.md) | Blinn-phong lighting model mixin |
@@ -135,8 +141,9 @@
 |  [mixinTextureProps(name)](doc/markdown/./scene.mixintextureprops.md) | Texture property mixin |
 |  [mixinVertexColor(BaseCls)](doc/markdown/./scene.mixinvertexcolor.md) | Vertex color mixin |
 |  [noise3D(scope, p)](doc/markdown/./scene.noise3d.md) | Calculate 3d noise by a 3d position |
-|  [noisef(scope, p)](doc/markdown/./scene.noisef.md) | Generate single float noise from a vec2 |
 |  [panoramaToCubemap(tex, outputCubeMap)](doc/markdown/./scene.panoramatocubemap.md) | Converts an equirectangular image to cubemap |
+|  [perlinNoise2D(scope, p)](doc/markdown/./scene.perlinnoise2d.md) | Generate a float perlin noise value from a vec2 |
+|  [perlinNoise3D(scope, p)](doc/markdown/./scene.perlinnoise3d.md) | Generate a float perlin noise value from a vec3 |
 |  [prefilterCubemap(tex, type, destTex, numSamples)](doc/markdown/./scene.prefiltercubemap.md) | Prefilters an environment cubemap |
 |  [projectCubemap(tex)](doc/markdown/./scene.projectcubemap.md) | Projects a function represented in a cubemap into spherical harmonics using GPU |
 |  [projectCubemapCPU(input)](doc/markdown/./scene.projectcubemapcpu.md) | Projects a function represented in a cubemap into spherical harmonics using CPU |
@@ -181,7 +188,6 @@
 |  [MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md) | Texture information for model loading |
 |  [OrbitCameraControllerOptions](doc/markdown/./scene.orbitcameracontrolleroptions.md) | Creation options for OrbitCameraController |
 |  [PlaneCreationOptions](doc/markdown/./scene.planecreationoptions.md) | Creation options for plane shapes |
-|  [SceneNodeVisitor](doc/markdown/./scene.scenenodevisitor.md) | Base interface for all scene node visitors |
 |  [ShapeCreationOptions](doc/markdown/./scene.shapecreationoptions.md) | Base class for creation options of any kind of shapes |
 |  [SphereCreationOptions](doc/markdown/./scene.spherecreationoptions.md) | Creation options for sphere shape |
 |  [TorusCreationOptions](doc/markdown/./scene.toruscreationoptions.md) | Creation options for torus shape |
@@ -227,6 +233,7 @@
 |  [ModelFetchOptions](doc/markdown/./scene.modelfetchoptions.md) | Options for model fetching |
 |  [ModelInfo](doc/markdown/./scene.modelinfo.md) | Data structure returned by AssetManager.fetchModel() |
 |  [PickResult](doc/markdown/./scene.pickresult.md) | Camera pick result |
+|  [PickTarget](doc/markdown/./scene.picktarget.md) | Pick target |
 |  [PlayAnimationOptions](doc/markdown/./scene.playanimationoptions.md) | Options for playing animation |
 |  [SceneNodeVisible](doc/markdown/./scene.scenenodevisible.md) | Scene node visible state |
 |  [ShadowMode](doc/markdown/./scene.shadowmode.md) | Shadow mapping mode |

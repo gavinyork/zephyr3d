@@ -9,7 +9,7 @@ Creates an instance of PostWater.
 **Signature:**
 
 ```typescript
-constructor(elevation: number);
+constructor(elevation: number, waveGenerator: WaveGenerator);
 ```
 
 ## Parameters
@@ -17,4 +17,5 @@ constructor(elevation: number);
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  elevation | number | Elevation of the water |
+|  waveGenerator | [WaveGenerator](doc/markdown/./scene.wavegenerator.md) |  |
 

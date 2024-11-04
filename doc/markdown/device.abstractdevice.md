@@ -39,16 +39,23 @@ interface AbstractDevice extends IEventTarget<DeviceEventMap>
 |  [clearFrameBuffer(clearColor, clearDepth, clearStencil)](doc/markdown/./device.abstractdevice.clearframebuffer.md) | Clears the current frame buffer |
 |  [compute(workgroupCountX, workgroupCountY, workgroupCountZ)](doc/markdown/./device.abstractdevice.compute.md) | Dispatches a compute task to the GPU |
 |  [copyBuffer(sourceBuffer, destBuffer, srcOffset, dstOffset, bytes)](doc/markdown/./device.abstractdevice.copybuffer.md) | Copies a buffer to another buffer |
+|  [copyFramebufferToTexture2D(src, index, dst, level)](doc/markdown/./device.abstractdevice.copyframebuffertotexture2d.md) | Copies a color attachment of a framebuffer to a mipmap level of a texture. |
+|  [copyTexture2D(src, srcLevel, dst, dstLevel)](doc/markdown/./device.abstractdevice.copytexture2d.md) | Copies a 2d texture to another texture. |
 |  [createBindGroup(layout)](doc/markdown/./device.abstractdevice.createbindgroup.md) | Creates a bind group |
+|  [createBlendingState()](doc/markdown/./device.abstractdevice.createblendingstate.md) | Creates a blending state object |
 |  [createBuffer(sizeInBytes, options)](doc/markdown/./device.abstractdevice.createbuffer.md) | Creates a gpu buffer |
+|  [createColorState()](doc/markdown/./device.abstractdevice.createcolorstate.md) | Creates a color state object |
 |  [createCubeTexture(format, size, options)](doc/markdown/./device.abstractdevice.createcubetexture.md) | Creates a cube texture |
 |  [createCubeTextureFromMipmapData(data, sRGB, options)](doc/markdown/./device.abstractdevice.createcubetexturefrommipmapdata.md) | Creates a cube texture from given mipmap data |
+|  [createDepthState()](doc/markdown/./device.abstractdevice.createdepthstate.md) | Creates a depth state object |
 |  [createFrameBuffer(colorAttachments, depthAttachment, options)](doc/markdown/./device.abstractdevice.createframebuffer.md) | Creates a frame buffer |
 |  [createGPUProgram(params)](doc/markdown/./device.abstractdevice.creategpuprogram.md) | Creates a gpu program |
 |  [createIndexBuffer(data, options)](doc/markdown/./device.abstractdevice.createindexbuffer.md) | Creates an index buffer |
 |  [createInterleavedVertexBuffer(attribFormats, data, options)](doc/markdown/./device.abstractdevice.createinterleavedvertexbuffer.md) | Creates an interleaved vertex buffer |
+|  [createRasterizerState()](doc/markdown/./device.abstractdevice.createrasterizerstate.md) | Creates a rasterizer state object |
 |  [createRenderStateSet()](doc/markdown/./device.abstractdevice.createrenderstateset.md) | Creates a render state set object |
 |  [createSampler(options)](doc/markdown/./device.abstractdevice.createsampler.md) | Creates a texture sampler object |
+|  [createStencilState()](doc/markdown/./device.abstractdevice.createstencilstate.md) | Creates a stencil state object |
 |  [createStructuredBuffer(structureType, options, data)](doc/markdown/./device.abstractdevice.createstructuredbuffer.md) | Creates a structured buffer |
 |  [createTexture2D(format, width, height, options)](doc/markdown/./device.abstractdevice.createtexture2d.md) | Creates a 2d texture |
 |  [createTexture2DArray(format, width, height, depth, options)](doc/markdown/./device.abstractdevice.createtexture2darray.md) | Creates a 2d array texture |

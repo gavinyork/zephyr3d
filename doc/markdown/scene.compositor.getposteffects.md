@@ -9,9 +9,9 @@ Gets all post effects
 **Signature:**
 
 ```typescript
-getPostEffects(): AbstractPostEffect[];
+getPostEffects(): AbstractPostEffect<any>[];
 ```
 **Returns:**
 
-[AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)<!-- -->\[\]
+[AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)<!-- -->&lt;any&gt;\[\]
 

@@ -40,7 +40,7 @@ declare class Terrain extends GraphNode
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [computeBoundingVolume(bv)](doc/markdown/./scene.terrain.computeboundingvolume.md) |  | Computes the bounding volume of the node |
+|  [computeBoundingVolume()](doc/markdown/./scene.terrain.computeboundingvolume.md) |  | Computes the bounding volume of the node |
 |  [create(sizeX, sizeZ, elevations, scale, patchSize, options)](doc/markdown/./scene.terrain.create.md) |  | Creates the terrain |
 |  [createGrass(density, bladeWidth, bladeHeight, offset, grassTexture)](doc/markdown/./scene.terrain.creategrass.md) |  | Create grass fields |
 |  [getElevation(x, z)](doc/markdown/./scene.terrain.getelevation.md) |  | Get elevation at specified position in terrain coordinate space |

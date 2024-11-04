@@ -40,7 +40,6 @@ declare class Mesh extends Mesh_base implements BatchDrawable
 |  [getInstanceColor()](doc/markdown/./scene.mesh.getinstancecolor.md) |  | Gets the instance color |
 |  [getInstanceId(renderPass)](doc/markdown/./scene.mesh.getinstanceid.md) |  | Gets the instance id of the object |
 |  [getInstanceUniforms()](doc/markdown/./scene.mesh.getinstanceuniforms.md) |  | Gets the instance uniforms |
-|  [getInvBindMatrix()](doc/markdown/./scene.mesh.getinvbindmatrix.md) |  | Gets the inversed bind matrix for skeleton animation |
 |  [getMaterial()](doc/markdown/./scene.mesh.getmaterial.md) |  | Gets the associated material |
 |  [getMorphData()](doc/markdown/./scene.mesh.getmorphdata.md) |  | Gets the morph texture |
 |  [getMorphInfo()](doc/markdown/./scene.mesh.getmorphinfo.md) |  | Gets the morph information buffer |
@@ -54,7 +53,7 @@ declare class Mesh extends Mesh_base implements BatchDrawable
 |  [needSceneColor()](doc/markdown/./scene.mesh.needscenecolor.md) |  | Need scene color |
 |  [setAnimatedBoundingBox(bbox)](doc/markdown/./scene.mesh.setanimatedboundingbox.md) |  | Sets the bounding box for animation |
 |  [setBoneMatrices(matrices)](doc/markdown/./scene.mesh.setbonematrices.md) |  | Sets the texture that contains the bone matrices for skeletal animation |
-|  [setInvBindMatrix(matrix)](doc/markdown/./scene.mesh.setinvbindmatrix.md) |  | Sets the inverse bind matrix for skeletal animation |
 |  [setMorphData(data)](doc/markdown/./scene.mesh.setmorphdata.md) |  | Sets the texture that contains the morph target data |
 |  [setMorphInfo(info)](doc/markdown/./scene.mesh.setmorphinfo.md) |  | Sets the buffer that contains the morph target information |
+|  [setPickTarget(node, label)](doc/markdown/./scene.mesh.setpicktarget.md) |  |  |
 

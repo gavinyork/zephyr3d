@@ -9,8 +9,15 @@ Checks whether this post effect requires the scene depth buffer
 **Signature:**
 
 ```typescript
-abstract requireDepthAttachment(): boolean;
+abstract requireDepthAttachment(ctx: DrawContext): boolean;
 ```
+
+## Parameters
+
+|  Parameter | Type | Description |
+|  --- | --- | --- |
+|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) |  |
+
 **Returns:**
 
 boolean

@@ -11,7 +11,7 @@ Interface for blinn-phong lighting model mixin
 ```typescript
 type IMixinBlinnPhong = {
     shininess: number;
-    blinnPhongLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp): PBShaderExp;
+    blinnPhongLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp, outRoughness?: PBShaderExp): PBShaderExp;
 } & IMixinLight;
 ```
 **References:** [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)<!-- -->, [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, [IMixinLight](doc/markdown/./scene.imixinlight.md)

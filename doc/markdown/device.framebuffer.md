@@ -18,8 +18,14 @@ interface FrameBuffer<T = unknown> extends GPUObject<T>
 |  Method | Description |
 |  --- | --- |
 |  [bind()](doc/markdown/./device.framebuffer.bind.md) |  |
+|  [getColorAttachmentCubeFace(index)](doc/markdown/./device.framebuffer.getcolorattachmentcubeface.md) |  |
+|  [getColorAttachmentGenerateMipmaps(index)](doc/markdown/./device.framebuffer.getcolorattachmentgeneratemipmaps.md) |  |
+|  [getColorAttachmentLayer(index)](doc/markdown/./device.framebuffer.getcolorattachmentlayer.md) |  |
+|  [getColorAttachmentMipLevel(index)](doc/markdown/./device.framebuffer.getcolorattachmentmiplevel.md) |  |
 |  [getColorAttachments()](doc/markdown/./device.framebuffer.getcolorattachments.md) |  |
 |  [getDepthAttachment()](doc/markdown/./device.framebuffer.getdepthattachment.md) |  |
+|  [getDepthAttachmentCubeFace()](doc/markdown/./device.framebuffer.getdepthattachmentcubeface.md) |  |
+|  [getDepthAttachmentLayer()](doc/markdown/./device.framebuffer.getdepthattachmentlayer.md) |  |
 |  [getHash()](doc/markdown/./device.framebuffer.gethash.md) |  |
 |  [getHeight()](doc/markdown/./device.framebuffer.getheight.md) |  |
 |  [getSampleCount()](doc/markdown/./device.framebuffer.getsamplecount.md) |  |

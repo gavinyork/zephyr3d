@@ -9,14 +9,14 @@ Traverse the entire subtree of this node by a visitor
 **Signature:**
 
 ```typescript
-traverse(v: SceneNodeVisitor, inverse?: boolean): void;
+traverse(v: Visitor<SceneNode>, inverse?: boolean): void;
 ```
 
 ## Parameters
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  v | [SceneNodeVisitor](doc/markdown/./scene.scenenodevisitor.md) | The visitor that will travel the subtree of this node |
+|  v | [Visitor](doc/markdown/./scene.visitor.md)<!-- -->&lt;[SceneNode](doc/markdown/./scene.scenenode.md)<!-- -->&gt; | The visitor that will travel the subtree of this node |
 |  inverse | boolean | _(Optional)_ true if traversing from bottom to top, otherwise top to bottom |
 
 **Returns:**

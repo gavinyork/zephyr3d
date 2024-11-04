@@ -21,3 +21,10 @@ declare class DepthPass extends RenderPass
 |  --- | --- | --- |
 |  [(constructor)()](doc/markdown/./scene.depthpass._constructor_.md) |  | Creates an instance of DepthRenderPass |
 
+## Properties
+
+|  Property | Modifiers | Type | Description |
+|  --- | --- | --- | --- |
+|  [encodeDepth](doc/markdown/./scene.depthpass.encodedepth.md) |  | boolean |  |
+|  [renderBackface](doc/markdown/./scene.depthpass.renderbackface.md) |  | boolean |  |
+

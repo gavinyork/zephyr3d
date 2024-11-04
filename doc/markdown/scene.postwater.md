@@ -9,40 +9,39 @@ The post water effect
 **Signature:**
 
 ```typescript
-declare class PostWater extends AbstractPostEffect 
+declare class PostWater extends AbstractPostEffect<'PostWater'> 
 ```
-**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)
+**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)<!-- -->&lt;'PostWater'&gt;
 
 ## Constructors
 
 |  Constructor | Modifiers | Description |
 |  --- | --- | --- |
-|  [(constructor)(elevation)](doc/markdown/./scene.postwater._constructor_.md) |  | Creates an instance of PostWater. |
+|  [(constructor)(elevation, waveGenerator)](doc/markdown/./scene.postwater._constructor_.md) |  | Creates an instance of PostWater. |
 
 ## Properties
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
-|  [alignment](doc/markdown/./scene.postwater.alignment.md) |  | number |  |
 |  [antiReflectanceLeak](doc/markdown/./scene.postwater.antireflectanceleak.md) |  | number | The amount for increasing the water elevation to reduce leaking artifact |
 |  [boundary](doc/markdown/./scene.postwater.boundary.md) |  | [Vector4](doc/markdown/./base.vector4.md) | Water boundary in world space ( minX, minZ, maxX, maxZ ) |
+|  [causticsFalloff](doc/markdown/./scene.postwater.causticsfalloff.md) |  | number |  |
+|  [causticsIntensity](doc/markdown/./scene.postwater.causticsintensity.md) |  | number |  |
+|  [causticsSlopeMax](doc/markdown/./scene.postwater.causticsslopemax.md) |  | number |  |
+|  [causticsSlopeMin](doc/markdown/./scene.postwater.causticsslopemin.md) |  | number |  |
+|  [className](doc/markdown/./scene.postwater.classname.md) | <p><code>static</code></p><p><code>readonly</code></p> | "PostWater" |  |
 |  [depthMulti](doc/markdown/./scene.postwater.depthmulti.md) |  | number | Water depth multiply factor |
 |  [displace](doc/markdown/./scene.postwater.displace.md) |  | number | Texture displace |
 |  [elevation](doc/markdown/./scene.postwater.elevation.md) |  | number | Water elevation in world space |
-|  [foamContrast](doc/markdown/./scene.postwater.foamcontrast.md) |  | number |  |
-|  [foamWidth](doc/markdown/./scene.postwater.foamwidth.md) |  | number |  |
+|  [envMap](doc/markdown/./scene.postwater.envmap.md) |  | [TextureCube](doc/markdown/./device.texturecube.md) | Environment map |
 |  [gridScale](doc/markdown/./scene.postwater.gridscale.md) |  | number | Water clipmap grid scale |
 |  [refractionStrength](doc/markdown/./scene.postwater.refractionstrength.md) |  | number | Refraction strength |
-|  [waveCroppiness0](doc/markdown/./scene.postwater.wavecroppiness0.md) |  | number |  |
-|  [waveCroppiness1](doc/markdown/./scene.postwater.wavecroppiness1.md) |  | number |  |
-|  [waveCroppiness2](doc/markdown/./scene.postwater.wavecroppiness2.md) |  | number |  |
-|  [waveLength0](doc/markdown/./scene.postwater.wavelength0.md) |  | number |  |
-|  [waveLength1](doc/markdown/./scene.postwater.wavelength1.md) |  | number |  |
-|  [waveLength2](doc/markdown/./scene.postwater.wavelength2.md) |  | number |  |
-|  [waveStrength0](doc/markdown/./scene.postwater.wavestrength0.md) |  | number |  |
-|  [waveStrength1](doc/markdown/./scene.postwater.wavestrength1.md) |  | number |  |
-|  [waveStrength2](doc/markdown/./scene.postwater.wavestrength2.md) |  | number |  |
-|  [wind](doc/markdown/./scene.postwater.wind.md) |  | [Vector2](doc/markdown/./base.vector2.md) |  |
+|  [speed](doc/markdown/./scene.postwater.speed.md) |  | number | Water animation speed factor |
+|  [ssr](doc/markdown/./scene.postwater.ssr.md) |  | boolean | SSR |
+|  [ssrIterations](doc/markdown/./scene.postwater.ssriterations.md) |  | number |  |
+|  [ssrMaxDistance](doc/markdown/./scene.postwater.ssrmaxdistance.md) |  | number |  |
+|  [ssrThickness](doc/markdown/./scene.postwater.ssrthickness.md) |  | number |  |
+|  [waveGenerator](doc/markdown/./scene.postwater.wavegenerator.md) | <code>readonly</code> | [WaveGenerator](doc/markdown/./scene.wavegenerator.md) |  |
 |  [wireframe](doc/markdown/./scene.postwater.wireframe.md) |  | boolean |  |
 
 ## Methods

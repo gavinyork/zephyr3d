@@ -39,6 +39,7 @@ declare abstract class Blitter
 |  [blit(source, dest, layer, sampler)](doc/markdown/./scene.blitter.blit_3.md) |  | Blits given layer of a 2d array texture to a 2d texture or frame buffer |
 |  [blit(source, dest, sampler)](doc/markdown/./scene.blitter.blit_4.md) |  | Blits a cube texture to another cube texture |
 |  [blit(source, dest, face, sampler)](doc/markdown/./scene.blitter.blit_5.md) |  | Blits given face of a cube texture to a 2d texture or frame buffer |
+|  [blit(source, dest, layer, sampler)](doc/markdown/./scene.blitter.blit_6.md) |  |  |
 |  [calcHash()](doc/markdown/./scene.blitter.calchash.md) | <p><code>protected</code></p><p><code>abstract</code></p> | Calculates the hash code |
 |  [filter(scope, type, srcTex, srcUV, srcLayer, sampeType)](doc/markdown/./scene.blitter.filter.md) | <code>abstract</code> | Calculates the destination texel by the source texel |
 |  [invalidateHash()](doc/markdown/./scene.blitter.invalidatehash.md) |  | Force the hash code to be regenerated |

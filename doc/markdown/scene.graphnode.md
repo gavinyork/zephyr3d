@@ -28,7 +28,6 @@ Graph node is the base class of any kind of scene node that will be placed into 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
 |  [getBoneMatrices()](doc/markdown/./scene.graphnode.getbonematrices.md) |  | Gets the texture that contains the bone matrices of the object |
-|  [getInvBindMatrix()](doc/markdown/./scene.graphnode.getinvbindmatrix.md) |  | Gets the inversed bind matrix for skeleton animation |
 |  [getName()](doc/markdown/./scene.graphnode.getname.md) |  | Gets the name |
 |  [getSortDistance(camera)](doc/markdown/./scene.graphnode.getsortdistance.md) |  | Gets the distance for object sorting |
 |  [getXForm()](doc/markdown/./scene.graphnode.getxform.md) |  | Gets the XForm of the object |

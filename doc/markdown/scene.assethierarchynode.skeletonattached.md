@@ -9,5 +9,5 @@ The skeleton to which the node belongs if this is a joint node
 **Signature:**
 
 ```typescript
-get skeletonAttached(): AssetSkeleton;
+get skeletonAttached(): Set<AssetSkeleton>;
 ```

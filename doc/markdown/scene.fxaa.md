@@ -9,15 +9,21 @@ FXAA post effect
 **Signature:**
 
 ```typescript
-declare class FXAA extends AbstractPostEffect 
+declare class FXAA extends AbstractPostEffect<'FXAA'> 
 ```
-**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)
+**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)<!-- -->&lt;'FXAA'&gt;
 
 ## Constructors
 
 |  Constructor | Modifiers | Description |
 |  --- | --- | --- |
 |  [(constructor)()](doc/markdown/./scene.fxaa._constructor_.md) |  | Creates an instance of grayscale post effect |
+
+## Properties
+
+|  Property | Modifiers | Type | Description |
+|  --- | --- | --- | --- |
+|  [className](doc/markdown/./scene.fxaa.classname.md) | <p><code>static</code></p><p><code>readonly</code></p> | "FXAA" |  |
 
 ## Methods
 

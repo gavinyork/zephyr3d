@@ -4,7 +4,7 @@
 
 ## CylinderCreationOptions.bottomRadius property
 
-Bottom radius, default is 1.0
+Top radius, default is 1.0 \*
 
 **Signature:**
 

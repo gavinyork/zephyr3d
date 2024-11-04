@@ -9,7 +9,7 @@ Visior
 **Signature:**
 
 ```typescript
-interface Visitor 
+interface Visitor<T> 
 ```
 
 ## Methods

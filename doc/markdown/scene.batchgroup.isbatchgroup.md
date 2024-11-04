@@ -9,9 +9,9 @@ true if this is a batch group, false otherwise
 **Signature:**
 
 ```typescript
-isBatchGroup(): boolean;
+isBatchGroup(): this is BatchGroup;
 ```
 **Returns:**
 
-boolean
+this is [BatchGroup](doc/markdown/./scene.batchgroup.md)
 

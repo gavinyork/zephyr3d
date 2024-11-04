@@ -23,7 +23,6 @@ declare class AssetHierarchyNode extends NamedObject
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
-|  [attachIndex](doc/markdown/./scene.assethierarchynode.attachindex.md) | <code>readonly</code> | number | The joint index if this is a joint node |
 |  [children](doc/markdown/./scene.assethierarchynode.children.md) | <code>readonly</code> | [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)<!-- -->\[\] | Children of the node |
 |  [instances](doc/markdown/./scene.assethierarchynode.instances.md) | <code>readonly</code> | { t: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; s: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; r: [Quaternion](doc/markdown/./base.quaternion.md)<!-- -->; }\[\] | instances |
 |  [matrix](doc/markdown/./scene.assethierarchynode.matrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | Local transformation matrix of the node |
@@ -34,7 +33,7 @@ declare class AssetHierarchyNode extends NamedObject
 |  [rotation](doc/markdown/./scene.assethierarchynode.rotation.md) |  | [Quaternion](doc/markdown/./base.quaternion.md) | The rotation of the node |
 |  [scaling](doc/markdown/./scene.assethierarchynode.scaling.md) |  | [Vector3](doc/markdown/./base.vector3.md) | The scale of the node |
 |  [skeleton](doc/markdown/./scene.assethierarchynode.skeleton.md) |  | [AssetSkeleton](doc/markdown/./scene.assetskeleton.md) | The skeleton used to control the node |
-|  [skeletonAttached](doc/markdown/./scene.assethierarchynode.skeletonattached.md) | <code>readonly</code> | [AssetSkeleton](doc/markdown/./scene.assetskeleton.md) | The skeleton to which the node belongs if this is a joint node |
+|  [skeletonAttached](doc/markdown/./scene.assethierarchynode.skeletonattached.md) | <code>readonly</code> | Set&lt;[AssetSkeleton](doc/markdown/./scene.assetskeleton.md)<!-- -->&gt; | The skeleton to which the node belongs if this is a joint node |
 |  [weights](doc/markdown/./scene.assethierarchynode.weights.md) |  | number\[\] | Default morph target weights |
 |  [worldMatrix](doc/markdown/./scene.assethierarchynode.worldmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | World transformation matrix of the node |
 

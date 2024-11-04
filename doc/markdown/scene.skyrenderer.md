@@ -24,6 +24,7 @@ declare class SkyRenderer
 |  --- | --- | --- | --- |
 |  [aerialPerspectiveDensity](doc/markdown/./scene.skyrenderer.aerialperspectivedensity.md) |  | number | Aerial perspective density |
 |  [autoUpdateIBLMaps](doc/markdown/./scene.skyrenderer.autoupdateiblmaps.md) |  | boolean | Wether the IBL maps should be updated automatically. |
+|  [bakedSkyTexture](doc/markdown/./scene.skyrenderer.bakedskytexture.md) | <code>readonly</code> | [TextureCube](doc/markdown/./device.texturecube.md) | Baked sky texture |
 |  [cloudIntensity](doc/markdown/./scene.skyrenderer.cloudintensity.md) |  | number | Intensity of the sky color |
 |  [cloudy](doc/markdown/./scene.skyrenderer.cloudy.md) |  | number | Light density of the sky. |
 |  [drawGround](doc/markdown/./scene.skyrenderer.drawground.md) |  | boolean | Whether ground should be rendered |

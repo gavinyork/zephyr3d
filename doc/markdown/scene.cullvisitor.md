@@ -9,9 +9,9 @@ Node visitor for culling
 **Signature:**
 
 ```typescript
-declare class CullVisitor implements Visitor 
+declare class CullVisitor implements Visitor<SceneNode | OctreeNode> 
 ```
-**Implements:** [Visitor](doc/markdown/./scene.visitor.md)
+**Implements:** [Visitor](doc/markdown/./scene.visitor.md)<!-- -->&lt;[SceneNode](doc/markdown/./scene.scenenode.md) \| [OctreeNode](doc/markdown/./scene.octreenode.md)<!-- -->&gt;
 
 ## Constructors
 

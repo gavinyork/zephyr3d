@@ -701,6 +701,196 @@
             },
             {
               "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!AbstractDevice#copyFramebufferToTexture2D:member(1)",
+              "docComment": "/**\n * Copies a color attachment of a framebuffer to a mipmap level of a texture.\n *\n * @remarks\n *\n * The color attachment and the mipmap level must have the same size and format\n *\n * @param src - Framebuffer that will be copied from.\n *\n * @param index - Color attachment index of the framebuffer.\n *\n * @param dst - Texture that will be copied to.\n *\n * @param level - Which mipmap level should be copied to.\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "copyFramebufferToTexture2D(src: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "FrameBuffer",
+                  "canonicalReference": "@zephyr3d/device!FrameBuffer:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", index: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", dst: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Texture2D",
+                  "canonicalReference": "@zephyr3d/device!Texture2D:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", level: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 9,
+                "endIndex": 10
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "src",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "index",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 4
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "dst",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 5,
+                    "endIndex": 6
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "level",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 7,
+                    "endIndex": 8
+                  },
+                  "isOptional": false
+                }
+              ],
+              "name": "copyFramebufferToTexture2D"
+            },
+            {
+              "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!AbstractDevice#copyTexture2D:member(1)",
+              "docComment": "/**\n * Copies a 2d texture to another texture.\n *\n * @remarks\n *\n * The two textures must have the same size and format\n *\n * @param src - Texture that will be copied from.\n *\n * @param srcLevel - Which mipmap level to be copied from.\n *\n * @param dst - Texture that will be copied to.\n *\n * @param dstLevel - Which mipmap level to be copied to.\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "copyTexture2D(src: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Texture2D",
+                  "canonicalReference": "@zephyr3d/device!Texture2D:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", srcLevel: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", dst: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Texture2D",
+                  "canonicalReference": "@zephyr3d/device!Texture2D:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", dstLevel: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 9,
+                "endIndex": 10
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "src",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "srcLevel",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 4
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "dst",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 5,
+                    "endIndex": 6
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "dstLevel",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 7,
+                    "endIndex": 8
+                  },
+                  "isOptional": false
+                }
+              ],
+              "name": "copyTexture2D"
+            },
+            {
+              "kind": "MethodSignature",
               "canonicalReference": "@zephyr3d/device!AbstractDevice#createBindGroup:member(1)",
               "docComment": "/**\n * Creates a bind group\n *\n * @param layout - Layout of the bind group\n */\n",
               "excerptTokens": [
@@ -745,6 +935,35 @@
                 }
               ],
               "name": "createBindGroup"
+            },
+            {
+              "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!AbstractDevice#createBlendingState:member(1)",
+              "docComment": "/**\n * Creates a blending state object\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "createBlendingState(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "BlendingState",
+                  "canonicalReference": "@zephyr3d/device!BlendingState:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [],
+              "name": "createBlendingState"
             },
             {
               "kind": "MethodSignature",
@@ -808,6 +1027,35 @@
                 }
               ],
               "name": "createBuffer"
+            },
+            {
+              "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!AbstractDevice#createColorState:member(1)",
+              "docComment": "/**\n * Creates a color state object\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "createColorState(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "ColorState",
+                  "canonicalReference": "@zephyr3d/device!ColorState:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [],
+              "name": "createColorState"
             },
             {
               "kind": "MethodSignature",
@@ -968,6 +1216,35 @@
                 }
               ],
               "name": "createCubeTextureFromMipmapData"
+            },
+            {
+              "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!AbstractDevice#createDepthState:member(1)",
+              "docComment": "/**\n * Creates a depth state object\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "createDepthState(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "DepthState",
+                  "canonicalReference": "@zephyr3d/device!DepthState:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [],
+              "name": "createDepthState"
             },
             {
               "kind": "MethodSignature",
@@ -1261,6 +1538,35 @@
             },
             {
               "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!AbstractDevice#createRasterizerState:member(1)",
+              "docComment": "/**\n * Creates a rasterizer state object\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "createRasterizerState(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "RasterizerState",
+                  "canonicalReference": "@zephyr3d/device!RasterizerState:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [],
+              "name": "createRasterizerState"
+            },
+            {
+              "kind": "MethodSignature",
               "canonicalReference": "@zephyr3d/device!AbstractDevice#createRenderStateSet:member(1)",
               "docComment": "/**\n * Creates a render state set object\n */\n",
               "excerptTokens": [
@@ -1334,6 +1640,35 @@
                 }
               ],
               "name": "createSampler"
+            },
+            {
+              "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!AbstractDevice#createStencilState:member(1)",
+              "docComment": "/**\n * Creates a stencil state object\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "createStencilState(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "StencilState",
+                  "canonicalReference": "@zephyr3d/device!StencilState:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [],
+              "name": "createStencilState"
             },
             {
               "kind": "MethodSignature",
@@ -6820,6 +7155,202 @@
             },
             {
               "kind": "Method",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#copyFramebufferToTexture2D:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "abstract copyFramebufferToTexture2D(src: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "FrameBuffer",
+                  "canonicalReference": "@zephyr3d/device!FrameBuffer:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", index: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", dst: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Texture2D",
+                  "canonicalReference": "@zephyr3d/device!Texture2D:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", level: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 9,
+                "endIndex": 10
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "src",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "index",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 4
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "dst",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 5,
+                    "endIndex": 6
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "level",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 7,
+                    "endIndex": 8
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": true,
+              "name": "copyFramebufferToTexture2D"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#copyTexture2D:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "abstract copyTexture2D(src: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Texture2D",
+                  "canonicalReference": "@zephyr3d/device!Texture2D:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", srcLevel: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", dst: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Texture2D",
+                  "canonicalReference": "@zephyr3d/device!Texture2D:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", dstLevel: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 9,
+                "endIndex": 10
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "src",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "srcLevel",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 4
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "dst",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 5,
+                    "endIndex": 6
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "dstLevel",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 7,
+                    "endIndex": 8
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": true,
+              "name": "copyTexture2D"
+            },
+            {
+              "kind": "Method",
               "canonicalReference": "@zephyr3d/device!BaseDevice#createBindGroup:member(1)",
               "docComment": "",
               "excerptTokens": [
@@ -6867,6 +7398,38 @@
               "isOptional": false,
               "isAbstract": true,
               "name": "createBindGroup"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#createBlendingState:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "abstract createBlendingState(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "BlendingState",
+                  "canonicalReference": "@zephyr3d/device!BlendingState:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": true,
+              "name": "createBlendingState"
             },
             {
               "kind": "Method",
@@ -6933,6 +7496,38 @@
               "isOptional": false,
               "isAbstract": true,
               "name": "createBuffer"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#createColorState:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "abstract createColorState(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "ColorState",
+                  "canonicalReference": "@zephyr3d/device!ColorState:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": true,
+              "name": "createColorState"
             },
             {
               "kind": "Method",
@@ -7099,6 +7694,38 @@
               "isOptional": false,
               "isAbstract": true,
               "name": "createCubeTextureFromMipmapData"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#createDepthState:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "abstract createDepthState(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "DepthState",
+                  "canonicalReference": "@zephyr3d/device!DepthState:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": true,
+              "name": "createDepthState"
             },
             {
               "kind": "Method",
@@ -7436,6 +8063,38 @@
             },
             {
               "kind": "Method",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#createRasterizerState:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "abstract createRasterizerState(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "RasterizerState",
+                  "canonicalReference": "@zephyr3d/device!RasterizerState:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": true,
+              "name": "createRasterizerState"
+            },
+            {
+              "kind": "Method",
               "canonicalReference": "@zephyr3d/device!BaseDevice#createRenderStateSet:member(1)",
               "docComment": "",
               "excerptTokens": [
@@ -7515,6 +8174,38 @@
               "isOptional": false,
               "isAbstract": true,
               "name": "createSampler"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@zephyr3d/device!BaseDevice#createStencilState:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "abstract createStencilState(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "StencilState",
+                  "canonicalReference": "@zephyr3d/device!StencilState:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": true,
+              "name": "createStencilState"
             },
             {
               "kind": "Method",
@@ -17968,6 +18659,187 @@
             },
             {
               "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!FrameBuffer#getColorAttachmentCubeFace:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getColorAttachmentCubeFace(index: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "CubeFace",
+                  "canonicalReference": "@zephyr3d/base!CubeFace:enum"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "index",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "name": "getColorAttachmentCubeFace"
+            },
+            {
+              "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!FrameBuffer#getColorAttachmentGenerateMipmaps:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getColorAttachmentGenerateMipmaps(index: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "index",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "name": "getColorAttachmentGenerateMipmaps"
+            },
+            {
+              "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!FrameBuffer#getColorAttachmentLayer:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getColorAttachmentLayer(index: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "index",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "name": "getColorAttachmentLayer"
+            },
+            {
+              "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!FrameBuffer#getColorAttachmentMipLevel:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getColorAttachmentMipLevel(index: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "index",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "name": "getColorAttachmentMipLevel"
+            },
+            {
+              "kind": "MethodSignature",
               "canonicalReference": "@zephyr3d/device!FrameBuffer#getColorAttachments:member(1)",
               "docComment": "",
               "excerptTokens": [
@@ -18027,6 +18899,63 @@
               "overloadIndex": 1,
               "parameters": [],
               "name": "getDepthAttachment"
+            },
+            {
+              "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!FrameBuffer#getDepthAttachmentCubeFace:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getDepthAttachmentCubeFace(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "CubeFace",
+                  "canonicalReference": "@zephyr3d/base!CubeFace:enum"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [],
+              "name": "getDepthAttachmentCubeFace"
+            },
+            {
+              "kind": "MethodSignature",
+              "canonicalReference": "@zephyr3d/device!FrameBuffer#getDepthAttachmentLayer:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "getDepthAttachmentLayer(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isOptional": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "releaseTag": "Public",
+              "overloadIndex": 1,
+              "parameters": [],
+              "name": "getDepthAttachmentLayer"
             },
             {
               "kind": "MethodSignature",
@@ -52210,7 +53139,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "'1d' | '2d'"
+                  "text": "'1d' | '2d' | '2d-array' | 'cube' | 'cube-array' | '3d'"
                 },
                 {
                   "kind": "Content",

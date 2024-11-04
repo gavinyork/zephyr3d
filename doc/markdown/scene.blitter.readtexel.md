@@ -9,7 +9,7 @@ Reads a texel from the source texture
 **Signature:**
 
 ```typescript
-readTexel(scope: PBInsideFunctionScope, type: BlitType, srcTex: PBShaderExp, uv: PBShaderExp, srcLayer: PBShaderExp, sampleType: 'float' | 'int' | 'uint'): PBShaderExp;
+readTexel(scope: PBInsideFunctionScope, type: BlitType, srcTex: PBShaderExp, uv: PBShaderExp, srcLayer: PBShaderExp, sampleType: 'float' | 'int' | 'uint' | 'depth'): PBShaderExp;
 ```
 
 ## Parameters
@@ -21,7 +21,7 @@ readTexel(scope: PBInsideFunctionScope, type: BlitType, srcTex: PBShaderExp, uv:
 |  srcTex | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The source texture |
 |  uv | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The texture coordinate from where the texel will be read |
 |  srcLayer | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The layer of the source texture |
-|  sampleType | 'float' \| 'int' \| 'uint' |  |
+|  sampleType | 'float' \| 'int' \| 'uint' \| 'depth' |  |
 
 **Returns:**
 

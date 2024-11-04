@@ -11,8 +11,8 @@ Camera pick result
 ```typescript
 type PickResult = {
     drawable: Drawable;
-    node: GraphNode;
+    target: PickTarget;
 };
 ```
-**References:** [Drawable](doc/markdown/./scene.drawable.md)<!-- -->, [GraphNode](doc/markdown/./scene.graphnode.md)
+**References:** [Drawable](doc/markdown/./scene.drawable.md)<!-- -->, [PickTarget](doc/markdown/./scene.picktarget.md)
 

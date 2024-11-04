@@ -33,6 +33,7 @@ declare class Camera extends SceneNode
 |  [framebuffer](doc/markdown/./scene.camera.framebuffer.md) |  | [FrameBuffer](doc/markdown/./device.framebuffer.md) | Framebuffer object into which the scene will be rendered |
 |  [frustum](doc/markdown/./scene.camera.frustum.md) | <code>readonly</code> | [Frustum](doc/markdown/./base.frustum.md) | Gets the frustum of the camera |
 |  [frustumViewSpace](doc/markdown/./scene.camera.frustumviewspace.md) | <code>readonly</code> | [Frustum](doc/markdown/./base.frustum.md) |  |
+|  [HiZ](doc/markdown/./scene.camera.hiz.md) |  | boolean | Gets whether Hi-Z acceleration is enabled. When enabled, it can significantly improve SSR performance with minimal quality impact. |
 |  [invViewProjectionMatrix](doc/markdown/./scene.camera.invviewprojectionmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The inverse-view-projection matrix of the camera |
 |  [oit](doc/markdown/./scene.camera.oit.md) |  | [OIT](doc/markdown/./scene.oit.md) | OIT |
 |  [pickPosX](doc/markdown/./scene.camera.pickposx.md) |  | number | X coordinate for picking related to viewport |
@@ -40,6 +41,18 @@ declare class Camera extends SceneNode
 |  [pickResult](doc/markdown/./scene.camera.pickresult.md) |  | [PickResult](doc/markdown/./scene.pickresult.md) | Pick result |
 |  [sampleCount](doc/markdown/./scene.camera.samplecount.md) |  | number | Sample count for MSAA |
 |  [scissor](doc/markdown/./scene.camera.scissor.md) |  | number\[\] | Scissor rectangle used for rendering, if null, use viewport value |
+|  [SSR](doc/markdown/./scene.camera.ssr.md) |  | boolean | Gets whether Screen Space Reflections (SSR) is enabled. |
+|  [ssrBlurDepthCutoff](doc/markdown/./scene.camera.ssrblurdepthcutoff.md) |  | number | Gets the depth cutoff value for SSR blur. Determines at what depth difference the blur effect should be reduced or eliminated. |
+|  [ssrBlurKernelSize](doc/markdown/./scene.camera.ssrblurkernelsize.md) |  | number | Gets the kernel size for the SSR blur effect. Defines the size of the blur kernel. Larger values create softer, more spread-out blur. |
+|  [ssrBlurScale](doc/markdown/./scene.camera.ssrblurscale.md) |  | number | Gets the blur scale factor for SSR. Controls the overall intensity of the blur effect applied to reflections. |
+|  [ssrBlurStdDev](doc/markdown/./scene.camera.ssrblurstddev.md) |  | number | Gets the standard deviation for the SSR Gaussian blur. Controls the distribution of the blur effect. Higher values create more pronounced blur. |
+|  [ssrCalcThickness](doc/markdown/./scene.camera.ssrcalcthickness.md) |  | boolean | Gets whether SSR should calculate thickness automatically. When enabled, the system will dynamically compute surface thickness for reflections. |
+|  [ssrIterations](doc/markdown/./scene.camera.ssriterations.md) |  | number | Gets the number of iterations for SSR ray marching. Higher values provide more accurate reflections but impact performance. |
+|  [ssrMaxDistance](doc/markdown/./scene.camera.ssrmaxdistance.md) |  | number | Gets the maximum distance for SSR ray marching. Defines how far rays will travel when searching for reflection intersections. |
+|  [ssrMaxRoughness](doc/markdown/./scene.camera.ssrmaxroughness.md) |  | number | Gets the maximum roughness value for screen space reflections. Controls the cutoff point where surfaces are considered too rough for SSR. |
+|  [ssrRoughnessFactor](doc/markdown/./scene.camera.ssrroughnessfactor.md) |  | number | Gets the roughness factor for SSR calculations. Affects how surface roughness influences reflection clarity. |
+|  [ssrStride](doc/markdown/./scene.camera.ssrstride.md) |  | number | Gets the stride value for SSR ray marching. Controls the step size during ray marching. Larger values improve performance but may miss details. |
+|  [ssrThickness](doc/markdown/./scene.camera.ssrthickness.md) |  | number | Gets the thickness value for SSR calculations. Determines the thickness threshold for surfaces when calculating reflections. |
 |  [viewMatrix](doc/markdown/./scene.camera.viewmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | View matrix of the camera |
 |  [viewport](doc/markdown/./scene.camera.viewport.md) |  | number\[\] | Viewport used for rendering, if null, use full framebuffer size |
 |  [viewProjectionMatrix](doc/markdown/./scene.camera.viewprojectionmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) |  |

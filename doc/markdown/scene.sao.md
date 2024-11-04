@@ -9,9 +9,9 @@ The Scalable Ambient Obscurance (SAO) post effect
 **Signature:**
 
 ```typescript
-declare class SAO extends AbstractPostEffect 
+declare class SAO extends AbstractPostEffect<'SAO'> 
 ```
-**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)
+**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)<!-- -->&lt;'SAO'&gt;
 
 ## Constructors
 
@@ -27,6 +27,7 @@ declare class SAO extends AbstractPostEffect
 |  [blurDepthCutoff](doc/markdown/./scene.sao.blurdepthcutoff.md) |  | number | Cutoff of depth limited blur |
 |  [blurKernelSize](doc/markdown/./scene.sao.blurkernelsize.md) |  | number | Blur kernel size |
 |  [blurStdDev](doc/markdown/./scene.sao.blurstddev.md) |  | number | Gaussian blur stddev value |
+|  [className](doc/markdown/./scene.sao.classname.md) | <p><code>static</code></p><p><code>readonly</code></p> | "SAO" |  |
 |  [intensity](doc/markdown/./scene.sao.intensity.md) |  | number | SAO intensity |
 |  [minResolution](doc/markdown/./scene.sao.minresolution.md) |  | number | Minimum resolution |
 |  [radius](doc/markdown/./scene.sao.radius.md) |  | number | Radius value |

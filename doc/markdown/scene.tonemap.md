@@ -9,9 +9,9 @@ The tonemap post effect
 **Signature:**
 
 ```typescript
-declare class Tonemap extends AbstractPostEffect 
+declare class Tonemap extends AbstractPostEffect<'Tonemap'> 
 ```
-**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)
+**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)<!-- -->&lt;'Tonemap'&gt;
 
 ## Constructors
 
@@ -23,6 +23,7 @@ declare class Tonemap extends AbstractPostEffect
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
+|  [className](doc/markdown/./scene.tonemap.classname.md) | <p><code>static</code></p><p><code>readonly</code></p> | "Tonemap" |  |
 |  [exposure](doc/markdown/./scene.tonemap.exposure.md) |  | number | Exposure value |
 
 ## Methods

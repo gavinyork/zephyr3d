@@ -9,5 +9,5 @@ View dimension
 **Signature:**
 
 ```typescript
-viewDimension: '1d' | '2d';
+viewDimension: '1d' | '2d' | '2d-array' | 'cube' | 'cube-array' | '3d';
 ```

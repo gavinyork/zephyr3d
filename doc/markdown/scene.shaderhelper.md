@@ -45,6 +45,8 @@ declare class ShaderHelper
 |  [getCameraClipPlaneFlag(scope)](doc/markdown/./scene.shaderhelper.getcameraclipplaneflag.md) | <code>static</code> | Gets the clip plane flag |
 |  [getCameraParams(scope)](doc/markdown/./scene.shaderhelper.getcameraparams.md) | <code>static</code> | Gets the uniform variable of type vec4 which holds the camera parameters |
 |  [getCameraPosition(scope)](doc/markdown/./scene.shaderhelper.getcameraposition.md) | <code>static</code> | Gets the uniform variable of type vec3 which holds the camera position |
+|  [getCameraRoughnessFactor(scope)](doc/markdown/./scene.shaderhelper.getcameraroughnessfactor.md) | <code>static</code> | Gets the uniform variable of type float which holds the roughness factor |
+|  [getDrawableBindGroupLayout(skinning, morphing, instancing)](doc/markdown/./scene.shaderhelper.getdrawablebindgrouplayout.md) | <code>static</code> |  |
 |  [getEnvLightStrength(scope)](doc/markdown/./scene.shaderhelper.getenvlightstrength.md) | <code>static</code> | Gets the uniform variable of type float which holds the strength of the environment light |
 |  [getFogColor(scope)](doc/markdown/./scene.shaderhelper.getfogcolor.md) | <code>static</code> | Gets the uniform variable of type vec4 which holds the fog color |
 |  [getFogParams(scope)](doc/markdown/./scene.shaderhelper.getfogparams.md) | <code>static</code> | Gets the uniform variable of type vec4 which holds the fog parameters |

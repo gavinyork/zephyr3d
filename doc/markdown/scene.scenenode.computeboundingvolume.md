@@ -9,15 +9,8 @@ Computes the bounding volume of the node
 **Signature:**
 
 ```typescript
-computeBoundingVolume(bv: BoundingVolume): BoundingVolume;
+computeBoundingVolume(): BoundingVolume;
 ```
-
-## Parameters
-
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  bv | [BoundingVolume](doc/markdown/./scene.boundingvolume.md) | The output bounding volume |
-
 **Returns:**
 
 [BoundingVolume](doc/markdown/./scene.boundingvolume.md)

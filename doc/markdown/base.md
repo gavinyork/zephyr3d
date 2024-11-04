@@ -77,6 +77,7 @@
 |  [GenericConstructor](doc/markdown/./base.genericconstructor.md) | A generic constructor type |
 |  [InterpolationMode](doc/markdown/./base.interpolationmode.md) | The interpolation mode |
 |  [InterpolationTarget](doc/markdown/./base.interpolationtarget.md) | Target of interpolation |
+|  [MaybeArray](doc/markdown/./base.maybearray.md) |  |
 |  [PackRect](doc/markdown/./base.packrect.md) | The type of packed result. |
 |  [REventHandlerOptions](doc/markdown/./base.reventhandleroptions.md) | Options of event handler |
 |  [TypedArray](doc/markdown/./base.typedarray.md) | Typed array |

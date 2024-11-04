@@ -9,9 +9,9 @@ true if this is a mesh node, false otherwise
 **Signature:**
 
 ```typescript
-isMesh(): boolean;
+isMesh(): this is Mesh;
 ```
 **Returns:**
 
-boolean
+this is [Mesh](doc/markdown/./scene.mesh.md)
 

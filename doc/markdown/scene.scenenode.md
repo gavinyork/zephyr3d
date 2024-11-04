@@ -45,7 +45,7 @@ We use a data structure called SceneGraph to store scenes, which consists of a c
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [computeBoundingVolume(bv)](doc/markdown/./scene.scenenode.computeboundingvolume.md) |  | Computes the bounding volume of the node |
+|  [computeBoundingVolume()](doc/markdown/./scene.scenenode.computeboundingvolume.md) |  | Computes the bounding volume of the node |
 |  [dispose()](doc/markdown/./scene.scenenode.dispose.md) |  | Disposes the node |
 |  [getBoundingVolume()](doc/markdown/./scene.scenenode.getboundingvolume.md) |  | Gets the bounding volume of the node |
 |  [getWorldBoundingVolume()](doc/markdown/./scene.scenenode.getworldboundingvolume.md) |  | Gets the world space bounding volume of the node |

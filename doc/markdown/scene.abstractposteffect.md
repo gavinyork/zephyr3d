@@ -9,7 +9,7 @@ Base class for any type of post effect
 **Signature:**
 
 ```typescript
-declare abstract class AbstractPostEffect 
+declare abstract class AbstractPostEffect<ClassName extends string> 
 ```
 
 ## Constructors
@@ -27,6 +27,7 @@ declare abstract class AbstractPostEffect
 |  [\_outputTexture](doc/markdown/./scene.abstractposteffect._outputtexture.md) | <code>protected</code> | [Texture2D](doc/markdown/./device.texture2d.md) |  |
 |  [\_quadRenderStateSet](doc/markdown/./scene.abstractposteffect._quadrenderstateset.md) | <code>protected</code> | [RenderStateSet](doc/markdown/./device.renderstateset.md) |  |
 |  [\_quadVertexLayout](doc/markdown/./scene.abstractposteffect._quadvertexlayout.md) | <code>protected</code> | [VertexLayout](doc/markdown/./device.vertexlayout.md) |  |
+|  [className](doc/markdown/./scene.abstractposteffect.classname.md) | <p><code>static</code></p><p><code>readonly</code></p> | string |  |
 |  [enabled](doc/markdown/./scene.abstractposteffect.enabled.md) |  | boolean | Whether this post effect is enabled |
 |  [opaque](doc/markdown/./scene.abstractposteffect.opaque.md) | <code>readonly</code> | boolean | Whether this post effect will be rendered at opaque phase |
 
@@ -37,7 +38,8 @@ declare abstract class AbstractPostEffect
 |  [apply(ctx, inputColorTexture, sceneDepthTexture, srgbOutput)](doc/markdown/./scene.abstractposteffect.apply.md) | <code>abstract</code> | Apply the post effect |
 |  [dispose()](doc/markdown/./scene.abstractposteffect.dispose.md) |  | Disposes the post effect. |
 |  [drawFullscreenQuad(renderStateSet)](doc/markdown/./scene.abstractposteffect.drawfullscreenquad.md) | <code>protected</code> | Draws a fullscreen quad |
+|  [getClassName()](doc/markdown/./scene.abstractposteffect.getclassname.md) |  | Gets class name of this instance |
 |  [needFlip(device)](doc/markdown/./scene.abstractposteffect.needflip.md) |  | Check if the post effect should be rendered upside down. |
-|  [requireDepthAttachment()](doc/markdown/./scene.abstractposteffect.requiredepthattachment.md) | <code>abstract</code> | Checks whether this post effect requires the scene depth buffer |
-|  [requireLinearDepthTexture()](doc/markdown/./scene.abstractposteffect.requirelineardepthtexture.md) | <code>abstract</code> | Checks whether this post effect requires the linear depth texture |
+|  [requireDepthAttachment(ctx)](doc/markdown/./scene.abstractposteffect.requiredepthattachment.md) | <code>abstract</code> | Checks whether this post effect requires the scene depth buffer |
+|  [requireLinearDepthTexture(ctx)](doc/markdown/./scene.abstractposteffect.requirelineardepthtexture.md) | <code>abstract</code> | Checks whether this post effect requires the linear depth texture |
 
