@@ -2,6 +2,18 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.6.0",
+      "tag": "@zephyr3d/scene_v0.6.0",
+      "date": "Mon, 04 Nov 2024 16:19:45 GMT",
+      "comments": {
+        "minor": [
+          {
+            "comment": "Add screen space reflection"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.5.0",
       "tag": "@zephyr3d/scene_v0.5.0",
       "date": "Sun, 02 Jun 2024 11:21:22 GMT",

@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Sun, 02 Jun 2024 11:21:22 GMT and should not be manually modified.
+This log was last generated on Mon, 04 Nov 2024 16:19:45 GMT and should not be manually modified.
+
+## 0.6.0
+Mon, 04 Nov 2024 16:19:45 GMT
+
+### Minor changes
+
+- Add screen space reflection
 
 ## 0.5.0
 Sun, 02 Jun 2024 11:21:22 GMT

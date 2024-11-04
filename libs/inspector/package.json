@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/inspector",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Scene inspector for zephyr3d",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
@@ -61,9 +61,9 @@
   "dependencies": {
     "@webgpu/types": "^0.1.40",
     "@types/draco3d": "^1.4.9",
-    "@zephyr3d/base": "workspace:*",
-    "@zephyr3d/device": "workspace:*",
-    "@zephyr3d/scene": "workspace:*",
-    "@zephyr3d/imgui": "workspace:*"
+    "@zephyr3d/base": "workspace:^0.1.4",
+    "@zephyr3d/device": "workspace:^0.2.3",
+    "@zephyr3d/scene": "workspace:^0.6.0",
+    "@zephyr3d/imgui": "workspace:^0.1.3"
   }
 }

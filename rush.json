@@ -459,8 +459,7 @@
     },
     {
       "packageName": "@zephyr3d/inspector",
-      "projectFolder": "libs/inspector",
-      "shouldPublish": true
+      "projectFolder": "libs/inspector"
     },
     {
       "packageName": "@zephyr3d/examples",
