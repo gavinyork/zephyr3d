@@ -6,6 +6,5 @@ export * from './frustum';
 export * from './aabb';
 export * from './ray';
 export * from './sh';
-//export * from './fft';
 export * from './noise';
 export * from './interpolator';

@@ -1,4 +1,4 @@
-# @zephyr3d
+# @zephyr3d/backend-webgl
 
 Zephyr3d is a set of API for 3D rendering within the browser. 
 

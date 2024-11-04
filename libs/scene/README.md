@@ -1,4 +1,4 @@
-# @zephyr3d
+# @zephyr3d/scene
 
 Zephyr3d is a set of API for 3D rendering within the browser. 
 
