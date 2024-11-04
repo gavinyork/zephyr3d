@@ -8,6 +8,7 @@ interface GUIParams {
 export class Panel {
   private _deviceList: string[];
   private _params: GUIParams;
+  private _shown: boolean;
   private _gui: GUI;
   constructor() {
     this._deviceList = ['WebGL', 'WebGL2', 'WebGPU'];
@@ -18,7 +19,12 @@ export class Panel {
         ]
     };
     this._gui = new GUI({ container: document.body });
+    this._shown = true;
     this.create();
+  }
+  toggle() {
+    this._shown = !this._shown;
+    this._gui.show(this._shown);
   }
   create() {
     const desc1 = document.createElement('p');

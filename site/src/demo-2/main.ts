@@ -12,7 +12,6 @@ import {
   PointLight,
   UnlitMaterial,
   Mesh,
-  GraphNode,
   DirectionalLight,
   PerspectiveCamera,
   SphereShape,
@@ -112,7 +111,7 @@ lightApp.ready().then(async () => {
     1,
     260
   );
-  camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
+  camera.controller = new FPSCameraController({ moveSpeed: 0.05 });
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
 
@@ -202,7 +201,9 @@ lightApp.ready().then(async () => {
         for (let i = 0; i < 255; i++) {
           const color = Vector3.normalize(new Vector3(Math.random(), Math.random(), Math.random()));
           const pointlight = new PointLight(scene)
-            .setRange(Math.min(bbox.extents.x, bbox.extents.y, bbox.extents.z) * (0.02 + Math.random() * 0.3))
+            .setRange(
+              Math.min(bbox.extents.x, bbox.extents.y, bbox.extents.z) * (0.027 + Math.random() * 0.3)
+            )
             .setIntensity(20)
             .setColor(new Vector4(color.x, color.y, color.z, 1))
             .setCastShadow(false);

@@ -1,7 +1,7 @@
-import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
+import type { Vector4 } from '@zephyr3d/base';
 import { Vector2, applyMixins, nextPowerOf2 } from '@zephyr3d/base';
 import { Primitive } from '../../render/primitive';
-import type { BatchDrawable, Drawable, DrawContext } from '../../render/drawable';
+import type { BatchDrawable, Drawable, DrawContext, PickTarget } from '../../render/drawable';
 import type { XForm } from '../xform';
 import type { QuadtreeNode } from './quadtree';
 import type { Camera } from '../../camera/camera';
@@ -13,13 +13,12 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import type { Terrain } from './terrain';
-import type { GraphNode } from '../graph_node';
 import { GrassMaterial } from '../../material/grassmaterial';
 import { mixinDrawable } from '../../render/drawable_mixin';
 import type { MeshMaterial } from '../../material';
 
 export class GrassClusterBase {
-  protected _terrain;
+  protected _terrain: Terrain;
   constructor(terrain: Terrain) {
     this._terrain = terrain;
   }
@@ -59,13 +58,10 @@ export class GrassCluster extends applyMixins(GrassClusterBase, mixinDrawable) i
   getInstanceColor(): Vector4 {
     return this._terrain.getInstanceColor();
   }
-  getPickTarget(): GraphNode {
-    return this._terrain;
+  getPickTarget(): PickTarget {
+    return { node: this._terrain };
   }
   getBoneMatrices(): Texture2D<unknown> {
-    return null;
-  }
-  getInvBindMatrix(): Matrix4x4 {
     return null;
   }
   getMorphData(): Texture2D {

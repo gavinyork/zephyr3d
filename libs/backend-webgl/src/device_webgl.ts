@@ -37,7 +37,12 @@ import type {
   DeviceBackend,
   DeviceEventMap,
   AbstractDevice,
-  RenderBundle
+  RenderBundle,
+  BlendingState,
+  ColorState,
+  RasterizerState,
+  DepthState,
+  StencilState
 } from '@zephyr3d/device';
 import {
   hasAlphaChannel,
@@ -68,7 +73,14 @@ import { WebGLVertexLayout } from './vertexlayout_webgl';
 import { WebGLGPUBuffer } from './buffer_webgl';
 import { WebGLIndexBuffer } from './indexbuffer_webgl';
 import { WebGLFrameBuffer } from './framebuffer_webgl';
-import { WebGLDepthState, WebGLRenderStateSet } from './renderstate_webgl';
+import {
+  WebGLBlendingState,
+  WebGLColorState,
+  WebGLDepthState,
+  WebGLRasterizerState,
+  WebGLRenderStateSet,
+  WebGLStencilState
+} from './renderstate_webgl';
 import { GPUTimer } from './gpu_timer';
 import { WebGLTextureCaps, WebGLFramebufferCaps, WebGLMiscCaps, WebGLShaderCaps } from './capabilities_webgl';
 import { WebGLBindGroup } from './bindgroup_webgl';
@@ -87,12 +99,12 @@ import type { WebGLBaseTexture } from './basetexture_webgl';
 
 declare global {
   interface WebGLRenderingContext {
-    _currentFramebuffer: FrameBuffer;
-    _currentProgram: GPUProgram;
+    _currentFramebuffer: WebGLFrameBuffer;
+    _currentProgram: WebGLGPUProgram;
   }
   interface WebGL2RenderingContext {
-    _currentFramebuffer: FrameBuffer;
-    _currentProgram: GPUProgram;
+    _currentFramebuffer: WebGLFrameBuffer;
+    _currentProgram: WebGLGPUProgram;
   }
 }
 
@@ -256,7 +268,7 @@ export class WebGLDevice extends BaseDevice {
     return this._dpr;
   }
   isContextLost(): boolean {
-    return this._context.isContextLost();
+    return this._contextLost;
   }
   getDeviceCaps(): DeviceCaps {
     return this._deviceCaps;
@@ -403,9 +415,9 @@ export class WebGLDevice extends BaseDevice {
           }
         }
       } else {
-        gl.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
-        gl.clearDepth(clearDepth);
-        gl.clearStencil(clearStencil);
+        colorFlag && gl.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+        depthFlag && gl.clearDepth(clearDepth);
+        stencilFlag && gl.clearStencil(clearStencil);
         gl.clear(colorFlag | depthFlag | stencilFlag);
       }
       (gl._currentFramebuffer as WebGLFrameBuffer)?.tagDraw();
@@ -418,8 +430,23 @@ export class WebGLDevice extends BaseDevice {
   createRenderStateSet(): RenderStateSet {
     return new WebGLRenderStateSet(this._context);
   }
+  createBlendingState(): BlendingState {
+    return new WebGLBlendingState();
+  }
+  createColorState(): ColorState {
+    return new WebGLColorState();
+  }
+  createRasterizerState(): RasterizerState {
+    return new WebGLRasterizerState();
+  }
+  createDepthState(): DepthState {
+    return new WebGLDepthState();
+  }
+  createStencilState(): StencilState {
+    return new WebGLStencilState();
+  }
   createSampler(options: SamplerOptions): TextureSampler {
-    return this._samplerCache.fetchSampler(options);
+    return this._samplerCache.fetchSampler(options) as TextureSampler;
   }
   createTextureFromMipmapData<T extends BaseTexture>(
     data: TextureMipmapData,
@@ -621,6 +648,68 @@ export class WebGLDevice extends BaseDevice {
     const tex = new WebGLTextureVideo(this, el);
     tex.samplerOptions = samplerOptions ?? null;
     return tex;
+  }
+  copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number) {
+    if (!src?.isFramebuffer() || !dst?.isTexture2D()) {
+      console.error('copyFramebufferToTexture2D(): invalid framebuffer or texture');
+      return;
+    }
+    if (!Number.isInteger(level) || level < 0 || level >= dst.mipLevelCount) {
+      console.error('copyFramebufferToTexture2D(): invalid mipmap level');
+      return;
+    }
+    const tex = src.getColorAttachments()[index];
+    if (!tex || !tex.isTexture2D()) {
+      console.error('copyFramebufferToTexture2D(): Color attachment is not a 2D texture');
+      return;
+    }
+    const srcLevel = src.getColorAttachmentMipLevel(index);
+    const srcWidth = Math.max(tex.width >> srcLevel, 1);
+    const srcHeight = Math.max(tex.height >> srcLevel, 1);
+    const dstWidth = Math.max(dst.width >> level, 1);
+    const dstHeight = Math.max(dst.height >> level, 1);
+    if (srcWidth !== dstWidth || srcHeight !== dstHeight) {
+      console.error('Source texture and destination texture must have same size');
+      return;
+    }
+    if (tex.format !== dst.format) {
+      console.error(
+        'copyFramebufferToTexture2D(): Color attachment must have same format with destination texture'
+      );
+      return;
+    }
+    if (index > 0 && !this.isWebGL2) {
+      console.error(
+        'copyFramebufferToTexture2D(): Non-zero color attachment index requires WebGL2 or WebGPU device'
+      );
+      return;
+    }
+    this.pushDeviceStates();
+    // If src is current framebuffer, force mipmaps to be generated
+    this.setFramebuffer(null);
+    this.setFramebuffer(src);
+    const gl = this._context;
+    if (this.isWebGL2) {
+      (gl as WebGL2RenderingContext).readBuffer(gl.COLOR_ATTACHMENT0 + index);
+    }
+    this.bindTexture(gl.TEXTURE_2D, 0, dst as WebGLTexture2D);
+    gl.copyTexSubImage2D(gl.TEXTURE_2D, level, 0, 0, 0, 0, srcWidth, srcHeight);
+    this.popDeviceStates();
+  }
+  copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number) {
+    if (!src || !dst) {
+      console.error('CopyTexture2D(): invalid texture');
+      return;
+    }
+    if (!Number.isInteger(srcLevel) || srcLevel < 0 || srcLevel >= src.mipLevelCount) {
+      console.error('CopyTexture2D(): invalid source mipmap level');
+      return;
+    }
+    const fb = this.createFrameBuffer([src], null);
+    fb.setColorAttachmentGenerateMipmaps(0, false);
+    fb.setColorAttachmentMipLevel(0, srcLevel);
+    this.copyFramebufferToTexture2D(fb, 0, dst, dstLevel);
+    fb.dispose();
   }
   createGPUProgram(params: GPUProgramConstructParams): GPUProgram {
     if (params.type === 'compute') {
@@ -976,6 +1065,7 @@ export class WebGLDevice extends BaseDevice {
         this.context.drawArrays(primitiveTypeMap[primitiveType], first, count);
       }
       (this._context._currentFramebuffer as WebGLFrameBuffer)?.tagDraw();
+      (this.getFramebuffer() as WebGLFrameBuffer)?.invalidateMipmaps();
     }
     if (this._captureRenderBundle) {
       const rs = this._currentStateSet?.clone() ?? this.createRenderStateSet();
@@ -1042,6 +1132,7 @@ export class WebGLDevice extends BaseDevice {
         );
       }
       (this._context._currentFramebuffer as WebGLFrameBuffer)?.tagDraw();
+      (this._context._currentFramebuffer as WebGLFrameBuffer)?.invalidateMipmaps();
     }
     if (this._captureRenderBundle) {
       this._captureRenderBundle.push({

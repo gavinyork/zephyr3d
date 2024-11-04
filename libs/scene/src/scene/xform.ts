@@ -18,6 +18,7 @@ export class XForm<T extends XForm<T> = XForm<any>> extends makeEventTarget(Obje
   noderemoved: SceneNode;
   visiblechanged: SceneNode;
   transformchanged: SceneNode;
+  bvchanged: SceneNode;
 }>() {
   /** @internal */
   protected _parent: T;
@@ -287,7 +288,7 @@ export class XForm<T extends XForm<T> = XForm<any>> extends makeEventTarget(Obje
     return this;
   }
   /** @internal */
-  getTag(): number {
+  get transformTag(): number {
     return this._transformTag;
   }
   /** @internal */
@@ -305,15 +306,13 @@ export class XForm<T extends XForm<T> = XForm<any>> extends makeEventTarget(Obje
     if (invalidateLocal) {
       this._localMatrix = null;
     }
-    if (this._worldMatrix) {
-      this._worldMatrix = null;
-      this._invWorldMatrix = null;
-      this._transformTag++;
-      for (const child of this._children) {
-        child._onTransformChanged(false);
-      }
-    }
+    this._worldMatrix = null;
+    this._invWorldMatrix = null;
     this._worldMatrixDet = null;
+    this._transformTag++;
+    for (const child of this._children) {
+      child._onTransformChanged(false);
+    }
   }
   /** @internal */
   protected _setParent(p: T) {

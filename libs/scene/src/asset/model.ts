@@ -252,8 +252,7 @@ export class AssetHierarchyNode extends NamedObject {
   private _scaling: Vector3;
   private _mesh: AssetMeshData;
   private _skeleton: AssetSkeleton;
-  private _attachToSkeleton: AssetSkeleton;
-  private _attachIndex: number;
+  private _attachToSkeleton: Set<AssetSkeleton>;
   private _meshAttached: boolean;
   private _matrix: Matrix4x4;
   private _worldMatrix: Matrix4x4;
@@ -276,7 +275,6 @@ export class AssetHierarchyNode extends NamedObject {
     this._skeleton = null;
     this._attachToSkeleton = null;
     this._meshAttached = false;
-    this._attachIndex = -1;
     this._matrix = null;
     this._weights = null;
     this._worldMatrix = null;
@@ -351,12 +349,8 @@ export class AssetHierarchyNode extends NamedObject {
     return this._children;
   }
   /** The skeleton to which the node belongs if this is a joint node */
-  get skeletonAttached(): AssetSkeleton {
+  get skeletonAttached(): Set<AssetSkeleton> {
     return this._attachToSkeleton;
-  }
-  /** The joint index if this is a joint node */
-  get attachIndex(): number {
-    return this._attachIndex;
   }
   /** @internal */
   computeTransforms(parentTransform: Matrix4x4) {
@@ -400,11 +394,10 @@ export class AssetHierarchyNode extends NamedObject {
    * @param index - The joint index
    */
   attachToSkeleton(skeleton: AssetSkeleton, index: number) {
-    if (this._attachToSkeleton && skeleton !== this._attachToSkeleton) {
-      throw new Error(`joint can not attached to multiple skeletons`);
+    if (!this._attachToSkeleton) {
+      this._attachToSkeleton = new Set();
     }
-    this._attachToSkeleton = skeleton;
-    this._attachIndex = index;
+    this._attachToSkeleton.add(skeleton);
   }
   /** @internal */
   private setMeshAttached() {

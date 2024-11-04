@@ -2459,9 +2459,21 @@ export class ProgramBuilder {
           throw new Error('internal error');
         }
         if (entry.type.isStorageTexture()) {
+          let viewDimension: typeof entry.texture.viewDimension;
+          if (entry.type.isArrayTexture()) {
+            viewDimension = entry.type.isCubeTexture() ? 'cube-array' : '2d-array';
+          } else if (entry.type.is3DTexture()) {
+            viewDimension = '3d';
+          } else if (entry.type.isCubeTexture()) {
+            viewDimension = 'cube';
+          } else if (entry.type.is1DTexture()) {
+            viewDimension = '1d';
+          } else {
+            viewDimension = '2d';
+          }
           entry.storageTexture = {
             access: 'write-only',
-            viewDimension: entry.type.is1DTexture() ? '1d' : '2d',
+            viewDimension: viewDimension,
             format: entry.type.storageTexelFormat
           };
         } else if (entry.type.isExternalTexture()) {
@@ -3547,7 +3559,17 @@ export class PBGlobalScope extends PBScope {
             );
             const funcType = pb._getFunctionOverload(name, argsNonArray);
             if (!funcType) {
-              throw new Error(`ERROR: no matching overloads for function ${name}`);
+              throw new Error(
+                `ERROR: no matching overloads for function ${name}(${argsNonArray
+                  .map((val) => {
+                    if (val instanceof PBShaderExp) {
+                      return val.$ast?.getType()?.toTypeName() ?? '?';
+                    } else {
+                      return typeof val;
+                    }
+                  })
+                  .join(', ')})`
+              );
             }
             return getCurrentProgramBuilder().$callFunction(name, funcType[1], funcType[0]);
           };

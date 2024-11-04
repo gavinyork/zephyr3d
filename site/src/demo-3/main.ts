@@ -40,7 +40,6 @@ terrainApp.ready().then(async () => {
     ev.preventDefault();
     return false;
   });
-  terrainApp.inputManager.use(demo.camera.handleEvent.bind(demo.camera));
 
   terrainApp.on('pointerup', (ev) => {
     demo.handlePointerUp(ev.button, ev.offsetX, ev.offsetY);
@@ -48,6 +47,14 @@ terrainApp.ready().then(async () => {
   Application.instance.device.canvas.addEventListener('contextmenu', function (ev) {
     ev.preventDefault();
     return false;
+  });
+  terrainApp.on('keyup', (ev) => {
+    console.log(ev.code);
+    if (ev.code === 'Backquote') {
+      demo.toggleInspector();
+    } else if (ev.code === 'KeyT') {
+      demo.toggleGUI();
+    }
   });
   terrainApp.on('resize', (ev) => {
     demo.camera.aspect = ev.width / ev.height;

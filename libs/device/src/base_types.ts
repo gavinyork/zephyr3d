@@ -29,7 +29,14 @@ import type {
   VertexLayoutOptions,
   VertexSemantic
 } from './gpuobject';
-import type { RenderStateSet } from './render_states';
+import type {
+  BlendingState,
+  ColorState,
+  DepthState,
+  RasterizerState,
+  RenderStateSet,
+  StencilState
+} from './render_states';
 import type { Pool } from './pool';
 
 /**
@@ -2494,6 +2501,16 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number);
   /** Creates a render state set object */
   createRenderStateSet(): RenderStateSet;
+  /** Creates a blending state object */
+  createBlendingState(): BlendingState;
+  /** Creates a color state object */
+  createColorState(): ColorState;
+  /** Creates a rasterizer state object */
+  createRasterizerState(): RasterizerState;
+  /** Creates a depth state object */
+  createDepthState(): DepthState;
+  /** Creates a stencil state object */
+  createStencilState(): StencilState;
   /**
    * Creates a texture sampler object
    * @param options - The creation options
@@ -2616,6 +2633,30 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param el - The video element
    */
   createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo;
+  /**
+   * Copies a 2d texture to another texture.
+   *
+   * @remarks
+   * The two textures must have the same size and format
+   *
+   * @param src - Texture that will be copied from.
+   * @param srcLevel - Which mipmap level to be copied from.
+   * @param dst - Texture that will be copied to.
+   * @param dstLevel - Which mipmap level to be copied to.
+   */
+  copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number);
+  /**
+   * Copies a color attachment of a framebuffer to a mipmap level of a texture.
+   *
+   * @remarks
+   * The color attachment and the mipmap level must have the same size and format
+   *
+   * @param src - Framebuffer that will be copied from.
+   * @param index - Color attachment index of the framebuffer.
+   * @param dst - Texture that will be copied to.
+   * @param level - Which mipmap level should be copied to.
+   */
+  copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number);
   /**
    * Set wether to reverse the winding order
    *

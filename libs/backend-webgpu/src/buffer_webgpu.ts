@@ -148,7 +148,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
       this._memCost = 0;
     }
   }
-  isBuffer(): boolean {
+  isBuffer(): this is GPUDataBuffer {
     return true;
   }
   beginSyncChanges(encoder: GPUCommandEncoder) {

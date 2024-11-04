@@ -206,6 +206,7 @@ export class WebGPUMipmapGenerator {
       ]
     };
     this._frameBufferInfo = {
+      frameBuffer: null,
       colorFormats: [format],
       depthFormat: null,
       sampleCount: 1,

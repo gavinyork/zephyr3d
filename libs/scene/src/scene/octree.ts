@@ -267,7 +267,7 @@ export class OctreeNode {
    * Traverse this node by a visitor
    * @param v - The visitor
    */
-  traverse(v: Visitor) {
+  traverse(v: Visitor<OctreeNode>) {
     if (v.visit(this)) {
       for (let i = 0; i < 8; i++) {
         const child = this.getChild(i);
@@ -606,8 +606,11 @@ export class Octree {
    */
   locateNodeChain(candidate: OctreeNode, center: Vector3, radius: number): OctreeNode {
     let level = this._chunks.length - 1;
-    while (level && this._chunks[level].getNodeSize() < 4 * radius) {
+    while (level >= 0 && this._chunks[level].getNodeSize() < 4 * radius) {
       --level;
+    }
+    if (level < 0) {
+      return null;
     }
     const dim = this._chunks[level].getDimension();
     const inv_node_size = 1 / this._chunks[level].getNodeSize();
@@ -691,7 +694,7 @@ export class Octree {
     }
   }
   resize(size: number) {
-    size = Math.max(nextPowerOf2(size), this._leafSize);
+    size = Math.max(nextPowerOf2(Math.ceil(size)), this._leafSize);
     if (size === this._rootSize) {
       return;
     }

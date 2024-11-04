@@ -4,7 +4,7 @@ import type { AssetAnimationTrack, AssetSubMeshData } from '../asset';
 import { BoundingBox } from '../utility';
 import { MAX_MORPH_TARGETS } from '../values';
 import { calculateMorphBoundingBox } from './morphtarget';
-import { Vector3 } from '@zephyr3d/base';
+import { AABB, Vector3 } from '@zephyr3d/base';
 
 /** Morph animation state */
 export type MorphState = {
@@ -19,6 +19,7 @@ export type MorphState = {
  */
 export class MorphTargetTrack extends AnimationTrack<MorphState> {
   private _state: MorphState;
+  private _originBox: AABB;
   private _boundingBox: BoundingBox[];
   private _defaultWeights: number[];
   /**
@@ -32,6 +33,7 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
       weights: new Float32Array(MAX_MORPH_TARGETS)
     };
     this._boundingBox = subMesh.targetBox;
+    this._originBox = subMesh.mesh.getBoundingVolume().toAABB();
     this._defaultWeights =
       assetTrack.defaultMorphWeights ?? Array.from({ length: this._state.numTargets }).map(() => 0);
   }
@@ -47,11 +49,9 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
   }
   applyState(node: SceneNode, state: MorphState) {
     (node as Mesh).getMorphInfo().bufferSubData(4 * 4, state.weights);
-    const animatedBoundingBox = new BoundingBox();
-    const originBoundingBox = (node as Mesh).getBoundingVolume().toAABB();
-    animatedBoundingBox.minPoint = Vector3.add(originBoundingBox.minPoint, state.boundingBox.minPoint);
-    animatedBoundingBox.maxPoint = Vector3.add(originBoundingBox.maxPoint, state.boundingBox.maxPoint);
-    (node as Mesh).setAnimatedBoundingBox(animatedBoundingBox);
+    state.boundingBox.minPoint.addBy(this._originBox.minPoint);
+    state.boundingBox.maxPoint.addBy(this._originBox.maxPoint);
+    (node as Mesh).setAnimatedBoundingBox(state.boundingBox);
   }
   mixState(a: MorphState, b: MorphState, t: number): MorphState {
     const state: MorphState = {

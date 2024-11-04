@@ -133,8 +133,8 @@ export class ShadowMapper {
       shadowMapSize: 1024,
       numCascades: 1,
       splitLambda: 0.5,
-      depthBias: 0.05,
-      normalBias: 0.05,
+      depthBias: 0.5,
+      normalBias: 0.2,
       nearClip: 1
     };
     this._resourceDirty = true;
@@ -663,7 +663,14 @@ export class ShadowMapper {
     up.setXYZ(0, 1, 0);
     lightCamera.lookAt(center, target, up);
     lightCamera.position.set(center);
-    lightCamera.setOrtho(-radius, radius, -radius, radius, -radius, radius);
+    lightCamera.setOrtho(
+      -radius,
+      radius,
+      -radius,
+      radius,
+      -radius,
+      Math.max(Vector3.distance(center, sceneCamera.getWorldPosition()), sceneCamera.getFarPlane())
+    );
     center.setXYZ(0, 0, 0);
     lightCamera.viewProjectionMatrix.transformPointP(center, center);
     if (cropMatrix) {
@@ -800,7 +807,7 @@ export class ShadowMapper {
   }
   /** @internal */
   protected calcDepthBiasParams(
-    shadowMapCamera: Camera,
+    camera: Camera,
     shadowMapSize: number,
     depthBias: number,
     normalBias: number,
@@ -808,15 +815,15 @@ export class ShadowMapper {
     result: Vector4
   ): void {
     const sizeNear = Math.min(
-      shadowMapCamera.getProjectionMatrix().getNearPlaneWidth(),
-      shadowMapCamera.getProjectionMatrix().getNearPlaneHeight()
+      camera.getProjectionMatrix().getNearPlaneWidth(),
+      camera.getProjectionMatrix().getNearPlaneHeight()
     );
     const sizeFar = Math.min(
-      shadowMapCamera.getProjectionMatrix().getFarPlaneWidth(),
-      shadowMapCamera.getProjectionMatrix().getFarPlaneHeight()
+      camera.getProjectionMatrix().getFarPlaneWidth(),
+      camera.getProjectionMatrix().getFarPlaneHeight()
     );
-    const scaleFactor = sizeNear / shadowMapSize / 2;
-    result.setXYZW(depthBias * scaleFactor, normalBias * scaleFactor, depthScale, sizeFar / sizeNear);
+    const scaleFactor = (sizeNear / shadowMapSize) * 2;
+    result.setXYZW(depthBias * scaleFactor, normalBias * 0.0001, depthScale, sizeFar / sizeNear);
   }
   /** @internal */
   protected postRenderShadowMap(shadowMapParams: ShadowMapParams) {
@@ -855,7 +862,7 @@ export class ShadowMapper {
       const shadowMapRenderCamera = ShadowMapper.fetchCameraForScene(scene);
       this.createLightCameraPoint(shadowMapRenderCamera);
       this.calcDepthBiasParams(
-        shadowMapRenderCamera,
+        camera,
         this._config.shadowMapSize,
         this._config.depthBias,
         this._config.normalBias,
@@ -911,7 +918,7 @@ export class ShadowMapper {
           );
           this.createLightCameraDirectional(shadowRegion, cascadeCamera, shadowMapCullCamera, null, border);
           this.calcDepthBiasParams(
-            shadowMapRenderCamera,
+            camera,
             this._config.shadowMapSize,
             this._config.depthBias,
             this._config.normalBias,
@@ -998,7 +1005,7 @@ export class ShadowMapper {
           this.createLightCameraSpot(shadowMapRenderCamera);
         }
         this.calcDepthBiasParams(
-          shadowMapRenderCamera,
+          camera,
           this._config.shadowMapSize,
           this._config.depthBias,
           this._config.normalBias,

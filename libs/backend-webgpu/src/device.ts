@@ -32,7 +32,12 @@ import type {
   DeviceBackend,
   DeviceViewport,
   BaseTexture,
-  RenderBundle
+  RenderBundle,
+  BlendingState,
+  ColorState,
+  RasterizerState,
+  DepthState,
+  StencilState
 } from '@zephyr3d/device';
 import { getTextureFormatBlockSize, DeviceResizeEvent, BaseDevice } from '@zephyr3d/device';
 import type { WebGPUTextureSampler } from './sampler_webgpu';
@@ -51,7 +56,14 @@ import {
 } from './capabilities_webgpu';
 import { WebGPUVertexLayout } from './vertexlayout_webgpu';
 import { PipelineCache } from './pipeline_cache';
-import { WebGPURenderStateSet } from './renderstates_webgpu';
+import {
+  WebGPUBlendingState,
+  WebGPUColorState,
+  WebGPUDepthState,
+  WebGPURasterizerState,
+  WebGPURenderStateSet,
+  WebGPUStencilState
+} from './renderstates_webgpu';
 import { WebGPUBuffer } from './buffer_webgpu';
 import { WebGPUFrameBuffer } from './framebuffer_webgpu';
 import { WebGPUIndexBuffer } from './indexbuffer_webgpu';
@@ -290,6 +302,21 @@ export class WebGPUDevice extends BaseDevice {
   createRenderStateSet(): RenderStateSet {
     return new WebGPURenderStateSet(this);
   }
+  createBlendingState(): BlendingState {
+    return new WebGPUBlendingState();
+  }
+  createColorState(): ColorState {
+    return new WebGPUColorState();
+  }
+  createRasterizerState(): RasterizerState {
+    return new WebGPURasterizerState();
+  }
+  createDepthState(): DepthState {
+    return new WebGPUDepthState();
+  }
+  createStencilState(): StencilState {
+    return new WebGPUStencilState();
+  }
   createSampler(options: SamplerOptions): TextureSampler {
     return this.fetchSampler(options);
   }
@@ -489,6 +516,66 @@ export class WebGPUDevice extends BaseDevice {
     const tex = new WebGPUTextureVideo(this, el);
     tex.samplerOptions = samplerOptions ?? null;
     return tex;
+  }
+  copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number) {
+    if (!src?.isFramebuffer() || !dst?.isTexture2D()) {
+      console.error('copyFramebufferToTexture2D(): invalid texture');
+      return;
+    }
+    const srcTex = src.getColorAttachments()?.[index];
+    if (!srcTex || !srcTex.isTexture2D()) {
+      console.error('copyFramebufferToTexture2D(): Color attachment is not a 2D texture');
+      return;
+    }
+    this.copyTexture2D(srcTex, src.getColorAttachmentMipLevel(index), dst, level);
+  }
+  copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number) {
+    if (!src?.isTexture2D() || !dst?.isTexture2D()) {
+      console.error('CopyTexture2D(): invalid texture');
+      return;
+    }
+    if (!Number.isInteger(srcLevel) || srcLevel < 0 || srcLevel >= src.mipLevelCount) {
+      console.error('CopyTexture2D(): invalid source mipmap level');
+      return;
+    }
+    if (!Number.isInteger(dstLevel) || dstLevel < 0 || dstLevel >= dst.mipLevelCount) {
+      console.error('CopyTexture2D(): invalid destination mipmap level');
+      return;
+    }
+    const srcWidth = Math.max(src.width >> srcLevel, 1);
+    const srcHeight = Math.max(src.height >> srcLevel, 1);
+    const dstWidth = Math.max(dst.width >> dstLevel, 1);
+    const dstHeight = Math.max(dst.height >> dstLevel, 1);
+    if (srcWidth !== dstWidth || srcHeight !== dstHeight) {
+      console.error('Source texture and destination texture must have same size');
+      return;
+    }
+    if (src.format !== dst.format) {
+      console.error('CopyTexture2D(): Source texture and destination texture must have same format');
+      return;
+    }
+    this.flush();
+    const srcTex = src as WebGPUTexture2D;
+    const dstTex = dst as WebGPUTexture2D;
+    const commandEncoder = this._device.createCommandEncoder();
+    commandEncoder.copyTextureToTexture(
+      {
+        texture: srcTex.object,
+        mipLevel: srcLevel,
+        origin: { x: 0, y: 0, z: 0 }
+      },
+      {
+        texture: dstTex.object,
+        mipLevel: dstLevel,
+        origin: { x: 0, y: 0, z: 0 }
+      },
+      {
+        width: srcWidth,
+        height: srcHeight,
+        depthOrArrayLayers: 1
+      }
+    );
+    this._device.queue.submit([commandEncoder.finish()]);
   }
   createGPUProgram(params: GPUProgramConstructParams): GPUProgram {
     return new WebGPUProgram(this, params);

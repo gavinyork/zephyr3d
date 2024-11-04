@@ -1,27 +1,31 @@
 import type {
   AbstractDevice,
+  FrameBuffer,
   PBGlobalScope,
   PBInsideFunctionScope,
   PBShaderExp,
-  Texture2D
+  Texture2D,
+  TextureCube
 } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { WaterMesh } from '../render';
 import { AbstractPostEffect } from './posteffect';
-import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders';
+import { WaterShaderImpl } from '../shaders';
+import { linearToGamma } from '../shaders';
 import { Interpolator, Matrix4x4, Plane, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import { Camera } from '../camera';
 import { CopyBlitter } from '../blitter';
 import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
+import { sampleLinearDepth, screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
+import type { WaveGenerator } from '../render/wavegenerator';
+import { fetchSampler } from '../utility/misc';
 
 /**
  * The post water effect
  * @public
  */
-export class PostWater extends AbstractPostEffect {
-  private _elevation: number;
-  private _region: Vector4;
-  private _gridScale: number;
+export class PostWater extends AbstractPostEffect<'PostWater'> {
+  static readonly className = 'PostWater' as const;
   private _reflectSize: number;
   private _copyBlitter: CopyBlitter;
   private _renderingReflections: boolean;
@@ -29,40 +33,29 @@ export class PostWater extends AbstractPostEffect {
   private _displace: number;
   private _depthMulti: number;
   private _refractionStrength: number;
+  private _causticsParams: Vector4;
   private _absorptionGrad: Interpolator;
   private _scatterGrad: Interpolator;
   private _rampTex: Texture2D;
-  private _foamWidth: number;
-  private _foamContrast: number;
-  private _waterAlignment: number;
-  private _waterWireframe: boolean;
-  private _waterWind: Vector2;
-  private _waveLength0: number;
-  private _waveStrength0: number;
-  private _waveCroppiness0: number;
-  private _waveLength1: number;
-  private _waveStrength1: number;
-  private _waveCroppiness1: number;
-  private _waveLength2: number;
-  private _waveStrength2: number;
-  private _waveCroppiness2: number;
-  private _currentWaterMesh: WaterMesh;
-  private _waterMeshes: Record<string, WaterMesh>;
+  private _targetSize: Vector4;
+  private _envMap: TextureCube;
+  private _ssr: boolean;
+  private _ssrParams: Vector4;
+  private _waterImpls: Record<string, WaterShaderImpl>;
+  private _waterMesh: WaterMesh;
   /**
    * Creates an instance of PostWater.
    * @param elevation - Elevation of the water
    */
-  constructor(elevation: number) {
+  constructor(elevation: number, waveGenerator: WaveGenerator) {
     super();
-    this._elevation = elevation ?? 0;
-    this._region = new Vector4(-1000, -1000, 1000, 1000);
-    this._gridScale = 1;
     this._reflectSize = 512;
     this._antiReflectanceLeak = 0.5;
     this._opaque = true;
     this._displace = 16;
     this._depthMulti = 0.1;
     this._refractionStrength = 0;
+    this._causticsParams = new Vector4(0.8, 1.0, 1, 0);
     this._copyBlitter = new CopyBlitter();
     this._renderingReflections = false;
     this._absorptionGrad = new Interpolator(
@@ -78,145 +71,67 @@ export class PostWater extends AbstractPostEffect {
       new Float32Array([0, 0, 0, 0.08, 0.41, 0.34, 0.13, 0.4, 0.45, 0.21, 0.5, 0.6])
     );
     this._rampTex = null;
-    this._foamWidth = 1.2;
-    this._foamContrast = 7.2;
-    this._waterWireframe = false;
-    this._waterAlignment = 1;
-    this._waterWind = new Vector2(2, 2);
-    this._waveLength0 = 400;
-    this._waveStrength0 = 0.4;
-    this._waveCroppiness0 = -1.5;
-    this._waveLength1 = 100;
-    this._waveStrength1 = 0.4;
-    this._waveCroppiness1 = -1.2;
-    this._waveLength2 = 15;
-    this._waveStrength2 = 0.2;
-    this._waveCroppiness2 = -0.5;
-    this._currentWaterMesh = null;
-    this._waterMeshes = {};
+    this._targetSize = new Vector4();
+    this._envMap = null;
+    this._ssr = true;
+    this._ssrParams = new Vector4(32, 80, 0.5, 6);
+    this._waterImpls = {};
+    this._waterMesh = new WaterMesh();
+    this._waterMesh.waveImpl = waveGenerator;
+    this._waterMesh.wireframe = false;
+    this._waterMesh.gridScale = 1;
+    this._waterMesh.level = elevation;
+  }
+  get waveGenerator(): WaveGenerator {
+    return this._waterMesh.waveImpl;
   }
   get wireframe() {
-    return this._waterWireframe;
+    return this._waterMesh.wireframe;
   }
   set wireframe(val: boolean) {
-    this._waterWireframe = val;
-    if (this._currentWaterMesh) {
-      this._currentWaterMesh.wireframe = this._waterWireframe;
-    }
+    this._waterMesh.wireframe = val;
   }
-  get alignment() {
-    return this._waterAlignment;
+  get ssrMaxDistance(): number {
+    return this._ssrParams.x;
   }
-  set alignment(val: number) {
-    this._waterAlignment = val;
-    if (this._currentWaterMesh) {
-      this._currentWaterMesh.alignment = this._waterAlignment;
-    }
+  set ssrMaxDistance(val: number) {
+    this._ssrParams.x = val;
   }
-  get wind() {
-    return this._waterWind;
+  get causticsSlopeMin(): number {
+    return this._causticsParams.x;
   }
-  set wind(val: Vector2) {
-    this._waterWind.set(val);
+  set causticsSlopeMin(val: number) {
+    this._causticsParams.x = val;
   }
-  get foamWidth() {
-    return this._foamWidth;
+  get causticsSlopeMax(): number {
+    return this._causticsParams.y;
   }
-  set foamWidth(val: number) {
-    this._foamWidth = val;
-    if (this._currentWaterMesh) {
-      this._currentWaterMesh.foamWidth = this._foamWidth;
-    }
+  set causticsSlopeMax(val: number) {
+    this._causticsParams.y = val;
   }
-  get foamContrast() {
-    return this._foamContrast;
+  get causticsFalloff(): number {
+    return this._causticsParams.z;
   }
-  set foamContrast(val: number) {
-    this._foamContrast = val;
-    if (this._currentWaterMesh) {
-      this._currentWaterMesh.foamContrast = this._foamContrast;
-    }
+  set causticsFalloff(val: number) {
+    this._causticsParams.z = val;
   }
-  get waveLength0() {
-    return this._waveLength0;
+  get causticsIntensity(): number {
+    return this._causticsParams.w;
   }
-  set waveLength0(val: number) {
-    this._waveLength0 = val;
-    if (this._currentWaterMesh) {
-      this._currentWaterMesh.setWaveLength(0, this._waveLength0);
-    }
+  set causticsIntensity(val: number) {
+    this._causticsParams.w = val;
   }
-  get waveStrength0() {
-    return this._waveStrength0;
+  get ssrIterations(): number {
+    return this._ssrParams.y;
   }
-  set waveStrength0(val: number) {
-    this._waveStrength0 = val;
-    if (this._currentWaterMesh) {
-      this._currentWaterMesh.setWaveStrength(0, this._waveStrength0);
-    }
+  set ssrIterations(val: number) {
+    this._ssrParams.y = val;
   }
-  get waveCroppiness0() {
-    return this._waveCroppiness0;
+  get ssrThickness(): number {
+    return this._ssrParams.z;
   }
-  set waveCroppiness0(val: number) {
-    this._waveCroppiness0 = val;
-    if (this._currentWaterMesh) {
-      this._currentWaterMesh.setWaveCroppiness(0, this._waveCroppiness0);
-    }
-  }
-  get waveLength1() {
-    return this._waveLength1;
-  }
-  set waveLength1(val: number) {
-    this._waveLength1 = val;
-    if (this._currentWaterMesh) {
-      this._currentWaterMesh.setWaveLength(1, this._waveLength1);
-    }
-  }
-  get waveStrength1() {
-    return this._waveStrength1;
-  }
-  set waveStrength1(val: number) {
-    this._waveStrength1 = val;
-    if (this._currentWaterMesh) {
-      this._currentWaterMesh.setWaveStrength(1, this._waveStrength1);
-    }
-  }
-  get waveCroppiness1() {
-    return this._waveCroppiness1;
-  }
-  set waveCroppiness1(val: number) {
-    this._waveCroppiness1 = val;
-    if (this._currentWaterMesh) {
-      this._currentWaterMesh.setWaveCroppiness(1, this._waveCroppiness1);
-    }
-  }
-  get waveLength2() {
-    return this._waveLength2;
-  }
-  set waveLength2(val: number) {
-    this._waveLength2 = val;
-    if (this._currentWaterMesh) {
-      this._currentWaterMesh.setWaveLength(2, this._waveLength2);
-    }
-  }
-  get waveStrength2() {
-    return this._waveStrength2;
-  }
-  set waveStrength2(val: number) {
-    this._waveStrength2 = val;
-    if (this._currentWaterMesh) {
-      this._currentWaterMesh.setWaveStrength(2, this._waveStrength2);
-    }
-  }
-  get waveCroppiness2() {
-    return this._waveCroppiness2;
-  }
-  set waveCroppiness2(val: number) {
-    this._waveCroppiness2 = val;
-    if (this._currentWaterMesh) {
-      this._currentWaterMesh.setWaveCroppiness(2, this._waveCroppiness2);
-    }
+  set ssrThickness(val: number) {
+    this._ssrParams.z = val;
   }
   /** Refraction strength */
   get refractionStrength(): number {
@@ -234,31 +149,31 @@ export class PostWater extends AbstractPostEffect {
   }
   /** Water elevation in world space */
   get elevation(): number {
-    return this._elevation;
+    return this._waterMesh.level;
   }
   set elevation(val: number) {
-    this._elevation = val;
+    this._waterMesh.level = val;
   }
   /** Water boundary in world space ( minX, minZ, maxX, maxZ ) */
   get boundary(): Vector4 {
-    return this._region;
+    return this._waterMesh.region;
   }
   set boundary(val: Vector4) {
-    this._region.set(val);
-    if (this._currentWaterMesh) {
-      this._currentWaterMesh.regionMin.setXY(this._region.x, this._region.y);
-      this._currentWaterMesh.regionMax.setXY(this._region.z, this._region.w);
-    }
+    this._waterMesh.region = val;
   }
   /** Water clipmap grid scale */
   get gridScale(): number {
-    return this._gridScale;
+    return this._waterMesh.gridScale;
   }
   set gridScale(val: number) {
-    this._gridScale = val;
-    if (this._currentWaterMesh) {
-      this._currentWaterMesh.gridScale = this._gridScale;
-    }
+    this._waterMesh.gridScale = val;
+  }
+  /** Water animation speed factor */
+  get speed(): number {
+    return this._waterMesh.speed;
+  }
+  set speed(val: number) {
+    this._waterMesh.speed = val;
   }
   /** The amount for increasing the water elevation to reduce leaking artifact */
   get antiReflectanceLeak() {
@@ -274,6 +189,20 @@ export class PostWater extends AbstractPostEffect {
   set displace(val: number) {
     this._displace = val;
   }
+  /** Environment map */
+  get envMap(): TextureCube {
+    return this._envMap;
+  }
+  set envMap(tex: TextureCube) {
+    this._envMap = tex;
+  }
+  /** SSR */
+  get ssr(): boolean {
+    return this._ssr;
+  }
+  set ssr(val: boolean) {
+    this._ssr = !!val;
+  }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
   requireLinearDepthTexture(): boolean {
     return true;
@@ -285,96 +214,92 @@ export class PostWater extends AbstractPostEffect {
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const device = ctx.device;
+    const ssr = this._ssr; // ctx.device.type === 'webgl' ? false : this._ssr;
     const rampTex = this._getRampTexture(device);
     this._copyBlitter.srgbOut = srgbOutput;
-    this._copyBlitter.blit(
-      inputColorTexture,
-      device.getFramebuffer(),
-      device.createSampler({
-        magFilter: 'nearest',
-        minFilter: 'nearest',
-        mipFilter: 'none',
-        addressU: 'clamp',
-        addressV: 'clamp'
-      })
-    );
-    if (this._renderingReflections) {
-      return;
+    this._copyBlitter.blit(inputColorTexture, device.getFramebuffer(), fetchSampler('clamp_nearest_nomip'));
+    let fbRefl: FrameBuffer;
+    if (!ssr) {
+      if (this._renderingReflections) {
+        return;
+      }
+      this._renderingReflections = true;
+      fbRefl = ctx.device.pool.fetchTemporalFramebuffer(
+        true,
+        this._reflectSize,
+        this._reflectSize,
+        inputColorTexture.format,
+        ctx.depthFormat,
+        false
+      );
+      const plane = new Plane(0, -1, 0, this._waterMesh.level);
+      const clipPlane = new Plane(0, -1, 0, this._waterMesh.level - this._antiReflectanceLeak);
+      const matReflectionR = Matrix4x4.invert(Matrix4x4.reflection(-plane.a, -plane.b, -plane.c, -plane.d));
+      const reflCamera = new Camera(ctx.scene);
+      reflCamera.framebuffer = fbRefl;
+      Matrix4x4.multiply(matReflectionR, ctx.camera.worldMatrix).decompose(
+        reflCamera.scale,
+        reflCamera.rotation,
+        reflCamera.position
+      );
+      reflCamera.setProjectionMatrix(ctx.camera.getProjectionMatrix());
+      reflCamera.clipPlane = clipPlane;
+      reflCamera.render(ctx.scene, ctx.compositor);
+      reflCamera.remove();
+      this._renderingReflections = false;
     }
-
-    this._renderingReflections = true;
-    const fbRefl = ctx.device.pool.fetchTemporalFramebuffer(
-      true,
-      this._reflectSize,
-      this._reflectSize,
-      inputColorTexture.format,
-      ctx.depthFormat,
-      false
-    );
-    const plane = new Plane(0, -1, 0, this._elevation);
-    const clipPlane = new Plane(0, -1, 0, this._elevation - this._antiReflectanceLeak);
-    const matReflectionR = Matrix4x4.invert(Matrix4x4.reflection(-plane.a, -plane.b, -plane.c, -plane.d));
-    const reflCamera = new Camera(ctx.scene);
-    reflCamera.framebuffer = fbRefl;
-    Matrix4x4.multiply(matReflectionR, ctx.camera.worldMatrix).decompose(
-      reflCamera.scale,
-      reflCamera.rotation,
-      reflCamera.position
-    );
-    reflCamera.setProjectionMatrix(ctx.camera.getProjectionMatrix());
-    reflCamera.clipPlane = clipPlane;
-    reflCamera.render(ctx.scene, ctx.compositor);
-    reflCamera.remove();
-    this._renderingReflections = false;
-
     const cameraNearFar = new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
     const waterMesh = this._getWaterMesh(ctx);
-    waterMesh.regionMin.setXY(this._region.x, this._region.y);
-    waterMesh.regionMax.setXY(this._region.z, this._region.w);
-    waterMesh.wind = this._waterWind;
-    if (waterMesh !== this._currentWaterMesh) {
-      waterMesh.wireframe = this._waterWireframe;
-      waterMesh.gridScale = this._gridScale;
-      waterMesh.alignment = this._waterAlignment;
-      waterMesh.foamWidth = this._foamWidth;
-      waterMesh.foamContrast = this._foamContrast;
-      waterMesh.setWaveLength(0, this._waveLength0);
-      waterMesh.setWaveLength(1, this._waveLength1);
-      waterMesh.setWaveLength(2, this._waveLength2);
-      waterMesh.setWaveStrength(0, this._waveStrength0);
-      waterMesh.setWaveStrength(1, this._waveStrength1);
-      waterMesh.setWaveStrength(2, this._waveStrength2);
-      waterMesh.setWaveCroppiness(0, this._waveCroppiness0);
-      waterMesh.setWaveCroppiness(1, this._waveCroppiness1);
-      waterMesh.setWaveCroppiness(2, this._waveCroppiness2);
-      this._currentWaterMesh = waterMesh;
+    const waterBindGroup = waterMesh.getWaterBindGroup(ctx.device);
+    if (!waterBindGroup) {
+      return;
     }
-    waterMesh.bindGroup.setTexture('tex', inputColorTexture);
-    waterMesh.bindGroup.setTexture('depthTex', sceneDepthTexture);
-    waterMesh.bindGroup.setTexture('rampTex', rampTex);
-    waterMesh.bindGroup.setTexture('reflectionTex', fbRefl.getColorAttachments()[0]);
-    waterMesh.bindGroup.setValue('invViewProj', ctx.camera.invViewProjectionMatrix);
-    waterMesh.bindGroup.setValue('cameraNearFar', cameraNearFar);
-    waterMesh.bindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
-    waterMesh.bindGroup.setValue('displace', this._displace / fbRefl.getColorAttachments()[0].width);
-    waterMesh.bindGroup.setValue('depthMulti', this._depthMulti);
-    waterMesh.bindGroup.setValue('refractionStrength', this._refractionStrength);
-    waterMesh.bindGroup.setValue(
+    waterBindGroup.setTexture('tex', inputColorTexture);
+    waterBindGroup.setTexture('depthTex', ctx.linearDepthTexture);
+    waterBindGroup.setTexture('rampTex', rampTex);
+    waterBindGroup.setTexture('envMap', this._envMap ?? ctx.scene.env.sky.bakedSkyTexture);
+    if (ssr) {
+      waterBindGroup.setValue('ssrParams', this._ssrParams);
+      if (ctx.HiZTexture) {
+        waterBindGroup.setTexture('hizTex', ctx.HiZTexture, fetchSampler('clamp_nearest'));
+        waterBindGroup.setValue('depthMipLevels', ctx.HiZTexture.mipLevelCount);
+      }
+    } else {
+      waterBindGroup.setTexture('reflectionTex', fbRefl.getColorAttachments()[0]);
+    }
+    waterBindGroup.setValue('invViewProj', ctx.camera.invViewProjectionMatrix);
+    waterBindGroup.setValue('invProjMatrix', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
+    waterBindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
+    if (ssr) {
+      waterBindGroup.setValue('projMatrix', ctx.camera.getProjectionMatrix());
+    }
+    waterBindGroup.setValue('cameraNearFar', cameraNearFar);
+    waterBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
+    waterBindGroup.setValue('displace', this._displace / inputColorTexture.width);
+    waterBindGroup.setValue('depthMulti', this._depthMulti);
+    waterBindGroup.setValue('refractionStrength', this._refractionStrength);
+    waterBindGroup.setValue('causticsParams', this._causticsParams);
+    waterBindGroup.setValue(
       'targetSize',
-      new Vector2(device.getViewport().width, device.getViewport().height)
+      this._targetSize.setXYZW(
+        device.getFramebuffer().getWidth(),
+        device.getFramebuffer().getHeight(),
+        ctx.linearDepthTexture.width,
+        ctx.linearDepthTexture.height
+      )
     );
-    waterMesh.bindGroup.setValue('waterLevel', this._elevation);
-    waterMesh.bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
+    waterBindGroup.setValue('waterLevel', this._waterMesh.level);
+    waterBindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
     if (ctx.sunLight) {
-      waterMesh.bindGroup.setValue('lightDir', ctx.sunLight.directionAndCutoff.xyz());
-      waterMesh.bindGroup.setValue('lightShininess', 0.7);
-      waterMesh.bindGroup.setValue('lightDiffuseAndIntensity', ctx.sunLight.diffuseAndIntensity);
+      waterBindGroup.setValue('lightDir', ctx.sunLight.directionAndCutoff.xyz());
+      waterBindGroup.setValue('lightShininess', 0.7);
+      waterBindGroup.setValue('lightDiffuseAndIntensity', ctx.sunLight.diffuseAndIntensity);
     }
     if (ctx.env.light.envLight) {
-      waterMesh.bindGroup.setValue('envLightStrength', ctx.env.light.strength);
-      ctx.env.light.envLight.updateBindGroup(waterMesh.bindGroup);
+      waterBindGroup.setValue('envLightStrength', ctx.env.light.strength);
+      ctx.env.light.envLight.updateBindGroup(waterBindGroup);
     }
-    waterMesh.render(ctx.camera, this.needFlip(device));
+    waterMesh.render(ctx.device, ctx.camera, this.needFlip(device));
   }
   /** @internal */
   private _getRampTexture(device: AbstractDevice) {
@@ -401,26 +326,42 @@ export class PostWater extends AbstractPostEffect {
     return this._rampTex;
   }
   /** @internal */
-  private _getWaterMesh(ctx: DrawContext) {
-    const hash = `${ctx.sunLight ? 1 : 0}:${ctx.env.light.getHash(ctx)}`;
-    let waterMesh = this._waterMeshes[hash];
-    if (!waterMesh) {
-      const device = ctx.device;
-      waterMesh = new WaterMesh(device, {
-        setupUniforms(scope: PBGlobalScope) {
+  private _getWaterMesh(ctx: DrawContext): WaterMesh {
+    const ssr = this._ssr; // ctx.device.type === 'webgl' ? false : this._ssr;
+    const HiZ = ssr && !!ctx.HiZTexture;
+    const hash = `${ctx.sunLight ? 1 : 0}:${ctx.env.light.getHash()}:${ssr}:${HiZ}`;
+    let impl = this._waterImpls[hash];
+    if (!impl) {
+      impl = new WaterShaderImpl(
+        function (this: WaterShaderImpl, scope: PBGlobalScope) {
           const pb = scope.$builder;
           if (pb.shaderKind === 'fragment') {
             scope.tex = pb.tex2D().uniform(0);
             scope.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
             scope.rampTex = pb.tex2D().uniform(0);
-            scope.reflectionTex = pb.tex2D().uniform(0);
+            scope.envMap = pb.texCube().uniform(0);
+            if (ssr) {
+              scope.ssrParams = pb.vec4().uniform(0);
+              if (HiZ) {
+                scope.hizTex = pb.tex2D().uniform(0);
+                scope.depthMipLevels = pb.int().uniform(0);
+              }
+            } else {
+              scope.reflectionTex = pb.tex2D().uniform(0);
+            }
             scope.displace = pb.float().uniform(0);
             scope.depthMulti = pb.float().uniform(0);
             scope.refractionStrength = pb.float().uniform(0);
+            scope.causticsParams = pb.vec4().uniform(0);
             scope.cameraNearFar = pb.vec2().uniform(0);
             scope.cameraPos = pb.vec3().uniform(0);
             scope.invViewProj = pb.mat4().uniform(0);
-            scope.targetSize = pb.vec2().uniform(0);
+            scope.invProjMatrix = pb.mat4().uniform(0);
+            scope.viewMatrix = pb.mat4().uniform(0);
+            if (ssr) {
+              scope.projMatrix = pb.mat4().uniform(0);
+            }
+            scope.targetSize = pb.vec4().uniform(0);
             scope.waterLevel = pb.float().uniform(0);
             scope.srgbOut = pb.int().uniform(0);
             if (ctx.sunLight) {
@@ -434,11 +375,15 @@ export class PostWater extends AbstractPostEffect {
             ctx.env.light.envLight.initShaderBindings(pb);
           }
         },
-        shading(
+        null, //function (this: WaterShaderImpl, scope: PBInsideFunctionScope, pos: PBShaderExp, xz: PBShaderExp) {},
+        function (
+          this: WaterShaderImpl,
           scope: PBInsideFunctionScope,
           worldPos: PBShaderExp,
           worldNormal: PBShaderExp,
-          foamFactor: PBShaderExp
+          foamFactor: PBShaderExp,
+          discardable: PBShaderExp,
+          waveGenerator: WaveGenerator
         ) {
           const pb = scope.$builder;
           pb.func('getAbsorption', [pb.float('depth')], function () {
@@ -457,13 +402,8 @@ export class PostWater extends AbstractPostEffect {
             ).rgb;
             this.$return(pb.mul(this.c, this.c));
           });
-          pb.func('getPositionWS', [pb.vec2('uv')], function () {
-            this.$l.depthValue = pb.textureSampleLevel(this.depthTex, this.uv, 0);
-            if (device.type === 'webgl') {
-              this.$l.linearDepth = decodeNormalizedFloatFromRGBA(this, this.depthValue);
-            } else {
-              this.$l.linearDepth = this.depthValue.r;
-            }
+          pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
+            this.$l.linearDepth = sampleLinearDepth(this, this.depthTex, this.uv, 0);
             this.$l.nonLinearDepth = pb.div(
               pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
               pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
@@ -473,8 +413,8 @@ export class PostWater extends AbstractPostEffect {
               pb.sub(pb.mul(pb.clamp(this.nonLinearDepth, 0, 1), 2), 1),
               1
             );
-            this.$l.wPos = pb.mul(this.invViewProj, this.clipSpacePos);
-            this.$return(pb.div(this.wPos.xyz, this.wPos.w));
+            this.$l.wPos = pb.mul(this.mat, this.clipSpacePos);
+            this.$return(pb.vec4(pb.div(this.wPos.xyz, this.wPos.w), this.linearDepth));
           });
           pb.func('fresnel', [pb.vec3('normal'), pb.vec3('eyeVec')], function () {
             this.$return(
@@ -489,37 +429,117 @@ export class PostWater extends AbstractPostEffect {
             'waterShading',
             [pb.vec3('worldPos'), pb.vec3('worldNormal'), pb.float('foamFactor')],
             function () {
-              this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize);
+              this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
               this.$l.dist = pb.length(pb.sub(this.worldPos, this.cameraPos));
-              this.$l.normalScale = pb.pow(pb.clamp(pb.div(100, this.dist), 0, 1), 4);
-              this.$l.myNormal = pb.normalize(
+              this.$l.normalScale = pb.pow(pb.clamp(pb.div(100, this.dist), 0, 1), 2);
+              this.$l.normal = pb.normalize(
                 pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
               );
-              this.$l.displacedTexCoord = pb.add(this.screenUV, pb.mul(this.myNormal.xz, this.displace));
-              this.$l.wPos = this.getPositionWS(this.displacedTexCoord);
-              this.$l.eyeVec = pb.sub(this.wPos.xyz, this.cameraPos);
+              this.$l.displacedTexCoord = pb.add(this.screenUV, pb.mul(this.normal.xz, this.displace));
+              this.$l.wPos = this.getPosition(this.screenUV, this.invViewProj).xyz;
+              this.$l.eyeVec = pb.sub(this.worldPos.xyz, this.cameraPos);
               this.$l.eyeVecNorm = pb.normalize(this.eyeVec);
-              this.$l.surfacePoint = this.worldPos;
-              this.$l.depth = pb.length(pb.sub(this.wPos.xyz, this.surfacePoint));
-              this.$l.reflectance = pb.textureSampleLevel(
-                this.reflectionTex,
-                pb.clamp(this.displacedTexCoord, pb.vec2(0.01), pb.vec2(0.99)),
-                0
+              this.$l.depth = pb.length(pb.sub(this.wPos.xyz, this.worldPos));
+              this.$l.viewPos = pb.mul(this.viewMatrix, pb.vec4(this.worldPos, 1)).xyz;
+              if (ssr) {
+                this.incidentVec = pb.normalize(pb.sub(this.worldPos, this.cameraPos));
+                this.reflectVecW = pb.reflect(this.incidentVec, this.normal);
+                this.$l.reflectance = pb.vec3();
+                this.$l.hitInfo = pb.vec4(0);
+                this.$if(pb.greaterThan(this.reflectVecW.y, 0), function () {
+                  this.reflectVec = pb.mul(this.viewMatrix, pb.vec4(this.reflectVecW, 0)).xyz;
+                  /*
+                  this.$l.thicknessFactor = pb.add(
+                    pb.mul(pb.dot(this.incidentVec, this.reflectVecW), 0.5),
+                    0.5
+                  );
+                  this.thicknessFactor = pb.div(
+                    this.thicknessFactor,
+                    pb.max(pb.mul(pb.length(this.viewPos), 5), 1)
+                  );
+                  this.thicknessFactor = pb.mul(this.thicknessFactor, 50);
+                  this.$l.thickness = pb.mul(this.thicknessFactor, this.ssrParams.z);
+                  */
+                  this.hitInfo = HiZ
+                    ? screenSpaceRayTracing_HiZ(
+                        this,
+                        this.viewPos,
+                        this.reflectVec,
+                        this.viewMatrix,
+                        this.projMatrix,
+                        this.invProjMatrix,
+                        this.cameraNearFar,
+                        this.depthMipLevels,
+                        this.ssrParams.y,
+                        this.ssrParams.z,
+                        this.targetSize,
+                        this.hizTex
+                      )
+                    : screenSpaceRayTracing_Linear2D(
+                        this,
+                        this.viewPos,
+                        this.reflectVec,
+                        this.viewMatrix,
+                        this.projMatrix,
+                        this.invProjMatrix,
+                        this.cameraNearFar,
+                        this.ssrParams.x,
+                        this.ssrParams.y,
+                        this.ssrParams.z,
+                        4,
+                        this.targetSize,
+                        this.depthTex
+                      );
+                });
+                this.$l.refl = pb.reflect(pb.normalize(pb.sub(this.worldPos, this.cameraPos)), this.normal);
+                this.refl.y = pb.max(this.refl.y, 0.1);
+                this.reflectance = pb.mix(
+                  pb.textureSampleLevel(this.envMap, this.refl, 0).rgb,
+                  pb.textureSampleLevel(this.tex, this.hitInfo.xy, 0).rgb,
+                  this.hitInfo.w
+                );
+              } else {
+                this.$l.reflectance = pb.textureSampleLevel(
+                  this.reflectionTex,
+                  pb.clamp(this.displacedTexCoord, pb.vec2(0.01), pb.vec2(0.99)),
+                  0
+                ).rgb;
+              }
+              this.refractUV = this.displacedTexCoord;
+              this.$l.caustics = pb.float(0);
+              this.displacedPos = this.getPosition(this.refractUV, this.invProjMatrix);
+              this.$if(
+                pb.or(
+                  pb.greaterThanEqual(this.displacedPos.w, 0.99999),
+                  pb.greaterThan(this.displacedPos.z, this.viewPos.z)
+                ),
+                function () {
+                  this.refractUV = this.screenUV;
+                }
+              ).$else(function () {
+                this.depth = pb.length(pb.sub(this.displacedPos.xyz, this.viewPos));
+                this.$l.worldPos = this.getPosition(this.refractUV, this.invViewProj);
+                this.$l.unprojectedNormal = waveGenerator.calcFragmentNormal(
+                  this,
+                  pb.add(this.worldPos.xz, pb.mul(pb.vec2(this.depth), 0.2)),
+                  this.normal
+                );
+                this.caustics = pb.sub(
+                  1,
+                  pb.smoothStep(this.causticsParams.x, this.causticsParams.y, this.unprojectedNormal.y)
+                );
+                this.caustics = pb.mul(this.caustics, this.causticsParams.w);
+                this.caustics = pb.pow(this.caustics, this.causticsParams.z);
+              });
+              this.$l.refraction = pb.textureSampleLevel(this.tex, this.refractUV, 0).rgb;
+              this.refraction = pb.mul(
+                pb.add(this.refraction, pb.vec3(this.caustics)),
+                this.getAbsorption(this.depth)
               );
-              this.$l.wPosRefract = this.getPositionWS(this.displacedTexCoord);
-              this.$l.refractionTexCoord = this.$choice(
-                pb.greaterThan(this.wPos.y, this.waterLevel),
-                this.screenUV,
-                this.displacedTexCoord
-              );
-              this.$l.refraction = pb.textureSampleLevel(this.tex, this.refractionTexCoord, 0).rgb;
-              this.$l.fresnelTerm = this.fresnel(
-                this.myNormal,
-                pb.normalize(pb.sub(this.cameraPos, this.surfacePoint))
-              );
-              this.refraction = pb.mul(this.refraction, this.getAbsorption(this.depth));
+
+              this.$l.fresnelTerm = this.fresnel(this.normal, pb.neg(this.eyeVecNorm));
               this.$l.finalColor = pb.mix(
-                pb.mix(this.refraction, this.reflectance.rgb, this.fresnelTerm),
+                pb.mix(this.refraction, this.reflectance, this.fresnelTerm),
                 pb.vec3(1),
                 this.foamFactor
               );
@@ -530,10 +550,10 @@ export class PostWater extends AbstractPostEffect {
                 this.$l.L = pb.neg(this.lightDir);
                 this.$l.V = pb.neg(this.eyeVecNorm);
                 this.$l.halfVec = pb.normalize(pb.add(this.L, this.V));
-                this.$l.NoH = pb.clamp(pb.dot(this.myNormal, this.halfVec), 0, 1);
-                this.$l.NoL = pb.clamp(pb.dot(this.myNormal, this.L), 0, 1);
+                this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
+                this.$l.NoL = pb.clamp(pb.dot(this.normal, this.L), 0, 1);
                 this.$l.VoH = pb.clamp(pb.dot(this.V, this.halfVec), 0, 1);
-                this.$l.NoV = pb.clamp(pb.dot(this.myNormal, this.V), 0, 1);
+                this.$l.NoV = pb.clamp(pb.dot(this.normal, this.V), 0, 1);
                 this.$l.F = fresnelSchlick(this, this.VoH, this.f0, this.f90);
                 this.$l.alphaRoughness = pb.mul(this.roughness, this.roughness);
                 this.$l.D = distributionGGX(this, this.NoH, this.alphaRoughness);
@@ -548,7 +568,7 @@ export class PostWater extends AbstractPostEffect {
                 this.finalColor = pb.add(this.finalColor, this.specular);
               }
               if (ctx.env.light.envLight) {
-                const irradiance = ctx.env.light.envLight.getIrradiance(this, this.myNormal);
+                const irradiance = ctx.env.light.envLight.getIrradiance(this, this.normal);
                 if (irradiance) {
                   this.$l.sss = pb.mul(this.getScattering(this.depth), irradiance, this.envLightStrength);
                   this.finalColor = pb.add(this.finalColor, this.sss);
@@ -557,16 +577,19 @@ export class PostWater extends AbstractPostEffect {
               this.$if(pb.notEqual(this.srgbOut, 0), function () {
                 this.finalColor = linearToGamma(this, this.finalColor);
               });
-              //this.$return(pb.vec4(pb.vec3(this.wPos.z), 1));
               this.$return(pb.vec4(this.finalColor, 1));
             }
           );
+          scope.$if(discardable, function () {
+            pb.discard();
+          });
           return pb.getGlobalScope()['waterShading'](worldPos, worldNormal, foamFactor);
         }
-      });
-      this._waterMeshes[hash] = waterMesh;
+      );
+      this._waterImpls[hash] = impl;
     }
-    waterMesh.level = this._elevation;
-    return waterMesh;
+    this._waterMesh.shadingImpl = impl;
+
+    return this._waterMesh;
   }
 }

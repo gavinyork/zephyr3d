@@ -29,8 +29,8 @@ export class EnvLightWrapper {
     this._strength = 1;
   }
   /** @internal */
-  getHash(ctx: DrawContext): string {
-    return ctx.drawEnvLight
+  getHash(ctx?: DrawContext): string {
+    return !ctx || ctx.drawEnvLight
       ? `${this.type}:${this._envLight.hasRadiance() ? '1' : '0'}:${
           this._envLight.hasIrradiance() ? '1' : '0'
         }`

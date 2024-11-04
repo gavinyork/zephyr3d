@@ -5,6 +5,7 @@ import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } f
 import type { DrawContext } from '../../render';
 import type { TextureMixinInstanceTypes } from './texture';
 import { mixinTextureProps } from './texture';
+import { MaterialVaryingFlags } from '../../values';
 
 /**
  * Interface for albedo color mixin
@@ -44,7 +45,9 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
       this.uniformChanged();
     }
     getUniformValueAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp {
-      return this.drawContext.instancing ? scope.$inputs.zAlbedo : scope.zAlbedo;
+      return this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
+        ? scope.$inputs.zAlbedo
+        : scope.zAlbedo;
     }
     calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp {
       const pb = scope.$builder;
@@ -63,21 +66,21 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
     vertexShader(scope: PBFunctionScope): void {
       super.vertexShader(scope);
       if (this.needFragmentColor()) {
-        if (this.drawContext.instancing) {
+        if (this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
           scope.$outputs.zAlbedo = this.getInstancedUniform(scope, ALBEDO_COLOR_UNIFORM);
         }
       }
     }
     fragmentShader(scope: PBFunctionScope): void {
       super.fragmentShader(scope);
-      if (this.needFragmentColor() && !this.drawContext.instancing) {
+      if (this.needFragmentColor() && !(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)) {
         const pb = scope.$builder;
         scope.zAlbedo = pb.vec4().uniform(2);
       }
     }
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
       super.applyUniformValues(bindGroup, ctx, pass);
-      if (this.needFragmentColor(ctx) && !ctx.instancing) {
+      if (this.needFragmentColor(ctx) && !(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
         bindGroup.setValue('zAlbedo', this._albedoColor);
       }
     }

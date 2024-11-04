@@ -1,17 +1,20 @@
 import { PRNG, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import type { AssetHierarchyNode, MeshMaterial, ModelInfo, SharedModel } from '@zephyr3d/scene';
+import { BatchGroup, SceneNode } from '@zephyr3d/scene';
 import {
   Application,
   AssetManager,
   Bloom,
   Compositor,
   DirectionalLight,
+  FFTWaveGenerator,
   FXAA,
   OrbitCameraController,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
   PerspectiveCamera,
+  PostWater,
   Scene,
   Terrain,
   Tonemap
@@ -19,10 +22,13 @@ import {
 import * as zip from '@zip.js/zip.js';
 import { TreeMaterialMetallicRoughness } from './treematerial';
 import { Panel } from './ui';
+import { imGuiInit, imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
+import { Inspector } from '@zephyr3d/inspector';
 
 export class Demo {
   private _assetManager: AssetManager;
   private _scene: Scene;
+  private _root: SceneNode;
   private _terrain: Terrain;
   private _camera: PerspectiveCamera;
   private _character: ModelInfo;
@@ -34,7 +40,10 @@ export class Demo {
   private _actorRunning: boolean;
   private _loaded: boolean;
   private _loadPercent: number;
+  private _showInspector: boolean;
   private _ui: Panel;
+  private _showUI: boolean;
+  private _inspector: Inspector;
   private _lastAnimation: string;
   constructor() {
     this._terrain = null;
@@ -45,6 +54,7 @@ export class Demo {
     this._actorRunning = false;
     this._assetManager = new AssetManager();
     this._scene = this.createScene();
+    this._root = new BatchGroup(this._scene) ?? new SceneNode(this._scene);
     this._camera = this.createCamera(this._scene);
     this._compositor = new Compositor();
     this._compositor.appendPostEffect(new Tonemap());
@@ -55,6 +65,7 @@ export class Demo {
     this._loaded = false;
     this._loadPercent = 0;
     this._ui = null;
+    this._showUI = true;
     this._lastAnimation = null;
   }
   async fetchAssetArchive(url: string, progressCallback: (percent: number) => void): Promise<Blob> {
@@ -119,7 +130,7 @@ export class Demo {
     scene.env.sky.aerialPerspectiveDensity = 10;
     scene.env.sky.cloudy = 0.6;
 
-    const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1));
+    const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1)).setIntensity(25);
     light.lookAt(new Vector3(1, 1, 1), new Vector3(0, 0, 0), Vector3.axisPY());
     light.intensity = 4;
     light.shadow.shadowMapSize = 2048;
@@ -153,10 +164,12 @@ export class Demo {
 
       // load world
       this._terrain = await this.loadTerrain(this._scene, this._assetManager);
+      this._terrain.parent = this._root;
       this._character = await this.loadCharacter(this._scene, this._assetManager);
       // initialize
       this._camera.parent = this._terrain;
       this._character.group.parent = this._terrain;
+      this._character.group.showState = 'visible';
       const x = this._terrain.scaledWidth * 0.37;
       const z = this._terrain.scaledHeight * 0.19;
       const y = this._terrain.getElevation(x, z);
@@ -167,9 +180,36 @@ export class Demo {
       const destPos = new Vector3(x, y, z);
       this._camera.lookAt(eyePos, destPos, Vector3.axisPY());
       this._camera.controller = new OrbitCameraController({ center: destPos });
+      //create water
+      const waveGenerator = new FFTWaveGenerator();
+      waveGenerator.alignment = 1;
+      waveGenerator.setWaveLength(0, 400);
+      waveGenerator.setWaveStrength(0, 0.2);
+      waveGenerator.setWaveCroppiness(0, -1.5);
+      waveGenerator.setWaveLength(1, 200);
+      waveGenerator.setWaveStrength(1, 0.1);
+      waveGenerator.setWaveCroppiness(1, -1.2);
+      waveGenerator.setWaveLength(2, 40);
+      waveGenerator.setWaveStrength(2, 0.03);
+      waveGenerator.setWaveCroppiness(2, -0.5);
+      const water = new PostWater(40, waveGenerator);
+      water.causticsIntensity = 0;
+      water.depthMulti = 0.03;
+      water.boundary = new Vector4(0, 0, 1000, 1000);
+      if (Application.instance.device.type === 'webgl') {
+        water.ssr = false;
+        water.displace = 80;
+      }
+      this._compositor.appendPostEffect(water);
       // loaded
       this._terrain.showState = 'visible';
       this._scene.env.sky.wind.setXY(700, 350);
+      await imGuiInit(Application.instance.device);
+      Application.instance.inputManager.use((ev: Event, type: string) => {
+        return this._showInspector ? imGuiInjectEvent(ev, type) : false;
+      });
+      Application.instance.inputManager.use(this._camera.handleEvent.bind(this._camera));
+      this._inspector = new Inspector(this._scene, this._compositor, this._camera);
       this._loaded = true;
     });
   }
@@ -271,6 +311,7 @@ export class Demo {
     terrain.pickable = true;
 
     // Distribute some trees
+    const numTrees = 500;
     const PY = Vector3.axisPY();
     const trees = [
       {
@@ -281,13 +322,14 @@ export class Demo {
     const f = 1 / trees.length;
     const seed = 0;
     const prng = new PRNG(seed);
-    for (let i = 0; i < 500; i++) {
+    for (let i = 0; i < numTrees; i++) {
       const x = prng.get() * terrain.scaledWidth;
       const z = prng.get() * terrain.scaledHeight;
       const y = terrain.getElevation(x, z);
       const index = Math.min(Math.floor(prng.get() / f), trees.length - 1);
       const tree = await assetManager.fetchModel(scene, trees[index].url, {
-        postProcess: this.replaceMaterials
+        postProcess: this.replaceMaterials,
+        enableInstancing: true
       });
       tree.group.parent = terrain;
       tree.group.pickable = false;
@@ -394,7 +436,7 @@ export class Demo {
     }
     const ray = this._camera.constructRay(x, y);
     const obj = this._scene.raycast(ray, this._camera.getFarPlane());
-    if (obj && obj.node.isTerrain()) {
+    if (obj && obj.target.node.isTerrain()) {
       this._terrain.invWorldMatrix.transformPointAffine(obj.point, this._actorTarget);
       if (button === 2) {
         this._actorDirection.set(
@@ -429,6 +471,12 @@ export class Demo {
         Vector3.scale(this._actorDirection, movement)
       );
       newPos.y = this._terrain.getElevation(newPos.x, newPos.z);
+      const oldPos = this._character.group.position;
+      console.log(
+        `(${oldPos.x.toFixed(2)},${oldPos.y.toFixed(2)},${oldPos.z.toFixed(2)})->(${newPos.x.toFixed(
+          2
+        )},${newPos.y.toFixed(2)},${newPos.z.toFixed(2)})`
+      );
       this._character.group.position.set(newPos);
       (this._camera.controller as OrbitCameraController).center = newPos;
     }
@@ -448,8 +496,23 @@ export class Demo {
     this._camera.render(this._scene, this._compositor);
     if (!this._loaded) {
       Application.instance.device.drawText(`Loading: %${this._loadPercent}`, 20, 20, '#a00000');
-    } else if (!this._ui) {
-      this._ui = new Panel();
+    } else {
+      if (!this._ui) {
+        this._ui = new Panel();
+      }
+      if (this._showInspector) {
+        imGuiNewFrame();
+        this._inspector.render();
+        imGuiEndFrame();
+      }
+    }
+  }
+  toggleInspector() {
+    this._showInspector = !this._showInspector;
+  }
+  toggleGUI() {
+    if (this._ui) {
+      this._ui.toggle();
     }
   }
 }

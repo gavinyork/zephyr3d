@@ -1,14 +1,15 @@
 import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
-import type { AbstractDevice, BindGroup, GPUProgram, Texture2D, TextureSampler } from '@zephyr3d/device';
+import type { AbstractDevice, BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
+import { fetchSampler } from '../utility/misc';
 
 /**
  * The tonemap post effect
  * @public
  */
-export class Tonemap extends AbstractPostEffect {
-  private static _nearestSampler: TextureSampler = null;
+export class Tonemap extends AbstractPostEffect<'Tonemap'> {
+  static readonly className = 'Tonemap' as const;
   private static _programTonemap: GPUProgram = null;
   private _bindgroupTonemap: BindGroup;
   private _exposure: number;
@@ -47,7 +48,7 @@ export class Tonemap extends AbstractPostEffect {
     this._bindgroupTonemap.setValue('srgbOut', sRGBOutput ? 1 : 0);
     this._bindgroupTonemap.setValue('exposure', this._exposure);
     this._bindgroupTonemap.setValue('flip', this.needFlip(device) ? 1 : 0);
-    this._bindgroupTonemap.setTexture('tex', inputColorTexture, Tonemap._nearestSampler);
+    this._bindgroupTonemap.setTexture('tex', inputColorTexture, fetchSampler('clamp_nearest_nomip'));
     device.setProgram(Tonemap._programTonemap);
     device.setBindGroup(0, this._bindgroupTonemap);
     this.drawFullscreenQuad();
@@ -120,15 +121,6 @@ export class Tonemap extends AbstractPostEffect {
     }
     if (!this._bindgroupTonemap) {
       this._bindgroupTonemap = device.createBindGroup(Tonemap._programTonemap.bindGroupLayouts[0]);
-    }
-    if (!Tonemap._nearestSampler) {
-      Tonemap._nearestSampler = device.createSampler({
-        magFilter: 'nearest',
-        minFilter: 'nearest',
-        mipFilter: 'none',
-        addressU: 'clamp',
-        addressV: 'clamp'
-      });
     }
   }
   /** {@inheritDoc AbstractPostEffect.dispose} */

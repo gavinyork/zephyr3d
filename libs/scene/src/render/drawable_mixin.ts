@@ -1,12 +1,13 @@
 import type { GenericConstructor } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type { AbstractDevice } from '@zephyr3d/device';
-import { ProgramBuilder, type BindGroup } from '@zephyr3d/device';
+import type { BindGroup } from '@zephyr3d/device';
 import type { BatchDrawable, DrawContext, Drawable } from './drawable';
 import { ShaderHelper } from '../material';
 import type { DrawableInstanceInfo, RenderQueue, RenderQueueRef } from './render_queue';
 import { Application } from '../app';
 import type { Mesh, XForm } from '../scene';
+import { MaterialVaryingFlags } from '../values';
 
 export interface IMixinDrawable {
   readonly objectColor: Vector4;
@@ -20,6 +21,9 @@ export interface IMixinDrawable {
 }
 
 let _drawableId = 0;
+
+const instanceBindGroupTransfromTags = new WeakMap<DrawableInstanceInfo, number>();
+const drawableBindGroupTransfromTags = new WeakMap<BindGroup, number>();
 
 export function mixinDrawable<
   T extends GenericConstructor<{
@@ -88,21 +92,32 @@ export function mixinDrawable<
     }
     applyTransformUniforms(renderQueue: RenderQueue): void {
       const instanceInfo = renderQueue.getInstanceInfo(this as unknown as Drawable);
-      const drawableBindGroup = this.getDrawableBindGroup(
-        Application.instance.device,
-        !!instanceInfo,
-        renderQueue
-      );
+      const currentTag = this.getXForm().transformTag;
       if (instanceInfo) {
-        instanceInfo.bindGroup.bindGroup.setRawData(
-          ShaderHelper.getInstanceDataUniformName(),
-          instanceInfo.offset * 4,
-          this.getXForm().worldMatrix,
-          0,
-          16
-        );
+        const tag = instanceBindGroupTransfromTags.get(instanceInfo) ?? -1;
+        if (tag !== currentTag) {
+          instanceInfo.bindGroup.bindGroup.setRawData(
+            ShaderHelper.getInstanceDataUniformName(),
+            instanceInfo.offset * 4,
+            this.getXForm().worldMatrix,
+            0,
+            16
+          );
+          instanceBindGroupTransfromTags.set(instanceInfo, tag);
+        }
       } else {
-        drawableBindGroup.setValue(ShaderHelper.getWorldMatrixUniformName(), this.getXForm().worldMatrix);
+        const drawableBindGroup = this.getDrawableBindGroup(Application.instance.device, false, renderQueue);
+        const tag = drawableBindGroupTransfromTags.get(drawableBindGroup) ?? -1;
+        if (tag !== currentTag) {
+          drawableBindGroup.setValue(ShaderHelper.getWorldMatrixUniformName(), this.getXForm().worldMatrix);
+          if ((this as unknown as Drawable).getBoneMatrices()) {
+            drawableBindGroup.setValue(
+              ShaderHelper.getBoneInvBindMatrixUniformName(),
+              (this as unknown as Mesh).invWorldMatrix
+            );
+          }
+          drawableBindGroupTransfromTags.set(drawableBindGroup, tag);
+        }
       }
     }
     applyMaterialUniforms(instanceInfo: DrawableInstanceInfo): void {
@@ -123,16 +138,16 @@ export function mixinDrawable<
       const drawableBindGroup = this.getDrawableBindGroup(device, !!ctx.instanceData, ctx.renderQueue);
       device.setBindGroup(1, drawableBindGroup);
       device.setBindGroup(3, ctx.instanceData ? ctx.instanceData.bindGroup.bindGroup : null);
-      if (ctx.skinAnimation) {
+      if (ctx.materialFlags & MaterialVaryingFlags.SKIN_ANIMATION) {
         const boneTexture = (this as unknown as Mesh).getBoneMatrices();
         drawableBindGroup.setTexture(ShaderHelper.getBoneMatricesUniformName(), boneTexture);
         drawableBindGroup.setValue(
           ShaderHelper.getBoneInvBindMatrixUniformName(),
-          (this as unknown as Mesh).getInvBindMatrix()
+          (this as unknown as Mesh).invWorldMatrix
         );
         drawableBindGroup.setValue(ShaderHelper.getBoneTextureSizeUniformName(), boneTexture.width);
       }
-      if (ctx.morphAnimation) {
+      if (ctx.materialFlags & MaterialVaryingFlags.MORPH_ANIMATION) {
         const morphData = (this as unknown as Mesh).getMorphData();
         const morphInfo = (this as unknown as Mesh).getMorphInfo();
         drawableBindGroup.setTexture(ShaderHelper.getMorphDataUniformName(), morphData);
@@ -153,16 +168,8 @@ export function mixinDrawable<
         ? this._mdDrawableBindGroupMorph
         : this._mdDrawableBindGroup;
       if (!bindGroup) {
-        const buildInfo = new ProgramBuilder(device).buildRender({
-          vertex(pb) {
-            ShaderHelper.vertexShaderDrawableStuff(this, skinning, morphing, instancing);
-            pb.main(function () {});
-          },
-          fragment(pb) {
-            pb.main(function () {});
-          }
-        });
-        bindGroup = device.createBindGroup(buildInfo[2][1]);
+        const layout = ShaderHelper.getDrawableBindGroupLayout(skinning, morphing, instancing);
+        bindGroup = device.createBindGroup(layout);
         if (instancing) {
           this._mdDrawableBindGroupInstanced.set(renderQueue, bindGroup);
         } else if (skinning && morphing) {
@@ -170,7 +177,6 @@ export function mixinDrawable<
         } else if (skinning) {
           this._mdDrawableBindGroupSkin = bindGroup;
         } else if (morphing) {
-          const layout = buildInfo[2][1];
           const bindName =
             layout.nameMap?.[ShaderHelper.getMorphInfoUniformName()] ??
             ShaderHelper.getMorphInfoUniformName();

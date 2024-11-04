@@ -1,12 +1,24 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, FPSCameraController, DirectionalLight, AssetManager, Application, Tonemap, PerspectiveCamera, Compositor, Terrain, FXAA, PostWater } from '@zephyr3d/scene';
+import {
+  Scene,
+  FPSCameraController,
+  DirectionalLight,
+  AssetManager,
+  Application,
+  Tonemap,
+  PerspectiveCamera,
+  Compositor,
+  Terrain,
+  FXAA,
+  PostWater,
+  FFTWaveGenerator
+} from '@zephyr3d/scene';
 
 const myApp = new Application({
   backend: backendWebGL2,
   canvas: document.querySelector('#my-canvas')
 });
-
 
 myApp.ready().then(async () => {
   async function loadTerrain(scene, assetManager) {
@@ -18,13 +30,27 @@ myApp.ready().then(async () => {
     for (let i = 0; i < mapWidth * mapHeight; i++) {
       heightsF32[i] = heightsInt16[i] / 65535;
     }
-    const splatMap = await assetManager.fetchTexture('./assets/maps/map2/splatmap.tga', { linearColorSpace: true });
-    const detailAlbedo0 = await assetManager.fetchTexture('./assets/maps/map2/stone_color.png', { linearColorSpace: false });
-    const detailNormal0 = await assetManager.fetchTexture('./assets/maps/map2/stone_norm.png', { linearColorSpace: true });
-    const detailAlbedo1 = await assetManager.fetchTexture('./assets/maps/map2/grass_color.png', { linearColorSpace: false });
-    const detailNormal1 = await assetManager.fetchTexture('./assets/maps/map2/grass_norm.png', { linearColorSpace: true });
-    const detailAlbedo2 = await assetManager.fetchTexture('./assets/maps/map2/174.jpg', { linearColorSpace: false });
-    const detailNormal2 = await assetManager.fetchTexture('./assets/maps/map2/174_norm.jpg', { linearColorSpace: true });
+    const splatMap = await assetManager.fetchTexture('./assets/maps/map2/splatmap.tga', {
+      linearColorSpace: true
+    });
+    const detailAlbedo0 = await assetManager.fetchTexture('./assets/maps/map2/stone_color.png', {
+      linearColorSpace: false
+    });
+    const detailNormal0 = await assetManager.fetchTexture('./assets/maps/map2/stone_norm.png', {
+      linearColorSpace: true
+    });
+    const detailAlbedo1 = await assetManager.fetchTexture('./assets/maps/map2/grass_color.png', {
+      linearColorSpace: false
+    });
+    const detailNormal1 = await assetManager.fetchTexture('./assets/maps/map2/grass_norm.png', {
+      linearColorSpace: true
+    });
+    const detailAlbedo2 = await assetManager.fetchTexture('./assets/maps/map2/174.jpg', {
+      linearColorSpace: false
+    });
+    const detailNormal2 = await assetManager.fetchTexture('./assets/maps/map2/174_norm.jpg', {
+      linearColorSpace: true
+    });
     const terrain = new Terrain(scene);
     terrain.create(mapWidth, mapHeight, heightsF32, new Vector3(1, 100, 1), 33, {
       splatMap,
@@ -47,7 +73,13 @@ myApp.ready().then(async () => {
   scene.env.sky.aerialPerspectiveDensity = 8;
   scene.env.light.strength = 0.1;
 
-  const camera = new PerspectiveCamera(scene, Math.PI/3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 500);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
+    1,
+    500
+  );
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
   camera.lookAt(new Vector3(200, 40, 80), new Vector3(250, 0, 250), Vector3.axisPY());
   myApp.inputManager.use(camera.handleEvent.bind(camera));
@@ -60,7 +92,7 @@ myApp.ready().then(async () => {
   light.castShadow = true;
   light.shadow.mode = 'pcf-opt';
 
-  const water = new PostWater(0);
+  const water = new PostWater(0, new FFTWaveGenerator());
   water.boundary.setXYZW(0, 0, 500, 500);
   water.depthMulti = 0.06;
   water.refractionStrength = 0.12;
@@ -68,7 +100,7 @@ myApp.ready().then(async () => {
 
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
-  compositor.appendPostEffect(new PostWater(30));
+  compositor.appendPostEffect(water);
   compositor.appendPostEffect(new FXAA());
 
   scene.env.light.type = 'ibl';
@@ -81,11 +113,11 @@ myApp.ready().then(async () => {
   const assetManager = new AssetManager();
   loadTerrain(scene, assetManager);
 
-  myApp.on('resize', ev => {
+  myApp.on('resize', (ev) => {
     camera.aspect = ev.width / ev.height;
   });
 
-  myApp.on('tick', ev => {
+  myApp.on('tick', (ev) => {
     camera.updateController();
     camera.render(scene, compositor);
   });

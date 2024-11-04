@@ -10,12 +10,14 @@ interface GUIParams {
   useSH: boolean;
   punctualLighting: boolean;
   tonemap: boolean;
-  water: boolean;
   bloom: boolean;
   fxaa: boolean;
   sao: boolean;
+  rotate: boolean;
   FPS: string;
   oitType: string;
+  SSR: boolean;
+  HiZ: boolean;
   animation?: string;
 }
 
@@ -45,11 +47,13 @@ export class Panel {
       useSH: false,
       punctualLighting: this._viewer.punctualLightEnabled,
       tonemap: this._viewer.tonemapEnabled(),
-      water: this._viewer.waterEnabled(),
       bloom: this._viewer.bloomEnabled(),
       fxaa: this._viewer.FXAAEnabled(),
       sao: this._viewer.SAOEnabled(),
+      rotate: this._viewer.rotateEnabled(),
       FPS: '',
+      SSR: this._viewer.camera.SSR,
+      HiZ: this._viewer.camera.HiZ,
       oitType: this._oitNames[this._oitTypes.indexOf(this._viewer.getOITType())]
     };
     this._animationController = null;
@@ -79,6 +83,9 @@ export class Panel {
         });
     }
   }
+  show(show: boolean) {
+    this._gui.show(show);
+  }
   create() {
     const desc1 = document.createElement('p');
     desc1.style.marginTop = '1.5rem';
@@ -106,6 +113,21 @@ export class Panel {
       .name('VSync')
       .onChange((value) => {
         Application.instance.device.vSync = value;
+      });
+    if (Application.instance.device.type !== 'webgl') {
+      systemSettings
+        .add(this._params, 'HiZ')
+        .name('HiZ')
+        .onChange((value) => {
+          this._viewer.camera.HiZ = value;
+        });
+    }
+    const viewSettings = this._gui.addFolder('View');
+    viewSettings
+      .add(this._params, 'rotate')
+      .name('Auto rotate')
+      .onChange((value) => {
+        this._viewer.enableRotate(value);
       });
 
     const lightSettings = this._gui.addFolder('Lighting');
@@ -171,10 +193,10 @@ export class Panel {
         this._viewer.enableSAO(value);
       });
     ppSettings
-      .add(this._params, 'water')
-      .name('Water')
+      .add(this._params, 'SSR')
+      .name('SSR')
       .onChange((value) => {
-        this._viewer.enableWater(value);
+        this._viewer.camera.SSR = value;
       });
 
     const perfSettings = this._gui.addFolder('Performance');

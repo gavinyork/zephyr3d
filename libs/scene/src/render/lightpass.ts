@@ -1,5 +1,5 @@
 import { RenderPass } from './renderpass';
-import { QUEUE_OPAQUE, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '../values';
+import { MaterialVaryingFlags, QUEUE_OPAQUE, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '../values';
 import { Vector4 } from '@zephyr3d/base';
 import type { RenderItemListBundle, RenderQueue } from './render_queue';
 import type { PunctualLight } from '../scene/light';
@@ -95,6 +95,16 @@ export class LightPass extends RenderPass {
     ctx.env = ctx.scene.env;
     ctx.drawEnvLight = false;
     ctx.flip = this.isAutoFlip(ctx);
+    const ssr = !!(ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS);
+    const tmpFramebuffer = ssr
+      ? ctx.device.pool.fetchTemporalFramebuffer(
+          false,
+          ctx.device.getDrawingBufferWidth(),
+          ctx.device.getDrawingBufferHeight(),
+          ctx.device.getFramebuffer().getColorAttachments()[0],
+          ctx.device.getFramebuffer().getDepthAttachment()
+        )
+      : null;
     const oit =
       renderQueue.drawTransparent &&
       ctx.primaryCamera.oit &&
@@ -110,7 +120,9 @@ export class LightPass extends RenderPass {
       fogSet: {}
     };
     const items = renderQueue.itemList;
-    const lists = [this._transmission ? items?.transmission : items?.opaque, items?.transparent];
+    const lists = this._transmission
+      ? [items?.transmission, items?.transmission_trans, items?.transparent]
+      : [items?.opaque, items?.transparent];
     for (let i = 0; i < 2; i++) {
       if (lists[i]) {
         ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none' ? ctx.env.sky.fogType : null;
@@ -137,7 +149,16 @@ export class LightPass extends RenderPass {
             ctx.currentShadowLight = null;
             ctx.lightBlending = lightIndex > 0;
             this._shadowMapHash = '';
+            if (ctx.lightBlending && tmpFramebuffer) {
+              ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
+              ctx.device.pushDeviceStates();
+              ctx.device.setFramebuffer(tmpFramebuffer);
+            }
             this.renderLightPass(ctx, lists[i], renderQueue.unshadowedLights, flags);
+            if (ctx.lightBlending && tmpFramebuffer) {
+              ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
+              ctx.device.popDeviceStates();
+            }
           }
           if (ctx.oit) {
             ctx.oit.endPass(ctx, p);
@@ -148,15 +169,32 @@ export class LightPass extends RenderPass {
         }
       }
       if (i === 0 && !ctx.sceneColorTexture) {
+        if (tmpFramebuffer) {
+          ctx.device.pushDeviceStates();
+          ctx.device.setFramebuffer(tmpFramebuffer);
+        }
         ctx.env.sky.skyWorldMatrix = ctx.scene.rootNode.worldMatrix;
         ctx.env.sky.renderSky(ctx);
+        if (tmpFramebuffer) {
+          ctx.device.popDeviceStates();
+        }
       }
       if (!renderQueue.needSceneColor || ctx.sceneColorTexture) {
         if (i === 0) {
+          if (tmpFramebuffer) {
+            ctx.device.pushDeviceStates();
+            ctx.device.setFramebuffer(tmpFramebuffer);
+          }
           ctx.env.sky.renderFog(ctx);
+          if (tmpFramebuffer) {
+            ctx.device.popDeviceStates();
+          }
         }
         ctx.compositor?.drawPostEffects(ctx, i === 0, ctx.linearDepthTexture);
       }
+    }
+    if (tmpFramebuffer) {
+      ctx.device.pool.releaseFrameBuffer(tmpFramebuffer);
     }
   }
 }

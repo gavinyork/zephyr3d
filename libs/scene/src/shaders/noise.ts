@@ -1,39 +1,88 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 
 /**
- * Generate single float noise from a vec2
+ * Generate random float value from a vec2
  *
  * @param scope - Current shader scope
  * @param p - random seed
+ * @returns random float value
+ *
+ * @public
+ */
+export function hash(scope: PBInsideFunctionScope, p: PBShaderExp) {
+  const pb = scope.$builder;
+  const funcName = 'Z_hashf';
+  pb.func(funcName, [pb.vec2('p')], function () {
+    this.h = pb.dot(this.p, pb.vec2(12.9898, 78.233));
+    this.$return(pb.fract(pb.mul(pb.sin(this.h), 43758.5453123)));
+  });
+  return scope[funcName](p);
+}
+
+/**
+ * Generate random float value from a vec2
+ *
+ * @param scope - Current shader scope
+ * @param p - random seed
+ * @returns random float value
+ *
+ * @public
+ */
+export function gradient(scope: PBInsideFunctionScope, p: PBShaderExp, t: PBShaderExp | number) {
+  const pb = scope.$builder;
+  const funcName = 'Z_gradient2f';
+  pb.func(funcName, [pb.vec2('p'), pb.float('t')], function () {
+    this.$l.rand = hash(this, this.p);
+    this.$l.angle = pb.mul(pb.add(this.t, Math.PI * 2), this.rand);
+    this.$return(pb.vec2(pb.cos(this.angle), pb.sin(this.angle)));
+  });
+  return scope[funcName](p, t);
+}
+
+/**
+ * Generate a float perlin noise value from a vec2
+ *
+ * @param scope - Current shader scope
+ * @param p - 2d vector
  * @returns a float noise value
  *
  * @public
  */
-export function noisef(scope: PBInsideFunctionScope, p: PBShaderExp) {
+export function perlinNoise2D(scope: PBInsideFunctionScope, p: PBShaderExp) {
+  return perlinNoise3D(scope, scope.$builder.vec3(p, 0));
+}
+
+/**
+ * Generate a float perlin noise value from a vec3
+ *
+ * @param scope - Current shader scope
+ * @param p - 3d vector
+ * @returns a float noise value
+ *
+ * @public
+ */
+export function perlinNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp) {
   const pb = scope.$builder;
-  const funcNameHash = 'Z_hashf';
-  const funcNameNoise = 'Z_noisef';
-  pb.func(funcNameHash, [pb.vec2('p')], function () {
-    this.h = pb.dot(this.p, pb.vec2(127.1, 311.7));
-    this.$return(pb.fract(pb.mul(pb.sin(this.h), 43758.5453123)));
-  });
-  pb.func(funcNameNoise, [pb.vec2('p')], function () {
-    this.i = pb.floor(this.p);
-    this.f = pb.fract(this.p);
+  const funcNameNoise = 'Z_perlinNoise3D';
+  pb.func(funcNameNoise, [pb.vec3('p')], function () {
+    this.i = pb.floor(this.p.xy);
+    this.f = pb.sub(this.p.xy, this.i);
     this.u = pb.mul(this.f, this.f, pb.sub(3, pb.mul(this.f, 2)));
-    this.h1 = this[funcNameHash](this.i);
-    this.h2 = this[funcNameHash](pb.add(this.i, pb.vec2(1, 0)));
-    this.h3 = this[funcNameHash](pb.add(this.i, pb.vec2(0, 1)));
-    this.h4 = this[funcNameHash](pb.add(this.i, pb.vec2(1, 1)));
-    this.$return(
-      pb.add(
-        -1,
-        pb.mul(2, pb.mix(pb.mix(this.h1, this.h2, this.u.x), pb.mix(this.h3, this.h4, this.u.x), this.u.y))
-      )
-    );
+    this.h1 = gradient(this, this.i, this.p.z);
+    this.h2 = gradient(this, pb.add(this.i, pb.vec2(1, 0)), this.p.z);
+    this.h3 = gradient(this, pb.add(this.i, pb.vec2(0, 1)), this.p.z);
+    this.h4 = gradient(this, pb.add(this.i, pb.vec2(1, 1)), this.p.z);
+    this.$l.tl = pb.dot(this.h1, this.f);
+    this.$l.tr = pb.dot(this.h2, pb.sub(this.f, pb.vec2(1, 0)));
+    this.$l.bl = pb.dot(this.h3, pb.sub(this.f, pb.vec2(0, 1)));
+    this.$l.br = pb.dot(this.h4, pb.sub(this.f, pb.vec2(1, 1)));
+    this.$l.noise = pb.mix(pb.mix(this.tl, this.tr, this.u.x), pb.mix(this.bl, this.br, this.u.x), this.u.y);
+    this.noise = pb.add(pb.mul(this.noise, 0.5), 0.5);
+    this.$return(this.noise);
   });
   return scope[funcNameNoise](p);
 }
+
 /**
  * worley 3d noise
  *
@@ -199,4 +248,21 @@ export function smoothNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBS
     );
   });
   return pb.getGlobalScope()[funcName](p);
+}
+
+/**
+ * Calculate interleaved gradient noise
+ *
+ * @param scope - current shader scope
+ * @param c - 2d position at where to calculate noise
+ * @returns noise value
+ *
+ * @public
+ */
+export function interleavedGradientNoise(scope: PBInsideFunctionScope, c: PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  const x = 0.06711056;
+  const y = 0.00583715;
+  const z = 52.9829189;
+  return pb.fract(pb.mul(z, pb.fract(pb.dot(c, pb.vec2(x, y)))));
 }

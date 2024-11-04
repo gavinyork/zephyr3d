@@ -2,13 +2,21 @@ import * as zip from '@zip.js/zip.js';
 import type * as draco3d from 'draco3d';
 import { Vector4, Vector3 } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
-import { BatchGroup, PostWater, WeightedBlendedOIT, ABufferOIT, SAO } from '@zephyr3d/scene';
+import { Mesh, PlaneShape, LambertMaterial, FPSCameraController } from '@zephyr3d/scene';
+import {
+  BatchGroup,
+  PostWater,
+  WeightedBlendedOIT,
+  ABufferOIT,
+  SAO,
+  FFTWaveGenerator,
+  OrbitCameraController
+} from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
 import {
   BoundingBox,
   AssetManager,
   DirectionalLight,
-  OrbitCameraController,
   Application,
   Tonemap,
   PerspectiveCamera,
@@ -18,6 +26,8 @@ import {
 } from '@zephyr3d/scene';
 import { EnvMaps } from './envmap';
 import { Panel } from './ui';
+import { imGuiInit, imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
+import { Inspector } from '@zephyr3d/inspector';
 
 declare global {
   const DracoDecoderModule: draco3d.DracoDecoderModule;
@@ -47,35 +57,53 @@ export class GLTFViewer {
   private _nearPlane: number;
   private _envMaps: EnvMaps;
   private _batchGroup: BatchGroup;
+  private _floor: Mesh;
   private _ui: Panel;
+  private _showGUI: boolean;
+  private _showFloor: boolean;
+  private _useScatter: boolean;
+  private _showInspector: boolean;
+  private _autoRotate: boolean;
   private _compositor: Compositor;
   private _dracoModule: draco3d.DecoderModule;
+  private _inspector: Inspector;
+  private _bboxNoScale: AABB;
   constructor(scene: Scene) {
     const device = Application.instance.device;
     this._currentAnimation = null;
     this._modelNode = null;
     this._animationSet = null;
     this._scene = scene;
+    this._scene.env.light.strength = 0.8;
+    this._scene.env.sky.drawGround = true;
     this._envMaps = new EnvMaps();
     this._batchGroup = new BatchGroup(scene);
     this._assetManager = new AssetManager();
     this._tonemap = new Tonemap();
-    this._water = new PostWater(0);
+    this._water = new PostWater(0, new FFTWaveGenerator());
+    this._water.elevation = 2;
+    this._water.ssr = true;
+    const floorMaterial = new LambertMaterial();
+    floorMaterial.albedoColor = new Vector4(0.8, 0.8, 0.8, 1);
+    this._floor = new Mesh(scene, new PlaneShape({ size: 1 }), floorMaterial);
+    this._floor.castShadow = false;
     this._bloom = new Bloom();
     this._sao = new SAO();
+    this._sao.radius = 10;
     this._sao.intensity = 0.025;
     this._bloom.threshold = 0.85;
     this._bloom.intensity = 1.5;
     this._fxaa = new FXAA();
     this._doTonemap = true;
-    this._doWater = false;
     this._doBloom = true;
     this._doFXAA = true;
     this._doWater = false;
     this._doSAO = false;
+    this._autoRotate = false;
     this._oit = new WeightedBlendedOIT();
     this._fov = Math.PI / 3;
     this._nearPlane = 1;
+    this._bboxNoScale = null;
     this._compositor = new Compositor();
     this._compositor.appendPostEffect(this._tonemap);
     this._compositor.appendPostEffect(this._bloom);
@@ -89,23 +117,42 @@ export class GLTFViewer {
     );
     this._camera.oit = this._oit;
     this._camera.position.setXYZ(0, 0, 15);
-    this._camera.controller = new OrbitCameraController();
-    this._light0 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
+    //this._camera.controller = new OrbitCameraController();
+    this._camera.controller = new FPSCameraController();
+    this._light0 = new DirectionalLight(this._scene)
+      .setColor(new Vector4(1, 1, 1, 1))
+      .setIntensity(8)
+      .setCastShadow(true);
     this._light0.shadow.shadowMapSize = 1024;
-    this._light0.lookAt(new Vector3(0, 0, 0), new Vector3(0, -1, 1), Vector3.axisPY());
+    this._light0.shadow.depthBias = 0.1;
+    this._light0.shadow.mode = 'pcf-opt';
+    this._light0.shadow.pcfKernelSize = 7;
+    this._light0.lookAt(new Vector3(0, 0, 0), new Vector3(1, -1, 1), Vector3.axisPY());
     this._light1 = new DirectionalLight(this._scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
     this._light1.shadow.shadowMapSize = 1024;
     this._light1.lookAt(new Vector3(0, 0, 0), new Vector3(-0.5, 0.707, 0.5), Vector3.axisPY());
     this._envMaps.selectById(this._envMaps.getIdList()[0], this.scene);
     this._ui = new Panel(this);
+    this._showGUI = true;
+    this._showFloor = false;
+    this._useScatter = false;
+    this._showInspector = false;
     this._dracoModule = null;
+    this._inspector = new Inspector(this._scene, this._compositor, this._camera);
   }
   async ready() {
+    const that = this;
     return new Promise<void>((resolve) => {
       DracoDecoderModule({
         onModuleLoaded: (module) => {
           this._dracoModule = module;
-          resolve();
+          imGuiInit(Application.instance.device).then(() => {
+            Application.instance.inputManager.use(function (ev: Event, type: string) {
+              return that._showInspector ? imGuiInjectEvent(ev, type) : false;
+            });
+            Application.instance.inputManager.use(this._camera.handleEvent.bind(this._camera));
+            resolve();
+          });
         }
       });
     });
@@ -118,15 +165,6 @@ export class GLTFViewer {
   }
   get light1(): DirectionalLight {
     return this._light1;
-  }
-  get FOV(): number {
-    return this._fov;
-  }
-  set FOV(val: number) {
-    if (val !== this._fov) {
-      this._fov = val;
-      this.lookAt();
-    }
   }
   get bloom(): Bloom {
     return this._bloom;
@@ -189,8 +227,24 @@ export class GLTFViewer {
           }
         }
         this._ui.update();
+        this._bboxNoScale = this.getBoundingBox();
+        const scaleFactor =
+          Math.max(this._bboxNoScale.maxPoint.x, this._bboxNoScale.maxPoint.y, this._bboxNoScale.maxPoint.z) *
+          8;
+        this._floor.scale.setXYZ(scaleFactor, 1, scaleFactor);
+        this._floor.position.setXYZ(
+          -0.5 * scaleFactor,
+          this._bboxNoScale.minPoint.y - this._bboxNoScale.extents.y * 0.01,
+          -0.5 * scaleFactor
+        );
+        this._floor.parent = this._showFloor ? this._modelNode : null;
         this.lookAt();
+        this._light0.shadow.shadowRegion = this.getBoundingBox();
       });
+    this._water.ssrMaxDistance = Vector3.distance(
+      this._scene.boundingBox.minPoint,
+      this._scene.boundingBox.maxPoint
+    );
   }
   async handleDrop(data: DataTransfer) {
     this.resolveDraggedItems(data).then(async (fileMap) => {
@@ -229,6 +283,17 @@ export class GLTFViewer {
       this._currentAnimation = null;
       this.lookAt();
     }
+  }
+  enableRotate(enable: boolean) {
+    if (this._autoRotate !== enable) {
+      this._autoRotate = enable;
+      if (this._modelNode && !this._autoRotate) {
+        this._modelNode.rotation.identity();
+      }
+    }
+  }
+  rotateEnabled(): boolean {
+    return this._autoRotate;
   }
   enableShadow(enable: boolean) {
     this._light0.setCastShadow(enable);
@@ -320,11 +385,25 @@ export class GLTFViewer {
     }
   }
   render() {
+    if (this._modelNode) {
+      if (this._autoRotate) {
+        const angle = Application.instance.device.frameInfo.elapsedOverall * 0.001;
+        this._modelNode.rotation.fromAxisAngle(Vector3.axisPY(), angle);
+      }
+      if (this._animationSet) {
+        this._light0.shadow.shadowRegion = this.getBoundingBox();
+      }
+    }
     this._camera.render(this._scene, this._compositor);
+    if (this._showInspector) {
+      imGuiNewFrame();
+      this._inspector.render();
+      imGuiEndFrame();
+    }
     //this._ui.render();
   }
   lookAt() {
-    const bbox = this.getBoundingBox();
+    const bbox = this._bboxNoScale;
     const minSize = 10;
     const maxSize = 100;
     if (bbox) {
@@ -347,14 +426,25 @@ export class GLTFViewer {
       );
       this._camera.near = Math.min(1, this._camera.near);
       this._camera.far = Math.max(1000, dist + extents.z + 100);
-      (this._camera.controller as OrbitCameraController).setOptions({ center });
+      if (this._camera.controller instanceof OrbitCameraController) {
+        this._camera.controller.setOptions({ center });
+      }
+    }
+  }
+  nextBackground() {
+    const idList = this._envMaps.getIdList();
+    if (idList?.length > 0) {
+      const currentId = this._envMaps.getCurrentId();
+      const index = idList.indexOf(currentId);
+      const newIndex = (index + 1) % idList.length;
+      this._envMaps.selectById(idList[newIndex], this._scene);
     }
   }
   private getBoundingBox(): AABB {
     const bbox = new BoundingBox();
     bbox.beginExtend();
     this.traverseModel((node) => {
-      if (node.isGraphNode()) {
+      if (node.isGraphNode() && node !== this._floor) {
         const aabb = node.getWorldBoundingVolume()?.toAABB();
         if (aabb && aabb.isValid()) {
           bbox.extend(aabb.minPoint);
@@ -436,6 +526,38 @@ export class GLTFViewer {
     );
     await Promise.all(promises);
     return result;
+  }
+  toggleScatter() {
+    this._useScatter = !this._useScatter;
+    if (this._useScatter) {
+      this._scene.env.sky.skyType = 'scatter';
+      this._scene.env.sky.autoUpdateIBLMaps = true;
+      this._scene.env.light.radianceMap = this._scene.env.sky.radianceMap;
+      this._scene.env.light.irradianceMap = this._scene.env.sky.irradianceMap;
+    } else {
+      this._envMaps.selectById(this._envMaps.getCurrentId(), this._scene);
+    }
+  }
+  toggleFloor() {
+    this._showFloor = !this._showFloor;
+    this._floor.parent = this._showFloor ? this._modelNode : null;
+  }
+  toggleInspector() {
+    this._showInspector = !this._showInspector;
+  }
+  toggleGUI() {
+    this._showGUI = !this._showGUI;
+    this._ui.show(this._showGUI);
+  }
+  randomLightDir() {
+    this._light0.lookAt(
+      new Vector3(0, 0, 0),
+      new Vector3(Math.random() * 2 - 1, -1, Math.random() * 2 - 1),
+      Vector3.axisPY()
+    );
+  }
+  toggleShadow() {
+    this._light0.castShadow = !this._light0.castShadow;
   }
   private async resolveDraggedItems(data: DataTransfer): Promise<Map<string, string>> {
     const files = Array.from(data.files);

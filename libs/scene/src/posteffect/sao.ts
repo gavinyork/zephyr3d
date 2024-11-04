@@ -2,27 +2,71 @@ import type {
   AbstractDevice,
   BindGroup,
   GPUProgram,
+  PBInsideFunctionScope,
+  PBShaderExp,
   RenderStateSet,
-  Texture2D,
-  TextureSampler
+  Texture2D
 } from '@zephyr3d/device';
 import { isFloatTextureFormat } from '@zephyr3d/device';
 import { AbstractPostEffect } from './posteffect';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
-import { AOBilateralBlurBlitter } from '../blitter/depthlimitedgaussion';
-import { CopyBlitter } from '../blitter';
+import { BilateralBlurBlitter } from '../blitter/bilateralblur';
+import type { BlitType } from '../blitter';
 import type { DrawContext } from '../render';
+import { copyTexture, fetchSampler } from '../utility/misc';
 
 const NUM_SAMPLES = 7;
 const NUM_RINGS = 4;
 
+class DepthLimitAOBlurBlitter extends BilateralBlurBlitter {
+  private _packed: boolean;
+  constructor(finalPhase: boolean) {
+    super(finalPhase);
+    this._packed = false;
+  }
+  get packed(): boolean {
+    return this._packed;
+  }
+  set packed(val: boolean) {
+    if (this._packed !== !!val) {
+      this._packed = !!val;
+      this.invalidateHash();
+    }
+  }
+  protected calcHash(): string {
+    return `${this._packed}:${super.calcHash()}`;
+  }
+  readTexel(
+    scope: PBInsideFunctionScope,
+    type: BlitType,
+    srcTex: PBShaderExp,
+    srcUV: PBShaderExp,
+    srcLayer: PBShaderExp,
+    sampleType: 'float' | 'int' | 'uint' | 'depth'
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    const texel = super.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
+    if (this._packed) {
+      return pb.vec4(pb.vec3(decodeNormalizedFloatFromRGBA(scope, texel)), 1);
+    } else {
+      return pb.vec4(texel.rrr, 1);
+    }
+  }
+  writeTexel(scope: PBInsideFunctionScope, type: BlitType, uv: PBShaderExp, texel: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    const outTexel = super.writeTexel(scope, type, uv, pb.vec4(texel.rrr, 1));
+    return this._finalPhase || !this._packed
+      ? pb.vec4(outTexel.rrr, 1)
+      : encodeNormalizedFloatToRGBA(scope, outTexel.r);
+  }
+}
 /**
  * The Scalable Ambient Obscurance (SAO) post effect
  * @public
  */
-export class SAO extends AbstractPostEffect {
-  private static _nearestSampler: TextureSampler = null;
+export class SAO extends AbstractPostEffect<'SAO'> {
+  static readonly className = 'SAO' as const;
   private static _program: GPUProgram = null;
   private static _programPacked: GPUProgram = null;
   private static _renderState: RenderStateSet = null;
@@ -36,9 +80,8 @@ export class SAO extends AbstractPostEffect {
   private _saoMinResolution: number;
   private _saoRandomSeed: number;
   private _saoBlurDepthCutoff: number;
-  private _blitterH: AOBilateralBlurBlitter;
-  private _blitterV: AOBilateralBlurBlitter;
-  private _copyBlitter: CopyBlitter;
+  private _blitterH: DepthLimitAOBlurBlitter;
+  private _blitterV: DepthLimitAOBlurBlitter;
   private _supported: boolean;
   /**
    * Creates an instance of SAO post effect
@@ -55,14 +98,13 @@ export class SAO extends AbstractPostEffect {
     this._saoRadius = 100;
     this._saoMinResolution = 0;
     this._saoRandomSeed = 0;
-    this._saoBlurDepthCutoff = 1;
-    this._blitterH = new AOBilateralBlurBlitter(false);
+    this._saoBlurDepthCutoff = 2;
+    this._blitterH = new DepthLimitAOBlurBlitter(false);
     this._blitterH.kernelRadius = 8;
     this._blitterH.stdDev = 10;
-    this._blitterV = new AOBilateralBlurBlitter(true);
+    this._blitterV = new DepthLimitAOBlurBlitter(true);
     this._blitterV.kernelRadius = 8;
     this._blitterV.stdDev = 10;
-    this._copyBlitter = new CopyBlitter();
   }
   /** Scale value */
   get scale(): number {
@@ -136,8 +178,14 @@ export class SAO extends AbstractPostEffect {
     const device = ctx.device;
     const viewport = device.getViewport();
     this._prepare(device, inputColorTexture);
-    this._copyBlitter.srgbOut = srgbOutput;
-    this._copyBlitter.blit(inputColorTexture, device.getFramebuffer(), SAO._nearestSampler);
+    copyTexture(
+      inputColorTexture,
+      device.getFramebuffer(),
+      fetchSampler('clamp_nearest_nomip'),
+      null,
+      0,
+      srgbOutput
+    );
     if (!this._supported) {
       return;
     }
@@ -169,15 +217,15 @@ export class SAO extends AbstractPostEffect {
     this.drawFullscreenQuad(SAO._renderState);
     this._blitterH.size = new Vector2(inputColorTexture.width, inputColorTexture.height);
     this._blitterH.depthTex = sceneDepthTexture;
-    this._blitterH.depthCutoff = this._saoBlurDepthCutoff / ctx.camera.getFarPlane();
-    this._blitterH.nearestSampler = SAO._nearestSampler;
+    this._blitterH.depthCutoff = this._saoBlurDepthCutoff;
+    this._blitterH.sampler = fetchSampler('clamp_nearest_nomip');
     this._blitterH.cameraNearFar = cameraNearFar;
     this._blitterH.packed = packed;
     this._blitterH.renderStates = SAO._renderState;
     this._blitterV.size = new Vector2(inputColorTexture.width, inputColorTexture.height);
     this._blitterV.depthTex = sceneDepthTexture;
-    this._blitterV.depthCutoff = this._saoBlurDepthCutoff / ctx.camera.getFarPlane();
-    this._blitterV.nearestSampler = SAO._nearestSampler;
+    this._blitterV.depthCutoff = this._saoBlurDepthCutoff;
+    this._blitterV.sampler = fetchSampler('clamp_nearest_nomip');
     this._blitterV.cameraNearFar = cameraNearFar;
     this._blitterV.packed = packed;
     this._blitterV.srgbOut = srgbOutput;
@@ -203,15 +251,6 @@ export class SAO extends AbstractPostEffect {
     const isFloatFramebuffer = fb && isFloatTextureFormat(fb.getColorAttachments()[0].format);
     this._supported = !isFloatFramebuffer || device.getDeviceCaps().framebufferCaps.supportFloatBlending;
     if (this._supported) {
-      if (!SAO._nearestSampler) {
-        SAO._nearestSampler = device.createSampler({
-          magFilter: 'nearest',
-          minFilter: 'nearest',
-          mipFilter: 'none',
-          addressU: 'clamp',
-          addressV: 'clamp'
-        });
-      }
       if (!SAO._renderState) {
         SAO._renderState = device.createRenderStateSet();
         SAO._renderState.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('gt');

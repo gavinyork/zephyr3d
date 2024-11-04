@@ -1,6 +1,7 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render/drawable';
 import {
+  MaterialVaryingFlags,
   MAX_CLUSTERED_LIGHTS,
   MORPH_ATTRIBUTE_VECTOR_COUNT,
   MORPH_TARGET_NORMAL,
@@ -14,17 +15,19 @@ import {
 } from '../../values';
 import { ScatteringLut } from '../../render/scatteringlut';
 import type {
-  ProgramBuilder,
   BindGroup,
   PBShaderExp,
   PBInsideFunctionScope,
   StructuredBuffer,
   Texture2D,
-  PBGlobalScope
+  PBGlobalScope,
+  BindGroupLayout
 } from '@zephyr3d/device';
+import { ProgramBuilder } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
 import { linearToGamma } from '../../shaders';
 import type { Camera } from '../../camera';
+import { Application } from '../../app';
 
 const UNIFORM_NAME_GLOBAL = 'Z_UniformGlobal';
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
@@ -57,6 +60,8 @@ export class ShaderHelper {
   static defaultSunDir = Vector3.one().inplaceNormalize();
   /** @internal */
   private static readonly SKIN_MATRIX_NAME = 'Z_SkinMatrix';
+  /** @internal */
+  private static _drawableBindGroupLayouts: Record<string, BindGroupLayout> = {};
   /** @internal */
   private static _lightUniformShadow = {
     light: {
@@ -114,6 +119,25 @@ export class ShaderHelper {
   static getLightBufferUniformName(): string {
     return UNIFORM_NAME_LIGHT_BUFFER;
   }
+  static getDrawableBindGroupLayout(skinning: boolean, morphing: boolean, instancing: boolean) {
+    const hash = `${skinning ? 1 : 0}${morphing ? 1 : 0}${instancing ? 1 : 0}`;
+    let bindGroupLayout = this._drawableBindGroupLayouts[hash];
+    if (!bindGroupLayout) {
+      const device = Application.instance.device;
+      const buildInfo = new ProgramBuilder(device).buildRender({
+        vertex(pb) {
+          ShaderHelper.vertexShaderDrawableStuff(this, skinning, morphing, instancing);
+          pb.main(function () {});
+        },
+        fragment(pb) {
+          pb.main(function () {});
+        }
+      });
+      bindGroupLayout = buildInfo[2][1];
+      this._drawableBindGroupLayouts[hash] = bindGroupLayout;
+    }
+    return bindGroupLayout;
+  }
   /**
    * Prepares the fragment shader which is going to be used in our material system
    *
@@ -148,7 +172,8 @@ export class ShaderHelper {
       pb.mat4('viewProjectionMatrix'),
       pb.mat4('viewMatrix'),
       pb.mat4('projectionMatrix'),
-      pb.vec4('params')
+      pb.vec4('params'),
+      pb.float('roughnessFactor')
     ]);
     if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
       const lightStruct = pb.defineStruct([
@@ -557,26 +582,10 @@ export class ShaderHelper {
   static prepareVertexShaderCommon(pb: ProgramBuilder, ctx: DrawContext) {
     this.vertexShaderDrawableStuff(
       pb.getGlobalScope(),
-      !!ctx.skinAnimation,
-      !!ctx.morphAnimation,
-      !!ctx.instancing
+      !!(ctx.materialFlags & MaterialVaryingFlags.SKIN_ANIMATION),
+      !!(ctx.materialFlags & MaterialVaryingFlags.MORPH_ANIMATION),
+      !!(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)
     );
-    /*
-    const skinning = !!ctx.target?.getBoneMatrices();
-    const scope = pb.getGlobalScope();
-    if (ctx.instanceData) {
-      scope[UNIFORM_NAME_INSTANCE_DATA_STRIDE] = pb.uint().uniform(1);
-      scope[UNIFORM_NAME_INSTANCE_DATA_OFFSET] = pb.uint().uniform(1);
-      scope[UNIFORM_NAME_INSTANCE_DATA] = pb.vec4[65536 >> 4]().uniformBuffer(3);
-    } else {
-      scope[UNIFORM_NAME_WORLD_MATRIX] = pb.mat4().uniform(1);
-    }
-    if (skinning) {
-      scope[UNIFORM_NAME_BONE_MATRICES] = pb.tex2D().uniform(1).sampleType('unfilterable-float');
-      scope[UNIFORM_NAME_BONE_INV_BIND_MATRIX] = pb.mat4().uniform(1);
-      scope[UNIFORM_NAME_BONE_TEXTURE_SIZE] = pb.int().uniform(1);
-    }
-    */
   }
   /** @internal */
   static setCameraUniforms(bindGroup: BindGroup, camera: Camera, flip: boolean, linear: boolean) {
@@ -587,7 +596,8 @@ export class ShaderHelper {
       viewProjectionMatrix: camera.viewProjectionMatrix,
       viewMatrix: camera.viewMatrix,
       projectionMatrix: camera.getProjectionMatrix(),
-      params: new Vector4(camera.getNearPlane(), camera.getFarPlane(), flip ? -1 : 1, linear ? 0 : 1)
+      params: new Vector4(camera.getNearPlane(), camera.getFarPlane(), flip ? -1 : 1, linear ? 0 : 1),
+      roughnessFactor: camera.SSR ? camera.ssrRoughnessFactor : 1
     };
     bindGroup.setValue(UNIFORM_NAME_GLOBAL, {
       camera: cameraStruct
@@ -691,6 +701,14 @@ export class ShaderHelper {
    */
   static getCameraPosition(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_GLOBAL].camera.position.xyz;
+  }
+  /**
+   * Gets the uniform variable of type float which holds the roughness factor
+   * @param scope - Current shader scope
+   * @returns The roughness factor
+   */
+  static getCameraRoughnessFactor(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].camera.roughnessFactor;
   }
   /**
    * Discard the fragment if it was clipped by the clip plane

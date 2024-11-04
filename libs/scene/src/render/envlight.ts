@@ -38,7 +38,8 @@ export abstract class EnvironmentLighting {
    * Get radiance for a fragment
    *
    * @param scope - The shader scope
-   * @param surfaceData - surface data of the fragment
+   * @param refl - Reflection vector
+   * @param roughness - Surface roughness
    *
    * @returns The radiance for the fragment
    */
@@ -47,7 +48,7 @@ export abstract class EnvironmentLighting {
    * Get irradiance for a fragment
    *
    * @param scope - The shader scope
-   * @param surfaceData - surface data of the fragment
+   * @param normal - surface normal
    *
    * @returns The radiance for the fragment
    */
@@ -521,7 +522,13 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
    * @override
    */
   getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp {
-    return null;
+    const pb = scope.$builder;
+    const factor = pb.add(pb.mul(refl.y, 0.5), 0.5);
+    return pb.mix(
+      scope[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_DOWN],
+      scope[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_UP],
+      factor
+    ).rgb;
   }
   /**
    * {@inheritDoc EnvironmentLighting.getIrradiance}
@@ -541,7 +548,7 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
    * @override
    */
   hasRadiance(): boolean {
-    return false;
+    return true;
   }
   /**
    * {@inheritDoc EnvironmentLighting.hasIrradiance}

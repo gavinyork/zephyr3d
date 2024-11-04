@@ -662,7 +662,7 @@ export abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetailI
    */
   abstract toBufferLayout(offset: number, layout: PBStructLayout): UniformBufferLayout;
   /** @internal */
-  abstract toTypeName(deviceType: string, varName?: string): string;
+  abstract toTypeName(deviceType?: string, varName?: string): string;
   /** @internal */
   protected abstract genTypeId(): string;
 }
@@ -680,7 +680,7 @@ export class PBVoidTypeInfo extends PBTypeInfo<null> {
     return true;
   }
   /** @internal */
-  toTypeName(deviceType: string, varName?: string): string {
+  toTypeName(): string {
     return 'void';
   }
   /** @internal */
@@ -706,7 +706,7 @@ export class PBAnyTypeInfo extends PBTypeInfo<null> {
     return true;
   }
   /** @internal */
-  toTypeName(deviceType: string, varName?: string): string {
+  toTypeName(): string {
     return 'any';
   }
   /** @internal */
@@ -1666,7 +1666,7 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
   }
   /** @internal */
   protected genTypeId(): string {
-    return `TEXTURE:${this.textureType}`;
+    return `TEXTURE:${this.textureType}:${this.textureType & BITFLAG_STORAGE ? this.storageTexelFormat : ''}`;
   }
 }
 
@@ -1707,7 +1707,7 @@ export class PBFunctionTypeInfo extends PBTypeInfo<FunctionTypeDetail> {
     return null;
   }
   /** @internal */
-  toTypeName(deviceType: string, varName?: string): string {
+  toTypeName(): string {
     throw new Error('not supported');
   }
 }

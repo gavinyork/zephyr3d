@@ -1,17 +1,30 @@
-import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
-import type { AbstractDevice, GPUDataBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
+import type { Vector4 } from '@zephyr3d/base';
+import type {
+  AbstractDevice,
+  ColorState,
+  FaceMode,
+  GPUDataBuffer,
+  Texture2D,
+  TextureFormat
+} from '@zephyr3d/device';
 import type { XForm } from '../scene/xform';
 import type { Camera } from '../camera/camera';
 import type { FogType, RenderPass } from '.';
 import type { DrawableInstanceInfo, InstanceData, RenderQueue, RenderQueueRef } from './render_queue';
 import type { ShadowMapParams } from '../shadow';
 import type { Environment } from '../scene/environment';
-import type { DirectionalLight, GraphNode, PunctualLight, Scene } from '../scene';
+import type { DirectionalLight, PunctualLight, Scene, SceneNode } from '../scene';
 import type { Compositor, CompositorContext } from '../posteffect';
 import type { ClusteredLight } from './cluster_light';
 import type { MeshMaterial } from '../material';
 import type { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import type { OIT } from './oit';
+
+/**
+ * Pick target
+ * @public
+ */
+export type PickTarget = { node: SceneNode; label?: string };
 
 /**
  * The context for drawing objects
@@ -30,6 +43,10 @@ export interface DrawContext {
   camera: Camera;
   /** OIT */
   oit: OIT;
+  /** hierarchical depth */
+  HiZ: boolean;
+  /** hierarchical depth buffer */
+  HiZTexture: Texture2D;
   /** The scene that is currently been drawing */
   scene: Scene;
   /** The render pass to which the current drawing task belongs */
@@ -84,12 +101,12 @@ export interface DrawContext {
   sunLight?: DirectionalLight;
   /** clustered light index */
   clusteredLight?: ClusteredLight;
-  /** Whether skin animation is used */
-  skinAnimation?: boolean;
-  /** Whether morph animation is used */
-  morphAnimation?: boolean;
-  /** Whehter instance rendering is used */
-  instancing?: boolean;
+  /** Material varying flags */
+  materialFlags: number;
+  /** Force cull mode */
+  forceCullMode?: FaceMode;
+  /** Force color mask state */
+  forceColorState?: ColorState;
 }
 
 /**
@@ -106,11 +123,9 @@ export interface Drawable {
   /** Gets the instance color */
   getInstanceColor(): Vector4;
   /** If set, the pick target will be returned as the pick result  */
-  getPickTarget(): GraphNode;
+  getPickTarget(): PickTarget;
   /** Gets the texture that contains the bone matrices of the object */
   getBoneMatrices(): Texture2D;
-  /** Gets the inversed bind matrix for skeleton animation */
-  getInvBindMatrix(): Matrix4x4;
   /** Gets the object color used for GPU picking */
   getObjectColor(): Vector4;
   /** Gets the morph texture */

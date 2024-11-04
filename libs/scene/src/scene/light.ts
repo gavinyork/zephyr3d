@@ -344,7 +344,7 @@ export class DirectionalLight extends PunctualLight {
     return true;
   }
   /** @internal */
-  computeBoundingVolume(bv: BoundingVolume): BoundingVolume {
+  computeBoundingVolume(): BoundingVolume {
     return null;
   }
   /** @internal */
@@ -584,8 +584,8 @@ export class PointLight extends PunctualLight {
     return true;
   }
   /** @internal */
-  computeBoundingVolume(bv: BoundingVolume): BoundingVolume {
-    const bbox = bv ? (bv as BoundingBox) : new BoundingBox();
+  computeBoundingVolume(): BoundingVolume {
+    const bbox = new BoundingBox();
     bbox.minPoint = new Vector3(-this._range, -this._range, -this._range);
     bbox.maxPoint = new Vector3(this._range, this._range, this._range);
     return bbox;
@@ -669,8 +669,8 @@ export class SpotLight extends PunctualLight {
     return true;
   }
   /** @internal */
-  computeBoundingVolume(bv: BoundingVolume): BoundingVolume {
-    const bbox = bv ? (bv as BoundingBox) : new BoundingBox();
+  computeBoundingVolume(): BoundingVolume {
+    const bbox = new BoundingBox();
     const cosCutoff = Math.cos(this._cutoff);
     const r = (this._range / cosCutoff) * Math.sqrt(1 - cosCutoff * cosCutoff);
     bbox.minPoint = new Vector3(-r, -r, 0);

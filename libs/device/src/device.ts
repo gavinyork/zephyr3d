@@ -1,7 +1,14 @@
 import type { Vector4, TypedArray, IEventTarget } from '@zephyr3d/base';
 import type { ITimer } from './timer';
 import { CPUTimer } from './timer';
-import type { RenderStateSet } from './render_states';
+import type {
+  BlendingState,
+  ColorState,
+  DepthState,
+  RasterizerState,
+  RenderStateSet,
+  StencilState
+} from './render_states';
 import type {
   FrameBufferOptions,
   SamplerOptions,
@@ -161,6 +168,11 @@ export abstract class BaseDevice {
   abstract clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number);
   abstract createGPUTimer(): ITimer;
   abstract createRenderStateSet(): RenderStateSet;
+  abstract createBlendingState(): BlendingState;
+  abstract createColorState(): ColorState;
+  abstract createRasterizerState(): RasterizerState;
+  abstract createDepthState(): DepthState;
+  abstract createStencilState(): StencilState;
   abstract createSampler(options: SamplerOptions): TextureSampler;
   abstract createTextureFromMipmapData<T extends BaseTexture>(
     data: TextureMipmapData,
@@ -219,6 +231,8 @@ export abstract class BaseDevice {
   abstract createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo;
   abstract reverseVertexWindingOrder(reverse: boolean): void;
   abstract isWindingOrderReversed(): boolean;
+  abstract copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number);
+  abstract copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number);
   // program
   abstract createGPUProgram(params: GPUProgramConstructParams): GPUProgram;
   abstract createBindGroup(layout: BindGroupLayout): BindGroup;

@@ -1,8 +1,8 @@
 import { LightPass } from './lightpass';
 import { ShadowMapPass } from './shadowmap_pass';
 import { DepthPass } from './depthpass';
-import { Vector4 } from '@zephyr3d/base';
-import type { FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
+import { isPowerOf2, nextPowerOf2, Vector4 } from '@zephyr3d/base';
+import type { ColorState, FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
 import { Application } from '../app';
 import { CopyBlitter } from '../blitter';
 import type { DrawContext } from './drawable';
@@ -11,16 +11,21 @@ import type { RenderQueue } from './render_queue';
 import type { PunctualLight, Scene } from '../scene';
 import type { PickResult } from '../camera';
 import { PerspectiveCamera, type Camera } from '../camera';
-import type { Compositor } from '../posteffect';
+import { Compositor } from '../posteffect';
 import { ClusteredLight } from './cluster_light';
 import { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import { ObjectColorPass } from './objectcolorpass';
+import { buildHiZ } from './hzb';
+import { MaterialVaryingFlags } from '../values';
+import { fetchSampler } from '../utility/misc';
 
 /**
  * Forward render scheme
  * @internal
  */
 export class SceneRenderer {
+  /** @internal */
+  private static _defaultCompositor = new Compositor();
   /** @internal */
   private static _scenePass = new LightPass();
   /** @internal */
@@ -29,6 +34,10 @@ export class SceneRenderer {
   private static _shadowMapPass = new ShadowMapPass();
   /** @internal */
   private static _objectColorPass = new ObjectColorPass();
+  /** @internal */
+  private static _frontDepthColorState: ColorState = null;
+  /** @internal */
+  private static _backDepthColorState: ColorState = null;
   /** @internal */
   private static _clusters: ClusteredLight[] = [];
   /** lighting render pass */
@@ -72,9 +81,11 @@ export class SceneRenderer {
       primaryCamera: camera,
       picking: false,
       oit: null,
+      HiZ: camera.HiZ && device.type !== 'webgl',
+      HiZTexture: null,
       globalBindGroupAllocator: GlobalBindGroupAllocator.get(),
       camera,
-      compositor: compositor?.needDrawPostEffects() ? compositor : null,
+      compositor: compositor ?? this._defaultCompositor,
       timestamp: device.frameInfo.frameTimestamp,
       queue: 0,
       lightBlending: false,
@@ -83,7 +94,8 @@ export class SceneRenderer {
       applyFog: null,
       flip: false,
       drawEnvLight: false,
-      env: null
+      env: null,
+      materialFlags: 0
     };
     scene.frameUpdate();
     if (camera && !device.isContextLost()) {
@@ -95,18 +107,43 @@ export class SceneRenderer {
   protected static _renderSceneDepth(
     ctx: DrawContext,
     renderQueue: RenderQueue,
-    depthFramebuffer: FrameBuffer
+    depthFramebuffer: FrameBuffer,
+    renderBackfaceDepth?: boolean
   ) {
     const device = ctx.device;
     device.pushDeviceStates();
     device.setFramebuffer(depthFramebuffer);
-    this._depthPass.clearColor = device.type === 'webgl' ? new Vector4(0, 0, 0, 1) : new Vector4(1, 1, 1, 1);
+    this._depthPass.encodeDepth = depthFramebuffer.getColorAttachments()[0].format === 'rgba8unorm';
+    this._depthPass.clearColor = this._depthPass.encodeDepth
+      ? new Vector4(0, 0, 0, 1)
+      : new Vector4(1, 1, 1, 1);
+    this._depthPass.clearDepth = 1;
+    if (renderBackfaceDepth) {
+      if (!this._backDepthColorState) {
+        this._backDepthColorState = device.createColorState().setColorMask(false, true, false, false);
+      }
+      if (!this._frontDepthColorState) {
+        this._frontDepthColorState = device.createColorState().setColorMask(true, false, false, false);
+      }
+      ctx.forceColorState = this._backDepthColorState;
+      ctx.forceCullMode = 'front';
+      this._depthPass.renderBackface = true;
+      this._depthPass.render(ctx, null, renderQueue);
+      this._depthPass.clearColor = null;
+      this._depthPass.renderBackface = false;
+      ctx.forceColorState = this._frontDepthColorState;
+      ctx.forceCullMode = null;
+    }
     this._depthPass.render(ctx, null, renderQueue);
+    ctx.forceColorState = null;
     device.popDeviceStates();
   }
   /** @internal */
   protected static _renderScene(ctx: DrawContext): void {
     const device = ctx.device;
+    const SSR =
+      ctx.primaryCamera.SSR && ctx.scene.env.light.envLight && ctx.scene.env.light.envLight.hasRadiance();
+    const SSRCalcThickness = SSR && ctx.primaryCamera.ssrCalcThickness;
     const vp = ctx.camera.viewport;
     const scissor = ctx.camera.scissor;
     const finalFramebuffer = device.getFramebuffer();
@@ -144,7 +181,7 @@ export class SceneRenderer {
     if (ctx.camera.enablePicking) {
       this.renderObjectColors(ctx);
     }
-
+    let HiZFrameBuffer: FrameBuffer = null;
     const renderQueue = this._scenePass.cullScene(ctx, ctx.camera);
     ctx.sunLight = renderQueue.sunLight;
     ctx.clusteredLight = this.getClusteredLight();
@@ -152,21 +189,31 @@ export class SceneRenderer {
     this.renderShadowMaps(ctx, renderQueue.shadowedLights);
     const sampleCount = ctx.compositor ? 1 : ctx.primaryCamera.sampleCount;
     if (
+      SSR ||
       ctx.primaryCamera.depthPrePass ||
       oversizedViewport ||
       renderQueue.needSceneColor ||
       ctx.scene.env.needSceneDepthTexture() ||
+      ctx.HiZ ||
       ctx.primaryCamera.oit ||
-      ctx.compositor?.requireLinearDepth()
+      ctx.compositor.requireLinearDepth(ctx)
     ) {
-      const format: TextureFormat = device.type === 'webgl' ? 'rgba8unorm' : 'r32f';
+      const format: TextureFormat =
+        device.type === 'webgl'
+          ? SSRCalcThickness
+            ? 'rgba16f'
+            : 'rgba8unorm'
+          : SSRCalcThickness
+          ? 'rg32f'
+          : 'r32f';
       if (!finalFramebuffer && !vp) {
         depthFramebuffer = device.pool.fetchTemporalFramebuffer(
           true,
           drawingBufferWidth,
           drawingBufferHeight,
           format,
-          ctx.depthFormat
+          ctx.depthFormat,
+          ctx.HiZ
         );
       } else {
         const originDepth = finalFramebuffer?.getDepthAttachment();
@@ -177,7 +224,7 @@ export class SceneRenderer {
               originDepth.height,
               format,
               originDepth,
-              false
+              ctx.HiZ
             )
           : device.pool.fetchTemporalFramebuffer(
               true,
@@ -185,12 +232,34 @@ export class SceneRenderer {
               ctx.viewportHeight,
               format,
               ctx.depthFormat,
-              false
+              ctx.HiZ
             );
       }
-      this._renderSceneDepth(ctx, renderQueue, depthFramebuffer);
+      this._renderSceneDepth(ctx, renderQueue, depthFramebuffer, SSRCalcThickness);
       ctx.linearDepthTexture = depthFramebuffer.getColorAttachments()[0] as Texture2D;
       ctx.depthTexture = depthFramebuffer.getDepthAttachment() as Texture2D;
+      if (ctx.HiZ) {
+        let w = isPowerOf2(ctx.linearDepthTexture.width)
+          ? ctx.linearDepthTexture.width
+          : nextPowerOf2(ctx.linearDepthTexture.width);
+        let h = isPowerOf2(ctx.linearDepthTexture.height)
+          ? ctx.linearDepthTexture.height
+          : nextPowerOf2(ctx.linearDepthTexture.height);
+        w = Math.max(1, w >> 1);
+        h = Math.max(1, h >> 1);
+        w = ctx.linearDepthTexture.width;
+        h = ctx.linearDepthTexture.height;
+        HiZFrameBuffer = device.pool.fetchTemporalFramebuffer(
+          true,
+          w,
+          h,
+          ctx.linearDepthTexture.format,
+          null,
+          true
+        );
+        buildHiZ(ctx.depthTexture, HiZFrameBuffer);
+        ctx.HiZTexture = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
+      }
       if (ctx.depthTexture === finalFramebuffer?.getDepthAttachment()) {
         tempFramebuffer = finalFramebuffer;
       } else {
@@ -229,45 +298,48 @@ export class SceneRenderer {
       device.setViewport(vp);
       device.setScissor(scissor);
     }
-    this._scenePass.clearDepth = 1; //ctx.depthTexture ? null : 1;
-    this._scenePass.clearStencil = 0; //ctx.depthTexture ? null : 0;
     this._scenePass.transmission = false; // transmission
+    this._scenePass.clearDepth = ctx.depthTexture ? null : 1;
+    this._scenePass.clearStencil = ctx.depthTexture ? null : 0;
+    if (SSR && !renderQueue.needSceneColor) {
+      ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
+    }
+    ctx.compositor?.begin(ctx);
     if (renderQueue.needSceneColor) {
       const sceneColorFramebuffer = device.pool.fetchTemporalFramebuffer(
         true,
         ctx.depthTexture.width,
         ctx.depthTexture.height,
-        colorFmt,
+        ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS
+          ? [
+              colorFmt,
+              device.getFramebuffer().getColorAttachments()[1],
+              device.getFramebuffer().getColorAttachments()[2]
+            ]
+          : colorFmt,
         ctx.depthTexture,
         true
       );
       device.pushDeviceStates();
       device.setFramebuffer(sceneColorFramebuffer);
-    }
-    ctx.compositor?.begin(ctx);
-    this._scenePass.render(ctx, null, renderQueue);
-    ctx.compositor?.end(ctx);
-    if (renderQueue.needSceneColor) {
-      ctx.sceneColorTexture = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
+      this._scenePass.transmission = false;
+      this._scenePass.render(ctx, null, renderQueue);
       device.popDeviceStates();
+      ctx.sceneColorTexture = sceneColorFramebuffer.getColorAttachments()[0] as Texture2D;
       new CopyBlitter().blit(
         ctx.sceneColorTexture,
         device.getFramebuffer() ?? null,
-        device.createSampler({
-          magFilter: 'nearest',
-          minFilter: 'nearest',
-          mipFilter: 'none'
-        })
+        fetchSampler('clamp_nearest_nomip')
       );
       this._scenePass.transmission = true;
       this._scenePass.clearColor = null;
       this._scenePass.clearDepth = null;
       this._scenePass.clearStencil = null;
-      ctx.compositor?.begin(ctx);
-      this._scenePass.render(ctx, null, renderQueue);
-      ctx.compositor?.end(ctx);
     }
+    this._scenePass.render(ctx, null, renderQueue);
+    ctx.compositor?.end(ctx);
     renderQueue.dispose();
+    ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
 
     if (tempFramebuffer && tempFramebuffer !== finalFramebuffer) {
       const blitter = new CopyBlitter();
@@ -279,15 +351,7 @@ export class SceneRenderer {
       blitter.scissor = scissor;
       blitter.srgbOut = !finalFramebuffer;
       const srcTex = tempFramebuffer.getColorAttachments()[0] as Texture2D;
-      blitter.blit(
-        srcTex,
-        finalFramebuffer ?? null,
-        device.createSampler({
-          magFilter: 'nearest',
-          minFilter: 'nearest',
-          mipFilter: 'none'
-        })
-      );
+      blitter.blit(srcTex, finalFramebuffer ?? null, fetchSampler('clamp_nearest_nomip'));
       device.popDeviceStates();
     }
     ShadowMapper.releaseTemporalResources(ctx);
@@ -311,10 +375,10 @@ export class SceneRenderer {
     ctx.device.pushDeviceStates();
     const fb = ctx.device.pool.fetchTemporalFramebuffer(false, 1, 1, 'rgba8unorm', ctx.depthFormat, false);
     ctx.device.setViewport(ctx.camera.viewport);
-    const vp = ctx.device.getViewport();
     const savedViewport = ctx.camera.viewport;
     const savedScissor = ctx.camera.scissor;
     const savedWindow = ctx.camera.window;
+    const vp = ctx.device.getViewport();
     const windowX = ctx.camera.pickPosX / vp.width;
     const windowY = (vp.height - ctx.camera.pickPosY - 1) / vp.height;
     const windowW = 1 / vp.width;
@@ -341,8 +405,8 @@ export class SceneRenderer {
         .then(() => {
           const drawable = renderQueue.getDrawableByColor(pixels);
           camera.pickResult =
-            drawable && drawable.getPickTarget()?.pickable
-              ? { drawable, node: drawable.getPickTarget() }
+            drawable && drawable.getPickTarget()?.node?.pickable
+              ? { drawable, target: drawable.getPickTarget() }
               : null;
           device.pool.releaseFrameBuffer(fb);
           resolve(camera.pickResult);

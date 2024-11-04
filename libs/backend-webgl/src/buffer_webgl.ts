@@ -181,7 +181,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
       this._memCost = 0;
     }
   }
-  isBuffer(): boolean {
+  isBuffer(): this is GPUDataBuffer {
     return true;
   }
   protected load(data?: TypedArray): void {

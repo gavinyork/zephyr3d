@@ -5,7 +5,6 @@ import { BoundingBox } from '../../utility/bounding_volume';
 /** @internal */
 export interface HeightfieldBBoxTreeNode {
   bbox: BoundingBox;
-  h: number[];
   rc: { x: number; y: number; w: number; h: number };
   left: HeightfieldBBoxTreeNode;
   right: HeightfieldBBoxTreeNode;
@@ -34,7 +33,7 @@ export class HeightfieldBBoxTree {
     for (let i = 0; i < this._heights.length; i++) {
       this._heights[i] = vertices[i].y;
     }
-    this.createChildNode(this._rootNode, 0, 0, res_x, res_y, vertices);
+    this.createChildNode(this._rootNode, 0, 0, res_x - 1, res_y - 1, vertices);
     return true;
   }
   getHeight(x: number, y: number): number {
@@ -132,7 +131,6 @@ export class HeightfieldBBoxTree {
   allocNode(): HeightfieldBBoxTreeNode {
     return {
       bbox: new BoundingBox(),
-      h: [0, 0, 0, 0],
       rc: { x: 0, y: 0, w: 0, h: 0 },
       left: null,
       right: null
@@ -160,34 +158,41 @@ export class HeightfieldBBoxTree {
     node.rc.y = y;
     node.rc.w = w;
     node.rc.h = h;
-    if (w <= 2 && h <= 2) {
+    if (w <= 16 && h <= 16) {
       node.left = null;
       node.right = null;
-      node.h[0] = this.getHeight(x, y);
-      node.h[1] = this.getHeight(x + 1, y);
-      node.h[2] = this.getHeight(x + 1, y + 1);
-      node.h[3] = this.getHeight(x, y + 1);
-      const hMin = Math.min(...node.h);
-      const hMax = Math.max(...node.h);
+      let hMin = Infinity;
+      let hMax = -Infinity;
+      for (let i = x; i <= x + w; i++) {
+        for (let j = y; j <= y + h; j++) {
+          const h = this.getHeight(i, j);
+          if (h > hMax) {
+            hMax = h;
+          }
+          if (h < hMin) {
+            hMin = h;
+          }
+        }
+      }
       node.bbox = new BoundingBox(
         new Vector3(x * this._spacingX, hMin, y * this._spacingZ),
-        new Vector3((x + 1) * this._spacingX, hMax, (y + 1) * this._spacingZ)
+        new Vector3((x + w) * this._spacingX, hMax, (y + h) * this._spacingZ)
       );
     } else {
       if (w >= h) {
-        const w1 = (w + 1) >> 1;
-        const w2 = w - w1 + 1;
+        const w1 = w >> 1;
+        const w2 = w - w1;
         node.left = this.allocNode();
         this.createChildNode(node.left, x, y, w1, h, vertices);
         node.right = this.allocNode();
-        this.createChildNode(node.right, x + w1 - 1, y, w2, h, vertices);
+        this.createChildNode(node.right, x + w1, y, w2, h, vertices);
       } else {
-        const h1 = (h + 1) >> 1;
-        const h2 = h - h1 + 1;
+        const h1 = h >> 1;
+        const h2 = h - h1;
         node.left = this.allocNode();
         this.createChildNode(node.left, x, y, w, h1, vertices);
         node.right = this.allocNode();
-        this.createChildNode(node.right, x, y + h1 - 1, w, h2, vertices);
+        this.createChildNode(node.right, x, y + h1, w, h2, vertices);
       }
       node.bbox.beginExtend();
       node.bbox.extend(node.left.bbox.minPoint);
@@ -198,61 +203,128 @@ export class HeightfieldBBoxTree {
     return true;
   }
   rayIntersect(ray: Ray): number | null {
-    return this.rayIntersectR(ray, this._rootNode);
+    return this.rayIntersectRecursive(ray);
   }
-  rayIntersectR(ray: Ray, node: HeightfieldBBoxTreeNode): number | null {
-    const d = ray.bboxIntersectionTestEx(node.bbox);
-    if (d === null) {
-      return null;
+  rayIntersectLeaf(ray: Ray, node: HeightfieldBBoxTreeNode): number | null {
+    let x0 = ray.origin.x;
+    let y0 = ray.origin.z;
+    let dx = ray.direction.x;
+    let dy = ray.direction.z;
+    const gridSizeX = this._spacingX;
+    const gridSizeY = this._spacingZ;
+    const x = node.rc.x;
+    const y = node.rc.y;
+    const w = node.rc.w;
+    const h = node.rc.h;
+    const epsl = 0.001;
+    let tx = 0;
+    let ty = 0;
+    const xmin = x * gridSizeX;
+    const xmax = xmin + w * gridSizeX;
+    const ymin = y * gridSizeY;
+    const ymax = ymin + h * gridSizeY;
+    const xcenter = (xmin + xmax) / 2;
+    const ycenter = (ymin + ymax) / 2;
+    let mirrorx = false;
+    let mirrory = false;
+    if (dx < 0) {
+      dx = -dx;
+      x0 += 2 * (xcenter - x0);
+      mirrorx = true;
     }
-    if (node.left && node.right) {
-      const l = this.rayIntersectR(ray, node.left);
-      const r = this.rayIntersectR(ray, node.right);
-      if (l !== null && r !== null) {
-        return l < r ? l : r;
-      } else {
-        return l === null ? r : l;
+    if (dy < 0) {
+      dy = -dy;
+      y0 += 2 * (ycenter - y0);
+      mirrory = true;
+    }
+    if (x0 < xmin) {
+      tx = (xmin - x0) / dx;
+    } else if (x0 > xmax) {
+      return;
+    }
+    if (y0 < ymin) {
+      ty = (ymin - y0) / dy;
+    } else if (y0 > ymax) {
+      return;
+    }
+    const t = tx > ty ? tx : ty;
+    x0 += t * dx;
+    y0 += t * dy;
+    let u = Math.floor((x0 - xmin + epsl) / gridSizeX);
+    let v = Math.floor((y0 - ymin + epsl) / gridSizeY);
+    while (u >= 0 && u <= w && v >= 0 && v <= h) {
+      if (u < w && v < h) {
+        const m = x + (mirrorx ? w - u - 1 : u);
+        const n = y + (mirrory ? h - v - 1 : v);
+        const v00 = new Vector3(m * this._spacingX, this.getHeight(m, n), n * this._spacingZ);
+        const v01 = new Vector3((m + 1) * this._spacingX, this.getHeight(m + 1, n), n * this._spacingZ);
+        const v11 = new Vector3(
+          (m + 1) * this._spacingX,
+          this.getHeight(m + 1, n + 1),
+          (n + 1) * this._spacingZ
+        );
+        const v10 = new Vector3(m * this._spacingX, this.getHeight(m, n + 1), (n + 1) * this._spacingZ);
+        let intersected = false;
+        let dist1 = ray.intersectionTestTriangle(v00, v01, v10, false);
+        if (dist1 !== null && dist1 > 0) {
+          intersected = true;
+        } else {
+          dist1 = Number.MAX_VALUE;
+        }
+        let dist2 = ray.intersectionTestTriangle(v10, v01, v11, false);
+        if (dist2 !== null && dist2 > 0) {
+          intersected = true;
+        } else {
+          dist2 = Number.MAX_VALUE;
+        }
+        if (intersected) {
+          return dist1 < dist2 ? dist1 : dist2;
+        }
       }
-    } else {
-      const v00 = new Vector3(
-        node.bbox.minPoint.x,
-        node.h[0] /*this.dvHeights.getFloat32(24 + node.v[0] * 4)*/,
-        node.bbox.minPoint.z
-      );
-      const v01 = new Vector3(
-        node.bbox.maxPoint.x,
-        node.h[1] /*this.dvHeights.getFloat32(24 + node.v[1] * 4)*/,
-        node.bbox.minPoint.z
-      );
-      const v11 = new Vector3(
-        node.bbox.maxPoint.x,
-        node.h[2] /*this.dvHeights.getFloat32(24 + node.v[2] * 4)*/,
-        node.bbox.maxPoint.z
-      );
-      const v10 = new Vector3(
-        node.bbox.minPoint.x,
-        node.h[3] /*this.dvHeights.getFloat32(24 + node.v[3] * 4)*/,
-        node.bbox.maxPoint.z
-      );
-      let intersected = false;
-      let dist1 = ray.intersectionTestTriangle(v00, v01, v10, false);
-      if (dist1 !== null && dist1 > 0) {
-        intersected = true;
-      } else {
-        dist1 = Number.MAX_VALUE;
+      let d = Infinity;
+      if (dx > 0) {
+        const x1 = (u + x + 1) * gridSizeX;
+        d = Math.min(d, (x1 - x0) / dx);
       }
-      let dist2 = ray.intersectionTestTriangle(v10, v01, v11, false);
-      if (dist2 !== null && dist2 > 0) {
-        intersected = true;
-      } else {
-        dist2 = Number.MAX_VALUE;
+      if (dy !== 0) {
+        const y1 = (v + y + 1) * gridSizeY;
+        d = Math.min(d, (y1 - y0) / dy);
       }
-      if (!intersected) {
-        return null;
+      x0 += d * dx;
+      y0 += d * dy;
+      u = Math.floor((x0 - xmin + epsl) / gridSizeX);
+      v = Math.floor((y0 - ymin + epsl) / gridSizeY);
+    }
+    return null;
+  }
+  rayIntersectRecursive(ray: Ray): number | null {
+    const q: HeightfieldBBoxTreeNode[] = [this._rootNode];
+    while (q.length > 0) {
+      const node = q.shift();
+      if (!node.left) {
+        const d = this.rayIntersectLeaf(ray, node);
+        if (d !== null) {
+          return d;
+        }
       } else {
-        return dist1 < dist2 ? dist1 : dist2;
+        const dl = ray.bboxIntersectionTestEx(node.left.bbox);
+        const dr = ray.bboxIntersectionTestEx(node.right.bbox);
+        if (dl !== null && dr !== null) {
+          if (dl < dr) {
+            q.unshift(node.right);
+            q.unshift(node.left);
+          } else {
+            q.unshift(node.left);
+            q.unshift(node.right);
+          }
+        } else if (dl !== null) {
+          q.unshift(node.left);
+        } else if (dr !== null) {
+          q.unshift(node.right);
+        }
       }
     }
+    return null;
   }
 }
 

@@ -123,19 +123,6 @@ import { DrawText } from '@zephyr3d/device';
   renderStatesOutline.useStencilState().enable(true).setFrontCompareFunc('eq').setReference(0);
   renderStatesOutline.useDepthState().enableWrite(false);
 
-  (function (){
-    for (let i = 0; i < 10; i++) {
-      const tex1 = device.pool.fetchTemporalTexture2D(true, 'rgba8unorm', 1, 1, false);
-      const tex2 = device.pool.fetchTemporalTexture2D(true, 'rgba8unorm', 1, 1, false);
-      const tex3 = device.pool.fetchTemporalTexture2D(true, 'd24s8', 1, 1, false);
-      const fb1 = device.pool.createTemporalFramebuffer(true, [tex1, tex2], tex3);
-      const tex4 = device.pool.fetchTemporalTexture2D(true, 'rgba8unorm', 1, 1, false);
-      const tex5 = device.pool.fetchTemporalTexture2D(true, 'rgba8unorm', 1, 1, false);
-      const tex6 = device.pool.fetchTemporalTexture2D(true, 'd24s8', 1, 1, false);
-      const fb2 = device.pool.createTemporalFramebuffer(true, [tex4, tex5], tex6);
-      device.pool.autoRelease();
-    }
-  })();
   // start render loop
   device.runLoop((device) => {
     const t = device.frameInfo.elapsedOverall * 0.002;

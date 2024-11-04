@@ -4,6 +4,7 @@ import { applyMaterialMixins } from '../../meshmaterial';
 import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
 import type { DrawContext } from '../../../render';
+import { ShaderHelper } from '../../shader/helper';
 
 /**
  * Interface for blinn-phong lighting model mixin
@@ -16,7 +17,8 @@ export type IMixinBlinnPhong = {
     worldPos: PBShaderExp,
     normal: PBShaderExp,
     viewVec: PBShaderExp,
-    albedo: PBShaderExp
+    albedo: PBShaderExp,
+    outRoughness?: PBShaderExp
   ): PBShaderExp;
 } & IMixinLight;
 
@@ -66,19 +68,26 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
       worldPos: PBShaderExp,
       normal: PBShaderExp,
       viewVec: PBShaderExp,
-      albedo: PBShaderExp
+      albedo: PBShaderExp,
+      outRoughness?: PBShaderExp
     ): PBShaderExp {
       const pb = scope.$builder;
       const funcName = 'Z_blinnPhongLight';
       const that = this;
       pb.func(
         funcName,
-        [pb.vec3('worldPos'), pb.vec3('normal'), pb.vec3('viewVec'), pb.vec4('albedo')],
+        [
+          pb.vec3('worldPos'),
+          pb.vec3('normal'),
+          pb.vec3('viewVec'),
+          pb.vec4('albedo'),
+          ...(outRoughness ? [pb.vec4('outRoughness').out()] : [])
+        ],
         function () {
           if (!that.needFragmentColor()) {
             this.$return(this.albedo.rgb);
           } else {
-            if (that.needCalculateEnvLight()) {
+            if (that.needCalculateEnvLight() && !outRoughness) {
               this.$l.diffuseColor = that.getEnvLightIrradiance(this, this.normal);
             } else {
               this.$l.diffuseColor = pb.vec3(0);
@@ -100,19 +109,30 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
               this.$l.diffuse = pb.mul(this.lightColor, this.NoL);
               this.$l.specular = pb.mul(this.lightColor, pb.pow(this.NoH, this.zShininess));
               if (shadow) {
-                this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, this.NoL));
-                this.diffuse = pb.mul(this.diffuse, this.shadow);
-                this.specular = pb.mul(this.specular, this.shadow);
+                this.$if(pb.greaterThan(this.NoL, 0), function () {
+                  this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, this.NoL));
+                  this.diffuse = pb.mul(this.diffuse, this.shadow);
+                  this.specular = pb.mul(this.specular, this.shadow);
+                });
               }
               this.diffuseColor = pb.add(this.diffuseColor, this.diffuse);
               this.specularColor = pb.add(this.specularColor, this.specular);
             });
             this.$l.litColor = pb.add(pb.mul(this.albedo.rgb, this.diffuseColor), this.specularColor);
+            if (outRoughness) {
+              this.$l.roughness = pb.sqrt(pb.div(2, pb.add(this.zShininess, 2)));
+              this.outRoughness = pb.vec4(
+                pb.mul(this.albedo.rgb, pb.sub(1, this.roughness)),
+                pb.mul(this.roughness, ShaderHelper.getCameraRoughnessFactor(this))
+              );
+            }
             this.$return(this.litColor);
           }
         }
       );
-      return pb.getGlobalScope()[funcName](worldPos, normal, viewVec, albedo);
+      return outRoughness
+        ? pb.getGlobalScope()[funcName](worldPos, normal, viewVec, albedo, outRoughness)
+        : pb.getGlobalScope()[funcName](worldPos, normal, viewVec, albedo);
     }
   } as unknown as T & { new (...args: any[]): IMixinBlinnPhong };
 }

@@ -1120,7 +1120,7 @@ export interface StorageTextureBindingLayout {
   /** The texture format */
   format: TextureFormat;
   /** View dimension */
-  viewDimension: '1d' | '2d';
+  viewDimension: '1d' | '2d' | '2d-array' | 'cube' | 'cube-array' | '3d';
 }
 
 /**
@@ -1445,11 +1445,17 @@ export interface FrameBuffer<T = unknown> extends GPUObject<T> {
   getSampleCount(): number;
   getHash(): string;
   setColorAttachmentCubeFace(index: number, face: CubeFace): void;
+  getColorAttachmentCubeFace(index: number): CubeFace;
   setColorAttachmentMipLevel(index: number, level: number): void;
+  getColorAttachmentMipLevel(index: number): number;
   setColorAttachmentLayer(index: number, layer: number): void;
+  getColorAttachmentLayer(index: number): number;
   setColorAttachmentGenerateMipmaps(index: number, generateMipmaps: boolean): void;
+  getColorAttachmentGenerateMipmaps(index: number): boolean;
   setDepthAttachmentCubeFace(face: CubeFace): void;
+  getDepthAttachmentCubeFace(): CubeFace;
   setDepthAttachmentLayer(layer: number): void;
+  getDepthAttachmentLayer(): number;
   getColorAttachments(): BaseTexture[];
   getDepthAttachment(): BaseTexture;
   bind(): boolean;

@@ -16,11 +16,11 @@ import type {
   RenderStateSet,
   TextureCube,
   TextureFormat,
-  TextureSampler,
   VertexLayout
 } from '@zephyr3d/device';
 import type { DrawContext } from './drawable';
 import { ShaderHelper } from '../material/shader/helper';
+import { fetchSampler } from '../utility/misc';
 
 /**
  * Type of sky
@@ -74,7 +74,6 @@ export class SkyRenderer {
   private _cloudy: number;
   private _cloudIntensity: number;
   private _wind: Vector2;
-  private _nearestSampler: TextureSampler;
   private _programSky: Partial<Record<SkyType, GPUProgram>>;
   private _bindgroupSky: Partial<Record<SkyType, BindGroup>>;
   private _programFog: GPUProgram;
@@ -113,7 +112,6 @@ export class SkyRenderer {
     this._cloudIntensity = 40;
     this._wind = Vector2.zero();
     this._drawGround = false;
-    this._nearestSampler = null;
     this._programSky = {};
     this._bindgroupSky = {};
     this._programFog = null;
@@ -149,6 +147,16 @@ export class SkyRenderer {
   }
   set drawGround(val: boolean) {
     this._drawGround = !!val;
+  }
+  /** Baked sky texture */
+  get bakedSkyTexture(): TextureCube {
+    if (this._skyType === 'skybox' && this._skyboxTexture) {
+      return this._skyboxTexture;
+    }
+    if (!this._scatterSkyboxFramebuffer) {
+      this.updateIBLMaps(this._lastSunDir);
+    }
+    return this._scatterSkyboxFramebuffer.getColorAttachments()[0] as TextureCube;
   }
   /**
    * Wether the IBL maps should be updated automatically.
@@ -410,7 +418,7 @@ export class SkyRenderer {
     const renderStates = this._fogType === 'scatter' ? this._renderStatesFogScatter : this._renderStatesFog;
     if (fogProgram && sceneDepthTexture) {
       const bindgroup = this._fogType === 'scatter' ? this._bindgroupFogScatter : this._bindgroupFog;
-      bindgroup.setTexture('depthTex', sceneDepthTexture, this._nearestSampler);
+      bindgroup.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
       bindgroup.setValue('rt', device.getFramebuffer() ? 1 : 0);
       bindgroup.setValue('invProjViewMatrix', camera.invViewProjectionMatrix);
       bindgroup.setValue('cameraNearFar', new Vector2(camera.getNearPlane(), camera.getFarPlane()));
@@ -443,6 +451,7 @@ export class SkyRenderer {
     const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
     if (!sunDir.equalsTo(this._lastSunDir)) {
       this._radianceMapDirty = true;
+      this._lastSunDir.set(sunDir);
     }
     this._renderSky(
       ctx.camera,
@@ -458,7 +467,6 @@ export class SkyRenderer {
           ctx.env.light.irradianceMap === this._irradianceMap)
       ) {
         this._radianceMapDirty = false;
-        this._lastSunDir.set(sunDir);
         this.updateIBLMaps(sunDir);
       }
     }
@@ -794,15 +802,6 @@ export class SkyRenderer {
       this._renderStatesFogScatter.useRasterizerState().setCullMode('none');
       this._renderStatesFogScatter.useBlendingState().enable(true).setBlendFunc('one', 'inv-src-alpha');
       this._renderStatesFogScatter.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('gt');
-    }
-    if (!this._nearestSampler) {
-      this._nearestSampler = device.createSampler({
-        magFilter: 'nearest',
-        minFilter: 'nearest',
-        mipFilter: 'none',
-        addressU: 'clamp',
-        addressV: 'clamp'
-      });
     }
     if (!this._vertexLayout) {
       this._vertexLayout = device.createVertexLayout({

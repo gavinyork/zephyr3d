@@ -125,6 +125,7 @@ export interface RenderItemList {
   opaque: RenderItemListBundle;
   transmission: RenderItemListBundle;
   transparent: RenderItemListBundle;
+  transmission_trans: RenderItemListBundle;
 }
 
 /**
@@ -280,6 +281,8 @@ export class RenderQueue {
     this._itemList.transmission.unlit.push(...newItemLists.transmission.unlit);
     this._itemList.transparent.lit.push(...newItemLists.transparent.lit);
     this._itemList.transparent.unlit.push(...newItemLists.transparent.unlit);
+    this._itemList.transmission_trans.lit.push(...newItemLists.transmission_trans.lit);
+    this._itemList.transmission_trans.unlit.push(...newItemLists.transmission_trans.unlit);
     this._needSceneColor ||= queue._needSceneColor;
     this._drawTransparent ||= queue._drawTransparent;
     this._objectColorMaps.push(...queue._objectColorMaps);
@@ -296,7 +299,7 @@ export class RenderQueue {
       }
       const trans = drawable.getQueueType() === QUEUE_TRANSPARENT;
       const unlit = drawable.isUnlit();
-      const transmission = !trans && drawable.needSceneColor();
+      const transmission = drawable.needSceneColor();
       this._needSceneColor ||= transmission;
       this._drawTransparent ||= trans;
       if (camera.enablePicking) {
@@ -305,15 +308,19 @@ export class RenderQueue {
       }
       if (drawable.isBatchable()) {
         const instanceList = trans
-          ? unlit
+          ? transmission
+            ? unlit
+              ? this._itemList.transmission_trans.unlit[0].instanceList
+              : this._itemList.transmission_trans.lit[0].instanceList
+            : unlit
             ? this._itemList.transparent.unlit[0].instanceList
             : this._itemList.transparent.lit[0].instanceList
-          : unlit
-          ? transmission
-            ? this._itemList.transmission.unlit[0].instanceList
-            : this._itemList.opaque.unlit[0].instanceList
           : transmission
-          ? this._itemList.transmission.lit[0].instanceList
+          ? unlit
+            ? this._itemList.transmission.unlit[0].instanceList
+            : this._itemList.transmission.lit[0].instanceList
+          : unlit
+          ? this._itemList.opaque.unlit[0].instanceList
           : this._itemList.opaque.lit[0].instanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         let drawableList = instanceList[hash];
@@ -324,15 +331,19 @@ export class RenderQueue {
         drawableList.push(drawable);
       } else {
         const list = trans
-          ? unlit
+          ? transmission
+            ? unlit
+              ? this._itemList.transmission_trans.unlit[0]
+              : this._itemList.transmission_trans.lit[0]
+            : unlit
             ? this._itemList.transparent.unlit[0]
             : this._itemList.transparent.lit[0]
-          : unlit
-          ? transmission
-            ? this._itemList.transmission.unlit[0]
-            : this._itemList.opaque.unlit[0]
           : transmission
-          ? this._itemList.transmission.lit[0]
+          ? unlit
+            ? this._itemList.transmission.unlit[0]
+            : this._itemList.transmission.lit[0]
+          : unlit
+          ? this._itemList.opaque.unlit[0]
           : this._itemList.opaque.lit[0];
         const skinAnimation = !!drawable.getBoneMatrices();
         const morphAnimation = !!drawable.getMorphData();
@@ -375,7 +386,35 @@ export class RenderQueue {
    * Removes all items in the render queue
    */
   reset() {
-    this._itemList = null;
+    if (this._itemList) {
+      // Release all render bundles
+      for (const k in this._itemList) {
+        const itemListBundle: RenderItemListBundle = this._itemList[k];
+        for (const l in itemListBundle) {
+          const listInfo: RenderItemListInfo[] = itemListBundle[l];
+          for (const info of listInfo) {
+            if (info.renderQueue === this) {
+              if (info.renderBundle) {
+                info.renderBundle.dispose();
+              }
+              if (info.skinRenderBundle) {
+                info.skinRenderBundle.dispose();
+              }
+              if (info.morphRenderBundle) {
+                info.morphRenderBundle.dispose();
+              }
+              if (info.skinAndMorphRenderBundle) {
+                info.skinAndMorphRenderBundle.dispose();
+              }
+              if (info.instanceRenderBundle) {
+                info.instanceRenderBundle.dispose();
+              }
+            }
+          }
+        }
+      }
+      this._itemList = null;
+    }
     this._shadowedLightList = [];
     this._unshadowedLightList = [];
     this._sunLight = null;
@@ -401,7 +440,9 @@ export class RenderQueue {
       itemList.transmission.lit,
       itemList.transmission.unlit,
       itemList.transparent.lit,
-      itemList.transparent.unlit
+      itemList.transparent.unlit,
+      itemList.transmission_trans.lit,
+      itemList.transmission_trans.unlit
     ];
     for (let i = 0; i < lists.length; i++) {
       const list = lists[i];
@@ -412,50 +453,37 @@ export class RenderQueue {
         const instanceList = info.instanceList;
         for (const x in instanceList) {
           const drawables = instanceList[x];
-          if (drawables.length === 1) {
-            this.binaryInsert(info.itemList, {
-              drawable: drawables[0],
-              sortDistance: drawables[0].getSortDistance(camera),
-              instanceData: null
-            });
-            drawables[0].applyTransformUniforms(this);
-            const mat = drawables[0].getMaterial();
+          let bindGroup: CachedBindGroup = null;
+          let item: RenderQueueItem = null;
+          for (let i = 0; i < drawables.length; i++) {
+            const drawable = drawables[i];
+            const instanceUniforms = drawable.getInstanceUniforms();
+            const instanceUniformsSize = instanceUniforms?.length ?? 0;
+            const stride = 16 + instanceUniformsSize;
+            if (!bindGroup || bindGroup.offset + stride > maxBufferSizeInFloats) {
+              bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(frameCounter, stride);
+              item = {
+                drawable,
+                sortDistance: drawable.getSortDistance(camera),
+                instanceData: {
+                  bindGroup,
+                  offset: bindGroup.offset,
+                  numInstances: 0,
+                  stride
+                }
+              };
+              this.binaryInsert(info.instanceItemList, item);
+              drawable.applyInstanceOffsetAndStride(this, stride, bindGroup.offset);
+            }
+            const instanceInfo = { bindGroup, offset: bindGroup.offset };
+            this._instanceInfo.set(drawable, instanceInfo);
+            drawable.applyTransformUniforms(this);
+            drawable.applyMaterialUniforms(instanceInfo);
+            bindGroup.offset += stride;
+            item.instanceData.numInstances++;
+            const mat = drawable.getMaterial();
             if (mat) {
               info.materialList.add(mat.coreMaterial);
-            }
-          } else {
-            let bindGroup: CachedBindGroup = null;
-            let item: RenderQueueItem = null;
-            for (let i = 0; i < drawables.length; i++) {
-              const drawable = drawables[i];
-              const instanceUniforms = drawable.getInstanceUniforms();
-              const instanceUniformsSize = instanceUniforms?.length ?? 0;
-              const stride = 16 + instanceUniformsSize;
-              if (!bindGroup || bindGroup.offset + stride > maxBufferSizeInFloats) {
-                bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(frameCounter, stride);
-                item = {
-                  drawable,
-                  sortDistance: drawable.getSortDistance(camera),
-                  instanceData: {
-                    bindGroup,
-                    offset: bindGroup.offset,
-                    numInstances: 0,
-                    stride
-                  }
-                };
-                this.binaryInsert(info.instanceItemList, item);
-                drawable.applyInstanceOffsetAndStride(this, stride, bindGroup.offset);
-              }
-              const instanceInfo = { bindGroup, offset: bindGroup.offset };
-              this._instanceInfo.set(drawable, instanceInfo);
-              drawable.applyTransformUniforms(this);
-              drawable.applyMaterialUniforms(instanceInfo);
-              bindGroup.offset += stride;
-              item.instanceData.numInstances++;
-              const mat = drawable.getMaterial();
-              if (mat) {
-                info.materialList.add(mat.coreMaterial);
-              }
             }
           }
         }
@@ -572,38 +600,8 @@ export class RenderQueue {
     return {
       opaque: this.newRenderItemListBundle(),
       transmission: this.newRenderItemListBundle(),
-      transparent: this.newRenderItemListBundle()
+      transparent: this.newRenderItemListBundle(),
+      transmission_trans: this.newRenderItemListBundle()
     };
   }
-  /*
-  private encodeInstanceColor(index: number, outColor: Float32Array) {
-    outColor[0] = ((index >> 24) & 255) / 255;
-    outColor[1] = ((index >> 16) & 255) / 255;
-    outColor[2] = (index >> 8 && 255) / 255;
-    outColor[3] = (index >> 0 && 255) / 255;
-  }
-  private decodeInstanceColor(value: Float32Array): number {
-    return (value[0] << 24) + (value[1] << 16) + (value[2] << 8) + value[3];
-  }
-  setInstanceColors(): GraphNode[] {
-    const nodes: GraphNode[] = [];
-    let id = 0;
-    for (const k in this._itemLists) {
-      const lists = this._itemLists[k];
-      for (const item of lists.opaqueList) {
-        if (item.instanceColor) {
-          item.instanceData.instanceColorList = [];
-          for (let i = 0; i < item.instanceData.data.length; i++) {
-            const v = item.drawable.getInstanceColor();
-            this.encodeInstanceColor(id, v);
-            nodes[id] = item.drawable.getPickTarget();
-            item.instanceData.instanceColorList.push(v);
-            id++;
-          }
-        }
-      }
-    }
-    return nodes;
-  }
-  */
 }

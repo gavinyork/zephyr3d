@@ -42,7 +42,6 @@ gltfApp.ready().then(async () => {
   const gltfViewer = new GLTFViewer(scene);
   await gltfViewer.ready();
   gltfViewer.loadModel('./assets/models/DamagedHelmet.glb');
-  gltfApp.inputManager.use(gltfViewer.camera.handleEvent.bind(gltfViewer.camera));
   gltfApp.on('drop', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
@@ -56,6 +55,28 @@ gltfApp.ready().then(async () => {
   });
   gltfApp.on('resize', (ev) => {
     gltfViewer.camera.aspect = ev.width / ev.height;
+  });
+  gltfApp.on('keyup', (ev) => {
+    console.log(ev.code);
+    if (ev.code === 'KeyB') {
+      gltfViewer.nextBackground();
+    } else if (ev.code === 'KeyN') {
+      gltfViewer.toggleScatter();
+    } else if (ev.code === 'KeyF') {
+      gltfViewer.toggleFloor();
+    } else if (ev.code === 'Backquote') {
+      gltfViewer.toggleInspector();
+    } else if (ev.code === 'KeyT') {
+      gltfViewer.toggleGUI();
+    } else if (ev.code === 'KeyR') {
+      gltfViewer.enableRotate(!gltfViewer.rotateEnabled());
+    } else if (ev.code === 'KeyL') {
+      gltfViewer.randomLightDir();
+    } else if (ev.code === 'KeyO') {
+      gltfViewer.enableWater(!gltfViewer.waterEnabled());
+    } else if (ev.code === 'KeyP') {
+      gltfViewer.toggleShadow();
+    }
   });
   gltfApp.on('tick', (ev) => {
     gltfViewer.camera.updateController();

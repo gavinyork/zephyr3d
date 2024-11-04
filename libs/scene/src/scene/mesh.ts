@@ -1,10 +1,9 @@
-import type { Matrix4x4 } from '@zephyr3d/base';
 import { Vector4, applyMixins } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import { BoxFrameShape } from '../shapes';
 import type { MeshMaterial } from '../material';
 import { LambertMaterial } from '../material';
-import type { RenderPass, Primitive, BatchDrawable, DrawContext } from '../render';
+import type { RenderPass, Primitive, BatchDrawable, DrawContext, PickTarget } from '../render';
 import { Application } from '../app';
 import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
 import type { XForm } from './xform';
@@ -12,6 +11,8 @@ import type { Scene } from './scene';
 import type { BoundingBox, BoundingVolume } from '../utility/bounding_volume';
 import { QUEUE_OPAQUE } from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
+import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
+import type { SceneNode } from './scene_node';
 
 /**
  * Mesh node
@@ -31,8 +32,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   protected _boneMatrices: Texture2D;
   /** @internal */
-  protected _invBindMatrix: Matrix4x4;
-  /** @internal */
   protected _morphData: Texture2D;
   /** @internal */
   protected _morphInfo: GPUDataBuffer;
@@ -40,6 +39,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   protected _instanceHash: string;
   /** @internal */
   protected _batchable: boolean;
+  /** @internal */
+  protected _pickTarget: PickTarget;
   /** @internal */
   protected _boundingBoxNode: Mesh;
   /** @internal */
@@ -55,10 +56,10 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._castShadow = true;
     this._animatedBoundingBox = null;
     this._boneMatrices = null;
-    this._invBindMatrix = null;
     this._morphData = null;
     this._morphInfo = null;
     this._instanceHash = null;
+    this._pickTarget = { node: this };
     this._boundingBoxNode = null;
     this._instanceColor = Vector4.zero();
     this._batchable = Application.instance.deviceType !== 'webgl';
@@ -94,8 +95,11 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * {@inheritDoc Drawable.getPickTarget }
    */
-  getPickTarget(): GraphNode {
-    return this;
+  getPickTarget(): PickTarget {
+    return this._pickTarget;
+  }
+  setPickTarget(node: SceneNode, label?: string) {
+    this._pickTarget = { node, label };
   }
   /** Wether the mesh node casts shadows */
   get castShadow(): boolean {
@@ -122,6 +126,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
           ? `${this.constructor.name}:${this._scene.id}:${this._primitive.id}:${this._material.instanceId}`
           : null;
       this.invalidateBoundingVolume();
+      RenderBundleWrapper.drawableChanged(this);
     }
   }
   /** Material of the mesh */
@@ -130,11 +135,18 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   }
   set material(m: MeshMaterial) {
     if (this._material !== m) {
+      if (this._material) {
+        RenderBundleWrapper.materialDetached(this._material.coreMaterial, this);
+      }
       this._material = m;
+      if (this._material) {
+        RenderBundleWrapper.materialAttached(this._material.coreMaterial, this);
+      }
       this._instanceHash =
         this._primitive && this._material
           ? `${this.constructor.name}:${this._scene.id}:${this._primitive.id}:${this._material.instanceId}`
           : null;
+      RenderBundleWrapper.drawableChanged(this);
     }
   }
   /** Wether to draw the bounding box of the mesh node */
@@ -159,7 +171,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * {@inheritDoc SceneNode.isMesh}
    */
-  isMesh(): boolean {
+  isMesh(): this is Mesh {
     return true;
   }
   /**
@@ -175,21 +187,20 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    * @param matrices - The texture that contains the bone matrices
    */
   setBoneMatrices(matrices: Texture2D) {
-    this._boneMatrices = matrices;
-  }
-  /**
-   * Sets the inverse bind matrix for skeletal animation
-   * @param matrix - The matrix to set
-   */
-  setInvBindMatrix(matrix: Matrix4x4) {
-    this._invBindMatrix = matrix;
+    if (this._boneMatrices !== matrices) {
+      this._boneMatrices = matrices;
+      RenderBundleWrapper.drawableChanged(this);
+    }
   }
   /**
    * Sets the texture that contains the morph target data
    * @param data - The texture that contains the morph target data
    */
   setMorphData(data: Texture2D) {
-    this._morphData = data;
+    if (this._morphData !== data) {
+      this._morphData = data;
+      RenderBundleWrapper.drawableChanged(this);
+    }
   }
   /**
    * {@inheritDoc Drawable.getMorphData}
@@ -202,7 +213,10 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    * @param info - The buffer that contains the morph target information
    */
   setMorphInfo(info: GPUDataBuffer) {
-    this._morphInfo = info;
+    if (this._morphInfo !== info) {
+      this._morphInfo = info;
+      RenderBundleWrapper.drawableChanged(this);
+    }
   }
   /**
    * {@inheritDoc Drawable.getMorphInfo}
@@ -221,6 +235,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._primitive = null;
     this._material = null;
     super.dispose();
+    RenderBundleWrapper.drawableChanged(this);
   }
   /**
    * {@inheritDoc Drawable.getQueueType}
@@ -260,12 +275,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     return this._boneMatrices;
   }
   /**
-   * {@inheritDoc Drawable.getInvBindMatrix}
-   */
-  getInvBindMatrix(): Matrix4x4 {
-    return this._invBindMatrix;
-  }
-  /**
    * {@inheritDoc Drawable.getXForm}
    */
   getXForm(): XForm {
@@ -273,7 +282,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     return this;
   }
   /** @internal */
-  computeBoundingVolume(bv: BoundingVolume): BoundingVolume {
+  computeBoundingVolume(): BoundingVolume {
     let bbox: BoundingVolume;
     if (this._animatedBoundingBox) {
       bbox = this._animatedBoundingBox;

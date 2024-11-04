@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add screen space reflection",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

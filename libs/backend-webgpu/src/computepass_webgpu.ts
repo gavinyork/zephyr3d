@@ -29,7 +29,7 @@ export class WebGPUComputePass {
     if (validation & VALIDATION_FAILED) {
       return;
     }
-    if (!this._computePassEncoder) {
+    if (!this.active) {
       this.begin();
     }
     this.setBindGroupsForCompute(this._computePassEncoder, program, bindGroups, bindGroupOffsets);

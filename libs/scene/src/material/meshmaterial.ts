@@ -9,6 +9,7 @@ import type {
 } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
 import {
+  MaterialVaryingFlags,
   QUEUE_OPAQUE,
   QUEUE_TRANSPARENT,
   RENDER_PASS_TYPE_DEPTH,
@@ -17,7 +18,8 @@ import {
   RENDER_PASS_TYPE_SHADOWMAP
 } from '../values';
 import { Material } from './material';
-import type { DrawContext, ShadowMapPass } from '../render';
+import type { DepthPass } from '../render';
+import { type DrawContext, type ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA } from '../shaders';
 import { Application } from '../app';
 import { ShaderHelper } from './shader/helper';
@@ -157,17 +159,18 @@ export class MeshMaterial extends Material {
     instance.coreMaterial = that;
     // Copy original uniform values
     for (let i = 0; i < instanceUniforms.length; i++) {
-      const [prop, type] = instanceUniforms[i];
+      const instanceIndex = i;
+      const [prop, type] = instanceUniforms[instanceIndex];
       const value = that[prop];
       switch (type) {
         case 'float': {
-          uniformsHolder[i * 4] = Number(value);
+          uniformsHolder[instanceIndex * 4] = Number(value);
           Object.defineProperty(instance, prop, {
             get() {
-              return uniformsHolder[i * 4];
+              return uniformsHolder[instanceIndex * 4];
             },
             set(value) {
-              uniformsHolder[i * 4 + 0] = value;
+              uniformsHolder[instanceIndex * 4 + 0] = value;
               that[prop] = value;
             }
           });
@@ -177,14 +180,18 @@ export class MeshMaterial extends Material {
           if (!(value instanceof Vector2)) {
             throw new Error(`Instance uniform property ${prop} must be of type Vector2`);
           }
-          uniformsHolder[i * 4] = value.x;
-          uniformsHolder[i * 4 + 1] = value.y;
+          uniformsHolder[instanceIndex * 4] = value.x;
+          uniformsHolder[instanceIndex * 4 + 1] = value.y;
           Object.defineProperty(instance, prop, {
             get() {
-              return new Vector2(uniformsHolder[i * 4], uniformsHolder[i * 4 + 1]);
+              return new Vector2(uniformsHolder[instanceIndex * 4], uniformsHolder[instanceIndex * 4 + 1]);
             },
             set(value) {
-              uniformsHolder.set(value);
+              if (!(value instanceof Vector2)) {
+                throw new Error(`Instance uniform property ${prop} must be of type Vector2`);
+              }
+              uniformsHolder[instanceIndex * 4] = value.x;
+              uniformsHolder[instanceIndex * 4 + 1] = value.y;
               that[prop] = value;
             }
           });
@@ -194,15 +201,24 @@ export class MeshMaterial extends Material {
           if (!(value instanceof Vector3)) {
             throw new Error(`Instance uniform property ${prop} must be of type Vector3`);
           }
-          uniformsHolder[i * 4] = value.x;
-          uniformsHolder[i * 4 + 1] = value.y;
-          uniformsHolder[i * 4 + 2] = value.z;
+          uniformsHolder[instanceIndex * 4] = value.x;
+          uniformsHolder[instanceIndex * 4 + 1] = value.y;
+          uniformsHolder[instanceIndex * 4 + 2] = value.z;
           Object.defineProperty(instance, prop, {
             get() {
-              return new Vector3(uniformsHolder[i * 4], uniformsHolder[i * 4 + 1], uniformsHolder[i * 4 + 2]);
+              return new Vector3(
+                uniformsHolder[instanceIndex * 4],
+                uniformsHolder[instanceIndex * 4 + 1],
+                uniformsHolder[instanceIndex * 4 + 2]
+              );
             },
             set(value) {
-              uniformsHolder.set(value);
+              if (!(value instanceof Vector3)) {
+                throw new Error(`Instance uniform property ${prop} must be of type Vector3`);
+              }
+              uniformsHolder[instanceIndex * 4] = value.x;
+              uniformsHolder[instanceIndex * 4 + 1] = value.y;
+              uniformsHolder[instanceIndex * 4 + 2] = value.z;
               that[prop] = value;
             }
           });
@@ -212,21 +228,27 @@ export class MeshMaterial extends Material {
           if (!(value instanceof Vector4)) {
             throw new Error(`Instance uniform property ${prop} must be of type Vector4`);
           }
-          uniformsHolder[i * 4] = value.x;
-          uniformsHolder[i * 4 + 1] = value.y;
-          uniformsHolder[i * 4 + 2] = value.z;
-          uniformsHolder[i * 4 + 3] = value.w;
+          uniformsHolder[instanceIndex * 4] = value.x;
+          uniformsHolder[instanceIndex * 4 + 1] = value.y;
+          uniformsHolder[instanceIndex * 4 + 2] = value.z;
+          uniformsHolder[instanceIndex * 4 + 3] = value.w;
           Object.defineProperty(instance, prop, {
             get() {
               return new Vector4(
-                uniformsHolder[i * 4],
-                uniformsHolder[i * 4 + 1],
-                uniformsHolder[i * 4 + 2],
-                uniformsHolder[i * 4 + 3]
+                uniformsHolder[instanceIndex * 4],
+                uniformsHolder[instanceIndex * 4 + 1],
+                uniformsHolder[instanceIndex * 4 + 2],
+                uniformsHolder[instanceIndex * 4 + 3]
               );
             },
             set(value) {
-              uniformsHolder.set(value);
+              if (!(value instanceof Vector4)) {
+                throw new Error(`Instance uniform property ${prop} must be of type Vector4`);
+              }
+              uniformsHolder[instanceIndex * 4] = value.x;
+              uniformsHolder[instanceIndex * 4 + 1] = value.y;
+              uniformsHolder[instanceIndex * 4 + 2] = value.z;
+              uniformsHolder[instanceIndex * 4 + 3] = value.w;
               that[prop] = value;
             }
           });
@@ -313,6 +335,7 @@ export class MeshMaterial extends Material {
     const blending =
       !isObjectColorPass && (this.featureUsed<boolean>(FEATURE_ALPHABLEND) || ctx.lightBlending);
     const a2c = !isObjectColorPass && this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
+    const ztestEq = ctx.queue === QUEUE_OPAQUE && !!ctx.depthTexture;
     if (blending || a2c) {
       const blendingState = stateSet.useBlendingState();
       if (blending) {
@@ -328,21 +351,33 @@ export class MeshMaterial extends Material {
         blendingState.enable(false);
       }
       blendingState.enableAlphaToCoverage(a2c);
-      if (blendingState.enabled) {
+      if (ztestEq) {
+        stateSet.useDepthState().setCompareFunc('eq').enableTest(true).enableWrite(false);
+      } else if (blendingState.enabled) {
         stateSet.useDepthState().enableTest(true).enableWrite(false);
       } else {
         stateSet.defaultDepthState();
       }
     } else if (stateSet.blendingState?.enabled && !blending) {
       stateSet.defaultBlendingState();
-      stateSet.defaultDepthState();
+      if (ztestEq) {
+        stateSet.useDepthState().setCompareFunc('eq').enableTest(true).enableWrite(false);
+      } else {
+        stateSet.defaultDepthState();
+      }
     }
-    if (this._cullMode !== 'back') {
-      stateSet.useRasterizerState().cullMode = this._cullMode;
+    if (ctx.forceCullMode || this._cullMode !== 'back') {
+      stateSet.useRasterizerState().cullMode = ctx.forceCullMode || this._cullMode;
+    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
+      stateSet.useRasterizerState().cullMode = 'none';
     } else {
       stateSet.defaultRasterizerState();
     }
-    stateSet.defaultColorState();
+    if (ctx.forceColorState) {
+      stateSet.useColorState(ctx.forceColorState);
+    } else {
+      stateSet.defaultColorState();
+    }
     stateSet.defaultStencilState();
     if (ctx.oit) {
       ctx.oit.setRenderStates(stateSet);
@@ -365,7 +400,10 @@ export class MeshMaterial extends Material {
     if (ctx.oit) {
       ctx.oit.applyUniforms(ctx, bindGroup);
     }
-    if (!ctx.instancing && ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
+    if (
+      !(ctx.materialFlags & MaterialVaryingFlags.INSTANCING) &&
+      ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR
+    ) {
       bindGroup.setValue('zObjectColor', this._objectColor);
     }
   }
@@ -451,14 +489,20 @@ export class MeshMaterial extends Material {
   vertexShader(scope: PBFunctionScope): void {
     const pb = scope.$builder;
     ShaderHelper.prepareVertexShader(pb, this.drawContext);
-    if (this.drawContext.skinAnimation) {
+    if (this.drawContext.materialFlags & MaterialVaryingFlags.SKIN_ANIMATION) {
       scope.$inputs.zBlendIndices = pb.vec4().attrib('blendIndices');
       scope.$inputs.zBlendWeights = pb.vec4().attrib('blendWeights');
     }
-    if (this.drawContext.morphAnimation && this.drawContext.device.type === 'webgl') {
+    if (
+      this.drawContext.materialFlags & MaterialVaryingFlags.MORPH_ANIMATION &&
+      this.drawContext.device.type === 'webgl'
+    ) {
       scope.$inputs.zFakeVertexID = pb.float().attrib('texCoord7');
     }
-    if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR && this.drawContext.instancing) {
+    if (
+      this.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR &&
+      this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
+    ) {
       scope.$outputs.zObjectColor = this.getInstancedUniform(scope, MeshMaterial.OBJECT_COLOR_UNIFORM);
     }
   }
@@ -478,7 +522,7 @@ export class MeshMaterial extends Material {
       }
     } else if (
       this.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR &&
-      !this.drawContext.instancing
+      !(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)
     ) {
       scope.zObjectColor = pb.vec4().uniform(2);
     }
@@ -504,6 +548,10 @@ export class MeshMaterial extends Material {
           that.drawContext.oit.setupFragmentOutput(this);
         } else {
           this.$outputs.zFragmentOutput = pb.vec4();
+          if (ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
+            this.$outputs.zSSRRoughness = pb.vec4();
+            this.$outputs.zSSRNormal = pb.vec4();
+          }
         }
         pb.main(function () {
           that.fragmentShader(this);
@@ -527,7 +575,13 @@ export class MeshMaterial extends Material {
    *
    * @returns The final fragment color
    */
-  outputFragmentColor(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: PBShaderExp) {
+  outputFragmentColor(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    color: PBShaderExp,
+    ssrRoughness?: PBShaderExp,
+    ssrNormal?: PBShaderExp
+  ) {
     const pb = scope.$builder;
     const that = this;
     const funcName = 'Z_outputFragmentColor';
@@ -559,9 +613,12 @@ export class MeshMaterial extends Material {
           });
         }
         ShaderHelper.discardIfClipped(this, this.worldPos);
+        const depthPass = that.drawContext.renderPass as DepthPass;
         this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
-        if (that.drawContext.device.type === 'webgl') {
+        if (depthPass.encodeDepth) {
           this.$outputs.zFragmentOutput = encodeNormalizedFloatToRGBA(this, this.depth);
+        } else if (depthPass.renderBackface) {
+          this.$outputs.zFragmentOutput = pb.vec4(0, this.depth, 0, 1);
         } else {
           this.$outputs.zFragmentOutput = pb.vec4(this.depth, 0, 0, 1);
         }
@@ -572,9 +629,10 @@ export class MeshMaterial extends Material {
           });
         }
         ShaderHelper.discardIfClipped(this, this.worldPos);
-        this.$outputs.zFragmentOutput = that.drawContext.instancing
-          ? scope.$inputs.zObjectColor
-          : scope.zObjectColor;
+        this.$outputs.zFragmentOutput =
+          that.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
+            ? scope.$inputs.zObjectColor
+            : scope.zObjectColor;
       } /*if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP)*/ else {
         if (color) {
           this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
@@ -593,6 +651,10 @@ export class MeshMaterial extends Material {
       }
     });
     color ? pb.getGlobalScope()[funcName](worldPos, color) : pb.getGlobalScope()[funcName](worldPos);
+    if (that.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
+      scope.$outputs.zSSRRoughness = ssrRoughness ?? pb.vec4(1, 0, 0, 1);
+      scope.$outputs.zSSRNormal = ssrNormal ?? pb.vec4(0);
+    }
   }
 }
 FEATURE_ALPHATEST = MeshMaterial.defineFeature();

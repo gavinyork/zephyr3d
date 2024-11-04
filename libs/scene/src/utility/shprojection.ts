@@ -13,6 +13,7 @@ import type {
 import { Application } from '../app';
 import type { BlitType } from '../blitter';
 import { Blitter, CopyBlitter } from '../blitter';
+import { fetchSampler } from './misc';
 
 class ReduceBlitter extends Blitter {
   protected _width: number;
@@ -262,13 +263,7 @@ async function doProjectCubemap(srcTexture: TextureCube, coeff: number): Promise
     framebuffer.dispose();
 
     const blitter = new ReduceBlitter();
-    const sampler = device.createSampler({
-      addressU: 'clamp',
-      addressV: 'clamp',
-      magFilter: 'nearest',
-      minFilter: 'nearest',
-      mipFilter: 'none'
-    });
+    const sampler = fetchSampler('clamp_nearest_nomip');
     for (let i = 1; i < tmpTextures.length; i++) {
       blitter.width = tmpTextures[i - 1].width;
       blitter.blit(tmpTextures[i - 1], tmpTextures[i], sampler);

@@ -255,7 +255,7 @@ function canvas_on_touchend(event: TouchEvent): void {
     if (touch.identifier == touch_id) {
       io.MouseDown[0] = false;
     }
-    delete multi_touch[touch.identifier];
+    multi_touch[touch.identifier] = undefined;
   }
   touch_count++;
   if (touch_count >= 200) {

@@ -188,7 +188,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
       this.load();
     }
   }
-  isProgram(): boolean {
+  isProgram(): this is GPUProgram {
     return true;
   }
   use(): boolean {

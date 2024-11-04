@@ -90,22 +90,22 @@ export class Skeleton {
     return this._jointTexture;
   }
   /** @internal */
-  updateJointMatrices(jointTransforms?: Matrix4x4[]) {
+  updateJointMatrices(jointTransforms?: Matrix4x4[], worldMatrix?: Matrix4x4) {
     if (!this._jointTexture) {
       this._createJointTexture();
     }
     for (let i = 0; i < this._joints.length; i++) {
       const mat = this._jointMatrices[i];
-      Matrix4x4.multiply(
-        jointTransforms ? jointTransforms[i] : this._joints[i].worldMatrix,
-        this._inverseBindMatrices[i],
-        mat
-      );
+      const jointTransform = jointTransforms ? jointTransforms[i] : this._joints[i].worldMatrix;
+      if (worldMatrix) {
+        Matrix4x4.multiplyAffine(worldMatrix, jointTransform, jointTransform);
+      }
+      Matrix4x4.multiply(jointTransform, this._inverseBindMatrices[i], mat);
     }
   }
   /** @internal */
-  computeBindPose() {
-    this.updateJointMatrices(this._bindPoseMatrices);
+  computeBindPose(model: SceneNode) {
+    this.updateJointMatrices(this._bindPoseMatrices, model.worldMatrix);
     this._jointTexture.update(
       this._jointMatrixArray,
       0,
@@ -131,18 +131,15 @@ export class Skeleton {
     for (const mesh of this._meshes) {
       this.computeBoundingBox(mesh.bounding, mesh.mesh.invWorldMatrix);
       mesh.mesh.setBoneMatrices(this.jointTexture);
-      mesh.mesh.setInvBindMatrix(mesh.mesh.invWorldMatrix);
       mesh.mesh.setAnimatedBoundingBox(mesh.bounding.boundingBox);
     }
   }
   /** @internal */
   reset(model: SceneNode) {
-    this.computeBindPose();
+    this.computeBindPose(model);
     for (const mesh of this._meshes) {
-      const invWorldMatrix = Matrix4x4.multiply(mesh.mesh.invWorldMatrix, model.worldMatrix);
-      this.computeBoundingBox(mesh.bounding, invWorldMatrix);
+      this.computeBoundingBox(mesh.bounding, mesh.mesh.invWorldMatrix);
       mesh.mesh.setBoneMatrices(this.jointTexture);
-      mesh.mesh.setInvBindMatrix(invWorldMatrix);
       mesh.mesh.setAnimatedBoundingBox(mesh.bounding.boundingBox);
     }
   }

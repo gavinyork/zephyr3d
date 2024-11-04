@@ -1,5 +1,17 @@
-import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, LambertMaterial, Mesh, DirectionalLight, BoxShape, PlaneShape } from '@zephyr3d/scene';
+import { AABB, Vector3, Vector4 } from '@zephyr3d/base';
+import {
+  Scene,
+  Application,
+  OrbitCameraController,
+  PerspectiveCamera,
+  Compositor,
+  Tonemap,
+  LambertMaterial,
+  Mesh,
+  DirectionalLight,
+  BoxShape,
+  PlaneShape
+} from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
@@ -16,9 +28,10 @@ myApp.ready().then(function () {
   // Create a directional light
   const dirLight = new DirectionalLight(scene);
   // light direction
-  dirLight.rotation.fromEulerAngle(-Math.PI/4, Math.PI/4, 0, 'ZYX');
+  dirLight.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0, 'ZYX');
   // Enable shadowing
   dirLight.castShadow = true;
+  dirLight.shadow.shadowRegion = new AABB(new Vector3(-50, 0, -50), new Vector3(50, 6, 50));
 
   // Create several boxes
   const boxMaterial = new LambertMaterial();
@@ -36,7 +49,13 @@ myApp.ready().then(function () {
   floor.position.z = -50;
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 600);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    myApp.device.canvas.width / myApp.device.canvas.height,
+    1,
+    600
+  );
   camera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
 
@@ -48,7 +67,7 @@ myApp.ready().then(function () {
 
   myApp.on('tick', function () {
     // light rotation
-    dirLight.rotation.fromEulerAngle(-Math.PI/4, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
+    dirLight.rotation.fromEulerAngle(-Math.PI / 4, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
     camera.updateController();
 
     const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
@@ -56,12 +75,12 @@ myApp.ready().then(function () {
 
     camera.viewport = [0, 0, width, height >> 1];
     dirLight.shadow.mode = 'hard';
-    camera.aspect = camera.viewport[2]/camera.viewport[3];
+    camera.aspect = camera.viewport[2] / camera.viewport[3];
     camera.render(scene);
 
     camera.viewport = [0, height >> 1, width, height - (height >> 1)];
     dirLight.shadow.mode = 'pcf-opt';
-    camera.aspect = camera.viewport[2]/camera.viewport[3];
+    camera.aspect = camera.viewport[2] / camera.viewport[3];
     camera.render(scene);
   });
 

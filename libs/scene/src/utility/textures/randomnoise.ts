@@ -3,6 +3,7 @@ import { drawFullscreenQuad } from '../../render/fullscreenquad';
 
 let randomNoiseProgram: GPUProgram = null;
 
+/** @internal */
 export function createRandomNoiseTexture(device: AbstractDevice, size: number) {
   if (!randomNoiseProgram) {
     randomNoiseProgram = device.buildRenderProgram({

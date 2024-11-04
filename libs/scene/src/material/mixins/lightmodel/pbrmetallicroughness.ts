@@ -9,6 +9,7 @@ import type { DrawContext } from '../../../render';
 import { Vector4 } from '@zephyr3d/base';
 import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
+import { ShaderHelper } from '../../shader/helper';
 
 /**
  * Interface for PBRMetallicRoughness lighting model mixin
@@ -24,7 +25,8 @@ export type IMixinPBRMetallicRoughness = {
     normal: PBShaderExp,
     viewVec: PBShaderExp,
     albedo: PBShaderExp,
-    TBN?: PBShaderExp
+    TBN: PBShaderExp,
+    outRoughness?: PBShaderExp
   ): PBShaderExp;
   calculateCommonData(
     scope: PBInsideFunctionScope,
@@ -101,19 +103,38 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
       normal: PBShaderExp,
       viewVec: PBShaderExp,
       albedo: PBShaderExp,
-      TBN?: PBShaderExp
+      TBN: PBShaderExp,
+      outRoughness?: PBShaderExp
     ): PBShaderExp {
       const pb = scope.$builder;
       const funcName = 'Z_PBRMetallicRoughnessLight';
       const that = this;
       pb.func(
         funcName,
-        [pb.vec3('worldPos'), pb.vec3('normal'), pb.mat3('TBN'), pb.vec3('viewVec'), pb.vec4('albedo')],
+        [
+          pb.vec3('worldPos'),
+          pb.vec3('normal'),
+          pb.mat3('TBN'),
+          pb.vec3('viewVec'),
+          pb.vec4('albedo'),
+          ...(outRoughness ? [pb.vec4('outRoughness').out()] : [])
+        ],
         function () {
           this.$l.pbrData = that.getCommonData(this, this.albedo, this.normal, this.viewVec, this.TBN);
           this.$l.lightingColor = pb.vec3(0);
           this.$l.emissiveColor = that.calculateEmissiveColor(this);
-          that.indirectLighting(this, this.normal, this.viewVec, this.pbrData, this.lightingColor);
+          if (outRoughness) {
+            that.indirectLighting(
+              this,
+              this.normal,
+              this.viewVec,
+              this.pbrData,
+              this.lightingColor,
+              this.outRoughness
+            );
+          } else {
+            that.indirectLighting(this, this.normal, this.viewVec, this.pbrData, this.lightingColor);
+          }
           that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
             this.$l.diffuse = pb.vec3();
             this.$l.specular = pb.vec3();
@@ -143,7 +164,9 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
           this.$return(pb.add(this.lightingColor, this.emissiveColor));
         }
       );
-      return pb.getGlobalScope()[funcName](worldPos, normal, TBN, viewVec, albedo);
+      return outRoughness
+        ? pb.getGlobalScope()[funcName](worldPos, normal, TBN, viewVec, albedo, outRoughness)
+        : pb.getGlobalScope()[funcName](worldPos, normal, TBN, viewVec, albedo);
     }
     fragmentShader(scope: PBFunctionScope): void {
       super.fragmentShader(scope);
@@ -179,6 +202,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
         data.metallic = scope.zMetallic;
         data.roughness = scope.zRoughness;
       }
+      data.roughness = pb.mul(data.roughness, ShaderHelper.getCameraRoughnessFactor(scope));
       if (this.specularColorTexture) {
         scope.$l.specularColor = pb.mul(
           scope.zSpecularFactor.rgb,

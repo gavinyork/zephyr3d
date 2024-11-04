@@ -1,109 +1,106 @@
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Scene,
-  OrbitCameraController,
   Application,
+  OrbitCameraController,
   PerspectiveCamera,
-  Compositor,
-  Tonemap,
-  BatchGroup,
-  DirectionalLight,
-  WeightedBlendedOIT,
-  ABufferOIT,
-  SphereShape,
-  UnlitMaterial,
-  Mesh
+  LambertMaterial,
+  Mesh,
+  SpotLight,
+  BoxShape,
+  PlaneShape,
+  BatchGroup
 } from '@zephyr3d/scene';
-import * as common from '../common';
+import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { Inspector } from '@zephyr3d/inspector';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
-import { Vector3, Vector4 } from '@zephyr3d/base';
 
-const instancingApp = new Application({
-  backend: common.getBackend(),
-  canvas: document.querySelector('#canvas'),
-  pixelRatio: 1
+const myApp = new Application({
+  backend: backendWebGL2,
+  canvas: document.querySelector('#canvas')
 });
 
-instancingApp.ready().then(async () => {
-  const device = instancingApp.device;
-  await imGuiInit(device);
+myApp.ready().then(async function () {
+  await imGuiInit(myApp.device);
   const scene = new Scene();
-  scene.env.sky.skyType = 'color';
-  scene.env.sky.skyColor = new Vector4(0, 0, 1, 1);
-  scene.env.sky.fogType = 'none';
-  //scene.env.sky.skyType = 'none';
+
+  const batchGroup = new BatchGroup(scene);
+  // Turn off environment lighting
+  scene.env.light.type = 'none';
+
+  // Create a spot light
+  const spotLight = new SpotLight(scene);
+  spotLight.cutoff = Math.PI * 0.2;
+  spotLight.range = 200;
+  spotLight.position.setXYZ(0, 10, 0);
+  spotLight.castShadow = true;
+
+  //
+  const tex = myApp.device.createTexture2D('rgba8unorm', 1, 1);
+  const pixels = new Uint8Array([128, 128, 128, 255]);
+  tex.update(pixels, 0, 0, 1, 1);
+
+  // Create several boxes
+  const boxMaterial = new LambertMaterial();
+  boxMaterial.albedoColor = new Vector4(1, 1, 0, 1);
+  const boxShape = new BoxShape({ size: 6 });
+  for (let i = 0; i < 16; i++) {
+    const box = new Mesh(scene, boxShape, boxMaterial);
+    box.parent = batchGroup;
+    box.position.setXYZ(Math.random() * 50 - 25, 3, Math.random() * 50 - 25);
+  }
+  // Create floor
+  const floorMaterial = new LambertMaterial();
+  floorMaterial.albedoColor = new Vector4(1, 0, 1, 1);
+  floorMaterial.albedoTexture = tex;
+
+  const floorMaterial2 = new LambertMaterial();
+  floorMaterial2.albedoColor = new Vector4(1, 1, 0, 1);
+  floorMaterial2.albedoTexture = tex;
+
+  const floor = new Mesh(scene, new PlaneShape({ size: 100 }), floorMaterial);
+  floor.parent = batchGroup;
+  floor.position.x = -50;
+  floor.position.z = -50;
+
+  // Create camera
   const camera = new PerspectiveCamera(
     scene,
     Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
+    myApp.device.canvas.width / myApp.device.canvas.height,
     1,
-    1000
+    600
   );
-  camera.position.setXYZ(0, 0, 6);
+  camera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
-  camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
-  camera.depthPrePass = true;
-  camera.enablePicking = true;
 
-  instancingApp.inputManager.use(imGuiInjectEvent);
-  instancingApp.inputManager.use(camera.handleEvent.bind(camera));
-  const inspector = new common.Inspector(scene, null, camera);
+  myApp.inputManager.use(imGuiInjectEvent);
+  myApp.inputManager.use(camera.handleEvent.bind(camera));
 
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
+  const inspector = new Inspector(scene, null, camera);
 
-  const batchGroup = new BatchGroup(scene);
-  const sphere = new SphereShape();
-  const mat = new UnlitMaterial();
-  mat.albedoColor = new Vector4(1, 0, 0, 1);
-  const mesh = new Mesh(scene, sphere, mat);
-  mesh.parent = batchGroup;
-
-  const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
-  light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
-
-  instancingApp.on('resize', (ev) => {
-    camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane());
-  });
-
-  let mouseX = 0;
-  let mouseY = 0;
-  instancingApp.device.canvas.addEventListener('pointermove', (ev) => {
-    mouseX = ev.offsetX;
-    mouseY = ev.offsetY;
-    camera.pickPosX = mouseX;
-    camera.pickPosY = mouseY;
-  });
-
-  instancingApp.on('tick', (ev) => {
-    camera.updateController();
-    camera.viewport = null;
-    camera.window = null;
-    camera.render(scene);
-    /*
-    instancingApp.device.setViewport(null);
-    const vp = instancingApp.device.getViewport();
-    const w = vp.width;
-    const h = vp.height;
-    const windowX = mouseX / w;
-    const windowY = (h - mouseY - 1) / h;
-    const windowW = 1 / w;
-    const windowH = 1 / h;
-    camera.window = [windowX, windowY, windowW, windowH];
-    camera.viewport = [100, 100, 1, 1];
-    camera.render(scene);
-
-    camera.viewport = [100, 200, 100, 100];
-    camera.window = null;
-    camera.render(scene);
-*/
-    if (camera.pickResult?.drawable === mesh) {
-      mat.albedoColor = Vector4.one();
-    } else {
-      mat.albedoColor = new Vector4(1, 0, 0, 1);
+  myApp.on('pointerup', (ev) => {
+    if (ev.button === 2) {
+      if (floor.material === floorMaterial) {
+        floor.material = floorMaterial2;
+        floorMaterial.albedoTexture = floorMaterial.albedoTexture ? null : tex;
+      } else {
+        floor.material = floorMaterial;
+        floorMaterial2.albedoTexture = floorMaterial2.albedoTexture ? null : tex;
+      }
     }
+  });
+
+  myApp.on('tick', function () {
+    // light rotation
+    spotLight.rotation.fromEulerAngle(-Math.PI / 6, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
+
+    camera.updateController();
+    camera.render(scene);
     imGuiNewFrame();
     inspector.render();
     imGuiEndFrame();
   });
-  instancingApp.run();
+
+  myApp.run();
 });

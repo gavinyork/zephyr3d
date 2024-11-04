@@ -11,6 +11,7 @@ import {
   TestTextureVideo
 } from './case';
 import { packFloat3 } from '@zephyr3d/base';
+import { Inspector } from '@zephyr3d/inspector';
 
 const test2D = true;
 const test3D = true;
@@ -50,7 +51,7 @@ const textureApp = new Application({
 textureApp.ready().then(async () => {
   const device = textureApp.device;
   await imGuiInit(device);
-  const inspector = new common.Inspector(null, null);
+  const inspector = new Inspector(null, null);
   textureApp.inputManager.use(imGuiInjectEvent);
   const assetManager = new AssetManager();
   function getSubViewport(index: number) {

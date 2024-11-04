@@ -80,7 +80,7 @@ export class WebGPUTextureSampler extends WebGPUObject<GPUSampler> implements Te
     });
     return !!this._object;
   }
-  isSampler(): boolean {
+  isSampler(): this is TextureSampler {
     return true;
   }
 }

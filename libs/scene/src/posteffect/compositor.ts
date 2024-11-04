@@ -7,10 +7,13 @@ import type {
   GPUProgram,
   RenderStateSet,
   Texture2D,
-  TextureSampler,
+  TextureFormat,
   VertexLayout
 } from '@zephyr3d/device';
 import type { AbstractPostEffect } from './posteffect';
+import { MaterialVaryingFlags } from '../values';
+import { SSR } from './ssr';
+import { fetchSampler } from '../utility/misc';
 
 /**
  * Posteffect rendering context
@@ -28,11 +31,11 @@ export interface CompositorContext {
  */
 export class Compositor {
   /** @internal */
-  protected _postEffectsOpaque: AbstractPostEffect[];
+  private static _SSRPostEffect: SSR = null;
   /** @internal */
-  protected _postEffectsTransparency: AbstractPostEffect[];
+  protected _postEffectsOpaque: AbstractPostEffect<any>[];
   /** @internal */
-  private static _blitSampler: TextureSampler = null;
+  protected _postEffectsTransparency: AbstractPostEffect<any>[];
   /** @internal */
   private static _blitProgram: GPUProgram = null;
   /** @internal */
@@ -49,14 +52,14 @@ export class Compositor {
     this._postEffectsTransparency = [];
   }
   /** @internal */
-  requireLinearDepth(): boolean {
+  requireLinearDepth(ctx: DrawContext): boolean {
     for (const postEffect of this._postEffectsOpaque) {
-      if (postEffect.requireLinearDepthTexture()) {
+      if (postEffect.requireLinearDepthTexture(ctx)) {
         return true;
       }
     }
     for (const postEffect of this._postEffectsTransparency) {
-      if (postEffect.requireLinearDepthTexture()) {
+      if (postEffect.requireLinearDepthTexture(ctx)) {
         return true;
       }
     }
@@ -68,7 +71,7 @@ export class Compositor {
    * @param postEffect - The post effect to add
    * @param opaque - true if the post effect should be applied after the opaque pass and before the transparent pass, otherwise the post effect should be applied after the transparent pass
    */
-  appendPostEffect(postEffect: AbstractPostEffect): void {
+  appendPostEffect(postEffect: AbstractPostEffect<any>): void {
     if (postEffect) {
       if (
         this._postEffectsOpaque.indexOf(postEffect) >= 0 ||
@@ -86,7 +89,7 @@ export class Compositor {
    *
    * @param postEffect - The posteffect to be remove.
    */
-  removePostEffect(postEffect: AbstractPostEffect): void {
+  removePostEffect(postEffect: AbstractPostEffect<any>): void {
     for (const list of [this._postEffectsOpaque, this._postEffectsTransparency]) {
       const index = list.indexOf(postEffect);
       if (index >= 0) {
@@ -105,11 +108,21 @@ export class Compositor {
   /**
    * Gets all post effects
    */
-  getPostEffects(): AbstractPostEffect[] {
+  getPostEffects(): AbstractPostEffect<any>[] {
     return [...this._postEffectsOpaque, ...this._postEffectsTransparency];
   }
   /** @internal */
   begin(ctx: DrawContext) {
+    const ssr = !!(ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS);
+    if (
+      this._postEffectsOpaque.length === 0 &&
+      this._postEffectsTransparency.length === 0 &&
+      ctx.primaryCamera.sampleCount === 1 &&
+      !ssr
+    ) {
+      ctx.compositorContex = null;
+      return;
+    }
     const device = ctx.device;
     const format = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
     const finalFramebuffer = device.getFramebuffer();
@@ -117,14 +130,15 @@ export class Compositor {
     let msFramebuffer: FrameBuffer = null;
     const w = depth ? depth.width : ctx.viewportWidth;
     const h = depth ? depth.height : ctx.viewportHeight;
-    if (ctx.primaryCamera.sampleCount > 1) {
+    if (ctx.primaryCamera.sampleCount > 1 || ssr) {
+      const fmt2: TextureFormat = ssr ? (device.type === 'webgl' ? format : 'rgba8unorm') : format;
       msFramebuffer = device.pool.fetchTemporalFramebuffer(
         true,
         w,
         h,
-        format,
+        ssr ? [format, fmt2, fmt2] : format,
         depth,
-        false,
+        ssr,
         ctx.primaryCamera.sampleCount
       );
     }
@@ -148,6 +162,14 @@ export class Compositor {
       msTexture: msFramebuffer,
       writeIndex
     };
+    if (ssr) {
+      if (!Compositor._SSRPostEffect) {
+        Compositor._SSRPostEffect = new SSR();
+      }
+      Compositor._SSRPostEffect.roughnessTexture = msFramebuffer.getColorAttachments()[1] as Texture2D;
+      Compositor._SSRPostEffect.normalTexture = msFramebuffer.getColorAttachments()[2] as Texture2D;
+      this._postEffectsOpaque.unshift(Compositor._SSRPostEffect);
+    }
   }
   /** @internal */
   drawPostEffects(ctx: DrawContext, opaque: boolean, sceneDepthTexture: Texture2D) {
@@ -162,7 +184,7 @@ export class Compositor {
         const inputTexture = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
         const isLast = this.isLastPostEffect(opaque, i);
         const finalEffect =
-          isLast && (!postEffect.requireDepthAttachment() || !!ctx.compositorContex.finalFramebuffer);
+          isLast && (!postEffect.requireDepthAttachment(ctx) || !!ctx.compositorContex.finalFramebuffer);
         if (finalEffect) {
           device.setFramebuffer(ctx.compositorContex.finalFramebuffer);
           device.setViewport(null);
@@ -179,15 +201,20 @@ export class Compositor {
   }
   /** @internal */
   end(ctx: DrawContext) {
-    const device = ctx.device;
-    if (device.getFramebuffer() !== ctx.compositorContex.finalFramebuffer) {
-      const srcTex = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
-      device.setFramebuffer(ctx.compositorContex.finalFramebuffer);
-      device.setViewport(null);
-      device.setScissor(null);
-      Compositor._blit(device, srcTex, !ctx.compositorContex.finalFramebuffer);
+    if (ctx.compositorContex) {
+      const device = ctx.device;
+      if (device.getFramebuffer() !== ctx.compositorContex.finalFramebuffer) {
+        const srcTex = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
+        device.setFramebuffer(ctx.compositorContex.finalFramebuffer);
+        device.setViewport(null);
+        device.setScissor(null);
+        Compositor._blit(device, srcTex, !ctx.compositorContex.finalFramebuffer);
+      }
+      ctx.compositorContex = null;
     }
-    ctx.compositorContex = null;
+    if (this._postEffectsOpaque[0] === Compositor._SSRPostEffect) {
+      this._postEffectsOpaque.shift();
+    }
   }
   /** @internal */
   private isLastPostEffect(opaque: boolean, index: number) {
@@ -259,18 +286,11 @@ export class Compositor {
           }
         ]
       });
-      this._blitSampler = device.createSampler({
-        minFilter: 'nearest',
-        magFilter: 'nearest',
-        mipFilter: 'none',
-        addressU: 'clamp',
-        addressV: 'clamp'
-      });
       this._blitRenderStates = device.createRenderStateSet();
       this._blitRenderStates.useRasterizerState().setCullMode('none');
       this._blitRenderStates.useDepthState().enableTest(false).enableWrite(false);
     }
-    this._blitBindgroup.setTexture('srcTex', srcTex, this._blitSampler);
+    this._blitBindgroup.setTexture('srcTex', srcTex, fetchSampler('clamp_nearest_nomip'));
     this._blitBindgroup.setValue('srgbOutput', srgbOutput ? 1 : 0);
     this._blitBindgroup.setValue('flip', device.type === 'webgpu' && !!device.getFramebuffer() ? 1 : 0);
     device.setRenderStates(this._blitRenderStates);

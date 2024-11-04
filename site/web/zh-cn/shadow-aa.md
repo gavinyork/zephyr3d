@@ -7,7 +7,7 @@
 
 我们可以通过```light.shadow.shadowMapSize```属性设置ShadowMap贴图的分辨率。
 
-在下面的示例中，上半屏阴影贴图分辨率为512像素，下半屏阴影贴图的分辨率为1024像素。
+在下面的示例中，上半屏阴影贴图分辨率为256像素，下半屏阴影贴图的分辨率为1024像素。
 
 <div class="showcase" case="tut-19" style="width:600px;height:800px"></div>
 

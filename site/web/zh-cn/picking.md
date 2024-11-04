@@ -18,7 +18,7 @@ const ray = camera.constructRay(x, y);
 const pickResult = scene.raycast(ray);
 // 返回拾取到的场景节点以及相交距离和交点，否则返回null
 if (pickResult) {
-  console.log(`节点: ${pickResult.node}`);
+  console.log(`节点: ${pickResult.target.node}`);
   console.log(`距离: ${pickResult.dist}`);
   console.log(`交点: ${pickResult.point}`);
 }
@@ -63,7 +63,7 @@ app.on('tick', () => {
     // drawable是拾取到的渲染对象
     console.log(pickResult.drawable);
     // node是拾取到的节点
-    console.log(pickResult.node);
+    console.log(pickResult.target.node);
   }
 });
 
@@ -94,7 +94,7 @@ app.on('tick', () => {
       // drawable是拾取到的渲染对象
       console.log(pickResult.drawable);
       // node是拾取到的节点
-      console.log(pickResult.node);
+      console.log(pickResult.target.node);
     }
   });
 });

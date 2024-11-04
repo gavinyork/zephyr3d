@@ -377,8 +377,12 @@ export class GLTFLoader extends AbstractModelLoader {
       if (animationData.nodes.indexOf(targetNode) < 0) {
         animationData.nodes.push(targetNode);
       }
-      if (targetNode.skeletonAttached && animationData.skeletons.indexOf(targetNode.skeletonAttached) < 0) {
-        animationData.skeletons.push(targetNode.skeletonAttached);
+      if (targetNode.skeletonAttached) {
+        for (const skeleton of targetNode.skeletonAttached) {
+          if (animationData.skeletons.indexOf(skeleton) < 0) {
+            animationData.skeletons.push(skeleton);
+          }
+        }
       }
     }
     return animationData;

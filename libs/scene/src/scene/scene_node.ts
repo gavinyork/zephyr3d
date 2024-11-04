@@ -7,14 +7,7 @@ import type { Terrain } from './terrain/terrain';
 import type { PunctualLight, BaseLight } from './light';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import type { BatchGroup } from './batchgroup';
-
-/**
- * Base interface for all scene node visitors
- * @public
- */
-export interface SceneNodeVisitor {
-  visit(target: SceneNode): unknown;
-}
+import type { Visitor } from './visitor';
 
 /**
  * Scene node visible state
@@ -153,7 +146,7 @@ export class SceneNode extends XForm<SceneNode> {
    * @param v - The visitor that will travel the subtree of this node
    * @param inverse - true if traversing from bottom to top, otherwise top to bottom
    */
-  traverse(v: SceneNodeVisitor, inverse?: boolean): void {
+  traverse(v: Visitor<SceneNode>, inverse?: boolean): void {
     if (inverse) {
       for (let i = this._children.length - 1; i >= 0; i--) {
         this._children[i].traverse(v, inverse);
@@ -215,11 +208,10 @@ export class SceneNode extends XForm<SceneNode> {
   }
   /**
    * Computes the bounding volume of the node
-   * @param bv - The output bounding volume
    * @returns The output bounding volume
    */
-  computeBoundingVolume(bv: BoundingVolume): BoundingVolume {
-    return bv;
+  computeBoundingVolume(): BoundingVolume {
+    return null;
   }
   /**
    * Gets the bounding volume of the node
@@ -227,7 +219,7 @@ export class SceneNode extends XForm<SceneNode> {
    */
   getBoundingVolume(): BoundingVolume {
     if (this._bvDirty) {
-      this._bv = this.computeBoundingVolume(this._bv) || null;
+      this._bv = this.computeBoundingVolume();
       this._bvDirty = false;
     }
     return this._bv;
@@ -239,7 +231,8 @@ export class SceneNode extends XForm<SceneNode> {
   setBoundingVolume(bv: BoundingVolume) {
     if (bv !== this._bv) {
       this._bv = bv;
-      this.invalidateBoundingVolume();
+      this._bvDirty = !this._bv;
+      this.invalidateWorldBoundingVolume(false);
     }
   }
   /**
@@ -272,6 +265,7 @@ export class SceneNode extends XForm<SceneNode> {
       } else if (this.isGraphNode()) {
         this._scene.invalidateNodePlacement(this);
       }
+      this.dispatchEvent(this, 'bvchanged');
     }
   }
   /** Clip mode */
@@ -298,6 +292,9 @@ export class SceneNode extends XForm<SceneNode> {
       const prevHidden = this.hidden;
       this._visible = val;
       if (prevHidden !== this.hidden) {
+        if (this.isGraphNode()) {
+          this._scene.invalidateNodePlacement(this);
+        }
         this.notifyHiddenChanged();
       }
     }

@@ -153,7 +153,7 @@ export class WebGLTextureSampler
     }
     return true;
   }
-  isSampler(): boolean {
+  isSampler(): this is TextureSampler {
     return true;
   }
 }

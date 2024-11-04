@@ -8,6 +8,7 @@ import { Environment } from './environment';
 import type { GraphNode } from './graph_node';
 import type { Camera } from '../camera/camera';
 import type { AnimationSet } from '../animation/animationset';
+import type { PickTarget } from '../render';
 
 /**
  * Event that will be fired when the scene needs to be updated
@@ -110,12 +111,12 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
    * @param length - Length of the ray
    * @returns The closest object hit by the ray
    */
-  raycast(ray: Ray, length = Infinity): { node: GraphNode; dist: number; point: Vector3 } {
+  raycast(ray: Ray, length = Infinity): { target: PickTarget; dist: number; point: Vector3 } {
     const raycastVisitor = new RaycastVisitor(ray, length);
     this.octree.getRootNode().traverse(raycastVisitor);
     return raycastVisitor.intersected
       ? {
-          node: raycastVisitor.intersected,
+          target: raycastVisitor.intersected,
           dist: raycastVisitor.intersectedDist,
           point: raycastVisitor.intersectedPoint
         }

@@ -17,15 +17,20 @@
         padding: 0;
       }
       .lil-gui {
-        position: relative;
-        z-index: 99;
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
       }
     </style>
   </head>
 
   <body>
-    <div style="left:0;top:0;position:absolute;width:100%;height:100%;">
-      <canvas id="canvas" style="position:absolute;left:0;top:0;width:100%;height:100%;outline:none;"></canvas>
+    <div style="left: 0; top: 0; position: absolute; width: 100%; height: 100%">
+      <canvas
+        id="canvas"
+        style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; outline: none"
+      ></canvas>
     </div>
     <script type="module" src="js/demo-3.js"></script>
   </body>
