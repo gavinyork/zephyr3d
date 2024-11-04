@@ -2,6 +2,18 @@
   "name": "@zephyr3d/base",
   "entries": [
     {
+      "version": "0.1.5",
+      "tag": "@zephyr3d/base_v0.1.5",
+      "date": "Mon, 04 Nov 2024 16:42:57 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Update README.md"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.4",
       "tag": "@zephyr3d/base_v0.1.4",
       "date": "Sun, 02 Jun 2024 11:21:22 GMT",

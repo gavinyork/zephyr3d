@@ -2,6 +2,23 @@
   "name": "@zephyr3d/device",
   "entries": [
     {
+      "version": "0.2.4",
+      "tag": "@zephyr3d/device_v0.2.4",
+      "date": "Mon, 04 Nov 2024 16:42:57 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Update README.md"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.1.4` to `^0.1.5`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.3",
       "tag": "@zephyr3d/device_v0.2.3",
       "date": "Sun, 02 Jun 2024 11:21:22 GMT",

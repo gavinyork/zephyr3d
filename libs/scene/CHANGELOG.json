@@ -2,6 +2,26 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.6.1",
+      "tag": "@zephyr3d/scene_v0.6.1",
+      "date": "Mon, 04 Nov 2024 16:42:57 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Update README.md"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.1.4` to `^0.1.5`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.3` to `^0.2.4`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.6.0",
       "tag": "@zephyr3d/scene_v0.6.0",
       "date": "Mon, 04 Nov 2024 16:19:45 GMT",

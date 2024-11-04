@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/imgui
 
-This log was last generated on Mon, 11 Mar 2024 18:19:27 GMT and should not be manually modified.
+This log was last generated on Mon, 04 Nov 2024 16:42:57 GMT and should not be manually modified.
+
+## 0.1.4
+Mon, 04 Nov 2024 16:42:57 GMT
+
+### Patches
+
+- Update README.md
 
 ## 0.1.3
 Mon, 11 Mar 2024 18:19:27 GMT
