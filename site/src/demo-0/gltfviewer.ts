@@ -2,7 +2,7 @@ import * as zip from '@zip.js/zip.js';
 import type * as draco3d from 'draco3d';
 import { Vector4, Vector3 } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
-import { Mesh, PlaneShape, LambertMaterial, FPSCameraController } from '@zephyr3d/scene';
+import { Mesh, PlaneShape, LambertMaterial } from '@zephyr3d/scene';
 import {
   BatchGroup,
   PostWater,
@@ -114,8 +114,7 @@ export class GLTFViewer {
     );
     this._camera.oit = this._oit;
     this._camera.position.setXYZ(0, 0, 15);
-    //this._camera.controller = new OrbitCameraController();
-    this._camera.controller = new FPSCameraController();
+    this._camera.controller = new OrbitCameraController();
     this._light0 = new DirectionalLight(this._scene)
       .setColor(new Vector4(1, 1, 1, 1))
       .setIntensity(8)
