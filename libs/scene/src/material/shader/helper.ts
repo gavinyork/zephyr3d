@@ -958,12 +958,21 @@ export class ShaderHelper {
     cascade: PBShaderExp | number = 0
   ): PBShaderExp {
     const pb = scope.$builder;
-    return pb.vec4(
-      pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 0)), worldPos),
-      pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 1)), worldPos),
-      pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 2)), worldPos),
-      pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 3)), worldPos)
-    );
+    if (typeof cascade === 'number') {
+      return pb.vec4(
+        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(cascade * 4 + 0), worldPos),
+        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(cascade * 4 + 1), worldPos),
+        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(cascade * 4 + 2), worldPos),
+        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(cascade * 4 + 3), worldPos)
+      );
+    } else {
+      return pb.vec4(
+        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 0)), worldPos),
+        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 1)), worldPos),
+        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 2)), worldPos),
+        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 3)), worldPos)
+      );
+    }
   }
   /** @internal */
   static getLightPositionAndRange(
