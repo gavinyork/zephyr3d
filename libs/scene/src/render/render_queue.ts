@@ -459,7 +459,7 @@ export class RenderQueue {
             const drawable = drawables[i];
             const instanceUniforms = drawable.getInstanceUniforms();
             const instanceUniformsSize = instanceUniforms?.length ?? 0;
-            const stride = 16 + instanceUniformsSize;
+            const stride = ShaderHelper.MATERIAL_INSTANCE_DATA_OFFSET * 4 + instanceUniformsSize;
             if (!bindGroup || bindGroup.offset + stride > maxBufferSizeInFloats) {
               bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(frameCounter, stride);
               item = {

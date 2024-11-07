@@ -141,7 +141,11 @@ export class MeshMaterial extends Material {
     const strideName = ShaderHelper.getInstanceDataStrideUniformName();
     const offsetName = ShaderHelper.getInstanceDataOffsetUniformName();
     return scope[uniformName].at(
-      pb.add(pb.mul(scope[strideName], instanceID), 4 + uniformIndex, scope[offsetName])
+      pb.add(
+        pb.mul(scope[strideName], instanceID),
+        ShaderHelper.MATERIAL_INSTANCE_DATA_OFFSET + uniformIndex,
+        scope[offsetName]
+      )
     );
   }
   /** Create material instance */

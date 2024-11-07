@@ -56,6 +56,7 @@ export class ShaderHelper {
   static readonly FOG_TYPE_SCATTER = 4;
   static readonly BILLBOARD_SPHERICAL = 1;
   static readonly BILLBOARD_SYLINDRAL = 2;
+  static readonly MATERIAL_INSTANCE_DATA_OFFSET = 4;
   /** @internal */
   static defaultSunDir = Vector3.one().inplaceNormalize();
   /** @internal */

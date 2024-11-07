@@ -136,7 +136,7 @@ export function mixinDrawable<
       if (uniforms) {
         instanceInfo.bindGroup.bindGroup.setRawData(
           ShaderHelper.getInstanceDataUniformName(),
-          (instanceInfo.offset + 16) * 4,
+          (instanceInfo.offset + ShaderHelper.MATERIAL_INSTANCE_DATA_OFFSET * 4) * 4,
           uniforms,
           0,
           uniforms.length
