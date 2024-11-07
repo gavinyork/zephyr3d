@@ -6,10 +6,10 @@ import {
   PerspectiveCamera,
   LambertMaterial,
   Mesh,
-  SpotLight,
   BoxShape,
   PlaneShape,
-  BatchGroup
+  BatchGroup,
+  DirectionalLight
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Inspector } from '@zephyr3d/inspector';
@@ -28,12 +28,9 @@ myApp.ready().then(async function () {
   // Turn off environment lighting
   scene.env.light.type = 'none';
 
-  // Create a spot light
-  const spotLight = new SpotLight(scene);
-  spotLight.cutoff = Math.PI * 0.2;
-  spotLight.range = 200;
-  spotLight.position.setXYZ(0, 10, 0);
-  spotLight.castShadow = true;
+  // Create a directional light
+  const light = new DirectionalLight(scene);
+  light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
   //
   const tex = myApp.device.createTexture2D('rgba8unorm', 1, 1);
@@ -44,10 +41,20 @@ myApp.ready().then(async function () {
   const boxMaterial = new LambertMaterial();
   boxMaterial.albedoColor = new Vector4(1, 1, 0, 1);
   const boxShape = new BoxShape({ size: 6 });
-  for (let i = 0; i < 16; i++) {
-    const box = new Mesh(scene, boxShape, boxMaterial);
-    box.parent = batchGroup;
-    box.position.setXYZ(Math.random() * 50 - 25, 3, Math.random() * 50 - 25);
+  const matlist: LambertMaterial[] = [];
+  for (let i = 0; i < 2; i++) {
+    if (i < 1) {
+      const mat = boxMaterial.createInstance();
+      mat.albedoColor = new Vector4(1, 1, 1, 1);
+      matlist.push(mat);
+      const box = new Mesh(scene, boxShape, mat);
+      box.parent = batchGroup;
+      box.position.setXYZ(Math.random() * 50 - 25, 3, Math.random() * 50 - 25);
+    } else {
+      const box = new Mesh(scene, boxShape, boxMaterial);
+      box.parent = batchGroup;
+      box.position.setXYZ(Math.random() * 50 - 25, 3, Math.random() * 50 - 25);
+    }
   }
   // Create floor
   const floorMaterial = new LambertMaterial();
@@ -81,19 +88,13 @@ myApp.ready().then(async function () {
 
   myApp.on('pointerup', (ev) => {
     if (ev.button === 2) {
-      if (floor.material === floorMaterial) {
-        floor.material = floorMaterial2;
-        floorMaterial.albedoTexture = floorMaterial.albedoTexture ? null : tex;
-      } else {
-        floor.material = floorMaterial;
-        floorMaterial2.albedoTexture = floorMaterial2.albedoTexture ? null : tex;
-      }
+      matlist[0].albedoColor = new Vector4(1, 0, 1, 1);
     }
   });
 
   myApp.on('tick', function () {
     // light rotation
-    spotLight.rotation.fromEulerAngle(-Math.PI / 6, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
+    light.rotation.fromEulerAngle(-Math.PI / 6, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
 
     camera.updateController();
     camera.render(scene);

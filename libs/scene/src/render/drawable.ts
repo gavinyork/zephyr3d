@@ -165,12 +165,31 @@ export interface BatchDrawable extends Drawable {
   /**
    * Gets the instance id of the object
    * @param renderPass - The render pass to which current drawing task belongs
+   * @internal
    */
   getInstanceId(renderPass: RenderPass): string;
   /**
    * Gets the instance uniforms
+   * @internal
    */
   getInstanceUniforms(): Float32Array;
+  /**
+   * Apply instance offset and stride to bind group
+   * @param renderQueue - The render queue to which the bind group belongs.
+   * @param stride - Instance stride
+   * @param offset - Instance offset
+   * @internal
+   */
   applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void;
+  /**
+   * Apply material uniforms of the drawable
+   * @param instanceInfo - Instance data information
+   * @internal
+   */
   applyMaterialUniforms(instanceInfo: DrawableInstanceInfo);
+  /**
+   * Apply material uniforms to all of the instance informations that the material belongs to
+   * @internal
+   */
+  applyMaterialUniformsAll();
 }

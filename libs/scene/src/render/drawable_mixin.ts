@@ -16,6 +16,7 @@ export interface IMixinDrawable {
   applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void;
   applyTransformUniforms(renderQueue: RenderQueue): void;
   applyMaterialUniforms(instanceInfo: DrawableInstanceInfo): void;
+  applyMaterialUniformsAll(): void;
   getObjectColor(): Vector4;
   bind(ctx: DrawContext): void;
 }
@@ -120,7 +121,17 @@ export function mixinDrawable<
         }
       }
     }
-    applyMaterialUniforms(instanceInfo: DrawableInstanceInfo): void {
+    applyMaterialUniformsAll() {
+      for (const ref of this._mdRenderQueueRef) {
+        if (ref.ref) {
+          const instanceInfo = ref.ref.getInstanceInfo(this as unknown as Drawable);
+          if (instanceInfo) {
+            this.applyMaterialUniforms(instanceInfo);
+          }
+        }
+      }
+    }
+    applyMaterialUniforms(instanceInfo: DrawableInstanceInfo) {
       const uniforms = (this as unknown as BatchDrawable).getInstanceUniforms();
       if (uniforms) {
         instanceInfo.bindGroup.bindGroup.setRawData(

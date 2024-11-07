@@ -59,6 +59,17 @@ export class RenderBundleWrapper {
     }
   }
   /** @internal */
+  static materialUniformsChanged(material: Material) {
+    const ownDrawables = this._materialContainer.get(material);
+    if (ownDrawables) {
+      for (const drawable of ownDrawables) {
+        if (drawable.isBatchable()) {
+          drawable.applyMaterialUniformsAll();
+        }
+      }
+    }
+  }
+  /** @internal */
   static materialAttached(material: Material, drawable: Drawable) {
     const ownDrawables = this._materialContainer.get(material);
     if (ownDrawables && !ownDrawables.has(drawable)) {

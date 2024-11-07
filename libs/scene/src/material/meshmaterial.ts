@@ -24,6 +24,7 @@ import { encodeNormalizedFloatToRGBA } from '../shaders';
 import { Application } from '../app';
 import { ShaderHelper } from './shader/helper';
 import { Vector2, Vector3, Vector4, applyMixins } from '@zephyr3d/base';
+import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 
 /**
  * Blending mode for mesh material
@@ -171,7 +172,7 @@ export class MeshMaterial extends Material {
             },
             set(value) {
               uniformsHolder[instanceIndex * 4 + 0] = value;
-              that[prop] = value;
+              RenderBundleWrapper.materialUniformsChanged(instance);
             }
           });
           break;
@@ -192,7 +193,7 @@ export class MeshMaterial extends Material {
               }
               uniformsHolder[instanceIndex * 4] = value.x;
               uniformsHolder[instanceIndex * 4 + 1] = value.y;
-              that[prop] = value;
+              RenderBundleWrapper.materialUniformsChanged(instance);
             }
           });
           break;
@@ -219,7 +220,7 @@ export class MeshMaterial extends Material {
               uniformsHolder[instanceIndex * 4] = value.x;
               uniformsHolder[instanceIndex * 4 + 1] = value.y;
               uniformsHolder[instanceIndex * 4 + 2] = value.z;
-              that[prop] = value;
+              RenderBundleWrapper.materialUniformsChanged(instance);
             }
           });
           break;
@@ -249,7 +250,7 @@ export class MeshMaterial extends Material {
               uniformsHolder[instanceIndex * 4 + 1] = value.y;
               uniformsHolder[instanceIndex * 4 + 2] = value.z;
               uniformsHolder[instanceIndex * 4 + 3] = value.w;
-              that[prop] = value;
+              RenderBundleWrapper.materialUniformsChanged(instance);
             }
           });
           break;
