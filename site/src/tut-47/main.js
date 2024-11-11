@@ -71,7 +71,7 @@ myApp.ready().then(async () => {
     }
   });
 
-  myApp.on('tick', (ev) => {
+  myApp.on('tick', () => {
     camera.updateController();
     camera.render(scene);
   });

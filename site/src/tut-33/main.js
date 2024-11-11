@@ -1,21 +1,35 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3 } from '@zephyr3d/base';
-import { Scene, AssetManager, Application, PerspectiveCamera, OrbitCameraController, panoramaToCubemap, Compositor, Tonemap } from '@zephyr3d/scene';
+import {
+  Scene,
+  AssetManager,
+  Application,
+  PerspectiveCamera,
+  OrbitCameraController,
+  panoramaToCubemap,
+  Compositor,
+  Tonemap
+} from '@zephyr3d/scene';
 
 const myApp = new Application({
   backend: backendWebGL2,
   canvas: document.querySelector('#my-canvas')
 });
 
-
-myApp.ready().then(async() => {
+myApp.ready().then(async () => {
   const device = myApp.device;
 
   // Create scene
   const scene = new Scene();
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, device.canvas.width / device.canvas.height, 1, 500);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    device.canvas.width / device.canvas.height,
+    1,
+    500
+  );
   camera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
@@ -38,8 +52,8 @@ myApp.ready().then(async() => {
   compositor.appendPostEffect(new Tonemap());
 
   // Reset aspect ratio when size was changed
-  myApp.on('resize', ev => {
-    camera.aspect = ev.width / ev.height;
+  myApp.on('resize', (width, height) => {
+    camera.aspect = width / height;
   });
 
   myApp.on('tick', function () {

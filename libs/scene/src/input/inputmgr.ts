@@ -148,7 +148,7 @@ export class InputManager {
       eventData.lastDown = false;
       eventData.lastClick = false;
       if (!that._callMiddlewares(ev)) {
-        that._app.dispatchEvent(ev);
+        that._app.dispatchEvent(ev.type as any, ev);
       }
     };
   }
@@ -159,7 +159,7 @@ export class InputManager {
       eventData.lastMoveX = ev.offsetX;
       eventData.lastMoveY = ev.offsetY;
       if (!that._callMiddlewares(ev)) {
-        that._app.dispatchEvent(ev);
+        that._app.dispatchEvent(ev.type as any, ev);
       }
     };
   }
@@ -177,7 +177,7 @@ export class InputManager {
       eventData.lastDownTime = Date.now();
       that._app.focus();
       if (!that._callMiddlewares(ev)) {
-        that._app.dispatchEvent(ev);
+        that._app.dispatchEvent(ev.type as any, ev);
       }
     };
   }
@@ -212,15 +212,15 @@ export class InputManager {
       eventData.lastMoveX = ev.offsetX;
       eventData.lastMoveY = ev.offsetY;
       if (!that._callMiddlewares(ev)) {
-        that._app.dispatchEvent(ev);
+        that._app.dispatchEvent(ev.type as any, ev);
       }
       if (emitClickEvent) {
         if (!that._callMiddlewares(ev, 'click')) {
-          that._app.dispatchEvent(ev, 'click');
+          that._app.dispatchEvent('click', ev);
         }
         if (emitDoubleClickEvent) {
           if (!that._callMiddlewares(ev, 'dblclick')) {
-            that._app.dispatchEvent(ev, 'dblclick');
+            that._app.dispatchEvent('dblclick', ev);
           }
           eventData.lastClick = false;
         } else {
@@ -236,7 +236,7 @@ export class InputManager {
     const that = this;
     return function (ev: KeyboardEvent) {
       if (!that._callMiddlewares(ev)) {
-        that._app.dispatchEvent(ev);
+        that._app.dispatchEvent(ev.type as any, ev);
       }
     };
   }
@@ -244,7 +244,7 @@ export class InputManager {
     const that = this;
     return function (ev: DragEvent) {
       if (!that._callMiddlewares(ev)) {
-        that._app.dispatchEvent(ev);
+        that._app.dispatchEvent(ev.type as any, ev);
       }
     };
   }
@@ -252,7 +252,7 @@ export class InputManager {
     const that = this;
     return function (ev: WheelEvent) {
       if (!that._callMiddlewares(ev)) {
-        that._app.dispatchEvent(ev);
+        that._app.dispatchEvent(ev.type as any);
       }
     };
   }

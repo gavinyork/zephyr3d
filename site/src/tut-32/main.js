@@ -7,15 +7,20 @@ const myApp = new Application({
   canvas: document.querySelector('#my-canvas')
 });
 
-
-myApp.ready().then(async() => {
+myApp.ready().then(async () => {
   const device = myApp.device;
 
   // Create scene
   const scene = new Scene();
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, device.canvas.width / device.canvas.height, 1, 500);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    device.canvas.width / device.canvas.height,
+    1,
+    500
+  );
   camera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
@@ -30,8 +35,8 @@ myApp.ready().then(async() => {
   scene.env.sky.skyboxTexture = skyboxTexture;
 
   // Reset aspect ratio when size was changed
-  myApp.on('resize', ev => {
-    camera.aspect = ev.width / ev.height;
+  myApp.on('resize', (width, height) => {
+    camera.aspect = width / height;
   });
 
   myApp.on('tick', function () {

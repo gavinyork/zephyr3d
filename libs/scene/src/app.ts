@@ -2,57 +2,30 @@ import { InputManager } from './input/inputmgr';
 import { makeEventTarget } from '@zephyr3d/base';
 import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
 
-/**
- * Event that will be fired every frame
- *
- * @remarks
- * This is where all the rendering work is done.
- *
- * @public
- */
-export class AppTickEvent {
-  type = 'tick';
-}
-
-/**
- * This event will be fired whenever the device size changes
- * @public
- */
-export class AppResizeEvent {
-  width: number;
-  height: number;
-  type: string;
-  constructor(width: number, height: number) {
-    this.type = 'resize';
-    this.width = width;
-    this.height = height;
-  }
-}
-
 type appEventMap = {
-  resize: AppResizeEvent;
-  tick: AppTickEvent;
-  click: PointerEvent;
-  dblclick: PointerEvent;
-  pointerdown: PointerEvent;
-  pointerup: PointerEvent;
-  pointermove: PointerEvent;
-  pointercancel: PointerEvent;
-  pointerenter: PointerEvent;
-  pointerleave: PointerEvent;
-  pointerover: PointerEvent;
-  pointerout: PointerEvent;
-  wheel: WheelEvent;
-  keydown: KeyboardEvent;
-  keyup: KeyboardEvent;
-  keypress: KeyboardEvent;
-  drag: DragEvent;
-  dragenter: DragEvent;
-  dragleave: DragEvent;
-  dragover: DragEvent;
-  dragstart: DragEvent;
-  dragend: DragEvent;
-  drop: DragEvent;
+  resize: [width: number, height: number];
+  tick: [];
+  click: [evt: PointerEvent];
+  dblclick: [evt: PointerEvent];
+  pointerdown: [evt: PointerEvent];
+  pointerup: [evt: PointerEvent];
+  pointermove: [evt: PointerEvent];
+  pointercancel: [evt: PointerEvent];
+  pointerenter: [evt: PointerEvent];
+  pointerleave: [evt: PointerEvent];
+  pointerover: [evt: PointerEvent];
+  pointerout: [evt: PointerEvent];
+  wheel: [evt: WheelEvent];
+  keydown: [evt: KeyboardEvent];
+  keyup: [evt: KeyboardEvent];
+  keypress: [evt: KeyboardEvent];
+  drag: [evt: DragEvent];
+  dragenter: [evt: DragEvent];
+  dragleave: [evt: DragEvent];
+  dragover: [evt: DragEvent];
+  dragstart: [evt: DragEvent];
+  dragend: [evt: DragEvent];
+  drop: [evt: DragEvent];
 };
 
 /**
@@ -101,7 +74,6 @@ export class Application extends makeEventTarget(Object)<appEventMap>() {
   private _device: AbstractDevice;
   private _inputManager: InputManager;
   private _ready: boolean;
-  private _drawEvent: AppTickEvent;
   private _logger: Logger;
   private _elapsed: number;
   private static _instance: Application;
@@ -124,7 +96,6 @@ export class Application extends makeEventTarget(Object)<appEventMap>() {
     this._inputManager = new InputManager(this);
     this._ready = false;
     this._elapsed = 0;
-    this._drawEvent = new AppTickEvent();
     this._logger = {
       log(text: string, mode?: LogMode) {
         if (mode === 'warn') {
@@ -190,8 +161,8 @@ export class Application extends makeEventTarget(Object)<appEventMap>() {
       }
       this._device.canvas.focus();
       this._inputManager.start();
-      this._device.on('resize', (ev) => {
-        this.dispatchEvent(new AppResizeEvent(ev.width, ev.height));
+      this._device.on('resize', (width, height) => {
+        this.dispatchEvent('resize', width, height);
       });
       this._ready = true;
     }
@@ -203,7 +174,7 @@ export class Application extends makeEventTarget(Object)<appEventMap>() {
       this.device.setFramebuffer(null);
       this.device.setViewport(null);
       this.device.setScissor(null);
-      this.dispatchEvent(this._drawEvent);
+      this.dispatchEvent('tick');
     }
   }
   /** Start running the rendering loop */

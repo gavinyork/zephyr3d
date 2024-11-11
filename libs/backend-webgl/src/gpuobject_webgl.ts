@@ -14,7 +14,7 @@ import type {
   GPUObject,
   AbstractDevice
 } from '@zephyr3d/device';
-import { genDefaultName, DeviceGPUObjectRenameEvent } from '@zephyr3d/device';
+import { genDefaultName } from '@zephyr3d/device';
 import type { WebGLDevice } from './device_webgl';
 import { makeEventTarget } from '@zephyr3d/base';
 
@@ -66,9 +66,9 @@ export abstract class WebGLGPUObject<T>
   }
   set name(val: string) {
     if (val !== this._name) {
-      const evt = new DeviceGPUObjectRenameEvent(this, this._name);
+      const lastName = this._name;
       this._name = val;
-      this._device.dispatchEvent(evt);
+      this._device.dispatchEvent('gpuobject_rename', this, lastName);
     }
   }
   isVertexLayout(): this is VertexLayout {

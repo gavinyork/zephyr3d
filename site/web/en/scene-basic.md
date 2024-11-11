@@ -168,8 +168,8 @@ myApp.ready().then(function () {
   // Creates a perspective camera
   const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
   // When the frame buffer size changes, reset the camera aspect ratio to avoid image distortion
-  myApp.on('resize', function(ev){
-    camera.aspect = ev.width / ev.height;
+  myApp.on('resize', function(width, height){
+    camera.aspect = width / height;
   });
   // Process the frame event
   myApp.on('tick', function(){

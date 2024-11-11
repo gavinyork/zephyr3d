@@ -61,7 +61,7 @@ myApp.ready().then(async () => {
     camera.pickPosY = ev.offsetY;
   });
 
-  myApp.on('tick', (ev) => {
+  myApp.on('tick', () => {
     camera.updateController();
     camera.render(scene);
     camera.pickResultAsync.then((pickResult) => {

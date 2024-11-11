@@ -7,7 +7,6 @@ import type {
   Texture2D,
   TextureFormat
 } from '@zephyr3d/device';
-import type { XForm } from '../scene/xform';
 import type { Camera } from '../camera/camera';
 import type { FogType, RenderPass } from '.';
 import type { DrawableInstanceInfo, InstanceData, RenderQueue, RenderQueueRef } from './render_queue';
@@ -119,7 +118,7 @@ export interface Drawable {
   /** Gets unique id of the drawable object */
   getId(): number;
   /** Gets the XForm of the object */
-  getXForm(): XForm;
+  getXForm(): SceneNode;
   /** Gets the instance color */
   getInstanceColor(): Vector4;
   /** If set, the pick target will be returned as the pick result  */

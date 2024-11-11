@@ -1201,7 +1201,7 @@ export interface SamplerOptions {
  * Base class for a GPU object
  * @public
  */
-export interface GPUObject<T = unknown> extends IEventTarget<{ disposed: null }> {
+export interface GPUObject<T = unknown> extends IEventTarget<{ disposed: [] }> {
   /** The object was created by which device */
   readonly device: AbstractDevice;
   /** The internal GPU object  */

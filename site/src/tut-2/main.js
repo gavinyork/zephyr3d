@@ -16,10 +16,16 @@ myApp.ready().then(function () {
   // Create scene
   const scene = new Scene();
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    myApp.device.canvas.width / myApp.device.canvas.height,
+    1,
+    100
+  );
   // Reset aspect ratio when size was changed
-  myApp.on('resize', function(ev){
-    camera.aspect = ev.width / ev.height;
+  myApp.on('resize', function (width, height) {
+    camera.aspect = width / height;
   });
   // Frame event handler
   myApp.on('tick', function () {

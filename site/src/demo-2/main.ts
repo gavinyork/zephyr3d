@@ -248,8 +248,8 @@ lightApp.ready().then(async () => {
   });
 
   let ui: Panel = null;
-  lightApp.on('resize', (ev) => {
-    camera.aspect = ev.width / ev.height;
+  lightApp.on('resize', (width, height) => {
+    camera.aspect = width / height;
   });
   lightApp.on('tick', () => {
     for (const f of animationFunctions) {

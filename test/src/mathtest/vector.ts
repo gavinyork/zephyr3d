@@ -1,7 +1,7 @@
 import type { Vector2 } from '@zephyr3d/base';
 import { Vector3, Vector4, Quaternion, Matrix3x3, Matrix4x4 } from '@zephyr3d/base';
-import { XForm } from '@zephyr3d/scene';
 import { assert, rand, randInt, randNonZero, numberEquals } from './common';
+import { Scene, SceneNode } from '@zephyr3d/scene';
 
 type VectorType = Vector2 | Vector3 | Vector4;
 interface VectorConstructor {
@@ -565,12 +565,13 @@ export function testXForm() {
     return arr;
   }
   const count = 10;
-  const xformArray = Array<XForm>(count);
+  const scene = new Scene();
+  const xformArray = Array<SceneNode>(count);
   const matrixArray = Array<Matrix4x4>(count);
   const mulArray = Array<Matrix4x4>(count);
   const invArray = Array<Matrix4x4>(count);
   for (let i = 0; i < count; i++) {
-    xformArray[i] = new XForm().reparent(xformArray[i - 1]);
+    xformArray[i] = new SceneNode(scene).reparent(xformArray[i - 1]);
     (xformArray[i] as any).__index__ = i;
     matrixArray[i] = Matrix4x4.identity();
   }

@@ -184,8 +184,8 @@
     // 创建相机
     const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
     // 当缓冲区大小发生变化时重新设置相机长宽比以避免图像变形
-    myApp.on('resize', function(ev){
-      camera.aspect = ev.width / ev.height;
+    myApp.on('resize', function(width, height){
+      camera.aspect = width / height;
     });
     // 添加帧事件处理
     myApp.on('tick', function(){

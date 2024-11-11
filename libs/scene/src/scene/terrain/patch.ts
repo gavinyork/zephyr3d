@@ -4,13 +4,13 @@ import { Primitive } from '../../render/primitive';
 import { Application } from '../../app';
 import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
 import type { BatchDrawable, Drawable, DrawContext, PickTarget } from '../../render/drawable';
-import type { XForm } from '../xform';
 import type { Camera } from '../../camera/camera';
 import type { Quadtree } from './quadtree';
 import type { Terrain } from './terrain';
 import { QUEUE_OPAQUE, RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import { mixinDrawable } from '../../render/drawable_mixin';
 import type { MeshMaterial } from '../../material';
+import type { SceneNode } from '..';
 
 /** @internal */
 export class TerrainPatchBase {
@@ -18,7 +18,7 @@ export class TerrainPatchBase {
   constructor(terrain: Terrain) {
     this._terrain = terrain;
   }
-  getXForm(): XForm<XForm<any>> {
+  getXForm(): SceneNode {
     return this._terrain;
   }
 }

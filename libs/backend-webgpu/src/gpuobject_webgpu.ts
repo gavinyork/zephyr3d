@@ -14,7 +14,7 @@ import type {
   GPUProgram,
   GPUObject
 } from '@zephyr3d/device';
-import { DeviceGPUObjectRenameEvent, genDefaultName } from '@zephyr3d/device';
+import { genDefaultName } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
 import { makeEventTarget } from '@zephyr3d/base';
 
@@ -68,9 +68,9 @@ export abstract class WebGPUObject<T>
   }
   set name(val: string) {
     if (val !== this._name) {
-      const evt = new DeviceGPUObjectRenameEvent(this, this._name);
+      const lastName = this._name;
       this._name = val;
-      this._device.dispatchEvent(evt);
+      this._device.dispatchEvent('gpuobject_rename', this, lastName);
     }
   }
   get queueState(): number {

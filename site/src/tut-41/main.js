@@ -1,6 +1,21 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, PerspectiveCamera, MeshMaterial, ShaderHelper, OrbitCameraController, Mesh, TorusShape, Compositor, Tonemap, AssetManager, applyMaterialMixins, DirectionalLight, mixinLight } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  PerspectiveCamera,
+  MeshMaterial,
+  ShaderHelper,
+  OrbitCameraController,
+  Mesh,
+  TorusShape,
+  Compositor,
+  Tonemap,
+  AssetManager,
+  applyMaterialMixins,
+  DirectionalLight,
+  mixinLight
+} from '@zephyr3d/scene';
 
 // 自定义Lambert材质
 // 我们需要混入mixinLight组件
@@ -29,7 +44,10 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
     scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
     scope.$outputs.worldNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
     scope.$outputs.texcoord = scope.$inputs.texcoord;
-    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    ShaderHelper.setClipSpacePosition(
+      scope,
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+    );
   }
   // FragmentShader实现
   fragmentShader(scope) {
@@ -40,7 +58,10 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
       scope.diffuseTexture = pb.tex2D().uniform(2);
       scope.$l.normal = this.calculateNormal(scope, scope.$inputs.worldPos, scope.$inputs.worldNorm);
       scope.$l.viewVec = pb.normalize(pb.sub(ShaderHelper.getCameraPosition(scope), scope.$inputs.worldPos));
-      scope.$l.diffuseColor = pb.mul(pb.textureSample(scope.diffuseTexture, scope.$inputs.texcoord), scope.diffuseColor);
+      scope.$l.diffuseColor = pb.mul(
+        pb.textureSample(scope.diffuseTexture, scope.$inputs.texcoord),
+        scope.diffuseColor
+      );
 
       //////// 此处与上一个例子不同，这里需要自行计算光照
 
@@ -62,11 +83,23 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
       // colorIntensity(vec4): xyz分量光源颜色，w分量光的强度
       // shadow(bool): 此光源是否投射阴影
       const that = this;
-      this.forEachLight(scope, function(type, posRange, dirCutoff, colorIntensity, shadow){
+      this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, shadow) {
         // 计算光线衰减
-        this.$l.lightAtten = that.calculateLightAttenuation(this, type, this.$inputs.worldPos, posRange, dirCutoff);
+        this.$l.lightAtten = that.calculateLightAttenuation(
+          this,
+          type,
+          this.$inputs.worldPos,
+          posRange,
+          dirCutoff
+        );
         // 计算片元到光源的方向
-        this.$l.lightDir = that.calculateLightDirection(this, type, this.$inputs.worldPos, posRange, dirCutoff);
+        this.$l.lightDir = that.calculateLightDirection(
+          this,
+          type,
+          this.$inputs.worldPos,
+          posRange,
+          dirCutoff
+        );
         // 经过衰减的光源颜色
         this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
         // Lambert光照模型
@@ -90,14 +123,14 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
     }
   }
   // 设置材质的Uniform常量
-  applyUniformValues(bindGroup, ctx, pass){
+  applyUniformValues(bindGroup, ctx, pass) {
     // 必须调用父类
     super.applyUniformValues(bindGroup, ctx, pass);
-    if (this.needFragmentColor(ctx)){
+    if (this.needFragmentColor(ctx)) {
       // 漫反射颜色
       bindGroup.setValue('diffuseColor', this.color);
       // 漫反射贴图（不可以是null）
-      bindGroup.setTexture('diffuseTexture', this.diffuseTexture)
+      bindGroup.setTexture('diffuseTexture', this.diffuseTexture);
     }
   }
 }
@@ -124,7 +157,13 @@ myApp.ready().then(async () => {
 
   new Mesh(scene, new TorusShape(), material);
 
-  const camera = new PerspectiveCamera(scene, Math.PI/3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 500);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
+    1,
+    500
+  );
   camera.lookAt(new Vector3(25, 15, 0), new Vector3(0, 0, 0), Vector3.axisPY());
   camera.controller = new OrbitCameraController();
   myApp.inputManager.use(camera.handleEvent.bind(camera));
@@ -132,11 +171,11 @@ myApp.ready().then(async () => {
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
 
-  myApp.on('resize', ev => {
-    camera.aspect = ev.width / ev.height;
+  myApp.on('resize', (width, height) => {
+    camera.aspect = width / height;
   });
 
-  myApp.on('tick', ev => {
+  myApp.on('tick', () => {
     camera.updateController();
     camera.render(scene, compositor);
   });

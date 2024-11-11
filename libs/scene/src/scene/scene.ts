@@ -11,23 +11,10 @@ import type { AnimationSet } from '../animation/animationset';
 import type { PickTarget } from '../render';
 
 /**
- * Event that will be fired when the scene needs to be updated
- * @public
- */
-export class SceneUpdateEvent {
-  static readonly NAME = 'sceneupdate' as const;
-  scene: Scene;
-  type = SceneUpdateEvent.NAME;
-  constructor(scene: Scene) {
-    this.scene = scene;
-  }
-}
-
-/**
  * Presents a world that manages a couple of objects that will be rendered
  * @public
  */
-export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEvent }>() {
+export class Scene extends makeEventTarget(Object)<{ sceneupdate: [Scene] }>() {
   /** @internal */
   private static _nextId = 0;
   /** @internal */
@@ -38,8 +25,6 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
   protected _nodePlaceList: Set<GraphNode>;
   /** @internal */
   protected _env: Environment;
-  /** @internal */
-  protected _updateEvent: SceneUpdateEvent;
   /** @internal */
   protected _updateFrame: number;
   /** @internal */
@@ -55,7 +40,6 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
     this._octree = new Octree(this, 8, 8);
     this._nodePlaceList = new Set();
     this._env = new Environment();
-    this._updateEvent = new SceneUpdateEvent(this);
     this._updateFrame = -1;
     this._animationSet = [];
     this._rootNode = new SceneNode(this);
@@ -187,7 +171,7 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: SceneUpdateEve
         }
       }
       // update scene objects first
-      this.dispatchEvent(this._updateEvent);
+      this.dispatchEvent('sceneupdate', this);
       this.updateNodePlacement(this._octree, this._nodePlaceList);
     }
   }

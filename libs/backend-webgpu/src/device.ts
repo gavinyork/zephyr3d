@@ -39,7 +39,7 @@ import type {
   DepthState,
   StencilState
 } from '@zephyr3d/device';
-import { getTextureFormatBlockSize, DeviceResizeEvent, BaseDevice } from '@zephyr3d/device';
+import { getTextureFormatBlockSize, BaseDevice } from '@zephyr3d/device';
 import type { WebGPUTextureSampler } from './sampler_webgpu';
 import { WebGPUProgram } from './gpuprogram_webgpu';
 import { WebGPUBindGroup } from './bindgroup_webgpu';
@@ -271,7 +271,7 @@ export class WebGPUDevice extends BaseDevice {
     this.setViewport(null);
     this.setScissor(null);
 
-    this.on('resize', (evt) => {
+    this.on('resize', () => {
       const width = Math.max(1, Math.round(this.canvas.clientWidth * this._dpr));
       const height = Math.max(1, Math.round(this.canvas.clientHeight * this._dpr));
       if (width !== this.canvas.width || height !== this.canvas.height) {
@@ -282,7 +282,7 @@ export class WebGPUDevice extends BaseDevice {
         this.setScissor(null);
       }
     });
-    this.dispatchEvent(new DeviceResizeEvent(this.canvas.clientWidth, this.canvas.clientHeight));
+    this.dispatchEvent('resize', this.canvas.clientWidth, this.canvas.clientHeight);
   }
   nextFrame(callback: () => void): number {
     this._commandQueue.finish().then(callback);

@@ -1,19 +1,35 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, PerspectiveCamera, DirectionalLight, Compositor, Tonemap, PBRMetallicRoughnessMaterial, BoxShape, Mesh, FPSCameraController } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  PerspectiveCamera,
+  DirectionalLight,
+  Compositor,
+  Tonemap,
+  PBRMetallicRoughnessMaterial,
+  BoxShape,
+  Mesh,
+  FPSCameraController
+} from '@zephyr3d/scene';
 
 const myApp = new Application({
   backend: backendWebGL2,
   canvas: document.querySelector('#my-canvas')
 });
 
-
-myApp.ready().then(async() => {
+myApp.ready().then(async () => {
   // Create scene
   const scene = new Scene();
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 600);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    myApp.device.canvas.width / myApp.device.canvas.height,
+    1,
+    600
+  );
   camera.lookAt(new Vector3(0, 8, 30), new Vector3(0, 8, 0), Vector3.axisPY());
   camera.controller = new FPSCameraController();
   myApp.inputManager.use(camera.handleEvent.bind(camera));
@@ -66,8 +82,8 @@ myApp.ready().then(async() => {
   compositor.appendPostEffect(new Tonemap());
 
   // Reset aspect ratio when size was changed
-  myApp.on('resize', ev => {
-    camera.aspect = ev.width / ev.height;
+  myApp.on('resize', (width, height) => {
+    camera.aspect = width / height;
   });
 
   myApp.on('tick', function () {

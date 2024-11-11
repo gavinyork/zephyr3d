@@ -2,7 +2,6 @@ import type { Vector4 } from '@zephyr3d/base';
 import { Vector2, applyMixins, nextPowerOf2 } from '@zephyr3d/base';
 import { Primitive } from '../../render/primitive';
 import type { BatchDrawable, Drawable, DrawContext, PickTarget } from '../../render/drawable';
-import type { XForm } from '../xform';
 import type { QuadtreeNode } from './quadtree';
 import type { Camera } from '../../camera/camera';
 import type {
@@ -16,13 +15,14 @@ import type { Terrain } from './terrain';
 import { GrassMaterial } from '../../material/grassmaterial';
 import { mixinDrawable } from '../../render/drawable_mixin';
 import type { MeshMaterial } from '../../material';
+import type { SceneNode } from '..';
 
 export class GrassClusterBase {
   protected _terrain: Terrain;
   constructor(terrain: Terrain) {
     this._terrain = terrain;
   }
-  getXForm(): XForm<XForm<any>> {
+  getXForm(): SceneNode {
     return this._terrain;
   }
 }

@@ -53,8 +53,8 @@ gltfApp.ready().then(async () => {
     ev.preventDefault();
     return false;
   });
-  gltfApp.on('resize', (ev) => {
-    gltfViewer.camera.aspect = ev.width / ev.height;
+  gltfApp.on('resize', (width, height) => {
+    gltfViewer.camera.aspect = width / height;
   });
   gltfApp.on('keyup', (ev) => {
     console.log(ev.code);
@@ -78,7 +78,7 @@ gltfApp.ready().then(async () => {
       gltfViewer.toggleShadow();
     }
   });
-  gltfApp.on('tick', (ev) => {
+  gltfApp.on('tick', () => {
     gltfViewer.camera.updateController();
     gltfViewer.render();
   });

@@ -6,7 +6,7 @@ import type { BatchDrawable, DrawContext, Drawable } from './drawable';
 import { ShaderHelper } from '../material';
 import type { DrawableInstanceInfo, RenderQueue, RenderQueueRef } from './render_queue';
 import { Application } from '../app';
-import type { Mesh, XForm } from '../scene';
+import type { Mesh, SceneNode } from '../scene';
 import { MaterialVaryingFlags } from '../values';
 
 export interface IMixinDrawable {
@@ -28,7 +28,7 @@ const drawableBindGroupTransfromTags = new WeakMap<BindGroup, number>();
 
 export function mixinDrawable<
   T extends GenericConstructor<{
-    getXForm(): XForm;
+    getXForm(): SceneNode;
   }>
 >(baseCls?: T): T & { new (...args: any[]): IMixinDrawable } {
   const cls = class extends baseCls {

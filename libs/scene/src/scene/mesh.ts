@@ -6,7 +6,6 @@ import { LambertMaterial } from '../material';
 import type { RenderPass, Primitive, BatchDrawable, DrawContext, PickTarget } from '../render';
 import { Application } from '../app';
 import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
-import type { XForm } from './xform';
 import type { Scene } from './scene';
 import type { BoundingBox, BoundingVolume } from '../utility/bounding_volume';
 import { QUEUE_OPAQUE } from '../values';
@@ -162,7 +161,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
         if (!Mesh._defaultBoxFrame) {
           Mesh._defaultBoxFrame = new BoxFrameShape({ size: 1 });
         }
-        this._boundingBoxNode = new Mesh(this._scene, Mesh._defaultBoxFrame).reparent(this);
+        this._boundingBoxNode = new Mesh(this._scene, Mesh._defaultBoxFrame);
+        this._boundingBoxNode.parent = this;
         this._boundingBoxNode.scale.set(this.getBoundingVolume().toAABB().size);
         this._boundingBoxNode.position.set(this.getBoundingVolume().toAABB().minPoint);
       }
@@ -277,7 +277,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * {@inheritDoc Drawable.getXForm}
    */
-  getXForm(): XForm {
+  getXForm(): SceneNode {
     // mesh transform should be ignored when skinned
     return this;
   }

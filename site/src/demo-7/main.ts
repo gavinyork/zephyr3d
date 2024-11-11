@@ -84,11 +84,11 @@ app.ready().then(async () => {
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
-  app.on('resize', (ev) => {
-    camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane());
+  app.on('resize', (width, height) => {
+    camera.aspect = width / height;
   });
 
-  app.on('tick', (ev) => {
+  app.on('tick', () => {
     camera.updateController();
     camera.render(scene, compositor);
   });

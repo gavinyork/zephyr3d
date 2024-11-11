@@ -93,13 +93,13 @@ app.ready().then(async () => {
   light.shadow.pcfKernelSize = 7;
   light.parent = lightSource;
 
-  app.on('resize', (ev) => {
-    camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane());
+  app.on('resize', (width, height) => {
+    camera.aspect = width / height;
   });
 
   let t = 0;
   let a = 0;
-  app.on('tick', (ev) => {
+  app.on('tick', () => {
     const elapsed = app.device.frameInfo.elapsedOverall;
     if (t === 0) {
       t = elapsed;

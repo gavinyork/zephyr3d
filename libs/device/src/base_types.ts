@@ -2327,86 +2327,6 @@ export interface GPUProgramConstructParams {
 }
 
 /**
- * Event that will be fired when device is lost
- * @public
- */
-export class DeviceLostEvent {
-  /** The event name */
-  static readonly NAME = 'devicelost' as const;
-  type = DeviceLostEvent.NAME;
-}
-
-/**
- * Event that will be fired when device has just been restored
- * @public
- */
-export class DeviceRestoreEvent {
-  /** The event name */
-  static readonly NAME = 'devicerestored' as const;
-  type = DeviceRestoreEvent.NAME;
-}
-
-/**
- * Event that will be fired when size of back buffer has changed
- * @public
- */
-export class DeviceResizeEvent {
-  /** The event name */
-  static readonly NAME = 'resize' as const;
-  width: number;
-  height: number;
-  type = DeviceResizeEvent.NAME;
-  constructor(width: number, height: number) {
-    this.width = width;
-    this.height = height;
-  }
-}
-
-/**
- * Event that will be fired when any gpu object is created
- * @public
- */
-export class DeviceGPUObjectAddedEvent {
-  /** the event name */
-  static readonly NAME = 'gpuobject_added' as const;
-  object: GPUObject;
-  type = DeviceGPUObjectAddedEvent.NAME;
-  constructor(obj: GPUObject) {
-    this.object = obj;
-  }
-}
-
-/**
- * Event that will be fired when any gpu object is disposed
- * @public
- */
-export class DeviceGPUObjectRemovedEvent {
-  /** The event name */
-  static readonly NAME: 'gpuobject_removed' = 'gpuobject_removed' as const;
-  object: GPUObject;
-  type = DeviceGPUObjectRemovedEvent.NAME;
-  constructor(obj: GPUObject) {
-    this.object = obj;
-  }
-}
-
-/**
- * Event that will be fired when any gpu object name is changed
- * @public
- */
-export class DeviceGPUObjectRenameEvent {
-  /** The event name */
-  static readonly NAME: 'gpuobject_rename' = 'gpuobject_rename' as const;
-  object: GPUObject;
-  lastName: string;
-  type = DeviceGPUObjectRenameEvent.NAME;
-  constructor(obj: GPUObject, lastName: string) {
-    this.object = obj;
-    this.lastName = lastName;
-  }
-}
-
-/**
  * Creation options for device
  * @public
  */
@@ -2422,12 +2342,12 @@ export interface DeviceOptions {
  * @public
  */
 export type DeviceEventMap = {
-  [DeviceResizeEvent.NAME]: DeviceResizeEvent;
-  [DeviceLostEvent.NAME]: DeviceLostEvent;
-  [DeviceRestoreEvent.NAME]: DeviceRestoreEvent;
-  [DeviceGPUObjectAddedEvent.NAME]: DeviceGPUObjectAddedEvent;
-  [DeviceGPUObjectRemovedEvent.NAME]: DeviceGPUObjectRemovedEvent;
-  [DeviceGPUObjectRenameEvent.NAME]: DeviceGPUObjectRenameEvent;
+  resize: [width: number, height: number];
+  devicelost: [];
+  devicerestored: [];
+  gpuobject_added: [obj: GPUObject];
+  gpuobject_removed: [obj: GPUObject];
+  gpuobject_rename: [obj: GPUObject, lastName: string];
 };
 
 /**

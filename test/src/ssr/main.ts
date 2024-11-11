@@ -80,8 +80,8 @@ ssrApp.ready().then(async () => {
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
-  ssrApp.on('resize', (ev) => {
-    camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane());
+  ssrApp.on('resize', (width, height) => {
+    camera.setPerspective(camera.getFOV(), width / height, camera.getNearPlane(), camera.getFarPlane());
   });
 
   ssrApp.device.canvas.addEventListener('pointermove', (ev) => {
@@ -89,7 +89,7 @@ ssrApp.ready().then(async () => {
     camera.pickPosY = ev.offsetY;
   });
 
-  ssrApp.on('tick', (ev) => {
+  ssrApp.on('tick', () => {
     camera.updateController();
     camera.render(scene, compositor);
     imGuiNewFrame();

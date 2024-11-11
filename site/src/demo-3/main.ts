@@ -56,10 +56,10 @@ terrainApp.ready().then(async () => {
       demo.toggleGUI();
     }
   });
-  terrainApp.on('resize', (ev) => {
-    demo.camera.aspect = ev.width / ev.height;
+  terrainApp.on('resize', (width, height) => {
+    demo.camera.aspect = width / height;
   });
-  terrainApp.on('tick', (ev) => {
+  terrainApp.on('tick', () => {
     demo.render();
   });
   demo.load();

@@ -78,8 +78,8 @@ PhysicsApp.ready().then(async () => {
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
 
-  PhysicsApp.on('resize', (ev) => {
-    camera.aspect = ev.width / ev.height;
+  PhysicsApp.on('resize', (width, height) => {
+    camera.aspect = width / height;
   });
   PhysicsApp.on('keydown', (ev) => {
     if (ev.code === 'Space') {

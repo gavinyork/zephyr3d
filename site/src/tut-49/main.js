@@ -57,7 +57,7 @@ myApp.ready().then(async () => {
 
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
-  myApp.on('tick', (ev) => {
+  myApp.on('tick', () => {
     camera.updateController();
     camera.render(scene, compositor);
   });

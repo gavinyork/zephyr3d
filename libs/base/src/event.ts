@@ -4,19 +4,13 @@ import type { GenericConstructor } from './utils';
  * Mapping table of event types and their constructors
  * @public
  */
-export type EventMap = Record<string, any>;
-
-/**
- * Get the constructor type bye event type
- * @public
- */
-export type EventType<T extends EventMap> = T[keyof T];
+export type EventMap = Record<string, any[]>;
 
 /**
  * Event handler type
  * @public
  */
-export type EventListener<T extends EventMap, K extends keyof T> = (evt: T[K]) => void | Promise<void>;
+export type EventListener<T extends EventMap, K extends keyof T> = (...args: T[K]) => void | Promise<void>;
 
 /**
  * Options of event handler
@@ -27,13 +21,13 @@ export type REventHandlerOptions = {
   context?: unknown;
 };
 
-type EventListenerMap<T extends EventMap> = Partial<{
-  [type: string]: {
-    handler: EventListener<T, any>;
+type EventListenerMap<T extends EventMap> = {
+  [K in keyof T]?: {
+    handler: EventListener<T, K>;
     options: REventHandlerOptions;
     removed: boolean;
   }[];
-}>;
+};
 
 /**
  * The event target interface
@@ -65,7 +59,7 @@ export interface IEventTarget<T extends EventMap = any> {
    * @param evt - The event object to be dispatch.
    * @returns false if the event was canceled, otherwise true
    */
-  dispatchEvent(evt: T[keyof T], type?: string & keyof T): void;
+  dispatchEvent<K extends keyof T>(type: K, ...args: T[K]): void;
 }
 
 /**
@@ -108,8 +102,8 @@ export function makeEventTarget<C extends GenericConstructor | ObjectConstructor
       /**
        * {@inheritDoc IEventTarget.dispatchEvent}
        */
-      dispatchEvent(evt: I[keyof I], type?: string & keyof I): void {
-        this._invokeLocalListeners(evt, type);
+      dispatchEvent<K extends keyof I>(type: K, ...args: I[K]): void {
+        this._invokeLocalListeners(type, ...args);
       }
       /** @internal */
       _internalAddEventListener<K extends keyof I>(
@@ -161,15 +155,15 @@ export function makeEventTarget<C extends GenericConstructor | ObjectConstructor
         }
       }
       /** @internal */
-      _invokeLocalListeners(evt: EventType<I>, type?: string) {
+      _invokeLocalListeners<K extends keyof I>(type: keyof I, ...args: I[K]) {
         if (!this._listeners) {
           return;
         }
-        const handlers = this._listeners[type ?? evt?.type];
+        const handlers = this._listeners[type];
         if (handlers && handlers.length > 0) {
           const handlersCopy = handlers.slice();
           for (const handler of handlersCopy) {
-            handler.handler.call(handler.options?.context || this, evt);
+            handler.handler.call(handler.options?.context || this, ...args);
             if (handler.options.once) {
               handler.removed = true;
             }

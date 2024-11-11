@@ -588,7 +588,7 @@ export class ShadowMapper {
   /** @internal */
   protected createLightCameraPoint(lightCamera: Camera): void {
     //lightCamera.reparent(this._light);
-    lightCamera.reparent(lightCamera.scene.rootNode);
+    lightCamera.parent = lightCamera.scene.rootNode;
     lightCamera.position.setXYZ(0, 0, 0);
     lightCamera.rotation.identity();
     lightCamera.scale.setXYZ(1, 1, 1);
@@ -602,7 +602,7 @@ export class ShadowMapper {
   }
   /** @internal */
   protected createLightCameraSpot(lightCamera: Camera): void {
-    lightCamera.reparent(this._light);
+    lightCamera.parent = this._light;
     lightCamera.position.setXYZ(0, 0, 0);
     lightCamera.rotation.identity();
     lightCamera.scale.setXYZ(1, 1, 1);
@@ -897,7 +897,7 @@ export class ShadowMapper {
         const shadowMapRenderCamera = ShadowMapper.fetchCameraForScene(scene);
         const shadowMapCullCamera = ShadowMapper.fetchCameraForScene(scene);
         shadowMapCullCamera.clipMask = AABB.ClipLeft | AABB.ClipRight | AABB.ClipBottom | AABB.ClipTop;
-        cascadeCamera.reparent(camera);
+        cascadeCamera.parent = camera;
         shadowMapParams.depthClampEnabled =
           Application.instance.device.getDeviceCaps().shaderCaps.supportFragmentDepth;
         for (let split = 0; split < this._config.numCascades; split++) {

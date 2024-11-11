@@ -1,6 +1,15 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3 } from '@zephyr3d/base';
-import { Scene, Application, PerspectiveCamera, OrbitCameraController, Mesh, DirectionalLight, BoxShape, LambertMaterial } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  PerspectiveCamera,
+  OrbitCameraController,
+  Mesh,
+  DirectionalLight,
+  BoxShape,
+  LambertMaterial
+} from '@zephyr3d/scene';
 
 const myApp = new Application({
   backend: backendWebGL2,
@@ -18,13 +27,19 @@ myApp.ready().then(async () => {
 
   const boxShape = new BoxShape();
   const material = new LambertMaterial();
-  const mesh = new Mesh(scene, boxShape, material);
-  const camera = new PerspectiveCamera(scene, Math.PI/3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 500);
+  new Mesh(scene, boxShape, material);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
+    1,
+    500
+  );
   camera.lookAt(new Vector3(0, 0, 4), new Vector3(0, 0, 0), Vector3.axisPY());
   camera.controller = new OrbitCameraController();
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
-  myApp.on('tick', ev => {
+  myApp.on('tick', () => {
     camera.updateController();
     // Obtain the canvas width in CSS pixels
     const canvasWidth = myApp.device.deviceToScreen(myApp.device.canvas.width);
@@ -32,11 +47,11 @@ myApp.ready().then(async () => {
     const canvasHeight = myApp.device.deviceToScreen(myApp.device.canvas.height);
     // Full-screen rendering
     camera.viewport = [0, 0, canvasWidth, canvasHeight];
-    camera.aspect = camera.viewport[2]/camera.viewport[3];
+    camera.aspect = camera.viewport[2] / camera.viewport[3];
     camera.render(scene);
     // Picture-in-Picture Rendering
     camera.viewport = [30, 30, 200, 160];
-    camera.aspect = camera.viewport[2]/camera.viewport[3];
+    camera.aspect = camera.viewport[2] / camera.viewport[3];
     camera.render(scene);
   });
 

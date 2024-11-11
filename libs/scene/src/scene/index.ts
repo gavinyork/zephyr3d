@@ -8,5 +8,4 @@ export * from './scene_node';
 export * from './batchgroup';
 export * from './scene';
 export * from './terrain';
-export * from './xform';
 export * from './visitor';

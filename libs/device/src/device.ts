@@ -1,4 +1,4 @@
-import type { Vector4, TypedArray, IEventTarget } from '@zephyr3d/base';
+import { type Vector4, type TypedArray, type IEventTarget, makeEventTarget } from '@zephyr3d/base';
 import type { ITimer } from './timer';
 import { CPUTimer } from './timer';
 import type {
@@ -46,7 +46,6 @@ import {
 } from './gpuobject';
 import type { PBComputeOptions, PBRenderOptions, PBStructTypeInfo } from './builder';
 import { ProgramBuilder } from './builder';
-import { DeviceResizeEvent, DeviceGPUObjectAddedEvent, DeviceGPUObjectRemovedEvent } from './base_types';
 import type {
   DataType,
   PrimitiveType,
@@ -88,7 +87,7 @@ type DeviceState = {
  * Base class for rendering device
  * @public
  */
-export abstract class BaseDevice {
+export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>() {
   protected _canvas: HTMLCanvasElement;
   protected _canvasClientWidth: number;
   protected _canvasClientHeight: number;
@@ -111,6 +110,7 @@ export abstract class BaseDevice {
   protected _vSync: boolean;
   private _stateStack: DeviceState[];
   constructor(cvs: HTMLCanvasElement, backend: DeviceBackend) {
+    super();
     this._backend = backend;
     this._gpuObjectList = {
       textures: [],
@@ -395,7 +395,7 @@ export abstract class BaseDevice {
           this._disposeObjectList.push(obj);
         }
       }
-      obj.dispatchEvent(null, 'disposed');
+      obj.dispatchEvent('disposed');
     }
   }
   async restoreObject(obj: GPUObject) {
@@ -624,7 +624,7 @@ export abstract class BaseDevice {
     const list = this.getGPUObjectList(obj);
     if (list && list.indexOf(obj) < 0) {
       list.push(obj);
-      this.dispatchEvent(new DeviceGPUObjectAddedEvent(obj));
+      this.dispatchEvent('gpuobject_added', obj);
     }
   }
   removeGPUObject(obj: GPUObject) {
@@ -633,7 +633,7 @@ export abstract class BaseDevice {
       const index = list.indexOf(obj);
       if (index >= 0) {
         list.splice(index, 1);
-        this.dispatchEvent(new DeviceGPUObjectRemovedEvent(obj));
+        this.dispatchEvent('gpuobject_removed', obj);
       }
     }
   }
@@ -650,7 +650,7 @@ export abstract class BaseDevice {
     ) {
       this._canvasClientWidth = this._canvas.clientWidth;
       this._canvasClientHeight = this._canvas.clientHeight;
-      this.dispatchEvent(new DeviceResizeEvent(this._canvasClientWidth, this._canvasClientHeight));
+      this.dispatchEvent('resize', this._canvasClientWidth, this._canvasClientHeight);
     }
   }
   private _registerEventHandlers() {

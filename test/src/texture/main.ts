@@ -72,7 +72,7 @@ textureApp.ready().then(async () => {
   const caseVideo = new TestTextureVideo(assetManager, './assets/images/sample-video.mp4');
   await caseVideo.init();
 
-  textureApp.on('tick', (ev) => {
+  textureApp.on('tick', () => {
     device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
     device.pushDeviceStates();
     {

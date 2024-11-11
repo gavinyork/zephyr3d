@@ -189,8 +189,8 @@ myApp.ready().then(async function () {
 
   new Panel(camera, meshes);
 
-  myApp.on('resize', (ev) => {
-    camera.aspect = ev.width / ev.height;
+  myApp.on('resize', (width, height) => {
+    camera.aspect = width / height;
   });
 
   myApp.on('tick', function () {

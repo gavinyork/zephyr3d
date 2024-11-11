@@ -113,11 +113,11 @@ myApp.ready().then(async () => {
   const assetManager = new AssetManager();
   loadTerrain(scene, assetManager);
 
-  myApp.on('resize', (ev) => {
-    camera.aspect = ev.width / ev.height;
+  myApp.on('resize', (width, height) => {
+    camera.aspect = width / height;
   });
 
-  myApp.on('tick', (ev) => {
+  myApp.on('tick', () => {
     camera.updateController();
     camera.render(scene, compositor);
   });

@@ -55,9 +55,6 @@ import {
   getTextureFormatBlockSize,
   isCompressedTextureFormat,
   hasDepthChannel,
-  DeviceLostEvent,
-  DeviceRestoreEvent,
-  DeviceResizeEvent,
   BaseDevice,
   PBPrimitiveType,
   PBPrimitiveTypeInfo
@@ -366,7 +363,7 @@ export class WebGLDevice extends BaseDevice {
   }
   async initContext() {
     this.initContextState();
-    this.on('resize', (evt) => {
+    this.on('resize', () => {
       const width = Math.max(1, Math.round(this.canvas.clientWidth * this._dpr));
       const height = Math.max(1, Math.round(this.canvas.clientHeight * this._dpr));
       if (width !== this.canvas.width || height !== this.canvas.height) {
@@ -376,7 +373,7 @@ export class WebGLDevice extends BaseDevice {
         this.setScissor(this._currentScissorRect);
       }
     });
-    this.dispatchEvent(new DeviceResizeEvent(this.canvas.clientWidth, this.canvas.clientHeight));
+    this.dispatchEvent('resize', this.canvas.clientWidth, this.canvas.clientHeight);
   }
   clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number) {
     const gl = this._context;
@@ -1216,7 +1213,7 @@ export class WebGLDevice extends BaseDevice {
     this.exitLoop();
     console.log('handle context lost');
     this.invalidateAll();
-    this.dispatchEvent(new DeviceLostEvent());
+    this.dispatchEvent('devicelost');
   }
   /** @internal */
   private handleContextRestored() {
@@ -1234,7 +1231,7 @@ export class WebGLDevice extends BaseDevice {
     if (this._isRendering) {
       this._isRendering = false;
       this.reloadAll().then(() => {
-        this.dispatchEvent(new DeviceRestoreEvent());
+        this.dispatchEvent('devicerestored');
         this.runLoop(this.runLoopFunction);
       });
     }

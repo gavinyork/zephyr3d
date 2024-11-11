@@ -589,7 +589,7 @@ export class AssetManager {
           meshNode.showState = 'inherit';
           meshNode.primitive = subMesh.primitive;
           meshNode.material = instancing ? subMesh.material.createInstance() : subMesh.material;
-          meshNode.reparent(node);
+          meshNode.parent = node;
           subMesh.mesh = meshNode;
           processMorphData(subMesh, meshData.morphWeights);
           if (skeleton) {
@@ -603,7 +603,7 @@ export class AssetManager {
         }
       }
     }
-    node.reparent(parent);
+    node.parent = parent;
     for (const child of assetNode.children) {
       this.setAssetNodeToSceneNode(scene, node, model, child, skeletonMeshMap, nodeMap, instancing);
     }
