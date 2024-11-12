@@ -66,7 +66,7 @@ export function mixinDrawable<
         const frame = Application.instance.device.frameInfo.frameCounter;
         if (frame !== this._framestampBuffer[1]) {
           this._prevWorldMatrixBuffer.set(this._currentWorldMatrixBuffer);
-          this._framestampBuffer[0] = frame - 1;
+          this._framestampBuffer[0] = frame;
           this._framestampBuffer[1] = frame;
         }
         this._currentWorldMatrixBuffer.set(this.getXForm().worldMatrix);
@@ -132,9 +132,11 @@ export function mixinDrawable<
           drawableBindGroup.setValue(ShaderHelper.getWorldMatrixUniformName(), this._worldMatrixBuffer);
           drawableBindGroup.setValue(
             ShaderHelper.getPrevWorldMatrixUniformName(),
-            this._framestampBuffer[0] + 1 === this._framestampBuffer[1]
-              ? this._prevWorldMatrixBuffer
-              : this._currentWorldMatrixBuffer
+            this._prevWorldMatrixBuffer
+          );
+          drawableBindGroup.setValue(
+            ShaderHelper.getPrevWorldMatrixFrameUniformName(),
+            this._framestampBuffer[0]
           );
           if ((this as unknown as Drawable).getBoneMatrices()) {
             drawableBindGroup.setValue(

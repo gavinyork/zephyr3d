@@ -81,6 +81,7 @@ export class SceneRenderer {
       primaryCamera: camera,
       picking: false,
       oit: null,
+      motionVectors: device.type !== 'webgl',
       HiZ: camera.HiZ && device.type !== 'webgl',
       HiZTexture: null,
       globalBindGroupAllocator: GlobalBindGroupAllocator.get(),
@@ -194,6 +195,7 @@ export class SceneRenderer {
       oversizedViewport ||
       renderQueue.needSceneColor ||
       ctx.scene.env.needSceneDepthTexture() ||
+      ctx.motionVectors ||
       ctx.HiZ ||
       ctx.primaryCamera.oit ||
       ctx.compositor.requireLinearDepth(ctx)
@@ -206,12 +208,13 @@ export class SceneRenderer {
           : SSRCalcThickness
           ? 'rg32f'
           : 'r32f';
+      const mvFormat: TextureFormat = 'rg16f';
       if (!finalFramebuffer && !vp) {
         depthFramebuffer = device.pool.fetchTemporalFramebuffer(
           true,
           drawingBufferWidth,
           drawingBufferHeight,
-          format,
+          ctx.motionVectors ? [format, mvFormat] : format,
           ctx.depthFormat,
           ctx.HiZ
         );
@@ -222,7 +225,7 @@ export class SceneRenderer {
               true,
               originDepth.width,
               originDepth.height,
-              format,
+              ctx.motionVectors ? [format, mvFormat] : format,
               originDepth,
               ctx.HiZ
             )
@@ -230,7 +233,7 @@ export class SceneRenderer {
               true,
               ctx.viewportWidth,
               ctx.viewportHeight,
-              format,
+              ctx.motionVectors ? [format, mvFormat] : format,
               ctx.depthFormat,
               ctx.HiZ
             );

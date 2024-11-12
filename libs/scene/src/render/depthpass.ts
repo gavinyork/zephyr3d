@@ -36,7 +36,7 @@ export class DepthPass extends RenderPass {
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return `${Number(this._renderBackface)}:${Number(this._encodeDepth)}`;
+    return `${Number(this._renderBackface)}:${Number(this._encodeDepth)}:${Number(ctx.motionVectors)}`;
   }
   /** @internal */
   protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {

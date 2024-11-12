@@ -36,6 +36,7 @@ const UNIFORM_NAME_AERIALPERSPECTIVE_LUT = 'Z_UniformAerialPerspectiveLUT';
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
 const UNIFORM_NAME_WORLD_MATRIX = 'Z_UniformWorldMatrix';
 const UNIFORM_NAME_PREV_WORLD_MATRIX = 'Z_UniformPrevWorldMatrix';
+const UNIFORM_NAME_PREV_WORLD_MATRXI_FRAME = 'Z_UniformPrevWorldMatrixFrame';
 const UNIFORM_NAME_INSTANCE_DATA_STRIDE = 'Z_UniformInstanceDataStride';
 const UNIFORM_NAME_INSTANCE_DATA = 'Z_UniformInstanceData';
 const UNIFORM_NAME_INSTANCE_DATA_OFFSET = 'Z_UniformInstanceDataOffset';
@@ -96,6 +97,9 @@ export class ShaderHelper {
   }
   static getPrevWorldMatrixUniformName(): string {
     return UNIFORM_NAME_PREV_WORLD_MATRIX;
+  }
+  static getPrevWorldMatrixFrameUniformName(): string {
+    return UNIFORM_NAME_PREV_WORLD_MATRXI_FRAME;
   }
   static getInstanceDataUniformName(): string {
     return UNIFORM_NAME_INSTANCE_DATA;
@@ -573,6 +577,7 @@ export class ShaderHelper {
     } else {
       scope[UNIFORM_NAME_WORLD_MATRIX] = pb.mat4().uniform(1);
       scope[UNIFORM_NAME_PREV_WORLD_MATRIX] = pb.mat4().uniform(1);
+      scope[UNIFORM_NAME_PREV_WORLD_MATRXI_FRAME] = pb.int().uniform(1);
     }
     if (skinning) {
       scope[UNIFORM_NAME_BONE_MATRICES] = pb.tex2D().uniform(1).sampleType('unfilterable-float');

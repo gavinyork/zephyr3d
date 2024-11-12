@@ -42,6 +42,8 @@ export interface DrawContext {
   camera: Camera;
   /** OIT */
   oit: OIT;
+  /** motion vectors */
+  motionVectors: boolean;
   /** hierarchical depth */
   HiZ: boolean;
   /** hierarchical depth buffer */

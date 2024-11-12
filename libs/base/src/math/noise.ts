@@ -136,3 +136,21 @@ export function perlinNoise3D(
 ) {
   return interpolateNoise3(x * freqX, y * freqY, z * freqZ) * amp;
 }
+
+export function haltonNoise(length: number): [number, number][] {
+  function halton(base: number, index: number) {
+    let result = 0;
+    let f = 1;
+    while (index > 0) {
+      f /= base;
+      result += f * (index % base);
+      index = Math.floor(index / base);
+    }
+    return result;
+  }
+  const jitters: [number, number][] = [];
+  for (let i = 1; i <= length; i++) {
+    jitters.push([(halton(2, i) - 0.5) * 2, (halton(3, i) - 0.5) * 2]);
+  }
+  return jitters;
+}
