@@ -461,12 +461,6 @@ export class Demo {
         Vector3.scale(this._actorDirection, movement)
       );
       newPos.y = this._terrain.getElevation(newPos.x, newPos.z);
-      const oldPos = this._character.group.position;
-      console.log(
-        `(${oldPos.x.toFixed(2)},${oldPos.y.toFixed(2)},${oldPos.z.toFixed(2)})->(${newPos.x.toFixed(
-          2
-        )},${newPos.y.toFixed(2)},${newPos.z.toFixed(2)})`
-      );
       this._character.group.position.set(newPos);
       (this._camera.controller as OrbitCameraController).center = newPos;
     }

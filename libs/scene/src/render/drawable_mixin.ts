@@ -38,6 +38,10 @@ export function mixinDrawable<
     private _mdDrawableBindGroupSkin: BindGroup;
     private _mdDrawableBindGroupMorph: BindGroup;
     private _mdDrawableBindGroupSkinMorph: BindGroup;
+    private _worldMatrixBuffer: Float32Array;
+    private _framestampBuffer: Int32Array;
+    private _currentWorldMatrixBuffer: Float32Array;
+    private _prevWorldMatrixBuffer: Float32Array;
     private _id: number;
     private _objectColor: Vector4;
     constructor(...args: any[]) {
@@ -50,7 +54,22 @@ export function mixinDrawable<
       this._mdDrawableBindGroupSkin = null;
       this._mdDrawableBindGroupMorph = null;
       this._mdDrawableBindGroupSkinMorph = null;
-      this.getXForm().on('transformchanged', (node) => {
+      this._worldMatrixBuffer = new Float32Array(4 * 9);
+      this._framestampBuffer = new Int32Array(this._worldMatrixBuffer.buffer, 4 * 16);
+      this._currentWorldMatrixBuffer = this._worldMatrixBuffer.subarray(0, 16);
+      this._prevWorldMatrixBuffer = this._worldMatrixBuffer.subarray(20, 36);
+      this._currentWorldMatrixBuffer.set(this.getXForm().worldMatrix);
+      this._framestampBuffer[0] = Application.instance.device.frameInfo.frameCounter;
+      this._framestampBuffer[1] = this._framestampBuffer[0];
+      this._prevWorldMatrixBuffer.set(this.getXForm().worldMatrix);
+      this.getXForm().on('transformchanged', () => {
+        const frame = Application.instance.device.frameInfo.frameCounter;
+        if (frame !== this._framestampBuffer[1]) {
+          this._prevWorldMatrixBuffer.set(this._currentWorldMatrixBuffer);
+          this._framestampBuffer[0] = frame - 1;
+          this._framestampBuffer[1] = frame;
+        }
+        this._currentWorldMatrixBuffer.set(this.getXForm().worldMatrix);
         for (const ref of this._mdRenderQueueRef) {
           if (ref.ref) {
             this.applyTransformUniforms(ref.ref);
@@ -100,9 +119,9 @@ export function mixinDrawable<
           instanceInfo.bindGroup.bindGroup.setRawData(
             ShaderHelper.getInstanceDataUniformName(),
             instanceInfo.offset * 4,
-            this.getXForm().worldMatrix,
+            this._worldMatrixBuffer,
             0,
-            16
+            36
           );
           instanceBindGroupTransfromTags.set(instanceInfo, tag);
         }
@@ -110,7 +129,13 @@ export function mixinDrawable<
         const drawableBindGroup = this.getDrawableBindGroup(Application.instance.device, false, renderQueue);
         const tag = drawableBindGroupTransfromTags.get(drawableBindGroup) ?? -1;
         if (tag !== currentTag) {
-          drawableBindGroup.setValue(ShaderHelper.getWorldMatrixUniformName(), this.getXForm().worldMatrix);
+          drawableBindGroup.setValue(ShaderHelper.getWorldMatrixUniformName(), this._worldMatrixBuffer);
+          drawableBindGroup.setValue(
+            ShaderHelper.getPrevWorldMatrixUniformName(),
+            this._framestampBuffer[0] + 1 === this._framestampBuffer[1]
+              ? this._prevWorldMatrixBuffer
+              : this._currentWorldMatrixBuffer
+          );
           if ((this as unknown as Drawable).getBoneMatrices()) {
             drawableBindGroup.setValue(
               ShaderHelper.getBoneInvBindMatrixUniformName(),

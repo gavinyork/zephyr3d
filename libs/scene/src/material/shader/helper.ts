@@ -35,6 +35,7 @@ const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'Z_UniformLightIndexTex';
 const UNIFORM_NAME_AERIALPERSPECTIVE_LUT = 'Z_UniformAerialPerspectiveLUT';
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
 const UNIFORM_NAME_WORLD_MATRIX = 'Z_UniformWorldMatrix';
+const UNIFORM_NAME_PREV_WORLD_MATRIX = 'Z_UniformPrevWorldMatrix';
 const UNIFORM_NAME_INSTANCE_DATA_STRIDE = 'Z_UniformInstanceDataStride';
 const UNIFORM_NAME_INSTANCE_DATA = 'Z_UniformInstanceData';
 const UNIFORM_NAME_INSTANCE_DATA_OFFSET = 'Z_UniformInstanceDataOffset';
@@ -56,7 +57,7 @@ export class ShaderHelper {
   static readonly FOG_TYPE_SCATTER = 4;
   static readonly BILLBOARD_SPHERICAL = 1;
   static readonly BILLBOARD_SYLINDRAL = 2;
-  static readonly MATERIAL_INSTANCE_DATA_OFFSET = 4;
+  static readonly MATERIAL_INSTANCE_DATA_OFFSET = 9;
   /** @internal */
   static defaultSunDir = Vector3.one().inplaceNormalize();
   /** @internal */
@@ -92,6 +93,9 @@ export class ShaderHelper {
   };
   static getWorldMatrixUniformName(): string {
     return UNIFORM_NAME_WORLD_MATRIX;
+  }
+  static getPrevWorldMatrixUniformName(): string {
+    return UNIFORM_NAME_PREV_WORLD_MATRIX;
   }
   static getInstanceDataUniformName(): string {
     return UNIFORM_NAME_INSTANCE_DATA;
@@ -174,7 +178,8 @@ export class ShaderHelper {
       pb.mat4('viewMatrix'),
       pb.mat4('projectionMatrix'),
       pb.vec4('params'),
-      pb.float('roughnessFactor')
+      pb.float('roughnessFactor'),
+      pb.int('framestamp')
     ]);
     if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
       const lightStruct = pb.defineStruct([
@@ -567,6 +572,7 @@ export class ShaderHelper {
       scope[UNIFORM_NAME_INSTANCE_DATA] = pb.vec4[65536 >> 4]().uniformBuffer(3);
     } else {
       scope[UNIFORM_NAME_WORLD_MATRIX] = pb.mat4().uniform(1);
+      scope[UNIFORM_NAME_PREV_WORLD_MATRIX] = pb.mat4().uniform(1);
     }
     if (skinning) {
       scope[UNIFORM_NAME_BONE_MATRICES] = pb.tex2D().uniform(1).sampleType('unfilterable-float');
@@ -598,7 +604,8 @@ export class ShaderHelper {
       viewMatrix: camera.viewMatrix,
       projectionMatrix: camera.getProjectionMatrix(),
       params: new Vector4(camera.getNearPlane(), camera.getFarPlane(), flip ? -1 : 1, linear ? 0 : 1),
-      roughnessFactor: camera.SSR ? camera.ssrRoughnessFactor : 1
+      roughnessFactor: camera.SSR ? camera.ssrRoughnessFactor : 1,
+      framestamp: Application.instance.device.frameInfo.frameCounter
     };
     bindGroup.setValue(UNIFORM_NAME_GLOBAL, {
       camera: cameraStruct
@@ -710,6 +717,14 @@ export class ShaderHelper {
    */
   static getCameraRoughnessFactor(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_GLOBAL].camera.roughnessFactor;
+  }
+  /**
+   * Gets the uniform variable of type uint which holds the framestamp
+   * @param scope - Current shader scope
+   * @returns The framestamp
+   */
+  static getFramestamp(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].camera.framestamp;
   }
   /**
    * Discard the fragment if it was clipped by the clip plane
