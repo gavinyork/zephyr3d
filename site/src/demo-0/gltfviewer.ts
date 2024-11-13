@@ -26,6 +26,8 @@ import {
 } from '@zephyr3d/scene';
 import { EnvMaps } from './envmap';
 import { Panel } from './ui';
+import { Inspector } from '@zephyr3d/inspector';
+import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 
 declare global {
   const DracoDecoderModule: draco3d.DracoDecoderModule;
@@ -65,6 +67,7 @@ export class GLTFViewer {
   private _compositor: Compositor;
   private _dracoModule: draco3d.DecoderModule;
   private _bboxNoScale: AABB;
+  private _inspector: Inspector;
   constructor(scene: Scene) {
     const device = Application.instance.device;
     this._currentAnimation = null;
@@ -132,17 +135,22 @@ export class GLTFViewer {
     this._showGUI = true;
     this._showFloor = false;
     this._useScatter = false;
-    this._showInspector = false;
+    this._showInspector = true;
     this._dracoModule = null;
+    this._inspector = null;
   }
   async ready() {
     return new Promise<void>((resolve) => {
-      DracoDecoderModule({
-        onModuleLoaded: (module) => {
-          this._dracoModule = module;
-          Application.instance.inputManager.use(this._camera.handleEvent.bind(this._camera));
-          resolve();
-        }
+      imGuiInit(Application.instance.device).then(() => {
+        this._inspector = new Inspector(this._scene, this._compositor, this._camera);
+        Application.instance.inputManager.use(imGuiInjectEvent);
+        DracoDecoderModule({
+          onModuleLoaded: (module) => {
+            this._dracoModule = module;
+            Application.instance.inputManager.use(this._camera.handleEvent.bind(this._camera));
+            resolve();
+          }
+        });
       });
     });
   }
@@ -384,6 +392,11 @@ export class GLTFViewer {
       }
     }
     this._camera.render(this._scene, this._compositor);
+    if (this._showInspector) {
+      imGuiNewFrame();
+      this._inspector.render();
+      imGuiEndFrame();
+    }
   }
   lookAt() {
     const bbox = this._bboxNoScale;

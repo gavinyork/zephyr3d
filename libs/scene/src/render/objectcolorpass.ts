@@ -31,7 +31,7 @@ export class ObjectColorPass extends RenderPass {
       ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
       const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
       ctx.device.setBindGroup(0, bindGroup);
-      ShaderHelper.setCameraUniforms(bindGroup, ctx.camera, ctx.flip, true);
+      ShaderHelper.setCameraUniforms(bindGroup, ctx, true);
       const reverseWinding = ctx.camera.worldMatrixDet < 0;
       for (const list of [items.opaque, items.transmission, items.transparent, items.transmission_trans]) {
         if (list) {

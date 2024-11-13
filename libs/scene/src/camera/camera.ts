@@ -1,5 +1,5 @@
 import type { CubeFace, Plane } from '@zephyr3d/base';
-import { Matrix4x4, Frustum, Vector4, Vector3, Ray } from '@zephyr3d/base';
+import { Matrix4x4, Frustum, Vector4, Vector3, Ray, halton23 } from '@zephyr3d/base';
 import { SceneNode } from '../scene/scene_node';
 import { Application } from '../app';
 import type { Drawable, PickTarget } from '../render';
@@ -24,6 +24,8 @@ export type PickResult = {
  * @public
  */
 export class Camera extends SceneNode {
+  /** @internal */
+  private static _halton23 = halton23(16);
   /** @internal */
   protected _projMatrix: Matrix4x4;
   /** @internal */
@@ -67,6 +69,8 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _SSR: boolean;
   /** @internal */
+  protected _TAA: boolean;
+  /** @internal */
   protected _ssrParams: Vector4;
   /** @internal */
   protected _ssrMaxRoughness: number;
@@ -94,6 +98,12 @@ export class Camera extends SceneNode {
   protected _pickResultPromise: Promise<PickResult>;
   /** @internal */
   protected _pickResult: PickResult;
+  /** @internal */
+  protected _jitteredVPMatrix: Matrix4x4;
+  /** @internal */
+  protected _prevVPMatrix: Matrix4x4;
+  /** @internal */
+  protected _prevJitteredVPMatrix: Matrix4x4;
   /**
    * Creates a new camera node
    *
@@ -123,6 +133,7 @@ export class Camera extends SceneNode {
     this._pickPosY = 0;
     this._HiZ = false;
     this._SSR = false;
+    this._TAA = true;
     this._ssrParams = new Vector4(100, 120, 0.5, 0);
     this._ssrMaxRoughness = 0.8;
     this._ssrRoughnessFactor = 1;
@@ -134,6 +145,9 @@ export class Camera extends SceneNode {
     this._ssrBlurStdDev = 10;
     this._pickResult = null;
     this._commandBufferReuse = true;
+    this._jitteredVPMatrix = new Matrix4x4();
+    this._prevVPMatrix = null;
+    this._prevJitteredVPMatrix = null;
   }
   /** Clip plane in camera space */
   get clipPlane(): Plane {
@@ -152,6 +166,15 @@ export class Camera extends SceneNode {
   }
   set HiZ(val: boolean) {
     this._HiZ = !!val;
+  }
+  /**
+   * Gets whether TAA is enabled.
+   */
+  get TAA(): boolean {
+    return this._TAA;
+  }
+  set TAA(val: boolean) {
+    this._TAA = !!val;
   }
   /**
    * Gets whether Screen Space Reflections (SSR) is enabled.
@@ -601,12 +624,40 @@ export class Camera extends SceneNode {
    */
   render(scene: Scene, compositor?: Compositor) {
     const device = Application.instance.device;
+    const useTAA = device.type !== 'webgl' && this._TAA;
+    if (useTAA) {
+      const width = device.getDrawingBufferWidth();
+      const height = device.getDrawingBufferHeight();
+      const halton = Camera._halton23[device.frameInfo.frameCounter % Camera._halton23.length];
+      const jitterX = halton[0] / width;
+      const jitterY = halton[1] / height;
+      this._jitteredVPMatrix.set(this.getProjectionMatrix());
+      this._jitteredVPMatrix[8] += jitterX;
+      this._jitteredVPMatrix[9] += jitterY;
+      this._jitteredVPMatrix.multiplyRight(this.viewMatrix);
+      if (!this._prevJitteredVPMatrix) {
+        this._prevJitteredVPMatrix = new Matrix4x4();
+        this._prevJitteredVPMatrix.set(this._jitteredVPMatrix);
+      }
+      if (!this._prevVPMatrix) {
+        this._prevVPMatrix = new Matrix4x4();
+        this._prevVPMatrix.set(this.viewProjectionMatrix);
+      }
+    } else {
+      this._prevVPMatrix = null;
+      this._prevJitteredVPMatrix = null;
+      this._jitteredVPMatrix = null;
+    }
     device.pushDeviceStates();
     device.reverseVertexWindingOrder(false);
     device.setFramebuffer(this._framebuffer);
     SceneRenderer.setClearColor(this._clearColor);
     SceneRenderer.renderScene(scene, this, compositor);
     device.popDeviceStates();
+    if (useTAA) {
+      this._prevJitteredVPMatrix.set(this._jitteredVPMatrix);
+      this._prevVPMatrix.set(this.viewProjectionMatrix);
+    }
   }
   /**
    * Updates the controller state
@@ -619,6 +670,18 @@ export class Camera extends SceneNode {
    */
   resetController() {
     this._controller?.reset();
+  }
+  /** @internal */
+  get jitteredVPMatrix() {
+    return this._jitteredVPMatrix;
+  }
+  /** @internal */
+  get prevJitteredVPMatrix() {
+    return this._prevJitteredVPMatrix;
+  }
+  /** @internal */
+  get prevVPMatrix() {
+    return this._prevVPMatrix;
   }
   /** @internal */
   private setController(controller: BaseCameraController): this {

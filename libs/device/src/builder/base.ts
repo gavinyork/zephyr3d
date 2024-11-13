@@ -532,7 +532,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
             if (varType.isStructType()) {
               const elementIndex = varType.structMembers.findIndex((val) => val.name === prop);
               if (elementIndex < 0) {
-                throw new Error(`unknown struct member '${prop}'`);
+                return undefined;
               }
               const element = varType.structMembers[elementIndex];
               if (element.type.isStructType()) {

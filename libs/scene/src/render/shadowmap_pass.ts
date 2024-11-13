@@ -43,7 +43,7 @@ export class ShadowMapPass extends RenderPass {
       const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
       ctx.device.setBindGroup(0, bindGroup);
       ShaderHelper.setLightUniformsShadowMap(bindGroup, ctx, this._currentLight);
-      ShaderHelper.setCameraUniforms(bindGroup, ctx.camera, ctx.flip, true);
+      ShaderHelper.setCameraUniforms(bindGroup, ctx, true);
       const reverseWinding = ctx.camera.worldMatrixDet < 0;
       for (const lit of items.opaque.lit) {
         this.drawItemList(lit, ctx, reverseWinding);

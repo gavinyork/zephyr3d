@@ -48,7 +48,7 @@ export class LightPass extends RenderPass {
     ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
     const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
     if (!flags.cameraSet[ctx.renderPassHash]) {
-      ShaderHelper.setCameraUniforms(bindGroup, ctx.camera, ctx.flip, !!ctx.device.getFramebuffer());
+      ShaderHelper.setCameraUniforms(bindGroup, ctx, !!ctx.device.getFramebuffer());
       flags.cameraSet[ctx.renderPassHash] = 1;
     }
     if (ctx.currentShadowLight) {

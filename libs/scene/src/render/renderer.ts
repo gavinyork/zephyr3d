@@ -81,7 +81,7 @@ export class SceneRenderer {
       primaryCamera: camera,
       picking: false,
       oit: null,
-      motionVectors: device.type !== 'webgl',
+      motionVectors: device.type !== 'webgl' && camera.TAA,
       HiZ: camera.HiZ && device.type !== 'webgl',
       HiZTexture: null,
       globalBindGroupAllocator: GlobalBindGroupAllocator.get(),
@@ -96,7 +96,16 @@ export class SceneRenderer {
       flip: false,
       drawEnvLight: false,
       env: null,
-      materialFlags: 0
+      materialFlags: 0,
+      TAA:
+        device.type !== 'webgl' && camera.TAA
+          ? {
+              jitteredVPMatrix: camera.jitteredVPMatrix,
+              VPMatrix: camera.viewProjectionMatrix,
+              prevJitteredVPMatrix: camera.prevJitteredVPMatrix,
+              prevVPMatrix: camera.prevVPMatrix
+            }
+          : null
     };
     scene.frameUpdate();
     if (camera && !device.isContextLost()) {

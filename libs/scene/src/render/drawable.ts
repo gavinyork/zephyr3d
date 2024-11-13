@@ -1,4 +1,4 @@
-import type { Vector4 } from '@zephyr3d/base';
+import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   ColorState,
@@ -108,6 +108,13 @@ export interface DrawContext {
   forceCullMode?: FaceMode;
   /** Force color mask state */
   forceColorState?: ColorState;
+  /** TAA related stuff */
+  TAA?: {
+    prevVPMatrix: Matrix4x4;
+    prevJitteredVPMatrix: Matrix4x4;
+    jitteredVPMatrix: Matrix4x4;
+    VPMatrix: Matrix4x4;
+  };
 }
 
 /**

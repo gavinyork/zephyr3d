@@ -26,7 +26,6 @@ import type {
 import { ProgramBuilder } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
 import { linearToGamma } from '../../shaders';
-import type { Camera } from '../../camera';
 import { Application } from '../../app';
 
 const UNIFORM_NAME_GLOBAL = 'Z_UniformGlobal';
@@ -180,8 +179,10 @@ export class ShaderHelper {
       pb.vec4('clipPlane'),
       pb.mat4('viewProjectionMatrix'),
       pb.mat4('viewMatrix'),
-      pb.mat4('projectionMatrix'),
       pb.vec4('params'),
+      ...(ctx.motionVectors && ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH
+        ? [pb.mat4('unjitteredVPMatrix'), pb.mat4('prevUnjitteredVPMatrix')]
+        : []),
       pb.float('roughnessFactor'),
       pb.int('framestamp')
     ]);
@@ -412,36 +413,46 @@ export class ShaderHelper {
    * Calculates the vertex position of type vec3 in object space
    *
    * @param scope - Current shader scope
-   * @param pos - Vertex position input, must be type of vec3, null if no vertex position input
    * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
    * @returns The calculated vertex position in object space, or null if pos is null
    */
-  static resolveVertexPosition(scope: PBInsideFunctionScope, pos?: PBShaderExp): PBShaderExp {
+  static resolveVertexPosition(scope: PBInsideFunctionScope): PBShaderExp {
     const pb = scope.$builder;
     if (pb.shaderKind !== 'vertex') {
       throw new Error(`ShaderHelper.resolveVertexPosition(): must be called at vertex stage`);
     }
-    const funcScope = pb.getCurrentFunctionScope();
-    if (!funcScope || !funcScope.$isMain()) {
-      throw new Error(`ShaderHelper.resolveVertexPosition(): must be called at entry function`);
+    if (!pb.getGlobalScope().$getVertexAttrib('position')) {
+      pb.getGlobalScope().$inputs.Z_pos = pb.vec3().attrib('position');
     }
-    if (!pos) {
-      if (!scope.$getVertexAttrib('position')) {
-        scope.$inputs.Z_pos = pb.vec3().attrib('position');
+    const that = this;
+    pb.func('Z_resolveVertexPosition', [], function () {
+      this.$l.pos = this.$getVertexAttrib('position');
+      if (that.hasMorphing(scope)) {
+        this.pos = pb.add(this.pos, that.calculateMorphDelta(this, MORPH_TARGET_POSITION).xyz);
       }
-      pos = scope.$getVertexAttrib('position');
-    }
-    if (this.hasMorphing(scope)) {
-      pos = pb.add(pos, this.calculateMorphDelta(scope, MORPH_TARGET_POSITION).xyz);
-    }
-    if (this.hasSkinning(scope)) {
-      if (!funcScope[this.SKIN_MATRIX_NAME]) {
-        funcScope[this.SKIN_MATRIX_NAME] = this.calculateSkinMatrix(funcScope);
+      if (that.hasSkinning(scope)) {
+        if (!this[that.SKIN_MATRIX_NAME]) {
+          this[that.SKIN_MATRIX_NAME] = that.calculateSkinMatrix(this);
+        }
+        this.pos = pb.mul(this[that.SKIN_MATRIX_NAME], pb.vec4(this.pos, 1)).xyz;
       }
-      return pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(pos, 1)).xyz;
-    } else {
-      return pos;
-    }
+      const unjitteredVPMatrix = that.getUnjitteredViewProjectionMatrix(this);
+      if (unjitteredVPMatrix) {
+        this.$l.unjitteredVPMatrix = unjitteredVPMatrix;
+        this.$l.worldPos = pb.mul(that.getWorldMatrix(this), pb.vec4(this.pos, 1));
+        this.$l.prevWorldPos = pb.mul(that.getPrevWorldMatrix(this), pb.vec4(this.pos, 1));
+        this.$outputs.zMotionVectorPosCurrent = pb.mul(this.unjitteredVPMatrix, this.worldPos);
+        this.$outputs.zMotionVectorPosPrev = pb.mul(
+          that.getPrevUnjitteredViewProjectionMatrix(this),
+          this.worldPos
+        );
+      }
+      this.$return(this.pos);
+    });
+    /*
+    return pos;
+    */
+    return scope.Z_resolveVertexPosition();
   }
   /**
    * Calculates the normal vector of type vec3 in object space
@@ -533,6 +544,37 @@ export class ShaderHelper {
     );
   }
   /**
+   * Gets the uniform variable of type mat4 which holds the world matrix at previous frame of current object to be drawn
+   * @param scope - Current shader scope
+   * @returns The world matrix at previous frame of current object to be drawn
+   */
+  static getPrevWorldMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+    const pb = scope.$builder;
+    const that = this;
+    const framestamp = this.getFramestamp(scope);
+    if (scope[UNIFORM_NAME_WORLD_MATRIX]) {
+      return scope.$choice(
+        pb.equal(framestamp, scope[UNIFORM_NAME_PREV_WORLD_MATRXI_FRAME]),
+        scope[UNIFORM_NAME_PREV_WORLD_MATRIX],
+        scope[UNIFORM_NAME_WORLD_MATRIX]
+      );
+    } else {
+      pb.func('Z_getPrevWorldMatrix', [pb.int('framestamp')], function () {
+        this.$l.prevFrame = pb.floatBitsToInt(that.getInstancedUniform(this, 4).x);
+        this.$l.index = this.$choice(pb.equal(this.framestamp, this.prevFrame), pb.int(5), pb.int(0));
+        this.$return(
+          pb.mat4(
+            that.getInstancedUniform(scope, this.index),
+            that.getInstancedUniform(scope, pb.add(this.index, 1)),
+            that.getInstancedUniform(scope, pb.add(this.index, 2)),
+            that.getInstancedUniform(scope, pb.add(this.index, 3))
+          )
+        );
+      });
+      return scope.Z_getPrevWorldMatrix(framestamp);
+    }
+  }
+  /**
    * Gets the instance uniform value of type vec4 by uniform index
    * @param scope - Current shader scope
    * @returns instance uniform value
@@ -543,7 +585,7 @@ export class ShaderHelper {
       pb.add(
         pb.mul(scope[UNIFORM_NAME_INSTANCE_DATA_STRIDE], pb.uint(scope.$builtins.instanceIndex)),
         scope[UNIFORM_NAME_INSTANCE_DATA_OFFSET],
-        uniformIndex
+        pb.uint(uniformIndex)
       )
     );
   }
@@ -600,18 +642,26 @@ export class ShaderHelper {
     );
   }
   /** @internal */
-  static setCameraUniforms(bindGroup: BindGroup, camera: Camera, flip: boolean, linear: boolean) {
-    const pos = camera.getWorldPosition();
+  static setCameraUniforms(bindGroup: BindGroup, ctx: DrawContext, linear: boolean) {
+    const pos = ctx.camera.getWorldPosition();
     const cameraStruct = {
-      position: new Vector4(pos.x, pos.y, pos.z, camera.clipPlane ? 1 : 0),
-      clipPlane: camera.clipPlane ?? Vector4.zero(),
-      viewProjectionMatrix: camera.viewProjectionMatrix,
-      viewMatrix: camera.viewMatrix,
-      projectionMatrix: camera.getProjectionMatrix(),
-      params: new Vector4(camera.getNearPlane(), camera.getFarPlane(), flip ? -1 : 1, linear ? 0 : 1),
-      roughnessFactor: camera.SSR ? camera.ssrRoughnessFactor : 1,
+      position: new Vector4(pos.x, pos.y, pos.z, ctx.camera.clipPlane ? 1 : 0),
+      clipPlane: ctx.camera.clipPlane ?? Vector4.zero(),
+      viewProjectionMatrix: ctx.TAA ? ctx.TAA.jitteredVPMatrix : ctx.camera.viewProjectionMatrix,
+      viewMatrix: ctx.camera.viewMatrix,
+      params: new Vector4(
+        ctx.camera.getNearPlane(),
+        ctx.camera.getFarPlane(),
+        ctx.flip ? -1 : 1,
+        linear ? 0 : 1
+      ),
+      roughnessFactor: ctx.camera.SSR ? ctx.camera.ssrRoughnessFactor : 1,
       framestamp: Application.instance.device.frameInfo.frameCounter
-    };
+    } as any;
+    if (ctx.motionVectors && ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
+      cameraStruct.unjitteredVPMatrix = ctx.camera.viewProjectionMatrix;
+      cameraStruct.prevUnjitteredVPMatrix = ctx.camera.prevVPMatrix;
+    }
     bindGroup.setValue(UNIFORM_NAME_GLOBAL, {
       camera: cameraStruct
     });
@@ -921,20 +971,28 @@ export class ShaderHelper {
     return scope[UNIFORM_NAME_GLOBAL].camera.viewProjectionMatrix;
   }
   /**
+   * Gets the uniform variable of type mat4 which holds the unjittered view projection matrix of current camera
+   * @param scope - Current shader scope
+   * @returns The unjittered view projection matrix of current camera
+   */
+  static getUnjitteredViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].camera.unjitteredVPMatrix;
+  }
+  /**
+   * Gets the uniform variable of type mat4 which holds the unjittered view projection at previous frame matrix of current camera
+   * @param scope - Current shader scope
+   * @returns The unjittered view projection matrix at previous frame of current camera
+   */
+  static getPrevUnjitteredViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].camera.prevUnjitteredVPMatrix;
+  }
+  /**
    * Gets the uniform variable of type mat4 which holds the view matrix of current camera
    * @param scope - Current shader scope
    * @returns The view matrix of current camera
    */
   static getViewMatrix(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_GLOBAL].camera.viewMatrix;
-  }
-  /**
-   * Gets the uniform variable of type mat4 which holds the projection matrix of current camera
-   * @param scope - Current shader scope
-   * @returns The projection matrix of current camera
-   */
-  static getProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.projectionMatrix;
   }
   /** @internal */
   static getCascadeDistances(scope: PBInsideFunctionScope): PBShaderExp {

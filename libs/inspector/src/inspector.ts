@@ -716,6 +716,14 @@ export class Inspector {
         }
         return val;
       });
+      ImGui.Checkbox('TAA', (val?: boolean) => {
+        if (val === undefined) {
+          val = camera.TAA;
+        } else {
+          camera.TAA = val;
+        }
+        return val;
+      });
       ImGui.SliderFloat(
         'NearPlane',
         (val?: number) => {

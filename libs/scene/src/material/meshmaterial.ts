@@ -557,6 +557,9 @@ export class MeshMaterial extends Material {
             this.$outputs.zSSRRoughness = pb.vec4();
             this.$outputs.zSSRNormal = pb.vec4();
           }
+          if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH && ctx.motionVectors) {
+            this.$outputs.zMotionVector = pb.vec4();
+          }
         }
         pb.main(function () {
           that.fragmentShader(this);
@@ -626,6 +629,23 @@ export class MeshMaterial extends Material {
           this.$outputs.zFragmentOutput = pb.vec4(0, this.depth, 0, 1);
         } else {
           this.$outputs.zFragmentOutput = pb.vec4(this.depth, 0, 0, 1);
+        }
+        if (that.drawContext.motionVectors) {
+          if (this.$inputs.zMotionVectorPosCurrent && this.$inputs.zMotionVectorPosPrev) {
+            this.$outputs.zMotionVector = pb.vec4(
+              pb.mul(
+                pb.sub(
+                  pb.div(this.$inputs.zMotionVectorPosCurrent.xy, this.$inputs.zMotionVectorPosCurrent.w),
+                  pb.div(this.$inputs.zMotionVectorPosPrev.xy, this.$inputs.zMotionVectorPosPrev.w)
+                ),
+                0.5
+              ),
+              0,
+              1
+            );
+          } else {
+            this.$outputs.zMotionVector = pb.vec4(0, 0, 0, 1);
+          }
         }
       } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
         if (color) {
