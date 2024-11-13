@@ -646,7 +646,6 @@ export class Camera extends SceneNode {
     } else {
       this._prevVPMatrix = null;
       this._prevJitteredVPMatrix = null;
-      this._jitteredVPMatrix = null;
     }
     device.pushDeviceStates();
     device.reverseVertexWindingOrder(false);

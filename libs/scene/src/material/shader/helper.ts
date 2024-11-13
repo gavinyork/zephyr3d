@@ -647,7 +647,12 @@ export class ShaderHelper {
     const cameraStruct = {
       position: new Vector4(pos.x, pos.y, pos.z, ctx.camera.clipPlane ? 1 : 0),
       clipPlane: ctx.camera.clipPlane ?? Vector4.zero(),
-      viewProjectionMatrix: ctx.TAA ? ctx.TAA.jitteredVPMatrix : ctx.camera.viewProjectionMatrix,
+      viewProjectionMatrix:
+        ctx.motionVectors &&
+        ctx.renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP &&
+        ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR
+          ? ctx.TAA.jitteredVPMatrix
+          : ctx.camera.viewProjectionMatrix,
       viewMatrix: ctx.camera.viewMatrix,
       params: new Vector4(
         ctx.camera.getNearPlane(),
