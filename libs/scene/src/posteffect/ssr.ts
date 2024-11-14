@@ -36,12 +36,6 @@ export class SSR extends AbstractPostEffect<'SSR'> {
   private static _renderStateZTestEqual: RenderStateSet = null;
   private static _blurBlitterH: BilateralBlurBlitter = null;
   private static _blurBlitterV: BilateralBlurBlitter = null;
-  private static _weights = [
-    0.1847392078702266, 0.16595854345772326, 0.12031364177766891, 0.07038755277896766, 0.03322925565155569,
-    0.012657819729901945, 0.0038903040680094217, 0.0009646503390864025, 0.00019297087402915717,
-    0.000031139936308099136, 0.000004053309048174758, 4.255228059965837e-7, 3.602517634249573e-8,
-    2.4592560765896795e-9, 1.3534945386863618e-10, 0
-  ];
 
   private _roughnessTex: Texture2D;
   private _normalTex: Texture2D;

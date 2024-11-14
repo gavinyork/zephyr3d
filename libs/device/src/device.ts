@@ -105,7 +105,8 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
   protected _backend: DeviceBackend;
   protected _beginFrameCounter: number;
   protected _programBuilder: ProgramBuilder;
-  protected _pool: Pool;
+  protected _poolMap: Map<string | Symbol, Pool>;
+  protected _defaultPoolKey: Symbol;
   protected _temporalFramebuffer: boolean;
   protected _vSync: boolean;
   private _stateStack: DeviceState[];
@@ -150,7 +151,10 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
     this._fpsCounter = { time: 0, frame: 0 };
     this._stateStack = [];
     this._beginFrameCounter = 0;
-    this._pool = new Pool(this);
+    this._poolMap = new Map();
+    this._defaultPoolKey = Symbol('defaultPool');
+    this._poolMap.set(this._defaultPoolKey, new Pool(this));
+    this._temporalFramebuffer = false;
     this._temporalFramebuffer = false;
     this._vSync = true;
     this._registerEventHandlers();
@@ -332,13 +336,21 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
     this._vSync = !!val;
   }
   get pool(): Pool {
-    return this._pool;
+    return this._poolMap.get(this._defaultPoolKey);
   }
   get runLoopFunction(): (device: AbstractDevice) => void {
     return this._runLoopFunc;
   }
   get programBuilder(): ProgramBuilder {
     return this._programBuilder;
+  }
+  getPool(key: string | Symbol): Pool {
+    let pool = this._poolMap.get(key);
+    if (!pool) {
+      pool = new Pool(this);
+      this._poolMap.set(key, pool);
+    }
+    return pool;
   }
   setFont(fontName: string) {
     DrawText.setFont(this, fontName);
@@ -347,37 +359,20 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
     DrawText.drawText(this, text, color, x, y);
   }
   setFramebuffer(rt: FrameBuffer);
-  setFramebuffer(
-    color: (BaseTexture | { texture: BaseTexture; miplevel?: number; face?: number; layer?: number })[],
-    depth?: BaseTexture,
-    sampleCount?: number
-  );
-  setFramebuffer(
-    colorOrRT:
-      | (BaseTexture | { texture: BaseTexture; miplevel?: number; face?: number; layer?: number })[]
-      | FrameBuffer,
-    depth?: BaseTexture,
-    sampleCount?: number
-  ) {
+  setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number);
+  setFramebuffer(colorOrRT: BaseTexture[] | FrameBuffer, depth?: BaseTexture, sampleCount?: number) {
     let newRT: FrameBuffer = null;
     let temporal = false;
     if (!Array.isArray(colorOrRT)) {
       newRT = colorOrRT ?? null;
     } else {
-      const colorAttachments = colorOrRT.map((val) => (val as any).texture ?? val) as BaseTexture[];
-      newRT = this._pool.createTemporalFramebuffer(false, colorAttachments, depth, sampleCount, true);
-      for (let i = 0; i < colorOrRT.length; i++) {
-        const rt = colorOrRT[i];
-        newRT.setColorAttachmentMipLevel(i, (rt as any).texture ? (rt as any).miplevel ?? 0 : 0);
-        newRT.setColorAttachmentLayer(i, (rt as any).texture ? (rt as any).face ?? 0 : 0);
-        newRT.setColorAttachmentCubeFace(i, (rt as any).texture ? (rt as any).layer ?? 0 : 0);
-      }
+      newRT = this.pool.fetchTemporalFramebuffer(false, 0, 0, colorOrRT, depth, true, sampleCount);
       temporal = true;
     }
     const currentRT = this.getFramebuffer();
     if (currentRT !== newRT) {
       if (this._temporalFramebuffer) {
-        this._pool.releaseFrameBuffer(currentRT);
+        this.pool.releaseFrameBuffer(currentRT);
       }
       this._temporalFramebuffer = temporal;
       this._setFramebuffer(newRT);
@@ -424,7 +419,7 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
     this._beginFrameCounter++;
     this._beginFrameTime = this._cpuTimer.now();
     this.updateFrameInfo();
-    this._pool.autoRelease();
+    this._poolMap.forEach((pool) => pool.autoRelease());
     return this.onBeginFrame();
   }
   endFrame(): void {
