@@ -344,6 +344,9 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
   get programBuilder(): ProgramBuilder {
     return this._programBuilder;
   }
+  poolExists(key: string | Symbol): boolean {
+    return this._poolMap.has(key);
+  }
   getPool(key: string | Symbol): Pool {
     let pool = this._poolMap.get(key);
     if (!pool) {

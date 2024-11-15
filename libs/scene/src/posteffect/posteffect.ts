@@ -1,6 +1,7 @@
 import type { AbstractDevice, RenderStateSet, Texture2D, VertexLayout } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
+import { copyTexture, fetchSampler } from '../utility/misc';
 
 /**
  * Base class for any type of post effect
@@ -73,6 +74,22 @@ export abstract class AbstractPostEffect<ClassName extends string> {
     sceneDepthTexture: Texture2D,
     srgbOutput: boolean
   ): void;
+  /**
+   *
+   * @param ctx - Draw context
+   * @param inputColorTexture - Input color texture
+   * @param srgbOutput - Whether the result should be gamma corrected
+   */
+  protected passThrough(ctx: DrawContext, inputColorTexture: Texture2D, srgbOutput: boolean) {
+    copyTexture(
+      inputColorTexture,
+      ctx.device.getFramebuffer(),
+      fetchSampler('clamp_nearest_nomip'),
+      null,
+      0,
+      srgbOutput
+    );
+  }
   /**
    * Disposes the post effect.
    */

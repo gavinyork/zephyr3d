@@ -178,14 +178,7 @@ export class SAO extends AbstractPostEffect<'SAO'> {
     const device = ctx.device;
     const viewport = device.getViewport();
     this._prepare(device, inputColorTexture);
-    copyTexture(
-      inputColorTexture,
-      device.getFramebuffer(),
-      fetchSampler('clamp_nearest_nomip'),
-      null,
-      0,
-      srgbOutput
-    );
+    this.passThrough(ctx, inputColorTexture, srgbOutput);
     if (!this._supported) {
       return;
     }
