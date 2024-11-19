@@ -40,6 +40,14 @@ export class SceneRenderer {
   private static _backDepthColorState: ColorState = null;
   /** @internal */
   private static _clusters: ClusteredLight[] = [];
+  /** @internal */
+  private static _cameraTextures: WeakMap<
+    Camera,
+    {
+      prevColorTex: Texture2D;
+      prevDepthTex: Texture2D;
+    }
+  > = new WeakMap();
   /** lighting render pass */
   static get sceneRenderPass(): LightPass {
     return this._scenePass;
@@ -103,7 +111,9 @@ export class SceneRenderer {
               jitteredVPMatrix: camera.jitteredVPMatrix,
               VPMatrix: camera.viewProjectionMatrix,
               prevJitteredVPMatrix: camera.prevJitteredVPMatrix,
-              prevVPMatrix: camera.prevVPMatrix
+              prevVPMatrix: camera.prevVPMatrix,
+              prevColorTexture: null,
+              prevDepthTexture: null
             }
           : null
     };
@@ -159,8 +169,7 @@ export class SceneRenderer {
     const finalFramebuffer = device.getFramebuffer();
     const drawingBufferWidth = device.getDrawingBufferWidth();
     const drawingBufferHeight = device.getDrawingBufferHeight();
-    ctx.depthFormat =
-      false && device.getDeviceCaps().framebufferCaps.supportDepth32floatStencil8 ? 'd32fs8' : 'd24s8';
+    ctx.depthFormat = device.getDeviceCaps().framebufferCaps.supportDepth32floatStencil8 ? 'd32fs8' : 'd24s8';
     ctx.viewportX = finalFramebuffer ? vp?.[0] ?? 0 : device.screenToDevice(vp?.[0] ?? 0);
     ctx.viewportY = finalFramebuffer ? vp?.[1] ?? 0 : device.screenToDevice(vp?.[1] ?? 0);
     ctx.viewportWidth = finalFramebuffer
@@ -271,6 +280,17 @@ export class SceneRenderer {
         );
         buildHiZ(ctx.depthTexture, HiZFrameBuffer);
         ctx.HiZTexture = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
+      }
+      if (ctx.TAA) {
+        let t = this._cameraTextures.get(ctx.camera);
+        if (!t) {
+          t = {
+            prevColorTex: null,
+            prevDepthTex: null
+          };
+        }
+        ctx.TAA.prevDepthTexture = t.prevDepthTex;
+        ctx.TAA.prevColorTexture = t.prevColorTex;
       }
       if (ctx.depthTexture === finalFramebuffer?.getDepthAttachment()) {
         tempFramebuffer = finalFramebuffer;

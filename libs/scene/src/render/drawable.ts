@@ -114,6 +114,8 @@ export interface DrawContext {
     prevJitteredVPMatrix: Matrix4x4;
     jitteredVPMatrix: Matrix4x4;
     VPMatrix: Matrix4x4;
+    prevColorTexture: Texture2D;
+    prevDepthTexture: Texture2D;
   };
 }
 

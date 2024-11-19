@@ -23,7 +23,7 @@ export class Pool {
   /** @internal */
   private _freeFramebuffers: Record<string, FrameBuffer[]> = {};
   /** @internal */
-  private _allocatedFramebuffers: WeakMap<FrameBuffer, string> = new WeakMap();
+  private _allocatedFramebuffers: WeakMap<FrameBuffer, { hash: string; refcount: number }> = new WeakMap();
   /** @internal */
   private _autoReleaseFramebuffers: Set<FrameBuffer> = new Set();
   /**
@@ -295,7 +295,7 @@ export class Pool {
         info.refcount++;
       }
     }
-    this._allocatedFramebuffers.set(fb, hash);
+    this._allocatedFramebuffers.set(fb, { hash, refcount: 1 });
     if (autoRelease) {
       this._autoReleaseFramebuffers.add(fb);
     }
@@ -321,6 +321,18 @@ export class Pool {
     }
   }
   /**
+   * Increment reference counter for given texture
+   * @param texture - The texture to retain
+   */
+  retainTexture(texture: BaseTexture): void {
+    const info = this._allocatedTextures.get(texture);
+    if (!info) {
+      console.error(`ObjectPool.retainTexture(): texture is not allocated from pool`);
+    } else {
+      info.refcount++;
+    }
+  }
+  /**
    * Dispose a framebuffer that is allocated from the object pool.
    * @param fb - The framebuffer to dispose.
    */
@@ -338,17 +350,32 @@ export class Pool {
    * @param fb - The framebuffer to release.
    */
   releaseFrameBuffer(fb: FrameBuffer) {
-    const hash = this._allocatedFramebuffers.get(fb);
-    if (!hash) {
+    const info = this._allocatedFramebuffers.get(fb);
+    if (!info) {
       console.error(`ObjectPool.releaseFrameBuffer(): framebuffer is not allocated from pool`);
     } else {
-      this.internalDisposeFrameBuffer(fb);
-      const list = this._freeFramebuffers[hash];
-      if (list) {
-        list.push(fb);
-      } else {
-        this._freeFramebuffers[hash] = [fb];
+      info.refcount--;
+      if (info.refcount <= 0) {
+        this.internalDisposeFrameBuffer(fb);
+        const list = this._freeFramebuffers[info.hash];
+        if (list) {
+          list.push(fb);
+        } else {
+          this._freeFramebuffers[info.hash] = [fb];
+        }
       }
+    }
+  }
+  /**
+   * Increment reference counter for given framebuffer
+   * @param fb - The framebuffer to retain
+   */
+  retainFrameBuffer(fb: FrameBuffer) {
+    const info = this._allocatedFramebuffers.get(fb);
+    if (!info) {
+      console.error(`ObjectPool.retainFrameBuffer(): framebuffer is not allocated from pool`);
+    } else {
+      info.refcount++;
     }
   }
   /**
@@ -397,7 +424,7 @@ export class Pool {
     const info = this._allocatedTextures.get(texture);
     if (info) {
       info.refcount--;
-      if (info.refcount === 0) {
+      if (info.refcount <= 0) {
         this._allocatedTextures.delete(texture);
         this._autoReleaseTextures.delete(texture);
         if (purge || info.dispose) {

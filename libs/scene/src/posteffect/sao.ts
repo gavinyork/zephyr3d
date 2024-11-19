@@ -14,7 +14,7 @@ import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { BilateralBlurBlitter } from '../blitter/bilateralblur';
 import type { BlitType } from '../blitter';
 import type { DrawContext } from '../render';
-import { copyTexture, fetchSampler } from '../utility/misc';
+import { fetchSampler } from '../utility/misc';
 
 const NUM_SAMPLES = 7;
 const NUM_RINGS = 4;

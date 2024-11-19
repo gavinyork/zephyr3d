@@ -294,6 +294,7 @@ export class RenderQueue {
    */
   push(camera: Camera, drawable: Drawable): void {
     if (drawable) {
+      drawable.pushRenderQueueRef(this._ref);
       if (!this._itemList) {
         this._itemList = this.newRenderItemList();
       }
@@ -362,13 +363,12 @@ export class RenderQueue {
           sortDistance: drawable.getSortDistance(camera),
           instanceData: null
         });
-        drawable.applyTransformUniforms(this);
         const mat = drawable.getMaterial();
         if (mat) {
           list.materialList.add(mat.coreMaterial);
         }
+        drawable.applyTransformUniforms(this);
       }
-      drawable.pushRenderQueueRef(this._ref);
     }
   }
   /** @internal */

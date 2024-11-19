@@ -553,11 +553,22 @@ export class ShaderHelper {
     const that = this;
     const framestamp = this.getFramestamp(scope);
     if (scope[UNIFORM_NAME_WORLD_MATRIX]) {
-      return scope.$choice(
-        pb.equal(framestamp, scope[UNIFORM_NAME_PREV_WORLD_MATRXI_FRAME]),
-        scope[UNIFORM_NAME_PREV_WORLD_MATRIX],
-        scope[UNIFORM_NAME_WORLD_MATRIX]
-      );
+      if (pb.getDevice().type === 'webgpu') {
+        pb.func('Z_getPrevWorldMatrix', [pb.int('framestamp')], function () {
+          this.$if(pb.equal(this.framestamp, this[UNIFORM_NAME_PREV_WORLD_MATRXI_FRAME]), function () {
+            this.$return(this[UNIFORM_NAME_PREV_WORLD_MATRIX]);
+          }).$else(function () {
+            this.$return(this[UNIFORM_NAME_WORLD_MATRIX]);
+          });
+        });
+        return scope.Z_getPrevWorldMatrix(framestamp);
+      } else {
+        return scope.$choice(
+          pb.equal(framestamp, scope[UNIFORM_NAME_PREV_WORLD_MATRXI_FRAME]),
+          scope[UNIFORM_NAME_PREV_WORLD_MATRIX],
+          scope[UNIFORM_NAME_WORLD_MATRIX]
+        );
+      }
     } else {
       pb.func('Z_getPrevWorldMatrix', [pb.int('framestamp')], function () {
         this.$l.prevFrame = pb.floatBitsToInt(that.getInstancedUniform(this, 4).x);

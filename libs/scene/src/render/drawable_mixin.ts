@@ -129,7 +129,10 @@ export function mixinDrawable<
         const drawableBindGroup = this.getDrawableBindGroup(Application.instance.device, false, renderQueue);
         const tag = drawableBindGroupTransfromTags.get(drawableBindGroup) ?? -1;
         if (tag !== currentTag) {
-          drawableBindGroup.setValue(ShaderHelper.getWorldMatrixUniformName(), this._worldMatrixBuffer);
+          drawableBindGroup.setValue(
+            ShaderHelper.getWorldMatrixUniformName(),
+            this._currentWorldMatrixBuffer
+          );
           drawableBindGroup.setValue(
             ShaderHelper.getPrevWorldMatrixUniformName(),
             this._prevWorldMatrixBuffer
