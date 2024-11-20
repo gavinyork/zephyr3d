@@ -13,6 +13,7 @@ interface GUIParams {
   bloom: boolean;
   fxaa: boolean;
   sao: boolean;
+  taa: boolean;
   rotate: boolean;
   FPS: string;
   oitType: string;
@@ -50,6 +51,7 @@ export class Panel {
       bloom: this._viewer.bloomEnabled(),
       fxaa: this._viewer.FXAAEnabled(),
       sao: this._viewer.SAOEnabled(),
+      taa: this._viewer.TAAEnabled(),
       rotate: this._viewer.rotateEnabled(),
       FPS: '',
       SSR: this._viewer.camera.SSR,
@@ -197,6 +199,12 @@ export class Panel {
       .name('SSR')
       .onChange((value) => {
         this._viewer.camera.SSR = value;
+      });
+    ppSettings
+      .add(this._params, 'taa')
+      .name('TAA')
+      .onChange((value) => {
+        this._viewer.enableTAA(value);
       });
 
     const perfSettings = this._gui.addFolder('Performance');

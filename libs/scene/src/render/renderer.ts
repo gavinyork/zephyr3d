@@ -2,7 +2,7 @@ import { LightPass } from './lightpass';
 import { ShadowMapPass } from './shadowmap_pass';
 import { DepthPass } from './depthpass';
 import { isPowerOf2, nextPowerOf2, Vector4 } from '@zephyr3d/base';
-import type { ColorState, FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
+import type { BaseTexture, ColorState, FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
 import { Application } from '../app';
 import { CopyBlitter } from '../blitter';
 import type { DrawContext } from './drawable';
@@ -44,8 +44,8 @@ export class SceneRenderer {
   private static _cameraTextures: WeakMap<
     Camera,
     {
-      prevColorTex: Texture2D;
-      prevDepthTex: Texture2D;
+      prevColorTex: BaseTexture;
+      prevDepthTex: BaseTexture;
     }
   > = new WeakMap();
   /** lighting render pass */
@@ -257,6 +257,9 @@ export class SceneRenderer {
             );
       }
       this._renderSceneDepth(ctx, renderQueue, depthFramebuffer, SSRCalcThickness);
+      ctx.motionVectorTexture = ctx.motionVectors
+        ? (depthFramebuffer.getColorAttachments()[1] as Texture2D)
+        : null;
       ctx.linearDepthTexture = depthFramebuffer.getColorAttachments()[0] as Texture2D;
       ctx.depthTexture = depthFramebuffer.getDepthAttachment() as Texture2D;
       if (ctx.HiZ) {
@@ -288,6 +291,7 @@ export class SceneRenderer {
             prevColorTex: null,
             prevDepthTex: null
           };
+          this._cameraTextures.set(ctx.camera, t);
         }
         ctx.TAA.prevDepthTexture = t.prevDepthTex;
         ctx.TAA.prevColorTexture = t.prevColorTex;
@@ -338,6 +342,8 @@ export class SceneRenderer {
     }
     ctx.compositor?.begin(ctx);
     if (renderQueue.needSceneColor) {
+      const compositor = ctx.compositor;
+      ctx.compositor = null;
       const sceneColorFramebuffer = device.pool.fetchTemporalFramebuffer(
         true,
         ctx.depthTexture.width,
@@ -367,12 +373,18 @@ export class SceneRenderer {
       this._scenePass.clearColor = null;
       this._scenePass.clearDepth = null;
       this._scenePass.clearStencil = null;
+      ctx.compositor = compositor;
     }
     this._scenePass.render(ctx, null, renderQueue);
     ctx.compositor?.end(ctx);
     renderQueue.dispose();
     ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
 
+    if (ctx.TAA) {
+      const t = this._cameraTextures.get(ctx.camera);
+      t.prevColorTex = ctx.TAA.prevColorTexture;
+      t.prevDepthTex = ctx.TAA.prevDepthTexture;
+    }
     if (tempFramebuffer && tempFramebuffer !== finalFramebuffer) {
       const blitter = new CopyBlitter();
       if (oversizedViewport) {

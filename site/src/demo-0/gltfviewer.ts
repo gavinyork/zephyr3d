@@ -310,6 +310,9 @@ export class GLTFViewer {
   SAOEnabled(): boolean {
     return this._doSAO;
   }
+  TAAEnabled(): boolean {
+    return this._camera.TAA;
+  }
   getOITType(): string {
     return this._oit?.getType() ?? '';
   }
@@ -379,6 +382,11 @@ export class GLTFViewer {
     if (!!enable !== this._doSAO) {
       this._doSAO = !!enable;
       this.syncPostEffects();
+    }
+  }
+  enableTAA(enable: boolean) {
+    if (!!enable !== this._camera.TAA) {
+      this._camera.TAA = !!enable;
     }
   }
   render() {

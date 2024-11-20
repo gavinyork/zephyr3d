@@ -14,6 +14,7 @@ import type { AbstractPostEffect } from './posteffect';
 import { MaterialVaryingFlags } from '../values';
 import { SSR } from './ssr';
 import { fetchSampler } from '../utility/misc';
+import { TAA } from './taa';
 
 /**
  * Posteffect rendering context
@@ -32,6 +33,8 @@ export interface CompositorContext {
 export class Compositor {
   /** @internal */
   private static _SSRPostEffect: SSR = null;
+  /** @internal */
+  private static _TAAPostEffect: TAA = null;
   /** @internal */
   protected _postEffectsOpaque: AbstractPostEffect<any>[];
   /** @internal */
@@ -170,6 +173,12 @@ export class Compositor {
       Compositor._SSRPostEffect.normalTexture = msFramebuffer.getColorAttachments()[2] as Texture2D;
       this._postEffectsOpaque.unshift(Compositor._SSRPostEffect);
     }
+    if (ctx.TAA) {
+      if (!Compositor._TAAPostEffect) {
+        Compositor._TAAPostEffect = new TAA();
+      }
+      this._postEffectsOpaque.push(Compositor._TAAPostEffect);
+    }
   }
   /** @internal */
   drawPostEffects(ctx: DrawContext, opaque: boolean, sceneDepthTexture: Texture2D) {
@@ -214,6 +223,9 @@ export class Compositor {
     }
     if (this._postEffectsOpaque[0] === Compositor._SSRPostEffect) {
       this._postEffectsOpaque.shift();
+    }
+    if (this._postEffectsOpaque[this._postEffectsOpaque.length - 1] === Compositor._TAAPostEffect) {
+      this._postEffectsOpaque.pop();
     }
   }
   /** @internal */

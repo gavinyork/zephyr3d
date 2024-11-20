@@ -9,6 +9,8 @@ import { copyTexture, fetchSampler } from '../utility/misc';
  */
 export abstract class AbstractPostEffect<ClassName extends string> {
   static readonly className: string;
+  private static _renderStateZTestGreater: RenderStateSet = null;
+  private static _renderStateZTestEqual: RenderStateSet = null;
   protected _outputTexture: Texture2D;
   protected _quadVertexLayout: VertexLayout;
   protected _quadRenderStateSet: RenderStateSet;
@@ -80,12 +82,17 @@ export abstract class AbstractPostEffect<ClassName extends string> {
    * @param inputColorTexture - Input color texture
    * @param srgbOutput - Whether the result should be gamma corrected
    */
-  protected passThrough(ctx: DrawContext, inputColorTexture: Texture2D, srgbOutput: boolean) {
+  protected passThrough(
+    ctx: DrawContext,
+    inputColorTexture: Texture2D,
+    srgbOutput: boolean,
+    renderStates?: RenderStateSet
+  ) {
     copyTexture(
       inputColorTexture,
       ctx.device.getFramebuffer(),
       fetchSampler('clamp_nearest_nomip'),
-      null,
+      renderStates,
       0,
       srgbOutput
     );
@@ -135,5 +142,23 @@ export abstract class AbstractPostEffect<ClassName extends string> {
     renderStates.useRasterizerState().setCullMode('none');
     renderStates.useDepthState().enableTest(false).enableWrite(false);
     return renderStates;
+  }
+  /** @internal */
+  protected static getZTestGreaterRenderState(ctx: DrawContext): RenderStateSet {
+    if (!this._renderStateZTestGreater) {
+      this._renderStateZTestGreater = ctx.device.createRenderStateSet();
+      this._renderStateZTestGreater.useRasterizerState().setCullMode('none');
+      this._renderStateZTestGreater.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('gt');
+    }
+    return this._renderStateZTestGreater;
+  }
+  /** @internal */
+  protected static getZTestEqualRenderState(ctx: DrawContext): RenderStateSet {
+    if (!this._renderStateZTestEqual) {
+      this._renderStateZTestEqual = ctx.device.createRenderStateSet();
+      this._renderStateZTestEqual.useRasterizerState().setCullMode('none');
+      this._renderStateZTestEqual.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('eq');
+    }
+    return this._renderStateZTestEqual;
   }
 }

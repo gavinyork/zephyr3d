@@ -1,6 +1,7 @@
 import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
+  BaseTexture,
   ColorState,
   FaceMode,
   GPUDataBuffer,
@@ -44,6 +45,8 @@ export interface DrawContext {
   oit: OIT;
   /** motion vectors */
   motionVectors: boolean;
+  /** motion vector texture */
+  motionVectorTexture?: Texture2D;
   /** hierarchical depth */
   HiZ: boolean;
   /** hierarchical depth buffer */
@@ -114,8 +117,8 @@ export interface DrawContext {
     prevJitteredVPMatrix: Matrix4x4;
     jitteredVPMatrix: Matrix4x4;
     VPMatrix: Matrix4x4;
-    prevColorTexture: Texture2D;
-    prevDepthTexture: Texture2D;
+    prevColorTexture: BaseTexture;
+    prevDepthTexture: BaseTexture;
   };
 }
 

@@ -1,13 +1,6 @@
 import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
-import type {
-  BaseTexture,
-  BindGroup,
-  FrameBuffer,
-  GPUProgram,
-  RenderStateSet,
-  Texture2D
-} from '@zephyr3d/device';
+import type { BaseTexture, BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import {
   sampleLinearDepth,
@@ -32,8 +25,6 @@ export class SSR extends AbstractPostEffect<'SSR'> {
   private static _programs: Record<string, GPUProgram> = {};
   private static _resolveProgram: Record<string, GPUProgram> = {};
   private static _combineProgram: GPUProgram = undefined;
-  private static _renderStateZTestGreater: RenderStateSet = null;
-  private static _renderStateZTestEqual: RenderStateSet = null;
   private static _blurBlitterH: BilateralBlurBlitter = null;
   private static _blurBlitterV: BilateralBlurBlitter = null;
 
@@ -131,7 +122,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     this._combineBindGroup.setValue('srgbOut', srgbOut ? 1 : 0);
     device.setProgram(program);
     device.setBindGroup(0, this._combineBindGroup);
-    this.drawFullscreenQuad(this._getZTestGreaterRenderState(ctx));
+    this.drawFullscreenQuad(AbstractPostEffect.getZTestGreaterRenderState(ctx));
   }
   /** @internal */
   resolve(
@@ -179,7 +170,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     bindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
-    this.drawFullscreenQuad(this._getZTestGreaterRenderState(ctx));
+    this.drawFullscreenQuad(AbstractPostEffect.getZTestGreaterRenderState(ctx));
   }
   /** @internal */
   intersect(
@@ -251,7 +242,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     bindGroup.setValue('srgbOut', srgbOut ? 1 : 0);
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
-    this.drawFullscreenQuad(this._getZTestGreaterRenderState(ctx));
+    this.drawFullscreenQuad(AbstractPostEffect.getZTestGreaterRenderState(ctx));
   }
   /** @internal */
   debugTexture(tex: BaseTexture, label: string) {
@@ -282,7 +273,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
       inputColorTexture,
       device.getFramebuffer(),
       fetchSampler('clamp_nearest_nomip'),
-      this._getZTestEqualRenderState(ctx)
+      AbstractPostEffect.getZTestEqualRenderState(ctx)
     );
     const intersectFramebuffer = device.pool.fetchTemporalFramebuffer(
       false,
@@ -321,7 +312,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
       const stdDev = ctx.camera.ssrBlurStdDev;
       const depthCutoff = ctx.camera.ssrBlurDepthCutoff;
       const blitterH = (SSR._blurBlitterH = SSR._blurBlitterH ?? new BilateralBlurBlitter(false));
-      blitterH.renderStates = this._getZTestGreaterRenderState(ctx);
+      blitterH.renderStates = AbstractPostEffect.getZTestGreaterRenderState(ctx);
       this.blurPass(
         ctx,
         blitterH,
@@ -335,7 +326,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         pingpongFramebuffer[1]
       );
       const blitterV = (SSR._blurBlitterV = SSR._blurBlitterV ?? new BilateralBlurBlitter(true));
-      blitterV.renderStates = this._getZTestGreaterRenderState(ctx);
+      blitterV.renderStates = AbstractPostEffect.getZTestGreaterRenderState(ctx);
       this.blurPass(
         ctx,
         blitterV,
@@ -359,24 +350,6 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     device.pool.releaseFrameBuffer(intersectFramebuffer);
     device.pool.releaseFrameBuffer(pingpongFramebuffer[0]);
     device.pool.releaseFrameBuffer(pingpongFramebuffer[1]);
-  }
-  /** @internal */
-  private _getZTestGreaterRenderState(ctx: DrawContext): RenderStateSet {
-    if (!SSR._renderStateZTestGreater) {
-      SSR._renderStateZTestGreater = ctx.device.createRenderStateSet();
-      SSR._renderStateZTestGreater.useRasterizerState().setCullMode('none');
-      SSR._renderStateZTestGreater.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('gt');
-    }
-    return SSR._renderStateZTestGreater;
-  }
-  /** @internal */
-  private _getZTestEqualRenderState(ctx: DrawContext): RenderStateSet {
-    if (!SSR._renderStateZTestEqual) {
-      SSR._renderStateZTestEqual = ctx.device.createRenderStateSet();
-      SSR._renderStateZTestEqual.useRasterizerState().setCullMode('none');
-      SSR._renderStateZTestEqual.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('eq');
-    }
-    return SSR._renderStateZTestEqual;
   }
   /** @internal */
   private _createCombineProgrm(ctx: DrawContext): GPUProgram {
