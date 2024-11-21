@@ -14,7 +14,7 @@ import type { DrawableInstanceInfo, InstanceData, RenderQueue, RenderQueueRef } 
 import type { ShadowMapParams } from '../shadow';
 import type { Environment } from '../scene/environment';
 import type { DirectionalLight, PunctualLight, Scene, SceneNode } from '../scene';
-import type { Compositor, CompositorContext } from '../posteffect';
+import type { Compositor } from '../posteffect';
 import type { ClusteredLight } from './cluster_light';
 import type { MeshMaterial } from '../material';
 import type { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
@@ -95,8 +95,6 @@ export interface DrawContext {
   instanceData?: InstanceData;
   /** The compositor used to apply postprocessing effects */
   compositor?: Compositor;
-  /** The posteffect rendering context */
-  compositorContex?: CompositorContext;
   /** @internal */
   shadowMapInfo?: Map<PunctualLight, ShadowMapParams>;
   /** @internal */

@@ -110,7 +110,7 @@ export class TAA extends AbstractPostEffect<'TAA'> {
             );
             this.$l.alpha = pb.max(0.05, this.$choice(this.edgeTest, pb.float(0), pb.float(1)));
             this.$l.resolvedColor = pb.mix(this.prevColor.rgb, this.currentColor.rgb, this.alpha);
-            this.$l.resolvedColor = pb.abs(pb.sub(this.prevColor.rgb, this.currentColor.rgb)); //pb.textureSampleLevel(this.historyColor, this.screenUV, 0).rgb;
+            //this.$l.resolvedColor = pb.abs(pb.sub(this.prevColor.rgb, this.currentColor.rgb)); //pb.textureSampleLevel(this.historyColor, this.screenUV, 0).rgb;
             this.$if(pb.equal(this.srgbOut, 0), function () {
               this.$outputs.outColor = pb.vec4(this.resolvedColor, 1);
             }).$else(function () {

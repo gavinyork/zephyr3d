@@ -21,7 +21,6 @@ import { TAA } from './taa';
  * @public
  */
 export interface CompositorContext {
-  msTexture?: FrameBuffer;
   pingpongFramebuffers: FrameBuffer[];
   finalFramebuffer: FrameBuffer;
   writeIndex: number;
@@ -40,6 +39,12 @@ export class Compositor {
   /** @internal */
   protected _postEffectsTransparency: AbstractPostEffect<any>[];
   /** @internal */
+  private _finalFramebuffer: FrameBuffer;
+  /** @internal */
+  private _prevInputTexture: Texture2D;
+  /** @internal */
+  private _prevFrameBuffer: FrameBuffer;
+  /** @internal */
   private static _blitProgram: GPUProgram = null;
   /** @internal */
   private static _blitBindgroup: BindGroup = null;
@@ -53,6 +58,9 @@ export class Compositor {
   constructor() {
     this._postEffectsOpaque = [];
     this._postEffectsTransparency = [];
+    this._finalFramebuffer = null;
+    this._prevInputTexture = null;
+    this._prevFrameBuffer = null;
   }
   /** @internal */
   requireLinearDepth(ctx: DrawContext): boolean {
@@ -121,56 +129,34 @@ export class Compositor {
       this._postEffectsOpaque.length === 0 &&
       this._postEffectsTransparency.length === 0 &&
       ctx.primaryCamera.sampleCount === 1 &&
-      !ssr
+      !ssr &&
+      !ctx.TAA
     ) {
-      ctx.compositorContex = null;
       return;
     }
     const device = ctx.device;
     const format = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
-    const finalFramebuffer = device.getFramebuffer();
-    const depth = finalFramebuffer?.getDepthAttachment() as Texture2D;
-    let msFramebuffer: FrameBuffer = null;
+    this._finalFramebuffer = device.getFramebuffer();
+    const depth = this._finalFramebuffer?.getDepthAttachment() as Texture2D;
     const w = depth ? depth.width : ctx.viewportWidth;
     const h = depth ? depth.height : ctx.viewportHeight;
-    if (ctx.primaryCamera.sampleCount > 1 || ssr) {
-      const fmt2: TextureFormat = ssr ? (device.type === 'webgl' ? format : 'rgba8unorm') : format;
-      msFramebuffer = device.pool.fetchTemporalFramebuffer(
-        true,
-        w,
-        h,
-        ssr ? [format, fmt2, fmt2] : format,
-        depth,
-        ssr,
-        ctx.primaryCamera.sampleCount
-      );
-    }
-    const pingpongFramebuffers = [
-      device.pool.fetchTemporalFramebuffer(true, w, h, format, depth ?? ctx.depthFormat, false),
-      device.pool.fetchTemporalFramebuffer(true, w, h, format, depth ?? ctx.depthFormat, false)
-    ];
-    let writeIndex: number;
-    if (msFramebuffer) {
-      writeIndex = 3;
-      device.setFramebuffer(msFramebuffer);
-    } else {
-      writeIndex = 0;
-      device.setFramebuffer(pingpongFramebuffers[writeIndex]);
-    }
-    device.setViewport(null);
-    device.setScissor(null);
-    ctx.compositorContex = {
-      finalFramebuffer,
-      pingpongFramebuffers,
-      msTexture: msFramebuffer,
-      writeIndex
-    };
+    const fmt2: TextureFormat = ssr ? (device.type === 'webgl' ? format : 'rgba8unorm') : format;
+    const tmpFramebuffer = device.pool.fetchTemporalFramebuffer(
+      true,
+      w,
+      h,
+      ssr ? [format, fmt2, fmt2] : format,
+      depth ?? ctx.depthFormat,
+      ssr,
+      ctx.primaryCamera.sampleCount
+    );
+    device.setFramebuffer(tmpFramebuffer);
     if (ssr) {
       if (!Compositor._SSRPostEffect) {
         Compositor._SSRPostEffect = new SSR();
       }
-      Compositor._SSRPostEffect.roughnessTexture = msFramebuffer.getColorAttachments()[1] as Texture2D;
-      Compositor._SSRPostEffect.normalTexture = msFramebuffer.getColorAttachments()[2] as Texture2D;
+      Compositor._SSRPostEffect.roughnessTexture = tmpFramebuffer.getColorAttachments()[1] as Texture2D;
+      Compositor._SSRPostEffect.normalTexture = tmpFramebuffer.getColorAttachments()[2] as Texture2D;
       this._postEffectsOpaque.unshift(Compositor._SSRPostEffect);
     }
     if (ctx.TAA) {
@@ -185,41 +171,63 @@ export class Compositor {
     const postEffects = opaque ? this._postEffectsOpaque : this._postEffectsTransparency;
     if (postEffects.length > 0) {
       const device = ctx.device;
+      const inputFramebuffer = device.getFramebuffer();
+      const inputTexture = inputFramebuffer.getColorAttachments()[0] as Texture2D;
+      let tmpTexture: Texture2D = null;
       for (let i = 0; i < postEffects.length; i++) {
         const postEffect = postEffects[i];
         if (!postEffect.enabled) {
           continue;
         }
-        const inputTexture = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
-        const isLast = this.isLastPostEffect(opaque, i);
-        const finalEffect =
-          isLast && (!postEffect.requireDepthAttachment(ctx) || !!ctx.compositorContex.finalFramebuffer);
-        if (finalEffect) {
-          device.setFramebuffer(ctx.compositorContex.finalFramebuffer);
-          device.setViewport(null);
-          device.setScissor(null);
-        } else {
-          ctx.compositorContex.writeIndex = (1 + ctx.compositorContex.writeIndex) % 2;
-          device.setFramebuffer(ctx.compositorContex.pingpongFramebuffers[ctx.compositorContex.writeIndex]);
-          device.setViewport(null);
-          device.setScissor(null);
+        if (this._prevFrameBuffer) {
+          device.pool.releaseFrameBuffer(this._prevFrameBuffer);
+          this._prevFrameBuffer = null;
         }
-        postEffect.apply(ctx, inputTexture, sceneDepthTexture, !device.getFramebuffer());
+        const isLast = this.isLastPostEffect(opaque, i);
+        const finalEffect = isLast && (!postEffect.requireDepthAttachment(ctx) || !!this._finalFramebuffer);
+        if (finalEffect) {
+          device.setFramebuffer(this._finalFramebuffer);
+        } else {
+          this._prevFrameBuffer = device.pool.fetchTemporalFramebuffer(
+            false,
+            inputFramebuffer.getWidth(),
+            inputFramebuffer.getHeight(),
+            'rgba16f',
+            inputFramebuffer.getDepthAttachment() ?? null
+          );
+          device.setFramebuffer(this._prevFrameBuffer);
+        }
+        const inputColorTexture = tmpTexture ?? inputTexture;
+        postEffect.apply(ctx, inputColorTexture, sceneDepthTexture, !device.getFramebuffer());
+        if (this._prevInputTexture) {
+          device.pool.releaseTexture(this._prevInputTexture);
+          this._prevInputTexture = null;
+        }
+        if (this._prevFrameBuffer) {
+          tmpTexture = this._prevFrameBuffer.getColorAttachments()[0] as Texture2D;
+          device.pool.retainTexture(tmpTexture);
+          this._prevInputTexture = tmpTexture;
+        }
       }
     }
   }
   /** @internal */
   end(ctx: DrawContext) {
-    if (ctx.compositorContex) {
-      const device = ctx.device;
-      if (device.getFramebuffer() !== ctx.compositorContex.finalFramebuffer) {
-        const srcTex = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
-        device.setFramebuffer(ctx.compositorContex.finalFramebuffer);
-        device.setViewport(null);
-        device.setScissor(null);
-        Compositor._blit(device, srcTex, !ctx.compositorContex.finalFramebuffer);
-      }
-      ctx.compositorContex = null;
+    const device = ctx.device;
+    if (device.getFramebuffer() !== this._finalFramebuffer) {
+      const srcTex = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
+      device.setFramebuffer(this._finalFramebuffer);
+      device.setViewport(null);
+      device.setScissor(null);
+      Compositor._blit(device, srcTex, !this._finalFramebuffer);
+    }
+    if (this._prevInputTexture) {
+      device.pool.releaseTexture(this._prevInputTexture);
+      this._prevInputTexture = null;
+    }
+    if (this._prevFrameBuffer) {
+      device.pool.releaseFrameBuffer(this._prevFrameBuffer);
+      this._prevFrameBuffer = null;
     }
     if (this._postEffectsOpaque[0] === Compositor._SSRPostEffect) {
       this._postEffectsOpaque.shift();

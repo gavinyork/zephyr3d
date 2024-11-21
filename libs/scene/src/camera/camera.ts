@@ -133,7 +133,7 @@ export class Camera extends SceneNode {
     this._pickPosY = 0;
     this._HiZ = false;
     this._SSR = false;
-    this._TAA = true;
+    this._TAA = false;
     this._ssrParams = new Vector4(100, 120, 0.5, 0);
     this._ssrMaxRoughness = 0.8;
     this._ssrRoughnessFactor = 1;
