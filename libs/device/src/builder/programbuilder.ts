@@ -3111,7 +3111,7 @@ export class PBLocalScope extends PBScope {
 export interface PBBuiltinScope {
   position: PBShaderExp;
   pointSize: PBShaderExp | number;
-  fragDepth: PBShaderExp;
+  fragDepth: PBShaderExp | number;
   readonly fragCoord: PBShaderExp;
   readonly frontFacing: PBShaderExp;
   readonly vertexIndex: PBShaderExp;

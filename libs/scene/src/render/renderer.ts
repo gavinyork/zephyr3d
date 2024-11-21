@@ -110,8 +110,10 @@ export class SceneRenderer {
           ? {
               jitteredVPMatrix: camera.jitteredVPMatrix,
               VPMatrix: camera.viewProjectionMatrix,
+              position: camera.getWorldPosition(),
               prevJitteredVPMatrix: camera.prevJitteredVPMatrix,
               prevVPMatrix: camera.prevVPMatrix,
+              prevPosition: camera.prevPosition,
               prevColorTexture: null,
               prevDepthTexture: null
             }

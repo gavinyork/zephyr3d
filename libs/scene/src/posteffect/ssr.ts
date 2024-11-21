@@ -122,7 +122,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     this._combineBindGroup.setValue('srgbOut', srgbOut ? 1 : 0);
     device.setProgram(program);
     device.setBindGroup(0, this._combineBindGroup);
-    this.drawFullscreenQuad(AbstractPostEffect.getZTestGreaterRenderState(ctx));
+    this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'gt'));
   }
   /** @internal */
   resolve(
@@ -170,7 +170,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     bindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
-    this.drawFullscreenQuad(AbstractPostEffect.getZTestGreaterRenderState(ctx));
+    this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'gt'));
   }
   /** @internal */
   intersect(
@@ -242,7 +242,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     bindGroup.setValue('srgbOut', srgbOut ? 1 : 0);
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
-    this.drawFullscreenQuad(AbstractPostEffect.getZTestGreaterRenderState(ctx));
+    this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'gt'));
   }
   /** @internal */
   debugTexture(tex: BaseTexture, label: string) {
@@ -273,7 +273,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
       inputColorTexture,
       device.getFramebuffer(),
       fetchSampler('clamp_nearest_nomip'),
-      AbstractPostEffect.getZTestEqualRenderState(ctx)
+      AbstractPostEffect.getDefaultRenderState(ctx, 'eq')
     );
     const intersectFramebuffer = device.pool.fetchTemporalFramebuffer(
       false,
@@ -312,7 +312,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
       const stdDev = ctx.camera.ssrBlurStdDev;
       const depthCutoff = ctx.camera.ssrBlurDepthCutoff;
       const blitterH = (SSR._blurBlitterH = SSR._blurBlitterH ?? new BilateralBlurBlitter(false));
-      blitterH.renderStates = AbstractPostEffect.getZTestGreaterRenderState(ctx);
+      blitterH.renderStates = AbstractPostEffect.getDefaultRenderState(ctx, 'gt');
       this.blurPass(
         ctx,
         blitterH,
@@ -326,7 +326,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         pingpongFramebuffer[1]
       );
       const blitterV = (SSR._blurBlitterV = SSR._blurBlitterV ?? new BilateralBlurBlitter(true));
-      blitterV.renderStates = AbstractPostEffect.getZTestGreaterRenderState(ctx);
+      blitterV.renderStates = AbstractPostEffect.getDefaultRenderState(ctx, 'gt');
       this.blurPass(
         ctx,
         blitterV,

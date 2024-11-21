@@ -103,6 +103,8 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _prevVPMatrix: Matrix4x4;
   /** @internal */
+  protected _prevPosition: Vector3;
+  /** @internal */
   protected _prevJitteredVPMatrix: Matrix4x4;
   /**
    * Creates a new camera node
@@ -147,6 +149,7 @@ export class Camera extends SceneNode {
     this._commandBufferReuse = true;
     this._jitteredVPMatrix = new Matrix4x4();
     this._prevVPMatrix = null;
+    this._prevPosition = null;
     this._prevJitteredVPMatrix = null;
   }
   /** Clip plane in camera space */
@@ -642,9 +645,11 @@ export class Camera extends SceneNode {
       if (!this._prevVPMatrix) {
         this._prevVPMatrix = new Matrix4x4();
         this._prevVPMatrix.set(this.viewProjectionMatrix);
+        this._prevPosition = this.getWorldPosition();
       }
     } else {
       this._prevVPMatrix = null;
+      this._prevPosition = null;
       this._prevJitteredVPMatrix = null;
     }
     device.pushDeviceStates();
@@ -656,6 +661,7 @@ export class Camera extends SceneNode {
     if (useTAA) {
       this._prevJitteredVPMatrix.set(this._jitteredVPMatrix);
       this._prevVPMatrix.set(this.viewProjectionMatrix);
+      this._prevPosition = this.getWorldPosition();
     }
   }
   /**
@@ -681,6 +687,10 @@ export class Camera extends SceneNode {
   /** @internal */
   get prevVPMatrix() {
     return this._prevVPMatrix;
+  }
+  /** @internal */
+  get prevPosition() {
+    return this._prevPosition;
   }
   /** @internal */
   private setController(controller: BaseCameraController): this {

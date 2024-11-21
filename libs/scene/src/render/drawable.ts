@@ -1,4 +1,4 @@
-import type { Matrix4x4, Vector4 } from '@zephyr3d/base';
+import type { Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   BaseTexture,
@@ -112,9 +112,11 @@ export interface DrawContext {
   /** TAA related stuff */
   TAA?: {
     prevVPMatrix: Matrix4x4;
+    prevPosition: Vector3;
     prevJitteredVPMatrix: Matrix4x4;
     jitteredVPMatrix: Matrix4x4;
     VPMatrix: Matrix4x4;
+    position: Vector3;
     prevColorTexture: BaseTexture;
     prevDepthTexture: BaseTexture;
   };

@@ -1,4 +1,4 @@
-import type { AbstractDevice, RenderStateSet, Texture2D, VertexLayout } from '@zephyr3d/device';
+import type { AbstractDevice, CompareFunc, RenderStateSet, Texture2D, VertexLayout } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { copyTexture, fetchSampler } from '../utility/misc';
@@ -9,8 +9,7 @@ import { copyTexture, fetchSampler } from '../utility/misc';
  */
 export abstract class AbstractPostEffect<ClassName extends string> {
   static readonly className: string;
-  private static _renderStateZTestGreater: RenderStateSet = null;
-  private static _renderStateZTestEqual: RenderStateSet = null;
+  private static _defaultRenderStates: { CompareFunc?: RenderStateSet } = {};
   protected _outputTexture: Texture2D;
   protected _quadVertexLayout: VertexLayout;
   protected _quadRenderStateSet: RenderStateSet;
@@ -144,21 +143,18 @@ export abstract class AbstractPostEffect<ClassName extends string> {
     return renderStates;
   }
   /** @internal */
-  protected static getZTestGreaterRenderState(ctx: DrawContext): RenderStateSet {
-    if (!this._renderStateZTestGreater) {
-      this._renderStateZTestGreater = ctx.device.createRenderStateSet();
-      this._renderStateZTestGreater.useRasterizerState().setCullMode('none');
-      this._renderStateZTestGreater.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('gt');
+  protected static getDefaultRenderState(ctx: DrawContext, compareFunc: CompareFunc) {
+    let renderState = this._defaultRenderStates[compareFunc];
+    if (!renderState) {
+      renderState = ctx.device.createRenderStateSet();
+      renderState.useRasterizerState().setCullMode('none');
+      renderState
+        .useDepthState()
+        .enableTest(compareFunc !== 'always')
+        .enableWrite(false)
+        .setCompareFunc(compareFunc);
+      this._defaultRenderStates[compareFunc] = renderState;
     }
-    return this._renderStateZTestGreater;
-  }
-  /** @internal */
-  protected static getZTestEqualRenderState(ctx: DrawContext): RenderStateSet {
-    if (!this._renderStateZTestEqual) {
-      this._renderStateZTestEqual = ctx.device.createRenderStateSet();
-      this._renderStateZTestEqual.useRasterizerState().setCullMode('none');
-      this._renderStateZTestEqual.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('eq');
-    }
-    return this._renderStateZTestEqual;
+    return renderState;
   }
 }
