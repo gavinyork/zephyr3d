@@ -1,6 +1,6 @@
 import { AbstractPostEffect } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
-import type { BaseTexture, BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
+import type { BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import {
   sampleLinearDepth,
@@ -27,14 +27,11 @@ export class SSR extends AbstractPostEffect<'SSR'> {
   private static _combineProgram: GPUProgram = undefined;
   private static _blurBlitterH: BilateralBlurBlitter = null;
   private static _blurBlitterV: BilateralBlurBlitter = null;
-
   private _roughnessTex: Texture2D;
   private _normalTex: Texture2D;
   private _bindgroups: Record<string, BindGroup>;
   private _resolveBindGroup: Record<string, BindGroup>;
   private _combineBindGroup: BindGroup;
-
-  private _debugFrameBuffer: Record<string, FrameBuffer>;
   /**
    * Creates an instance of SSR post effect
    */
@@ -45,7 +42,6 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     this._resolveBindGroup = {};
     this._combineBindGroup = null;
     this._roughnessTex = null;
-    this._debugFrameBuffer = {};
   }
   get roughnessTexture() {
     return this._roughnessTex;
@@ -243,27 +239,6 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
     this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'gt'));
-  }
-  /** @internal */
-  debugTexture(tex: BaseTexture, label: string) {
-    let fb = this._debugFrameBuffer[label];
-    if (!fb || fb.getWidth() !== tex.width || fb.getHeight() !== tex.height) {
-      fb?.getColorAttachments()[0]?.dispose();
-      fb?.dispose();
-      fb = tex.device.createFrameBuffer(
-        [
-          tex.device.createTexture2D(tex.format, tex.width, tex.height, {
-            samplerOptions: {
-              mipFilter: 'none'
-            }
-          })
-        ],
-        null
-      );
-      fb.getColorAttachments()[0].name = label ?? 'SSR_Debug';
-      this._debugFrameBuffer[label] = fb;
-    }
-    copyTexture(tex, fb, fetchSampler('clamp_nearest_nomip'));
   }
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {

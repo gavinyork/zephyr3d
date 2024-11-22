@@ -446,6 +446,17 @@ export class ShaderHelper {
           that.getPrevUnjitteredViewProjectionMatrix(this),
           this.worldPos
         );
+        const cameraParams = that.getCameraParams(this);
+        if (cameraParams) {
+          this.$outputs.zMotionVectorPosCurrent = pb.mul(
+            this.$outputs.zMotionVectorPosCurrent,
+            pb.vec4(1, cameraParams.z, 1, 1)
+          );
+          this.$outputs.zMotionVectorPosPrev = pb.mul(
+            this.$outputs.zMotionVectorPosPrev,
+            pb.vec4(1, cameraParams.z, 1, 1)
+          );
+        }
       }
       this.$return(this.pos);
     });

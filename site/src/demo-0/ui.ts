@@ -14,6 +14,7 @@ interface GUIParams {
   fxaa: boolean;
   sao: boolean;
   taa: boolean;
+  taaDebug: string;
   rotate: boolean;
   FPS: string;
   oitType: string;
@@ -27,6 +28,8 @@ export class Panel {
   private _deviceList: string[];
   private _oitTypes: string[];
   private _oitNames: string[];
+  private _taaDebugTypes: number[];
+  private _taaDebugNames: string[];
   private _params: GUIParams;
   private _gui: GUI;
   private _animationController: GUI;
@@ -35,6 +38,8 @@ export class Panel {
     this._deviceList = ['WebGL', 'WebGL2', 'WebGPU'];
     this._oitTypes = ['', WeightedBlendedOIT.type, ABufferOIT.type];
     this._oitNames = ['None', 'weighted-blended', 'per-pixel linked list'];
+    this._taaDebugTypes = [0, 1, 2, 3, 4, 5];
+    this._taaDebugNames = ['None', 'CurrentColor', 'HistoryColor', 'Velocity', 'Edge', 'ALPHA'];
     this._gui = new GUI({ container: document.body });
     this._params = {
       deviceType:
@@ -52,6 +57,7 @@ export class Panel {
       fxaa: this._viewer.FXAAEnabled(),
       sao: this._viewer.SAOEnabled(),
       taa: this._viewer.TAAEnabled(),
+      taaDebug: this._taaDebugNames[this._taaDebugTypes.indexOf(this._viewer.camera.TAADebug)],
       rotate: this._viewer.rotateEnabled(),
       FPS: '',
       SSR: this._viewer.camera.SSR,
@@ -205,6 +211,13 @@ export class Panel {
       .name('TAA')
       .onChange((value) => {
         this._viewer.enableTAA(value);
+      });
+    ppSettings
+      .add(this._params, 'taaDebug', this._taaDebugNames)
+      .name('TAA Debug option')
+      .onChange((value) => {
+        const index = this._taaDebugNames.indexOf(value);
+        this._viewer.camera.TAADebug = this._taaDebugTypes[index];
       });
 
     const perfSettings = this._gui.addFolder('Performance');
