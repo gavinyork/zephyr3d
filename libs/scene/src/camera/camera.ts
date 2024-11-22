@@ -1,10 +1,11 @@
 import type { CubeFace, Plane } from '@zephyr3d/base';
+import { Vector2 } from '@zephyr3d/base';
 import { Matrix4x4, Frustum, Vector4, Vector3, Ray, halton23 } from '@zephyr3d/base';
 import { SceneNode } from '../scene/scene_node';
 import { Application } from '../app';
 import type { Drawable, PickTarget } from '../render';
 import { SceneRenderer } from '../render';
-import type { FrameBuffer } from '@zephyr3d/device';
+import type { BaseTexture, FrameBuffer } from '@zephyr3d/device';
 import type { Compositor } from '../posteffect';
 import type { Scene } from '../scene/scene';
 import type { BaseCameraController } from './base';
@@ -19,6 +20,11 @@ export type PickResult = {
   target: PickTarget;
 };
 
+export type CameraHistoryData = {
+  prevColorTex: BaseTexture;
+  prevDepthTex: BaseTexture;
+};
+
 /**
  * The camera node class
  * @public
@@ -26,6 +32,8 @@ export type PickResult = {
 export class Camera extends SceneNode {
   /** @internal */
   private static _halton23 = halton23(16);
+  /** @internal */
+  private static _historyData: WeakMap<Camera, CameraHistoryData> = new WeakMap();
   /** @internal */
   protected _projMatrix: Matrix4x4;
   /** @internal */
@@ -99,6 +107,10 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _pickResult: PickResult;
   /** @internal */
+  protected _jitterValue: Vector2;
+  /** @internal */
+  protected _prevJitterValue: Vector2;
+  /** @internal */
   protected _jitteredVPMatrix: Matrix4x4;
   /** @internal */
   protected _prevVPMatrix: Matrix4x4;
@@ -148,9 +160,11 @@ export class Camera extends SceneNode {
     this._pickResult = null;
     this._commandBufferReuse = true;
     this._jitteredVPMatrix = new Matrix4x4();
+    this._jitterValue = new Vector2(0, 0);
     this._prevVPMatrix = null;
     this._prevPosition = null;
     this._prevJitteredVPMatrix = null;
+    this._prevJitterValue = null;
   }
   /** Clip plane in camera space */
   get clipPlane(): Plane {
@@ -620,6 +634,48 @@ export class Camera extends SceneNode {
   getAspect(): number {
     return this._projMatrix.getAspect();
   }
+  /** Returns true if the camera is perspective */
+  isPerspective(): boolean {
+    return this._projMatrix.isPerspective();
+  }
+  /** Returns true if the camera is orthographic */
+  isOrtho(): boolean {
+    return this._projMatrix.isOrtho();
+  }
+  /**
+   * Gets the camera history data which is used in temporal reprojection
+   * @returns Camera history data
+   */
+  getHistoryData(): CameraHistoryData {
+    let data = Camera._historyData.get(this);
+    if (!data) {
+      data = {
+        prevColorTex: null,
+        prevDepthTex: null
+      };
+      Camera._historyData.set(this, data);
+    }
+    return data;
+  }
+  /**
+   * Clears the camera history data which is used in temporal reprojection
+   */
+  clearHistoryData() {
+    const data = Camera._historyData.get(this);
+    if (data) {
+      if (data.prevColorTex) {
+        Application.instance.device.pool.releaseTexture(data.prevColorTex);
+      }
+      if (data.prevDepthTex) {
+        Application.instance.device.pool.releaseTexture(data.prevDepthTex);
+      }
+      Camera._historyData.delete(this);
+    }
+    this._prevVPMatrix = null;
+    this._prevPosition = null;
+    this._prevJitteredVPMatrix = null;
+    this._prevJitterValue = null;
+  }
   /**
    * Renders a scene
    * @param scene - The scene to be rendered
@@ -632,15 +688,15 @@ export class Camera extends SceneNode {
       const width = device.getDrawingBufferWidth();
       const height = device.getDrawingBufferHeight();
       const halton = Camera._halton23[device.frameInfo.frameCounter % Camera._halton23.length];
-      const jitterX = halton[0] / width;
-      const jitterY = halton[1] / height;
+      this._jitterValue.setXY((halton[0] * 1) / width, (halton[1] * 1) / height);
       this._jitteredVPMatrix.set(this.getProjectionMatrix());
-      this._jitteredVPMatrix[8] += jitterX;
-      this._jitteredVPMatrix[9] += jitterY;
+      this._jitteredVPMatrix[8] += this._jitterValue.x;
+      this._jitteredVPMatrix[9] += this._jitterValue.y;
       this._jitteredVPMatrix.multiplyRight(this.viewMatrix);
       if (!this._prevJitteredVPMatrix) {
         this._prevJitteredVPMatrix = new Matrix4x4();
         this._prevJitteredVPMatrix.set(this._jitteredVPMatrix);
+        this._prevJitterValue = new Vector2(this._jitterValue);
       }
       if (!this._prevVPMatrix) {
         this._prevVPMatrix = new Matrix4x4();
@@ -651,6 +707,7 @@ export class Camera extends SceneNode {
       this._prevVPMatrix = null;
       this._prevPosition = null;
       this._prevJitteredVPMatrix = null;
+      this._prevJitterValue = null;
     }
     device.pushDeviceStates();
     device.reverseVertexWindingOrder(false);
@@ -660,6 +717,7 @@ export class Camera extends SceneNode {
     device.popDeviceStates();
     if (useTAA) {
       this._prevJitteredVPMatrix.set(this._jitteredVPMatrix);
+      this._prevJitterValue.set(this._jitterValue);
       this._prevVPMatrix.set(this.viewProjectionMatrix);
       this._prevPosition = this.getWorldPosition();
     }
@@ -681,8 +739,16 @@ export class Camera extends SceneNode {
     return this._jitteredVPMatrix;
   }
   /** @internal */
+  get jitterValue() {
+    return this._jitterValue;
+  }
+  /** @internal */
   get prevJitteredVPMatrix() {
     return this._prevJitteredVPMatrix;
+  }
+  /** @internal */
+  get prevJitterValue() {
+    return this._prevJitterValue;
   }
   /** @internal */
   get prevVPMatrix() {
@@ -735,6 +801,7 @@ export class Camera extends SceneNode {
   /** {@inheritdoc SceneNode.dispose} */
   dispose() {
     this.setController(null);
+    this.clearHistoryData();
     this._projMatrix = null;
     this._viewMatrix = null;
     this._viewProjMatrix = null;

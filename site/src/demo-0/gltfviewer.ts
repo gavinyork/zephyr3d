@@ -203,6 +203,7 @@ export class GLTFViewer {
   }
   async loadModel(url: string) {
     this._modelNode?.remove();
+    this._camera.clearHistoryData();
     this._assetManager.purgeCache();
     this._assetManager
       .fetchModel(this._scene, url, {
@@ -237,6 +238,7 @@ export class GLTFViewer {
         this._floor.parent = this._showFloor ? this._modelNode : null;
         this.lookAt();
         this._light0.shadow.shadowRegion = this.getBoundingBox();
+        this._camera.clearHistoryData();
       });
     this._water.ssrMaxDistance = Vector3.distance(
       this._scene.boundingBox.minPoint,

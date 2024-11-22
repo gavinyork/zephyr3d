@@ -2,7 +2,7 @@ import { LightPass } from './lightpass';
 import { ShadowMapPass } from './shadowmap_pass';
 import { DepthPass } from './depthpass';
 import { isPowerOf2, nextPowerOf2, Vector4 } from '@zephyr3d/base';
-import type { BaseTexture, ColorState, FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
+import type { ColorState, FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
 import { Application } from '../app';
 import { CopyBlitter } from '../blitter';
 import type { DrawContext } from './drawable';
@@ -40,14 +40,6 @@ export class SceneRenderer {
   private static _backDepthColorState: ColorState = null;
   /** @internal */
   private static _clusters: ClusteredLight[] = [];
-  /** @internal */
-  private static _cameraTextures: WeakMap<
-    Camera,
-    {
-      prevColorTex: BaseTexture;
-      prevDepthTex: BaseTexture;
-    }
-  > = new WeakMap();
   /** lighting render pass */
   static get sceneRenderPass(): LightPass {
     return this._scenePass;
@@ -77,7 +69,7 @@ export class SceneRenderer {
   }
   /**
    * Renders a scene by given camera
-   * @param scene - The scene to be rendered
+   * @param scene - The scene tondered
    * @param camera - The camera that will be used to render the scene
    * @param compositor - The compositor that will be used to apply postprocess effects
    */
@@ -109,9 +101,11 @@ export class SceneRenderer {
         device.type !== 'webgl' && camera.TAA
           ? {
               jitteredVPMatrix: camera.jitteredVPMatrix,
+              jitterValue: camera.jitterValue,
               VPMatrix: camera.viewProjectionMatrix,
               position: camera.getWorldPosition(),
               prevJitteredVPMatrix: camera.prevJitteredVPMatrix,
+              prevJitterValue: camera.prevJitterValue,
               prevVPMatrix: camera.prevVPMatrix,
               prevPosition: camera.prevPosition,
               prevColorTexture: null,
@@ -287,16 +281,9 @@ export class SceneRenderer {
         ctx.HiZTexture = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
       }
       if (ctx.TAA) {
-        let t = this._cameraTextures.get(ctx.camera);
-        if (!t) {
-          t = {
-            prevColorTex: null,
-            prevDepthTex: null
-          };
-          this._cameraTextures.set(ctx.camera, t);
-        }
-        ctx.TAA.prevDepthTexture = t.prevDepthTex;
-        ctx.TAA.prevColorTexture = t.prevColorTex;
+        const data = ctx.camera.getHistoryData();
+        ctx.TAA.prevDepthTexture = data.prevDepthTex;
+        ctx.TAA.prevColorTexture = data.prevColorTex;
       }
       if (ctx.depthTexture === finalFramebuffer?.getDepthAttachment()) {
         tempFramebuffer = finalFramebuffer;
@@ -383,9 +370,9 @@ export class SceneRenderer {
     ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
 
     if (ctx.TAA) {
-      const t = this._cameraTextures.get(ctx.camera);
-      t.prevColorTex = ctx.TAA.prevColorTexture;
-      t.prevDepthTex = ctx.TAA.prevDepthTexture;
+      const data = ctx.camera.getHistoryData();
+      data.prevColorTex = ctx.TAA.prevColorTexture;
+      data.prevDepthTex = ctx.TAA.prevDepthTexture;
     }
     if (tempFramebuffer && tempFramebuffer !== finalFramebuffer) {
       const blitter = new CopyBlitter();

@@ -1,4 +1,4 @@
-import type { Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
+import type { Matrix4x4, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   BaseTexture,
@@ -114,7 +114,9 @@ export interface DrawContext {
     prevVPMatrix: Matrix4x4;
     prevPosition: Vector3;
     prevJitteredVPMatrix: Matrix4x4;
+    prevJitterValue: Vector2;
     jitteredVPMatrix: Matrix4x4;
+    jitterValue: Vector2;
     VPMatrix: Matrix4x4;
     position: Vector3;
     prevColorTexture: BaseTexture;

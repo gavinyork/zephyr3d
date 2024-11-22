@@ -66,7 +66,7 @@ export class TAA extends AbstractPostEffect<'TAA'> {
       this._bindGroup.setTexture(
         'historyColor',
         ctx.TAA.prevColorTexture,
-        fetchSampler('clamp_nearest_nomip')
+        fetchSampler('clamp_linear_nomip')
       );
       this._bindGroup.setTexture(
         'historyDepth',
