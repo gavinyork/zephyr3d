@@ -257,7 +257,7 @@ export class TAA extends AbstractPostEffect<'TAA'> {
               }
               this.colorAvg = pb.div(this.colorAvg, n - 1);
               this.colorAvg2 = pb.div(this.colorAvg2, n - 1);
-              this.$l.boxSize = pb.mix(0, 2.5, pb.smoothStep(0.02, 0, pb.length(this.closestVelocity)));
+              this.$l.boxSize = pb.mix(2.5, 0, pb.smoothStep(0, 0.02, pb.length(this.closestVelocity)));
               this.$l.dev = pb.mul(
                 pb.sqrt(pb.abs(pb.sub(this.colorAvg2, pb.mul(this.colorAvg, this.colorAvg)))),
                 this.boxSize
