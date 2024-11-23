@@ -664,7 +664,7 @@ export class ShaderHelper {
         ctx.renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP &&
         ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR &&
         ctx.queue !== QUEUE_TRANSPARENT
-          ? ctx.TAA.jitteredVPMatrix
+          ? ctx.camera.jitteredVPMatrix
           : ctx.camera.viewProjectionMatrix,
       viewMatrix: ctx.camera.viewMatrix,
       params: new Vector4(

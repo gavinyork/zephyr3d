@@ -97,22 +97,7 @@ export class SceneRenderer {
       drawEnvLight: false,
       env: null,
       materialFlags: 0,
-      TAA:
-        device.type !== 'webgl' && camera.TAA
-          ? {
-              jitteredVPMatrix: camera.jitteredVPMatrix,
-              jitterValue: camera.jitterValue,
-              VPMatrix: camera.viewProjectionMatrix,
-              position: camera.getWorldPosition(),
-              prevJitteredVPMatrix: camera.prevJitteredVPMatrix,
-              prevJitterValue: camera.prevJitterValue,
-              prevVPMatrix: camera.prevVPMatrix,
-              prevPosition: camera.prevPosition,
-              prevColorTexture: null,
-              prevDepthTexture: null,
-              prevMotionVectorTexture: null
-            }
-          : null
+      TAA: device.type !== 'webgl' && camera.TAA
     };
     scene.frameUpdate();
     if (camera && !device.isContextLost()) {
@@ -281,12 +266,6 @@ export class SceneRenderer {
         buildHiZ(ctx.depthTexture, HiZFrameBuffer);
         ctx.HiZTexture = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
       }
-      if (ctx.TAA) {
-        const data = ctx.camera.getHistoryData();
-        ctx.TAA.prevDepthTexture = data.prevDepthTex;
-        ctx.TAA.prevColorTexture = data.prevColorTex;
-        ctx.TAA.prevMotionVectorTexture = data.prevMotionVectorTex;
-      }
       if (ctx.depthTexture === finalFramebuffer?.getDepthAttachment()) {
         tempFramebuffer = finalFramebuffer;
       } else {
@@ -371,12 +350,6 @@ export class SceneRenderer {
     renderQueue.dispose();
     ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
 
-    if (ctx.TAA) {
-      const data = ctx.camera.getHistoryData();
-      data.prevColorTex = ctx.TAA.prevColorTexture;
-      data.prevDepthTex = ctx.TAA.prevDepthTexture;
-      data.prevMotionVectorTex = ctx.TAA.prevMotionVectorTexture;
-    }
     if (tempFramebuffer && tempFramebuffer !== finalFramebuffer) {
       const blitter = new CopyBlitter();
       if (oversizedViewport) {

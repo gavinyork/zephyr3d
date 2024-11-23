@@ -1,7 +1,6 @@
-import type { Matrix4x4, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import type { Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
-  BaseTexture,
   ColorState,
   FaceMode,
   GPUDataBuffer,
@@ -110,19 +109,7 @@ export interface DrawContext {
   /** Force color mask state */
   forceColorState?: ColorState;
   /** TAA related stuff */
-  TAA?: {
-    prevVPMatrix: Matrix4x4;
-    prevPosition: Vector3;
-    prevJitteredVPMatrix: Matrix4x4;
-    prevJitterValue: Vector2;
-    jitteredVPMatrix: Matrix4x4;
-    jitterValue: Vector2;
-    VPMatrix: Matrix4x4;
-    position: Vector3;
-    prevColorTexture: BaseTexture;
-    prevDepthTexture: BaseTexture;
-    prevMotionVectorTexture: BaseTexture;
-  };
+  TAA: boolean;
 }
 
 /**

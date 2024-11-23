@@ -22,7 +22,6 @@ export type PickResult = {
 
 export type CameraHistoryData = {
   prevColorTex: BaseTexture;
-  prevDepthTex: BaseTexture;
   prevMotionVectorTex: BaseTexture;
 };
 
@@ -664,7 +663,6 @@ export class Camera extends SceneNode {
     if (!data) {
       data = {
         prevColorTex: null,
-        prevDepthTex: null,
         prevMotionVectorTex: null
       };
       Camera._historyData.set(this, data);
@@ -679,9 +677,6 @@ export class Camera extends SceneNode {
     if (data) {
       if (data.prevColorTex) {
         Application.instance.device.pool.releaseTexture(data.prevColorTex);
-      }
-      if (data.prevDepthTex) {
-        Application.instance.device.pool.releaseTexture(data.prevDepthTex);
       }
       if (data.prevMotionVectorTex) {
         Application.instance.device.pool.releaseTexture(data.prevMotionVectorTex);
