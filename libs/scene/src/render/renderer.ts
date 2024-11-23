@@ -109,7 +109,8 @@ export class SceneRenderer {
               prevVPMatrix: camera.prevVPMatrix,
               prevPosition: camera.prevPosition,
               prevColorTexture: null,
-              prevDepthTexture: null
+              prevDepthTexture: null,
+              prevMotionVectorTexture: null
             }
           : null
     };
@@ -284,6 +285,7 @@ export class SceneRenderer {
         const data = ctx.camera.getHistoryData();
         ctx.TAA.prevDepthTexture = data.prevDepthTex;
         ctx.TAA.prevColorTexture = data.prevColorTex;
+        ctx.TAA.prevMotionVectorTexture = data.prevMotionVectorTex;
       }
       if (ctx.depthTexture === finalFramebuffer?.getDepthAttachment()) {
         tempFramebuffer = finalFramebuffer;
@@ -373,6 +375,7 @@ export class SceneRenderer {
       const data = ctx.camera.getHistoryData();
       data.prevColorTex = ctx.TAA.prevColorTexture;
       data.prevDepthTex = ctx.TAA.prevDepthTexture;
+      data.prevMotionVectorTex = ctx.TAA.prevMotionVectorTexture;
     }
     if (tempFramebuffer && tempFramebuffer !== finalFramebuffer) {
       const blitter = new CopyBlitter();

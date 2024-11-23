@@ -212,6 +212,7 @@ export class Panel {
       .onChange((value) => {
         this._viewer.enableTAA(value);
       });
+    /*
     ppSettings
       .add(this._params, 'taaDebug', this._taaDebugNames)
       .name('TAA Debug option')
@@ -219,7 +220,7 @@ export class Panel {
         const index = this._taaDebugNames.indexOf(value);
         this._viewer.camera.TAADebug = this._taaDebugTypes[index];
       });
-
+    */
     const perfSettings = this._gui.addFolder('Performance');
     perfSettings.add(this._params, 'FPS').name('FPS').disable(true).listen();
     setInterval(() => {

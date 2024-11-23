@@ -8,6 +8,7 @@ import {
   MORPH_TARGET_POSITION,
   MORPH_TARGET_TANGENT,
   MORPH_WEIGHTS_VECTOR_COUNT,
+  QUEUE_TRANSPARENT,
   RENDER_PASS_TYPE_DEPTH,
   RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_OBJECT_COLOR,
@@ -446,17 +447,6 @@ export class ShaderHelper {
           that.getPrevUnjitteredViewProjectionMatrix(this),
           this.worldPos
         );
-        const cameraParams = that.getCameraParams(this);
-        if (cameraParams) {
-          this.$outputs.zMotionVectorPosCurrent = pb.mul(
-            this.$outputs.zMotionVectorPosCurrent,
-            pb.vec4(1, cameraParams.z, 1, 1)
-          );
-          this.$outputs.zMotionVectorPosPrev = pb.mul(
-            this.$outputs.zMotionVectorPosPrev,
-            pb.vec4(1, cameraParams.z, 1, 1)
-          );
-        }
       }
       this.$return(this.pos);
     });
@@ -672,7 +662,8 @@ export class ShaderHelper {
       viewProjectionMatrix:
         ctx.motionVectors &&
         ctx.renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP &&
-        ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR
+        ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR &&
+        ctx.queue !== QUEUE_TRANSPARENT
           ? ctx.TAA.jitteredVPMatrix
           : ctx.camera.viewProjectionMatrix,
       viewMatrix: ctx.camera.viewMatrix,

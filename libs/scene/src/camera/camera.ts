@@ -23,6 +23,7 @@ export type PickResult = {
 export type CameraHistoryData = {
   prevColorTex: BaseTexture;
   prevDepthTex: BaseTexture;
+  prevMotionVectorTex: BaseTexture;
 };
 
 /**
@@ -663,7 +664,8 @@ export class Camera extends SceneNode {
     if (!data) {
       data = {
         prevColorTex: null,
-        prevDepthTex: null
+        prevDepthTex: null,
+        prevMotionVectorTex: null
       };
       Camera._historyData.set(this, data);
     }
@@ -680,6 +682,9 @@ export class Camera extends SceneNode {
       }
       if (data.prevDepthTex) {
         Application.instance.device.pool.releaseTexture(data.prevDepthTex);
+      }
+      if (data.prevMotionVectorTex) {
+        Application.instance.device.pool.releaseTexture(data.prevMotionVectorTex);
       }
       Camera._historyData.delete(this);
     }
@@ -700,7 +705,7 @@ export class Camera extends SceneNode {
       const width = device.getDrawingBufferWidth();
       const height = device.getDrawingBufferHeight();
       const halton = Camera._halton23[device.frameInfo.frameCounter % Camera._halton23.length];
-      this._jitterValue.setXY((halton[0] * 1) / width, (halton[1] * 1) / height);
+      this._jitterValue.setXY((halton[0] * 2) / width, (halton[1] * 2) / height);
       this._jitteredVPMatrix.set(this.getProjectionMatrix());
       this._jitteredVPMatrix[8] += this._jitterValue.x;
       this._jitteredVPMatrix[9] += this._jitterValue.y;

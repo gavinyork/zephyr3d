@@ -121,6 +121,7 @@ export interface DrawContext {
     position: Vector3;
     prevColorTexture: BaseTexture;
     prevDepthTexture: BaseTexture;
+    prevMotionVectorTexture: BaseTexture;
   };
 }
 

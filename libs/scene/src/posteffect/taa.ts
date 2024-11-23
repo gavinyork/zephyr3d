@@ -11,6 +11,7 @@ const DEBUG_HISTORY_COLOR = 2;
 const DEBUG_VELOCITY = 3;
 const DEBUG_EDGE = 4;
 const DEBUG_ALAPH = 5;
+
 const FLT_MIN = 0.00000001;
 const FLT_MAX = 32767;
 
@@ -90,8 +91,14 @@ export class TAA extends AbstractPostEffect<'TAA'> {
         ctx.motionVectorTexture,
         fetchSampler('clamp_nearest_nomip')
       );
+      this._bindGroup.setTexture(
+        'prevMotionVector',
+        ctx.TAA.prevMotionVectorTexture,
+        fetchSampler('clamp_nearest_nomip')
+      );
       TAA._texelSize.setXY(1 / sceneDepthTexture.width, 1 / sceneDepthTexture.height);
       this._bindGroup.setValue('texelSize', TAA._texelSize);
+      this._bindGroup.setValue('occlusionParams', new Vector2(2.5, 0.01));
       this._bindGroup.setValue('debug', ctx.camera.TAADebug);
       this._bindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
       this._bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
@@ -111,6 +118,11 @@ export class TAA extends AbstractPostEffect<'TAA'> {
     const currentColorTex = ctx.device.getFramebuffer().getColorAttachments()[0];
     ctx.device.pool.retainTexture(currentColorTex);
     ctx.TAA.prevColorTexture = currentColorTex;
+    if (ctx.TAA.prevMotionVectorTexture) {
+      ctx.device.pool.releaseTexture(ctx.TAA.prevMotionVectorTexture);
+    }
+    ctx.device.pool.retainTexture(ctx.motionVectorTexture);
+    ctx.TAA.prevMotionVectorTexture = ctx.motionVectorTexture;
   }
   requireLinearDepthTexture(ctx: DrawContext): boolean {
     return true;
@@ -187,7 +199,9 @@ export class TAA extends AbstractPostEffect<'TAA'> {
           this.currentColorTex = pb.tex2D().uniform(0);
           this.currentDepthTex = pb.tex2D().uniform(0);
           this.motionVector = pb.tex2D().uniform(0);
+          this.prevMotionVector = pb.tex2D().uniform(0);
           this.texelSize = pb.vec2().uniform(0);
+          this.occlusionParams = pb.vec2().uniform(0);
           this.debug = pb.int().uniform(0);
           this.srgbOut = pb.int().uniform(0);
           this.$outputs.outColor = pb.vec4();
@@ -283,18 +297,28 @@ export class TAA extends AbstractPostEffect<'TAA'> {
           pb.func('luminance', [pb.vec3('color')], function () {
             this.$return(pb.max(pb.dot(this.color, pb.vec3(0.299, 0.587, 0.114)), 0.0001));
           });
+          pb.func(
+            'getDisocclusionFactor',
+            [pb.vec2('uv'), pb.vec2('velocity'), pb.vec2('texSize')],
+            function () {
+              this.$l.prevVelocity = pb.textureSampleLevel(this.prevMotionVector, this.uv, 0).xy;
+              this.$l.disocclusion = pb.sub(
+                pb.length(pb.mul(pb.sub(this.velocity, this.prevVelocity), this.texSize)),
+                this.occlusionParams.x
+              );
+              this.$return(pb.clamp(pb.mul(this.disocclusion, this.occlusionParams.y), 0, 1));
+            }
+          );
           pb.main(function () {
-            this.$l.screenUV = pb.div(
-              pb.vec2(this.$builtins.fragCoord.xy),
-              pb.vec2(pb.textureDimensions(this.currentColorTex, 0))
-            );
-            this.$l.velocity = pb.textureSampleLevel(this.motionVector, this.screenUV, 0);
-            this.$l.reprojectedUV = pb.sub(this.screenUV, pb.mul(this.velocity.xy, pb.vec2(1, -1)));
-            this.$l.prevColor = pb.textureSampleLevel(this.historyColorTex, this.reprojectedUV, 0).rgb;
-            this.$l.currentColor = pb.textureSampleLevel(this.currentColorTex, this.screenUV, 0).rgb;
+            this.$l.texSize = pb.vec2(pb.textureDimensions(this.currentColorTex, 0));
+            this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
+            this.$l.velocity = pb.textureSampleLevel(this.motionVector, this.screenUV, 0).xy;
+            this.$l.reprojectedUV = pb.sub(this.screenUV, pb.mul(this.velocity, pb.vec2(1, 1)));
+            this.$l.historyColor = pb.textureSampleLevel(this.historyColorTex, this.reprojectedUV, 0).rgb;
+            this.$l.sampleColor = pb.textureSampleLevel(this.currentColorTex, this.screenUV, 0).rgb;
             this.$l.velocityClosest = this.getClosestVelocity(this.screenUV);
-            this.prevColor = this.clipHistoryColor(this.screenUV, this.prevColor, this.velocityClosest);
-            this.$l.blendFactor = pb.float(1 / 16);
+            this.prevColor = this.clipHistoryColor(this.screenUV, this.historyColor, this.velocityClosest);
+            this.$l.blendFactor = pb.float(1 / 8);
             this.$l.screenFactor = this.$choice(
               pb.or(
                 pb.any(pb.lessThan(this.reprojectedUV, pb.vec2(0))),
@@ -303,9 +327,18 @@ export class TAA extends AbstractPostEffect<'TAA'> {
               pb.float(1),
               pb.float(0)
             );
-            this.$l.alpha = pb.clamp(pb.add(this.blendFactor, this.screenFactor), 0, 1);
+            this.$l.disocclusionFactor = this.getDisocclusionFactor(
+              this.reprojectedUV,
+              this.velocity,
+              this.texSize
+            );
+            this.$l.alpha = pb.clamp(
+              pb.add(this.blendFactor, this.screenFactor, this.disocclusionFactor),
+              0,
+              1
+            );
             this.prevColor = this.reinhard(this.prevColor);
-            this.currentColor = this.reinhard(this.currentColor);
+            this.currentColor = this.reinhard(this.sampleColor);
             this.$l.currentLum = this.luminance(this.currentColor);
             this.$l.prevLum = this.luminance(this.prevColor);
             this.$l.diff = pb.div(
@@ -318,9 +351,11 @@ export class TAA extends AbstractPostEffect<'TAA'> {
             this.$l.resolvedColor = pb.vec3();
             this.$if(pb.equal(this.debug, DEBUG_CURRENT_COLOR), function () {
               this.resolvedColor = this.currentColor.rgb;
+              this.resolvedColor = this.reinhardInv(this.resolvedColor);
             })
               .$elseif(pb.equal(this.debug, DEBUG_HISTORY_COLOR), function () {
                 this.resolvedColor = this.prevColor.rgb;
+                this.resolvedColor = this.reinhardInv(this.resolvedColor);
               })
               .$elseif(pb.equal(this.debug, DEBUG_EDGE), function () {
                 this.resolvedColor = pb.vec3(this.screenFactor);
@@ -329,7 +364,7 @@ export class TAA extends AbstractPostEffect<'TAA'> {
                 this.resolvedColor = pb.vec3(this.alpha);
               })
               .$elseif(pb.equal(this.debug, DEBUG_VELOCITY), function () {
-                this.resolvedColor = pb.vec3(pb.add(pb.mul(this.velocity.xy, 0.5), pb.vec2(0.5)), 0);
+                this.resolvedColor = pb.abs(pb.sub(this.sampleColor, this.historyColor));
               })
               .$else(function () {
                 this.resolvedColor = pb.mix(this.prevColor.rgb, this.currentColor.rgb, this.alpha);
