@@ -81,7 +81,7 @@ export class SceneRenderer {
       primaryCamera: camera,
       picking: false,
       oit: null,
-      motionVectors: device.type !== 'webgl' && camera.TAA,
+      motionVectors: camera.TAA,
       HiZ: camera.HiZ && device.type !== 'webgl',
       HiZTexture: null,
       globalBindGroupAllocator: GlobalBindGroupAllocator.get(),
@@ -97,7 +97,7 @@ export class SceneRenderer {
       drawEnvLight: false,
       env: null,
       materialFlags: 0,
-      TAA: device.type !== 'webgl' && camera.TAA
+      TAA: camera.TAA
     };
     scene.frameUpdate();
     if (camera && !device.isContextLost()) {
@@ -208,7 +208,7 @@ export class SceneRenderer {
           : SSRCalcThickness
           ? 'rg32f'
           : 'r32f';
-      const mvFormat: TextureFormat = 'rg16f';
+      const mvFormat: TextureFormat = device.type === 'webgl' ? 'rgba8unorm' : 'rg16f';
       if (!finalFramebuffer && !vp) {
         depthFramebuffer = device.pool.fetchTemporalFramebuffer(
           true,

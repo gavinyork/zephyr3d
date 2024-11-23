@@ -1,16 +1,18 @@
 import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext, Primitive } from '../render';
 import { AbstractPostEffect } from './posteffect';
-import { linearToGamma } from '../shaders';
+import { linearToGamma, packFloat16x2 } from '../shaders';
 import { fetchSampler } from '../utility/misc';
 import { BoxShape } from '../shapes';
 import { temporalResolve } from '../shaders/temporal';
+import { Vector2 } from '@zephyr3d/base';
 
 export class TAA extends AbstractPostEffect<'TAA'> {
   static readonly className = 'TAA' as const;
   private static _resolveProgram: GPUProgram = null;
   private static _skyMotionVectorProgram: GPUProgram = null;
   private static _box: Primitive;
+  private static _texSize = new Vector2();
   private _bindGroup: BindGroup;
   private _skyMotionVectorBindGroup: BindGroup;
   constructor() {
@@ -80,6 +82,8 @@ export class TAA extends AbstractPostEffect<'TAA'> {
       this._bindGroup.setValue('debug', ctx.camera.TAADebug);
       this._bindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
       this._bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
+      TAA._texSize.setXY(sceneDepthTexture.width, sceneDepthTexture.height);
+      this._bindGroup.setValue('texSize', TAA._texSize);
       //this.passThrough(ctx, inputColorTexture, srgbOutput, AbstractPostEffect.getZTestEqualRenderState(ctx));
       ctx.device.setProgram(program);
       ctx.device.setBindGroup(0, this._bindGroup);
@@ -134,6 +138,12 @@ export class TAA extends AbstractPostEffect<'TAA'> {
               0.5
             );
             this.$outputs.color = pb.vec4(this.motionVector, 0, 1);
+            if (pb.getDevice().type === 'webgl') {
+              this.$outputs.zMotionVector = packFloat16x2(
+                this,
+                pb.add(pb.mul(this.$outputs.color.xy, 0.5), pb.vec2(0.5))
+              );
+            }
           });
         }
       });
@@ -172,11 +182,11 @@ export class TAA extends AbstractPostEffect<'TAA'> {
           this.currentDepthTex = pb.tex2D().uniform(0);
           this.motionVector = pb.tex2D().uniform(0);
           this.prevMotionVector = pb.tex2D().uniform(0);
+          this.texSize = pb.vec2().uniform(0);
           this.debug = pb.int().uniform(0);
           this.srgbOut = pb.int().uniform(0);
           this.$outputs.outColor = pb.vec4();
           pb.main(function () {
-            this.$l.texSize = pb.vec2(pb.textureDimensions(this.currentColorTex, 0));
             this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
             this.$l.resolvedColor = temporalResolve(
               this,

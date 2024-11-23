@@ -695,7 +695,7 @@ export class Camera extends SceneNode {
    */
   render(scene: Scene, compositor?: Compositor) {
     const device = Application.instance.device;
-    const useTAA = device.type !== 'webgl' && this._TAA;
+    const useTAA = this._TAA;
     if (useTAA) {
       const width = device.getDrawingBufferWidth();
       const height = device.getDrawingBufferHeight();

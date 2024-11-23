@@ -1,4 +1,5 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import { unpackFloat16x2 } from './misc';
 
 const DEBUG_CURRENT_COLOR = 1;
 const DEBUG_HISTORY_COLOR = 2;
@@ -36,7 +37,12 @@ export function temporalResolve(
         });
       }
     }
-    this.$return(pb.textureSampleLevel(motionVectorTex, this.closestUV, 0).xy);
+    this.$l.motionVector = pb.textureSampleLevel(motionVectorTex, this.closestUV, 0);
+    if (pb.getDevice().type === 'webgl') {
+      this.$return(pb.sub(pb.mul(unpackFloat16x2(this, this.motionVector), 2), pb.vec2(1)));
+    } else {
+      this.$return(this.motionVector.xy);
+    }
   });
   pb.func('clipAABB', [pb.vec3('aabbMin'), pb.vec3('aabbMax'), pb.vec3('p'), pb.vec3('q')], function () {
     this.$l.r = pb.sub(this.q, this.p);
@@ -110,7 +116,11 @@ export function temporalResolve(
     this.$return(pb.max(pb.dot(this.color, pb.vec3(0.299, 0.587, 0.114)), 0.0001));
   });
   pb.func('getDisocclusionFactor', [pb.vec2('uv'), pb.vec2('velocity'), pb.vec2('texSize')], function () {
-    this.$l.prevVelocity = pb.textureSampleLevel(prevMotionVectorTex, this.uv, 0).xy;
+    this.$l.prevVelocitySample = pb.textureSampleLevel(prevMotionVectorTex, this.uv, 0);
+    this.$l.prevVelocity =
+      pb.getDevice().type === 'webgl'
+        ? pb.sub(pb.mul(unpackFloat16x2(this, this.prevVelocitySample), 2), pb.vec2(1))
+        : this.prevVelocitySample.xy;
     this.$l.disocclusion = pb.sub(
       pb.length(pb.mul(pb.sub(this.velocity, this.prevVelocity), this.texSize)),
       2.5
@@ -118,7 +128,11 @@ export function temporalResolve(
     this.$return(pb.clamp(pb.mul(this.disocclusion, 0.01), 0, 1));
   });
   pb.func('temporalResolve', [pb.vec2('screenUV'), pb.vec2('texSize'), pb.int('debug')], function () {
-    this.$l.velocity = pb.textureSampleLevel(motionVectorTex, this.screenUV, 0).xy;
+    this.$l.velocitySample = pb.textureSampleLevel(motionVectorTex, this.screenUV, 0);
+    this.$l.velocity =
+      pb.getDevice().type === 'webgl'
+        ? pb.sub(pb.mul(unpackFloat16x2(this, this.velocitySample), 2), pb.vec2(1))
+        : this.velocitySample.xy;
     this.$l.reprojectedUV = pb.sub(this.screenUV, pb.mul(this.velocity, pb.vec2(1, 1)));
     this.$l.historyColor = pb.textureSampleLevel(historyColorTex, this.reprojectedUV, 0).rgb;
     this.$l.sampleColor = pb.textureSampleLevel(currentColorTex, this.screenUV, 0).rgb;

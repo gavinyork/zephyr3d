@@ -20,7 +20,7 @@ import {
 import { Material } from './material';
 import type { DepthPass } from '../render';
 import { type DrawContext, type ShadowMapPass } from '../render';
-import { encodeNormalizedFloatToRGBA } from '../shaders';
+import { encodeNormalizedFloatToRGBA, packFloat16x2 } from '../shaders';
 import { Application } from '../app';
 import { ShaderHelper } from './shader/helper';
 import { Vector2, Vector3, Vector4, applyMixins } from '@zephyr3d/base';
@@ -645,6 +645,12 @@ export class MeshMaterial extends Material {
             );
           } else {
             this.$outputs.zMotionVector = pb.vec4(0, 0, 0, 1);
+          }
+          if (that.drawContext.device.type === 'webgl') {
+            this.$outputs.zMotionVector = packFloat16x2(
+              this,
+              pb.add(pb.mul(this.$outputs.zMotionVector.xy, 0.5), pb.vec2(0.5))
+            );
           }
         }
       } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
