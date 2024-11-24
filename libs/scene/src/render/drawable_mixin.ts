@@ -1,5 +1,5 @@
 import type { GenericConstructor } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { Vector2, Vector4 } from '@zephyr3d/base';
 import type { AbstractDevice } from '@zephyr3d/device';
 import type { BindGroup } from '@zephyr3d/device';
 import type { BatchDrawable, DrawContext, Drawable } from './drawable';
@@ -22,6 +22,7 @@ export interface IMixinDrawable {
 }
 
 let _drawableId = 0;
+const boneTextureSize = new Vector2();
 
 const instanceBindGroupTransfromTags = new WeakMap<DrawableInstanceInfo, number>();
 const drawableBindGroupTransfromTags = new WeakMap<BindGroup, number>();
@@ -186,7 +187,8 @@ export function mixinDrawable<
           ShaderHelper.getBoneInvBindMatrixUniformName(),
           (this as unknown as Mesh).invWorldMatrix
         );
-        drawableBindGroup.setValue(ShaderHelper.getBoneTextureSizeUniformName(), boneTexture.width);
+        boneTextureSize.setXY(boneTexture.width, boneTexture.height);
+        drawableBindGroup.setValue(ShaderHelper.getBoneTextureSizeUniformName(), boneTextureSize);
       }
       if (ctx.materialFlags & MaterialVaryingFlags.MORPH_ANIMATION) {
         const morphData = (this as unknown as Mesh).getMorphData();

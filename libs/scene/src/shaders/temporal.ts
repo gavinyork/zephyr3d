@@ -127,6 +127,91 @@ export function temporalResolve(
     );
     this.$return(pb.clamp(pb.mul(this.disocclusion, 0.01), 0, 1));
   });
+  pb.func('sampleHistoryColorCatmulRom9', [pb.vec2('uv'), pb.vec2('texSize')], function () {
+    this.$l.samplePos = pb.mul(this.uv, this.texSize);
+    this.$l.texPos1 = pb.add(pb.floor(pb.sub(this.samplePos, pb.vec2(0.5))), pb.vec2(0.5));
+    this.$l.f = pb.sub(this.samplePos, this.texPos1);
+    this.$l.w0 = pb.mul(
+      this.f,
+      pb.sub(pb.mul(this.f, pb.sub(pb.vec2(1), pb.mul(this.f, 0.5))), pb.vec2(0.5))
+    );
+    this.$l.w1 = pb.add(pb.vec2(1), pb.mul(this.f, this.f, pb.sub(pb.mul(this.f, 1.5), pb.vec2(2.5))));
+    this.$l.w2 = pb.mul(
+      this.f,
+      pb.add(pb.vec2(0.5), pb.mul(this.f, pb.sub(pb.vec2(2), pb.mul(this.f, 1.5))))
+    );
+    this.$l.w3 = pb.mul(this.f, this.f, pb.sub(pb.mul(this.f, 0.5), pb.vec2(0.5)));
+    this.$l.w12 = pb.add(this.w1, this.w2);
+    this.$l.offset12 = pb.div(this.w2, pb.add(this.w1, this.w2));
+    this.$l.texPos0 = pb.sub(this.texPos1, pb.vec2(1));
+    this.$l.texPos3 = pb.add(this.texPos1, pb.vec2(2));
+    this.$l.texPos12 = pb.add(this.texPos1, this.offset12);
+    this.texPos0 = pb.div(this.texPos0, this.texSize);
+    this.texPos3 = pb.div(this.texPos3, this.texSize);
+    this.texPos12 = pb.div(this.texPos12, this.texSize);
+    this.$l.result = pb.vec3(0);
+    this.result = pb.add(
+      this.result,
+      pb.mul(pb.textureSampleLevel(historyColorTex, this.texPos0, 0).rgb, this.w0.x, this.w0.y)
+    );
+    this.result = pb.add(
+      this.result,
+      pb.mul(
+        pb.textureSampleLevel(historyColorTex, pb.vec2(this.texPos12.x, this.texPos0.y), 0).rgb,
+        this.w12.x,
+        this.w0.y
+      )
+    );
+    this.result = pb.add(
+      this.result,
+      pb.mul(
+        pb.textureSampleLevel(historyColorTex, pb.vec2(this.texPos3.x, this.texPos0.y), 0).rgb,
+        this.w3.x,
+        this.w0.y
+      )
+    );
+    this.result = pb.add(
+      this.result,
+      pb.mul(
+        pb.textureSampleLevel(historyColorTex, pb.vec2(this.texPos0.x, this.texPos12.y), 0).rgb,
+        this.w0.x,
+        this.w12.y
+      )
+    );
+    this.result = pb.add(
+      this.result,
+      pb.mul(pb.textureSampleLevel(historyColorTex, this.texPos12, 0).rgb, this.w12.x, this.w12.y)
+    );
+    this.result = pb.add(
+      this.result,
+      pb.mul(
+        pb.textureSampleLevel(historyColorTex, pb.vec2(this.texPos3.x, this.texPos12.y), 0).rgb,
+        this.w3.x,
+        this.w12.y
+      )
+    );
+    this.result = pb.add(
+      this.result,
+      pb.mul(
+        pb.textureSampleLevel(historyColorTex, pb.vec2(this.texPos0.x, this.texPos3.y), 0).rgb,
+        this.w0.x,
+        this.w3.y
+      )
+    );
+    this.result = pb.add(
+      this.result,
+      pb.mul(
+        pb.textureSampleLevel(historyColorTex, pb.vec2(this.texPos12.x, this.texPos3.y), 0).rgb,
+        this.w12.x,
+        this.w3.y
+      )
+    );
+    this.result = pb.add(
+      this.result,
+      pb.mul(pb.textureSampleLevel(historyColorTex, this.texPos3, 0).rgb, this.w3.x, this.w3.y)
+    );
+    this.$return(pb.max(this.result, pb.vec3(0)));
+  });
   pb.func('temporalResolve', [pb.vec2('screenUV'), pb.vec2('texSize'), pb.int('debug')], function () {
     this.$l.velocitySample = pb.textureSampleLevel(motionVectorTex, this.screenUV, 0);
     this.$l.velocity =
@@ -134,7 +219,8 @@ export function temporalResolve(
         ? pb.sub(pb.mul(unpackFloat16x2(this, this.velocitySample), 2), pb.vec2(1))
         : this.velocitySample.xy;
     this.$l.reprojectedUV = pb.sub(this.screenUV, pb.mul(this.velocity, pb.vec2(1, 1)));
-    this.$l.historyColor = pb.textureSampleLevel(historyColorTex, this.reprojectedUV, 0).rgb;
+    //this.$l.historyColor = pb.textureSampleLevel(historyColorTex, this.reprojectedUV, 0).rgb;
+    this.$l.historyColor = this.sampleHistoryColorCatmulRom9(this.reprojectedUV, this.texSize);
     this.$l.sampleColor = pb.textureSampleLevel(currentColorTex, this.screenUV, 0).rgb;
     this.$l.velocityClosest = this.getClosestVelocity(this.screenUV, this.texSize);
     this.prevColor = this.clipHistoryColor(
@@ -143,7 +229,7 @@ export function temporalResolve(
       this.velocityClosest,
       this.texSize
     );
-    this.$l.blendFactor = pb.float(1 / 8);
+    this.$l.blendFactor = pb.float(1 / 16);
     this.$l.screenFactor = this.$choice(
       pb.or(
         pb.any(pb.lessThan(this.reprojectedUV, pb.vec2(0))),

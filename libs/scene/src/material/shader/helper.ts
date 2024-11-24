@@ -63,6 +63,8 @@ export class ShaderHelper {
   static defaultSunDir = Vector3.one().inplaceNormalize();
   /** @internal */
   private static readonly SKIN_MATRIX_NAME = 'Z_SkinMatrix';
+  private static readonly SKIN_PREV_MATRIX_NAME = 'Z_PrevSkinMatrix';
+  private static readonly SKIN_BONE_OFFSET = 'Z_boneOffset';
   /** @internal */
   private static _drawableBindGroupLayouts: Record<string, BindGroupLayout> = {};
   /** @internal */
@@ -304,8 +306,14 @@ export class ShaderHelper {
     const funcNameGetBoneMatrixFromTexture = 'Z_getBoneMatrixFromTexture';
     pb.func(funcNameGetBoneMatrixFromTexture, [pb.int('boneIndex')], function () {
       const boneTexture = this[UNIFORM_NAME_BONE_MATRICES];
-      this.$l.w = pb.float(this[UNIFORM_NAME_BONE_TEXTURE_SIZE]);
-      this.$l.pixelIndex = pb.float(pb.mul(this.boneIndex, 4));
+      this.$l.uvOffsets = pb.textureSampleLevel(
+        boneTexture,
+        pb.div(pb.vec2(0.5), this[UNIFORM_NAME_BONE_TEXTURE_SIZE]),
+        0
+      );
+      this.$l.currentOffset = pb.int(this.uvOffsets.x);
+      this.$l.w = this[UNIFORM_NAME_BONE_TEXTURE_SIZE].x;
+      this.$l.pixelIndex = pb.float(pb.mul(pb.add(this.boneIndex, this.currentOffset), 4));
       this.$l.xIndex = pb.mod(this.pixelIndex, this.w);
       this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.w));
       this.$l.u1 = pb.div(pb.add(this.xIndex, 0.5), this.w);
@@ -410,6 +418,60 @@ export class ShaderHelper {
     const offset = scope[this.getMorphInfoUniformName()][pos][comp];
     return scope[funcName](pb.int(offset));
   }
+  /** @internal */
+  static prepareSkinAnimation(scope: PBInsideFunctionScope) {
+    if (!this.hasSkinning(scope)) {
+      return;
+    }
+    const that = this;
+    const pb = scope.$builder;
+    const funcNameGetBoneMatrixFromTexture = 'Z_getBoneMatrixFromTexture';
+    pb.func(funcNameGetBoneMatrixFromTexture, [pb.float('boneIndex'), pb.float('boneOffset')], function () {
+      const boneTexture = this[UNIFORM_NAME_BONE_MATRICES];
+      this.$l.w = this[UNIFORM_NAME_BONE_TEXTURE_SIZE].x;
+      this.$l.pixelIndex = pb.mul(pb.add(this.boneIndex, this.boneOffset), 4);
+      this.$l.xIndex = pb.mod(this.pixelIndex, this.w);
+      this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.w));
+      this.$l.u1 = pb.div(pb.add(this.xIndex, 0.5), this.w);
+      this.$l.u2 = pb.div(pb.add(this.xIndex, 1.5), this.w);
+      this.$l.u3 = pb.div(pb.add(this.xIndex, 2.5), this.w);
+      this.$l.u4 = pb.div(pb.add(this.xIndex, 3.5), this.w);
+      this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.w);
+      this.$l.row1 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u1, this.v), 0);
+      this.$l.row2 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u2, this.v), 0);
+      this.$l.row3 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u3, this.v), 0);
+      this.$l.row4 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u4, this.v), 0);
+      this.$return(pb.mat4(this.row1, this.row2, this.row3, this.row4));
+    });
+    const funcNameGetSkinningMatrix = 'Z_getSkinningMatrix';
+    pb.func(funcNameGetSkinningMatrix, [pb.float('boneOffset')], function () {
+      const invBindMatrix = this[UNIFORM_NAME_BONE_INV_BIND_MATRIX];
+      const blendIndices = scope.$getVertexAttrib('blendIndices');
+      const blendWeights = scope.$getVertexAttrib('blendWeights');
+      this.$l.m0 = scope.$g[funcNameGetBoneMatrixFromTexture](blendIndices[0], this.boneOffset);
+      this.$l.m1 = scope.$g[funcNameGetBoneMatrixFromTexture](blendIndices[1], this.boneOffset);
+      this.$l.m2 = scope.$g[funcNameGetBoneMatrixFromTexture](blendIndices[2], this.boneOffset);
+      this.$l.m3 = scope.$g[funcNameGetBoneMatrixFromTexture](blendIndices[3], this.boneOffset);
+      this.$l.m = pb.add(
+        pb.mul(this.m0, blendWeights.x),
+        pb.mul(this.m1, blendWeights.y),
+        pb.mul(this.m2, blendWeights.z),
+        pb.mul(this.m3, blendWeights.w)
+      );
+      this.$return(pb.mul(invBindMatrix, this.m));
+    });
+    const motionVector = !!this.getUnjitteredViewProjectionMatrix(scope);
+    const boneTexture = scope[UNIFORM_NAME_BONE_MATRICES];
+    scope.$l[that.SKIN_BONE_OFFSET] = pb.textureSampleLevel(
+      boneTexture,
+      pb.div(pb.vec2(0.5), scope[UNIFORM_NAME_BONE_TEXTURE_SIZE]),
+      0
+    ).xy;
+    scope.$l[that.SKIN_MATRIX_NAME] = scope[funcNameGetSkinningMatrix](scope[that.SKIN_BONE_OFFSET].x);
+    if (motionVector) {
+      scope.$l[that.SKIN_PREV_MATRIX_NAME] = scope[funcNameGetSkinningMatrix](scope[that.SKIN_BONE_OFFSET].y);
+    }
+  }
   /**
    * Calculates the vertex position of type vec3 in object space
    *
@@ -426,34 +488,45 @@ export class ShaderHelper {
       pb.getGlobalScope().$inputs.Z_pos = pb.vec3().attrib('position');
     }
     const that = this;
-    pb.func('Z_resolveVertexPosition', [], function () {
+    const params =
+      scope[that.SKIN_MATRIX_NAME] && scope[that.SKIN_PREV_MATRIX_NAME]
+        ? [pb.mat4('skinMatrix'), pb.mat4('prevSkinMatrix')]
+        : scope[that.SKIN_MATRIX_NAME]
+        ? [pb.mat4('skinMatrix')]
+        : [];
+    pb.func('Z_resolveVertexPosition', params, function () {
       this.$l.pos = this.$getVertexAttrib('position');
       if (that.hasMorphing(scope)) {
         this.pos = pb.add(this.pos, that.calculateMorphDelta(this, MORPH_TARGET_POSITION).xyz);
       }
-      if (that.hasSkinning(scope)) {
-        if (!this[that.SKIN_MATRIX_NAME]) {
-          this[that.SKIN_MATRIX_NAME] = that.calculateSkinMatrix(this);
-        }
-        this.pos = pb.mul(this[that.SKIN_MATRIX_NAME], pb.vec4(this.pos, 1)).xyz;
+      if (this.skinMatrix) {
+        this.pos = pb.mul(this.skinMatrix, pb.vec4(this.pos, 1)).xyz;
       }
       const unjitteredVPMatrix = that.getUnjitteredViewProjectionMatrix(this);
       if (unjitteredVPMatrix) {
         this.$l.unjitteredVPMatrix = unjitteredVPMatrix;
         this.$l.worldPos = pb.mul(that.getWorldMatrix(this), pb.vec4(this.pos, 1));
-        this.$l.prevWorldPos = pb.mul(that.getPrevWorldMatrix(this), pb.vec4(this.pos, 1));
+        if (this.prevSkinMatrix) {
+          this.$l.prevWorldPos = pb.mul(
+            that.getPrevWorldMatrix(this),
+            pb.mul(this.prevSkinMatrix, pb.vec4(this.pos, 1))
+          );
+        } else {
+          this.$l.prevWorldPos = pb.mul(that.getPrevWorldMatrix(this), pb.vec4(this.pos, 1));
+        }
         this.$outputs.zMotionVectorPosCurrent = pb.mul(this.unjitteredVPMatrix, this.worldPos);
         this.$outputs.zMotionVectorPosPrev = pb.mul(
           that.getPrevUnjitteredViewProjectionMatrix(this),
-          this.worldPos
+          this.prevWorldPos
         );
       }
       this.$return(this.pos);
     });
-    /*
-    return pos;
-    */
-    return scope.Z_resolveVertexPosition();
+    return scope[that.SKIN_MATRIX_NAME] && scope[that.SKIN_PREV_MATRIX_NAME]
+      ? scope.Z_resolveVertexPosition(scope[that.SKIN_MATRIX_NAME], scope[that.SKIN_PREV_MATRIX_NAME])
+      : scope[that.SKIN_MATRIX_NAME]
+      ? scope.Z_resolveVertexPosition(scope[that.SKIN_MATRIX_NAME])
+      : scope.Z_resolveVertexPosition();
   }
   /**
    * Calculates the normal vector of type vec3 in object space
@@ -481,10 +554,7 @@ export class ShaderHelper {
     if (this.hasMorphing(scope)) {
       normal = pb.normalize(pb.add(normal, this.calculateMorphDelta(scope, MORPH_TARGET_NORMAL).xyz));
     }
-    if (this.hasSkinning(scope)) {
-      if (!funcScope[this.SKIN_MATRIX_NAME]) {
-        funcScope[this.SKIN_MATRIX_NAME] = this.calculateSkinMatrix(funcScope);
-      }
+    if (scope[this.SKIN_MATRIX_NAME]) {
       return pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(normal, 0)).xyz;
     } else {
       return normal;
@@ -518,10 +588,7 @@ export class ShaderHelper {
         pb.add(tangent, pb.vec4(this.calculateMorphDelta(scope, MORPH_TARGET_TANGENT).xyz, 0))
       );
     }
-    if (this.hasSkinning(scope)) {
-      if (!funcScope[this.SKIN_MATRIX_NAME]) {
-        funcScope[this.SKIN_MATRIX_NAME] = this.calculateSkinMatrix(funcScope);
-      }
+    if (scope[this.SKIN_MATRIX_NAME]) {
       return pb.vec4(pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(tangent.xyz, 0)).xyz, tangent.w);
     } else {
       return tangent;
@@ -636,7 +703,7 @@ export class ShaderHelper {
     if (skinning) {
       scope[UNIFORM_NAME_BONE_MATRICES] = pb.tex2D().uniform(1).sampleType('unfilterable-float');
       scope[UNIFORM_NAME_BONE_INV_BIND_MATRIX] = pb.mat4().uniform(1);
-      scope[UNIFORM_NAME_BONE_TEXTURE_SIZE] = pb.int().uniform(1);
+      scope[UNIFORM_NAME_BONE_TEXTURE_SIZE] = pb.vec2().uniform(1);
     }
     if (morphing) {
       scope[UNIFORM_NAME_MORPH_DATA] = pb.tex2D().uniform(1).sampleType('unfilterable-float');

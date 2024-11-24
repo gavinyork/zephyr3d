@@ -3776,6 +3776,15 @@ export class PBInsideFunctionScope extends PBScope {
     }
     return null;
   }
+  /** Gets main function scope */
+  $getMainScope(): PBFunctionScope {
+    for (let scope: PBScope = this; scope; scope = scope.$parent) {
+      if (scope instanceof PBFunctionScope && scope.$isMain()) {
+        return scope;
+      }
+    }
+    return null;
+  }
 }
 
 /**

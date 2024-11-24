@@ -34,6 +34,8 @@ export class Skeleton {
   /** @internal */
   protected _jointMatrices: Matrix4x4[];
   /** @internal */
+  protected _jointOffsets: Float32Array;
+  /** @internal */
   protected _jointMatrixArray: Float32Array;
   /** @internal */
   protected _jointTexture: Texture2D;
@@ -55,6 +57,7 @@ export class Skeleton {
     this._bindPoseMatrices = bindPoseMatrices;
     this._jointMatrixArray = null;
     this._jointMatrices = null;
+    this._jointOffsets = null;
     this._jointTexture = null;
     this.updateJointMatrices();
     this._meshes = meshes.map((mesh, index) => {
@@ -78,12 +81,6 @@ export class Skeleton {
     this._jointMatrixArray = null;
   }
   /**
-   * The joint transform matrices
-   */
-  get jointMatrices(): Matrix4x4[] {
-    return this._jointMatrices;
-  }
-  /**
    * The texture that contains the transform matrices of all the joints
    */
   get jointTexture(): Texture2D {
@@ -94,8 +91,15 @@ export class Skeleton {
     if (!this._jointTexture) {
       this._createJointTexture();
     }
+    if (this._jointOffsets[0] === 0) {
+      this._jointOffsets[0] = 1;
+      this._jointOffsets[1] = 1;
+    } else {
+      this._jointOffsets[1] = this._jointOffsets[0];
+      this._jointOffsets[0] = this._joints.length - this._jointOffsets[0] + 2;
+    }
     for (let i = 0; i < this._joints.length; i++) {
-      const mat = this._jointMatrices[i];
+      const mat = this._jointMatrices[i + this._jointOffsets[0] - 1];
       const jointTransform = jointTransforms ? jointTransforms[i] : this._joints[i].worldMatrix;
       if (worldMatrix) {
         Matrix4x4.multiplyAffine(worldMatrix, jointTransform, jointTransform);
@@ -147,16 +151,16 @@ export class Skeleton {
   computeBoundingBox(info: SkinnedBoundingBox, invWorldMatrix: Matrix4x4) {
     info.boundingBox.beginExtend();
     for (let i = 0; i < info.boundingVertices.length; i++) {
-      this._jointMatrices[info.boundingVertexBlendIndices[i * 4 + 0]]
+      this._jointMatrices[info.boundingVertexBlendIndices[i * 4 + 0] + this._jointOffsets[0] - 1]
         .transformPointAffine(info.boundingVertices[i], tmpV0)
         .scaleBy(info.boundingVertexJointWeights[i * 4 + 0]);
-      this._jointMatrices[info.boundingVertexBlendIndices[i * 4 + 1]]
+      this._jointMatrices[info.boundingVertexBlendIndices[i * 4 + 1] + this._jointOffsets[0] - 1]
         .transformPointAffine(info.boundingVertices[i], tmpV1)
         .scaleBy(info.boundingVertexJointWeights[i * 4 + 1]);
-      this._jointMatrices[info.boundingVertexBlendIndices[i * 4 + 2]]
+      this._jointMatrices[info.boundingVertexBlendIndices[i * 4 + 2] + this._jointOffsets[0] - 1]
         .transformPointAffine(info.boundingVertices[i], tmpV2)
         .scaleBy(info.boundingVertexJointWeights[i * 4 + 2]);
-      this._jointMatrices[info.boundingVertexBlendIndices[i * 4 + 3]]
+      this._jointMatrices[info.boundingVertexBlendIndices[i * 4 + 3] + this._jointOffsets[0] - 1]
         .transformPointAffine(info.boundingVertices[i], tmpV3)
         .scaleBy(info.boundingVertexJointWeights[i * 4 + 3]);
       tmpV0.addBy(tmpV1).addBy(tmpV2).addBy(tmpV3);
@@ -166,7 +170,7 @@ export class Skeleton {
   }
   /** @internal */
   private _createJointTexture() {
-    const textureWidth = nextPowerOf2(Math.max(4, Math.ceil(Math.sqrt(this._joints.length * 4))));
+    const textureWidth = nextPowerOf2(Math.max(4, Math.ceil(Math.sqrt((this._joints.length * 2 + 1) * 4))));
     this._jointTexture = Application.instance.device.createTexture2D('rgba32f', textureWidth, textureWidth, {
       samplerOptions: {
         magFilter: 'nearest',
@@ -176,8 +180,11 @@ export class Skeleton {
     });
     this._jointMatrixArray = new Float32Array(textureWidth * textureWidth * 4);
     const buffer = this._jointMatrixArray.buffer;
-    this._jointMatrices = this._joints.map(
-      (val, index) => new Matrix4x4(buffer, index * 16 * Float32Array.BYTES_PER_ELEMENT)
+    this._jointOffsets = new Float32Array(buffer);
+    this._jointOffsets[0] = 0;
+    this._jointOffsets[1] = 0;
+    this._jointMatrices = Array.from({ length: this._joints.length * 2 }).map(
+      (val, index) => new Matrix4x4(buffer, (index + 1) * 16 * Float32Array.BYTES_PER_ELEMENT)
     );
   }
   /** @internal */
@@ -198,16 +205,16 @@ export class Skeleton {
     const numVertices = Math.floor(v.length / 3);
     for (let i = 0; i < numVertices; i++) {
       vert.setXYZ(v[i * 3], v[i * 3 + 1], v[i * 3 + 2]);
-      this.jointMatrices[meshData.rawBlendIndices[i * 4 + 0]]
+      this._jointMatrices[meshData.rawBlendIndices[i * 4 + 0] + this._jointOffsets[0] - 1]
         .transformPointAffine(vert, tmpV0)
         .scaleBy(meshData.rawJointWeights[i * 4 + 0]);
-      this.jointMatrices[meshData.rawBlendIndices[i * 4 + 1]]
+      this._jointMatrices[meshData.rawBlendIndices[i * 4 + 1] + this._jointOffsets[0] - 1]
         .transformPointAffine(vert, tmpV1)
         .scaleBy(meshData.rawJointWeights[i * 4 + 1]);
-      this.jointMatrices[meshData.rawBlendIndices[i * 4 + 2]]
+      this._jointMatrices[meshData.rawBlendIndices[i * 4 + 2] + this._jointOffsets[0] - 1]
         .transformPointAffine(vert, tmpV2)
         .scaleBy(meshData.rawJointWeights[i * 4 + 2]);
-      this.jointMatrices[meshData.rawBlendIndices[i * 4 + 3]]
+      this._jointMatrices[meshData.rawBlendIndices[i * 4 + 3] + this._jointOffsets[0] - 1]
         .transformPointAffine(vert, tmpV3)
         .scaleBy(meshData.rawJointWeights[i * 4 + 3]);
       tmpV0.addBy(tmpV1).addBy(tmpV2).addBy(tmpV3);

@@ -497,6 +497,7 @@ export class MeshMaterial extends Material {
     if (this.drawContext.materialFlags & MaterialVaryingFlags.SKIN_ANIMATION) {
       scope.$inputs.zBlendIndices = pb.vec4().attrib('blendIndices');
       scope.$inputs.zBlendWeights = pb.vec4().attrib('blendWeights');
+      ShaderHelper.prepareSkinAnimation(scope);
     }
     if (
       this.drawContext.materialFlags & MaterialVaryingFlags.MORPH_ANIMATION &&
