@@ -4,7 +4,8 @@ import type { AssetAnimationTrack, AssetSubMeshData } from '../asset';
 import { BoundingBox } from '../utility';
 import { MAX_MORPH_TARGETS } from '../values';
 import { calculateMorphBoundingBox } from './morphtarget';
-import { AABB, Vector3 } from '@zephyr3d/base';
+import type { AABB } from '@zephyr3d/base';
+import { Vector3 } from '@zephyr3d/base';
 
 /** Morph animation state */
 export type MorphState = {
