@@ -1,7 +1,13 @@
-import { Vector4 } from '@zephyr3d/base';
+import { applyMixins, Vector4 } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
-import type { Scene } from '.';
-import { Mesh } from '.';
+import type { Scene } from './scene';
+import { GraphNode } from './graph_node';
+import type { BoundingBox, BoundingVolume } from '../utility';
+import { mixinDrawable } from '../render/drawable_mixin';
+import type { Drawable, DrawContext, PickTarget, Primitive } from '../render';
+import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
+import { QUEUE_OPAQUE } from '../values';
+import type { MeshMaterial } from '../material';
 
 type Particle = {
   position: Vector3;
@@ -23,14 +29,14 @@ type ParticleNode = {
   next: ParticleNode;
 };
 
+const PS_DIRECTIONAL = 1 << 7;
 const PS_WORLDSPACE = 1 << 8;
 
 export type EmitterShape = 'point' | 'sphere' | 'box' | 'cylinder' | 'cone';
 export type EmitterBehavior = 'surface' | 'volume';
-export type ParticleForm = 'sprite' | 'line';
-export type ParticleDirection = 'none' | 'velocity' | 'verticle' | 'horizontal';
+export type ParticleDirection = 'none' | 'velocity' | 'vertical' | 'horizontal';
 
-export class ParticleSystem extends Mesh {
+export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implements Drawable {
   private _activeParticleList: ParticleNode;
   private _freeParticleList: ParticleNode;
   private _maxParticleCount: number;
@@ -60,7 +66,6 @@ export class ParticleSystem extends Mesh {
   private _jitterSpeed: number;
   private _jitterPower: number;
   private _emitterShape: EmitterShape;
-  private _particleForm: ParticleForm;
   private _emitterBehavior: EmitterBehavior;
   private _emitterConeRadius: number;
   private _emitterConeRadiusVar: number;
@@ -77,6 +82,11 @@ export class ParticleSystem extends Mesh {
   private _emitterShapeSize: Vector3;
   private _emitterShapeSizeVar: Vector3;
   private _colorValue: Vector4;
+  private _primitive: Primitive;
+  private _material: MeshMaterial;
+  private _wsBoundingBox: BoundingBox;
+  private _instanceColor: Vector4;
+  private _pickTarget: PickTarget;
   constructor(scene: Scene) {
     super(scene);
     this._activeParticleList = null;
@@ -104,7 +114,6 @@ export class ParticleSystem extends Mesh {
     this._jitterSpeed = 1;
     this._jitterPower = 0;
     this._emitterShape = 'point';
-    this._particleForm = 'sprite';
     this._emitterBehavior = 'surface';
     this._emitterConeRadius = 0;
     this._emitterConeRadiusVar = 0.1;
@@ -124,10 +133,18 @@ export class ParticleSystem extends Mesh {
     this._transparency = 1;
     this._colorMultiplier = 1;
     this._directionType = 'none';
+    this._instanceColor = Vector4.zero();
+    this._pickTarget = { node: this };
     this._flags = PS_WORLDSPACE;
+    this._primitive = null;
+    this._material = null;
+    this._wsBoundingBox = null;
   }
   set maxParticleCount(value: number) {
-    this._maxParticleCount = value;
+    if (value !== this._maxParticleCount) {
+      this._maxParticleCount = value;
+      this.invalidateBoundingVolume();
+    }
   }
   get maxParticleCount(): number {
     return this._maxParticleCount;
@@ -139,7 +156,10 @@ export class ParticleSystem extends Mesh {
     return this._updateInterval;
   }
   set emitInterval(value: number) {
-    this._emitInterval = value;
+    if (value !== this._emitInterval) {
+      this._emitInterval = Math.max(value, 1);
+      this._startEmitTime = 0;
+    }
   }
   get emitInterval(): number {
     return this._emitInterval;
@@ -151,19 +171,28 @@ export class ParticleSystem extends Mesh {
     return this._emitCount;
   }
   set gravity(value: Vector3) {
-    this._gravity = value;
+    if (!value.equalsTo(this._gravity)) {
+      this._gravity.set(value);
+      this.invalidateBoundingVolume();
+    }
   }
   get gravity(): Vector3 {
     return this._gravity;
   }
   set wind(value: Vector3) {
-    this._wind = value;
+    if (!value.equalsTo(this._wind)) {
+      this._wind.set(value);
+      this.invalidateBoundingVolume();
+    }
   }
   get wind(): Vector3 {
     return this._wind;
   }
   set scalar(value: number) {
-    this._scalar = value;
+    if (value !== this._scalar) {
+      this._scalar = value;
+      this.invalidateBoundingVolume();
+    }
   }
   get scalar(): number {
     return this._scalar;
@@ -209,12 +238,6 @@ export class ParticleSystem extends Mesh {
   }
   get emitterShape(): EmitterShape {
     return this._emitterShape;
-  }
-  set particleForm(value: ParticleForm) {
-    this._particleForm = value;
-  }
-  get particleForm(): ParticleForm {
-    return this._particleForm;
   }
   set emitterBehavior(value: EmitterBehavior) {
     this._emitterBehavior = value;
@@ -295,13 +318,13 @@ export class ParticleSystem extends Mesh {
     return this._particleAccelVar;
   }
   set emitterShapeSize(value: Vector3) {
-    this._emitterShapeSize = value;
+    this._emitterShapeSize.set(value);
   }
   get emitterShapeSize(): Vector3 {
     return this._emitterShapeSize;
   }
   set emitterShapeSizeVar(value: Vector3) {
-    this._emitterShapeSizeVar = value;
+    this._emitterShapeSizeVar.set(value);
   }
   get emitterShapeSizeVar(): Vector3 {
     return this._emitterShapeSizeVar;
@@ -314,12 +337,30 @@ export class ParticleSystem extends Mesh {
   }
   set directionType(value: ParticleDirection) {
     this._directionType = value;
+    if (this._directionType === 'none') {
+      this.flags &= ~PS_DIRECTIONAL;
+    } else {
+      this.flags |= PS_DIRECTIONAL;
+    }
   }
   get directionType(): ParticleDirection {
     return this._directionType;
   }
+  set worldSpace(value: boolean) {
+    if (value) {
+      this.flags |= PS_WORLDSPACE;
+    } else {
+      this.flags &= ~PS_WORLDSPACE;
+    }
+  }
+  get worldSpace(): boolean {
+    return !!(this.flags & PS_WORLDSPACE);
+  }
   set flags(value: number) {
-    this._flags = value;
+    if (value !== this._flags) {
+      this._flags = value;
+      this._needUpdateVertexArray = true;
+    }
   }
   get flags(): number {
     return this._flags;
@@ -342,10 +383,176 @@ export class ParticleSystem extends Mesh {
   get colorMultiplier(): number {
     return this._colorMultiplier;
   }
-  set paused(value: boolean) {
-    this._paused = value;
+  pause() {
+    this._paused = true;
   }
-  get paused(): boolean {
-    return this._paused;
+  resume() {
+    this._paused = false;
+  }
+  /** @internal */
+  computeBoundingVolume(): BoundingVolume {
+    if (!this._wsBoundingBox) {
+      return null;
+    }
+    if (this._flags & PS_WORLDSPACE) {
+      return this._wsBoundingBox.transform(this.invWorldMatrix);
+    }
+    return this._wsBoundingBox;
+  }
+  /** @internal */
+  private initParticle(p: Particle, emitTime: number) {
+    this.getParticleInitialPosition(p.position, p.velocity);
+    p.size1 = this._particleSize1 + Math.random() * this._particleSize1Var;
+    p.size2 = this._particleSize2 + Math.random() * this._particleSize2Var;
+    p.rotation = this._particleRotation + Math.random() * this._particleRotationVar;
+    p.lifeSpan = this._particleLife + Math.random() * this._particleLifeVar;
+    p.acceleartion = this._particleAccel + Math.random() * this._particleAccelVar;
+  }
+  private getParticleInitialPosition(pos: Vector3, vel: Vector3) {
+    if (this._emitterShape === 'point') {
+      pos.setXYZ(0, 0, 0);
+      const coneRadius = this._emitterConeRadius + Math.random() * this._emitterConeRadiusVar;
+      vel.x = -coneRadius + Math.random() * 2 * coneRadius;
+      vel.y = 1;
+      vel.z = -coneRadius + Math.random() * 2 * coneRadius;
+    } else {
+      const shapeSizeX = this._emitterShapeSize.x + this._emitterShapeSizeVar.x * Math.random();
+      const shapeSizeY = this._emitterShapeSize.y + this._emitterShapeSizeVar.y * Math.random();
+      const shapeSizeZ = this._emitterShapeSize.z + this._emitterShapeSizeVar.z * Math.random();
+      switch (this._emitterShape) {
+        case 'sphere': {
+          const alpha = Math.PI * Math.random();
+          const theta = Math.PI * 2 * Math.random();
+          const r = Math.sin(alpha);
+          const y = Math.cos(alpha);
+          const x = Math.sin(theta) * r;
+          const z = Math.cos(theta) * r;
+          pos.x = x * shapeSizeX;
+          pos.y = y * shapeSizeY;
+          pos.z = z * shapeSizeZ;
+          vel.x = pos.x;
+          vel.y = pos.y;
+          vel.z = pos.z;
+          if (this._emitterBehavior === 'volume') {
+            const t = Math.random();
+            pos.x *= t;
+            pos.y *= t;
+            pos.z *= t;
+          }
+          break;
+        }
+        case 'box': {
+          let x = Math.random() * 2 - 1;
+          let y = Math.random() * 2 - 1;
+          let z = Math.random() * 2 - 1;
+          if (this._emitterBehavior === 'volume') {
+            const t = Math.max(Math.abs(x), Math.abs(y), Math.abs(z));
+            if (t !== 0) {
+              x /= t;
+              y /= t;
+              z /= t;
+            }
+          }
+          pos.x = x * shapeSizeX;
+          pos.y = y * shapeSizeY;
+          pos.z = z * shapeSizeZ;
+          const coneRadius = this._emitterConeRadius + this._emitterConeRadiusVar * Math.random();
+          vel.x = -coneRadius + Math.random() * 2 * coneRadius;
+          vel.y = 1;
+          vel.z = -coneRadius + Math.random() * 2 * coneRadius;
+          break;
+        }
+        case 'cylinder': {
+          const alpha = Math.random() * Math.PI * 2;
+          let x = Math.sin(alpha);
+          let z = Math.cos(alpha);
+          const y = Math.random() * 2 - 1;
+          const coneRadius = this._emitterConeRadius + this._emitterConeRadiusVar * Math.random();
+          vel.x = x * shapeSizeX;
+          vel.y = (-coneRadius + Math.random() * 2 * coneRadius) * shapeSizeY;
+          vel.z = z * shapeSizeZ;
+          if (this._emitterBehavior === 'volume') {
+            const t = Math.random();
+            x *= t;
+            z *= t;
+          }
+          pos.x = x * shapeSizeX;
+          pos.y = y * shapeSizeY;
+          pos.z = z * shapeSizeZ;
+          break;
+        }
+        case 'cone': {
+          const alpha = Math.random() * Math.PI * 2;
+          const scale = Math.random();
+          const s = Math.sin(alpha);
+          const c = Math.cos(alpha);
+          pos.x = s * scale * shapeSizeX;
+          pos.y = (2 - 2 * scale) * shapeSizeY;
+          pos.z = c * scale * shapeSizeZ;
+          const t = (shapeSizeY * shapeSizeY) / Math.sqrt(shapeSizeY * shapeSizeY + shapeSizeX + shapeSizeX);
+          vel.x = s * shapeSizeX * t;
+          vel.y = -t * shapeSizeY;
+          vel.z = c * shapeSizeX * t;
+          break;
+        }
+      }
+    }
+    vel.inplaceNormalize();
+    vel.scaleBy(this._particleVelocity + Math.random() * this._particleVelocityVar);
+  }
+  /**
+   * {@inheritDoc Drawable.getInstanceColor}
+   */
+  getInstanceColor(): Vector4 {
+    return this._instanceColor;
+  }
+  /**
+   * {@inheritDoc Drawable.getPickTarget }
+   */
+  getPickTarget(): PickTarget {
+    return this._pickTarget;
+  }
+  /**
+   * {@inheritDoc Drawable.getMorphData}
+   */
+  getMorphData(): Texture2D {
+    return null;
+  }
+  /**
+   * {@inheritDoc Drawable.getMorphInfo}
+   */
+  getMorphInfo(): GPUDataBuffer<unknown> {
+    return null;
+  }
+  /**
+   * {@inheritDoc Drawable.getQueueType}
+   */
+  getQueueType(): number {
+    return this._material?.getQueueType() ?? QUEUE_OPAQUE;
+  }
+  /**
+   * {@inheritDoc Drawable.isUnlit}
+   */
+  isUnlit(): boolean {
+    return !this._material?.supportLighting();
+  }
+  /**
+   * {@inheritDoc Drawable.needSceneColor}
+   */
+  needSceneColor(): boolean {
+    return this._material?.needSceneColor();
+  }
+  /**
+   * {@inheritDoc Drawable.getMaterial}
+   */
+  getMaterial(): MeshMaterial {
+    return this._material;
+  }
+  /**
+   * {@inheritDoc Drawable.draw}
+   */
+  draw(ctx: DrawContext) {
+    this.bind(ctx);
+    this._material.draw(this._primitive, ctx);
   }
 }
