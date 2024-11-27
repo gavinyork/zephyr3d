@@ -1,13 +1,16 @@
-import { applyMixins, Vector4 } from '@zephyr3d/base';
+import type { Matrix4x4 } from '@zephyr3d/base';
+import { applyMixins, nextPowerOf2, Vector4 } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
 import type { BoundingBox, BoundingVolume } from '../utility';
 import { mixinDrawable } from '../render/drawable_mixin';
-import type { Drawable, DrawContext, PickTarget, Primitive } from '../render';
-import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
+import type { Drawable, DrawContext, PickTarget } from '../render';
+import { Primitive } from '../render';
+import type { AbstractDevice, GPUDataBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
 import { QUEUE_OPAQUE } from '../values';
 import type { MeshMaterial } from '../material';
+import { Application } from '../app';
 
 type Particle = {
   position: Vector3;
@@ -26,7 +29,6 @@ type ParticleNode = {
   rotation: number;
   ageBias: number;
   jitterAngle: number;
-  next: ParticleNode;
 };
 
 const PS_DIRECTIONAL = 1 << 7;
@@ -37,13 +39,11 @@ export type EmitterBehavior = 'surface' | 'volume';
 export type ParticleDirection = 'none' | 'velocity' | 'vertical' | 'horizontal';
 
 export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implements Drawable {
-  private _activeParticleList: ParticleNode;
-  private _freeParticleList: ParticleNode;
+  private _activeParticleList: ParticleNode[];
   private _maxParticleCount: number;
   private _updateInterval: number;
   private _emitInterval: number;
   private _emitCount: number;
-  private _activeParticleCount: number;
   private _startTick: number;
   private _startEmitTime: number;
   private _lastUpdateTime: number;
@@ -87,14 +87,14 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   private _wsBoundingBox: BoundingBox;
   private _instanceColor: Vector4;
   private _pickTarget: PickTarget;
+  private _instanceData: Float32Array;
+  private _instanceBuffer: StructuredBuffer;
   constructor(scene: Scene) {
     super(scene);
-    this._activeParticleList = null;
-    this._freeParticleList = null;
+    this._activeParticleList = [];
     this._maxParticleCount = 100;
     this._emitInterval = 100;
     this._emitCount = 1;
-    this._activeParticleCount = 0;
     this._gravity = Vector3.zero();
     this._wind = Vector3.zero();
     this._startEmitTime = 0;
@@ -139,6 +139,8 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._primitive = null;
     this._material = null;
     this._wsBoundingBox = null;
+    this._instanceData = null;
+    this._instanceBuffer = null;
   }
   set maxParticleCount(value: number) {
     if (value !== this._maxParticleCount) {
@@ -400,13 +402,15 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     return this._wsBoundingBox;
   }
   /** @internal */
-  private initParticle(p: Particle, emitTime: number) {
+  private initParticle(p?: Particle): Particle {
+    p = p ?? ({} as Particle);
     this.getParticleInitialPosition(p.position, p.velocity);
     p.size1 = this._particleSize1 + Math.random() * this._particleSize1Var;
     p.size2 = this._particleSize2 + Math.random() * this._particleSize2Var;
     p.rotation = this._particleRotation + Math.random() * this._particleRotationVar;
     p.lifeSpan = this._particleLife + Math.random() * this._particleLifeVar;
     p.acceleartion = this._particleAccel + Math.random() * this._particleAccelVar;
+    return p;
   }
   private getParticleInitialPosition(pos: Vector3, vel: Vector3) {
     if (this._emitterShape === 'point') {
@@ -499,6 +503,121 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     }
     vel.inplaceNormalize();
     vel.scaleBy(this._particleVelocity + Math.random() * this._particleVelocityVar);
+  }
+  resizeVertexBuffers(device: AbstractDevice) {
+    if (!this._primitive) {
+      this._primitive = new Primitive();
+      const quad = device.createInterleavedVertexBuffer(
+        ['position_f32x4', 'tex0_f32x2'],
+        new Float32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 2, 1, 1, 0, 0, 0, 3, 1, 0])
+      );
+      const indices = device.createIndexBuffer(new Uint16Array([0, 1, 2, 0, 2, 3]));
+      this._primitive.setVertexBuffer(quad);
+      this._primitive.setIndexBuffer(indices);
+    }
+    if (!this._instanceData || this._instanceData.length < this._maxParticleCount * 8) {
+      if (this._instanceBuffer) {
+        this._primitive.removeVertexBuffer(this._instanceBuffer);
+      }
+      this._instanceData = new Float32Array(nextPowerOf2(this._maxParticleCount * 8));
+      this._instanceBuffer = device.createInterleavedVertexBuffer(
+        ['tex1_f32x4', 'tex2_f32x4'],
+        this._instanceData
+      );
+      this._primitive.setVertexBuffer(this._instanceBuffer, 'instance');
+    }
+  }
+  update() {
+    const tick = Application.instance.device.frameInfo.elapsedOverall;
+    if (this._startTick === 0) {
+      this._startTick = tick;
+    }
+    if (this._delay > 0 && tick - this._startTick < this._delay) {
+      return;
+    }
+    if (this._lastUpdateTime === 0) {
+      this._lastUpdateTime = tick;
+    }
+    const updateElapsed = tick - this._lastUpdateTime;
+    if (updateElapsed < this._updateInterval) {
+      return;
+    }
+    this.invalidateBoundingVolume();
+    this._wsBoundingBox.beginExtend();
+    this._needUpdateVertexArray = true;
+    const elapsedInSecond = updateElapsed * 0.001;
+    this._lastUpdateTime = tick;
+    for (let i = this._activeParticleList.length - 1; i >= 0; i--) {
+      const node = this._activeParticleList[i];
+      const p = node.particle;
+      node.elapsedTime += updateElapsed;
+      const age = node.elapsedTime / p.lifeSpan;
+      if (age >= 1) {
+        this._activeParticleList.splice(i, 1);
+      } else {
+        p.velocity.x += this._gravity.x * elapsedInSecond;
+        p.velocity.y += this._gravity.y * elapsedInSecond;
+        p.velocity.z += this._gravity.z * elapsedInSecond;
+        if (this._airResistence) {
+          p.velocity.x += (this._wind.x - p.velocity.x) * elapsedInSecond;
+          p.velocity.y += (this._wind.y - p.velocity.y) * elapsedInSecond;
+          p.velocity.z += (this._wind.z - p.velocity.z) * elapsedInSecond;
+        }
+        const len = p.velocity.length;
+        if (len > 0.0001) {
+          const s = 1 + (elapsedInSecond * p.acceleartion) / len;
+          p.velocity.scaleBy(s < 0 ? 0 : s);
+        }
+        p.position.x += p.velocity.x * elapsedInSecond * this._scalar;
+        p.position.y += p.velocity.y * elapsedInSecond * this._scalar;
+        p.position.z += p.velocity.z * elapsedInSecond * this._scalar;
+        node.jitterAngle = (node.elapsedTime + p.lifeSpan * node.ageBias) * this._jitterSpeed * 0.001;
+        this._wsBoundingBox.extend(p.position);
+        node.size = p.size1 + p.size2 * age;
+        node.rotation += p.rotation * elapsedInSecond;
+      }
+    }
+    let newParticleCount = 0;
+    if (this._startEmitTime === 0) {
+      newParticleCount = this._emitCount > this._maxParticleCount ? this._maxParticleCount : this._emitCount;
+      this._numEmitCount = 1;
+      this._startEmitTime = tick;
+    } else {
+      const emitElapsed = tick - this._startEmitTime;
+      const count = ((emitElapsed / this._emitInterval) >> 0) + 1;
+      if (count > this._numEmitCount) {
+        newParticleCount = this._emitCount;
+        this._numEmitCount = count;
+        if (this._activeParticleList.length + newParticleCount > this._maxParticleCount) {
+          newParticleCount = this._maxParticleCount - this._activeParticleList.length;
+        }
+      }
+    }
+    if (newParticleCount > 0) {
+      this.newParticle(newParticleCount, this.worldMatrix);
+    }
+  }
+  newParticle(num: number, worldMatrix: Matrix4x4) {
+    for (let i = 0; i < num; i++) {
+      const particle = this.initParticle();
+      particle.size1 *= this._scalar;
+      particle.size2 *= this._scalar;
+      particle.size2 -= particle.size1;
+      const node: ParticleNode = {
+        particle,
+        elapsedTime: 0,
+        rotation: 0,
+        size: particle.size1,
+        ageBias: Math.random(),
+        jitterAngle: 0
+      };
+      if (this._flags & PS_WORLDSPACE) {
+        worldMatrix.transformPoint(particle.position);
+        worldMatrix.transformVector(particle.velocity);
+      }
+      this._wsBoundingBox.extend(particle.position);
+      this._activeParticleList.push(node);
+    }
   }
   /**
    * {@inheritDoc Drawable.getInstanceColor}

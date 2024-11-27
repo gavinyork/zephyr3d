@@ -447,7 +447,7 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
     options?: BufferCreationOptions
   ): StructuredBuffer {
     if (options && options.usage && options.usage !== 'vertex') {
-      console.error(`createVertexBuffer() failed: options.usage must be 'vertex' or not set`);
+      console.error(`createInterleavedVertexBuffer() failed: options.usage must be 'vertex' or not set`);
       return null;
     }
     let size = 0;
