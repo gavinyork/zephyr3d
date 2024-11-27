@@ -12,6 +12,7 @@ import type { Visitor } from '../scene/visitor';
 import type { Camera } from '../camera/camera';
 import type { SceneNode } from '../scene/scene_node';
 import type { BatchGroup } from '../scene/batchgroup';
+import { ParticleSystem } from '../scene';
 
 /**
  * Node visitor for culling
@@ -92,6 +93,8 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
       return this.visitOctreeNode(target);
     } else if (target.isMesh()) {
       return this.visitMesh(target);
+    } else if (target.isParticleSystem()) {
+      return this.visitParticleSystem(target);
     } else if (target.isTerrain()) {
       return this.visitTerrain(target);
     } else if (target.isPunctualLight()) {
@@ -127,6 +130,17 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {
         node.cull(this);
+        return true;
+      }
+    }
+    return false;
+  }
+  /** @internal */
+  visitParticleSystem(node: ParticleSystem) {
+    if (!node.hidden && this._renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP) {
+      const clipState = this.getClipStateWithNode(node);
+      if (clipState !== ClipState.NOT_CLIPPED) {
+        this.push(this._camera, node);
         return true;
       }
     }

@@ -16,6 +16,7 @@ import {
   Vector3,
   Vector4
 } from '@zephyr3d/base';
+import { ParticleSystem } from './particlesys';
 
 /**
  * Scene node visible state
@@ -241,6 +242,10 @@ export class SceneNode extends makeEventTarget(Object)<{
   isMesh(): this is Mesh {
     return false;
   }
+  /** true if this is a particle system node, false otherwise */
+  isParticleSystem(): this is ParticleSystem {
+    return false;
+  }
   /** true if this is a batch group, false otherwise */
   isBatchGroup(): this is BatchGroup {
     return false;
@@ -389,8 +394,8 @@ export class SceneNode extends makeEventTarget(Object)<{
       const sceneNew = newParent?.attached ? newParent.scene : null;
       const willDetach = sceneLast && sceneLast !== sceneNew;
       const willAttach = sceneNew && sceneLast !== sceneNew;
-      willDetach && this._willDetach();
-      willAttach && this._willAttach();
+      willDetach && this._willDetach(sceneNew);
+      willAttach && this._willAttach(sceneNew);
 
       if (this._parent !== p) {
         if (this._parent) {
@@ -403,8 +408,8 @@ export class SceneNode extends makeEventTarget(Object)<{
         this._onTransformChanged(false);
       }
 
-      willDetach && this._detached();
-      willAttach && this._attached();
+      willDetach && this._detached(sceneNew);
+      willAttach && this._attached(sceneNew);
     }
     while (lastParent) {
       lastParent.dispatchEvent('noderemoved', this);
@@ -431,13 +436,13 @@ export class SceneNode extends makeEventTarget(Object)<{
     this.dispatchEvent('transformchanged', this);
   }
   /** @internal */
-  protected _willAttach(): void {}
+  protected _willAttach(scene: Scene): void {}
   /** @internal */
-  protected _attached(): void {}
+  protected _attached(scene: Scene): void {}
   /** @internal */
-  protected _willDetach(): void {}
+  protected _willDetach(scene: Scene): void {}
   /** @internal */
-  protected _detached(): void {}
+  protected _detached(scene: Scene): void {}
   /** @internal */
   notifyHiddenChanged() {
     this._visibleChanged();

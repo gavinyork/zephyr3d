@@ -2,6 +2,7 @@ export * from './shader/helper';
 export * from './lambert';
 export * from './blinn';
 export * from './unlit';
+export * from './particle';
 export * from './material';
 export * from './meshmaterial';
 export * from './grassmaterial';

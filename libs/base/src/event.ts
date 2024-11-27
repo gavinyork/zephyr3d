@@ -82,16 +82,24 @@ export function makeEventTarget<C extends GenericConstructor | ObjectConstructor
        * {@inheritDoc IEventTarget.on}
        */
       on<K extends keyof I>(type: K, listener: EventListener<I, K>, context?: unknown): void {
-        this._listeners = this._internalAddEventListener(this._listeners, type, listener, { context });
+        if (listener) {
+          this._listeners = this._internalAddEventListener(this._listeners, type, listener, { context });
+        } else {
+          console.error('Cannot set NULL listener');
+        }
       }
       /**
        * {@inheritDoc IEventTarget.once}
        */
       once<K extends keyof I>(type: K, listener: EventListener<I, K>, context?: unknown): void {
-        this._listeners = this._internalAddEventListener(this._listeners, type, listener, {
-          context,
-          once: true
-        });
+        if (listener) {
+          this._listeners = this._internalAddEventListener(this._listeners, type, listener, {
+            context,
+            once: true
+          });
+        } else {
+          console.error('Cannot set NULL listener');
+        }
       }
       /**
        * {@inheritDoc IEventTarget.off}

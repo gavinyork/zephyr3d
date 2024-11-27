@@ -495,7 +495,7 @@ export class ShaderHelper {
         ? [pb.mat4('skinMatrix')]
         : [];
     pb.func('Z_resolveVertexPosition', params, function () {
-      this.$l.pos = this.$getVertexAttrib('position');
+      this.$l.pos = this.$getVertexAttrib('position').xyz;
       if (that.hasMorphing(scope)) {
         this.pos = pb.add(this.pos, that.calculateMorphDelta(this, MORPH_TARGET_POSITION).xyz);
       }

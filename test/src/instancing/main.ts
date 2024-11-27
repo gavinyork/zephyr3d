@@ -9,7 +9,8 @@ import {
   BoxShape,
   PlaneShape,
   BatchGroup,
-  DirectionalLight
+  DirectionalLight,
+  ParticleSystem
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Inspector } from '@zephyr3d/inspector';
@@ -56,6 +57,9 @@ myApp.ready().then(async function () {
       box.position.setXYZ(Math.random() * 50 - 25, 3, Math.random() * 50 - 25);
     }
   }
+  const p = new ParticleSystem(scene);
+  p.position.setXYZ(0, 0, 0);
+
   // Create floor
   const floorMaterial = new LambertMaterial();
   floorMaterial.albedoColor = new Vector4(1, 0, 1, 1);

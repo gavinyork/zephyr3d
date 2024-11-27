@@ -5,6 +5,7 @@ export * from './light';
 export * from './mesh';
 export * from './octree';
 export * from './scene_node';
+export * from './particlesys';
 export * from './batchgroup';
 export * from './scene';
 export * from './terrain';

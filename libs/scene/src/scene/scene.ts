@@ -147,7 +147,9 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: [Scene] }>() {
     if (frameInfo.frameCounter !== this._updateFrame) {
       this._updateFrame = frameInfo.frameCounter;
       for (const an of this._animationSet) {
-        an.update();
+        if (an.model.attached) {
+          an.update();
+        }
       }
       // check environment lighting
       if (this.env.light.type === 'ibl') {

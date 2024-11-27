@@ -98,6 +98,7 @@ export class AnimationSet {
   /**
    * Creates an instance of AnimationSet
    * @param scene - The scene to which the animation set belongs
+   * @param model - The model which is controlled by the animation set
    */
   constructor(scene: Scene, model: SceneNode) {
     this._scene = scene;
@@ -107,6 +108,12 @@ export class AnimationSet {
     this._activeTracks = new Map();
     this._activeSkeletons = new Map();
     this._activeAnimations = new Map();
+  }
+  /**
+   * The model which is controlled by the animation set
+   */
+  get model(): SceneNode {
+    return this._model;
   }
   /**
    * How many animations in this set

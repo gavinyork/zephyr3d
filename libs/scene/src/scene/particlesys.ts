@@ -3,14 +3,17 @@ import { applyMixins, nextPowerOf2, Vector4 } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
-import type { BoundingBox, BoundingVolume } from '../utility';
+import type { BoundingVolume } from '../utility';
+import { BoundingBox } from '../utility';
 import { mixinDrawable } from '../render/drawable_mixin';
 import type { Drawable, DrawContext, PickTarget } from '../render';
 import { Primitive } from '../render';
 import type { AbstractDevice, GPUDataBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
 import { QUEUE_OPAQUE } from '../values';
-import type { MeshMaterial } from '../material';
+import { ParticleMaterial, type MeshMaterial } from '../material';
 import { Application } from '../app';
+
+const tmpVec3 = new Vector3();
 
 type Particle = {
   position: Vector3;
@@ -39,6 +42,7 @@ export type EmitterBehavior = 'surface' | 'volume';
 export type ParticleDirection = 'none' | 'velocity' | 'vertical' | 'horizontal';
 
 export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implements Drawable {
+  private static updateFuncMap: WeakMap<ParticleSystem, () => void> = new WeakMap();
   private _activeParticleList: ParticleNode[];
   private _maxParticleCount: number;
   private _updateInterval: number;
@@ -50,8 +54,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   private _numEmitCount: number;
   private _delay: number;
   private _airResistence: boolean;
-  private _needUpdateVertexArray: boolean;
-  private _paused: boolean;
   private _transparency: number;
   private _blendMode: number;
   private _colorMultiplier: number;
@@ -104,8 +106,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._aspect = 1;
     this._airResistence = false;
     this._updateInterval = 50;
-    this._needUpdateVertexArray = false;
-    this._paused = true;
     this._startTick = 0;
     this._delay = 0;
     this._blendMode = 0;
@@ -138,7 +138,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._flags = PS_WORLDSPACE;
     this._primitive = null;
     this._material = null;
-    this._wsBoundingBox = null;
+    this._wsBoundingBox = new BoundingBox();
     this._instanceData = null;
     this._instanceBuffer = null;
   }
@@ -359,10 +359,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     return !!(this.flags & PS_WORLDSPACE);
   }
   set flags(value: number) {
-    if (value !== this._flags) {
-      this._flags = value;
-      this._needUpdateVertexArray = true;
-    }
+    this._flags = value;
   }
   get flags(): number {
     return this._flags;
@@ -385,25 +382,18 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   get colorMultiplier(): number {
     return this._colorMultiplier;
   }
-  pause() {
-    this._paused = true;
-  }
-  resume() {
-    this._paused = false;
-  }
   /** @internal */
   computeBoundingVolume(): BoundingVolume {
-    if (!this._wsBoundingBox) {
-      return null;
-    }
-    if (this._flags & PS_WORLDSPACE) {
-      return this._wsBoundingBox.transform(this.invWorldMatrix);
-    }
     return this._wsBoundingBox;
   }
   /** @internal */
   private initParticle(p?: Particle): Particle {
-    p = p ?? ({} as Particle);
+    p =
+      p ??
+      ({
+        position: new Vector3(),
+        velocity: new Vector3()
+      } as Particle);
     this.getParticleInitialPosition(p.position, p.velocity);
     p.size1 = this._particleSize1 + Math.random() * this._particleSize1Var;
     p.size2 = this._particleSize2 + Math.random() * this._particleSize2Var;
@@ -515,13 +505,14 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
       this._primitive.setVertexBuffer(quad);
       this._primitive.setIndexBuffer(indices);
     }
-    if (!this._instanceData || this._instanceData.length < this._maxParticleCount * 8) {
+    if (!this._instanceData || this._instanceData.length < this._maxParticleCount * 10) {
       if (this._instanceBuffer) {
         this._primitive.removeVertexBuffer(this._instanceBuffer);
+        this._instanceBuffer.dispose();
       }
-      this._instanceData = new Float32Array(nextPowerOf2(this._maxParticleCount * 8));
+      this._instanceData = new Float32Array(nextPowerOf2(this._maxParticleCount) * 10);
       this._instanceBuffer = device.createInterleavedVertexBuffer(
-        ['tex1_f32x4', 'tex2_f32x4'],
+        ['tex1_f32x3', 'tex2_f32x4', 'tex3_f32x3'],
         this._instanceData
       );
       this._primitive.setVertexBuffer(this._instanceBuffer, 'instance');
@@ -539,12 +530,10 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
       this._lastUpdateTime = tick;
     }
     const updateElapsed = tick - this._lastUpdateTime;
-    if (updateElapsed < this._updateInterval) {
+    if (false && updateElapsed < this._updateInterval) {
       return;
     }
     this.invalidateBoundingVolume();
-    this._wsBoundingBox.beginExtend();
-    this._needUpdateVertexArray = true;
     const elapsedInSecond = updateElapsed * 0.001;
     this._lastUpdateTime = tick;
     for (let i = this._activeParticleList.length - 1; i >= 0; i--) {
@@ -596,6 +585,52 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     if (newParticleCount > 0) {
       this.newParticle(newParticleCount, this.worldMatrix);
     }
+    const device = Application.instance.device;
+    this.resizeVertexBuffers(device);
+    this._wsBoundingBox.beginExtend();
+    let n = 0;
+    const worldSpace = !!(this._flags & PS_WORLDSPACE);
+    const invWorldMatrix = worldSpace ? this.invWorldMatrix : null;
+    for (const p of this._activeParticleList) {
+      if (worldSpace) {
+        invWorldMatrix.transformPointAffine(p.particle.position, tmpVec3);
+        this._instanceData[n++] = tmpVec3.x;
+        this._instanceData[n++] = tmpVec3.y;
+        this._instanceData[n++] = tmpVec3.z;
+        this._wsBoundingBox.extend(tmpVec3);
+      } else {
+        this._instanceData[n++] = p.particle.position.x;
+        this._instanceData[n++] = p.particle.position.y;
+        this._instanceData[n++] = p.particle.position.z;
+        this._wsBoundingBox.extend(p.particle.position);
+      }
+      this._instanceData[n++] = p.size;
+      this._instanceData[n++] = p.rotation;
+      this._instanceData[n++] = p.jitterAngle;
+      this._instanceData[n++] = p.elapsedTime / p.particle.lifeSpan;
+      if (this._directionType === 'horizontal') {
+        this._instanceData[n++] = 1;
+        this._instanceData[n++] = 0;
+        this._instanceData[n++] = 0;
+      } else if (this._directionType === 'vertical') {
+        this._instanceData[n++] = 0;
+        this._instanceData[n++] = 1;
+        this._instanceData[n++] = 0;
+      } else if (worldSpace) {
+        invWorldMatrix.transformVectorAffine(p.particle.velocity, tmpVec3);
+        this._instanceData[n++] = tmpVec3.x;
+        this._instanceData[n++] = tmpVec3.y;
+        this._instanceData[n++] = tmpVec3.z;
+      } else {
+        this._instanceData[n++] = p.particle.velocity.x;
+        this._instanceData[n++] = p.particle.velocity.y;
+        this._instanceData[n++] = p.particle.velocity.z;
+      }
+    }
+    this._instanceBuffer.bufferSubData(0, this._instanceData);
+    if (!this._material) {
+      this._material = new ParticleMaterial();
+    }
   }
   newParticle(num: number, worldMatrix: Matrix4x4) {
     for (let i = 0; i < num; i++) {
@@ -612,8 +647,8 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
         jitterAngle: 0
       };
       if (this._flags & PS_WORLDSPACE) {
-        worldMatrix.transformPoint(particle.position);
-        worldMatrix.transformVector(particle.velocity);
+        worldMatrix.transformPointAffine(particle.position);
+        worldMatrix.transformVectorAffine(particle.velocity);
       }
       this._wsBoundingBox.extend(particle.position);
       this._activeParticleList.push(node);
@@ -665,13 +700,40 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
    * {@inheritDoc Drawable.getMaterial}
    */
   getMaterial(): MeshMaterial {
+    if (!this._material) {
+      this._material = new ParticleMaterial();
+    }
     return this._material;
+  }
+  /**
+   * {@inheritDoc SceneNode.isParticleSystem}
+   */
+  isParticleSystem(): this is ParticleSystem {
+    return true;
   }
   /**
    * {@inheritDoc Drawable.draw}
    */
   draw(ctx: DrawContext) {
-    this.bind(ctx);
-    this._material.draw(this._primitive, ctx);
+    if (this._activeParticleList.length > 0) {
+      this.bind(ctx);
+      this._material.draw(this._primitive, ctx, this._activeParticleList.length);
+    }
+  }
+  protected _detached(scene: Scene): void {
+    super._detached(scene);
+    const func = ParticleSystem.updateFuncMap.get(this);
+    if (func) {
+      scene.off('sceneupdate', func);
+    }
+  }
+  protected _attached(scene: Scene): void {
+    super._attached(scene);
+    let func = ParticleSystem.updateFuncMap.get(this);
+    if (!func) {
+      func = this.update.bind(this);
+      ParticleSystem.updateFuncMap.set(this, func);
+    }
+    scene.on('sceneupdate', func);
   }
 }
