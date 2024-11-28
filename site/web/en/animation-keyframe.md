@@ -40,7 +40,7 @@ animation.addTrack(box, new EulerRotationTrack('linear', [{
 }]));
 
 // Add the animation to an animation set
-const animationSet = new AnimationSet(scene);
+const animationSet = new AnimationSet(scene, box);
 animationSet.add(animation);
 
 // Start playing 

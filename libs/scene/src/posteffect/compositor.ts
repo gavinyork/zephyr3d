@@ -217,8 +217,13 @@ export class Compositor {
     if (device.getFramebuffer() !== this._finalFramebuffer) {
       const srcTex = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
       device.setFramebuffer(this._finalFramebuffer);
-      device.setViewport(null);
-      device.setScissor(null);
+      if (ctx.defaultViewport) {
+        device.setViewport(null);
+        device.setScissor(null);
+      } else {
+        device.setViewport([ctx.viewportX, ctx.viewportY, ctx.viewportWidth, ctx.viewportHeight]);
+        device.setScissor([ctx.viewportX, ctx.viewportY, ctx.viewportWidth, ctx.viewportHeight]);
+      }
       Compositor._blit(device, srcTex, !this._finalFramebuffer);
     }
     if (this._prevInputTexture) {

@@ -74,7 +74,7 @@ ssrApp.ready().then(async () => {
   sphere.position.setXYZ(0, 6, 0);
   sphere.parent = batchGroup;
 
-  const axisGroup = createAxisGroup(scene, 10, 1, 5, 2);
+  const axisGroup = createAxisGroup(scene, 10, 0.1, 5, 0.2);
   axisGroup.parent = sphere;
 
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));

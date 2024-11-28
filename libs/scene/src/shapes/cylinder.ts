@@ -1,7 +1,9 @@
+import type { AABB } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import { BoundingBox } from '../utility/bounding_volume';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
+import type { PrimitiveType } from '@zephyr3d/device';
 
 /**
  * Creation options for cylinder shape
@@ -46,50 +48,87 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
     return options;
   }
   /** @internal */
-  private addPatch(x: number, y: number, indices: number[]) {
-    const stride = this._options.radialDetail + 1;
-    const lt = (y + 1) * stride + x;
-    const rt = lt + 1;
-    const lb = lt - stride;
-    const rb = lb + 1;
+  private static addPatch(
+    radialDetail: number,
+    x: number,
+    y: number,
+    indices: number[],
+    indexOffset: number
+  ) {
+    const stride = radialDetail + 1;
+    const lt = (y + 1) * stride + x + indexOffset;
+    const rt = lt + 1 + indexOffset;
+    const lb = lt - stride + indexOffset;
+    const rb = lb + 1 + indexOffset;
     indices.push(lt, lb, rb, lt, rb, rt);
   }
-  /** @internal */
-  protected _createArrays(vertices: number[], normals: number[], uvs: number[], indices: number[]) {
-    const slope = (this._options.topRadius - this._options.bottomRadius) / this._options.height;
-    for (let y = 0; y <= this._options.heightDetail; y++) {
-      const v = y / this._options.heightDetail;
-      const radius = (this._options.topRadius - this._options.bottomRadius) * v + this._options.bottomRadius;
-      for (let x = 0; x <= this._options.radialDetail; x++) {
-        const u = x / this._options.radialDetail;
+  /**
+   * Generates the data for the cylinder shape
+   * @param vertices - vertex positions
+   * @param normals - vertex normals
+   * @param uvs - vertex uvs
+   * @param indices - vertex indices
+   */
+  static generateData(
+    options: CylinderCreationOptions,
+    vertices: number[],
+    normals: number[],
+    uvs: number[],
+    indices: number[],
+    positionOffset?: Vector3,
+    indicesOffset?: number,
+    bbox?: AABB
+  ): PrimitiveType {
+    const offsetX = positionOffset ? positionOffset.x : 0;
+    const offsetY = positionOffset ? positionOffset.y : 0;
+    const offsetZ = positionOffset ? positionOffset.z : 0;
+    const indexOffset = indicesOffset ?? 0;
+    const slope = (options.topRadius - options.bottomRadius) / options.height;
+    for (let y = 0; y <= options.heightDetail; y++) {
+      const v = y / options.heightDetail;
+      const radius = (options.topRadius - options.bottomRadius) * v + options.bottomRadius;
+      for (let x = 0; x <= options.radialDetail; x++) {
+        const u = x / options.radialDetail;
         const theta = u * Math.PI * 2;
         const sinTheta = Math.sin(theta);
         const cosTheta = Math.cos(theta);
         const m = 1 / Math.sqrt(sinTheta * sinTheta + slope * slope + cosTheta * cosTheta);
         vertices.push(
-          radius * sinTheta,
-          (v - this._options.anchor) * this._options.height,
-          radius * cosTheta
+          radius * sinTheta + offsetX,
+          (v - options.anchor) * options.height + offsetY,
+          radius * cosTheta + offsetZ
         );
-        normals.push(sinTheta * m, slope * m, cosTheta * m);
-        uvs.push(u, 1 - v);
-        if (y < this._options.heightDetail && x < this._options.radialDetail) {
-          this.addPatch(x, y, indices);
+        normals && normals.push(sinTheta * m, slope * m, cosTheta * m);
+        uvs && uvs.push(u, 1 - v);
+        if (y < options.heightDetail && x < options.radialDetail) {
+          this.addPatch(options.radialDetail, x, y, indices, indexOffset);
         }
       }
     }
-    this.primitiveType = 'triangle-list';
+    Shape._transform(options.transform, vertices, normals);
+    if (bbox) {
+      bbox.beginExtend();
+      for (let i = 0; i < vertices.length / 3; i++) {
+        bbox.minPoint.x = Math.min(bbox.minPoint.x, vertices[i * 3]);
+        bbox.minPoint.y = Math.min(bbox.minPoint.y, vertices[i * 3 + 1]);
+        bbox.minPoint.z = Math.min(bbox.minPoint.z, vertices[i * 3 + 2]);
+        bbox.maxPoint.x = Math.max(bbox.maxPoint.x, vertices[i * 3]);
+        bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i * 3 + 1]);
+        bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i * 3 + 2]);
+      }
+    }
+    return 'triangle-list';
   }
   /** @internal */
   protected _create(): boolean {
     const vertices: number[] = [];
     const indices: number[] = [];
-    const normals: number[] = [];
-    const uvs: number[] = [];
-    this._createArrays(vertices, normals, uvs, indices);
+    const normals: number[] = this._options.needNormal ? [] : null;
+    const uvs: number[] = this._options.needUV ? [] : null;
+    this._primitiveType = CylinderShape.generateData(this._options, vertices, normals, uvs, indices);
     this.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
-    this.createAndSetVertexBuffer('normal_f32x3', new Float32Array(normals));
-    this.createAndSetVertexBuffer('tex0_f32x2', new Float32Array(uvs));
+    normals && this.createAndSetVertexBuffer('normal_f32x3', new Float32Array(normals));
+    uvs && this.createAndSetVertexBuffer('tex0_f32x2', new Float32Array(uvs));
     this.createAndSetIndexBuffer(new Uint16Array(indices));
     const radiusMax = Math.max(this._options.bottomRadius, this._options.topRadius);
     this.setBoundingVolume(

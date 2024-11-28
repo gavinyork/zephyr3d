@@ -155,8 +155,7 @@ export class TAA extends AbstractPostEffect<'TAA'> {
       this._box = new BoxShape({
         size: 2,
         needNormal: false,
-        needUV: false,
-        needTangent: false
+        needUV: false
       });
     }
     return this._box;

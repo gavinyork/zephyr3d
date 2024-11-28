@@ -1,7 +1,9 @@
+import { AABB } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import { BoundingBox } from '../utility/bounding_volume';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
+import type { PrimitiveType } from '@zephyr3d/device';
 
 /**
  * Creation options for box shape
@@ -36,22 +38,36 @@ export class BoxShape extends Shape<BoxCreationOptions> {
     options.size = 1;
     return options;
   }
-  /** @internal */
-  protected _createArrays(
+  /**
+   * Generates the data for the cylinder shape
+   * @param vertices - vertex positions
+   * @param normals - vertex normals
+   * @param uvs - vertex uvs
+   * @param indices - vertex indices
+   */
+  static generateData(
+    options: BoxCreationOptions,
     vertices: number[],
     normals: number[],
     uvs: number[],
     indices: number[],
-    minx: number,
-    miny: number,
-    minz: number,
-    maxx: number,
-    maxy: number,
-    maxz: number
-  ) {
-    const needTangent = this._options.needTangent;
-    const needNormal = this._options.needNormal || needTangent;
-    const needUV = this._options.needUV;
+    bbox?: AABB
+  ): PrimitiveType {
+    const indexOffset = options.indexOffset ?? 0;
+    const sizeX = options?.sizeX ?? options?.size ?? 1;
+    const sizeY = options?.sizeY ?? options?.size ?? 1;
+    const sizeZ = options?.sizeZ ?? options?.size ?? 1;
+    const anchorX = 0.5;
+    const anchorY = 0.5;
+    const anchorZ = 0.5;
+    const minx = -anchorX * sizeX;
+    const maxx = minx + sizeX;
+    const miny = -anchorY * sizeY;
+    const maxy = miny + sizeY;
+    const minz = -anchorZ * sizeZ;
+    const maxz = minz + sizeZ;
+    const needNormal = !!normals;
+    const needUV = !!uvs;
     const uv = needUV ? [0, 0, 0, 1, 1, 1, 1, 0] : null;
     const topFacePos = [minx, maxy, minz, minx, maxy, maxz, maxx, maxy, maxz, maxx, maxy, minz];
     const topFacenormal = needNormal ? [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0] : null;
@@ -67,42 +83,42 @@ export class BoxShape extends Shape<BoxCreationOptions> {
     const bottomFaceNormal = needNormal ? [0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0] : null;
     indices &&
       indices.push(
-        0,
-        1,
-        2,
-        0,
-        2,
-        3,
-        4,
-        5,
-        6,
-        4,
-        6,
-        7,
-        8,
-        9,
-        10,
-        8,
-        10,
-        11,
-        12,
-        13,
-        14,
-        12,
-        14,
-        15,
-        16,
-        17,
-        18,
-        16,
-        18,
-        19,
-        20,
-        21,
-        22,
-        20,
-        22,
-        23
+        0 + indexOffset,
+        1 + indexOffset,
+        2 + indexOffset,
+        0 + indexOffset,
+        2 + indexOffset,
+        3 + indexOffset,
+        4 + indexOffset,
+        5 + indexOffset,
+        6 + indexOffset,
+        4 + indexOffset,
+        6 + indexOffset,
+        7 + indexOffset,
+        8 + indexOffset,
+        9 + indexOffset,
+        10 + indexOffset,
+        8 + indexOffset,
+        10 + indexOffset,
+        11 + indexOffset,
+        12 + indexOffset,
+        13 + indexOffset,
+        14 + indexOffset,
+        12 + indexOffset,
+        14 + indexOffset,
+        15 + indexOffset,
+        16 + indexOffset,
+        17 + indexOffset,
+        18 + indexOffset,
+        16 + indexOffset,
+        18 + indexOffset,
+        19 + indexOffset,
+        20 + indexOffset,
+        21 + indexOffset,
+        22 + indexOffset,
+        20 + indexOffset,
+        22 + indexOffset,
+        23 + indexOffset
       );
     vertices &&
       vertices.push(
@@ -113,8 +129,7 @@ export class BoxShape extends Shape<BoxCreationOptions> {
         ...leftFacePos,
         ...bottomFacePos
       );
-    needNormal &&
-      normals &&
+    normals &&
       normals.push(
         ...topFacenormal,
         ...frontFaceNormal,
@@ -123,8 +138,20 @@ export class BoxShape extends Shape<BoxCreationOptions> {
         ...leftFaceNormal,
         ...bottomFaceNormal
       );
-    needUV && uvs && uvs.push(...uv, ...uv, ...uv, ...uv, ...uv, ...uv);
-    this.primitiveType = 'triangle-list';
+    uvs.push(...uv, ...uv, ...uv, ...uv, ...uv, ...uv);
+    Shape._transform(options.transform, vertices, normals);
+    if (bbox) {
+      bbox.beginExtend();
+      for (let i = 0; i < vertices.length / 3; i++) {
+        bbox.minPoint.x = Math.min(bbox.minPoint.x, vertices[i * 3]);
+        bbox.minPoint.y = Math.min(bbox.minPoint.y, vertices[i * 3 + 1]);
+        bbox.minPoint.z = Math.min(bbox.minPoint.z, vertices[i * 3 + 2]);
+        bbox.maxPoint.x = Math.max(bbox.maxPoint.x, vertices[i * 3]);
+        bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i * 3 + 1]);
+        bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i * 3 + 2]);
+      }
+    }
+    return 'triangle-list';
   }
   /** Box width */
   get width(): number {
@@ -140,30 +167,17 @@ export class BoxShape extends Shape<BoxCreationOptions> {
   }
   /** @internal */
   protected _create(): boolean {
-    const needNormal = this._options.needNormal;
-    const needUV = this._options.needUV;
-    const sizeX = this._options.sizeX ?? this._options.size ?? 1;
-    const sizeY = this._options.sizeY ?? this._options.size ?? 1;
-    const sizeZ = this._options.sizeZ ?? this._options.size ?? 1;
-    const anchorX = 0.5;
-    const anchorY = 0.5;
-    const anchorZ = 0.5;
-    const minx = -anchorX * sizeX;
-    const maxx = minx + sizeX;
-    const miny = -anchorY * sizeY;
-    const maxy = miny + sizeY;
-    const minz = -anchorZ * sizeZ;
-    const maxz = minz + sizeZ;
     const vertices: number[] = [];
     const indices: number[] = [];
-    const normals: number[] = needNormal ? [] : null;
-    const uvs: number[] = needUV ? [] : null;
-    this._createArrays(vertices, normals, uvs, indices, minx, miny, minz, maxx, maxy, maxz);
+    const normals: number[] = this._options.needNormal ? [] : null;
+    const uvs: number[] = this._options.needUV ? [] : null;
+    const bbox = new AABB();
+    this._primitiveType = BoxShape.generateData(this._options, vertices, normals, uvs, indices, bbox);
     this.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
     normals && this.createAndSetVertexBuffer('normal_f32x3', new Float32Array(normals));
     uvs && this.createAndSetVertexBuffer('tex0_f32x2', new Float32Array(uvs));
     this.createAndSetIndexBuffer(new Uint16Array(indices));
-    this.setBoundingVolume(new BoundingBox(new Vector3(minx, miny, minz), new Vector3(maxx, maxy, maxz)));
+    this.setBoundingVolume(new BoundingBox(bbox.minPoint, bbox.maxPoint));
     this.indexCount = indices.length;
     return true;
   }
@@ -186,7 +200,6 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> {
     const options = super.createDefaultOptions();
     options.size = 1;
     options.needNormal = false;
-    options.needTangent = false;
     options.needUV = false;
     return options;
   }

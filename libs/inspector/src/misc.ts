@@ -36,9 +36,8 @@ export function createAxisGroup(
   arrowXMesh.pickable = true;
   arrowXMesh.setPickTarget(axisXMesh);
   arrowXMesh.parent = axisXMesh;
-  arrowXMesh.position.setXYZ(0, 10, 0);
+  arrowXMesh.position.setXYZ(0, axisLength, 0);
   axisXMesh.parent = axisGroup;
-  axisXMesh.scale.setXYZ(0.1, 1, 0.1);
   axisXMesh.rotation.fromAxisAngle(new Vector3(0, 0, -1), Math.PI * 0.5);
 
   const materialAxisY = useInstancing ? materialAxis.createInstance() : new UnlitMaterial();
@@ -51,9 +50,8 @@ export function createAxisGroup(
   arrowYMesh.pickable = true;
   arrowYMesh.setPickTarget(axisYMesh);
   arrowYMesh.parent = axisYMesh;
-  arrowYMesh.position.setXYZ(0, 10, 0);
+  arrowYMesh.position.setXYZ(0, axisLength, 0);
   axisYMesh.parent = axisGroup;
-  axisYMesh.scale.setXYZ(0.1, 1, 0.1);
 
   const materialAxisZ = useInstancing ? materialAxis.createInstance() : new UnlitMaterial();
   materialAxisZ.albedoColor = new Vector4(0, 0, 1, 1);
@@ -65,9 +63,8 @@ export function createAxisGroup(
   arrowZMesh.pickable = true;
   arrowZMesh.setPickTarget(axisZMesh);
   arrowZMesh.parent = axisZMesh;
-  arrowZMesh.position.setXYZ(0, 10, 0);
+  arrowZMesh.position.setXYZ(0, axisLength, 0);
   axisZMesh.parent = axisGroup;
-  axisZMesh.scale.setXYZ(0.1, 1, 0.1);
   axisZMesh.rotation.fromAxisAngle(new Vector3(1, 0, 0), Math.PI * 0.5);
 
   return axisGroup;

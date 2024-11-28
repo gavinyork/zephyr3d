@@ -147,7 +147,7 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: [Scene] }>() {
     if (frameInfo.frameCounter !== this._updateFrame) {
       this._updateFrame = frameInfo.frameCounter;
       for (const an of this._animationSet) {
-        if (an.model.attached) {
+        if (an.model?.attached) {
           an.update();
         }
       }

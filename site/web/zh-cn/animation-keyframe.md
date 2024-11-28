@@ -37,12 +37,11 @@ animation.addTrack(box, new EulerRotationTrack('linear', [{
 }]));
 
 // 将动画添加到动画组
-const animationSet = new AnimationSet(scene);
+const animationSet = new AnimationSet(scene, box);
 animationSet.add(animation);
 
 // 开始播放
-// 第二个参数指定循环播放次数，如果为0，则始终循环
-animationSet.playAnimation('animation0', 0);
+animationSet.playAnimation('animation0');
 
 // 结束播放
 animationSet.stopAnimation('animation0');
