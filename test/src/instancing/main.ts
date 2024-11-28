@@ -7,7 +7,6 @@ import {
   LambertMaterial,
   Mesh,
   BoxShape,
-  PlaneShape,
   BatchGroup,
   DirectionalLight,
   ParticleSystem
@@ -28,6 +27,7 @@ myApp.ready().then(async function () {
   const batchGroup = new BatchGroup(scene);
   // Turn off environment lighting
   scene.env.light.type = 'none';
+  scene.env.sky.skyType = 'none';
 
   // Create a directional light
   const light = new DirectionalLight(scene);
@@ -43,7 +43,8 @@ myApp.ready().then(async function () {
   boxMaterial.albedoColor = new Vector4(1, 1, 0, 1);
   const boxShape = new BoxShape({ size: 6 });
   const matlist: LambertMaterial[] = [];
-  for (let i = 0; i < 2; i++) {
+  const numBoxes = 0;
+  for (let i = 0; i < numBoxes; i++) {
     if (i < 1) {
       const mat = boxMaterial.createInstance();
       mat.albedoColor = new Vector4(1, 1, 1, 1);
@@ -59,7 +60,9 @@ myApp.ready().then(async function () {
   }
   const p = new ParticleSystem(scene);
   p.position.setXYZ(0, 0, 0);
+  p.particleVelocity = 2;
 
+  /*
   // Create floor
   const floorMaterial = new LambertMaterial();
   floorMaterial.albedoColor = new Vector4(1, 0, 1, 1);
@@ -73,6 +76,7 @@ myApp.ready().then(async function () {
   floor.parent = batchGroup;
   floor.position.x = -50;
   floor.position.z = -50;
+  */
 
   // Create camera
   const camera = new PerspectiveCamera(

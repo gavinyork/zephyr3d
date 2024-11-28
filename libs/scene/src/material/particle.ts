@@ -10,6 +10,7 @@ import { ShaderHelper } from './shader/helper';
 export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor) {
   constructor() {
     super();
+    this.cullMode = 'none';
   }
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
@@ -66,8 +67,8 @@ export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlb
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     if (this.needFragmentColor()) {
-      const color = this.calculateAlbedoColor(scope);
-      this.outputFragmentColor(scope, scope.$inputs.worldPos, color);
+      //const color = this.calculateAlbedoColor(scope);
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.$builder.vec4(scope.$inputs.uv, 1, 1));
     } else {
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }

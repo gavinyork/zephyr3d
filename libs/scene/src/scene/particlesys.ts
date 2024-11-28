@@ -398,7 +398,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     p.size1 = this._particleSize1 + Math.random() * this._particleSize1Var;
     p.size2 = this._particleSize2 + Math.random() * this._particleSize2Var;
     p.rotation = this._particleRotation + Math.random() * this._particleRotationVar;
-    p.lifeSpan = this._particleLife + Math.random() * this._particleLifeVar;
+    p.lifeSpan = Math.max(this._particleLife + Math.random() * this._particleLifeVar, 0.01);
     p.acceleartion = this._particleAccel + Math.random() * this._particleAccelVar;
     return p;
   }
@@ -410,9 +410,18 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
       vel.y = 1;
       vel.z = -coneRadius + Math.random() * 2 * coneRadius;
     } else {
-      const shapeSizeX = this._emitterShapeSize.x + this._emitterShapeSizeVar.x * Math.random();
-      const shapeSizeY = this._emitterShapeSize.y + this._emitterShapeSizeVar.y * Math.random();
-      const shapeSizeZ = this._emitterShapeSize.z + this._emitterShapeSizeVar.z * Math.random();
+      const shapeSizeX = Math.max(
+        this._emitterShapeSize.x + this._emitterShapeSizeVar.x * Math.random(),
+        0.01
+      );
+      const shapeSizeY = Math.max(
+        this._emitterShapeSize.y + this._emitterShapeSizeVar.y * Math.random(),
+        0.01
+      );
+      const shapeSizeZ = Math.max(
+        this._emitterShapeSize.z + this._emitterShapeSizeVar.z * Math.random(),
+        0.01
+      );
       switch (this._emitterShape) {
         case 'sphere': {
           const alpha = Math.PI * Math.random();
@@ -497,13 +506,14 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   resizeVertexBuffers(device: AbstractDevice) {
     if (!this._primitive) {
       this._primitive = new Primitive();
-      const quad = device.createInterleavedVertexBuffer(
-        ['position_f32x4', 'tex0_f32x2'],
-        new Float32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 2, 1, 1, 0, 0, 0, 3, 1, 0])
+      const quad = device.createVertexBuffer(
+        'position_f32x4',
+        new Float32Array([0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3])
       );
-      const indices = device.createIndexBuffer(new Uint16Array([0, 1, 2, 0, 2, 3]));
+      const indices = device.createIndexBuffer(new Uint16Array([0, 1, 2, 3]));
       this._primitive.setVertexBuffer(quad);
       this._primitive.setIndexBuffer(indices);
+      this._primitive.primitiveType = 'triangle-strip';
     }
     if (!this._instanceData || this._instanceData.length < this._maxParticleCount * 10) {
       if (this._instanceBuffer) {
@@ -512,7 +522,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
       }
       this._instanceData = new Float32Array(nextPowerOf2(this._maxParticleCount) * 10);
       this._instanceBuffer = device.createInterleavedVertexBuffer(
-        ['tex1_f32x3', 'tex2_f32x4', 'tex3_f32x3'],
+        ['tex0_f32x3', 'tex1_f32x4', 'tex2_f32x3'],
         this._instanceData
       );
       this._primitive.setVertexBuffer(this._instanceBuffer, 'instance');
@@ -539,7 +549,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     for (let i = this._activeParticleList.length - 1; i >= 0; i--) {
       const node = this._activeParticleList[i];
       const p = node.particle;
-      node.elapsedTime += updateElapsed;
+      node.elapsedTime += elapsedInSecond;
       const age = node.elapsedTime / p.lifeSpan;
       if (age >= 1) {
         this._activeParticleList.splice(i, 1);
@@ -560,9 +570,9 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
         p.position.x += p.velocity.x * elapsedInSecond * this._scalar;
         p.position.y += p.velocity.y * elapsedInSecond * this._scalar;
         p.position.z += p.velocity.z * elapsedInSecond * this._scalar;
-        node.jitterAngle = (node.elapsedTime + p.lifeSpan * node.ageBias) * this._jitterSpeed * 0.001;
+        node.jitterAngle = (node.elapsedTime + p.lifeSpan * node.ageBias) * this._jitterSpeed;
         this._wsBoundingBox.extend(p.position);
-        node.size = p.size1 + p.size2 * age;
+        node.size = Math.max(p.size1 + p.size2 * age, 0);
         node.rotation += p.rotation * elapsedInSecond;
       }
     }
@@ -647,10 +657,9 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
         jitterAngle: 0
       };
       if (this._flags & PS_WORLDSPACE) {
-        worldMatrix.transformPointAffine(particle.position);
-        worldMatrix.transformVectorAffine(particle.velocity);
+        worldMatrix.transformPointAffine(particle.position, particle.position);
+        worldMatrix.transformVectorAffine(particle.velocity, particle.velocity);
       }
-      this._wsBoundingBox.extend(particle.position);
       this._activeParticleList.push(node);
     }
   }
@@ -716,6 +725,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
    */
   draw(ctx: DrawContext) {
     if (this._activeParticleList.length > 0) {
+      console.log(`Draw ${this._activeParticleList.length} particles`);
       this.bind(ctx);
       this._material.draw(this._primitive, ctx, this._activeParticleList.length);
     }
