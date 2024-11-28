@@ -1,5 +1,6 @@
 import { Vector3, type Matrix4x4 } from '@zephyr3d/base';
 import { Primitive } from '../render/primitive';
+import { BoundingBox } from '../utility';
 
 /**
  * Base class for creation options of any kind of shapes
@@ -12,8 +13,6 @@ export interface ShapeCreationOptions {
   needUV?: boolean;
   /** Transform matrix for the shape */
   transform?: Matrix4x4;
-  /** Index offset for the shape */
-  indexOffset?: number;
 }
 
 /**
@@ -21,7 +20,10 @@ export interface ShapeCreationOptions {
  * @public
  */
 export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOptions> extends Primitive {
-  /** @internal */
+  static _defaultOptions = {
+    needNormal: true,
+    needUV: true
+  };
   protected _options: T;
   /**
    * Creates an instance of shape
@@ -29,49 +31,59 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
    */
   constructor(options?: T) {
     super();
-    this._options = this.createDefaultOptions();
-    this.create(options);
+    this._create(options);
   }
   /**
-   * Creation options
+   * Normalize options
+   * @param options - creation options
+   * @returns Normalized creation options
    */
-  get options() {
-    return this._options;
+  normalizeOptions(options?: T): T {
+    const defaultOptions = (this.constructor as any)._defaultOptions as T;
+    return Object.assign({}, defaultOptions, options ?? {});
   }
   /** @internal */
-  create(options?: T): boolean {
-    if (options) {
-      this._options = this.createDefaultOptions();
-      Object.assign(this._options, options);
-    }
-    return this._create();
+  protected _create(options?: T): boolean {
+    this._options = this.normalizeOptions(options);
+    const vertices: number[] = [];
+    const indices: number[] = [];
+    const normals: number[] = this._options.needNormal ? [] : null;
+    const uvs: number[] = this._options.needUV ? [] : null;
+    const bbox = new BoundingBox();
+    bbox.beginExtend();
+    this._primitiveType = (this.constructor as any).generateData(
+      this._options,
+      vertices,
+      normals,
+      uvs,
+      indices,
+      bbox
+    );
+    this.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
+    normals && this.createAndSetVertexBuffer('normal_f32x3', new Float32Array(normals));
+    uvs && this.createAndSetVertexBuffer('tex0_f32x2', new Float32Array(uvs));
+    this.createAndSetIndexBuffer(new Uint16Array(indices));
+    this.setBoundingVolume(bbox);
+    this.indexCount = indices.length;
+    return true;
   }
   /** @internal */
-  protected createDefaultOptions(): T {
-    return {
-      needNormal: true,
-      needUV: true
-    } as T;
-  }
-  /** @internal */
-  protected abstract _create(): boolean;
-  /** @internal */
-  protected static _transform(matrix: Matrix4x4, vertices: number[], normals: number[]) {
+  protected static _transform(matrix: Matrix4x4, vertices: number[], normals: number[], offset: number) {
     if (matrix) {
       const tmpVec = new Vector3();
-      for (let i = 0; i < vertices.length / 3; i++) {
-        tmpVec.setXYZ(vertices[i * 3], vertices[i * 3 + 1], vertices[i * 3 + 2]);
+      for (let i = offset; i < vertices.length - 2; i += 3) {
+        tmpVec.setXYZ(vertices[i], vertices[i + 1], vertices[i + 2]);
         matrix.transformPointAffine(tmpVec, tmpVec);
-        vertices[i * 3] = tmpVec.x;
-        vertices[i * 3 + 1] = tmpVec.y;
-        vertices[i * 3 + 2] = tmpVec.z;
+        vertices[i] = tmpVec.x;
+        vertices[i + 1] = tmpVec.y;
+        vertices[i + 2] = tmpVec.z;
         if (normals) {
-          tmpVec.setXYZ(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]);
+          tmpVec.setXYZ(normals[i], normals[i + 1], normals[i + 2]);
           matrix.transformVectorAffine(tmpVec, tmpVec);
           tmpVec.inplaceNormalize();
-          normals[i * 3] = tmpVec.x;
-          normals[i * 3 + 1] = tmpVec.y;
-          normals[i * 3 + 2] = tmpVec.z;
+          normals[i] = tmpVec.x;
+          normals[i + 1] = tmpVec.y;
+          normals[i + 2] = tmpVec.z;
         }
       }
     }

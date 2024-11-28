@@ -1,6 +1,4 @@
-import { AABB } from '@zephyr3d/base';
-import type { Vector3 } from '@zephyr3d/base';
-import { BoundingBox } from '../utility/bounding_volume';
+import type { AABB } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 import type { PrimitiveType } from '@zephyr3d/device';
@@ -45,22 +43,20 @@ Triangle(n, m) = (VIndex(n, m), VIndex(n+1, m), VIndex(n+1, m+1), VIndex(n, m), 
  * @public
  */
 export class TorusShape extends Shape<TorusCreationOptions> {
+  static _defaultOptions = {
+    ...Shape._defaultOptions,
+    numSlices: 40,
+    numSegments: 16,
+    outerRadius: 10,
+    innerRadius: 3,
+    radialDetail: 20
+  };
   /**
    * Creates an instance of torus shape
    * @param options - The creation options
    */
   constructor(options?: TorusCreationOptions) {
     super(options);
-  }
-  /** @internal */
-  protected createDefaultOptions() {
-    const options = super.createDefaultOptions();
-    options.numSlices = 40;
-    options.numSegments = 16;
-    options.outerRadius = 10;
-    options.innerRadius = 3;
-    options.radialDetail = 20;
-    return options;
   }
   /**
    * Generates the data for the torus shape
@@ -75,14 +71,12 @@ export class TorusShape extends Shape<TorusCreationOptions> {
     normals: number[],
     uvs: number[],
     indices: number[],
-    positionOffset?: Vector3,
-    indicesOffset?: number,
-    bbox?: AABB
+    bbox?: AABB,
+    indexOffset?: number
   ): PrimitiveType {
-    const offsetX = positionOffset ? positionOffset.x : 0;
-    const offsetY = positionOffset ? positionOffset.y : 0;
-    const offsetZ = positionOffset ? positionOffset.z : 0;
-    const indexOffset = indicesOffset ?? 0;
+    options = Object.assign({}, this._defaultOptions, options ?? {});
+    indexOffset = indexOffset ?? 0;
+    const start = vertices.length;
     const N = options.numSlices;
     const M = options.numSegments;
     const OR = options.outerRadius;
@@ -113,9 +107,6 @@ export class TorusShape extends Shape<TorusCreationOptions> {
           uvs[idx * 2 + 0] = m / M;
           uvs[idx * 2 + 1] = n / N;
         }
-        vertices[idx * 3 + 0] += offsetX;
-        vertices[idx * 3 + 1] += offsetY;
-        vertices[idx * 3 + 2] += offsetZ;
       }
     }
     for (let n = 0; n < N; n++) {
@@ -128,43 +119,17 @@ export class TorusShape extends Shape<TorusCreationOptions> {
         indices.push((n + 1) * (M + 1) + m + 1 + indexOffset);
       }
     }
-    Shape._transform(options.transform, vertices, normals);
+    Shape._transform(options.transform, vertices, normals, start);
     if (bbox) {
-      bbox.beginExtend();
-      for (let i = 0; i < vertices.length / 3; i++) {
-        bbox.minPoint.x = Math.min(bbox.minPoint.x, vertices[i * 3]);
-        bbox.minPoint.y = Math.min(bbox.minPoint.y, vertices[i * 3 + 1]);
-        bbox.minPoint.z = Math.min(bbox.minPoint.z, vertices[i * 3 + 2]);
-        bbox.maxPoint.x = Math.max(bbox.maxPoint.x, vertices[i * 3]);
-        bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i * 3 + 1]);
-        bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i * 3 + 2]);
+      for (let i = start; i < vertices.length - 2; i += 3) {
+        bbox.minPoint.x = Math.min(bbox.minPoint.x, vertices[i]);
+        bbox.minPoint.y = Math.min(bbox.minPoint.y, vertices[i + 1]);
+        bbox.minPoint.z = Math.min(bbox.minPoint.z, vertices[i + 2]);
+        bbox.maxPoint.x = Math.max(bbox.maxPoint.x, vertices[i]);
+        bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i + 1]);
+        bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i + 2]);
       }
     }
     return 'triangle-list';
-  }
-  /** @internal */
-  protected _create(): boolean {
-    const vertices: number[] = [];
-    const indices: number[] = [];
-    const normals: number[] = this._options.needNormal ? [] : null;
-    const uvs: number[] = this._options.needUV ? [] : null;
-    const bbox = new AABB();
-    this._primitiveType = TorusShape.generateData(
-      this._options,
-      vertices,
-      normals,
-      uvs,
-      indices,
-      null,
-      null,
-      bbox
-    );
-    this.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
-    normals && this.createAndSetVertexBuffer('normal_f32x3', new Float32Array(normals));
-    uvs && this.createAndSetVertexBuffer('tex0_f32x2', new Float32Array(uvs));
-    this.createAndSetIndexBuffer(new Uint16Array(indices));
-    this.setBoundingVolume(new BoundingBox(bbox.minPoint, bbox.maxPoint));
-    this.indexCount = indices.length;
-    return true;
   }
 }

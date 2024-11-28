@@ -16,7 +16,7 @@ import {
   createGradientNoiseTexture
 } from '@zephyr3d/scene';
 import * as common from '../common';
-import { createAxisGroup, Inspector } from '@zephyr3d/inspector';
+import { createAxisGroup, createAxisGroup2, Inspector } from '@zephyr3d/inspector';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 
@@ -74,7 +74,7 @@ ssrApp.ready().then(async () => {
   sphere.position.setXYZ(0, 6, 0);
   sphere.parent = batchGroup;
 
-  const axisGroup = createAxisGroup(scene, 10, 0.1, 5, 0.2);
+  const axisGroup = createAxisGroup2(scene, 10, 0.1, 5, 0.2);
   axisGroup.parent = sphere;
 
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));

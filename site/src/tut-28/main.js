@@ -1,5 +1,15 @@
 import { Vector3 } from '@zephyr3d/base';
-import { Scene, Application, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, DirectionalLight, AssetManager, Bloom } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  OrbitCameraController,
+  PerspectiveCamera,
+  Compositor,
+  Tonemap,
+  DirectionalLight,
+  AssetManager,
+  Bloom
+} from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
@@ -15,12 +25,18 @@ myApp.ready().then(function () {
 
   const assetManager = new AssetManager();
   // Loads a model
-  assetManager.fetchModel(scene, 'assets/models/DamagedHelmet.glb').then(info => {
+  assetManager.fetchModel(scene, 'assets/models/DamagedHelmet.glb').then((info) => {
     info.group.position.setXYZ(0, -0.5, 0);
   });
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    myApp.device.canvas.width / myApp.device.canvas.height,
+    1,
+    100
+  );
   camera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
 
@@ -40,12 +56,12 @@ myApp.ready().then(function () {
     // The lower half of the screen uses Bloom
     compositor.appendPostEffect(bloom);
     camera.viewport = [0, 0, width, height >> 1];
-    camera.aspect = camera.viewport[2]/camera.viewport[3];
+    camera.aspect = camera.viewport[2] / camera.viewport[3];
     camera.render(scene, compositor);
-    // No Bloom on the upper half of the screen 
+    // No Bloom on the upper half of the screen
     compositor.removePostEffect(bloom);
     camera.viewport = [0, height >> 1, width, height - (height >> 1)];
-    camera.aspect = camera.viewport[2]/camera.viewport[3];
+    camera.aspect = camera.viewport[2] / camera.viewport[3];
     camera.render(scene, compositor);
   });
 

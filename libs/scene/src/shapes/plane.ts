@@ -1,6 +1,4 @@
-import { AABB } from '@zephyr3d/base';
-import type { Vector3 } from '@zephyr3d/base';
-import { BoundingBox } from '../utility/bounding_volume';
+import type { AABB } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 import type { PrimitiveType } from '@zephyr3d/device';
@@ -23,18 +21,16 @@ export interface PlaneCreationOptions extends ShapeCreationOptions {
  * @public
  */
 export class PlaneShape extends Shape<PlaneCreationOptions> {
+  static _defaultOptions = {
+    ...Shape._defaultOptions,
+    size: 1
+  };
   /**
    * Creates an instance of plane shape
    * @param options - The creation options
    */
   constructor(options?: PlaneCreationOptions) {
     super(options);
-  }
-  /** @internal */
-  protected createDefaultOptions() {
-    const options = super.createDefaultOptions();
-    options.size = 1;
-    return options;
   }
   /**
    * Generates the data for the cylinder shape
@@ -49,31 +45,16 @@ export class PlaneShape extends Shape<PlaneCreationOptions> {
     normals: number[],
     uvs: number[],
     indices: number[],
-    positionOffset?: Vector3,
-    indicesOffset?: number,
-    bbox?: AABB
+    bbox?: AABB,
+    indexOffset?: number
   ): PrimitiveType {
-    const offsetX = positionOffset ? positionOffset.x : 0;
-    const offsetY = positionOffset ? positionOffset.y : 0;
-    const offsetZ = positionOffset ? positionOffset.z : 0;
-    const indexOffset = indicesOffset ?? 0;
+    options = Object.assign({}, this._defaultOptions, options ?? {});
+    indexOffset = indexOffset ?? 0;
+    const start = vertices.length;
     const sizeX = Math.abs(options.sizeX || options.size) || 1;
     const sizeY = Math.abs(options.sizeY || options.size) || 1;
     uvs?.push(0, 1, 0, 0, 1, 0, 1, 1);
-    vertices?.push(
-      0 + offsetX,
-      0 + offsetY,
-      sizeY + offsetZ,
-      sizeX + offsetX,
-      0 + offsetY,
-      sizeY + offsetZ,
-      sizeX + offsetX,
-      0 + offsetY,
-      0 + offsetZ,
-      0 + offsetX,
-      0 + offsetY,
-      0 + offsetZ
-    );
+    vertices?.push(0, 0, sizeY, sizeX, 0, sizeY, sizeX, 0, 0, 0, 0, 0);
     indices?.push(
       0 + indexOffset,
       1 + indexOffset,
@@ -83,34 +64,17 @@ export class PlaneShape extends Shape<PlaneCreationOptions> {
       3 + indexOffset
     );
     normals?.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
-    Shape._transform(options.transform, vertices, normals);
+    Shape._transform(options.transform, vertices, normals, start);
     if (bbox) {
-      bbox.beginExtend();
-      for (let i = 0; i < vertices.length / 3; i++) {
-        bbox.minPoint.x = Math.min(bbox.minPoint.x, vertices[i * 3]);
-        bbox.minPoint.y = Math.min(bbox.minPoint.y, vertices[i * 3 + 1]);
-        bbox.minPoint.z = Math.min(bbox.minPoint.z, vertices[i * 3 + 2]);
-        bbox.maxPoint.x = Math.max(bbox.maxPoint.x, vertices[i * 3]);
-        bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i * 3 + 1]);
-        bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i * 3 + 2]);
+      for (let i = start; i < vertices.length - 2; i += 3) {
+        bbox.minPoint.x = Math.min(bbox.minPoint.x, vertices[i]);
+        bbox.minPoint.y = Math.min(bbox.minPoint.y, vertices[i + 1]);
+        bbox.minPoint.z = Math.min(bbox.minPoint.z, vertices[i + 2]);
+        bbox.maxPoint.x = Math.max(bbox.maxPoint.x, vertices[i]);
+        bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i + 1]);
+        bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i + 2]);
       }
     }
     return 'triangle-list';
-  }
-  /** @internal */
-  protected _create(): boolean {
-    const vertices: number[] = [];
-    const indices: number[] = [];
-    const normals: number[] = this._options.needNormal ? [] : null;
-    const uvs: number[] = this._options.needUV ? [] : null;
-    const bbox = new AABB();
-    PlaneShape.generateData(this._options, vertices, normals, uvs, indices, null, null, bbox);
-    this.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
-    normals && this.createAndSetVertexBuffer('normal_f32x3', new Float32Array(normals));
-    uvs && this.createAndSetVertexBuffer('tex0_f32x2', new Float32Array(uvs));
-    this.createAndSetIndexBuffer(new Uint16Array(indices));
-    this.setBoundingVolume(new BoundingBox(bbox.minPoint, bbox.maxPoint));
-    this.indexCount = indices.length;
-    return true;
   }
 }

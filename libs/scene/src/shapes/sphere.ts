@@ -1,7 +1,6 @@
 import type { Ray } from '@zephyr3d/base';
-import { AABB } from '@zephyr3d/base';
+import type { AABB } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
-import { BoundingBox } from '../utility/bounding_volume';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 import type { PrimitiveType } from '@zephyr3d/device';
@@ -24,6 +23,12 @@ export interface SphereCreationOptions extends ShapeCreationOptions {
  * @public
  */
 export class SphereShape extends Shape<SphereCreationOptions> {
+  static _defaultOptions = {
+    ...Shape._defaultOptions,
+    radius: 1,
+    verticalDetail: 20,
+    horizonalDetail: 20
+  };
   /**
    * Creates an instance of sphere shape
    * @param options - The creation options
@@ -52,14 +57,6 @@ export class SphereShape extends Shape<SphereCreationOptions> {
   get radius(): number {
     return this._options.radius ?? 1;
   }
-  /** @internal */
-  protected createDefaultOptions() {
-    const options = super.createDefaultOptions();
-    options.radius = 1;
-    options.verticalDetail = 20;
-    options.horizonalDetail = 20;
-    return options;
-  }
   /**
    * Generates the data for the sphere shape
    * @param vertices - vertex positions
@@ -73,9 +70,8 @@ export class SphereShape extends Shape<SphereCreationOptions> {
     normals: number[],
     uvs: number[],
     indices: number[],
-    positionOffset?: Vector3,
-    indicesOffset?: number,
-    bbox?: AABB
+    bbox?: AABB,
+    indexOffset?: number
   ): PrimitiveType {
     function getVertex(v: number, h: number, r: number) {
       const y = r * Math.cos(v);
@@ -84,10 +80,9 @@ export class SphereShape extends Shape<SphereCreationOptions> {
       const z = hRadius * Math.cos(h);
       return [x, y, z];
     }
-    const offsetX = positionOffset ? positionOffset.x : 0;
-    const offsetY = positionOffset ? positionOffset.y : 0;
-    const offsetZ = positionOffset ? positionOffset.z : 0;
-    const indexOffset = indicesOffset ?? 0;
+    options = Object.assign({}, this._defaultOptions, options ?? {});
+    indexOffset = indexOffset ?? 0;
+    const start = vertices.length;
     const stripIndices: number[] = [];
     const radius = options.radius ?? 1;
     const verticalDetail = options.verticalDetail ?? 20;
@@ -97,7 +92,7 @@ export class SphereShape extends Shape<SphereCreationOptions> {
     for (let i = 0; i <= verticalDetail; i++) {
       for (let j = 0; j <= horizonalDetail; j++) {
         const v = getVertex(i * vTheta, j * hTheta, radius);
-        vertices.push(v[0] + offsetX, v[1] + offsetY, v[2] + offsetZ);
+        vertices.push(v[0], v[1], v[2]);
         uvs && uvs.push(j / horizonalDetail, i / verticalDetail);
         normals && normals.push(v[0] / radius, v[1] / radius, v[2] / radius);
       }
@@ -117,43 +112,17 @@ export class SphereShape extends Shape<SphereCreationOptions> {
         indices.push(stripIndices[i], stripIndices[i + 2], stripIndices[i + 1]);
       }
     }
-    Shape._transform(options.transform, vertices, normals);
+    Shape._transform(options.transform, vertices, normals, start);
     if (bbox) {
-      bbox.beginExtend();
-      for (let i = 0; i < vertices.length / 3; i++) {
-        bbox.minPoint.x = Math.min(bbox.minPoint.x, vertices[i * 3]);
-        bbox.minPoint.y = Math.min(bbox.minPoint.y, vertices[i * 3 + 1]);
-        bbox.minPoint.z = Math.min(bbox.minPoint.z, vertices[i * 3 + 2]);
-        bbox.maxPoint.x = Math.max(bbox.maxPoint.x, vertices[i * 3]);
-        bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i * 3 + 1]);
-        bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i * 3 + 2]);
+      for (let i = start; i < vertices.length - 2; i += 3) {
+        bbox.minPoint.x = Math.min(bbox.minPoint.x, vertices[i]);
+        bbox.minPoint.y = Math.min(bbox.minPoint.y, vertices[i + 1]);
+        bbox.minPoint.z = Math.min(bbox.minPoint.z, vertices[i + 2]);
+        bbox.maxPoint.x = Math.max(bbox.maxPoint.x, vertices[i]);
+        bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i + 1]);
+        bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i + 2]);
       }
     }
     return 'triangle-list';
-  }
-  /** @internal */
-  protected _create(): boolean {
-    const vertices: number[] = [];
-    const normals: number[] = this._options.needNormal ? [] : null;
-    const uv: number[] = this._options.needUV ? [] : null;
-    const indices: number[] = [];
-    const bbox = new AABB();
-    this._primitiveType = SphereShape.generateData(
-      this._options,
-      vertices,
-      normals,
-      uv,
-      indices,
-      null,
-      null,
-      bbox
-    );
-    this.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
-    normals && this.createAndSetVertexBuffer('normal_f32x3', new Float32Array(normals));
-    uv && this.createAndSetVertexBuffer('tex0_f32x2', new Float32Array(uv));
-    this.createAndSetIndexBuffer(new Uint32Array(indices));
-    this.setBoundingVolume(new BoundingBox(bbox.minPoint, bbox.maxPoint));
-    this.indexCount = indices.length;
-    return true;
   }
 }
