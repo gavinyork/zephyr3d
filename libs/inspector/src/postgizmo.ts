@@ -148,6 +148,31 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
           };
         }
       }
+    } else if (this._mode === 'rotation') {
+      const distance = rayLocal.intersectionTestSphere(this._axisLength);
+      if (distance !== null) {
+        for (const t of distance) {
+          let axis = -1;
+          let minValue = this._axisRadius;
+          const d = [
+            Math.abs(rayLocal.origin.x + rayLocal.direction.x * t),
+            Math.abs(rayLocal.origin.y + rayLocal.direction.y * t),
+            Math.abs(rayLocal.origin.z + rayLocal.direction.z * t)
+          ];
+          for (let i = 0; i < 3; i++) {
+            if (d[i] < minValue) {
+              axis = i;
+              minValue = d[i];
+            }
+          }
+          if (axis >= 0) {
+            return {
+              axis,
+              t
+            };
+          }
+        }
+      }
     }
     return null;
   }

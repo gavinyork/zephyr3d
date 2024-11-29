@@ -115,6 +115,39 @@ export class Ray {
     return other;
   }
   /**
+   * Do a ray sphere intersection test
+   * @param radius - Sphere radius
+   * @returns Distance from origin to the intersected point if the ray intersects with the sphere, otherwise null
+   */
+  intersectionTestSphere(radius: number): number[] | null {
+    const a = Vector3.dot(this._direction, this._direction);
+    const b = 2 * Vector3.dot(this._origin, this._direction);
+    const c = Vector3.dot(this._origin, this._origin) - radius * radius;
+    const discriminant = b * b - 4 * a * c;
+    if (discriminant < 0) {
+      return null;
+    }
+    const s = Math.sqrt(discriminant);
+    let t1 = (-b - s) / (2 * a);
+    let t2 = (-b + s) / (2 * a);
+    if (t1 > t2) {
+      const t = t1;
+      t1 = t2;
+      t2 = t;
+    }
+    if (t1 >= 0 || t2 >= 0) {
+      const result: number[] = [];
+      if (t1 >= 0) {
+        result.push(t1);
+      }
+      if (t2 >= 0) {
+        result.push(t2);
+      }
+      return result;
+    }
+    return null;
+  }
+  /**
    * Do a ray triangle intersection test.
    * @param v1 - The first triangle vertex.
    * @param v2 - The second triangle vertex.
