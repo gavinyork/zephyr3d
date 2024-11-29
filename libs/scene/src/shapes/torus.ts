@@ -88,24 +88,21 @@ export class TorusShape extends Shape<TorusCreationOptions> {
       const cz = OR * Math.sin(alpha);
       for (let m = 0; m <= M; m++) {
         const theta = ((m % M) / M) * Math.PI * 2;
-        const idx = n * (M + 1) + m;
         const t = 1 + (IR * Math.cos(theta)) / OR;
         const s = IR * Math.sin(theta);
-        vertices[idx * 3 + 0] = cx * t;
-        vertices[idx * 3 + 1] = cy * t + s;
-        vertices[idx * 3 + 2] = cz * t;
+        const x = cx * t;
+        const y = cy * t + s;
+        const z = cz * t;
         if (normals) {
-          const nx = vertices[idx * 3 + 0] - cx;
-          const ny = vertices[idx * 3 + 1] - cy;
-          const nz = vertices[idx * 3 + 2] - cz;
+          const nx = x - cx;
+          const ny = y - cy;
+          const nz = z - cz;
           const mag = Math.sqrt(nx * nx + ny * ny + nz * nz);
-          normals[idx * 3 + 0] = nx / mag;
-          normals[idx * 3 + 1] = ny / mag;
-          normals[idx * 3 + 2] = nz / mag;
+          normals.push(nx / mag, ny / mag, nz / mag);
         }
+        vertices.push(x, y, z);
         if (uvs) {
-          uvs[idx * 2 + 0] = m / M;
-          uvs[idx * 2 + 1] = n / N;
+          uvs.push(m / M, n / N);
         }
       }
     }
@@ -114,7 +111,7 @@ export class TorusShape extends Shape<TorusCreationOptions> {
         indices.push(n * (M + 1) + m + indexOffset);
         indices.push((n + 1) * (M + 1) + m + 1 + indexOffset);
         indices.push((n + 1) * (M + 1) + m + indexOffset);
-        indices.push(n * (M + 1) + m) + indexOffset;
+        indices.push(n * (M + 1) + m + indexOffset);
         indices.push(n * (M + 1) + m + 1 + indexOffset);
         indices.push((n + 1) * (M + 1) + m + 1 + indexOffset);
       }

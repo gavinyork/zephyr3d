@@ -49,9 +49,6 @@ ssrApp.ready().then(async () => {
   camera.depthPrePass = true;
   camera.enablePicking = true;
 
-  ssrApp.inputManager.use(imGuiInjectEvent);
-  ssrApp.inputManager.use(camera.handleEvent.bind(camera));
-
   const batchGroup = new BatchGroup(scene);
   const mat1 = new BlinnMaterial();
   mat1.albedoColor = new Vector4(0.8, 0.8, 0.6, 1);
@@ -74,11 +71,26 @@ ssrApp.ready().then(async () => {
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
   const compositor = new Compositor();
+  const postGizmo = new PostGizmoRenderer(sphere, 5);
+  postGizmo.mode = 'scaling';
   compositor.appendPostEffect(new Tonemap());
-  compositor.appendPostEffect(new PostGizmoRenderer(sphere));
+  compositor.appendPostEffect(postGizmo);
 
   const inspector = new Inspector(scene, compositor, camera);
 
+  ssrApp.inputManager.use(imGuiInjectEvent);
+  ssrApp.inputManager.use(function (ev: Event, type?: string) {
+    if (ev.type === 'pointerdown') {
+      const ray = camera.constructRay((ev as PointerEvent).offsetX, (ev as PointerEvent).offsetY);
+      const hitInfo = postGizmo.rayIntersection(ray);
+      if (hitInfo) {
+        console.log(`Axis ${hitInfo.axis} hit at ${hitInfo.t}`);
+        return true;
+      }
+    }
+    return false;
+  });
+  ssrApp.inputManager.use(camera.handleEvent.bind(camera));
   ssrApp.on('resize', (width, height) => {
     camera.setPerspective(camera.getFOV(), width / height, camera.getNearPlane(), camera.getFarPlane());
   });

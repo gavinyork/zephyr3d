@@ -1880,6 +1880,13 @@ export class Quaternion extends VectorBase {
   toMatrix4x4(matrix?: Matrix4x4): Matrix4x4 {
     const m = matrix || Matrix4x4.identity();
     this.toMatrix(m);
+    m.m03 = 0;
+    m.m13 = 0;
+    m.m23 = 0;
+    m.m30 = 0;
+    m.m31 = 0;
+    m.m32 = 0;
+    m.m33 = 1;
     return m;
   }
   /**
@@ -3157,13 +3164,6 @@ export class Matrix4x4 extends VectorBase {
         this[15] = arg15;
       } else if (arg0 instanceof Quaternion) {
         arg0.toMatrix4x4(this);
-        this.m03 = 0;
-        this.m13 = 0;
-        this.m23 = 0;
-        this.m30 = 0;
-        this.m31 = 0;
-        this.m32 = 0;
-        this.m33 = 1;
       } else if (arg0 instanceof Matrix3x3) {
         this.m00 = arg0.m00;
         this.m01 = arg0.m01;

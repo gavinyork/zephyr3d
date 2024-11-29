@@ -25,6 +25,7 @@ import {
 import { ImGui } from '@zephyr3d/imgui';
 import type { Texture2D, BaseTexture, FrameBuffer } from '@zephyr3d/device';
 import { TextureDrawer } from './textureview';
+import { GizmoMode, PostGizmoRenderer } from './postgizmo';
 
 export class Inspector {
   private _scene: Scene;
@@ -55,6 +56,7 @@ export class Inspector {
   private _envlightTypes: EnvLightType[];
   private _shadowMethods: ShadowMode[];
   private _skyTypes: SkyType[];
+  private _gizmoModes: GizmoMode[];
   private _fogTypes: FogType[];
   private _renderPostEffects: Set<AbstractPostEffect<any>>;
   private _assetManager: AssetManager;
@@ -98,6 +100,7 @@ export class Inspector {
     this._shadowMethods = ['hard', 'pcf-pd', 'pcf-opt', 'vsm', 'esm'];
     this._skyTypes = ['none', 'color', 'skybox', 'scatter'];
     this._fogTypes = ['none', 'linear', 'exp', 'exp2', 'scatter'];
+    this._gizmoModes = ['none', 'rotation', 'scaling', 'translation'];
     this._renderPostEffects = new Set();
     this._assetManager = null;
     this._assetManager = new AssetManager();
@@ -219,7 +222,6 @@ export class Inspector {
         if (postEffects.length > 0 && ImGui.BeginMenu('Compositor')) {
           for (const eff of postEffects) {
             const name = eff.getClassName();
-            console.log(`PostEffect constructor name: ${name}`);
             ImGui.MenuItem(name, null, (val?: boolean) => {
               if (val === undefined || val === null) {
                 val = this._renderPostEffects.has(eff);
@@ -247,6 +249,8 @@ export class Inspector {
         this.renderPostWater(eff);
       } else if (eff instanceof Bloom) {
         this.renderBloom(eff);
+      } else if (eff instanceof PostGizmoRenderer) {
+        this.renderGizmo(eff);
       }
     }
   }
@@ -519,6 +523,23 @@ export class Inspector {
         },
         0,
         1
+      );
+    }
+    ImGui.End();
+  }
+  private renderGizmo(gizmo: PostGizmoRenderer) {
+    if (ImGui.Begin('Gizmo')) {
+      ImGui.Combo(
+        'Mode##gizmo',
+        (val?: number) => {
+          if (val === undefined) {
+            val = this._gizmoModes.indexOf(gizmo.mode);
+          } else {
+            gizmo.mode = this._gizmoModes[val];
+          }
+          return val;
+        },
+        this._gizmoModes
       );
     }
     ImGui.End();

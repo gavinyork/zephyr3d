@@ -7,8 +7,18 @@ import {
   linearToGamma,
   ShaderHelper
 } from '@zephyr3d/scene';
-import { createAxisPrimitive } from './misc';
-import { Matrix4x4, Vector2 } from '@zephyr3d/base';
+import { createTranslationGizmo, createRotationGizmo, createScaleGizmo } from './gizmo';
+import { Matrix4x4, Quaternion, Ray, Vector2, Vector3 } from '@zephyr3d/base';
+
+const tmpVecT = new Vector3();
+const tmpVecS = new Vector3();
+const tmpQuatR = new Quaternion();
+
+export type GizmoMode = 'none' | 'translation' | 'rotation' | 'scaling';
+export type GizmoHitInfo = {
+  axis: number;
+  t: number;
+};
 
 /**
  * The post water effect
@@ -18,19 +28,39 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   static readonly className = 'PostGizmoRenderer' as const;
   static _gizmoProgram: GPUProgram = null;
   static _gizmoRenderState: RenderStateSet = null;
-  static _axis: Primitive = null;
+  static _primitives: Partial<Record<GizmoMode, Primitive>> = {};
+  static _rotation: Primitive = null;
   static _mvpMatrix: Matrix4x4 = new Matrix4x4();
   static _texSize: Vector2 = new Vector2();
   static _cameraNearFar: Vector2 = new Vector2();
   private _axisBinding: SceneNode;
   private _bindGroup: BindGroup;
+  private _mode: GizmoMode;
+  private _axisLength: number;
+  private _arrowLength: number;
+  private _axisRadius: number;
+  private _arrowRadius: number;
+  private _boxSize: number;
   /**
    * Creates an instance of PostGizmoRenderer.
    */
-  constructor(binding: SceneNode) {
+  constructor(binding: SceneNode, size = 10) {
     super();
     this._axisBinding = binding;
     this._bindGroup = null;
+    this._axisLength = size;
+    this._arrowLength = size * 0.4;
+    this._axisRadius = size * 0.01;
+    this._arrowRadius = size * 0.02;
+    this._boxSize = size * 0.05;
+
+    this._mode = 'none';
+  }
+  get mode(): GizmoMode {
+    return this._mode;
+  }
+  set mode(val: GizmoMode) {
+    this._mode = val;
   }
   get axisBinding(): SceneNode {
     return this._axisBinding;
@@ -49,8 +79,24 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     this.passThrough(ctx, inputColorTexture, srgbOutput);
-    if (!PostGizmoRenderer._axis) {
-      PostGizmoRenderer._axis = createAxisPrimitive(10, 0.1, 5, 0.2);
+    let primitive: Primitive = PostGizmoRenderer._primitives[this._mode];
+    if (!primitive) {
+      if (this._mode === 'translation') {
+        primitive = createTranslationGizmo(
+          this._axisLength,
+          this._axisRadius,
+          this._arrowLength,
+          this._arrowRadius
+        );
+      } else if (this._mode === 'rotation') {
+        primitive = createRotationGizmo(this._axisLength, this._axisRadius);
+      } else if (this._mode === 'scaling') {
+        primitive = createScaleGizmo(this._axisLength, this._axisRadius, this._boxSize);
+      }
+      PostGizmoRenderer._primitives[this._mode] = primitive;
+    }
+    if (!primitive) {
+      return;
     }
     if (!PostGizmoRenderer._gizmoProgram) {
       PostGizmoRenderer._gizmoProgram = this._createAxisProgram(ctx);
@@ -61,11 +107,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     if (!this._bindGroup) {
       this._bindGroup = ctx.device.createBindGroup(PostGizmoRenderer._gizmoProgram.bindGroupLayouts[0]);
     }
-    if (this._axisBinding) {
-      PostGizmoRenderer._mvpMatrix.set(this._axisBinding.worldMatrix);
-    } else {
-      PostGizmoRenderer._mvpMatrix.identity();
-    }
+    this._calcGizmoWorldMatrix(PostGizmoRenderer._mvpMatrix);
     PostGizmoRenderer._mvpMatrix.multiplyLeft(ctx.camera.viewProjectionMatrix);
     PostGizmoRenderer._texSize.setXY(inputColorTexture.width, inputColorTexture.height);
     PostGizmoRenderer._cameraNearFar.setXY(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
@@ -79,12 +121,69 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     ctx.device.setProgram(PostGizmoRenderer._gizmoProgram);
     ctx.device.setBindGroup(0, this._bindGroup);
     ctx.device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
-    PostGizmoRenderer._axis.draw();
+    primitive.draw();
+  }
+  /** Ray intersection */
+  rayIntersection(ray: Ray): GizmoHitInfo {
+    const rayLocal = new Ray();
+    const invWorldMatrix = this._calcGizmoWorldMatrix().inplaceInvertAffine();
+    ray.transform(invWorldMatrix, rayLocal);
+    if (this._mode === 'translation') {
+      for (let i = 0; i < 3; i++) {
+        const coord = this._rayIntersectAxis(rayLocal, i);
+        if (coord >= 0) {
+          return {
+            axis: i,
+            t: coord
+          };
+        }
+      }
+    }
+    return null;
+  }
+  private _calcGizmoWorldMatrix(matrix?: Matrix4x4) {
+    matrix = matrix ?? new Matrix4x4();
+    if (this._axisBinding) {
+      this._axisBinding.worldMatrix.decompose(tmpVecS, tmpQuatR, tmpVecT);
+      tmpQuatR.toMatrix4x4(matrix).translateLeft(tmpVecT);
+    } else {
+      matrix.identity();
+    }
+    return matrix;
   }
   private _createRenderStates(ctx: DrawContext) {
     const rs = ctx.device.createRenderStateSet();
     rs.useDepthState().enableTest(false).enableWrite(false);
     return rs;
+  }
+  private _rayIntersectAxis(ray: Ray, axis: number): number {
+    const coords = [0, 1, 2];
+    coords.splice(axis, 1);
+    const [i1, i2] = coords;
+
+    const origin = [ray.origin.x, ray.origin.y, ray.origin.z];
+    const direction = [ray.direction.x, ray.direction.y, ray.direction.z];
+
+    const a = direction[i1] * direction[i1] + direction[i2] * direction[i2];
+    const b = 2 * (origin[i1] * direction[i1] + origin[i2] * direction[i2]);
+    const c = origin[i1] * origin[i1] + origin[i2] * origin[i2] - this._axisRadius * this._axisRadius;
+
+    const discriminant = b * b - 4 * a * c;
+    if (discriminant < 0) return -1;
+
+    const sqrtDisc = Math.sqrt(discriminant);
+    const t1 = (-b - sqrtDisc) / (2 * a);
+    const t2 = (-b + sqrtDisc) / (2 * a);
+
+    for (const t of [t1, t2]) {
+      if (t < 0) continue;
+      const hitPoint = Vector3.add(ray.origin, Vector3.scale(ray.direction, t));
+      const axisCoord = [hitPoint.x, hitPoint.y, hitPoint.z][axis];
+      if (axisCoord >= 0 && axisCoord <= this._axisLength) {
+        return axisCoord;
+      }
+    }
+    return -1;
   }
   private _createAxisProgram(ctx: DrawContext) {
     return ctx.device.buildRenderProgram({
@@ -120,7 +219,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
               : this.sceneDepthSample.r;
           this.$l.alpha = this.$choice(
             pb.greaterThan(this.depth, this.sceneDepth),
-            pb.float(0.3),
+            pb.float(0.2),
             pb.float(1)
           );
           this.$l.sceneColor = pb.textureSampleLevel(this.inputColor, this.screenUV, 0);

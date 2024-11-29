@@ -1,3 +1,3 @@
 export * from './inspector';
-export * from './misc';
+export * from './gizmo';
 export * from './postgizmo';
