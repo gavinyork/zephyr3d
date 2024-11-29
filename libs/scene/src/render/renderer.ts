@@ -94,6 +94,8 @@ export class SceneRenderer {
       renderPassHash: null,
       applyFog: null,
       flip: false,
+      depthFormat: device.getDeviceCaps().framebufferCaps.supportDepth32floatStencil8 ? 'd32fs8' : 'd24s8',
+      colorFormat: device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm',
       drawEnvLight: false,
       env: null,
       materialFlags: 0,
@@ -101,7 +103,51 @@ export class SceneRenderer {
     };
     scene.frameUpdate();
     if (camera && !device.isContextLost()) {
+      const defaultViewport = !camera.viewport && !camera.scissor;
+      const renderX = camera.viewport ? device.screenToDevice(camera.viewport[0]) : 0;
+      const renderY = camera.viewport ? device.screenToDevice(camera.viewport[1]) : 0;
+      const renderWidth = camera.viewport
+        ? device.screenToDevice(camera.viewport[2])
+        : device.getDrawingBufferWidth();
+      const renderHeight = camera.viewport
+        ? device.screenToDevice(camera.viewport[3])
+        : device.getDrawingBufferHeight();
+      const tmpFramebuffer = defaultViewport
+        ? null
+        : device.pool.fetchTemporalFramebuffer(
+            false,
+            renderWidth,
+            renderHeight,
+            ctx.colorFormat,
+            ctx.depthFormat
+          );
+      const originFramebuffer = device.getFramebuffer();
+      if (tmpFramebuffer) {
+        device.pushDeviceStates();
+        device.setFramebuffer(tmpFramebuffer);
+      }
       this._renderScene(ctx);
+      if (tmpFramebuffer) {
+        device.popDeviceStates();
+        const oversizedViewport =
+          renderX < 0 ||
+          renderY < 0 ||
+          renderX + renderWidth > device.getDrawingBufferWidth() ||
+          renderY + renderHeight > device.getDrawingBufferHeight();
+        const blitter = new CopyBlitter();
+        if (oversizedViewport) {
+          blitter.destRect = [renderX, renderY, renderWidth, renderHeight];
+        } else {
+          blitter.viewport = camera.viewport;
+        }
+        blitter.scissor = camera.scissor;
+        blitter.blit(
+          tmpFramebuffer.getColorAttachments()[0],
+          originFramebuffer ?? null,
+          fetchSampler('clamp_nearest_nomip')
+        );
+        device.pool.releaseFrameBuffer(tmpFramebuffer);
+      }
     }
     GlobalBindGroupAllocator.release(ctx.globalBindGroupAllocator);
   }
@@ -146,36 +192,9 @@ export class SceneRenderer {
     const SSR =
       ctx.primaryCamera.SSR && ctx.scene.env.light.envLight && ctx.scene.env.light.envLight.hasRadiance();
     const SSRCalcThickness = SSR && ctx.primaryCamera.ssrCalcThickness;
-    const vp = ctx.camera.viewport;
-    const scissor = ctx.camera.scissor;
     const finalFramebuffer = device.getFramebuffer();
     const drawingBufferWidth = device.getDrawingBufferWidth();
     const drawingBufferHeight = device.getDrawingBufferHeight();
-    ctx.depthFormat = device.getDeviceCaps().framebufferCaps.supportDepth32floatStencil8 ? 'd32fs8' : 'd24s8';
-    ctx.viewportX = finalFramebuffer ? vp?.[0] ?? 0 : device.screenToDevice(vp?.[0] ?? 0);
-    ctx.viewportY = finalFramebuffer ? vp?.[1] ?? 0 : device.screenToDevice(vp?.[1] ?? 0);
-    ctx.viewportWidth = finalFramebuffer
-      ? vp?.[2] ?? finalFramebuffer.getWidth()
-      : vp
-      ? device.screenToDevice(vp[2])
-      : device.getDrawingBufferWidth();
-    ctx.viewportHeight = finalFramebuffer
-      ? vp?.[3] ?? finalFramebuffer.getHeight()
-      : vp
-      ? device.screenToDevice(vp[3])
-      : device.getDrawingBufferHeight();
-    ctx.defaultViewport = !finalFramebuffer && !vp;
-    const oversizedViewport =
-      vp &&
-      !device.getDeviceCaps().miscCaps.supportOversizedViewport &&
-      (ctx.viewportX < 0 ||
-        ctx.viewportY < 0 ||
-        ctx.viewportX + ctx.viewportWidth > drawingBufferWidth ||
-        ctx.viewportY + ctx.viewportHeight > drawingBufferHeight);
-    // TODO: determin the color buffer format
-    const colorFmt: TextureFormat = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
-      ? 'rgba16f'
-      : 'rgba8unorm';
     let tempFramebuffer: FrameBuffer = null;
     let depthFramebuffer: FrameBuffer = null;
 
@@ -192,7 +211,6 @@ export class SceneRenderer {
     if (
       SSR ||
       ctx.primaryCamera.depthPrePass ||
-      oversizedViewport ||
       renderQueue.needSceneColor ||
       ctx.scene.env.needSceneDepthTexture() ||
       ctx.motionVectors ||
@@ -209,7 +227,7 @@ export class SceneRenderer {
           ? 'rg32f'
           : 'r32f';
       const mvFormat: TextureFormat = device.type === 'webgl' ? 'rgba8unorm' : 'rg16f';
-      if (!finalFramebuffer && !vp) {
+      if (!finalFramebuffer) {
         depthFramebuffer = device.pool.fetchTemporalFramebuffer(
           true,
           drawingBufferWidth,
@@ -231,8 +249,8 @@ export class SceneRenderer {
             )
           : device.pool.fetchTemporalFramebuffer(
               true,
-              ctx.viewportWidth,
-              ctx.viewportHeight,
+              device.getDrawingBufferWidth(),
+              device.getDrawingBufferHeight(),
               ctx.motionVectors ? [format, mvFormat] : format,
               ctx.depthFormat,
               ctx.HiZ
@@ -271,10 +289,10 @@ export class SceneRenderer {
       } else {
         // TODO: fetch resizable framebuffer if ctx.defaultViewport is true
         tempFramebuffer = device.pool.fetchTemporalFramebuffer(
-          true,
+          false,
           ctx.depthTexture.width,
           ctx.depthTexture.height,
-          colorFmt,
+          ctx.colorFormat,
           ctx.depthTexture,
           false,
           sampleCount
@@ -283,26 +301,14 @@ export class SceneRenderer {
     } else {
       ctx.linearDepthTexture = null;
       ctx.depthTexture = null;
-      if (!vp) {
-        tempFramebuffer = finalFramebuffer;
-      } else {
-        tempFramebuffer = device.pool.fetchTemporalFramebuffer(
-          true,
-          ctx.viewportWidth,
-          ctx.viewportHeight,
-          colorFmt,
-          ctx.depthFormat,
-          false,
-          sampleCount
-        );
-      }
+      tempFramebuffer = finalFramebuffer;
     }
     if (tempFramebuffer && tempFramebuffer !== finalFramebuffer) {
       device.pushDeviceStates();
       device.setFramebuffer(tempFramebuffer);
     } else {
-      device.setViewport(vp);
-      device.setScissor(scissor);
+      device.setViewport(null);
+      device.setScissor(null);
     }
     this._scenePass.transmission = false; // transmission
     this._scenePass.clearDepth = ctx.depthTexture ? null : 1;
@@ -320,11 +326,11 @@ export class SceneRenderer {
         ctx.depthTexture.height,
         ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS
           ? [
-              colorFmt,
+              ctx.colorFormat,
               device.getFramebuffer().getColorAttachments()[1],
               device.getFramebuffer().getColorAttachments()[2]
             ]
-          : colorFmt,
+          : ctx.colorFormat,
         ctx.depthTexture,
         true
       );
@@ -352,16 +358,12 @@ export class SceneRenderer {
 
     if (tempFramebuffer && tempFramebuffer !== finalFramebuffer) {
       const blitter = new CopyBlitter();
-      if (oversizedViewport) {
-        blitter.destRect = [ctx.viewportX, ctx.viewportY, ctx.viewportWidth, ctx.viewportHeight];
-      } else {
-        blitter.viewport = vp;
-      }
-      blitter.scissor = scissor;
       blitter.srgbOut = !finalFramebuffer;
       const srcTex = tempFramebuffer.getColorAttachments()[0] as Texture2D;
       blitter.blit(srcTex, finalFramebuffer ?? null, fetchSampler('clamp_nearest_nomip'));
       device.popDeviceStates();
+
+      device.pool.releaseFrameBuffer(tempFramebuffer);
     }
     ShadowMapper.releaseTemporalResources(ctx);
     this.freeClusteredLight(ctx.clusteredLight);

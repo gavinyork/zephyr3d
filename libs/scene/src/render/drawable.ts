@@ -78,18 +78,10 @@ export interface DrawContext {
   linearDepthTexture?: Texture2D;
   /** Scene color texture */
   sceneColorTexture?: Texture2D;
-  /** viewport X */
-  viewportX?: number;
-  /** viewport Y */
-  viewportY?: number;
-  /** viewport width */
-  viewportWidth?: number;
-  /** viewport height */
-  viewportHeight?: number;
-  /** whether render to default viewport */
-  defaultViewport?: boolean;
   /** Default depth buffer format */
   depthFormat?: TextureFormat;
+  /** Default color buffer format */
+  colorFormat?: TextureFormat;
   /** Instance data for current drawing task */
   instanceData?: InstanceData;
   /** The compositor used to apply postprocessing effects */

@@ -124,6 +124,8 @@ export class Compositor {
   }
   /** @internal */
   begin(ctx: DrawContext) {
+    const device = ctx.device;
+    this._finalFramebuffer = device.getFramebuffer();
     const ssr = !!(ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS);
     if (
       this._postEffectsOpaque.length === 0 &&
@@ -134,12 +136,10 @@ export class Compositor {
     ) {
       return;
     }
-    const device = ctx.device;
     const format = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
-    this._finalFramebuffer = device.getFramebuffer();
     const depth = this._finalFramebuffer?.getDepthAttachment() as Texture2D;
-    const w = depth ? depth.width : ctx.viewportWidth;
-    const h = depth ? depth.height : ctx.viewportHeight;
+    const w = depth ? depth.width : device.getDrawingBufferWidth();
+    const h = depth ? depth.height : device.getDrawingBufferHeight();
     const fmt2: TextureFormat = ssr ? (device.type === 'webgl' ? format : 'rgba8unorm') : format;
     const tmpFramebuffer = device.pool.fetchTemporalFramebuffer(
       true,
@@ -217,13 +217,8 @@ export class Compositor {
     if (device.getFramebuffer() !== this._finalFramebuffer) {
       const srcTex = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
       device.setFramebuffer(this._finalFramebuffer);
-      if (ctx.defaultViewport) {
-        device.setViewport(null);
-        device.setScissor(null);
-      } else {
-        device.setViewport([ctx.viewportX, ctx.viewportY, ctx.viewportWidth, ctx.viewportHeight]);
-        device.setScissor([ctx.viewportX, ctx.viewportY, ctx.viewportWidth, ctx.viewportHeight]);
-      }
+      device.setViewport(null);
+      device.setScissor(null);
       Compositor._blit(device, srcTex, !this._finalFramebuffer);
     }
     if (this._prevInputTexture) {
