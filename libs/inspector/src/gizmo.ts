@@ -28,21 +28,21 @@ export function createScaleGizmo(axisLength: number, axisRadius: number, boxRadi
     transform: Matrix4x4.rotation(new Vector3(1, 0, 0), Math.PI * 0.5)
   };
   const boxOptions: BoxCreationOptions = {
-    size: boxRadius
+    size: boxRadius * 2
   };
   const boxOptionsX: CylinderCreationOptions = {
     ...boxOptions,
-    transform: Matrix4x4.translation(new Vector3(0, axisLength, 0)).rotateLeft(
+    transform: Matrix4x4.translation(new Vector3(0, axisLength + boxRadius, 0)).rotateLeft(
       Quaternion.fromAxisAngle(new Vector3(0, 0, -1), Math.PI * 0.5)
     )
   };
   const boxOptionsY: CylinderCreationOptions = {
     ...boxOptions,
-    transform: Matrix4x4.translation(new Vector3(0, axisLength, 0))
+    transform: Matrix4x4.translation(new Vector3(0, axisLength + boxRadius, 0))
   };
   const boxOptionsZ: CylinderCreationOptions = {
     ...boxOptions,
-    transform: Matrix4x4.translation(new Vector3(0, axisLength, 0)).rotateLeft(
+    transform: Matrix4x4.translation(new Vector3(0, axisLength + boxRadius, 0)).rotateLeft(
       Quaternion.fromAxisAngle(new Vector3(1, 0, 0), Math.PI * 0.5)
     )
   };

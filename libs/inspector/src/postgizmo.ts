@@ -128,10 +128,20 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     const rayLocal = new Ray();
     const invWorldMatrix = this._calcGizmoWorldMatrix().inplaceInvertAffine();
     ray.transform(invWorldMatrix, rayLocal);
-    if (this._mode === 'translation') {
+    if (this._mode === 'translation' || this._mode === 'scaling') {
       for (let i = 0; i < 3; i++) {
-        const coord = this._rayIntersectAxis(rayLocal, i);
+        let coord = this._rayIntersectAxis(rayLocal, i, this._axisLength, this._axisRadius);
         if (coord >= 0) {
+          return {
+            axis: i,
+            t: coord
+          };
+        }
+        const length =
+          this._axisLength + (this._mode === 'translation' ? this._arrowLength : 2 * this._boxSize);
+        const radius = this._mode === 'translation' ? this._arrowRadius : this._boxSize;
+        coord = this._rayIntersectAxis(rayLocal, i, length, radius);
+        if (coord >= this._axisLength) {
           return {
             axis: i,
             t: coord
@@ -156,17 +166,17 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     rs.useDepthState().enableTest(false).enableWrite(false);
     return rs;
   }
-  private _rayIntersectAxis(ray: Ray, axis: number): number {
+  private _rayIntersectAxis(ray: Ray, axis: number, length: number, radius: number): number {
     const coords = [0, 1, 2];
     coords.splice(axis, 1);
     const [i1, i2] = coords;
 
-    const origin = [ray.origin.x, ray.origin.y, ray.origin.z];
-    const direction = [ray.direction.x, ray.direction.y, ray.direction.z];
+    const o = ray.origin;
+    const d = ray.direction;
 
-    const a = direction[i1] * direction[i1] + direction[i2] * direction[i2];
-    const b = 2 * (origin[i1] * direction[i1] + origin[i2] * direction[i2]);
-    const c = origin[i1] * origin[i1] + origin[i2] * origin[i2] - this._axisRadius * this._axisRadius;
+    const a = d[i1] * d[i1] + d[i2] * d[i2];
+    const b = 2 * (o[i1] * d[i1] + o[i2] * d[i2]);
+    const c = o[i1] * o[i1] + o[i2] * o[i2] - radius * radius;
 
     const discriminant = b * b - 4 * a * c;
     if (discriminant < 0) return -1;
@@ -177,10 +187,10 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
 
     for (const t of [t1, t2]) {
       if (t < 0) continue;
-      const hitPoint = Vector3.add(ray.origin, Vector3.scale(ray.direction, t));
-      const axisCoord = [hitPoint.x, hitPoint.y, hitPoint.z][axis];
-      if (axisCoord >= 0 && axisCoord <= this._axisLength) {
-        return axisCoord;
+      const hit = Vector3.add(ray.origin, Vector3.scale(ray.direction, t));
+      const coord = [hit.x, hit.y, hit.z][axis];
+      if (coord >= 0 && coord <= length) {
+        return coord;
       }
     }
     return -1;
