@@ -8,6 +8,10 @@ import type {
 import { Application } from '../app';
 import { CopyBlitter } from '../blitter';
 
+/**
+ * Sampler types
+ * @public
+ */
 export type SamplerType =
   | 'clamp_linear'
   | 'clamp_linear_nomip'
@@ -81,6 +85,11 @@ const samplers: Partial<Record<SamplerType, TextureSampler>> = {};
 let copyBlitter: CopyBlitter = null;
 let defaultCopyRenderState: RenderStateSet = null;
 
+/**
+ * Fetch a sampler by type
+ * @param type - The sampler type to fetch
+ * @returns The sampler for the given type
+ */
 export function fetchSampler(type: SamplerType): TextureSampler {
   let sampler = samplers[type];
   if (!sampler) {

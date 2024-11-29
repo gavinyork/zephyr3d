@@ -16,7 +16,7 @@ import {
   createGradientNoiseTexture
 } from '@zephyr3d/scene';
 import * as common from '../common';
-import { createAxisGroup, createAxisGroup2, Inspector } from '@zephyr3d/inspector';
+import { Inspector, PostGizmoRenderer } from '@zephyr3d/inspector';
 import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 
@@ -52,10 +52,6 @@ ssrApp.ready().then(async () => {
   ssrApp.inputManager.use(imGuiInjectEvent);
   ssrApp.inputManager.use(camera.handleEvent.bind(camera));
 
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
-  const inspector = new Inspector(scene, compositor, camera);
-
   const batchGroup = new BatchGroup(scene);
   const mat1 = new BlinnMaterial();
   mat1.albedoColor = new Vector4(0.8, 0.8, 0.6, 1);
@@ -74,11 +70,14 @@ ssrApp.ready().then(async () => {
   sphere.position.setXYZ(0, 6, 0);
   sphere.parent = batchGroup;
 
-  const axisGroup = createAxisGroup2(scene, 10, 0.1, 5, 0.2);
-  axisGroup.parent = sphere;
-
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
+
+  const compositor = new Compositor();
+  compositor.appendPostEffect(new Tonemap());
+  compositor.appendPostEffect(new PostGizmoRenderer(sphere));
+
+  const inspector = new Inspector(scene, compositor, camera);
 
   ssrApp.on('resize', (width, height) => {
     camera.setPerspective(camera.getFOV(), width / height, camera.getNearPlane(), camera.getFarPlane());
