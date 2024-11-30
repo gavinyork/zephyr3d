@@ -173,19 +173,15 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
         const ray = this._camera.constructRay(x, y);
         const hitInfo = this.rayIntersection(ray);
         if (hitInfo) {
-          console.log(`Hit: x=${x} y=${y} axis=${hitInfo.axis} pos=${hitInfo.t}`);
           if (this._mode === 'translation' && !this._translateInfo) {
-            console.log('Begin translate');
             this._beginTranslate(x, y, hitInfo.axis, hitInfo.t);
             return true;
           }
           if (this._mode === 'rotation' && !this._rotateInfo) {
-            console.log('Begin rotate');
             this._beginRotate(x, y, hitInfo.axis, hitInfo.point);
             return true;
           }
           if (this._mode === 'scaling' && !this._scaleInfo) {
-            console.log('Begin scale');
             this._beginScale(x, y, hitInfo.axis, hitInfo.t);
             return true;
           }
@@ -193,34 +189,28 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       }
       if (ev.type === 'pointermove') {
         if (this._mode === 'translation' && this._translateInfo) {
-          console.log(`Update translation (${x},${y})`);
           this._updateTranslation(x, y);
           return true;
         }
         if (this._mode === 'rotation' && this._rotateInfo) {
-          console.log(`Update rotation (${x},${y})`);
           this._updateRotate(x, y);
           return true;
         }
         if (this._mode === 'scaling' && this._scaleInfo) {
-          console.log(`Update scaling (${x},${y})`);
           this._updateScale(x, y);
           return true;
         }
       }
       if (ev.type === 'pointerup') {
         if (this._mode === 'translation' && this._translateInfo) {
-          console.log('End translation');
           this._endTranslation();
           return true;
         }
         if (this._mode === 'rotation' && this._rotateInfo) {
-          console.log('End rotation');
           this._endRotate();
           return true;
         }
         if (this._mode === 'scaling' && this._scaleInfo) {
-          console.log('End scaling');
           this._endScale();
           return true;
         }
@@ -354,9 +344,6 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     axis.inplaceNormalize();
     const deltaRotation = Quaternion.fromAxisAngle(axis, movement / this._rotateInfo.speed);
     this._axisBinding.rotation = Quaternion.multiply(deltaRotation, this._rotateInfo.startRotation);
-    console.log(
-      `RotateAxis=(${axis.x},${axis.y},${axis.z}) RotateAngle=${movement / this._rotateInfo.speed}`
-    );
   }
   private _endRotate() {
     this._rotateInfo = null;
@@ -418,9 +405,6 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     }
     this._scaleInfo.startX = x;
     this._scaleInfo.startY = y;
-    console.log(
-      `move=(${movementX},${movementY}) axis=(${axisDirectionX},${axisDirectionY}) dot=${dot} axisLength=${axisLength}, scale=${scale}`
-    );
   }
   private _endScale() {
     this._scaleInfo = null;
@@ -479,9 +463,6 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
           break;
       }
     }
-    console.log(
-      `move=(${movementX},${movementY}) axis=(${axisDirectionX},${axisDirectionY}) dot=${dot} axisLength=${axisLength}, translation=${translation}`
-    );
   }
   private _endTranslation() {
     this._translateInfo = null;
@@ -601,7 +582,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
               : this.sceneDepthSample.r;
           this.$l.alpha = this.$choice(
             pb.greaterThan(this.depth, this.sceneDepth),
-            pb.float(0.2),
+            pb.float(0.5),
             pb.float(1)
           );
           this.$l.sceneColor = pb.textureSampleLevel(this.inputColor, this.screenUV, 0);
