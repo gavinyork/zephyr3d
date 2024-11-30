@@ -62,16 +62,17 @@ ssrApp.ready().then(async () => {
   mat3.albedoColor = new Vector4(1, 1, 0, 1);
   mat3.shininess = 5;
 
-  const sphereShape = new SphereShape({ radius: 4 });
-  const sphere = new Mesh(scene, sphereShape, mat3);
-  sphere.position.setXYZ(0, 6, 0);
-  sphere.parent = batchGroup;
+  const boxShape = new BoxShape({ size: 8 });
+  const box = new Mesh(scene, boxShape, mat3);
+  box.position.setXYZ(0, 6, 0);
+  box.rotation.fromAxisAngle(new Vector3(1, 1, 1).inplaceNormalize(), 1);
+  box.parent = batchGroup;
 
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
   const compositor = new Compositor();
-  const postGizmo = new PostGizmoRenderer(camera, sphere, 5);
+  const postGizmo = new PostGizmoRenderer(camera, box, 5);
   postGizmo.mode = 'translation';
   compositor.appendPostEffect(new Tonemap());
   compositor.appendPostEffect(postGizmo);

@@ -9,7 +9,8 @@ import {
   ShaderHelper
 } from '@zephyr3d/scene';
 import { createTranslationGizmo, createRotationGizmo, createScaleGizmo } from './gizmo';
-import { Matrix4x4, Quaternion, Ray, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import type { Ray } from '@zephyr3d/base';
+import { Matrix4x4, Quaternion, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 
 const tmpVecT = new Vector3();
 const tmpVecS = new Vector3();
@@ -29,6 +30,17 @@ type TranslateInfo = {
   axis: number;
   bindingPosition: Vector3;
 };
+
+type RotateInfo = {
+  startX: number;
+  startY: number;
+  startPosition: Vector3;
+  startRotation: Quaternion;
+  axis: number;
+  speed: number;
+};
+
+type ScaleInfo = TranslateInfo;
 /**
  * The post water effect
  * @public
@@ -53,6 +65,8 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   private _arrowRadius: number;
   private _boxSize: number;
   private _translateInfo: TranslateInfo;
+  private _rotateInfo: RotateInfo;
+  private _scaleInfo: ScaleInfo;
   /**
    * Creates an instance of PostGizmoRenderer.
    */
@@ -63,11 +77,13 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     this._bindGroup = null;
     this._axisLength = size;
     this._arrowLength = size * 0.4;
-    this._axisRadius = size * 0.01;
-    this._arrowRadius = size * 0.02;
+    this._axisRadius = size * 0.02;
+    this._arrowRadius = size * 0.04;
     this._boxSize = size * 0.05;
     this._mode = 'none';
     this._translateInfo = null;
+    this._rotateInfo = null;
+    this._scaleInfo = null;
   }
   get mode(): GizmoMode {
     return this._mode;
@@ -92,6 +108,9 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     this.passThrough(ctx, inputColorTexture, srgbOutput);
+    if (this._mode === 'rotation' && this._rotateInfo && this._rotateInfo.axis < 0) {
+      return;
+    }
     let primitive: Primitive = PostGizmoRenderer._primitives[this._mode];
     if (!primitive) {
       if (this._mode === 'translation') {
@@ -147,54 +166,88 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     }
     const x = ev.offsetX;
     const y = ev.offsetY;
-    if (this._mode === 'translation') {
-      if (ev.type === 'pointerdown' && !this._translateInfo) {
+    if (this._mode === 'rotation' || this._mode === 'scaling' || this._mode === 'translation') {
+      if (ev.type === 'pointerdown') {
         const ray = this._camera.constructRay(x, y);
         const hitInfo = this.rayIntersection(ray);
         if (hitInfo) {
-          console.log(`Begin translate: x=${x} y=${y} axis=${hitInfo.axis} pos=${hitInfo.t}`);
-          this._beginTranslate(x, y, hitInfo.axis, hitInfo.t);
+          console.log(`Hit: x=${x} y=${y} axis=${hitInfo.axis} pos=${hitInfo.t}`);
+          if (this._mode === 'translation' && !this._translateInfo) {
+            console.log('Begin translate');
+            this._beginTranslate(x, y, hitInfo.axis, hitInfo.t);
+            return true;
+          }
+          if (this._mode === 'rotation' && !this._rotateInfo) {
+            console.log('Begin rotate');
+            this._beginRotate(x, y, hitInfo.axis, hitInfo.point);
+            return true;
+          }
+          if (this._mode === 'scaling' && !this._scaleInfo) {
+            console.log('Begin scale');
+            this._beginScale(x, y);
+            return true;
+          }
+        }
+      }
+      if (ev.type === 'pointermove') {
+        if (this._mode === 'translation' && this._translateInfo) {
+          console.log(`Update translation (${x},${y})`);
+          this._updateTranslation(x, y);
+          return true;
+        }
+        if (this._mode === 'rotation' && this._rotateInfo) {
+          console.log(`Update rotation (${x},${y})`);
+          this._updateRotate(x, y);
+          return true;
+        }
+        if (this._mode === 'scaling' && this._scaleInfo) {
+          console.log(`Update scaling (${x},${y})`);
+          this._updateScale(x, y);
           return true;
         }
       }
-      if (ev.type === 'pointermove' && this._translateInfo) {
-        console.log(`Update translate: x=${x} y=${y}`);
-        this._updateTranslation(x, y);
-        return true;
-      }
-      if (ev.type === 'pointerup' && this._translateInfo) {
-        console.log(`End translate`);
-        this._endTranslation();
+      if (ev.type === 'pointerup') {
+        if (this._mode === 'translation' && this._translateInfo) {
+          console.log('End translation');
+          this._endTranslation();
+          return true;
+        }
+        if (this._mode === 'rotation' && this._rotateInfo) {
+          console.log('End rotation');
+          this._endRotate();
+          return true;
+        }
+        if (this._mode === 'scaling' && this._scaleInfo) {
+          console.log('End scaling');
+          this._endScale();
+          return true;
+        }
       }
     }
     return false;
   }
   /** Ray intersection */
   rayIntersection(ray: Ray): GizmoHitInfo {
-    const rayLocal = new Ray();
     const invWorldMatrix = this._calcGizmoWorldMatrix().inplaceInvertAffine();
-    ray.transform(invWorldMatrix, rayLocal);
+    const rayLocal = ray.transform(invWorldMatrix);
     if (this._mode === 'translation' || this._mode === 'scaling') {
-      for (let i = 0; i < 3; i++) {
-        let coord = this._rayIntersectAxis(rayLocal, i, this._axisLength, this._axisRadius);
-        if (coord >= 0) {
-          return {
-            axis: i,
-            t: coord,
-            point: Vector3.add(ray.origin, Vector3.scale(ray.direction, coord))
-          };
-        }
-        const length =
-          this._axisLength + (this._mode === 'translation' ? this._arrowLength : 2 * this._boxSize);
-        const radius = this._mode === 'translation' ? this._arrowRadius : this._boxSize;
-        coord = this._rayIntersectAxis(rayLocal, i, length, radius);
-        if (coord >= this._axisLength) {
-          return {
-            axis: i,
-            t: coord,
-            point: Vector3.add(ray.origin, Vector3.scale(ray.direction, coord))
-          };
-        }
+      const hitInfo: GizmoHitInfo = {
+        axis: -1,
+        t: 0,
+        point: null
+      };
+      this._rayIntersectAxis(rayLocal, this._axisLength, this._axisRadius, hitInfo);
+      if (hitInfo.axis >= 0) {
+        hitInfo.point = Vector3.add(ray.origin, Vector3.scale(ray.direction, hitInfo.t));
+        return hitInfo;
+      }
+      const length =
+        this._axisLength + (this._mode === 'translation' ? this._arrowLength : 2 * this._boxSize);
+      const radius = this._mode === 'translation' ? this._arrowRadius : this._boxSize;
+      this._rayIntersectAxis(rayLocal, length, radius, hitInfo);
+      if (hitInfo.t >= this._axisLength) {
+        hitInfo.point = Vector3.add(ray.origin, Vector3.scale(ray.direction, hitInfo.t));
+        return hitInfo;
       }
     } else if (this._mode === 'rotation') {
       const distance = rayLocal.intersectionTestSphere(this._axisLength);
@@ -230,7 +283,82 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     }
     return null;
   }
+  private _beginScale(startX: number, startY: number) {
+    return;
+  }
+  private _updateScale(x: number, y: number) {
+    return;
+  }
+  private _endScale() {
+    return;
+  }
+  private _beginRotate(startX: number, startY: number, axis: number, hitPosition: Vector3) {
+    if (this._translateInfo) {
+      this._endTranslation();
+    }
+    if (this._scaleInfo) {
+      this._endScale();
+    }
+    this._rotateInfo = {
+      startX: startX,
+      startY: startY,
+      startPosition: hitPosition,
+      startRotation: new Quaternion(this._axisBinding.rotation),
+      axis,
+      speed: this._measureRotateSpeed()
+    };
+  }
+  private _updateRotate(x: number, y: number) {
+    const velocity = new Vector2(x - this._rotateInfo.startX, y - this._rotateInfo.startY);
+    const movement = velocity.magnitude;
+    velocity.scaleBy(1 / movement).scaleBy(10);
+    const ray = this._camera.constructRay(
+      this._rotateInfo.startX + velocity.x,
+      this._rotateInfo.startY + velocity.y
+    );
+    const invWorldMatrix = this._calcGizmoWorldMatrix().inplaceInvertAffine();
+    const rayLocal = ray.transform(invWorldMatrix);
+    const distance = rayLocal.intersectionTestSphere(this._axisLength);
+    if (!distance) {
+      return;
+    }
+    const nearestPoint = Vector3.add(ray.origin, Vector3.scale(ray.direction, distance[0]));
+    const delta = Vector3.distance(this._rotateInfo.startPosition, nearestPoint);
+    if (distance.length > 1) {
+      const nearestPoint2 = Vector3.add(ray.origin, Vector3.scale(ray.direction, distance[1]));
+      const delta2 = Vector3.distance(this._rotateInfo.startPosition, nearestPoint2);
+      if (delta2 < delta) {
+        nearestPoint.set(nearestPoint2);
+      }
+    }
+    const center = this._axisBinding.getWorldPosition();
+    const edge1 = Vector3.sub(this._rotateInfo.startPosition, center).inplaceNormalize();
+    const edge2 = Vector3.sub(nearestPoint, center).inplaceNormalize();
+    const axis = Vector3.cross(edge1, edge2).inplaceNormalize();
+    if (this._rotateInfo.axis === 0) {
+      axis.setXYZ(axis.x > 0 ? 1 : -1, 0, 0);
+    } else if (this._rotateInfo.axis === 1) {
+      axis.setXYZ(0, axis.y > 0 ? 1 : -1, 0);
+    } else if (this._rotateInfo.axis === 2) {
+      axis.setXYZ(0, 0, axis.y > 0 ? 1 : -1);
+    }
+    invWorldMatrix.transformVectorAffine(axis, axis);
+    const deltaRotation = Quaternion.fromAxisAngle(axis, movement / this._rotateInfo.speed);
+    this._axisBinding.rotation = Quaternion.multiply(deltaRotation, this._rotateInfo.startRotation);
+    console.log(
+      `RotateAxis=(${axis.x},${axis.y},${axis.z}) RotateAngle=${movement / this._rotateInfo.speed}`
+    );
+  }
+  private _endRotate() {
+    this._rotateInfo = null;
+  }
   private _beginTranslate(startX: number, startY: number, axis: number, startPosition: number) {
+    if (this._rotateInfo) {
+      this._endRotate();
+    }
+    if (this._scaleInfo) {
+      this._endScale();
+    }
     this._translateInfo = {
       startX,
       startY,
@@ -255,15 +383,16 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     const axisEnd = new Vector4(axis.x, axis.y, axis.z, 1);
     const startH = mvpMatrix.transform(axisStart, axisStart);
     const endH = mvpMatrix.transform(axisEnd, axisEnd);
-    const axisDirX = ((endH.x - startH.x) / startH.w) * 0.5 * width;
-    const axisDirY = ((startH.y - endH.y) / startH.w) * 0.5 * height;
+    const axisDirX = (endH.x / endH.w - startH.x / startH.w) * 0.5 * width;
+    const axisDirY = (startH.y / startH.w - endH.y / endH.w) * 0.5 * height;
     const axisLength = Math.sqrt(axisDirX * axisDirX + axisDirY * axisDirY);
     const axisDirectionX = axisDirX / axisLength;
     const axisDirectionY = axisDirY / axisLength;
     const movementX = x - this._translateInfo.startX;
     const movementY = y - this._translateInfo.startY;
     const dot = axisDirectionX * movementX + axisDirectionY * movementY;
-    const translation = dot / axisLength;
+    const factor = Math.min(axisLength / 10, 1);
+    const translation = (dot * factor) / axisLength;
     if (this._axisBinding) {
       switch (this._translateInfo.axis) {
         case 0:
@@ -284,6 +413,24 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   private _endTranslation() {
     this._translateInfo = null;
   }
+  private _measureRotateSpeed() {
+    const pos1 = new Vector4(0, 0, this._axisLength, 1);
+    const pos2 = Matrix4x4.rotation(PostGizmoRenderer._axises[0], 1).transformAffine(pos1);
+    const mvpMatrix = this._calcGizmoMVPMatrix();
+    const width = this._camera.viewport
+      ? this._camera.viewport[2]
+      : Application.instance.device.getViewport().width;
+    const height = this._camera.viewport
+      ? this._camera.viewport[3]
+      : Application.instance.device.getViewport().height;
+    mvpMatrix.transform(pos1, pos1);
+    mvpMatrix.transform(pos2, pos2);
+    let dx = pos2.x / pos2.w - pos1.x / pos1.w;
+    let dy = pos2.y / pos2.w - pos1.y / pos1.w;
+    dx *= 0.5 * width;
+    dy *= 0.5 * height;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
   private _calcGizmoMVPMatrix(matrix?: Matrix4x4) {
     matrix = this._calcGizmoWorldMatrix(matrix);
     return matrix.multiplyLeft(this._camera.viewProjectionMatrix);
@@ -292,7 +439,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     matrix = matrix ?? new Matrix4x4();
     if (this._axisBinding) {
       this._axisBinding.worldMatrix.decompose(tmpVecS, tmpQuatR, tmpVecT);
-      tmpQuatR.toMatrix4x4(matrix).translateLeft(tmpVecT);
+      matrix.translation(tmpVecT);
     } else {
       matrix.identity();
     }
@@ -303,34 +450,46 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     rs.useDepthState().enableTest(false).enableWrite(false);
     return rs;
   }
-  private _rayIntersectAxis(ray: Ray, axis: number, length: number, radius: number): number {
-    const coords = [0, 1, 2];
-    coords.splice(axis, 1);
-    const [i1, i2] = coords;
+  private _rayIntersectAxis(ray: Ray, length: number, radius: number, info: GizmoHitInfo) {
+    let intersectedAxis = -1;
+    let minDistance = Infinity;
+    let intersectedCoord = 0;
+    for (let axis = 0; axis < 3; axis++) {
+      const coords = [0, 1, 2];
+      coords.splice(axis, 1);
+      const [i1, i2] = coords;
 
-    const o = ray.origin;
-    const d = ray.direction;
+      const o = ray.origin;
+      const d = ray.direction;
 
-    const a = d[i1] * d[i1] + d[i2] * d[i2];
-    const b = 2 * (o[i1] * d[i1] + o[i2] * d[i2]);
-    const c = o[i1] * o[i1] + o[i2] * o[i2] - radius * radius;
+      const a = d[i1] * d[i1] + d[i2] * d[i2];
+      const b = 2 * (o[i1] * d[i1] + o[i2] * d[i2]);
+      const c = o[i1] * o[i1] + o[i2] * o[i2] - radius * radius;
 
-    const discriminant = b * b - 4 * a * c;
-    if (discriminant < 0) return -1;
-
-    const sqrtDisc = Math.sqrt(discriminant);
-    const t1 = (-b - sqrtDisc) / (2 * a);
-    const t2 = (-b + sqrtDisc) / (2 * a);
-
-    for (const t of [t1, t2]) {
-      if (t < 0) continue;
-      const hit = Vector3.add(ray.origin, Vector3.scale(ray.direction, t));
-      const coord = [hit.x, hit.y, hit.z][axis];
-      if (coord >= 0 && coord <= length) {
-        return coord;
+      const discriminant = b * b - 4 * a * c;
+      if (discriminant < 0) {
+        continue;
+      }
+      const sqrtDisc = Math.sqrt(discriminant);
+      const t1 = (-b - sqrtDisc) / (2 * a);
+      const t2 = (-b + sqrtDisc) / (2 * a);
+      for (const t of [t1, t2]) {
+        if (t < 0) {
+          continue;
+        }
+        if (t < minDistance) {
+          const hit = Vector3.add(ray.origin, Vector3.scale(ray.direction, t));
+          const coord = [hit.x, hit.y, hit.z][axis];
+          if (coord >= 0 && coord <= length) {
+            intersectedAxis = axis;
+            minDistance = t;
+            intersectedCoord = coord;
+          }
+        }
       }
     }
-    return -1;
+    info.axis = intersectedAxis;
+    info.t = intersectedCoord;
   }
   private _createAxisProgram(ctx: DrawContext) {
     return ctx.device.buildRenderProgram({

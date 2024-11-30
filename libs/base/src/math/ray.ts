@@ -98,11 +98,16 @@ export class Ray {
    */
   transform(matrix: Matrix4x4, other?: Ray): Ray {
     if (other) {
+      matrix.transformPointAffine(Vector3.add(this._origin, this._direction), other._direction);
+      matrix.transformPointAffine(this._origin, other._origin);
+      other._direction.subBy(other._origin).inplaceNormalize();
+      /*
       matrix.transformPointAffine(this._origin, other._origin);
       matrix
         .transformPointAffine(Vector3.add(this._origin, this._direction), other._direction)
         .subBy(other._origin)
         .inplaceNormalize();
+      */
       other.prepare();
     } else {
       const origin = matrix.transformPointAffine(this._origin);
