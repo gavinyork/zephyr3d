@@ -1,14 +1,15 @@
 import type { BindGroup, GPUProgram, RenderStateSet, Texture2D } from '@zephyr3d/device';
-import type { DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
+import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
 import {
   AbstractPostEffect,
+  Application,
   decodeNormalizedFloatFromRGBA,
   fetchSampler,
   linearToGamma,
   ShaderHelper
 } from '@zephyr3d/scene';
 import { createTranslationGizmo, createRotationGizmo, createScaleGizmo } from './gizmo';
-import { Matrix4x4, Quaternion, Ray, Vector2, Vector3 } from '@zephyr3d/base';
+import { Matrix4x4, Quaternion, Ray, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 
 const tmpVecT = new Vector3();
 const tmpVecS = new Vector3();
@@ -18,8 +19,16 @@ export type GizmoMode = 'none' | 'translation' | 'rotation' | 'scaling';
 export type GizmoHitInfo = {
   axis: number;
   t: number;
+  point: Vector3;
 };
 
+type TranslateInfo = {
+  startX: number;
+  startY: number;
+  startPosition: number;
+  axis: number;
+  bindingPosition: Vector3;
+};
 /**
  * The post water effect
  * @public
@@ -33,6 +42,8 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   static _mvpMatrix: Matrix4x4 = new Matrix4x4();
   static _texSize: Vector2 = new Vector2();
   static _cameraNearFar: Vector2 = new Vector2();
+  static _axises = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)];
+  private _camera: Camera;
   private _axisBinding: SceneNode;
   private _bindGroup: BindGroup;
   private _mode: GizmoMode;
@@ -41,11 +52,13 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   private _axisRadius: number;
   private _arrowRadius: number;
   private _boxSize: number;
+  private _translateInfo: TranslateInfo;
   /**
    * Creates an instance of PostGizmoRenderer.
    */
-  constructor(binding: SceneNode, size = 10) {
+  constructor(camera: Camera, binding: SceneNode, size = 10) {
     super();
+    this._camera = camera;
     this._axisBinding = binding;
     this._bindGroup = null;
     this._axisLength = size;
@@ -53,8 +66,8 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     this._axisRadius = size * 0.01;
     this._arrowRadius = size * 0.02;
     this._boxSize = size * 0.05;
-
     this._mode = 'none';
+    this._translateInfo = null;
   }
   get mode(): GizmoMode {
     return this._mode;
@@ -107,10 +120,9 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     if (!this._bindGroup) {
       this._bindGroup = ctx.device.createBindGroup(PostGizmoRenderer._gizmoProgram.bindGroupLayouts[0]);
     }
-    this._calcGizmoWorldMatrix(PostGizmoRenderer._mvpMatrix);
-    PostGizmoRenderer._mvpMatrix.multiplyLeft(ctx.camera.viewProjectionMatrix);
+    this._calcGizmoMVPMatrix(PostGizmoRenderer._mvpMatrix);
     PostGizmoRenderer._texSize.setXY(inputColorTexture.width, inputColorTexture.height);
-    PostGizmoRenderer._cameraNearFar.setXY(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
+    PostGizmoRenderer._cameraNearFar.setXY(this._camera.getNearPlane(), this._camera.getFarPlane());
     this._bindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
     this._bindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
     this._bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
@@ -123,6 +135,40 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     ctx.device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
     primitive.draw();
   }
+  /**
+   * Handle pointer input events
+   * @param ev - Event object
+   * @param type - Event type
+   * @returns true if event was handled, otherwise false
+   */
+  handleEvent(ev: Event, type?: string): boolean {
+    if (!(ev instanceof PointerEvent)) {
+      return false;
+    }
+    const x = ev.offsetX;
+    const y = ev.offsetY;
+    if (this._mode === 'translation') {
+      if (ev.type === 'pointerdown' && !this._translateInfo) {
+        const ray = this._camera.constructRay(x, y);
+        const hitInfo = this.rayIntersection(ray);
+        if (hitInfo) {
+          console.log(`Begin translate: x=${x} y=${y} axis=${hitInfo.axis} pos=${hitInfo.t}`);
+          this._beginTranslate(x, y, hitInfo.axis, hitInfo.t);
+          return true;
+        }
+      }
+      if (ev.type === 'pointermove' && this._translateInfo) {
+        console.log(`Update translate: x=${x} y=${y}`);
+        this._updateTranslation(x, y);
+        return true;
+      }
+      if (ev.type === 'pointerup' && this._translateInfo) {
+        console.log(`End translate`);
+        this._endTranslation();
+      }
+    }
+    return false;
+  }
   /** Ray intersection */
   rayIntersection(ray: Ray): GizmoHitInfo {
     const rayLocal = new Ray();
@@ -134,7 +180,8 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
         if (coord >= 0) {
           return {
             axis: i,
-            t: coord
+            t: coord,
+            point: Vector3.add(ray.origin, Vector3.scale(ray.direction, coord))
           };
         }
         const length =
@@ -144,7 +191,8 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
         if (coord >= this._axisLength) {
           return {
             axis: i,
-            t: coord
+            t: coord,
+            point: Vector3.add(ray.origin, Vector3.scale(ray.direction, coord))
           };
         }
       }
@@ -168,13 +216,77 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
           if (axis >= 0) {
             return {
               axis,
-              t
+              t,
+              point: Vector3.add(ray.origin, Vector3.scale(ray.direction, t))
             };
           }
         }
+        return {
+          axis: -1,
+          t: distance[0],
+          point: Vector3.add(ray.origin, Vector3.scale(ray.direction, distance[0]))
+        };
       }
     }
     return null;
+  }
+  private _beginTranslate(startX: number, startY: number, axis: number, startPosition: number) {
+    this._translateInfo = {
+      startX,
+      startY,
+      axis,
+      startPosition,
+      bindingPosition: this._axisBinding ? new Vector3(this._axisBinding.position) : Vector3.zero()
+    };
+  }
+  private _updateTranslation(x: number, y: number) {
+    if (!this._translateInfo) {
+      return;
+    }
+    const mvpMatrix = this._calcGizmoMVPMatrix();
+    const width = this._camera.viewport
+      ? this._camera.viewport[2]
+      : Application.instance.device.getViewport().width;
+    const height = this._camera.viewport
+      ? this._camera.viewport[3]
+      : Application.instance.device.getViewport().height;
+    const axis = PostGizmoRenderer._axises[this._translateInfo.axis];
+    const axisStart = new Vector4(0, 0, 0, 1);
+    const axisEnd = new Vector4(axis.x, axis.y, axis.z, 1);
+    const startH = mvpMatrix.transform(axisStart, axisStart);
+    const endH = mvpMatrix.transform(axisEnd, axisEnd);
+    const axisDirX = ((endH.x - startH.x) / startH.w) * 0.5 * width;
+    const axisDirY = ((startH.y - endH.y) / startH.w) * 0.5 * height;
+    const axisLength = Math.sqrt(axisDirX * axisDirX + axisDirY * axisDirY);
+    const axisDirectionX = axisDirX / axisLength;
+    const axisDirectionY = axisDirY / axisLength;
+    const movementX = x - this._translateInfo.startX;
+    const movementY = y - this._translateInfo.startY;
+    const dot = axisDirectionX * movementX + axisDirectionY * movementY;
+    const translation = dot / axisLength;
+    if (this._axisBinding) {
+      switch (this._translateInfo.axis) {
+        case 0:
+          this._axisBinding.position.x = this._translateInfo.bindingPosition.x + translation;
+          break;
+        case 1:
+          this._axisBinding.position.y = this._translateInfo.bindingPosition.y + translation;
+          break;
+        case 2:
+          this._axisBinding.position.z = this._translateInfo.bindingPosition.z + translation;
+          break;
+      }
+    }
+    console.log(
+      `move=(${movementX},${movementY}) axis=(${axisDirectionX},${axisDirectionY}) dot=${dot} axisLength=${axisLength}, translation=${translation}`
+    );
+  }
+  private _endTranslation() {
+    this._translateInfo = null;
+  }
+  private _calcGizmoMVPMatrix(matrix?: Matrix4x4) {
+    matrix = this._calcGizmoWorldMatrix(matrix);
+    return matrix.multiplyLeft(this._camera.viewProjectionMatrix);
   }
   private _calcGizmoWorldMatrix(matrix?: Matrix4x4) {
     matrix = matrix ?? new Matrix4x4();
