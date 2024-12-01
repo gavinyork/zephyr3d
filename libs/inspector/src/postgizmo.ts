@@ -511,10 +511,6 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       const dy = p[t[1]] - this._translatePlaneInfo.lastPlanePos[t[1]];
       this._axisBinding.position[t[0]] += dx;
       this._axisBinding.position[t[1]] += dy;
-      console.log(
-        `ray: (${rayLocal.origin.x},${rayLocal.origin.y},${rayLocal.origin.z}) (${rayLocal.direction.x},${rayLocal.direction.y},${rayLocal.direction.z})`
-      );
-      console.log(`mouse: (${x} ${y}) distance: ${d} movement: (${dx} ${dy})`);
     }
   }
   private _endTranslation() {
