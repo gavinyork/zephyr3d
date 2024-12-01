@@ -8,12 +8,20 @@ import type { PrimitiveType } from '@zephyr3d/device';
  * @public
  */
 export interface PlaneCreationOptions extends ShapeCreationOptions {
-  /** Default size of axis x and axis y */
+  /** Default size of axis x and axis y, default is 1 */
   size?: number;
-  /** Size of axis x */
+  /** Size of axis x, default value equals to size */
   sizeX?: number;
-  /** Size of axis y */
+  /** Size of axis y, default value equals to size */
   sizeY?: number;
+  /** Whether this plane have front side, default is true */
+  twoSided?: boolean;
+  /** Anchor, default is 0.5 */
+  anchor?: number;
+  /** Anchor X, default value equals to anchor */
+  anchorX?: number;
+  /** Anchor Z, default value equals to anchor */
+  anchorY?: number;
 }
 
 /**
@@ -23,7 +31,9 @@ export interface PlaneCreationOptions extends ShapeCreationOptions {
 export class PlaneShape extends Shape<PlaneCreationOptions> {
   static _defaultOptions = {
     ...Shape._defaultOptions,
-    size: 1
+    size: 1,
+    twoSided: false,
+    anchor: 0.5
   };
   /**
    * Creates an instance of plane shape
@@ -53,8 +63,15 @@ export class PlaneShape extends Shape<PlaneCreationOptions> {
     const start = vertices.length;
     const sizeX = Math.abs(options.sizeX || options.size) || 1;
     const sizeY = Math.abs(options.sizeY || options.size) || 1;
+    const anchorX = options.anchorX ?? options.anchor;
+    const anchorY = options.anchorY ?? options.anchor;
+    const minX = -anchorX * sizeX;
+    const maxX = minX + sizeX;
+    const minY = -anchorY * sizeY;
+    const maxY = minY + sizeY;
     uvs?.push(0, 1, 0, 0, 1, 0, 1, 1);
-    vertices?.push(0, 0, sizeY, sizeX, 0, sizeY, sizeX, 0, 0, 0, 0, 0);
+    vertices?.push(minX, 0, maxY, maxX, 0, maxY, maxX, 0, minY, minX, 0, minY);
+    normals?.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
     indices?.push(
       0 + indexOffset,
       1 + indexOffset,
@@ -63,7 +80,16 @@ export class PlaneShape extends Shape<PlaneCreationOptions> {
       2 + indexOffset,
       3 + indexOffset
     );
-    normals?.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
+    if (options.twoSided) {
+      indices?.push(
+        0 + indexOffset,
+        2 + indexOffset,
+        1 + indexOffset,
+        0 + indexOffset,
+        3 + indexOffset,
+        2 + indexOffset
+      );
+    }
     Shape._transform(options.transform, vertices, normals, start);
     if (bbox) {
       for (let i = start; i < vertices.length - 2; i += 3) {

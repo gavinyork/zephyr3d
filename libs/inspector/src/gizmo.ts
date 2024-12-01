@@ -1,6 +1,19 @@
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
-import type { BoxCreationOptions, CylinderCreationOptions, TorusCreationOptions } from '@zephyr3d/scene';
-import { Application, BoundingBox, BoxShape, CylinderShape, Primitive, TorusShape } from '@zephyr3d/scene';
+import type {
+  BoxCreationOptions,
+  CylinderCreationOptions,
+  PlaneCreationOptions,
+  TorusCreationOptions
+} from '@zephyr3d/scene';
+import {
+  Application,
+  BoundingBox,
+  BoxShape,
+  CylinderShape,
+  PlaneShape,
+  Primitive,
+  TorusShape
+} from '@zephyr3d/scene';
 
 /**
  * Creates a primitive that presents the translation gizmo
@@ -213,6 +226,25 @@ export function createTranslationGizmo(
       Quaternion.fromAxisAngle(new Vector3(1, 0, 0), Math.PI * 0.5)
     )
   };
+  const planeOptionsX: PlaneCreationOptions = {
+    size: axisLength * 0.5,
+    twoSided: true,
+    transform: Matrix4x4.translation(new Vector3(0, axisLength * 0.5, axisLength * 0.5)).rotateRight(
+      Quaternion.fromAxisAngle(new Vector3(0, 0, -1), Math.PI * 0.5)
+    )
+  };
+  const planeOptionsY: PlaneCreationOptions = {
+    size: axisLength * 0.5,
+    twoSided: true,
+    transform: Matrix4x4.translation(new Vector3(axisLength * 0.5, 0, axisLength * 0.5))
+  };
+  const planeOptionsZ: PlaneCreationOptions = {
+    size: axisLength * 0.5,
+    twoSided: true,
+    transform: Matrix4x4.translation(new Vector3(axisLength * 0.5, axisLength * 0.5, 0)).rotateRight(
+      Quaternion.fromAxisAngle(new Vector3(1, 0, 0), Math.PI * 0.5)
+    )
+  };
   const vertices: number[] = [];
   const diffuse: number[] = [];
   const rgb: number[][] = [
@@ -228,14 +260,20 @@ export function createTranslationGizmo(
   CylinderShape.generateData(axisOptionsX, vertices, null, null, indices, bbox, vertices.length / 3);
   // X arrow
   CylinderShape.generateData(arrowOptionsX, vertices, null, null, indices, bbox, vertices.length / 3);
+  // X plane
+  PlaneShape.generateData(planeOptionsX, vertices, null, null, indices, bbox, vertices.length / 3);
   // Y axis
   CylinderShape.generateData(axisOptionsY, vertices, null, null, indices, bbox, vertices.length / 3);
   // Y arrow
   CylinderShape.generateData(arrowOptionsY, vertices, null, null, indices, bbox, vertices.length / 3);
+  // Y plane
+  PlaneShape.generateData(planeOptionsY, vertices, null, null, indices, bbox, vertices.length / 3);
   // Z axis
   CylinderShape.generateData(axisOptionsZ, vertices, null, null, indices, bbox, vertices.length / 3);
   // Z arrow
   CylinderShape.generateData(arrowOptionsZ, vertices, null, null, indices, bbox, vertices.length / 3);
+  // Z plane
+  PlaneShape.generateData(planeOptionsZ, vertices, null, null, indices, bbox, vertices.length / 3);
   // diffuse color
   for (let i = 0; i < 3; i++) {
     for (let j = 0; j < vertices.length / 3 / 3; j++) {

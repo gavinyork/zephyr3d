@@ -16,6 +16,14 @@ export interface BoxCreationOptions extends ShapeCreationOptions {
   sizeY?: number;
   /** Size of axis z, default 1 */
   sizeZ?: number;
+  /** Anchor */
+  anchor?: number;
+  /** Anchor X */
+  anchorX?: number;
+  /** Anchor Y */
+  anchorY?: number;
+  /** Anchor Z */
+  anchorZ?: number;
 }
 
 /**
@@ -25,7 +33,8 @@ export interface BoxCreationOptions extends ShapeCreationOptions {
 export class BoxShape extends Shape<BoxCreationOptions> {
   static _defaultOptions = {
     ...Shape._defaultOptions,
-    size: 1
+    size: 1,
+    anchor: 0.5
   };
   /**
    * Creates an instance of box shape
@@ -56,9 +65,9 @@ export class BoxShape extends Shape<BoxCreationOptions> {
     const sizeX = options?.sizeX ?? options?.size ?? 1;
     const sizeY = options?.sizeY ?? options?.size ?? 1;
     const sizeZ = options?.sizeZ ?? options?.size ?? 1;
-    const anchorX = 0.5;
-    const anchorY = 0.5;
-    const anchorZ = 0.5;
+    const anchorX = options.anchorX ?? options.anchor;
+    const anchorY = options.anchorY ?? options.anchor;
+    const anchorZ = options.anchorZ ?? options.anchor;
     const minx = -anchorX * sizeX;
     const maxx = minx + sizeX;
     const miny = -anchorY * sizeY;

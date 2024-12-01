@@ -3,9 +3,9 @@ import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene'
 import {
   AbstractPostEffect,
   Application,
+  copyTexture,
   decodeNormalizedFloatFromRGBA,
   fetchSampler,
-  linearToGamma,
   ShaderHelper
 } from '@zephyr3d/scene';
 import { createTranslationGizmo, createRotationGizmo, createScaleGizmo } from './gizmo';
@@ -16,19 +16,37 @@ const tmpVecT = new Vector3();
 const tmpVecS = new Vector3();
 const tmpQuatR = new Quaternion();
 
+export type HitType =
+  | 'move_axis'
+  | 'move_plane'
+  | 'rotate_axis'
+  | 'rotate_free'
+  | 'scale_axis'
+  | 'scale_uniform';
 export type GizmoMode = 'none' | 'translation' | 'rotation' | 'scaling';
 export type GizmoHitInfo = {
   axis: number;
-  t: number;
-  point: Vector3;
+  type?: HitType;
+  coord: number;
+  distance: number;
+  pointWorld: Vector3;
+  pointLocal: Vector3;
 };
 
-type TranslateInfo = {
+type TranslateAxisInfo = {
   startX: number;
   startY: number;
   startPosition: number;
   axis: number;
   bindingPosition: Vector3;
+  planePosition?: Vector3;
+};
+
+type TranslatePlaneInfo = {
+  axis: number;
+  planeAxis: number;
+  lastPlanePos: Vector3;
+  type: HitType;
 };
 
 type RotateInfo = {
@@ -40,7 +58,7 @@ type RotateInfo = {
   speed: number;
 };
 
-type ScaleInfo = TranslateInfo;
+type ScaleInfo = TranslateAxisInfo;
 /**
  * The post water effect
  * @public
@@ -49,6 +67,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   static readonly className = 'PostGizmoRenderer' as const;
   static _gizmoProgram: GPUProgram = null;
   static _gizmoRenderState: RenderStateSet = null;
+  static _blendRenderState: RenderStateSet = null;
   static _primitives: Partial<Record<GizmoMode, Primitive>> = {};
   static _rotation: Primitive = null;
   static _mvpMatrix: Matrix4x4 = new Matrix4x4();
@@ -64,7 +83,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   private _axisRadius: number;
   private _arrowRadius: number;
   private _boxSize: number;
-  private _translateInfo: TranslateInfo;
+  private _translatePlaneInfo: TranslatePlaneInfo;
   private _rotateInfo: RotateInfo;
   private _scaleInfo: ScaleInfo;
   private _screenSize: number;
@@ -82,10 +101,10 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     this._arrowRadius = size * 0.04;
     this._boxSize = size * 0.05;
     this._mode = 'none';
-    this._translateInfo = null;
+    this._translatePlaneInfo = null;
     this._rotateInfo = null;
     this._scaleInfo = null;
-    this._screenSize = 0.5;
+    this._screenSize = 0.3;
   }
   get mode(): GizmoMode {
     return this._mode;
@@ -132,29 +151,52 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     if (!primitive) {
       return;
     }
+    const destFramebuffer = ctx.device.getFramebuffer();
+    const tmpFramebuffer = ctx.device.pool.fetchTemporalFramebuffer(
+      false,
+      ctx.device.getDrawingBufferWidth(),
+      ctx.device.getDrawingBufferHeight(),
+      'rgba8unorm',
+      ctx.device.getFramebuffer().getDepthAttachment().format,
+      false
+    );
+    ctx.device.pushDeviceStates();
+    ctx.device.setFramebuffer(tmpFramebuffer);
+    ctx.device.clearFrameBuffer(new Vector4(0, 0, 0, 0), 1, 0);
     if (!PostGizmoRenderer._gizmoProgram) {
       PostGizmoRenderer._gizmoProgram = this._createAxisProgram(ctx);
     }
     if (!PostGizmoRenderer._gizmoRenderState) {
       PostGizmoRenderer._gizmoRenderState = this._createRenderStates(ctx);
     }
+    if (!PostGizmoRenderer._blendRenderState) {
+      PostGizmoRenderer._blendRenderState = this._createBlendRenderStates(ctx);
+    }
     if (!this._bindGroup) {
       this._bindGroup = ctx.device.createBindGroup(PostGizmoRenderer._gizmoProgram.bindGroupLayouts[0]);
     }
-    this._calcGizmoMVPMatrix(PostGizmoRenderer._mvpMatrix);
+    this._calcGizmoMVPMatrix(false, PostGizmoRenderer._mvpMatrix);
     PostGizmoRenderer._texSize.setXY(inputColorTexture.width, inputColorTexture.height);
     PostGizmoRenderer._cameraNearFar.setXY(this._camera.getNearPlane(), this._camera.getFarPlane());
     this._bindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
     this._bindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
-    this._bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
     this._bindGroup.setValue('texSize', PostGizmoRenderer._texSize);
     this._bindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
-    this._bindGroup.setTexture('inputColor', inputColorTexture, fetchSampler('clamp_nearest_nomip'));
     this._bindGroup.setTexture('linearDepthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
     ctx.device.setProgram(PostGizmoRenderer._gizmoProgram);
     ctx.device.setBindGroup(0, this._bindGroup);
     ctx.device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
     primitive.draw();
+    copyTexture(
+      tmpFramebuffer.getColorAttachments()[0],
+      destFramebuffer,
+      fetchSampler('clamp_nearest_nomip'),
+      PostGizmoRenderer._blendRenderState,
+      0,
+      srgbOutput
+    );
+    ctx.device.popDeviceStates();
+    ctx.device.pool.releaseFrameBuffer(tmpFramebuffer);
   }
   /**
    * Handle pointer input events
@@ -173,22 +215,22 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
         const ray = this._camera.constructRay(x, y);
         const hitInfo = this.rayIntersection(ray);
         if (hitInfo) {
-          if (this._mode === 'translation' && !this._translateInfo) {
-            this._beginTranslate(x, y, hitInfo.axis, hitInfo.t);
+          if (this._mode === 'translation' && !this._translatePlaneInfo) {
+            this._beginTranslate(x, y, hitInfo.axis, hitInfo.coord, hitInfo.type, hitInfo.pointLocal);
             return true;
           }
           if (this._mode === 'rotation' && !this._rotateInfo) {
-            this._beginRotate(x, y, hitInfo.axis, hitInfo.point);
+            this._beginRotate(x, y, hitInfo.axis, hitInfo.pointWorld);
             return true;
           }
           if (this._mode === 'scaling' && !this._scaleInfo) {
-            this._beginScale(x, y, hitInfo.axis, hitInfo.t);
+            this._beginScale(x, y, hitInfo.axis, hitInfo.coord);
             return true;
           }
         }
       }
       if (ev.type === 'pointermove') {
-        if (this._mode === 'translation' && this._translateInfo) {
+        if (this._mode === 'translation' && this._translatePlaneInfo) {
           this._updateTranslation(x, y);
           return true;
         }
@@ -202,7 +244,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
         }
       }
       if (ev.type === 'pointerup') {
-        if (this._mode === 'translation' && this._translateInfo) {
+        if (this._mode === 'translation' && this._translatePlaneInfo) {
           this._endTranslation();
           return true;
         }
@@ -220,30 +262,27 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   }
   /** Ray intersection */
   rayIntersection(ray: Ray): GizmoHitInfo {
-    const worldMatrix = this._calcGizmoWorldMatrix();
+    const worldMatrix = this._calcGizmoWorldMatrix(false);
     const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
     const rayLocal = ray.transform(invWorldMatrix);
     if (this._mode === 'translation' || this._mode === 'scaling') {
       const hitInfo: GizmoHitInfo = {
         axis: -1,
-        t: 0,
-        point: null
+        coord: 0,
+        distance: 0,
+        pointWorld: null,
+        pointLocal: null
       };
-      this._rayIntersectAxis(rayLocal, this._axisLength, this._axisRadius, hitInfo);
-      if (hitInfo.axis >= 0) {
-        hitInfo.point = worldMatrix.transformPointAffine(
-          Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, hitInfo.t))
-        );
-        return hitInfo;
-      }
       const length =
         this._axisLength + (this._mode === 'translation' ? this._arrowLength : 2 * this._boxSize);
       const radius = this._mode === 'translation' ? this._arrowRadius : this._boxSize;
-      this._rayIntersectAxis(rayLocal, length, radius, hitInfo);
-      if (hitInfo.t >= this._axisLength) {
-        hitInfo.point = worldMatrix.transformPointAffine(
-          Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, hitInfo.t))
+      this._rayIntersectAxis(rayLocal, length, radius, this._mode === 'translation', hitInfo);
+      if (hitInfo.axis >= 0) {
+        hitInfo.pointLocal = Vector3.add(
+          rayLocal.origin,
+          Vector3.scale(rayLocal.direction, hitInfo.distance)
         );
+        hitInfo.pointWorld = worldMatrix.transformPointAffine(hitInfo.pointLocal);
         return hitInfo;
       }
     } else if (this._mode === 'rotation') {
@@ -264,33 +303,32 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
             }
           }
           if (axis >= 0) {
+            const pointLocal = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, t));
             return {
               axis,
-              t,
-              point: worldMatrix.transformPointAffine(
-                Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, t))
-              )
+              coord: t,
+              distance: t,
+              pointLocal,
+              pointWorld: worldMatrix.transformPointAffine(pointLocal)
             };
           }
         }
+        const pointLocal = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, distance[0]));
         return {
           axis: -1,
-          t: distance[0],
-          point: worldMatrix.transformPointAffine(
-            Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, distance[0]))
-          )
+          coord: distance[0],
+          distance: distance[0],
+          pointLocal,
+          pointWorld: worldMatrix.transformPointAffine(pointLocal)
         };
       }
     }
     return null;
   }
   private _beginRotate(startX: number, startY: number, axis: number, hitPosition: Vector3) {
-    if (this._translateInfo) {
-      this._endTranslation();
-    }
-    if (this._scaleInfo) {
-      this._endScale();
-    }
+    this._endTranslation();
+    this._endScale();
+    Application.instance.device.canvas.style.cursor = 'grab';
     this._rotateInfo = {
       startX: startX,
       startY: startY,
@@ -311,7 +349,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       this._rotateInfo.startX + velocity.x,
       this._rotateInfo.startY + velocity.y
     );
-    const worldMatrix = this._calcGizmoWorldMatrix();
+    const worldMatrix = this._calcGizmoWorldMatrix(false);
     const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
     const rayLocal = ray.transform(invWorldMatrix);
     const distance = rayLocal.intersectionTestSphere(this._axisLength);
@@ -346,15 +384,13 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     this._axisBinding.rotation = Quaternion.multiply(deltaRotation, this._rotateInfo.startRotation);
   }
   private _endRotate() {
+    Application.instance.device.canvas.style.cursor = 'default';
     this._rotateInfo = null;
   }
   private _beginScale(startX: number, startY: number, axis: number, startPosition: number) {
-    if (this._rotateInfo) {
-      this._endRotate();
-    }
-    if (this._translateInfo) {
-      this._endTranslation();
-    }
+    this._endRotate();
+    this._endTranslation();
+    Application.instance.device.canvas.style.cursor = 'grab';
     this._scaleInfo = {
       startX,
       startY,
@@ -367,7 +403,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     if (!this._scaleInfo) {
       return;
     }
-    const mvpMatrix = this._calcGizmoMVPMatrix();
+    const mvpMatrix = this._calcGizmoMVPMatrix(false);
     const width = this._camera.viewport
       ? this._camera.viewport[2]
       : Application.instance.device.getViewport().width;
@@ -407,70 +443,88 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     this._scaleInfo.startY = y;
   }
   private _endScale() {
+    Application.instance.device.canvas.style.cursor = 'default';
     this._scaleInfo = null;
   }
-  private _beginTranslate(startX: number, startY: number, axis: number, startPosition: number) {
-    if (this._rotateInfo) {
-      this._endRotate();
+  private _beginTranslate(
+    startX: number,
+    startY: number,
+    axis: number,
+    startPosition: number,
+    type: HitType,
+    pointLocal: Vector3
+  ) {
+    this._endRotate();
+    this._endScale();
+    Application.instance.device.canvas.style.cursor = 'grab';
+    let planeAxis = axis;
+    if (type === 'move_axis') {
+      const ray = this._camera.constructRay(startX, startY);
+      const worldMatrix = this._calcGizmoWorldMatrix(false);
+      const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
+      const rayLocal = ray.transform(invWorldMatrix);
+      const t = [0, 1, 2];
+      t.splice(axis, 1);
+      if (Math.abs(rayLocal.direction[t[0]]) > Math.abs(rayLocal.direction[t[1]])) {
+        planeAxis = t[0];
+      } else {
+        planeAxis = t[1];
+      }
+      const d = (0 - rayLocal.origin[planeAxis]) / rayLocal.direction[planeAxis];
+      pointLocal.set(rayLocal.direction);
+      pointLocal.scaleBy(d);
+      pointLocal.addBy(rayLocal.origin);
     }
-    if (this._scaleInfo) {
-      this._endScale();
-    }
-    this._translateInfo = {
-      startX,
-      startY,
+    const scale = new Vector3();
+    this._calcGizmoWorldMatrix(false).decompose(scale);
+    this._translatePlaneInfo = {
       axis,
-      startPosition,
-      bindingPosition: this._axisBinding ? new Vector3(this._axisBinding.position) : Vector3.zero()
+      planeAxis,
+      type,
+      lastPlanePos: pointLocal.mulBy(scale)
     };
   }
   private _updateTranslation(x: number, y: number) {
-    if (!this._translateInfo) {
+    if (!this._translatePlaneInfo) {
       return;
     }
-    const mvpMatrix = this._calcGizmoMVPMatrix();
-    const width = this._camera.viewport
-      ? this._camera.viewport[2]
-      : Application.instance.device.getViewport().width;
-    const height = this._camera.viewport
-      ? this._camera.viewport[3]
-      : Application.instance.device.getViewport().height;
-    const axis = PostGizmoRenderer._axises[this._translateInfo.axis];
-    const axisStart = new Vector4(0, 0, 0, 1);
-    const axisEnd = new Vector4(axis.x, axis.y, axis.z, 1);
-    const startH = mvpMatrix.transform(axisStart, axisStart);
-    const endH = mvpMatrix.transform(axisEnd, axisEnd);
-    const axisDirX = (endH.x / endH.w - startH.x / startH.w) * 0.5 * width;
-    const axisDirY = (startH.y / startH.w - endH.y / endH.w) * 0.5 * height;
-    const axisLength = Math.sqrt(axisDirX * axisDirX + axisDirY * axisDirY);
-    const axisDirectionX = axisDirX / axisLength;
-    const axisDirectionY = axisDirY / axisLength;
-    const movementX = x - this._translateInfo.startX;
-    const movementY = y - this._translateInfo.startY;
-    const dot = axisDirectionX * movementX + axisDirectionY * movementY;
-    const factor = Math.min(axisLength / 10, 1);
-    const translation = (dot * factor) / axisLength;
-    if (this._axisBinding) {
-      switch (this._translateInfo.axis) {
-        case 0:
-          this._axisBinding.position.x = this._translateInfo.bindingPosition.x + translation;
-          break;
-        case 1:
-          this._axisBinding.position.y = this._translateInfo.bindingPosition.y + translation;
-          break;
-        case 2:
-          this._axisBinding.position.z = this._translateInfo.bindingPosition.z + translation;
-          break;
-      }
+    const ray = this._camera.constructRay(x, y);
+    const worldMatrix = this._calcGizmoWorldMatrix(true);
+    const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
+    const rayLocal = ray.transform(invWorldMatrix);
+    if (Math.abs(rayLocal.direction[this._translatePlaneInfo.planeAxis]) < 0.0001) {
+      return;
+    }
+    const t = ['x', 'y', 'z'];
+    const c = t[this._translatePlaneInfo.axis];
+    t.splice(this._translatePlaneInfo.planeAxis, 1);
+    const d =
+      (0 - rayLocal.origin[this._translatePlaneInfo.planeAxis]) /
+      rayLocal.direction[this._translatePlaneInfo.planeAxis];
+    const p = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, d));
+    if (this._translatePlaneInfo.type === 'move_axis') {
+      this._axisBinding.position[c] +=
+        p[this._translatePlaneInfo.axis] -
+        this._translatePlaneInfo.lastPlanePos[this._translatePlaneInfo.axis];
+    } else {
+      const dx = p[t[0]] - this._translatePlaneInfo.lastPlanePos[t[0]];
+      const dy = p[t[1]] - this._translatePlaneInfo.lastPlanePos[t[1]];
+      this._axisBinding.position[t[0]] += dx;
+      this._axisBinding.position[t[1]] += dy;
+      console.log(
+        `ray: (${rayLocal.origin.x},${rayLocal.origin.y},${rayLocal.origin.z}) (${rayLocal.direction.x},${rayLocal.direction.y},${rayLocal.direction.z})`
+      );
+      console.log(`mouse: (${x} ${y}) distance: ${d} movement: (${dx} ${dy})`);
     }
   }
   private _endTranslation() {
-    this._translateInfo = null;
+    Application.instance.device.canvas.style.cursor = 'default';
+    this._translatePlaneInfo = null;
   }
   private _measureRotateSpeed() {
     const pos1 = new Vector4(0, 0, this._axisLength, 1);
     const pos2 = Matrix4x4.rotation(PostGizmoRenderer._axises[0], 1).transformAffine(pos1);
-    const mvpMatrix = this._calcGizmoMVPMatrix();
+    const mvpMatrix = this._calcGizmoMVPMatrix(false);
     const width = this._camera.viewport
       ? this._camera.viewport[2]
       : Application.instance.device.getViewport().width;
@@ -485,18 +539,20 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     dy *= 0.5 * height;
     return Math.sqrt(dx * dx + dy * dy);
   }
-  private _calcGizmoMVPMatrix(matrix?: Matrix4x4) {
-    matrix = this._calcGizmoWorldMatrix(matrix);
+  private _calcGizmoMVPMatrix(noScale: boolean, matrix?: Matrix4x4) {
+    matrix = this._calcGizmoWorldMatrix(noScale, matrix);
     return matrix.multiplyLeft(this._camera.viewProjectionMatrix);
   }
-  private _calcGizmoWorldMatrix(matrix?: Matrix4x4) {
+  private _calcGizmoWorldMatrix(noScale: boolean, matrix?: Matrix4x4) {
     matrix = matrix ?? new Matrix4x4();
     if (this._axisBinding) {
       this._axisBinding.worldMatrix.decompose(tmpVecS, tmpQuatR, tmpVecT);
       matrix.translation(tmpVecT);
       const d = Vector3.distance(this._camera.getWorldPosition(), tmpVecT);
-      const scale = (this._screenSize * d * this._camera.getTanHalfFovy()) / (2 * this._axisLength);
-      matrix.scaling(new Vector3(scale, scale, scale)).translateLeft(tmpVecT);
+      if (!noScale) {
+        const scale = (this._screenSize * d * this._camera.getTanHalfFovy()) / (2 * this._axisLength);
+        matrix.scaling(new Vector3(scale, scale, scale)).translateLeft(tmpVecT);
+      }
     } else {
       matrix.identity();
     }
@@ -504,10 +560,27 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   }
   private _createRenderStates(ctx: DrawContext) {
     const rs = ctx.device.createRenderStateSet();
-    rs.useDepthState().enableTest(false).enableWrite(false);
+    rs.useDepthState().enableTest(true).enableWrite(true);
     return rs;
   }
-  private _rayIntersectAxis(ray: Ray, length: number, radius: number, info: GizmoHitInfo) {
+  private _createBlendRenderStates(ctx: DrawContext) {
+    const rs = ctx.device.createRenderStateSet();
+    rs.useDepthState().enableTest(false).enableWrite(false);
+    rs.useRasterizerState().setCullMode('none');
+    rs.useBlendingState()
+      .enable(true)
+      .setBlendFuncRGB('one', 'inv-src-alpha')
+      .setBlendFuncAlpha('zero', 'one');
+    return rs;
+  }
+  private _rayIntersectAxis(
+    ray: Ray,
+    length: number,
+    radius: number,
+    intersectWithPlane: boolean,
+    info: GizmoHitInfo
+  ) {
+    let type: HitType = null;
     let intersectedAxis = -1;
     let minDistance = Infinity;
     let intersectedCoord = 0;
@@ -515,6 +588,26 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       const coords = [0, 1, 2];
       coords.splice(axis, 1);
       const [i1, i2] = coords;
+
+      // intersection test for plane
+      if (intersectWithPlane && Math.abs(ray.direction[axis]) > 0.001) {
+        const d = (0 - ray.origin[axis]) / ray.direction[axis];
+        if (d > 0 && d < minDistance) {
+          const a = ray.origin[i1] + d * ray.direction[i1];
+          const b = ray.origin[i2] + d * ray.direction[i2];
+          if (
+            a > this._axisLength * 0.25 &&
+            a < this._axisLength * 0.75 &&
+            b > this._axisLength * 0.25 &&
+            b < this._axisLength * 0.75
+          ) {
+            type = 'move_plane';
+            minDistance = d;
+            intersectedAxis = axis;
+          }
+        }
+      }
+      // intersection test for axis
 
       const o = ray.origin;
       const d = ray.direction;
@@ -538,6 +631,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
           const hit = Vector3.add(ray.origin, Vector3.scale(ray.direction, t));
           const coord = [hit.x, hit.y, hit.z][axis];
           if (coord >= 0 && coord <= length) {
+            type = 'move_axis';
             intersectedAxis = axis;
             minDistance = t;
             intersectedCoord = coord;
@@ -545,8 +639,10 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
         }
       }
     }
+    info.type = type;
     info.axis = intersectedAxis;
-    info.t = intersectedCoord;
+    info.coord = intersectedCoord;
+    info.distance = minDistance;
   }
   private _createAxisProgram(ctx: DrawContext) {
     return ctx.device.buildRenderProgram({
@@ -563,11 +659,9 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       },
       fragment(pb) {
         this.$outputs.color = pb.vec4();
-        this.inputColor = pb.tex2D().uniform(0);
         this.linearDepthTex = pb.tex2D().uniform(0);
         this.texSize = pb.vec2().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
-        this.srgbOut = pb.int().uniform(0);
         pb.main(function () {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
           this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(
@@ -585,13 +679,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
             pb.float(0.5),
             pb.float(1)
           );
-          this.$l.sceneColor = pb.textureSampleLevel(this.inputColor, this.screenUV, 0);
-          this.$l.outColor = pb.mix(this.sceneColor.rgb, this.$inputs.color.rgb, this.alpha);
-          this.$if(pb.equal(this.srgbOut, 0), function () {
-            this.$outputs.color = pb.vec4(this.outColor, 1);
-          }).$else(function () {
-            this.$outputs.outColor = pb.vec4(linearToGamma(this, this.outColor), 1);
-          });
+          this.$outputs.color = pb.vec4(pb.mul(this.$inputs.color.rgb, this.alpha), this.alpha);
         });
       }
     });

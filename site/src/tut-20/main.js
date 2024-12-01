@@ -44,9 +44,7 @@ myApp.ready().then(function () {
   // Create floor
   const floorMaterial = new LambertMaterial();
   floorMaterial.albedoColor = new Vector4(0, 1, 1, 1);
-  const floor = new Mesh(scene, new PlaneShape({ size: 100 }), floorMaterial);
-  floor.position.x = -50;
-  floor.position.z = -50;
+  new Mesh(scene, new PlaneShape({ size: 100 }), floorMaterial);
 
   // Create camera
   const camera = new PerspectiveCamera(

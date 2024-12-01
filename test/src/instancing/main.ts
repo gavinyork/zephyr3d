@@ -74,8 +74,6 @@ myApp.ready().then(async function () {
 
   const floor = new Mesh(scene, new PlaneShape({ size: 100 }), floorMaterial);
   floor.parent = batchGroup;
-  floor.position.x = -50;
-  floor.position.z = -50;
   */
 
   // Create camera

@@ -11,7 +11,6 @@ import {
   FPSCameraController,
   Tonemap,
   BoxShape,
-  SphereShape,
   BlinnMaterial,
   createGradientNoiseTexture
 } from '@zephyr3d/scene';
@@ -65,7 +64,6 @@ ssrApp.ready().then(async () => {
   const boxShape = new BoxShape({ size: 8 });
   const box = new Mesh(scene, boxShape, mat3);
   box.position.setXYZ(0, 6, 0);
-  box.rotation.fromAxisAngle(new Vector3(1, 1, 1).inplaceNormalize(), 1);
   box.parent = batchGroup;
 
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));

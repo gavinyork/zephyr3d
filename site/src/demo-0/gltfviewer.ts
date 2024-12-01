@@ -85,7 +85,7 @@ export class GLTFViewer {
     this._water.ssr = true;
     const floorMaterial = new LambertMaterial();
     floorMaterial.albedoColor = new Vector4(0.8, 0.8, 0.8, 1);
-    this._floor = new Mesh(scene, new PlaneShape({ size: 1 }), floorMaterial);
+    this._floor = new Mesh(scene, new PlaneShape({ size: 1, anchor: 0 }), floorMaterial);
     this._floor.castShadow = false;
     this._bloom = new Bloom();
     this._sao = new SAO();
