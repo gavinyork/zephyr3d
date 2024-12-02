@@ -94,14 +94,41 @@ class GizmoBlendBlitter extends CopyBlitter {
     const pb = scope.$builder;
     pb.func(
       'screenSpaceGrid',
-      [pb.vec2('uv'), pb.vec3('cameraPos'), pb.float('gridUnit'), pb.float('gridWidth')],
+      [
+        pb.vec2('uv'),
+        pb.vec3('cameraPos'),
+        pb.float('gridUnit'),
+        pb.float('gridWidth'),
+        pb.float('distance'),
+        pb.vec3('colorGrid'),
+        pb.vec3('colorGridEmphasis')
+      ],
       function () {
         this.$l.ndc = pb.vec4(pb.sub(pb.mul(this.uv, 2), pb.vec2(1)), 1, 1);
         this.$l.worldPosH = pb.mul(this.invViewProjMatrix, this.ndc);
         this.$l.worldPos = pb.div(this.worldPosH.xyz, this.worldPosH.w);
         this.$l.ray = pb.normalize(pb.sub(this.cameraPos, this.worldPos));
         this.$l.d = pb.div(this.cameraPos.y, this.ray.y);
-        this.$l.grid = pb.sub(this.cameraPos, pb.mul(this.ray, this.d)).xz;
+        this.$l.P = pb.sub(this.cameraPos, pb.mul(this.ray, this.d));
+        this.$l.dFdxPos = pb.dpdx(this.P);
+        this.$l.dFdyPos = pb.dpdy(this.P);
+        this.$if(pb.lessThan(this.d, 0), function () {
+          this.$return(pb.vec4(0));
+        }).$else(function () {
+          this.$l.fwidthPos = pb.add(pb.abs(this.dFdxPos), pb.abs(this.dFdyPos));
+          this.$l.V = pb.sub(this.cameraPos, this.P);
+          this.$l.dist = pb.length(this.V);
+          this.V = pb.div(this.V, this.dist);
+          this.$l.angle = pb.sub(1, pb.abs(this.V.y));
+          this.angle = pb.mul(this.angle, this.angle);
+          this.$l.fade = pb.sub(1, pb.mul(this.angle, this.angle));
+          this.fade = pb.mul(
+            this.fade,
+            pb.sub(1, pb.smoothStep(0, this.distance, pb.sub(this.dist, this.distance)))
+          );
+          this.$return(pb.vec4(this.colorGrid, this.fade));
+        });
+        /*
         this.$l.fw = pb.fwidth(this.grid);
         this.$if(pb.lessThan(this.d, 0), function () {
           this.$return(pb.vec4(0));
@@ -120,9 +147,18 @@ class GizmoBlendBlitter extends CopyBlitter {
           this.fade = this.$choice(this.isMultipleOf4, pb.float(1), pb.float(0.2));
           this.$return(pb.vec4(1, 0, 1, pb.mul(this.alpha, this.fade)));
         });
+*/
       }
     );
-    return scope.screenSpaceGrid(srcUV, scope.cameraPos, scope.gridUnit, scope.gridWidth);
+    return scope.screenSpaceGrid(
+      srcUV,
+      scope.cameraPos,
+      scope.gridUnit,
+      scope.gridWidth,
+      500,
+      pb.vec3(0.112, 0.112, 0.112),
+      pb.vec3(0.1384, 0.1384, 0.1384)
+    );
     //return this.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
   }
   setup(scope: PBGlobalScope) {
