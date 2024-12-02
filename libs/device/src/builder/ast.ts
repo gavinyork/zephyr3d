@@ -1632,6 +1632,20 @@ export class ASTAssignment extends ShaderAST {
     if (this.rvalue instanceof ASTCallFunction) {
       this.rvalue.isStatement = false;
     }
+    const ltype = this.lvalue.getType();
+    const valueTypeLeft = ltype.isPointerType() ? ltype.pointerType : ltype;
+    const rtype = this.checkScalarType(this.rvalue, valueTypeLeft);
+    const rvalueIsPtr = rtype && rtype.isPointerType();
+    const valueTypeRight = rvalueIsPtr ? (rtype as PBPointerTypeInfo).pointerType : rtype;
+    if (!valueTypeLeft.isCompatibleType(valueTypeRight)) {
+      throw new errors.PBTypeCastError(
+        this.rvalue instanceof ASTExpression
+          ? this.rvalue.toString(rtype.isPointerType() ? 'webgpu' : 'webgl')
+          : `${this.rvalue}`,
+        rtype,
+        ltype
+      );
+    }
   }
   getType(): PBTypeInfo {
     return null;

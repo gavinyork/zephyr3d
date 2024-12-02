@@ -1,9 +1,17 @@
-import type { BindGroup, GPUProgram, RenderStateSet, Texture2D } from '@zephyr3d/device';
-import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
+import type {
+  BindGroup,
+  GPUProgram,
+  PBGlobalScope,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  RenderStateSet,
+  Texture2D
+} from '@zephyr3d/device';
+import type { BlitType, Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
 import {
   AbstractPostEffect,
   Application,
-  copyTexture,
+  CopyBlitter,
   decodeNormalizedFloatFromRGBA,
   fetchSampler,
   ShaderHelper
@@ -58,6 +66,82 @@ type RotateInfo = {
   speed: number;
 };
 
+class GizmoBlendBlitter extends CopyBlitter {
+  private _invViewProjMatrix: Matrix4x4;
+  private _cameraPos: Vector3;
+  private _gridUnit: number;
+  private _gridWidth: number;
+  constructor() {
+    super();
+    this._invViewProjMatrix = new Matrix4x4();
+    this._cameraPos = new Vector3();
+    this._gridUnit = 1;
+    this._gridWidth = 1.5;
+  }
+  get invViewProjMatrix(): Matrix4x4 {
+    return this._invViewProjMatrix;
+  }
+  set invViewProjMatrix(val: Matrix4x4) {
+    this._invViewProjMatrix.set(val);
+  }
+  get cameraPos(): Vector3 {
+    return this._cameraPos;
+  }
+  set cameraPos(val: Vector3) {
+    this._cameraPos.set(val);
+  }
+  filter(scope: PBInsideFunctionScope, type: BlitType, srcTex: PBShaderExp, srcUV: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    pb.func(
+      'screenSpaceGrid',
+      [pb.vec2('uv'), pb.vec3('cameraPos'), pb.float('gridUnit'), pb.float('gridWidth')],
+      function () {
+        this.$l.ndc = pb.vec4(pb.sub(pb.mul(this.uv, 2), pb.vec2(1)), 1, 1);
+        this.$l.worldPosH = pb.mul(this.invViewProjMatrix, this.ndc);
+        this.$l.worldPos = pb.div(this.worldPosH.xyz, this.worldPosH.w);
+        this.$l.ray = pb.normalize(pb.sub(this.cameraPos, this.worldPos));
+        this.$l.d = pb.div(this.cameraPos.y, this.ray.y);
+        this.$l.grid = pb.sub(this.cameraPos, pb.mul(this.ray, this.d)).xz;
+        this.$l.fw = pb.fwidth(this.grid);
+        this.$if(pb.lessThan(this.d, 0), function () {
+          this.$return(pb.vec4(0));
+        }).$else(function () {
+          this.$l.lineWidth = pb.mul(pb.mul(this.gridWidth, this.fw), 0.5);
+          this.grid = pb.add(this.grid, this.lineWidth);
+          this.$l.grid2 = pb.abs(pb.sub(pb.fract(this.grid), this.lineWidth));
+          this.$l.edge = pb.sub(pb.vec2(1), pb.smoothStep(pb.vec2(0), this.lineWidth, this.grid2));
+          this.$l.alpha = pb.max(this.edge.x, this.edge.y);
+          this.grid = pb.floor(this.grid);
+          this.$l.isMultipleOf4 = pb.or(
+            pb.equal(pb.mod(this.grid.x, 4), 0),
+            pb.equal(pb.mod(this.grid.y, 4), 0)
+          );
+          this.$l.fade = pb.sub(1, pb.smoothStep(0, 1, pb.min(pb.abs(this.fw.x), pb.abs(this.fw.y))));
+          this.fade = this.$choice(this.isMultipleOf4, pb.float(1), pb.float(0.2));
+          this.$return(pb.vec4(1, 0, 1, pb.mul(this.alpha, this.fade)));
+        });
+      }
+    );
+    return scope.screenSpaceGrid(srcUV, scope.cameraPos, scope.gridUnit, scope.gridWidth);
+    //return this.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
+  }
+  setup(scope: PBGlobalScope) {
+    const pb = scope.$builder;
+    if (pb.shaderKind === 'fragment') {
+      scope.invViewProjMatrix = pb.mat4().uniform(0);
+      scope.cameraPos = pb.vec3().uniform(0);
+      scope.gridUnit = pb.float().uniform(0);
+      scope.gridWidth = pb.float().uniform(0);
+    }
+  }
+  setUniforms(bindGroup: BindGroup) {
+    bindGroup.setValue('invViewProjMatrix', this._invViewProjMatrix);
+    bindGroup.setValue('cameraPos', this._cameraPos);
+    bindGroup.setValue('gridUnit', this._gridUnit);
+    bindGroup.setValue('gridWidth', this._gridWidth);
+  }
+}
+
 type ScaleInfo = TranslateAxisInfo;
 /**
  * The post water effect
@@ -65,6 +149,7 @@ type ScaleInfo = TranslateAxisInfo;
  */
 export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   static readonly className = 'PostGizmoRenderer' as const;
+  static _blendBlitter: GizmoBlendBlitter = new GizmoBlendBlitter();
   static _gizmoProgram: GPUProgram = null;
   static _gizmoSelectProgram: GPUProgram = null;
   static _gizmoRenderState: RenderStateSet = null;
@@ -195,13 +280,16 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     ctx.device.setBindGroup(0, this._bindGroup);
     ctx.device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
     primitive.draw();
-    copyTexture(
+
+    PostGizmoRenderer._blendBlitter.invViewProjMatrix = this._camera.invViewProjectionMatrix;
+    PostGizmoRenderer._blendBlitter.cameraPos = this._camera.getWorldPosition();
+    PostGizmoRenderer._blendBlitter.renderStates = PostGizmoRenderer._gizmoRenderState;
+    PostGizmoRenderer._blendBlitter.srgbOut = srgbOutput;
+    PostGizmoRenderer._blendBlitter.blit(
       tmpFramebuffer.getColorAttachments()[0],
       destFramebuffer,
-      fetchSampler('clamp_nearest_nomip'),
-      PostGizmoRenderer._blendRenderState,
       0,
-      srgbOutput
+      fetchSampler('clamp_nearest_nomip')
     );
     ctx.device.popDeviceStates();
     ctx.device.pool.releaseFrameBuffer(tmpFramebuffer);
