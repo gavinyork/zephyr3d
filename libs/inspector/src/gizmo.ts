@@ -15,6 +15,37 @@ import {
   TorusShape
 } from '@zephyr3d/scene';
 
+export function createSelectGizmo(): Primitive {
+  const vertices: number[] = [];
+  const barycentric: number[] = [];
+  const indices: number[] = [];
+  const bbox = new BoundingBox();
+  bbox.beginExtend();
+  BoxShape.generateData({ anchor: 0, size: 1 }, vertices, null, null, indices, bbox);
+  for (let i = 0; i < vertices.length / 3 / 3; i++) {
+    barycentric.push(1, 0, 0);
+    barycentric.push(0, 1, 0);
+    barycentric.push(0, 0, 1);
+  }
+  const primitive = new Primitive();
+  const vertexBuffer = Application.instance.device.createVertexBuffer(
+    'position_f32x3',
+    new Float32Array(vertices)
+  );
+  primitive.setVertexBuffer(vertexBuffer);
+  const barycentricBuffer = Application.instance.device.createVertexBuffer(
+    'tex0_f32x3',
+    new Uint8Array(barycentric)
+  );
+  primitive.setVertexBuffer(barycentricBuffer);
+  const indexBuffer = Application.instance.device.createIndexBuffer(new Uint16Array(indices));
+  primitive.setIndexBuffer(indexBuffer);
+  primitive.primitiveType = 'triangle-list';
+  primitive.indexCount = indices.length;
+  primitive.setBoundingVolume(bbox);
+
+  return primitive;
+}
 /**
  * Creates a primitive that presents the translation gizmo
  * @param axisLength - Length of the axies

@@ -100,7 +100,7 @@ export class Inspector {
     this._shadowMethods = ['hard', 'pcf-pd', 'pcf-opt', 'vsm', 'esm'];
     this._skyTypes = ['none', 'color', 'skybox', 'scatter'];
     this._fogTypes = ['none', 'linear', 'exp', 'exp2', 'scatter'];
-    this._gizmoModes = ['none', 'rotation', 'scaling', 'translation'];
+    this._gizmoModes = ['none', 'rotation', 'scaling', 'translation', 'select'];
     this._renderPostEffects = new Set();
     this._assetManager = null;
     this._assetManager = new AssetManager();

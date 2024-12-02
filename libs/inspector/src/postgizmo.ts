@@ -8,7 +8,7 @@ import {
   fetchSampler,
   ShaderHelper
 } from '@zephyr3d/scene';
-import { createTranslationGizmo, createRotationGizmo, createScaleGizmo } from './gizmo';
+import { createTranslationGizmo, createRotationGizmo, createScaleGizmo, createSelectGizmo } from './gizmo';
 import type { Ray } from '@zephyr3d/base';
 import { Matrix4x4, Quaternion, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 
@@ -23,7 +23,7 @@ export type HitType =
   | 'rotate_free'
   | 'scale_axis'
   | 'scale_uniform';
-export type GizmoMode = 'none' | 'translation' | 'rotation' | 'scaling';
+export type GizmoMode = 'none' | 'translation' | 'rotation' | 'scaling' | 'select';
 export type GizmoHitInfo = {
   axis: number;
   type?: HitType;
@@ -66,6 +66,7 @@ type ScaleInfo = TranslateAxisInfo;
 export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   static readonly className = 'PostGizmoRenderer' as const;
   static _gizmoProgram: GPUProgram = null;
+  static _gizmoSelectProgram: GPUProgram = null;
   static _gizmoRenderState: RenderStateSet = null;
   static _blendRenderState: RenderStateSet = null;
   static _primitives: Partial<Record<GizmoMode, Primitive>> = {};
@@ -75,7 +76,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   static _cameraNearFar: Vector2 = new Vector2();
   static _axises = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)];
   private _camera: Camera;
-  private _axisBinding: SceneNode;
+  private _node: SceneNode;
   private _bindGroup: BindGroup;
   private _mode: GizmoMode;
   private _axisLength: number;
@@ -93,7 +94,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   constructor(camera: Camera, binding: SceneNode, size = 10) {
     super();
     this._camera = camera;
-    this._axisBinding = binding;
+    this._node = binding;
     this._bindGroup = null;
     this._axisLength = size;
     this._arrowLength = size * 0.4;
@@ -112,11 +113,11 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   set mode(val: GizmoMode) {
     this._mode = val;
   }
-  get axisBinding(): SceneNode {
-    return this._axisBinding;
+  get node(): SceneNode {
+    return this._node;
   }
-  set axisBinding(node: SceneNode) {
-    this._axisBinding = node;
+  set node(node: SceneNode) {
+    this._node = node;
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
   requireLinearDepthTexture(): boolean {
@@ -145,6 +146,8 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
         primitive = createRotationGizmo(this._axisLength, this._axisRadius);
       } else if (this._mode === 'scaling') {
         primitive = createScaleGizmo(this._axisLength, this._axisRadius, this._boxSize);
+      } else if (this._mode === 'select') {
+        primitive = createSelectGizmo();
       }
       PostGizmoRenderer._primitives[this._mode] = primitive;
     }
@@ -164,7 +167,10 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     ctx.device.setFramebuffer(tmpFramebuffer);
     ctx.device.clearFrameBuffer(new Vector4(0, 0, 0, 0), 1, 0);
     if (!PostGizmoRenderer._gizmoProgram) {
-      PostGizmoRenderer._gizmoProgram = this._createAxisProgram(ctx);
+      PostGizmoRenderer._gizmoProgram = this._createAxisProgram(ctx, false);
+    }
+    if (!PostGizmoRenderer._gizmoSelectProgram) {
+      PostGizmoRenderer._gizmoSelectProgram = this._createAxisProgram(ctx, true);
     }
     if (!PostGizmoRenderer._gizmoRenderState) {
       PostGizmoRenderer._gizmoRenderState = this._createRenderStates(ctx);
@@ -183,7 +189,9 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     this._bindGroup.setValue('texSize', PostGizmoRenderer._texSize);
     this._bindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
     this._bindGroup.setTexture('linearDepthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
-    ctx.device.setProgram(PostGizmoRenderer._gizmoProgram);
+    ctx.device.setProgram(
+      this._mode === 'select' ? PostGizmoRenderer._gizmoSelectProgram : PostGizmoRenderer._gizmoProgram
+    );
     ctx.device.setBindGroup(0, this._bindGroup);
     ctx.device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
     primitive.draw();
@@ -216,7 +224,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
         const hitInfo = this.rayIntersection(ray);
         if (hitInfo) {
           if (this._mode === 'translation' && !this._translatePlaneInfo) {
-            this._beginTranslate(x, y, hitInfo.axis, hitInfo.coord, hitInfo.type, hitInfo.pointLocal);
+            this._beginTranslate(x, y, hitInfo.axis, hitInfo.type, hitInfo.pointLocal);
             return true;
           }
           if (this._mode === 'rotation' && !this._rotateInfo) {
@@ -333,7 +341,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       startX: startX,
       startY: startY,
       startPosition: hitPosition,
-      startRotation: new Quaternion(this._axisBinding.rotation),
+      startRotation: new Quaternion(this._node.rotation),
       axis,
       speed: this._measureRotateSpeed()
     };
@@ -367,7 +375,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
         nearestPoint.set(nearestPoint2);
       }
     }
-    const center = this._axisBinding.getWorldPosition();
+    const center = this._node.getWorldPosition();
     const edge1 = Vector3.sub(this._rotateInfo.startPosition, center).inplaceNormalize();
     const edge2 = Vector3.sub(nearestPoint, center).inplaceNormalize();
     const axis = Vector3.cross(edge1, edge2).inplaceNormalize();
@@ -381,7 +389,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     invWorldMatrix.transformVectorAffine(axis, axis);
     axis.inplaceNormalize();
     const deltaRotation = Quaternion.fromAxisAngle(axis, movement / this._rotateInfo.speed);
-    this._axisBinding.rotation = Quaternion.multiply(deltaRotation, this._rotateInfo.startRotation);
+    this._node.rotation = Quaternion.multiply(deltaRotation, this._rotateInfo.startRotation);
   }
   private _endRotate() {
     Application.instance.device.canvas.style.cursor = 'default';
@@ -396,7 +404,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       startY,
       axis,
       startPosition,
-      bindingPosition: this._axisBinding ? new Vector3(this._axisBinding.position) : Vector3.zero()
+      bindingPosition: this._node ? new Vector3(this._node.position) : Vector3.zero()
     };
   }
   private _updateScale(x: number, y: number) {
@@ -426,16 +434,16 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     const factor = Math.min(axisLength / 10, 1);
     const increment = (dot * factor) / axisLength;
     const scale = increment / this._axisLength;
-    if (this._axisBinding) {
+    if (this._node) {
       switch (this._scaleInfo.axis) {
         case 0:
-          this._axisBinding.scale.x += scale;
+          this._node.scale.x += scale;
           break;
         case 1:
-          this._axisBinding.scale.y += scale;
+          this._node.scale.y += scale;
           break;
         case 2:
-          this._axisBinding.scale.z += scale;
+          this._node.scale.z += scale;
           break;
       }
     }
@@ -446,14 +454,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     Application.instance.device.canvas.style.cursor = 'default';
     this._scaleInfo = null;
   }
-  private _beginTranslate(
-    startX: number,
-    startY: number,
-    axis: number,
-    startPosition: number,
-    type: HitType,
-    pointLocal: Vector3
-  ) {
+  private _beginTranslate(startX: number, startY: number, axis: number, type: HitType, pointLocal: Vector3) {
     this._endRotate();
     this._endScale();
     Application.instance.device.canvas.style.cursor = 'grab';
@@ -503,14 +504,14 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       rayLocal.direction[this._translatePlaneInfo.planeAxis];
     const p = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, d));
     if (this._translatePlaneInfo.type === 'move_axis') {
-      this._axisBinding.position[c] +=
+      this._node.position[c] +=
         p[this._translatePlaneInfo.axis] -
         this._translatePlaneInfo.lastPlanePos[this._translatePlaneInfo.axis];
     } else {
       const dx = p[t[0]] - this._translatePlaneInfo.lastPlanePos[t[0]];
       const dy = p[t[1]] - this._translatePlaneInfo.lastPlanePos[t[1]];
-      this._axisBinding.position[t[0]] += dx;
-      this._axisBinding.position[t[1]] += dy;
+      this._node.position[t[0]] += dx;
+      this._node.position[t[1]] += dy;
     }
   }
   private _endTranslation() {
@@ -541,13 +542,23 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   }
   private _calcGizmoWorldMatrix(noScale: boolean, matrix?: Matrix4x4) {
     matrix = matrix ?? new Matrix4x4();
-    if (this._axisBinding) {
-      this._axisBinding.worldMatrix.decompose(tmpVecS, tmpQuatR, tmpVecT);
-      matrix.translation(tmpVecT);
-      const d = Vector3.distance(this._camera.getWorldPosition(), tmpVecT);
-      if (!noScale) {
-        const scale = (this._screenSize * d * this._camera.getTanHalfFovy()) / (2 * this._axisLength);
-        matrix.scaling(new Vector3(scale, scale, scale)).translateLeft(tmpVecT);
+    if (this._node) {
+      if (this._mode === 'select') {
+        const box = this._node.getWorldBoundingVolume()?.toAABB();
+        if (box) {
+          const scale = Vector3.sub(box.maxPoint, box.minPoint);
+          matrix.scaling(scale).translateLeft(box.minPoint);
+        } else {
+          matrix.identity();
+        }
+      } else {
+        this._node.worldMatrix.decompose(tmpVecS, tmpQuatR, tmpVecT);
+        matrix.translation(tmpVecT);
+        const d = Vector3.distance(this._camera.getWorldPosition(), tmpVecT);
+        if (!noScale) {
+          const scale = (this._screenSize * d * this._camera.getTanHalfFovy()) / (2 * this._axisLength);
+          matrix.scaling(new Vector3(scale, scale, scale)).translateLeft(tmpVecT);
+        }
       }
     } else {
       matrix.identity();
@@ -640,16 +651,22 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     info.coord = intersectedCoord;
     info.distance = minDistance;
   }
-  private _createAxisProgram(ctx: DrawContext) {
+  private _createAxisProgram(ctx: DrawContext, selectMode: boolean) {
     return ctx.device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
-        this.$inputs.color = pb.vec4().attrib('diffuse');
+        if (selectMode) {
+          this.$inputs.barycentric = pb.vec3().attrib('texCoord0');
+        } else {
+          this.$inputs.color = pb.vec4().attrib('diffuse');
+        }
         this.mvpMatrix = pb.mat4().uniform(0);
         this.flip = pb.float().uniform(0);
         pb.main(function () {
           this.$builtins.position = pb.mul(this.mvpMatrix, pb.vec4(this.$inputs.pos, 1));
-          this.$outputs.color = this.$inputs.color;
+          if (!selectMode) {
+            this.$outputs.color = this.$inputs.color;
+          }
           this.$builtins.position = pb.mul(this.$builtins.position, pb.vec4(1, this.flip, 1, 1));
         });
       },
@@ -672,10 +689,11 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
               : this.sceneDepthSample.r;
           this.$l.alpha = this.$choice(
             pb.greaterThan(this.depth, this.sceneDepth),
-            pb.float(0.5),
+            selectMode ? pb.float(0.3) : pb.float(0.5),
             pb.float(1)
           );
-          this.$outputs.color = pb.vec4(pb.mul(this.$inputs.color.rgb, this.alpha), this.alpha);
+          const diffuse = selectMode ? pb.vec3(1, 0, 1) : this.$inputs.color.rgb;
+          this.$outputs.color = pb.vec4(pb.mul(diffuse, this.alpha), this.alpha);
         });
       }
     });
