@@ -1,19 +1,19 @@
 import type {
   BindGroup,
   GPUProgram,
-  PBGlobalScope,
   PBInsideFunctionScope,
   PBShaderExp,
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
-import type { BlitType, Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
+import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
 import {
   AbstractPostEffect,
   Application,
   CopyBlitter,
   decodeNormalizedFloatFromRGBA,
   fetchSampler,
+  PlaneShape,
   ShaderHelper
 } from '@zephyr3d/scene';
 import { createTranslationGizmo, createRotationGizmo, createScaleGizmo, createSelectGizmo } from './gizmo';
@@ -66,118 +66,6 @@ type RotateInfo = {
   speed: number;
 };
 
-class GizmoBlendBlitter extends CopyBlitter {
-  private _invViewProjMatrix: Matrix4x4;
-  private _cameraPos: Vector3;
-  private _gridUnit: number;
-  private _gridWidth: number;
-  constructor() {
-    super();
-    this._invViewProjMatrix = new Matrix4x4();
-    this._cameraPos = new Vector3();
-    this._gridUnit = 1;
-    this._gridWidth = 1.5;
-  }
-  get invViewProjMatrix(): Matrix4x4 {
-    return this._invViewProjMatrix;
-  }
-  set invViewProjMatrix(val: Matrix4x4) {
-    this._invViewProjMatrix.set(val);
-  }
-  get cameraPos(): Vector3 {
-    return this._cameraPos;
-  }
-  set cameraPos(val: Vector3) {
-    this._cameraPos.set(val);
-  }
-  filter(scope: PBInsideFunctionScope, type: BlitType, srcTex: PBShaderExp, srcUV: PBShaderExp): PBShaderExp {
-    const pb = scope.$builder;
-    pb.func(
-      'screenSpaceGrid',
-      [
-        pb.vec2('uv'),
-        pb.vec3('cameraPos'),
-        pb.float('gridUnit'),
-        pb.float('gridWidth'),
-        pb.float('distance'),
-        pb.vec3('colorGrid'),
-        pb.vec3('colorGridEmphasis')
-      ],
-      function () {
-        this.$l.ndc = pb.vec4(pb.sub(pb.mul(this.uv, 2), pb.vec2(1)), 1, 1);
-        this.$l.worldPosH = pb.mul(this.invViewProjMatrix, this.ndc);
-        this.$l.worldPos = pb.div(this.worldPosH.xyz, this.worldPosH.w);
-        this.$l.ray = pb.normalize(pb.sub(this.cameraPos, this.worldPos));
-        this.$l.d = pb.div(this.cameraPos.y, this.ray.y);
-        this.$l.P = pb.sub(this.cameraPos, pb.mul(this.ray, this.d));
-        this.$l.dFdxPos = pb.dpdx(this.P);
-        this.$l.dFdyPos = pb.dpdy(this.P);
-        this.$if(pb.lessThan(this.d, 0), function () {
-          this.$return(pb.vec4(0));
-        }).$else(function () {
-          this.$l.fwidthPos = pb.add(pb.abs(this.dFdxPos), pb.abs(this.dFdyPos));
-          this.$l.V = pb.sub(this.cameraPos, this.P);
-          this.$l.dist = pb.length(this.V);
-          this.V = pb.div(this.V, this.dist);
-          this.$l.angle = pb.sub(1, pb.abs(this.V.y));
-          this.angle = pb.mul(this.angle, this.angle);
-          this.$l.fade = pb.sub(1, pb.mul(this.angle, this.angle));
-          this.fade = pb.mul(
-            this.fade,
-            pb.sub(1, pb.smoothStep(0, this.distance, pb.sub(this.dist, this.distance)))
-          );
-          this.$return(pb.vec4(this.colorGrid, this.fade));
-        });
-        /*
-        this.$l.fw = pb.fwidth(this.grid);
-        this.$if(pb.lessThan(this.d, 0), function () {
-          this.$return(pb.vec4(0));
-        }).$else(function () {
-          this.$l.lineWidth = pb.mul(pb.mul(this.gridWidth, this.fw), 0.5);
-          this.grid = pb.add(this.grid, this.lineWidth);
-          this.$l.grid2 = pb.abs(pb.sub(pb.fract(this.grid), this.lineWidth));
-          this.$l.edge = pb.sub(pb.vec2(1), pb.smoothStep(pb.vec2(0), this.lineWidth, this.grid2));
-          this.$l.alpha = pb.max(this.edge.x, this.edge.y);
-          this.grid = pb.floor(this.grid);
-          this.$l.isMultipleOf4 = pb.or(
-            pb.equal(pb.mod(this.grid.x, 4), 0),
-            pb.equal(pb.mod(this.grid.y, 4), 0)
-          );
-          this.$l.fade = pb.sub(1, pb.smoothStep(0, 1, pb.min(pb.abs(this.fw.x), pb.abs(this.fw.y))));
-          this.fade = this.$choice(this.isMultipleOf4, pb.float(1), pb.float(0.2));
-          this.$return(pb.vec4(1, 0, 1, pb.mul(this.alpha, this.fade)));
-        });
-*/
-      }
-    );
-    return scope.screenSpaceGrid(
-      srcUV,
-      scope.cameraPos,
-      scope.gridUnit,
-      scope.gridWidth,
-      500,
-      pb.vec3(0.112, 0.112, 0.112),
-      pb.vec3(0.1384, 0.1384, 0.1384)
-    );
-    //return this.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
-  }
-  setup(scope: PBGlobalScope) {
-    const pb = scope.$builder;
-    if (pb.shaderKind === 'fragment') {
-      scope.invViewProjMatrix = pb.mat4().uniform(0);
-      scope.cameraPos = pb.vec3().uniform(0);
-      scope.gridUnit = pb.float().uniform(0);
-      scope.gridWidth = pb.float().uniform(0);
-    }
-  }
-  setUniforms(bindGroup: BindGroup) {
-    bindGroup.setValue('invViewProjMatrix', this._invViewProjMatrix);
-    bindGroup.setValue('cameraPos', this._cameraPos);
-    bindGroup.setValue('gridUnit', this._gridUnit);
-    bindGroup.setValue('gridWidth', this._gridWidth);
-  }
-}
-
 type ScaleInfo = TranslateAxisInfo;
 /**
  * The post water effect
@@ -185,20 +73,25 @@ type ScaleInfo = TranslateAxisInfo;
  */
 export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   static readonly className = 'PostGizmoRenderer' as const;
-  static _blendBlitter: GizmoBlendBlitter = new GizmoBlendBlitter();
+  static _blendBlitter: CopyBlitter = new CopyBlitter();
   static _gizmoProgram: GPUProgram = null;
   static _gizmoSelectProgram: GPUProgram = null;
+  static _gridProgram: GPUProgram = null;
   static _gizmoRenderState: RenderStateSet = null;
   static _blendRenderState: RenderStateSet = null;
   static _primitives: Partial<Record<GizmoMode, Primitive>> = {};
+  static _gridPrimitive: Primitive = null;
   static _rotation: Primitive = null;
   static _mvpMatrix: Matrix4x4 = new Matrix4x4();
   static _texSize: Vector2 = new Vector2();
   static _cameraNearFar: Vector2 = new Vector2();
   static _axises = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)];
+  private _gridSteps: Float32Array;
+  private _gridParams: Vector4;
   private _camera: Camera;
   private _node: SceneNode;
   private _bindGroup: BindGroup;
+  private _gridBindGroup: BindGroup;
   private _mode: GizmoMode;
   private _axisLength: number;
   private _arrowLength: number;
@@ -209,6 +102,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   private _rotateInfo: RotateInfo;
   private _scaleInfo: ScaleInfo;
   private _screenSize: number;
+  private _drawGrid: boolean;
   /**
    * Creates an instance of PostGizmoRenderer.
    */
@@ -217,6 +111,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     this._camera = camera;
     this._node = binding;
     this._bindGroup = null;
+    this._gridBindGroup = null;
     this._axisLength = size;
     this._arrowLength = size * 0.4;
     this._axisRadius = size * 0.02;
@@ -227,6 +122,12 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     this._rotateInfo = null;
     this._scaleInfo = null;
     this._screenSize = 0.3;
+    this._gridParams = new Vector4(1000, 500, 0, 0);
+    this._gridSteps = new Float32Array([
+      1, 1, 0, 0, 10, 10, 0, 0, 100, 100, 0, 0, 1000, 1000, 0, 0, 1000, 1000, 0, 0, 1000, 1000, 0, 0, 1000,
+      1000, 0, 0, 1000, 1000, 0, 0
+    ]);
+    this._drawGrid = true;
   }
   get mode(): GizmoMode {
     return this._mode;
@@ -240,6 +141,35 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   set node(node: SceneNode) {
     this._node = node;
   }
+  get drawGrid(): boolean {
+    return this._drawGrid;
+  }
+  set drawGrid(val: boolean) {
+    this._drawGrid = !!val;
+  }
+  get gridSize(): number {
+    return this._gridParams.x;
+  }
+  set gridSize(val: number) {
+    if (val !== this._gridParams.x) {
+      this._gridParams.x = val;
+      this.calcGridSteps(this._gridParams.x);
+    }
+  }
+  get gridDistance(): number {
+    return this._gridParams.y;
+  }
+  set gridDistance(val: number) {
+    this._gridParams.y = val;
+  }
+  private calcGridSteps(size: number) {
+    for (let i = 0, k = 1; i < 8; i++, k = Math.min(size, k * 10)) {
+      this._gridSteps[i * 4] = k;
+      this._gridSteps[i * 4 + 1] = k;
+      this._gridSteps[i * 4 + 2] = 0;
+      this._gridSteps[i * 4 + 3] = 0;
+    }
+  }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
   requireLinearDepthTexture(): boolean {
     return true;
@@ -251,30 +181,77 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     this.passThrough(ctx, inputColorTexture, srgbOutput);
-    if (this._mode === 'rotation' && this._rotateInfo && this._rotateInfo.axis < 0) {
+    if (!this.enabled) {
       return;
     }
-    let primitive: Primitive = PostGizmoRenderer._primitives[this._mode];
-    if (!primitive) {
+    if (!this._drawGrid && this._mode === 'rotation' && this._rotateInfo && this._rotateInfo.axis < 0) {
+      return;
+    }
+    let gridPrimitive: Primitive = null;
+    let gridProgram: GPUProgram = null;
+    let gridBindGroup: BindGroup = null;
+    let gizmoRenderState: RenderStateSet = null;
+    if (this._drawGrid) {
+      if (!PostGizmoRenderer._gridPrimitive) {
+        PostGizmoRenderer._gridPrimitive = new PlaneShape({ size: 2, twoSided: true, resolution: 8 });
+      }
+      gridPrimitive = PostGizmoRenderer._gridPrimitive;
+      if (!PostGizmoRenderer._gridProgram) {
+        PostGizmoRenderer._gridProgram = this._createGridProgram(ctx);
+      }
+      gridProgram = PostGizmoRenderer._gridProgram;
+      if (!this._gridBindGroup) {
+        this._gridBindGroup = ctx.device.createBindGroup(gridProgram.bindGroupLayouts[0]);
+      }
+      gridBindGroup = this._gridBindGroup;
+    }
+    let gizmoPrimitive = PostGizmoRenderer._primitives[this._mode];
+    let gizmoProgram: GPUProgram = null;
+    let gizmoBindGroup: BindGroup = null;
+    if (!gizmoPrimitive) {
       if (this._mode === 'translation') {
-        primitive = createTranslationGizmo(
+        gizmoPrimitive = createTranslationGizmo(
           this._axisLength,
           this._axisRadius,
           this._arrowLength,
           this._arrowRadius
         );
       } else if (this._mode === 'rotation') {
-        primitive = createRotationGizmo(this._axisLength, this._axisRadius);
+        gizmoPrimitive = createRotationGizmo(this._axisLength, this._axisRadius);
       } else if (this._mode === 'scaling') {
-        primitive = createScaleGizmo(this._axisLength, this._axisRadius, this._boxSize);
+        gizmoPrimitive = createScaleGizmo(this._axisLength, this._axisRadius, this._boxSize);
       } else if (this._mode === 'select') {
-        primitive = createSelectGizmo();
+        gizmoPrimitive = createSelectGizmo();
       }
-      PostGizmoRenderer._primitives[this._mode] = primitive;
+      PostGizmoRenderer._primitives[this._mode] = gizmoPrimitive;
     }
-    if (!primitive) {
+    if (gizmoPrimitive) {
+      if (this._mode === 'select') {
+        if (!PostGizmoRenderer._gizmoSelectProgram) {
+          PostGizmoRenderer._gizmoSelectProgram = this._createAxisProgram(ctx, true);
+        }
+        gizmoProgram = PostGizmoRenderer._gizmoSelectProgram;
+      } else {
+        if (!PostGizmoRenderer._gizmoProgram) {
+          PostGizmoRenderer._gizmoProgram = this._createAxisProgram(ctx, false);
+        }
+        gizmoProgram = PostGizmoRenderer._gizmoProgram;
+      }
+      if (!this._bindGroup) {
+        this._bindGroup = ctx.device.createBindGroup(PostGizmoRenderer._gizmoProgram.bindGroupLayouts[0]);
+      }
+      gizmoBindGroup = this._bindGroup;
+    }
+    if (!gridPrimitive && !gizmoPrimitive) {
       return;
     }
+    if (!PostGizmoRenderer._gizmoRenderState) {
+      PostGizmoRenderer._gizmoRenderState = this._createRenderStates(ctx);
+    }
+    if (!PostGizmoRenderer._blendRenderState) {
+      PostGizmoRenderer._blendRenderState = this._createBlendRenderStates(ctx);
+    }
+    gizmoRenderState = PostGizmoRenderer._gizmoRenderState;
     const destFramebuffer = ctx.device.getFramebuffer();
     const tmpFramebuffer = ctx.device.pool.fetchTemporalFramebuffer(
       false,
@@ -284,42 +261,38 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       ctx.device.getFramebuffer().getDepthAttachment().format,
       false
     );
-    ctx.device.pushDeviceStates();
-    ctx.device.setFramebuffer(tmpFramebuffer);
-    ctx.device.clearFrameBuffer(new Vector4(0, 0, 0, 0), 1, 0);
-    if (!PostGizmoRenderer._gizmoProgram) {
-      PostGizmoRenderer._gizmoProgram = this._createAxisProgram(ctx, false);
-    }
-    if (!PostGizmoRenderer._gizmoSelectProgram) {
-      PostGizmoRenderer._gizmoSelectProgram = this._createAxisProgram(ctx, true);
-    }
-    if (!PostGizmoRenderer._gizmoRenderState) {
-      PostGizmoRenderer._gizmoRenderState = this._createRenderStates(ctx);
-    }
-    if (!PostGizmoRenderer._blendRenderState) {
-      PostGizmoRenderer._blendRenderState = this._createBlendRenderStates(ctx);
-    }
-    if (!this._bindGroup) {
-      this._bindGroup = ctx.device.createBindGroup(PostGizmoRenderer._gizmoProgram.bindGroupLayouts[0]);
-    }
     this._calcGizmoMVPMatrix(false, PostGizmoRenderer._mvpMatrix);
     PostGizmoRenderer._texSize.setXY(inputColorTexture.width, inputColorTexture.height);
     PostGizmoRenderer._cameraNearFar.setXY(this._camera.getNearPlane(), this._camera.getFarPlane());
-    this._bindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
-    this._bindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
-    this._bindGroup.setValue('texSize', PostGizmoRenderer._texSize);
-    this._bindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
-    this._bindGroup.setTexture('linearDepthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
-    ctx.device.setProgram(
-      this._mode === 'select' ? PostGizmoRenderer._gizmoSelectProgram : PostGizmoRenderer._gizmoProgram
-    );
-    ctx.device.setBindGroup(0, this._bindGroup);
-    ctx.device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
-    primitive.draw();
-
-    PostGizmoRenderer._blendBlitter.invViewProjMatrix = this._camera.invViewProjectionMatrix;
-    PostGizmoRenderer._blendBlitter.cameraPos = this._camera.getWorldPosition();
-    PostGizmoRenderer._blendBlitter.renderStates = PostGizmoRenderer._gizmoRenderState;
+    ctx.device.pushDeviceStates();
+    ctx.device.setFramebuffer(tmpFramebuffer);
+    ctx.device.clearFrameBuffer(new Vector4(0, 0, 0, 0), 1, 0);
+    ctx.device.setRenderStates(gizmoRenderState);
+    if (gridPrimitive) {
+      gridBindGroup.setValue('viewMatrix', ctx.camera.worldMatrix);
+      gridBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
+      gridBindGroup.setValue('params', this._gridParams);
+      gridBindGroup.setValue('steps', this._gridSteps);
+      gridBindGroup.setValue('viewProjMatrix', ctx.camera.viewProjectionMatrix);
+      gridBindGroup.setValue('texSize', PostGizmoRenderer._texSize);
+      gridBindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
+      gridBindGroup.setTexture('linearDepthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
+      gridBindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
+      ctx.device.setProgram(gridProgram);
+      ctx.device.setBindGroup(0, gridBindGroup);
+      gridPrimitive.draw();
+    }
+    if (gizmoPrimitive) {
+      gizmoBindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
+      gizmoBindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
+      gizmoBindGroup.setValue('texSize', PostGizmoRenderer._texSize);
+      gizmoBindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
+      gizmoBindGroup.setTexture('linearDepthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
+      ctx.device.setProgram(gizmoProgram);
+      ctx.device.setBindGroup(0, gizmoBindGroup);
+      gizmoPrimitive.draw();
+    }
+    PostGizmoRenderer._blendBlitter.renderStates = PostGizmoRenderer._blendRenderState;
     PostGizmoRenderer._blendBlitter.srgbOut = srgbOutput;
     PostGizmoRenderer._blendBlitter.blit(
       tmpFramebuffer.getColorAttachments()[0],
@@ -338,6 +311,12 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
    */
   handleEvent(ev: Event, type?: string): boolean {
     if (!(ev instanceof PointerEvent)) {
+      return false;
+    }
+    if (!this.enabled) {
+      this._endRotate();
+      this._endTranslation();
+      this._endScale();
       return false;
     }
     const x = ev.offsetX;
@@ -774,6 +753,255 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     info.axis = intersectedAxis;
     info.coord = intersectedCoord;
     info.distance = minDistance;
+  }
+  private _createGridProgram(ctx: DrawContext) {
+    return ctx.device.buildRenderProgram({
+      vertex(pb) {
+        this.$inputs.pos = pb.vec3().attrib('position');
+        this.params = pb.vec4().uniform(0);
+        this.cameraPos = pb.vec3().uniform(0);
+        this.viewProjMatrix = pb.mat4().uniform(0);
+        this.flip = pb.float().uniform(0);
+        pb.main(function () {
+          this.$outputs.worldPos = pb.add(
+            pb.vec3(this.cameraPos.x, 0, this.cameraPos.y),
+            pb.mul(this.$inputs.pos, this.params.x)
+          );
+          this.$builtins.position = pb.mul(this.viewProjMatrix, pb.vec4(this.$outputs.worldPos, 1));
+          this.$builtins.position = pb.mul(this.$builtins.position, pb.vec4(1, this.flip, 1, 1));
+        });
+      },
+      fragment(pb) {
+        this.$outputs.outColor = pb.vec4();
+        this.viewMatrix = pb.mat4().uniform(0);
+        this.params = pb.vec4().uniform(0);
+        this.cameraPos = pb.vec3().uniform(0);
+        this.steps = pb.vec4[8]().uniform(0);
+        this.linearDepthTex = pb.tex2D().uniform(0);
+        this.texSize = pb.vec2().uniform(0);
+        this.cameraNearFar = pb.vec2().uniform(0);
+        const STEPS_LEN = 8;
+        const discRadius = 1.05 / Math.sqrt(Math.PI);
+        const gridLineSmoothStart = 0.5 + discRadius;
+        const gridLineSmoothEnd = 0.5 - discRadius;
+        function minInt(scope: PBInsideFunctionScope, a: PBShaderExp | number, b: PBShaderExp | number) {
+          if (pb.getDevice().type === 'webgl' && (typeof a !== 'number' || typeof b !== 'number')) {
+            pb.func('minInt', [pb.int('a'), pb.int('b')], function () {
+              this.$return(this.$choice(pb.lessThan(this.a, this.b), this.a, this.b));
+            });
+            return scope.minInt(a, b);
+          } else {
+            return pb.min(a, b);
+          }
+        }
+        function getStep(scope: PBInsideFunctionScope, i: PBShaderExp | number) {
+          if (pb.getDevice().type === 'webgl' && typeof i !== 'number') {
+            pb.func('getStep', [pb.int('i')], function () {
+              this.$for(pb.int('k'), 0, STEPS_LEN, function () {
+                this.$if(pb.equal(this.k, this.i), function () {
+                  this.$return(this.steps.at(this.k));
+                });
+              });
+              this.$return(pb.vec4(0));
+            });
+            return scope.getStep(i);
+          } else {
+            return scope.steps.at(i);
+          }
+        }
+        pb.func('linearStep', [pb.float('p0'), pb.float('p1'), pb.float('v')], function () {
+          this.$return(pb.clamp(pb.div(pb.sub(this.v, this.p0), pb.abs(pb.sub(this.p1, this.p0))), 0, 1));
+        });
+        pb.func(
+          'getAxis',
+          [pb.vec3('co'), pb.vec3('fwidthCos'), pb.float('lineSize'), pb.float('gridLineSize')],
+          function () {
+            this.$l.axisDomain = pb.div(pb.abs(this.co), this.fwidthCos);
+            this.$return(
+              pb.sub(
+                pb.vec3(1),
+                pb.smoothStep(
+                  pb.vec3(gridLineSmoothEnd),
+                  pb.vec3(gridLineSmoothStart),
+                  pb.sub(this.axisDomain, pb.vec3(pb.add(this.lineSize, this.gridLineSize)))
+                )
+              )
+            );
+          }
+        );
+        pb.func(
+          'getGrid',
+          [pb.vec2('co'), pb.vec2('fwidthCos'), pb.vec2('gridScale'), pb.float('lineSize')],
+          function () {
+            this.$l.halfSize = pb.mul(this.gridScale, 0.5);
+            this.$l.x = pb.add(this.co, this.halfSize);
+            if (pb.getDevice().type === 'webgpu') {
+              this.$l.gridDomain = pb.abs(
+                pb.sub(
+                  pb.sub(this.x, pb.mul(this.gridScale, pb.floor(pb.div(this.x, this.gridScale)))),
+                  this.halfSize
+                )
+              );
+            } else {
+              this.$l.gridDomain = pb.abs(pb.sub(pb.mod(this.x, this.gridScale), this.halfSize));
+            }
+            this.gridDomain = pb.div(this.gridDomain, this.fwidthCos);
+            this.$l.lineDist = pb.min(this.gridDomain.x, this.gridDomain.y);
+            this.$return(
+              pb.sub(
+                1,
+                pb.smoothStep(gridLineSmoothEnd, gridLineSmoothStart, pb.sub(this.lineDist, this.lineSize))
+              )
+            );
+          }
+        );
+        pb.func(
+          'screenSpaceGrid',
+          [
+            pb.vec3('P'),
+            pb.vec3('cameraPos'),
+            pb.mat4('viewMatrix'),
+            pb.float('distance'),
+            pb.vec3('colorGrid'),
+            pb.vec3('colorGridEmphasis')
+          ],
+          function () {
+            this.$l.dFdxPos = pb.dpdx(this.P);
+            this.$l.dFdyPos = pb.dpdy(this.P);
+            this.$l.fwidthPos = pb.add(pb.abs(this.dFdxPos), pb.abs(this.dFdyPos));
+            this.$l.V = pb.sub(this.cameraPos, this.P);
+            this.$l.dist = pb.length(this.V);
+            this.V = pb.div(this.V, this.dist);
+            this.$l.angle = pb.sub(1, pb.abs(this.V.y));
+            this.angle = pb.mul(this.angle, this.angle);
+            this.$l.fade = pb.sub(1, pb.mul(this.angle, this.angle));
+            this.fade = pb.mul(
+              this.fade,
+              pb.sub(1, pb.smoothStep(0, this.distance, pb.sub(this.dist, this.distance)))
+            );
+            this.$l.gridRes = pb.mul(pb.dot(this.dFdxPos, this.viewMatrix[0].xyz), 4);
+            this.$l.step_id_x = pb.int(STEPS_LEN - 1);
+            this.$l.step_id_y = pb.int(STEPS_LEN - 1);
+            this.$for(pb.int('i'), STEPS_LEN - 2, 0, false, true, function () {
+              this.step_id_x = this.$choice(
+                pb.lessThan(this.gridRes, this.steps.at(this.i).x),
+                this.i,
+                this.step_id_x
+              );
+              this.step_id_y = this.$choice(
+                pb.lessThan(this.gridRes, this.steps.at(this.i).y),
+                this.i,
+                this.step_id_y
+              );
+            });
+            this.$l.scale0x = this.$choice(
+              pb.greaterThan(this.step_id_x, 0),
+              getStep(this, pb.sub(this.step_id_x, 1)).x,
+              0
+            );
+            this.$l.scaleAx = getStep(this, this.step_id_x).x;
+            this.$l.scaleBx = getStep(this, minInt(this, pb.add(this.step_id_x, 1), STEPS_LEN - 1)).x;
+            this.$l.scaleCx = getStep(this, minInt(this, pb.add(this.step_id_x, 2), STEPS_LEN - 1)).x;
+            this.$l.scale0y = this.$choice(
+              pb.greaterThan(this.step_id_y, 0),
+              getStep(this, pb.sub(this.step_id_y, 1)).y,
+              0
+            );
+            this.$l.scaleAy = getStep(this, this.step_id_y).y;
+            this.$l.scaleBy = getStep(this, minInt(this, pb.add(this.step_id_y, 1), STEPS_LEN - 1)).y;
+            this.$l.scaleCy = getStep(this, minInt(this, pb.add(this.step_id_y, 2), STEPS_LEN - 1)).y;
+
+            this.$l.blend = pb.sub(
+              1,
+              this.linearStep(
+                pb.add(this.scale0x, this.scale0y),
+                pb.add(this.scaleAx, this.scaleAy),
+                pb.add(this.gridRes, this.gridRes)
+              )
+            );
+            this.blend = pb.mul(this.blend, this.blend, this.blend);
+            this.$l.gridPos = this.P.xz;
+            this.$l.gridFwidth = this.fwidthPos.xz;
+            this.$l.lineSize = pb.float(0);
+            this.$l.gridA = this.getGrid(
+              this.gridPos,
+              this.gridFwidth,
+              pb.vec2(this.scaleAx, this.scaleAy),
+              this.lineSize
+            );
+            this.$l.gridB = this.getGrid(
+              this.gridPos,
+              this.gridFwidth,
+              pb.vec2(this.scaleBx, this.scaleBy),
+              this.lineSize
+            );
+            this.$l.gridC = this.getGrid(
+              this.gridPos,
+              this.gridFwidth,
+              pb.vec2(this.scaleCx, this.scaleCy),
+              this.lineSize
+            );
+            this.$l.color = pb.vec4(this.colorGrid, 1);
+            this.$l.colorEmphasis = pb.vec4(this.colorGridEmphasis, 1);
+            this.$l.outColor = pb.vec4(this.color.rgb, pb.mul(this.gridA, this.blend));
+            this.outColor = pb.mix(
+              this.outColor,
+              pb.mix(this.color, this.colorEmphasis, this.blend),
+              this.gridB
+            );
+            this.outColor = pb.mix(this.outColor, this.colorEmphasis, this.gridC);
+
+            // Axis
+            this.$l.axisDist = pb.vec3();
+            this.$l.axisFwidth = pb.vec3();
+            this.$l.planeAxis = pb.vec3(1, 0, 1);
+            this.$l.axisDist.x = pb.dot(this.P.yz, this.planeAxis.yz);
+            this.$l.axisFwidth.x = pb.dot(this.fwidthPos.yz, this.planeAxis.yz);
+            this.$l.axisDist.z = pb.dot(this.P.xy, this.planeAxis.xy);
+            this.$l.axisFwidth.z = pb.dot(this.fwidthPos.xy, this.planeAxis.xy);
+            this.$l.axes = this.getAxis(this.axisDist, this.axisFwidth, 0.5, 0);
+            this.outColor = pb.vec4(
+              this.$choice(pb.lessThan(this.axes.x, 1e-8), this.outColor.rgb, pb.vec3(1, 0, 0)),
+              pb.max(this.outColor.a, this.axes.x)
+            );
+            this.outColor = pb.vec4(
+              this.$choice(pb.lessThan(this.axes.z, 1e-8), this.outColor.rgb, pb.vec3(0, 0, 1)),
+              pb.max(this.outColor.a, this.axes.x)
+            );
+
+            this.outAlpha = pb.mul(this.outColor.a, this.fade);
+            this.$return(pb.vec4(pb.mul(this.outColor.rgb, this.outAlpha), this.outAlpha));
+          }
+        );
+        pb.main(function () {
+          this.$l.color = this.screenSpaceGrid(
+            this.$inputs.worldPos,
+            this.cameraPos,
+            this.viewMatrix,
+            this.params.y,
+            pb.vec3(0.112, 0.112, 0.112),
+            pb.vec3(0.1384, 0.1384, 0.1384)
+          );
+          this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
+          this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(
+            this,
+            this.$builtins.fragCoord.z,
+            this.cameraNearFar
+          );
+          this.$l.sceneDepthSample = pb.textureSampleLevel(this.linearDepthTex, this.screenUV, 0);
+          this.$l.sceneDepth =
+            pb.getDevice().type === 'webgl'
+              ? decodeNormalizedFloatFromRGBA(this, this.sceneDepthSample)
+              : this.sceneDepthSample.r;
+          this.$l.alpha = this.$choice(
+            pb.greaterThan(this.depth, this.sceneDepth),
+            pb.float(0),
+            this.color.a
+          );
+          this.$outputs.outColor = pb.vec4(pb.mul(this.color.rgb, this.alpha), this.alpha);
+        });
+      }
+    });
   }
   private _createAxisProgram(ctx: DrawContext, selectMode: boolean) {
     return ctx.device.buildRenderProgram({

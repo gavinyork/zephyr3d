@@ -3,6 +3,11 @@ import { copyTexture, fetchSampler } from './misc';
 
 const debugFrameBuffer: Record<string, FrameBuffer> = {};
 
+/**
+ * Copies texture to an intermidate texture for debugging with inspector
+ * @param tex - The texture to debug
+ * @param label - Label for the intermidate texture
+ */
 export function debugTexture(tex: BaseTexture, label: string) {
   let fb = debugFrameBuffer[label];
   if (!fb || fb.getWidth() !== tex.width || fb.getHeight() !== tex.height) {

@@ -529,6 +529,22 @@ export class Inspector {
   }
   private renderGizmo(gizmo: PostGizmoRenderer) {
     if (ImGui.Begin('Gizmo')) {
+      const enabled = [gizmo.enabled] as [boolean];
+      if (ImGui.Checkbox('Enabled##gizmo', enabled)) {
+        gizmo.enabled = enabled[0];
+      }
+      const drawGrid = [gizmo.drawGrid] as [boolean];
+      if (ImGui.Checkbox('Grid##gizmo', drawGrid)) {
+        gizmo.drawGrid = drawGrid[0];
+      }
+      const size = [gizmo.gridSize] as [number];
+      if (ImGui.SliderInt('Size##gizmo', size, 1, 100000)) {
+        gizmo.gridSize = size[0];
+      }
+      const dist = [gizmo.gridDistance] as [number];
+      if (ImGui.SliderInt('Distance##gizmo', dist, 1, 10000)) {
+        gizmo.gridDistance = dist[0];
+      }
       ImGui.Combo(
         'Mode##gizmo',
         (val?: number) => {

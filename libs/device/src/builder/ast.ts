@@ -2325,12 +2325,15 @@ export class ASTRange extends ASTScope {
   end: ASTExpression;
   /** @internal */
   open: boolean;
-  constructor(init: ASTPrimitive, start: ASTExpression, end: ASTExpression, open: boolean) {
+  /** @internal */
+  reverse: boolean;
+  constructor(init: ASTPrimitive, start: ASTExpression, end: ASTExpression, open: boolean, reverse: boolean) {
     super();
     this.init = init;
     this.start = start;
     this.end = end;
     this.open = open;
+    this.reverse = reverse;
     this.statements = [];
     if (this.start instanceof ASTCallFunction) {
       this.start.isStatement = false;
@@ -2343,8 +2346,10 @@ export class ASTRange extends ASTScope {
     const init = this.init.getType().toTypeName('webgl', this.init.name);
     const start = unbracket(this.start.toWebGL(indent, ctx));
     const end = unbracket(this.end.toWebGL(indent, ctx));
-    const comp = this.open ? '<' : '<=';
-    let str = `${indent}for (${init} = ${start}; ${this.init.name} ${comp} ${end}; ${this.init.name}++) {\n`;
+    const comp = this.open ? (this.reverse ? '>' : '<') : this.reverse ? '>=' : '<=';
+    let str = `${indent}for (${init} = ${start}; ${this.init.name} ${comp} ${end}; ${this.init.name}${
+      this.reverse ? '--' : '++'
+    }) {\n`;
     str += super.toWebGL(indent + '  ', ctx);
     str += `${indent}}\n`;
     return str;
@@ -2353,8 +2358,10 @@ export class ASTRange extends ASTScope {
     const init = this.init.getType().toTypeName('webgl2', this.init.name);
     const start = unbracket(this.start.toWebGL2(indent, ctx));
     const end = unbracket(this.end.toWebGL2(indent, ctx));
-    const comp = this.open ? '<' : '<=';
-    let str = `${indent}for (${init} = ${start}; ${this.init.name} ${comp} ${end}; ${this.init.name}++) {\n`;
+    const comp = this.open ? (this.reverse ? '>' : '<') : this.reverse ? '>=' : '<=';
+    let str = `${indent}for (${init} = ${start}; ${this.init.name} ${comp} ${end}; ${this.init.name}${
+      this.reverse ? '--' : '++'
+    }) {\n`;
     str += super.toWebGL2(indent + '  ', ctx);
     str += `${indent}}\n`;
     return str;
@@ -2364,8 +2371,10 @@ export class ASTRange extends ASTScope {
     const start = unbracket(this.start.toWGSL(indent, ctx));
     const end = unbracket(this.end.toWGSL(indent, ctx));
     const incr = new ASTScalar(1, this.init.getType() as PBPrimitiveTypeInfo).toWGSL(indent, ctx);
-    const comp = this.open ? '<' : '<=';
-    let str = `${indent}for (${init} = ${start}; ${this.init.name} ${comp} ${end}; ${this.init.name} = ${this.init.name} + ${incr}) {\n`;
+    const comp = this.open ? (this.reverse ? '> ' : '<') : this.reverse ? '>=' : '<=';
+    let str = `${indent}for (${init} = ${start}; ${this.init.name} ${comp} ${end}; ${this.init.name} = ${
+      this.init.name
+    } ${this.reverse ? '-' : '+'} ${incr}) {\n`;
     str += super.toWGSL(indent + '  ', ctx);
     str += `${indent}}\n`;
     return str;

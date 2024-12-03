@@ -36,7 +36,7 @@ myApp.ready().then(function () {
   material.roughness = 0.9;
   const box = new Mesh(scene, new BoxShape({ size: 10 }), material);
   box.position.setXYZ(16, 5, -12);
-  new Mesh(scene, new PlaneShape({ size: 60 }), material);
+  new Mesh(scene, new PlaneShape({ size: 60, resolution: 10 }), material);
   const torus = new Mesh(scene, new TorusShape(), material);
   torus.position.setXYZ(0, 3, 0);
 

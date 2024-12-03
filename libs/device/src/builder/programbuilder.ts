@@ -3724,18 +3724,33 @@ export class PBInsideFunctionScope extends PBScope {
     counter: PBShaderExp,
     init: number | PBShaderExp,
     end: number | PBShaderExp,
-    body: (this: PBForScope) => void
+    open?: boolean | ((this: PBForScope) => void),
+    reverse?: boolean | ((this: PBForScope) => void),
+    body?: (this: PBForScope) => void
   ) {
     const initializerType = counter.$ast.getType();
     if (!initializerType.isPrimitiveType() || !initializerType.isScalarType()) {
       throw new errors.PBASTError(counter.$ast, 'invalid for range initializer type');
     }
     const initval = init instanceof PBShaderExp ? init.$ast : new AST.ASTScalar(init, initializerType);
+    if (typeof open === 'function') {
+      body = open;
+      open = true;
+      reverse = false;
+    } else if (typeof reverse === 'function') {
+      body = reverse;
+      open = !!open;
+      reverse = false;
+    } else {
+      open = !!open;
+      reverse = !!reverse;
+    }
     const astFor = new AST.ASTRange(
       counter.$ast as AST.ASTPrimitive,
       initval,
       end instanceof PBShaderExp ? end.$ast : new AST.ASTScalar(end, initializerType),
-      true
+      open,
+      reverse
     );
     this.$ast.statements.push(astFor);
     new PBForScope(this, counter, end, astFor, body);

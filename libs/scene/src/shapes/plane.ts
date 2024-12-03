@@ -14,6 +14,12 @@ export interface PlaneCreationOptions extends ShapeCreationOptions {
   sizeX?: number;
   /** Size of axis y, default value equals to size */
   sizeY?: number;
+  /** Resolution, default is 1 */
+  resolution?: number;
+  /** Resolution X, default value equals to resolution */
+  resolutionX?: number;
+  /** Resolution Y, default value equals to resolution */
+  resolutionY?: number;
   /** Whether this plane have front side, default is true */
   twoSided?: boolean;
   /** Anchor, default is 0.5 */
@@ -32,6 +38,7 @@ export class PlaneShape extends Shape<PlaneCreationOptions> {
   static _defaultOptions = {
     ...Shape._defaultOptions,
     size: 1,
+    resolution: 1,
     twoSided: false,
     anchor: 0.5
   };
@@ -69,6 +76,46 @@ export class PlaneShape extends Shape<PlaneCreationOptions> {
     const maxX = minX + sizeX;
     const minY = -anchorY * sizeY;
     const maxY = minY + sizeY;
+    const resolutionX = Math.max(options.resolutionX ?? options.resolution, 1);
+    const resolutionY = Math.max(options.resolutionY ?? options.resolution, 1);
+    const dx = (maxX - minX) / resolutionX;
+    const dy = (maxY - minY) / resolutionY;
+    for (let i = 0; i <= resolutionX; i++) {
+      for (let j = 0; j <= resolutionY; j++) {
+        uvs?.push(i / resolutionX, j / resolutionY);
+        vertices?.push(minX + dx * i, 0, minY + dy * j);
+        normals?.push(0, 1, 0);
+      }
+    }
+    if (indices) {
+      for (let i = 0; i < resolutionX; i++) {
+        for (let j = 0; j < resolutionY; j++) {
+          const tl = j * (resolutionY + 1) + i;
+          const tr = (j + 1) * (resolutionY + 1) + i;
+          const bl = tl + 1;
+          const br = tr + 1;
+          indices.push(
+            tl + indexOffset,
+            bl + indexOffset,
+            br + indexOffset,
+            tl + indexOffset,
+            br + indexOffset,
+            tr + indexOffset
+          );
+          if (options.twoSided) {
+            indices.push(
+              tl + indexOffset,
+              br + indexOffset,
+              bl + indexOffset,
+              tl + indexOffset,
+              tr + indexOffset,
+              br + indexOffset
+            );
+          }
+        }
+      }
+    }
+    /*
     uvs?.push(0, 1, 0, 0, 1, 0, 1, 1);
     vertices?.push(minX, 0, maxY, maxX, 0, maxY, maxX, 0, minY, minX, 0, minY);
     normals?.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
@@ -90,6 +137,7 @@ export class PlaneShape extends Shape<PlaneCreationOptions> {
         2 + indexOffset
       );
     }
+    */
     Shape._transform(options.transform, vertices, normals, start);
     if (bbox) {
       for (let i = start; i < vertices.length - 2; i += 3) {
