@@ -17,27 +17,19 @@ import {
 
 export function createSelectGizmo(): Primitive {
   const vertices: number[] = [];
-  const barycentric: number[] = [];
+  const uv: number[] = [];
   const indices: number[] = [];
   const bbox = new BoundingBox();
   bbox.beginExtend();
-  BoxShape.generateData({ anchor: 0, size: 1 }, vertices, null, null, indices, bbox);
-  for (let i = 0; i < vertices.length / 3 / 3; i++) {
-    barycentric.push(1, 0, 0);
-    barycentric.push(0, 1, 0);
-    barycentric.push(0, 0, 1);
-  }
+  BoxShape.generateData({ anchor: 0, size: 1 }, vertices, null, uv, indices, bbox);
   const primitive = new Primitive();
   const vertexBuffer = Application.instance.device.createVertexBuffer(
     'position_f32x3',
     new Float32Array(vertices)
   );
   primitive.setVertexBuffer(vertexBuffer);
-  const barycentricBuffer = Application.instance.device.createVertexBuffer(
-    'tex0_f32x3',
-    new Uint8Array(barycentric)
-  );
-  primitive.setVertexBuffer(barycentricBuffer);
+  const uvBuffer = Application.instance.device.createVertexBuffer('tex0_f32x2', new Float32Array(uv));
+  primitive.setVertexBuffer(uvBuffer);
   const indexBuffer = Application.instance.device.createIndexBuffer(new Uint16Array(indices));
   primitive.setIndexBuffer(indexBuffer);
   primitive.primitiveType = 'triangle-list';
@@ -102,23 +94,33 @@ export function createScaleGizmo(axisLength: number, axisRadius: number, boxRadi
   bbox.beginExtend();
 
   // X axis
-  CylinderShape.generateData(axisOptionsX, vertices, null, null, indices, bbox, vertices.length / 3);
+  CylinderShape.generateData(axisOptionsX, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[0])
+  );
   // X arrow
-  BoxShape.generateData(boxOptionsX, vertices, null, null, indices, bbox, vertices.length / 3);
+  BoxShape.generateData(boxOptionsX, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[0])
+  );
   // Y axis
-  CylinderShape.generateData(axisOptionsY, vertices, null, null, indices, bbox, vertices.length / 3);
+  CylinderShape.generateData(axisOptionsY, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[1])
+  );
   // Y arrow
-  BoxShape.generateData(boxOptionsY, vertices, null, null, indices, bbox, vertices.length / 3);
+  BoxShape.generateData(boxOptionsY, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[1])
+  );
   // Z axis
-  CylinderShape.generateData(axisOptionsZ, vertices, null, null, indices, bbox, vertices.length / 3);
+  CylinderShape.generateData(axisOptionsZ, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[2])
+  );
   // Z arrow
-  BoxShape.generateData(boxOptionsZ, vertices, null, null, indices, bbox, vertices.length / 3);
-  // diffuse color
-  for (let i = 0; i < 3; i++) {
-    for (let j = 0; j < vertices.length / 3 / 3; j++) {
-      diffuse.push(...rgb[i]);
-    }
-  }
+  BoxShape.generateData(boxOptionsZ, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[2])
+  );
+  // center
+  BoxShape.generateData(boxOptions, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(255, 255, 255, 255)
+  );
   const primitive = new Primitive();
   const vertexBuffer = Application.instance.device.createVertexBuffer(
     'position_f32x3',
@@ -173,17 +175,17 @@ export function createRotationGizmo(outerRadius: number, innerRadius: number) {
   bbox.beginExtend();
 
   // X axis
-  TorusShape.generateData(torusOptionsX, vertices, null, null, indices, bbox, vertices.length / 3);
-  // X arrow
-  TorusShape.generateData(torusOptionsY, vertices, null, null, indices, bbox, vertices.length / 3);
+  TorusShape.generateData(torusOptionsX, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[0])
+  );
+  // Y arrow
+  TorusShape.generateData(torusOptionsY, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[1])
+  );
   // Y axis
-  TorusShape.generateData(torusOptionsZ, vertices, null, null, indices, bbox, vertices.length / 3);
-  // diffuse color
-  for (let i = 0; i < 3; i++) {
-    for (let j = 0; j < vertices.length / 3 / 3; j++) {
-      diffuse.push(...rgb[i]);
-    }
-  }
+  TorusShape.generateData(torusOptionsZ, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[2])
+  );
   const primitive = new Primitive();
   const vertexBuffer = Application.instance.device.createVertexBuffer(
     'position_f32x3',
@@ -288,29 +290,41 @@ export function createTranslationGizmo(
   bbox.beginExtend();
 
   // X axis
-  CylinderShape.generateData(axisOptionsX, vertices, null, null, indices, bbox, vertices.length / 3);
+  CylinderShape.generateData(axisOptionsX, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[0])
+  );
   // X arrow
-  CylinderShape.generateData(arrowOptionsX, vertices, null, null, indices, bbox, vertices.length / 3);
+  CylinderShape.generateData(arrowOptionsX, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[0])
+  );
   // X plane
-  PlaneShape.generateData(planeOptionsX, vertices, null, null, indices, bbox, vertices.length / 3);
+  PlaneShape.generateData(planeOptionsX, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[0])
+  );
   // Y axis
-  CylinderShape.generateData(axisOptionsY, vertices, null, null, indices, bbox, vertices.length / 3);
+  CylinderShape.generateData(axisOptionsY, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[1])
+  );
   // Y arrow
-  CylinderShape.generateData(arrowOptionsY, vertices, null, null, indices, bbox, vertices.length / 3);
+  CylinderShape.generateData(arrowOptionsY, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[1])
+  );
   // Y plane
-  PlaneShape.generateData(planeOptionsY, vertices, null, null, indices, bbox, vertices.length / 3);
+  PlaneShape.generateData(planeOptionsY, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[1])
+  );
   // Z axis
-  CylinderShape.generateData(axisOptionsZ, vertices, null, null, indices, bbox, vertices.length / 3);
+  CylinderShape.generateData(axisOptionsZ, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[2])
+  );
   // Z arrow
-  CylinderShape.generateData(arrowOptionsZ, vertices, null, null, indices, bbox, vertices.length / 3);
+  CylinderShape.generateData(arrowOptionsZ, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[2])
+  );
   // Z plane
-  PlaneShape.generateData(planeOptionsZ, vertices, null, null, indices, bbox, vertices.length / 3);
-  // diffuse color
-  for (let i = 0; i < 3; i++) {
-    for (let j = 0; j < vertices.length / 3 / 3; j++) {
-      diffuse.push(...rgb[i]);
-    }
-  }
+  PlaneShape.generateData(planeOptionsZ, vertices, null, null, indices, bbox, vertices.length / 3, () =>
+    diffuse.push(...rgb[2])
+  );
   const primitive = new Primitive();
   const vertexBuffer = Application.instance.device.createVertexBuffer(
     'position_f32x3',

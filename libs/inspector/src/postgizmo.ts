@@ -184,9 +184,6 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     if (!this.enabled) {
       return;
     }
-    if (!this._drawGrid && this._mode === 'rotation' && this._rotateInfo && this._rotateInfo.axis < 0) {
-      return;
-    }
     let gridPrimitive: Primitive = null;
     let gridProgram: GPUProgram = null;
     let gridBindGroup: BindGroup = null;
@@ -282,7 +279,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       ctx.device.setBindGroup(0, gridBindGroup);
       gridPrimitive.draw();
     }
-    if (gizmoPrimitive) {
+    if (gizmoPrimitive && !(this._mode === 'rotation' && this._rotateInfo && this._rotateInfo.axis < 0)) {
       gizmoBindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
       gizmoBindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
       gizmoBindGroup.setValue('texSize', PostGizmoRenderer._texSize);
@@ -1008,7 +1005,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
         if (selectMode) {
-          this.$inputs.barycentric = pb.vec3().attrib('texCoord0');
+          this.$inputs.uv = pb.vec2().attrib('texCoord0');
         } else {
           this.$inputs.color = pb.vec4().attrib('diffuse');
         }
@@ -1018,6 +1015,8 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
           this.$builtins.position = pb.mul(this.mvpMatrix, pb.vec4(this.$inputs.pos, 1));
           if (!selectMode) {
             this.$outputs.color = this.$inputs.color;
+          } else {
+            this.$outputs.uv = this.$inputs.uv;
           }
           this.$builtins.position = pb.mul(this.$builtins.position, pb.vec4(1, this.flip, 1, 1));
         });
@@ -1027,6 +1026,17 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
         this.linearDepthTex = pb.tex2D().uniform(0);
         this.texSize = pb.vec2().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
+        if (selectMode) {
+          pb.func('edge', [pb.float('lineWidth')], function () {
+            this.$l.fw = pb.fwidth(this.$inputs.uv);
+            this.$l.d = pb.mul(
+              pb.smoothStep(pb.vec2(0), pb.mul(this.fw, this.lineWidth), this.$inputs.uv),
+              pb.smoothStep(pb.vec2(0), pb.mul(this.fw, this.lineWidth), pb.sub(pb.vec2(1), this.$inputs.uv))
+            );
+            this.$return(pb.smoothStep(0, 0.5, pb.sub(1, pb.min(this.d.x, this.d.y))));
+            //this.$return(pb.sub(1, pb.min(this.d.x, this.d.y)));
+          });
+        }
         pb.main(function () {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
           this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(
@@ -1044,7 +1054,12 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
             selectMode ? pb.float(0.3) : pb.float(0.5),
             pb.float(1)
           );
-          const diffuse = selectMode ? pb.vec3(1, 0, 1) : this.$inputs.color.rgb;
+          if (selectMode) {
+            this.$l.lineWidth = pb.float(1.5);
+            this.$l.edgeFactor = this.edge(this.lineWidth);
+            this.alpha = pb.mul(this.alpha, this.edgeFactor);
+          }
+          const diffuse = selectMode ? pb.vec3(1) : this.$inputs.color.rgb;
           this.$outputs.color = pb.vec4(pb.mul(diffuse, this.alpha), this.alpha);
         });
       }

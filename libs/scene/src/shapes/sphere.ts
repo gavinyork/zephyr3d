@@ -71,7 +71,8 @@ export class SphereShape extends Shape<SphereCreationOptions> {
     uvs: number[],
     indices: number[],
     bbox?: AABB,
-    indexOffset?: number
+    indexOffset?: number,
+    vertexCallback?: (index: number, x: number, y: number, z: number) => void
   ): PrimitiveType {
     function getVertex(v: number, h: number, r: number) {
       const y = r * Math.cos(v);
@@ -115,12 +116,15 @@ export class SphereShape extends Shape<SphereCreationOptions> {
     Shape._transform(options.transform, vertices, normals, start);
     if (bbox) {
       for (let i = start; i < vertices.length - 2; i += 3) {
-        bbox.minPoint.x = Math.min(bbox.minPoint.x, vertices[i]);
-        bbox.minPoint.y = Math.min(bbox.minPoint.y, vertices[i + 1]);
-        bbox.minPoint.z = Math.min(bbox.minPoint.z, vertices[i + 2]);
-        bbox.maxPoint.x = Math.max(bbox.maxPoint.x, vertices[i]);
-        bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i + 1]);
-        bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i + 2]);
+        if (bbox) {
+          bbox.minPoint.x = Math.min(bbox.minPoint.x, vertices[i]);
+          bbox.minPoint.y = Math.min(bbox.minPoint.y, vertices[i + 1]);
+          bbox.minPoint.z = Math.min(bbox.minPoint.z, vertices[i + 2]);
+          bbox.maxPoint.x = Math.max(bbox.maxPoint.x, vertices[i]);
+          bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i + 1]);
+          bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i + 2]);
+        }
+        vertexCallback && vertexCallback((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
       }
     }
     return 'triangle-list';

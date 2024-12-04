@@ -63,7 +63,8 @@ export class PlaneShape extends Shape<PlaneCreationOptions> {
     uvs: number[],
     indices: number[],
     bbox?: AABB,
-    indexOffset?: number
+    indexOffset?: number,
+    vertexCallback?: (index: number, x: number, y: number, z: number) => void
   ): PrimitiveType {
     options = Object.assign({}, this._defaultOptions, options ?? {});
     indexOffset = indexOffset ?? 0;
@@ -115,38 +116,18 @@ export class PlaneShape extends Shape<PlaneCreationOptions> {
         }
       }
     }
-    /*
-    uvs?.push(0, 1, 0, 0, 1, 0, 1, 1);
-    vertices?.push(minX, 0, maxY, maxX, 0, maxY, maxX, 0, minY, minX, 0, minY);
-    normals?.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
-    indices?.push(
-      0 + indexOffset,
-      1 + indexOffset,
-      2 + indexOffset,
-      0 + indexOffset,
-      2 + indexOffset,
-      3 + indexOffset
-    );
-    if (options.twoSided) {
-      indices?.push(
-        0 + indexOffset,
-        2 + indexOffset,
-        1 + indexOffset,
-        0 + indexOffset,
-        3 + indexOffset,
-        2 + indexOffset
-      );
-    }
-    */
     Shape._transform(options.transform, vertices, normals, start);
-    if (bbox) {
+    if (bbox || vertexCallback) {
       for (let i = start; i < vertices.length - 2; i += 3) {
-        bbox.minPoint.x = Math.min(bbox.minPoint.x, vertices[i]);
-        bbox.minPoint.y = Math.min(bbox.minPoint.y, vertices[i + 1]);
-        bbox.minPoint.z = Math.min(bbox.minPoint.z, vertices[i + 2]);
-        bbox.maxPoint.x = Math.max(bbox.maxPoint.x, vertices[i]);
-        bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i + 1]);
-        bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i + 2]);
+        if (bbox) {
+          bbox.minPoint.x = Math.min(bbox.minPoint.x, vertices[i]);
+          bbox.minPoint.y = Math.min(bbox.minPoint.y, vertices[i + 1]);
+          bbox.minPoint.z = Math.min(bbox.minPoint.z, vertices[i + 2]);
+          bbox.maxPoint.x = Math.max(bbox.maxPoint.x, vertices[i]);
+          bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i + 1]);
+          bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i + 2]);
+        }
+        vertexCallback && vertexCallback((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
       }
     }
     return 'triangle-list';
