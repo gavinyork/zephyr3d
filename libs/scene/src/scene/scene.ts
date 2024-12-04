@@ -43,6 +43,7 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: [Scene] }>() {
     this._updateFrame = -1;
     this._animationSet = [];
     this._rootNode = new SceneNode(this);
+    this._rootNode.name = 'Root';
   }
   /** @internal */
   get animationSet(): AnimationSet[] {

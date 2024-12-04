@@ -18,6 +18,7 @@ import {
 } from '@zephyr3d/scene';
 import { createTranslationGizmo, createRotationGizmo, createScaleGizmo, createSelectGizmo } from './gizmo';
 import type { Ray } from '@zephyr3d/base';
+import { AABB } from '@zephyr3d/base';
 import { Matrix4x4, Quaternion, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 
 const tmpVecT = new Vector3();
@@ -41,15 +42,6 @@ export type GizmoHitInfo = {
   pointLocal: Vector3;
 };
 
-type TranslateAxisInfo = {
-  startX: number;
-  startY: number;
-  startPosition: number;
-  axis: number;
-  bindingPosition: Vector3;
-  planePosition?: Vector3;
-};
-
 type TranslatePlaneInfo = {
   axis: number;
   planeAxis: number;
@@ -66,7 +58,17 @@ type RotateInfo = {
   speed: number;
 };
 
-type ScaleInfo = TranslateAxisInfo;
+type ScaleInfo = {
+  startX: number;
+  startY: number;
+  lastX: number;
+  lastY: number;
+  startPosition: number;
+  axis: number;
+  bindingPosition: Vector3;
+  planePosition?: Vector3;
+};
+
 /**
  * The post water effect
  * @public
@@ -103,6 +105,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   private _scaleInfo: ScaleInfo;
   private _screenSize: number;
   private _drawGrid: boolean;
+  private _scaleBox: AABB;
   /**
    * Creates an instance of PostGizmoRenderer.
    */
@@ -128,6 +131,10 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       1000, 0, 0, 1000, 1000, 0, 0
     ]);
     this._drawGrid = true;
+    this._scaleBox = new AABB(
+      new Vector3(-this._boxSize, -this._boxSize, -this._boxSize),
+      new Vector3(this._boxSize, this._boxSize, this._boxSize)
+    );
   }
   get mode(): GizmoMode {
     return this._mode;
@@ -381,6 +388,12 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
         pointWorld: null,
         pointLocal: null
       };
+      if (this._mode === 'scaling') {
+        const d = rayLocal.bboxIntersectionTestEx(this._scaleBox);
+        if (d > 0) {
+          return hitInfo;
+        }
+      }
       const length =
         this._axisLength + (this._mode === 'translation' ? this._arrowLength : 2 * this._boxSize);
       const radius = this._mode === 'translation' ? this._arrowRadius : this._boxSize;
@@ -502,6 +515,8 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     this._scaleInfo = {
       startX,
       startY,
+      lastX: startX,
+      lastY: startY,
       axis,
       startPosition,
       bindingPosition: this._node ? new Vector3(this._node.position) : Vector3.zero()
@@ -518,7 +533,20 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     const height = this._camera.viewport
       ? this._camera.viewport[3]
       : Application.instance.device.getViewport().height;
-    const axis = PostGizmoRenderer._axises[this._scaleInfo.axis];
+    let axisIndex = this._scaleInfo.axis;
+    if (axisIndex < 0) {
+      const cameraZ = this._camera.worldMatrix.getRow(2);
+      let dot = 1;
+      for (let i = 0; i < 3; i++) {
+        const x = Math.abs(cameraZ[i]);
+        if (x < dot) {
+          axisIndex = i;
+          dot = x;
+        }
+      }
+      console.log(`Uniform scaling at ${axisIndex} axis`);
+    }
+    const axis = PostGizmoRenderer._axises[axisIndex];
     const axisStart = new Vector4(0, 0, 0, 1);
     const axisEnd = new Vector4(axis.x, axis.y, axis.z, 1);
     const startH = mvpMatrix.transform(axisStart, axisStart);
@@ -528,27 +556,37 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     const axisLength = Math.sqrt(axisDirX * axisDirX + axisDirY * axisDirY);
     const axisDirectionX = axisDirX / axisLength;
     const axisDirectionY = axisDirY / axisLength;
-    const movementX = x - this._scaleInfo.startX;
-    const movementY = y - this._scaleInfo.startY;
+    const movementX = x - this._scaleInfo.lastX;
+    const movementY = y - this._scaleInfo.lastY;
     const dot = axisDirectionX * movementX + axisDirectionY * movementY;
     const factor = Math.min(axisLength / 10, 1);
     const increment = (dot * factor) / axisLength;
     const scale = increment / this._axisLength;
     if (this._node) {
-      switch (this._scaleInfo.axis) {
-        case 0:
-          this._node.scale.x += scale;
-          break;
-        case 1:
-          this._node.scale.y += scale;
-          break;
-        case 2:
-          this._node.scale.z += scale;
-          break;
+      if (this._scaleInfo.axis < 0) {
+        const currentScale =
+          Math.abs(this._node.scale[axisIndex]) < 1e-6 ? 1e-6 : this._node.scale[axisIndex];
+        const s = movementY < 0 ? Math.abs(scale) : -Math.abs(scale);
+        const t = Math.abs((currentScale + s) / currentScale);
+        this._node.scale.x *= t;
+        this._node.scale.y *= t;
+        this._node.scale.z *= t;
+      } else {
+        switch (this._scaleInfo.axis) {
+          case 0:
+            this._node.scale.x += scale;
+            break;
+          case 1:
+            this._node.scale.y += scale;
+            break;
+          case 2:
+            this._node.scale.z += scale;
+            break;
+        }
       }
     }
-    this._scaleInfo.startX = x;
-    this._scaleInfo.startY = y;
+    this._scaleInfo.lastX = x;
+    this._scaleInfo.lastY = y;
   }
   private _endScale() {
     Application.instance.device.canvas.style.cursor = 'default';

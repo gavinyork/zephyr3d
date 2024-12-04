@@ -25,7 +25,9 @@ import {
 import { ImGui } from '@zephyr3d/imgui';
 import type { Texture2D, BaseTexture, FrameBuffer } from '@zephyr3d/device';
 import { TextureDrawer } from './textureview';
-import { GizmoMode, PostGizmoRenderer } from './postgizmo';
+import type { GizmoMode } from './postgizmo';
+import { PostGizmoRenderer } from './postgizmo';
+import { SceneHierarchy } from './editor/scenehierarchy';
 
 export class Inspector {
   private _scene: Scene;
@@ -61,8 +63,10 @@ export class Inspector {
   private _renderPostEffects: Set<AbstractPostEffect<any>>;
   private _assetManager: AssetManager;
   private _camera: Camera;
+  private _sceneHierarchy: SceneHierarchy;
   constructor(scene: Scene, compositor: Compositor, camera?: Camera) {
     this._scene = scene;
+    this._sceneHierarchy = new SceneHierarchy(scene);
     this._compositor = compositor;
     this._camera = camera;
     this._logs = [];
@@ -138,6 +142,7 @@ export class Inspector {
   }
   render() {
     this.renderMenuBar();
+    this.renderSceneHierarchy();
     this.renderStatusBar();
     if (this._inspectScene && this._scene) {
       this.renderScene();
@@ -168,6 +173,30 @@ export class Inspector {
       ImGui.Text(`GPU time: ${Number(Application.instance.device.frameInfo.elapsedTimeGPU).toFixed(2)}`);
       ImGui.EndStatusBar();
     }
+  }
+  private renderSceneHierarchy() {
+    ImGui.PushStyleVar(ImGui.StyleVar.WindowRounding, 0);
+    ImGui.PushStyleVar(ImGui.StyleVar.WindowBorderSize, 1);
+    ImGui.PushStyleColor(ImGui.Col.Border, ImGui.GetColorU32(ImGui.Col.Separator));
+    const displaySize = ImGui.GetIO().DisplaySize;
+    const frameHeight = ImGui.GetFrameHeight();
+    ImGui.SetNextWindowPos(new ImGui.ImVec2(0, frameHeight), ImGui.Cond.Always);
+    ImGui.SetNextWindowSize(new ImGui.ImVec2(300, displaySize.y - 2 * frameHeight), ImGui.Cond.Always);
+    if (
+      ImGui.Begin(
+        'Scene Hierarchy',
+        null,
+        ImGui.WindowFlags.NoMove |
+          ImGui.WindowFlags.NoResize |
+          ImGui.WindowFlags.NoBringToFrontOnFocus |
+          ImGui.WindowFlags.NoTitleBar
+      )
+    ) {
+      this._sceneHierarchy.render();
+    }
+    ImGui.End();
+    ImGui.PopStyleVar(2);
+    ImGui.PopStyleColor();
   }
   private renderMenuBar() {
     if (ImGui.BeginMainMenuBar()) {

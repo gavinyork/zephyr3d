@@ -42,7 +42,7 @@ ssrApp.ready().then(async () => {
     1,
     300
   );
-  camera.lookAt(new Vector3(0, 6, 20), new Vector3(0, 6, 0), new Vector3(0, 1, 0));
+  camera.lookAt(new Vector3(2, 8, 2), new Vector3(0, 6, 0), new Vector3(0, 1, 0));
   camera.controller = new FPSCameraController();
   camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
   camera.depthPrePass = true;

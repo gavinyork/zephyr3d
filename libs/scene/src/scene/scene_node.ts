@@ -16,7 +16,7 @@ import {
   Vector3,
   Vector4
 } from '@zephyr3d/base';
-import { ParticleSystem } from './particlesys';
+import type { ParticleSystem } from './particlesys';
 
 /**
  * Scene node visible state
@@ -52,6 +52,9 @@ export class SceneNode extends makeEventTarget(Object)<{
   static readonly BBOXDRAW_DISABLED = 0;
   static readonly BBOXDRAW_LOCAL = 1;
   static readonly BBOXDRAW_WORLD = 2;
+  private static nodeId = 1;
+  /** @internal */
+  protected _id: number;
   /** @internal */
   protected _clipMode: boolean;
   /** @internal */
@@ -104,6 +107,7 @@ export class SceneNode extends makeEventTarget(Object)<{
    */
   constructor(scene: Scene) {
     super();
+    this._id = SceneNode.nodeId++;
     this._scene = scene;
     this._name = '';
     this._bv = null;
@@ -147,7 +151,13 @@ export class SceneNode extends makeEventTarget(Object)<{
     }
   }
   /**
-   * Name of the scene node
+   * Id of the node
+   */
+  get id() {
+    return this._id;
+  }
+  /**
+   * Name of the node
    */
   get name() {
     return this._name;
