@@ -28,6 +28,9 @@ import { TextureDrawer } from './textureview';
 import type { GizmoMode } from './postgizmo';
 import { PostGizmoRenderer } from './postgizmo';
 import { SceneHierarchy } from './editor/scenehierarchy';
+import { PropertyEditor } from './editor/propertygrid';
+
+let propertyGridTest: PropertyEditor;
 
 export class Inspector {
   private _scene: Scene;
@@ -162,6 +165,7 @@ export class Inspector {
     if (this._showLogs) {
       this.renderLogs();
     }
+    this.testPropertyGrid();
     this.renderPostEffects();
   }
   private renderStatusBar() {
@@ -173,6 +177,69 @@ export class Inspector {
       ImGui.Text(`GPU time: ${Number(Application.instance.device.frameInfo.elapsedTimeGPU).toFixed(2)}`);
       ImGui.EndStatusBar();
     }
+  }
+  private testPropertyGrid() {
+    if (!propertyGridTest) {
+      propertyGridTest = new PropertyEditor('Test', 300, 8, 600, 200, 0.3);
+
+      // 添加分组属性
+      propertyGridTest.setProperty('Transform/Position', 'vec3', { x: 0, y: 0, z: 0 });
+      propertyGridTest.setProperty('Transform/Rotation', 'vec3', { x: 0, y: 0, z: 0 });
+      propertyGridTest.setProperty('Transform/Scale', 'vec3', { x: 1, y: 1, z: 1 });
+
+      propertyGridTest.setProperty('Material/Color', 'color4', { x: 1, y: 1, z: 1, w: 1 });
+      propertyGridTest.setProperty('Material/Roughness', 'float', 0.5);
+      propertyGridTest.setProperty('Material/Metallic', 'float', 0.0);
+
+      propertyGridTest.setProperty('General/Name', 'string', 'Object');
+      propertyGridTest.setProperty('General/ID', 'int', 1);
+
+      propertyGridTest.setProperty('A1/Name', 'string', 'Object');
+      propertyGridTest.setProperty('A1/ID', 'int', 1);
+
+      propertyGridTest.setProperty('A2/Name', 'string', 'Object');
+      propertyGridTest.setProperty('A2/ID', 'int', 1);
+
+      propertyGridTest.setProperty('A3/Name', 'string', 'Object');
+      propertyGridTest.setProperty('A3/ID', 'int', 1);
+
+      propertyGridTest.setProperty('A4/Name', 'string', 'Object');
+      propertyGridTest.setProperty('A4/ID', 'int', 1);
+
+      propertyGridTest.setProperty('A5/Name', 'string', 'Object');
+      propertyGridTest.setProperty('A5/ID', 'int', 1);
+
+      propertyGridTest.setProperty('A6/Name', 'string', 'Object');
+      propertyGridTest.setProperty('A6/ID', 'int', 1);
+
+      propertyGridTest.setProperty('A7/Name', 'string', 'Object');
+      propertyGridTest.setProperty('A7/ID', 'int', 1);
+
+      propertyGridTest.setProperty('A8/Name', 'string', 'Object');
+      propertyGridTest.setProperty('A8/ID', 'int', 1);
+
+      propertyGridTest.setProperty('A9/Name', 'string', 'Object');
+      propertyGridTest.setProperty('A9/ID', 'int', 1);
+
+      propertyGridTest.setProperty('A10/Name', 'string', 'Object');
+      propertyGridTest.setProperty('A10/ID', 'int', 1);
+
+      propertyGridTest.setProperty('A11/Name', 'string', 'Object');
+      propertyGridTest.setProperty('A11/ID', 'int', 1);
+
+      propertyGridTest.setProperty('A12/Name', 'string', 'Object');
+      propertyGridTest.setProperty('A12/ID', 'int', 1);
+
+      propertyGridTest.setProperty('A13/Name', 'string', 'Object');
+      propertyGridTest.setProperty('A13/ID', 'int', 1);
+
+      propertyGridTest.setProperty('A14/Name', 'string', 'Object');
+      propertyGridTest.setProperty('A14/ID', 'int', 1);
+
+      propertyGridTest.setProperty('A15/Name', 'string', 'Object');
+      propertyGridTest.setProperty('A15/ID', 'int', 1);
+    }
+    propertyGridTest.render();
   }
   private renderSceneHierarchy() {
     ImGui.PushStyleVar(ImGui.StyleVar.WindowRounding, 0);
