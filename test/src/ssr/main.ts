@@ -15,8 +15,8 @@ import {
   createGradientNoiseTexture
 } from '@zephyr3d/scene';
 import * as common from '../common';
-import { Inspector, PostGizmoRenderer } from '@zephyr3d/inspector';
-import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
+import { Inspector } from '@zephyr3d/inspector';
+import { imGuiInit } from '@zephyr3d/imgui';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 
 const ssrApp = new Application({
@@ -70,29 +70,13 @@ ssrApp.ready().then(async () => {
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
   const compositor = new Compositor();
-  const postGizmo = new PostGizmoRenderer(camera, box, 5);
-  postGizmo.mode = 'translation';
   compositor.appendPostEffect(new Tonemap());
-  compositor.appendPostEffect(postGizmo);
 
   const inspector = new Inspector(scene, compositor, camera);
 
-  ssrApp.inputManager.use(imGuiInjectEvent);
-  ssrApp.inputManager.use(postGizmo.handleEvent.bind(postGizmo));
-  /*
-  ssrApp.inputManager.use(function (ev: Event, type?: string) {
-    if (ev.type === 'pointerdown') {
-      const ray = camera.constructRay((ev as PointerEvent).offsetX, (ev as PointerEvent).offsetY);
-      const hitInfo = postGizmo.rayIntersection(ray);
-      if (hitInfo) {
-        console.log(`Axis ${hitInfo.axis} hit at ${hitInfo.t}`);
-        return true;
-      }
-    }
-    return false;
-  });
-  */
+  ssrApp.inputManager.use(inspector.handleEvent.bind(inspector));
   ssrApp.inputManager.use(camera.handleEvent.bind(camera));
+
   ssrApp.on('resize', (width, height) => {
     camera.setPerspective(camera.getFOV(), width / height, camera.getNearPlane(), camera.getFarPlane());
   });
@@ -105,9 +89,7 @@ ssrApp.ready().then(async () => {
   ssrApp.on('tick', () => {
     camera.updateController();
     camera.render(scene, compositor);
-    imGuiNewFrame();
     inspector.render();
-    imGuiEndFrame();
     camera.pickResultAsync.then((pickResult) => {
       if (pickResult?.target?.node?.isMesh()) {
         console.log(`Mesh ${pickResult.target.node.name ?? '???'} picked`);

@@ -734,7 +734,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     super._detached(scene);
     const func = ParticleSystem.updateFuncMap.get(this);
     if (func) {
-      scene.off('sceneupdate', func);
+      scene.off('update', func);
     }
   }
   protected _attached(scene: Scene): void {
@@ -744,6 +744,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
       func = this.update.bind(this);
       ParticleSystem.updateFuncMap.set(this, func);
     }
-    scene.on('sceneupdate', func);
+    scene.on('update', func);
   }
 }

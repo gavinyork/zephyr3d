@@ -6,7 +6,7 @@ import { Application } from '../app';
 import type { Drawable, PickTarget } from '../render';
 import { SceneRenderer } from '../render';
 import type { BaseTexture, FrameBuffer } from '@zephyr3d/device';
-import type { Compositor } from '../posteffect';
+import { Compositor } from '../posteffect';
 import type { Scene } from '../scene/scene';
 import type { BaseCameraController } from './base';
 import type { OIT } from '../render/oit';
@@ -30,6 +30,8 @@ export type CameraHistoryData = {
  * @public
  */
 export class Camera extends SceneNode {
+  /** @internal */
+  private static _defaultCompositor = new Compositor();
   /** @internal */
   private static _halton23 = halton23(16);
   /** @internal */
@@ -694,6 +696,8 @@ export class Camera extends SceneNode {
    * @param compositor - Compositor instance that will be used to apply postprocess effects
    */
   render(scene: Scene, compositor?: Compositor) {
+    compositor = compositor ?? Camera._defaultCompositor;
+    scene.dispatchEvent('startrender', scene, this, compositor);
     const device = Application.instance.device;
     const useTAA = this._TAA;
     if (useTAA) {
@@ -733,6 +737,7 @@ export class Camera extends SceneNode {
       this._prevVPMatrix.set(this.viewProjectionMatrix);
       this._prevPosition = this.getWorldPosition();
     }
+    scene.dispatchEvent('endrender', scene, this, compositor ?? null);
   }
   /**
    * Updates the controller state

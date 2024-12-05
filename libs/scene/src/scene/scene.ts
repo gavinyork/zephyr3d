@@ -9,12 +9,17 @@ import type { GraphNode } from './graph_node';
 import type { Camera } from '../camera/camera';
 import type { AnimationSet } from '../animation/animationset';
 import type { PickTarget } from '../render';
+import type { Compositor } from '../posteffect';
 
 /**
  * Presents a world that manages a couple of objects that will be rendered
  * @public
  */
-export class Scene extends makeEventTarget(Object)<{ sceneupdate: [Scene] }>() {
+export class Scene extends makeEventTarget(Object)<{
+  update: [Scene];
+  startrender: [Scene, Camera, Compositor];
+  endrender: [Scene, Camera, Compositor];
+}>() {
   /** @internal */
   private static _nextId = 0;
   /** @internal */
@@ -174,7 +179,7 @@ export class Scene extends makeEventTarget(Object)<{ sceneupdate: [Scene] }>() {
         }
       }
       // update scene objects first
-      this.dispatchEvent('sceneupdate', this);
+      this.dispatchEvent('update', this);
       this.updateNodePlacement(this._octree, this._nodePlaceList);
     }
   }

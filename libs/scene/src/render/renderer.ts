@@ -11,7 +11,7 @@ import type { RenderQueue } from './render_queue';
 import type { PunctualLight, Scene } from '../scene';
 import type { PickResult } from '../camera';
 import { PerspectiveCamera, type Camera } from '../camera';
-import { Compositor } from '../posteffect';
+import type { Compositor } from '../posteffect';
 import { ClusteredLight } from './cluster_light';
 import { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import { ObjectColorPass } from './objectcolorpass';
@@ -24,8 +24,6 @@ import { fetchSampler } from '../utility/misc';
  * @internal
  */
 export class SceneRenderer {
-  /** @internal */
-  private static _defaultCompositor = new Compositor();
   /** @internal */
   private static _scenePass = new LightPass();
   /** @internal */
@@ -86,7 +84,7 @@ export class SceneRenderer {
       HiZTexture: null,
       globalBindGroupAllocator: GlobalBindGroupAllocator.get(),
       camera,
-      compositor: compositor ?? this._defaultCompositor,
+      compositor,
       timestamp: device.frameInfo.frameTimestamp,
       queue: 0,
       lightBlending: false,

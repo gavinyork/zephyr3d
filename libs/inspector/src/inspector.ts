@@ -22,7 +22,7 @@ import {
   Bloom,
   PerspectiveCamera
 } from '@zephyr3d/scene';
-import { ImGui } from '@zephyr3d/imgui';
+import { ImGui, imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import type { Texture2D, BaseTexture, FrameBuffer } from '@zephyr3d/device';
 import { TextureDrawer } from './textureview';
 import type { GizmoMode } from './postgizmo';
@@ -63,6 +63,7 @@ export class Inspector {
   private _gizmoModes: GizmoMode[];
   private _fogTypes: FogType[];
   private _renderPostEffects: Set<AbstractPostEffect<any>>;
+  private _postGizmoRenderer: PostGizmoRenderer;
   private _assetManager: AssetManager;
   private _camera: Camera;
   private _sceneHierarchy: SceneHierarchy;
@@ -112,6 +113,7 @@ export class Inspector {
     this._assetManager = null;
     this._assetManager = new AssetManager();
     this._propertyEditor = new PropertyEditor(300, 8, 600, 200, 0.4);
+    this._postGizmoRenderer = this._camera ? new PostGizmoRenderer(this._camera) : null;
     const that = this;
     Application.instance.logger = {
       log(text, mode) {
@@ -125,10 +127,28 @@ export class Inspector {
       for (const prop of SceneNodeProps) {
         this._propertyEditor.addProperty(prop);
       }
+      if (this._postGizmoRenderer) {
+        this._postGizmoRenderer.node = node;
+        this._postGizmoRenderer.mode = 'select';
+      }
     });
     this._sceneHierarchy.on('node_deselected', () => {
       this._propertyEditor.object = null;
       this._propertyEditor.clear();
+      if (this._postGizmoRenderer) {
+        this._postGizmoRenderer.node = null;
+        this._postGizmoRenderer.mode = 'none';
+      }
+    });
+    this._scene.on('startrender', (scene, camera, compositor) => {
+      if (this._postGizmoRenderer && (this._postGizmoRenderer.node || this._postGizmoRenderer.drawGrid)) {
+        compositor.appendPostEffect(this._postGizmoRenderer);
+      }
+    });
+    this._scene.on('endrender', (scene, camera, compositor) => {
+      if ((this._postGizmoRenderer && this._postGizmoRenderer.node) || this._postGizmoRenderer.drawGrid) {
+        compositor.removePostEffect(this._postGizmoRenderer);
+      }
     });
   }
   calculateSecionBoundsX(padding: number) {
@@ -155,7 +175,17 @@ export class Inspector {
     }
     this._logs.push(str);
   }
+  handleEvent(ev: Event, type?: string): boolean {
+    if (imGuiInjectEvent(ev, type)) {
+      return true;
+    }
+    if (this._postGizmoRenderer && this._postGizmoRenderer.node) {
+      return this._postGizmoRenderer.handleEvent(ev, type);
+    }
+    return false;
+  }
   render() {
+    imGuiNewFrame();
     this.renderMenuBar();
     this.renderSceneHierarchy();
     this.renderPropertyGrid();
@@ -179,6 +209,7 @@ export class Inspector {
       this.renderLogs();
     }
     this.renderPostEffects();
+    imGuiEndFrame();
   }
   private renderStatusBar() {
     if (ImGui.BeginStatusBar()) {

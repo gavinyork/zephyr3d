@@ -109,7 +109,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   /**
    * Creates an instance of PostGizmoRenderer.
    */
-  constructor(camera: Camera, binding: SceneNode, size = 10) {
+  constructor(camera: Camera, binding = null, size = 10) {
     super();
     this._camera = camera;
     this._node = binding;
@@ -242,7 +242,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
         gizmoProgram = PostGizmoRenderer._gizmoProgram;
       }
       if (!this._bindGroup) {
-        this._bindGroup = ctx.device.createBindGroup(PostGizmoRenderer._gizmoProgram.bindGroupLayouts[0]);
+        this._bindGroup = ctx.device.createBindGroup(gizmoProgram.bindGroupLayouts[0]);
       }
       gizmoBindGroup = this._bindGroup;
     }
@@ -291,6 +291,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       gizmoBindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
       gizmoBindGroup.setValue('texSize', PostGizmoRenderer._texSize);
       gizmoBindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
+      gizmoBindGroup.setValue('time', (ctx.device.frameInfo.elapsedOverall % 1000) * 0.001);
       gizmoBindGroup.setTexture('linearDepthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
       ctx.device.setProgram(gizmoProgram);
       ctx.device.setBindGroup(0, gizmoBindGroup);
@@ -1064,16 +1065,40 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
         this.linearDepthTex = pb.tex2D().uniform(0);
         this.texSize = pb.vec2().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
+        this.time = pb.float().uniform(0);
         if (selectMode) {
-          pb.func('edge', [pb.float('lineWidth')], function () {
-            this.$l.fw = pb.fwidth(this.$inputs.uv);
+          pb.func('edge', [pb.vec2('uv'), pb.float('lineWidth')], function () {
+            this.$l.fw = pb.fwidth(this.uv);
             this.$l.d = pb.mul(
-              pb.smoothStep(pb.vec2(0), pb.mul(this.fw, this.lineWidth), this.$inputs.uv),
-              pb.smoothStep(pb.vec2(0), pb.mul(this.fw, this.lineWidth), pb.sub(pb.vec2(1), this.$inputs.uv))
+              pb.smoothStep(pb.vec2(0), pb.mul(this.fw, this.lineWidth), this.uv),
+              pb.smoothStep(pb.vec2(0), pb.mul(this.fw, this.lineWidth), pb.sub(pb.vec2(1), this.uv))
             );
             this.$return(pb.smoothStep(0, 0.5, pb.sub(1, pb.min(this.d.x, this.d.y))));
             //this.$return(pb.sub(1, pb.min(this.d.x, this.d.y)));
           });
+          pb.func(
+            'dash',
+            [
+              pb.vec2('uv'),
+              pb.float('lineWidth'),
+              pb.float('dashLenSS'),
+              pb.float('dashGapSS'),
+              pb.float('time')
+            ],
+            function () {
+              this.$l.edge = this.edge(this.uv, this.lineWidth);
+              this.$l.du = pb.min(this.uv.x, pb.sub(1, this.uv.x));
+              this.$l.dv = pb.min(this.uv.y, pb.sub(1, this.uv.y));
+              this.$l.alongEdge = this.$choice(pb.greaterThan(this.du, this.dv), this.du, this.dv);
+              this.$l.d = pb.fwidth(this.alongEdge);
+              this.$l.dashLen = pb.mul(this.dashLenSS, this.d);
+              this.$l.dashGap = pb.mul(this.dashGapSS, this.d);
+              this.$l.totalLen = pb.add(this.dashLen, this.dashGap);
+              this.$l.pattern = pb.mod(pb.add(this.alongEdge, pb.mul(this.time, 0.1)), this.totalLen);
+              this.$l.dash = pb.step(this.pattern, this.dashGap);
+              this.$return(pb.mul(this.edge, this.dash));
+            }
+          );
         }
         pb.main(function () {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
@@ -1094,8 +1119,11 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
           );
           if (selectMode) {
             this.$l.lineWidth = pb.float(1.5);
-            this.$l.edgeFactor = this.edge(this.lineWidth);
+            this.$l.edgeFactor = this.edge(this.$inputs.uv, this.lineWidth);
             this.alpha = pb.mul(this.alpha, this.edgeFactor);
+            this.$if(pb.lessThan(this.alpha, 0.01), function () {
+              pb.discard();
+            });
           }
           const diffuse = selectMode ? pb.vec3(1) : this.$inputs.color.rgb;
           this.$outputs.color = pb.vec4(pb.mul(diffuse, this.alpha), this.alpha);
