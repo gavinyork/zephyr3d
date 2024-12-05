@@ -3,6 +3,28 @@ const tmpFloatArray = new Float32Array(tmpArrayBuffer);
 const tmpUint32Array = new Uint32Array(tmpArrayBuffer);
 
 /**
+ * Convert a degree value to radian value.
+ * @param degree - The degree value to be converted.
+ * @returns The radian value.
+ *
+ * @public
+ */
+export function degree2radian(degree: number) {
+  return (degree * Math.PI) / 180;
+}
+
+/**
+ * Convert a radian value to degree value.
+ * @param radian - The radian value to be converted.
+ * @returns The degree value.
+ *
+ * @public
+ */
+export function radian2degree(radian: number) {
+  return (radian * 180) / Math.PI;
+}
+
+/**
  * Convert a number to 32 bit float value
  * @param val - The number to be converted
  * @returns 32bit float value

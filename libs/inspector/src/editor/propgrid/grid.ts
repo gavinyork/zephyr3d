@@ -1,9 +1,10 @@
 import { ImGui } from '@zephyr3d/imgui';
 
-type PropertyType = 'int' | 'float' | 'vec2' | 'vec3' | 'vec4' | 'string' | 'rgb' | 'rgba';
+type PropertyType = 'bool' | 'int' | 'float' | 'vec2' | 'vec3' | 'vec4' | 'string' | 'rgb' | 'rgba';
 type PropertyValue = {
   num?: number[];
   str?: string[];
+  bool?: boolean[];
 };
 
 export type PropertyAccessor<T extends {}> = {
@@ -35,7 +36,8 @@ class PropertyGroup<T extends {}> {
 
 const tmpProperty: PropertyValue = {
   num: [0, 0, 0, 0],
-  str: ['']
+  str: [''],
+  bool: [false]
 };
 
 export class PropertyEditor<T extends {} = unknown> {
@@ -207,6 +209,11 @@ export class PropertyEditor<T extends {} = unknown> {
     let changed = false;
     value.get.call(this._object, tmpProperty);
     switch (value.type) {
+      case 'bool': {
+        const val = tmpProperty.bool as [boolean];
+        changed = ImGui.Checkbox('##value', val) && !readonly;
+        break;
+      }
       case 'int': {
         if (value.enum) {
           const val = [value.enum.values.indexOf(tmpProperty.num[0])] as [number];
@@ -266,17 +273,32 @@ export class PropertyEditor<T extends {} = unknown> {
       }
       case 'vec2': {
         const val = tmpProperty.num as [number, number];
-        changed = ImGui.DragFloat2('##value', val, readonly ? 0 : 0.01, undefined, undefined, '%.3f');
+        changed = ImGui.InputFloat2(
+          '##value',
+          val,
+          undefined,
+          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+        );
         break;
       }
       case 'vec3': {
         const val = tmpProperty.num as [number, number, number];
-        changed = ImGui.DragFloat3('##value', val, readonly ? 0 : 0.01, undefined, undefined, '%.3f');
+        changed = ImGui.InputFloat3(
+          '##value',
+          val,
+          undefined,
+          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+        );
         break;
       }
       case 'vec4': {
         const val = tmpProperty.num as [number, number, number, number];
-        changed = ImGui.DragFloat4('##value', val, readonly ? 0 : 0.01, undefined, undefined, '%.3f');
+        changed = ImGui.InputFloat4(
+          '##value',
+          val,
+          undefined,
+          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+        );
         break;
       }
       case 'rgb': {
