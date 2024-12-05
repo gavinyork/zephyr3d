@@ -19,6 +19,12 @@ import {
 import type { ParticleSystem } from './particlesys';
 
 /**
+ * Node iterate function type
+ * @public
+ */
+export type NodeIterateFunc = ((node: SceneNode) => boolean) | ((node: SceneNode) => void);
+
+/**
  * Scene node visible state
  * @public
  */
@@ -234,11 +240,16 @@ export class SceneNode extends makeEventTarget(Object)<{
    *
    * @param callback - callback function that will be called on each node
    */
-  iterate(callback: (node: SceneNode) => void) {
-    callback(this);
-    for (const child of this._children) {
-      child.iterate(callback);
+  iterate(callback: NodeIterateFunc): boolean {
+    if (!!callback(this)) {
+      return true;
     }
+    for (const child of this._children) {
+      if (!!child.iterate(callback)) {
+        return true;
+      }
+    }
+    return false;
   }
   /** true if this is a graph node, false otherwise */
   isGraphNode(): this is GraphNode {
@@ -366,6 +377,11 @@ export class SceneNode extends makeEventTarget(Object)<{
         if (this.isGraphNode()) {
           this._scene.invalidateNodePlacement(this);
         }
+        let parent: SceneNode = this;
+        while (parent) {
+          parent.dispatchEvent('visiblechanged', this);
+          parent = parent.parent;
+        }
         this.notifyHiddenChanged();
       }
     }
@@ -456,7 +472,6 @@ export class SceneNode extends makeEventTarget(Object)<{
   /** @internal */
   notifyHiddenChanged() {
     this._visibleChanged();
-    this.dispatchEvent('visiblechanged', this);
     for (const child of this._children) {
       if (child.showState === 'inherit') {
         child.notifyHiddenChanged();

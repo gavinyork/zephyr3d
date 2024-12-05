@@ -37,6 +37,15 @@ export class BatchGroup extends GraphNode {
         this.invalidateBoundingVolume();
       }
     }.bind(this);
+    this.on('visiblechanged', (node) => {
+      node.iterate((child) => {
+        if (child.isMesh()) {
+          this._changeTag++;
+          return true;
+        }
+        return false;
+      });
+    });
     this.on('nodeattached', (node) => {
       node.iterate((child) => {
         if (child.isMesh()) {
