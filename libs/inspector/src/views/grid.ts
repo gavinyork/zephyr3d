@@ -108,11 +108,14 @@ export class PropertyEditor<T extends {} = unknown> {
     }
   }
   private renderContent() {
+    const resizeBarWidth = 4;
+    const padding = 8;
+    ImGui.SetCursorPosX(ImGui.GetCursorPosX() + resizeBarWidth + padding);
     // 为resize bar预留空间
-    ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 4);
+    //ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 4);
 
     // 计算内容区域宽度
-    const availableWidth = this._width - this._padding * 2 - 4;
+    const availableWidth = this._width - this._padding * 2 - 4 - resizeBarWidth - padding;
     const labelWidth = availableWidth * this._labelPercent;
     const valueWidth = availableWidth * (1 - this._labelPercent);
 
@@ -142,24 +145,25 @@ export class PropertyEditor<T extends {} = unknown> {
   }
   private renderResizeBar(initialCursorPos: ImGui.ImVec2) {
     const resizeBarWidth = 4;
-    const windowPos = ImGui.GetWindowPos();
-    const windowHeight = ImGui.GetWindowSize().y;
+    const availableHeight = ImGui.GetContentRegionAvail().y;
 
-    // 设置resize bar的位置（窗口最左侧）
-    const resizeBarPos = new ImGui.ImVec2(windowPos.x, windowPos.y);
+    // 保存当前的样式
+    ImGui.PushStyleColor(ImGui.Col.Button, ImGui.GetColorU32(ImGui.Col.ScrollbarGrab));
+    ImGui.PushStyleColor(ImGui.Col.ButtonHovered, ImGui.GetColorU32(ImGui.Col.ScrollbarGrabHovered));
+    ImGui.PushStyleColor(ImGui.Col.ButtonActive, ImGui.GetColorU32(ImGui.Col.ScrollbarGrabActive));
 
-    // 绘制resize bar
-    const drawList = ImGui.GetWindowDrawList();
-    drawList.AddRectFilled(
-      resizeBarPos,
-      new ImGui.ImVec2(resizeBarPos.x + resizeBarWidth, resizeBarPos.y + windowHeight),
-      ImGui.GetColorU32(ImGui.Col.ScrollbarGrabHovered)
-    );
+    // 移除按钮的内边距
+    ImGui.PushStyleVar(ImGui.StyleVar.FramePadding, new ImGui.ImVec2(0, 0));
+
+    // 设置位置并创建按钮
+    ImGui.SetCursorPos(initialCursorPos);
+    ImGui.Button('##resize', new ImGui.ImVec2(resizeBarWidth, availableHeight));
+
+    // 恢复样式
+    ImGui.PopStyleVar();
+    ImGui.PopStyleColor(3);
 
     // 处理拖动逻辑
-    ImGui.SetCursorPos(initialCursorPos); // 恢复到初始光标位置
-    ImGui.InvisibleButton('##resize', new ImGui.ImVec2(resizeBarWidth, windowHeight));
-
     if (ImGui.IsItemActive()) {
       const mouseDelta = ImGui.GetIO().MouseDelta.x;
       this._width = Math.max(Math.min(this._width - mouseDelta, this._maxWidth), this._minWidth);

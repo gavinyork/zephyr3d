@@ -301,6 +301,8 @@ export class Inspector {
     this._propertyEditor.render();
   }
   private renderSceneHierarchy() {
+    this._sceneHierarchy.render();
+    /*
     ImGui.PushStyleVar(ImGui.StyleVar.WindowRounding, 0);
     ImGui.PushStyleVar(ImGui.StyleVar.WindowBorderSize, 1);
     ImGui.PushStyleColor(ImGui.Col.Border, ImGui.GetColorU32(ImGui.Col.Separator));
@@ -323,6 +325,7 @@ export class Inspector {
     ImGui.End();
     ImGui.PopStyleVar(2);
     ImGui.PopStyleColor();
+    */
   }
   private renderMenuBar() {
     this._menubar.render();
