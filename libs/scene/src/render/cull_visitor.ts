@@ -12,7 +12,7 @@ import type { Visitor } from '../scene/visitor';
 import type { Camera } from '../camera/camera';
 import type { SceneNode } from '../scene/scene_node';
 import type { BatchGroup } from '../scene/batchgroup';
-import { ParticleSystem } from '../scene';
+import type { ParticleSystem } from '../scene';
 
 /**
  * Node visitor for culling

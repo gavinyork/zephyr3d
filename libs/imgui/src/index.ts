@@ -24,6 +24,10 @@ export async function imGuiInit(device: AbstractDevice, fontFamily?: string, fon
   ImGui.CreateContext();
   ImGui.StyleColorsDark();
   const io: ImGui.IO = ImGui.GetIO();
+
+  io.ConfigWindowsResizeFromEdges = true;
+  io.ConfigDragClickToInputText = true;
+  io.BackendFlags |= ImGui.BackendFlags.HasMouseCursors;
   const font = io.Fonts.AddFontDefault();
 
   font.FontName = fontFamily || 'arial';

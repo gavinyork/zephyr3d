@@ -27,9 +27,10 @@ import type { Texture2D, BaseTexture, FrameBuffer } from '@zephyr3d/device';
 import { TextureDrawer } from './textureview';
 import type { GizmoMode } from './postgizmo';
 import { PostGizmoRenderer } from './postgizmo';
-import { SceneHierarchy } from './editor/scenehierarchy';
-import { PropertyEditor } from './editor/propgrid/grid';
-import { SceneNodeProps } from './editor/propgrid/nodeprop';
+import { SceneHierarchy } from './views/scenehierarchy';
+import { PropertyEditor } from './views/grid';
+import { SceneNodeProps } from './views/nodeprop';
+import { MenubarView } from './views/menubar';
 
 export class Inspector {
   private _scene: Scene;
@@ -68,6 +69,7 @@ export class Inspector {
   private _camera: Camera;
   private _sceneHierarchy: SceneHierarchy;
   private _propertyEditor: PropertyEditor;
+  private _menubar: MenubarView;
   constructor(scene: Scene, compositor: Compositor, camera?: Camera) {
     this._scene = scene;
     this._sceneHierarchy = new SceneHierarchy(scene);
@@ -138,6 +140,80 @@ export class Inspector {
       if (this._postGizmoRenderer) {
         this._postGizmoRenderer.node = null;
         this._postGizmoRenderer.mode = 'none';
+      }
+    });
+    this._menubar = new MenubarView({
+      items: [
+        {
+          label: 'Edit',
+          subMenus: [
+            {
+              label: 'Box',
+              id: 'ADD_BOX'
+            },
+            {
+              label: 'Sphere',
+              id: 'ADD_SPHERE'
+            },
+            {
+              label: 'Plane',
+              id: 'ADD_PLANE'
+            },
+            {
+              label: 'Cylinder',
+              id: 'ADD_CYLINDER'
+            }
+          ]
+        },
+        {
+          label: 'Inspector',
+          subMenus: [
+            {
+              label: 'Scene',
+              id: 'INSPECT_SCENE'
+            },
+            {
+              label: 'Camera',
+              id: 'INSPECT_CAMERA'
+            },
+            {
+              label: 'Lights',
+              id: 'INSPECT_LIGHTS'
+            },
+            {
+              label: 'Textures',
+              id: 'INSPECT_TEXTURES'
+            },
+            {
+              label: 'Sky',
+              id: 'INSPECT_SKY'
+            }
+          ]
+        }
+      ]
+    });
+    this._menubar.on('action', (id, item) => {
+      switch (id) {
+        case 'INSPECT_SCENE':
+          this._inspectScene = !this._inspectScene;
+          item.checked = this._inspectScene;
+          break;
+        case 'INSPECT_CAMERA':
+          this._inspectCamera = !this._inspectCamera;
+          item.checked = this._inspectCamera;
+          break;
+        case 'INSPECT_LIGHTS':
+          this._inspectLights = !this._inspectLights;
+          item.checked = this._inspectLights;
+          break;
+        case 'INSPECT_TEXTURES':
+          this._inspectTextures = !this._inspectTextures;
+          item.checked = this._inspectTextures;
+          break;
+        case 'INSPECT_SKY':
+          this._inspectSky = !this._inspectSky;
+          item.checked = this._inspectSky;
+          break;
       }
     });
     this._scene.on('startrender', (scene, camera, compositor) => {
@@ -249,6 +325,8 @@ export class Inspector {
     ImGui.PopStyleColor();
   }
   private renderMenuBar() {
+    this._menubar.render();
+    return;
     if (ImGui.BeginMainMenuBar()) {
       if (ImGui.BeginMenu('Edit##scene')) {
         if (ImGui.BeginMenu('Add##sceneobject')) {
