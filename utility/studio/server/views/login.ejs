@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.9">
+  <title>Tencent CPM - 登录</title>
+  <link rel="stylesheet" type="text/css" href="./local/css/bootstrap.min.css">
+</head>
+
+<body>
+  <nav class="navbar navbar-dark bg-dark navbar-fixed-top">
+    <a class="navbar-brand" href="javascript:void(0)">Tencent CPM</a>
+  </nav>
+  <div class="container">
+    <div class="form-horizontal">
+      <div class="row mt-5">
+        <div class="col-md-3"></div>
+        <div class="col-md-6">
+          <h2>登录 Tencent CPM</h2>
+          <hr>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-3"></div>
+        <div class="col-md-6">
+          <div class="form-group has-danger">
+            <label class="sr-only" for="account">账号</label>
+            <div class="input-group mb-2 mr-sm-2 mb-sm-0">
+              <input type="text" class="form-control" id="account" value="<%= defaultAccount %>" placeholder="请输入账号"
+                required autofocus>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="form-control-feedback">
+            <span class="text-danger align-middle" id="err_msg_account">
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="row" style="padding-top: 1rem">
+        <div class="col-md-3"></div>
+        <div class="col-md-6">
+          <button class="btn btn-success" id="btn-login">登录</button>
+        </div>
+      </div>
+    </div>
+    <input id="callback" type="hidden" value="<%= callbackUrl %>">
+  </div>
+  <script src="./local/js/jquery.min.js"></script>
+  <script src="./local/js/bootstrap.min.js"></script>
+  <script src="./local/js/login.js"></script>
+</body>
+
+</html>

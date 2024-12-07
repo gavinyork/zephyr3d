@@ -51,7 +51,7 @@ function getTargetES6(input, output) {
             src: `src/${output}/index.html`,
             dest: 'dist',
             rename: `${output}.html`
-          },
+          }
         ],
         verbose: true
       })

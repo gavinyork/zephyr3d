@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.9">
+  <title>Tencent CPM - 安装应用</title>
+  <link rel="stylesheet" type="text/css" href="<%= prefix %>/local/css/bootstrap.min.css">
+  <style>
+    td {
+      vertical-align: middle !important;
+    }
+
+    td:first-child {
+      width: 20%;
+      min-width: 200px;
+    }
+  </style>
+</head>
+
+<body>
+  <nav class="navbar navbar-dark bg-dark navbar-fixed-top">
+    <a class="navbar-brand" href="javascript:void(0)">Tencent CPM</a>
+  </nav>
+  <div class="container">
+    <iframe referrerpolicy="origin" style="border:0;width:100%;height:600px" src="<%= url %>"
+      sandbox="allow-scripts allow-top-navigation allow-same-origin"></iframe>
+  </div>
+  <script src="<%= prefix %>/local/js/jquery.min.js"></script>
+  <script src="<%= prefix %>/local/js/bootstrap.min.js"></script>
+</body>
+
+</html>

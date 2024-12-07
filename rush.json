@@ -462,6 +462,10 @@
       "projectFolder": "libs/inspector"
     },
     {
+      "packageName": "@zephyr3d/studio",
+      "projectFolder": "utility/studio"
+    },
+    {
       "packageName": "@zephyr3d/examples",
       "projectFolder": "examples"
     },

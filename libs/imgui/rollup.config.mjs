@@ -8,7 +8,7 @@ function getTargetDts() {
     input: './src/index.ts',
     output: [{ file: './dist/index.d.ts', format: 'es' }],
     plugins: [dts()]
-  }
+  };
 }
 
 function getTargetES6() {
@@ -25,7 +25,7 @@ function getTargetES6() {
     plugins: [
       nodeResolve(),
       commonjs(),
-      swc(),
+      swc()
       // terser()
     ]
   };
