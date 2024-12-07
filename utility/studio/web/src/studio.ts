@@ -1,59 +1,10 @@
 import { imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
-import { MenubarView } from '@zephyr3d/inspector';
+import { Frame } from './ui/frame';
 
 export class Studio {
-  private _menubar: MenubarView;
+  private _frame: Frame;
   constructor() {
-    this._menubar = new MenubarView({
-      items: [
-        {
-          label: 'Edit',
-          subMenus: [
-            {
-              label: 'Box',
-              id: 'ADD_BOX'
-            },
-            {
-              label: 'Sphere',
-              id: 'ADD_SPHERE'
-            },
-            {
-              label: 'Plane',
-              id: 'ADD_PLANE'
-            },
-            {
-              label: 'Cylinder',
-              id: 'ADD_CYLINDER'
-            }
-          ]
-        },
-        {
-          label: 'Inspector',
-          subMenus: [
-            {
-              label: 'Scene',
-              id: 'INSPECT_SCENE'
-            },
-            {
-              label: 'Camera',
-              id: 'INSPECT_CAMERA'
-            },
-            {
-              label: 'Lights',
-              id: 'INSPECT_LIGHTS'
-            },
-            {
-              label: 'Textures',
-              id: 'INSPECT_TEXTURES'
-            },
-            {
-              label: 'Sky',
-              id: 'INSPECT_SKY'
-            }
-          ]
-        }
-      ]
-    });
+    this._frame = new Frame();
   }
   handleEvent(ev: Event, type?: string): boolean {
     return imGuiInjectEvent(ev, type);
@@ -62,7 +13,7 @@ export class Studio {
   update(dt: number) {}
   render() {
     imGuiNewFrame();
-    this._menubar.render();
+    this._frame.render();
     imGuiEndFrame();
   }
 }

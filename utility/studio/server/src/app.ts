@@ -1,6 +1,7 @@
 import http from 'http';
 import path from 'path';
 import os from 'os';
+import fs from 'fs';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import * as support from './support';
@@ -10,14 +11,21 @@ import 'express-async-errors';
 export class StudioApp {
   private static _instance: StudioApp = null;
   private _logDir: string;
+  private _workspace: string;
   constructor() {
     this._logDir = path.resolve(os.homedir(), '.zephyr3d-studio', 'logs');
+    fs.mkdirSync(this._logDir, { recursive: true });
+    this._workspace = path.resolve(os.homedir(), '.zephyr3d-studio', 'projects');
+    fs.mkdirSync(this._workspace, { recursive: true });
   }
   public static getInstance() {
     if (!this._instance) {
       this._instance = new StudioApp();
     }
     return this._instance;
+  }
+  get workspace(): string {
+    return this._workspace;
   }
   get logDir(): string {
     return this._logDir;

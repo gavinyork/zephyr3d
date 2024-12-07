@@ -21,7 +21,7 @@ import { makeEventTarget } from '@zephyr3d/base';
 let _uniqueId = 0;
 
 export abstract class WebGPUObject<T>
-  extends makeEventTarget(Object)<{ disposed: null }>()
+  extends makeEventTarget(Object)<{ disposed: [] }>()
   implements GPUObject<T>
 {
   protected _device: WebGPUDevice;

@@ -14,7 +14,8 @@
   "scripts": {
     "clean": "shx rm -rf dist .tsbuildinfo",
     "tsc": "tsc -p . --noEmit",
-    "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent"
+    "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent",
+    "serve": "node --watch dist/main.js"
   },
   "engines": {
     "node": ">=16.18.0"
@@ -34,8 +35,8 @@
     "@rollup/plugin-node-resolve": "^15.0.1",
     "@rollup/plugin-strip": "^3.0.2",
     "@rollup/plugin-terser": "^0.4.0",
-    "@rollup/plugin-commonjs":"^25.0.1",
-    "@rollup/plugin-json":"^6.1.0",
+    "@rollup/plugin-commonjs": "^25.0.1",
+    "@rollup/plugin-json": "^6.1.0",
     "rollup-plugin-typescript2": "^0.34.1",
     "@rollup/pluginutils": "^5.0.2",
     "rollup": "^3.15.0",

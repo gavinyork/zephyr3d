@@ -21,7 +21,7 @@ import { makeEventTarget } from '@zephyr3d/base';
 let _uniqueId = 0;
 
 export abstract class WebGLGPUObject<T>
-  extends makeEventTarget(Object)<{ disposed: null }>()
+  extends makeEventTarget(Object)<{ disposed: [] }>()
   implements GPUObject<T>
 {
   protected _device: WebGLDevice;
@@ -41,6 +41,7 @@ export abstract class WebGLGPUObject<T>
     this._device.addGPUObject(this);
   }
   get device(): AbstractDevice {
+    this.dispatchEvent('disposed');
     return this._device;
   }
   get object(): T {

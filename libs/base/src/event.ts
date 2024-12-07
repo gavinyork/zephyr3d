@@ -17,8 +17,8 @@ export type EventListener<T extends EventMap, K extends keyof T> = (...args: T[K
  * @public
  */
 export type REventHandlerOptions = {
-  once?: boolean;
-  context?: unknown;
+  once: boolean;
+  context: unknown;
 };
 
 type EventListenerMap<T extends EventMap> = {
@@ -53,7 +53,7 @@ export interface IEventTarget<T extends EventMap = any> {
    * @param type - The event type for which to remove an event listener
    * @param listener - The callback function to be removed
    */
-  off<K extends keyof T>(type: K, listener: EventListener<T, K>): void;
+  off<K extends keyof T>(type: K, listener: EventListener<T, K>, context?: unknown): void;
   /**
    * Synchronously invoke the affected event listeners with an event object
    * @param evt - The event object to be dispatch.
@@ -83,7 +83,10 @@ export function makeEventTarget<C extends GenericConstructor | ObjectConstructor
        */
       on<K extends keyof I>(type: K, listener: EventListener<I, K>, context?: unknown): void {
         if (listener) {
-          this._listeners = this._internalAddEventListener(this._listeners, type, listener, { context });
+          this._listeners = this._internalAddEventListener(this._listeners, type, listener, {
+            context: context ?? null,
+            once: false
+          });
         } else {
           console.error('Cannot set NULL listener');
         }
@@ -94,7 +97,7 @@ export function makeEventTarget<C extends GenericConstructor | ObjectConstructor
       once<K extends keyof I>(type: K, listener: EventListener<I, K>, context?: unknown): void {
         if (listener) {
           this._listeners = this._internalAddEventListener(this._listeners, type, listener, {
-            context,
+            context: context ?? null,
             once: true
           });
         } else {
@@ -104,8 +107,8 @@ export function makeEventTarget<C extends GenericConstructor | ObjectConstructor
       /**
        * {@inheritDoc IEventTarget.off}
        */
-      off<K extends keyof I>(type: K, listener: EventListener<I, K>): void {
-        this._internalRemoveEventListener(this._listeners, type, listener);
+      off<K extends keyof I>(type: K, listener: EventListener<I, K>, context?: unknown): void {
+        this._internalRemoveEventListener(this._listeners, type, listener, context ?? null);
       }
       /**
        * {@inheritDoc IEventTarget.dispatchEvent}
@@ -118,7 +121,7 @@ export function makeEventTarget<C extends GenericConstructor | ObjectConstructor
         listenerMap: EventListenerMap<I>,
         type: K,
         listener: EventListener<I, K>,
-        options?: REventHandlerOptions
+        options: REventHandlerOptions
       ): EventListenerMap<I> {
         if (typeof type !== 'string') {
           return;
@@ -127,10 +130,7 @@ export function makeEventTarget<C extends GenericConstructor | ObjectConstructor
           listenerMap = {};
         }
         const l: EventListener<I, K> = listener;
-        const o: REventHandlerOptions = {
-          once: !!options?.once,
-          context: options?.context
-        };
+        const o: REventHandlerOptions = { ...options };
         let handlers = listenerMap[type];
         if (!handlers) {
           listenerMap[type] = handlers = [];
@@ -142,7 +142,8 @@ export function makeEventTarget<C extends GenericConstructor | ObjectConstructor
       _internalRemoveEventListener<K extends keyof I>(
         listenerMap: EventListenerMap<I>,
         type: K,
-        listener: EventListener<I, K>
+        listener: EventListener<I, K>,
+        context: unknown
       ): void {
         if (typeof type !== 'string' || !listenerMap) {
           return;
@@ -152,7 +153,7 @@ export function makeEventTarget<C extends GenericConstructor | ObjectConstructor
         if (handlers) {
           for (let i = 0; i < handlers.length; i++) {
             const handler = handlers[i];
-            if (handler.handler === l) {
+            if (handler.handler === l && handler.options.context === context) {
               handlers.splice(i, 1);
               break;
             }
