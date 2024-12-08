@@ -1,6 +1,7 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { ModalDialog } from './modal';
-import { eventBus } from '../eventbus';
+import { ModalDialog } from '../../components/modal';
+import { eventBus } from '../../core/eventbus';
+import { createScene } from '../../api/services/sceneservcie';
 
 export class DlgNewScene extends ModalDialog {
   private _sceneName: string;
@@ -14,8 +15,12 @@ export class DlgNewScene extends ModalDialog {
       this._sceneName = name[0];
     }
     if (ImGui.Button('确定')) {
-      this.close();
-      eventBus.dispatchEvent('action_doc_post_new', 'scene');
+      createScene(this._sceneName).then((value) => {
+        this.close();
+        if (value) {
+          eventBus.dispatchEvent('action_doc_post_new', 'scene', value.name, value.uuid);
+        }
+      });
     }
   }
 }

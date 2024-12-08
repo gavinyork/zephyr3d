@@ -1,11 +1,16 @@
 import path from 'path';
-import { STAT_API, STAT_HANDLERS } from './statistics';
+import { SCENE_API, SCENE_HANDLERS } from './scene';
+import { HOME_API, HOME_HANDLERS } from './home';
 
 export type ApiDefine = typeof API_DEFINE;
 export const API_DEFINE = [
   {
-    def: STAT_API,
-    handlers: STAT_HANDLERS
+    def: HOME_API,
+    handlers: HOME_HANDLERS
+  },
+  {
+    def: SCENE_API,
+    handlers: SCENE_HANDLERS
   }
 ];
 

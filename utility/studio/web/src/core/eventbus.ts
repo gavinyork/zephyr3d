@@ -1,9 +1,10 @@
 import { makeEventTarget } from '@zephyr3d/base';
-import type { DocumentType } from './ui/common';
+import type { DocumentType } from '../components/common';
 
 type EventBusEventMap = {
+  error: [msg: string];
   action_doc_request_new: [type: DocumentType];
-  action_doc_post_new: [type: DocumentType];
+  action_doc_post_new: [type: DocumentType, name: string, uuid: string];
   action_doc_request_close: [type: DocumentType];
   action_doc_post_close: [type: DocumentType];
 };

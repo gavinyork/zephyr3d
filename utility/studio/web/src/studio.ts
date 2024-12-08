@@ -1,5 +1,5 @@
 import { imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
-import { Frame } from './ui/frame';
+import { Frame } from './components/frame';
 
 export class Studio {
   private _frame: Frame;

@@ -51,9 +51,9 @@ export class StudioApp {
       next();
     });
 
-    app.use('/', express.static(path.join(__dirname, 'static')));
-
     support.RouteTool.loadRouters(app, apiconf.API_DEFINE);
+
+    app.use('/', express.static(path.join(__dirname, 'static')));
 
     app.use((req: express.Request, res: express.Response) => {
       res.sendStatus(404);

@@ -1,7 +1,7 @@
 import type { MenuBarOptions } from '@zephyr3d/inspector';
 import { MenubarView } from '@zephyr3d/inspector';
 import type { DocumentType } from './common';
-import { eventBus } from '../eventbus';
+import { eventBus } from '../core/eventbus';
 
 const fileMenus = [
   {
