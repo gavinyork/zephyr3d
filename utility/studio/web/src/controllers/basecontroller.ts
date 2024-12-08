@@ -1,10 +1,24 @@
 import { eventBus } from '../core/eventbus';
+import type { BaseView } from '../views/baseview';
 
-export class BaseController {
-  private static _activeController: BaseController = null;
+export class BaseController<Model, View extends BaseView<Model>> {
+  private static _activeController: BaseController<any, any> = null;
   private _name: string;
-  constructor(name: string) {
+  private _model: Model;
+  private _view: View;
+  constructor(name: string, model: Model, view: View) {
     this._name = name;
+    this._model = model;
+    this._view = view;
+  }
+  get model() {
+    return this._model;
+  }
+  get view() {
+    return this._view;
+  }
+  render() {
+    this._view.render(this._model);
   }
   activate() {
     if (BaseController._activeController !== this) {

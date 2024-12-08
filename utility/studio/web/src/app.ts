@@ -1,7 +1,7 @@
 import { Application } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { imGuiInit } from '@zephyr3d/imgui';
-import { Studio } from './studio';
+import { Editor } from './core/editor';
 
 const studioApp = new Application({
   backend: backendWebGL2,
@@ -11,7 +11,7 @@ const studioApp = new Application({
 studioApp.ready().then(async () => {
   const device = studioApp.device;
   await imGuiInit(device);
-  const studio = new Studio();
+  const studio = Editor.instance;
   studioApp.inputManager.use(studio.handleEvent.bind(studio));
 
   studioApp.on('resize', (width, height) => {
