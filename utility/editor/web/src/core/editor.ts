@@ -1,13 +1,20 @@
 import { imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { eventBus } from './eventbus';
-import type { BaseController } from '../controllers/basecontroller';
 import { ModalDialog } from '../components/modal';
+import { ModuleManager } from './module';
+import { EmptyView } from '../views/emptyview';
+import { EmptyController } from '../controllers/emptycontroller';
 
 export class Editor {
   private static _instance: Editor;
-  private _controller: BaseController<any, any>;
+  private _moduleManager: ModuleManager;
   private constructor() {
-    this._controller = null;
+    this._moduleManager = new ModuleManager();
+    this._moduleManager.register('Empty', null, EmptyView, EmptyController);
+    this._moduleManager.activate('Empty');
+    eventBus.on('switch_module', (name, ...args: any[]) => {
+      this._moduleManager.activate(name, ...args);
+    });
   }
   static get instance(): Editor {
     if (!this._instance) {
@@ -25,9 +32,10 @@ export class Editor {
     eventBus.dispatchEvent('update', dt);
   }
   render() {
-    if (this._controller) {
+    const module = this._moduleManager.currentModule;
+    if (module.view) {
       imGuiNewFrame();
-      this._controller.render();
+      module.view.render();
       ModalDialog.render();
       imGuiEndFrame();
     }

@@ -1,8 +1,8 @@
-import type { SceneModel } from '../../models/scenemodel';
-import { BaseView } from '../baseview';
+import { SceneModel } from '../../models/scenemodel';
+import { EmptyView } from '../emptyview';
 
-export class SceneView extends BaseView<SceneModel> {
-  render(model: SceneModel) {
-    // Not implemented
+export class SceneView extends EmptyView<SceneModel> {
+  render() {
+    super.render();
   }
 }

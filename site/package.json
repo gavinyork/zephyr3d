@@ -15,7 +15,7 @@
     "build:showcase": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c rollup.config.showcase.mjs --silent",
     "build:copy": "shx mkdir -p dist && shx cp -R web dist && npm run build:showcase",
     "build:web": "npm run build:copy && cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent && shx cp -R assets dist/web/tut",
-    "build": "shx rm -rf dist && shx rm -f .buildcache.json && shx rm -f .buildcache.tmp.json && npm run build:web && npm run build:doc",
+    "build:site": "shx rm -rf dist && shx rm -f .buildcache.json && shx rm -f .buildcache.tmp.json && npm run build:web && npm run build:doc",
     "lint": "eslint \"src/**/*.ts\" -f compact",
     "lint-fix": "eslint --fix \"src/**/*.ts\" -f compact",
     "serve": "web-dev-server --open dist/web/index.html"
