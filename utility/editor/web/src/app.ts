@@ -11,15 +11,15 @@ const studioApp = new Application({
 studioApp.ready().then(async () => {
   const device = studioApp.device;
   await imGuiInit(device);
-  const studio = Editor.instance;
-  studioApp.inputManager.use(studio.handleEvent.bind(studio));
+  const editor = Editor.instance;
+  studioApp.inputManager.use(editor.handleEvent.bind(editor));
 
   studioApp.on('resize', (width, height) => {
-    studio.resize(width, height);
+    editor.resize(width, height);
   });
   studioApp.on('tick', () => {
-    studio.update(device.frameInfo.elapsedFrame);
-    studio.render();
+    editor.update(device.frameInfo.elapsedFrame);
+    editor.render();
   });
   studioApp.run();
 });

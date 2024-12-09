@@ -424,10 +424,6 @@
     //   "tags": [ "tools" ]
     // }
     {
-      "packageName": "@zephyr3d/root",
-      "projectFolder": "/"
-    },
-    {
       "packageName": "@zephyr3d/base",
       "projectFolder": "libs/base",
       "shouldPublish": true
@@ -462,8 +458,8 @@
       "projectFolder": "libs/inspector"
     },
     {
-      "packageName": "@zephyr3d/studio",
-      "projectFolder": "utility/studio"
+      "packageName": "@zephyr3d/editor",
+      "projectFolder": "utility/editor"
     },
     {
       "packageName": "@zephyr3d/examples",

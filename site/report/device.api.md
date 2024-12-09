@@ -10,6 +10,7 @@ import { MaybeArray } from '@zephyr3d/base';
 import { TypedArray } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import { VectorBase } from '@zephyr3d/base';
+import * as _zephyr3d_base from '@zephyr3d/base';
 
 // @public
 export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
@@ -72,6 +73,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     getFrameBufferSampleCount(): number;
     getGPUObjectById(uid: number): GPUObject;
     getGPUObjects(): GPUObjectList;
+    getPool(key: string | Symbol): Pool;
     getProgram(): GPUProgram;
     getRenderStates(): RenderStateSet;
     getScale(): number;
@@ -85,6 +87,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     nextFrame(callback: () => void): number;
     // Warning: (ae-forgotten-export) The symbol "Pool" needs to be exported by the entry point index.d.ts
     pool: Pool;
+    poolExists(key: string | Symbol): boolean;
     popDeviceStates(): any;
     programBuilder: ProgramBuilder;
     pushDeviceStates(): any;
@@ -148,8 +151,10 @@ export interface BaseCreationOptions {
     dynamic?: boolean;
 }
 
+// Warning: (ae-forgotten-export) The symbol "BaseDevice_base" needs to be exported by the entry point index.d.ts
+//
 // @public
-export abstract class BaseDevice {
+export abstract class BaseDevice extends BaseDevice_base {
     constructor(cvs: HTMLCanvasElement, backend: DeviceBackend);
     // (undocumented)
     addGPUObject(obj: GPUObject): void;
@@ -250,6 +255,8 @@ export abstract class BaseDevice {
     // (undocumented)
     abstract createVertexLayout(options: VertexLayoutOptions): VertexLayout;
     // (undocumented)
+    protected _defaultPoolKey: Symbol;
+    // (undocumented)
     deviceToScreen(val: number): number;
     // (undocumented)
     disposeObject(obj: GPUObject, remove?: boolean): void;
@@ -311,6 +318,8 @@ export abstract class BaseDevice {
     // (undocumented)
     getGPUObjects(): GPUObjectList;
     // (undocumented)
+    getPool(key: string | Symbol): Pool;
+    // (undocumented)
     abstract getProgram(): GPUProgram;
     // (undocumented)
     abstract getRenderStates(): RenderStateSet;
@@ -355,7 +364,9 @@ export abstract class BaseDevice {
     // (undocumented)
     get pool(): Pool;
     // (undocumented)
-    protected _pool: Pool;
+    poolExists(key: string | Symbol): boolean;
+    // (undocumented)
+    protected _poolMap: Map<string | Symbol, Pool>;
     // (undocumented)
     popDeviceStates(): void;
     // (undocumented)
@@ -397,12 +408,7 @@ export abstract class BaseDevice {
     // (undocumented)
     setFramebuffer(rt: FrameBuffer): any;
     // (undocumented)
-    setFramebuffer(color: (BaseTexture | {
-        texture: BaseTexture;
-        miplevel?: number;
-        face?: number;
-        layer?: number;
-    })[], depth?: BaseTexture, sampleCount?: number): any;
+    setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number): any;
     // (undocumented)
     protected abstract _setFramebuffer(fb: FrameBuffer): any;
     // (undocumented)
@@ -646,76 +652,18 @@ export interface DeviceCaps {
 
 // @public
 export type DeviceEventMap = {
-    [DeviceResizeEvent.NAME]: DeviceResizeEvent;
-    [DeviceLostEvent.NAME]: DeviceLostEvent;
-    [DeviceRestoreEvent.NAME]: DeviceRestoreEvent;
-    [DeviceGPUObjectAddedEvent.NAME]: DeviceGPUObjectAddedEvent;
-    [DeviceGPUObjectRemovedEvent.NAME]: DeviceGPUObjectRemovedEvent;
-    [DeviceGPUObjectRenameEvent.NAME]: DeviceGPUObjectRenameEvent;
+    resize: [width: number, height: number];
+    devicelost: [];
+    devicerestored: [];
+    gpuobject_added: [obj: GPUObject];
+    gpuobject_removed: [obj: GPUObject];
+    gpuobject_rename: [obj: GPUObject, lastName: string];
 };
-
-// @public
-export class DeviceGPUObjectAddedEvent {
-    constructor(obj: GPUObject);
-    static readonly NAME: "gpuobject_added";
-    // (undocumented)
-    object: GPUObject;
-    // (undocumented)
-    type: "gpuobject_added";
-}
-
-// @public
-export class DeviceGPUObjectRemovedEvent {
-    constructor(obj: GPUObject);
-    static readonly NAME: 'gpuobject_removed';
-    // (undocumented)
-    object: GPUObject;
-    // (undocumented)
-    type: "gpuobject_removed";
-}
-
-// @public
-export class DeviceGPUObjectRenameEvent {
-    constructor(obj: GPUObject, lastName: string);
-    // (undocumented)
-    lastName: string;
-    static readonly NAME: 'gpuobject_rename';
-    // (undocumented)
-    object: GPUObject;
-    // (undocumented)
-    type: "gpuobject_rename";
-}
-
-// @public
-export class DeviceLostEvent {
-    static readonly NAME: "devicelost";
-    // (undocumented)
-    type: "devicelost";
-}
 
 // @public
 export interface DeviceOptions {
     dpr?: number;
     msaa?: boolean;
-}
-
-// @public
-export class DeviceResizeEvent {
-    constructor(width: number, height: number);
-    // (undocumented)
-    height: number;
-    static readonly NAME: "resize";
-    // (undocumented)
-    type: "resize";
-    // (undocumented)
-    width: number;
-}
-
-// @public
-export class DeviceRestoreEvent {
-    static readonly NAME: "devicerestored";
-    // (undocumented)
-    type: "devicerestored";
 }
 
 // @public
@@ -922,7 +870,7 @@ export interface GPUDataBuffer<T = unknown> extends GPUObject<T> {
 
 // @public
 export interface GPUObject<T = unknown> extends IEventTarget<{
-    disposed: null;
+    disposed: [];
 }> {
     // (undocumented)
     readonly cid: number;
@@ -1156,7 +1104,7 @@ export interface PBBuiltinScope {
     // (undocumented)
     readonly fragCoord: PBShaderExp;
     // (undocumented)
-    fragDepth: PBShaderExp;
+    fragDepth: PBShaderExp | number;
     // (undocumented)
     readonly frontFacing: PBShaderExp;
     // (undocumented)
@@ -1247,7 +1195,8 @@ export class PBInsideFunctionScope extends PBScope {
     $choice(condition: ExpValueNonArrayType, first: ExpValueNonArrayType, second: ExpValueNonArrayType): PBShaderExp;
     $continue(): void;
     $do(body: (this: PBDoWhileScope) => void): PBDoWhileScope;
-    $for(counter: PBShaderExp, init: number | PBShaderExp, end: number | PBShaderExp, body: (this: PBForScope) => void): void;
+    $for(counter: PBShaderExp, init: number | PBShaderExp, end: number | PBShaderExp, open?: boolean | ((this: PBForScope) => void), reverse?: boolean | ((this: PBForScope) => void), body?: (this: PBForScope) => void): void;
+    $getMainScope(): PBFunctionScope;
     $if(condition: ExpValueNonArrayType, body: (this: PBIfScope) => void): PBIfScope;
     $return(retval?: ExpValueType): void;
     $scope(body: (this: PBInsideFunctionScope) => void): PBInsideFunctionScope;

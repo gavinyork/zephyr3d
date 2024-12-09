@@ -92,14 +92,14 @@ export enum CubeFace {
 }
 
 // @public
-type EventListener_2<T extends EventMap, K extends keyof T> = (evt: T[K]) => void | Promise<void>;
+export function degree2radian(degree: number): number;
+
+// @public
+type EventListener_2<T extends EventMap, K extends keyof T> = (...args: T[K]) => void | Promise<void>;
 export { EventListener_2 as EventListener }
 
 // @public
-export type EventMap = Record<string, any>;
-
-// @public
-export type EventType<T extends EventMap> = T[keyof T];
+export type EventMap = Record<string, any[]>;
 
 // @public
 export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ? R : never;
@@ -146,6 +146,9 @@ export type GenericConstructor<T = {}> = {
 export function halfToFloat(val: number): number;
 
 // @public
+export function halton23(length: number): [number, number][];
+
+// @public
 export class HttpRequest {
     constructor();
     get crossOrigin(): string;
@@ -163,8 +166,8 @@ export class HttpRequest {
 
 // @public
 export interface IEventTarget<T extends EventMap = any> {
-    dispatchEvent(evt: T[keyof T], type?: string & keyof T): void;
-    off<K extends keyof T>(type: K, listener: EventListener_2<T, K>): void;
+    dispatchEvent<K extends keyof T>(type: K, ...args: T[K]): void;
+    off<K extends keyof T>(type: K, listener: EventListener_2<T, K>, context?: unknown): void;
     on<K extends keyof T>(type: K, listener: EventListener_2<T, K>, context?: unknown): void;
     once<K extends keyof T>(type: K, listener: EventListener_2<T, K>, context?: unknown): void;
 }
@@ -225,38 +228,14 @@ export class ListIterator<T = unknown> {
 // @public
 export function makeEventTarget<C extends GenericConstructor | ObjectConstructor>(cls: C): <X extends EventMap>() => {
     new (...args: any[]): {
-        _listeners: Partial<{
-            [type: string]: {
-                handler: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, any>;
-                options: REventHandlerOptions;
-                removed: boolean;
-            }[];
-        }>;
+        _listeners: EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>;
         on<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K>, context?: unknown): void;
         once<K_1 extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K_1, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K_1>, context?: unknown): void;
-        off<K_2 extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K_2, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K_2>): void;
-        dispatchEvent(evt: (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)[keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)], type?: string & keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)): void;
-        _internalAddEventListener<K_3 extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(listenerMap: Partial<{
-            [type: string]: {
-                handler: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, any>;
-                options: REventHandlerOptions;
-                removed: boolean;
-            }[];
-        }>, type: K_3, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K_3>, options?: REventHandlerOptions): Partial<{
-            [type: string]: {
-                handler: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, any>;
-                options: REventHandlerOptions;
-                removed: boolean;
-            }[];
-        }>;
-        _internalRemoveEventListener<K_4 extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(listenerMap: Partial<{
-            [type: string]: {
-                handler: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, any>;
-                options: REventHandlerOptions;
-                removed: boolean;
-            }[];
-        }>, type: K_4, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K_4>): void;
-        _invokeLocalListeners(evt: EventType<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>, type?: string): void;
+        off<K_2 extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K_2, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K_2>, context?: unknown): void;
+        dispatchEvent<K_3 extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K_3, ...args: (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)[K_3]): void;
+        _internalAddEventListener<K_4 extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(listenerMap: EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>, type: K_4, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K_4>, options: REventHandlerOptions): EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>;
+        _internalRemoveEventListener<K_5 extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(listenerMap: EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>, type: K_5, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K_5>, context: unknown): void;
+        _invokeLocalListeners<K_6 extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X), ...args: (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)[K_6]): void;
     };
 } & C;
 
@@ -644,11 +623,15 @@ export class Quaternion extends VectorBase {
 }
 
 // @public
+export function radian2degree(radian: number): number;
+
+// @public
 export class Ray {
     constructor(origin?: Vector3, directionNormalized?: Vector3);
     bboxIntersectionTest: (bbox: AABB) => boolean;
     bboxIntersectionTestEx: (bbox: AABB) => number | null;
     get direction(): Vector3;
+    intersectionTestSphere(radius: number): number[] | null;
     intersectionTestTriangle(v1: Vector3, v2: Vector3, v3: Vector3, cull: boolean): number | null;
     get origin(): Vector3;
     set(origin: Vector3, directionNormalized: Vector3): void;
@@ -664,8 +647,8 @@ export class RectsPacker {
 
 // @public
 export type REventHandlerOptions = {
-    once?: boolean;
-    context?: unknown;
+    once: boolean;
+    context: unknown;
 };
 
 // @public
@@ -892,6 +875,10 @@ export class VectorBase extends Float32Array {
 
 // @public
 export function weightedAverage<T>(weights: number[], values: T[], funcLerp: (a: T, b: T, w: number) => T): T;
+
+// Warnings were encountered during analysis:
+//
+// dist/index.d.ts:212:9 - (ae-forgotten-export) The symbol "EventListenerMap" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

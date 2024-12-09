@@ -20,6 +20,8 @@
   "scripts": {
     "clean": "shx rm -rf ./dist .tsbuildinfo",
     "tsc": "tsc -p . --noEmit",
+    "lint": "eslint \"src/**/*.ts\" -f compact",
+    "lint-fix": "eslint --fix \"src/**/*.ts\" -f compact",
     "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent"
   },
   "keywords": [
@@ -38,6 +40,14 @@
     "url": "https://github.com/gavinyork/zephyr3d/issues"
   },
   "devDependencies": {
+    "eslint": "^9.16.0",
+    "eslint-config-prettier": "^8.6.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "prettier": "^2.8.4",
+    "eslint-plugin-tsdoc": "^0.2.17",
+    "@typescript-eslint/parser": "^8.17.0",
+    "@typescript-eslint/eslint-plugin": "^8.17.0",
     "@babel/core": "^7.20.12",
     "@babel/preset-env": "^7.20.2",
     "@rollup/plugin-babel": "^6.0.3",

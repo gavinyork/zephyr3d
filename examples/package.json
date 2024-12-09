@@ -16,18 +16,20 @@
     "clean": "shx rm -rf dist .tsbuildinfo",
     "tsc": "tsc -p . --noEmit",
     "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent",
+    "lint": "eslint \"src/**/*.ts\" -f compact",
+    "lint-fix": "eslint --fix \"src/**/*.ts\" -f compact",
     "dev-test": "web-dev-server -r dist --open /"
   },
   "engines": {
     "node": ">=16.18.0"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^5.51.0",
-    "@typescript-eslint/parser": "^5.51.0",
     "@web/dev-server": "^0.1.35",
-    "eslint": "^8.33.0",
+    "@typescript-eslint/parser": "^8.17.0",
+    "@typescript-eslint/eslint-plugin": "^8.17.0",
+    "eslint": "^9.16.0",
     "eslint-config-prettier": "^8.6.0",
-    "eslint-plugin-import": "^2.27.5",
+    "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-prettier": "^4.2.1",
     "eslint-plugin-tsdoc": "^0.2.17",
     "@babel/core": "^7.20.12",
@@ -52,10 +54,8 @@
     "tslib": "^2.5.0"
   },
   "dependencies": {
-    "@types/colors": "^1.2.1",
     "@types/diff": "^5.0.2",
     "@webgpu/types": "^0.1.40",
-    "colors": "^1.4.0",
     "diff": "^5.0.0",
     "@zephyr3d/base": "workspace:*",
     "@zephyr3d/device": "workspace:*",

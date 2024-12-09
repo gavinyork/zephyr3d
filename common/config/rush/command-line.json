@@ -20,6 +20,22 @@
       "incremental": true
     },
     {
+      "name": "lint",
+      "commandKind": "bulk",
+      "summary": "Lint projects",
+      "enableParallelism": true,
+      "ignoreMissingScript": true,
+      "incremental": false
+    },
+    {
+      "name": "lint-fix",
+      "commandKind": "bulk",
+      "summary": "Lint and fix projects",
+      "enableParallelism": true,
+      "ignoreMissingScript": true,
+      "incremental": false
+    },
+    {
       "name": "tsc",
       "commandKind": "bulk",
       "summary": "tsc check compilation",
