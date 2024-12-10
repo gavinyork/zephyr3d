@@ -8,5 +8,13 @@ export abstract class BaseView<Model extends BaseModel> {
   get model() {
     return this._model;
   }
+  activate() {
+    this.onActivate();
+  }
+  deactivate() {
+    this.onDeactivate();
+  }
   abstract render();
+  protected onActivate() {}
+  protected onDeactivate() {}
 }

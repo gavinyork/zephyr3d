@@ -12,6 +12,7 @@ export type MenuBarOptions = {
   items: MenuItemOptions[];
 };
 
+let UID = 0;
 export class MenubarView extends makeEventTarget(Object)<{
   action: [id: string, item: MenuItemOptions];
 }>() {
@@ -19,12 +20,22 @@ export class MenubarView extends makeEventTarget(Object)<{
   private _options: MenuBarOptions;
   constructor(options?: MenuBarOptions) {
     super();
+    this._map = null;
+    this._options = null;
+    this.create(options);
+  }
+  get options() {
+    return this._options;
+  }
+  set options(options: MenuBarOptions) {
+    this.create(options);
+  }
+  private create(options: MenuBarOptions) {
     this._map = new Map();
-    this._options = { items: [] };
-    if (options?.items?.length > 0) {
-      // BFS iterate through the menu items and add them to the map and copy to _options
-      const queue: { item: MenuItemOptions; parent: MenuItemOptions }[] = options.items.map((item) => ({
-        item: this.copyItem(item),
+    this._options = { items: (options?.items ?? []).map(val => this.copyItem(val))};
+    if (this._options.items.length > 0) {
+      const queue: { item: MenuItemOptions; parent: MenuItemOptions }[] = this._options.items.map((item) => ({
+        item,
         parent: null
       }));
       while (queue.length > 0) {
@@ -38,7 +49,6 @@ export class MenubarView extends makeEventTarget(Object)<{
           queue.push({ item: subItem, parent: item.item });
         });
       }
-      this._options = options;
     }
   }
   addMenuItem(parentId: string, label: string, id: string): string {
@@ -101,17 +111,15 @@ export class MenubarView extends makeEventTarget(Object)<{
         ImGui.EndMenu();
       }
     } else {
-      if (ImGui.MenuItem(`${item.label}##${item.id}`, null, !!item.checked)) {
+      if (item.label === '-') {
+        ImGui.Separator();
+      } else if (ImGui.MenuItem(`${item.label}##${item.id}`, null, !!item.checked)) {
         this.dispatchEvent('action', item.id, item);
       }
     }
   }
   private uniqueId(): string {
-    let id = 0;
-    while (this._map.has(`id${id}`)) {
-      id++;
-    }
-    return `id${id}`;
+    return `id${++UID}`;
   }
   private copyItem(item: MenuItemOptions): MenuItemOptions {
     return {

@@ -7,6 +7,6 @@ export class EditorApiService {
     this._api = api;
   }
   async createScene(name: string): Promise<CreateSceneResponse> {
-    return this._api.post<CreateSceneResponse>('/scene', { name });
+    return this._api.post<CreateSceneResponse>('scene', { name });
   }
 }

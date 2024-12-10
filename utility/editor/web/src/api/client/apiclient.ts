@@ -23,7 +23,12 @@ export class ApiClient {
   }
   private async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
     const { params, timeout = this.config.timeout, ...fetchOptions } = options;
-    const url = new URL(endpoint, this._config.apiBaseUrl);
+    const baseUrl = this._config.apiBaseUrl.startsWith('http')
+      ? this._config.apiBaseUrl
+      : window.location.origin + this._config.apiBaseUrl;
+    const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+    const url = new URL(normalizedEndpoint, normalizedBaseUrl);
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         url.searchParams.append(key, value);

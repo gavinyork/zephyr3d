@@ -2,7 +2,7 @@ import { eventBus } from '../core/eventbus';
 import type { DocumentType } from './common';
 import { Menubar } from './menubar';
 import { ModalDialog } from './modal';
-import { DlgNewScene } from '../views/scene/newscenedlg';
+import { DlgNewScene } from '../views/dlg/newscenedlg';
 
 export class Frame {
   private _mainMenuBar: Menubar;

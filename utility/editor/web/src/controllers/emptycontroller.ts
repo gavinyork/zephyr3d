@@ -1,15 +1,16 @@
 import { eventBus } from '../core/eventbus';
 import type { DocumentType } from '../components/common';
-import { DlgNewScene } from '../views/scene/newscenedlg';
+import { DlgNewScene } from '../views/dlg/newscenedlg';
 import { BaseController } from './basecontroller';
 import { EditorApiService } from '../api/services/editorservice';
 import { ApiClient } from '../api/client/apiclient';
+import { BaseModel } from '../models/basemodel';
 
-export class EmptyController extends BaseController<null> {
+export class EmptyController<T extends BaseModel> extends BaseController<T> {
   private _editorservice: EditorApiService;
-  constructor(apiClient: ApiClient) {
-    super(null);
-    this._editorservice = new EditorApiService(apiClient);
+  constructor(model: T, apiClient: ApiClient) {
+    super(model, apiClient);
+    this._editorservice = new EditorApiService(this.apiClient);
   }
   protected onActivate(): void {
     eventBus.on('action_doc_request_new', this.requestNew, this);
@@ -31,7 +32,7 @@ export class EmptyController extends BaseController<null> {
   }
   requestNewScene(name: string) {
     this._editorservice.createScene(name).then((val) => {
-      eventBus.dispatchEvent('switch_module', val.name, val.uuid);
+      eventBus.dispatchEvent('switch_module', 'Scene', val.name, val.uuid);
     });
   }
 }

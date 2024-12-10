@@ -1,12 +1,14 @@
+import { ApiClient } from '../api/client/apiclient';
 import type { BaseController } from '../controllers/basecontroller';
 import type { BaseModel } from '../models/basemodel';
 import type { BaseView } from '../views/baseview';
 
 export type ClsModel = { new (...args: any[]): BaseModel };
 export type ClsView = { new (model: any, ...args: any[]): BaseView<any> };
-export type ClsController<T extends BaseModel> = { new (model: T, ...args: any[]): BaseController<T> };
+export type ClsController<T extends BaseModel> = { new (model: T, apiClient: ApiClient): BaseController<T> };
 
 export class ModuleManager {
+  private _apiClient: ApiClient;
   private _modules: Record<
     string,
     {
@@ -17,7 +19,8 @@ export class ModuleManager {
     }
   >;
   private _currentModule: string;
-  constructor() {
+  constructor(apiClient: ApiClient) {
+    this._apiClient = apiClient;
     this._modules = {};
     this._currentModule = '';
   }
@@ -33,7 +36,7 @@ export class ModuleManager {
     }
     const model = clsModel ? new clsModel() : null;
     const view = clsView ? new clsView(model) : null;
-    const controller = clsController ? new clsController(model) : null;
+    const controller = clsController ? new clsController(model, this._apiClient) : null;
     this._modules[name] = { name, model, view, controller };
   }
   activate(name: string, ...args: any[]) {
@@ -44,8 +47,10 @@ export class ModuleManager {
     const currentModule = this._modules[this._currentModule];
     if (currentModule) {
       currentModule.controller?.deactivate();
+      currentModule.view?.deactivate();
     }
     this._currentModule = name;
     module.controller?.activate(...args);
+    module.view?.activate();
   }
 }
