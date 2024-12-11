@@ -152,7 +152,7 @@ export class SceneNode extends makeEventTarget(Object)<{
     if (!!val !== this._placeToOctree) {
       this._placeToOctree = !!val;
       if (this.isGraphNode()) {
-        this.scene.invalidateNodePlacement(this);
+        this.scene?.invalidateNodePlacement(this);
       }
     }
   }
@@ -175,9 +175,9 @@ export class SceneNode extends makeEventTarget(Object)<{
   get scene(): Scene {
     return this._scene;
   }
-  /** true if the node is attached to the scene node, false otherwise */
+  /** true if the node is attached to a scene, false otherwise */
   get attached(): boolean {
-    return !!this._scene?.rootNode?.isParentOf(this);
+    return !!this._scene;
   }
   /**
    * Check if given node is a direct child of the node
@@ -375,7 +375,7 @@ export class SceneNode extends makeEventTarget(Object)<{
       this._visible = val;
       if (prevHidden !== this.hidden) {
         if (this.isGraphNode()) {
-          this._scene.invalidateNodePlacement(this);
+          this._scene?.invalidateNodePlacement(this);
         }
         let parent: SceneNode = this;
         while (parent) {
@@ -416,34 +416,39 @@ export class SceneNode extends makeEventTarget(Object)<{
     let lastParent = this._parent;
     let newParent = p;
     if (newParent !== lastParent) {
-      const sceneLast = this.attached ? this.scene : null;
-      const sceneNew = newParent?.attached ? newParent.scene : null;
+      const sceneLast = this.scene;
+      const sceneNew = newParent?.scene ?? null;
       const willDetach = sceneLast && sceneLast !== sceneNew;
       const willAttach = sceneNew && sceneLast !== sceneNew;
-      willDetach && this._willDetach(sceneNew);
+      willDetach && this._willDetach(sceneLast);
       willAttach && this._willAttach(sceneNew);
 
-      if (this._parent !== p) {
-        if (this._parent) {
-          this._parent._children.splice(this._parent._children.indexOf(this), 1);
-        }
-        this._parent = p;
-        if (this._parent) {
-          this._parent._children.push(this);
-        }
-        this._onTransformChanged(false);
+      if (this._parent) {
+        this._parent._children.splice(this._parent._children.indexOf(this), 1);
       }
+      this._parent = p;
+      if (this._parent) {
+        this._parent._children.push(this);
+      }
+      if (this._scene !== sceneNew) {
+        if (this._scene) {
+          this._onTransformChanged(false);
+        }
+        this._scene = sceneNew;
+      }
+      this._onTransformChanged(false);
 
-      willDetach && this._detached(sceneNew);
+      willDetach && this._detached(sceneLast);
       willAttach && this._attached(sceneNew);
-    }
-    while (lastParent) {
-      lastParent.dispatchEvent('noderemoved', this);
-      lastParent = lastParent.parent;
-    }
-    while (newParent) {
-      newParent.dispatchEvent('nodeattached', this);
-      newParent = newParent.parent;
+
+      while (lastParent) {
+        lastParent.dispatchEvent('noderemoved', this);
+        lastParent = lastParent.parent;
+      }
+      while (newParent) {
+        newParent.dispatchEvent('nodeattached', this);
+        newParent = newParent.parent;
+      }
     }
   }
   /** @internal */

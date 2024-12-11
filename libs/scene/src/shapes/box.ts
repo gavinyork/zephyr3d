@@ -44,6 +44,12 @@ export class BoxShape extends Shape<BoxCreationOptions> {
     super(options);
   }
   /**
+   * {@inheritDoc Shape.type}
+   */
+  get type(): string {
+    return 'Box';
+  }
+  /**
    * Generates the data for the box shape
    * @param vertices - vertex positions
    * @param normals - vertex normals
@@ -192,6 +198,12 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> {
    */
   constructor(options?: BoxCreationOptions) {
     super(options);
+  }
+  /**
+   * {@inheritDoc Shape.type}
+   */
+  get type(): string {
+    return 'BoxFrame';
   }
   /**
    * Generates the data for the box shape

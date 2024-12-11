@@ -37,6 +37,12 @@ export class SphereShape extends Shape<SphereCreationOptions> {
     super(options);
   }
   /**
+   * {@inheritDoc Shape.type}
+   */
+  get type(): string {
+    return 'Sphere';
+  }
+  /**
    * {@inheritDoc Primitive.raycast}
    * @override
    */

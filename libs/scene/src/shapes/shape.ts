@@ -33,6 +33,8 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     super();
     this._create(options);
   }
+  /** Get shape type */
+  abstract get type(): string;
   /**
    * Normalize options
    * @param options - creation options

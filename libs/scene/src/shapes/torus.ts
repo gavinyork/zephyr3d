@@ -59,6 +59,12 @@ export class TorusShape extends Shape<TorusCreationOptions> {
     super(options);
   }
   /**
+   * {@inheritDoc Shape.type}
+   */
+  get type(): string {
+    return 'Torus';
+  }
+  /**
    * Generates the data for the torus shape
    * @param vertices - vertex positions
    * @param normals - vertex normals

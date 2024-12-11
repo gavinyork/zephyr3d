@@ -50,6 +50,12 @@ export class PlaneShape extends Shape<PlaneCreationOptions> {
     super(options);
   }
   /**
+   * {@inheritDoc Shape.type}
+   */
+  get type(): string {
+    return 'Plane';
+  }
+  /**
    * Generates the data for the cylinder shape
    * @param vertices - vertex positions
    * @param normals - vertex normals

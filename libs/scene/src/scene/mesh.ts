@@ -143,7 +143,9 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
       }
       this._instanceHash =
         this._primitive && this._material
-          ? `${this.constructor.name}:${this._scene.id}:${this._primitive.id}:${this._material.instanceId}`
+          ? `${this.constructor.name}:${this._scene?.id ?? 0}:${this._primitive.id}:${
+              this._material.instanceId
+            }`
           : null;
       RenderBundleWrapper.drawableChanged(this);
     }

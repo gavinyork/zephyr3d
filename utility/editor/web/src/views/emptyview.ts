@@ -33,10 +33,12 @@ export class EmptyView<T extends BaseModel> extends BaseView<T> {
             },
             {
               label: 'Open',
+              shortCut: 'Ctrl+O',
               id: 'OPEN_DOC'
             },
             {
               label: 'Save',
+              shortCut: 'Ctrl+S',
               id: 'SAVE_DOC'
             },
             {
@@ -104,7 +106,7 @@ export class EmptyView<T extends BaseModel> extends BaseView<T> {
     this._menubar.off('action', this.handleFileMenu, this);
   }
   private handleFileMenu(action: string) {
-    switch(action) {
+    switch (action) {
       case 'NEW_SCENE':
         eventBus.dispatchEvent('action_doc_request_new', 'scene');
         break;

@@ -3,6 +3,7 @@ import { ImGui } from '@zephyr3d/imgui';
 
 export type MenuItemOptions = {
   label: string;
+  shortCut?: string;
   id?: string;
   checked?: boolean;
   subMenus?: MenuItemOptions[];
@@ -32,7 +33,7 @@ export class MenubarView extends makeEventTarget(Object)<{
   }
   private create(options: MenuBarOptions) {
     this._map = new Map();
-    this._options = { items: (options?.items ?? []).map(val => this.copyItem(val))};
+    this._options = { items: (options?.items ?? []).map((val) => this.copyItem(val)) };
     if (this._options.items.length > 0) {
       const queue: { item: MenuItemOptions; parent: MenuItemOptions }[] = this._options.items.map((item) => ({
         item,
@@ -51,14 +52,14 @@ export class MenubarView extends makeEventTarget(Object)<{
       }
     }
   }
-  addMenuItem(parentId: string, label: string, id: string): string {
+  addMenuItem(parentId: string, label: string, id: string, shortCut?: string): string {
     if (id === null || id === undefined) {
       id = this.uniqueId();
     }
     if (this._map.has(id)) {
       throw new Error(`Menu item with id ${id} already exists`);
     }
-    const newItem = { label, id };
+    const newItem = { label, id, shortCut };
     if (parentId === null) {
       this._options.items.push(newItem);
     } else {
@@ -113,7 +114,7 @@ export class MenubarView extends makeEventTarget(Object)<{
     } else {
       if (item.label === '-') {
         ImGui.Separator();
-      } else if (ImGui.MenuItem(`${item.label}##${item.id}`, null, !!item.checked)) {
+      } else if (ImGui.MenuItem(`${item.label}##${item.id}`, item.shortCut ?? null, !!item.checked)) {
         this.dispatchEvent('action', item.id, item);
       }
     }
@@ -125,6 +126,7 @@ export class MenubarView extends makeEventTarget(Object)<{
     return {
       label: item.label,
       id: item.id,
+      shortCut: item.shortCut,
       subMenus: item.subMenus?.map((subItem) => this.copyItem(subItem))
     };
   }

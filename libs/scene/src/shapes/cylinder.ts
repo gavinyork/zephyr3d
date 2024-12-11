@@ -43,6 +43,12 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
   constructor(options?: CylinderCreationOptions) {
     super(options);
   }
+  /**
+   * {@inheritDoc Shape.type}
+   */
+  get type(): string {
+    return 'Cylinder';
+  }
   /** @internal */
   private static addPatch(
     radialDetail: number,
