@@ -4,6 +4,7 @@ import { BaseModel } from '../models/basemodel';
 import { eventBus } from '../core/eventbus';
 import { MenubarView } from '../components/menubar';
 import { StatusBar } from '../components/statusbar';
+import { ICONS } from './icons';
 
 export class EmptyView<T extends BaseModel> extends BaseView<T> {
   private _menubar: MenubarView;
@@ -20,7 +21,7 @@ export class EmptyView<T extends BaseModel> extends BaseView<T> {
     this._menubar = new MenubarView({
       items: [
         {
-          label: 'File',
+          label: `${ICONS.AUDIO}${ICONS.CODE}${ICONS.COPY}${ICONS.CUBE}${ICONS.CUT}${ICONS.DELETE}File`,
           subMenus: [
             {
               label: 'New',

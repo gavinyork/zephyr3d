@@ -46,7 +46,11 @@ function getTargetWeb() {
       copy({
         targets: [
           {
-            src: `./web/index.html`,
+            src: './web/index.html',
+            dest: path.join(destdir, 'static')
+          },
+          {
+            src: './web/assets',
             dest: path.join(destdir, 'static')
           }
         ],

@@ -1,7 +1,6 @@
-import type { AbstractDevice, Texture2D } from '@zephyr3d/device';
+import type { AbstractDevice, AtlasInfo, Texture2D } from '@zephyr3d/device';
 import { GlyphManager, Font as DeviceFont } from '@zephyr3d/device';
 import { Renderer } from './renderer';
-import type { Font } from './font';
 import * as ImGui from './imgui';
 import * as Input from './input';
 import { Vector4 } from '@zephyr3d/base';
@@ -612,7 +611,12 @@ function toRgba(col:number):string
 }
 */
 
-export let dom_font: Font = null;
+const glyphFontMap: Record<number, DeviceFont> = {};
+
+/** @internal */
+export function addCustomGlyph(charCode: number, font: DeviceFont) {
+  glyphFontMap[charCode] = font;
+}
 
 async function font_update(io: ImGui.IO) {
   io.Fonts.Fonts.forEach((font) => {
@@ -624,7 +628,13 @@ async function font_update(io: ImGui.IO) {
     }
     let glyph = font.GlyphToCreate;
     while (glyph) {
-      const glyphInfo = glyphManager.getGlyphInfo(String.fromCharCode(glyph.Char), deviceFont);
+      const f = glyphFontMap[glyph.Char];
+      let glyphInfo: AtlasInfo;
+      if (f) {
+        glyphInfo = glyphManager.getGlyphInfo(String.fromCharCode(glyph.Char), f);
+      } else {
+        glyphInfo = glyphManager.getGlyphInfo(String.fromCharCode(glyph.Char), deviceFont);
+      }
       glyph.X0 = 0;
       glyph.X1 = glyphInfo.width;
       glyph.Y0 = 0;
@@ -812,10 +822,6 @@ export function DestroyFontsTexture(): void {
   const io = ImGui.GetIO();
   io.Fonts.TexID?.dispose();
   io.Fonts.TexID = null;
-  if (dom_font) {
-    dom_font.Destroy();
-    dom_font = null;
-  }
 }
 
 export function CreateDeviceObjects(): void {

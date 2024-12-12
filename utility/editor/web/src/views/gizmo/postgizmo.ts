@@ -229,6 +229,9 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       }
       PostGizmoRenderer._primitives[this._mode] = gizmoPrimitive;
     }
+    if (this._mode === 'select' && !this._node?.getWorldBoundingVolume()) {
+      gizmoPrimitive = null;
+    }
     if (gizmoPrimitive) {
       if (this._mode === 'select') {
         if (!PostGizmoRenderer._gizmoSelectProgram) {

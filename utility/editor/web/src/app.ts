@@ -12,6 +12,7 @@ studioApp.ready().then(async () => {
   const device = studioApp.device;
   await imGuiInit(device);
   const editor = Editor.instance;
+  await editor.loadEditorFonts();
   studioApp.inputManager.use(editor.handleEvent.bind(editor));
 
   studioApp.on('resize', (width, height) => {

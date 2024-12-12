@@ -1,4 +1,4 @@
-import type { AbstractDevice } from '@zephyr3d/device';
+import type { AbstractDevice, Font } from '@zephyr3d/device';
 import * as ImGui from './imgui';
 import * as ImGui_Impl from './imgui_impl';
 
@@ -72,4 +72,13 @@ export function imGuiInjectEvent(ev: Event, type?: string) {
   } else {
     return false;
   }
+}
+
+/**
+ * Set special text glyph font
+ * @param charCode - char code of glyph
+ * @param font - Web font
+ */
+export function imGuiSetFontGlyph(charCode: number, font: Font) {
+  ImGui_Impl.addCustomGlyph(charCode, font);
 }

@@ -1,4 +1,4 @@
-import { imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
+import { imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame, imGuiSetFontGlyph } from '@zephyr3d/imgui';
 import { eventBus } from './eventbus';
 import { ModalDialog } from '../components/modal';
 import { ModuleManager } from './module';
@@ -8,6 +8,9 @@ import { SceneView } from '../views/sceneview';
 import { SceneController } from '../controllers/scenecontroller';
 import { SceneModel } from '../models/scenemodel';
 import { ApiClient } from '../api/client/apiclient';
+import { Font } from '@zephyr3d/device';
+import { Application } from '@zephyr3d/scene';
+import { ICONS } from '../views/icons';
 
 export class Editor {
   private static _instance: Editor;
@@ -43,6 +46,20 @@ export class Editor {
   }
   update(dt: number) {
     eventBus.dispatchEvent('update', dt);
+  }
+  async loadEditorFonts() {
+    try {
+      const font = new FontFace('EditorIcon', 'url(assets/fonts/icons.woff2');
+      const loadedFont = await font.load();
+      document.fonts.add(loadedFont);
+    } catch (err) {
+      console.error(`Failed to load icon font: ${err}`);
+    }
+    const deviceFont = new Font('12px EditorIcon', Application.instance.device.getScale());
+    for (const k of Object.getOwnPropertyNames(ICONS)) {
+      const charCode = String(ICONS[k]).charCodeAt(0);
+      imGuiSetFontGlyph(charCode, deviceFont);
+    }
   }
   render() {
     const module = this._moduleManager.currentModule;
