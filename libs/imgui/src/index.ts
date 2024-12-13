@@ -8,6 +8,8 @@ import * as ImGui_Impl from './imgui_impl';
  */
 export { ImGui };
 
+let inFrame = false;
+
 /**
  * Initialize the ImGUI bindings
  *
@@ -36,10 +38,22 @@ export async function imGuiInit(device: AbstractDevice, fontFamily?: string, fon
 }
 
 /**
+ * Whether a frame is currently rendering
+ * @public
+ */
+export function imGuiInFrame(): boolean {
+  return inFrame;
+}
+
+/**
  * Starts a new frame
  * @public
  */
 export function imGuiNewFrame() {
+  if (inFrame) {
+    throw new Error('imGuiNewFrame() failed: alreay in a frame');
+  }
+  inFrame = true;
   ImGui_Impl.NewFrame(Date.now());
   ImGui.NewFrame();
 }
@@ -49,6 +63,10 @@ export function imGuiNewFrame() {
  * @public
  */
 export function imGuiEndFrame() {
+  if (!inFrame) {
+    throw new Error('imGuiEndFrame() failed: not in a frame');
+  }
+  inFrame = false;
   ImGui.EndFrame();
   ImGui.Render();
   ImGui_Impl.RenderDrawData(ImGui.GetDrawData());

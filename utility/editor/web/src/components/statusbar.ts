@@ -1,7 +1,11 @@
-import { ImGui } from "@zephyr3d/imgui";
-import { Application } from "@zephyr3d/scene";
+import { ImGui } from '@zephyr3d/imgui';
+import { Application } from '@zephyr3d/scene';
+import { getFrameHeight } from '../views/misc';
 
 export class StatusBar {
+  get height() {
+    return getFrameHeight();
+  }
   render() {
     if (ImGui.BeginStatusBar()) {
       ImGui.Text(`Device: ${Application.instance.device.type}`);

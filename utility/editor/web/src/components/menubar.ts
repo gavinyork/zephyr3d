@@ -1,5 +1,6 @@
 import { makeEventTarget } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
+import { getFrameHeight } from '../views/misc';
 
 export type MenuItemOptions = {
   label: string;
@@ -24,6 +25,9 @@ export class MenubarView extends makeEventTarget(Object)<{
     this._map = null;
     this._options = null;
     this.create(options);
+  }
+  get height() {
+    return getFrameHeight();
   }
   get options() {
     return this._options;

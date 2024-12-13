@@ -6,10 +6,13 @@ import { PropertyEditor } from '../components/grid';
 import { Tab } from '../components/tab';
 import { Camera, Compositor, Scene, SceneNode } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
+import { ToolBar } from '../components/toolbar';
+import { FontGlyph } from '../core/fontglyph';
 
 export class SceneView extends EmptyView<SceneModel> {
   private _postGizmoRenderer: PostGizmoRenderer;
   private _propGrid: PropertyEditor;
+  private _toolbar: ToolBar;
   private _tab: Tab;
   constructor(model: SceneModel) {
     super(model);
@@ -17,7 +20,31 @@ export class SceneView extends EmptyView<SceneModel> {
     this._postGizmoRenderer = new PostGizmoRenderer(this.model.camera, null);
     this._postGizmoRenderer.mode = 'select';
     this._propGrid = new PropertyEditor(300, 8, 600, 200, 0.4);
-    this._tab = new Tab(this.model.scene);
+    this._toolbar = new ToolBar(0, this.menubar.height, -1, 30, 8, 2, 0, 20);
+    this._toolbar.tools.push(
+      {
+        label: FontGlyph.glyphs['mouse-pointer'],
+        id: 'TOOL_SELECT'
+      },
+      {
+        label: FontGlyph.glyphs['move'],
+        id: 'TOOL_TRANSLATE'
+      },
+      {
+        label: FontGlyph.glyphs['arrows-cw'],
+        id: 'TOOL_ROTATE'
+      },
+      {
+        label: FontGlyph.glyphs['resize-vertical'],
+        id: 'TOOL_SCALE'
+      }
+    );
+    this._tab = new Tab(
+      this.model.scene,
+      true,
+      this.menubar.height + this._toolbar.height,
+      this.statusbar.height
+    );
     this.menubar.options = {
       items: [
         ...this.menubar.options.items,
@@ -98,6 +125,13 @@ export class SceneView extends EmptyView<SceneModel> {
     this.model.camera.render(this.model.scene, this.model.compositor);
     this._tab.render();
     this._propGrid.render();
+    this._toolbar.render();
+    /*
+    if (ImGui.Begin('FontTest')) {
+      ImGui.Text(FontGlyph.allGlyphs);
+    }
+    ImGui.End();
+    */
     super.render();
   }
   protected onActivate(): void {

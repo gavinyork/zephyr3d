@@ -3,8 +3,8 @@ import { ImGui } from '@zephyr3d/imgui';
 export class DockPannel {
   static _resizeId = 0;
   private _left: boolean;
-  private _topFrame: boolean;
-  private _bottomFrame: boolean;
+  private _top: number;
+  private _bottom: number;
   private _padding: number;
   private _width: number;
   private _minWidth: number;
@@ -14,16 +14,16 @@ export class DockPannel {
   private _buttonId: string;
   constructor(
     left: boolean,
-    topFrame: boolean,
-    bottomFrame: boolean,
+    top: number,
+    bottom: number,
     padding: number,
     width: number,
     minWidth: number,
     maxWidth: number
   ) {
     this._left = left;
-    this._topFrame = topFrame;
-    this._bottomFrame = bottomFrame;
+    this._top = top;
+    this._bottom = bottom;
     this._padding = padding;
     this._width = width;
     this._minWidth = minWidth;
@@ -38,17 +38,17 @@ export class DockPannel {
   set left(val) {
     this._left = val;
   }
-  get topFrame() {
-    return this._topFrame;
+  get top() {
+    return this._top;
   }
-  set topFrame(val) {
-    this._topFrame = val;
+  set top(val) {
+    this._top = val;
   }
-  get bottomFrame() {
-    return this._bottomFrame;
+  get bottom() {
+    return this._bottom;
   }
-  set bottomFrame(val) {
-    this._bottomFrame = val;
+  set bottom(val) {
+    this._bottom = val;
   }
   get width() {
     return this._width;
@@ -70,8 +70,8 @@ export class DockPannel {
   }
   begin(id: string) {
     const displaySize = ImGui.GetIO().DisplaySize;
-    const frameHeightTop = this._topFrame ? ImGui.GetFrameHeight() : 0;
-    const frameHeightBottom = this._bottomFrame ? ImGui.GetFrameHeight() : 0;
+    const frameHeightTop = this._top;
+    const frameHeightBottom = this._bottom;
     const windowPos = this._left
       ? new ImGui.ImVec2(0, frameHeightTop)
       : new ImGui.ImVec2(displaySize.x - this._width, frameHeightTop);

@@ -6,9 +6,9 @@ import type { Scene } from '@zephyr3d/scene';
 export class Tab {
   private _panel: DockPannel;
   private _sceneHierarchy: SceneHierarchy;
-  constructor(scene: Scene) {
+  constructor(scene: Scene, left: boolean, top: number, bottom: number) {
     this._sceneHierarchy = new SceneHierarchy(scene);
-    this._panel = new DockPannel(true, true, true, 8, 300, 200, 600);
+    this._panel = new DockPannel(left, top, bottom, 8, 300, 200, 600);
   }
   get width() {
     return this._panel.width;
