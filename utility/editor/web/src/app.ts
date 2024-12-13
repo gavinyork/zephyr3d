@@ -12,7 +12,8 @@ studioApp.ready().then(async () => {
   const device = studioApp.device;
   await imGuiInit(device);
   const editor = Editor.instance;
-  await editor.loadEditorFonts();
+  await editor.loadEditorFonts('zef-12px');
+  editor.registerModules();
   studioApp.inputManager.use(editor.handleEvent.bind(editor));
 
   studioApp.on('resize', (width, height) => {

@@ -7,7 +7,7 @@ interface RequestOptions extends RequestInit {
   timeout?: number;
 }
 
-interface RequestData<T> {
+interface RequestData<T = null> {
   code: number;
   message: string;
   data: T;
@@ -21,11 +21,11 @@ export class ApiClient {
   get config() {
     return this._config;
   }
-  private async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+  private async request(endpoint: string, baseUrl: string, options: RequestOptions = {}): Promise<Response> {
     const { params, timeout = this.config.timeout, ...fetchOptions } = options;
-    const baseUrl = this._config.apiBaseUrl.startsWith('http')
-      ? this._config.apiBaseUrl
-      : window.location.origin + this._config.apiBaseUrl;
+    baseUrl = baseUrl.startsWith('http')
+      ? baseUrl
+      : window.location.origin + baseUrl;
     const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
     const url = new URL(normalizedEndpoint, normalizedBaseUrl);
@@ -56,12 +56,7 @@ export class ApiClient {
       if (!response.ok) {
         await this.handleHttpError(response);
       }
-      const data: RequestData<T> = await response.json();
-      if (!data || data.code !== 0) {
-        this.handleRequestError(data);
-        return null;
-      }
-      return data.data;
+      return response;
     } catch (error) {
       clearTimeout(timeoutId);
       this.handleNetworkError(error);
@@ -101,48 +96,66 @@ export class ApiClient {
       eventBus.dispatchEvent('error', `Request failed: ${error}`);
     }
   }
-  async get<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-    return this.request<T>(endpoint, {
+  async asset(endpoint: string, type: 'json'|'text'|'blob'|'arraybuffer', options: RequestOptions = {}) {
+    const res = await this.request(endpoint, this._config.assetBaseUrl, {
       ...options,
       method: 'GET'
     });
+    switch (type) {
+      case 'json':
+        return res.json();
+      case 'text':
+        return res.text();
+      case 'blob':
+        return res.blob();
+      case 'arraybuffer':
+        return res.arrayBuffer();
+      default:
+        throw new Error(`Unsupported response type: ${type}`);
+    }
+  }
+  async get<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+    const res = await this.request(endpoint, this._config.apiBaseUrl, {
+      ...options,
+      method: 'GET'
+    });
+    const data: RequestData<T> = await res.json();
+    if (!data || data.code !== 0) {
+      this.handleRequestError(data);
+      return null;
+    }
+    return data.data;
   }
 
-  async post<T>(endpoint: string, data?: any, options: RequestOptions = {}): Promise<T> {
-    return this.request<T>(endpoint, {
+  async post<T>(endpoint: string, body?: any, options: RequestOptions = {}): Promise<T> {
+    const res = await this.request(endpoint, this._config.apiBaseUrl, {
       ...options,
       method: 'POST',
-      body: data ? JSON.stringify(data) : undefined
+      body: body ? JSON.stringify(body) : undefined
     });
+    const data: RequestData<T> = await res.json();
+    if (!data || data.code !== 0) {
+      this.handleRequestError(data);
+      return null;
+    }
+    return data.data;
   }
 
-  async put<T>(endpoint: string, data?: any, options: RequestOptions = {}): Promise<T> {
-    return this.request<T>(endpoint, {
-      ...options,
-      method: 'PUT',
-      body: data ? JSON.stringify(data) : undefined
-    });
-  }
-
-  async delete<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-    return this.request<T>(endpoint, {
-      ...options,
-      method: 'DELETE'
-    });
-  }
-
-  // 用于上传文件的专用方法
-  async uploadFile<T>(endpoint: string, file: File, onProgress?: (progress: number) => void): Promise<T> {
+  async uploadFile<T>(endpoint: string, file: File) {
     const formData = new FormData();
     formData.append('file', file);
-
-    return this.request<T>(endpoint, {
+    const res = await this.request(endpoint, this._config.apiBaseUrl, {
       method: 'POST',
       body: formData,
-      // 不设置 Content-Type，让浏览器自动设置
       headers: {
         Accept: 'application/json'
       }
     });
+    const data: RequestData<T> = await res.json();
+    if (!data || data.code !== 0) {
+      this.handleRequestError(data);
+      return null;
+    }
+    return data.data;
   }
 }
