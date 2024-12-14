@@ -18,7 +18,7 @@ import {
 } from '@zephyr3d/scene';
 import { createTranslationGizmo, createRotationGizmo, createScaleGizmo, createSelectGizmo } from './gizmo';
 import type { Ray } from '@zephyr3d/base';
-import { AABB } from '@zephyr3d/base';
+import { AABB, makeEventTarget } from '@zephyr3d/base';
 import { Matrix4x4, Quaternion, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 
 const tmpVecT = new Vector3();
@@ -73,7 +73,14 @@ type ScaleInfo = {
  * The post water effect
  * @public
  */
-export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
+export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostGizmoRenderer'>)<{
+  begin_translate: [node: SceneNode];
+  end_translate: [node: SceneNode];
+  begin_rotate: [node: SceneNode];
+  end_rotate: [node: SceneNode];
+  begin_scale: [node: SceneNode];
+  end_scale: [node: SceneNode];
+}>() {
   static readonly className = 'PostGizmoRenderer' as const;
   static _blendBlitter: CopyBlitter = new CopyBlitter();
   static _gizmoProgram: GPUProgram = null;
@@ -478,6 +485,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       axis,
       speed: this._measureRotateSpeed()
     };
+    this.dispatchEvent('begin_rotate', this._node);
   }
   private _updateRotate(x: number, y: number) {
     if (!this._rotateInfo) {
@@ -527,6 +535,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   private _endRotate() {
     Application.instance.device.canvas.style.cursor = 'default';
     this._rotateInfo = null;
+    this._node && this.dispatchEvent('end_rotate', this._node);
   }
   private _beginScale(startX: number, startY: number, axis: number, startPosition: number) {
     this._endRotate();
@@ -541,6 +550,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       startPosition,
       bindingPosition: this._node ? new Vector3(this._node.position) : Vector3.zero()
     };
+    this.dispatchEvent('begin_scale', this._node);
   }
   private _updateScale(x: number, y: number) {
     if (!this._scaleInfo) {
@@ -611,6 +621,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   private _endScale() {
     Application.instance.device.canvas.style.cursor = 'default';
     this._scaleInfo = null;
+    this._node && this.dispatchEvent('end_scale', this._node);
   }
   private _beginTranslate(startX: number, startY: number, axis: number, type: HitType, pointLocal: Vector3) {
     this._endRotate();
@@ -642,6 +653,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       type,
       lastPlanePos: pointLocal.mulBy(scale)
     };
+    this.dispatchEvent('begin_translate', this._node);
   }
   private _updateTranslation(x: number, y: number) {
     if (!this._translatePlaneInfo) {
@@ -675,6 +687,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   private _endTranslation() {
     Application.instance.device.canvas.style.cursor = 'default';
     this._translatePlaneInfo = null;
+    this._node && this.dispatchEvent('end_translate', this._node);
   }
   private _measureRotateSpeed() {
     const pos1 = new Vector4(0, 0, this._axisLength, 1);

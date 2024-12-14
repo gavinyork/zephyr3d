@@ -1,12 +1,13 @@
-import { BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '@zephyr3d/scene';
+import { BoxShape, CylinderShape, PlaneShape, SceneNode, SphereShape, TorusShape } from '@zephyr3d/scene';
 import type { ApiClient } from '../api/client/apiclient';
 import { SceneApiService } from '../api/services/sceneservcie';
-import { AddShapeCommand } from '../commands/scenecommands';
+import { AddShapeCommand, NodeTransformCommand } from '../commands/scenecommands';
 import { CommandManager } from '../core/command';
 import { eventBus } from '../core/eventbus';
 import type { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
 import type { SceneView } from '../views/sceneview';
+import type { TRS } from '../types';
 
 export class SceneController extends BaseController<SceneModel> {
   protected _api: SceneApiService;
@@ -24,10 +25,15 @@ export class SceneController extends BaseController<SceneModel> {
   protected onActivate(name: string, uuid: string): void {
     eventBus.on('update', this.update, this);
     eventBus.on('action', this.sceneAction, this);
+    eventBus.on('node_transform', this.nodeTransform, this);
   }
   protected onDeactivate(): void {
     eventBus.off('update', this.update, this);
     eventBus.off('action', this.sceneAction, this);
+    eventBus.off('node_transform', this.nodeTransform, this);
+  }
+  private nodeTransform(node: SceneNode, oldTransform: TRS, newTransform: TRS) {
+    this._cmdManager.execute(new NodeTransformCommand(node, oldTransform, newTransform));
   }
   private sceneAction(action: string) {
     switch (action) {

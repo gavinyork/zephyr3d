@@ -7,7 +7,7 @@ import { copyTexture, fetchSampler } from '../utility/misc';
  * Base class for any type of post effect
  * @public
  */
-export abstract class AbstractPostEffect<ClassName extends string> {
+export class AbstractPostEffect<ClassName extends string> {
   static readonly className: string;
   private static _defaultRenderStates: { CompareFunc?: RenderStateSet } = {};
   protected _outputTexture: Texture2D;
@@ -53,12 +53,16 @@ export abstract class AbstractPostEffect<ClassName extends string> {
    * Checks whether this post effect requires the linear depth texture
    * @returns true if the linear depth texture is required.
    */
-  abstract requireLinearDepthTexture(ctx: DrawContext): boolean;
+  requireLinearDepthTexture(ctx: DrawContext): boolean {
+    return false;
+  }
   /**
    * Checks whether this post effect requires the scene depth buffer
    * @returns true if the scene depth buffer is required.
    */
-  abstract requireDepthAttachment(ctx: DrawContext): boolean;
+  requireDepthAttachment(ctx: DrawContext): boolean {
+    return false;
+  }
   /**
    * Apply the post effect
    * @param camera - Camera used the render the scene
@@ -69,12 +73,14 @@ export abstract class AbstractPostEffect<ClassName extends string> {
    * @remarks
    * The frame buffer of the post effect is already set when apply() is called.
    */
-  abstract apply(
+  apply(
     ctx: DrawContext,
     inputColorTexture: Texture2D,
     sceneDepthTexture: Texture2D,
     srgbOutput: boolean
-  ): void;
+  ): void {
+    this.passThrough(ctx, inputColorTexture, srgbOutput);
+  }
   /**
    *
    * @param ctx - Draw context

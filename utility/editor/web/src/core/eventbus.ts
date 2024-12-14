@@ -1,5 +1,7 @@
 import { makeEventTarget } from '@zephyr3d/base';
 import type { DocumentType } from '../components/common';
+import type { SceneNode } from '@zephyr3d/scene';
+import type { TRS } from '../types';
 
 type EventBusEventMap = {
   error: [msg: string];
@@ -15,6 +17,7 @@ type EventBusEventMap = {
   action_doc_request_close: [];
   action_doc_post_close: [];
   action_doc_request_new_scene: [name: string];
+  node_transform: [node: SceneNode, oldTransform: TRS, newTransform: TRS];
 };
 
 export class EventBus extends makeEventTarget(Object)<EventBusEventMap>() {}

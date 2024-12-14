@@ -1,6 +1,14 @@
-import { Mesh, PBRMetallicRoughnessMaterial, Scene, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
+import {
+  Mesh,
+  PBRMetallicRoughnessMaterial,
+  Scene,
+  SceneNode,
+  ShapeOptionType,
+  ShapeType
+} from '@zephyr3d/scene';
 import { Command } from '../core/command';
 import { GenericConstructor } from '@zephyr3d/base';
+import { TRS } from '../types';
 
 export class AddShapeCommand<T extends ShapeType> implements Command {
   private _mesh: Mesh;
@@ -22,5 +30,22 @@ export class AddShapeCommand<T extends ShapeType> implements Command {
     this._mesh.parent = null;
     this._mesh.primitive.dispose();
     this._mesh.dispose();
+  }
+}
+
+export class NodeTransformCommand implements Command {
+  constructor(private node: SceneNode, private oldTransform: TRS, private newTransform: TRS) {}
+  get desc(): string {
+    return 'Node transform';
+  }
+  execute() {
+    this.node.position = this.newTransform.position;
+    this.node.rotation = this.newTransform.rotation;
+    this.node.scale = this.newTransform.scale;
+  }
+  undo() {
+    this.node.position = this.oldTransform.position;
+    this.node.rotation = this.oldTransform.rotation;
+    this.node.scale = this.oldTransform.scale;
   }
 }

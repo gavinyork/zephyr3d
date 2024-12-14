@@ -8,16 +8,21 @@ import { Camera, Compositor, Scene, SceneNode } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
-import { Matrix4x4 } from '@zephyr3d/base';
+import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import { SceneNodeProps } from '../components/nodeprop';
+import { TRS } from '../types';
 
 export class SceneView extends EmptyView<SceneModel> {
   private _postGizmoRenderer: PostGizmoRenderer;
   private _propGrid: PropertyEditor;
   private _toolbar: ToolBar;
   private _tab: Tab;
+  private _transformNode: SceneNode;
+  private _oldTransform: TRS;
   constructor(model: SceneModel) {
     super(model);
+    this._transformNode = null;
+    this._oldTransform = null;
     this.drawBackground = false;
     this._propGrid = new PropertyEditor(300, 8, 600, 200, 0.4);
     this._toolbar = new ToolBar(
@@ -48,6 +53,11 @@ export class SceneView extends EmptyView<SceneModel> {
         },
         {
           label: '-'
+        },
+        {
+          label: FontGlyph.glyphs['ccw'],
+          id: 'UNDO',
+          tooltip: 'Undo last change'
         }
       ],
       0,
@@ -112,12 +122,10 @@ export class SceneView extends EmptyView<SceneModel> {
     this._tab.render();
     this._propGrid.render();
     this._toolbar.render();
-    /*
     if (ImGui.Begin('FontTest')) {
       ImGui.Text(FontGlyph.allGlyphs);
     }
     ImGui.End();
-    */
     super.render();
   }
   handleEvent(ev: Event, type?: string): boolean {
@@ -136,6 +144,12 @@ export class SceneView extends EmptyView<SceneModel> {
     this.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
     this.model.scene.on('startrender', this.handleStartRender, this);
     this.model.scene.on('endrender', this.handleEndRender, this);
+    this._postGizmoRenderer.on('begin_translate', this.handleBeginTransformNode, this);
+    this._postGizmoRenderer.on('begin_rotate', this.handleBeginTransformNode, this);
+    this._postGizmoRenderer.on('begin_scale', this.handleBeginTransformNode, this);
+    this._postGizmoRenderer.on('end_translate', this.handleEndTransformNode, this);
+    this._postGizmoRenderer.on('end_rotate', this.handleEndTransformNode, this);
+    this._postGizmoRenderer.on('end_scale', this.handleEndTransformNode, this);
   }
   protected onDeactivate(): void {
     super.onDeactivate();
@@ -147,6 +161,12 @@ export class SceneView extends EmptyView<SceneModel> {
     this.model.scene.rootNode.off('noderemoved', this.handleNodeRemoved, this);
     this.model.scene.off('startrender', this.handleStartRender, this);
     this.model.scene.off('endrender', this.handleEndRender, this);
+    this._postGizmoRenderer.off('begin_translate', this.handleBeginTransformNode, this);
+    this._postGizmoRenderer.off('begin_rotate', this.handleBeginTransformNode, this);
+    this._postGizmoRenderer.off('begin_scale', this.handleBeginTransformNode, this);
+    this._postGizmoRenderer.off('end_translate', this.handleEndTransformNode, this);
+    this._postGizmoRenderer.off('end_rotate', this.handleEndTransformNode, this);
+    this._postGizmoRenderer.off('end_scale', this.handleEndTransformNode, this);
   }
   private handleNodeSelected(node: SceneNode) {
     this._postGizmoRenderer.node = node;
@@ -173,6 +193,25 @@ export class SceneView extends EmptyView<SceneModel> {
   private handleNodeRemoved(node: SceneNode) {
     if (this._postGizmoRenderer.node === node) {
       this._postGizmoRenderer.node = null;
+    }
+  }
+  private handleBeginTransformNode(node: SceneNode) {
+    this._transformNode = node;
+    this._oldTransform = {
+      position: new Vector3(node.position),
+      rotation: new Quaternion(node.rotation),
+      scale: new Vector3(node.scale)
+    };
+  }
+  private handleEndTransformNode(node: SceneNode) {
+    if (node && node === this._transformNode) {
+      eventBus.dispatchEvent('node_transform', node, this._oldTransform, {
+        position: node.position,
+        rotation: node.rotation,
+        scale: node.scale
+      });
+      this._oldTransform = null;
+      this._transformNode = null;
     }
   }
   private handleSceneAction(action: string) {
