@@ -4,19 +4,22 @@ import { SceneApiService } from '../api/services/sceneservcie';
 import { AddShapeCommand } from '../commands/scenecommands';
 import { CommandManager } from '../core/command';
 import { eventBus } from '../core/eventbus';
-import { SceneModel } from '../models/scenemodel';
+import type { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
+import type { SceneView } from '../views/sceneview';
 
 export class SceneController extends BaseController<SceneModel> {
   protected _api: SceneApiService;
+  protected _view: SceneView;
   protected _cmdManager: CommandManager;
-  constructor(model: SceneModel, apiClient: ApiClient) {
+  constructor(model: SceneModel, view: SceneView, apiClient: ApiClient) {
     super(model, apiClient);
+    this._view = view;
     this._api = new SceneApiService(this.apiClient);
     this._cmdManager = new CommandManager();
   }
   handleEvent(ev: Event, type?: string): boolean {
-    return this.model.camera.handleEvent(ev, type);
+    return this._view.handleEvent(ev, type);
   }
   protected onActivate(name: string, uuid: string): void {
     eventBus.on('update', this.update, this);

@@ -617,7 +617,7 @@ export class Octree {
     const px = Math.floor((center.x + this._rootSize * 0.5) * inv_node_size);
     const py = Math.floor((center.y + this._rootSize * 0.5) * inv_node_size);
     const pz = Math.floor((center.z + this._rootSize * 0.5) * inv_node_size);
-    if (px >= dim || py >= dim || pz >= dim) {
+    if (px >= dim || px < 0 || py >= dim || py < 0 || pz >= dim || pz < 0) {
       return null;
     }
     const index = px + py * dim + pz * dim * dim;

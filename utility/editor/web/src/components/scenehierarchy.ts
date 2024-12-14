@@ -34,6 +34,15 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   render() {
     this.renderSceneNode(this._scene.rootNode);
   }
+  selectNode(node: SceneNode) {
+    if (this._selectedNode !== node) {
+      if (this._selectedNode) {
+        this.dispatchEvent('node_deselected', this._selectedNode);
+      }
+      this._selectedNode = node;
+      this.dispatchEvent('node_selected', this._selectedNode);
+    }
+  }
   private renderSceneNode(node: SceneNode) {
     const cls = SceneHierarchy.classInfo.get(node.constructor) ?? SceneHierarchy.classInfo.get(SceneNode);
     const label = `${node.name || cls.classname}##${node.id}`;
@@ -46,13 +55,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     }
     const isOpen = ImGui.TreeNodeEx(label, flags);
     if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
-      if (this._selectedNode !== node) {
-        if (this._selectedNode) {
-          this.dispatchEvent('node_deselected', this._selectedNode);
-        }
-        this._selectedNode = node;
-        this.dispatchEvent('node_selected', this._selectedNode);
-      }
+      this.selectNode(node);
     }
     if (ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
       ImGui.OpenPopup(`context_${node.id}`);

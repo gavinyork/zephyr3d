@@ -324,8 +324,11 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       this._endScale();
       return false;
     }
-    const x = ev.offsetX;
-    const y = ev.offsetY;
+    const vp = this._camera.viewport;
+    const vp_x = vp ? vp[0] : 0;
+    const vp_y = vp ? Application.instance.device.canvas.clientHeight - vp[1] - vp[3] : 0;
+    const x = ev.offsetX - vp_x;
+    const y = ev.offsetY - vp_y;
     if (this._mode === 'rotation' || this._mode === 'scaling' || this._mode === 'translation') {
       if (ev.type === 'pointerdown') {
         const ray = this._camera.constructRay(x, y);

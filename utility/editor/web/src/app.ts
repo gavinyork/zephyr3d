@@ -16,6 +16,10 @@ studioApp.ready().then(async () => {
   editor.registerModules();
   studioApp.inputManager.use(editor.handleEvent.bind(editor));
 
+  document.addEventListener('contextmenu', function (e) {
+    e.preventDefault();
+  });
+
   studioApp.on('resize', (width, height) => {
     editor.resize(width, height);
   });

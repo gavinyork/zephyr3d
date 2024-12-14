@@ -1,4 +1,4 @@
-import { imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame, imGuiSetFontGlyph } from '@zephyr3d/imgui';
+import { imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { eventBus } from './eventbus';
 import { ModalDialog } from '../components/modal';
 import { ModuleManager } from './module';
@@ -16,7 +16,7 @@ export class Editor {
   private _apiClient: ApiClient;
   private constructor() {
     this._apiClient = new ApiClient();
-    this._moduleManager = new ModuleManager(this._apiClient);
+    this._moduleManager = new ModuleManager();
   }
   static get instance(): Editor {
     if (!this._instance) {
@@ -43,8 +43,15 @@ export class Editor {
     await FontGlyph.loadFontGlyphs(this._apiClient, name);
   }
   registerModules() {
-    this._moduleManager.register('Empty', null, EmptyView, EmptyController);
-    this._moduleManager.register('Scene', SceneModel, SceneView, SceneController);
+    const emptyView = new EmptyView(null);
+    const emptyController = new EmptyController(null, this._apiClient);
+    this._moduleManager.register('Empty', null, emptyView, emptyController);
+
+    const sceneModel = new SceneModel();
+    const sceneView = new SceneView(sceneModel);
+    const sceneController = new SceneController(sceneModel, sceneView, this._apiClient);
+    this._moduleManager.register('Scene', sceneModel, sceneView, sceneController);
+
     this._moduleManager.activate('Empty');
     eventBus.on('switch_module', (name, ...args: any[]) => {
       this._moduleManager.activate(name, ...args);

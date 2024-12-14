@@ -80,6 +80,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   static _gizmoSelectProgram: GPUProgram = null;
   static _gridProgram: GPUProgram = null;
   static _gizmoRenderState: RenderStateSet = null;
+  static _gridRenderState: RenderStateSet = null;
   static _blendRenderState: RenderStateSet = null;
   static _primitives: Partial<Record<GizmoMode, Primitive>> = {};
   static _gridPrimitive: Primitive = null;
@@ -194,6 +195,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     let gridPrimitive: Primitive = null;
     let gridProgram: GPUProgram = null;
     let gridBindGroup: BindGroup = null;
+    let gridRenderState: RenderStateSet = null;
     let gizmoRenderState: RenderStateSet = null;
     if (this._drawGrid) {
       if (!PostGizmoRenderer._gridPrimitive) {
@@ -204,6 +206,10 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
         PostGizmoRenderer._gridProgram = this._createGridProgram(ctx);
       }
       gridProgram = PostGizmoRenderer._gridProgram;
+      if (!PostGizmoRenderer._gridRenderState) {
+        PostGizmoRenderer._gridRenderState = this._createGridRenderStates(ctx);
+      }
+      gridRenderState = PostGizmoRenderer._gridRenderState;
       if (!this._gridBindGroup) {
         this._gridBindGroup = ctx.device.createBindGroup(gridProgram.bindGroupLayouts[0]);
       }
@@ -229,7 +235,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       }
       PostGizmoRenderer._primitives[this._mode] = gizmoPrimitive;
     }
-    if (this._mode === 'select' && !this._node?.getWorldBoundingVolume()) {
+    if (!this._node || (this._mode === 'select' && !this._node.getWorldBoundingVolume())) {
       gizmoPrimitive = null;
     }
     if (gizmoPrimitive) {
@@ -253,7 +259,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       return;
     }
     if (!PostGizmoRenderer._gizmoRenderState) {
-      PostGizmoRenderer._gizmoRenderState = this._createRenderStates(ctx);
+      PostGizmoRenderer._gizmoRenderState = this._createGizmoRenderStates(ctx);
     }
     if (!PostGizmoRenderer._blendRenderState) {
       PostGizmoRenderer._blendRenderState = this._createBlendRenderStates(ctx);
@@ -274,8 +280,8 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     ctx.device.pushDeviceStates();
     ctx.device.setFramebuffer(tmpFramebuffer);
     ctx.device.clearFrameBuffer(new Vector4(0, 0, 0, 0), 1, 0);
-    ctx.device.setRenderStates(gizmoRenderState);
     if (gridPrimitive) {
+      ctx.device.setRenderStates(gridRenderState);
       gridBindGroup.setValue('viewMatrix', ctx.camera.worldMatrix);
       gridBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
       gridBindGroup.setValue('params', this._gridParams);
@@ -290,6 +296,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
       gridPrimitive.draw();
     }
     if (gizmoPrimitive && !(this._mode === 'rotation' && this._rotateInfo && this._rotateInfo.axis < 0)) {
+      ctx.device.setRenderStates(gizmoRenderState);
       gizmoBindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
       gizmoBindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
       gizmoBindGroup.setValue('texSize', PostGizmoRenderer._texSize);
@@ -321,14 +328,23 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     if (!(ev instanceof PointerEvent)) {
       return false;
     }
-    if (!this.enabled) {
+    if (!this.enabled || !this._node) {
       this._endRotate();
       this._endTranslation();
       this._endScale();
       return false;
     }
-    const x = ev.offsetX;
-    const y = ev.offsetY;
+    const cvs = Application.instance.device.canvas;
+    const vp = this._camera.viewport;
+    const vp_x = vp ? vp[0] : 0;
+    const vp_y = vp ? cvs.clientHeight - vp[1] - vp[3] : 0;
+    const vp_w = vp ? vp[2] : cvs.clientWidth;
+    const vp_h = vp ? vp[3] : cvs.clientHeight;
+    const x = ev.offsetX - vp_x;
+    const y = ev.offsetY - vp_y;
+    if (x < 0 || x > vp_w || y < 0 || y > vp_h) {
+      return false;
+    }
     if (this._mode === 'rotation' || this._mode === 'scaling' || this._mode === 'translation') {
       if (ev.type === 'pointerdown') {
         const ray = this._camera.constructRay(x, y);
@@ -707,9 +723,14 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
     }
     return matrix;
   }
-  private _createRenderStates(ctx: DrawContext) {
+  private _createGizmoRenderStates(ctx: DrawContext) {
     const rs = ctx.device.createRenderStateSet();
     rs.useDepthState().enableTest(true).enableWrite(true);
+    return rs;
+  }
+  private _createGridRenderStates(ctx: DrawContext) {
+    const rs = ctx.device.createRenderStateSet();
+    rs.useDepthState().enableTest(true).enableWrite(false);
     return rs;
   }
   private _createBlendRenderStates(ctx: DrawContext) {
