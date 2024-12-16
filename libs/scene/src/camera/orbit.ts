@@ -42,12 +42,12 @@ export interface OrbitCameraControllerOptions {
   };
 }
 
-export const OperationType = {
-  NONE: 0,
-  ROTATE: 1,
-  PAN: 2,
-  ZOOM: 3
-} as const;
+enum OperationType {
+  NONE = 0,
+  ROTATE = 1,
+  PAN = 2,
+  ZOOM = 3
+}
 
 /**
  * Orbit camera controller
@@ -56,8 +56,6 @@ export const OperationType = {
 export class OrbitCameraController extends BaseCameraController {
   /** @internal */
   private options: OrbitCameraControllerOptions;
-  /** @internal */
-  private mouseDown: boolean;
   /** @internal */
   private lastMouseX: number;
   /** @internal */
@@ -82,6 +80,8 @@ export class OrbitCameraController extends BaseCameraController {
   private quat: Quaternion;
   /** @internal */
   private scale: number;
+  /** @internal */
+  private currentOp: OperationType;
   /**
    * Creates an instance of OrbitCameraController
    * @param options - The creation options
@@ -91,11 +91,9 @@ export class OrbitCameraController extends BaseCameraController {
     this.options = Object.assign(
       {
         center: Vector3.zero(),
-        distance: 1,
-        damping: 0.1,
-        moveSpeed: 0.2,
-        rotateSpeed: 0.01,
-        panSpeed: 0.01,
+        damping: 1,
+        rotateSpeed: 1,
+        panSpeed: 1,
         zoomSpeed: 1,
         controls: {
           rotate: {
@@ -133,6 +131,7 @@ export class OrbitCameraController extends BaseCameraController {
     this.direction = new Vector3();
     this.quat = new Quaternion();
     this.scale = 1;
+    this.currentOp = OperationType.NONE;
   }
   /** Rotation center */
   get center(): Vector3 {
@@ -146,13 +145,13 @@ export class OrbitCameraController extends BaseCameraController {
    * @override
    */
   reset(): void {
-    this.mouseDown = false;
     this.lastMouseX = 0;
     this.lastMouseY = 0;
     this.rotateX = 0;
     this.rotateY = 0;
     this.upVector = Vector3.axisPY();
     this.scale = 1;
+    this.currentOp = OperationType.NONE;
     this._loadCameraParams();
   }
   /**
@@ -160,13 +159,21 @@ export class OrbitCameraController extends BaseCameraController {
    * @override
    */
   protected _onMouseDown(evt: PointerEvent): boolean {
-    if (evt.button === 0) {
-      this.mouseDown = true;
+    if (this.matchesControl(evt, this.options.controls.rotate)) {
       this.lastMouseX = evt.offsetX;
       this.lastMouseY = evt.offsetY;
       this.rotateX = 0;
       this.rotateY = 0;
+      this.currentOp = OperationType.ROTATE;
+    } else if (this.matchesControl(evt, this.options.controls.pan)) {
+      this.lastMouseX = evt.offsetX;
+      this.lastMouseY = evt.offsetY;
+      this.currentOp = OperationType.PAN;
       return true;
+    } else if (this.matchesControl(evt, this.options.controls.zoom)) {
+      this.lastMouseX = evt.offsetX;
+      this.lastMouseY = evt.offsetY;
+      this.currentOp = OperationType.ZOOM;
     }
     return false;
   }
@@ -175,8 +182,16 @@ export class OrbitCameraController extends BaseCameraController {
    * @override
    */
   protected _onMouseUp(evt: PointerEvent): boolean {
-    if (evt.button === 0 && this.mouseDown) {
-      this.mouseDown = false;
+    const control =
+      this.currentOp === OperationType.ROTATE
+        ? this.options.controls.rotate
+        : this.currentOp === OperationType.PAN
+        ? this.options.controls.pan
+        : this.currentOp === OperationType.ZOOM
+        ? this.options.controls.zoom
+        : null;
+    if (control && evt.button === control.button) {
+      this.currentOp = OperationType.NONE;
       return true;
     }
     return false;
@@ -199,13 +214,33 @@ export class OrbitCameraController extends BaseCameraController {
    * @override
    */
   protected _onMouseMove(evt: PointerEvent): boolean {
-    if (this.mouseDown) {
+    if (this.currentOp !== OperationType.NONE) {
       const dx = evt.offsetX - this.lastMouseX;
       const dy = evt.offsetY - this.lastMouseY;
       this.lastMouseX = evt.offsetX;
       this.lastMouseY = evt.offsetY;
-      this.rotateX -= dy * this.options.rotateSpeed;
-      this.rotateY -= dx * this.options.rotateSpeed;
+      if (this.currentOp === OperationType.ROTATE) {
+        this.rotateX -= dy * this.options.rotateSpeed * 0.005;
+        this.rotateY -= dx * this.options.rotateSpeed * 0.005;
+      } else if (this.currentOp === OperationType.PAN) {
+        const right = this.xVector;
+        const up = this.upVector;
+        const panX = -dx * this.options.panSpeed * this.distance * 0.02;
+        const panY = dy * this.options.panSpeed * this.distance * 0.02;
+        this.target.combineBy(right, 1, panX);
+        this.target.combineBy(up, 1, panY);
+        this.eyePos.combineBy(right, 1, panX);
+        this.eyePos.combineBy(up, 1, panY);
+        this.options.center.combineBy(right, 1, panX);
+        this.options.center.combineBy(up, 1, panY);
+      } else if (this.currentOp === OperationType.ZOOM) {
+        const factor = Math.pow(0.9, Math.abs(this.options.zoomSpeed));
+        if (dy > 0) {
+          this.scale /= factor;
+        } else if (dy < 0) {
+          this.scale *= factor;
+        }
+      }
       return true;
     }
     return false;
@@ -273,11 +308,7 @@ export class OrbitCameraController extends BaseCameraController {
       Vector3.cross(this.direction, this.xVector, this.upVector).inplaceNormalize();
       Vector3.add(this.target, Vector3.scale(this.direction, this.distance * this.scale), this.eyePos);
       this._getCamera().lookAt(this.eyePos, this.target, this.upVector);
-      // this._loadCameraParams();
-      if (this.mouseDown) {
-        this.rotateX = 0;
-        this.rotateY = 0;
-      } else {
+      if (this.rotateX !== 0 || this.rotateY !== 0) {
         this.rotateX *= 1 - this.options.damping;
         this.rotateY *= 1 - this.options.damping;
         if (Math.abs(this.rotateX) < 0.0001) {

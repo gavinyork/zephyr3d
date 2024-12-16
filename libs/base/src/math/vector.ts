@@ -185,6 +185,16 @@ export class Vector2 extends VectorBase {
     return Vector2.add(this, other, this);
   }
   /**
+   * Combine a vector to this vector.
+   * @param other - The vector that will be added.
+   * @param t0 - Scale factor for this vector
+   * @param t1 - Scale factor for other vector
+   * @returns self
+   */
+  combineBy(other: Vector2, t0: number, t1: number) {
+    return Vector2.combine(this, other, t0, t1, this);
+  }
+  /**
    * Multiply this vector by a vector.
    * @param other - The vector that will be multiplied by.
    * @returns self
@@ -345,6 +355,20 @@ export class Vector2 extends VectorBase {
   static add(a: Vector2, b: Vector2, result?: Vector2): Vector2 {
     const x = a.x + b.x;
     const y = a.y + b.y;
+    return (result || new Vector2()).setXY(x, y);
+  }
+  /**
+   * Combine two Vector2's.
+   * @param a - The first operand.
+   * @param b - The second operand.
+   * @param t0 - Scale factor for the first operand
+   * @param t1 - Scale factor for the second operand
+   * @param result - The output vector (can be the same vector as a or b). if not specified, a new vector will be created.
+   * @returns The output vector
+   */
+  static combine(a: Vector2, b: Vector2, t0: number, t1: number, result?: Vector2): Vector2 {
+    const x = a.x * t0 + b.x * t1;
+    const y = a.y * t0 + b.y * t1;
     return (result || new Vector2()).setXY(x, y);
   }
   /**
@@ -664,6 +688,16 @@ export class Vector3 extends VectorBase {
     return Vector3.add(this, other, this);
   }
   /**
+   * Combine a vector to this vector.
+   * @param other - The vector that will be added.
+   * @param t0 - Scale factor for this vector
+   * @param t1 - Scale factor for other vector
+   * @returns self
+   */
+  combineBy(other: Vector3, t0: number, t1: number) {
+    return Vector3.combine(this, other, t0, t1, this);
+  }
+  /**
    * Multiply this vector by a vector.
    * @param other - The vector that will be multiplied by.
    * @returns self
@@ -843,6 +877,21 @@ export class Vector3 extends VectorBase {
     const x = a.x + b.x;
     const y = a.y + b.y;
     const z = a.z + b.z;
+    return (result || new Vector3()).setXYZ(x, y, z);
+  }
+  /**
+   * Combine two Vector3's.
+   * @param a - The first operand.
+   * @param b - The second operand.
+   * @param t0 - Scale factor for the first operand
+   * @param t1 - Scale factor for the second operand
+   * @param result - The output vector (can be the same vector as a or b). if not specified, a new vector will be created.
+   * @returns The output vector
+   */
+  static combine(a: Vector3, b: Vector3, t0: number, t1: number, result?: Vector3): Vector3 {
+    const x = a.x * t0 + b.x * t1;
+    const y = a.y * t0 + b.y * t1;
+    const z = a.z * t0 + b.z * t1;
     return (result || new Vector3()).setXYZ(x, y, z);
   }
   /**
@@ -1215,6 +1264,16 @@ export class Vector4 extends VectorBase {
     return Vector4.add(this, other, this);
   }
   /**
+   * Combine a vector to this vector.
+   * @param other - The vector that will be added.
+   * @param t0 - Scale factor for this vector
+   * @param t1 - Scale factor for other vector
+   * @returns self
+   */
+  combineBy(other: Vector4, t0: number, t1: number) {
+    return Vector4.combine(this, other, t0, t1, this);
+  }
+  /**
    * Multiply this vector by a vector.
    * @param other - The vector that will be multiplied by.
    * @returns self
@@ -1391,6 +1450,22 @@ export class Vector4 extends VectorBase {
     const y = a.y + b.y;
     const z = a.z + b.z;
     const w = a.w + b.w;
+    return (result || new Vector4()).setXYZW(x, y, z, w);
+  }
+  /**
+   * Combine two Vector4's.
+   * @param a - The first operand.
+   * @param b - The second operand.
+   * @param t0 - Scale factor for the first operand
+   * @param t1 - Scale factor for the second operand
+   * @param result - The output vector (can be the same vector as a or b). if not specified, a new vector will be created.
+   * @returns The output vector
+   */
+  static combine(a: Vector4, b: Vector4, t0: number, t1: number, result?: Vector4): Vector4 {
+    const x = a.x * t0 + b.x * t1;
+    const y = a.y * t0 + b.y * t1;
+    const z = a.z * t0 + b.z * t1;
+    const w = a.w * t0 + b.w * t1;
     return (result || new Vector4()).setXYZW(x, y, z, w);
   }
   /**
