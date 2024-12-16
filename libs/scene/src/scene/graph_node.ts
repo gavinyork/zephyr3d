@@ -43,9 +43,9 @@ export class GraphNode extends SceneNode {
     return true;
   }
   /**
-   * {@inheritDoc Drawable.getXForm}
+   * {@inheritDoc Drawable.getNode}
    */
-  getXForm(): SceneNode {
+  getNode(): SceneNode {
     return this;
   }
   /**

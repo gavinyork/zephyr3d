@@ -277,9 +277,9 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     return this._boneMatrices;
   }
   /**
-   * {@inheritDoc Drawable.getXForm}
+   * {@inheritDoc Drawable.getNode}
    */
-  getXForm(): SceneNode {
+  getNode(): SceneNode {
     // mesh transform should be ignored when skinned
     return this;
   }

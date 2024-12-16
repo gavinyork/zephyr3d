@@ -413,10 +413,7 @@ export class SceneRenderer {
         .readPixels(0, 0, 1, 1, 0, 0, pixels)
         .then(() => {
           const drawable = renderQueue.getDrawableByColor(pixels);
-          camera.pickResult =
-            drawable && drawable.getPickTarget()?.node?.pickable
-              ? { drawable, target: drawable.getPickTarget() }
-              : null;
+          camera.pickResult = drawable ? { drawable, target: drawable.getPickTarget() } : null;
           device.pool.releaseFrameBuffer(fb);
           resolve(camera.pickResult);
         })

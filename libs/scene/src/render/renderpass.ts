@@ -150,7 +150,7 @@ export abstract class RenderPass {
     ctx: DrawContext,
     reverseWinding: boolean
   ) {
-    const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
+    const reverse = reverseWinding !== item.drawable.getNode().worldMatrixDet < 0;
     if (reverse) {
       device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
     }
@@ -179,7 +179,7 @@ export abstract class RenderPass {
     }
     for (const item of items) {
       ctx.instanceData = item.instanceData;
-      const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
+      const reverse = reverseWinding !== item.drawable.getNode().worldMatrixDet < 0;
       if (reverse) {
         ctx.device.reverseVertexWindingOrder(!ctx.device.isWindingOrderReversed());
       }
@@ -261,19 +261,6 @@ export abstract class RenderPass {
           reverseWinding,
           hash
         );
-        /*
-        for (const item of itemList.instanceItemList) {
-          ctx.instanceData = item.instanceData;
-          const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
-          if (reverse) {
-            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
-          }
-          item.drawable.draw(ctx);
-          if (reverse) {
-            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
-          }
-        }
-        */
       }
     }
     ctx.renderQueue = null;

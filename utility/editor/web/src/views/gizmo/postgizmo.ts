@@ -331,29 +331,15 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
    * @param type - Event type
    * @returns true if event was handled, otherwise false
    */
-  handleEvent(ev: Event, type?: string): boolean {
-    if (!(ev instanceof PointerEvent)) {
-      return false;
-    }
+  handlePointerEvent(type: string, x: number, y: number, button: number): boolean {
     if (!this.enabled || !this._node) {
       this._endRotate();
       this._endTranslation();
       this._endScale();
       return false;
     }
-    const cvs = Application.instance.device.canvas;
-    const vp = this._camera.viewport;
-    const vp_x = vp ? vp[0] : 0;
-    const vp_y = vp ? cvs.clientHeight - vp[1] - vp[3] : 0;
-    const vp_w = vp ? vp[2] : cvs.clientWidth;
-    const vp_h = vp ? vp[3] : cvs.clientHeight;
-    const x = ev.offsetX - vp_x;
-    const y = ev.offsetY - vp_y;
-    if (x < 0 || x > vp_w || y < 0 || y > vp_h) {
-      return false;
-    }
     if (this._mode === 'rotation' || this._mode === 'scaling' || this._mode === 'translation') {
-      if (ev.type === 'pointerdown') {
+      if (type === 'pointerdown' && button === 0) {
         const ray = this._camera.constructRay(x, y);
         const hitInfo = this.rayIntersection(ray);
         if (hitInfo) {
@@ -371,7 +357,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
           }
         }
       }
-      if (ev.type === 'pointermove') {
+      if (type === 'pointermove') {
         if (this._mode === 'translation' && this._translatePlaneInfo) {
           this._updateTranslation(x, y);
           return true;
@@ -385,7 +371,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
           return true;
         }
       }
-      if (ev.type === 'pointerup') {
+      if (type === 'pointerup' && button === 0) {
         if (this._mode === 'translation' && this._translatePlaneInfo) {
           this._endTranslation();
           return true;

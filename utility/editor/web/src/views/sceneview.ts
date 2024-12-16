@@ -4,7 +4,7 @@ import { EmptyView } from './emptyview';
 import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import { Tab } from '../components/tab';
-import { Camera, Compositor, Scene, SceneNode } from '@zephyr3d/scene';
+import { Application, Camera, Compositor, Scene, SceneNode } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
@@ -129,7 +129,21 @@ export class SceneView extends EmptyView<SceneModel> {
     super.render();
   }
   handleEvent(ev: Event, type?: string): boolean {
-    if (!this._postGizmoRenderer.handleEvent(ev, type)) {
+    let handled: boolean;
+    if (ev instanceof PointerEvent) {
+      const cvs = Application.instance.device.canvas;
+      const vp = this.model.camera.viewport;
+      const vp_x = vp ? vp[0] : 0;
+      const vp_y = vp ? cvs.clientHeight - vp[1] - vp[3] : 0;
+      const vp_w = vp ? vp[2] : cvs.clientWidth;
+      const vp_h = vp ? vp[3] : cvs.clientHeight;
+      const x = ev.offsetX - vp_x;
+      const y = ev.offsetY - vp_y;
+      if (x >= 0 && x <= vp_w && y >= 0 && y <= vp_h) {
+        handled = this._postGizmoRenderer.handlePointerEvent(ev.type, x, y, ev.button);
+      }
+    }
+    if (!handled) {
       return this.model.camera.handleEvent(ev, type);
     }
     return true;

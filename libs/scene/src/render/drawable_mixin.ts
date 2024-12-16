@@ -29,7 +29,7 @@ const drawableBindGroupTransfromTags = new WeakMap<BindGroup, number>();
 
 export function mixinDrawable<
   T extends GenericConstructor<{
-    getXForm(): SceneNode;
+    getNode(): SceneNode;
   }>
 >(baseCls?: T): T & { new (...args: any[]): IMixinDrawable } {
   const cls = class extends baseCls {
@@ -59,18 +59,18 @@ export function mixinDrawable<
       this._framestampBuffer = new Int32Array(this._worldMatrixBuffer.buffer, 4 * 16);
       this._currentWorldMatrixBuffer = this._worldMatrixBuffer.subarray(0, 16);
       this._prevWorldMatrixBuffer = this._worldMatrixBuffer.subarray(20, 36);
-      this._currentWorldMatrixBuffer.set(this.getXForm().worldMatrix);
+      this._currentWorldMatrixBuffer.set(this.getNode().worldMatrix);
       this._framestampBuffer[0] = Application.instance.device.frameInfo.frameCounter;
       this._framestampBuffer[1] = this._framestampBuffer[0];
-      this._prevWorldMatrixBuffer.set(this.getXForm().worldMatrix);
-      this.getXForm().on('transformchanged', () => {
+      this._prevWorldMatrixBuffer.set(this.getNode().worldMatrix);
+      this.getNode().on('transformchanged', () => {
         const frame = Application.instance.device.frameInfo.frameCounter;
         if (frame !== this._framestampBuffer[1]) {
           this._prevWorldMatrixBuffer.set(this._currentWorldMatrixBuffer);
           this._framestampBuffer[0] = frame;
           this._framestampBuffer[1] = frame;
         }
-        this._currentWorldMatrixBuffer.set(this.getXForm().worldMatrix);
+        this._currentWorldMatrixBuffer.set(this.getNode().worldMatrix);
         for (const ref of this._mdRenderQueueRef) {
           if (ref.ref) {
             this.applyTransformUniforms(ref.ref);
@@ -113,7 +113,7 @@ export function mixinDrawable<
     }
     applyTransformUniforms(renderQueue: RenderQueue): void {
       const instanceInfo = renderQueue.getInstanceInfo(this as unknown as Drawable);
-      const currentTag = this.getXForm().transformTag;
+      const currentTag = this.getNode().transformTag;
       if (instanceInfo) {
         const tag = instanceBindGroupTransfromTags.get(instanceInfo) ?? -1;
         if (tag !== currentTag) {
@@ -220,16 +220,6 @@ export function mixinDrawable<
         } else if (skinning) {
           this._mdDrawableBindGroupSkin = bindGroup;
         } else if (morphing) {
-          const bindName =
-            layout.nameMap?.[ShaderHelper.getMorphInfoUniformName()] ??
-            ShaderHelper.getMorphInfoUniformName();
-          for (let binding = 0; binding < layout.entries.length; binding++) {
-            const bindingPoint = layout.entries[binding];
-            if (bindingPoint.name === bindName) {
-              console.log(bindingPoint.type);
-              break;
-            }
-          }
           this._mdDrawableBindGroupMorph = bindGroup;
         } else {
           this._mdDrawableBindGroup = bindGroup;

@@ -18,7 +18,7 @@ export class TerrainPatchBase {
   constructor(terrain: Terrain) {
     this._terrain = terrain;
   }
-  getXForm(): SceneNode {
+  getNode(): SceneNode {
     return this._terrain;
   }
 }

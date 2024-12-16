@@ -575,7 +575,7 @@ export class RenderQueue {
     }
   }
   private drawableDistanceToCamera(drawable: Drawable, cameraPos: Vector3) {
-    const drawablePos = drawable.getXForm().position;
+    const drawablePos = drawable.getNode().position;
     return Vector3.distanceSq(drawablePos, cameraPos);
   }
   private newRenderItemListInfo(): RenderItemListInfo {
