@@ -42,6 +42,8 @@ const tmpProperty: PropertyValue = {
 
 export class PropertyEditor<T extends {} = unknown> {
   private _rootGroup: PropertyGroup<T>;
+  private _top: number;
+  private _bottom: number;
   private _width: number;
   private _maxWidth: number;
   private _minWidth: number;
@@ -49,8 +51,18 @@ export class PropertyEditor<T extends {} = unknown> {
   private _labelPercent: number;
   private _object: T;
   private _groupStack: PropertyGroup<T>[];
-  constructor(width: number, padding: number, maxWidth: number, minWidth: number, labelPercent = 0.4) {
+  constructor(
+    top: number,
+    bottom: number,
+    width: number,
+    padding: number,
+    maxWidth: number,
+    minWidth: number,
+    labelPercent = 0.4
+  ) {
     this._rootGroup = new PropertyGroup('Root');
+    this._top = top;
+    this._bottom = bottom;
     this._width = width;
     this._maxWidth = maxWidth;
     this._minWidth = minWidth;
@@ -93,9 +105,8 @@ export class PropertyEditor<T extends {} = unknown> {
   }
   render() {
     const displaySize = ImGui.GetIO().DisplaySize;
-    const frameHeight = ImGui.GetFrameHeight();
-    const windowPos = new ImGui.ImVec2(displaySize.x - this._width, frameHeight);
-    const windowSize = new ImGui.ImVec2(this._width, displaySize.y - 2 * frameHeight);
+    const windowPos = new ImGui.ImVec2(displaySize.x - this._width, this._top);
+    const windowSize = new ImGui.ImVec2(this._width, displaySize.y - this._top - this._bottom);
     ImGui.SetNextWindowPos(windowPos, ImGui.Cond.Always);
     ImGui.SetNextWindowSize(windowSize, ImGui.Cond.Always);
     const flags =

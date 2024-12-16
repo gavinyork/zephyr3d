@@ -25,7 +25,6 @@ export class SceneView extends EmptyView<SceneModel> {
     this._transformNode = null;
     this._oldTransform = null;
     this.drawBackground = false;
-    this._propGrid = new PropertyEditor(300, 8, 600, 200, 0.4);
     this._toolbar = new ToolBar(
       [
         {
@@ -76,6 +75,15 @@ export class SceneView extends EmptyView<SceneModel> {
       true,
       this.menubar.height + this._toolbar.height,
       this.statusbar.height
+    );
+    this._propGrid = new PropertyEditor(
+      this.menubar.height + this._toolbar.height,
+      this.statusbar.height,
+      300,
+      8,
+      600,
+      200,
+      0.4
     );
     this.menubar.options = {
       items: [
