@@ -403,9 +403,7 @@ export class GLTFViewer {
     }
     this._camera.render(this._scene, this._compositor);
     if (this._showInspector) {
-      imGuiNewFrame();
       this._inspector.render();
-      imGuiEndFrame();
     }
   }
   lookAt() {

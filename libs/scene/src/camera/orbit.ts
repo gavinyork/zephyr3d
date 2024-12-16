@@ -225,8 +225,8 @@ export class OrbitCameraController extends BaseCameraController {
       } else if (this.currentOp === OperationType.PAN) {
         const right = this.xVector;
         const up = this.upVector;
-        const panX = -dx * this.options.panSpeed * this.distance * 0.02;
-        const panY = dy * this.options.panSpeed * this.distance * 0.02;
+        const panX = -dx * this.options.panSpeed * this.distance * 0.01;
+        const panY = dy * this.options.panSpeed * this.distance * 0.01;
         this.target.combineBy(right, 1, panX);
         this.target.combineBy(up, 1, panY);
         this.eyePos.combineBy(right, 1, panX);

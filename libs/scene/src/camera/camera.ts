@@ -101,13 +101,13 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _ssrBlurStdDev: number;
   /** @internal */
-  protected _picking: boolean;
+  protected _pickResultPromise: Promise<PickResult>;
+  /** @internal */
+  protected _pickResultResolve: (result: PickResult) => void;
   /** @internal */
   protected _pickPosX: number;
   /** @internal */
   protected _pickPosY: number;
-  /** @internal */
-  protected _pickResultPromise: Promise<PickResult>;
   /** @internal */
   protected _pickResult: PickResult;
   /** @internal */
@@ -147,8 +147,6 @@ export class Camera extends SceneNode {
     this._frustumV = null;
     this._oit = null;
     this._depthPrePass = false;
-    this._pickPosX = 0;
-    this._pickPosY = 0;
     this._HiZ = false;
     this._SSR = false;
     this._TAA = false;
@@ -170,6 +168,10 @@ export class Camera extends SceneNode {
     this._prevPosition = null;
     this._prevJitteredVPMatrix = null;
     this._prevJitterValue = null;
+    this._pickResultPromise = null;
+    this._pickResultResolve = null;
+    this._pickPosX = 0;
+    this._pickPosY = 0;
   }
   /** Clip plane in camera space */
   get clipPlane(): Plane {
@@ -343,41 +345,6 @@ export class Camera extends SceneNode {
   }
   set commandBufferReuse(val: boolean) {
     this._commandBufferReuse = !!val;
-  }
-  /** Whether GPU picking is enabled for this camera */
-  get enablePicking(): boolean {
-    return this._picking;
-  }
-  set enablePicking(enable: boolean) {
-    this._picking = !!enable;
-  }
-  /** X coordinate for picking related to viewport  */
-  get pickPosX(): number {
-    return this._pickPosX;
-  }
-  set pickPosX(val: number) {
-    this._pickPosX = val;
-  }
-  /** Y coordinate for picking related to viewport  */
-  get pickPosY(): number {
-    return this._pickPosY;
-  }
-  set pickPosY(val: number) {
-    this._pickPosY = val;
-  }
-  /** Pick result */
-  get pickResult(): PickResult {
-    return this._pickResult;
-  }
-  set pickResult(val: PickResult) {
-    this._pickResult = val;
-  }
-  /** @internal */
-  get pickResultAsync(): Promise<PickResult> {
-    return this._pickResultPromise;
-  }
-  set pickResultAsync(val: Promise<PickResult>) {
-    this._pickResultPromise = val;
   }
   /**
    * Sample count for MSAA
@@ -738,6 +705,32 @@ export class Camera extends SceneNode {
       this._prevPosition = this.getWorldPosition();
     }
     scene.dispatchEvent('endrender', scene, this, compositor ?? null);
+  }
+  async pickAsync(posX: number, posY: number): Promise<PickResult> {
+    this._pickPosX = posX;
+    this._pickPosY = posY;
+    if (!this._pickResultPromise) {
+      this._pickResultPromise = new Promise<PickResult>((resolve) => {
+        this._pickResultResolve = (result: PickResult) => {
+          resolve(result);
+          this._pickResultPromise = null;
+          this._pickResultResolve = null;
+        };
+      });
+    }
+    return this._pickResultPromise;
+  }
+  /** @internal */
+  getPickResultResolveFunc() {
+    return this._pickResultResolve;
+  }
+  /** @internal */
+  getPickPosX() {
+    return this._pickPosX;
+  }
+  /** @internal */
+  getPickPosY() {
+    return this._pickPosY;
   }
   /**
    * Updates the controller state

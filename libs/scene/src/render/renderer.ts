@@ -9,7 +9,6 @@ import type { DrawContext } from './drawable';
 import { ShadowMapper } from '../shadow';
 import type { RenderQueue } from './render_queue';
 import type { PunctualLight, Scene } from '../scene';
-import type { PickResult } from '../camera';
 import { PerspectiveCamera, type Camera } from '../camera';
 import type { Compositor } from '../posteffect';
 import { ClusteredLight } from './cluster_light';
@@ -196,7 +195,7 @@ export class SceneRenderer {
     let tempFramebuffer: FrameBuffer = null;
     let depthFramebuffer: FrameBuffer = null;
 
-    if (ctx.camera.enablePicking) {
+    if (ctx.camera.getPickResultResolveFunc()) {
       this.renderObjectColors(ctx);
     }
     let HiZFrameBuffer: FrameBuffer = null;
@@ -388,8 +387,8 @@ export class SceneRenderer {
     const savedScissor = ctx.camera.scissor;
     const savedWindow = ctx.camera.window;
     const vp = ctx.device.getViewport();
-    const windowX = ctx.camera.pickPosX / vp.width;
-    const windowY = (vp.height - ctx.camera.pickPosY - 1) / vp.height;
+    const windowX = ctx.camera.getPickPosX() / vp.width;
+    const windowY = (vp.height - ctx.camera.getPickPosY() - 1) / vp.height;
     const windowW = 1 / vp.width;
     const windowH = 1 / vp.height;
     ctx.camera.viewport = null;
@@ -408,26 +407,16 @@ export class SceneRenderer {
     const pixels = new Uint8Array(4);
     const camera = ctx.camera;
     const device = ctx.device;
-    camera.pickResultAsync = new Promise<PickResult>((resolve, reject) => {
-      tex
-        .readPixels(0, 0, 1, 1, 0, 0, pixels)
-        .then(() => {
-          const drawable = renderQueue.getDrawableByColor(pixels);
-          camera.pickResult = drawable ? { drawable, target: drawable.getPickTarget() } : null;
-          device.pool.releaseFrameBuffer(fb);
-          resolve(camera.pickResult);
-        })
-        .catch((err) => {
-          reject(err);
-        });
-    });
-    /*
-    tex.readPixels(0, 0, 1, 1, 0, 0, pixels).then(() => {
-      const drawable = renderQueue.getDrawableByColor(pixels);
-      camera.pickResult =
-        drawable && drawable.getPickTarget()?.pickable ? { drawable, node: drawable.getPickTarget() } : null;
-      device.pool.releaseFrameBuffer(fb);
-    });
-    */
+    tex
+      .readPixels(0, 0, 1, 1, 0, 0, pixels)
+      .then(() => {
+        const drawable = renderQueue.getDrawableByColor(pixels);
+        camera.getPickResultResolveFunc()?.(drawable ? { drawable, target: drawable.getPickTarget() } : null);
+        device.pool.releaseFrameBuffer(fb);
+      })
+      .catch((err) => {
+        ctx.camera.getPickResultResolveFunc()?.(null);
+        device.pool.releaseFrameBuffer(fb);
+      });
   }
 }

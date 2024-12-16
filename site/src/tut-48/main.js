@@ -49,22 +49,21 @@ myApp.ready().then(async () => {
   );
   camera.lookAt(new Vector3(0, 0, 100), new Vector3(0, 0, 0), Vector3.axisPY());
   camera.controller = new OrbitCameraController();
-  camera.enablePicking = true;
 
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
   /** @type {*} */
   let lastPickResult;
 
+  let x = 0;
+  let y = 0;
   myApp.device.canvas.addEventListener('pointermove', (ev) => {
-    camera.pickPosX = ev.offsetX;
-    camera.pickPosY = ev.offsetY;
+    x = ev.offsetX;
+    y = ev.offsetY;
   });
 
-  myApp.on('tick', () => {
-    camera.updateController();
-    camera.render(scene);
-    camera.pickResultAsync.then((pickResult) => {
+  function continusPicking() {
+    camera.pickAsync(x, y).then((pickResult) => {
       if (lastPickResult !== pickResult?.target.node) {
         if (lastPickResult) {
           lastPickResult.material.emissiveColor = Vector3.zero();
@@ -75,7 +74,15 @@ myApp.ready().then(async () => {
           lastPickResult.material.emissiveColor = new Vector3(1, 1, 0);
         }
       }
+      continusPicking();
     });
+  }
+
+  continusPicking();
+
+  myApp.on('tick', () => {
+    camera.updateController();
+    camera.render(scene);
   });
 
   myApp.run();

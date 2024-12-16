@@ -130,7 +130,9 @@ export class SceneView extends EmptyView<SceneModel> {
     super.render();
   }
   handleEvent(ev: Event, type?: string): boolean {
-    let handled: boolean;
+    if (this.model.camera.handleEvent(ev, type)) {
+      return true;
+    }
     if (ev instanceof PointerEvent) {
       const cvs = Application.instance.device.canvas;
       const vp = this.model.camera.viewport;
@@ -140,12 +142,17 @@ export class SceneView extends EmptyView<SceneModel> {
       const vp_h = vp ? vp[3] : cvs.clientHeight;
       const x = ev.offsetX - vp_x;
       const y = ev.offsetY - vp_y;
-      if (x >= 0 && x <= vp_w && y >= 0 && y <= vp_h) {
-        handled = this._postGizmoRenderer.handlePointerEvent(ev.type, x, y, ev.button);
+      if (x < 0 || x >= vp_w || y < 0 || y >= vp_h) {
+        return false;
       }
-    }
-    if (!handled) {
-      return this.model.camera.handleEvent(ev, type);
+      if (this._postGizmoRenderer.handlePointerEvent(ev.type, x, y, ev.button)) {
+        return true;
+      }
+      if (ev.button === 0 && ev.type === 'pointerdown') {
+        this.model.camera.pickAsync(x, y).then((pickResult) => {
+          this._tab.sceneHierarchy.selectNode(pickResult?.target?.node ?? null);
+        });
+      }
     }
     return true;
   }

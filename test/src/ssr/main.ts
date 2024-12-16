@@ -46,7 +46,6 @@ ssrApp.ready().then(async () => {
   camera.controller = new FPSCameraController();
   camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
   camera.depthPrePass = true;
-  camera.enablePicking = true;
 
   const batchGroup = new BatchGroup(scene);
   const mat1 = new BlinnMaterial();
@@ -82,19 +81,17 @@ ssrApp.ready().then(async () => {
   });
 
   ssrApp.device.canvas.addEventListener('pointermove', (ev) => {
-    camera.pickPosX = ev.offsetX;
-    camera.pickPosY = ev.offsetY;
+    camera.pickAsync(ev.offsetX, ev.offsetY).then((pickResult) => {
+      if (pickResult?.target?.node?.isMesh()) {
+        console.log(`Mesh ${pickResult.target.node.name ?? '???'} picked`);
+      }
+    });
   });
 
   ssrApp.on('tick', () => {
     camera.updateController();
     camera.render(scene, compositor);
     inspector.render();
-    camera.pickResultAsync.then((pickResult) => {
-      if (pickResult?.target?.node?.isMesh()) {
-        console.log(`Mesh ${pickResult.target.node.name ?? '???'} picked`);
-      }
-    });
   });
   ssrApp.run();
 });

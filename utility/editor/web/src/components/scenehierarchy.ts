@@ -40,7 +40,9 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
         this.dispatchEvent('node_deselected', this._selectedNode);
       }
       this._selectedNode = node;
-      this.dispatchEvent('node_selected', this._selectedNode);
+      if (this._selectedNode) {
+        this.dispatchEvent('node_selected', this._selectedNode);
+      }
     }
   }
   private renderSceneNode(node: SceneNode) {
