@@ -1,6 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { BaseView } from './baseview';
-import { BaseModel } from '../models/basemodel';
+import type { BaseModel } from '../models/basemodel';
 import { eventBus } from '../core/eventbus';
 import { MenubarView } from '../components/menubar';
 import { StatusBar } from '../components/statusbar';

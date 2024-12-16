@@ -133,7 +133,7 @@ export class PlaneShape extends Shape<PlaneCreationOptions> {
           bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i + 1]);
           bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i + 2]);
         }
-        vertexCallback && vertexCallback((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
+        vertexCallback?.((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
       }
     }
     return 'triangle-list';

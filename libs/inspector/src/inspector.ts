@@ -241,7 +241,7 @@ export class Inspector {
     fileInput.accept = accept ?? '';
     fileInput.multiple = !!multi;
     fileInput.onchange = () => {
-      callback && callback([...fileInput.files]);
+      callback?.([...fileInput.files]);
     };
     fileInput.click();
   }

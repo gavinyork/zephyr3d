@@ -186,7 +186,9 @@ export class TextureAtlasManager {
     tex.update(new Uint8Array(tex.width * tex.height * 4), 0, 0, tex.width, tex.height);
     tex.restoreHandler = async () => {
       tex.update(new Uint8Array(tex.width * tex.height * 4), 0, 0, tex.width, tex.height);
-      this._atlasRestoreHandler && (await this._atlasRestoreHandler(tex));
+      if (this._atlasRestoreHandler) {
+        await this._atlasRestoreHandler(tex);
+      }
     };
     return tex;
   }

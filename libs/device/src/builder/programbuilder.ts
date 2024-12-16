@@ -2041,7 +2041,7 @@ export class ProgramBuilder {
     if (this._emulateDepthClamp && this._shaderType === ShaderType.Vertex) {
       this._globalScope.$outputs.clamppedDepth = this.float().tag('CLAMPPED_DEPTH');
     }
-    body && body.call(this._globalScope, this);
+    body?.call(this._globalScope, this);
     this.popScope();
 
     // Global delcarations should be at the first
@@ -3825,7 +3825,7 @@ export class PBFunctionScope extends PBInsideFunctionScope {
       this.$_registerVar(param);
     }
     getCurrentProgramBuilder().pushScope(this);
-    body && body.call(this);
+    body?.call(this);
     getCurrentProgramBuilder().popScope();
   }
   $isMain(): boolean {
@@ -3843,7 +3843,7 @@ export class PBWhileScope extends PBInsideFunctionScope {
     super(parent);
     this.$ast = ast;
     getCurrentProgramBuilder().pushScope(this);
-    body && body.call(this);
+    body?.call(this);
     getCurrentProgramBuilder().popScope();
   }
 }
@@ -3858,7 +3858,7 @@ export class PBDoWhileScope extends PBInsideFunctionScope {
     super(parent);
     this.$ast = ast;
     getCurrentProgramBuilder().pushScope(this);
-    body && body.call(this);
+    body?.call(this);
     getCurrentProgramBuilder().popScope();
   }
   $while(condition: ExpValueNonArrayType) {
@@ -3886,7 +3886,7 @@ export class PBForScope extends PBInsideFunctionScope {
     this.$ast = ast;
     this.$_registerVar(counter);
     getCurrentProgramBuilder().pushScope(this);
-    body && body.call(this);
+    body?.call(this);
     getCurrentProgramBuilder().popScope();
   }
 }
@@ -3901,7 +3901,7 @@ export class PBNakedScope extends PBInsideFunctionScope {
     super(parent);
     this.$ast = ast;
     getCurrentProgramBuilder().pushScope(this);
-    body && body.call(this);
+    body?.call(this);
     getCurrentProgramBuilder().popScope();
   }
 }
@@ -3916,7 +3916,7 @@ export class PBIfScope extends PBInsideFunctionScope {
     super(parent);
     this.$ast = ast;
     getCurrentProgramBuilder().pushScope(this);
-    body && body.call(this);
+    body?.call(this);
     getCurrentProgramBuilder().popScope();
   }
   /**

@@ -682,7 +682,11 @@ export class MeshMaterial extends Material {
         );
       }
     });
-    color ? pb.getGlobalScope()[funcName](worldPos, color) : pb.getGlobalScope()[funcName](worldPos);
+    if (color) {
+      pb.getGlobalScope()[funcName](worldPos, color);
+    } else {
+      pb.getGlobalScope()[funcName](worldPos);
+    }
     if (that.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
       scope.$outputs.zSSRRoughness = ssrRoughness ?? pb.vec4(1, 0, 0, 1);
       scope.$outputs.zSSRNormal = ssrNormal ?? pb.vec4(0);

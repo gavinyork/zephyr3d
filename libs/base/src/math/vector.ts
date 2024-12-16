@@ -462,7 +462,7 @@ export class ObservableVector2 extends Vector2 {
     val = toFloat(val);
     if (val !== super.x) {
       super.x = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -475,7 +475,7 @@ export class ObservableVector2 extends Vector2 {
     val = toFloat(val);
     if (val !== super.y) {
       super.y = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -486,7 +486,7 @@ export class ObservableVector2 extends Vector2 {
     y = toFloat(y);
     if (x !== super.x || y !== super.y) {
       super.setXY(x, y);
-      this._callback && this._callback();
+      this._callback?.();
     }
     return this;
   }
@@ -495,7 +495,7 @@ export class ObservableVector2 extends Vector2 {
    */
   copyWithin(target: number, start: number, end?: number): this {
     super.copyWithin(target, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -503,15 +503,15 @@ export class ObservableVector2 extends Vector2 {
    */
   fill(value: number, start?: number, end?: number): this {
     super.fill(value, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
    * Inherited from Float32Array.reverse
    */
-  reverse(): Float32Array {
+  reverse(): this {
     super.reverse();
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -519,14 +519,14 @@ export class ObservableVector2 extends Vector2 {
    */
   set(array: ArrayLike<number>, offset?: number): void {
     super.set(array, offset);
-    this._callback && this._callback();
+    this._callback?.();
   }
   /**
    * Inherited from Float32Array.sort
    */
   sort(compareFn?: (a: number, b: number) => number): this {
     super.sort(compareFn);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
 }
@@ -630,7 +630,7 @@ export class Vector3 extends VectorBase {
    * @param z - The z component value.
    * @returns self
    */
-  setXYZ(x: number, y: number, z: number): Vector3 {
+  setXYZ(x: number, y: number, z: number): this {
     this[0] = x;
     this[1] = y;
     this[2] = z;
@@ -969,7 +969,7 @@ export class ObservableVector3 extends Vector3 {
     val = toFloat(val);
     if (val !== super.x) {
       super.x = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -982,7 +982,7 @@ export class ObservableVector3 extends Vector3 {
     val = toFloat(val);
     if (val !== super.y) {
       super.y = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -995,7 +995,7 @@ export class ObservableVector3 extends Vector3 {
     val = toFloat(val);
     if (val !== super.z) {
       super.z = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -1007,7 +1007,7 @@ export class ObservableVector3 extends Vector3 {
     z = toFloat(z);
     if (x !== super.x || y !== super.y || z !== super.z) {
       super.setXYZ(x, y, z);
-      this._callback && this._callback();
+      this._callback?.();
     }
     return this;
   }
@@ -1016,7 +1016,7 @@ export class ObservableVector3 extends Vector3 {
    */
   copyWithin(target: number, start: number, end?: number): this {
     super.copyWithin(target, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -1024,15 +1024,15 @@ export class ObservableVector3 extends Vector3 {
    */
   fill(value: number, start?: number, end?: number): this {
     super.fill(value, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
    * Inherited from Float32Array.reverse
    */
-  reverse(): Float32Array {
+  reverse(): this {
     super.reverse();
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -1040,14 +1040,14 @@ export class ObservableVector3 extends Vector3 {
    */
   set(array: ArrayLike<number>, offset?: number): void {
     super.set(array, offset);
-    this._callback && this._callback();
+    this._callback?.();
   }
   /**
    * Inherited from Float32Array.sort
    */
   sort(compareFn?: (a: number, b: number) => number): this {
     super.sort(compareFn);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
 }
@@ -1179,7 +1179,7 @@ export class Vector4 extends VectorBase {
    * @param w - The w component value.
    * @returns self
    */
-  setXYZW(x: number, y: number, z: number, w: number): Vector4 {
+  setXYZW(x: number, y: number, z: number, w: number): this {
     this[0] = x;
     this[1] = y;
     this[2] = z;
@@ -1511,7 +1511,7 @@ export class ObservableVector4 extends Vector4 {
     val = toFloat(val);
     if (val !== super.x) {
       super.x = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -1524,7 +1524,7 @@ export class ObservableVector4 extends Vector4 {
     val = toFloat(val);
     if (val !== super.y) {
       super.y = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -1537,7 +1537,7 @@ export class ObservableVector4 extends Vector4 {
     val = toFloat(val);
     if (val !== super.z) {
       super.z = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -1550,7 +1550,7 @@ export class ObservableVector4 extends Vector4 {
     val = toFloat(val);
     if (val !== super.w) {
       super.w = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -1563,7 +1563,7 @@ export class ObservableVector4 extends Vector4 {
     w = toFloat(w);
     if (x !== super.x || y !== super.y || z !== super.z || w !== super.w) {
       super.setXYZW(x, y, z, w);
-      this._callback && this._callback();
+      this._callback?.();
     }
     return this;
   }
@@ -1572,7 +1572,7 @@ export class ObservableVector4 extends Vector4 {
    */
   copyWithin(target: number, start: number, end?: number): this {
     super.copyWithin(target, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -1580,15 +1580,15 @@ export class ObservableVector4 extends Vector4 {
    */
   fill(value: number, start?: number, end?: number): this {
     super.fill(value, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
    * Inherited from Float32Array.reverse
    */
-  reverse(): Float32Array {
+  reverse(): this {
     super.reverse();
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -1596,14 +1596,14 @@ export class ObservableVector4 extends Vector4 {
    */
   set(array: ArrayLike<number>, offset?: number): void {
     super.set(array, offset);
-    this._callback && this._callback();
+    this._callback?.();
   }
   /**
    * Inherited from Float32Array.sort
    */
   sort(compareFn?: (a: number, b: number) => number): this {
     super.sort(compareFn);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
 }
@@ -1720,7 +1720,7 @@ export class Quaternion extends VectorBase {
    * @param w - The w component value.
    * @returns self
    */
-  setXYZW(x: number, y: number, z: number, w: number): Quaternion {
+  setXYZW(x: number, y: number, z: number, w: number): this {
     this[0] = x;
     this[1] = y;
     this[2] = z;
@@ -2296,7 +2296,7 @@ export class ObservableQuaternion extends Quaternion {
     val = toFloat(val);
     if (val !== super.x) {
       super.x = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -2309,7 +2309,7 @@ export class ObservableQuaternion extends Quaternion {
     val = toFloat(val);
     if (val !== super.y) {
       super.y = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -2322,7 +2322,7 @@ export class ObservableQuaternion extends Quaternion {
     val = toFloat(val);
     if (val !== super.z) {
       super.z = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -2335,7 +2335,7 @@ export class ObservableQuaternion extends Quaternion {
     val = toFloat(val);
     if (val !== super.w) {
       super.w = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -2348,7 +2348,7 @@ export class ObservableQuaternion extends Quaternion {
     w = toFloat(w);
     if (x !== super.x || y !== super.y || z !== super.z || w !== super.w) {
       super.setXYZW(x, y, z, w);
-      this._callback && this._callback();
+      this._callback?.();
     }
     return this;
   }
@@ -2357,7 +2357,7 @@ export class ObservableQuaternion extends Quaternion {
    */
   copyWithin(target: number, start: number, end?: number): this {
     super.copyWithin(target, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -2365,15 +2365,15 @@ export class ObservableQuaternion extends Quaternion {
    */
   fill(value: number, start?: number, end?: number): this {
     super.fill(value, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
    * Inherited from Float32Array.reverse
    */
-  reverse(): Float32Array {
+  reverse(): this {
     super.reverse();
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -2381,14 +2381,14 @@ export class ObservableQuaternion extends Quaternion {
    */
   set(array: ArrayLike<number>, offset?: number): void {
     super.set(array, offset);
-    this._callback && this._callback();
+    this._callback?.();
   }
   /**
    * Inherited from Float32Array.sort
    */
   sort(compareFn?: (a: number, b: number) => number): this {
     super.sort(compareFn);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
 }
@@ -5180,9 +5180,9 @@ export class Matrix4x4 extends VectorBase {
    * @returns self
    */
   decomposeLookAt(eye?: Vector3, target?: Vector3, up?: Vector3) {
-    eye && eye.setXYZ(this[12], this[13], this[14]);
-    up && up.setXYZ(this[4], this[5], this[6]);
-    target && target.setXYZ(this[12] - this[8], this[13] - this[9], this[14] - this[10]);
+    eye?.setXYZ(this[12], this[13], this[14]);
+    up?.setXYZ(this[4], this[5], this[6]);
+    target?.setXYZ(this[12] - this[8], this[13] - this[9], this[14] - this[10]);
     return this;
   }
   /** @internal */

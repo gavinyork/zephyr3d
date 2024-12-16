@@ -251,9 +251,13 @@ export class RouteTool {
           } else if (def.type === 'fileArray' && !isArray) {
             f = [f as fileUpload.UploadedFile];
           }
-          results && (results[name] = f);
+          if (results) {
+            results[name] = f;
+          }
         } else if (def.nullable) {
-          results && (results[name] = null);
+          if (results) {
+            results[name] = null;
+          }
         } else if (def.required) {
           return def.name || name;
         }
@@ -263,7 +267,9 @@ export class RouteTool {
           ? def.validator.validate(val)
           : { value: val, succeeded: true };
         if (isSucceeded) {
-          results && (results[name] = value);
+          if (results) {
+            results[name] = value;
+          }
           if (def.fields) {
             const arr = Array.isArray(value) ? value : [value];
             for (const el of arr) {

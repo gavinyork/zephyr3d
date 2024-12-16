@@ -71,7 +71,9 @@ export class Primitive {
    * @internal
    */
   addBoundingboxChangeCallback(cb: () => void): void {
-    cb && this._bboxChangeCallback.push(cb);
+    if (cb) {
+      this._bboxChangeCallback.push(cb);
+    }
   }
   /**
    * Removes a callback function for bounding box changing

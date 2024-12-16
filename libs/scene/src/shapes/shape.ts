@@ -62,8 +62,12 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
       bbox
     );
     this.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
-    normals && this.createAndSetVertexBuffer('normal_f32x3', new Float32Array(normals));
-    uvs && this.createAndSetVertexBuffer('tex0_f32x2', new Float32Array(uvs));
+    if (normals) {
+      this.createAndSetVertexBuffer('normal_f32x3', new Float32Array(normals));
+    }
+    if (uvs) {
+      this.createAndSetVertexBuffer('tex0_f32x2', new Float32Array(uvs));
+    }
     this.createAndSetIndexBuffer(new Uint16Array(indices));
     this.setBoundingVolume(bbox);
     this.indexCount = indices.length;

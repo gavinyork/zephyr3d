@@ -6,7 +6,7 @@ export type ParamType<T> = T extends { params: { [name: string]: { default: unkn
 export type RetType<T> = T extends { retval: unknown } ? T['retval'] : unknown;
 type FuncType<T> = (
   req: express.Request,
-  res: express.Response & { cookie: Function },
+  res: express.Response,
   next: express.NextFunction,
   params: ParamType<T>
 ) => Promise<RetType<T>>;

@@ -1,4 +1,5 @@
-import { BoxShape, CylinderShape, PlaneShape, SceneNode, SphereShape, TorusShape } from '@zephyr3d/scene';
+import type { SceneNode } from '@zephyr3d/scene';
+import { BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '@zephyr3d/scene';
 import type { ApiClient } from '../api/client/apiclient';
 import { SceneApiService } from '../api/services/sceneservcie';
 import { AddShapeCommand, NodeTransformCommand } from '../commands/scenecommands';

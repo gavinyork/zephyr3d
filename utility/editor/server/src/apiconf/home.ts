@@ -1,7 +1,6 @@
 import path from 'path';
 import type * as helper from './helper';
 import fs from 'fs';
-import { successResponse } from '../support';
 
 export const HOME_API = {
   path: ['/'],
@@ -22,6 +21,5 @@ export const HOME_HANDLERS: helper.ApiFunctions<typeof HOME_API.interfaces> = {
     html = html.replace('</head>', `<meta name="api-base-url" content="${config.apiBaseUrl}"></head>`);
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
-    successResponse;
   }
 };

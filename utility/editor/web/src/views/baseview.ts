@@ -1,4 +1,4 @@
-import { BaseModel } from '../models/basemodel';
+import type { BaseModel } from '../models/basemodel';
 
 export abstract class BaseView<Model extends BaseModel> {
   private _model: Model;

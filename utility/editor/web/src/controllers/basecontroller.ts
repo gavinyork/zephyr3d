@@ -1,4 +1,4 @@
-import { ApiClient } from '../api/client/apiclient';
+import type { ApiClient } from '../api/client/apiclient';
 import { eventBus } from '../core/eventbus';
 import type { BaseModel } from '../models/basemodel';
 

@@ -275,7 +275,7 @@ export class ABufferOIT extends OIT {
           this.Z_AB_nodeOffset,
           pb.uvec4(this.Z_AB_color, this.Z_AB_colorScale, this.Z_AB_depth, this.Z_AB_oldHead)
         );
-        pb.discard;
+        pb.discard();
       });
     });
     return true;

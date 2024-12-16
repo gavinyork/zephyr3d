@@ -1,9 +1,9 @@
 import type { Shape } from './shape';
-import { BoxFrameShape, BoxShape } from './box';
-import { CylinderShape } from './cylinder';
-import { PlaneShape } from './plane';
-import { SphereShape } from './sphere';
-import { TorusShape } from './torus';
+import type { BoxFrameShape, BoxShape } from './box';
+import type { CylinderShape } from './cylinder';
+import type { PlaneShape } from './plane';
+import type { SphereShape } from './sphere';
+import type { TorusShape } from './torus';
 
 export * from './shape';
 export * from './box';

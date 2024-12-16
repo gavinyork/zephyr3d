@@ -420,9 +420,12 @@ export class SceneNode extends makeEventTarget(Object)<{
       const sceneNew = newParent?.scene ?? null;
       const willDetach = sceneLast && sceneLast !== sceneNew;
       const willAttach = sceneNew && sceneLast !== sceneNew;
-      willDetach && this._willDetach(sceneLast);
-      willAttach && this._willAttach(sceneNew);
-
+      if (willDetach) {
+        this._willDetach(sceneLast);
+      }
+      if (willAttach) {
+        this._willAttach(sceneNew);
+      }
       if (this._parent) {
         this._parent._children.splice(this._parent._children.indexOf(this), 1);
       }
@@ -437,10 +440,12 @@ export class SceneNode extends makeEventTarget(Object)<{
         this._scene = sceneNew;
       }
       this._onTransformChanged(false);
-
-      willDetach && this._detached(sceneLast);
-      willAttach && this._attached(sceneNew);
-
+      if (willDetach) {
+        this._detached(sceneLast);
+      }
+      if (willAttach) {
+        this._attached(sceneNew);
+      }
       while (lastParent) {
         lastParent.dispatchEvent('noderemoved', this);
         lastParent = lastParent.parent;

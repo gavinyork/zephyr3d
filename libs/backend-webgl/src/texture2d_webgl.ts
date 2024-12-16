@@ -275,14 +275,8 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
       (this.device as WebGLDevice).clearErrors();
       const target = textureTargetMap[this._target];
       this._device.bindTexture(target, 0, this);
-      //this._device.context.bindTexture(target, this._object);
       this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 4);
       this._device.context.texSubImage2D(target, 0, 0, 0, params.glFormat, params.glType[0], element);
-      const err = (this.device as WebGLDevice).getError();
-      if (err) {
-        console.error(err);
-        false;
-      }
       if (this._mipLevelCount > 1) {
         this.generateMipmaps();
       }

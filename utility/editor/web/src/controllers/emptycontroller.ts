@@ -3,8 +3,8 @@ import type { DocumentType } from '../components/common';
 import { DlgNewScene } from '../views/dlg/newscenedlg';
 import { BaseController } from './basecontroller';
 import { EditorApiService } from '../api/services/editorservice';
-import { ApiClient } from '../api/client/apiclient';
-import { BaseModel } from '../models/basemodel';
+import type { ApiClient } from '../api/client/apiclient';
+import type { BaseModel } from '../models/basemodel';
 
 export class EmptyController<T extends BaseModel> extends BaseController<T> {
   private _editorservice: EditorApiService;

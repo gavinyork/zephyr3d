@@ -62,7 +62,9 @@ function internalLog(
   for (const cb of callbacks) {
     try {
       cb(stream, chunk);
-    } catch (err) {}
+    } catch (err) {
+      void err;
+    }
   }
   const name = normalizeName(stream);
   let wss = streams[name]?.stream;

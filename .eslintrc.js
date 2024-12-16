@@ -25,6 +25,11 @@ module.exports = {
     '@typescript-eslint/no-this-alias': 'off',
     '@typescript-eslint/consistent-type-imports': 'warn',
     '@typescript-eslint/ban-types': 'off',
+    '@typescript-eslint/no-unsafe-declaration-merging': 'off',
+    '@typescript-eslint/no-empty-interface': 'off',
+    '@typescript-eslint/no-empty-object-type': 'off',
+    '@typescript-eslint/no-duplicate-enum-values': 'off',
+    '@typescript-eslint/no-unsafe-function-type': 'off',
     'prettier/prettier': 'error'
   }
 };

@@ -1,16 +1,17 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { SceneModel } from '../models/scenemodel';
+import type { SceneModel } from '../models/scenemodel';
 import { EmptyView } from './emptyview';
 import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import { Tab } from '../components/tab';
-import { Application, Camera, Compositor, Scene, SceneNode } from '@zephyr3d/scene';
+import type { Camera, Compositor, Scene, SceneNode } from '@zephyr3d/scene';
+import { Application } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import { SceneNodeProps } from '../components/nodeprop';
-import { TRS } from '../types';
+import type { TRS } from '../types';
 
 export class SceneView extends EmptyView<SceneModel> {
   private _postGizmoRenderer: PostGizmoRenderer;

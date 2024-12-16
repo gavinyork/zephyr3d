@@ -2381,9 +2381,9 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /** vSync */
   vSync: boolean;
   /** Check if a pool with given key exists */
-  poolExists(key: string | Symbol): boolean;
+  poolExists(key: string | symbol): boolean;
   /** Get the pool with given key, or create a new one if not exists */
-  getPool(key: string | Symbol): Pool;
+  getPool(key: string | symbol): Pool;
   /** Get adapter information */
   getAdapterInfo(): any;
   /** Get sample count of current frame buffer */

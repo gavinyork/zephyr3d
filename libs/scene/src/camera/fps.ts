@@ -215,7 +215,7 @@ export class FPSCameraController extends BaseCameraController {
    * @param opt - options
    */
   setOptions(opt?: FPSCameraControllerOptions) {
-    opt && Object.assign(this.options, opt);
+    Object.assign(this.options, opt ?? {});
     this.reset();
   }
   /**

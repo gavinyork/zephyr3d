@@ -146,7 +146,7 @@ const colorNames = {
  * A generic constructor type
  * @public
  */
-export type GenericConstructor<T = {}> = {
+export type GenericConstructor<T = object> = {
   new (...args: any[]): T;
 };
 

@@ -100,8 +100,8 @@ export class SphereShape extends Shape<SphereCreationOptions> {
       for (let j = 0; j <= horizonalDetail; j++) {
         const v = getVertex(i * vTheta, j * hTheta, radius);
         vertices.push(v[0], v[1], v[2]);
-        uvs && uvs.push(j / horizonalDetail, i / verticalDetail);
-        normals && normals.push(v[0] / radius, v[1] / radius, v[2] / radius);
+        uvs?.push(j / horizonalDetail, i / verticalDetail);
+        normals?.push(v[0] / radius, v[1] / radius, v[2] / radius);
       }
     }
     for (let i = 0; i < verticalDetail; i++) {
@@ -130,7 +130,7 @@ export class SphereShape extends Shape<SphereCreationOptions> {
           bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i + 1]);
           bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i + 2]);
         }
-        vertexCallback && vertexCallback((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
+        vertexCallback?.((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
       }
     }
     return 'triangle-list';

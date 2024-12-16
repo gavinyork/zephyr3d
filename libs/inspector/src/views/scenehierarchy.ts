@@ -14,7 +14,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   node_request_delete: [node: SceneNode];
   node_drag_drop: [from: SceneNode, target: SceneNode];
 }>() {
-  private static classInfo: Map<Function, ClassInfo> = new Map([
+  private static classInfo: Map<unknown, ClassInfo> = new Map([
     [SceneNode, { classname: 'SceneNode' }],
     [GraphNode, { classname: 'GraphNode' }],
     [Mesh, { classname: 'Mesh' }],

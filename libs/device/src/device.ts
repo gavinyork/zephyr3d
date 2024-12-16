@@ -105,8 +105,8 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
   protected _backend: DeviceBackend;
   protected _beginFrameCounter: number;
   protected _programBuilder: ProgramBuilder;
-  protected _poolMap: Map<string | Symbol, Pool>;
-  protected _defaultPoolKey: Symbol;
+  protected _poolMap: Map<string | symbol, Pool>;
+  protected _defaultPoolKey: symbol;
   protected _temporalFramebuffer: boolean;
   protected _vSync: boolean;
   private _stateStack: DeviceState[];
@@ -344,10 +344,10 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
   get programBuilder(): ProgramBuilder {
     return this._programBuilder;
   }
-  poolExists(key: string | Symbol): boolean {
+  poolExists(key: string | symbol): boolean {
     return this._poolMap.has(key);
   }
-  getPool(key: string | Symbol): Pool {
+  getPool(key: string | symbol): Pool {
     let pool = this._poolMap.get(key);
     if (!pool) {
       pool = new Pool(this);

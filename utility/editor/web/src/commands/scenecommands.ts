@@ -1,14 +1,8 @@
-import {
-  Mesh,
-  PBRMetallicRoughnessMaterial,
-  Scene,
-  SceneNode,
-  ShapeOptionType,
-  ShapeType
-} from '@zephyr3d/scene';
-import { Command } from '../core/command';
-import { GenericConstructor } from '@zephyr3d/base';
-import { TRS } from '../types';
+import type { Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
+import { Mesh, PBRMetallicRoughnessMaterial } from '@zephyr3d/scene';
+import type { Command } from '../core/command';
+import type { GenericConstructor } from '@zephyr3d/base';
+import type { TRS } from '../types';
 
 export class AddShapeCommand<T extends ShapeType> implements Command {
   private _mesh: Mesh;

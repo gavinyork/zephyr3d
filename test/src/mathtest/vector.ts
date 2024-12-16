@@ -189,7 +189,7 @@ export function testQuaternion() {
     const axis2 = q2.getAxisAngle().xyz();
     const angle2 = Math.acos(Vector3.dot(axis1, axis2));
     assert(numberEquals(angle, angle2), 'angle between failed');
-  });
+  })();
   (function testEulerAngle() {
     const angle1 = rand(-Math.PI, Math.PI);
     const angle2 = rand(-Math.PI, Math.PI);

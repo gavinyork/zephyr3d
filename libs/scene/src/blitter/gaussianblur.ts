@@ -208,8 +208,8 @@ export class GaussianBlurBlitter extends Blitter {
       this.$if(this.test1, function () {
         this.d1 = that.readTexel(scope, type, srcTex, this.uv1, srcLayer, sampleType);
       });
-      (this.$l.uv2 = pb.add(srcUV, pb.mul(this.blurMultiplyVec, this.blurSize, this.i))),
-        (this.$l.d2 = pb.vec4());
+      this.$l.uv2 = pb.add(srcUV, pb.mul(this.blurMultiplyVec, this.blurSize, this.i));
+      this.$l.d2 = pb.vec4();
       if (that._depthTex) {
         this.$l.depth2 = this.getLinearDepth(this.uv2);
         this.$l.test2 = pb.lessThan(pb.abs(pb.sub(this.depth2, this.centerDepth)), this.depthCutoff);

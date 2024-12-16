@@ -276,7 +276,10 @@ export class ShadowMapper {
     val = Math.min(Math.max(1, Number(val) >> 0), 64);
     if (val !== this._pdSampleCount) {
       this._pdSampleCount = val;
-      this.asPCFPD() && (this.asPCFPD().tapCount = this._pdSampleCount);
+      const pcfpd = this.asPCFPD();
+      if (pcfpd) {
+        pcfpd.tapCount = this._pdSampleCount;
+      }
     }
   }
   /** Radius for poisson disc PCF */
@@ -298,7 +301,10 @@ export class ShadowMapper {
     val = val !== 3 && val !== 5 && val !== 7 ? 5 : val;
     if (val !== this._pcfKernelSize) {
       this._pcfKernelSize = val;
-      this.asPCFOPT() && (this.asPCFOPT().kernelSize = this._pcfKernelSize);
+      const pcfopt = this.asPCFOPT();
+      if (pcfopt) {
+        pcfopt.kernelSize = this._pcfKernelSize;
+      }
     }
   }
   /** Kernel size of VSM */
@@ -309,7 +315,10 @@ export class ShadowMapper {
     val = Math.max(3, Number(val) >> 0) | 1;
     if (val !== this._vsmBlurKernelSize) {
       this._vsmBlurKernelSize = val;
-      this.asVSM() && (this.asVSM().kernelSize = this._vsmBlurKernelSize);
+      const vsm = this.asVSM();
+      if (vsm) {
+        vsm.kernelSize = this._vsmBlurKernelSize;
+      }
     }
   }
   /** Blur radius for VSM */
@@ -320,7 +329,10 @@ export class ShadowMapper {
     val = Math.max(0, Number(val) || 0);
     if (val !== this._vsmBlurRadius) {
       this._vsmBlurRadius = val;
-      this.asVSM() && (this.asVSM().blurSize = this._vsmBlurRadius);
+      const vsm = this.asVSM();
+      if (vsm) {
+        vsm.blurSize = this._vsmBlurRadius;
+      }
     }
   }
   /** Darkness for VSM */
@@ -341,7 +353,10 @@ export class ShadowMapper {
   set esmBlur(val: boolean) {
     if (!!val !== this.esmBlur) {
       this._esmBlur = !!val;
-      this.asESM() && (this.asESM().blur = this._esmBlur);
+      const esm = this.asESM();
+      if (esm) {
+        esm.blur = this._esmBlur;
+      }
     }
   }
   /** Kernel size for ESM */
@@ -352,7 +367,10 @@ export class ShadowMapper {
     val = Math.max(3, Number(val) >> 0) | 1;
     if (val !== this._esmBlurKernelSize) {
       this._esmBlurKernelSize = val;
-      this.asESM() && (this.asESM().kernelSize = this._esmBlurKernelSize);
+      const esm = this.asESM();
+      if (esm) {
+        esm.kernelSize = this._esmBlurKernelSize;
+      }
     }
   }
   /** Blur radius for ESM */
@@ -363,7 +381,10 @@ export class ShadowMapper {
     val = Math.max(0, Number(val) || 0);
     if (val !== this._esmBlurRadius) {
       this._esmBlurRadius = val;
-      this.asESM() && (this.asESM().blurSize = this._esmBlurRadius);
+      const esm = this.asESM();
+      if (esm) {
+        esm.blurSize = this._esmBlurRadius;
+      }
     }
   }
   /** Depth scale for ESM */

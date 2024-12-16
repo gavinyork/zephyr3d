@@ -347,22 +347,22 @@ export class WebGPUTextureCaps implements TextureCaps {
       writable: false,
       size: 1
     };
-    (this._textureFormatInfos['r8snorm'] = {
+    this._textureFormatInfos['r8snorm'] = {
       gpuSampleType: 'float',
       filterable: true,
       renderable: false,
       compressed: false,
       writable: false,
       size: 1
-    }),
-      (this._textureFormatInfos['r16f'] = {
-        gpuSampleType: 'float',
-        filterable: true,
-        renderable: true,
-        compressed: false,
-        writable: false,
-        size: 2
-      });
+    };
+    this._textureFormatInfos['r16f'] = {
+      gpuSampleType: 'float',
+      filterable: true,
+      renderable: true,
+      compressed: false,
+      writable: false,
+      size: 2
+    };
     this._textureFormatInfos['r32f'] = {
       gpuSampleType: 'unfilterable-float',
       filterable: false,

@@ -94,64 +94,61 @@ export class BoxShape extends Shape<BoxCreationOptions> {
     const leftFaceNormal = normals ? [-1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0] : null;
     const bottomFacePos = [minx, miny, maxz, minx, miny, minz, maxx, miny, minz, maxx, miny, maxz];
     const bottomFaceNormal = normals ? [0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0] : null;
-    indices &&
-      indices.push(
-        0 + indexOffset,
-        1 + indexOffset,
-        2 + indexOffset,
-        0 + indexOffset,
-        2 + indexOffset,
-        3 + indexOffset,
-        4 + indexOffset,
-        5 + indexOffset,
-        6 + indexOffset,
-        4 + indexOffset,
-        6 + indexOffset,
-        7 + indexOffset,
-        8 + indexOffset,
-        9 + indexOffset,
-        10 + indexOffset,
-        8 + indexOffset,
-        10 + indexOffset,
-        11 + indexOffset,
-        12 + indexOffset,
-        13 + indexOffset,
-        14 + indexOffset,
-        12 + indexOffset,
-        14 + indexOffset,
-        15 + indexOffset,
-        16 + indexOffset,
-        17 + indexOffset,
-        18 + indexOffset,
-        16 + indexOffset,
-        18 + indexOffset,
-        19 + indexOffset,
-        20 + indexOffset,
-        21 + indexOffset,
-        22 + indexOffset,
-        20 + indexOffset,
-        22 + indexOffset,
-        23 + indexOffset
-      );
-    vertices &&
-      vertices.push(
-        ...topFacePos,
-        ...frontFacePos,
-        ...rightFacePos,
-        ...backFacePos,
-        ...leftFacePos,
-        ...bottomFacePos
-      );
-    normals &&
-      normals.push(
-        ...topFacenormal,
-        ...frontFaceNormal,
-        ...rightFaceNormal,
-        ...backFaceNormal,
-        ...leftFaceNormal,
-        ...bottomFaceNormal
-      );
-    uvs && uvs.push(...uv, ...uv, ...uv, ...uv, ...uv, ...uv);
+    indices?.push(
+      0 + indexOffset,
+      1 + indexOffset,
+      2 + indexOffset,
+      0 + indexOffset,
+      2 + indexOffset,
+      3 + indexOffset,
+      4 + indexOffset,
+      5 + indexOffset,
+      6 + indexOffset,
+      4 + indexOffset,
+      6 + indexOffset,
+      7 + indexOffset,
+      8 + indexOffset,
+      9 + indexOffset,
+      10 + indexOffset,
+      8 + indexOffset,
+      10 + indexOffset,
+      11 + indexOffset,
+      12 + indexOffset,
+      13 + indexOffset,
+      14 + indexOffset,
+      12 + indexOffset,
+      14 + indexOffset,
+      15 + indexOffset,
+      16 + indexOffset,
+      17 + indexOffset,
+      18 + indexOffset,
+      16 + indexOffset,
+      18 + indexOffset,
+      19 + indexOffset,
+      20 + indexOffset,
+      21 + indexOffset,
+      22 + indexOffset,
+      20 + indexOffset,
+      22 + indexOffset,
+      23 + indexOffset
+    );
+    vertices?.push(
+      ...topFacePos,
+      ...frontFacePos,
+      ...rightFacePos,
+      ...backFacePos,
+      ...leftFacePos,
+      ...bottomFacePos
+    );
+    normals?.push(
+      ...topFacenormal,
+      ...frontFaceNormal,
+      ...rightFaceNormal,
+      ...backFaceNormal,
+      ...leftFaceNormal,
+      ...bottomFaceNormal
+    );
+    uvs?.push(...uv, ...uv, ...uv, ...uv, ...uv, ...uv);
     Shape._transform(options.transform, vertices, normals, start);
     if (bbox || vertexCallback) {
       for (let i = start; i < vertices.length - 2; i += 3) {
@@ -163,7 +160,7 @@ export class BoxShape extends Shape<BoxCreationOptions> {
           bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i + 1]);
           bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i + 2]);
         }
-        vertexCallback && vertexCallback((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
+        vertexCallback?.((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
       }
     }
     return 'triangle-list';
@@ -240,10 +237,10 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> {
     const topFacenormal = normals ? [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0] : null;
     const bottomFacePos = [minx, miny, maxz, minx, miny, minz, maxx, miny, minz, maxx, miny, maxz];
     const bottomFaceNormal = normals ? [0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0] : null;
-    indices && indices.push(0, 1, 1, 2, 2, 3, 3, 0, 0, 5, 1, 4, 2, 7, 3, 6, 6, 5, 5, 4, 4, 7, 7, 6);
-    vertices && vertices.push(...topFacePos, ...bottomFacePos);
-    normals && normals.push(...topFacenormal, ...bottomFaceNormal);
-    uvs && uvs.push(...uv, ...uv, ...uv, ...uv, ...uv, ...uv);
+    indices?.push(0, 1, 1, 2, 2, 3, 3, 0, 0, 5, 1, 4, 2, 7, 3, 6, 6, 5, 5, 4, 4, 7, 7, 6);
+    vertices?.push(...topFacePos, ...bottomFacePos);
+    normals?.push(...topFacenormal, ...bottomFaceNormal);
+    uvs?.push(...uv, ...uv, ...uv, ...uv, ...uv, ...uv);
     Shape._transform(options.transform, vertices, normals, start);
     if (bbox) {
       for (let i = start; i < vertices.length - 2; i += 3) {

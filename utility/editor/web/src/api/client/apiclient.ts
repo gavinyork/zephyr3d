@@ -23,9 +23,7 @@ export class ApiClient {
   }
   private async request(endpoint: string, baseUrl: string, options: RequestOptions = {}): Promise<Response> {
     const { params, timeout = this.config.timeout, ...fetchOptions } = options;
-    baseUrl = baseUrl.startsWith('http')
-      ? baseUrl
-      : window.location.origin + baseUrl;
+    baseUrl = baseUrl.startsWith('http') ? baseUrl : window.location.origin + baseUrl;
     const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
     const url = new URL(normalizedEndpoint, normalizedBaseUrl);
@@ -96,7 +94,11 @@ export class ApiClient {
       eventBus.dispatchEvent('error', `Request failed: ${error}`);
     }
   }
-  async asset(endpoint: string, type: 'json'|'text'|'blob'|'arraybuffer', options: RequestOptions = {}) {
+  async asset(
+    endpoint: string,
+    type: 'json' | 'text' | 'blob' | 'arraybuffer',
+    options: RequestOptions = {}
+  ) {
     const res = await this.request(endpoint, this._config.assetBaseUrl, {
       ...options,
       method: 'GET'

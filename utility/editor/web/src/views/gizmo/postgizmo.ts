@@ -521,7 +521,9 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   private _endRotate() {
     Application.instance.device.canvas.style.cursor = 'default';
     this._rotateInfo = null;
-    this._node && this.dispatchEvent('end_rotate', this._node);
+    if (this._node) {
+      this.dispatchEvent('end_rotate', this._node);
+    }
   }
   private _beginScale(startX: number, startY: number, axis: number, startPosition: number) {
     this._endRotate();
@@ -607,7 +609,9 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   private _endScale() {
     Application.instance.device.canvas.style.cursor = 'default';
     this._scaleInfo = null;
-    this._node && this.dispatchEvent('end_scale', this._node);
+    if (this._node) {
+      this.dispatchEvent('end_scale', this._node);
+    }
   }
   private _beginTranslate(startX: number, startY: number, axis: number, type: HitType, pointLocal: Vector3) {
     this._endRotate();
@@ -673,7 +677,9 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   private _endTranslation() {
     Application.instance.device.canvas.style.cursor = 'default';
     this._translatePlaneInfo = null;
-    this._node && this.dispatchEvent('end_translate', this._node);
+    if (this._node) {
+      this.dispatchEvent('end_translate', this._node);
+    }
   }
   private _measureRotateSpeed() {
     const pos1 = new Vector4(0, 0, this._axisLength, 1);

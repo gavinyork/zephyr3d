@@ -412,9 +412,15 @@ export class WebGLDevice extends BaseDevice {
           }
         }
       } else {
-        colorFlag && gl.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
-        depthFlag && gl.clearDepth(clearDepth);
-        stencilFlag && gl.clearStencil(clearStencil);
+        if (colorFlag) {
+          gl.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+        }
+        if (depthFlag) {
+          gl.clearDepth(clearDepth);
+        }
+        if (stencilFlag) {
+          gl.clearStencil(clearStencil);
+        }
         gl.clear(colorFlag | depthFlag | stencilFlag);
       }
       (gl._currentFramebuffer as WebGLFrameBuffer)?.tagDraw();

@@ -101,9 +101,9 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
         const sinTheta = Math.sin(theta);
         const cosTheta = Math.cos(theta);
         const m = 1 / Math.sqrt(sinTheta * sinTheta + slope * slope + cosTheta * cosTheta);
-        vertices.push(radius * sinTheta, (v - options.anchor) * options.height, radius * cosTheta);
-        normals && normals.push(sinTheta * m, slope * m, cosTheta * m);
-        uvs && uvs.push(u, 1 - v);
+        vertices?.push(radius * sinTheta, (v - options.anchor) * options.height, radius * cosTheta);
+        normals?.push(sinTheta * m, slope * m, cosTheta * m);
+        uvs?.push(u, 1 - v);
         if (y < options.heightDetail && x < options.radialDetail) {
           this.addPatch(options.radialDetail, x, y, indices, indexOffset);
         }
@@ -120,7 +120,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
           bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i + 1]);
           bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i + 2]);
         }
-        vertexCallback && vertexCallback((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
+        vertexCallback?.((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
       }
     }
     return 'triangle-list';

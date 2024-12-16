@@ -125,7 +125,7 @@ export class Utils {
       const s = url.toString();
       return s[s.length - 1] === '/' ? s.slice(0, s.length - 1) : s;
     } catch (err) {
-      serverError(`joinURL(): invalid domain: ${domain}`);
+      serverError(`joinURL(): ${err}`);
     }
   }
   public static csvToArray(data: string, fieldSep?: string, newLine?: string): string[][] {
@@ -605,7 +605,7 @@ export function serializable(options?: ISerailizable) {
       if (this.super) {
         this.super.deserialize(obj, data);
       }
-      this.options && this.options.pre && this.options.pre(obj, data);
+      this.options?.pre?.(obj, data);
       const proplist: any = this.properties;
       for (const prop in proplist) {
         if (proplist[prop].options.deserialize) {
@@ -614,7 +614,7 @@ export function serializable(options?: ISerailizable) {
           obj[prop] = deserialize(data.value[prop]);
         }
       }
-      this.options && this.options.post && this.options.post(obj, data);
+      this.options?.post?.(obj, data);
     }.bind(info);
   };
 }

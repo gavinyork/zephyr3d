@@ -40,7 +40,7 @@
     "url": "https://github.com/gavinyork/zephyr3d/issues"
   },
   "devDependencies": {
-    "eslint": "^9.16.0",
+    "eslint": "^8.56.0",
     "eslint-config-prettier": "^8.6.0",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-prettier": "^4.2.1",

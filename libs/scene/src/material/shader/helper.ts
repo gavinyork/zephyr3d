@@ -268,7 +268,9 @@ export class ShaderHelper {
         }
         scope[UNIFORM_NAME_SHADOW_MAP] = tex.uniform(0);
       }
-      ctx.drawEnvLight && ctx.env.light.envLight.initShaderBindings(pb);
+      if (ctx.drawEnvLight) {
+        ctx.env.light.envLight.initShaderBindings(pb);
+      }
     }
   }
   /**
@@ -804,15 +806,17 @@ export class ShaderHelper {
     });
     bindGroup.setBuffer(UNIFORM_NAME_LIGHT_BUFFER, lightBuffer);
     bindGroup.setTexture(UNIFORM_NAME_LIGHT_INDEX_TEXTURE, lightIndexTexture);
-    ctx.drawEnvLight && ctx.env.light.envLight.updateBindGroup(bindGroup);
+    if (ctx.drawEnvLight) {
+      ctx.env.light.envLight.updateBindGroup(bindGroup);
+    }
   }
   /** @internal */
   static setLightUniformsShadow(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight) {
     const shadowMapParams = ctx.shadowMapInfo.get(light);
-    (this._lightUniformShadow.light.sunDir = ctx.sunLight
+    this._lightUniformShadow.light.sunDir = ctx.sunLight
       ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1)
-      : this.defaultSunDir),
-      (this._lightUniformShadow.light.envLightStrength = ctx.env?.light.strength ?? 0);
+      : this.defaultSunDir;
+    this._lightUniformShadow.light.envLightStrength = ctx.env?.light.strength ?? 0;
     this._lightUniformShadow.light.shadowCascades = shadowMapParams.numShadowCascades;
     this._lightUniformShadow.light.positionAndRange.set(light.positionAndRange);
     this._lightUniformShadow.light.directionAndCutoff.set(light.directionAndCutoff);
@@ -828,7 +832,9 @@ export class ShaderHelper {
       shadowMapParams.shadowMap,
       shadowMapParams.shadowMapSampler
     );
-    ctx.drawEnvLight && ctx.env.light.envLight.updateBindGroup(bindGroup);
+    if (ctx.drawEnvLight) {
+      ctx.env.light.envLight.updateBindGroup(bindGroup);
+    }
   }
   /**
    * Gets the uniform variable of type float which holds the strength of the environment light

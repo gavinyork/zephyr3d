@@ -80,42 +80,54 @@ textureApp.ready().then(async () => {
       device.setViewport(vp);
       device.setScissor(vp);
       device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
-      test2D && case2d.draw(vp[2], vp[3]);
+      if (test2D) {
+        case2d.draw(vp[2], vp[3]);
+      }
     }
     {
       const vp = getSubViewport(1);
       device.setViewport(vp);
       device.setScissor(vp);
       device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
-      test3D && case3d?.draw(vp[2], vp[3]);
+      if (test3D) {
+        case3d?.draw(vp[2], vp[3]);
+      }
     }
     {
       const vp = getSubViewport(2);
       device.setViewport(vp);
       device.setScissor(vp);
       device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
-      test2DArray && case2dArray && case2dArray.draw(vp[2], vp[3]);
+      if (test2DArray && case2dArray) {
+        case2dArray.draw(vp[2], vp[3]);
+      }
     }
     {
       const vp = getSubViewport(3);
       device.setViewport(vp);
       device.setScissor(vp);
       device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
-      testCubeSH && caseCubeSH.draw(vp[2], vp[3]);
+      if (testCubeSH) {
+        caseCubeSH.draw(vp[2], vp[3]);
+      }
     }
     {
       const vp = getSubViewport(4);
       device.setViewport(vp);
       device.setScissor(vp);
       device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
-      testCube && caseCube.draw(vp[2], vp[3]);
+      if (testCube) {
+        caseCube.draw(vp[2], vp[3]);
+      }
     }
     {
       const vp = getSubViewport(5);
       device.setViewport(vp);
       device.setScissor(vp);
       device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
-      testVideo && caseVideo.draw(vp[2], vp[3]);
+      if (testVideo) {
+        caseVideo.draw(vp[2], vp[3]);
+      }
     }
     device.popDeviceStates();
     imGuiNewFrame();
