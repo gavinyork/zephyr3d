@@ -17,6 +17,7 @@ import {
   Vector4
 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
+import type { AnimationSet } from '../animation';
 
 /**
  * Node iterate function type
@@ -82,6 +83,12 @@ export class SceneNode extends makeEventTarget(Object)<{
   /** @internal */
   private _placeToOctree: boolean;
   /** @internal */
+  private _sealed: boolean;
+  /** @internal */
+  private _assetUrl: string;
+  /** @internal */
+  private _animationSet: AnimationSet;
+  /** @internal */
   protected _parent: SceneNode;
   /** @internal */
   protected _children: SceneNode[];
@@ -125,6 +132,9 @@ export class SceneNode extends makeEventTarget(Object)<{
     this._pickMode = false;
     this._placeToOctree = true;
     this._parent = null;
+    this._sealed = false;
+    this._assetUrl = '';
+    this._animationSet = null;
     this._children = [];
     this._transformChangeCallback = () => this._onTransformChanged(true);
     this._position = new ObservableVector3(0, 0, 0);
@@ -178,6 +188,27 @@ export class SceneNode extends makeEventTarget(Object)<{
   /** true if the node is attached to a scene, false otherwise */
   get attached(): boolean {
     return !!this._scene;
+  }
+  /** true if the node is sealed */
+  get sealed(): boolean {
+    return this._sealed;
+  }
+  set sealed(val: boolean) {
+    this._sealed = val;
+  }
+  /** Asset url */
+  get assetUrl(): string {
+    return this._assetUrl;
+  }
+  set assetUrl(val: string) {
+    this._assetUrl = val;
+  }
+  /** Animation set */
+  get animationSet(): AnimationSet {
+    return this._animationSet;
+  }
+  set animationSet(val: AnimationSet) {
+    this._animationSet = val;
   }
   /**
    * Check if given node is a direct child of the node

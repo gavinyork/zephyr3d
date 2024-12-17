@@ -264,7 +264,7 @@ export class AssetManager {
    */
   async fetchModel(scene: Scene, url: string, options?: ModelFetchOptions): Promise<ModelInfo> {
     const sharedModel = await this.fetchModelData(scene, url, options);
-    return this.createSceneNode(scene, sharedModel, !!options?.enableInstancing);
+    return this.createSceneNode(scene, url, sharedModel, !!options?.enableInstancing);
   }
   /** @internal */
   async loadTextData(url: string, postProcess?: (text: string) => string): Promise<string> {
@@ -469,12 +469,15 @@ export class AssetManager {
   /** @internal */
   private createSceneNode(
     scene: Scene,
+    url: string,
     model: SharedModel,
     instancing: boolean
   ): { group: SceneNode; animationSet: AnimationSet } {
     const group = new SceneNode(scene);
     group.name = model.name;
-    let animationSet = new AnimationSet(scene, group);
+    group.assetUrl = url;
+    group.sealed = true;
+    group.animationSet = new AnimationSet(scene, group);
     for (let i = 0; i < model.scenes.length; i++) {
       const assetScene = model.scenes[i];
       const skeletonMeshMap: Map<
@@ -520,7 +523,7 @@ export class AssetManager {
         if (animation.tracks.size === 0) {
           continue;
         }
-        animationSet.add(animation);
+        group.animationSet.add(animation);
         for (const sk of animationData.skeletons) {
           const nodes = skeletonMeshMap.get(sk);
           if (nodes) {
@@ -538,11 +541,11 @@ export class AssetManager {
         }
       }
     }
-    if (animationSet.numAnimations === 0) {
-      animationSet.dispose();
-      animationSet = null;
+    if (group.animationSet.numAnimations === 0) {
+      group.animationSet.dispose();
+      group.animationSet = null;
     }
-    return { group, animationSet };
+    return { group, animationSet: group.animationSet };
   }
   /**
    * Sets the loader for a given builtin-texture
