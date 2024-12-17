@@ -157,48 +157,6 @@ export abstract class AmbientLight extends BaseLight {
 }
 */
 
-/*
-export class HemiSphericLight extends AmbientLight {
-  protected _colorUp: Vector4;
-  protected _colorDown: Vector4;
-  constructor(scene: Scene) {
-    super(scene, LIGHT_TYPE_HEMISPHERIC);
-    this._colorUp = Vector4.zero();
-    this._colorDown = Vector4.zero();
-  }
-  get colorUp() {
-    return this._colorUp;
-  }
-  set colorUp(val: Vector4) {
-    this.setColorUp(val);
-  }
-  setColorUp(val: Vector4) {
-    this._colorUp.set(val);
-    this.invalidateUniforms();
-    return this;
-  }
-  get colorDown() {
-    return this._colorDown;
-  }
-  set colorDown(val: Vector4) {
-    this.setColorDown(val);
-  }
-  setColorDown(val: Vector4) {
-    this._colorDown.set(val);
-    this.invalidateUniforms();
-    return this;
-  }
-  isHemiSphericLight(): this is HemiSphericLight {
-    return true;
-  }
-  computeUniforms() {
-    this._positionRange = this.colorUp;
-    this._directionCutoff = this.colorDown;
-    this._diffuseIntensity = new Vector4(1, 1, 1, this.intensity);
-  }
-}
-*/
-
 /**
  * Base class for any kind of puncual light
  * @public
@@ -552,7 +510,7 @@ export class PointLight extends PunctualLight {
    */
   constructor(scene: Scene) {
     super(scene, LIGHT_TYPE_POINT);
-    this._range = 1;
+    this._range = 10;
     this.invalidateBoundingVolume();
   }
   /** The range of the light */
@@ -615,7 +573,7 @@ export class SpotLight extends PunctualLight {
    */
   constructor(scene: Scene) {
     super(scene, LIGHT_TYPE_SPOT);
-    this._range = 1;
+    this._range = 10;
     this._cutoff = Math.cos(Math.PI / 4);
     this.invalidateBoundingVolume();
   }

@@ -6,8 +6,9 @@ export function deserializeObjectProps<T>(obj: T, cls: SerializableClass<T>, jso
     str: [''],
     bool: [false]
   };
-  for (const k of Object.getOwnPropertyNames(cls.props)) {
-    const prop = cls.props[k];
+  const props = cls.getProps() ?? [];
+  for (const prop of props) {
+    const k = prop.name;
     const v = json[k];
     if (!v && !prop.default) {
       console.error(`Warn: serialized value not found for '${k}'`);
@@ -58,8 +59,9 @@ export function serializeObjectProps<T>(obj: T, cls: SerializableClass<T>, json:
     str: [''],
     bool: [false]
   };
-  for (const k of Object.getOwnPropertyNames(cls.props)) {
-    const prop = cls.props[k];
+  const props = cls.getProps() ?? [];
+  for (const prop of props) {
+    const k = prop.name;
     prop.get.call(obj, tmpVal);
     switch (prop.type) {
       case 'float':
@@ -116,15 +118,33 @@ export function serializeObjectProps<T>(obj: T, cls: SerializableClass<T>, json:
   }
 }
 
-export function serializeObject<T>(obj: T, serailizationInfo: SerializationInfo<T>, json?: object) {
+export function serializeObject<T, P>(obj: T, serailizationInfo: SerializationInfo<T>, json?: object) {
   const index = serailizationInfo.findIndex((val) => val.ctor === obj.constructor);
   if (index < 0) {
     throw new Error('Serialize object failed: Cannot found serialization meta data');
   }
-  const info = serailizationInfo[index];
+  let info = serailizationInfo[index];
   json = json ?? {
     ClassName: info.className
   };
-  serializeObjectProps(obj, info, json);
+  while (info) {
+    serializeObjectProps(obj, info, json);
+    info = info.parent;
+  }
   return json;
+}
+
+export function deserializeObject<T>(ctx: unknown, json: object, serailizationInfo: SerializationInfo<T>): T {
+  const className = json['ClassName'];
+  const index = serailizationInfo.findIndex((val) => val.className === className);
+  if (index < 0) {
+    throw new Error('Deserialize object failed: Cannot found serialization meta data');
+  }
+  let info = serailizationInfo[index];
+  const obj = info.createFunc ? info.createFunc(ctx) : new info.ctor();
+  while (info) {
+    deserializeObjectProps(obj, info, json);
+    info = info.parent;
+  }
+  return obj;
 }

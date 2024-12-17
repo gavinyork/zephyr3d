@@ -24,12 +24,12 @@ export class OrthoCamera extends Camera {
    */
   constructor(
     scene: Scene,
-    left: number,
-    right: number,
-    bottom: number,
-    top: number,
-    near: number,
-    far: number
+    left = -1,
+    right = 1,
+    bottom = -1,
+    top = 1,
+    near = -1,
+    far = 1
   ) {
     super(scene);
     this._left = left;

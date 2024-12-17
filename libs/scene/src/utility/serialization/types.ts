@@ -20,9 +20,9 @@ export type PropertyAccessor<T = unknown> = {
 export type SerializableClass<T = unknown> = {
   ctor: GenericConstructor<T>;
   className: string;
-  super: GenericConstructor<T>;
-  createFunc?: (ctx: unknown) => T;
-  props: Record<string, PropertyAccessor<T>>;
+  parent?: SerializableClass<T>;
+  createFunc?: (ctx: any) => T;
+  getProps: () => PropertyAccessor<T>[];
 };
 
 export type SerializationInfo<T = unknown> = SerializableClass<T>[];

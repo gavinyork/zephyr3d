@@ -21,7 +21,7 @@ export class PerspectiveCamera extends Camera {
    * @param near - The near clip plane
    * @param far - The far clip plane
    */
-  constructor(scene: Scene, fovY: number, aspect: number, near: number, far: number) {
+  constructor(scene: Scene, fovY = Math.PI / 3, aspect = 1, near = 1, far = 1000) {
     super(scene);
     this._fovY = fovY;
     this._aspect = aspect;
