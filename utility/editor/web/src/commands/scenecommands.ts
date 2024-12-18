@@ -1,45 +1,103 @@
 import type { Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
-import { Mesh, PBRMetallicRoughnessMaterial } from '@zephyr3d/scene';
+import {
+  BoxFrameShape,
+  BoxShape,
+  CylinderShape,
+  Mesh,
+  PBRMetallicRoughnessMaterial,
+  PlaneShape,
+  SphereShape,
+  TorusShape
+} from '@zephyr3d/scene';
 import type { Command } from '../core/command';
-import type { GenericConstructor } from '@zephyr3d/base';
+import { Quaternion, Vector3, type GenericConstructor } from '@zephyr3d/base';
 import type { TRS } from '../types';
 
 export class AddShapeCommand<T extends ShapeType> implements Command {
   private _mesh: Mesh;
   private _desc: string;
   private _scene: Scene;
+  private _shapeCls: GenericConstructor<T>;
+  private _options: ShapeOptionType<T>;
   constructor(scene: Scene, shapeCls: GenericConstructor<T>, options?: ShapeOptionType<T>) {
-    const shape = new shapeCls(options);
-    this._mesh = new Mesh(null, shape, new PBRMetallicRoughnessMaterial());
+    this._mesh = null;
     this._scene = scene;
-    this._desc = `Add ${shape.type}`;
+    switch (shapeCls as any) {
+      case BoxShape: {
+        this._desc = 'Add box';
+        break;
+      }
+      case SphereShape: {
+        this._desc = 'Add sphere';
+        break;
+      }
+      case BoxFrameShape: {
+        this._desc = 'Add box frame';
+        break;
+      }
+      case PlaneShape: {
+        this._desc = 'Add plane';
+        break;
+      }
+      case CylinderShape: {
+        this._desc = 'Add cylinder';
+        break;
+      }
+      case TorusShape: {
+        this._desc = 'Add torus';
+        break;
+      }
+      default: {
+        this._desc = 'Add unknown shape';
+        break;
+      }
+    }
+    this._shapeCls = shapeCls;
+    this._options = options;
   }
   get desc(): string {
     return this._desc;
   }
   execute() {
-    this._mesh.parent = this._scene.rootNode;
+    const shape = new this._shapeCls(this._options);
+    this._mesh = new Mesh(this._scene, shape, new PBRMetallicRoughnessMaterial());
   }
   undo() {
     this._mesh.parent = null;
-    this._mesh.primitive.dispose();
+    this._mesh.primitive?.dispose();
     this._mesh.dispose();
+    this._mesh = null;
   }
 }
 
 export class NodeTransformCommand implements Command {
-  constructor(private node: SceneNode, private oldTransform: TRS, private newTransform: TRS) {}
+  private _node: SceneNode;
+  private _oldTransform: TRS;
+  private _newTransform: TRS;
+  constructor(node: SceneNode, oldTransform: TRS, newTransform: TRS) {
+    this._node = node;
+    this._oldTransform = {
+      position: new Vector3(oldTransform.position),
+      rotation: new Quaternion(oldTransform.rotation),
+      scale: new Vector3(oldTransform.scale)
+    };
+    this._newTransform = {
+      position: new Vector3(newTransform.position),
+      rotation: new Quaternion(newTransform.rotation),
+      scale: new Vector3(newTransform.scale)
+    };
+  }
   get desc(): string {
     return 'Node transform';
   }
   execute() {
-    this.node.position = this.newTransform.position;
-    this.node.rotation = this.newTransform.rotation;
-    this.node.scale = this.newTransform.scale;
+    this._node.position = this._newTransform.position;
+    this._node.rotation = this._newTransform.rotation;
+    this._node.scale = this._newTransform.scale;
   }
   undo() {
-    this.node.position = this.oldTransform.position;
-    this.node.rotation = this.oldTransform.rotation;
-    this.node.scale = this.oldTransform.scale;
+    this._node.position = this._oldTransform.position;
+    this._node.rotation = this._oldTransform.rotation;
+    this._node.scale = this._oldTransform.scale;
   }
 }

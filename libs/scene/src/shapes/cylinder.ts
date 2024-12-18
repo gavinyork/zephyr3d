@@ -12,6 +12,10 @@ export interface CylinderCreationOptions extends ShapeCreationOptions {
   bottomRadius?: number;
   /** Bottom radius, default is 1.0 */
   topRadius?: number;
+  /** Generate top cap, default is true */
+  topCap?: boolean;
+  /** Generate bottom cap, default is true */
+  bottomCap?: boolean;
   /** Height, default is 1.0 */
   height?: number;
   /** Height detail, default is 1 */
@@ -29,6 +33,8 @@ export interface CylinderCreationOptions extends ShapeCreationOptions {
 export class CylinderShape extends Shape<CylinderCreationOptions> {
   static _defaultOptions = {
     ...Shape._defaultOptions,
+    topCap: true,
+    bottomCap: true,
     bottomRadius: 1,
     topRadius: 1,
     heightDetail: 1,
@@ -62,7 +68,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
     const rt = lt + 1;
     const lb = lt - stride;
     const rb = lb + 1;
-    indices.push(
+    indices?.push(
       lt + indexOffset,
       lb + indexOffset,
       rb + indexOffset,
@@ -91,6 +97,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
     options = Object.assign({}, this._defaultOptions, options ?? {});
     indexOffset = indexOffset ?? 0;
     const start = vertices.length;
+
     const slope = (options.topRadius - options.bottomRadius) / options.height;
     for (let y = 0; y <= options.heightDetail; y++) {
       const v = y / options.heightDetail;
@@ -109,6 +116,81 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
         }
       }
     }
+
+    // 计算顶盖和底盖的起始索引
+    const sideVertexCount = (options.heightDetail + 1) * (options.radialDetail + 1);
+    let currentVertexOffset = start + sideVertexCount;
+
+    // 生成底盖
+    if (options.bottomCap) {
+      // 底盖中心点
+      vertices?.push(0, -options.anchor * options.height, 0);
+      normals?.push(0, -1, 0);
+      uvs?.push(0.5, 0.5);
+
+      const bottomCenterIndex = currentVertexOffset - start;
+      currentVertexOffset++;
+
+      // 底盖边缘顶点
+      for (let i = 0; i <= options.radialDetail; i++) {
+        const theta = (i / options.radialDetail) * Math.PI * 2;
+        const sinTheta = Math.sin(theta);
+        const cosTheta = Math.cos(theta);
+        vertices?.push(
+          options.bottomRadius * sinTheta,
+          -options.anchor * options.height,
+          options.bottomRadius * cosTheta
+        );
+        normals?.push(0, -1, 0);
+        uvs?.push(0.5 + 0.5 * sinTheta, 0.5 + 0.5 * cosTheta);
+        currentVertexOffset++;
+
+        // 生成三角形
+        if (i < options.radialDetail) {
+          indices?.push(
+            bottomCenterIndex + indexOffset,
+            bottomCenterIndex + i + 2 + indexOffset,
+            bottomCenterIndex + i + 1 + indexOffset
+          );
+        }
+      }
+    }
+
+    // 生成顶盖
+    if (options.topCap) {
+      // 顶盖中心点
+      vertices?.push(0, (1 - options.anchor) * options.height, 0);
+      normals?.push(0, 1, 0);
+      uvs?.push(0.5, 0.5);
+
+      const topCenterIndex = currentVertexOffset - start;
+      currentVertexOffset++;
+
+      // 顶盖边缘顶点
+      for (let i = 0; i <= options.radialDetail; i++) {
+        const theta = (i / options.radialDetail) * Math.PI * 2;
+        const sinTheta = Math.sin(theta);
+        const cosTheta = Math.cos(theta);
+        vertices?.push(
+          options.topRadius * sinTheta,
+          (1 - options.anchor) * options.height,
+          options.topRadius * cosTheta
+        );
+        normals?.push(0, 1, 0);
+        uvs?.push(0.5 + 0.5 * sinTheta, 0.5 + 0.5 * cosTheta);
+        currentVertexOffset++;
+
+        // 生成三角形
+        if (i < options.radialDetail) {
+          indices?.push(
+            topCenterIndex + indexOffset,
+            topCenterIndex + i + 1 + indexOffset,
+            topCenterIndex + i + 2 + indexOffset
+          );
+        }
+      }
+    }
+
     Shape._transform(options.transform, vertices, normals, start);
     if (bbox || vertexCallback) {
       for (let i = start; i < vertices.length - 2; i += 3) {

@@ -42,6 +42,9 @@ export class SceneController extends BaseController<SceneModel> {
         this._cmdManager.undo();
         break;
       case 'REDO':
+        this._cmdManager.redo();
+        break;
+      case 'REDO':
         alert('Not implemented');
         break;
       case 'TRANSLATE':
@@ -71,7 +74,9 @@ export class SceneController extends BaseController<SceneModel> {
         break;
       }
       case 'ADD_CYLINDER': {
-        this._cmdManager.execute(new AddShapeCommand(this.model.scene, CylinderShape));
+        this._cmdManager.execute(
+          new AddShapeCommand(this.model.scene, CylinderShape, { topCap: true, bottomCap: true })
+        );
         break;
       }
       case 'ADD_TORUS': {

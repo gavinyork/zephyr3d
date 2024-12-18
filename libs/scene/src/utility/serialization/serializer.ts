@@ -118,7 +118,7 @@ export function serializeObjectProps<T>(obj: T, cls: SerializableClass<T>, json:
   }
 }
 
-export function serializeObject<T, P>(obj: T, serailizationInfo: SerializationInfo<T>, json?: object) {
+export function serializeObject<T>(obj: T, serailizationInfo: SerializationInfo<T>, json?: object) {
   const index = serailizationInfo.findIndex((val) => val.ctor === obj.constructor);
   if (index < 0) {
     throw new Error('Serialize object failed: Cannot found serialization meta data');

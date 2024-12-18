@@ -6,22 +6,25 @@ export interface Command {
 
 export class CommandManager {
   private _undoStack: Command[];
-  private _depth: number;
-  constructor(depth = 1000) {
-    this._depth = depth;
+  private _current: number;
+  constructor() {
     this._undoStack = [];
+    this._current = 0;
   }
   execute(command: Command) {
     command.execute();
+    this._undoStack.splice(this._current);
     this._undoStack.push(command);
-    if (this._undoStack.length > this._depth) {
-      this._undoStack.shift();
-    }
+    this._current++;
   }
   undo() {
-    if (this._undoStack.length > 0) {
-      const lastCommand = this._undoStack.pop();
-      lastCommand.undo();
+    if (this._current > 0) {
+      this._undoStack[--this._current].undo();
+    }
+  }
+  redo() {
+    if (this._current < this._undoStack.length) {
+      this._undoStack[this._current++].execute();
     }
   }
 }

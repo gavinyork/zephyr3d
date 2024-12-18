@@ -58,6 +58,11 @@ export class SceneView extends EmptyView<SceneModel> {
           label: FontGlyph.glyphs['ccw'],
           id: 'UNDO',
           tooltip: 'Undo last change'
+        },
+        {
+          label: FontGlyph.glyphs['cw'],
+          id: 'REDO',
+          tooltip: 'Redo last change'
         }
       ],
       0,
