@@ -117,13 +117,9 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
       }
     }
 
-    // 计算顶盖和底盖的起始索引
     const sideVertexCount = (options.heightDetail + 1) * (options.radialDetail + 1);
     let currentVertexOffset = start + sideVertexCount;
-
-    // 生成底盖
     if (options.bottomCap) {
-      // 底盖中心点
       vertices?.push(0, -options.anchor * options.height, 0);
       normals?.push(0, -1, 0);
       uvs?.push(0.5, 0.5);
@@ -131,7 +127,6 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
       const bottomCenterIndex = currentVertexOffset - start;
       currentVertexOffset++;
 
-      // 底盖边缘顶点
       for (let i = 0; i <= options.radialDetail; i++) {
         const theta = (i / options.radialDetail) * Math.PI * 2;
         const sinTheta = Math.sin(theta);
@@ -145,7 +140,6 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
         uvs?.push(0.5 + 0.5 * sinTheta, 0.5 + 0.5 * cosTheta);
         currentVertexOffset++;
 
-        // 生成三角形
         if (i < options.radialDetail) {
           indices?.push(
             bottomCenterIndex + indexOffset,
@@ -156,9 +150,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
       }
     }
 
-    // 生成顶盖
     if (options.topCap) {
-      // 顶盖中心点
       vertices?.push(0, (1 - options.anchor) * options.height, 0);
       normals?.push(0, 1, 0);
       uvs?.push(0.5, 0.5);
@@ -166,7 +158,6 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
       const topCenterIndex = currentVertexOffset - start;
       currentVertexOffset++;
 
-      // 顶盖边缘顶点
       for (let i = 0; i <= options.radialDetail; i++) {
         const theta = (i / options.radialDetail) * Math.PI * 2;
         const sinTheta = Math.sin(theta);
@@ -180,7 +171,6 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
         uvs?.push(0.5 + 0.5 * sinTheta, 0.5 + 0.5 * cosTheta);
         currentVertexOffset++;
 
-        // 生成三角形
         if (i < options.radialDetail) {
           indices?.push(
             topCenterIndex + indexOffset,
