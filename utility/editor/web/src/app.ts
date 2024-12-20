@@ -12,7 +12,7 @@ studioApp.ready().then(async () => {
   const device = studioApp.device;
   await imGuiInit(device);
   const editor = Editor.instance;
-  await editor.loadEditorFonts('zef-16px');
+  await editor.init();
   editor.registerModules();
   studioApp.inputManager.use(editor.handleEvent.bind(editor));
 

@@ -9,6 +9,7 @@ import { SceneController } from '../controllers/scenecontroller';
 import { SceneModel } from '../models/scenemodel';
 import { ApiClient } from '../api/client/apiclient';
 import { FontGlyph } from './fontglyph';
+import { Database } from '../storage/db';
 
 export class Editor {
   private static _instance: Editor;
@@ -39,8 +40,9 @@ export class Editor {
   update(dt: number) {
     eventBus.dispatchEvent('update', dt);
   }
-  async loadEditorFonts(name: string) {
-    await FontGlyph.loadFontGlyphs(this._apiClient, name);
+  async init() {
+    await Database.init();
+    await FontGlyph.loadFontGlyphs(this._apiClient, 'zef-16px');
   }
   registerModules() {
     const emptyView = new EmptyView(null);

@@ -309,17 +309,23 @@ export class WebGPUDepthState extends WebGPURenderState implements DepthState {
   private _testEnabled: boolean;
   private _writeEnabled: boolean;
   private _compareFunc: CompareFunc;
+  private _depthBias: number;
+  private _depthBiasSlopeScale: number;
   constructor() {
     super();
     this._testEnabled = true;
     this._writeEnabled = true;
     this._compareFunc = 'le';
+    this._depthBias = 0;
+    this._depthBiasSlopeScale = 0;
   }
   clone(): DepthState {
     const other = new WebGPUDepthState();
     other.enableTest(this._testEnabled);
     other.enableWrite(this._writeEnabled);
     other.setCompareFunc(this._compareFunc);
+    other.setDepthBias(this._depthBias);
+    other.setDepthBiasSlopeScale(this._depthBiasSlopeScale);
     return other;
   }
   get testEnabled(): boolean {
@@ -349,6 +355,32 @@ export class WebGPUDepthState extends WebGPURenderState implements DepthState {
       this.invalidateHash();
     }
   }
+  get depthBias(): number {
+    return this._depthBias;
+  }
+  set depthBias(value: number) {
+    this.setDepthBias(value);
+  }
+  setDepthBias(value: number): this {
+    if (this._depthBias !== value) {
+      this._depthBias = value;
+      this.invalidateHash();
+    }
+    return this;
+  }
+  get depthBiasSlopeScale(): number {
+    return this._depthBiasSlopeScale;
+  }
+  set depthBiasSlopeScale(value: number) {
+    this.setDepthBiasSlopeScale(value);
+  }
+  setDepthBiasSlopeScale(value: number): this {
+    if (this._depthBiasSlopeScale !== value) {
+      this._depthBiasSlopeScale = value;
+      this.invalidateHash();
+    }
+    return this;
+  }
   enableTest(b: boolean): this {
     this.testEnabled = b;
     return this;
@@ -362,7 +394,9 @@ export class WebGPUDepthState extends WebGPURenderState implements DepthState {
     return this;
   }
   protected computeHash(): string {
-    return `${Number(this._testEnabled)}-${Number(this._writeEnabled)}-${this.compareFunc}}`;
+    return `${Number(this._testEnabled)}-${Number(this._writeEnabled)}-${this._compareFunc}-${
+      this._depthBias
+    }-${this._depthBiasSlopeScale}`;
   }
 }
 

@@ -25,6 +25,10 @@ const tmpVecT = new Vector3();
 const tmpVecS = new Vector3();
 const tmpQuatR = new Quaternion();
 
+const discRadius = 1.05 / Math.sqrt(Math.PI);
+const gridLineSmoothStart = 0.5 + discRadius;
+const gridLineSmoothEnd = 0.5 - discRadius;
+
 export type HitType =
   | 'move_axis'
   | 'move_plane'
@@ -730,7 +734,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   }
   private _createGizmoRenderStates(ctx: DrawContext) {
     const rs = ctx.device.createRenderStateSet();
-    rs.useDepthState().enableTest(true).enableWrite(true);
+    rs.useDepthState().enableTest(true).enableWrite(true).setDepthBias(0).setDepthBiasSlopeScale(0);
     return rs;
   }
   private _createGridRenderStates(ctx: DrawContext) {
@@ -846,9 +850,6 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
         this.texSize = pb.vec2().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         const STEPS_LEN = 8;
-        const discRadius = 1.05 / Math.sqrt(Math.PI);
-        const gridLineSmoothStart = 0.5 + discRadius;
-        const gridLineSmoothEnd = 0.5 - discRadius;
         function minInt(scope: PBInsideFunctionScope, a: PBShaderExp | number, b: PBShaderExp | number) {
           if (pb.getDevice().type === 'webgl' && (typeof a !== 'number' || typeof b !== 'number')) {
             pb.func('minInt', [pb.int('a'), pb.int('b')], function () {
@@ -1096,38 +1097,41 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
         this.cameraNearFar = pb.vec2().uniform(0);
         this.time = pb.float().uniform(0);
         if (selectMode) {
+          /*
+            this.$l.x = pb.add(this.co, this.halfSize);
+            if (pb.getDevice().type === 'webgpu') {
+              this.$l.gridDomain = pb.abs(
+                pb.sub(
+                  pb.sub(this.x, pb.mul(this.gridScale, pb.floor(pb.div(this.x, this.gridScale)))),
+                  this.halfSize
+                )
+              );
+            } else {
+              this.$l.gridDomain = pb.abs(pb.sub(pb.mod(this.x, this.gridScale), this.halfSize));
+            }
+            this.gridDomain = pb.div(this.gridDomain, this.fwidthCos);
+            this.$l.lineDist = pb.min(this.gridDomain.x, this.gridDomain.y);
+            this.$return(
+              pb.sub(
+                1,
+                pb.smoothStep(gridLineSmoothEnd, gridLineSmoothStart, pb.sub(this.lineDist, this.lineSize))
+              )
+            );
+          */
           pb.func('edge', [pb.vec2('uv'), pb.float('lineWidth')], function () {
-            this.$l.fw = pb.fwidth(this.uv);
+            this.$l.fw = pb.add(pb.abs(pb.dpdx(this.uv)), pb.abs(pb.dpdy(this.uv)));
+            this.$l.domain = pb.abs(pb.sub(pb.fract(pb.add(this.uv, pb.vec2(0.5))), pb.vec2(0.5)));
+            this.domain = pb.div(this.domain, this.fw);
+            this.$l.lineDist = pb.min(this.domain.x, this.domain.y);
+            this.$return(pb.sub(1, pb.smoothStep(0, 0.5, pb.sub(this.lineDist, this.lineWidth))));
+            /*
             this.$l.d = pb.mul(
               pb.smoothStep(pb.vec2(0), pb.mul(this.fw, this.lineWidth), this.uv),
               pb.smoothStep(pb.vec2(0), pb.mul(this.fw, this.lineWidth), pb.sub(pb.vec2(1), this.uv))
             );
             this.$return(pb.smoothStep(0, 0.5, pb.sub(1, pb.min(this.d.x, this.d.y))));
-            //this.$return(pb.sub(1, pb.min(this.d.x, this.d.y)));
+            */
           });
-          pb.func(
-            'dash',
-            [
-              pb.vec2('uv'),
-              pb.float('lineWidth'),
-              pb.float('dashLenSS'),
-              pb.float('dashGapSS'),
-              pb.float('time')
-            ],
-            function () {
-              this.$l.edge = this.edge(this.uv, this.lineWidth);
-              this.$l.du = pb.min(this.uv.x, pb.sub(1, this.uv.x));
-              this.$l.dv = pb.min(this.uv.y, pb.sub(1, this.uv.y));
-              this.$l.alongEdge = this.$choice(pb.greaterThan(this.du, this.dv), this.du, this.dv);
-              this.$l.d = pb.fwidth(this.alongEdge);
-              this.$l.dashLen = pb.mul(this.dashLenSS, this.d);
-              this.$l.dashGap = pb.mul(this.dashGapSS, this.d);
-              this.$l.totalLen = pb.add(this.dashLen, this.dashGap);
-              this.$l.pattern = pb.mod(pb.add(this.alongEdge, pb.mul(this.time, 0.1)), this.totalLen);
-              this.$l.dash = pb.step(this.pattern, this.dashGap);
-              this.$return(pb.mul(this.edge, this.dash));
-            }
-          );
         }
         pb.main(function () {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
@@ -1147,14 +1151,14 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
             pb.float(1)
           );
           if (selectMode) {
-            this.$l.lineWidth = pb.float(1.5);
+            this.$l.lineWidth = pb.float(1);
             this.$l.edgeFactor = this.edge(this.$inputs.uv, this.lineWidth);
             this.alpha = pb.mul(this.alpha, this.edgeFactor);
             this.$if(pb.lessThan(this.alpha, 0.01), function () {
               pb.discard();
             });
           }
-          const diffuse = selectMode ? pb.vec3(1) : this.$inputs.color.rgb;
+          const diffuse = selectMode ? pb.vec3(0, 255, 204) : this.$inputs.color.rgb;
           this.$outputs.color = pb.vec4(pb.mul(diffuse, this.alpha), this.alpha);
         });
       }

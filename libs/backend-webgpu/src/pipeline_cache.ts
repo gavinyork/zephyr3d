@@ -179,6 +179,10 @@ export class PipelineCache {
       depthWriteEnabled,
       depthCompare
     };
+    if (depthState.depthBias !== 0 || depthState.depthBiasSlopeScale !== 0) {
+      state.depthBias = depthState.depthBias;
+      state.depthBiasSlopeScale = depthState.depthBiasSlopeScale;
+    }
     if (hasStencil) {
       const stencilFront = stencilState.enabled
         ? this.createStencilFaceState(

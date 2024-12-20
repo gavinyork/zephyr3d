@@ -239,18 +239,24 @@ export class WebGLDepthState extends WebGLRenderState implements DepthState {
   protected static _currentState: WebGLDepthState = null;
   testEnabled: boolean;
   writeEnabled: boolean;
+  depthBias: number;
+  depthBiasSlopeScale: number;
   private _compareFunc: number;
   constructor() {
     super();
     this.testEnabled = true;
     this.writeEnabled = true;
     this.compareFunc = 'le';
+    this.depthBias = 0;
+    this.depthBiasSlopeScale = 0;
   }
   clone(): DepthState {
     const other = new WebGLDepthState();
     other.enableTest(this.testEnabled);
     other.enableWrite(this.writeEnabled);
     other.setCompareFunc(this.compareFunc);
+    other.setDepthBias(this.depthBias);
+    other.setDepthBiasSlopeScale(this.depthBiasSlopeScale);
     return other;
   }
   get compareFunc(): CompareFunc {
@@ -271,6 +277,14 @@ export class WebGLDepthState extends WebGLRenderState implements DepthState {
     this.compareFunc = func;
     return this;
   }
+  setDepthBias(value: number): this {
+    this.depthBias = value;
+    return this;
+  }
+  setDepthBiasSlopeScale(value: number): this {
+    this.depthBiasSlopeScale = value;
+    return this;
+  }
   protected _apply(gl: WebGLContext) {
     if (this.testEnabled) {
       gl.enable(WebGLEnum.DEPTH_TEST);
@@ -279,6 +293,12 @@ export class WebGLDepthState extends WebGLRenderState implements DepthState {
       gl.disable(WebGLEnum.DEPTH_TEST);
     }
     gl.depthMask(this.writeEnabled);
+    if (this.depthBias !== 0 || this.depthBiasSlopeScale !== 0) {
+      gl.enable(gl.POLYGON_OFFSET_FILL);
+      gl.polygonOffset(this.depthBiasSlopeScale, this.depthBias);
+    } else {
+      gl.disable(gl.POLYGON_OFFSET_FILL);
+    }
   }
 }
 
