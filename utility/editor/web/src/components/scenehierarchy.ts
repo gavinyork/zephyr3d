@@ -75,9 +75,9 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
       ImGui.EndDragDropSource();
     }
     if (ImGui.BeginDragDropTarget()) {
-      const payload = ImGui.AcceptDragDropPayload('NODE') as unknown as SceneNode;
+      const payload = ImGui.AcceptDragDropPayload('NODE');
       if (payload) {
-        this.dispatchEvent('node_drag_drop', payload, node);
+        this.dispatchEvent('node_drag_drop', payload.Data as SceneNode, node);
       }
       ImGui.EndDragDropTarget();
     }

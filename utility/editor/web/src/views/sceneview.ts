@@ -221,9 +221,11 @@ export class SceneView extends EmptyView<SceneModel> {
     }
   }
   private handleNodeDragDrop(src: SceneNode, dst: SceneNode) {
-    const localMatrix = Matrix4x4.invertAffine(dst.worldMatrix).multiplyRight(src.worldMatrix);
-    localMatrix.decompose(src.scale, src.rotation, src.position);
-    src.parent = dst;
+    if (src.parent !== dst && !src.isParentOf(dst)) {
+      const localMatrix = Matrix4x4.invertAffine(dst.worldMatrix).multiplyRight(src.worldMatrix);
+      localMatrix.decompose(src.scale, src.rotation, src.position);
+      src.parent = dst;
+    }
   }
   private handleNodeRemoved(node: SceneNode) {
     if (this._postGizmoRenderer.node === node) {

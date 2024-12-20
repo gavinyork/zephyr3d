@@ -114,6 +114,8 @@ export class SceneNode extends makeEventTarget(Object)<{
   protected _transformTag: number;
   /** @internal */
   protected _transformChangeCallback: () => void;
+  /** @internal */
+  private _disableCallback: boolean;
   /**
    * Creates a new scene node
    * @param scene - Which scene the node belongs to
@@ -148,6 +150,7 @@ export class SceneNode extends makeEventTarget(Object)<{
     this._invWorldMatrix = null;
     this._localMatrix = null;
     this._transformTag = 0;
+    this._disableCallback = false;
     this._tmpLocalMatrix = Matrix4x4.identity();
     this._tmpWorldMatrix = Matrix4x4.identity();
     if (scene && this !== scene.rootNode) {
@@ -489,6 +492,9 @@ export class SceneNode extends makeEventTarget(Object)<{
   }
   /** @internal */
   protected _onTransformChanged(invalidateLocal: boolean): void {
+    if (this._disableCallback) {
+      return;
+    }
     if (invalidateLocal) {
       this._localMatrix = null;
     }
@@ -539,45 +545,27 @@ export class SceneNode extends makeEventTarget(Object)<{
    * Position of the xform relative to it's parent
    */
   get position(): Vector3 {
-    if (!this._position) {
-      this.syncTRS();
-    }
     return this._position;
   }
   set position(val: Vector3) {
-    if (!this._position) {
-      this.syncTRS();
-    }
     this._position.setXYZ(val[0], val[1], val[2]);
   }
   /**
    * Scaling of the xform
    */
   get scale(): Vector3 {
-    if (!this._scaling) {
-      this.syncTRS();
-    }
     return this._scaling;
   }
   set scale(val: Vector3) {
-    if (!this._scaling) {
-      this.syncTRS();
-    }
     this._scaling.setXYZ(val[0], val[1], val[2]);
   }
   /**
    * Rotation of the xform
    */
   get rotation() {
-    if (!this._rotation) {
-      this.syncTRS();
-    }
     return this._rotation;
   }
   set rotation(val: Quaternion) {
-    if (!this._rotation) {
-      this.syncTRS();
-    }
     this._rotation.setXYZW(val[0], val[1], val[2], val[3]);
   }
   /**
@@ -674,9 +662,9 @@ export class SceneNode extends makeEventTarget(Object)<{
    */
   setLocalTransform(matrix: Matrix4x4): this {
     this._localMatrix = matrix;
-    this._position = null;
-    this._rotation = null;
-    this._scaling = null;
+    this._disableCallback = true;
+    this._localMatrix.decompose(this._scaling, this._rotation, this._position);
+    this._disableCallback = false;
     this._onTransformChanged(false);
     return this;
   }
@@ -728,7 +716,7 @@ export class SceneNode extends makeEventTarget(Object)<{
    * @returns self
    */
   lookAt(eye: Vector3, target: Vector3, up: Vector3) {
-    Matrix4x4.lookAt(eye, target, up).decompose(this._scaling, this._rotation, this._position);
+    this.setLocalTransform(Matrix4x4.lookAt(eye, target, up));
     return this;
   }
   /**
@@ -743,15 +731,5 @@ export class SceneNode extends makeEventTarget(Object)<{
   /** @internal */
   get transformTag(): number {
     return this._transformTag;
-  }
-  /** @internal */
-  private syncTRS(): void {
-    this._position = new ObservableVector3();
-    this._rotation = new ObservableQuaternion();
-    this._scaling = new ObservableVector3();
-    this._localMatrix.decompose(this._scaling, this._rotation, this._position);
-    this._position.callback = this._transformChangeCallback;
-    this._rotation.callback = this._transformChangeCallback;
-    this._scaling.callback = this._transformChangeCallback;
   }
 }
