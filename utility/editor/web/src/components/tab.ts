@@ -2,12 +2,15 @@ import { ImGui } from '@zephyr3d/imgui';
 import { DockPannel } from './dockpanel';
 import { SceneHierarchy } from './scenehierarchy';
 import type { Scene } from '@zephyr3d/scene';
+import { AssetHierarchy } from './assethierarchy';
 
 export class Tab {
   private _panel: DockPannel;
   private _sceneHierarchy: SceneHierarchy;
+  private _assetHierarchy: AssetHierarchy;
   constructor(scene: Scene, left: boolean, top: number, bottom: number) {
     this._sceneHierarchy = new SceneHierarchy(scene);
+    this._assetHierarchy = new AssetHierarchy();
     this._panel = new DockPannel(left, top, bottom, 8, 300, 200, 600);
   }
   get width() {
@@ -24,7 +27,7 @@ export class Tab {
           ImGui.EndTabItem();
         }
         if (ImGui.BeginTabItem('Assets##SceneAssets')) {
-          this._sceneHierarchy.render();
+          this._assetHierarchy.render();
           ImGui.EndTabItem();
         }
         ImGui.EndTabBar();

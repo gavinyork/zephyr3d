@@ -1,5 +1,22 @@
 import { IDBPDatabase, openDB } from 'idb';
 
+export type AssetType = 'model';
+
+export type AssetBlob = {
+  uuid?: string;
+  name: string;
+  data: Blob;
+  metadata: object;
+};
+
+export type AssetInfo = {
+  uuid?: string;
+  name: string;
+  type: AssetType;
+  blobs: { [path: string]: string };
+  metadata: object;
+};
+
 export class Database {
   static instance: IDBPDatabase = null;
   static readonly DB_NAME = 'zephyr3d-editor';
@@ -26,7 +43,8 @@ export class Database {
   static randomUUID() {
     return crypto.randomUUID();
   }
-  static async addBlob(name: string, data: Blob, metadata = {}) {
+  static async addBlob(blob: AssetBlob) {
+    const { name, data, metadata } = blob;
     const uuid = this.randomUUID();
     const arrayBuffer = await data.arrayBuffer();
     await this.instance.put(this.DB_NAME_BLOBS, {
@@ -38,23 +56,24 @@ export class Database {
     });
     return uuid;
   }
-  static async getBlob(uuid: string) {
+  static async getBlob(uuid: string): Promise<AssetBlob> {
     const blob = await this.instance.get(this.DB_NAME_BLOBS, uuid);
-    if (blob) {
-      return {
-        uuid: blob.uuid as string,
-        name: blob.name as string,
-        type: blob.type as string,
-        data: new Blob([blob.data], { type: blob.type }),
-        metadata: JSON.parse(blob.metadata)
-      };
-    }
+    return blob
+      ? {
+          uuid,
+          name: blob.name as string,
+          data: new Blob([blob.data], { type: blob.type }),
+          metadata: JSON.parse(blob.metadata)
+        }
+      : null;
   }
   static async deleteBlob(uuid: string, force = false): Promise<boolean> {
     try {
       if (!force) {
         const assets = await this.listAssets();
-        const isReferenced = assets.some(asset => asset.data === uuid);
+        const isReferenced = assets.some(
+          (asset) => Object.getOwnPropertyNames(asset.blobs).findIndex((k) => asset.blobs[k] === uuid) >= 0
+        );
         if (isReferenced) {
           console.warn(`Blob ${uuid} is still referenced by some assets and cannot be deleted`);
           return false;
@@ -67,31 +86,53 @@ export class Database {
       return false;
     }
   }
-  static async addAsset(name: string, uuidBlob: string, type: string, metadata = {}) {
+  static async addAsset(asset: AssetInfo) {
+    const { name, type, blobs, metadata } = asset;
     const uuid = this.randomUUID();
     await this.instance.put(this.DB_NAME_ASSETS, {
       uuid,
       name,
       type,
-      data: uuidBlob,
+      blobs: JSON.stringify(blobs),
       metadata: JSON.stringify(metadata)
     });
     return uuid;
   }
-  static async getAsset(uuid: string) {
-    return await this.instance.get(this.DB_NAME_ASSETS, uuid);
-  }
-  static async listAssets(type?: string) {
+  static async deleteAsset(uuid: string): Promise<boolean> {
     try {
-      let assets: { uuid: string, name: string, type: string, data: string, metadata: any }[];
+      await this.instance.delete(this.DB_NAME_ASSETS, uuid);
+      return true;
+    } catch (error) {
+      console.error('Error deleting asset:', error);
+      return false;
+    }
+  }
+  static async getAsset(uuid: string): Promise<AssetInfo> {
+    const asset = await this.instance.get(this.DB_NAME_ASSETS, uuid);
+    return asset
+      ? {
+          uuid,
+          name: asset.name,
+          type: asset.type,
+          blobs: JSON.parse(asset.blobs),
+          metadata: JSON.parse(asset.metadata)
+        }
+      : null;
+  }
+  static async listAssets(type?: string): Promise<AssetInfo[]> {
+    try {
+      let assets: any[];
       if (type) {
         const index = this.instance.transaction(this.DB_NAME_ASSETS).store.index('idxType');
         assets = await index.getAll(type);
       } else {
         assets = await this.instance.getAll(this.DB_NAME_ASSETS);
       }
-      return assets.map(asset => ({
-        ...asset,
+      return assets.map((asset) => ({
+        uuid: asset.uuid,
+        name: asset.name,
+        type: asset.type,
+        blobs: JSON.parse(asset.blobs),
         metadata: JSON.parse(asset.metadata)
       }));
     } catch (error) {
@@ -109,11 +150,14 @@ export class Database {
     });
     return uuid;
   }
-  static async updateScene(uuid: string, updates: {
-    name?: string;
-    content?: any;
-    metadata?: any;
-  }): Promise<boolean> {
+  static async updateScene(
+    uuid: string,
+    updates: {
+      name?: string;
+      content?: any;
+      metadata?: any;
+    }
+  ): Promise<boolean> {
     try {
       const scene = await this.getScene(uuid);
       if (!scene) {
@@ -160,7 +204,7 @@ export class Database {
   static async listScenes() {
     try {
       let scenes = await this.instance.getAll(this.DB_NAME_SCENES);
-      return scenes.map(scene => ({
+      return scenes.map((scene) => ({
         ...scene,
         content: JSON.parse(scene.content),
         metadata: JSON.parse(scene.metadata)
