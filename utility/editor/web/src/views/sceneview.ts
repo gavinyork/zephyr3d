@@ -123,15 +123,11 @@ export class SceneView extends EmptyView<SceneModel> {
   }
   render() {
     const displaySize = ImGui.GetIO().DisplaySize;
-    const frameHeight = ImGui.GetFrameHeight();
-    this.model.camera.viewport = [
-      this._tab.width,
-      this.statusbar.height,
-      displaySize.x - this._tab.width - this._propGrid.width,
-      displaySize.y - this.statusbar.height - this.menubar.height - this._toolbar.height
-    ];
-    this.model.camera.scissor = [0, frameHeight, displaySize.x, displaySize.y - frameHeight * 2];
-    this.model.camera.aspect = this.model.camera.viewport[2] / this.model.camera.viewport[3];
+    const viewportWidth = displaySize.x - this._tab.width - this._propGrid.width;
+    const viewportHeight = displaySize.y - this.statusbar.height - this.menubar.height - this._toolbar.height;
+    this.model.camera.viewport = [this._tab.width, this.statusbar.height, viewportWidth, viewportHeight];
+    this.model.camera.scissor = [this._tab.width, this.statusbar.height, viewportWidth, viewportHeight];
+    this.model.camera.aspect = viewportWidth / viewportHeight;
     this.model.camera.render(this.model.scene, this.model.compositor);
     this._tab.render();
     this._propGrid.render();

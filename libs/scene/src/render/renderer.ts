@@ -109,6 +109,10 @@ export class SceneRenderer {
       const renderHeight = camera.viewport
         ? device.screenToDevice(camera.viewport[3])
         : device.getDrawingBufferHeight();
+      if (renderWidth <= 0 || renderHeight <= 0) {
+        ctx.camera.getPickResultResolveFunc()?.(null);
+        return;
+      }
       const tmpFramebuffer = defaultViewport
         ? null
         : device.pool.fetchTemporalFramebuffer(
