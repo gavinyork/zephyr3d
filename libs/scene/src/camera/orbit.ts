@@ -61,6 +61,8 @@ export class OrbitCameraController extends BaseCameraController {
   /** @internal */
   private lastMouseY: number;
   /** @internal */
+  private initialMouseY: number;
+  /** @internal */
   private distance: number;
   /** @internal */
   private rotateX: number;
@@ -173,6 +175,7 @@ export class OrbitCameraController extends BaseCameraController {
     } else if (this.matchesControl(evt, this.options.controls.zoom)) {
       this.lastMouseX = evt.offsetX;
       this.lastMouseY = evt.offsetY;
+      this.initialMouseY = evt.offsetY;
       this.currentOp = OperationType.ZOOM;
     }
     return false;
@@ -201,12 +204,10 @@ export class OrbitCameraController extends BaseCameraController {
    * @override
    */
   protected _onMouseWheel(evt: WheelEvent): boolean {
-    const factor = Math.pow(0.9, Math.abs(this.options.zoomSpeed));
-    if (evt.deltaY > 0) {
-      this.scale /= factor;
-    } else {
-      this.scale *= factor;
-    }
+    const t = evt.deltaY > 0 ? this.options.zoomSpeed : evt.deltaY < 0 ? -this.options.zoomSpeed : 0;
+    this.target.combineBy(this.direction, 1, t);
+    this.eyePos.combineBy(this.direction, 1, t);
+    this.options.center.combineBy(this.direction, 1, t);
     return true;
   }
   /**
@@ -234,12 +235,11 @@ export class OrbitCameraController extends BaseCameraController {
         this.options.center.combineBy(right, 1, panX);
         this.options.center.combineBy(up, 1, panY);
       } else if (this.currentOp === OperationType.ZOOM) {
-        const factor = Math.pow(0.9, Math.abs(this.options.zoomSpeed));
-        if (dy > 0) {
-          this.scale /= factor;
-        } else if (dy < 0) {
-          this.scale *= factor;
-        }
+        let t = dy > 0 ? this.options.zoomSpeed : dy < 0 ? -this.options.zoomSpeed : 0;
+        t *= Math.max(Math.abs(evt.offsetY - this.initialMouseY) / 50, 1);
+        this.target.combineBy(this.direction, 1, t);
+        this.eyePos.combineBy(this.direction, 1, t);
+        this.options.center.combineBy(this.direction, 1, t);
       }
       return true;
     }
@@ -306,7 +306,9 @@ export class OrbitCameraController extends BaseCameraController {
       this.quat.transform(this.xVector, this.xVector).inplaceNormalize();
       Vector3.normalize(this.eyePos, this.direction).inplaceNormalize();
       Vector3.cross(this.direction, this.xVector, this.upVector).inplaceNormalize();
-      Vector3.add(this.target, Vector3.scale(this.direction, this.distance * this.scale), this.eyePos);
+      Vector3.combine(this.target, this.direction, 1, this.distance, this.eyePos);
+      //this.eyePos.combineBy(this.target, )
+      //Vector3.add(this.target, Vector3.scale(this.direction, this.distance), this.eyePos);
       this._getCamera().lookAt(this.eyePos, this.target, this.upVector);
       if (this.rotateX !== 0 || this.rotateY !== 0) {
         this.rotateX *= 1 - this.options.damping;
@@ -318,6 +320,7 @@ export class OrbitCameraController extends BaseCameraController {
           this.rotateY = 0;
         }
       }
+      console.log(this.scale);
     }
   }
 }

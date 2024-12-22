@@ -3,13 +3,15 @@ import { ImGui } from '@zephyr3d/imgui';
 export class ModalDialog {
   private static _currentDlg: ModalDialog = null;
   private _id: string;
+  private _width: number;
   static render() {
     if (this._currentDlg) {
       this._currentDlg.render();
     }
   }
-  constructor(id: string, open: boolean) {
+  constructor(id: string, open: boolean, width = 0) {
     this._id = id;
+    this._width = width;
     if (open) {
       this.open();
     }
@@ -29,6 +31,9 @@ export class ModalDialog {
   render() {
     if (ModalDialog._currentDlg !== this) {
       return;
+    }
+    if (this._width !== 0) {
+      ImGui.SetNextWindowSize(new ImGui.ImVec2(this._width, 0));
     }
     ImGui.OpenPopup(this._id);
     if (ImGui.BeginPopupModal(this._id, null, ImGui.WindowFlags.AlwaysAutoResize)) {

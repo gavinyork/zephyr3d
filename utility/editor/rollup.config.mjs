@@ -31,6 +31,19 @@ function getTargetServer() {
   };
 }
 
+function getTargetWorker() {
+  return {
+    input: './web/src/workers/zip.ts',
+    preserveSymlinks: false,
+    output: {
+      file: path.join(destdir, 'static', 'js', `zip.worker.js`),
+      format: 'esm',
+      sourcemap: true
+    },
+    plugins: [nodeResolve(), swc()]
+  };
+}
+
 function getTargetWeb() {
   return {
     input: './web/src/app.ts',
@@ -61,5 +74,5 @@ function getTargetWeb() {
 }
 
 export default (args) => {
-  return [getTargetServer(), getTargetWeb()];
+  return [getTargetServer(), getTargetWorker(), getTargetWeb()];
 };

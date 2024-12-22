@@ -737,6 +737,7 @@ importers:
       '@zephyr3d/imgui': workspace:*
       '@zephyr3d/inspector': workspace:*
       '@zephyr3d/scene': workspace:*
+      '@zip.js/zip.js': ^2.7.35
       cookie-parser: ^1.4.6
       cross-env: ^7.0.3
       diff: ^5.0.0
@@ -776,6 +777,7 @@ importers:
       '@zephyr3d/imgui': link:../../libs/imgui
       '@zephyr3d/inspector': link:../../libs/inspector
       '@zephyr3d/scene': link:../../libs/scene
+      '@zip.js/zip.js': 2.7.35
       cookie-parser: 1.4.7
       diff: 5.1.0
       express: 4.21.2

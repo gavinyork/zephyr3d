@@ -4,6 +4,7 @@ export type AssetType = 'model';
 
 export type AssetBlob = {
   uuid?: string;
+  mimeType?: string;
   name: string;
   data: Blob;
   metadata: object;
@@ -13,8 +14,8 @@ export type AssetInfo = {
   uuid?: string;
   name: string;
   type: AssetType;
-  blobs: { [path: string]: string };
-  metadata: object;
+  blob: string;
+  metadata: { zip: boolean };
 };
 
 export class Database {
@@ -50,7 +51,7 @@ export class Database {
     await this.instance.put(this.DB_NAME_BLOBS, {
       uuid,
       name,
-      type: data.type,
+      type: blob.mimeType ?? data.type,
       data: arrayBuffer,
       metadata: JSON.stringify(metadata)
     });
@@ -67,13 +68,24 @@ export class Database {
         }
       : null;
   }
+  static async downloadBlob(uuid: string, zip: boolean) {
+    const { data, name } = await this.getBlob(uuid);
+    if (data) {
+      const url = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = zip ? `${name}.zip` : name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+  }
   static async deleteBlob(uuid: string, force = false): Promise<boolean> {
     try {
       if (!force) {
         const assets = await this.listAssets();
-        const isReferenced = assets.some(
-          (asset) => Object.getOwnPropertyNames(asset.blobs).findIndex((k) => asset.blobs[k] === uuid) >= 0
-        );
+        const isReferenced = assets.some((asset) => asset.blob === uuid);
         if (isReferenced) {
           console.warn(`Blob ${uuid} is still referenced by some assets and cannot be deleted`);
           return false;
@@ -87,13 +99,13 @@ export class Database {
     }
   }
   static async addAsset(asset: AssetInfo) {
-    const { name, type, blobs, metadata } = asset;
+    const { name, type, blob, metadata } = asset;
     const uuid = this.randomUUID();
     await this.instance.put(this.DB_NAME_ASSETS, {
       uuid,
       name,
       type,
-      blobs: JSON.stringify(blobs),
+      blob,
       metadata: JSON.stringify(metadata)
     });
     return uuid;
@@ -114,7 +126,7 @@ export class Database {
           uuid,
           name: asset.name,
           type: asset.type,
-          blobs: JSON.parse(asset.blobs),
+          blob: asset.blob,
           metadata: JSON.parse(asset.metadata)
         }
       : null;
@@ -132,7 +144,7 @@ export class Database {
         uuid: asset.uuid,
         name: asset.name,
         type: asset.type,
-        blobs: JSON.parse(asset.blobs),
+        blob: asset.blob,
         metadata: JSON.parse(asset.metadata)
       }));
     } catch (error) {

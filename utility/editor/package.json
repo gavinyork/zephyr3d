@@ -69,6 +69,7 @@
     "mysql": "^2.18.1",
     "long": "^5.2.3",
     "idb": "^8.0.1",
+    "@zip.js/zip.js": "^2.7.35",
     "@zephyr3d/base": "workspace:*",
     "@zephyr3d/device": "workspace:*",
     "@zephyr3d/scene": "workspace:*",

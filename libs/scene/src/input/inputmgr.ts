@@ -166,7 +166,7 @@ export class InputManager {
   private _getPointerDownHandler() {
     const that = this;
     return function (ev: PointerEvent) {
-      if (ev.pointerType === 'mouse' && ev.button === 0) {
+      if (ev.pointerType === 'mouse') {
         that._captureId = ev.pointerId;
         that._app.options.canvas.setPointerCapture(ev.pointerId);
       }
@@ -184,7 +184,7 @@ export class InputManager {
   private _getPointerUpHandler() {
     const that = this;
     return function (ev: PointerEvent) {
-      if (ev.pointerType === 'mouse' && ev.button === 0 && that._captureId === ev.pointerId) {
+      if (ev.pointerType === 'mouse' && that._captureId === ev.pointerId) {
         that._app.options.canvas.releasePointerCapture(ev.pointerId);
         that._captureId = -1;
       }
