@@ -12,6 +12,7 @@ import { FontGlyph } from '../core/fontglyph';
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import { SceneNodeProps } from '../components/nodeprop';
 import type { TRS } from '../types';
+import { AssetInfo } from '../storage/db';
 
 export class SceneView extends EmptyView<SceneModel> {
   private _postGizmoRenderer: PostGizmoRenderer;
@@ -25,6 +26,7 @@ export class SceneView extends EmptyView<SceneModel> {
     this._transformNode = null;
     this._oldTransform = null;
     this.drawBackground = false;
+    this.dragDropTypes = ['ASSET'];
     this._toolbar = new ToolBar(
       [
         {
@@ -122,6 +124,7 @@ export class SceneView extends EmptyView<SceneModel> {
     };
   }
   render() {
+    super.render();
     const displaySize = ImGui.GetIO().DisplaySize;
     const viewportWidth = displaySize.x - this._tab.width - this._propGrid.width;
     const viewportHeight = displaySize.y - this.statusbar.height - this.menubar.height - this._toolbar.height;
@@ -136,7 +139,6 @@ export class SceneView extends EmptyView<SceneModel> {
       ImGui.Text(FontGlyph.allGlyphs);
     }
     ImGui.End();
-    super.render();
   }
   handleEvent(ev: Event, type?: string): boolean {
     if (this.model.camera.handleEvent(ev, type)) {
@@ -181,6 +183,7 @@ export class SceneView extends EmptyView<SceneModel> {
     this._postGizmoRenderer.on('end_translate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.on('end_rotate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.on('end_scale', this.handleEndTransformNode, this);
+    eventBus.on('workspace_drag_drop', this.handleAssetDragDrop, this);
   }
   protected onDeactivate(): void {
     super.onDeactivate();
@@ -198,6 +201,7 @@ export class SceneView extends EmptyView<SceneModel> {
     this._postGizmoRenderer.off('end_translate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.off('end_rotate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.off('end_scale', this.handleEndTransformNode, this);
+    eventBus.off('workspace_drag_drop', this.handleAssetDragDrop, this);
   }
   private handleNodeSelected(node: SceneNode) {
     this._postGizmoRenderer.node = node;
@@ -222,6 +226,9 @@ export class SceneView extends EmptyView<SceneModel> {
       localMatrix.decompose(src.scale, src.rotation, src.position);
       src.parent = dst;
     }
+  }
+  private handleAssetDragDrop(type: string, asset: unknown) {
+    console.log(`Asset drag drop: ${type}`);
   }
   private handleNodeRemoved(node: SceneNode) {
     if (this._postGizmoRenderer.node === node) {

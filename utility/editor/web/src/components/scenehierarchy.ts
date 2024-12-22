@@ -68,18 +68,18 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
       }
       ImGui.EndPopup();
     }
-    if (ImGui.BeginDragDropSource()) {
-      if (node !== this._scene.rootNode) {
-        ImGui.SetDragDropPayload('NODE', node);
-      }
-      ImGui.EndDragDropSource();
-    }
     if (ImGui.BeginDragDropTarget()) {
       const payload = ImGui.AcceptDragDropPayload('NODE');
       if (payload) {
         this.dispatchEvent('node_drag_drop', payload.Data as SceneNode, node);
       }
       ImGui.EndDragDropTarget();
+    }
+    if (ImGui.BeginDragDropSource()) {
+      if (node !== this._scene.rootNode) {
+        ImGui.SetDragDropPayload('NODE', node);
+      }
+      ImGui.EndDragDropSource();
     }
     if (isOpen) {
       for (const child of node.children) {

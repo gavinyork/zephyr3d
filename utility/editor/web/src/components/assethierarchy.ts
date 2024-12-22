@@ -180,6 +180,10 @@ export class AssetHierarchy {
       }
       ImGui.EndPopup();
     }
+    if (ImGui.BeginDragDropSource()) {
+      ImGui.SetDragDropPayload('ASSET', asset);
+      ImGui.EndDragDropSource();
+    }
     if (isOpen) {
       ImGui.TreePop();
     }

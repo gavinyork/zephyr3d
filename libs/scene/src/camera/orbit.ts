@@ -81,8 +81,6 @@ export class OrbitCameraController extends BaseCameraController {
   /** @internal */
   private quat: Quaternion;
   /** @internal */
-  private scale: number;
-  /** @internal */
   private currentOp: OperationType;
   /**
    * Creates an instance of OrbitCameraController
@@ -132,7 +130,6 @@ export class OrbitCameraController extends BaseCameraController {
     this.target = new Vector3();
     this.direction = new Vector3();
     this.quat = new Quaternion();
-    this.scale = 1;
     this.currentOp = OperationType.NONE;
   }
   /** Rotation center */
@@ -152,7 +149,6 @@ export class OrbitCameraController extends BaseCameraController {
     this.rotateX = 0;
     this.rotateY = 0;
     this.upVector = Vector3.axisPY();
-    this.scale = 1;
     this.currentOp = OperationType.NONE;
     this._loadCameraParams();
   }
@@ -307,8 +303,6 @@ export class OrbitCameraController extends BaseCameraController {
       Vector3.normalize(this.eyePos, this.direction).inplaceNormalize();
       Vector3.cross(this.direction, this.xVector, this.upVector).inplaceNormalize();
       Vector3.combine(this.target, this.direction, 1, this.distance, this.eyePos);
-      //this.eyePos.combineBy(this.target, )
-      //Vector3.add(this.target, Vector3.scale(this.direction, this.distance), this.eyePos);
       this._getCamera().lookAt(this.eyePos, this.target, this.upVector);
       if (this.rotateX !== 0 || this.rotateY !== 0) {
         this.rotateX *= 1 - this.options.damping;
@@ -320,7 +314,6 @@ export class OrbitCameraController extends BaseCameraController {
           this.rotateY = 0;
         }
       }
-      console.log(this.scale);
     }
   }
 }
