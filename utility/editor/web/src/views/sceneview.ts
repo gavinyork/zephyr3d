@@ -12,7 +12,6 @@ import { FontGlyph } from '../core/fontglyph';
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import { SceneNodeProps } from '../components/nodeprop';
 import type { TRS } from '../types';
-import { AssetInfo } from '../storage/db';
 
 export class SceneView extends EmptyView<SceneModel> {
   private _postGizmoRenderer: PostGizmoRenderer;

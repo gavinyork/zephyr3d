@@ -1,12 +1,13 @@
 // worker.ts
-import { ZipWriter, BlobWriter, BlobReader } from '@zip.js/zip.js';
+import { ZipWriter, BlobWriter, BlobReader, ZipReader } from '@zip.js/zip.js';
 
 interface WorkerMessage {
-  type: 'compress';
-  files: {
+  type: 'compress' | 'decompress';
+  files?: {
     path: string;
     file: File;
   }[];
+  zipBlob?: Blob;
 }
 
 interface ProgressMessage {
@@ -32,7 +33,59 @@ async function compressFiles(files: WorkerMessage['files']): Promise<Blob> {
   return blob;
 }
 
+async function decompressBlob(zipBlob: Blob): Promise<Record<string, Blob>> {
+  const zipReader = new ZipReader(new BlobReader(zipBlob));
+  const entries = await zipReader.getEntries();
+  const result = {} as Record<string, Blob>;
+  const total = entries.length;
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (!entry.directory) {
+      self.postMessage({
+        type: 'progress',
+        current: i + 1,
+        total
+      } as ProgressMessage);
+
+      const blob = await entry.getData!(new BlobWriter());
+      result[entry.filename] = blob;
+    }
+  }
+  await zipReader.close();
+  return result;
+}
+
 self.addEventListener('message', async (e: MessageEvent<WorkerMessage>) => {
+  try {
+    let result: Blob | Record<string, Blob>;
+
+    switch (e.data.type) {
+      case 'compress':
+        if (!e.data.files) {
+          throw new Error('No files provided for compression');
+        }
+        result = await compressFiles(e.data.files);
+        self.postMessage({ type: 'success', data: result });
+        break;
+
+      case 'decompress':
+        if (!e.data.zipBlob) {
+          throw new Error('No zip blob provided for decompression');
+        }
+        result = await decompressBlob(e.data.zipBlob);
+        self.postMessage({ type: 'success', data: result });
+        break;
+
+      default:
+        throw new Error('Unknown message type');
+    }
+  } catch (error) {
+    self.postMessage({
+      type: 'error',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+  /*
   if (e.data.type === 'compress') {
     try {
       const zipBlob = await compressFiles(e.data.files);
@@ -44,4 +97,5 @@ self.addEventListener('message', async (e: MessageEvent<WorkerMessage>) => {
       });
     }
   }
+    */
 });
