@@ -25,7 +25,7 @@ export class SceneView extends EmptyView<SceneModel> {
     this._transformNode = null;
     this._oldTransform = null;
     this.drawBackground = false;
-    this.dragDropTypes = ['ASSET'];
+    this.dragDropTypes = [];
     this._toolbar = new ToolBar(
       [
         {
@@ -123,6 +123,9 @@ export class SceneView extends EmptyView<SceneModel> {
     };
   }
   render() {
+    if (!ImGui.GetIO().MouseDown[0] && this.dragDropTypes.length > 0) {
+      this.dragDropTypes = [];
+    }
     super.render();
     const displaySize = ImGui.GetIO().DisplaySize;
     const viewportWidth = displaySize.x - this._tab.width - this._propGrid.width;
@@ -182,6 +185,7 @@ export class SceneView extends EmptyView<SceneModel> {
     this._postGizmoRenderer.on('end_translate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.on('end_rotate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.on('end_scale', this.handleEndTransformNode, this);
+    eventBus.on('workspace_drag_start', this.handleNodeDragStart, this);
     eventBus.on('workspace_drag_drop', this.handleAssetDragDrop, this);
   }
   protected onDeactivate(): void {
@@ -200,6 +204,7 @@ export class SceneView extends EmptyView<SceneModel> {
     this._postGizmoRenderer.off('end_translate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.off('end_rotate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.off('end_scale', this.handleEndTransformNode, this);
+    eventBus.off('workspace_drag_start', this.handleNodeDragStart, this);
     eventBus.off('workspace_drag_drop', this.handleAssetDragDrop, this);
   }
   private handleNodeSelected(node: SceneNode) {
@@ -218,6 +223,9 @@ export class SceneView extends EmptyView<SceneModel> {
       this._propGrid.object = null;
       this._propGrid.clear();
     }
+  }
+  private handleNodeDragStart() {
+    this.dragDropTypes = ['ASSET'];
   }
   private handleNodeDragDrop(src: SceneNode, dst: SceneNode) {
     if (src.parent !== dst && !src.isParentOf(dst)) {

@@ -9,6 +9,7 @@ type EventBusEventMap = {
   update: [frameElapsed: number];
   switch_module: [name: string, ...args: any[]];
   input_event: [ev: Event, type: string];
+  workspace_drag_start: [];
   workspace_drag_drop: [type: string, data: unknown];
   action: [action: string];
   action_doc_request_new: [type: DocumentType];

@@ -5,6 +5,7 @@ import { BaseController } from './basecontroller';
 import { EditorApiService } from '../api/services/editorservice';
 import type { ApiClient } from '../api/client/apiclient';
 import type { BaseModel } from '../models/basemodel';
+import { Dialog } from '../views/dlg/dlg';
 
 export class EmptyController<T extends BaseModel> extends BaseController<T> {
   private _editorservice: EditorApiService;
@@ -24,7 +25,7 @@ export class EmptyController<T extends BaseModel> extends BaseController<T> {
   }
   requestNew(type: DocumentType) {
     if (type === 'scene') {
-      new DlgNewScene('New Scene', true);
+      Dialog.createScene('New Scene');
     }
   }
   requestClose() {

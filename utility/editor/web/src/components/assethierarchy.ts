@@ -2,6 +2,9 @@ import { ImGui } from '@zephyr3d/imgui';
 import { AssetInfo, AssetType, Database } from '../storage/db';
 import { FilePicker } from './filepicker';
 import { DlgProgress } from '../views/dlg/progressdlg';
+import { ModelAsset } from '../helpers/model';
+import { Dialog } from '../views/dlg/dlg';
+import { eventBus } from '../core/eventbus';
 
 export class AssetHierarchy {
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
@@ -29,67 +32,64 @@ export class AssetHierarchy {
   selectAsset(asset: AssetInfo) {
     this._selectedAsset = asset;
   }
-  uploadAssetFile(type: AssetType) {
-    FilePicker.chooseFiles(false, '').then((files) => {
-      if (files.length > 0) {
-        const file = files[0];
-        Database.addBlob({
-          name: file.name,
-          data: file,
-          metadata: {}
-        }).then((blob) => {
-          Database.addAsset({
-            name: file.name,
-            type,
-            blob,
-            metadata: { zip: false }
-          }).then(() => {
-            Database.listAssets().then((assets) => {
-              this._assets = assets;
-              this._selectedAsset = null;
-            });
-          });
-        });
-      }
+  async uploadFiles(type: AssetType, zip: Blob, folderName: string, paths: string[]) {
+    const blob = await Database.addBlob({
+      data: zip
     });
+    const pkg = await Database.addPackage({
+      blob,
+      name: folderName,
+      size: zip.size,
+    })
+    for( const path of paths) {
+      await Database.addAsset({
+        name: path.split('/').pop(),
+        path: path,
+        type,
+        pkg
+      });
+    }
   }
-  uploadAssetDirectory(type: AssetType) {
-    FilePicker.chooseDirectory().then((files) => {
-      if (files.length === 0) {
-        return;
+  async uploadAssetFile(type: AssetType) {
+    const files = await FilePicker.chooseFiles(false, '')
+    const file = files[0];
+    if (ModelAsset.extensions.findIndex((ext) => file.name.toLowerCase().endsWith(ext)) < 0) {
+      Dialog.messageBox('Error', 'Invalid file type. Only glb, gltf files are supported.')
+      return;
+    }
+    const zip = await this.zipFiles([{ path: file.name, file}]);
+    await this.uploadFiles(type, zip, file.name, [file.name]);
+    this._assets = await Database.listAssets();
+    this._selectedAsset = null;
+  }
+  async uploadAssetDirectory(type: AssetType) {
+    const files = await FilePicker.chooseDirectory();
+    if (files.length === 0) {
+      return;
+    }
+    const folderName = files[0].webkitRelativePath.split('/')[0];
+    const assetFiles: string[] = [];
+    const fileList = files.map((file) => {
+      const path = file.webkitRelativePath.split('/').slice(1).join('/');
+      const filename = file.name.toLowerCase();
+      if (ModelAsset.extensions.findIndex((ext) => filename.endsWith(ext)) >= 0) {
+        assetFiles.push(path);
       }
-      const folderName = files[0].webkitRelativePath.split('/')[0];
-      const fileList = files.map((file) => ({
+      return {
         path: file.webkitRelativePath.split('/').slice(1).join('/'),
         file
-      }));
-      this.zipFolder(fileList)
-        .then((zip) => {
-          console.log(`Zip folder succeeded: ${zip}`);
-          Database.addBlob({
-            name: folderName,
-            data: zip,
-            metadata: {}
-          }).then((blob) => {
-            Database.addAsset({
-              name: folderName,
-              type,
-              blob,
-              metadata: { zip: true }
-            }).then(() => {
-              Database.listAssets().then((assets) => {
-                this._assets = assets;
-                this._selectedAsset = null;
-              });
-            });
-          });
-        })
-        .catch((err) => {
-          console.error(`Zip folder failed: ${err}`);
-        });
+      };
     });
+    if (assetFiles.length === 0) {
+      Dialog.messageBox('Error', 'No glb or gltf files found in the selected directory.');
+      return;
+    }
+    const zip = await this.zipFiles(fileList);
+    await this.uploadFiles(type, zip, folderName, assetFiles);
+    this._assets = await Database.listAssets();
+    this._selectedAsset = null;
   }
-  async zipFolder(files: { path: string; file: File }[]) {
+  async zipFiles(files: { path: string; file: File }[]) {
     return new Promise<Blob>((resolve, reject) => {
       let worker = new Worker(new URL('./zip.worker.js', import.meta.url), { type: 'module' });
       worker.onmessage = (e) => {
@@ -176,13 +176,18 @@ export class AssetHierarchy {
         this.deleteAsset(asset);
       }
       if (ImGui.MenuItem('Download')) {
-        Database.downloadBlob(asset.blob, asset.metadata.zip);
+        Database.getPackage(asset.pkg).then((pkg) => {
+          Database.downloadBlob(pkg.blob, `${pkg.name}.zip`);
+        }).catch((error) => {
+          Dialog.messageBox('Error', `Failed to download package: ${error}`);
+        });
       }
       ImGui.EndPopup();
     }
     if (ImGui.BeginDragDropSource()) {
       ImGui.SetDragDropPayload('ASSET', asset);
       ImGui.EndDragDropSource();
+      eventBus.dispatchEvent('workspace_drag_start');
     }
     if (isOpen) {
       ImGui.TreePop();

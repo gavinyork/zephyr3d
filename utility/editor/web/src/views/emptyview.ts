@@ -64,7 +64,6 @@ export class EmptyView<T extends BaseModel> extends BaseView<T> {
       ImGui.WindowFlags.NoDecoration |
       ImGui.WindowFlags.NoScrollbar |
       ImGui.WindowFlags.NoScrollWithMouse |
-      //ImGui.WindowFlags.NoMouseInputs |
       ImGui.WindowFlags.NoMove |
       ImGui.WindowFlags.NoResize;
     this._dragDropTypes = [];
@@ -99,7 +98,14 @@ export class EmptyView<T extends BaseModel> extends BaseView<T> {
     this._windowSize.Set(displaySize.x, displaySize.y);
     ImGui.SetNextWindowPos(this._windowPos);
     ImGui.SetNextWindowSize(this._windowSize);
-    const flags = this._drawBackground ? this._baseFlags : this._baseFlags | ImGui.WindowFlags.NoBackground;
+    const dropzone = this._dragDropTypes?.length > 0;
+    let flags = this._baseFlags;
+    if (!this._drawBackground) {
+      flags |= ImGui.WindowFlags.NoBackground;
+    }
+    if (!dropzone) {
+      flags |= ImGui.WindowFlags.NoMouseInputs;
+    }
     ImGui.Begin('##Background', null, flags);
     if (this._dragDropTypes?.length > 0) {
       ImGui.BeginChild('##dropzone_container', ImGui.GetContentRegionAvail());

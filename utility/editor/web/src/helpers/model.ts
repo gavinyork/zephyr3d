@@ -1,8 +1,9 @@
 import { AnimationSet, AssetManager, SceneNode } from '@zephyr3d/scene';
-import { Database } from '../../storage/db';
+import { Database } from '../storage/db';
 
 export class ModelAsset {
   private _cache: Record<string, Promise<{ group: SceneNode; animationSet: AnimationSet }[]>>;
+  static readonly extensions = ['.gltf', '.glb'];
   constructor() {
     this._cache = {};
   }
@@ -53,7 +54,7 @@ export class ModelAsset {
       return null;
     }
     assetManager = assetManager ?? new AssetManager();
-    const blob = await Database.getBlob(asset.blob);
+    const blob = await Database.getBlob(asset.pkg);
     let files: Record<string, Blob> = {};
     if (asset.metadata.zip) {
       files = await this.decompressZip(blob.data);
