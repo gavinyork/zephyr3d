@@ -98,7 +98,7 @@ export class EmptyView<T extends BaseModel> extends BaseView<T> {
     this._windowSize.Set(displaySize.x, displaySize.y);
     ImGui.SetNextWindowPos(this._windowPos);
     ImGui.SetNextWindowSize(this._windowSize);
-    const dropzone = this._dragDropTypes?.length > 0;
+    const dropzone = false && this._dragDropTypes?.length > 0;
     let flags = this._baseFlags;
     if (!this._drawBackground) {
       flags |= ImGui.WindowFlags.NoBackground;
@@ -108,12 +108,13 @@ export class EmptyView<T extends BaseModel> extends BaseView<T> {
     }
     ImGui.Begin('##Background', null, flags);
     if (this._dragDropTypes?.length > 0) {
-      ImGui.BeginChild('##dropzone_container', ImGui.GetContentRegionAvail());
       ImGui.PushStyleColor(ImGui.Col.Header, this._transColor);
       ImGui.PushStyleColor(ImGui.Col.HeaderActive, this._transColor);
       ImGui.PushStyleColor(ImGui.Col.HeaderHovered, this._transColor);
       ImGui.Selectable('##dropzone', false, ImGui.SelectableFlags.Disabled, ImGui.GetContentRegionAvail());
       if (ImGui.BeginDragDropTarget()) {
+        const p = ImGui.GetDragDropPayload();
+        console.log(p);
         for (const type of this._dragDropTypes) {
           const payload = ImGui.AcceptDragDropPayload(type);
           if (payload) {
@@ -124,7 +125,6 @@ export class EmptyView<T extends BaseModel> extends BaseView<T> {
         ImGui.EndDragDropTarget();
       }
       ImGui.PopStyleColor(3);
-      ImGui.EndChild();
     }
     ImGui.End();
     ImGui.PopStyleColor();

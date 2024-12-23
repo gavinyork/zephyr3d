@@ -4,7 +4,7 @@ import { FilePicker } from './filepicker';
 import { DlgProgress } from '../views/dlg/progressdlg';
 import { ModelAsset } from '../helpers/model';
 import { Dialog } from '../views/dlg/dlg';
-import { eventBus } from '../core/eventbus';
+import { enableWorkspaceDragging } from './dragdrop';
 
 export class AssetHierarchy {
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
@@ -39,9 +39,9 @@ export class AssetHierarchy {
     const pkg = await Database.addPackage({
       blob,
       name: folderName,
-      size: zip.size,
-    })
-    for( const path of paths) {
+      size: zip.size
+    });
+    for (const path of paths) {
       await Database.addAsset({
         name: path.split('/').pop(),
         path: path,
@@ -51,13 +51,13 @@ export class AssetHierarchy {
     }
   }
   async uploadAssetFile(type: AssetType) {
-    const files = await FilePicker.chooseFiles(false, '')
+    const files = await FilePicker.chooseFiles(false, '');
     const file = files[0];
     if (ModelAsset.extensions.findIndex((ext) => file.name.toLowerCase().endsWith(ext)) < 0) {
-      Dialog.messageBox('Error', 'Invalid file type. Only glb, gltf files are supported.')
+      Dialog.messageBox('Error', 'Invalid file type. Only glb, gltf files are supported.');
       return;
     }
-    const zip = await this.zipFiles([{ path: file.name, file}]);
+    const zip = await this.zipFiles([{ path: file.name, file }]);
     await this.uploadFiles(type, zip, file.name, [file.name]);
     this._assets = await Database.listAssets();
     this._selectedAsset = null;
@@ -176,19 +176,17 @@ export class AssetHierarchy {
         this.deleteAsset(asset);
       }
       if (ImGui.MenuItem('Download')) {
-        Database.getPackage(asset.pkg).then((pkg) => {
-          Database.downloadBlob(pkg.blob, `${pkg.name}.zip`);
-        }).catch((error) => {
-          Dialog.messageBox('Error', `Failed to download package: ${error}`);
-        });
+        Database.getPackage(asset.pkg)
+          .then((pkg) => {
+            Database.downloadBlob(pkg.blob, `${pkg.name}.zip`);
+          })
+          .catch((error) => {
+            Dialog.messageBox('Error', `Failed to download package: ${error}`);
+          });
       }
       ImGui.EndPopup();
     }
-    if (ImGui.BeginDragDropSource()) {
-      ImGui.SetDragDropPayload('ASSET', asset);
-      ImGui.EndDragDropSource();
-      eventBus.dispatchEvent('workspace_drag_start');
-    }
+    enableWorkspaceDragging('ASSET', asset);
     if (isOpen) {
       ImGui.TreePop();
     }

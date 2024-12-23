@@ -123,51 +123,104 @@ export class SceneView extends EmptyView<SceneModel> {
     };
   }
   render() {
-    if (!ImGui.GetIO().MouseDown[0] && this.dragDropTypes.length > 0) {
-      this.dragDropTypes = [];
-    }
     super.render();
     const displaySize = ImGui.GetIO().DisplaySize;
     const viewportWidth = displaySize.x - this._tab.width - this._propGrid.width;
     const viewportHeight = displaySize.y - this.statusbar.height - this.menubar.height - this._toolbar.height;
+    this._tab.render();
+    this._propGrid.render();
+    this._toolbar.render();
+    if (this.dragDropTypes.length > 0) {
+      if (viewportWidth > 0 && viewportHeight > 0) {
+        this.renderDropZone(
+          this._tab.width,
+          this.menubar.height + this._toolbar.height,
+          viewportWidth,
+          viewportHeight
+        );
+      }
+    }
     this.model.camera.viewport = [this._tab.width, this.statusbar.height, viewportWidth, viewportHeight];
     this.model.camera.scissor = [this._tab.width, this.statusbar.height, viewportWidth, viewportHeight];
     this.model.camera.aspect = viewportWidth / viewportHeight;
     this.model.camera.render(this.model.scene, this.model.compositor);
-    this._tab.render();
-    this._propGrid.render();
-    this._toolbar.render();
     if (ImGui.Begin('FontTest')) {
       ImGui.Text(FontGlyph.allGlyphs);
     }
     ImGui.End();
+  }
+  renderDropZone(x: number, y: number, w: number, h: number) {
+    const color = new ImGui.ImVec4(0, 0, 0, 0);
+    ImGui.PushStyleColor(ImGui.Col.WindowBg, color);
+    ImGui.PushStyleVar(ImGui.StyleVar.WindowPadding, new ImGui.ImVec2(0, 0));
+    ImGui.PushStyleVar(ImGui.StyleVar.WindowBorderSize, 0);
+    ImGui.SetNextWindowPos(new ImGui.ImVec2(x, y));
+    ImGui.SetNextWindowSize(new ImGui.ImVec2(w, h));
+    ImGui.Begin(
+      '##DropZone',
+      null,
+      ImGui.WindowFlags.NoTitleBar |
+        ImGui.WindowFlags.NoBringToFrontOnFocus |
+        ImGui.WindowFlags.NoCollapse |
+        ImGui.WindowFlags.NoDecoration |
+        ImGui.WindowFlags.NoScrollbar |
+        ImGui.WindowFlags.NoScrollWithMouse |
+        ImGui.WindowFlags.NoMove |
+        ImGui.WindowFlags.NoResize
+    );
+    ImGui.PushStyleColor(ImGui.Col.Header, color);
+    ImGui.PushStyleColor(ImGui.Col.HeaderActive, color);
+    ImGui.PushStyleColor(ImGui.Col.HeaderHovered, color);
+    ImGui.Selectable('##dropzone', false, ImGui.SelectableFlags.Disabled, ImGui.GetContentRegionAvail());
+    if (ImGui.BeginDragDropTarget()) {
+      for (const type of this.dragDropTypes) {
+        const payload = ImGui.AcceptDragDropPayload(type);
+        if (payload) {
+          const mousePos = ImGui.GetMousePos();
+          const pos = [mousePos.x, mousePos.y];
+          if (this.posToViewport(pos, this.model.camera.viewport)) {
+            eventBus.dispatchEvent('workspace_drag_drop', type, payload.Data, pos[0], pos[1]);
+          }
+          break;
+        }
+      }
+      ImGui.EndDragDropTarget();
+    }
+    ImGui.PopStyleColor(3);
+    ImGui.End();
+    ImGui.PopStyleColor();
+    ImGui.PopStyleVar(2);
   }
   handleEvent(ev: Event, type?: string): boolean {
     if (this.model.camera.handleEvent(ev, type)) {
       return true;
     }
     if (ev instanceof PointerEvent) {
-      const cvs = Application.instance.device.canvas;
-      const vp = this.model.camera.viewport;
-      const vp_x = vp ? vp[0] : 0;
-      const vp_y = vp ? cvs.clientHeight - vp[1] - vp[3] : 0;
-      const vp_w = vp ? vp[2] : cvs.clientWidth;
-      const vp_h = vp ? vp[3] : cvs.clientHeight;
-      const x = ev.offsetX - vp_x;
-      const y = ev.offsetY - vp_y;
-      if (x < 0 || x >= vp_w || y < 0 || y >= vp_h) {
+      const p = [ev.offsetX, ev.offsetY];
+      if (!this.posToViewport(p, this.model.camera.viewport)) {
         return false;
       }
-      if (this._postGizmoRenderer.handlePointerEvent(ev.type, x, y, ev.button)) {
+      if (this._postGizmoRenderer.handlePointerEvent(ev.type, p[0], p[1], ev.button)) {
         return true;
       }
       if (ev.button === 0 && ev.type === 'pointerdown') {
-        this.model.camera.pickAsync(x, y).then((pickResult) => {
+        this.model.camera.pickAsync(p[0], p[1]).then((pickResult) => {
           this._tab.sceneHierarchy.selectNode(pickResult?.target?.node ?? null);
         });
       }
     }
     return true;
+  }
+  private posToViewport(pos: number[], viewport: ArrayLike<number>): boolean {
+    const cvs = Application.instance.device.canvas;
+    const vp = viewport;
+    const vp_x = vp ? vp[0] : 0;
+    const vp_y = vp ? cvs.clientHeight - vp[1] - vp[3] : 0;
+    const vp_w = vp ? vp[2] : cvs.clientWidth;
+    const vp_h = vp ? vp[3] : cvs.clientHeight;
+    pos[0] -= vp_x;
+    pos[1] -= vp_y;
+    return pos[0] >= 0 && pos[0] < vp_w && pos[1] >= 0 && pos[1] < vp_h;
   }
   protected onActivate(): void {
     super.onActivate();
@@ -186,6 +239,7 @@ export class SceneView extends EmptyView<SceneModel> {
     this._postGizmoRenderer.on('end_rotate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.on('end_scale', this.handleEndTransformNode, this);
     eventBus.on('workspace_drag_start', this.handleNodeDragStart, this);
+    eventBus.on('workspace_drag_end', this.handleNodeDragEnd, this);
     eventBus.on('workspace_drag_drop', this.handleAssetDragDrop, this);
   }
   protected onDeactivate(): void {
@@ -205,6 +259,7 @@ export class SceneView extends EmptyView<SceneModel> {
     this._postGizmoRenderer.off('end_rotate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.off('end_scale', this.handleEndTransformNode, this);
     eventBus.off('workspace_drag_start', this.handleNodeDragStart, this);
+    eventBus.off('workspace_drag_end', this.handleNodeDragEnd, this);
     eventBus.off('workspace_drag_drop', this.handleAssetDragDrop, this);
   }
   private handleNodeSelected(node: SceneNode) {
@@ -227,6 +282,11 @@ export class SceneView extends EmptyView<SceneModel> {
   private handleNodeDragStart() {
     this.dragDropTypes = ['ASSET'];
   }
+  private handleNodeDragEnd() {
+    Application.instance.device.nextFrame(() => {
+      this.dragDropTypes = [];
+    });
+  }
   private handleNodeDragDrop(src: SceneNode, dst: SceneNode) {
     if (src.parent !== dst && !src.isParentOf(dst)) {
       const localMatrix = Matrix4x4.invertAffine(dst.worldMatrix).multiplyRight(src.worldMatrix);
@@ -234,8 +294,8 @@ export class SceneView extends EmptyView<SceneModel> {
       src.parent = dst;
     }
   }
-  private handleAssetDragDrop(type: string, asset: unknown) {
-    console.log(`Asset drag drop: ${type}`);
+  private handleAssetDragDrop(type: string, asset: unknown, x: number, y: number) {
+    console.log(`DragDrop ${type} at (${x}, ${y})`);
   }
   private handleNodeRemoved(node: SceneNode) {
     if (this._postGizmoRenderer.node === node) {
