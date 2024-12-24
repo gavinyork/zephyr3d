@@ -22,15 +22,7 @@ export class OrthoCamera extends Camera {
    * @param nearPlane - The near clip plane
    * @param farPlane - The far clip plane
    */
-  constructor(
-    scene: Scene,
-    left = -1,
-    right = 1,
-    bottom = -1,
-    top = 1,
-    near = -1,
-    far = 1
-  ) {
+  constructor(scene: Scene, left = -1, right = 1, bottom = -1, top = 1, near = -1, far = 1) {
     super(scene);
     this._left = left;
     this._right = right;

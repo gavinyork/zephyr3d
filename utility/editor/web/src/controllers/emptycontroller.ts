@@ -1,6 +1,5 @@
 import { eventBus } from '../core/eventbus';
 import type { DocumentType } from '../components/common';
-import { DlgNewScene } from '../views/dlg/newscenedlg';
 import { BaseController } from './basecontroller';
 import { EditorApiService } from '../api/services/editorservice';
 import type { ApiClient } from '../api/client/apiclient';

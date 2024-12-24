@@ -1,4 +1,4 @@
-import { PropertyValue, SerializableClass, SerializationInfo } from './types';
+import type { PropertyValue, SerializableClass, SerializationInfo } from './types';
 
 export function deserializeObjectProps<T>(obj: T, cls: SerializableClass<T>, json: object) {
   const tmpVal: PropertyValue = {

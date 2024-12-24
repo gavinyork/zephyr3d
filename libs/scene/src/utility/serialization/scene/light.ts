@@ -1,9 +1,15 @@
-import type { SceneNode } from "../../../scene/scene_node";
-import { type BaseLight, type PunctualLight, DirectionalLight, PointLight, SpotLight } from "../../../scene/light";
-import type { Scene } from "../../../scene/scene";
-import type { SerializableClass } from "../types";
-import { sceneNodeClass } from "./node";
-import { Vector4 } from "@zephyr3d/base";
+import type { SceneNode } from '../../../scene/scene_node';
+import {
+  type BaseLight,
+  type PunctualLight,
+  DirectionalLight,
+  PointLight,
+  SpotLight
+} from '../../../scene/light';
+import type { Scene } from '../../../scene/scene';
+import type { SerializableClass } from '../types';
+import { sceneNodeClass } from './node';
+import { Vector4 } from '@zephyr3d/base';
 
 export const baseLightClass: SerializableClass<SceneNode> = {
   ctor: null,
@@ -24,7 +30,7 @@ export const baseLightClass: SerializableClass<SceneNode> = {
       }
     ];
   }
-}
+};
 
 export const punctualLightClass: SerializableClass<SceneNode> = {
   ctor: null,
@@ -58,7 +64,7 @@ export const punctualLightClass: SerializableClass<SceneNode> = {
       }
     ];
   }
-}
+};
 
 export const directionalLightClass: SerializableClass<SceneNode> = {
   ctor: DirectionalLight,
@@ -82,7 +88,7 @@ export const directionalLightClass: SerializableClass<SceneNode> = {
       }
     ];
   }
-}
+};
 
 export const pointLightClass: SerializableClass<SceneNode> = {
   ctor: PointLight,
@@ -106,7 +112,7 @@ export const pointLightClass: SerializableClass<SceneNode> = {
       }
     ];
   }
-}
+};
 
 export const spotLightClass: SerializableClass<SceneNode> = {
   ctor: SpotLight,
@@ -141,4 +147,4 @@ export const spotLightClass: SerializableClass<SceneNode> = {
       }
     ];
   }
-}
+};

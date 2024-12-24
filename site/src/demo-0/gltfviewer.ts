@@ -27,7 +27,7 @@ import {
 import { EnvMaps } from './envmap';
 import { Panel } from './ui';
 import { Inspector } from '@zephyr3d/inspector';
-import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
+import { imGuiInit, imGuiInjectEvent } from '@zephyr3d/imgui';
 
 declare global {
   const DracoDecoderModule: draco3d.DracoDecoderModule;

@@ -1,4 +1,5 @@
-import { AnimationSet, AssetManager, SceneNode } from '@zephyr3d/scene';
+import type { AnimationSet, SceneNode } from '@zephyr3d/scene';
+import { AssetManager } from '@zephyr3d/scene';
 import { Database } from '../storage/db';
 
 export class ModelAsset {
@@ -45,7 +46,7 @@ export class ModelAsset {
     uuid: string,
     assetManager?: AssetManager
   ): Promise<{ group: SceneNode; animationSet: AnimationSet }[]> {
-    let model = this._cache[uuid];
+    const model = this._cache[uuid];
     if (model) {
       return model;
     }
@@ -54,12 +55,6 @@ export class ModelAsset {
       return null;
     }
     assetManager = assetManager ?? new AssetManager();
-    const blob = await Database.getBlob(asset.pkg);
-    let files: Record<string, Blob> = {};
-    if (asset.metadata.zip) {
-      files = await this.decompressZip(blob.data);
-    } else {
-      files = { '': blob.data };
-    }
+    return null;
   }
 }

@@ -5,7 +5,7 @@ export class DlgMessage extends ModalDialog {
   private _text: string;
   constructor(id?: string, open?: boolean, width?: number, message?: string) {
     super(id ?? 'MessageBox', open ?? true, width ?? 300);
-    this._text = message?? '';
+    this._text = message ?? '';
   }
   get text() {
     return this._text;

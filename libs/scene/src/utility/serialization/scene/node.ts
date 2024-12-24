@@ -1,20 +1,20 @@
-import { SceneNode } from "../../../scene/scene_node";
-import type { SceneNodeVisible } from "../../../scene/scene_node";
-import type { Scene } from "../../../scene/scene";
-import type { SerializableClass } from "../types";
-import { degree2radian, radian2degree } from "@zephyr3d/base";
+import { SceneNode } from '../../../scene/scene_node';
+import type { SceneNodeVisible } from '../../../scene/scene_node';
+import type { Scene } from '../../../scene/scene';
+import type { SerializableClass } from '../types';
+import { degree2radian, radian2degree } from '@zephyr3d/base';
 
 export const sceneNodeClass: SerializableClass<SceneNode> = {
   ctor: SceneNode,
   className: 'SceneNode',
   createFunc(scene: Scene) {
-    return new SceneNode(scene)
+    return new SceneNode(scene);
   },
   getProps() {
     return [
       {
         name: 'Name',
-        type:'string',
+        type: 'string',
         defaultValue: '',
         get(value) {
           value.str[0] = this.name;
@@ -89,6 +89,6 @@ export const sceneNodeClass: SerializableClass<SceneNode> = {
           this.showState = value.str[0] as SceneNodeVisible;
         }
       }
-    ]
+    ];
   }
-}
+};

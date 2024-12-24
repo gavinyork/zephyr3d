@@ -1,5 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { AssetInfo, AssetPackage, AssetType, Database } from '../storage/db';
+import type { AssetInfo, AssetPackage, AssetType } from '../storage/db';
+import { Database } from '../storage/db';
 import { FilePicker } from './filepicker';
 import { DlgProgress } from '../views/dlg/progressdlg';
 import { ModelAsset } from '../helpers/model';
@@ -8,7 +9,7 @@ import { enableWorkspaceDragging } from './dragdrop';
 
 export class AssetHierarchy {
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
-  private _assets: { pkg: AssetPackage, assets: AssetInfo[] }[];
+  private _assets: { pkg: AssetPackage; assets: AssetInfo[] }[];
   private _selectedAsset: AssetInfo;
   private _zipProgress: DlgProgress;
   constructor() {
@@ -96,7 +97,6 @@ export class AssetHierarchy {
     await this.uploadFiles(type, zip, folderName, assetFiles);
     this._selectedAsset = null;
     await this.listAssets();
-
   }
   async zipFiles(files: { path: string; file: File }[]) {
     return new Promise<Blob>((resolve, reject) => {
@@ -146,7 +146,10 @@ export class AssetHierarchy {
   }
   private renderAssetGroup(type: AssetType) {
     ImGui.PushID(type);
-    const isOpen = ImGui.TreeNodeEx(`${type}##__AssetHierarchy__${type}`, AssetHierarchy.baseFlags|ImGui.TreeNodeFlags.DefaultOpen);
+    const isOpen = ImGui.TreeNodeEx(
+      `${type}##__AssetHierarchy__${type}`,
+      AssetHierarchy.baseFlags | ImGui.TreeNodeFlags.DefaultOpen
+    );
     if (ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
       ImGui.OpenPopup(`context_upload`);
     }

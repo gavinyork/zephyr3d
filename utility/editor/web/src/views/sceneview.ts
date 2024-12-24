@@ -175,12 +175,19 @@ export class SceneView extends EmptyView<SceneModel> {
     ImGui.Selectable('##dropzone', false, ImGui.SelectableFlags.Disabled, ImGui.GetContentRegionAvail());
     if (ImGui.BeginDragDropTarget()) {
       for (const type of this._dragDropTypes) {
+        const peekPayload = ImGui.AcceptDragDropPayload(type, ImGui.DragDropFlags.AcceptBeforeDelivery);
         const payload = ImGui.AcceptDragDropPayload(type);
-        if (payload) {
+        if (payload || peekPayload) {
           const mousePos = ImGui.GetMousePos();
           const pos = [mousePos.x, mousePos.y];
           if (this.posToViewport(pos, this.model.camera.viewport)) {
-            eventBus.dispatchEvent('workspace_drag_drop', type, payload.Data, pos[0], pos[1]);
+            eventBus.dispatchEvent(
+              payload ? 'workspace_drag_drop' : 'workspace_dragging',
+              type,
+              payload ? payload.Data : peekPayload.Data,
+              pos[0],
+              pos[1]
+            );
           }
           break;
         }
@@ -242,6 +249,7 @@ export class SceneView extends EmptyView<SceneModel> {
     eventBus.on('workspace_drag_start', this.handleNodeDragStart, this);
     eventBus.on('workspace_drag_end', this.handleNodeDragEnd, this);
     eventBus.on('workspace_drag_drop', this.handleAssetDragDrop, this);
+    eventBus.on('workspace_dragging', this.handleAssetDragging, this);
   }
   protected onDeactivate(): void {
     super.onDeactivate();
@@ -262,6 +270,7 @@ export class SceneView extends EmptyView<SceneModel> {
     eventBus.off('workspace_drag_start', this.handleNodeDragStart, this);
     eventBus.off('workspace_drag_end', this.handleNodeDragEnd, this);
     eventBus.off('workspace_drag_drop', this.handleAssetDragDrop, this);
+    eventBus.off('workspace_dragging', this.handleAssetDragging, this);
   }
   private handleNodeSelected(node: SceneNode) {
     this._postGizmoRenderer.node = node;
@@ -297,6 +306,9 @@ export class SceneView extends EmptyView<SceneModel> {
   }
   private handleAssetDragDrop(type: string, asset: unknown, x: number, y: number) {
     console.log(`DragDrop ${type} at (${x}, ${y})`);
+  }
+  private handleAssetDragging(type: string, asset: unknown, x: number, y: number) {
+    console.log(`Dragging ${type} at (${x}, ${y})`);
   }
   private handleNodeRemoved(node: SceneNode) {
     if (this._postGizmoRenderer.node === node) {

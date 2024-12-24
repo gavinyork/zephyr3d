@@ -1,7 +1,7 @@
-import { BatchGroup, type SceneNode } from "../../../scene";
-import type { Scene } from "../../../scene/scene";
-import type { SerializableClass } from "../types";
-import { sceneNodeClass } from "./node";
+import { BatchGroup, type SceneNode } from '../../../scene';
+import type { Scene } from '../../../scene/scene';
+import type { SerializableClass } from '../types';
+import { sceneNodeClass } from './node';
 
 export const batchGroupClass: SerializableClass<SceneNode> = {
   ctor: BatchGroup,
@@ -13,4 +13,4 @@ export const batchGroupClass: SerializableClass<SceneNode> = {
   getProps() {
     return [];
   }
-}
+};

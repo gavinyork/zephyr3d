@@ -1,4 +1,4 @@
-import { GenericConstructor } from '@zephyr3d/base';
+import type { GenericConstructor } from '@zephyr3d/base';
 
 export type PropertyType = 'bool' | 'int' | 'float' | 'vec2' | 'vec3' | 'vec4' | 'string' | 'rgb' | 'rgba';
 export type PropertyValue = {

@@ -1,5 +1,5 @@
 import { degree2radian, radian2degree, Vector3 } from '@zephyr3d/base';
-import { PropertyAccessor } from './types';
+import type { PropertyAccessor } from './types';
 import type { SceneNode, SceneNodeVisible } from '../../scene';
 
 const tmpVec3 = new Vector3();

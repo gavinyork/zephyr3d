@@ -1,4 +1,4 @@
-import { ImGui, imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
+import { imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { eventBus } from './eventbus';
 import { ModalDialog } from '../components/modal';
 import { ModuleManager } from './module';

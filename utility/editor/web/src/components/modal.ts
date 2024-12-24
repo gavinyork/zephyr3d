@@ -2,8 +2,8 @@ import { makeEventTarget } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 
 export class ModalDialog extends makeEventTarget(Object)<{
-  opened: [],
-  closed: []
+  opened: [];
+  closed: [];
 }>() {
   private static _currentDlg: ModalDialog = null;
   private _id: string;

@@ -1,4 +1,5 @@
-import { IDBPDatabase, openDB } from 'idb';
+import type { IDBPDatabase } from 'idb';
+import { openDB } from 'idb';
 
 export type AssetType = 'model';
 
@@ -8,7 +9,7 @@ export type AssetPackage = {
   blob: string;
   size: number;
   metadata?: object;
-}
+};
 
 export type AssetBlob = {
   uuid?: string;
@@ -32,7 +33,7 @@ export class Database {
   static readonly DB_NAME_ASSETS = 'assets';
   static readonly DB_NAME_SCENES = 'scenes';
   static readonly DB_NAME_BLOBS = 'blobs';
-  static readonly DB_NAME_PACKAGES  = 'packages';
+  static readonly DB_NAME_PACKAGES = 'packages';
   static async init() {
     if (!this.instance) {
       const that = this;
@@ -268,7 +269,7 @@ export class Database {
   }
   static async listScenes() {
     try {
-      let scenes = await this.instance.getAll(this.DB_NAME_SCENES);
+      const scenes = await this.instance.getAll(this.DB_NAME_SCENES);
       return scenes.map((scene) => ({
         ...scene,
         content: JSON.parse(scene.content),

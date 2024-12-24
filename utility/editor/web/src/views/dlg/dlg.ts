@@ -1,5 +1,5 @@
-import { DlgMessage } from "./messagedlg";
-import { DlgNewScene } from "./newscenedlg";
+import { DlgMessage } from './messagedlg';
+import { DlgNewScene } from './newscenedlg';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number) {

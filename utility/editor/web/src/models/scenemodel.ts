@@ -1,11 +1,4 @@
-import {
-  Compositor,
-  FPSCameraController,
-  OrbitCameraController,
-  PerspectiveCamera,
-  Scene,
-  Tonemap
-} from '@zephyr3d/scene';
+import { Compositor, OrbitCameraController, PerspectiveCamera, Scene, Tonemap } from '@zephyr3d/scene';
 import { BaseModel } from './basemodel';
 import { Vector3 } from '@zephyr3d/base';
 

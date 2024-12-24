@@ -1,21 +1,21 @@
-import { SceneNode } from "../../../scene/scene_node";
-import type { Scene } from "../../../scene/scene";
-import type { SerializableClass } from "../types";
-import { sceneNodeClass } from "./node";
-import { Camera, OrthoCamera, PerspectiveCamera } from "../../../camera";
+import type { SceneNode } from '../../../scene/scene_node';
+import type { Scene } from '../../../scene/scene';
+import type { SerializableClass } from '../types';
+import { sceneNodeClass } from './node';
+import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 
 export const cameraClass: SerializableClass<SceneNode> = {
   ctor: Camera,
   parent: sceneNodeClass,
   className: 'Camera',
   createFunc(scene: Scene) {
-    return new Camera(scene)
+    return new Camera(scene);
   },
   getProps() {
     return [
       {
         name: 'HiZ',
-        type:'bool',
+        type: 'bool',
         default: { bool: [false] },
         get(this: Camera, value) {
           value.bool[0] = this.HiZ;
@@ -188,10 +188,10 @@ export const cameraClass: SerializableClass<SceneNode> = {
         set(this: Camera, value) {
           this.sampleCount = value.num[0];
         }
-      },
-    ]
+      }
+    ];
   }
-}
+};
 
 export const perspectiveCameraClass: SerializableClass<SceneNode> = {
   ctor: PerspectiveCamera,
@@ -245,10 +245,10 @@ export const perspectiveCameraClass: SerializableClass<SceneNode> = {
         set(this: PerspectiveCamera, value) {
           this.far = value.num[0];
         }
-      },
+      }
     ];
   }
-}
+};
 
 export const orthographicCameraClass: SerializableClass<SceneNode> = {
   ctor: OrthoCamera,
@@ -324,7 +324,7 @@ export const orthographicCameraClass: SerializableClass<SceneNode> = {
         set(this: OrthoCamera, value) {
           this.far = value.num[0];
         }
-      },
+      }
     ];
   }
-}
+};
