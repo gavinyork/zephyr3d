@@ -191,8 +191,8 @@ export class HttpRequest {
   private _crossOrigin: string;
   /** @internal */
   private _headers: Record<string, string>;
-  constructor() {
-    this._urlResolver = null;
+  constructor(urlResolver?: (url: string) => string) {
+    this._urlResolver = urlResolver;
     this._crossOrigin = '';
     this._headers = {};
   }

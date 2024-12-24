@@ -1,7 +1,6 @@
 import { AbstractTextureLoader } from '../loader';
 import { Application } from '../../../app';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions } from '@zephyr3d/device';
-import type { AssetManager } from '../../assetmanager';
 
 /**
  * Web image loader
@@ -15,8 +14,6 @@ export class WebImageLoader extends AbstractTextureLoader {
     return mimeType === 'image/jpg' || mimeType === 'image/jpeg' || mimeType === 'image/png';
   }
   async load(
-    assetManager: AssetManager,
-    filename: string,
     mimeType: string,
     data: ArrayBuffer,
     srgb: boolean,

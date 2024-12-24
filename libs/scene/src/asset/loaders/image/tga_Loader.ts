@@ -1,7 +1,6 @@
 import { AbstractTextureLoader } from '../loader';
 import { Application } from '../../../app';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions } from '@zephyr3d/device';
-import type { AssetManager } from '../../assetmanager';
 
 /**
  * TGA image loader
@@ -106,8 +105,6 @@ export class TGALoader extends AbstractTextureLoader {
     }
   }
   async load(
-    assetManager: AssetManager,
-    filename: string,
     mimeType: string,
     data: ArrayBuffer,
     srgb: boolean,

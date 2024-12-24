@@ -2,7 +2,6 @@ import { AbstractTextureLoader } from '../loader';
 import { floatToHalf, packFloat3 } from '@zephyr3d/base';
 import { Application } from '../../../app';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions, TextureFormat } from '@zephyr3d/device';
-import type { AssetManager } from '../../assetmanager';
 
 const _f16one = floatToHalf(1);
 /**
@@ -17,8 +16,6 @@ export class HDRLoader extends AbstractTextureLoader {
     return mimeType === 'image/hdr';
   }
   async load(
-    assetManager: AssetManager,
-    url: string,
     mimeType: string,
     data: ArrayBuffer,
     srgb: boolean,

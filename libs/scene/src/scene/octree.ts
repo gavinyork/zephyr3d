@@ -529,6 +529,8 @@ export class Octree {
   private _rootNode: OctreeNode;
   /** @internal */
   private _nodeMap: WeakMap<GraphNode, OctreeNode>;
+  /** @internal */
+  private _nodes: Set<GraphNode>;
   /**
    * Creates an instance of octree
    * @param scene - The scene to which the octree belongs
@@ -542,6 +544,7 @@ export class Octree {
     this._leafSize = 0;
     this._rootNode = null;
     this._nodeMap = new WeakMap();
+    this._nodes = new Set();
     this.initialize(rootSize, leafSize);
   }
   /**
@@ -679,6 +682,7 @@ export class Octree {
       locatedNode?.addNode(node);
       this._nodeMap.set(node, locatedNode);
     }
+    this._nodes.add(node);
   }
   /**
    * Removes a scene node from the octree
@@ -691,6 +695,7 @@ export class Octree {
         curNode.removeNode(node);
         this._nodeMap.delete(node);
       }
+      this._nodes.delete(node);
     }
   }
   resize(size: number) {

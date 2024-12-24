@@ -1,6 +1,6 @@
 import * as zip from '@zip.js/zip.js';
 import type * as draco3d from 'draco3d';
-import { Vector4, Vector3 } from '@zephyr3d/base';
+import { Vector4, Vector3, HttpRequest } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
 import { Mesh, PlaneShape, LambertMaterial } from '@zephyr3d/scene';
 import {
@@ -201,15 +201,20 @@ export class GLTFViewer {
     }
     return fileMap;
   }
-  async loadModel(url: string) {
+  async loadModel(url: string, httpRequest: HttpRequest) {
     this._modelNode?.remove();
     this._camera.clearHistoryData();
     this._assetManager.purgeCache();
     this._assetManager
-      .fetchModel(this._scene, url, {
-        enableInstancing: true,
-        dracoDecoderModule: this._dracoModule
-      })
+      .fetchModel(
+        this._scene,
+        url,
+        {
+          enableInstancing: true,
+          dracoDecoderModule: this._dracoModule
+        },
+        httpRequest
+      )
       .then((info) => {
         this._modelNode?.dispose();
         this._modelNode = info.group;
@@ -248,9 +253,6 @@ export class GLTFViewer {
   async handleDrop(data: DataTransfer) {
     this.resolveDraggedItems(data).then(async (fileMap) => {
       if (fileMap) {
-        this._assetManager.httpRequest.urlResolver = (url) => {
-          return fileMap.get(url) || url;
-        };
         if (fileMap.size === 1 && /\.zip$/i.test(Array.from(fileMap.keys())[0])) {
           fileMap = await this.readZip(fileMap.get(Array.from(fileMap.keys())[0]));
         }
@@ -262,7 +264,7 @@ export class GLTFViewer {
           if (!modelFile) {
             console.error('GLTF model not found');
           } else {
-            await this.loadModel(modelFile);
+            await this.loadModel(modelFile, new HttpRequest((url) => fileMap.get(url) ?? url));
           }
         }
       }

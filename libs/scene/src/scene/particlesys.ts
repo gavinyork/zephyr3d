@@ -730,20 +730,20 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
       this._material.draw(this._primitive, ctx, this._activeParticleList.length);
     }
   }
-  protected _detached(scene: Scene): void {
-    super._detached(scene);
+  protected _detached(): void {
+    super._detached();
     const func = ParticleSystem.updateFuncMap.get(this);
     if (func) {
-      scene.off('update', func);
+      this._scene.off('update', func);
     }
   }
-  protected _attached(scene: Scene): void {
-    super._attached(scene);
+  protected _attached(): void {
+    super._attached();
     let func = ParticleSystem.updateFuncMap.get(this);
     if (!func) {
       func = this.update.bind(this);
       ParticleSystem.updateFuncMap.set(this, func);
     }
-    scene.on('update', func);
+    this._scene.on('update', func);
   }
 }

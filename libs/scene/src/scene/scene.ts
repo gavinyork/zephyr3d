@@ -143,9 +143,7 @@ export class Scene extends makeEventTarget(Object)<{
   }
   /** @internal */
   invalidateNodePlacement(node: GraphNode) {
-    if (node.placeToOctree || node.octreeNode) {
-      this._nodePlaceList.add(node);
-    }
+    this._nodePlaceList.add(node);
   }
   /** @internal */
   frameUpdate() {
@@ -187,8 +185,8 @@ export class Scene extends makeEventTarget(Object)<{
    * Update node placement in the octree
    */
   updateNodePlacement(octree: Octree, list: Set<GraphNode>) {
-    function placeNode(scene: Scene, node: GraphNode) {
-      if (node.scene === scene && !node.hidden && node.placeToOctree) {
+    function placeNode(node: GraphNode) {
+      if (node.attached && !node.hidden && node.placeToOctree) {
         octree.placeNode(node);
       } else {
         octree.removeNode(node);
@@ -199,7 +197,7 @@ export class Scene extends makeEventTarget(Object)<{
       while (list.size > 0) {
         const node = list.keys().next().value;
         if (octree) {
-          placeNode(this, node);
+          placeNode(node);
         } else {
           list.delete(node);
         }

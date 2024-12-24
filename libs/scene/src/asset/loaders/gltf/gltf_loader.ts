@@ -1,5 +1,5 @@
 import type { DecoderModule } from 'draco3d';
-import type { InterpolationMode, TypedArray } from '@zephyr3d/base';
+import type { HttpRequest, InterpolationMode, TypedArray } from '@zephyr3d/base';
 import { Vector3, Vector4, Matrix4x4, Quaternion, Interpolator } from '@zephyr3d/base';
 import type {
   AssetHierarchyNode,
@@ -51,6 +51,7 @@ import {
 /** @internal */
 export interface GLTFContent extends GlTf {
   _manager: AssetManager;
+  _httpRequest: HttpRequest;
   _loadedBuffers: ArrayBuffer[];
   _accessors: GLTFAccessor[];
   _bufferCache: Record<string, GPUDataBuffer>;
@@ -77,14 +78,16 @@ export class GLTFLoader extends AbstractModelLoader {
     url: string,
     mimeType: string,
     data: Blob,
+    httpRequest: HttpRequest,
     decoderModule?: DecoderModule
   ) {
     const buffer = await data.arrayBuffer();
     if (this.isGLB(buffer)) {
-      return this.loadBinary(assetManager, url, buffer, decoderModule);
+      return this.loadBinary(assetManager, url, buffer, httpRequest, decoderModule);
     }
     const gltf = (await new Response(data).json()) as GLTFContent;
     gltf._manager = assetManager;
+    gltf._httpRequest = httpRequest;
     gltf._loadedBuffers = null;
     return this.loadJson(url, gltf, decoderModule);
   }
@@ -92,6 +95,7 @@ export class GLTFLoader extends AbstractModelLoader {
     assetManager: AssetManager,
     url: string,
     buffer: ArrayBuffer,
+    httpRequest: HttpRequest,
     decoderModule?: DecoderModule
   ): Promise<SharedModel> {
     const jsonChunkType = 0x4e4f534a;
@@ -110,6 +114,7 @@ export class GLTFLoader extends AbstractModelLoader {
     }
     if (gltf) {
       gltf._manager = assetManager;
+      gltf._httpRequest = httpRequest;
       gltf._loadedBuffers = buffers;
       return this.loadJson(url, gltf, decoderModule);
     }
@@ -148,8 +153,7 @@ export class GLTFLoader extends AbstractModelLoader {
       if (buffers) {
         for (const buffer of buffers) {
           const uri = this._normalizeURI(gltf._baseURI, buffer.uri);
-          const buf = await gltf._manager.fetchBinaryData(uri);
-          // const buf = (await new FileLoader(null, 'arraybuffer').load(uri)) as ArrayBuffer;
+          const buf = await gltf._manager.fetchBinaryData(uri, null, gltf._httpRequest);
           if (buffer.byteLength !== buf.byteLength) {
             console.error(`Invalid GLTF: buffer byte length error.`);
             return null;
@@ -637,7 +641,7 @@ export class GLTFLoader extends AbstractModelLoader {
     }
     return mesh;
   }
-  private async _createMaterial(assetManager: AssetManager, assetMaterial: AssetMaterial): Promise<M> {
+  private async _createMaterial(assetMaterial: AssetMaterial): Promise<M> {
     if (assetMaterial.type === 'unlit') {
       const unlitAssetMaterial = assetMaterial as AssetUnlitMaterial;
       const unlitMaterial = new UnlitMaterial(); //new NewLambertMaterial();// new TestLitMaterial();// new UnlitMaterial();
@@ -1074,7 +1078,7 @@ export class GLTFLoader extends AbstractModelLoader {
         };
       }
     }
-    return await this._createMaterial(gltf._manager, assetMaterial);
+    return await this._createMaterial(assetMaterial);
   }
   /** @internal */
   private async _loadTexture(
@@ -1182,7 +1186,11 @@ export class GLTFLoader extends AbstractModelLoader {
         if (image) {
           if (image.uri) {
             const imageUrl = this._normalizeURI(gltf._baseURI, image.uri);
-            mt.texture = await gltf._manager.fetchTexture(imageUrl, { linearColorSpace: !sRGB });
+            mt.texture = await gltf._manager.fetchTexture(
+              imageUrl,
+              { linearColorSpace: !sRGB },
+              gltf._httpRequest
+            );
             mt.texture.name = imageUrl;
           } else if (typeof image.bufferView === 'number' && image.mimeType) {
             const bufferView = gltf.bufferViews && gltf.bufferViews[image.bufferView];
@@ -1193,10 +1201,14 @@ export class GLTFLoader extends AbstractModelLoader {
                 const mimeType = image.mimeType;
                 const blob = new Blob([view], { type: mimeType });
                 const sourceURI = URL.createObjectURL(blob);
-                mt.texture = await gltf._manager.fetchTexture(sourceURI, {
-                  mimeType,
-                  linearColorSpace: !sRGB
-                });
+                mt.texture = await gltf._manager.fetchTexture(
+                  sourceURI,
+                  {
+                    mimeType,
+                    linearColorSpace: !sRGB
+                  },
+                  gltf._httpRequest
+                );
                 URL.revokeObjectURL(sourceURI);
               }
             }

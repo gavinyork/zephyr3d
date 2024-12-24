@@ -190,7 +190,11 @@ export class SceneNode extends makeEventTarget(Object)<{
   }
   /** true if the node is attached to a scene, false otherwise */
   get attached(): boolean {
-    return !!this._scene;
+    let node: SceneNode = this;
+    while (node && node !== this._scene.rootNode) {
+      node = node.parent;
+    }
+    return node === this._scene.rootNode;
   }
   /** true if the node is sealed */
   get sealed(): boolean {
@@ -447,19 +451,14 @@ export class SceneNode extends makeEventTarget(Object)<{
   }
   /** @internal */
   protected _setParent(p: SceneNode): void {
+    if (p && p._scene !== this._scene) {
+      throw new Error('Parent node and child node must belongs to the same scene');
+    }
     let lastParent = this._parent;
     let newParent = p;
     if (newParent !== lastParent) {
-      const sceneLast = this.scene;
-      const sceneNew = newParent?.scene ?? null;
-      const willDetach = sceneLast && sceneLast !== sceneNew;
-      const willAttach = sceneNew && sceneLast !== sceneNew;
-      if (willDetach) {
-        this._willDetach(sceneLast);
-      }
-      if (willAttach) {
-        this._willAttach(sceneNew);
-      }
+      const willDetach = (!p || !p.attached) && this.attached;
+      const willAttach = !this.attached && p && p.attached;
       if (this._parent) {
         this._parent._children.splice(this._parent._children.indexOf(this), 1);
       }
@@ -467,18 +466,12 @@ export class SceneNode extends makeEventTarget(Object)<{
       if (this._parent) {
         this._parent._children.push(this);
       }
-      if (this._scene !== sceneNew) {
-        if (this._scene) {
-          this._onTransformChanged(false);
-        }
-        this._scene = sceneNew;
-      }
       this._onTransformChanged(false);
       if (willDetach) {
-        this._detached(sceneLast);
+        this._detached();
       }
       if (willAttach) {
-        this._attached(sceneNew);
+        this._attached();
       }
       while (lastParent) {
         lastParent.dispatchEvent('noderemoved', this);
@@ -509,13 +502,9 @@ export class SceneNode extends makeEventTarget(Object)<{
     this.dispatchEvent('transformchanged', this);
   }
   /** @internal */
-  protected _willAttach(scene: Scene): void {}
+  protected _attached(): void {}
   /** @internal */
-  protected _attached(scene: Scene): void {}
-  /** @internal */
-  protected _willDetach(scene: Scene): void {}
-  /** @internal */
-  protected _detached(scene: Scene): void {}
+  protected _detached(): void {}
   /** @internal */
   notifyHiddenChanged() {
     this._visibleChanged();

@@ -26,9 +26,13 @@ import { processMorphData } from '../animation/morphtarget';
  * @public
  **/
 export type TextureFetchOptions<T extends BaseTexture> = {
+  /** MIME type of the texture, if not specified, model type will be determined by file extension */
   mimeType?: string;
+  /** If true, load the texture in linear color space, other wise load in sRGB color space */
   linearColorSpace?: boolean;
+  /** If not null, load into existing texture */
   texture?: T;
+  /** Sampler options of the texture */
   samplerOptions?: SamplerOptions;
 };
 
@@ -165,6 +169,7 @@ export class AssetManager {
    * Fetches a text resource from a given URL
    * @param url - The URL from where to fetch the resource
    * @param postProcess - A function that will be involved when the text data was loaded.
+   * @param httpRequest - Custom HttpRequest object to be used
    *
    * @remarks
    * If a text data has already been loaded, the function will ignore the
@@ -174,10 +179,14 @@ export class AssetManager {
    *
    * @returns The fetched text
    */
-  async fetchTextData(url: string, postProcess?: (text: string) => string): Promise<string> {
+  async fetchTextData(
+    url: string,
+    postProcess?: (text: string) => string,
+    httpRequest?: HttpRequest
+  ): Promise<string> {
     let P = this._textDatas[url];
     if (!P) {
-      P = this.loadTextData(url, postProcess);
+      P = this.loadTextData(url, postProcess, httpRequest);
       this._textDatas[url] = P;
     }
     return P;
@@ -186,6 +195,7 @@ export class AssetManager {
    * Fetches a binary resource from a given URL
    * @param url - The URL from where to fetch the resource
    * @param postProcess - A function that will be involved when the binary data was loaded.
+   * @param httpRequest - Custom HttpRequest object to be used
    *
    * @remarks
    * If a binary data has already been loaded, the function will ignore the
@@ -195,10 +205,14 @@ export class AssetManager {
    *
    * @returns Binary data as ArrayBuffer
    */
-  async fetchBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer> {
+  async fetchBinaryData(
+    url: string,
+    postProcess?: (data: ArrayBuffer) => ArrayBuffer,
+    httpRequest?: HttpRequest
+  ): Promise<ArrayBuffer> {
     let P = this._binaryDatas[url];
     if (!P) {
-      P = this.loadBinaryData(url, postProcess);
+      P = this.loadBinaryData(url, postProcess, httpRequest);
       this._binaryDatas[url] = P;
     }
     return P;
@@ -207,16 +221,23 @@ export class AssetManager {
    * Fetches a texture resource from a given URL
    * @param url - The URL from where to fetch the resource
    * @param options - Options for texture fetching
+   * @param httpRequest - Custom HttpRequest object to be used
+   *
    * @returns The fetched texture
    */
-  async fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>): Promise<T> {
+  async fetchTexture<T extends BaseTexture>(
+    url: string,
+    options?: TextureFetchOptions<T>,
+    httpRequest?: HttpRequest
+  ): Promise<T> {
     if (options?.texture) {
       return this.loadTexture(
         url,
         options.mimeType ?? null,
         !options.linearColorSpace,
         options.samplerOptions,
-        options.texture
+        options.texture,
+        httpRequest
       ) as Promise<T>;
     } else {
       const hash = this.getHash('2d', url, options);
@@ -226,7 +247,9 @@ export class AssetManager {
           url,
           options?.mimeType ?? null,
           !options?.linearColorSpace,
-          options?.samplerOptions
+          options?.samplerOptions,
+          null,
+          httpRequest
         );
         this._textures[hash] = P;
       } else {
@@ -240,10 +263,14 @@ export class AssetManager {
     }
   }
   /** @internal */
-  async fetchModelData(scene: Scene, url: string, options?: ModelFetchOptions): Promise<SharedModel> {
+  async fetchModelData(
+    url: string,
+    options?: ModelFetchOptions,
+    httpRequest?: HttpRequest
+  ): Promise<SharedModel> {
     let P = this._models[url];
     if (!P) {
-      P = this.loadModel(url, options);
+      P = this.loadModel(url, options, httpRequest);
       this._models[url] = P;
     }
     return P;
@@ -253,6 +280,7 @@ export class AssetManager {
    * @param scene - The scene to which the model node belongs
    * @param url - The URL from where to fetch the resource
    * @param options - Options for model fetching
+   * @param httpRequest - HttpRequest object to be used
    *
    * @remarks
    * If a model has already been loaded, the function will ignore the
@@ -262,13 +290,22 @@ export class AssetManager {
    *
    * @returns The created model node
    */
-  async fetchModel(scene: Scene, url: string, options?: ModelFetchOptions): Promise<ModelInfo> {
-    const sharedModel = await this.fetchModelData(scene, url, options);
+  async fetchModel(
+    scene: Scene,
+    url: string,
+    options?: ModelFetchOptions,
+    httpRequest?: HttpRequest
+  ): Promise<ModelInfo> {
+    const sharedModel = await this.fetchModelData(url, options, httpRequest);
     return this.createSceneNode(scene, url, sharedModel, !!options?.enableInstancing);
   }
   /** @internal */
-  async loadTextData(url: string, postProcess?: (text: string) => string): Promise<string> {
-    let text = await this._httpRequest.requestText(url);
+  async loadTextData(
+    url: string,
+    postProcess?: (text: string) => string,
+    httpRequest?: HttpRequest
+  ): Promise<string> {
+    let text = await (httpRequest ?? this._httpRequest).requestText(url);
     if (postProcess) {
       try {
         text = postProcess(text);
@@ -279,8 +316,12 @@ export class AssetManager {
     return text;
   }
   /** @internal */
-  async loadBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer> {
-    let data = await this._httpRequest.requestArrayBuffer(url);
+  async loadBinaryData(
+    url: string,
+    postProcess?: (data: ArrayBuffer) => ArrayBuffer,
+    httpRequest?: HttpRequest
+  ): Promise<ArrayBuffer> {
+    let data = await (httpRequest ?? this._httpRequest).requestArrayBuffer(url);
     if (postProcess) {
       try {
         data = postProcess(data);
@@ -296,9 +337,10 @@ export class AssetManager {
     mimeType?: string,
     srgb?: boolean,
     samplerOptions?: SamplerOptions,
-    texture?: BaseTexture
+    texture?: BaseTexture,
+    httpRequest?: HttpRequest
   ): Promise<BaseTexture> {
-    const data = await this._httpRequest.requestArrayBuffer(url);
+    const data = await (httpRequest ?? this._httpRequest).requestArrayBuffer(url);
     let ext = '';
     let filename = '';
     const dataUriMatchResult = url.match(/^data:([^;]+)/);
@@ -323,19 +365,11 @@ export class AssetManager {
       if ((!ext || !loader.supportExtension(ext)) && (!mimeType || !loader.supportMIMEType(mimeType))) {
         continue;
       }
-      const tex = await this.doLoadTexture(loader, filename, mimeType, data, !!srgb, samplerOptions, texture);
+      const tex = await this.doLoadTexture(loader, mimeType, data, !!srgb, samplerOptions, texture);
       tex.name = filename;
       if (url.match(/^blob:/)) {
         tex.restoreHandler = async (tex: GPUObject) => {
-          await this.doLoadTexture(
-            loader,
-            filename,
-            mimeType,
-            data,
-            !!srgb,
-            samplerOptions,
-            tex as BaseTexture
-          );
+          await this.doLoadTexture(loader, mimeType, data, !!srgb, samplerOptions, tex as BaseTexture);
         };
       } else {
         const so = samplerOptions ? null : { ...samplerOptions };
@@ -350,7 +384,6 @@ export class AssetManager {
   /** @internal */
   async doLoadTexture(
     loader: AbstractTextureLoader,
-    url: string,
     mimeType: string,
     data: ArrayBuffer,
     srgb: boolean,
@@ -359,9 +392,9 @@ export class AssetManager {
   ): Promise<BaseTexture> {
     const device = Application.instance.device;
     if (device.type !== 'webgl') {
-      return await loader.load(this, url, mimeType, data, srgb, samplerOptions, texture);
+      return await loader.load(mimeType, data, srgb, samplerOptions, texture);
     } else {
-      let tex = await loader.load(this, url, mimeType, data, srgb, samplerOptions);
+      let tex = await loader.load(mimeType, data, srgb, samplerOptions);
       if (texture) {
         const magFilter = tex.width !== texture.width || tex.height !== texture.height ? 'linear' : 'nearest';
         const minFilter = magFilter;
@@ -407,8 +440,9 @@ export class AssetManager {
     }
   }
   /** @internal */
-  async loadModel(url: string, options?: ModelFetchOptions): Promise<SharedModel> {
-    const data = await this.httpRequest.requestBlob(url);
+  async loadModel(url: string, options?: ModelFetchOptions, httpRequest?: HttpRequest): Promise<SharedModel> {
+    httpRequest = httpRequest ?? this.httpRequest;
+    const data = await httpRequest.requestBlob(url);
     const filename = new URL(url, new URL(location.href).origin).pathname
       .split('/')
       .filter((val) => !!val)
@@ -424,6 +458,7 @@ export class AssetManager {
         url,
         options?.mimeType || data.type,
         data,
+        httpRequest,
         options?.dracoDecoderModule
       );
       if (!model) {

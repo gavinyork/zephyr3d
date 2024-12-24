@@ -2,7 +2,6 @@ import { getDDSMipLevelsInfo } from './dds';
 import { AbstractTextureLoader } from '../loader';
 import { Application } from '../../../app';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions } from '@zephyr3d/device';
-import type { AssetManager } from '../../assetmanager';
 
 /**
  * The DDS texture loader
@@ -16,8 +15,6 @@ export class DDSLoader extends AbstractTextureLoader {
     return mimeType === 'image/dds' || mimeType === 'image/x-dds';
   }
   async load(
-    assetManager: AssetManager,
-    url: string,
     mimeType: string,
     data: ArrayBuffer,
     srgb: boolean,
@@ -27,7 +24,7 @@ export class DDSLoader extends AbstractTextureLoader {
     const arrayBuffer = data;
     const mipmapLevelData = getDDSMipLevelsInfo(arrayBuffer);
     if (!mipmapLevelData) {
-      throw new Error(`read DDS file failed: ${url}`);
+      throw new Error('read DDS file failed');
     }
     const options: TextureCreationOptions = {
       texture: texture,
