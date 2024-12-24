@@ -1,5 +1,5 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { AssetInfo, AssetType, Database } from '../storage/db';
+import { AssetInfo, AssetPackage, AssetType, Database } from '../storage/db';
 import { FilePicker } from './filepicker';
 import { DlgProgress } from '../views/dlg/progressdlg';
 import { ModelAsset } from '../helpers/model';
@@ -8,17 +8,14 @@ import { enableWorkspaceDragging } from './dragdrop';
 
 export class AssetHierarchy {
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
-  private _assets: AssetInfo[];
+  private _assets: { pkg: AssetPackage, assets: AssetInfo[] }[];
   private _selectedAsset: AssetInfo;
   private _zipProgress: DlgProgress;
   constructor() {
     this._assets = [];
     this._selectedAsset = null;
     this._zipProgress = null;
-    Database.listAssets().then((assets) => {
-      this._assets = assets;
-      this._selectedAsset = null;
-    });
+    this.listAssets();
   }
   get assets() {
     return this._assets;
@@ -31,6 +28,17 @@ export class AssetHierarchy {
   }
   selectAsset(asset: AssetInfo) {
     this._selectedAsset = asset;
+  }
+  async listAssets() {
+    const packages = await Database.listPackages();
+    const assets = await Database.listAssets();
+    this._assets = packages.map((pkg) => {
+      const assetsInPkg = assets.filter((asset) => asset.pkg === pkg.uuid);
+      return {
+        pkg,
+        assets: assetsInPkg
+      };
+    });
   }
   async uploadFiles(type: AssetType, zip: Blob, folderName: string, paths: string[]) {
     const blob = await Database.addBlob({
@@ -59,8 +67,8 @@ export class AssetHierarchy {
     }
     const zip = await this.zipFiles([{ path: file.name, file }]);
     await this.uploadFiles(type, zip, file.name, [file.name]);
-    this._assets = await Database.listAssets();
     this._selectedAsset = null;
+    await this.listAssets();
   }
   async uploadAssetDirectory(type: AssetType) {
     const files = await FilePicker.chooseDirectory();
@@ -86,8 +94,9 @@ export class AssetHierarchy {
     }
     const zip = await this.zipFiles(fileList);
     await this.uploadFiles(type, zip, folderName, assetFiles);
-    this._assets = await Database.listAssets();
     this._selectedAsset = null;
+    await this.listAssets();
+
   }
   async zipFiles(files: { path: string; file: File }[]) {
     return new Promise<Blob>((resolve, reject) => {
@@ -136,7 +145,8 @@ export class AssetHierarchy {
     Database.deleteAsset(asset.uuid);
   }
   private renderAssetGroup(type: AssetType) {
-    const isOpen = ImGui.TreeNodeEx(`${type}##__AssetHierarchy__${type}`, AssetHierarchy.baseFlags);
+    ImGui.PushID(type);
+    const isOpen = ImGui.TreeNodeEx(`${type}##__AssetHierarchy__${type}`, AssetHierarchy.baseFlags|ImGui.TreeNodeFlags.DefaultOpen);
     if (ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
       ImGui.OpenPopup(`context_upload`);
     }
@@ -150,16 +160,32 @@ export class AssetHierarchy {
       ImGui.EndPopup();
     }
     if (isOpen) {
-      for (const asset of this._assets) {
-        if (asset.type === type) {
-          this.renderAsset(asset);
+      for (let i = 0; i < this._assets.length; i++) {
+        const asset = this._assets[i];
+        const grouped = asset.assets.length > 1;
+        const assetsInPkg = asset.assets.filter((a) => a.type === type);
+        if (assetsInPkg.length === 0) {
+          continue;
+        }
+        if (grouped) {
+          ImGui.PushID(i);
+          if (ImGui.TreeNodeEx(asset.pkg.name, AssetHierarchy.baseFlags)) {
+            for (let j = 0; j < assetsInPkg.length; j++) {
+              this.renderAsset(assetsInPkg[j]);
+            }
+            ImGui.TreePop();
+          }
+          ImGui.PopID();
+        } else {
+          this.renderAsset(assetsInPkg[0]);
         }
       }
       ImGui.TreePop();
     }
+    ImGui.PopID();
   }
   private renderAsset(asset: AssetInfo) {
-    const label = `${asset.name}##${asset.uuid}`;
+    const label = `${asset.path}##${asset.uuid}`;
     let flags = AssetHierarchy.baseFlags;
     if (this._selectedAsset === asset) {
       flags |= ImGui.TreeNodeFlags.Selected;
@@ -186,7 +212,7 @@ export class AssetHierarchy {
       }
       ImGui.EndPopup();
     }
-    enableWorkspaceDragging('ASSET', asset);
+    enableWorkspaceDragging(asset, 'ASSET', asset);
     if (isOpen) {
       ImGui.TreePop();
     }

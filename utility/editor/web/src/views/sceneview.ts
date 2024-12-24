@@ -20,12 +20,13 @@ export class SceneView extends EmptyView<SceneModel> {
   private _tab: Tab;
   private _transformNode: SceneNode;
   private _oldTransform: TRS;
+  private _dragDropTypes: string[];
   constructor(model: SceneModel) {
     super(model);
     this._transformNode = null;
     this._oldTransform = null;
     this.drawBackground = false;
-    this.dragDropTypes = [];
+    this._dragDropTypes = [];
     this._toolbar = new ToolBar(
       [
         {
@@ -130,7 +131,7 @@ export class SceneView extends EmptyView<SceneModel> {
     this._tab.render();
     this._propGrid.render();
     this._toolbar.render();
-    if (this.dragDropTypes.length > 0) {
+    if (this._dragDropTypes.length > 0) {
       if (viewportWidth > 0 && viewportHeight > 0) {
         this.renderDropZone(
           this._tab.width,
@@ -173,7 +174,7 @@ export class SceneView extends EmptyView<SceneModel> {
     ImGui.PushStyleColor(ImGui.Col.HeaderHovered, color);
     ImGui.Selectable('##dropzone', false, ImGui.SelectableFlags.Disabled, ImGui.GetContentRegionAvail());
     if (ImGui.BeginDragDropTarget()) {
-      for (const type of this.dragDropTypes) {
+      for (const type of this._dragDropTypes) {
         const payload = ImGui.AcceptDragDropPayload(type);
         if (payload) {
           const mousePos = ImGui.GetMousePos();
@@ -280,11 +281,11 @@ export class SceneView extends EmptyView<SceneModel> {
     }
   }
   private handleNodeDragStart() {
-    this.dragDropTypes = ['ASSET'];
+    this._dragDropTypes = ['ASSET'];
   }
   private handleNodeDragEnd() {
     Application.instance.device.nextFrame(() => {
-      this.dragDropTypes = [];
+      this._dragDropTypes = [];
     });
   }
   private handleNodeDragDrop(src: SceneNode, dst: SceneNode) {

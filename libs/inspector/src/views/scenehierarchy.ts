@@ -47,6 +47,9 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     if (node.children.length === 0) {
       flags |= ImGui.TreeNodeFlags.Leaf;
     }
+    if (!node.parent) {
+      flags |= ImGui.TreeNodeFlags.DefaultOpen;
+    }
     const isOpen = ImGui.TreeNodeEx(label, flags);
     if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
       if (this._selectedNode !== node) {
