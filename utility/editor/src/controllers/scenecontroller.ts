@@ -1,7 +1,5 @@
 import type { SceneNode } from '@zephyr3d/scene';
 import { BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '@zephyr3d/scene';
-import type { ApiClient } from '../api/client/apiclient';
-import { SceneApiService } from '../api/services/sceneservcie';
 import { AddShapeCommand, NodeTransformCommand } from '../commands/scenecommands';
 import { CommandManager } from '../core/command';
 import { eventBus } from '../core/eventbus';
@@ -9,26 +7,28 @@ import type { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
 import type { SceneView } from '../views/sceneview';
 import type { TRS } from '../types';
+import { SceneInfo } from '../storage/db';
 
 export class SceneController extends BaseController<SceneModel> {
-  protected _api: SceneApiService;
+  protected _scene: SceneInfo;
   protected _view: SceneView;
   protected _cmdManager: CommandManager;
-  constructor(model: SceneModel, view: SceneView, apiClient: ApiClient) {
-    super(model, apiClient);
+  constructor(model: SceneModel, view: SceneView) {
+    super(model);
     this._view = view;
-    this._api = new SceneApiService(this.apiClient);
     this._cmdManager = new CommandManager();
   }
   handleEvent(ev: Event, type?: string): boolean {
     return this._view.handleEvent(ev, type);
   }
-  protected onActivate(name: string, uuid: string): void {
+  protected onActivate(scene: SceneInfo): void {
+    this._scene = scene;
     eventBus.on('update', this.update, this);
     eventBus.on('action', this.sceneAction, this);
     eventBus.on('node_transform', this.nodeTransform, this);
   }
   protected onDeactivate(): void {
+    this._scene = null;
     eventBus.off('update', this.update, this);
     eventBus.off('action', this.sceneAction, this);
     eventBus.off('node_transform', this.nodeTransform, this);

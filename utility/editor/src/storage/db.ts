@@ -26,6 +26,13 @@ export type AssetInfo = {
   metadata?: object;
 };
 
+export type SceneInfo = {
+  uuid?: string;
+  name: string;
+  content: object;
+  metadata?: object;
+};
+
 export class Database {
   static instance: IDBPDatabase = null;
   static readonly DB_NAME = 'zephyr3d-editor';
@@ -206,7 +213,8 @@ export class Database {
       return [];
     }
   }
-  static async addScene(name: string, content: any, metadata?: object) {
+  static async addScene(scene: SceneInfo) {
+    const { name, content, metadata } = scene;
     const uuid = this.randomUUID();
     await this.instance.put(this.DB_NAME_SCENES, {
       uuid,
@@ -216,24 +224,17 @@ export class Database {
     });
     return uuid;
   }
-  static async updateScene(
-    uuid: string,
-    updates: {
-      name?: string;
-      content?: any;
-      metadata?: any;
-    }
-  ): Promise<boolean> {
+  static async updateScene(scene: SceneInfo): Promise<boolean> {
     try {
-      const scene = await this.getScene(uuid);
-      if (!scene) {
+      const sceneinfo = await this.getScene(scene.uuid);
+      if (!sceneinfo) {
         return false;
       }
       const updatedScene = {
+        ...sceneinfo,
         ...scene,
-        ...updates,
-        content: updates.content ? JSON.stringify(updates.content) : scene.content,
-        metadata: updates.metadata ? JSON.stringify(updates.metadata) : scene.metadata
+        content: scene.content ? JSON.stringify(scene.content) : scene.content,
+        metadata: scene.metadata ? JSON.stringify(scene.metadata) : scene.metadata
       };
       await this.instance.put(this.DB_NAME_SCENES, updatedScene);
       return true;

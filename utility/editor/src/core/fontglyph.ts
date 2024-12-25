@@ -1,5 +1,4 @@
 import { Font } from '@zephyr3d/device';
-import type { ApiClient } from '../api/client/apiclient';
 import { Application } from '@zephyr3d/scene';
 import { imGuiSetFontGlyph } from '@zephyr3d/imgui';
 
@@ -11,10 +10,10 @@ type FontConfig = {
 export class FontGlyph {
   static glyphs: { [name: string]: string } = {};
   static allGlyphs: string = '';
-  static async loadFontGlyphs(apiClient: ApiClient, name: string) {
+  static async loadFontGlyphs(name: string) {
     try {
-      const config = (await apiClient.asset(`/fonts/${name}.json`, 'json')) as FontConfig;
-      const fontData = await apiClient.asset(`/fonts/${name}.woff2`, 'arraybuffer');
+      const config = await (await fetch(`assets/fonts/${name}.json`)).json() as FontConfig;
+      const fontData = await (await fetch(`assets/fonts/${name}.woff2`)).arrayBuffer();
       const font = new FontFace(config.name, fontData);
       const loadedFont = await font.load();
       document.fonts.add(loadedFont);

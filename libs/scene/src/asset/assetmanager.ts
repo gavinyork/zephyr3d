@@ -184,10 +184,11 @@ export class AssetManager {
     postProcess?: (text: string) => string,
     httpRequest?: HttpRequest
   ): Promise<string> {
-    let P = this._textDatas[url];
+    const hash = httpRequest?.urlResolver?.(url) ?? url;
+    let P = this._textDatas[hash];
     if (!P) {
       P = this.loadTextData(url, postProcess, httpRequest);
-      this._textDatas[url] = P;
+      this._textDatas[hash] = P;
     }
     return P;
   }
@@ -210,10 +211,11 @@ export class AssetManager {
     postProcess?: (data: ArrayBuffer) => ArrayBuffer,
     httpRequest?: HttpRequest
   ): Promise<ArrayBuffer> {
-    let P = this._binaryDatas[url];
+    const hash = httpRequest?.urlResolver?.(url) ?? url;
+    let P = this._binaryDatas[hash];
     if (!P) {
       P = this.loadBinaryData(url, postProcess, httpRequest);
-      this._binaryDatas[url] = P;
+      this._binaryDatas[hash] = P;
     }
     return P;
   }
@@ -240,7 +242,7 @@ export class AssetManager {
         httpRequest
       ) as Promise<T>;
     } else {
-      const hash = this.getHash('2d', url, options);
+      const hash = this.getHash('2d', httpRequest?.urlResolver?.(url) ?? url, options);
       let P = this._textures[hash];
       if (!P) {
         P = this.loadTexture(
@@ -268,10 +270,11 @@ export class AssetManager {
     options?: ModelFetchOptions,
     httpRequest?: HttpRequest
   ): Promise<SharedModel> {
-    let P = this._models[url];
+    const hash = httpRequest?.urlResolver?.(url) ?? url;
+    let P = this._models[hash];
     if (!P) {
       P = this.loadModel(url, options, httpRequest);
-      this._models[url] = P;
+      this._models[hash] = P;
     }
     return P;
   }

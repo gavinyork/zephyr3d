@@ -7,16 +7,13 @@ import { EmptyController } from '../controllers/emptycontroller';
 import { SceneView } from '../views/sceneview';
 import { SceneController } from '../controllers/scenecontroller';
 import { SceneModel } from '../models/scenemodel';
-import { ApiClient } from '../api/client/apiclient';
 import { FontGlyph } from './fontglyph';
 import { Database } from '../storage/db';
 
 export class Editor {
   private static _instance: Editor;
   private _moduleManager: ModuleManager;
-  private _apiClient: ApiClient;
   private constructor() {
-    this._apiClient = new ApiClient();
     this._moduleManager = new ModuleManager();
   }
   static get instance(): Editor {
@@ -42,16 +39,16 @@ export class Editor {
   }
   async init() {
     await Database.init();
-    await FontGlyph.loadFontGlyphs(this._apiClient, 'zef-16px');
+    await FontGlyph.loadFontGlyphs('zef-16px');
   }
   registerModules() {
     const emptyView = new EmptyView(null);
-    const emptyController = new EmptyController(null, this._apiClient);
+    const emptyController = new EmptyController(null);
     this._moduleManager.register('Empty', null, emptyView, emptyController);
 
     const sceneModel = new SceneModel();
     const sceneView = new SceneView(sceneModel);
-    const sceneController = new SceneController(sceneModel, sceneView, this._apiClient);
+    const sceneController = new SceneController(sceneModel, sceneView);
     this._moduleManager.register('Scene', sceneModel, sceneView, sceneController);
 
     this._moduleManager.activate('Empty');
