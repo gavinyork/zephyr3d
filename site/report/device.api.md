@@ -30,7 +30,6 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer;
     createColorState(): ColorState;
     createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube;
-    createCubeTextureFromMipmapData(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): TextureCube;
     createDepthState(): DepthState;
     createFrameBuffer(colorAttachments: BaseTexture[], depthAttachment: BaseTexture, options?: FrameBufferOptions): FrameBuffer;
     createGPUProgram(params: GPUProgramConstructParams): GPUProgram;
@@ -44,9 +43,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     createTexture2D(format: TextureFormat, width: number, height: number, options?: TextureCreationOptions): Texture2D;
     createTexture2DArray(format: TextureFormat, width: number, height: number, depth: number, options?: TextureCreationOptions): Texture2DArray;
     createTexture2DArrayFromImages(elements: TextureImageElement[], sRGB: boolean, options?: TextureCreationOptions): Texture2DArray;
-    createTexture2DArrayFromMipmapData(data: TextureMipmapData, options?: TextureCreationOptions): Texture2DArray;
     createTexture2DFromImage(element: TextureImageElement, sRGB: boolean, options?: TextureCreationOptions): Texture2D;
-    createTexture2DFromMipmapData(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): Texture2D;
     createTexture3D(format: TextureFormat, width: number, height: number, depth: number, options?: TextureCreationOptions): Texture3D;
     createTextureFromMipmapData<T extends BaseTexture = BaseTexture>(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): T;
     createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo;
@@ -73,7 +70,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     getFrameBufferSampleCount(): number;
     getGPUObjectById(uid: number): GPUObject;
     getGPUObjects(): GPUObjectList;
-    getPool(key: string | Symbol): Pool;
+    getPool(key: string | symbol): Pool;
     getProgram(): GPUProgram;
     getRenderStates(): RenderStateSet;
     getScale(): number;
@@ -87,7 +84,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     nextFrame(callback: () => void): number;
     // Warning: (ae-forgotten-export) The symbol "Pool" needs to be exported by the entry point index.d.ts
     pool: Pool;
-    poolExists(key: string | Symbol): boolean;
+    poolExists(key: string | symbol): boolean;
     popDeviceStates(): any;
     programBuilder: ProgramBuilder;
     pushDeviceStates(): any;
@@ -209,8 +206,6 @@ export abstract class BaseDevice extends BaseDevice_base {
     // (undocumented)
     abstract createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube;
     // (undocumented)
-    abstract createCubeTextureFromMipmapData(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): TextureCube;
-    // (undocumented)
     abstract createDepthState(): DepthState;
     // (undocumented)
     abstract createFrameBuffer(colorAttachments: BaseTexture[], depthAttachment: BaseTexture, options?: FrameBufferOptions): FrameBuffer;
@@ -239,11 +234,7 @@ export abstract class BaseDevice extends BaseDevice_base {
     // (undocumented)
     abstract createTexture2DArrayFromImages(elements: TextureImageElement[], sRGB: boolean, options?: TextureCreationOptions): Texture2DArray;
     // (undocumented)
-    abstract createTexture2DArrayFromMipmapData(data: TextureMipmapData, options?: TextureCreationOptions): Texture2DArray;
-    // (undocumented)
     abstract createTexture2DFromImage(element: TextureImageElement, sRGB: boolean, options?: TextureCreationOptions): Texture2D;
-    // (undocumented)
-    abstract createTexture2DFromMipmapData(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): Texture2D;
     // (undocumented)
     abstract createTexture3D(format: TextureFormat, width: number, height: number, depth: number, options?: TextureCreationOptions): Texture3D;
     // (undocumented)
@@ -255,7 +246,7 @@ export abstract class BaseDevice extends BaseDevice_base {
     // (undocumented)
     abstract createVertexLayout(options: VertexLayoutOptions): VertexLayout;
     // (undocumented)
-    protected _defaultPoolKey: Symbol;
+    protected _defaultPoolKey: symbol;
     // (undocumented)
     deviceToScreen(val: number): number;
     // (undocumented)
@@ -318,7 +309,7 @@ export abstract class BaseDevice extends BaseDevice_base {
     // (undocumented)
     getGPUObjects(): GPUObjectList;
     // (undocumented)
-    getPool(key: string | Symbol): Pool;
+    getPool(key: string | symbol): Pool;
     // (undocumented)
     abstract getProgram(): GPUProgram;
     // (undocumented)
@@ -364,9 +355,9 @@ export abstract class BaseDevice extends BaseDevice_base {
     // (undocumented)
     get pool(): Pool;
     // (undocumented)
-    poolExists(key: string | Symbol): boolean;
+    poolExists(key: string | symbol): boolean;
     // (undocumented)
-    protected _poolMap: Map<string | Symbol, Pool>;
+    protected _poolMap: Map<string | symbol, Pool>;
     // (undocumented)
     popDeviceStates(): void;
     // (undocumented)
@@ -625,9 +616,13 @@ export type DataType = 'u8' | 'u8norm' | 'i8' | 'i8norm' | 'u16' | 'u16norm' | '
 export interface DepthState {
     clone(): DepthState;
     compareFunc: CompareFunc;
+    depthBias: number;
+    depthBiasSlopeScale: number;
     enableTest(b: boolean): this;
     enableWrite(b: boolean): this;
     setCompareFunc(func: CompareFunc): this;
+    setDepthBias(value: number): this;
+    setDepthBiasSlopeScale(value: number): this;
     testEnabled: boolean;
     writeEnabled: boolean;
 }

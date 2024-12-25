@@ -7,6 +7,7 @@
 /// <reference types="emscripten" />
 
 import { AbstractDevice } from '@zephyr3d/device';
+import { Font } from '@zephyr3d/device';
 
 // @public (undocumented)
 export namespace ImGui {
@@ -559,6 +560,9 @@ export namespace ImGui {
 export function imGuiEndFrame(): void;
 
 // @public
+export function imGuiInFrame(): boolean;
+
+// @public
 export function imGuiInit(device: AbstractDevice, fontFamily?: string, fontSize?: number): Promise<void>;
 
 // @public
@@ -566,6 +570,9 @@ export function imGuiInjectEvent(ev: Event, type?: string): boolean;
 
 // @public
 export function imGuiNewFrame(): void;
+
+// @public
+export function imGuiSetFontGlyph(charCode: number, font: Font): void;
 
 // (No @packageDocumentation comment for this package)
 

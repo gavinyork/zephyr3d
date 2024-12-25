@@ -66,12 +66,11 @@ const texture = device.createTexture2DFromMipmapData(data, false, {
 
 The above are the primary ways to create 2D textures. Additionally, there are methods for creating 2D array textures, 3D textures, and cube textures.
 
+- [device.createTextureFromMipmapData](/doc/markdown/./device.abstractdevice.createtexturefrommipmapdata)
 - [device.createTexture2DArray()](/doc/markdown/./device.abstractdevice.createtexture2darray)
 - [device.createTexture2DArrayFromImages()](/doc/markdown/./device.abstractdevice.createtexture2darrayfromimages)
-- [device.createTexture2DArrayFromMipmapData](/doc/markdown/./device.abstractdevice.createtexture2darrayfrommipmapdata)
 - [device.createTexture3D()](/doc/markdown/./device.abstractdevice.createtexture3d)
 - [device.createCubeTexture()](/doc/markdown/./device.abstractdevice.createcubetexture)
-- [device.createCubeTextureFromMipmapData()](/doc/markdown/./device.abstractdevice.createcubetexturefrommipmapdata)
 - [device.createTextureVideo()](/doc/markdown/./device.abstractdevice.createtexturevideo)
 
 For available texture formats, refer to the documentation: [Texture formats](/doc/markdown/./device.textureformat)

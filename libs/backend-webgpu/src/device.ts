@@ -332,18 +332,22 @@ export class WebGPUDevice extends BaseDevice {
     if (data.isCubemap) {
       const tex = new WebGPUTextureCube(this);
       tex.createWithMipmapData(data, sRGB, this.parseTextureOptions(options));
+      tex.samplerOptions = options?.samplerOptions ?? null;
       return tex as unknown as T;
     } else if (data.isVolume) {
       const tex = new WebGPUTexture3D(this);
       tex.createWithMipmapData(data, this.parseTextureOptions(options));
+      tex.samplerOptions = options?.samplerOptions ?? null;
       return tex as unknown as T;
     } else if (data.isArray) {
       const tex = new WebGPUTexture2DArray(this);
       tex.createWithMipmapData(data, this.parseTextureOptions(options));
+      tex.samplerOptions = options?.samplerOptions ?? null;
       return tex as unknown as T;
     } else {
       const tex = new WebGPUTexture2D(this);
       tex.createWithMipmapData(data, sRGB, this.parseTextureOptions(options));
+      tex.samplerOptions = options?.samplerOptions ?? null;
       return tex as unknown as T;
     }
   }
@@ -359,20 +363,6 @@ export class WebGPUDevice extends BaseDevice {
       return null;
     }
     tex.createEmpty(format, width, height, this.parseTextureOptions(options));
-    tex.samplerOptions = options?.samplerOptions ?? null;
-    return tex;
-  }
-  createTexture2DFromMipmapData(
-    data: TextureMipmapData,
-    sRGB: boolean,
-    options?: TextureCreationOptions
-  ): Texture2D {
-    const tex = (options?.texture as WebGPUTexture2D) ?? new WebGPUTexture2D(this);
-    if (!tex.isTexture2D()) {
-      console.error('createTexture2DFromMipmapData() failed: options.texture must be 2d texture');
-      return null;
-    }
-    tex.createWithMipmapData(data, sRGB, this.parseTextureOptions(options));
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
@@ -403,19 +393,6 @@ export class WebGPUDevice extends BaseDevice {
       return null;
     }
     tex.createEmpty(format, width, height, depth, this.parseTextureOptions(options));
-    tex.samplerOptions = options?.samplerOptions ?? null;
-    return tex;
-  }
-  createTexture2DArrayFromMipmapData(
-    data: TextureMipmapData,
-    options?: TextureCreationOptions
-  ): Texture2DArray {
-    const tex = (options?.texture as WebGPUTexture2DArray) ?? new WebGPUTexture2DArray(this);
-    if (!tex.isTexture2DArray()) {
-      console.error('createTexture2DArrayFromMipmapData() failed: options.texture must be 2d array texture');
-      return null;
-    }
-    tex.createWithMipmapData(data, this.parseTextureOptions(options));
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
@@ -495,20 +472,6 @@ export class WebGPUDevice extends BaseDevice {
       return null;
     }
     tex.createEmpty(format, size, this.parseTextureOptions(options));
-    tex.samplerOptions = options?.samplerOptions ?? null;
-    return tex;
-  }
-  createCubeTextureFromMipmapData(
-    data: TextureMipmapData,
-    sRGB: boolean,
-    options?: TextureCreationOptions
-  ): TextureCube {
-    const tex = (options?.texture as WebGPUTextureCube) ?? new WebGPUTextureCube(this);
-    if (!tex.isTextureCube()) {
-      console.error('createCubeTextureFromMipmapData() failed: options.texture must be cube texture');
-      return null;
-    }
-    tex.createWithMipmapData(data, sRGB, this.parseTextureOptions(options));
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }

@@ -189,11 +189,6 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
     height: number,
     options?: TextureCreationOptions
   ): Texture2D;
-  abstract createTexture2DFromMipmapData(
-    data: TextureMipmapData,
-    sRGB: boolean,
-    options?: TextureCreationOptions
-  ): Texture2D;
   abstract createTexture2DFromImage(
     element: TextureImageElement,
     sRGB: boolean,
@@ -204,10 +199,6 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
     width: number,
     height: number,
     depth: number,
-    options?: TextureCreationOptions
-  ): Texture2DArray;
-  abstract createTexture2DArrayFromMipmapData(
-    data: TextureMipmapData,
     options?: TextureCreationOptions
   ): Texture2DArray;
   abstract createTexture2DArrayFromImages(
@@ -225,11 +216,6 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
   abstract createCubeTexture(
     format: TextureFormat,
     size: number,
-    options?: TextureCreationOptions
-  ): TextureCube;
-  abstract createCubeTextureFromMipmapData(
-    data: TextureMipmapData,
-    sRGB: boolean,
     options?: TextureCreationOptions
   ): TextureCube;
   abstract createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo;

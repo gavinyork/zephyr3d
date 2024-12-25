@@ -59,7 +59,7 @@ export enum BoxSide {
 export enum ClipState {
     A_INSIDE_B = 1,
     B_INSIDE_A = 2,
-    CLIPPED = 2,
+    CLIPPED = 3,
     NOT_CLIPPED = 0
 }
 
@@ -138,7 +138,7 @@ export class Frustum {
 }
 
 // @public
-export type GenericConstructor<T = {}> = {
+export type GenericConstructor<T = object> = {
     new (...args: any[]): T;
 };
 
@@ -150,7 +150,7 @@ export function halton23(length: number): [number, number][];
 
 // @public
 export class HttpRequest {
-    constructor();
+    constructor(urlResolver?: (url: string) => string);
     get crossOrigin(): string;
     set crossOrigin(val: string);
     get headers(): Record<string, string>;
@@ -451,7 +451,7 @@ export class ObservableQuaternion extends Quaternion {
     set callback(cb: () => void);
     copyWithin(target: number, start: number, end?: number): this;
     fill(value: number, start?: number, end?: number): this;
-    reverse(): Float32Array;
+    reverse(): this;
     set(array: ArrayLike<number>, offset?: number): void;
     setXYZW(x: number, y: number, z: number, w: number): this;
     sort(compareFn?: (a: number, b: number) => number): this;
@@ -471,7 +471,7 @@ export class ObservableVector2 extends Vector2 {
     set callback(cb: () => void);
     copyWithin(target: number, start: number, end?: number): this;
     fill(value: number, start?: number, end?: number): this;
-    reverse(): Float32Array;
+    reverse(): this;
     set(array: ArrayLike<number>, offset?: number): void;
     setXY(x: number, y: number): this;
     sort(compareFn?: (a: number, b: number) => number): this;
@@ -487,7 +487,7 @@ export class ObservableVector3 extends Vector3 {
     set callback(cb: () => void);
     copyWithin(target: number, start: number, end?: number): this;
     fill(value: number, start?: number, end?: number): this;
-    reverse(): Float32Array;
+    reverse(): this;
     set(array: ArrayLike<number>, offset?: number): void;
     setXYZ(x: number, y: number, z: number): this;
     sort(compareFn?: (a: number, b: number) => number): this;
@@ -505,7 +505,7 @@ export class ObservableVector4 extends Vector4 {
     set callback(cb: () => void);
     copyWithin(target: number, start: number, end?: number): this;
     fill(value: number, start?: number, end?: number): this;
-    reverse(): Float32Array;
+    reverse(): this;
     set(array: ArrayLike<number>, offset?: number): void;
     setXYZW(x: number, y: number, z: number, w: number): this;
     sort(compareFn?: (a: number, b: number) => number): this;
@@ -603,7 +603,7 @@ export class Quaternion extends VectorBase {
     static scale(q: Quaternion, t: number, result?: Quaternion): Quaternion;
     scaleBy(f: number): Quaternion;
     setAndNormalize(x: number, y: number, z: number, w: number): Quaternion;
-    setXYZW(x: number, y: number, z: number, w: number): Quaternion;
+    setXYZW(x: number, y: number, z: number, w: number): this;
     static slerp(a: Quaternion, b: Quaternion, t: number, result?: Quaternion): Quaternion;
     toAxisAngle(axis: Vector3): number;
     toEulerAngles(angles?: Vector3): Vector3;
@@ -727,6 +727,8 @@ export class Vector2 extends VectorBase {
     static axisPX(): Vector2;
     static axisPY(): Vector2;
     clone(): Vector2;
+    static combine(a: Vector2, b: Vector2, t0: number, t1: number, result?: Vector2): Vector2;
+    combineBy(other: Vector2, t0: number, t1: number): Vector2;
     static cross(a: Vector2, b: Vector2): number;
     static distance(v1: Vector2, v2: Vector2): number;
     static distanceSq(v1: Vector2, v2: Vector2): number;
@@ -776,6 +778,8 @@ export class Vector3 extends VectorBase {
     static axisPY(): Vector3;
     static axisPZ(): Vector3;
     clone(): Vector3;
+    static combine(a: Vector3, b: Vector3, t0: number, t1: number, result?: Vector3): Vector3;
+    combineBy(other: Vector3, t0: number, t1: number): Vector3;
     static cross(a: Vector3, b: Vector3, result?: Vector3): Vector3;
     static distance(v1: Vector3, v2: Vector3): number;
     static distanceSq(v1: Vector3, v2: Vector3): number;
@@ -798,7 +802,7 @@ export class Vector3 extends VectorBase {
     static scale(a: Vector3, b: number, result?: Vector3): Vector3;
     scaleBy(f: number): Vector3;
     setAndNormalize(x: number, y: number, z: number): Vector3;
-    setXYZ(x: number, y: number, z: number): Vector3;
+    setXYZ(x: number, y: number, z: number): this;
     static sub(a: Vector3, b: Vector3, result?: Vector3): Vector3;
     subBy(other: Vector3): Vector3;
     get x(): number;
@@ -830,6 +834,8 @@ export class Vector4 extends VectorBase {
     static axisPY(): Vector4;
     static axisPZ(): Vector4;
     clone(): Vector4;
+    static combine(a: Vector4, b: Vector4, t0: number, t1: number, result?: Vector4): Vector4;
+    combineBy(other: Vector4, t0: number, t1: number): Vector4;
     static div(a: Vector4, b: Vector4, result?: Vector4): Vector4;
     divBy(other: Vector4): Vector4;
     static dot(a: Vector4, b: Vector4): number;
@@ -849,7 +855,7 @@ export class Vector4 extends VectorBase {
     static scale(a: Vector4, b: number, result?: Vector4): Vector4;
     scaleBy(f: number): Vector4;
     setAndNormalize(x: number, y: number, z: number, w: number): Vector4;
-    setXYZW(x: number, y: number, z: number, w: number): Vector4;
+    setXYZW(x: number, y: number, z: number, w: number): this;
     static sub(a: Vector4, b: Vector4, result?: Vector4): Vector4;
     subBy(other: Vector4): Vector4;
     get w(): number;

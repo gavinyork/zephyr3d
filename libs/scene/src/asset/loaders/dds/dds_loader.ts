@@ -31,14 +31,5 @@ export class DDSLoader extends AbstractTextureLoader {
       samplerOptions
     };
     return Application.instance.device.createTextureFromMipmapData(mipmapLevelData, srgb, options);
-    /*
-    if (mipmapLevelData.isCubemap) {
-      return Application.instance.device.createCubeTextureFromMipmapData(mipmapLevelData, options);
-    } else if (mipmapLevelData.isVolume) {
-      throw new Error(`load DDS volume texture is not supported`);
-    } else {
-      return Application.instance.device.createTexture2DFromMipmapData(mipmapLevelData, options);
-    }
-    */
   }
 }

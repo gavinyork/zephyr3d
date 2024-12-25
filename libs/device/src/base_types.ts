@@ -2465,16 +2465,6 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     options?: TextureCreationOptions
   ): Texture2D;
   /**
-   * Creates a 2d texture from given mipmap data
-   * @param data - The mipmap data
-   * @param options - The creation options
-   */
-  createTexture2DFromMipmapData(
-    data: TextureMipmapData,
-    sRGB: boolean,
-    options?: TextureCreationOptions
-  ): Texture2D;
-  /**
    * Creates a 2d texture from a image element
    * @param element - The image element
    * @param options - The creation options
@@ -2497,16 +2487,6 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     width: number,
     height: number,
     depth: number,
-    options?: TextureCreationOptions
-  ): Texture2DArray;
-  /**
-   * Creates a 2d array texture from mipmap data
-   * @param data - mipmap data
-   * @param sRGB - whether texture should have sRGB texture format
-   * @param options - The creation options
-   */
-  createTexture2DArrayFromMipmapData(
-    data: TextureMipmapData,
     options?: TextureCreationOptions
   ): Texture2DArray;
   /**
@@ -2542,16 +2522,6 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param options - The creation options
    */
   createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube;
-  /**
-   * Creates a cube texture from given mipmap data
-   * @param data - The mipmap data
-   * @param options - The creation options
-   */
-  createCubeTextureFromMipmapData(
-    data: TextureMipmapData,
-    sRGB: boolean,
-    options?: TextureCreationOptions
-  ): TextureCube;
   /**
    * Creates a video texture from a video element
    * @param el - The video element

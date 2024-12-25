@@ -75,9 +75,9 @@ export class AABBTree {
 }
 
 // @public
-export abstract class AbstractPostEffect<ClassName extends string> {
+export class AbstractPostEffect<ClassName extends string> {
     constructor();
-    abstract apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean): void;
+    apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean): void;
     // (undocumented)
     static readonly className: string;
     // @internal (undocumented)
@@ -105,8 +105,8 @@ export abstract class AbstractPostEffect<ClassName extends string> {
     protected _quadRenderStateSet: RenderStateSet;
     // (undocumented)
     protected _quadVertexLayout: VertexLayout;
-    abstract requireDepthAttachment(ctx: DrawContext): boolean;
-    abstract requireLinearDepthTexture(ctx: DrawContext): boolean;
+    requireDepthAttachment(ctx: DrawContext): boolean;
+    requireLinearDepthTexture(ctx: DrawContext): boolean;
 }
 
 // @public
@@ -289,23 +289,23 @@ export class AssetManager {
     };
     clearCache(): void;
     // @internal (undocumented)
-    doLoadTexture(loader: AbstractTextureLoader, url: string, mimeType: string, data: ArrayBuffer, srgb: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<BaseTexture>;
-    fetchBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer>;
+    doLoadTexture(loader: AbstractTextureLoader, mimeType: string, data: ArrayBuffer, srgb: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<BaseTexture>;
+    fetchBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer, httpRequest?: HttpRequest): Promise<ArrayBuffer>;
     fetchBuiltinTexture<T extends BaseTexture>(name: string, texture?: BaseTexture): Promise<T>;
-    fetchModel(scene: Scene, url: string, options?: ModelFetchOptions): Promise<ModelInfo>;
+    fetchModel(scene: Scene, url: string, options?: ModelFetchOptions, httpRequest?: HttpRequest): Promise<ModelInfo>;
     // @internal (undocumented)
-    fetchModelData(scene: Scene, url: string, options?: ModelFetchOptions): Promise<SharedModel>;
-    fetchTextData(url: string, postProcess?: (text: string) => string): Promise<string>;
-    fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>): Promise<T>;
+    fetchModelData(url: string, options?: ModelFetchOptions, httpRequest?: HttpRequest): Promise<SharedModel>;
+    fetchTextData(url: string, postProcess?: (text: string) => string, httpRequest?: HttpRequest): Promise<string>;
+    fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>, httpRequest?: HttpRequest): Promise<T>;
     get httpRequest(): HttpRequest;
     // @internal (undocumented)
-    loadBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer>;
+    loadBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer, httpRequest?: HttpRequest): Promise<ArrayBuffer>;
     // @internal (undocumented)
-    loadModel(url: string, options?: ModelFetchOptions): Promise<SharedModel>;
+    loadModel(url: string, options?: ModelFetchOptions, httpRequest?: HttpRequest): Promise<SharedModel>;
     // @internal (undocumented)
-    loadTextData(url: string, postProcess?: (text: string) => string): Promise<string>;
+    loadTextData(url: string, postProcess?: (text: string) => string, httpRequest?: HttpRequest): Promise<string>;
     // @internal (undocumented)
-    loadTexture(url: string, mimeType?: string, srgb?: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<BaseTexture>;
+    loadTexture(url: string, mimeType?: string, srgb?: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture, httpRequest?: HttpRequest): Promise<BaseTexture>;
     purgeCache(): void;
     static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => Promise<BaseTexture>): void;
 }
@@ -817,6 +817,8 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> {
         needUV: boolean;
     };
     static generateData(options: BoxCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number): PrimitiveType;
+    // (undocumented)
+    get type(): string;
 }
 
 // @public
@@ -832,6 +834,8 @@ export class BoxShape extends Shape<BoxCreationOptions> {
     get depth(): number;
     static generateData(options: BoxCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
     get height(): number;
+    // (undocumented)
+    get type(): string;
     get width(): number;
 }
 
@@ -887,8 +891,6 @@ export class Camera extends SceneNode {
     // @internal (undocumented)
     protected _dirty: boolean;
     dispose(): void;
-    get enablePicking(): boolean;
-    set enablePicking(enable: boolean);
     get framebuffer(): FrameBuffer;
     set framebuffer(fb: FrameBuffer);
     // @internal (undocumented)
@@ -905,6 +907,12 @@ export class Camera extends SceneNode {
     getFOV(): number;
     getHistoryData(): CameraHistoryData;
     getNearPlane(): number;
+    // @internal (undocumented)
+    getPickPosX(): number;
+    // @internal (undocumented)
+    getPickPosY(): number;
+    // @internal (undocumented)
+    getPickResultResolveFunc(): (result: PickResult) => void;
     getProjectionMatrix(): Matrix4x4;
     // (undocumented)
     getRotationMatrix(): Matrix4x4;
@@ -938,25 +946,18 @@ export class Camera extends SceneNode {
     protected _oit: OIT;
     // @internal (undocumented)
     protected _onTransformChanged(invalidateLocal: boolean): void;
-    // @internal (undocumented)
-    protected _picking: boolean;
-    get pickPosX(): number;
-    set pickPosX(val: number);
+    // (undocumented)
+    pickAsync(posX: number, posY: number): Promise<PickResult>;
     // @internal (undocumented)
     protected _pickPosX: number;
-    get pickPosY(): number;
-    set pickPosY(val: number);
     // @internal (undocumented)
     protected _pickPosY: number;
-    get pickResult(): PickResult;
-    set pickResult(val: PickResult);
     // @internal (undocumented)
     protected _pickResult: PickResult;
     // @internal (undocumented)
-    get pickResultAsync(): Promise<PickResult>;
-    set pickResultAsync(val: Promise<PickResult>);
-    // @internal (undocumented)
     protected _pickResultPromise: Promise<PickResult>;
+    // @internal (undocumented)
+    protected _pickResultResolve: (result: PickResult) => void;
     // @internal (undocumented)
     get prevJitteredVPMatrix(): Matrix4x4;
     // @internal (undocumented)
@@ -1253,10 +1254,12 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
 // @public
 export interface CylinderCreationOptions extends ShapeCreationOptions {
     anchor?: number;
+    bottomCap?: boolean;
     bottomRadius?: number;
     height?: number;
     heightDetail?: number;
     radialDetail?: number;
+    topCap?: boolean;
     topRadius?: number;
 }
 
@@ -1265,6 +1268,8 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
     constructor(options?: CylinderCreationOptions);
     // (undocumented)
     static _defaultOptions: {
+        topCap: boolean;
+        bottomCap: boolean;
         bottomRadius: number;
         topRadius: number;
         heightDetail: number;
@@ -1275,6 +1280,8 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
         needUV: boolean;
     };
     static generateData(options: CylinderCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
+    // (undocumented)
+    get type(): string;
 }
 
 // @public
@@ -1331,11 +1338,11 @@ export interface Drawable {
     getMorphData(): Texture2D;
     getMorphInfo(): GPUDataBuffer;
     getName(): string;
+    getNode(): SceneNode;
     getObjectColor(): Vector4;
     getPickTarget(): PickTarget;
     getQueueType(): number;
     getSortDistance(camera: Camera): number;
-    getXForm(): SceneNode;
     isBatchable(): this is BatchDrawable;
     isUnlit(): boolean;
     needSceneColor(): boolean;
@@ -1842,8 +1849,8 @@ export class GraphNode extends SceneNode {
     constructor(scene: Scene);
     getBoneMatrices(): Texture2D;
     getName(): string;
+    getNode(): SceneNode;
     getSortDistance(camera: Camera): number;
-    getXForm(): SceneNode;
     isBatchable(): this is BatchDrawable;
     // @override
     isGraphNode(): this is GraphNode;
@@ -2310,9 +2317,9 @@ export class Mesh extends Mesh_base implements BatchDrawable {
     getMorphData(): Texture2D;
     getMorphInfo(): GPUDataBuffer<unknown>;
     getName(): string;
+    getNode(): SceneNode;
     getPickTarget(): PickTarget;
     getQueueType(): number;
-    getXForm(): SceneNode;
     // @internal (undocumented)
     protected _instanceColor: Vector4;
     // @internal (undocumented)
@@ -2629,15 +2636,40 @@ export class OrbitCameraController extends BaseCameraController {
 // @public
 export interface OrbitCameraControllerOptions {
     center: Vector3;
+    // (undocumented)
+    controls?: {
+        rotate?: {
+            button: number;
+            shiftKey: boolean;
+            ctrlKey: boolean;
+            altKey: boolean;
+            metaKey: boolean;
+        };
+        pan?: {
+            button: number;
+            shiftKey: boolean;
+            ctrlKey: boolean;
+            altKey: boolean;
+            metaKey: boolean;
+        };
+        zoom?: {
+            button: number;
+            shiftKey: boolean;
+            ctrlKey: boolean;
+            altKey: boolean;
+            metaKey: boolean;
+        };
+        zoomWheel?: boolean;
+    };
     damping?: number;
-    distance?: number;
+    panSpeed?: number;
     rotateSpeed?: number;
     zoomSpeed?: number;
 }
 
 // @public
 export class OrthoCamera extends Camera {
-    constructor(scene: Scene, left: number, right: number, bottom: number, top: number, near: number, far: number);
+    constructor(scene: Scene, left?: number, right?: number, bottom?: number, top?: number, near?: number, far?: number);
     get bottom(): number;
     set bottom(val: number);
     // @internal (undocumented)
@@ -2691,7 +2723,7 @@ export class ParticleSystem extends ParticleSystem_base implements Drawable {
     // (undocumented)
     get aspect(): number;
     // (undocumented)
-    protected _attached(scene: Scene): void;
+    protected _attached(): void;
     set blendMode(value: number);
     // (undocumented)
     get blendMode(): number;
@@ -2704,7 +2736,7 @@ export class ParticleSystem extends ParticleSystem_base implements Drawable {
     // @internal (undocumented)
     computeBoundingVolume(): BoundingVolume;
     // (undocumented)
-    protected _detached(scene: Scene): void;
+    protected _detached(): void;
     set directionType(value: ParticleDirection);
     // (undocumented)
     get directionType(): ParticleDirection;
@@ -2960,7 +2992,7 @@ export function perlinNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp): any
 
 // @public
 export class PerspectiveCamera extends Camera {
-    constructor(scene: Scene, fovY: number, aspect: number, near: number, far: number);
+    constructor(scene: Scene, fovY?: number, aspect?: number, near?: number, far?: number);
     get aspect(): number;
     set aspect(val: number);
     // @internal (undocumented)
@@ -3013,10 +3045,12 @@ export class PlaneShape extends Shape<PlaneCreationOptions> {
         resolution: number;
         twoSided: boolean;
         anchor: number;
-        needNormal: boolean; /** Whether this plane have front side, default is true */
+        needNormal: boolean;
         needUV: boolean;
     };
     static generateData(options: PlaneCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
+    // (undocumented)
+    get type(): string;
 }
 
 // @public
@@ -3552,9 +3586,13 @@ export class Scene extends Scene_base {
 // @public
 export class SceneNode extends SceneNode_base {
     constructor(scene: Scene);
+    get animationSet(): AnimationSet;
+    set animationSet(val: AnimationSet);
+    get assetUrl(): string;
+    set assetUrl(val: string);
     get attached(): boolean;
     // @internal (undocumented)
-    protected _attached(scene: Scene): void;
+    protected _attached(): void;
     // (undocumented)
     static readonly BBOXDRAW_DISABLED = 0;
     // (undocumented)
@@ -3583,7 +3621,7 @@ export class SceneNode extends SceneNode_base {
     computeBoundingVolume(): BoundingVolume;
     get computedBoundingBoxDrawMode(): number;
     // @internal (undocumented)
-    protected _detached(scene: Scene): void;
+    protected _detached(): void;
     dispose(): void;
     getBoundingVolume(): BoundingVolume;
     getWorldBoundingVolume(): BoundingVolume;
@@ -3655,6 +3693,8 @@ export class SceneNode extends SceneNode_base {
     get scene(): Scene;
     // @internal (undocumented)
     protected _scene: Scene;
+    get sealed(): boolean;
+    set sealed(val: boolean);
     setBoundingVolume(bv: BoundingVolume): void;
     setLocalTransform(matrix: Matrix4x4): this;
     // @internal (undocumented)
@@ -3682,10 +3722,6 @@ export class SceneNode extends SceneNode_base {
     protected _visible: SceneNodeVisible;
     // @internal (undocumented)
     protected _visibleChanged(): void;
-    // @internal (undocumented)
-    protected _willAttach(scene: Scene): void;
-    // @internal (undocumented)
-    protected _willDetach(scene: Scene): void;
     get worldMatrix(): Matrix4x4;
     // @internal (undocumented)
     protected _worldMatrix: Matrix4x4;
@@ -4044,6 +4080,7 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     protected _options: T;
     // @internal (undocumented)
     protected static _transform(matrix: Matrix4x4, vertices: number[], normals: number[], offset: number): void;
+    abstract get type(): string;
 }
 
 // @public
@@ -4052,6 +4089,12 @@ export interface ShapeCreationOptions {
     needUV?: boolean;
     transform?: Matrix4x4;
 }
+
+// @public (undocumented)
+export type ShapeOptionType<ST extends ShapeType> = ST extends Shape<infer U> ? U : never;
+
+// @public (undocumented)
+export type ShapeType = BoxShape | BoxFrameShape | SphereShape | CylinderShape | PlaneShape | TorusShape;
 
 // @public
 export class SharedModel {
@@ -4194,6 +4237,8 @@ export class SphereShape extends Shape<SphereCreationOptions> {
     get radius(): number;
     // @override
     raycast(ray: Ray): number;
+    // (undocumented)
+    get type(): string;
 }
 
 // @public
@@ -4424,7 +4469,7 @@ export class TerrainPatch extends TerrainPatch_base implements Drawable {
 export class TerrainPatchBase {
     constructor(terrain: Terrain);
     // (undocumented)
-    getXForm(): SceneNode;
+    getNode(): SceneNode;
     // (undocumented)
     protected _terrain: Terrain;
 }
@@ -4496,6 +4541,8 @@ export class TorusShape extends Shape<TorusCreationOptions> {
         needUV: boolean;
     };
     static generateData(options: TorusCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
+    // (undocumented)
+    get type(): string;
 }
 
 // @public
@@ -4717,7 +4764,7 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:4797:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:4843:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 
