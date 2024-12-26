@@ -61,10 +61,6 @@ export class OrbitCameraController extends BaseCameraController {
   /** @internal */
   private lastMouseY: number;
   /** @internal */
-  private initialMouseY: number;
-  /** @internal */
-  private distance: number;
-  /** @internal */
   private rotateX: number;
   /** @internal */
   private rotateY: number;
@@ -74,8 +70,6 @@ export class OrbitCameraController extends BaseCameraController {
   private upVector: Vector3;
   /** @internal */
   private xVector: Vector3;
-  /** @internal */
-  private target: Vector3;
   /** @internal */
   private direction: Vector3;
   /** @internal */
@@ -127,7 +121,6 @@ export class OrbitCameraController extends BaseCameraController {
     this.eyePos = new Vector3();
     this.upVector = Vector3.axisPY();
     this.xVector = new Vector3();
-    this.target = new Vector3();
     this.direction = new Vector3();
     this.quat = new Quaternion();
     this.currentOp = OperationType.NONE;
@@ -171,7 +164,6 @@ export class OrbitCameraController extends BaseCameraController {
     } else if (this.matchesControl(evt, this.options.controls.zoom)) {
       this.lastMouseX = evt.offsetX;
       this.lastMouseY = evt.offsetY;
-      this.initialMouseY = evt.offsetY;
       this.currentOp = OperationType.ZOOM;
     }
     return false;
@@ -200,10 +192,7 @@ export class OrbitCameraController extends BaseCameraController {
    * @override
    */
   protected _onMouseWheel(evt: WheelEvent): boolean {
-    const t = evt.deltaY > 0 ? this.options.zoomSpeed : evt.deltaY < 0 ? -this.options.zoomSpeed : 0;
-    this.target.combineBy(this.direction, 1, t);
-    this.eyePos.combineBy(this.direction, 1, t);
-    this.options.center.combineBy(this.direction, 1, t);
+    this.zoom(evt.deltaY);
     return true;
   }
   /**
@@ -216,30 +205,34 @@ export class OrbitCameraController extends BaseCameraController {
       const dy = evt.offsetY - this.lastMouseY;
       this.lastMouseX = evt.offsetX;
       this.lastMouseY = evt.offsetY;
+      const center = this.options.center;
       if (this.currentOp === OperationType.ROTATE) {
         this.rotateX -= dy * this.options.rotateSpeed * 0.005;
         this.rotateY -= dx * this.options.rotateSpeed * 0.005;
       } else if (this.currentOp === OperationType.PAN) {
+        const distance = Vector3.distance(this.eyePos, center);
         const right = this.xVector;
         const up = this.upVector;
-        const panX = -dx * this.options.panSpeed * this.distance * 0.01;
-        const panY = dy * this.options.panSpeed * this.distance * 0.01;
-        this.target.combineBy(right, 1, panX);
-        this.target.combineBy(up, 1, panY);
+        const panX = -dx * this.options.panSpeed * distance * 0.005;
+        const panY = dy * this.options.panSpeed * distance * 0.005;
+        center.combineBy(right, 1, panX);
+        center.combineBy(up, 1, panY);
         this.eyePos.combineBy(right, 1, panX);
         this.eyePos.combineBy(up, 1, panY);
-        this.options.center.combineBy(right, 1, panX);
-        this.options.center.combineBy(up, 1, panY);
       } else if (this.currentOp === OperationType.ZOOM) {
-        let t = dy > 0 ? this.options.zoomSpeed : dy < 0 ? -this.options.zoomSpeed : 0;
-        t *= Math.max(Math.abs(evt.offsetY - this.initialMouseY) / 50, 1);
-        this.target.combineBy(this.direction, 1, t);
-        this.eyePos.combineBy(this.direction, 1, t);
-        this.options.center.combineBy(this.direction, 1, t);
+        this.zoom(dy);
       }
       return true;
     }
     return false;
+  }
+  private zoom(dy: number) {
+    const distance = Vector3.distance(this.eyePos, this.options.center);
+    let t = dy > 0 ? this.options.zoomSpeed : dy < 0 ? -this.options.zoomSpeed : 0;
+    t = Math.exp(t * 0.1);
+    if (t > 1 || distance > 0.01) {
+      this.eyePos.combineBy(this.options.center, t, 1 - t);
+    }
   }
   private matchesControl(
     evt: PointerEvent | WheelEvent,
@@ -265,10 +258,8 @@ export class OrbitCameraController extends BaseCameraController {
     const camera = this._getCamera();
     if (camera) {
       this.eyePos.set(this._getCamera().position);
-      this.target.set(this.options.center);
-      camera.lookAt(this.eyePos, this.target, this.upVector);
-      Vector3.sub(this.eyePos, this.target, this.direction);
-      this.distance = this.direction.magnitude;
+      camera.lookAt(this.eyePos, this.options.center, this.upVector);
+      Vector3.sub(this.eyePos, this.options.center, this.direction);
       this.direction.inplaceNormalize();
       const mat = this._getCamera().localMatrix;
       this.xVector.setXYZ(mat[0], mat[1], mat[2]);
@@ -288,22 +279,16 @@ export class OrbitCameraController extends BaseCameraController {
    */
   update() {
     if (this._getCamera()) {
-      const dx = this.options.center.x - this.target.x;
-      const dy = this.options.center.y - this.target.y;
-      const dz = this.options.center.z - this.target.z;
-      this.eyePos.x += dx;
-      this.eyePos.y += dy;
-      this.eyePos.z += dz;
-      this.target.set(this.options.center);
+      const center = this.options.center;
       Quaternion.fromAxisAngle(this.xVector, this.rotateX, this.quat);
-      this.quat.transform(this.eyePos.subBy(this.target), this.eyePos);
+      this.quat.transform(this.eyePos.subBy(center), this.eyePos);
       Quaternion.fromEulerAngle(0, this.rotateY, 0, 'XYZ', this.quat);
       this.quat.transform(this.eyePos, this.eyePos);
       this.quat.transform(this.xVector, this.xVector).inplaceNormalize();
       Vector3.normalize(this.eyePos, this.direction).inplaceNormalize();
       Vector3.cross(this.direction, this.xVector, this.upVector).inplaceNormalize();
-      Vector3.combine(this.target, this.direction, 1, this.distance, this.eyePos);
-      this._getCamera().lookAt(this.eyePos, this.target, this.upVector);
+      this.eyePos.addBy(center);
+      this._getCamera().lookAt(this.eyePos, center, this.upVector);
       if (this.rotateX !== 0 || this.rotateY !== 0) {
         this.rotateX *= 1 - this.options.damping;
         this.rotateY *= 1 - this.options.damping;
