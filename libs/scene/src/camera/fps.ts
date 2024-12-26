@@ -67,6 +67,7 @@ export class FPSCameraController extends BaseCameraController {
       },
       options || {}
     );
+    this.reset();
   }
   /**
    * {@inheritDoc BaseCameraController.reset}

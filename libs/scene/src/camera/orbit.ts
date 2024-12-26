@@ -76,6 +76,10 @@ export class OrbitCameraController extends BaseCameraController {
   private quat: Quaternion;
   /** @internal */
   private currentOp: OperationType;
+  /** @internal */
+  private panVelocityX: number;
+  /** @internal */
+  private panVelocityY: number;
   /**
    * Creates an instance of OrbitCameraController
    * @param options - The creation options
@@ -116,14 +120,12 @@ export class OrbitCameraController extends BaseCameraController {
       },
       options || {}
     );
-    this.rotateX = 0;
-    this.rotateY = 0;
     this.eyePos = new Vector3();
-    this.upVector = Vector3.axisPY();
+    this.upVector = new Vector3();
     this.xVector = new Vector3();
     this.direction = new Vector3();
     this.quat = new Quaternion();
-    this.currentOp = OperationType.NONE;
+    this.reset();
   }
   /** Rotation center */
   get center(): Vector3 {
@@ -143,6 +145,8 @@ export class OrbitCameraController extends BaseCameraController {
     this.rotateY = 0;
     this.upVector = Vector3.axisPY();
     this.currentOp = OperationType.NONE;
+    this.panVelocityX = 0;
+    this.panVelocityY = 0;
     this._loadCameraParams();
   }
   /**
@@ -155,16 +159,26 @@ export class OrbitCameraController extends BaseCameraController {
       this.lastMouseY = evt.offsetY;
       this.rotateX = 0;
       this.rotateY = 0;
+      this.panVelocityX = 0;
+      this.panVelocityY = 0;
       this.currentOp = OperationType.ROTATE;
     } else if (this.matchesControl(evt, this.options.controls.pan)) {
       this.lastMouseX = evt.offsetX;
       this.lastMouseY = evt.offsetY;
+      this.rotateX = 0;
+      this.rotateY = 0;
+      this.panVelocityX = 0;
+      this.panVelocityY = 0;
       this.currentOp = OperationType.PAN;
       return true;
     } else if (this.matchesControl(evt, this.options.controls.zoom)) {
       this.lastMouseX = evt.offsetX;
       this.lastMouseY = evt.offsetY;
       this.currentOp = OperationType.ZOOM;
+      this.rotateX = 0;
+      this.rotateY = 0;
+      this.panVelocityX = 0;
+      this.panVelocityY = 0;
     }
     return false;
   }
@@ -211,14 +225,9 @@ export class OrbitCameraController extends BaseCameraController {
         this.rotateY -= dx * this.options.rotateSpeed * 0.005;
       } else if (this.currentOp === OperationType.PAN) {
         const distance = Vector3.distance(this.eyePos, center);
-        const right = this.xVector;
-        const up = this.upVector;
-        const panX = -dx * this.options.panSpeed * distance * 0.005;
-        const panY = dy * this.options.panSpeed * distance * 0.005;
-        center.combineBy(right, 1, panX);
-        center.combineBy(up, 1, panY);
-        this.eyePos.combineBy(right, 1, panX);
-        this.eyePos.combineBy(up, 1, panY);
+        // 更新平移速度而不是直接平移
+        this.panVelocityX = -dx * this.options.panSpeed * distance * 0.005;
+        this.panVelocityY = dy * this.options.panSpeed * distance * 0.005;
       } else if (this.currentOp === OperationType.ZOOM) {
         this.zoom(dy);
       }
@@ -280,16 +289,34 @@ export class OrbitCameraController extends BaseCameraController {
   update() {
     if (this._getCamera()) {
       const center = this.options.center;
-      Quaternion.fromAxisAngle(this.xVector, this.rotateX, this.quat);
-      this.quat.transform(this.eyePos.subBy(center), this.eyePos);
-      Quaternion.fromEulerAngle(0, this.rotateY, 0, 'XYZ', this.quat);
-      this.quat.transform(this.eyePos, this.eyePos);
-      this.quat.transform(this.xVector, this.xVector).inplaceNormalize();
-      Vector3.normalize(this.eyePos, this.direction).inplaceNormalize();
-      Vector3.cross(this.direction, this.xVector, this.upVector).inplaceNormalize();
-      this.eyePos.addBy(center);
-      this._getCamera().lookAt(this.eyePos, center, this.upVector);
-      if (this.rotateX !== 0 || this.rotateY !== 0) {
+
+      if (Math.abs(this.panVelocityX) > 0.0001 || Math.abs(this.panVelocityY) > 0.0001) {
+        const right = this.xVector;
+        const up = this.upVector;
+
+        center.combineBy(right, 1, this.panVelocityX);
+        center.combineBy(up, 1, this.panVelocityY);
+        this.eyePos.combineBy(right, 1, this.panVelocityX);
+        this.eyePos.combineBy(up, 1, this.panVelocityY);
+
+        // 应用damping到平移速度
+        this.panVelocityX *= 1 - this.options.damping;
+        this.panVelocityY *= 1 - this.options.damping;
+
+        if (Math.abs(this.panVelocityX) < 0.0001) this.panVelocityX = 0;
+        if (Math.abs(this.panVelocityY) < 0.0001) this.panVelocityY = 0;
+      }
+
+      if (Math.abs(this.rotateX) > 0.0001 || Math.abs(this.rotateY) > 0.0001) {
+        Quaternion.fromAxisAngle(this.xVector, this.rotateX, this.quat);
+        this.quat.transform(this.eyePos.subBy(center), this.eyePos);
+        Quaternion.fromEulerAngle(0, this.rotateY, 0, 'XYZ', this.quat);
+        this.quat.transform(this.eyePos, this.eyePos);
+        this.quat.transform(this.xVector, this.xVector).inplaceNormalize();
+        Vector3.normalize(this.eyePos, this.direction).inplaceNormalize();
+        Vector3.cross(this.direction, this.xVector, this.upVector).inplaceNormalize();
+        this.eyePos.addBy(center);
+
         this.rotateX *= 1 - this.options.damping;
         this.rotateY *= 1 - this.options.damping;
         if (Math.abs(this.rotateX) < 0.0001) {
@@ -299,6 +326,8 @@ export class OrbitCameraController extends BaseCameraController {
           this.rotateY = 0;
         }
       }
+
+      this._getCamera().lookAt(this.eyePos, center, this.upVector);
     }
   }
 }

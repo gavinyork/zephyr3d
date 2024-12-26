@@ -12,7 +12,6 @@ export class BaseCameraController {
    */
   constructor() {
     this._camera = null;
-    this.reset();
   }
   /** @internal */
   _getCamera() {
