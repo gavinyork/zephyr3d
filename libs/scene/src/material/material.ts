@@ -8,6 +8,7 @@ import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 type MaterialState = {
   program: GPUProgram;
   bindGroup: BindGroup;
+  bindGroupTag: string;
   renderStateSet: RenderStateSet;
   materialTag: number;
 };
@@ -115,6 +116,7 @@ export class Material {
         state = {
           program,
           bindGroup,
+          bindGroupTag: bindGroup?.getGPUId() ?? '',
           renderStateSet: ctx.device.createRenderStateSet(),
           materialTag: -1
         };
@@ -127,6 +129,9 @@ export class Material {
       state.materialTag = this._optionTag;
       this.updateRenderStates(pass, state.renderStateSet, ctx);
       this._currentHash[pass] = hash;
+      if (state.bindGroup.getGPUId() !== state.bindGroupTag) {
+        RenderBundleWrapper.materialChanged(this.coreMaterial);
+      }
     }
   }
   /** @internal */
@@ -180,7 +185,7 @@ export class Material {
       for (let i = 0; i < this._numPasses; i++) {
         this._hash[i] = null;
       }
-      RenderBundleWrapper.materialChanged(this);
+      RenderBundleWrapper.materialChanged(this.coreMaterial);
     }
   }
   /**

@@ -395,6 +395,10 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
           return null;
         }
         let buffer = this._resources[entry.name] as [WebGPUBuffer, number, number];
+        if (!nocreate && buffer?.[0]?.disposed) {
+          buffer[0] = null;
+          this.invalidate();
+        }
         if ((!buffer || !buffer[0]) && !nocreate) {
           const options: BufferCreationOptions = {
             usage: bufferUsage === GPUResourceUsageFlags.BF_UNIFORM ? 'uniform' : null,
