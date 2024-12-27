@@ -107,14 +107,14 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
     const attachment = this._options.colorAttachments?.[0] ?? this._options.depthAttachment;
     return attachment ? Math.max(attachment.texture.height >> attachment.level, 1) : 0;
   }
-  async restore() {
+  restore() {
     if (this._options?.depthAttachment?.texture?.disposed) {
-      await this._options.depthAttachment.texture.reload();
+      this._options.depthAttachment.texture.reload();
     }
     if (this._options?.colorAttachments) {
       for (const k of this._options.colorAttachments) {
         if (k?.texture?.disposed) {
-          await k.texture.reload();
+          k.texture.reload();
         }
       }
     }

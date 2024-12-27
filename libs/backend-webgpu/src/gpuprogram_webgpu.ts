@@ -116,7 +116,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
     this._pipelineLayout = null;
     this._object = null;
   }
-  async restore() {
+  restore() {
     if (!this._object) {
       this._load();
     }

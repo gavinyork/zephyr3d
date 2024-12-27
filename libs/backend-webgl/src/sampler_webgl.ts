@@ -72,7 +72,7 @@ export class WebGLTextureSampler
     }
     this._object = null;
   }
-  async restore() {
+  restore() {
     if (!this._object && !this._device.isContextLost()) {
       this._load();
     }

@@ -35,7 +35,7 @@ export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexL
   destroy() {
     this._object = null;
   }
-  async restore(): Promise<void> {
+  restore(): void {
     this._object = {};
   }
   setDrawOffset(buffer: StructuredBuffer, byteOffset: number) {

@@ -362,6 +362,9 @@ export class ClusteredLight {
     device.pushDeviceStates();
     device.setFramebuffer(this._lightIndexFramebuffer);
     if (numLights > 0) {
+      if (this._lightBuffer.disposed) {
+        this._lightBuffer.reload();
+      }
       this._lightBuffer.bufferSubData(0, this._lights);
       this._sizeParam.setXYZW(vw, vh, camera.getNearPlane(), camera.getFarPlane());
       this._countParam[0] = this._tileCountX;

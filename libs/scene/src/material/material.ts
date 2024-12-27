@@ -129,7 +129,7 @@ export class Material {
       state.materialTag = this._optionTag;
       this.updateRenderStates(pass, state.renderStateSet, ctx);
       this._currentHash[pass] = hash;
-      if (state.bindGroup.getGPUId() !== state.bindGroupTag) {
+      if (state.bindGroup && state.bindGroup.getGPUId() !== state.bindGroupTag) {
         RenderBundleWrapper.materialChanged(this.coreMaterial);
       }
     }

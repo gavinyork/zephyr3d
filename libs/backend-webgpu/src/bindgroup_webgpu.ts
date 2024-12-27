@@ -344,7 +344,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     this._videoTextures = null;
     this._object = null;
   }
-  async restore() {
+  restore() {
     this.invalidate();
     this._object = {};
   }

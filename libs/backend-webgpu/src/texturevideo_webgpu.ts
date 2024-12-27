@@ -39,7 +39,7 @@ export class WebGPUTextureVideo
   get source(): HTMLVideoElement {
     return this._source;
   }
-  async restore() {
+  restore() {
     if (!this._object && !this._device.isContextLost()) {
       this.loadElement(this._source);
     }

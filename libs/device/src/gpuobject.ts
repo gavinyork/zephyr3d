@@ -1211,7 +1211,7 @@ export interface GPUObject<T = unknown> extends IEventTarget<{ disposed: [] }> {
   readonly cid: number;
   readonly disposed: boolean;
   name: string;
-  restoreHandler: (tex: GPUObject) => Promise<void>;
+  restoreHandler: (tex: GPUObject) => void;
   isVertexLayout(): this is VertexLayout;
   isFramebuffer(): this is FrameBuffer;
   isSampler(): this is TextureSampler;
@@ -1225,9 +1225,9 @@ export interface GPUObject<T = unknown> extends IEventTarget<{ disposed: [] }> {
   isBuffer(): this is GPUDataBuffer;
   isBindGroup(): this is BindGroup;
   dispose(): void;
-  reload(): Promise<void>;
+  reload(): void;
   destroy(): void;
-  restore(): Promise<void>;
+  restore(): void;
 }
 
 /**

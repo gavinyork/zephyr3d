@@ -168,7 +168,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     }
     return dstBuffer;
   }
-  async restore() {
+  restore(): void {
     if (!this._systemMemory && !this._object && !this._device.isContextLost()) {
       this.load(this._systemMemoryBuffer);
     }

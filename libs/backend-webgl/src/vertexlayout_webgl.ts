@@ -37,7 +37,7 @@ export class WebGLVertexLayout
     }
     this._object = null;
   }
-  async restore() {
+  restore() {
     if (!this._device.isContextLost()) {
       this.load();
     }

@@ -382,12 +382,10 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
       obj.dispatchEvent('disposed');
     }
   }
-  async restoreObject(obj: GPUObject) {
+  restoreObject(obj: GPUObject) {
     if (obj && obj.disposed && !this.isContextLost()) {
-      await obj.restore();
-      if (obj.restoreHandler) {
-        await obj.restoreHandler(obj);
-      }
+      obj.restore();
+      obj.restoreHandler?.(obj);
     }
   }
   enableGPUTimeRecording(enable: boolean) {
@@ -741,8 +739,7 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
       this._disposeObjectList = [];
     }
   }
-  protected async reloadAll(): Promise<void> {
-    const promises: Promise<void>[] = [];
+  protected reloadAll(): void {
     for (const list of [
       this._gpuObjectList.buffers,
       this._gpuObjectList.textures,
@@ -754,10 +751,9 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
     ]) {
       // obj.reload() may change the list, so make a copy first
       for (const obj of list.slice()) {
-        promises.push(obj.reload());
+        obj.reload();
       }
     }
-    Promise.all(promises);
     return;
   }
   protected parseTextureOptions(options?: TextureCreationOptions): number {

@@ -153,15 +153,15 @@ export class WebGLFrameBuffer
   getHash(): string {
     return this._hash;
   }
-  async restore() {
+  restore() {
     if (!this._object && !this._device.isContextLost()) {
       if (this._options?.depthAttachment?.texture?.disposed) {
-        await this._options.depthAttachment.texture.reload();
+        this._options.depthAttachment.texture.reload();
       }
       if (this._options?.colorAttachments) {
         for (const k of this._options.colorAttachments) {
           if (k?.texture?.disposed) {
-            await k.texture.reload();
+            k.texture.reload();
           }
         }
       }

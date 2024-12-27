@@ -42,7 +42,7 @@ export class TextureAtlasManager {
   /** @internal */
   protected _atlasInfoMap: Record<string, AtlasInfo>;
   /** @internal */
-  protected _atlasRestoreHandler: (tex: BaseTexture) => Promise<void>;
+  protected _atlasRestoreHandler: (tex: BaseTexture) => void;
   /**
    * Creates a new texture atlas manager instance
    * @param device - The render device
@@ -72,10 +72,10 @@ export class TextureAtlasManager {
    * The texture restore handler callback function
    * This callback function will be called whenever the device has been restored
    */
-  get atlasTextureRestoreHandler(): (tex: BaseTexture) => Promise<void> {
+  get atlasTextureRestoreHandler(): (tex: BaseTexture) => void {
     return this._atlasRestoreHandler;
   }
-  set atlasTextureRestoreHandler(f: (tex: BaseTexture) => Promise<void>) {
+  set atlasTextureRestoreHandler(f: (tex: BaseTexture) => void) {
     this._atlasRestoreHandler = f;
   }
   /**
@@ -184,11 +184,9 @@ export class TextureAtlasManager {
       samplerOptions: { mipFilter: 'none' }
     });
     tex.update(new Uint8Array(tex.width * tex.height * 4), 0, 0, tex.width, tex.height);
-    tex.restoreHandler = async () => {
+    tex.restoreHandler = () => {
       tex.update(new Uint8Array(tex.width * tex.height * 4), 0, 0, tex.width, tex.height);
-      if (this._atlasRestoreHandler) {
-        await this._atlasRestoreHandler(tex);
-      }
+      this._atlasRestoreHandler?.(tex);
     };
     return tex;
   }

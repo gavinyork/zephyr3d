@@ -135,7 +135,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     this._object.unmap();
     return dstBuffer;
   }
-  async restore() {
+  restore() {
     if (!this._device.isContextLost()) {
       this.load();
     }

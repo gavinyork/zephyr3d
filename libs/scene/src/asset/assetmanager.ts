@@ -10,11 +10,11 @@ import { Mesh } from '../scene/mesh';
 import { RotationTrack, ScaleTrack, Skeleton, TranslationTrack } from '../animation';
 import { AnimationClip } from '../animation/animation';
 import { CopyBlitter } from '../blitter';
-import { getSheenLutLoader, getTestCubemapLoader } from './builtin';
-import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT, BUILTIN_ASSET_TEST_CUBEMAP, MAX_MORPH_TARGETS } from '../values';
+import { getSheenLutLoader } from './builtin';
+import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT, MAX_MORPH_TARGETS } from '../values';
 import { Application } from '../app';
 import { AnimationSet } from '../animation/animationset';
-import type { BaseTexture, Texture2D, GPUObject, SamplerOptions } from '@zephyr3d/device';
+import type { BaseTexture, SamplerOptions } from '@zephyr3d/device';
 import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
@@ -69,14 +69,13 @@ export type ModelInfo = {
 export class AssetManager {
   /** @internal */
   static _builtinTextures: {
-    [name: string]: Promise<BaseTexture>;
+    [name: string]: BaseTexture;
   } = {};
   /** @internal */
   static _builtinTextureLoaders: {
-    [name: string]: (assetManager: AssetManager, texture?: BaseTexture) => Promise<BaseTexture>;
+    [name: string]: (assetManager: AssetManager, texture?: BaseTexture) => BaseTexture;
   } = {
-    [BUILTIN_ASSET_TEXTURE_SHEEN_LUT]: getSheenLutLoader(64),
-    [BUILTIN_ASSET_TEST_CUBEMAP]: getTestCubemapLoader()
+    [BUILTIN_ASSET_TEXTURE_SHEEN_LUT]: getSheenLutLoader(64)
   };
   /** @internal */
   private _httpRequest: HttpRequest;
@@ -257,7 +256,7 @@ export class AssetManager {
       } else {
         const tex = await P;
         if (tex.disposed) {
-          await tex.reload();
+          tex.reload();
           return tex as T;
         }
       }
@@ -370,16 +369,6 @@ export class AssetManager {
       }
       const tex = await this.doLoadTexture(loader, mimeType, data, !!srgb, samplerOptions, texture);
       tex.name = filename;
-      if (url.match(/^blob:/)) {
-        tex.restoreHandler = async (tex: GPUObject) => {
-          await this.doLoadTexture(loader, mimeType, data, !!srgb, samplerOptions, tex as BaseTexture);
-        };
-      } else {
-        const so = samplerOptions ? null : { ...samplerOptions };
-        tex.restoreHandler = async (tex: GPUObject) => {
-          await this.loadTexture(url, mimeType, srgb, so, tex as BaseTexture);
-        };
-      }
       return tex;
     }
     throw new Error(`Can not find loader for asset ${url}`);
@@ -484,24 +473,23 @@ export class AssetManager {
    * @param name - Name of the built-in texture
    * @returns The built-in texture
    */
-  async fetchBuiltinTexture<T extends BaseTexture>(name: string, texture?: BaseTexture): Promise<T> {
+  fetchBuiltinTexture<T extends BaseTexture>(name: string, texture?: T): T {
     const loader = AssetManager._builtinTextureLoaders[name];
     if (!loader) {
       throw new Error(`Unknown builtin texture name: ${name}`);
     }
     if (texture) {
-      return loader(this, texture) as Promise<T>;
+      return loader(this, texture) as T;
     } else {
-      let P = AssetManager._builtinTextures[name];
-      if (!P) {
-        P = loader(this);
-        AssetManager._builtinTextures[name] = P;
+      texture = AssetManager._builtinTextures[name] as T;
+      if (!texture) {
+        texture = loader(this) as T;
+        AssetManager._builtinTextures[name] = texture;
       }
-      const tex = await P;
-      tex.restoreHandler = async (tex) => {
-        await loader(this, tex as Texture2D);
+      texture.restoreHandler = (tex) => {
+        loader(this, tex as BaseTexture);
       };
-      return tex as T;
+      return texture;
     }
   }
   /** @internal */
@@ -590,10 +578,7 @@ export class AssetManager {
    * @param name - Name of the builtin texture
    * @param loader - Loader for the builtin texture
    */
-  static setBuiltinTextureLoader(
-    name: string,
-    loader: (assetManager: AssetManager) => Promise<BaseTexture>
-  ): void {
+  static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => BaseTexture): void {
     if (loader) {
       this._builtinTextureLoaders[name] = loader;
     } else {

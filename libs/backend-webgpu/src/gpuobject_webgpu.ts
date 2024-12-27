@@ -30,7 +30,7 @@ export abstract class WebGPUObject<T>
   protected _cid: number;
   protected _name: string;
   protected _queueState: number;
-  protected _restoreHandler: (tex: GPUObject) => Promise<void>;
+  protected _restoreHandler: (tex: GPUObject) => void;
   constructor(device: WebGPUDevice) {
     super();
     this._device = device;
@@ -57,10 +57,10 @@ export abstract class WebGPUObject<T>
   get disposed(): boolean {
     return !this._object;
   }
-  get restoreHandler(): (obj: GPUObject) => Promise<void> {
+  get restoreHandler(): (obj: GPUObject) => void {
     return this._restoreHandler;
   }
-  set restoreHandler(handler: (obj: GPUObject) => Promise<void>) {
+  set restoreHandler(handler: (obj: GPUObject) => void) {
     this._restoreHandler = handler;
   }
   get name(): string {
@@ -120,17 +120,16 @@ export abstract class WebGPUObject<T>
       this._device.disposeObject(this, true);
     }
   }
-  async reload(): Promise<void> {
+  reload(): void {
     if (this.disposed) {
-      const p = this._device.restoreObject(this);
+      this._device.restoreObject(this);
       this._cid++;
-      return p;
     }
   }
   destroy(): void {
     throw new Error('Abstract function call: dispose()');
   }
-  async restore(): Promise<void> {
+  restore(): void {
     throw new Error('Abstract function call: restore()');
   }
 }

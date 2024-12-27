@@ -29,7 +29,7 @@ export abstract class WebGLGPUObject<T>
   protected _uid: number;
   protected _cid: number;
   protected _name: string;
-  protected _restoreHandler: (obj: GPUObject) => Promise<void>;
+  protected _restoreHandler: (obj: GPUObject) => void;
   constructor(device: WebGLDevice) {
     super();
     this._device = device;
@@ -50,10 +50,10 @@ export abstract class WebGLGPUObject<T>
   get disposed(): boolean {
     return !this._object;
   }
-  get restoreHandler(): (obj: GPUObject) => Promise<void> {
+  get restoreHandler(): (obj: GPUObject) => void {
     return this._restoreHandler;
   }
-  set restoreHandler(handler: (obj: GPUObject) => Promise<void>) {
+  set restoreHandler(handler: (obj: GPUObject) => void) {
     this._restoreHandler = handler;
   }
   get uid(): number {
@@ -113,17 +113,16 @@ export abstract class WebGLGPUObject<T>
       this._device.disposeObject(this, true);
     }
   }
-  async reload(): Promise<void> {
+  reload(): void {
     if (this.disposed) {
-      const p = this._device.restoreObject(this);
+      this._device.restoreObject(this);
       this._cid++;
-      return p;
     }
   }
   destroy(): void {
     throw new Error('Abstract function call: destroy()');
   }
-  async restore(): Promise<void> {
+  restore(): void {
     throw new Error('Abstract function call: restore()');
   }
 }

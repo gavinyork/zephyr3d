@@ -103,7 +103,7 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
       this._memCost = 0;
     }
   }
-  async restore() {
+  restore() {
     if (!this._object && !this._device.isContextLost()) {
       this.init();
     }

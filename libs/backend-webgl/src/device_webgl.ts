@@ -1179,8 +1179,6 @@ export class WebGLDevice extends BaseDevice {
   /** @internal */
   private handleContextLost() {
     this._isRendering = this.isRendering;
-    this.exitLoop();
-    console.log('handle context lost');
     this.invalidateAll();
     this.dispatchEvent('devicelost');
   }
@@ -1199,10 +1197,8 @@ export class WebGLDevice extends BaseDevice {
     this._samplerCache = new SamplerCache(this);
     if (this._isRendering) {
       this._isRendering = false;
-      this.reloadAll().then(() => {
-        this.dispatchEvent('devicerestored');
-        this.runLoop(this.runLoopFunction);
-      });
+      this.reloadAll();
+      this.dispatchEvent('devicerestored');
     }
   }
   /** @internal */

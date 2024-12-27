@@ -183,7 +183,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
       this._fragmentShader = null;
     }
   }
-  async restore() {
+  restore() {
     if (!this._object && !this._device.isContextLost()) {
       this.load();
     }

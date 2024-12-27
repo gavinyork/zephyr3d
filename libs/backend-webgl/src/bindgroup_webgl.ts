@@ -172,7 +172,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
     this._resources = {};
     this._object = null;
   }
-  async restore(): Promise<void> {
+  restore(): void {
     this._object = {};
   }
   isBindGroup(): this is BindGroup {
