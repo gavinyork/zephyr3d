@@ -132,7 +132,16 @@ export class OrbitCameraController extends BaseCameraController {
     return this.options.center;
   }
   set center(val: Vector3) {
-    this.options.center.set(val);
+    const center = this.options.center;
+    const dx = val.x - center.x;
+    const dy = val.y - center.y;
+    const dz = val.z - center.z;
+    center.x += dx;
+    center.y += dy;
+    center.z += dz;
+    this.eyePos.x += dx;
+    this.eyePos.y += dy;
+    this.eyePos.z += dz;
   }
   /**
    * {@inheritDoc BaseCameraController.reset}
