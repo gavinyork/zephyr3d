@@ -10,7 +10,9 @@ import {
 import { ShaderHelper } from '../material';
 import { BoundingBox } from '../utility';
 
-export function processMorphData(subMesh: AssetSubMeshData, morphWeights?: number[]) {
+export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number[], poolId: string | symbol) {
+  const device = Application.instance.device;
+  const pool = poolId ? device.getPool(poolId) : device;
   const numTargets = subMesh.numTargets;
   if (numTargets === 0) {
     return;
@@ -22,7 +24,7 @@ export function processMorphData(subMesh: AssetSubMeshData, morphWeights?: numbe
     weightsAndOffsets[4 + i] = morphWeights?.[i] ?? 0;
   }
   const textureSize = Math.ceil(Math.sqrt(numVertices * attributes.length * numTargets));
-  if (textureSize > Application.instance.device.getDeviceCaps().textureCaps.maxTextureSize) {
+  if (textureSize > device.getDeviceCaps().textureCaps.maxTextureSize) {
     // TODO: reduce morph attributes
     throw new Error(`Morph target data too large`);
   }
@@ -53,7 +55,7 @@ export function processMorphData(subMesh: AssetSubMeshData, morphWeights?: numbe
       }
     }
   }
-  const morphTexture = Application.instance.device.createTexture2D('rgba32f', textureSize, textureSize, {
+  const morphTexture = pool.createTexture2D('rgba32f', textureSize, textureSize, {
     samplerOptions: {
       minFilter: 'nearest',
       magFilter: 'nearest',
@@ -70,7 +72,7 @@ export function processMorphData(subMesh: AssetSubMeshData, morphWeights?: numbe
       )
     }
   ]);
-  const morphUniformBuffer = Application.instance.device.createStructuredBuffer(
+  const morphUniformBuffer = pool.createStructuredBuffer(
     bufferType,
     {
       usage: 'uniform'

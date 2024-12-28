@@ -39,6 +39,8 @@ export class Skeleton {
   protected _jointMatrixArray: Float32Array;
   /** @internal */
   protected _jointTexture: Texture2D;
+  /** @internal */
+  protected _poolId: string | symbol;
   /**
    * Creates an instance of skeleton
    * @param joints - The joint nodes
@@ -50,7 +52,8 @@ export class Skeleton {
     inverseBindMatrices: Matrix4x4[],
     bindPoseMatrices: Matrix4x4[],
     meshes: Mesh[],
-    bounding: AssetSubMeshData[]
+    bounding: AssetSubMeshData[],
+    poolId: string | symbol
   ) {
     this._joints = joints;
     this._inverseBindMatrices = inverseBindMatrices;
@@ -59,6 +62,7 @@ export class Skeleton {
     this._jointMatrices = null;
     this._jointOffsets = null;
     this._jointTexture = null;
+    this._poolId = poolId;
     this.updateJointMatrices();
     this._meshes = meshes.map((mesh, index) => {
       return {
@@ -171,13 +175,19 @@ export class Skeleton {
   /** @internal */
   private _createJointTexture() {
     const textureWidth = nextPowerOf2(Math.max(4, Math.ceil(Math.sqrt((this._joints.length * 2 + 1) * 4))));
-    this._jointTexture = Application.instance.device.createTexture2D('rgba32f', textureWidth, textureWidth, {
-      samplerOptions: {
-        magFilter: 'nearest',
-        minFilter: 'nearest',
-        mipFilter: 'none'
+    const device = Application.instance.device;
+    this._jointTexture = (this._poolId ? device.getPool(this._poolId) : device).createTexture2D(
+      'rgba32f',
+      textureWidth,
+      textureWidth,
+      {
+        samplerOptions: {
+          magFilter: 'nearest',
+          minFilter: 'nearest',
+          mipFilter: 'none'
+        }
       }
-    });
+    );
     this._jointMatrixArray = new Float32Array(textureWidth * textureWidth * 4);
     const buffer = this._jointMatrixArray.buffer;
     this._jointOffsets = new Float32Array(buffer);

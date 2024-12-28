@@ -560,7 +560,8 @@ export class AssetManager {
                 sk.inverseBindMatrices,
                 sk.bindPoseMatrices,
                 nodes.mesh,
-                nodes.bounding
+                nodes.bounding,
+                this._poolId
               );
             }
             animation.addSkeleton(nodes.skeleton);
@@ -618,7 +619,7 @@ export class AssetManager {
           meshNode.material = instancing ? subMesh.material.createInstance() : subMesh.material;
           meshNode.parent = node;
           subMesh.mesh = meshNode;
-          processMorphData(subMesh, meshData.morphWeights);
+          processMorphData(subMesh, meshData.morphWeights, this._poolId);
           if (skeleton) {
             if (!skeletonMeshMap.has(skeleton)) {
               skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });
