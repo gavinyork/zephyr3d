@@ -17,8 +17,8 @@ export class BlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinBlinnP
   /**
    * Creates an instance of BlinnMaterial class
    */
-  constructor() {
-    super();
+  constructor(poolId?: string | symbol) {
+    super(poolId);
     this.useFeature(BlinnMaterial.FEATURE_VERTEX_NORMAL, true);
   }
   /** true if vertex normal attribute presents */

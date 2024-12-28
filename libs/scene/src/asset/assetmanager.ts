@@ -68,21 +68,28 @@ export type ModelInfo = {
  */
 export class AssetManager {
   /** @internal */
-  static _builtinTextures: {
+  private static _builtinTextures: {
     [name: string]: BaseTexture;
   } = {};
   /** @internal */
-  static _builtinTextureLoaders: {
+  private static _builtinTextureLoaders: {
     [name: string]: (assetManager: AssetManager, texture?: BaseTexture) => BaseTexture;
   } = {
     [BUILTIN_ASSET_TEXTURE_SHEEN_LUT]: getSheenLutLoader(64)
   };
   /** @internal */
+  private static _textureLoaders: AbstractTextureLoader[] = [
+    new WebImageLoader(),
+    new DDSLoader(),
+    new HDRLoader(),
+    new TGALoader()
+  ];
+  /** @internal */
+  private static _modelLoaders: AbstractModelLoader[] = [new GLTFLoader()];
+  /** @internal */
+  private _poolId: string | symbol;
+  /** @internal */
   private _httpRequest: HttpRequest;
-  /** @internal */
-  private _textureLoaders: AbstractTextureLoader[];
-  /** @internal */
-  private _modelLoaders: AbstractModelLoader[];
   /** @internal */
   private _textures: {
     [hash: string]: Promise<BaseTexture>;
@@ -102,14 +109,19 @@ export class AssetManager {
   /**
    * Creates an instance of AssetManager
    */
-  constructor() {
+  constructor(poolId?: string | symbol) {
+    this._poolId = poolId ?? Symbol();
     this._httpRequest = new HttpRequest();
-    this._textureLoaders = [new WebImageLoader(), new DDSLoader(), new HDRLoader(), new TGALoader()];
-    this._modelLoaders = [new GLTFLoader()];
     this._textures = {};
     this._models = {};
     this._binaryDatas = {};
     this._textDatas = {};
+  }
+  /**
+   * Device pool for this manager
+   */
+  get pool() {
+    return Application.instance.device.getPool(this._poolId);
   }
   /**
    * HttpRequest instance of the asset manager
@@ -118,25 +130,14 @@ export class AssetManager {
     return this._httpRequest;
   }
   /**
-   * Removes all cached assets
-   */
-  clearCache() {
-    this._textures = {};
-    this._models = {};
-    this._binaryDatas = {};
-    this._textDatas = {};
-  }
-  /**
    * Remove and dispose all cached assets
    */
   purgeCache() {
-    for (const k in this._textures) {
-      this._textures[k].then((tex) => tex?.dispose()).catch((err) => {});
-    }
     this._textures = {};
     this._models = {};
     this._binaryDatas = {};
     this._textDatas = {};
+    Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
   }
   /**
    * Adds a texture loader to the asset manager
@@ -146,7 +147,7 @@ export class AssetManager {
    *
    * @param loader - The texture loader to be added
    */
-  addTextureLoader(loader: AbstractTextureLoader): void {
+  static addTextureLoader(loader: AbstractTextureLoader): void {
     if (loader) {
       this._textureLoaders.unshift(loader);
     }
@@ -159,7 +160,7 @@ export class AssetManager {
    *
    * @param loader - The model loader to be added
    */
-  addModelLoader(loader: AbstractModelLoader) {
+  static addModelLoader(loader: AbstractModelLoader) {
     if (loader) {
       this._modelLoaders.unshift(loader);
     }
@@ -363,7 +364,7 @@ export class AssetManager {
         }
       }
     }
-    for (const loader of this._textureLoaders) {
+    for (const loader of AssetManager._textureLoaders) {
       if ((!ext || !loader.supportExtension(ext)) && (!mimeType || !loader.supportMIMEType(mimeType))) {
         continue;
       }
@@ -441,7 +442,7 @@ export class AssetManager {
       .slice(-1)[0];
     const p = filename ? filename.lastIndexOf('.') : -1;
     const ext = p >= 0 ? filename.substring(p) : null;
-    for (const loader of this._modelLoaders) {
+    for (const loader of AssetManager._modelLoaders) {
       if (!loader.supportExtension(ext) && !loader.supportMIMEType(options?.mimeType || data.type)) {
         continue;
       }

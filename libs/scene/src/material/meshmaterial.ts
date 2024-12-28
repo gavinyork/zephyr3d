@@ -59,7 +59,7 @@ export type ExtractMixinType<M> = M extends [infer First]
 export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
   target: T,
   ...mixins: M
-): ExtractMixinType<M> {
+): ExtractMixinType<M> & T {
   return applyMixins(target, ...mixins);
 }
 
@@ -102,8 +102,8 @@ export class MeshMaterial extends Material {
    * Creates an instance of MeshMaterial class
    * @param args - constructor arguments
    */
-  constructor(...args: any[]) {
-    super();
+  constructor(poolId?: string | symbol) {
+    super(poolId);
     this._featureStates = [];
     this._alphaCutoff = 0;
     this._blendMode = 'none';

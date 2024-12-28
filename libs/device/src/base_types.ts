@@ -2438,6 +2438,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /**
    * Creates a texture sampler object
    * @param options - The creation options
+   * @returns The created texture sampler
    */
   createSampler(options: SamplerOptions): TextureSampler;
   /**
@@ -2457,6 +2458,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param width - Pixel width of the texture
    * @param height - Pixel height of the texture
    * @param options - The creation options
+   * @returns The created 2D texture
    */
   createTexture2D(
     format: TextureFormat,
@@ -2468,6 +2470,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * Creates a 2d texture from a image element
    * @param element - The image element
    * @param options - The creation options
+   * @returns The created 2D texture.
    */
   createTexture2DFromImage(
     element: TextureImageElement,
@@ -2481,6 +2484,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param height - Pixel height of the texture
    * @param depth - Array length of the texture
    * @param options - The creation options
+   * @returns The created 2D array texture.
    */
   createTexture2DArray(
     format: TextureFormat,
@@ -2494,6 +2498,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @remarks image elements must have the same size.
    * @param elements - image elements
    * @param options - The creation options
+   * @returns The created 2D array texture.
    */
   createTexture2DArrayFromImages(
     elements: TextureImageElement[],
@@ -2501,12 +2506,13 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     options?: TextureCreationOptions
   ): Texture2DArray;
   /**
-   * Creates a 3d texture
+   * Creates a 3D texture
    * @param format - The texture format
    * @param width - Pixel width of the texture
    * @param height - Pixel height of the texture
    * @param depth - Pixel depth of the texture
    * @param options - The creation options
+   * @returns The created 3D texture.
    */
   createTexture3D(
     format: TextureFormat,
@@ -2520,11 +2526,13 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param format - The texture format
    * @param size - Pixel width of the texture
    * @param options - The creation options
+   * @returns The created cube texture.
    */
   createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube;
   /**
    * Creates a video texture from a video element
    * @param el - The video element
+   * @returns The created video texture.
    */
   createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo;
   /**
@@ -2567,17 +2575,20 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /**
    * Creates a gpu program
    * @param params - The creation options
+   * @returns The created program.
    */
   createGPUProgram(params: GPUProgramConstructParams): GPUProgram;
   /**
    * Creates a bind group
    * @param layout - Layout of the bind group
+   * @returns The created bind group.
    */
   createBindGroup(layout: BindGroupLayout): BindGroup;
   /**
    * Creates a gpu buffer
    * @param sizeInBytes - Size of the buffer in bytes
    * @param options - The creation options
+   * @returns The created buffer.
    */
   createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer;
   /**
@@ -2599,6 +2610,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * Creates an index buffer
    * @param data - Data of the index buffer
    * @param options - The creation options
+   * @returns The created index buffer.
    */
   createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer;
   /**
@@ -2606,6 +2618,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param structureType - The structure type
    * @param options - The creation options
    * @param data - Data to be filled with
+   * @returns The created structured buffer.
    */
   createStructuredBuffer(
     structureType: PBStructTypeInfo,
@@ -2613,13 +2626,15 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     data?: TypedArray
   ): StructuredBuffer;
   /**
-   * Creates a vertex layout
+   * Creates a vertex layout object.
    * @param options - The creation options
+   * @returns The created vertex layout object.
    */
   createVertexLayout(options: VertexLayoutOptions): VertexLayout;
   /**
    * Creates a frame buffer
    * @param options - The creation options
+   * @returns The created framebuffer.
    */
   createFrameBuffer(
     colorAttachments: BaseTexture[],
@@ -2799,6 +2814,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param attribFormats - The vertex attribute formats for each vertex stream in the vertex buffer
    * @param data - Data to be filled with
    * @param options - The creation options
+   * @returns The created vertex buffer.
    */
   createInterleavedVertexBuffer(
     attribFormats: VertexAttribFormat[],
@@ -2811,6 +2827,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param attribFormat - The vertex attribute format
    * @param data - Data to be filled with
    * @param options - The creation options
+   * @returns The created vertex buffer
    */
   createVertexBuffer(
     attribFormat: VertexAttribFormat,

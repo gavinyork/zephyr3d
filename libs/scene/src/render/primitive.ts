@@ -21,6 +21,8 @@ import type { BoundingVolume } from '../utility/bounding_volume';
  */
 export class Primitive {
   /** @internal */
+  protected _poolId: string | symbol;
+  /** @internal */
   protected _vertexLayout: VertexLayout;
   /** @internal */
   protected _vertexLayoutOptions: VertexLayoutOptions;
@@ -45,7 +47,8 @@ export class Primitive {
   /**
    * Creates an instance of a primitive
    */
-  constructor() {
+  constructor(poolId?: string | symbol) {
+    this._poolId = poolId;
     this._vertexLayout = null;
     this._vertexLayoutOptions = { vertexBuffers: [] };
     this._primitiveType = 'triangle-list';
@@ -184,7 +187,8 @@ export class Primitive {
     data: TypedArray,
     stepMode?: VertexStepMode
   ): StructuredBuffer {
-    const buffer = Application.instance.device.createVertexBuffer(format, data);
+    const device = Application.instance.device;
+    const buffer = (this._poolId ? device.getPool(this._poolId) : device).createVertexBuffer(format, data);
     return this.setVertexBuffer(buffer, stepMode);
   }
   /**
@@ -208,7 +212,8 @@ export class Primitive {
    * @returns The created index buffer
    */
   createAndSetIndexBuffer(data: Uint16Array | Uint32Array, dynamic?: boolean): IndexBuffer {
-    const buffer = Application.instance.device.createIndexBuffer(data, {
+    const device = Application.instance.device;
+    const buffer = (this._poolId ? device.getPool(this._poolId) : device).createIndexBuffer(data, {
       dynamic: !!dynamic,
       managed: !dynamic
     });
@@ -313,7 +318,10 @@ export class Primitive {
   private checkVertexLayout() {
     if (this._vertexLayoutDirty) {
       this._vertexLayout?.dispose();
-      this._vertexLayout = Application.instance.device.createVertexLayout(this._vertexLayoutOptions);
+      const device = Application.instance.device;
+      this._vertexLayout = (this._poolId ? device.getPool(this._poolId) : device).createVertexLayout(
+        this._vertexLayoutOptions
+      );
       this._vertexLayoutDirty = false;
     }
   }

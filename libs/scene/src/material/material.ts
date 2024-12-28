@@ -24,6 +24,8 @@ export class Material {
   /** @internal */
   private static _programCache: { [hash: string]: GPUProgram } = {};
   /** @internal */
+  private _poolId: string | symbol;
+  /** @internal */
   private _states: { [hash: string]: MaterialState };
   /** @internal */
   protected _numPasses: number;
@@ -38,13 +40,18 @@ export class Material {
   /**
    * Creates an instance of material
    */
-  constructor() {
+  constructor(poolId?: string | symbol) {
     this._id = ++Material._nextId;
+    this._poolId = poolId;
     this._states = {};
     this._numPasses = 1;
     this._hash = [null];
     this._optionTag = 0;
     this._currentHash = [];
+  }
+  /** Pool id */
+  get poolId() {
+    return this._poolId;
   }
   /** Unique identifier of the material */
   get instanceId(): number {
@@ -111,7 +118,9 @@ export class Material {
         }
         const bindGroup =
           program.bindGroupLayouts.length > 2
-            ? ctx.device.createBindGroup(program.bindGroupLayouts[2])
+            ? (this._poolId ? ctx.device.getPool(this._poolId) : ctx.device).createBindGroup(
+                program.bindGroupLayouts[2]
+              )
             : null;
         state = {
           program,

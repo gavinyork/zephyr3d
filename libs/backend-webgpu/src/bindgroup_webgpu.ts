@@ -27,6 +27,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   private _bindGroup: GPUBindGroup;
   private _buffers: WebGPUBuffer[];
   private _textures: WebGPUBaseTexture[];
+  private _createdBuffers: WebGPUBuffer[];
   private _gpuId: number;
   private _videoTextures: WebGPUTextureVideo[];
   private _dynamicOffsets: number[];
@@ -49,6 +50,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     this._resources = {};
     this._buffers = [];
     this._textures = [];
+    this._createdBuffers = [];
     this._videoTextures = null;
     for (const entry of this._layout.entries) {
       if (entry.buffer && entry.buffer.hasDynamicOffset) {
@@ -343,6 +345,10 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     this._textures = [];
     this._videoTextures = null;
     this._object = null;
+    for (const buffer of this._createdBuffers) {
+      buffer.dispose();
+    }
+    this._createdBuffers = [];
   }
   restore() {
     this.invalidate();
@@ -411,6 +417,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
           ) as WebGPUStructuredBuffer;
           buffer = [gpuBuffer, 0, gpuBuffer.byteLength];
           this._resources[entry.name] = buffer;
+          this._createdBuffers.push(gpuBuffer);
         }
         return buffer;
       }

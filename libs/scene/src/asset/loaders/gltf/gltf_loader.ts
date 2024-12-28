@@ -517,7 +517,7 @@ export class GLTFLoader extends AbstractModelLoader {
             rawJointWeights: null,
             numTargets: 0
           };
-          const primitive = new Primitive();
+          const primitive = new Primitive(gltf._manager.pool.id);
           const attributes = p.attributes;
           const dracoExtension = gltf._dracoModule ? p.extensions?.['KHR_draco_mesh_compression'] : null;
           let dracoMeshDecoder: DracoMeshDecoder = null;
@@ -557,10 +557,7 @@ export class GLTFLoader extends AbstractModelLoader {
                 for (let i = 0; i < vertexIndices.length; i++) {
                   vertexIndices[i] = i;
                 }
-                const vertexIndexBuffer = Application.instance.device.createVertexBuffer(
-                  'tex7_f32',
-                  vertexIndices
-                );
+                const vertexIndexBuffer = gltf._manager.pool.createVertexBuffer('tex7_f32', vertexIndices);
                 primitive.setVertexBuffer(vertexIndexBuffer);
               }
             }
@@ -641,10 +638,10 @@ export class GLTFLoader extends AbstractModelLoader {
     }
     return mesh;
   }
-  private async _createMaterial(assetMaterial: AssetMaterial): Promise<M> {
+  private async _createMaterial(assetMaterial: AssetMaterial, poolId: string | symbol): Promise<M> {
     if (assetMaterial.type === 'unlit') {
       const unlitAssetMaterial = assetMaterial as AssetUnlitMaterial;
-      const unlitMaterial = new UnlitMaterial(); //new NewLambertMaterial();// new TestLitMaterial();// new UnlitMaterial();
+      const unlitMaterial = new UnlitMaterial(poolId);
       unlitMaterial.albedoColor = unlitAssetMaterial.diffuse ?? Vector4.one();
       if (unlitAssetMaterial.diffuseMap) {
         unlitMaterial.albedoTexture = unlitAssetMaterial.diffuseMap.texture;
@@ -664,7 +661,7 @@ export class GLTFLoader extends AbstractModelLoader {
       return unlitMaterial;
     } else if (assetMaterial.type === 'pbrSpecularGlossiness') {
       const assetPBRMaterial = assetMaterial as AssetPBRMaterialSG;
-      const pbrMaterial = new PBRSpecularGlossinessMaterial();
+      const pbrMaterial = new PBRSpecularGlossinessMaterial(poolId);
       pbrMaterial.ior = assetPBRMaterial.ior;
       pbrMaterial.albedoColor = assetPBRMaterial.diffuse;
       pbrMaterial.specularFactor = new Vector4(
@@ -722,7 +719,7 @@ export class GLTFLoader extends AbstractModelLoader {
       return pbrMaterial;
     } else if (assetMaterial.type === 'pbrMetallicRoughness') {
       const assetPBRMaterial = assetMaterial as AssetPBRMaterialMR;
-      const pbrMaterial = new PBRMetallicRoughnessMaterial();
+      const pbrMaterial = new PBRMetallicRoughnessMaterial(poolId);
       pbrMaterial.ior = assetPBRMaterial.ior;
       pbrMaterial.albedoColor = assetPBRMaterial.diffuse;
       pbrMaterial.metallic = assetPBRMaterial.metallic;
@@ -1078,7 +1075,7 @@ export class GLTFLoader extends AbstractModelLoader {
         };
       }
     }
-    return await this._createMaterial(assetMaterial);
+    return await this._createMaterial(assetMaterial, gltf._manager.pool.id);
   }
   /** @internal */
   private async _loadTexture(
@@ -1430,10 +1427,10 @@ export class GLTFLoader extends AbstractModelLoader {
         }
       }
       if (!semantic) {
-        buffer = device.createIndexBuffer(data as Uint16Array | Uint32Array, { managed: true });
+        buffer = gltf._manager.pool.createIndexBuffer(data as Uint16Array | Uint32Array, { managed: true });
       } else {
         const attribFormat = device.getVertexAttribFormat(semantic, 'f32', componentCount);
-        buffer = device.createVertexBuffer(attribFormat, data);
+        buffer = gltf._manager.pool.createVertexBuffer(attribFormat, data);
       }
       gltf._bufferCache[hash] = buffer;
     }

@@ -22,6 +22,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
   private _layout: BindGroupLayout;
   private _dynamicOffsets: number[];
   private _resources: Record<string, WebGLGPUBuffer | [WebGLBaseTexture, WebGLTextureSampler]>;
+  private _createdBuffers: WebGLGPUBuffer[];
   constructor(device: WebGLDevice, layout: BindGroupLayout) {
     super(device);
     this._device = device;
@@ -29,6 +30,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
     this._dynamicOffsets = null;
     this._resources = {};
     this._object = {};
+    this._createdBuffers = [];
     for (const entry of this._layout.entries) {
       if (entry.buffer && entry.buffer.hasDynamicOffset) {
         if (!this._dynamicOffsets) {
@@ -171,6 +173,10 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
   destroy(): void {
     this._resources = {};
     this._object = null;
+    for (const buffer of this._createdBuffers) {
+      buffer.dispose();
+    }
+    this._createdBuffers = [];
   }
   restore(): void {
     this._object = {};
@@ -188,6 +194,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
             usage: 'uniform'
           }) as WebGLStructuredBuffer;
           this._resources[entry.name] = buffer;
+          this._createdBuffers.push(buffer);
         }
         return buffer as GPUDataBuffer;
       }

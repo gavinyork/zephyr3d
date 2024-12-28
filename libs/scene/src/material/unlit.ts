@@ -10,8 +10,8 @@ import { ShaderHelper } from './shader/helper';
  */
 export class UnlitMaterial extends applyMaterialMixins(MeshMaterial, mixinVertexColor, mixinAlbedoColor) {
   static readonly FEATURE_VERTEX_COLOR = 'um_vertexcolor';
-  constructor() {
-    super();
+  constructor(poolId?: string | symbol) {
+    super(poolId);
   }
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);

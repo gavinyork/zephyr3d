@@ -8,8 +8,8 @@ import { ShaderHelper } from './shader/helper';
  * @public
  */
 export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor) {
-  constructor() {
-    super();
+  constructor(poolId?: string | symbol) {
+    super(poolId);
     this.cullMode = 'none';
   }
   vertexShader(scope: PBFunctionScope) {

@@ -25,10 +25,10 @@ function mixinFoliage<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).foliageMixed) {
     return BaseCls as T & { new (...args: any[]): IMixinFoliage };
   }
-  return class extends BaseCls {
+  return class extends (BaseCls as typeof MeshMaterial) {
     static foliageMixed = true;
-    constructor(...args: any[]) {
-      super(...args);
+    constructor(poolId?: string | symbol) {
+      super(poolId);
       this.cullMode = 'none';
     }
     calculateFoliageAlbedo(

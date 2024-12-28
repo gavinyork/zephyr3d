@@ -1013,6 +1013,8 @@ export class ProgramBuilder {
   /** @internal */
   _device: AbstractDevice;
   /** @internal */
+  _poolId: string | symbol;
+  /** @internal */
   _workgroupSize: [number, number, number];
   /** @internal */
   _scopeStack: PBScope[] = [];
@@ -1052,8 +1054,9 @@ export class ProgramBuilder {
    * Creates a program builder for given device
    * @param device - The device
    */
-  constructor(device: AbstractDevice) {
+  constructor(device: AbstractDevice, poolId?: string | symbol) {
     this._device = device;
+    this._poolId = poolId;
     this._workgroupSize = null;
     this._structInfo = {};
     this._uniforms = [];
@@ -1207,7 +1210,7 @@ export class ProgramBuilder {
   buildRenderProgram(options: PBRenderOptions): GPUProgram {
     const ret = this.buildRender(options);
     return ret
-      ? this._device.createGPUProgram({
+      ? (this._poolId ? this._device.getPool(this._poolId) : this._device).createGPUProgram({
           type: 'render',
           label: options.label,
           params: {
@@ -1227,7 +1230,7 @@ export class ProgramBuilder {
   buildComputeProgram(options: PBComputeOptions): GPUProgram {
     const ret = this.buildCompute(options);
     return ret
-      ? this._device.createGPUProgram({
+      ? (this._poolId ? this._device.getPool(this._poolId) : this._device).createGPUProgram({
           type: 'compute',
           params: {
             source: ret[0],

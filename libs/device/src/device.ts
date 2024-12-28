@@ -153,7 +153,7 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
     this._beginFrameCounter = 0;
     this._poolMap = new Map();
     this._defaultPoolKey = Symbol('defaultPool');
-    this._poolMap.set(this._defaultPoolKey, new Pool(this));
+    this._poolMap.set(this._defaultPoolKey, new Pool(this, this._defaultPoolKey));
     this._temporalFramebuffer = false;
     this._temporalFramebuffer = false;
     this._vSync = true;
@@ -336,7 +336,7 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
   getPool(key: string | symbol): Pool {
     let pool = this._poolMap.get(key);
     if (!pool) {
-      pool = new Pool(this);
+      pool = new Pool(this, key);
       this._poolMap.set(key, pool);
     }
     return pool;

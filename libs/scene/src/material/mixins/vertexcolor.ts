@@ -24,10 +24,10 @@ function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T) {
     return BaseCls as T & { new (...args: any[]): IMixinVertexColor };
   }
   let FEATURE_VERTEX_COLOR = 0;
-  const cls = class extends BaseCls {
+  const cls = class extends (BaseCls as typeof MeshMaterial) {
     static vertexColorMixed = true;
-    constructor(...args: any[]) {
-      super(...args);
+    constructor(poolId?: string | symbol) {
+      super(poolId);
     }
     /** Albedo color */
     get vertexColor(): boolean {
