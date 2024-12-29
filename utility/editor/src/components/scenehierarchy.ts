@@ -52,7 +52,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     if (this._selectedNode === node) {
       flags |= ImGui.TreeNodeFlags.Selected;
     }
-    if (node.children.length === 0) {
+    if (node.sealed || node.children.length === 0) {
       flags |= ImGui.TreeNodeFlags.Leaf;
     }
     const isOpen = ImGui.TreeNodeEx(label, flags);
@@ -82,8 +82,10 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
       ImGui.EndDragDropSource();
     }
     if (isOpen) {
-      for (const child of node.children) {
-        this.renderSceneNode(child);
+      if (!node.sealed) {
+        for (const child of node.children) {
+          this.renderSceneNode(child);
+        }
       }
       ImGui.TreePop();
     }

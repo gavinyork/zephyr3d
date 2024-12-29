@@ -250,7 +250,7 @@ export class HttpRequest {
    */
   async requestText(url: string): Promise<string> {
     const response = await this.request(url);
-    if (!response.ok) {
+    if (!response?.ok) {
       throw new Error(`Asset download failed: ${url}`);
     }
     return response.text();
@@ -262,7 +262,7 @@ export class HttpRequest {
    */
   async requestArrayBuffer(url: string): Promise<ArrayBuffer> {
     const response = await this.request(url);
-    if (!response.ok) {
+    if (!response?.ok) {
       throw new Error(`Asset download failed: ${url}`);
     }
     return response.arrayBuffer();

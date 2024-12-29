@@ -215,7 +215,17 @@ export class SceneView extends EmptyView<SceneModel> {
       }
       if (ev.button === 0 && ev.type === 'pointerdown') {
         this.model.camera.pickAsync(p[0], p[1]).then((pickResult) => {
-          this._tab.sceneHierarchy.selectNode(pickResult?.target?.node ?? null);
+          let node = pickResult?.target?.node ?? null;
+          if (node) {
+            let sealedNode = node;
+            while (sealedNode && !sealedNode.sealed) {
+              sealedNode = sealedNode.parent;
+            }
+            if (sealedNode) {
+              node = sealedNode;
+            }
+          }
+          this._tab.sceneHierarchy.selectNode(node);
         });
       }
     }
@@ -275,8 +285,16 @@ export class SceneView extends EmptyView<SceneModel> {
     eventBus.off('workspace_dragging', this.handleViewportDragging, this);
   }
   private handleNodeSelected(node: SceneNode) {
+    let sealedNode = node;
+    while (sealedNode && !sealedNode.sealed) {
+      sealedNode = sealedNode.parent;
+    }
+    if (sealedNode) {
+      node = sealedNode;
+    }
     this._postGizmoRenderer.node = node;
     this._propGrid.object = node;
+    this._tab.sceneHierarchy.selectNode(node);
     this._propGrid.clear();
     for (const prop of SceneNodeProps) {
       this._propGrid.addProperty(prop);

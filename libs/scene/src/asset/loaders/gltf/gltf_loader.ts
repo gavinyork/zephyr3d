@@ -1198,14 +1198,10 @@ export class GLTFLoader extends AbstractModelLoader {
                 const mimeType = image.mimeType;
                 const blob = new Blob([view], { type: mimeType });
                 const sourceURI = URL.createObjectURL(blob);
-                mt.texture = await gltf._manager.fetchTexture(
-                  sourceURI,
-                  {
-                    mimeType,
-                    linearColorSpace: !sRGB
-                  },
-                  gltf._httpRequest
-                );
+                mt.texture = await gltf._manager.fetchTexture(sourceURI, {
+                  mimeType,
+                  linearColorSpace: !sRGB
+                });
                 URL.revokeObjectURL(sourceURI);
               }
             }

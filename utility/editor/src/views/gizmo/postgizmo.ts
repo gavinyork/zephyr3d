@@ -118,6 +118,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   private _screenSize: number;
   private _drawGrid: boolean;
   private _scaleBox: AABB;
+  private _nodeBox: AABB;
   /**
    * Creates an instance of PostGizmoRenderer.
    */
@@ -147,6 +148,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       new Vector3(-this._boxSize, -this._boxSize, -this._boxSize),
       new Vector3(this._boxSize, this._boxSize, this._boxSize)
     );
+    this._nodeBox = new AABB();
   }
   get mode(): GizmoMode {
     return this._mode;
@@ -246,7 +248,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       }
       PostGizmoRenderer._primitives[this._mode] = gizmoPrimitive;
     }
-    if (!this._node || (this._mode === 'select' && !this._node.getWorldBoundingVolume())) {
+    if (!this._node) {
       gizmoPrimitive = null;
     }
     if (gizmoPrimitive) {
@@ -711,13 +713,26 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
     matrix = matrix ?? new Matrix4x4();
     if (this._node) {
       if (this._mode === 'select') {
-        const box = this._node.getWorldBoundingVolume()?.toAABB();
-        if (box) {
-          const scale = Vector3.sub(box.maxPoint, box.minPoint);
-          matrix.scaling(scale).translateLeft(box.minPoint);
-        } else {
-          matrix.identity();
+        this._nodeBox.beginExtend();
+        this._node.iterate((child) => {
+          const bbox = child.getWorldBoundingVolume();
+          if (bbox) {
+            const aabb = bbox.toAABB();
+            this._nodeBox.extend(aabb.minPoint);
+            this._nodeBox.extend(aabb.maxPoint);
+          }
+        });
+        if (!this._nodeBox.isValid()) {
+          const worldPos = this._node.getWorldPosition();
+          this._nodeBox.minPoint.x = worldPos.x - 1;
+          this._nodeBox.minPoint.y = worldPos.y - 1;
+          this._nodeBox.minPoint.z = worldPos.z - 1;
+          this._nodeBox.maxPoint.x = worldPos.x + 1;
+          this._nodeBox.maxPoint.y = worldPos.y + 1;
+          this._nodeBox.maxPoint.z = worldPos.z + 1;
         }
+        const scale = Vector3.sub(this._nodeBox.maxPoint, this._nodeBox.minPoint);
+        matrix.scaling(scale).translateLeft(this._nodeBox.minPoint);
       } else {
         this._node.worldMatrix.decompose(tmpVecS, tmpQuatR, tmpVecT);
         matrix.translation(tmpVecT);
