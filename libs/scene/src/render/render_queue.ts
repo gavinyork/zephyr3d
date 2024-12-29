@@ -172,6 +172,8 @@ export class RenderQueue {
   private _drawTransparent: boolean;
   /** @internal */
   private _objectColorMaps: Map<number, Drawable>[];
+  /** @internal */
+  private _disposed: boolean;
   /**
    * Creates an instance of a render queue
    * @param renderPass - The render pass to which the render queue belongs
@@ -187,7 +189,12 @@ export class RenderQueue {
     this._instanceInfo = new Map();
     this._needSceneColor = false;
     this._drawTransparent = false;
+    this._disposed = false;
     this._objectColorMaps = [new Map()];
+  }
+  /** Whether this is disposed */
+  get disposed() {
+    return this._disposed;
   }
   /** The sun light */
   get sunLight(): DirectionalLight {
@@ -423,9 +430,8 @@ export class RenderQueue {
   }
   /** @internal */
   dispose() {
-    this._ref.ref = null;
-    this._ref = null;
     this.reset();
+    this._disposed = true;
   }
   /** @internal */
   end(camera: Camera, createRenderBundles?: boolean): this {

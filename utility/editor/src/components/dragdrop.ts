@@ -9,10 +9,10 @@ export function enableWorkspaceDragging(object: unknown, type: string, payload: 
     ImGui.EndDragDropSource();
     if (isDragging !== object) {
       isDragging = object;
-      eventBus.dispatchEvent('workspace_drag_start');
+      eventBus.dispatchEvent('workspace_drag_start', type, payload);
     }
   } else if (isDragging === object) {
     isDragging = null;
-    eventBus.dispatchEvent('workspace_drag_end');
+    eventBus.dispatchEvent('workspace_drag_end', type, payload);
   }
 }

@@ -12,6 +12,8 @@ import { FontGlyph } from '../core/fontglyph';
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import { SceneNodeProps } from '../components/nodeprop';
 import type { TRS } from '../types';
+import { AssetInfo } from '../storage/db';
+import { ModelAsset } from '../helpers/model';
 
 export class SceneView extends EmptyView<SceneModel> {
   private _postGizmoRenderer: PostGizmoRenderer;
@@ -246,10 +248,10 @@ export class SceneView extends EmptyView<SceneModel> {
     this._postGizmoRenderer.on('end_translate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.on('end_rotate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.on('end_scale', this.handleEndTransformNode, this);
-    eventBus.on('workspace_drag_start', this.handleNodeDragStart, this);
-    eventBus.on('workspace_drag_end', this.handleNodeDragEnd, this);
-    eventBus.on('workspace_drag_drop', this.handleAssetDragDrop, this);
-    eventBus.on('workspace_dragging', this.handleAssetDragging, this);
+    eventBus.on('workspace_drag_start', this.handleViewportDragStart, this);
+    eventBus.on('workspace_drag_end', this.handleViewportDragEnd, this);
+    eventBus.on('workspace_drag_drop', this.handleViewportDragDrop, this);
+    eventBus.on('workspace_dragging', this.handleViewportDragging, this);
   }
   protected onDeactivate(): void {
     super.onDeactivate();
@@ -267,10 +269,10 @@ export class SceneView extends EmptyView<SceneModel> {
     this._postGizmoRenderer.off('end_translate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.off('end_rotate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.off('end_scale', this.handleEndTransformNode, this);
-    eventBus.off('workspace_drag_start', this.handleNodeDragStart, this);
-    eventBus.off('workspace_drag_end', this.handleNodeDragEnd, this);
-    eventBus.off('workspace_drag_drop', this.handleAssetDragDrop, this);
-    eventBus.off('workspace_dragging', this.handleAssetDragging, this);
+    eventBus.off('workspace_drag_start', this.handleViewportDragStart, this);
+    eventBus.off('workspace_drag_end', this.handleViewportDragEnd, this);
+    eventBus.off('workspace_drag_drop', this.handleViewportDragDrop, this);
+    eventBus.off('workspace_dragging', this.handleViewportDragging, this);
   }
   private handleNodeSelected(node: SceneNode) {
     this._postGizmoRenderer.node = node;
@@ -289,10 +291,10 @@ export class SceneView extends EmptyView<SceneModel> {
       this._propGrid.clear();
     }
   }
-  private handleNodeDragStart() {
-    this._dragDropTypes = ['ASSET'];
+  private handleViewportDragStart(type: string, payload: any) {
+    this._dragDropTypes = [type];
   }
-  private handleNodeDragEnd() {
+  private handleViewportDragEnd(type: string, payload: any) {
     Application.instance.device.nextFrame(() => {
       this._dragDropTypes = [];
     });
@@ -304,10 +306,14 @@ export class SceneView extends EmptyView<SceneModel> {
       src.parent = dst;
     }
   }
-  private handleAssetDragDrop(type: string, asset: unknown, x: number, y: number) {
+  private handleViewportDragDrop(type: string, asset: any, x: number, y: number) {
     console.log(`DragDrop ${type} at (${x}, ${y})`);
+    if (type === 'ASSET') {
+      const uuid = (asset as AssetInfo).uuid;
+      ModelAsset.fetch(this.model.scene, uuid);
+    }
   }
-  private handleAssetDragging(type: string, asset: unknown, x: number, y: number) {
+  private handleViewportDragging(type: string, asset: any, x: number, y: number) {
     console.log(`Dragging ${type} at (${x}, ${y})`);
   }
   private handleNodeRemoved(node: SceneNode) {

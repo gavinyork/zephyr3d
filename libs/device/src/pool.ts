@@ -54,7 +54,7 @@ export class Pool {
   /** @internal */
   private _autoReleaseFramebuffers: Set<FrameBuffer> = new Set();
   /** @internal */
-  private _allocatedObjects: GPUObject[];
+  private _allocatedObjects: Set<GPUObject>;
   /**
    * Creates an instance of Pool class
    * @param device - Rendering device
@@ -70,7 +70,7 @@ export class Pool {
     this._freeFramebuffers = {};
     this._allocatedFramebuffers = new WeakMap();
     this._autoReleaseFramebuffers = new Set();
-    this._allocatedObjects = [];
+    this._allocatedObjects = new Set();
     this._memCost = 0;
   }
   /**
@@ -86,7 +86,17 @@ export class Pool {
     for (const obj of this._allocatedObjects) {
       obj.dispose();
     }
-    this._allocatedObjects = [];
+    this._allocatedObjects.clear();
+  }
+  /**
+   * Dispose object created by createXXXX methods.
+   * @param object - Object to be disposed
+   */
+  disposeNonCachedObject(obj: GPUObject) {
+    if (this._allocatedObjects.has(obj)) {
+      obj.dispose();
+      this._allocatedObjects.delete(obj);
+    }
   }
   /**
    * Creates a texture from given mipmap data and stores it in this pool
@@ -101,7 +111,7 @@ export class Pool {
   ): T {
     const tex = this._device.createTextureFromMipmapData<T>(data, sRGB, options);
     if (tex) {
-      this._allocatedObjects.push(tex);
+      this._allocatedObjects.add(tex);
     }
     return tex;
   }
@@ -121,7 +131,7 @@ export class Pool {
   ): Texture2D {
     const tex = this._device.createTexture2D(format, width, height, options);
     if (tex) {
-      this._allocatedObjects.push(tex);
+      this._allocatedObjects.add(tex);
     }
     return tex;
   }
@@ -138,7 +148,7 @@ export class Pool {
   ): Texture2D {
     const tex = this._device.createTexture2DFromImage(element, sRGB, options);
     if (tex) {
-      this._allocatedObjects.push(tex);
+      this._allocatedObjects.add(tex);
     }
     return tex;
   }
@@ -160,7 +170,7 @@ export class Pool {
   ): Texture2DArray {
     const tex = this._device.createTexture2DArray(format, width, height, depth, options);
     if (tex) {
-      this._allocatedObjects.push(tex);
+      this._allocatedObjects.add(tex);
     }
     return tex;
   }
@@ -178,7 +188,7 @@ export class Pool {
   ): Texture2DArray {
     const tex = this._device.createTexture2DArrayFromImages(elements, sRGB, options);
     if (tex) {
-      this._allocatedObjects.push(tex);
+      this._allocatedObjects.add(tex);
     }
     return tex;
   }
@@ -200,7 +210,7 @@ export class Pool {
   ): Texture3D {
     const tex = this._device.createTexture3D(format, width, height, depth, options);
     if (tex) {
-      this._allocatedObjects.push(tex);
+      this._allocatedObjects.add(tex);
     }
     return tex;
   }
@@ -214,7 +224,7 @@ export class Pool {
   createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube {
     const tex = this._device.createCubeTexture(format, size, options);
     if (tex) {
-      this._allocatedObjects.push(tex);
+      this._allocatedObjects.add(tex);
     }
     return tex;
   }
@@ -226,7 +236,7 @@ export class Pool {
   createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo {
     const tex = this._device.createTextureVideo(el, samplerOptions);
     if (tex) {
-      this._allocatedObjects.push(tex);
+      this._allocatedObjects.add(tex);
     }
     return tex;
   }
@@ -238,7 +248,7 @@ export class Pool {
   createGPUProgram(params: GPUProgramConstructParams): GPUProgram {
     const program = this._device.createGPUProgram(params);
     if (program) {
-      this._allocatedObjects.push(program);
+      this._allocatedObjects.add(program);
     }
     return program;
   }
@@ -250,7 +260,7 @@ export class Pool {
   createBindGroup(layout: BindGroupLayout): BindGroup {
     const bindGroup = this._device.createBindGroup(layout);
     if (bindGroup) {
-      this._allocatedObjects.push(bindGroup);
+      this._allocatedObjects.add(bindGroup);
     }
     return bindGroup;
   }
@@ -263,7 +273,7 @@ export class Pool {
   createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer {
     const buffer = this._device.createBuffer(sizeInBytes, options);
     if (buffer) {
-      this._allocatedObjects.push(buffer);
+      this._allocatedObjects.add(buffer);
     }
     return buffer;
   }
@@ -276,7 +286,7 @@ export class Pool {
   createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer {
     const buffer = this._device.createIndexBuffer(data, options);
     if (buffer) {
-      this._allocatedObjects.push(buffer);
+      this._allocatedObjects.add(buffer);
     }
     return buffer;
   }
@@ -294,7 +304,7 @@ export class Pool {
   ): StructuredBuffer {
     const buffer = this._device.createStructuredBuffer(structureType, options, data);
     if (buffer) {
-      this._allocatedObjects.push(buffer);
+      this._allocatedObjects.add(buffer);
     }
     return buffer;
   }
@@ -306,7 +316,7 @@ export class Pool {
   createVertexLayout(options: VertexLayoutOptions): VertexLayout {
     const layout = this._device.createVertexLayout(options);
     if (layout) {
-      this._allocatedObjects.push(layout);
+      this._allocatedObjects.add(layout);
     }
     return layout;
   }
@@ -325,7 +335,7 @@ export class Pool {
   ): StructuredBuffer {
     const buffer = this._device.createVertexBuffer(attribFormat, data, options);
     if (buffer) {
-      this._allocatedObjects.push(buffer);
+      this._allocatedObjects.add(buffer);
     }
     return buffer;
   }
@@ -343,7 +353,7 @@ export class Pool {
   ): StructuredBuffer {
     const buffer = this._device.createInterleavedVertexBuffer(attribFormats, data, options);
     if (buffer) {
-      this._allocatedObjects.push(buffer);
+      this._allocatedObjects.add(buffer);
     }
     return buffer;
   }
@@ -359,7 +369,7 @@ export class Pool {
   ): FrameBuffer {
     const fb = this._device.createFrameBuffer(colorAttachments, depthAttachment, options);
     if (fb) {
-      this._allocatedObjects.push(fb);
+      this._allocatedObjects.add(fb);
     }
     return fb;
   }

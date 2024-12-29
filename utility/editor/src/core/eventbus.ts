@@ -9,10 +9,10 @@ type EventBusEventMap = {
   update: [frameElapsed: number];
   switch_module: [name: string, ...args: any[]];
   input_event: [ev: Event, type: string];
-  workspace_drag_start: [];
-  workspace_drag_end: [];
-  workspace_drag_drop: [type: string, data: unknown, x: number, y: number];
-  workspace_dragging: [type: string, data: unknown, x: number, y: number];
+  workspace_drag_start: [type: string, data: any];
+  workspace_drag_end: [type: string, data: any];
+  workspace_drag_drop: [type: string, data: any, x: number, y: number];
+  workspace_dragging: [type: string, data: any, x: number, y: number];
   action: [action: string];
   action_doc_request_new: [type: DocumentType];
   action_doc_post_new: [type: DocumentType, name: string, uuid: string];

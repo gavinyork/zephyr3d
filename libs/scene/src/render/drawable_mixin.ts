@@ -27,6 +27,38 @@ const boneTextureSize = new Vector2();
 const instanceBindGroupTransfromTags = new WeakMap<DrawableInstanceInfo, number>();
 const drawableBindGroupTransfromTags = new WeakMap<BindGroup, number>();
 
+const bindGroupCache: Record<string, BindGroup[]> = {};
+const usedBindGroups: WeakMap<BindGroup, string> = new WeakMap();
+
+function fetchBindGroup(skinning: boolean, morphing: boolean, instancing: boolean) {
+  const hash = `${instancing}:${morphing}:${skinning}`;
+  let bindGroups = bindGroupCache[hash];
+  let bindGroup: BindGroup = null;
+  if (bindGroups && bindGroups.length > 0) {
+    bindGroup = bindGroups.pop();
+  } else {
+    const layout = ShaderHelper.getDrawableBindGroupLayout(skinning, morphing, instancing);
+    bindGroup = Application.instance.device.createBindGroup(layout);
+  }
+  usedBindGroups.set(bindGroup, hash);
+  return bindGroup;
+}
+
+function releaseBindGroup(bindGroup: BindGroup) {
+  const hash = usedBindGroups.get(bindGroup);
+  if (hash) {
+    usedBindGroups.delete(bindGroup);
+    const bindGroups = bindGroupCache[hash];
+    if (bindGroups) {
+      bindGroups.push(bindGroup);
+    } else {
+      bindGroupCache[hash] = [bindGroup];
+    }
+  } else {
+    bindGroup.dispose();
+  }
+}
+
 export function mixinDrawable<
   T extends GenericConstructor<{
     getNode(): SceneNode;
@@ -96,15 +128,17 @@ export function mixinDrawable<
       this._mdRenderQueueRef.push(ref);
     }
     renderQueueRefPrune() {
-      while (this._mdRenderQueueRef.length > 0) {
-        const ref = this._mdRenderQueueRef[this._mdRenderQueueRef.length - 1].ref;
-        if (!ref) {
-          this._mdRenderQueueRef.pop();
-        } else {
-          return ref;
+      for (let i = this._mdRenderQueueRef.length - 1; i >= 0; i--) {
+        const ref = this._mdRenderQueueRef[i].ref;
+        if (ref.disposed) {
+          this._mdRenderQueueRef.splice(i, 1);
+          const bindGroup = this._mdDrawableBindGroupInstanced.get(ref);
+          if (bindGroup) {
+            releaseBindGroup(bindGroup);
+            this._mdDrawableBindGroupInstanced.delete(ref);
+          }
         }
       }
-      return null;
     }
     applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void {
       const drawableBindGroup = this.getDrawableBindGroup(Application.instance.device, true, renderQueue);
@@ -211,8 +245,7 @@ export function mixinDrawable<
         ? this._mdDrawableBindGroupMorph
         : this._mdDrawableBindGroup;
       if (!bindGroup) {
-        const layout = ShaderHelper.getDrawableBindGroupLayout(skinning, morphing, instancing);
-        bindGroup = device.createBindGroup(layout);
+        bindGroup = fetchBindGroup(skinning, morphing, instancing);
         if (instancing) {
           this._mdDrawableBindGroupInstanced.set(renderQueue, bindGroup);
         } else if (skinning && morphing) {
