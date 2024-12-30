@@ -722,7 +722,7 @@ export class Camera extends SceneNode {
   }
   /** @internal */
   getPickResultResolveFunc() {
-    return this._pickResultResolve;
+    return null;
   }
   /** @internal */
   getPickPosX() {

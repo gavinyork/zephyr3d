@@ -105,7 +105,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._scalar = 1;
     this._aspect = 1;
     this._airResistence = false;
-    this._updateInterval = 50;
+    this._updateInterval = 10;
     this._startTick = 0;
     this._delay = 0;
     this._blendMode = 0;

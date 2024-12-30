@@ -1,3 +1,5 @@
+const { toEditorSettings } = require('typescript');
+
 module.exports = {
   parser: '@typescript-eslint/parser',
   extends: ['plugin:@typescript-eslint/recommended', 'plugin:prettier/recommended'],
@@ -6,6 +8,11 @@ module.exports = {
     ecmaVersion: 12,
     sourceType: 'module'
   },
+  settings: {
+    'import/resolver': {
+      typescript: {}
+    }
+  },
   env: {
     browser: true,
     node: true,
@@ -13,7 +20,7 @@ module.exports = {
   },
   ignorePatterns: ['**/*.d.ts', '**/dist/**'],
   rules: {
-    'import/no-cycle': 'warn',
+    'import/no-cycle': ['error', { maxDepth: Infinity }],
     'no-explicit-any': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
     '@typescript-eslint/ban-ts-comment': 'off',

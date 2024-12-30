@@ -1,9 +1,12 @@
-import type { SceneNode, SceneNodeVisible } from '@zephyr3d/scene';
+import type { BaseLight, SceneNode, SceneNodeVisible } from '@zephyr3d/scene';
 import type { PropertyAccessor } from './grid';
 import { degree2radian, radian2degree, Vector3 } from '@zephyr3d/base';
 
 const tmpVec3 = new Vector3();
-export const SceneNodeProps: PropertyAccessor<SceneNode>[] = [
+
+export const baseLightProps: PropertyAccessor<BaseLight>[] = [];
+
+export const sceneNodeProps: PropertyAccessor<SceneNode>[] = [
   {
     name: 'Name',
     type: 'string',

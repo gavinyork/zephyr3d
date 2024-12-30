@@ -32,7 +32,7 @@ const usedBindGroups: WeakMap<BindGroup, string> = new WeakMap();
 
 function fetchBindGroup(skinning: boolean, morphing: boolean, instancing: boolean) {
   const hash = `${instancing}:${morphing}:${skinning}`;
-  let bindGroups = bindGroupCache[hash];
+  const bindGroups = bindGroupCache[hash];
   let bindGroup: BindGroup = null;
   if (bindGroups && bindGroups.length > 0) {
     bindGroup = bindGroups.pop();

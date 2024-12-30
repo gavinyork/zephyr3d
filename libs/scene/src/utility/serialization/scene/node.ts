@@ -3,6 +3,7 @@ import type { SceneNodeVisible } from '../../../scene/scene_node';
 import type { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
 import { degree2radian, radian2degree } from '@zephyr3d/base';
+import { GraphNode } from '../../../scene';
 
 export const sceneNodeClass: SerializableClass<SceneNode> = {
   ctor: SceneNode,
@@ -90,5 +91,17 @@ export const sceneNodeClass: SerializableClass<SceneNode> = {
         }
       }
     ];
+  }
+};
+
+export const graphNodeClass: SerializableClass<SceneNode> = {
+  ctor: GraphNode,
+  parent: sceneNodeClass,
+  className: 'GraphNode',
+  createFunc(scene: Scene) {
+    return new GraphNode(scene);
+  },
+  getProps() {
+    return [];
   }
 };

@@ -10,9 +10,9 @@ import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
-import { SceneNodeProps } from '../components/nodeprop';
+import { sceneNodeProps } from '../components/nodeprop';
 import type { TRS } from '../types';
-import { AssetInfo } from '../storage/db';
+import type { AssetInfo } from '../storage/db';
 import { ModelAsset } from '../helpers/model';
 
 export class SceneView extends EmptyView<SceneModel> {
@@ -296,7 +296,7 @@ export class SceneView extends EmptyView<SceneModel> {
     this._propGrid.object = node;
     this._tab.sceneHierarchy.selectNode(node);
     this._propGrid.clear();
-    for (const prop of SceneNodeProps) {
+    for (const prop of sceneNodeProps) {
       this._propGrid.addProperty(prop);
     }
   }

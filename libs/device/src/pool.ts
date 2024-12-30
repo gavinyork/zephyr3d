@@ -25,7 +25,7 @@ import type {
   VertexLayout,
   VertexLayoutOptions
 } from './gpuobject';
-import { PBStructTypeInfo } from './builder';
+import type { PBStructTypeInfo } from './builder';
 
 /**
  * ObjectPool class is responsible for managing and reusing textures and framebuffers.

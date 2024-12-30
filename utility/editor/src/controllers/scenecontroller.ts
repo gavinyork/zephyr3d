@@ -7,7 +7,7 @@ import type { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
 import type { SceneView } from '../views/sceneview';
 import type { TRS } from '../types';
-import { SceneInfo } from '../storage/db';
+import type { SceneInfo } from '../storage/db';
 
 export class SceneController extends BaseController<SceneModel> {
   protected _scene: SceneInfo;

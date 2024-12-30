@@ -1,12 +1,8 @@
 import { makeEventTarget } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
-import type { Scene } from '@zephyr3d/scene';
-import { GraphNode, Mesh, ParticleSystem, SceneNode, Terrain } from '@zephyr3d/scene';
+import type { Scene, SerializableClass, SceneNode } from '@zephyr3d/scene';
+import { nodeSerializationInfo } from '@zephyr3d/scene';
 import { DockPannel } from './dockpanel';
-
-type ClassInfo = {
-  classname: string;
-};
 
 export class SceneHierarchy extends makeEventTarget(Object)<{
   node_deselected: [node: SceneNode];
@@ -14,13 +10,6 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   node_request_delete: [node: SceneNode];
   node_drag_drop: [from: SceneNode, target: SceneNode];
 }>() {
-  private static classInfo: Map<unknown, ClassInfo> = new Map([
-    [SceneNode, { classname: 'SceneNode' }],
-    [GraphNode, { classname: 'GraphNode' }],
-    [Mesh, { classname: 'Mesh' }],
-    [Terrain, { classname: 'Terrain' }],
-    [ParticleSystem, { classname: 'ParticleSystem' }]
-  ]);
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
   private _scene: Scene;
   private _selectedNode: SceneNode;
@@ -38,8 +27,13 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     }
   }
   private renderSceneNode(node: SceneNode) {
-    const cls = SceneHierarchy.classInfo.get(node.constructor) ?? SceneHierarchy.classInfo.get(SceneNode);
-    const label = `${node.name || cls.classname}##${node.id}`;
+    let cls: SerializableClass = null;
+    let ctor = node.constructor;
+    while (!cls) {
+      cls = nodeSerializationInfo.get(ctor);
+      ctor = Object.getPrototypeOf(cls);
+    }
+    const label = `${node.name || cls.className}##${node.id}`;
     let flags = SceneHierarchy.baseFlags;
     if (this._selectedNode === node) {
       flags |= ImGui.TreeNodeFlags.Selected;

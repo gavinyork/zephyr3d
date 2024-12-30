@@ -9,7 +9,7 @@ import type { DrawContext } from './drawable';
 import { ShadowMapper } from '../shadow';
 import type { RenderQueue } from './render_queue';
 import type { PunctualLight, Scene } from '../scene';
-import { PerspectiveCamera, type Camera } from '../camera';
+import type { PerspectiveCamera, Camera } from '../camera';
 import type { Compositor } from '../posteffect';
 import { ClusteredLight } from './cluster_light';
 import { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
@@ -380,36 +380,33 @@ export class SceneRenderer {
   }
   /** @internal */
   private static renderObjectColors(ctx: DrawContext) {
-    if (!(ctx.camera instanceof PerspectiveCamera)) {
-      return;
-    }
+    const camera = ctx.camera as PerspectiveCamera;
     ctx.renderPass = this._objectColorPass;
     ctx.device.pushDeviceStates();
     const fb = ctx.device.pool.fetchTemporalFramebuffer(false, 1, 1, 'rgba8unorm', ctx.depthFormat, false);
-    ctx.device.setViewport(ctx.camera.viewport);
-    const savedViewport = ctx.camera.viewport;
-    const savedScissor = ctx.camera.scissor;
-    const savedWindow = ctx.camera.window;
+    ctx.device.setViewport(camera.viewport);
+    const savedViewport = camera.viewport;
+    const savedScissor = camera.scissor;
+    const savedWindow = camera.window;
     const vp = ctx.device.getViewport();
-    const windowX = ctx.camera.getPickPosX() / vp.width;
-    const windowY = (vp.height - ctx.camera.getPickPosY() - 1) / vp.height;
+    const windowX = camera.getPickPosX() / vp.width;
+    const windowY = (vp.height - camera.getPickPosY() - 1) / vp.height;
     const windowW = 1 / vp.width;
     const windowH = 1 / vp.height;
-    ctx.camera.viewport = null;
-    ctx.camera.scissor = null;
-    ctx.camera.window = [windowX, windowY, windowW, windowH];
+    camera.viewport = null;
+    camera.scissor = null;
+    camera.window = [windowX, windowY, windowW, windowH];
     ctx.device.setFramebuffer(fb);
     this._objectColorPass.clearColor = Vector4.zero();
     this._objectColorPass.clearDepth = 1;
-    const renderQueue = this._objectColorPass.cullScene(ctx, ctx.camera);
-    this._objectColorPass.render(ctx, ctx.camera, renderQueue);
-    ctx.camera.viewport = savedViewport;
-    ctx.camera.scissor = savedScissor;
-    ctx.camera.window = savedWindow;
+    const renderQueue = this._objectColorPass.cullScene(ctx, camera);
+    this._objectColorPass.render(ctx, camera, renderQueue);
+    camera.viewport = savedViewport;
+    camera.scissor = savedScissor;
+    camera.window = savedWindow;
     ctx.device.popDeviceStates();
     const tex = fb.getColorAttachments()[0];
     const pixels = new Uint8Array(4);
-    const camera = ctx.camera;
     const device = ctx.device;
     tex
       .readPixels(0, 0, 1, 1, 0, 0, pixels)
@@ -419,7 +416,7 @@ export class SceneRenderer {
         device.pool.releaseFrameBuffer(fb);
       })
       .catch((err) => {
-        ctx.camera.getPickResultResolveFunc()?.(null);
+        camera.getPickResultResolveFunc()?.(null);
         device.pool.releaseFrameBuffer(fb);
       });
   }

@@ -143,4 +143,8 @@ export class PerspectiveCamera extends Camera {
     this._projMatrix.frustum(left, right, bottom, top, this._near, this._far);
     //this._projMatrix.perspective(this._fovY, this._aspect, this._near, this._far);
   }
+  /** @internal */
+  getPickResultResolveFunc() {
+    return this._pickResultResolve;
+  }
 }

@@ -1,4 +1,11 @@
-import { Compositor, OrbitCameraController, PerspectiveCamera, Scene, Tonemap } from '@zephyr3d/scene';
+import {
+  Compositor,
+  DirectionalLight,
+  OrbitCameraController,
+  PerspectiveCamera,
+  Scene,
+  Tonemap
+} from '@zephyr3d/scene';
 import { BaseModel } from './basemodel';
 import { Vector3 } from '@zephyr3d/base';
 
@@ -9,6 +16,8 @@ export class SceneModel extends BaseModel {
   constructor() {
     super();
     this._scene = new Scene();
+    const light = new DirectionalLight(this._scene);
+    light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
     this._camera = new PerspectiveCamera(this._scene, Math.PI / 3, 1, 1, 1000);
     this._camera.lookAt(new Vector3(0, 5, 15), new Vector3(0, 0, 0), new Vector3(0, 1, 0));
     this._camera.controller = new OrbitCameraController({
