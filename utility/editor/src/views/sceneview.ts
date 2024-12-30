@@ -14,6 +14,7 @@ import type { TRS } from '../types';
 import type { AssetInfo } from '../storage/db';
 import { ModelAsset } from '../helpers/model';
 import { Dialog } from './dlg/dlg';
+import { renderTextureViewer } from '../components/textureviewer';
 
 export class SceneView extends EmptyView<SceneModel> {
   private _postGizmoRenderer: PostGizmoRenderer;
@@ -172,6 +173,9 @@ export class SceneView extends EmptyView<SceneModel> {
     this.model.camera.scissor = [this._tab.width, this.statusbar.height, viewportWidth, viewportHeight];
     this.model.camera.aspect = viewportWidth / viewportHeight;
     this.model.camera.render(this.model.scene, this.model.compositor);
+
+    renderTextureViewer();
+
     if (ImGui.Begin('FontTest')) {
       ImGui.Text(FontGlyph.allGlyphs);
     }
