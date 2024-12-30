@@ -6,6 +6,7 @@ import { DlgProgress } from '../views/dlg/progressdlg';
 import { ModelAsset } from '../helpers/model';
 import { Dialog } from '../views/dlg/dlg';
 import { enableWorkspaceDragging } from './dragdrop';
+import { eventBus } from '../core/eventbus';
 
 export class AssetHierarchy {
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
@@ -201,6 +202,9 @@ export class AssetHierarchy {
       ImGui.OpenPopup(`context_${asset.uuid}`);
     }
     if (ImGui.BeginPopup(`context_${asset.uuid}`)) {
+      if (ImGui.MenuItem('Add to scene')) {
+        eventBus.dispatchEvent('scene_add_asset', asset);
+      }
       if (ImGui.MenuItem('Delete')) {
         this.deleteAsset(asset);
       }

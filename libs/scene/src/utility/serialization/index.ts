@@ -6,12 +6,13 @@ import {
   Mesh,
   ParticleSystem,
   PointLight,
+  PunctualLight,
   SceneNode,
   SpotLight
 } from '../../scene';
 import { batchGroupClass } from './scene/batch';
 import { cameraClass, orthographicCameraClass, perspectiveCameraClass } from './scene/camera';
-import { directionalLightClass, pointLightClass, spotLightClass } from './scene/light';
+import { directionalLightClass, pointLightClass, punctualLightClass, spotLightClass } from './scene/light';
 import { meshNodeClass } from './scene/mesh';
 import { graphNodeClass, sceneNodeClass } from './scene/node';
 import { particleNodeClass } from './scene/particle';
@@ -31,6 +32,7 @@ const nodeSerializationInfo = new Map<any, SerializableClass<SceneNode>>([
   [GraphNode, graphNodeClass],
   [Mesh, meshNodeClass],
   [ParticleSystem, particleNodeClass],
+  [PunctualLight, punctualLightClass],
   [DirectionalLight, directionalLightClass],
   [SpotLight, spotLightClass],
   [PointLight, pointLightClass],

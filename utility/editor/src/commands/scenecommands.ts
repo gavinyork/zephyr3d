@@ -12,6 +12,52 @@ import {
 import type { Command } from '../core/command';
 import { Quaternion, Vector3, type GenericConstructor } from '@zephyr3d/base';
 import type { TRS } from '../types';
+import { ModelAsset } from '../helpers/model';
+import type { AssetInfo } from '../storage/db';
+
+export class AddAssetCommand implements Command {
+  private _scene: Scene;
+  private _asset: AssetInfo;
+  private _node: SceneNode;
+  private _position: Vector3;
+  private _loading: boolean;
+  constructor(scene: Scene, asset: AssetInfo, position: Vector3) {
+    this._scene = scene;
+    this._node = null;
+    this._asset = { ...asset };
+    this._position = new Vector3(position);
+    this._loading = false;
+  }
+  get desc(): string {
+    return 'Add asset';
+  }
+  execute() {
+    if (!this._loading) {
+      this._loading = true;
+      ModelAsset.fetch(this._scene, this._asset.uuid)
+        .then((asset) => {
+          if (!this._loading) {
+            ModelAsset.release(asset.group);
+          } else {
+            asset.group.position.set(this._position);
+            this._loading = false;
+            this._node = asset.group;
+          }
+        })
+        .catch(() => {
+          this._loading = false;
+        });
+    }
+  }
+  undo() {
+    this._loading = false;
+    if (this._node) {
+      this._node.parent = null;
+      ModelAsset.release(this._node);
+      this._node = null;
+    }
+  }
+}
 
 export class AddShapeCommand<T extends ShapeType> implements Command {
   private _mesh: Mesh;

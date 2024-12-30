@@ -39,7 +39,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     let ctor = node.constructor;
     while (!cls) {
       cls = nodeSerializationInfo.get(ctor);
-      ctor = Object.getPrototypeOf(cls);
+      ctor = Object.getPrototypeOf(ctor);
     }
     const label = `${node.name || cls.className}##${node.id}`;
     let flags = SceneHierarchy.baseFlags;

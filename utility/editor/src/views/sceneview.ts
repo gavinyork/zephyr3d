@@ -4,8 +4,8 @@ import { EmptyView } from './emptyview';
 import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import { Tab } from '../components/tab';
-import type { Camera, Compositor, Scene, SceneNode } from '@zephyr3d/scene';
-import { Application } from '@zephyr3d/scene';
+import type { Camera, Compositor, Scene, SceneNode, SerializableClass } from '@zephyr3d/scene';
+import { Application, nodeSerializationInfo } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
@@ -23,12 +23,18 @@ export class SceneView extends EmptyView<SceneModel> {
   private _transformNode: SceneNode;
   private _oldTransform: TRS;
   private _dragDropTypes: string[];
+  private _nodeToBePlaced: SceneNode;
+  private _mousePosX: number;
+  private _mousePosY: number;
   constructor(model: SceneModel) {
     super(model);
     this._transformNode = null;
     this._oldTransform = null;
     this.drawBackground = false;
     this._dragDropTypes = [];
+    this._nodeToBePlaced = null;
+    this._mousePosX = -1;
+    this._mousePosY = -1;
     this._toolbar = new ToolBar(
       [
         {
@@ -143,6 +149,23 @@ export class SceneView extends EmptyView<SceneModel> {
         );
       }
     }
+    if (this._nodeToBePlaced) {
+      if (this._mousePosX >= 0 && this._mousePosY >= 0) {
+        this._nodeToBePlaced.parent = this.model.scene.rootNode;
+        const ray = this.model.camera.constructRay(this._mousePosX, this._mousePosY);
+        let hitDistance = -ray.origin.y / ray.direction.y;
+        if (Number.isNaN(hitDistance) || hitDistance < 0) {
+          hitDistance = 10;
+        }
+        this._nodeToBePlaced.position.setXYZ(
+          ray.origin.x + ray.direction.x * hitDistance,
+          ray.origin.y + ray.direction.y * hitDistance,
+          ray.origin.z + ray.direction.z * hitDistance
+        );
+      } else {
+        this._nodeToBePlaced.parent = null;
+      }
+    }
     this.model.camera.viewport = [this._tab.width, this.statusbar.height, viewportWidth, viewportHeight];
     this.model.camera.scissor = [this._tab.width, this.statusbar.height, viewportWidth, viewportHeight];
     this.model.camera.aspect = viewportWidth / viewportHeight;
@@ -208,7 +231,23 @@ export class SceneView extends EmptyView<SceneModel> {
     if (ev instanceof PointerEvent) {
       const p = [ev.offsetX, ev.offsetY];
       if (!this.posToViewport(p, this.model.camera.viewport)) {
+        this._mousePosX = -1;
+        this._mousePosY = -1;
         return false;
+      }
+      this._mousePosX = p[0];
+      this._mousePosY = p[1];
+      if (this._nodeToBePlaced) {
+        if (ev.type === 'pointerdown') {
+          if (ev.button === 2) {
+            this._nodeToBePlaced.parent = null;
+            ModelAsset.release(this._nodeToBePlaced);
+            this._nodeToBePlaced = null;
+          } else if (ev.button === 0) {
+            this._tab.sceneHierarchy.selectNode(this._nodeToBePlaced);
+            this._nodeToBePlaced = null;
+          }
+        }
       }
       if (this._postGizmoRenderer.handlePointerEvent(ev.type, p[0], p[1], ev.button)) {
         return true;
@@ -258,10 +297,7 @@ export class SceneView extends EmptyView<SceneModel> {
     this._postGizmoRenderer.on('end_translate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.on('end_rotate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.on('end_scale', this.handleEndTransformNode, this);
-    eventBus.on('workspace_drag_start', this.handleViewportDragStart, this);
-    eventBus.on('workspace_drag_end', this.handleViewportDragEnd, this);
-    eventBus.on('workspace_drag_drop', this.handleViewportDragDrop, this);
-    eventBus.on('workspace_dragging', this.handleViewportDragging, this);
+    eventBus.on('scene_add_asset', this.handleAddAsset, this);
   }
   protected onDeactivate(): void {
     super.onDeactivate();
@@ -279,10 +315,7 @@ export class SceneView extends EmptyView<SceneModel> {
     this._postGizmoRenderer.off('end_translate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.off('end_rotate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.off('end_scale', this.handleEndTransformNode, this);
-    eventBus.off('workspace_drag_start', this.handleViewportDragStart, this);
-    eventBus.off('workspace_drag_end', this.handleViewportDragEnd, this);
-    eventBus.off('workspace_drag_drop', this.handleViewportDragDrop, this);
-    eventBus.off('workspace_dragging', this.handleViewportDragging, this);
+    eventBus.off('scene_add_asset', this.handleAddAsset, this);
   }
   private handleNodeSelected(node: SceneNode) {
     let sealedNode = node;
@@ -296,8 +329,21 @@ export class SceneView extends EmptyView<SceneModel> {
     this._propGrid.object = node;
     this._tab.sceneHierarchy.selectNode(node);
     this._propGrid.clear();
-    for (const prop of sceneNodeProps) {
-      this._propGrid.addProperty(prop);
+    let cls: SerializableClass = null;
+    let ctor = node.constructor;
+    while (ctor) {
+      cls = nodeSerializationInfo.get(ctor);
+      if (cls) {
+        const props = cls.getProps();
+        if (props.length > 0) {
+          this._propGrid.beginGroup(cls.className);
+          for (const prop of cls.getProps()) {
+            this._propGrid.addProperty(prop);
+          }
+          this._propGrid.endGroup();
+        }
+      }
+      ctor = Object.getPrototypeOf(ctor);
     }
   }
   private handleNodeDeselected(node: SceneNode) {
@@ -309,14 +355,6 @@ export class SceneView extends EmptyView<SceneModel> {
       this._propGrid.clear();
     }
   }
-  private handleViewportDragStart(type: string, payload: any) {
-    this._dragDropTypes = [type];
-  }
-  private handleViewportDragEnd(type: string, payload: any) {
-    Application.instance.device.nextFrame(() => {
-      this._dragDropTypes = [];
-    });
-  }
   private handleNodeDragDrop(src: SceneNode, dst: SceneNode) {
     if (src.parent !== dst && !src.isParentOf(dst)) {
       const localMatrix = Matrix4x4.invertAffine(dst.worldMatrix).multiplyRight(src.worldMatrix);
@@ -324,15 +362,15 @@ export class SceneView extends EmptyView<SceneModel> {
       src.parent = dst;
     }
   }
-  private handleViewportDragDrop(type: string, asset: any, x: number, y: number) {
-    console.log(`DragDrop ${type} at (${x}, ${y})`);
-    if (type === 'ASSET') {
-      const uuid = (asset as AssetInfo).uuid;
-      ModelAsset.fetch(this.model.scene, uuid);
+  private handleAddAsset(asset: AssetInfo) {
+    console.log(`Add asset ${asset.name}`);
+    if (this._nodeToBePlaced) {
+      ModelAsset.release(this._nodeToBePlaced);
+      this._nodeToBePlaced = null;
     }
-  }
-  private handleViewportDragging(type: string, asset: any, x: number, y: number) {
-    console.log(`Dragging ${type} at (${x}, ${y})`);
+    ModelAsset.fetch(this.model.scene, asset.uuid).then((node) => {
+      this._nodeToBePlaced = node.group;
+    });
   }
   private handleNodeRemoved(node: SceneNode) {
     if (this._postGizmoRenderer.node === node) {

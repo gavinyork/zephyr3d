@@ -12,6 +12,7 @@ export class ModelAsset {
       httpRequest: HttpRequest;
       path: string;
       urls: string[];
+      nodes: Map<SceneNode, AnimationSet>;
     }
   > = {};
   static readonly extensions = ['.gltf', '.glb'];
@@ -57,6 +58,19 @@ export class ModelAsset {
     await reader.close();
     return fileMap;
   }
+  static async release(node: SceneNode) {
+    for (const k of Object.getOwnPropertyNames(this._assetManagers)) {
+      const assetManager = this._assetManagers[k];
+      if (assetManager.nodes.has(node)) {
+        assetManager.nodes.get(node)?.dispose();
+        assetManager.nodes.delete(node);
+        if (assetManager.nodes.size === 0) {
+          assetManager.assetManager.purgeCache();
+        }
+        break;
+      }
+    }
+  }
   static async fetch(scene: Scene, uuid: string): Promise<{ group: SceneNode; animationSet: AnimationSet }> {
     let assetManager = this._assetManagers[uuid];
     if (!assetManager) {
@@ -77,17 +91,27 @@ export class ModelAsset {
         urls: [...fileMap.values()],
         path: asset.path,
         httpRequest: new HttpRequest((url) => fileMap.get(url)),
-        assetManager: new AssetManager(Symbol(uuid))
+        assetManager: new AssetManager(Symbol(uuid)),
+        nodes: new Map()
       };
       this._assetManagers[uuid] = assetManager;
     }
-    return await assetManager.assetManager.fetchModel(
-      scene,
-      `/${assetManager.path}`,
-      {
-        enableInstancing: true
-      },
-      assetManager.httpRequest
-    );
+    try {
+      const model = await assetManager.assetManager.fetchModel(
+        scene,
+        `/${assetManager.path}`,
+        {
+          enableInstancing: true
+        },
+        assetManager.httpRequest
+      );
+      if (model) {
+        assetManager.nodes.set(model.group, model.animationSet);
+        return model;
+      }
+    } catch (error) {
+      console.error(`Load model failed: ${error}`);
+      return null;
+    }
   }
 }

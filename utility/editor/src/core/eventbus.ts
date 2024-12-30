@@ -2,6 +2,7 @@ import { makeEventTarget } from '@zephyr3d/base';
 import type { DocumentType } from '../components/common';
 import type { SceneNode } from '@zephyr3d/scene';
 import type { TRS } from '../types';
+import type { AssetInfo } from '../storage/db';
 
 type EventBusEventMap = {
   error: [msg: string];
@@ -9,6 +10,7 @@ type EventBusEventMap = {
   update: [frameElapsed: number];
   switch_module: [name: string, ...args: any[]];
   input_event: [ev: Event, type: string];
+  scene_add_asset: [asset: AssetInfo];
   workspace_drag_start: [type: string, data: any];
   workspace_drag_end: [type: string, data: any];
   workspace_drag_drop: [type: string, data: any, x: number, y: number];

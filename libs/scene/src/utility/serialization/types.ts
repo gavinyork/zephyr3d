@@ -1,5 +1,3 @@
-import type { GenericConstructor } from '@zephyr3d/base';
-
 export type PropertyType = 'bool' | 'int' | 'float' | 'vec2' | 'vec3' | 'vec4' | 'string' | 'rgb' | 'rgba';
 export type PropertyValue = {
   num?: number[];
@@ -18,7 +16,7 @@ export type PropertyAccessor<T = unknown> = {
 };
 
 export type SerializableClass<T = unknown> = {
-  ctor: GenericConstructor<T>;
+  ctor: any;
   className: string;
   parent?: SerializableClass<T>;
   createFunc?: (ctx: any) => T;

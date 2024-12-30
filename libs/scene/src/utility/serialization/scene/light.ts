@@ -1,9 +1,9 @@
 import type { SceneNode } from '../../../scene/scene_node';
 import {
-  type BaseLight,
-  type PunctualLight,
+  BaseLight,
   DirectionalLight,
   PointLight,
+  PunctualLight,
   SpotLight
 } from '../../../scene/light';
 import type { Scene } from '../../../scene/scene';
@@ -11,30 +11,9 @@ import type { SerializableClass } from '../types';
 import { sceneNodeClass } from './node';
 import { Vector4 } from '@zephyr3d/base';
 
-export const baseLightClass: SerializableClass<SceneNode> = {
-  ctor: null,
-  parent: sceneNodeClass,
-  className: 'BaseLight',
-  getProps() {
-    return [
-      {
-        name: 'Intensity',
-        type: 'float',
-        default: { num: [1] },
-        get(this: BaseLight, value) {
-          value.num[0] = this.intensity;
-        },
-        set(this: BaseLight, value) {
-          this.intensity = value.num[0];
-        }
-      }
-    ];
-  }
-};
-
 export const punctualLightClass: SerializableClass<SceneNode> = {
-  ctor: null,
-  parent: baseLightClass,
+  ctor: PunctualLight,
+  parent: sceneNodeClass,
   className: 'PunctualLight',
   getProps() {
     return [
@@ -49,6 +28,17 @@ export const punctualLightClass: SerializableClass<SceneNode> = {
         },
         set(this: PunctualLight, value) {
           this.color = new Vector4(value.num[0], value.num[1], value.num[2], 1);
+        }
+      },
+      {
+        name: 'Intensity',
+        type: 'float',
+        default: { num: [1] },
+        get(this: BaseLight, value) {
+          value.num[0] = this.intensity;
+        },
+        set(this: BaseLight, value) {
+          this.intensity = value.num[0];
         }
       },
       {
