@@ -96,22 +96,19 @@ export class ModelAsset {
       };
       this._assetManagers[uuid] = assetManager;
     }
-    try {
-      const model = await assetManager.assetManager.fetchModel(
-        scene,
-        `/${assetManager.path}`,
-        {
-          enableInstancing: true
-        },
-        assetManager.httpRequest
-      );
-      if (model) {
-        assetManager.nodes.set(model.group, model.animationSet);
-        return model;
-      }
-    } catch (error) {
-      console.error(`Load model failed: ${error}`);
-      return null;
+    const model = await assetManager.assetManager.fetchModel(
+      scene,
+      `/${assetManager.path}`,
+      {
+        enableInstancing: true
+      },
+      assetManager.httpRequest
+    );
+    if (model) {
+      assetManager.nodes.set(model.group, model.animationSet);
+      return model;
+    } else {
+      throw new Error('Load asset failed');
     }
   }
 }

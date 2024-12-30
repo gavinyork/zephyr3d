@@ -10,10 +10,10 @@ import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
-import { sceneNodeProps } from '../components/nodeprop';
 import type { TRS } from '../types';
 import type { AssetInfo } from '../storage/db';
 import { ModelAsset } from '../helpers/model';
+import { Dialog } from './dlg/dlg';
 
 export class SceneView extends EmptyView<SceneModel> {
   private _postGizmoRenderer: PostGizmoRenderer;
@@ -26,6 +26,7 @@ export class SceneView extends EmptyView<SceneModel> {
   private _nodeToBePlaced: SceneNode;
   private _mousePosX: number;
   private _mousePosY: number;
+  private _postGizmoCaptured: boolean;
   constructor(model: SceneModel) {
     super(model);
     this._transformNode = null;
@@ -35,6 +36,7 @@ export class SceneView extends EmptyView<SceneModel> {
     this._nodeToBePlaced = null;
     this._mousePosX = -1;
     this._mousePosY = -1;
+    this._postGizmoCaptured = false;
     this._toolbar = new ToolBar(
       [
         {
@@ -230,7 +232,12 @@ export class SceneView extends EmptyView<SceneModel> {
     }
     if (ev instanceof PointerEvent) {
       const p = [ev.offsetX, ev.offsetY];
-      if (!this.posToViewport(p, this.model.camera.viewport)) {
+      const insideViewport = this.posToViewport(p, this.model.camera.viewport);
+      if (this._postGizmoCaptured) {
+        this._postGizmoRenderer.handlePointerEvent(ev.type, p[0], p[1], ev.button);
+        return true;
+      }
+      if (!insideViewport) {
         this._mousePosX = -1;
         this._mousePosY = -1;
         return false;
@@ -368,9 +375,13 @@ export class SceneView extends EmptyView<SceneModel> {
       ModelAsset.release(this._nodeToBePlaced);
       this._nodeToBePlaced = null;
     }
-    ModelAsset.fetch(this.model.scene, asset.uuid).then((node) => {
-      this._nodeToBePlaced = node.group;
-    });
+    ModelAsset.fetch(this.model.scene, asset.uuid)
+      .then((node) => {
+        this._nodeToBePlaced = node.group;
+      })
+      .catch((err) => {
+        Dialog.messageBox('Error', `${err}`);
+      });
   }
   private handleNodeRemoved(node: SceneNode) {
     if (this._postGizmoRenderer.node === node) {
@@ -384,6 +395,7 @@ export class SceneView extends EmptyView<SceneModel> {
       rotation: new Quaternion(node.rotation),
       scale: new Vector3(node.scale)
     };
+    this._postGizmoCaptured = true;
   }
   private handleEndTransformNode(node: SceneNode) {
     if (node && node === this._transformNode) {
@@ -395,6 +407,7 @@ export class SceneView extends EmptyView<SceneModel> {
       this._oldTransform = null;
       this._transformNode = null;
     }
+    this._postGizmoCaptured = false;
   }
   private handleSceneAction(action: string) {
     switch (action) {

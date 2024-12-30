@@ -154,7 +154,16 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
     return this._mode;
   }
   set mode(val: GizmoMode) {
-    this._mode = val;
+    if (this._mode !== val) {
+      if (this._mode === 'translation') {
+        this._endTranslation();
+      } else if (this._mode === 'scaling') {
+        this._endScale();
+      } else if (this._mode === 'rotation') {
+        this._endRotate();
+      }
+      this._mode = val;
+    }
   }
   get node(): SceneNode {
     return this._node;
@@ -212,7 +221,12 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
     let gizmoRenderState: RenderStateSet = null;
     if (this._drawGrid) {
       if (!PostGizmoRenderer._gridPrimitive) {
-        PostGizmoRenderer._gridPrimitive = new PlaneShape({ size: 2, twoSided: true, resolution: 8 });
+        PostGizmoRenderer._gridPrimitive = new PlaneShape({
+          size: 2,
+          twoSided: true,
+          resolution: 8,
+          transform: Matrix4x4.translation(new Vector3(0, -0.01, 0))
+        });
       }
       gridPrimitive = PostGizmoRenderer._gridPrimitive;
       if (!PostGizmoRenderer._gridProgram) {
@@ -526,9 +540,11 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   }
   private _endRotate() {
     Application.instance.device.canvas.style.cursor = 'default';
-    this._rotateInfo = null;
-    if (this._node) {
-      this.dispatchEvent('end_rotate', this._node);
+    if (this._rotateInfo) {
+      this._rotateInfo = null;
+      if (this._node) {
+        this.dispatchEvent('end_rotate', this._node);
+      }
     }
   }
   private _beginScale(startX: number, startY: number, axis: number, startPosition: number) {
@@ -550,61 +566,28 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
     if (!this._scaleInfo) {
       return;
     }
-    const mvpMatrix = this._calcGizmoMVPMatrix(false);
-    const width = this._camera.viewport
-      ? this._camera.viewport[2]
-      : Application.instance.device.getViewport().width;
-    const height = this._camera.viewport
-      ? this._camera.viewport[3]
-      : Application.instance.device.getViewport().height;
     let axisIndex = this._scaleInfo.axis;
     if (axisIndex < 0) {
-      const cameraZ = this._camera.worldMatrix.getRow(2);
-      let dot = 1;
-      for (let i = 0; i < 3; i++) {
-        const x = Math.abs(cameraZ[i]);
-        if (x < dot) {
-          axisIndex = i;
-          dot = x;
-        }
-      }
+      axisIndex = 1;
       console.log(`Uniform scaling at ${axisIndex} axis`);
     }
-    const axis = PostGizmoRenderer._axises[axisIndex];
-    const axisStart = new Vector4(0, 0, 0, 1);
-    const axisEnd = new Vector4(axis.x, axis.y, axis.z, 1);
-    const startH = mvpMatrix.transform(axisStart, axisStart);
-    const endH = mvpMatrix.transform(axisEnd, axisEnd);
-    const axisDirX = (endH.x / endH.w - startH.x / startH.w) * 0.5 * width;
-    const axisDirY = (startH.y / startH.w - endH.y / endH.w) * 0.5 * height;
-    const axisLength = Math.sqrt(axisDirX * axisDirX + axisDirY * axisDirY);
-    const axisDirectionX = axisDirX / axisLength;
-    const axisDirectionY = axisDirY / axisLength;
-    const movementX = x - this._scaleInfo.lastX;
     const movementY = y - this._scaleInfo.lastY;
-    const dot = axisDirectionX * movementX + axisDirectionY * movementY;
-    const factor = Math.min(axisLength / 10, 1);
-    const increment = (dot * factor) / axisLength;
-    const scale = increment / this._axisLength;
+    const scale = 0.95 ** movementY;
     if (this._node) {
       if (this._scaleInfo.axis < 0) {
-        const currentScale =
-          Math.abs(this._node.scale[axisIndex]) < 1e-6 ? 1e-6 : this._node.scale[axisIndex];
-        const s = movementY < 0 ? Math.abs(scale) : -Math.abs(scale);
-        const t = Math.abs((currentScale + s) / currentScale);
-        this._node.scale.x *= t;
-        this._node.scale.y *= t;
-        this._node.scale.z *= t;
+        this._node.scale.x *= scale;
+        this._node.scale.y *= scale;
+        this._node.scale.z *= scale;
       } else {
         switch (this._scaleInfo.axis) {
           case 0:
-            this._node.scale.x += scale;
+            this._node.scale.x *= scale;
             break;
           case 1:
-            this._node.scale.y += scale;
+            this._node.scale.y *= scale;
             break;
           case 2:
-            this._node.scale.z += scale;
+            this._node.scale.z *= scale;
             break;
         }
       }
@@ -614,9 +597,11 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   }
   private _endScale() {
     Application.instance.device.canvas.style.cursor = 'default';
-    this._scaleInfo = null;
-    if (this._node) {
-      this.dispatchEvent('end_scale', this._node);
+    if (this._scaleInfo) {
+      this._scaleInfo = null;
+      if (this._node) {
+        this.dispatchEvent('end_scale', this._node);
+      }
     }
   }
   private _beginTranslate(startX: number, startY: number, axis: number, type: HitType, pointLocal: Vector3) {
@@ -682,9 +667,11 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   }
   private _endTranslation() {
     Application.instance.device.canvas.style.cursor = 'default';
-    this._translatePlaneInfo = null;
-    if (this._node) {
-      this.dispatchEvent('end_translate', this._node);
+    if (this._translatePlaneInfo) {
+      this._translatePlaneInfo = null;
+      if (this._node) {
+        this.dispatchEvent('end_translate', this._node);
+      }
     }
   }
   private _measureRotateSpeed() {
@@ -849,7 +836,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
         pb.main(function () {
           this.$outputs.worldPos = pb.add(
             pb.vec3(this.cameraPos.x, 0, this.cameraPos.y),
-            pb.mul(this.$inputs.pos, this.params.x)
+            pb.mul(this.$inputs.pos, pb.vec3(this.params.x, 1, this.params.x))
           );
           this.$builtins.position = pb.mul(this.viewProjMatrix, pb.vec4(this.$outputs.worldPos, 1));
           this.$builtins.position = pb.mul(this.$builtins.position, pb.vec4(1, this.flip, 1, 1));

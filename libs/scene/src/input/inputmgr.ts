@@ -184,10 +184,6 @@ export class InputManager {
   private _getPointerUpHandler() {
     const that = this;
     return function (ev: PointerEvent) {
-      if (ev.pointerType === 'mouse' && that._captureId === ev.pointerId) {
-        that._app.options.canvas.releasePointerCapture(ev.pointerId);
-        that._captureId = -1;
-      }
       const eventData = that._getPointerEventData(ev.pointerId);
       let emitClickEvent = false;
       let emitDoubleClickEvent = false;
@@ -229,6 +225,10 @@ export class InputManager {
           eventData.lastClickY = ev.offsetY;
           eventData.lastClickTime = now;
         }
+      }
+      if (ev.pointerType === 'mouse' && that._captureId === ev.pointerId) {
+        that._app.options.canvas.releasePointerCapture(ev.pointerId);
+        that._captureId = -1;
       }
     };
   }

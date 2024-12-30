@@ -14,7 +14,7 @@ export class DlgMessage extends ModalDialog {
     this._text = val;
   }
   doRender(): void {
-    ImGui.Text(this._text);
+    ImGui.TextWrapped(this._text);
     if (ImGui.Button('OK')) {
       this.close();
     }
