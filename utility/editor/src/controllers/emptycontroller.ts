@@ -4,10 +4,16 @@ import { BaseController } from './basecontroller';
 import type { BaseModel } from '../models/basemodel';
 import { Dialog } from '../views/dlg/dlg';
 import { Database, type SceneInfo } from '../storage/db';
+import { EmptyView } from '../views/emptyview';
 
 export class EmptyController<T extends BaseModel> extends BaseController<T> {
-  constructor(model: T) {
-    super(model);
+  private _view: EmptyView<null>;
+  constructor(view: EmptyView<null>) {
+    super(null);
+    this._view = view;
+  }
+  handleEvent(ev: Event): boolean {
+    return this._view.shortcut(ev);
   }
   protected onActivate(): void {
     eventBus.on('action_doc_request_new', this.requestNew, this);

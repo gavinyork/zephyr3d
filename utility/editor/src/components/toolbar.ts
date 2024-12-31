@@ -1,10 +1,12 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { makeEventTarget } from '@zephyr3d/base';
+import type { BaseView } from '../views/baseview';
 
 export type ToolBarItem = {
   label: string;
   id?: string;
   tooltip?: string;
+  shortcut?: string;
   group?: number;
   selected?: boolean;
 };
@@ -92,6 +94,28 @@ export class ToolBar extends makeEventTarget(Object)<{
       }
     }
     return false;
+  }
+  registerShortcuts(view: BaseView<any>) {
+    for (const tool of this._tools) {
+      if (tool.shortcut) {
+        view.registerShortcut(tool.shortcut, () => {
+          const selected = tool.group >= 0 && tool.id === this._state[tool.group];
+          if (!selected) {
+            this.dispatchEvent('action', tool.id);
+            if (tool.group >= 0) {
+              this._state[tool.group] = tool.id;
+            }
+          }
+        });
+      }
+    }
+  }
+  unregisterShortcuts(view: BaseView<any>) {
+    for (const tool of this._tools) {
+      if (tool.shortcut) {
+        view.unregisterShortcut(tool.shortcut);
+      }
+    }
   }
   render() {
     const displaySize = ImGui.GetIO().DisplaySize;

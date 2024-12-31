@@ -98,10 +98,15 @@ export class EmptyView<T extends BaseModel> extends BaseView<T> {
     this._statusbar.render();
   }
   protected onActivate(): void {
+    this._menubar.registerShortcuts(this);
     this._menubar.on('action', this.handleFileMenu, this);
   }
   protected onDeactivate(): void {
+    this._menubar.unregisterShortcuts(this);
     this._menubar.off('action', this.handleFileMenu, this);
+  }
+  protected handleShortcut(shortcut: string) {
+    return false;
   }
   private handleFileMenu(action: string) {
     switch (action) {

@@ -69,11 +69,13 @@ export class SceneView extends EmptyView<SceneModel> {
         },
         {
           label: FontGlyph.glyphs['ccw'],
+          shortcut: 'Ctrl+Z',
           id: 'UNDO',
           tooltip: 'Undo last change'
         },
         {
           label: FontGlyph.glyphs['cw'],
+          shortcut: 'Ctrl+Shift+Z',
           id: 'REDO',
           tooltip: 'Redo last change'
         }
@@ -231,6 +233,9 @@ export class SceneView extends EmptyView<SceneModel> {
     ImGui.PopStyleVar(2);
   }
   handleEvent(ev: Event, type?: string): boolean {
+    if (this.shortcut(ev)) {
+      return true;
+    }
     if (this.model.camera.handleEvent(ev, type)) {
       return true;
     }
@@ -294,7 +299,9 @@ export class SceneView extends EmptyView<SceneModel> {
   }
   protected onActivate(): void {
     super.onActivate();
+    this.menubar.registerShortcuts(this);
     this.menubar.on('action', this.handleSceneAction, this);
+    this._toolbar.registerShortcuts(this);
     this._toolbar.on('action', this.handleSceneAction, this);
     this._tab.sceneHierarchy.on('node_selected', this.handleNodeSelected, this);
     this._tab.sceneHierarchy.on('node_deselected', this.handleNodeDeselected, this);
@@ -312,7 +319,9 @@ export class SceneView extends EmptyView<SceneModel> {
   }
   protected onDeactivate(): void {
     super.onDeactivate();
+    this.menubar.unregisterShortcuts(this);
     this.menubar.off('action', this.handleSceneAction, this);
+    this._toolbar.unregisterShortcuts(this);
     this._toolbar.off('action', this.handleSceneAction, this);
     this._tab.sceneHierarchy.off('node_selected', this.handleNodeSelected, this);
     this._tab.sceneHierarchy.off('node_deselected', this.handleNodeDeselected, this);

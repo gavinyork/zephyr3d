@@ -9,7 +9,7 @@ export class BaseController<Model extends BaseModel> {
   get model() {
     return this._model;
   }
-  handleEvent(ev: Event, type?: string): boolean {
+  handleEvent(ev: Event): boolean {
     return false;
   }
   activate(...args: any[]) {

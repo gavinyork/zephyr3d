@@ -8,6 +8,7 @@ type EventBusEventMap = {
   error: [msg: string];
   resize: [width: number, height: number];
   update: [frameElapsed: number];
+  shortcut: [key: string];
   switch_module: [name: string, ...args: any[]];
   input_event: [ev: Event, type: string];
   scene_add_asset: [asset: AssetInfo];

@@ -26,7 +26,7 @@ export class Editor {
     if (imGuiInjectEvent(ev, type)) {
       return true;
     }
-    if (this._moduleManager.currentModule.controller?.handleEvent(ev, type)) {
+    if (this._moduleManager.currentModule.controller?.handleEvent(ev)) {
       return true;
     }
     return false;
@@ -43,7 +43,7 @@ export class Editor {
   }
   registerModules() {
     const emptyView = new EmptyView(null);
-    const emptyController = new EmptyController(null);
+    const emptyController = new EmptyController(emptyView);
     this._moduleManager.register('Empty', null, emptyView, emptyController);
 
     const sceneModel = new SceneModel();

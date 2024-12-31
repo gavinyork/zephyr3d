@@ -1,6 +1,7 @@
 import { makeEventTarget } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 import { getFrameHeight } from '../views/misc';
+import type { BaseView } from '../views/baseview';
 
 export type MenuItemOptions = {
   label: string;
@@ -98,6 +99,32 @@ export class MenubarView extends makeEventTarget(Object)<{
       this._options.items.splice(index, 1);
     }
     this._map.delete(id);
+  }
+  registerShortcuts(view: BaseView<any>) {
+    const menuItems = this._options.items.slice();
+    while (menuItems.length > 0) {
+      const item = menuItems.shift();
+      if (item.shortCut) {
+        view.registerShortcut(item.shortCut, () => {
+          this.dispatchEvent('action', item.id, item);
+        });
+      }
+      if (item.subMenus) {
+        menuItems.push(...item.subMenus);
+      }
+    }
+  }
+  unregisterShortcuts(view: BaseView<any>) {
+    const menuItems = this._options.items.slice();
+    while (menuItems.length > 0) {
+      const item = menuItems.shift();
+      if (item.shortCut) {
+        view.unregisterShortcut(item.shortCut);
+      }
+      if (item.subMenus) {
+        menuItems.push(...item.subMenus);
+      }
+    }
   }
   render() {
     if (ImGui.BeginMainMenuBar()) {
