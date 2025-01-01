@@ -17,6 +17,12 @@ export class CommandManager {
     this._undoStack.push(command);
     this._current++;
   }
+  canUndo() {
+    return this._current > 0;
+  }
+  canRedo() {
+    return this._current < this._undoStack.length;
+  }
   undo() {
     if (this._current > 0) {
       this._undoStack[--this._current].undo();

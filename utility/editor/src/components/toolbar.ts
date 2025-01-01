@@ -36,7 +36,11 @@ export class ToolBar extends makeEventTarget(Object)<{
     spacing: number
   ) {
     super();
-    this._tools = [...items];
+    this._tools = (items ?? []).map((item) => ({
+      ...item,
+      group: item.group ?? -1,
+      selected: !!item.selected
+    }));
     this._state = {};
     this._pos = new ImGui.ImVec2(x, y);
     this._size = new ImGui.ImVec2(w, h);
@@ -82,18 +86,14 @@ export class ToolBar extends makeEventTarget(Object)<{
   }
   selectTool(id: string, select: boolean) {
     for (const tool of this._tools) {
-      if (tool.id === id && tool.group >= 0) {
-        this._state[tool.group] = select ? tool.id : null;
+      if (tool.id === id) {
+        if (tool.group >= 0) {
+          this._state[tool.group] = select ? tool.id : null;
+        }
+        tool.selected = select;
+        break;
       }
     }
-  }
-  toolSelected(id: string) {
-    for (const tool of this._tools) {
-      if (tool.id === id && tool.group >= 0) {
-        return this._state[tool.group] === tool.id;
-      }
-    }
-    return false;
   }
   registerShortcuts(view: BaseView<any>) {
     for (const tool of this._tools) {
@@ -152,14 +152,11 @@ export class ToolBar extends makeEventTarget(Object)<{
           ImGui.Button('##vsep', new ImGui.ImVec2(1, -1));
           ImGui.PopStyleColor(3);
         } else {
-          let selected: boolean;
-          if (tool.group >= 0) {
-            selected = tool.id === this._state[tool.group];
-            const col = selected ? this._textColorSelected : this._textColorUnselected;
-            ImGui.PushStyleColor(ImGui.Col.Text, col);
-          } else {
-            selected = false;
-          }
+          ImGui.PushStyleColor(
+            ImGui.Col.Text,
+            tool.selected ? this._textColorSelected : this._textColorUnselected
+          );
+          const selected = tool.group >= 0 && tool.id === this._state[tool.group];
           if (ImGui.Button(`${tool.label}##${tool.id}`, this._buttonSize)) {
             if (!selected) {
               this.dispatchEvent('action', tool.id);
@@ -169,11 +166,9 @@ export class ToolBar extends makeEventTarget(Object)<{
             }
           }
           if (tool.tooltip && ImGui.IsItemHovered()) {
-            ImGui.SetTooltip(tool.tooltip);
+            ImGui.SetTooltip(tool.shortcut ? `${tool.tooltip} (${tool.shortcut})` : tool.tooltip);
           }
-          if (tool.group >= 0) {
-            ImGui.PopStyleColor();
-          }
+          ImGui.PopStyleColor();
         }
         ImGui.SameLine();
       }

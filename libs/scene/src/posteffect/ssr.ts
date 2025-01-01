@@ -11,6 +11,7 @@ import {
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { copyTexture, fetchSampler } from '../utility/misc';
 import { BilateralBlurBlitter } from '../blitter/bilateralblur';
+import { debugTexture } from '../utility';
 
 /**
  * SSR post effect
@@ -279,6 +280,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     device.setFramebuffer(intersectFramebuffer);
     this.intersect(ctx, inputColorTexture, sceneDepthTexture, true, false);
     const intersectTex = intersectFramebuffer.getColorAttachments()[0] as Texture2D;
+    //debugTexture(intersectTex, 'SSR_Intersect');
     device.setFramebuffer(pingpongFramebuffer[0]);
     this.resolve(ctx, inputColorTexture, sceneDepthTexture, intersectTex);
     if (ctx.camera.ssrBlurScale > 0 && ctx.camera.ssrBlurKernelSize > 0) {

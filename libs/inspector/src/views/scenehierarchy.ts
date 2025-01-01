@@ -1,7 +1,7 @@
 import { makeEventTarget } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 import type { Scene, SerializableClass, SceneNode } from '@zephyr3d/scene';
-import { nodeSerializationInfo } from '@zephyr3d/scene';
+import { getNodeSerializationInfo } from '@zephyr3d/scene';
 import { DockPannel } from './dockpanel';
 
 export class SceneHierarchy extends makeEventTarget(Object)<{
@@ -27,10 +27,11 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     }
   }
   private renderSceneNode(node: SceneNode) {
+    const serializationInfo = getNodeSerializationInfo(null);
     let cls: SerializableClass = null;
     let ctor = node.constructor;
     while (!cls) {
-      cls = nodeSerializationInfo.get(ctor);
+      cls = serializationInfo.get(ctor);
       ctor = Object.getPrototypeOf(ctor);
     }
     const label = `${node.name || cls.className}##${node.id}`;

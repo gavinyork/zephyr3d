@@ -1,16 +1,18 @@
 import { BatchGroup, type SceneNode } from '../../../scene';
 import type { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
-import { graphNodeClass } from './node';
+import { getGraphNodeClass } from './node';
 
-export const batchGroupClass: SerializableClass<SceneNode> = {
-  ctor: BatchGroup,
-  parent: graphNodeClass,
-  className: 'BatchGroup',
-  createFunc(scene: Scene) {
-    return new BatchGroup(scene);
-  },
-  getProps() {
-    return [];
-  }
-};
+export function getBatchGroupClass(): SerializableClass<SceneNode> {
+  return {
+    ctor: BatchGroup,
+    parent: getGraphNodeClass(),
+    className: 'BatchGroup',
+    createFunc(scene: Scene) {
+      return new BatchGroup(scene);
+    },
+    getProps() {
+      return [];
+    }
+  };
+}

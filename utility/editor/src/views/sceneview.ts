@@ -5,7 +5,7 @@ import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import { Tab } from '../components/tab';
 import type { Camera, Compositor, Scene, SceneNode, SerializableClass } from '@zephyr3d/scene';
-import { Application, nodeSerializationInfo } from '@zephyr3d/scene';
+import { Application, getNodeSerializationInfo } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
@@ -28,8 +28,10 @@ export class SceneView extends EmptyView<SceneModel> {
   private _mousePosX: number;
   private _mousePosY: number;
   private _postGizmoCaptured: boolean;
+  private _serializationInfo: Map<any, SerializableClass<SceneNode>>;
   constructor(model: SceneModel) {
     super(model);
+    this._serializationInfo = getNodeSerializationInfo(null);
     this._transformNode = null;
     this._oldTransform = null;
     this.drawBackground = false;
@@ -135,6 +137,9 @@ export class SceneView extends EmptyView<SceneModel> {
         }
       ]
     };
+  }
+  get toolbar() {
+    return this._toolbar;
   }
   render() {
     super.render();
@@ -352,7 +357,7 @@ export class SceneView extends EmptyView<SceneModel> {
     let cls: SerializableClass = null;
     let ctor = node.constructor;
     while (ctor) {
-      cls = nodeSerializationInfo.get(ctor);
+      cls = this._serializationInfo.get(ctor);
       if (cls) {
         const props = cls.getProps();
         if (props.length > 0) {

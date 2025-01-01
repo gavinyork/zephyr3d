@@ -1,3 +1,4 @@
+export type PropertyUsage = 'texture' | 'texture_2d' | 'texture_cube' | 'model';
 export type PropertyType = 'bool' | 'int' | 'float' | 'vec2' | 'vec3' | 'vec4' | 'string' | 'rgb' | 'rgba';
 export type PropertyValue = {
   num?: number[];
@@ -10,6 +11,7 @@ export type PropertyAccessor<T = unknown> = {
   name: string;
   options?: { minValue: number; maxValue: number; speed: number };
   enum?: { labels: string[]; values: (number | string)[] };
+  usage?: PropertyUsage;
   default?: PropertyValue;
   get(this: T, value: PropertyValue): void;
   set(this: T, value: PropertyValue): void;
@@ -19,7 +21,7 @@ export type SerializableClass<T = unknown> = {
   ctor: any;
   className: string;
   parent?: SerializableClass<T>;
-  createFunc?: (ctx: any) => T;
+  createFunc?: (ctx?: any) => T;
   getProps: () => PropertyAccessor<T>[];
 };
 

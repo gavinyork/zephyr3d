@@ -10,12 +10,18 @@ import {
   SceneNode,
   SpotLight
 } from '../../scene';
-import { batchGroupClass } from './scene/batch';
-import { cameraClass, orthographicCameraClass, perspectiveCameraClass } from './scene/camera';
-import { directionalLightClass, pointLightClass, punctualLightClass, spotLightClass } from './scene/light';
-import { meshNodeClass } from './scene/mesh';
-import { graphNodeClass, sceneNodeClass } from './scene/node';
-import { particleNodeClass } from './scene/particle';
+import { AssetRegistry } from './asset/asset';
+import { getBatchGroupClass } from './scene/batch';
+import { getCameraClass, getOrthoCameraClass, getPerspectiveCameraClass } from './scene/camera';
+import {
+  getDirectionalLightClass,
+  getPointLightClass,
+  getPunctualLightClass,
+  getSpotLightClass
+} from './scene/light';
+import { getMeshClass } from './scene/mesh';
+import { getGraphNodeClass, getSceneNodeClass } from './scene/node';
+import { getParticleNodeClass } from './scene/particle';
 import type { SerializableClass } from './types';
 
 export * from './scene/batch';
@@ -27,19 +33,19 @@ export * from './scene/particle';
 export * from './types';
 export * from './serializer';
 
-const nodeSerializationInfo = new Map<any, SerializableClass<SceneNode>>([
-  [SceneNode, sceneNodeClass],
-  [GraphNode, graphNodeClass],
-  [Mesh, meshNodeClass],
-  [ParticleSystem, particleNodeClass],
-  [PunctualLight, punctualLightClass],
-  [DirectionalLight, directionalLightClass],
-  [SpotLight, spotLightClass],
-  [PointLight, pointLightClass],
-  [Camera, cameraClass],
-  [PerspectiveCamera, perspectiveCameraClass],
-  [OrthoCamera, orthographicCameraClass],
-  [BatchGroup, batchGroupClass]
-]);
-
-export { nodeSerializationInfo };
+export function getNodeSerializationInfo(assetRegistry: AssetRegistry) {
+  return new Map<any, SerializableClass<SceneNode>>([
+    [SceneNode, getSceneNodeClass()],
+    [GraphNode, getGraphNodeClass()],
+    [Mesh, getMeshClass()],
+    [ParticleSystem, getParticleNodeClass()],
+    [PunctualLight, getPunctualLightClass()],
+    [DirectionalLight, getDirectionalLightClass()],
+    [SpotLight, getSpotLightClass()],
+    [PointLight, getPointLightClass()],
+    [Camera, getCameraClass()],
+    [PerspectiveCamera, getPerspectiveCameraClass()],
+    [OrthoCamera, getOrthoCameraClass()],
+    [BatchGroup, getBatchGroupClass()]
+  ]);
+}

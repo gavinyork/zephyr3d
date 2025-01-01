@@ -44,9 +44,6 @@ export class SceneController extends BaseController<SceneModel> {
       case 'REDO':
         this._cmdManager.redo();
         break;
-      case 'REDO':
-        alert('Not implemented');
-        break;
       case 'TRANSLATE':
         console.log('Translate');
         break;
@@ -90,5 +87,7 @@ export class SceneController extends BaseController<SceneModel> {
   }
   private update() {
     this.model.camera.updateController();
+    this._view.toolbar.selectTool('UNDO', this._cmdManager.canUndo());
+    this._view.toolbar.selectTool('REDO', this._cmdManager.canRedo());
   }
 }
