@@ -55,7 +55,6 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
     mixinPBRCommon,
     mixinLight,
     mixinTextureProps('metallicRoughness'),
-    mixinTextureProps('occlusion'),
     mixinTextureProps('specular'),
     mixinTextureProps('specularColor')
   );

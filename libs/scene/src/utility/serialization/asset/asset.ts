@@ -10,6 +10,7 @@ export type AssetInfo = {
   path: string;
   manager: AssetManager;
   allocated: Set<any>;
+  textureOptions?: TextureFetchOptions<any>;
 };
 
 export class AssetRegistry {

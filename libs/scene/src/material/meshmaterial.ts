@@ -268,7 +268,10 @@ export class MeshMaterial extends Material {
   get drawContext(): DrawContext {
     return this._ctx;
   }
-  /** Current material pass */
+  /**
+   * Current material pass
+   * @internal
+   **/
   get pass(): number {
     return this._materialPass;
   }
@@ -567,15 +570,8 @@ export class MeshMaterial extends Material {
         });
       }
     });
-    /*
-    if (program) {
-      console.log(program.getShaderSource('vertex'));
-      console.log(program.getShaderSource('fragment'));
-    }
-    */
     return program;
   }
-  doAlphaTest(scope: PBInsideFunctionScope, color: PBShaderExp) {}
   /**
    * Calculate final fragment color for output.
    *
