@@ -4,7 +4,7 @@ import { BaseController } from './basecontroller';
 import type { BaseModel } from '../models/basemodel';
 import { Dialog } from '../views/dlg/dlg';
 import { Database, type SceneInfo } from '../storage/db';
-import { EmptyView } from '../views/emptyview';
+import type { EmptyView } from '../views/emptyview';
 
 export class EmptyController<T extends BaseModel> extends BaseController<T> {
   private _view: EmptyView<null>;

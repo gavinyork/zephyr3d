@@ -3,7 +3,7 @@ import { AssetManager, type ModelFetchOptions, type TextureFetchOptions } from '
 import type { Scene } from '../../../scene';
 import type { Texture2D, TextureCube } from '@zephyr3d/device';
 
-export type AssetType = 'model' | 'texture_2d' | 'texture_cube';
+export type AssetType = 'model' | 'texture';
 export type AssetInfo = {
   name: string;
   type: AssetType;
@@ -51,7 +51,7 @@ export class AssetRegistry {
     request?: HttpRequest
   ) {
     const info = this._assetMap.get(name);
-    if (!info || (info.type !== 'texture_2d' && info.type !== 'texture_cube')) {
+    if (!info || info.type !== 'texture') {
       return null;
     }
     const texture = await info.manager.fetchTexture<T>(info.path, options, request);

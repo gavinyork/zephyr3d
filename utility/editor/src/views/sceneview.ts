@@ -5,14 +5,14 @@ import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import { Tab } from '../components/tab';
 import type { Camera, Compositor, Scene, SceneNode, SerializableClass } from '@zephyr3d/scene';
-import { Application, getNodeSerializationInfo } from '@zephyr3d/scene';
+import { Application, getSerializationInfo } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import type { AssetInfo } from '../storage/db';
-import { ModelAsset } from '../helpers/model';
+import { AssetStore } from '../helpers/assetstore';
 import { Dialog } from './dlg/dlg';
 import { renderTextureViewer } from '../components/textureviewer';
 
@@ -31,7 +31,6 @@ export class SceneView extends EmptyView<SceneModel> {
   private _serializationInfo: Map<any, SerializableClass<SceneNode>>;
   constructor(model: SceneModel) {
     super(model);
-    this._serializationInfo = getNodeSerializationInfo(null);
     this._transformNode = null;
     this._oldTransform = null;
     this.drawBackground = false;
@@ -98,6 +97,7 @@ export class SceneView extends EmptyView<SceneModel> {
       this.menubar.height + this._toolbar.height,
       this.statusbar.height
     );
+    this._serializationInfo = getSerializationInfo(this._tab.assetHierarchy.assetRegistry);
     this._propGrid = new PropertyEditor(
       this.menubar.height + this._toolbar.height,
       this.statusbar.height,
@@ -262,7 +262,7 @@ export class SceneView extends EmptyView<SceneModel> {
         if (ev.type === 'pointerdown') {
           if (ev.button === 2) {
             this._nodeToBePlaced.parent = null;
-            ModelAsset.release(this._nodeToBePlaced);
+            AssetStore.release(this._nodeToBePlaced);
             this._nodeToBePlaced = null;
           } else if (ev.button === 0) {
             this._tab.sceneHierarchy.selectNode(this._nodeToBePlaced);
@@ -390,10 +390,10 @@ export class SceneView extends EmptyView<SceneModel> {
   private handleAddAsset(asset: AssetInfo) {
     console.log(`Add asset ${asset.name}`);
     if (this._nodeToBePlaced) {
-      ModelAsset.release(this._nodeToBePlaced);
+      AssetStore.release(this._nodeToBePlaced);
       this._nodeToBePlaced = null;
     }
-    ModelAsset.fetch(this.model.scene, asset.uuid)
+    AssetStore.fetchModel(this.model.scene, asset.uuid, { enableInstancing: true })
       .then((node) => {
         this._nodeToBePlaced = node.group;
       })

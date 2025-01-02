@@ -1,22 +1,36 @@
 import { ImGui } from '@zephyr3d/imgui';
-import type { AssetInfo, AssetPackage, AssetType } from '../storage/db';
+import type { AssetInfo, AssetPackage } from '../storage/db';
 import { Database } from '../storage/db';
 import { FilePicker } from './filepicker';
 import { DlgProgress } from '../views/dlg/progressdlg';
-import { ModelAsset } from '../helpers/model';
+import { AssetStore } from '../helpers/assetstore';
 import { Dialog } from '../views/dlg/dlg';
 import { enableWorkspaceDragging } from './dragdrop';
 import { eventBus } from '../core/eventbus';
+import type { AssetType, ModelFetchOptions, Scene, TextureFetchOptions } from '@zephyr3d/scene';
+import { AssetRegistry } from '@zephyr3d/scene';
+import type { Texture2D, TextureCube } from '@zephyr3d/device';
+
+class EditorAssetRegistry extends AssetRegistry {
+  async fetchModel(name: string, scene: Scene, options?: ModelFetchOptions) {
+    return AssetStore.fetchModel(scene, name, options);
+  }
+  async fetchTexture<T extends Texture2D | TextureCube>(name: string, options?: TextureFetchOptions<T>) {
+    return AssetStore.fetchTexture<T>(name, options);
+  }
+}
 
 export class AssetHierarchy {
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
   private _assets: { pkg: AssetPackage; assets: AssetInfo[] }[];
   private _selectedAsset: AssetInfo;
   private _zipProgress: DlgProgress;
+  private _assetRegistry: EditorAssetRegistry;
   constructor() {
     this._assets = [];
     this._selectedAsset = null;
     this._zipProgress = null;
+    this._assetRegistry = new EditorAssetRegistry();
     this.listAssets();
   }
   get assets() {
@@ -25,8 +39,12 @@ export class AssetHierarchy {
   get uploadProgress() {
     return this._zipProgress;
   }
+  get assetRegistry() {
+    return this._assetRegistry;
+  }
   render() {
     this.renderAssetGroup('model');
+    this.renderAssetGroup('texture');
   }
   selectAsset(asset: AssetInfo) {
     this._selectedAsset = asset;
@@ -41,6 +59,13 @@ export class AssetHierarchy {
         assets: assetsInPkg
       };
     });
+    for (const assets of this._assets) {
+      for (const asset of assets.assets) {
+        if (!this._assetRegistry.getAssetInfo(asset.uuid)) {
+          this._assetRegistry.registerAsset(asset.uuid, asset.type, asset.uuid);
+        }
+      }
+    }
   }
   async uploadFiles(type: AssetType, zip: Blob, folderName: string, paths: string[]) {
     const blob = await Database.addBlob({
@@ -63,8 +88,10 @@ export class AssetHierarchy {
   async uploadAssetFile(type: AssetType) {
     const files = await FilePicker.chooseFiles(false, '');
     const file = files[0];
-    if (ModelAsset.extensions.findIndex((ext) => file.name.toLowerCase().endsWith(ext)) < 0) {
-      Dialog.messageBox('Error', 'Invalid file type. Only glb, gltf files are supported.');
+    const extensions =
+      type === 'model' ? AssetStore.modelExtensions : type === 'texture' ? AssetStore.textureExtensions : [];
+    if (extensions.findIndex((ext) => file.name.toLowerCase().endsWith(ext)) < 0) {
+      Dialog.messageBox('Error', `Invalid file type. Only ${extensions.join(', ')} files are supported.`);
       return;
     }
     const zip = await this.zipFiles([{ path: file.name, file }]);
@@ -82,7 +109,7 @@ export class AssetHierarchy {
     const fileList = files.map((file) => {
       const path = file.webkitRelativePath.split('/').slice(1).join('/');
       const filename = file.name.toLowerCase();
-      if (ModelAsset.extensions.findIndex((ext) => filename.endsWith(ext)) >= 0) {
+      if (AssetStore.modelExtensions.findIndex((ext) => filename.endsWith(ext)) >= 0) {
         assetFiles.push(path);
       }
       return {
@@ -158,7 +185,7 @@ export class AssetHierarchy {
       if (ImGui.MenuItem('Import file...')) {
         this.uploadAssetFile(type);
       }
-      if (ImGui.MenuItem('Import directory...')) {
+      if (type === 'model' && ImGui.MenuItem('Import directory...')) {
         this.uploadAssetDirectory(type);
       }
       ImGui.EndPopup();
@@ -219,7 +246,7 @@ export class AssetHierarchy {
       }
       ImGui.EndPopup();
     }
-    enableWorkspaceDragging(asset, 'ASSET', asset);
+    enableWorkspaceDragging(asset, `ASSET:${asset.type}`, asset);
     if (isOpen) {
       ImGui.TreePop();
     }

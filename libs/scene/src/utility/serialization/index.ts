@@ -1,5 +1,12 @@
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../camera';
 import {
+  BlinnMaterial,
+  LambertMaterial,
+  PBRMetallicRoughnessMaterial,
+  PBRSpecularGlossinessMaterial,
+  UnlitMaterial
+} from '../../material';
+import {
   BatchGroup,
   DirectionalLight,
   GraphNode,
@@ -7,10 +14,11 @@ import {
   ParticleSystem,
   PointLight,
   PunctualLight,
+  Scene,
   SceneNode,
   SpotLight
 } from '../../scene';
-import { AssetRegistry } from './asset/asset';
+import type { AssetRegistry } from './asset/asset';
 import { getBatchGroupClass } from './scene/batch';
 import { getCameraClass, getOrthoCameraClass, getPerspectiveCameraClass } from './scene/camera';
 import {
@@ -19,11 +27,20 @@ import {
   getPunctualLightClass,
   getSpotLightClass
 } from './scene/light';
+import {
+  getBlinnMaterialClass,
+  getLambertMaterialClass,
+  getPBRMetallicRoughnessMaterialClass,
+  getPBRSpecularGlossinessMaterialClass,
+  getUnlitMaterialClass
+} from './scene/material';
 import { getMeshClass } from './scene/mesh';
 import { getGraphNodeClass, getSceneNodeClass } from './scene/node';
 import { getParticleNodeClass } from './scene/particle';
+import { getSceneClass } from './scene/scene';
 import type { SerializableClass } from './types';
 
+export * from './asset/asset';
 export * from './scene/batch';
 export * from './scene/camera';
 export * from './scene/light';
@@ -33,8 +50,8 @@ export * from './scene/particle';
 export * from './types';
 export * from './serializer';
 
-export function getNodeSerializationInfo(assetRegistry: AssetRegistry) {
-  return new Map<any, SerializableClass<SceneNode>>([
+export function getSerializationInfo(assetRegistry: AssetRegistry) {
+  return new Map<any, SerializableClass<any>>([
     [SceneNode, getSceneNodeClass()],
     [GraphNode, getGraphNodeClass()],
     [Mesh, getMeshClass()],
@@ -46,6 +63,12 @@ export function getNodeSerializationInfo(assetRegistry: AssetRegistry) {
     [Camera, getCameraClass()],
     [PerspectiveCamera, getPerspectiveCameraClass()],
     [OrthoCamera, getOrthoCameraClass()],
-    [BatchGroup, getBatchGroupClass()]
+    [BatchGroup, getBatchGroupClass()],
+    [Scene, getSceneClass(assetRegistry)],
+    [UnlitMaterial, getUnlitMaterialClass(assetRegistry)],
+    [LambertMaterial, getLambertMaterialClass(assetRegistry)],
+    [BlinnMaterial, getBlinnMaterialClass(assetRegistry)],
+    [PBRMetallicRoughnessMaterial, getPBRMetallicRoughnessMaterialClass(assetRegistry)],
+    [PBRSpecularGlossinessMaterial, getPBRSpecularGlossinessMaterialClass(assetRegistry)]
   ]);
 }

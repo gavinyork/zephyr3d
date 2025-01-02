@@ -1,5 +1,6 @@
 import type { SceneNode } from '../../../scene/scene_node';
-import { BaseLight, DirectionalLight, PointLight, PunctualLight, SpotLight } from '../../../scene/light';
+import type { BaseLight } from '../../../scene/light';
+import { DirectionalLight, PointLight, PunctualLight, SpotLight } from '../../../scene/light';
 import type { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
 import { Vector4 } from '@zephyr3d/base';

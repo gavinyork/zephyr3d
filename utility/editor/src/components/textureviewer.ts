@@ -1,4 +1,4 @@
-import { BaseTexture, FrameBuffer, Texture2D } from '@zephyr3d/device';
+import type { BaseTexture, FrameBuffer, Texture2D } from '@zephyr3d/device';
 import { ImGui } from '@zephyr3d/imgui';
 import { Application } from '@zephyr3d/scene';
 import { TextureDrawer } from './texturedrawer';
@@ -15,7 +15,7 @@ let textureLinear = false;
 let textureRepeat = 1;
 let textureGammaCorrect = false;
 let textureDrawMode = 0;
-let textureModes = [
+const textureModes = [
   TextureDrawer.RGBA,
   TextureDrawer.RGB,
   TextureDrawer.R,

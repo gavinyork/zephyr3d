@@ -1,6 +1,6 @@
-import { SkyType } from '../../../render';
+import type { SkyType } from '../../../render';
 import { Scene } from '../../../scene/scene';
-import { AssetRegistry } from '../asset/asset';
+import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
 
 export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass<Scene> {

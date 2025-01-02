@@ -2,7 +2,7 @@ import type { BaseModel } from '../models/basemodel';
 
 export abstract class BaseView<Model extends BaseModel> {
   private _model: Model;
-  private _shortcuts: Map<string, { handler: (shortcut: string) => void, repeatable: boolean }>
+  private _shortcuts: Map<string, { handler: (shortcut: string) => void; repeatable: boolean }>;
   constructor(model: Model) {
     this._model = model;
     this._shortcuts = new Map();
@@ -40,7 +40,8 @@ export abstract class BaseView<Model extends BaseModel> {
       let key: string;
       if (code === 'Space') {
         key = 'Space';
-      } if (code === 'Escape') {
+      }
+      if (code === 'Escape') {
         key = 'Esc';
       } else if (code === 'Slash') {
         key = '/';
@@ -57,7 +58,7 @@ export abstract class BaseView<Model extends BaseModel> {
       } else if (code === 'Backslash') {
         key = '\\';
       } else if (code === 'Quote') {
-        key = '\'';
+        key = "'";
       } else if (code === 'Comma') {
         key = ',';
       } else if (code === 'Period') {

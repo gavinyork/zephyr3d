@@ -12,7 +12,7 @@ import {
 import type { Command } from '../core/command';
 import { Quaternion, Vector3, type GenericConstructor } from '@zephyr3d/base';
 import type { TRS } from '../types';
-import { ModelAsset } from '../helpers/model';
+import { AssetStore } from '../helpers/assetstore';
 import type { AssetInfo } from '../storage/db';
 
 export class AddAssetCommand implements Command {
@@ -34,10 +34,10 @@ export class AddAssetCommand implements Command {
   execute() {
     if (!this._loading) {
       this._loading = true;
-      ModelAsset.fetch(this._scene, this._asset.uuid)
+      AssetStore.fetchModel(this._scene, this._asset.uuid, { enableInstancing: true })
         .then((asset) => {
           if (!this._loading) {
-            ModelAsset.release(asset.group);
+            AssetStore.release(asset.group);
           } else {
             asset.group.position.set(this._position);
             this._loading = false;
@@ -53,7 +53,7 @@ export class AddAssetCommand implements Command {
     this._loading = false;
     if (this._node) {
       this._node.parent = null;
-      ModelAsset.release(this._node);
+      AssetStore.release(this._node);
       this._node = null;
     }
   }

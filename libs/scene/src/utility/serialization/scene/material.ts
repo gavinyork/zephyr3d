@@ -1,6 +1,6 @@
-import { FaceMode, Texture2D } from '@zephyr3d/device';
+import type { FaceMode, Texture2D } from '@zephyr3d/device';
+import type { BlendMode } from '../../../material';
 import {
-  BlendMode,
   BlinnMaterial,
   LambertMaterial,
   MeshMaterial,
@@ -9,12 +9,12 @@ import {
   UnlitMaterial
 } from '../../../material';
 import type { PropertyAccessor, SerializableClass } from '../types';
-import { AssetRegistry } from '../asset/asset';
+import type { AssetRegistry } from '../asset/asset';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 
-type PBRMaterial = PBRMetallicRoughnessMaterial|PBRSpecularGlossinessMaterial;
-type LitPropTypes = LambertMaterial|BlinnMaterial|PBRMaterial
-type UnlitPropTypes = UnlitMaterial|LitPropTypes;
+type PBRMaterial = PBRMetallicRoughnessMaterial | PBRSpecularGlossinessMaterial;
+type LitPropTypes = LambertMaterial | BlinnMaterial | PBRMaterial;
+type UnlitPropTypes = UnlitMaterial | LitPropTypes;
 
 function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMaterial>[] {
   return [
@@ -727,7 +727,7 @@ function getLitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<Lit
         }
       }
     }
-  ]
+  ];
 }
 function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<UnlitPropTypes>[] {
   return [
@@ -918,7 +918,6 @@ export function getBlinnMaterialClass(assetRegistry: AssetRegistry): Serializabl
     }
   };
 }
-
 
 export function getPBRMetallicRoughnessMaterialClass(
   assetRegistry: AssetRegistry

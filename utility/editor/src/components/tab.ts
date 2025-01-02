@@ -19,6 +19,9 @@ export class Tab {
   get sceneHierarchy() {
     return this._sceneHierarchy;
   }
+  get assetHierarchy() {
+    return this._assetHierarchy;
+  }
   render() {
     if (this._panel.begin('##SceneTabPanel')) {
       if (ImGui.BeginTabBar('##SceneTabBar')) {

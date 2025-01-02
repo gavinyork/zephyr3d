@@ -11,7 +11,7 @@ import {
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { copyTexture, fetchSampler } from '../utility/misc';
 import { BilateralBlurBlitter } from '../blitter/bilateralblur';
-import { debugTexture } from '../utility';
+// import { debugTexture } from '../utility';
 
 /**
  * SSR post effect

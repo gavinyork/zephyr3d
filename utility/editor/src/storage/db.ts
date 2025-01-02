@@ -1,7 +1,6 @@
+import type { AssetType } from '@zephyr3d/scene';
 import type { IDBPDatabase } from 'idb';
 import { openDB } from 'idb';
-
-export type AssetType = 'model';
 
 export type AssetPackage = {
   uuid?: string;

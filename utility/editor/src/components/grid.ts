@@ -1,20 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
-
-type PropertyType = 'bool' | 'int' | 'float' | 'vec2' | 'vec3' | 'vec4' | 'string' | 'rgb' | 'rgba';
-type PropertyValue = {
-  num?: number[];
-  str?: string[];
-  bool?: boolean[];
-};
-
-export type PropertyAccessor<T extends {}> = {
-  type: PropertyType;
-  name: string;
-  options?: { minValue: number; maxValue: number; speed: number };
-  enum?: { labels: string[]; values: (number | string)[] };
-  get(this: T, value: PropertyValue): void;
-  set?(this: T, value: PropertyValue): void;
-};
+import type { PropertyAccessor, PropertyValue } from '@zephyr3d/scene';
+import type { AssetInfo } from '../storage/db';
 
 interface Property<T extends {}> {
   path: string;
@@ -286,6 +272,21 @@ export class PropertyEditor<T extends {} = unknown> {
             undefined,
             readonly ? ImGui.InputTextFlags.ReadOnly : undefined
           );
+          if (
+            !changed &&
+            (property.value.usage === 'texture' ||
+              property.value.usage === 'texture_2d' ||
+              property.value.usage === 'texture_cube')
+          ) {
+            if (ImGui.BeginDragDropTarget()) {
+              const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
+              if (payload) {
+                tmpProperty.str[0] = (payload.Data as AssetInfo).uuid;
+                value.set.call(this.object, tmpProperty);
+              }
+              ImGui.EndDragDropTarget();
+            }
+          }
         }
         break;
       }
