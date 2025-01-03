@@ -63,9 +63,6 @@ export class PerspectiveCamera extends Camera {
     return this._fovY;
   }
   set fovY(val: number) {
-    if (val === 0) {
-      debugger;
-    }
     if (val !== this._fovY) {
       this._fovY = val;
       this._invalidate(true);
@@ -85,9 +82,6 @@ export class PerspectiveCamera extends Camera {
    * {@inheritDoc Camera.setPerspective}
    */
   setPerspective(fovY: number, aspect: number, zNear: number, zFar: number): this {
-    if (fovY === 0) {
-      debugger;
-    }
     this._aspect = aspect;
     this._fovY = fovY;
     this._near = zNear;
@@ -110,9 +104,6 @@ export class PerspectiveCamera extends Camera {
    */
   setProjectionMatrix(matrix: Matrix4x4): void {
     if (matrix && matrix !== this._projMatrix && matrix.isPerspective()) {
-      if (matrix.getFov() === 0) {
-        debugger;
-      }
       this._aspect = matrix.getAspect();
       this._fovY = matrix.getFov();
       this._near = matrix.getNearPlane();

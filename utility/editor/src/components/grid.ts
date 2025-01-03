@@ -1,78 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
-import type { PropertyAccessor, PropertyValue, SerializableClass } from '@zephyr3d/scene';
+import { type PropertyAccessor, type PropertyValue, type SerializableClass } from '@zephyr3d/scene';
 import type { DBAssetInfo } from '../storage/db';
-
-interface Property<T extends {}> {
-  path: string;
-  name: string;
-  value: PropertyAccessor<T>;
-}
-
-class PropertyGroup<T extends {}> {
-  grid: PropertyEditor<T>;
-  name: string;
-  value: PropertyValue;
-  property: Property<T>;
-  currentType: number;
-  objectTypes: SerializableClass<any>[];
-  objectTypeNames: string[];
-  properties: Map<string, Property<T>>;
-  subgroups: PropertyGroup<T>[];
-  constructor(name: string, grid: PropertyEditor<T>, object?: any, prop?: PropertyAccessor<T>) {
-    this.grid = grid;
-    this.name = name;
-    this.value = { num: [], str: [], bool: [], object: null };
-    this.property = null;
-    this.currentType = -1;
-    this.objectTypes = [];
-    this.objectTypeNames = [];
-    this.properties = new Map();
-    this.subgroups = [];
-    if (prop) {
-      if (prop.type === 'object' && prop.objectTypes?.length > 0) {
-        this.property = {
-          path: `${this.name}/${prop.name}`,
-          name: prop.name,
-          value: prop
-        };
-        for (const t of prop.objectTypes) {
-          const cls = this.grid.serailizationInfo.get(t);
-          if (cls) {
-            this.objectTypes.push(cls);
-            this.objectTypeNames.push(cls.className);
-          }
-        }
-      }
-    }
-    this.object = object ?? null;
-  }
-  addProperty<U extends T>(value: PropertyAccessor<U>) {
-    if (value.type === 'object' && value.objectTypes?.length > 0) {
-      this.addGroup(value.name, value);
-    } else {
-      const property: Property<T> = {
-        path: `${this.name}/${value.name}`,
-        name: value.name,
-        value
-      };
-      value.get.call(this.object, this.value);
-      this.properties.set(value.name, property);
-    }
-  }
-  addGroup(name: string, object?: any, prop?: PropertyAccessor<T>) {
-    const group = new PropertyGroup(name, this.grid, object, prop);
-    this.subgroups.push(group);
-    return group;
-  }
-  get object() {
-    return this.value.object;
-  }
-  set object(obj: any) {
-    if (this.value.object !== obj) {
-      this.value.object = obj ?? null;
-    }
-  }
-}
 
 const tmpProperty: PropertyValue = {
   num: [0, 0, 0, 0],
@@ -81,8 +9,106 @@ const tmpProperty: PropertyValue = {
   object: null
 };
 
+interface Property<T extends {}> {
+  path: string;
+  name: string;
+  value: PropertyAccessor<T>;
+}
+
+class PropertyGroup {
+  grid: PropertyEditor<any>;
+  name: string;
+  value: PropertyValue;
+  parent: PropertyGroup;
+  property: Property<any>;
+  currentType: number;
+  objectTypes: SerializableClass<any>[];
+  objectTypeNames: string[];
+  properties: Map<string, Property<any>>;
+  subgroups: PropertyGroup[];
+  constructor(name: string, grid: PropertyEditor<any>) {
+    this.grid = grid;
+    this.name = name;
+    this.parent = null;
+    this.value = { num: [], str: [], bool: [], object: null };
+    this.property = null;
+    this.currentType = -1;
+    this.objectTypes = [];
+    this.objectTypeNames = [];
+    this.properties = new Map();
+    this.subgroups = [];
+  }
+  addProperty(obj: any, value: PropertyAccessor<any>) {
+    if (value.type === 'object' && value.objectTypes?.length > 0) {
+      const propGroup = this.addGroup(value.name);
+      value.get.call(obj, tmpProperty);
+      propGroup.setObject(tmpProperty.object);
+    } else {
+      const property: Property<any> = {
+        path: `${this.name}/${value.name}`,
+        name: value.name,
+        value
+      };
+      value.get.call(obj, this.value);
+      this.properties.set(value.name, property);
+    }
+  }
+  addGroup(name: string) {
+    const group = new PropertyGroup(name, this.grid);
+    group.parent = this;
+    this.subgroups.push(group);
+    return group;
+  }
+  getObject() {
+    let group: PropertyGroup = this;
+    while (group) {
+      if (group.value.object) {
+        return group.value.object;
+      }
+      group = group.parent;
+    }
+    return null;
+  }
+  setObject(obj: any, objTypes?: unknown[]) {
+    if (this.value.object !== obj) {
+      const serializationInfo = this.grid.serailizationInfo;
+      this.value.object = obj ?? null;
+      this.property = null;
+      this.currentType = -1;
+      this.objectTypes =
+        objTypes?.map((ctor) => {
+          let s: SerializableClass<any>;
+          while (ctor) {
+            s = serializationInfo.get(ctor);
+          }
+          return s;
+        }) ?? [];
+      this.objectTypeNames = this.objectTypes.map((t) => t.className);
+      this.properties = new Map();
+      this.subgroups = [];
+      if (this.value.object) {
+        let cls: SerializableClass = null;
+        let ctor = this.value.object.constructor;
+        while (ctor) {
+          cls = serializationInfo.get(ctor);
+          if (cls) {
+            const props = cls.getProps(this.value.object);
+            if (props.length > 0) {
+              const group = this.addGroup(cls.className);
+              for (const prop of cls.getProps(this.value.object)) {
+                group.addProperty(this.value.object, prop);
+              }
+            }
+          }
+          ctor = Object.getPrototypeOf(ctor);
+        }
+      }
+    }
+  }
+}
+
 export class PropertyEditor<T extends {} = unknown> {
-  private _rootGroup: PropertyGroup<T>;
+  private _rootGroup: PropertyGroup;
   private _top: number;
   private _bottom: number;
   private _width: number;
@@ -120,27 +146,7 @@ export class PropertyEditor<T extends {} = unknown> {
     return this._object;
   }
   set object(value: T) {
-    if (this._object !== value) {
-      this._object = value;
-      this.clear();
-      if (this._object) {
-        let cls: SerializableClass = null;
-        let ctor = value.constructor;
-        while (ctor) {
-          cls = this._serializationInfo.get(ctor);
-          if (cls) {
-            const props = cls.getProps(value);
-            if (props.length > 0) {
-              const group = this._rootGroup.addGroup(cls.className, value);
-              for (const prop of cls.getProps(value)) {
-                group.addProperty(prop);
-              }
-            }
-          }
-          ctor = Object.getPrototypeOf(ctor);
-        }
-      }
-    }
+    this._rootGroup.setObject(value);
   }
   get width(): number {
     return this._width;
@@ -231,7 +237,7 @@ export class PropertyEditor<T extends {} = unknown> {
       ImGui.SetMouseCursor(ImGui.MouseCursor.ResizeEW);
     }
   }
-  private renderGroup(group: PropertyGroup<T>, level = 0) {
+  private renderGroup(group: PropertyGroup, level = 0) {
     let opened = false;
     const propLevel = group === this._rootGroup ? 0 : level + 1;
     if (group !== this._rootGroup) {
@@ -249,10 +255,10 @@ export class PropertyEditor<T extends {} = unknown> {
       }
       //ImGui.TableNextColumn();
     }
-    for (const property of group.properties) {
-      this.renderProperty(property[1], propLevel, group.object);
-    }
     if (opened) {
+      for (const property of group.properties) {
+        this.renderProperty(property[1], propLevel, group.getObject());
+      }
       ImGui.TreePop();
     }
     for (const subgroup of group.subgroups) {

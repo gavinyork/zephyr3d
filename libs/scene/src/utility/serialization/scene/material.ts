@@ -57,8 +57,8 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       usage: 'texture_2d',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.occlusionTexture.name;
-        value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+        const name = this.occlusionTexture?.name ?? '';
+        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
       },
       set(this: PBRMaterial, value) {
         if (value.str[0]?.startsWith('ASSET:')) {
@@ -118,8 +118,8 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       usage: 'texture_2d',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.emissiveTexture.name;
-        value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+        const name = this.emissiveTexture?.name ?? '';
+        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
       },
       set(this: PBRMaterial, value) {
         if (value.str[0]?.startsWith('ASSET:')) {
@@ -169,8 +169,8 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       usage: 'texture_2d',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.specularTexture.name;
-        value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+        const name = this.specularTexture?.name ?? '';
+        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
       },
       set(this: PBRMaterial, value) {
         if (value.str[0]?.startsWith('ASSET:')) {
@@ -228,8 +228,8 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       usage: 'texture_2d',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.transmissionTexture.name;
-        value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+        const name = this.transmissionTexture?.name ?? '';
+        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
       },
       set(this: PBRMaterial, value) {
         if (value.str[0]?.startsWith('ASSET:')) {
@@ -276,8 +276,8 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       usage: 'texture_2d',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.thicknessTexture.name;
-        value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+        const name = this.thicknessTexture?.name ?? '';
+        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
       },
       set(this: PBRMaterial, value) {
         if (value.str[0]?.startsWith('ASSET:')) {
@@ -359,8 +359,8 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       usage: 'texture_2d',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.iridescenceTexture.name;
-        value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+        const name = this.iridescenceTexture?.name ?? '';
+        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
       },
       set(this: PBRMaterial, value) {
         if (value.str[0]?.startsWith('ASSET:')) {
@@ -429,8 +429,8 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       usage: 'texture_2d',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.iridescenceThicknessTexture.name;
-        value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+        const name = this.iridescenceThicknessTexture?.name ?? '';
+        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
       },
       set(this: PBRMaterial, value) {
         if (value.str[0]?.startsWith('ASSET:')) {
@@ -488,8 +488,8 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       usage: 'texture_2d',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.clearcoatIntensityTexture.name;
-        value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+        const name = this.clearcoatIntensityTexture?.name ?? '';
+        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
       },
       set(this: PBRMaterial, value) {
         if (value.str[0]?.startsWith('ASSET:')) {
@@ -536,8 +536,8 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       usage: 'texture_2d',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.clearcoatRoughnessTexture.name;
-        value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+        const name = this.clearcoatRoughnessTexture?.name ?? '';
+        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
       },
       set(this: PBRMaterial, value) {
         if (value.str[0]?.startsWith('ASSET:')) {
@@ -584,8 +584,8 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       usage: 'texture_2d',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.clearcoatNormalTexture.name;
-        value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+        const name = this.clearcoatNormalTexture?.name ?? '';
+        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
       },
       set(this: PBRMaterial, value) {
         if (value.str[0]?.startsWith('ASSET:')) {
@@ -645,8 +645,8 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       usage: 'texture_2d',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.sheenColorTexture.name;
-        value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+        const name = this.sheenColorTexture?.name ?? '';
+        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
       },
       set(this: PBRMaterial, value) {
         if (value.str[0]?.startsWith('ASSET:')) {
@@ -693,8 +693,8 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       usage: 'texture_2d',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.sheenRoughnessTexture.name;
-        value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+        const name = this.sheenRoughnessTexture?.name ?? '';
+        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
       },
       set(this: PBRMaterial, value) {
         if (value.str[0]?.startsWith('ASSET:')) {
@@ -759,8 +759,8 @@ function getLitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<Lit
       usage: 'texture_2d',
       default: { str: [''] },
       get(this: LitPropTypes, value) {
-        const name = this.normalTexture.name;
-        value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+        const name = this.normalTexture?.name ?? '';
+        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
       },
       set(this: LitPropTypes, value) {
         if (value.str[0]?.startsWith('ASSET:')) {
@@ -826,8 +826,8 @@ function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<U
       usage: 'texture_2d',
       default: { str: [''] },
       get(this: UnlitPropTypes, value) {
-        const name = this.albedoTexture.name;
-        value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+        const name = this.albedoTexture?.name ?? '';
+        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
       },
       set(this: UnlitPropTypes, value) {
         if (value.str[0]?.startsWith('ASSET:')) {
@@ -1026,8 +1026,8 @@ export function getPBRMetallicRoughnessMaterialClass(
           usage: 'texture_2d',
           default: { str: [''] },
           get(this: PBRMetallicRoughnessMaterial, value) {
-            const name = this.metallicRoughnessTexture.name;
-            value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+            const name = this.metallicRoughnessTexture?.name ?? '';
+            value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
           },
           set(this: PBRMetallicRoughnessMaterial, value) {
             if (value.str[0]?.startsWith('ASSET:')) {
@@ -1063,8 +1063,8 @@ export function getPBRMetallicRoughnessMaterialClass(
           usage: 'texture_2d',
           default: { str: [''] },
           get(this: PBRMetallicRoughnessMaterial, value) {
-            const name = this.specularColorTexture.name;
-            value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
+            const name = this.specularColorTexture?.name ?? '';
+            value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
           },
           set(this: PBRMetallicRoughnessMaterial, value) {
             if (value.str[0]?.startsWith('ASSET:')) {

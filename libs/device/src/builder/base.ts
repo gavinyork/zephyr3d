@@ -229,9 +229,6 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
   }
   set $group(val: number) {
     this.$_group = val;
-    if (this.$_group === undefined) {
-      debugger;
-    }
   }
   /**
    * Point out that the variable should be in uniform address space
