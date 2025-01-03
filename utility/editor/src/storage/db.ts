@@ -2,7 +2,7 @@ import type { AssetType } from '@zephyr3d/scene';
 import type { IDBPDatabase } from 'idb';
 import { openDB } from 'idb';
 
-export type AssetPackage = {
+export type DBAssetPackage = {
   uuid?: string;
   name: string;
   blob: string;
@@ -10,22 +10,23 @@ export type AssetPackage = {
   metadata?: object;
 };
 
-export type AssetBlob = {
+export type DBAssetBlob = {
   uuid?: string;
   mimeType?: string;
   data: Blob;
 };
 
-export type AssetInfo = {
+export type DBAssetInfo = {
   uuid?: string;
   name: string;
   path: string;
+  thumbnail: string;
   type: AssetType;
   pkg: string;
   metadata?: object;
 };
 
-export type SceneInfo = {
+export type DBSceneInfo = {
   uuid?: string;
   name: string;
   content: object;
@@ -57,9 +58,9 @@ export class Database {
   static randomUUID() {
     return crypto.randomUUID();
   }
-  static async addPackage(pkg: AssetPackage) {
-    const { name, blob, size, metadata } = pkg;
-    const uuid = this.randomUUID();
+  static async putPackage(pkg: DBAssetPackage) {
+    pkg.uuid = pkg.uuid ?? this.randomUUID();
+    const { uuid, name, blob, size, metadata } = pkg;
     await this.instance.put(this.DB_NAME_PACKAGES, {
       uuid,
       name,
@@ -69,7 +70,7 @@ export class Database {
     });
     return uuid;
   }
-  static async getPackage(uuid: string): Promise<AssetPackage> {
+  static async getPackage(uuid: string): Promise<DBAssetPackage> {
     const pkg = await this.instance.get(this.DB_NAME_PACKAGES, uuid);
     return pkg
       ? {
@@ -90,7 +91,7 @@ export class Database {
       return false;
     }
   }
-  static async listPackages(): Promise<AssetPackage[]> {
+  static async listPackages(): Promise<DBAssetPackage[]> {
     try {
       const packages = await this.instance.getAll(this.DB_NAME_PACKAGES);
       return packages.map((pkg) => ({
@@ -105,17 +106,17 @@ export class Database {
       return [];
     }
   }
-  static async addBlob(blob: AssetBlob) {
-    const uuid = this.randomUUID();
+  static async putBlob(blob: DBAssetBlob) {
+    blob.uuid = blob.uuid ?? this.randomUUID();
     const arrayBuffer = await blob.data.arrayBuffer();
     await this.instance.put(this.DB_NAME_BLOBS, {
-      uuid,
+      uuid: blob.uuid,
       type: blob.mimeType ?? blob.data.type,
       data: arrayBuffer
     });
-    return uuid;
+    return blob.uuid;
   }
-  static async getBlob(uuid: string): Promise<AssetBlob> {
+  static async getBlob(uuid: string): Promise<DBAssetBlob> {
     const blob = await this.instance.get(this.DB_NAME_BLOBS, uuid);
     return blob
       ? {
@@ -155,14 +156,15 @@ export class Database {
       return false;
     }
   }
-  static async addAsset(asset: AssetInfo) {
-    const { name, type, path, pkg, metadata } = asset;
-    const uuid = this.randomUUID();
+  static async pubAsset(asset: DBAssetInfo) {
+    asset.uuid = asset.uuid ?? this.randomUUID();
+    const { uuid, name, type, path, thumbnail, pkg, metadata } = asset;
     await this.instance.put(this.DB_NAME_ASSETS, {
       uuid,
       name,
       path,
       type,
+      thumbnail,
       pkg,
       metadata: JSON.stringify(metadata ?? {})
     });
@@ -177,7 +179,7 @@ export class Database {
       return false;
     }
   }
-  static async getAsset(uuid: string): Promise<AssetInfo> {
+  static async getAsset(uuid: string): Promise<DBAssetInfo> {
     const asset = await this.instance.get(this.DB_NAME_ASSETS, uuid);
     return asset
       ? {
@@ -186,11 +188,12 @@ export class Database {
           type: asset.type,
           pkg: asset.pkg,
           path: asset.path,
+          thumbnail: asset.thumbnail,
           metadata: JSON.parse(asset.metadata)
         }
       : null;
   }
-  static async listAssets(type?: string): Promise<AssetInfo[]> {
+  static async listAssets(type?: string): Promise<DBAssetInfo[]> {
     try {
       let assets: any[];
       if (type) {
@@ -205,6 +208,7 @@ export class Database {
         type: asset.type,
         pkg: asset.pkg,
         path: asset.path,
+        thumbnail: asset.thumbnail,
         metadata: JSON.parse(asset.metadata)
       }));
     } catch (error) {
@@ -212,9 +216,9 @@ export class Database {
       return [];
     }
   }
-  static async addScene(scene: SceneInfo) {
-    const { name, content, metadata } = scene;
-    const uuid = this.randomUUID();
+  static async putScene(scene: DBSceneInfo) {
+    scene.uuid = scene.uuid ?? this.randomUUID();
+    const { uuid, name, content, metadata } = scene;
     await this.instance.put(this.DB_NAME_SCENES, {
       uuid,
       name,
@@ -222,25 +226,6 @@ export class Database {
       metadata: JSON.stringify(metadata ?? {})
     });
     return uuid;
-  }
-  static async updateScene(scene: SceneInfo): Promise<boolean> {
-    try {
-      const sceneinfo = await this.getScene(scene.uuid);
-      if (!sceneinfo) {
-        return false;
-      }
-      const updatedScene = {
-        ...sceneinfo,
-        ...scene,
-        content: scene.content ? JSON.stringify(scene.content) : scene.content,
-        metadata: scene.metadata ? JSON.stringify(scene.metadata) : scene.metadata
-      };
-      await this.instance.put(this.DB_NAME_SCENES, updatedScene);
-      return true;
-    } catch (error) {
-      console.error('Error updating scene:', error);
-      return false;
-    }
   }
   static async getScene(uuid: string) {
     try {

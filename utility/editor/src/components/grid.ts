@@ -1,6 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
-import type { PropertyAccessor, PropertyValue } from '@zephyr3d/scene';
-import type { AssetInfo } from '../storage/db';
+import type { PropertyAccessor, PropertyValue, SerializableClass } from '@zephyr3d/scene';
+import type { DBAssetInfo } from '../storage/db';
 
 interface Property<T extends {}> {
   path: string;
@@ -9,21 +9,76 @@ interface Property<T extends {}> {
 }
 
 class PropertyGroup<T extends {}> {
+  grid: PropertyEditor<T>;
   name: string;
+  value: PropertyValue;
+  property: Property<T>;
+  currentType: number;
+  objectTypes: SerializableClass<any>[];
+  objectTypeNames: string[];
   properties: Map<string, Property<T>>;
   subgroups: PropertyGroup<T>[];
-
-  constructor(name: string) {
+  constructor(name: string, grid: PropertyEditor<T>, object?: any, prop?: PropertyAccessor<T>) {
+    this.grid = grid;
     this.name = name;
+    this.value = { num: [], str: [], bool: [], object: null };
+    this.property = null;
+    this.currentType = -1;
+    this.objectTypes = [];
+    this.objectTypeNames = [];
     this.properties = new Map();
     this.subgroups = [];
+    if (prop) {
+      if (prop.type === 'object' && prop.objectTypes?.length > 0) {
+        this.property = {
+          path: `${this.name}/${prop.name}`,
+          name: prop.name,
+          value: prop
+        };
+        for (const t of prop.objectTypes) {
+          const cls = this.grid.serailizationInfo.get(t);
+          if (cls) {
+            this.objectTypes.push(cls);
+            this.objectTypeNames.push(cls.className);
+          }
+        }
+      }
+    }
+    this.object = object ?? null;
+  }
+  addProperty<U extends T>(value: PropertyAccessor<U>) {
+    if (value.type === 'object' && value.objectTypes?.length > 0) {
+      this.addGroup(value.name, value);
+    } else {
+      const property: Property<T> = {
+        path: `${this.name}/${value.name}`,
+        name: value.name,
+        value
+      };
+      value.get.call(this.object, this.value);
+      this.properties.set(value.name, property);
+    }
+  }
+  addGroup(name: string, object?: any, prop?: PropertyAccessor<T>) {
+    const group = new PropertyGroup(name, this.grid, object, prop);
+    this.subgroups.push(group);
+    return group;
+  }
+  get object() {
+    return this.value.object;
+  }
+  set object(obj: any) {
+    if (this.value.object !== obj) {
+      this.value.object = obj ?? null;
+    }
   }
 }
 
 const tmpProperty: PropertyValue = {
   num: [0, 0, 0, 0],
   str: [''],
-  bool: [false]
+  bool: [false],
+  object: null
 };
 
 export class PropertyEditor<T extends {} = unknown> {
@@ -36,8 +91,9 @@ export class PropertyEditor<T extends {} = unknown> {
   private _padding: number;
   private _labelPercent: number;
   private _object: T;
-  private _groupStack: PropertyGroup<T>[];
+  private _serializationInfo: Map<any, SerializableClass<any>>;
   constructor(
+    serializationInfo: Map<any, SerializableClass<any>>,
     top: number,
     bottom: number,
     width: number,
@@ -46,7 +102,8 @@ export class PropertyEditor<T extends {} = unknown> {
     minWidth: number,
     labelPercent = 0.4
   ) {
-    this._rootGroup = new PropertyGroup('Root');
+    this._serializationInfo = serializationInfo;
+    this._rootGroup = new PropertyGroup('Root', this);
     this._top = top;
     this._bottom = bottom;
     this._width = width;
@@ -54,40 +111,42 @@ export class PropertyEditor<T extends {} = unknown> {
     this._minWidth = minWidth;
     this._padding = padding;
     this._labelPercent = labelPercent;
-    this._groupStack = [this._rootGroup];
     this._object = null;
+  }
+  get serailizationInfo(): Map<any, SerializableClass<any>> {
+    return this._serializationInfo;
   }
   get object(): T {
     return this._object;
   }
   set object(value: T) {
-    this._object = value;
+    if (this._object !== value) {
+      this._object = value;
+      this.clear();
+      if (this._object) {
+        let cls: SerializableClass = null;
+        let ctor = value.constructor;
+        while (ctor) {
+          cls = this._serializationInfo.get(ctor);
+          if (cls) {
+            const props = cls.getProps(value);
+            if (props.length > 0) {
+              const group = this._rootGroup.addGroup(cls.className, value);
+              for (const prop of cls.getProps(value)) {
+                group.addProperty(prop);
+              }
+            }
+          }
+          ctor = Object.getPrototypeOf(ctor);
+        }
+      }
+    }
   }
   get width(): number {
     return this._width;
   }
-  beginGroup(name: string) {
-    const newGroup = new PropertyGroup(name);
-    const currentGroup = this._groupStack[this._groupStack.length - 1];
-    currentGroup.subgroups.push(newGroup);
-    this._groupStack.push(newGroup);
-  }
-  endGroup() {
-    if (this._groupStack.length > 1) {
-      this._groupStack.pop();
-    }
-  }
-  addProperty<U extends T>(value: PropertyAccessor<U>) {
-    const property: Property<T> = {
-      path: `${this._groupStack.map((g) => g.name).join('/')}/${value.name}`,
-      name: value.name,
-      value
-    };
-    this._groupStack[this._groupStack.length - 1].properties.set(value.name, property);
-  }
   clear() {
-    this._rootGroup = new PropertyGroup('Root');
-    this._groupStack = [this._rootGroup];
+    this._rootGroup = new PropertyGroup('Root', this);
   }
   render() {
     const displaySize = ImGui.GetIO().DisplaySize;
@@ -173,10 +232,32 @@ export class PropertyEditor<T extends {} = unknown> {
     }
   }
   private renderGroup(group: PropertyGroup<T>, level = 0) {
+    let opened = false;
+    const propLevel = group === this._rootGroup ? 0 : level + 1;
+    if (group !== this._rootGroup) {
+      ImGui.TableNextRow();
+      ImGui.TableNextColumn();
+      const flags = ImGui.TreeNodeFlags.DefaultOpen | ImGui.TreeNodeFlags.SpanFullWidth;
+      if (level > 0) {
+        ImGui.Indent(level * 10);
+      }
+      opened = ImGui.TreeNodeEx(group.name, flags);
+      if (level > 0) {
+        ImGui.Unindent(level * 10);
+      }
+      if (group.objectTypes.length > 0) {
+      }
+      //ImGui.TableNextColumn();
+    }
     for (const property of group.properties) {
-      this.renderProperty(property[1], level);
+      this.renderProperty(property[1], propLevel, group.object);
+    }
+    if (opened) {
+      ImGui.TreePop();
     }
     for (const subgroup of group.subgroups) {
+      this.renderGroup(subgroup, group === this._rootGroup ? 0 : level + 1);
+      /*
       ImGui.TableNextRow();
       ImGui.TableNextColumn();
       const flags = ImGui.TreeNodeFlags.DefaultOpen | ImGui.TreeNodeFlags.SpanFullWidth;
@@ -188,13 +269,15 @@ export class PropertyEditor<T extends {} = unknown> {
         ImGui.Unindent(level * 10);
       }
       ImGui.TableNextColumn();
+      ImGui.Combo('Type##TestCombo', [0], ['TestCombo', 'TestCombo2']);
       if (opened) {
         this.renderGroup(subgroup, level + 1);
         ImGui.TreePop();
       }
+      */
     }
   }
-  private renderProperty(property: Property<T>, level: number) {
+  private renderProperty(property: Property<T>, level: number, object?: any) {
     const { name, value } = property;
     ImGui.PushID(property.path);
     ImGui.TableNextRow();
@@ -211,7 +294,8 @@ export class PropertyEditor<T extends {} = unknown> {
     ImGui.SetNextItemWidth(-1); // 使用剩余所有宽度
     const readonly = !value.set;
     let changed = false;
-    value.get.call(this._object, tmpProperty);
+    object = object ?? this._object;
+    value.get.call(object, tmpProperty);
     switch (value.type) {
       case 'bool': {
         const val = tmpProperty.bool as [boolean];
@@ -281,8 +365,8 @@ export class PropertyEditor<T extends {} = unknown> {
             if (ImGui.BeginDragDropTarget()) {
               const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
               if (payload) {
-                tmpProperty.str[0] = (payload.Data as AssetInfo).uuid;
-                value.set.call(this.object, tmpProperty);
+                tmpProperty.str[0] = (payload.Data as DBAssetInfo).uuid;
+                value.set.call(object, tmpProperty);
               }
               ImGui.EndDragDropTarget();
             }
@@ -332,7 +416,7 @@ export class PropertyEditor<T extends {} = unknown> {
       }
     }
     if (changed && value.set) {
-      value.set.call(this.object, tmpProperty);
+      value.set.call(object, tmpProperty);
     }
     ImGui.PopID();
   }

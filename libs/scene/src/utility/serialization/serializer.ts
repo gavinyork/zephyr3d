@@ -6,7 +6,7 @@ export function deserializeObjectProps<T>(obj: T, cls: SerializableClass<T>, jso
     str: [''],
     bool: [false]
   };
-  const props = cls.getProps() ?? [];
+  const props = cls.getProps(obj) ?? [];
   for (const prop of props) {
     const k = prop.name;
     const v = json[k];
@@ -59,7 +59,7 @@ export function serializeObjectProps<T>(obj: T, cls: SerializableClass<T>, json:
     str: [''],
     bool: [false]
   };
-  const props = cls.getProps() ?? [];
+  const props = cls.getProps(obj) ?? [];
   for (const prop of props) {
     const k = prop.name;
     prop.get.call(obj, tmpVal);

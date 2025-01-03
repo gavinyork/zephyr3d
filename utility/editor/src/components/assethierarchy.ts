@@ -1,5 +1,5 @@
 import { ImGui } from '@zephyr3d/imgui';
-import type { AssetInfo, AssetPackage } from '../storage/db';
+import type { DBAssetInfo, DBAssetPackage } from '../storage/db';
 import { Database } from '../storage/db';
 import { FilePicker } from './filepicker';
 import { DlgProgress } from '../views/dlg/progressdlg';
@@ -22,8 +22,8 @@ class EditorAssetRegistry extends AssetRegistry {
 
 export class AssetHierarchy {
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
-  private _assets: { pkg: AssetPackage; assets: AssetInfo[] }[];
-  private _selectedAsset: AssetInfo;
+  private _assets: { pkg: DBAssetPackage; assets: DBAssetInfo[] }[];
+  private _selectedAsset: DBAssetInfo;
   private _zipProgress: DlgProgress;
   private _assetRegistry: EditorAssetRegistry;
   constructor() {
@@ -46,7 +46,7 @@ export class AssetHierarchy {
     this.renderAssetGroup('model');
     this.renderAssetGroup('texture');
   }
-  selectAsset(asset: AssetInfo) {
+  selectAsset(asset: DBAssetInfo) {
     this._selectedAsset = asset;
   }
   async listAssets() {
@@ -68,18 +68,19 @@ export class AssetHierarchy {
     }
   }
   async uploadFiles(type: AssetType, zip: Blob, folderName: string, paths: string[]) {
-    const blob = await Database.addBlob({
+    const blob = await Database.putBlob({
       data: zip
     });
-    const pkg = await Database.addPackage({
+    const pkg = await Database.putPackage({
       blob,
       name: folderName,
       size: zip.size
     });
     for (const path of paths) {
-      await Database.addAsset({
+      await Database.pubAsset({
         name: path.split('/').pop(),
         path: path,
+        thumbnail: '',
         type,
         pkg
       });
@@ -166,7 +167,7 @@ export class AssetHierarchy {
       });
     });
   }
-  deleteAsset(asset: AssetInfo) {
+  deleteAsset(asset: DBAssetInfo) {
     if (this._selectedAsset === asset) {
       this._selectedAsset = null;
     }
@@ -215,7 +216,7 @@ export class AssetHierarchy {
     }
     ImGui.PopID();
   }
-  private renderAsset(asset: AssetInfo) {
+  private renderAsset(asset: DBAssetInfo) {
     const label = `${asset.path}##${asset.uuid}`;
     let flags = AssetHierarchy.baseFlags;
     if (this._selectedAsset === asset) {

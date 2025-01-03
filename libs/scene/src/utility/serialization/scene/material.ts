@@ -64,10 +64,14 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         if (value.str[0]?.startsWith('ASSET:')) {
           const assetId = value.str[0].slice(6);
           const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture_2d') {
+          if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              tex.name = `ASSET:${assetId}`;
-              this.occlusionTexture = tex;
+              if (tex?.isTexture2D()) {
+                tex.name = `ASSET:${assetId}`;
+                this.occlusionTexture = tex;
+              } else {
+                console.error('Invalid occlusion texture');
+              }
             });
           }
         }
@@ -121,10 +125,14 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         if (value.str[0]?.startsWith('ASSET:')) {
           const assetId = value.str[0].slice(6);
           const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture_2d') {
+          if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              tex.name = `ASSET:${assetId}`;
-              this.emissiveTexture = tex;
+              if (tex?.isTexture2D()) {
+                tex.name = `ASSET:${assetId}`;
+                this.emissiveTexture = tex;
+              } else {
+                console.error('Invalid emissive texture');
+              }
             });
           }
         }
@@ -168,10 +176,14 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         if (value.str[0]?.startsWith('ASSET:')) {
           const assetId = value.str[0].slice(6);
           const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture_2d') {
+          if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              tex.name = `ASSET:${assetId}`;
-              this.specularTexture = tex;
+              if (tex?.isTexture2D()) {
+                tex.name = `ASSET:${assetId}`;
+                this.specularTexture = tex;
+              } else {
+                console.error('Invalid specular texture');
+              }
             });
           }
         }
@@ -223,10 +235,14 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         if (value.str[0]?.startsWith('ASSET:')) {
           const assetId = value.str[0].slice(6);
           const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture_2d') {
+          if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              tex.name = `ASSET:${assetId}`;
-              this.transmissionTexture = tex;
+              if (tex?.isTexture2D()) {
+                tex.name = `ASSET:${assetId}`;
+                this.transmissionTexture = tex;
+              } else {
+                console.error('Invalid transmission texture');
+              }
             });
           }
         }
@@ -267,10 +283,14 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         if (value.str[0]?.startsWith('ASSET:')) {
           const assetId = value.str[0].slice(6);
           const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture_2d') {
+          if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              tex.name = `ASSET:${assetId}`;
-              this.thicknessTexture = tex;
+              if (tex?.isTexture2D()) {
+                tex.name = `ASSET:${assetId}`;
+                this.thicknessTexture = tex;
+              } else {
+                console.error('Invalid thickness texture');
+              }
             });
           }
         }
@@ -346,10 +366,14 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         if (value.str[0]?.startsWith('ASSET:')) {
           const assetId = value.str[0].slice(6);
           const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture_2d') {
+          if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              tex.name = `ASSET:${assetId}`;
-              this.iridescenceTexture = tex;
+              if (tex?.isTexture2D()) {
+                tex.name = `ASSET:${assetId}`;
+                this.iridescenceTexture = tex;
+              } else {
+                console.error('Invalid iridescence texture');
+              }
             });
           }
         }
@@ -412,10 +436,14 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         if (value.str[0]?.startsWith('ASSET:')) {
           const assetId = value.str[0].slice(6);
           const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture_2d') {
+          if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              tex.name = `ASSET:${assetId}`;
-              this.iridescenceThicknessTexture = tex;
+              if (tex?.isTexture2D()) {
+                tex.name = `ASSET:${assetId}`;
+                this.iridescenceThicknessTexture = tex;
+              } else {
+                console.error('Invalid iridescence thickness texture');
+              }
             });
           }
         }
@@ -467,10 +495,14 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         if (value.str[0]?.startsWith('ASSET:')) {
           const assetId = value.str[0].slice(6);
           const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture_2d') {
+          if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              tex.name = `ASSET:${assetId}`;
-              this.clearcoatIntensityTexture = tex;
+              if (tex?.isTexture2D()) {
+                tex.name = `ASSET:${assetId}`;
+                this.clearcoatIntensityTexture = tex;
+              } else {
+                console.error('Invalid clearcoat intensity texture');
+              }
             });
           }
         }
@@ -511,10 +543,14 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         if (value.str[0]?.startsWith('ASSET:')) {
           const assetId = value.str[0].slice(6);
           const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture_2d') {
+          if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              tex.name = `ASSET:${assetId}`;
-              this.clearcoatRoughnessTexture = tex;
+              if (tex?.isTexture2D()) {
+                tex.name = `ASSET:${assetId}`;
+                this.clearcoatRoughnessTexture = tex;
+              } else {
+                console.error('Invalid clearcoat roughness texture');
+              }
             });
           }
         }
@@ -555,10 +591,14 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         if (value.str[0]?.startsWith('ASSET:')) {
           const assetId = value.str[0].slice(6);
           const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture_2d') {
+          if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              tex.name = `ASSET:${assetId}`;
-              this.clearcoatNormalTexture = tex;
+              if (tex?.isTexture2D()) {
+                tex.name = `ASSET:${assetId}`;
+                this.clearcoatNormalTexture = tex;
+              } else {
+                console.error('Invalid clearcoat normal texture');
+              }
             });
           }
         }
@@ -612,10 +652,14 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         if (value.str[0]?.startsWith('ASSET:')) {
           const assetId = value.str[0].slice(6);
           const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture_2d') {
+          if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              tex.name = `ASSET:${assetId}`;
-              this.sheenColorTexture = tex;
+              if (tex?.isTexture2D()) {
+                tex.name = `ASSET:${assetId}`;
+                this.sheenColorTexture = tex;
+              } else {
+                console.error('Invalid sheen color texture');
+              }
             });
           }
         }
@@ -656,10 +700,14 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         if (value.str[0]?.startsWith('ASSET:')) {
           const assetId = value.str[0].slice(6);
           const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture_2d') {
+          if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              tex.name = `ASSET:${assetId}`;
-              this.sheenRoughnessTexture = tex;
+              if (tex?.isTexture2D()) {
+                tex.name = `ASSET:${assetId}`;
+                this.sheenRoughnessTexture = tex;
+              } else {
+                console.error('Invalid sheen roughness texture');
+              }
             });
           }
         }
@@ -718,10 +766,14 @@ function getLitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<Lit
         if (value.str[0]?.startsWith('ASSET:')) {
           const assetId = value.str[0].slice(6);
           const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture_2d') {
+          if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              tex.name = `ASSET:${assetId}`;
-              this.normalTexture = tex;
+              if (tex?.isTexture2D()) {
+                tex.name = `ASSET:${assetId}`;
+                this.normalTexture = tex;
+              } else {
+                console.error('Invalid normal texture');
+              }
             });
           }
         }
@@ -781,10 +833,14 @@ function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<U
         if (value.str[0]?.startsWith('ASSET:')) {
           const assetId = value.str[0].slice(6);
           const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture_2d') {
+          if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              tex.name = `ASSET:${assetId}`;
-              this.albedoTexture = tex;
+              if (tex?.isTexture2D()) {
+                tex.name = `ASSET:${assetId}`;
+                this.albedoTexture = tex;
+              } else {
+                console.error('Invalid albedo texture');
+              }
             });
           }
         }
@@ -977,10 +1033,14 @@ export function getPBRMetallicRoughnessMaterialClass(
             if (value.str[0]?.startsWith('ASSET:')) {
               const assetId = value.str[0].slice(6);
               const assetInfo = assetRegistry.getAssetInfo(assetId);
-              if (assetInfo && assetInfo.type === 'texture_2d') {
+              if (assetInfo && assetInfo.type === 'texture') {
                 assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-                  tex.name = `ASSET:${assetId}`;
-                  this.metallicRoughnessTexture = tex;
+                  if (tex?.isTexture2D()) {
+                    tex.name = `ASSET:${assetId}`;
+                    this.metallicRoughnessTexture = tex;
+                  } else {
+                    console.error('Invalid metallic roughness texture');
+                  }
                 });
               }
             }
@@ -1010,10 +1070,14 @@ export function getPBRMetallicRoughnessMaterialClass(
             if (value.str[0]?.startsWith('ASSET:')) {
               const assetId = value.str[0].slice(6);
               const assetInfo = assetRegistry.getAssetInfo(assetId);
-              if (assetInfo && assetInfo.type === 'texture_2d') {
+              if (assetInfo && assetInfo.type === 'texture') {
                 assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-                  tex.name = `ASSET:${assetId}`;
-                  this.specularColorTexture = tex;
+                  if (tex?.isTexture2D()) {
+                    tex.name = `ASSET:${assetId}`;
+                    this.specularColorTexture = tex;
+                  } else {
+                    console.error('Invalid specular texture');
+                  }
                 });
               }
             }
@@ -1046,50 +1110,6 @@ export function getPBRSpecularGlossinessMaterialClass(
           },
           set(this: PBRSpecularGlossinessMaterial, value) {
             this.glossinessFactor = value.num[0];
-          }
-        },
-        {
-          name: 'Roughness',
-          type: 'float',
-          default: { num: [1] },
-          get(this: PBRMetallicRoughnessMaterial, value) {
-            value.num[0] = this.roughness;
-          },
-          set(this: PBRMetallicRoughnessMaterial, value) {
-            this.roughness = value.num[0];
-          }
-        },
-        {
-          name: 'MetallicRoughnessTexCoordIndex',
-          type: 'int',
-          default: { num: [0] },
-          get(this: PBRMetallicRoughnessMaterial, value) {
-            value.num[0] = this.metallicRoughnessTexCoordIndex;
-          },
-          set(this: PBRMetallicRoughnessMaterial, value) {
-            this.metallicRoughnessTexCoordIndex = value.num[0];
-          }
-        },
-        {
-          name: 'MetallicRoughnessTexture',
-          type: 'string',
-          usage: 'texture_2d',
-          default: { str: [''] },
-          get(this: PBRMetallicRoughnessMaterial, value) {
-            const name = this.metallicRoughnessTexture.name;
-            value.str[0] = name?.startsWith('ASSET:') ? name.slice(6) : name;
-          },
-          set(this: PBRMetallicRoughnessMaterial, value) {
-            if (value.str[0]?.startsWith('ASSET:')) {
-              const assetId = value.str[0].slice(6);
-              const assetInfo = assetRegistry.getAssetInfo(assetId);
-              if (assetInfo && assetInfo.type === 'texture_2d') {
-                assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-                  tex.name = `ASSET:${assetId}`;
-                  this.metallicRoughnessTexture = tex;
-                });
-              }
-            }
           }
         },
         ...getPBRCommonProps(assetRegistry)

@@ -4,14 +4,14 @@ import { EmptyView } from './emptyview';
 import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import { Tab } from '../components/tab';
-import type { Camera, Compositor, Scene, SceneNode, SerializableClass } from '@zephyr3d/scene';
+import type { Camera, Compositor, Scene, SceneNode } from '@zephyr3d/scene';
 import { Application, getSerializationInfo } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
-import type { AssetInfo } from '../storage/db';
+import type { DBAssetInfo } from '../storage/db';
 import { AssetStore } from '../helpers/assetstore';
 import { Dialog } from './dlg/dlg';
 import { renderTextureViewer } from '../components/textureviewer';
@@ -28,7 +28,6 @@ export class SceneView extends EmptyView<SceneModel> {
   private _mousePosX: number;
   private _mousePosY: number;
   private _postGizmoCaptured: boolean;
-  private _serializationInfo: Map<any, SerializableClass<SceneNode>>;
   constructor(model: SceneModel) {
     super(model);
     this._transformNode = null;
@@ -97,8 +96,8 @@ export class SceneView extends EmptyView<SceneModel> {
       this.menubar.height + this._toolbar.height,
       this.statusbar.height
     );
-    this._serializationInfo = getSerializationInfo(this._tab.assetHierarchy.assetRegistry);
     this._propGrid = new PropertyEditor(
+      getSerializationInfo(this._tab.assetHierarchy.assetRegistry),
       this.menubar.height + this._toolbar.height,
       this.statusbar.height,
       300,
@@ -353,23 +352,6 @@ export class SceneView extends EmptyView<SceneModel> {
     this._postGizmoRenderer.node = node;
     this._propGrid.object = node;
     this._tab.sceneHierarchy.selectNode(node);
-    this._propGrid.clear();
-    let cls: SerializableClass = null;
-    let ctor = node.constructor;
-    while (ctor) {
-      cls = this._serializationInfo.get(ctor);
-      if (cls) {
-        const props = cls.getProps();
-        if (props.length > 0) {
-          this._propGrid.beginGroup(cls.className);
-          for (const prop of cls.getProps()) {
-            this._propGrid.addProperty(prop);
-          }
-          this._propGrid.endGroup();
-        }
-      }
-      ctor = Object.getPrototypeOf(ctor);
-    }
   }
   private handleNodeDeselected(node: SceneNode) {
     if (this._postGizmoRenderer.node === node) {
@@ -387,7 +369,7 @@ export class SceneView extends EmptyView<SceneModel> {
       src.parent = dst;
     }
   }
-  private handleAddAsset(asset: AssetInfo) {
+  private handleAddAsset(asset: DBAssetInfo) {
     console.log(`Add asset ${asset.name}`);
     if (this._nodeToBePlaced) {
       AssetStore.release(this._nodeToBePlaced);

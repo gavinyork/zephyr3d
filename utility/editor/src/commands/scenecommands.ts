@@ -13,15 +13,15 @@ import type { Command } from '../core/command';
 import { Quaternion, Vector3, type GenericConstructor } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import { AssetStore } from '../helpers/assetstore';
-import type { AssetInfo } from '../storage/db';
+import type { DBAssetInfo } from '../storage/db';
 
 export class AddAssetCommand implements Command {
   private _scene: Scene;
-  private _asset: AssetInfo;
+  private _asset: DBAssetInfo;
   private _node: SceneNode;
   private _position: Vector3;
   private _loading: boolean;
-  constructor(scene: Scene, asset: AssetInfo, position: Vector3) {
+  constructor(scene: Scene, asset: DBAssetInfo, position: Vector3) {
     this._scene = scene;
     this._node = null;
     this._asset = { ...asset };

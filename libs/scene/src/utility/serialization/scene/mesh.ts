@@ -1,3 +1,11 @@
+import {
+  BlinnMaterial,
+  LambertMaterial,
+  MeshMaterial,
+  PBRMetallicRoughnessMaterial,
+  PBRSpecularGlossinessMaterial,
+  UnlitMaterial
+} from '../../../material';
 import { Mesh, type SceneNode } from '../../../scene';
 import type { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
@@ -22,6 +30,28 @@ export function getMeshClass(): SerializableClass<SceneNode> {
           },
           set(this: Mesh, value) {
             this.castShadow = value.bool[0];
+          }
+        },
+        {
+          name: 'Material',
+          type: 'object',
+          default: { object: new LambertMaterial() },
+          objectTypes: [
+            UnlitMaterial,
+            LambertMaterial,
+            BlinnMaterial,
+            PBRMetallicRoughnessMaterial,
+            PBRSpecularGlossinessMaterial
+          ],
+          get(this: Mesh, value) {
+            value.object = this.material;
+          },
+          set(this: Mesh, value) {
+            if (value.object instanceof MeshMaterial) {
+              this.material = value.object;
+            } else {
+              console.error('Invalid material type');
+            }
           }
         }
       ];

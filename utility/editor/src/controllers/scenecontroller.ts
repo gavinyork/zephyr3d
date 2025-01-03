@@ -7,10 +7,10 @@ import type { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
 import type { SceneView } from '../views/sceneview';
 import type { TRS } from '../types';
-import type { SceneInfo } from '../storage/db';
+import type { DBSceneInfo } from '../storage/db';
 
 export class SceneController extends BaseController<SceneModel> {
-  protected _scene: SceneInfo;
+  protected _scene: DBSceneInfo;
   protected _view: SceneView;
   protected _cmdManager: CommandManager;
   constructor(model: SceneModel, view: SceneView) {
@@ -21,7 +21,7 @@ export class SceneController extends BaseController<SceneModel> {
   handleEvent(ev: Event, type?: string): boolean {
     return this._view.handleEvent(ev, type);
   }
-  protected onActivate(scene: SceneInfo): void {
+  protected onActivate(scene: DBSceneInfo): void {
     this._scene = scene;
     eventBus.on('update', this.update, this);
     eventBus.on('action', this.sceneAction, this);

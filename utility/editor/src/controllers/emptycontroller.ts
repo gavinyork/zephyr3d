@@ -3,7 +3,7 @@ import type { DocumentType } from '../components/common';
 import { BaseController } from './basecontroller';
 import type { BaseModel } from '../models/basemodel';
 import { Dialog } from '../views/dlg/dlg';
-import { Database, type SceneInfo } from '../storage/db';
+import { Database, type DBSceneInfo } from '../storage/db';
 import type { EmptyView } from '../views/emptyview';
 
 export class EmptyController<T extends BaseModel> extends BaseController<T> {
@@ -34,12 +34,12 @@ export class EmptyController<T extends BaseModel> extends BaseController<T> {
     eventBus.dispatchEvent('switch_module', 'Empty');
   }
   requestNewScene(name: string) {
-    const scene: SceneInfo = {
+    const scene: DBSceneInfo = {
       name,
       content: {},
       metadata: {}
     };
-    Database.addScene(scene).then((uuid) => {
+    Database.putScene(scene).then((uuid) => {
       scene.uuid = uuid;
       eventBus.dispatchEvent('switch_module', 'Scene', scene);
     });
