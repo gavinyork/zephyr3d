@@ -1,4 +1,3 @@
-export type PropertyUsage = 'texture' | 'texture_2d' | 'texture_cube' | 'model';
 export type PropertyType =
   | 'bool'
   | 'int'
@@ -20,10 +19,9 @@ export type PropertyValue = {
 export type PropertyAccessor<T = unknown> = {
   type: PropertyType;
   name: string;
-  options?: { minValue: number; maxValue: number; speed: number };
+  options?: { minValue: number; maxValue: number; speed?: number };
   enum?: { labels: string[]; values: (number | string)[] };
   objectTypes?: unknown[];
-  usage?: PropertyUsage;
   default?: PropertyValue;
   get(this: T, value: PropertyValue): void;
   set(this: T, value: PropertyValue): void;

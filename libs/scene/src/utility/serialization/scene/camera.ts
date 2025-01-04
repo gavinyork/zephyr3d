@@ -51,6 +51,10 @@ export function getCameraClass(): SerializableClass<SceneNode> {
           name: 'SSRMaxRoughness',
           type: 'float',
           default: { num: [0.8] },
+          options: {
+            minValue: 0,
+            maxValue: 1
+          },
           get(this: Camera, value) {
             value.num[0] = this.ssrMaxRoughness;
           },
@@ -62,6 +66,10 @@ export function getCameraClass(): SerializableClass<SceneNode> {
           name: 'SSRRoughnessFactor',
           type: 'float',
           default: { num: [1.0] },
+          options: {
+            minValue: 0,
+            maxValue: 1
+          },
           get(this: Camera, value) {
             value.num[0] = this.ssrRoughnessFactor;
           },
@@ -71,8 +79,12 @@ export function getCameraClass(): SerializableClass<SceneNode> {
         },
         {
           name: 'SSRStride',
-          type: 'float',
+          type: 'int',
           default: { num: [2] },
+          options: {
+            minValue: 1,
+            maxValue: 32
+          },
           get(this: Camera, value) {
             value.num[0] = this.ssrStride;
           },
@@ -84,6 +96,10 @@ export function getCameraClass(): SerializableClass<SceneNode> {
           name: 'SSRMaxDistance',
           type: 'float',
           default: { num: [100] },
+          options: {
+            minValue: 0,
+            maxValue: 9999
+          },
           get(this: Camera, value) {
             value.num[0] = this.ssrMaxDistance;
           },
@@ -93,8 +109,12 @@ export function getCameraClass(): SerializableClass<SceneNode> {
         },
         {
           name: 'SSRMaxSteps',
-          type: 'float',
+          type: 'int',
           default: { num: [120] },
+          options: {
+            minValue: 1,
+            maxValue: 2000
+          },
           get(this: Camera, value) {
             value.num[0] = this.ssrIterations;
           },
@@ -106,6 +126,10 @@ export function getCameraClass(): SerializableClass<SceneNode> {
           name: 'SSRThickness',
           type: 'float',
           default: { num: [0.5] },
+          options: {
+            minValue: 0,
+            maxValue: 8
+          },
           get(this: Camera, value) {
             value.num[0] = this.ssrThickness;
           },
@@ -117,6 +141,10 @@ export function getCameraClass(): SerializableClass<SceneNode> {
           name: 'SSRBlurScale',
           type: 'float',
           default: { num: [0.05] },
+          options: {
+            minValue: 0,
+            maxValue: 1
+          },
           get(this: Camera, value) {
             value.num[0] = this.ssrBlurScale;
           },
@@ -128,6 +156,10 @@ export function getCameraClass(): SerializableClass<SceneNode> {
           name: 'SSRBlurDepthCutoff',
           type: 'float',
           default: { num: [2] },
+          options: {
+            minValue: 0,
+            maxValue: 8
+          },
           get(this: Camera, value) {
             value.num[0] = this.ssrBlurDepthCutoff;
           },
@@ -137,8 +169,12 @@ export function getCameraClass(): SerializableClass<SceneNode> {
         },
         {
           name: 'SSRBlurKernelSize',
-          type: 'float',
+          type: 'int',
           default: { num: [17] },
+          options: {
+            minValue: 1,
+            maxValue: 65
+          },
           get(this: Camera, value) {
             value.num[0] = this.ssrBlurKernelSize;
           },
@@ -150,6 +186,10 @@ export function getCameraClass(): SerializableClass<SceneNode> {
           name: 'SSRBlurStdDev',
           type: 'float',
           default: { num: [10] },
+          options: {
+            minValue: 0,
+            maxValue: 100
+          },
           get(this: Camera, value) {
             value.num[0] = this.ssrBlurStdDev;
           },
@@ -169,19 +209,8 @@ export function getCameraClass(): SerializableClass<SceneNode> {
           }
         },
         {
-          name: 'SampleCount',
-          type: 'int',
-          default: { num: [1] },
-          get(this: Camera, value) {
-            value.num[0] = this.sampleCount;
-          },
-          set(this: Camera, value) {
-            this.sampleCount = value.num[0];
-          }
-        },
-        {
-          name: 'Clear',
-          type: 'vec4',
+          name: 'ClearColor',
+          type: 'rgba',
           default: { num: [0, 0, 0, 1] },
           get(this: Camera, value) {
             value.num[0] = this.sampleCount;
@@ -209,22 +238,15 @@ export function getPerspectiveCameraClass(): SerializableClass<SceneNode> {
           name: 'FovVertical',
           type: 'float',
           default: { num: [Math.PI / 3] },
+          options: {
+            minValue: 0,
+            maxValue: Math.PI
+          },
           get(this: PerspectiveCamera, value) {
             value.num[0] = this.fovY;
           },
           set(this: PerspectiveCamera, value) {
             this.fovY = value.num[0];
-          }
-        },
-        {
-          name: 'AspectRatio',
-          type: 'float',
-          default: { num: [1] },
-          get(this: PerspectiveCamera, value) {
-            value.num[0] = this.aspect;
-          },
-          set(this: PerspectiveCamera, value) {
-            this.aspect = value.num[0];
           }
         },
         {

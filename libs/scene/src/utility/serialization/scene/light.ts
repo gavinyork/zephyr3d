@@ -15,7 +15,7 @@ export function getPunctualLightClass(): SerializableClass<SceneNode> {
       return [
         {
           name: 'Color',
-          type: 'vec3',
+          type: 'rgb',
           default: { num: [1, 1, 1] },
           get(this: PunctualLight, value) {
             value.num[0] = this.color.x;
@@ -30,6 +30,10 @@ export function getPunctualLightClass(): SerializableClass<SceneNode> {
           name: 'Intensity',
           type: 'float',
           default: { num: [1] },
+          options: {
+            minValue: 0,
+            maxValue: 100
+          },
           get(this: BaseLight, value) {
             value.num[0] = this.intensity;
           },
@@ -92,6 +96,10 @@ export function getPointLightClass(): SerializableClass<SceneNode> {
           name: 'Range',
           type: 'float',
           default: { num: [10] },
+          options: {
+            minValue: 0,
+            maxValue: 1000
+          },
           get(this: PointLight, value) {
             value.num[0] = this.range;
           },
@@ -118,6 +126,10 @@ export function getSpotLightClass(): SerializableClass<SceneNode> {
           name: 'Range',
           type: 'float',
           default: { num: [10] },
+          options: {
+            minValue: 0,
+            maxValue: 1000
+          },
           get(this: SpotLight, value) {
             value.num[0] = this.range;
           },
@@ -129,6 +141,10 @@ export function getSpotLightClass(): SerializableClass<SceneNode> {
           name: 'Cutoff',
           type: 'float',
           default: { num: [Math.cos(Math.PI / 4)] },
+          options: {
+            minValue: 0,
+            maxValue: Math.PI
+          },
           get(this: SpotLight, value) {
             value.num[0] = this.cutoff;
           },

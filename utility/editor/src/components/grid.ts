@@ -16,7 +16,7 @@ interface Property<T extends {}> {
 }
 
 class PropertyGroup {
-  grid: PropertyEditor<any>;
+  grid: PropertyEditor;
   name: string;
   value: PropertyValue;
   parent: PropertyGroup;
@@ -26,7 +26,7 @@ class PropertyGroup {
   objectTypeNames: string[];
   properties: Map<string, Property<any>>;
   subgroups: PropertyGroup[];
-  constructor(name: string, grid: PropertyEditor<any>) {
+  constructor(name: string, grid: PropertyEditor) {
     this.grid = grid;
     this.name = name;
     this.parent = null;
@@ -107,7 +107,7 @@ class PropertyGroup {
   }
 }
 
-export class PropertyEditor<T extends {} = unknown> {
+export class PropertyEditor {
   private _rootGroup: PropertyGroup;
   private _top: number;
   private _bottom: number;
@@ -116,8 +116,8 @@ export class PropertyEditor<T extends {} = unknown> {
   private _minWidth: number;
   private _padding: number;
   private _labelPercent: number;
-  private _object: T;
   private _serializationInfo: Map<any, SerializableClass<any>>;
+  private _dragging: boolean;
   constructor(
     serializationInfo: Map<any, SerializableClass<any>>,
     top: number,
@@ -137,15 +137,15 @@ export class PropertyEditor<T extends {} = unknown> {
     this._minWidth = minWidth;
     this._padding = padding;
     this._labelPercent = labelPercent;
-    this._object = null;
+    this._dragging = false;
   }
   get serailizationInfo(): Map<any, SerializableClass<any>> {
     return this._serializationInfo;
   }
-  get object(): T {
-    return this._object;
+  get object(): any {
+    return this._rootGroup.getObject();
   }
-  set object(value: T) {
+  set object(value: any) {
     this._rootGroup.setObject(value);
   }
   get width(): number {
@@ -176,21 +176,29 @@ export class PropertyEditor<T extends {} = unknown> {
     const resizeBarWidth = 4;
     const padding = 8;
     ImGui.SetCursorPosX(ImGui.GetCursorPosX() + resizeBarWidth + padding);
-    // 为resize bar预留空间
-    //ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 4);
-
-    // 计算内容区域宽度
     const availableWidth = this._width - this._padding * 2 - 4 - resizeBarWidth - padding;
     const labelWidth = availableWidth * this._labelPercent;
     const valueWidth = availableWidth * (1 - this._labelPercent);
-
-    // 使用 ChildWindow 来处理滚动，但不强制显示滚动条
     const contentHeight = ImGui.GetContentRegionAvail().y;
     const childFlags = ImGui.WindowFlags.None; // 允许在需要时显示滚动条
 
     if (
       ImGui.BeginChild('ContentRegion', new ImGui.ImVec2(availableWidth, contentHeight), false, childFlags)
     ) {
+      // Prevent unexpected scrolling
+      if (
+        ImGui.IsWindowHovered(ImGui.HoveredFlags.AllowWhenBlockedByActiveItem) &&
+        ImGui.IsMouseClicked(ImGui.MouseButton.Left)
+      ) {
+        this._dragging = true;
+      }
+      if (!ImGui.IsMouseDown(ImGui.MouseButton.Left)) {
+        this._dragging = false;
+      }
+      if (!this._dragging) {
+        ImGui.SetScrollY(ImGui.GetScrollY());
+      }
+      // Draw properties
       if (
         ImGui.BeginTable(
           'PropertyTable',
@@ -200,7 +208,6 @@ export class PropertyEditor<T extends {} = unknown> {
       ) {
         ImGui.TableSetupColumn('Name', ImGui.TableColumnFlags.WidthFixed, labelWidth);
         ImGui.TableSetupColumn('Value', ImGui.TableColumnFlags.WidthFixed, valueWidth);
-
         this.renderGroup(this._rootGroup);
         ImGui.EndTable();
       }
@@ -283,7 +290,7 @@ export class PropertyEditor<T extends {} = unknown> {
       */
     }
   }
-  private renderProperty(property: Property<T>, level: number, object?: any) {
+  private renderProperty(property: Property<any>, level: number, object?: any) {
     const { name, value } = property;
     ImGui.PushID(property.path);
     ImGui.TableNextRow();
@@ -300,12 +307,12 @@ export class PropertyEditor<T extends {} = unknown> {
     ImGui.SetNextItemWidth(-1); // 使用剩余所有宽度
     const readonly = !value.set;
     let changed = false;
-    object = object ?? this._object;
+    object = object ?? this.object;
     value.get.call(object, tmpProperty);
     switch (value.type) {
       case 'bool': {
         const val = tmpProperty.bool as [boolean];
-        changed = ImGui.Checkbox('##value', val) && !readonly;
+        changed = ImGui.Checkbox(`##value`, val) && !readonly;
         break;
       }
       case 'int': {
@@ -362,21 +369,6 @@ export class PropertyEditor<T extends {} = unknown> {
             undefined,
             readonly ? ImGui.InputTextFlags.ReadOnly : undefined
           );
-          if (
-            !changed &&
-            (property.value.usage === 'texture' ||
-              property.value.usage === 'texture_2d' ||
-              property.value.usage === 'texture_cube')
-          ) {
-            if (ImGui.BeginDragDropTarget()) {
-              const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
-              if (payload) {
-                tmpProperty.str[0] = (payload.Data as DBAssetInfo).uuid;
-                value.set.call(object, tmpProperty);
-              }
-              ImGui.EndDragDropTarget();
-            }
-          }
         }
         break;
       }
@@ -419,6 +411,18 @@ export class PropertyEditor<T extends {} = unknown> {
         const val = tmpProperty.num as [number, number, number, number];
         changed = ImGui.ColorEdit4('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined);
         break;
+      }
+      case 'object': {
+        const val = tmpProperty.str as [string];
+        changed = ImGui.InputText('##value', val, undefined, ImGui.InputTextFlags.ReadOnly);
+        if (ImGui.BeginDragDropTarget()) {
+          const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
+          if (payload) {
+            tmpProperty.str[0] = `ASSET:${(payload.Data as DBAssetInfo).uuid}`;
+            value.set.call(object, tmpProperty);
+          }
+          ImGui.EndDragDropTarget();
+        }
       }
     }
     if (changed && value.set) {
