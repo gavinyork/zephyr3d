@@ -22,7 +22,7 @@ class PropertyGroup {
   parent: PropertyGroup;
   property: Property<any>;
   currentType: number;
-  objectTypes: SerializableClass<any>[];
+  objectTypes: SerializableClass[];
   objectTypeNames: string[];
   properties: Map<string, Property<any>>;
   subgroups: PropertyGroup[];
@@ -77,7 +77,7 @@ class PropertyGroup {
       this.currentType = -1;
       this.objectTypes =
         objTypes?.map((ctor) => {
-          let s: SerializableClass<any>;
+          let s: SerializableClass;
           while (ctor) {
             s = serializationInfo.get(ctor);
           }
@@ -116,10 +116,10 @@ export class PropertyEditor {
   private _minWidth: number;
   private _padding: number;
   private _labelPercent: number;
-  private _serializationInfo: Map<any, SerializableClass<any>>;
+  private _serializationInfo: Map<any, SerializableClass>;
   private _dragging: boolean;
   constructor(
-    serializationInfo: Map<any, SerializableClass<any>>,
+    serializationInfo: Map<any, SerializableClass>,
     top: number,
     bottom: number,
     width: number,
@@ -139,7 +139,7 @@ export class PropertyEditor {
     this._labelPercent = labelPercent;
     this._dragging = false;
   }
-  get serailizationInfo(): Map<any, SerializableClass<any>> {
+  get serailizationInfo(): Map<any, SerializableClass> {
     return this._serializationInfo;
   }
   get object(): any {
@@ -292,6 +292,10 @@ export class PropertyEditor {
   }
   private renderProperty(property: Property<any>, level: number, object?: any) {
     const { name, value } = property;
+    object = object ?? this.object;
+    if (value.isValid && !value.isValid.call(object)) {
+      return;
+    }
     ImGui.PushID(property.path);
     ImGui.TableNextRow();
     ImGui.TableNextColumn();
@@ -307,7 +311,6 @@ export class PropertyEditor {
     ImGui.SetNextItemWidth(-1); // 使用剩余所有宽度
     const readonly = !value.set;
     let changed = false;
-    object = object ?? this.object;
     value.get.call(object, tmpProperty);
     switch (value.type) {
       case 'bool': {

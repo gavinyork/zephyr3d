@@ -1,10 +1,9 @@
-import type { SceneNode } from '../../../scene/scene_node';
 import type { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 import { getSceneNodeClass } from './node';
 
-export function getCameraClass(): SerializableClass<SceneNode> {
+export function getCameraClass(): SerializableClass {
   return {
     ctor: Camera,
     parent: getSceneNodeClass(),
@@ -224,7 +223,7 @@ export function getCameraClass(): SerializableClass<SceneNode> {
   };
 }
 
-export function getPerspectiveCameraClass(): SerializableClass<SceneNode> {
+export function getPerspectiveCameraClass(): SerializableClass {
   return {
     ctor: PerspectiveCamera,
     parent: getCameraClass(),
@@ -276,7 +275,7 @@ export function getPerspectiveCameraClass(): SerializableClass<SceneNode> {
   };
 }
 
-export function getOrthoCameraClass(): SerializableClass<SceneNode> {
+export function getOrthoCameraClass(): SerializableClass {
   return {
     ctor: OrthoCamera,
     parent: getCameraClass(),

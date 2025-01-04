@@ -5,7 +5,7 @@ import type { SerializableClass } from '../types';
 import { degree2radian, radian2degree } from '@zephyr3d/base';
 import { GraphNode } from '../../../scene';
 
-export function getSceneNodeClass(): SerializableClass<SceneNode> {
+export function getSceneNodeClass(): SerializableClass {
   return {
     ctor: SceneNode,
     className: 'SceneNode',
@@ -96,7 +96,7 @@ export function getSceneNodeClass(): SerializableClass<SceneNode> {
   };
 }
 
-export function getGraphNodeClass(): SerializableClass<SceneNode> {
+export function getGraphNodeClass(): SerializableClass {
   return {
     ctor: GraphNode,
     parent: getSceneNodeClass(),

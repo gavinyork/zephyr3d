@@ -23,16 +23,17 @@ export type PropertyAccessor<T = unknown> = {
   enum?: { labels: string[]; values: (number | string)[] };
   objectTypes?: unknown[];
   default?: PropertyValue;
-  get(this: T, value: PropertyValue): void;
-  set(this: T, value: PropertyValue): void;
+  get: (this: T, value: PropertyValue) => void;
+  set?: (this: T, value: PropertyValue) => void;
+  isValid?: (this: T) => boolean;
 };
 
-export type SerializableClass<T = unknown> = {
+export type SerializableClass = {
   ctor: any;
   className: string;
-  parent?: SerializableClass<T>;
-  createFunc?: (ctx?: any) => T;
-  getProps: (obj: T) => PropertyAccessor<T>[];
+  parent?: SerializableClass;
+  createFunc?: (ctx?: any) => any;
+  getProps: (obj: any) => PropertyAccessor<any>[];
 };
 
-export type SerializationInfo<T = unknown> = SerializableClass<T>[];
+export type SerializationInfo = SerializableClass[];

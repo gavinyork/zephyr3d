@@ -6,12 +6,12 @@ import {
   PBRSpecularGlossinessMaterial,
   UnlitMaterial
 } from '../../../material';
-import { Mesh, type SceneNode } from '../../../scene';
+import { Mesh } from '../../../scene';
 import type { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
 import { getGraphNodeClass } from './node';
 
-export function getMeshClass(): SerializableClass<SceneNode> {
+export function getMeshClass(): SerializableClass {
   return {
     ctor: Mesh,
     parent: getGraphNodeClass(),

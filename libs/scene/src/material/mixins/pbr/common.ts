@@ -38,7 +38,6 @@ export type IMixinPBRCommon = {
   clearcoat: boolean;
   clearcoatIntensity: number;
   clearcoatRoughnessFactor: number;
-  clearcoatNormalScale: number;
   iridescence: boolean;
   iridescenceFactor: number;
   iridescenceIor: number;
@@ -309,15 +308,6 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     set clearcoatRoughnessFactor(val: number) {
       if (val !== this._clearcoatFactor.y) {
         this._clearcoatFactor.y = val;
-        this.uniformChanged();
-      }
-    }
-    get clearcoatNormalScale(): number {
-      return this._clearcoatFactor.z;
-    }
-    set clearcoatNormalScale(val: number) {
-      if (val !== this._clearcoatFactor.z) {
-        this._clearcoatFactor.z = val;
         this.uniformChanged();
       }
     }

@@ -1,4 +1,3 @@
-import type { SceneNode } from '../../../scene/scene_node';
 import type { BaseLight } from '../../../scene/light';
 import { DirectionalLight, PointLight, PunctualLight, SpotLight } from '../../../scene/light';
 import type { Scene } from '../../../scene/scene';
@@ -6,7 +5,7 @@ import type { SerializableClass } from '../types';
 import { Vector4 } from '@zephyr3d/base';
 import { getSceneNodeClass } from './node';
 
-export function getPunctualLightClass(): SerializableClass<SceneNode> {
+export function getPunctualLightClass(): SerializableClass {
   return {
     ctor: PunctualLight,
     parent: getSceneNodeClass(),
@@ -56,7 +55,7 @@ export function getPunctualLightClass(): SerializableClass<SceneNode> {
     }
   };
 }
-export function getDirectionalLightClass(): SerializableClass<SceneNode> {
+export function getDirectionalLightClass(): SerializableClass {
   return {
     ctor: DirectionalLight,
     parent: getPunctualLightClass(),
@@ -82,7 +81,7 @@ export function getDirectionalLightClass(): SerializableClass<SceneNode> {
   };
 }
 
-export function getPointLightClass(): SerializableClass<SceneNode> {
+export function getPointLightClass(): SerializableClass {
   return {
     ctor: PointLight,
     parent: getPunctualLightClass(),
@@ -112,7 +111,7 @@ export function getPointLightClass(): SerializableClass<SceneNode> {
   };
 }
 
-export function getSpotLightClass(): SerializableClass<SceneNode> {
+export function getSpotLightClass(): SerializableClass {
   return {
     ctor: SpotLight,
     parent: getPunctualLightClass(),

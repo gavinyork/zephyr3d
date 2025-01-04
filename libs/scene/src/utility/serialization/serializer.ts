@@ -1,6 +1,6 @@
 import type { PropertyValue, SerializableClass, SerializationInfo } from './types';
 
-export function deserializeObjectProps<T>(obj: T, cls: SerializableClass<T>, json: object) {
+export function deserializeObjectProps<T>(obj: T, cls: SerializableClass, json: object) {
   const tmpVal: PropertyValue = {
     num: [0, 0, 0, 0],
     str: [''],
@@ -53,7 +53,7 @@ export function deserializeObjectProps<T>(obj: T, cls: SerializableClass<T>, jso
   }
 }
 
-export function serializeObjectProps<T>(obj: T, cls: SerializableClass<T>, json: object) {
+export function serializeObjectProps<T>(obj: T, cls: SerializableClass, json: object) {
   const tmpVal: PropertyValue = {
     num: [0, 0, 0, 0],
     str: [''],
@@ -118,7 +118,7 @@ export function serializeObjectProps<T>(obj: T, cls: SerializableClass<T>, json:
   }
 }
 
-export function serializeObject<T>(obj: T, serailizationInfo: SerializationInfo<T>, json?: object) {
+export function serializeObject<T>(obj: T, serailizationInfo: SerializationInfo, json?: object) {
   const index = serailizationInfo.findIndex((val) => val.ctor === obj.constructor);
   if (index < 0) {
     throw new Error('Serialize object failed: Cannot found serialization meta data');
@@ -134,7 +134,7 @@ export function serializeObject<T>(obj: T, serailizationInfo: SerializationInfo<
   return json;
 }
 
-export function deserializeObject<T>(ctx: unknown, json: object, serailizationInfo: SerializationInfo<T>): T {
+export function deserializeObject<T>(ctx: unknown, json: object, serailizationInfo: SerializationInfo): T {
   const className = json['ClassName'];
   const index = serailizationInfo.findIndex((val) => val.className === className);
   if (index < 0) {

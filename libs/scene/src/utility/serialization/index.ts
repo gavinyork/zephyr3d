@@ -51,7 +51,7 @@ export * from './types';
 export * from './serializer';
 
 export function getSerializationInfo(assetRegistry: AssetRegistry) {
-  return new Map<any, SerializableClass<any>>([
+  return new Map<any, SerializableClass>([
     [SceneNode, getSceneNodeClass()],
     [GraphNode, getGraphNodeClass()],
     [Mesh, getMeshClass()],

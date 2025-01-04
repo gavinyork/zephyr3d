@@ -1,10 +1,10 @@
-import type { EmitterBehavior, EmitterShape, ParticleDirection, SceneNode } from '../../../scene';
+import type { EmitterBehavior, EmitterShape, ParticleDirection } from '../../../scene';
 import { ParticleSystem } from '../../../scene';
 import type { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
 import { getGraphNodeClass } from './node';
 
-export function getParticleNodeClass(): SerializableClass<SceneNode> {
+export function getParticleNodeClass(): SerializableClass {
   return {
     ctor: ParticleSystem,
     parent: getGraphNodeClass(),

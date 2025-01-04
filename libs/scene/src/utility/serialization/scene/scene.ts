@@ -3,7 +3,7 @@ import { Scene } from '../../../scene/scene';
 import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
 
-export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass<Scene> {
+export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: Scene,
     className: 'Scene',

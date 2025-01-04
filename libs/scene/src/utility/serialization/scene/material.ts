@@ -42,6 +42,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.occlusionStrength = value.num[0];
+      },
+      isValid() {
+        return !!this.occlusionTexture;
       }
     },
     {
@@ -53,6 +56,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.occlusionTexCoordIndex = value.num[0];
+      },
+      isValid() {
+        return !!this.occlusionTexture;
       }
     },
     {
@@ -117,6 +123,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.emissiveTexCoordIndex = value.num[0];
+      },
+      isValid() {
+        return !!this.emissiveTexture;
       }
     },
     {
@@ -167,6 +176,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.specularTexCoordIndex = value.num[0];
+      },
+      isValid() {
+        return !!this.specularTexture;
       }
     },
     {
@@ -218,6 +230,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.transmissionFactor = value.num[0];
+      },
+      isValid() {
+        return !!this.transmission;
       }
     },
     {
@@ -229,6 +244,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.transmissionTexCoordIndex = value.num[0];
+      },
+      isValid() {
+        return !!this.transmission && !!this.transmissionTexture;
       }
     },
     {
@@ -254,6 +272,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
             });
           }
         }
+      },
+      isValid() {
+        return !!this.transmission;
       }
     },
     {
@@ -269,6 +290,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.thicknessFactor = value.num[0];
+      },
+      isValid() {
+        return !!this.transmission;
       }
     },
     {
@@ -280,6 +304,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.thicknessTexCoordIndex = value.num[0];
+      },
+      isValid() {
+        return !!this.transmission && !!this.thicknessTexture;
       }
     },
     {
@@ -305,6 +332,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
             });
           }
         }
+      },
+      isValid() {
+        return !!this.transmission;
       }
     },
     {
@@ -318,6 +348,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.attenuationColor = new Vector3(value.num[0], value.num[1], value.num[2]);
+      },
+      isValid() {
+        return !!this.transmission;
       }
     },
     {
@@ -333,6 +366,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.attenuationDistance = value.num[0];
+      },
+      isValid() {
+        return !!this.transmission;
       }
     },
     {
@@ -359,6 +395,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.iridescenceFactor = value.num[0];
+      },
+      isValid() {
+        return !!this.iridescence;
       }
     },
     {
@@ -370,6 +409,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.iridescenceTexCoordIndex = value.num[0];
+      },
+      isValid() {
+        return !!this.iridescence && !!this.iridescenceTexture;
       }
     },
     {
@@ -395,6 +437,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
             });
           }
         }
+      },
+      isValid() {
+        return !!this.iridescence;
       }
     },
     {
@@ -406,6 +451,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.iridescenceIor = value.num[0];
+      },
+      isValid() {
+        return !!this.iridescence;
       }
     },
     {
@@ -421,6 +469,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.iridescenceThicknessMin = value.num[0];
+      },
+      isValid() {
+        return !!this.iridescence;
       }
     },
     {
@@ -436,6 +487,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.iridescenceThicknessMax = value.num[0];
+      },
+      isValid() {
+        return !!this.iridescence;
       }
     },
     {
@@ -447,6 +501,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.iridescenceThicknessTexCoordIndex = value.num[0];
+      },
+      isValid() {
+        return !!this.iridescence && !!this.iridescenceThicknessTexture;
       }
     },
     {
@@ -472,6 +529,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
             });
           }
         }
+      },
+      isValid() {
+        return !!this.iridescence;
       }
     },
     {
@@ -498,6 +558,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.clearcoatIntensity = value.num[0];
+      },
+      isValid() {
+        return !!this.clearcoat;
       }
     },
     {
@@ -509,6 +572,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.clearcoatIntensityTexCoordIndex = value.num[0];
+      },
+      isValid() {
+        return !!this.clearcoat && !!this.clearcoatIntensityTexture;
       }
     },
     {
@@ -534,6 +600,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
             });
           }
         }
+      },
+      isValid() {
+        return !!this.clearcoat;
       }
     },
     {
@@ -549,6 +618,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.clearcoatRoughnessFactor = value.num[0];
+      },
+      isValid() {
+        return !!this.clearcoat;
       }
     },
     {
@@ -560,6 +632,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.clearcoatRoughnessTexCoordIndex = value.num[0];
+      },
+      isValid() {
+        return !!this.clearcoat && !!this.clearcoatRoughnessTexture;
       }
     },
     {
@@ -585,17 +660,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
             });
           }
         }
-      }
-    },
-    {
-      name: 'ClearCoatNormalScale',
-      type: 'float',
-      default: { num: [1] },
-      get(this: PBRMaterial, value) {
-        value.num[0] = this.clearcoatNormalScale;
       },
-      set(this: PBRMaterial, value) {
-        this.clearcoatNormalScale = value.num[0];
+      isValid() {
+        return this.clearcoat;
       }
     },
     {
@@ -607,6 +674,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.clearcoatNormalTexCoordIndex = value.num[0];
+      },
+      isValid() {
+        return !!this.clearcoat && !!this.clearcoatNormalTexture;
       }
     },
     {
@@ -632,6 +702,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
             });
           }
         }
+      },
+      isValid() {
+        return !!this.clearcoat;
       }
     },
     {
@@ -656,6 +729,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.sheenColorFactor = new Vector3(value.num[0], value.num[1], value.num[2]);
+      },
+      isValid() {
+        return !!this.sheen;
       }
     },
     {
@@ -667,6 +743,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.sheenColorTexCoordIndex = value.num[0];
+      },
+      isValid() {
+        return !!this.sheen && !!this.sheenColorTexture;
       }
     },
     {
@@ -692,6 +771,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
             });
           }
         }
+      },
+      isValid() {
+        return !!this.sheen;
       }
     },
     {
@@ -707,6 +789,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.sheenRoughnessFactor = value.num[0];
+      },
+      isValid() {
+        return !!this.sheen;
       }
     },
     {
@@ -718,6 +803,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.sheenRoughnessTexCoordIndex = value.num[0];
+      },
+      isValid() {
+        return !!this.sheen && !!this.sheenRoughnessTexture;
       }
     },
     {
@@ -743,6 +831,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
             });
           }
         }
+      },
+      isValid() {
+        return !!this.sheen;
       }
     },
     ...getLitMaterialProps(assetRegistry)
@@ -772,6 +863,9 @@ function getLitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<Lit
       },
       set(this: LitPropTypes, value) {
         this.vertexTangent = value.bool[0];
+      },
+      isValid() {
+        return !!this.vertexNormal;
       }
     },
     {
@@ -783,6 +877,9 @@ function getLitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<Lit
       },
       set(this: LitPropTypes, value) {
         this.normalTexCoordIndex = value.num[0];
+      },
+      isValid() {
+        return !!this.normalTexture;
       }
     },
     {
@@ -849,6 +946,9 @@ function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<U
       },
       set(this: UnlitPropTypes, value) {
         this.albedoTexCoordIndex = value.num[0];
+      },
+      isValid() {
+        return !!this.albedoTexture;
       }
     },
     {
@@ -879,7 +979,7 @@ function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<U
   ];
 }
 
-export function getMeshMaterialClass(): SerializableClass<MeshMaterial> {
+export function getMeshMaterialClass(): SerializableClass {
   return {
     ctor: MeshMaterial,
     className: 'MeshMaterial',
@@ -958,7 +1058,7 @@ export function getMeshMaterialClass(): SerializableClass<MeshMaterial> {
   };
 }
 
-export function getUnlitMaterialClass(assetRegistry: AssetRegistry): SerializableClass<MeshMaterial> {
+export function getUnlitMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: UnlitMaterial,
     parent: getMeshMaterialClass(),
@@ -972,7 +1072,7 @@ export function getUnlitMaterialClass(assetRegistry: AssetRegistry): Serializabl
   };
 }
 
-export function getLambertMaterialClass(assetRegistry: AssetRegistry): SerializableClass<MeshMaterial> {
+export function getLambertMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: LambertMaterial,
     parent: getMeshMaterialClass(),
@@ -986,7 +1086,7 @@ export function getLambertMaterialClass(assetRegistry: AssetRegistry): Serializa
   };
 }
 
-export function getBlinnMaterialClass(assetRegistry: AssetRegistry): SerializableClass<MeshMaterial> {
+export function getBlinnMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: BlinnMaterial,
     parent: getMeshMaterialClass(),
@@ -1017,9 +1117,7 @@ export function getBlinnMaterialClass(assetRegistry: AssetRegistry): Serializabl
   };
 }
 
-export function getPBRMetallicRoughnessMaterialClass(
-  assetRegistry: AssetRegistry
-): SerializableClass<MeshMaterial> {
+export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: PBRMetallicRoughnessMaterial,
     parent: getMeshMaterialClass(),
@@ -1137,9 +1235,7 @@ export function getPBRMetallicRoughnessMaterialClass(
   };
 }
 
-export function getPBRSpecularGlossinessMaterialClass(
-  assetRegistry: AssetRegistry
-): SerializableClass<MeshMaterial> {
+export function getPBRSpecularGlossinessMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: PBRSpecularGlossinessMaterial,
     parent: getMeshMaterialClass(),
