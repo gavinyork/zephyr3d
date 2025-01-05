@@ -1,4 +1,4 @@
-import { Vector4 } from '@zephyr3d/base';
+import { ObservableVector4, Vector4 } from '@zephyr3d/base';
 import type { DrawContext, EnvironmentLighting, EnvLightType } from '../render';
 import { EnvShIBL } from '../render';
 import { EnvConstantAmbient, EnvHemisphericAmbient, EnvIBL } from '../render';
@@ -11,9 +11,9 @@ import type { TextureCube } from '@zephyr3d/device';
  */
 export class EnvLightWrapper {
   private _envLight: EnvironmentLighting;
-  private _ambientColor: Vector4;
-  private _ambientDown: Vector4;
-  private _ambientUp: Vector4;
+  private _ambientColor: ObservableVector4;
+  private _ambientDown: ObservableVector4;
+  private _ambientUp: ObservableVector4;
   private _radianceMap: TextureCube;
   private _irradianceMap: TextureCube;
   private _irradianceSH: Float32Array;
@@ -21,9 +21,24 @@ export class EnvLightWrapper {
   /** @internal */
   constructor() {
     this._envLight = new EnvIBL();
-    this._ambientColor = new Vector4(0.2, 0.2, 0.2, 1);
-    this._ambientDown = new Vector4(0.2, 0.2, 0.2, 1);
-    this._ambientUp = new Vector4(0.3, 0.5, 0.8, 1);
+    this._ambientColor = new ObservableVector4(0.2, 0.2, 0.2, 1);
+    this._ambientColor.callback = () => {
+      if (this.type === 'constant') {
+        (this._envLight as EnvConstantAmbient).ambientColor.set(this._ambientColor);
+      }
+    };
+    this._ambientDown = new ObservableVector4(0.2, 0.2, 0.2, 1);
+    this._ambientDown.callback = () => {
+      if (this.type === 'hemisphere') {
+        (this._envLight as EnvHemisphericAmbient).ambientDown.set(this._ambientDown);
+      }
+    };
+    this._ambientUp = new ObservableVector4(0.3, 0.5, 0.8, 1);
+    this._ambientUp.callback = () => {
+      if (this.type === 'hemisphere') {
+        (this._envLight as EnvHemisphericAmbient).ambientUp.set(this._ambientUp);
+      }
+    };
     this._radianceMap = null;
     this._irradianceMap = null;
     this._strength = 1;
@@ -49,33 +64,24 @@ export class EnvLightWrapper {
   }
   /** Ambient light color for environment light type constant */
   get ambientColor(): Vector4 {
-    return this._ambientColor.clone();
+    return this._ambientColor;
   }
   set ambientColor(val: Vector4) {
     this._ambientColor.set(val);
-    if (this.type === 'constant') {
-      (this._envLight as EnvConstantAmbient).ambientColor = this._ambientColor;
-    }
   }
   /** Up color for environment light type hemisphere */
   get ambientUp(): Vector4 {
-    return this._ambientUp.clone();
+    return this._ambientUp;
   }
   set ambientUp(val: Vector4) {
     this._ambientUp.set(val);
-    if (this.type === 'hemisphere') {
-      (this._envLight as EnvHemisphericAmbient).ambientUp = this._ambientUp;
-    }
   }
   /** Down color for environment light type hemisphere */
   get ambientDown(): Vector4 {
-    return this._ambientDown.clone();
+    return this._ambientDown;
   }
   set ambientDown(val: Vector4) {
     this._ambientDown.set(val);
-    if (this.type === 'hemisphere') {
-      (this._envLight as EnvHemisphericAmbient).ambientDown = this._ambientDown;
-    }
   }
   /** Radiance map for environment light type ibl */
   get radianceMap(): TextureCube {
