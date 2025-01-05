@@ -51,7 +51,7 @@ export class Editor {
     const sceneController = new SceneController(sceneModel, sceneView);
     this._moduleManager.register('Scene', sceneModel, sceneView, sceneController);
 
-    this._moduleManager.activate('Empty');
+    this._moduleManager.activate('Scene', null);
     eventBus.on('switch_module', (name, ...args: any[]) => {
       this._moduleManager.activate(name, ...args);
     });

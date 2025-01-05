@@ -29,8 +29,8 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
    * Creates an instance of shape
    * @param options - The creation options
    */
-  constructor(options?: T) {
-    super();
+  constructor(options?: T, poolId?: string | symbol) {
+    super(poolId);
     this._create(options);
   }
   /** Get shape type */

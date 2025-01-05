@@ -1,5 +1,6 @@
 import type { Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
 import {
+  Application,
   BoxFrameShape,
   BoxShape,
   CylinderShape,
@@ -63,10 +64,12 @@ export class AddShapeCommand<T extends ShapeType> implements Command {
   private _mesh: Mesh;
   private _desc: string;
   private _scene: Scene;
+  private _poolId: symbol;
   private _shapeCls: GenericConstructor<T>;
   private _options: ShapeOptionType<T>;
-  constructor(scene: Scene, shapeCls: GenericConstructor<T>, options?: ShapeOptionType<T>) {
+  constructor(scene: Scene, shapeCls: GenericConstructor<T>, options?: ShapeOptionType<T>, poolId?: symbol) {
     this._mesh = null;
+    this._poolId = poolId;
     this._scene = scene;
     switch (shapeCls as any) {
       case BoxShape: {
@@ -105,13 +108,12 @@ export class AddShapeCommand<T extends ShapeType> implements Command {
     return this._desc;
   }
   execute() {
-    const shape = new this._shapeCls(this._options);
-    this._mesh = new Mesh(this._scene, shape, new PBRMetallicRoughnessMaterial());
+    const shape = new this._shapeCls(this._options, this._poolId);
+    this._mesh = new Mesh(this._scene, shape, new PBRMetallicRoughnessMaterial(this._poolId));
   }
   undo() {
+    Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
     this._mesh.parent = null;
-    this._mesh.primitive?.dispose();
-    this._mesh.dispose();
     this._mesh = null;
   }
 }

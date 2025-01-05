@@ -34,6 +34,10 @@ export class AssetRegistry {
   getAssetInfo(name: string) {
     return this._assetMap.get(name);
   }
+  getAssetPoolId(name: string) {
+    const info = this._assetMap.get(name);
+    return info ? info.manager.pool.id : null;
+  }
   async fetchModel(name: string, scene: Scene, options?: ModelFetchOptions, request?: HttpRequest) {
     const info = this._assetMap.get(name);
     if (!info || info.type !== 'model') {

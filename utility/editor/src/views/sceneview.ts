@@ -28,6 +28,7 @@ export class SceneView extends EmptyView<SceneModel> {
   private _mousePosX: number;
   private _mousePosY: number;
   private _postGizmoCaptured: boolean;
+  private _drawTextureViewer: boolean;
   constructor(model: SceneModel) {
     super(model);
     this._transformNode = null;
@@ -38,6 +39,7 @@ export class SceneView extends EmptyView<SceneModel> {
     this._mousePosX = -1;
     this._mousePosY = -1;
     this._postGizmoCaptured = false;
+    this._drawTextureViewer = false;
     this._toolbar = new ToolBar(
       [
         {
@@ -133,6 +135,16 @@ export class SceneView extends EmptyView<SceneModel> {
               id: 'ADD_TORUS'
             }
           ]
+        },
+        {
+          label: 'Tools',
+          subMenus: [
+            {
+              label: 'Texture viewer',
+              id: 'SHOW_TEXTURE_VIEWER',
+              checked: this._drawTextureViewer
+            }
+          ]
         }
       ]
     };
@@ -180,12 +192,15 @@ export class SceneView extends EmptyView<SceneModel> {
     this.model.camera.aspect = viewportWidth / viewportHeight;
     this.model.camera.render(this.model.scene, this.model.compositor);
 
-    renderTextureViewer();
-
+    if (this._drawTextureViewer) {
+      renderTextureViewer();
+    }
+    /*
     if (ImGui.Begin('FontTest')) {
       ImGui.Text(FontGlyph.allGlyphs);
     }
     ImGui.End();
+    */
   }
   renderDropZone(x: number, y: number, w: number, h: number) {
     const color = new ImGui.ImVec4(0, 0, 0, 0);
@@ -350,8 +365,7 @@ export class SceneView extends EmptyView<SceneModel> {
       node = sealedNode;
     }
     this._postGizmoRenderer.node = node;
-    this._propGrid.object = node;
-    this._tab.sceneHierarchy.selectNode(node);
+    this._propGrid.object = node === node.scene.rootNode ? node.scene : node;
   }
   private handleNodeDeselected(node: SceneNode) {
     if (this._postGizmoRenderer.node === node) {
@@ -384,8 +398,11 @@ export class SceneView extends EmptyView<SceneModel> {
       });
   }
   private handleNodeRemoved(node: SceneNode) {
-    if (this._postGizmoRenderer.node === node) {
+    if (node.isParentOf(this._postGizmoRenderer.node)) {
       this._postGizmoRenderer.node = null;
+    }
+    if (node.isParentOf(this._tab.sceneHierarchy.selectedNode)) {
+      this._tab.sceneHierarchy.selectNode(null);
     }
   }
   private handleBeginTransformNode(node: SceneNode) {
@@ -422,6 +439,10 @@ export class SceneView extends EmptyView<SceneModel> {
         break;
       case 'TOOL_SCALE':
         this._postGizmoRenderer.mode = 'scaling';
+        break;
+      case 'SHOW_TEXTURE_VIEWER':
+        this._drawTextureViewer = !this._drawTextureViewer;
+        this.menubar.checkMenuItem(action, this._drawTextureViewer);
         break;
       default:
         eventBus.dispatchEvent('action', action);

@@ -57,6 +57,16 @@ export class MenubarView extends makeEventTarget(Object)<{
       }
     }
   }
+  checkMenuItem(id: string, checked: boolean) {
+    const item = this._map.get(id);
+    if (item) {
+      item.item.checked = checked;
+    }
+  }
+  isMenuItemChecked(id: string): boolean {
+    const item = this._map.get(id);
+    return !!item?.item.checked;
+  }
   addMenuItem(parentId: string, label: string, id: string, shortCut?: string): string {
     if (id === null || id === undefined) {
       id = this.uniqueId();

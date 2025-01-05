@@ -33,8 +33,8 @@ export class SphereShape extends Shape<SphereCreationOptions> {
    * Creates an instance of sphere shape
    * @param options - The creation options
    */
-  constructor(options?: SphereCreationOptions) {
-    super(options);
+  constructor(options?: SphereCreationOptions, poolId?: string | symbol) {
+    super(options, poolId);
   }
   /**
    * {@inheritDoc Shape.type}

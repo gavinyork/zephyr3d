@@ -40,8 +40,8 @@ export class BoxShape extends Shape<BoxCreationOptions> {
    * Creates an instance of box shape
    * @param options - The creation options
    */
-  constructor(options?: BoxCreationOptions) {
-    super(options);
+  constructor(options?: BoxCreationOptions, poolId?: string | symbol) {
+    super(options, poolId);
   }
   /**
    * {@inheritDoc Shape.type}

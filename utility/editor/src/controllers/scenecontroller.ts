@@ -11,11 +11,13 @@ import type { DBSceneInfo } from '../storage/db';
 
 export class SceneController extends BaseController<SceneModel> {
   protected _scene: DBSceneInfo;
+  protected _pools: symbol[];
   protected _view: SceneView;
   protected _cmdManager: CommandManager;
   constructor(model: SceneModel, view: SceneView) {
     super(model);
     this._view = view;
+    this._pools = [];
     this._cmdManager = new CommandManager();
   }
   handleEvent(ev: Event, type?: string): boolean {
@@ -57,27 +59,37 @@ export class SceneController extends BaseController<SceneModel> {
         console.log('Delete');
         break;
       case 'ADD_BOX': {
+        const poolId = Symbol();
+        this._pools.push(poolId);
         this._cmdManager.execute(
-          new AddShapeCommand(this.model.scene, BoxShape, { anchor: 0.5, anchorY: 0 })
+          new AddShapeCommand(this.model.scene, BoxShape, { anchor: 0.5, anchorY: 0 }, poolId)
         );
         break;
       }
       case 'ADD_SPHERE': {
-        this._cmdManager.execute(new AddShapeCommand(this.model.scene, SphereShape));
+        const poolId = Symbol();
+        this._pools.push(poolId);
+        this._cmdManager.execute(new AddShapeCommand(this.model.scene, SphereShape, null, poolId));
         break;
       }
       case 'ADD_PLANE': {
-        this._cmdManager.execute(new AddShapeCommand(this.model.scene, PlaneShape));
+        const poolId = Symbol();
+        this._pools.push(poolId);
+        this._cmdManager.execute(new AddShapeCommand(this.model.scene, PlaneShape, null, poolId));
         break;
       }
       case 'ADD_CYLINDER': {
+        const poolId = Symbol();
+        this._pools.push(poolId);
         this._cmdManager.execute(
-          new AddShapeCommand(this.model.scene, CylinderShape, { topCap: true, bottomCap: true })
+          new AddShapeCommand(this.model.scene, CylinderShape, { topCap: true, bottomCap: true }, poolId)
         );
         break;
       }
       case 'ADD_TORUS': {
-        this._cmdManager.execute(new AddShapeCommand(this.model.scene, TorusShape));
+        const poolId = Symbol();
+        this._pools.push(poolId);
+        this._cmdManager.execute(new AddShapeCommand(this.model.scene, TorusShape, null, poolId));
         break;
       }
       default:

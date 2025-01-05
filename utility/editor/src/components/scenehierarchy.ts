@@ -34,6 +34,9 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
       }
     }
   }
+  get selectedNode() {
+    return this._selectedNode;
+  }
   private renderSceneNode(node: SceneNode) {
     const serializationInfo = getSerializationInfo(null);
     let cls: SerializableClass = null;
@@ -57,11 +60,13 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     if (ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
       ImGui.OpenPopup(`context_${node.id}`);
     }
-    if (ImGui.BeginPopup(`context_${node.id}`)) {
-      if (ImGui.MenuItem('Delete')) {
-        this.dispatchEvent('node_request_delete', node);
+    if (node !== this._scene.rootNode) {
+      if (ImGui.BeginPopup(`context_${node.id}`)) {
+        if (ImGui.MenuItem('Delete')) {
+          this.dispatchEvent('node_request_delete', node);
+        }
+        ImGui.EndPopup();
       }
-      ImGui.EndPopup();
     }
     if (ImGui.BeginDragDropTarget()) {
       const payload = ImGui.AcceptDragDropPayload('NODE');
