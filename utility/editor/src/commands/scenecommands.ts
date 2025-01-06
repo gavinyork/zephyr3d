@@ -1,4 +1,4 @@
-import type { Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
+import { ParticleSystem, Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
 import {
   Application,
   BoxFrameShape,
@@ -60,6 +60,27 @@ export class AddAssetCommand implements Command {
   }
 }
 
+export class AddParticleSystemCommand implements Command {
+  private _scene: Scene;
+  private _poolId: symbol;
+  private _node: ParticleSystem;
+  constructor(scene: Scene, poolId?: symbol) {
+    this._scene = scene;
+    this._node = null;
+    this._poolId = poolId;
+  }
+  get desc(): string {
+    return 'Add particle system';
+  }
+  execute(): void {
+    this._node = new ParticleSystem(this._scene);
+  }
+  undo(): void {
+    Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
+    this._node.parent = null;
+    this._node = null;
+  }
+}
 export class AddShapeCommand<T extends ShapeType> implements Command {
   private _mesh: Mesh;
   private _desc: string;

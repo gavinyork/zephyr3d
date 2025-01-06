@@ -1,6 +1,6 @@
 import type { SceneNode } from '@zephyr3d/scene';
 import { BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '@zephyr3d/scene';
-import { AddShapeCommand, NodeTransformCommand } from '../commands/scenecommands';
+import { AddParticleSystemCommand, AddShapeCommand, NodeTransformCommand } from '../commands/scenecommands';
 import { CommandManager } from '../core/command';
 import { eventBus } from '../core/eventbus';
 import type { SceneModel } from '../models/scenemodel';
@@ -90,6 +90,12 @@ export class SceneController extends BaseController<SceneModel> {
         const poolId = Symbol();
         this._pools.push(poolId);
         this._cmdManager.execute(new AddShapeCommand(this.model.scene, TorusShape, null, poolId));
+        break;
+      }
+      case 'ADD_PARTICLE_SYSTEM': {
+        const poolId = Symbol();
+        this._pools.push(poolId);
+        this._cmdManager.execute(new AddParticleSystemCommand(this.model.scene, poolId));
         break;
       }
       default:

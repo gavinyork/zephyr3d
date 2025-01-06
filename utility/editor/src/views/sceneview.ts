@@ -133,6 +133,13 @@ export class SceneView extends EmptyView<SceneModel> {
             {
               label: 'Torus',
               id: 'ADD_TORUS'
+            },
+            {
+              label: '-',
+            },
+            {
+              label: 'ParticleSystem',
+              id: 'ADD_PARTICLE_SYSTEM'
             }
           ]
         },
