@@ -1,5 +1,6 @@
-import { Texture2D, TextureCube } from '@zephyr3d/device';
-import { AssetRegistry, ModelFetchOptions, Scene, TextureFetchOptions } from '@zephyr3d/scene';
+import type { Texture2D, TextureCube } from '@zephyr3d/device';
+import type { ModelFetchOptions, Scene, TextureFetchOptions } from '@zephyr3d/scene';
+import { AssetRegistry } from '@zephyr3d/scene';
 import { AssetStore } from '../helpers/assetstore';
 
 export class EditorAssetRegistry extends AssetRegistry {

@@ -1,4 +1,5 @@
-import { ParticleSystem, Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
+import type { Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
+import { ParticleSystem } from '@zephyr3d/scene';
 import {
   Application,
   BoxFrameShape,

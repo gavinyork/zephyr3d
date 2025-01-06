@@ -8,7 +8,7 @@ import { Dialog } from '../views/dlg/dlg';
 import { enableWorkspaceDragging } from './dragdrop';
 import { eventBus } from '../core/eventbus';
 import type { AssetType } from '@zephyr3d/scene';
-import { AssetRegistry } from '@zephyr3d/scene';
+import type { AssetRegistry } from '@zephyr3d/scene';
 
 export class AssetHierarchy {
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
