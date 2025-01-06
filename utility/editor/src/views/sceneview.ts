@@ -1,10 +1,9 @@
 import { ImGui } from '@zephyr3d/imgui';
 import type { SceneModel } from '../models/scenemodel';
-import { EmptyView } from './emptyview';
 import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import { Tab } from '../components/tab';
-import type { Camera, Compositor, Scene, SceneNode } from '@zephyr3d/scene';
+import type { AssetRegistry, Camera, Compositor, Scene, SceneNode } from '@zephyr3d/scene';
 import { Application, getSerializationInfo } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
@@ -15,12 +14,17 @@ import type { DBAssetInfo } from '../storage/db';
 import { AssetStore } from '../helpers/assetstore';
 import { Dialog } from './dlg/dlg';
 import { renderTextureViewer } from '../components/textureviewer';
+import { MenubarView } from '../components/menubar';
+import { StatusBar } from '../components/statusbar';
+import { BaseView } from './baseview';
 
-export class SceneView extends EmptyView<SceneModel> {
+export class SceneView extends BaseView<SceneModel> {
   private _postGizmoRenderer: PostGizmoRenderer;
   private _propGrid: PropertyEditor;
   private _toolbar: ToolBar;
   private _tab: Tab;
+  private _menubar: MenubarView;
+  private _statusbar: StatusBar;
   private _transformNode: SceneNode;
   private _oldTransform: TRS;
   private _dragDropTypes: string[];
@@ -29,17 +33,87 @@ export class SceneView extends EmptyView<SceneModel> {
   private _mousePosY: number;
   private _postGizmoCaptured: boolean;
   private _drawTextureViewer: boolean;
-  constructor(model: SceneModel) {
+  constructor(model: SceneModel, assetRegistry: AssetRegistry) {
     super(model);
     this._transformNode = null;
     this._oldTransform = null;
-    this.drawBackground = false;
     this._dragDropTypes = [];
     this._nodeToBePlaced = null;
     this._mousePosX = -1;
     this._mousePosY = -1;
     this._postGizmoCaptured = false;
     this._drawTextureViewer = false;
+    this._statusbar = new StatusBar();
+    this._menubar = new MenubarView({
+      items: [
+        {
+          label: `File`,
+          subMenus: [
+            {
+              label: 'New',
+              subMenus: [
+                {
+                  label: 'Scene',
+                  id: 'NEW_SCENE'
+                }
+              ]
+            },
+            {
+              label: 'Open',
+              shortCut: 'Ctrl+O',
+              id: 'OPEN_DOC'
+            },
+            {
+              label: 'Save',
+              shortCut: 'Ctrl+S',
+              id: 'SAVE_DOC'
+            }
+          ]
+        },
+        {
+          label: 'Add',
+          subMenus: [
+            {
+              label: 'Box',
+              id: 'ADD_BOX'
+            },
+            {
+              label: 'Sphere',
+              id: 'ADD_SPHERE'
+            },
+            {
+              label: 'Plane',
+              id: 'ADD_PLANE'
+            },
+            {
+              label: 'Cylinder',
+              id: 'ADD_CYLINDER'
+            },
+            {
+              label: 'Torus',
+              id: 'ADD_TORUS'
+            },
+            {
+              label: '-'
+            },
+            {
+              label: 'ParticleSystem',
+              id: 'ADD_PARTICLE_SYSTEM'
+            }
+          ]
+        },
+        {
+          label: 'Tools',
+          subMenus: [
+            {
+              label: 'Texture viewer',
+              id: 'SHOW_TEXTURE_VIEWER',
+              checked: this._drawTextureViewer
+            }
+          ]
+        }
+      ]
+    });
     this._toolbar = new ToolBar(
       [
         {
@@ -83,7 +157,7 @@ export class SceneView extends EmptyView<SceneModel> {
         }
       ],
       0,
-      this.menubar.height,
+      this._menubar.height,
       -1,
       30,
       16,
@@ -95,83 +169,39 @@ export class SceneView extends EmptyView<SceneModel> {
     this._tab = new Tab(
       this.model.scene,
       true,
-      this.menubar.height + this._toolbar.height,
-      this.statusbar.height
+      this._menubar.height + this._toolbar.height,
+      this._statusbar.height,
+      assetRegistry
     );
     this._propGrid = new PropertyEditor(
       getSerializationInfo(this._tab.assetHierarchy.assetRegistry),
-      this.menubar.height + this._toolbar.height,
-      this.statusbar.height,
+      this._menubar.height + this._toolbar.height,
+      this._statusbar.height,
       300,
       8,
       600,
       200,
       0.4
     );
-    this.menubar.options = {
-      items: [
-        ...this.menubar.options.items,
-        {
-          label: 'Add',
-          subMenus: [
-            {
-              label: 'Box',
-              id: 'ADD_BOX'
-            },
-            {
-              label: 'Sphere',
-              id: 'ADD_SPHERE'
-            },
-            {
-              label: 'Plane',
-              id: 'ADD_PLANE'
-            },
-            {
-              label: 'Cylinder',
-              id: 'ADD_CYLINDER'
-            },
-            {
-              label: 'Torus',
-              id: 'ADD_TORUS'
-            },
-            {
-              label: '-',
-            },
-            {
-              label: 'ParticleSystem',
-              id: 'ADD_PARTICLE_SYSTEM'
-            }
-          ]
-        },
-        {
-          label: 'Tools',
-          subMenus: [
-            {
-              label: 'Texture viewer',
-              id: 'SHOW_TEXTURE_VIEWER',
-              checked: this._drawTextureViewer
-            }
-          ]
-        }
-      ]
-    };
   }
   get toolbar() {
     return this._toolbar;
   }
   render() {
-    super.render();
-    const displaySize = ImGui.GetIO().DisplaySize;
-    const viewportWidth = displaySize.x - this._tab.width - this._propGrid.width;
-    const viewportHeight = displaySize.y - this.statusbar.height - this.menubar.height - this._toolbar.height;
+    this._menubar.render();
     this._tab.render();
     this._propGrid.render();
     this._toolbar.render();
+    this._statusbar.render();
+    const displaySize = ImGui.GetIO().DisplaySize;
+    const viewportWidth = displaySize.x - this._tab.width - this._propGrid.width;
+    const viewportHeight =
+      displaySize.y - this._statusbar.height - this._menubar.height - this._toolbar.height;
     if (this._dragDropTypes.length > 0) {
       if (viewportWidth > 0 && viewportHeight > 0) {
         this.renderDropZone(
           this._tab.width,
-          this.menubar.height + this._toolbar.height,
+          this._menubar.height + this._toolbar.height,
           viewportWidth,
           viewportHeight
         );
@@ -194,8 +224,8 @@ export class SceneView extends EmptyView<SceneModel> {
         this._nodeToBePlaced.parent = null;
       }
     }
-    this.model.camera.viewport = [this._tab.width, this.statusbar.height, viewportWidth, viewportHeight];
-    this.model.camera.scissor = [this._tab.width, this.statusbar.height, viewportWidth, viewportHeight];
+    this.model.camera.viewport = [this._tab.width, this._statusbar.height, viewportWidth, viewportHeight];
+    this.model.camera.scissor = [this._tab.width, this._statusbar.height, viewportWidth, viewportHeight];
     this.model.camera.aspect = viewportWidth / viewportHeight;
     this.model.camera.render(this.model.scene, this.model.compositor);
 
@@ -325,8 +355,8 @@ export class SceneView extends EmptyView<SceneModel> {
   }
   protected onActivate(): void {
     super.onActivate();
-    this.menubar.registerShortcuts(this);
-    this.menubar.on('action', this.handleSceneAction, this);
+    this._menubar.registerShortcuts(this);
+    this._menubar.on('action', this.handleSceneAction, this);
     this._toolbar.registerShortcuts(this);
     this._toolbar.on('action', this.handleSceneAction, this);
     this._tab.sceneHierarchy.on('node_selected', this.handleNodeSelected, this);
@@ -345,8 +375,8 @@ export class SceneView extends EmptyView<SceneModel> {
   }
   protected onDeactivate(): void {
     super.onDeactivate();
-    this.menubar.unregisterShortcuts(this);
-    this.menubar.off('action', this.handleSceneAction, this);
+    this._menubar.unregisterShortcuts(this);
+    this._menubar.off('action', this.handleSceneAction, this);
     this._toolbar.unregisterShortcuts(this);
     this._toolbar.off('action', this.handleSceneAction, this);
     this._tab.sceneHierarchy.off('node_selected', this.handleNodeSelected, this);
@@ -449,7 +479,7 @@ export class SceneView extends EmptyView<SceneModel> {
         break;
       case 'SHOW_TEXTURE_VIEWER':
         this._drawTextureViewer = !this._drawTextureViewer;
-        this.menubar.checkMenuItem(action, this._drawTextureViewer);
+        this._menubar.checkMenuItem(action, this._drawTextureViewer);
         break;
       default:
         eventBus.dispatchEvent('action', action);

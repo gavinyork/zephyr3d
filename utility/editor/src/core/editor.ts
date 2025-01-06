@@ -9,6 +9,7 @@ import { SceneController } from '../controllers/scenecontroller';
 import { SceneModel } from '../models/scenemodel';
 import { FontGlyph } from './fontglyph';
 import { Database } from '../storage/db';
+import { EditorAssetRegistry } from './assetregistry';
 
 export class Editor {
   private static _instance: Editor;
@@ -46,9 +47,10 @@ export class Editor {
     const emptyController = new EmptyController(emptyView);
     this._moduleManager.register('Empty', null, emptyView, emptyController);
 
+    const assetRegistry = new EditorAssetRegistry();
     const sceneModel = new SceneModel();
-    const sceneView = new SceneView(sceneModel);
-    const sceneController = new SceneController(sceneModel, sceneView);
+    const sceneView = new SceneView(sceneModel, assetRegistry);
+    const sceneController = new SceneController(sceneModel, sceneView, assetRegistry);
     this._moduleManager.register('Scene', sceneModel, sceneView, sceneController);
 
     this._moduleManager.activate('Scene', null);

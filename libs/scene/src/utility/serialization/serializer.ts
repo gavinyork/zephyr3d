@@ -1,51 +1,68 @@
-import type { PropertyValue, SerializableClass, SerializationInfo } from './types';
+import type { PropertyValue, SerializableClass } from './types';
 
-export function deserializeObjectProps<T>(obj: T, cls: SerializableClass, json: object) {
+export function deserializeObjectProps<T>(
+  obj: T,
+  cls: SerializableClass,
+  json: object,
+  serializationInfo: Map<any, SerializableClass>
+) {
   const tmpVal: PropertyValue = {
     num: [0, 0, 0, 0],
     str: [''],
-    bool: [false]
+    bool: [false],
+    object: [null]
   };
   const props = cls.getProps(obj) ?? [];
   for (const prop of props) {
     const k = prop.name;
     const v = json[k];
-    if (!v && !prop.default) {
-      console.error(`Warn: serialized value not found for '${k}'`);
-      continue;
-    }
     switch (prop.type) {
+      case 'object':
+        if (typeof v === 'string' && v.startsWith('ASSET:')) {
+          tmpVal.str[0] = v;
+        } else {
+          tmpVal.object[0] = v ? deserializeObject<any>(obj, v, serializationInfo) ?? null : null;
+        }
+        break;
+      case 'object_array':
+        tmpVal.object = [];
+        if (Array.isArray(v)) {
+          for (const p of v) {
+            tmpVal.object.push = deserializeObject<any>(obj, p, serializationInfo) ?? null;
+          }
+        }
+        break;
       case 'float':
       case 'int': {
-        tmpVal.num[0] = v ?? prop.default.num[0];
+        tmpVal.num[0] = v ?? prop.default?.num[0] ?? 0;
         break;
       }
       case 'string': {
-        tmpVal.num[0] = v ?? prop.default.str[0];
+        tmpVal.num[0] = v ?? prop.default?.str[0] ?? '';
         break;
       }
       case 'bool': {
-        tmpVal.num[0] = v ?? prop.default.bool[0];
+        tmpVal.num[0] = v ?? prop.default?.bool[0] ?? false;
         break;
       }
       case 'vec2': {
-        tmpVal.num[0] = v ? v[0] : prop.default.num[0];
-        tmpVal.num[1] = v ? v[1] : prop.default.num[1];
+        tmpVal.num[0] = v ? v[0] : prop.default?.num[0] ?? 0;
+        tmpVal.num[1] = v ? v[1] : prop.default?.num[1] ?? 0;
         break;
       }
       case 'vec3':
       case 'rgb': {
-        tmpVal.num[0] = v ? v[0] : prop.default.num[0];
-        tmpVal.num[1] = v ? v[1] : prop.default.num[1];
-        tmpVal.num[2] = v ? v[2] : prop.default.num[2];
+        tmpVal.num[0] = v ? v[0] : prop.default?.num[0] ?? 0;
+        tmpVal.num[1] = v ? v[1] : prop.default?.num[1] ?? 0;
+        tmpVal.num[2] = v ? v[2] : prop.default?.num[2] ?? 0;
         break;
       }
       case 'vec4':
       case 'rgba': {
-        tmpVal.num[0] = v ? v[0] : prop.default.num[0];
-        tmpVal.num[1] = v ? v[1] : prop.default.num[1];
-        tmpVal.num[2] = v ? v[2] : prop.default.num[2];
-        tmpVal.num[3] = v ? v[3] : prop.default.num[3];
+        tmpVal.num[0] = v ? v[0] : prop.default?.num[0] ?? 0;
+        tmpVal.num[1] = v ? v[1] : prop.default?.num[1] ?? 0;
+        tmpVal.num[2] = v ? v[2] : prop.default?.num[2] ?? 0;
+        tmpVal.num[3] = v ? v[3] : prop.default?.num[3] ?? 0;
         break;
       }
     }
@@ -53,17 +70,37 @@ export function deserializeObjectProps<T>(obj: T, cls: SerializableClass, json: 
   }
 }
 
-export function serializeObjectProps<T>(obj: T, cls: SerializableClass, json: object) {
+export function serializeObjectProps<T>(
+  obj: T,
+  cls: SerializableClass,
+  json: object,
+  serializationInfo: Map<any, SerializableClass>
+) {
   const tmpVal: PropertyValue = {
     num: [0, 0, 0, 0],
     str: [''],
-    bool: [false]
+    bool: [false],
+    object: [null]
   };
   const props = cls.getProps(obj) ?? [];
   for (const prop of props) {
     const k = prop.name;
     prop.get.call(obj, tmpVal);
     switch (prop.type) {
+      case 'object':
+        json[k] =
+          typeof tmpVal.str[0] === 'string' && tmpVal.str[0].startsWith('ASSET:')
+            ? tmpVal.str[0]
+            : tmpVal.object[0]
+            ? serializeObject(tmpVal.object[0], serializationInfo)
+            : null;
+        break;
+      case 'object_array':
+        json[k] = [];
+        for (const p of tmpVal.object) {
+          json[k].push(serializeObject(p, serializationInfo));
+        }
+        break;
       case 'float':
       case 'int': {
         if (!prop.default || prop.default.num[0] !== tmpVal.num[0]) {
@@ -118,32 +155,37 @@ export function serializeObjectProps<T>(obj: T, cls: SerializableClass, json: ob
   }
 }
 
-export function serializeObject<T>(obj: T, serailizationInfo: SerializationInfo, json?: object) {
-  const index = serailizationInfo.findIndex((val) => val.ctor === obj.constructor);
+export function serializeObject<T>(obj: T, serializationInfo: Map<any, SerializableClass>, json?: any) {
+  const cls = [...serializationInfo.values()];
+  const index = cls.findIndex((val) => val.ctor === obj.constructor);
   if (index < 0) {
     throw new Error('Serialize object failed: Cannot found serialization meta data');
   }
-  let info = serailizationInfo[index];
-  json = json ?? {
-    ClassName: info.className
-  };
+  let info = cls[index];
+  json = json ?? {};
+  json.ClassName = info.className;
   while (info) {
-    serializeObjectProps(obj, info, json);
+    serializeObjectProps(obj, info, json, serializationInfo);
     info = info.parent;
   }
   return json;
 }
 
-export function deserializeObject<T>(ctx: unknown, json: object, serailizationInfo: SerializationInfo): T {
+export function deserializeObject<T>(
+  ctx: any,
+  json: object,
+  serializationInfo: Map<any, SerializableClass>
+): T {
+  const cls = [...serializationInfo.values()];
   const className = json['ClassName'];
-  const index = serailizationInfo.findIndex((val) => val.className === className);
+  const index = cls.findIndex((val) => val.className === className);
   if (index < 0) {
     throw new Error('Deserialize object failed: Cannot found serialization meta data');
   }
-  let info = serailizationInfo[index];
+  let info = cls[index];
   const obj = info.createFunc ? info.createFunc(ctx) : new info.ctor();
   while (info) {
-    deserializeObjectProps(obj, info, json);
+    deserializeObjectProps(obj, info, json, serializationInfo);
     info = info.parent;
   }
   return obj;

@@ -8,12 +8,13 @@ export type PropertyType =
   | 'string'
   | 'rgb'
   | 'rgba'
-  | 'object';
+  | 'object'
+  | 'object_array';
 export type PropertyValue = {
   num?: number[];
   str?: string[];
   bool?: boolean[];
-  object?: unknown;
+  object?: unknown[];
 };
 
 export type PropertyAccessor<T = unknown> = {

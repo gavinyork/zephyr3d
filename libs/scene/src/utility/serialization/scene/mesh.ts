@@ -35,7 +35,7 @@ export function getMeshClass(): SerializableClass {
         {
           name: 'Material',
           type: 'object',
-          default: { object: new LambertMaterial() },
+          default: { object: [new LambertMaterial()] },
           objectTypes: [
             UnlitMaterial,
             LambertMaterial,
@@ -44,11 +44,13 @@ export function getMeshClass(): SerializableClass {
             PBRSpecularGlossinessMaterial
           ],
           get(this: Mesh, value) {
-            value.object = this.material;
+            value.object[0] = this.material;
           },
           set(this: Mesh, value) {
-            if (value.object instanceof MeshMaterial) {
-              this.material = value.object;
+            if (!value.object[0]) {
+              this.material = null;
+            } else if (value.object[0] instanceof MeshMaterial) {
+              this.material = value.object[0];
             } else {
               console.error('Invalid material type');
             }

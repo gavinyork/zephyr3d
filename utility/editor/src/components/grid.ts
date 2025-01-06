@@ -6,7 +6,7 @@ const tmpProperty: PropertyValue = {
   num: [0, 0, 0, 0],
   str: [''],
   bool: [false],
-  object: null
+  object: []
 };
 
 interface Property<T extends {}> {
@@ -30,7 +30,7 @@ class PropertyGroup {
     this.grid = grid;
     this.name = name;
     this.parent = null;
-    this.value = { num: [], str: [], bool: [], object: null };
+    this.value = { num: [], str: [], bool: [], object: [null] };
     this.property = null;
     this.currentType = -1;
     this.objectTypes = [];
@@ -42,7 +42,7 @@ class PropertyGroup {
     if (value.type === 'object' && value.objectTypes?.length > 0) {
       const propGroup = this.addGroup(value.name);
       value.get.call(obj, tmpProperty);
-      propGroup.setObject(tmpProperty.object);
+      propGroup.setObject(tmpProperty.object[0]);
     } else {
       const property: Property<any> = {
         path: `${this.name}/${value.name}`,
@@ -62,17 +62,17 @@ class PropertyGroup {
   getObject() {
     let group: PropertyGroup = this;
     while (group) {
-      if (group.value.object) {
-        return group.value.object;
+      if (group.value.object[0]) {
+        return group.value.object[0];
       }
       group = group.parent;
     }
     return null;
   }
   setObject(obj: any, objTypes?: unknown[]) {
-    if (this.value.object !== obj) {
+    if (this.value.object[0] !== obj) {
       const serializationInfo = this.grid.serailizationInfo;
-      this.value.object = obj ?? null;
+      this.value.object[0] = obj ?? null;
       this.property = null;
       this.currentType = -1;
       this.objectTypes =
@@ -86,17 +86,17 @@ class PropertyGroup {
       this.objectTypeNames = this.objectTypes.map((t) => t.className);
       this.properties = new Map();
       this.subgroups = [];
-      if (this.value.object) {
+      if (this.value.object[0]) {
         let cls: SerializableClass = null;
-        let ctor = this.value.object.constructor;
+        let ctor = this.value.object[0].constructor;
         while (ctor) {
           cls = serializationInfo.get(ctor);
           if (cls) {
-            const props = cls.getProps(this.value.object);
+            const props = cls.getProps(this.value.object[0]).filter((p) => p.type !== 'object_array');
             if (props.length > 0) {
               const group = this.addGroup(cls.className);
-              for (const prop of cls.getProps(this.value.object)) {
-                group.addProperty(this.value.object, prop);
+              for (const prop of props) {
+                group.addProperty(this.value.object[0], prop);
               }
             }
           }

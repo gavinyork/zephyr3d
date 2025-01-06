@@ -1,5 +1,13 @@
-import type { SceneNode } from '@zephyr3d/scene';
-import { BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '@zephyr3d/scene';
+import type { AssetRegistry, SceneNode } from '@zephyr3d/scene';
+import {
+  BoxShape,
+  CylinderShape,
+  getSerializationInfo,
+  PlaneShape,
+  serializeObject,
+  SphereShape,
+  TorusShape
+} from '@zephyr3d/scene';
 import { AddParticleSystemCommand, AddShapeCommand, NodeTransformCommand } from '../commands/scenecommands';
 import { CommandManager } from '../core/command';
 import { eventBus } from '../core/eventbus';
@@ -7,17 +15,20 @@ import type { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
 import type { SceneView } from '../views/sceneview';
 import type { TRS } from '../types';
-import type { DBSceneInfo } from '../storage/db';
+import { Database, type DBSceneInfo } from '../storage/db';
+import { Dialog } from '../views/dlg/dlg';
 
 export class SceneController extends BaseController<SceneModel> {
   protected _scene: DBSceneInfo;
   protected _pools: symbol[];
   protected _view: SceneView;
+  protected _assetRegistry: AssetRegistry;
   protected _cmdManager: CommandManager;
-  constructor(model: SceneModel, view: SceneView) {
+  constructor(model: SceneModel, view: SceneView, assetRegistry: AssetRegistry) {
     super(model);
     this._view = view;
     this._pools = [];
+    this._assetRegistry = assetRegistry;
     this._cmdManager = new CommandManager();
   }
   handleEvent(ev: Event, type?: string): boolean {
@@ -28,18 +39,27 @@ export class SceneController extends BaseController<SceneModel> {
     eventBus.on('update', this.update, this);
     eventBus.on('action', this.sceneAction, this);
     eventBus.on('node_transform', this.nodeTransform, this);
+    eventBus.on('action_doc_request_save_scene', this.saveScene, this);
   }
   protected onDeactivate(): void {
     this._scene = null;
     eventBus.off('update', this.update, this);
     eventBus.off('action', this.sceneAction, this);
     eventBus.off('node_transform', this.nodeTransform, this);
+    eventBus.off('action_doc_request_save_scene', this.saveScene, this);
   }
   private nodeTransform(node: SceneNode, oldTransform: TRS, newTransform: TRS) {
     this._cmdManager.execute(new NodeTransformCommand(node, oldTransform, newTransform));
   }
   private sceneAction(action: string) {
     switch (action) {
+      case 'SAVE_DOC':
+        if (!this._scene) {
+          Dialog.saveScene('Save scene');
+        } else {
+          eventBus.dispatchEvent('action_doc_request_save_scene', this._scene.name);
+        }
+        break;
       case 'UNDO':
         this._cmdManager.undo();
         break;
@@ -107,5 +127,15 @@ export class SceneController extends BaseController<SceneModel> {
     this.model.camera.updateController();
     this._view.toolbar.selectTool('UNDO', this._cmdManager.canUndo());
     this._view.toolbar.selectTool('REDO', this._cmdManager.canRedo());
+  }
+  private saveScene(name: string) {
+    this._scene = Object.assign({}, this._scene ?? {}, {
+      name,
+      content: serializeObject(this.model.scene, getSerializationInfo(this._assetRegistry), {})
+    });
+    Database.putScene(this._scene).then((uuid) => {
+      this._scene.uuid = uuid;
+      Dialog.messageBox('Zephyr3d', `Scene saved: ${uuid}`);
+    });
   }
 }

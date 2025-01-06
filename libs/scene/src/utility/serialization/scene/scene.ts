@@ -1,4 +1,4 @@
-import { Texture2D, TextureCube } from '@zephyr3d/device';
+import { Texture2D } from '@zephyr3d/device';
 import type { EnvLightType, FogType, SkyType } from '../../../render';
 import { Scene } from '../../../scene/scene';
 import type { AssetRegistry } from '../asset/asset';
@@ -6,6 +6,7 @@ import type { SerializableClass } from '../types';
 import { Application } from '../../../app';
 import { panoramaToCubemap } from '../../panorama';
 import { prefilterCubemap } from '../../pmrem';
+import { SceneNode } from '../../../scene';
 
 export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
@@ -362,6 +363,21 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
                     console.error('Invalid skybox texture');
                   }
                 });
+              }
+            }
+          }
+        },
+        {
+          name: 'Nodes',
+          type: 'object_array',
+          get(this: Scene, value) {
+            value.object = this.rootNode.children.slice();
+          },
+          set(this: Scene, value) {
+            this.rootNode.removeChildren();
+            for (const child of value.object) {
+              if (child instanceof SceneNode) {
+                child.parent = this.rootNode;
               }
             }
           }

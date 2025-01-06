@@ -7,30 +7,20 @@ import { AssetStore } from '../helpers/assetstore';
 import { Dialog } from '../views/dlg/dlg';
 import { enableWorkspaceDragging } from './dragdrop';
 import { eventBus } from '../core/eventbus';
-import type { AssetType, ModelFetchOptions, Scene, TextureFetchOptions } from '@zephyr3d/scene';
+import type { AssetType } from '@zephyr3d/scene';
 import { AssetRegistry } from '@zephyr3d/scene';
-import type { Texture2D, TextureCube } from '@zephyr3d/device';
-
-class EditorAssetRegistry extends AssetRegistry {
-  async fetchModel(name: string, scene: Scene, options?: ModelFetchOptions) {
-    return AssetStore.fetchModel(scene, name, options);
-  }
-  async fetchTexture<T extends Texture2D | TextureCube>(name: string, options?: TextureFetchOptions<T>) {
-    return AssetStore.fetchTexture<T>(name, options);
-  }
-}
 
 export class AssetHierarchy {
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
   private _assets: { pkg: DBAssetPackage; assets: DBAssetInfo[] }[];
   private _selectedAsset: DBAssetInfo;
   private _zipProgress: DlgProgress;
-  private _assetRegistry: EditorAssetRegistry;
-  constructor() {
+  private _assetRegistry: AssetRegistry;
+  constructor(assetRegistry: AssetRegistry) {
     this._assets = [];
     this._selectedAsset = null;
     this._zipProgress = null;
-    this._assetRegistry = new EditorAssetRegistry();
+    this._assetRegistry = assetRegistry;
     this.listAssets();
   }
   get assets() {

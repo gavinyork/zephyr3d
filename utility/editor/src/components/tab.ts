@@ -1,16 +1,16 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { DockPannel } from './dockpanel';
 import { SceneHierarchy } from './scenehierarchy';
-import type { Scene } from '@zephyr3d/scene';
+import type { AssetRegistry, Scene } from '@zephyr3d/scene';
 import { AssetHierarchy } from './assethierarchy';
 
 export class Tab {
   private _panel: DockPannel;
   private _sceneHierarchy: SceneHierarchy;
   private _assetHierarchy: AssetHierarchy;
-  constructor(scene: Scene, left: boolean, top: number, bottom: number) {
+  constructor(scene: Scene, left: boolean, top: number, bottom: number, assetRegistry: AssetRegistry) {
     this._sceneHierarchy = new SceneHierarchy(scene);
-    this._assetHierarchy = new AssetHierarchy();
+    this._assetHierarchy = new AssetHierarchy(assetRegistry);
     this._panel = new DockPannel(left, top, bottom, 8, 300, 200, 600);
   }
   get width() {
