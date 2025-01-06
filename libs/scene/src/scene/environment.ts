@@ -1,4 +1,5 @@
-import { ObservableVector4, Vector4 } from '@zephyr3d/base';
+import type { Vector4 } from '@zephyr3d/base';
+import { ObservableVector4 } from '@zephyr3d/base';
 import type { DrawContext, EnvironmentLighting, EnvLightType } from '../render';
 import { EnvShIBL } from '../render';
 import { EnvConstantAmbient, EnvHemisphericAmbient, EnvIBL } from '../render';
