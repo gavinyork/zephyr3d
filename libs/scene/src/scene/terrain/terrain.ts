@@ -43,8 +43,6 @@ export class Terrain extends GraphNode {
   /** @internal */
   private _grassMaterial: GrassMaterial;
   /** @internal */
-  private _wireframe: boolean;
-  /** @internal */
   private _viewPoint: Vector3;
   /** @internal */
   private _castShadow: boolean;
@@ -68,7 +66,6 @@ export class Terrain extends GraphNode {
     this._height = 0;
     this._material = null;
     this._grassMaterial = null;
-    this._wireframe = false;
     this._viewPoint = null;
     this._castShadow = true;
     this._instanceColor = Vector4.zero();
@@ -144,13 +141,6 @@ export class Terrain extends GraphNode {
   /** Grass material */
   get grassMaterial(): GrassMaterial {
     return this._grassMaterial;
-  }
-  /** Whether the terrain should be rendered in wireframe mode */
-  get wireframe(): boolean {
-    return this._wireframe;
-  }
-  set wireframe(b: boolean) {
-    this._wireframe = !!b;
   }
   /** Normal map of the terrain */
   get normalMap(): Texture2D {

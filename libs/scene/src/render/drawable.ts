@@ -8,7 +8,7 @@ import type {
   TextureFormat
 } from '@zephyr3d/device';
 import type { Camera } from '../camera/camera';
-import type { FogType, RenderPass } from '.';
+import type { FogType, Primitive, RenderPass } from '.';
 import type { DrawableInstanceInfo, InstanceData, RenderQueue, RenderQueueRef } from './render_queue';
 import type { ShadowMapParams } from '../shadow';
 import type { Environment } from '../scene/environment';
@@ -137,6 +137,8 @@ export interface Drawable {
   isUnlit(): boolean;
   /** Gets the associated material */
   getMaterial(): MeshMaterial;
+  /** Gets the associated primitive */
+  getPrimitive(): Primitive;
   /** Set render queue reference */
   pushRenderQueueRef(ref: RenderQueueRef);
   /** Apply transform uniforms */

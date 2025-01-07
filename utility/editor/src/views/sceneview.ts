@@ -420,7 +420,7 @@ export class SceneView extends BaseView<SceneModel> {
     if (sealedNode) {
       node = sealedNode;
     }
-    this._postGizmoRenderer.node = node;
+    this._postGizmoRenderer.node = node === node.scene.rootNode ? null : node;
     this._propGrid.object = node === node.scene.rootNode ? node.scene : node;
   }
   private handleNodeDeselected(node: SceneNode) {

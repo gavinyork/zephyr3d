@@ -30,8 +30,8 @@ export type PropertyAccessor<T = unknown> = {
 };
 
 export type SerializableClass = {
-  ctor: any;
-  className: string;
+  ctor?: any;
+  className?: string;
   parent?: SerializableClass;
   createFunc?: (ctx?: any) => any;
   getProps: (obj: any) => PropertyAccessor<any>[];

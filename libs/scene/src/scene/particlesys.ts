@@ -715,6 +715,12 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     return this._material;
   }
   /**
+   * {@inheritDoc Drawable.getPrimitive}
+   */
+  getPrimitive(): Primitive {
+    return this._primitive;
+  }
+  /**
    * {@inheritDoc SceneNode.isParticleSystem}
    */
   isParticleSystem(): this is ParticleSystem {

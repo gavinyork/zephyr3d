@@ -14,6 +14,7 @@ import {
 } from '@zephyr3d/device';
 import { Application } from '../app';
 import type { BoundingVolume } from '../utility/bounding_volume';
+import { RenderBundleWrapper } from './renderbundle_wrapper';
 
 /**
  * Primitive contains only the vertex and index data of a mesh
@@ -93,14 +94,20 @@ export class Primitive {
     return this._primitiveType;
   }
   set primitiveType(type) {
-    this._primitiveType = type;
+    if (type !== this._primitiveType) {
+      this._primitiveType = type;
+      RenderBundleWrapper.primitiveChanged(this);
+    }
   }
   /** Start index for drawing */
   get indexStart() {
     return this._indexStart;
   }
   set indexStart(val) {
-    this._indexStart = val;
+    if (val !== this._indexStart) {
+      this._indexStart = val;
+      RenderBundleWrapper.primitiveChanged(this);
+    }
   }
   /** The number of the indices or vertices to be drawn */
   get indexCount() {
@@ -108,7 +115,10 @@ export class Primitive {
     return this._indexCount;
   }
   set indexCount(val) {
-    this._indexCount = val;
+    if (val !== this._indexCount) {
+      this._indexCount = val;
+      RenderBundleWrapper.primitiveChanged(this);
+    }
   }
   /**
    * Query total vertex count
@@ -154,6 +164,7 @@ export class Primitive {
       if (info?.buffer === buffer) {
         info[loc] = null;
         this._vertexLayoutDirty = true;
+        RenderBundleWrapper.primitiveChanged(this);
       }
     }
   }
@@ -203,6 +214,7 @@ export class Primitive {
       stepMode
     });
     this._vertexLayoutDirty = true;
+    RenderBundleWrapper.primitiveChanged(this);
     return buffer;
   }
   /**
@@ -228,6 +240,7 @@ export class Primitive {
     if (this._vertexLayoutOptions.indexBuffer !== buffer) {
       this._vertexLayoutOptions.indexBuffer = buffer;
       this._vertexLayoutDirty = true;
+      RenderBundleWrapper.primitiveChanged(this);
     }
   }
   /**

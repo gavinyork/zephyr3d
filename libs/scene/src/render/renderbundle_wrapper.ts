@@ -2,6 +2,7 @@ import type { RenderBundle } from '@zephyr3d/device';
 import { Application } from '../app';
 import type { Material } from '../material';
 import type { Drawable } from './drawable';
+import { Primitive } from './primitive';
 
 export class RenderBundleWrapper {
   private _renderBundles: Record<string, RenderBundle>;
@@ -9,8 +10,15 @@ export class RenderBundleWrapper {
   private static _drawableContainer: WeakMap<Drawable, { wrapper: RenderBundleWrapper; hashes: string[] }[]> =
     new WeakMap();
   private static _materialContainer: WeakMap<Material, Set<Drawable>> = new WeakMap();
+  private static _primitiveContainer: WeakMap<Primitive, Set<Drawable>> = new WeakMap();
   /** @internal */
-  static addDrawable(drawable: Drawable, material: Material, wrapper: RenderBundleWrapper, hash: string) {
+  static addDrawable(
+    drawable: Drawable,
+    material: Material,
+    primitive: Primitive,
+    wrapper: RenderBundleWrapper,
+    hash: string
+  ) {
     let renderBundles = this._drawableContainer.get(drawable);
     if (!renderBundles) {
       renderBundles = [];
@@ -32,6 +40,14 @@ export class RenderBundleWrapper {
       }
       ownDrawables.add(drawable);
     }
+    if (primitive) {
+      let ownDrawables = this._primitiveContainer.get(primitive);
+      if (!ownDrawables) {
+        ownDrawables = new Set();
+        this._primitiveContainer.set(primitive, ownDrawables);
+      }
+      ownDrawables.add(drawable);
+    }
   }
   /** @internal */
   static drawableChanged(drawable: Drawable) {
@@ -47,6 +63,35 @@ export class RenderBundleWrapper {
           }
         }
       }
+    }
+  }
+  /** @internal */
+  static primitiveChanged(primitive: Primitive) {
+    const ownDrawables = this._primitiveContainer.get(primitive);
+    if (ownDrawables) {
+      for (const drawable of ownDrawables) {
+        this.drawableChanged(drawable);
+      }
+    }
+  }
+  /** @internal */
+  static primitiveAttached(primitive: Primitive, drawable: Drawable) {
+    if (this._drawableContainer.has(drawable)) {
+      const ownDrawables = this._primitiveContainer.get(primitive);
+      if (!ownDrawables) {
+        this._primitiveContainer.set(primitive, new Set([drawable]));
+      } else {
+        ownDrawables.add(drawable);
+      }
+      this.drawableChanged(drawable);
+    }
+  }
+  /** @internal */
+  static primitiveDetached(primitive: Primitive, drawable: Drawable) {
+    const ownDrawables = this._primitiveContainer.get(primitive);
+    if (ownDrawables && ownDrawables.has(drawable)) {
+      ownDrawables.delete(drawable);
+      this.drawableChanged(drawable);
     }
   }
   /** @internal */
@@ -71,9 +116,13 @@ export class RenderBundleWrapper {
   }
   /** @internal */
   static materialAttached(material: Material, drawable: Drawable) {
-    const ownDrawables = this._materialContainer.get(material);
-    if (ownDrawables && !ownDrawables.has(drawable)) {
-      ownDrawables.add(drawable);
+    if (this._drawableContainer.has(drawable)) {
+      const ownDrawables = this._materialContainer.get(material);
+      if (!ownDrawables) {
+        this._materialContainer.set(material, new Set([drawable]));
+      } else {
+        ownDrawables.add(drawable);
+      }
       this.drawableChanged(drawable);
     }
   }

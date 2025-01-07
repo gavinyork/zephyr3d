@@ -271,6 +271,12 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     return this.material;
   }
   /**
+   * {@inheritDoc Drawable.getPrimitive}
+   */
+  getPrimitive(): Primitive {
+    return this.primitive;
+  }
+  /**
    * {@inheritDoc Drawable.getBoneMatrices}
    */
   getBoneMatrices(): Texture2D {

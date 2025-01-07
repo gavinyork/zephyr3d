@@ -7,7 +7,7 @@ import type { BatchDrawable, Drawable, DrawContext, PickTarget } from '../../ren
 import type { Camera } from '../../camera/camera';
 import type { Quadtree } from './quadtree';
 import type { Terrain } from './terrain';
-import { QUEUE_OPAQUE, RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
+import { QUEUE_OPAQUE } from '../../values';
 import { mixinDrawable } from '../../render/drawable_mixin';
 import type { MeshMaterial } from '../../material';
 import type { SceneNode } from '..';
@@ -25,7 +25,6 @@ export class TerrainPatchBase {
 /** @internal */
 export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) implements Drawable {
   private _geometry: Primitive;
-  private _geometryLines: Primitive;
   private _quadtree: Quadtree;
   private _mipLevel: number;
   private _offsetX: number;
@@ -39,7 +38,6 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   constructor(terrain: Terrain) {
     super(terrain);
     this._geometry = null;
-    this._geometryLines = null;
     this._mipLevel = 0;
     this._offsetX = 0;
     this._offsetZ = 0;
@@ -79,7 +77,6 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
     this._step = step;
     this._parent = parent;
     this._geometry = baseVertices ? new Primitive() : null;
-    this._geometryLines = baseVertices ? new Primitive() : null;
     this._maxError = baseVertices ? this.computeMaxError() : 0;
     if (baseVertices) {
       const scaleX = this._quadtree.getScaleX();
@@ -114,14 +111,12 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   getMaterial(): MeshMaterial {
     return this._terrain.material;
   }
+  getPrimitive(): Primitive {
+    return this._geometry;
+  }
   draw(ctx: DrawContext) {
-    const isShadowMapPass = ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP;
-    const primitive =
-      this._quadtree.getTerrain().wireframe && !isShadowMapPass
-        ? this.getGeometryWireframe()
-        : this.getGeometry();
     this.bind(ctx);
-    this._terrain.material.draw(primitive, ctx);
+    this._terrain.material.draw(this._geometry, ctx);
   }
   setupCamera(viewportH: number, tanHalfFovy: number, maxPixelError: number): void {
     if (maxPixelError > 0 && tanHalfFovy > 0) {
@@ -234,12 +229,6 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
     this._geometry.indexStart = 0;
     this._geometry.indexCount = this._quadtree.getIndices().length;
     this._geometry.primitiveType = 'triangle-strip';
-    this._geometryLines.setVertexBuffer(heightArray);
-    this._geometryLines.setVertexBuffer(normalArray);
-    this._geometryLines.setIndexBuffer(this._quadtree.getIndicesWireframe());
-    this._geometryLines.indexStart = 0;
-    this._geometryLines.indexCount = this._quadtree.getIndicesWireframe().length;
-    this._geometryLines.primitiveType = 'line-list';
   }
   getOffsetScale(): Vector4 {
     if (!this._offsetScale) {
@@ -277,9 +266,6 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   }
   getGeometry(): Primitive {
     return this._geometry;
-  }
-  getGeometryWireframe(): Primitive {
-    return this._geometryLines;
   }
   getHeight(x: number, z: number): number {
     const startX = this._offsetX + this._step * Math.floor((x - this._offsetX) / this._step);

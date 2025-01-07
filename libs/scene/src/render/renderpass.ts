@@ -187,6 +187,7 @@ export abstract class RenderPass {
         RenderBundleWrapper.addDrawable(
           item.drawable,
           item.drawable.getMaterial()?.coreMaterial,
+          item.drawable.getPrimitive(),
           renderBundle,
           hash
         );

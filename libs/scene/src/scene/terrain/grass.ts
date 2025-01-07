@@ -55,6 +55,9 @@ export class GrassCluster extends applyMixins(GrassClusterBase, mixinDrawable) i
   getMaterial(): MeshMaterial {
     return this._material;
   }
+  getPrimitive(): Primitive {
+    return this._primitive;
+  }
   getInstanceColor(): Vector4 {
     return this._terrain.getInstanceColor();
   }
