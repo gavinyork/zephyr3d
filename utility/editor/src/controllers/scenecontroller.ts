@@ -40,6 +40,7 @@ export class SceneController extends BaseController<SceneModel> {
     eventBus.on('action', this.sceneAction, this);
     eventBus.on('node_transform', this.nodeTransform, this);
     eventBus.on('action_doc_request_save_scene', this.saveScene, this);
+    eventBus.on('action_doc_request_open_scene', this.openScene, this);
   }
   protected onDeactivate(): void {
     this._scene = null;
@@ -47,18 +48,27 @@ export class SceneController extends BaseController<SceneModel> {
     eventBus.off('action', this.sceneAction, this);
     eventBus.off('node_transform', this.nodeTransform, this);
     eventBus.off('action_doc_request_save_scene', this.saveScene, this);
+    eventBus.off('action_doc_request_open_scene', this.openScene, this);
   }
   private nodeTransform(node: SceneNode, oldTransform: TRS, newTransform: TRS) {
     this._cmdManager.execute(new NodeTransformCommand(node, oldTransform, newTransform));
   }
   private sceneAction(action: string) {
     switch (action) {
+      case 'NEW_DOC':
+        this.createScene();
+        break;
       case 'SAVE_DOC':
         if (!this._scene) {
-          Dialog.saveScene('Save scene');
+          Dialog.saveScene('Input scene name:');
         } else {
           eventBus.dispatchEvent('action_doc_request_save_scene', this._scene.name);
         }
+        break;
+      case 'OPEN_DOC':
+        Database.listScenes().then((scenes) => {
+          Dialog.openScene('Select scene:', scenes, 300);
+        });
         break;
       case 'UNDO':
         this._cmdManager.undo();
@@ -137,5 +147,13 @@ export class SceneController extends BaseController<SceneModel> {
       this._scene.uuid = uuid;
       Dialog.messageBox('Zephyr3d', `Scene saved: ${uuid}`);
     });
+  }
+  openScene(uuid: string) {
+    alert(`Open scene: ${uuid}`);
+  }
+  createScene() {
+    this._scene = null;
+    this.model.reset();
+    this._view.reset(this.model.scene);
   }
 }

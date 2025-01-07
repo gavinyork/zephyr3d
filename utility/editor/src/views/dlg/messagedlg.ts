@@ -3,8 +3,8 @@ import { ModalDialog } from '../../components/modal';
 
 export class DlgMessage extends ModalDialog {
   private _text: string;
-  constructor(id?: string, open?: boolean, width?: number, message?: string) {
-    super(id ?? 'MessageBox', open ?? true, width ?? 300);
+  constructor(id?: string, message?: string, open?: boolean, width?: number, height?: number) {
+    super(id ?? 'MessageBox', open ?? true, width ?? 300, height ?? 0);
     this._text = message ?? '';
   }
   get text() {

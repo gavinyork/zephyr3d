@@ -7,16 +7,16 @@ export class ModalDialog extends makeEventTarget(Object)<{
 }>() {
   private static _currentDlg: ModalDialog = null;
   private _id: string;
-  private _width: number;
+  private _size: ImGui.ImVec2;
   static render() {
     if (this._currentDlg) {
       this._currentDlg.render();
     }
   }
-  constructor(id: string, open: boolean, width = 0) {
+  constructor(id: string, open: boolean, width = 0, height = 0) {
     super();
     this._id = id;
-    this._width = width;
+    this._size = new ImGui.ImVec2(width, height);
     if (open) {
       this.open();
     }
@@ -28,10 +28,16 @@ export class ModalDialog extends makeEventTarget(Object)<{
     this._id = value;
   }
   get width() {
-    return this._width;
+    return this._size.x;
   }
   set width(value: number) {
-    this._width = value;
+    this._size.x = value;
+  }
+  get height() {
+    return this._size.y;
+  }
+  set height(value: number) {
+    this._size.y = value;
   }
   open() {
     if (ModalDialog._currentDlg) {
@@ -51,9 +57,7 @@ export class ModalDialog extends makeEventTarget(Object)<{
     if (ModalDialog._currentDlg !== this) {
       return;
     }
-    if (this._width !== 0) {
-      ImGui.SetNextWindowSize(new ImGui.ImVec2(this._width, 0));
-    }
+    ImGui.SetNextWindowSize(this._size, ImGui.Cond.Always);
     ImGui.OpenPopup(this._id);
     if (ImGui.BeginPopupModal(this._id, null, ImGui.WindowFlags.AlwaysAutoResize)) {
       this.doRender();

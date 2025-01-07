@@ -15,7 +15,25 @@ export class SceneModel extends BaseModel {
   private _compositor: Compositor;
   constructor() {
     super();
-    this._scene = new Scene();
+    this._scene = null;
+    this._camera = null;
+    this._compositor = null;
+    this.reset();
+  }
+  get scene() {
+    return this._scene;
+  }
+  get compositor() {
+    return this._compositor;
+  }
+  get camera() {
+    return this._camera;
+  }
+  reset(scene?: Scene) {
+    this._scene?.dispose();
+    this._camera?.dispose();
+    this._compositor = null;
+    this._scene = scene ?? new Scene();
     const light = new DirectionalLight(this._scene);
     light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
     this._camera = new PerspectiveCamera(this._scene, Math.PI / 3, 1, 1, 1000);
@@ -50,14 +68,5 @@ export class SceneModel extends BaseModel {
     });
     this._compositor = new Compositor();
     this._compositor.appendPostEffect(new Tonemap());
-  }
-  get scene() {
-    return this._scene;
-  }
-  get compositor() {
-    return this._compositor;
-  }
-  get camera() {
-    return this._camera;
   }
 }

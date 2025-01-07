@@ -20,6 +20,12 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   get scene() {
     return this._scene;
   }
+  set scene(scene: Scene) {
+    if (this._scene !== scene) {
+      this.selectNode(null);
+      this._scene = scene;
+    }
+  }
   render() {
     this.renderSceneNode(this._scene.rootNode);
   }

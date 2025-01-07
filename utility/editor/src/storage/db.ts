@@ -252,7 +252,7 @@ export class Database {
       return false;
     }
   }
-  static async listScenes() {
+  static async listScenes(): Promise<DBSceneInfo[]> {
     try {
       const scenes = await this.instance.getAll(this.DB_NAME_SCENES);
       return scenes.map((scene) => ({

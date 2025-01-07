@@ -23,8 +23,8 @@ type EventBusEventMap = {
   action_doc_request_save: [];
   action_doc_request_close: [];
   action_doc_post_close: [];
-  action_doc_request_new_scene: [name: string];
   action_doc_request_save_scene: [name: string];
+  action_doc_request_open_scene: [name: string];
   node_transform: [node: SceneNode, oldTransform: TRS, newTransform: TRS];
 };
 

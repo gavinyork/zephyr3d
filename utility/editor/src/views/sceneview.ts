@@ -51,12 +51,8 @@ export class SceneView extends BaseView<SceneModel> {
           subMenus: [
             {
               label: 'New',
-              subMenus: [
-                {
-                  label: 'Scene',
-                  id: 'NEW_SCENE'
-                }
-              ]
+              shortCut: 'Ctrl+N',
+              id: 'NEW_DOC'
             },
             {
               label: 'Open',
@@ -186,6 +182,23 @@ export class SceneView extends BaseView<SceneModel> {
   }
   get toolbar() {
     return this._toolbar;
+  }
+  reset(scene: Scene) {
+    this.sceneFinialize();
+    this._postGizmoRenderer.dispose();
+    this._postGizmoRenderer = new PostGizmoRenderer(this.model.camera, null);
+    this._postGizmoRenderer.mode = 'select';
+    this._tab.sceneHierarchy.selectNode(null);
+    this._tab.sceneHierarchy.scene = scene;
+    this._propGrid.object = null;
+    this._transformNode = null;
+    this._oldTransform = null;
+    this._dragDropTypes = [];
+    this._nodeToBePlaced = null;
+    this._postGizmoCaptured = false;
+    this._drawTextureViewer = false;
+    this._menubar.checkMenuItem('SHOW_TEXTURE_VIEWER', false);
+    this.sceneSetup();
   }
   render() {
     this._menubar.render();
@@ -362,16 +375,8 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.sceneHierarchy.on('node_selected', this.handleNodeSelected, this);
     this._tab.sceneHierarchy.on('node_deselected', this.handleNodeDeselected, this);
     this._tab.sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
-    this.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
-    this.model.scene.on('startrender', this.handleStartRender, this);
-    this.model.scene.on('endrender', this.handleEndRender, this);
-    this._postGizmoRenderer.on('begin_translate', this.handleBeginTransformNode, this);
-    this._postGizmoRenderer.on('begin_rotate', this.handleBeginTransformNode, this);
-    this._postGizmoRenderer.on('begin_scale', this.handleBeginTransformNode, this);
-    this._postGizmoRenderer.on('end_translate', this.handleEndTransformNode, this);
-    this._postGizmoRenderer.on('end_rotate', this.handleEndTransformNode, this);
-    this._postGizmoRenderer.on('end_scale', this.handleEndTransformNode, this);
     eventBus.on('scene_add_asset', this.handleAddAsset, this);
+    this.sceneSetup();
   }
   protected onDeactivate(): void {
     super.onDeactivate();
@@ -382,6 +387,21 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.sceneHierarchy.off('node_selected', this.handleNodeSelected, this);
     this._tab.sceneHierarchy.off('node_deselected', this.handleNodeDeselected, this);
     this._tab.sceneHierarchy.off('node_drag_drop', this.handleNodeDragDrop, this);
+    eventBus.off('scene_add_asset', this.handleAddAsset, this);
+    this.sceneFinialize();
+  }
+  private sceneSetup() {
+    this.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
+    this.model.scene.on('startrender', this.handleStartRender, this);
+    this.model.scene.on('endrender', this.handleEndRender, this);
+    this._postGizmoRenderer.on('begin_translate', this.handleBeginTransformNode, this);
+    this._postGizmoRenderer.on('begin_rotate', this.handleBeginTransformNode, this);
+    this._postGizmoRenderer.on('begin_scale', this.handleBeginTransformNode, this);
+    this._postGizmoRenderer.on('end_translate', this.handleEndTransformNode, this);
+    this._postGizmoRenderer.on('end_rotate', this.handleEndTransformNode, this);
+    this._postGizmoRenderer.on('end_scale', this.handleEndTransformNode, this);
+  }
+  private sceneFinialize() {
     this.model.scene.rootNode.off('noderemoved', this.handleNodeRemoved, this);
     this.model.scene.off('startrender', this.handleStartRender, this);
     this.model.scene.off('endrender', this.handleEndRender, this);
@@ -391,7 +411,6 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoRenderer.off('end_translate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.off('end_rotate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.off('end_scale', this.handleEndTransformNode, this);
-    eventBus.off('scene_add_asset', this.handleAddAsset, this);
   }
   private handleNodeSelected(node: SceneNode) {
     let sealedNode = node;

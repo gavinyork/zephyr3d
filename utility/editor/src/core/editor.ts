@@ -2,8 +2,6 @@ import { imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui'
 import { eventBus } from './eventbus';
 import { ModalDialog } from '../components/modal';
 import { ModuleManager } from './module';
-import { EmptyView } from '../views/emptyview';
-import { EmptyController } from '../controllers/emptycontroller';
 import { SceneView } from '../views/sceneview';
 import { SceneController } from '../controllers/scenecontroller';
 import { SceneModel } from '../models/scenemodel';
@@ -43,10 +41,6 @@ export class Editor {
     await FontGlyph.loadFontGlyphs('zef-16px');
   }
   registerModules() {
-    const emptyView = new EmptyView(null);
-    const emptyController = new EmptyController(emptyView);
-    this._moduleManager.register('Empty', null, emptyView, emptyController);
-
     const assetRegistry = new EditorAssetRegistry();
     const sceneModel = new SceneModel();
     const sceneView = new SceneView(sceneModel, assetRegistry);
