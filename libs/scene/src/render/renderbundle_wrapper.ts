@@ -2,7 +2,7 @@ import type { RenderBundle } from '@zephyr3d/device';
 import { Application } from '../app';
 import type { Material } from '../material';
 import type { Drawable } from './drawable';
-import { Primitive } from './primitive';
+import type { Primitive } from './primitive';
 
 export class RenderBundleWrapper {
   private _renderBundles: Record<string, RenderBundle>;
