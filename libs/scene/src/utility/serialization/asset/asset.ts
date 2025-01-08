@@ -15,8 +15,13 @@ export type AssetInfo = {
 
 export class AssetRegistry {
   private _assetMap: Map<string, AssetInfo>;
+  private _poolId: symbol;
   constructor() {
     this._assetMap = new Map();
+    this._poolId = Symbol('AssetRegistry');
+  }
+  get poolId() {
+    return this._poolId;
   }
   registerAsset(name: string, type: AssetType, path: string) {
     if (this._assetMap.has(name)) {

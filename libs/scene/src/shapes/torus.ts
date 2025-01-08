@@ -47,8 +47,8 @@ export class TorusShape extends Shape<TorusCreationOptions> {
     ...Shape._defaultOptions,
     numSlices: 40,
     numSegments: 16,
-    outerRadius: 10,
-    innerRadius: 3,
+    outerRadius: 1,
+    innerRadius: 0.3,
     radialDetail: 20
   };
   /**

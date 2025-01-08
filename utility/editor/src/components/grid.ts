@@ -208,7 +208,11 @@ export class PropertyEditor {
       ) {
         ImGui.TableSetupColumn('Name', ImGui.TableColumnFlags.WidthFixed, labelWidth);
         ImGui.TableSetupColumn('Value', ImGui.TableColumnFlags.WidthFixed, valueWidth);
-        this.renderGroup(this._rootGroup);
+        for (const subgroup of this._rootGroup.subgroups) {
+          this.renderGroup(subgroup, 0);
+        }
+
+        //this.renderGroup(this._rootGroup);
         ImGui.EndTable();
       }
 
@@ -245,49 +249,24 @@ export class PropertyEditor {
     }
   }
   private renderGroup(group: PropertyGroup, level = 0) {
-    let opened = false;
-    const propLevel = group === this._rootGroup ? 0 : level + 1;
-    if (group !== this._rootGroup) {
-      ImGui.TableNextRow();
-      ImGui.TableNextColumn();
-      const flags = ImGui.TreeNodeFlags.DefaultOpen | ImGui.TreeNodeFlags.SpanFullWidth;
-      if (level > 0) {
-        ImGui.Indent(level * 10);
-      }
-      opened = ImGui.TreeNodeEx(group.name, flags);
-      if (level > 0) {
-        ImGui.Unindent(level * 10);
-      }
-      if (group.objectTypes.length > 0) {
-      }
-      //ImGui.TableNextColumn();
+    ImGui.TableNextRow();
+    ImGui.TableNextColumn();
+    if (level > 0) {
+      ImGui.Indent(level * 10);
     }
+    const flags = ImGui.TreeNodeFlags.DefaultOpen | ImGui.TreeNodeFlags.SpanFullWidth;
+    const opened = ImGui.TreeNodeEx(group.name, flags);
     if (opened) {
-      for (const property of group.properties) {
-        this.renderProperty(property[1], propLevel, group.getObject());
-      }
       ImGui.TreePop();
-    }
-    for (const subgroup of group.subgroups) {
-      this.renderGroup(subgroup, group === this._rootGroup ? 0 : level + 1);
-      /*
-      ImGui.TableNextRow();
-      ImGui.TableNextColumn();
-      const flags = ImGui.TreeNodeFlags.DefaultOpen | ImGui.TreeNodeFlags.SpanFullWidth;
-      if (level > 0) {
-        ImGui.Indent(level * 10);
+      for (const property of group.properties) {
+        this.renderProperty(property[1], level + 1, group.getObject());
       }
-      const opened = ImGui.TreeNodeEx(subgroup.name, flags);
-      if (level > 0) {
-        ImGui.Unindent(level * 10);
-      }
-      ImGui.TableNextColumn();
-      ImGui.Combo('Type##TestCombo', [0], ['TestCombo', 'TestCombo2']);
-      if (opened) {
+      for (const subgroup of group.subgroups) {
         this.renderGroup(subgroup, level + 1);
-        ImGui.TreePop();
       }
-      */
+    }
+    if (level > 0) {
+      ImGui.Unindent(level * 10);
     }
   }
   private renderProperty(property: Property<any>, level: number, object?: any) {

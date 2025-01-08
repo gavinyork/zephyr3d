@@ -27,7 +27,13 @@ function getTargetES6() {
       dir: 'dist',
       preserveModules: true,
       format: 'esm',
-      sourcemap: true
+      sourcemap: true,
+      hoistTransitiveImports: false
+    },
+    treeshake: {
+      moduleSideEffects: false,
+      propertyReadSideEffects: false,
+      tryCatchDeoptimization: false
     },
     plugins: [nodeResolve(), swc()]
   };

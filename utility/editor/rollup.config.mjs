@@ -28,7 +28,18 @@ function getTargetWeb() {
     output: {
       file: path.join(destdir, 'js', `index.js`),
       format: 'esm',
-      sourcemap: true
+      sourcemap: true,
+      hoistTransitiveImports: false
+    },
+    treeshake: {
+      moduleSideEffects: false,
+      propertyReadSideEffects: false,
+      tryCatchDeoptimization: false
+    },
+    onwarn(warning, warn) {
+      if (warning.code === 'CIRCULAR_DEPENDENCY') {
+        console.error(warning.message);
+      }
     },
     plugins: [
       nodeResolve(),

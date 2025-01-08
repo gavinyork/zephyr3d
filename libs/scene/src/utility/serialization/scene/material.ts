@@ -979,12 +979,12 @@ function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<U
   ];
 }
 
-export function getMeshMaterialClass(): SerializableClass {
+export function getMeshMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: MeshMaterial,
     className: 'MeshMaterial',
     createFunc() {
-      return new MeshMaterial();
+      return new MeshMaterial(assetRegistry.poolId);
     },
     getProps() {
       return [
@@ -1061,10 +1061,10 @@ export function getMeshMaterialClass(): SerializableClass {
 export function getUnlitMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: UnlitMaterial,
-    parent: getMeshMaterialClass(),
+    parent: getMeshMaterialClass(assetRegistry),
     className: 'UnlitMaterial',
     createFunc() {
-      return new UnlitMaterial();
+      return new UnlitMaterial(assetRegistry.poolId);
     },
     getProps() {
       return getUnlitMaterialProps(assetRegistry);
@@ -1075,10 +1075,10 @@ export function getUnlitMaterialClass(assetRegistry: AssetRegistry): Serializabl
 export function getLambertMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: LambertMaterial,
-    parent: getMeshMaterialClass(),
+    parent: getMeshMaterialClass(assetRegistry),
     className: 'LambertMaterial',
     createFunc() {
-      return new LambertMaterial();
+      return new LambertMaterial(assetRegistry.poolId);
     },
     getProps() {
       return getLitMaterialProps(assetRegistry);
@@ -1089,10 +1089,10 @@ export function getLambertMaterialClass(assetRegistry: AssetRegistry): Serializa
 export function getBlinnMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: BlinnMaterial,
-    parent: getMeshMaterialClass(),
+    parent: getMeshMaterialClass(assetRegistry),
     className: 'BlinnMaterial',
     createFunc() {
-      return new BlinnMaterial();
+      return new BlinnMaterial(assetRegistry.poolId);
     },
     getProps() {
       return [
@@ -1120,10 +1120,10 @@ export function getBlinnMaterialClass(assetRegistry: AssetRegistry): Serializabl
 export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: PBRMetallicRoughnessMaterial,
-    parent: getMeshMaterialClass(),
+    parent: getMeshMaterialClass(assetRegistry),
     className: 'PBRMetallicRoughnessMaterial',
     createFunc() {
-      return new PBRMetallicRoughnessMaterial();
+      return new PBRMetallicRoughnessMaterial(assetRegistry.poolId);
     },
     getProps() {
       return [
@@ -1238,10 +1238,10 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
 export function getPBRSpecularGlossinessMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: PBRSpecularGlossinessMaterial,
-    parent: getMeshMaterialClass(),
+    parent: getMeshMaterialClass(assetRegistry),
     className: 'PBRSpecularGlossinessMaterial',
     createFunc() {
-      return new PBRSpecularGlossinessMaterial();
+      return new PBRSpecularGlossinessMaterial(assetRegistry.poolId);
     },
     getProps() {
       return [

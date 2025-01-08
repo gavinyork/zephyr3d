@@ -7,7 +7,7 @@ function getTargetDts() {
     input: './src/index.ts',
     output: [{ file: './dist/index.d.ts', format: 'es' }],
     plugins: [dts()]
-  }
+  };
 }
 
 function getTargetES6() {
@@ -18,11 +18,17 @@ function getTargetES6() {
       dir: 'dist',
       preserveModules: true,
       format: 'esm',
-      sourcemap: true
+      sourcemap: true,
+      hoistTransitiveImports: false
+    },
+    treeshake: {
+      moduleSideEffects: false,
+      propertyReadSideEffects: false,
+      tryCatchDeoptimization: false
     },
     plugins: [
       nodeResolve(),
-      swc(),
+      swc()
       // terser()
     ]
   };

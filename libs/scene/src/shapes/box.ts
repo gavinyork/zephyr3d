@@ -193,8 +193,8 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> {
    * Creates an instance of wireframe box shape
    * @param options - The creation options
    */
-  constructor(options?: BoxCreationOptions) {
-    super(options);
+  constructor(options?: BoxCreationOptions, poolId?: string | symbol) {
+    super(options, poolId);
   }
   /**
    * {@inheritDoc Shape.type}
@@ -216,8 +216,10 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> {
     uvs: number[],
     indices: number[],
     bbox?: AABB,
-    indexOffset?: number
+    indexOffset?: number,
+    vertexCallback?: (index: number, x: number, y: number, z: number) => void
   ): PrimitiveType {
+    options = Object.assign({}, this._defaultOptions, options ?? {});
     indexOffset = indexOffset ?? 0;
     const start = vertices.length;
     const sizeX = options?.sizeX ?? options?.size ?? 1;
@@ -237,19 +239,47 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> {
     const topFacenormal = normals ? [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0] : null;
     const bottomFacePos = [minx, miny, maxz, minx, miny, minz, maxx, miny, minz, maxx, miny, maxz];
     const bottomFaceNormal = normals ? [0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0] : null;
-    indices?.push(0, 1, 1, 2, 2, 3, 3, 0, 0, 5, 1, 4, 2, 7, 3, 6, 6, 5, 5, 4, 4, 7, 7, 6);
+    indices?.push(
+      0 + indexOffset,
+      1 + indexOffset,
+      1 + indexOffset,
+      2 + indexOffset,
+      2 + indexOffset,
+      3 + indexOffset,
+      3 + indexOffset,
+      0 + indexOffset,
+      0 + indexOffset,
+      5 + indexOffset,
+      1 + indexOffset,
+      4 + indexOffset,
+      2 + indexOffset,
+      7 + indexOffset,
+      3 + indexOffset,
+      6 + indexOffset,
+      6 + indexOffset,
+      5 + indexOffset,
+      5 + indexOffset,
+      4 + indexOffset,
+      4 + indexOffset,
+      7 + indexOffset,
+      7 + indexOffset,
+      6 + indexOffset
+    );
     vertices?.push(...topFacePos, ...bottomFacePos);
     normals?.push(...topFacenormal, ...bottomFaceNormal);
     uvs?.push(...uv, ...uv, ...uv, ...uv, ...uv, ...uv);
     Shape._transform(options.transform, vertices, normals, start);
-    if (bbox) {
+    if (bbox || vertexCallback) {
       for (let i = start; i < vertices.length - 2; i += 3) {
-        bbox.minPoint.x = Math.min(bbox.minPoint.x, vertices[i]);
-        bbox.minPoint.y = Math.min(bbox.minPoint.y, vertices[i + 1]);
-        bbox.minPoint.z = Math.min(bbox.minPoint.z, vertices[i + 2]);
-        bbox.maxPoint.x = Math.max(bbox.maxPoint.x, vertices[i]);
-        bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i + 1]);
-        bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i + 2]);
+        if (bbox) {
+          bbox.minPoint.x = Math.min(bbox.minPoint.x, vertices[i]);
+          bbox.minPoint.y = Math.min(bbox.minPoint.y, vertices[i + 1]);
+          bbox.minPoint.z = Math.min(bbox.minPoint.z, vertices[i + 2]);
+          bbox.maxPoint.x = Math.max(bbox.maxPoint.x, vertices[i]);
+          bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i + 1]);
+          bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i + 2]);
+        }
+        vertexCallback?.((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
       }
     }
     return 'line-list';

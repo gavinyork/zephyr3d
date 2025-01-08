@@ -6,8 +6,10 @@ import {
   PBRSpecularGlossinessMaterial,
   UnlitMaterial
 } from '../../../material';
+import { Primitive } from '../../../render';
 import { Mesh } from '../../../scene';
 import type { Scene } from '../../../scene/scene';
+import { BoxFrameShape, BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '../../../shapes';
 import type { SerializableClass } from '../types';
 import { getGraphNodeClass } from './node';
 
@@ -33,9 +35,35 @@ export function getMeshClass(): SerializableClass {
           }
         },
         {
+          name: 'Primitive',
+          type: 'object',
+          default: { object: [null] },
+          objectTypes: [
+            Primitive,
+            BoxShape,
+            BoxFrameShape,
+            SphereShape,
+            CylinderShape,
+            PlaneShape,
+            TorusShape
+          ],
+          get(this: Mesh, value) {
+            value.object[0] = this.primitive;
+          },
+          set(this: Mesh, value) {
+            if (!value.object[0]) {
+              this.primitive = null;
+            } else if (value.object[0] instanceof Primitive) {
+              this.primitive = value.object[0];
+            } else {
+              console.error('Invalid primitive type');
+            }
+          }
+        },
+        {
           name: 'Material',
           type: 'object',
-          default: { object: [new LambertMaterial()] },
+          default: { object: [null] },
           objectTypes: [
             UnlitMaterial,
             LambertMaterial,

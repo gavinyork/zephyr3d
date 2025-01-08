@@ -54,7 +54,6 @@ export class PCFPD extends ShadowImpl {
       shadowMapParams.shadowMap?.getDefaultSampler(this.useNativeShadowMap(shadowMapParams)) || null;
   }
   postRenderShadowMap() {}
-  releaseTemporalResources(shadowMapParams: ShadowMapParams) {}
   getDepthScale(): number {
     return this._sampleRadius;
   }

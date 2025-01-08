@@ -6,6 +6,7 @@ import {
   PBRSpecularGlossinessMaterial,
   UnlitMaterial
 } from '../../material';
+import { Primitive } from '../../render';
 import {
   BatchGroup,
   DirectionalLight,
@@ -18,6 +19,7 @@ import {
   SceneNode,
   SpotLight
 } from '../../scene';
+import { BoxFrameShape, BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '../../shapes';
 import type { AssetRegistry } from './asset/asset';
 import { getBatchGroupClass } from './scene/batch';
 import { getCameraClass, getOrthoCameraClass, getPerspectiveCameraClass } from './scene/camera';
@@ -37,6 +39,15 @@ import {
 import { getMeshClass } from './scene/mesh';
 import { getGraphNodeClass, getSceneNodeClass } from './scene/node';
 import { getParticleNodeClass } from './scene/particle';
+import {
+  getBoxFrameShapeClass,
+  getBoxShapeClass,
+  getCylinderShapeClass,
+  getPlaneShapeClass,
+  getPrimitiveClass,
+  getSphereShapeClass,
+  getTorusShapeClass
+} from './scene/primitive';
 import { getSceneClass } from './scene/scene';
 import type { SerializableClass } from './types';
 
@@ -69,6 +80,13 @@ export function getSerializationInfo(assetRegistry: AssetRegistry) {
     [LambertMaterial, getLambertMaterialClass(assetRegistry)],
     [BlinnMaterial, getBlinnMaterialClass(assetRegistry)],
     [PBRMetallicRoughnessMaterial, getPBRMetallicRoughnessMaterialClass(assetRegistry)],
-    [PBRSpecularGlossinessMaterial, getPBRSpecularGlossinessMaterialClass(assetRegistry)]
+    [PBRSpecularGlossinessMaterial, getPBRSpecularGlossinessMaterialClass(assetRegistry)],
+    [Primitive, getPrimitiveClass(assetRegistry)],
+    [BoxShape, getBoxShapeClass(assetRegistry)],
+    [BoxFrameShape, getBoxFrameShapeClass(assetRegistry)],
+    [SphereShape, getSphereShapeClass(assetRegistry)],
+    [TorusShape, getTorusShapeClass(assetRegistry)],
+    [CylinderShape, getCylinderShapeClass(assetRegistry)],
+    [PlaneShape, getPlaneShapeClass(assetRegistry)]
   ]);
 }

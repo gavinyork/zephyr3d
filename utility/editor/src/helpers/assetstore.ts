@@ -1,7 +1,6 @@
 import type { AnimationSet, ModelFetchOptions, Scene, SceneNode, TextureFetchOptions } from '@zephyr3d/scene';
 import { AssetManager } from '@zephyr3d/scene';
 import { Database } from '../storage/db';
-import { ZipReader, BlobReader, BlobWriter } from '@zip.js/zip.js';
 import { HttpRequest } from '@zephyr3d/base';
 import type { BaseTexture } from '@zephyr3d/device';
 
@@ -10,23 +9,26 @@ export class AssetStore {
     string,
     {
       assetManager: AssetManager;
-      httpRequest: HttpRequest;
       path: string;
-      urls: string[];
       nodes: Map<SceneNode, AnimationSet>;
     }
   > = {};
   static readonly modelExtensions = ['.gltf', '.glb'];
   static readonly textureExtensions = ['jpg', 'jpeg', 'png', 'tga', 'dds', 'hdr'];
   static async decompressZip(zip: Blob) {
-    return new Promise<Record<string, Blob>>((resolve, reject) => {
+    return new Promise<Map<string, string>>((resolve, reject) => {
       let worker = new Worker(new URL('./zip.worker.js', import.meta.url), { type: 'module' });
       worker.onmessage = (e) => {
         switch (e.data.type) {
           case 'success':
             worker?.terminate();
             worker = null;
-            resolve(e.data.data as Record<string, Blob>);
+            const blobMap = e.data.data as Map<string, Blob>;
+            const fileMap = new Map<string, string>();
+            for (const [k, v] of blobMap) {
+              fileMap.set(k, URL.createObjectURL(v));
+            }
+            resolve(fileMap);
             break;
           case 'error':
             worker?.terminate();
@@ -46,20 +48,6 @@ export class AssetStore {
       });
     });
   }
-  static async readZip(blob: Blob): Promise<Map<string, string>> {
-    const reader = new ZipReader(new BlobReader(blob));
-    const entries = await reader.getEntries();
-    const fileMap = new Map<string, string>();
-    for (const entry of entries) {
-      if (!entry.directory) {
-        const blob = await entry.getData(new BlobWriter());
-        const fileURL = URL.createObjectURL(blob);
-        fileMap.set(`/${entry.filename}`, fileURL);
-      }
-    }
-    await reader.close();
-    return fileMap;
-  }
   static async release(node: SceneNode) {
     for (const k of Object.getOwnPropertyNames(this._assetManagers)) {
       const assetManager = this._assetManagers[k];
@@ -77,35 +65,37 @@ export class AssetStore {
     uuid: string,
     options?: TextureFetchOptions<T>
   ): Promise<T> {
+    const asset = await Database.getAsset(uuid);
+    if (asset?.type !== 'texture') {
+      return null;
+    }
     let assetManager = this._assetManagers[uuid];
     if (!assetManager) {
-      const asset = await Database.getAsset(uuid);
-      if (asset.type !== 'texture') {
-        return null;
-      }
-      const pkg = await Database.getPackage(asset.pkg);
-      if (!pkg) {
-        return null;
-      }
-      const blob = await Database.getBlob(pkg.blob);
-      if (!blob) {
-        return null;
-      }
-      const fileMap = await this.readZip(blob.data);
       assetManager = {
-        urls: [...fileMap.values()],
         path: asset.path,
-        httpRequest: new HttpRequest((url) => fileMap.get(url)),
         assetManager: new AssetManager(Symbol(uuid)),
         nodes: new Map()
       };
       this._assetManagers[uuid] = assetManager;
     }
+    const pkg = await Database.getPackage(asset.pkg);
+    if (!pkg) {
+      return null;
+    }
+    const blob = await Database.getBlob(pkg.blob);
+    if (!blob) {
+      return null;
+    }
+    const fileMap = await this.decompressZip(blob.data);
+    const httpRequest = new HttpRequest((url) => fileMap.get(url));
     const texture = await assetManager.assetManager.fetchTexture<T>(
       `/${assetManager.path}`,
       options,
-      assetManager.httpRequest
+      httpRequest
     );
+    for (const url of fileMap.values()) {
+      URL.revokeObjectURL(url);
+    }
     if (texture) {
       return texture;
     } else {
@@ -117,36 +107,38 @@ export class AssetStore {
     uuid: string,
     options?: ModelFetchOptions
   ): Promise<{ group: SceneNode; animationSet: AnimationSet }> {
+    const asset = await Database.getAsset(uuid);
+    if (asset?.type !== 'model') {
+      return null;
+    }
     let assetManager = this._assetManagers[uuid];
     if (!assetManager) {
-      const asset = await Database.getAsset(uuid);
-      if (asset.type !== 'model') {
-        return null;
-      }
-      const pkg = await Database.getPackage(asset.pkg);
-      if (!pkg) {
-        return null;
-      }
-      const blob = await Database.getBlob(pkg.blob);
-      if (!blob) {
-        return null;
-      }
-      const fileMap = await this.readZip(blob.data);
       assetManager = {
-        urls: [...fileMap.values()],
         path: asset.path,
-        httpRequest: new HttpRequest((url) => fileMap.get(url)),
         assetManager: new AssetManager(Symbol(uuid)),
         nodes: new Map()
       };
       this._assetManagers[uuid] = assetManager;
     }
+    const pkg = await Database.getPackage(asset.pkg);
+    if (!pkg) {
+      return null;
+    }
+    const blob = await Database.getBlob(pkg.blob);
+    if (!blob) {
+      return null;
+    }
+    const fileMap = await this.decompressZip(blob.data);
+    const httpRequest = new HttpRequest((url) => fileMap.get(url));
     const model = await assetManager.assetManager.fetchModel(
       scene,
       `/${assetManager.path}`,
       options,
-      assetManager.httpRequest
+      httpRequest
     );
+    for (const url of fileMap.values()) {
+      URL.revokeObjectURL(url);
+    }
     if (model) {
       assetManager.nodes.set(model.group, model.animationSet);
       return model;

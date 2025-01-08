@@ -33,12 +33,12 @@ async function compressFiles(files: WorkerMessage['files']): Promise<Blob> {
   return blob;
 }
 
-async function decompressBlob(zipBlob: Blob): Promise<Record<string, Blob>> {
+async function decompressBlob(zipBlob: Blob): Promise<Map<string, Blob>> {
   const zipReader = new ZipReader(new BlobReader(zipBlob));
   const entries = await zipReader.getEntries();
-  const result = {} as Record<string, Blob>;
+  const fileMap = new Map<string, Blob>();
   const total = entries.length;
-  for (let i = 0; i < entries.length; i++) {
+  for (let i = 0; i < total; i++) {
     const entry = entries[i];
     if (!entry.directory) {
       self.postMessage({
@@ -46,18 +46,17 @@ async function decompressBlob(zipBlob: Blob): Promise<Record<string, Blob>> {
         current: i + 1,
         total
       } as ProgressMessage);
-
-      const blob = await entry.getData!(new BlobWriter());
-      result[entry.filename] = blob;
+      const blob = await entry.getData(new BlobWriter());
+      fileMap.set(`/${entry.filename}`, blob);
     }
   }
   await zipReader.close();
-  return result;
+  return fileMap;
 }
 
 self.addEventListener('message', async (e: MessageEvent<WorkerMessage>) => {
   try {
-    let result: Blob | Record<string, Blob>;
+    let result: Blob | Map<string, Blob>;
 
     switch (e.data.type) {
       case 'compress':
@@ -85,17 +84,4 @@ self.addEventListener('message', async (e: MessageEvent<WorkerMessage>) => {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
-  /*
-  if (e.data.type === 'compress') {
-    try {
-      const zipBlob = await compressFiles(e.data.files);
-      self.postMessage({ type: 'success', data: zipBlob });
-    } catch (error) {
-      self.postMessage({
-        type: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  }
-    */
 });

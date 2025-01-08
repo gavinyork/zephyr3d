@@ -198,9 +198,6 @@ export class ESM extends ShadowImpl {
       );
     }
   }
-  releaseTemporalResources(shadowMapParams: ShadowMapParams) {
-    return;
-  }
   getDepthScale(): number {
     return this._depthScale;
   }

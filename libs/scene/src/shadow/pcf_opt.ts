@@ -49,7 +49,6 @@ export class PCFOPT extends ShadowImpl {
       shadowMapParams.shadowMap?.getDefaultSampler(this.useNativeShadowMap(shadowMapParams)) || null;
   }
   postRenderShadowMap() {}
-  releaseTemporalResources(shadowMapParams: ShadowMapParams) {}
   getDepthScale(): number {
     return 1;
   }

@@ -39,7 +39,13 @@ function getTargetES6(input, output) {
     output: {
       file: path.join(destdir, 'js', `${output}.js`),
       format: 'esm',
-      sourcemap: true
+      sourcemap: true,
+      hoistTransitiveImports: false
+    },
+    treeshake: {
+      moduleSideEffects: false,
+      propertyReadSideEffects: false,
+      tryCatchDeoptimization: false
     },
     plugins: [
       nodeResolve(),

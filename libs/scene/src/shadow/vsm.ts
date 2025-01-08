@@ -292,9 +292,6 @@ export class VSM extends ShadowImpl {
       );
     }
   }
-  releaseTemporalResources(shadowMapParams: ShadowMapParams) {
-    return;
-  }
   getShaderHash(): string {
     return '';
   }

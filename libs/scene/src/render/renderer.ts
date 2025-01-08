@@ -6,7 +6,7 @@ import type { ColorState, FrameBuffer, Texture2D, TextureFormat } from '@zephyr3
 import { Application } from '../app';
 import { CopyBlitter } from '../blitter';
 import type { DrawContext } from './drawable';
-import { ShadowMapper } from '../shadow';
+//import type { ShadowMapper } from '../shadow';
 import type { RenderQueue } from './render_queue';
 import type { PunctualLight, Scene } from '../scene';
 import type { PerspectiveCamera, Camera } from '../camera';
@@ -366,7 +366,7 @@ export class SceneRenderer {
 
       device.pool.releaseFrameBuffer(tempFramebuffer);
     }
-    ShadowMapper.releaseTemporalResources(ctx);
+    //ShadowMapper.releaseTemporalResources(ctx);
     this.freeClusteredLight(ctx.clusteredLight);
   }
   /** @internal */

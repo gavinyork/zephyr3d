@@ -21,6 +21,10 @@ import { RenderBundleWrapper } from './renderbundle_wrapper';
  * @public
  */
 export class Primitive {
+  static _dummy = (function () {
+    console.log('Constructor of Shape');
+    return 0;
+  })();
   /** @internal */
   protected _poolId: string | symbol;
   /** @internal */
@@ -175,7 +179,7 @@ export class Primitive {
    */
   getVertexBuffer(semantic: VertexSemantic): StructuredBuffer {
     this.checkVertexLayout();
-    return this._vertexLayout.getVertexBuffer(semantic);
+    return this._vertexLayout?.getVertexBuffer(semantic) ?? null;
   }
   /**
    * Gets the vertex buffer information by a given semantic
@@ -184,7 +188,7 @@ export class Primitive {
    */
   getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo {
     this.checkVertexLayout();
-    return this._vertexLayout.getVertexBufferInfo(semantic);
+    return this._vertexLayout?.getVertexBufferInfo(semantic) ?? null;
   }
   /**
    * Creates a vertex buffer from the given options and then adds it to the primitive

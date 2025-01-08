@@ -422,8 +422,7 @@ export class ShadowMapper {
     if (ctx.shadowMapInfo) {
       for (const k of ctx.shadowMapInfo.keys()) {
         const shadowMapParams = ctx.shadowMapInfo.get(k);
-        ctx.device.pool.releaseFrameBuffer(shadowMapParams.shadowMapFramebuffer);
-        shadowMapParams.impl.releaseTemporalResources(shadowMapParams);
+        //ctx.device.pool.releaseFrameBuffer(shadowMapParams.shadowMapFramebuffer);
         shadowMapParams.lightType = LIGHT_TYPE_NONE;
         shadowMapParams.depthClampEnabled = false;
         shadowMapParams.shaderHash = '';
@@ -595,7 +594,7 @@ export class ShadowMapper {
     }
     */
     shadowMapParams.shadowMapFramebuffer = ShadowMapper.fetchTemporalFramebuffer(
-      false,
+      true,
       this._light.lightType,
       numCascades,
       shadowMapWidth,
