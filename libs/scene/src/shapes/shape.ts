@@ -33,6 +33,13 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     super(poolId);
     this._create(options);
   }
+  /** Get shape creation options */
+  get options(): T {
+    return this._options;
+  }
+  set options(options: T) {
+    this._create(options);
+  }
   /** Get shape type */
   abstract get type(): string;
   /**
@@ -53,7 +60,7 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     const uvs: number[] = this._options.needUV ? [] : null;
     const bbox = new BoundingBox();
     bbox.beginExtend();
-    this._primitiveType = (this.constructor as any).generateData(
+    this.primitiveType = (this.constructor as any).generateData(
       this._options,
       vertices,
       normals,
@@ -61,6 +68,18 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
       indices,
       bbox
     );
+    for (const s of ['position', 'normal', 'texCoord0'] as const) {
+      const buffer = this.getVertexBuffer(s);
+      if (buffer) {
+        this.removeVertexBuffer(buffer);
+        buffer.dispose();
+      }
+    }
+    const indexBuffer = this.getIndexBuffer();
+    if (indexBuffer) {
+      this.setIndexBuffer(null);
+      indexBuffer.dispose();
+    }
     this.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
     if (normals) {
       this.createAndSetVertexBuffer('normal_f32x3', new Float32Array(normals));
