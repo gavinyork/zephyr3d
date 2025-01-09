@@ -28,7 +28,7 @@ export function deserializeObjectProps<T>(
         tmpVal.object = [];
         if (Array.isArray(v)) {
           for (const p of v) {
-            tmpVal.object.push = deserializeObject<any>(obj, p, serializationInfo) ?? null;
+            tmpVal.object.push(deserializeObject<any>(obj, p, serializationInfo) ?? null);
           }
         }
         break;
@@ -38,11 +38,11 @@ export function deserializeObjectProps<T>(
         break;
       }
       case 'string': {
-        tmpVal.num[0] = v ?? prop.default?.str[0] ?? '';
+        tmpVal.str[0] = v ?? prop.default?.str[0] ?? '';
         break;
       }
       case 'bool': {
-        tmpVal.num[0] = v ?? prop.default?.bool[0] ?? false;
+        tmpVal.bool[0] = v ?? prop.default?.bool[0] ?? false;
         break;
       }
       case 'vec2': {

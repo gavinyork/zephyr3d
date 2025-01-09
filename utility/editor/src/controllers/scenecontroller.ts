@@ -1,7 +1,8 @@
-import type { AssetRegistry, SceneNode } from '@zephyr3d/scene';
+import type { AssetRegistry, Scene, SceneNode } from '@zephyr3d/scene';
 import {
   BoxShape,
   CylinderShape,
+  deserializeObject,
   getSerializationInfo,
   PlaneShape,
   serializeObject,
@@ -149,7 +150,24 @@ export class SceneController extends BaseController<SceneModel> {
     });
   }
   openScene(uuid: string) {
-    alert(`Open scene: ${uuid}`);
+    Database.getScene(uuid)
+      .then((sceneinfo) => {
+        if (sceneinfo) {
+          this._scene = sceneinfo;
+          const scene = deserializeObject<Scene>(
+            null,
+            sceneinfo.content,
+            getSerializationInfo(this._assetRegistry)
+          );
+          this.model.reset(scene);
+          this._view.reset(this.model.scene);
+        } else {
+          Dialog.messageBox('Zephyr3d', `Scene not found: ${uuid}`);
+        }
+      })
+      .catch((err) => {
+        Dialog.messageBox('Zephyr3d', `Error loading scene: ${err}`);
+      });
   }
   createScene() {
     this._scene = null;
