@@ -39,13 +39,12 @@ function getTargetES6(input, output) {
     output: {
       file: path.join(destdir, 'js', `${output}.js`),
       format: 'esm',
-      sourcemap: true,
-      hoistTransitiveImports: false
+      sourcemap: true
     },
-    treeshake: {
-      moduleSideEffects: false,
-      propertyReadSideEffects: false,
-      tryCatchDeoptimization: false
+    onwarn(warning, warn) {
+      if (warning.code === 'CIRCULAR_DEPENDENCY') {
+        console.error(warning.message);
+      }
     },
     plugins: [
       nodeResolve(),

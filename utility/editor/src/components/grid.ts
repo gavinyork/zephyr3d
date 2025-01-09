@@ -126,7 +126,7 @@ export class PropertyEditor {
     padding: number,
     maxWidth: number,
     minWidth: number,
-    labelPercent = 0.4
+    labelPercent = 0.6
   ) {
     this._serializationInfo = serializationInfo;
     this._rootGroup = new PropertyGroup('Root', this);

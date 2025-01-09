@@ -7,8 +7,8 @@ import {
   MORPH_ATTRIBUTE_VECTOR_COUNT,
   MORPH_WEIGHTS_VECTOR_COUNT
 } from '../values';
-import { ShaderHelper } from '../material';
-import { BoundingBox } from '../utility';
+import { ShaderHelper } from '../material/shader/helper';
+import { BoundingBox } from '../utility/bounding_volume';
 
 export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number[], poolId: string | symbol) {
   const device = Application.instance.device;

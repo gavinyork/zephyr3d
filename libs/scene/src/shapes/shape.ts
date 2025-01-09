@@ -1,6 +1,6 @@
 import { Vector3, type Matrix4x4 } from '@zephyr3d/base';
 import { Primitive } from '../render/primitive';
-import { BoundingBox } from '../utility';
+import { BoundingBox } from '../utility/bounding_volume';
 
 /**
  * Base class for creation options of any kind of shapes

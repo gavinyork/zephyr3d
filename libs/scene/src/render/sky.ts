@@ -6,7 +6,7 @@ import type { Primitive } from './primitive';
 import { BoxShape } from '../shapes';
 import { ScatteringLut } from './scatteringlut';
 import { Camera } from '../camera/camera';
-import { prefilterCubemap } from '../utility';
+import { prefilterCubemap } from '../utility/pmrem';
 import type { DirectionalLight } from '../scene';
 import type {
   AbstractDevice,

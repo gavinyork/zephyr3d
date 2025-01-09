@@ -278,6 +278,17 @@ export function getCylinderShapeClass(assetRegistry: AssetRegistry): Serializabl
     getProps() {
       return [
         {
+          name: 'Height',
+          type: 'float',
+          default: { num: [1] },
+          get(this: CylinderShape, value) {
+            value.num[0] = this.options.height;
+          },
+          set(this: CylinderShape, value) {
+            this.options = { ...this.options, height: value.num[0] };
+          }
+        },
+        {
           name: 'BottomRadius',
           type: 'float',
           default: { num: [1] },

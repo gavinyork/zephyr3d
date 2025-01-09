@@ -2,11 +2,11 @@ import type { TextureFormat, PBInsideFunctionScope, PBShaderExp } from '@zephyr3
 import { ShadowImpl } from './shadow_impl';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
-import { ShadowMapper } from './shadowmapper';
 import { Application } from '../app';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import { computeShadowMapDepth } from '../shaders/shadow';
 import { ShaderHelper } from '../material/shader/helper';
+import { computeShadowBias, computeShadowBiasCSM } from './shader';
 
 /** @internal */
 export class SSM extends ShadowImpl {
@@ -101,12 +101,7 @@ export class SSM extends ShadowImpl {
         );
         this.$l.shadow = pb.float(1);
         this.$if(this.inShadow, function () {
-          this.$l.shadowBias = ShadowMapper.computeShadowBiasCSM(
-            shadowMapParams,
-            this,
-            this.NdotL,
-            this.split
-          );
+          this.$l.shadowBias = computeShadowBiasCSM(this, this.NdotL, this.split);
           this.shadowCoord.z = pb.sub(this.shadowCoord.z, this.shadowBias);
           if (that.useNativeShadowMap(shadowMapParams)) {
             if (shadowMapParams.shadowMap.isTexture2DArray()) {
@@ -166,8 +161,8 @@ export class SSM extends ShadowImpl {
           this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
           this.$l.maxZ = pb.max(pb.max(pb.abs(this.dir.x), pb.abs(this.dir.y)), pb.abs(this.dir.z));
           this.$l.distance = ShaderHelper.linearDepthToNonLinear(this, this.maxZ, this.nearFar);
-          this.$l.shadowBias = ShadowMapper.computeShadowBias(
-            shadowMapParams,
+          this.$l.shadowBias = computeShadowBias(
+            shadowMapParams.lightType,
             this,
             pb.div(this.maxZ, ShaderHelper.getLightPositionAndRangeForShadow(this).w),
             this.NdotL,
@@ -185,8 +180,8 @@ export class SSM extends ShadowImpl {
             pb.length(this.dir),
             ShaderHelper.getLightPositionAndRangeForShadow(this).w
           );
-          this.$l.shadowBias = ShadowMapper.computeShadowBias(
-            shadowMapParams,
+          this.$l.shadowBias = computeShadowBias(
+            shadowMapParams.lightType,
             this,
             this.distance,
             this.NdotL,
@@ -218,8 +213,8 @@ export class SSM extends ShadowImpl {
         this.$l.shadow = pb.float(1);
         this.$if(this.inShadow, function () {
           if (that.useNativeShadowMap(shadowMapParams)) {
-            this.$l.shadowBias = ShadowMapper.computeShadowBias(
-              shadowMapParams,
+            this.$l.shadowBias = computeShadowBias(
+              shadowMapParams.lightType,
               this,
               this.shadowCoord.z,
               this.NdotL,
@@ -239,16 +234,16 @@ export class SSM extends ShadowImpl {
                 this.shadowCoord.z,
                 this.nearFar
               );
-              this.$l.shadowBias = ShadowMapper.computeShadowBias(
-                shadowMapParams,
+              this.$l.shadowBias = computeShadowBias(
+                shadowMapParams.lightType,
                 this,
                 this.shadowCoord.z,
                 this.NdotL,
                 true
               );
             } else {
-              this.$l.shadowBias = ShadowMapper.computeShadowBias(
-                shadowMapParams,
+              this.$l.shadowBias = computeShadowBias(
+                shadowMapParams.lightType,
                 this,
                 this.shadowCoord.z,
                 this.NdotL,

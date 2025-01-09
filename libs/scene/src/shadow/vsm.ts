@@ -11,11 +11,11 @@ import type { BlitType } from '../blitter';
 import { Blitter } from '../blitter';
 import { computeShadowMapDepth, filterShadowVSM } from '../shaders/shadow';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
-import { ShadowMapper } from './shadowmapper';
 import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encode2HalfToRGBA } from '../shaders/misc';
 import { Application } from '../app';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
+import { computeShadowBias, computeShadowBiasCSM } from './shader';
 
 type VSMImplData = {
   blurFramebuffer: FrameBuffer;
@@ -241,6 +241,51 @@ export class VSM extends ShadowImpl {
         : shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0]
     ) as ShadowMapType;
   }
+  /** @internal */
+  fetchTemporalFramebuffer(
+    autoRelease: boolean,
+    lightType: number,
+    numCascades: number,
+    width: number,
+    height: number,
+    colorFormat: TextureFormat,
+    depthFormat: TextureFormat,
+    mipmapping?: boolean
+  ) {
+    const device = Application.instance.device;
+    const useTextureArray = numCascades > 1 && device.type !== 'webgl';
+    const colorAttachments = colorFormat
+      ? useTextureArray
+        ? [
+            device.pool.fetchTemporalTexture2DArray(
+              false,
+              colorFormat,
+              width,
+              height,
+              numCascades,
+              mipmapping
+            )
+          ]
+        : lightType === LIGHT_TYPE_POINT
+        ? [device.pool.fetchTemporalTextureCube(false, colorFormat, width, mipmapping)]
+        : [device.pool.fetchTemporalTexture2D(false, colorFormat, width, height, mipmapping)]
+      : null;
+    const depthAttachment = depthFormat
+      ? useTextureArray
+        ? device.pool.fetchTemporalTexture2DArray(false, depthFormat, width, height, numCascades, false)
+        : device.type !== 'webgl' && lightType === LIGHT_TYPE_POINT
+        ? device.pool.fetchTemporalTextureCube(false, depthFormat, width, false)
+        : device.pool.fetchTemporalTexture2D(false, depthFormat, width, height, false)
+      : null;
+    const fb = device.pool.createTemporalFramebuffer(autoRelease, colorAttachments, depthAttachment);
+    if (colorAttachments) {
+      device.pool.releaseTexture(colorAttachments[0]);
+    }
+    if (depthAttachment) {
+      device.pool.releaseTexture(depthAttachment);
+    }
+    return fb;
+  }
   doUpdateResources(shadowMapParams: ShadowMapParams) {
     const colorFormat = this.getShadowMapColorFormat(shadowMapParams);
     //const target = shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0].target;
@@ -248,7 +293,7 @@ export class VSM extends ShadowImpl {
     const shadowMapHeight = shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0].height;
     if (this._blur) {
       shadowMapParams.implData = {
-        blurFramebuffer: ShadowMapper.fetchTemporalFramebuffer(
+        blurFramebuffer: this.fetchTemporalFramebuffer(
           true,
           shadowMapParams.lightType,
           shadowMapParams.numShadowCascades,
@@ -258,7 +303,7 @@ export class VSM extends ShadowImpl {
           null,
           false
         ),
-        blurFramebuffer2: ShadowMapper.fetchTemporalFramebuffer(
+        blurFramebuffer2: this.fetchTemporalFramebuffer(
           true,
           shadowMapParams.lightType,
           shadowMapParams.numShadowCascades,
@@ -349,12 +394,7 @@ export class VSM extends ShadowImpl {
         );
         this.$l.shadow = pb.float(1);
         this.$if(this.inShadow, function () {
-          this.$l.shadowBias = ShadowMapper.computeShadowBiasCSM(
-            shadowMapParams,
-            this,
-            this.NdotL,
-            this.split
-          );
+          this.$l.shadowBias = computeShadowBiasCSM(this, this.NdotL, this.split);
           this.shadowCoord.z = pb.sub(this.shadowCoord.z, this.shadowBias);
           this.shadow = filterShadowVSM(
             this,
@@ -384,8 +424,8 @@ export class VSM extends ShadowImpl {
           pb.length(this.dir),
           ShaderHelper.getLightPositionAndRangeForShadow(this).w
         );
-        this.$l.shadowBias = ShadowMapper.computeShadowBias(
-          shadowMapParams,
+        this.$l.shadowBias = computeShadowBias(
+          shadowMapParams.lightType,
           this,
           this.distance,
           this.NdotL,
@@ -420,16 +460,16 @@ export class VSM extends ShadowImpl {
               this.shadowCoord.z,
               this.nearFar
             );
-            this.$l.shadowBias = ShadowMapper.computeShadowBias(
-              shadowMapParams,
+            this.$l.shadowBias = computeShadowBias(
+              shadowMapParams.lightType,
               this,
               this.shadowCoord.z,
               this.NdotL,
               true
             );
           } else {
-            this.$l.shadowBias = ShadowMapper.computeShadowBias(
-              shadowMapParams,
+            this.$l.shadowBias = computeShadowBias(
+              shadowMapParams.lightType,
               this,
               this.shadowCoord.z,
               this.NdotL,

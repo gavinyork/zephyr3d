@@ -4,7 +4,7 @@ import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import { Tab } from '../components/tab';
 import type { AssetRegistry, Camera, Compositor, Scene, SceneNode } from '@zephyr3d/scene';
-import { Application, getSerializationInfo } from '@zephyr3d/scene';
+import { Application, DirectionalLight, getSerializationInfo } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
@@ -173,11 +173,11 @@ export class SceneView extends BaseView<SceneModel> {
       getSerializationInfo(this._tab.assetHierarchy.assetRegistry),
       this._menubar.height + this._toolbar.height,
       this._statusbar.height,
-      300,
+      400,
       8,
       600,
       200,
-      0.4
+      0.6
     );
   }
   get toolbar() {
@@ -420,7 +420,8 @@ export class SceneView extends BaseView<SceneModel> {
     if (sealedNode) {
       node = sealedNode;
     }
-    this._postGizmoRenderer.node = node === node.scene.rootNode ? null : node;
+    this._postGizmoRenderer.node =
+      node === node.scene.rootNode || node instanceof DirectionalLight ? null : node;
     this._propGrid.object = node === node.scene.rootNode ? node.scene : node;
   }
   private handleNodeDeselected(node: SceneNode) {

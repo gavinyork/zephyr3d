@@ -4,7 +4,7 @@ import { Vector3 } from '@zephyr3d/base';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
 import type { BoundingVolume } from '../utility';
-import { BoundingBox } from '../utility';
+import { BoundingBox } from '../utility/bounding_volume';
 import { mixinDrawable } from '../render/drawable_mixin';
 import type { Drawable, DrawContext, PickTarget } from '../render';
 import { Primitive } from '../render';

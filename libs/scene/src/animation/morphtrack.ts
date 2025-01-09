@@ -1,7 +1,7 @@
 import { AnimationTrack } from './animationtrack';
 import type { Mesh, SceneNode } from '../scene';
 import type { AssetAnimationTrack, AssetSubMeshData } from '../asset';
-import { BoundingBox } from '../utility';
+import { BoundingBox } from '../utility/bounding_volume';
 import { MAX_MORPH_TARGETS } from '../values';
 import { calculateMorphBoundingBox } from './morphtarget';
 import type { AABB } from '@zephyr3d/base';

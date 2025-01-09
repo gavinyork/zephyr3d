@@ -27,13 +27,12 @@ function getTargetES6() {
       dir: 'dist',
       preserveModules: true,
       format: 'esm',
-      sourcemap: true,
-      hoistTransitiveImports: false
+      sourcemap: true
     },
-    treeshake: {
-      moduleSideEffects: false,
-      propertyReadSideEffects: false,
-      tryCatchDeoptimization: false
+    onwarn(warning, warn) {
+      if (warning.code === 'CIRCULAR_DEPENDENCY') {
+        console.error(warning.message);
+      }
     },
     plugins: [nodeResolve(), swc()]
   };
