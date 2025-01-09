@@ -378,6 +378,16 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
             for (const child of value.object) {
               if (child instanceof SceneNode) {
                 child.parent = this.rootNode;
+              } else if (typeof child === 'string' && child.startsWith('ASSET:')) {
+                const assetId = child.slice(6);
+                const assetInfo = assetRegistry.getAssetInfo(assetId);
+                if (assetInfo?.type === 'model') {
+                  assetRegistry.fetchModel(assetId, this).then((modelInfo) => {
+                    modelInfo.group.parent = this.rootNode;
+                  });
+                }
+              } else {
+                console.error(`Invalid scene node: ${child}`);
               }
             }
           }

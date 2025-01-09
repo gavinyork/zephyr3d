@@ -7,19 +7,28 @@ import {
   UnlitMaterial
 } from '../../../material';
 import { Primitive } from '../../../render';
-import { Mesh } from '../../../scene';
-import type { Scene } from '../../../scene/scene';
+import { Mesh, SceneNode } from '../../../scene';
+import { Scene } from '../../../scene/scene';
 import { BoxFrameShape, BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '../../../shapes';
+import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
 import { getGraphNodeClass } from './node';
 
-export function getMeshClass(): SerializableClass {
+export function getMeshClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: Mesh,
-    parent: getGraphNodeClass(),
+    parent: getGraphNodeClass(assetRegistry),
     className: 'Mesh',
-    createFunc(scene: Scene) {
-      return new Mesh(scene);
+    createFunc(scene: Scene | SceneNode) {
+      if (scene instanceof Scene) {
+        return new Mesh(scene);
+      } else if (scene instanceof SceneNode) {
+        const mesh = new Mesh(scene.scene);
+        mesh.parent = scene;
+        return mesh;
+      } else {
+        return null;
+      }
     },
     getProps() {
       return [

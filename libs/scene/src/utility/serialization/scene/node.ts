@@ -1,16 +1,25 @@
 import { SceneNode } from '../../../scene/scene_node';
 import type { SceneNodeVisible } from '../../../scene/scene_node';
-import type { Scene } from '../../../scene/scene';
+import { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
 import { degree2radian, radian2degree } from '@zephyr3d/base';
 import { GraphNode } from '../../../scene';
+import type { AssetRegistry } from '../asset/asset';
 
-export function getSceneNodeClass(): SerializableClass {
+export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: SceneNode,
     className: 'SceneNode',
-    createFunc(scene: Scene) {
-      return new SceneNode(scene);
+    createFunc(scene: Scene | SceneNode) {
+      if (scene instanceof Scene) {
+        return new SceneNode(scene);
+      } else if (scene instanceof SceneNode) {
+        const batchGroup = new SceneNode(scene.scene);
+        batchGroup.parent = scene;
+        return batchGroup;
+      } else {
+        return null;
+      }
     },
     getProps() {
       return [
@@ -102,6 +111,16 @@ export function getSceneNodeClass(): SerializableClass {
             for (const child of value.object) {
               if (child instanceof SceneNode) {
                 child.parent = this;
+              } else if (typeof child === 'string' && child.startsWith('ASSET:')) {
+                const assetId = child.slice(6);
+                const assetInfo = assetRegistry.getAssetInfo(assetId);
+                if (assetInfo?.type === 'model') {
+                  assetRegistry.fetchModel(assetId, this.scene).then((modelInfo) => {
+                    modelInfo.group.parent = this;
+                  });
+                }
+              } else {
+                console.error(`Invalid scene node: ${child}`);
               }
             }
           }
@@ -111,13 +130,21 @@ export function getSceneNodeClass(): SerializableClass {
   };
 }
 
-export function getGraphNodeClass(): SerializableClass {
+export function getGraphNodeClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: GraphNode,
-    parent: getSceneNodeClass(),
+    parent: getSceneNodeClass(assetRegistry),
     className: 'GraphNode',
-    createFunc(scene: Scene) {
-      return new GraphNode(scene);
+    createFunc(scene: Scene | SceneNode) {
+      if (scene instanceof Scene) {
+        return new GraphNode(scene);
+      } else if (scene instanceof SceneNode) {
+        const batchGroup = new GraphNode(scene.scene);
+        batchGroup.parent = scene;
+        return batchGroup;
+      } else {
+        return null;
+      }
     },
     getProps() {
       return [];

@@ -1,14 +1,16 @@
 import type { BaseLight } from '../../../scene/light';
 import { DirectionalLight, PointLight, PunctualLight, SpotLight } from '../../../scene/light';
-import type { Scene } from '../../../scene/scene';
+import { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
 import { Vector4 } from '@zephyr3d/base';
 import { getSceneNodeClass } from './node';
+import type { AssetRegistry } from '../asset/asset';
+import { SceneNode } from '../../../scene';
 
-export function getPunctualLightClass(): SerializableClass {
+export function getPunctualLightClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: PunctualLight,
-    parent: getSceneNodeClass(),
+    parent: getSceneNodeClass(assetRegistry),
     className: 'PunctualLight',
     getProps() {
       return [
@@ -55,13 +57,21 @@ export function getPunctualLightClass(): SerializableClass {
     }
   };
 }
-export function getDirectionalLightClass(): SerializableClass {
+export function getDirectionalLightClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: DirectionalLight,
-    parent: getPunctualLightClass(),
+    parent: getPunctualLightClass(assetRegistry),
     className: 'DirectionalLight',
-    createFunc(scene: Scene) {
-      return new DirectionalLight(scene);
+    createFunc(scene: Scene | SceneNode) {
+      if (scene instanceof Scene) {
+        return new DirectionalLight(scene);
+      } else if (scene instanceof SceneNode) {
+        const batchGroup = new DirectionalLight(scene.scene);
+        batchGroup.parent = scene;
+        return batchGroup;
+      } else {
+        return null;
+      }
     },
     getProps() {
       return [
@@ -81,13 +91,21 @@ export function getDirectionalLightClass(): SerializableClass {
   };
 }
 
-export function getPointLightClass(): SerializableClass {
+export function getPointLightClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: PointLight,
-    parent: getPunctualLightClass(),
+    parent: getPunctualLightClass(assetRegistry),
     className: 'PointLight',
-    createFunc(scene: Scene) {
-      return new PointLight(scene);
+    createFunc(scene: Scene | SceneNode) {
+      if (scene instanceof Scene) {
+        return new PointLight(scene);
+      } else if (scene instanceof SceneNode) {
+        const batchGroup = new PointLight(scene.scene);
+        batchGroup.parent = scene;
+        return batchGroup;
+      } else {
+        return null;
+      }
     },
     getProps() {
       return [
@@ -111,13 +129,21 @@ export function getPointLightClass(): SerializableClass {
   };
 }
 
-export function getSpotLightClass(): SerializableClass {
+export function getSpotLightClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: SpotLight,
-    parent: getPunctualLightClass(),
+    parent: getPunctualLightClass(assetRegistry),
     className: 'SpotLight',
-    createFunc(scene: Scene) {
-      return new SpotLight(scene);
+    createFunc(scene: Scene | SceneNode) {
+      if (scene instanceof Scene) {
+        return new SpotLight(scene);
+      } else if (scene instanceof SceneNode) {
+        const batchGroup = new SpotLight(scene.scene);
+        batchGroup.parent = scene;
+        return batchGroup;
+      } else {
+        return null;
+      }
     },
     getProps() {
       return [

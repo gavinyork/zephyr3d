@@ -9,7 +9,7 @@ export type AssetInfo = {
   type: AssetType;
   path: string;
   manager: AssetManager;
-  allocated: Set<any>;
+  allocated: Map<any, string>;
   textureOptions?: TextureFetchOptions<any>;
 };
 
@@ -23,6 +23,9 @@ export class AssetRegistry {
   get poolId() {
     return this._poolId;
   }
+  getAssetId(asset: any) {
+    return this._assetMap.get(asset);
+  }
   registerAsset(name: string, type: AssetType, path: string) {
     if (this._assetMap.has(name)) {
       console.error(`AssetRegistry.registerAsset() failed: Asset <${name}> already exists`);
@@ -32,7 +35,7 @@ export class AssetRegistry {
         type,
         path,
         manager: new AssetManager(),
-        allocated: new Set()
+        allocated: new Map()
       });
     }
   }
@@ -50,7 +53,7 @@ export class AssetRegistry {
     }
     const model = await info.manager.fetchModel(scene, info.path, options, request);
     if (model) {
-      info.allocated.add(model.group);
+      info.allocated.set(model.group, name);
     }
     return model;
   }
@@ -65,7 +68,7 @@ export class AssetRegistry {
     }
     const texture = await info.manager.fetchTexture<T>(info.path, options, request);
     if (texture) {
-      info.allocated.add(texture);
+      info.allocated.set(texture, name);
     }
     return texture;
   }
@@ -103,7 +106,7 @@ export class AssetRegistry {
           type: info.type,
           path: info.path,
           manager: new AssetManager(Symbol(k)),
-          allocated: new Set()
+          allocated: new Map()
         });
       }
     }

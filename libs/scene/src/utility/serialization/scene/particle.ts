@@ -1,16 +1,26 @@
 import type { EmitterBehavior, EmitterShape, ParticleDirection } from '../../../scene';
+import { SceneNode } from '../../../scene';
 import { ParticleSystem } from '../../../scene';
-import type { Scene } from '../../../scene/scene';
+import { Scene } from '../../../scene/scene';
+import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
 import { getGraphNodeClass } from './node';
 
-export function getParticleNodeClass(): SerializableClass {
+export function getParticleNodeClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: ParticleSystem,
-    parent: getGraphNodeClass(),
+    parent: getGraphNodeClass(assetRegistry),
     className: 'ParticleSystem',
-    createFunc(scene: Scene) {
-      return new ParticleSystem(scene);
+    createFunc(scene: Scene | SceneNode) {
+      if (scene instanceof Scene) {
+        return new ParticleSystem(scene);
+      } else if (scene instanceof SceneNode) {
+        const batchGroup = new ParticleSystem(scene.scene);
+        batchGroup.parent = scene;
+        return batchGroup;
+      } else {
+        return null;
+      }
     },
     getProps() {
       return [

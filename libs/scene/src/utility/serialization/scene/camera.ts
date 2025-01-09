@@ -1,15 +1,25 @@
-import type { Scene } from '../../../scene/scene';
+import { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 import { getSceneNodeClass } from './node';
+import type { AssetRegistry } from '../asset/asset';
+import { SceneNode } from '../../../scene';
 
-export function getCameraClass(): SerializableClass {
+export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: Camera,
-    parent: getSceneNodeClass(),
+    parent: getSceneNodeClass(assetRegistry),
     className: 'Camera',
-    createFunc(scene: Scene) {
-      return new Camera(scene);
+    createFunc(scene: Scene | SceneNode) {
+      if (scene instanceof Scene) {
+        return new Camera(scene);
+      } else if (scene instanceof SceneNode) {
+        const batchGroup = new Camera(scene.scene);
+        batchGroup.parent = scene;
+        return batchGroup;
+      } else {
+        return null;
+      }
     },
     getProps() {
       return [
@@ -223,13 +233,21 @@ export function getCameraClass(): SerializableClass {
   };
 }
 
-export function getPerspectiveCameraClass(): SerializableClass {
+export function getPerspectiveCameraClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: PerspectiveCamera,
-    parent: getCameraClass(),
+    parent: getCameraClass(assetRegistry),
     className: 'PerspectiveCamera',
-    createFunc(scene: Scene) {
-      return new PerspectiveCamera(scene);
+    createFunc(scene: Scene | SceneNode) {
+      if (scene instanceof Scene) {
+        return new PerspectiveCamera(scene);
+      } else if (scene instanceof SceneNode) {
+        const batchGroup = new PerspectiveCamera(scene.scene);
+        batchGroup.parent = scene;
+        return batchGroup;
+      } else {
+        return null;
+      }
     },
     getProps() {
       return [
@@ -275,13 +293,21 @@ export function getPerspectiveCameraClass(): SerializableClass {
   };
 }
 
-export function getOrthoCameraClass(): SerializableClass {
+export function getOrthoCameraClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: OrthoCamera,
-    parent: getCameraClass(),
+    parent: getCameraClass(assetRegistry),
     className: 'OrthoCamera',
-    createFunc(scene: Scene) {
-      return new OrthoCamera(scene);
+    createFunc(scene: Scene | SceneNode) {
+      if (scene instanceof Scene) {
+        return new OrthoCamera(scene);
+      } else if (scene instanceof SceneNode) {
+        const batchGroup = new OrthoCamera(scene.scene);
+        batchGroup.parent = scene;
+        return batchGroup;
+      } else {
+        return null;
+      }
     },
     getProps() {
       return [
