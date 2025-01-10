@@ -1,4 +1,4 @@
-import type { Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
+import type { AssetRegistry, Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
 import { ParticleSystem } from '@zephyr3d/scene';
 import {
   Application,
@@ -14,17 +14,18 @@ import {
 import type { Command } from '../core/command';
 import { Quaternion, Vector3, type GenericConstructor } from '@zephyr3d/base';
 import type { TRS } from '../types';
-import { AssetStore } from '../helpers/assetstore';
 import type { DBAssetInfo } from '../storage/db';
 
 export class AddAssetCommand implements Command {
   private _scene: Scene;
+  private _assetRegistry: AssetRegistry;
   private _asset: DBAssetInfo;
   private _node: SceneNode;
   private _position: Vector3;
   private _loading: boolean;
-  constructor(scene: Scene, asset: DBAssetInfo, position: Vector3) {
+  constructor(scene: Scene, assetRegistry: AssetRegistry, asset: DBAssetInfo, position: Vector3) {
     this._scene = scene;
+    this._assetRegistry = assetRegistry;
     this._node = null;
     this._asset = { ...asset };
     this._position = new Vector3(position);
@@ -36,10 +37,10 @@ export class AddAssetCommand implements Command {
   execute() {
     if (!this._loading) {
       this._loading = true;
-      AssetStore.fetchModel(this._scene, this._asset.uuid, { enableInstancing: true })
+      this._assetRegistry.fetchModel(this._asset.uuid, this._scene, { enableInstancing: true })
         .then((asset) => {
           if (!this._loading) {
-            AssetStore.release(asset.group);
+            this._assetRegistry.releaseAsset(asset.group);
           } else {
             asset.group.position.set(this._position);
             this._loading = false;
@@ -55,7 +56,7 @@ export class AddAssetCommand implements Command {
     this._loading = false;
     if (this._node) {
       this._node.parent = null;
-      AssetStore.release(this._node);
+      this._assetRegistry.releaseAsset(this._node);
       this._node = null;
     }
   }

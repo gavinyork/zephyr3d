@@ -11,7 +11,6 @@ import { FontGlyph } from '../core/fontglyph';
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import type { DBAssetInfo } from '../storage/db';
-import { AssetStore } from '../helpers/assetstore';
 import { Dialog } from './dlg/dlg';
 import { renderTextureViewer } from '../components/textureviewer';
 import { MenubarView } from '../components/menubar';
@@ -31,6 +30,7 @@ export class SceneView extends BaseView<SceneModel> {
   private _nodeToBePlaced: SceneNode;
   private _mousePosX: number;
   private _mousePosY: number;
+  private _assetRegistry: AssetRegistry;
   private _postGizmoCaptured: boolean;
   private _drawTextureViewer: boolean;
   constructor(model: SceneModel, assetRegistry: AssetRegistry) {
@@ -43,6 +43,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._mousePosY = -1;
     this._postGizmoCaptured = false;
     this._drawTextureViewer = false;
+    this._assetRegistry = assetRegistry;
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
       items: [
@@ -326,7 +327,7 @@ export class SceneView extends BaseView<SceneModel> {
         if (ev.type === 'pointerdown') {
           if (ev.button === 2) {
             this._nodeToBePlaced.parent = null;
-            AssetStore.release(this._nodeToBePlaced);
+            this._assetRegistry.releaseAsset(this._nodeToBePlaced);
             this._nodeToBePlaced = null;
           } else if (ev.button === 0) {
             this._tab.sceneHierarchy.selectNode(this._nodeToBePlaced);
@@ -443,10 +444,10 @@ export class SceneView extends BaseView<SceneModel> {
   private handleAddAsset(asset: DBAssetInfo) {
     console.log(`Add asset ${asset.name}`);
     if (this._nodeToBePlaced) {
-      AssetStore.release(this._nodeToBePlaced);
+      this._assetRegistry.releaseAsset(this._nodeToBePlaced);
       this._nodeToBePlaced = null;
     }
-    AssetStore.fetchModel(this.model.scene, asset.uuid, { enableInstancing: true })
+    this._assetRegistry.fetchModel(asset.uuid, this.model.scene, { enableInstancing: true })
       .then((node) => {
         this._nodeToBePlaced = node.group;
       })

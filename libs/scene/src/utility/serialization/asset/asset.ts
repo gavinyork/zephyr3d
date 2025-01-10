@@ -24,7 +24,13 @@ export class AssetRegistry {
     return this._poolId;
   }
   getAssetId(asset: any) {
-    return this._assetMap.get(asset);
+    for (const entry of this._assetMap) {
+      const id = entry[1].allocated.get(asset);
+      if (id) {
+        return id;
+      }
+    }
+    return null;
   }
   registerAsset(name: string, type: AssetType, path: string) {
     if (this._assetMap.has(name)) {
@@ -47,13 +53,12 @@ export class AssetRegistry {
     return info ? info.manager.pool.id : null;
   }
   async fetchModel(name: string, scene: Scene, options?: ModelFetchOptions, request?: HttpRequest) {
-    const info = this._assetMap.get(name);
-    if (!info || info.type !== 'model') {
-      return null;
-    }
-    const model = await info.manager.fetchModel(scene, info.path, options, request);
+    const model = await this.doFetchModel(name, scene, options, request);
     if (model) {
-      info.allocated.set(model.group, name);
+      const info = this._assetMap.get(name);
+      if (info) {
+        info.allocated.set(model.group, name);
+      }
     }
     return model;
   }
@@ -62,13 +67,12 @@ export class AssetRegistry {
     options?: TextureFetchOptions<T>,
     request?: HttpRequest
   ) {
-    const info = this._assetMap.get(name);
-    if (!info || info.type !== 'texture') {
-      return null;
-    }
-    const texture = await info.manager.fetchTexture<T>(info.path, options, request);
+    const texture = await this.doFetchTexture(name, options, request);
     if (texture) {
-      info.allocated.set(texture, name);
+      const info = this._assetMap.get(name);
+      if (info) {
+        info.allocated.set(texture, name);
+      }
     }
     return texture;
   }
@@ -117,5 +121,23 @@ export class AssetRegistry {
       entry[1].allocated.clear();
     }
     this._assetMap.clear();
+  }
+  protected async doFetchModel(name: string, scene: Scene, options?: ModelFetchOptions, request?: HttpRequest) {
+    const info = this._assetMap.get(name);
+    if (!info || info.type !== 'model') {
+      return null;
+    }
+    return await info.manager.fetchModel(scene, info.path, options, request);
+  }
+  protected async doFetchTexture<T extends Texture2D | TextureCube>(
+    name: string,
+    options?: TextureFetchOptions<T>,
+    request?: HttpRequest
+  ) {
+    const info = this._assetMap.get(name);
+    if (!info || info.type !== 'texture') {
+      return null;
+    }
+    return await info.manager.fetchTexture<T>(info.path, options, request);
   }
 }

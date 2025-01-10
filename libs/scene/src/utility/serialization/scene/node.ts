@@ -104,7 +104,15 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
           name: 'Children',
           type: 'object_array',
           get(this: SceneNode, value) {
-            value.object = this.children.slice();
+            value.object = [];
+            for (const child of this.children) {
+              const assetId = assetRegistry.getAssetId(child);
+              if (assetId) {
+                value.object.push(`ASSET:${assetId}`);
+              } else {
+                value.object.push(child);
+              }
+            };
           },
           set(this: SceneNode, value) {
             this.removeChildren();

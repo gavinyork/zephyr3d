@@ -144,6 +144,7 @@ export class SceneController extends BaseController<SceneModel> {
       name,
       content: serializeObject(this.model.scene, getSerializationInfo(this._assetRegistry), {})
     });
+    console.log(JSON.stringify(this._scene.content, null, 2));
     Database.putScene(this._scene).then((uuid) => {
       this._scene.uuid = uuid;
       Dialog.messageBox('Zephyr3d', `Scene saved: ${uuid}`);
