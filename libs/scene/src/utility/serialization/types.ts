@@ -23,6 +23,7 @@ export type PropertyValue = {
 export type PropertyAccessor<T = unknown> = {
   type: PropertyType;
   name: string;
+  hidden?: boolean;
   options?: { minValue: number; maxValue: number; speed?: number };
   enum?: { labels: string[]; values: (number | string)[] };
   objectTypes?: unknown[];
@@ -36,7 +37,9 @@ export type SerializableClass = {
   ctor?: any;
   className?: string;
   parent?: SerializableClass;
-  createFunc?: (ctx?: any) => any;
+  createFunc?: (ctx?: any, ...args: any[]) => any;
+  getObject?: (obj: any) => any;
+  getInitParams?: (obj: any) => any[];
   getProps: (obj: any) => PropertyAccessor<any>[];
 };
 

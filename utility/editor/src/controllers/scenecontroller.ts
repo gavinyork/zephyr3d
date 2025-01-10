@@ -155,13 +155,16 @@ export class SceneController extends BaseController<SceneModel> {
       .then((sceneinfo) => {
         if (sceneinfo) {
           this._scene = sceneinfo;
-          const scene = deserializeObject<Scene>(
-            null,
-            sceneinfo.content,
-            getSerializationInfo(this._assetRegistry)
+          deserializeObject<Scene>(null, sceneinfo.content, getSerializationInfo(this._assetRegistry)).then(
+            (scene) => {
+              if (scene) {
+                this.model.reset(scene);
+                this._view.reset(this.model.scene);
+              } else {
+                throw new Error('Cannot load scene');
+              }
+            }
           );
-          this.model.reset(scene);
-          this._view.reset(this.model.scene);
         } else {
           Dialog.messageBox('Zephyr3d', `Scene not found: ${uuid}`);
         }

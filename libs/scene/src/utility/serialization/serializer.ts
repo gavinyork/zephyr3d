@@ -1,6 +1,6 @@
 import type { PropertyValue, SerializableClass } from './types';
 
-export function deserializeObjectProps<T>(
+export async function deserializeObjectProps<T>(
   obj: T,
   cls: SerializableClass,
   json: object,
@@ -21,14 +21,20 @@ export function deserializeObjectProps<T>(
         if (typeof v === 'string' && v.startsWith('ASSET:')) {
           tmpVal.str[0] = v;
         } else {
-          tmpVal.object[0] = v ? deserializeObject<any>(obj, v, serializationInfo) ?? null : null;
+          tmpVal.object[0] = v ? (await deserializeObject<any>(obj, v, serializationInfo)) ?? null : null;
         }
         break;
       case 'object_array':
         tmpVal.object = [];
         if (Array.isArray(v)) {
           for (const p of v) {
-            tmpVal.object.push(deserializeObject<any>(obj, p, serializationInfo) ?? null);
+            if (typeof p === 'string' && p.startsWith('ASSET:')) {
+              tmpVal.str[0] = p.slice(6);
+            } else {
+              tmpVal.object.push(
+                p ? (await deserializeObject<any>(obj, p, serializationInfo)) ?? null : null
+              );
+            }
           }
         }
         break;
@@ -155,27 +161,33 @@ export function serializeObjectProps<T>(
   }
 }
 
-export function serializeObject<T>(obj: T, serializationInfo: Map<any, SerializableClass>, json?: any) {
+export function serializeObject(obj: any, serializationInfo: Map<any, SerializableClass>, json?: any) {
   const cls = [...serializationInfo.values()];
   const index = cls.findIndex((val) => val.ctor === obj.constructor);
   if (index < 0) {
     throw new Error('Serialize object failed: Cannot found serialization meta data');
   }
   let info = cls[index];
+  const initParams = info?.getInitParams?.(obj);
   json = json ?? {};
   json.ClassName = info.className;
+  json.Object = {};
+  if (initParams) {
+    json.Init = initParams;
+  }
+  obj = info.getObject?.(obj) ?? obj;
   while (info) {
-    serializeObjectProps(obj, info, json, serializationInfo);
+    serializeObjectProps(obj, info, json.Object, serializationInfo);
     info = info.parent;
   }
   return json;
 }
 
-export function deserializeObject<T>(
+export async function deserializeObject<T>(
   ctx: any,
   json: object,
   serializationInfo: Map<any, SerializableClass>
-): T {
+): Promise<T> {
   const cls = [...serializationInfo.values()];
   const className = json['ClassName'];
   const index = cls.findIndex((val) => val.className === className);
@@ -183,7 +195,16 @@ export function deserializeObject<T>(
     throw new Error('Deserialize object failed: Cannot found serialization meta data');
   }
   let info = cls[index];
-  const obj = info.createFunc ? info.createFunc(ctx) : new info.ctor();
+  const initParams: any[] = json['Init'] ?? [];
+  if (!Array.isArray(initParams)) {
+    throw new Error('Deserialize object failed: Invalid initialization parameters');
+  }
+  json = json['Object'];
+  const p: T | Promise<T> = info.createFunc ? info.createFunc(ctx, ...initParams) : new info.ctor();
+  if (!p) {
+    return null;
+  }
+  const obj = p instanceof Promise ? await p : p;
   while (info) {
     deserializeObjectProps(obj, info, json, serializationInfo);
     info = info.parent;

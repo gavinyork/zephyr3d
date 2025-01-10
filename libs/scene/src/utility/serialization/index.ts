@@ -37,7 +37,7 @@ import {
   getUnlitMaterialClass
 } from './scene/material';
 import { getMeshClass } from './scene/mesh';
-import { getGraphNodeClass, getSceneNodeClass } from './scene/node';
+import { AssetNode, getAssetNodeClass, getGraphNodeClass, getSceneNodeClass } from './scene/node';
 import { getParticleNodeClass } from './scene/particle';
 import {
   getBoxFrameShapeClass,
@@ -87,6 +87,7 @@ export function getSerializationInfo(assetRegistry: AssetRegistry) {
     [SphereShape, getSphereShapeClass(assetRegistry)],
     [TorusShape, getTorusShapeClass(assetRegistry)],
     [CylinderShape, getCylinderShapeClass(assetRegistry)],
-    [PlaneShape, getPlaneShapeClass(assetRegistry)]
+    [PlaneShape, getPlaneShapeClass(assetRegistry)],
+    [AssetNode, getAssetNodeClass(assetRegistry)]
   ]);
 }

@@ -7,6 +7,7 @@ import { Application } from '../../../app';
 import { panoramaToCubemap } from '../../panorama';
 import { prefilterCubemap } from '../../pmrem';
 import { SceneNode } from '../../../scene';
+import { AssetNode } from './node';
 
 export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
@@ -370,16 +371,17 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'Nodes',
           type: 'object_array',
+          hidden: true,
           get(this: Scene, value) {
             value.object = [];
             for (const child of this.rootNode.children) {
               const assetId = assetRegistry.getAssetId(child);
               if (assetId) {
-                value.object.push(`ASSET:${assetId}`);
+                value.object.push(new AssetNode(assetId, child));
               } else {
                 value.object.push(child);
               }
-            };
+            }
           },
           set(this: Scene, value) {
             this.rootNode.removeChildren();

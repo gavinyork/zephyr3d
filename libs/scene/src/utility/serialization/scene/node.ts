@@ -6,6 +6,10 @@ import { degree2radian, radian2degree } from '@zephyr3d/base';
 import { GraphNode } from '../../../scene';
 import type { AssetRegistry } from '../asset/asset';
 
+export class AssetNode {
+  constructor(public id: string, public node: SceneNode) {}
+}
+
 export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: SceneNode,
@@ -103,30 +107,23 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
         {
           name: 'Children',
           type: 'object_array',
+          hidden: true,
           get(this: SceneNode, value) {
             value.object = [];
             for (const child of this.children) {
               const assetId = assetRegistry.getAssetId(child);
               if (assetId) {
-                value.object.push(`ASSET:${assetId}`);
+                value.object.push(new AssetNode(assetId, this));
               } else {
                 value.object.push(child);
               }
-            };
+            }
           },
           set(this: SceneNode, value) {
             this.removeChildren();
             for (const child of value.object) {
               if (child instanceof SceneNode) {
                 child.parent = this;
-              } else if (typeof child === 'string' && child.startsWith('ASSET:')) {
-                const assetId = child.slice(6);
-                const assetInfo = assetRegistry.getAssetInfo(assetId);
-                if (assetInfo?.type === 'model') {
-                  assetRegistry.fetchModel(assetId, this.scene).then((modelInfo) => {
-                    modelInfo.group.parent = this;
-                  });
-                }
               } else {
                 console.error(`Invalid scene node: ${child}`);
               }
@@ -134,6 +131,29 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
           }
         }
       ];
+    }
+  };
+}
+
+export function getAssetNodeClass(assetRegistry: AssetRegistry): SerializableClass {
+  return {
+    ctor: AssetNode,
+    className: 'AssetNode',
+    async createFunc(ctx: Scene | SceneNode, id: string) {
+      const scene = ctx instanceof Scene ? ctx : ctx.scene;
+      const model = await assetRegistry.fetchModel(id, scene);
+      return model?.group ?? null;
+    },
+    getInitParams(obj: AssetNode) {
+      return [obj.id];
+    },
+    getObject(obj: AssetNode) {
+      return obj.node;
+    },
+    getProps(obj: SceneNode) {
+      return getSceneNodeClass(assetRegistry)
+        .getProps(obj)
+        .filter((val) => val.name !== 'Children');
     }
   };
 }

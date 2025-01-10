@@ -92,7 +92,7 @@ class PropertyGroup {
         while (ctor) {
           cls = serializationInfo.get(ctor);
           if (cls) {
-            const props = cls.getProps(this.value.object[0]).filter((p) => p.type !== 'object_array');
+            const props = cls.getProps(this.value.object[0]).filter((p) => !p.hidden);
             if (props.length > 0) {
               const group = this.addGroup(cls.className);
               for (const prop of props) {
