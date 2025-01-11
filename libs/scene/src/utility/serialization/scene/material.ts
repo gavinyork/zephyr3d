@@ -4,6 +4,7 @@ import {
   BlinnMaterial,
   LambertMaterial,
   MeshMaterial,
+  ParticleMaterial,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
   UnlitMaterial
@@ -1051,6 +1052,36 @@ export function getMeshMaterialClass(assetRegistry: AssetRegistry): Serializable
           },
           set(this: MeshMaterial, value) {
             this.opacity = value.num[0];
+          }
+        }
+      ];
+    }
+  };
+}
+
+export function getParticleMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
+  return {
+    ctor: ParticleMaterial,
+    parent: getMeshMaterialClass(assetRegistry),
+    className: 'ParticleMaterial',
+    createFunc() {
+      return new ParticleMaterial(assetRegistry.poolId);
+    },
+    getProps() {
+      return [
+        {
+          name: 'jitterPower',
+          type: 'float',
+          default: { num: [0] },
+          options: {
+            minValue: 0,
+            maxValue: 32
+          },
+          get(this: ParticleMaterial, value) {
+            value.num[0] = this.jitterPower;
+          },
+          set(this: ParticleMaterial, value) {
+            this.jitterPower = value.num[0];
           }
         }
       ];

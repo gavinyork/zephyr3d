@@ -45,7 +45,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   private static updateFuncMap: WeakMap<ParticleSystem, () => void> = new WeakMap();
   private _activeParticleList: ParticleNode[];
   private _maxParticleCount: number;
-  private _updateInterval: number;
   private _emitInterval: number;
   private _emitCount: number;
   private _startTick: number;
@@ -66,7 +65,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   private _particleRotation: number;
   private _particleRotationVar: number;
   private _jitterSpeed: number;
-  private _jitterPower: number;
   private _emitterShape: EmitterShape;
   private _emitterBehavior: EmitterBehavior;
   private _emitterConeRadius: number;
@@ -85,7 +83,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   private _emitterShapeSizeVar: Vector3;
   private _colorValue: Vector4;
   private _primitive: Primitive;
-  private _material: MeshMaterial;
+  private _material: ParticleMaterial;
   private _wsBoundingBox: BoundingBox;
   private _instanceColor: Vector4;
   private _pickTarget: PickTarget;
@@ -105,14 +103,12 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._scalar = 1;
     this._aspect = 1;
     this._airResistence = false;
-    this._updateInterval = 10;
     this._startTick = 0;
     this._delay = 0;
     this._blendMode = 0;
     this._particleRotation = 0;
     this._particleRotationVar = 0;
     this._jitterSpeed = 1;
-    this._jitterPower = 0;
     this._emitterShape = 'point';
     this._emitterBehavior = 'surface';
     this._emitterConeRadius = 0;
@@ -137,10 +133,10 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._pickTarget = { node: this };
     this._flags = PS_WORLDSPACE;
     this._primitive = null;
-    this._material = null;
     this._wsBoundingBox = new BoundingBox();
     this._instanceData = null;
     this._instanceBuffer = null;
+    this._material = new ParticleMaterial();
   }
   set maxParticleCount(value: number) {
     if (value !== this._maxParticleCount) {
@@ -150,12 +146,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   }
   get maxParticleCount(): number {
     return this._maxParticleCount;
-  }
-  set updateInterval(value: number) {
-    this._updateInterval = value;
-  }
-  get updateInterval(): number {
-    return this._updateInterval;
   }
   set emitInterval(value: number) {
     if (value !== this._emitInterval) {
@@ -230,10 +220,10 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     return this._jitterSpeed;
   }
   set jitterPower(value: number) {
-    this._jitterPower = value;
+    this._material.jitterPower = value;
   }
   get jitterPower(): number {
-    return this._jitterPower;
+    return this._material.jitterPower;
   }
   set emitterShape(value: EmitterShape) {
     this._emitterShape = value;
@@ -540,9 +530,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
       this._lastUpdateTime = tick;
     }
     const updateElapsed = tick - this._lastUpdateTime;
-    if (false && updateElapsed < this._updateInterval) {
-      return;
-    }
     this.invalidateBoundingVolume();
     const elapsedInSecond = updateElapsed * 0.001;
     this._lastUpdateTime = tick;
@@ -571,7 +558,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
         p.position.y += p.velocity.y * elapsedInSecond * this._scalar;
         p.position.z += p.velocity.z * elapsedInSecond * this._scalar;
         node.jitterAngle = (node.elapsedTime + p.lifeSpan * node.ageBias) * this._jitterSpeed;
-        this._wsBoundingBox.extend(p.position);
         node.size = Math.max(p.size1 + p.size2 * age, 0);
         node.rotation += p.rotation * elapsedInSecond;
       }
@@ -600,7 +586,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._wsBoundingBox.beginExtend();
     let n = 0;
     const worldSpace = !!(this._flags & PS_WORLDSPACE);
-    const invWorldMatrix = worldSpace ? this.invWorldMatrix : null;
+    const invWorldMatrix = this.invWorldMatrix;
     for (const p of this._activeParticleList) {
       if (worldSpace) {
         invWorldMatrix.transformPointAffine(p.particle.position, tmpVec3);
@@ -637,10 +623,23 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
         this._instanceData[n++] = p.particle.velocity.z;
       }
     }
-    this._instanceBuffer.bufferSubData(0, this._instanceData);
-    if (!this._material) {
-      this._material = new ParticleMaterial();
+    let maxParticleSize = Math.max(
+      Math.abs(this.particleSize1) + Math.abs(this.particleSize1Var),
+      Math.abs(this.particleSize2) + Math.abs(this.particleSize2Var)
+    );
+    invWorldMatrix.decompose(tmpVec3, null, null);
+    const scale = Math.max(Math.abs(tmpVec3.x), Math.abs(tmpVec3.y), Math.abs(tmpVec3.z));
+    maxParticleSize *= scale;
+    if (this._jitterSpeed !== 0 && this.jitterPower !== 0) {
+      maxParticleSize += 2 * Math.abs(this.jitterPower);
     }
+    this._wsBoundingBox.minPoint.x -= maxParticleSize;
+    this._wsBoundingBox.minPoint.y -= maxParticleSize;
+    this._wsBoundingBox.minPoint.z -= maxParticleSize;
+    this._wsBoundingBox.maxPoint.x += maxParticleSize;
+    this._wsBoundingBox.maxPoint.y += maxParticleSize;
+    this._wsBoundingBox.maxPoint.z += maxParticleSize;
+    this._instanceBuffer.bufferSubData(0, this._instanceData);
   }
   newParticle(num: number, worldMatrix: Matrix4x4) {
     for (let i = 0; i < num; i++) {
@@ -731,7 +730,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
    */
   draw(ctx: DrawContext) {
     if (this._activeParticleList.length > 0) {
-      console.log(`Draw ${this._activeParticleList.length} particles`);
       this.bind(ctx);
       this._material.draw(this._primitive, ctx, this._activeParticleList.length);
     }

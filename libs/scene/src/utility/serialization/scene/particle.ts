@@ -1,6 +1,6 @@
 import type { EmitterBehavior, EmitterShape, ParticleDirection } from '../../../scene';
-import { SceneNode } from '../../../scene';
-import { ParticleSystem } from '../../../scene';
+import { SceneNode } from '../../../scene/scene_node';
+import { ParticleSystem } from '../../../scene/particlesys';
 import { Scene } from '../../../scene/scene';
 import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
@@ -44,17 +44,6 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
           },
           set(this: ParticleSystem, value) {
             this.maxParticleCount = value.num[0];
-          }
-        },
-        {
-          name: 'updateInterval',
-          type: 'int',
-          default: { num: [10] },
-          get(this: ParticleSystem, value) {
-            value.num[0] = this.updateInterval;
-          },
-          set(this: ParticleSystem, value) {
-            this.updateInterval = value.num[0];
           }
         },
         {
