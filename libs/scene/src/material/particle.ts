@@ -3,24 +3,44 @@ import { mixinAlbedoColor } from './mixins/albedocolor';
 import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
 import { DrawContext } from '../render';
+import { Vector4 } from '@zephyr3d/base';
 
 /**
  * Particle material
  * @public
  */
 export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor) {
-  private _jitterPower: number;
+  private _params: Vector4;
   constructor(poolId?: string | symbol) {
     super(poolId);
     this.cullMode = 'none';
-    this._jitterPower = 0;
+    this._params = new Vector4(0, 1, 0, 0);
   }
   get jitterPower() {
-    return this._jitterPower;
+    return this._params.x;
   }
   set jitterPower(val: number) {
-    if (val !== this._jitterPower) {
-      this._jitterPower = val;
+    if (val !== this._params.x) {
+      this._params.x = val;
+      this.uniformChanged();
+    }
+  }
+  get aspect() {
+    return this._params.y;
+  }
+  set aspect(val: number) {
+    if (val !== this._params.y) {
+      this._params.y = val;
+      this.uniformChanged();
+    }
+  }
+  get directional() {
+    return this._params.z !== 0;
+  }
+  set directional(b: boolean) {
+    const val = b ? 1 : 0;
+    if (this._params.z !== val) {
+      this._params.z = val;
       this.uniformChanged();
     }
   }
@@ -45,7 +65,8 @@ export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlb
     scope.$inputs.particlePos = pb.vec3().attrib('texCoord0');
     scope.$inputs.particleParams = pb.vec4().attrib('texCoord1');
     scope.$inputs.particleVelocity = pb.vec3().attrib('texCoord2');
-    scope.jitterPower = pb.float().uniform(2);
+    scope.params = pb.vec4().uniform(2);
+
     scope.$l.vertexID = pb.int(scope.$inputs.pos.w);
     scope.$l.z = pb.normalize(scope.$inputs.particleVelocity);
     scope.$l.x = pb.vec3(pb.neg(scope.z.y), scope.z.x, 0);
@@ -54,15 +75,17 @@ export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlb
       pb.mul(pb.sin(scope.$inputs.particleParams.z), scope.x),
       pb.mul(pb.cos(scope.$inputs.particleParams.z), scope.y)
     );
+    scope.$l.jitterVec = pb.mul(scope.offset, scope.params.x);
     scope.$l.centerPosWS = pb.mul(
       ShaderHelper.getWorldMatrix(scope),
-      pb.vec4(pb.add(scope.$inputs.particlePos, pb.mul(scope.offset, scope.jitterPower)), 1)
+      pb.vec4(pb.add(scope.$inputs.particlePos, scope.jitterVec), 1)
     ).xyz;
-    scope.$l.forward = pb.normalize(pb.sub(ShaderHelper.getCameraPosition(scope), scope.centerPosWS));
+    const viewMatrix = ShaderHelper.getViewMatrix(scope);
+    scope.$l.forward = pb.vec3(viewMatrix[0].z, viewMatrix[1].z, viewMatrix[2].z);
     scope.$l.axis = scope.$choice(
-      pb.lessThan(pb.abs(scope.forward.y), 0.999),
-      pb.vec3(0, 1, 0),
-      pb.vec3(1, 0, 0)
+      pb.notEqual(scope.params.z, 0),
+      scope.z,
+      scope.$choice(pb.lessThan(pb.abs(scope.forward.y), 0.999), pb.vec3(0, 1, 0), pb.vec3(1, 0, 0))
     );
     scope.$l.right = pb.normalize(pb.cross(scope.axis, scope.forward));
     scope.$l.up = pb.normalize(pb.cross(scope.forward, scope.right));
@@ -88,7 +111,7 @@ export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlb
     scope.pos = pb.mul(scope.pos, scope.$inputs.particleParams.x);
     scope.centerPosWS = pb.add(
       scope.centerPosWS,
-      pb.mul(scope.right, scope.pos.x),
+      pb.mul(scope.right, scope.pos.x, scope.params.y),
       pb.mul(scope.up, scope.pos.y)
     );
     scope.$outputs.uv = scope.uv;
@@ -109,6 +132,6 @@ export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlb
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
-    bindGroup.setValue('jitterPower', this._jitterPower);
+    bindGroup.setValue('params', this._params);
   }
 }

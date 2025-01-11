@@ -1,4 +1,4 @@
-import type { EmitterBehavior, EmitterShape, ParticleDirection } from '../../../scene';
+import type { EmitterBehavior, EmitterShape } from '../../../scene';
 import { SceneNode } from '../../../scene/scene_node';
 import { ParticleSystem } from '../../../scene/particlesys';
 import { Scene } from '../../../scene/scene';
@@ -189,18 +189,14 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
           }
         },
         {
-          name: 'Direction',
-          type: 'string',
-          enum: {
-            labels: ['None', 'Velocity', 'Vertical', 'Horizontal'],
-            values: ['none', 'velocity', 'vertical', 'horizontal']
-          },
-          default: { str: ['none'] },
+          name: 'Directional',
+          type: 'bool',
+          default: { bool: [false] },
           get(this: ParticleSystem, value) {
-            value.str[0] = this.directionType;
+            value.bool[0] = this.directional;
           },
           set(this: ParticleSystem, value) {
-            this.directionType = value.str[0] as ParticleDirection;
+            this.directional = value.bool[0];
           }
         },
         {

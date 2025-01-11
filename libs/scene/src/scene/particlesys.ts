@@ -34,12 +34,10 @@ type ParticleNode = {
   jitterAngle: number;
 };
 
-const PS_DIRECTIONAL = 1 << 7;
 const PS_WORLDSPACE = 1 << 8;
 
 export type EmitterShape = 'point' | 'sphere' | 'box' | 'cylinder' | 'cone';
 export type EmitterBehavior = 'surface' | 'volume';
-export type ParticleDirection = 'none' | 'velocity' | 'vertical' | 'horizontal';
 
 export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implements Drawable {
   private static updateFuncMap: WeakMap<ParticleSystem, () => void> = new WeakMap();
@@ -56,12 +54,10 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   private _transparency: number;
   private _blendMode: number;
   private _colorMultiplier: number;
-  private _directionType: ParticleDirection;
   private _flags: number;
   private _gravity: Vector3;
   private _wind: Vector3;
   private _scalar: number;
-  private _aspect: number;
   private _particleRotation: number;
   private _particleRotationVar: number;
   private _jitterSpeed: number;
@@ -101,7 +97,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._lastUpdateTime = 0;
     this._numEmitCount = 0;
     this._scalar = 1;
-    this._aspect = 1;
     this._airResistence = false;
     this._startTick = 0;
     this._delay = 0;
@@ -128,7 +123,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._particleAccelVar = -0.01;
     this._transparency = 1;
     this._colorMultiplier = 1;
-    this._directionType = 'none';
     this._instanceColor = Vector4.zero();
     this._pickTarget = { node: this };
     this._flags = PS_WORLDSPACE;
@@ -190,10 +184,10 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     return this._scalar;
   }
   set aspect(value: number) {
-    this._aspect = value;
+    this._material.aspect = value;
   }
   get aspect(): number {
-    return this._aspect;
+    return this._material.aspect;
   }
   set airResistence(value: boolean) {
     this._airResistence = value;
@@ -327,16 +321,11 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   get colorValue(): Vector4 {
     return this._colorValue;
   }
-  set directionType(value: ParticleDirection) {
-    this._directionType = value;
-    if (this._directionType === 'none') {
-      this.flags &= ~PS_DIRECTIONAL;
-    } else {
-      this.flags |= PS_DIRECTIONAL;
-    }
+  set directional(val: boolean) {
+    this._material.directional = val;
   }
-  get directionType(): ParticleDirection {
-    return this._directionType;
+  get directional(): boolean {
+    return this._material.directional;
   }
   set worldSpace(value: boolean) {
     if (value) {
@@ -604,15 +593,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
       this._instanceData[n++] = p.rotation;
       this._instanceData[n++] = p.jitterAngle;
       this._instanceData[n++] = p.elapsedTime / p.particle.lifeSpan;
-      if (this._directionType === 'horizontal') {
-        this._instanceData[n++] = 1;
-        this._instanceData[n++] = 0;
-        this._instanceData[n++] = 0;
-      } else if (this._directionType === 'vertical') {
-        this._instanceData[n++] = 0;
-        this._instanceData[n++] = 1;
-        this._instanceData[n++] = 0;
-      } else if (worldSpace) {
+      if (worldSpace) {
         invWorldMatrix.transformVectorAffine(p.particle.velocity, tmpVec3);
         this._instanceData[n++] = tmpVec3.x;
         this._instanceData[n++] = tmpVec3.y;
