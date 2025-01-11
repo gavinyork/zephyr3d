@@ -15,6 +15,7 @@ export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlb
     super(poolId);
     this.cullMode = 'none';
     this._params = new Vector4(0, 1, 0, 0);
+    this.albedoTexCoordIndex = -1;
   }
   get jitterPower() {
     return this._params.x;
@@ -114,7 +115,7 @@ export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlb
       pb.mul(scope.right, scope.pos.x, scope.params.y),
       pb.mul(scope.up, scope.pos.y)
     );
-    scope.$outputs.uv = scope.uv;
+    scope.$outputs.zAlbedoTexCoord = scope.uv;
     scope.$outputs.worldPos = scope.centerPosWS;
     ShaderHelper.setClipSpacePosition(
       scope,
@@ -124,8 +125,8 @@ export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlb
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     if (this.needFragmentColor()) {
-      //const color = this.calculateAlbedoColor(scope);
-      this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.$builder.vec4(scope.$inputs.uv, 1, 1));
+      const color = this.calculateAlbedoColor(scope);
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, color);
     } else {
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }

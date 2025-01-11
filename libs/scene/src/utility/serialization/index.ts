@@ -2,6 +2,8 @@ import { Camera, OrthoCamera, PerspectiveCamera } from '../../camera';
 import {
   BlinnMaterial,
   LambertMaterial,
+  MeshMaterial,
+  ParticleMaterial,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
   UnlitMaterial
@@ -32,6 +34,8 @@ import {
 import {
   getBlinnMaterialClass,
   getLambertMaterialClass,
+  getMeshMaterialClass,
+  getParticleMaterialClass,
   getPBRMetallicRoughnessMaterialClass,
   getPBRSpecularGlossinessMaterialClass,
   getUnlitMaterialClass
@@ -76,11 +80,13 @@ export function getSerializationInfo(assetRegistry: AssetRegistry) {
     [OrthoCamera, getOrthoCameraClass(assetRegistry)],
     [BatchGroup, getBatchGroupClass(assetRegistry)],
     [Scene, getSceneClass(assetRegistry)],
+    [MeshMaterial, getMeshMaterialClass(assetRegistry)],
     [UnlitMaterial, getUnlitMaterialClass(assetRegistry)],
     [LambertMaterial, getLambertMaterialClass(assetRegistry)],
     [BlinnMaterial, getBlinnMaterialClass(assetRegistry)],
     [PBRMetallicRoughnessMaterial, getPBRMetallicRoughnessMaterialClass(assetRegistry)],
     [PBRSpecularGlossinessMaterial, getPBRSpecularGlossinessMaterialClass(assetRegistry)],
+    [ParticleMaterial, getParticleMaterialClass(assetRegistry)],
     [Primitive, getPrimitiveClass(assetRegistry)],
     [BoxShape, getBoxShapeClass(assetRegistry)],
     [BoxFrameShape, getBoxFrameShapeClass(assetRegistry)],

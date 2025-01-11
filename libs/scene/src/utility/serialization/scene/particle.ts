@@ -5,6 +5,7 @@ import { Scene } from '../../../scene/scene';
 import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
 import { getGraphNodeClass } from './node';
+import { ParticleMaterial } from '../../../material';
 
 export function getParticleNodeClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
@@ -381,6 +382,15 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
           },
           set(this: ParticleSystem, value) {
             this.colorMultiplier = value.num[0];
+          }
+        },
+        {
+          name: 'Material',
+          type: 'object',
+          default: { object: [null] },
+          objectTypes: [ParticleMaterial],
+          get(this: ParticleSystem, value) {
+            value.object[0] = this.material;
           }
         }
       ];

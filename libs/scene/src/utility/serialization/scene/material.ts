@@ -1070,18 +1070,43 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
     getProps() {
       return [
         {
-          name: 'jitterPower',
-          type: 'float',
-          default: { num: [0] },
-          options: {
-            minValue: 0,
-            maxValue: 32
-          },
+          name: 'AlbedoColor',
+          type: 'rgba',
+          default: { num: [1, 1, 1, 1] },
           get(this: ParticleMaterial, value) {
-            value.num[0] = this.jitterPower;
+            const color = this.albedoColor;
+            value.num[0] = color.x;
+            value.num[1] = color.y;
+            value.num[2] = color.z;
+            value.num[3] = color.w;
           },
           set(this: ParticleMaterial, value) {
-            this.jitterPower = value.num[0];
+            this.albedoColor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
+          }
+        },
+        {
+          name: 'AlbedoTexture',
+          type: 'object',
+          default: { str: [''] },
+          get(this: ParticleMaterial, value) {
+            const name = this.albedoTexture?.name ?? '';
+            value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+          },
+          set(this: ParticleMaterial, value) {
+            if (value.str[0]?.startsWith('ASSET:')) {
+              const assetId = value.str[0].slice(6);
+              const assetInfo = assetRegistry.getAssetInfo(assetId);
+              if (assetInfo && assetInfo.type === 'texture') {
+                assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
+                  if (tex?.isTexture2D()) {
+                    tex.name = `ASSET:${assetId}`;
+                    this.albedoTexture = tex;
+                  } else {
+                    console.error('Invalid albedo texture');
+                  }
+                });
+              }
+            }
           }
         }
       ];

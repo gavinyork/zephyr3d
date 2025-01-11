@@ -132,6 +132,9 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._instanceBuffer = null;
     this._material = new ParticleMaterial();
   }
+  get material() {
+    return this._material;
+  }
   set maxParticleCount(value: number) {
     if (value !== this._maxParticleCount) {
       this._maxParticleCount = value;
