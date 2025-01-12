@@ -19,16 +19,16 @@ interface CurveSettings {
 
 export class CurveEditor {
   private points: Point[] = [];
-  private interpolators: Interpolator[] = []; // 你现有的插值器类型
+  private interpolators: Interpolator[] = [];
 
-  // 编辑器设置
+  // Settings
   private settings: CurveSettings;
   private timeRangeStartInput: [number];
   private timeRangeEndInput: [number];
   private valueRangeStartInput: [number];
   private valueRangeEndInput: [number];
 
-  // 画布状态
+  // Status
   private canvasSize: ImGui.ImVec2 = new ImGui.ImVec2(0, 0);
   private isDragging: boolean = false;
   private selectedPointIndex: number = -1;
@@ -36,7 +36,7 @@ export class CurveEditor {
   private curveDirty: boolean = true;
 
   constructor() {
-    // 初始化默认设置
+    // Default settings
     this.settings = {
       timeRange: [0, 10],
       valueRange: [-1, 1],
@@ -48,13 +48,11 @@ export class CurveEditor {
       interpolationType: 'cubicspline-natural'
     };
 
-    // 初始化ImGui输入数组
     this.timeRangeStartInput = [this.settings.timeRange[0]];
     this.timeRangeEndInput = [this.settings.timeRange[1]];
     this.valueRangeStartInput = [this.settings.valueRange[0]];
     this.valueRangeEndInput = [this.settings.valueRange[1]];
 
-    // 初始化首尾关键帧
     this.points = [
       { x: this.settings.timeRange[0], values: [0] },
       { x: this.settings.timeRange[1], values: [0] }
@@ -75,8 +73,6 @@ export class CurveEditor {
 
     this.renderSettings();
 
-    // 使用 BeginChild 创建一个子窗口来容纳画布
-    // 这样可以让画布填充剩余空间
     if (
       ImGui.BeginChild(
         'CurveCanvas',
@@ -98,17 +94,14 @@ export class CurveEditor {
     if (ImGui.CollapsingHeader('Curve Settings')) {
       let changed = false;
 
-      // 时间范围设置
       ImGui.Text('Time Range');
       changed = ImGui.InputFloat('Start Time', this.timeRangeStartInput, 0.1, 1.0, '%.2f') || changed;
       changed = ImGui.InputFloat('End Time', this.timeRangeEndInput, 0.1, 1.0, '%.2f') || changed;
 
-      // 值范围设置
       ImGui.Text('Value Range');
       changed = ImGui.InputFloat('Min Value', this.valueRangeStartInput, 0.1, 1.0, '%.2f') || changed;
       changed = ImGui.InputFloat('Max Value', this.valueRangeEndInput, 0.1, 1.0, '%.2f') || changed;
 
-      // 插值类型设置
       ImGui.Text('Interpolation');
       const interpolationTypes = ['linear', 'step', 'cubicspline-natural'];
       const currentType = interpolationTypes.indexOf(this.settings.interpolationType);
@@ -134,17 +127,16 @@ export class CurveEditor {
         this.updateSettings();
       }
 
-      // 如果插值类型改变，立即更新插值器和曲线
       if (interpolationChanged) {
         this.updateInterpolators();
         this.curveDirty = true;
-        this.cachedCurvePoints = []; // 清空曲线缓存
+        this.cachedCurvePoints = [];
       }
     }
   }
 
   private updateSettings(): void {
-    // 确保范围有效
+    // Make sure the range is valid
     if (this.timeRangeStartInput[0] >= this.timeRangeEndInput[0]) {
       this.timeRangeEndInput[0] = this.timeRangeStartInput[0] + 0.1;
     }
@@ -152,14 +144,13 @@ export class CurveEditor {
       this.valueRangeEndInput[0] = this.valueRangeStartInput[0] + 0.1;
     }
 
-    // 更新设置
+    // Update settings
     this.settings.timeRange = [this.timeRangeStartInput[0], this.timeRangeEndInput[0]];
     this.settings.valueRange = [this.valueRangeStartInput[0], this.valueRangeEndInput[0]];
 
-    // 规范化所有点
+    // Initialize all points
     this.normalizePoints();
 
-    // 确保更新插值器
     this.updateInterpolators();
 
     this.curveDirty = true;
@@ -176,7 +167,6 @@ export class CurveEditor {
     }
 
     const interpolator = this.interpolators[0];
-    // 对于阶梯插值，增加采样点数以获得更好的效果
     const baseSegments = Math.min(Math.ceil(this.canvasSize.x / 2), 100);
     const numSegments = this.settings.interpolationType === 'step' ? baseSegments * 2 : baseSegments;
     const result = new Float32Array(1);
@@ -194,11 +184,9 @@ export class CurveEditor {
     this.curveDirty = false;
   }
   private normalizePoints(): void {
-    // 确保首尾点的时间位置固定
     this.points[0].x = this.settings.timeRange[0];
     this.points[this.points.length - 1].x = this.settings.timeRange[1];
 
-    // 处理所有点的值范围
     this.points.forEach((point) => {
       point.values[0] = Math.max(
         this.settings.valueRange[0],
@@ -206,7 +194,6 @@ export class CurveEditor {
       );
     });
 
-    // 确保中间点的时间在合理范围内
     for (let i = 1; i < this.points.length - 1; i++) {
       this.points[i].x = Math.max(
         this.points[0].x + 0.001,
@@ -224,12 +211,10 @@ export class CurveEditor {
   private renderCurveView(): void {
     const cursorPos = ImGui.GetCursorScreenPos();
 
-    // 创建交互区域
     ImGui.InvisibleButton('curve_canvas', this.canvasSize);
     const isCanvasHovered = ImGui.IsItemHovered();
     const isCanvasActive = ImGui.IsItemActive();
 
-    // 绘制内容
     const drawList = ImGui.GetWindowDrawList();
     drawList.AddRectFilled(
       cursorPos,
@@ -237,16 +222,13 @@ export class CurveEditor {
       this.settings.backgroundColor
     );
 
-    // 绘制曲线
     if (this.points.length >= 2) {
       this.drawCurve(drawList, cursorPos);
     }
     this.drawPoints(drawList, cursorPos);
 
-    // 绘制范围标签
     this.drawRangeLabels(drawList, cursorPos);
 
-    // 处理鼠标悬停提示
     if (isCanvasHovered || isCanvasActive) {
       this.handleInteraction(cursorPos);
       this.drawHoverHint(drawList, cursorPos);
@@ -257,8 +239,6 @@ export class CurveEditor {
     const padding = 5;
     const fontSize = ImGui.GetFontSize();
 
-    // 绘制value范围
-    // 最大值 - 上方中央
     const maxValueText = this.settings.valueRange[1].toFixed(2);
     const maxValueWidth = ImGui.CalcTextSize(maxValueText).x;
     drawList.AddText(
@@ -270,7 +250,6 @@ export class CurveEditor {
       maxValueText
     );
 
-    // 最小值 - 下方中央
     const minValueText = this.settings.valueRange[0].toFixed(2);
     const minValueWidth = ImGui.CalcTextSize(minValueText).x;
     drawList.AddText(
@@ -282,8 +261,6 @@ export class CurveEditor {
       minValueText
     );
 
-    // 绘制time范围
-    // 最小值 - 左侧中央
     const startTimeText = this.settings.timeRange[0].toFixed(2);
     drawList.AddText(
       new ImGui.ImVec2(
@@ -294,7 +271,6 @@ export class CurveEditor {
       startTimeText
     );
 
-    // 最大值 - 右侧中央
     const endTimeText = this.settings.timeRange[1].toFixed(2);
     const endTimeWidth = ImGui.CalcTextSize(endTimeText).x;
     drawList.AddText(
@@ -310,37 +286,30 @@ export class CurveEditor {
     const mousePos = ImGui.GetMousePos();
     const relativeMousePos = new ImGui.ImVec2(mousePos.x - cursorPos.x, mousePos.y - cursorPos.y);
 
-    // 只在鼠标在画布内时显示提示
     if (!this.isPointInCanvas(relativeMousePos)) {
       return;
     }
 
-    // 获取鼠标位置对应的世界坐标
     const worldPos = this.screenToWorld(relativeMousePos.x, relativeMousePos.y);
 
-    // 找到最近的曲线点
     const curveValue = this.findNearestCurveValue(worldPos.x);
     if (curveValue === null) {
       return;
     }
 
-    // 计算屏幕坐标
     const screenPos = this.worldToScreen(worldPos.x, curveValue);
     const distance = Math.abs(screenPos.y - relativeMousePos.y);
 
-    // 只在鼠标靠近曲线时显示提示（比如距离小于10像素）
     if (distance > 10) {
       return;
     }
 
-    // 绘制提示文本
     const hintText = `Time: ${worldPos.x.toFixed(2)}\nValue: ${curveValue.toFixed(2)}`;
     const textSize = ImGui.CalcTextSize(hintText);
     const padding = 5;
     const backgroundColor = ImGui.GetColorU32(new ImGui.ImVec4(0, 0, 0, 0.8));
     const textColor = ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 1, 1));
 
-    // 计算提示框位置，确保不会超出画布边界
     let hintX = cursorPos.x + relativeMousePos.x + 10;
     let hintY = cursorPos.y + relativeMousePos.y - textSize.y - padding * 2;
 
@@ -351,7 +320,6 @@ export class CurveEditor {
       hintY = cursorPos.y + relativeMousePos.y + padding;
     }
 
-    // 绘制提示框背景
     drawList.AddRectFilled(
       new ImGui.ImVec2(hintX, hintY),
       new ImGui.ImVec2(hintX + textSize.x + padding * 2, hintY + textSize.y + padding * 2),
@@ -359,7 +327,6 @@ export class CurveEditor {
       4
     );
 
-    // 绘制提示文本
     drawList.AddText(new ImGui.ImVec2(hintX + padding, hintY + padding), textColor, hintText);
   }
 
@@ -368,12 +335,10 @@ export class CurveEditor {
       return null;
     }
 
-    // 确保时间在曲线范围内
     if (time < this.points[0].x || time > this.points[this.points.length - 1].x) {
       return null;
     }
 
-    // 使用插值器获取精确值
     const result = new Float32Array(1);
     this.interpolators[0].interpolate(time, result);
     return result[0];
@@ -417,21 +382,17 @@ export class CurveEditor {
     const mousePos = ImGui.GetMousePos();
     const relativeMousePos = new ImGui.ImVec2(mousePos.x - cursorPos.x, mousePos.y - cursorPos.y);
 
-    // 左键点击处理
     if (ImGui.IsMouseClicked(0)) {
       const clickedPoint = this.findPointNear(relativeMousePos);
       if (clickedPoint !== -1) {
-        // 选中现有点
         this.selectedPointIndex = clickedPoint;
         this.isDragging = true;
       } else {
-        // 在空白处添加新点
         const worldPos = this.screenToWorld(relativeMousePos.x, relativeMousePos.y);
         this.addPoint(worldPos.x, worldPos.y);
       }
     }
 
-    // 右键点击处理（删除点）
     if (ImGui.IsMouseClicked(1)) {
       const clickedPoint = this.findPointNear(relativeMousePos);
       if (clickedPoint !== -1 && clickedPoint !== 0 && clickedPoint !== this.points.length - 1) {
@@ -439,15 +400,12 @@ export class CurveEditor {
       }
     }
 
-    // 拖动处理
     if (this.isDragging && this.selectedPointIndex !== -1) {
       if (ImGui.IsMouseDown(0)) {
         const worldPos = this.screenToWorld(relativeMousePos.x, relativeMousePos.y);
         if (this.selectedPointIndex === 0 || this.selectedPointIndex === this.points.length - 1) {
-          // 首尾点只能改变value
           this.updatePointValue(this.selectedPointIndex, worldPos.y);
         } else {
-          // 中间点可以自由移动
           const minTime = this.points[0].x;
           const maxTime = this.points[this.points.length - 1].x;
           const clampedTime = Math.max(minTime + 0.001, Math.min(maxTime - 0.001, worldPos.x));
@@ -459,7 +417,6 @@ export class CurveEditor {
     }
   }
 
-  // 坐标转换方法
   private worldToScreen(x: number, y: number): { x: number; y: number } {
     return {
       x: this.timeToScreen(x),
@@ -503,7 +460,6 @@ export class CurveEditor {
     );
   }
 
-  // 辅助方法
   private isPointInCanvas(point: ImGui.ImVec2): boolean {
     return point.x >= 0 && point.x <= this.canvasSize.x && point.y >= 0 && point.y <= this.canvasSize.y;
   }
@@ -520,30 +476,23 @@ export class CurveEditor {
     return -1;
   }
 
-  // 点管理方法
   private addPoint(time: number, value: number): void {
-    // 确保时间在首尾点之间
     const minTime = this.points[0].x;
     const maxTime = this.points[this.points.length - 1].x;
     time = Math.max(minTime + 0.001, Math.min(maxTime - 0.001, time));
 
-    // 确保值在有效范围内
     value = Math.max(this.settings.valueRange[0], Math.min(this.settings.valueRange[1], value));
 
-    // 创建新点
     const newPoint: Point = {
       x: time,
       values: [value]
     };
 
-    // 添加点并排序
     this.points.push(newPoint);
     this.sortPoints();
 
-    // 更新插值器
     this.updateInterpolators();
 
-    // 选中新添加的点
     this.selectedPointIndex = this.points.findIndex((p) => p === newPoint);
 
     this.curveDirty = true;
@@ -552,7 +501,6 @@ export class CurveEditor {
   private removePoint(index: number): void {
     if (index < 0 || index >= this.points.length) return;
 
-    // 至少保留两个点
     if (this.points.length <= 2) {
       ImGui.OpenPopup('Cannot Remove Point');
       return;
@@ -560,14 +508,12 @@ export class CurveEditor {
 
     this.points.splice(index, 1);
 
-    // 更新选中点
     if (this.selectedPointIndex === index) {
       this.selectedPointIndex = -1;
     } else if (this.selectedPointIndex > index) {
       this.selectedPointIndex--;
     }
 
-    // 更新插值器
     this.updateInterpolators();
 
     this.curveDirty = true;
@@ -576,12 +522,10 @@ export class CurveEditor {
   private updatePointValue(index: number, newValue: number): void {
     if (index < 0 || index >= this.points.length) return;
 
-    // 确保值在有效范围内
     newValue = Math.max(this.settings.valueRange[0], Math.min(this.settings.valueRange[1], newValue));
 
     this.points[index].values[0] = newValue;
 
-    // 更新插值器
     this.updateInterpolators();
 
     this.curveDirty = true;
@@ -590,30 +534,25 @@ export class CurveEditor {
   private updatePointPosition(index: number, time: number, value: number): void {
     if (index <= 0 || index >= this.points.length - 1) return; // 保护首尾点的位置
 
-    // 确保时间在首尾点之间
     const minTime = this.points[0].x;
     const maxTime = this.points[this.points.length - 1].x;
     time = Math.max(minTime + 0.001, Math.min(maxTime - 0.001, time));
 
-    // 确保值在有效范围内
     value = Math.max(this.settings.valueRange[0], Math.min(this.settings.valueRange[1], value));
 
     this.points[index].x = time;
     this.points[index].values[0] = value;
     this.sortPoints();
 
-    // 更新选中点的索引（因为排序可能改变了位置）
     if (this.selectedPointIndex === index) {
       this.selectedPointIndex = this.points.findIndex((p) => p.x === time);
     }
 
-    // 更新插值器
     this.updateInterpolators();
 
     this.curveDirty = true;
   }
 
-  // 插值器更新方法
   private updateInterpolators(): void {
     if (this.points.length < 2) {
       this.interpolators = [];
