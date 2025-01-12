@@ -77,16 +77,21 @@ export class AssetHierarchy {
     }
   }
   async uploadAssetFile(type: AssetType) {
-    const files = await FilePicker.chooseFiles(false, '');
-    const file = files[0];
-    const extensions =
-      type === 'model' ? AssetStore.modelExtensions : type === 'texture' ? AssetStore.textureExtensions : [];
-    if (extensions.findIndex((ext) => file.name.toLowerCase().endsWith(ext)) < 0) {
-      Dialog.messageBox('Error', `Invalid file type. Only ${extensions.join(', ')} files are supported.`);
-      return;
+    const files = await FilePicker.chooseFiles(true, '');
+    for (const file of files) {
+      const extensions =
+        type === 'model'
+          ? AssetStore.modelExtensions
+          : type === 'texture'
+          ? AssetStore.textureExtensions
+          : [];
+      if (extensions.findIndex((ext) => file.name.toLowerCase().endsWith(ext)) < 0) {
+        Dialog.messageBox('Error', `Invalid file type. Only ${extensions.join(', ')} files are supported.`);
+        return;
+      }
+      const zip = await this.zipFiles([{ path: file.name, file }]);
+      await this.uploadFiles(type, zip, file.name, [file.name]);
     }
-    const zip = await this.zipFiles([{ path: file.name, file }]);
-    await this.uploadFiles(type, zip, file.name, [file.name]);
     this._selectedAsset = null;
     await this.listAssets();
   }
@@ -173,7 +178,7 @@ export class AssetHierarchy {
       ImGui.OpenPopup(`context_upload`);
     }
     if (ImGui.BeginPopup(`context_upload`)) {
-      if (ImGui.MenuItem('Import file...')) {
+      if (ImGui.MenuItem('Import files...')) {
         this.uploadAssetFile(type);
       }
       if (type === 'model' && ImGui.MenuItem('Import directory...')) {

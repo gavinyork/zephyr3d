@@ -112,6 +112,7 @@ export class MeshMaterial extends Material {
     this._objectColor = Vector4.one();
     this._ctx = null;
     this._materialPass = -1;
+    this.useFeature(FEATURE_ALPHABLEND, this._blendMode);
   }
   /** Indicate that the uniform has changed and needs to be resubmitted. */
   uniformChanged() {
@@ -299,7 +300,7 @@ export class MeshMaterial extends Material {
   set blendMode(val: BlendMode) {
     if (this._blendMode !== val) {
       this._blendMode = val;
-      this.useFeature(FEATURE_ALPHABLEND, this._blendMode !== 'none' || this._opacity < 1);
+      this.useFeature(FEATURE_ALPHABLEND, this._blendMode);
     }
   }
   /** Cull mode */
@@ -317,7 +318,6 @@ export class MeshMaterial extends Material {
     val = val < 0 ? 0 : val > 1 ? 1 : val;
     if (this._opacity !== val) {
       this._opacity = val;
-      this.useFeature(FEATURE_ALPHABLEND, this._blendMode !== 'none' || this._opacity < 1);
       this.uniformChanged();
     }
   }
@@ -341,7 +341,7 @@ export class MeshMaterial extends Material {
   protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
     const isObjectColorPass = ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR;
     const blending =
-      !isObjectColorPass && (this.featureUsed<boolean>(FEATURE_ALPHABLEND) || ctx.lightBlending);
+      !isObjectColorPass && (this.featureUsed<BlendMode>(FEATURE_ALPHABLEND) !== 'none' || ctx.lightBlending);
     const a2c = !isObjectColorPass && this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
     const ztestEq = ctx.queue === QUEUE_OPAQUE && !!ctx.depthTexture;
     if (blending || a2c) {
@@ -428,7 +428,7 @@ export class MeshMaterial extends Material {
    * @returns True if it is translucent, otherwise false.
    */
   isTransparentPass(pass: number): boolean {
-    return this.featureUsed(FEATURE_ALPHABLEND);
+    return this.featureUsed<BlendMode>(FEATURE_ALPHABLEND) !== 'none';
   }
   /** @internal */
   protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
@@ -606,7 +606,10 @@ export class MeshMaterial extends Material {
         }
         if (that.isTransparentPass(that.pass)) {
           if (!that.drawContext.oit || !that.drawContext.oit.outputFragmentColor(this, this.outColor)) {
-            this.outColor = pb.vec4(pb.mul(this.outColor.rgb, this.outColor.a), this.outColor.a);
+            this.outColor = pb.vec4(
+              pb.mul(this.outColor.rgb, this.outColor.a),
+              that.featureUsed<BlendMode>(FEATURE_ALPHABLEND) === 'additive' ? 0 : this.outColor.a
+            );
           }
         }
         ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext);

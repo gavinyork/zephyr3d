@@ -82,7 +82,8 @@ export class DockPannel {
       ImGui.WindowFlags.NoMove |
       ImGui.WindowFlags.NoResize |
       ImGui.WindowFlags.NoCollapse |
-      ImGui.WindowFlags.NoTitleBar;
+      ImGui.WindowFlags.NoTitleBar |
+      ImGui.WindowFlags.NoBringToFrontOnFocus;
     if (ImGui.Begin(id, null, flags)) {
       this._initialCursorPos = ImGui.GetCursorPos();
       this._availableHeight = ImGui.GetContentRegionAvail().y;

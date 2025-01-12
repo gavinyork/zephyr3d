@@ -14,6 +14,7 @@ export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlb
   constructor(poolId?: string | symbol) {
     super(poolId);
     this.cullMode = 'none';
+    this.blendMode = 'blend';
     this._params = new Vector4(0, 1, 0, 0);
     this.albedoTexCoordIndex = -1;
   }

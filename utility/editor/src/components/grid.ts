@@ -164,7 +164,8 @@ export class PropertyEditor {
       ImGui.WindowFlags.NoMove |
       ImGui.WindowFlags.NoResize |
       ImGui.WindowFlags.NoCollapse |
-      ImGui.WindowFlags.NoTitleBar;
+      ImGui.WindowFlags.NoTitleBar |
+      ImGui.WindowFlags.NoBringToFrontOnFocus;
     if (ImGui.Begin('Property Editor', null, flags)) {
       const initialCursorPos = ImGui.GetCursorPos();
       this.renderContent();

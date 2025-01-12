@@ -16,6 +16,7 @@ import { renderTextureViewer } from '../components/textureviewer';
 import { MenubarView } from '../components/menubar';
 import { StatusBar } from '../components/statusbar';
 import { BaseView } from './baseview';
+import { CurveEditor } from '../components/curveeditor';
 
 export class SceneView extends BaseView<SceneModel> {
   private _postGizmoRenderer: PostGizmoRenderer;
@@ -32,7 +33,9 @@ export class SceneView extends BaseView<SceneModel> {
   private _mousePosY: number;
   private _assetRegistry: AssetRegistry;
   private _postGizmoCaptured: boolean;
-  private _drawTextureViewer: boolean;
+  private _showTextureViewer: boolean;
+  private _showCurveEditor: boolean;
+  private _curveEditor: CurveEditor;
   constructor(model: SceneModel, assetRegistry: AssetRegistry) {
     super(model);
     this._transformNode = null;
@@ -42,7 +45,8 @@ export class SceneView extends BaseView<SceneModel> {
     this._mousePosX = -1;
     this._mousePosY = -1;
     this._postGizmoCaptured = false;
-    this._drawTextureViewer = false;
+    this._showTextureViewer = false;
+    this._showCurveEditor = false;
     this._assetRegistry = assetRegistry;
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
@@ -105,7 +109,12 @@ export class SceneView extends BaseView<SceneModel> {
             {
               label: 'Texture viewer',
               id: 'SHOW_TEXTURE_VIEWER',
-              checked: this._drawTextureViewer
+              checked: this._showTextureViewer
+            },
+            {
+              label: 'Curve editor',
+              id: 'SHOW_CURVE_EDITOR',
+              checked: this._showCurveEditor
             }
           ]
         }
@@ -180,6 +189,7 @@ export class SceneView extends BaseView<SceneModel> {
       200,
       0.6
     );
+    this._curveEditor = new CurveEditor();
   }
   get toolbar() {
     return this._toolbar;
@@ -197,8 +207,9 @@ export class SceneView extends BaseView<SceneModel> {
     this._dragDropTypes = [];
     this._nodeToBePlaced = null;
     this._postGizmoCaptured = false;
-    this._drawTextureViewer = false;
+    this._showTextureViewer = false;
     this._menubar.checkMenuItem('SHOW_TEXTURE_VIEWER', false);
+    this._menubar.checkMenuItem('SHOW_CURVE_EDITOR', false);
     this.sceneSetup();
   }
   render() {
@@ -243,8 +254,11 @@ export class SceneView extends BaseView<SceneModel> {
     this.model.camera.aspect = viewportWidth / viewportHeight;
     this.model.camera.render(this.model.scene, this.model.compositor);
 
-    if (this._drawTextureViewer) {
+    if (this._showTextureViewer) {
       renderTextureViewer();
+    }
+    if (this._showCurveEditor) {
+      this._curveEditor.render();
     }
     /*
     if (ImGui.Begin('FontTest')) {
@@ -447,7 +461,8 @@ export class SceneView extends BaseView<SceneModel> {
       this._assetRegistry.releaseAsset(this._nodeToBePlaced);
       this._nodeToBePlaced = null;
     }
-    this._assetRegistry.fetchModel(asset.uuid, this.model.scene, { enableInstancing: true })
+    this._assetRegistry
+      .fetchModel(asset.uuid, this.model.scene, { enableInstancing: true })
       .then((node) => {
         this._nodeToBePlaced = node.group;
       })
@@ -499,8 +514,12 @@ export class SceneView extends BaseView<SceneModel> {
         this._postGizmoRenderer.mode = 'scaling';
         break;
       case 'SHOW_TEXTURE_VIEWER':
-        this._drawTextureViewer = !this._drawTextureViewer;
-        this._menubar.checkMenuItem(action, this._drawTextureViewer);
+        this._showTextureViewer = !this._showTextureViewer;
+        this._menubar.checkMenuItem(action, this._showTextureViewer);
+        break;
+      case 'SHOW_CURVE_EDITOR':
+        this._showCurveEditor = !this._showCurveEditor;
+        this._menubar.checkMenuItem(action, this._showCurveEditor);
         break;
       default:
         eventBus.dispatchEvent('action', action);

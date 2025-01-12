@@ -50,14 +50,18 @@ function traverseDirectory(dirPath, rootPath, dict) {
   dict = dict || {};
   for (const entry of entries) {
     const fullPath = path.join(dirPath, entry);
-    const stats = fs.statSync(fullPath);
-    if (stats.isDirectory()) {
-      // 如果是目录，则递归遍历
-      traverseDirectory(fullPath, rootPath, dict);
-    } else {
-      // 计算文件的MD5并添加到Map中
-      const fileMD5 = calculateFileMD5(fullPath);
-      dict[path.relative(rootPath, fullPath)] = fileMD5;
+    try {
+      const stats = fs.statSync(fullPath);
+      if (stats.isDirectory()) {
+        // 如果是目录，则递归遍历
+        traverseDirectory(fullPath, rootPath, dict);
+      } else {
+        // 计算文件的MD5并添加到Map中
+        const fileMD5 = calculateFileMD5(fullPath);
+        dict[path.relative(rootPath, fullPath)] = fileMD5;
+      }
+    } catch (err) {
+      console.error(err);
     }
   }
   return dict;
