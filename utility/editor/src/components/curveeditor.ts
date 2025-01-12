@@ -14,6 +14,7 @@ interface CurveSettings {
   pointColor: number;
   selectedPointColor: number;
   backgroundColor: number;
+  interpolationType: 'linear' | 'step' | 'cubicspline-natural';
 }
 
 export class CurveEditor {
@@ -43,7 +44,8 @@ export class CurveEditor {
       curveColor: ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 1, 1)),
       pointColor: ImGui.GetColorU32(new ImGui.ImVec4(0.7, 0.7, 0.7, 1)),
       selectedPointColor: ImGui.GetColorU32(new ImGui.ImVec4(1, 0.5, 0, 1)),
-      backgroundColor: ImGui.GetColorU32(new ImGui.ImVec4(0.2, 0.2, 0.2, 1))
+      backgroundColor: ImGui.GetColorU32(new ImGui.ImVec4(0.2, 0.2, 0.2, 1)),
+      interpolationType: 'cubicspline-natural'
     };
 
     // 初始化ImGui输入数组
@@ -71,10 +73,7 @@ export class CurveEditor {
       return;
     }
 
-    // 渲染设置面板
-    if (ImGui.CollapsingHeader('Curve Settings')) {
-      this.renderSettings();
-    }
+    this.renderSettings();
 
     // 使用 BeginChild 创建一个子窗口来容纳画布
     // 这样可以让画布填充剩余空间
@@ -109,8 +108,37 @@ export class CurveEditor {
       changed = ImGui.InputFloat('Min Value', this.valueRangeStartInput, 0.1, 1.0, '%.2f') || changed;
       changed = ImGui.InputFloat('Max Value', this.valueRangeEndInput, 0.1, 1.0, '%.2f') || changed;
 
+      // 插值类型设置
+      ImGui.Text('Interpolation');
+      const interpolationTypes = ['linear', 'step', 'cubicspline-natural'];
+      const currentType = interpolationTypes.indexOf(this.settings.interpolationType);
+      const interpolationLabels = ['Linear', 'Step', 'Cubic Spline'];
+
+      let interpolationChanged = false;
+      if (ImGui.BeginCombo('Type', interpolationLabels[currentType])) {
+        interpolationTypes.forEach((type, index) => {
+          const isSelected = type === this.settings.interpolationType;
+          if (ImGui.Selectable(interpolationLabels[index], isSelected)) {
+            this.settings.interpolationType = type as CurveSettings['interpolationType'];
+            interpolationChanged = true;
+            changed = true;
+          }
+          if (isSelected) {
+            ImGui.SetItemDefaultFocus();
+          }
+        });
+        ImGui.EndCombo();
+      }
+
       if (changed) {
         this.updateSettings();
+      }
+
+      // 如果插值类型改变，立即更新插值器和曲线
+      if (interpolationChanged) {
+        this.updateInterpolators();
+        this.curveDirty = true;
+        this.cachedCurvePoints = []; // 清空曲线缓存
       }
     }
   }
@@ -131,9 +159,40 @@ export class CurveEditor {
     // 规范化所有点
     this.normalizePoints();
 
+    // 确保更新插值器
+    this.updateInterpolators();
+
     this.curveDirty = true;
   }
 
+  private updateCurvePoints(): void {
+    if (!this.curveDirty && this.cachedCurvePoints.length > 0) {
+      return;
+    }
+
+    if (this.points.length < 2 || this.interpolators.length === 0) {
+      this.cachedCurvePoints = [];
+      return;
+    }
+
+    const interpolator = this.interpolators[0];
+    // 对于阶梯插值，增加采样点数以获得更好的效果
+    const baseSegments = Math.min(Math.ceil(this.canvasSize.x / 2), 100);
+    const numSegments = this.settings.interpolationType === 'step' ? baseSegments * 2 : baseSegments;
+    const result = new Float32Array(1);
+
+    this.cachedCurvePoints = [];
+    const timeRange = this.points[this.points.length - 1].x - this.points[0].x;
+    const step = timeRange / numSegments;
+
+    for (let i = 0; i <= numSegments; i++) {
+      const x = this.points[0].x + i * step;
+      interpolator.interpolate(x, result);
+      this.cachedCurvePoints.push({ x, y: result[0] });
+    }
+
+    this.curveDirty = false;
+  }
   private normalizePoints(): void {
     // 确保首尾点的时间位置固定
     this.points[0].x = this.settings.timeRange[0];
@@ -400,34 +459,6 @@ export class CurveEditor {
     }
   }
 
-  private updateCurvePoints(): void {
-    if (!this.curveDirty && this.cachedCurvePoints.length > 0) {
-      return;
-    }
-
-    if (this.points.length < 2 || this.interpolators.length === 0) {
-      this.cachedCurvePoints = [];
-      return;
-    }
-
-    const interpolator = this.interpolators[0];
-    // 根据画布宽度计算采样点数，但设置上限
-    const numSegments = Math.min(Math.ceil(this.canvasSize.x / 2), 100);
-    const result = new Float32Array(1);
-
-    this.cachedCurvePoints = [];
-    const timeRange = this.points[this.points.length - 1].x - this.points[0].x;
-    const step = timeRange / numSegments;
-
-    for (let i = 0; i <= numSegments; i++) {
-      const x = this.points[0].x + i * step;
-      interpolator.interpolate(x, result);
-      this.cachedCurvePoints.push({ x, y: result[0] });
-    }
-
-    this.curveDirty = false;
-  }
-
   // 坐标转换方法
   private worldToScreen(x: number, y: number): { x: number; y: number } {
     return {
@@ -588,18 +619,14 @@ export class CurveEditor {
       this.interpolators = [];
       return;
     }
-
-    // 准备输入数组（时间）和输出数组（值）
     const inputs = new Float32Array(this.points.length);
     const outputs = new Float32Array(this.points.length);
-
     for (let i = 0; i < this.points.length; i++) {
       inputs[i] = this.points[i].x;
       outputs[i] = this.points[i].values[0];
     }
-
-    this.interpolators = [new Interpolator('cubicspline-natural', 'number', inputs, outputs)];
-    this.curveDirty = true; // 标记需要更新曲线缓存
+    this.interpolators = [new Interpolator(this.settings.interpolationType, 'number', inputs, outputs)];
+    this.curveDirty = true;
   }
 
   public getValue(time: number): number {
