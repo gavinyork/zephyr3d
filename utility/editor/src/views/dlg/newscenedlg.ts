@@ -4,7 +4,7 @@ import { ModalDialog } from '../../components/modal';
 export class DlgPromptName extends ModalDialog {
   private _sceneName: string;
   private _resolve: (s: string) => void;
-  constructor(id: string, open: boolean, width?: number, height?: number, resolve: (s: string) => void) {
+  constructor(id: string, open: boolean, width: number, height: number, resolve: (s: string) => void) {
     super(id, open, width, height);
     this._sceneName = '';
     this._resolve = resolve;

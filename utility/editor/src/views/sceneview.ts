@@ -110,6 +110,10 @@ export class SceneView extends BaseView<SceneModel> {
             {
               label: 'Curve editor',
               id: 'SHOW_CURVE_EDITOR'
+            },
+            {
+              label: 'Ramp Texture Creator',
+              id: 'SHOW_RAMP_TEXTURE_CREATOR'
             }
           ]
         }
@@ -203,7 +207,6 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._menubar.checkMenuItem('SHOW_TEXTURE_VIEWER', false);
-    this._menubar.checkMenuItem('SHOW_CURVE_EDITOR', false);
     this.sceneSetup();
   }
   render() {
@@ -511,6 +514,11 @@ export class SceneView extends BaseView<SceneModel> {
       case 'SHOW_CURVE_EDITOR':
         Dialog.editCurve('Edit curve', 600, 500).then((interpolator) => {
           console.dir(interpolator);
+        });
+        break;
+      case 'SHOW_RAMP_TEXTURE_CREATOR':
+        Dialog.createRampTexture('CreateRampTexture', 128, null, 400, 200).then((texture) => {
+          //texture?.dispose();
         });
         break;
       default:

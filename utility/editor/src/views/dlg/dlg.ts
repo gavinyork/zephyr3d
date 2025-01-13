@@ -1,9 +1,11 @@
 import { Interpolator } from '@zephyr3d/base';
-import { DlgCurveEditor } from '../../components/curveeditor';
+import { DlgCurveEditor } from './curveeditor';
 import type { DBSceneInfo } from '../../storage/db';
 import { DlgMessage } from './messagedlg';
 import { DlgPromptName } from './newscenedlg';
 import { DlgOpenScene } from './openscenedlg';
+import { Texture2D } from '@zephyr3d/device';
+import { DlgRampTextureCreator } from './ramptexture';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
@@ -27,6 +29,17 @@ export class Dialog {
   public static async editCurve(title: string, width?: number, height?: number): Promise<Interpolator> {
     return new Promise((resolve) => {
       new DlgCurveEditor(title, true, width, height, resolve);
+    });
+  }
+  public static async createRampTexture(
+    title: string,
+    textureWidth: number,
+    poolId?: string | symbol,
+    width?: number,
+    height?: number
+  ): Promise<Texture2D> {
+    return new Promise((resolve) => {
+      new DlgRampTextureCreator(title, true, width, height, poolId, textureWidth, resolve);
     });
   }
 }

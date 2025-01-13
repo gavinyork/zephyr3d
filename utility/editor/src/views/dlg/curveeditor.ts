@@ -1,6 +1,6 @@
 import { Interpolator } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
-import { ModalDialog } from './modal';
+import { ModalDialog } from '../../components/modal';
 
 interface Point {
   x: number; // time
