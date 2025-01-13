@@ -156,33 +156,6 @@ export class CurveEditor {
     this.curveDirty = true;
   }
 
-  private updateCurvePoints(): void {
-    if (!this.curveDirty && this.cachedCurvePoints.length > 0) {
-      return;
-    }
-
-    if (this.points.length < 2 || this.interpolators.length === 0) {
-      this.cachedCurvePoints = [];
-      return;
-    }
-
-    const interpolator = this.interpolators[0];
-    const baseSegments = Math.min(Math.ceil(this.canvasSize.x / 2), 100);
-    const numSegments = this.settings.interpolationType === 'step' ? baseSegments * 2 : baseSegments;
-    const result = new Float32Array(1);
-
-    this.cachedCurvePoints = [];
-    const timeRange = this.points[this.points.length - 1].x - this.points[0].x;
-    const step = timeRange / numSegments;
-
-    for (let i = 0; i <= numSegments; i++) {
-      const x = this.points[0].x + i * step;
-      interpolator.interpolate(x, result);
-      this.cachedCurvePoints.push({ x, y: result[0] });
-    }
-
-    this.curveDirty = false;
-  }
   private normalizePoints(): void {
     this.points[0].x = this.settings.timeRange[0];
     this.points[this.points.length - 1].x = this.settings.timeRange[1];
@@ -291,18 +264,44 @@ export class CurveEditor {
     }
 
     const worldPos = this.screenToWorld(relativeMousePos.x, relativeMousePos.y);
-
     const curveValue = this.findNearestCurveValue(worldPos.x);
+
     if (curveValue === null) {
       return;
     }
 
-    const screenPos = this.worldToScreen(worldPos.x, curveValue);
-    const distance = Math.abs(screenPos.y - relativeMousePos.y);
+    // 计算曲线上对应点的屏幕坐标
+    const curvePointScreen = this.worldToScreen(worldPos.x, curveValue);
+    const distance = Math.abs(curvePointScreen.y - relativeMousePos.y);
 
     if (distance > 10) {
       return;
     }
+
+    // 绘制垂直参考线
+    const lineColor = ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 1, 0.3));
+    drawList.AddLine(
+      new ImGui.ImVec2(cursorPos.x + curvePointScreen.x, cursorPos.y),
+      new ImGui.ImVec2(cursorPos.x + curvePointScreen.x, cursorPos.y + this.canvasSize.y),
+      lineColor,
+      1.0
+    );
+
+    // 在曲线上标记当前点
+    const pointColor = ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 0, 1)); // 黄色标记点
+    drawList.AddCircleFilled(
+      new ImGui.ImVec2(cursorPos.x + curvePointScreen.x, cursorPos.y + curvePointScreen.y),
+      4,
+      pointColor
+    );
+    // 绘制点的外圈
+    drawList.AddCircle(
+      new ImGui.ImVec2(cursorPos.x + curvePointScreen.x, cursorPos.y + curvePointScreen.y),
+      5,
+      ImGui.GetColorU32(new ImGui.ImVec4(0, 0, 0, 1)),
+      0,
+      1.5
+    );
 
     const hintText = `Time: ${worldPos.x.toFixed(2)}\nValue: ${curveValue.toFixed(2)}`;
     const textSize = ImGui.CalcTextSize(hintText);
@@ -320,6 +319,7 @@ export class CurveEditor {
       hintY = cursorPos.y + relativeMousePos.y + padding;
     }
 
+    // 绘制提示框背景
     drawList.AddRectFilled(
       new ImGui.ImVec2(hintX, hintY),
       new ImGui.ImVec2(hintX + textSize.x + padding * 2, hintY + textSize.y + padding * 2),
@@ -327,9 +327,9 @@ export class CurveEditor {
       4
     );
 
+    // 绘制提示文本
     drawList.AddText(new ImGui.ImVec2(hintX + padding, hintY + padding), textColor, hintText);
   }
-
   private findNearestCurveValue(time: number): number | null {
     if (this.cachedCurvePoints.length < 2) {
       return null;
@@ -344,26 +344,112 @@ export class CurveEditor {
     return result[0];
   }
   private drawCurve(drawList: ImGui.ImDrawList, cursorPos: ImGui.ImVec2): void {
-    this.updateCurvePoints();
+    if (this.points.length < 2) return;
 
-    if (this.cachedCurvePoints.length < 2) return;
+    // 保存原始标志位
+    const originalFlags = drawList.Flags;
+    // 启用抗锯齿
+    drawList.Flags |= ImGui.ImDrawListFlags.AntiAliasedLines;
 
-    for (let i = 0; i < this.cachedCurvePoints.length - 1; i++) {
-      const p1 = this.cachedCurvePoints[i];
-      const p2 = this.cachedCurvePoints[i + 1];
+    if (this.settings.interpolationType === 'step') {
+      // Step类型绘制阶跃波形
+      for (let i = 0; i < this.points.length - 1; i++) {
+        const p1 = this.points[i];
+        const p2 = this.points[i + 1];
 
-      const screenP1 = this.worldToScreen(p1.x, p1.y);
-      const screenP2 = this.worldToScreen(p2.x, p2.y);
+        const screen1 = this.worldToScreen(p1.x, p1.values[0]);
+        const screen2 = this.worldToScreen(p2.x, p2.values[0]);
 
-      drawList.AddLine(
-        new ImGui.ImVec2(cursorPos.x + screenP1.x, cursorPos.y + screenP1.y),
-        new ImGui.ImVec2(cursorPos.x + screenP2.x, cursorPos.y + screenP2.y),
-        this.settings.curveColor,
-        2.0
-      );
+        // 绘制水平线段
+        drawList.AddLine(
+          new ImGui.ImVec2(cursorPos.x + screen1.x, cursorPos.y + screen1.y),
+          new ImGui.ImVec2(cursorPos.x + screen2.x, cursorPos.y + screen1.y),
+          this.settings.curveColor,
+          2.0
+        );
+
+        // 绘制垂直线段
+        drawList.AddLine(
+          new ImGui.ImVec2(cursorPos.x + screen2.x, cursorPos.y + screen1.y),
+          new ImGui.ImVec2(cursorPos.x + screen2.x, cursorPos.y + screen2.y),
+          this.settings.curveColor,
+          2.0
+        );
+      }
+    } else if (this.settings.interpolationType === 'linear') {
+      // Linear类型直接连接控制点
+      for (let i = 0; i < this.points.length - 1; i++) {
+        const p1 = this.points[i];
+        const p2 = this.points[i + 1];
+
+        const screen1 = this.worldToScreen(p1.x, p1.values[0]);
+        const screen2 = this.worldToScreen(p2.x, p2.values[0]);
+
+        drawList.AddLine(
+          new ImGui.ImVec2(cursorPos.x + screen1.x, cursorPos.y + screen1.y),
+          new ImGui.ImVec2(cursorPos.x + screen2.x, cursorPos.y + screen2.y),
+          this.settings.curveColor,
+          2.0
+        );
+      }
+    } else {
+      // 只有cubicspline需要使用缓存的曲线点
+      this.updateCurvePoints();
+
+      if (this.cachedCurvePoints.length < 2) return;
+
+      for (let i = 0; i < this.cachedCurvePoints.length - 1; i++) {
+        const p1 = this.cachedCurvePoints[i];
+        const p2 = this.cachedCurvePoints[i + 1];
+
+        const screenP1 = this.worldToScreen(p1.x, p1.y);
+        const screenP2 = this.worldToScreen(p2.x, p2.y);
+
+        drawList.AddLine(
+          new ImGui.ImVec2(cursorPos.x + screenP1.x, cursorPos.y + screenP1.y),
+          new ImGui.ImVec2(cursorPos.x + screenP2.x, cursorPos.y + screenP2.y),
+          this.settings.curveColor,
+          2.0
+        );
+      }
     }
+
+    // 恢复原始标志位
+    drawList.Flags = originalFlags;
   }
 
+  private updateCurvePoints(): void {
+    if (!this.curveDirty && this.cachedCurvePoints.length > 0) {
+      return;
+    }
+
+    if (this.points.length < 2 || this.interpolators.length === 0) {
+      this.cachedCurvePoints = [];
+      return;
+    }
+
+    // 只有cubicspline需要缓存点
+    if (this.settings.interpolationType !== 'cubicspline-natural') {
+      this.cachedCurvePoints = [];
+      return;
+    }
+
+    const interpolator = this.interpolators[0];
+    const numSegments = Math.min(Math.ceil(this.canvasSize.x / 2), 100);
+    const result = new Float32Array(1);
+
+    this.cachedCurvePoints = [];
+    const timeRange = this.points[this.points.length - 1].x - this.points[0].x;
+    const step = timeRange / numSegments;
+
+    for (let i = 0; i <= numSegments; i++) {
+      const x = this.points[0].x + i * step;
+      interpolator.interpolate(x, result);
+      this.cachedCurvePoints.push({ x, y: result[0] });
+    }
+
+    this.curveDirty = false;
+  }
   private drawPoints(drawList: ImGui.ImDrawList, cursorPos: ImGui.ImVec2): void {
     this.points.forEach((point, index) => {
       const screenPos = this.worldToScreen(point.x, point.values[0]);
