@@ -22,6 +22,7 @@ interface CurveSettings {
 export class DlgCurveEditor extends ModalDialog {
   private points: Point[] = [];
   private interpolators: Interpolator[] = [];
+  private resolve: (val: Interpolator) => void;
 
   // Settings
   private settings: CurveSettings;
@@ -38,8 +39,15 @@ export class DlgCurveEditor extends ModalDialog {
   private cachedCurvePoints: Array<{ x: number; y: number }>;
   private curveDirty: boolean;
 
-  constructor(id: string, open: boolean, width?: number, height?: number) {
+  constructor(
+    id: string,
+    open: boolean,
+    width: number,
+    height: number,
+    resolve: (val: Interpolator) => void
+  ) {
     super(id, open, width, height);
+    this.resolve = resolve;
     // Default settings
     this.settings = {
       timeRange: [0, 10],
@@ -89,10 +97,12 @@ export class DlgCurveEditor extends ModalDialog {
     }
     ImGui.EndChild();
     if (ImGui.Button('Ok')) {
+      this.resolve(this.interpolators[0]);
       this.close();
     }
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {
+      this.resolve(null);
       this.close();
     }
   }

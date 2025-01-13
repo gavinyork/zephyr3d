@@ -509,7 +509,9 @@ export class SceneView extends BaseView<SceneModel> {
         this._menubar.checkMenuItem(action, this._showTextureViewer);
         break;
       case 'SHOW_CURVE_EDITOR':
-        Dialog.editCurve('Edit curve', 600, 500);
+        Dialog.editCurve('Edit curve', 600, 500).then((interpolator) => {
+          console.dir(interpolator);
+        });
         break;
       default:
         eventBus.dispatchEvent('action', action);

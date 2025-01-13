@@ -1,3 +1,4 @@
+import { Interpolator } from '@zephyr3d/base';
 import { DlgCurveEditor } from '../../components/curveeditor';
 import type { DBSceneInfo } from '../../storage/db';
 import { DlgMessage } from './messagedlg';
@@ -23,7 +24,9 @@ export class Dialog {
       new DlgPromptName(title, true, width, height, resolve);
     });
   }
-  public static editCurve(title: string, width?: number, height?: number) {
-    new DlgCurveEditor(title, true, width, height);
+  public static async editCurve(title: string, width?: number, height?: number): Promise<Interpolator> {
+    return new Promise((resolve) => {
+      new DlgCurveEditor(title, true, width, height, resolve);
+    });
   }
 }
