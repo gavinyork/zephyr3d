@@ -1,5 +1,6 @@
 import { Interpolator } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
+import { ModalDialog } from './modal';
 
 interface Point {
   x: number; // time
@@ -18,7 +19,7 @@ interface CurveSettings {
   interpolationType: 'linear' | 'step' | 'cubicspline-natural';
 }
 
-export class CurveEditor {
+export class DlgCurveEditor extends ModalDialog {
   private points: Point[] = [];
   private interpolators: Interpolator[] = [];
 
@@ -37,7 +38,8 @@ export class CurveEditor {
   private cachedCurvePoints: Array<{ x: number; y: number }>;
   private curveDirty: boolean;
 
-  constructor() {
+  constructor(id: string, open: boolean, width?: number, height?: number) {
+    super(id, open, width, height);
     // Default settings
     this.settings = {
       timeRange: [0, 10],
@@ -70,28 +72,33 @@ export class CurveEditor {
     this.updateInterpolators();
   }
 
-  public render(): void {
+  public doRender(): void {
+    this.renderSettings();
+    const region = ImGui.GetContentRegionAvail();
+    region.y -= ImGui.GetFrameHeightWithSpacing();
     if (
-      ImGui.Begin('Curve Editor', null, ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse)
+      ImGui.BeginChild(
+        `##${this.id}_CANVAS`,
+        region,
+        false,
+        ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
+      )
     ) {
-      this.renderSettings();
-      if (
-        ImGui.BeginChild(
-          'CurveCanvas',
-          ImGui.GetContentRegionAvail(),
-          false,
-          ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
-        )
-      ) {
-        const canvasSize = ImGui.GetContentRegionAvail();
-        this.canvasSize = new ImGui.ImVec2(Math.max(100, canvasSize.x), Math.max(200, canvasSize.y));
+      const canvasSize = ImGui.GetContentRegionAvail();
+      this.canvasSize = new ImGui.ImVec2(Math.max(100, canvasSize.x), Math.max(200, canvasSize.y));
 
-        this.renderCurveView();
-      }
-      ImGui.EndChild();
+      this.renderCurveView();
     }
-    ImGui.End();
+    ImGui.EndChild();
+    if (ImGui.Button('Ok')) {
+      this.close();
+    }
+    ImGui.SameLine();
+    if (ImGui.Button('Cancel')) {
+      this.close();
+    }
   }
+
   private renderSettings(): void {
     if (ImGui.CollapsingHeader('Curve Settings')) {
       let changed = false;

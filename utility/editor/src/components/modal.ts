@@ -57,9 +57,9 @@ export class ModalDialog extends makeEventTarget(Object)<{
     if (ModalDialog._currentDlg !== this) {
       return;
     }
-    ImGui.SetNextWindowSize(this._size, ImGui.Cond.Always);
+    ImGui.SetNextWindowSize(this._size, ImGui.Cond.FirstUseEver);
     ImGui.OpenPopup(this._id);
-    if (ImGui.BeginPopupModal(this._id, null, ImGui.WindowFlags.AlwaysAutoResize)) {
+    if (ImGui.BeginPopupModal(this._id, null)) {
       this.doRender();
       ImGui.EndPopup();
     }

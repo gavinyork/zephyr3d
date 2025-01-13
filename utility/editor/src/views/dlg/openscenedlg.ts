@@ -14,8 +14,19 @@ export class DlgOpenScene extends ModalDialog {
     this._selected = [0];
   }
   doRender(): void {
-    ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x);
-    ImGui.ListBox('##SceneList', this._selected, this._sceneNames, this._sceneNames.length, 5);
+    if (
+      ImGui.BeginChild(`##${this.id}_ListBox`, new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing()), true)
+    ) {
+      if (ImGui.ListBoxHeader(`##${this.id}_ListBoxHeader`, new ImGui.ImVec2(-1, -1))) {
+        for (let i = 0; i < this._sceneIds.length; i++) {
+          if (ImGui.Selectable(this._sceneNames[i], this._selected[0] === i)) {
+            this._selected[0] = i;
+          }
+        }
+        ImGui.ListBoxFooter();
+      }
+    }
+    ImGui.EndChild();
     if (ImGui.Button('Open')) {
       if (this._selected[0] >= 0 && this._selected[0] < this._sceneIds.length) {
         eventBus.dispatchEvent('action_doc_request_open_scene', this._sceneIds[this._selected[0]]);

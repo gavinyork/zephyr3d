@@ -16,7 +16,6 @@ import { renderTextureViewer } from '../components/textureviewer';
 import { MenubarView } from '../components/menubar';
 import { StatusBar } from '../components/statusbar';
 import { BaseView } from './baseview';
-import { CurveEditor } from '../components/curveeditor';
 
 export class SceneView extends BaseView<SceneModel> {
   private _postGizmoRenderer: PostGizmoRenderer;
@@ -34,8 +33,6 @@ export class SceneView extends BaseView<SceneModel> {
   private _assetRegistry: AssetRegistry;
   private _postGizmoCaptured: boolean;
   private _showTextureViewer: boolean;
-  private _showCurveEditor: boolean;
-  private _curveEditor: CurveEditor;
   constructor(model: SceneModel, assetRegistry: AssetRegistry) {
     super(model);
     this._transformNode = null;
@@ -46,7 +43,6 @@ export class SceneView extends BaseView<SceneModel> {
     this._mousePosY = -1;
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
-    this._showCurveEditor = false;
     this._assetRegistry = assetRegistry;
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
@@ -113,8 +109,7 @@ export class SceneView extends BaseView<SceneModel> {
             },
             {
               label: 'Curve editor',
-              id: 'SHOW_CURVE_EDITOR',
-              checked: this._showCurveEditor
+              id: 'SHOW_CURVE_EDITOR'
             }
           ]
         }
@@ -189,7 +184,6 @@ export class SceneView extends BaseView<SceneModel> {
       200,
       0.6
     );
-    this._curveEditor = new CurveEditor();
   }
   get toolbar() {
     return this._toolbar;
@@ -256,9 +250,6 @@ export class SceneView extends BaseView<SceneModel> {
 
     if (this._showTextureViewer) {
       renderTextureViewer();
-    }
-    if (this._showCurveEditor) {
-      this._curveEditor.render();
     }
     /*
     if (ImGui.Begin('FontTest')) {
@@ -518,8 +509,7 @@ export class SceneView extends BaseView<SceneModel> {
         this._menubar.checkMenuItem(action, this._showTextureViewer);
         break;
       case 'SHOW_CURVE_EDITOR':
-        this._showCurveEditor = !this._showCurveEditor;
-        this._menubar.checkMenuItem(action, this._showCurveEditor);
+        Dialog.editCurve('Edit curve', 600, 500);
         break;
       default:
         eventBus.dispatchEvent('action', action);

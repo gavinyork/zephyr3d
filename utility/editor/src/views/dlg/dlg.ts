@@ -1,3 +1,4 @@
+import { DlgCurveEditor } from '../../components/curveeditor';
 import type { DBSceneInfo } from '../../storage/db';
 import { DlgMessage } from './messagedlg';
 import { DlgPromptName } from './newscenedlg';
@@ -12,5 +13,8 @@ export class Dialog {
   }
   public static saveScene(title: string, width?: number, height?: number) {
     new DlgPromptName(title, true, 'action_doc_request_save_scene', width, height);
+  }
+  public static editCurve(title: string, width?: number, height?: number) {
+    new DlgCurveEditor(title, true, width, height);
   }
 }
