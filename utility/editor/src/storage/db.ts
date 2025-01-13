@@ -156,7 +156,7 @@ export class Database {
       return false;
     }
   }
-  static async pubAsset(asset: DBAssetInfo) {
+  static async putAsset(asset: DBAssetInfo) {
     asset.uuid = asset.uuid ?? this.randomUUID();
     const { uuid, name, type, path, thumbnail, pkg, metadata } = asset;
     await this.instance.put(this.DB_NAME_ASSETS, {

@@ -7,7 +7,7 @@ import { AssetStore } from '../helpers/assetstore';
 import { Dialog } from '../views/dlg/dlg';
 import { enableWorkspaceDragging } from './dragdrop';
 import { eventBus } from '../core/eventbus';
-import type { AssetType } from '@zephyr3d/scene';
+import type { AssetInfo, AssetType } from '@zephyr3d/scene';
 import type { AssetRegistry } from '@zephyr3d/scene';
 
 export class AssetHierarchy {
@@ -57,9 +57,10 @@ export class AssetHierarchy {
       }
     }
   }
-  async uploadFiles(type: AssetType, zip: Blob, folderName: string, paths: string[]) {
+  async uploadFiles(type: AssetType, zip: Blob, mimeType: string, folderName: string, paths: string[]) {
     const blob = await Database.putBlob({
-      data: zip
+      data: zip,
+      mimeType
     });
     const pkg = await Database.putPackage({
       blob,
@@ -67,7 +68,7 @@ export class AssetHierarchy {
       size: zip.size
     });
     for (const path of paths) {
-      await Database.pubAsset({
+      await Database.putAsset({
         name: path.split('/').pop(),
         path: path,
         thumbnail: '',
@@ -76,22 +77,19 @@ export class AssetHierarchy {
       });
     }
   }
+  async uploadRampTexture() {
+    const rgba = await Dialog.createRampTexture('Create ramp texture', 400, 120);
+    if (rgba) {
+      const name = `${Database.randomUUID()}.png`;
+      const file = await this.rgbaToPng(name, rgba.byteLength >> 2, 1, rgba);
+      await this.doUploadAssetFile('texture', [file]);
+      this._selectedAsset = null;
+      await this.listAssets();
+    }
+  }
   async uploadAssetFile(type: AssetType) {
     const files = await FilePicker.chooseFiles(true, '');
-    for (const file of files) {
-      const extensions =
-        type === 'model'
-          ? AssetStore.modelExtensions
-          : type === 'texture'
-          ? AssetStore.textureExtensions
-          : [];
-      if (extensions.findIndex((ext) => file.name.toLowerCase().endsWith(ext)) < 0) {
-        Dialog.messageBox('Error', `Invalid file type. Only ${extensions.join(', ')} files are supported.`);
-        return;
-      }
-      const zip = await this.zipFiles([{ path: file.name, file }]);
-      await this.uploadFiles(type, zip, file.name, [file.name]);
-    }
+    await this.doUploadAssetFile(type, files);
     this._selectedAsset = null;
     await this.listAssets();
   }
@@ -118,7 +116,7 @@ export class AssetHierarchy {
       return;
     }
     const zip = await this.zipFiles(fileList);
-    await this.uploadFiles(type, zip, folderName, assetFiles);
+    await this.uploadFiles(type, zip, null, folderName, assetFiles);
     this._selectedAsset = null;
     await this.listAssets();
   }
@@ -168,6 +166,46 @@ export class AssetHierarchy {
     }
     Database.deleteAsset(asset.uuid);
   }
+  async doUploadAssetFile(type: AssetType, files: File[]) {
+    for (const file of files) {
+      const extensions =
+        type === 'model'
+          ? AssetStore.modelExtensions
+          : type === 'texture'
+          ? AssetStore.textureExtensions
+          : [];
+      if (extensions.findIndex((ext) => file.name.toLowerCase().endsWith(ext)) < 0) {
+        Dialog.messageBox('Error', `Invalid file type. Only ${extensions.join(', ')} files are supported.`);
+        return;
+      }
+      const zip = await this.zipFiles([{ path: file.name, file }]);
+      await this.uploadFiles(type, zip, null, file.name, [file.name]);
+    }
+    this._selectedAsset = null;
+    await this.listAssets();
+  }
+  private async rgbaToPng(
+    name: string,
+    width: number,
+    height: number,
+    rgbaData: Uint8ClampedArray
+  ): Promise<File> {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    const imageData = new ImageData(new Uint8ClampedArray(rgbaData), width, height);
+    ctx.putImageData(imageData, 0, 0);
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        const file = new File([blob], name, {
+          type: 'image/png',
+          lastModified: Date.now()
+        });
+        resolve(file);
+      }, 'image/png');
+    });
+  }
   private renderAssetGroup(type: AssetType) {
     ImGui.PushID(type);
     const isOpen = ImGui.TreeNodeEx(
@@ -183,6 +221,11 @@ export class AssetHierarchy {
       }
       if (type === 'model' && ImGui.MenuItem('Import directory...')) {
         this.uploadAssetDirectory(type);
+      }
+      if (type === 'texture') {
+        if (ImGui.MenuItem('New ramp texture...')) {
+          this.uploadRampTexture();
+        }
       }
       ImGui.EndPopup();
     }

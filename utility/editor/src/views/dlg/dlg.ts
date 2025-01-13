@@ -33,13 +33,11 @@ export class Dialog {
   }
   public static async createRampTexture(
     title: string,
-    textureWidth: number,
-    poolId?: string | symbol,
     width?: number,
     height?: number
-  ): Promise<Texture2D> {
+  ): Promise<Uint8ClampedArray> {
     return new Promise((resolve) => {
-      new DlgRampTextureCreator(title, true, width, height, poolId, textureWidth, resolve);
+      new DlgRampTextureCreator(title, true, width, height, resolve);
     });
   }
 }

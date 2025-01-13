@@ -517,8 +517,8 @@ export class SceneView extends BaseView<SceneModel> {
         });
         break;
       case 'SHOW_RAMP_TEXTURE_CREATOR':
-        Dialog.createRampTexture('CreateRampTexture', 128, null, 400, 200).then((texture) => {
-          //texture?.dispose();
+        Dialog.createRampTexture('Create Ramp Texture', 400, 100).then((data) => {
+          console.log(data);
         });
         break;
       default:

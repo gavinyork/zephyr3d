@@ -5,12 +5,11 @@ import { Application } from '@zephyr3d/scene';
 import { Interpolator } from '@zephyr3d/base';
 
 export class DlgRampTextureCreator extends ModalDialog {
-  private _poolId: string | symbol;
   private _textureWidth: number;
   private _texture: Texture2D;
   private _interpolator: Interpolator;
-  private _textureData: Uint8Array;
-  private _resolve: (tex: Texture2D) => void;
+  private _textureData: Uint8ClampedArray;
+  private _resolve: (data: Uint8ClampedArray) => void;
   private _keyframes: Array<{ time: number; color: Float32Array }>;
   private _selectedKeyframe: number;
   private _isDragging: boolean;
@@ -21,14 +20,11 @@ export class DlgRampTextureCreator extends ModalDialog {
     open: boolean,
     width: number,
     height: number,
-    poolId: string | symbol,
-    textureWidth: number,
-    resolve: (tex: Texture2D) => void
+    resolve: (data: Uint8ClampedArray) => void
   ) {
     super(id, open, width, height);
-    this._poolId = poolId;
-    this._textureWidth = textureWidth;
-    this._textureData = new Uint8Array(this._textureWidth * 4);
+    this._textureWidth = 256;
+    this._textureData = new Uint8ClampedArray(this._textureWidth * 4);
     this._texture = null;
     this._keyframes = [
       { time: 0, color: new Float32Array([0, 0, 0]) },
@@ -237,17 +233,17 @@ export class DlgRampTextureCreator extends ModalDialog {
         kf.color[2] = color[2];
         this.updateInterpolator();
       }
-      ImGui.SameLine();
-      ImGui.Text(`Position: ${kf.time.toFixed(3)}`);
     }
 
     // 按钮
     if (ImGui.Button('Ok')) {
-      this._resolve(this._texture);
+      this._resolve(this._textureData);
+      this._texture.dispose();
       this.close();
     }
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {
+      this._resolve(null);
       this._texture.dispose();
       this.close();
     }
@@ -265,9 +261,7 @@ export class DlgRampTextureCreator extends ModalDialog {
     }
 
     if (!this._texture) {
-      const device = Application.instance.device;
-      const pool = this._poolId ? device.getPool(this._poolId) : device;
-      this._texture = pool.createTexture2D('rgba8unorm', this._textureWidth, 1, {
+      this._texture = Application.instance.device.createTexture2D('rgba8unorm', this._textureWidth, 1, {
         samplerOptions: {
           mipFilter: 'none'
         }
