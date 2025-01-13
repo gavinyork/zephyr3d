@@ -1,5 +1,4 @@
 import { makeEventTarget } from '@zephyr3d/base';
-import type { DocumentType } from '../components/common';
 import type { SceneNode } from '@zephyr3d/scene';
 import type { TRS } from '../types';
 import type { DBAssetInfo } from '../storage/db';
@@ -17,14 +16,6 @@ type EventBusEventMap = {
   workspace_drag_drop: [type: string, data: any, x: number, y: number];
   workspace_dragging: [type: string, data: any, x: number, y: number];
   action: [action: string];
-  action_doc_request_new: [type: DocumentType];
-  action_doc_post_new: [type: DocumentType, name: string, uuid: string];
-  action_doc_request_open: [];
-  action_doc_request_save: [];
-  action_doc_request_close: [];
-  action_doc_post_close: [];
-  action_doc_request_save_scene: [name: string];
-  action_doc_request_open_scene: [name: string];
   node_transform: [node: SceneNode, oldTransform: TRS, newTransform: TRS];
 };
 

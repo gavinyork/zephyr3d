@@ -40,16 +40,12 @@ export class SceneController extends BaseController<SceneModel> {
     eventBus.on('update', this.update, this);
     eventBus.on('action', this.sceneAction, this);
     eventBus.on('node_transform', this.nodeTransform, this);
-    eventBus.on('action_doc_request_save_scene', this.saveScene, this);
-    eventBus.on('action_doc_request_open_scene', this.openScene, this);
   }
   protected onDeactivate(): void {
     this._scene = null;
     eventBus.off('update', this.update, this);
     eventBus.off('action', this.sceneAction, this);
     eventBus.off('node_transform', this.nodeTransform, this);
-    eventBus.off('action_doc_request_save_scene', this.saveScene, this);
-    eventBus.off('action_doc_request_open_scene', this.openScene, this);
   }
   private nodeTransform(node: SceneNode, oldTransform: TRS, newTransform: TRS) {
     this._cmdManager.execute(new NodeTransformCommand(node, oldTransform, newTransform));
@@ -61,14 +57,22 @@ export class SceneController extends BaseController<SceneModel> {
         break;
       case 'SAVE_DOC':
         if (!this._scene) {
-          Dialog.saveScene('Input scene name:');
+          Dialog.promptName('Input scene name:').then((name) => {
+            if (name) {
+              this.saveScene(name);
+            }
+          });
         } else {
-          eventBus.dispatchEvent('action_doc_request_save_scene', this._scene.name);
+          this.saveScene(this._scene.name);
         }
         break;
       case 'OPEN_DOC':
         Database.listScenes().then((scenes) => {
-          Dialog.openScene('Select scene:', scenes, 300);
+          Dialog.openScene('Select scene:', scenes, 300).then((sceneId) => {
+            if (sceneId) {
+              this.openScene(sceneId);
+            }
+          });
         });
         break;
       case 'UNDO':
