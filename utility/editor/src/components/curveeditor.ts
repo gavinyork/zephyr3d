@@ -344,31 +344,21 @@ export class CurveEditor {
     return result[0];
   }
   private drawCurve(drawList: ImGui.ImDrawList, cursorPos: ImGui.ImVec2): void {
-    if (this.points.length < 2) return;
-
-    // 保存原始标志位
-    const originalFlags = drawList.Flags;
-    // 启用抗锯齿
-    drawList.Flags |= ImGui.ImDrawListFlags.AntiAliasedLines;
-
+    if (this.points.length < 2) {
+      return;
+    }
     if (this.settings.interpolationType === 'step') {
-      // Step类型绘制阶跃波形
       for (let i = 0; i < this.points.length - 1; i++) {
         const p1 = this.points[i];
         const p2 = this.points[i + 1];
-
         const screen1 = this.worldToScreen(p1.x, p1.values[0]);
         const screen2 = this.worldToScreen(p2.x, p2.values[0]);
-
-        // 绘制水平线段
         drawList.AddLine(
           new ImGui.ImVec2(cursorPos.x + screen1.x, cursorPos.y + screen1.y),
           new ImGui.ImVec2(cursorPos.x + screen2.x, cursorPos.y + screen1.y),
           this.settings.curveColor,
           2.0
         );
-
-        // 绘制垂直线段
         drawList.AddLine(
           new ImGui.ImVec2(cursorPos.x + screen2.x, cursorPos.y + screen1.y),
           new ImGui.ImVec2(cursorPos.x + screen2.x, cursorPos.y + screen2.y),
@@ -377,7 +367,6 @@ export class CurveEditor {
         );
       }
     } else if (this.settings.interpolationType === 'linear') {
-      // Linear类型直接连接控制点
       for (let i = 0; i < this.points.length - 1; i++) {
         const p1 = this.points[i];
         const p2 = this.points[i + 1];
@@ -393,18 +382,15 @@ export class CurveEditor {
         );
       }
     } else {
-      // 只有cubicspline需要使用缓存的曲线点
       this.updateCurvePoints();
-
-      if (this.cachedCurvePoints.length < 2) return;
-
+      if (this.cachedCurvePoints.length < 2) {
+        return;
+      }
       for (let i = 0; i < this.cachedCurvePoints.length - 1; i++) {
         const p1 = this.cachedCurvePoints[i];
         const p2 = this.cachedCurvePoints[i + 1];
-
         const screenP1 = this.worldToScreen(p1.x, p1.y);
         const screenP2 = this.worldToScreen(p2.x, p2.y);
-
         drawList.AddLine(
           new ImGui.ImVec2(cursorPos.x + screenP1.x, cursorPos.y + screenP1.y),
           new ImGui.ImVec2(cursorPos.x + screenP2.x, cursorPos.y + screenP2.y),
@@ -413,22 +399,15 @@ export class CurveEditor {
         );
       }
     }
-
-    // 恢复原始标志位
-    drawList.Flags = originalFlags;
   }
-
   private updateCurvePoints(): void {
     if (!this.curveDirty && this.cachedCurvePoints.length > 0) {
       return;
     }
-
     if (this.points.length < 2 || this.interpolators.length === 0) {
       this.cachedCurvePoints = [];
       return;
     }
-
-    // 只有cubicspline需要缓存点
     if (this.settings.interpolationType !== 'cubicspline-natural') {
       this.cachedCurvePoints = [];
       return;
