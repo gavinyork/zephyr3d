@@ -11,6 +11,7 @@ interface CurveSettings {
   valueRange: [number, number];
   gridColor: number;
   curveColor: number;
+  curveColorActive: number;
   pointColor: number;
   selectedPointColor: number;
   backgroundColor: number;
@@ -29,11 +30,12 @@ export class CurveEditor {
   private valueRangeEndInput: [number];
 
   // Status
-  private canvasSize: ImGui.ImVec2 = new ImGui.ImVec2(0, 0);
-  private isDragging: boolean = false;
-  private selectedPointIndex: number = -1;
-  private cachedCurvePoints: Array<{ x: number; y: number }> = [];
-  private curveDirty: boolean = true;
+  private canvasSize: ImGui.ImVec2;
+  private isDragging: boolean;
+  private curveActive: boolean;
+  private selectedPointIndex: number;
+  private cachedCurvePoints: Array<{ x: number; y: number }>;
+  private curveDirty: boolean;
 
   constructor() {
     // Default settings
@@ -42,6 +44,7 @@ export class CurveEditor {
       valueRange: [-1, 1],
       gridColor: ImGui.GetColorU32(new ImGui.ImVec4(0.5, 0.5, 0.5, 0.25)),
       curveColor: ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 1, 1)),
+      curveColorActive: ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 0, 1)),
       pointColor: ImGui.GetColorU32(new ImGui.ImVec4(0.7, 0.7, 0.7, 1)),
       selectedPointColor: ImGui.GetColorU32(new ImGui.ImVec4(1, 0.5, 0, 1)),
       backgroundColor: ImGui.GetColorU32(new ImGui.ImVec4(0.2, 0.2, 0.2, 1)),
@@ -58,6 +61,10 @@ export class CurveEditor {
       { x: this.settings.timeRange[1], values: [0] }
     ];
 
+    this.canvasSize = new ImGui.ImVec2(0, 0);
+    this.isDragging = false;
+    this.curveActive = false;
+    this.selectedPointIndex = -1;
     this.cachedCurvePoints = [];
     this.curveDirty = true;
     this.updateInterpolators();
@@ -65,29 +72,24 @@ export class CurveEditor {
 
   public render(): void {
     if (
-      !ImGui.Begin('Curve Editor', null, ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse)
+      ImGui.Begin('Curve Editor', null, ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse)
     ) {
-      ImGui.End();
-      return;
+      this.renderSettings();
+      if (
+        ImGui.BeginChild(
+          'CurveCanvas',
+          ImGui.GetContentRegionAvail(),
+          false,
+          ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
+        )
+      ) {
+        const canvasSize = ImGui.GetContentRegionAvail();
+        this.canvasSize = new ImGui.ImVec2(Math.max(100, canvasSize.x), Math.max(200, canvasSize.y));
+
+        this.renderCurveView();
+      }
+      ImGui.EndChild();
     }
-
-    this.renderSettings();
-
-    if (
-      ImGui.BeginChild(
-        'CurveCanvas',
-        ImGui.GetContentRegionAvail(),
-        false,
-        ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
-      )
-    ) {
-      const canvasSize = ImGui.GetContentRegionAvail();
-      this.canvasSize = new ImGui.ImVec2(Math.max(100, canvasSize.x), Math.max(200, canvasSize.y));
-
-      this.renderCurveView();
-    }
-    ImGui.EndChild();
-
     ImGui.End();
   }
   private renderSettings(): void {
@@ -186,7 +188,6 @@ export class CurveEditor {
 
     ImGui.InvisibleButton('curve_canvas', this.canvasSize);
     const isCanvasHovered = ImGui.IsItemHovered();
-    const isCanvasActive = ImGui.IsItemActive();
 
     const drawList = ImGui.GetWindowDrawList();
     drawList.AddRectFilled(
@@ -202,7 +203,7 @@ export class CurveEditor {
 
     this.drawRangeLabels(drawList, cursorPos);
 
-    if (isCanvasHovered || isCanvasActive) {
+    if (isCanvasHovered) {
       this.handleInteraction(cursorPos);
       this.drawHoverHint(drawList, cursorPos);
     }
@@ -274,7 +275,13 @@ export class CurveEditor {
     const curvePointScreen = this.worldToScreen(worldPos.x, curveValue);
     const distance = Math.abs(curvePointScreen.y - relativeMousePos.y);
 
-    if (distance > 10) {
+    this.curveActive = distance < 10;
+    if (this.curveActive) {
+      const pointIndex = this.findPointNear(relativeMousePos);
+      if (pointIndex >= 0) {
+        const point = this.points[pointIndex];
+        this.drawHint(point.x, point.values[0], cursorPos, relativeMousePos, drawList);
+      }
       return;
     }
 
@@ -303,20 +310,29 @@ export class CurveEditor {
       1.5
     );
 
-    const hintText = `Time: ${worldPos.x.toFixed(2)}\nValue: ${curveValue.toFixed(2)}`;
+    this.drawHint(worldPos.x, curveValue, cursorPos, relativeMousePos, drawList);
+  }
+  private drawHint(
+    time: number,
+    value: number,
+    cursorPos: ImGui.Vec2,
+    mousePos: ImGui.Vec2,
+    drawList: ImGui.DrawList
+  ) {
+    const hintText = `Time: ${time.toFixed(2)}\nValue: ${value.toFixed(2)}`;
     const textSize = ImGui.CalcTextSize(hintText);
     const padding = 5;
     const backgroundColor = ImGui.GetColorU32(new ImGui.ImVec4(0, 0, 0, 0.8));
     const textColor = ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 1, 1));
 
-    let hintX = cursorPos.x + relativeMousePos.x + 10;
-    let hintY = cursorPos.y + relativeMousePos.y - textSize.y - padding * 2;
+    let hintX = cursorPos.x + mousePos.x + 10;
+    let hintY = cursorPos.y + mousePos.y - textSize.y - padding * 2;
 
     if (hintX + textSize.x + padding * 2 > cursorPos.x + this.canvasSize.x) {
-      hintX = cursorPos.x + relativeMousePos.x - textSize.x - padding * 2 - 10;
+      hintX = cursorPos.x + mousePos.x - textSize.x - padding * 2 - 10;
     }
     if (hintY < cursorPos.y) {
-      hintY = cursorPos.y + relativeMousePos.y + padding;
+      hintY = cursorPos.y + mousePos.y + padding;
     }
 
     // 绘制提示框背景
@@ -331,7 +347,7 @@ export class CurveEditor {
     drawList.AddText(new ImGui.ImVec2(hintX + padding, hintY + padding), textColor, hintText);
   }
   private findNearestCurveValue(time: number): number | null {
-    if (this.cachedCurvePoints.length < 2) {
+    if (this.settings.interpolationType === 'cubicspline-natural' && this.cachedCurvePoints.length < 2) {
       return null;
     }
 
@@ -347,6 +363,7 @@ export class CurveEditor {
     if (this.points.length < 2) {
       return;
     }
+    const curveColor = this.curveActive ? this.settings.curveColorActive : this.settings.curveColor;
     if (this.settings.interpolationType === 'step') {
       for (let i = 0; i < this.points.length - 1; i++) {
         const p1 = this.points[i];
@@ -356,13 +373,13 @@ export class CurveEditor {
         drawList.AddLine(
           new ImGui.ImVec2(cursorPos.x + screen1.x, cursorPos.y + screen1.y),
           new ImGui.ImVec2(cursorPos.x + screen2.x, cursorPos.y + screen1.y),
-          this.settings.curveColor,
+          curveColor,
           2.0
         );
         drawList.AddLine(
           new ImGui.ImVec2(cursorPos.x + screen2.x, cursorPos.y + screen1.y),
           new ImGui.ImVec2(cursorPos.x + screen2.x, cursorPos.y + screen2.y),
-          this.settings.curveColor,
+          curveColor,
           2.0
         );
       }
@@ -377,7 +394,7 @@ export class CurveEditor {
         drawList.AddLine(
           new ImGui.ImVec2(cursorPos.x + screen1.x, cursorPos.y + screen1.y),
           new ImGui.ImVec2(cursorPos.x + screen2.x, cursorPos.y + screen2.y),
-          this.settings.curveColor,
+          curveColor,
           2.0
         );
       }
@@ -394,7 +411,7 @@ export class CurveEditor {
         drawList.AddLine(
           new ImGui.ImVec2(cursorPos.x + screenP1.x, cursorPos.y + screenP1.y),
           new ImGui.ImVec2(cursorPos.x + screenP2.x, cursorPos.y + screenP2.y),
-          this.settings.curveColor,
+          curveColor,
           2.0
         );
       }
