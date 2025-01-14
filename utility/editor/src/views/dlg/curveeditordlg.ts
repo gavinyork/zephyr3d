@@ -22,7 +22,7 @@ export class DlgCurveEditor extends ModalDialog {
     this.editor.renderSettings();
     if (
       ImGui.BeginChild(
-        `##${this.id}_CANVAS`,
+        'Canvas',
         new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing()),
         false,
         ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse

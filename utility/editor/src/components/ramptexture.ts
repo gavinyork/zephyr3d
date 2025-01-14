@@ -1,17 +1,15 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { ModalDialog } from '../../components/modal';
 import type { Texture2D } from '@zephyr3d/device';
 import { Application } from '@zephyr3d/scene';
 import { Interpolator } from '@zephyr3d/base';
-import { CurveEditor } from '../../components/curveeditor';
+import { CurveEditor } from './curveeditor';
 
-export class DlgRampTextureCreator extends ModalDialog {
+export class RampTextureCreator {
   private _textureWidth: number;
   private _texture: Texture2D;
   private _interpolator: Interpolator;
   private _alphaInterpolator: Interpolator;
   private _textureData: Uint8ClampedArray;
-  private _resolve: (data: Uint8ClampedArray) => void;
   private _keyframes: Array<{ time: number; color: Float32Array }>;
   private _selectedKeyframe: number;
   private _isDragging: boolean;
@@ -20,14 +18,7 @@ export class DlgRampTextureCreator extends ModalDialog {
   private _alphaEditor: CurveEditor;
   private _showAlpha: boolean;
   private _dragStartPos: { x: number; time: number };
-  constructor(
-    id: string,
-    open: boolean,
-    width: number,
-    height: number,
-    resolve: (data: Uint8ClampedArray) => void
-  ) {
-    super(id, open, width, height);
+  constructor() {
     this._textureWidth = 256;
     this._textureData = new Uint8ClampedArray(this._textureWidth * 4);
     this._texture = null;
@@ -41,22 +32,27 @@ export class DlgRampTextureCreator extends ModalDialog {
     this._markerWidth = 4;
     this._showAlpha = true;
     this._dragStartPos = null;
-    this._alphaEditor = new CurveEditor([{
-      x: 0,
-      value: 1
-    }, {
-      x: 1,
-      value: 1
-    }], {
-      timeRange: [0, 1],
-      valueRange: [0, 1],
-      interpolationType: 'linear',
-      drawLabels: false,
-      drawHints: false
-    });
+    this._alphaEditor = new CurveEditor(
+      [
+        {
+          x: 0,
+          value: 1
+        },
+        {
+          x: 1,
+          value: 1
+        }
+      ],
+      {
+        timeRange: [0, 1],
+        valueRange: [0, 1],
+        interpolationType: 'linear',
+        drawLabels: false,
+        drawHints: false
+      }
+    );
     this.updateInterpolator();
     this._alphaInterpolator = this._alphaEditor.interpolator;
-    this._resolve = resolve;
   }
   private updateInterpolator() {
     this._keyframes.sort((a, b) => a.time - b.time);
@@ -69,11 +65,9 @@ export class DlgRampTextureCreator extends ModalDialog {
       colors[index * 3 + 1] = kf.color[1];
       colors[index * 3 + 2] = kf.color[2];
     });
-
     this._interpolator = new Interpolator('linear', 'vec3', times, colors);
     this.updateTexture();
   }
-
   private handleEditorInteraction() {
     const mousePos = ImGui.GetMousePos();
     const canvasPos = ImGui.GetCursorScreenPos();
@@ -152,7 +146,6 @@ export class DlgRampTextureCreator extends ModalDialog {
         this.updateInterpolator();
       }
     }
-    // 处理拖动
     if (this._selectedKeyframe !== -1 && this._dragStartPos) {
       if (ImGui.IsMouseDown(0)) {
         const dragDelta = mousePos.x - this._dragStartPos.x;
@@ -181,7 +174,11 @@ export class DlgRampTextureCreator extends ModalDialog {
       ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.2, 0.2, 0.2, 1))
     );
     this.drawCheckerboard(drawList, canvasPos, canvasSize, 10, 10);
-    drawList.AddImage(this._texture, canvasPos, new ImGui.ImVec2(canvasPos.x + canvasSize.x, canvasPos.y + canvasSize.y))
+    drawList.AddImage(
+      this._texture,
+      canvasPos,
+      new ImGui.ImVec2(canvasPos.x + canvasSize.x, canvasPos.y + canvasSize.y)
+    );
     this._keyframes.forEach((kf, index) => {
       const markerX = canvasPos.x + ((kf.time - timeStart) / timeDelta) * canvasSize.x;
       const isSelected = index === this._selectedKeyframe;
@@ -221,19 +218,23 @@ export class DlgRampTextureCreator extends ModalDialog {
       }
     });
   }
-  doRender(): void {
+  render(): void {
     if (!this._texture || this._alphaEditor.interpolator !== this._alphaInterpolator) {
       this._alphaInterpolator = this._alphaEditor.interpolator;
       if (this._showAlpha) {
         this.updateTexture();
       }
     }
-    const height = (ImGui.GetContentRegionAvail().y - ImGui.GetFrameHeightWithSpacing() - ImGui.GetStyle().ItemSpacing.y) >> 1;
-    if (ImGui.BeginChild(`##${this.id}_RGB_EDITOR`, new ImGui.ImVec2(0, height), true, ImGui.WindowFlags.NoScrollbar)) {
+    const height = (ImGui.GetContentRegionAvail().y - ImGui.GetStyle().ItemSpacing.y) >> 1;
+    if (ImGui.BeginChild('RGBEditor', new ImGui.ImVec2(0, height), true, ImGui.WindowFlags.NoScrollbar)) {
       ImGui.SetNextWindowBgAlpha(1);
-      if (ImGui.BeginChild(`##${this.id}_CANVAS`, new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing())), true, ImGui.WindowFlags.NoScrollbar) {
+      if (
+        (ImGui.BeginChild(`CanvasContainer`, new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing())),
+        true,
+        ImGui.WindowFlags.NoScrollbar)
+      ) {
         this.handleEditorInteraction();
-        ImGui.InvisibleButton('##canvas', ImGui.GetContentRegionAvail());
+        ImGui.InvisibleButton('Canvas', ImGui.GetContentRegionAvail());
       }
       ImGui.EndChild();
       if (this._selectedKeyframe !== -1) {
@@ -242,7 +243,7 @@ export class DlgRampTextureCreator extends ModalDialog {
         ImGui.Text('RGB');
         ImGui.SameLine(ImGui.GetWindowWidth() - 200 - ImGui.GetStyle().WindowPadding.x);
         ImGui.SetNextItemWidth(200);
-        if (ImGui.ColorEdit3('##Color', color)) {
+        if (ImGui.ColorEdit3('KeyframeColor', color)) {
           kf.color[0] = color[0];
           kf.color[1] = color[1];
           kf.color[2] = color[2];
@@ -251,9 +252,15 @@ export class DlgRampTextureCreator extends ModalDialog {
       }
     }
     ImGui.EndChild();
-    if (ImGui.BeginChild(`##${this.id}_ALPHA_EDITOR`, new ImGui.ImVec2(0, height), true, ImGui.WindowFlags.NoScrollbar)) {
-      if (ImGui.BeginChild(`##${this.id}_CURVE_EDITOR`, new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing())), true, ImGui.WindowFlags.NoScrollbar) {
+    if (ImGui.BeginChild('AlphaEditor', new ImGui.ImVec2(0, height), true, ImGui.WindowFlags.NoScrollbar)) {
+      if (
+        (ImGui.BeginChild('CurveEditor', new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing())),
+        true,
+        ImGui.WindowFlags.NoScrollbar)
+      ) {
+        ImGui.PushID('CurveEditor');
         this._alphaEditor.renderCurveView(ImGui.GetContentRegionAvail());
+        ImGui.PopID();
       }
       ImGui.EndChild();
       const showAlpha = [this._showAlpha] as [boolean];
@@ -264,59 +271,50 @@ export class DlgRampTextureCreator extends ModalDialog {
       ImGui.Text('Alpha');
     }
     ImGui.EndChild();
-    if (ImGui.Button('Ok')) {
-      if (!this._showAlpha) {
-        this._showAlpha = true;
-        this.updateTexture(false);
-        this._resolve(this._textureData);
-      }
-      this._texture.dispose();
-      this.close();
-    }
-    ImGui.SameLine();
-    if (ImGui.Button('Cancel')) {
-      this._resolve(null);
-      this._texture.dispose();
-      this.close();
-    }
   }
-  private drawCheckerboard(drawList: ImGui.DrawList, pos: ImGui.ImVec2, size: ImGui.ImVec2, squaresSizeX: number, squaresSizeY: number) {
-    const col1 = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1, 1, 1, 1))
-    const col2 = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.5, 1))
+  private drawCheckerboard(
+    drawList: ImGui.DrawList,
+    pos: ImGui.ImVec2,
+    size: ImGui.ImVec2,
+    squaresSizeX: number,
+    squaresSizeY: number
+  ) {
+    const col1 = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1, 1, 1, 1));
+    const col2 = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.5, 1));
     const dimX = Math.ceil(size.x / squaresSizeX);
     const dimY = Math.ceil(size.y / squaresSizeY);
     for (let y = 0; y < dimY; y++) {
       for (let x = 0; x < dimX; x++) {
-        const squarePosStart = new ImGui.ImVec2(
-          pos.x + x * squaresSizeX,
-          pos.y + y * squaresSizeY
-        );
+        const squarePosStart = new ImGui.ImVec2(pos.x + x * squaresSizeX, pos.y + y * squaresSizeY);
         const squarePosEnd = new ImGui.ImVec2(
           Math.min(pos.x + size.x, squarePosStart.x + squaresSizeX),
           Math.min(pos.y + size.y, squarePosStart.y + squaresSizeY)
         );
-        const col = ((x + y) % 2) == 0 ? col1 : col2;
+        const col = (x + y) % 2 == 0 ? col1 : col2;
         drawList.AddRectFilled(squarePosStart, squarePosEnd, col);
       }
     }
   }
-  private updateTexture(changTexture = true) {
+  fillTextureData(showAlpha: boolean, data: Uint8ClampedArray) {
     const p = new Float32Array(3);
     for (let i = 0; i < this._textureWidth; i++) {
       const t = i / (this._textureWidth - 1);
       this._interpolator.interpolate(t, p);
-      this._textureData[i * 4 + 0] = (p[0] * 255) >> 0;
-      this._textureData[i * 4 + 1] = (p[1] * 255) >> 0;
-      this._textureData[i * 4 + 2] = (p[2] * 255) >> 0;
-      if (this._showAlpha) {
+      data[i * 4 + 0] = (p[0] * 255) >> 0;
+      data[i * 4 + 1] = (p[1] * 255) >> 0;
+      data[i * 4 + 2] = (p[2] * 255) >> 0;
+      if (showAlpha) {
         this._alphaEditor.interpolator.interpolate(t, p);
-        this._textureData[i * 4 + 3] = (p[0] * 255) >> 0;
+        data[i * 4 + 3] = (p[0] * 255) >> 0;
       } else {
-        this._textureData[i * 4 + 3] = 255;
+        data[i * 4 + 3] = 255;
       }
     }
+  }
+  private updateTexture(changTexture = true) {
+    this.fillTextureData(this._showAlpha, this._textureData);
     if (!this._texture) {
-      this._texture = Application.instance.device.createTexture2D('rgba8unorm', this._textureWidth, 1, {
+      this._texture = Application.instance.device.createTexture2D('rgba8unorm-srgb', this._textureWidth, 1, {
         samplerOptions: {
           mipFilter: 'none'
         }
@@ -326,5 +324,9 @@ export class DlgRampTextureCreator extends ModalDialog {
     if (changTexture) {
       this._texture.update(this._textureData, 0, 0, this._textureWidth, 1);
     }
+  }
+  dispose() {
+    this._texture?.dispose();
+    this._texture = null;
   }
 }

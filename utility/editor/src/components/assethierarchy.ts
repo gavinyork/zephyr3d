@@ -52,7 +52,7 @@ export class AssetHierarchy {
     for (const assets of this._assets) {
       for (const asset of assets.assets) {
         if (!this._assetRegistry.getAssetInfo(asset.uuid)) {
-          this._assetRegistry.registerAsset(asset.uuid, asset.type, asset.uuid);
+          this._assetRegistry.registerAsset(asset.uuid, asset.type, asset.path, asset.name);
         }
       }
     }
@@ -69,7 +69,7 @@ export class AssetHierarchy {
     });
     for (const path of paths) {
       await Database.putAsset({
-        name: path.split('/').pop(),
+        name: path,
         path: path,
         thumbnail: '',
         type,
@@ -78,7 +78,7 @@ export class AssetHierarchy {
     }
   }
   async uploadRampTexture() {
-    const rgba = await Dialog.createRampTexture('Create ramp texture', 400, 120);
+    const rgba = await Dialog.createRampTexture('Create ramp texture', 400, 200);
     if (rgba) {
       const name = `${Database.randomUUID()}.png`;
       const file = await this.rgbaToPng(name, rgba.byteLength >> 2, 1, rgba);
@@ -255,7 +255,7 @@ export class AssetHierarchy {
     ImGui.PopID();
   }
   private renderAsset(asset: DBAssetInfo) {
-    const label = `${asset.path}##${asset.uuid}`;
+    const label = `${asset.name}##${asset.uuid}`;
     let flags = AssetHierarchy.baseFlags;
     if (this._selectedAsset === asset) {
       flags |= ImGui.TreeNodeFlags.Selected;
@@ -268,8 +268,17 @@ export class AssetHierarchy {
       ImGui.OpenPopup(`context_${asset.uuid}`);
     }
     if (ImGui.BeginPopup(`context_${asset.uuid}`)) {
-      if (ImGui.MenuItem('Add to scene')) {
+      if (asset.type === 'model' && ImGui.MenuItem('Add to scene')) {
         eventBus.dispatchEvent('scene_add_asset', asset);
+      }
+      if (ImGui.MenuItem('Rename')) {
+        Dialog.rename('Rename Asset', asset.name, 300).then((name) => {
+          if (name) {
+            asset.name = name;
+            this._assetRegistry.renameAsset(asset.uuid, name);
+            Database.putAsset(asset);
+          }
+        });
       }
       if (ImGui.MenuItem('Delete')) {
         this.deleteAsset(asset);

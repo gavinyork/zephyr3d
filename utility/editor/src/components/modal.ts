@@ -60,7 +60,9 @@ export class ModalDialog extends makeEventTarget(Object)<{
     ImGui.SetNextWindowSize(this._size, ImGui.Cond.FirstUseEver);
     ImGui.OpenPopup(this._id);
     if (ImGui.BeginPopupModal(this._id, null)) {
+      ImGui.PushID(this._id);
       this.doRender();
+      ImGui.PopID();
       ImGui.EndPopup();
     }
   }

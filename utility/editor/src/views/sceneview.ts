@@ -179,7 +179,7 @@ export class SceneView extends BaseView<SceneModel> {
       assetRegistry
     );
     this._propGrid = new PropertyEditor(
-      getSerializationInfo(this._tab.assetHierarchy.assetRegistry),
+      assetRegistry,
       this._menubar.height + this._toolbar.height,
       this._statusbar.height,
       400,
@@ -517,7 +517,7 @@ export class SceneView extends BaseView<SceneModel> {
         });
         break;
       case 'SHOW_RAMP_TEXTURE_CREATOR':
-        Dialog.createRampTexture('Create Ramp Texture', 400, 100).then((data) => {
+        Dialog.createRampTexture('Create Ramp Texture', 400, 200).then((data) => {
           console.log(data);
         });
         break;

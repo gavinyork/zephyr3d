@@ -5,6 +5,7 @@ import type { Texture2D, TextureCube } from '@zephyr3d/device';
 
 export type AssetType = 'model' | 'texture';
 export type AssetInfo = {
+  id: string;
   name: string;
   type: AssetType;
   path: string;
@@ -32,11 +33,12 @@ export class AssetRegistry {
     }
     return null;
   }
-  registerAsset(name: string, type: AssetType, path: string) {
-    if (this._assetMap.has(name)) {
-      console.error(`AssetRegistry.registerAsset() failed: Asset <${name}> already exists`);
+  registerAsset(id: string, type: AssetType, path: string, name: string) {
+    if (this._assetMap.has(id)) {
+      console.error(`AssetRegistry.registerAsset() failed: Asset <${id}> already exists`);
     } else {
-      this._assetMap.set(name, {
+      this._assetMap.set(id, {
+        id,
         name,
         type,
         path,
@@ -45,33 +47,39 @@ export class AssetRegistry {
       });
     }
   }
-  getAssetInfo(name: string) {
-    return this._assetMap.get(name);
+  getAssetInfo(id: string) {
+    return this._assetMap.get(id);
   }
-  getAssetPoolId(name: string) {
-    const info = this._assetMap.get(name);
+  renameAsset(id: string, name: string) {
+    const info = this._assetMap.get(id);
+    if (info) {
+      info.name = name;
+    }
+  }
+  getAssetPoolId(id: string) {
+    const info = this._assetMap.get(id);
     return info ? info.manager.pool.id : null;
   }
-  async fetchModel(name: string, scene: Scene, options?: ModelFetchOptions, request?: HttpRequest) {
-    const model = await this.doFetchModel(name, scene, options, request);
+  async fetchModel(id: string, scene: Scene, options?: ModelFetchOptions, request?: HttpRequest) {
+    const model = await this.doFetchModel(id, scene, options, request);
     if (model) {
-      const info = this._assetMap.get(name);
+      const info = this._assetMap.get(id);
       if (info) {
-        info.allocated.set(model.group, name);
+        info.allocated.set(model.group, id);
       }
     }
     return model;
   }
   async fetchTexture<T extends Texture2D | TextureCube>(
-    name: string,
+    id: string,
     options?: TextureFetchOptions<T>,
     request?: HttpRequest
   ) {
-    const texture = await this.doFetchTexture(name, options, request);
+    const texture = await this.doFetchTexture(id, options, request);
     if (texture) {
-      const info = this._assetMap.get(name);
+      const info = this._assetMap.get(id);
       if (info) {
-        info.allocated.set(texture, name);
+        info.allocated.set(texture, id);
       }
     }
     return texture;
@@ -89,10 +97,11 @@ export class AssetRegistry {
     }
   }
   serialize() {
-    const assets: Record<string, { name: string; type: AssetType; path: string }> = {};
+    const assets: Record<string, { id: string; name: string; type: AssetType; path: string }> = {};
     for (const entry of this._assetMap) {
       assets[entry[0]] = {
-        name: entry[0],
+        id: entry[0],
+        name: entry[1].name,
         type: entry[1].type,
         path: entry[1].path
       };
@@ -106,7 +115,8 @@ export class AssetRegistry {
       for (const k of Object.getOwnPropertyNames(assets)) {
         const info = assets[k];
         this._assetMap.set(k, {
-          name: k,
+          id: info.id,
+          name: info.name,
           type: info.type,
           path: info.path,
           manager: new AssetManager(Symbol(k)),

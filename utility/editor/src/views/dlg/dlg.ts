@@ -4,7 +4,8 @@ import type { DBSceneInfo } from '../../storage/db';
 import { DlgMessage } from './messagedlg';
 import { DlgPromptName } from './newscenedlg';
 import { DlgOpenScene } from './openscenedlg';
-import { DlgRampTextureCreator } from './ramptexture';
+import { DlgRampTextureCreator } from './ramptexturedlg';
+import { DlgRename } from './renamedlg';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
@@ -23,6 +24,11 @@ export class Dialog {
   public static async promptName(title: string, width?: number, height?: number): Promise<string> {
     return new Promise((resolve) => {
       new DlgPromptName(title, true, width, height, resolve);
+    });
+  }
+  public static async rename(title: string, name: string, width?: number): Promise<string> {
+    return new Promise((resolve) => {
+      new DlgRename(title, true, width, name, resolve);
     });
   }
   public static async editCurve(title: string, width?: number, height?: number): Promise<Interpolator> {

@@ -110,6 +110,7 @@ export class CurveEditor {
     this.settingsChanged();
   }
   renderSettings(): void {
+    ImGui.PushID(`${ImGui.GetCurrentWindow().ID}`);
     if (ImGui.CollapsingHeader('Curve Settings')) {
       let changed = false;
 
@@ -148,6 +149,7 @@ export class CurveEditor {
         this.interpolationChanged();
       }
     }
+    ImGui.PopID();
   }
   private updateSettings(): void {
     if (this._timeRangeStartInput[0] >= this._timeRangeEndInput[0]) {
@@ -189,6 +191,7 @@ export class CurveEditor {
     this._points.sort((a, b) => a.x - b.x);
   }
   renderCurveView(canvasSize: ImGui.ImVec2): void {
+    ImGui.PushID(`${ImGui.GetCurrentWindow().ID}`);
     this._canvasSize = new ImGui.ImVec2(Math.max(1, canvasSize.x), Math.max(1, canvasSize.y));
     const cursorPos = ImGui.GetCursorScreenPos();
 
@@ -214,6 +217,7 @@ export class CurveEditor {
       this.handleInteraction(cursorPos);
       this.drawHoverHint(drawList, cursorPos);
     }
+    ImGui.PopID();
   }
   private drawRangeLabels(drawList: ImGui.ImDrawList, cursorPos: ImGui.ImVec2): void {
     const textColor = ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 1, 0.8));
@@ -222,10 +226,7 @@ export class CurveEditor {
     const maxValueText = this._settings.valueRange[1].toFixed(2);
     const maxValueWidth = ImGui.CalcTextSize(maxValueText).x;
     drawList.AddText(
-      new ImGui.ImVec2(
-        cursorPos.x + (this._canvasSize.x - maxValueWidth) / 2,
-        cursorPos.y + padding
-      ),
+      new ImGui.ImVec2(cursorPos.x + (this._canvasSize.x - maxValueWidth) / 2, cursorPos.y + padding),
       textColor,
       maxValueText
     );
@@ -241,10 +242,7 @@ export class CurveEditor {
     );
     const startTimeText = this._settings.timeRange[0].toFixed(2);
     drawList.AddText(
-      new ImGui.ImVec2(
-        cursorPos.x + padding,
-        cursorPos.y + (this._canvasSize.y - fontSize) / 2
-      ),
+      new ImGui.ImVec2(cursorPos.x + padding, cursorPos.y + (this._canvasSize.y - fontSize) / 2),
       textColor,
       startTimeText
     );

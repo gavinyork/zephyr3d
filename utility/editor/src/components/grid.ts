@@ -1,5 +1,11 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { type PropertyAccessor, type PropertyValue, type SerializableClass } from '@zephyr3d/scene';
+import {
+  AssetRegistry,
+  getSerializationInfo,
+  type PropertyAccessor,
+  type PropertyValue,
+  type SerializableClass
+} from '@zephyr3d/scene';
 import type { DBAssetInfo } from '../storage/db';
 
 const tmpProperty: PropertyValue = {
@@ -117,9 +123,10 @@ export class PropertyEditor {
   private _padding: number;
   private _labelPercent: number;
   private _serializationInfo: Map<any, SerializableClass>;
+  private _assetRegistry: AssetRegistry;
   private _dragging: boolean;
   constructor(
-    serializationInfo: Map<any, SerializableClass>,
+    assetRegistry: AssetRegistry,
     top: number,
     bottom: number,
     width: number,
@@ -128,7 +135,8 @@ export class PropertyEditor {
     minWidth: number,
     labelPercent = 0.6
   ) {
-    this._serializationInfo = serializationInfo;
+    this._assetRegistry = assetRegistry;
+    this._serializationInfo = getSerializationInfo(assetRegistry);
     this._rootGroup = new PropertyGroup('Root', this);
     this._top = top;
     this._bottom = bottom;
@@ -397,6 +405,10 @@ export class PropertyEditor {
       }
       case 'object': {
         const val = tmpProperty.str as [string];
+        const assetInfo = this._assetRegistry.getAssetInfo(val[0]);
+        if (assetInfo) {
+          val[0] = assetInfo.name;
+        }
         changed = ImGui.InputText('##value', val, undefined, ImGui.InputTextFlags.ReadOnly);
         if (ImGui.BeginDragDropTarget()) {
           const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
