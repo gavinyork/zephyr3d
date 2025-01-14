@@ -186,7 +186,7 @@ export class SceneView extends BaseView<SceneModel> {
       8,
       600,
       200,
-      0.6
+      0.4
     );
   }
   get toolbar() {

@@ -133,7 +133,7 @@ export class PropertyEditor {
     padding: number,
     maxWidth: number,
     minWidth: number,
-    labelPercent = 0.6
+    labelPercent = 0.4
   ) {
     this._assetRegistry = assetRegistry;
     this._serializationInfo = getSerializationInfo(assetRegistry);

@@ -160,12 +160,6 @@ export class AssetHierarchy {
       });
     });
   }
-  deleteAsset(asset: DBAssetInfo) {
-    if (this._selectedAsset === asset) {
-      this._selectedAsset = null;
-    }
-    Database.deleteAsset(asset.uuid);
-  }
   async doUploadAssetFile(type: AssetType, files: File[]) {
     for (const file of files) {
       const extensions =
@@ -280,10 +274,7 @@ export class AssetHierarchy {
           }
         });
       }
-      if (ImGui.MenuItem('Delete')) {
-        this.deleteAsset(asset);
-      }
-      if (ImGui.MenuItem('Download')) {
+      if (ImGui.MenuItem('Export')) {
         Database.getPackage(asset.pkg)
           .then((pkg) => {
             Database.downloadBlob(pkg.blob, `${pkg.name}.zip`);
