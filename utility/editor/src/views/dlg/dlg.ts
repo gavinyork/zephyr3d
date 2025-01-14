@@ -1,10 +1,9 @@
 import { Interpolator } from '@zephyr3d/base';
-import { DlgCurveEditor } from './curveeditor';
+import { DlgCurveEditor } from './curveeditordlg';
 import type { DBSceneInfo } from '../../storage/db';
 import { DlgMessage } from './messagedlg';
 import { DlgPromptName } from './newscenedlg';
 import { DlgOpenScene } from './openscenedlg';
-import { Texture2D } from '@zephyr3d/device';
 import { DlgRampTextureCreator } from './ramptexture';
 
 export class Dialog {
