@@ -1,6 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { ModalDialog } from '../../components/modal';
-import { Texture2D } from '@zephyr3d/device';
+import type { Texture2D } from '@zephyr3d/device';
 import { Application } from '@zephyr3d/scene';
 import { Interpolator } from '@zephyr3d/base';
 import { CurveEditor } from '../../components/curveeditor';
@@ -17,6 +17,7 @@ export class DlgRampTextureCreator extends ModalDialog {
   private _hoverKeyframe: number;
   private _markerWidth: number;
   private _alphaEditor: CurveEditor;
+  private _dragStartPos: { x: number; time: number };
   constructor(
     id: string,
     open: boolean,
@@ -36,6 +37,7 @@ export class DlgRampTextureCreator extends ModalDialog {
     this._isDragging = false;
     this._hoverKeyframe = -1;
     this._markerWidth = 4;
+    this._dragStartPos = null;
     this._alphaEditor = new CurveEditor({
       timeRange: [0, 1],
       valueRange: [0, 1],
@@ -65,23 +67,35 @@ export class DlgRampTextureCreator extends ModalDialog {
     const mousePos = ImGui.GetMousePos();
     const canvasPos = ImGui.GetCursorScreenPos();
     const canvasSize = ImGui.GetContentRegionAvail();
-    const markerSize = 10; // 关键帧标记的大小
-    const relX = (mousePos.x - canvasPos.x) / canvasSize.x;
-    const relY = (mousePos.y - canvasPos.y) / canvasSize.y;
-    this._hoverKeyframe = -1;
+    const markerSize = 10;
+
     const timeStart = this._keyframes[0].time;
     const timeEnd = this._keyframes[this._keyframes.length - 1].time;
     const timeDelta = timeEnd - timeStart;
+
+    const relX = (mousePos.x - canvasPos.x) / canvasSize.x;
+    const currentTime = timeStart + relX * timeDelta;
+
+    this._hoverKeyframe = -1;
     this._keyframes.forEach((kf, index) => {
-      const markerX = canvasPos.x + (kf.time - timeStart) / timeDelta * canvasSize.x;
-      if (Math.abs(mousePos.x - markerX) < markerSize && relY >= 0 && relY <= 1) {
+      const markerX = canvasPos.x + ((kf.time - timeStart) / timeDelta) * canvasSize.x;
+      if (
+        Math.abs(mousePos.x - markerX) < markerSize &&
+        mousePos.y >= canvasPos.y &&
+        mousePos.y <= canvasPos.y + canvasSize.y
+      ) {
         this._hoverKeyframe = index;
       }
     });
+
     if (ImGui.IsMouseClicked(0)) {
       if (this._hoverKeyframe !== -1) {
         this._selectedKeyframe = this._hoverKeyframe;
-        this._isDragging = true;
+        const kf = this._keyframes[this._selectedKeyframe];
+        this._dragStartPos = {
+          x: mousePos.x,
+          time: kf.time
+        };
       } else {
         const inCanvas =
           mousePos.x >= canvasPos.x &&
@@ -90,18 +104,25 @@ export class DlgRampTextureCreator extends ModalDialog {
           mousePos.y <= canvasPos.y + canvasSize.y;
 
         if (inCanvas) {
-          const t = Math.max(0, Math.min(1, relX));
           const newColor = new Float32Array(3);
-          this._interpolator.interpolate(t, newColor);
+          this._interpolator.interpolate(currentTime, newColor);
           const newKeyframe = {
-            time: t,
+            time: currentTime,
             color: newColor
           };
           this._keyframes.push(newKeyframe);
+          this._dragStartPos = {
+            x: mousePos.x,
+            time: currentTime
+          };
           this.updateInterpolator();
-          this._selectedKeyframe = this._keyframes.findIndex((kf) => kf === newKeyframe);
-          this._hoverKeyframe = this._selectedKeyframe;
-          this._isDragging = true;
+          this._selectedKeyframe = this._keyframes.findIndex(
+            (kf) =>
+              kf.time === currentTime &&
+              kf.color[0] === newColor[0] &&
+              kf.color[1] === newColor[1] &&
+              kf.color[2] === newColor[2]
+          );
         }
       }
     } else if (ImGui.IsMouseClicked(1)) {
@@ -111,19 +132,35 @@ export class DlgRampTextureCreator extends ModalDialog {
         this._hoverKeyframe !== this._keyframes.length - 1
       ) {
         this._keyframes.splice(this._hoverKeyframe, 1);
-        this._selectedKeyframe = -1;
+        if (this._selectedKeyframe === this._hoverKeyframe) {
+          this._selectedKeyframe = -1;
+          this._dragStartPos = null;
+        } else if (this._selectedKeyframe > this._hoverKeyframe) {
+          this._selectedKeyframe--;
+        }
         this.updateInterpolator();
       }
     }
-    if (this._isDragging && this._selectedKeyframe !== -1) {
+    // 处理拖动
+    if (this._selectedKeyframe !== -1 && this._dragStartPos) {
       if (ImGui.IsMouseDown(0)) {
-        const kf = this._keyframes[this._selectedKeyframe];
-        if (this._selectedKeyframe > 0 && this._selectedKeyframe < this._keyframes.length - 1) {
-          kf.time = Math.max(0, Math.min(1, relX));
+        const dragDelta = mousePos.x - this._dragStartPos.x;
+        if (Math.abs(dragDelta) > 2 || this._isDragging) {
+          this._isDragging = true;
+          const draggedKeyframe = this._keyframes[this._selectedKeyframe];
+          if (this._selectedKeyframe > 0 && this._selectedKeyframe < this._keyframes.length - 1) {
+            const timeDelta = (dragDelta / canvasSize.x) * (timeEnd - timeStart);
+            draggedKeyframe.time = Math.max(
+              timeStart,
+              Math.min(timeEnd, this._dragStartPos.time + timeDelta)
+            );
+            this.updateInterpolator();
+            this._selectedKeyframe = this._keyframes.findIndex((kf) => kf === draggedKeyframe);
+          }
         }
-        this.updateInterpolator();
       } else {
         this._isDragging = false;
+        this._dragStartPos = null;
       }
     }
     const drawList = ImGui.GetWindowDrawList();
@@ -143,7 +180,7 @@ export class DlgRampTextureCreator extends ModalDialog {
       );
     }
     this._keyframes.forEach((kf, index) => {
-      const markerX = canvasPos.x + kf.time * canvasSize.x;
+      const markerX = canvasPos.x + ((kf.time - timeStart) / timeDelta) * canvasSize.x;
       const isSelected = index === this._selectedKeyframe;
       const isHovered = index === this._hoverKeyframe;
       drawList.AddRectFilled(
@@ -186,21 +223,14 @@ export class DlgRampTextureCreator extends ModalDialog {
     if (!this._texture) {
       this.updateTexture();
     }
-
-    // 渐变编辑器
     if (ImGui.BeginChild('##Editor', new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing() * 2), true)) {
       this.handleEditorInteraction();
-
-      // 确保在每帧都能接收鼠标输入
       ImGui.InvisibleButton('##canvas', ImGui.GetContentRegionAvail());
     }
     ImGui.EndChild();
-
-    // 选中关键帧的颜色编辑器
     if (this._selectedKeyframe !== -1) {
       const kf = this._keyframes[this._selectedKeyframe];
       const color = [kf.color[0], kf.color[1], kf.color[2]] as [number, number, number];
-
       ImGui.SetNextItemWidth(200);
       if (ImGui.ColorEdit3('##Color', color)) {
         kf.color[0] = color[0];
@@ -209,8 +239,6 @@ export class DlgRampTextureCreator extends ModalDialog {
         this.updateInterpolator();
       }
     }
-
-    // 按钮
     if (ImGui.Button('Ok')) {
       this._resolve(this._textureData);
       this._texture.dispose();
@@ -223,7 +251,6 @@ export class DlgRampTextureCreator extends ModalDialog {
       this.close();
     }
   }
-
   private updateTexture() {
     const p = new Float32Array(3);
     for (let i = 0; i < this._textureWidth; i++) {

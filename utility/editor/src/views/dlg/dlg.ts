@@ -1,4 +1,4 @@
-import { Interpolator } from '@zephyr3d/base';
+import type { Interpolator } from '@zephyr3d/base';
 import { DlgCurveEditor } from './curveeditordlg';
 import type { DBSceneInfo } from '../../storage/db';
 import { DlgMessage } from './messagedlg';

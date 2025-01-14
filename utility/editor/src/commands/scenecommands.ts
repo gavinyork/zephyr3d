@@ -37,7 +37,8 @@ export class AddAssetCommand implements Command {
   execute() {
     if (!this._loading) {
       this._loading = true;
-      this._assetRegistry.fetchModel(this._asset.uuid, this._scene, { enableInstancing: true })
+      this._assetRegistry
+        .fetchModel(this._asset.uuid, this._scene, { enableInstancing: true })
         .then((asset) => {
           if (!this._loading) {
             this._assetRegistry.releaseAsset(asset.group);

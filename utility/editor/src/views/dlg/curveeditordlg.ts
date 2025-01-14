@@ -1,4 +1,4 @@
-import { Interpolator } from '@zephyr3d/base';
+import type { Interpolator } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 import { ModalDialog } from '../../components/modal';
 import { CurveEditor } from '../../components/curveeditor';

@@ -1,7 +1,7 @@
 import { Interpolator } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 
-export type CurveInterpolation = 'linear' |'step' | 'cubicspline-natural';
+export type CurveInterpolation = 'linear' | 'step' | 'cubicspline-natural';
 
 interface Point {
   x: number;
@@ -528,7 +528,8 @@ export class CurveEditor {
   private valueToScreen(value: number): number {
     return (
       (1 -
-        (value - this._settings.valueRange[0]) / (this._settings.valueRange[1] - this._settings.valueRange[0])) *
+        (value - this._settings.valueRange[0]) /
+          (this._settings.valueRange[1] - this._settings.valueRange[0])) *
       this._canvasSize.y
     );
   }

@@ -2,7 +2,7 @@ import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinAlbedoColor } from './mixins/albedocolor';
 import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
-import { DrawContext } from '../render';
+import type { DrawContext } from '../render';
 import { Vector4 } from '@zephyr3d/base';
 
 /**

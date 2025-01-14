@@ -7,7 +7,7 @@ import { AssetStore } from '../helpers/assetstore';
 import { Dialog } from '../views/dlg/dlg';
 import { enableWorkspaceDragging } from './dragdrop';
 import { eventBus } from '../core/eventbus';
-import type { AssetInfo, AssetType } from '@zephyr3d/scene';
+import type { AssetType } from '@zephyr3d/scene';
 import type { AssetRegistry } from '@zephyr3d/scene';
 
 export class AssetHierarchy {

@@ -122,7 +122,12 @@ export class AssetRegistry {
     }
     this._assetMap.clear();
   }
-  protected async doFetchModel(name: string, scene: Scene, options?: ModelFetchOptions, request?: HttpRequest) {
+  protected async doFetchModel(
+    name: string,
+    scene: Scene,
+    options?: ModelFetchOptions,
+    request?: HttpRequest
+  ) {
     const info = this._assetMap.get(name);
     if (!info || info.type !== 'model') {
       return null;
