@@ -16,6 +16,8 @@ interface CurveSettings {
   pointColor: number;
   selectedPointColor: number;
   backgroundColor: number;
+  drawLabels: boolean;
+  drawHints: boolean;
   interpolationType: CurveInterpolation;
 }
 
@@ -38,7 +40,7 @@ export class CurveEditor {
   private _cachedCurvePoints: Array<{ x: number; y: number }>;
   private _curveDirty: boolean;
 
-  constructor(settings?: Partial<CurveSettings>) {
+  constructor(points?: Point[], settings?: Partial<CurveSettings>) {
     // Default settings
     this._settings = {
       timeRange: [0, 1],
@@ -48,6 +50,8 @@ export class CurveEditor {
       pointColor: ImGui.GetColorU32(new ImGui.ImVec4(0.7, 0.7, 0.7, 1)),
       selectedPointColor: ImGui.GetColorU32(new ImGui.ImVec4(1, 0.5, 0, 1)),
       backgroundColor: ImGui.GetColorU32(new ImGui.ImVec4(0.2, 0.2, 0.2, 1)),
+      drawLabels: true,
+      drawHints: true,
       interpolationType: 'cubicspline-natural',
       ...settings
     };
@@ -55,7 +59,7 @@ export class CurveEditor {
     this._timeRangeEndInput = [this._settings.timeRange[1]];
     this._valueRangeStartInput = [this._settings.valueRange[0]];
     this._valueRangeEndInput = [this._settings.valueRange[1]];
-    this._points = [
+    this._points = points ?? [
       { x: this._settings.timeRange[0], value: 0 },
       { x: this._settings.timeRange[1], value: 0 }
     ];
@@ -63,8 +67,7 @@ export class CurveEditor {
     this._curveActive = false;
     this._selectedPointIndex = -1;
     this._cachedCurvePoints = [];
-    this._curveDirty = true;
-    this.updateInterpolators();
+    this.updateInterpolator();
   }
   get interpolator() {
     return this._interpolator;
@@ -159,12 +162,10 @@ export class CurveEditor {
   }
   private settingsChanged() {
     this.normalizePoints();
-    this.updateInterpolators();
-    this._curveDirty = true;
+    this.updateInterpolator();
   }
   private interpolationChanged() {
-    this.updateInterpolators();
-    this._curveDirty = true;
+    this.updateInterpolator();
     this._cachedCurvePoints = [];
   }
   private normalizePoints(): void {
@@ -206,8 +207,9 @@ export class CurveEditor {
     }
     this.drawPoints(drawList, cursorPos);
 
-    this.drawRangeLabels(drawList, cursorPos);
-
+    if (this._settings.drawLabels) {
+      this.drawRangeLabels(drawList, cursorPos);
+    }
     if (isCanvasHovered) {
       this.handleInteraction(cursorPos);
       this.drawHoverHint(drawList, cursorPos);
@@ -217,45 +219,41 @@ export class CurveEditor {
     const textColor = ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 1, 0.8));
     const padding = 5;
     const fontSize = ImGui.GetFontSize();
-
     const maxValueText = this._settings.valueRange[1].toFixed(2);
     const maxValueWidth = ImGui.CalcTextSize(maxValueText).x;
     drawList.AddText(
       new ImGui.ImVec2(
-        cursorPos.x + (this._canvasSize.x - maxValueWidth) / 2, // 水平居中
+        cursorPos.x + (this._canvasSize.x - maxValueWidth) / 2,
         cursorPos.y + padding
       ),
       textColor,
       maxValueText
     );
-
     const minValueText = this._settings.valueRange[0].toFixed(2);
     const minValueWidth = ImGui.CalcTextSize(minValueText).x;
     drawList.AddText(
       new ImGui.ImVec2(
-        cursorPos.x + (this._canvasSize.x - minValueWidth) / 2, // 水平居中
+        cursorPos.x + (this._canvasSize.x - minValueWidth) / 2,
         cursorPos.y + this._canvasSize.y - fontSize - padding
       ),
       textColor,
       minValueText
     );
-
     const startTimeText = this._settings.timeRange[0].toFixed(2);
     drawList.AddText(
       new ImGui.ImVec2(
         cursorPos.x + padding,
-        cursorPos.y + (this._canvasSize.y - fontSize) / 2 // 垂直居中
+        cursorPos.y + (this._canvasSize.y - fontSize) / 2
       ),
       textColor,
       startTimeText
     );
-
     const endTimeText = this._settings.timeRange[1].toFixed(2);
     const endTimeWidth = ImGui.CalcTextSize(endTimeText).x;
     drawList.AddText(
       new ImGui.ImVec2(
         cursorPos.x + this._canvasSize.x - endTimeWidth - padding,
-        cursorPos.y + (this._canvasSize.y - fontSize) / 2 // 垂直居中
+        cursorPos.y + (this._canvasSize.y - fontSize) / 2
       ),
       textColor,
       endTimeText
@@ -264,33 +262,22 @@ export class CurveEditor {
   private drawHoverHint(drawList: ImGui.ImDrawList, cursorPos: ImGui.ImVec2): void {
     const mousePos = ImGui.GetMousePos();
     const relativeMousePos = new ImGui.ImVec2(mousePos.x - cursorPos.x, mousePos.y - cursorPos.y);
-
     if (!this.isPointInCanvas(relativeMousePos)) {
       return;
     }
-
     const worldPos = this.screenToWorld(relativeMousePos.x, relativeMousePos.y);
     const curveValue = this.findNearestCurveValue(worldPos.x);
-
     if (curveValue === null) {
       return;
     }
-
-    // 计算曲线上对应点的屏幕坐标
     const curvePointScreen = this.worldToScreen(worldPos.x, curveValue);
     const distance = Math.abs(curvePointScreen.y - relativeMousePos.y);
-
     this._curveActive = distance < 10;
-    if (this._curveActive) {
-      const pointIndex = this.findPointNear(relativeMousePos);
-      if (pointIndex >= 0) {
-        const point = this._points[pointIndex];
-        this.drawHint(point.x, point.value, cursorPos, relativeMousePos, drawList);
-      }
-      return;
+    const pointIndex = this.findPointNear(relativeMousePos);
+    if (pointIndex >= 0) {
+      const point = this._points[pointIndex];
+      this.drawHint(point.x, point.value, cursorPos, relativeMousePos, drawList);
     }
-
-    // 绘制垂直参考线
     const lineColor = ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 1, 0.3));
     drawList.AddLine(
       new ImGui.ImVec2(cursorPos.x + curvePointScreen.x, cursorPos.y),
@@ -298,23 +285,21 @@ export class CurveEditor {
       lineColor,
       1.0
     );
-
-    // 在曲线上标记当前点
-    const pointColor = ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 0, 1)); // 黄色标记点
-    drawList.AddCircleFilled(
-      new ImGui.ImVec2(cursorPos.x + curvePointScreen.x, cursorPos.y + curvePointScreen.y),
-      4,
-      pointColor
-    );
-    // 绘制点的外圈
-    drawList.AddCircle(
-      new ImGui.ImVec2(cursorPos.x + curvePointScreen.x, cursorPos.y + curvePointScreen.y),
-      5,
-      ImGui.GetColorU32(new ImGui.ImVec4(0, 0, 0, 1)),
-      0,
-      1.5
-    );
-
+    if (!this._curveActive) {
+      const pointColor = ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 0, 1)); // 黄色标记点
+      drawList.AddCircleFilled(
+        new ImGui.ImVec2(cursorPos.x + curvePointScreen.x, cursorPos.y + curvePointScreen.y),
+        4,
+        pointColor
+      );
+      drawList.AddCircle(
+        new ImGui.ImVec2(cursorPos.x + curvePointScreen.x, cursorPos.y + curvePointScreen.y),
+        5,
+        ImGui.GetColorU32(new ImGui.ImVec4(0, 0, 0, 1)),
+        0,
+        1.5
+      );
+    }
     this.drawHint(worldPos.x, curveValue, cursorPos, relativeMousePos, drawList);
   }
   private drawHint(
@@ -324,31 +309,28 @@ export class CurveEditor {
     mousePos: ImGui.Vec2,
     drawList: ImGui.DrawList
   ) {
+    if (!this._settings.drawHints) {
+      return;
+    }
     const hintText = `Time: ${time.toFixed(2)}\nValue: ${value.toFixed(2)}`;
     const textSize = ImGui.CalcTextSize(hintText);
     const padding = 5;
     const backgroundColor = ImGui.GetColorU32(new ImGui.ImVec4(0, 0, 0, 0.8));
     const textColor = ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 1, 1));
-
     let hintX = cursorPos.x + mousePos.x + 10;
     let hintY = cursorPos.y + mousePos.y - textSize.y - padding * 2;
-
     if (hintX + textSize.x + padding * 2 > cursorPos.x + this._canvasSize.x) {
       hintX = cursorPos.x + mousePos.x - textSize.x - padding * 2 - 10;
     }
     if (hintY < cursorPos.y) {
       hintY = cursorPos.y + mousePos.y + padding;
     }
-
-    // 绘制提示框背景
     drawList.AddRectFilled(
       new ImGui.ImVec2(hintX, hintY),
       new ImGui.ImVec2(hintX + textSize.x + padding * 2, hintY + textSize.y + padding * 2),
       backgroundColor,
       4
     );
-
-    // 绘制提示文本
     drawList.AddText(new ImGui.ImVec2(hintX + padding, hintY + padding), textColor, hintText);
   }
   private findNearestCurveValue(time: number): number | null {
@@ -434,21 +416,17 @@ export class CurveEditor {
       this._cachedCurvePoints = [];
       return;
     }
-
     const interpolator = this._interpolator;
     const numSegments = Math.min(Math.ceil(this._canvasSize.x / 2), 100);
     const result = new Float32Array(1);
-
     this._cachedCurvePoints = [];
     const timeRange = this._points[this._points.length - 1].x - this._points[0].x;
     const step = timeRange / numSegments;
-
     for (let i = 0; i <= numSegments; i++) {
       const x = this._points[0].x + i * step;
       interpolator.interpolate(x, result);
       this._cachedCurvePoints.push({ x, y: result[0] });
     }
-
     this._curveDirty = false;
   }
   private drawPoints(drawList: ImGui.ImDrawList, cursorPos: ImGui.ImVec2): void {
@@ -464,11 +442,9 @@ export class CurveEditor {
       );
     });
   }
-
   private handleInteraction(cursorPos: ImGui.ImVec2): void {
     const mousePos = ImGui.GetMousePos();
     const relativeMousePos = new ImGui.ImVec2(mousePos.x - cursorPos.x, mousePos.y - cursorPos.y);
-
     if (ImGui.IsMouseClicked(0)) {
       const clickedPoint = this.findPointNear(relativeMousePos);
       if (clickedPoint !== -1) {
@@ -479,14 +455,12 @@ export class CurveEditor {
         this.addPoint(worldPos.x, worldPos.y);
       }
     }
-
     if (ImGui.IsMouseClicked(1)) {
       const clickedPoint = this.findPointNear(relativeMousePos);
       if (clickedPoint !== -1 && clickedPoint !== 0 && clickedPoint !== this._points.length - 1) {
         this.removePoint(clickedPoint);
       }
     }
-
     if (this._isDragging && this._selectedPointIndex !== -1) {
       if (ImGui.IsMouseDown(0)) {
         const worldPos = this.screenToWorld(relativeMousePos.x, relativeMousePos.y);
@@ -503,28 +477,24 @@ export class CurveEditor {
       }
     }
   }
-
   private worldToScreen(x: number, y: number): { x: number; y: number } {
     return {
       x: this.timeToScreen(x),
       y: this.valueToScreen(y)
     };
   }
-
   private screenToWorld(x: number, y: number): { x: number; y: number } {
     return {
       x: this.screenToTime(x),
       y: this.screenToValue(y)
     };
   }
-
   private timeToScreen(time: number): number {
     return (
       ((time - this._settings.timeRange[0]) / (this._settings.timeRange[1] - this._settings.timeRange[0])) *
       this._canvasSize.x
     );
   }
-
   private valueToScreen(value: number): number {
     return (
       (1 -
@@ -533,25 +503,21 @@ export class CurveEditor {
       this._canvasSize.y
     );
   }
-
   private screenToTime(x: number): number {
     return (
       this._settings.timeRange[0] +
       (x / this._canvasSize.x) * (this._settings.timeRange[1] - this._settings.timeRange[0])
     );
   }
-
   private screenToValue(y: number): number {
     return (
       this._settings.valueRange[0] +
       (1 - y / this._canvasSize.y) * (this._settings.valueRange[1] - this._settings.valueRange[0])
     );
   }
-
   private isPointInCanvas(point: ImGui.ImVec2): boolean {
     return point.x >= 0 && point.x <= this._canvasSize.x && point.y >= 0 && point.y <= this._canvasSize.y;
   }
-
   private findPointNear(screenPos: ImGui.ImVec2, threshold: number = 10): number {
     for (let i = 0; i < this._points.length; i++) {
       const pointScreen = this.worldToScreen(this._points[i].x, this._points[i].value);
@@ -563,85 +529,62 @@ export class CurveEditor {
     }
     return -1;
   }
-
   private addPoint(time: number, value: number): void {
     const minTime = this._points[0].x;
     const maxTime = this._points[this._points.length - 1].x;
     time = Math.max(minTime + 0.001, Math.min(maxTime - 0.001, time));
-
     value = Math.max(this._settings.valueRange[0], Math.min(this._settings.valueRange[1], value));
-
     const newPoint: Point = {
       x: time,
       value: value
     };
-
     this._points.push(newPoint);
     this.sortPoints();
-
-    this.updateInterpolators();
-
+    this.updateInterpolator();
     this._selectedPointIndex = this._points.findIndex((p) => p === newPoint);
-
-    this._curveDirty = true;
   }
-
   private removePoint(index: number): void {
-    if (index < 0 || index >= this._points.length) return;
-
+    if (index < 0 || index >= this._points.length) {
+      return;
+    }
     if (this._points.length <= 2) {
       ImGui.OpenPopup('Cannot Remove Point');
       return;
     }
-
     this._points.splice(index, 1);
-
     if (this._selectedPointIndex === index) {
       this._selectedPointIndex = -1;
     } else if (this._selectedPointIndex > index) {
       this._selectedPointIndex--;
     }
-
-    this.updateInterpolators();
-
-    this._curveDirty = true;
+    this.updateInterpolator();
   }
-
   private updatePointValue(index: number, newValue: number): void {
-    if (index < 0 || index >= this._points.length) return;
-
+    if (index < 0 || index >= this._points.length) {
+      return;
+    }
     newValue = Math.max(this._settings.valueRange[0], Math.min(this._settings.valueRange[1], newValue));
-
     this._points[index].value = newValue;
-
-    this.updateInterpolators();
-
-    this._curveDirty = true;
+    this.updateInterpolator();
   }
-
   private updatePointPosition(index: number, time: number, value: number): void {
-    if (index <= 0 || index >= this._points.length - 1) return; // 保护首尾点的位置
-
+    if (index <= 0 || index >= this._points.length - 1) {
+      return; // 保护首尾点的位置
+    }
     const minTime = this._points[0].x;
     const maxTime = this._points[this._points.length - 1].x;
     time = Math.max(minTime + 0.001, Math.min(maxTime - 0.001, time));
-
     value = Math.max(this._settings.valueRange[0], Math.min(this._settings.valueRange[1], value));
-
     this._points[index].x = time;
     this._points[index].value = value;
     this.sortPoints();
-
     if (this._selectedPointIndex === index) {
       this._selectedPointIndex = this._points.findIndex((p) => p.x === time);
     }
-
-    this.updateInterpolators();
-
-    this._curveDirty = true;
+    this.updateInterpolator();
   }
 
-  private updateInterpolators(): void {
+  private updateInterpolator(): void {
     if (this._points.length < 2) {
       this._interpolator = null;
       return;
@@ -655,7 +598,6 @@ export class CurveEditor {
     this._interpolator = new Interpolator(this._settings.interpolationType, 'number', inputs, outputs);
     this._curveDirty = true;
   }
-
   getValue(time: number): number {
     if (!this._interpolator || this._points.length < 2) {
       return 0;

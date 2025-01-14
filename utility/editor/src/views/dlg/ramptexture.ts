@@ -9,6 +9,7 @@ export class DlgRampTextureCreator extends ModalDialog {
   private _textureWidth: number;
   private _texture: Texture2D;
   private _interpolator: Interpolator;
+  private _alphaInterpolator: Interpolator;
   private _textureData: Uint8ClampedArray;
   private _resolve: (data: Uint8ClampedArray) => void;
   private _keyframes: Array<{ time: number; color: Float32Array }>;
@@ -17,6 +18,7 @@ export class DlgRampTextureCreator extends ModalDialog {
   private _hoverKeyframe: number;
   private _markerWidth: number;
   private _alphaEditor: CurveEditor;
+  private _showAlpha: boolean;
   private _dragStartPos: { x: number; time: number };
   constructor(
     id: string,
@@ -37,14 +39,23 @@ export class DlgRampTextureCreator extends ModalDialog {
     this._isDragging = false;
     this._hoverKeyframe = -1;
     this._markerWidth = 4;
+    this._showAlpha = true;
     this._dragStartPos = null;
-    this._alphaEditor = new CurveEditor({
+    this._alphaEditor = new CurveEditor([{
+      x: 0,
+      value: 1
+    }, {
+      x: 1,
+      value: 1
+    }], {
       timeRange: [0, 1],
       valueRange: [0, 1],
-      interpolationType: 'linear'
+      interpolationType: 'linear',
+      drawLabels: false,
+      drawHints: false
     });
-
     this.updateInterpolator();
+    this._alphaInterpolator = this._alphaEditor.interpolator;
     this._resolve = resolve;
   }
   private updateInterpolator() {
@@ -169,16 +180,8 @@ export class DlgRampTextureCreator extends ModalDialog {
       new ImGui.ImVec2(canvasPos.x + canvasSize.x, canvasPos.y + canvasSize.y),
       ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.2, 0.2, 0.2, 1))
     );
-    for (let i = 0; i < canvasSize.x; i++) {
-      const t = i / canvasSize.x;
-      const color = new Float32Array(3);
-      this._interpolator.interpolate(t, color);
-      drawList.AddRectFilled(
-        new ImGui.ImVec2(canvasPos.x + i, canvasPos.y),
-        new ImGui.ImVec2(canvasPos.x + i + 1, canvasPos.y + canvasSize.y),
-        ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(color[0], color[1], color[2], 1))
-      );
-    }
+    this.drawCheckerboard(drawList, canvasPos, canvasSize, 10, 10);
+    drawList.AddImage(this._texture, canvasPos, new ImGui.ImVec2(canvasPos.x + canvasSize.x, canvasPos.y + canvasSize.y))
     this._keyframes.forEach((kf, index) => {
       const markerX = canvasPos.x + ((kf.time - timeStart) / timeDelta) * canvasSize.x;
       const isSelected = index === this._selectedKeyframe;
@@ -218,29 +221,55 @@ export class DlgRampTextureCreator extends ModalDialog {
       }
     });
   }
-
   doRender(): void {
-    if (!this._texture) {
-      this.updateTexture();
-    }
-    if (ImGui.BeginChild('##Editor', new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing() * 2), true)) {
-      this.handleEditorInteraction();
-      ImGui.InvisibleButton('##canvas', ImGui.GetContentRegionAvail());
-    }
-    ImGui.EndChild();
-    if (this._selectedKeyframe !== -1) {
-      const kf = this._keyframes[this._selectedKeyframe];
-      const color = [kf.color[0], kf.color[1], kf.color[2]] as [number, number, number];
-      ImGui.SetNextItemWidth(200);
-      if (ImGui.ColorEdit3('##Color', color)) {
-        kf.color[0] = color[0];
-        kf.color[1] = color[1];
-        kf.color[2] = color[2];
-        this.updateInterpolator();
+    if (!this._texture || this._alphaEditor.interpolator !== this._alphaInterpolator) {
+      this._alphaInterpolator = this._alphaEditor.interpolator;
+      if (this._showAlpha) {
+        this.updateTexture();
       }
     }
+    const height = (ImGui.GetContentRegionAvail().y - ImGui.GetFrameHeightWithSpacing() - ImGui.GetStyle().ItemSpacing.y) >> 1;
+    if (ImGui.BeginChild(`##${this.id}_RGB_EDITOR`, new ImGui.ImVec2(0, height), true, ImGui.WindowFlags.NoScrollbar)) {
+      ImGui.SetNextWindowBgAlpha(1);
+      if (ImGui.BeginChild(`##${this.id}_CANVAS`, new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing())), true, ImGui.WindowFlags.NoScrollbar) {
+        this.handleEditorInteraction();
+        ImGui.InvisibleButton('##canvas', ImGui.GetContentRegionAvail());
+      }
+      ImGui.EndChild();
+      if (this._selectedKeyframe !== -1) {
+        const kf = this._keyframes[this._selectedKeyframe];
+        const color = [kf.color[0], kf.color[1], kf.color[2]] as [number, number, number];
+        ImGui.Text('RGB');
+        ImGui.SameLine(ImGui.GetWindowWidth() - 200 - ImGui.GetStyle().WindowPadding.x);
+        ImGui.SetNextItemWidth(200);
+        if (ImGui.ColorEdit3('##Color', color)) {
+          kf.color[0] = color[0];
+          kf.color[1] = color[1];
+          kf.color[2] = color[2];
+          this.updateInterpolator();
+        }
+      }
+    }
+    ImGui.EndChild();
+    if (ImGui.BeginChild(`##${this.id}_ALPHA_EDITOR`, new ImGui.ImVec2(0, height), true, ImGui.WindowFlags.NoScrollbar)) {
+      if (ImGui.BeginChild(`##${this.id}_CURVE_EDITOR`, new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing())), true, ImGui.WindowFlags.NoScrollbar) {
+        this._alphaEditor.renderCurveView(ImGui.GetContentRegionAvail());
+      }
+      ImGui.EndChild();
+      const showAlpha = [this._showAlpha] as [boolean];
+      if (ImGui.Checkbox('Show Alpha', showAlpha)) {
+        this._showAlpha = showAlpha[0];
+        this.updateTexture();
+      }
+      ImGui.Text('Alpha');
+    }
+    ImGui.EndChild();
     if (ImGui.Button('Ok')) {
-      this._resolve(this._textureData);
+      if (!this._showAlpha) {
+        this._showAlpha = true;
+        this.updateTexture(false);
+        this._resolve(this._textureData);
+      }
       this._texture.dispose();
       this.close();
     }
@@ -251,7 +280,27 @@ export class DlgRampTextureCreator extends ModalDialog {
       this.close();
     }
   }
-  private updateTexture() {
+  private drawCheckerboard(drawList: ImGui.DrawList, pos: ImGui.ImVec2, size: ImGui.ImVec2, squaresSizeX: number, squaresSizeY: number) {
+    const col1 = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1, 1, 1, 1))
+    const col2 = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.5, 1))
+    const dimX = Math.ceil(size.x / squaresSizeX);
+    const dimY = Math.ceil(size.y / squaresSizeY);
+    for (let y = 0; y < dimY; y++) {
+      for (let x = 0; x < dimX; x++) {
+        const squarePosStart = new ImGui.ImVec2(
+          pos.x + x * squaresSizeX,
+          pos.y + y * squaresSizeY
+        );
+        const squarePosEnd = new ImGui.ImVec2(
+          Math.min(pos.x + size.x, squarePosStart.x + squaresSizeX),
+          Math.min(pos.y + size.y, squarePosStart.y + squaresSizeY)
+        );
+        const col = ((x + y) % 2) == 0 ? col1 : col2;
+        drawList.AddRectFilled(squarePosStart, squarePosEnd, col);
+      }
+    }
+  }
+  private updateTexture(changTexture = true) {
     const p = new Float32Array(3);
     for (let i = 0; i < this._textureWidth; i++) {
       const t = i / (this._textureWidth - 1);
@@ -259,16 +308,23 @@ export class DlgRampTextureCreator extends ModalDialog {
       this._textureData[i * 4 + 0] = (p[0] * 255) >> 0;
       this._textureData[i * 4 + 1] = (p[1] * 255) >> 0;
       this._textureData[i * 4 + 2] = (p[2] * 255) >> 0;
-      this._textureData[i * 4 + 3] = 255;
+      if (this._showAlpha) {
+        this._alphaEditor.interpolator.interpolate(t, p);
+        this._textureData[i * 4 + 3] = (p[0] * 255) >> 0;
+      } else {
+        this._textureData[i * 4 + 3] = 255;
+      }
     }
-
     if (!this._texture) {
       this._texture = Application.instance.device.createTexture2D('rgba8unorm', this._textureWidth, 1, {
         samplerOptions: {
           mipFilter: 'none'
         }
       });
+      changTexture = true;
     }
-    this._texture.update(this._textureData, 0, 0, this._textureWidth, 1);
+    if (changTexture) {
+      this._texture.update(this._textureData, 0, 0, this._textureWidth, 1);
+    }
   }
 }
