@@ -8,13 +8,6 @@ import {
 } from '@zephyr3d/scene';
 import type { DBAssetInfo } from '../storage/db';
 
-const tmpProperty: PropertyValue = {
-  num: [0, 0, 0, 0],
-  str: [''],
-  bool: [false],
-  object: []
-};
-
 interface Property<T extends {}> {
   path: string;
   name: string;
@@ -45,6 +38,12 @@ class PropertyGroup {
     this.subgroups = [];
   }
   addProperty(obj: any, value: PropertyAccessor<any>) {
+    const tmpProperty: PropertyValue = {
+      num: [0, 0, 0, 0],
+      str: [''],
+      bool: [false],
+      object: []
+    };
     if (value.type === 'object' && value.objectTypes?.length > 0) {
       const propGroup = this.addGroup(value.name);
       value.get.call(obj, tmpProperty);
@@ -299,6 +298,12 @@ export class PropertyEditor {
     ImGui.SetNextItemWidth(-1); // 使用剩余所有宽度
     const readonly = !value.set;
     let changed = false;
+    const tmpProperty: PropertyValue = {
+      num: [0, 0, 0, 0],
+      str: [''],
+      bool: [false],
+      object: []
+    };
     value.get.call(object, tmpProperty);
     switch (value.type) {
       case 'bool': {
@@ -413,7 +418,7 @@ export class PropertyEditor {
         if (ImGui.BeginDragDropTarget()) {
           const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
           if (payload) {
-            tmpProperty.str[0] = `ASSET:${(payload.Data as DBAssetInfo).uuid}`;
+            tmpProperty.str[0] = (payload.Data as DBAssetInfo).uuid;
             value.set.call(object, tmpProperty);
           }
           ImGui.EndDragDropTarget();

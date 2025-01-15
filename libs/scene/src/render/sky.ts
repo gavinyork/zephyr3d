@@ -89,6 +89,7 @@ export class SkyRenderer {
   private _renderStatesFogScatter: RenderStateSet;
   private _drawGround: boolean;
   private _lastSunDir: Vector3;
+  private _panoramaAsset: string;
   /**
    * Creates an instance of SkyRenderer
    */
@@ -126,6 +127,7 @@ export class SkyRenderer {
     this._renderStatesFogScatter = null;
     this._skyWorldMatrix = defaultSkyWorldMatrix;
     this._lastSunDir = Vector3.zero();
+    this._panoramaAsset = '';
   }
   /** @internal */
   getHash(ctx: DrawContext): string {
@@ -140,6 +142,13 @@ export class SkyRenderer {
       this._skyType = val;
       this.invalidateIBLMaps();
     }
+  }
+  /** @internal */
+  get panoramaTextureAsset() {
+    return this._panoramaAsset;
+  }
+  set panoramaTextureAsset(id: string) {
+    this._panoramaAsset = id;
   }
   /** Whether ground should be rendered */
   get drawGround(): boolean {

@@ -328,19 +328,17 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'PanoramaTexture',
           type: 'object',
-          default: { str: [''] },
           get(this: Scene, value) {
-            const name = this.env.sky.skyboxTexture?.name ?? '';
-            value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+            value.str[0] = this.env.sky.panoramaTextureAsset;
           },
           set(this: Scene, value) {
-            if (value.str[0]?.startsWith('ASSET:')) {
-              const assetId = value.str[0].slice(6);
+            if (value.str[0]) {
+              const assetId = value.str[0];
               const assetInfo = assetRegistry.getAssetInfo(assetId);
               if (assetInfo && assetInfo.type === 'texture') {
                 assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
                   if (tex?.isTexture2D()) {
-                    tex.name = `ASSET:${assetId}`;
+                    tex.name = assetInfo.name;
                     const device = Application.instance.device;
                     const skyBoxTexture =
                       this.env.sky.skyboxTexture ?? device.createCubeTexture('rgba16f', 1024);
@@ -357,9 +355,8 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
                     this.env.sky.skyboxTexture = skyBoxTexture;
                     this.env.light.radianceMap = radianceMap;
                     this.env.light.irradianceMap = irradianceMap;
+                    this.env.sky.panoramaTextureAsset = assetId;
                     assetRegistry.releaseAsset(tex);
-                  } else if (tex?.isTexture2D()) {
-                    tex.name = `ASSET:${assetId}`;
                   } else {
                     console.error('Invalid skybox texture');
                   }
@@ -388,12 +385,13 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
             for (const child of value.object) {
               if (child instanceof SceneNode) {
                 child.parent = this.rootNode;
-              } else if (typeof child === 'string' && child.startsWith('ASSET:')) {
-                const assetId = child.slice(6);
+              } else if (typeof child === 'string' && child) {
+                const assetId = child;
                 const assetInfo = assetRegistry.getAssetInfo(assetId);
                 if (assetInfo?.type === 'model') {
                   assetRegistry.fetchModel(assetId, this).then((modelInfo) => {
                     modelInfo.group.parent = this.rootNode;
+                    modelInfo.group.name = assetInfo.name;
                   });
                 }
               } else {

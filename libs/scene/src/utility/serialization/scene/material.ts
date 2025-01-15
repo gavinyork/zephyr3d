@@ -65,19 +65,17 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
     {
       name: 'OcclusionTexture',
       type: 'object',
-      default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.occlusionTexture?.name ?? '';
-        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+        value.str[0] = assetRegistry.getAssetId(this.occlusionTexture) ?? '';
       },
       set(this: PBRMaterial, value) {
-        if (value.str[0]?.startsWith('ASSET:')) {
-          const assetId = value.str[0].slice(6);
+        if (value.str[0]) {
+          const assetId = value.str[0];
           const assetInfo = assetRegistry.getAssetInfo(assetId);
           if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
               if (tex?.isTexture2D()) {
-                tex.name = `ASSET:${assetId}`;
+                tex.name = assetInfo.name;
                 this.occlusionTexture = tex;
               } else {
                 console.error('Invalid occlusion texture');
@@ -134,17 +132,16 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       type: 'object',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.emissiveTexture?.name ?? '';
-        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+        value.str[0] = assetRegistry.getAssetId(this.emissiveTexture) ?? '';
       },
       set(this: PBRMaterial, value) {
-        if (value.str[0]?.startsWith('ASSET:')) {
-          const assetId = value.str[0].slice(6);
+        if (value.str[0]) {
+          const assetId = value.str[0];
           const assetInfo = assetRegistry.getAssetInfo(assetId);
           if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
               if (tex?.isTexture2D()) {
-                tex.name = `ASSET:${assetId}`;
+                tex.name = assetInfo.name;
                 this.emissiveTexture = tex;
               } else {
                 console.error('Invalid emissive texture');
@@ -187,17 +184,16 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       type: 'object',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.specularTexture?.name ?? '';
-        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+        value.str[0] = assetRegistry.getAssetId(this.specularTexture) ?? '';
       },
       set(this: PBRMaterial, value) {
-        if (value.str[0]?.startsWith('ASSET:')) {
-          const assetId = value.str[0].slice(6);
+        if (value.str[0]) {
+          const assetId = value.str[0];
           const assetInfo = assetRegistry.getAssetInfo(assetId);
           if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
               if (tex?.isTexture2D()) {
-                tex.name = `ASSET:${assetId}`;
+                tex.name = assetInfo.name;
                 this.specularTexture = tex;
               } else {
                 console.error('Invalid specular texture');
@@ -255,17 +251,16 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       type: 'object',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.transmissionTexture?.name ?? '';
-        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+        value.str[0] = assetRegistry.getAssetId(this.transmissionTexture) ?? '';
       },
       set(this: PBRMaterial, value) {
-        if (value.str[0]?.startsWith('ASSET:')) {
-          const assetId = value.str[0].slice(6);
+        if (value.str[0]) {
+          const assetId = value.str[0];
           const assetInfo = assetRegistry.getAssetInfo(assetId);
           if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
               if (tex?.isTexture2D()) {
-                tex.name = `ASSET:${assetId}`;
+                tex.name = assetInfo.name;
                 this.transmissionTexture = tex;
               } else {
                 console.error('Invalid transmission texture');
@@ -315,17 +310,16 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       type: 'object',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.thicknessTexture?.name ?? '';
-        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+        value.str[0] = assetRegistry.getAssetId(this.thicknessTexture) ?? '';
       },
       set(this: PBRMaterial, value) {
-        if (value.str[0]?.startsWith('ASSET:')) {
-          const assetId = value.str[0].slice(6);
+        if (value.str[0]) {
+          const assetId = value.str[0];
           const assetInfo = assetRegistry.getAssetInfo(assetId);
           if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
               if (tex?.isTexture2D()) {
-                tex.name = `ASSET:${assetId}`;
+                tex.name = assetInfo.name;
                 this.thicknessTexture = tex;
               } else {
                 console.error('Invalid thickness texture');
@@ -420,17 +414,16 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       type: 'object',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.iridescenceTexture?.name ?? '';
-        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+        value.str[0] = assetRegistry.getAssetId(this.iridescenceTexture) ?? '';
       },
       set(this: PBRMaterial, value) {
-        if (value.str[0]?.startsWith('ASSET:')) {
-          const assetId = value.str[0].slice(6);
+        if (value.str[0]) {
+          const assetId = value.str[0];
           const assetInfo = assetRegistry.getAssetInfo(assetId);
           if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
               if (tex?.isTexture2D()) {
-                tex.name = `ASSET:${assetId}`;
+                tex.name = assetInfo.name;
                 this.iridescenceTexture = tex;
               } else {
                 console.error('Invalid iridescence texture');
@@ -512,17 +505,16 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       type: 'object',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.iridescenceThicknessTexture?.name ?? '';
-        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+        value.str[0] = assetRegistry.getAssetId(this.iridescenceThicknessTexture) ?? '';
       },
       set(this: PBRMaterial, value) {
-        if (value.str[0]?.startsWith('ASSET:')) {
-          const assetId = value.str[0].slice(6);
+        if (value.str[0]) {
+          const assetId = value.str[0];
           const assetInfo = assetRegistry.getAssetInfo(assetId);
           if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
               if (tex?.isTexture2D()) {
-                tex.name = `ASSET:${assetId}`;
+                tex.name = assetInfo.name;
                 this.iridescenceThicknessTexture = tex;
               } else {
                 console.error('Invalid iridescence thickness texture');
@@ -583,17 +575,16 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       type: 'object',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.clearcoatIntensityTexture?.name ?? '';
-        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+        value.str[0] = assetRegistry.getAssetId(this.clearcoatIntensityTexture) ?? '';
       },
       set(this: PBRMaterial, value) {
-        if (value.str[0]?.startsWith('ASSET:')) {
-          const assetId = value.str[0].slice(6);
+        if (value.str[0]) {
+          const assetId = value.str[0];
           const assetInfo = assetRegistry.getAssetInfo(assetId);
           if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
               if (tex?.isTexture2D()) {
-                tex.name = `ASSET:${assetId}`;
+                tex.name = assetInfo.name;
                 this.clearcoatIntensityTexture = tex;
               } else {
                 console.error('Invalid clearcoat intensity texture');
@@ -643,17 +634,16 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       type: 'object',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.clearcoatRoughnessTexture?.name ?? '';
-        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+        value.str[0] = assetRegistry.getAssetId(this.clearcoatRoughnessTexture) ?? '';
       },
       set(this: PBRMaterial, value) {
-        if (value.str[0]?.startsWith('ASSET:')) {
-          const assetId = value.str[0].slice(6);
+        if (value.str[0]) {
+          const assetId = value.str[0];
           const assetInfo = assetRegistry.getAssetInfo(assetId);
           if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
               if (tex?.isTexture2D()) {
-                tex.name = `ASSET:${assetId}`;
+                tex.name = assetInfo.name;
                 this.clearcoatRoughnessTexture = tex;
               } else {
                 console.error('Invalid clearcoat roughness texture');
@@ -685,17 +675,16 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       type: 'object',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.clearcoatNormalTexture?.name ?? '';
-        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+        value.str[0] = assetRegistry.getAssetId(this.clearcoatNormalTexture) ?? '';
       },
       set(this: PBRMaterial, value) {
-        if (value.str[0]?.startsWith('ASSET:')) {
-          const assetId = value.str[0].slice(6);
+        if (value.str[0]) {
+          const assetId = value.str[0];
           const assetInfo = assetRegistry.getAssetInfo(assetId);
           if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
               if (tex?.isTexture2D()) {
-                tex.name = `ASSET:${assetId}`;
+                tex.name = assetInfo.name;
                 this.clearcoatNormalTexture = tex;
               } else {
                 console.error('Invalid clearcoat normal texture');
@@ -754,17 +743,16 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       type: 'object',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.sheenColorTexture?.name ?? '';
-        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+        value.str[0] = assetRegistry.getAssetId(this.sheenColorTexture) ?? '';
       },
       set(this: PBRMaterial, value) {
-        if (value.str[0]?.startsWith('ASSET:')) {
-          const assetId = value.str[0].slice(6);
+        if (value.str[0]) {
+          const assetId = value.str[0];
           const assetInfo = assetRegistry.getAssetInfo(assetId);
           if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
               if (tex?.isTexture2D()) {
-                tex.name = `ASSET:${assetId}`;
+                tex.name = assetInfo.name;
                 this.sheenColorTexture = tex;
               } else {
                 console.error('Invalid sheen color texture');
@@ -814,17 +802,16 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       type: 'object',
       default: { str: [''] },
       get(this: PBRMaterial, value) {
-        const name = this.sheenRoughnessTexture?.name ?? '';
-        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+        value.str[0] = assetRegistry.getAssetId(this.sheenRoughnessTexture) ?? '';
       },
       set(this: PBRMaterial, value) {
-        if (value.str[0]?.startsWith('ASSET:')) {
-          const assetId = value.str[0].slice(6);
+        if (value.str[0]) {
+          const assetId = value.str[0];
           const assetInfo = assetRegistry.getAssetInfo(assetId);
           if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
               if (tex?.isTexture2D()) {
-                tex.name = `ASSET:${assetId}`;
+                tex.name = assetInfo.name;
                 this.sheenRoughnessTexture = tex;
               } else {
                 console.error('Invalid sheen roughness texture');
@@ -888,17 +875,16 @@ function getLitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<Lit
       type: 'object',
       default: { str: [''] },
       get(this: LitPropTypes, value) {
-        const name = this.normalTexture?.name ?? '';
-        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+        value.str[0] = assetRegistry.getAssetId(this.normalTexture) ?? '';
       },
       set(this: LitPropTypes, value) {
-        if (value.str[0]?.startsWith('ASSET:')) {
-          const assetId = value.str[0].slice(6);
+        if (value.str[0]) {
+          const assetId = value.str[0];
           const assetInfo = assetRegistry.getAssetInfo(assetId);
           if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
               if (tex?.isTexture2D()) {
-                tex.name = `ASSET:${assetId}`;
+                tex.name = assetInfo.name;
                 this.normalTexture = tex;
               } else {
                 console.error('Invalid normal texture');
@@ -957,17 +943,16 @@ function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<U
       type: 'object',
       default: { str: [''] },
       get(this: UnlitPropTypes, value) {
-        const name = this.albedoTexture?.name ?? '';
-        value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+        value.str[0] = assetRegistry.getAssetId(this.albedoTexture) ?? '';
       },
       set(this: UnlitPropTypes, value) {
-        if (value.str[0]?.startsWith('ASSET:')) {
-          const assetId = value.str[0].slice(6);
+        if (value.str[0]) {
+          const assetId = value.str[0];
           const assetInfo = assetRegistry.getAssetInfo(assetId);
           if (assetInfo && assetInfo.type === 'texture') {
             assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
               if (tex?.isTexture2D()) {
-                tex.name = `ASSET:${assetId}`;
+                tex.name = assetInfo.name;
                 this.albedoTexture = tex;
               } else {
                 console.error('Invalid albedo texture');
@@ -1089,17 +1074,16 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
           type: 'object',
           default: { str: [''] },
           get(this: ParticleMaterial, value) {
-            const name = this.albedoTexture?.name ?? '';
-            value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+            value.str[0] = assetRegistry.getAssetId(this.albedoTexture) ?? '';
           },
           set(this: ParticleMaterial, value) {
-            if (value.str[0]?.startsWith('ASSET:')) {
-              const assetId = value.str[0].slice(6);
+            if (value.str[0]) {
+              const assetId = value.str[0];
               const assetInfo = assetRegistry.getAssetInfo(assetId);
               if (assetInfo && assetInfo.type === 'texture') {
                 assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
                   if (tex?.isTexture2D()) {
-                    tex.name = `ASSET:${assetId}`;
+                    tex.name = assetInfo.name;
                     this.albedoTexture = tex;
                   } else {
                     console.error('Invalid albedo texture');
@@ -1229,17 +1213,16 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
           type: 'object',
           default: { str: [''] },
           get(this: PBRMetallicRoughnessMaterial, value) {
-            const name = this.metallicRoughnessTexture?.name ?? '';
-            value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+            value.str[0] = assetRegistry.getAssetId(this.metallicRoughnessTexture) ?? '';
           },
           set(this: PBRMetallicRoughnessMaterial, value) {
-            if (value.str[0]?.startsWith('ASSET:')) {
-              const assetId = value.str[0].slice(6);
+            if (value.str[0]) {
+              const assetId = value.str[0];
               const assetInfo = assetRegistry.getAssetInfo(assetId);
               if (assetInfo && assetInfo.type === 'texture') {
                 assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
                   if (tex?.isTexture2D()) {
-                    tex.name = `ASSET:${assetId}`;
+                    tex.name = assetInfo.name;
                     this.metallicRoughnessTexture = tex;
                   } else {
                     console.error('Invalid metallic roughness texture');
@@ -1265,17 +1248,16 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
           type: 'object',
           default: { str: [''] },
           get(this: PBRMetallicRoughnessMaterial, value) {
-            const name = this.specularColorTexture?.name ?? '';
-            value.str[0] = name.startsWith('ASSET:') ? name.slice(6) : name;
+            value.str[0] = assetRegistry.getAssetId(this.specularColorTexture) ?? '';
           },
           set(this: PBRMetallicRoughnessMaterial, value) {
-            if (value.str[0]?.startsWith('ASSET:')) {
-              const assetId = value.str[0].slice(6);
+            if (value.str[0]) {
+              const assetId = value.str[0];
               const assetInfo = assetRegistry.getAssetInfo(assetId);
               if (assetInfo && assetInfo.type === 'texture') {
                 assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
                   if (tex?.isTexture2D()) {
-                    tex.name = `ASSET:${assetId}`;
+                    tex.name = assetInfo.name;
                     this.specularColorTexture = tex;
                   } else {
                     console.error('Invalid specular texture');

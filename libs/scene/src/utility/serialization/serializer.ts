@@ -6,19 +6,19 @@ export async function deserializeObjectProps<T>(
   json: object,
   serializationInfo: Map<any, SerializableClass>
 ) {
-  const tmpVal: PropertyValue = {
-    num: [0, 0, 0, 0],
-    str: [''],
-    bool: [false],
-    object: [null]
-  };
   const props = cls.getProps(obj) ?? [];
   for (const prop of props) {
+    const tmpVal: PropertyValue = {
+      num: [0, 0, 0, 0],
+      str: [''],
+      bool: [false],
+      object: [null]
+    };
     const k = prop.name;
     const v = json[k];
     switch (prop.type) {
       case 'object':
-        if (typeof v === 'string' && v.startsWith('ASSET:')) {
+        if (typeof v === 'string' && v) {
           tmpVal.str[0] = v;
         } else {
           tmpVal.object[0] = v ? (await deserializeObject<any>(obj, v, serializationInfo)) ?? null : null;
@@ -28,8 +28,8 @@ export async function deserializeObjectProps<T>(
         tmpVal.object = [];
         if (Array.isArray(v)) {
           for (const p of v) {
-            if (typeof p === 'string' && p.startsWith('ASSET:')) {
-              tmpVal.str[0] = p.slice(6);
+            if (typeof p === 'string' && p) {
+              tmpVal.str[0] = p;
             } else {
               tmpVal.object.push(
                 p ? (await deserializeObject<any>(obj, p, serializationInfo)) ?? null : null
@@ -82,20 +82,20 @@ export function serializeObjectProps<T>(
   json: object,
   serializationInfo: Map<any, SerializableClass>
 ) {
-  const tmpVal: PropertyValue = {
-    num: [0, 0, 0, 0],
-    str: [''],
-    bool: [false],
-    object: [null]
-  };
   const props = cls.getProps(obj) ?? [];
   for (const prop of props) {
+    const tmpVal: PropertyValue = {
+      num: [0, 0, 0, 0],
+      str: [''],
+      bool: [false],
+      object: [null]
+    };
     const k = prop.name;
     prop.get.call(obj, tmpVal);
     switch (prop.type) {
       case 'object':
         json[k] =
-          typeof tmpVal.str[0] === 'string' && tmpVal.str[0].startsWith('ASSET:')
+          typeof tmpVal.str[0] === 'string' && tmpVal.str[0]
             ? tmpVal.str[0]
             : tmpVal.object[0]
             ? serializeObject(tmpVal.object[0], serializationInfo)
