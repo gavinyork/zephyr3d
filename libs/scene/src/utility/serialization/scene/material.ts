@@ -12,6 +12,7 @@ import {
 import type { PropertyAccessor, SerializableClass } from '../types';
 import type { AssetRegistry } from '../asset/asset';
 import { Vector3, Vector4 } from '@zephyr3d/base';
+import { getTextureProps } from './common';
 
 type PBRMaterial = PBRMetallicRoughnessMaterial | PBRSpecularGlossinessMaterial;
 type LitPropTypes = LambertMaterial | BlinnMaterial | PBRMaterial;
@@ -48,43 +49,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.occlusionTexture;
       }
     },
-    {
-      name: 'OcclusionTexCoordIndex',
-      type: 'int',
-      default: { num: [0] },
-      get(this: PBRMaterial, value) {
-        value.num[0] = this.occlusionTexCoordIndex;
-      },
-      set(this: PBRMaterial, value) {
-        this.occlusionTexCoordIndex = value.num[0];
-      },
-      isValid() {
-        return !!this.occlusionTexture;
-      }
-    },
-    {
-      name: 'OcclusionTexture',
-      type: 'object',
-      get(this: PBRMaterial, value) {
-        value.str[0] = assetRegistry.getAssetId(this.occlusionTexture) ?? '';
-      },
-      set(this: PBRMaterial, value) {
-        if (value.str[0]) {
-          const assetId = value.str[0];
-          const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture') {
-            assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.occlusionTexture = tex;
-              } else {
-                console.error('Invalid occlusion texture');
-              }
-            });
-          }
-        }
-      }
-    },
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'occlusionTexture', '2D'),
     {
       name: 'EmissiveColor',
       type: 'rgb',
@@ -113,44 +78,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         this.emissiveStrength = value.num[0];
       }
     },
-    {
-      name: 'EmissiveTexCoordIndex',
-      type: 'int',
-      default: { num: [0] },
-      get(this: PBRMaterial, value) {
-        value.num[0] = this.emissiveTexCoordIndex;
-      },
-      set(this: PBRMaterial, value) {
-        this.emissiveTexCoordIndex = value.num[0];
-      },
-      isValid() {
-        return !!this.emissiveTexture;
-      }
-    },
-    {
-      name: 'EmissiveTexture',
-      type: 'object',
-      default: { str: [''] },
-      get(this: PBRMaterial, value) {
-        value.str[0] = assetRegistry.getAssetId(this.emissiveTexture) ?? '';
-      },
-      set(this: PBRMaterial, value) {
-        if (value.str[0]) {
-          const assetId = value.str[0];
-          const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture') {
-            assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.emissiveTexture = tex;
-              } else {
-                console.error('Invalid emissive texture');
-              }
-            });
-          }
-        }
-      }
-    },
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'emissiveTexture', '2D'),
     {
       name: 'SpecularFactor',
       type: 'vec4',
@@ -165,44 +93,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         this.specularFactor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
       }
     },
-    {
-      name: 'SpecularTexCoordIndex',
-      type: 'int',
-      default: { num: [0] },
-      get(this: PBRMaterial, value) {
-        value.num[0] = this.specularTexCoordIndex;
-      },
-      set(this: PBRMaterial, value) {
-        this.specularTexCoordIndex = value.num[0];
-      },
-      isValid() {
-        return !!this.specularTexture;
-      }
-    },
-    {
-      name: 'SpecularTexture',
-      type: 'object',
-      default: { str: [''] },
-      get(this: PBRMaterial, value) {
-        value.str[0] = assetRegistry.getAssetId(this.specularTexture) ?? '';
-      },
-      set(this: PBRMaterial, value) {
-        if (value.str[0]) {
-          const assetId = value.str[0];
-          const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture') {
-            assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.specularTexture = tex;
-              } else {
-                console.error('Invalid specular texture');
-              }
-            });
-          }
-        }
-      }
-    },
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'specularTexture', '2D'),
     {
       name: 'Transmission',
       type: 'bool',
@@ -232,47 +123,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.transmission;
       }
     },
-    {
-      name: 'TransmissionTexCoordIndex',
-      type: 'int',
-      default: { num: [0] },
-      get(this: PBRMaterial, value) {
-        value.num[0] = this.transmissionTexCoordIndex;
-      },
-      set(this: PBRMaterial, value) {
-        this.transmissionTexCoordIndex = value.num[0];
-      },
-      isValid() {
-        return !!this.transmission && !!this.transmissionTexture;
-      }
-    },
-    {
-      name: 'TransmissionTexture',
-      type: 'object',
-      default: { str: [''] },
-      get(this: PBRMaterial, value) {
-        value.str[0] = assetRegistry.getAssetId(this.transmissionTexture) ?? '';
-      },
-      set(this: PBRMaterial, value) {
-        if (value.str[0]) {
-          const assetId = value.str[0];
-          const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture') {
-            assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.transmissionTexture = tex;
-              } else {
-                console.error('Invalid transmission texture');
-              }
-            });
-          }
-        }
-      },
-      isValid() {
-        return !!this.transmission;
-      }
-    },
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'transmissionTexture', '2D', function () {
+      return this.transmission;
+    }),
     {
       name: 'ThicknessFactor',
       type: 'float',
@@ -291,47 +144,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.transmission;
       }
     },
-    {
-      name: 'ThicknessTexCoordIndex',
-      type: 'int',
-      default: { num: [0] },
-      get(this: PBRMaterial, value) {
-        value.num[0] = this.thicknessTexCoordIndex;
-      },
-      set(this: PBRMaterial, value) {
-        this.thicknessTexCoordIndex = value.num[0];
-      },
-      isValid() {
-        return !!this.transmission && !!this.thicknessTexture;
-      }
-    },
-    {
-      name: 'thicknessTexture',
-      type: 'object',
-      default: { str: [''] },
-      get(this: PBRMaterial, value) {
-        value.str[0] = assetRegistry.getAssetId(this.thicknessTexture) ?? '';
-      },
-      set(this: PBRMaterial, value) {
-        if (value.str[0]) {
-          const assetId = value.str[0];
-          const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture') {
-            assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.thicknessTexture = tex;
-              } else {
-                console.error('Invalid thickness texture');
-              }
-            });
-          }
-        }
-      },
-      isValid() {
-        return !!this.transmission;
-      }
-    },
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'thicknessTexture', '2D', function () {
+      return this.transmission;
+    }),
     {
       name: 'AttenuationColor',
       type: 'rgb',
@@ -395,47 +210,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.iridescence;
       }
     },
-    {
-      name: 'IridescenceTexCoordIndex',
-      type: 'int',
-      default: { num: [0] },
-      get(this: PBRMaterial, value) {
-        value.num[0] = this.iridescenceTexCoordIndex;
-      },
-      set(this: PBRMaterial, value) {
-        this.iridescenceTexCoordIndex = value.num[0];
-      },
-      isValid() {
-        return !!this.iridescence && !!this.iridescenceTexture;
-      }
-    },
-    {
-      name: 'IridescenceTexture',
-      type: 'object',
-      default: { str: [''] },
-      get(this: PBRMaterial, value) {
-        value.str[0] = assetRegistry.getAssetId(this.iridescenceTexture) ?? '';
-      },
-      set(this: PBRMaterial, value) {
-        if (value.str[0]) {
-          const assetId = value.str[0];
-          const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture') {
-            assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.iridescenceTexture = tex;
-              } else {
-                console.error('Invalid iridescence texture');
-              }
-            });
-          }
-        }
-      },
-      isValid() {
-        return !!this.iridescence;
-      }
-    },
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'iridescenceTexture', '2D', function () {
+      return this.iridescence;
+    }),
     {
       name: 'IridescenceIOR',
       type: 'float',
@@ -486,47 +263,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.iridescence;
       }
     },
-    {
-      name: 'IridescenceThicknessTexCoordIndex',
-      type: 'int',
-      default: { num: [0] },
-      get(this: PBRMaterial, value) {
-        value.num[0] = this.iridescenceThicknessTexCoordIndex;
-      },
-      set(this: PBRMaterial, value) {
-        this.iridescenceThicknessTexCoordIndex = value.num[0];
-      },
-      isValid() {
-        return !!this.iridescence && !!this.iridescenceThicknessTexture;
-      }
-    },
-    {
-      name: 'IridescenceThicknessTexture',
-      type: 'object',
-      default: { str: [''] },
-      get(this: PBRMaterial, value) {
-        value.str[0] = assetRegistry.getAssetId(this.iridescenceThicknessTexture) ?? '';
-      },
-      set(this: PBRMaterial, value) {
-        if (value.str[0]) {
-          const assetId = value.str[0];
-          const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture') {
-            assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.iridescenceThicknessTexture = tex;
-              } else {
-                console.error('Invalid iridescence thickness texture');
-              }
-            });
-          }
-        }
-      },
-      isValid() {
-        return !!this.iridescence;
-      }
-    },
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'iridescenceThicknessTexture', '2D', function () {
+      return this.iridescence;
+    }),
     {
       name: 'ClearCoat',
       type: 'bool',
@@ -556,47 +295,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.clearcoat;
       }
     },
-    {
-      name: 'ClearCoatIntensityTexCoordIndex',
-      type: 'int',
-      default: { num: [0] },
-      get(this: PBRMaterial, value) {
-        value.num[0] = this.clearcoatIntensityTexCoordIndex;
-      },
-      set(this: PBRMaterial, value) {
-        this.clearcoatIntensityTexCoordIndex = value.num[0];
-      },
-      isValid() {
-        return !!this.clearcoat && !!this.clearcoatIntensityTexture;
-      }
-    },
-    {
-      name: 'ClearCoatIntensityTexture',
-      type: 'object',
-      default: { str: [''] },
-      get(this: PBRMaterial, value) {
-        value.str[0] = assetRegistry.getAssetId(this.clearcoatIntensityTexture) ?? '';
-      },
-      set(this: PBRMaterial, value) {
-        if (value.str[0]) {
-          const assetId = value.str[0];
-          const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture') {
-            assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.clearcoatIntensityTexture = tex;
-              } else {
-                console.error('Invalid clearcoat intensity texture');
-              }
-            });
-          }
-        }
-      },
-      isValid() {
-        return !!this.clearcoat;
-      }
-    },
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'clearcoatIntensityTexture', '2D', function () {
+      return this.clearcoat;
+    }),
     {
       name: 'ClearCoatRoughnessFactor',
       type: 'float',
@@ -615,88 +316,12 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.clearcoat;
       }
     },
-    {
-      name: 'ClearCoatRoughnessTexCoordIndex',
-      type: 'int',
-      default: { num: [0] },
-      get(this: PBRMaterial, value) {
-        value.num[0] = this.clearcoatRoughnessTexCoordIndex;
-      },
-      set(this: PBRMaterial, value) {
-        this.clearcoatRoughnessTexCoordIndex = value.num[0];
-      },
-      isValid() {
-        return !!this.clearcoat && !!this.clearcoatRoughnessTexture;
-      }
-    },
-    {
-      name: 'ClearCoatRoughnessTexture',
-      type: 'object',
-      default: { str: [''] },
-      get(this: PBRMaterial, value) {
-        value.str[0] = assetRegistry.getAssetId(this.clearcoatRoughnessTexture) ?? '';
-      },
-      set(this: PBRMaterial, value) {
-        if (value.str[0]) {
-          const assetId = value.str[0];
-          const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture') {
-            assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.clearcoatRoughnessTexture = tex;
-              } else {
-                console.error('Invalid clearcoat roughness texture');
-              }
-            });
-          }
-        }
-      },
-      isValid() {
-        return this.clearcoat;
-      }
-    },
-    {
-      name: 'ClearCoatNormalTexCoordIndex',
-      type: 'int',
-      default: { num: [0] },
-      get(this: PBRMaterial, value) {
-        value.num[0] = this.clearcoatNormalTexCoordIndex;
-      },
-      set(this: PBRMaterial, value) {
-        this.clearcoatNormalTexCoordIndex = value.num[0];
-      },
-      isValid() {
-        return !!this.clearcoat && !!this.clearcoatNormalTexture;
-      }
-    },
-    {
-      name: 'ClearCoatNormalTexture',
-      type: 'object',
-      default: { str: [''] },
-      get(this: PBRMaterial, value) {
-        value.str[0] = assetRegistry.getAssetId(this.clearcoatNormalTexture) ?? '';
-      },
-      set(this: PBRMaterial, value) {
-        if (value.str[0]) {
-          const assetId = value.str[0];
-          const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture') {
-            assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.clearcoatNormalTexture = tex;
-              } else {
-                console.error('Invalid clearcoat normal texture');
-              }
-            });
-          }
-        }
-      },
-      isValid() {
-        return !!this.clearcoat;
-      }
-    },
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'clearcoatRoughnessTexture', '2D', function () {
+      return this.clearcoat;
+    }),
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'clearcoatNormalTexture', '2D', function () {
+      return this.clearcoat;
+    }),
     {
       name: 'Sheen',
       type: 'bool',
@@ -724,47 +349,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.sheen;
       }
     },
-    {
-      name: 'SheenColorTexCoordIndex',
-      type: 'int',
-      default: { num: [0] },
-      get(this: PBRMaterial, value) {
-        value.num[0] = this.sheenColorTexCoordIndex;
-      },
-      set(this: PBRMaterial, value) {
-        this.sheenColorTexCoordIndex = value.num[0];
-      },
-      isValid() {
-        return !!this.sheen && !!this.sheenColorTexture;
-      }
-    },
-    {
-      name: 'SheenColorTexture',
-      type: 'object',
-      default: { str: [''] },
-      get(this: PBRMaterial, value) {
-        value.str[0] = assetRegistry.getAssetId(this.sheenColorTexture) ?? '';
-      },
-      set(this: PBRMaterial, value) {
-        if (value.str[0]) {
-          const assetId = value.str[0];
-          const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture') {
-            assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.sheenColorTexture = tex;
-              } else {
-                console.error('Invalid sheen color texture');
-              }
-            });
-          }
-        }
-      },
-      isValid() {
-        return !!this.sheen;
-      }
-    },
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'sheenColorTexture', '2D', function () {
+      return this.sheen;
+    }),
     {
       name: 'SheenRoughnessFactor',
       type: 'float',
@@ -783,47 +370,9 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.sheen;
       }
     },
-    {
-      name: 'SheenRoughnessTexCoordIndex',
-      type: 'int',
-      default: { num: [0] },
-      get(this: PBRMaterial, value) {
-        value.num[0] = this.sheenRoughnessTexCoordIndex;
-      },
-      set(this: PBRMaterial, value) {
-        this.sheenRoughnessTexCoordIndex = value.num[0];
-      },
-      isValid() {
-        return !!this.sheen && !!this.sheenRoughnessTexture;
-      }
-    },
-    {
-      name: 'SheenRoughnessTexture',
-      type: 'object',
-      default: { str: [''] },
-      get(this: PBRMaterial, value) {
-        value.str[0] = assetRegistry.getAssetId(this.sheenRoughnessTexture) ?? '';
-      },
-      set(this: PBRMaterial, value) {
-        if (value.str[0]) {
-          const assetId = value.str[0];
-          const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture') {
-            assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.sheenRoughnessTexture = tex;
-              } else {
-                console.error('Invalid sheen roughness texture');
-              }
-            });
-          }
-        }
-      },
-      isValid() {
-        return !!this.sheen;
-      }
-    },
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'sheenRoughnessTexture', '2D', function () {
+      return this.sheen;
+    }),
     ...getLitMaterialProps(assetRegistry)
   ];
 }
@@ -856,44 +405,7 @@ function getLitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<Lit
         return !!this.vertexNormal;
       }
     },
-    {
-      name: 'NormalTexCoordIndex',
-      type: 'int',
-      default: { num: [0] },
-      get(this: LitPropTypes, value) {
-        value.num[0] = this.normalTexCoordIndex;
-      },
-      set(this: LitPropTypes, value) {
-        this.normalTexCoordIndex = value.num[0];
-      },
-      isValid() {
-        return !!this.normalTexture;
-      }
-    },
-    {
-      name: 'NormalTexture',
-      type: 'object',
-      default: { str: [''] },
-      get(this: LitPropTypes, value) {
-        value.str[0] = assetRegistry.getAssetId(this.normalTexture) ?? '';
-      },
-      set(this: LitPropTypes, value) {
-        if (value.str[0]) {
-          const assetId = value.str[0];
-          const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture') {
-            assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.normalTexture = tex;
-              } else {
-                console.error('Invalid normal texture');
-              }
-            });
-          }
-        }
-      }
-    }
+    ...getTextureProps<LitPropTypes>(assetRegistry, 'normalTexture', '2D')
   ];
 }
 function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<UnlitPropTypes>[] {
@@ -924,44 +436,7 @@ function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<U
         this.albedoColor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
       }
     },
-    {
-      name: 'AlbedoTexCoordIndex',
-      type: 'int',
-      default: { num: [0] },
-      get(this: UnlitPropTypes, value) {
-        value.num[0] = this.albedoTexCoordIndex;
-      },
-      set(this: UnlitPropTypes, value) {
-        this.albedoTexCoordIndex = value.num[0];
-      },
-      isValid() {
-        return !!this.albedoTexture;
-      }
-    },
-    {
-      name: 'AlbedoTexture',
-      type: 'object',
-      default: { str: [''] },
-      get(this: UnlitPropTypes, value) {
-        value.str[0] = assetRegistry.getAssetId(this.albedoTexture) ?? '';
-      },
-      set(this: UnlitPropTypes, value) {
-        if (value.str[0]) {
-          const assetId = value.str[0];
-          const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture') {
-            assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.albedoTexture = tex;
-              } else {
-                console.error('Invalid albedo texture');
-              }
-            });
-          }
-        }
-      }
-    }
+    ...getTextureProps<UnlitPropTypes>(assetRegistry, 'albedoTexture', '2D')
   ];
 }
 
@@ -1197,76 +672,8 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
             this.roughness = value.num[0];
           }
         },
-        {
-          name: 'MetallicRoughnessTexCoordIndex',
-          type: 'int',
-          default: { num: [0] },
-          get(this: PBRMetallicRoughnessMaterial, value) {
-            value.num[0] = this.metallicRoughnessTexCoordIndex;
-          },
-          set(this: PBRMetallicRoughnessMaterial, value) {
-            this.metallicRoughnessTexCoordIndex = value.num[0];
-          }
-        },
-        {
-          name: 'MetallicRoughnessTexture',
-          type: 'object',
-          default: { str: [''] },
-          get(this: PBRMetallicRoughnessMaterial, value) {
-            value.str[0] = assetRegistry.getAssetId(this.metallicRoughnessTexture) ?? '';
-          },
-          set(this: PBRMetallicRoughnessMaterial, value) {
-            if (value.str[0]) {
-              const assetId = value.str[0];
-              const assetInfo = assetRegistry.getAssetInfo(assetId);
-              if (assetInfo && assetInfo.type === 'texture') {
-                assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-                  if (tex?.isTexture2D()) {
-                    tex.name = assetInfo.name;
-                    this.metallicRoughnessTexture = tex;
-                  } else {
-                    console.error('Invalid metallic roughness texture');
-                  }
-                });
-              }
-            }
-          }
-        },
-        {
-          name: 'SpecularColorTexCoordIndex',
-          type: 'int',
-          default: { num: [0] },
-          get(this: PBRMetallicRoughnessMaterial, value) {
-            value.num[0] = this.specularColorTexCoordIndex;
-          },
-          set(this: PBRMetallicRoughnessMaterial, value) {
-            this.specularColorTexCoordIndex = value.num[0];
-          }
-        },
-        {
-          name: 'SpecularColorTexture',
-          type: 'object',
-          default: { str: [''] },
-          get(this: PBRMetallicRoughnessMaterial, value) {
-            value.str[0] = assetRegistry.getAssetId(this.specularColorTexture) ?? '';
-          },
-          set(this: PBRMetallicRoughnessMaterial, value) {
-            if (value.str[0]) {
-              const assetId = value.str[0];
-              const assetInfo = assetRegistry.getAssetInfo(assetId);
-              if (assetInfo && assetInfo.type === 'texture') {
-                assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-                  if (tex?.isTexture2D()) {
-                    tex.name = assetInfo.name;
-                    this.specularColorTexture = tex;
-                  } else {
-                    console.error('Invalid specular texture');
-                  }
-                });
-              }
-            }
-          }
-        },
+        ...getTextureProps<PBRMetallicRoughnessMaterial>(assetRegistry, 'metallicRoughnessTexture', '2D'),
+        ...getTextureProps<PBRMetallicRoughnessMaterial>(assetRegistry, 'specularColorTexture', '2D'),
         ...getPBRCommonProps(assetRegistry)
       ];
     }

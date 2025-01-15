@@ -28,6 +28,17 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
     getProps() {
       return [
         {
+          name: 'Id',
+          type: 'string',
+          hidden: true,
+          get(this: SceneNode, value) {
+            value.str[0] = this.id;
+          },
+          set(this: SceneNode, value) {
+            this.id = value.str[0];
+          }
+        },
+        {
           name: 'Name',
           type: 'string',
           defaultValue: '',

@@ -59,9 +59,8 @@ export class SceneNode extends makeEventTarget(Object)<{
   static readonly BBOXDRAW_DISABLED = 0;
   static readonly BBOXDRAW_LOCAL = 1;
   static readonly BBOXDRAW_WORLD = 2;
-  private static nodeId = 1;
   /** @internal */
-  protected _id: number;
+  protected _id: string;
   /** @internal */
   protected _clipMode: boolean;
   /** @internal */
@@ -122,7 +121,7 @@ export class SceneNode extends makeEventTarget(Object)<{
    */
   constructor(scene: Scene) {
     super();
-    this._id = SceneNode.nodeId++;
+    this._id = crypto.randomUUID();
     this._scene = scene;
     this._name = '';
     this._bv = null;
@@ -174,6 +173,9 @@ export class SceneNode extends makeEventTarget(Object)<{
    */
   get id() {
     return this._id;
+  }
+  set id(id: string) {
+    this._id = id;
   }
   /**
    * Name of the node
@@ -322,10 +324,7 @@ export class SceneNode extends makeEventTarget(Object)<{
     return false;
   }
   /** Disposes the node */
-  dispose() {
-    this.remove();
-    this.removeChildren();
-  }
+  dispose() {}
   /**
    * Computes the bounding volume of the node
    * @returns The output bounding volume

@@ -92,6 +92,9 @@ export class Scene extends makeEventTarget(Object)<{
    * Disposes the scene
    */
   dispose() {
+    this._rootNode?.iterate((child) => {
+      child.dispose();
+    });
     this._rootNode = null;
   }
   /**

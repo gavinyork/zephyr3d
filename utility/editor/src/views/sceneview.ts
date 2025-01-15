@@ -4,7 +4,7 @@ import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import { Tab } from '../components/tab';
 import type { AssetRegistry, Camera, Compositor, Scene, SceneNode } from '@zephyr3d/scene';
-import { Application, DirectionalLight, getSerializationInfo } from '@zephyr3d/scene';
+import { Application, DirectionalLight } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';

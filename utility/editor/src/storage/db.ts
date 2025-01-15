@@ -7,7 +7,7 @@ export type DBAssetPackage = {
   name: string;
   blob: string;
   size: number;
-  metadata?: object;
+  metadata?: any;
 };
 
 export type DBAssetBlob = {
@@ -23,14 +23,14 @@ export type DBAssetInfo = {
   thumbnail: string;
   type: AssetType;
   pkg: string;
-  metadata?: object;
+  metadata?: any;
 };
 
 export type DBSceneInfo = {
   uuid?: string;
   name: string;
   content: object;
-  metadata?: object;
+  metadata?: any;
 };
 
 export class Database {
@@ -227,7 +227,7 @@ export class Database {
     });
     return uuid;
   }
-  static async getScene(uuid: string) {
+  static async getScene(uuid: string): Promise<DBSceneInfo> {
     try {
       const scene = await this.instance.get(this.DB_NAME_SCENES, uuid);
       if (scene) {

@@ -206,7 +206,7 @@ export async function deserializeObject<T>(
   }
   const obj = p instanceof Promise ? await p : p;
   while (info) {
-    deserializeObjectProps(obj, info, json, serializationInfo);
+    await deserializeObjectProps(obj, info, json, serializationInfo);
     info = info.parent;
   }
   return obj;

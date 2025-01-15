@@ -146,7 +146,10 @@ export class SceneController extends BaseController<SceneModel> {
   private saveScene(name: string) {
     this._scene = Object.assign({}, this._scene ?? {}, {
       name,
-      content: serializeObject(this.model.scene, getSerializationInfo(this._assetRegistry), {})
+      content: serializeObject(this.model.scene, getSerializationInfo(this._assetRegistry), {}),
+      metadata: {
+        activeCamera: this.model.camera?.id ?? ''
+      }
     });
     console.log(JSON.stringify(this._scene.content, null, 2));
     Database.putScene(this._scene).then((uuid) => {
@@ -162,7 +165,8 @@ export class SceneController extends BaseController<SceneModel> {
           deserializeObject<Scene>(null, sceneinfo.content, getSerializationInfo(this._assetRegistry)).then(
             (scene) => {
               if (scene) {
-                this.model.reset(scene);
+                const cameraId = sceneinfo.metadata?.activeCamera;
+                this.model.reset(scene, cameraId);
                 this._view.reset(this.model.scene);
               } else {
                 throw new Error('Cannot load scene');
