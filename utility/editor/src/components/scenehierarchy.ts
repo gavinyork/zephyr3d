@@ -1,6 +1,6 @@
 import { makeEventTarget } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
-import type { Scene, SceneNode, SerializableClass } from '@zephyr3d/scene';
+import type { AssetRegistry, Scene, SceneNode, SerializableClass } from '@zephyr3d/scene';
 import { getSerializationInfo } from '@zephyr3d/scene';
 
 export class SceneHierarchy extends makeEventTarget(Object)<{
@@ -12,10 +12,12 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
   private _scene: Scene;
   private _selectedNode: SceneNode;
-  constructor(scene: Scene) {
+  private _assetRegistry: AssetRegistry;
+  constructor(scene: Scene, assetRegistry: AssetRegistry) {
     super();
     this._scene = scene;
     this._selectedNode = null;
+    this._assetRegistry = assetRegistry;
   }
   get scene() {
     return this._scene;
@@ -44,7 +46,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     return this._selectedNode;
   }
   private renderSceneNode(node: SceneNode) {
-    const serializationInfo = getSerializationInfo(null);
+    const serializationInfo = getSerializationInfo(this._assetRegistry);
     let cls: SerializableClass = null;
     let ctor = node.constructor;
     while (!cls) {

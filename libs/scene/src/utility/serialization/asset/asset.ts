@@ -1,7 +1,8 @@
 import type { HttpRequest } from '@zephyr3d/base';
 import { AssetManager, type ModelFetchOptions, type TextureFetchOptions } from '../../../asset';
-import type { Scene } from '../../../scene';
+import type { Scene, SceneNode } from '../../../scene';
 import type { Texture2D, TextureCube } from '@zephyr3d/device';
+import { AnimationSet } from '../../../animation';
 
 export type AssetType = 'model' | 'texture';
 export type AssetInfo = {
@@ -17,9 +18,11 @@ export type AssetInfo = {
 export class AssetRegistry {
   private _assetMap: Map<string, AssetInfo>;
   private _poolId: symbol;
+  private _animations: WeakMap<SceneNode, AnimationSet>;
   constructor() {
     this._assetMap = new Map();
     this._poolId = Symbol('AssetRegistry');
+    this._animations = new WeakMap();
   }
   get poolId() {
     return this._poolId;
@@ -50,6 +53,9 @@ export class AssetRegistry {
   getAssetInfo(id: string) {
     return this._assetMap.get(id);
   }
+  getAnimations(group: SceneNode) {
+    return this._animations.get(group);
+  }
   renameAsset(id: string, name: string) {
     const info = this._assetMap.get(id);
     if (info) {
@@ -63,6 +69,7 @@ export class AssetRegistry {
   async fetchModel(id: string, scene: Scene, options?: ModelFetchOptions, request?: HttpRequest) {
     const model = await this.doFetchModel(id, scene, options, request);
     if (model) {
+      this._animations.set(model.group, model.animationSet);
       const info = this._assetMap.get(id);
       if (info) {
         info.allocated.set(model.group, id);

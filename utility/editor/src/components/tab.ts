@@ -9,7 +9,7 @@ export class Tab {
   private _sceneHierarchy: SceneHierarchy;
   private _assetHierarchy: AssetHierarchy;
   constructor(scene: Scene, left: boolean, top: number, bottom: number, assetRegistry: AssetRegistry) {
-    this._sceneHierarchy = new SceneHierarchy(scene);
+    this._sceneHierarchy = new SceneHierarchy(scene, assetRegistry);
     this._assetHierarchy = new AssetHierarchy(assetRegistry);
     this._panel = new DockPannel(left, top, bottom, 8, 300, 200, 600);
   }

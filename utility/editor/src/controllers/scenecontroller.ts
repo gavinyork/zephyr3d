@@ -146,7 +146,7 @@ export class SceneController extends BaseController<SceneModel> {
   private saveScene(name: string) {
     this._scene = Object.assign({}, this._scene ?? {}, {
       name,
-      content: serializeObject(this.model.scene, getSerializationInfo(this._assetRegistry), {}),
+      content: serializeObject(this.model.scene, this._assetRegistry, {}),
       metadata: {
         activeCamera: this.model.camera?.id ?? ''
       }
@@ -162,17 +162,15 @@ export class SceneController extends BaseController<SceneModel> {
       .then((sceneinfo) => {
         if (sceneinfo) {
           this._scene = sceneinfo;
-          deserializeObject<Scene>(null, sceneinfo.content, getSerializationInfo(this._assetRegistry)).then(
-            (scene) => {
-              if (scene) {
-                const cameraId = sceneinfo.metadata?.activeCamera;
-                this.model.reset(scene, cameraId);
-                this._view.reset(this.model.scene);
-              } else {
-                throw new Error('Cannot load scene');
-              }
+          deserializeObject<Scene>(null, sceneinfo.content, this._assetRegistry).then((scene) => {
+            if (scene) {
+              const cameraId = sceneinfo.metadata?.activeCamera;
+              this.model.reset(scene, cameraId);
+              this._view.reset(this.model.scene);
+            } else {
+              throw new Error('Cannot load scene');
             }
-          );
+          });
         } else {
           Dialog.messageBox('Zephyr3d', `Scene not found: ${uuid}`);
         }
