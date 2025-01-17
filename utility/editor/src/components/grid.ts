@@ -414,7 +414,10 @@ export class PropertyEditor {
         if (assetInfo) {
           val[0] = assetInfo.name;
         }
-        changed = ImGui.InputText('##value', val, undefined, ImGui.InputTextFlags.ReadOnly);
+        if (value.nullable) {
+          ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
+        }
+        ImGui.InputText('##value', val, undefined, ImGui.InputTextFlags.ReadOnly);
         if (ImGui.BeginDragDropTarget()) {
           const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
           if (payload) {
@@ -422,6 +425,12 @@ export class PropertyEditor {
             value.set.call(object, tmpProperty);
           }
           ImGui.EndDragDropTarget();
+        }
+        if (value.nullable) {
+          ImGui.SameLine(0, 0);
+          if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
+            value.set.call(object, null);
+          }
         }
       }
     }

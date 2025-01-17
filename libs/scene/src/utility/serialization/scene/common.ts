@@ -30,26 +30,31 @@ export function getTextureProps<T>(
     {
       name: name[0].toUpperCase() + name.slice(1),
       type: 'object',
+      nullable: true,
       get(value) {
         value.str[0] = assetRegistry.getAssetId(this[name]) ?? '';
       },
       set(value) {
-        if (value.str[0]) {
-          const assetId = value.str[0];
-          const assetInfo = assetRegistry.getAssetInfo(assetId);
-          if (assetInfo && assetInfo.type === 'texture') {
-            assetRegistry
-              .fetchTexture<Texture2D | TextureCube>(assetId, assetInfo.textureOptions)
-              .then((tex) => {
-                const isValidTextureType =
-                  type === '2D' ? tex?.isTexture2D() : type === 'Cube' ? tex?.isTextureCube() : false;
-                if (isValidTextureType) {
-                  tex.name = assetInfo.name;
-                  this[name] = tex as any;
-                } else {
-                  console.error('Invalid texture type');
-                }
-              });
+        if (!value) {
+          this[name] = null;
+        } else {
+          if (value.str[0]) {
+            const assetId = value.str[0];
+            const assetInfo = assetRegistry.getAssetInfo(assetId);
+            if (assetInfo && assetInfo.type === 'texture') {
+              assetRegistry
+                .fetchTexture<Texture2D | TextureCube>(assetId, assetInfo.textureOptions)
+                .then((tex) => {
+                  const isValidTextureType =
+                    type === '2D' ? tex?.isTexture2D() : type === 'Cube' ? tex?.isTextureCube() : false;
+                  if (isValidTextureType) {
+                    tex.name = assetInfo.name;
+                    this[name] = tex as any;
+                  } else {
+                    console.error('Invalid texture type');
+                  }
+                });
+            }
           }
         }
       },
