@@ -414,6 +414,7 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
       this._beginFrameCounter--;
       if (this._beginFrameCounter === 0) {
         this._endFrameTime = this._cpuTimer.now();
+        this._frameInfo.frameCounter++;
         this.onEndFrame();
       }
     }
@@ -656,7 +657,6 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
     }
   }
   private updateFrameInfo() {
-    this._frameInfo.frameCounter++;
     this._frameInfo.drawCalls = 0;
     this._frameInfo.computeCalls = 0;
     const now = this._beginFrameTime;
