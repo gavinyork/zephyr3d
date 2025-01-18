@@ -497,12 +497,14 @@ export class ShaderHelper {
         ? [pb.mat4('skinMatrix')]
         : [];
     pb.func('Z_resolveVertexPosition', params, function () {
-      this.$l.pos = this.$getVertexAttrib('position').xyz;
+      this.$l.opos = this.$getVertexAttrib('position').xyz;
       if (that.hasMorphing(scope)) {
-        this.pos = pb.add(this.pos, that.calculateMorphDelta(this, MORPH_TARGET_POSITION).xyz);
+        this.opos = pb.add(this.opos, that.calculateMorphDelta(this, MORPH_TARGET_POSITION).xyz);
       }
       if (this.skinMatrix) {
-        this.pos = pb.mul(this.skinMatrix, pb.vec4(this.pos, 1)).xyz;
+        this.$l.pos = pb.mul(this.skinMatrix, pb.vec4(this.opos, 1)).xyz;
+      } else {
+        this.$l.pos = this.opos;
       }
       const unjitteredVPMatrix = that.getUnjitteredViewProjectionMatrix(this);
       if (unjitteredVPMatrix) {
@@ -511,7 +513,7 @@ export class ShaderHelper {
         if (this.prevSkinMatrix) {
           this.$l.prevWorldPos = pb.mul(
             that.getPrevWorldMatrix(this),
-            pb.mul(this.prevSkinMatrix, pb.vec4(this.pos, 1))
+            pb.mul(this.prevSkinMatrix, pb.vec4(this.opos, 1))
           );
         } else {
           this.$l.prevWorldPos = pb.mul(that.getPrevWorldMatrix(this), pb.vec4(this.pos, 1));

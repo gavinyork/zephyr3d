@@ -4,7 +4,15 @@ import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 import { getSceneNodeClass } from './node';
 import type { AssetRegistry } from '../asset/asset';
 import { SceneNode } from '../../../scene';
-import { TAA_DEBUG_ALAPH, TAA_DEBUG_CURRENT_COLOR, TAA_DEBUG_EDGE, TAA_DEBUG_HISTORY_COLOR, TAA_DEBUG_NONE, TAA_DEBUG_VELOCITY } from '../../../shaders';
+import {
+  TAA_DEBUG_ALAPH,
+  TAA_DEBUG_CURRENT_COLOR,
+  TAA_DEBUG_EDGE,
+  TAA_DEBUG_HISTORY_COLOR,
+  TAA_DEBUG_MOTION_VECTOR,
+  TAA_DEBUG_NONE,
+  TAA_DEBUG_VELOCITY
+} from '../../../shaders';
 
 export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
@@ -50,8 +58,16 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           name: 'TAADebug',
           type: 'int',
           enum: {
-            labels: ['None', 'Current Color', 'History Color', 'Velocity', 'Edge', 'Alpha'],
-            values: [TAA_DEBUG_NONE, TAA_DEBUG_CURRENT_COLOR, TAA_DEBUG_HISTORY_COLOR, TAA_DEBUG_VELOCITY, TAA_DEBUG_EDGE, TAA_DEBUG_ALAPH]
+            labels: ['None', 'Current Color', 'History Color', 'Velocity', 'Edge', 'Alpha', 'Motion Vector'],
+            values: [
+              TAA_DEBUG_NONE,
+              TAA_DEBUG_CURRENT_COLOR,
+              TAA_DEBUG_HISTORY_COLOR,
+              TAA_DEBUG_VELOCITY,
+              TAA_DEBUG_EDGE,
+              TAA_DEBUG_ALAPH,
+              TAA_DEBUG_MOTION_VECTOR
+            ]
           },
           default: { num: [TAA_DEBUG_NONE] },
           get(this: Camera, value) {
