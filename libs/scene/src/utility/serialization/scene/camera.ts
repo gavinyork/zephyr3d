@@ -259,10 +259,13 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           type: 'rgba',
           default: { num: [0, 0, 0, 1] },
           get(this: Camera, value) {
-            value.num[0] = this.sampleCount;
+            value.num[0] = this.clearColor.x;
+            value.num[1] = this.clearColor.y;
+            value.num[2] = this.clearColor.z;
+            value.num[3] = this.clearColor.w;
           },
           set(this: Camera, value) {
-            this.sampleCount = value.num[0];
+            this.clearColor.setXYZW(value.num[0], value.num[1], value.num[2], value.num[3]);
           }
         }
       ];

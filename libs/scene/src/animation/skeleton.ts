@@ -114,6 +114,7 @@ export class Skeleton {
   /** @internal */
   computeBindPose(model: SceneNode) {
     this.updateJointMatrices(this._bindPoseMatrices, model.worldMatrix);
+    this._jointOffsets[1] = this._jointOffsets[0];
     this._jointTexture.update(
       this._jointMatrixArray,
       0,
@@ -144,11 +145,15 @@ export class Skeleton {
   }
   /** @internal */
   reset(model: SceneNode) {
-    this.computeBindPose(model);
+    //this.computeBindPose(model);
     for (const mesh of this._meshes) {
+      mesh.mesh.setBoneMatrices(null);
+      mesh.mesh.setAnimatedBoundingBox(null);
+      /*
       this.computeBoundingBox(mesh.bounding, mesh.mesh.invWorldMatrix);
       mesh.mesh.setBoneMatrices(this.jointTexture);
       mesh.mesh.setAnimatedBoundingBox(mesh.bounding.boundingBox);
+      */
     }
   }
   /** @internal */

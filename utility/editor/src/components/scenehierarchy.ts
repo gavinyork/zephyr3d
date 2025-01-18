@@ -70,6 +70,33 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     }
     if (node !== this._scene.rootNode) {
       if (ImGui.BeginPopup(`context_${node.id}`)) {
+        const animationSet = this._assetRegistry.getAnimations(node);
+        if (animationSet && animationSet.getAnimationNames().length > 0) {
+          if (ImGui.BeginMenu('Animation')) {
+            ImGui.PushID(node.id);
+            for (let i = 0; i < animationSet.getAnimationNames().length; i++) {
+              ImGui.PushID(i);
+              const name = animationSet.getAnimationNames()[i];
+              const playing = animationSet.isPlayingAnimation(name);
+              if (ImGui.MenuItem(name, null, playing)) {
+                if (playing) {
+                  animationSet.stopAnimation(name);
+                } else {
+                  for (const ani of animationSet.getAnimationNames()) {
+                    if (ani !== name) {
+                      animationSet.stopAnimation(ani);
+                    } else {
+                      animationSet.playAnimation(ani);
+                    }
+                  }
+                }
+              }
+              ImGui.PopID();
+            }
+            ImGui.PopID();
+            ImGui.EndMenu();
+          }
+        }
         if (ImGui.MenuItem('Delete')) {
           this.dispatchEvent('node_request_delete', node);
         }

@@ -65,7 +65,7 @@ export class TAA extends AbstractPostEffect<'TAA'> {
       let program = TAA._resolveProgram[ctx.camera.TAADebug];
       if (!program) {
         program = TAA._getResolveProgram(ctx, ctx.camera.TAADebug);
-        TAA._resolveProgram[ctx.camera.TAADebug]
+        TAA._resolveProgram[ctx.camera.TAADebug] = program;
       }
       if (!this._bindGroup) {
         this._bindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
