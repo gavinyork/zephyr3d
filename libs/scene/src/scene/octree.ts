@@ -537,7 +537,7 @@ export class Octree {
    * @param rootSize - Root size of the octre
    * @param leafSize - Leaf size of the octree
    */
-  constructor(scene: Scene, rootSize = 4096, leafSize = 64) {
+  constructor(scene: Scene, rootSize = 8, leafSize = 64) {
     this._scene = scene;
     this._chunks = [];
     this._rootSize = 0;
@@ -697,6 +697,17 @@ export class Octree {
       }
       this._nodes.delete(node);
     }
+  }
+  prune() {
+    if (this._chunks.length === 1) {
+      return;
+    }
+    for (const entry of this._chunks[1].nodeMap) {
+      if (entry[1].getNodes().length > 0) {
+        return;
+      }
+    }
+    this.resize(this._leafSize);
   }
   resize(size: number) {
     size = Math.max(nextPowerOf2(Math.ceil(size)), this._leafSize);

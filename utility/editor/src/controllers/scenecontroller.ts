@@ -3,7 +3,6 @@ import {
   BoxShape,
   CylinderShape,
   deserializeObject,
-  getSerializationInfo,
   PlaneShape,
   serializeObject,
   SphereShape,
@@ -49,6 +48,7 @@ export class SceneController extends BaseController<SceneModel> {
   }
   private nodeTransform(node: SceneNode, oldTransform: TRS, newTransform: TRS) {
     this._cmdManager.execute(new NodeTransformCommand(node, oldTransform, newTransform));
+    this.model.scene.octree.prune();
   }
   private sceneAction(action: string) {
     switch (action) {
