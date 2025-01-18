@@ -1,11 +1,12 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { unpackFloat16x2 } from './misc';
 
-const DEBUG_CURRENT_COLOR = 1;
-const DEBUG_HISTORY_COLOR = 2;
-const DEBUG_VELOCITY = 3;
-const DEBUG_EDGE = 4;
-const DEBUG_ALAPH = 5;
+export const TAA_DEBUG_NONE = 0;
+export const TAA_DEBUG_CURRENT_COLOR = 1;
+export const TAA_DEBUG_HISTORY_COLOR = 2;
+export const TAA_DEBUG_VELOCITY = 3;
+export const TAA_DEBUG_EDGE = 4;
+export const TAA_DEBUG_ALAPH = 5;
 
 const FLT_MIN = 0.00000001;
 const FLT_MAX = 32767;
@@ -19,7 +20,8 @@ export function temporalResolve(
   prevMotionVectorTex: PBShaderExp,
   uv: PBShaderExp,
   workSize: PBShaderExp,
-  debug?: PBShaderExp | number
+  blendFactor: PBShaderExp,
+  debug = TAA_DEBUG_NONE
 ): PBShaderExp {
   const pb = scope.$builder;
   pb.func('getClosestVelocity', [pb.vec2('uv'), pb.vec2('texSize')], function () {
@@ -212,7 +214,7 @@ export function temporalResolve(
     );
     this.$return(pb.max(this.result, pb.vec3(0)));
   });
-  pb.func('temporalResolve', [pb.vec2('screenUV'), pb.vec2('texSize'), pb.int('debug')], function () {
+  pb.func('temporalResolve', [pb.vec2('screenUV'), pb.vec2('texSize'), pb.float('blendFactor')], function () {
     this.$l.velocitySample = pb.textureSampleLevel(motionVectorTex, this.screenUV, 0);
     this.$l.velocity =
       pb.getDevice().type === 'webgl'
@@ -229,7 +231,6 @@ export function temporalResolve(
       this.velocityClosest,
       this.texSize
     );
-    this.$l.blendFactor = pb.float(1 / 16);
     this.$l.screenFactor = this.$choice(
       pb.or(
         pb.any(pb.lessThan(this.reprojectedUV, pb.vec2(0))),
@@ -252,28 +253,23 @@ export function temporalResolve(
     this.diff = pb.mul(this.diff, this.diff);
     this.alpha = pb.mix(0, this.alpha, this.diff);
     this.$l.resolvedColor = pb.vec3();
-    this.$if(pb.equal(this.debug, DEBUG_CURRENT_COLOR), function () {
+    if (debug === TAA_DEBUG_CURRENT_COLOR) {
       this.resolvedColor = this.currentColor.rgb;
       this.resolvedColor = this.reinhardInv(this.resolvedColor);
-    })
-      .$elseif(pb.equal(this.debug, DEBUG_HISTORY_COLOR), function () {
-        this.resolvedColor = this.prevColor.rgb;
-        this.resolvedColor = this.reinhardInv(this.resolvedColor);
-      })
-      .$elseif(pb.equal(this.debug, DEBUG_EDGE), function () {
-        this.resolvedColor = pb.vec3(this.screenFactor);
-      })
-      .$elseif(pb.equal(this.debug, DEBUG_ALAPH), function () {
-        this.resolvedColor = pb.vec3(this.alpha);
-      })
-      .$elseif(pb.equal(this.debug, DEBUG_VELOCITY), function () {
-        this.resolvedColor = pb.abs(pb.sub(this.sampleColor, this.historyColor));
-      })
-      .$else(function () {
-        this.resolvedColor = pb.mix(this.prevColor.rgb, this.currentColor.rgb, this.alpha);
-        this.resolvedColor = this.reinhardInv(this.resolvedColor);
-      });
+    } else if (debug === TAA_DEBUG_HISTORY_COLOR) {
+      this.resolvedColor = this.prevColor.rgb;
+      this.resolvedColor = this.reinhardInv(this.resolvedColor);
+    } else if (debug === TAA_DEBUG_EDGE) {
+      this.resolvedColor = pb.vec3(this.screenFactor);
+    } else if (debug === TAA_DEBUG_ALAPH) {
+      this.resolvedColor = pb.vec3(this.alpha);
+    } else if (debug === TAA_DEBUG_VELOCITY) {
+      this.resolvedColor = pb.abs(pb.sub(this.sampleColor, this.historyColor));
+    } else {
+      this.resolvedColor = pb.mix(this.prevColor.rgb, this.currentColor.rgb, this.alpha);
+      this.resolvedColor = this.reinhardInv(this.resolvedColor);
+    }
     this.$return(this.resolvedColor);
   });
-  return scope.temporalResolve(uv, workSize, debug ?? 0);
+  return scope.temporalResolve(uv, workSize, blendFactor);
 }

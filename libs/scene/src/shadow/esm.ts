@@ -220,6 +220,8 @@ export class ESM extends ShadowImpl {
           true
         )
       };
+    } else {
+      shadowMapParams.implData = null;
     }
     shadowMapParams.shadowMap = this.getShadowMap(shadowMapParams);
     shadowMapParams.shadowMapSampler = shadowMapParams.shadowMap?.getDefaultSampler(false) ?? null;

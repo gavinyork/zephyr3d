@@ -9,7 +9,7 @@ import { Vector2 } from '@zephyr3d/base';
 
 export class TAA extends AbstractPostEffect<'TAA'> {
   static readonly className = 'TAA' as const;
-  private static _resolveProgram: GPUProgram = null;
+  private static _resolveProgram: GPUProgram[] = [];
   private static _skyMotionVectorProgram: GPUProgram = null;
   private static _box: Primitive;
   private static _texSize = new Vector2();
@@ -62,7 +62,11 @@ export class TAA extends AbstractPostEffect<'TAA'> {
       this.passThrough(ctx, inputColorTexture, srgbOutput);
     } else {
       this.renderSkyMotionVectors(ctx);
-      const program = TAA._getResolveProgram(ctx);
+      let program = TAA._resolveProgram[ctx.camera.TAADebug];
+      if (!program) {
+        program = TAA._getResolveProgram(ctx, ctx.camera.TAADebug);
+        TAA._resolveProgram[ctx.camera.TAADebug]
+      }
       if (!this._bindGroup) {
         this._bindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
       }
@@ -79,11 +83,11 @@ export class TAA extends AbstractPostEffect<'TAA'> {
         data.prevMotionVectorTex,
         fetchSampler('clamp_nearest_nomip')
       );
-      this._bindGroup.setValue('debug', ctx.camera.TAADebug);
       this._bindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
       this._bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
       TAA._texSize.setXY(sceneDepthTexture.width, sceneDepthTexture.height);
       this._bindGroup.setValue('texSize', TAA._texSize);
+      this._bindGroup.setValue('blendFactor', ctx.camera.TAABlendFactor);
       //this.passThrough(ctx, inputColorTexture, srgbOutput, AbstractPostEffect.getZTestEqualRenderState(ctx));
       ctx.device.setProgram(program);
       ctx.device.setBindGroup(0, this._bindGroup);
@@ -160,53 +164,51 @@ export class TAA extends AbstractPostEffect<'TAA'> {
     }
     return this._box;
   }
-  private static _getResolveProgram(ctx: DrawContext): GPUProgram {
-    if (!this._resolveProgram) {
-      this._resolveProgram = ctx.device.buildRenderProgram({
-        vertex(pb) {
-          this.flip = pb.int().uniform(0);
-          this.$inputs.pos = pb.vec2().attrib('position');
-          this.$outputs.uv = pb.vec2();
-          pb.main(function () {
-            this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
-            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-            this.$if(pb.notEqual(this.flip, 0), function () {
-              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
-            });
+  private static _getResolveProgram(ctx: DrawContext, debug: number): GPUProgram {
+    return ctx.device.buildRenderProgram({
+      vertex(pb) {
+        this.flip = pb.int().uniform(0);
+        this.$inputs.pos = pb.vec2().attrib('position');
+        this.$outputs.uv = pb.vec2();
+        pb.main(function () {
+          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+          this.$if(pb.notEqual(this.flip, 0), function () {
+            this.$builtins.position.y = pb.neg(this.$builtins.position.y);
           });
-        },
-        fragment(pb) {
-          this.historyColorTex = pb.tex2D().uniform(0);
-          this.currentColorTex = pb.tex2D().uniform(0);
-          this.currentDepthTex = pb.tex2D().uniform(0);
-          this.motionVector = pb.tex2D().uniform(0);
-          this.prevMotionVector = pb.tex2D().uniform(0);
-          this.texSize = pb.vec2().uniform(0);
-          this.debug = pb.int().uniform(0);
-          this.srgbOut = pb.int().uniform(0);
-          this.$outputs.outColor = pb.vec4();
-          pb.main(function () {
-            this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
-            this.$l.resolvedColor = temporalResolve(
-              this,
-              this.currentColorTex,
-              this.historyColorTex,
-              this.currentDepthTex,
-              this.motionVector,
-              this.prevMotionVector,
-              this.screenUV,
-              this.texSize,
-              this.debug
-            );
-            this.$if(pb.equal(this.srgbOut, 0), function () {
-              this.$outputs.outColor = pb.vec4(this.resolvedColor, 1);
-            }).$else(function () {
-              this.$outputs.outColor = pb.vec4(linearToGamma(this, this.resolvedColor), 1);
-            });
+        });
+      },
+      fragment(pb) {
+        this.historyColorTex = pb.tex2D().uniform(0);
+        this.currentColorTex = pb.tex2D().uniform(0);
+        this.currentDepthTex = pb.tex2D().uniform(0);
+        this.motionVector = pb.tex2D().uniform(0);
+        this.prevMotionVector = pb.tex2D().uniform(0);
+        this.texSize = pb.vec2().uniform(0);
+        this.blendFactor = pb.float().uniform(0);
+        this.srgbOut = pb.int().uniform(0);
+        this.$outputs.outColor = pb.vec4();
+        pb.main(function () {
+          this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
+          this.$l.resolvedColor = temporalResolve(
+            this,
+            this.currentColorTex,
+            this.historyColorTex,
+            this.currentDepthTex,
+            this.motionVector,
+            this.prevMotionVector,
+            this.screenUV,
+            this.texSize,
+            this.blendFactor,
+            debug
+          );
+          this.$if(pb.equal(this.srgbOut, 0), function () {
+            this.$outputs.outColor = pb.vec4(this.resolvedColor, 1);
+          }).$else(function () {
+            this.$outputs.outColor = pb.vec4(linearToGamma(this, this.resolvedColor), 1);
           });
-        }
-      });
-    }
-    return this._resolveProgram;
+        });
+      }
+    });
   }
 }

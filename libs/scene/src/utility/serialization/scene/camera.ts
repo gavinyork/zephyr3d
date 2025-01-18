@@ -4,6 +4,7 @@ import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 import { getSceneNodeClass } from './node';
 import type { AssetRegistry } from '../asset/asset';
 import { SceneNode } from '../../../scene';
+import { TAA_DEBUG_ALAPH, TAA_DEBUG_CURRENT_COLOR, TAA_DEBUG_EDGE, TAA_DEBUG_HISTORY_COLOR, TAA_DEBUG_NONE, TAA_DEBUG_VELOCITY } from '../../../shaders';
 
 export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
@@ -43,6 +44,42 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           },
           set(this: Camera, value) {
             this.TAA = value.bool[0];
+          }
+        },
+        {
+          name: 'TAADebug',
+          type: 'int',
+          enum: {
+            labels: ['None', 'Current Color', 'History Color', 'Velocity', 'Edge', 'Alpha'],
+            values: [TAA_DEBUG_NONE, TAA_DEBUG_CURRENT_COLOR, TAA_DEBUG_HISTORY_COLOR, TAA_DEBUG_VELOCITY, TAA_DEBUG_EDGE, TAA_DEBUG_ALAPH]
+          },
+          default: { num: [TAA_DEBUG_NONE] },
+          get(this: Camera, value) {
+            value.num[0] = this.TAADebug;
+          },
+          set(this: Camera, value) {
+            this.TAADebug = value.num[0];
+          },
+          isValid() {
+            return !!this.TAA;
+          }
+        },
+        {
+          name: 'TAABlendFactor',
+          type: 'float',
+          options: {
+            minValue: 0,
+            maxValue: 1
+          },
+          default: { num: [1 / 16] },
+          get(this: Camera, value) {
+            value.num[0] = this.TAABlendFactor;
+          },
+          set(this: Camera, value) {
+            this.TAABlendFactor = value.num[0];
+          },
+          isValid() {
+            return !!this.TAA;
           }
         },
         {

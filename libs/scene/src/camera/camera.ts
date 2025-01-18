@@ -83,6 +83,8 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _TAADebug: number;
   /** @internal */
+  protected _TAABlendFactor: number;
+  /** @internal */
   protected _ssrParams: Vector4;
   /** @internal */
   protected _ssrMaxRoughness: number;
@@ -151,6 +153,7 @@ export class Camera extends SceneNode {
     this._SSR = false;
     this._TAA = false;
     this._TAADebug = 0;
+    this._TAABlendFactor = 1 / 16;
     this._ssrParams = new Vector4(100, 120, 0.5, 0);
     this._ssrMaxRoughness = 0.8;
     this._ssrRoughnessFactor = 1;
@@ -208,6 +211,15 @@ export class Camera extends SceneNode {
   }
   set TAADebug(val: number) {
     this._TAADebug = val;
+  }
+  /**
+   * Gets the blend factor for TAA
+   */
+  get TAABlendFactor(): number {
+    return this._TAABlendFactor;
+  }
+  set TAABlendFactor(val: number) {
+    this._TAABlendFactor = val;
   }
   /**
    * Gets whether Screen Space Reflections (SSR) is enabled.
