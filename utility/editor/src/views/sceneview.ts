@@ -383,6 +383,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._toolbar.on('action', this.handleSceneAction, this);
     this._tab.sceneHierarchy.on('node_selected', this.handleNodeSelected, this);
     this._tab.sceneHierarchy.on('node_deselected', this.handleNodeDeselected, this);
+    this._tab.sceneHierarchy.on('node_request_delete', this.handleDeleteNode, this);
     this._tab.sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
     eventBus.on('scene_add_asset', this.handleAddAsset, this);
     this.sceneSetup();
@@ -395,6 +396,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._toolbar.off('action', this.handleSceneAction, this);
     this._tab.sceneHierarchy.off('node_selected', this.handleNodeSelected, this);
     this._tab.sceneHierarchy.off('node_deselected', this.handleNodeDeselected, this);
+    this._tab.sceneHierarchy.off('node_request_delete', this.handleDeleteNode, this);
     this._tab.sceneHierarchy.off('node_drag_drop', this.handleNodeDragDrop, this);
     eventBus.off('scene_add_asset', this.handleAddAsset, this);
     this.sceneFinialize();
@@ -421,6 +423,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoRenderer.off('end_rotate', this.handleEndTransformNode, this);
     this._postGizmoRenderer.off('end_scale', this.handleEndTransformNode, this);
   }
+  private handleDeleteNode(node: SceneNode) {}
   private handleNodeSelected(node: SceneNode) {
     let sealedNode = node;
     while (sealedNode && !sealedNode.sealed) {

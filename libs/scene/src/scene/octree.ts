@@ -670,7 +670,6 @@ export class Octree {
         locatedNode = this.locateNodeChain(curNode, center, size);
         if (!locatedNode) {
           const d = Math.max(...Vector3.abs(bbox.minPoint), ...Vector3.abs(bbox.maxPoint));
-          // nodeSize >= 4 * size & octreeSize >= 2 * d
           this.resize(Math.max(d * 2, 4 * size));
           this.placeNode(node);
           return;

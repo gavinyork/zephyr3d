@@ -81,18 +81,6 @@ export class SceneController extends BaseController<SceneModel> {
       case 'REDO':
         this._cmdManager.redo();
         break;
-      case 'TRANSLATE':
-        console.log('Translate');
-        break;
-      case 'ROTATE':
-        console.log('Rotate');
-        break;
-      case 'SCALE':
-        console.log('Scale');
-        break;
-      case 'DELETE':
-        console.log('Delete');
-        break;
       case 'ADD_BOX': {
         const poolId = Symbol();
         this._pools.push(poolId);
@@ -183,5 +171,8 @@ export class SceneController extends BaseController<SceneModel> {
     this._scene = null;
     this.model.reset();
     this._view.reset(this.model.scene);
+  }
+  private deleteNode(node: SceneNode) {
+    const assetI;
   }
 }
