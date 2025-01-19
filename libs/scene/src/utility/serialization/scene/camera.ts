@@ -122,6 +122,9 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           },
           set(this: Camera, value) {
             this.ssrMaxRoughness = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR;
           }
         },
         {
@@ -137,6 +140,9 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           },
           set(this: Camera, value) {
             this.ssrRoughnessFactor = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR;
           }
         },
         {
@@ -152,6 +158,9 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           },
           set(this: Camera, value) {
             this.ssrStride = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR && !this.HiZ;
           }
         },
         {
@@ -167,6 +176,9 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           },
           set(this: Camera, value) {
             this.ssrMaxDistance = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR;
           }
         },
         {
@@ -182,6 +194,9 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           },
           set(this: Camera, value) {
             this.ssrIterations = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR;
           }
         },
         {
@@ -197,6 +212,9 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           },
           set(this: Camera, value) {
             this.ssrThickness = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR;
           }
         },
         {
@@ -212,6 +230,9 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           },
           set(this: Camera, value) {
             this.ssrBlurScale = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR;
           }
         },
         {
@@ -227,6 +248,9 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           },
           set(this: Camera, value) {
             this.ssrBlurDepthCutoff = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR;
           }
         },
         {
@@ -242,6 +266,9 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           },
           set(this: Camera, value) {
             this.ssrBlurKernelSize = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR;
           }
         },
         {
@@ -257,6 +284,9 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           },
           set(this: Camera, value) {
             this.ssrBlurStdDev = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR;
           }
         },
         {
@@ -268,6 +298,9 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           },
           set(this: Camera, value) {
             this.ssrCalcThickness = value.bool[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR;
           }
         },
         {

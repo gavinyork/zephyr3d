@@ -172,7 +172,4 @@ export class SceneController extends BaseController<SceneModel> {
     this.model.reset();
     this._view.reset(this.model.scene);
   }
-  private deleteNode(node: SceneNode) {
-    const assetI;
-  }
 }
