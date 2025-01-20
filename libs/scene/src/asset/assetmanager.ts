@@ -616,7 +616,10 @@ export class AssetManager {
           meshNode.clipTestEnabled = true;
           meshNode.showState = 'inherit';
           meshNode.primitive = subMesh.primitive;
-          meshNode.material = instancing ? subMesh.material.createInstance() : subMesh.material;
+          meshNode.material =
+            instancing && !skeleton && subMesh.numTargets === 0
+              ? subMesh.material.createInstance()
+              : subMesh.material;
           meshNode.parent = node;
           subMesh.mesh = meshNode;
           processMorphData(subMesh, meshData.morphWeights, this._poolId);

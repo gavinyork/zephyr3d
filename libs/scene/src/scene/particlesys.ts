@@ -41,6 +41,7 @@ export type EmitterBehavior = 'surface' | 'volume';
 
 export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implements Drawable {
   private static updateFuncMap: WeakMap<ParticleSystem, () => void> = new WeakMap();
+  private _poolId: string | symbol;
   private _activeParticleList: ParticleNode[];
   private _maxParticleCount: number;
   private _emitInterval: number;
@@ -85,8 +86,9 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   private _pickTarget: PickTarget;
   private _instanceData: Float32Array;
   private _instanceBuffer: StructuredBuffer;
-  constructor(scene: Scene) {
+  constructor(scene: Scene, poolId?: string | symbol) {
     super(scene);
+    this._poolId = poolId;
     this._activeParticleList = [];
     this._maxParticleCount = 100;
     this._emitInterval = 100;
@@ -130,10 +132,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._wsBoundingBox = new BoundingBox();
     this._instanceData = null;
     this._instanceBuffer = null;
-    this._material = new ParticleMaterial();
-  }
-  get material() {
-    return this._material;
+    this._material = new ParticleMaterial(this._poolId);
   }
   set maxParticleCount(value: number) {
     if (value !== this._maxParticleCount) {
@@ -487,7 +486,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   }
   resizeVertexBuffers(device: AbstractDevice) {
     if (!this._primitive) {
-      this._primitive = new Primitive();
+      this._primitive = new Primitive(this._poolId);
       const quad = device.createVertexBuffer(
         'position_f32x4',
         new Float32Array([0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3])
@@ -692,9 +691,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
    * {@inheritDoc Drawable.getMaterial}
    */
   getMaterial(): MeshMaterial {
-    if (!this._material) {
-      this._material = new ParticleMaterial();
-    }
     return this._material;
   }
   /**

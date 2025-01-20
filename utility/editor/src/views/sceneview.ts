@@ -17,7 +17,7 @@ import { MenubarView } from '../components/menubar';
 import { StatusBar } from '../components/statusbar';
 import { BaseView } from './baseview';
 import { CommandManager } from '../core/command';
-import { NodeTransformCommand } from '../commands/scenecommands';
+import { AddAssetCommand, NodeTransformCommand } from '../commands/scenecommands';
 
 export class SceneView extends BaseView<SceneModel> {
   private _cmdManager: CommandManager;
@@ -31,6 +31,7 @@ export class SceneView extends BaseView<SceneModel> {
   private _oldTransform: TRS;
   private _dragDropTypes: string[];
   private _nodeToBePlaced: SceneNode;
+  private _assetToBeAdded: DBAssetInfo;
   private _mousePosX: number;
   private _mousePosY: number;
   private _assetRegistry: AssetRegistry;
@@ -43,6 +44,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._oldTransform = null;
     this._dragDropTypes = [];
     this._nodeToBePlaced = null;
+    this._assetToBeAdded = null;
     this._mousePosX = -1;
     this._mousePosY = -1;
     this._postGizmoCaptured = false;
@@ -380,8 +382,21 @@ export class SceneView extends BaseView<SceneModel> {
             this._assetRegistry.releaseAsset(this._nodeToBePlaced);
             this._nodeToBePlaced = null;
           } else if (ev.button === 0) {
-            this._tab.sceneHierarchy.selectNode(this._nodeToBePlaced);
-            this._nodeToBePlaced = null;
+            this._cmdManager
+              .execute(
+                new AddAssetCommand(
+                  this.model.scene,
+                  this._assetRegistry,
+                  this._assetToBeAdded,
+                  this._nodeToBePlaced.position
+                )
+              )
+              .then((node) => {
+                this._tab.sceneHierarchy.selectNode(node);
+                this._nodeToBePlaced.parent = null;
+                this._assetRegistry.releaseAsset(this._nodeToBePlaced);
+                this._nodeToBePlaced = null;
+              });
           }
         }
       }
@@ -495,8 +510,8 @@ export class SceneView extends BaseView<SceneModel> {
     }
   }
   private handleAddAsset(asset: DBAssetInfo) {
-    console.log(`Add asset ${asset.name}`);
     if (this._nodeToBePlaced) {
+      this._nodeToBePlaced.remove();
       this._assetRegistry.releaseAsset(this._nodeToBePlaced);
       this._nodeToBePlaced = null;
     }
@@ -504,6 +519,7 @@ export class SceneView extends BaseView<SceneModel> {
       .fetchModel(asset.uuid, this.model.scene, { enableInstancing: true })
       .then((node) => {
         this._nodeToBePlaced = node.group;
+        this._assetToBeAdded = asset;
       })
       .catch((err) => {
         Dialog.messageBox('Error', `${err}`);
@@ -528,11 +544,18 @@ export class SceneView extends BaseView<SceneModel> {
   }
   private handleEndTransformNode(node: SceneNode, desc: string) {
     if (node && node === this._transformNode) {
-      this._cmdManager.execute(new NodeTransformCommand(node, this._oldTransform, {
-        position: node.position,
-        rotation: node.rotation,
-        scale: node.scale
-      }, desc));
+      this._cmdManager.execute(
+        new NodeTransformCommand(
+          node,
+          this._oldTransform,
+          {
+            position: node.position,
+            rotation: node.rotation,
+            scale: node.scale
+          },
+          desc
+        )
+      );
       this._oldTransform = null;
       this._transformNode = null;
       this.model.scene.octree.prune();

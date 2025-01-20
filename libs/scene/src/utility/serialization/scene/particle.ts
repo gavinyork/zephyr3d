@@ -390,7 +390,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
           default: { object: [null] },
           objectTypes: [ParticleMaterial],
           get(this: ParticleSystem, value) {
-            value.object[0] = this.material;
+            value.object[0] = this.getMaterial();
           }
         }
       ];

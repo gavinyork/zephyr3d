@@ -1,4 +1,4 @@
-import type { AssetRegistry, Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
+import type { AssetRegistry, ModelInfo, Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
 import { ParticleSystem } from '@zephyr3d/scene';
 import {
   Application,
@@ -18,94 +18,93 @@ import type { DBAssetInfo } from '../storage/db';
 
 const idNodeMap: Record<string, SceneNode> = {};
 
-export class AddAssetCommand implements Command {
+export type CommandExecuteResult<T> = T extends AddAssetCommand ? SceneNode : void;
+
+export class AddAssetCommand implements Command<SceneNode> {
   private _scene: Scene;
   private _assetRegistry: AssetRegistry;
   private _asset: DBAssetInfo;
-  private _node: SceneNode;
   private _nodeId: string;
   private _position: Vector3;
-  private _loading: boolean;
   constructor(scene: Scene, assetRegistry: AssetRegistry, asset: DBAssetInfo, position: Vector3) {
     this._scene = scene;
     this._assetRegistry = assetRegistry;
-    this._node = null;
     this._nodeId = '';
     this._asset = { ...asset };
     this._position = new Vector3(position);
-    this._loading = false;
   }
   get desc(): string {
     return 'Add asset';
   }
-  execute() {
-    if (!this._loading) {
-      this._loading = true;
-      this._assetRegistry
-        .fetchModel(this._asset.uuid, this._scene, { enableInstancing: true })
-        .then((asset) => {
-          if (!this._loading) {
-            this._assetRegistry.releaseAsset(asset.group);
-          } else {
-            asset.group.position.set(this._position);
-            if (this._nodeId) {
-              asset.group.id = this._nodeId;
-            } else {
-              this._nodeId = asset.group.id;
-            }
-            idNodeMap[asset.group.id] = asset.group;
-            this._loading = false;
-            this._node = asset.group;
-          }
-        })
-        .catch(() => {
-          this._loading = false;
-        });
+  async execute() {
+    let asset: ModelInfo = null;
+    try {
+      asset = await this._assetRegistry.fetchModel(this._asset.uuid, this._scene, {
+        enableInstancing: true
+      });
+    } catch (err) {
+      console.error(`Load asset failed: ${this._asset.name}`);
+    }
+    if (asset) {
+      asset.group.position.set(this._position);
+      if (this._nodeId) {
+        asset.group.id = this._nodeId;
+      } else {
+        this._nodeId = asset.group.id;
+      }
+      idNodeMap[asset.group.id] = asset.group;
+      return asset.group;
+    } else {
+      this._nodeId = '';
+      return null;
     }
   }
-  undo() {
-    this._loading = false;
-    if (this._node) {
-      idNodeMap[this._node.id] = undefined;
-      this._node.parent = null;
-      this._assetRegistry.releaseAsset(this._node);
-      this._node = null;
+  async undo() {
+    if (this._nodeId) {
+      const node = idNodeMap[this._nodeId];
+      if (node) {
+        idNodeMap[this._nodeId] = undefined;
+        node.parent = null;
+        this._assetRegistry.releaseAsset(node);
+      }
     }
   }
 }
 
-export class AddParticleSystemCommand implements Command {
+export class AddParticleSystemCommand implements Command<ParticleSystem> {
   private _scene: Scene;
   private _poolId: symbol;
-  private _node: ParticleSystem;
   private _nodeId: string;
   constructor(scene: Scene, poolId?: symbol) {
     this._scene = scene;
-    this._node = null;
     this._nodeId = '';
     this._poolId = poolId;
   }
   get desc(): string {
     return 'Add particle system';
   }
-  execute(): void {
-    this._node = new ParticleSystem(this._scene);
+  async execute() {
+    const node = new ParticleSystem(this._scene, this._poolId);
     if (this._nodeId) {
-      this._node.id = this._nodeId;
+      node.id = this._nodeId;
     } else {
-      this._nodeId = this._node.id;
+      this._nodeId = node.id;
     }
-    idNodeMap[this._node.id] = this._node;
+    idNodeMap[this._nodeId] = node;
+    return node;
   }
-  undo(): void {
-    Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
-    idNodeMap[this._node.id] = undefined;
-    this._node.parent = null;
-    this._node = null;
+  async undo() {
+    if (this._nodeId) {
+      const node = idNodeMap[this._nodeId];
+      if (node) {
+        idNodeMap[this._nodeId] = undefined;
+        Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
+        node.parent = null;
+      }
+    }
   }
 }
-export class AddShapeCommand<T extends ShapeType> implements Command {
-  private _mesh: Mesh;
+export class AddShapeCommand<T extends ShapeType> implements Command<Mesh> {
   private _desc: string;
   private _scene: Scene;
   private _nodeId: string;
@@ -113,7 +112,6 @@ export class AddShapeCommand<T extends ShapeType> implements Command {
   private _shapeCls: GenericConstructor<T>;
   private _options: ShapeOptionType<T>;
   constructor(scene: Scene, shapeCls: GenericConstructor<T>, options?: ShapeOptionType<T>, poolId?: symbol) {
-    this._mesh = null;
     this._nodeId = '';
     this._poolId = poolId;
     this._scene = scene;
@@ -153,21 +151,26 @@ export class AddShapeCommand<T extends ShapeType> implements Command {
   get desc(): string {
     return this._desc;
   }
-  execute() {
+  async execute() {
     const shape = new this._shapeCls(this._options, this._poolId);
-    this._mesh = new Mesh(this._scene, shape, new PBRMetallicRoughnessMaterial(this._poolId));
+    const mesh = new Mesh(this._scene, shape, new PBRMetallicRoughnessMaterial(this._poolId));
     if (this._nodeId) {
-      this._mesh.id = this._nodeId;
+      mesh.id = this._nodeId;
     } else {
-      this._nodeId = this._mesh.id;
+      this._nodeId = mesh.id;
     }
-    idNodeMap[this._mesh.id] = this._mesh;
+    idNodeMap[this._nodeId] = mesh;
+    return mesh;
   }
-  undo() {
-    Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
-    idNodeMap[this._mesh.id] = undefined;
-    this._mesh.parent = null;
-    this._mesh = null;
+  async undo() {
+    if (this._nodeId) {
+      const node = idNodeMap[this._nodeId];
+      if (node) {
+        idNodeMap[this._nodeId] = undefined;
+        Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
+        node.parent = null;
+      }
+    }
   }
 }
 
@@ -193,7 +196,7 @@ export class NodeTransformCommand implements Command {
   get desc(): string {
     return this._desc;
   }
-  execute() {
+  async execute() {
     const node = idNodeMap[this._nodeId];
     if (node) {
       node.position = this._newTransform.position;
@@ -201,7 +204,7 @@ export class NodeTransformCommand implements Command {
       node.scale = this._newTransform.scale;
     }
   }
-  undo() {
+  async undo() {
     const node = idNodeMap[this._nodeId];
     if (node) {
       node.position = this._oldTransform.position;

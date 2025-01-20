@@ -18,13 +18,11 @@ import { Dialog } from '../views/dlg/dlg';
 
 export class SceneController extends BaseController<SceneModel> {
   protected _scene: DBSceneInfo;
-  protected _pools: symbol[];
   protected _view: SceneView;
   protected _assetRegistry: AssetRegistry;
   constructor(model: SceneModel, view: SceneView, assetRegistry: AssetRegistry) {
     super(model);
     this._view = view;
-    this._pools = [];
     this._assetRegistry = assetRegistry;
   }
   handleEvent(ev: Event, type?: string): boolean {
@@ -66,43 +64,31 @@ export class SceneController extends BaseController<SceneModel> {
         });
         break;
       case 'ADD_BOX': {
-        const poolId = Symbol();
-        this._pools.push(poolId);
         this._view.cmdManager.execute(
-          new AddShapeCommand(this.model.scene, BoxShape, { anchor: 0.5, anchorY: 0 }, poolId)
+          new AddShapeCommand(this.model.scene, BoxShape, { anchor: 0.5, anchorY: 0 })
         );
         break;
       }
       case 'ADD_SPHERE': {
-        const poolId = Symbol();
-        this._pools.push(poolId);
-        this._view.cmdManager.execute(new AddShapeCommand(this.model.scene, SphereShape, null, poolId));
+        this._view.cmdManager.execute(new AddShapeCommand(this.model.scene, SphereShape, null));
         break;
       }
       case 'ADD_PLANE': {
-        const poolId = Symbol();
-        this._pools.push(poolId);
-        this._view.cmdManager.execute(new AddShapeCommand(this.model.scene, PlaneShape, null, poolId));
+        this._view.cmdManager.execute(new AddShapeCommand(this.model.scene, PlaneShape, null));
         break;
       }
       case 'ADD_CYLINDER': {
-        const poolId = Symbol();
-        this._pools.push(poolId);
         this._view.cmdManager.execute(
-          new AddShapeCommand(this.model.scene, CylinderShape, { topCap: true, bottomCap: true }, poolId)
+          new AddShapeCommand(this.model.scene, CylinderShape, { topCap: true, bottomCap: true })
         );
         break;
       }
       case 'ADD_TORUS': {
-        const poolId = Symbol();
-        this._pools.push(poolId);
-        this._view.cmdManager.execute(new AddShapeCommand(this.model.scene, TorusShape, null, poolId));
+        this._view.cmdManager.execute(new AddShapeCommand(this.model.scene, TorusShape, null));
         break;
       }
       case 'ADD_PARTICLE_SYSTEM': {
-        const poolId = Symbol();
-        this._pools.push(poolId);
-        this._view.cmdManager.execute(new AddParticleSystemCommand(this.model.scene, poolId));
+        this._view.cmdManager.execute(new AddParticleSystemCommand(this.model.scene));
         break;
       }
       default:
