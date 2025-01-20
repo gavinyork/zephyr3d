@@ -16,17 +16,21 @@ import { Quaternion, Vector3, type GenericConstructor } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import type { DBAssetInfo } from '../storage/db';
 
+const idNodeMap: Record<string, SceneNode> = {};
+
 export class AddAssetCommand implements Command {
   private _scene: Scene;
   private _assetRegistry: AssetRegistry;
   private _asset: DBAssetInfo;
   private _node: SceneNode;
+  private _nodeId: string;
   private _position: Vector3;
   private _loading: boolean;
   constructor(scene: Scene, assetRegistry: AssetRegistry, asset: DBAssetInfo, position: Vector3) {
     this._scene = scene;
     this._assetRegistry = assetRegistry;
     this._node = null;
+    this._nodeId = '';
     this._asset = { ...asset };
     this._position = new Vector3(position);
     this._loading = false;
@@ -44,6 +48,12 @@ export class AddAssetCommand implements Command {
             this._assetRegistry.releaseAsset(asset.group);
           } else {
             asset.group.position.set(this._position);
+            if (this._nodeId) {
+              asset.group.id = this._nodeId;
+            } else {
+              this._nodeId = asset.group.id;
+            }
+            idNodeMap[asset.group.id] = asset.group;
             this._loading = false;
             this._node = asset.group;
           }
@@ -56,6 +66,7 @@ export class AddAssetCommand implements Command {
   undo() {
     this._loading = false;
     if (this._node) {
+      idNodeMap[this._node.id] = undefined;
       this._node.parent = null;
       this._assetRegistry.releaseAsset(this._node);
       this._node = null;
@@ -67,9 +78,11 @@ export class AddParticleSystemCommand implements Command {
   private _scene: Scene;
   private _poolId: symbol;
   private _node: ParticleSystem;
+  private _nodeId: string;
   constructor(scene: Scene, poolId?: symbol) {
     this._scene = scene;
     this._node = null;
+    this._nodeId = '';
     this._poolId = poolId;
   }
   get desc(): string {
@@ -77,9 +90,16 @@ export class AddParticleSystemCommand implements Command {
   }
   execute(): void {
     this._node = new ParticleSystem(this._scene);
+    if (this._nodeId) {
+      this._node.id = this._nodeId;
+    } else {
+      this._nodeId = this._node.id;
+    }
+    idNodeMap[this._node.id] = this._node;
   }
   undo(): void {
     Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
+    idNodeMap[this._node.id] = undefined;
     this._node.parent = null;
     this._node = null;
   }
@@ -88,11 +108,13 @@ export class AddShapeCommand<T extends ShapeType> implements Command {
   private _mesh: Mesh;
   private _desc: string;
   private _scene: Scene;
+  private _nodeId: string;
   private _poolId: symbol;
   private _shapeCls: GenericConstructor<T>;
   private _options: ShapeOptionType<T>;
   constructor(scene: Scene, shapeCls: GenericConstructor<T>, options?: ShapeOptionType<T>, poolId?: symbol) {
     this._mesh = null;
+    this._nodeId = '';
     this._poolId = poolId;
     this._scene = scene;
     switch (shapeCls as any) {
@@ -134,20 +156,28 @@ export class AddShapeCommand<T extends ShapeType> implements Command {
   execute() {
     const shape = new this._shapeCls(this._options, this._poolId);
     this._mesh = new Mesh(this._scene, shape, new PBRMetallicRoughnessMaterial(this._poolId));
+    if (this._nodeId) {
+      this._mesh.id = this._nodeId;
+    } else {
+      this._nodeId = this._mesh.id;
+    }
+    idNodeMap[this._mesh.id] = this._mesh;
   }
   undo() {
     Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
+    idNodeMap[this._mesh.id] = undefined;
     this._mesh.parent = null;
     this._mesh = null;
   }
 }
 
 export class NodeTransformCommand implements Command {
-  private _node: SceneNode;
+  private _nodeId: string;
+  private _desc: string;
   private _oldTransform: TRS;
   private _newTransform: TRS;
-  constructor(node: SceneNode, oldTransform: TRS, newTransform: TRS) {
-    this._node = node;
+  constructor(node: SceneNode, oldTransform: TRS, newTransform: TRS, desc: string) {
+    this._nodeId = node.id;
     this._oldTransform = {
       position: new Vector3(oldTransform.position),
       rotation: new Quaternion(oldTransform.rotation),
@@ -158,18 +188,25 @@ export class NodeTransformCommand implements Command {
       rotation: new Quaternion(newTransform.rotation),
       scale: new Vector3(newTransform.scale)
     };
+    this._desc = desc;
   }
   get desc(): string {
-    return 'Node transform';
+    return this._desc;
   }
   execute() {
-    this._node.position = this._newTransform.position;
-    this._node.rotation = this._newTransform.rotation;
-    this._node.scale = this._newTransform.scale;
+    const node = idNodeMap[this._nodeId];
+    if (node) {
+      node.position = this._newTransform.position;
+      node.rotation = this._newTransform.rotation;
+      node.scale = this._newTransform.scale;
+    }
   }
   undo() {
-    this._node.position = this._oldTransform.position;
-    this._node.rotation = this._oldTransform.rotation;
-    this._node.scale = this._oldTransform.scale;
+    const node = idNodeMap[this._nodeId];
+    if (node) {
+      node.position = this._oldTransform.position;
+      node.rotation = this._oldTransform.rotation;
+      node.scale = this._oldTransform.scale;
+    }
   }
 }

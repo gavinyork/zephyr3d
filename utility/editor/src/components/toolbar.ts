@@ -5,17 +5,17 @@ import type { BaseView } from '../views/baseview';
 export type ToolBarItem = {
   label: string;
   id?: string;
-  tooltip?: string;
   shortcut?: string;
-  group?: number;
-  selected?: boolean;
+  action?: () => void;
+  tooltip?: ()=>string;
+  selected?: () => boolean;
 };
 
 export class ToolBar extends makeEventTarget(Object)<{
   action: [id: string];
 }>() {
+  private _id: string;
   private _tools: ToolBarItem[];
-  private _state: Record<number, string>;
   private _pos: ImGui.ImVec2;
   private _size: ImGui.ImVec2;
   private _size2: ImGui.ImVec2;
@@ -26,6 +26,7 @@ export class ToolBar extends makeEventTarget(Object)<{
   private _textColorUnselected: ImGui.ImVec4;
   private _textColorSelected: ImGui.ImVec4;
   constructor(
+    id: string,
     items: ToolBarItem[],
     x: number,
     y: number,
@@ -36,12 +37,10 @@ export class ToolBar extends makeEventTarget(Object)<{
     spacing: number
   ) {
     super();
+    this._id = id;
     this._tools = (items ?? []).map((item) => ({
       ...item,
-      group: item.group ?? -1,
-      selected: !!item.selected
     }));
-    this._state = {};
     this._pos = new ImGui.ImVec2(x, y);
     this._size = new ImGui.ImVec2(w, h);
     this._size2 = new ImGui.ImVec2(w, h);
@@ -51,11 +50,6 @@ export class ToolBar extends makeEventTarget(Object)<{
     this._sepColor = ImGui.GetStyleColorVec4(ImGui.Col.Separator);
     this._textColorUnselected = new ImGui.ImVec4(0.6, 0.6, 0.6, 1);
     this._textColorSelected = new ImGui.ImVec4(1, 1, 1, 1);
-    for (const item of this._tools) {
-      if (item.group >= 0) {
-        this._state[item.group] = item.selected ? item.id : this._state[item.group] ?? null;
-      }
-    }
   }
   get x() {
     return this._pos.x;
@@ -84,27 +78,14 @@ export class ToolBar extends makeEventTarget(Object)<{
   get tools() {
     return this._tools;
   }
-  selectTool(id: string, select: boolean) {
-    for (const tool of this._tools) {
-      if (tool.id === id) {
-        if (tool.group >= 0) {
-          this._state[tool.group] = select ? tool.id : null;
-        }
-        tool.selected = select;
-        break;
-      }
-    }
-  }
   registerShortcuts(view: BaseView<any>) {
     for (const tool of this._tools) {
       if (tool.shortcut) {
         view.registerShortcut(tool.shortcut, () => {
-          const selected = tool.group >= 0 && tool.id === this._state[tool.group];
-          if (!selected) {
+          if (tool.action) {
+            tool.action();
+          } else if (tool.id) {
             this.dispatchEvent('action', tool.id);
-            if (tool.group >= 0) {
-              this._state[tool.group] = tool.id;
-            }
           }
         });
       }
@@ -134,7 +115,7 @@ export class ToolBar extends makeEventTarget(Object)<{
     this._buttonSize.y = this._size2.y - 2 * this._padding.y;
     if (
       ImGui.Begin(
-        'ToolBar',
+        `##${this._id}`,
         null,
         ImGui.WindowFlags.NoTitleBar |
           ImGui.WindowFlags.NoResize |
@@ -144,7 +125,10 @@ export class ToolBar extends makeEventTarget(Object)<{
           ImGui.WindowFlags.NoCollapse
       )
     ) {
-      for (const tool of this._tools) {
+      ImGui.PushID(this._id)
+      for (let i = 0; i < this._tools.length; i++) {
+        ImGui.PushID(i);
+        const tool = this._tools[i];
         if (tool.label === '-') {
           ImGui.PushStyleColor(ImGui.Col.Button, this._sepColor);
           ImGui.PushStyleColor(ImGui.Col.ButtonHovered, this._sepColor);
@@ -154,24 +138,27 @@ export class ToolBar extends makeEventTarget(Object)<{
         } else {
           ImGui.PushStyleColor(
             ImGui.Col.Text,
-            tool.selected ? this._textColorSelected : this._textColorUnselected
+            tool.selected?.() ? this._textColorSelected : this._textColorUnselected
           );
-          const selected = tool.group >= 0 && tool.id === this._state[tool.group];
-          if (ImGui.Button(`${tool.label}##${tool.id}`, this._buttonSize)) {
-            if (!selected) {
+          if (ImGui.Button(tool.label, this._buttonSize)) {
+            if (tool.action) {
+              tool.action();
+            } else if (tool.id) {
               this.dispatchEvent('action', tool.id);
-              if (tool.group >= 0) {
-                this._state[tool.group] = tool.id;
-              }
             }
           }
           if (tool.tooltip && ImGui.IsItemHovered()) {
-            ImGui.SetTooltip(tool.shortcut ? `${tool.tooltip} (${tool.shortcut})` : tool.tooltip);
+            const tooltip = tool.tooltip();
+            if (tooltip) {
+              ImGui.SetTooltip(tool.shortcut ? `${tooltip} (${tool.shortcut})` : tooltip);
+            }
           }
           ImGui.PopStyleColor();
         }
         ImGui.SameLine();
+        ImGui.PopID();
       }
+      ImGui.PopID();
     }
     ImGui.End();
     ImGui.PopStyleVar(2);

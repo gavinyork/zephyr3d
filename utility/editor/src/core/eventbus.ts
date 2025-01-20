@@ -1,6 +1,4 @@
 import { makeEventTarget } from '@zephyr3d/base';
-import type { SceneNode } from '@zephyr3d/scene';
-import type { TRS } from '../types';
 import type { DBAssetInfo } from '../storage/db';
 
 type EventBusEventMap = {
@@ -16,7 +14,6 @@ type EventBusEventMap = {
   workspace_drag_drop: [type: string, data: any, x: number, y: number];
   workspace_dragging: [type: string, data: any, x: number, y: number];
   action: [action: string];
-  node_transform: [node: SceneNode, oldTransform: TRS, newTransform: TRS];
 };
 
 export class EventBus extends makeEventTarget(Object)<EventBusEventMap>() {}

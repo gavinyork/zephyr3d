@@ -16,8 +16,11 @@ import { renderTextureViewer } from '../components/textureviewer';
 import { MenubarView } from '../components/menubar';
 import { StatusBar } from '../components/statusbar';
 import { BaseView } from './baseview';
+import { CommandManager } from '../core/command';
+import { NodeTransformCommand } from '../commands/scenecommands';
 
 export class SceneView extends BaseView<SceneModel> {
+  private _cmdManager: CommandManager;
   private _postGizmoRenderer: PostGizmoRenderer;
   private _propGrid: PropertyEditor;
   private _toolbar: ToolBar;
@@ -35,6 +38,7 @@ export class SceneView extends BaseView<SceneModel> {
   private _showTextureViewer: boolean;
   constructor(model: SceneModel, assetRegistry: AssetRegistry) {
     super(model);
+    this._cmdManager = new CommandManager();
     this._transformNode = null;
     this._oldTransform = null;
     this._dragDropTypes = [];
@@ -120,30 +124,47 @@ export class SceneView extends BaseView<SceneModel> {
       ]
     });
     this._toolbar = new ToolBar(
+      'MainToolBar',
       [
         {
           label: FontGlyph.glyphs['mouse-pointer'],
-          id: 'TOOL_SELECT',
-          tooltip: 'Select node',
-          group: 0
+          tooltip: () => 'Select node',
+          selected: () => {
+            return this._postGizmoRenderer.mode === 'select';
+          },
+          action: () => {
+            this._postGizmoRenderer.mode = 'select';
+          }
         },
         {
           label: FontGlyph.glyphs['move'],
-          id: 'TOOL_TRANSLATE',
-          tooltip: 'Move current selected node',
-          group: 0
+          tooltip: () => 'Move selected node',
+          selected: () => {
+            return this._postGizmoRenderer.mode === 'translation';
+          },
+          action: () => {
+            this._postGizmoRenderer.mode = 'translation';
+          }
         },
         {
           label: FontGlyph.glyphs['arrows-cw'],
-          id: 'TOOL_ROTATE',
-          tooltip: 'Rotate current selected node',
-          group: 0
+          tooltip: () => 'Rotate selected node',
+          selected: () => {
+            return this._postGizmoRenderer.mode === 'rotation';
+          },
+          action: () => {
+            this._postGizmoRenderer.mode = 'rotation';
+          }
         },
         {
           label: FontGlyph.glyphs['resize-vertical'],
-          id: 'TOOL_SCALE',
-          tooltip: 'Scale current selected node',
-          group: 0
+          tooltip: () => 'Scale selected node',
+          selected: () => {
+            return this._postGizmoRenderer.mode === 'scaling';
+          },
+          action: () => {
+            this._postGizmoRenderer.mode = 'scaling';
+          }
         },
         {
           label: '-'
@@ -151,14 +172,31 @@ export class SceneView extends BaseView<SceneModel> {
         {
           label: FontGlyph.glyphs['ccw'],
           shortcut: 'Ctrl+Z',
-          id: 'UNDO',
-          tooltip: 'Undo last change'
+          selected: () => {
+            return !!this._cmdManager.getUndoCommand();
+          },
+          tooltip: () => {
+            const cmd = this._cmdManager.getUndoCommand();
+            return cmd ? `Undo ${cmd.desc}` : 'Undo';
+          },
+          action: () => {
+            this._cmdManager.undo();
+          }
         },
         {
           label: FontGlyph.glyphs['cw'],
           shortcut: 'Ctrl+Shift+Z',
           id: 'REDO',
-          tooltip: 'Redo last change'
+          selected: () => {
+            return !!this._cmdManager.getRedoCommand();
+          },
+          tooltip: () => {
+            const cmd = this._cmdManager.getRedoCommand();
+            return cmd ? `Redo ${cmd.desc}` : 'Redo';
+          },
+          action: () => {
+            this._cmdManager.redo();
+          }
         }
       ],
       0,
@@ -192,8 +230,12 @@ export class SceneView extends BaseView<SceneModel> {
   get toolbar() {
     return this._toolbar;
   }
+  get cmdManager() {
+    return this._cmdManager;
+  }
   reset(scene: Scene) {
     this.sceneFinialize();
+    this._cmdManager.clear();
     this._postGizmoRenderer.dispose();
     this._postGizmoRenderer = new PostGizmoRenderer(this.model.camera, null);
     this._postGizmoRenderer.mode = 'select';
@@ -350,12 +392,12 @@ export class SceneView extends BaseView<SceneModel> {
         this.model.camera.pickAsync(p[0], p[1]).then((pickResult) => {
           let node = pickResult?.target?.node ?? null;
           if (node) {
-            let sealedNode = node;
-            while (sealedNode && !sealedNode.sealed) {
-              sealedNode = sealedNode.parent;
+            let assetNode = node;
+            while (assetNode && !this._assetRegistry.getAssetId(assetNode)) {
+              assetNode = assetNode.parent;
             }
-            if (sealedNode) {
-              node = sealedNode;
+            if (assetNode) {
+              node = assetNode;
             }
           }
           this._tab.sceneHierarchy.selectNode(node);
@@ -408,9 +450,9 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoRenderer.on('begin_translate', this.handleBeginTransformNode, this);
     this._postGizmoRenderer.on('begin_rotate', this.handleBeginTransformNode, this);
     this._postGizmoRenderer.on('begin_scale', this.handleBeginTransformNode, this);
-    this._postGizmoRenderer.on('end_translate', this.handleEndTransformNode, this);
-    this._postGizmoRenderer.on('end_rotate', this.handleEndTransformNode, this);
-    this._postGizmoRenderer.on('end_scale', this.handleEndTransformNode, this);
+    this._postGizmoRenderer.on('end_translate', this.handleEndTranslateNode, this);
+    this._postGizmoRenderer.on('end_rotate', this.handleEndRotateNode, this);
+    this._postGizmoRenderer.on('end_scale', this.handleEndScaleNode, this);
   }
   private sceneFinialize() {
     this.model.scene.rootNode.off('noderemoved', this.handleNodeRemoved, this);
@@ -419,18 +461,18 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoRenderer.off('begin_translate', this.handleBeginTransformNode, this);
     this._postGizmoRenderer.off('begin_rotate', this.handleBeginTransformNode, this);
     this._postGizmoRenderer.off('begin_scale', this.handleBeginTransformNode, this);
-    this._postGizmoRenderer.off('end_translate', this.handleEndTransformNode, this);
-    this._postGizmoRenderer.off('end_rotate', this.handleEndTransformNode, this);
-    this._postGizmoRenderer.off('end_scale', this.handleEndTransformNode, this);
+    this._postGizmoRenderer.off('end_translate', this.handleEndTranslateNode, this);
+    this._postGizmoRenderer.off('end_rotate', this.handleEndRotateNode, this);
+    this._postGizmoRenderer.off('end_scale', this.handleEndScaleNode, this);
   }
   private handleDeleteNode(node: SceneNode) {}
   private handleNodeSelected(node: SceneNode) {
-    let sealedNode = node;
-    while (sealedNode && !sealedNode.sealed) {
-      sealedNode = sealedNode.parent;
+    let assetNode = node;
+    while (assetNode && !this._assetRegistry.getAssetId(assetNode)) {
+      assetNode = assetNode.parent;
     }
-    if (sealedNode) {
-      node = sealedNode;
+    if (assetNode) {
+      node = assetNode;
     }
     this._postGizmoRenderer.node =
       node === node.scene.rootNode || node instanceof DirectionalLight ? null : node;
@@ -484,32 +526,30 @@ export class SceneView extends BaseView<SceneModel> {
     };
     this._postGizmoCaptured = true;
   }
-  private handleEndTransformNode(node: SceneNode) {
+  private handleEndTransformNode(node: SceneNode, desc: string) {
     if (node && node === this._transformNode) {
-      eventBus.dispatchEvent('node_transform', node, this._oldTransform, {
+      this._cmdManager.execute(new NodeTransformCommand(node, this._oldTransform, {
         position: node.position,
         rotation: node.rotation,
         scale: node.scale
-      });
+      }, desc));
       this._oldTransform = null;
       this._transformNode = null;
+      this.model.scene.octree.prune();
     }
     this._postGizmoCaptured = false;
   }
+  private handleEndTranslateNode(node: SceneNode) {
+    this.handleEndTransformNode(node, 'moving object');
+  }
+  private handleEndRotateNode(node: SceneNode) {
+    this.handleEndTransformNode(node, 'rotating object');
+  }
+  private handleEndScaleNode(node: SceneNode) {
+    this.handleEndTransformNode(node, 'scaling object');
+  }
   private handleSceneAction(action: string) {
     switch (action) {
-      case 'TOOL_SELECT':
-        this._postGizmoRenderer.mode = 'select';
-        break;
-      case 'TOOL_TRANSLATE':
-        this._postGizmoRenderer.mode = 'translation';
-        break;
-      case 'TOOL_ROTATE':
-        this._postGizmoRenderer.mode = 'rotation';
-        break;
-      case 'TOOL_SCALE':
-        this._postGizmoRenderer.mode = 'scaling';
-        break;
       case 'SHOW_TEXTURE_VIEWER':
         this._showTextureViewer = !this._showTextureViewer;
         this._menubar.checkMenuItem(action, this._showTextureViewer);

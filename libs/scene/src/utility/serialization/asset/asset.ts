@@ -2,7 +2,7 @@ import type { HttpRequest } from '@zephyr3d/base';
 import { AssetManager, type ModelFetchOptions, type TextureFetchOptions } from '../../../asset';
 import type { Scene, SceneNode } from '../../../scene';
 import type { Texture2D, TextureCube } from '@zephyr3d/device';
-import { AnimationSet } from '../../../animation';
+import type { AnimationSet } from '../../../animation';
 
 export type AssetType = 'model' | 'texture';
 export type AssetInfo = {

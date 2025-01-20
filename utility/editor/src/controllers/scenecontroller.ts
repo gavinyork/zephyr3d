@@ -1,4 +1,4 @@
-import type { AssetRegistry, Scene, SceneNode } from '@zephyr3d/scene';
+import type { AssetRegistry, Scene } from '@zephyr3d/scene';
 import {
   BoxShape,
   CylinderShape,
@@ -8,13 +8,11 @@ import {
   SphereShape,
   TorusShape
 } from '@zephyr3d/scene';
-import { AddParticleSystemCommand, AddShapeCommand, NodeTransformCommand } from '../commands/scenecommands';
-import { CommandManager } from '../core/command';
+import { AddParticleSystemCommand, AddShapeCommand } from '../commands/scenecommands';
 import { eventBus } from '../core/eventbus';
 import type { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
 import type { SceneView } from '../views/sceneview';
-import type { TRS } from '../types';
 import { Database, type DBSceneInfo } from '../storage/db';
 import { Dialog } from '../views/dlg/dlg';
 
@@ -23,13 +21,11 @@ export class SceneController extends BaseController<SceneModel> {
   protected _pools: symbol[];
   protected _view: SceneView;
   protected _assetRegistry: AssetRegistry;
-  protected _cmdManager: CommandManager;
   constructor(model: SceneModel, view: SceneView, assetRegistry: AssetRegistry) {
     super(model);
     this._view = view;
     this._pools = [];
     this._assetRegistry = assetRegistry;
-    this._cmdManager = new CommandManager();
   }
   handleEvent(ev: Event, type?: string): boolean {
     return this._view.handleEvent(ev, type);
@@ -38,17 +34,11 @@ export class SceneController extends BaseController<SceneModel> {
     this._scene = scene;
     eventBus.on('update', this.update, this);
     eventBus.on('action', this.sceneAction, this);
-    eventBus.on('node_transform', this.nodeTransform, this);
   }
   protected onDeactivate(): void {
     this._scene = null;
     eventBus.off('update', this.update, this);
     eventBus.off('action', this.sceneAction, this);
-    eventBus.off('node_transform', this.nodeTransform, this);
-  }
-  private nodeTransform(node: SceneNode, oldTransform: TRS, newTransform: TRS) {
-    this._cmdManager.execute(new NodeTransformCommand(node, oldTransform, newTransform));
-    this.model.scene.octree.prune();
   }
   private sceneAction(action: string) {
     switch (action) {
@@ -75,16 +65,10 @@ export class SceneController extends BaseController<SceneModel> {
           });
         });
         break;
-      case 'UNDO':
-        this._cmdManager.undo();
-        break;
-      case 'REDO':
-        this._cmdManager.redo();
-        break;
       case 'ADD_BOX': {
         const poolId = Symbol();
         this._pools.push(poolId);
-        this._cmdManager.execute(
+        this._view.cmdManager.execute(
           new AddShapeCommand(this.model.scene, BoxShape, { anchor: 0.5, anchorY: 0 }, poolId)
         );
         break;
@@ -92,19 +76,19 @@ export class SceneController extends BaseController<SceneModel> {
       case 'ADD_SPHERE': {
         const poolId = Symbol();
         this._pools.push(poolId);
-        this._cmdManager.execute(new AddShapeCommand(this.model.scene, SphereShape, null, poolId));
+        this._view.cmdManager.execute(new AddShapeCommand(this.model.scene, SphereShape, null, poolId));
         break;
       }
       case 'ADD_PLANE': {
         const poolId = Symbol();
         this._pools.push(poolId);
-        this._cmdManager.execute(new AddShapeCommand(this.model.scene, PlaneShape, null, poolId));
+        this._view.cmdManager.execute(new AddShapeCommand(this.model.scene, PlaneShape, null, poolId));
         break;
       }
       case 'ADD_CYLINDER': {
         const poolId = Symbol();
         this._pools.push(poolId);
-        this._cmdManager.execute(
+        this._view.cmdManager.execute(
           new AddShapeCommand(this.model.scene, CylinderShape, { topCap: true, bottomCap: true }, poolId)
         );
         break;
@@ -112,13 +96,13 @@ export class SceneController extends BaseController<SceneModel> {
       case 'ADD_TORUS': {
         const poolId = Symbol();
         this._pools.push(poolId);
-        this._cmdManager.execute(new AddShapeCommand(this.model.scene, TorusShape, null, poolId));
+        this._view.cmdManager.execute(new AddShapeCommand(this.model.scene, TorusShape, null, poolId));
         break;
       }
       case 'ADD_PARTICLE_SYSTEM': {
         const poolId = Symbol();
         this._pools.push(poolId);
-        this._cmdManager.execute(new AddParticleSystemCommand(this.model.scene, poolId));
+        this._view.cmdManager.execute(new AddParticleSystemCommand(this.model.scene, poolId));
         break;
       }
       default:
@@ -128,8 +112,6 @@ export class SceneController extends BaseController<SceneModel> {
   }
   private update() {
     this.model.camera.updateController();
-    this._view.toolbar.selectTool('UNDO', this._cmdManager.canUndo());
-    this._view.toolbar.selectTool('REDO', this._cmdManager.canRedo());
   }
   private saveScene(name: string) {
     this._scene = Object.assign({}, this._scene ?? {}, {
@@ -152,9 +134,8 @@ export class SceneController extends BaseController<SceneModel> {
           this._scene = sceneinfo;
           deserializeObject<Scene>(null, sceneinfo.content, this._assetRegistry).then((scene) => {
             if (scene) {
-              const cameraId = sceneinfo.metadata?.activeCamera;
-              this.model.reset(scene, cameraId);
-              this._view.reset(this.model.scene);
+              const cameraId = sceneinfo.metadata?.activeCamera as string;
+              this.reset(scene, cameraId);
             } else {
               throw new Error('Cannot load scene');
             }
@@ -169,7 +150,10 @@ export class SceneController extends BaseController<SceneModel> {
   }
   createScene() {
     this._scene = null;
-    this.model.reset();
+    this.reset();
+  }
+  reset(scene?: Scene, cameraId?: string) {
+    this.model.reset(scene, cameraId);
     this._view.reset(this.model.scene);
   }
 }

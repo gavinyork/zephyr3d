@@ -1,6 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
+import type { AssetRegistry } from '@zephyr3d/scene';
 import {
-  AssetRegistry,
   getSerializationInfo,
   type PropertyAccessor,
   type PropertyValue,

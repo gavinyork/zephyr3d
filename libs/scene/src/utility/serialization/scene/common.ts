@@ -1,6 +1,6 @@
-import { Texture2D, TextureCube } from '@zephyr3d/device';
-import { AssetRegistry } from '../asset/asset';
-import { PropertyAccessor } from '../types';
+import type { Texture2D, TextureCube } from '@zephyr3d/device';
+import type { AssetRegistry } from '../asset/asset';
+import type { PropertyAccessor } from '../types';
 
 export function getTextureProps<T>(
   assetRegistry: AssetRegistry,

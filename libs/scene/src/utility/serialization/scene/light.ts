@@ -6,7 +6,7 @@ import { Vector4 } from '@zephyr3d/base';
 import { getSceneNodeClass } from './node';
 import type { AssetRegistry } from '../asset/asset';
 import { SceneNode } from '../../../scene';
-import { ShadowMode } from '../../../shadow';
+import type { ShadowMode } from '../../../shadow';
 
 export function getPunctualLightClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
@@ -102,7 +102,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
             value.num[0] = this.shadow.shadowMapSize;
           },
           set(this: PunctualLight, value) {
-            this.shadow.shadowMapSize = value.num[0]
+            this.shadow.shadowMapSize = value.num[0];
           },
           isValid(this: PunctualLight) {
             return !!this.castShadow;
@@ -156,7 +156,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
             value.num[0] = this.shadow.numShadowCascades;
           },
           set(this: PunctualLight, value) {
-            this.shadow.numShadowCascades = value.num[0]
+            this.shadow.numShadowCascades = value.num[0];
           },
           isValid(this: PunctualLight) {
             return !!this.castShadow;
