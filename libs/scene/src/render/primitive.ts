@@ -21,10 +21,6 @@ import { RenderBundleWrapper } from './renderbundle_wrapper';
  * @public
  */
 export class Primitive {
-  static _dummy = (function () {
-    console.log('Constructor of Shape');
-    return 0;
-  })();
   /** @internal */
   protected _poolId: string | symbol;
   /** @internal */
