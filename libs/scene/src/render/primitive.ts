@@ -53,7 +53,7 @@ export class Primitive {
    * Creates an instance of a primitive
    */
   constructor(poolId?: string | symbol) {
-    this._poolId = poolId;
+    this._poolId = poolId ?? Symbol();
     this._vertexLayout = null;
     this._vertexLayoutOptions = { vertexBuffers: [] };
     this._primitiveType = 'triangle-list';
@@ -71,6 +71,20 @@ export class Primitive {
    */
   get id(): number {
     return this._id;
+  }
+  /**
+   * GPU object pool
+   */
+  get poolId(): string | symbol {
+    return this._poolId;
+  }
+  set poolId(poolId: string | symbol) {
+    if (poolId && poolId !== this._poolId) {
+      Application.instance.device
+        .getPool(poolId)
+        .moveNonCachedObjectsFrom(Application.instance.device.getPool(this._poolId));
+      this._poolId = poolId;
+    }
   }
   /**
    * Adds a callback function that will be called whenever the bounding box of the primitive changes.
@@ -282,17 +296,8 @@ export class Primitive {
    * call removeVertexBuffer() or setIndexBuffer(null) first.
    */
   dispose() {
-    if (this._vertexLayout) {
-      const vertexBuffers = this._vertexLayout.vertexBuffers;
-      for (const k in vertexBuffers) {
-        vertexBuffers[k]?.buffer?.dispose();
-      }
-      this._vertexLayout.indexBuffer?.dispose();
-      this._vertexLayout.dispose();
-      this._vertexLayout = null;
-    }
-    this._indexCount = null;
-    this._indexStart = 0;
+    Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
+    this._vertexLayout = null;
   }
   /*
   createAABBTree(): AABBTree {

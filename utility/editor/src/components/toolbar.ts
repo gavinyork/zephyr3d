@@ -7,7 +7,7 @@ export type ToolBarItem = {
   id?: string;
   shortcut?: string;
   action?: () => void;
-  tooltip?: ()=>string;
+  tooltip?: () => string;
   selected?: () => boolean;
 };
 
@@ -39,7 +39,7 @@ export class ToolBar extends makeEventTarget(Object)<{
     super();
     this._id = id;
     this._tools = (items ?? []).map((item) => ({
-      ...item,
+      ...item
     }));
     this._pos = new ImGui.ImVec2(x, y);
     this._size = new ImGui.ImVec2(w, h);
@@ -125,7 +125,7 @@ export class ToolBar extends makeEventTarget(Object)<{
           ImGui.WindowFlags.NoCollapse
       )
     ) {
-      ImGui.PushID(this._id)
+      ImGui.PushID(this._id);
       for (let i = 0; i < this._tools.length; i++) {
         ImGui.PushID(i);
         const tool = this._tools[i];
@@ -147,13 +147,13 @@ export class ToolBar extends makeEventTarget(Object)<{
               this.dispatchEvent('action', tool.id);
             }
           }
+          ImGui.PopStyleColor();
           if (tool.tooltip && ImGui.IsItemHovered()) {
             const tooltip = tool.tooltip();
             if (tooltip) {
               ImGui.SetTooltip(tool.shortcut ? `${tooltip} (${tool.shortcut})` : tooltip);
             }
           }
-          ImGui.PopStyleColor();
         }
         ImGui.SameLine();
         ImGui.PopID();

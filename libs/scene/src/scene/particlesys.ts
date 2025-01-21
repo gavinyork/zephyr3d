@@ -88,7 +88,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   private _instanceBuffer: StructuredBuffer;
   constructor(scene: Scene, poolId?: string | symbol) {
     super(scene);
-    this._poolId = poolId;
+    this._poolId = poolId ?? Symbol();
     this._activeParticleList = [];
     this._maxParticleCount = 100;
     this._emitInterval = 100;
@@ -133,6 +133,17 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._instanceData = null;
     this._instanceBuffer = null;
     this._material = new ParticleMaterial(this._poolId);
+  }
+  get poolId() {
+    return this._poolId;
+  }
+  set poolId(poolId) {
+    if (poolId && poolId !== this._poolId) {
+      Application.instance.device
+        .getPool(poolId)
+        .moveNonCachedObjectsFrom(Application.instance.device.getPool(this._poolId));
+      this._poolId = poolId;
+    }
   }
   set maxParticleCount(value: number) {
     if (value !== this._maxParticleCount) {

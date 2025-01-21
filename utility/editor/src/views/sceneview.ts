@@ -17,7 +17,7 @@ import { MenubarView } from '../components/menubar';
 import { StatusBar } from '../components/statusbar';
 import { BaseView } from './baseview';
 import { CommandManager } from '../core/command';
-import { AddAssetCommand, NodeTransformCommand } from '../commands/scenecommands';
+import { AddAssetCommand, NodeReparentCommand, NodeTransformCommand } from '../commands/scenecommands';
 
 export class SceneView extends BaseView<SceneModel> {
   private _cmdManager: CommandManager;
@@ -98,6 +98,10 @@ export class SceneView extends BaseView<SceneModel> {
             },
             {
               label: '-'
+            },
+            {
+              label: 'Batch group',
+              id: 'ADD_BATCH_GROUP'
             },
             {
               label: 'ParticleSystem',
@@ -187,7 +191,7 @@ export class SceneView extends BaseView<SceneModel> {
         },
         {
           label: FontGlyph.glyphs['cw'],
-          shortcut: 'Ctrl+Shift+Z',
+          shortcut: 'Ctrl+Y',
           id: 'REDO',
           selected: () => {
             return !!this._cmdManager.getRedoCommand();
@@ -504,9 +508,7 @@ export class SceneView extends BaseView<SceneModel> {
   }
   private handleNodeDragDrop(src: SceneNode, dst: SceneNode) {
     if (src.parent !== dst && !src.isParentOf(dst)) {
-      const localMatrix = Matrix4x4.invertAffine(dst.worldMatrix).multiplyRight(src.worldMatrix);
-      localMatrix.decompose(src.scale, src.rotation, src.position);
-      src.parent = dst;
+      this._cmdManager.execute(new NodeReparentCommand(src, dst));
     }
   }
   private handleAddAsset(asset: DBAssetInfo) {

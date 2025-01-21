@@ -8,7 +8,7 @@ import {
   SphereShape,
   TorusShape
 } from '@zephyr3d/scene';
-import { AddParticleSystemCommand, AddShapeCommand } from '../commands/scenecommands';
+import { AddBatchGroupCommand, AddParticleSystemCommand, AddShapeCommand } from '../commands/scenecommands';
 import { eventBus } from '../core/eventbus';
 import type { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
@@ -89,6 +89,10 @@ export class SceneController extends BaseController<SceneModel> {
       }
       case 'ADD_PARTICLE_SYSTEM': {
         this._view.cmdManager.execute(new AddParticleSystemCommand(this.model.scene));
+        break;
+      }
+      case 'ADD_BATCH_GROUP': {
+        this._view.cmdManager.execute(new AddBatchGroupCommand(this.model.scene));
         break;
       }
       default:

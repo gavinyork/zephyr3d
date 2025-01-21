@@ -4,6 +4,7 @@ import type { Primitive } from '../render/primitive';
 import type { DrawContext } from '../render/drawable';
 import { QUEUE_OPAQUE } from '../values';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
+import { Application } from '../app';
 
 type MaterialState = {
   program: GPUProgram;
@@ -42,7 +43,7 @@ export class Material {
    */
   constructor(poolId?: string | symbol) {
     this._id = ++Material._nextId;
-    this._poolId = poolId;
+    this._poolId = poolId ?? Symbol();
     this._states = {};
     this._numPasses = 1;
     this._hash = [null];
@@ -52,6 +53,14 @@ export class Material {
   /** Pool id */
   get poolId() {
     return this._poolId;
+  }
+  set poolId(poolId: string | symbol) {
+    if (poolId && poolId !== this._poolId) {
+      Application.instance.device
+        .getPool(poolId)
+        .moveNonCachedObjectsFrom(Application.instance.device.getPool(this._poolId));
+      this._poolId = poolId;
+    }
   }
   /** Unique identifier of the material */
   get instanceId(): number {
@@ -138,8 +147,12 @@ export class Material {
       state.materialTag = this._optionTag;
       this.updateRenderStates(pass, state.renderStateSet, ctx);
       this._currentHash[pass] = hash;
-      if (state.bindGroup && state.bindGroup.getGPUId() !== state.bindGroupTag) {
-        RenderBundleWrapper.materialChanged(this.coreMaterial);
+      if (state.bindGroup) {
+        const id = state.bindGroup.getGPUId();
+        if (id !== state.bindGroupTag) {
+          state.bindGroupTag = id;
+          RenderBundleWrapper.materialChanged(this.coreMaterial);
+        }
       }
     }
   }

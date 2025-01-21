@@ -89,6 +89,34 @@ export class Pool {
     this._allocatedObjects.clear();
   }
   /**
+   * Move objects from another pool to this
+   * @param other - The pool to move object from
+   */
+  moveNonCachedObjectsFrom(other: Pool) {
+    if (other !== this) {
+      other?._allocatedObjects.forEach((value) => {
+        this._allocatedObjects.add(value);
+      });
+      other?._allocatedObjects.clear();
+    }
+  }
+  /**
+   * Add an object to this pool
+   * @param obj - GPU object to add
+   */
+  addNonCachedObject(obj: GPUObject) {
+    if (obj) {
+      this._allocatedObjects.add(obj);
+    }
+  }
+  /**
+   * Remove an object from this pool
+   * @param obj - GPU object to remove
+   */
+  removeNonCachedObject(obj: GPUObject) {
+    this._allocatedObjects.delete(obj);
+  }
+  /**
    * Dispose object created by createXXXX methods.
    * @param object - Object to be disposed
    */

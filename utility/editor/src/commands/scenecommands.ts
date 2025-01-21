@@ -1,5 +1,14 @@
-import type { AssetRegistry, ModelInfo, Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
-import { ParticleSystem } from '@zephyr3d/scene';
+import {
+  AssetRegistry,
+  BatchGroup,
+  deserializeObject,
+  ModelInfo,
+  Scene,
+  SceneNode,
+  ShapeOptionType,
+  ShapeType
+} from '@zephyr3d/scene';
+import { ParticleSystem, serializeObject } from '@zephyr3d/scene';
 import {
   Application,
   BoxFrameShape,
@@ -12,11 +21,12 @@ import {
   TorusShape
 } from '@zephyr3d/scene';
 import type { Command } from '../core/command';
-import { Quaternion, Vector3, type GenericConstructor } from '@zephyr3d/base';
+import { Matrix4x4, Quaternion, Vector3, type GenericConstructor } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import type { DBAssetInfo } from '../storage/db';
 
 const idNodeMap: Record<string, SceneNode> = {};
+const nodePoolMap: WeakMap<SceneNode, symbol> = new WeakMap();
 
 export type CommandExecuteResult<T> = T extends AddAssetCommand ? SceneNode : void;
 
@@ -70,36 +80,76 @@ export class AddAssetCommand implements Command<SceneNode> {
     }
   }
 }
-
-export class AddParticleSystemCommand implements Command<ParticleSystem> {
+export class AddBatchGroupCommand implements Command<BatchGroup> {
   private _scene: Scene;
-  private _poolId: symbol;
   private _nodeId: string;
-  constructor(scene: Scene, poolId?: symbol) {
+  constructor(scene: Scene) {
     this._scene = scene;
     this._nodeId = '';
-    this._poolId = poolId;
   }
   get desc(): string {
     return 'Add particle system';
   }
   async execute() {
-    const node = new ParticleSystem(this._scene, this._poolId);
+    const poolId = Symbol();
+    const node = new BatchGroup(this._scene);
     if (this._nodeId) {
       node.id = this._nodeId;
     } else {
       this._nodeId = node.id;
     }
     idNodeMap[this._nodeId] = node;
+    nodePoolMap.set(node, poolId);
     return node;
   }
   async undo() {
     if (this._nodeId) {
       const node = idNodeMap[this._nodeId];
       if (node) {
+        node.remove();
         idNodeMap[this._nodeId] = undefined;
-        Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
-        node.parent = null;
+        const poolId = nodePoolMap.get(node);
+        if (poolId) {
+          Application.instance.device.getPool(poolId).disposeNonCachedObjects();
+          nodePoolMap.delete(node);
+        }
+      }
+    }
+  }
+}
+export class AddParticleSystemCommand implements Command<ParticleSystem> {
+  private _scene: Scene;
+  private _nodeId: string;
+  constructor(scene: Scene) {
+    this._scene = scene;
+    this._nodeId = '';
+  }
+  get desc(): string {
+    return 'Add particle system';
+  }
+  async execute() {
+    const poolId = Symbol();
+    const node = new ParticleSystem(this._scene, poolId);
+    if (this._nodeId) {
+      node.id = this._nodeId;
+    } else {
+      this._nodeId = node.id;
+    }
+    idNodeMap[this._nodeId] = node;
+    nodePoolMap.set(node, poolId);
+    return node;
+  }
+  async undo() {
+    if (this._nodeId) {
+      const node = idNodeMap[this._nodeId];
+      if (node) {
+        node.remove();
+        idNodeMap[this._nodeId] = undefined;
+        const poolId = nodePoolMap.get(node);
+        if (poolId) {
+          Application.instance.device.getPool(poolId).disposeNonCachedObjects();
+          nodePoolMap.delete(node);
+        }
       }
     }
   }
@@ -108,12 +158,10 @@ export class AddShapeCommand<T extends ShapeType> implements Command<Mesh> {
   private _desc: string;
   private _scene: Scene;
   private _nodeId: string;
-  private _poolId: symbol;
   private _shapeCls: GenericConstructor<T>;
   private _options: ShapeOptionType<T>;
-  constructor(scene: Scene, shapeCls: GenericConstructor<T>, options?: ShapeOptionType<T>, poolId?: symbol) {
+  constructor(scene: Scene, shapeCls: GenericConstructor<T>, options?: ShapeOptionType<T>) {
     this._nodeId = '';
-    this._poolId = poolId;
     this._scene = scene;
     switch (shapeCls as any) {
       case BoxShape: {
@@ -152,28 +200,120 @@ export class AddShapeCommand<T extends ShapeType> implements Command<Mesh> {
     return this._desc;
   }
   async execute() {
-    const shape = new this._shapeCls(this._options, this._poolId);
-    const mesh = new Mesh(this._scene, shape, new PBRMetallicRoughnessMaterial(this._poolId));
+    const poolId = Symbol();
+    const shape = new this._shapeCls(this._options, poolId);
+    const mesh = new Mesh(this._scene, shape, new PBRMetallicRoughnessMaterial(poolId));
     if (this._nodeId) {
       mesh.id = this._nodeId;
     } else {
       this._nodeId = mesh.id;
     }
     idNodeMap[this._nodeId] = mesh;
+    nodePoolMap.set(mesh, poolId);
     return mesh;
   }
   async undo() {
     if (this._nodeId) {
       const node = idNodeMap[this._nodeId];
       if (node) {
+        node.remove();
         idNodeMap[this._nodeId] = undefined;
-        Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
-        node.parent = null;
+        const poolId = nodePoolMap.get(node);
+        if (poolId) {
+          Application.instance.device.getPool(poolId).disposeNonCachedObjects();
+          nodePoolMap.delete(node);
+        }
       }
     }
   }
 }
 
+export class NodeDeleteCommand implements Command {
+  private _assetRegistry: AssetRegistry;
+  private _scene: any;
+  private _archive: any;
+  private _nodeId: string;
+  private _parentId: string;
+  constructor(node: SceneNode, assetRegistry: AssetRegistry) {
+    this._scene = node.scene;
+    this._assetRegistry = assetRegistry;
+    this._nodeId = node.id;
+    idNodeMap[this._nodeId] = node;
+    this._parentId = node.parent.id;
+    idNodeMap[this._parentId] = node.parent;
+    this._archive = null;
+  }
+  get desc() {
+    return 'Delete node';
+  }
+  async execute(): Promise<void> {
+    const node = idNodeMap[this._nodeId];
+    if (node) {
+      this._archive = await serializeObject(node, this._assetRegistry);
+      node.remove();
+      node.iterate((child) => {
+        delete idNodeMap[child.id];
+        const poolId = nodePoolMap.get(child);
+        if (poolId) {
+          Application.instance.device.getPool(poolId).disposeNonCachedObjects();
+          nodePoolMap.delete(child);
+        }
+      });
+      delete idNodeMap[this._nodeId];
+    }
+  }
+  async undo() {
+    if (this._archive) {
+      const parent = idNodeMap[this._parentId];
+      if (parent) {
+        const node = (await deserializeObject(this._scene, this._archive, this._assetRegistry)) as SceneNode;
+        if (node) {
+          node.iterate((child) => {
+            idNodeMap[child.id] = child;
+          });
+          node.parent = parent;
+        }
+      }
+    }
+  }
+}
+export class NodeReparentCommand implements Command {
+  private _nodeId: string;
+  private _newParentId: string;
+  private _oldParentId: string;
+  private _oldLocalMatrix: Matrix4x4;
+  constructor(node: SceneNode, newParent: SceneNode) {
+    this._nodeId = node.id;
+    idNodeMap[this._nodeId] = node;
+    this._newParentId = newParent.id;
+    idNodeMap[this._newParentId] = newParent;
+    this._oldParentId = '';
+    this._oldLocalMatrix = null;
+  }
+  get desc() {
+    return 'reparent object';
+  }
+  async execute(): Promise<void> {
+    const node = idNodeMap[this._nodeId];
+    const newParent = idNodeMap[this._newParentId];
+    if (node && newParent) {
+      this._oldParentId = node.parent.id;
+      idNodeMap[this._oldParentId] = node.parent;
+      this._oldLocalMatrix = new Matrix4x4(node.localMatrix);
+      const newLocalMatrix = Matrix4x4.invertAffine(newParent.worldMatrix).multiplyRight(node.worldMatrix);
+      newLocalMatrix.decompose(node.scale, node.rotation, node.position);
+      node.parent = newParent;
+    }
+  }
+  async undo() {
+    const node = idNodeMap[this._nodeId];
+    const oldParent = idNodeMap[this._oldParentId];
+    if (node && oldParent) {
+      this._oldLocalMatrix.decompose(node.scale, node.rotation, node.position);
+      node.parent = oldParent;
+    }
+  }
+}
 export class NodeTransformCommand implements Command {
   private _nodeId: string;
   private _desc: string;
@@ -181,6 +321,7 @@ export class NodeTransformCommand implements Command {
   private _newTransform: TRS;
   constructor(node: SceneNode, oldTransform: TRS, newTransform: TRS, desc: string) {
     this._nodeId = node.id;
+    idNodeMap[this._nodeId] = node;
     this._oldTransform = {
       position: new Vector3(oldTransform.position),
       rotation: new Quaternion(oldTransform.rotation),
