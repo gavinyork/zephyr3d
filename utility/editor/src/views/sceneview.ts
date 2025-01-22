@@ -329,8 +329,8 @@ export class SceneView extends BaseView<SceneModel> {
     if (ImGui.Begin('FontTest')) {
       ImGui.Text(FontGlyph.allGlyphs);
     }
-    */
     ImGui.End();
+    */
   }
   renderDropZone(x: number, y: number, w: number, h: number) {
     const color = new ImGui.ImVec4(0, 0, 0, 0);
