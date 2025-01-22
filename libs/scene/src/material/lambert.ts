@@ -12,7 +12,7 @@ import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
 export class LambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLight, mixinVertexColor) {
   private static FEATURE_VERTEX_NORMAL = this.defineFeature();
   private static FEATURE_VERTEX_TANGENT = this.defineFeature();
-  constructor(poolId?: string | symbol) {
+  constructor(poolId?: symbol) {
     super(poolId);
     this.useFeature(LambertMaterial.FEATURE_VERTEX_NORMAL, true);
   }

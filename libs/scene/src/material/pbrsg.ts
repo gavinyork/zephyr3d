@@ -21,7 +21,7 @@ export class PBRSpecularGlossinessMaterial extends applyMaterialMixins(
   /**
    * Creates an instance of PBRSpecularGlossinessMaterial class
    */
-  constructor(poolId?: string | symbol) {
+  constructor(poolId?: symbol) {
     super(poolId);
     this.useFeature(PBRSpecularGlossinessMaterial.FEATURE_VERTEX_NORMAL, true);
   }

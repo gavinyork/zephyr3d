@@ -32,7 +32,7 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
   return class extends S {
     static albedoColorMixed = true;
     private _albedoColor: Vector4;
-    constructor(poolId?: string | symbol) {
+    constructor(poolId?: symbol) {
       super(poolId);
       this._albedoColor = Vector4.one();
     }

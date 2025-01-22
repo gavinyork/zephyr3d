@@ -10,7 +10,7 @@ import {
 import { ShaderHelper } from '../material/shader/helper';
 import { BoundingBox } from '../utility/bounding_volume';
 
-export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number[], poolId: string | symbol) {
+export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number[], poolId?: symbol) {
   const device = Application.instance.device;
   const pool = poolId ? device.getPool(poolId) : device;
   const numTargets = subMesh.numTargets;

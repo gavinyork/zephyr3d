@@ -40,7 +40,7 @@ export class BoxShape extends Shape<BoxCreationOptions> {
    * Creates an instance of box shape
    * @param options - The creation options
    */
-  constructor(options?: BoxCreationOptions, poolId?: string | symbol) {
+  constructor(options?: BoxCreationOptions, poolId?: symbol) {
     super(options, poolId);
   }
   /**
@@ -193,7 +193,7 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> {
    * Creates an instance of wireframe box shape
    * @param options - The creation options
    */
-  constructor(options?: BoxCreationOptions, poolId?: string | symbol) {
+  constructor(options?: BoxCreationOptions, poolId?: symbol) {
     super(options, poolId);
   }
   /**

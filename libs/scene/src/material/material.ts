@@ -4,7 +4,6 @@ import type { Primitive } from '../render/primitive';
 import type { DrawContext } from '../render/drawable';
 import { QUEUE_OPAQUE } from '../values';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
-import { Application } from '../app';
 
 type MaterialState = {
   program: GPUProgram;
@@ -25,7 +24,7 @@ export class Material {
   /** @internal */
   private static _programCache: { [hash: string]: GPUProgram } = {};
   /** @internal */
-  private _poolId: string | symbol;
+  private _poolId: symbol;
   /** @internal */
   private _states: { [hash: string]: MaterialState };
   /** @internal */
@@ -41,9 +40,12 @@ export class Material {
   /**
    * Creates an instance of material
    */
-  constructor(poolId?: string | symbol) {
+  constructor(poolId?: symbol) {
+    if (poolId && (typeof poolId !== 'symbol' || Symbol.keyFor(poolId) === undefined)) {
+      throw new Error('Material construction failed: poolId must be a symbol which is created by Symbol.for');
+    }
+    this._poolId = poolId ?? null;
     this._id = ++Material._nextId;
-    this._poolId = poolId ?? Symbol();
     this._states = {};
     this._numPasses = 1;
     this._hash = [null];
@@ -53,14 +55,6 @@ export class Material {
   /** Pool id */
   get poolId() {
     return this._poolId;
-  }
-  set poolId(poolId: string | symbol) {
-    if (poolId && poolId !== this._poolId) {
-      Application.instance.device
-        .getPool(poolId)
-        .moveNonCachedObjectsFrom(Application.instance.device.getPool(this._poolId));
-      this._poolId = poolId;
-    }
   }
   /** Unique identifier of the material */
   get instanceId(): number {

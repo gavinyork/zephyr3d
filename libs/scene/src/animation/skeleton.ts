@@ -40,7 +40,7 @@ export class Skeleton {
   /** @internal */
   protected _jointTexture: Texture2D;
   /** @internal */
-  protected _poolId: string | symbol;
+  protected _poolId: symbol;
   /**
    * Creates an instance of skeleton
    * @param joints - The joint nodes
@@ -53,7 +53,7 @@ export class Skeleton {
     bindPoseMatrices: Matrix4x4[],
     meshes: Mesh[],
     bounding: AssetSubMeshData[],
-    poolId: string | symbol
+    poolId?: symbol
   ) {
     this._joints = joints;
     this._inverseBindMatrices = inverseBindMatrices;

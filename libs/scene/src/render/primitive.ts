@@ -22,7 +22,7 @@ import { RenderBundleWrapper } from './renderbundle_wrapper';
  */
 export class Primitive {
   /** @internal */
-  protected _poolId: string | symbol;
+  protected _poolId: symbol;
   /** @internal */
   protected _vertexLayout: VertexLayout;
   /** @internal */
@@ -48,8 +48,13 @@ export class Primitive {
   /**
    * Creates an instance of a primitive
    */
-  constructor(poolId?: string | symbol) {
-    this._poolId = poolId ?? Symbol();
+  constructor(poolId?: symbol) {
+    if (poolId && (typeof poolId !== 'symbol' || Symbol.keyFor(poolId) === undefined)) {
+      throw new Error(
+        'Primitive construction failed: poolId must be a symbol which is created by Symbol.for'
+      );
+    }
+    this._poolId = poolId ?? null;
     this._vertexLayout = null;
     this._vertexLayoutOptions = { vertexBuffers: [] };
     this._primitiveType = 'triangle-list';
@@ -71,16 +76,8 @@ export class Primitive {
   /**
    * GPU object pool
    */
-  get poolId(): string | symbol {
+  get poolId(): symbol {
     return this._poolId;
-  }
-  set poolId(poolId: string | symbol) {
-    if (poolId && poolId !== this._poolId) {
-      Application.instance.device
-        .getPool(poolId)
-        .moveNonCachedObjectsFrom(Application.instance.device.getPool(this._poolId));
-      this._poolId = poolId;
-    }
   }
   /**
    * Adds a callback function that will be called whenever the bounding box of the primitive changes.

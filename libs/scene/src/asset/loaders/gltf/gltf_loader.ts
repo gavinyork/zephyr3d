@@ -30,7 +30,9 @@ import type {
   IndexBuffer,
   StructuredBuffer,
   TextureAddressMode,
-  TextureFilterMode
+  TextureFilterMode,
+  AbstractDevice,
+  Pool
 } from '@zephyr3d/device';
 import type { AssetManager } from '../../assetmanager';
 import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf';
@@ -59,6 +61,7 @@ export interface GLTFContent extends GlTf {
   _materialCache: Record<string, M>;
   _nodes: AssetHierarchyNode[];
   _meshes: AssetMeshData[];
+  _device: AbstractDevice | Pool;
   _dracoModule?: DecoderModule;
 }
 
@@ -87,6 +90,9 @@ export class GLTFLoader extends AbstractModelLoader {
     }
     const gltf = (await new Response(data).json()) as GLTFContent;
     gltf._manager = assetManager;
+    gltf._device = assetManager.poolId
+      ? Application.instance.device.getPool(assetManager.poolId)
+      : Application.instance.device;
     gltf._httpRequest = httpRequest;
     gltf._loadedBuffers = null;
     return this.loadJson(url, gltf, decoderModule);
@@ -114,6 +120,9 @@ export class GLTFLoader extends AbstractModelLoader {
     }
     if (gltf) {
       gltf._manager = assetManager;
+      gltf._device = assetManager.poolId
+        ? Application.instance.device.getPool(assetManager.poolId)
+        : Application.instance.device;
       gltf._httpRequest = httpRequest;
       gltf._loadedBuffers = buffers;
       return this.loadJson(url, gltf, decoderModule);
@@ -517,7 +526,7 @@ export class GLTFLoader extends AbstractModelLoader {
             rawJointWeights: null,
             numTargets: 0
           };
-          const primitive = new Primitive(gltf._manager.pool.id);
+          const primitive = new Primitive(gltf._manager.poolId);
           const attributes = p.attributes;
           const dracoExtension = gltf._dracoModule ? p.extensions?.['KHR_draco_mesh_compression'] : null;
           let dracoMeshDecoder: DracoMeshDecoder = null;
@@ -557,7 +566,7 @@ export class GLTFLoader extends AbstractModelLoader {
                 for (let i = 0; i < vertexIndices.length; i++) {
                   vertexIndices[i] = i;
                 }
-                const vertexIndexBuffer = gltf._manager.pool.createVertexBuffer('tex7_f32', vertexIndices);
+                const vertexIndexBuffer = gltf._device.createVertexBuffer('tex7_f32', vertexIndices);
                 primitive.setVertexBuffer(vertexIndexBuffer);
               }
             }
@@ -638,7 +647,7 @@ export class GLTFLoader extends AbstractModelLoader {
     }
     return mesh;
   }
-  private async _createMaterial(assetMaterial: AssetMaterial, poolId: string | symbol): Promise<M> {
+  private async _createMaterial(assetMaterial: AssetMaterial, poolId: symbol): Promise<M> {
     if (assetMaterial.type === 'unlit') {
       const unlitAssetMaterial = assetMaterial as AssetUnlitMaterial;
       const unlitMaterial = new UnlitMaterial(poolId);
@@ -1075,7 +1084,7 @@ export class GLTFLoader extends AbstractModelLoader {
         };
       }
     }
-    return await this._createMaterial(assetMaterial, gltf._manager.pool.id);
+    return await this._createMaterial(assetMaterial, gltf._manager.poolId);
   }
   /** @internal */
   private async _loadTexture(
@@ -1423,10 +1432,10 @@ export class GLTFLoader extends AbstractModelLoader {
         }
       }
       if (!semantic) {
-        buffer = gltf._manager.pool.createIndexBuffer(data as Uint16Array | Uint32Array, { managed: true });
+        buffer = gltf._device.createIndexBuffer(data as Uint16Array | Uint32Array, { managed: true });
       } else {
         const attribFormat = device.getVertexAttribFormat(semantic, 'f32', componentCount);
-        buffer = gltf._manager.pool.createVertexBuffer(attribFormat, data);
+        buffer = gltf._device.createVertexBuffer(attribFormat, data);
       }
       gltf._bufferCache[hash] = buffer;
     }

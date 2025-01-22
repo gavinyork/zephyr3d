@@ -30,7 +30,7 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
   const S = applyMaterialMixins(BaseCls, mixinLight);
   return class extends S {
     protected static lambertMixed = true;
-    constructor(poolId?: string | symbol) {
+    constructor(poolId?: symbol) {
       super(poolId);
     }
     lambertLight(

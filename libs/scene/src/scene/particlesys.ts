@@ -41,7 +41,7 @@ export type EmitterBehavior = 'surface' | 'volume';
 
 export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implements Drawable {
   private static updateFuncMap: WeakMap<ParticleSystem, () => void> = new WeakMap();
-  private _poolId: string | symbol;
+  private _poolId: symbol;
   private _activeParticleList: ParticleNode[];
   private _maxParticleCount: number;
   private _emitInterval: number;
@@ -86,9 +86,13 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   private _pickTarget: PickTarget;
   private _instanceData: Float32Array;
   private _instanceBuffer: StructuredBuffer;
-  constructor(scene: Scene, poolId?: string | symbol) {
+  constructor(scene: Scene, poolId?: symbol) {
     super(scene);
-    this._poolId = poolId ?? Symbol();
+    if (poolId && (typeof poolId !== 'symbol' || Symbol.keyFor(poolId) === undefined)) {
+      throw new Error(
+        'ParticleSystem construction failed: poolId must be a symbol which is created by Symbol.for'
+      );
+    }
     this._activeParticleList = [];
     this._maxParticleCount = 100;
     this._emitInterval = 100;
@@ -136,14 +140,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   }
   get poolId() {
     return this._poolId;
-  }
-  set poolId(poolId) {
-    if (poolId && poolId !== this._poolId) {
-      Application.instance.device
-        .getPool(poolId)
-        .moveNonCachedObjectsFrom(Application.instance.device.getPool(this._poolId));
-      this._poolId = poolId;
-    }
   }
   set maxParticleCount(value: number) {
     if (value !== this._maxParticleCount) {

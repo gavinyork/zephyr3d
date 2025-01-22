@@ -87,7 +87,7 @@ export class AssetManager {
   /** @internal */
   private static _modelLoaders: AbstractModelLoader[] = [new GLTFLoader()];
   /** @internal */
-  private _poolId: string | symbol;
+  private _poolId: symbol;
   /** @internal */
   private _httpRequest: HttpRequest;
   /** @internal */
@@ -109,8 +109,13 @@ export class AssetManager {
   /**
    * Creates an instance of AssetManager
    */
-  constructor(poolId?: string | symbol) {
-    this._poolId = poolId ?? Symbol();
+  constructor(poolId?: symbol) {
+    if (poolId && (typeof poolId !== 'symbol' || Symbol.keyFor(poolId) === undefined)) {
+      throw new Error(
+        'AssetManager construction failed: poolId must be a symbol which is created by Symbol.for'
+      );
+    }
+    this._poolId = poolId ?? null;
     this._httpRequest = new HttpRequest();
     this._textures = {};
     this._models = {};
@@ -120,8 +125,8 @@ export class AssetManager {
   /**
    * Device pool for this manager
    */
-  get pool() {
-    return Application.instance.device.getPool(this._poolId);
+  get poolId() {
+    return this._poolId;
   }
   /**
    * HttpRequest instance of the asset manager
@@ -137,7 +142,9 @@ export class AssetManager {
     this._models = {};
     this._binaryDatas = {};
     this._textDatas = {};
-    Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
+    if (this._poolId) {
+      Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
+    }
   }
   /**
    * Adds a texture loader to the asset manager

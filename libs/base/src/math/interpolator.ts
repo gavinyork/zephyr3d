@@ -1,3 +1,4 @@
+import { TypedArray } from '../utils';
 import { Quaternion } from './vector';
 
 /**
@@ -5,6 +6,8 @@ import { Quaternion } from './vector';
  * @public
  */
 export type InterpolationMode = 'unknown' | 'step' | 'linear' | 'cubicspline' | 'cubicspline-natural';
+
+export type InterpolateData = TypedArray | number[];
 
 /**
  * Target of interpolation
@@ -37,9 +40,9 @@ export class Interpolator {
   /** @internal */
   private _prevT: number;
   /** @internal */
-  private _inputs: Float32Array;
+  private _inputs: InterpolateData;
   /** @internal */
-  private _outputs: Float32Array;
+  private _outputs: InterpolateData;
   /** @internal */
   private _mode: InterpolationMode;
   /** @internal */
@@ -72,8 +75,8 @@ export class Interpolator {
   constructor(
     mode: InterpolationMode,
     target: InterpolationTarget,
-    inputs: Float32Array,
-    outputs: Float32Array
+    inputs: InterpolateData,
+    outputs: InterpolateData
   ) {
     this._prevKey = 0;
     this._prevT = 0;
@@ -102,10 +105,10 @@ export class Interpolator {
     return this._maxTime;
   }
   /** inputs */
-  get inputs(): Float32Array {
+  get inputs(): InterpolateData {
     return this._inputs;
   }
-  set inputs(val: Float32Array) {
+  set inputs(val: InterpolateData) {
     if (val !== this._inputs) {
       this._inputs = val;
       this._a = null;
@@ -113,10 +116,10 @@ export class Interpolator {
     }
   }
   /** outputs */
-  get outputs(): Float32Array {
+  get outputs(): InterpolateData {
     return this._outputs;
   }
-  set outputs(val: Float32Array) {
+  set outputs(val: InterpolateData) {
     if (val !== this._outputs) {
       this._outputs = val;
       this._a = null;
@@ -134,7 +137,7 @@ export class Interpolator {
    * @param result - The calculated interpolation value
    * @returns The calcuated interpolation value
    */
-  interpolate(t: number, result: Float32Array): Float32Array {
+  interpolate<T extends InterpolateData>(t: number, result: T): T {
     if (t === undefined) {
       return undefined;
     }
@@ -172,7 +175,10 @@ export class Interpolator {
         this.getQuat(this._prevKey, tmpQuat1);
         this.getQuat(nextKey, tmpQuat2);
         this.slerpQuat(tmpQuat1, tmpQuat2, tn, tmpQuat3);
-        result.set(tmpQuat3);
+        result[0] = tmpQuat3.x;
+        result[1] = tmpQuat3.y;
+        result[2] = tmpQuat3.z;
+        result[3] = tmpQuat3.w;
         return result;
       } /* if (this._mode === 'step) */ else {
         return this.getQuat(this._prevKey, result);
@@ -191,7 +197,7 @@ export class Interpolator {
     }
   }
   /** @internal */
-  private getQuat(index: number, result: Float32Array): Float32Array {
+  private getQuat<T extends InterpolateData>(index: number, result: T): T {
     result[0] = this._outputs[4 * index];
     result[1] = this._outputs[4 * index + 1];
     result[2] = this._outputs[4 * index + 2];
@@ -199,14 +205,14 @@ export class Interpolator {
     return result;
   }
   /** @internal */
-  private step(prevKey: number, result: Float32Array): Float32Array {
+  private step<T extends InterpolateData>(prevKey: number, result: T): T {
     for (let i = 0; i < this._stride; i++) {
       result[i] = this._outputs[prevKey * this._stride + i];
     }
     return result;
   }
   /** @internal */
-  private linear(prevKey: number, nextKey: number, t: number, result: Float32Array): Float32Array {
+  private linear<T extends InterpolateData>(prevKey: number, nextKey: number, t: number, result: T): T {
     for (let i = 0; i < this._stride; i++) {
       result[i] =
         this._outputs[prevKey * this._stride + i] * (1 - t) + this._outputs[nextKey * this._stride + i] * t;
@@ -214,13 +220,13 @@ export class Interpolator {
     return result;
   }
   /** @internal */
-  private cubicSpline(
+  private cubicSpline<T extends InterpolateData>(
     prevKey: number,
     nextKey: number,
     keyDelta: number,
     t: number,
-    result: Float32Array
-  ): Float32Array {
+    result: T
+  ): T {
     const prevIndex = prevKey * this._stride * 3;
     const nextIndex = nextKey * this._stride * 3;
     const A = 0;
@@ -242,13 +248,13 @@ export class Interpolator {
     return result;
   }
   /** @internal */
-  private cubicSplineNatural(
+  private cubicSplineNatural<T extends InterpolateData>(
     prevKey: number,
     nextKey: number,
     t: number,
     tn: number,
-    result: Float32Array
-  ): Float32Array {
+    result: T
+  ): T {
     if (this._inputs.length === 2) {
       return this.linear(prevKey, nextKey, tn, result);
     }

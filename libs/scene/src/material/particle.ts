@@ -11,7 +11,7 @@ import { Vector4 } from '@zephyr3d/base';
  */
 export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor) {
   private _params: Vector4;
-  constructor(poolId?: string | symbol) {
+  constructor(poolId?: symbol) {
     super(poolId);
     this.cullMode = 'none';
     this.blendMode = 'blend';

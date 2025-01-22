@@ -91,7 +91,6 @@ export class AddBatchGroupCommand implements Command<BatchGroup> {
     return 'Add particle system';
   }
   async execute() {
-    const poolId = Symbol();
     const node = new BatchGroup(this._scene);
     if (this._nodeId) {
       node.id = this._nodeId;
@@ -99,7 +98,6 @@ export class AddBatchGroupCommand implements Command<BatchGroup> {
       this._nodeId = node.id;
     }
     idNodeMap[this._nodeId] = node;
-    nodePoolMap.set(node, poolId);
     return node;
   }
   async undo() {
@@ -108,11 +106,6 @@ export class AddBatchGroupCommand implements Command<BatchGroup> {
       if (node) {
         node.remove();
         idNodeMap[this._nodeId] = undefined;
-        const poolId = nodePoolMap.get(node);
-        if (poolId) {
-          Application.instance.device.getPool(poolId).disposeNonCachedObjects();
-          nodePoolMap.delete(node);
-        }
       }
     }
   }
@@ -128,7 +121,7 @@ export class AddParticleSystemCommand implements Command<ParticleSystem> {
     return 'Add particle system';
   }
   async execute() {
-    const poolId = Symbol();
+    const poolId = Symbol.for(crypto.randomUUID());
     const node = new ParticleSystem(this._scene, poolId);
     if (this._nodeId) {
       node.id = this._nodeId;
@@ -200,7 +193,7 @@ export class AddShapeCommand<T extends ShapeType> implements Command<Mesh> {
     return this._desc;
   }
   async execute() {
-    const poolId = Symbol();
+    const poolId = Symbol.for(crypto.randomUUID());
     const shape = new this._shapeCls(this._options, poolId);
     const mesh = new Mesh(this._scene, shape, new PBRMetallicRoughnessMaterial(poolId));
     if (this._nodeId) {

@@ -101,7 +101,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
   const cls = class extends S {
     static readonly lightMixed = true;
     private _normalScale: number;
-    constructor(poolId?: string | symbol) {
+    constructor(poolId?: symbol) {
       super(poolId);
       this._normalScale = 1;
       this.useFeature(FEATURE_DOUBLE_SIDED_LIGHTING, true);

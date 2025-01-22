@@ -46,7 +46,7 @@ export class PlaneShape extends Shape<PlaneCreationOptions> {
    * Creates an instance of plane shape
    * @param options - The creation options
    */
-  constructor(options?: PlaneCreationOptions, poolId?: string | symbol) {
+  constructor(options?: PlaneCreationOptions, poolId?: symbol) {
     super(options, poolId);
   }
   /**

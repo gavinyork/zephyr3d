@@ -46,7 +46,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
    * Creates an instance of cylinder shape
    * @param options - The creation options
    */
-  constructor(options?: CylinderCreationOptions, poolId?: string | symbol) {
+  constructor(options?: CylinderCreationOptions, poolId?: symbol) {
     super(options, poolId);
   }
   /**

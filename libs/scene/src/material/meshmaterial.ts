@@ -102,7 +102,7 @@ export class MeshMaterial extends Material {
    * Creates an instance of MeshMaterial class
    * @param args - constructor arguments
    */
-  constructor(poolId?: string | symbol) {
+  constructor(poolId?: symbol) {
     super(poolId);
     this._featureStates = [];
     this._alphaCutoff = 0;

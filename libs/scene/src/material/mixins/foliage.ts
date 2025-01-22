@@ -27,7 +27,7 @@ function mixinFoliage<T extends typeof MeshMaterial>(BaseCls: T) {
   }
   return class extends (BaseCls as typeof MeshMaterial) {
     static foliageMixed = true;
-    constructor(poolId?: string | symbol) {
+    constructor(poolId?: symbol) {
       super(poolId);
       this.cullMode = 'none';
     }

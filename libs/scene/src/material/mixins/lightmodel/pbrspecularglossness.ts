@@ -55,7 +55,7 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
     static readonly pbrSpecularGlossnessMixed = true;
     private _specularFactor: Vector4;
     private _glossinessFactor: number;
-    constructor(poolId?: string | symbol) {
+    constructor(poolId?: symbol) {
       super(poolId);
       this._specularFactor = Vector4.one();
       this._glossinessFactor = 1;

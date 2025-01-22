@@ -73,7 +73,7 @@ export class AssetStore {
     if (!assetManager) {
       assetManager = {
         path: asset.path,
-        assetManager: new AssetManager(Symbol(uuid)),
+        assetManager: new AssetManager(Symbol.for(uuid)),
         nodes: new Map()
       };
       this._assetManagers[uuid] = assetManager;
@@ -115,7 +115,7 @@ export class AssetStore {
     if (!assetManager) {
       assetManager = {
         path: asset.path,
-        assetManager: new AssetManager(Symbol(uuid)),
+        assetManager: new AssetManager(Symbol.for(uuid)),
         nodes: new Map()
       };
       this._assetManagers[uuid] = assetManager;

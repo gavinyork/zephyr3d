@@ -90,7 +90,7 @@ export function mixinTextureProps<U extends string>(name: U) {
       };
     }
     const cls = class extends (BaseCls as typeof MeshMaterial) {
-      constructor(poolId?: string | symbol) {
+      constructor(poolId?: symbol) {
         super(poolId);
       }
       vertexShader(scope: PBFunctionScope): void {

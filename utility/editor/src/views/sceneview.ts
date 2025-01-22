@@ -8,7 +8,7 @@ import { Application, DirectionalLight } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
-import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
+import { Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import type { DBAssetInfo } from '../storage/db';
 import { Dialog } from './dlg/dlg';

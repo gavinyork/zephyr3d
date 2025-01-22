@@ -28,12 +28,7 @@ export class GrassMaterial extends applyMaterialMixins(
    * @param normalMap - normal map
    * @param grassTexture - grass texture
    */
-  constructor(
-    terrainSize: Vector2,
-    normalMap: Texture2D,
-    grassTexture?: Texture2D,
-    poolId?: string | symbol
-  ) {
+  constructor(terrainSize: Vector2, normalMap: Texture2D, grassTexture?: Texture2D, poolId?: symbol) {
     super(poolId);
     this.metallic = 0;
     this.roughness = 1;
