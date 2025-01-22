@@ -827,5 +827,6 @@ export class Camera extends SceneNode {
     this._projMatrix = null;
     this._viewMatrix = null;
     this._viewProjMatrix = null;
+    super.dispose();
   }
 }

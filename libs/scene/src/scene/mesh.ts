@@ -48,8 +48,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    * Creates an instance of mesh node
    * @param scene - The scene to which the mesh node belongs
    */
-  constructor(scene: Scene, primitive?: Primitive, material?: MeshMaterial) {
-    super(scene);
+  constructor(scene: Scene, primitive?: Primitive, material?: MeshMaterial, poolId?: symbol) {
+    super(scene, poolId);
     this._primitive = null;
     this._material = null;
     this._castShadow = true;
@@ -236,8 +236,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   dispose() {
     this._primitive = null;
     this._material = null;
-    super.dispose();
     RenderBundleWrapper.drawableChanged(this);
+    super.dispose();
   }
   /**
    * {@inheritDoc Drawable.getQueueType}
@@ -261,8 +261,10 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    * {@inheritDoc Drawable.draw}
    */
   draw(ctx: DrawContext) {
-    this.bind(ctx);
-    this.material.draw(this.primitive, ctx);
+    if (this._material && this._primitive) {
+      this.bind(ctx);
+      this._material.draw(this._primitive, ctx);
+    }
   }
   /**
    * {@inheritDoc Drawable.getMaterial}

@@ -3,25 +3,31 @@ import { BoxFrameShape, BoxShape, CylinderShape, PlaneShape, SphereShape, TorusS
 import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
 
-export function getPrimitiveClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getPrimitiveClass(): SerializableClass {
   return {
     ctor: Primitive,
     className: 'Primitive',
-    createFunc() {
-      return new Primitive(assetRegistry.poolId);
+    createFunc(ctx: any, poolId: string) {
+      return new Primitive(typeof poolId === 'string' ? Symbol.for(poolId) : null);
+    },
+    getInitParams(obj: Primitive) {
+      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
     },
     getProps() {
       return [];
     }
   };
 }
-export function getBoxShapeClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getBoxShapeClass(): SerializableClass {
   return {
     ctor: BoxShape,
-    parent: getPrimitiveClass(assetRegistry),
+    parent: getPrimitiveClass(),
     className: 'BoxShape',
-    createFunc() {
-      return new BoxShape({ size: 1 }, assetRegistry.poolId);
+    createFunc(ctx: any, poolId: string) {
+      return new BoxShape({ size: 1 }, typeof poolId === 'string' ? Symbol.for(poolId) : null);
+    },
+    getInitParams(obj: BoxShape) {
+      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
     },
     getProps() {
       return [
@@ -66,13 +72,16 @@ export function getBoxShapeClass(assetRegistry: AssetRegistry): SerializableClas
   };
 }
 
-export function getBoxFrameShapeClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getBoxFrameShapeClass(): SerializableClass {
   return {
     ctor: BoxFrameShape,
-    parent: getPrimitiveClass(assetRegistry),
+    parent: getPrimitiveClass(),
     className: 'BoxFrameShape',
-    createFunc() {
-      return new BoxFrameShape({ size: 1 }, assetRegistry.poolId);
+    createFunc(ctx: any, poolId: string) {
+      return new BoxFrameShape({ size: 1 }, typeof poolId === 'string' ? Symbol.for(poolId) : null);
+    },
+    getInitParams(obj: BoxFrameShape) {
+      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
     },
     getProps() {
       return [
@@ -117,13 +126,16 @@ export function getBoxFrameShapeClass(assetRegistry: AssetRegistry): Serializabl
   };
 }
 
-export function getTorusShapeClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getTorusShapeClass(): SerializableClass {
   return {
     ctor: TorusShape,
-    parent: getPrimitiveClass(assetRegistry),
+    parent: getPrimitiveClass(),
     className: 'TorusShape',
-    createFunc() {
-      return new TorusShape(null, assetRegistry.poolId);
+    createFunc(ctx: any, poolId: string) {
+      return new TorusShape(null, typeof poolId === 'string' ? Symbol.for(poolId) : null);
+    },
+    getInitParams(obj: TorusShape) {
+      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
     },
     getProps() {
       return [
@@ -192,13 +204,16 @@ export function getTorusShapeClass(assetRegistry: AssetRegistry): SerializableCl
   };
 }
 
-export function getPlaneShapeClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getPlaneShapeClass(): SerializableClass {
   return {
     ctor: PlaneShape,
-    parent: getPrimitiveClass(assetRegistry),
+    parent: getPrimitiveClass(),
     className: 'PlaneShape',
-    createFunc() {
-      return new PlaneShape(null, assetRegistry.poolId);
+    createFunc(ctx: any, poolId: string) {
+      return new PlaneShape(null, typeof poolId === 'string' ? Symbol.for(poolId) : null);
+    },
+    getInitParams(obj: PlaneShape) {
+      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
     },
     getProps() {
       return [
@@ -267,13 +282,16 @@ export function getPlaneShapeClass(assetRegistry: AssetRegistry): SerializableCl
   };
 }
 
-export function getCylinderShapeClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getCylinderShapeClass(): SerializableClass {
   return {
     ctor: CylinderShape,
-    parent: getPrimitiveClass(assetRegistry),
+    parent: getPrimitiveClass(),
     className: 'CylinderShape',
-    createFunc() {
-      return new CylinderShape(null, assetRegistry.poolId);
+    createFunc(ctx: any, poolId: string) {
+      return new CylinderShape(null, typeof poolId === 'string' ? Symbol.for(poolId) : null);
+    },
+    getInitParams(obj: CylinderShape) {
+      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
     },
     getProps() {
       return [
@@ -375,13 +393,16 @@ export function getCylinderShapeClass(assetRegistry: AssetRegistry): Serializabl
   };
 }
 
-export function getSphereShapeClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getSphereShapeClass(): SerializableClass {
   return {
     ctor: SphereShape,
-    parent: getPrimitiveClass(assetRegistry),
+    parent: getPrimitiveClass(),
     className: 'SphereShape',
-    createFunc() {
-      return new SphereShape(null, assetRegistry.poolId);
+    createFunc(ctx: any, poolId: string) {
+      return new SphereShape(null, typeof poolId === 'string' ? Symbol.for(poolId) : null);
+    },
+    getInitParams(obj: SphereShape) {
+      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
     },
     getProps() {
       return [

@@ -18,6 +18,7 @@ import {
 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
 import type { AnimationSet } from '../animation';
+import { Application } from '../app';
 
 /**
  * Node iterate function type
@@ -61,6 +62,8 @@ export class SceneNode extends makeEventTarget(Object)<{
   static readonly BBOXDRAW_WORLD = 2;
   /** @internal */
   protected _id: string;
+  /** @internal */
+  protected _poolId: symbol;
   /** @internal */
   protected _clipMode: boolean;
   /** @internal */
@@ -119,9 +122,15 @@ export class SceneNode extends makeEventTarget(Object)<{
    * Creates a new scene node
    * @param scene - Which scene the node belongs to
    */
-  constructor(scene: Scene) {
+  constructor(scene: Scene, poolId?: symbol) {
     super();
     this._id = crypto.randomUUID();
+    if (poolId && (typeof poolId !== 'symbol' || Symbol.keyFor(poolId) === undefined)) {
+      throw new Error(
+        'SceneNode construction failed: poolId must be a symbol which is created by Symbol.for'
+      );
+    }
+    this._poolId = poolId ?? null;
     this._scene = scene;
     this._name = '';
     this._bv = null;
@@ -176,6 +185,12 @@ export class SceneNode extends makeEventTarget(Object)<{
   }
   set id(id: string) {
     this._id = id;
+  }
+  /**
+   * GPU object pool of this node
+   */
+  get poolId() {
+    return this._poolId;
   }
   /**
    * Name of the node
@@ -278,7 +293,7 @@ export class SceneNode extends makeEventTarget(Object)<{
    * @remarks
    * DO NOT remove child duration iteration!
    *
-   * @param callback - callback function that will be called on each node
+   * @param callback - callback function that will be called on each node, if callback returns true, iteration will be stopped immediately
    */
   iterate(callback: NodeIterateFunc): boolean {
     if (!!callback(this)) {
@@ -288,6 +303,26 @@ export class SceneNode extends makeEventTarget(Object)<{
       if (!!child.iterate(callback)) {
         return true;
       }
+    }
+    return false;
+  }
+  /**
+   * Iterate self and all of the children from bottom to top in reversed order
+   *
+   * @remarks
+   * Child can be removed duration iteration!
+   *
+   * @param callback - callback function that will be called on each node, if callback returns true, iteration will be stopped immediately
+   */
+  iterateBottomToTop(callback: NodeIterateFunc): boolean {
+    for (let i = this._children.length - 1; i >= 0; i--) {
+      const child = this._children[i];
+      if (!!child.iterateBottomToTop(callback)) {
+        return true;
+      }
+    }
+    if (!!callback(this)) {
+      return true;
     }
     return false;
   }
@@ -324,7 +359,11 @@ export class SceneNode extends makeEventTarget(Object)<{
     return false;
   }
   /** Disposes the node */
-  dispose() {}
+  dispose() {
+    if (this._poolId) {
+      Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
+    }
+  }
   /**
    * Computes the bounding volume of the node
    * @returns The output bounding volume

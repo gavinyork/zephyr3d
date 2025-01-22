@@ -26,7 +26,6 @@ import type { TRS } from '../types';
 import type { DBAssetInfo } from '../storage/db';
 
 const idNodeMap: Record<string, SceneNode> = {};
-const nodePoolMap: WeakMap<SceneNode, symbol> = new WeakMap();
 
 export type CommandExecuteResult<T> = T extends AddAssetCommand ? SceneNode : void;
 
@@ -129,7 +128,6 @@ export class AddParticleSystemCommand implements Command<ParticleSystem> {
       this._nodeId = node.id;
     }
     idNodeMap[this._nodeId] = node;
-    nodePoolMap.set(node, poolId);
     return node;
   }
   async undo() {
@@ -137,12 +135,8 @@ export class AddParticleSystemCommand implements Command<ParticleSystem> {
       const node = idNodeMap[this._nodeId];
       if (node) {
         node.remove();
+        node.dispose();
         idNodeMap[this._nodeId] = undefined;
-        const poolId = nodePoolMap.get(node);
-        if (poolId) {
-          Application.instance.device.getPool(poolId).disposeNonCachedObjects();
-          nodePoolMap.delete(node);
-        }
       }
     }
   }
@@ -202,7 +196,6 @@ export class AddShapeCommand<T extends ShapeType> implements Command<Mesh> {
       this._nodeId = mesh.id;
     }
     idNodeMap[this._nodeId] = mesh;
-    nodePoolMap.set(mesh, poolId);
     return mesh;
   }
   async undo() {
@@ -210,12 +203,8 @@ export class AddShapeCommand<T extends ShapeType> implements Command<Mesh> {
       const node = idNodeMap[this._nodeId];
       if (node) {
         node.remove();
+        node.dispose();
         idNodeMap[this._nodeId] = undefined;
-        const poolId = nodePoolMap.get(node);
-        if (poolId) {
-          Application.instance.device.getPool(poolId).disposeNonCachedObjects();
-          nodePoolMap.delete(node);
-        }
       }
     }
   }
@@ -246,11 +235,7 @@ export class NodeDeleteCommand implements Command {
       node.remove();
       node.iterate((child) => {
         delete idNodeMap[child.id];
-        const poolId = nodePoolMap.get(child);
-        if (poolId) {
-          Application.instance.device.getPool(poolId).disposeNonCachedObjects();
-          nodePoolMap.delete(child);
-        }
+        child.dispose();
       });
       delete idNodeMap[this._nodeId];
     }

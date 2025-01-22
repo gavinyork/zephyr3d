@@ -20,8 +20,8 @@ export class GraphNode extends SceneNode {
    * Creates a graph node
    * @param scene - The scene to which the node belongs
    */
-  constructor(scene: Scene) {
-    super(scene);
+  constructor(scene: Scene, poolId?: symbol) {
+    super(scene, poolId);
     this._octreeNode = null;
   }
   /** @internal */

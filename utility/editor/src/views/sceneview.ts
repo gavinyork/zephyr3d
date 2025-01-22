@@ -3,7 +3,7 @@ import type { SceneModel } from '../models/scenemodel';
 import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import { Tab } from '../components/tab';
-import type { AssetRegistry, Camera, Compositor, Scene, SceneNode } from '@zephyr3d/scene';
+import { AssetRegistry, Camera, Compositor, Scene, SceneNode } from '@zephyr3d/scene';
 import { Application, DirectionalLight } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
@@ -17,7 +17,12 @@ import { MenubarView } from '../components/menubar';
 import { StatusBar } from '../components/statusbar';
 import { BaseView } from './baseview';
 import { CommandManager } from '../core/command';
-import { AddAssetCommand, NodeReparentCommand, NodeTransformCommand } from '../commands/scenecommands';
+import {
+  AddAssetCommand,
+  NodeDeleteCommand,
+  NodeReparentCommand,
+  NodeTransformCommand
+} from '../commands/scenecommands';
 
 export class SceneView extends BaseView<SceneModel> {
   private _cmdManager: CommandManager;
@@ -134,6 +139,7 @@ export class SceneView extends BaseView<SceneModel> {
       [
         {
           label: FontGlyph.glyphs['mouse-pointer'],
+          shortcut: 'Esc',
           tooltip: () => 'Select node',
           selected: () => {
             return this._postGizmoRenderer.mode === 'select';
@@ -144,6 +150,7 @@ export class SceneView extends BaseView<SceneModel> {
         },
         {
           label: FontGlyph.glyphs['move'],
+          shortcut: 'T',
           tooltip: () => 'Move selected node',
           selected: () => {
             return this._postGizmoRenderer.mode === 'translation';
@@ -154,6 +161,7 @@ export class SceneView extends BaseView<SceneModel> {
         },
         {
           label: FontGlyph.glyphs['arrows-cw'],
+          shortcut: 'R',
           tooltip: () => 'Rotate selected node',
           selected: () => {
             return this._postGizmoRenderer.mode === 'rotation';
@@ -164,12 +172,27 @@ export class SceneView extends BaseView<SceneModel> {
         },
         {
           label: FontGlyph.glyphs['resize-vertical'],
+          shortcut: 'S',
           tooltip: () => 'Scale selected node',
           selected: () => {
             return this._postGizmoRenderer.mode === 'scaling';
           },
           action: () => {
             this._postGizmoRenderer.mode = 'scaling';
+          }
+        },
+        {
+          label: FontGlyph.glyphs['cancel'],
+          shortcut: 'Delete',
+          tooltip: () => 'Delete selected node',
+          selected: () => {
+            return !!this._postGizmoRenderer.node;
+          },
+          action: () => {
+            const node = this._tab.sceneHierarchy.selectedNode;
+            if (node) {
+              this.handleDeleteNode(node);
+            }
           }
         },
         {
@@ -302,12 +325,10 @@ export class SceneView extends BaseView<SceneModel> {
     if (this._showTextureViewer) {
       renderTextureViewer();
     }
-    /*
     if (ImGui.Begin('FontTest')) {
       ImGui.Text(FontGlyph.allGlyphs);
     }
     ImGui.End();
-    */
   }
   renderDropZone(x: number, y: number, w: number, h: number) {
     const color = new ImGui.ImVec4(0, 0, 0, 0);
@@ -484,7 +505,18 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoRenderer.off('end_rotate', this.handleEndRotateNode, this);
     this._postGizmoRenderer.off('end_scale', this.handleEndScaleNode, this);
   }
-  private handleDeleteNode(node: SceneNode) {}
+  private handleDeleteNode(node: SceneNode) {
+    if (node.isParentOf(this._tab.sceneHierarchy.selectedNode)) {
+      this._tab.sceneHierarchy.selectNode(null);
+    }
+    if (this._propGrid.object instanceof SceneNode && node.isParentOf(this._propGrid.object)) {
+      this._propGrid.object = null;
+    }
+    if (node.isParentOf(this._postGizmoRenderer.node)) {
+      this._postGizmoRenderer.node = null;
+    }
+    this._cmdManager.execute(new NodeDeleteCommand(node, this._assetRegistry));
+  }
   private handleNodeSelected(node: SceneNode) {
     let assetNode = node;
     while (assetNode && !this._assetRegistry.getAssetId(assetNode)) {

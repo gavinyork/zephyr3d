@@ -440,12 +440,15 @@ function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<U
   ];
 }
 
-export function getMeshMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getMeshMaterialClass(): SerializableClass {
   return {
     ctor: MeshMaterial,
     className: 'MeshMaterial',
-    createFunc() {
-      return new MeshMaterial(assetRegistry.poolId);
+    createFunc(ctx: any, poolId: string) {
+      return new MeshMaterial(typeof poolId === 'string' ? Symbol.for(poolId) : void 0);
+    },
+    getInitParams(obj: MeshMaterial) {
+      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
     },
     getProps() {
       return [
@@ -522,10 +525,13 @@ export function getMeshMaterialClass(assetRegistry: AssetRegistry): Serializable
 export function getParticleMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: ParticleMaterial,
-    parent: getMeshMaterialClass(assetRegistry),
+    parent: getMeshMaterialClass(),
     className: 'ParticleMaterial',
-    createFunc() {
-      return new ParticleMaterial(assetRegistry.poolId);
+    createFunc(ctx: any, poolId: string) {
+      return new ParticleMaterial(typeof poolId === 'string' ? Symbol.for(poolId) : void 0);
+    },
+    getInitParams(obj: ParticleMaterial) {
+      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
     },
     getProps() {
       return [
@@ -576,10 +582,13 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
 export function getUnlitMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: UnlitMaterial,
-    parent: getMeshMaterialClass(assetRegistry),
+    parent: getMeshMaterialClass(),
     className: 'UnlitMaterial',
-    createFunc() {
-      return new UnlitMaterial(assetRegistry.poolId);
+    createFunc(ctx: any, poolId: string) {
+      return new UnlitMaterial(typeof poolId === 'string' ? Symbol.for(poolId) : void 0);
+    },
+    getInitParams(obj: UnlitMaterial) {
+      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
     },
     getProps() {
       return getUnlitMaterialProps(assetRegistry);
@@ -590,10 +599,13 @@ export function getUnlitMaterialClass(assetRegistry: AssetRegistry): Serializabl
 export function getLambertMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: LambertMaterial,
-    parent: getMeshMaterialClass(assetRegistry),
+    parent: getMeshMaterialClass(),
     className: 'LambertMaterial',
-    createFunc() {
-      return new LambertMaterial(assetRegistry.poolId);
+    createFunc(ctx: any, poolId: string) {
+      return new LambertMaterial(typeof poolId === 'string' ? Symbol.for(poolId) : void 0);
+    },
+    getInitParams(obj: LambertMaterial) {
+      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
     },
     getProps() {
       return getLitMaterialProps(assetRegistry);
@@ -604,10 +616,13 @@ export function getLambertMaterialClass(assetRegistry: AssetRegistry): Serializa
 export function getBlinnMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: BlinnMaterial,
-    parent: getMeshMaterialClass(assetRegistry),
+    parent: getMeshMaterialClass(),
     className: 'BlinnMaterial',
-    createFunc() {
-      return new BlinnMaterial(assetRegistry.poolId);
+    createFunc(ctx: any, poolId: string) {
+      return new BlinnMaterial(typeof poolId === 'string' ? Symbol.for(poolId) : void 0);
+    },
+    getInitParams(obj: BlinnMaterial) {
+      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
     },
     getProps() {
       return [
@@ -635,10 +650,13 @@ export function getBlinnMaterialClass(assetRegistry: AssetRegistry): Serializabl
 export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: PBRMetallicRoughnessMaterial,
-    parent: getMeshMaterialClass(assetRegistry),
+    parent: getMeshMaterialClass(),
     className: 'PBRMetallicRoughnessMaterial',
-    createFunc() {
-      return new PBRMetallicRoughnessMaterial(assetRegistry.poolId);
+    createFunc(ctx: any, poolId: string) {
+      return new PBRMetallicRoughnessMaterial(typeof poolId === 'string' ? Symbol.for(poolId) : void 0);
+    },
+    getInitParams(obj: PBRMetallicRoughnessMaterial) {
+      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
     },
     getProps() {
       return [
@@ -683,10 +701,13 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
 export function getPBRSpecularGlossinessMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: PBRSpecularGlossinessMaterial,
-    parent: getMeshMaterialClass(assetRegistry),
+    parent: getMeshMaterialClass(),
     className: 'PBRSpecularGlossinessMaterial',
-    createFunc() {
-      return new PBRSpecularGlossinessMaterial(assetRegistry.poolId);
+    createFunc(ctx: any, poolId: string) {
+      return new PBRSpecularGlossinessMaterial(typeof poolId === 'string' ? Symbol.for(poolId) : void 0);
+    },
+    getInitParams(obj: PBRSpecularGlossinessMaterial) {
+      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
     },
     getProps() {
       return [

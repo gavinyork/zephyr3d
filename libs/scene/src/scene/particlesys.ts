@@ -41,7 +41,6 @@ export type EmitterBehavior = 'surface' | 'volume';
 
 export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implements Drawable {
   private static updateFuncMap: WeakMap<ParticleSystem, () => void> = new WeakMap();
-  private _poolId: symbol;
   private _activeParticleList: ParticleNode[];
   private _maxParticleCount: number;
   private _emitInterval: number;
@@ -87,12 +86,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   private _instanceData: Float32Array;
   private _instanceBuffer: StructuredBuffer;
   constructor(scene: Scene, poolId?: symbol) {
-    super(scene);
-    if (poolId && (typeof poolId !== 'symbol' || Symbol.keyFor(poolId) === undefined)) {
-      throw new Error(
-        'ParticleSystem construction failed: poolId must be a symbol which is created by Symbol.for'
-      );
-    }
+    super(scene, poolId);
     this._activeParticleList = [];
     this._maxParticleCount = 100;
     this._emitInterval = 100;
@@ -137,9 +131,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._instanceData = null;
     this._instanceBuffer = null;
     this._material = new ParticleMaterial(this._poolId);
-  }
-  get poolId() {
-    return this._poolId;
   }
   set maxParticleCount(value: number) {
     if (value !== this._maxParticleCount) {
