@@ -325,9 +325,11 @@ export class SceneView extends BaseView<SceneModel> {
     if (this._showTextureViewer) {
       renderTextureViewer();
     }
+    /*
     if (ImGui.Begin('FontTest')) {
       ImGui.Text(FontGlyph.allGlyphs);
     }
+    */
     ImGui.End();
   }
   renderDropZone(x: number, y: number, w: number, h: number) {
@@ -506,6 +508,10 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoRenderer.off('end_scale', this.handleEndScaleNode, this);
   }
   private handleDeleteNode(node: SceneNode) {
+    if (node === this.model.camera) {
+      Dialog.messageBox('Zephyr3d editor', 'Cannot delete active camera');
+      return;
+    }
     if (node.isParentOf(this._tab.sceneHierarchy.selectedNode)) {
       this._tab.sceneHierarchy.selectNode(null);
     }
