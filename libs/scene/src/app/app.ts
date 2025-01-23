@@ -1,6 +1,6 @@
-import { InputManager } from './input/inputmgr';
 import { makeEventTarget } from '@zephyr3d/base';
 import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
+import { InputManager } from './inputmgr';
 
 type appEventMap = {
   resize: [width: number, height: number];

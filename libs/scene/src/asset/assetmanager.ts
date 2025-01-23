@@ -12,7 +12,7 @@ import { AnimationClip } from '../animation/animation';
 import { CopyBlitter } from '../blitter';
 import { getSheenLutLoader } from './builtin';
 import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT, MAX_MORPH_TARGETS } from '../values';
-import { Application } from '../app';
+import { Application } from '../app/app';
 import { AnimationSet } from '../animation/animationset';
 import type { BaseTexture, SamplerOptions } from '@zephyr3d/device';
 import type { Scene } from '../scene/scene';

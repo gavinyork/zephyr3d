@@ -1,6 +1,6 @@
 import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import { drawFullscreenQuad } from './fullscreenquad';
-import { Application } from '../app';
+import { Application } from '../app/app';
 import { CopyBlitter } from '../blitter';
 import { fetchSampler } from '../utility/misc';
 

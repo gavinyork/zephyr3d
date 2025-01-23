@@ -7,7 +7,7 @@ import type {
   ProgramBuilder,
   TextureCube
 } from '@zephyr3d/device';
-import { Application } from '../app';
+import { Application } from '../app/app';
 
 /**
  * Environment light type

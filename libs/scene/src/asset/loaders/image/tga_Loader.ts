@@ -1,5 +1,5 @@
 import { AbstractTextureLoader } from '../loader';
-import { Application } from '../../../app';
+import { Application } from '../../../app/app';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions } from '@zephyr3d/device';
 
 /**

@@ -1,5 +1,5 @@
 import { PBArrayTypeInfo, PBPrimitiveType, PBPrimitiveTypeInfo, PBStructTypeInfo } from '@zephyr3d/device';
-import { Application } from '../app';
+import { Application } from '../app/app';
 import type { AssetSubMeshData } from '../asset';
 import {
   MAX_MORPH_ATTRIBUTES,

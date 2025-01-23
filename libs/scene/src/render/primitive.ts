@@ -12,7 +12,7 @@ import {
   type VertexBufferInfo,
   PBPrimitiveType
 } from '@zephyr3d/device';
-import { Application } from '../app';
+import { Application } from '../app/app';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
 

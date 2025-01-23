@@ -36,7 +36,7 @@ import type {
 } from '@zephyr3d/device';
 import type { AssetManager } from '../../assetmanager';
 import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf';
-import { Application } from '../../../app';
+import { Application } from '../../../app/app';
 import { PBRMetallicRoughnessMaterial } from '../../../material/pbrmr';
 import { PBRSpecularGlossinessMaterial } from '../../../material/pbrsg';
 import { DracoMeshDecoder } from '../../../utility/draco/decoder';

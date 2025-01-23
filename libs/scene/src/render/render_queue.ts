@@ -1,4 +1,4 @@
-import { Application } from '../app';
+import { Application } from '../app/app';
 import type { Vector4 } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';

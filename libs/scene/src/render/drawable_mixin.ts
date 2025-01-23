@@ -5,7 +5,7 @@ import type { BindGroup } from '@zephyr3d/device';
 import type { BatchDrawable, DrawContext, Drawable } from './drawable';
 import { ShaderHelper } from '../material';
 import type { DrawableInstanceInfo, RenderQueue, RenderQueueRef } from './render_queue';
-import { Application } from '../app';
+import { Application } from '../app/app';
 import type { Mesh, SceneNode } from '../scene';
 import { MaterialVaryingFlags } from '../values';
 

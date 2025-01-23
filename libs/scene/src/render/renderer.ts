@@ -3,7 +3,7 @@ import { ShadowMapPass } from './shadowmap_pass';
 import { DepthPass } from './depthpass';
 import { isPowerOf2, nextPowerOf2, Vector4 } from '@zephyr3d/base';
 import type { ColorState, FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
-import { Application } from '../app';
+import { Application } from '../app/app';
 import { CopyBlitter } from '../blitter';
 import type { DrawContext } from './drawable';
 //import type { ShadowMapper } from '../shadow';

@@ -2,7 +2,7 @@ import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT } from '../values';
 import type { Texture2D, BaseTexture, TextureCube } from '@zephyr3d/device';
 import type { AssetManager } from './assetmanager';
-import { Application } from '../app';
+import { Application } from '../app/app';
 
 /*
 interface MicrofacetDistributionSample {

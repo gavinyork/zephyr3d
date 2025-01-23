@@ -3,7 +3,7 @@ import { Vector3, Vector4, Ray, makeEventTarget } from '@zephyr3d/base';
 import { SceneNode } from './scene_node';
 import { Octree } from './octree';
 import { RaycastVisitor } from './raycast_visitor';
-import { Application } from '../app';
+import { Application } from '../app/app';
 import { Environment } from './environment';
 import type { GraphNode } from './graph_node';
 import type { Camera } from '../camera/camera';

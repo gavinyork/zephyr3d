@@ -11,7 +11,7 @@ import { Primitive } from '../render';
 import type { AbstractDevice, GPUDataBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
 import { QUEUE_OPAQUE } from '../values';
 import { ParticleMaterial, type MeshMaterial } from '../material';
-import { Application } from '../app';
+import { Application } from '../app/app';
 
 const tmpVec3 = new Vector3();
 

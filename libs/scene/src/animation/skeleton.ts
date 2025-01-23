@@ -1,10 +1,10 @@
 import { Matrix4x4, Vector3, nextPowerOf2 } from '@zephyr3d/base';
-import { Application } from '../app';
 import type { Texture2D } from '@zephyr3d/device';
 import type { SceneNode } from '../scene/scene_node';
 import type { Mesh } from '../scene';
 import { BoundingBox } from '../utility/bounding_volume';
 import type { AssetSubMeshData } from '../asset';
+import { Application } from '../app/app';
 
 interface SkinnedBoundingBox {
   boundingVertices: Vector3[];

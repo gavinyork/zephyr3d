@@ -18,7 +18,7 @@ import {
 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
 import type { AnimationSet } from '../animation';
-import { Application } from '../app';
+import { Application } from '../app/app';
 
 /**
  * Node iterate function type

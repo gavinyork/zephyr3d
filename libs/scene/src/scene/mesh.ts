@@ -4,7 +4,7 @@ import { BoxFrameShape } from '../shapes';
 import type { MeshMaterial } from '../material';
 import { LambertMaterial } from '../material';
 import type { RenderPass, Primitive, BatchDrawable, DrawContext, PickTarget } from '../render';
-import { Application } from '../app';
+import { Application } from '../app/app';
 import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
 import type { Scene } from './scene';
 import type { BoundingBox, BoundingVolume } from '../utility/bounding_volume';

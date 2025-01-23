@@ -10,7 +10,7 @@ import type {
   TextureCube,
   VertexLayout
 } from '@zephyr3d/device';
-import { Application } from '../app';
+import { Application } from '../app/app';
 import type { BlitType } from '../blitter';
 import { Blitter, CopyBlitter } from '../blitter';
 import { fetchSampler } from './misc';

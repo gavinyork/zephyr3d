@@ -1,4 +1,4 @@
-import { Application } from '../app';
+import { Application } from '../app/app';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders/misc';
 import { smoothNoise3D } from '../shaders';
 import { CubeFace, Matrix4x4, Vector2, Vector3, Vector4 } from '@zephyr3d/base';

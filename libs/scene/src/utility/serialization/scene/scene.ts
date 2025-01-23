@@ -3,7 +3,7 @@ import type { EnvLightType, FogType, SkyType } from '../../../render';
 import { Scene } from '../../../scene/scene';
 import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
-import { Application } from '../../../app';
+import { Application } from '../../../app/app';
 import { panoramaToCubemap } from '../../panorama';
 import { prefilterCubemap } from '../../pmrem';
 import { SceneNode } from '../../../scene';

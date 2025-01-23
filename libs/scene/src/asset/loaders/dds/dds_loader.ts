@@ -1,7 +1,7 @@
 import { getDDSMipLevelsInfo } from './dds';
 import { AbstractTextureLoader } from '../loader';
-import { Application } from '../../../app';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions } from '@zephyr3d/device';
+import { Application } from '../../../app/app';
 
 /**
  * The DDS texture loader

@@ -1,5 +1,5 @@
 import { Matrix4x4, Vector4 } from '@zephyr3d/base';
-import { Application } from '../app';
+import { Application } from '../app/app';
 import { MAX_CLUSTERED_LIGHTS } from '../values';
 import type {
   AbstractDevice,
