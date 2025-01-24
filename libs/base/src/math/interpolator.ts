@@ -1,4 +1,4 @@
-import { TypedArray } from '../utils';
+import type { TypedArray } from '../utils';
 import { Quaternion } from './vector';
 
 /**

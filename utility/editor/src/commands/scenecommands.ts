@@ -1,16 +1,7 @@
-import {
-  AssetRegistry,
-  BatchGroup,
-  deserializeObject,
-  ModelInfo,
-  Scene,
-  SceneNode,
-  ShapeOptionType,
-  ShapeType
-} from '@zephyr3d/scene';
+import type { AssetRegistry, ModelInfo, Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
+import { BatchGroup, deserializeObject } from '@zephyr3d/scene';
 import { ParticleSystem, serializeObject } from '@zephyr3d/scene';
 import {
-  Application,
   BoxFrameShape,
   BoxShape,
   CylinderShape,
@@ -52,7 +43,7 @@ export class AddAssetCommand implements Command<SceneNode> {
         enableInstancing: true
       });
     } catch (err) {
-      console.error(`Load asset failed: ${this._asset.name}`);
+      console.error(`Load asset failed: ${this._asset.name}: ${err}`);
     }
     if (asset) {
       asset.group.position.set(this._position);

@@ -1,6 +1,5 @@
 import { Primitive } from '../../../render';
 import { BoxFrameShape, BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '../../../shapes';
-import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
 
 export function getPrimitiveClass(): SerializableClass {
