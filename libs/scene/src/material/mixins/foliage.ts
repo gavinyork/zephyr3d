@@ -27,8 +27,8 @@ function mixinFoliage<T extends typeof MeshMaterial>(BaseCls: T) {
   }
   return class extends (BaseCls as typeof MeshMaterial) {
     static foliageMixed = true;
-    constructor(poolId?: symbol) {
-      super(poolId);
+    constructor() {
+      super();
       this.cullMode = 'none';
     }
     calculateFoliageAlbedo(

@@ -63,8 +63,8 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
     private _metallic: number;
     private _roughness: number;
     private _specularFactor: Vector4;
-    constructor(poolId?: symbol) {
-      super(poolId);
+    constructor() {
+      super();
       this._metallic = 1;
       this._roughness = 1;
       this._specularFactor = Vector4.one();

@@ -145,8 +145,8 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     private _attenuationDistance: number;
     private _iridescenceFactor: Vector4;
     private _sceneColorTexSize: Vector2;
-    constructor(poolId?: symbol) {
-      super(poolId);
+    constructor() {
+      super();
       this._f0 = new Vector4(0.04, 0.04, 0.04, 1.5);
       this._occlusionStrength = 1;
       this._emissiveFactor = new Vector4(0, 0, 0, 1);

@@ -9,6 +9,7 @@ import type {
 import type { MeshMaterial, applyMaterialMixins } from '../meshmaterial';
 import type { Matrix4x4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
+import { makeRef, Ref } from '../../app';
 
 /**
  * ToMixedTextureType
@@ -84,14 +85,18 @@ export function mixinTextureProps<U extends string>(name: U) {
     let feature = 0;
     let featureTexIndex = 0;
     let featureTexMatrix = 0;
+    const propTexture = `__${name}Texture`;
+    const propSampler = `__${name}Sampler`;
+    const propTexCoord = `__${name}TexCoordIndex`;
+    const propMatrix = `__${name}TexMatrix`;
     if ((BaseCls as any)[id]) {
       return BaseCls as unknown as T & {
         new (...args: any[]): TextureProp<U> & TexturePropUniforms<U>;
       };
     }
     const cls = class extends (BaseCls as typeof MeshMaterial) {
-      constructor(poolId?: symbol) {
-        super(poolId);
+      constructor() {
+        super();
       }
       vertexShader(scope: PBFunctionScope): void {
         super.vertexShader(scope);
@@ -141,15 +146,15 @@ export function mixinTextureProps<U extends string>(name: U) {
           }
         }
       }
+      dispose() {
+        super.dispose();
+        (this as any)[`${name}Texture`] = null;
+      }
     };
     feature = cls.defineFeature();
     featureTexIndex = cls.defineFeature();
     featureTexMatrix = cls.defineFeature();
     const proto: any = cls.prototype;
-    const propTexture = `__${name}Texture`;
-    const propSampler = `__${name}Sampler`;
-    const propTexCoord = `__${name}TexCoordIndex`;
-    const propMatrix = `__${name}TexMatrix`;
     proto[propTexture] = null;
     proto[propSampler] = null;
     proto[propTexCoord] = 0;
@@ -187,12 +192,19 @@ export function mixinTextureProps<U extends string>(name: U) {
         : scope.$inputs[`texCoord${proto[propTexCoord]}`];
     };
     Object.defineProperty(proto, `${name}Texture`, {
-      get: function (): Texture2D {
+      get: function (): Ref<Texture2D> {
         return this[propTexture];
       },
       set: function (newValue: Texture2D) {
-        if (this[propTexture] !== newValue) {
-          this[propTexture] = newValue ?? null;
+        const texRef = makeRef(newValue);
+        if (this[propTexture] !== texRef) {
+          if (this[propTexture]) {
+            this[propTexture].unref();
+          }
+          this[propTexture] = texRef;
+          if (this[propTexture]) {
+            this[propTexture].ref();
+          }
           this.useFeature(feature, !!this[propTexture]);
           if (this[propTexture]) {
             this.useFeature(featureTexIndex, this[propTexCoord]);

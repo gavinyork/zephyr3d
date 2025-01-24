@@ -6,13 +6,14 @@ import type {
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
-import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
+import type { Camera, DrawContext, Primitive, Ref, SceneNode } from '@zephyr3d/scene';
 import {
   AbstractPostEffect,
   Application,
   CopyBlitter,
   decodeNormalizedFloatFromRGBA,
   fetchSampler,
+  makeRef,
   PlaneShape,
   ShaderHelper
 } from '@zephyr3d/scene';
@@ -91,7 +92,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   private _gridSteps: Float32Array;
   private _gridParams: Vector4;
   private _camera: Camera;
-  private _node: SceneNode;
+  private _node: Ref<SceneNode>;
   private _bindGroup: BindGroup;
   private _gridBindGroup: BindGroup;
   private _mode: GizmoMode;
@@ -142,11 +143,14 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   set mode(val: GizmoMode) {
     this._mode = val;
   }
-  get node(): SceneNode {
+  get node(): Ref<SceneNode> {
     return this._node;
   }
   set node(node: SceneNode) {
-    this._node = node;
+    const nodeRef = makeRef(node);
+    nodeRef?.ref();
+    this._node?.unref();
+    this._node = nodeRef;
   }
   get drawGrid(): boolean {
     return this._drawGrid;

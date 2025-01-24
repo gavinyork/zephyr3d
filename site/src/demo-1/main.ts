@@ -1,6 +1,6 @@
 import * as zip from '@zip.js/zip.js';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import type { SceneNode, Material, PBRMetallicRoughnessMaterial } from '@zephyr3d/scene';
+import type { SceneNode, Material, PBRMetallicRoughnessMaterial, Ref } from '@zephyr3d/scene';
 import {
   Scene,
   Application,
@@ -154,7 +154,7 @@ myApp.ready().then(async function () {
   const toonMesh = await fetchModel(scene, 'assets/models/Duck.glb');
   toonMesh.group.iterate((node) => {
     if (node.isMesh()) {
-      toonMaterial.albedoTexture = (node.material as PBRMetallicRoughnessMaterial).albedoTexture;
+      toonMaterial.albedoTexture = (node.material as Ref<PBRMetallicRoughnessMaterial>).albedoTexture;
       node.material = toonMaterial;
     }
   });

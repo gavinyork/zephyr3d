@@ -111,8 +111,7 @@ export class AddParticleSystemCommand implements Command<ParticleSystem> {
     return 'Add particle system';
   }
   async execute() {
-    const poolId = Symbol.for(crypto.randomUUID());
-    const node = new ParticleSystem(this._scene, poolId);
+    const node = new ParticleSystem(this._scene);
     if (this._nodeId) {
       node.id = this._nodeId;
     } else {
@@ -178,9 +177,8 @@ export class AddShapeCommand<T extends ShapeType> implements Command<Mesh> {
     return this._desc;
   }
   async execute() {
-    const poolId = Symbol.for(crypto.randomUUID());
-    const shape = new this._shapeCls(this._options, poolId);
-    const mesh = new Mesh(this._scene, shape, new PBRMetallicRoughnessMaterial(poolId));
+    const shape = new this._shapeCls(this._options);
+    const mesh = new Mesh(this._scene, shape, new PBRMetallicRoughnessMaterial());
     if (this._nodeId) {
       mesh.id = this._nodeId;
     } else {

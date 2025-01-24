@@ -48,13 +48,8 @@ export class Primitive {
   /**
    * Creates an instance of a primitive
    */
-  constructor(poolId?: symbol) {
-    if (poolId && (typeof poolId !== 'symbol' || Symbol.keyFor(poolId) === undefined)) {
-      throw new Error(
-        'Primitive construction failed: poolId must be a symbol which is created by Symbol.for'
-      );
-    }
-    this._poolId = poolId ?? null;
+  constructor() {
+    this._poolId = Symbol();
     this._vertexLayout = null;
     this._vertexLayoutOptions = { vertexBuffers: [] };
     this._primitiveType = 'triangle-list';
@@ -72,12 +67,6 @@ export class Primitive {
    */
   get id(): number {
     return this._id;
-  }
-  /**
-   * GPU object pool
-   */
-  get poolId(): symbol {
-    return this._poolId;
   }
   /**
    * Adds a callback function that will be called whenever the bounding box of the primitive changes.

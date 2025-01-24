@@ -17,15 +17,10 @@ export type AssetInfo = {
 
 export class AssetRegistry {
   private _assetMap: Map<string, AssetInfo>;
-  private _poolId: symbol;
   private _animations: WeakMap<SceneNode, AnimationSet>;
   constructor() {
     this._assetMap = new Map();
-    this._poolId = Symbol('AssetRegistry');
     this._animations = new WeakMap();
-  }
-  get poolId() {
-    return this._poolId;
   }
   getAssetId(asset: any) {
     for (const entry of this._assetMap) {
@@ -61,10 +56,6 @@ export class AssetRegistry {
     if (info) {
       info.name = name;
     }
-  }
-  getAssetPoolId(id: string) {
-    const info = this._assetMap.get(id);
-    return info ? info.manager.poolId : null;
   }
   async fetchModel(id: string, scene: Scene, options?: ModelFetchOptions, request?: HttpRequest) {
     const model = await this.doFetchModel(id, scene, options, request);
@@ -126,7 +117,7 @@ export class AssetRegistry {
           name: info.name,
           type: info.type,
           path: info.path,
-          manager: new AssetManager(Symbol(k)),
+          manager: new AssetManager(),
           allocated: new Map()
         });
       }

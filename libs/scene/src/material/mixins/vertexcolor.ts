@@ -26,8 +26,8 @@ function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T) {
   let FEATURE_VERTEX_COLOR = 0;
   const cls = class extends (BaseCls as typeof MeshMaterial) {
     static vertexColorMixed = true;
-    constructor(poolId?: symbol) {
-      super(poolId);
+    constructor() {
+      super();
     }
     /** Albedo color */
     get vertexColor(): boolean {

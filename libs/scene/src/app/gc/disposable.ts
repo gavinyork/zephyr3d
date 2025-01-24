@@ -23,6 +23,11 @@ export type Ref<T extends Disposable> = T & {
    * @returns The original object
    */
   unref(): Ref<T>;
+  /**
+   * Get the original object
+   * @returns The original object
+   */
+  refobj(): T;
 };
 
 /**

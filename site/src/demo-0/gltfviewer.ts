@@ -1,7 +1,7 @@
 import * as zip from '@zip.js/zip.js';
 import type * as draco3d from 'draco3d';
 import { Vector4, Vector3, HttpRequest } from '@zephyr3d/base';
-import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
+import type { SceneNode, Scene, AnimationSet, OIT, Ref } from '@zephyr3d/scene';
 import { Mesh, PlaneShape, LambertMaterial } from '@zephyr3d/scene';
 import {
   BatchGroup,
@@ -35,8 +35,8 @@ declare global {
 
 export class GLTFViewer {
   private _currentAnimation: string;
-  private _modelNode: SceneNode;
-  private _animationSet: AnimationSet;
+  private _modelNode: Ref<SceneNode>;
+  private _animationSet: Ref<AnimationSet>;
   private _assetManager: AssetManager;
   private _scene: Scene;
   private _tonemap: Tonemap;
@@ -172,7 +172,7 @@ export class GLTFViewer {
   get scene(): Scene {
     return this._scene;
   }
-  get animationSet(): AnimationSet {
+  get animationSet(): Ref<AnimationSet> {
     return this._animationSet;
   }
   get animations(): string[] {
@@ -198,9 +198,6 @@ export class GLTFViewer {
     return fileMap;
   }
   async loadModel(url: string, httpRequest: HttpRequest) {
-    this._modelNode?.remove();
-    this._camera.clearHistoryData();
-    this._assetManager.purgeCache();
     this._assetManager
       .fetchModel(
         this._scene,
@@ -212,11 +209,13 @@ export class GLTFViewer {
         httpRequest
       )
       .then((info) => {
-        this._modelNode?.dispose();
-        this._modelNode = info.group;
+        this._modelNode?.remove();
+        this._modelNode?.unref();
+        this._camera.clearHistoryData();
+        this._modelNode = info.group.ref();
         this._modelNode.parent = this._batchGroup;
-        this._animationSet?.dispose();
-        this._animationSet = info.animationSet;
+        this._animationSet?.unref();
+        this._animationSet = info.animationSet?.ref() ?? null;
         this._modelNode.pickable = true;
         this._currentAnimation = null;
         if (this._animationSet) {

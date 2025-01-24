@@ -12,6 +12,7 @@ import type { AbstractDevice, GPUDataBuffer, StructuredBuffer, Texture2D } from 
 import { QUEUE_OPAQUE } from '../values';
 import { ParticleMaterial, type MeshMaterial } from '../material';
 import { Application } from '../app/app';
+import { makeRef, Ref } from '../app';
 
 const tmpVec3 = new Vector3();
 
@@ -78,15 +79,15 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   private _emitterShapeSize: Vector3;
   private _emitterShapeSizeVar: Vector3;
   private _colorValue: Vector4;
-  private _primitive: Primitive;
-  private _material: ParticleMaterial;
+  private _primitive: Ref<Primitive>;
+  private _material: Ref<ParticleMaterial>;
   private _wsBoundingBox: BoundingBox;
   private _instanceColor: Vector4;
   private _pickTarget: PickTarget;
   private _instanceData: Float32Array;
   private _instanceBuffer: StructuredBuffer;
-  constructor(scene: Scene, poolId?: symbol) {
-    super(scene, poolId);
+  constructor(scene: Scene) {
+    super(scene);
     this._activeParticleList = [];
     this._maxParticleCount = 100;
     this._emitInterval = 100;
@@ -130,7 +131,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._wsBoundingBox = new BoundingBox();
     this._instanceData = null;
     this._instanceBuffer = null;
-    this._material = new ParticleMaterial(this._poolId);
+    this._material = makeRef(new ParticleMaterial()).ref();
   }
   set maxParticleCount(value: number) {
     if (value !== this._maxParticleCount) {
@@ -484,7 +485,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   }
   resizeVertexBuffers(device: AbstractDevice) {
     if (!this._primitive) {
-      this._primitive = new Primitive(this._poolId);
+      this._primitive = makeRef(new Primitive()).ref();
       const quad = device.createVertexBuffer(
         'position_f32x4',
         new Float32Array([0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3])
@@ -711,6 +712,16 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
       this.bind(ctx);
       this._material.draw(this._primitive, ctx, this._activeParticleList.length);
     }
+  }
+  /**
+   * {@inheritDoc SceneNode.dispose}
+   */
+  dispose() {
+    super.dispose();
+    this._primitive?.unref();
+    this._primitive = null;
+    this._material?.unref();
+    this._material = null;
   }
   protected _detached(): void {
     super._detached();

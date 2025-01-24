@@ -10,6 +10,7 @@ import type { Camera } from '../camera/camera';
 import type { AnimationSet } from '../animation/animationset';
 import type { PickTarget } from '../render';
 import type { Compositor } from '../posteffect';
+import { makeRef, Ref } from '../app';
 
 /**
  * Presents a world that manages a couple of objects that will be rendered
@@ -23,7 +24,7 @@ export class Scene extends makeEventTarget(Object)<{
   /** @internal */
   private static _nextId = 0;
   /** @internal */
-  protected _rootNode: SceneNode;
+  protected _rootNode: Ref<SceneNode>;
   /** @internal */
   protected _octree: Octree;
   /** @internal */
@@ -47,7 +48,7 @@ export class Scene extends makeEventTarget(Object)<{
     this._env = new Environment();
     this._updateFrame = -1;
     this._animationSet = [];
-    this._rootNode = new SceneNode(this);
+    this._rootNode = makeRef(new SceneNode(this)).ref();
     this._rootNode.name = 'Root';
   }
   /** @internal */
@@ -92,9 +93,7 @@ export class Scene extends makeEventTarget(Object)<{
    * Disposes the scene
    */
   dispose() {
-    this._rootNode?.iterate((child) => {
-      child.dispose();
-    });
+    this._rootNode.unref();
     this._rootNode = null;
   }
   /**

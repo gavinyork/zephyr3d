@@ -21,8 +21,8 @@ export class PBRMetallicRoughnessMaterial extends applyMaterialMixins(
   /**
    * Creates an instance of PBRMetallicRoughnessMaterial class
    */
-  constructor(poolId?: symbol) {
-    super(poolId);
+  constructor() {
+    super();
     this.useFeature(PBRMetallicRoughnessMaterial.FEATURE_VERTEX_NORMAL, true);
   }
   /** true if vertex normal attribute presents */

@@ -55,8 +55,8 @@ export class TorusShape extends Shape<TorusCreationOptions> {
    * Creates an instance of torus shape
    * @param options - The creation options
    */
-  constructor(options?: TorusCreationOptions, poolId?: symbol) {
-    super(options, poolId);
+  constructor(options?: TorusCreationOptions) {
+    super(options);
   }
   /**
    * {@inheritDoc Shape.type}

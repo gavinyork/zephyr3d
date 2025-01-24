@@ -65,8 +65,8 @@ export class TerrainMaterial extends applyMaterialMixins(
   private _uvScales: Float32Array;
   private _numDetailMaps: number;
   private _terrainInfo: Vector4;
-  constructor(options?: TerrainMaterialOptions, poolId?: symbol) {
-    super(poolId);
+  constructor(options?: TerrainMaterialOptions) {
+    super();
     this.normalMapMode = 'object-space';
     this._options = null;
     this._numDetailMaps = 0;

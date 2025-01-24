@@ -3,7 +3,7 @@ import type { Scene, SceneNode } from '../scene';
 import type { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
 import type { Skeleton } from './skeleton';
-import { Application } from '../app';
+import { Application, makeRef, Ref } from '../app';
 
 /**
  * Options for playing animation
@@ -70,7 +70,7 @@ export type StopAnimationOptions = {
  */
 export class AnimationSet {
   /** @internal */
-  private _model: SceneNode;
+  private _model: Ref<SceneNode>;
   /** @internal */
   private _animations: Record<string, AnimationClip>;
   /** @internal */
@@ -102,7 +102,7 @@ export class AnimationSet {
    */
   constructor(scene: Scene, model: SceneNode) {
     this._scene = scene;
-    this._model = model;
+    this._model = makeRef(model);
     this._scene.animationSet.push(this);
     this._animations = {};
     this._activeTracks = new Map();
@@ -324,6 +324,8 @@ export class AnimationSet {
     }
   }
   dispose() {
+    this._model?.unref();
+    this._model = null;
     const index = this._scene.animationSet.indexOf(this);
     if (index >= 0) {
       this._scene.animationSet.splice(index, 1);

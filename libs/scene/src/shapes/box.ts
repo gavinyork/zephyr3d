@@ -40,8 +40,8 @@ export class BoxShape extends Shape<BoxCreationOptions> {
    * Creates an instance of box shape
    * @param options - The creation options
    */
-  constructor(options?: BoxCreationOptions, poolId?: symbol) {
-    super(options, poolId);
+  constructor(options?: BoxCreationOptions) {
+    super(options);
   }
   /**
    * {@inheritDoc Shape.type}
@@ -193,8 +193,8 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> {
    * Creates an instance of wireframe box shape
    * @param options - The creation options
    */
-  constructor(options?: BoxCreationOptions, poolId?: symbol) {
-    super(options, poolId);
+  constructor(options?: BoxCreationOptions) {
+    super(options);
   }
   /**
    * {@inheritDoc Shape.type}

@@ -12,20 +12,16 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
     ctor: ParticleSystem,
     parent: getGraphNodeClass(assetRegistry),
     className: 'ParticleSystem',
-    createFunc(scene: Scene | SceneNode, poolId: string) {
-      const poolSym = typeof poolId === 'string' ? Symbol.for(poolId) : void 0;
+    createFunc(scene: Scene | SceneNode) {
       if (scene instanceof Scene) {
-        return new ParticleSystem(scene, poolSym);
+        return new ParticleSystem(scene);
       } else if (scene instanceof SceneNode) {
-        const particlesys = new ParticleSystem(scene.scene, poolSym);
+        const particlesys = new ParticleSystem(scene.scene);
         particlesys.parent = scene;
         return particlesys;
       } else {
         return null;
       }
-    },
-    getInitParams(obj: ParticleSystem) {
-      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
     },
     getProps() {
       return [

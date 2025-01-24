@@ -6,11 +6,8 @@ export function getPrimitiveClass(): SerializableClass {
   return {
     ctor: Primitive,
     className: 'Primitive',
-    createFunc(ctx: any, poolId: string) {
-      return new Primitive(typeof poolId === 'string' ? Symbol.for(poolId) : null);
-    },
-    getInitParams(obj: Primitive) {
-      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
+    createFunc() {
+      return new Primitive();
     },
     getProps() {
       return [];
@@ -22,11 +19,8 @@ export function getBoxShapeClass(): SerializableClass {
     ctor: BoxShape,
     parent: getPrimitiveClass(),
     className: 'BoxShape',
-    createFunc(ctx: any, poolId: string) {
-      return new BoxShape({ size: 1 }, typeof poolId === 'string' ? Symbol.for(poolId) : null);
-    },
-    getInitParams(obj: BoxShape) {
-      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
+    createFunc() {
+      return new BoxShape({ size: 1 });
     },
     getProps() {
       return [
@@ -76,11 +70,8 @@ export function getBoxFrameShapeClass(): SerializableClass {
     ctor: BoxFrameShape,
     parent: getPrimitiveClass(),
     className: 'BoxFrameShape',
-    createFunc(ctx: any, poolId: string) {
-      return new BoxFrameShape({ size: 1 }, typeof poolId === 'string' ? Symbol.for(poolId) : null);
-    },
-    getInitParams(obj: BoxFrameShape) {
-      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
+    createFunc() {
+      return new BoxFrameShape({ size: 1 });
     },
     getProps() {
       return [
@@ -130,11 +121,8 @@ export function getTorusShapeClass(): SerializableClass {
     ctor: TorusShape,
     parent: getPrimitiveClass(),
     className: 'TorusShape',
-    createFunc(ctx: any, poolId: string) {
-      return new TorusShape(null, typeof poolId === 'string' ? Symbol.for(poolId) : null);
-    },
-    getInitParams(obj: TorusShape) {
-      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
+    createFunc() {
+      return new TorusShape();
     },
     getProps() {
       return [
@@ -208,11 +196,8 @@ export function getPlaneShapeClass(): SerializableClass {
     ctor: PlaneShape,
     parent: getPrimitiveClass(),
     className: 'PlaneShape',
-    createFunc(ctx: any, poolId: string) {
-      return new PlaneShape(null, typeof poolId === 'string' ? Symbol.for(poolId) : null);
-    },
-    getInitParams(obj: PlaneShape) {
-      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
+    createFunc() {
+      return new PlaneShape();
     },
     getProps() {
       return [
@@ -286,11 +271,8 @@ export function getCylinderShapeClass(): SerializableClass {
     ctor: CylinderShape,
     parent: getPrimitiveClass(),
     className: 'CylinderShape',
-    createFunc(ctx: any, poolId: string) {
-      return new CylinderShape(null, typeof poolId === 'string' ? Symbol.for(poolId) : null);
-    },
-    getInitParams(obj: CylinderShape) {
-      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
+    createFunc() {
+      return new CylinderShape();
     },
     getProps() {
       return [
@@ -397,11 +379,8 @@ export function getSphereShapeClass(): SerializableClass {
     ctor: SphereShape,
     parent: getPrimitiveClass(),
     className: 'SphereShape',
-    createFunc(ctx: any, poolId: string) {
-      return new SphereShape(null, typeof poolId === 'string' ? Symbol.for(poolId) : null);
-    },
-    getInitParams(obj: SphereShape) {
-      return [obj.poolId ? Symbol.keyFor(obj.poolId) : null];
+    createFunc() {
+      return new SphereShape();
     },
     getProps() {
       return [

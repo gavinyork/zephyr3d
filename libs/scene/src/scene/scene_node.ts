@@ -17,8 +17,7 @@ import {
   Vector4
 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
-import type { AnimationSet } from '../animation';
-import { Application } from '../app/app';
+import { makeRef, Ref } from '../app/gc/disposable';
 
 /**
  * Node iterate function type
@@ -63,8 +62,6 @@ export class SceneNode extends makeEventTarget(Object)<{
   /** @internal */
   protected _id: string;
   /** @internal */
-  protected _poolId: symbol;
-  /** @internal */
   protected _clipMode: boolean;
   /** @internal */
   protected _boxDrawMode: number;
@@ -89,11 +86,9 @@ export class SceneNode extends makeEventTarget(Object)<{
   /** @internal */
   private _assetUrl: string;
   /** @internal */
-  private _animationSet: AnimationSet;
-  /** @internal */
   protected _parent: SceneNode;
   /** @internal */
-  protected _children: SceneNode[];
+  protected _children: Ref<SceneNode>[];
   /** @internal */
   protected _position: ObservableVector3;
   /** @internal */
@@ -122,15 +117,9 @@ export class SceneNode extends makeEventTarget(Object)<{
    * Creates a new scene node
    * @param scene - Which scene the node belongs to
    */
-  constructor(scene: Scene, poolId?: symbol) {
+  constructor(scene: Scene) {
     super();
     this._id = crypto.randomUUID();
-    if (poolId && (typeof poolId !== 'symbol' || Symbol.keyFor(poolId) === undefined)) {
-      throw new Error(
-        'SceneNode construction failed: poolId must be a symbol which is created by Symbol.for'
-      );
-    }
-    this._poolId = poolId ?? null;
     this._scene = scene;
     this._name = '';
     this._bv = null;
@@ -144,7 +133,6 @@ export class SceneNode extends makeEventTarget(Object)<{
     this._parent = null;
     this._sealed = false;
     this._assetUrl = '';
-    this._animationSet = null;
     this._children = [];
     this._transformChangeCallback = () => this._onTransformChanged(true);
     this._position = new ObservableVector3(0, 0, 0);
@@ -161,7 +149,7 @@ export class SceneNode extends makeEventTarget(Object)<{
     this._disableCallback = false;
     this._tmpLocalMatrix = Matrix4x4.identity();
     this._tmpWorldMatrix = Matrix4x4.identity();
-    if (scene && this !== scene.rootNode) {
+    if (scene && this !== scene.rootNode.refobj()) {
       this.reparent(scene.rootNode);
     }
   }
@@ -185,12 +173,6 @@ export class SceneNode extends makeEventTarget(Object)<{
   }
   set id(id: string) {
     this._id = id;
-  }
-  /**
-   * GPU object pool of this node
-   */
-  get poolId() {
-    return this._poolId;
   }
   /**
    * Name of the node
@@ -227,20 +209,13 @@ export class SceneNode extends makeEventTarget(Object)<{
   set assetUrl(val: string) {
     this._assetUrl = val;
   }
-  /** Animation set */
-  get animationSet(): AnimationSet {
-    return this._animationSet;
-  }
-  set animationSet(val: AnimationSet) {
-    this._animationSet = val;
-  }
   /**
    * Check if given node is a direct child of the node
    * @param child - The node to be checked
    * @returns true if the given node is a direct child of this node, false otherwise
    */
   hasChild(child: SceneNode): boolean {
-    return this._children.indexOf(child) >= 0;
+    return child && child.parent === this;
   }
   /**
    * Removes all children from this node
@@ -360,9 +335,7 @@ export class SceneNode extends makeEventTarget(Object)<{
   }
   /** Disposes the node */
   dispose() {
-    if (this._poolId) {
-      Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
-    }
+    this.removeChildren();
   }
   /**
    * Computes the bounding volume of the node
@@ -497,13 +470,16 @@ export class SceneNode extends makeEventTarget(Object)<{
     if (newParent !== lastParent) {
       const willDetach = (!p || !p.attached) && this.attached;
       const willAttach = !this.attached && p && p.attached;
+      const ref = makeRef(this);
+      if (newParent) {
+        newParent._children.push(ref);
+        ref.ref();
+      }
       if (this._parent) {
-        this._parent._children.splice(this._parent._children.indexOf(this), 1);
+        this._parent._children.splice(this._parent._children.indexOf(ref), 1);
+        ref.unref();
       }
       this._parent = p;
-      if (this._parent) {
-        this._parent._children.push(this);
-      }
       this._onTransformChanged(false);
       if (willDetach) {
         this._detached();
@@ -565,7 +541,7 @@ export class SceneNode extends makeEventTarget(Object)<{
     }
   }
   /** Children of this xform */
-  get children(): SceneNode[] {
+  get children(): Ref<SceneNode>[] {
     return this._children;
   }
   /**

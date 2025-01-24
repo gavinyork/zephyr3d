@@ -4,6 +4,7 @@ import type { Primitive } from '../render/primitive';
 import type { DrawContext } from '../render/drawable';
 import { QUEUE_OPAQUE } from '../values';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
+import { Application } from '../app';
 
 type MaterialState = {
   program: GPUProgram;
@@ -40,21 +41,14 @@ export class Material {
   /**
    * Creates an instance of material
    */
-  constructor(poolId?: symbol) {
-    if (poolId && (typeof poolId !== 'symbol' || Symbol.keyFor(poolId) === undefined)) {
-      throw new Error('Material construction failed: poolId must be a symbol which is created by Symbol.for');
-    }
-    this._poolId = poolId ?? null;
+  constructor() {
+    this._poolId = Symbol();
     this._id = ++Material._nextId;
     this._states = {};
     this._numPasses = 1;
     this._hash = [null];
     this._optionTag = 0;
     this._currentHash = [];
-  }
-  /** Pool id */
-  get poolId() {
-    return this._poolId;
   }
   /** Unique identifier of the material */
   get instanceId(): number {
@@ -230,6 +224,12 @@ export class Material {
     } else {
       primitive.draw();
     }
+  }
+  /**
+   * Dispose material
+   */
+  dispose() {
+    Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
   }
   /** @internal */
   protected createProgram(ctx: DrawContext, pass: number): GPUProgram {

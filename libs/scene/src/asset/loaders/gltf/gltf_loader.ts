@@ -90,9 +90,7 @@ export class GLTFLoader extends AbstractModelLoader {
     }
     const gltf = (await new Response(data).json()) as GLTFContent;
     gltf._manager = assetManager;
-    gltf._device = assetManager.poolId
-      ? Application.instance.device.getPool(assetManager.poolId)
-      : Application.instance.device;
+    gltf._device = Application.instance.device;
     gltf._httpRequest = httpRequest;
     gltf._loadedBuffers = null;
     return this.loadJson(url, gltf, decoderModule);
@@ -120,9 +118,7 @@ export class GLTFLoader extends AbstractModelLoader {
     }
     if (gltf) {
       gltf._manager = assetManager;
-      gltf._device = assetManager.poolId
-        ? Application.instance.device.getPool(assetManager.poolId)
-        : Application.instance.device;
+      gltf._device = Application.instance.device;
       gltf._httpRequest = httpRequest;
       gltf._loadedBuffers = buffers;
       return this.loadJson(url, gltf, decoderModule);
@@ -526,7 +522,7 @@ export class GLTFLoader extends AbstractModelLoader {
             rawJointWeights: null,
             numTargets: 0
           };
-          const primitive = new Primitive(gltf._manager.poolId);
+          const primitive = new Primitive();
           const attributes = p.attributes;
           const dracoExtension = gltf._dracoModule ? p.extensions?.['KHR_draco_mesh_compression'] : null;
           let dracoMeshDecoder: DracoMeshDecoder = null;
@@ -647,10 +643,10 @@ export class GLTFLoader extends AbstractModelLoader {
     }
     return mesh;
   }
-  private async _createMaterial(assetMaterial: AssetMaterial, poolId: symbol): Promise<M> {
+  private async _createMaterial(assetMaterial: AssetMaterial): Promise<M> {
     if (assetMaterial.type === 'unlit') {
       const unlitAssetMaterial = assetMaterial as AssetUnlitMaterial;
-      const unlitMaterial = new UnlitMaterial(poolId);
+      const unlitMaterial = new UnlitMaterial();
       unlitMaterial.albedoColor = unlitAssetMaterial.diffuse ?? Vector4.one();
       if (unlitAssetMaterial.diffuseMap) {
         unlitMaterial.albedoTexture = unlitAssetMaterial.diffuseMap.texture;
@@ -670,7 +666,7 @@ export class GLTFLoader extends AbstractModelLoader {
       return unlitMaterial;
     } else if (assetMaterial.type === 'pbrSpecularGlossiness') {
       const assetPBRMaterial = assetMaterial as AssetPBRMaterialSG;
-      const pbrMaterial = new PBRSpecularGlossinessMaterial(poolId);
+      const pbrMaterial = new PBRSpecularGlossinessMaterial();
       pbrMaterial.ior = assetPBRMaterial.ior;
       pbrMaterial.albedoColor = assetPBRMaterial.diffuse;
       pbrMaterial.specularFactor = new Vector4(
@@ -728,7 +724,7 @@ export class GLTFLoader extends AbstractModelLoader {
       return pbrMaterial;
     } else if (assetMaterial.type === 'pbrMetallicRoughness') {
       const assetPBRMaterial = assetMaterial as AssetPBRMaterialMR;
-      const pbrMaterial = new PBRMetallicRoughnessMaterial(poolId);
+      const pbrMaterial = new PBRMetallicRoughnessMaterial();
       pbrMaterial.ior = assetPBRMaterial.ior;
       pbrMaterial.albedoColor = assetPBRMaterial.diffuse;
       pbrMaterial.metallic = assetPBRMaterial.metallic;
@@ -1084,7 +1080,7 @@ export class GLTFLoader extends AbstractModelLoader {
         };
       }
     }
-    return await this._createMaterial(assetMaterial, gltf._manager.poolId);
+    return await this._createMaterial(assetMaterial);
   }
   /** @internal */
   private async _loadTexture(

@@ -20,6 +20,7 @@ import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loade
 import { TGALoader } from './loaders/image/tga_Loader';
 import { MorphTargetTrack } from '../animation/morphtrack';
 import { processMorphData } from '../animation/morphtarget';
+import { makeRef, Ref } from '../app';
 
 /**
  * Options for texture fetching
@@ -57,9 +58,9 @@ export type ModelFetchOptions = {
  */
 export type ModelInfo = {
   /** Mesh group */
-  group: SceneNode;
+  group: Ref<SceneNode>;
   /** Animation set, null if no animation */
-  animationSet: AnimationSet;
+  animationSet: Ref<AnimationSet>;
 };
 
 /**
@@ -87,8 +88,6 @@ export class AssetManager {
   /** @internal */
   private static _modelLoaders: AbstractModelLoader[] = [new GLTFLoader()];
   /** @internal */
-  private _poolId: symbol;
-  /** @internal */
   private _httpRequest: HttpRequest;
   /** @internal */
   private _textures: {
@@ -109,24 +108,12 @@ export class AssetManager {
   /**
    * Creates an instance of AssetManager
    */
-  constructor(poolId?: symbol) {
-    if (poolId && (typeof poolId !== 'symbol' || Symbol.keyFor(poolId) === undefined)) {
-      throw new Error(
-        'AssetManager construction failed: poolId must be a symbol which is created by Symbol.for'
-      );
-    }
-    this._poolId = poolId ?? null;
+  constructor() {
     this._httpRequest = new HttpRequest();
     this._textures = {};
     this._models = {};
     this._binaryDatas = {};
     this._textDatas = {};
-  }
-  /**
-   * Device pool for this manager
-   */
-  get poolId() {
-    return this._poolId;
   }
   /**
    * HttpRequest instance of the asset manager
@@ -142,9 +129,6 @@ export class AssetManager {
     this._models = {};
     this._binaryDatas = {};
     this._textDatas = {};
-    if (this._poolId) {
-      Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
-    }
   }
   /**
    * Adds a texture loader to the asset manager
@@ -501,17 +485,12 @@ export class AssetManager {
     }
   }
   /** @internal */
-  private createSceneNode(
-    scene: Scene,
-    url: string,
-    model: SharedModel,
-    instancing: boolean
-  ): { group: SceneNode; animationSet: AnimationSet } {
+  private createSceneNode(scene: Scene, url: string, model: SharedModel, instancing: boolean): ModelInfo {
     const group = new SceneNode(scene);
     group.name = model.name;
     group.assetUrl = url;
     group.sealed = true;
-    group.animationSet = new AnimationSet(scene, group);
+    const animationSet = new AnimationSet(scene, group);
     for (let i = 0; i < model.scenes.length; i++) {
       const assetScene = model.scenes[i];
       const skeletonMeshMap: Map<
@@ -557,7 +536,7 @@ export class AssetManager {
         if (animation.tracks.size === 0) {
           continue;
         }
-        group.animationSet.add(animation);
+        animationSet.add(animation);
         for (const sk of animationData.skeletons) {
           const nodes = skeletonMeshMap.get(sk);
           if (nodes) {
@@ -567,8 +546,7 @@ export class AssetManager {
                 sk.inverseBindMatrices,
                 sk.bindPoseMatrices,
                 nodes.mesh,
-                nodes.bounding,
-                this._poolId
+                nodes.bounding
               );
             }
             animation.addSkeleton(nodes.skeleton);
@@ -576,11 +554,7 @@ export class AssetManager {
         }
       }
     }
-    if (group.animationSet.numAnimations === 0) {
-      group.animationSet.dispose();
-      group.animationSet = null;
-    }
-    return { group, animationSet: group.animationSet };
+    return { group: makeRef(group), animationSet: makeRef(animationSet) };
   }
   /**
    * Sets the loader for a given builtin-texture
@@ -629,7 +603,7 @@ export class AssetManager {
               : subMesh.material;
           meshNode.parent = node;
           subMesh.mesh = meshNode;
-          processMorphData(subMesh, meshData.morphWeights, this._poolId);
+          processMorphData(subMesh, meshData.morphWeights);
           if (skeleton) {
             if (!skeletonMeshMap.has(skeleton)) {
               skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });

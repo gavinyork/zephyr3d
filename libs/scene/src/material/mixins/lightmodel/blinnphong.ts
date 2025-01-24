@@ -36,8 +36,8 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
   return class extends S {
     protected static blinnPhongMixed = true;
     private _shininess: number;
-    constructor(poolId?: symbol) {
-      super(poolId);
+    constructor() {
+      super();
       this._shininess = 32;
     }
     /** Shininess */

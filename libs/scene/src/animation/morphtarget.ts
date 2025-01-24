@@ -10,9 +10,8 @@ import {
 import { ShaderHelper } from '../material/shader/helper';
 import { BoundingBox } from '../utility/bounding_volume';
 
-export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number[], poolId?: symbol) {
+export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number[]) {
   const device = Application.instance.device;
-  const pool = poolId ? device.getPool(poolId) : device;
   const numTargets = subMesh.numTargets;
   if (numTargets === 0) {
     return;
@@ -55,7 +54,7 @@ export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number
       }
     }
   }
-  const morphTexture = pool.createTexture2D('rgba32f', textureSize, textureSize, {
+  const morphTexture = device.createTexture2D('rgba32f', textureSize, textureSize, {
     samplerOptions: {
       minFilter: 'nearest',
       magFilter: 'nearest',
@@ -72,7 +71,7 @@ export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number
       )
     }
   ]);
-  const morphUniformBuffer = pool.createStructuredBuffer(
+  const morphUniformBuffer = device.createStructuredBuffer(
     bufferType,
     {
       usage: 'uniform'

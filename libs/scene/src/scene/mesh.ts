@@ -12,6 +12,7 @@ import { QUEUE_OPAQUE } from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import type { SceneNode } from './scene_node';
+import { makeRef, Ref } from '../app';
 
 /**
  * Mesh node
@@ -19,9 +20,9 @@ import type { SceneNode } from './scene_node';
  */
 export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements BatchDrawable {
   /** @internal */
-  private _primitive: Primitive;
+  private _primitive: Ref<Primitive>;
   /** @internal */
-  private _material: MeshMaterial;
+  private _material: Ref<MeshMaterial>;
   /** @internal */
   protected _castShadow: boolean;
   /** @internal */
@@ -48,8 +49,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    * Creates an instance of mesh node
    * @param scene - The scene to which the mesh node belongs
    */
-  constructor(scene: Scene, primitive?: Primitive, material?: MeshMaterial, poolId?: symbol) {
-    super(scene, poolId);
+  constructor(scene: Scene, primitive?: Primitive, material?: MeshMaterial) {
+    super(scene);
     this._primitive = null;
     this._material = null;
     this._castShadow = true;
@@ -108,17 +109,20 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._castShadow = b;
   }
   /** Primitive of the mesh */
-  get primitive(): Primitive {
+  get primitive(): Ref<Primitive> {
     return this._primitive;
   }
   set primitive(prim: Primitive) {
+    const primRef = makeRef(prim);
     if (prim !== this._primitive) {
       if (this._primitive) {
         this._primitive.removeBoundingboxChangeCallback(this._bboxChangeCallback);
+        this._primitive.unref();
       }
-      this._primitive = prim || null;
+      this._primitive = primRef;
       if (this._primitive) {
         this._primitive.addBoundingboxChangeCallback(this._bboxChangeCallback);
+        this._primitive.ref();
       }
       this._instanceHash =
         this._primitive && this._material
@@ -129,17 +133,20 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     }
   }
   /** Material of the mesh */
-  get material(): MeshMaterial {
+  get material(): Ref<MeshMaterial> {
     return this._material;
   }
   set material(m: MeshMaterial) {
+    const materialRef = makeRef(m);
     if (this._material !== m) {
       if (this._material) {
         RenderBundleWrapper.materialDetached(this._material.coreMaterial, this);
+        this._material.unref();
       }
-      this._material = m;
+      this._material = materialRef;
       if (this._material) {
         RenderBundleWrapper.materialAttached(this._material.coreMaterial, this);
+        this._material.ref();
       }
       this._instanceHash =
         this._primitive && this._material
@@ -234,7 +241,9 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   }
   /** Disposes the mesh node */
   dispose() {
+    this._primitive?.unref();
     this._primitive = null;
+    this._material?.unref();
     this._material = null;
     RenderBundleWrapper.drawableChanged(this);
     super.dispose();
