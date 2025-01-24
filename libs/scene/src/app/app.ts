@@ -1,6 +1,7 @@
 import { makeEventTarget } from '@zephyr3d/base';
 import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
 import { InputManager } from './inputmgr';
+import { GCManager } from './gc/gcmanager';
 
 type appEventMap = {
   resize: [width: number, height: number];
@@ -169,6 +170,8 @@ export class Application extends makeEventTarget(Object)<appEventMap>() {
   }
   /** Render one frame */
   frame() {
+    // Gabage collect objects which was disposed.
+    GCManager.process();
     if (this._ready) {
       this._elapsed = this.device.frameInfo.elapsedFrame * 0.001;
       this.device.setFramebuffer(null);
