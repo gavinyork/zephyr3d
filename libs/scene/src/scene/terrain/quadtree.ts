@@ -3,11 +3,11 @@ import type { IndexBuffer, PrimitiveType, Texture2D } from '@zephyr3d/device';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { TerrainPatch } from './patch';
 import { HeightField } from './heightfield';
-import { Application } from '../../app';
+import { Application, Ref } from '../../app';
 import type { CullVisitor } from '../../render/cull_visitor';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import type { Terrain } from './terrain';
-import type { GrassCluster } from './grass';
+import { GrassCluster } from './grass';
 
 /** @internal */
 export class QuadtreeNode {
@@ -125,14 +125,17 @@ export class QuadtreeNode {
   getChild(index: number): QuadtreeNode {
     return this._children[index];
   }
+  dispose() {
+    this._patch?.dispose();
+  }
 }
 
 /** @internal */
 export class Quadtree {
   private _baseVertices: Float32Array;
-  private _indices: IndexBuffer;
-  private _indicesWireframe: IndexBuffer;
-  private _normalMap: Texture2D;
+  private _indices: Ref<IndexBuffer>;
+  private _indicesWireframe: Ref<IndexBuffer>;
+  private _normalMap: Ref<Texture2D>;
   private _scaleX: number;
   private _scaleZ: number;
   private _patchSize: number;
@@ -147,9 +150,9 @@ export class Quadtree {
   constructor(terrain: Terrain) {
     this._terrain = terrain;
     this._baseVertices = null;
-    this._indices = null;
-    this._indicesWireframe = null;
-    this._normalMap = null;
+    this._indices = new Ref<IndexBuffer>();
+    this._indicesWireframe = new Ref<IndexBuffer>();
+    this._normalMap = new Ref<Texture2D>();
     this._scaleX = 1;
     this._scaleZ = 1;
     this._patchSize = 0;
@@ -162,13 +165,33 @@ export class Quadtree {
     this._primitiveType = 'triangle-strip';
   }
   get normalMap(): Texture2D {
-    return this._normalMap;
+    return this._normalMap.get();
   }
   get rootNode(): QuadtreeNode {
     return this._rootNode;
   }
   get terrain(): Terrain {
     return this._terrain;
+  }
+  dispose() {
+    if (this._rootNode) {
+      const nodes: QuadtreeNode[] = [this._rootNode];
+      while (nodes.length > 0) {
+        const node = nodes.shift();
+        if (node) {
+          for (let i = 0; i < 4; i++) {
+            const child = node.getChild(i);
+            if (child) {
+              nodes.push(child);
+            }
+          }
+          node.dispose();
+        }
+      }
+    }
+    this._indices.dispose();
+    this._indicesWireframe.dispose();
+    this._normalMap.dispose();
   }
   build(
     patchSize: number,
@@ -248,9 +271,9 @@ export class Quadtree {
     this._baseVertices = vertices;
     // Create base index buffer
     const indices = this.strip(vertexCacheSize);
-    this._indices = device.createIndexBuffer(indices, { managed: true });
+    this._indices.set(device.createIndexBuffer(indices, { managed: true }));
     const lineIndices = this.line(indices);
-    this._indicesWireframe = device.createIndexBuffer(lineIndices, { managed: true });
+    this._indicesWireframe.set(device.createIndexBuffer(lineIndices, { managed: true }));
     this._primitiveCount = indices.length - 2;
     this._primitiveType = 'triangle-strip';
     this._rootNode = new QuadtreeNode();
@@ -263,11 +286,15 @@ export class Quadtree {
       normalMapBytes[i * 4 + 2] = Math.floor((normal.z * 0.5 + 0.5) * 255);
       normalMapBytes[i * 4 + 3] = 255;
     }
-    this._normalMap = device.createTexture2D('rgba8unorm', rootSizeX, rootSizeZ, {
-      samplerOptions: { mipFilter: 'none' }
-    });
-    this._normalMap.name = `TerrainNormalMap-${this._normalMap.uid}`;
-    this._normalMap.update(normalMapBytes, 0, 0, this._normalMap.width, this._normalMap.height);
+    this._normalMap.set(
+      device.createTexture2D('rgba8unorm', rootSizeX, rootSizeZ, {
+        samplerOptions: { mipFilter: 'none' }
+      })
+    );
+    this._normalMap.get().name = `TerrainNormalMap-${this._normalMap.get().uid}`;
+    this._normalMap
+      .get()
+      .update(normalMapBytes, 0, 0, this._normalMap.get().width, this._normalMap.get().height);
     return this._rootNode.initialize(this, null, 0, 0, this._baseVertices, normals, scaleY, elevations);
   }
   strip(vertexCacheSize: number): Uint16Array {
@@ -354,10 +381,10 @@ export class Quadtree {
     return this._scaleZ;
   }
   getIndices(): IndexBuffer {
-    return this._indices;
+    return this._indices.get();
   }
   getIndicesWireframe(): IndexBuffer {
-    return this._indicesWireframe;
+    return this._indicesWireframe.get();
   }
   getPrimitiveCount(): number {
     return this._primitiveCount;

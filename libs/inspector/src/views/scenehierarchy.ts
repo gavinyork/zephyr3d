@@ -79,7 +79,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     }
     if (isOpen) {
       for (const child of node.children) {
-        this.renderSceneNode(child);
+        this.renderSceneNode(child.get());
       }
       ImGui.TreePop();
     }

@@ -21,7 +21,7 @@ import { Material } from './material';
 import type { DepthPass } from '../render';
 import { type DrawContext, type ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA, packFloat16x2 } from '../shaders';
-import { Application, makeRef } from '../app';
+import { Application, Ref } from '../app';
 import { ShaderHelper } from './shader/helper';
 import { Vector2, Vector3, Vector4, applyMixins } from '@zephyr3d/base';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
@@ -161,11 +161,11 @@ export class MeshMaterial extends Material {
     const that = this;
     instance.isBatchable = () => !isWebGL1 && that.supportInstancing();
     instance.dispose = () => {
-      instance.coreMaterial.unref();
+      instance.coreMaterial.dispose();
     };
     instance.$instanceUniforms = uniformsHolder;
     instance.$isInstance = true;
-    instance.coreMaterial = makeRef(that).ref();
+    instance.coreMaterial = new Ref<MeshMaterial>(that);
     // Copy original uniform values
     for (let i = 0; i < instanceUniforms.length; i++) {
       const instanceIndex = i;

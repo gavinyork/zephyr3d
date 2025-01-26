@@ -375,13 +375,11 @@ export class FFTWaveGenerator extends WaveGenerator {
     ]);
     const indexData = new Uint32Array([0, 1, 2, 0, 2, 3]);
     const prim = new Primitive();
-    const vb = device.createInterleavedVertexBuffer(['position_f32x3', 'tex0_f32x2'], vertexData);
-    const ib = device.createIndexBuffer(indexData);
-    prim.setVertexBuffer(vb);
-    prim.setIndexBuffer(ib);
+    prim.createAndSetVertexBuffer(['position_f32x3', 'tex0_f32x2'], vertexData);
+    prim.createAndSetIndexBuffer(indexData);
     prim.primitiveType = 'triangle-list';
     prim.indexStart = 0;
-    prim.indexCount = ib.length;
+    prim.indexCount = indexData.length;
     return prim;
   }
   /** @internal */

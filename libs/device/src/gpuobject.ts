@@ -665,21 +665,16 @@ const vertexAttribNameRevMap = {
  * Options for creating vertex layout
  * @public
  */
-export type VertexLayoutOptions = {
+export type VertexLayoutOptions<
+  T extends { buffer: StructuredBuffer; stepMode?: VertexStepMode } = {
+    buffer: StructuredBuffer;
+    stepMode?: VertexStepMode;
+  }
+> = {
   /**
    * vertex buffers in this vertex layout
    */
-  vertexBuffers: {
-    /**
-     * vertex buffer object created by device
-     */
-    buffer: StructuredBuffer;
-    /**
-     * the vertex buffer step mode,
-     * value can be 'vertex' or 'instance', default is 'vertex'
-     */
-    stepMode?: VertexStepMode;
-  }[];
+  vertexBuffers: T[];
   /**
    * optional index buffer in this vertex layout
    */
@@ -763,6 +758,34 @@ export function getVertexAttribByName(name: VertexSemantic): number {
  */
 export function getVertexAttribName(attrib: number): VertexSemantic {
   return vertexAttribNameRevMap[attrib];
+}
+
+/**
+ * Test whether a vertex buffer matches given semantic
+ * @param buffer - Vertex buffer
+ * @param name - Semantic to test
+ * @returns true if the vertex buffer matches given semantic, otherwise false
+ *
+ * @public
+ */
+export function matchVertexBuffer(buffer: StructuredBuffer, name: VertexSemantic): boolean {
+  if (!buffer) {
+    return false;
+  }
+  const bufferType = buffer.structure.structMembers[0].type;
+  if (!bufferType.isArrayType()) {
+    return false;
+  }
+  const vertexType = bufferType.elementType;
+  if (vertexType.isStructType()) {
+    for (const attrib of vertexType.structMembers) {
+      if (attrib.name === name) {
+        return true;
+      }
+    }
+  } else {
+    return buffer.structure.structMembers[0].name === name;
+  }
 }
 
 /**

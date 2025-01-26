@@ -98,7 +98,10 @@ export class VertexData {
    * @returns The buffer that was set
    */
   setVertexBuffer(buffer: StructuredBuffer, stepMode?: VertexStepMode): StructuredBuffer {
-    if (!buffer || !(buffer.usage & GPUResourceUsageFlags.BF_VERTEX)) {
+    if (!buffer) {
+      return null;
+    }
+    if (!(buffer.usage & GPUResourceUsageFlags.BF_VERTEX)) {
       throw new Error('setVertexBuffer() failed: buffer is null or buffer has not Vertex usage flag');
     }
     stepMode = stepMode || 'vertex';

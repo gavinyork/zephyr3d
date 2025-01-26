@@ -562,8 +562,7 @@ export class GLTFLoader extends AbstractModelLoader {
                 for (let i = 0; i < vertexIndices.length; i++) {
                   vertexIndices[i] = i;
                 }
-                const vertexIndexBuffer = gltf._device.createVertexBuffer('tex7_f32', vertexIndices);
-                primitive.setVertexBuffer(vertexIndexBuffer);
+                primitive.createAndSetVertexBuffer('tex7_f32', vertexIndices);
               }
             }
           }

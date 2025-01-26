@@ -10,7 +10,7 @@ import type { Camera } from '../camera/camera';
 import type { AnimationSet } from '../animation/animationset';
 import type { PickTarget } from '../render';
 import type { Compositor } from '../posteffect';
-import { makeRef, Ref } from '../app';
+import { Ref } from '../app';
 
 /**
  * Presents a world that manages a couple of objects that will be rendered
@@ -48,8 +48,8 @@ export class Scene extends makeEventTarget(Object)<{
     this._env = new Environment();
     this._updateFrame = -1;
     this._animationSet = [];
-    this._rootNode = makeRef(new SceneNode(this)).ref();
-    this._rootNode.name = 'Root';
+    this._rootNode = new Ref<SceneNode>(new SceneNode(this));
+    this._rootNode.get().name = 'Root';
   }
   /** @internal */
   get animationSet(): AnimationSet[] {
@@ -65,7 +65,7 @@ export class Scene extends makeEventTarget(Object)<{
    * Gets the root scene node of the scene
    */
   get rootNode() {
-    return this._rootNode;
+    return this._rootNode?.get() ?? null;
   }
   /**
    * Gets the octree
@@ -93,8 +93,7 @@ export class Scene extends makeEventTarget(Object)<{
    * Disposes the scene
    */
   dispose() {
-    this._rootNode.unref();
-    this._rootNode = null;
+    this._rootNode.dispose();
   }
   /**
    * Cast a ray into the scene to get the closest object hit by the ray

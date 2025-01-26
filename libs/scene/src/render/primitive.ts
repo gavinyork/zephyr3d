@@ -10,11 +10,13 @@ import {
   type VertexSemantic,
   type VertexAttribFormat,
   type VertexBufferInfo,
-  PBPrimitiveType
+  PBPrimitiveType,
+  matchVertexBuffer
 } from '@zephyr3d/device';
 import { Application } from '../app/app';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
+import { Ref } from '../app';
 
 /**
  * Primitive contains only the vertex and index data of a mesh
@@ -22,11 +24,13 @@ import { RenderBundleWrapper } from './renderbundle_wrapper';
  */
 export class Primitive {
   /** @internal */
-  protected _poolId: symbol;
-  /** @internal */
   protected _vertexLayout: VertexLayout;
   /** @internal */
-  protected _vertexLayoutOptions: VertexLayoutOptions;
+  protected _vertexLayoutOptions: VertexLayoutOptions<{
+    buffer: StructuredBuffer;
+    bufferRef: Ref<StructuredBuffer>;
+    stepMode?: VertexStepMode;
+  }> & { indexBufferRef?: Ref<IndexBuffer> };
   /** @internal */
   protected _primitiveType: PrimitiveType;
   /** @internal */
@@ -49,7 +53,6 @@ export class Primitive {
    * Creates an instance of a primitive
    */
   constructor() {
-    this._poolId = Symbol();
     this._vertexLayout = null;
     this._vertexLayoutOptions = { vertexBuffers: [] };
     this._primitiveType = 'triangle-list';
@@ -158,14 +161,17 @@ export class Primitive {
    * Removes a vertex buffer from the primitive
    * @param buffer - The vertex buffer to be removed
    */
-  removeVertexBuffer(buffer: StructuredBuffer): void {
-    for (let loc = 0; loc < this._vertexLayoutOptions.vertexBuffers.length; loc++) {
-      const info = this._vertexLayoutOptions.vertexBuffers[loc];
-      if (info?.buffer === buffer) {
-        info[loc] = null;
+  removeVertexBuffer(semantic: VertexSemantic): void {
+    for (let i = this._vertexLayoutOptions.vertexBuffers.length - 1; i >= 0; i--) {
+      const info = this._vertexLayoutOptions.vertexBuffers[i];
+      if (matchVertexBuffer(info.buffer, semantic)) {
+        info.bufferRef.dispose();
+        this._vertexLayoutOptions.vertexBuffers.splice(i, 1);
         this._vertexLayoutDirty = true;
-        RenderBundleWrapper.primitiveChanged(this);
       }
+    }
+    if (this._vertexLayoutDirty) {
+      RenderBundleWrapper.primitiveChanged(this);
     }
   }
   /**
@@ -174,8 +180,12 @@ export class Primitive {
    * @returns The vertex buffer which semantic matches the given value
    */
   getVertexBuffer(semantic: VertexSemantic): StructuredBuffer {
-    this.checkVertexLayout();
-    return this._vertexLayout?.getVertexBuffer(semantic) ?? null;
+    for (const info of this._vertexLayoutOptions.vertexBuffers) {
+      if (info.buffer && matchVertexBuffer(info.buffer, semantic)) {
+        return info.buffer;
+      }
+    }
+    return null;
   }
   /**
    * Gets the vertex buffer information by a given semantic
@@ -194,12 +204,14 @@ export class Primitive {
    * @returns The created vertex buffer
    */
   createAndSetVertexBuffer(
-    format: VertexAttribFormat,
+    format: VertexAttribFormat[] | VertexAttribFormat,
     data: TypedArray,
     stepMode?: VertexStepMode
   ): StructuredBuffer {
     const device = Application.instance.device;
-    const buffer = (this._poolId ? device.getPool(this._poolId) : device).createVertexBuffer(format, data);
+    const buffer = Array.isArray(format)
+      ? device.createInterleavedVertexBuffer(format, data)
+      : device.createVertexBuffer(format, data);
     return this.setVertexBuffer(buffer, stepMode);
   }
   /**
@@ -211,6 +223,7 @@ export class Primitive {
   setVertexBuffer(buffer: StructuredBuffer, stepMode?: VertexStepMode) {
     this._vertexLayoutOptions.vertexBuffers.push({
       buffer,
+      bufferRef: new Ref<StructuredBuffer>(buffer),
       stepMode
     });
     this._vertexLayoutDirty = true;
@@ -225,7 +238,7 @@ export class Primitive {
    */
   createAndSetIndexBuffer(data: Uint16Array | Uint32Array, dynamic?: boolean): IndexBuffer {
     const device = Application.instance.device;
-    const buffer = (this._poolId ? device.getPool(this._poolId) : device).createIndexBuffer(data, {
+    const buffer = device.createIndexBuffer(data, {
       dynamic: !!dynamic,
       managed: !dynamic
     });
@@ -240,6 +253,11 @@ export class Primitive {
     if (this._vertexLayoutOptions.indexBuffer !== buffer) {
       this._vertexLayoutOptions.indexBuffer = buffer;
       this._vertexLayoutDirty = true;
+      if (this._vertexLayoutOptions.indexBufferRef) {
+        this._vertexLayoutOptions.indexBufferRef.set(buffer);
+      } else {
+        this._vertexLayoutOptions.indexBufferRef = new Ref<IndexBuffer>(buffer);
+      }
       RenderBundleWrapper.primitiveChanged(this);
     }
   }
@@ -278,8 +296,11 @@ export class Primitive {
    * call removeVertexBuffer() or setIndexBuffer(null) first.
    */
   dispose() {
-    Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
-    this._vertexLayout = null;
+    this._vertexLayout?.dispose();
+    this._vertexLayoutOptions.indexBufferRef?.dispose();
+    for (const info of this._vertexLayoutOptions.vertexBuffers) {
+      info.bufferRef?.dispose();
+    }
   }
   /*
   createAABBTree(): AABBTree {
@@ -323,9 +344,7 @@ export class Primitive {
     if (this._vertexLayoutDirty) {
       this._vertexLayout?.dispose();
       const device = Application.instance.device;
-      this._vertexLayout = (this._poolId ? device.getPool(this._poolId) : device).createVertexLayout(
-        this._vertexLayoutOptions
-      );
+      this._vertexLayout = device.createVertexLayout(this._vertexLayoutOptions);
       this._vertexLayoutDirty = false;
     }
   }

@@ -140,16 +140,10 @@ export class Skeleton {
     }
   }
   /** @internal */
-  reset(model: SceneNode) {
-    //this.computeBindPose(model);
+  reset() {
     for (const mesh of this._meshes) {
       mesh.mesh.setBoneMatrices(null);
       mesh.mesh.setAnimatedBoundingBox(null);
-      /*
-      this.computeBoundingBox(mesh.bounding, mesh.mesh.invWorldMatrix);
-      mesh.mesh.setBoneMatrices(this.jointTexture);
-      mesh.mesh.setAnimatedBoundingBox(mesh.bounding.boundingBox);
-      */
     }
   }
   /** @internal */

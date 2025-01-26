@@ -69,17 +69,9 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
       bbox
     );
     for (const s of ['position', 'normal', 'texCoord0'] as const) {
-      const buffer = this.getVertexBuffer(s);
-      if (buffer) {
-        this.removeVertexBuffer(buffer);
-        buffer.dispose();
-      }
+      this.removeVertexBuffer(s);
     }
-    const indexBuffer = this.getIndexBuffer();
-    if (indexBuffer) {
-      this.setIndexBuffer(null);
-      indexBuffer.dispose();
-    }
+    this.setIndexBuffer(null);
     this.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
     if (normals) {
       this.createAndSetVertexBuffer('normal_f32x3', new Float32Array(normals));

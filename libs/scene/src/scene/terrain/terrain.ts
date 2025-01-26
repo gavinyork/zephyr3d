@@ -1,5 +1,5 @@
 import type { Ray } from '@zephyr3d/base';
-import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import { Quadtree } from './quadtree';
 import { GraphNode } from '../graph_node';
@@ -11,7 +11,6 @@ import type { CullVisitor } from '../../render/cull_visitor';
 import type { Scene } from '../scene';
 import type { QuadtreeNode } from './quadtree';
 import { TerrainMaterial, type TerrainMaterialOptions } from '../../material/terrainmaterial';
-import { GrassMaterial } from '../../material/grassmaterial';
 
 /**
  * Terrain node
@@ -41,8 +40,6 @@ export class Terrain extends GraphNode {
   /** @internal */
   private _material: TerrainMaterial;
   /** @internal */
-  private _grassMaterial: GrassMaterial;
-  /** @internal */
   private _viewPoint: Vector3;
   /** @internal */
   private _castShadow: boolean;
@@ -65,7 +62,6 @@ export class Terrain extends GraphNode {
     this._width = 0;
     this._height = 0;
     this._material = null;
-    this._grassMaterial = null;
     this._viewPoint = null;
     this._castShadow = true;
     this._instanceColor = Vector4.zero();
@@ -137,10 +133,6 @@ export class Terrain extends GraphNode {
   /** Material of the terrain */
   get material(): TerrainMaterial {
     return this._material;
-  }
-  /** Grass material */
-  get grassMaterial(): GrassMaterial {
-    return this._grassMaterial;
   }
   /** Normal map of the terrain */
   get normalMap(): Texture2D {
@@ -230,13 +222,6 @@ export class Terrain extends GraphNode {
     if (!this._grassManager) {
       this._grassManager = new GrassManager(64, density);
     }
-    if (!this._grassMaterial) {
-      this._grassMaterial = new GrassMaterial(
-        new Vector2(this.scaledWidth, this.scaledHeight),
-        this._quadtree.normalMap,
-        grassTexture
-      );
-    }
     this._grassManager.addGrassLayer(
       Application.instance.device,
       this,
@@ -303,5 +288,10 @@ export class Terrain extends GraphNode {
    */
   isTerrain(): this is Terrain {
     return true;
+  }
+  dispose() {
+    this._grassManager?.dispose();
+    this._material?.dispose();
+    this._quadtree?.dispose();
   }
 }

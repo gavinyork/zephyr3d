@@ -154,7 +154,7 @@ myApp.ready().then(async function () {
   const toonMesh = await fetchModel(scene, 'assets/models/Duck.glb');
   toonMesh.group.iterate((node) => {
     if (node.isMesh()) {
-      toonMaterial.albedoTexture = (node.material as Ref<PBRMetallicRoughnessMaterial>).albedoTexture;
+      toonMaterial.albedoTexture = (node.material as PBRMetallicRoughnessMaterial).albedoTexture;
       node.material = toonMaterial;
     }
   });

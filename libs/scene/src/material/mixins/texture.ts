@@ -9,7 +9,7 @@ import type {
 import type { MeshMaterial, applyMaterialMixins } from '../meshmaterial';
 import type { Matrix4x4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
-import { makeRef, Ref } from '../../app';
+import { Ref } from '../../app';
 
 /**
  * ToMixedTextureType
@@ -155,7 +155,7 @@ export function mixinTextureProps<U extends string>(name: U) {
     featureTexIndex = cls.defineFeature();
     featureTexMatrix = cls.defineFeature();
     const proto: any = cls.prototype;
-    proto[propTexture] = null;
+    proto[propTexture] = new Ref<Texture2D>();
     proto[propSampler] = null;
     proto[propTexCoord] = 0;
     proto[propMatrix] = null;
@@ -192,21 +192,14 @@ export function mixinTextureProps<U extends string>(name: U) {
         : scope.$inputs[`texCoord${proto[propTexCoord]}`];
     };
     Object.defineProperty(proto, `${name}Texture`, {
-      get: function (): Ref<Texture2D> {
-        return this[propTexture];
+      get: function (): Texture2D {
+        return this[propTexture].get();
       },
       set: function (newValue: Texture2D) {
-        const texRef = makeRef(newValue);
-        if (this[propTexture] !== texRef) {
-          if (this[propTexture]) {
-            this[propTexture].unref();
-          }
-          this[propTexture] = texRef;
-          if (this[propTexture]) {
-            this[propTexture].ref();
-          }
-          this.useFeature(feature, !!this[propTexture]);
-          if (this[propTexture]) {
+        if (this[propTexture].get() !== newValue) {
+          this[propTexture] = newValue;
+          this.useFeature(feature, !!this[propTexture].get());
+          if (this[propTexture].get()) {
             this.useFeature(featureTexIndex, this[propTexCoord]);
             this.useFeature(featureTexMatrix, !!this[propMatrix]);
             this.uniformChanged();

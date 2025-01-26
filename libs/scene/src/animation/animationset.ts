@@ -1,9 +1,9 @@
 import { weightedAverage } from '@zephyr3d/base';
-import type { Scene, SceneNode } from '../scene';
+import { Scene, SceneNode } from '../scene';
 import type { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
 import type { Skeleton } from './skeleton';
-import { Application, makeRef, Ref } from '../app';
+import { Application, WeakRef } from '../app';
 
 /**
  * Options for playing animation
@@ -70,7 +70,7 @@ export type StopAnimationOptions = {
  */
 export class AnimationSet {
   /** @internal */
-  private _model: Ref<SceneNode>;
+  private _model: WeakRef<SceneNode>;
   /** @internal */
   private _animations: Record<string, AnimationClip>;
   /** @internal */
@@ -102,7 +102,7 @@ export class AnimationSet {
    */
   constructor(scene: Scene, model: SceneNode) {
     this._scene = scene;
-    this._model = makeRef(model);
+    this._model = new WeakRef<SceneNode>(model);
     this._scene.animationSet.push(this);
     this._animations = {};
     this._activeTracks = new Map();
@@ -113,7 +113,7 @@ export class AnimationSet {
    * The model which is controlled by the animation set
    */
   get model(): SceneNode {
-    return this._model;
+    return this._model.get();
   }
   /**
    * How many animations in this set
@@ -314,7 +314,7 @@ export class AnimationSet {
         ani.skeletons?.forEach((v, k) => {
           const refcount = this._activeSkeletons.get(k);
           if (refcount === 1) {
-            k.reset(this._model);
+            k.reset();
             this._activeSkeletons.delete(k);
           } else {
             this._activeSkeletons.set(k, refcount - 1);
@@ -324,8 +324,7 @@ export class AnimationSet {
     }
   }
   dispose() {
-    this._model?.unref();
-    this._model = null;
+    this._model.dispose();
     const index = this._scene.animationSet.indexOf(this);
     if (index >= 0) {
       this._scene.animationSet.splice(index, 1);

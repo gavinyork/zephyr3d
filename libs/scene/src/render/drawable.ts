@@ -152,6 +152,10 @@ export interface Drawable {
    * returns true if the object is batchable
    */
   isBatchable(): this is BatchDrawable;
+  /**
+   * Disposes this object
+   */
+  dispose(): void;
 }
 
 /**

@@ -1,7 +1,7 @@
 import * as zip from '@zip.js/zip.js';
 import type * as draco3d from 'draco3d';
 import { Vector4, Vector3, HttpRequest } from '@zephyr3d/base';
-import type { SceneNode, Scene, AnimationSet, OIT, Ref } from '@zephyr3d/scene';
+import { SceneNode, Scene, AnimationSet, OIT, Ref } from '@zephyr3d/scene';
 import { Mesh, PlaneShape, LambertMaterial } from '@zephyr3d/scene';
 import {
   BatchGroup,
@@ -71,8 +71,8 @@ export class GLTFViewer {
   constructor(scene: Scene) {
     const device = Application.instance.device;
     this._currentAnimation = null;
-    this._modelNode = null;
-    this._animationSet = null;
+    this._modelNode = new Ref<SceneNode>();
+    this._animationSet = new Ref<AnimationSet>();
     this._scene = scene;
     this._scene.env.light.strength = 0.8;
     this._scene.env.sky.drawGround = true;
@@ -176,7 +176,7 @@ export class GLTFViewer {
     return this._animationSet;
   }
   get animations(): string[] {
-    return this._animationSet?.getAnimationNames() || [];
+    return this._animationSet.get()?.getAnimationNames() || [];
   }
   get compositor(): Compositor {
     return this._compositor;
@@ -209,19 +209,16 @@ export class GLTFViewer {
         httpRequest
       )
       .then((info) => {
-        this._modelNode?.remove();
-        this._modelNode?.unref();
         this._camera.clearHistoryData();
-        this._modelNode = info.group.ref();
-        this._modelNode.parent = this._batchGroup;
-        this._animationSet?.unref();
-        this._animationSet = info.animationSet?.ref() ?? null;
-        this._modelNode.pickable = true;
+        this._modelNode.set(info.group);
+        this._modelNode.get().parent = this._batchGroup;
+        this._animationSet.set(info.animationSet);
+        this._modelNode.get().pickable = true;
         this._currentAnimation = null;
-        if (this._animationSet) {
-          const animations = this._animationSet.getAnimationNames();
+        if (this._animationSet.get()) {
+          const animations = this._animationSet.get().getAnimationNames();
           if (animations.length > 0) {
-            this._animationSet.playAnimation(animations[0]);
+            this._animationSet.get().playAnimation(animations[0]);
           }
         }
         this._ui.update();
@@ -235,7 +232,7 @@ export class GLTFViewer {
           this._bboxNoScale.minPoint.y - this._bboxNoScale.extents.y * 0.01,
           -0.5 * scaleFactor
         );
-        this._floor.parent = this._showFloor ? this._modelNode : null;
+        this._floor.parent = this._showFloor ? this._modelNode.get() : null;
         this.lookAt();
         this._light0.shadow.shadowRegion = this.getBoundingBox();
         this._camera.clearHistoryData();
@@ -268,14 +265,14 @@ export class GLTFViewer {
   playAnimation(name: string) {
     if (this._currentAnimation !== name) {
       this.stopAnimation();
-      this._animationSet?.playAnimation(name);
+      this._animationSet.get()?.playAnimation(name);
       this._currentAnimation = name;
       this.lookAt();
     }
   }
   stopAnimation() {
     if (this._currentAnimation) {
-      this._animationSet?.stopAnimation(this._currentAnimation);
+      this._animationSet.get()?.stopAnimation(this._currentAnimation);
       this._currentAnimation = null;
       this.lookAt();
     }
@@ -283,8 +280,8 @@ export class GLTFViewer {
   enableRotate(enable: boolean) {
     if (this._autoRotate !== enable) {
       this._autoRotate = enable;
-      if (this._modelNode && !this._autoRotate) {
-        this._modelNode.rotation.identity();
+      if (this._modelNode.get() && !this._autoRotate) {
+        this._modelNode.get().rotation.identity();
       }
     }
   }
@@ -389,10 +386,10 @@ export class GLTFViewer {
     }
   }
   render() {
-    if (this._modelNode) {
+    if (this._modelNode.get()) {
       if (this._autoRotate) {
         const angle = Application.instance.device.frameInfo.elapsedOverall * 0.001;
-        this._modelNode.rotation.fromAxisAngle(Vector3.axisPY(), angle);
+        this._modelNode.get().rotation.fromAxisAngle(Vector3.axisPY(), angle);
       }
       if (this._animationSet) {
         this._light0.shadow.shadowRegion = this.getBoundingBox();
@@ -413,7 +410,7 @@ export class GLTFViewer {
       let size = Math.max(extents.x, extents.y);
       if (size < minSize || size > maxSize) {
         const scale = size < minSize ? minSize / size : maxSize / size;
-        this._modelNode.scaleBy(new Vector3(scale, scale, scale));
+        this._modelNode.get().scaleBy(new Vector3(scale, scale, scale));
         center.scaleBy(scale);
         extents.scaleBy(scale);
         size *= scale;
@@ -457,12 +454,12 @@ export class GLTFViewer {
   }
   private traverseModel(func: (node: SceneNode) => void, context?: any) {
     if (this._modelNode) {
-      const queue: SceneNode[] = [this._modelNode];
+      const queue: Ref<SceneNode>[] = [this._modelNode];
       while (queue.length > 0) {
         const node = queue.shift();
-        queue.push(...node.children);
-        if (node.isMesh()) {
-          func.call(context, node);
+        queue.push(...node.get().children);
+        if (node.get().isMesh()) {
+          func.call(context, node.get());
         }
       }
     }
@@ -541,7 +538,7 @@ export class GLTFViewer {
   }
   toggleFloor() {
     this._showFloor = !this._showFloor;
-    this._floor.parent = this._showFloor ? this._modelNode : null;
+    this._floor.parent = this._showFloor ? this._modelNode.get() : null;
   }
   toggleInspector() {
     this._showInspector = !this._showInspector;

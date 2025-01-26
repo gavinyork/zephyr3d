@@ -453,11 +453,10 @@ let blitRenderStates: RenderStateSet = null;
 function getBlitPrimitive2D(): Primitive {
   if (!blitPrimitive2D) {
     blitPrimitive2D = new Primitive();
-    const vb = Application.instance.device.createVertexBuffer(
+    blitPrimitive2D.createAndSetVertexBuffer(
       'position_f32x2',
       new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])
     );
-    blitPrimitive2D.setVertexBuffer(vb);
     blitPrimitive2D.indexCount = 4;
     blitPrimitive2D.indexStart = 0;
     blitPrimitive2D.primitiveType = 'triangle-strip';

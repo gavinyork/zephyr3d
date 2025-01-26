@@ -20,7 +20,6 @@ import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loade
 import { TGALoader } from './loaders/image/tga_Loader';
 import { MorphTargetTrack } from '../animation/morphtrack';
 import { processMorphData } from '../animation/morphtarget';
-import { makeRef, Ref } from '../app';
 
 /**
  * Options for texture fetching
@@ -58,9 +57,9 @@ export type ModelFetchOptions = {
  */
 export type ModelInfo = {
   /** Mesh group */
-  group: Ref<SceneNode>;
+  group: SceneNode;
   /** Animation set, null if no animation */
-  animationSet: Ref<AnimationSet>;
+  animationSet: AnimationSet;
 };
 
 /**
@@ -554,7 +553,7 @@ export class AssetManager {
         }
       }
     }
-    return { group: makeRef(group), animationSet: makeRef(animationSet) };
+    return { group, animationSet };
   }
   /**
    * Sets the loader for a given builtin-texture

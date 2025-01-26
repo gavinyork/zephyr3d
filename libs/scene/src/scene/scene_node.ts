@@ -17,7 +17,7 @@ import {
   Vector4
 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
-import { makeRef, Ref } from '../app/gc/disposable';
+import { Ref } from '../app/gc/ref';
 
 /**
  * Node iterate function type
@@ -149,7 +149,7 @@ export class SceneNode extends makeEventTarget(Object)<{
     this._disableCallback = false;
     this._tmpLocalMatrix = Matrix4x4.identity();
     this._tmpWorldMatrix = Matrix4x4.identity();
-    if (scene && this !== scene.rootNode.refobj()) {
+    if (scene && this !== scene.rootNode) {
       this.reparent(scene.rootNode);
     }
   }
@@ -222,7 +222,7 @@ export class SceneNode extends makeEventTarget(Object)<{
    */
   removeChildren() {
     while (this._children.length) {
-      this._children[0].remove();
+      this._children[0].get().remove();
     }
   }
   /**
@@ -252,13 +252,13 @@ export class SceneNode extends makeEventTarget(Object)<{
   traverse(v: Visitor<SceneNode>, inverse?: boolean): void {
     if (inverse) {
       for (let i = this._children.length - 1; i >= 0; i--) {
-        this._children[i].traverse(v, inverse);
+        this._children[i].get().traverse(v, inverse);
       }
       v.visit(this);
     } else {
       v.visit(this);
       for (const child of this._children) {
-        child.traverse(v);
+        child.get().traverse(v);
       }
     }
   }
@@ -275,7 +275,7 @@ export class SceneNode extends makeEventTarget(Object)<{
       return true;
     }
     for (const child of this._children) {
-      if (!!child.iterate(callback)) {
+      if (!!child.get().iterate(callback)) {
         return true;
       }
     }
@@ -292,7 +292,7 @@ export class SceneNode extends makeEventTarget(Object)<{
   iterateBottomToTop(callback: NodeIterateFunc): boolean {
     for (let i = this._children.length - 1; i >= 0; i--) {
       const child = this._children[i];
-      if (!!child.iterateBottomToTop(callback)) {
+      if (!!child.get().iterateBottomToTop(callback)) {
         return true;
       }
     }
@@ -470,14 +470,13 @@ export class SceneNode extends makeEventTarget(Object)<{
     if (newParent !== lastParent) {
       const willDetach = (!p || !p.attached) && this.attached;
       const willAttach = !this.attached && p && p.attached;
-      const ref = makeRef(this);
       if (newParent) {
-        newParent._children.push(ref);
-        ref.ref();
+        newParent._children.push(new Ref<SceneNode>(this));
       }
       if (this._parent) {
-        this._parent._children.splice(this._parent._children.indexOf(ref), 1);
-        ref.unref();
+        const index = this._parent._children.findIndex((val) => val.get() === this);
+        this._parent.children[index].dispose();
+        this._parent._children.splice(index, 1);
       }
       this._parent = p;
       this._onTransformChanged(false);
@@ -510,7 +509,7 @@ export class SceneNode extends makeEventTarget(Object)<{
     this._worldMatrixDet = null;
     this._transformTag++;
     for (const child of this._children) {
-      child._onTransformChanged(false);
+      child.get()._onTransformChanged(false);
     }
     this.invalidateWorldBoundingVolume(true);
     this.dispatchEvent('transformchanged', this);
@@ -523,8 +522,8 @@ export class SceneNode extends makeEventTarget(Object)<{
   notifyHiddenChanged() {
     this._visibleChanged();
     for (const child of this._children) {
-      if (child.showState === 'inherit') {
-        child.notifyHiddenChanged();
+      if (child.get().showState === 'inherit') {
+        child.get().notifyHiddenChanged();
       }
     }
   }

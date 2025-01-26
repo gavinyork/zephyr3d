@@ -1,7 +1,6 @@
 import { Vector3, Vector4, applyMixins } from '@zephyr3d/base';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { Primitive } from '../../render/primitive';
-import { Application } from '../../app';
 import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
 import type { BatchDrawable, Drawable, DrawContext, PickTarget } from '../../render/drawable';
 import type { Camera } from '../../camera/camera';
@@ -221,10 +220,8 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
       t = setNormalAndHeight(heights, normals, t, x, z, w, -skirtLength);
     }
     t = setNormalAndHeight(heights, normals, t, x - this._step, z, w, -skirtLength);
-    const heightArray = Application.instance.device.createVertexBuffer('position_f32x3', heights);
-    const normalArray = Application.instance.device.createVertexBuffer('normal_f32x3', normals);
-    this._geometry.setVertexBuffer(heightArray);
-    this._geometry.setVertexBuffer(normalArray);
+    this._geometry.createAndSetVertexBuffer('position_f32x3', heights);
+    this._geometry.createAndSetVertexBuffer('normal_f32x3', normals);
     this._geometry.setIndexBuffer(this._quadtree.getIndices());
     this._geometry.indexStart = 0;
     this._geometry.indexCount = this._quadtree.getIndices().length;
@@ -574,5 +571,8 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   }
   isDummy(): boolean {
     return !this._geometry && !!this._quadtree;
+  }
+  dispose() {
+    this._geometry?.dispose();
   }
 }
