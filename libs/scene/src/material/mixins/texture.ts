@@ -85,10 +85,6 @@ export function mixinTextureProps<U extends string>(name: U) {
     let feature = 0;
     let featureTexIndex = 0;
     let featureTexMatrix = 0;
-    const propTexture = `__${name}Texture`;
-    const propSampler = `__${name}Sampler`;
-    const propTexCoord = `__${name}TexCoordIndex`;
-    const propMatrix = `__${name}TexMatrix`;
     if ((BaseCls as any)[id]) {
       return BaseCls as unknown as T & {
         new (...args: any[]): TextureProp<U> & TexturePropUniforms<U>;
@@ -97,6 +93,106 @@ export function mixinTextureProps<U extends string>(name: U) {
     const cls = class extends (BaseCls as typeof MeshMaterial) {
       constructor() {
         super();
+        let texture = new Ref<Texture2D>();
+        let sampler: TextureSampler = null;
+        let texCoord = 0;
+        let matrix: Matrix4x4 = null;
+        Object.defineProperty(this, `sample${capName}Texture`, {
+          value: function (scope: PBInsideFunctionScope, texCoord?: PBShaderExp): PBShaderExp {
+            const tex = this[`get${capName}TextureUniform`](scope);
+            const coord = texCoord ?? this[`get${capName}TexCoord`](scope);
+            return scope.$builder.textureSample(tex, coord);
+          },
+          writable: false,
+          enumerable: false,
+          configurable: false
+        });
+        Object.defineProperty(this, `get${capName}TextureUniform`, {
+          value: function (scope: PBInsideFunctionScope): PBShaderExp {
+            return scope.$builder.shaderKind === 'fragment' ? scope[`z${capName}Tex`] : null;
+          },
+          writable: false,
+          enumerable: false,
+          configurable: false
+        });
+        Object.defineProperty(this, `get${capName}TexCoord`, {
+          value: function (scope: PBInsideFunctionScope): PBShaderExp {
+            if (texCoord < 0) {
+              return null;
+            }
+            const pb = scope.$builder;
+            if ((pb.shaderKind === 'vertex') !== !!vertex) {
+              throw new Error(
+                `mixinTextureProps.get${capName}TexCoord(): must be called in ${
+                  vertex ? 'vertex' : 'fragment'
+                } stage`
+              );
+            }
+            return scope.$builder.shaderKind === 'fragment'
+              ? scope.$inputs[`z${capName}TexCoord`]
+              : this.featureUsed(featureTexMatrix)
+              ? pb.mul(scope[`z${capName}TextureMatrix`], pb.vec4(scope.$inputs[`texCoord${texCoord}`], 0, 1))
+                  .xy
+              : scope.$inputs[`texCoord${texCoord}`];
+          },
+          writable: false,
+          enumerable: false,
+          configurable: false
+        });
+        Object.defineProperty(this, `${name}Texture`, {
+          get: function (): Texture2D {
+            return texture.get();
+          },
+          set: function (newValue: Texture2D) {
+            if (texture.get() !== newValue) {
+              texture.set(newValue);
+              this.useFeature(feature, !!newValue);
+              if (newValue) {
+                this.useFeature(featureTexIndex, texCoord);
+                this.useFeature(featureTexMatrix, !!matrix);
+                this.uniformChanged();
+              }
+            }
+          },
+          enumerable: true,
+          configurable: true
+        });
+        Object.defineProperty(this, `${name}TextureSampler`, {
+          get: function (): TextureSampler {
+            return sampler;
+          },
+          set: function (newValue: TextureSampler) {
+            sampler = newValue;
+          },
+          enumerable: true,
+          configurable: true
+        });
+        Object.defineProperty(this, `${name}TexCoordMatrix`, {
+          get: function (): Matrix4x4 {
+            return matrix;
+          },
+          set: function (newValue: Matrix4x4) {
+            if (matrix !== newValue) {
+              matrix = newValue;
+              this.useFeature(featureTexMatrix, !!matrix);
+            }
+          },
+          enumerable: true,
+          configurable: true
+        });
+        Object.defineProperty(this, `${name}TexCoordIndex`, {
+          get: function (): number {
+            return texCoord;
+          },
+          set: function (newValue: number) {
+            if (texCoord !== newValue) {
+              texCoord = newValue;
+              this.useFeature(featureTexIndex, texCoord);
+            }
+          },
+          enumerable: true,
+          configurable: true
+        });
       }
       vertexShader(scope: PBFunctionScope): void {
         super.vertexShader(scope);
@@ -154,97 +250,6 @@ export function mixinTextureProps<U extends string>(name: U) {
     feature = cls.defineFeature();
     featureTexIndex = cls.defineFeature();
     featureTexMatrix = cls.defineFeature();
-    const proto: any = cls.prototype;
-    proto[propTexture] = new Ref<Texture2D>();
-    proto[propSampler] = null;
-    proto[propTexCoord] = 0;
-    proto[propMatrix] = null;
-    proto[`sample${capName}Texture`] = function (
-      scope: PBInsideFunctionScope,
-      texCoord?: PBShaderExp
-    ): PBShaderExp {
-      const tex = this[`get${capName}TextureUniform`](scope);
-      const coord = texCoord ?? this[`get${capName}TexCoord`](scope);
-      return scope.$builder.textureSample(tex, coord);
-    };
-    proto[`get${capName}TextureUniform`] = function (scope: PBInsideFunctionScope): PBShaderExp {
-      return scope.$builder.shaderKind === 'fragment' ? scope[`z${capName}Tex`] : null;
-    };
-    proto[`get${capName}TexCoord`] = function (scope: PBInsideFunctionScope): PBShaderExp {
-      if (proto[propTexCoord] < 0) {
-        return null;
-      }
-      const pb = scope.$builder;
-      if ((pb.shaderKind === 'vertex') !== !!vertex) {
-        throw new Error(
-          `mixinTextureProps.get${capName}TexCoord(): must be called in ${
-            vertex ? 'vertex' : 'fragment'
-          } stage`
-        );
-      }
-      return scope.$builder.shaderKind === 'fragment'
-        ? scope.$inputs[`z${capName}TexCoord`]
-        : this.featureUsed(featureTexMatrix)
-        ? pb.mul(
-            scope[`z${capName}TextureMatrix`],
-            pb.vec4(scope.$inputs[`texCoord${proto[propTexCoord]}`], 0, 1)
-          ).xy
-        : scope.$inputs[`texCoord${proto[propTexCoord]}`];
-    };
-    Object.defineProperty(proto, `${name}Texture`, {
-      get: function (): Texture2D {
-        return this[propTexture].get();
-      },
-      set: function (newValue: Texture2D) {
-        if (this[propTexture].get() !== newValue) {
-          this[propTexture] = newValue;
-          this.useFeature(feature, !!this[propTexture].get());
-          if (this[propTexture].get()) {
-            this.useFeature(featureTexIndex, this[propTexCoord]);
-            this.useFeature(featureTexMatrix, !!this[propMatrix]);
-            this.uniformChanged();
-          }
-        }
-      },
-      enumerable: true,
-      configurable: true
-    });
-    Object.defineProperty(proto, `${name}TextureSampler`, {
-      get: function (): TextureSampler {
-        return this[propSampler];
-      },
-      set: function (newValue: TextureSampler) {
-        this[propSampler] = newValue;
-      },
-      enumerable: true,
-      configurable: true
-    });
-    Object.defineProperty(proto, `${name}TexCoordMatrix`, {
-      get: function (): Matrix4x4 {
-        return this[propMatrix];
-      },
-      set: function (newValue: Matrix4x4) {
-        if (this[propMatrix] !== newValue) {
-          this[propMatrix] = newValue;
-          this.useFeature(featureTexMatrix, !!this[propMatrix]);
-        }
-      },
-      enumerable: true,
-      configurable: true
-    });
-    Object.defineProperty(proto, `${name}TexCoordIndex`, {
-      get: function (): number {
-        return this[propTexCoord];
-      },
-      set: function (newValue: number) {
-        if (this[propTexCoord] !== newValue) {
-          this[propTexCoord] = newValue;
-          this.useFeature(featureTexIndex, this[propTexCoord]);
-        }
-      },
-      enumerable: true,
-      configurable: true
-    });
     cls[id] = true;
     return cls as unknown as T & {
       new (...args: any[]): TextureProp<U> & TexturePropUniforms<U>;

@@ -5,6 +5,7 @@ import type { Primitive } from '../render/primitive';
 import type { MeshMaterial } from '../material/meshmaterial';
 import type { Mesh } from '../scene/mesh';
 import type { BoundingBox } from '../utility';
+import { Ref } from '../app';
 
 /**
  * Named object interface for model loading
@@ -161,8 +162,8 @@ export interface AssetPBRMaterialSG extends AssetPBRMaterialCommon {
  * @public
  */
 export interface AssetSubMeshData {
-  primitive: Primitive;
-  material: MeshMaterial;
+  primitive: Ref<Primitive>;
+  material: Ref<MeshMaterial>;
   mesh?: Mesh;
   rawPositions: Float32Array;
   rawBlendIndices: TypedArray;
@@ -489,6 +490,21 @@ export class SharedModel {
     this._scenes = [];
     this._animations = [];
     this._activeScene = -1;
+  }
+  /** Disposes this model */
+  dispose() {
+    const nodes = [...this._nodes];
+    while (nodes.length > 0) {
+      const node = nodes.shift();
+      nodes.push(...node.children);
+      const mesh = node.mesh;
+      if (mesh) {
+        for (const subMesh of mesh.subMeshes) {
+          subMesh.primitive?.dispose();
+          subMesh.material?.dispose();
+        }
+      }
+    }
   }
   /** Name of the model */
   get name(): string {

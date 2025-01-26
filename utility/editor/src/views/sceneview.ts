@@ -3,7 +3,7 @@ import type { SceneModel } from '../models/scenemodel';
 import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import { Tab } from '../components/tab';
-import type { AssetRegistry, Camera, Compositor, Scene } from '@zephyr3d/scene';
+import { AssetRegistry, Camera, Compositor, Ref, Scene } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { Application, DirectionalLight } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
@@ -33,10 +33,10 @@ export class SceneView extends BaseView<SceneModel> {
   private _tab: Tab;
   private _menubar: MenubarView;
   private _statusbar: StatusBar;
-  private _transformNode: SceneNode;
+  private _transformNode: Ref<SceneNode>;
   private _oldTransform: TRS;
   private _dragDropTypes: string[];
-  private _nodeToBePlaced: SceneNode;
+  private _nodeToBePlaced: Ref<SceneNode>;
   private _assetToBeAdded: DBAssetInfo;
   private _mousePosX: number;
   private _mousePosY: number;
@@ -46,10 +46,10 @@ export class SceneView extends BaseView<SceneModel> {
   constructor(model: SceneModel, assetRegistry: AssetRegistry) {
     super(model);
     this._cmdManager = new CommandManager();
-    this._transformNode = null;
+    this._transformNode = new Ref<SceneNode>();
     this._oldTransform = null;
     this._dragDropTypes = [];
-    this._nodeToBePlaced = null;
+    this._nodeToBePlaced = new Ref<SceneNode>();
     this._assetToBeAdded = null;
     this._mousePosX = -1;
     this._mousePosY = -1;
@@ -272,10 +272,10 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.sceneHierarchy.selectNode(null);
     this._tab.sceneHierarchy.scene = scene;
     this._propGrid.object = null;
-    this._transformNode = null;
+    this._transformNode.dispose();
     this._oldTransform = null;
     this._dragDropTypes = [];
-    this._nodeToBePlaced = null;
+    this._nodeToBePlaced.dispose();
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._menubar.checkMenuItem('SHOW_TEXTURE_VIEWER', false);
@@ -301,21 +301,22 @@ export class SceneView extends BaseView<SceneModel> {
         );
       }
     }
-    if (this._nodeToBePlaced) {
+    const placeNode = this._nodeToBePlaced.get();
+    if (placeNode) {
       if (this._mousePosX >= 0 && this._mousePosY >= 0) {
-        this._nodeToBePlaced.parent = this.model.scene.rootNode;
+        placeNode.parent = this.model.scene.rootNode;
         const ray = this.model.camera.constructRay(this._mousePosX, this._mousePosY);
         let hitDistance = -ray.origin.y / ray.direction.y;
         if (Number.isNaN(hitDistance) || hitDistance < 0) {
           hitDistance = 10;
         }
-        this._nodeToBePlaced.position.setXYZ(
+        placeNode.position.setXYZ(
           ray.origin.x + ray.direction.x * hitDistance,
           ray.origin.y + ray.direction.y * hitDistance,
           ray.origin.z + ray.direction.z * hitDistance
         );
       } else {
-        this._nodeToBePlaced.parent = null;
+        placeNode.parent = null;
       }
     }
     this.model.camera.viewport = [this._tab.width, this._statusbar.height, viewportWidth, viewportHeight];
@@ -403,12 +404,13 @@ export class SceneView extends BaseView<SceneModel> {
       }
       this._mousePosX = p[0];
       this._mousePosY = p[1];
-      if (this._nodeToBePlaced) {
+      const placeNode = this._nodeToBePlaced.get();
+      if (placeNode) {
         if (ev.type === 'pointerdown') {
           if (ev.button === 2) {
-            this._nodeToBePlaced.parent = null;
-            this._assetRegistry.releaseAsset(this._nodeToBePlaced);
-            this._nodeToBePlaced = null;
+            placeNode.parent = null;
+            this._assetRegistry.releaseAsset(placeNode);
+            this._nodeToBePlaced.dispose();
           } else if (ev.button === 0) {
             this._cmdManager
               .execute(
@@ -416,14 +418,14 @@ export class SceneView extends BaseView<SceneModel> {
                   this.model.scene,
                   this._assetRegistry,
                   this._assetToBeAdded,
-                  this._nodeToBePlaced.position
+                  placeNode.position
                 )
               )
               .then((node) => {
                 this._tab.sceneHierarchy.selectNode(node);
-                this._nodeToBePlaced.parent = null;
-                this._assetRegistry.releaseAsset(this._nodeToBePlaced);
-                this._nodeToBePlaced = null;
+                placeNode.parent = null;
+                this._assetRegistry.releaseAsset(placeNode);
+                this._nodeToBePlaced.dispose();
               });
           }
         }
@@ -551,15 +553,16 @@ export class SceneView extends BaseView<SceneModel> {
     }
   }
   private handleAddAsset(asset: DBAssetInfo) {
-    if (this._nodeToBePlaced) {
-      this._nodeToBePlaced.remove();
-      this._assetRegistry.releaseAsset(this._nodeToBePlaced);
-      this._nodeToBePlaced = null;
+    const placeNode = this._nodeToBePlaced.get();
+    if (placeNode) {
+      placeNode.remove();
+      this._assetRegistry.releaseAsset(placeNode);
+      this._nodeToBePlaced.dispose();
     }
     this._assetRegistry
       .fetchModel(asset.uuid, this.model.scene, { enableInstancing: true })
       .then((node) => {
-        this._nodeToBePlaced = node.group;
+        this._nodeToBePlaced.set(node.group);
         this._assetToBeAdded = asset;
       })
       .catch((err) => {
@@ -575,7 +578,7 @@ export class SceneView extends BaseView<SceneModel> {
     }
   }
   private handleBeginTransformNode(node: SceneNode) {
-    this._transformNode = node;
+    this._transformNode.set(node);
     this._oldTransform = {
       position: new Vector3(node.position),
       rotation: new Quaternion(node.rotation),
@@ -584,7 +587,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoCaptured = true;
   }
   private handleEndTransformNode(node: SceneNode, desc: string) {
-    if (node && node === this._transformNode) {
+    if (node && node === this._transformNode.get()) {
       this._cmdManager.execute(
         new NodeTransformCommand(
           node,
@@ -598,7 +601,7 @@ export class SceneView extends BaseView<SceneModel> {
         )
       );
       this._oldTransform = null;
-      this._transformNode = null;
+      this._transformNode.dispose();
       this.model.scene.octree.prune();
     }
     this._postGizmoCaptured = false;

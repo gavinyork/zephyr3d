@@ -19,7 +19,7 @@ import { SharedModel, AssetSkeleton, AssetScene } from '../../model';
 import { BoundingBox } from '../../../utility/bounding_volume';
 import { Primitive } from '../../../render/primitive';
 import type { MeshMaterial as M } from '../../../material/meshmaterial';
-import { UnlitMaterial } from '../../../material';
+import { MeshMaterial, UnlitMaterial } from '../../../material';
 import { ComponentType, GLTFAccessor } from './helpers';
 import { AbstractModelLoader } from '../loader';
 import type {
@@ -50,6 +50,7 @@ import {
   MORPH_TARGET_TEX2,
   MORPH_TARGET_TEX3
 } from '../../../values';
+import { Ref } from '../../../app';
 /** @internal */
 export interface GLTFContent extends GlTf {
   _manager: AssetManager;
@@ -515,8 +516,8 @@ export class GLTFLoader extends AbstractModelLoader {
           const p = primitives[i];
           const subMeshData: AssetSubMeshData = {
             name: `${meshName}-${i}`,
-            primitive: null,
-            material: null,
+            primitive: new Ref<Primitive>(),
+            material: new Ref<MeshMaterial>(),
             rawPositions: null,
             rawBlendIndices: null,
             rawJointWeights: null,
@@ -634,8 +635,8 @@ export class GLTFLoader extends AbstractModelLoader {
             );
             gltf._materialCache[materialHash] = material;
           }
-          subMeshData.primitive = primitive;
-          subMeshData.material = material;
+          subMeshData.primitive.set(primitive);
+          subMeshData.material.set(material);
           mesh.subMeshes.push(subMeshData);
         }
       }

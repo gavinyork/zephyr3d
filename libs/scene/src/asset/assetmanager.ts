@@ -20,6 +20,7 @@ import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loade
 import { TGALoader } from './loaders/image/tga_Loader';
 import { MorphTargetTrack } from '../animation/morphtrack';
 import { processMorphData } from '../animation/morphtarget';
+import { Ref } from '../app';
 
 /**
  * Options for texture fetching
@@ -90,11 +91,11 @@ export class AssetManager {
   private _httpRequest: HttpRequest;
   /** @internal */
   private _textures: {
-    [hash: string]: Promise<BaseTexture>;
+    [hash: string]: Promise<BaseTexture> | Ref<BaseTexture>;
   };
   /** @internal */
   private _models: {
-    [url: string]: Promise<SharedModel>;
+    [url: string]: Promise<SharedModel> | Ref<SharedModel>;
   };
   /** @internal */
   private _binaryDatas: {
@@ -124,7 +125,19 @@ export class AssetManager {
    * Remove and dispose all cached assets
    */
   purgeCache() {
+    for (const k in this._textures) {
+      const P = this._textures[k];
+      if (P instanceof Ref) {
+        P.dispose();
+      }
+    }
     this._textures = {};
+    for (const k in this._models) {
+      const P = this._models[k];
+      if (P instanceof Ref) {
+        P.dispose();
+      }
+    }
     this._models = {};
     this._binaryDatas = {};
     this._textDatas = {};
@@ -232,8 +245,8 @@ export class AssetManager {
         httpRequest
       ) as Promise<T>;
     } else {
-      const hash = this.getHash('2d', httpRequest?.urlResolver?.(url) ?? url, options);
-      let P = this._textures[hash];
+      const hash = this.getHash('2d', url, options);
+      let P = this._textures[hash] as Promise<T> | Ref<T>;
       if (!P) {
         P = this.loadTexture(
           url,
@@ -242,16 +255,12 @@ export class AssetManager {
           options?.samplerOptions,
           null,
           httpRequest
-        );
+        ) as Promise<T>;
         this._textures[hash] = P;
+        return P;
       } else {
-        const tex = await P;
-        if (tex.disposed) {
-          tex.reload();
-          return tex as T;
-        }
+        return P instanceof Promise ? await P : (P.get() as T);
       }
-      return P as Promise<T>;
     }
   }
   /** @internal */
@@ -260,13 +269,15 @@ export class AssetManager {
     options?: ModelFetchOptions,
     httpRequest?: HttpRequest
   ): Promise<SharedModel> {
-    const hash = httpRequest?.urlResolver?.(url) ?? url;
+    const hash = url;
     let P = this._models[hash];
     if (!P) {
       P = this.loadModel(url, options, httpRequest);
       this._models[hash] = P;
+      return P;
+    } else {
+      return P instanceof Promise ? P : P.get();
     }
-    return P;
   }
   /**
    * Fetches a model resource from a given URL and adds it to a scene
@@ -595,11 +606,11 @@ export class AssetManager {
           meshNode.name = subMesh.name;
           meshNode.clipTestEnabled = true;
           meshNode.showState = 'inherit';
-          meshNode.primitive = subMesh.primitive;
+          meshNode.primitive = subMesh.primitive.get();
           meshNode.material =
             instancing && !skeleton && subMesh.numTargets === 0
-              ? subMesh.material.createInstance()
-              : subMesh.material;
+              ? subMesh.material.get().createInstance()
+              : subMesh.material.get();
           meshNode.parent = node;
           subMesh.mesh = meshNode;
           processMorphData(subMesh, meshData.morphWeights);

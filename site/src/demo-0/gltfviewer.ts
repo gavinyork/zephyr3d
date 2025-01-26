@@ -198,6 +198,7 @@ export class GLTFViewer {
     return fileMap;
   }
   async loadModel(url: string, httpRequest: HttpRequest) {
+    this._assetManager.purgeCache();
     this._assetManager
       .fetchModel(
         this._scene,

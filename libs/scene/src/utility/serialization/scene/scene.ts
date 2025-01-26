@@ -372,9 +372,9 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           get(this: Scene, value) {
             value.object = [];
             for (const child of this.rootNode.children) {
-              const assetId = assetRegistry.getAssetId(child);
+              const assetId = assetRegistry.getAssetId(child.get());
               if (assetId) {
-                value.object.push(new AssetNode(assetId, child));
+                value.object.push(new AssetNode(assetId, child.get()));
               } else {
                 value.object.push(child);
               }

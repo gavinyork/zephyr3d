@@ -17,7 +17,7 @@ export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number
     return;
   }
   const attributes = Object.getOwnPropertyNames(subMesh.targets);
-  const numVertices = subMesh.primitive.getNumVertices();
+  const numVertices = subMesh.primitive.get().getNumVertices();
   const weightsAndOffsets = new Float32Array(4 + MAX_MORPH_TARGETS + MAX_MORPH_ATTRIBUTES);
   for (let i = 0; i < numTargets; i++) {
     weightsAndOffsets[4 + i] = morphWeights?.[i] ?? 0;

@@ -83,7 +83,11 @@ export class Ref<T extends Disposable> {
   /** @internal */
   private retain() {
     if (this._object) {
-      objectReferenceMap.set(this._object, (objectReferenceMap.get(this._object) ?? 0) + 1);
+      const ref = objectReferenceMap.get(this._object) ?? 0;
+      objectReferenceMap.set(this._object, ref + 1);
+      if (ref === 0) {
+        disposalQueue.delete(this._object);
+      }
     }
   }
   /** @internal */

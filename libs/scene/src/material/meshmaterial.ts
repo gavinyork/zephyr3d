@@ -159,13 +159,18 @@ export class MeshMaterial extends Material {
     const isWebGL1 = Application.instance.device.type === 'webgl';
     const instance = {} as any;
     const that = this;
+    const coreMaterial = new Ref<MeshMaterial>(that);
     instance.isBatchable = () => !isWebGL1 && that.supportInstancing();
     instance.dispose = () => {
-      instance.coreMaterial.dispose();
+      coreMaterial.dispose();
     };
     instance.$instanceUniforms = uniformsHolder;
     instance.$isInstance = true;
-    instance.coreMaterial = new Ref<MeshMaterial>(that);
+    Object.defineProperty(instance, 'coreMaterial', {
+      get: function () {
+        return coreMaterial.get();
+      }
+    });
     // Copy original uniform values
     for (let i = 0; i < instanceUniforms.length; i++) {
       const instanceIndex = i;

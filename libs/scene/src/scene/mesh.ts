@@ -109,8 +109,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._castShadow = b;
   }
   /** Primitive of the mesh */
-  get primitive(): Ref<Primitive> {
-    return this._primitive;
+  get primitive(): Primitive {
+    return this._primitive.get();
   }
   set primitive(prim: Primitive) {
     if (prim !== this._primitive.get()) {
@@ -268,7 +268,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    * {@inheritDoc Drawable.getPrimitive}
    */
   getPrimitive(): Primitive {
-    return this.primitive.get();
+    return this.primitive;
   }
   /**
    * {@inheritDoc Drawable.getBoneMatrices}

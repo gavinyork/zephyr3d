@@ -122,11 +122,11 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
           get(this: SceneNode, value) {
             value.object = [];
             for (const child of this.children) {
-              const assetId = assetRegistry.getAssetId(child);
+              const assetId = assetRegistry.getAssetId(child.get());
               if (assetId) {
-                value.object.push(new AssetNode(assetId, this));
+                value.object.push(new AssetNode(assetId, child.get()));
               } else {
-                value.object.push(child);
+                value.object.push(child.get());
               }
             }
           },

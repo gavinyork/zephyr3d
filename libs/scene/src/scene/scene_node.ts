@@ -335,6 +335,7 @@ export class SceneNode extends makeEventTarget(Object)<{
   }
   /** Disposes the node */
   dispose() {
+    this.remove();
     this.removeChildren();
   }
   /**

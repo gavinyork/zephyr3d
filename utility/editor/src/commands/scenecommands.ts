@@ -224,7 +224,6 @@ export class NodeDeleteCommand implements Command {
       node.remove();
       node.iterate((child) => {
         delete idNodeMap[child.id];
-        child.dispose();
       });
       delete idNodeMap[this._nodeId];
     }
