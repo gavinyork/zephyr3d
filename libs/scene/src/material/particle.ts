@@ -126,7 +126,7 @@ export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlb
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     if (this.needFragmentColor()) {
-      const color = this.calculateAlbedoColor(scope);
+      const color = this.calculateAlbedoColor(scope, scope.$inputs.zAlbedoTexCoord);
       this.outputFragmentColor(scope, scope.$inputs.worldPos, color);
     } else {
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
