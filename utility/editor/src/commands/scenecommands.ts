@@ -65,7 +65,6 @@ export class AddAssetCommand implements Command<SceneNode> {
       if (node) {
         idNodeMap[this._nodeId] = undefined;
         node.parent = null;
-        this._assetRegistry.releaseAsset(node);
       }
     }
   }

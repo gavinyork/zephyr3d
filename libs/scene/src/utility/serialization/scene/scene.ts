@@ -337,7 +337,6 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
               if (assetInfo && assetInfo.type === 'texture') {
                 assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
                   if (tex?.isTexture2D()) {
-                    tex.name = assetInfo.name;
                     const device = Application.instance.device;
                     const skyBoxTexture =
                       this.env.sky.skyboxTexture ?? device.createCubeTexture('rgba16f', 1024);
@@ -355,7 +354,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
                     this.env.light.radianceMap = radianceMap;
                     this.env.light.irradianceMap = irradianceMap;
                     this.env.sky.panoramaTextureAsset = assetId;
-                    assetRegistry.releaseAsset(tex);
+                    tex.dispose();
                   } else {
                     console.error('Invalid skybox texture');
                   }

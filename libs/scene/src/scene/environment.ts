@@ -5,6 +5,7 @@ import { EnvShIBL } from '../render';
 import { EnvConstantAmbient, EnvHemisphericAmbient, EnvIBL } from '../render';
 import { SkyRenderer } from '../render/sky';
 import type { TextureCube } from '@zephyr3d/device';
+import { Ref } from '../app';
 
 /**
  * Wrapper for environmant lighting
@@ -15,8 +16,8 @@ export class EnvLightWrapper {
   private _ambientColor: ObservableVector4;
   private _ambientDown: ObservableVector4;
   private _ambientUp: ObservableVector4;
-  private _radianceMap: TextureCube;
-  private _irradianceMap: TextureCube;
+  private _radianceMap: Ref<TextureCube>;
+  private _irradianceMap: Ref<TextureCube>;
   private _irradianceSH: Float32Array;
   private _strength: number;
   /** @internal */
@@ -40,8 +41,8 @@ export class EnvLightWrapper {
         (this._envLight as EnvHemisphericAmbient).ambientUp.set(this._ambientUp);
       }
     };
-    this._radianceMap = null;
-    this._irradianceMap = null;
+    this._radianceMap = new Ref();
+    this._irradianceMap = new Ref();
     this._strength = 1;
   }
   /** @internal */
@@ -86,24 +87,24 @@ export class EnvLightWrapper {
   }
   /** Radiance map for environment light type ibl */
   get radianceMap(): TextureCube {
-    return this._radianceMap;
+    return this._radianceMap.get();
   }
   set radianceMap(tex: TextureCube) {
-    this._radianceMap = tex ?? null;
+    this._radianceMap.set(tex);
     if (this.type === 'ibl') {
-      (this._envLight as EnvIBL).radianceMap = this._radianceMap;
+      (this._envLight as EnvIBL).radianceMap = this.radianceMap;
     } else if (this.type === 'ibl-sh') {
-      (this._envLight as EnvShIBL).radianceMap = this._radianceMap;
+      (this._envLight as EnvShIBL).radianceMap = this.radianceMap;
     }
   }
   /** Irradiance map for environment light type ibl */
   get irradianceMap(): TextureCube {
-    return this._irradianceMap;
+    return this._irradianceMap.get();
   }
   set irradianceMap(tex: TextureCube) {
-    this._irradianceMap = tex ?? null;
+    this._irradianceMap.set(tex);
     if (this.type === 'ibl') {
-      (this._envLight as EnvIBL).irradianceMap = this._irradianceMap;
+      (this._envLight as EnvIBL).irradianceMap = this.irradianceMap;
     }
   }
   /** Irradiance SH for environment light type ibl-sh */
@@ -127,14 +128,14 @@ export class EnvLightWrapper {
         break;
       case 'ibl':
         if (this._envLight?.getType() !== val) {
-          this._envLight = new EnvIBL(this._radianceMap, this._irradianceMap);
+          this._envLight = new EnvIBL(this.radianceMap, this.irradianceMap);
         }
         (this._envLight as EnvIBL).radianceMap = this.radianceMap;
         (this._envLight as EnvIBL).irradianceMap = this.irradianceMap;
         break;
       case 'ibl-sh':
         if (this._envLight?.getType() !== val) {
-          this._envLight = new EnvShIBL(this._radianceMap, this._irradianceSH);
+          this._envLight = new EnvShIBL(this.radianceMap, this.irradianceSH);
         }
         (this._envLight as EnvShIBL).radianceMap = this.radianceMap;
         (this._envLight as EnvShIBL).irradianceSH = this.irradianceSH;

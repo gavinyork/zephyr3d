@@ -104,14 +104,16 @@ export class SceneController extends BaseController<SceneModel> {
     this.model.camera.updateController();
   }
   private saveScene(name: string) {
+    const assetList = new Set<string>();
     this._scene = Object.assign({}, this._scene ?? {}, {
       name,
-      content: serializeObject(this.model.scene, this._assetRegistry, {}),
+      content: serializeObject(this.model.scene, this._assetRegistry, {}, assetList),
       metadata: {
         activeCamera: this.model.camera?.id ?? ''
       }
     });
     console.log(JSON.stringify(this._scene.content, null, 2));
+    console.log([...assetList]);
     Database.putScene(this._scene).then((uuid) => {
       this._scene.uuid = uuid;
       Dialog.messageBox('Zephyr3d', `Scene saved: ${uuid}`);

@@ -10,7 +10,7 @@ export type AssetInfo = {
   type: AssetType;
   path: string;
   manager: AssetManager;
-  allocated: Map<any, string>;
+  allocated: WeakMap<any, string>;
   textureOptions?: TextureFetchOptions<any>;
 };
 
@@ -38,7 +38,7 @@ export class AssetRegistry {
         type,
         path,
         manager: new AssetManager(),
-        allocated: new Map()
+        allocated: new WeakMap()
       });
     }
   }
@@ -75,18 +75,6 @@ export class AssetRegistry {
     }
     return texture;
   }
-  releaseAsset(asset: unknown) {
-    for (const entry of this._assetMap) {
-      const info = entry[1];
-      if (info.allocated.has(asset)) {
-        info.allocated.delete(asset);
-        if (info.allocated.size === 0) {
-          info.manager.purgeCache();
-        }
-        return;
-      }
-    }
-  }
   serialize() {
     const assets: Record<string, { id: string; name: string; type: AssetType; path: string }> = {};
     for (const entry of this._assetMap) {
@@ -119,7 +107,7 @@ export class AssetRegistry {
   purge() {
     for (const entry of this._assetMap) {
       entry[1].manager.purgeCache();
-      entry[1].allocated.clear();
+      entry[1].allocated = new WeakMap();
     }
     this._assetMap.clear();
   }

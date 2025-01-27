@@ -8,6 +8,7 @@ import type {
   TextureCube
 } from '@zephyr3d/device';
 import { Application } from '../app/app';
+import { Ref } from '../app';
 
 /**
  * Environment light type
@@ -272,9 +273,9 @@ export class EnvIBL extends EnvironmentLighting {
   /** @internal */
   public static readonly UNIFORM_NAME_IBL_IRRADIANCE_MAP = 'zIBLIrradianceMap';
   /** @internal */
-  private _radianceMap: TextureCube;
+  private _radianceMap: Ref<TextureCube>;
   /** @internal */
-  private _irradianceMap: TextureCube;
+  private _irradianceMap: Ref<TextureCube>;
   /**
    * Creates an instance of EnvIBL
    * @param radianceMap - The radiance map
@@ -282,8 +283,8 @@ export class EnvIBL extends EnvironmentLighting {
    */
   constructor(radianceMap?: TextureCube, irradianceMap?: TextureCube) {
     super();
-    this._radianceMap = radianceMap || null;
-    this._irradianceMap = irradianceMap || null;
+    this._radianceMap = new Ref(radianceMap);
+    this._irradianceMap = new Ref(irradianceMap);
   }
   /**
    * {@inheritDoc EnvironmentLighting.getType}
@@ -294,17 +295,17 @@ export class EnvIBL extends EnvironmentLighting {
   }
   /** The radiance map */
   get radianceMap(): TextureCube {
-    return this._radianceMap;
+    return this._radianceMap.get();
   }
   set radianceMap(tex: TextureCube) {
-    this._radianceMap = tex;
+    this._radianceMap.set(tex);
   }
   /** The irradiance map */
   get irradianceMap(): TextureCube {
-    return this._irradianceMap;
+    return this._irradianceMap.get();
   }
   set irradianceMap(tex: TextureCube) {
-    this._irradianceMap = tex;
+    this._irradianceMap.set(tex);
   }
   /**
    * {@inheritDoc EnvironmentLighting.initShaderBindings}
@@ -327,11 +328,11 @@ export class EnvIBL extends EnvironmentLighting {
    */
   updateBindGroup(bg: BindGroup): void {
     if (this._radianceMap) {
-      bg.setValue(EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this._radianceMap.mipLevelCount - 1);
-      bg.setTexture(EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this._radianceMap);
+      bg.setValue(EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this.radianceMap.mipLevelCount - 1);
+      bg.setTexture(EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this.radianceMap);
     }
     if (this._irradianceMap) {
-      bg.setTexture(EnvIBL.UNIFORM_NAME_IBL_IRRADIANCE_MAP, this._irradianceMap);
+      bg.setTexture(EnvIBL.UNIFORM_NAME_IBL_IRRADIANCE_MAP, this.irradianceMap);
     }
   }
   /**

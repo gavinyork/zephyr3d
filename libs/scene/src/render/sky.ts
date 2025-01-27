@@ -21,6 +21,7 @@ import type {
 import type { DrawContext } from './drawable';
 import { ShaderHelper } from '../material/shader/helper';
 import { fetchSampler } from '../utility/misc';
+import { Ref } from '../app';
 
 /**
  * Type of sky
@@ -58,15 +59,16 @@ const defaultSkyWorldMatrix = Matrix4x4.identity();
 export class SkyRenderer {
   private _skyType: SkyType;
   private _skyColor: Vector4;
-  private _skyboxTexture: TextureCube;
+  private _skyboxTexture: Ref<TextureCube>;
+  private _bakedSkyboxTexture: Ref<TextureCube>;
   private _updateRadianceMaps: boolean;
   private _radianceMapDirty: boolean;
   private _scatterSkyboxFramebuffer: FrameBuffer;
   private _scatterSkyboxTextureWidth: number;
   private _aerialPerspectiveDensity: number;
-  private _radianceMap: TextureCube;
+  private _radianceMap: Ref<TextureCube>;
   private _radianceMapWidth: number;
-  private _irradianceMap: TextureCube;
+  private _irradianceMap: Ref<TextureCube>;
   private _irradianceMapWidth: number;
   private _fogType: FogType;
   private _fogColor: Vector4;
@@ -98,13 +100,14 @@ export class SkyRenderer {
     this._updateRadianceMaps = true;
     this._radianceMapDirty = true;
     this._skyColor = Vector4.zero();
-    this._skyboxTexture = null;
+    this._skyboxTexture = new Ref();
+    this._bakedSkyboxTexture = new Ref();
     this._scatterSkyboxFramebuffer = null;
     this._scatterSkyboxTextureWidth = 256;
     this._aerialPerspectiveDensity = 1;
-    this._radianceMap = null;
+    this._radianceMap = new Ref();
     this._radianceMapWidth = 128;
-    this._irradianceMap = null;
+    this._irradianceMap = new Ref();
     this._irradianceMapWidth = 64;
     this._fogType = 'none';
     this._fogColor = Vector4.one();
@@ -159,13 +162,13 @@ export class SkyRenderer {
   }
   /** Baked sky texture */
   get bakedSkyTexture(): TextureCube {
-    if (this._skyType === 'skybox' && this._skyboxTexture) {
-      return this._skyboxTexture;
+    if (this._skyType === 'skybox' && this.skyboxTexture) {
+      return this.skyboxTexture;
     }
     if (!this._scatterSkyboxFramebuffer) {
       this.updateIBLMaps(this._lastSunDir);
     }
-    return this._scatterSkyboxFramebuffer.getColorAttachments()[0] as TextureCube;
+    return this._bakedSkyboxTexture.get();
   }
   /**
    * Wether the IBL maps should be updated automatically.
@@ -248,37 +251,35 @@ export class SkyRenderer {
    * Radiance map of the sky.
    */
   get radianceMap(): TextureCube {
-    if (!this._radianceMap) {
-      this._radianceMap = Application.instance.device.createCubeTexture('rgba16f', this._radianceMapWidth);
-      this._radianceMap.name = 'SkyRadianceMap';
+    if (!this._radianceMap.get()) {
+      this._radianceMap.set(Application.instance.device.createCubeTexture('rgba16f', this._radianceMapWidth));
+      this._radianceMap.get().name = 'SkyRadianceMap';
     }
-    return this._radianceMap;
+    return this._radianceMap.get();
   }
   /**
    * Irradiance map of the sky.
    */
   get irradianceMap(): TextureCube {
-    if (!this._irradianceMap) {
-      this._irradianceMap = Application.instance.device.createCubeTexture(
-        'rgba16f',
-        this._irradianceMapWidth,
-        {
+    if (!this._irradianceMap.get()) {
+      this._irradianceMap.set(
+        Application.instance.device.createCubeTexture('rgba16f', this._irradianceMapWidth, {
           samplerOptions: { mipFilter: 'none' }
-        }
+        })
       );
-      this._irradianceMap.name = 'SkyIrradianceMap';
+      this._irradianceMap.get().name = 'SkyIrradianceMap';
     }
-    return this._irradianceMap;
+    return this._irradianceMap.get();
   }
   /**
    * Cube texture for skybox.
    */
   get skyboxTexture(): TextureCube {
-    return this._skyboxTexture;
+    return this._skyboxTexture.get();
   }
   set skyboxTexture(tex: TextureCube) {
-    if (tex !== this._skyboxTexture) {
-      this._skyboxTexture = tex;
+    if (tex !== this.skyboxTexture) {
+      this._skyboxTexture.set(tex);
       if (this._skyType === 'skybox') {
         this.invalidateIBLMaps();
       }
@@ -377,9 +378,10 @@ export class SkyRenderer {
    */
   updateIBLMaps(sunDir: Vector3) {
     const device = Application.instance.device;
-    let bakedSkyboxTexture: TextureCube = null;
-    if (this._skyType === 'skybox' && this._skyboxTexture) {
-      bakedSkyboxTexture = this._skyboxTexture;
+    if (this._skyType === 'skybox' && this.skyboxTexture) {
+      this._bakedSkyboxTexture.set(this.skyboxTexture);
+      this._scatterSkyboxFramebuffer?.dispose();
+      this._scatterSkyboxFramebuffer = null;
     } else {
       if (!this._scatterSkyboxFramebuffer) {
         const texCaps = device.getDeviceCaps().textureCaps;
@@ -406,10 +408,10 @@ export class SkyRenderer {
       }
       device.popDeviceStates();
       device.setRenderStates(saveRenderStates);
-      bakedSkyboxTexture = this._scatterSkyboxFramebuffer.getColorAttachments()[0] as TextureCube;
+      this._bakedSkyboxTexture.set(this._scatterSkyboxFramebuffer.getColorAttachments()[0] as TextureCube);
     }
-    prefilterCubemap(bakedSkyboxTexture, 'ggx', this.radianceMap);
-    prefilterCubemap(bakedSkyboxTexture, 'lambertian', this.irradianceMap);
+    prefilterCubemap(this._bakedSkyboxTexture.get(), 'ggx', this.radianceMap);
+    prefilterCubemap(this._bakedSkyboxTexture.get(), 'lambertian', this.irradianceMap);
   }
   /** @internal */
   renderFog(ctx: DrawContext) {
@@ -472,8 +474,7 @@ export class SkyRenderer {
     if (this._radianceMapDirty && ctx.env.light.type === 'ibl') {
       if (
         ctx.env.light.radianceMap &&
-        (ctx.env.light.radianceMap === this._radianceMap ||
-          ctx.env.light.irradianceMap === this._irradianceMap)
+        (ctx.env.light.radianceMap === this.radianceMap || ctx.env.light.irradianceMap === this.irradianceMap)
       ) {
         this._radianceMapDirty = false;
         this.updateIBLMaps(sunDir);
@@ -493,7 +494,7 @@ export class SkyRenderer {
     this._prepareSkyBox(device);
     if (this._skyType === 'scatter') {
       this._drawScattering(camera, sunDir, depthTest, drawGround, drawCloud);
-    } else if (this._skyType === 'skybox' && this._skyboxTexture) {
+    } else if (this._skyType === 'skybox' && this.skyboxTexture) {
       this._drawSkybox(camera, depthTest);
     } else {
       this._drawSkyColor(camera, depthTest);
@@ -518,7 +519,7 @@ export class SkyRenderer {
   private _drawSkybox(camera: Camera, depthTest: boolean) {
     const device = Application.instance.device;
     const bindgroup = this._bindgroupSky.skybox;
-    bindgroup.setTexture('skyCubeMap', this._skyboxTexture);
+    bindgroup.setTexture('skyCubeMap', this.skyboxTexture);
     bindgroup.setValue(
       'flip',
       device.getFramebuffer() && device.type === 'webgpu' ? new Vector4(1, -1, 1, 1) : new Vector4(1, 1, 1, 1)

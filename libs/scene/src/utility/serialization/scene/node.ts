@@ -10,10 +10,10 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
   return {
     ctor: SceneNode,
     className: 'SceneNode',
-    async createFunc(ctx: Scene | SceneNode, assetId: string) {
-      if (assetId) {
+    async createFunc(ctx: Scene | SceneNode, init?: { asset?: string }) {
+      if (init?.asset) {
         const scene = ctx instanceof Scene ? ctx : ctx.scene;
-        return (await assetRegistry.fetchModel(assetId, scene)).group;
+        return (await assetRegistry.fetchModel(init.asset, scene)).group;
       }
       if (ctx instanceof Scene) {
         return new SceneNode(ctx);
@@ -26,7 +26,8 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
       }
     },
     getInitParams(obj: SceneNode) {
-      return [assetRegistry.getAssetId(obj)];
+      const asset = assetRegistry.getAssetId(obj);
+      return asset ? { asset } : undefined;
     },
     getProps() {
       return [

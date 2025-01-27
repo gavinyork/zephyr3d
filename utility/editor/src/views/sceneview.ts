@@ -422,7 +422,6 @@ export class SceneView extends BaseView<SceneModel> {
         if (ev.type === 'pointerdown') {
           if (ev.button === 2) {
             placeNode.parent = null;
-            this._assetRegistry.releaseAsset(placeNode);
             this._nodeToBePlaced.dispose();
           } else if (ev.button === 0) {
             this._cmdManager
@@ -437,7 +436,6 @@ export class SceneView extends BaseView<SceneModel> {
               .then((node) => {
                 this._tab.sceneHierarchy.selectNode(node);
                 placeNode.parent = null;
-                this._assetRegistry.releaseAsset(placeNode);
                 this._nodeToBePlaced.dispose();
               });
           }
@@ -602,7 +600,6 @@ export class SceneView extends BaseView<SceneModel> {
     const placeNode = this._nodeToBePlaced.get();
     if (placeNode) {
       placeNode.remove();
-      this._assetRegistry.releaseAsset(placeNode);
       this._nodeToBePlaced.dispose();
     }
     this._assetRegistry

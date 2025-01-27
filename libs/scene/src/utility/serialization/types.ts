@@ -38,9 +38,9 @@ export type SerializableClass = {
   ctor?: any;
   className?: string;
   parent?: SerializableClass;
-  createFunc?: (ctx?: any, ...args: any[]) => any;
+  createFunc?: (ctx?: any, init?: { asset?: string }) => any;
   getObject?: (obj: any) => any;
-  getInitParams?: (obj: any) => any[];
+  getInitParams?: (obj: any) => { asset?: string };
   getProps: (obj: any) => PropertyAccessor<any>[];
 };
 

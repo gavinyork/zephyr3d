@@ -184,7 +184,8 @@ export function serializeObjectProps<T>(
   obj: T,
   cls: SerializableClass,
   json: object,
-  assetRegistry: AssetRegistry
+  assetRegistry: AssetRegistry,
+  assetList?: Set<string>
 ) {
   const props = cls.getProps(obj) ?? [];
   for (const prop of props) {
@@ -202,13 +203,16 @@ export function serializeObjectProps<T>(
           typeof tmpVal.str[0] === 'string' && tmpVal.str[0]
             ? tmpVal.str[0]
             : tmpVal.object[0]
-            ? serializeObject(tmpVal.object[0], assetRegistry)
+            ? serializeObject(tmpVal.object[0], assetRegistry, {}, assetList)
             : null;
+        if (assetList && typeof json[k] === 'string' && assetRegistry.getAssetInfo(json[k])) {
+          assetList.add(json[k]);
+        }
         break;
       case 'object_array':
         json[k] = [];
         for (const p of tmpVal.object) {
-          json[k].push(serializeObject(p, assetRegistry));
+          json[k].push(serializeObject(p, assetRegistry, {}, assetList));
         }
         break;
       case 'float':
@@ -265,7 +269,7 @@ export function serializeObjectProps<T>(
   }
 }
 
-export function serializeObject(obj: any, assetRegistry: AssetRegistry, json?: any) {
+export function serializeObject(obj: any, assetRegistry: AssetRegistry, json?: any, assetList?: Set<string>) {
   const serializationInfo = getSerializationInfo(assetRegistry);
   const cls = [...serializationInfo.values()];
   const index = cls.findIndex((val) => val.ctor === obj.constructor);
@@ -279,10 +283,13 @@ export function serializeObject(obj: any, assetRegistry: AssetRegistry, json?: a
   json.Object = {};
   if (initParams) {
     json.Init = initParams;
+    if (assetList && initParams.asset && assetRegistry.getAssetInfo(initParams.asset)) {
+      assetList.add(initParams.asset);
+    }
   }
   obj = info.getObject?.(obj) ?? obj;
   while (info) {
-    serializeObjectProps(obj, info, json.Object, assetRegistry);
+    serializeObjectProps(obj, info, json.Object, assetRegistry, assetList);
     info = info.parent;
   }
   return json;
@@ -297,12 +304,9 @@ export async function deserializeObject<T>(ctx: any, json: object, assetRegistry
     throw new Error('Deserialize object failed: Cannot found serialization meta data');
   }
   let info = cls[index];
-  const initParams: any[] = json['Init'] ?? [];
-  if (!Array.isArray(initParams)) {
-    throw new Error('Deserialize object failed: Invalid initialization parameters');
-  }
+  const initParams: { asset?: string } = json['Init'];
   json = json['Object'];
-  const p: T | Promise<T> = info.createFunc ? info.createFunc(ctx, ...initParams) : new info.ctor();
+  const p: T | Promise<T> = info.createFunc ? info.createFunc(ctx, initParams) : new info.ctor();
   if (!p) {
     return null;
   }
