@@ -18,6 +18,7 @@ import {
 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
 import { Ref } from '../app/gc/ref';
+import { AnimationSet } from '../animation';
 
 /**
  * Node iterate function type
@@ -61,6 +62,8 @@ export class SceneNode extends makeEventTarget(Object)<{
   static readonly BBOXDRAW_WORLD = 2;
   /** @internal */
   protected _id: string;
+  /** @internal */
+  protected _animationSet: Ref<AnimationSet>;
   /** @internal */
   protected _clipMode: boolean;
   /** @internal */
@@ -122,6 +125,7 @@ export class SceneNode extends makeEventTarget(Object)<{
     this._id = crypto.randomUUID();
     this._scene = scene;
     this._name = '';
+    this._animationSet = new Ref();
     this._bv = null;
     this._bvWorld = null;
     this._bvDirty = true;
@@ -201,6 +205,12 @@ export class SceneNode extends makeEventTarget(Object)<{
   }
   set sealed(val: boolean) {
     this._sealed = val;
+  }
+  get animationSet() {
+    return this._animationSet.get();
+  }
+  set animationSet(animationSet: AnimationSet) {
+    this._animationSet.set(animationSet);
   }
   /** Asset url */
   get assetUrl(): string {
@@ -337,6 +347,7 @@ export class SceneNode extends makeEventTarget(Object)<{
   dispose() {
     this.remove();
     this.removeChildren();
+    this._animationSet.dispose();
   }
   /**
    * Computes the bounding volume of the node

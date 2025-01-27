@@ -568,6 +568,7 @@ export class AssetManager {
         child.sealed = true;
       }
     });
+    group.animationSet = animationSet;
     return { group, animationSet };
   }
   /**

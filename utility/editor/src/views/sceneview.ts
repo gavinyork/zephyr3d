@@ -44,6 +44,7 @@ export class SceneView extends BaseView<SceneModel> {
   private _assetRegistry: AssetRegistry;
   private _postGizmoCaptured: boolean;
   private _showTextureViewer: boolean;
+  private _showDeviceInfo: boolean;
   constructor(model: SceneModel, assetRegistry: AssetRegistry) {
     super(model);
     this._cmdManager = new CommandManager();
@@ -56,6 +57,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._mousePosY = -1;
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
+    this._showDeviceInfo = false;
     this._assetRegistry = assetRegistry;
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
@@ -131,6 +133,11 @@ export class SceneView extends BaseView<SceneModel> {
             {
               label: 'Ramp Texture Creator',
               id: 'SHOW_RAMP_TEXTURE_CREATOR'
+            },
+            {
+              label: 'Device Information',
+              id: 'SHOW_DEVICE_INFO',
+              checked: this._showDeviceInfo
             }
           ]
         }
@@ -279,7 +286,9 @@ export class SceneView extends BaseView<SceneModel> {
     this._nodeToBePlaced.dispose();
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
+    this._showDeviceInfo = false;
     this._menubar.checkMenuItem('SHOW_TEXTURE_VIEWER', false);
+    this._menubar.checkMenuItem('SHOW_DEVICE_INFO', false);
     this.sceneSetup();
   }
   render() {
@@ -327,6 +336,9 @@ export class SceneView extends BaseView<SceneModel> {
 
     if (this._showTextureViewer) {
       renderTextureViewer();
+    }
+    if (this._showDeviceInfo) {
+      this.renderDeviceInfo();
     }
     /*
     if (ImGui.Begin('FontTest')) {
@@ -511,6 +523,46 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoRenderer.off('end_rotate', this.handleEndRotateNode, this);
     this._postGizmoRenderer.off('end_scale', this.handleEndScaleNode, this);
   }
+  private renderDeviceInfo() {
+    const device = Application.instance.device;
+    const gpuObjectList = device.getGPUObjects();
+    if (ImGui.Begin('DeviceInfo')) {
+      if (ImGui.BeginTable('DeviceProperties', 2)) {
+        ImGui.TableNextRow();
+        ImGui.TableNextColumn();
+        ImGui.Text('Type');
+        ImGui.TableNextColumn();
+        ImGui.Text(device.type);
+        ImGui.TableNextRow();
+        ImGui.TableNextColumn();
+        ImGui.Text('FPS');
+        ImGui.TableNextColumn();
+        ImGui.Text(device.frameInfo.FPS.toFixed(2));
+        ImGui.TableNextRow();
+        ImGui.TableNextColumn();
+        ImGui.Text('Texture Count');
+        ImGui.TableNextColumn();
+        ImGui.Text(`${gpuObjectList.textures.length}`);
+        ImGui.TableNextRow();
+        ImGui.TableNextColumn();
+        ImGui.Text('Buffer Count');
+        ImGui.TableNextColumn();
+        ImGui.Text(`${gpuObjectList.buffers.length}`);
+        ImGui.TableNextRow();
+        ImGui.TableNextColumn();
+        ImGui.Text('BindGroup Count');
+        ImGui.TableNextColumn();
+        ImGui.Text(`${gpuObjectList.bindGroups.length}`);
+        ImGui.TableNextRow();
+        ImGui.TableNextColumn();
+        ImGui.Text('Framebuffer Count');
+        ImGui.TableNextColumn();
+        ImGui.Text(`${gpuObjectList.framebuffers.length}`);
+        ImGui.EndTable();
+      }
+    }
+    ImGui.End();
+  }
   private handleDeleteNode(node: SceneNode) {
     if (node === this.model.camera) {
       Dialog.messageBox('Zephyr3d editor', 'Cannot delete active camera');
@@ -614,6 +666,10 @@ export class SceneView extends BaseView<SceneModel> {
       case 'SHOW_TEXTURE_VIEWER':
         this._showTextureViewer = !this._showTextureViewer;
         this._menubar.checkMenuItem(action, this._showTextureViewer);
+        break;
+      case 'SHOW_DEVICE_INFO':
+        this._showDeviceInfo = !this._showDeviceInfo;
+        this._menubar.checkMenuItem(action, this._showDeviceInfo);
         break;
       case 'SHOW_CURVE_EDITOR':
         Dialog.editCurve('Edit curve', 600, 500).then((interpolator) => {

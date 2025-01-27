@@ -45,23 +45,26 @@ function fetchBindGroup(skinning: boolean, morphing: boolean, instancing: boolea
 }
 
 function releaseBindGroup(bindGroup: BindGroup) {
-  const hash = usedBindGroups.get(bindGroup);
-  if (hash) {
-    usedBindGroups.delete(bindGroup);
-    const bindGroups = bindGroupCache[hash];
-    if (bindGroups) {
-      bindGroups.push(bindGroup);
+  if (bindGroup) {
+    const hash = usedBindGroups.get(bindGroup);
+    if (hash) {
+      usedBindGroups.delete(bindGroup);
+      const bindGroups = bindGroupCache[hash];
+      if (bindGroups) {
+        bindGroups.push(bindGroup);
+      } else {
+        bindGroupCache[hash] = [bindGroup];
+      }
     } else {
-      bindGroupCache[hash] = [bindGroup];
+      bindGroup.dispose();
     }
-  } else {
-    bindGroup.dispose();
   }
 }
 
 export function mixinDrawable<
   T extends GenericConstructor<{
     getNode(): SceneNode;
+    dispose(): void;
   }>
 >(baseCls?: T): T & { new (...args: any[]): IMixinDrawable } {
   const cls = class extends baseCls {
@@ -127,10 +130,10 @@ export function mixinDrawable<
       this.renderQueueRefPrune();
       this._mdRenderQueueRef.push(ref);
     }
-    renderQueueRefPrune() {
+    renderQueueRefPrune(force = false) {
       for (let i = this._mdRenderQueueRef.length - 1; i >= 0; i--) {
         const ref = this._mdRenderQueueRef[i].ref;
-        if (ref.disposed) {
+        if (force || ref.disposed) {
           this._mdRenderQueueRef.splice(i, 1);
           const bindGroup = this._mdDrawableBindGroupInstanced.get(ref);
           if (bindGroup) {
@@ -259,6 +262,13 @@ export function mixinDrawable<
         }
       }
       return bindGroup;
+    }
+    dispose() {
+      super.dispose();
+      this.renderQueueRefPrune(true);
+      releaseBindGroup(this._mdDrawableBindGroup);
+      releaseBindGroup(this._mdDrawableBindGroupSkin);
+      releaseBindGroup(this._mdDrawableBindGroupMorph);
     }
   };
   return cls as unknown as T & { new (...args: any[]): IMixinDrawable };

@@ -71,7 +71,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     }
     if (node !== this._scene.rootNode) {
       if (ImGui.BeginPopup(`context_${node.id}`)) {
-        const animationSet = this._assetRegistry.getAnimations(node);
+        const animationSet = node.animationSet;
         if (animationSet && animationSet.getAnimationNames().length > 0) {
           if (ImGui.BeginMenu('Animation')) {
             ImGui.PushID(node.id);
