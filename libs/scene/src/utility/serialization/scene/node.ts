@@ -6,10 +6,6 @@ import { degree2radian, radian2degree } from '@zephyr3d/base';
 import { GraphNode } from '../../../scene';
 import type { AssetRegistry } from '../asset/asset';
 
-export class AssetNode {
-  constructor(public id: string, public node: SceneNode) {}
-}
-
 export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: SceneNode,
@@ -151,29 +147,6 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
           }
         }
       ];
-    }
-  };
-}
-
-export function getAssetNodeClass(assetRegistry: AssetRegistry): SerializableClass {
-  return {
-    ctor: AssetNode,
-    className: 'AssetNode',
-    async createFunc(ctx: Scene | SceneNode, id: string) {
-      const scene = ctx instanceof Scene ? ctx : ctx.scene;
-      const model = await assetRegistry.fetchModel(id, scene);
-      return model?.group ?? null;
-    },
-    getInitParams(obj: AssetNode) {
-      return [obj.id];
-    },
-    getObject(obj: AssetNode) {
-      return obj.node;
-    },
-    getProps(obj: SceneNode) {
-      return getSceneNodeClass(assetRegistry)
-        .getProps(obj)
-        .filter((val) => val.name !== 'Children');
     }
   };
 }

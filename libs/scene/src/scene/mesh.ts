@@ -1,9 +1,9 @@
 import { Vector4, applyMixins } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import { BoxFrameShape } from '../shapes';
-import { MeshMaterial } from '../material';
+import type { MeshMaterial } from '../material';
 import { LambertMaterial } from '../material';
-import { RenderPass, Primitive, BatchDrawable, DrawContext, PickTarget } from '../render';
+import type { RenderPass, Primitive, BatchDrawable, DrawContext, PickTarget } from '../render';
 import { Application } from '../app/app';
 import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
 import type { Scene } from './scene';

@@ -19,7 +19,8 @@ import { SharedModel, AssetSkeleton, AssetScene } from '../../model';
 import { BoundingBox } from '../../../utility/bounding_volume';
 import { Primitive } from '../../../render/primitive';
 import type { MeshMaterial as M } from '../../../material/meshmaterial';
-import { MeshMaterial, UnlitMaterial } from '../../../material';
+import type { MeshMaterial } from '../../../material';
+import { UnlitMaterial } from '../../../material';
 import { ComponentType, GLTFAccessor } from './helpers';
 import { AbstractModelLoader } from '../loader';
 import type {

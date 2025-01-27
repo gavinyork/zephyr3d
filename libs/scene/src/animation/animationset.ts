@@ -1,5 +1,5 @@
 import { weightedAverage } from '@zephyr3d/base';
-import { Scene, SceneNode } from '../scene';
+import type { Scene, SceneNode } from '../scene';
 import type { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
 import type { Skeleton } from './skeleton';

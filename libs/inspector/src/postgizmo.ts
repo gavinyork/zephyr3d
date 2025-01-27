@@ -6,7 +6,8 @@ import type {
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
-import { Camera, DrawContext, Primitive, SceneNode, WeakRef } from '@zephyr3d/scene';
+import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
+import { WeakRef } from '@zephyr3d/scene';
 import {
   AbstractPostEffect,
   Application,

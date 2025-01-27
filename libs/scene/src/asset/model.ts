@@ -5,7 +5,7 @@ import type { Primitive } from '../render/primitive';
 import type { MeshMaterial } from '../material/meshmaterial';
 import type { Mesh } from '../scene/mesh';
 import type { BoundingBox } from '../utility';
-import { Ref } from '../app';
+import type { Ref } from '../app';
 
 /**
  * Named object interface for model loading

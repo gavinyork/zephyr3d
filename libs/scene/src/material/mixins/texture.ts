@@ -93,7 +93,7 @@ export function mixinTextureProps<U extends string>(name: U) {
     const cls = class extends (BaseCls as typeof MeshMaterial) {
       constructor() {
         super();
-        let texture = new Ref<Texture2D>();
+        const texture = new Ref<Texture2D>();
         let sampler: TextureSampler = null;
         let texCoord = 0;
         let matrix: Matrix4x4 = null;

@@ -7,7 +7,6 @@ import { Application } from '../../../app/app';
 import { panoramaToCubemap } from '../../panorama';
 import { prefilterCubemap } from '../../pmrem';
 import { SceneNode } from '../../../scene';
-import { AssetNode } from './node';
 
 export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
   return {

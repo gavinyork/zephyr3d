@@ -145,7 +145,7 @@ export class WeakRef<T extends Disposable> {
   }
   /** @internal */
   private retain() {
-    let weakRefList = weakRefMap.get(this._object);
+    const weakRefList = weakRefMap.get(this._object);
     if (weakRefList) {
       weakRefList.add(this);
     } else {

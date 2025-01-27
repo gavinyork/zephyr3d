@@ -7,7 +7,7 @@ import { Application, Ref } from '../../app';
 import type { CullVisitor } from '../../render/cull_visitor';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import type { Terrain } from './terrain';
-import { GrassCluster } from './grass';
+import type { GrassCluster } from './grass';
 
 /** @internal */
 export class QuadtreeNode {
