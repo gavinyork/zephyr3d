@@ -18,7 +18,7 @@ import { ESM } from './esm';
 import { VSM } from './vsm';
 import { PCFPD } from './pcf_pd';
 import { PCFOPT } from './pcf_opt';
-import { Application } from '../app';
+import { Application, retainObject } from '../app';
 import type { PointLight, PunctualLight, SpotLight } from '../scene/light';
 import type { ShadowMapPass } from '../render/shadowmap_pass';
 import type { Scene } from '../scene/scene';
@@ -793,7 +793,9 @@ export class ShadowMapper {
   private static fetchCameraForScene(scene: Scene) {
     const cameras = this._lightCameras.get(scene);
     if (!cameras || cameras.length === 0) {
-      return new Camera(scene);
+      const camera = new Camera(scene);
+      retainObject(camera);
+      return camera;
     } else {
       const camera = cameras.pop();
       camera.parent = scene.rootNode;

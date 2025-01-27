@@ -39,6 +39,30 @@ export function flushPendingDisposals() {
   disposalQueue.clear();
 }
 
+export function retainObject(obj: Disposable) {
+  if (obj) {
+    const ref = objectReferenceMap.get(obj) ?? 0;
+    objectReferenceMap.set(obj, ref + 1);
+    if (ref === 0) {
+      disposalQueue.delete(obj);
+    }
+  }
+}
+
+export function releaseObject(obj: Disposable) {
+  if (obj) {
+    let refcount = objectReferenceMap.get(obj) ?? 0;
+    if (refcount > 0) {
+      refcount--;
+      if (refcount > 0) {
+        objectReferenceMap.set(obj, refcount);
+      } else {
+        objectReferenceMap.delete(obj);
+        disposalQueue.add(obj);
+      }
+    }
+  }
+}
 /**
  * A reference-counting wrapper for disposable objects.
  *
@@ -54,7 +78,7 @@ export class Ref<T extends Disposable> {
    */
   constructor(obj?: T) {
     this._object = obj ?? null;
-    this.retain();
+    retainObject(this._object);
   }
   /**
    * Gets the currently referenced object.
@@ -69,42 +93,17 @@ export class Ref<T extends Disposable> {
    */
   set(obj: T) {
     if (obj !== this._object) {
-      this.release();
+      releaseObject(this._object);
       this._object = obj ?? null;
-      this.retain();
+      retainObject(this._object);
     }
   }
   /**
    * Releases the reference and cleans up resources.
    */
   dispose() {
-    this.release();
-  }
-  /** @internal */
-  private retain() {
-    if (this._object) {
-      const ref = objectReferenceMap.get(this._object) ?? 0;
-      objectReferenceMap.set(this._object, ref + 1);
-      if (ref === 0) {
-        disposalQueue.delete(this._object);
-      }
-    }
-  }
-  /** @internal */
-  private release() {
-    if (this._object) {
-      let refcount = objectReferenceMap.get(this._object) ?? 0;
-      if (refcount > 0) {
-        refcount--;
-        if (refcount > 0) {
-          objectReferenceMap.set(this._object, refcount);
-        } else {
-          objectReferenceMap.delete(this._object);
-          disposalQueue.add(this._object);
-        }
-      }
-      this._object = null;
-    }
+    releaseObject(this._object);
+    this._object = null;
   }
 }
 
