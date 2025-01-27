@@ -14,16 +14,23 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
   return {
     ctor: SceneNode,
     className: 'SceneNode',
-    createFunc(scene: Scene | SceneNode) {
-      if (scene instanceof Scene) {
-        return new SceneNode(scene);
-      } else if (scene instanceof SceneNode) {
-        const batchGroup = new SceneNode(scene.scene);
-        batchGroup.parent = scene;
-        return batchGroup;
+    async createFunc(ctx: Scene | SceneNode, assetId: string) {
+      if (assetId) {
+        const scene = ctx instanceof Scene ? ctx : ctx.scene;
+        return (await assetRegistry.fetchModel(assetId, scene)).group;
+      }
+      if (ctx instanceof Scene) {
+        return new SceneNode(ctx);
+      } else if (ctx instanceof SceneNode) {
+        const node = new SceneNode(ctx.scene);
+        node.parent = ctx;
+        return node;
       } else {
         return null;
       }
+    },
+    getInitParams(obj: SceneNode) {
+      return [assetRegistry.getAssetId(obj)];
     },
     getProps() {
       return [
@@ -122,16 +129,18 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
           get(this: SceneNode, value) {
             value.object = [];
             for (const child of this.children) {
-              const assetId = assetRegistry.getAssetId(child.get());
-              if (assetId) {
-                value.object.push(new AssetNode(assetId, child.get()));
-              } else {
+              if (!child.get().sealed) {
                 value.object.push(child.get());
               }
             }
           },
           set(this: SceneNode, value) {
-            this.removeChildren();
+            for (let i = this.children.length - 1; i >= 0; i--) {
+              const child = this.children[i].get();
+              if (!child.sealed) {
+                child.remove();
+              }
+            }
             for (const child of value.object) {
               if (child instanceof SceneNode) {
                 child.parent = this;

@@ -58,7 +58,8 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     if (this._selectedNode === node) {
       flags |= ImGui.TreeNodeFlags.Selected;
     }
-    if (this._assetRegistry.getAssetId(node) || node.children.length === 0) {
+    const leaf = node.children.findIndex((val) => !val.get().sealed) < 0;
+    if (leaf) {
       flags |= ImGui.TreeNodeFlags.Leaf;
     }
     const isOpen = ImGui.TreeNodeEx(label, flags);
@@ -117,9 +118,11 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
       ImGui.EndDragDropSource();
     }
     if (isOpen) {
-      if (!this._assetRegistry.getAssetId(node)) {
+      if (!leaf) {
         for (const child of node.children) {
-          this.renderSceneNode(child.get());
+          if (!child.get().sealed) {
+            this.renderSceneNode(child.get());
+          }
         }
       }
       ImGui.TreePop();

@@ -499,7 +499,6 @@ export class AssetManager {
     const group = new SceneNode(scene);
     group.name = model.name;
     group.assetUrl = url;
-    group.sealed = true;
     const animationSet = new AnimationSet(scene, group);
     for (let i = 0; i < model.scenes.length; i++) {
       const assetScene = model.scenes[i];
@@ -564,6 +563,11 @@ export class AssetManager {
         }
       }
     }
+    group.iterate((child) => {
+      if (child !== group) {
+        child.sealed = true;
+      }
+    });
     return { group, animationSet };
   }
   /**
