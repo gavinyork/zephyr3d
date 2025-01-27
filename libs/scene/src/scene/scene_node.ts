@@ -19,6 +19,7 @@ import {
 import type { ParticleSystem } from './particlesys';
 import { Ref } from '../app/gc/ref';
 import { AnimationSet } from '../animation';
+import { SharedModel } from '../asset';
 
 /**
  * Node iterate function type
@@ -64,6 +65,8 @@ export class SceneNode extends makeEventTarget(Object)<{
   protected _id: string;
   /** @internal */
   protected _animationSet: Ref<AnimationSet>;
+  /** @internal */
+  protected _sharedModel: Ref<SharedModel>;
   /** @internal */
   protected _clipMode: boolean;
   /** @internal */
@@ -126,6 +129,7 @@ export class SceneNode extends makeEventTarget(Object)<{
     this._scene = scene;
     this._name = '';
     this._animationSet = new Ref();
+    this._sharedModel = new Ref();
     this._bv = null;
     this._bvWorld = null;
     this._bvDirty = true;
@@ -211,6 +215,12 @@ export class SceneNode extends makeEventTarget(Object)<{
   }
   set animationSet(animationSet: AnimationSet) {
     this._animationSet.set(animationSet);
+  }
+  get sharedModel() {
+    return this._sharedModel.get();
+  }
+  set sharedModel(model: SharedModel) {
+    this._sharedModel.set(model);
   }
   /** Asset url */
   get assetUrl(): string {
@@ -348,6 +358,7 @@ export class SceneNode extends makeEventTarget(Object)<{
     this.remove();
     this.removeChildren();
     this._animationSet.dispose();
+    this._sharedModel.dispose();
   }
   /**
    * Computes the bounding volume of the node

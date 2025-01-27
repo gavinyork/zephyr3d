@@ -1,6 +1,6 @@
 import type { DecoderModule } from 'draco3d';
 import { isPowerOf2, nextPowerOf2, HttpRequest } from '@zephyr3d/base';
-import type { AssetHierarchyNode, AssetSkeleton, AssetSubMeshData, SharedModel } from './model';
+import { AssetHierarchyNode, AssetSkeleton, AssetSubMeshData, SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
 import { DDSLoader } from './loaders/dds/dds_loader';
@@ -20,7 +20,7 @@ import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loade
 import { TGALoader } from './loaders/image/tga_Loader';
 import { MorphTargetTrack } from '../animation/morphtrack';
 import { processMorphData } from '../animation/morphtarget';
-import { Ref } from '../app';
+import { WeakRef } from '../app';
 
 /**
  * Options for texture fetching
@@ -91,11 +91,11 @@ export class AssetManager {
   private _httpRequest: HttpRequest;
   /** @internal */
   private _textures: {
-    [hash: string]: Promise<BaseTexture> | Ref<BaseTexture>;
+    [hash: string]: Promise<BaseTexture> | WeakRef<BaseTexture>;
   };
   /** @internal */
   private _models: {
-    [url: string]: Promise<SharedModel> | Ref<SharedModel>;
+    [url: string]: Promise<SharedModel> | WeakRef<SharedModel>;
   };
   /** @internal */
   private _binaryDatas: {
@@ -127,14 +127,14 @@ export class AssetManager {
   purgeCache() {
     for (const k in this._textures) {
       const P = this._textures[k];
-      if (P instanceof Ref) {
+      if (P instanceof WeakRef) {
         P.dispose();
       }
     }
     this._textures = {};
     for (const k in this._models) {
       const P = this._models[k];
-      if (P instanceof Ref) {
+      if (P instanceof WeakRef) {
         P.dispose();
       }
     }
@@ -246,8 +246,10 @@ export class AssetManager {
       ) as Promise<T>;
     } else {
       const hash = this.getHash('2d', url, options);
-      let P = this._textures[hash] as Promise<T> | Ref<T>;
-      if (!P) {
+      let P = this._textures[hash] as Promise<T> | WeakRef<T>;
+      if (P instanceof WeakRef && P.get()) {
+        return P.get();
+      } else if (!P || P instanceof WeakRef) {
         P = this.loadTexture(
           url,
           options?.mimeType ?? null,
@@ -257,10 +259,12 @@ export class AssetManager {
           httpRequest
         ) as Promise<T>;
         this._textures[hash] = P;
-        return P;
-      } else {
-        return P instanceof Promise ? await P : (P.get() as T);
       }
+      const tex: T = await P;
+      if (this._textures[hash] instanceof Promise) {
+        this._textures[hash] = new WeakRef<T>(tex);
+      }
+      return tex;
     }
   }
   /** @internal */
@@ -271,13 +275,17 @@ export class AssetManager {
   ): Promise<SharedModel> {
     const hash = url;
     let P = this._models[hash];
-    if (!P) {
+    if (P instanceof WeakRef && P.get()) {
+      return P.get();
+    } else if (!P || P instanceof WeakRef) {
       P = this.loadModel(url, options, httpRequest);
       this._models[hash] = P;
-      return P;
-    } else {
-      return P instanceof Promise ? P : P.get();
     }
+    const sharedModel = await P;
+    if (this._models[hash] instanceof Promise) {
+      this._models[hash] = new WeakRef<SharedModel>(sharedModel);
+    }
+    return sharedModel;
   }
   /**
    * Fetches a model resource from a given URL and adds it to a scene
@@ -569,6 +577,7 @@ export class AssetManager {
       }
     });
     group.animationSet = animationSet;
+    group.sharedModel = model;
     return { group, animationSet };
   }
   /**
