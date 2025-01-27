@@ -391,6 +391,15 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
           objectTypes: [ParticleMaterial],
           get(this: ParticleSystem, value) {
             value.object[0] = this.getMaterial();
+          },
+          set(this: ParticleSystem, value) {
+            if (!value.object[0]) {
+              this.material = null;
+            } else if (value.object[0] instanceof ParticleMaterial) {
+              this.material = value.object[0];
+            } else {
+              console.error('Invalid material type');
+            }
           }
         }
       ];

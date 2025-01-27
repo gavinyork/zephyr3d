@@ -112,6 +112,9 @@ export async function deserializeObjectProps<T>(
 ) {
   const props = cls.getProps(obj) ?? [];
   for (const prop of props) {
+    if (!prop.set) {
+      continue;
+    }
     const tmpVal: PropertyValue = {
       num: [0, 0, 0, 0],
       str: [''],

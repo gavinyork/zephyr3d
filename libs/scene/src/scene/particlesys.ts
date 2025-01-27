@@ -131,6 +131,12 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._instanceData = null;
     this._material = new Ref<ParticleMaterial>(new ParticleMaterial());
   }
+  get material(): ParticleMaterial {
+    return this._material.get();
+  }
+  set material(material: ParticleMaterial) {
+    this._material.set(material);
+  }
   set maxParticleCount(value: number) {
     if (value !== this._maxParticleCount) {
       this._maxParticleCount = value;
@@ -713,16 +719,20 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     super.dispose();
     this._primitive.dispose();
     this._material.dispose();
-  }
-  protected _detached(): void {
-    super._detached();
     const func = ParticleSystem.updateFuncMap.get(this);
     if (func) {
       this._scene.off('update', func);
     }
   }
-  protected _attached(): void {
-    super._attached();
+  protected _onDetached(): void {
+    super._onDetached();
+    const func = ParticleSystem.updateFuncMap.get(this);
+    if (func) {
+      this._scene.off('update', func);
+    }
+  }
+  protected _onAttached(): void {
+    super._onAttached();
     let func = ParticleSystem.updateFuncMap.get(this);
     if (!func) {
       func = this.update.bind(this);

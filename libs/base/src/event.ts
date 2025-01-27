@@ -158,9 +158,9 @@ export function makeEventTarget<C extends GenericConstructor | ObjectConstructor
               break;
             }
           }
-        }
-        if (handlers.length === 0) {
-          listenerMap[type] = undefined;
+          if (handlers.length === 0) {
+            listenerMap[type] = undefined;
+          }
         }
       }
       /** @internal */

@@ -527,13 +527,6 @@ export class SceneView extends BaseView<SceneModel> {
     this._cmdManager.execute(new NodeDeleteCommand(node, this._assetRegistry));
   }
   private handleNodeSelected(node: SceneNode) {
-    let assetNode = node;
-    while (assetNode && !this._assetRegistry.getAssetId(assetNode)) {
-      assetNode = assetNode.parent;
-    }
-    if (assetNode) {
-      node = assetNode;
-    }
     this._postGizmoRenderer.node =
       node === node.scene.rootNode || node instanceof DirectionalLight ? null : node;
     this._propGrid.object = node === node.scene.rootNode ? node.scene : node;

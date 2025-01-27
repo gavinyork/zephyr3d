@@ -90,7 +90,8 @@ export class BatchGroup extends GraphNode {
     this._changeTag++;
   }
   /** @internal */
-  protected _detached(): void {
+  protected _onDetached(): void {
+    super._onDetached();
     // Usually the node will be garbage collected after it is detached,
     // We should reset the render queue to release the render bundles.
     this._renderQueueMap.forEach((val) => {
@@ -99,7 +100,7 @@ export class BatchGroup extends GraphNode {
     this.invalidate();
   }
   /** @internal */
-  protected _attached(): void {
+  protected _onAttached(): void {
     // Reset the render queue when attached to a new scene.
     this.invalidate();
   }

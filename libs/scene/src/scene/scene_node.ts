@@ -515,10 +515,26 @@ export class SceneNode extends makeEventTarget(Object)<{
     this.invalidateWorldBoundingVolume(true);
     this.dispatchEvent('transformchanged', this);
   }
+  /**
+   * Get called when this node is attached to scene
+   */
+  protected _onAttached(): void {}
+  /**
+   * Get called when this node is detached from scene
+   */
+  protected _onDetached(): void {}
   /** @internal */
-  protected _attached(): void {}
+  protected _attached(): void {
+    this.iterate((child) => {
+      child._onAttached();
+    });
+  }
   /** @internal */
-  protected _detached(): void {}
+  protected _detached(): void {
+    this.iterate((child) => {
+      child._onDetached();
+    });
+  }
   /** @internal */
   notifyHiddenChanged() {
     this._visibleChanged();

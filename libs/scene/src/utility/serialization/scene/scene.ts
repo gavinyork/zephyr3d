@@ -376,19 +376,15 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
             }
           },
           set(this: Scene, value) {
-            this.rootNode.removeChildren();
+            for (let i = this.rootNode.children.length - 1; i >= 0; i--) {
+              const child = this.rootNode.children[i].get();
+              if (!value.object.includes(child) && !child.sealed) {
+                child.remove();
+              }
+            }
             for (const child of value.object) {
               if (child instanceof SceneNode) {
                 child.parent = this.rootNode;
-              } else if (typeof child === 'string' && child) {
-                const assetId = child;
-                const assetInfo = assetRegistry.getAssetInfo(assetId);
-                if (assetInfo?.type === 'model') {
-                  assetRegistry.fetchModel(assetId, this).then((modelInfo) => {
-                    modelInfo.group.parent = this.rootNode;
-                    modelInfo.group.name = assetInfo.name;
-                  });
-                }
               } else {
                 console.error(`Invalid scene node: ${child}`);
               }

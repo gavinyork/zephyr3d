@@ -137,7 +137,7 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
           set(this: SceneNode, value) {
             for (let i = this.children.length - 1; i >= 0; i--) {
               const child = this.children[i].get();
-              if (!child.sealed) {
+              if (!value.object.includes(child) && !child.sealed) {
                 child.remove();
               }
             }
