@@ -12,7 +12,7 @@ import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import { Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
-import type { DBAssetInfo } from '../storage/db';
+import { Database, type DBAssetInfo } from '../storage/db';
 import { Dialog } from './dlg/dlg';
 import { renderTextureViewer } from '../components/textureviewer';
 import { MenubarView } from '../components/menubar';
@@ -25,6 +25,7 @@ import {
   NodeReparentCommand,
   NodeTransformCommand
 } from '../commands/scenecommands';
+import { testDownloadZip, ZipDownloader } from '../helpers/zipdownload';
 
 export class SceneView extends BaseView<SceneModel> {
   private _cmdManager: CommandManager;
@@ -138,6 +139,10 @@ export class SceneView extends BaseView<SceneModel> {
               label: 'Device Information',
               id: 'SHOW_DEVICE_INFO',
               checked: this._showDeviceInfo
+            },
+            {
+              label: 'Test ZIP download',
+              id: 'TEST_ZIP_DOWNLOAD'
             }
           ]
         }
@@ -678,6 +683,23 @@ export class SceneView extends BaseView<SceneModel> {
           console.log(data);
         });
         break;
+      case 'TEST_ZIP_DOWNLOAD': {
+        const assetList: string[] = [];
+        for (const asset of this._tab.assetHierarchy.assets) {
+          assetList.push(...asset.assets.map((val) => val.uuid));
+        }
+        if (assetList.length > 0) {
+          const zipDownloader = new ZipDownloader('test.zip');
+          Database.exportAssets(zipDownloader, assetList, 'ASSET', new Set())
+            .then(() => {
+              zipDownloader.finish();
+            })
+            .catch((err) => {
+              zipDownloader.finish();
+            });
+        }
+        break;
+      }
       default:
         eventBus.dispatchEvent('action', action);
         break;

@@ -3,6 +3,7 @@ import { nodeResolve } from '@rollup/plugin-node-resolve';
 import path from 'path';
 import copy from 'rollup-plugin-copy';
 import { fileURLToPath } from 'url';
+import commonjs from '@rollup/plugin-commonjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,6 +39,7 @@ function getTargetWeb() {
     plugins: [
       nodeResolve(),
       swc(),
+      commonjs(),
       copy({
         targets: [
           {

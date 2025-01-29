@@ -15,39 +15,6 @@ export class AssetStore {
   > = {};
   static readonly modelExtensions = ['.gltf', '.glb'];
   static readonly textureExtensions = ['jpg', 'jpeg', 'png', 'tga', 'dds', 'hdr'];
-  static async decompressZip(zip: Blob) {
-    return new Promise<Map<string, string>>((resolve, reject) => {
-      let worker = new Worker(new URL('./zip.worker.js', import.meta.url), { type: 'module' });
-      worker.onmessage = (e) => {
-        switch (e.data.type) {
-          case 'success':
-            worker?.terminate();
-            worker = null;
-            const blobMap = e.data.data as Map<string, Blob>;
-            const fileMap = new Map<string, string>();
-            for (const [k, v] of blobMap) {
-              fileMap.set(k, URL.createObjectURL(v));
-            }
-            resolve(fileMap);
-            break;
-          case 'error':
-            worker?.terminate();
-            worker = null;
-            reject(e.data.error);
-            break;
-        }
-      };
-      worker.onerror = (error) => {
-        worker?.terminate();
-        worker = null;
-        reject(error);
-      };
-      worker.postMessage({
-        type: 'decompress',
-        zipBlob: zip
-      });
-    });
-  }
   static async release(node: SceneNode) {
     for (const k of Object.getOwnPropertyNames(this._assetManagers)) {
       const assetManager = this._assetManagers[k];
@@ -86,7 +53,9 @@ export class AssetStore {
     if (!blob) {
       return null;
     }
-    const fileMap = await this.decompressZip(blob.data);
+    const fileMap = new Map(
+      [...(await Database.decompressZip(blob.data))].map((val) => [val[0], URL.createObjectURL(val[1])])
+    );
     const httpRequest = new HttpRequest((url) => fileMap.get(url));
     const texture = await assetManager.assetManager.fetchTexture<T>(
       `/${assetManager.path}`,
@@ -128,7 +97,9 @@ export class AssetStore {
     if (!blob) {
       return null;
     }
-    const fileMap = await this.decompressZip(blob.data);
+    const fileMap = new Map(
+      [...(await Database.decompressZip(blob.data))].map((val) => [val[0], URL.createObjectURL(val[1])])
+    );
     const httpRequest = new HttpRequest((url) => fileMap.get(url));
     const model = await assetManager.assetManager.fetchModel(
       scene,

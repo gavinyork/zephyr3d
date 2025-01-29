@@ -1,6 +1,8 @@
 import type { AssetType } from '@zephyr3d/scene';
 import type { IDBPDatabase } from 'idb';
 import { openDB } from 'idb';
+import { ZipDownloader } from '../helpers/zipdownload';
+import { ZipWriter } from '@zip.js/zip.js';
 
 export type DBAssetPackage = {
   uuid?: string;
@@ -264,5 +266,113 @@ export class Database {
       console.error('Error listing scenes:', error);
       return [];
     }
+  }
+  private static async copyZipFilesToZip(writer: ZipWriter<any>, source: Blob, path: string) {
+    const fileMap = await this.decompressZip(source);
+    for (const val of fileMap) {
+      const f = val[0].startsWith('/') ? val[0].slice(1) : val[0];
+      await writer.add([path, f].join('/'), val[1].stream());
+    }
+  }
+  static async exportAssets(
+    downloader: ZipDownloader,
+    assets: string[],
+    dirname: string,
+    downloadedPackages: Set<string>
+  ) {
+    for (const asset of assets) {
+      const info = await this.getAsset(asset);
+      if (!info) {
+        console.error(`Asset not found: ${asset}`);
+        continue;
+      }
+      if (downloadedPackages.has(info.pkg)) {
+        continue;
+      }
+      const pkg = await this.getPackage(info.pkg);
+      if (!pkg) {
+        console.error(`Package not found: ${asset}`);
+        continue;
+      }
+      const { data } = await this.getBlob(pkg.blob);
+      if (!data) {
+        console.error(`Blob not found: ${asset}`);
+      }
+      const path = [dirname, pkg.uuid].join('/');
+      await this.copyZipFilesToZip(downloader.zipWriter, data, path);
+      downloadedPackages.add(pkg.uuid);
+    }
+  }
+  static async decompressZip(zip: Blob) {
+    return new Promise<Map<string, Blob>>((resolve, reject) => {
+      let worker = new Worker(new URL('./zip.worker.js', import.meta.url), { type: 'module' });
+      worker.onmessage = (e) => {
+        switch (e.data.type) {
+          case 'success':
+            worker?.terminate();
+            worker = null;
+            const blobMap = e.data.data as Map<string, Blob>;
+            const fileMap = new Map<string, Blob>();
+            for (const [k, v] of blobMap) {
+              fileMap.set(k, v /*URL.createObjectURL(v)*/);
+            }
+            resolve(fileMap);
+            break;
+          case 'error':
+            worker?.terminate();
+            worker = null;
+            reject(e.data.error);
+            break;
+        }
+      };
+      worker.onerror = (error) => {
+        worker?.terminate();
+        worker = null;
+        reject(error);
+      };
+      worker.postMessage({
+        type: 'decompress',
+        zipBlob: zip
+      });
+    });
+  }
+  static async compressFiles(
+    files: { path: string; file: File }[],
+    onsuccess?: () => void,
+    onerror?: () => void,
+    onprogress?: (current: number, total: number) => void
+  ): Promise<Blob> {
+    return new Promise<Blob>((resolve, reject) => {
+      let worker = new Worker(new URL('./zip.worker.js', import.meta.url), { type: 'module' });
+      worker.onmessage = (e) => {
+        switch (e.data.type) {
+          case 'success':
+            worker?.terminate();
+            worker = null;
+            onsuccess?.();
+            resolve(e.data.data as Blob);
+            break;
+          case 'error':
+            worker?.terminate();
+            worker = null;
+            onerror?.();
+            reject(e.data.error);
+            break;
+          case 'progress':
+            onprogress?.(e.data.current, e.data.total);
+            break;
+        }
+      };
+      worker.onerror = (error) => {
+        worker?.terminate();
+        worker = null;
+        onerror?.();
+        reject(error);
+      };
+      worker.postMessage({
+        type: 'compress',
+        files
+      });
+    });
   }
 }

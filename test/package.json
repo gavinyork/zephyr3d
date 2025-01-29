@@ -55,7 +55,7 @@
   },
   "dependencies": {
     "@webgpu/types": "^0.1.40",
-    "@zip.js/zip.js": "^2.7.35",
+    "@zip.js/zip.js": "^2.7.54",
     "@zephyr3d/base": "workspace:*",
     "@zephyr3d/device": "workspace:*",
     "@zephyr3d/scene": "workspace:*",

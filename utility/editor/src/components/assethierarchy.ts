@@ -121,44 +121,23 @@ export class AssetHierarchy {
     await this.listAssets();
   }
   async zipFiles(files: { path: string; file: File }[]) {
-    return new Promise<Blob>((resolve, reject) => {
-      let worker = new Worker(new URL('./zip.worker.js', import.meta.url), { type: 'module' });
-      worker.onmessage = (e) => {
-        switch (e.data.type) {
-          case 'success':
-            worker?.terminate();
-            worker = null;
-            this._zipProgress?.close();
-            this._zipProgress = null;
-            resolve(e.data.data as Blob);
-            break;
-          case 'error':
-            worker?.terminate();
-            worker = null;
-            this._zipProgress?.close();
-            this._zipProgress = null;
-            reject(e.data.error);
-            break;
-          case 'progress':
-            if (!this._zipProgress) {
-              this._zipProgress = new DlgProgress('Uploading files', true);
-            }
-            this._zipProgress.progress = `${e.data.current}/${e.data.total}`;
-            break;
-        }
-      };
-      worker.onerror = (error) => {
-        worker?.terminate();
-        worker = null;
+    return Database.compressFiles(
+      files,
+      () => {
         this._zipProgress?.close();
         this._zipProgress = null;
-        reject(error);
-      };
-      worker.postMessage({
-        type: 'compress',
-        files
-      });
-    });
+      },
+      () => {
+        this._zipProgress?.close();
+        this._zipProgress = null;
+      },
+      (current, total) => {
+        if (!this._zipProgress) {
+          this._zipProgress = new DlgProgress('Uploading files', true);
+        }
+        this._zipProgress.progress = `${current}/${total}`;
+      }
+    );
   }
   async doUploadAssetFile(type: AssetType, files: File[]) {
     for (const file of files) {

@@ -55,9 +55,11 @@
   },
   "dependencies": {
     "@types/node": "^18.13.0",
+    "@types/streamsaver": "^2.0.5",
     "@webgpu/types": "^0.1.40",
     "idb": "^8.0.1",
-    "@zip.js/zip.js": "^2.7.35",
+    "@zip.js/zip.js": "^2.7.54",
+    "streamsaver": "^2.0.6",
     "@zephyr3d/base": "workspace:*",
     "@zephyr3d/device": "workspace:*",
     "@zephyr3d/scene": "workspace:*",
