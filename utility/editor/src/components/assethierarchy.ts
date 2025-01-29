@@ -212,7 +212,27 @@ export class AssetHierarchy {
         }
         if (grouped) {
           ImGui.PushID(i);
-          if (ImGui.TreeNodeEx(asset.pkg.name, AssetHierarchy.baseFlags)) {
+          const opened = ImGui.TreeNodeEx(asset.pkg.name, AssetHierarchy.baseFlags);
+          if (ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
+            ImGui.OpenPopup(`context_${asset.pkg.uuid}`);
+          }
+          if (ImGui.BeginPopup(`context_${asset.pkg.uuid}`)) {
+            if (ImGui.MenuItem('Rename')) {
+              Dialog.rename('Rename Package', asset.pkg.name, 300).then((name) => {
+                name = name ? name.trim() : name;
+                if (name) {
+                  if (this._assets.findIndex((val) => val.pkg.name === name) >= 0) {
+                    Dialog.messageBox('Zephyr3d', `Package '${name}' already exists`);
+                  } else {
+                    asset.pkg.name = name;
+                    Database.putPackage(asset.pkg);
+                  }
+                }
+              });
+            }
+            ImGui.EndPopup();
+          }
+          if (opened) {
             for (let j = 0; j < assetsInPkg.length; j++) {
               this.renderAsset(assetsInPkg[j]);
             }
