@@ -267,31 +267,17 @@ export class Database {
       return [];
     }
   }
-  private static async copyZipFilesToZip(
-    writer: ZipWriter<any>,
-    source: Blob,
-    dir: string,
-    pkgName: string,
-    defaultPkgName: string,
-    assetNames: Set<string>
-  ) {
+  private static async copyZipFilesToZip(writer: ZipWriter<any>, source: Blob, path: string) {
     const fileMap = await this.decompressZip(source);
-    const files = [...fileMap];
-    const path = [dir, files.length > 1 ? pkgName : defaultPkgName].join('/');
     for (const val of fileMap) {
       const f = val[0].startsWith('/') ? val[0].slice(1) : val[0];
       let name = [path, f].join('/');
-      if (assetNames.has(name)) {
-        name = [dir, pkgName, f].join('/');
-      }
       await writer.add(name, val[1].stream());
     }
   }
   static async exportAssets(downloader: ZipDownloader, assets: string[], dirname: string) {
     const pkgDownloaded = new Set<string>();
-    const pkgNames = new Set<string>();
-    const assetNames = new Set<string>();
-    const defaultPkgName = this.randomUUID();
+    const assetRegistry: any = {};
     for (const asset of assets) {
       const info = await this.getAsset(asset);
       if (!info) {
@@ -310,14 +296,19 @@ export class Database {
       if (!data) {
         console.error(`Blob not found: ${asset}`);
       }
-      let pkgName = pkg.name;
-      if (pkgNames.has(pkgName)) {
-        pkgName = this.randomUUID();
-        pkgNames.add(pkgName);
-      }
-      await this.copyZipFilesToZip(downloader.zipWriter, data, dirname, pkgName, defaultPkgName, assetNames);
+      const path = [dirname, pkg.uuid].join('/');
+      await this.copyZipFilesToZip(downloader.zipWriter, data, path);
       pkgDownloaded.add(pkg.uuid);
+
+      assetRegistry[info.uuid] = {
+        id: info.uuid,
+        name: info.name,
+        type: info.type,
+        path: [path, info.path].join('/')
+      };
     }
+    const assetIndex = new Blob([JSON.stringify(assetRegistry, null, '  ')]).stream();
+    await downloader.zipWriter.add([dirname, 'index.json'].join('/'), assetIndex);
   }
   static async decompressZip(zip: Blob) {
     return new Promise<Map<string, Blob>>((resolve, reject) => {
