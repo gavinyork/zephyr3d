@@ -15,6 +15,7 @@ import { BaseController } from './basecontroller';
 import type { SceneView } from '../views/sceneview';
 import { Database, type DBSceneInfo } from '../storage/db';
 import { Dialog } from '../views/dlg/dlg';
+import { ZipDownloader } from '../helpers/zipdownload';
 
 export class SceneController extends BaseController<SceneModel> {
   protected _scene: DBSceneInfo;
@@ -52,6 +53,19 @@ export class SceneController extends BaseController<SceneModel> {
           });
         } else {
           this.saveScene(this._scene.name);
+        }
+        break;
+      case 'EXPORT_DOC':
+        if (!this._scene) {
+          Dialog.promptName('Input scene name:').then((name) => {
+            if (name) {
+              this.saveScene(name, false);
+              this.exportScene(name);
+            }
+          });
+        } else {
+          this.saveScene(this._scene.name, false);
+          this.exportScene(this._scene.name);
         }
         break;
       case 'OPEN_DOC':
@@ -103,7 +117,7 @@ export class SceneController extends BaseController<SceneModel> {
   private update() {
     this.model.camera.updateController();
   }
-  private saveScene(name: string) {
+  private saveScene(name: string, showMessage = true) {
     const assetList = new Set<string>();
     this._scene = Object.assign({}, this._scene ?? {}, {
       name,
@@ -116,8 +130,29 @@ export class SceneController extends BaseController<SceneModel> {
     console.log([...assetList]);
     Database.putScene(this._scene).then((uuid) => {
       this._scene.uuid = uuid;
-      Dialog.messageBox('Zephyr3d', `Scene saved: ${uuid}`);
+      if (showMessage) {
+        Dialog.messageBox('Zephyr3d', `Scene saved: ${uuid}`);
+      }
     });
+  }
+  private async exportScene(name: string) {
+    const assetList = new Set<string>();
+    this._scene = Object.assign({}, this._scene ?? {}, {
+      name,
+      content: serializeObject(this.model.scene, this._assetRegistry, {}, assetList),
+      metadata: {
+        activeCamera: this.model.camera?.id ?? ''
+      }
+    });
+    const zipDownloader = new ZipDownloader(`${name}.zip`);
+    if (assetList.size > 0) {
+      await Database.exportAssets(zipDownloader, [...assetList], 'assets');
+    }
+    await zipDownloader.zipWriter.add(
+      'scene.json',
+      new Blob([JSON.stringify(this._scene.content, null, 2)]).stream()
+    );
+    await zipDownloader.finish();
   }
   openScene(uuid: string) {
     Database.getScene(uuid)

@@ -25,7 +25,7 @@ import {
   NodeReparentCommand,
   NodeTransformCommand
 } from '../commands/scenecommands';
-import { testDownloadZip, ZipDownloader } from '../helpers/zipdownload';
+import { ZipDownloader } from '../helpers/zipdownload';
 
 export class SceneView extends BaseView<SceneModel> {
   private _cmdManager: CommandManager;
@@ -80,6 +80,10 @@ export class SceneView extends BaseView<SceneModel> {
               label: 'Save',
               shortCut: 'Ctrl+S',
               id: 'SAVE_DOC'
+            },
+            {
+              label: 'Export',
+              id: 'EXPORT_DOC'
             }
           ]
         },
@@ -139,10 +143,6 @@ export class SceneView extends BaseView<SceneModel> {
               label: 'Device Information',
               id: 'SHOW_DEVICE_INFO',
               checked: this._showDeviceInfo
-            },
-            {
-              label: 'Test ZIP download',
-              id: 'TEST_ZIP_DOWNLOAD'
             }
           ]
         }
@@ -690,7 +690,7 @@ export class SceneView extends BaseView<SceneModel> {
         }
         if (assetList.length > 0) {
           const zipDownloader = new ZipDownloader('test.zip');
-          Database.exportAssets(zipDownloader, assetList, 'ASSET', new Set())
+          Database.exportAssets(zipDownloader, assetList, 'ASSET')
             .then(() => {
               zipDownloader.finish();
             })

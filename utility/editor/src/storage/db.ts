@@ -307,7 +307,7 @@ export class Database {
         path: [path, info.path].join('/')
       };
     }
-    const assetIndex = new Blob([JSON.stringify(assetRegistry, null, '  ')]).stream();
+    const assetIndex = new Blob([JSON.stringify(assetRegistry, null, 2)]).stream();
     await downloader.zipWriter.add([dirname, 'index.json'].join('/'), assetIndex);
   }
   static async decompressZip(zip: Blob) {
