@@ -372,12 +372,10 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
       if (remove) {
         this.removeGPUObject(obj);
       }
-      if (!obj.disposed) {
-        if (this.isContextLost()) {
-          obj.destroy();
-        } else {
-          this._disposeObjectList.push(obj);
-        }
+      if (this.isContextLost()) {
+        obj.destroy();
+      } else {
+        this._disposeObjectList.push(obj);
       }
       obj.dispatchEvent('disposed');
     }

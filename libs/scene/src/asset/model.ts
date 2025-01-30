@@ -479,6 +479,8 @@ export class SharedModel {
   private _scenes: AssetScene[];
   /** @internal */
   private _activeScene: number;
+  /** @internal */
+  private _disposed: boolean;
   /**
    * Creates an instance of SharedModel
    * @param name - Name of the model
@@ -490,20 +492,32 @@ export class SharedModel {
     this._scenes = [];
     this._animations = [];
     this._activeScene = -1;
+    this._disposed = false;
+  }
+  /** Whether this model has been disposed */
+  get disposed() {
+    return this._disposed;
   }
   /** Disposes this model */
   dispose() {
-    const nodes = [...this._nodes];
-    while (nodes.length > 0) {
-      const node = nodes.shift();
-      nodes.push(...node.children);
-      const mesh = node.mesh;
-      if (mesh) {
-        for (const subMesh of mesh.subMeshes) {
-          subMesh.primitive?.dispose();
-          subMesh.material?.dispose();
+    if (!this._disposed) {
+      const nodes = [...this._nodes];
+      while (nodes.length > 0) {
+        const node = nodes.shift();
+        nodes.push(...node.children);
+        const mesh = node.mesh;
+        if (mesh) {
+          for (const subMesh of mesh.subMeshes) {
+            subMesh.primitive?.dispose();
+            subMesh.material?.dispose();
+          }
         }
       }
+      this._nodes = [];
+      this._skeletons = [];
+      this._scenes = [];
+      this._animations = [];
+      this._disposed = true;
     }
   }
   /** Name of the model */

@@ -247,7 +247,7 @@ export class AssetManager {
     } else {
       const hash = this.getHash('2d', url, options);
       let P = this._textures[hash] as Promise<T> | WeakRef<T>;
-      if (P instanceof WeakRef && P.get()) {
+      if (P instanceof WeakRef && P.get() && !P.get().disposed) {
         return P.get();
       } else if (!P || P instanceof WeakRef) {
         P = this.loadTexture(
@@ -275,7 +275,7 @@ export class AssetManager {
   ): Promise<SharedModel> {
     const hash = url;
     let P = this._models[hash];
-    if (P instanceof WeakRef && P.get()) {
+    if (P instanceof WeakRef && P.get() && !P.get().disposed) {
       return P.get();
     } else if (!P || P instanceof WeakRef) {
       P = this.loadModel(url, options, httpRequest);

@@ -29,6 +29,7 @@ export abstract class WebGLGPUObject<T>
   protected _uid: number;
   protected _cid: number;
   protected _name: string;
+  protected _disposed: boolean;
   protected _restoreHandler: (obj: GPUObject) => void;
   constructor(device: WebGLDevice) {
     super();
@@ -38,6 +39,7 @@ export abstract class WebGLGPUObject<T>
     this._cid = 1;
     this._name = `${genDefaultName(this)}#${this._uid}`;
     this._restoreHandler = null;
+    this._disposed = false;
     this._device.addGPUObject(this);
   }
   get device(): AbstractDevice {
@@ -48,7 +50,7 @@ export abstract class WebGLGPUObject<T>
     return this._object;
   }
   get disposed(): boolean {
-    return !this._object;
+    return this._disposed;
   }
   get restoreHandler(): (obj: GPUObject) => void {
     return this._restoreHandler;
@@ -109,12 +111,13 @@ export abstract class WebGLGPUObject<T>
     return false;
   }
   dispose(): void {
-    if (!this.disposed) {
+    if (!this._disposed) {
+      this._disposed = true;
       this._device.disposeObject(this, true);
     }
   }
   reload(): void {
-    if (this.disposed) {
+    if (this._disposed) {
       this._device.restoreObject(this);
       this._cid++;
     }

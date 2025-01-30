@@ -29,6 +29,7 @@ export abstract class WebGPUObject<T>
   protected _uid: number;
   protected _cid: number;
   protected _name: string;
+  protected _disposed: boolean;
   protected _queueState: number;
   protected _restoreHandler: (tex: GPUObject) => void;
   constructor(device: WebGPUDevice) {
@@ -39,6 +40,7 @@ export abstract class WebGPUObject<T>
     this._cid = 1;
     this._name = `${genDefaultName(this)}#${this._uid}`;
     this._queueState = 0;
+    this._disposed = false;
     this._restoreHandler = null;
     this._device.addGPUObject(this);
   }
@@ -55,7 +57,7 @@ export abstract class WebGPUObject<T>
     return this._cid;
   }
   get disposed(): boolean {
-    return !this._object;
+    return this._disposed;
   }
   get restoreHandler(): (obj: GPUObject) => void {
     return this._restoreHandler;
@@ -116,7 +118,8 @@ export abstract class WebGPUObject<T>
     return false;
   }
   dispose() {
-    if (!this.disposed) {
+    if (!this._disposed) {
+      this._disposed = true;
       this._device.disposeObject(this, true);
     }
   }
