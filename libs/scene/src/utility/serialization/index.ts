@@ -109,10 +109,19 @@ export async function deserializeObjectProps<T>(
   json: object,
   assetRegistry: AssetRegistry
 ) {
-  const props = cls.getProps(obj) ?? [];
+  const props = (cls.getProps(obj) ?? []).sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0));
+  let currentPhase: number = undefined;
+  const promises: Promise<void>[] = [];
   for (const prop of props) {
     if (!prop.set) {
       continue;
+    }
+    const phase = prop.phase ?? 0;
+    if (phase !== currentPhase) {
+      currentPhase = phase;
+      if (promises.length > 0) {
+        await Promise.all(promises);
+      }
     }
     const tmpVal: PropertyValue = {
       num: [0, 0, 0, 0],
@@ -176,7 +185,10 @@ export async function deserializeObjectProps<T>(
         break;
       }
     }
-    prop.set.call(obj, tmpVal);
+    promises.push(Promise.resolve(prop.set.call(obj, tmpVal)));
+  }
+  if (promises.length > 0) {
+    await Promise.all(promises);
   }
 }
 

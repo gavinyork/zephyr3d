@@ -2,9 +2,10 @@
  * Represents an object that can be disposed
  * @public
  **/
-export type Disposable = {
+export interface Disposable {
   dispose(): void;
-};
+  readonly disposed: boolean;
+}
 
 /**
  * Maps disposable objects to their reference counts.
@@ -123,6 +124,9 @@ export class WeakRef<T extends Disposable> {
    * @returns The referenced object, or null if none is set
    */
   get() {
+    if (this._object?.disposed) {
+      this._object = null;
+    }
     return this._object;
   }
   /**

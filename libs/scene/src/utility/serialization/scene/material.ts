@@ -34,6 +34,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
     {
       name: 'OcclusionStrength',
       type: 'float',
+      phase: 2,
       default: { num: [1] },
       options: {
         minValue: 0,
@@ -49,7 +50,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.occlusionTexture;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'occlusionTexture', '2D'),
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'occlusionTexture', '2D', 0),
     {
       name: 'EmissiveColor',
       type: 'rgb',
@@ -78,7 +79,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         this.emissiveStrength = value.num[0];
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'emissiveTexture', '2D'),
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'emissiveTexture', '2D', 0),
     {
       name: 'SpecularFactor',
       type: 'vec4',
@@ -93,10 +94,11 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         this.specularFactor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'specularTexture', '2D'),
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'specularTexture', '2D', 0),
     {
       name: 'Transmission',
       type: 'bool',
+      phase: 0,
       default: { bool: [false] },
       get(this: PBRMaterial, value) {
         value.bool[0] = this.transmission;
@@ -108,6 +110,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
     {
       name: 'TransmissionFactor',
       type: 'float',
+      phase: 1,
       default: { num: [0] },
       options: {
         minValue: 0,
@@ -123,12 +126,13 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.transmission;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'transmissionTexture', '2D', function () {
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'transmissionTexture', '2D', 1, function () {
       return this.transmission;
     }),
     {
       name: 'ThicknessFactor',
       type: 'float',
+      phase: 1,
       default: { num: [0] },
       options: {
         minValue: 0,
@@ -144,12 +148,13 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.transmission;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'thicknessTexture', '2D', function () {
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'thicknessTexture', '2D', 1, function () {
       return this.transmission;
     }),
     {
       name: 'AttenuationColor',
       type: 'rgb',
+      phase: 1,
       default: { num: [1, 1, 1] },
       get(this: PBRMaterial, value) {
         value.num[0] = this.attenuationColor.x;
@@ -166,6 +171,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
     {
       name: 'AttenuationDistance',
       type: 'float',
+      phase: 1,
       default: { num: [99999] },
       options: {
         minValue: 0,
@@ -184,6 +190,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
     {
       name: 'Iridescence',
       type: 'bool',
+      phase: 0,
       default: { bool: [false] },
       get(this: PBRMaterial, value) {
         value.bool[0] = this.iridescence;
@@ -195,6 +202,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
     {
       name: 'IridescenceFactor',
       type: 'float',
+      phase: 1,
       default: { num: [0] },
       options: {
         minValue: 0,
@@ -210,12 +218,13 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.iridescence;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'iridescenceTexture', '2D', function () {
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'iridescenceTexture', '2D', 1, function () {
       return this.iridescence;
     }),
     {
       name: 'IridescenceIOR',
       type: 'float',
+      phase: 1,
       default: { num: [1.3] },
       get(this: PBRMaterial, value) {
         value.num[0] = this.iridescenceIor;
@@ -230,6 +239,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
     {
       name: 'IridescenceThicknessMin',
       type: 'float',
+      phase: 1,
       default: { num: [100] },
       options: {
         minValue: 0,
@@ -248,6 +258,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
     {
       name: 'IridescenceThicknessMax',
       type: 'float',
+      phase: 1,
       default: { num: [400] },
       options: {
         minValue: 0,
@@ -263,12 +274,13 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.iridescence;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'iridescenceThicknessTexture', '2D', function () {
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'iridescenceThicknessTexture', '2D', 1, function () {
       return this.iridescence;
     }),
     {
       name: 'ClearCoat',
       type: 'bool',
+      phase: 0,
       default: { bool: [false] },
       get(this: PBRMaterial, value) {
         value.bool[0] = this.clearcoat;
@@ -280,6 +292,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
     {
       name: 'ClearCoatIntensity',
       type: 'float',
+      phase: 1,
       default: { num: [0] },
       options: {
         minValue: 0,
@@ -295,12 +308,13 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.clearcoat;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'clearcoatIntensityTexture', '2D', function () {
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'clearcoatIntensityTexture', '2D', 1, function () {
       return this.clearcoat;
     }),
     {
       name: 'ClearCoatRoughnessFactor',
       type: 'float',
+      phase: 1,
       default: { num: [0] },
       options: {
         minValue: 0,
@@ -316,15 +330,16 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.clearcoat;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'clearcoatRoughnessTexture', '2D', function () {
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'clearcoatRoughnessTexture', '2D', 1, function () {
       return this.clearcoat;
     }),
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'clearcoatNormalTexture', '2D', function () {
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'clearcoatNormalTexture', '2D', 1, function () {
       return this.clearcoat;
     }),
     {
       name: 'Sheen',
       type: 'bool',
+      phase: 0,
       default: { bool: [false] },
       get(this: PBRMaterial, value) {
         value.bool[0] = this.sheen;
@@ -336,6 +351,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
     {
       name: 'SheenColorFactor',
       type: 'rgb',
+      phase: 1,
       default: { num: [0, 0, 0] },
       get(this: PBRMaterial, value) {
         value.num[0] = this.sheenColorFactor.x;
@@ -349,12 +365,13 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.sheen;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'sheenColorTexture', '2D', function () {
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'sheenColorTexture', '2D', 1, function () {
       return this.sheen;
     }),
     {
       name: 'SheenRoughnessFactor',
       type: 'float',
+      phase: 1,
       default: { num: [0] },
       options: {
         minValue: 0,
@@ -370,7 +387,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !!this.sheen;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'sheenRoughnessTexture', '2D', function () {
+    ...getTextureProps<PBRMaterial>(assetRegistry, 'sheenRoughnessTexture', '2D', 1, function () {
       return this.sheen;
     }),
     ...getLitMaterialProps(assetRegistry)
@@ -405,7 +422,7 @@ function getLitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<Lit
         return !!this.vertexNormal;
       }
     },
-    ...getTextureProps<LitPropTypes>(assetRegistry, 'normalTexture', '2D')
+    ...getTextureProps<LitPropTypes>(assetRegistry, 'normalTexture', '2D', 0)
   ];
 }
 function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<UnlitPropTypes>[] {
@@ -436,7 +453,7 @@ function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<U
         this.albedoColor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
       }
     },
-    ...getTextureProps<UnlitPropTypes>(assetRegistry, 'albedoTexture', '2D')
+    ...getTextureProps<UnlitPropTypes>(assetRegistry, 'albedoTexture', '2D', 0)
   ];
 }
 
@@ -551,19 +568,23 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
           get(this: ParticleMaterial, value) {
             value.str[0] = assetRegistry.getAssetId(this.albedoTexture) ?? '';
           },
-          set(this: ParticleMaterial, value) {
+          async set(this: ParticleMaterial, value) {
             if (value.str[0]) {
               const assetId = value.str[0];
               const assetInfo = assetRegistry.getAssetInfo(assetId);
               if (assetInfo && assetInfo.type === 'texture') {
-                assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-                  if (tex?.isTexture2D()) {
-                    tex.name = assetInfo.name;
-                    this.albedoTexture = tex;
-                  } else {
-                    console.error('Invalid albedo texture');
-                  }
-                });
+                let tex: Texture2D;
+                try {
+                  tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
+                } catch (err) {
+                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                }
+                if (tex?.isTexture2D()) {
+                  tex.name = assetInfo.name;
+                  this.albedoTexture = tex;
+                } else {
+                  console.error('Invalid albedo texture');
+                }
               }
             }
           }
@@ -672,8 +693,8 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
             this.roughness = value.num[0];
           }
         },
-        ...getTextureProps<PBRMetallicRoughnessMaterial>(assetRegistry, 'metallicRoughnessTexture', '2D'),
-        ...getTextureProps<PBRMetallicRoughnessMaterial>(assetRegistry, 'specularColorTexture', '2D'),
+        ...getTextureProps<PBRMetallicRoughnessMaterial>(assetRegistry, 'metallicRoughnessTexture', '2D', 0),
+        ...getTextureProps<PBRMetallicRoughnessMaterial>(assetRegistry, 'specularColorTexture', '2D', 0),
         ...getPBRCommonProps(assetRegistry)
       ];
     }

@@ -46,6 +46,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         {
           name: 'TAA',
           type: 'bool',
+          phase: 0,
           default: { bool: [false] },
           get(this: Camera, value) {
             value.bool[0] = this.TAA;
@@ -57,6 +58,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         {
           name: 'TAADebug',
           type: 'int',
+          phase: 1,
           enum: {
             labels: ['None', 'Current Color', 'History Color', 'Velocity', 'Edge', 'Alpha', 'Motion Vector'],
             values: [
@@ -83,6 +85,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         {
           name: 'TAABlendFactor',
           type: 'float',
+          phase: 1,
           options: {
             minValue: 0,
             maxValue: 1
@@ -101,6 +104,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         {
           name: 'SSR',
           type: 'bool',
+          phase: 0,
           default: { bool: [false] },
           get(this: Camera, value) {
             value.bool[0] = this.SSR;
@@ -112,6 +116,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         {
           name: 'SSRMaxRoughness',
           type: 'float',
+          phase: 1,
           default: { num: [0.8] },
           options: {
             minValue: 0,
@@ -130,6 +135,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         {
           name: 'SSRRoughnessFactor',
           type: 'float',
+          phase: 1,
           default: { num: [1.0] },
           options: {
             minValue: 0,
@@ -148,6 +154,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         {
           name: 'SSRStride',
           type: 'int',
+          phase: 1,
           default: { num: [2] },
           options: {
             minValue: 1,
@@ -166,6 +173,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         {
           name: 'SSRMaxDistance',
           type: 'float',
+          phase: 1,
           default: { num: [100] },
           options: {
             minValue: 0,
@@ -184,6 +192,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         {
           name: 'SSRMaxSteps',
           type: 'int',
+          phase: 1,
           default: { num: [120] },
           options: {
             minValue: 1,
@@ -202,6 +211,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         {
           name: 'SSRThickness',
           type: 'float',
+          phase: 1,
           default: { num: [0.5] },
           options: {
             minValue: 0,
@@ -219,6 +229,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRBlurScale',
+          phase: 1,
           type: 'float',
           default: { num: [0.05] },
           options: {
@@ -237,6 +248,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRBlurDepthCutoff',
+          phase: 1,
           type: 'float',
           default: { num: [2] },
           options: {
@@ -256,6 +268,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         {
           name: 'SSRBlurKernelSize',
           type: 'int',
+          phase: 1,
           default: { num: [17] },
           options: {
             minValue: 1,
@@ -274,6 +287,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         {
           name: 'SSRBlurStdDev',
           type: 'float',
+          phase: 1,
           default: { num: [10] },
           options: {
             minValue: 0,
@@ -292,6 +306,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         {
           name: 'SSRCalcThickness',
           type: 'bool',
+          phase: 1,
           default: { bool: [false] },
           get(this: Camera, value) {
             value.bool[0] = this.ssrCalcThickness;

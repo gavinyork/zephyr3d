@@ -19,6 +19,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
       return [
         {
           name: 'EnvLightType',
+          phase: 0,
           type: 'string',
           enum: {
             labels: ['None', 'Constant', 'Hemispheric', 'IBL'],
@@ -35,6 +36,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'AmbientColor',
           type: 'rgb',
+          phase: 1,
           default: { num: [0.2, 0.2, 0.2] },
           get(this: Scene, value) {
             const color = this.env.light.ambientColor;
@@ -52,6 +54,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'AmbientUp',
           type: 'rgb',
+          phase: 1,
           default: { num: [0.3, 0.5, 0.8] },
           get(this: Scene, value) {
             const color = this.env.light.ambientUp;
@@ -69,6 +72,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'AmbientDown',
           type: 'rgb',
+          phase: 1,
           default: { num: [0.2, 0.2, 0.2] },
           get(this: Scene, value) {
             const color = this.env.light.ambientDown;
@@ -86,6 +90,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'EnvLightStrength',
           type: 'float',
+          phase: 0,
           options: { minValue: 0, maxValue: 10 },
           default: { num: [1] },
           get(this: Scene, value) {
@@ -98,6 +103,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'SkyType',
           type: 'string',
+          phase: 0,
           enum: {
             labels: ['None', 'Color', 'SkyBox', 'Scatter'],
             values: ['none', 'color', 'skybox', 'scatter']
@@ -113,6 +119,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'AutoUpdateIBLMaps',
           type: 'bool',
+          phase: 1,
           default: { bool: [true] },
           get(this: Scene, value) {
             value.bool[0] = this.env.sky.autoUpdateIBLMaps;
@@ -127,6 +134,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'SkyColor',
           type: 'rgb',
+          phase: 1,
           default: { num: [1, 1, 1] },
           isValid() {
             return this.env.sky.skyType === 'color';
@@ -144,6 +152,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'DrawGround',
           type: 'bool',
+          phase: 1,
           default: { bool: [false] },
           isValid() {
             return this.env.sky.skyType === 'scatter';
@@ -158,6 +167,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'FogType',
           type: 'string',
+          phase: 0,
           enum: {
             labels: ['None', 'Linear', 'Exp', 'Exp2', 'Scatter'],
             values: ['none', 'linear', 'exp', 'exp2', 'scatter']
@@ -173,6 +183,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'FogColor',
           type: 'rgb',
+          phase: 1,
           default: { num: [1, 1, 1] },
           isValid() {
             return this.env.sky.fogType !== 'none' && this.env.sky.fogType !== 'scatter';
@@ -190,6 +201,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'FogTop',
           type: 'float',
+          phase: 1,
           isValid() {
             return this.env.sky.fogType !== 'none' && this.env.sky.fogType !== 'scatter';
           },
@@ -203,6 +215,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'FogStart',
           type: 'float',
+          phase: 1,
           isValid() {
             return this.env.sky.fogType === 'linear';
           },
@@ -216,6 +229,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'FogEnd',
           type: 'float',
+          phase: 1,
           isValid() {
             return this.env.sky.fogType === 'linear';
           },
@@ -229,6 +243,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'FogDensity',
           type: 'float',
+          phase: 1,
           options: { minValue: 0, maxValue: 1 },
           default: { num: [0.1] },
           get(this: Scene, value) {
@@ -244,6 +259,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'FogStart',
           type: 'float',
+          phase: 1,
           default: { num: [0] },
           get(this: Scene, value) {
             value.num[0] = this.env.sky.fogStart;
@@ -258,6 +274,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'FogEnd',
           type: 'float',
+          phase: 1,
           default: { num: [100] },
           get(this: Scene, value) {
             value.num[0] = this.env.sky.fogEnd;
@@ -272,6 +289,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'AerialPerspectiveDensity',
           type: 'float',
+          phase: 1,
           options: { minValue: 0, maxValue: 100 },
           default: { num: [1] },
           get(this: Scene, value) {
@@ -287,6 +305,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'Cloudy',
           type: 'float',
+          phase: 1,
           options: { minValue: 0, maxValue: 1 },
           get(this: Scene, value) {
             value.num[0] = this.env.sky.cloudy;
@@ -301,6 +320,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'CloudIntensity',
           type: 'float',
+          phase: 1,
           options: { minValue: 0, maxValue: 200 },
           get(this: Scene, value) {
             value.num[0] = this.env.sky.cloudIntensity;
@@ -315,6 +335,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'Wind',
           type: 'vec2',
+          phase: 1,
           options: { minValue: -100, maxValue: 100 },
           get(this: Scene, value) {
             value.num[0] = this.env.sky.wind.x;
@@ -322,45 +343,56 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           },
           set(this: Scene, value) {
             this.env.sky.wind.setXY(value.num[0], value.num[1]);
+          },
+          isValid() {
+            return this.env.sky.skyType === 'scatter';
           }
         },
         {
           name: 'PanoramaTexture',
           type: 'object',
+          phase: 1,
           get(this: Scene, value) {
             value.str[0] = this.env.sky.panoramaTextureAsset;
           },
-          set(this: Scene, value) {
+          async set(this: Scene, value) {
             if (value.str[0]) {
               const assetId = value.str[0];
               const assetInfo = assetRegistry.getAssetInfo(assetId);
               if (assetInfo && assetInfo.type === 'texture') {
-                assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions).then((tex) => {
-                  if (tex?.isTexture2D()) {
-                    const device = Application.instance.device;
-                    const skyBoxTexture =
-                      this.env.sky.skyboxTexture ?? device.createCubeTexture('rgba16f', 1024);
-                    const radianceMap =
-                      this.env.light.radianceMap ?? device.createCubeTexture('rgba16f', 256);
-                    const irradianceMap =
-                      this.env.light.irradianceMap ??
-                      device.createCubeTexture('rgba16f', 64, {
-                        samplerOptions: { mipFilter: 'none' }
-                      });
-                    panoramaToCubemap(tex, skyBoxTexture);
-                    prefilterCubemap(skyBoxTexture, 'ggx', radianceMap);
-                    prefilterCubemap(skyBoxTexture, 'lambertian', irradianceMap);
-                    this.env.sky.skyboxTexture = skyBoxTexture;
-                    this.env.light.radianceMap = radianceMap;
-                    this.env.light.irradianceMap = irradianceMap;
-                    this.env.sky.panoramaTextureAsset = assetId;
-                    tex.dispose();
-                  } else {
-                    console.error('Invalid skybox texture');
-                  }
-                });
+                let tex: Texture2D;
+                try {
+                  tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
+                } catch (err) {
+                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                  tex = null;
+                }
+                if (tex?.isTexture2D()) {
+                  const device = Application.instance.device;
+                  const skyBoxTexture =
+                    this.env.sky.skyboxTexture ?? device.createCubeTexture('rgba16f', 1024);
+                  const radianceMap = this.env.light.radianceMap ?? device.createCubeTexture('rgba16f', 256);
+                  const irradianceMap =
+                    this.env.light.irradianceMap ??
+                    device.createCubeTexture('rgba16f', 64, {
+                      samplerOptions: { mipFilter: 'none' }
+                    });
+                  panoramaToCubemap(tex, skyBoxTexture);
+                  prefilterCubemap(skyBoxTexture, 'ggx', radianceMap);
+                  prefilterCubemap(skyBoxTexture, 'lambertian', irradianceMap);
+                  this.env.sky.skyboxTexture = skyBoxTexture;
+                  this.env.light.radianceMap = radianceMap;
+                  this.env.light.irradianceMap = irradianceMap;
+                  this.env.sky.panoramaTextureAsset = assetId;
+                  tex.dispose();
+                } else {
+                  console.error('Invalid skybox texture');
+                }
               }
             }
+          },
+          isValid() {
+            return this.env.sky.skyType === 'skybox';
           }
         },
         {

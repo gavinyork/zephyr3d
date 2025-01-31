@@ -23,6 +23,7 @@ export type PropertyValue = {
 export type PropertyAccessor<T = unknown> = {
   type: PropertyType;
   name: string;
+  phase?: number;
   hidden?: boolean;
   options?: { minValue: number; maxValue: number; speed?: number };
   enum?: { labels: string[]; values: (number | string)[] };
@@ -30,7 +31,7 @@ export type PropertyAccessor<T = unknown> = {
   default?: PropertyValue;
   nullable?: boolean;
   get: (this: T, value: PropertyValue) => void;
-  set?: (this: T, value: PropertyValue) => void;
+  set?: (this: T, value: PropertyValue) => void | Promise<void>;
   isValid?: (this: T) => boolean;
 };
 

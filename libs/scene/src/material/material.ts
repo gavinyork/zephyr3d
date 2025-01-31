@@ -4,7 +4,6 @@ import type { Primitive } from '../render/primitive';
 import type { DrawContext } from '../render/drawable';
 import { QUEUE_OPAQUE } from '../values';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
-import { Application } from '../app';
 
 type MaterialState = {
   program: GPUProgram;
@@ -25,7 +24,7 @@ export class Material {
   /** @internal */
   private static _programCache: { [hash: string]: GPUProgram } = {};
   /** @internal */
-  private _poolId: symbol;
+  private _disposed: boolean;
   /** @internal */
   private _states: { [hash: string]: MaterialState };
   /** @internal */
@@ -42,7 +41,7 @@ export class Material {
    * Creates an instance of material
    */
   constructor() {
-    this._poolId = Symbol();
+    this._disposed = false;
     this._id = ++Material._nextId;
     this._states = {};
     this._numPasses = 1;
@@ -115,9 +114,7 @@ export class Material {
         }
         const bindGroup =
           program.bindGroupLayouts.length > 2
-            ? (this._poolId ? ctx.device.getPool(this._poolId) : ctx.device).createBindGroup(
-                program.bindGroupLayouts[2]
-              )
+            ? ctx.device.createBindGroup(program.bindGroupLayouts[2])
             : null;
         state = {
           program,
@@ -229,7 +226,21 @@ export class Material {
    * Dispose material
    */
   dispose() {
-    Application.instance.device.getPool(this._poolId).disposeNonCachedObjects();
+    if (!this._disposed) {
+      this._disposed = true;
+      if (this._states) {
+        for (const k in this._states) {
+          this._states[k]?.bindGroup?.dispose();
+        }
+        this._states = {};
+      }
+    }
+  }
+  /**
+   * Whether this material was disposed
+   */
+  get disposed() {
+    return this._disposed;
   }
   /** @internal */
   protected createProgram(ctx: DrawContext, pass: number): GPUProgram {

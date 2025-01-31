@@ -49,6 +49,8 @@ export class Primitive {
   protected _bbox: BoundingVolume;
   /** @internal */
   protected _bboxChangeCallback: (() => void)[];
+  /** @internal */
+  protected _disposed: boolean;
   /**
    * Creates an instance of a primitive
    */
@@ -63,6 +65,7 @@ export class Primitive {
     this._id = ++Primitive._nextId;
     this._bbox = null;
     this._bboxChangeCallback = [];
+    this._disposed = false;
   }
   /**
    * Unique identifier of the primitive
@@ -296,11 +299,20 @@ export class Primitive {
    * call removeVertexBuffer() or setIndexBuffer(null) first.
    */
   dispose() {
-    this._vertexLayout?.dispose();
-    this._vertexLayoutOptions.indexBufferRef?.dispose();
-    for (const info of this._vertexLayoutOptions.vertexBuffers) {
-      info.bufferRef?.dispose();
+    if (!this._disposed) {
+      this._disposed = true;
+      this._vertexLayout?.dispose();
+      this._vertexLayoutOptions.indexBufferRef?.dispose();
+      for (const info of this._vertexLayoutOptions.vertexBuffers) {
+        info.bufferRef?.dispose();
+      }
     }
+  }
+  /**
+   * Whether this primitive was disposed
+   */
+  get disposed() {
+    return this._disposed;
   }
   /*
   createAABBTree(): AABBTree {

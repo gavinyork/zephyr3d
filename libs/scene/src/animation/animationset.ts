@@ -70,6 +70,8 @@ export type StopAnimationOptions = {
  */
 export class AnimationSet {
   /** @internal */
+  private _disposed: boolean;
+  /** @internal */
   private _model: WeakRef<SceneNode>;
   /** @internal */
   private _animations: Record<string, AnimationClip>;
@@ -102,6 +104,7 @@ export class AnimationSet {
    */
   constructor(scene: Scene, model: SceneNode) {
     this._scene = scene;
+    this._disposed = false;
     this._model = new WeakRef<SceneNode>(model);
     this._scene.animationSet.push(this);
     this._animations = {};
@@ -324,17 +327,23 @@ export class AnimationSet {
     }
   }
   dispose() {
-    this._model.dispose();
-    const index = this._scene.animationSet.indexOf(this);
-    if (index >= 0) {
-      this._scene.animationSet.splice(index, 1);
+    if (!this._disposed) {
+      this._disposed = true;
+      this._model.dispose();
+      const index = this._scene.animationSet.indexOf(this);
+      if (index >= 0) {
+        this._scene.animationSet.splice(index, 1);
+      }
+      for (const k in this._animations) {
+        this._animations[k].dispose();
+      }
+      this._animations = {};
+      this._activeAnimations.clear();
+      this._activeSkeletons.clear();
+      this._activeTracks.clear();
     }
-    for (const k in this._animations) {
-      this._animations[k].dispose();
-    }
-    this._animations = {};
-    this._activeAnimations.clear();
-    this._activeSkeletons.clear();
-    this._activeTracks.clear();
+  }
+  get disposed() {
+    return this._disposed;
   }
 }

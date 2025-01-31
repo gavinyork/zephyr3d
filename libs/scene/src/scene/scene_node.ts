@@ -64,6 +64,8 @@ export class SceneNode extends makeEventTarget(Object)<{
   /** @internal */
   protected _id: string;
   /** @internal */
+  protected _disposed: boolean;
+  /** @internal */
   protected _animationSet: Ref<AnimationSet>;
   /** @internal */
   protected _sharedModel: Ref<SharedModel>;
@@ -126,6 +128,7 @@ export class SceneNode extends makeEventTarget(Object)<{
   constructor(scene: Scene) {
     super();
     this._id = crypto.randomUUID();
+    this._disposed = false;
     this._scene = scene;
     this._name = '';
     this._animationSet = new Ref();
@@ -355,10 +358,19 @@ export class SceneNode extends makeEventTarget(Object)<{
   }
   /** Disposes the node */
   dispose() {
-    this.remove();
-    this.removeChildren();
-    this._animationSet.dispose();
-    this._sharedModel.dispose();
+    if (!this._disposed) {
+      this._disposed = true;
+      this.remove();
+      this.removeChildren();
+      this._animationSet.dispose();
+      this._sharedModel.dispose();
+    }
+  }
+  /**
+   * Whether this node was disposed
+   */
+  get disposed() {
+    return this._disposed;
   }
   /**
    * Computes the bounding volume of the node

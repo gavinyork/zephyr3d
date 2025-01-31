@@ -46,6 +46,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'CastShadow',
           type: 'bool',
+          phase: 0,
           default: { bool: [false] },
           get(this: PunctualLight, value) {
             value.bool[0] = this.castShadow;
@@ -57,6 +58,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'ShadowType',
           type: 'string',
+          phase: 1,
           default: { str: ['hard'] },
           enum: {
             labels: ['Hard', 'PCF', 'PCF-PD', 'VSM', 'ESM'],
@@ -75,6 +77,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'ShadowDistance',
           type: 'float',
+          phase: 1,
           default: { num: [2000] },
           options: {
             minValue: 0,
@@ -92,6 +95,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         },
         {
           name: 'ShadowMapSize',
+          phase: 1,
           type: 'int',
           default: { num: [1024] },
           enum: {
@@ -111,6 +115,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'ShadowDepthBias',
           type: 'float',
+          phase: 1,
           default: { num: [0.5] },
           options: {
             minValue: 0,
@@ -129,6 +134,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'ShadowNormalBias',
           type: 'float',
+          phase: 1,
           default: { num: [0.2] },
           options: {
             minValue: 0,
@@ -147,6 +153,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'ShadowCascades',
           type: 'int',
+          phase: 1,
           default: { num: [1] },
           options: {
             minValue: 1,
@@ -164,6 +171,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         },
         {
           name: 'PCFKernelSize',
+          phase: 2,
           type: 'int',
           default: { num: [5] },
           enum: {
@@ -183,6 +191,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'PCFSampleCount',
           type: 'int',
+          phase: 2,
           options: {
             minValue: 1,
             maxValue: 128
@@ -201,6 +210,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'PCFSampleRadius',
           type: 'float',
+          phase: 2,
           options: {
             minValue: 0,
             maxValue: 64
@@ -219,6 +229,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'VSMBlurKernelSize',
           type: 'int',
+          phase: 2,
           options: {
             minValue: 1,
             maxValue: 33
@@ -237,6 +248,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'VSMBlurRadius',
           type: 'float',
+          phase: 2,
           options: {
             minValue: 0,
             maxValue: 32
@@ -255,6 +267,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'VSMDarkness',
           type: 'float',
+          phase: 2,
           options: {
             minValue: 0,
             maxValue: 1
@@ -273,6 +286,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'ESMDepthScale',
           type: 'float',
+          phase: 2,
           options: {
             minValue: 1,
             maxValue: 2000
@@ -291,6 +305,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'ESMBlur',
           type: 'bool',
+          phase: 2,
           default: { bool: [true] },
           get(this: PunctualLight, value) {
             value.bool[0] = this.shadow.esmBlur;
@@ -305,6 +320,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'ESMBlurKernelSize',
           type: 'int',
+          phase: 2,
           default: { num: [5] },
           options: {
             minValue: 1,
@@ -323,6 +339,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'ESMBlurRadius',
           type: 'float',
+          phase: 2,
           default: { num: [4] },
           options: {
             minValue: 0,
