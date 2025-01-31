@@ -57,7 +57,14 @@ export class AssetHierarchy {
       }
     }
   }
-  async uploadFiles(type: AssetType, zip: Blob, mimeType: string, folderName: string, paths: string[]) {
+  async uploadFiles(
+    type: AssetType,
+    zip: Blob,
+    mimeType: string,
+    folderName: string,
+    paths: string[],
+    names?: string[]
+  ) {
     const blob = await Database.putBlob({
       data: zip,
       mimeType
@@ -67,10 +74,12 @@ export class AssetHierarchy {
       name: folderName,
       size: zip.size
     });
-    for (const path of paths) {
+    for (let i = 0; i < paths.length; i++) {
+      const path = paths[i];
+      const name = names?.[i] ?? path;
       await Database.putAsset({
-        name: path,
-        path: path,
+        name,
+        path,
         thumbnail: '',
         type,
         pkg
@@ -78,11 +87,10 @@ export class AssetHierarchy {
     }
   }
   async uploadRampTexture() {
-    const rgba = await Dialog.createRampTexture('Create ramp texture', 400, 200);
-    if (rgba) {
-      const name = `${Database.randomUUID()}.png`;
-      const file = await this.rgbaToPng(name, rgba.byteLength >> 2, 1, rgba);
-      await this.doUploadAssetFile('texture', [file]);
+    const tex = await Dialog.createRampTexture('Create ramp texture', 400, 200);
+    if (tex) {
+      const file = await this.rgbaToPng(`${crypto.randomUUID()}.png`, tex.data.byteLength >> 2, 1, tex.data);
+      await this.doUploadAssetFile('texture', [file], tex.name);
       this._selectedAsset = null;
       await this.listAssets();
     }
@@ -139,7 +147,7 @@ export class AssetHierarchy {
       }
     );
   }
-  async doUploadAssetFile(type: AssetType, files: File[]) {
+  async doUploadAssetFile(type: AssetType, files: File[], name?: string) {
     for (const file of files) {
       const extensions =
         type === 'model'
@@ -152,7 +160,7 @@ export class AssetHierarchy {
         return;
       }
       const zip = await this.zipFiles([{ path: file.name, file }]);
-      await this.uploadFiles(type, zip, null, file.name, [file.name]);
+      await this.uploadFiles(type, zip, null, file.name, [file.name], name ? [name] : null);
     }
     this._selectedAsset = null;
     await this.listAssets();

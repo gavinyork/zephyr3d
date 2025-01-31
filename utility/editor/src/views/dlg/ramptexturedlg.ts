@@ -3,7 +3,7 @@ import { ModalDialog } from '../../components/modal';
 import { RampTextureCreator } from '../../components/ramptexture';
 
 export class DlgRampTextureCreator extends ModalDialog {
-  private _resolve: (data: Uint8ClampedArray) => void;
+  private _resolve: (tex: { data: Uint8ClampedArray; name: string }) => void;
   private _name: string;
   private _creator: RampTextureCreator;
   constructor(
@@ -11,7 +11,7 @@ export class DlgRampTextureCreator extends ModalDialog {
     open: boolean,
     width: number,
     height: number,
-    resolve: (data: Uint8ClampedArray) => void
+    resolve: (tex: { data: Uint8ClampedArray; name: string }) => void
   ) {
     super(id, open, width, height);
     this._resolve = resolve;
@@ -32,7 +32,7 @@ export class DlgRampTextureCreator extends ModalDialog {
       const data = new Uint8ClampedArray(256 * 4);
       this._creator.fillTextureData(true, data);
       this._creator.dispose();
-      this._resolve(data);
+      this._resolve({ data, name: this._name });
       this.close();
     }
     ImGui.SameLine();

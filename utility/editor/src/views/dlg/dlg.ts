@@ -40,7 +40,7 @@ export class Dialog {
     title: string,
     width?: number,
     height?: number
-  ): Promise<Uint8ClampedArray> {
+  ): Promise<{ data: Uint8ClampedArray; name: string }> {
     return new Promise((resolve) => {
       new DlgRampTextureCreator(title, true, width, height, resolve);
     });

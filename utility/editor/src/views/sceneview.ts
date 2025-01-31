@@ -156,15 +156,6 @@ export class SceneView extends BaseView<SceneModel> {
               }
             },
             {
-              label: 'Ramp Texture Creator',
-              id: 'SHOW_RAMP_TEXTURE_CREATOR',
-              action: () => {
-                Dialog.createRampTexture('Create Ramp Texture', 400, 200).then((data) => {
-                  console.log(data);
-                });
-              }
-            },
-            {
               label: 'Device Information',
               id: 'SHOW_DEVICE_INFO',
               action: () => (this._showDeviceInfo = !this._showDeviceInfo),
