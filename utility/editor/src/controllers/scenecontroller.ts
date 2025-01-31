@@ -1,14 +1,5 @@
 import type { AssetRegistry, Scene } from '@zephyr3d/scene';
-import {
-  BoxShape,
-  CylinderShape,
-  deserializeObject,
-  PlaneShape,
-  serializeObject,
-  SphereShape,
-  TorusShape
-} from '@zephyr3d/scene';
-import { AddBatchGroupCommand, AddParticleSystemCommand, AddShapeCommand } from '../commands/scenecommands';
+import { deserializeObject, serializeObject } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import type { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
@@ -77,38 +68,6 @@ export class SceneController extends BaseController<SceneModel> {
           });
         });
         break;
-      case 'ADD_BOX': {
-        this._view.cmdManager.execute(
-          new AddShapeCommand(this.model.scene, BoxShape, { anchor: 0.5, anchorY: 0 })
-        );
-        break;
-      }
-      case 'ADD_SPHERE': {
-        this._view.cmdManager.execute(new AddShapeCommand(this.model.scene, SphereShape, null));
-        break;
-      }
-      case 'ADD_PLANE': {
-        this._view.cmdManager.execute(new AddShapeCommand(this.model.scene, PlaneShape, null));
-        break;
-      }
-      case 'ADD_CYLINDER': {
-        this._view.cmdManager.execute(
-          new AddShapeCommand(this.model.scene, CylinderShape, { topCap: true, bottomCap: true })
-        );
-        break;
-      }
-      case 'ADD_TORUS': {
-        this._view.cmdManager.execute(new AddShapeCommand(this.model.scene, TorusShape, null));
-        break;
-      }
-      case 'ADD_PARTICLE_SYSTEM': {
-        this._view.cmdManager.execute(new AddParticleSystemCommand(this.model.scene));
-        break;
-      }
-      case 'ADD_BATCH_GROUP': {
-        this._view.cmdManager.execute(new AddBatchGroupCommand(this.model.scene));
-        break;
-      }
       default:
         console.log('Unknown action');
         break;

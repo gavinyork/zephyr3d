@@ -7,7 +7,8 @@ export type MenuItemOptions = {
   label: string;
   shortCut?: string;
   id?: string;
-  checked?: boolean;
+  action?: () => void;
+  checked?: () => boolean;
   subMenus?: MenuItemOptions[];
 };
 
@@ -17,7 +18,7 @@ export type MenuBarOptions = {
 
 let UID = 0;
 export class MenubarView extends makeEventTarget(Object)<{
-  action: [id: string, item: MenuItemOptions];
+  action: [id: string];
 }>() {
   private _map: Map<string, { item: MenuItemOptions; parent: MenuItemOptions }>;
   private _options: MenuBarOptions;
@@ -56,16 +57,6 @@ export class MenubarView extends makeEventTarget(Object)<{
         });
       }
     }
-  }
-  checkMenuItem(id: string, checked: boolean) {
-    const item = this._map.get(id);
-    if (item) {
-      item.item.checked = checked;
-    }
-  }
-  isMenuItemChecked(id: string): boolean {
-    const item = this._map.get(id);
-    return !!item?.item.checked;
   }
   addMenuItem(parentId: string, label: string, id: string, shortCut?: string): string {
     if (id === null || id === undefined) {
@@ -116,7 +107,11 @@ export class MenubarView extends makeEventTarget(Object)<{
       const item = menuItems.shift();
       if (item.shortCut) {
         view.registerShortcut(item.shortCut, () => {
-          this.dispatchEvent('action', item.id, item);
+          if (item.action) {
+            item.action();
+          } else if (item.id) {
+            this.dispatchEvent('action', item.id);
+          }
         });
       }
       if (item.subMenus) {
@@ -155,8 +150,12 @@ export class MenubarView extends makeEventTarget(Object)<{
     } else {
       if (item.label === '-') {
         ImGui.Separator();
-      } else if (ImGui.MenuItem(`${item.label}##${item.id}`, item.shortCut ?? null, !!item.checked)) {
-        this.dispatchEvent('action', item.id, item);
+      } else if (ImGui.MenuItem(`${item.label}##${item.id}`, item.shortCut ?? null, !!item.checked?.())) {
+        if (item.action) {
+          item.action();
+        } else if (item.id) {
+          this.dispatchEvent('action', item.id);
+        }
       }
     }
   }
@@ -167,6 +166,8 @@ export class MenubarView extends makeEventTarget(Object)<{
     return {
       label: item.label,
       id: item.id,
+      action: item.action,
+      checked: item.checked,
       shortCut: item.shortCut,
       subMenus: item.subMenus?.map((subItem) => this.copyItem(subItem))
     };

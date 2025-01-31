@@ -150,9 +150,9 @@ export class Quadtree {
   constructor(terrain: Terrain) {
     this._terrain = terrain;
     this._baseVertices = null;
-    this._indices = new Ref<IndexBuffer>();
-    this._indicesWireframe = new Ref<IndexBuffer>();
-    this._normalMap = new Ref<Texture2D>();
+    this._indices = new Ref();
+    this._indicesWireframe = new Ref();
+    this._normalMap = new Ref();
     this._scaleX = 1;
     this._scaleZ = 1;
     this._patchSize = 0;

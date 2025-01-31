@@ -19,7 +19,6 @@ import { SharedModel, AssetSkeleton, AssetScene } from '../../model';
 import { BoundingBox } from '../../../utility/bounding_volume';
 import { Primitive } from '../../../render/primitive';
 import type { MeshMaterial as M } from '../../../material/meshmaterial';
-import type { MeshMaterial } from '../../../material';
 import { UnlitMaterial } from '../../../material';
 import { ComponentType, GLTFAccessor } from './helpers';
 import { AbstractModelLoader } from '../loader';
@@ -517,8 +516,8 @@ export class GLTFLoader extends AbstractModelLoader {
           const p = primitives[i];
           const subMeshData: AssetSubMeshData = {
             name: `${meshName}-${i}`,
-            primitive: new Ref<Primitive>(),
-            material: new Ref<MeshMaterial>(),
+            primitive: new Ref(),
+            material: new Ref(),
             rawPositions: null,
             rawBlendIndices: null,
             rawJointWeights: null,

@@ -226,7 +226,7 @@ export class Primitive {
   setVertexBuffer(buffer: StructuredBuffer, stepMode?: VertexStepMode) {
     this._vertexLayoutOptions.vertexBuffers.push({
       buffer,
-      bufferRef: new Ref<StructuredBuffer>(buffer),
+      bufferRef: new Ref(buffer),
       stepMode
     });
     this._vertexLayoutDirty = true;
@@ -259,7 +259,7 @@ export class Primitive {
       if (this._vertexLayoutOptions.indexBufferRef) {
         this._vertexLayoutOptions.indexBufferRef.set(buffer);
       } else {
-        this._vertexLayoutOptions.indexBufferRef = new Ref<IndexBuffer>(buffer);
+        this._vertexLayoutOptions.indexBufferRef = new Ref(buffer);
       }
       RenderBundleWrapper.primitiveChanged(this);
     }

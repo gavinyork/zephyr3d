@@ -72,8 +72,8 @@ export class GLTFViewer {
   constructor(scene: Scene) {
     const device = Application.instance.device;
     this._currentAnimation = null;
-    this._modelNode = new Ref<SceneNode>();
-    this._animationSet = new Ref<AnimationSet>();
+    this._modelNode = new Ref();
+    this._animationSet = new Ref();
     this._scene = scene;
     this._scene.env.light.strength = 0.8;
     this._scene.env.sky.drawGround = true;

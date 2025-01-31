@@ -102,15 +102,18 @@ export class AddBatchGroupCommand implements Command<BatchGroup> {
 export class AddParticleSystemCommand implements Command<ParticleSystem> {
   private _scene: Scene;
   private _nodeId: string;
-  constructor(scene: Scene) {
+  private _position: Vector3;
+  constructor(scene: Scene, pos: Vector3) {
     this._scene = scene;
     this._nodeId = '';
+    this._position = pos.clone();
   }
   get desc(): string {
     return 'Add particle system';
   }
   async execute() {
     const node = new ParticleSystem(this._scene);
+    node.position.set(this._position);
     if (this._nodeId) {
       node.id = this._nodeId;
     } else {
@@ -136,9 +139,11 @@ export class AddShapeCommand<T extends ShapeType> implements Command<Mesh> {
   private _nodeId: string;
   private _shapeCls: GenericConstructor<T>;
   private _options: ShapeOptionType<T>;
-  constructor(scene: Scene, shapeCls: GenericConstructor<T>, options?: ShapeOptionType<T>) {
+  private _position: Vector3;
+  constructor(scene: Scene, shapeCls: GenericConstructor<T>, pos: Vector3, options?: ShapeOptionType<T>) {
     this._nodeId = '';
     this._scene = scene;
+    this._position = pos.clone();
     switch (shapeCls as any) {
       case BoxShape: {
         this._desc = 'Add box';
@@ -178,6 +183,7 @@ export class AddShapeCommand<T extends ShapeType> implements Command<Mesh> {
   async execute() {
     const shape = new this._shapeCls(this._options);
     const mesh = new Mesh(this._scene, shape, new PBRMetallicRoughnessMaterial());
+    mesh.position.set(this._position);
     if (this._nodeId) {
       mesh.id = this._nodeId;
     } else {

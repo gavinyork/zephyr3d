@@ -9,6 +9,7 @@ type EventBusEventMap = {
   switch_module: [name: string, ...args: any[]];
   input_event: [ev: Event, type: string];
   scene_add_asset: [asset: DBAssetInfo];
+  scene_add_batch: [];
   workspace_drag_start: [type: string, data: any];
   workspace_drag_end: [type: string, data: any];
   workspace_drag_drop: [type: string, data: any, x: number, y: number];

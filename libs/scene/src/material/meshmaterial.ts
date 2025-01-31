@@ -159,7 +159,7 @@ export class MeshMaterial extends Material {
     const isWebGL1 = Application.instance.device.type === 'webgl';
     const instance = {} as any;
     const that = this;
-    const coreMaterial = new Ref<MeshMaterial>(that);
+    const coreMaterial = new Ref(that);
     instance.isBatchable = () => !isWebGL1 && that.supportInstancing();
     instance.dispose = () => {
       coreMaterial.dispose();

@@ -2,6 +2,7 @@ import { makeEventTarget } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 import type { AssetRegistry, Scene, SceneNode, SerializableClass } from '@zephyr3d/scene';
 import { getSerializationInfo } from '@zephyr3d/scene';
+import { eventBus } from '../core/eventbus';
 
 export class SceneHierarchy extends makeEventTarget(Object)<{
   node_deselected: [node: SceneNode];
@@ -100,6 +101,13 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
         }
         if (ImGui.MenuItem('Delete')) {
           this.dispatchEvent('node_request_delete', node);
+        }
+        ImGui.EndPopup();
+      }
+    } else {
+      if (ImGui.BeginPopup(`context_${node.id}`)) {
+        if (ImGui.MenuItem('Create static batch')) {
+          eventBus.dispatchEvent('scene_add_batch');
         }
         ImGui.EndPopup();
       }

@@ -3,13 +3,24 @@ import type { SceneModel } from '../models/scenemodel';
 import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import { Tab } from '../components/tab';
-import type { AssetRegistry, Camera, Compositor, Scene } from '@zephyr3d/scene';
-import { Ref } from '@zephyr3d/scene';
+import type { AssetRegistry, Camera, Compositor, Scene, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
+import {
+  BoxShape,
+  CylinderShape,
+  Mesh,
+  ParticleSystem,
+  PBRMetallicRoughnessMaterial,
+  PlaneShape,
+  Ref,
+  SphereShape,
+  TorusShape
+} from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { Application, DirectionalLight } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
+import type { GenericConstructor } from '@zephyr3d/base';
 import { Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import { Database, type DBAssetInfo } from '../storage/db';
@@ -21,6 +32,9 @@ import { BaseView } from './baseview';
 import { CommandManager } from '../core/command';
 import {
   AddAssetCommand,
+  AddBatchGroupCommand,
+  AddParticleSystemCommand,
+  AddShapeCommand,
   NodeDeleteCommand,
   NodeReparentCommand,
   NodeTransformCommand
@@ -39,7 +53,9 @@ export class SceneView extends BaseView<SceneModel> {
   private _oldTransform: TRS;
   private _dragDropTypes: string[];
   private _nodeToBePlaced: Ref<SceneNode>;
+  private _typeToBePlaced: 'shape' | 'asset' | 'particlesys' | 'none';
   private _assetToBeAdded: DBAssetInfo;
+  private _shapeToBeAdded: { cls: GenericConstructor<ShapeType>; options: any };
   private _mousePosX: number;
   private _mousePosY: number;
   private _assetRegistry: AssetRegistry;
@@ -49,11 +65,13 @@ export class SceneView extends BaseView<SceneModel> {
   constructor(model: SceneModel, assetRegistry: AssetRegistry) {
     super(model);
     this._cmdManager = new CommandManager();
-    this._transformNode = new Ref<SceneNode>();
+    this._transformNode = new Ref();
     this._oldTransform = null;
     this._dragDropTypes = [];
-    this._nodeToBePlaced = new Ref<SceneNode>();
+    this._nodeToBePlaced = new Ref();
+    this._typeToBePlaced = 'none';
     this._assetToBeAdded = null;
+    this._shapeToBeAdded = null;
     this._mousePosX = -1;
     this._mousePosY = -1;
     this._postGizmoCaptured = false;
@@ -69,21 +87,21 @@ export class SceneView extends BaseView<SceneModel> {
             {
               label: 'New',
               shortCut: 'Ctrl+N',
-              id: 'NEW_DOC'
+              action: () => eventBus.dispatchEvent('action', 'NEW_DOC')
             },
             {
               label: 'Open',
               shortCut: 'Ctrl+O',
-              id: 'OPEN_DOC'
+              action: () => eventBus.dispatchEvent('action', 'OPEN_DOC')
             },
             {
               label: 'Save',
               shortCut: 'Ctrl+S',
-              id: 'SAVE_DOC'
+              action: () => eventBus.dispatchEvent('action', 'SAVE_DOC')
             },
             {
               label: 'Export',
-              id: 'EXPORT_DOC'
+              action: () => eventBus.dispatchEvent('action', 'EXPORT_DOC')
             }
           ]
         },
@@ -92,34 +110,30 @@ export class SceneView extends BaseView<SceneModel> {
           subMenus: [
             {
               label: 'Box',
-              id: 'ADD_BOX'
+              action: () => this.handleAddShape(BoxShape, { anchor: 0.5, anchorY: 0 })
             },
             {
               label: 'Sphere',
-              id: 'ADD_SPHERE'
+              action: () => this.handleAddShape(SphereShape)
             },
             {
               label: 'Plane',
-              id: 'ADD_PLANE'
+              action: () => this.handleAddShape(PlaneShape)
             },
             {
               label: 'Cylinder',
-              id: 'ADD_CYLINDER'
+              action: () => this.handleAddShape(CylinderShape, { topCap: true, bottomCap: true })
             },
             {
               label: 'Torus',
-              id: 'ADD_TORUS'
+              action: () => this.handleAddShape(TorusShape)
             },
             {
               label: '-'
             },
             {
-              label: 'Batch group',
-              id: 'ADD_BATCH_GROUP'
-            },
-            {
               label: 'ParticleSystem',
-              id: 'ADD_PARTICLE_SYSTEM'
+              action: () => this.handleAddParticleSystem()
             }
           ]
         },
@@ -129,20 +143,32 @@ export class SceneView extends BaseView<SceneModel> {
             {
               label: 'Texture viewer',
               id: 'SHOW_TEXTURE_VIEWER',
-              checked: this._showTextureViewer
+              action: () => (this._showTextureViewer = !this._showTextureViewer),
+              checked: () => this._showTextureViewer
             },
             {
               label: 'Curve editor',
-              id: 'SHOW_CURVE_EDITOR'
+              id: 'SHOW_CURVE_EDITOR',
+              action: () => {
+                Dialog.editCurve('Edit curve', 600, 500).then((interpolator) => {
+                  console.dir(interpolator);
+                });
+              }
             },
             {
               label: 'Ramp Texture Creator',
-              id: 'SHOW_RAMP_TEXTURE_CREATOR'
+              id: 'SHOW_RAMP_TEXTURE_CREATOR',
+              action: () => {
+                Dialog.createRampTexture('Create Ramp Texture', 400, 200).then((data) => {
+                  console.log(data);
+                });
+              }
             },
             {
               label: 'Device Information',
               id: 'SHOW_DEVICE_INFO',
-              checked: this._showDeviceInfo
+              action: () => (this._showDeviceInfo = !this._showDeviceInfo),
+              checked: () => this._showDeviceInfo
             }
           ]
         }
@@ -292,8 +318,6 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
-    this._menubar.checkMenuItem('SHOW_TEXTURE_VIEWER', false);
-    this._menubar.checkMenuItem('SHOW_DEVICE_INFO', false);
     this.sceneSetup();
   }
   render() {
@@ -429,20 +453,37 @@ export class SceneView extends BaseView<SceneModel> {
             placeNode.parent = null;
             this._nodeToBePlaced.dispose();
           } else if (ev.button === 0) {
-            this._cmdManager
-              .execute(
-                new AddAssetCommand(
-                  this.model.scene,
-                  this._assetRegistry,
-                  this._assetToBeAdded,
-                  placeNode.position
-                )
-              )
-              .then((node) => {
-                this._tab.sceneHierarchy.selectNode(node);
-                placeNode.parent = null;
-                this._nodeToBePlaced.dispose();
-              });
+            const pos = placeNode.position.clone();
+            placeNode.parent = null;
+            this._nodeToBePlaced.dispose();
+            switch (this._typeToBePlaced) {
+              case 'asset':
+                this._cmdManager
+                  .execute(
+                    new AddAssetCommand(this.model.scene, this._assetRegistry, this._assetToBeAdded, pos)
+                  )
+                  .then((node) => {
+                    this._tab.sceneHierarchy.selectNode(node);
+                  });
+                break;
+              case 'shape':
+                this._cmdManager
+                  .execute(
+                    new AddShapeCommand(
+                      this.model.scene,
+                      this._shapeToBeAdded.cls,
+                      pos,
+                      this._shapeToBeAdded.options
+                    )
+                  )
+                  .then((mesh) => {
+                    this._tab.sceneHierarchy.selectNode(mesh);
+                  });
+              case 'particlesys':
+                this._cmdManager.execute(new AddParticleSystemCommand(this.model.scene, pos)).then((node) => {
+                  this._tab.sceneHierarchy.selectNode(node);
+                });
+            }
           }
         }
       }
@@ -489,6 +530,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.sceneHierarchy.on('node_request_delete', this.handleDeleteNode, this);
     this._tab.sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
     eventBus.on('scene_add_asset', this.handleAddAsset, this);
+    eventBus.on('scene_add_batch', this.handleAddBatch, this);
     this.sceneSetup();
   }
   protected onDeactivate(): void {
@@ -502,6 +544,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.sceneHierarchy.off('node_request_delete', this.handleDeleteNode, this);
     this._tab.sceneHierarchy.off('node_drag_drop', this.handleNodeDragDrop, this);
     eventBus.off('scene_add_asset', this.handleAddAsset, this);
+    eventBus.off('scene_add_batch', this.handleAddBatch, this);
     this.sceneFinialize();
   }
   private sceneSetup() {
@@ -601,21 +644,55 @@ export class SceneView extends BaseView<SceneModel> {
       this._cmdManager.execute(new NodeReparentCommand(src, dst));
     }
   }
+  private handleAddShape<T extends ShapeType>(shapeCls: GenericConstructor<T>, options?: ShapeOptionType<T>) {
+    const placeNode = this._nodeToBePlaced.get();
+    if (placeNode) {
+      placeNode.remove();
+      this._nodeToBePlaced.dispose();
+      this._typeToBePlaced = 'none';
+    }
+    const shape = new shapeCls(options);
+    const mesh = new Mesh(this.model.scene, shape, new PBRMetallicRoughnessMaterial());
+    this._nodeToBePlaced.set(mesh);
+    this._shapeToBeAdded = {
+      cls: shapeCls,
+      options
+    };
+    this._typeToBePlaced = 'shape';
+  }
+  private handleAddParticleSystem() {
+    const placeNode = this._nodeToBePlaced.get();
+    if (placeNode) {
+      placeNode.remove();
+      this._nodeToBePlaced.dispose();
+      this._typeToBePlaced = 'none';
+    }
+    const ps = new ParticleSystem(this.model.scene);
+    this._nodeToBePlaced.set(ps);
+    this._typeToBePlaced = 'particlesys';
+  }
   private handleAddAsset(asset: DBAssetInfo) {
     const placeNode = this._nodeToBePlaced.get();
     if (placeNode) {
       placeNode.remove();
       this._nodeToBePlaced.dispose();
+      this._typeToBePlaced = 'none';
     }
     this._assetRegistry
       .fetchModel(asset.uuid, this.model.scene, { enableInstancing: true })
       .then((node) => {
         this._nodeToBePlaced.set(node.group);
         this._assetToBeAdded = asset;
+        this._typeToBePlaced = 'asset';
       })
       .catch((err) => {
         Dialog.messageBox('Error', `${err}`);
       });
+  }
+  private handleAddBatch() {
+    this._cmdManager.execute(new AddBatchGroupCommand(this.model.scene)).then((node) => {
+      this._tab.sceneHierarchy.selectNode(node);
+    });
   }
   private handleNodeRemoved(node: SceneNode) {
     if (node.isParentOf(this._postGizmoRenderer.node)) {
@@ -665,24 +742,6 @@ export class SceneView extends BaseView<SceneModel> {
   }
   private handleSceneAction(action: string) {
     switch (action) {
-      case 'SHOW_TEXTURE_VIEWER':
-        this._showTextureViewer = !this._showTextureViewer;
-        this._menubar.checkMenuItem(action, this._showTextureViewer);
-        break;
-      case 'SHOW_DEVICE_INFO':
-        this._showDeviceInfo = !this._showDeviceInfo;
-        this._menubar.checkMenuItem(action, this._showDeviceInfo);
-        break;
-      case 'SHOW_CURVE_EDITOR':
-        Dialog.editCurve('Edit curve', 600, 500).then((interpolator) => {
-          console.dir(interpolator);
-        });
-        break;
-      case 'SHOW_RAMP_TEXTURE_CREATOR':
-        Dialog.createRampTexture('Create Ramp Texture', 400, 200).then((data) => {
-          console.log(data);
-        });
-        break;
       case 'TEST_ZIP_DOWNLOAD': {
         const assetList: string[] = [];
         for (const asset of this._tab.assetHierarchy.assets) {

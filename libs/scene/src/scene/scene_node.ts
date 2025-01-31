@@ -18,8 +18,8 @@ import {
 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
 import { Ref } from '../app/gc/ref';
-import { AnimationSet } from '../animation';
-import { SharedModel } from '../asset';
+import type { AnimationSet } from '../animation';
+import type { SharedModel } from '../asset';
 
 /**
  * Node iterate function type
@@ -92,8 +92,6 @@ export class SceneNode extends makeEventTarget(Object)<{
   /** @internal */
   private _sealed: boolean;
   /** @internal */
-  private _assetUrl: string;
-  /** @internal */
   protected _parent: SceneNode;
   /** @internal */
   protected _children: Ref<SceneNode>[];
@@ -143,7 +141,6 @@ export class SceneNode extends makeEventTarget(Object)<{
     this._placeToOctree = true;
     this._parent = null;
     this._sealed = false;
-    this._assetUrl = '';
     this._children = [];
     this._transformChangeCallback = () => this._onTransformChanged(true);
     this._position = new ObservableVector3(0, 0, 0);
@@ -224,13 +221,6 @@ export class SceneNode extends makeEventTarget(Object)<{
   }
   set sharedModel(model: SharedModel) {
     this._sharedModel.set(model);
-  }
-  /** Asset url */
-  get assetUrl(): string {
-    return this._assetUrl;
-  }
-  set assetUrl(val: string) {
-    this._assetUrl = val;
   }
   /**
    * Check if given node is a direct child of the node
@@ -506,7 +496,7 @@ export class SceneNode extends makeEventTarget(Object)<{
       const willDetach = (!p || !p.attached) && this.attached;
       const willAttach = !this.attached && p && p.attached;
       if (newParent) {
-        newParent._children.push(new Ref<SceneNode>(this));
+        newParent._children.push(new Ref(this));
       }
       if (this._parent) {
         const index = this._parent._children.findIndex((val) => val.get() === this);

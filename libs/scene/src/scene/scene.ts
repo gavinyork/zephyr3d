@@ -48,7 +48,7 @@ export class Scene extends makeEventTarget(Object)<{
     this._env = new Environment();
     this._updateFrame = -1;
     this._animationSet = [];
-    this._rootNode = new Ref<SceneNode>(new SceneNode(this));
+    this._rootNode = new Ref(new SceneNode(this));
     this._rootNode.get().name = 'Root';
   }
   /** @internal */

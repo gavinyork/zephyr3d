@@ -1,6 +1,6 @@
 import type { DecoderModule } from 'draco3d';
 import { isPowerOf2, nextPowerOf2, HttpRequest } from '@zephyr3d/base';
-import { AssetHierarchyNode, AssetSkeleton, AssetSubMeshData, SharedModel } from './model';
+import type { AssetHierarchyNode, AssetSkeleton, AssetSubMeshData, SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
 import { DDSLoader } from './loaders/dds/dds_loader';
@@ -309,7 +309,7 @@ export class AssetManager {
     httpRequest?: HttpRequest
   ): Promise<ModelInfo> {
     const sharedModel = await this.fetchModelData(url, options, httpRequest);
-    return this.createSceneNode(scene, url, sharedModel, !!options?.enableInstancing);
+    return this.createSceneNode(scene, sharedModel, !!options?.enableInstancing);
   }
   /** @internal */
   async loadTextData(
@@ -503,10 +503,9 @@ export class AssetManager {
     }
   }
   /** @internal */
-  private createSceneNode(scene: Scene, url: string, model: SharedModel, instancing: boolean): ModelInfo {
+  private createSceneNode(scene: Scene, model: SharedModel, instancing: boolean): ModelInfo {
     const group = new SceneNode(scene);
     group.name = model.name;
-    group.assetUrl = url;
     const animationSet = new AnimationSet(scene, group);
     for (let i = 0; i < model.scenes.length; i++) {
       const assetScene = model.scenes[i];

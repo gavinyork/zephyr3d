@@ -100,11 +100,11 @@ export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlb
       })
       .$elseif(pb.equal(scope.vertexID, 1), function () {
         scope.pos = pb.vec2(0.5, -0.5);
-        scope.uv = pb.vec2(1, 0);
+        scope.uv = pb.vec2(0, 1);
       })
       .$elseif(pb.equal(scope.vertexID, 2), function () {
         scope.pos = pb.vec2(-0.5, 0.5);
-        scope.uv = pb.vec2(0, 1);
+        scope.uv = pb.vec2(1, 0);
       })
       .$else(function () {
         scope.pos = pb.vec2(0.5, 0.5);

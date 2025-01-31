@@ -109,7 +109,7 @@ export class GrassManager {
   constructor(clusterSize: number, density: number[][]) {
     this._clusterSize = clusterSize;
     this._baseVertexBuffer = new Map();
-    this._indexBuffer = new Ref<IndexBuffer>();
+    this._indexBuffer = new Ref();
     this._layers = [];
   }
   dispose() {
@@ -203,7 +203,7 @@ export class GrassManager {
       0
     ]);
     baseVertexBuffer = device.createInterleavedVertexBuffer(['position_f32x3', 'tex0_f32x2'], vertices);
-    this._baseVertexBuffer.set(hash, new Ref<StructuredBuffer>(baseVertexBuffer));
+    this._baseVertexBuffer.set(hash, new Ref(baseVertexBuffer));
     return baseVertexBuffer;
   }
   getIndexBuffer(device: AbstractDevice) {
@@ -271,7 +271,7 @@ export class GrassManager {
         if (grassData.length > 0) {
           if (!layer) {
             layer = {
-              material: new Ref<GrassMaterial>(
+              material: new Ref(
                 new GrassMaterial(
                   new Vector2(terrain.scaledWidth, terrain.scaledHeight),
                   terrain.quadtree.normalMap,

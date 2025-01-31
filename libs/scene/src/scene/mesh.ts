@@ -51,8 +51,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    */
   constructor(scene: Scene, primitive?: Primitive, material?: MeshMaterial) {
     super(scene);
-    this._primitive = new Ref<Primitive>();
-    this._material = new Ref<MeshMaterial>();
+    this._primitive = new Ref();
+    this._material = new Ref();
     this._castShadow = true;
     this._animatedBoundingBox = null;
     this._boneMatrices = null;

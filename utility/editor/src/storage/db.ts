@@ -1,8 +1,8 @@
 import type { AssetType } from '@zephyr3d/scene';
 import type { IDBPDatabase } from 'idb';
 import { openDB } from 'idb';
-import { ZipDownloader } from '../helpers/zipdownload';
-import { ZipWriter } from '@zip.js/zip.js';
+import type { ZipDownloader } from '../helpers/zipdownload';
+import type { ZipWriter } from '@zip.js/zip.js';
 
 export type DBAssetPackage = {
   uuid?: string;
@@ -271,7 +271,7 @@ export class Database {
     const fileMap = await this.decompressZip(source);
     for (const val of fileMap) {
       const f = val[0].startsWith('/') ? val[0].slice(1) : val[0];
-      let name = [path, f].join('/');
+      const name = [path, f].join('/');
       await writer.add(name, val[1].stream());
     }
   }

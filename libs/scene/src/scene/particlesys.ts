@@ -126,10 +126,10 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._instanceColor = Vector4.zero();
     this._pickTarget = { node: this };
     this._flags = PS_WORLDSPACE;
-    this._primitive = new Ref<Primitive>();
+    this._primitive = new Ref();
     this._wsBoundingBox = new BoundingBox();
     this._instanceData = null;
-    this._material = new Ref<ParticleMaterial>(new ParticleMaterial());
+    this._material = new Ref(new ParticleMaterial());
   }
   get material(): ParticleMaterial {
     return this._material.get();
