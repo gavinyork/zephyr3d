@@ -524,6 +524,8 @@ export class Octree {
   /** @internal */
   private _rootSize: number;
   /** @internal */
+  private _maxRootSize: number;
+  /** @internal */
   private _leafSize: number;
   /** @internal */
   private _rootNode: OctreeNode;
@@ -537,7 +539,7 @@ export class Octree {
    * @param rootSize - Root size of the octre
    * @param leafSize - Leaf size of the octree
    */
-  constructor(scene: Scene, rootSize = 8, leafSize = 64) {
+  constructor(scene: Scene, rootSize = 8, leafSize = 8, maxRootSize = 65536) {
     this._scene = scene;
     this._chunks = [];
     this._rootSize = 0;
@@ -546,6 +548,7 @@ export class Octree {
     this._nodeMap = new WeakMap();
     this._nodes = new Set();
     this.initialize(rootSize, leafSize);
+    this._maxRootSize = Math.max(maxRootSize, this._rootSize);
   }
   /**
    * Initialize the octree with specified root size and leaf size
@@ -666,13 +669,28 @@ export class Octree {
       if (bbox && bbox.isValid()) {
         const center = bbox.center;
         const extents = bbox.extents;
-        const size = Math.max(Math.max(extents.x, extents.y), extents.z);
+        let size = Math.min(Math.max(Math.max(extents.x, extents.y), extents.z), this._maxRootSize);
+        if (Number.isNaN(size)) {
+          size = this._maxRootSize;
+        }
         locatedNode = this.locateNodeChain(curNode, center, size);
         if (!locatedNode) {
-          const d = Math.max(...Vector3.abs(bbox.minPoint), ...Vector3.abs(bbox.maxPoint));
-          this.resize(Math.max(d * 2, 4 * size));
-          this.placeNode(node);
-          return;
+          let d = Math.min(
+            Math.max(...Vector3.abs(bbox.minPoint), ...Vector3.abs(bbox.maxPoint)),
+            this._maxRootSize
+          );
+          if (Number.isNaN(d)) {
+            d = this._maxRootSize;
+          }
+          const newSize = nextPowerOf2(Math.max(d * 2, 4 * size));
+          if (newSize <= this._maxRootSize) {
+            console.log(`Octree resize: ${newSize}`);
+            this.resize(newSize);
+            this.placeNode(node);
+            return;
+          } else {
+            locatedNode = this.getRootNode();
+          }
         }
       }
     }

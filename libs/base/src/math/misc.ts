@@ -57,14 +57,17 @@ export function isPowerOf2(value: number) {
  * @public
  */
 export function nextPowerOf2(value: number) {
+  if (value <= 0) {
+    return 1;
+  }
   value--;
   value |= value >> 1;
   value |= value >> 2;
   value |= value >> 4;
   value |= value >> 8;
   value |= value >> 16;
-  value++;
-  return value;
+  value |= value >> 32;
+  return value + 1;
 }
 
 /**
