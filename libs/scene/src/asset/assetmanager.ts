@@ -623,7 +623,7 @@ export class AssetManager {
           meshNode.material =
             instancing && !skeleton && subMesh.numTargets === 0
               ? subMesh.material.get().createInstance()
-              : subMesh.material.get();
+              : subMesh.material.get().clone();
           meshNode.parent = node;
           subMesh.mesh = meshNode;
           processMorphData(subMesh, meshData.morphWeights);

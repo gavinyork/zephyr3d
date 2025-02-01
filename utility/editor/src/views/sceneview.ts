@@ -445,7 +445,6 @@ export class SceneView extends BaseView<SceneModel> {
             this._nodeToBePlaced.dispose();
           } else if (ev.button === 0) {
             const pos = placeNode.position.clone();
-            placeNode.parent = null;
             this._nodeToBePlaced.dispose();
             switch (this._typeToBePlaced) {
               case 'asset':
@@ -455,6 +454,7 @@ export class SceneView extends BaseView<SceneModel> {
                   )
                   .then((node) => {
                     this._tab.sceneHierarchy.selectNode(node);
+                    placeNode.parent = null;
                   });
                 break;
               case 'shape':
@@ -469,10 +469,12 @@ export class SceneView extends BaseView<SceneModel> {
                   )
                   .then((mesh) => {
                     this._tab.sceneHierarchy.selectNode(mesh);
+                    placeNode.parent = null;
                   });
               case 'particlesys':
                 this._cmdManager.execute(new AddParticleSystemCommand(this.model.scene, pos)).then((node) => {
                   this._tab.sceneHierarchy.selectNode(node);
+                  placeNode.parent = null;
                 });
             }
           }
