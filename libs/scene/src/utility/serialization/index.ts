@@ -391,6 +391,9 @@ class GatherVisitor implements Visitor<SceneNode> {
   private addMaterial(material: Material) {
     if (material) {
       this._materialSet.add(material);
+      if (material.$isInstance) {
+        this._materialSet.add(material.coreMaterial);
+      }
     }
   }
   private addPrimitive(primitive: Primitive) {
