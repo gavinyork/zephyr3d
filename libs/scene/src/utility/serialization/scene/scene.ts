@@ -13,7 +13,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
     ctor: Scene,
     className: 'Scene',
     createFunc() {
-      return new Scene();
+      return { obj: new Scene() };
     },
     getProps() {
       return [

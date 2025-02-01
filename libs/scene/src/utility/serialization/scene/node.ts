@@ -13,14 +13,14 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
     async createFunc(ctx: Scene | SceneNode, init?: { asset?: string }) {
       if (init?.asset) {
         const scene = ctx instanceof Scene ? ctx : ctx.scene;
-        return (await assetRegistry.fetchModel(init.asset, scene)).group;
+        return { obj: (await assetRegistry.fetchModel(init.asset, scene)).group };
       }
       if (ctx instanceof Scene) {
-        return new SceneNode(ctx);
+        return { obj: new SceneNode(ctx) };
       } else if (ctx instanceof SceneNode) {
         const node = new SceneNode(ctx.scene);
         node.parent = ctx;
-        return node;
+        return { obj: node };
       } else {
         return null;
       }
@@ -159,11 +159,11 @@ export function getGraphNodeClass(assetRegistry: AssetRegistry): SerializableCla
     className: 'GraphNode',
     createFunc(scene: Scene | SceneNode) {
       if (scene instanceof Scene) {
-        return new GraphNode(scene);
+        return { obj: new GraphNode(scene) };
       } else if (scene instanceof SceneNode) {
-        const batchGroup = new GraphNode(scene.scene);
-        batchGroup.parent = scene;
-        return batchGroup;
+        const node = new GraphNode(scene.scene);
+        node.parent = scene;
+        return { obj: node };
       } else {
         return null;
       }

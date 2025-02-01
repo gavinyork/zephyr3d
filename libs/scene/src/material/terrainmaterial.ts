@@ -12,7 +12,8 @@ import type {
 import type { DrawContext } from '../render';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 import { mixinLight } from './mixins/lit';
-import { Application } from '../app';
+import { Application, retainObject } from '../app';
+import type { Clonable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { ShaderHelper } from './shader/helper';
@@ -54,11 +55,10 @@ export type TerrainMaterialOptions = {
  * Terrain material class
  * @public
  */
-export class TerrainMaterial extends applyMaterialMixins(
-  MeshMaterial,
-  mixinLight,
-  mixinPBRMetallicRoughness
-) {
+export class TerrainMaterial
+  extends applyMaterialMixins(MeshMaterial, mixinLight, mixinPBRMetallicRoughness)
+  implements Clonable<TerrainMaterial>
+{
   private static _metallicRoughnessGenerationProgram: GPUProgram = null;
   private static _metallicRoughnessGenerationBindGroup: BindGroup = null;
   private _options: TerrainMaterialOptions;
@@ -74,8 +74,28 @@ export class TerrainMaterial extends applyMaterialMixins(
     this._terrainInfo = null;
     if (options && options.splatMap && options.detailMaps && options.detailMaps.albedoTextures) {
       this._options = Object.assign({}, options);
+      retainObject(this._options.splatMap);
       const albedoTextures = this._options.detailMaps.albedoTextures;
-      this._numDetailMaps = Array.isArray(albedoTextures) ? albedoTextures.length : albedoTextures.depth;
+      if (Array.isArray(albedoTextures)) {
+        for (const tex of albedoTextures) {
+          if (!tex) {
+            throw new Error(`TerrainMaterial(): Invalid detail albedo texture`);
+          }
+          retainObject(tex);
+          tex.samplerOptions = {
+            addressU: 'repeat',
+            addressV: 'repeat'
+          };
+        }
+        this._numDetailMaps = albedoTextures.length;
+      } else {
+        albedoTextures.samplerOptions = {
+          addressU: 'repeat',
+          addressV: 'repeat'
+        };
+        retainObject(albedoTextures);
+        this._numDetailMaps = albedoTextures.depth;
+      }
       if (!this._numDetailMaps) {
         throw new Error(`TerrainMaterial(): Invalid detail textures`);
       }
@@ -113,7 +133,27 @@ export class TerrainMaterial extends applyMaterialMixins(
       }
       const normalTextures = options.detailMaps.normalTextures;
       if (normalTextures) {
-        const m = Array.isArray(normalTextures) ? normalTextures.length : normalTextures.depth;
+        let m: number;
+        if (Array.isArray(normalTextures)) {
+          for (const tex of normalTextures) {
+            if (!tex) {
+              throw new Error(`TerrainMaterial(): Invalid detail normal texture`);
+            }
+            retainObject(tex);
+            tex.samplerOptions = {
+              addressU: 'repeat',
+              addressV: 'repeat'
+            };
+          }
+          m = normalTextures.length;
+        } else {
+          normalTextures.samplerOptions = {
+            addressU: 'repeat',
+            addressV: 'repeat'
+          };
+          retainObject(normalTextures);
+          m = normalTextures.depth;
+        }
         if (m !== this._numDetailMaps) {
           throw new Error(
             `TerrainMaterial(): The number of normal textures not match the number of albedo textures`
@@ -128,44 +168,16 @@ export class TerrainMaterial extends applyMaterialMixins(
           }
         }
       }
-      this._options = Object.assign({}, options);
-      if (Array.isArray(albedoTextures)) {
-        for (let i = 0; i < albedoTextures.length; i++) {
-          if (!albedoTextures[i]) {
-            throw new Error(`TerrainMaterial(): Invalid detail albedo texture`);
-          }
-          albedoTextures[i].samplerOptions = {
-            addressU: 'repeat',
-            addressV: 'repeat'
-          };
-        }
-      } else {
-        albedoTextures.samplerOptions = {
-          addressU: 'repeat',
-          addressV: 'repeat'
-        };
-      }
-      if (Array.isArray(normalTextures)) {
-        for (let i = 0; i < normalTextures.length; i++) {
-          if (!normalTextures[i]) {
-            throw new Error(`TerrainMaterial(): Invalid detail normal texture`);
-          }
-          normalTextures[i].samplerOptions = {
-            addressU: 'repeat',
-            addressV: 'repeat'
-          };
-        }
-      } else if (normalTextures) {
-        normalTextures.samplerOptions = {
-          addressU: 'repeat',
-          addressV: 'repeat'
-        };
-      }
     }
     this.metallicRoughnessTexture = this.generateMetallicRoughnessMap();
     this.metallicRoughnessTexCoordIndex = -1;
     this.albedoTexCoordIndex = -1;
     this.normalTexCoordIndex = -1;
+  }
+  clone(): TerrainMaterial {
+    const other = new TerrainMaterial(this._options);
+    other.copyFrom(this);
+    return other;
   }
   get terrainInfo(): Vector4 {
     return this._terrainInfo;

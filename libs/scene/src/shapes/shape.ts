@@ -1,4 +1,4 @@
-import { Vector3, type Matrix4x4 } from '@zephyr3d/base';
+import { Clonable, Vector3, type Matrix4x4 } from '@zephyr3d/base';
 import { Primitive } from '../render/primitive';
 import { BoundingBox } from '../utility/bounding_volume';
 
@@ -19,7 +19,10 @@ export interface ShapeCreationOptions {
  * Abstract base class for any kind of shapes
  * @public
  */
-export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOptions> extends Primitive {
+export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOptions>
+  extends Primitive
+  implements Clonable<Shape<T>>
+{
   static _defaultOptions = {
     needNormal: true,
     needUV: true
@@ -33,6 +36,7 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     super();
     this._create(options);
   }
+  abstract clone(): Shape<T>;
   /** Get shape creation options */
   get options(): T {
     return this._options;

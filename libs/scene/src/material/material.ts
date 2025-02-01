@@ -4,6 +4,8 @@ import type { Primitive } from '../render/primitive';
 import type { DrawContext } from '../render/drawable';
 import { QUEUE_OPAQUE } from '../values';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
+import { WeakRef } from '../app';
+import type { Clonable } from '@zephyr3d/base';
 
 type MaterialState = {
   program: GPUProgram;
@@ -18,7 +20,9 @@ type MaterialState = {
  *
  * @public
  */
-export class Material {
+export class Material implements Clonable<Material> {
+  /** @internal */
+  private static _registry: Map<string, WeakRef<Material>> = new Map();
   /** @internal */
   private static _nextId = 0;
   /** @internal */
@@ -36,6 +40,8 @@ export class Material {
   /** @internal */
   private _id: number;
   /** @internal */
+  private _persistentId: string;
+  /** @internal */
   private _currentHash: string[];
   /**
    * Creates an instance of material
@@ -43,11 +49,52 @@ export class Material {
   constructor() {
     this._disposed = false;
     this._id = ++Material._nextId;
+    this._persistentId = '';
     this._states = {};
     this._numPasses = 1;
     this._hash = [null];
     this._optionTag = 0;
     this._currentHash = [];
+  }
+  clone(): Material {
+    const other = new Material();
+    other.copyFrom(this);
+    return other;
+  }
+  copyFrom(other: this) {
+    if (this._states) {
+      for (const k in this._states) {
+        this._states[k]?.bindGroup?.dispose();
+      }
+      this._states = {};
+    }
+    this._numPasses = other._numPasses;
+  }
+  /** @internal */
+  static registerMaterial(pid: string, material: Material) {
+    if (material && pid) {
+      material.persistentId = pid;
+      this._registry.set(pid, new WeakRef(material));
+    }
+  }
+  /** @internal */
+  static unregisterMaterial(material: Material) {
+    if (material) {
+      this._registry.delete(material._persistentId);
+    }
+  }
+  /** @internal */
+  static findMaterialById(id: string) {
+    return this._registry.get(id)?.get() ?? null;
+  }
+  /**
+   * Persistent ID used in serialization
+   */
+  get persistentId() {
+    return this._persistentId;
+  }
+  set persistentId(val) {
+    this._persistentId = val;
   }
   /** Unique identifier of the material */
   get instanceId(): number {
@@ -227,6 +274,7 @@ export class Material {
    */
   dispose() {
     if (!this._disposed) {
+      Material.unregisterMaterial(this);
       this._disposed = true;
       if (this._states) {
         for (const k in this._states) {

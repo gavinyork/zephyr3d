@@ -23,6 +23,7 @@ import { type DrawContext, type ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA, packFloat16x2 } from '../shaders';
 import { Application, Ref } from '../app';
 import { ShaderHelper } from './shader/helper';
+import type { Clonable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4, applyMixins } from '@zephyr3d/base';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 
@@ -75,7 +76,7 @@ export type InstanceUniformType = 'float' | 'vec2' | 'vec3' | 'vec4';
  *
  * @public
  */
-export class MeshMaterial extends Material {
+export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   /** @internal */
   static INSTANCE_UNIFORMS: [string, InstanceUniformType][] = [];
   /** @internal */
@@ -113,6 +114,19 @@ export class MeshMaterial extends Material {
     this._ctx = null;
     this._materialPass = -1;
     this.useFeature(FEATURE_ALPHABLEND, this._blendMode);
+  }
+  clone(): MeshMaterial {
+    const other = new MeshMaterial();
+    other.copyFrom(this);
+    return other;
+  }
+  copyFrom(other: this): void {
+    super.copyFrom(other);
+    this.alphaCutoff = other.alphaCutoff;
+    this.blendMode = other.blendMode;
+    this.cullMode = other.cullMode;
+    this.opacity = other.opacity;
+    this.objectColor = other.objectColor;
   }
   /** Indicate that the uniform has changed and needs to be resubmitted. */
   uniformChanged() {
@@ -154,13 +168,16 @@ export class MeshMaterial extends Material {
     if (this.$isInstance) {
       return this.coreMaterial.createInstance();
     }
+    const isWebGL1 = Application.instance.device.type === 'webgl';
+    if (isWebGL1 || !this.supportInstancing) {
+      return this.clone() as this;
+    }
     const instanceUniforms = (this.constructor as typeof MeshMaterial).INSTANCE_UNIFORMS;
     const uniformsHolder = instanceUniforms.length > 0 ? new Float32Array(4 * instanceUniforms.length) : null;
-    const isWebGL1 = Application.instance.device.type === 'webgl';
     const instance = {} as any;
     const that = this;
     const coreMaterial = new Ref(that);
-    instance.isBatchable = () => !isWebGL1 && that.supportInstancing();
+    instance.isBatchable = () => true; //!isWebGL1 && that.supportInstancing();
     instance.dispose = () => {
       coreMaterial.dispose();
     };
@@ -335,7 +352,7 @@ export class MeshMaterial extends Material {
   }
   set objectColor(val: Vector4) {
     if (val !== this._objectColor) {
-      this._objectColor = val;
+      this._objectColor.set(val ?? Vector4.one());
       this.uniformChanged();
     }
   }

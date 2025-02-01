@@ -1,4 +1,4 @@
-import type { AABB } from '@zephyr3d/base';
+import type { AABB, Clonable } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 import type { PrimitiveType } from '@zephyr3d/device';
@@ -42,7 +42,7 @@ Triangle(n, m) = (VIndex(n, m), VIndex(n+1, m), VIndex(n+1, m+1), VIndex(n, m), 
  *
  * @public
  */
-export class TorusShape extends Shape<TorusCreationOptions> {
+export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<TorusShape> {
   static _defaultOptions = {
     ...Shape._defaultOptions,
     numSlices: 40,
@@ -57,6 +57,9 @@ export class TorusShape extends Shape<TorusCreationOptions> {
    */
   constructor(options?: TorusCreationOptions) {
     super(options);
+  }
+  clone(): TorusShape {
+    return new TorusShape(this._options);
   }
   /**
    * {@inheritDoc Shape.type}

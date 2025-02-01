@@ -236,7 +236,6 @@ export class PostWater extends AbstractPostEffect<'PostWater'> {
       const clipPlane = new Plane(0, -1, 0, this._waterMesh.level - this._antiReflectanceLeak);
       const matReflectionR = Matrix4x4.invert(Matrix4x4.reflection(-plane.a, -plane.b, -plane.c, -plane.d));
       const reflCamera = new Camera(ctx.scene);
-      reflCamera.framebuffer = fbRefl;
       Matrix4x4.multiply(matReflectionR, ctx.camera.worldMatrix).decompose(
         reflCamera.scale,
         reflCamera.rotation,
@@ -244,7 +243,10 @@ export class PostWater extends AbstractPostEffect<'PostWater'> {
       );
       reflCamera.setProjectionMatrix(ctx.camera.getProjectionMatrix());
       reflCamera.clipPlane = clipPlane;
+      ctx.device.pushDeviceStates();
+      ctx.device.setFramebuffer(fbRefl);
       reflCamera.render(ctx.scene, ctx.compositor);
+      ctx.device.popDeviceStates();
       reflCamera.remove();
       this._renderingReflections = false;
     }

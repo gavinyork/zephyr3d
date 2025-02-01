@@ -3,13 +3,17 @@ import { mixinAlbedoColor } from './mixins/albedocolor';
 import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
 import type { DrawContext } from '../render';
+import type { Clonable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 
 /**
  * Particle material
  * @public
  */
-export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor) {
+export class ParticleMaterial
+  extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor)
+  implements Clonable<ParticleMaterial>
+{
   private _params: Vector4;
   constructor() {
     super();
@@ -17,6 +21,17 @@ export class ParticleMaterial extends applyMaterialMixins(MeshMaterial, mixinAlb
     this.blendMode = 'blend';
     this._params = new Vector4(0, 1, 0, 0);
     this.albedoTexCoordIndex = -1;
+  }
+  clone(): ParticleMaterial {
+    const other = new ParticleMaterial();
+    other.copyFrom(this);
+    return other;
+  }
+  copyFrom(other: this): void {
+    super.copyFrom(other);
+    this.jitterPower = other.jitterPower;
+    this.aspect = other.aspect;
+    this.directional = other.directional;
   }
   get jitterPower() {
     return this._params.x;

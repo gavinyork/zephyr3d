@@ -29,6 +29,10 @@ function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T) {
     constructor() {
       super();
     }
+    copyFrom(other: this): void {
+      super.copyFrom(other);
+      this.vertexColor = other.vertexColor;
+    }
     /** Albedo color */
     get vertexColor(): boolean {
       return this.featureUsed(FEATURE_VERTEX_COLOR);

@@ -39,10 +39,13 @@ export type SerializableClass = {
   ctor?: any;
   className?: string;
   parent?: SerializableClass;
-  createFunc?: (ctx?: any, init?: { asset?: string }) => any;
+  createFunc?: (
+    ctx?: any,
+    init?: { asset?: string }
+  ) => { obj: any; loadProps?: boolean } | Promise<{ obj: any; loadProps?: boolean }>;
   getObject?: (obj: any) => any;
   getInitParams?: (obj: any) => { asset?: string };
-  getProps: (obj: any) => PropertyAccessor<any>[];
+  getProps: (obj: any, forSerialize: boolean) => PropertyAccessor<any>[];
 };
 
 export type SerializationInfo = SerializableClass[];

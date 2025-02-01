@@ -7,7 +7,7 @@ import type { PunctualLight, BaseLight } from './light';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import type { BatchGroup } from './batchgroup';
 import type { Visitor } from './visitor';
-import type { Quaternion } from '@zephyr3d/base';
+import type { Clonable, Quaternion } from '@zephyr3d/base';
 import {
   makeEventTarget,
   Matrix4x4,
@@ -45,13 +45,16 @@ export type SceneNodeVisible = 'visible' | 'inherit' | 'hidden';
  *
  * @public
  */
-export class SceneNode extends makeEventTarget(Object)<{
-  nodeattached: [node: SceneNode];
-  noderemoved: [node: SceneNode];
-  visiblechanged: [node: SceneNode];
-  transformchanged: [node: SceneNode];
-  bvchanged: [node: SceneNode];
-}>() {
+export class SceneNode
+  extends makeEventTarget(Object)<{
+    nodeattached: [node: SceneNode];
+    noderemoved: [node: SceneNode];
+    visiblechanged: [node: SceneNode];
+    transformchanged: [node: SceneNode];
+    bvchanged: [node: SceneNode];
+  }>()
+  implements Clonable<SceneNode>
+{
   /*
   static readonly PICK_INHERITED = -1;
   static readonly PICK_DISABLED = 0;
@@ -222,6 +225,36 @@ export class SceneNode extends makeEventTarget(Object)<{
   set sharedModel(model: SharedModel) {
     this._sharedModel.set(model);
   }
+  clone(): SceneNode {
+    const other = new SceneNode(this.scene);
+    other.copyFrom(this);
+    other.parent = this.parent;
+    return other;
+  }
+  copyFrom(other: this) {
+    if (other.disposed || this.disposed) {
+      console.error('SceneNode.copyFrom(): Cannot copy from/to disposed node');
+      return;
+    }
+    if (other.scene !== this.scene) {
+      console.error('SceneNode.copyFrom(): Cannot copy from/to node which belongs to another scene');
+      return;
+    }
+    this._animationSet.set(other._animationSet.get());
+    this._sharedModel.set(other._sharedModel.get());
+    this.clipTestEnabled = other.clipTestEnabled;
+    this.boundingBoxDrawMode = other.boundingBoxDrawMode;
+    this.showState = other.showState;
+    this.pickable = other.pickable;
+    this.placeToOctree = other.placeToOctree;
+    this.position.set(other.position);
+    this.scale.set(other.scale);
+    this.rotation.set(other.rotation);
+    this.removeChildren();
+    for (const child of other.children) {
+      child.get().clone().parent = this;
+    }
+  }
   /**
    * Check if given node is a direct child of the node
    * @param child - The node to be checked
@@ -262,17 +295,10 @@ export class SceneNode extends makeEventTarget(Object)<{
    * @param v - The visitor that will travel the subtree of this node
    * @param inverse - true if traversing from bottom to top, otherwise top to bottom
    */
-  traverse(v: Visitor<SceneNode>, inverse?: boolean): void {
-    if (inverse) {
-      for (let i = this._children.length - 1; i >= 0; i--) {
-        this._children[i].get().traverse(v, inverse);
-      }
-      v.visit(this);
-    } else {
-      v.visit(this);
-      for (const child of this._children) {
-        child.get().traverse(v);
-      }
+  traverse(v: Visitor<SceneNode>): void {
+    v.visit(this);
+    for (const child of this._children) {
+      child.get().traverse(v);
     }
   }
   /**

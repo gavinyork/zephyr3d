@@ -14,11 +14,11 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
     className: 'ParticleSystem',
     createFunc(scene: Scene | SceneNode) {
       if (scene instanceof Scene) {
-        return new ParticleSystem(scene);
+        return { obj: new ParticleSystem(scene) };
       } else if (scene instanceof SceneNode) {
         const particlesys = new ParticleSystem(scene.scene);
         particlesys.parent = scene;
-        return particlesys;
+        return { obj: particlesys };
       } else {
         return null;
       }

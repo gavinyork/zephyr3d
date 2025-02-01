@@ -1,6 +1,6 @@
 import type { AssetRegistry, ModelInfo, Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
-import { BatchGroup, deserializeObject } from '@zephyr3d/scene';
-import { ParticleSystem, serializeObject } from '@zephyr3d/scene';
+import { BatchGroup, deserializeScene, serializeScene } from '@zephyr3d/scene';
+import { ParticleSystem } from '@zephyr3d/scene';
 import {
   BoxFrameShape,
   BoxShape,
@@ -225,7 +225,7 @@ export class NodeDeleteCommand implements Command {
   async execute(): Promise<void> {
     const node = idNodeMap[this._nodeId];
     if (node) {
-      this._archive = await serializeObject(node, this._assetRegistry);
+      this._archive = await serializeScene(node, this._assetRegistry); // await serializeObject(node, this._assetRegistry);
       node.remove();
       node.iterate((child) => {
         delete idNodeMap[child.id];
@@ -237,7 +237,8 @@ export class NodeDeleteCommand implements Command {
     if (this._archive) {
       const parent = idNodeMap[this._parentId];
       if (parent) {
-        const node = (await deserializeObject(this._scene, this._archive, this._assetRegistry)) as SceneNode;
+        const node = await deserializeScene<SceneNode>(this._scene, this._assetRegistry, this._archive);
+        //const node = (await deserializeObject(this._scene, this._archive, this._assetRegistry)) as SceneNode;
         if (node) {
           node.iterate((child) => {
             idNodeMap[child.id] = child;

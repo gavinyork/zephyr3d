@@ -1,11 +1,12 @@
-import type { CubeFace, Plane } from '@zephyr3d/base';
+import type { Clonable, CubeFace } from '@zephyr3d/base';
+import { Plane } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
 import { Matrix4x4, Frustum, Vector4, Vector3, Ray, halton23 } from '@zephyr3d/base';
 import { SceneNode } from '../scene/scene_node';
-import { Application } from '../app';
+import { Application, Ref } from '../app';
 import type { Drawable, PickTarget } from '../render/drawable';
 import { SceneRenderer } from '../render/renderer';
-import type { BaseTexture, FrameBuffer } from '@zephyr3d/device';
+import type { BaseTexture } from '@zephyr3d/device';
 import { Compositor } from '../posteffect/compositor';
 import type { Scene } from '../scene/scene';
 import type { BaseCameraController } from './base';
@@ -29,7 +30,7 @@ export type CameraHistoryData = {
  * The camera node class
  * @public
  */
-export class Camera extends SceneNode {
+export class Camera extends SceneNode implements Clonable<Camera> {
   /** @internal */
   private static _defaultCompositor = new Compositor();
   /** @internal */
@@ -59,8 +60,6 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _sampleCount: number;
   /** @internal */
-  protected _framebuffer: FrameBuffer;
-  /** @internal */
   protected _viewport: number[];
   /** @internal */
   protected _scissor: number[];
@@ -69,7 +68,7 @@ export class Camera extends SceneNode {
   /** @internal */
   protected _clipMask: number;
   /** @internal */
-  protected _oit: OIT;
+  protected _oit: Ref<OIT>;
   /** @internal */
   protected _depthPrePass: boolean;
   /** @internal */
@@ -139,7 +138,6 @@ export class Camera extends SceneNode {
     this._clipPlane = null;
     this._dirty = true;
     this._controller = null;
-    this._framebuffer = null;
     this._viewport = null;
     this._scissor = null;
     this._clearColor = new Vector4(0, 0, 0, 1);
@@ -147,7 +145,7 @@ export class Camera extends SceneNode {
     this._sampleCount = 1;
     this._frustum = null;
     this._frustumV = null;
-    this._oit = null;
+    this._oit = new Ref();
     this._depthPrePass = false;
     this._HiZ = false;
     this._SSR = false;
@@ -175,6 +173,40 @@ export class Camera extends SceneNode {
     this._pickResultResolve = null;
     this._pickPosX = 0;
     this._pickPosY = 0;
+  }
+  clone(): Camera {
+    const other = new Camera(this.scene);
+    other.copyFrom(this);
+    other.parent = this.parent;
+    return other;
+  }
+  copyFrom(other: this): void {
+    super.copyFrom(other);
+    this.clipPlane = other.clipPlane ? new Plane(other.clipPlane) : null;
+    this.HiZ = other.HiZ;
+    this.TAA = other.TAA;
+    this.TAADebug = other.TAADebug;
+    this.TAABlendFactor = other.TAABlendFactor;
+    this.SSR = other.SSR;
+    this.ssrMaxRoughness = other.ssrMaxRoughness;
+    this.ssrRoughnessFactor = other.ssrRoughnessFactor;
+    this.ssrStride = other.ssrStride;
+    this.ssrMaxDistance = other.ssrMaxDistance;
+    this.ssrIterations = other.ssrIterations;
+    this.ssrThickness = other.ssrThickness;
+    this.ssrCalcThickness = other.ssrCalcThickness;
+    this.ssrBlurScale = other.ssrBlurScale;
+    this.ssrBlurDepthCutoff = other.ssrBlurDepthCutoff;
+    this.ssrBlurKernelSize = other.ssrBlurKernelSize;
+    this.depthPrePass = other.depthPrePass;
+    this.commandBufferReuse = other.commandBufferReuse;
+    this.sampleCount = other.sampleCount;
+    this.oit = other.oit;
+    this.clipMask = other.clipMask;
+    this.viewport = other.viewport;
+    this.scissor = other.scissor;
+    this.clearColor = other.clearColor;
+    this.setProjectionMatrix(other.getProjectionMatrix());
   }
   /** Clip plane in camera space */
   get clipPlane(): Plane {
@@ -376,10 +408,10 @@ export class Camera extends SceneNode {
   }
   /** OIT */
   get oit(): OIT {
-    return this._oit;
+    return this._oit.get();
   }
   set oit(val: OIT) {
-    this._oit = val;
+    this._oit.set(val);
   }
   /** Clip plane mask */
   get clipMask(): number {
@@ -387,13 +419,6 @@ export class Camera extends SceneNode {
   }
   set clipMask(val: number) {
     this._clipMask = val;
-  }
-  /** Framebuffer object into which the scene will be rendered */
-  get framebuffer(): FrameBuffer {
-    return this._framebuffer;
-  }
-  set framebuffer(fb: FrameBuffer) {
-    this._framebuffer = fb ?? null;
   }
   /** Viewport used for rendering, if null, use full framebuffer size */
   get viewport(): number[] {
@@ -706,7 +731,6 @@ export class Camera extends SceneNode {
     }
     device.pushDeviceStates();
     device.reverseVertexWindingOrder(false);
-    device.setFramebuffer(this._framebuffer);
     SceneRenderer.setClearColor(this._clearColor);
     SceneRenderer.renderScene(scene, this, compositor);
     device.popDeviceStates();

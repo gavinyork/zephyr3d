@@ -159,6 +159,29 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       this._iridescenceFactor = new Vector4(0, 1.3, 100, 400);
       this._sceneColorTexSize = new Vector2();
     }
+    copyFrom(other: this): void {
+      super.copyFrom(other);
+      this.ior = other.ior;
+      this.transmissionFactor = other.transmissionFactor;
+      this.thicknessFactor = other.thicknessFactor;
+      this.attenuationColor = other.attenuationColor;
+      this.attenuationDistance = other.attenuationDistance;
+      this.iridescenceFactor = other.iridescenceFactor;
+      this.iridescenceIor = other.iridescenceIor;
+      this.iridescenceThicknessMin = other.iridescenceThicknessMin;
+      this.iridescenceThicknessMax = other.iridescenceThicknessMax;
+      this.occlusionStrength = other.occlusionStrength;
+      this.emissiveColor = other.emissiveColor;
+      this.emissiveStrength = other.emissiveStrength;
+      this.transmission = other.transmission;
+      this.iridescence = other.iridescence;
+      this.clearcoat = other.clearcoat;
+      this.clearcoatIntensity = other.clearcoatIntensity;
+      this.clearcoatRoughnessFactor = other.clearcoatRoughnessFactor;
+      this.sheen = other.sheen;
+      this.sheenColorFactor = other.sheenColorFactor;
+      this.sheenRoughnessFactor = other.sheenRoughnessFactor;
+    }
     get ior(): number {
       return this._f0.w;
     }

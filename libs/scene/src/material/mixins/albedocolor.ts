@@ -36,6 +36,10 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
       super();
       this._albedoColor = Vector4.one();
     }
+    copyFrom(other: this): void {
+      super.copyFrom(other);
+      this.albedoColor = other.albedoColor;
+    }
     /** Albedo color */
     get albedoColor(): Vector4 {
       return this._albedoColor;

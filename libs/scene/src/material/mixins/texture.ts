@@ -194,6 +194,14 @@ export function mixinTextureProps<U extends string>(name: U) {
           configurable: true
         });
       }
+      copyFrom(other: any): void {
+        super.copyFrom(other);
+        const that = this as any;
+        that[`${name}Texture`] = other[`${name}Texture`];
+        that[`${name}TextureSampler`] = other[`${name}TextureSampler`];
+        that[`${name}TexCoordMatrix`] = other[`${name}TexCoordMatrix`];
+        that[`${name}TexCoordIndex`] = other[`${name}TexCoordIndex`];
+      }
       vertexShader(scope: PBFunctionScope): void {
         super.vertexShader(scope);
         if (vertex || this.needFragmentColor()) {

@@ -4,6 +4,7 @@ import type { BatchDrawable } from '../render/drawable';
 import type { Scene } from './scene';
 import type { Camera } from '../camera/camera';
 import type { OctreeNode } from '.';
+import type { Clonable } from '@zephyr3d/base';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 /**
@@ -14,7 +15,7 @@ import type { OctreeNode } from '.';
  *
  * @public
  */
-export class GraphNode extends SceneNode {
+export class GraphNode extends SceneNode implements Clonable<GraphNode> {
   private _octreeNode: OctreeNode;
   /**
    * Creates a graph node
@@ -23,6 +24,12 @@ export class GraphNode extends SceneNode {
   constructor(scene: Scene) {
     super(scene);
     this._octreeNode = null;
+  }
+  clone(): GraphNode {
+    const other = new GraphNode(this.scene);
+    other.copyFrom(this);
+    other.parent = this.parent;
+    return other;
   }
   /** @internal */
   get octreeNode(): OctreeNode {

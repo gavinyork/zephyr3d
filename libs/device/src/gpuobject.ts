@@ -665,16 +665,14 @@ const vertexAttribNameRevMap = {
  * Options for creating vertex layout
  * @public
  */
-export type VertexLayoutOptions<
-  T extends { buffer: StructuredBuffer; stepMode?: VertexStepMode } = {
-    buffer: StructuredBuffer;
-    stepMode?: VertexStepMode;
-  }
-> = {
+export type VertexLayoutOptions = {
   /**
    * vertex buffers in this vertex layout
    */
-  vertexBuffers: T[];
+  vertexBuffers: {
+    buffer: StructuredBuffer;
+    stepMode?: VertexStepMode;
+  }[];
   /**
    * optional index buffer in this vertex layout
    */

@@ -1,3 +1,4 @@
+import type { Clonable } from '@zephyr3d/base';
 import { Vector4, applyMixins } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import { BoxFrameShape } from '../shapes';
@@ -18,7 +19,7 @@ import { Ref } from '../app/gc/ref';
  * Mesh node
  * @public
  */
-export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements BatchDrawable {
+export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements BatchDrawable, Clonable<Mesh> {
   /** @internal */
   private _primitive: Ref<Primitive>;
   /** @internal */
@@ -67,6 +68,22 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     // use setter
     this.primitive = primitive ?? null;
     this.material = material ?? Mesh._getDefaultMaterial();
+  }
+  clone(): Mesh {
+    const other = new Mesh(this.scene);
+    other.copyFrom(this);
+    other.parent = this.parent;
+    return other;
+  }
+  copyFrom(other: this): void {
+    super.copyFrom(other);
+    this.castShadow = other.castShadow;
+    this.primitive = other.primitive;
+    this.drawBoundingBox = other.drawBoundingBox;
+    this._boneMatrices = other._boneMatrices;
+    this._morphData = other._morphData;
+    this._morphInfo = other._morphInfo;
+    this.material = other.material?.createInstance();
   }
   /**
    * {@inheritDoc Drawable.getName}

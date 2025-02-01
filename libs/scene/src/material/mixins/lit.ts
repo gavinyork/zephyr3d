@@ -106,6 +106,12 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       this._normalScale = 1;
       this.useFeature(FEATURE_DOUBLE_SIDED_LIGHTING, true);
     }
+    copyFrom(other: this): void {
+      super.copyFrom(other);
+      this.normalScale = other.normalScale;
+      this.normalMapMode = other.normalMapMode;
+      this.doubleSidedLighting = other.doubleSidedLighting;
+    }
     get normalScale(): number {
       return this._normalScale;
     }

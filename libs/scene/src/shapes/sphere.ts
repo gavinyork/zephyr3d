@@ -1,4 +1,4 @@
-import type { Ray } from '@zephyr3d/base';
+import type { Clonable, Ray } from '@zephyr3d/base';
 import type { AABB } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
@@ -22,7 +22,7 @@ export interface SphereCreationOptions extends ShapeCreationOptions {
  * Sphere shape
  * @public
  */
-export class SphereShape extends Shape<SphereCreationOptions> {
+export class SphereShape extends Shape<SphereCreationOptions> implements Clonable<SphereShape> {
   static _defaultOptions = {
     ...Shape._defaultOptions,
     radius: 1,
@@ -35,6 +35,9 @@ export class SphereShape extends Shape<SphereCreationOptions> {
    */
   constructor(options?: SphereCreationOptions) {
     super(options);
+  }
+  clone(): SphereShape {
+    return new SphereShape(this._options);
   }
   /**
    * {@inheritDoc Shape.type}

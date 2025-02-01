@@ -21,11 +21,11 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
     className: 'Camera',
     createFunc(scene: Scene | SceneNode) {
       if (scene instanceof Scene) {
-        return new Camera(scene);
+        return { obj: new Camera(scene) };
       } else if (scene instanceof SceneNode) {
-        const batchGroup = new Camera(scene.scene);
-        batchGroup.parent = scene;
-        return batchGroup;
+        const camera = new Camera(scene.scene);
+        camera.parent = scene;
+        return { obj: camera };
       } else {
         return null;
       }
@@ -344,11 +344,11 @@ export function getPerspectiveCameraClass(assetRegistry: AssetRegistry): Seriali
     className: 'PerspectiveCamera',
     createFunc(scene: Scene | SceneNode) {
       if (scene instanceof Scene) {
-        return new PerspectiveCamera(scene);
+        return { obj: new PerspectiveCamera(scene) };
       } else if (scene instanceof SceneNode) {
-        const batchGroup = new PerspectiveCamera(scene.scene);
-        batchGroup.parent = scene;
-        return batchGroup;
+        const camera = new PerspectiveCamera(scene.scene);
+        camera.parent = scene;
+        return { obj: camera };
       } else {
         return null;
       }
@@ -404,11 +404,11 @@ export function getOrthoCameraClass(assetRegistry: AssetRegistry): SerializableC
     className: 'OrthoCamera',
     createFunc(scene: Scene | SceneNode) {
       if (scene instanceof Scene) {
-        return new OrthoCamera(scene);
+        return { obj: new OrthoCamera(scene) };
       } else if (scene instanceof SceneNode) {
-        const batchGroup = new OrthoCamera(scene.scene);
-        batchGroup.parent = scene;
-        return batchGroup;
+        const camera = new OrthoCamera(scene.scene);
+        camera.parent = scene;
+        return { obj: camera };
       } else {
         return null;
       }

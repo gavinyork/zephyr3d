@@ -3,15 +3,24 @@ import { mixinAlbedoColor } from './mixins/albedocolor';
 import { mixinVertexColor } from './mixins/vertexcolor';
 import type { PBFunctionScope } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
+import type { Clonable } from '@zephyr3d/base';
 
 /**
  * Unlit material
  * @public
  */
-export class UnlitMaterial extends applyMaterialMixins(MeshMaterial, mixinVertexColor, mixinAlbedoColor) {
+export class UnlitMaterial
+  extends applyMaterialMixins(MeshMaterial, mixinVertexColor, mixinAlbedoColor)
+  implements Clonable<UnlitMaterial>
+{
   static readonly FEATURE_VERTEX_COLOR = 'um_vertexcolor';
   constructor() {
     super();
+  }
+  clone(): UnlitMaterial {
+    const other = new UnlitMaterial();
+    other.copyFrom(this);
+    return other;
   }
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);

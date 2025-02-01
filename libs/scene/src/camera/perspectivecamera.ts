@@ -1,12 +1,12 @@
 import { Camera } from './camera';
 import type { Scene } from '../scene/scene';
-import type { Matrix4x4 } from '@zephyr3d/base';
+import type { Clonable, Matrix4x4 } from '@zephyr3d/base';
 
 /**
  * Perspective camera class
  * @public
  */
-export class PerspectiveCamera extends Camera {
+export class PerspectiveCamera extends Camera implements Clonable<PerspectiveCamera> {
   /** @internal */
   private _near: number;
   private _far: number;
@@ -30,12 +30,26 @@ export class PerspectiveCamera extends Camera {
     this._window = null;
     this._invalidate(true);
   }
+  clone(): PerspectiveCamera {
+    const other = new PerspectiveCamera(this.scene);
+    other.copyFrom(this);
+    other.parent = this.parent;
+    return other;
+  }
+  copyFrom(other: this): void {
+    super.copyFrom(other);
+    this.window = other.window;
+    this.near = other.near;
+    this.far = other.far;
+    this.fovY = other.fovY;
+    this.aspect = other.aspect;
+  }
   /** Sub-window of the frustum */
   get window(): number[] {
     return this._window;
   }
   set window(val: number[]) {
-    this._window = val ?? null;
+    this._window = val?.slice() ?? null;
     this._invalidate(true);
   }
   /** The near clip plane */

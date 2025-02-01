@@ -69,6 +69,12 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
       this._roughness = 1;
       this._specularFactor = Vector4.one();
     }
+    copyFrom(other: this): void {
+      super.copyFrom(other);
+      this.metallic = other.metallic;
+      this.roughness = other.roughness;
+      this.specularFactor = other.specularFactor;
+    }
     get metallic(): number {
       return this._metallic;
     }

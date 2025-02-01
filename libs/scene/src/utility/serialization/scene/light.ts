@@ -366,11 +366,11 @@ export function getDirectionalLightClass(assetRegistry: AssetRegistry): Serializ
     className: 'DirectionalLight',
     createFunc(scene: Scene | SceneNode) {
       if (scene instanceof Scene) {
-        return new DirectionalLight(scene);
+        return { obj: new DirectionalLight(scene) };
       } else if (scene instanceof SceneNode) {
-        const batchGroup = new DirectionalLight(scene.scene);
-        batchGroup.parent = scene;
-        return batchGroup;
+        const light = new DirectionalLight(scene.scene);
+        light.parent = scene;
+        return { obj: light };
       } else {
         return null;
       }
@@ -400,11 +400,11 @@ export function getPointLightClass(assetRegistry: AssetRegistry): SerializableCl
     className: 'PointLight',
     createFunc(scene: Scene | SceneNode) {
       if (scene instanceof Scene) {
-        return new PointLight(scene);
+        return { obj: new PointLight(scene) };
       } else if (scene instanceof SceneNode) {
-        const batchGroup = new PointLight(scene.scene);
-        batchGroup.parent = scene;
-        return batchGroup;
+        const light = new PointLight(scene.scene);
+        light.parent = scene;
+        return { obj: light };
       } else {
         return null;
       }
@@ -438,11 +438,11 @@ export function getSpotLightClass(assetRegistry: AssetRegistry): SerializableCla
     className: 'SpotLight',
     createFunc(scene: Scene | SceneNode) {
       if (scene instanceof Scene) {
-        return new SpotLight(scene);
+        return { obj: new SpotLight(scene) };
       } else if (scene instanceof SceneNode) {
-        const batchGroup = new SpotLight(scene.scene);
-        batchGroup.parent = scene;
-        return batchGroup;
+        const light = new SpotLight(scene.scene);
+        light.parent = scene;
+        return { obj: light };
       } else {
         return null;
       }

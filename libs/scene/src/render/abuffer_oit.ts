@@ -9,7 +9,7 @@ import type {
   PBShaderExp,
   RenderStateSet
 } from '@zephyr3d/device';
-import { OIT } from './oit';
+import type { OIT } from './oit';
 import type { DrawContext } from './drawable';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { ShaderHelper } from '../material';
@@ -22,7 +22,7 @@ import { ShaderHelper } from '../material';
  *
  * @public
  */
-export class ABufferOIT extends OIT {
+export class ABufferOIT implements OIT {
   /** Type name of ABufferOIT */
   public static readonly type = 'ab';
   private static MAX_FRAGMENT_LAYERS = 75;
@@ -42,13 +42,13 @@ export class ABufferOIT extends OIT {
   private _scissorHeight: number;
   private _currentPass: number;
   private _savedScissor: DeviceViewport;
+  private _disposed: boolean;
   /**
    * Creates an instance of ABufferOIT class
    *
    * @param numLayers - How many transparent layers, default is 16
    */
   constructor(numLayers = 16) {
-    super();
     this._nodeBuffer = null;
     this._headStagingBuffer = null;
     this._headBuffer = null;
@@ -61,6 +61,7 @@ export class ABufferOIT extends OIT {
     this._scissorHeight = 0;
     this._savedScissor = null;
     this._currentPass = 0;
+    this._disposed = false;
   }
   /**
    * {@inheritDoc OIT.getType}
@@ -78,16 +79,25 @@ export class ABufferOIT extends OIT {
    * {@inheritDoc OIT.dispose}
    */
   dispose() {
-    this._nodeBuffer?.dispose();
-    this._nodeBuffer = null;
-    this._headStagingBuffer?.dispose();
-    this._headStagingBuffer = null;
-    this._headBuffer?.dispose();
-    this._headBuffer = null;
-    this._scissorOffsetBuffer?.dispose();
-    this._scissorOffsetBuffer = null;
-    this._hash = null;
-    this._savedScissor = null;
+    if (!this._disposed) {
+      this._disposed = true;
+      this._nodeBuffer?.dispose();
+      this._nodeBuffer = null;
+      this._headStagingBuffer?.dispose();
+      this._headStagingBuffer = null;
+      this._headBuffer?.dispose();
+      this._headBuffer = null;
+      this._scissorOffsetBuffer?.dispose();
+      this._scissorOffsetBuffer = null;
+      this._hash = null;
+      this._savedScissor = null;
+    }
+  }
+  /**
+   * {@inheritDoc OIT.disposed}
+   */
+  get disposed() {
+    return this._disposed;
   }
   /**
    * {@inheritDoc OIT.begin}

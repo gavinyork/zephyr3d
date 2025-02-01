@@ -19,33 +19,33 @@ import type { DrawContext } from './drawable';
  *
  * @public
  */
-export abstract class OIT {
+export interface OIT {
   /**
    * Returns the type of the renderer.
    *
    * @returns The type of the renderer.
    */
-  abstract getType(): string;
+  getType(): string;
   /**
    * Checks whether the renderer supports the given device type.
    *
    * @param deviceType - The device type.
    * @returns True if the renderer supports the device type, false otherwise.
    */
-  abstract supportDevice(deviceType: string): boolean;
+  supportDevice(deviceType: string): boolean;
   /**
    * Begins rendering the transparent objects.
    *
    * @param ctx - The draw context.
    * @returns The number of passes required for rendering.
    */
-  abstract begin(ctx: DrawContext): number;
+  begin(ctx: DrawContext): number;
   /**
    * Ends rendering the transparent objects.
    *
    * @param ctx - The draw context.
    */
-  abstract end(ctx: DrawContext);
+  end(ctx: DrawContext);
   /**
    * Begins rendering for the given pass.
    *
@@ -53,14 +53,14 @@ export abstract class OIT {
    * @param pass - The pass number.
    * @returns True if the transparent objects should be rendered, false otherwise.
    */
-  abstract beginPass(ctx: DrawContext, pass: number): boolean;
+  beginPass(ctx: DrawContext, pass: number): boolean;
   /**
    * Ends rendering for the given pass.
    *
    * @param ctx - The draw context.
    * @param pass - The pass number.
    */
-  abstract endPass(ctx: DrawContext, pass: number);
+  endPass(ctx: DrawContext, pass: number);
   /**
    * Sets up the fragment output.
    *
@@ -69,7 +69,7 @@ export abstract class OIT {
    *
    * @param scope - The global shader scope.
    */
-  abstract setupFragmentOutput(scope: PBGlobalScope);
+  setupFragmentOutput(scope: PBGlobalScope);
   /**
    * Do the fragment color output.
    *
@@ -79,7 +79,7 @@ export abstract class OIT {
    * @param scope - The global shader scope.
    * @param color - The calculated fragment color.
    */
-  abstract outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp): boolean;
+  outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp): boolean;
   /**
    * Applies the uniforms for the given draw context and bind group.
    *
@@ -88,7 +88,7 @@ export abstract class OIT {
    * @param ctx - The draw context.
    * @param bindGroup - The bind group.
    */
-  abstract applyUniforms(ctx: DrawContext, bindGroup: BindGroup);
+  applyUniforms(ctx: DrawContext, bindGroup: BindGroup);
   /**
    * Calculates the hash of the renderer.
    *
@@ -97,7 +97,7 @@ export abstract class OIT {
    *
    * @returns The hash of the renderer.
    */
-  abstract calculateHash(): string;
+  calculateHash(): string;
   /**
    * Sets the render states for the renderer.
    *
@@ -105,9 +105,13 @@ export abstract class OIT {
    *
    * @param rs - The render states.
    */
-  abstract setRenderStates(rs: RenderStateSet);
+  setRenderStates(rs: RenderStateSet);
   /**
    * Disposes the renderer.
    */
-  abstract dispose(): void;
+  dispose(): void;
+  /**
+   * Whether this is disposed
+   */
+  readonly disposed: boolean;
 }

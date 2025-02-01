@@ -21,11 +21,11 @@ export function getMeshClass(assetRegistry: AssetRegistry): SerializableClass {
     className: 'Mesh',
     createFunc(scene: Scene | SceneNode) {
       if (scene instanceof Scene) {
-        return new Mesh(scene);
+        return { obj: new Mesh(scene) };
       } else if (scene instanceof SceneNode) {
         const mesh = new Mesh(scene.scene);
         mesh.parent = scene;
-        return mesh;
+        return { obj: mesh };
       } else {
         return null;
       }

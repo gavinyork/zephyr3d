@@ -151,6 +151,13 @@ export type GenericConstructor<T = object> = {
 };
 
 /**
+ * Clonable interface
+ */
+export interface Clonable<T> {
+  clone(): T;
+}
+
+/**
  * Typed array
  * @public
  */

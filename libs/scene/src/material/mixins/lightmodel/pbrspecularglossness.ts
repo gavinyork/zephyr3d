@@ -60,6 +60,11 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
       this._specularFactor = Vector4.one();
       this._glossinessFactor = 1;
     }
+    copyFrom(other: this): void {
+      super.copyFrom(other);
+      this.specularFactor = other.specularFactor;
+      this.glossinessFactor = other.glossinessFactor;
+    }
     get specularFactor(): Vector4 {
       return this._specularFactor;
     }

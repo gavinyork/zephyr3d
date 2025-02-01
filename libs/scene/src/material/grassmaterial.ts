@@ -1,3 +1,4 @@
+import type { Clonable } from '@zephyr3d/base';
 import { Vector2, Vector4 } from '@zephyr3d/base';
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
@@ -11,11 +12,10 @@ import { mixinFoliage } from './mixins/foliage';
  * Terrain grass material
  * @public
  */
-export class GrassMaterial extends applyMaterialMixins(
-  MeshMaterial,
-  mixinPBRMetallicRoughness,
-  mixinFoliage
-) {
+export class GrassMaterial
+  extends applyMaterialMixins(MeshMaterial, mixinPBRMetallicRoughness, mixinFoliage)
+  implements Clonable<GrassMaterial>
+{
   /** @internal */
   private _terrainSize: Vector2;
   /** @internal */
@@ -41,6 +41,11 @@ export class GrassMaterial extends applyMaterialMixins(
       this.albedoTexture = grassTexture;
       this._textureSize.setXY(grassTexture.width, grassTexture.height);
     }
+  }
+  clone(): GrassMaterial {
+    const other = new GrassMaterial(this._terrainSize, this._terrainNormalMap, this.albedoTexture);
+    other.copyFrom(this);
+    return other;
   }
   /**
    * {@inheritDoc MeshMaterial.isTransparentPass}

@@ -40,6 +40,10 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
       super();
       this._shininess = 32;
     }
+    copyFrom(other: this): void {
+      super.copyFrom(other);
+      this.shininess = other.shininess;
+    }
     /** Shininess */
     get shininess(): number {
       return this._shininess;

@@ -1,4 +1,4 @@
-import type { AABB } from '@zephyr3d/base';
+import type { AABB, Clonable } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 import type { PrimitiveType } from '@zephyr3d/device';
@@ -34,7 +34,7 @@ export interface PlaneCreationOptions extends ShapeCreationOptions {
  * The plane shape
  * @public
  */
-export class PlaneShape extends Shape<PlaneCreationOptions> {
+export class PlaneShape extends Shape<PlaneCreationOptions> implements Clonable<PlaneShape> {
   static _defaultOptions = {
     ...Shape._defaultOptions,
     size: 1,
@@ -48,6 +48,9 @@ export class PlaneShape extends Shape<PlaneCreationOptions> {
    */
   constructor(options?: PlaneCreationOptions) {
     super(options);
+  }
+  clone(): PlaneShape {
+    return new PlaneShape(this._options);
   }
   /**
    * {@inheritDoc Shape.type}

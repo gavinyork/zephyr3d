@@ -11,11 +11,11 @@ export function getBatchGroupClass(assetRegistry: AssetRegistry): SerializableCl
     className: 'BatchGroup',
     createFunc(scene: Scene | SceneNode) {
       if (scene instanceof Scene) {
-        return new BatchGroup(scene);
+        return { obj: new BatchGroup(scene) };
       } else if (scene instanceof SceneNode) {
         const batchGroup = new BatchGroup(scene.scene);
         batchGroup.parent = scene;
-        return batchGroup;
+        return { obj: batchGroup };
       } else {
         return null;
       }

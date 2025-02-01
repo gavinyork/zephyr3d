@@ -4,16 +4,16 @@ import type { PBFunctionScope } from '@zephyr3d/device';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 import { ShaderHelper } from './shader/helper';
 import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
+import type { Clonable } from '@zephyr3d/base';
 
 /**
  * PBRMetallicRoughnessMaterial class
  * @public
  */
-export class PBRMetallicRoughnessMaterial extends applyMaterialMixins(
-  MeshMaterial,
-  mixinPBRMetallicRoughness,
-  mixinVertexColor
-) {
+export class PBRMetallicRoughnessMaterial
+  extends applyMaterialMixins(MeshMaterial, mixinPBRMetallicRoughness, mixinVertexColor)
+  implements Clonable<PBRMetallicRoughnessMaterial>
+{
   /** @internal */
   private static FEATURE_VERTEX_NORMAL = this.defineFeature();
   /** @internal */
@@ -24,6 +24,16 @@ export class PBRMetallicRoughnessMaterial extends applyMaterialMixins(
   constructor() {
     super();
     this.useFeature(PBRMetallicRoughnessMaterial.FEATURE_VERTEX_NORMAL, true);
+  }
+  clone(): PBRMetallicRoughnessMaterial {
+    const other = new PBRMetallicRoughnessMaterial();
+    other.copyFrom(this);
+    return other;
+  }
+  copyFrom(other: this): void {
+    super.copyFrom(other);
+    this.vertexNormal = other.vertexNormal;
+    this.vertexTangent = other.vertexTangent;
   }
   /** true if vertex normal attribute presents */
   get vertexNormal(): boolean {

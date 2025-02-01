@@ -8,7 +8,7 @@ import type {
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
-import { OIT } from './oit';
+import type { OIT } from './oit';
 import type { DrawContext } from './drawable';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { Vector4 } from '@zephyr3d/base';
@@ -21,17 +21,17 @@ import { Vector4 } from '@zephyr3d/base';
  *
  * @public
  */
-export class WeightedBlendedOIT extends OIT {
+export class WeightedBlendedOIT implements OIT {
   /** Type name of WeightedBlendedOIT */
   public static readonly type = 'wb';
   private static _compositeProgram: GPUProgram;
   private static _compositeBindGroup: BindGroup;
   private static _compositeRenderStates: RenderStateSet;
-  /**
-   * Creates an instance of WeightedBlendedOIT class.
-   */
+  /** @internal */
+  private _disposed: boolean;
+
   constructor() {
-    super();
+    this._disposed = false;
   }
   /**
    * {@inheritDoc OIT.getType}
@@ -49,7 +49,13 @@ export class WeightedBlendedOIT extends OIT {
    * {@inheritDoc OIT.dispose}
    */
   dispose() {
-    return;
+    this._disposed = true;
+  }
+  /**
+   * {@inheritDoc OIT.disposed}
+   */
+  get disposed() {
+    return this._disposed;
   }
   /**
    * {@inheritDoc OIT.begin}

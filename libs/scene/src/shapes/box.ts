@@ -1,4 +1,4 @@
-import type { AABB } from '@zephyr3d/base';
+import type { AABB, Clonable } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 import type { PrimitiveType } from '@zephyr3d/device';
@@ -30,7 +30,7 @@ export interface BoxCreationOptions extends ShapeCreationOptions {
  * Box shape
  * @public
  */
-export class BoxShape extends Shape<BoxCreationOptions> {
+export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxShape> {
   static _defaultOptions = {
     ...Shape._defaultOptions,
     size: 1,
@@ -42,6 +42,9 @@ export class BoxShape extends Shape<BoxCreationOptions> {
    */
   constructor(options?: BoxCreationOptions) {
     super(options);
+  }
+  clone(): BoxShape {
+    return new BoxShape(this._options);
   }
   /**
    * {@inheritDoc Shape.type}
@@ -183,7 +186,7 @@ export class BoxShape extends Shape<BoxCreationOptions> {
  * Wireframe box shape
  * @public
  */
-export class BoxFrameShape extends Shape<BoxCreationOptions> {
+export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable<BoxFrameShape> {
   static _defaultOptions = {
     ...Shape._defaultOptions,
     size: 1,
@@ -195,6 +198,9 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> {
    */
   constructor(options?: BoxCreationOptions) {
     super(options);
+  }
+  clone(): BoxFrameShape {
+    return new BoxFrameShape(this._options);
   }
   /**
    * {@inheritDoc Shape.type}

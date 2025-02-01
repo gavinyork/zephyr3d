@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Ray, TypedArray } from '@zephyr3d/base';
+import type { Clonable, Ray, TypedArray } from '@zephyr3d/base';
 import {
   type VertexStepMode,
   type VertexLayout,
@@ -16,21 +16,19 @@ import {
 import { Application } from '../app/app';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
-import { Ref } from '../app';
+import { releaseObject, retainObject, WeakRef } from '../app';
 
 /**
  * Primitive contains only the vertex and index data of a mesh
  * @public
  */
-export class Primitive {
+export class Primitive implements Clonable<Primitive> {
+  /** @internal */
+  private static _registry: Map<string, WeakRef<Primitive>> = new Map();
   /** @internal */
   protected _vertexLayout: VertexLayout;
   /** @internal */
-  protected _vertexLayoutOptions: VertexLayoutOptions<{
-    buffer: StructuredBuffer;
-    bufferRef: Ref<StructuredBuffer>;
-    stepMode?: VertexStepMode;
-  }> & { indexBufferRef?: Ref<IndexBuffer> };
+  protected _vertexLayoutOptions: VertexLayoutOptions;
   /** @internal */
   protected _primitiveType: PrimitiveType;
   /** @internal */
@@ -45,6 +43,8 @@ export class Primitive {
   private static _nextId = 0;
   /** @internal */
   protected _id: number;
+  /** @internal */
+  protected _persistentId: string;
   /** @internal */
   protected _bbox: BoundingVolume;
   /** @internal */
@@ -63,9 +63,27 @@ export class Primitive {
     this._defaultIndexCount = 0;
     this._vertexLayoutDirty = false;
     this._id = ++Primitive._nextId;
+    this._persistentId = '';
     this._bbox = null;
     this._bboxChangeCallback = [];
     this._disposed = false;
+  }
+  /** @internal */
+  static registerPrimitive(pid: string, prim: Primitive) {
+    if (prim && pid) {
+      prim.persistentId = pid;
+      this._registry.set(pid, new WeakRef(prim));
+    }
+  }
+  /** @internal */
+  static unregisterPrimitive(prim: Primitive) {
+    if (prim) {
+      this._registry.delete(prim._persistentId);
+    }
+  }
+  /** @internal */
+  static findPrimitiveById(id: string) {
+    return this._registry.get(id)?.get() ?? null;
   }
   /**
    * Unique identifier of the primitive
@@ -73,6 +91,29 @@ export class Primitive {
    */
   get id(): number {
     return this._id;
+  }
+  /**
+   * Persistent ID used in serialization
+   */
+  get persistentId() {
+    return this._persistentId;
+  }
+  set persistentId(val) {
+    this._persistentId = val;
+  }
+  clone(): Primitive {
+    const other = new Primitive();
+    other.copyFrom(this);
+    return other;
+  }
+  copyFrom(other: this) {
+    for (const info of other._vertexLayoutOptions.vertexBuffers) {
+      this.setVertexBuffer(info.buffer, info.stepMode);
+    }
+    this.setIndexBuffer(other._vertexLayoutOptions.indexBuffer);
+    this.primitiveType = other.primitiveType;
+    this.indexStart = other.indexStart;
+    this.indexCount = other.indexCount;
   }
   /**
    * Adds a callback function that will be called whenever the bounding box of the primitive changes.
@@ -168,7 +209,7 @@ export class Primitive {
     for (let i = this._vertexLayoutOptions.vertexBuffers.length - 1; i >= 0; i--) {
       const info = this._vertexLayoutOptions.vertexBuffers[i];
       if (matchVertexBuffer(info.buffer, semantic)) {
-        info.bufferRef.dispose();
+        releaseObject(info.buffer);
         this._vertexLayoutOptions.vertexBuffers.splice(i, 1);
         this._vertexLayoutDirty = true;
       }
@@ -224,9 +265,9 @@ export class Primitive {
    * @returns The added vertex buffer
    */
   setVertexBuffer(buffer: StructuredBuffer, stepMode?: VertexStepMode) {
+    retainObject(buffer);
     this._vertexLayoutOptions.vertexBuffers.push({
       buffer,
-      bufferRef: new Ref(buffer),
       stepMode
     });
     this._vertexLayoutDirty = true;
@@ -254,13 +295,10 @@ export class Primitive {
    */
   setIndexBuffer(buffer: IndexBuffer): void {
     if (this._vertexLayoutOptions.indexBuffer !== buffer) {
+      retainObject(buffer);
+      releaseObject(this._vertexLayoutOptions.indexBuffer);
       this._vertexLayoutOptions.indexBuffer = buffer;
       this._vertexLayoutDirty = true;
-      if (this._vertexLayoutOptions.indexBufferRef) {
-        this._vertexLayoutOptions.indexBufferRef.set(buffer);
-      } else {
-        this._vertexLayoutOptions.indexBufferRef = new Ref(buffer);
-      }
       RenderBundleWrapper.primitiveChanged(this);
     }
   }
@@ -302,9 +340,9 @@ export class Primitive {
     if (!this._disposed) {
       this._disposed = true;
       this._vertexLayout?.dispose();
-      this._vertexLayoutOptions.indexBufferRef?.dispose();
+      releaseObject(this._vertexLayoutOptions.indexBuffer);
       for (const info of this._vertexLayoutOptions.vertexBuffers) {
-        info.bufferRef?.dispose();
+        releaseObject(info.buffer);
       }
     }
   }

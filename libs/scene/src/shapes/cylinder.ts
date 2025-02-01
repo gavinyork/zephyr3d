@@ -1,4 +1,4 @@
-import type { AABB } from '@zephyr3d/base';
+import type { AABB, Clonable } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 import type { PrimitiveType } from '@zephyr3d/device';
@@ -30,7 +30,7 @@ export interface CylinderCreationOptions extends ShapeCreationOptions {
  * Box shape
  * @public
  */
-export class CylinderShape extends Shape<CylinderCreationOptions> {
+export class CylinderShape extends Shape<CylinderCreationOptions> implements Clonable<CylinderShape> {
   static _defaultOptions = {
     ...Shape._defaultOptions,
     topCap: true,
@@ -48,6 +48,9 @@ export class CylinderShape extends Shape<CylinderCreationOptions> {
    */
   constructor(options?: CylinderCreationOptions) {
     super(options);
+  }
+  clone(): CylinderShape {
+    return new CylinderShape(this._options);
   }
   /**
    * {@inheritDoc Shape.type}
