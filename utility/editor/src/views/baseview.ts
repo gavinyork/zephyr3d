@@ -22,6 +22,7 @@ export abstract class BaseView<Model extends BaseModel> {
       const shortcut = this.getShortcutString(e);
       console.log(shortcut);
       if (this._shortcuts.has(shortcut)) {
+        ev.preventDefault();
         const info = this._shortcuts.get(shortcut);
         if (info.handler && (info.repeatable || !e.repeat)) {
           info.handler(shortcut);

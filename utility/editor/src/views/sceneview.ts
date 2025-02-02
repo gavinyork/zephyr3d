@@ -263,6 +263,42 @@ export class SceneView extends BaseView<SceneModel> {
           }
         },
         {
+          label: FontGlyph.glyphs['link'],
+          shortcut: 'Ctrl+D',
+          tooltip: () => 'Creatas an instance of current node',
+          selected: () => {
+            return !!this._postGizmoRenderer.node;
+          },
+          action: () => {
+            alert('clone');
+          }
+        },
+        {
+          label: '-'
+        },
+        {
+          label: FontGlyph.glyphs['clone'],
+          shortcut: 'Ctrl+C',
+          tooltip: () => 'Copy',
+          selected: () => {
+            return !!this._postGizmoRenderer.node;
+          },
+          action: () => {
+            alert('copy');
+          }
+        },
+        {
+          label: FontGlyph.glyphs['paste'],
+          shortcut: 'Ctrl+V',
+          tooltip: () => 'Paste',
+          selected: () => {
+            return true;
+          },
+          action: () => {
+            alert('paste');
+          }
+        },
+        {
           label: '-'
         },
         {
@@ -396,12 +432,10 @@ export class SceneView extends BaseView<SceneModel> {
     if (this._showDeviceInfo) {
       this.renderDeviceInfo();
     }
-    /*
     if (ImGui.Begin('FontTest')) {
       ImGui.Text(FontGlyph.allGlyphs);
     }
     ImGui.End();
-    */
   }
   renderDropZone(x: number, y: number, w: number, h: number) {
     const color = new ImGui.ImVec4(0, 0, 0, 0);

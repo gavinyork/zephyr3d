@@ -41,7 +41,8 @@ export class ModalDialog extends makeEventTarget(Object)<{
   }
   open() {
     if (ModalDialog._currentDlg) {
-      throw new Error('Only one modal dialog should be opened');
+      console.error('Only one modal dialog should be opened');
+      return;
     }
     ModalDialog._currentDlg = this;
     this.dispatchEvent('opened');
