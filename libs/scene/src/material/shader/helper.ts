@@ -8,7 +8,6 @@ import {
   MORPH_TARGET_POSITION,
   MORPH_TARGET_TANGENT,
   MORPH_WEIGHTS_VECTOR_COUNT,
-  QUEUE_TRANSPARENT,
   RENDER_PASS_TYPE_DEPTH,
   RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_OBJECT_COLOR,
@@ -733,8 +732,7 @@ export class ShaderHelper {
       viewProjectionMatrix:
         ctx.motionVectors &&
         ctx.renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP &&
-        ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR &&
-        ctx.queue !== QUEUE_TRANSPARENT
+        ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR
           ? ctx.camera.jitteredVPMatrix
           : ctx.camera.viewProjectionMatrix,
       viewMatrix: ctx.camera.viewMatrix,

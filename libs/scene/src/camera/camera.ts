@@ -11,6 +11,7 @@ import { Compositor } from '../posteffect/compositor';
 import type { Scene } from '../scene/scene';
 import type { BaseCameraController } from './base';
 import type { OIT } from '../render/oit';
+import { TAA } from '../posteffect/taa';
 
 /**
  * Camera pick result
@@ -37,6 +38,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   private static _halton23 = halton23(16);
   /** @internal */
   private static _historyData: WeakMap<Camera, CameraHistoryData> = new WeakMap();
+  private static _TAA: TAA = null;
   /** @internal */
   protected _projMatrix: Matrix4x4;
   /** @internal */
@@ -701,6 +703,12 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    */
   render(scene: Scene, compositor?: Compositor) {
     compositor = compositor ?? Camera._defaultCompositor;
+    if (this.TAA) {
+      if (!Camera._TAA) {
+        Camera._TAA = new TAA();
+      }
+      compositor.appendPostEffect(Camera._TAA);
+    }
     scene.dispatchEvent('startrender', scene, this, compositor);
     const device = Application.instance.device;
     const useTAA = this._TAA;
@@ -741,6 +749,9 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
       this._prevPosition = this.getWorldPosition();
     }
     scene.dispatchEvent('endrender', scene, this, compositor ?? null);
+    if (Camera._TAA) {
+      compositor.removePostEffect(Camera._TAA);
+    }
   }
   async pickAsync(posX: number, posY: number): Promise<PickResult> {
     this._pickPosX = posX;
