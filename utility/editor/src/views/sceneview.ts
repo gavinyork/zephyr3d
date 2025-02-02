@@ -699,6 +699,7 @@ export class SceneView extends BaseView<SceneModel> {
   }
   private handleCloneNode(node: SceneNode, method: NodeCloneMethod) {
     this._cmdManager.execute(new NodeCloneCommand(node, method, this._assetRegistry)).then((sceneNode) => {
+      sceneNode.position.x += 1;
       this._tab.sceneHierarchy.selectNode(sceneNode);
     });
   }
