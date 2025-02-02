@@ -117,27 +117,6 @@ export class AssetManager {
     return this._httpRequest;
   }
   /**
-   * Remove and dispose all cached assets
-   */
-  purgeCache() {
-    for (const k in this._textures) {
-      const P = this._textures[k];
-      if (P instanceof WeakRef) {
-        P.dispose();
-      }
-    }
-    this._textures = {};
-    for (const k in this._models) {
-      const P = this._models[k];
-      if (P instanceof WeakRef) {
-        P.dispose();
-      }
-    }
-    this._models = {};
-    this._binaryDatas = {};
-    this._textDatas = {};
-  }
-  /**
    * Adds a texture loader to the asset manager
    *
    * @remarks

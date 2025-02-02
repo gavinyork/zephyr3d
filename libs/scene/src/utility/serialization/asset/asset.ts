@@ -9,15 +9,16 @@ export type AssetInfo = {
   name: string;
   type: AssetType;
   path: string;
-  manager: AssetManager;
   allocated: WeakMap<any, string>;
   textureOptions?: TextureFetchOptions<any>;
 };
 
 export class AssetRegistry {
   private _assetMap: Map<string, AssetInfo>;
+  private _assetManager: AssetManager;
   constructor() {
     this._assetMap = new Map();
+    this._assetManager = new AssetManager();
   }
   getAssetId(asset: any) {
     for (const entry of this._assetMap) {
@@ -37,7 +38,6 @@ export class AssetRegistry {
         name,
         type,
         path,
-        manager: new AssetManager(),
         allocated: new WeakMap()
       });
     }
@@ -88,7 +88,6 @@ export class AssetRegistry {
     return { assets };
   }
   deserialize(json: any) {
-    this.purge();
     const assets = json?.assets;
     if (assets) {
       for (const k of Object.getOwnPropertyNames(assets)) {
@@ -98,18 +97,10 @@ export class AssetRegistry {
           name: info.name,
           type: info.type,
           path: info.path,
-          manager: new AssetManager(),
           allocated: new Map()
         });
       }
     }
-  }
-  purge() {
-    for (const entry of this._assetMap) {
-      entry[1].manager.purgeCache();
-      entry[1].allocated = new WeakMap();
-    }
-    this._assetMap.clear();
   }
   protected async doFetchModel(
     name: string,
@@ -121,7 +112,7 @@ export class AssetRegistry {
     if (!info || info.type !== 'model') {
       return null;
     }
-    return await info.manager.fetchModel(scene, info.path, options, request);
+    return await this._assetManager.fetchModel(scene, info.path, options, request);
   }
   protected async doFetchTexture<T extends Texture2D | TextureCube>(
     name: string,
@@ -132,6 +123,6 @@ export class AssetRegistry {
     if (!info || info.type !== 'texture') {
       return null;
     }
-    return await info.manager.fetchTexture<T>(info.path, options, request);
+    return await this._assetManager.fetchTexture<T>(info.path, options, request);
   }
 }

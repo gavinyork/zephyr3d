@@ -79,7 +79,6 @@ export class EnvMaps {
     ];
   }
   async selectByPath(path: string, scene: Scene, urlResolver: (url: string) => string) {
-    this._assetManagerEx.purgeCache();
     this._assetManagerEx.httpRequest.urlResolver = urlResolver;
     const maps = await this.loadEnvMap(path, this._assetManagerEx);
     this._currentId = '';

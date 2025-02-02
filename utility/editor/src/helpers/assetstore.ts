@@ -5,29 +5,9 @@ import { HttpRequest } from '@zephyr3d/base';
 import type { BaseTexture } from '@zephyr3d/device';
 
 export class AssetStore {
-  private static _assetManagers: Record<
-    string,
-    {
-      assetManager: AssetManager;
-      path: string;
-      nodes: Map<SceneNode, AnimationSet>;
-    }
-  > = {};
+  private static _assetManager: AssetManager = new AssetManager();
   static readonly modelExtensions = ['.gltf', '.glb'];
   static readonly textureExtensions = ['jpg', 'jpeg', 'png', 'tga', 'dds', 'hdr'];
-  static async release(node: SceneNode) {
-    for (const k of Object.getOwnPropertyNames(this._assetManagers)) {
-      const assetManager = this._assetManagers[k];
-      if (assetManager.nodes.has(node)) {
-        assetManager.nodes.get(node)?.dispose();
-        assetManager.nodes.delete(node);
-        if (assetManager.nodes.size === 0) {
-          assetManager.assetManager.purgeCache();
-        }
-        break;
-      }
-    }
-  }
   static async fetchTexture<T extends BaseTexture>(
     uuid: string,
     options?: TextureFetchOptions<T>
@@ -35,15 +15,6 @@ export class AssetStore {
     const asset = await Database.getAsset(uuid);
     if (asset?.type !== 'texture') {
       return null;
-    }
-    let assetManager = this._assetManagers[uuid];
-    if (!assetManager) {
-      assetManager = {
-        path: asset.path,
-        assetManager: new AssetManager(),
-        nodes: new Map()
-      };
-      this._assetManagers[uuid] = assetManager;
     }
     const pkg = await Database.getPackage(asset.pkg);
     if (!pkg) {
@@ -57,11 +28,7 @@ export class AssetStore {
       [...(await Database.decompressZip(blob.data))].map((val) => [val[0], URL.createObjectURL(val[1])])
     );
     const httpRequest = new HttpRequest((url) => fileMap.get(url));
-    const texture = await assetManager.assetManager.fetchTexture<T>(
-      `/${assetManager.path}`,
-      options,
-      httpRequest
-    );
+    const texture = await this._assetManager.fetchTexture<T>(`/${asset.path}`, options, httpRequest);
     for (const url of fileMap.values()) {
       URL.revokeObjectURL(url);
     }
@@ -80,15 +47,6 @@ export class AssetStore {
     if (asset?.type !== 'model') {
       return null;
     }
-    let assetManager = this._assetManagers[uuid];
-    if (!assetManager) {
-      assetManager = {
-        path: asset.path,
-        assetManager: new AssetManager(),
-        nodes: new Map()
-      };
-      this._assetManagers[uuid] = assetManager;
-    }
     const pkg = await Database.getPackage(asset.pkg);
     if (!pkg) {
       return null;
@@ -101,20 +59,10 @@ export class AssetStore {
       [...(await Database.decompressZip(blob.data))].map((val) => [val[0], URL.createObjectURL(val[1])])
     );
     const httpRequest = new HttpRequest((url) => fileMap.get(url));
-    const model = await assetManager.assetManager.fetchModel(
-      scene,
-      `/${assetManager.path}`,
-      options,
-      httpRequest
-    );
+    const model = await this._assetManager.fetchModel(scene, `/${asset.path}`, options, httpRequest);
     for (const url of fileMap.values()) {
       URL.revokeObjectURL(url);
     }
-    if (model) {
-      assetManager.nodes.set(model.group, model.animationSet);
-      return model;
-    } else {
-      throw new Error('Model asset cannot be loaded');
-    }
+    return model;
   }
 }
