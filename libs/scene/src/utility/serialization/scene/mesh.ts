@@ -47,15 +47,7 @@ export function getMeshClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'Primitive',
           type: 'object',
           default: { object: [null] },
-          objectTypes: [
-            Primitive,
-            BoxShape,
-            BoxFrameShape,
-            SphereShape,
-            CylinderShape,
-            PlaneShape,
-            TorusShape
-          ],
+          objectTypes: [BoxShape, BoxFrameShape, SphereShape, CylinderShape, PlaneShape, TorusShape],
           get(this: Mesh, value) {
             value.object[0] = this.primitive;
           },

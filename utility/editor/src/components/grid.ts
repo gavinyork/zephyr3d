@@ -22,8 +22,9 @@ class PropertyGroup {
   property: Property<any>;
   currentType: number;
   objectTypes: SerializableClass[];
-  objectTypeNames: string[];
+  prop: PropertyAccessor<any>;
   properties: Map<string, Property<any>>;
+  object: any;
   subgroups: PropertyGroup[];
   constructor(name: string, grid: PropertyEditor) {
     this.grid = grid;
@@ -31,9 +32,9 @@ class PropertyGroup {
     this.parent = null;
     this.value = { num: [], str: [], bool: [], object: [null] };
     this.property = null;
+    this.prop = null;
     this.currentType = -1;
     this.objectTypes = [];
-    this.objectTypeNames = [];
     this.properties = new Map();
     this.subgroups = [];
   }
@@ -47,7 +48,7 @@ class PropertyGroup {
     if (value.type === 'object' && value.objectTypes?.length > 0) {
       const propGroup = this.addGroup(value.name);
       value.get.call(obj, tmpProperty);
-      propGroup.setObject(tmpProperty.object[0]);
+      propGroup.setObject(tmpProperty.object[0], value, obj);
     } else {
       const property: Property<any> = {
         path: `${this.name}/${value.name}`,
@@ -74,21 +75,19 @@ class PropertyGroup {
     }
     return null;
   }
-  setObject(obj: any, objTypes?: unknown[]) {
+  setObject(obj: any, prop?: PropertyAccessor<any>, parentObj?: any) {
     if (this.value.object[0] !== obj) {
       const serializationInfo = this.grid.serailizationInfo;
       this.value.object[0] = obj ?? null;
       this.property = null;
+      this.object = parentObj;
       this.currentType = -1;
+      this.prop = prop ?? null;
       this.objectTypes =
-        objTypes?.map((ctor) => {
-          let s: SerializableClass;
-          while (ctor) {
-            s = serializationInfo.get(ctor);
-          }
-          return s;
-        }) ?? [];
-      this.objectTypeNames = this.objectTypes.map((t) => t.className);
+        prop?.objectTypes?.length > 0
+          ? prop.objectTypes.map((ctor) => this.grid.serailizationInfo.get(ctor)) ?? []
+          : [];
+      //this.objectTypes = objTypes ?? [];
       this.properties = new Map();
       this.subgroups = [];
       if (this.value.object[0]) {
@@ -124,6 +123,7 @@ export class PropertyEditor {
   private _serializationInfo: Map<any, SerializableClass>;
   private _assetRegistry: AssetRegistry;
   private _dragging: boolean;
+  private _dirty: boolean;
   constructor(
     assetRegistry: AssetRegistry,
     top: number,
@@ -145,6 +145,7 @@ export class PropertyEditor {
     this._padding = padding;
     this._labelPercent = labelPercent;
     this._dragging = false;
+    this._dirty = false;
   }
   get serailizationInfo(): Map<any, SerializableClass> {
     return this._serializationInfo;
@@ -161,7 +162,16 @@ export class PropertyEditor {
   clear() {
     this._rootGroup = new PropertyGroup('Root', this);
   }
+  refresh() {
+    this._dirty = true;
+  }
   render() {
+    if (this._dirty) {
+      this._dirty = false;
+      const object = this.object;
+      this.clear();
+      this.object = object;
+    }
     const displaySize = ImGui.GetIO().DisplaySize;
     const windowPos = new ImGui.ImVec2(displaySize.x - this._width, this._top);
     const windowSize = new ImGui.ImVec2(this._width, displaySize.y - this._top - this._bottom);
@@ -216,15 +226,20 @@ export class PropertyEditor {
       ) {
         ImGui.TableSetupColumn('Name', ImGui.TableColumnFlags.WidthFixed, labelWidth);
         ImGui.TableSetupColumn('Value', ImGui.TableColumnFlags.WidthFixed, valueWidth);
-        for (const subgroup of this._rootGroup.subgroups) {
-          this.renderGroup(subgroup, 0);
-        }
+        this.renderSubGroups(this._rootGroup, 0);
 
-        //this.renderGroup(this._rootGroup);
         ImGui.EndTable();
       }
 
       ImGui.EndChild();
+    }
+  }
+  private renderSubGroups(group: PropertyGroup, level: number) {
+    for (let i = 0; i < group.subgroups.length; i++) {
+      const subgroup = group.subgroups[i];
+      ImGui.PushID(i);
+      this.renderGroup(subgroup, level);
+      ImGui.PopID();
     }
   }
   private renderResizeBar(initialCursorPos: ImGui.ImVec2) {
@@ -264,14 +279,33 @@ export class PropertyEditor {
     }
     const flags = ImGui.TreeNodeFlags.DefaultOpen | ImGui.TreeNodeFlags.SpanFullWidth;
     const opened = ImGui.TreeNodeEx(group.name, flags);
+    if (group.object && group.prop && group.objectTypes.length > 0) {
+      ImGui.TableNextColumn();
+      ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
+      ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x);
+      const index = [
+        group.objectTypes.findIndex((val) => val.ctor === (group.getObject()?.constructor ?? null))
+      ] as [number];
+      if (
+        ImGui.Combo(
+          '',
+          index,
+          group.objectTypes.map((val) => val.className),
+          group.objectTypes.length
+        )
+      ) {
+        const newObj = new group.objectTypes[index[0]].ctor();
+        group.prop.set.call(group.object, { object: [newObj] });
+        this.refresh();
+      }
+      ImGui.EndChild();
+    }
     if (opened) {
       ImGui.TreePop();
       for (const property of group.properties) {
         this.renderProperty(property[1], level + 1, group.getObject());
       }
-      for (const subgroup of group.subgroups) {
-        this.renderGroup(subgroup, level + 1);
-      }
+      this.renderSubGroups(group, level + 1);
     }
     if (level > 0) {
       ImGui.Unindent(level * 10);
@@ -430,6 +464,18 @@ export class PropertyEditor {
           ImGui.SameLine(0, 0);
           if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
             value.set.call(object, null);
+            if (property.value.objectTypes?.length > 0) {
+              ImGui.OpenPopup('X##list');
+              if (ImGui.BeginPopup('X##list')) {
+                for (const t of property.value.objectTypes) {
+                  const cls = this._serializationInfo.get(t);
+                  if (cls && ImGui.MenuItem(`${cls.className}##create`)) {
+                    alert(cls.className);
+                  }
+                }
+                ImGui.EndPopup();
+              }
+            }
           }
         }
       }
