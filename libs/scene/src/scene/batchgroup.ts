@@ -3,8 +3,8 @@ import type { CullVisitor, RenderPass } from '../render';
 import { RenderQueue, InstanceBindGroupAllocator } from '../render';
 import type { Scene } from './scene';
 import { BoundingBox, type BoundingVolume } from '../utility/bounding_volume';
-import type { Clonable } from '@zephyr3d/base';
 import { Matrix4x4 } from '@zephyr3d/base';
+import { NodeClonable, NodeCloneMethod } from '.';
 
 const tmpMatrix = new Matrix4x4();
 
@@ -12,7 +12,7 @@ const tmpMatrix = new Matrix4x4();
  * Batch group node
  * @public
  */
-export class BatchGroup extends GraphNode implements Clonable<BatchGroup> {
+export class BatchGroup extends GraphNode implements NodeClonable<BatchGroup> {
   private _renderQueueMap: Map<
     RenderPass,
     {
@@ -84,9 +84,9 @@ export class BatchGroup extends GraphNode implements Clonable<BatchGroup> {
   isBatchGroup(): this is BatchGroup {
     return true;
   }
-  clone(): BatchGroup {
+  clone(method: NodeCloneMethod): BatchGroup {
     const other = new BatchGroup(this.scene);
-    other.copyFrom(this);
+    other.copyFrom(this, method);
     other.parent = this.parent;
     return other;
   }

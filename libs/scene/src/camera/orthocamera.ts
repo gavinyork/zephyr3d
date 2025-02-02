@@ -1,12 +1,13 @@
 import { Camera } from './camera';
 import type { Scene } from '../scene/scene';
-import type { Clonable, Matrix4x4 } from '@zephyr3d/base';
+import type { Matrix4x4 } from '@zephyr3d/base';
+import { NodeClonable, NodeCloneMethod } from '../scene';
 
 /**
  * Orthogonal camera class
  * @public
  */
-export class OrthoCamera extends Camera implements Clonable<OrthoCamera> {
+export class OrthoCamera extends Camera implements NodeClonable<OrthoCamera> {
   /** @internal */
   private _left: number;
   private _right: number;
@@ -32,14 +33,14 @@ export class OrthoCamera extends Camera implements Clonable<OrthoCamera> {
     this._far = far;
     this._invalidate(true);
   }
-  clone(): OrthoCamera {
+  clone(method: NodeCloneMethod): OrthoCamera {
     const other = new OrthoCamera(this.scene);
-    other.copyFrom(this);
+    other.copyFrom(this, method);
     other.parent = this.parent;
     return other;
   }
-  copyFrom(other: this): void {
-    super.copyFrom(other);
+  copyFrom(other: this, method: NodeCloneMethod): void {
+    super.copyFrom(other, method);
     this.near = other.near;
     this.far = other.far;
     this.left = other.left;

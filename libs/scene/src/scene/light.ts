@@ -5,6 +5,7 @@ import { BoundingBox } from '../utility/bounding_volume';
 import { ShadowMapper } from '../shadow/shadowmapper';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import type { Scene } from './scene';
+import { NodeClonable, NodeCloneMethod } from '.';
 
 /**
  * Base class for any kind of light node
@@ -33,6 +34,15 @@ export abstract class BaseLight extends GraphNode {
     this._positionRange = null;
     this._directionCutoff = null;
     this._diffuseIntensity = null;
+  }
+  /**
+   * Copy from another BaseLight
+   * @param other - Other BaseLight to copy from
+   * @param method - Copy method
+   */
+  copyFrom(other: this, method: NodeCloneMethod) {
+    super.copyFrom(other, method);
+    this.intensity = other.intensity;
   }
   /** Gets the light type */
   get lightType(): number {
@@ -93,16 +103,6 @@ export abstract class BaseLight extends GraphNode {
    */
   get viewMatrix(): Matrix4x4 {
     return this.invWorldMatrix;
-  }
-  /**
-   * View-projection matrix of the light
-   *
-   * @remarks
-   * The view-projection matrix of the light is used to transform
-   * a point from the world space to the clip space of the light view
-   */
-  get viewProjMatrix(): Matrix4x4 {
-    return null;
   }
   /**
    * Sets the intensity of the light
@@ -167,8 +167,6 @@ export abstract class PunctualLight extends BaseLight {
   /** @internal */
   protected _castShadow: boolean;
   /** @internal */
-  protected _lightViewProjectionMatrix: Matrix4x4;
-  /** @internal */
   protected _shadowMapper: ShadowMapper;
   /**
    * Creates an instance of punctual light
@@ -179,8 +177,13 @@ export abstract class PunctualLight extends BaseLight {
     super(scene, type);
     this._color = Vector4.one();
     this._castShadow = false;
-    this._lightViewProjectionMatrix = Matrix4x4.identity();
     this._shadowMapper = new ShadowMapper(this);
+  }
+  copyFrom(other: this, method: NodeCloneMethod): void {
+    super.copyFrom(other, method);
+    this.color = other.color;
+    this.castShadow = other.castShadow;
+    this.shadow.copyFrom(other.shadow);
   }
   /** Color of the light */
   get color(): Vector4 {
@@ -215,28 +218,9 @@ export abstract class PunctualLight extends BaseLight {
     this._castShadow = b;
     return this;
   }
-  /**
-   * {@inheritDoc BaseLight.viewProjMatrix}
-   * @override
-   */
-  get viewProjMatrix(): Matrix4x4 {
-    return this._lightViewProjectionMatrix;
-  }
-  set viewProjMatrix(mat: Matrix4x4) {
-    this.setLightViewProjectionMatrix(mat);
-  }
   /** The shadow mapper for this light */
   get shadow(): ShadowMapper {
     return this._shadowMapper;
-  }
-  /**
-   * Sets the view projection matrix for this light
-   * @param mat - The matrix to set
-   * @returns self
-   */
-  setLightViewProjectionMatrix(mat: Matrix4x4): this {
-    this._lightViewProjectionMatrix.set(mat);
-    return this;
   }
   /**
    * {@inheritDoc BaseLight.isPunctualLight}
@@ -257,7 +241,7 @@ export abstract class PunctualLight extends BaseLight {
  * Directional light
  * @public
  */
-export class DirectionalLight extends PunctualLight {
+export class DirectionalLight extends PunctualLight implements NodeClonable<DirectionalLight> {
   private static _currentSunLight: DirectionalLight = null;
   private _sunLight: boolean;
   /**
@@ -272,6 +256,12 @@ export class DirectionalLight extends PunctualLight {
     } else {
       this._sunLight = false;
     }
+  }
+  clone(method: NodeCloneMethod) {
+    const other = new DirectionalLight(this.scene);
+    other.copyFrom(this, method);
+    other.parent = this.parent;
+    return other;
   }
   /**
    * true if the light was defined as sun light
@@ -501,7 +491,7 @@ export class DirectionalLight extends PunctualLight {
  * Point light
  * @public
  */
-export class PointLight extends PunctualLight {
+export class PointLight extends PunctualLight implements NodeClonable<PointLight> {
   /** @internal */
   protected _range: number;
   /**
@@ -512,6 +502,16 @@ export class PointLight extends PunctualLight {
     super(scene, LIGHT_TYPE_POINT);
     this._range = 10;
     this.invalidateBoundingVolume();
+  }
+  clone(method: NodeCloneMethod) {
+    const other = new PointLight(this.scene);
+    other.copyFrom(this, method);
+    other.parent = this.parent;
+    return other;
+  }
+  copyFrom(other: this, method: NodeCloneMethod): void {
+    super.copyFrom(other, method);
+    this.range = other.range;
   }
   /** The range of the light */
   get range() {
@@ -562,7 +562,7 @@ export class PointLight extends PunctualLight {
  * Spot light
  * @public
  */
-export class SpotLight extends PunctualLight {
+export class SpotLight extends PunctualLight implements NodeClonable<SpotLight> {
   /** @internal */
   protected _range: number;
   /** @internal */
@@ -576,6 +576,17 @@ export class SpotLight extends PunctualLight {
     this._range = 10;
     this._cutoff = Math.cos(Math.PI / 4);
     this.invalidateBoundingVolume();
+  }
+  clone(method: NodeCloneMethod) {
+    const other = new SpotLight(this.scene);
+    other.copyFrom(this, method);
+    other.parent = this.parent;
+    return other;
+  }
+  copyFrom(other: this, method: NodeCloneMethod): void {
+    super.copyFrom(other, method);
+    this.range = other.range;
+    this.cutoff = other.cutoff;
   }
   /** The range of the light */
   get range() {

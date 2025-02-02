@@ -3,7 +3,7 @@ import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import { Quadtree } from './quadtree';
 import { GraphNode } from '../graph_node';
-import { Application } from '../../app';
+import { Application, Ref } from '../../app';
 import { GrassManager } from './grass';
 import type { Camera } from '../../camera/camera';
 import type { BoundingVolume } from '../../utility/bounding_volume';
@@ -11,16 +11,17 @@ import type { CullVisitor } from '../../render/cull_visitor';
 import type { Scene } from '../scene';
 import type { QuadtreeNode } from './quadtree';
 import { TerrainMaterial, type TerrainMaterialOptions } from '../../material/terrainmaterial';
+import { NodeClonable, NodeCloneMethod } from '..';
 
 /**
  * Terrain node
  * @public
  */
-export class Terrain extends GraphNode {
+export class Terrain extends GraphNode implements NodeClonable<Terrain> {
   /** @internal */
-  private _quadtree: Quadtree;
+  private _quadtree: Ref<Quadtree>;
   /** @internal */
-  private _grassManager: GrassManager;
+  private _grassManager: Ref<GrassManager>;
   /** @internal */
   private _maxPixelError: number;
   /** @internal */
@@ -51,8 +52,8 @@ export class Terrain extends GraphNode {
    */
   constructor(scene: Scene) {
     super(scene);
-    this._quadtree = null;
-    this._grassManager = null;
+    this._quadtree = new Ref();
+    this._grassManager = new Ref();
     this._maxPixelError = 10;
     this._maxPixelErrorDirty = true;
     this._lodCamera = null;
@@ -66,9 +67,29 @@ export class Terrain extends GraphNode {
     this._castShadow = true;
     this._instanceColor = Vector4.zero();
   }
+  clone(method: NodeCloneMethod) {
+    const terrain = new Terrain(this.scene);
+    terrain.copyFrom(this, method);
+    terrain.parent = this;
+    return terrain;
+  }
+  copyFrom(other: this, method: NodeCloneMethod): void {
+    super.copyFrom(other, method);
+    this._quadtree.set(other._quadtree.get());
+    this._grassManager.set(other._grassManager.get());
+    this.maxPixelError = other.maxPixelError;
+    this.castShadow = other.castShadow;
+    this._lodCamera = null;
+    this._heightFieldScale.set(other._heightFieldScale);
+    this._patchSize = other._patchSize;
+    this._lastTanHalfFOVY = 0;
+    this._width = other._width;
+    this._height = other._height;
+    this._material = other._material?.clone() ?? null;
+  }
   /** @internal */
   get quadtree(): Quadtree {
-    return this._quadtree;
+    return this._quadtree.get();
   }
   /**
    * {@inheritDoc Drawable.getName}
@@ -136,7 +157,7 @@ export class Terrain extends GraphNode {
   }
   /** Normal map of the terrain */
   get normalMap(): Texture2D {
-    return this._quadtree.normalMap;
+    return this._quadtree.get()?.normalMap ?? null;
   }
   /**
    * Creates the terrain
@@ -156,20 +177,20 @@ export class Terrain extends GraphNode {
     patchSize: number,
     options?: TerrainMaterialOptions
   ): boolean {
-    this._quadtree = new Quadtree(this);
+    this._quadtree.set(new Quadtree(this));
     if (options?.splatMap && options.splatMap.format !== 'rgba8unorm') {
       throw new Error('SplatMap must be rgba8unorm format');
     }
     this._material = new TerrainMaterial(options);
-    if (!this._quadtree.build(patchSize, sizeX, sizeZ, elevations, scale.x, scale.y, scale.z, 24)) {
-      this._quadtree = null;
+    if (!this._quadtree.get().build(patchSize, sizeX, sizeZ, elevations, scale.x, scale.y, scale.z, 24)) {
+      this._quadtree.dispose();
       return false;
     }
     this._patchSize = patchSize;
     this._heightFieldScale.set(scale);
     this._width = sizeX;
     this._height = sizeZ;
-    this._material.normalTexture = this._quadtree.normalMap;
+    this._material.normalTexture = this._quadtree.get().normalMap;
     this._material.normalTexCoordIndex = -1;
     this._material.terrainInfo = new Vector4(this.scaledWidth, this.scaledHeight, 0, 0);
     this.invalidateBoundingVolume();
@@ -219,37 +240,39 @@ export class Terrain extends GraphNode {
     offset: number,
     grassTexture: Texture2D
   ) {
-    if (!this._grassManager) {
-      this._grassManager = new GrassManager(64, density);
+    if (!this._grassManager.get()) {
+      this._grassManager.set(new GrassManager(64, density));
     }
-    this._grassManager.addGrassLayer(
-      Application.instance.device,
-      this,
-      density,
-      bladeWidth,
-      bladeHeight,
-      offset,
-      grassTexture
-    );
+    this._grassManager
+      .get()
+      .addGrassLayer(
+        Application.instance.device,
+        this,
+        density,
+        bladeWidth,
+        bladeHeight,
+        offset,
+        grassTexture
+      );
   }
   /** Get elevation at specified position in terrain coordinate space */
   getElevation(x: number, z: number): number {
-    return this._quadtree.getHeightField().getRealHeight(x, z);
+    return this._quadtree.get().getHeightField().getRealHeight(x, z);
   }
   /** Get normal at specified position in terrain coordinate space */
   getNormal(x: number, z: number, normal?: Vector3): Vector3 {
-    return this._quadtree.getHeightField().getRealNormal(x, z, normal);
+    return this._quadtree.get().getHeightField().getRealNormal(x, z, normal);
   }
   /** Get intersection distance by a ray in terrain coordinate space */
   rayIntersect(ray: Ray): number | null {
-    return this._quadtree.getHeightField().rayIntersect(ray);
+    return this._quadtree.get().getHeightField().rayIntersect(ray);
   }
   /**
    * {@inheritDoc SceneNode.computeBoundingVolume}
    * @override
    */
   computeBoundingVolume(): BoundingVolume {
-    return this._quadtree ? this._quadtree.getHeightField().getBBoxTree().getRootNode().bbox : null;
+    return this._quadtree.get()?.getHeightField().getBBoxTree().getRootNode().bbox ?? null;
   }
   /**
    * Traverse quadtree node top down
@@ -265,9 +288,9 @@ export class Terrain extends GraphNode {
         }
       }
     }
-    const rootNode = this._quadtree.rootNode;
+    const rootNode = this._quadtree.get().rootNode;
     if (rootNode) {
-      visitQuadtreeNode_r(this._quadtree.rootNode);
+      visitQuadtreeNode_r(this._quadtree.get().rootNode);
     }
   }
   /** @internal */
@@ -276,11 +299,11 @@ export class Terrain extends GraphNode {
     if (tanHalfFovy !== this._lastTanHalfFOVY || this._maxPixelErrorDirty) {
       this._maxPixelErrorDirty = false;
       this._lastTanHalfFOVY = tanHalfFovy;
-      this._quadtree.setupCamera(1024, tanHalfFovy, this._maxPixelError);
+      this._quadtree.get().setupCamera(1024, tanHalfFovy, this._maxPixelError);
     }
     const worldEyePos = cullVisitor.primaryCamera.getWorldPosition();
     this._viewPoint = this.invWorldMatrix.transformPointAffine(worldEyePos);
-    return this._quadtree.cull(cullVisitor, this._viewPoint, this.worldMatrix);
+    return this._quadtree.get().cull(cullVisitor, this._viewPoint, this.worldMatrix);
   }
   /**
    * {@inheritDoc SceneNode.isTerrain}
@@ -290,8 +313,8 @@ export class Terrain extends GraphNode {
     return true;
   }
   dispose() {
-    this._grassManager?.dispose();
+    this._grassManager.dispose();
     this._material?.dispose();
-    this._quadtree?.dispose();
+    this._quadtree.dispose();
   }
 }

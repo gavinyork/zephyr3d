@@ -1,12 +1,13 @@
 import { Camera } from './camera';
 import type { Scene } from '../scene/scene';
-import type { Clonable, Matrix4x4 } from '@zephyr3d/base';
+import type { Matrix4x4 } from '@zephyr3d/base';
+import { NodeClonable, NodeCloneMethod } from '../scene';
 
 /**
  * Perspective camera class
  * @public
  */
-export class PerspectiveCamera extends Camera implements Clonable<PerspectiveCamera> {
+export class PerspectiveCamera extends Camera implements NodeClonable<PerspectiveCamera> {
   /** @internal */
   private _near: number;
   private _far: number;
@@ -30,14 +31,14 @@ export class PerspectiveCamera extends Camera implements Clonable<PerspectiveCam
     this._window = null;
     this._invalidate(true);
   }
-  clone(): PerspectiveCamera {
+  clone(method: NodeCloneMethod): PerspectiveCamera {
     const other = new PerspectiveCamera(this.scene);
-    other.copyFrom(this);
+    other.copyFrom(this, method);
     other.parent = this.parent;
     return other;
   }
-  copyFrom(other: this): void {
-    super.copyFrom(other);
+  copyFrom(other: this, method: NodeCloneMethod): void {
+    super.copyFrom(other, method);
     this.window = other.window;
     this.near = other.near;
     this.far = other.far;

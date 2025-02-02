@@ -82,7 +82,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._menubar = new MenubarView({
       items: [
         {
-          label: `File`,
+          label: 'File',
           subMenus: [
             {
               label: 'New',
@@ -102,6 +102,42 @@ export class SceneView extends BaseView<SceneModel> {
             {
               label: 'Export',
               action: () => eventBus.dispatchEvent('action', 'EXPORT_DOC')
+            }
+          ]
+        },
+        {
+          label: 'Edit',
+          subMenus: [
+            {
+              label: 'Undo',
+              shortCut: 'Ctrl+Z',
+              action: () => {
+                this._cmdManager.undo();
+              }
+            },
+            {
+              label: 'Redo',
+              shortCut: 'Ctrl+Y',
+              action: () => {
+                this._cmdManager.redo();
+              }
+            },
+            {
+              label: '-'
+            },
+            {
+              label: 'Copy',
+              shortCut: 'Ctrl+C',
+              action: () => {
+                alert('copy');
+              }
+            },
+            {
+              label: 'Past',
+              shortCut: 'Ctrl+V',
+              action: () => {
+                alert('paste');
+              }
             }
           ]
         },

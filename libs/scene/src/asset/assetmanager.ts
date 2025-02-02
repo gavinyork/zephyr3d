@@ -619,9 +619,11 @@ export class AssetManager {
           meshNode.name = subMesh.name;
           meshNode.clipTestEnabled = true;
           meshNode.showState = 'inherit';
+          meshNode.skinAnimation = !!skeleton;
+          meshNode.morphAnimation = subMesh.numTargets > 0;
           meshNode.primitive = subMesh.primitive.get();
           meshNode.material =
-            instancing && !skeleton && subMesh.numTargets === 0
+            instancing && !meshNode.skinAnimation && !meshNode.morphAnimation
               ? subMesh.material.get().createInstance()
               : subMesh.material.get().clone();
           meshNode.parent = node;

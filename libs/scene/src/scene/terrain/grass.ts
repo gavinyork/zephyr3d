@@ -106,27 +106,35 @@ export class GrassManager {
   private _baseVertexBuffer: Map<string, Ref<StructuredBuffer>>;
   private _indexBuffer: Ref<IndexBuffer>;
   private _layers: GrassLayer[];
+  private _disposed: boolean;
   constructor(clusterSize: number, density: number[][]) {
     this._clusterSize = clusterSize;
     this._baseVertexBuffer = new Map();
     this._indexBuffer = new Ref();
     this._layers = [];
+    this._disposed = false;
   }
   dispose() {
-    this._indexBuffer.dispose();
-    for (const entry of this._baseVertexBuffer) {
-      entry[1].dispose();
-    }
-    this._baseVertexBuffer.clear();
-    for (const layer of this._layers) {
-      layer.material.dispose();
-    }
-    for (const layer of this._layers) {
-      layer.material.dispose();
-      for (const cluster of layer.clusters) {
-        cluster[1].dispose();
+    if (!this._disposed) {
+      this._disposed = true;
+      this._indexBuffer.dispose();
+      for (const entry of this._baseVertexBuffer) {
+        entry[1].dispose();
+      }
+      this._baseVertexBuffer.clear();
+      for (const layer of this._layers) {
+        layer.material.dispose();
+      }
+      for (const layer of this._layers) {
+        layer.material.dispose();
+        for (const cluster of layer.clusters) {
+          cluster[1].dispose();
+        }
       }
     }
+  }
+  get disposed() {
+    return this._disposed;
   }
   private getBaseVertexBuffer(device: AbstractDevice, bladeWidth: number, bladeHeight: number) {
     const hash = `${bladeWidth}-${bladeHeight}`;

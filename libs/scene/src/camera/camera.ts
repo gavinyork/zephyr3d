@@ -1,8 +1,8 @@
-import type { Clonable, CubeFace } from '@zephyr3d/base';
+import type { CubeFace } from '@zephyr3d/base';
 import { Plane } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
 import { Matrix4x4, Frustum, Vector4, Vector3, Ray, halton23 } from '@zephyr3d/base';
-import { SceneNode } from '../scene/scene_node';
+import { NodeClonable, NodeCloneMethod, SceneNode } from '../scene/scene_node';
 import { Application, Ref } from '../app';
 import type { Drawable, PickTarget } from '../render/drawable';
 import { SceneRenderer } from '../render/renderer';
@@ -30,7 +30,7 @@ export type CameraHistoryData = {
  * The camera node class
  * @public
  */
-export class Camera extends SceneNode implements Clonable<Camera> {
+export class Camera extends SceneNode implements NodeClonable<Camera> {
   /** @internal */
   private static _defaultCompositor = new Compositor();
   /** @internal */
@@ -174,14 +174,14 @@ export class Camera extends SceneNode implements Clonable<Camera> {
     this._pickPosX = 0;
     this._pickPosY = 0;
   }
-  clone(): Camera {
+  clone(method: NodeCloneMethod): Camera {
     const other = new Camera(this.scene);
-    other.copyFrom(this);
+    other.copyFrom(this, method);
     other.parent = this.parent;
     return other;
   }
-  copyFrom(other: this): void {
-    super.copyFrom(other);
+  copyFrom(other: this, method: NodeCloneMethod): void {
+    super.copyFrom(other, method);
     this.clipPlane = other.clipPlane ? new Plane(other.clipPlane) : null;
     this.HiZ = other.HiZ;
     this.TAA = other.TAA;

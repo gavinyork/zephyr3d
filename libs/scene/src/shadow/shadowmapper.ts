@@ -154,6 +154,27 @@ export class ShadowMapper {
     this._shadowRegion = null;
     this.applyMode(this._shadowMode);
   }
+  copyFrom(other: ShadowMapper) {
+    this.shadowMapSize = other.shadowMapSize;
+    this.shadowRegion = other.shadowRegion ? new AABB(other.shadowRegion) : null;
+    this.shadowDistance = other.shadowDistance;
+    this.numShadowCascades = other.numShadowCascades;
+    this.splitLambda = other.splitLambda;
+    this.depthBias = other.depthBias;
+    this.normalBias = other.normalBias;
+    this.nearClip = other.nearClip;
+    this.mode = other.mode;
+    this.pdSampleCount = other.pdSampleCount;
+    this.pdSampleRadius = other.pdSampleRadius;
+    this.pcfKernelSize = other.pcfKernelSize;
+    this.vsmBlurKernelSize = other.vsmBlurKernelSize;
+    this.vsmBlurRadius = other.vsmBlurRadius;
+    this.vsmDarkness = other.vsmDarkness;
+    this.esmBlur = other.esmBlur;
+    this.esmBlurKernelSize = other.esmBlurKernelSize;
+    this.esmBlurRadius = other.esmBlurRadius;
+    this.esmDepthScale = other.esmDepthScale;
+  }
   /** The light that is used to generate shadow map */
   get light(): PunctualLight {
     return this._light;

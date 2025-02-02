@@ -1,4 +1,3 @@
-import type { Clonable } from '@zephyr3d/base';
 import { Vector4, applyMixins } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import { BoxFrameShape } from '../shapes';
@@ -12,14 +11,14 @@ import type { BoundingBox, BoundingVolume } from '../utility/bounding_volume';
 import { QUEUE_OPAQUE } from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
-import type { SceneNode } from './scene_node';
+import type { NodeClonable, NodeCloneMethod, SceneNode } from './scene_node';
 import { Ref } from '../app/gc/ref';
 
 /**
  * Mesh node
  * @public
  */
-export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements BatchDrawable, Clonable<Mesh> {
+export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements BatchDrawable, NodeClonable<Mesh> {
   /** @internal */
   private _primitive: Ref<Primitive>;
   /** @internal */
@@ -46,6 +45,10 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   protected _boundingBoxNode: Mesh;
   /** @internal */
   protected _instanceColor: Vector4;
+  /** @internal */
+  protected _skinAnimation: boolean;
+  /** @internal */
+  protected _morphAnimation: boolean;
   /**
    * Creates an instance of mesh node
    * @param scene - The scene to which the mesh node belongs
@@ -65,25 +68,29 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._instanceColor = Vector4.zero();
     this._batchable = Application.instance.deviceType !== 'webgl';
     this._bboxChangeCallback = this._onBoundingboxChange.bind(this);
-    // use setter
     this.primitive = primitive ?? null;
     this.material = material ?? Mesh._getDefaultMaterial();
+    this._skinAnimation = false;
+    this._morphAnimation = false;
   }
-  clone(): Mesh {
+  clone(method: NodeCloneMethod): Mesh {
     const other = new Mesh(this.scene);
-    other.copyFrom(this);
+    other.copyFrom(this, method);
     other.parent = this.parent;
     return other;
   }
-  copyFrom(other: this): void {
-    super.copyFrom(other);
+  copyFrom(other: this, method: NodeCloneMethod): void {
+    super.copyFrom(other, method);
     this.castShadow = other.castShadow;
-    this.primitive = other.primitive;
+    this.primitive = method === 'deep' ? other.primitive.clone() : other.primitive;
     this.drawBoundingBox = other.drawBoundingBox;
     this._boneMatrices = other._boneMatrices;
     this._morphData = other._morphData;
     this._morphInfo = other._morphInfo;
-    this.material = other.material?.createInstance();
+    this.material =
+      !this._skinAnimation && !this._morphAnimation && method === 'instance'
+        ? other.material?.createInstance()
+        : other.material?.clone();
   }
   /**
    * {@inheritDoc Drawable.getName}
@@ -117,6 +124,21 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   }
   setPickTarget(node: SceneNode, label?: string) {
     this._pickTarget = { node, label };
+  }
+  /** @internal */
+  get skinAnimation() {
+    return this._skinAnimation;
+  }
+  /** @internal */
+  set skinAnimation(val: boolean) {
+    this._skinAnimation = val;
+  }
+  /** @internal */
+  get morphAnimation() {
+    return this._morphAnimation;
+  }
+  set morphAnimation(val: boolean) {
+    this._morphAnimation = val;
   }
   /** Wether the mesh node casts shadows */
   get castShadow(): boolean {

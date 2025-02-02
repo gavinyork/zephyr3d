@@ -7,7 +7,7 @@ import type { PunctualLight, BaseLight } from './light';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import type { BatchGroup } from './batchgroup';
 import type { Visitor } from './visitor';
-import type { Clonable, Quaternion } from '@zephyr3d/base';
+import type { Quaternion } from '@zephyr3d/base';
 import {
   makeEventTarget,
   Matrix4x4,
@@ -34,6 +34,16 @@ export type NodeIterateFunc = ((node: SceneNode) => boolean) | ((node: SceneNode
 export type SceneNodeVisible = 'visible' | 'inherit' | 'hidden';
 
 /**
+ * Scene node clone method
+ * @public
+ */
+export type NodeCloneMethod = 'deep' | 'instance';
+
+export interface NodeClonable<T extends SceneNode> {
+  clone(method: NodeCloneMethod): T;
+}
+
+/**
  * The base class for any kind of scene objects
  *
  * @remarks
@@ -53,7 +63,7 @@ export class SceneNode
     transformchanged: [node: SceneNode];
     bvchanged: [node: SceneNode];
   }>()
-  implements Clonable<SceneNode>
+  implements NodeClonable<SceneNode>
 {
   /*
   static readonly PICK_INHERITED = -1;
@@ -225,13 +235,13 @@ export class SceneNode
   set sharedModel(model: SharedModel) {
     this._sharedModel.set(model);
   }
-  clone(): SceneNode {
+  clone(method: NodeCloneMethod): SceneNode {
     const other = new SceneNode(this.scene);
-    other.copyFrom(this);
+    other.copyFrom(this, method);
     other.parent = this.parent;
     return other;
   }
-  copyFrom(other: this) {
+  copyFrom(other: this, method: NodeCloneMethod) {
     if (other.disposed || this.disposed) {
       console.error('SceneNode.copyFrom(): Cannot copy from/to disposed node');
       return;
@@ -252,7 +262,7 @@ export class SceneNode
     this.rotation.set(other.rotation);
     this.removeChildren();
     for (const child of other.children) {
-      child.get().clone().parent = this;
+      child.get().clone(method).parent = this;
     }
   }
   /**

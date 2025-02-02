@@ -13,6 +13,7 @@ import { QUEUE_OPAQUE } from '../values';
 import { ParticleMaterial, type MeshMaterial } from '../material';
 import { Application } from '../app/app';
 import { Ref } from '../app';
+import { NodeClonable, NodeCloneMethod } from '.';
 
 const tmpVec3 = new Vector3();
 
@@ -40,7 +41,10 @@ const PS_WORLDSPACE = 1 << 8;
 export type EmitterShape = 'point' | 'sphere' | 'box' | 'cylinder' | 'cone';
 export type EmitterBehavior = 'surface' | 'volume';
 
-export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implements Drawable {
+export class ParticleSystem
+  extends applyMixins(GraphNode, mixinDrawable)
+  implements Drawable, NodeClonable<ParticleSystem>
+{
   private static updateFuncMap: WeakMap<ParticleSystem, () => void> = new WeakMap();
   private _activeParticleList: ParticleNode[];
   private _maxParticleCount: number;
@@ -130,6 +134,50 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._wsBoundingBox = new BoundingBox();
     this._instanceData = null;
     this._material = new Ref(new ParticleMaterial());
+  }
+  clone(method: NodeCloneMethod) {
+    const other = new ParticleSystem(this.scene);
+    other.copyFrom(this, method);
+    other.parent = this.parent;
+    return other;
+  }
+  copyFrom(other: this, method: NodeCloneMethod): void {
+    super.copyFrom(other, method);
+    this.maxParticleCount = other.maxParticleCount;
+    this.emitInterval = other.emitInterval;
+    this.emitCount = other.emitCount;
+    this.gravity = other.gravity;
+    this.wind = other.wind;
+    this.scalar = other.scalar;
+    this.aspect = other.aspect;
+    this.airResistence = other.airResistence;
+    this.particleRotation = other.particleRotation;
+    this.particleRotationVar = other.particleRotationVar;
+    this.jitterSpeed = other.jitterSpeed;
+    this.jitterPower = other.jitterPower;
+    this.emitterShape = other.emitterShape;
+    this.emitterBehavior = other.emitterBehavior;
+    this.emitterConeRadius = other.emitterConeRadius;
+    this.emitterConeRadiusVar = other.emitterConeRadiusVar;
+    this.particleVelocity = other.particleVelocity;
+    this.particleVelocityVar = other.particleVelocityVar;
+    this.particleLife = other.particleLife;
+    this.particleLifeVar = other.particleLifeVar;
+    this.particleSize1 = other.particleSize1;
+    this.particleSize1Var = other.particleSize1Var;
+    this.particleSize2 = other.particleSize2;
+    this.particleSize2Var = other.particleSize2Var;
+    this.particleAccel = other.particleAccel;
+    this.particleAccelVar = other.particleAccelVar;
+    this.emitterShapeSize = other.emitterShapeSize;
+    this.emitterShapeSizeVar = other.emitterShapeSizeVar;
+    this.colorValue = other.colorValue;
+    this.directional = other.directional;
+    this.worldSpace = other.worldSpace;
+    this.flags = other.flags;
+    this.transparency = other.transparency;
+    this.blendMode = other.blendMode;
+    this.colorMultiplier = other.colorMultiplier;
   }
   get material(): ParticleMaterial {
     return this._material.get();
@@ -321,7 +369,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     return this._emitterShapeSizeVar;
   }
   set colorValue(value: Vector4) {
-    this._colorValue = value;
+    this._colorValue.set(value);
   }
   get colorValue(): Vector4 {
     return this._colorValue;

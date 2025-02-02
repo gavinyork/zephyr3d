@@ -147,6 +147,7 @@ export class Quadtree {
   private _rootNode: QuadtreeNode;
   private _terrain: Terrain;
   private _heightField: HeightField;
+  private _disposed: boolean;
   constructor(terrain: Terrain) {
     this._terrain = terrain;
     this._baseVertices = null;
@@ -163,6 +164,7 @@ export class Quadtree {
     this._rootNode = null;
     this._primitiveCount = 0;
     this._primitiveType = 'triangle-strip';
+    this._disposed = false;
   }
   get normalMap(): Texture2D {
     return this._normalMap.get();
@@ -174,24 +176,30 @@ export class Quadtree {
     return this._terrain;
   }
   dispose() {
-    if (this._rootNode) {
-      const nodes: QuadtreeNode[] = [this._rootNode];
-      while (nodes.length > 0) {
-        const node = nodes.shift();
-        if (node) {
-          for (let i = 0; i < 4; i++) {
-            const child = node.getChild(i);
-            if (child) {
-              nodes.push(child);
+    if (!this._disposed) {
+      this._disposed = true;
+      if (this._rootNode) {
+        const nodes: QuadtreeNode[] = [this._rootNode];
+        while (nodes.length > 0) {
+          const node = nodes.shift();
+          if (node) {
+            for (let i = 0; i < 4; i++) {
+              const child = node.getChild(i);
+              if (child) {
+                nodes.push(child);
+              }
             }
+            node.dispose();
           }
-          node.dispose();
         }
       }
+      this._indices.dispose();
+      this._indicesWireframe.dispose();
+      this._normalMap.dispose();
     }
-    this._indices.dispose();
-    this._indicesWireframe.dispose();
-    this._normalMap.dispose();
+  }
+  get disposed() {
+    return this._disposed;
   }
   build(
     patchSize: number,
