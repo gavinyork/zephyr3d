@@ -43,6 +43,7 @@ import {
   AddBatchGroupCommand,
   AddParticleSystemCommand,
   AddShapeCommand,
+  NodeCloneCommand,
   NodeDeleteCommand,
   NodeReparentCommand,
   NodeTransformCommand
@@ -697,30 +698,8 @@ export class SceneView extends BaseView<SceneModel> {
     }
   }
   private handleCloneNode(node: SceneNode, method: NodeCloneMethod) {
-    const that = this;
-    async function cloneNode(node: SceneNode) {
-      let newNode: SceneNode;
-      if (!node || node.sealed) {
-        return null;
-      }
-      const assetId = that._assetRegistry.getAssetId(node);
-      if (assetId) {
-        newNode = (await that._assetRegistry.fetchModel(assetId, node.scene)).group;
-        newNode.copyFrom(node, 'instance', false);
-      } else {
-        newNode = node.clone(method, false);
-      }
-      const promises = node.children.map((val) => cloneNode(val.get()));
-      const newChildren = await Promise.all(promises);
-      for (const newChild of newChildren) {
-        if (newChild) {
-          newChild.parent = newNode;
-        }
-      }
-      return newNode;
-    }
-    cloneNode(node).then((newNode) => {
-      this._tab.sceneHierarchy.selectNode(newNode);
+    this._cmdManager.execute(new NodeCloneCommand(node, method, this._assetRegistry)).then((sceneNode) => {
+      this._tab.sceneHierarchy.selectNode(sceneNode);
     });
   }
   private handleDeleteNode(node: SceneNode) {

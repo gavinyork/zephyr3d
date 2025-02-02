@@ -1,4 +1,12 @@
-import type { AssetRegistry, ModelInfo, Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
+import type {
+  AssetRegistry,
+  ModelInfo,
+  NodeCloneMethod,
+  Scene,
+  SceneNode,
+  ShapeOptionType,
+  ShapeType
+} from '@zephyr3d/scene';
 import { BatchGroup, deserializeScene, serializeScene } from '@zephyr3d/scene';
 import { ParticleSystem } from '@zephyr3d/scene';
 import {
@@ -283,6 +291,65 @@ export class NodeReparentCommand implements Command {
     if (node && oldParent) {
       this._oldLocalMatrix.decompose(node.scale, node.rotation, node.position);
       node.parent = oldParent;
+    }
+  }
+}
+
+export class NodeCloneCommand implements Command<SceneNode> {
+  private _nodeId: string;
+  private _newNodeId: string;
+  private _method: NodeCloneMethod;
+  private _assetRegistry: AssetRegistry;
+  constructor(node: SceneNode, method: NodeCloneMethod, assetRegistry: AssetRegistry) {
+    this._nodeId = node.id;
+    idNodeMap[this._nodeId] = node;
+    this._method = method;
+    this._assetRegistry = assetRegistry;
+    this._newNodeId = '';
+  }
+  get desc() {
+    return 'clone node';
+  }
+  async execute(): Promise<SceneNode> {
+    const node = idNodeMap[this._nodeId];
+    if (!node) {
+      return null;
+    }
+    const that = this;
+    async function cloneNode(node: SceneNode) {
+      let newNode: SceneNode;
+      if (!node || node.sealed) {
+        return null;
+      }
+      const assetId = that._assetRegistry.getAssetId(node);
+      if (assetId) {
+        newNode = (await that._assetRegistry.fetchModel(assetId, node.scene)).group;
+        newNode.copyFrom(node, 'instance', false);
+      } else {
+        newNode = node.clone(that._method, false);
+      }
+      const promises = node.children.map((val) => cloneNode(val.get()));
+      const newChildren = await Promise.all(promises);
+      for (const newChild of newChildren) {
+        if (newChild) {
+          newChild.parent = newNode;
+        }
+      }
+      return newNode;
+    }
+    const newNode = await cloneNode(node);
+    this._newNodeId = newNode.id;
+    idNodeMap[newNode.id] = newNode;
+
+    return newNode;
+  }
+  async undo() {
+    if (this._newNodeId) {
+      const newNode = idNodeMap[this._newNodeId];
+      if (newNode) {
+        newNode.parent = null;
+      }
+      this._newNodeId = '';
     }
   }
 }
