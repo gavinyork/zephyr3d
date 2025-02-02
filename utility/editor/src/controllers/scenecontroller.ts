@@ -96,21 +96,15 @@ export class SceneController extends BaseController<SceneModel> {
   }
   private async exportScene(name: string) {
     const assetList = new Set<string>();
-    this._scene = Object.assign({}, this._scene ?? {}, {
-      name,
-      content: serializeObject(this.model.scene, this._assetRegistry, {}, assetList),
-      metadata: {
-        activeCamera: this.model.camera?.id ?? ''
-      }
-    });
+    const content = serializeScene(this.model.scene, this._assetRegistry, assetList);
+    content.meta = {
+      activeCamera: this.model.camera?.id ?? ''
+    };
     const zipDownloader = new ZipDownloader(`${name}.zip`);
     if (assetList.size > 0) {
       await Database.exportAssets(zipDownloader, [...assetList], 'assets');
     }
-    await zipDownloader.zipWriter.add(
-      'scene.json',
-      new Blob([JSON.stringify(this._scene.content, null, 2)]).stream()
-    );
+    await zipDownloader.zipWriter.add('scene.json', new Blob([JSON.stringify(content, null, 2)]).stream());
     await zipDownloader.finish();
   }
   openScene(uuid: string) {

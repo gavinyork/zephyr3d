@@ -96,6 +96,19 @@ export class Scene extends makeEventTarget(Object)<{
     this._rootNode.dispose();
   }
   /**
+   * Find scene node by id
+   */
+  findNodeById<T extends SceneNode>(id: string) {
+    let node: T = null;
+    this._rootNode?.get().iterate((child) => {
+      if (child.id === id) {
+        node = child as T;
+        return true;
+      }
+    });
+    return node;
+  }
+  /**
    * Cast a ray into the scene to get the closest object hit by the ray
    *
    * @param ray - The ray in world coordinate space

@@ -16,9 +16,23 @@ export type AssetInfo = {
 export class AssetRegistry {
   private _assetMap: Map<string, AssetInfo>;
   private _assetManager: AssetManager;
-  constructor() {
+  private _baseUrl: string;
+  constructor(baseUrl?: string) {
     this._assetMap = new Map();
     this._assetManager = new AssetManager();
+    this._baseUrl = baseUrl ?? '';
+  }
+  async loadFromURL(url: string) {
+    try {
+      const content = await this._assetManager.fetchTextData(url);
+      const json = JSON.parse(content);
+      this.deserialize(json);
+    } catch (err) {
+      console.error(`Load asset registry failed: ${err}`);
+    }
+  }
+  get assetManager() {
+    return this._assetManager;
   }
   getAssetId(asset: any) {
     for (const entry of this._assetMap) {
@@ -88,15 +102,14 @@ export class AssetRegistry {
     return { assets };
   }
   deserialize(json: any) {
-    const assets = json?.assets;
-    if (assets) {
-      for (const k of Object.getOwnPropertyNames(assets)) {
-        const info = assets[k];
+    if (json) {
+      for (const k of Object.getOwnPropertyNames(json)) {
+        const info = json[k];
         this._assetMap.set(k, {
           id: info.id,
           name: info.name,
           type: info.type,
-          path: info.path,
+          path: this.resolveUrl(this._baseUrl, info.path),
           allocated: new Map()
         });
       }
@@ -124,5 +137,14 @@ export class AssetRegistry {
       return null;
     }
     return await this._assetManager.fetchTexture<T>(info.path, options, request);
+  }
+  private resolveUrl(...paths: string[]): string {
+    const cleanPaths = paths.filter((path) => path != null && path !== '');
+    const processedPaths = cleanPaths.map((path, index) => {
+      path = String(path).trim();
+      path = path.replace(/^\/+|\/+$/g, '');
+      return path;
+    });
+    return processedPaths.join('/');
   }
 }

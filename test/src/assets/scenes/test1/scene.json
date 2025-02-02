@@ -1,0 +1,154 @@
+{
+  "allMaterials": [],
+  "allPrimitives": [],
+  "content": {
+    "ClassName": "Scene",
+    "Object": {
+      "AmbientColor": [
+        0.20000000298023224,
+        0.20000000298023224,
+        0.20000000298023224
+      ],
+      "AmbientUp": [
+        0.30000001192092896,
+        0.5,
+        0.800000011920929
+      ],
+      "AmbientDown": [
+        0.20000000298023224,
+        0.20000000298023224,
+        0.20000000298023224
+      ],
+      "SkyColor": [
+        0,
+        0,
+        0
+      ],
+      "FogTop": 50,
+      "FogStart": 1,
+      "FogEnd": 100,
+      "FogDensity": 0.0020000000949949026,
+      "Cloudy": 0.6,
+      "CloudIntensity": 40,
+      "Wind": [
+        0,
+        0
+      ],
+      "PanoramaTexture": null,
+      "Nodes": [
+        {
+          "ClassName": "DirectionalLight",
+          "Object": {
+            "SunLight": true,
+            "Intensity": 8,
+            "VSMDarkness": 0.3,
+            "Id": "2412db3b-6f16-4e8e-8edd-05192975a397",
+            "Name": "",
+            "Position": [
+              1,
+              1,
+              1
+            ],
+            "Scale": [
+              1,
+              1,
+              1
+            ],
+            "Rotation": [
+              -35,
+              45,
+              0
+            ],
+            "Pickable": false,
+            "Visible": "inherit",
+            "Children": []
+          }
+        },
+        {
+          "ClassName": "PerspectiveCamera",
+          "Object": {
+            "Id": "4a2807df-cca4-48d1-a6ad-708adc65b17b",
+            "Name": "",
+            "Position": [
+              0,
+              5,
+              15
+            ],
+            "Scale": [
+              1,
+              1,
+              1
+            ],
+            "Rotation": [
+              -18,
+              0,
+              0
+            ],
+            "Pickable": false,
+            "Visible": "inherit",
+            "Children": []
+          }
+        },
+        {
+          "ClassName": "SceneNode",
+          "Object": {
+            "Id": "9d99cf10-d49a-4d97-958b-24707eb4a591",
+            "Name": "DamagedHelmet.glb",
+            "Position": [
+              -1.8470052480697632,
+              0,
+              0.5840670466423035
+            ],
+            "Scale": [
+              1,
+              1,
+              1
+            ],
+            "Rotation": [
+              0,
+              0,
+              0
+            ],
+            "Pickable": false,
+            "Visible": "inherit",
+            "Children": []
+          },
+          "Init": {
+            "asset": "da6d8193-688e-4bb7-a896-3be6e201ac07"
+          }
+        },
+        {
+          "ClassName": "SceneNode",
+          "Object": {
+            "Id": "21c5014d-2ecd-43a4-93d9-c216e9c1eeed",
+            "Name": "MetalRoughSpheres.glb",
+            "Position": [
+              0.30857914686203003,
+              0,
+              -12.441628456115723
+            ],
+            "Scale": [
+              1,
+              1,
+              1
+            ],
+            "Rotation": [
+              0,
+              0,
+              0
+            ],
+            "Pickable": false,
+            "Visible": "inherit",
+            "Children": []
+          },
+          "Init": {
+            "asset": "8d13610a-1b56-419a-b737-a193375fd3d7"
+          }
+        }
+      ]
+    }
+  },
+  "meta": {
+    "activeCamera": "4a2807df-cca4-48d1-a6ad-708adc65b17b"
+  }
+}

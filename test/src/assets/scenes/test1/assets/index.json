@@ -1,0 +1,14 @@
+{
+  "da6d8193-688e-4bb7-a896-3be6e201ac07": {
+    "id": "da6d8193-688e-4bb7-a896-3be6e201ac07",
+    "name": "DamagedHelmet",
+    "type": "model",
+    "path": "assets/987f886a-fa01-45c2-bb7a-25aa55503851/DamagedHelmet.glb"
+  },
+  "8d13610a-1b56-419a-b737-a193375fd3d7": {
+    "id": "8d13610a-1b56-419a-b737-a193375fd3d7",
+    "name": "MetalRoughSpheres.glb",
+    "type": "model",
+    "path": "assets/7e9f996d-6c36-4a33-a877-04e166dca970/MetalRoughSpheres.glb"
+  }
+}

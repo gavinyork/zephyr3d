@@ -445,6 +445,22 @@ export function serializeScene(
   return json;
 }
 
+export async function deserializeSceneFromURL(
+  url: string,
+  assetRegistry: AssetRegistry
+): Promise<{ scene: Scene; meta: any }> {
+  try {
+    const data = await assetRegistry.assetManager.fetchTextData(url);
+    const json = JSON.parse(data);
+    const scene = await deserializeScene<Scene>(null, assetRegistry, json);
+    const meta = json['meta'] ?? null;
+    return { scene, meta };
+  } catch (err) {
+    console.error(`Deserialize scene failed: ${err}`);
+    return null;
+  }
+}
+
 export async function deserializeScene<T>(scene: Scene, assetRegistry: AssetRegistry, json: any) {
   const allMaterials = json.allMaterials as { id: string; isInstance: boolean; content: any }[];
   if (allMaterials) {
