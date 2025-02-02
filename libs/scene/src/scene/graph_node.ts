@@ -24,9 +24,9 @@ export class GraphNode extends SceneNode implements NodeClonable<GraphNode> {
     super(scene);
     this._octreeNode = null;
   }
-  clone(method: NodeCloneMethod): GraphNode {
+  clone(method: NodeCloneMethod, recursive: boolean): GraphNode {
     const other = new GraphNode(this.scene);
-    other.copyFrom(this, method);
+    other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }

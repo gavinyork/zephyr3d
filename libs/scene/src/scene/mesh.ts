@@ -73,14 +73,14 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._skinAnimation = false;
     this._morphAnimation = false;
   }
-  clone(method: NodeCloneMethod): Mesh {
+  clone(method: NodeCloneMethod, recursive: boolean): Mesh {
     const other = new Mesh(this.scene);
-    other.copyFrom(this, method);
+    other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }
-  copyFrom(other: this, method: NodeCloneMethod): void {
-    super.copyFrom(other, method);
+  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
+    super.copyFrom(other, method, recursive);
     this.castShadow = other.castShadow;
     this.primitive = method === 'deep' ? other.primitive.clone() : other.primitive;
     this.drawBoundingBox = other.drawBoundingBox;

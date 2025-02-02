@@ -31,14 +31,14 @@ export class PerspectiveCamera extends Camera implements NodeClonable<Perspectiv
     this._window = null;
     this._invalidate(true);
   }
-  clone(method: NodeCloneMethod): PerspectiveCamera {
+  clone(method: NodeCloneMethod, recursive: boolean): PerspectiveCamera {
     const other = new PerspectiveCamera(this.scene);
-    other.copyFrom(this, method);
+    other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }
-  copyFrom(other: this, method: NodeCloneMethod): void {
-    super.copyFrom(other, method);
+  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
+    super.copyFrom(other, method, recursive);
     this.window = other.window;
     this.near = other.near;
     this.far = other.far;

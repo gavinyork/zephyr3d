@@ -67,14 +67,14 @@ export class Terrain extends GraphNode implements NodeClonable<Terrain> {
     this._castShadow = true;
     this._instanceColor = Vector4.zero();
   }
-  clone(method: NodeCloneMethod) {
+  clone(method: NodeCloneMethod, recursive: boolean) {
     const terrain = new Terrain(this.scene);
-    terrain.copyFrom(this, method);
+    terrain.copyFrom(this, method, recursive);
     terrain.parent = this;
     return terrain;
   }
-  copyFrom(other: this, method: NodeCloneMethod): void {
-    super.copyFrom(other, method);
+  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
+    super.copyFrom(other, method, recursive);
     this._quadtree.set(other._quadtree.get());
     this._grassManager.set(other._grassManager.get());
     this.maxPixelError = other.maxPixelError;

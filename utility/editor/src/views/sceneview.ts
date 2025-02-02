@@ -62,6 +62,7 @@ export class SceneView extends BaseView<SceneModel> {
   private _postGizmoCaptured: boolean;
   private _showTextureViewer: boolean;
   private _showDeviceInfo: boolean;
+  private _clipBoardData: Ref<SceneNode>;
   constructor(model: SceneModel, assetRegistry: AssetRegistry) {
     super(model);
     this._cmdManager = new CommandManager();
@@ -72,6 +73,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._typeToBePlaced = 'none';
     this._assetToBeAdded = null;
     this._shapeToBeAdded = null;
+    this._clipBoardData = new Ref();
     this._mousePosX = -1;
     this._mousePosY = -1;
     this._postGizmoCaptured = false;
@@ -292,7 +294,7 @@ export class SceneView extends BaseView<SceneModel> {
           shortcut: 'Ctrl+V',
           tooltip: () => 'Paste',
           selected: () => {
-            return true;
+            return !!this._clipBoardData.get();
           },
           action: () => {
             alert('paste');
@@ -672,6 +674,10 @@ export class SceneView extends BaseView<SceneModel> {
     }
     ImGui.End();
   }
+  private handleCopyNode(node: SceneNode) {
+    this._clipBoardData.set(node);
+  }
+  private handlePasteNode() {}
   private handleDeleteNode(node: SceneNode) {
     if (node === this.model.camera) {
       Dialog.messageBox('Zephyr3d editor', 'Cannot delete active camera');

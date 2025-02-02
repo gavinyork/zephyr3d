@@ -40,7 +40,7 @@ export type SceneNodeVisible = 'visible' | 'inherit' | 'hidden';
 export type NodeCloneMethod = 'deep' | 'instance';
 
 export interface NodeClonable<T extends SceneNode> {
-  clone(method: NodeCloneMethod): T;
+  clone(method: NodeCloneMethod, recursive: boolean): T;
 }
 
 /**
@@ -235,13 +235,13 @@ export class SceneNode
   set sharedModel(model: SharedModel) {
     this._sharedModel.set(model);
   }
-  clone(method: NodeCloneMethod): SceneNode {
+  clone(method: NodeCloneMethod, recursive: boolean): SceneNode {
     const other = new SceneNode(this.scene);
-    other.copyFrom(this, method);
+    other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }
-  copyFrom(other: this, method: NodeCloneMethod) {
+  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean) {
     if (other.disposed || this.disposed) {
       console.error('SceneNode.copyFrom(): Cannot copy from/to disposed node');
       return;
@@ -260,9 +260,10 @@ export class SceneNode
     this.position.set(other.position);
     this.scale.set(other.scale);
     this.rotation.set(other.rotation);
-    this.removeChildren();
-    for (const child of other.children) {
-      child.get().clone(method).parent = this;
+    if (recursive) {
+      for (const child of other.children) {
+        child.get().clone(method, true).parent = this;
+      }
     }
   }
   /**

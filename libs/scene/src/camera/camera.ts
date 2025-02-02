@@ -174,14 +174,14 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._pickPosX = 0;
     this._pickPosY = 0;
   }
-  clone(method: NodeCloneMethod): Camera {
+  clone(method: NodeCloneMethod, recursive: boolean): Camera {
     const other = new Camera(this.scene);
-    other.copyFrom(this, method);
+    other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }
-  copyFrom(other: this, method: NodeCloneMethod): void {
-    super.copyFrom(other, method);
+  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
+    super.copyFrom(other, method, recursive);
     this.clipPlane = other.clipPlane ? new Plane(other.clipPlane) : null;
     this.HiZ = other.HiZ;
     this.TAA = other.TAA;

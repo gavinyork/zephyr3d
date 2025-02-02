@@ -84,9 +84,9 @@ export class BatchGroup extends GraphNode implements NodeClonable<BatchGroup> {
   isBatchGroup(): this is BatchGroup {
     return true;
   }
-  clone(method: NodeCloneMethod): BatchGroup {
+  clone(method: NodeCloneMethod, recursive: boolean): BatchGroup {
     const other = new BatchGroup(this.scene);
-    other.copyFrom(this, method);
+    other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }

@@ -33,14 +33,14 @@ export class OrthoCamera extends Camera implements NodeClonable<OrthoCamera> {
     this._far = far;
     this._invalidate(true);
   }
-  clone(method: NodeCloneMethod): OrthoCamera {
+  clone(method: NodeCloneMethod, recursive: boolean): OrthoCamera {
     const other = new OrthoCamera(this.scene);
-    other.copyFrom(this, method);
+    other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }
-  copyFrom(other: this, method: NodeCloneMethod): void {
-    super.copyFrom(other, method);
+  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
+    super.copyFrom(other, method, recursive);
     this.near = other.near;
     this.far = other.far;
     this.left = other.left;

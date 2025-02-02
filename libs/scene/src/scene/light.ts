@@ -40,8 +40,8 @@ export abstract class BaseLight extends GraphNode {
    * @param other - Other BaseLight to copy from
    * @param method - Copy method
    */
-  copyFrom(other: this, method: NodeCloneMethod) {
-    super.copyFrom(other, method);
+  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean) {
+    super.copyFrom(other, method, recursive);
     this.intensity = other.intensity;
   }
   /** Gets the light type */
@@ -179,8 +179,8 @@ export abstract class PunctualLight extends BaseLight {
     this._castShadow = false;
     this._shadowMapper = new ShadowMapper(this);
   }
-  copyFrom(other: this, method: NodeCloneMethod): void {
-    super.copyFrom(other, method);
+  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
+    super.copyFrom(other, method, recursive);
     this.color = other.color;
     this.castShadow = other.castShadow;
     this.shadow.copyFrom(other.shadow);
@@ -257,9 +257,9 @@ export class DirectionalLight extends PunctualLight implements NodeClonable<Dire
       this._sunLight = false;
     }
   }
-  clone(method: NodeCloneMethod) {
+  clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new DirectionalLight(this.scene);
-    other.copyFrom(this, method);
+    other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }
@@ -503,14 +503,14 @@ export class PointLight extends PunctualLight implements NodeClonable<PointLight
     this._range = 10;
     this.invalidateBoundingVolume();
   }
-  clone(method: NodeCloneMethod) {
+  clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new PointLight(this.scene);
-    other.copyFrom(this, method);
+    other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }
-  copyFrom(other: this, method: NodeCloneMethod): void {
-    super.copyFrom(other, method);
+  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
+    super.copyFrom(other, method, recursive);
     this.range = other.range;
   }
   /** The range of the light */
@@ -577,14 +577,14 @@ export class SpotLight extends PunctualLight implements NodeClonable<SpotLight> 
     this._cutoff = Math.cos(Math.PI / 4);
     this.invalidateBoundingVolume();
   }
-  clone(method: NodeCloneMethod) {
+  clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new SpotLight(this.scene);
-    other.copyFrom(this, method);
+    other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }
-  copyFrom(other: this, method: NodeCloneMethod): void {
-    super.copyFrom(other, method);
+  copyFrom(other: this, method: NodeCloneMethod, recursive): void {
+    super.copyFrom(other, method, recursive);
     this.range = other.range;
     this.cutoff = other.cutoff;
   }

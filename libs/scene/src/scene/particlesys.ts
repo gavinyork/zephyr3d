@@ -135,14 +135,14 @@ export class ParticleSystem
     this._instanceData = null;
     this._material = new Ref(new ParticleMaterial());
   }
-  clone(method: NodeCloneMethod) {
+  clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new ParticleSystem(this.scene);
-    other.copyFrom(this, method);
+    other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }
-  copyFrom(other: this, method: NodeCloneMethod): void {
-    super.copyFrom(other, method);
+  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
+    super.copyFrom(other, method, recursive);
     this.maxParticleCount = other.maxParticleCount;
     this.emitInterval = other.emitInterval;
     this.emitCount = other.emitCount;
