@@ -3,9 +3,21 @@ import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { Texture2D, TextureSampler } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
 import type { MeshMaterial } from '../material/meshmaterial';
-import type { Mesh } from '../scene/mesh';
+import { Mesh } from '../scene/mesh';
 import type { BoundingBox } from '../utility';
 import type { Ref } from '../app';
+import { Scene, SceneNode } from '../scene';
+import {
+  AnimationClip,
+  AnimationSet,
+  RotationTrack,
+  ScaleTrack,
+  Skeleton,
+  TranslationTrack
+} from '../animation';
+import { processMorphData } from '../animation/morphtarget';
+import { MAX_MORPH_TARGETS } from '../values';
+import { MorphTargetTrack } from '../animation/morphtrack';
 
 /**
  * Named object interface for model loading
@@ -575,5 +587,132 @@ export class SharedModel {
    */
   addAnimation(animation: AssetAnimationData) {
     this._animations.push(animation);
+  }
+  createSceneNode(scene: Scene, instancing: boolean): SceneNode {
+    const group = new SceneNode(scene);
+    group.name = this.name;
+    const animationSet = new AnimationSet(scene, group);
+    for (let i = 0; i < this.scenes.length; i++) {
+      const assetScene = this.scenes[i];
+      const skeletonMeshMap: Map<
+        AssetSkeleton,
+        { mesh: Mesh[]; bounding: AssetSubMeshData[]; skeleton?: Skeleton }
+      > = new Map();
+      const nodeMap: Map<AssetHierarchyNode, SceneNode> = new Map();
+      for (let k = 0; k < assetScene.rootNodes.length; k++) {
+        this.setAssetNodeToSceneNode(
+          scene,
+          group,
+          assetScene.rootNodes[k],
+          skeletonMeshMap,
+          nodeMap,
+          instancing
+        );
+      }
+      for (const animationData of this.animations) {
+        const animation = new AnimationClip(animationData.name);
+        for (const track of animationData.tracks) {
+          if (track.type === 'translation') {
+            animation.addTrack(nodeMap.get(track.node), new TranslationTrack(track.interpolator));
+          } else if (track.type === 'scale') {
+            animation.addTrack(nodeMap.get(track.node), new ScaleTrack(track.interpolator));
+          } else if (track.type === 'rotation') {
+            animation.addTrack(nodeMap.get(track.node), new RotationTrack(track.interpolator));
+          } else if (track.type === 'weights') {
+            for (const m of track.node.mesh.subMeshes) {
+              if (track.interpolator.stride > MAX_MORPH_TARGETS) {
+                console.error(
+                  `Morph target too large: ${track.interpolator.stride}, the maximum is ${MAX_MORPH_TARGETS}`
+                );
+              } else {
+                const morphTrack = new MorphTargetTrack(track, m);
+                animation.addTrack(m.mesh, morphTrack);
+              }
+            }
+          } else {
+            console.error(`Invalid animation track type: ${track.type}`);
+          }
+        }
+        if (animation.tracks.size === 0) {
+          continue;
+        }
+        animationSet.add(animation);
+        for (const sk of animationData.skeletons) {
+          const nodes = skeletonMeshMap.get(sk);
+          if (nodes) {
+            if (!nodes.skeleton) {
+              nodes.skeleton = new Skeleton(
+                sk.joints.map((val) => nodeMap.get(val)),
+                sk.inverseBindMatrices,
+                sk.bindPoseMatrices,
+                nodes.mesh,
+                nodes.bounding
+              );
+            }
+            animation.addSkeleton(nodes.skeleton);
+          }
+        }
+      }
+    }
+    group.iterate((child) => {
+      if (child !== group) {
+        child.sealed = true;
+      }
+    });
+    group.animationSet = animationSet;
+    group.sharedModel = this;
+    return group;
+  }
+  private setAssetNodeToSceneNode(
+    scene: Scene,
+    parent: SceneNode,
+    assetNode: AssetHierarchyNode,
+    skeletonMeshMap: Map<AssetSkeleton, { mesh: Mesh[]; bounding: AssetSubMeshData[] }>,
+    nodeMap: Map<AssetHierarchyNode, SceneNode>,
+    instancing: boolean
+  ) {
+    const node: SceneNode = new SceneNode(scene);
+    nodeMap.set(assetNode, node);
+    node.name = `${assetNode.name}`;
+    node.position.set(assetNode.position);
+    node.rotation.set(assetNode.rotation);
+    node.scale.set(assetNode.scaling);
+    if (assetNode.mesh) {
+      const meshData = assetNode.mesh;
+      const skeleton = assetNode.skeleton;
+      for (const subMesh of meshData.subMeshes) {
+        for (const instance of assetNode.instances) {
+          const meshNode = new Mesh(scene);
+          meshNode.position = instance.t;
+          meshNode.scale = instance.s;
+          meshNode.rotation = instance.r;
+          meshNode.name = subMesh.name;
+          meshNode.clipTestEnabled = true;
+          meshNode.showState = 'inherit';
+          meshNode.skinAnimation = !!skeleton;
+          meshNode.morphAnimation = subMesh.numTargets > 0;
+          meshNode.primitive = subMesh.primitive.get();
+          meshNode.material =
+            instancing && !meshNode.skinAnimation && !meshNode.morphAnimation
+              ? subMesh.material.get().createInstance()
+              : subMesh.material.get().clone();
+          meshNode.parent = node;
+          subMesh.mesh = meshNode;
+          processMorphData(subMesh, meshData.morphWeights);
+          if (skeleton) {
+            if (!skeletonMeshMap.has(skeleton)) {
+              skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });
+            } else {
+              skeletonMeshMap.get(skeleton).mesh.push(meshNode);
+              skeletonMeshMap.get(skeleton).bounding.push(subMesh);
+            }
+          }
+        }
+      }
+    }
+    node.parent = parent;
+    for (const child of assetNode.children) {
+      this.setAssetNodeToSceneNode(scene, node, child, skeletonMeshMap, nodeMap, instancing);
+    }
   }
 }

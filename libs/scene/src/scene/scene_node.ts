@@ -1,6 +1,6 @@
 import type { Scene } from './scene';
 import type { GraphNode } from './graph_node';
-import type { Mesh } from './mesh';
+import { Mesh } from './mesh';
 import type { Camera } from '../camera/camera';
 import type { Terrain } from './terrain/terrain';
 import type { PunctualLight, BaseLight } from './light';
@@ -18,7 +18,7 @@ import {
 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
 import { Ref } from '../app/gc/ref';
-import type { AnimationSet } from '../animation';
+import { AnimationSet } from '../animation';
 import type { SharedModel } from '../asset';
 
 /**
@@ -236,7 +236,9 @@ export class SceneNode
     this._sharedModel.set(model);
   }
   clone(method: NodeCloneMethod, recursive: boolean): SceneNode {
-    const other = new SceneNode(this.scene);
+    const other = this._sharedModel.get()
+      ? this._sharedModel.get().createSceneNode(this.scene, method === 'instance')
+      : new SceneNode(this.scene);
     other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
@@ -250,8 +252,6 @@ export class SceneNode
       console.error('SceneNode.copyFrom(): Cannot copy from/to node which belongs to another scene');
       return;
     }
-    this._animationSet.set(other._animationSet.get());
-    this._sharedModel.set(other._sharedModel.get());
     this.clipTestEnabled = other.clipTestEnabled;
     this.boundingBoxDrawMode = other.boundingBoxDrawMode;
     this.showState = other.showState;
@@ -262,7 +262,9 @@ export class SceneNode
     this.rotation.set(other.rotation);
     if (recursive) {
       for (const child of other.children) {
-        child.get().clone(method, true).parent = this;
+        if (!child.get().sealed) {
+          child.get().clone(method, true).parent = this;
+        }
       }
     }
   }

@@ -3,7 +3,15 @@ import type { SceneModel } from '../models/scenemodel';
 import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import { Tab } from '../components/tab';
-import type { AssetRegistry, Camera, Compositor, Scene, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
+import type {
+  AssetRegistry,
+  Camera,
+  Compositor,
+  NodeCloneMethod,
+  Scene,
+  ShapeOptionType,
+  ShapeType
+} from '@zephyr3d/scene';
 import {
   BoxShape,
   CylinderShape,
@@ -131,14 +139,17 @@ export class SceneView extends BaseView<SceneModel> {
               label: 'Copy',
               shortCut: 'Ctrl+C',
               action: () => {
-                alert('copy');
+                const node = this._tab.sceneHierarchy.selectedNode;
+                if (node) {
+                  this.handleCopyNode(node);
+                }
               }
             },
             {
               label: 'Past',
               shortCut: 'Ctrl+V',
               action: () => {
-                alert('paste');
+                this.handlePasteNode();
               }
             }
           ]
@@ -255,7 +266,7 @@ export class SceneView extends BaseView<SceneModel> {
           shortcut: 'Delete',
           tooltip: () => 'Delete selected node',
           selected: () => {
-            return !!this._postGizmoRenderer.node;
+            return !!this._tab.sceneHierarchy.selectedNode;
           },
           action: () => {
             const node = this._tab.sceneHierarchy.selectedNode;
@@ -269,10 +280,10 @@ export class SceneView extends BaseView<SceneModel> {
           shortcut: 'Ctrl+D',
           tooltip: () => 'Creatas an instance of current node',
           selected: () => {
-            return !!this._postGizmoRenderer.node;
+            return !!this._tab.sceneHierarchy.selectedNode;
           },
           action: () => {
-            alert('clone');
+            this.handleCloneNode(this._tab.sceneHierarchy.selectedNode, 'instance');
           }
         },
         {
@@ -283,10 +294,13 @@ export class SceneView extends BaseView<SceneModel> {
           shortcut: 'Ctrl+C',
           tooltip: () => 'Copy',
           selected: () => {
-            return !!this._postGizmoRenderer.node;
+            return !!this._tab.sceneHierarchy.selectedNode;
           },
           action: () => {
-            alert('copy');
+            const node = this._tab.sceneHierarchy.selectedNode;
+            if (node) {
+              this.handleCopyNode(node);
+            }
           }
         },
         {
@@ -297,7 +311,7 @@ export class SceneView extends BaseView<SceneModel> {
             return !!this._clipBoardData.get();
           },
           action: () => {
-            alert('paste');
+            this.handlePasteNode();
           }
         },
         {
@@ -677,7 +691,38 @@ export class SceneView extends BaseView<SceneModel> {
   private handleCopyNode(node: SceneNode) {
     this._clipBoardData.set(node);
   }
-  private handlePasteNode() {}
+  private handlePasteNode() {
+    if (this._clipBoardData.get()) {
+      this.handleCloneNode(this._clipBoardData.get(), 'deep');
+    }
+  }
+  private handleCloneNode(node: SceneNode, method: NodeCloneMethod) {
+    const that = this;
+    async function cloneNode(node: SceneNode) {
+      let newNode: SceneNode;
+      if (!node || node.sealed) {
+        return null;
+      }
+      const assetId = that._assetRegistry.getAssetId(node);
+      if (assetId) {
+        newNode = (await that._assetRegistry.fetchModel(assetId, node.scene)).group;
+        newNode.copyFrom(node, 'instance', false);
+      } else {
+        newNode = node.clone(method, false);
+      }
+      const promises = node.children.map((val) => cloneNode(val.get()));
+      const newChildren = await Promise.all(promises);
+      for (const newChild of newChildren) {
+        if (newChild) {
+          newChild.parent = newNode;
+        }
+      }
+      return newNode;
+    }
+    cloneNode(node).then((newNode) => {
+      this._tab.sceneHierarchy.selectNode(newNode);
+    });
+  }
   private handleDeleteNode(node: SceneNode) {
     if (node === this.model.camera) {
       Dialog.messageBox('Zephyr3d editor', 'Cannot delete active camera');

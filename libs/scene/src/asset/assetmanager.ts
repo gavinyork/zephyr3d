@@ -1,25 +1,20 @@
 import type { DecoderModule } from 'draco3d';
 import { isPowerOf2, nextPowerOf2, HttpRequest } from '@zephyr3d/base';
-import type { AssetHierarchyNode, AssetSkeleton, AssetSubMeshData, SharedModel } from './model';
+import type { SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
 import { DDSLoader } from './loaders/dds/dds_loader';
 import { HDRLoader } from './loaders/hdr/hdr';
 import { SceneNode } from '../scene/scene_node';
-import { Mesh } from '../scene/mesh';
-import { RotationTrack, ScaleTrack, Skeleton, TranslationTrack } from '../animation';
-import { AnimationClip } from '../animation/animation';
 import { CopyBlitter } from '../blitter';
 import { getSheenLutLoader } from './builtin';
-import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT, MAX_MORPH_TARGETS } from '../values';
+import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT } from '../values';
 import { Application } from '../app/app';
 import { AnimationSet } from '../animation/animationset';
 import type { BaseTexture, SamplerOptions } from '@zephyr3d/device';
 import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
-import { MorphTargetTrack } from '../animation/morphtrack';
-import { processMorphData } from '../animation/morphtarget';
 import { WeakRef } from '../app';
 
 /**
@@ -309,7 +304,8 @@ export class AssetManager {
     httpRequest?: HttpRequest
   ): Promise<ModelInfo> {
     const sharedModel = await this.fetchModelData(url, options, httpRequest);
-    return this.createSceneNode(scene, sharedModel, !!options?.enableInstancing);
+    const node = sharedModel.createSceneNode(scene, !!options?.enableInstancing);
+    return { group: node, animationSet: node.animationSet };
   }
   /** @internal */
   async loadTextData(
@@ -502,83 +498,6 @@ export class AssetManager {
       return texture;
     }
   }
-  /** @internal */
-  private createSceneNode(scene: Scene, model: SharedModel, instancing: boolean): ModelInfo {
-    const group = new SceneNode(scene);
-    group.name = model.name;
-    const animationSet = new AnimationSet(scene, group);
-    for (let i = 0; i < model.scenes.length; i++) {
-      const assetScene = model.scenes[i];
-      const skeletonMeshMap: Map<
-        AssetSkeleton,
-        { mesh: Mesh[]; bounding: AssetSubMeshData[]; skeleton?: Skeleton }
-      > = new Map();
-      const nodeMap: Map<AssetHierarchyNode, SceneNode> = new Map();
-      for (let k = 0; k < assetScene.rootNodes.length; k++) {
-        this.setAssetNodeToSceneNode(
-          scene,
-          group,
-          model,
-          assetScene.rootNodes[k],
-          skeletonMeshMap,
-          nodeMap,
-          instancing
-        );
-      }
-      for (const animationData of model.animations) {
-        const animation = new AnimationClip(animationData.name);
-        for (const track of animationData.tracks) {
-          if (track.type === 'translation') {
-            animation.addTrack(nodeMap.get(track.node), new TranslationTrack(track.interpolator));
-          } else if (track.type === 'scale') {
-            animation.addTrack(nodeMap.get(track.node), new ScaleTrack(track.interpolator));
-          } else if (track.type === 'rotation') {
-            animation.addTrack(nodeMap.get(track.node), new RotationTrack(track.interpolator));
-          } else if (track.type === 'weights') {
-            for (const m of track.node.mesh.subMeshes) {
-              if (track.interpolator.stride > MAX_MORPH_TARGETS) {
-                console.error(
-                  `Morph target too large: ${track.interpolator.stride}, the maximum is ${MAX_MORPH_TARGETS}`
-                );
-              } else {
-                const morphTrack = new MorphTargetTrack(track, m);
-                animation.addTrack(m.mesh, morphTrack);
-              }
-            }
-          } else {
-            console.error(`Invalid animation track type: ${track.type}`);
-          }
-        }
-        if (animation.tracks.size === 0) {
-          continue;
-        }
-        animationSet.add(animation);
-        for (const sk of animationData.skeletons) {
-          const nodes = skeletonMeshMap.get(sk);
-          if (nodes) {
-            if (!nodes.skeleton) {
-              nodes.skeleton = new Skeleton(
-                sk.joints.map((val) => nodeMap.get(val)),
-                sk.inverseBindMatrices,
-                sk.bindPoseMatrices,
-                nodes.mesh,
-                nodes.bounding
-              );
-            }
-            animation.addSkeleton(nodes.skeleton);
-          }
-        }
-      }
-    }
-    group.iterate((child) => {
-      if (child !== group) {
-        child.sealed = true;
-      }
-    });
-    group.animationSet = animationSet;
-    group.sharedModel = model;
-    return { group, animationSet };
-  }
   /**
    * Sets the loader for a given builtin-texture
    * @param name - Name of the builtin texture
@@ -589,60 +508,6 @@ export class AssetManager {
       this._builtinTextureLoaders[name] = loader;
     } else {
       this._builtinTextureLoaders[name] = undefined;
-    }
-  }
-  /** @internal */
-  private setAssetNodeToSceneNode(
-    scene: Scene,
-    parent: SceneNode,
-    model: SharedModel,
-    assetNode: AssetHierarchyNode,
-    skeletonMeshMap: Map<AssetSkeleton, { mesh: Mesh[]; bounding: AssetSubMeshData[] }>,
-    nodeMap: Map<AssetHierarchyNode, SceneNode>,
-    instancing: boolean
-  ) {
-    const node: SceneNode = new SceneNode(scene);
-    nodeMap.set(assetNode, node);
-    node.name = `${assetNode.name}`;
-    node.position.set(assetNode.position);
-    node.rotation.set(assetNode.rotation);
-    node.scale.set(assetNode.scaling);
-    if (assetNode.mesh) {
-      const meshData = assetNode.mesh;
-      const skeleton = assetNode.skeleton;
-      for (const subMesh of meshData.subMeshes) {
-        for (const instance of assetNode.instances) {
-          const meshNode = new Mesh(scene);
-          meshNode.position = instance.t;
-          meshNode.scale = instance.s;
-          meshNode.rotation = instance.r;
-          meshNode.name = subMesh.name;
-          meshNode.clipTestEnabled = true;
-          meshNode.showState = 'inherit';
-          meshNode.skinAnimation = !!skeleton;
-          meshNode.morphAnimation = subMesh.numTargets > 0;
-          meshNode.primitive = subMesh.primitive.get();
-          meshNode.material =
-            instancing && !meshNode.skinAnimation && !meshNode.morphAnimation
-              ? subMesh.material.get().createInstance()
-              : subMesh.material.get().clone();
-          meshNode.parent = node;
-          subMesh.mesh = meshNode;
-          processMorphData(subMesh, meshData.morphWeights);
-          if (skeleton) {
-            if (!skeletonMeshMap.has(skeleton)) {
-              skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });
-            } else {
-              skeletonMeshMap.get(skeleton).mesh.push(meshNode);
-              skeletonMeshMap.get(skeleton).bounding.push(subMesh);
-            }
-          }
-        }
-      }
-    }
-    node.parent = parent;
-    for (const child of assetNode.children) {
-      this.setAssetNodeToSceneNode(scene, node, model, child, skeletonMeshMap, nodeMap, instancing);
     }
   }
   private getHash<T extends BaseTexture>(type: string, url: string, options: TextureFetchOptions<T>): string {
