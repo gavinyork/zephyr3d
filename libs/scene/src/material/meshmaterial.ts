@@ -208,6 +208,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     const m = ['x', 'y', 'z', 'w'].slice(vecOffset, vecOffset + numComponents).join('');
     return u[m];
   }
+  /** Get instanced material property list */
+  getInstancedUniforms() {
+    return (this.constructor as typeof MeshMaterial).INSTANCE_UNIFORMS;
+  }
   /** Create material instance */
   createInstance(): this {
     if (this.$isInstance) {
@@ -217,7 +221,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     if (isWebGL1 || !this.supportInstancing) {
       return this.clone() as this;
     }
-    const instanceUniforms = (this.constructor as typeof MeshMaterial).INSTANCE_UNIFORMS;
+    const instanceUniforms = this.getInstancedUniforms();
     const uniformsHolder =
       instanceUniforms.length > 0
         ? new Float32Array((instanceUniforms[instanceUniforms.length - 1].offset + 4) & ~3)
@@ -225,17 +229,31 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     const instance = {} as any;
     const that = this;
     const coreMaterial = new Ref(that);
+    let disposed = false;
     instance.isBatchable = () => true; //!isWebGL1 && that.supportInstancing();
     instance.dispose = () => {
-      coreMaterial.dispose();
+      if (!disposed) {
+        disposed = true;
+        coreMaterial.dispose();
+      }
     };
     instance.$instanceUniforms = uniformsHolder;
     instance.$isInstance = true;
+    let persistentId = '';
     Object.defineProperty(instance, 'coreMaterial', {
       get: function () {
         return coreMaterial.get();
       }
     });
+    Object.defineProperty(instance, 'persistentId', {
+      get: function () {
+        return persistentId;
+      },
+      set: function (val) {
+        persistentId = val;
+      }
+    });
+
     // Copy original uniform values
     for (let i = 0; i < instanceUniforms.length; i++) {
       const { prop, offset, type } = instanceUniforms[i];

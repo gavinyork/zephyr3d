@@ -2,6 +2,7 @@ import { ImGui } from '@zephyr3d/imgui';
 import type { AssetRegistry } from '@zephyr3d/scene';
 import {
   getSerializationInfo,
+  MeshMaterial,
   type PropertyAccessor,
   type PropertyValue,
   type SerializableClass
@@ -312,6 +313,9 @@ export class PropertyEditor {
     }
   }
   private renderProperty(property: Property<any>, level: number, object?: any) {
+    if (object instanceof MeshMaterial && object.$isInstance && !property.value.instance) {
+      return;
+    }
     const { name, value } = property;
     object = object ?? this.object;
     if (value.isValid && !value.isValid.call(object)) {

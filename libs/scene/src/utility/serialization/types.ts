@@ -27,6 +27,7 @@ export type PropertyAccessor<T = unknown> = {
   hidden?: boolean;
   options?: { minValue: number; maxValue: number; speed?: number };
   enum?: { labels: string[]; values: (number | string)[] };
+  instance?: boolean;
   objectTypes?: unknown[];
   default?: PropertyValue;
   nullable?: boolean;
@@ -41,10 +42,10 @@ export type SerializableClass = {
   parent?: SerializableClass;
   createFunc?: (
     ctx?: any,
-    init?: { asset?: string }
+    init?: any
   ) => { obj: any; loadProps?: boolean } | Promise<{ obj: any; loadProps?: boolean }>;
   getObject?: (obj: any) => any;
-  getInitParams?: (obj: any) => { asset?: string };
+  getInitParams?: (obj: any) => any;
   getProps: (obj: any, forSerialize: boolean) => PropertyAccessor<any>[];
 };
 

@@ -139,6 +139,10 @@ export class Material implements Clonable<Material> {
   needSceneColor(): boolean {
     return false;
   }
+  /** Create material instance */
+  createInstance(): this {
+    return null;
+  }
   /** @internal */
   get coreMaterial(): this {
     return this;

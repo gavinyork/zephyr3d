@@ -118,6 +118,11 @@ export async function deserializeObjectProps<T>(
     if (!prop.set) {
       continue;
     }
+    const k = prop.name;
+    const v = json[k];
+    if (v === undefined) {
+      continue;
+    }
     const phase = prop.phase ?? 0;
     if (phase !== currentPhase) {
       currentPhase = phase;
@@ -131,8 +136,6 @@ export async function deserializeObjectProps<T>(
       bool: [false],
       object: [null]
     };
-    const k = prop.name;
-    const v = json[k];
     switch (prop.type) {
       case 'object':
         if (typeof v === 'string' && v) {
@@ -199,10 +202,14 @@ export function serializeObjectProps<T>(
   cls: SerializableClass,
   json: object,
   assetRegistry: AssetRegistry,
+  instance: boolean,
   assetList?: Set<string>
 ) {
   const props = cls.getProps(obj, true) ?? [];
   for (const prop of props) {
+    if (instance && !prop.instance) {
+      continue;
+    }
     const tmpVal: PropertyValue = {
       num: [0, 0, 0, 0],
       str: [''],
@@ -283,7 +290,13 @@ export function serializeObjectProps<T>(
   }
 }
 
-export function serializeObject(obj: any, assetRegistry: AssetRegistry, json?: any, assetList?: Set<string>) {
+export function serializeObject(
+  obj: any,
+  assetRegistry: AssetRegistry,
+  json?: any,
+  assetList?: Set<string>,
+  instance?: boolean
+) {
   const serializationInfo = getSerializationInfo(assetRegistry);
   const cls = [...serializationInfo.values()];
   const index = cls.findIndex((val) => val.ctor === obj.constructor);
@@ -303,7 +316,7 @@ export function serializeObject(obj: any, assetRegistry: AssetRegistry, json?: a
   }
   obj = info.getObject?.(obj) ?? obj;
   while (info) {
-    serializeObjectProps(obj, info, json.Object, assetRegistry, assetList);
+    serializeObjectProps(obj, info, json.Object, assetRegistry, instance, assetList);
     info = info.parent;
   }
   return json;
@@ -419,11 +432,11 @@ export function serializeScene(
     }
     const pid = m.persistentId;
     m.persistentId = '';
-    const matContent = serializeObject(m, assetRegistry, null, assetList);
+    const matContent = serializeObject(m, assetRegistry, null, assetList, m.$isInstance);
     m.persistentId = pid;
     json.allMaterials.push({
       id: m.persistentId,
-      isInstance: m.$isInstance,
+      proto: m.$isInstance ? m.coreMaterial.persistentId : null,
       content: matContent
     });
   }
@@ -462,10 +475,10 @@ export async function deserializeSceneFromURL(
 }
 
 export async function deserializeScene<T>(scene: Scene, assetRegistry: AssetRegistry, json: any) {
-  const allMaterials = json.allMaterials as { id: string; isInstance: boolean; content: any }[];
+  const allMaterials = json.allMaterials as { id: string; proto: string; content: any }[];
   if (allMaterials) {
     const nonInstancedMaterials = allMaterials.filter(
-      (val) => !val.isInstance && !Material.findMaterialById(val.id)
+      (val) => !val.proto && !Material.findMaterialById(val.id)
     );
     let promises: Promise<Material>[] = nonInstancedMaterials.map((val) =>
       deserializeObject(null, val.content, assetRegistry)
@@ -475,7 +488,7 @@ export async function deserializeScene<T>(scene: Scene, assetRegistry: AssetRegi
       Material.registerMaterial(nonInstancedMaterials[i].id, materials[i]);
     }
     const instancedMaterials = allMaterials.filter(
-      (val) => val.isInstance && !Material.findMaterialById(val.id)
+      (val) => val.proto && Material.findMaterialById(val.proto) && !Material.findMaterialById(val.id)
     );
     promises = instancedMaterials.map((val) => deserializeObject(null, val.content, assetRegistry));
     materials = await Promise.all(promises);

@@ -55,6 +55,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
     {
       name: 'EmissiveColor',
       type: 'rgb',
+      instance: true,
       default: { num: [0, 0, 0] },
       get(this: PBRMaterial, value) {
         value.num[0] = this.emissiveColor.x;
@@ -68,6 +69,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
     {
       name: 'EmissiveStrength',
       type: 'float',
+      instance: true,
       default: { num: [1] },
       options: {
         minValue: 0,
@@ -428,6 +430,7 @@ function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<U
     {
       name: 'AlbedoColor',
       type: 'rgba',
+      instance: true,
       default: { num: [1, 1, 1, 1] },
       get(this: UnlitPropTypes, value) {
         const color = this.albedoColor;
@@ -449,14 +452,17 @@ export function getMeshMaterialClass(): SerializableClass {
     ctor: MeshMaterial,
     className: 'MeshMaterial',
     createFunc(ctx, initParams) {
-      if (initParams?.asset) {
-        return { obj: Material.findMaterialById(initParams.asset), loadProps: false };
+      if (initParams?.proto) {
+        const mat = Material.findMaterialById(initParams.proto);
+        return { obj: mat?.createInstance(), loadProps: true };
       } else {
         return { obj: new MeshMaterial() };
       }
     },
     getInitParams(obj: MeshMaterial) {
-      return obj.persistentId ? { asset: obj.persistentId } : null;
+      return obj.$isInstance && obj.coreMaterial.persistentId
+        ? { proto: obj.coreMaterial.persistentId }
+        : null;
     },
     getProps(obj: MeshMaterial, forSerialize: boolean) {
       return forSerialize && obj.persistentId
@@ -515,6 +521,7 @@ export function getMeshMaterialClass(): SerializableClass {
             {
               name: 'Opacity',
               type: 'float',
+              instance: true,
               options: {
                 minValue: 0,
                 maxValue: 1
@@ -538,14 +545,17 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
     parent: getMeshMaterialClass(),
     className: 'ParticleMaterial',
     createFunc(ctx, initParams) {
-      if (initParams?.asset) {
-        return { obj: Material.findMaterialById(initParams.asset), loadProps: false };
+      if (initParams?.proto) {
+        const mat = Material.findMaterialById(initParams.proto);
+        return { obj: mat?.createInstance(), loadProps: true };
       } else {
         return { obj: new ParticleMaterial() };
       }
     },
     getInitParams(obj: ParticleMaterial) {
-      return obj.persistentId ? { asset: obj.persistentId } : null;
+      return obj.$isInstance && obj.coreMaterial.persistentId
+        ? { proto: obj.coreMaterial.persistentId }
+        : null;
     },
     getProps(obj: ParticleMaterial, forSerialize: boolean) {
       return forSerialize && obj.persistentId
@@ -605,14 +615,17 @@ export function getUnlitMaterialClass(assetRegistry: AssetRegistry): Serializabl
     parent: getMeshMaterialClass(),
     className: 'UnlitMaterial',
     createFunc(ctx, initParams) {
-      if (initParams?.asset) {
-        return { obj: Material.findMaterialById(initParams.asset), loadProps: false };
+      if (initParams?.proto) {
+        const mat = Material.findMaterialById(initParams.proto);
+        return { obj: mat?.createInstance(), loadProps: true };
       } else {
         return { obj: new UnlitMaterial() };
       }
     },
     getInitParams(obj: UnlitMaterial) {
-      return obj.persistentId ? { asset: obj.persistentId } : null;
+      return obj.$isInstance && obj.coreMaterial.persistentId
+        ? { proto: obj.coreMaterial.persistentId }
+        : null;
     },
     getProps(obj: UnlitMaterial, forSerialize: boolean) {
       return forSerialize && obj.persistentId ? [] : getUnlitMaterialProps(assetRegistry);
@@ -626,14 +639,17 @@ export function getLambertMaterialClass(assetRegistry: AssetRegistry): Serializa
     parent: getMeshMaterialClass(),
     className: 'LambertMaterial',
     createFunc(ctx, initParams) {
-      if (initParams?.asset) {
-        return { obj: Material.findMaterialById(initParams.asset), loadProps: false };
+      if (initParams?.proto) {
+        const mat = Material.findMaterialById(initParams.proto);
+        return { obj: mat?.createInstance(), loadProps: true };
       } else {
         return { obj: new LambertMaterial() };
       }
     },
     getInitParams(obj: LambertMaterial) {
-      return obj.persistentId ? { asset: obj.persistentId } : null;
+      return obj.$isInstance && obj.coreMaterial.persistentId
+        ? { proto: obj.coreMaterial.persistentId }
+        : null;
     },
     getProps(obj: LambertMaterial, forSerialize: boolean) {
       return forSerialize && obj.persistentId ? [] : getLitMaterialProps(assetRegistry);
@@ -647,14 +663,17 @@ export function getBlinnMaterialClass(assetRegistry: AssetRegistry): Serializabl
     parent: getMeshMaterialClass(),
     className: 'BlinnMaterial',
     createFunc(ctx, initParams) {
-      if (initParams?.asset) {
-        return { obj: Material.findMaterialById(initParams.asset), loadProps: false };
+      if (initParams?.proto) {
+        const mat = Material.findMaterialById(initParams.proto);
+        return { obj: mat?.createInstance(), loadProps: true };
       } else {
         return { obj: new BlinnMaterial() };
       }
     },
     getInitParams(obj: BlinnMaterial) {
-      return obj.persistentId ? { asset: obj.persistentId } : null;
+      return obj.$isInstance && obj.coreMaterial.persistentId
+        ? { proto: obj.coreMaterial.persistentId }
+        : null;
     },
     getProps(obj: BlinnMaterial, forSerialize: boolean) {
       return forSerialize && obj.persistentId
@@ -663,6 +682,7 @@ export function getBlinnMaterialClass(assetRegistry: AssetRegistry): Serializabl
             {
               name: 'Shininess',
               type: 'float',
+              instance: true,
               default: { num: [32] },
               options: {
                 minValue: 0,
@@ -687,14 +707,17 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
     parent: getMeshMaterialClass(),
     className: 'PBRMetallicRoughnessMaterial',
     createFunc(ctx, initParams) {
-      if (initParams?.asset) {
-        return { obj: Material.findMaterialById(initParams.asset), loadProps: false };
+      if (initParams?.proto) {
+        const mat = Material.findMaterialById(initParams.proto);
+        return { obj: mat?.createInstance(), loadProps: true };
       } else {
         return { obj: new PBRMetallicRoughnessMaterial() };
       }
     },
     getInitParams(obj: PBRMetallicRoughnessMaterial) {
-      return obj.persistentId ? { asset: obj.persistentId } : null;
+      return obj.$isInstance && obj.coreMaterial.persistentId
+        ? { proto: obj.coreMaterial.persistentId }
+        : null;
     },
     getProps(obj: PBRMetallicRoughnessMaterial, forSerialize: boolean) {
       return forSerialize && obj.persistentId
@@ -703,6 +726,7 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
             {
               name: 'Metallic',
               type: 'float',
+              instance: true,
               default: { num: [1] },
               options: {
                 minValue: 0,
@@ -718,6 +742,7 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
             {
               name: 'Roughness',
               type: 'float',
+              instance: true,
               default: { num: [1] },
               options: {
                 minValue: 0,
@@ -733,6 +758,7 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
             {
               name: 'SpecularFactor',
               type: 'rgba',
+              instance: true,
               default: { num: [1, 1, 1, 1] },
               get(this: PBRMetallicRoughnessMaterial, value) {
                 value.num[0] = this.specularFactor.x;
@@ -763,14 +789,17 @@ export function getPBRSpecularGlossinessMaterialClass(assetRegistry: AssetRegist
     parent: getMeshMaterialClass(),
     className: 'PBRSpecularGlossinessMaterial',
     createFunc(ctx, initParams) {
-      if (initParams?.asset) {
-        return { obj: Material.findMaterialById(initParams.asset), loadProps: false };
+      if (initParams?.proto) {
+        const mat = Material.findMaterialById(initParams.proto);
+        return { obj: mat?.createInstance(), loadProps: true };
       } else {
         return { obj: new PBRSpecularGlossinessMaterial() };
       }
     },
     getInitParams(obj: PBRSpecularGlossinessMaterial) {
-      return obj.persistentId ? { asset: obj.persistentId } : null;
+      return obj.$isInstance && obj.coreMaterial.persistentId
+        ? { proto: obj.coreMaterial.persistentId }
+        : null;
     },
     getProps(obj: PBRSpecularGlossinessMaterial, forSerialize: boolean) {
       return forSerialize && obj.persistentId
@@ -779,6 +808,7 @@ export function getPBRSpecularGlossinessMaterialClass(assetRegistry: AssetRegist
             {
               name: 'SpecularFactor',
               type: 'rgb',
+              instance: true,
               default: { num: [1, 1, 1] },
               get(this: PBRSpecularGlossinessMaterial, value) {
                 value.num[0] = this.specularFactor.x;
@@ -792,6 +822,7 @@ export function getPBRSpecularGlossinessMaterialClass(assetRegistry: AssetRegist
             {
               name: 'GlossnessFactor',
               type: 'float',
+              instance: true,
               default: { num: [1] },
               options: {
                 minValue: 0,
