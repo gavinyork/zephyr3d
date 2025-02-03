@@ -69,7 +69,7 @@ let FEATURE_ALPHABLEND = 0;
 let FEATURE_ALPHATOCOVERAGE = 0;
 
 /** @internal */
-export type InstanceUniformType = 'float' | 'vec2' | 'vec3' | 'vec4';
+export type InstanceUniformType = 'float' | 'vec2' | 'vec3' | 'vec4' | 'rgb' | 'rgba';
 
 /**
  * Base class for any kind of mesh materials
@@ -78,11 +78,13 @@ export type InstanceUniformType = 'float' | 'vec2' | 'vec3' | 'vec4';
  */
 export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   /** @internal */
-  static INSTANCE_UNIFORMS: [string, InstanceUniformType][] = [];
+  static INSTANCE_UNIFORMS: { prop: string; type: InstanceUniformType; offset: number }[] = [];
   /** @internal */
   static NEXT_FEATURE_INDEX = 3;
   /** @internal */
-  static OBJECT_COLOR_UNIFORM = this.defineInstanceUniform('objectColor', 'vec4');
+  static OBJECT_COLOR_UNIFORM = this.defineInstanceUniform('objectColor', 'rgba');
+  /** @internal */
+  static OPACITY_UNIFORM = this.defineInstanceUniform('opacity', 'float');
   /** @internal */
   private _featureStates: unknown[];
   /** @internal */
@@ -138,16 +140,54 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     this.NEXT_FEATURE_INDEX++;
     return val;
   }
+  /** @internal */
+  private static getNumComponents(type: InstanceUniformType) {
+    if (type === 'float') {
+      return 1;
+    }
+    if (type === 'vec2') {
+      return 2;
+    }
+    if (type === 'rgb' || type === 'vec3') {
+      return 3;
+    }
+    if (type === 'rgba' || type === 'vec4') {
+      return 4;
+    }
+    return 0;
+  }
   /** Define instance uniform index */
   static defineInstanceUniform(prop: string, type: InstanceUniformType): number {
-    if (this.INSTANCE_UNIFORMS.findIndex((val) => val[0] === prop) >= 0) {
+    if (this.INSTANCE_UNIFORMS.findIndex((val) => val.prop === prop) >= 0) {
       throw new Error(`${this.name}.defineInstanceUniform(): ${prop} was already defined`);
     }
-    if (type !== 'float' && type !== 'vec2' && type !== 'vec3' && type !== 'vec4') {
+    const numComponents = this.getNumComponents(type);
+    if (numComponents === 0) {
       throw new Error(`${this.name}.defineInstanceUniform(): invalid uniform type ${type}`);
     }
-    this.INSTANCE_UNIFORMS = [...this.INSTANCE_UNIFORMS, [prop, type]];
-    return this.INSTANCE_UNIFORMS.length - 1;
+    let index = this.INSTANCE_UNIFORMS.length;
+    let offset = 0;
+    if (this.INSTANCE_UNIFORMS.length > 0) {
+      const lastUniform = this.INSTANCE_UNIFORMS[this.INSTANCE_UNIFORMS.length - 1];
+      const finalOffset = (lastUniform.offset + 4) & ~3;
+      offset = finalOffset;
+      for (let i = 0; i < this.INSTANCE_UNIFORMS.length; i++) {
+        const offset1 = this.INSTANCE_UNIFORMS[i].offset;
+        const numComps1 = this.getNumComponents(this.INSTANCE_UNIFORMS[i].type);
+        const offset2 =
+          i === this.INSTANCE_UNIFORMS.length - 1 ? finalOffset : this.INSTANCE_UNIFORMS[i + 1].offset;
+        if (offset1 + numComps1 + numComponents <= offset2) {
+          index = i + 1;
+          offset = offset1 + numComps1;
+          if (offset + numComponents === offset2) {
+            break;
+          }
+        }
+      }
+    }
+    this.INSTANCE_UNIFORMS = this.INSTANCE_UNIFORMS.slice();
+    this.INSTANCE_UNIFORMS.splice(index, 0, { prop, offset, type });
+    return (offset << 2) | (numComponents - 1);
   }
   getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShaderExp {
     const pb = scope.$builder;
@@ -155,13 +195,18 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     const uniformName = ShaderHelper.getInstanceDataUniformName();
     const strideName = ShaderHelper.getInstanceDataStrideUniformName();
     const offsetName = ShaderHelper.getInstanceDataOffsetUniformName();
-    return scope[uniformName].at(
+    const numComponents = (uniformIndex & 3) + 1;
+    const vecIndex = uniformIndex >> 4;
+    const vecOffset = (uniformIndex >> 2) & 3;
+    const u = scope[uniformName].at(
       pb.add(
         pb.mul(scope[strideName], instanceID),
-        ShaderHelper.MATERIAL_INSTANCE_DATA_OFFSET + uniformIndex,
+        ShaderHelper.MATERIAL_INSTANCE_DATA_OFFSET + vecIndex,
         scope[offsetName]
       )
     );
+    const m = ['x', 'y', 'z', 'w'].slice(vecOffset, vecOffset + numComponents).join('');
+    return u[m];
   }
   /** Create material instance */
   createInstance(): this {
@@ -173,7 +218,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       return this.clone() as this;
     }
     const instanceUniforms = (this.constructor as typeof MeshMaterial).INSTANCE_UNIFORMS;
-    const uniformsHolder = instanceUniforms.length > 0 ? new Float32Array(4 * instanceUniforms.length) : null;
+    const uniformsHolder =
+      instanceUniforms.length > 0
+        ? new Float32Array((instanceUniforms[instanceUniforms.length - 1].offset + 4) & ~3)
+        : null;
     const instance = {} as any;
     const that = this;
     const coreMaterial = new Ref(that);
@@ -190,18 +238,17 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     });
     // Copy original uniform values
     for (let i = 0; i < instanceUniforms.length; i++) {
-      const instanceIndex = i;
-      const [prop, type] = instanceUniforms[instanceIndex];
+      const { prop, offset, type } = instanceUniforms[i];
       const value = that[prop];
       switch (type) {
         case 'float': {
-          uniformsHolder[instanceIndex * 4] = Number(value);
+          uniformsHolder[offset] = Number(value);
           Object.defineProperty(instance, prop, {
             get() {
-              return uniformsHolder[instanceIndex * 4];
+              return uniformsHolder[offset];
             },
             set(value) {
-              uniformsHolder[instanceIndex * 4 + 0] = value;
+              uniformsHolder[offset] = value;
               RenderBundleWrapper.materialUniformsChanged(instance);
             }
           });
@@ -211,75 +258,77 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           if (!(value instanceof Vector2)) {
             throw new Error(`Instance uniform property ${prop} must be of type Vector2`);
           }
-          uniformsHolder[instanceIndex * 4] = value.x;
-          uniformsHolder[instanceIndex * 4 + 1] = value.y;
+          uniformsHolder[offset] = value.x;
+          uniformsHolder[offset + 1] = value.y;
           Object.defineProperty(instance, prop, {
             get() {
-              return new Vector2(uniformsHolder[instanceIndex * 4], uniformsHolder[instanceIndex * 4 + 1]);
+              return new Vector2(uniformsHolder[offset], uniformsHolder[offset + 1]);
             },
             set(value) {
               if (!(value instanceof Vector2)) {
                 throw new Error(`Instance uniform property ${prop} must be of type Vector2`);
               }
-              uniformsHolder[instanceIndex * 4] = value.x;
-              uniformsHolder[instanceIndex * 4 + 1] = value.y;
+              uniformsHolder[offset] = value.x;
+              uniformsHolder[offset + 1] = value.y;
               RenderBundleWrapper.materialUniformsChanged(instance);
             }
           });
           break;
         }
-        case 'vec3': {
+        case 'vec3':
+        case 'rgb': {
           if (!(value instanceof Vector3)) {
             throw new Error(`Instance uniform property ${prop} must be of type Vector3`);
           }
-          uniformsHolder[instanceIndex * 4] = value.x;
-          uniformsHolder[instanceIndex * 4 + 1] = value.y;
-          uniformsHolder[instanceIndex * 4 + 2] = value.z;
+          uniformsHolder[offset] = value.x;
+          uniformsHolder[offset + 1] = value.y;
+          uniformsHolder[offset + 2] = value.z;
           Object.defineProperty(instance, prop, {
             get() {
               return new Vector3(
-                uniformsHolder[instanceIndex * 4],
-                uniformsHolder[instanceIndex * 4 + 1],
-                uniformsHolder[instanceIndex * 4 + 2]
+                uniformsHolder[offset],
+                uniformsHolder[offset + 1],
+                uniformsHolder[offset + 2]
               );
             },
             set(value) {
               if (!(value instanceof Vector3)) {
                 throw new Error(`Instance uniform property ${prop} must be of type Vector3`);
               }
-              uniformsHolder[instanceIndex * 4] = value.x;
-              uniformsHolder[instanceIndex * 4 + 1] = value.y;
-              uniformsHolder[instanceIndex * 4 + 2] = value.z;
+              uniformsHolder[offset] = value.x;
+              uniformsHolder[offset + 1] = value.y;
+              uniformsHolder[offset + 2] = value.z;
               RenderBundleWrapper.materialUniformsChanged(instance);
             }
           });
           break;
         }
-        case 'vec4': {
+        case 'vec4':
+        case 'rgba': {
           if (!(value instanceof Vector4)) {
             throw new Error(`Instance uniform property ${prop} must be of type Vector4`);
           }
-          uniformsHolder[instanceIndex * 4] = value.x;
-          uniformsHolder[instanceIndex * 4 + 1] = value.y;
-          uniformsHolder[instanceIndex * 4 + 2] = value.z;
-          uniformsHolder[instanceIndex * 4 + 3] = value.w;
+          uniformsHolder[offset] = value.x;
+          uniformsHolder[offset + 1] = value.y;
+          uniformsHolder[offset + 2] = value.z;
+          uniformsHolder[offset + 3] = value.w;
           Object.defineProperty(instance, prop, {
             get() {
               return new Vector4(
-                uniformsHolder[instanceIndex * 4],
-                uniformsHolder[instanceIndex * 4 + 1],
-                uniformsHolder[instanceIndex * 4 + 2],
-                uniformsHolder[instanceIndex * 4 + 3]
+                uniformsHolder[offset],
+                uniformsHolder[offset + 1],
+                uniformsHolder[offset + 2],
+                uniformsHolder[offset + 3]
               );
             },
             set(value) {
               if (!(value instanceof Vector4)) {
                 throw new Error(`Instance uniform property ${prop} must be of type Vector4`);
               }
-              uniformsHolder[instanceIndex * 4] = value.x;
-              uniformsHolder[instanceIndex * 4 + 1] = value.y;
-              uniformsHolder[instanceIndex * 4 + 2] = value.z;
-              uniformsHolder[instanceIndex * 4 + 3] = value.w;
+              uniformsHolder[offset] = value.x;
+              uniformsHolder[offset + 1] = value.y;
+              uniformsHolder[offset + 2] = value.z;
+              uniformsHolder[offset + 3] = value.w;
               RenderBundleWrapper.materialUniformsChanged(instance);
             }
           });
@@ -427,7 +476,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     if (this.featureUsed(FEATURE_ALPHATEST)) {
       bindGroup.setValue('zAlphaCutoff', this._alphaCutoff);
     }
-    if (this.isTransparentPass(pass)) {
+    if (this.isTransparentPass(pass) && !(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
       bindGroup.setValue('zOpacity', this._opacity);
     }
     if (ctx.oit) {
@@ -533,11 +582,13 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     ) {
       scope.$inputs.zFakeVertexID = pb.float().attrib('texCoord7');
     }
-    if (
-      this.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR &&
-      this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
-    ) {
-      scope.$outputs.zObjectColor = this.getInstancedUniform(scope, MeshMaterial.OBJECT_COLOR_UNIFORM);
+    if (this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
+      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
+        scope.$outputs.zObjectColor = this.getInstancedUniform(scope, MeshMaterial.OBJECT_COLOR_UNIFORM);
+      }
+      if (this.isTransparentPass(this.pass)) {
+        scope.$outputs.zOpacity = this.getInstancedUniform(scope, MeshMaterial.OPACITY_UNIFORM);
+      }
     }
   }
   /**
@@ -551,7 +602,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       scope.zAlphaCutoff = pb.float().uniform(2);
     }
     if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
-      if (this.isTransparentPass(this.pass)) {
+      if (
+        this.isTransparentPass(this.pass) &&
+        !(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)
+      ) {
         scope.zOpacity = pb.float().uniform(2);
       }
     } else if (
@@ -621,8 +675,12 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         ShaderHelper.discardIfClipped(this, this.worldPos);
         if (!that.isTransparentPass(that.pass) && !this.zAlphaCutoff && !that.alphaToCoverage) {
           this.outColor.a = 1;
-        } else if (this.zOpacity) {
-          this.outColor.a = pb.mul(this.outColor.a, this.zOpacity);
+        } else if (that.isTransparentPass(that.pass)) {
+          const opacity =
+            that.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
+              ? this.$inputs.zOpacity
+              : this.zOpacity;
+          this.outColor.a = pb.mul(this.outColor.a, opacity);
         }
         if (this.zAlphaCutoff) {
           this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {

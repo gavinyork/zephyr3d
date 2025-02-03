@@ -15,7 +15,7 @@ import { getGGXLUT } from '../../../utility/textures/ggxlut';
 import type { TextureMixinInstanceTypes } from '../texture';
 import { mixinTextureProps } from '../texture';
 import { ShaderHelper } from '../../shader/helper';
-import { RENDER_PASS_TYPE_LIGHT } from '../../../values';
+import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../../../values';
 
 /**
  * Interface for common PBR mixin
@@ -132,10 +132,14 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
   let FEATURE_TRANSMISSION = 0;
   let FEATURE_IRIDESCENCE = 0;
 
+  const EMISSIVE_COLOR_UNIFORM = S.defineInstanceUniform('emissiveColor', 'rgb');
+  const EMISSIVE_STRENGTH_UNIFORM = S.defineInstanceUniform('emissiveStrength', 'float');
+
   const cls = class extends S {
     static readonly pbrCommonMixed = true;
     private _f0: Vector4;
-    private _emissiveFactor: Vector4;
+    private _emissiveColor: Vector3;
+    private _emissiveStrength: number;
     private _occlusionStrength: number;
     private _sheenFactor: Vector4;
     private _clearcoatFactor: Vector4;
@@ -149,7 +153,8 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       super();
       this._f0 = new Vector4(0.04, 0.04, 0.04, 1.5);
       this._occlusionStrength = 1;
-      this._emissiveFactor = new Vector4(0, 0, 0, 1);
+      this._emissiveColor = new Vector3(0, 0, 0);
+      this._emissiveStrength = 1;
       this._sheenFactor = Vector4.zero();
       this._clearcoatFactor = new Vector4(0, 0, 1, 0);
       this._transmissionFactor = 0;
@@ -275,26 +280,24 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       }
     }
     get emissiveColor(): Vector3 {
-      return this._emissiveFactor.xyz();
+      return this._emissiveColor;
     }
     set emissiveColor(val: Vector3) {
       if (
-        val.x !== this._emissiveFactor.x ||
-        val.y !== this._emissiveFactor.y ||
-        val.z !== this._emissiveFactor.z
+        val.x !== this._emissiveColor.x ||
+        val.y !== this._emissiveColor.y ||
+        val.z !== this._emissiveColor.z
       ) {
-        this._emissiveFactor.x = val.x;
-        this._emissiveFactor.y = val.y;
-        this._emissiveFactor.z = val.z;
+        this._emissiveColor.set(val);
         this.uniformChanged();
       }
     }
     get emissiveStrength(): number {
-      return this._emissiveFactor.w;
+      return this._emissiveStrength;
     }
     set emissiveStrength(val: number) {
-      if (this._emissiveFactor.w !== val) {
-        this._emissiveFactor.w = val;
+      if (this._emissiveStrength !== val) {
+        this._emissiveStrength = val;
         this.uniformChanged();
       }
     }
@@ -360,12 +363,22 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         this.uniformChanged();
       }
     }
+    vertexShader(scope: PBFunctionScope): void {
+      super.vertexShader(scope);
+      if (this.needFragmentColor() && this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
+        scope.$outputs.zEmissiveColor = this.getInstancedUniform(scope, EMISSIVE_COLOR_UNIFORM);
+        scope.$outputs.zEmissiveStrength = this.getInstancedUniform(scope, EMISSIVE_STRENGTH_UNIFORM);
+      }
+    }
     fragmentShader(scope: PBFunctionScope): void {
       const pb = scope.$builder;
       super.fragmentShader(scope);
       if (this.needFragmentColor()) {
         scope.zF0 = pb.vec4().uniform(2);
-        scope.zEmissiveFactor = pb.vec4().uniform(2);
+        if (!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)) {
+          scope.zEmissiveColor = pb.vec3().uniform(2);
+          scope.zEmissiveStrength = pb.float().uniform(2);
+        }
         if (this.occlusionTexture) {
           scope.zOcclusionStrength = pb.float().uniform(2);
         }
@@ -398,7 +411,10 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       super.applyUniformValues(bindGroup, ctx, pass);
       if (this.needFragmentColor(ctx)) {
         bindGroup.setValue('zF0', this._f0);
-        bindGroup.setValue('zEmissiveFactor', this._emissiveFactor);
+        if (!(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
+          bindGroup.setValue('zEmissiveColor', this._emissiveColor);
+          bindGroup.setValue('zEmissiveStrength', this._emissiveStrength);
+        }
         if (this.occlusionTexture) {
           bindGroup.setValue('zOcclusionStrength', this._occlusionStrength);
         }
@@ -571,16 +587,24 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         );
       }
     }
+    getEmissiveColor(scope: PBInsideFunctionScope) {
+      const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
+      return instancing ? scope.$inputs.zEmissiveColor : scope.zEmissiveColor;
+    }
+    getEmissiveStrength(scope: PBInsideFunctionScope) {
+      const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
+      return instancing ? scope.$inputs.zEmissiveStrength : scope.zEmissiveStrength;
+    }
     calculateEmissiveColor(scope: PBInsideFunctionScope): PBShaderExp {
       const pb = scope.$builder;
       if (this.emissiveTexture) {
         return pb.mul(
           this.sampleEmissiveTexture(scope).rgb,
-          scope.zEmissiveFactor.rgb,
-          scope.zEmissiveFactor.a
+          this.getEmissiveColor(scope),
+          this.getEmissiveStrength(scope)
         );
       } else {
-        return pb.mul(scope.zEmissiveFactor.rgb, scope.zEmissiveFactor.a);
+        return pb.mul(this.getEmissiveColor(scope), this.getEmissiveStrength(scope));
       }
     }
     D_Charlie(scope: PBInsideFunctionScope, NdotH: PBShaderExp, sheenRoughness: PBShaderExp): PBShaderExp {

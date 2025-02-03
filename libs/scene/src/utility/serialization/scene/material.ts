@@ -81,20 +81,6 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       }
     },
     ...getTextureProps<PBRMaterial>(assetRegistry, 'emissiveTexture', '2D', 0),
-    {
-      name: 'SpecularFactor',
-      type: 'vec4',
-      default: { num: [1, 1, 1, 1] },
-      get(this: PBRMaterial, value) {
-        value.num[0] = this.specularFactor.x;
-        value.num[1] = this.specularFactor.y;
-        value.num[2] = this.specularFactor.z;
-        value.num[3] = this.specularFactor.w;
-      },
-      set(this: PBRMaterial, value) {
-        this.specularFactor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
-      }
-    },
     ...getTextureProps<PBRMaterial>(assetRegistry, 'specularTexture', '2D', 0),
     {
       name: 'Transmission',
@@ -744,6 +730,20 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
                 this.roughness = value.num[0];
               }
             },
+            {
+              name: 'SpecularFactor',
+              type: 'rgba',
+              default: { num: [1, 1, 1, 1] },
+              get(this: PBRMetallicRoughnessMaterial, value) {
+                value.num[0] = this.specularFactor.x;
+                value.num[1] = this.specularFactor.y;
+                value.num[2] = this.specularFactor.z;
+                value.num[3] = this.specularFactor.w;
+              },
+              set(this: PBRMaterial, value) {
+                this.specularFactor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
+              }
+            },
             ...getTextureProps<PBRMetallicRoughnessMaterial>(
               assetRegistry,
               'metallicRoughnessTexture',
@@ -776,6 +776,19 @@ export function getPBRSpecularGlossinessMaterialClass(assetRegistry: AssetRegist
       return forSerialize && obj.persistentId
         ? []
         : [
+            {
+              name: 'SpecularFactor',
+              type: 'rgb',
+              default: { num: [1, 1, 1] },
+              get(this: PBRSpecularGlossinessMaterial, value) {
+                value.num[0] = this.specularFactor.x;
+                value.num[1] = this.specularFactor.y;
+                value.num[2] = this.specularFactor.z;
+              },
+              set(this: PBRSpecularGlossinessMaterial, value) {
+                this.specularFactor = new Vector3(value.num[0], value.num[1], value.num[2]);
+              }
+            },
             {
               name: 'GlossnessFactor',
               type: 'float',

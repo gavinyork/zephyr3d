@@ -10,6 +10,7 @@ import { Vector4 } from '@zephyr3d/base';
 import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
 import { ShaderHelper } from '../../shader/helper';
+import { MaterialVaryingFlags } from '../../../values';
 
 /**
  * Interface for PBRMetallicRoughness lighting model mixin
@@ -58,6 +59,10 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
     mixinTextureProps('specular'),
     mixinTextureProps('specularColor')
   );
+  const METALLIC_UNIFORM = S.defineInstanceUniform('metallic', 'float');
+  const ROUGHNESS_UNIFORM = S.defineInstanceUniform('roughness', 'float');
+  const SPECULAR_FACTOR_UNFORM = S.defineInstanceUniform('specularFactor', 'vec4');
+
   return class extends S {
     static readonly pbrMetallicRoughnessMixed = true;
     private _metallic: number;
@@ -173,21 +178,33 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
         ? pb.getGlobalScope()[funcName](worldPos, normal, TBN, viewVec, albedo, outRoughness)
         : pb.getGlobalScope()[funcName](worldPos, normal, TBN, viewVec, albedo);
     }
+    vertexShader(scope: PBFunctionScope): void {
+      super.vertexShader(scope);
+      if (this.needFragmentColor() && this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
+        scope.$outputs.zMetallic = this.getInstancedUniform(scope, METALLIC_UNIFORM);
+        scope.$outputs.zRoughness = this.getInstancedUniform(scope, ROUGHNESS_UNIFORM);
+        scope.$outputs.zSpecularFactor = this.getInstancedUniform(scope, SPECULAR_FACTOR_UNFORM);
+      }
+    }
     fragmentShader(scope: PBFunctionScope): void {
       super.fragmentShader(scope);
       if (this.needFragmentColor()) {
         const pb = scope.$builder;
-        scope.zMetallic = pb.float().uniform(2);
-        scope.zRoughness = pb.float().uniform(2);
-        scope.zSpecularFactor = pb.vec4().uniform(2);
+        if (!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)) {
+          scope.zMetallic = pb.float().uniform(2);
+          scope.zRoughness = pb.float().uniform(2);
+          scope.zSpecularFactor = pb.vec4().uniform(2);
+        }
       }
     }
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
       super.applyUniformValues(bindGroup, ctx, pass);
       if (this.needFragmentColor(ctx)) {
-        bindGroup.setValue('zMetallic', this._metallic);
-        bindGroup.setValue('zRoughness', this._roughness);
-        bindGroup.setValue('zSpecularFactor', this._specularFactor);
+        if (!(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
+          bindGroup.setValue('zMetallic', this._metallic);
+          bindGroup.setValue('zRoughness', this._roughness);
+          bindGroup.setValue('zSpecularFactor', this._specularFactor);
+        }
       }
     }
     calculateCommonData(
@@ -199,27 +216,28 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
       data: PBShaderExp
     ): void {
       const pb = scope.$builder;
+      const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
+      const metallic = instancing ? scope.$inputs.zMetallic : scope.zMetallic;
+      const roughness = instancing ? scope.$inputs.zRoughness : scope.zRoughness;
+      const specularFactor = instancing ? scope.$inputs.zSpecularFactor : scope.zSpecularFactor;
       if (this.metallicRoughnessTexture) {
         scope.$l.metallicRoughnessSample = this.sampleMetallicRoughnessTexture(scope);
-        data.metallic = pb.mul(scope.zMetallic, scope.metallicRoughnessSample.z);
-        data.roughness = pb.mul(scope.zRoughness, scope.metallicRoughnessSample.y);
+        data.metallic = pb.mul(metallic, scope.metallicRoughnessSample.z);
+        data.roughness = pb.mul(roughness, scope.metallicRoughnessSample.y);
       } else {
-        data.metallic = scope.zMetallic;
-        data.roughness = scope.zRoughness;
+        data.metallic = metallic;
+        data.roughness = roughness;
       }
       data.roughness = pb.mul(data.roughness, ShaderHelper.getCameraRoughnessFactor(scope));
       if (this.specularColorTexture) {
-        scope.$l.specularColor = pb.mul(
-          scope.zSpecularFactor.rgb,
-          this.sampleSpecularColorTexture(scope).rgb
-        );
+        scope.$l.specularColor = pb.mul(specularFactor.rgb, this.sampleSpecularColorTexture(scope).rgb);
       } else {
-        scope.$l.specularColor = scope.zSpecularFactor.rgb;
+        scope.$l.specularColor = specularFactor.rgb;
       }
       if (this.specularTexture) {
-        data.specularWeight = pb.mul(scope.zSpecularFactor.a, this.sampleSpecularTexture(scope).a);
+        data.specularWeight = pb.mul(specularFactor.a, this.sampleSpecularTexture(scope).a);
       } else {
-        data.specularWeight = scope.zSpecularFactor.a;
+        data.specularWeight = specularFactor.a;
       }
       data.f0 = pb.vec4(
         pb.mix(

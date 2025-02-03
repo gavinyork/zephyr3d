@@ -6,17 +6,18 @@ import { mixinTextureProps } from '../texture';
 import type { IMixinPBRCommon } from '../pbr/common';
 import { mixinPBRCommon } from '../pbr/common';
 import type { DrawContext } from '../../../render';
-import { Vector4 } from '@zephyr3d/base';
+import { Vector3 } from '@zephyr3d/base';
 import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
 import { ShaderHelper } from '../../shader/helper';
+import { MaterialVaryingFlags } from '../../../values';
 
 /**
  * Interface for PBRSpecularGlossiness mixin
  * @public
  */
 export type IMixinPBRSpecularGlossiness = {
-  specularFactor: Vector4;
+  specularFactor: Vector3;
   glossinessFactor: number;
   PBRLight(
     scope: PBInsideFunctionScope,
@@ -51,13 +52,15 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
     return BaseCls as T & { new (...args: any[]): IMixinPBRSpecularGlossiness };
   }
   const S = applyMaterialMixins(BaseCls, mixinPBRCommon, mixinLight, mixinTextureProps('specular'));
+  const SPECULAR_FACTOR_UNFORM = S.defineInstanceUniform('specularFactor', 'rgb');
+  const GLOSSINESS_FACTOR_UNIFORM = S.defineInstanceUniform('glossinessFactor', 'float');
   return class extends S {
     static readonly pbrSpecularGlossnessMixed = true;
-    private _specularFactor: Vector4;
+    private _specularFactor: Vector3;
     private _glossinessFactor: number;
     constructor() {
       super();
-      this._specularFactor = Vector4.one();
+      this._specularFactor = Vector3.one();
       this._glossinessFactor = 1;
     }
     copyFrom(other: this): void {
@@ -65,10 +68,10 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
       this.specularFactor = other.specularFactor;
       this.glossinessFactor = other.glossinessFactor;
     }
-    get specularFactor(): Vector4 {
+    get specularFactor(): Vector3 {
       return this._specularFactor;
     }
-    set specularFactor(val: Vector4) {
+    set specularFactor(val: Vector3) {
       if (!val.equalsTo(this._specularFactor)) {
         this._specularFactor.set(val);
         this.uniformChanged();
@@ -83,17 +86,24 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
         this.uniformChanged();
       }
     }
+    vertexShader(scope: PBFunctionScope): void {
+      super.vertexShader(scope);
+      if (this.needFragmentColor() && this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
+        scope.$outputs.zSpecularFactor = this.getInstancedUniform(scope, SPECULAR_FACTOR_UNFORM);
+        scope.$outputs.zGlossinessFactor = this.getInstancedUniform(scope, GLOSSINESS_FACTOR_UNIFORM);
+      }
+    }
     fragmentShader(scope: PBFunctionScope): void {
       super.fragmentShader(scope);
-      if (this.needFragmentColor()) {
+      if (this.needFragmentColor() && !(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)) {
         const pb = scope.$builder;
-        scope.zSpecularFactor = pb.vec4().uniform(2);
+        scope.zSpecularFactor = pb.vec3().uniform(2);
         scope.zGlossinessFactor = pb.float().uniform(2);
       }
     }
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
       super.applyUniformValues(bindGroup, ctx, pass);
-      if (this.needFragmentColor(ctx)) {
+      if (this.needFragmentColor(ctx) && !(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
         bindGroup.setValue('zSpecularFactor', this._specularFactor);
         bindGroup.setValue('zGlossinessFactor', this._glossinessFactor);
       }
@@ -179,16 +189,16 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
     ): void {
       super.calculateCommonData(scope, albedo, normal, viewVec, TBN, data);
       const pb = scope.$builder;
+      const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
+      const specularFactor = instancing ? scope.$inputs.zSpecularFactor : scope.zSpecularFactor;
+      const glossinessFactor = instancing ? scope.$inputs.zGlossinessFactor : scope.zGlossinessFactor;
       if (this.specularTexture) {
         scope.$l.specularTextureSample = this.sampleSpecularTexture(scope);
-        data.roughness = pb.sub(1, pb.mul(scope.zGlossinessFactor, scope.specularTextureSample.a));
-        data.f0 = pb.vec4(
-          pb.mul(scope.specularTextureSample.rgb, scope.zSpecularFactor.rgb),
-          this.getF0(scope).a
-        );
+        data.roughness = pb.sub(1, pb.mul(glossinessFactor, scope.specularTextureSample.a));
+        data.f0 = pb.vec4(pb.mul(scope.specularTextureSample.rgb, specularFactor), this.getF0(scope).a);
       } else {
-        data.roughness = pb.sub(1, scope.zGlossinessFactor);
-        data.f0 = pb.vec4(scope.zSpecularFactor.rgb, this.getF0(scope).a);
+        data.roughness = pb.sub(1, glossinessFactor);
+        data.f0 = pb.vec4(specularFactor, this.getF0(scope).a);
       }
       data.roughness = pb.mul(data.roughness, ShaderHelper.getCameraRoughnessFactor(scope));
       data.metallic = pb.max(pb.max(data.f0.r, data.f0.g), data.f0.b);
