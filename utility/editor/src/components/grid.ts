@@ -313,9 +313,6 @@ export class PropertyEditor {
     }
   }
   private renderProperty(property: Property<any>, level: number, object?: any) {
-    if (object instanceof MeshMaterial && object.$isInstance && !property.value.instance) {
-      return;
-    }
     const { name, value } = property;
     object = object ?? this.object;
     if (value.isValid && !value.isValid.call(object)) {

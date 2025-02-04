@@ -205,14 +205,10 @@ export function serializeObjectProps<T>(
   cls: SerializableClass,
   json: object,
   assetRegistry: AssetRegistry,
-  instance: boolean,
   assetList?: Set<string>
 ) {
   const props = cls.getProps(obj) ?? [];
   for (const prop of props) {
-    if (instance && !prop.instance) {
-      continue;
-    }
     const persistent = prop.persistent ?? true;
     if (!persistent) {
       continue;
@@ -297,13 +293,7 @@ export function serializeObjectProps<T>(
   }
 }
 
-export function serializeObject(
-  obj: any,
-  assetRegistry: AssetRegistry,
-  json?: any,
-  assetList?: Set<string>,
-  instance?: boolean
-) {
+export function serializeObject(obj: any, assetRegistry: AssetRegistry, json?: any, assetList?: Set<string>) {
   const serializationInfo = getSerializationInfo(assetRegistry);
   const cls = [...serializationInfo.values()];
   const index = cls.findIndex((val) => val.ctor === obj.constructor);
@@ -323,7 +313,7 @@ export function serializeObject(
   }
   obj = info.getObject?.(obj) ?? obj;
   while (info) {
-    serializeObjectProps(obj, info, json.Object, assetRegistry, instance, assetList);
+    serializeObjectProps(obj, info, json.Object, assetRegistry, assetList);
     info = info.parent;
   }
   return json;

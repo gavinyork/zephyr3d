@@ -80,7 +80,7 @@ export class SceneController extends BaseController<SceneModel> {
     const assetList = new Set<string>();
     this._scene = Object.assign({}, this._scene ?? {}, {
       name,
-      content: serializeObject(this.model.scene, this._assetRegistry, null, assetList, true), // serializeObject(this.model.scene, this._assetRegistry, {}, assetList),
+      content: serializeObject(this.model.scene, this._assetRegistry, null, assetList), // serializeObject(this.model.scene, this._assetRegistry, {}, assetList),
       metadata: {
         activeCamera: this.model.camera?.id ?? ''
       }
@@ -96,7 +96,7 @@ export class SceneController extends BaseController<SceneModel> {
   }
   private async exportScene(name: string) {
     const assetList = new Set<string>();
-    const content = serializeObject(this.model.scene, this._assetRegistry, null, assetList, true);
+    const content = serializeObject(this.model.scene, this._assetRegistry, null, assetList);
     content.meta = {
       activeCamera: this.model.camera?.id ?? ''
     };

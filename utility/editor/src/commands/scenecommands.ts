@@ -234,7 +234,7 @@ export class NodeDeleteCommand implements Command {
     const node = idNodeMap[this._nodeId];
     if (node) {
       const nodeHierarchy = new NodeHierarchy(node);
-      this._archive = await serializeObject(nodeHierarchy, this._assetRegistry, null, null, true); // await serializeObject(node, this._assetRegistry);
+      this._archive = await serializeObject(nodeHierarchy, this._assetRegistry, null, null); // await serializeObject(node, this._assetRegistry);
       node.remove();
       node.iterate((child) => {
         delete idNodeMap[child.id];

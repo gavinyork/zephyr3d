@@ -1,8 +1,9 @@
 import type { Texture2D, TextureCube } from '@zephyr3d/device';
 import type { AssetRegistry } from '../asset/asset';
 import type { PropertyAccessor } from '../types';
+import { Material } from '../../../material';
 
-export function getTextureProps<T>(
+export function getTextureProps<T extends Material>(
   assetRegistry: AssetRegistry,
   name: keyof T & string & { [P in keyof T]: T[P] extends Texture2D | TextureCube ? P : never }[keyof T],
   type: T[typeof name] extends Texture2D ? '2D' : T[typeof name] extends TextureCube ? 'Cube' : never,
@@ -22,6 +23,9 @@ export function getTextureProps<T>(
         this[name.slice(0, name.length - 7) + 'TexCoordIndex'] = value.num[0];
       },
       isValid() {
+        if (this.$isInstance) {
+          return false;
+        }
         if (isValid) {
           return !!this[name] && isValid.call(this);
         } else {
@@ -67,7 +71,15 @@ export function getTextureProps<T>(
           }
         }
       },
-      isValid
+      isValid() {
+        if (this.$isInstance) {
+          return false;
+        }
+        if (isValid) {
+          return isValid.call(this);
+        }
+        return true;
+      }
     }
   ];
 }
