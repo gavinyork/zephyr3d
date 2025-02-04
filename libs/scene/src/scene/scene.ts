@@ -10,7 +10,7 @@ import type { Camera } from '../camera/camera';
 import type { AnimationSet } from '../animation/animationset';
 import type { PickTarget } from '../render';
 import type { Compositor } from '../posteffect';
-import { Ref } from '../app';
+import { Ref, WeakRef } from '../app';
 
 /**
  * Presents a world that manages a couple of objects that will be rendered
@@ -34,7 +34,7 @@ export class Scene extends makeEventTarget(Object)<{
   /** @internal */
   protected _updateFrame: number;
   /** @internal */
-  protected _animationSet: AnimationSet[];
+  protected _animationSet: WeakRef<AnimationSet>[];
   /** @internal */
   protected _id: number;
   /**
@@ -52,8 +52,8 @@ export class Scene extends makeEventTarget(Object)<{
     this._rootNode.get().name = 'Root';
   }
   /** @internal */
-  get animationSet(): AnimationSet[] {
-    return this._animationSet;
+  addAnimationSet(animationSet: AnimationSet) {
+    this._animationSet.push(new WeakRef(animationSet));
   }
   /**
    * Gets the unique identifier of the scene
@@ -160,37 +160,47 @@ export class Scene extends makeEventTarget(Object)<{
     this._nodePlaceList.add(node);
   }
   /** @internal */
+  private updateAnimations() {
+    for (let i = this._animationSet.length - 1; i >= 0; i--) {
+      const animationSet = this._animationSet[i].get();
+      if (!animationSet) {
+        this._animationSet[i].dispose();
+        this._animationSet.splice(i, 1);
+      } else if (animationSet.model?.attached) {
+        animationSet.update();
+      }
+    }
+  }
+  /** @internal */
+  private updateEnvLight() {
+    if (this.env.light.type === 'ibl') {
+      if (!this.env.light.radianceMap) {
+        if (this.env.sky.skyType !== 'none') {
+          this.env.light.radianceMap = this.env.sky.radianceMap;
+        }
+      } else if (this.env.light.radianceMap === this.env.sky.radianceMap) {
+        if (this.env.sky.skyType === 'none') {
+          this.env.light.radianceMap = null;
+        }
+      }
+      if (!this.env.light.irradianceMap) {
+        if (this.env.sky.skyType !== 'none') {
+          this.env.light.irradianceMap = this.env.sky.irradianceMap;
+        }
+      } else if (this.env.light.irradianceMap === this.env.sky.irradianceMap) {
+        if (this.env.sky.skyType === 'none') {
+          this.env.light.irradianceMap = null;
+        }
+      }
+    }
+  }
+  /** @internal */
   frameUpdate() {
     const frameInfo = Application.instance.device.frameInfo;
     if (frameInfo.frameCounter !== this._updateFrame) {
       this._updateFrame = frameInfo.frameCounter;
-      for (const an of this._animationSet) {
-        if (an.model?.attached) {
-          an.update();
-        }
-      }
-      // check environment lighting
-      if (this.env.light.type === 'ibl') {
-        if (!this.env.light.radianceMap) {
-          if (this.env.sky.skyType !== 'none') {
-            this.env.light.radianceMap = this.env.sky.radianceMap;
-          }
-        } else if (this.env.light.radianceMap === this.env.sky.radianceMap) {
-          if (this.env.sky.skyType === 'none') {
-            this.env.light.radianceMap = null;
-          }
-        }
-        if (!this.env.light.irradianceMap) {
-          if (this.env.sky.skyType !== 'none') {
-            this.env.light.irradianceMap = this.env.sky.irradianceMap;
-          }
-        } else if (this.env.light.irradianceMap === this.env.sky.irradianceMap) {
-          if (this.env.sky.skyType === 'none') {
-            this.env.light.irradianceMap = null;
-          }
-        }
-      }
-      // update scene objects first
+      this.updateAnimations();
+      this.updateEnvLight();
       this.dispatchEvent('update', this);
       this.updateNodePlacement(this._octree, this._nodePlaceList);
     }
@@ -200,7 +210,7 @@ export class Scene extends makeEventTarget(Object)<{
    */
   updateNodePlacement(octree: Octree, list: Set<GraphNode>) {
     function placeNode(node: GraphNode) {
-      if (node.attached && !node.hidden && node.placeToOctree) {
+      if (!node.disposed && node.attached && !node.hidden && node.placeToOctree) {
         octree.placeNode(node);
       } else {
         octree.removeNode(node);

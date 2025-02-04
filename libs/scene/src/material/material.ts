@@ -22,7 +22,7 @@ type MaterialState = {
  */
 export class Material implements Clonable<Material> {
   /** @internal */
-  private static _registry: Map<string, WeakRef<Material>> = new Map();
+  protected static _registry: Map<string, WeakRef<Material>> = new Map();
   /** @internal */
   private static _nextId = 0;
   /** @internal */
@@ -49,12 +49,13 @@ export class Material implements Clonable<Material> {
   constructor() {
     this._disposed = false;
     this._id = ++Material._nextId;
-    this._persistentId = '';
+    this._persistentId = crypto.randomUUID();
     this._states = {};
     this._numPasses = 1;
     this._hash = [null];
     this._optionTag = 0;
     this._currentHash = [];
+    Material._registry.set(this._persistentId, new WeakRef(this));
   }
   clone(): Material {
     const other = new Material();
@@ -71,21 +72,13 @@ export class Material implements Clonable<Material> {
     this._numPasses = other._numPasses;
   }
   /** @internal */
-  static registerMaterial(pid: string, material: Material) {
-    if (material && pid) {
-      material.persistentId = pid;
-      this._registry.set(pid, new WeakRef(material));
-    }
-  }
-  /** @internal */
-  static unregisterMaterial(material: Material) {
-    if (material) {
-      this._registry.delete(material._persistentId);
-    }
-  }
-  /** @internal */
   static findMaterialById(id: string) {
-    return this._registry.get(id)?.get() ?? null;
+    const m = this._registry.get(id);
+    if (m && !m.get()) {
+      this._registry.delete(id);
+      return null;
+    }
+    return m ? m.get() : null;
   }
   /**
    * Persistent ID used in serialization
@@ -94,7 +87,15 @@ export class Material implements Clonable<Material> {
     return this._persistentId;
   }
   set persistentId(val) {
-    this._persistentId = val;
+    if (val !== this._persistentId) {
+      const m = Material._registry.get(this._persistentId);
+      if (!m || m.get() !== this) {
+        throw new Error('Registry material mismatch');
+      }
+      Material._registry.delete(this._persistentId);
+      this._persistentId = val;
+      Material._registry.set(this._persistentId, m);
+    }
   }
   /** Unique identifier of the material */
   get instanceId(): number {
@@ -278,7 +279,12 @@ export class Material implements Clonable<Material> {
    */
   dispose() {
     if (!this._disposed) {
-      Material.unregisterMaterial(this);
+      const m = Material._registry.get(this.persistentId);
+      if (!m || m.get() !== this) {
+        throw new Error('Registry material mismatch');
+      }
+      Material._registry.delete(this._persistentId);
+      m.dispose();
       this._disposed = true;
       if (this._states) {
         for (const k in this._states) {

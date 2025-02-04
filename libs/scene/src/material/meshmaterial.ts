@@ -21,7 +21,7 @@ import { Material } from './material';
 import type { DepthPass } from '../render';
 import { type DrawContext, type ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA, packFloat16x2 } from '../shaders';
-import { Application, Ref } from '../app';
+import { Application, Ref, WeakRef } from '../app';
 import { ShaderHelper } from './shader/helper';
 import type { Clonable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4, applyMixins } from '@zephyr3d/base';
@@ -239,7 +239,8 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     };
     instance.$instanceUniforms = uniformsHolder;
     instance.$isInstance = true;
-    let persistentId = '';
+    let persistentId = crypto.randomUUID();
+    Material._registry.set(persistentId, new WeakRef(instance));
     Object.defineProperty(instance, 'coreMaterial', {
       get: function () {
         return coreMaterial.get();
@@ -250,7 +251,15 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         return persistentId;
       },
       set: function (val) {
-        persistentId = val;
+        if (val !== persistentId) {
+          const m = Material._registry.get(persistentId);
+          if (!m || m.get() !== instance) {
+            throw new Error('Registry material mismatch');
+          }
+          Material._registry.delete(persistentId);
+          persistentId = val;
+          Material._registry.set(persistentId, m);
+        }
       }
     });
 

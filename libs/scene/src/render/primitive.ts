@@ -63,27 +63,20 @@ export class Primitive implements Clonable<Primitive> {
     this._defaultIndexCount = 0;
     this._vertexLayoutDirty = false;
     this._id = ++Primitive._nextId;
-    this._persistentId = '';
+    this._persistentId = crypto.randomUUID();
     this._bbox = null;
     this._bboxChangeCallback = [];
     this._disposed = false;
-  }
-  /** @internal */
-  static registerPrimitive(pid: string, prim: Primitive) {
-    if (prim && pid) {
-      prim.persistentId = pid;
-      this._registry.set(pid, new WeakRef(prim));
-    }
-  }
-  /** @internal */
-  static unregisterPrimitive(prim: Primitive) {
-    if (prim) {
-      this._registry.delete(prim._persistentId);
-    }
+    Primitive._registry.set(this._persistentId, new WeakRef(this));
   }
   /** @internal */
   static findPrimitiveById(id: string) {
-    return this._registry.get(id)?.get() ?? null;
+    const m = this._registry.get(id);
+    if (m && !m.get()) {
+      this._registry.delete(id);
+      return null;
+    }
+    return m ? m.get() : null;
   }
   /**
    * Unique identifier of the primitive
@@ -99,7 +92,15 @@ export class Primitive implements Clonable<Primitive> {
     return this._persistentId;
   }
   set persistentId(val) {
-    this._persistentId = val;
+    if (val !== this._persistentId) {
+      const m = Primitive._registry.get(this._persistentId);
+      if (!m || m.get() !== this) {
+        throw new Error('Registry primitive mismatch');
+      }
+      Primitive._registry.delete(this._persistentId);
+      this._persistentId = val;
+      Primitive._registry.set(this._persistentId, m);
+    }
   }
   clone(): Primitive {
     const other = new Primitive();
@@ -338,6 +339,12 @@ export class Primitive implements Clonable<Primitive> {
    */
   dispose() {
     if (!this._disposed) {
+      const m = Primitive._registry.get(this.persistentId);
+      if (!m || m.get() !== this) {
+        throw new Error('Registry material mismatch');
+      }
+      Primitive._registry.delete(this._persistentId);
+      m.dispose();
       this._disposed = true;
       this._vertexLayout?.dispose();
       releaseObject(this._vertexLayoutOptions.indexBuffer);

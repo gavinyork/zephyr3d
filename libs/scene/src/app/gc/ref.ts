@@ -125,7 +125,7 @@ export class WeakRef<T extends Disposable> {
    */
   get() {
     if (this._object?.disposed) {
-      this._object = null;
+      this.dispose();
     }
     return this._object;
   }

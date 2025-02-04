@@ -3,8 +3,154 @@ import type { SceneNodeVisible } from '../../../scene/scene_node';
 import { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
 import { degree2radian, radian2degree } from '@zephyr3d/base';
-import { GraphNode } from '../../../scene';
+import { GraphNode, Mesh, ParticleSystem, Visitor } from '../../../scene';
 import type { AssetRegistry } from '../asset/asset';
+import { Material } from '../../../material';
+import { Primitive } from '../../../render';
+
+export class GatherVisitor implements Visitor<SceneNode> {
+  /** @internal */
+  private _primitiveSet: Set<Primitive>;
+  private _materialSet: Set<Material>;
+  private _nodeList: SceneNode[];
+  /**
+   * Creates an instance of CullVisitor
+   * @param renderPass - Render pass for the culling task
+   * @param camera - Camera that will be used for culling
+   * @param rendeQueue - RenderQueue
+   * @param viewPoint - Camera position of the primary render pass
+   */
+  constructor() {
+    this._primitiveSet = new Set();
+    this._materialSet = new Set();
+    this._nodeList = [];
+  }
+  get primitiveSet() {
+    return this._primitiveSet;
+  }
+  get materialSet() {
+    return this._materialSet;
+  }
+  get nodeList() {
+    return this._nodeList;
+  }
+  visit(target: SceneNode): unknown {
+    this._nodeList.push(target);
+    if (target.isMesh()) {
+      return this.visitMesh(target);
+    } else if (target.isParticleSystem()) {
+      return this.visitParticleSystem(target);
+    }
+  }
+  /** @internal */
+  visitParticleSystem(node: ParticleSystem) {
+    this.addMaterial(node.material);
+    return true;
+  }
+  /** @internal */
+  visitMesh(node: Mesh) {
+    if (!node.sealed) {
+      this.addMaterial(node.material);
+      this.addPrimitive(node.primitive);
+    }
+    return true;
+  }
+  /** @internal */
+  private addMaterial(material: Material) {
+    if (material) {
+      this._materialSet.add(material);
+      if (material.$isInstance) {
+        this._materialSet.add(material.coreMaterial);
+      }
+    }
+  }
+  private addPrimitive(primitive: Primitive) {
+    if (primitive) {
+      this._primitiveSet.add(primitive);
+    }
+  }
+}
+
+export class NodeHierarchy {
+  private _rootNode: SceneNode;
+  private _materialList: Material[];
+  private _primitiveList: Primitive[];
+  private _nodeList: SceneNode[];
+  constructor(node: SceneNode, noRoot: boolean) {
+    this._rootNode = node;
+    this._materialList = null;
+    this._primitiveList = null;
+    this._nodeList = null;
+  }
+  get rootNode() {
+    return this._rootNode;
+  }
+  get materialList() {
+    if (!this._materialList) {
+      this.gather();
+    }
+    return this._materialList;
+  }
+  get primitiveList() {
+    if (!this._primitiveList) {
+      this.gather();
+    }
+    return this._primitiveList;
+  }
+  get nodeList() {
+    if (!this._nodeList) {
+      this.gather();
+    }
+    return this._nodeList;
+  }
+  private gather() {
+    const v = new GatherVisitor();
+    this._rootNode.traverse(v);
+    this._materialList = [...v.materialSet];
+    this._primitiveList = [...v.primitiveSet];
+    this._nodeList = v.nodeList;
+  }
+}
+
+export function getNodeHierarchyClass(assetRegistry: AssetRegistry): SerializableClass {
+  return {
+    ctor: NodeHierarchy,
+    className: 'NodeHierarchy',
+    getProps() {
+      return [
+        {
+          name: 'MaterialList',
+          type: 'object_array',
+          hidden: true,
+          get(this: NodeHierarchy, value) {
+            value.object = [...this.materialList].sort(
+              (a, b) => Number(b.$isInstance) - Number(a.$isInstance)
+            );
+          },
+          set() {}
+        },
+        {
+          name: 'PrimitiveList',
+          type: 'object_array',
+          hidden: true,
+          get(this: NodeHierarchy, value) {
+            value.object = [...this.primitiveList];
+          },
+          set() {}
+        },
+        {
+          name: 'NodeList',
+          type: 'object_array',
+          hidden: true,
+          get(this: NodeHierarchy, value) {
+            value.object = [...this.nodeList];
+          },
+          set() {}
+        }
+      ];
+    }
+  };
+}
 
 export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableClass {
   return {

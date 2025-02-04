@@ -43,7 +43,7 @@ import {
   getUnlitMaterialClass
 } from './scene/material';
 import { getMeshClass } from './scene/mesh';
-import { getGraphNodeClass, getSceneNodeClass } from './scene/node';
+import { GatherVisitor, getGraphNodeClass, getSceneNodeClass } from './scene/node';
 import { getParticleNodeClass } from './scene/particle';
 import {
   getBoxFrameShapeClass,
@@ -111,7 +111,7 @@ export async function deserializeObjectProps<T>(
   json: object,
   assetRegistry: AssetRegistry
 ) {
-  const props = (cls.getProps(obj, true) ?? []).sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0));
+  const props = (cls.getProps(obj) ?? []).sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0));
   let currentPhase: number = undefined;
   const promises: Promise<void>[] = [];
   for (const prop of props) {
@@ -205,7 +205,7 @@ export function serializeObjectProps<T>(
   instance: boolean,
   assetList?: Set<string>
 ) {
-  const props = cls.getProps(obj, true) ?? [];
+  const props = cls.getProps(obj) ?? [];
   for (const prop of props) {
     if (instance && !prop.instance) {
       continue;
@@ -359,63 +359,7 @@ export async function deserializeObject<T>(ctx: any, json: object, assetRegistry
   return obj;
 }
 
-class GatherVisitor implements Visitor<SceneNode> {
-  /** @internal */
-  private _primitiveSet: Set<Primitive>;
-  private _materialSet: Set<Material>;
-  /**
-   * Creates an instance of CullVisitor
-   * @param renderPass - Render pass for the culling task
-   * @param camera - Camera that will be used for culling
-   * @param rendeQueue - RenderQueue
-   * @param viewPoint - Camera position of the primary render pass
-   */
-  constructor() {
-    this._primitiveSet = new Set();
-    this._materialSet = new Set();
-  }
-  get primitiveSet() {
-    return this._primitiveSet;
-  }
-  get materialSet() {
-    return this._materialSet;
-  }
-  visit(target: SceneNode): unknown {
-    if (target.isMesh()) {
-      return this.visitMesh(target);
-    } else if (target.isParticleSystem()) {
-      return this.visitParticleSystem(target);
-    }
-  }
-  /** @internal */
-  visitParticleSystem(node: ParticleSystem) {
-    this.addMaterial(node.material);
-    return true;
-  }
-  /** @internal */
-  visitMesh(node: Mesh) {
-    if (!node.sealed) {
-      this.addMaterial(node.material);
-      this.addPrimitive(node.primitive);
-    }
-    return true;
-  }
-  /** @internal */
-  private addMaterial(material: Material) {
-    if (material) {
-      this._materialSet.add(material);
-      if (material.$isInstance) {
-        this._materialSet.add(material.coreMaterial);
-      }
-    }
-  }
-  private addPrimitive(primitive: Primitive) {
-    if (primitive) {
-      this._primitiveSet.add(primitive);
-    }
-  }
-}
-
+/*
 export function serializeScene(
   nodeOrScene: Scene | SceneNode,
   assetRegistry: AssetRegistry,
@@ -509,3 +453,4 @@ export async function deserializeScene<T>(scene: Scene, assetRegistry: AssetRegi
   }
   return await deserializeObject<T>(scene, json.content, assetRegistry);
 }
+*/

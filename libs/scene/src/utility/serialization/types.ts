@@ -46,7 +46,7 @@ export type SerializableClass = {
   ) => { obj: any; loadProps?: boolean } | Promise<{ obj: any; loadProps?: boolean }>;
   getObject?: (obj: any) => any;
   getInitParams?: (obj: any) => any;
-  getProps: (obj: any, forSerialize: boolean) => PropertyAccessor<any>[];
+  getProps: (obj: any) => PropertyAccessor<any>[];
 };
 
 export type SerializationInfo = SerializableClass[];

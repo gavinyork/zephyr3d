@@ -452,89 +452,98 @@ export function getMeshMaterialClass(): SerializableClass {
     ctor: MeshMaterial,
     className: 'MeshMaterial',
     createFunc(ctx, initParams) {
-      if (initParams?.proto) {
-        const mat = Material.findMaterialById(initParams.proto);
-        return { obj: mat?.createInstance(), loadProps: true };
+      let mat = Material.findMaterialById(initParams.persistentId);
+      if (mat) {
+        return { obj: mat, loadProps: false };
+      } else if (initParams.persistentId === initParams.corePersistentId) {
+        mat = new MeshMaterial();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
       } else {
-        return { obj: new MeshMaterial() };
+        const coreMaterial = Material.findMaterialById(initParams.corePersistentId);
+        if (!coreMaterial) {
+          throw new Error('Load material failed: core material not found');
+        }
+        mat = coreMaterial.createInstance();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
       }
     },
     getInitParams(obj: MeshMaterial) {
-      return obj.$isInstance && obj.coreMaterial.persistentId
-        ? { proto: obj.coreMaterial.persistentId }
-        : null;
+      return {
+        persistentId: obj.persistentId,
+        corePersistentId: obj.coreMaterial.persistentId
+      };
     },
-    getProps(obj: MeshMaterial, forSerialize: boolean) {
-      return forSerialize && obj.persistentId
-        ? []
-        : [
-            {
-              name: 'AlphaCutoff',
-              type: 'float',
-              default: { num: [0] },
-              options: {
-                minValue: 0,
-                maxValue: 1
-              },
-              get(this: MeshMaterial, value) {
-                value.num[0] = this.alphaCutoff;
-              },
-              set(this: MeshMaterial, value) {
-                this.alphaCutoff = value.num[0];
-              }
-            },
-            {
-              name: 'AlphaToCoverage',
-              type: 'bool',
-              default: { bool: [false] },
-              get(this: MeshMaterial, value) {
-                value.bool[0] = this.alphaToCoverage;
-              },
-              set(this: MeshMaterial, value) {
-                this.alphaToCoverage = value.bool[0];
-              }
-            },
-            {
-              name: 'BlendMode',
-              type: 'string',
-              enum: { labels: ['None', 'Blend', 'Additive'], values: ['none', 'blend', 'additive'] },
-              default: { str: ['none'] },
-              get(this: MeshMaterial, value) {
-                value.str[0] = this.blendMode;
-              },
-              set(this: MeshMaterial, value) {
-                this.blendMode = value.str[0] as BlendMode;
-              }
-            },
-            {
-              name: 'CullMode',
-              type: 'string',
-              enum: { labels: ['None', 'Front', 'Back'], values: ['none', 'front', 'back'] },
-              default: { str: ['back'] },
-              get(this: MeshMaterial, value) {
-                value.str[0] = this.cullMode;
-              },
-              set(this: MeshMaterial, value) {
-                this.cullMode = value.str[0] as FaceMode;
-              }
-            },
-            {
-              name: 'Opacity',
-              type: 'float',
-              instance: true,
-              options: {
-                minValue: 0,
-                maxValue: 1
-              },
-              default: { num: [1] },
-              get(this: MeshMaterial, value) {
-                value.num[0] = this.opacity;
-              },
-              set(this: MeshMaterial, value) {
-                this.opacity = value.num[0];
-              }
-            }
-          ];
+    getProps() {
+      return [
+        {
+          name: 'AlphaCutoff',
+          type: 'float',
+          default: { num: [0] },
+          options: {
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: MeshMaterial, value) {
+            value.num[0] = this.alphaCutoff;
+          },
+          set(this: MeshMaterial, value) {
+            this.alphaCutoff = value.num[0];
+          }
+        },
+        {
+          name: 'AlphaToCoverage',
+          type: 'bool',
+          default: { bool: [false] },
+          get(this: MeshMaterial, value) {
+            value.bool[0] = this.alphaToCoverage;
+          },
+          set(this: MeshMaterial, value) {
+            this.alphaToCoverage = value.bool[0];
+          }
+        },
+        {
+          name: 'BlendMode',
+          type: 'string',
+          enum: { labels: ['None', 'Blend', 'Additive'], values: ['none', 'blend', 'additive'] },
+          default: { str: ['none'] },
+          get(this: MeshMaterial, value) {
+            value.str[0] = this.blendMode;
+          },
+          set(this: MeshMaterial, value) {
+            this.blendMode = value.str[0] as BlendMode;
+          }
+        },
+        {
+          name: 'CullMode',
+          type: 'string',
+          enum: { labels: ['None', 'Front', 'Back'], values: ['none', 'front', 'back'] },
+          default: { str: ['back'] },
+          get(this: MeshMaterial, value) {
+            value.str[0] = this.cullMode;
+          },
+          set(this: MeshMaterial, value) {
+            this.cullMode = value.str[0] as FaceMode;
+          }
+        },
+        {
+          name: 'Opacity',
+          type: 'float',
+          instance: true,
+          options: {
+            minValue: 0,
+            maxValue: 1
+          },
+          default: { num: [1] },
+          get(this: MeshMaterial, value) {
+            value.num[0] = this.opacity;
+          },
+          set(this: MeshMaterial, value) {
+            this.opacity = value.num[0];
+          }
+        }
+      ];
     }
   };
 }
@@ -545,66 +554,75 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
     parent: getMeshMaterialClass(),
     className: 'ParticleMaterial',
     createFunc(ctx, initParams) {
-      if (initParams?.proto) {
-        const mat = Material.findMaterialById(initParams.proto);
-        return { obj: mat?.createInstance(), loadProps: true };
+      let mat = Material.findMaterialById(initParams.persistentId);
+      if (mat) {
+        return { obj: mat, loadProps: false };
+      } else if (initParams.persistentId === initParams.corePersistentId) {
+        mat = new ParticleMaterial();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
       } else {
-        return { obj: new ParticleMaterial() };
+        const coreMaterial = Material.findMaterialById(initParams.corePersistentId);
+        if (!coreMaterial) {
+          throw new Error('Load material failed: core material not found');
+        }
+        mat = coreMaterial.createInstance();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
       }
     },
-    getInitParams(obj: ParticleMaterial) {
-      return obj.$isInstance && obj.coreMaterial.persistentId
-        ? { proto: obj.coreMaterial.persistentId }
-        : null;
+    getInitParams(obj: MeshMaterial) {
+      return {
+        persistentId: obj.persistentId,
+        corePersistentId: obj.coreMaterial.persistentId
+      };
     },
-    getProps(obj: ParticleMaterial, forSerialize: boolean) {
-      return forSerialize && obj.persistentId
-        ? []
-        : [
-            {
-              name: 'AlbedoColor',
-              type: 'rgba',
-              default: { num: [1, 1, 1, 1] },
-              get(this: ParticleMaterial, value) {
-                const color = this.albedoColor;
-                value.num[0] = color.x;
-                value.num[1] = color.y;
-                value.num[2] = color.z;
-                value.num[3] = color.w;
-              },
-              set(this: ParticleMaterial, value) {
-                this.albedoColor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
-              }
-            },
-            {
-              name: 'AlbedoTexture',
-              type: 'object',
-              default: { str: [''] },
-              get(this: ParticleMaterial, value) {
-                value.str[0] = assetRegistry.getAssetId(this.albedoTexture) ?? '';
-              },
-              async set(this: ParticleMaterial, value) {
-                if (value.str[0]) {
-                  const assetId = value.str[0];
-                  const assetInfo = assetRegistry.getAssetInfo(assetId);
-                  if (assetInfo && assetInfo.type === 'texture') {
-                    let tex: Texture2D;
-                    try {
-                      tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
-                    } catch (err) {
-                      console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                    }
-                    if (tex?.isTexture2D()) {
-                      tex.name = assetInfo.name;
-                      this.albedoTexture = tex;
-                    } else {
-                      console.error('Invalid albedo texture');
-                    }
-                  }
+    getProps() {
+      return [
+        {
+          name: 'AlbedoColor',
+          type: 'rgba',
+          default: { num: [1, 1, 1, 1] },
+          get(this: ParticleMaterial, value) {
+            const color = this.albedoColor;
+            value.num[0] = color.x;
+            value.num[1] = color.y;
+            value.num[2] = color.z;
+            value.num[3] = color.w;
+          },
+          set(this: ParticleMaterial, value) {
+            this.albedoColor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
+          }
+        },
+        {
+          name: 'AlbedoTexture',
+          type: 'object',
+          default: { str: [''] },
+          get(this: ParticleMaterial, value) {
+            value.str[0] = assetRegistry.getAssetId(this.albedoTexture) ?? '';
+          },
+          async set(this: ParticleMaterial, value) {
+            if (value.str[0]) {
+              const assetId = value.str[0];
+              const assetInfo = assetRegistry.getAssetInfo(assetId);
+              if (assetInfo && assetInfo.type === 'texture') {
+                let tex: Texture2D;
+                try {
+                  tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
+                } catch (err) {
+                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                }
+                if (tex?.isTexture2D()) {
+                  tex.name = assetInfo.name;
+                  this.albedoTexture = tex;
+                } else {
+                  console.error('Invalid albedo texture');
                 }
               }
             }
-          ];
+          }
+        }
+      ];
     }
   };
 }
@@ -615,20 +633,31 @@ export function getUnlitMaterialClass(assetRegistry: AssetRegistry): Serializabl
     parent: getMeshMaterialClass(),
     className: 'UnlitMaterial',
     createFunc(ctx, initParams) {
-      if (initParams?.proto) {
-        const mat = Material.findMaterialById(initParams.proto);
-        return { obj: mat?.createInstance(), loadProps: true };
+      let mat = Material.findMaterialById(initParams.persistentId);
+      if (mat) {
+        return { obj: mat, loadProps: false };
+      } else if (initParams.persistentId === initParams.corePersistentId) {
+        mat = new UnlitMaterial();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
       } else {
-        return { obj: new UnlitMaterial() };
+        const coreMaterial = Material.findMaterialById(initParams.corePersistentId);
+        if (!coreMaterial) {
+          throw new Error('Load material failed: core material not found');
+        }
+        mat = coreMaterial.createInstance();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
       }
     },
-    getInitParams(obj: UnlitMaterial) {
-      return obj.$isInstance && obj.coreMaterial.persistentId
-        ? { proto: obj.coreMaterial.persistentId }
-        : null;
+    getInitParams(obj: MeshMaterial) {
+      return {
+        persistentId: obj.persistentId,
+        corePersistentId: obj.coreMaterial.persistentId
+      };
     },
-    getProps(obj: UnlitMaterial, forSerialize: boolean) {
-      return forSerialize && obj.persistentId ? [] : getUnlitMaterialProps(assetRegistry);
+    getProps() {
+      return getUnlitMaterialProps(assetRegistry);
     }
   };
 }
@@ -639,20 +668,31 @@ export function getLambertMaterialClass(assetRegistry: AssetRegistry): Serializa
     parent: getMeshMaterialClass(),
     className: 'LambertMaterial',
     createFunc(ctx, initParams) {
-      if (initParams?.proto) {
-        const mat = Material.findMaterialById(initParams.proto);
-        return { obj: mat?.createInstance(), loadProps: true };
+      let mat = Material.findMaterialById(initParams.persistentId);
+      if (mat) {
+        return { obj: mat, loadProps: false };
+      } else if (initParams.persistentId === initParams.corePersistentId) {
+        mat = new LambertMaterial();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
       } else {
-        return { obj: new LambertMaterial() };
+        const coreMaterial = Material.findMaterialById(initParams.corePersistentId);
+        if (!coreMaterial) {
+          throw new Error('Load material failed: core material not found');
+        }
+        mat = coreMaterial.createInstance();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
       }
     },
-    getInitParams(obj: LambertMaterial) {
-      return obj.$isInstance && obj.coreMaterial.persistentId
-        ? { proto: obj.coreMaterial.persistentId }
-        : null;
+    getInitParams(obj: MeshMaterial) {
+      return {
+        persistentId: obj.persistentId,
+        corePersistentId: obj.coreMaterial.persistentId
+      };
     },
-    getProps(obj: LambertMaterial, forSerialize: boolean) {
-      return forSerialize && obj.persistentId ? [] : getLitMaterialProps(assetRegistry);
+    getProps() {
+      return getLitMaterialProps(assetRegistry);
     }
   };
 }
@@ -663,40 +703,49 @@ export function getBlinnMaterialClass(assetRegistry: AssetRegistry): Serializabl
     parent: getMeshMaterialClass(),
     className: 'BlinnMaterial',
     createFunc(ctx, initParams) {
-      if (initParams?.proto) {
-        const mat = Material.findMaterialById(initParams.proto);
-        return { obj: mat?.createInstance(), loadProps: true };
+      let mat = Material.findMaterialById(initParams.persistentId);
+      if (mat) {
+        return { obj: mat, loadProps: false };
+      } else if (initParams.persistentId === initParams.corePersistentId) {
+        mat = new BlinnMaterial();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
       } else {
-        return { obj: new BlinnMaterial() };
+        const coreMaterial = Material.findMaterialById(initParams.corePersistentId);
+        if (!coreMaterial) {
+          throw new Error('Load material failed: core material not found');
+        }
+        mat = coreMaterial.createInstance();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
       }
     },
-    getInitParams(obj: BlinnMaterial) {
-      return obj.$isInstance && obj.coreMaterial.persistentId
-        ? { proto: obj.coreMaterial.persistentId }
-        : null;
+    getInitParams(obj: MeshMaterial) {
+      return {
+        persistentId: obj.persistentId,
+        corePersistentId: obj.coreMaterial.persistentId
+      };
     },
-    getProps(obj: BlinnMaterial, forSerialize: boolean) {
-      return forSerialize && obj.persistentId
-        ? []
-        : [
-            {
-              name: 'Shininess',
-              type: 'float',
-              instance: true,
-              default: { num: [32] },
-              options: {
-                minValue: 0,
-                maxValue: 2048
-              },
-              get(this: BlinnMaterial, value) {
-                value.num[0] = this.shininess;
-              },
-              set(this: BlinnMaterial, value) {
-                this.shininess = value.num[0];
-              }
-            },
-            ...getLitMaterialProps(assetRegistry)
-          ];
+    getProps() {
+      return [
+        {
+          name: 'Shininess',
+          type: 'float',
+          instance: true,
+          default: { num: [32] },
+          options: {
+            minValue: 0,
+            maxValue: 2048
+          },
+          get(this: BlinnMaterial, value) {
+            value.num[0] = this.shininess;
+          },
+          set(this: BlinnMaterial, value) {
+            this.shininess = value.num[0];
+          }
+        },
+        ...getLitMaterialProps(assetRegistry)
+      ];
     }
   };
 }
@@ -707,78 +756,82 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
     parent: getMeshMaterialClass(),
     className: 'PBRMetallicRoughnessMaterial',
     createFunc(ctx, initParams) {
-      if (initParams?.proto) {
-        const mat = Material.findMaterialById(initParams.proto);
-        return { obj: mat?.createInstance(), loadProps: true };
+      let mat = Material.findMaterialById(initParams.persistentId);
+      if (mat) {
+        return { obj: mat, loadProps: false };
+      } else if (initParams.persistentId === initParams.corePersistentId) {
+        mat = new PBRMetallicRoughnessMaterial();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
       } else {
-        return { obj: new PBRMetallicRoughnessMaterial() };
+        const coreMaterial = Material.findMaterialById(initParams.corePersistentId);
+        if (!coreMaterial) {
+          throw new Error('Load material failed: core material not found');
+        }
+        mat = coreMaterial.createInstance();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
       }
     },
-    getInitParams(obj: PBRMetallicRoughnessMaterial) {
-      return obj.$isInstance && obj.coreMaterial.persistentId
-        ? { proto: obj.coreMaterial.persistentId }
-        : null;
+    getInitParams(obj: MeshMaterial) {
+      return {
+        persistentId: obj.persistentId,
+        corePersistentId: obj.coreMaterial.persistentId
+      };
     },
-    getProps(obj: PBRMetallicRoughnessMaterial, forSerialize: boolean) {
-      return forSerialize && obj.persistentId
-        ? []
-        : [
-            {
-              name: 'Metallic',
-              type: 'float',
-              instance: true,
-              default: { num: [1] },
-              options: {
-                minValue: 0,
-                maxValue: 1
-              },
-              get(this: PBRMetallicRoughnessMaterial, value) {
-                value.num[0] = this.metallic;
-              },
-              set(this: PBRMetallicRoughnessMaterial, value) {
-                this.metallic = value.num[0];
-              }
-            },
-            {
-              name: 'Roughness',
-              type: 'float',
-              instance: true,
-              default: { num: [1] },
-              options: {
-                minValue: 0,
-                maxValue: 1
-              },
-              get(this: PBRMetallicRoughnessMaterial, value) {
-                value.num[0] = this.roughness;
-              },
-              set(this: PBRMetallicRoughnessMaterial, value) {
-                this.roughness = value.num[0];
-              }
-            },
-            {
-              name: 'SpecularFactor',
-              type: 'rgba',
-              instance: true,
-              default: { num: [1, 1, 1, 1] },
-              get(this: PBRMetallicRoughnessMaterial, value) {
-                value.num[0] = this.specularFactor.x;
-                value.num[1] = this.specularFactor.y;
-                value.num[2] = this.specularFactor.z;
-                value.num[3] = this.specularFactor.w;
-              },
-              set(this: PBRMaterial, value) {
-                this.specularFactor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
-              }
-            },
-            ...getTextureProps<PBRMetallicRoughnessMaterial>(
-              assetRegistry,
-              'metallicRoughnessTexture',
-              '2D',
-              0
-            ),
-            ...getTextureProps<PBRMetallicRoughnessMaterial>(assetRegistry, 'specularColorTexture', '2D', 0),
-            ...getPBRCommonProps(assetRegistry)
-          ];
+    getProps() {
+      return [
+        {
+          name: 'Metallic',
+          type: 'float',
+          instance: true,
+          default: { num: [1] },
+          options: {
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: PBRMetallicRoughnessMaterial, value) {
+            value.num[0] = this.metallic;
+          },
+          set(this: PBRMetallicRoughnessMaterial, value) {
+            this.metallic = value.num[0];
+          }
+        },
+        {
+          name: 'Roughness',
+          type: 'float',
+          instance: true,
+          default: { num: [1] },
+          options: {
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: PBRMetallicRoughnessMaterial, value) {
+            value.num[0] = this.roughness;
+          },
+          set(this: PBRMetallicRoughnessMaterial, value) {
+            this.roughness = value.num[0];
+          }
+        },
+        {
+          name: 'SpecularFactor',
+          type: 'rgba',
+          instance: true,
+          default: { num: [1, 1, 1, 1] },
+          get(this: PBRMetallicRoughnessMaterial, value) {
+            value.num[0] = this.specularFactor.x;
+            value.num[1] = this.specularFactor.y;
+            value.num[2] = this.specularFactor.z;
+            value.num[3] = this.specularFactor.w;
+          },
+          set(this: PBRMaterial, value) {
+            this.specularFactor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
+          }
+        },
+        ...getTextureProps<PBRMetallicRoughnessMaterial>(assetRegistry, 'metallicRoughnessTexture', '2D', 0),
+        ...getTextureProps<PBRMetallicRoughnessMaterial>(assetRegistry, 'specularColorTexture', '2D', 0),
+        ...getPBRCommonProps(assetRegistry)
+      ];
     }
   };
 }
@@ -789,54 +842,63 @@ export function getPBRSpecularGlossinessMaterialClass(assetRegistry: AssetRegist
     parent: getMeshMaterialClass(),
     className: 'PBRSpecularGlossinessMaterial',
     createFunc(ctx, initParams) {
-      if (initParams?.proto) {
-        const mat = Material.findMaterialById(initParams.proto);
-        return { obj: mat?.createInstance(), loadProps: true };
+      let mat = Material.findMaterialById(initParams.persistentId);
+      if (mat) {
+        return { obj: mat, loadProps: false };
+      } else if (initParams.persistentId === initParams.corePersistentId) {
+        mat = new PBRSpecularGlossinessMaterial();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
       } else {
-        return { obj: new PBRSpecularGlossinessMaterial() };
+        const coreMaterial = Material.findMaterialById(initParams.corePersistentId);
+        if (!coreMaterial) {
+          throw new Error('Load material failed: core material not found');
+        }
+        mat = coreMaterial.createInstance();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
       }
     },
-    getInitParams(obj: PBRSpecularGlossinessMaterial) {
-      return obj.$isInstance && obj.coreMaterial.persistentId
-        ? { proto: obj.coreMaterial.persistentId }
-        : null;
+    getInitParams(obj: MeshMaterial) {
+      return {
+        persistentId: obj.persistentId,
+        corePersistentId: obj.coreMaterial.persistentId
+      };
     },
-    getProps(obj: PBRSpecularGlossinessMaterial, forSerialize: boolean) {
-      return forSerialize && obj.persistentId
-        ? []
-        : [
-            {
-              name: 'SpecularFactor',
-              type: 'rgb',
-              instance: true,
-              default: { num: [1, 1, 1] },
-              get(this: PBRSpecularGlossinessMaterial, value) {
-                value.num[0] = this.specularFactor.x;
-                value.num[1] = this.specularFactor.y;
-                value.num[2] = this.specularFactor.z;
-              },
-              set(this: PBRSpecularGlossinessMaterial, value) {
-                this.specularFactor = new Vector3(value.num[0], value.num[1], value.num[2]);
-              }
-            },
-            {
-              name: 'GlossnessFactor',
-              type: 'float',
-              instance: true,
-              default: { num: [1] },
-              options: {
-                minValue: 0,
-                maxValue: 1
-              },
-              get(this: PBRSpecularGlossinessMaterial, value) {
-                value.num[0] = this.glossinessFactor;
-              },
-              set(this: PBRSpecularGlossinessMaterial, value) {
-                this.glossinessFactor = value.num[0];
-              }
-            },
-            ...getPBRCommonProps(assetRegistry)
-          ];
+    getProps() {
+      return [
+        {
+          name: 'SpecularFactor',
+          type: 'rgb',
+          instance: true,
+          default: { num: [1, 1, 1] },
+          get(this: PBRSpecularGlossinessMaterial, value) {
+            value.num[0] = this.specularFactor.x;
+            value.num[1] = this.specularFactor.y;
+            value.num[2] = this.specularFactor.z;
+          },
+          set(this: PBRSpecularGlossinessMaterial, value) {
+            this.specularFactor = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'GlossnessFactor',
+          type: 'float',
+          instance: true,
+          default: { num: [1] },
+          options: {
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: PBRSpecularGlossinessMaterial, value) {
+            value.num[0] = this.glossinessFactor;
+          },
+          set(this: PBRSpecularGlossinessMaterial, value) {
+            this.glossinessFactor = value.num[0];
+          }
+        },
+        ...getPBRCommonProps(assetRegistry)
+      ];
     }
   };
 }

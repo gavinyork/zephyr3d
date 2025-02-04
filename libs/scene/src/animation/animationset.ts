@@ -106,7 +106,7 @@ export class AnimationSet {
     this._scene = scene;
     this._disposed = false;
     this._model = new WeakRef<SceneNode>(model);
-    this._scene.animationSet.push(this);
+    this._scene.addAnimationSet(this);
     this._animations = {};
     this._activeTracks = new Map();
     this._activeSkeletons = new Map();
@@ -330,10 +330,6 @@ export class AnimationSet {
     if (!this._disposed) {
       this._disposed = true;
       this._model.dispose();
-      const index = this._scene.animationSet.indexOf(this);
-      if (index >= 0) {
-        this._scene.animationSet.splice(index, 1);
-      }
       for (const k in this._animations) {
         this._animations[k].dispose();
       }
