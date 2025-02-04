@@ -1,6 +1,7 @@
 import {
   BlinnMaterial,
   LambertMaterial,
+  Material,
   MeshMaterial,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
@@ -44,8 +45,19 @@ export function getMeshClass(assetRegistry: AssetRegistry): SerializableClass {
           }
         },
         {
+          name: 'PrimitiveId',
+          type: 'string',
+          get(this: Mesh, value) {
+            value.str[0] = this.primitive?.persistentId ?? '';
+          },
+          set(this: Mesh, value) {
+            this.primitive = Primitive.findPrimitiveById(value.str[0]);
+          }
+        },
+        {
           name: 'Primitive',
           type: 'object',
+          persistent: false,
           default: { object: [null] },
           objectTypes: [BoxShape, BoxFrameShape, SphereShape, CylinderShape, PlaneShape, TorusShape],
           get(this: Mesh, value) {
@@ -62,9 +74,20 @@ export function getMeshClass(assetRegistry: AssetRegistry): SerializableClass {
           }
         },
         {
+          name: 'MaterialId',
+          type: 'string',
+          get(this: Mesh, value) {
+            value.str[0] = this.material?.persistentId ?? '';
+          },
+          set(this: Mesh, value) {
+            this.material = Material.findMaterialById(value.str[0]) as MeshMaterial;
+          }
+        },
+        {
           name: 'Material',
           type: 'object',
           default: { object: [null] },
+          persistent: false,
           objectTypes: [
             UnlitMaterial,
             LambertMaterial,

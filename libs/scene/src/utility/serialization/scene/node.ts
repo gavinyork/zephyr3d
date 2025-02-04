@@ -75,15 +75,16 @@ export class NodeHierarchy {
   private _rootNode: SceneNode;
   private _materialList: Material[];
   private _primitiveList: Primitive[];
-  private _nodeList: SceneNode[];
-  constructor(node: SceneNode, noRoot: boolean) {
+  constructor(node: SceneNode) {
     this._rootNode = node;
     this._materialList = null;
     this._primitiveList = null;
-    this._nodeList = null;
   }
   get rootNode() {
     return this._rootNode;
+  }
+  set rootNode(node: SceneNode) {
+    this._rootNode = node;
   }
   get materialList() {
     if (!this._materialList) {
@@ -97,18 +98,11 @@ export class NodeHierarchy {
     }
     return this._primitiveList;
   }
-  get nodeList() {
-    if (!this._nodeList) {
-      this.gather();
-    }
-    return this._nodeList;
-  }
   private gather() {
     const v = new GatherVisitor();
     this._rootNode.traverse(v);
     this._materialList = [...v.materialSet];
     this._primitiveList = [...v.primitiveSet];
-    this._nodeList = v.nodeList;
   }
 }
 
@@ -121,6 +115,7 @@ export function getNodeHierarchyClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'MaterialList',
           type: 'object_array',
+          phase: 0,
           hidden: true,
           get(this: NodeHierarchy, value) {
             value.object = [...this.materialList].sort(
@@ -132,6 +127,7 @@ export function getNodeHierarchyClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'PrimitiveList',
           type: 'object_array',
+          phase: 0,
           hidden: true,
           get(this: NodeHierarchy, value) {
             value.object = [...this.primitiveList];
@@ -139,13 +135,15 @@ export function getNodeHierarchyClass(assetRegistry: AssetRegistry): Serializabl
           set() {}
         },
         {
-          name: 'NodeList',
-          type: 'object_array',
+          name: 'NodeHierarchy',
+          type: 'object',
           hidden: true,
           get(this: NodeHierarchy, value) {
-            value.object = [...this.nodeList];
+            value.object = [this.rootNode];
           },
-          set() {}
+          set(this: NodeHierarchy, value) {
+            this.rootNode = value.object[0] as SceneNode;
+          }
         }
       ];
     }

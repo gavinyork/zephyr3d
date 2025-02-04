@@ -2,7 +2,6 @@ import { Camera, OrthoCamera, PerspectiveCamera } from '../../camera';
 import {
   BlinnMaterial,
   LambertMaterial,
-  Material,
   MeshMaterial,
   ParticleMaterial,
   PBRMetallicRoughnessMaterial,
@@ -10,7 +9,6 @@ import {
   UnlitMaterial
 } from '../../material';
 import { Primitive } from '../../render';
-import type { Visitor } from '../../scene';
 import {
   BatchGroup,
   DirectionalLight,
@@ -43,7 +41,7 @@ import {
   getUnlitMaterialClass
 } from './scene/material';
 import { getMeshClass } from './scene/mesh';
-import { GatherVisitor, getGraphNodeClass, getSceneNodeClass } from './scene/node';
+import { getGraphNodeClass, getNodeHierarchyClass, getSceneNodeClass, NodeHierarchy } from './scene/node';
 import { getParticleNodeClass } from './scene/particle';
 import {
   getBoxFrameShapeClass,
@@ -72,6 +70,7 @@ export function getSerializationInfo(assetRegistry: AssetRegistry) {
   let info = serializationInfoCache.get(assetRegistry);
   if (!info) {
     info = new Map<any, SerializableClass>([
+      [NodeHierarchy, getNodeHierarchyClass(assetRegistry)],
       [SceneNode, getSceneNodeClass(assetRegistry)],
       [GraphNode, getGraphNodeClass(assetRegistry)],
       [Mesh, getMeshClass(assetRegistry)],
@@ -116,6 +115,10 @@ export async function deserializeObjectProps<T>(
   const promises: Promise<void>[] = [];
   for (const prop of props) {
     if (!prop.set) {
+      continue;
+    }
+    const persistent = prop.persistent ?? true;
+    if (!persistent) {
       continue;
     }
     const k = prop.name;
@@ -208,6 +211,10 @@ export function serializeObjectProps<T>(
   const props = cls.getProps(obj) ?? [];
   for (const prop of props) {
     if (instance && !prop.instance) {
+      continue;
+    }
+    const persistent = prop.persistent ?? true;
+    if (!persistent) {
       continue;
     }
     const tmpVal: PropertyValue = {
@@ -401,7 +408,7 @@ export function serializeScene(
   json.content = serializeObject(nodeOrScene, assetRegistry, null, assetList);
   return json;
 }
-
+*/
 export async function deserializeSceneFromURL(
   url: string,
   assetRegistry: AssetRegistry
@@ -409,7 +416,7 @@ export async function deserializeSceneFromURL(
   try {
     const data = await assetRegistry.assetManager.fetchTextData(url);
     const json = JSON.parse(data);
-    const scene = await deserializeScene<Scene>(null, assetRegistry, json);
+    const scene = await deserializeObject<Scene>(null, json, assetRegistry);
     const meta = json['meta'] ?? null;
     return { scene, meta };
   } catch (err) {
@@ -417,7 +424,7 @@ export async function deserializeSceneFromURL(
     return null;
   }
 }
-
+/*
 export async function deserializeScene<T>(scene: Scene, assetRegistry: AssetRegistry, json: any) {
   const allMaterials = json.allMaterials as { id: string; proto: string; content: any }[];
   if (allMaterials) {

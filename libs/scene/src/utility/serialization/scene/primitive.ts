@@ -7,14 +7,17 @@ export function getPrimitiveClass(): SerializableClass {
     ctor: Primitive,
     className: 'Primitive',
     createFunc(ctx, initParams) {
-      if (initParams?.asset) {
-        return { obj: Primitive.findPrimitiveById(initParams.asset), loadProps: false };
+      let primitive = Primitive.findPrimitiveById(initParams.persistentId);
+      if (primitive) {
+        return { obj: primitive, loadProps: false };
       } else {
-        return { obj: new Primitive() };
+        primitive = new Primitive();
+        primitive.persistentId = initParams.persistentId;
+        return { obj: primitive, loadProps: true };
       }
     },
-    getInitParams(obj: Primitive) {
-      return obj.persistentId ? { asset: obj.persistentId } : null;
+    getInitParams(obj: BoxShape) {
+      return { persistentId: obj.persistentId };
     },
     getProps() {
       return [];
@@ -27,14 +30,17 @@ export function getBoxShapeClass(): SerializableClass {
     parent: getPrimitiveClass(),
     className: 'BoxShape',
     createFunc(ctx, initParams) {
-      if (initParams?.asset) {
-        return { obj: Primitive.findPrimitiveById(initParams.asset), loadProps: false };
+      let primitive = Primitive.findPrimitiveById(initParams.persistentId);
+      if (primitive) {
+        return { obj: primitive, loadProps: false };
       } else {
-        return { obj: new BoxShape({ size: 1 }) };
+        primitive = new BoxShape({ size: 1 });
+        primitive.persistentId = initParams.persistentId;
+        return { obj: primitive, loadProps: true };
       }
     },
     getInitParams(obj: BoxShape) {
-      return obj.persistentId ? { asset: obj.persistentId } : null;
+      return { persistentId: obj.persistentId };
     },
     getProps() {
       return [
@@ -85,14 +91,17 @@ export function getBoxFrameShapeClass(): SerializableClass {
     parent: getPrimitiveClass(),
     className: 'BoxFrameShape',
     createFunc(ctx, initParams) {
-      if (initParams?.asset) {
-        return { obj: Primitive.findPrimitiveById(initParams.asset), loadProps: false };
+      let primitive = Primitive.findPrimitiveById(initParams.persistentId);
+      if (primitive) {
+        return { obj: primitive, loadProps: false };
       } else {
-        return { obj: new BoxFrameShape({ size: 1 }) };
+        primitive = new BoxFrameShape({ size: 1 });
+        primitive.persistentId = initParams.persistentId;
+        return { obj: primitive, loadProps: true };
       }
     },
-    getInitParams(obj: BoxFrameShape) {
-      return obj.persistentId ? { asset: obj.persistentId } : null;
+    getInitParams(obj: BoxShape) {
+      return { persistentId: obj.persistentId };
     },
     getProps() {
       return [
@@ -143,14 +152,17 @@ export function getTorusShapeClass(): SerializableClass {
     parent: getPrimitiveClass(),
     className: 'TorusShape',
     createFunc(ctx, initParams) {
-      if (initParams?.asset) {
-        return { obj: Primitive.findPrimitiveById(initParams.asset), loadProps: false };
+      let primitive = Primitive.findPrimitiveById(initParams.persistentId);
+      if (primitive) {
+        return { obj: primitive, loadProps: false };
       } else {
-        return { obj: new TorusShape() };
+        primitive = new TorusShape();
+        primitive.persistentId = initParams.persistentId;
+        return { obj: primitive, loadProps: true };
       }
     },
-    getInitParams(obj: TorusShape) {
-      return obj.persistentId ? { asset: obj.persistentId } : null;
+    getInitParams(obj: BoxShape) {
+      return { persistentId: obj.persistentId };
     },
     getProps() {
       return [
@@ -225,14 +237,17 @@ export function getPlaneShapeClass(): SerializableClass {
     parent: getPrimitiveClass(),
     className: 'PlaneShape',
     createFunc(ctx, initParams) {
-      if (initParams?.asset) {
-        return { obj: Primitive.findPrimitiveById(initParams.asset), loadProps: false };
+      let primitive = Primitive.findPrimitiveById(initParams.persistentId);
+      if (primitive) {
+        return { obj: primitive, loadProps: false };
       } else {
-        return { obj: new PlaneShape() };
+        primitive = new PlaneShape({ size: 1 });
+        primitive.persistentId = initParams.persistentId;
+        return { obj: primitive, loadProps: true };
       }
     },
-    getInitParams(obj: PlaneShape) {
-      return obj.persistentId ? { asset: obj.persistentId } : null;
+    getInitParams(obj: BoxShape) {
+      return { persistentId: obj.persistentId };
     },
     getProps() {
       return [
@@ -307,14 +322,17 @@ export function getCylinderShapeClass(): SerializableClass {
     parent: getPrimitiveClass(),
     className: 'CylinderShape',
     createFunc(ctx, initParams) {
-      if (initParams?.asset) {
-        return { obj: Primitive.findPrimitiveById(initParams.asset), loadProps: false };
+      let primitive = Primitive.findPrimitiveById(initParams.persistentId);
+      if (primitive) {
+        return { obj: primitive, loadProps: false };
       } else {
-        return { obj: new CylinderShape() };
+        primitive = new CylinderShape();
+        primitive.persistentId = initParams.persistentId;
+        return { obj: primitive, loadProps: true };
       }
     },
-    getInitParams(obj: CylinderShape) {
-      return obj.persistentId ? { asset: obj.persistentId } : null;
+    getInitParams(obj: BoxShape) {
+      return { persistentId: obj.persistentId };
     },
     getProps() {
       return [
@@ -422,14 +440,17 @@ export function getSphereShapeClass(): SerializableClass {
     parent: getPrimitiveClass(),
     className: 'SphereShape',
     createFunc(ctx, initParams) {
-      if (initParams?.asset) {
-        return { obj: Primitive.findPrimitiveById(initParams.asset), loadProps: false };
+      let primitive = Primitive.findPrimitiveById(initParams.persistentId);
+      if (primitive) {
+        return { obj: primitive, loadProps: false };
       } else {
-        return { obj: new SphereShape() };
+        primitive = new SphereShape();
+        primitive.persistentId = initParams.persistentId;
+        return { obj: primitive, loadProps: true };
       }
     },
-    getInitParams(obj: SphereShape) {
-      return obj.persistentId ? { asset: obj.persistentId } : null;
+    getInitParams(obj: BoxShape) {
+      return { persistentId: obj.persistentId };
     },
     getProps() {
       return [

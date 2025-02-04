@@ -31,6 +31,7 @@ export type PropertyAccessor<T = unknown> = {
   objectTypes?: unknown[];
   default?: PropertyValue;
   nullable?: boolean;
+  persistent?: boolean;
   get: (this: T, value: PropertyValue) => void;
   set?: (this: T, value: PropertyValue) => void | Promise<void>;
   isValid?: (this: T) => boolean;

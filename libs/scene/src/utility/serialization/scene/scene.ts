@@ -7,6 +7,7 @@ import { Application } from '../../../app/app';
 import { panoramaToCubemap } from '../../panorama';
 import { prefilterCubemap } from '../../pmrem';
 import { SceneNode } from '../../../scene';
+import { NodeHierarchy } from './node';
 
 export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
@@ -396,28 +397,16 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           }
         },
         {
-          name: 'Nodes',
-          type: 'object_array',
+          name: 'NodeHierarchy',
+          type: 'object',
           hidden: true,
           get(this: Scene, value) {
-            value.object = [];
-            for (const child of this.rootNode.children) {
-              value.object.push(child.get());
-            }
+            value.object = [new NodeHierarchy(this.rootNode)];
           },
           set(this: Scene, value) {
-            for (let i = this.rootNode.children.length - 1; i >= 0; i--) {
-              const child = this.rootNode.children[i].get();
-              if (!value.object.includes(child) && !child.sealed) {
-                child.remove();
-              }
-            }
-            for (const child of value.object) {
-              if (child instanceof SceneNode) {
-                child.parent = this.rootNode;
-              } else {
-                console.error(`Invalid scene node: ${child}`);
-              }
+            const nodeHierarchy = value.object[0] as NodeHierarchy;
+            for (const child of nodeHierarchy.rootNode.children) {
+              child.get().parent = this.rootNode;
             }
           }
         }

@@ -1,5 +1,5 @@
 import type { AssetRegistry, Scene } from '@zephyr3d/scene';
-import { deserializeScene, serializeObject, serializeScene } from '@zephyr3d/scene';
+import { deserializeObject, serializeObject } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import type { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
@@ -80,7 +80,7 @@ export class SceneController extends BaseController<SceneModel> {
     const assetList = new Set<string>();
     this._scene = Object.assign({}, this._scene ?? {}, {
       name,
-      content: serializeScene(this.model.scene, this._assetRegistry, assetList), // serializeObject(this.model.scene, this._assetRegistry, {}, assetList),
+      content: serializeObject(this.model.scene, this._assetRegistry, null, assetList, true), // serializeObject(this.model.scene, this._assetRegistry, {}, assetList),
       metadata: {
         activeCamera: this.model.camera?.id ?? ''
       }
@@ -96,7 +96,7 @@ export class SceneController extends BaseController<SceneModel> {
   }
   private async exportScene(name: string) {
     const assetList = new Set<string>();
-    const content = serializeScene(this.model.scene, this._assetRegistry, assetList);
+    const content = serializeObject(this.model.scene, this._assetRegistry, null, assetList, true);
     content.meta = {
       activeCamera: this.model.camera?.id ?? ''
     };
@@ -112,7 +112,7 @@ export class SceneController extends BaseController<SceneModel> {
       .then((sceneinfo) => {
         if (sceneinfo) {
           this._scene = sceneinfo;
-          deserializeScene<Scene>(null, this._assetRegistry, sceneinfo.content).then((scene) => {
+          deserializeObject<Scene>(null, sceneinfo.content, this._assetRegistry).then((scene) => {
             //deserializeObject<Scene>(null, sceneinfo.content, this._assetRegistry).then((scene) => {
             if (scene) {
               const cameraId = sceneinfo.metadata?.activeCamera as string;
