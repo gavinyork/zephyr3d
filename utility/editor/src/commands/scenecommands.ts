@@ -248,8 +248,8 @@ export class NodeDeleteCommand implements Command {
       if (parent) {
         const nodeHierarchy = await deserializeObject<NodeHierarchy>(
           this._scene,
-          this._assetRegistry,
-          this._archive
+          this._archive,
+          this._assetRegistry
         );
         const node = nodeHierarchy.rootNode;
         //const node = (await deserializeObject(this._scene, this._archive, this._assetRegistry)) as SceneNode;
