@@ -1,10 +1,5 @@
-import {
-  Application,
-  AssetRegistry,
-  deserializeSceneFromURL,
-  OrbitCameraController,
-  PerspectiveCamera
-} from '@zephyr3d/scene';
+import type { PerspectiveCamera } from '@zephyr3d/scene';
+import { Application, AssetRegistry, deserializeSceneFromURL, OrbitCameraController } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({

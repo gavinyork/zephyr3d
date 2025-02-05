@@ -1,8 +1,8 @@
 import type { BaseLight } from '../../../scene/light';
 import { DirectionalLight, PointLight, PunctualLight, SpotLight } from '../../../scene/light';
-import { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
 import { Vector4 } from '@zephyr3d/base';
+import type { NodeHierarchy } from './node';
 import { getSceneNodeClass } from './node';
 import type { AssetRegistry } from '../asset/asset';
 import { SceneNode } from '../../../scene';
@@ -18,7 +18,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'Color',
           type: 'rgb',
-          default: { num: [1, 1, 1] },
+          default: [1, 1, 1],
           get(this: PunctualLight, value) {
             value.num[0] = this.color.x;
             value.num[1] = this.color.y;
@@ -31,7 +31,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'Intensity',
           type: 'float',
-          default: { num: [1] },
+          default: 1,
           options: {
             minValue: 0,
             maxValue: 100
@@ -47,7 +47,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
           name: 'CastShadow',
           type: 'bool',
           phase: 0,
-          default: { bool: [false] },
+          default: false,
           get(this: PunctualLight, value) {
             value.bool[0] = this.castShadow;
           },
@@ -59,7 +59,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
           name: 'ShadowType',
           type: 'string',
           phase: 1,
-          default: { str: ['hard'] },
+          default: 'hard',
           enum: {
             labels: ['Hard', 'PCF', 'PCF-PD', 'VSM', 'ESM'],
             values: ['hard', 'pcf-opt', 'pcf-pd', 'vsm', 'esm']
@@ -78,7 +78,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
           name: 'ShadowDistance',
           type: 'float',
           phase: 1,
-          default: { num: [2000] },
+          default: 2000,
           options: {
             minValue: 0,
             maxValue: 5000
@@ -97,7 +97,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
           name: 'ShadowMapSize',
           phase: 1,
           type: 'int',
-          default: { num: [1024] },
+          default: 1024,
           enum: {
             labels: ['128x128', '256x256', '512x512', '1024x1024', '2048x2048', '4096x4096'],
             values: [128, 256, 512, 1024, 2048, 4096]
@@ -116,7 +116,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
           name: 'ShadowDepthBias',
           type: 'float',
           phase: 1,
-          default: { num: [0.5] },
+          default: 0.5,
           options: {
             minValue: 0,
             maxValue: 5
@@ -135,7 +135,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
           name: 'ShadowNormalBias',
           type: 'float',
           phase: 1,
-          default: { num: [0.2] },
+          default: 0.2,
           options: {
             minValue: 0,
             maxValue: 5
@@ -154,7 +154,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
           name: 'ShadowCascades',
           type: 'int',
           phase: 1,
-          default: { num: [1] },
+          default: 1,
           options: {
             minValue: 1,
             maxValue: 4
@@ -173,7 +173,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
           name: 'PCFKernelSize',
           phase: 2,
           type: 'int',
-          default: { num: [5] },
+          default: 5,
           enum: {
             labels: ['3x3', '5x5', '7x7'],
             values: [3, 5, 7]
@@ -196,7 +196,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
             minValue: 1,
             maxValue: 128
           },
-          default: { num: [12] },
+          default: 12,
           get(this: PunctualLight, value) {
             value.num[0] = this.shadow.pdSampleCount;
           },
@@ -215,7 +215,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
             minValue: 0,
             maxValue: 64
           },
-          default: { num: [4] },
+          default: 4,
           get(this: PunctualLight, value) {
             value.num[0] = this.shadow.pdSampleRadius;
           },
@@ -234,7 +234,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
             minValue: 1,
             maxValue: 33
           },
-          default: { num: [5] },
+          default: 5,
           get(this: PunctualLight, value) {
             value.num[0] = this.shadow.vsmBlurKernelSize;
           },
@@ -253,7 +253,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
             minValue: 0,
             maxValue: 32
           },
-          default: { num: [4] },
+          default: 4,
           get(this: PunctualLight, value) {
             value.num[0] = this.shadow.vsmBlurRadius;
           },
@@ -272,7 +272,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
             minValue: 0,
             maxValue: 1
           },
-          default: { num: [0.5] },
+          default: 0.5,
           get(this: PunctualLight, value) {
             value.num[0] = this.shadow.vsmDarkness;
           },
@@ -291,7 +291,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
             minValue: 1,
             maxValue: 2000
           },
-          default: { num: [200] },
+          default: 200,
           get(this: PunctualLight, value) {
             value.num[0] = this.shadow.esmDepthScale;
           },
@@ -306,7 +306,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
           name: 'ESMBlur',
           type: 'bool',
           phase: 2,
-          default: { bool: [true] },
+          default: true,
           get(this: PunctualLight, value) {
             value.bool[0] = this.shadow.esmBlur;
           },
@@ -321,7 +321,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
           name: 'ESMBlurKernelSize',
           type: 'int',
           phase: 2,
-          default: { num: [5] },
+          default: 5,
           options: {
             minValue: 1,
             maxValue: 33
@@ -340,7 +340,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
           name: 'ESMBlurRadius',
           type: 'float',
           phase: 2,
-          default: { num: [4] },
+          default: 4,
           options: {
             minValue: 0,
             maxValue: 32
@@ -364,23 +364,19 @@ export function getDirectionalLightClass(assetRegistry: AssetRegistry): Serializ
     ctor: DirectionalLight,
     parent: getPunctualLightClass(assetRegistry),
     className: 'DirectionalLight',
-    createFunc(scene: Scene | SceneNode) {
-      if (scene instanceof Scene) {
-        return { obj: new DirectionalLight(scene) };
-      } else if (scene instanceof SceneNode) {
-        const light = new DirectionalLight(scene.scene);
-        light.parent = scene;
-        return { obj: light };
-      } else {
-        return null;
+    createFunc(ctx: NodeHierarchy | SceneNode) {
+      const node = new DirectionalLight(ctx.scene);
+      if (ctx instanceof SceneNode) {
+        node.parent = ctx;
       }
+      return { obj: node };
     },
     getProps() {
       return [
         {
           name: 'SunLight',
           type: 'bool',
-          default: { bool: [false] },
+          default: false,
           get(this: DirectionalLight, value) {
             value.bool[0] = this.sunLight;
           },
@@ -398,23 +394,19 @@ export function getPointLightClass(assetRegistry: AssetRegistry): SerializableCl
     ctor: PointLight,
     parent: getPunctualLightClass(assetRegistry),
     className: 'PointLight',
-    createFunc(scene: Scene | SceneNode) {
-      if (scene instanceof Scene) {
-        return { obj: new PointLight(scene) };
-      } else if (scene instanceof SceneNode) {
-        const light = new PointLight(scene.scene);
-        light.parent = scene;
-        return { obj: light };
-      } else {
-        return null;
+    createFunc(ctx: NodeHierarchy | SceneNode) {
+      const node = new PointLight(ctx.scene);
+      if (ctx instanceof SceneNode) {
+        node.parent = ctx;
       }
+      return { obj: node };
     },
     getProps() {
       return [
         {
           name: 'Range',
           type: 'float',
-          default: { num: [10] },
+          default: 10,
           options: {
             minValue: 0,
             maxValue: 1000
@@ -436,23 +428,19 @@ export function getSpotLightClass(assetRegistry: AssetRegistry): SerializableCla
     ctor: SpotLight,
     parent: getPunctualLightClass(assetRegistry),
     className: 'SpotLight',
-    createFunc(scene: Scene | SceneNode) {
-      if (scene instanceof Scene) {
-        return { obj: new SpotLight(scene) };
-      } else if (scene instanceof SceneNode) {
-        const light = new SpotLight(scene.scene);
-        light.parent = scene;
-        return { obj: light };
-      } else {
-        return null;
+    createFunc(ctx: NodeHierarchy | SceneNode) {
+      const node = new SpotLight(ctx.scene);
+      if (ctx instanceof SceneNode) {
+        node.parent = ctx;
       }
+      return { obj: node };
     },
     getProps() {
       return [
         {
           name: 'Range',
           type: 'float',
-          default: { num: [10] },
+          default: 10,
           options: {
             minValue: 0,
             maxValue: 1000
@@ -467,7 +455,7 @@ export function getSpotLightClass(assetRegistry: AssetRegistry): SerializableCla
         {
           name: 'Cutoff',
           type: 'float',
-          default: { num: [Math.cos(Math.PI / 4)] },
+          default: Math.cos(Math.PI / 4),
           options: {
             minValue: 0,
             maxValue: Math.PI

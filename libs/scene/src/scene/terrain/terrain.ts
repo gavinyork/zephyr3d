@@ -11,7 +11,7 @@ import type { CullVisitor } from '../../render/cull_visitor';
 import type { Scene } from '../scene';
 import type { QuadtreeNode } from './quadtree';
 import { TerrainMaterial, type TerrainMaterialOptions } from '../../material/terrainmaterial';
-import { NodeClonable, NodeCloneMethod } from '..';
+import type { NodeClonable, NodeCloneMethod } from '..';
 
 /**
  * Terrain node

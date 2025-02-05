@@ -4,7 +4,7 @@ import { RenderQueue, InstanceBindGroupAllocator } from '../render';
 import type { Scene } from './scene';
 import { BoundingBox, type BoundingVolume } from '../utility/bounding_volume';
 import { Matrix4x4 } from '@zephyr3d/base';
-import { NodeClonable, NodeCloneMethod } from '.';
+import type { NodeClonable, NodeCloneMethod } from '.';
 
 const tmpMatrix = new Matrix4x4();
 

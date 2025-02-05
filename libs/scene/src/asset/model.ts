@@ -6,7 +6,8 @@ import type { MeshMaterial } from '../material/meshmaterial';
 import { Mesh } from '../scene/mesh';
 import type { BoundingBox } from '../utility';
 import type { Ref } from '../app';
-import { Scene, SceneNode } from '../scene';
+import type { Scene } from '../scene';
+import { SceneNode } from '../scene';
 import {
   AnimationClip,
   AnimationSet,

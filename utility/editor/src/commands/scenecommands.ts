@@ -233,7 +233,7 @@ export class NodeDeleteCommand implements Command {
   async execute(): Promise<void> {
     const node = idNodeMap[this._nodeId];
     if (node) {
-      const nodeHierarchy = new NodeHierarchy(node);
+      const nodeHierarchy = new NodeHierarchy(node.scene, node);
       this._archive = await serializeObject(nodeHierarchy, this._assetRegistry, null, null); // await serializeObject(node, this._assetRegistry);
       node.remove();
       node.iterate((child) => {

@@ -29,7 +29,7 @@ export type PropertyAccessor<T = unknown> = {
   enum?: { labels: string[]; values: (number | string)[] };
   instance?: boolean;
   objectTypes?: unknown[];
-  default?: PropertyValue;
+  default?: any;
   nullable?: boolean;
   persistent?: boolean;
   get: (this: T, value: PropertyValue) => void;

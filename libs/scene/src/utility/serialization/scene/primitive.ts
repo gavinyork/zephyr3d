@@ -47,7 +47,7 @@ export function getBoxShapeClass(): SerializableClass {
         {
           name: 'Size',
           type: 'vec3',
-          default: { num: [1, 1, 1] },
+          default: [1, 1, 1],
           get(this: BoxShape, value) {
             value.num[0] = this.options.sizeX ?? this.options.size;
             value.num[1] = this.options.sizeY ?? this.options.size;
@@ -65,7 +65,7 @@ export function getBoxShapeClass(): SerializableClass {
         {
           name: 'Anchor',
           type: 'vec3',
-          default: { num: [0.5, 0.5, 0.5] },
+          default: [0.5, 0.5, 0.5],
           get(this: BoxShape, value) {
             value.num[0] = this.options.anchorX ?? this.options.anchor;
             value.num[1] = this.options.anchorY ?? this.options.anchor;
@@ -108,7 +108,7 @@ export function getBoxFrameShapeClass(): SerializableClass {
         {
           name: 'Size',
           type: 'vec3',
-          default: { num: [1, 1, 1] },
+          default: [1, 1, 1],
           get(this: BoxShape, value) {
             value.num[0] = this.options.sizeX ?? this.options.size;
             value.num[1] = this.options.sizeY ?? this.options.size;
@@ -126,7 +126,7 @@ export function getBoxFrameShapeClass(): SerializableClass {
         {
           name: 'Anchor',
           type: 'vec3',
-          default: { num: [0.5, 0.5, 0.5] },
+          default: [0.5, 0.5, 0.5],
           get(this: BoxShape, value) {
             value.num[0] = this.options.anchorX ?? this.options.anchor;
             value.num[1] = this.options.anchorY ?? this.options.anchor;
@@ -170,7 +170,7 @@ export function getTorusShapeClass(): SerializableClass {
           name: 'NumSlices',
           type: 'int',
           options: { minValue: 3, maxValue: 100 },
-          default: { num: [40] },
+          default: 40,
           get(this: TorusShape, value) {
             value.num[0] = this.options.numSlices;
           },
@@ -182,7 +182,7 @@ export function getTorusShapeClass(): SerializableClass {
           name: 'NumSegments',
           type: 'int',
           options: { minValue: 3, maxValue: 100 },
-          default: { num: [16] },
+          default: 16,
           get(this: TorusShape, value) {
             value.num[0] = this.options.numSegments;
           },
@@ -194,7 +194,7 @@ export function getTorusShapeClass(): SerializableClass {
           name: 'OuterRadius',
           type: 'float',
           options: { minValue: 0, maxValue: 9999 },
-          default: { num: [1] },
+          default: 1,
           get(this: TorusShape, value) {
             value.num[0] = this.options.outerRadius;
           },
@@ -206,7 +206,7 @@ export function getTorusShapeClass(): SerializableClass {
           name: 'InnerRadius',
           type: 'float',
           options: { minValue: 0, maxValue: 9999 },
-          default: { num: [0.3] },
+          default: 0.3,
           get(this: TorusShape, value) {
             value.num[0] = this.options.innerRadius;
           },
@@ -218,7 +218,7 @@ export function getTorusShapeClass(): SerializableClass {
           name: 'RadialDetail',
           type: 'int',
           options: { minValue: 3, maxValue: 100 },
-          default: { num: [20] },
+          default: 20,
           get(this: TorusShape, value) {
             value.num[0] = this.options.radialDetail;
           },
@@ -254,7 +254,7 @@ export function getPlaneShapeClass(): SerializableClass {
         {
           name: 'Size',
           type: 'vec2',
-          default: { num: [1, 1] },
+          default: [1, 1],
           get(this: PlaneShape, value) {
             value.num[0] = this.options.sizeX ?? this.options.size;
             value.num[1] = this.options.sizeY ?? this.options.size;
@@ -270,7 +270,7 @@ export function getPlaneShapeClass(): SerializableClass {
         {
           name: 'Resolution',
           type: 'int2',
-          default: { num: [1, 1] },
+          default: [1, 1],
           get(this: PlaneShape, value) {
             value.num[0] = this.options.resolutionX ?? this.options.resolution;
             value.num[1] = this.options.resolutionY ?? this.options.resolution;
@@ -286,7 +286,7 @@ export function getPlaneShapeClass(): SerializableClass {
         {
           name: 'Anchor',
           type: 'vec2',
-          default: { num: [0.5, 0.5] },
+          default: [0.5, 0.5],
           options: { minValue: 0, maxValue: 1 },
           get(this: PlaneShape, value) {
             value.num[0] = this.options.anchorX ?? this.options.anchor;
@@ -303,7 +303,7 @@ export function getPlaneShapeClass(): SerializableClass {
         {
           name: 'TwoSided',
           type: 'bool',
-          default: { bool: [false] },
+          default: false,
           get(this: PlaneShape, value) {
             value.bool[0] = this.options.twoSided;
           },
@@ -339,7 +339,7 @@ export function getCylinderShapeClass(): SerializableClass {
         {
           name: 'Height',
           type: 'float',
-          default: { num: [1] },
+          default: 1,
           get(this: CylinderShape, value) {
             value.num[0] = this.options.height;
           },
@@ -350,7 +350,7 @@ export function getCylinderShapeClass(): SerializableClass {
         {
           name: 'BottomRadius',
           type: 'float',
-          default: { num: [1] },
+          default: 1,
           options: { minValue: 0, maxValue: 9999 },
           get(this: CylinderShape, value) {
             value.num[0] = this.options.bottomRadius;
@@ -362,7 +362,7 @@ export function getCylinderShapeClass(): SerializableClass {
         {
           name: 'TopRadius',
           type: 'float',
-          default: { num: [1] },
+          default: 1,
           options: { minValue: 0, maxValue: 9999 },
           get(this: CylinderShape, value) {
             value.num[0] = this.options.topRadius;
@@ -374,7 +374,7 @@ export function getCylinderShapeClass(): SerializableClass {
         {
           name: 'HeightDetail',
           type: 'int',
-          default: { num: [1] },
+          default: 1,
           options: { minValue: 1, maxValue: 100 },
           get(this: CylinderShape, value) {
             value.num[0] = this.options.heightDetail;
@@ -386,7 +386,7 @@ export function getCylinderShapeClass(): SerializableClass {
         {
           name: 'RadialDetail',
           type: 'int',
-          default: { num: [20] },
+          default: 20,
           options: { minValue: 2, maxValue: 100 },
           get(this: CylinderShape, value) {
             value.num[0] = this.options.radialDetail;
@@ -398,7 +398,7 @@ export function getCylinderShapeClass(): SerializableClass {
         {
           name: 'Anchor',
           type: 'float',
-          default: { num: [0] },
+          default: 0,
           options: { minValue: 0, maxValue: 1 },
           get(this: CylinderShape, value) {
             value.num[0] = this.options.anchor;
@@ -410,7 +410,7 @@ export function getCylinderShapeClass(): SerializableClass {
         {
           name: 'TopCap',
           type: 'bool',
-          default: { bool: [true] },
+          default: true,
           get(this: CylinderShape, value) {
             value.bool[0] = this.options.topCap;
           },
@@ -421,7 +421,7 @@ export function getCylinderShapeClass(): SerializableClass {
         {
           name: 'BottomCap',
           type: 'bool',
-          default: { bool: [true] },
+          default: true,
           get(this: CylinderShape, value) {
             value.bool[0] = this.options.bottomCap;
           },
@@ -457,7 +457,7 @@ export function getSphereShapeClass(): SerializableClass {
         {
           name: 'Radius',
           type: 'float',
-          default: { num: [1] },
+          default: 1,
           get(this: SphereShape, value) {
             value.num[0] = this.options.radius;
           },
@@ -469,7 +469,7 @@ export function getSphereShapeClass(): SerializableClass {
           name: 'VerticalDetail',
           type: 'int',
           options: { minValue: 2, maxValue: 100 },
-          default: { num: [20] },
+          default: 20,
           get(this: SphereShape, value) {
             value.num[0] = this.options.verticalDetail;
           },
@@ -481,7 +481,7 @@ export function getSphereShapeClass(): SerializableClass {
           name: 'HorizontalDetail',
           type: 'int',
           options: { minValue: 2, maxValue: 100 },
-          default: { num: [20] },
+          default: 20,
           get(this: SphereShape, value) {
             value.num[0] = this.options.horizonalDetail;
           },

@@ -1,12 +1,13 @@
 import { SceneNode } from '../../../scene/scene_node';
 import type { SceneNodeVisible } from '../../../scene/scene_node';
-import { Scene } from '../../../scene/scene';
+import type { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
 import { degree2radian, radian2degree } from '@zephyr3d/base';
-import { GraphNode, Mesh, ParticleSystem, Visitor } from '../../../scene';
+import type { Mesh, ParticleSystem, Visitor } from '../../../scene';
+import { GraphNode } from '../../../scene';
 import type { AssetRegistry } from '../asset/asset';
-import { Material } from '../../../material';
-import { Primitive } from '../../../render';
+import type { Material } from '../../../material';
+import type { Primitive } from '../../../render';
 
 export class GatherVisitor implements Visitor<SceneNode> {
   /** @internal */
@@ -72,13 +73,18 @@ export class GatherVisitor implements Visitor<SceneNode> {
 }
 
 export class NodeHierarchy {
+  private _scene: Scene;
   private _rootNode: SceneNode;
   private _materialList: Material[];
   private _primitiveList: Primitive[];
-  constructor(node: SceneNode) {
-    this._rootNode = node;
+  constructor(scene: Scene, node?: SceneNode) {
+    this._scene = scene;
+    this._rootNode = node ?? null;
     this._materialList = null;
     this._primitiveList = null;
+  }
+  get scene() {
+    return this._scene;
   }
   get rootNode() {
     return this._rootNode;
@@ -110,6 +116,9 @@ export function getNodeHierarchyClass(assetRegistry: AssetRegistry): Serializabl
   return {
     ctor: NodeHierarchy,
     className: 'NodeHierarchy',
+    createFunc(ctx) {
+      return { obj: new NodeHierarchy(ctx as Scene) };
+    },
     getProps() {
       return [
         {
@@ -154,20 +163,15 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
   return {
     ctor: SceneNode,
     className: 'SceneNode',
-    async createFunc(ctx: Scene | SceneNode, init?: { asset?: string }) {
+    async createFunc(ctx: NodeHierarchy | SceneNode, init?: { asset?: string }) {
       if (init?.asset) {
-        const scene = ctx instanceof Scene ? ctx : ctx.scene;
-        return { obj: (await assetRegistry.fetchModel(init.asset, scene)).group };
+        return { obj: (await assetRegistry.fetchModel(init.asset, ctx.scene)).group };
       }
-      if (ctx instanceof Scene) {
-        return { obj: new SceneNode(ctx) };
-      } else if (ctx instanceof SceneNode) {
-        const node = new SceneNode(ctx.scene);
+      const node = new SceneNode(ctx.scene);
+      if (ctx instanceof SceneNode) {
         node.parent = ctx;
-        return { obj: node };
-      } else {
-        return null;
       }
+      return { obj: node };
     },
     getInitParams(obj: SceneNode) {
       const asset = assetRegistry.getAssetId(obj);
@@ -301,16 +305,12 @@ export function getGraphNodeClass(assetRegistry: AssetRegistry): SerializableCla
     ctor: GraphNode,
     parent: getSceneNodeClass(assetRegistry),
     className: 'GraphNode',
-    createFunc(scene: Scene | SceneNode) {
-      if (scene instanceof Scene) {
-        return { obj: new GraphNode(scene) };
-      } else if (scene instanceof SceneNode) {
-        const node = new GraphNode(scene.scene);
-        node.parent = scene;
-        return { obj: node };
-      } else {
-        return null;
+    createFunc(ctx: NodeHierarchy | SceneNode) {
+      const node = new GraphNode(ctx.scene);
+      if (ctx instanceof SceneNode) {
+        node.parent = ctx;
       }
+      return { obj: node };
     },
     getProps() {
       return [];

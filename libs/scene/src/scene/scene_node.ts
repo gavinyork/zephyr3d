@@ -1,6 +1,6 @@
 import type { Scene } from './scene';
 import type { GraphNode } from './graph_node';
-import { Mesh } from './mesh';
+import type { Mesh } from './mesh';
 import type { Camera } from '../camera/camera';
 import type { Terrain } from './terrain/terrain';
 import type { PunctualLight, BaseLight } from './light';
@@ -18,7 +18,7 @@ import {
 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
 import { Ref } from '../app/gc/ref';
-import { AnimationSet } from '../animation';
+import type { AnimationSet } from '../animation';
 import type { SharedModel } from '../asset';
 
 /**

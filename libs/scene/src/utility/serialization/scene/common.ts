@@ -1,7 +1,7 @@
 import type { Texture2D, TextureCube } from '@zephyr3d/device';
 import type { AssetRegistry } from '../asset/asset';
 import type { PropertyAccessor } from '../types';
-import { Material } from '../../../material';
+import type { Material } from '../../../material';
 
 export function getTextureProps<T extends Material>(
   assetRegistry: AssetRegistry,
@@ -15,7 +15,7 @@ export function getTextureProps<T extends Material>(
       name: name[0].toUpperCase() + name.slice(1, name.length - 7) + 'TexCoordIndex',
       type: 'int',
       phase: phase + 1,
-      default: { num: [0] },
+      default: 0,
       get(value) {
         value.num[0] = this[name.slice(0, name.length - 7) + 'TexCoordIndex'];
       },
@@ -36,7 +36,7 @@ export function getTextureProps<T extends Material>(
     {
       name: name[0].toUpperCase() + name.slice(1),
       type: 'object',
-      default: { object: [null] },
+      default: null,
       phase: phase,
       nullable: true,
       get(value) {

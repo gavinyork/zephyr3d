@@ -1,4 +1,5 @@
-import { Clonable, Vector3, type Matrix4x4 } from '@zephyr3d/base';
+import type { Clonable } from '@zephyr3d/base';
+import { Vector3, type Matrix4x4 } from '@zephyr3d/base';
 import { Primitive } from '../render/primitive';
 import { BoundingBox } from '../utility/bounding_volume';
 

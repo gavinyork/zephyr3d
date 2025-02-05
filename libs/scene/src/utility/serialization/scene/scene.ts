@@ -25,7 +25,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
             labels: ['None', 'Constant', 'Hemispheric', 'IBL'],
             values: ['none', 'constant', 'hemisphere', 'ibl']
           },
-          default: { str: ['ibl'] },
+          default: 'ibl',
           get(this: Scene, value) {
             value.str[0] = this.env.light.type;
           },
@@ -37,7 +37,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'AmbientColor',
           type: 'rgb',
           phase: 1,
-          default: { num: [0.2, 0.2, 0.2] },
+          default: [0.2, 0.2, 0.2],
           get(this: Scene, value) {
             const color = this.env.light.ambientColor;
             value.num[0] = color.x;
@@ -55,7 +55,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'AmbientUp',
           type: 'rgb',
           phase: 1,
-          default: { num: [0.3, 0.5, 0.8] },
+          default: [0.3, 0.5, 0.8],
           get(this: Scene, value) {
             const color = this.env.light.ambientUp;
             value.num[0] = color.x;
@@ -73,7 +73,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'AmbientDown',
           type: 'rgb',
           phase: 1,
-          default: { num: [0.2, 0.2, 0.2] },
+          default: [0.2, 0.2, 0.2],
           get(this: Scene, value) {
             const color = this.env.light.ambientDown;
             value.num[0] = color.x;
@@ -92,7 +92,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           type: 'float',
           phase: 0,
           options: { minValue: 0, maxValue: 10 },
-          default: { num: [1] },
+          default: 1,
           get(this: Scene, value) {
             value.num[0] = this.env.light.strength;
           },
@@ -108,7 +108,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
             labels: ['None', 'Color', 'SkyBox', 'Scatter'],
             values: ['none', 'color', 'skybox', 'scatter']
           },
-          default: { str: ['scatter'] },
+          default: 'scatter',
           get(this: Scene, value) {
             value.str[0] = this.env.sky.skyType;
           },
@@ -120,7 +120,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'AutoUpdateIBLMaps',
           type: 'bool',
           phase: 1,
-          default: { bool: [true] },
+          default: true,
           get(this: Scene, value) {
             value.bool[0] = this.env.sky.autoUpdateIBLMaps;
           },
@@ -135,7 +135,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'SkyColor',
           type: 'rgb',
           phase: 1,
-          default: { num: [1, 1, 1] },
+          default: [1, 1, 1],
           isValid() {
             return this.env.sky.skyType === 'color';
           },
@@ -153,7 +153,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'DrawGround',
           type: 'bool',
           phase: 1,
-          default: { bool: [false] },
+          default: false,
           isValid() {
             return this.env.sky.skyType === 'scatter';
           },
@@ -172,7 +172,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
             labels: ['None', 'Linear', 'Exp', 'Exp2', 'Scatter'],
             values: ['none', 'linear', 'exp', 'exp2', 'scatter']
           },
-          default: { str: ['none'] },
+          default: 'none',
           get(this: Scene, value) {
             value.str[0] = this.env.sky.fogType;
           },
@@ -184,7 +184,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'FogColor',
           type: 'rgb',
           phase: 1,
-          default: { num: [1, 1, 1] },
+          default: [1, 1, 1],
           isValid() {
             return this.env.sky.fogType !== 'none' && this.env.sky.fogType !== 'scatter';
           },
@@ -245,7 +245,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           type: 'float',
           phase: 1,
           options: { minValue: 0, maxValue: 1 },
-          default: { num: [0.1] },
+          default: 0.1,
           get(this: Scene, value) {
             value.num[0] = this.env.sky.fogDensity;
           },
@@ -260,7 +260,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'FogStart',
           type: 'float',
           phase: 1,
-          default: { num: [0] },
+          default: 0,
           get(this: Scene, value) {
             value.num[0] = this.env.sky.fogStart;
           },
@@ -275,7 +275,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'FogEnd',
           type: 'float',
           phase: 1,
-          default: { num: [100] },
+          default: 100,
           get(this: Scene, value) {
             value.num[0] = this.env.sky.fogEnd;
           },
@@ -291,7 +291,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           type: 'float',
           phase: 1,
           options: { minValue: 0, maxValue: 100 },
-          default: { num: [1] },
+          default: 1,
           get(this: Scene, value) {
             value.num[0] = this.env.sky.aerialPerspectiveDensity;
           },
@@ -305,7 +305,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'Cloudy',
           type: 'float',
-          default: { num: [0.6] },
+          default: 0.6,
           phase: 1,
           options: { minValue: 0, maxValue: 1 },
           get(this: Scene, value) {
@@ -321,7 +321,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'CloudIntensity',
           type: 'float',
-          default: { num: [40] },
+          default: 40,
           phase: 1,
           options: { minValue: 0, maxValue: 200 },
           get(this: Scene, value) {
@@ -337,7 +337,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'Wind',
           type: 'vec2',
-          default: { num: [0, 0] },
+          default: [0, 0],
           phase: 1,
           options: { minValue: -100, maxValue: 100 },
           get(this: Scene, value) {
@@ -403,7 +403,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           type: 'object',
           hidden: true,
           get(this: Scene, value) {
-            value.object = [new NodeHierarchy(this.rootNode)];
+            value.object = [new NodeHierarchy(this, this.rootNode)];
           },
           set(this: Scene, value) {
             const nodeHierarchy = value.object[0] as NodeHierarchy;

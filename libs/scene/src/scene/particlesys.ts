@@ -13,7 +13,7 @@ import { QUEUE_OPAQUE } from '../values';
 import { ParticleMaterial, type MeshMaterial } from '../material';
 import { Application } from '../app/app';
 import { Ref } from '../app';
-import { NodeClonable, NodeCloneMethod } from '.';
+import type { NodeClonable, NodeCloneMethod } from '.';
 
 const tmpVec3 = new Vector3();
 

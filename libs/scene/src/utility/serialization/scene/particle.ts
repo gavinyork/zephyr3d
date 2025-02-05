@@ -1,9 +1,9 @@
 import type { EmitterBehavior, EmitterShape } from '../../../scene';
 import { SceneNode } from '../../../scene/scene_node';
 import { ParticleSystem } from '../../../scene/particlesys';
-import { Scene } from '../../../scene/scene';
 import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
+import type { NodeHierarchy } from './node';
 import { getGraphNodeClass } from './node';
 import { ParticleMaterial } from '../../../material';
 
@@ -12,23 +12,19 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
     ctor: ParticleSystem,
     parent: getGraphNodeClass(assetRegistry),
     className: 'ParticleSystem',
-    createFunc(scene: Scene | SceneNode) {
-      if (scene instanceof Scene) {
-        return { obj: new ParticleSystem(scene) };
-      } else if (scene instanceof SceneNode) {
-        const particlesys = new ParticleSystem(scene.scene);
-        particlesys.parent = scene;
-        return { obj: particlesys };
-      } else {
-        return null;
+    createFunc(ctx: NodeHierarchy | SceneNode) {
+      const node = new ParticleSystem(ctx.scene);
+      if (ctx instanceof SceneNode) {
+        node.parent = ctx;
       }
+      return { obj: node };
     },
     getProps() {
       return [
         {
           name: 'WorldSpace',
           type: 'bool',
-          default: { bool: [true] },
+          default: true,
           get(this: ParticleSystem, value) {
             value.bool[0] = this.worldSpace;
           },
@@ -39,7 +35,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'MaxParticleCount',
           type: 'int',
-          default: { num: [100] },
+          default: 100,
           get(this: ParticleSystem, value) {
             value.num[0] = this.maxParticleCount;
           },
@@ -50,7 +46,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'EmitInterval',
           type: 'int',
-          default: { num: [100] },
+          default: 100,
           get(this: ParticleSystem, value) {
             value.num[0] = this.emitInterval;
           },
@@ -61,7 +57,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'EmitCount',
           type: 'int',
-          default: { num: [1] },
+          default: 1,
           get(this: ParticleSystem, value) {
             value.num[0] = this.emitCount;
           },
@@ -72,7 +68,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'Gravity',
           type: 'vec3',
-          default: { num: [0, 0, 0] },
+          default: [0, 0, 0],
           get(this: ParticleSystem, value) {
             const gravity = this.gravity;
             value.num[0] = gravity.x;
@@ -86,7 +82,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'Wind',
           type: 'vec3',
-          default: { num: [0, 0, 0] },
+          default: [0, 0, 0],
           get(this: ParticleSystem, value) {
             const wind = this.wind;
             value.num[0] = wind.x;
@@ -100,7 +96,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'Scalar',
           type: 'float',
-          default: { num: [1] },
+          default: 1,
           get(this: ParticleSystem, value) {
             value.num[0] = this.scalar;
           },
@@ -111,7 +107,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'Aspect',
           type: 'float',
-          default: { num: [1] },
+          default: 1,
           get(this: ParticleSystem, value) {
             value.num[0] = this.aspect;
           },
@@ -122,7 +118,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'AirResistence',
           type: 'bool',
-          default: { bool: [false] },
+          default: false,
           get(this: ParticleSystem, value) {
             value.bool[0] = this.airResistence;
           },
@@ -133,7 +129,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'ParticleRotation',
           type: 'float',
-          default: { num: [0] },
+          default: 0,
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleRotation;
           },
@@ -144,7 +140,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'ParticleRotationVar',
           type: 'float',
-          default: { num: [0] },
+          default: 0,
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleRotationVar;
           },
@@ -155,7 +151,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'JitterSpeed',
           type: 'float',
-          default: { num: [1] },
+          default: 1,
           get(this: ParticleSystem, value) {
             value.num[0] = this.jitterSpeed;
           },
@@ -166,7 +162,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'JitterPower',
           type: 'float',
-          default: { num: [0] },
+          default: 0,
           get(this: ParticleSystem, value) {
             value.num[0] = this.jitterPower;
           },
@@ -181,7 +177,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
             labels: ['Point', 'Sphere', 'Box', 'Cylinder', 'Cone'],
             values: ['point', 'sphere', 'box', 'cylinder', 'cone']
           },
-          default: { str: ['point'] },
+          default: 'point',
           get(this: ParticleSystem, value) {
             value.str[0] = this.emitterShape;
           },
@@ -192,7 +188,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'Directional',
           type: 'bool',
-          default: { bool: [false] },
+          default: false,
           get(this: ParticleSystem, value) {
             value.bool[0] = this.directional;
           },
@@ -207,7 +203,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
             labels: ['Point', 'Sphere', 'Box', 'Cylinder', 'Cone'],
             values: ['point', 'sphere', 'box', 'cylinder', 'cone']
           },
-          default: { str: ['point'] },
+          default: 'point',
           get(this: ParticleSystem, value) {
             value.str[0] = this.emitterShape;
           },
@@ -222,7 +218,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
             labels: ['Surface', 'Volume'],
             values: ['surface', 'volume']
           },
-          default: { str: ['surface'] },
+          default: 'surface',
           get(this: ParticleSystem, value) {
             value.str[0] = this.emitterBehavior;
           },
@@ -233,7 +229,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'EmitterConeRadius',
           type: 'float',
-          default: { num: [0] },
+          default: 0,
           get(this: ParticleSystem, value) {
             value.num[0] = this.emitterConeRadius;
           },
@@ -244,7 +240,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'EmitterConeRadiusVar',
           type: 'float',
-          default: { num: [0.1] },
+          default: 0.1,
           get(this: ParticleSystem, value) {
             value.num[0] = this.emitterConeRadiusVar;
           },
@@ -255,7 +251,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'ParticleVelocity',
           type: 'float',
-          default: { num: [0.2] },
+          default: 0.2,
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleVelocity;
           },
@@ -266,7 +262,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'ParticleVelocityVar',
           type: 'float',
-          default: { num: [0.2] },
+          default: 0.2,
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleVelocityVar;
           },
@@ -277,7 +273,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'ParticleLife',
           type: 'float',
-          default: { num: [1] },
+          default: 1,
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleLife;
           },
@@ -288,7 +284,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'ParticleLifeVar',
           type: 'float',
-          default: { num: [0.5] },
+          default: 0.5,
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleLifeVar;
           },
@@ -299,7 +295,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'ParticleSize1',
           type: 'float',
-          default: { num: [0.4] },
+          default: 0.4,
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleSize1;
           },
@@ -310,7 +306,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'ParticleSize1Var',
           type: 'float',
-          default: { num: [0.1] },
+          default: 0.1,
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleSize1Var;
           },
@@ -321,7 +317,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'ParticleSize2',
           type: 'float',
-          default: { num: [0] },
+          default: 0,
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleSize2;
           },
@@ -332,7 +328,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'ParticleSize2Var',
           type: 'float',
-          default: { num: [0.1] },
+          default: 0.1,
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleSize2Var;
           },
@@ -343,7 +339,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'Acceleration',
           type: 'float',
-          default: { num: [-0.01] },
+          default: -0.01,
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleAccel;
           },
@@ -354,7 +350,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'ParticleAccelerationVar',
           type: 'float',
-          default: { num: [-0.01] },
+          default: -0.01,
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleAccelVar;
           },
@@ -365,7 +361,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'Transparency',
           type: 'float',
-          default: { num: [1] },
+          default: 1,
           get(this: ParticleSystem, value) {
             value.num[0] = this.transparency;
           },
@@ -376,7 +372,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'ColorMultiplier',
           type: 'float',
-          default: { num: [1] },
+          default: 1,
           get(this: ParticleSystem, value) {
             value.num[0] = this.colorMultiplier;
           },
@@ -387,7 +383,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'Material',
           type: 'object',
-          default: { object: [null] },
+          default: null,
           objectTypes: [ParticleMaterial],
           get(this: ParticleSystem, value) {
             value.object[0] = this.getMaterial();

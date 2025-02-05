@@ -1,6 +1,6 @@
-import { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
+import type { NodeHierarchy } from './node';
 import { getSceneNodeClass } from './node';
 import type { AssetRegistry } from '../asset/asset';
 import { SceneNode } from '../../../scene';
@@ -19,23 +19,19 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
     ctor: Camera,
     parent: getSceneNodeClass(assetRegistry),
     className: 'Camera',
-    createFunc(scene: Scene | SceneNode) {
-      if (scene instanceof Scene) {
-        return { obj: new Camera(scene) };
-      } else if (scene instanceof SceneNode) {
-        const camera = new Camera(scene.scene);
-        camera.parent = scene;
-        return { obj: camera };
-      } else {
-        return null;
+    createFunc(ctx: NodeHierarchy | SceneNode) {
+      const node = new Camera(ctx.scene);
+      if (ctx instanceof SceneNode) {
+        node.parent = ctx;
       }
+      return { obj: node };
     },
     getProps() {
       return [
         {
           name: 'HiZ',
           type: 'bool',
-          default: { bool: [false] },
+          default: false,
           get(this: Camera, value) {
             value.bool[0] = this.HiZ;
           },
@@ -47,7 +43,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           name: 'TAA',
           type: 'bool',
           phase: 0,
-          default: { bool: [false] },
+          default: false,
           get(this: Camera, value) {
             value.bool[0] = this.TAA;
           },
@@ -71,7 +67,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
               TAA_DEBUG_MOTION_VECTOR
             ]
           },
-          default: { num: [TAA_DEBUG_NONE] },
+          default: TAA_DEBUG_NONE,
           get(this: Camera, value) {
             value.num[0] = this.TAADebug;
           },
@@ -90,7 +86,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
             minValue: 0,
             maxValue: 1
           },
-          default: { num: [1 / 16] },
+          default: 1 / 16,
           get(this: Camera, value) {
             value.num[0] = this.TAABlendFactor;
           },
@@ -105,7 +101,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           name: 'SSR',
           type: 'bool',
           phase: 0,
-          default: { bool: [false] },
+          default: false,
           get(this: Camera, value) {
             value.bool[0] = this.SSR;
           },
@@ -117,7 +113,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           name: 'SSRMaxRoughness',
           type: 'float',
           phase: 1,
-          default: { num: [0.8] },
+          default: 0.8,
           options: {
             minValue: 0,
             maxValue: 1
@@ -136,7 +132,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           name: 'SSRRoughnessFactor',
           type: 'float',
           phase: 1,
-          default: { num: [1.0] },
+          default: 1.0,
           options: {
             minValue: 0,
             maxValue: 1
@@ -155,7 +151,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           name: 'SSRStride',
           type: 'int',
           phase: 1,
-          default: { num: [2] },
+          default: 2,
           options: {
             minValue: 1,
             maxValue: 32
@@ -174,7 +170,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           name: 'SSRMaxDistance',
           type: 'float',
           phase: 1,
-          default: { num: [100] },
+          default: 100,
           options: {
             minValue: 0,
             maxValue: 9999
@@ -193,7 +189,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           name: 'SSRMaxSteps',
           type: 'int',
           phase: 1,
-          default: { num: [120] },
+          default: 120,
           options: {
             minValue: 1,
             maxValue: 2000
@@ -212,7 +208,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           name: 'SSRThickness',
           type: 'float',
           phase: 1,
-          default: { num: [0.5] },
+          default: 0.5,
           options: {
             minValue: 0,
             maxValue: 8
@@ -231,7 +227,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           name: 'SSRBlurScale',
           phase: 1,
           type: 'float',
-          default: { num: [0.05] },
+          default: 0.05,
           options: {
             minValue: 0,
             maxValue: 1
@@ -250,7 +246,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           name: 'SSRBlurDepthCutoff',
           phase: 1,
           type: 'float',
-          default: { num: [2] },
+          default: 2,
           options: {
             minValue: 0,
             maxValue: 8
@@ -269,7 +265,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           name: 'SSRBlurKernelSize',
           type: 'int',
           phase: 1,
-          default: { num: [17] },
+          default: 17,
           options: {
             minValue: 1,
             maxValue: 65
@@ -288,7 +284,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           name: 'SSRBlurStdDev',
           type: 'float',
           phase: 1,
-          default: { num: [10] },
+          default: 10,
           options: {
             minValue: 0,
             maxValue: 100
@@ -307,7 +303,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           name: 'SSRCalcThickness',
           type: 'bool',
           phase: 1,
-          default: { bool: [false] },
+          default: false,
           get(this: Camera, value) {
             value.bool[0] = this.ssrCalcThickness;
           },
@@ -321,7 +317,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         {
           name: 'ClearColor',
           type: 'rgba',
-          default: { num: [0, 0, 0, 1] },
+          default: [0, 0, 0, 1],
           get(this: Camera, value) {
             value.num[0] = this.clearColor.x;
             value.num[1] = this.clearColor.y;
@@ -342,23 +338,19 @@ export function getPerspectiveCameraClass(assetRegistry: AssetRegistry): Seriali
     ctor: PerspectiveCamera,
     parent: getCameraClass(assetRegistry),
     className: 'PerspectiveCamera',
-    createFunc(scene: Scene | SceneNode) {
-      if (scene instanceof Scene) {
-        return { obj: new PerspectiveCamera(scene) };
-      } else if (scene instanceof SceneNode) {
-        const camera = new PerspectiveCamera(scene.scene);
-        camera.parent = scene;
-        return { obj: camera };
-      } else {
-        return null;
+    createFunc(ctx: NodeHierarchy | SceneNode) {
+      const node = new PerspectiveCamera(ctx.scene);
+      if (ctx instanceof SceneNode) {
+        node.parent = ctx;
       }
+      return { obj: node };
     },
     getProps() {
       return [
         {
           name: 'FovVertical',
           type: 'float',
-          default: { num: [Math.PI / 3] },
+          default: Math.PI / 3,
           options: {
             minValue: 0,
             maxValue: Math.PI
@@ -373,7 +365,7 @@ export function getPerspectiveCameraClass(assetRegistry: AssetRegistry): Seriali
         {
           name: 'Near',
           type: 'float',
-          default: { num: [1] },
+          default: 1,
           get(this: PerspectiveCamera, value) {
             value.num[0] = this.near;
           },
@@ -384,7 +376,7 @@ export function getPerspectiveCameraClass(assetRegistry: AssetRegistry): Seriali
         {
           name: 'Far',
           type: 'float',
-          default: { num: [1000] },
+          default: 1000,
           get(this: PerspectiveCamera, value) {
             value.num[0] = this.far;
           },
@@ -402,23 +394,19 @@ export function getOrthoCameraClass(assetRegistry: AssetRegistry): SerializableC
     ctor: OrthoCamera,
     parent: getCameraClass(assetRegistry),
     className: 'OrthoCamera',
-    createFunc(scene: Scene | SceneNode) {
-      if (scene instanceof Scene) {
-        return { obj: new OrthoCamera(scene) };
-      } else if (scene instanceof SceneNode) {
-        const camera = new OrthoCamera(scene.scene);
-        camera.parent = scene;
-        return { obj: camera };
-      } else {
-        return null;
+    createFunc(ctx: NodeHierarchy | SceneNode) {
+      const node = new OrthoCamera(ctx.scene);
+      if (ctx instanceof SceneNode) {
+        node.parent = ctx;
       }
+      return { obj: node };
     },
     getProps() {
       return [
         {
           name: 'Left',
           type: 'float',
-          default: { num: [-1] },
+          default: -1,
           get(this: OrthoCamera, value) {
             value.num[0] = this.left;
           },
@@ -429,7 +417,7 @@ export function getOrthoCameraClass(assetRegistry: AssetRegistry): SerializableC
         {
           name: 'Right',
           type: 'float',
-          default: { num: [1] },
+          default: 1,
           get(this: OrthoCamera, value) {
             value.num[0] = this.right;
           },
@@ -440,7 +428,7 @@ export function getOrthoCameraClass(assetRegistry: AssetRegistry): SerializableC
         {
           name: 'Bottom',
           type: 'float',
-          default: { num: [-1] },
+          default: -1,
           get(this: OrthoCamera, value) {
             value.num[0] = this.bottom;
           },
@@ -451,7 +439,7 @@ export function getOrthoCameraClass(assetRegistry: AssetRegistry): SerializableC
         {
           name: 'Top',
           type: 'float',
-          default: { num: [1] },
+          default: 1,
           get(this: OrthoCamera, value) {
             value.num[0] = this.top;
           },
@@ -462,7 +450,7 @@ export function getOrthoCameraClass(assetRegistry: AssetRegistry): SerializableC
         {
           name: 'Near',
           type: 'float',
-          default: { num: [-1] },
+          default: -1,
           get(this: OrthoCamera, value) {
             value.num[0] = this.near;
           },
@@ -473,7 +461,7 @@ export function getOrthoCameraClass(assetRegistry: AssetRegistry): SerializableC
         {
           name: 'Far',
           type: 'float',
-          default: { num: [1] },
+          default: 1,
           get(this: OrthoCamera, value) {
             value.num[0] = this.far;
           },

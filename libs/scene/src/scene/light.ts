@@ -1,11 +1,12 @@
-import { Vector3, Vector4, Matrix4x4 } from '@zephyr3d/base';
+import type { Matrix4x4 } from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import { BoundingBox } from '../utility/bounding_volume';
 import { ShadowMapper } from '../shadow/shadowmapper';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import type { Scene } from './scene';
-import { NodeClonable, NodeCloneMethod } from '.';
+import type { NodeClonable, NodeCloneMethod } from '.';
 
 /**
  * Base class for any kind of light node

@@ -9,10 +9,10 @@ import {
 } from '../../../material';
 import { Primitive } from '../../../render';
 import { Mesh, SceneNode } from '../../../scene';
-import { Scene } from '../../../scene/scene';
 import { BoxFrameShape, BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '../../../shapes';
 import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
+import type { NodeHierarchy } from './node';
 import { getGraphNodeClass } from './node';
 
 export function getMeshClass(assetRegistry: AssetRegistry): SerializableClass {
@@ -20,23 +20,19 @@ export function getMeshClass(assetRegistry: AssetRegistry): SerializableClass {
     ctor: Mesh,
     parent: getGraphNodeClass(assetRegistry),
     className: 'Mesh',
-    createFunc(scene: Scene | SceneNode) {
-      if (scene instanceof Scene) {
-        return { obj: new Mesh(scene) };
-      } else if (scene instanceof SceneNode) {
-        const mesh = new Mesh(scene.scene);
-        mesh.parent = scene;
-        return { obj: mesh };
-      } else {
-        return null;
+    createFunc(ctx: NodeHierarchy | SceneNode) {
+      const node = new Mesh(ctx.scene);
+      if (ctx instanceof SceneNode) {
+        node.parent = ctx;
       }
+      return { obj: node };
     },
     getProps() {
       return [
         {
           name: 'CastShadow',
           type: 'bool',
-          default: { bool: [false] },
+          default: false,
           get(this: Mesh, value) {
             value.bool[0] = this.castShadow;
           },
@@ -58,7 +54,7 @@ export function getMeshClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'Primitive',
           type: 'object',
           persistent: false,
-          default: { object: [null] },
+          default: null,
           objectTypes: [BoxShape, BoxFrameShape, SphereShape, CylinderShape, PlaneShape, TorusShape],
           get(this: Mesh, value) {
             value.object[0] = this.primitive;
@@ -86,7 +82,7 @@ export function getMeshClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'Material',
           type: 'object',
-          default: { object: [null] },
+          default: null,
           persistent: false,
           objectTypes: [
             UnlitMaterial,
