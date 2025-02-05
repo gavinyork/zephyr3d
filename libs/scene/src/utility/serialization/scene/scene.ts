@@ -407,7 +407,8 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           },
           set(this: Scene, value) {
             const nodeHierarchy = value.object[0] as NodeHierarchy;
-            for (const child of nodeHierarchy.rootNode.children) {
+            nodeHierarchy.rootNode.remove();
+            for (const child of nodeHierarchy.rootNode.children.slice()) {
               child.get().parent = this.rootNode;
             }
           }

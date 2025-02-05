@@ -147,7 +147,7 @@ export class SceneView extends BaseView<SceneModel> {
               }
             },
             {
-              label: 'Past',
+              label: 'Paste',
               shortCut: 'Ctrl+V',
               action: () => {
                 this.handlePasteNode();
