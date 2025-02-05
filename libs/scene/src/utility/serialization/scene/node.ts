@@ -146,6 +146,7 @@ export function getNodeHierarchyClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'NodeHierarchy',
           type: 'object',
+          phase: 1,
           hidden: true,
           get(this: NodeHierarchy, value) {
             value.object = [this.rootNode];
