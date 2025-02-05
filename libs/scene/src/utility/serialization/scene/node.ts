@@ -119,7 +119,7 @@ export function getNodeHierarchyClass(assetRegistry: AssetRegistry): Serializabl
           hidden: true,
           get(this: NodeHierarchy, value) {
             value.object = [...this.materialList].sort(
-              (a, b) => Number(b.$isInstance) - Number(a.$isInstance)
+              (a, b) => Number(!!a.$isInstance) - Number(!!b.$isInstance)
             );
           },
           set() {}

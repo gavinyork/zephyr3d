@@ -6,7 +6,6 @@ import type { SerializableClass } from '../types';
 import { Application } from '../../../app/app';
 import { panoramaToCubemap } from '../../panorama';
 import { prefilterCubemap } from '../../pmrem';
-import { SceneNode } from '../../../scene';
 import { NodeHierarchy } from './node';
 
 export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
@@ -306,6 +305,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'Cloudy',
           type: 'float',
+          default: { num: [0.6] },
           phase: 1,
           options: { minValue: 0, maxValue: 1 },
           get(this: Scene, value) {
@@ -321,6 +321,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'CloudIntensity',
           type: 'float',
+          default: { num: [40] },
           phase: 1,
           options: { minValue: 0, maxValue: 200 },
           get(this: Scene, value) {
@@ -336,6 +337,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'Wind',
           type: 'vec2',
+          default: { num: [0, 0] },
           phase: 1,
           options: { minValue: -100, maxValue: 100 },
           get(this: Scene, value) {

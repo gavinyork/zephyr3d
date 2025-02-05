@@ -36,6 +36,7 @@ export function getTextureProps<T extends Material>(
     {
       name: name[0].toUpperCase() + name.slice(1),
       type: 'object',
+      default: { object: [null] },
       phase: phase,
       nullable: true,
       get(value) {

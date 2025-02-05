@@ -58,7 +58,6 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
     {
       name: 'EmissiveColor',
       type: 'rgb',
-      default: { num: [0, 0, 0] },
       get(this: PBRMaterial, value) {
         value.num[0] = this.emissiveColor.x;
         value.num[1] = this.emissiveColor.y;
@@ -66,12 +65,19 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.emissiveColor = new Vector3(value.num[0], value.num[1], value.num[2]);
+      },
+      getDefaultValue(this: PBRMaterial) {
+        if (this.$isInstance) {
+          const value = this.coreMaterial.emissiveColor;
+          return { num: [value.x, value.y, value.z] };
+        } else {
+          return { num: [0, 0, 0] };
+        }
       }
     },
     {
       name: 'EmissiveStrength',
       type: 'float',
-      default: { num: [1] },
       options: {
         minValue: 0,
         maxValue: 1
@@ -81,6 +87,13 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
       },
       set(this: PBRMaterial, value) {
         this.emissiveStrength = value.num[0];
+      },
+      getDefaultValue(this: PBRMaterial) {
+        if (this.$isInstance) {
+          return { num: [this.coreMaterial.emissiveStrength] };
+        } else {
+          return { num: [1] };
+        }
       }
     },
     ...getTextureProps<PBRMaterial>(assetRegistry, 'emissiveTexture', '2D', 0),
@@ -449,7 +462,6 @@ function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<U
     {
       name: 'AlbedoColor',
       type: 'rgba',
-      default: { num: [1, 1, 1, 1] },
       get(this: UnlitPropTypes, value) {
         const color = this.albedoColor;
         value.num[0] = color.x;
@@ -459,6 +471,14 @@ function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<U
       },
       set(this: UnlitPropTypes, value) {
         this.albedoColor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
+      },
+      getDefaultValue(this: UnlitPropTypes) {
+        if (this.$isInstance) {
+          const albedoColor = this.coreMaterial.albedoColor;
+          return { num: [albedoColor.x, albedoColor.y, albedoColor.z, albedoColor.w] };
+        } else {
+          return [1, 1, 1, 1];
+        }
       }
     },
     ...getTextureProps<UnlitPropTypes>(assetRegistry, 'albedoTexture', '2D', 0)
@@ -570,6 +590,13 @@ export function getMeshMaterialClass(): SerializableClass {
           },
           set(this: MeshMaterial, value) {
             this.opacity = value.num[0];
+          },
+          getDefaultValue(this: MeshMaterial) {
+            if (this.$isInstance) {
+              return { num: [this.coreMaterial.opacity] };
+            } else {
+              return { num: [1] };
+            }
           }
         }
       ];
@@ -773,6 +800,13 @@ export function getBlinnMaterialClass(assetRegistry: AssetRegistry): Serializabl
           },
           set(this: BlinnMaterial, value) {
             this.shininess = value.num[0];
+          },
+          getDefaultValue(this: BlinnMaterial) {
+            if (this.$isInstance) {
+              return { num: [this.coreMaterial.shininess] };
+            } else {
+              return { num: [32] };
+            }
           }
         },
         ...getLitMaterialProps(assetRegistry)
@@ -815,7 +849,6 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
         {
           name: 'Metallic',
           type: 'float',
-          default: { num: [1] },
           options: {
             minValue: 0,
             maxValue: 1
@@ -825,6 +858,13 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
           },
           set(this: PBRMetallicRoughnessMaterial, value) {
             this.metallic = value.num[0];
+          },
+          getDefaultValue(this: PBRMetallicRoughnessMaterial) {
+            if (this.$isInstance) {
+              return { num: [this.coreMaterial.metallic] };
+            } else {
+              return { num: [1] };
+            }
           }
         },
         {
@@ -840,20 +880,34 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
           },
           set(this: PBRMetallicRoughnessMaterial, value) {
             this.roughness = value.num[0];
+          },
+          getDefaultValue(this: PBRMetallicRoughnessMaterial) {
+            if (this.$isInstance) {
+              return { num: [this.coreMaterial.roughness] };
+            } else {
+              return { num: [1] };
+            }
           }
         },
         {
           name: 'SpecularFactor',
           type: 'rgba',
-          default: { num: [1, 1, 1, 1] },
           get(this: PBRMetallicRoughnessMaterial, value) {
             value.num[0] = this.specularFactor.x;
             value.num[1] = this.specularFactor.y;
             value.num[2] = this.specularFactor.z;
             value.num[3] = this.specularFactor.w;
           },
-          set(this: PBRMaterial, value) {
+          set(this: PBRMetallicRoughnessMaterial, value) {
             this.specularFactor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
+          },
+          getDefaultValue(this: PBRMetallicRoughnessMaterial) {
+            if (this.$isInstance) {
+              const value = this.coreMaterial.specularFactor;
+              return { num: [value.x, value.y, value.z, value.w] };
+            } else {
+              return { num: [1, 1, 1, 1] };
+            }
           }
         },
         ...getTextureProps<PBRMetallicRoughnessMaterial>(assetRegistry, 'metallicRoughnessTexture', '2D', 0),
@@ -906,12 +960,19 @@ export function getPBRSpecularGlossinessMaterialClass(assetRegistry: AssetRegist
           },
           set(this: PBRSpecularGlossinessMaterial, value) {
             this.specularFactor = new Vector3(value.num[0], value.num[1], value.num[2]);
+          },
+          getDefaultValue(this: PBRSpecularGlossinessMaterial) {
+            if (this.$isInstance) {
+              const value = this.coreMaterial.specularFactor;
+              return { num: [value.x, value.y, value.z] };
+            } else {
+              return { num: [1, 1, 1] };
+            }
           }
         },
         {
           name: 'GlossnessFactor',
           type: 'float',
-          default: { num: [1] },
           options: {
             minValue: 0,
             maxValue: 1
@@ -921,6 +982,13 @@ export function getPBRSpecularGlossinessMaterialClass(assetRegistry: AssetRegist
           },
           set(this: PBRSpecularGlossinessMaterial, value) {
             this.glossinessFactor = value.num[0];
+          },
+          getDefaultValue(this: PBRSpecularGlossinessMaterial) {
+            if (this.$isInstance) {
+              return { num: [this.coreMaterial.glossinessFactor] };
+            } else {
+              return { num: [1] };
+            }
           }
         },
         ...getPBRCommonProps(assetRegistry)

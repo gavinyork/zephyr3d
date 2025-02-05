@@ -53,7 +53,7 @@ import {
   getTorusShapeClass
 } from './scene/primitive';
 import { getSceneClass } from './scene/scene';
-import type { PropertyValue, SerializableClass } from './types';
+import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 
 export * from './asset/asset';
 export * from './scene/batch';
@@ -65,6 +65,64 @@ export * from './scene/particle';
 export * from './types';
 
 const serializationInfoCache: WeakMap<AssetRegistry, Map<any, SerializableClass>> = new WeakMap();
+
+const defaultValues: Record<PropertyType, any> = {
+  bool: false,
+  float: 0,
+  int: 0,
+  int2: [0, 0],
+  int3: [0, 0, 0],
+  int4: [0, 0, 0, 0],
+  object: null,
+  object_array: [],
+  rgb: [0, 0, 0],
+  rgba: [0, 0, 0, 0],
+  string: '',
+  vec2: [0, 0],
+  vec3: [0, 0, 0],
+  vec4: [0, 0, 0, 0]
+};
+
+function getDefaultValue<T>(obj: T, prop: PropertyAccessor<T>) {
+  let v = undefined;
+  if (prop.getDefaultValue) {
+    v = prop.getDefaultValue.call(obj);
+  } else if (prop.default) {
+    switch (prop.type) {
+      case 'float':
+      case 'int':
+        v = prop.default.num[0];
+        break;
+      case 'string':
+        v = prop.default.str[0];
+        break;
+      case 'bool':
+        v = prop.default.bool[0];
+        break;
+      case 'int2':
+      case 'int3':
+      case 'int4':
+      case 'vec2':
+      case 'vec3':
+      case 'vec4':
+      case 'rgb':
+      case 'rgba':
+        v = prop.default.num;
+        break;
+      case 'object':
+        v = prop.default.object[0];
+        break;
+      case 'object_array':
+        v = prop.default.object;
+        break;
+    }
+  }
+  if (v === undefined) {
+    v = defaultValues[prop.type];
+    console.warn(`No default value found for property: ${prop.name}, ${v} will be used`);
+  }
+  return v;
+}
 
 export function getSerializationInfo(assetRegistry: AssetRegistry) {
   let info = serializationInfoCache.get(assetRegistry);
@@ -122,10 +180,7 @@ export async function deserializeObjectProps<T>(
       continue;
     }
     const k = prop.name;
-    const v = json[k];
-    if (v === undefined) {
-      continue;
-    }
+    let v = json[k] ?? getDefaultValue(obj, prop);
     const phase = prop.phase ?? 0;
     if (phase !== currentPhase) {
       currentPhase = phase;
@@ -161,35 +216,38 @@ export async function deserializeObjectProps<T>(
         break;
       case 'float':
       case 'int': {
-        tmpVal.num[0] = v ?? prop.default?.num[0] ?? 0;
+        tmpVal.num[0] = v;
         break;
       }
       case 'string': {
-        tmpVal.str[0] = v ?? prop.default?.str[0] ?? '';
+        tmpVal.str[0] = v;
         break;
       }
       case 'bool': {
-        tmpVal.bool[0] = v ?? prop.default?.bool[0] ?? false;
+        tmpVal.bool[0] = v;
         break;
       }
-      case 'vec2': {
-        tmpVal.num[0] = v ? v[0] : prop.default?.num[0] ?? 0;
-        tmpVal.num[1] = v ? v[1] : prop.default?.num[1] ?? 0;
+      case 'vec2':
+      case 'int2': {
+        tmpVal.num[0] = v[0];
+        tmpVal.num[1] = v[1];
         break;
       }
       case 'vec3':
+      case 'int3':
       case 'rgb': {
-        tmpVal.num[0] = v ? v[0] : prop.default?.num[0] ?? 0;
-        tmpVal.num[1] = v ? v[1] : prop.default?.num[1] ?? 0;
-        tmpVal.num[2] = v ? v[2] : prop.default?.num[2] ?? 0;
+        tmpVal.num[0] = v[0];
+        tmpVal.num[1] = v[1];
+        tmpVal.num[2] = v[2];
         break;
       }
       case 'vec4':
+      case 'int4':
       case 'rgba': {
-        tmpVal.num[0] = v ? v[0] : prop.default?.num[0] ?? 0;
-        tmpVal.num[1] = v ? v[1] : prop.default?.num[1] ?? 0;
-        tmpVal.num[2] = v ? v[2] : prop.default?.num[2] ?? 0;
-        tmpVal.num[3] = v ? v[3] : prop.default?.num[3] ?? 0;
+        tmpVal.num[0] = v[0];
+        tmpVal.num[1] = v[1];
+        tmpVal.num[2] = v[2];
+        tmpVal.num[3] = v[3];
         break;
       }
     }
@@ -209,6 +267,9 @@ export function serializeObjectProps<T>(
 ) {
   const props = cls.getProps(obj) ?? [];
   for (const prop of props) {
+    if (prop.isValid && !prop.isValid.call(obj)) {
+      continue;
+    }
     const persistent = prop.persistent ?? true;
     if (!persistent) {
       continue;
@@ -222,17 +283,21 @@ export function serializeObjectProps<T>(
     const k = prop.name;
     prop.get.call(obj, tmpVal);
     switch (prop.type) {
-      case 'object':
-        json[k] =
+      case 'object': {
+        const value =
           typeof tmpVal.str[0] === 'string' && tmpVal.str[0]
             ? tmpVal.str[0]
             : tmpVal.object[0]
             ? serializeObject(tmpVal.object[0], assetRegistry, {}, assetList)
             : null;
-        if (assetList && typeof json[k] === 'string' && assetRegistry.getAssetInfo(json[k])) {
-          assetList.add(json[k]);
+        if (value) {
+          json[k] = value;
+          if (assetList && typeof json[k] === 'string' && assetRegistry.getAssetInfo(json[k])) {
+            assetList.add(json[k]);
+          }
         }
         break;
+      }
       case 'object_array':
         json[k] = [];
         for (const p of tmpVal.object) {
@@ -241,52 +306,61 @@ export function serializeObjectProps<T>(
         break;
       case 'float':
       case 'int': {
-        if (!prop.default || prop.default.num[0] !== tmpVal.num[0]) {
+        if ((!prop.default && !prop.getDefaultValue) || getDefaultValue(obj, prop) !== tmpVal.num[0]) {
           json[k] = tmpVal.num[0];
         }
         break;
       }
       case 'string': {
-        if (!prop.default || prop.default.str[0] !== tmpVal.str[0]) {
+        if ((!prop.default && !prop.getDefaultValue) || getDefaultValue(obj, prop) !== tmpVal.str[0]) {
           json[k] = tmpVal.str[0];
         }
         break;
       }
       case 'bool': {
-        if (!prop.default || prop.default.bool[0] !== tmpVal.bool[0]) {
+        if ((!prop.default && !prop.getDefaultValue) || getDefaultValue(obj, prop) !== tmpVal.bool[0]) {
           json[k] = tmpVal.bool[0];
         }
         break;
       }
-      case 'vec2': {
-        if (!prop.default || prop.default.num[0] !== tmpVal.num[0] || prop.default.num[1] !== tmpVal.num[1]) {
-          json[k] = [tmpVal.num[0], tmpVal.num[1]];
+      case 'vec2':
+      case 'int2': {
+        if (prop.default || prop.getDefaultValue) {
+          const v = getDefaultValue(obj, prop);
+          if (v[0] === tmpVal.num[0] && v[1] === tmpVal.num[1]) {
+            break;
+          }
         }
+        json[k] = [tmpVal.num[0], tmpVal.num[1]];
         break;
       }
       case 'vec3':
+      case 'int3':
       case 'rgb': {
-        if (
-          !prop.default ||
-          prop.default.num[0] !== tmpVal.num[0] ||
-          prop.default.num[1] !== tmpVal.num[1] ||
-          prop.default.num[2] !== tmpVal.num[2]
-        ) {
-          json[k] = [tmpVal.num[0], tmpVal.num[1], tmpVal.num[2]];
+        if (prop.default || prop.getDefaultValue) {
+          const v = getDefaultValue(obj, prop);
+          if (v[0] === tmpVal.num[0] && v[1] === tmpVal.num[1] && v[2] === tmpVal.num[2]) {
+            break;
+          }
         }
+        json[k] = [tmpVal.num[0], tmpVal.num[1], tmpVal.num[2]];
         break;
       }
       case 'vec4':
+      case 'int4':
       case 'rgba': {
-        if (
-          !prop.default ||
-          prop.default.num[0] !== tmpVal.num[0] ||
-          prop.default.num[1] !== tmpVal.num[1] ||
-          prop.default.num[2] !== tmpVal.num[2] ||
-          prop.default.num[3] !== tmpVal.num[3]
-        ) {
-          json[k] = [tmpVal.num[0], tmpVal.num[1], tmpVal.num[2], tmpVal.num[3]];
+        if (prop.default || prop.getDefaultValue) {
+          const v = getDefaultValue(obj, prop);
+          if (
+            v[0] === tmpVal.num[0] &&
+            v[1] === tmpVal.num[1] &&
+            v[2] === tmpVal.num[2] &&
+            v[3] === tmpVal.num[3]
+          ) {
+            break;
+          }
         }
+        json[k] = [tmpVal.num[0], tmpVal.num[1], tmpVal.num[2], tmpVal.num[3]];
         break;
       }
     }
