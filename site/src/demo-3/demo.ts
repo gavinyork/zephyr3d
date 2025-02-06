@@ -334,7 +334,7 @@ export class Demo {
     function recusivelyReplaceMaterial(node: AssetHierarchyNode) {
       if (node.mesh) {
         for (const subMesh of node.mesh.subMeshes) {
-          const material = subMesh.material as MeshMaterial;
+          const material = subMesh.material.get() as MeshMaterial;
           const needChange = material.blendMode === 'blend' || material.alphaCutoff > 0;
           if (material instanceof PBRMetallicRoughnessMaterial && material.albedoTexture && needChange) {
             const newMaterial = new TreeMaterialMetallicRoughness();
@@ -373,7 +373,7 @@ export class Demo {
             newMaterial.specularColorTextureSampler = material.specularColorTextureSampler;
             newMaterial.metallic = 0;
             newMaterial.roughness = 1;
-            subMesh.material = newMaterial;
+            subMesh.material.set(newMaterial);
           } else if (
             material instanceof PBRSpecularGlossinessMaterial &&
             material.albedoTexture &&
@@ -386,7 +386,6 @@ export class Demo {
             newMaterial.alphaCutoff = 0.8;
             newMaterial.cullMode = 'none';
             newMaterial.ior = material.ior;
-            newMaterial.specularFactor = material.specularFactor;
             newMaterial.albedoColor = material.albedoColor;
             newMaterial.albedoTexCoordIndex = material.albedoTexCoordIndex;
             newMaterial.albedoTexCoordMatrix = material.albedoTexCoordMatrix;
@@ -407,7 +406,7 @@ export class Demo {
             newMaterial.specularTextureSampler = material.specularTextureSampler;
             newMaterial.metallic = 0;
             newMaterial.roughness = 1;
-            subMesh.material = newMaterial;
+            subMesh.material.set(newMaterial);
           }
         }
       }

@@ -275,13 +275,26 @@ export class OrbitCameraController extends BaseCameraController {
   private _loadCameraParams() {
     const camera = this._getCamera();
     if (camera) {
-      this.eyePos.set(this._getCamera().position);
+      this.lookAt(camera.position, this.options.center, this.upVector);
+      /*
+      this.eyePos.set(camera.position);
       camera.lookAt(this.eyePos, this.options.center, this.upVector);
       Vector3.sub(this.eyePos, this.options.center, this.direction);
       this.direction.inplaceNormalize();
       const mat = this._getCamera().localMatrix;
       this.xVector.setXYZ(mat[0], mat[1], mat[2]);
+      */
     }
+  }
+  lookAt(from: Vector3, to: Vector3, up: Vector3) {
+    this.eyePos.set(from);
+    this.options.center.set(to);
+    this.upVector.set(up);
+    this._getCamera().lookAt(this.eyePos, this.options.center, this.upVector);
+    Vector3.sub(this.eyePos, this.options.center, this.direction);
+    this.direction.inplaceNormalize();
+    const mat = this._getCamera().localMatrix;
+    this.xVector.setXYZ(mat[0], mat[1], mat[2]);
   }
   /**
    * Set options

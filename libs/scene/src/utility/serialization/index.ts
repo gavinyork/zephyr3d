@@ -183,41 +183,35 @@ export async function deserializeObjectProps<T>(
         }
         break;
       case 'float':
-      case 'int': {
+      case 'int':
         tmpVal.num[0] = v;
         break;
-      }
-      case 'string': {
+      case 'string':
         tmpVal.str[0] = v;
         break;
-      }
-      case 'bool': {
+      case 'bool':
         tmpVal.bool[0] = v;
         break;
-      }
       case 'vec2':
-      case 'int2': {
+      case 'int2':
         tmpVal.num[0] = v[0];
         tmpVal.num[1] = v[1];
         break;
-      }
       case 'vec3':
       case 'int3':
-      case 'rgb': {
+      case 'rgb':
         tmpVal.num[0] = v[0];
         tmpVal.num[1] = v[1];
         tmpVal.num[2] = v[2];
         break;
-      }
       case 'vec4':
       case 'int4':
-      case 'rgba': {
+      case 'rgba':
         tmpVal.num[0] = v[0];
         tmpVal.num[1] = v[1];
         tmpVal.num[2] = v[2];
         tmpVal.num[3] = v[3];
         break;
-      }
     }
     promises.push(Promise.resolve(prop.set.call(obj, tmpVal)));
   }
@@ -273,7 +267,7 @@ export function serializeObjectProps<T>(
         }
         break;
       case 'float':
-      case 'int': {
+      case 'int':
         if (
           (prop.default === undefined && !prop.getDefaultValue) ||
           getDefaultValue(obj, prop) !== tmpVal.num[0]
@@ -281,8 +275,7 @@ export function serializeObjectProps<T>(
           json[k] = tmpVal.num[0];
         }
         break;
-      }
-      case 'string': {
+      case 'string':
         if (
           (prop.default === undefined && !prop.getDefaultValue) ||
           getDefaultValue(obj, prop) !== tmpVal.str[0]
@@ -290,8 +283,7 @@ export function serializeObjectProps<T>(
           json[k] = tmpVal.str[0];
         }
         break;
-      }
-      case 'bool': {
+      case 'bool':
         if (
           (prop.default === undefined && !prop.getDefaultValue) ||
           getDefaultValue(obj, prop) !== tmpVal.bool[0]
@@ -299,9 +291,8 @@ export function serializeObjectProps<T>(
           json[k] = tmpVal.bool[0];
         }
         break;
-      }
       case 'vec2':
-      case 'int2': {
+      case 'int2':
         if (prop.default !== undefined || !!prop.getDefaultValue) {
           const v = getDefaultValue(obj, prop);
           if (v[0] === tmpVal.num[0] && v[1] === tmpVal.num[1]) {
@@ -310,10 +301,9 @@ export function serializeObjectProps<T>(
         }
         json[k] = [tmpVal.num[0], tmpVal.num[1]];
         break;
-      }
       case 'vec3':
       case 'int3':
-      case 'rgb': {
+      case 'rgb':
         if (prop.default !== undefined || !!prop.getDefaultValue) {
           const v = getDefaultValue(obj, prop);
           if (v[0] === tmpVal.num[0] && v[1] === tmpVal.num[1] && v[2] === tmpVal.num[2]) {
@@ -322,10 +312,9 @@ export function serializeObjectProps<T>(
         }
         json[k] = [tmpVal.num[0], tmpVal.num[1], tmpVal.num[2]];
         break;
-      }
       case 'vec4':
       case 'int4':
-      case 'rgba': {
+      case 'rgba':
         if (prop.default !== undefined || !!prop.getDefaultValue) {
           const v = getDefaultValue(obj, prop);
           if (
@@ -339,7 +328,6 @@ export function serializeObjectProps<T>(
         }
         json[k] = [tmpVal.num[0], tmpVal.num[1], tmpVal.num[2], tmpVal.num[3]];
         break;
-      }
     }
   }
 }

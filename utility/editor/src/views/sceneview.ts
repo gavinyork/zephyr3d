@@ -29,7 +29,7 @@ import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import type { GenericConstructor } from '@zephyr3d/base';
-import { Quaternion, Vector3 } from '@zephyr3d/base';
+import { AABB, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import { Database, type DBAssetInfo } from '../storage/db';
 import { Dialog } from './dlg/dlg';
@@ -588,6 +588,25 @@ export class SceneView extends BaseView<SceneModel> {
     }
     return true;
   }
+  lookAt(camera: Camera, node: SceneNode) {
+    const aabb = new AABB();
+    aabb.beginExtend();
+    node.iterate((child) => {
+      const bbox = child.getWorldBoundingVolume();
+      if (bbox) {
+        const { minPoint, maxPoint } = bbox.toAABB();
+        aabb.extend(minPoint);
+        aabb.extend(maxPoint);
+      }
+    });
+    const radius = aabb.diagonalLength * 0.5;
+    const distance = Math.max(radius / camera.getTanHalfFovy(), camera.getNearPlane() + 1);
+    const cameraZ = camera.worldMatrix.getRow(2).xyz();
+    const worldPos = Vector3.add(node.getWorldPosition(), Vector3.scale(cameraZ, distance * 2));
+    const localPos = camera.parent.invWorldMatrix.transformPointAffine(worldPos);
+    camera.controller.lookAt(localPos, aabb.center, Vector3.axisPY());
+    //camera.position = camera.parent.invWorldMatrix.transformPointAffine(worldPos);
+  }
   private posToViewport(pos: number[], viewport: ArrayLike<number>): boolean {
     const cvs = Application.instance.device.canvas;
     const vp = viewport;
@@ -609,6 +628,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.sceneHierarchy.on('node_deselected', this.handleNodeDeselected, this);
     this._tab.sceneHierarchy.on('node_request_delete', this.handleDeleteNode, this);
     this._tab.sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
+    this._tab.sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
     eventBus.on('scene_add_asset', this.handleAddAsset, this);
     eventBus.on('scene_add_batch', this.handleAddBatch, this);
     this.sceneSetup();
@@ -623,6 +643,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.sceneHierarchy.off('node_deselected', this.handleNodeDeselected, this);
     this._tab.sceneHierarchy.off('node_request_delete', this.handleDeleteNode, this);
     this._tab.sceneHierarchy.off('node_drag_drop', this.handleNodeDragDrop, this);
+    this._tab.sceneHierarchy.off('node_double_clicked', this.handleNodeDoubleClicked, this);
     eventBus.off('scene_add_asset', this.handleAddAsset, this);
     eventBus.off('scene_add_batch', this.handleAddBatch, this);
     this.sceneFinialize();
@@ -737,6 +758,9 @@ export class SceneView extends BaseView<SceneModel> {
     if (src.parent !== dst && !src.isParentOf(dst)) {
       this._cmdManager.execute(new NodeReparentCommand(src, dst));
     }
+  }
+  private handleNodeDoubleClicked(node: SceneNode) {
+    this.lookAt(this.model.camera, node);
   }
   private handleAddShape<T extends ShapeType>(shapeCls: GenericConstructor<T>, options?: ShapeOptionType<T>) {
     const placeNode = this._nodeToBePlaced.get();

@@ -13,12 +13,15 @@ export type PropertyType =
   | 'rgba'
   | 'object'
   | 'object_array';
+
 export type PropertyValue = {
   num?: number[];
   str?: string[];
   bool?: boolean[];
   object?: unknown[];
 };
+
+export type PropEdit = 'aabb' | 'point' | 'plane';
 
 export type PropertyAccessor<T = unknown> = {
   type: PropertyType;

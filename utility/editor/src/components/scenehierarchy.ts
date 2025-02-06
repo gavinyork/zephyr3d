@@ -8,6 +8,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   node_deselected: [node: SceneNode];
   node_selected: [node: SceneNode];
   node_request_delete: [node: SceneNode];
+  node_double_clicked: [node: SceneNode];
   node_drag_drop: [from: SceneNode, target: SceneNode];
 }>() {
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
@@ -66,6 +67,9 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     const isOpen = ImGui.TreeNodeEx(label, flags);
     if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
       this.selectNode(node);
+    }
+    if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
+      this.dispatchEvent('node_double_clicked', node);
     }
     if (ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
       ImGui.OpenPopup(`context_${node.id}`);

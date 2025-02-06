@@ -227,13 +227,7 @@ export class FPSCameraController extends BaseCameraController {
     const x = this._getCamera().worldMatrix.getRow(0).xyz();
     x.y = 0;
     x.inplaceNormalize();
-    if (x.isNaN()) {
-      console.log(`Camera error 1: ${x.toString()}`);
-    }
     const z = this._getCamera().worldMatrix.getRow(2).xyz().inplaceNormalize();
-    if (z.isNaN()) {
-      console.log(`Camera error 2: ${z.toString()}`);
-    }
     const move = new Vector3(0, 0, 0);
     let changed = false;
     if (this.keyForward) {
@@ -272,9 +266,6 @@ export class FPSCameraController extends BaseCameraController {
           Matrix4x4.invertAffine(this._getCamera().parent.worldMatrix)
         );
         newLocalMatrix.decompose(scale, rotation, pos);
-        if (scale.isNaN() || rotation.isNaN() || pos.isNaN()) {
-          console.log(`Camera error 3: ${scale.toString()} ${rotation.toString()} ${pos.toString()}`);
-        }
         this._getCamera().position.set(pos);
         this._getCamera().scale.set(scale);
         this._getCamera().rotation.set(rotation);

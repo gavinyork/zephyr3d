@@ -1,3 +1,4 @@
+import { Vector3 } from '@zephyr3d/base';
 import type { Camera } from './camera';
 
 /**
@@ -23,6 +24,9 @@ export class BaseCameraController {
       this._camera = camera;
       this.reset();
     }
+  }
+  lookAt(from: Vector3, to: Vector3, up: Vector3) {
+    this._camera.lookAt(from, to, up);
   }
   /**
    * Resets state
