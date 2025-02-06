@@ -640,6 +640,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
     this._tab.sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
     this._propGrid.on('request_edit_aabb', this.editAABB, this);
+    this._propGrid.on('end_edit_aabb', this.endEditAABB, this);
     eventBus.on('scene_add_asset', this.handleAddAsset, this);
     eventBus.on('scene_add_batch', this.handleAddBatch, this);
     this.sceneSetup();
@@ -656,6 +657,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.sceneHierarchy.off('node_drag_drop', this.handleNodeDragDrop, this);
     this._tab.sceneHierarchy.off('node_double_clicked', this.handleNodeDoubleClicked, this);
     this._propGrid.off('request_edit_aabb', this.editAABB, this);
+    this._propGrid.off('end_edit_aabb', this.endEditAABB, this);
     eventBus.off('scene_add_asset', this.handleAddAsset, this);
     eventBus.off('scene_add_batch', this.handleAddBatch, this);
     this.sceneFinialize();
@@ -727,6 +729,12 @@ export class SceneView extends BaseView<SceneModel> {
   private editAABB(aabb: AABB) {
     this._aabbForEdit = aabb;
     this._postGizmoRenderer.editAABB(this._aabbForEdit);
+  }
+  private endEditAABB(aabb: AABB) {
+    if (aabb === this._aabbForEdit) {
+      this._aabbForEdit = null;
+      this._postGizmoRenderer.endEditAABB();
+    }
   }
   private handleCopyNode(node: SceneNode) {
     this._clipBoardData.set(node);

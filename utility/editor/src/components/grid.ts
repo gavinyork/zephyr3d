@@ -115,6 +115,7 @@ class PropertyGroup {
 
 export class PropertyEditor extends makeEventTarget(Object)<{
   request_edit_aabb: [aabb: AABB];
+  end_edit_aabb: [aabb: AABB];
 }>() {
   private _rootGroup: PropertyGroup;
   private _top: number;
@@ -315,12 +316,15 @@ export class PropertyEditor extends makeEventTarget(Object)<{
         if (ImGui.Button(`${FontGlyph.glyphs['trash-empty']}##clear`, new ImGui.ImVec2(buttonSize, 0))) {
           group.prop.set.call(group.object, { object: [null] });
           this.refresh();
+          if (editable) {
+            this.dispatchEvent('end_edit_aabb', group.value.object[0] as AABB);
+          }
         }
       }
       if (editable) {
         ImGui.SameLine(0, 0);
         if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
-          this.dispatchEvent('request_edit_aabb', group.value.object?.[0] as AABB);
+          this.dispatchEvent('request_edit_aabb', group.value.object[0] as AABB);
         }
       }
       ImGui.EndChild();

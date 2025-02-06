@@ -249,6 +249,11 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   set gridDistance(val: number) {
     this._gridParams.y = val;
   }
+  endEditAABB() {
+    if (this._node === PostGizmoRenderer._aabbMesh.get()) {
+      this.node = null;
+    }
+  }
   editAABB(value: AABB) {
     if (!PostGizmoRenderer._aabbMesh.get()) {
       PostGizmoRenderer._aabbMesh.set(
