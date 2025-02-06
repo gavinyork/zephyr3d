@@ -6,7 +6,16 @@ import type {
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
-import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
+import {
+  BoxShape,
+  Camera,
+  DrawContext,
+  Mesh,
+  Primitive,
+  Ref,
+  SceneNode,
+  UnlitMaterial
+} from '@zephyr3d/scene';
 import {
   AbstractPostEffect,
   Application,
@@ -84,8 +93,10 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   end_rotate: [node: SceneNode];
   begin_scale: [node: SceneNode];
   end_scale: [node: SceneNode];
+  aabb_changed: [aabb: AABB];
 }>() {
   static readonly className = 'PostGizmoRenderer' as const;
+  static _aabbMesh: Ref<Mesh> = new Ref();
   static _blendBlitter: CopyBlitter = new CopyBlitter();
   static _gizmoProgram: GPUProgram = null;
   static _gizmoSelectProgram: GPUProgram = null;
@@ -93,13 +104,17 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   static _gizmoRenderState: RenderStateSet = null;
   static _gridRenderState: RenderStateSet = null;
   static _blendRenderState: RenderStateSet = null;
-  static _primitives: Partial<Record<GizmoMode, Primitive>> = {};
   static _gridPrimitive: Primitive = null;
   static _rotation: Primitive = null;
   static _mvpMatrix: Matrix4x4 = new Matrix4x4();
   static _texSize: Vector2 = new Vector2();
   static _cameraNearFar: Vector2 = new Vector2();
   static _axises = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)];
+  private _primitives: Partial<Record<GizmoMode, Primitive>>;
+  private _allowTranslate: boolean;
+  private _allowRotate: boolean;
+  private _allowScale: boolean;
+  private _alwaysDrawIndicator: boolean;
   private _gridSteps: Float32Array;
   private _gridParams: Vector4;
   private _camera: Camera;
@@ -124,10 +139,15 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
    */
   constructor(camera: Camera, binding = null, size = 10) {
     super();
+    this._primitives = null;
     this._camera = camera;
     this._node = binding;
     this._bindGroup = null;
     this._gridBindGroup = null;
+    this._allowRotate = true;
+    this._allowScale = true;
+    this._allowTranslate = true;
+    this._alwaysDrawIndicator = false;
     this._axisLength = size;
     this._arrowLength = size * 0.4;
     this._axisRadius = size * 0.02;
@@ -150,10 +170,44 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
     );
     this._nodeBox = new AABB();
   }
+  get allowRotate() {
+    return this._allowRotate;
+  }
+  set allowRotate(val: boolean) {
+    this._allowRotate = val;
+    if (!this._allowRotate && this._mode === 'rotation') {
+      this.mode = 'select';
+    }
+  }
+  get allowTranslate() {
+    return this._allowTranslate;
+  }
+  set allowTranslate(val: boolean) {
+    this._allowTranslate = val;
+    if (!this._allowTranslate && this._mode === 'translation') {
+      this.mode = 'select';
+    }
+  }
+  get allowScale() {
+    return this._allowScale;
+  }
+  set allowScale(val: boolean) {
+    this._allowScale = val;
+    if (!this._allowScale && this._mode === 'scaling') {
+      this.mode = 'select';
+    }
+  }
   get mode(): GizmoMode {
     return this._mode;
   }
   set mode(val: GizmoMode) {
+    if (
+      (val === 'rotation' && !this._allowRotate) ||
+      (val === 'translation' && !this._allowTranslate) ||
+      (val === 'scaling' && !this._allowScale)
+    ) {
+      return;
+    }
     if (this._mode !== val) {
       if (this._mode === 'translation') {
         this._endTranslation();
@@ -192,6 +246,24 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   set gridDistance(val: number) {
     this._gridParams.y = val;
   }
+  editAABB(value: AABB) {
+    if (!PostGizmoRenderer._aabbMesh.get()) {
+      PostGizmoRenderer._aabbMesh.set(
+        new Mesh(this._camera.scene, new BoxShape({ anchor: 0, size: 1 }), new UnlitMaterial())
+      );
+      PostGizmoRenderer._aabbMesh.get().sealed = true;
+      PostGizmoRenderer._aabbMesh.get().showState = 'hidden';
+      PostGizmoRenderer._aabbMesh.get().remove();
+      PostGizmoRenderer._aabbMesh.get().on('transformchanged', () => {
+        const aabb = PostGizmoRenderer._aabbMesh.get().getWorldBoundingVolume().toAABB();
+        this.dispatchEvent('aabb_changed', aabb);
+      });
+    }
+    PostGizmoRenderer._aabbMesh.get().position.set(value.minPoint);
+    PostGizmoRenderer._aabbMesh.get().scale.set(Vector3.sub(value.maxPoint, value.minPoint));
+    this.node = PostGizmoRenderer._aabbMesh.get();
+    this._alwaysDrawIndicator = true;
+  }
   private calcGridSteps(size: number) {
     for (let i = 0, k = 1; i < 8; i++, k = Math.min(size, k * 10)) {
       this._gridSteps[i * 4] = k;
@@ -210,88 +282,11 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   }
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
+    this.prepare();
     this.passThrough(ctx, inputColorTexture, srgbOutput);
     if (!this.enabled) {
       return;
     }
-    let gridPrimitive: Primitive = null;
-    let gridProgram: GPUProgram = null;
-    let gridBindGroup: BindGroup = null;
-    let gridRenderState: RenderStateSet = null;
-    let gizmoRenderState: RenderStateSet = null;
-    if (this._drawGrid) {
-      if (!PostGizmoRenderer._gridPrimitive) {
-        PostGizmoRenderer._gridPrimitive = new PlaneShape({
-          size: 2,
-          twoSided: true,
-          resolution: 8,
-          transform: Matrix4x4.translation(new Vector3(0, -0.01, 0))
-        });
-      }
-      gridPrimitive = PostGizmoRenderer._gridPrimitive;
-      if (!PostGizmoRenderer._gridProgram) {
-        PostGizmoRenderer._gridProgram = this._createGridProgram(ctx);
-      }
-      gridProgram = PostGizmoRenderer._gridProgram;
-      if (!PostGizmoRenderer._gridRenderState) {
-        PostGizmoRenderer._gridRenderState = this._createGridRenderStates(ctx);
-      }
-      gridRenderState = PostGizmoRenderer._gridRenderState;
-      if (!this._gridBindGroup) {
-        this._gridBindGroup = ctx.device.createBindGroup(gridProgram.bindGroupLayouts[0]);
-      }
-      gridBindGroup = this._gridBindGroup;
-    }
-    let gizmoPrimitive = PostGizmoRenderer._primitives[this._mode];
-    let gizmoProgram: GPUProgram = null;
-    let gizmoBindGroup: BindGroup = null;
-    if (!gizmoPrimitive) {
-      if (this._mode === 'translation') {
-        gizmoPrimitive = createTranslationGizmo(
-          this._axisLength,
-          this._axisRadius,
-          this._arrowLength,
-          this._arrowRadius
-        );
-      } else if (this._mode === 'rotation') {
-        gizmoPrimitive = createRotationGizmo(this._axisLength, this._axisRadius);
-      } else if (this._mode === 'scaling') {
-        gizmoPrimitive = createScaleGizmo(this._axisLength, this._axisRadius, this._boxSize);
-      } else if (this._mode === 'select') {
-        gizmoPrimitive = createSelectGizmo();
-      }
-      PostGizmoRenderer._primitives[this._mode] = gizmoPrimitive;
-    }
-    if (!this._node) {
-      gizmoPrimitive = null;
-    }
-    if (gizmoPrimitive) {
-      if (this._mode === 'select') {
-        if (!PostGizmoRenderer._gizmoSelectProgram) {
-          PostGizmoRenderer._gizmoSelectProgram = this._createAxisProgram(ctx, true);
-        }
-        gizmoProgram = PostGizmoRenderer._gizmoSelectProgram;
-      } else {
-        if (!PostGizmoRenderer._gizmoProgram) {
-          PostGizmoRenderer._gizmoProgram = this._createAxisProgram(ctx, false);
-        }
-        gizmoProgram = PostGizmoRenderer._gizmoProgram;
-      }
-      if (!this._bindGroup) {
-        this._bindGroup = ctx.device.createBindGroup(gizmoProgram.bindGroupLayouts[0]);
-      }
-      gizmoBindGroup = this._bindGroup;
-    }
-    if (!gridPrimitive && !gizmoPrimitive) {
-      return;
-    }
-    if (!PostGizmoRenderer._gizmoRenderState) {
-      PostGizmoRenderer._gizmoRenderState = this._createGizmoRenderStates(ctx);
-    }
-    if (!PostGizmoRenderer._blendRenderState) {
-      PostGizmoRenderer._blendRenderState = this._createBlendRenderStates(ctx);
-    }
-    gizmoRenderState = PostGizmoRenderer._gizmoRenderState;
     const destFramebuffer = ctx.device.getFramebuffer();
     const tmpFramebuffer = ctx.device.pool.fetchTemporalFramebuffer(
       false,
@@ -301,38 +296,54 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       ctx.device.getFramebuffer().getDepthAttachment().format,
       false
     );
-    this._calcGizmoMVPMatrix(false, PostGizmoRenderer._mvpMatrix);
+    this._calcGizmoMVPMatrix(this._mode, false, PostGizmoRenderer._mvpMatrix);
     PostGizmoRenderer._texSize.setXY(inputColorTexture.width, inputColorTexture.height);
     PostGizmoRenderer._cameraNearFar.setXY(this._camera.getNearPlane(), this._camera.getFarPlane());
     ctx.device.pushDeviceStates();
     ctx.device.setFramebuffer(tmpFramebuffer);
     ctx.device.clearFrameBuffer(new Vector4(0, 0, 0, 0), 1, 0);
-    if (gridPrimitive) {
-      ctx.device.setRenderStates(gridRenderState);
-      gridBindGroup.setValue('viewMatrix', ctx.camera.worldMatrix);
-      gridBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
-      gridBindGroup.setValue('params', this._gridParams);
-      gridBindGroup.setValue('steps', this._gridSteps);
-      gridBindGroup.setValue('viewProjMatrix', ctx.camera.viewProjectionMatrix);
-      gridBindGroup.setValue('texSize', PostGizmoRenderer._texSize);
-      gridBindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
-      gridBindGroup.setTexture('linearDepthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
-      gridBindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
-      ctx.device.setProgram(gridProgram);
-      ctx.device.setBindGroup(0, gridBindGroup);
-      gridPrimitive.draw();
+    if (this._drawGrid) {
+      ctx.device.setRenderStates(PostGizmoRenderer._gridRenderState);
+      this._gridBindGroup.setValue('viewMatrix', ctx.camera.worldMatrix);
+      this._gridBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
+      this._gridBindGroup.setValue('params', this._gridParams);
+      this._gridBindGroup.setValue('steps', this._gridSteps);
+      this._gridBindGroup.setValue('viewProjMatrix', ctx.camera.viewProjectionMatrix);
+      this._gridBindGroup.setValue('texSize', PostGizmoRenderer._texSize);
+      this._gridBindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
+      this._gridBindGroup.setTexture(
+        'linearDepthTex',
+        sceneDepthTexture,
+        fetchSampler('clamp_nearest_nomip')
+      );
+      this._gridBindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
+      ctx.device.setProgram(PostGizmoRenderer._gridProgram);
+      ctx.device.setBindGroup(0, this._gridBindGroup);
+      PostGizmoRenderer._gridPrimitive.draw();
     }
-    if (gizmoPrimitive && !(this._mode === 'rotation' && this._rotateInfo && this._rotateInfo.axis < 0)) {
-      ctx.device.setRenderStates(gizmoRenderState);
-      gizmoBindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
-      gizmoBindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
-      gizmoBindGroup.setValue('texSize', PostGizmoRenderer._texSize);
-      gizmoBindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
-      gizmoBindGroup.setValue('time', (ctx.device.frameInfo.elapsedOverall % 1000) * 0.001);
-      gizmoBindGroup.setTexture('linearDepthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
-      ctx.device.setProgram(gizmoProgram);
-      ctx.device.setBindGroup(0, gizmoBindGroup);
-      gizmoPrimitive.draw();
+    if (
+      this._node &&
+      this._mode !== 'none' &&
+      !(this._mode === 'rotation' && this._rotateInfo && this._rotateInfo.axis < 0)
+    ) {
+      ctx.device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
+      this._bindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
+      this._bindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
+      this._bindGroup.setValue('texSize', PostGizmoRenderer._texSize);
+      this._bindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
+      this._bindGroup.setValue('time', (ctx.device.frameInfo.elapsedOverall % 1000) * 0.001);
+      this._bindGroup.setTexture('linearDepthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
+      ctx.device.setProgram(
+        this._mode === 'select' ? PostGizmoRenderer._gizmoSelectProgram : PostGizmoRenderer._gizmoProgram
+      );
+      ctx.device.setBindGroup(0, this._bindGroup);
+      this._primitives[this._mode].draw();
+      if (this._alwaysDrawIndicator && this._mode !== 'select') {
+        this._calcGizmoMVPMatrix('select', false, PostGizmoRenderer._mvpMatrix);
+        this._bindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
+        ctx.device.setProgram(PostGizmoRenderer._gizmoSelectProgram);
+        this._primitives.select.draw();
+      }
     }
     PostGizmoRenderer._blendBlitter.renderStates = PostGizmoRenderer._blendRenderState;
     PostGizmoRenderer._blendBlitter.srgbOut = srgbOutput;
@@ -410,7 +421,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   }
   /** Ray intersection */
   rayIntersection(ray: Ray): GizmoHitInfo {
-    const worldMatrix = this._calcGizmoWorldMatrix(false);
+    const worldMatrix = this._calcGizmoWorldMatrix(this._mode, false);
     const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
     const rayLocal = ray.transform(invWorldMatrix);
     if (this._mode === 'translation' || this._mode === 'scaling') {
@@ -504,7 +515,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       this._rotateInfo.startX + velocity.x,
       this._rotateInfo.startY + velocity.y
     );
-    const worldMatrix = this._calcGizmoWorldMatrix(false);
+    const worldMatrix = this._calcGizmoWorldMatrix(this._mode, false);
     const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
     const rayLocal = ray.transform(invWorldMatrix);
     const distance = rayLocal.intersectionTestSphere(this._axisLength);
@@ -611,7 +622,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
     let planeAxis = axis;
     if (type === 'move_axis') {
       const ray = this._camera.constructRay(startX, startY);
-      const worldMatrix = this._calcGizmoWorldMatrix(false);
+      const worldMatrix = this._calcGizmoWorldMatrix(this._mode, false);
       const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
       const rayLocal = ray.transform(invWorldMatrix);
       const t = [0, 1, 2];
@@ -627,7 +638,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       pointLocal.addBy(rayLocal.origin);
     }
     const scale = new Vector3();
-    this._calcGizmoWorldMatrix(false).decompose(scale);
+    this._calcGizmoWorldMatrix(this._mode, false).decompose(scale);
     this._translatePlaneInfo = {
       axis,
       planeAxis,
@@ -641,7 +652,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       return;
     }
     const ray = this._camera.constructRay(x, y);
-    const worldMatrix = this._calcGizmoWorldMatrix(true);
+    const worldMatrix = this._calcGizmoWorldMatrix(this._mode, true);
     const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
     const rayLocal = ray.transform(invWorldMatrix);
     if (Math.abs(rayLocal.direction[this._translatePlaneInfo.planeAxis]) < 0.0001) {
@@ -677,7 +688,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   private _measureRotateSpeed() {
     const pos1 = new Vector4(0, 0, this._axisLength, 1);
     const pos2 = Matrix4x4.rotation(PostGizmoRenderer._axises[0], 1).transformAffine(pos1);
-    const mvpMatrix = this._calcGizmoMVPMatrix(false);
+    const mvpMatrix = this._calcGizmoMVPMatrix(this._mode, false);
     const width = this._camera.viewport
       ? this._camera.viewport[2]
       : Application.instance.device.getViewport().width;
@@ -692,14 +703,14 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
     dy *= 0.5 * height;
     return Math.sqrt(dx * dx + dy * dy);
   }
-  private _calcGizmoMVPMatrix(noScale: boolean, matrix?: Matrix4x4) {
-    matrix = this._calcGizmoWorldMatrix(noScale, matrix);
+  private _calcGizmoMVPMatrix(mode: GizmoMode, noScale: boolean, matrix?: Matrix4x4) {
+    matrix = this._calcGizmoWorldMatrix(mode, noScale, matrix);
     return matrix.multiplyLeft(this._camera.viewProjectionMatrix);
   }
-  private _calcGizmoWorldMatrix(noScale: boolean, matrix?: Matrix4x4) {
+  private _calcGizmoWorldMatrix(mode: GizmoMode, noScale: boolean, matrix?: Matrix4x4) {
     matrix = matrix ?? new Matrix4x4();
     if (this._node) {
-      if (this._mode === 'select') {
+      if (mode === 'select') {
         this._nodeBox.beginExtend();
         this._node.iterate((child) => {
           const bbox = child.getWorldBoundingVolume();
@@ -734,18 +745,18 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
     }
     return matrix;
   }
-  private _createGizmoRenderStates(ctx: DrawContext) {
-    const rs = ctx.device.createRenderStateSet();
+  private _createGizmoRenderStates() {
+    const rs = Application.instance.device.createRenderStateSet();
     rs.useDepthState().enableTest(true).enableWrite(true).setDepthBias(0).setDepthBiasSlopeScale(0);
     return rs;
   }
-  private _createGridRenderStates(ctx: DrawContext) {
-    const rs = ctx.device.createRenderStateSet();
+  private _createGridRenderStates() {
+    const rs = Application.instance.device.createRenderStateSet();
     rs.useDepthState().enableTest(true).enableWrite(false);
     return rs;
   }
-  private _createBlendRenderStates(ctx: DrawContext) {
-    const rs = ctx.device.createRenderStateSet();
+  private _createBlendRenderStates() {
+    const rs = Application.instance.device.createRenderStateSet();
     rs.useDepthState().enableTest(false).enableWrite(false);
     rs.useRasterizerState().setCullMode('none');
     rs.useBlendingState()
@@ -825,8 +836,8 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
     info.coord = intersectedCoord;
     info.distance = minDistance;
   }
-  private _createGridProgram(ctx: DrawContext) {
-    return ctx.device.buildRenderProgram({
+  private _createGridProgram() {
+    return Application.instance.device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
         this.params = pb.vec4().uniform(0);
@@ -1071,8 +1082,8 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       }
     });
   }
-  private _createAxisProgram(ctx: DrawContext, selectMode: boolean) {
-    return ctx.device.buildRenderProgram({
+  private _createAxisProgram(selectMode: boolean) {
+    return Application.instance.device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
         if (selectMode) {
@@ -1165,5 +1176,48 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
         });
       }
     });
+  }
+  private prepare() {
+    if (!PostGizmoRenderer._gridPrimitive) {
+      PostGizmoRenderer._gridPrimitive = new PlaneShape({
+        size: 2,
+        twoSided: true,
+        resolution: 8,
+        transform: Matrix4x4.translation(new Vector3(0, -0.01, 0))
+      });
+      PostGizmoRenderer._gridProgram = this._createGridProgram();
+      PostGizmoRenderer._gridRenderState = this._createGridRenderStates();
+    }
+    if (!PostGizmoRenderer._gizmoSelectProgram) {
+      PostGizmoRenderer._gizmoSelectProgram = this._createAxisProgram(true);
+    }
+    if (!PostGizmoRenderer._gizmoProgram) {
+      PostGizmoRenderer._gizmoProgram = this._createAxisProgram(false);
+      PostGizmoRenderer._gizmoRenderState = this._createGizmoRenderStates();
+      PostGizmoRenderer._blendRenderState = this._createBlendRenderStates();
+    }
+    if (!this._gridBindGroup) {
+      this._gridBindGroup = Application.instance.device.createBindGroup(
+        PostGizmoRenderer._gridProgram.bindGroupLayouts[0]
+      );
+    }
+    if (!this._bindGroup) {
+      this._bindGroup = Application.instance.device.createBindGroup(
+        PostGizmoRenderer._gizmoProgram.bindGroupLayouts[0]
+      );
+    }
+    if (!this._primitives) {
+      this._primitives = {
+        translation: createTranslationGizmo(
+          this._axisLength,
+          this._axisRadius,
+          this._arrowLength,
+          this._arrowRadius
+        ),
+        rotation: createRotationGizmo(this._axisLength, this._axisRadius),
+        scaling: createScaleGizmo(this._axisLength, this._axisRadius, this._boxSize),
+        select: createSelectGizmo()
+      };
+    }
   }
 }

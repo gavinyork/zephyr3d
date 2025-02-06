@@ -210,6 +210,14 @@ export class SceneView extends BaseView<SceneModel> {
               id: 'SHOW_DEVICE_INFO',
               action: () => (this._showDeviceInfo = !this._showDeviceInfo),
               checked: () => this._showDeviceInfo
+            },
+            {
+              label: 'Test edit AABB',
+              id: 'TEST_EDIT_AABB',
+              action: () => {
+                this._tab.sceneHierarchy.selectNode(null);
+                this._postGizmoRenderer.editAABB(new AABB(Vector3.zero(), Vector3.one()));
+              }
             }
           ]
         }

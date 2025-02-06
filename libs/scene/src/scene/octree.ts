@@ -682,7 +682,7 @@ export class Octree {
           if (Number.isNaN(d)) {
             d = this._maxRootSize;
           }
-          const newSize = nextPowerOf2(Math.max(d * 2, 4 * size));
+          const newSize = nextPowerOf2(Math.ceil(Math.max(d * 2, 4 * size)));
           if (newSize <= this._maxRootSize) {
             console.log(`Octree resize: ${newSize}`);
             this.resize(newSize);

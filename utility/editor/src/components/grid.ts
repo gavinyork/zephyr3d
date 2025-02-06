@@ -76,7 +76,7 @@ class PropertyGroup {
     return null;
   }
   setObject(obj: any, prop?: PropertyAccessor<any>, parentObj?: any) {
-    if (this.value.object[0] !== obj) {
+    if (this.value.object[0] !== obj || this.prop !== prop) {
       const serializationInfo = this.grid.serailizationInfo;
       this.value.object[0] = obj ?? null;
       this.property = null;
@@ -272,6 +272,9 @@ export class PropertyEditor {
     }
   }
   private renderGroup(group: PropertyGroup, level = 0) {
+    if (group.prop?.isValid && group.object && !group.prop.isValid.call(group.object)) {
+      return;
+    }
     ImGui.TableNextRow();
     ImGui.TableNextColumn();
     if (level > 0) {
@@ -280,11 +283,13 @@ export class PropertyEditor {
     const flags = ImGui.TreeNodeFlags.DefaultOpen | ImGui.TreeNodeFlags.SpanFullWidth;
     const opened = ImGui.TreeNodeEx(group.name, flags);
     if (group.object && group.prop && group.objectTypes.length > 0) {
+      const buttonSize =
+        group.prop.nullable && group.prop.set && group.value.object?.[0] ? ImGui.GetFrameHeight() : 0;
       ImGui.TableNextColumn();
       ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
-      ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x);
+      ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - buttonSize);
       const index = [
-        group.objectTypes.findIndex((val) => val.ctor === (group.getObject()?.constructor ?? null))
+        group.objectTypes.findIndex((val) => val.ctor === (group.value.object?.[0]?.constructor ?? null))
       ] as [number];
       if (
         ImGui.Combo(
@@ -297,6 +302,13 @@ export class PropertyEditor {
         const newObj = new group.objectTypes[index[0]].ctor();
         group.prop.set.call(group.object, { object: [newObj] });
         this.refresh();
+      }
+      if (buttonSize > 0) {
+        ImGui.SameLine(0, 0);
+        if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
+          group.prop.set.call(group.object, { object: [null] });
+          this.refresh();
+        }
       }
       ImGui.EndChild();
     }

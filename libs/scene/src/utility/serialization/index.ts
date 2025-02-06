@@ -1,3 +1,4 @@
+import { AABB } from '@zephyr3d/base';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../camera';
 import {
   BlinnMaterial,
@@ -54,6 +55,7 @@ import {
 } from './scene/primitive';
 import { getSceneClass } from './scene/scene';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
+import { getAABBClass } from './scene/misc';
 
 export * from './asset/asset';
 export * from './scene/batch';
@@ -96,6 +98,7 @@ export function getSerializationInfo(assetRegistry: AssetRegistry) {
   let info = serializationInfoCache.get(assetRegistry);
   if (!info) {
     info = new Map<any, SerializableClass>([
+      [AABB, getAABBClass()],
       [NodeHierarchy, getNodeHierarchyClass(assetRegistry)],
       [SceneNode, getSceneNodeClass(assetRegistry)],
       [GraphNode, getGraphNodeClass(assetRegistry)],

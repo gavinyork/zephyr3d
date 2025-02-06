@@ -1,7 +1,7 @@
 import type { BaseLight } from '../../../scene/light';
 import { DirectionalLight, PointLight, PunctualLight, SpotLight } from '../../../scene/light';
 import type { SerializableClass } from '../types';
-import { Vector4 } from '@zephyr3d/base';
+import { AABB, Vector4 } from '@zephyr3d/base';
 import type { NodeHierarchy } from './node';
 import { getSceneNodeClass } from './node';
 import type { AssetRegistry } from '../asset/asset';
@@ -110,6 +110,24 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
           },
           isValid(this: PunctualLight) {
             return !!this.castShadow;
+          }
+        },
+        {
+          name: 'ShadowRegion',
+          phase: 1,
+          type: 'object',
+          edit: 'aabb',
+          default: null,
+          nullable: true,
+          objectTypes: [AABB],
+          get(this: PunctualLight, value) {
+            value.object[0] = this.shadow.shadowRegion;
+          },
+          set(this: PunctualLight, value) {
+            this.shadow.shadowRegion = value.object[0] as AABB;
+          },
+          isValid(this: PunctualLight) {
+            return !!this.castShadow && this.isDirectionLight();
           }
         },
         {
