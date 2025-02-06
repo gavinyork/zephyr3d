@@ -224,6 +224,9 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   }
   set node(node: SceneNode) {
     this._node = node;
+    if (this._node !== PostGizmoRenderer._aabbMesh.get()) {
+      this._alwaysDrawIndicator = false;
+    }
   }
   get drawGrid(): boolean {
     return this._drawGrid;
@@ -259,8 +262,10 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
         this.dispatchEvent('aabb_changed', aabb);
       });
     }
-    PostGizmoRenderer._aabbMesh.get().position.set(value.minPoint);
-    PostGizmoRenderer._aabbMesh.get().scale.set(Vector3.sub(value.maxPoint, value.minPoint));
+    const pos = value.minPoint.clone();
+    const scale = Vector3.sub(value.maxPoint, value.minPoint);
+    PostGizmoRenderer._aabbMesh.get().position.set(pos);
+    PostGizmoRenderer._aabbMesh.get().scale.set(scale);
     this.node = PostGizmoRenderer._aabbMesh.get();
     this._alwaysDrawIndicator = true;
   }

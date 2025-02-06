@@ -46,8 +46,8 @@ export class AABB {
       this._minPoint = new Vector3(arg0);
       this._maxPoint = new Vector3(arg1);
     } else {
-      this._minPoint = new Vector3(0, 0, 0);
-      this._maxPoint = new Vector3(0, 0, 0);
+      this._minPoint = new Vector3(-1, -1, -1);
+      this._maxPoint = new Vector3(1, 1, 1);
     }
   }
   /** Get the min point of the AABB. */

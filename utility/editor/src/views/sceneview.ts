@@ -72,6 +72,7 @@ export class SceneView extends BaseView<SceneModel> {
   private _showTextureViewer: boolean;
   private _showDeviceInfo: boolean;
   private _clipBoardData: Ref<SceneNode>;
+  private _aabbForEdit: AABB;
   constructor(model: SceneModel, assetRegistry: AssetRegistry) {
     super(model);
     this._cmdManager = new CommandManager();
@@ -88,6 +89,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
+    this._aabbForEdit = null;
     this._assetRegistry = assetRegistry;
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
@@ -637,6 +639,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.sceneHierarchy.on('node_request_delete', this.handleDeleteNode, this);
     this._tab.sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
     this._tab.sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
+    this._propGrid.on('request_edit_aabb', this.editAABB, this);
     eventBus.on('scene_add_asset', this.handleAddAsset, this);
     eventBus.on('scene_add_batch', this.handleAddBatch, this);
     this.sceneSetup();
@@ -652,6 +655,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.sceneHierarchy.off('node_request_delete', this.handleDeleteNode, this);
     this._tab.sceneHierarchy.off('node_drag_drop', this.handleNodeDragDrop, this);
     this._tab.sceneHierarchy.off('node_double_clicked', this.handleNodeDoubleClicked, this);
+    this._propGrid.off('request_edit_aabb', this.editAABB, this);
     eventBus.off('scene_add_asset', this.handleAddAsset, this);
     eventBus.off('scene_add_batch', this.handleAddBatch, this);
     this.sceneFinialize();
@@ -666,6 +670,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoRenderer.on('end_translate', this.handleEndTranslateNode, this);
     this._postGizmoRenderer.on('end_rotate', this.handleEndRotateNode, this);
     this._postGizmoRenderer.on('end_scale', this.handleEndScaleNode, this);
+    this._postGizmoRenderer.on('aabb_changed', this.handleEditAABB, this);
   }
   private sceneFinialize() {
     this.model.scene.rootNode.off('noderemoved', this.handleNodeRemoved, this);
@@ -677,6 +682,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoRenderer.off('end_translate', this.handleEndTranslateNode, this);
     this._postGizmoRenderer.off('end_rotate', this.handleEndRotateNode, this);
     this._postGizmoRenderer.off('end_scale', this.handleEndScaleNode, this);
+    this._postGizmoRenderer.off('aabb_changed', this.handleEditAABB, this);
   }
   private renderDeviceInfo() {
     const device = Application.instance.device;
@@ -718,6 +724,10 @@ export class SceneView extends BaseView<SceneModel> {
     }
     ImGui.End();
   }
+  private editAABB(aabb: AABB) {
+    this._aabbForEdit = aabb;
+    this._postGizmoRenderer.editAABB(this._aabbForEdit);
+  }
   private handleCopyNode(node: SceneNode) {
     this._clipBoardData.set(node);
   }
@@ -754,9 +764,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.object = node === node.scene.rootNode ? node.scene : node;
   }
   private handleNodeDeselected(node: SceneNode) {
-    if (this._postGizmoRenderer.node === node) {
-      this._postGizmoRenderer.node = null;
-    }
+    this._postGizmoRenderer.node = null;
     if (this._propGrid.object === node) {
       this._propGrid.object = null;
       this._propGrid.clear();
@@ -865,6 +873,12 @@ export class SceneView extends BaseView<SceneModel> {
   }
   private handleEndScaleNode(node: SceneNode) {
     this.handleEndTransformNode(node, 'scaling object');
+  }
+  private handleEditAABB(aabb: AABB) {
+    if (this._aabbForEdit) {
+      this._aabbForEdit.minPoint.set(aabb.minPoint);
+      this._aabbForEdit.maxPoint.set(aabb.maxPoint);
+    }
   }
   private handleSceneAction(action: string) {
     switch (action) {

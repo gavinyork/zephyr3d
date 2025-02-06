@@ -7,6 +7,8 @@ import {
   type SerializableClass
 } from '@zephyr3d/scene';
 import type { DBAssetInfo } from '../storage/db';
+import { FontGlyph } from '../core/fontglyph';
+import { AABB, makeEventTarget } from '@zephyr3d/base';
 
 interface Property<T extends {}> {
   path: string;
@@ -111,7 +113,9 @@ class PropertyGroup {
   }
 }
 
-export class PropertyEditor {
+export class PropertyEditor extends makeEventTarget(Object)<{
+  request_edit_aabb: [aabb: AABB];
+}>() {
   private _rootGroup: PropertyGroup;
   private _top: number;
   private _bottom: number;
@@ -134,6 +138,7 @@ export class PropertyEditor {
     minWidth: number,
     labelPercent = 0.4
   ) {
+    super();
     this._assetRegistry = assetRegistry;
     this._serializationInfo = getSerializationInfo(assetRegistry);
     this._rootGroup = new PropertyGroup('Root', this);
@@ -283,11 +288,13 @@ export class PropertyEditor {
     const flags = ImGui.TreeNodeFlags.DefaultOpen | ImGui.TreeNodeFlags.SpanFullWidth;
     const opened = ImGui.TreeNodeEx(group.name, flags);
     if (group.object && group.prop && group.objectTypes.length > 0) {
-      const buttonSize =
-        group.prop.nullable && group.prop.set && group.value.object?.[0] ? ImGui.GetFrameHeight() : 0;
+      const deletable = group.prop.nullable && group.prop.set && group.value.object?.[0];
+      const editable = group.value.object?.[0] instanceof AABB && group.prop.edit === 'aabb';
+      const buttonSize = ImGui.GetFrameHeight();
+      const spacing = (editable ? buttonSize : 0) + (deletable ? buttonSize : 0);
       ImGui.TableNextColumn();
       ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
-      ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - buttonSize);
+      ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - spacing);
       const index = [
         group.objectTypes.findIndex((val) => val.ctor === (group.value.object?.[0]?.constructor ?? null))
       ] as [number];
@@ -303,11 +310,17 @@ export class PropertyEditor {
         group.prop.set.call(group.object, { object: [newObj] });
         this.refresh();
       }
-      if (buttonSize > 0) {
+      if (deletable) {
         ImGui.SameLine(0, 0);
-        if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
+        if (ImGui.Button(`${FontGlyph.glyphs['trash-empty']}##clear`, new ImGui.ImVec2(buttonSize, 0))) {
           group.prop.set.call(group.object, { object: [null] });
           this.refresh();
+        }
+      }
+      if (editable) {
+        ImGui.SameLine(0, 0);
+        if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
+          this.dispatchEvent('request_edit_aabb', group.value.object?.[0] as AABB);
         }
       }
       ImGui.EndChild();
