@@ -696,7 +696,7 @@ export class SharedModel {
           meshNode.material =
             instancing && !meshNode.skinAnimation && !meshNode.morphAnimation
               ? subMesh.material.get().createInstance()
-              : subMesh.material.get().clone();
+              : subMesh.material.get();
           meshNode.parent = node;
           subMesh.mesh = meshNode;
           processMorphData(subMesh, meshData.morphWeights);

@@ -7,7 +7,7 @@ import type {
   ShapeOptionType,
   ShapeType
 } from '@zephyr3d/scene';
-import { BatchGroup, deserializeObject, NodeHierarchy, serializeObject } from '@zephyr3d/scene';
+import { deserializeObject, NodeHierarchy, serializeObject } from '@zephyr3d/scene';
 import { ParticleSystem } from '@zephyr3d/scene';
 import {
   BoxFrameShape,
@@ -77,18 +77,31 @@ export class AddAssetCommand implements Command<SceneNode> {
     }
   }
 }
-export class AddBatchGroupCommand implements Command<BatchGroup> {
-  private _scene: Scene;
+export class AddChildCommand<T extends SceneNode = SceneNode> implements Command<T> {
+  private _parentId: string;
   private _nodeId: string;
-  constructor(scene: Scene) {
-    this._scene = scene;
+  private _ctor: { new (scene: Scene): T };
+  private _name: string;
+  constructor(parentNode: SceneNode, ctor: { new (scene: Scene): T }, name: string) {
+    this._parentId = parentNode.id;
+    idNodeMap[this._parentId] = parentNode;
     this._nodeId = '';
+    this._ctor = ctor;
+    this._name = name;
   }
   get desc(): string {
-    return 'Add particle system';
+    return 'Add child node';
   }
   async execute() {
-    const node = new BatchGroup(this._scene);
+    const parent = idNodeMap[this._parentId];
+    if (!parent) {
+      console.error('Add batch group failed: parent node not found');
+      this._nodeId = '';
+      return null;
+    }
+    const node = new this._ctor(parent.scene);
+    node.name = this._name;
+    node.parent = parent;
     if (this._nodeId) {
       node.id = this._nodeId;
     } else {

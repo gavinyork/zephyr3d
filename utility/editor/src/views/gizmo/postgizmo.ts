@@ -6,16 +6,8 @@ import type {
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
-import {
-  BoxShape,
-  Camera,
-  DrawContext,
-  Mesh,
-  Primitive,
-  Ref,
-  SceneNode,
-  UnlitMaterial
-} from '@zephyr3d/scene';
+import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
+import { BoxShape, Mesh, Ref, UnlitMaterial } from '@zephyr3d/scene';
 import {
   AbstractPostEffect,
   Application,

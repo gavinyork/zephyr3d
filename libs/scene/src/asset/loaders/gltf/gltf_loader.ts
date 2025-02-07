@@ -31,8 +31,7 @@ import type {
   StructuredBuffer,
   TextureAddressMode,
   TextureFilterMode,
-  AbstractDevice,
-  Pool
+  AbstractDevice
 } from '@zephyr3d/device';
 import type { AssetManager } from '../../assetmanager';
 import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf';
@@ -62,7 +61,7 @@ export interface GLTFContent extends GlTf {
   _materialCache: Record<string, M>;
   _nodes: AssetHierarchyNode[];
   _meshes: AssetMeshData[];
-  _device: AbstractDevice | Pool;
+  _device: AbstractDevice;
   _dracoModule?: DecoderModule;
 }
 
@@ -669,11 +668,10 @@ export class GLTFLoader extends AbstractModelLoader {
       const pbrMaterial = new PBRSpecularGlossinessMaterial();
       pbrMaterial.ior = assetPBRMaterial.ior;
       pbrMaterial.albedoColor = assetPBRMaterial.diffuse;
-      pbrMaterial.specularFactor = new Vector4(
+      pbrMaterial.specularFactor = new Vector3(
         assetPBRMaterial.specular.x,
         assetPBRMaterial.specular.y,
-        assetPBRMaterial.specular.z,
-        1
+        assetPBRMaterial.specular.z
       );
       pbrMaterial.glossinessFactor = assetPBRMaterial.glossness;
       if (assetPBRMaterial.diffuseMap) {

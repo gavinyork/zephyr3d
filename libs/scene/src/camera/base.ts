@@ -1,4 +1,4 @@
-import { Vector3 } from '@zephyr3d/base';
+import type { Vector3 } from '@zephyr3d/base';
 import type { Camera } from './camera';
 
 /**

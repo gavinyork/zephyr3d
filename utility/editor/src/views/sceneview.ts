@@ -40,7 +40,7 @@ import { BaseView } from './baseview';
 import { CommandManager } from '../core/command';
 import {
   AddAssetCommand,
-  AddBatchGroupCommand,
+  AddChildCommand,
   AddParticleSystemCommand,
   AddShapeCommand,
   NodeCloneCommand,
@@ -626,10 +626,10 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.sceneHierarchy.on('node_request_delete', this.handleDeleteNode, this);
     this._tab.sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
     this._tab.sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
+    this._tab.sceneHierarchy.on('request_add_child', this.handleAddChild, this);
     this._propGrid.on('request_edit_aabb', this.editAABB, this);
     this._propGrid.on('end_edit_aabb', this.endEditAABB, this);
     eventBus.on('scene_add_asset', this.handleAddAsset, this);
-    eventBus.on('scene_add_batch', this.handleAddBatch, this);
     this.sceneSetup();
   }
   protected onDeactivate(): void {
@@ -643,10 +643,10 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.sceneHierarchy.off('node_request_delete', this.handleDeleteNode, this);
     this._tab.sceneHierarchy.off('node_drag_drop', this.handleNodeDragDrop, this);
     this._tab.sceneHierarchy.off('node_double_clicked', this.handleNodeDoubleClicked, this);
+    this._tab.sceneHierarchy.off('request_add_child', this.handleAddChild, this);
     this._propGrid.off('request_edit_aabb', this.editAABB, this);
     this._propGrid.off('end_edit_aabb', this.endEditAABB, this);
     eventBus.off('scene_add_asset', this.handleAddAsset, this);
-    eventBus.off('scene_add_batch', this.handleAddBatch, this);
     this.sceneFinialize();
   }
   private sceneSetup() {
@@ -818,8 +818,8 @@ export class SceneView extends BaseView<SceneModel> {
         Dialog.messageBox('Error', `${err}`);
       });
   }
-  private handleAddBatch() {
-    this._cmdManager.execute(new AddBatchGroupCommand(this.model.scene)).then((node) => {
+  private handleAddChild(parent: SceneNode, ctor: { new (scene: Scene): SceneNode }, name: string) {
+    this._cmdManager.execute(new AddChildCommand(parent, ctor, name)).then((node) => {
       this._tab.sceneHierarchy.selectNode(node);
     });
   }

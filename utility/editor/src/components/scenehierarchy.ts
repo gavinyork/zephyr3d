@@ -1,8 +1,8 @@
 import { makeEventTarget } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
-import type { AssetRegistry, Scene, SceneNode, SerializableClass } from '@zephyr3d/scene';
-import { getSerializationInfo } from '@zephyr3d/scene';
-import { eventBus } from '../core/eventbus';
+import type { AssetRegistry, Scene, SerializableClass } from '@zephyr3d/scene';
+import { SceneNode } from '@zephyr3d/scene';
+import { BatchGroup, getSerializationInfo } from '@zephyr3d/scene';
 
 export class SceneHierarchy extends makeEventTarget(Object)<{
   node_deselected: [node: SceneNode];
@@ -10,6 +10,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   node_request_delete: [node: SceneNode];
   node_double_clicked: [node: SceneNode];
   node_drag_drop: [from: SceneNode, target: SceneNode];
+  request_add_child: [node: SceneNode, ctor: { new (scene: Scene): SceneNode }, name: string];
 }>() {
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
   private _scene: Scene;
@@ -74,47 +75,46 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     if (ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
       ImGui.OpenPopup(`context_${node.id}`);
     }
-    if (node !== this._scene.rootNode) {
-      if (ImGui.BeginPopup(`context_${node.id}`)) {
-        const animationSet = node.animationSet;
-        if (animationSet && animationSet.getAnimationNames().length > 0) {
-          if (ImGui.BeginMenu('Animation')) {
-            ImGui.PushID(node.id);
-            for (let i = 0; i < animationSet.getAnimationNames().length; i++) {
-              ImGui.PushID(i);
-              const name = animationSet.getAnimationNames()[i];
-              const playing = animationSet.isPlayingAnimation(name);
-              if (ImGui.MenuItem(name, null, playing)) {
-                if (playing) {
-                  animationSet.stopAnimation(name);
-                } else {
-                  for (const ani of animationSet.getAnimationNames()) {
-                    if (ani !== name) {
-                      animationSet.stopAnimation(ani);
-                    } else {
-                      animationSet.playAnimation(ani);
-                    }
-                  }
-                }
-              }
-              ImGui.PopID();
-            }
-            ImGui.PopID();
-            ImGui.EndMenu();
-          }
-        }
+    if (ImGui.BeginPopup(`context_${node.id}`)) {
+      if (node !== this._scene.rootNode) {
         if (ImGui.MenuItem('Delete', 'Delete')) {
           this.dispatchEvent('node_request_delete', node);
         }
-        ImGui.EndPopup();
       }
-    } else {
-      if (ImGui.BeginPopup(`context_${node.id}`)) {
-        if (ImGui.MenuItem('Create static batch')) {
-          eventBus.dispatchEvent('scene_add_batch');
+      if (ImGui.MenuItem('Create static batch')) {
+        this.dispatchEvent('request_add_child', node, BatchGroup, 'Batch');
+      }
+      if (ImGui.MenuItem('Create group')) {
+        this.dispatchEvent('request_add_child', node, SceneNode, 'Group');
+      }
+      const animationSet = node.animationSet;
+      if (animationSet && animationSet.getAnimationNames().length > 0) {
+        if (ImGui.BeginMenu('Animation')) {
+          ImGui.PushID(node.id);
+          for (let i = 0; i < animationSet.getAnimationNames().length; i++) {
+            ImGui.PushID(i);
+            const name = animationSet.getAnimationNames()[i];
+            const playing = animationSet.isPlayingAnimation(name);
+            if (ImGui.MenuItem(name, null, playing)) {
+              if (playing) {
+                animationSet.stopAnimation(name);
+              } else {
+                for (const ani of animationSet.getAnimationNames()) {
+                  if (ani !== name) {
+                    animationSet.stopAnimation(ani);
+                  } else {
+                    animationSet.playAnimation(ani);
+                  }
+                }
+              }
+            }
+            ImGui.PopID();
+          }
+          ImGui.PopID();
+          ImGui.EndMenu();
         }
-        ImGui.EndPopup();
       }
+      ImGui.EndPopup();
     }
     if (ImGui.BeginDragDropTarget()) {
       const payload = ImGui.AcceptDragDropPayload('NODE');
