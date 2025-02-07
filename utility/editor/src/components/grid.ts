@@ -49,7 +49,9 @@ class PropertyGroup {
     };
     if (value.type === 'object' && value.objectTypes?.length > 0) {
       const propGroup = this.addGroup(value.name);
-      value.get.call(obj, tmpProperty);
+      if (!value.isValid || value.isValid.call(obj)) {
+        value.get.call(obj, tmpProperty);
+      }
       propGroup.setObject(tmpProperty.object[0], value, obj);
     } else {
       const property: Property<any> = {
@@ -57,7 +59,9 @@ class PropertyGroup {
         name: value.name,
         value
       };
-      value.get.call(obj, this.value);
+      if (!value.isValid || value.isValid.call(obj)) {
+        value.get.call(obj, this.value);
+      }
       this.properties.set(value.name, property);
     }
   }

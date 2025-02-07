@@ -753,11 +753,13 @@ export class SceneNode
   /** Local transformation matrix of the xform */
   get localMatrix() {
     if (!this._localMatrix) {
-      this._localMatrix = this._tmpLocalMatrix;
+      this._localMatrix = this._tmpLocalMatrix.compose(this._scaling, this._rotation, this._position);
+      /*
       this._localMatrix
         .scaling(this._scaling)
         .rotateLeft(new Matrix4x4(this._rotation))
         .translateLeft(this._position);
+      */
     }
     return this._localMatrix;
   }

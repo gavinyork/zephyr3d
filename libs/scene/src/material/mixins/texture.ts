@@ -162,7 +162,10 @@ export function mixinTextureProps<U extends string>(name: U) {
             return sampler;
           },
           set: function (newValue: TextureSampler) {
-            sampler = newValue;
+            if (sampler !== newValue) {
+              sampler = newValue;
+              this.uniformChanged();
+            }
           },
           enumerable: true,
           configurable: true
@@ -172,10 +175,9 @@ export function mixinTextureProps<U extends string>(name: U) {
             return matrix;
           },
           set: function (newValue: Matrix4x4) {
-            if (matrix !== newValue) {
-              matrix = newValue;
-              this.useFeature(featureTexMatrix, !!matrix);
-            }
+            matrix = newValue;
+            this.useFeature(featureTexMatrix, !!matrix);
+            this.uniformChanged();
           },
           enumerable: true,
           configurable: true
@@ -188,6 +190,7 @@ export function mixinTextureProps<U extends string>(name: U) {
             if (texCoord !== newValue) {
               texCoord = newValue;
               this.useFeature(featureTexIndex, texCoord);
+              this.uniformChanged();
             }
           },
           enumerable: true,

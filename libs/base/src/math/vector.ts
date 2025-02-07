@@ -4093,6 +4093,22 @@ export class Matrix4x4 extends VectorBase {
     return result;
   }
   /**
+   * Compose matrix from rotation, translation and scale components.
+   * @param scale - The input scale vector.
+   * @param rotation - The input rotation matrix or quaternion.
+   * @param translation - The input translation vector.
+   * @returns The composed matrix
+   */
+  static compose(
+    scale: Vector3,
+    rotation: Quaternion | Matrix3x3 | Matrix4x4,
+    translation: Vector3,
+    result?: Matrix4x4
+  ) {
+    result = result ?? new Matrix4x4();
+    return result.scaling(scale).rotateLeft(rotation).translateLeft(translation);
+  }
+  /**
    * Creates a look-at matrix.
    * @param eye - Position of the eye.
    * @param target - The point that the eye is looking at.
@@ -5186,6 +5202,16 @@ export class Matrix4x4 extends VectorBase {
     const cofact_02 = +(m10 * det_21_33 - m11 * det_20_33 + m13 * det_20_31);
     const cofact_03 = -(m10 * det_21_32 - m11 * det_20_32 + m12 * det_20_31);
     return m00 * cofact_00 + m01 * cofact_01 + m02 * cofact_02 + m03 * cofact_03;
+  }
+  /**
+   * Compose matrix from rotation, translation and scale components.
+   * @param scale - The input scale vector.
+   * @param rotation - The input rotation matrix or quaternion.
+   * @param translation - The input translation vector.
+   * @returns self
+   */
+  compose(scale: Vector3, rotation: Quaternion | Matrix3x3 | Matrix4x4, translation: Vector3) {
+    return Matrix4x4.compose(scale, rotation, translation, this);
   }
   /**
    * Decompose this matrix into its rotation, translation and scale components.

@@ -103,7 +103,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
             ImGui.EndMenu();
           }
         }
-        if (ImGui.MenuItem('Delete')) {
+        if (ImGui.MenuItem('Delete', 'Delete')) {
           this.dispatchEvent('node_request_delete', node);
         }
         ImGui.EndPopup();

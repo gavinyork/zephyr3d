@@ -212,14 +212,6 @@ export class SceneView extends BaseView<SceneModel> {
               id: 'SHOW_DEVICE_INFO',
               action: () => (this._showDeviceInfo = !this._showDeviceInfo),
               checked: () => this._showDeviceInfo
-            },
-            {
-              label: 'Test edit AABB',
-              id: 'TEST_EDIT_AABB',
-              action: () => {
-                this._tab.sceneHierarchy.selectNode(null);
-                this._postGizmoRenderer.editAABB(new AABB(Vector3.zero(), Vector3.one()));
-              }
             }
           ]
         }
@@ -599,23 +591,18 @@ export class SceneView extends BaseView<SceneModel> {
     return true;
   }
   lookAt(camera: Camera, node: SceneNode) {
-    const aabb = new AABB();
-    aabb.beginExtend();
-    node.iterate((child) => {
-      const bbox = child.getWorldBoundingVolume();
-      if (bbox) {
-        const { minPoint, maxPoint } = bbox.toAABB();
-        aabb.extend(minPoint);
-        aabb.extend(maxPoint);
-      }
-    });
+    if (camera === node) {
+      return;
+    }
+    const nodePos = node.getWorldPosition();
+    const aabb = node.getWorldBoundingVolume()?.toAABB() ?? new AABB(nodePos, nodePos);
     const radius = aabb.diagonalLength * 0.5;
     const distance = Math.max(radius / camera.getTanHalfFovy(), camera.getNearPlane() + 1);
     const cameraZ = camera.worldMatrix.getRow(2).xyz();
-    const worldPos = Vector3.add(node.getWorldPosition(), Vector3.scale(cameraZ, distance * 2));
-    const localPos = camera.parent.invWorldMatrix.transformPointAffine(worldPos);
-    camera.controller.lookAt(localPos, aabb.center, Vector3.axisPY());
-    //camera.position = camera.parent.invWorldMatrix.transformPointAffine(worldPos);
+    const worldPos = Vector3.add(nodePos, Vector3.scale(cameraZ, distance * 2));
+    const localEye = camera.parent.invWorldMatrix.transformPointAffine(worldPos);
+    const localTarget = camera.parent.invWorldMatrix.transformPointAffine(nodePos);
+    camera.controller.lookAt(localEye, localTarget, Vector3.axisPY());
   }
   private posToViewport(pos: number[], viewport: ArrayLike<number>): boolean {
     const cvs = Application.instance.device.canvas;

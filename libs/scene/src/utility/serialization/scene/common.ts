@@ -1,7 +1,15 @@
-import type { Texture2D, TextureCube } from '@zephyr3d/device';
+import type {
+  BaseTexture,
+  Texture2D,
+  TextureAddressMode,
+  TextureCube,
+  TextureSampler
+} from '@zephyr3d/device';
 import type { AssetRegistry } from '../asset/asset';
 import type { PropertyAccessor } from '../types';
 import type { Material } from '../../../material';
+import { Matrix4x4, Vector3 } from '@zephyr3d/base';
+import { Application } from '../../../app';
 
 export function getTextureProps<T extends Material>(
   assetRegistry: AssetRegistry,
@@ -11,6 +19,119 @@ export function getTextureProps<T extends Material>(
   isValid?: (this: T) => boolean
 ): PropertyAccessor<T>[] {
   return [
+    {
+      name: name[0].toUpperCase() + name.slice(1, name.length - 7) + 'TexCoordScale',
+      type: 'vec2',
+      phase: phase + 1,
+      default: [1, 1],
+      get(this: T, value) {
+        const matrix = this[name.slice(0, name.length - 7) + 'TexCoordMatrix'] as Matrix4x4;
+        if (!matrix) {
+          value.num[0] = 1;
+          value.num[1] = 1;
+        } else {
+          const scale = new Vector3();
+          matrix.decompose(scale, null, null);
+          value.num[0] = scale.x;
+          value.num[1] = scale.y;
+        }
+      },
+      set(this: T, value) {
+        if (value.num[0] === 1 && value.num[1] === 1) {
+          this[name.slice(0, name.length - 7) + 'TexCoordMatrix'] = null;
+        } else {
+          this[name.slice(0, name.length - 7) + 'TexCoordMatrix'] = Matrix4x4.scaling(
+            new Vector3(value.num[0], value.num[1], 1)
+          );
+        }
+      },
+      isValid() {
+        if (this.$isInstance) {
+          return false;
+        }
+        if (isValid) {
+          return !!this[name] && isValid.call(this);
+        } else {
+          return !!this[name];
+        }
+      }
+    },
+    {
+      name: name[0].toUpperCase() + name.slice(1, name.length - 7) + 'TexCoordAddressU',
+      type: 'string',
+      enum: { labels: ['Clamp', 'Repeat', 'MirroredRepeat'], values: ['clamp', 'repeat', 'mirrored_repeat'] },
+      phase: phase + 1,
+      default: 'clamp',
+      get(this: T, value) {
+        const sampler =
+          (this[name.slice(0, name.length - 7) + 'TextureSampler'] as TextureSampler) ??
+          (this[name] as BaseTexture).getDefaultSampler(false);
+        value.str[0] = sampler.addressModeU;
+      },
+      set(this: T, value) {
+        const sampler =
+          (this[name.slice(0, name.length - 7) + 'TextureSampler'] as TextureSampler) ??
+          (this[name] as BaseTexture).getDefaultSampler(false);
+        this[name.slice(0, name.length - 7) + 'TextureSampler'] = Application.instance.device.createSampler({
+          addressU: value.str[0] as TextureAddressMode,
+          addressV: sampler.addressModeV,
+          lodMax: sampler.lodMax,
+          lodMin: sampler.lodMin,
+          magFilter: sampler.magFilter,
+          minFilter: sampler.minFilter,
+          mipFilter: sampler.mipFilter,
+          maxAnisotropy: sampler.maxAnisotropy
+        });
+      },
+      isValid() {
+        if (this.$isInstance) {
+          return false;
+        }
+        if (isValid) {
+          return !!this[name] && isValid.call(this);
+        } else {
+          return !!this[name];
+        }
+      }
+    },
+    {
+      name: name[0].toUpperCase() + name.slice(1, name.length - 7) + 'TexCoordAddressV',
+      type: 'string',
+      enum: { labels: ['Clamp', 'Repeat', 'MirroredRepeat'], values: ['clamp', 'repeat', 'mirrored_repeat'] },
+      phase: phase + 1,
+      default: 'clamp',
+      get(this: T, value) {
+        const sampler =
+          (this[name.slice(0, name.length - 7) + 'TextureSampler'] as TextureSampler) ??
+          (this[name] as BaseTexture).getDefaultSampler(false);
+        value.str[0] = sampler.addressModeV;
+      },
+      set(this: T, value) {
+        const sampler =
+          (this[name.slice(0, name.length - 7) + 'TextureSampler'] as TextureSampler) ??
+          (this[name] as BaseTexture).getDefaultSampler(false);
+        this[name.slice(0, name.length - 7) + 'TextureSampler'] = Application.instance.device.createSampler({
+          addressU: sampler.addressModeU,
+          addressV: value.str[0] as TextureAddressMode,
+          lodMax: sampler.lodMax,
+          lodMin: sampler.lodMin,
+          magFilter: sampler.magFilter,
+          minFilter: sampler.minFilter,
+          mipFilter: sampler.mipFilter,
+          maxAnisotropy: sampler.maxAnisotropy
+        });
+      },
+      isValid() {
+        if (this.$isInstance) {
+          return false;
+        }
+        if (isValid) {
+          return !!this[name] && isValid.call(this);
+        } else {
+          return !!this[name];
+        }
+      }
+    },
     {
       name: name[0].toUpperCase() + name.slice(1, name.length - 7) + 'TexCoordIndex',
       type: 'int',

@@ -143,7 +143,17 @@ export async function deserializeObjectProps<T>(
   let currentPhase: number = undefined;
   const promises: Promise<void>[] = [];
   for (const prop of props) {
+    const phase = prop.phase ?? 0;
+    if (phase !== currentPhase) {
+      currentPhase = phase;
+      if (promises.length > 0) {
+        await Promise.all(promises);
+      }
+    }
     if (!prop.set) {
+      continue;
+    }
+    if (prop.isValid && !prop.isValid.call(obj)) {
       continue;
     }
     const persistent = prop.persistent ?? true;
@@ -152,13 +162,6 @@ export async function deserializeObjectProps<T>(
     }
     const k = prop.name;
     const v = json[k] ?? getDefaultValue(obj, prop);
-    const phase = prop.phase ?? 0;
-    if (phase !== currentPhase) {
-      currentPhase = phase;
-      if (promises.length > 0) {
-        await Promise.all(promises);
-      }
-    }
     const tmpVal: PropertyValue = {
       num: [0, 0, 0, 0],
       str: [''],
