@@ -127,28 +127,6 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
           }
         },
         {
-          name: 'ParticleRotation',
-          type: 'float',
-          default: 0,
-          get(this: ParticleSystem, value) {
-            value.num[0] = this.particleRotation;
-          },
-          set(this: ParticleSystem, value) {
-            this.particleRotation = value.num[0];
-          }
-        },
-        {
-          name: 'ParticleRotationVar',
-          type: 'float',
-          default: 0,
-          get(this: ParticleSystem, value) {
-            value.num[0] = this.particleRotationVar;
-          },
-          set(this: ParticleSystem, value) {
-            this.particleRotationVar = value.num[0];
-          }
-        },
-        {
           name: 'JitterSpeed',
           type: 'float',
           default: 1,
@@ -186,32 +164,6 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
           }
         },
         {
-          name: 'Directional',
-          type: 'bool',
-          default: false,
-          get(this: ParticleSystem, value) {
-            value.bool[0] = this.directional;
-          },
-          set(this: ParticleSystem, value) {
-            this.directional = value.bool[0];
-          }
-        },
-        {
-          name: 'EmitterShape',
-          type: 'string',
-          enum: {
-            labels: ['Point', 'Sphere', 'Box', 'Cylinder', 'Cone'],
-            values: ['point', 'sphere', 'box', 'cylinder', 'cone']
-          },
-          default: 'point',
-          get(this: ParticleSystem, value) {
-            value.str[0] = this.emitterShape;
-          },
-          set(this: ParticleSystem, value) {
-            this.emitterShape = value.str[0] as EmitterShape;
-          }
-        },
-        {
           name: 'EmitterBehavior',
           type: 'string',
           enum: {
@@ -227,135 +179,105 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
           }
         },
         {
-          name: 'EmitterConeRadius',
-          type: 'float',
-          default: 0,
+          name: 'Directional',
+          type: 'bool',
+          default: false,
           get(this: ParticleSystem, value) {
-            value.num[0] = this.emitterConeRadius;
+            value.bool[0] = this.directional;
           },
           set(this: ParticleSystem, value) {
-            this.emitterConeRadius = value.num[0];
+            this.directional = value.bool[0];
           }
         },
         {
-          name: 'EmitterConeRadiusVar',
-          type: 'float',
-          default: 0.1,
+          name: 'Rotation',
+          type: 'vec2',
+          default: [0, 0],
           get(this: ParticleSystem, value) {
-            value.num[0] = this.emitterConeRadiusVar;
+            value.num[0] = this.particleRotationMin;
+            value.num[1] = this.particleRotationMax;
           },
           set(this: ParticleSystem, value) {
-            this.emitterConeRadiusVar = value.num[0];
+            this.particleRotationMin = value.num[0];
+            this.particleRotationMax = value.num[1];
           }
         },
         {
-          name: 'ParticleVelocity',
-          type: 'float',
-          default: 0.2,
+          name: 'ConeRadius',
+          type: 'vec2',
+          default: [0, 0.1],
           get(this: ParticleSystem, value) {
-            value.num[0] = this.particleVelocity;
+            value.num[0] = this.emitterConeRadiusMin;
+            value.num[1] = this.emitterConeRadiusMax;
           },
           set(this: ParticleSystem, value) {
-            this.particleVelocity = value.num[0];
+            this.emitterConeRadiusMin = value.num[0];
+            this.emitterConeRadiusMax = value.num[1];
           }
         },
         {
-          name: 'ParticleVelocityVar',
-          type: 'float',
-          default: 0.2,
+          name: 'Velocity',
+          type: 'vec2',
+          default: [2, 3],
           get(this: ParticleSystem, value) {
-            value.num[0] = this.particleVelocityVar;
+            value.num[0] = this.particleVelocityMin;
+            value.num[1] = this.particleVelocityMax;
           },
           set(this: ParticleSystem, value) {
-            this.particleVelocityVar = value.num[0];
+            this.particleVelocityMin = value.num[0];
+            this.particleVelocityMax = value.num[1];
           }
         },
         {
-          name: 'ParticleLife',
-          type: 'float',
-          default: 1,
+          name: 'Life',
+          type: 'vec2',
+          default: [1, 1.5],
           get(this: ParticleSystem, value) {
-            value.num[0] = this.particleLife;
+            value.num[0] = this.particleLifeMin;
+            value.num[1] = this.particleLifeMax;
           },
           set(this: ParticleSystem, value) {
-            this.particleLife = value.num[0];
+            this.particleLifeMin = value.num[0];
+            this.particleLifeMax = value.num[1];
           }
         },
         {
-          name: 'ParticleLifeVar',
-          type: 'float',
-          default: 0.5,
+          name: 'Size1',
+          type: 'vec2',
+          default: [0.4, 0.5],
           get(this: ParticleSystem, value) {
-            value.num[0] = this.particleLifeVar;
+            value.num[0] = this.particleSize1Min;
+            value.num[1] = this.particleSize1Max;
           },
           set(this: ParticleSystem, value) {
-            this.particleLifeVar = value.num[0];
+            this.particleSize1Min = value.num[0];
+            this.particleSize1Max = value.num[1];
           }
         },
         {
-          name: 'ParticleSize1',
-          type: 'float',
-          default: 0.4,
+          name: 'Size2',
+          type: 'vec2',
+          default: [0, 0.1],
           get(this: ParticleSystem, value) {
-            value.num[0] = this.particleSize1;
+            value.num[0] = this.particleSize2Min;
+            value.num[1] = this.particleSize2Max;
           },
           set(this: ParticleSystem, value) {
-            this.particleSize1 = value.num[0];
-          }
-        },
-        {
-          name: 'ParticleSize1Var',
-          type: 'float',
-          default: 0.1,
-          get(this: ParticleSystem, value) {
-            value.num[0] = this.particleSize1Var;
-          },
-          set(this: ParticleSystem, value) {
-            this.particleSize1Var = value.num[0];
-          }
-        },
-        {
-          name: 'ParticleSize2',
-          type: 'float',
-          default: 0,
-          get(this: ParticleSystem, value) {
-            value.num[0] = this.particleSize2;
-          },
-          set(this: ParticleSystem, value) {
-            this.particleSize2 = value.num[0];
-          }
-        },
-        {
-          name: 'ParticleSize2Var',
-          type: 'float',
-          default: 0.1,
-          get(this: ParticleSystem, value) {
-            value.num[0] = this.particleSize2Var;
-          },
-          set(this: ParticleSystem, value) {
-            this.particleSize2Var = value.num[0];
+            this.particleSize2Min = value.num[0];
+            this.particleSize2Max = value.num[1];
           }
         },
         {
           name: 'Acceleration',
-          type: 'float',
-          default: -0.01,
+          type: 'vec2',
+          default: [-0.01, -0.02],
           get(this: ParticleSystem, value) {
-            value.num[0] = this.particleAccel;
+            value.num[0] = this.particleAccelMin;
+            value.num[1] = this.particleAccelMax;
           },
           set(this: ParticleSystem, value) {
-            this.particleAccel = value.num[0];
-          }
-        },
-        {
-          name: 'ParticleAccelerationVar',
-          type: 'float',
-          default: -0.01,
-          get(this: ParticleSystem, value) {
-            value.num[0] = this.particleAccelVar;
-          },
-          set(this: ParticleSystem, value) {
-            this.particleAccelVar = value.num[0];
+            this.particleAccelMin = value.num[0];
+            this.particleAccelMax = value.num[1];
           }
         },
         {

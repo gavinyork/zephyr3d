@@ -63,25 +63,25 @@ export class ParticleSystem
   private _gravity: Vector3;
   private _wind: Vector3;
   private _scalar: number;
-  private _particleRotation: number;
-  private _particleRotationVar: number;
+  private _particleRotationMin: number;
+  private _particleRotationMax: number;
   private _jitterSpeed: number;
   private _emitterShape: EmitterShape;
   private _emitterBehavior: EmitterBehavior;
-  private _emitterConeRadius: number;
-  private _emitterConeRadiusVar: number;
-  private _particleVelocity: number;
-  private _particleVelocityVar: number;
-  private _particleLife: number;
-  private _particleLifeVar: number;
-  private _particleSize1: number;
-  private _particleSize1Var: number;
-  private _particleSize2: number;
-  private _particleSize2Var: number;
-  private _particleAccel: number;
-  private _particleAccelVar: number;
-  private _emitterShapeSize: Vector3;
-  private _emitterShapeSizeVar: Vector3;
+  private _emitterConeRadiusMin: number;
+  private _emitterConeRadiusMax: number;
+  private _particleVelocityMin: number;
+  private _particleVelocityMax: number;
+  private _particleLifeMin: number;
+  private _particleLifeMax: number;
+  private _particleSize1Min: number;
+  private _particleSize1Max: number;
+  private _particleSize2Min: number;
+  private _particleSize2Max: number;
+  private _particleAccelMin: number;
+  private _particleAccelMax: number;
+  private _emitterShapeSizeMin: Vector3;
+  private _emitterShapeSizeMax: Vector3;
   private _colorValue: Vector4;
   private _primitive: Ref<Primitive>;
   private _material: Ref<ParticleMaterial>;
@@ -105,26 +105,26 @@ export class ParticleSystem
     this._startTick = 0;
     this._delay = 0;
     this._blendMode = 0;
-    this._particleRotation = 0;
-    this._particleRotationVar = 0;
+    this._particleRotationMin = 0;
+    this._particleRotationMax = 0;
     this._jitterSpeed = 1;
     this._emitterShape = 'point';
     this._emitterBehavior = 'surface';
-    this._emitterConeRadius = 0;
-    this._emitterConeRadiusVar = 0.1;
-    this._emitterShapeSize = Vector3.one();
-    this._emitterShapeSizeVar = Vector3.zero();
+    this._emitterConeRadiusMin = 0;
+    this._emitterConeRadiusMax = 0.1;
+    this._emitterShapeSizeMin = Vector3.one();
+    this._emitterShapeSizeMax = Vector3.one();
     this._colorValue = Vector4.one();
-    this._particleVelocity = 0.2;
-    this._particleVelocityVar = 0.2;
-    this._particleLife = 1;
-    this._particleLifeVar = 0.5;
-    this._particleSize1 = 0.4;
-    this._particleSize1Var = 0.1;
-    this._particleSize2 = 0;
-    this._particleSize2Var = 0.1;
-    this._particleAccel = -0.01;
-    this._particleAccelVar = -0.01;
+    this._particleVelocityMin = 2;
+    this._particleVelocityMax = 3;
+    this._particleLifeMin = 1;
+    this._particleLifeMax = 1.5;
+    this._particleSize1Min = 0.4;
+    this._particleSize1Max = 0.5;
+    this._particleSize2Min = 0;
+    this._particleSize2Max = 0.1;
+    this._particleAccelMin = -0.01;
+    this._particleAccelMax = -0.02;
     this._transparency = 1;
     this._colorMultiplier = 1;
     this._instanceColor = Vector4.zero();
@@ -151,26 +151,26 @@ export class ParticleSystem
     this.scalar = other.scalar;
     this.aspect = other.aspect;
     this.airResistence = other.airResistence;
-    this.particleRotation = other.particleRotation;
-    this.particleRotationVar = other.particleRotationVar;
+    this.particleRotationMin = other.particleRotationMin;
+    this.particleRotationMax = other.particleRotationMax;
     this.jitterSpeed = other.jitterSpeed;
     this.jitterPower = other.jitterPower;
     this.emitterShape = other.emitterShape;
     this.emitterBehavior = other.emitterBehavior;
-    this.emitterConeRadius = other.emitterConeRadius;
-    this.emitterConeRadiusVar = other.emitterConeRadiusVar;
-    this.particleVelocity = other.particleVelocity;
-    this.particleVelocityVar = other.particleVelocityVar;
-    this.particleLife = other.particleLife;
-    this.particleLifeVar = other.particleLifeVar;
-    this.particleSize1 = other.particleSize1;
-    this.particleSize1Var = other.particleSize1Var;
-    this.particleSize2 = other.particleSize2;
-    this.particleSize2Var = other.particleSize2Var;
-    this.particleAccel = other.particleAccel;
-    this.particleAccelVar = other.particleAccelVar;
-    this.emitterShapeSize = other.emitterShapeSize;
-    this.emitterShapeSizeVar = other.emitterShapeSizeVar;
+    this.emitterConeRadiusMin = other.emitterConeRadiusMin;
+    this.emitterConeRadiusMax = other.emitterConeRadiusMax;
+    this.particleVelocityMin = other.particleVelocityMin;
+    this.particleVelocityMax = other.particleVelocityMax;
+    this.particleLifeMin = other.particleLifeMin;
+    this.particleLifeMax = other.particleLifeMax;
+    this.particleSize1Min = other.particleSize1Min;
+    this.particleSize1Max = other.particleSize1Max;
+    this.particleSize2Min = other.particleSize2Min;
+    this.particleSize2Max = other.particleSize2Max;
+    this.particleAccelMin = other.particleAccelMin;
+    this.particleAccelMax = other.particleAccelMax;
+    this.emitterShapeSizeMin = other.emitterShapeSizeMin;
+    this.emitterShapeSizeMax = other.emitterShapeSizeMax;
     this.colorValue = other.colorValue;
     this.directional = other.directional;
     this.worldSpace = other.worldSpace;
@@ -248,17 +248,17 @@ export class ParticleSystem
   get airResistence(): boolean {
     return this._airResistence;
   }
-  set particleRotation(value: number) {
-    this._particleRotation = value;
+  set particleRotationMin(value: number) {
+    this._particleRotationMin = value;
   }
-  get particleRotation(): number {
-    return this._particleRotation;
+  get particleRotationMin(): number {
+    return this._particleRotationMin;
   }
-  set particleRotationVar(value: number) {
-    this._particleRotationVar = value;
+  set particleRotationMax(value: number) {
+    this._particleRotationMax = value;
   }
-  get particleRotationVar(): number {
-    return this._particleRotationVar;
+  get particleRotationMax(): number {
+    return this._particleRotationMax;
   }
   set jitterSpeed(value: number) {
     this._jitterSpeed = value;
@@ -284,89 +284,89 @@ export class ParticleSystem
   get emitterBehavior(): EmitterBehavior {
     return this._emitterBehavior;
   }
-  set emitterConeRadius(value: number) {
-    this._emitterConeRadius = value;
+  set emitterConeRadiusMin(value: number) {
+    this._emitterConeRadiusMin = value;
   }
-  get emitterConeRadius(): number {
-    return this._emitterConeRadius;
+  get emitterConeRadiusMin(): number {
+    return this._emitterConeRadiusMin;
   }
-  set emitterConeRadiusVar(value: number) {
-    this._emitterConeRadiusVar = value;
+  set emitterConeRadiusMax(value: number) {
+    this._emitterConeRadiusMax = value;
   }
-  get emitterConeRadiusVar(): number {
-    return this._emitterConeRadiusVar;
+  get emitterConeRadiusMax(): number {
+    return this._emitterConeRadiusMax;
   }
-  set particleVelocity(value: number) {
-    this._particleVelocity = value;
+  set particleVelocityMin(value: number) {
+    this._particleVelocityMin = value;
   }
-  get particleVelocity(): number {
-    return this._particleVelocity;
+  get particleVelocityMin(): number {
+    return this._particleVelocityMin;
   }
-  set particleVelocityVar(value: number) {
-    this._particleVelocityVar = value;
+  set particleVelocityMax(value: number) {
+    this._particleVelocityMax = value;
   }
-  get particleVelocityVar(): number {
-    return this._particleVelocityVar;
+  get particleVelocityMax(): number {
+    return this._particleVelocityMax;
   }
-  set particleLife(value: number) {
-    this._particleLife = value;
+  set particleLifeMin(value: number) {
+    this._particleLifeMin = value;
   }
-  get particleLife(): number {
-    return this._particleLife;
+  get particleLifeMin(): number {
+    return this._particleLifeMin;
   }
-  set particleLifeVar(value: number) {
-    this._particleLifeVar = value;
+  set particleLifeMax(value: number) {
+    this._particleLifeMax = value;
   }
-  get particleLifeVar(): number {
-    return this._particleLifeVar;
+  get particleLifeMax(): number {
+    return this._particleLifeMax;
   }
-  set particleSize1(value: number) {
-    this._particleSize1 = value;
+  set particleSize1Min(value: number) {
+    this._particleSize1Min = value;
   }
-  get particleSize1(): number {
-    return this._particleSize1;
+  get particleSize1Min(): number {
+    return this._particleSize1Min;
   }
-  set particleSize1Var(value: number) {
-    this._particleSize1Var = value;
+  set particleSize1Max(value: number) {
+    this._particleSize1Max = value;
   }
-  get particleSize1Var(): number {
-    return this._particleSize1Var;
+  get particleSize1Max(): number {
+    return this._particleSize1Max;
   }
-  set particleSize2(value: number) {
-    this._particleSize2 = value;
+  set particleSize2Min(value: number) {
+    this._particleSize2Min = value;
   }
-  get particleSize2(): number {
-    return this._particleSize2;
+  get particleSize2Min(): number {
+    return this._particleSize2Min;
   }
-  set particleSize2Var(value: number) {
-    this._particleSize2Var = value;
+  set particleSize2Max(value: number) {
+    this._particleSize2Max = value;
   }
-  get particleSize2Var(): number {
-    return this._particleSize2Var;
+  get particleSize2Max(): number {
+    return this._particleSize2Max;
   }
-  set particleAccel(value: number) {
-    this._particleAccel = value;
+  set particleAccelMin(value: number) {
+    this._particleAccelMin = value;
   }
-  get particleAccel(): number {
-    return this._particleAccel;
+  get particleAccelMin(): number {
+    return this._particleAccelMin;
   }
-  set particleAccelVar(value: number) {
-    this._particleAccelVar = value;
+  set particleAccelMax(value: number) {
+    this._particleAccelMax = value;
   }
-  get particleAccelVar(): number {
-    return this._particleAccelVar;
+  get particleAccelMax(): number {
+    return this._particleAccelMax;
   }
-  set emitterShapeSize(value: Vector3) {
-    this._emitterShapeSize.set(value);
+  set emitterShapeSizeMin(value: Vector3) {
+    this._emitterShapeSizeMin.set(value);
   }
-  get emitterShapeSize(): Vector3 {
-    return this._emitterShapeSize;
+  get emitterShapeSizeMin(): Vector3 {
+    return this._emitterShapeSizeMin;
   }
-  set emitterShapeSizeVar(value: Vector3) {
-    this._emitterShapeSizeVar.set(value);
+  set emitterShapeSizeMax(value: Vector3) {
+    this._emitterShapeSizeMax.set(value);
   }
-  get emitterShapeSizeVar(): Vector3 {
-    return this._emitterShapeSizeVar;
+  get emitterShapeSizeMax(): Vector3 {
+    return this._emitterShapeSizeMax;
   }
   set colorValue(value: Vector4) {
     this._colorValue.set(value);
@@ -427,31 +427,41 @@ export class ParticleSystem
         velocity: new Vector3()
       } as Particle);
     this.getParticleInitialPosition(p.position, p.velocity);
-    p.size1 = this._particleSize1 + Math.random() * this._particleSize1Var;
-    p.size2 = this._particleSize2 + Math.random() * this._particleSize2Var;
-    p.rotation = this._particleRotation + Math.random() * this._particleRotationVar;
-    p.lifeSpan = Math.max(this._particleLife + Math.random() * this._particleLifeVar, 0.01);
-    p.acceleartion = this._particleAccel + Math.random() * this._particleAccelVar;
+    p.size1 = this._particleSize1Min + Math.random() * (this._particleSize1Max - this._particleSize1Min);
+    p.size2 = this._particleSize2Min + Math.random() * (this._particleSize2Max - this._particleSize2Min);
+    p.rotation =
+      this._particleRotationMin + Math.random() * (this._particleRotationMax - this._particleRotationMin);
+    p.lifeSpan = Math.max(
+      this._particleLifeMin + Math.random() * (this._particleLifeMax - this._particleLifeMin),
+      0.01
+    );
+    p.acceleartion =
+      this._particleAccelMin + Math.random() * (this._particleAccelMax - this._particleAccelMin);
     return p;
   }
   private getParticleInitialPosition(pos: Vector3, vel: Vector3) {
     if (this._emitterShape === 'point') {
       pos.setXYZ(0, 0, 0);
-      const coneRadius = this._emitterConeRadius + Math.random() * this._emitterConeRadiusVar;
+      const coneRadius =
+        this._emitterConeRadiusMin +
+        Math.random() * (this._emitterConeRadiusMax - this._emitterConeRadiusMin);
       vel.x = -coneRadius + Math.random() * 2 * coneRadius;
       vel.y = 1;
       vel.z = -coneRadius + Math.random() * 2 * coneRadius;
     } else {
       const shapeSizeX = Math.max(
-        this._emitterShapeSize.x + this._emitterShapeSizeVar.x * Math.random(),
+        this._emitterShapeSizeMin.x +
+          (this._emitterShapeSizeMax.x - this._emitterShapeSizeMin.x) * Math.random(),
         0.01
       );
       const shapeSizeY = Math.max(
-        this._emitterShapeSize.y + this._emitterShapeSizeVar.y * Math.random(),
+        this._emitterShapeSizeMin.y +
+          (this._emitterShapeSizeMax.y - this._emitterShapeSizeMin.y) * Math.random(),
         0.01
       );
       const shapeSizeZ = Math.max(
-        this._emitterShapeSize.z + this._emitterShapeSizeVar.z * Math.random(),
+        this._emitterShapeSizeMin.z +
+          (this._emitterShapeSizeMax.z - this._emitterShapeSizeMin.z) * Math.random(),
         0.01
       );
       switch (this._emitterShape) {
@@ -491,7 +501,9 @@ export class ParticleSystem
           pos.x = x * shapeSizeX;
           pos.y = y * shapeSizeY;
           pos.z = z * shapeSizeZ;
-          const coneRadius = this._emitterConeRadius + this._emitterConeRadiusVar * Math.random();
+          const coneRadius =
+            this._emitterConeRadiusMin +
+            (this._emitterConeRadiusMax - this._emitterConeRadiusMin) * Math.random();
           vel.x = -coneRadius + Math.random() * 2 * coneRadius;
           vel.y = 1;
           vel.z = -coneRadius + Math.random() * 2 * coneRadius;
@@ -502,7 +514,9 @@ export class ParticleSystem
           let x = Math.sin(alpha);
           let z = Math.cos(alpha);
           const y = Math.random() * 2 - 1;
-          const coneRadius = this._emitterConeRadius + this._emitterConeRadiusVar * Math.random();
+          const coneRadius =
+            this._emitterConeRadiusMin +
+            (this._emitterConeRadiusMax - this._emitterConeRadiusMin) * Math.random();
           vel.x = x * shapeSizeX;
           vel.y = (-coneRadius + Math.random() * 2 * coneRadius) * shapeSizeY;
           vel.z = z * shapeSizeZ;
@@ -533,7 +547,9 @@ export class ParticleSystem
       }
     }
     vel.inplaceNormalize();
-    vel.scaleBy(this._particleVelocity + Math.random() * this._particleVelocityVar);
+    vel.scaleBy(
+      this._particleVelocityMin + Math.random() * (this._particleVelocityMax - this._particleVelocityMin)
+    );
   }
   resizeVertexBuffers(device: AbstractDevice) {
     if (!this._primitive.get()) {
@@ -653,8 +669,10 @@ export class ParticleSystem
       }
     }
     let maxParticleSize = Math.max(
-      Math.abs(this.particleSize1) + Math.abs(this.particleSize1Var),
-      Math.abs(this.particleSize2) + Math.abs(this.particleSize2Var)
+      Math.abs(this.particleSize1Min),
+      Math.abs(this.particleSize1Max),
+      Math.abs(this.particleSize2Min),
+      Math.abs(this.particleSize2Max)
     );
     invWorldMatrix.decompose(tmpVec3, null, null);
     const scale = Math.max(Math.abs(tmpVec3.x), Math.abs(tmpVec3.y), Math.abs(tmpVec3.z));
