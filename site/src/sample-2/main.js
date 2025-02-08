@@ -1,5 +1,6 @@
 import { Matrix4x4, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { PBFunctionScope } from '@zephyr3d/device';
 
 (async function () {
   // create render device
@@ -129,7 +130,7 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
   // start render loop
   device.runLoop((device) => {
     const t = device.frameInfo.elapsedOverall * 0.002;
-    const rotateMatrix = Quaternion.fromEulerAngle(t, t, 0, 'XYZ').toMatrix4x4();
+    const rotateMatrix = Quaternion.fromEulerAngle(t, t, 0).toMatrix4x4();
     const worldMatrix = Matrix4x4.translateLeft(rotateMatrix, new Vector3(0, 0, -4));
     device.setVertexLayout(vertexLayout);
 

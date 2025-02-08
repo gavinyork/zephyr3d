@@ -1,4 +1,4 @@
-import type { Interpolator } from '@zephyr3d/base';
+import { Interpolator, Quaternion } from '@zephyr3d/base';
 import { DlgCurveEditor } from './curveeditordlg';
 import type { DBSceneInfo } from '../../storage/db';
 import { DlgMessage } from './messagedlg';
@@ -6,6 +6,8 @@ import { DlgPromptName } from './newscenedlg';
 import { DlgOpenScene } from './openscenedlg';
 import { DlgRampTextureCreator } from './ramptexturedlg';
 import { DlgRename } from './renamedlg';
+import { DlgRotationEditor } from './editrotationdlg';
+import { RotationEditor } from '../../components/rotationeditor';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {

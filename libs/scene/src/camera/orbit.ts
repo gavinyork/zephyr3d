@@ -332,7 +332,7 @@ export class OrbitCameraController extends BaseCameraController {
       if (Math.abs(this.rotateX) > 0.0001 || Math.abs(this.rotateY) > 0.0001) {
         Quaternion.fromAxisAngle(this.xVector, this.rotateX, this.quat);
         this.quat.transform(this.eyePos.subBy(center), this.eyePos);
-        Quaternion.fromEulerAngle(0, this.rotateY, 0, 'XYZ', this.quat);
+        Quaternion.fromEulerAngle(0, this.rotateY, 0, 'ZYX', this.quat);
         this.quat.transform(this.eyePos, this.eyePos);
         this.quat.transform(this.xVector, this.xVector).inplaceNormalize();
         Vector3.normalize(this.eyePos, this.direction).inplaceNormalize();

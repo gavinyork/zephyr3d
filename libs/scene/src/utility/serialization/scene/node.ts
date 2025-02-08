@@ -229,6 +229,7 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
         {
           name: 'Rotation',
           type: 'vec3',
+          edit: 'quaternion',
           get(this: SceneNode, value) {
             const zyx = this.rotation.toEulerAngles();
             value.num[0] = Math.round(radian2degree(zyx.x));
@@ -239,8 +240,7 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
             this.rotation.fromEulerAngle(
               degree2radian(value.num[0]),
               degree2radian(value.num[1]),
-              degree2radian(value.num[2]),
-              'ZYX'
+              degree2radian(value.num[2])
             );
           }
         },

@@ -8,8 +8,7 @@ import {
   Mesh,
   BoxShape,
   BatchGroup,
-  DirectionalLight,
-  ParticleSystem
+  DirectionalLight
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Inspector } from '@zephyr3d/inspector';
@@ -58,9 +57,6 @@ myApp.ready().then(async function () {
       box.position.setXYZ(Math.random() * 50 - 25, 3, Math.random() * 50 - 25);
     }
   }
-  const p = new ParticleSystem(scene);
-  p.position.setXYZ(0, 0, 0);
-  p.particleVelocity = 2;
 
   /*
   // Create floor
@@ -100,7 +96,7 @@ myApp.ready().then(async function () {
 
   myApp.on('tick', function () {
     // light rotation
-    light.rotation.fromEulerAngle(-Math.PI / 6, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
+    light.rotation.fromEulerAngle(-Math.PI / 6, myApp.device.frameInfo.elapsedOverall * 0.0005, 0);
 
     camera.updateController();
     camera.render(scene);

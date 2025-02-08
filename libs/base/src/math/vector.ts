@@ -9,6 +9,8 @@ import type { Plane } from './plane';
 const IDENT_MATRIX3x3 = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
 const IDENT_MATRIX4x4 = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
+export type EulerAngleOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY';
+
 /**
  * Base class for vector and matrix types.
  *
@@ -1881,7 +1883,7 @@ export class Quaternion extends VectorBase {
    * @param order - Intrinsic order for conversion.
    * @returns self
    */
-  fromEulerAngle(x: number, y: number, z: number, order: 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY') {
+  fromEulerAngle(x: number, y: number, z: number, order: EulerAngleOrder = 'ZYX') {
     return Quaternion.fromEulerAngle(x, y, z, order, this);
   }
   /**
@@ -1917,13 +1919,13 @@ export class Quaternion extends VectorBase {
     angles = angles ?? new Vector3();
     const t0 = 2 * (this.w * this.x + this.y * this.z);
     const t1 = 1 - 2 * (this.x * this.x + this.y * this.y);
-    const roll = Math.atan2(t0, t1);
+    const pitch = Math.atan2(t0, t1);
     const t2 = Math.max(-1, Math.min(1, 2 * (this.w * this.y - this.z * this.x)));
-    const pitch = Math.asin(t2);
+    const yaw = Math.asin(t2);
     const t3 = 2 * (this.w * this.z + this.x * this.y);
     const t4 = 1 - 2 * (this.y * this.y + this.z * this.z);
-    const yaw = Math.atan2(t3, t4);
-    return angles.setXYZ(roll, pitch, yaw);
+    const roll = Math.atan2(t3, t4);
+    return angles.setXYZ(pitch, yaw, roll);
   }
   /**
    * Calculates the quaternion from a rotation matrix inplace.
@@ -2209,7 +2211,7 @@ export class Quaternion extends VectorBase {
     a: number,
     b: number,
     c: number,
-    order: 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY',
+    order: EulerAngleOrder = 'ZYX',
     result?: Quaternion
   ): Quaternion {
     result = result || new Quaternion();

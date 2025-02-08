@@ -120,7 +120,7 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
   // start render loop
   device.runLoop((device) => {
     const t = device.frameInfo.elapsedOverall * 0.002;
-    const rotateMatrix = Quaternion.fromEulerAngle(t, t, 0, 'XYZ').toMatrix4x4();
+    const rotateMatrix = Quaternion.fromEulerAngle(t, t, 0).toMatrix4x4();
     const projMatrix = Matrix4x4.perspective(
       1.5,
       device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),

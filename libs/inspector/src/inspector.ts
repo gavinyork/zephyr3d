@@ -1564,7 +1564,7 @@ export class Inspector {
     if (light.isDirectionLight() || light.isSpotLight()) {
       const eulerAngles = light.rotation.toEulerAngles();
       if (ImGui.SliderFloat3('Direction', eulerAngles, -Math.PI * 2, Math.PI * 2)) {
-        light.rotation.fromEulerAngle(eulerAngles.x, eulerAngles.y, eulerAngles.z, 'ZYX');
+        light.rotation.fromEulerAngle(eulerAngles.x, eulerAngles.y, eulerAngles.z);
       }
     }
     ImGui.EndSection(1);

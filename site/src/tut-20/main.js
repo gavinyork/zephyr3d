@@ -28,7 +28,7 @@ myApp.ready().then(function () {
   // Create a directional light
   const dirLight = new DirectionalLight(scene);
   // light direction
-  dirLight.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0, 'ZYX');
+  dirLight.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
   // Enable shadowing
   dirLight.castShadow = true;
   dirLight.shadow.shadowRegion = new AABB(new Vector3(-50, 0, -50), new Vector3(50, 6, 50));
@@ -65,7 +65,7 @@ myApp.ready().then(function () {
 
   myApp.on('tick', function () {
     // light rotation
-    dirLight.rotation.fromEulerAngle(-Math.PI / 4, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
+    dirLight.rotation.fromEulerAngle(-Math.PI / 4, myApp.device.frameInfo.elapsedOverall * 0.0005, 0);
     camera.updateController();
 
     const width = myApp.device.deviceToScreen(myApp.device.canvas.width);

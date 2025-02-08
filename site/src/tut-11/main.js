@@ -27,7 +27,7 @@ myApp.ready().then(function () {
   // Create directional light
   const light = new DirectionalLight(scene);
   // light direction
-  light.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0, 'ZYX');
+  light.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
   // light color
   light.color = new Vector4(1, 1, 1, 1);
 
@@ -63,7 +63,7 @@ myApp.ready().then(function () {
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
   myApp.on('tick', function () {
-    light.rotation.fromEulerAngle(-Math.PI / 4, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
+    light.rotation.fromEulerAngle(-Math.PI / 4, myApp.device.frameInfo.elapsedOverall * 0.0005, 0);
     camera.updateController();
     camera.render(scene, compositor);
   });

@@ -60,7 +60,7 @@ myApp.ready().then(function () {
 
   myApp.on('tick', function () {
     // light rotation
-    spotLight.rotation.fromEulerAngle(-Math.PI / 6, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
+    spotLight.rotation.fromEulerAngle(-Math.PI / 6, myApp.device.frameInfo.elapsedOverall * 0.0005, 0);
 
     camera.updateController();
     camera.render(scene);

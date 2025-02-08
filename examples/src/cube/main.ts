@@ -98,7 +98,7 @@ import type { DeviceBackend } from '@zephyr3d/device';
     if (x === 0) {
       x++;
       const t = device.frameInfo.elapsedOverall * 0.002;
-      const rotateMatrix = Quaternion.fromEulerAngle(t, t, 0, 'XYZ').toMatrix4x4();
+      const rotateMatrix = Quaternion.fromEulerAngle(t, t, 0).toMatrix4x4();
       bindGroup.setValue('worldMatrix', Matrix4x4.translateLeft(rotateMatrix, new Vector3(0, 0, -4)));
       bindGroup.setValue(
         'projMatrix',

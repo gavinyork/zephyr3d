@@ -92,7 +92,7 @@ myApp.ready().then(async function () {
   // Create directional light
   dlight = new DirectionalLight(scene);
   // light direction
-  dlight.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0, 'ZYX');
+  dlight.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
   // light color
   dlight.color = new Vector4(1, 1, 1, 1);
 

@@ -26,7 +26,7 @@ myApp.ready().then(function () {
   scene.env.light.strength = 0.4;
 
   const dirLight = new DirectionalLight(scene);
-  dirLight.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0, 'ZYX');
+  dirLight.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
   dirLight.castShadow = true;
   dirLight.shadow.mode = 'pcf-opt';
 

@@ -30,7 +30,7 @@ export class EulerRotationTrack extends AnimationTrack<Quaternion> {
   }
   calculateState(currentTime: number): Quaternion {
     this._interpolator.interpolate(currentTime, tmpVec3);
-    this._state.fromEulerAngle(tmpVec3.x, tmpVec3.y, tmpVec3.z, 'ZYX');
+    this._state.fromEulerAngle(tmpVec3.x, tmpVec3.y, tmpVec3.z);
     return this._state;
   }
   applyState(node: SceneNode, state: Quaternion) {

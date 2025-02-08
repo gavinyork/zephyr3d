@@ -51,8 +51,7 @@ export const SceneNodeProps: PropertyAccessor<SceneNode>[] = [
       this.rotation.fromEulerAngle(
         degree2radian(value.num[0]),
         degree2radian(value.num[1]),
-        degree2radian(value.num[2]),
-        'ZYX'
+        degree2radian(value.num[2])
       );
     }
   },

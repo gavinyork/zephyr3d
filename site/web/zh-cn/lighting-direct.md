@@ -13,7 +13,7 @@
 // 创建平行光对象
 const light = new DirectionalLight(scene);
 // 平行光方向
-light.rotation.fromEulerAngle(Math.PI/4, Math.PI/4, 0, 'ZYX');
+light.rotation.fromEulerAngle(Math.PI/4, Math.PI/4, 0);
 // 平行光颜色
 light.color = new Vector4(1, 1, 0, 1);
 
@@ -47,7 +47,7 @@ light.color = new Vector4(1, 1, 1, 1);
 // 创建锥形光对象
 const light = new SpotLight(scene);
 // 锥形光方向
-light.rotation.fromEulerAngle(-Math.PI/4, Math.PI/4, 0, 'ZYX');
+light.rotation.fromEulerAngle(-Math.PI/4, Math.PI/4, 0);
 // 锥形光颜色
 light.color = new Vector4(1, 1, 1, 1);
 // 光锥角度余弦

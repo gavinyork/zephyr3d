@@ -2,13 +2,15 @@ import { ImGui } from '@zephyr3d/imgui';
 import type { AssetRegistry } from '@zephyr3d/scene';
 import {
   getSerializationInfo,
+  Quadtree,
   type PropertyAccessor,
   type PropertyValue,
   type SerializableClass
 } from '@zephyr3d/scene';
 import type { DBAssetInfo } from '../storage/db';
 import { FontGlyph } from '../core/fontglyph';
-import { AABB, makeEventTarget } from '@zephyr3d/base';
+import { AABB, degree2radian, makeEventTarget, Quaternion, radian2degree } from '@zephyr3d/base';
+import { RotationEditor } from './rotationeditor';
 
 interface Property<T extends {}> {
   path: string;
@@ -447,12 +449,40 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       }
       case 'vec3': {
         const val = tmpProperty.num as [number, number, number];
+        if (value.edit === 'quaternion') {
+          ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
+          ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
+        }
         changed = ImGui.InputFloat3(
           '##value',
           val,
           undefined,
           readonly ? ImGui.InputTextFlags.ReadOnly : undefined
         );
+        if (value.edit === 'quaternion') {
+          ImGui.SameLine(0, 0);
+          if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
+            ImGui.OpenPopup('EditQuaternion');
+            RotationEditor.reset(
+              Quaternion.fromEulerAngle(degree2radian(val[0]), degree2radian(val[1]), degree2radian(val[2])),
+              new ImGui.ImVec2(100, 100)
+            );
+          }
+          if (
+            ImGui.BeginPopup('EditQuaternion', ImGui.WindowFlags.NoResize | ImGui.WindowFlags.NoScrollbar)
+          ) {
+            ImGui.BeginChild('xxyy', new ImGui.ImVec2(100, 100));
+            const quat = RotationEditor.render();
+            const v = quat.toEulerAngles();
+            val[0] = radian2degree(v.x);
+            val[1] = radian2degree(v.y);
+            val[2] = radian2degree(v.z);
+            changed = true;
+            ImGui.EndChild();
+            ImGui.EndPopup();
+          }
+          ImGui.EndChild();
+        }
         break;
       }
       case 'vec4': {

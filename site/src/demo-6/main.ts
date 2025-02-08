@@ -78,7 +78,7 @@ app.ready().then(async () => {
         Math.random() * 200 - 100
       );
       mesh.scale = new Vector3(scale, scale, scale);
-      mesh.rotation = Quaternion.fromEulerAngle(Math.random(), Math.random(), Math.random(), 'ZYX');
+      mesh.rotation = Quaternion.fromEulerAngle(Math.random(), Math.random(), Math.random());
       mesh.parent = batchGroup;
     }
     instanceCount += n;
@@ -86,7 +86,7 @@ app.ready().then(async () => {
   };
   const removeNBoxes = function (n: number) {
     for (let i = 0; i < Math.min(batchGroup.children.length, n); i++) {
-      batchGroup.children[0].remove();
+      batchGroup.children[0].get().remove();
       instanceCount--;
     }
     return instanceCount;

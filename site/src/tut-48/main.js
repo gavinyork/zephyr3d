@@ -34,8 +34,7 @@ myApp.ready().then(async () => {
     mesh.rotation.fromEulerAngle(
       Math.random() * Math.PI * 2,
       Math.random() * Math.PI * 2,
-      Math.random() * Math.PI * 2,
-      'ZYX'
+      Math.random() * Math.PI * 2
     );
     mesh.pickable = true;
   }
