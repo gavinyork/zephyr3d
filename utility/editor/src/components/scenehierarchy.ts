@@ -10,7 +10,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   node_request_delete: [node: SceneNode];
   node_double_clicked: [node: SceneNode];
   node_drag_drop: [from: SceneNode, target: SceneNode];
-  request_add_child: [node: SceneNode, ctor: { new (scene: Scene): SceneNode }, name: string];
+  request_add_child: [node: SceneNode, ctor: { new (scene: Scene): SceneNode }];
 }>() {
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
   private _scene: Scene;
@@ -82,10 +82,10 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
         }
       }
       if (ImGui.MenuItem('Create static batch')) {
-        this.dispatchEvent('request_add_child', node, BatchGroup, 'Batch');
+        this.dispatchEvent('request_add_child', node, BatchGroup);
       }
       if (ImGui.MenuItem('Create group')) {
-        this.dispatchEvent('request_add_child', node, SceneNode, 'Group');
+        this.dispatchEvent('request_add_child', node, SceneNode);
       }
       const animationSet = node.animationSet;
       if (animationSet && animationSet.getAnimationNames().length > 0) {

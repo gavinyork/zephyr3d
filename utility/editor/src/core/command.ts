@@ -1,7 +1,17 @@
-export interface Command<T = void> {
-  desc: string;
-  execute(): Promise<T>;
-  undo(): Promise<void>;
+export abstract class Command<T = void> {
+  protected _desc: string;
+  constructor(desc?: string) {
+    this._desc = desc ?? '';
+  }
+  getDesc() {
+    return this._desc;
+  }
+  setDesc(desc: string): this {
+    this._desc = desc;
+    return this;
+  }
+  abstract execute(): Promise<T>;
+  abstract undo(): Promise<void>;
 }
 
 export class CommandManager {

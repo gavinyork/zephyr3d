@@ -2,7 +2,6 @@ import { ImGui } from '@zephyr3d/imgui';
 import type { AssetRegistry } from '@zephyr3d/scene';
 import {
   getSerializationInfo,
-  Quadtree,
   type PropertyAccessor,
   type PropertyValue,
   type SerializableClass
@@ -122,6 +121,7 @@ class PropertyGroup {
 export class PropertyEditor extends makeEventTarget(Object)<{
   request_edit_aabb: [aabb: AABB];
   end_edit_aabb: [aabb: AABB];
+  object_property_changed: [object: unknown, prop: string];
 }>() {
   private _rootGroup: PropertyGroup;
   private _top: number;
@@ -315,12 +315,14 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       ) {
         const newObj = new group.objectTypes[index[0]].ctor();
         group.prop.set.call(group.object, { object: [newObj] });
+        this.dispatchEvent('object_property_changed', group.object, group.prop.name);
         this.refresh();
       }
       if (deletable) {
         ImGui.SameLine(0, 0);
         if (ImGui.Button(`${FontGlyph.glyphs['trash-empty']}##clear`, new ImGui.ImVec2(buttonSize, 0))) {
           group.prop.set.call(group.object, { object: [null] });
+          this.dispatchEvent('object_property_changed', group.object, group.prop.name);
           this.refresh();
           if (editable) {
             this.dispatchEvent('end_edit_aabb', group.value.object[0] as AABB);
@@ -520,6 +522,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
           if (payload) {
             tmpProperty.str[0] = (payload.Data as DBAssetInfo).uuid;
             value.set.call(object, tmpProperty);
+            this.dispatchEvent('object_property_changed', object, value.name);
           }
           ImGui.EndDragDropTarget();
         }
@@ -527,6 +530,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
           ImGui.SameLine(0, 0);
           if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
             value.set.call(object, null);
+            this.dispatchEvent('object_property_changed', object, value.name);
             if (property.value.objectTypes?.length > 0) {
               ImGui.OpenPopup('X##list');
               if (ImGui.BeginPopup('X##list')) {
@@ -545,6 +549,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     }
     if (changed && value.set) {
       value.set.call(object, tmpProperty);
+      this.dispatchEvent('object_property_changed', object, value.name);
     }
     ImGui.PopID();
   }

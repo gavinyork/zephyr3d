@@ -19,6 +19,7 @@ import {
   ParticleSystem,
   PBRMetallicRoughnessMaterial,
   PlaneShape,
+  PointLight,
   Ref,
   SphereShape,
   TorusShape
@@ -41,7 +42,6 @@ import { CommandManager } from '../core/command';
 import {
   AddAssetCommand,
   AddChildCommand,
-  AddParticleSystemCommand,
   AddShapeCommand,
   NodeCloneCommand,
   NodeDeleteCommand,
@@ -49,6 +49,7 @@ import {
   NodeTransformCommand
 } from '../commands/scenecommands';
 import { ZipDownloader } from '../helpers/zipdownload';
+import { NodeProxy } from '../helpers/proxy';
 
 export class SceneView extends BaseView<SceneModel> {
   private _cmdManager: CommandManager;
@@ -62,7 +63,9 @@ export class SceneView extends BaseView<SceneModel> {
   private _oldTransform: TRS;
   private _dragDropTypes: string[];
   private _nodeToBePlaced: Ref<SceneNode>;
-  private _typeToBePlaced: 'shape' | 'asset' | 'particlesys' | 'none';
+  private _typeToBePlaced: 'shape' | 'asset' | 'node' | 'none';
+  private _ctorToBePlaced: { new (scene: Scene): SceneNode };
+  private _descToBePlaced: string;
   private _assetToBeAdded: DBAssetInfo;
   private _shapeToBeAdded: { cls: GenericConstructor<ShapeType>; options: any };
   private _mousePosX: number;
@@ -73,6 +76,7 @@ export class SceneView extends BaseView<SceneModel> {
   private _showDeviceInfo: boolean;
   private _clipBoardData: Ref<SceneNode>;
   private _aabbForEdit: AABB;
+  private _proxy: NodeProxy;
   constructor(model: SceneModel, assetRegistry: AssetRegistry) {
     super(model);
     this._cmdManager = new CommandManager();
@@ -81,6 +85,8 @@ export class SceneView extends BaseView<SceneModel> {
     this._dragDropTypes = [];
     this._nodeToBePlaced = new Ref();
     this._typeToBePlaced = 'none';
+    this._ctorToBePlaced = null;
+    this._descToBePlaced = null;
     this._assetToBeAdded = null;
     this._shapeToBeAdded = null;
     this._clipBoardData = new Ref();
@@ -90,6 +96,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
     this._aabbForEdit = null;
+    this._proxy = null;
     this._assetRegistry = assetRegistry;
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
@@ -184,8 +191,16 @@ export class SceneView extends BaseView<SceneModel> {
               label: '-'
             },
             {
-              label: 'ParticleSystem',
-              action: () => this.handleAddParticleSystem()
+              label: 'Particle System',
+              action: () => this.handleAddNode(ParticleSystem, 'Add particle system')
+            },
+            {
+              label: 'Directional Light',
+              action: () => this.handleAddNode(DirectionalLight, 'Add directional light')
+            },
+            {
+              label: 'Point Light',
+              action: () => this.handleAddNode(PointLight, 'Add point light')
             }
           ]
         },
@@ -328,7 +343,7 @@ export class SceneView extends BaseView<SceneModel> {
           },
           tooltip: () => {
             const cmd = this._cmdManager.getUndoCommand();
-            return cmd ? `Undo ${cmd.desc}` : 'Undo';
+            return cmd ? `Undo ${cmd.getDesc()}` : 'Undo';
           },
           action: () => {
             this._cmdManager.undo();
@@ -343,7 +358,7 @@ export class SceneView extends BaseView<SceneModel> {
           },
           tooltip: () => {
             const cmd = this._cmdManager.getRedoCommand();
-            return cmd ? `Redo ${cmd.desc}` : 'Redo';
+            return cmd ? `Redo ${cmd.getDesc()}` : 'Redo';
           },
           action: () => {
             this._cmdManager.redo();
@@ -560,11 +575,20 @@ export class SceneView extends BaseView<SceneModel> {
                     this._tab.sceneHierarchy.selectNode(mesh);
                     placeNode.parent = null;
                   });
-              case 'particlesys':
-                this._cmdManager.execute(new AddParticleSystemCommand(this.model.scene, pos)).then((node) => {
-                  this._tab.sceneHierarchy.selectNode(node);
-                  placeNode.parent = null;
-                });
+                break;
+              case 'node':
+                this._cmdManager
+                  .execute(
+                    new AddChildCommand(this.model.scene.rootNode, this._ctorToBePlaced, pos).setDesc(
+                      this._descToBePlaced ?? 'Add node'
+                    )
+                  )
+                  .then((node) => {
+                    this._tab.sceneHierarchy.selectNode(node);
+                    placeNode.parent = null;
+                    this._proxy.createProxy(node);
+                  });
+                break;
             }
           }
         }
@@ -584,6 +608,7 @@ export class SceneView extends BaseView<SceneModel> {
               node = assetNode;
             }
           }
+          node = this._proxy.getProto(node);
           this._tab.sceneHierarchy.selectNode(node);
         });
       }
@@ -627,6 +652,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
     this._tab.sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
     this._tab.sceneHierarchy.on('request_add_child', this.handleAddChild, this);
+    this._propGrid.on('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.on('request_edit_aabb', this.editAABB, this);
     this._propGrid.on('end_edit_aabb', this.endEditAABB, this);
     eventBus.on('scene_add_asset', this.handleAddAsset, this);
@@ -644,13 +670,16 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.sceneHierarchy.off('node_drag_drop', this.handleNodeDragDrop, this);
     this._tab.sceneHierarchy.off('node_double_clicked', this.handleNodeDoubleClicked, this);
     this._tab.sceneHierarchy.off('request_add_child', this.handleAddChild, this);
+    this._propGrid.off('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.off('request_edit_aabb', this.editAABB, this);
     this._propGrid.off('end_edit_aabb', this.endEditAABB, this);
     eventBus.off('scene_add_asset', this.handleAddAsset, this);
     this.sceneFinialize();
   }
   private sceneSetup() {
+    this._proxy = new NodeProxy(this.model.scene);
     this.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
+    this.model.scene.rootNode.iterate((node) => this._proxy.createProxy(node));
     this.model.scene.on('startrender', this.handleStartRender, this);
     this.model.scene.on('endrender', this.handleEndRender, this);
     this._postGizmoRenderer.on('begin_translate', this.handleBeginTransformNode, this);
@@ -672,6 +701,8 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoRenderer.off('end_rotate', this.handleEndRotateNode, this);
     this._postGizmoRenderer.off('end_scale', this.handleEndScaleNode, this);
     this._postGizmoRenderer.off('aabb_changed', this.handleEditAABB, this);
+    this._proxy?.dispose();
+    this._proxy = null;
   }
   private renderDeviceInfo() {
     const device = Application.instance.device;
@@ -712,6 +743,11 @@ export class SceneView extends BaseView<SceneModel> {
       }
     }
     ImGui.End();
+  }
+  private handleObjectPropertyChanged(object: unknown) {
+    if (object instanceof SceneNode) {
+      this._proxy.updateProxy(object);
+    }
   }
   private editAABB(aabb: AABB) {
     this._aabbForEdit = aabb;
@@ -754,8 +790,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._cmdManager.execute(new NodeDeleteCommand(node, this._assetRegistry));
   }
   private handleNodeSelected(node: SceneNode) {
-    this._postGizmoRenderer.node =
-      node === node.scene.rootNode || node instanceof DirectionalLight ? null : node;
+    this._postGizmoRenderer.node = node === node.scene.rootNode ? null : node;
     this._propGrid.object = node === node.scene.rootNode ? node.scene : node;
   }
   private handleNodeDeselected(node: SceneNode) {
@@ -788,17 +823,21 @@ export class SceneView extends BaseView<SceneModel> {
       options
     };
     this._typeToBePlaced = 'shape';
+    this._ctorToBePlaced = null;
   }
-  private handleAddParticleSystem() {
+  private handleAddNode<T extends SceneNode>(ctor: { new (scene: Scene): T }, desc: string) {
     const placeNode = this._nodeToBePlaced.get();
     if (placeNode) {
       placeNode.remove();
       this._nodeToBePlaced.dispose();
       this._typeToBePlaced = 'none';
     }
-    const ps = new ParticleSystem(this.model.scene);
-    this._nodeToBePlaced.set(ps);
-    this._typeToBePlaced = 'particlesys';
+    const node = new ctor(this.model.scene);
+    this._proxy.createProxy(node);
+    this._nodeToBePlaced.set(node);
+    this._typeToBePlaced = 'node';
+    this._ctorToBePlaced = ctor;
+    this._descToBePlaced = desc;
   }
   private handleAddAsset(asset: DBAssetInfo) {
     const placeNode = this._nodeToBePlaced.get();
@@ -813,13 +852,14 @@ export class SceneView extends BaseView<SceneModel> {
         this._nodeToBePlaced.set(node.group);
         this._assetToBeAdded = asset;
         this._typeToBePlaced = 'asset';
+        this._ctorToBePlaced = null;
       })
       .catch((err) => {
         Dialog.messageBox('Error', `${err}`);
       });
   }
-  private handleAddChild(parent: SceneNode, ctor: { new (scene: Scene): SceneNode }, name: string) {
-    this._cmdManager.execute(new AddChildCommand(parent, ctor, name)).then((node) => {
+  private handleAddChild(parent: SceneNode, ctor: { new (scene: Scene): SceneNode }) {
+    this._cmdManager.execute(new AddChildCommand(parent, ctor)).then((node) => {
       this._tab.sceneHierarchy.selectNode(node);
     });
   }

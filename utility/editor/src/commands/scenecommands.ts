@@ -19,7 +19,7 @@ import {
   SphereShape,
   TorusShape
 } from '@zephyr3d/scene';
-import type { Command } from '../core/command';
+import { Command } from '../core/command';
 import { Matrix4x4, Quaternion, Vector3, type GenericConstructor } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import type { DBAssetInfo } from '../storage/db';
@@ -28,21 +28,19 @@ const idNodeMap: Record<string, SceneNode> = {};
 
 export type CommandExecuteResult<T> = T extends AddAssetCommand ? SceneNode : void;
 
-export class AddAssetCommand implements Command<SceneNode> {
+export class AddAssetCommand extends Command<SceneNode> {
   private _scene: Scene;
   private _assetRegistry: AssetRegistry;
   private _asset: DBAssetInfo;
   private _nodeId: string;
   private _position: Vector3;
   constructor(scene: Scene, assetRegistry: AssetRegistry, asset: DBAssetInfo, position: Vector3) {
+    super('Add asset');
     this._scene = scene;
     this._assetRegistry = assetRegistry;
     this._nodeId = '';
     this._asset = { ...asset };
     this._position = new Vector3(position);
-  }
-  get desc(): string {
-    return 'Add asset';
   }
   async execute() {
     let asset: ModelInfo = null;
@@ -77,20 +75,18 @@ export class AddAssetCommand implements Command<SceneNode> {
     }
   }
 }
-export class AddChildCommand<T extends SceneNode = SceneNode> implements Command<T> {
+export class AddChildCommand<T extends SceneNode = SceneNode> extends Command<T> {
   private _parentId: string;
+  private _position: Vector3;
   private _nodeId: string;
   private _ctor: { new (scene: Scene): T };
-  private _name: string;
-  constructor(parentNode: SceneNode, ctor: { new (scene: Scene): T }, name: string) {
+  constructor(parentNode: SceneNode, ctor: { new (scene: Scene): T }, position?: Vector3) {
+    super('Add child node');
     this._parentId = parentNode.id;
     idNodeMap[this._parentId] = parentNode;
     this._nodeId = '';
     this._ctor = ctor;
-    this._name = name;
-  }
-  get desc(): string {
-    return 'Add child node';
+    this._position = position;
   }
   async execute() {
     const parent = idNodeMap[this._parentId];
@@ -100,8 +96,10 @@ export class AddChildCommand<T extends SceneNode = SceneNode> implements Command
       return null;
     }
     const node = new this._ctor(parent.scene);
-    node.name = this._name;
     node.parent = parent;
+    if (this._position) {
+      node.position.set(this._position);
+    }
     if (this._nodeId) {
       node.id = this._nodeId;
     } else {
@@ -120,17 +118,15 @@ export class AddChildCommand<T extends SceneNode = SceneNode> implements Command
     }
   }
 }
-export class AddParticleSystemCommand implements Command<ParticleSystem> {
+export class AddParticleSystemCommand extends Command<ParticleSystem> {
   private _scene: Scene;
   private _nodeId: string;
   private _position: Vector3;
   constructor(scene: Scene, pos: Vector3) {
+    super('Add particle system');
     this._scene = scene;
     this._nodeId = '';
     this._position = pos.clone();
-  }
-  get desc(): string {
-    return 'Add particle system';
   }
   async execute() {
     const node = new ParticleSystem(this._scene);
@@ -154,14 +150,14 @@ export class AddParticleSystemCommand implements Command<ParticleSystem> {
     }
   }
 }
-export class AddShapeCommand<T extends ShapeType> implements Command<Mesh> {
-  private _desc: string;
+export class AddShapeCommand<T extends ShapeType> extends Command<Mesh> {
   private _scene: Scene;
   private _nodeId: string;
   private _shapeCls: GenericConstructor<T>;
   private _options: ShapeOptionType<T>;
   private _position: Vector3;
   constructor(scene: Scene, shapeCls: GenericConstructor<T>, pos: Vector3, options?: ShapeOptionType<T>) {
+    super();
     this._nodeId = '';
     this._scene = scene;
     this._position = pos.clone();
@@ -198,9 +194,6 @@ export class AddShapeCommand<T extends ShapeType> implements Command<Mesh> {
     this._shapeCls = shapeCls;
     this._options = options;
   }
-  get desc(): string {
-    return this._desc;
-  }
   async execute() {
     const shape = new this._shapeCls(this._options);
     const mesh = new Mesh(this._scene, shape, new PBRMetallicRoughnessMaterial());
@@ -225,13 +218,14 @@ export class AddShapeCommand<T extends ShapeType> implements Command<Mesh> {
   }
 }
 
-export class NodeDeleteCommand implements Command {
+export class NodeDeleteCommand extends Command {
   private _assetRegistry: AssetRegistry;
   private _scene: any;
   private _archive: any;
   private _nodeId: string;
   private _parentId: string;
   constructor(node: SceneNode, assetRegistry: AssetRegistry) {
+    super('Delete node');
     this._scene = node.scene;
     this._assetRegistry = assetRegistry;
     this._nodeId = node.id;
@@ -239,9 +233,6 @@ export class NodeDeleteCommand implements Command {
     this._parentId = node.parent.id;
     idNodeMap[this._parentId] = node.parent;
     this._archive = null;
-  }
-  get desc() {
-    return 'Delete node';
   }
   async execute(): Promise<void> {
     const node = idNodeMap[this._nodeId];
@@ -276,21 +267,19 @@ export class NodeDeleteCommand implements Command {
     }
   }
 }
-export class NodeReparentCommand implements Command {
+export class NodeReparentCommand extends Command {
   private _nodeId: string;
   private _newParentId: string;
   private _oldParentId: string;
   private _oldLocalMatrix: Matrix4x4;
   constructor(node: SceneNode, newParent: SceneNode) {
+    super('Reparent object');
     this._nodeId = node.id;
     idNodeMap[this._nodeId] = node;
     this._newParentId = newParent.id;
     idNodeMap[this._newParentId] = newParent;
     this._oldParentId = '';
     this._oldLocalMatrix = null;
-  }
-  get desc() {
-    return 'reparent object';
   }
   async execute(): Promise<void> {
     const node = idNodeMap[this._nodeId];
@@ -314,20 +303,18 @@ export class NodeReparentCommand implements Command {
   }
 }
 
-export class NodeCloneCommand implements Command<SceneNode> {
+export class NodeCloneCommand extends Command<SceneNode> {
   private _nodeId: string;
   private _newNodeId: string;
   private _method: NodeCloneMethod;
   private _assetRegistry: AssetRegistry;
   constructor(node: SceneNode, method: NodeCloneMethod, assetRegistry: AssetRegistry) {
+    super('Clone node');
     this._nodeId = node.id;
     idNodeMap[this._nodeId] = node;
     this._method = method;
     this._assetRegistry = assetRegistry;
     this._newNodeId = '';
-  }
-  get desc() {
-    return 'clone node';
   }
   async execute(): Promise<SceneNode> {
     const node = idNodeMap[this._nodeId];
@@ -372,12 +359,12 @@ export class NodeCloneCommand implements Command<SceneNode> {
     }
   }
 }
-export class NodeTransformCommand implements Command {
+export class NodeTransformCommand extends Command {
   private _nodeId: string;
-  private _desc: string;
   private _oldTransform: TRS;
   private _newTransform: TRS;
   constructor(node: SceneNode, oldTransform: TRS, newTransform: TRS, desc: string) {
+    super(desc);
     this._nodeId = node.id;
     idNodeMap[this._nodeId] = node;
     this._oldTransform = {

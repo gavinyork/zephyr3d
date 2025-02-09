@@ -586,7 +586,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
     }
     const movementY = y - this._scaleInfo.lastY;
     const scale = 0.95 ** movementY;
-    if (this._node) {
+    if (this._node && !this._node.isLight()) {
       if (this._scaleInfo.axis < 0) {
         this._node.scale.x *= scale;
         this._node.scale.y *= scale;

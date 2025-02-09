@@ -313,11 +313,11 @@ export class EnvIBL extends EnvironmentLighting {
    */
   initShaderBindings(pb: ProgramBuilder): void {
     if (pb.shaderKind === 'fragment') {
-      if (this._radianceMap) {
+      if (this._radianceMap.get()) {
         pb.getGlobalScope()[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP] = pb.texCube().uniform(0);
         pb.getGlobalScope()[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD] = pb.float().uniform(0);
       }
-      if (this._irradianceMap) {
+      if (this._irradianceMap.get()) {
         pb.getGlobalScope()[EnvIBL.UNIFORM_NAME_IBL_IRRADIANCE_MAP] = pb.texCube().uniform(0);
       }
     }
@@ -327,11 +327,11 @@ export class EnvIBL extends EnvironmentLighting {
    * @override
    */
   updateBindGroup(bg: BindGroup): void {
-    if (this._radianceMap) {
+    if (this._radianceMap.get()) {
       bg.setValue(EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this.radianceMap.mipLevelCount - 1);
       bg.setTexture(EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this.radianceMap);
     }
-    if (this._irradianceMap) {
+    if (this._irradianceMap.get()) {
       bg.setTexture(EnvIBL.UNIFORM_NAME_IBL_IRRADIANCE_MAP, this.irradianceMap);
     }
   }
