@@ -169,43 +169,50 @@ export class SceneView extends BaseView<SceneModel> {
           label: 'Add',
           subMenus: [
             {
-              label: 'Box',
-              action: () => this.handleAddShape(BoxShape, { anchor: 0.5, anchorY: 0 })
+              label: 'Mesh',
+              subMenus: [
+                {
+                  label: 'Box',
+                  action: () => this.handleAddShape(BoxShape, { anchor: 0.5, anchorY: 0 })
+                },
+                {
+                  label: 'Sphere',
+                  action: () => this.handleAddShape(SphereShape)
+                },
+                {
+                  label: 'Plane',
+                  action: () => this.handleAddShape(PlaneShape)
+                },
+                {
+                  label: 'Cylinder',
+                  action: () => this.handleAddShape(CylinderShape, { topCap: true, bottomCap: true })
+                },
+                {
+                  label: 'Torus',
+                  action: () => this.handleAddShape(TorusShape)
+                }
+              ]
             },
             {
-              label: 'Sphere',
-              action: () => this.handleAddShape(SphereShape)
-            },
-            {
-              label: 'Plane',
-              action: () => this.handleAddShape(PlaneShape)
-            },
-            {
-              label: 'Cylinder',
-              action: () => this.handleAddShape(CylinderShape, { topCap: true, bottomCap: true })
-            },
-            {
-              label: 'Torus',
-              action: () => this.handleAddShape(TorusShape)
-            },
-            {
-              label: '-'
+              label: 'Light',
+              subMenus: [
+                {
+                  label: 'Directional Light',
+                  action: () => this.handleAddNode(DirectionalLight, 'Add directional light')
+                },
+                {
+                  label: 'Point Light',
+                  action: () => this.handleAddNode(PointLight, 'Add point light')
+                },
+                {
+                  label: 'Spot Light',
+                  action: () => this.handleAddNode(SpotLight, 'Add spot light')
+                }
+              ]
             },
             {
               label: 'Particle System',
               action: () => this.handleAddNode(ParticleSystem, 'Add particle system')
-            },
-            {
-              label: 'Directional Light',
-              action: () => this.handleAddNode(DirectionalLight, 'Add directional light')
-            },
-            {
-              label: 'Point Light',
-              action: () => this.handleAddNode(PointLight, 'Add point light')
-            },
-            {
-              label: 'Spot Light',
-              action: () => this.handleAddNode(SpotLight, 'Add spot light')
             }
           ]
         },
@@ -427,7 +434,6 @@ export class SceneView extends BaseView<SceneModel> {
     this._tab.render();
     this._propGrid.render();
     this._toolbar.render();
-    this._statusbar.render();
     const displaySize = ImGui.GetIO().DisplaySize;
     const viewportWidth = displaySize.x - this._tab.width - this._propGrid.width;
     const viewportHeight =
@@ -464,6 +470,8 @@ export class SceneView extends BaseView<SceneModel> {
     this.model.camera.scissor = [this._tab.width, this._statusbar.height, viewportWidth, viewportHeight];
     this.model.camera.aspect = viewportWidth / viewportHeight;
     this.model.camera.render(this.model.scene, this.model.compositor);
+
+    this._statusbar.render();
 
     if (this._showTextureViewer) {
       renderTextureViewer();
