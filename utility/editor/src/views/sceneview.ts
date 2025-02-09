@@ -22,6 +22,7 @@ import {
   PointLight,
   Ref,
   SphereShape,
+  SpotLight,
   TorusShape
 } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
@@ -201,6 +202,10 @@ export class SceneView extends BaseView<SceneModel> {
             {
               label: 'Point Light',
               action: () => this.handleAddNode(PointLight, 'Add point light')
+            },
+            {
+              label: 'Spot Light',
+              action: () => this.handleAddNode(SpotLight, 'Add spot light')
             }
           ]
         },

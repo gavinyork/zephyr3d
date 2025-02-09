@@ -1,7 +1,7 @@
 import type { BaseLight } from '../../../scene/light';
 import { DirectionalLight, PointLight, PunctualLight, SpotLight } from '../../../scene/light';
 import type { SerializableClass } from '../types';
-import { AABB, Vector4 } from '@zephyr3d/base';
+import { AABB, degree2radian, radian2degree, Vector4 } from '@zephyr3d/base';
 import type { NodeHierarchy } from './node';
 import { getSceneNodeClass } from './node';
 import type { AssetRegistry } from '../asset/asset';
@@ -471,18 +471,18 @@ export function getSpotLightClass(assetRegistry: AssetRegistry): SerializableCla
           }
         },
         {
-          name: 'Cutoff',
+          name: 'BeamAngle',
           type: 'float',
-          default: Math.cos(Math.PI / 4),
+          default: 90,
           options: {
             minValue: 0,
-            maxValue: Math.PI
+            maxValue: 180
           },
           get(this: SpotLight, value) {
-            value.num[0] = this.cutoff;
+            value.num[0] = radian2degree(Math.acos(this.cutoff) * 2);
           },
           set(this: SpotLight, value) {
-            this.cutoff = value.num[0];
+            this.cutoff = Math.cos(degree2radian(value.num[0]) * 0.5);
           }
         }
       ];

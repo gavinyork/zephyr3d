@@ -652,7 +652,7 @@ export class SpotLight extends PunctualLight implements NodeClonable<SpotLight> 
     const a = this.worldMatrix.getRow(3);
     const b = this.worldMatrix.getRow(2).scaleBy(-1);
     this._positionRange = new Vector4(a.x, a.y, a.z, this.range);
-    this._directionCutoff = new Vector4(b.x, b.y, b.z, Math.cos(this.cutoff));
+    this._directionCutoff = new Vector4(b.x, b.y, b.z, this.cutoff);
     this._diffuseIntensity = new Vector4(this.color.x, this.color.y, this.color.z, this.intensity);
   }
 }

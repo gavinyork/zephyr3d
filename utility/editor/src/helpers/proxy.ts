@@ -65,6 +65,7 @@ export class NodeProxy {
       proxy.sealed = true;
       proxy.parent = src;
       proxy.showState = 'inherit';
+      proxy.castShadow = false;
       proxy.name = PROXY_NAME;
       this.updateProxy(src);
       this._proxyList.push(new WeakRef(proxy));
@@ -84,6 +85,9 @@ export class NodeProxy {
             primitive.setBoundingVolume(
               new BoundingBox(new Vector3(-range, -range, -range), new Vector3(range, range, range))
             );
+          } else if (src.isSpotLight()) {
+            const s = Math.tan(Math.acos(src.cutoff)) / 0.2;
+            proxy.scale.setXYZ(s, s, 1);
           }
         }
       }
@@ -145,10 +149,11 @@ export class NodeProxy {
     if (!this._spotLightPrimitive.get()) {
       this._spotLightPrimitive.set(
         new CylinderShape({
-          topRadius: 0.5,
+          topRadius: 0.2,
           bottomRadius: 0,
           topCap: true,
-          height: 1
+          height: 1,
+          transform: Quaternion.fromAxisAngle(new Vector3(1, 0, 0), -Math.PI * 0.5).toMatrix4x4()
         })
       );
     }
@@ -163,7 +168,7 @@ export class NodeProxy {
       const primitive = new Primitive();
       primitive.createAndSetVertexBuffer(
         'position_f32x3',
-        new Float32Array([0, 0.5, 0, -0.5, 0, 0.5, 0.5, 0, 0.5, 0.5, 0, -0.5, -0.5, 0, -0.5, 0, -0.5, 0])
+        new Float32Array([0, 0.2, 0, -0.1, 0, 0.1, 0.1, 0, 0.1, 0.1, 0, -0.1, -0.1, 0, -0.1, 0, -0.2, 0])
       );
       primitive.createAndSetIndexBuffer(
         new Uint16Array([0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 5, 2, 1, 5, 3, 2, 5, 4, 3, 5, 1, 4])
@@ -171,7 +176,7 @@ export class NodeProxy {
       primitive.primitiveType = 'triangle-list';
       primitive.indexStart = 0;
       primitive.indexCount = primitive.getIndexBuffer().length;
-      primitive.setBoundingVolume(new BoundingBox(new Vector3(-0.5, -0.5, -0.5), new Vector3(0.5, 0.5, 0.5)));
+      primitive.setBoundingVolume(new BoundingBox(new Vector3(-0.1, -0.2, -0.1), new Vector3(0.1, 0.2, 0.1)));
       this._diamondPrimitive.set(primitive);
     }
     return new Mesh(
