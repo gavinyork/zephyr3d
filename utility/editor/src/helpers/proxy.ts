@@ -1,15 +1,6 @@
 import { Matrix4x4, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
-import {
-  BoundingBox,
-  CylinderShape,
-  Mesh,
-  Primitive,
-  Ref,
-  Scene,
-  SceneNode,
-  UnlitMaterial,
-  WeakRef
-} from '@zephyr3d/scene';
+import type { Scene, SceneNode } from '@zephyr3d/scene';
+import { BoundingBox, CylinderShape, Mesh, Primitive, Ref, UnlitMaterial, WeakRef } from '@zephyr3d/scene';
 
 const PROXY_NAME = '$__PROXY__$';
 
