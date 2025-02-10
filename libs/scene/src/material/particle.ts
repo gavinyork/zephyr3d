@@ -1,26 +1,28 @@
-import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
-import { mixinAlbedoColor } from './mixins/albedocolor';
-import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
+import { MeshMaterial } from './meshmaterial';
+import type { BindGroup, PBFunctionScope, Texture2D } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
 import type { DrawContext } from '../render';
 import type { Clonable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
+import { Ref } from '../app';
 
 /**
  * Particle material
  * @public
  */
-export class ParticleMaterial
-  extends applyMaterialMixins(MeshMaterial, mixinAlbedoColor)
-  implements Clonable<ParticleMaterial>
-{
+export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleMaterial> {
+  private static FEATURE_ALPHA_MAP = this.defineFeature();
+  private static FEATURE_RAMP_MAP = this.defineFeature();
   private _params: Vector4;
+  private _alphaMap: Ref<Texture2D>;
+  private _rampMap: Ref<Texture2D>;
   constructor() {
     super();
     this.cullMode = 'none';
     this.blendMode = 'blend';
     this._params = new Vector4(0, 1, 0, 0);
-    this.albedoTexCoordIndex = -1;
+    this._alphaMap = new Ref();
+    this._rampMap = new Ref();
   }
   clone(): ParticleMaterial {
     const other = new ParticleMaterial();
@@ -32,6 +34,29 @@ export class ParticleMaterial
     this.jitterPower = other.jitterPower;
     this.aspect = other.aspect;
     this.directional = other.directional;
+  }
+  supportInstancing(): boolean {
+    return false;
+  }
+  get alphaMap(): Texture2D {
+    return this._alphaMap.get();
+  }
+  set alphaMap(tex: Texture2D) {
+    if (tex !== this._alphaMap.get()) {
+      this._alphaMap.set(tex);
+      this.useFeature(ParticleMaterial.FEATURE_ALPHA_MAP, !!this._alphaMap.get());
+      this.uniformChanged();
+    }
+  }
+  get rampMap(): Texture2D {
+    return this._rampMap.get();
+  }
+  set rampMap(tex: Texture2D) {
+    if (tex !== this._rampMap.get()) {
+      this._rampMap.set(tex);
+      this.useFeature(ParticleMaterial.FEATURE_RAMP_MAP, !!this._rampMap.get());
+      this.uniformChanged();
+    }
   }
   get jitterPower() {
     return this._params.x;
@@ -131,8 +156,9 @@ export class ParticleMaterial
       pb.mul(scope.right, scope.pos.x, scope.params.y),
       pb.mul(scope.up, scope.pos.y)
     );
-    scope.$outputs.zAlbedoTexCoord = scope.uv;
+    scope.$outputs.zUV = scope.uv;
     scope.$outputs.worldPos = scope.centerPosWS;
+    scope.$outputs.zParticleParams = scope.$inputs.particleParams;
     ShaderHelper.setClipSpacePosition(
       scope,
       pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.centerPosWS, 1))
@@ -141,8 +167,22 @@ export class ParticleMaterial
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     if (this.needFragmentColor()) {
-      const color = this.calculateAlbedoColor(scope, scope.$inputs.zAlbedoTexCoord);
-      this.outputFragmentColor(scope, scope.$inputs.worldPos, color);
+      const pb = scope.$builder;
+      if (this.alphaMap) {
+        scope.alphaMap = pb.tex2D().uniform(2);
+      }
+      if (this.rampMap) {
+        scope.rampMap = pb.tex2D().uniform(2);
+      }
+      scope.$l.alpha = this.alphaMap ? pb.textureSample(scope.alphaMap, scope.$inputs.zUV).r : pb.float(1);
+      scope.$l.rampValue = this.rampMap
+        ? pb.textureSample(scope.rampMap, pb.vec2(scope.$inputs.zParticleParams.w, 0))
+        : pb.vec4(1);
+      this.outputFragmentColor(
+        scope,
+        scope.$inputs.worldPos,
+        pb.mul(scope.rampValue, pb.vec4(1, 1, 1, scope.alpha))
+      );
     } else {
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
@@ -150,5 +190,13 @@ export class ParticleMaterial
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
     bindGroup.setValue('params', this._params);
+    if (this.needFragmentColor(ctx)) {
+      if (this.alphaMap) {
+        bindGroup.setTexture('alphaMap', this.alphaMap);
+      }
+      if (this.rampMap) {
+        bindGroup.setTexture('rampMap', this.rampMap);
+      }
+    }
   }
 }

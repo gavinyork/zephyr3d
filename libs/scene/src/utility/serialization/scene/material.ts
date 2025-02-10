@@ -595,49 +595,25 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
       let mat = Material.findMaterialById(initParams.persistentId);
       if (mat) {
         return { obj: mat, loadProps: false };
-      } else if (initParams.persistentId === initParams.corePersistentId) {
-        mat = new ParticleMaterial();
-        mat.persistentId = initParams.persistentId;
-        return { obj: mat, loadProps: true };
       } else {
-        const coreMaterial = Material.findMaterialById(initParams.corePersistentId);
-        if (!coreMaterial) {
-          throw new Error('Load material failed: core material not found');
-        }
-        mat = coreMaterial.createInstance();
+        mat = new ParticleMaterial();
         mat.persistentId = initParams.persistentId;
         return { obj: mat, loadProps: true };
       }
     },
     getInitParams(obj: MeshMaterial) {
       return {
-        persistentId: obj.persistentId,
-        corePersistentId: obj.coreMaterial.persistentId
+        persistentId: obj.persistentId
       };
     },
     getProps() {
       return [
         {
-          name: 'AlbedoColor',
-          type: 'rgba',
-          default: [1, 1, 1, 1],
-          get(this: ParticleMaterial, value) {
-            const color = this.albedoColor;
-            value.num[0] = color.x;
-            value.num[1] = color.y;
-            value.num[2] = color.z;
-            value.num[3] = color.w;
-          },
-          set(this: ParticleMaterial, value) {
-            this.albedoColor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
-          }
-        },
-        {
-          name: 'AlbedoTexture',
+          name: 'AlphaMap',
           type: 'object',
           default: '',
           get(this: ParticleMaterial, value) {
-            value.str[0] = assetRegistry.getAssetId(this.albedoTexture) ?? '';
+            value.str[0] = assetRegistry.getAssetId(this.alphaMap) ?? '';
           },
           async set(this: ParticleMaterial, value) {
             if (value.str[0]) {
@@ -652,15 +628,40 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
                 }
                 if (tex?.isTexture2D()) {
                   tex.name = assetInfo.name;
-                  this.albedoTexture = tex;
+                  this.alphaMap = tex;
                 } else {
                   console.error('Invalid albedo texture');
                 }
               }
             }
+          }
+        },
+        {
+          name: 'RampMap',
+          type: 'object',
+          default: '',
+          get(this: ParticleMaterial, value) {
+            value.str[0] = assetRegistry.getAssetId(this.rampMap) ?? '';
           },
-          isValid() {
-            return !this.$isInstance;
+          async set(this: ParticleMaterial, value) {
+            if (value.str[0]) {
+              const assetId = value.str[0];
+              const assetInfo = assetRegistry.getAssetInfo(assetId);
+              if (assetInfo && assetInfo.type === 'texture') {
+                let tex: Texture2D;
+                try {
+                  tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
+                } catch (err) {
+                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                }
+                if (tex?.isTexture2D()) {
+                  tex.name = assetInfo.name;
+                  this.rampMap = tex;
+                } else {
+                  console.error('Invalid albedo texture');
+                }
+              }
+            }
           }
         }
       ];
