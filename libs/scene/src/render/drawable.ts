@@ -133,6 +133,8 @@ export interface Drawable {
   getQueueType(): number;
   /** Need scene color */
   needSceneColor(): boolean;
+  /** Need scene depth */
+  needSceneDepth(): boolean;
   /** true if the shading of this object is independent of lighting */
   isUnlit(): boolean;
   /** Gets the associated material */

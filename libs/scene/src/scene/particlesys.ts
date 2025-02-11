@@ -752,6 +752,12 @@ export class ParticleSystem
     return this._material.get()?.needSceneColor();
   }
   /**
+   * {@inheritDoc Drawable.needSceneDepth}
+   */
+  needSceneDepth(): boolean {
+    return this._material.get()?.needSceneDepth();
+  }
+  /**
    * {@inheritDoc Drawable.getMaterial}
    */
   getMaterial(): MeshMaterial {

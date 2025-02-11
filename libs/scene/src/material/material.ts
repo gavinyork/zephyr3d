@@ -140,6 +140,10 @@ export class Material implements Clonable<Material> {
   needSceneColor(): boolean {
     return false;
   }
+  /** Return true if this material requires the linear scene depth texture */
+  needSceneDepth(): boolean {
+    return false;
+  }
   /** Create material instance */
   createInstance(): this {
     return null;

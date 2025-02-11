@@ -148,6 +148,9 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   needSceneColor(): boolean {
     return false;
   }
+  needSceneDepth(): boolean {
+    return false;
+  }
   isBatchable(): this is BatchDrawable {
     return false;
   }

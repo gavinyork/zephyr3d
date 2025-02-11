@@ -213,6 +213,7 @@ export class SceneRenderer {
       SSR ||
       ctx.primaryCamera.depthPrePass ||
       renderQueue.needSceneColor ||
+      renderQueue.needSceneDepth ||
       ctx.scene.env.needSceneDepthTexture() ||
       ctx.motionVectors ||
       ctx.HiZ ||

@@ -84,6 +84,9 @@ export class GrassCluster extends applyMixins(GrassClusterBase, mixinDrawable) i
   needSceneColor(): boolean {
     return false;
   }
+  needSceneDepth(): boolean {
+    return false;
+  }
   isBatchable(): this is BatchDrawable {
     return false;
   }
