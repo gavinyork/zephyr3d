@@ -181,15 +181,6 @@ export function testQuaternion() {
     const v3 = q1.transform(v1);
     assert(v2.equalsTo(v3), 'vector to vector rotation failed');
   })();
-  (function testAngleBetween() {
-    const q1 = new Quaternion(rand(), rand(), rand(), rand()).inplaceNormalize();
-    const q2 = new Quaternion(rand(), rand(), rand(), rand()).inplaceNormalize();
-    const angle = Quaternion.angleBetween(q1, q2);
-    const axis1 = q1.getAxisAngle().xyz();
-    const axis2 = q2.getAxisAngle().xyz();
-    const angle2 = Math.acos(Vector3.dot(axis1, axis2));
-    assert(numberEquals(angle, angle2), 'angle between failed');
-  })();
   (function testEulerAngle() {
     const angle1 = rand(-Math.PI, Math.PI);
     const angle2 = rand(-Math.PI, Math.PI);

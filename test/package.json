@@ -18,7 +18,7 @@
     "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent && npm run copy-assets",
     "lint": "eslint \"src/**/*.ts\" -f compact",
     "lint-fix": "eslint --fix \"src/**/*.ts\" -f compact",
-    "dev-test": "web-dev-server --open dist/index.html"
+    "serve": "web-dev-server --no-cache --watch --open dist/index.html"
   },
   "engines": {
     "node": ">=16.18.0"

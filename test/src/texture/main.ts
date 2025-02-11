@@ -1,4 +1,3 @@
-import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { floatToHalf, halfToFloat, unpackFloat3, Vector4 } from '@zephyr3d/base';
 import { AssetManager, Application } from '@zephyr3d/scene';
 import * as common from '../common';
@@ -11,7 +10,6 @@ import {
   TestTextureVideo
 } from './case';
 import { packFloat3 } from '@zephyr3d/base';
-import { Inspector } from '@zephyr3d/inspector';
 
 const test2D = true;
 const test3D = true;
@@ -50,9 +48,6 @@ const textureApp = new Application({
 
 textureApp.ready().then(async () => {
   const device = textureApp.device;
-  await imGuiInit(device);
-  const inspector = new Inspector(null, null);
-  textureApp.inputManager.use(imGuiInjectEvent);
   const assetManager = new AssetManager();
   function getSubViewport(index: number) {
     const width = (device.deviceToScreen(device.getDrawingBufferWidth()) / 3) >> 0;
@@ -130,9 +125,6 @@ textureApp.ready().then(async () => {
       }
     }
     device.popDeviceStates();
-    imGuiNewFrame();
-    inspector.render();
-    imGuiEndFrame();
   });
 
   textureApp.run();
