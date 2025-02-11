@@ -68,7 +68,7 @@ app.ready().then(async () => {
   const opaqueMat = new LambertMaterial();
   for (let i = 0; i < 100; i++) {
     const instanceMat = new LambertMaterial();
-    instanceMat.blendMode = 'additive';
+    instanceMat.blendMode = 'blend';
     instanceMat.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), Math.random());
     const transMesh = new Mesh(scene, boxShape, instanceMat);
     transMesh.position.setXYZ(Math.random() * 5 - 2.5, Math.random() * 5 - 2.5, Math.random() * 5 - 2.5);
