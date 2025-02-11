@@ -148,11 +148,13 @@ export class WeakRef<T extends Disposable> {
   }
   /** @internal */
   private retain() {
-    const weakRefList = weakRefMap.get(this._object);
-    if (weakRefList) {
-      weakRefList.add(this);
-    } else {
-      weakRefMap.set(this._object, new Set([this]));
+    if (this._object) {
+      const weakRefList = weakRefMap.get(this._object);
+      if (weakRefList) {
+        weakRefList.add(this);
+      } else {
+        weakRefMap.set(this._object, new Set([this]));
+      }
     }
   }
   /** @internal */

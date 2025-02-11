@@ -43,6 +43,7 @@ export class ABufferOIT implements OIT {
   private _currentPass: number;
   private _savedScissor: DeviceViewport;
   private _disposed: boolean;
+  private _usePremultipliedAlpha: boolean;
   /**
    * Creates an instance of ABufferOIT class
    *
@@ -61,6 +62,7 @@ export class ABufferOIT implements OIT {
     this._scissorHeight = 0;
     this._savedScissor = null;
     this._currentPass = 0;
+    this._usePremultipliedAlpha = false;
     this._disposed = false;
   }
   /**
@@ -74,6 +76,12 @@ export class ABufferOIT implements OIT {
    */
   supportDevice(deviceType: string): boolean {
     return deviceType === 'webgpu';
+  }
+  /**
+   * {@inheritDoc OIT.wantsPremultipliedAlpha}
+   */
+  wantsPremultipliedAlpha() {
+    return this._usePremultipliedAlpha;
   }
   /**
    * {@inheritDoc OIT.dispose}
@@ -186,9 +194,9 @@ export class ABufferOIT implements OIT {
     ]);
     device.copyBuffer(this._headStagingBuffer, this._headBuffer, 0, 0, this._headStagingBuffer.byteLength);
     // Update render hash
-    this._hash = `${this.getType()}#${this._nodeBuffer.uid}#${this._headBuffer.uid}#${
-      this._scissorOffsetBuffer.uid
-    }#${pass}`;
+    this._hash = `${this.getType()}#${Number(this._usePremultipliedAlpha)}#${this._nodeBuffer.uid}#${
+      this._headBuffer.uid
+    }#${this._scissorOffsetBuffer.uid}#${pass}`;
     if (this._debug) {
       const data = new Uint8Array(this._headBuffer.byteLength);
       const readBuffer = device.createBuffer(this._headBuffer.byteLength, { usage: 'read' });

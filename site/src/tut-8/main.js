@@ -1,5 +1,17 @@
 import { Quaternion, Vector3 } from '@zephyr3d/base';
-import { Scene, Application, Mesh, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, SphereShape, BlinnMaterial, DirectionalLight, AssetManager, Quadtree } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  Mesh,
+  OrbitCameraController,
+  PerspectiveCamera,
+  Compositor,
+  Tonemap,
+  SphereShape,
+  BlinnMaterial,
+  DirectionalLight,
+  AssetManager
+} from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
@@ -18,14 +30,16 @@ myApp.ready().then(function () {
   material.shininess = 256;
   // Load albedo map and normal map
   const assetManager = new AssetManager();
-  assetManager.fetchTexture('assets/images/earthcolor.jpg').then(texture => {
+  assetManager.fetchTexture('assets/images/earthcolor.jpg').then((texture) => {
     material.albedoTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
   });
-  assetManager.fetchTexture('assets/images/earthnormal.png', {
-    linearColorSpace: true
-  }).then(texture => {
-    material.normalTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
-  });
+  assetManager
+    .fetchTexture('assets/images/earthnormal.png', {
+      linearColorSpace: true
+    })
+    .then((texture) => {
+      material.normalTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
+    });
   // All sphere meshes share the same vertex data and materials, allowing for rendering with geometry instances on WebGL2 and WebGPU devices
   const spherePrimitive = new SphereShape();
   // Create a sphere mesh as the parent node
@@ -40,7 +54,13 @@ myApp.ready().then(function () {
   sphere3.position.y = 4;
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    myApp.device.canvas.width / myApp.device.canvas.height,
+    1,
+    100
+  );
   camera.lookAt(new Vector3(0, 0, 20), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
 

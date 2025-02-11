@@ -34,6 +34,12 @@ export interface OIT {
    */
   supportDevice(deviceType: string): boolean;
   /**
+   * Whether this OIT algorithm wants pre-multiplied alpha
+   *
+   * @returns True if the OIT wants pre-multiplied alpha, false otherwise
+   */
+  wantsPremultipliedAlpha(): boolean;
+  /**
    * Begins rendering the transparent objects.
    *
    * @param ctx - The draw context.

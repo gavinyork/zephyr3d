@@ -1,6 +1,5 @@
 import { Matrix4x4, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
-import { PBFunctionScope } from '@zephyr3d/device';
 
 (async function () {
   // create render device

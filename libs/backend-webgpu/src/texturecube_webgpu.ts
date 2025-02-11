@@ -163,6 +163,7 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
     }
   }
   /** @internal */
+  /*
   private loadImages(images: HTMLImageElement[], format: TextureFormat): void {
     const width = images[0].width;
     const height = images[0].height;
@@ -195,6 +196,7 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
       }
     }
   }
+  */
   /** @internal */
   private loadLevels(levels: TextureMipmapData, sRGB: boolean): void {
     const format = sRGB ? linearTextureFormatToSRGB(levels.format) : levels.format;

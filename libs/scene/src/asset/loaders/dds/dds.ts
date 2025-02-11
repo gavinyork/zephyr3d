@@ -7,27 +7,11 @@ const DDSHeaderSizeExtended = 31 + 5; // in DWORD
 
 const DDS_MAGIC = 0x20534444; // magic
 
-const DDSD_CAPS = 0x1; // required
-const DDSD_HEIGHT = 0x2; // required
-const DDSD_WIDTH = 0x4; // required
-const DDSD_PITCH = 0x8; // optional
-const DDSD_PIXELFORMAT = 0x1000; // required
-const DDSD_MIPMAPCOUNT = 0x20000; // optional
-const DDSD_LINEARSIZE = 0x80000; // optional
-const DDSD_DEPTH = 0x800000; // optional
-
 const DDPF_ALPHAPIXELS = 0x1;
 const DDPF_ALPHA = 0x2;
-const DDPF_PAL8 = 0x20;
 const DDPF_FOURCC = 0x4;
 const DDPF_RGB = 0x40;
-const DDPF_YUV = 0x200;
 const DDPF_LUMINANCE = 0x20000;
-const DDPF_BUMPDUDV = 0x80000;
-
-const DDSCAPS_COMPLEX = 0x8; // optional
-const DDSCAPS_MIPMAP = 0x400000; // optional
-const DDSCAPS_TEXTURE = 0x1000; // required
 
 const DDSCAPS2_CUBEMAP = 0x200;
 const DDSCAPS2_CUBEMAP_POSITIVEX = 0x400;
@@ -47,18 +31,10 @@ const DDS_CUBEMAP_ALLFACES =
 
 const DDSCAPS2_VOLUME = 0x200000;
 
-function getDimensionName(dimension: number) {
-  return DX10ResourceDimension[dimension] || String(dimension);
-}
-
 enum DX10ResourceDimension {
   DDS_DIMENSION_TEXTURE1D = 2,
   DDS_DIMENSION_TEXTURE2D = 3,
   DDS_DIMENSION_TEXTURE3D = 4
-}
-
-function getDXGIFormatName(fmt: number) {
-  return DXGIFormat[fmt] || String(fmt);
 }
 
 enum DXGIFormat {
@@ -95,37 +71,6 @@ enum DXGIFormat {
   DXGI_FORMAT_BGRX8_SRGB = 93
 }
 
-enum D3DFormat {
-  D3DFMT_RGB8 = 20,
-  D3DFMT_ARGB8 = 21,
-  D3DFMT_XRGB8 = 22,
-  D3DFMT_RGB565 = 23,
-  D3DFMT_XRGB1555 = 24,
-  D3DFMT_ARGB1555 = 25,
-  D3DFMT_ARGB4 = 26,
-  D3DFMT_A8 = 28,
-  D3DFMT_XRGB4 = 30,
-  D3DFMT_ABGR8 = 32,
-  D3DFMT_XBGR8 = 33,
-  D3DFMT_A8P8 = 40,
-  D3DFMT_P8 = 41,
-  D3DFMT_L8 = 50,
-  D3DFMT_A8L8 = 51,
-  D3DFMT_DXT1 = FourCCToInt32('DXT1'),
-  D3DFMT_DXT2 = FourCCToInt32('DXT2'),
-  D3DFMT_DXT3 = FourCCToInt32('DXT3'),
-  D3DFMT_DXT4 = FourCCToInt32('DXT4'),
-  D3DFMT_DXT5 = FourCCToInt32('DXT5'),
-  D3DFMT_BC4 = FourCCToInt32('ATI1'),
-  D3DFMT_BC5 = FourCCToInt32('ATI2'),
-  D3DFMT_R16F = 111,
-  D3DFMT_RG16F = 112,
-  D3DFMT_RGBA16F = 113,
-  D3DFMT_R32F = 114,
-  D3DFMT_RG32F = 115,
-  D3DFMT_RGBA32F = 116
-}
-
 function FourCCToInt32(value: string) {
   return (
     value.charCodeAt(0) +
@@ -137,57 +82,6 @@ function FourCCToInt32(value: string) {
 
 function Int32ToFourCC(value: number) {
   return String.fromCharCode(value & 0xff, (value >> 8) & 0xff, (value >> 16) & 0xff, (value >> 24) & 0xff);
-}
-
-function getPixelFormatDesc(header: DDSHeader) {
-  let desc = '';
-  const flags: string[] = [];
-  const pf = header.ddsPixelFormat;
-  if (pf.dwFlags & DDPF_ALPHAPIXELS) {
-    flags.push('AlphaPixels');
-  }
-  if (pf.dwFlags & DDPF_ALPHA) {
-    flags.push('Alpha');
-  }
-  if (pf.dwFlags & DDPF_FOURCC) {
-    flags.push('FourCC');
-  }
-  if (pf.dwFlags & DDPF_LUMINANCE) {
-    flags.push('Luminance');
-  }
-  if (pf.dwFlags & DDPF_RGB) {
-    flags.push('RGB');
-  }
-  if (pf.dwFlags & DDPF_YUV) {
-    flags.push('YUV');
-  }
-  if (pf.dwFlags & DDPF_PAL8) {
-    flags.push('Pal8');
-  }
-  if (pf.dwFlags & DDPF_BUMPDUDV) {
-    flags.push('BumpDuDv');
-  }
-  desc += `Flags: ${flags.join('|')}\n`;
-  if (pf.dwFlags & DDPF_FOURCC) {
-    if (!header.ddsHeaderDX10) {
-      const fmt = D3DFormat[pf.dwFourCC] || String(pf.dwFourCC);
-      desc += `FourCC: ${fmt}`;
-    }
-  }
-  if (header.ddsHeaderDX10) {
-    desc += `DXGIFormat: ${getDXGIFormatName(header.ddsHeaderDX10.dxgiFormat)}\n`;
-    desc += `Dimension: ${getDimensionName(header.ddsHeaderDX10.dimension)}\n`;
-    desc += `ArraySize: ${header.ddsHeaderDX10.arraySize}\n`;
-    desc += `DXGIMiscFlag: ${header.ddsHeaderDX10.miscFlag}\n`;
-  }
-  if (pf.dwFlags & (DDPF_RGB | DDPF_ALPHAPIXELS | DDPF_ALPHA | DDPF_LUMINANCE)) {
-    desc += `RGBBitCount: ${pf.dwRGBBitCount}\n`;
-    desc += `RBitMask: 0x${pf.dwRBitMask.toString(16)}\n`;
-    desc += `GBitMask: 0x${pf.dwGBitMask.toString(16)}\n`;
-    desc += `BBitMask: 0x${pf.dwBBitMask.toString(16)}\n`;
-    desc += `ABitMask: 0x${pf.dwABitMask.toString(16)}\n`;
-  }
-  return desc;
 }
 
 interface DDSPixelFormat {

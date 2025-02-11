@@ -135,7 +135,7 @@ lightApp.ready().then(async () => {
           const queue: SceneNode[] = [group];
           while (queue.length > 0) {
             const node = queue.shift();
-            queue.push(...node.children);
+            queue.push(...node.children.map((node) => node.get()));
             if (node.isMesh()) {
               func.call(context, node);
             }

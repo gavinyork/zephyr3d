@@ -64,8 +64,6 @@ gltfApp.ready().then(async () => {
       gltfViewer.toggleScatter();
     } else if (ev.code === 'KeyF') {
       gltfViewer.toggleFloor();
-    } else if (ev.code === 'Backquote') {
-      gltfViewer.toggleInspector();
     } else if (ev.code === 'KeyT') {
       gltfViewer.toggleGUI();
     } else if (ev.code === 'KeyR') {

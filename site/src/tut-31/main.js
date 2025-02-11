@@ -150,13 +150,6 @@ myApp.ready().then(async () => {
 
   camera.lookAt(new Vector3(223, 10, 10), new Vector3(222, 10, 15), Vector3.axisPY());
 
-  // U key to switch wireframe mode
-  myApp.on('keyup', (ev) => {
-    if (ev.code === 'Space') {
-      terrain.wireframe = !terrain.wireframe;
-    }
-  });
-
   // Reset aspect ratio when size was changed
   myApp.on('resize', (width, height) => {
     camera.aspect = width / height;

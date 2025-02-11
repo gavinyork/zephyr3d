@@ -14,7 +14,7 @@
   "scripts": {
     "copy-assets": "shx mkdir -p dist/js && shx cp -R src/assets dist && shx cp src/index.html dist",
     "clean": "shx rm -rf dist .tsbuildinfo",
-    "tsc": "tsc -p . --noEmit",
+    "build:check": "tsc -p . --noEmit",
     "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent",
     "lint": "eslint \"src/**/*.ts\" -f compact",
     "lint-fix": "eslint --fix \"src/**/*.ts\" -f compact",

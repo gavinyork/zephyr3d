@@ -46,6 +46,12 @@ export class WeightedBlendedOIT implements OIT {
     return true;
   }
   /**
+   * {@inheritDoc OIT.wantsPremultipliedAlpha}
+   */
+  wantsPremultipliedAlpha() {
+    return false;
+  }
+  /**
    * {@inheritDoc OIT.dispose}
    */
   dispose() {

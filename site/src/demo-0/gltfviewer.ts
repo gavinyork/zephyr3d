@@ -27,8 +27,6 @@ import {
 } from '@zephyr3d/scene';
 import { EnvMaps } from './envmap';
 import { Panel } from './ui';
-import { Inspector } from '@zephyr3d/inspector';
-import { imGuiInit, imGuiInjectEvent } from '@zephyr3d/imgui';
 
 declare global {
   const DracoDecoderModule: draco3d.DracoDecoderModule;
@@ -63,12 +61,10 @@ export class GLTFViewer {
   private _showGUI: boolean;
   private _showFloor: boolean;
   private _useScatter: boolean;
-  private _showInspector: boolean;
   private _autoRotate: boolean;
   private _compositor: Compositor;
   private _dracoModule: draco3d.DecoderModule;
   private _bboxNoScale: AABB;
-  private _inspector: Inspector;
   constructor(scene: Scene) {
     const device = Application.instance.device;
     this._currentAnimation = null;
@@ -136,22 +132,16 @@ export class GLTFViewer {
     this._showGUI = true;
     this._showFloor = false;
     this._useScatter = false;
-    this._showInspector = true;
     this._dracoModule = null;
-    this._inspector = null;
   }
   async ready() {
     return new Promise<void>((resolve) => {
-      imGuiInit(Application.instance.device).then(() => {
-        this._inspector = new Inspector(this._scene, this._compositor, this._camera);
-        Application.instance.inputManager.use(imGuiInjectEvent);
-        DracoDecoderModule({
-          onModuleLoaded: (module) => {
-            this._dracoModule = module;
-            Application.instance.inputManager.use(this._camera.handleEvent.bind(this._camera));
-            resolve();
-          }
-        });
+      DracoDecoderModule({
+        onModuleLoaded: (module) => {
+          this._dracoModule = module;
+          Application.instance.inputManager.use(this._camera.handleEvent.bind(this._camera));
+          resolve();
+        }
       });
     });
   }
@@ -173,8 +163,8 @@ export class GLTFViewer {
   get scene(): Scene {
     return this._scene;
   }
-  get animationSet(): Ref<AnimationSet> {
-    return this._animationSet;
+  get animationSet(): AnimationSet {
+    return this._animationSet.get();
   }
   get animations(): string[] {
     return this._animationSet.get()?.getAnimationNames() || [];
@@ -198,7 +188,7 @@ export class GLTFViewer {
     await reader.close();
     return fileMap;
   }
-  async loadModel(url: string, httpRequest: HttpRequest) {
+  async loadModel(url: string, httpRequest?: HttpRequest) {
     this._assetManager
       .fetchModel(
         this._scene,
@@ -397,9 +387,6 @@ export class GLTFViewer {
       }
     }
     this._camera.render(this._scene, this._compositor);
-    if (this._showInspector) {
-      this._inspector.render();
-    }
   }
   lookAt() {
     const bbox = this._bboxNoScale;
@@ -540,9 +527,6 @@ export class GLTFViewer {
   toggleFloor() {
     this._showFloor = !this._showFloor;
     this._floor.parent = this._showFloor ? this._modelNode.get() : null;
-  }
-  toggleInspector() {
-    this._showInspector = !this._showInspector;
   }
   toggleGUI() {
     this._showGUI = !this._showGUI;

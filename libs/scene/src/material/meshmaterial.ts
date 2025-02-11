@@ -700,6 +700,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       this.$l.outColor = color ? this.color : pb.vec4();
       if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         ShaderHelper.discardIfClipped(this, this.worldPos);
+        let output = true;
         if (!that.isTransparentPass(that.pass) && !this.zAlphaCutoff && !that.alphaToCoverage) {
           this.outColor.a = 1;
         } else if (that.isTransparentPass(that.pass)) {
@@ -715,15 +716,26 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           });
         }
         if (that.isTransparentPass(that.pass)) {
+          if (!that.drawContext.oit || that.drawContext.oit.wantsPremultipliedAlpha()) {
+            this.outColor = pb.vec4(
+              pb.mul(this.outColor.rgb, this.outColor.a),
+              that.featureUsed<BlendMode>(FEATURE_ALPHABLEND) === 'additive' ? 0 : this.outColor.a
+            );
+          }
+          output = !that.drawContext.oit || !that.drawContext.oit.outputFragmentColor(this, this.outColor);
+          /*
           if (!that.drawContext.oit || !that.drawContext.oit.outputFragmentColor(this, this.outColor)) {
             this.outColor = pb.vec4(
               pb.mul(this.outColor.rgb, this.outColor.a),
               that.featureUsed<BlendMode>(FEATURE_ALPHABLEND) === 'additive' ? 0 : this.outColor.a
             );
           }
+          */
         }
-        ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext);
-        this.$outputs.zFragmentOutput = ShaderHelper.encodeColorOutput(this, this.outColor);
+        if (output) {
+          ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext);
+          this.$outputs.zFragmentOutput = ShaderHelper.encodeColorOutput(this, this.outColor);
+        }
       } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
         if (color) {
           this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {

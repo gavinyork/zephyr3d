@@ -27,12 +27,6 @@ export class Renderer {
   /** @internal */
   private _indexPosition: number;
   /** @internal */
-  private _drawCount: number;
-  /** @internal */
-  private _indexCount: number;
-  /** @internal */
-  private _currentTexture: Texture2D;
-  /** @internal */
   private _program: GPUProgram;
   /** @internal */
   private _textureSampler: TextureSampler;
@@ -52,8 +46,6 @@ export class Renderer {
   private _projectionMatrix: Matrix4x4;
   /** @internal */
   private _flipMatrix: Matrix4x4;
-  /** @internal */
-  private _scissor: number[];
   /** @internal */
   private _clearBeforeRender: boolean;
   /**
@@ -95,10 +87,6 @@ export class Renderer {
     }
     this._drawPosition = 0;
     this._indexPosition = 0;
-    this._drawCount = 0;
-    this._indexCount = 0;
-    this._scissor = [0, 0, 0, 0];
-    this._currentTexture = null;
     this._clearBeforeRender = false;
   }
   /** Gets the render device */

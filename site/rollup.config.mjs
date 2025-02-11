@@ -50,6 +50,9 @@ function traverseDirectory(dirPath, rootPath, dict) {
   dict = dict || {};
   for (const entry of entries) {
     const fullPath = path.join(dirPath, entry);
+    if (fullPath.indexOf('node_modules') >= 0) {
+      continue;
+    }
     try {
       const stats = fs.statSync(fullPath);
       if (stats.isDirectory()) {
@@ -61,7 +64,7 @@ function traverseDirectory(dirPath, rootPath, dict) {
         dict[path.relative(rootPath, fullPath)] = fileMD5;
       }
     } catch (err) {
-      console.error(err);
+      console.error(`${fullPath}:${err}`);
     }
   }
   return dict;

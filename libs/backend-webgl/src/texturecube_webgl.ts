@@ -192,6 +192,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       this.generateMipmaps();
     }
   }
+  /*
   private loadImages(images: HTMLImageElement[], format: TextureFormat): void {
     const width = images[0].width;
     const height = images[0].height;
@@ -235,6 +236,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       }
     }
   }
+  */
   private loadLevels(levels: TextureMipmapData, sRGB: boolean): void {
     const format = sRGB ? linearTextureFormatToSRGB(levels.format) : levels.format;
     const width = levels.width;
