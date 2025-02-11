@@ -97,48 +97,6 @@ export function mixinTextureProps<U extends string>(name: U) {
         let sampler: TextureSampler = null;
         let texCoord = 0;
         let matrix: Matrix4x4 = null;
-        Object.defineProperty(this, `sample${capName}Texture`, {
-          value: function (scope: PBInsideFunctionScope, texCoord?: PBShaderExp): PBShaderExp {
-            const tex = this[`get${capName}TextureUniform`](scope);
-            const coord = texCoord ?? this[`get${capName}TexCoord`](scope);
-            return scope.$builder.textureSample(tex, coord);
-          },
-          writable: false,
-          enumerable: false,
-          configurable: false
-        });
-        Object.defineProperty(this, `get${capName}TextureUniform`, {
-          value: function (scope: PBInsideFunctionScope): PBShaderExp {
-            return scope.$builder.shaderKind === 'fragment' ? scope[`z${capName}Tex`] : null;
-          },
-          writable: false,
-          enumerable: false,
-          configurable: false
-        });
-        Object.defineProperty(this, `get${capName}TexCoord`, {
-          value: function (scope: PBInsideFunctionScope): PBShaderExp {
-            if (texCoord < 0) {
-              return null;
-            }
-            const pb = scope.$builder;
-            if ((pb.shaderKind === 'vertex') !== !!vertex) {
-              throw new Error(
-                `mixinTextureProps.get${capName}TexCoord(): must be called in ${
-                  vertex ? 'vertex' : 'fragment'
-                } stage`
-              );
-            }
-            return scope.$builder.shaderKind === 'fragment'
-              ? scope.$inputs[`z${capName}TexCoord`]
-              : this.featureUsed(featureTexMatrix)
-              ? pb.mul(scope[`z${capName}TextureMatrix`], pb.vec4(scope.$inputs[`texCoord${texCoord}`], 0, 1))
-                  .xy
-              : scope.$inputs[`texCoord${texCoord}`];
-          },
-          writable: false,
-          enumerable: false,
-          configurable: false
-        });
         Object.defineProperty(this, `${name}Texture`, {
           get: function (): Texture2D {
             return texture.get();
@@ -196,6 +154,33 @@ export function mixinTextureProps<U extends string>(name: U) {
           enumerable: true,
           configurable: true
         });
+      }
+      [`sample${capName}Texture`](scope: PBInsideFunctionScope, texCoord?: PBShaderExp): PBShaderExp {
+        const tex = this[`get${capName}TextureUniform`](scope);
+        const coord = texCoord ?? this[`get${capName}TexCoord`](scope);
+        return scope.$builder.textureSample(tex, coord);
+      }
+      [`get${capName}TextureUniform`](scope: PBInsideFunctionScope): PBShaderExp {
+        return scope.$builder.shaderKind === 'fragment' ? scope[`z${capName}Tex`] : null;
+      }
+      [`get${capName}TexCoord`](scope: PBInsideFunctionScope): PBShaderExp {
+        const texCoord = (this as any)[`${name}TexCoordIndex`];
+        if (texCoord < 0) {
+          return null;
+        }
+        const pb = scope.$builder;
+        if ((pb.shaderKind === 'vertex') !== !!vertex) {
+          throw new Error(
+            `mixinTextureProps.get${capName}TexCoord(): must be called in ${
+              vertex ? 'vertex' : 'fragment'
+            } stage`
+          );
+        }
+        return scope.$builder.shaderKind === 'fragment'
+          ? scope.$inputs[`z${capName}TexCoord`]
+          : this.featureUsed(featureTexMatrix)
+          ? pb.mul(scope[`z${capName}TextureMatrix`], pb.vec4(scope.$inputs[`texCoord${texCoord}`], 0, 1)).xy
+          : scope.$inputs[`texCoord${texCoord}`];
       }
       copyFrom(other: any): void {
         super.copyFrom(other);
