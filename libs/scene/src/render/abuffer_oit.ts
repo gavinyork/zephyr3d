@@ -25,6 +25,7 @@ import { ShaderHelper } from '../material';
 export class ABufferOIT implements OIT {
   /** Type name of ABufferOIT */
   public static readonly type = 'ab';
+  public static readonly usePremultipliedAlpha = true;
   private static MAX_FRAGMENT_LAYERS = 75;
   private static _compositeProgram: GPUProgram = null;
   private static _compositeBindGroup: BindGroup = null;
@@ -43,7 +44,6 @@ export class ABufferOIT implements OIT {
   private _currentPass: number;
   private _savedScissor: DeviceViewport;
   private _disposed: boolean;
-  private _usePremultipliedAlpha: boolean;
   /**
    * Creates an instance of ABufferOIT class
    *
@@ -62,7 +62,6 @@ export class ABufferOIT implements OIT {
     this._scissorHeight = 0;
     this._savedScissor = null;
     this._currentPass = 0;
-    this._usePremultipliedAlpha = false;
     this._disposed = false;
   }
   /**
@@ -81,7 +80,7 @@ export class ABufferOIT implements OIT {
    * {@inheritDoc OIT.wantsPremultipliedAlpha}
    */
   wantsPremultipliedAlpha() {
-    return this._usePremultipliedAlpha;
+    return ABufferOIT.usePremultipliedAlpha;
   }
   /**
    * {@inheritDoc OIT.dispose}
@@ -194,9 +193,9 @@ export class ABufferOIT implements OIT {
     ]);
     device.copyBuffer(this._headStagingBuffer, this._headBuffer, 0, 0, this._headStagingBuffer.byteLength);
     // Update render hash
-    this._hash = `${this.getType()}#${Number(this._usePremultipliedAlpha)}#${this._nodeBuffer.uid}#${
-      this._headBuffer.uid
-    }#${this._scissorOffsetBuffer.uid}#${pass}`;
+    this._hash = `${this.getType()}#${this._nodeBuffer.uid}#${this._headBuffer.uid}#${
+      this._scissorOffsetBuffer.uid
+    }#${pass}`;
     if (this._debug) {
       const data = new Uint8Array(this._headBuffer.byteLength);
       const readBuffer = device.createBuffer(this._headBuffer.byteLength, { usage: 'read' });
@@ -373,11 +372,15 @@ export class ABufferOIT implements OIT {
               });
               // under operator blending
               this.$l.c0 = this.unpackColor(this.fragmentArray[0]);
-              this.$l.c_dst = pb.mul(this.c0.rgb, this.c0.a);
+              this.$l.c_dst = ABufferOIT.usePremultipliedAlpha ? this.c0.rgb : pb.mul(this.c0.rgb, this.c0.a);
               this.$l.a_dst = pb.sub(1, this.c0.a);
               this.$for(pb.uint('i'), 1, this.fragmentArrayLen, function () {
                 this.$l.c = this.unpackColor(this.fragmentArray.at(this.i));
-                this.c_dst = pb.add(pb.mul(this.c.rgb, this.c.a, this.a_dst), this.c_dst);
+                if (ABufferOIT.usePremultipliedAlpha) {
+                  this.c_dst = pb.add(this.c_dst, pb.mul(this.c.rgb, this.a_dst));
+                } else {
+                  this.c_dst = pb.add(this.c_dst, pb.mul(this.c.rgb, this.c.a, this.a_dst));
+                }
                 this.a_dst = pb.mul(this.a_dst, pb.sub(1, this.c.a));
               });
               this.$outputs.outColor = pb.vec4(this.c_dst, this.a_dst);
