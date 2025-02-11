@@ -14,15 +14,15 @@ const MAX_NUM_WAVES = 64;
  * Gerstner wave generator.
  * @public
  */
-export class GerstnerWaveGenerator extends WaveGenerator {
+export class GerstnerWaveGenerator implements WaveGenerator {
   private _currentTime: number;
   private _waveParams: Float32Array;
   private _numWaves: number;
+  private _disposed: boolean;
   /**
    * Creates a new Gerstner wave generator.
    */
   constructor() {
-    super();
     this._currentTime = 0;
     this._waveParams = new Float32Array(8 * MAX_NUM_WAVES);
     this.randomWave(0);
@@ -30,6 +30,10 @@ export class GerstnerWaveGenerator extends WaveGenerator {
     this.randomWave(2);
     this.randomWave(3);
     this._numWaves = 4;
+    this._disposed = false;
+  }
+  get disposed() {
+    return this._disposed;
   }
   /** Gets the number of waves. */
   get numWaves(): number {
@@ -330,5 +334,7 @@ export class GerstnerWaveGenerator extends WaveGenerator {
     return '';
   }
   /** {@inheritDoc WaveGenerator.dispose} */
-  dispose(): void {}
+  dispose(): void {
+    this._disposed = true;
+  }
 }

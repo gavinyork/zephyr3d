@@ -137,7 +137,7 @@ const THREAD_GROUP_SIZE = 16;
  * This class generates a 2D ocean field using the Fast Fourier Transform (FFT) algorithm.
  * @public
  */
-export class FFTWaveGenerator extends WaveGenerator {
+export class FFTWaveGenerator implements WaveGenerator {
   private static _globals: Globales = null;
   private _useComputeShader: boolean;
   private _h0BindGroup: BindGroup;
@@ -170,12 +170,12 @@ export class FFTWaveGenerator extends WaveGenerator {
   private _h0TextureFormat: TextureFormat;
   private _dataTextureFormat: TextureFormat;
   private _renderMode: number;
+  private _disposed: boolean;
   /**
    * Create a new instance of the FFTWaveGenerator class.
    * @param params - Ocean field build parameters. If not provided, default parameters will be used.
    */
   constructor(params?: OceanFieldBuildParams) {
-    super();
     const device = Application.instance.device;
     const renderTargetFloat16 = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer;
     const maxDrawBuffers = /*device.type !== 'webgl' && */ renderTargetFloat16
@@ -272,7 +272,11 @@ export class FFTWaveGenerator extends WaveGenerator {
       this._updateRenderStates.useRasterizerState().setCullMode('none');
       this._updateRenderStates.useDepthState().enableTest(false).enableWrite(false);
       this._paramsChanged = true;
+      this._disposed = false;
     }
+  }
+  get disposed() {
+    return this._disposed;
   }
   /*
   get params() {
@@ -1280,7 +1284,10 @@ export class FFTWaveGenerator extends WaveGenerator {
   }
   /** {@inheritDoc WaveGenerator.dispose} */
   dispose() {
-    this.disposeInstanceData();
+    if (!this._disposed) {
+      this._disposed = true;
+      this.disposeInstanceData();
+    }
   }
   /** {@inheritDoc WaveGenerator.calcClipmapTileAABB} */
   calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB) {
