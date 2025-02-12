@@ -1,4 +1,4 @@
-import { Vector4, Vector3 } from '@zephyr3d/base';
+import { Vector4, Vector3, Matrix4x4 } from '@zephyr3d/base';
 import type { AbstractDevice, GPUProgram, BindGroup, RenderStateSet } from '@zephyr3d/device';
 import { Application } from '../app';
 import { Clipmap } from './clipmap';
@@ -187,10 +187,11 @@ export class WaterMesh {
         },
         drawPrimitive(prim, modelMatrix, offset, scale, gridScale) {
           const clipmapBindGroup = that.getClipmapBindGroup(device);
-          clipmapBindGroup.setValue('modelMatrix', modelMatrix);
-          clipmapBindGroup.setValue('offset', offset);
-          clipmapBindGroup.setValue('scale', scale);
-          clipmapBindGroup.setValue('gridScale', gridScale);
+          const worldMatrix = new Matrix4x4(modelMatrix)
+            .scaleLeft(new Vector3(scale, scale, 1))
+            .translateLeft(new Vector3(offset.x, offset.y, 0))
+            .scaleLeft(new Vector3(gridScale, gridScale, 1));
+          clipmapBindGroup.setValue('worldMatrix', worldMatrix);
           device.setBindGroup(1, clipmapBindGroup);
           prim.primitiveType = that._wireframe ? 'line-strip' : 'triangle-list';
           prim.draw();

@@ -117,14 +117,13 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
       this.$outputs.outXZ = pb.vec2();
       this.flip = pb.int().uniform(0);
       this.viewProjMatrix = pb.mat4().uniform(0);
-      this.modelMatrix = pb.mat4().uniform(1);
-      this.gridScale = pb.float().uniform(1);
+      this.worldMatrix = pb.mat4().uniform(1);
       this.level = pb.float().uniform(0);
-      this.offset = pb.vec2().uniform(1);
-      this.scale = pb.float().uniform(1);
       shadingImpl.setupUniforms(this);
       waveGenerator.setupUniforms(this);
       pb.main(function () {
+        this.$l.xz = pb.mul(this.worldMatrix, pb.vec4(this.$inputs.position, 1)).xy;
+        /*
         this.$l.xz = pb.mul(
           pb.add(
             this.offset,
@@ -132,6 +131,7 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
           ),
           this.gridScale
         );
+        */
         this.$l.outPos = pb.vec3();
         this.$l.outNormal = pb.vec3();
         waveGenerator.calcVertexPositionAndNormal(

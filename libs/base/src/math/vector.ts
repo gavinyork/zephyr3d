@@ -4417,38 +4417,22 @@ export class Matrix4x4 extends VectorBase {
    */
   static scaleLeft(m: Matrix4x4, s: Vector3, result?: Matrix4x4): Matrix4x4 {
     result = result || new Matrix4x4();
-    if (result !== m) {
-      result[0] = m[0] * s.x;
-      result[1] = m[1] * s.y;
-      result[2] = m[2] * s.z;
-      result[3] = m[3];
-      result[4] = m[4] * s.x;
-      result[5] = m[5] * s.y;
-      result[6] = m[6] * s.z;
-      result[7] = m[7];
-      result[8] = m[8] * s.x;
-      result[9] = m[9] * s.y;
-      result[10] = m[10] * s.z;
-      result[11] = m[11];
-      result[12] = m[12] * s.x;
-      result[13] = m[13] * s.y;
-      result[14] = m[14] * s.z;
-      result[15] = m[15];
-    } else {
-      result[0] *= s.x;
-      result[1] *= s.y;
-      result[2] *= s.z;
-      result[4] *= s.x;
-      result[5] *= s.y;
-      result[6] *= s.z;
-      result[8] *= s.x;
-      result[9] *= s.y;
-      result[10] *= s.z;
-      result[12] *= s.x;
-      result[13] *= s.y;
-      result[14] *= s.z;
-    }
-
+    result[0] = m[0] * s.x;
+    result[1] = m[1] * s.y;
+    result[2] = m[2] * s.z;
+    result[3] = m[3];
+    result[4] = m[4] * s.x;
+    result[5] = m[5] * s.y;
+    result[6] = m[6] * s.z;
+    result[7] = m[7];
+    result[8] = m[8] * s.x;
+    result[9] = m[9] * s.y;
+    result[10] = m[10] * s.z;
+    result[11] = m[11];
+    result[12] = m[12] * s.x;
+    result[13] = m[13] * s.y;
+    result[14] = m[14] * s.z;
+    result[15] = m[15];
     return result;
   }
   /**
