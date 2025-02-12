@@ -101,9 +101,6 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
     }
     return true;
   }
-  getInstanceColor(): Vector4 {
-    return this._terrain.getInstanceColor();
-  }
   getPickTarget(): PickTarget {
     return { node: this._terrain };
   }

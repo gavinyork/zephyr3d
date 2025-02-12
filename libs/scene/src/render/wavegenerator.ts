@@ -6,7 +6,7 @@ import type {
   PBInsideFunctionScope,
   PBShaderExp
 } from '@zephyr3d/device';
-import { Disposable } from '../app';
+import type { Disposable } from '../app';
 
 /**
  * Abstract class for wave generators.

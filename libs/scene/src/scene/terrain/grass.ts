@@ -1,4 +1,3 @@
-import type { Vector4 } from '@zephyr3d/base';
 import { Vector2, applyMixins, nextPowerOf2 } from '@zephyr3d/base';
 import { Primitive } from '../../render/primitive';
 import type { BatchDrawable, Drawable, DrawContext, PickTarget } from '../../render/drawable';
@@ -56,9 +55,6 @@ export class GrassCluster extends applyMixins(GrassClusterBase, mixinDrawable) i
   }
   getPrimitive(): Primitive {
     return this._primitive;
-  }
-  getInstanceColor(): Vector4 {
-    return this._terrain.getInstanceColor();
   }
   getPickTarget(): PickTarget {
     return { node: this._terrain };

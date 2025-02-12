@@ -44,8 +44,6 @@ export class Terrain extends GraphNode implements NodeClonable<Terrain> {
   private _viewPoint: Vector3;
   /** @internal */
   private _castShadow: boolean;
-  /** @internal */
-  private _instanceColor: Vector4;
   /**
    * Creates an instance of Terrain
    * @param scene - The scene to which the terrain belongs
@@ -65,7 +63,6 @@ export class Terrain extends GraphNode implements NodeClonable<Terrain> {
     this._material = null;
     this._viewPoint = null;
     this._castShadow = true;
-    this._instanceColor = Vector4.zero();
   }
   clone(method: NodeCloneMethod, recursive: boolean) {
     const terrain = new Terrain(this.scene);
@@ -96,12 +93,6 @@ export class Terrain extends GraphNode implements NodeClonable<Terrain> {
    */
   getName(): string {
     return this._name;
-  }
-  /**
-   * {@inheritDoc Drawable.getInstanceColor}
-   */
-  getInstanceColor(): Vector4 {
-    return this._instanceColor;
   }
   /** Wether the mesh node casts shadows */
   get castShadow(): boolean {

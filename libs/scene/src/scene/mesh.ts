@@ -1,4 +1,4 @@
-import { Vector4, applyMixins } from '@zephyr3d/base';
+import { applyMixins } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import { BoxFrameShape } from '../shapes';
 import type { MeshMaterial } from '../material';
@@ -44,8 +44,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   protected _boundingBoxNode: Mesh;
   /** @internal */
-  protected _instanceColor: Vector4;
-  /** @internal */
   protected _skinAnimation: boolean;
   /** @internal */
   protected _morphAnimation: boolean;
@@ -65,7 +63,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._instanceHash = null;
     this._pickTarget = { node: this };
     this._boundingBoxNode = null;
-    this._instanceColor = Vector4.zero();
     this._batchable = Application.instance.deviceType !== 'webgl';
     this._bboxChangeCallback = this._onBoundingboxChange.bind(this);
     this.primitive = primitive ?? null;
@@ -109,12 +106,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    */
   getInstanceUniforms(): Float32Array {
     return this._material.get().$instanceUniforms;
-  }
-  /**
-   * {@inheritDoc Drawable.getInstanceColor}
-   */
-  getInstanceColor(): Vector4 {
-    return this._instanceColor;
   }
   /**
    * {@inheritDoc Drawable.getPickTarget }

@@ -1,5 +1,5 @@
 import type { AABB } from '@zephyr3d/base';
-import { WaveGenerator } from './wavegenerator';
+import type { WaveGenerator } from './wavegenerator';
 import type {
   AbstractDevice,
   BindGroup,

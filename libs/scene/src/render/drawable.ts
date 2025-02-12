@@ -115,8 +115,6 @@ export interface Drawable {
   getId(): number;
   /** Gets the XForm of the object */
   getNode(): SceneNode;
-  /** Gets the instance color */
-  getInstanceColor(): Vector4;
   /** If set, the pick target will be returned as the pick result  */
   getPickTarget(): PickTarget;
   /** Gets the texture that contains the bone matrices of the object */

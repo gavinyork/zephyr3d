@@ -86,7 +86,6 @@ export class ParticleSystem
   private _primitive: Ref<Primitive>;
   private _material: Ref<ParticleMaterial>;
   private _wsBoundingBox: BoundingBox;
-  private _instanceColor: Vector4;
   private _pickTarget: PickTarget;
   private _instanceData: Float32Array;
   constructor(scene: Scene) {
@@ -127,7 +126,6 @@ export class ParticleSystem
     this._particleAccelMax = -0.02;
     this._transparency = 1;
     this._colorMultiplier = 1;
-    this._instanceColor = Vector4.zero();
     this._pickTarget = { node: this };
     this._flags = PS_WORLDSPACE;
     this._primitive = new Ref();
@@ -708,12 +706,6 @@ export class ParticleSystem
       }
       this._activeParticleList.push(node);
     }
-  }
-  /**
-   * {@inheritDoc Drawable.getInstanceColor}
-   */
-  getInstanceColor(): Vector4 {
-    return this._instanceColor;
   }
   /**
    * {@inheritDoc Drawable.getPickTarget }
