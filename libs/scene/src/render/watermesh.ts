@@ -86,7 +86,7 @@ export class WaterMesh {
     if (!this._impl || !this._waveGenerator?.isOk(device)) {
       return false;
     }
-    if (this._waterProgram && this._waveGeneratorHash !== this._waveGenerator.getHash(device)) {
+    if (this._waterProgram && this._waveGeneratorHash !== this._waveGenerator.getHash()) {
       this._waterProgram.dispose();
       this._waterProgram = null;
       this._waterBindGroup.dispose();
@@ -95,7 +95,7 @@ export class WaterMesh {
     if (!this._waterProgram) {
       this._waterProgram = createProgramOcean(this._waveGenerator, this._impl);
       this._waterBindGroup = device.createBindGroup(this._waterProgram.bindGroupLayouts[0]);
-      this._waveGeneratorHash = this._waveGenerator.getHash(device);
+      this._waveGeneratorHash = this._waveGenerator.getHash();
     }
     if (!this._waterRenderStates) {
       this._waterRenderStates = device.createRenderStateSet();

@@ -1,12 +1,6 @@
 import type { AABB } from '@zephyr3d/base';
 import type { WaveGenerator } from './wavegenerator';
-import type {
-  AbstractDevice,
-  BindGroup,
-  PBGlobalScope,
-  PBInsideFunctionScope,
-  PBShaderExp
-} from '@zephyr3d/device';
+import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 
 const MAX_NUM_WAVES = 64;
 
@@ -330,7 +324,7 @@ export class GerstnerWaveGenerator implements WaveGenerator {
     return true;
   }
   /** {@inheritDoc WaveGenerator.getHash} */
-  getHash(device: AbstractDevice): string {
+  getHash(): string {
     return '';
   }
   /** {@inheritDoc WaveGenerator.dispose} */

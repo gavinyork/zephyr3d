@@ -9,7 +9,7 @@ import {
   PBRSpecularGlossinessMaterial,
   UnlitMaterial
 } from '../../material';
-import { Primitive } from '../../render';
+import { GerstnerWaveGenerator, Primitive } from '../../render';
 import {
   BatchGroup,
   DirectionalLight,
@@ -56,7 +56,12 @@ import {
 import { getSceneClass } from './scene/scene';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
-import { getWaterClass } from './scene/water';
+import {
+  GerstnerWaveCls,
+  getGerstnerWaveClass,
+  getGerstnerWaveGeneratorClass,
+  getWaterClass
+} from './scene/water';
 import { Water } from '../../scene/water';
 
 export * from './asset/asset';
@@ -84,7 +89,8 @@ const defaultValues: Record<PropertyType, any> = {
   string: '',
   vec2: [0, 0],
   vec3: [0, 0, 0],
-  vec4: [0, 0, 0, 0]
+  vec4: [0, 0, 0, 0],
+  command: null
 };
 
 function getDefaultValue<T>(obj: T, prop: PropertyAccessor<T>) {
@@ -106,6 +112,8 @@ export function getSerializationInfo(assetRegistry: AssetRegistry) {
       [GraphNode, getGraphNodeClass(assetRegistry)],
       [Mesh, getMeshClass(assetRegistry)],
       [Water, getWaterClass(assetRegistry)],
+      [GerstnerWaveCls, getGerstnerWaveClass(assetRegistry)],
+      [GerstnerWaveGenerator, getGerstnerWaveGeneratorClass(assetRegistry)],
       [ParticleSystem, getParticleNodeClass(assetRegistry)],
       [PunctualLight, getPunctualLightClass(assetRegistry)],
       [DirectionalLight, getDirectionalLightClass(assetRegistry)],
@@ -152,6 +160,9 @@ export async function deserializeObjectProps<T>(
       if (promises.length > 0) {
         await Promise.all(promises);
       }
+    }
+    if (prop.type === 'command') {
+      continue;
     }
     if (!prop.set) {
       continue;
@@ -239,6 +250,9 @@ export function serializeObjectProps<T>(
   const props = cls.getProps(obj) ?? [];
   for (const prop of props) {
     if (prop.isValid && !prop.isValid.call(obj)) {
+      continue;
+    }
+    if (prop.type === 'command') {
       continue;
     }
     const persistent = prop.persistent ?? true;

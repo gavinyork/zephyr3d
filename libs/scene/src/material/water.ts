@@ -1,18 +1,22 @@
 import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
 import { MeshMaterial } from './meshmaterial';
-import type { DrawContext } from '../render';
+import type { DrawContext, WaveGenerator } from '../render';
 import { MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
 import { Matrix4x4, Vector4 } from '@zephyr3d/base';
+import { Ref } from '../app';
 
 export class WaterMaterial extends MeshMaterial {
   private static FEATURE_SSR = this.defineFeature();
+  private static _waveUpdateState: WeakMap<WaveGenerator, number> = new WeakMap();
   private _region: Vector4;
+  private _waveGenerator: Ref<WaveGenerator>;
   private _clipmapMatrix: Matrix4x4;
   constructor() {
     super();
     this._region = new Vector4(-99999, -99999, 99999, 99999);
     this._clipmapMatrix = new Matrix4x4();
+    this._waveGenerator = new Ref();
     this.cullMode = 'none';
     this.useFeature(WaterMaterial.FEATURE_SSR, true);
   }
@@ -31,6 +35,18 @@ export class WaterMaterial extends MeshMaterial {
       this.uniformChanged();
     }
   }
+  get waveGenerator() {
+    return this._waveGenerator.get();
+  }
+  set waveGenerator(waveGenerator: WaveGenerator) {
+    if (this._waveGenerator.get() !== waveGenerator) {
+      this._waveGenerator.set(waveGenerator);
+      this.uniformChanged();
+    }
+  }
+  protected _createHash(): string {
+    return `${super._createHash}:${this.waveGenerator?.getHash() ?? ''}`;
+  }
   setClipmapMatrix(mat: Matrix4x4) {
     this._clipmapMatrix.set(mat);
     this.uniformChanged();
@@ -44,15 +60,19 @@ export class WaterMaterial extends MeshMaterial {
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
     const pb = scope.$builder;
+    this.waveGenerator?.setupUniforms(scope);
     scope.$inputs.position = pb.vec3().attrib('position');
     scope.clipmapMatrix = pb.mat4().uniform(2);
     scope.$l.clipmapPos = pb.mul(scope.clipmapMatrix, pb.vec4(scope.$inputs.position, 1)).xy;
     //scope.$l.level = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(0, 0, 0, 1)).y;
-    scope.$outputs.worldPos = pb.mul(
+    scope.worldPos = pb.mul(
       ShaderHelper.getWorldMatrix(scope),
       pb.vec4(scope.clipmapPos.x, 0, scope.clipmapPos.y, 1)
     ).xyz; // pb.vec3(scope.clipmapPos.x, scope.level, scope.clipmapPos.y);
-    scope.$outputs.worldNormal = pb.vec3(0, 1, 0);
+    scope.worldNormal = pb.vec3(0, 1, 0);
+    this.waveGenerator?.calcVertexPositionAndNormal(scope, scope.worldPos, scope.worldPos, scope.worldNormal);
+    scope.$outputs.worldPos = scope.worldPos;
+    scope.$outputs.worldNormal = scope.worldNormal;
     ShaderHelper.setClipSpacePosition(
       scope,
       pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
@@ -90,5 +110,18 @@ export class WaterMaterial extends MeshMaterial {
     super.applyUniformValues(bindGroup, ctx, pass);
     bindGroup.setValue('clipmapMatrix', this._clipmapMatrix);
     bindGroup.setValue('region', this._region);
+  }
+  needUpdate() {
+    return !!this._waveGenerator.get();
+  }
+  update(frameId: number, elapsed: number) {
+    const waveGenerator = this._waveGenerator.get();
+    if (waveGenerator) {
+      const updateFrameId = WaterMaterial._waveUpdateState.get(waveGenerator);
+      if (updateFrameId !== frameId) {
+        waveGenerator.update(elapsed);
+        WaterMaterial._waveUpdateState.set(waveGenerator, frameId);
+      }
+    }
   }
 }

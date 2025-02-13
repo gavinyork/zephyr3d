@@ -4,7 +4,7 @@ import type { NodeClonable, NodeCloneMethod } from './scene_node';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
 import { mixinDrawable } from '../render/drawable_mixin';
-import type { Drawable, DrawContext, PickTarget, Primitive } from '../render';
+import type { Drawable, DrawContext, PickTarget, Primitive, WaveGenerator } from '../render';
 import { Clipmap } from '../render';
 import { WaterMaterial } from '../material/water';
 import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
@@ -35,6 +35,24 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
     super.copyFrom(other, method, recursive);
+  }
+  get material(): WaterMaterial {
+    return this._material.get();
+  }
+  get waveGenerator(): WaveGenerator {
+    return this.material.waveGenerator;
+  }
+  set waveGenerator(waveGenerator: WaveGenerator) {
+    this.material.waveGenerator = waveGenerator;
+    if (this.material.needUpdate()) {
+      this.scene.queueUpdateNode(this);
+    }
+  }
+  update(frameId: number, elapsedInSeconds: number) {
+    if (this.material.needUpdate()) {
+      this.scene.queueUpdateNode(this);
+      this.material.update(frameId, elapsedInSeconds);
+    }
   }
   /**
    * {@inheritDoc Drawable.getPickTarget }

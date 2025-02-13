@@ -37,6 +37,8 @@ export class Scene extends makeEventTarget(Object)<{
   protected _animationSet: WeakRef<AnimationSet>[];
   /** @internal */
   protected _id: number;
+  /** @internal */
+  protected _nodeUpdateQueue: WeakRef<SceneNode>[];
   /**
    * Creates an instance of scene
    */
@@ -45,6 +47,7 @@ export class Scene extends makeEventTarget(Object)<{
     this._id = ++Scene._nextId;
     this._octree = new Octree(this, 8, 8);
     this._nodePlaceList = new Set();
+    this._nodeUpdateQueue = [];
     this._env = new Environment();
     this._updateFrame = -1;
     this._animationSet = [];
@@ -155,6 +158,19 @@ export class Scene extends makeEventTarget(Object)<{
     }
     return new Ray(vEye, vDir);
   }
+  /**
+   * Add node to the update queue so the node's update method will be called before render.
+   * @param node - Node to be queued to update
+   *
+   * @remarks
+   * Node will be removed from update queue after frame rendered, to update the node continuous,
+   * call queueUpdateNode in the update method.
+   */
+  queueUpdateNode(node: SceneNode) {
+    if (node && this._nodeUpdateQueue.findIndex((val) => val.get() === node) < 0) {
+      this._nodeUpdateQueue.push(new WeakRef(node));
+    }
+  }
   /** @internal */
   invalidateNodePlacement(node: GraphNode) {
     this._nodePlaceList.add(node);
@@ -203,6 +219,15 @@ export class Scene extends makeEventTarget(Object)<{
       this.updateEnvLight();
       this.dispatchEvent('update', this);
       this.updateNodePlacement(this._octree, this._nodePlaceList);
+      const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
+      const deltaInSeconds = frameInfo.elapsedFrame * 0.001;
+      const queue = this._nodeUpdateQueue;
+      this._nodeUpdateQueue = [];
+      while (queue.length > 0) {
+        const ref = queue.shift();
+        ref.get()?.update(frameInfo.frameCounter, elapsedInSeconds, deltaInSeconds);
+        ref.dispose();
+      }
     }
   }
   /**

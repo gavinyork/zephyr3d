@@ -12,7 +12,8 @@ export type PropertyType =
   | 'rgb'
   | 'rgba'
   | 'object'
-  | 'object_array';
+  | 'object_array'
+  | 'command';
 
 export type PropertyValue = {
   num?: number[];
@@ -39,6 +40,7 @@ export type PropertyAccessor<T = unknown> = {
   get: (this: T, value: PropertyValue) => void;
   set?: (this: T, value: PropertyValue) => void | Promise<void>;
   isValid?: (this: T) => boolean;
+  command?: (this: T, index: number) => void;
   getDefaultValue?: (this: T) => any;
 };
 

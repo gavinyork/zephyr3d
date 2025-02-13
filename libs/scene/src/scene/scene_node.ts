@@ -839,6 +839,10 @@ export class SceneNode
     return this;
   }
   /**
+   * Update node state if update straigy is not 'none'
+   */
+  update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number) {}
+  /**
    * Removes this node from it's parent and add this node to another parent node if required
    * @param p - The new parent node that this node should be added to or null
    * @returns self

@@ -73,7 +73,7 @@ export interface WaveGenerator extends Disposable {
    * Get the shader hash of the wave generator.
    * @param device - Rendering device.
    */
-  getHash(device: AbstractDevice): string;
+  getHash(): string;
   /**
    * Check if the wave generator is ok.
    * @param device - Rendering device.
