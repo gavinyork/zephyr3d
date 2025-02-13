@@ -1,4 +1,4 @@
-import type { Vector4 } from '@zephyr3d/base';
+import { Vector4 } from '@zephyr3d/base';
 import { applyMixins, Matrix4x4, Vector3 } from '@zephyr3d/base';
 import type { NodeClonable, NodeCloneMethod } from './scene_node';
 import type { Scene } from './scene';
@@ -25,6 +25,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._clipmap = new Clipmap(32);
     this._gridScale = 1;
     this._material = new Ref(new WaterMaterial());
+    this._material.get().region = new Vector4(-1, -1, 1, 1);
   }
   clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new Water(this.scene);
@@ -118,8 +119,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     return this._material.get().region;
   }
   set region(val: Vector4) {
-    this._material.get().region = val;
-    this.invalidateWorldBoundingVolume(false);
+    if (this._material) {
+      this._material.get().region = val;
+      this.invalidateWorldBoundingVolume(false);
+    }
   }
   /**
    * Grid scale
@@ -129,6 +132,25 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   set gridScale(val: number) {
     this._gridScale = val;
+  }
+  calculateLocalTransform(outMatrix: Matrix4x4): void {
+    outMatrix.translation(this._position);
+  }
+  calculateWorldTransform(outMatrix: Matrix4x4): void {
+    outMatrix.set(this.localMatrix);
+    if (this.parent) {
+      outMatrix.m03 += this.parent.worldMatrix.m03;
+      outMatrix.m13 += this.parent.worldMatrix.m13;
+      outMatrix.m23 += this.parent.worldMatrix.m23;
+    }
+  }
+  protected _onTransformChanged(invalidateLocal: boolean): void {
+    super._onTransformChanged(invalidateLocal);
+    const x = Math.abs(this.scale.x);
+    const z = Math.abs(this.scale.z);
+    const px = this.position.x;
+    const pz = this.position.z;
+    this.region = new Vector4(px - x, pz - z, px + x, pz + z);
   }
   /**
    * {@inheritDoc Drawable.draw}
@@ -157,11 +179,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
           outAABB.maxPoint.setXYZ(maxX, p.y + 1, maxZ);
         },
         drawPrimitive(prim, modelMatrix, offset, scale, gridScale) {
-          const worldMatrix = new Matrix4x4(modelMatrix)
+          const clipmapMatrix = new Matrix4x4(modelMatrix)
             .scaleLeft(new Vector3(scale, scale, 1))
             .translateLeft(new Vector3(offset.x, offset.y, 0))
             .scaleLeft(new Vector3(gridScale, gridScale, 1));
-          that._material.get().setClipmapMatrix(worldMatrix);
+          clipmapMatrix.m03 -= that.worldMatrix.m03;
+          clipmapMatrix.m13 -= that.worldMatrix.m23;
+          that._material.get().setClipmapMatrix(clipmapMatrix);
           that._material.get().apply(ctx);
           that._material.get().draw(prim, ctx);
         }

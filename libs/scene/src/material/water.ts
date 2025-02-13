@@ -47,8 +47,11 @@ export class WaterMaterial extends MeshMaterial {
     scope.$inputs.position = pb.vec3().attrib('position');
     scope.clipmapMatrix = pb.mat4().uniform(2);
     scope.$l.clipmapPos = pb.mul(scope.clipmapMatrix, pb.vec4(scope.$inputs.position, 1)).xy;
-    scope.$l.level = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(0, 0, 0, 1)).y;
-    scope.$outputs.worldPos = pb.vec3(scope.clipmapPos.x, scope.level, scope.clipmapPos.y);
+    //scope.$l.level = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(0, 0, 0, 1)).y;
+    scope.$outputs.worldPos = pb.mul(
+      ShaderHelper.getWorldMatrix(scope),
+      pb.vec4(scope.clipmapPos.x, 0, scope.clipmapPos.y, 1)
+    ).xyz; // pb.vec3(scope.clipmapPos.x, scope.level, scope.clipmapPos.y);
     scope.$outputs.worldNormal = pb.vec3(0, 1, 0);
     ShaderHelper.setClipSpacePosition(
       scope,

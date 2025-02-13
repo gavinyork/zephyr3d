@@ -791,11 +791,7 @@ export class SceneNode
   get worldMatrix() {
     if (!this._worldMatrix) {
       this._worldMatrix = this._tmpWorldMatrix;
-      if (this._parent) {
-        Matrix4x4.multiplyAffine(this._parent.worldMatrix, this.localMatrix, this._worldMatrix);
-      } else {
-        this._worldMatrix.set(this.localMatrix);
-      }
+      this.calculateWorldTransform(this._worldMatrix);
     }
     return this._worldMatrix;
   }
@@ -813,8 +809,23 @@ export class SceneNode
     }
     return this._invWorldMatrix;
   }
+  /**
+   * Calculate local transform matrix
+   * @param outMatrix - Matrix object that holds the result of calculation
+   */
   calculateLocalTransform(outMatrix: Matrix4x4) {
     outMatrix.compose(this._scaling, this._rotation, this._position);
+  }
+  /**
+   * Calculate world transform matrix
+   * @param outMatrix - Matrix object that holds the result of calculation
+   */
+  calculateWorldTransform(outMatrix: Matrix4x4) {
+    if (this._parent) {
+      Matrix4x4.multiplyAffine(this._parent.worldMatrix, this.localMatrix, outMatrix);
+    } else {
+      outMatrix.set(this.localMatrix);
+    }
   }
   /**
    * Sets the local tranformation matrix by a look-at matrix
