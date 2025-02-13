@@ -105,24 +105,15 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /**
    * {@inheritDoc SceneNode.computeWorldBoundingVolume}
    */
-  computeWorldBoundingVolume(localBV: BoundingVolume): BoundingVolume {
+  computeWorldBoundingVolume(): BoundingVolume {
     const p = this.worldMatrix.transformPointAffine(Vector3.zero());
-    return new BoundingBox(
-      new Vector3(this.region.x, p.y, this.region.y),
-      new Vector3(this.region.z, p.y, this.region.w)
-    );
-  }
-  /**
-   * Water region
-   */
-  get region() {
-    return this._material.get().region;
-  }
-  set region(val: Vector4) {
-    if (this._material) {
-      this._material.get().region = val;
-      this.invalidateWorldBoundingVolume(false);
-    }
+    const mat = this._material?.get();
+    return mat
+      ? new BoundingBox(
+          new Vector3(mat.region.x, p.y, mat.region.y),
+          new Vector3(mat.region.z, p.y, mat.region.w)
+        )
+      : null;
   }
   /**
    * Grid scale
@@ -146,21 +137,25 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   protected _onTransformChanged(invalidateLocal: boolean): void {
     super._onTransformChanged(invalidateLocal);
-    const x = Math.abs(this.scale.x);
-    const z = Math.abs(this.scale.z);
-    const px = this.position.x;
-    const pz = this.position.z;
-    this.region = new Vector4(px - x, pz - z, px + x, pz + z);
+    const material = this._material?.get();
+    if (material) {
+      const x = Math.abs(this.scale.x);
+      const z = Math.abs(this.scale.z);
+      const px = this.position.x;
+      const pz = this.position.z;
+      material.region = new Vector4(px - x, pz - z, px + x, pz + z);
+    }
   }
   /**
    * {@inheritDoc Drawable.draw}
    */
   draw(ctx: DrawContext) {
+    const mat = this._material?.get();
     const camera = ctx.camera;
     const cameraPos = camera.getWorldPosition();
     const position = new Vector3(cameraPos.x, cameraPos.z, 0);
-    const distX = Math.max(Math.abs(position.x - this.region.x), Math.abs(position.x - this.region.z));
-    const distY = Math.max(Math.abs(position.y - this.region.y), Math.abs(position.y - this.region.w));
+    const distX = Math.max(Math.abs(position.x - mat.region.x), Math.abs(position.x - mat.region.z));
+    const distY = Math.max(Math.abs(position.y - mat.region.y), Math.abs(position.y - mat.region.w));
     const maxDist = Math.min(Math.max(distX, distY), camera.getFarPlane());
     const gridScale = Math.max(0.01, this._gridScale);
     const mipLevels = Math.ceil(Math.log2(maxDist / (this._clipmap.tileResolution * gridScale))) + 1;
@@ -170,7 +165,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       {
         camera,
         position,
-        minMaxWorldPos: this.region,
+        minMaxWorldPos: mat.region,
         gridScale: gridScale,
         userData: this,
         calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
@@ -185,9 +180,9 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
             .scaleLeft(new Vector3(gridScale, gridScale, 1));
           clipmapMatrix.m03 -= that.worldMatrix.m03;
           clipmapMatrix.m13 -= that.worldMatrix.m23;
-          that._material.get().setClipmapMatrix(clipmapMatrix);
-          that._material.get().apply(ctx);
-          that._material.get().draw(prim, ctx);
+          mat.setClipmapMatrix(clipmapMatrix);
+          mat.apply(ctx);
+          mat.draw(prim, ctx);
         }
       },
       mipLevels
