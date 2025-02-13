@@ -20,6 +20,7 @@ import type { ParticleSystem } from './particlesys';
 import { Ref } from '../app/gc/ref';
 import type { AnimationSet } from '../animation';
 import type { SharedModel } from '../asset';
+import type { Water } from './water';
 
 /**
  * Node iterate function type
@@ -366,6 +367,10 @@ export class SceneNode
   isMesh(): this is Mesh {
     return false;
   }
+  /** true if this is a water node, false otherwise */
+  isWater(): this is Water {
+    return false;
+  }
   /** true if this is a particle system node, false otherwise */
   isParticleSystem(): this is ParticleSystem {
     return false;
@@ -438,9 +443,16 @@ export class SceneNode
    */
   getWorldBoundingVolume(): BoundingVolume {
     if (!this._bvWorld) {
-      this._bvWorld = this.getBoundingVolume()?.transform(this.worldMatrix) ?? null;
+      this._bvWorld = this.computeWorldBoundingVolume(this.getBoundingVolume());
     }
     return this._bvWorld;
+  }
+  /**
+   * Computes the world space bounding volume of the node
+   * @returns The output bounding volume
+   */
+  computeWorldBoundingVolume(localBV: BoundingVolume): BoundingVolume {
+    return localBV?.transform(this.worldMatrix) ?? null;
   }
   /**
    * Force the bounding volume to be recalculated
@@ -745,17 +757,24 @@ export class SceneNode
    * @returns self
    */
   setLocalTransform(matrix: Matrix4x4): this {
+    this._disableCallback = true;
+    matrix.decompose(this._scaling, this._rotation, this._position);
+    this._disableCallback = false;
+    this._onTransformChanged(true);
+    /*
     this._localMatrix = matrix;
     this._disableCallback = true;
     this._localMatrix.decompose(this._scaling, this._rotation, this._position);
     this._disableCallback = false;
     this._onTransformChanged(false);
+    */
     return this;
   }
   /** Local transformation matrix of the xform */
   get localMatrix() {
     if (!this._localMatrix) {
-      this._localMatrix = this._tmpLocalMatrix.compose(this._scaling, this._rotation, this._position);
+      this.calculateLocalTransform(this._tmpLocalMatrix);
+      this._localMatrix = this._tmpLocalMatrix;
       /*
       this._localMatrix
         .scaling(this._scaling)
@@ -793,6 +812,9 @@ export class SceneNode
       this._invWorldMatrix = Matrix4x4.invertAffine(this.worldMatrix);
     }
     return this._invWorldMatrix;
+  }
+  calculateLocalTransform(outMatrix: Matrix4x4) {
+    outMatrix.compose(this._scaling, this._rotation, this._position);
   }
   /**
    * Sets the local tranformation matrix by a look-at matrix

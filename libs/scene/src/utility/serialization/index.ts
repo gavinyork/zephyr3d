@@ -56,6 +56,8 @@ import {
 import { getSceneClass } from './scene/scene';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
+import { getWaterClass } from './scene/water';
+import { Water } from '../../scene/water';
 
 export * from './asset/asset';
 export * from './scene/batch';
@@ -103,6 +105,7 @@ export function getSerializationInfo(assetRegistry: AssetRegistry) {
       [SceneNode, getSceneNodeClass(assetRegistry)],
       [GraphNode, getGraphNodeClass(assetRegistry)],
       [Mesh, getMeshClass(assetRegistry)],
+      [Water, getWaterClass(assetRegistry)],
       [ParticleSystem, getParticleNodeClass(assetRegistry)],
       [PunctualLight, getPunctualLightClass(assetRegistry)],
       [DirectionalLight, getDirectionalLightClass(assetRegistry)],

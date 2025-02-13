@@ -57,7 +57,7 @@ export class Clipmap {
     this.generateTrimMesh();
   }
   get tileResolution() {
-    return this.tileResolution;
+    return this._tileResolution;
   }
   set tileResolution(val: number) {
     if (val !== this._tileResolution) {

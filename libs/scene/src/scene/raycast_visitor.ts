@@ -5,6 +5,7 @@ import type { Terrain } from './terrain';
 import type { Visitor } from './visitor';
 import type { SceneNode } from './scene_node';
 import type { PickTarget } from '../render';
+import type { Water } from './water';
 
 /** @internal */
 export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
@@ -39,6 +40,8 @@ export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
       return this.visitMesh(target);
     } else if (target.isTerrain()) {
       return this.visitTerrain(target);
+    } else if (target.isWater()) {
+      return this.visitWater(target);
     }
     return false;
   }
@@ -46,6 +49,18 @@ export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
     if (!node.hidden && node.pickable) {
       this._ray.transform(node.invWorldMatrix, this._rayLocal);
       const d = node.rayIntersect(this._rayLocal); // this._rayLocal.bboxIntersectionTestEx(node.getBoundingVolume().toAABB());
+      if (d !== null && d < this._intersectedDist) {
+        this._intersectedDist = d;
+        this._intersected = { node };
+        return true;
+      }
+    }
+    return false;
+  }
+  visitWater(node: Water) {
+    if (!node.hidden && node.pickable) {
+      const bv = node.getWorldBoundingVolume().toAABB();
+      const d = this._ray.bboxIntersectionTestEx(bv);
       if (d !== null && d < this._intersectedDist) {
         this._intersectedDist = d;
         this._intersected = { node };

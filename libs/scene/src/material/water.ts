@@ -13,6 +13,7 @@ export class WaterMaterial extends MeshMaterial {
     super();
     this._region = new Vector4(-99999, -99999, 99999, 99999);
     this._clipmapMatrix = new Matrix4x4();
+    this.cullMode = 'none';
     this.useFeature(WaterMaterial.FEATURE_SSR, true);
   }
   get SSR() {
@@ -59,8 +60,8 @@ export class WaterMaterial extends MeshMaterial {
     const pb = scope.$builder;
     scope.region = pb.vec4().uniform(2);
     scope.$l.discardable = pb.or(
-      pb.any(pb.lessThan(scope.$inputs.outXZ, scope.region.xy)),
-      pb.any(pb.greaterThan(scope.$inputs.outXZ, scope.region.zw))
+      pb.any(pb.lessThan(scope.$inputs.worldPos.xz, scope.region.xy)),
+      pb.any(pb.greaterThan(scope.$inputs.worldPos.xz, scope.region.zw))
     );
     scope.$if(scope.discardable, function () {
       pb.discard();

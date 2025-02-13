@@ -23,7 +23,8 @@ import {
   Ref,
   SphereShape,
   SpotLight,
-  TorusShape
+  TorusShape,
+  Water
 } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { Application, DirectionalLight } from '@zephyr3d/scene';
@@ -213,6 +214,10 @@ export class SceneView extends BaseView<SceneModel> {
             {
               label: 'Particle System',
               action: () => this.handleAddNode(ParticleSystem, 'Add particle system')
+            },
+            {
+              label: 'Water',
+              action: () => this.handleAddNode(Water, 'Add water')
             }
           ]
         },

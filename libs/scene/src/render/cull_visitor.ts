@@ -13,6 +13,7 @@ import type { Camera } from '../camera/camera';
 import type { SceneNode } from '../scene/scene_node';
 import type { BatchGroup } from '../scene/batchgroup';
 import type { ParticleSystem } from '../scene';
+import type { Water } from '../scene/water';
 
 /**
  * Node visitor for culling
@@ -93,6 +94,8 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
       return this.visitOctreeNode(target);
     } else if (target.isMesh()) {
       return this.visitMesh(target);
+    } else if (target.isWater()) {
+      return this.visitWater(target);
     } else if (target.isParticleSystem()) {
       return this.visitParticleSystem(target);
     } else if (target.isTerrain()) {
@@ -149,6 +152,17 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   /** @internal */
   visitMesh(node: Mesh) {
     if (!node.hidden && (node.castShadow || this._renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP)) {
+      const clipState = this.getClipStateWithNode(node);
+      if (clipState !== ClipState.NOT_CLIPPED) {
+        this.push(this._camera, node);
+        return true;
+      }
+    }
+    return false;
+  }
+  /** @internal */
+  visitWater(node: Water) {
+    if (!node.hidden && this._renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP) {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {
         this.push(this._camera, node);
