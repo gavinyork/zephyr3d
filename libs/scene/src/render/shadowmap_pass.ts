@@ -29,7 +29,7 @@ export class ShadowMapPass extends RenderPass {
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return `sm:${ctx.shadowMapInfo.get(this.light).shaderHash}`;
+    return `${ctx.shadowMapInfo.get(this.light).shaderHash}`;
   }
   /** @internal */
   protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {

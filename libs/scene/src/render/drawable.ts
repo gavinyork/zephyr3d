@@ -104,7 +104,7 @@ export interface DrawContext {
   forceCullMode?: FaceMode;
   /** Force color mask state */
   forceColorState?: ColorState;
-  /** TAA related stuff */
+  /** TAA enabled */
   TAA: boolean;
 }
 

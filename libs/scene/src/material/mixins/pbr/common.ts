@@ -8,7 +8,6 @@ import type {
 import type { MeshMaterial } from '../../meshmaterial';
 import { applyMaterialMixins } from '../../meshmaterial';
 import { Vector3 } from '@zephyr3d/base';
-import { Vector2 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../../render';
 import { getGGXLUT } from '../../../utility/textures/ggxlut';
@@ -148,7 +147,6 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     private _attenuationColor: Vector3;
     private _attenuationDistance: number;
     private _iridescenceFactor: Vector4;
-    private _sceneColorTexSize: Vector2;
     constructor() {
       super();
       this._f0 = new Vector4(0.04, 0.04, 0.04, 1.5);
@@ -162,7 +160,6 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       this._attenuationColor = Vector3.one();
       this._attenuationDistance = 99999;
       this._iridescenceFactor = new Vector4(0, 1.3, 100, 400);
-      this._sceneColorTexSize = new Vector2();
     }
     copyFrom(other: this): void {
       super.copyFrom(other);
@@ -393,8 +390,6 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           scope.zThicknessFactor = pb.float().uniform(2);
           scope.zAttenuationColor = pb.vec3().uniform(2);
           scope.zAttenuationDistance = pb.float().uniform(2);
-          scope.zSceneColorTex = pb.tex2D().uniform(2);
-          scope.zSceneColorTexSize = pb.vec2().uniform(2);
         }
         if (this.iridescence) {
           scope.zIridescenceFactor = pb.vec4().uniform(2);
@@ -429,9 +424,6 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           bindGroup.setValue('zThicknessFactor', this._thicknessFactor);
           bindGroup.setValue('zAttenuationColor', this._attenuationColor);
           bindGroup.setValue('zAttenuationDistance', this._attenuationDistance);
-          bindGroup.setTexture('zSceneColorTex', ctx.sceneColorTexture);
-          this._sceneColorTexSize.setXY(ctx.sceneColorTexture.width, ctx.sceneColorTexture.height);
-          bindGroup.setValue('zSceneColorTexSize', this._sceneColorTexSize);
         }
         if (this.iridescence) {
           bindGroup.setValue('zIridescenceFactor', this._iridescenceFactor);
@@ -667,8 +659,14 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           this.roughness,
           pb.clamp(pb.sub(pb.mul(this.ior, 2), 2), 0.0, 1.0)
         );
-        this.$l.framebufferLod = pb.mul(pb.log2(this.zSceneColorTexSize.x), this.applyIorToRoughness);
-        this.$return(pb.textureSampleLevel(this.zSceneColorTex, this.fragCoord, this.framebufferLod).rgb);
+        this.$l.framebufferLod = pb.mul(
+          pb.log2(ShaderHelper.getSceneColorTextureSize(this).x),
+          this.applyIorToRoughness
+        );
+        this.$return(
+          pb.textureSampleLevel(ShaderHelper.getSceneColorTexture(this), this.fragCoord, this.framebufferLod)
+            .rgb
+        );
       });
       return pb.getGlobalScope()[funcName](fragCoord, roughness, ior);
     }

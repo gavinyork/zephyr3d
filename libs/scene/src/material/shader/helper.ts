@@ -33,6 +33,10 @@ const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
 const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'Z_UniformLightIndexTex';
 const UNIFORM_NAME_AERIALPERSPECTIVE_LUT = 'Z_UniformAerialPerspectiveLUT';
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
+const UNIFORM_NAME_LINEAR_DEPTH_MAP = 'Z_UniformLinearDepth';
+const UNIFORM_NAME_LINEAR_DEPTH_MAP_SIZE = 'Z_UniformLinearDepthSize';
+const UNIFORM_NAME_SCENE_COLOR_MAP = 'Z_UniformSceneColor';
+const UNIFORM_NAME_SCENE_COLOR_MAP_SIZE = 'Z_UniformSceneColorSize';
 const UNIFORM_NAME_WORLD_MATRIX = 'Z_UniformWorldMatrix';
 const UNIFORM_NAME_PREV_WORLD_MATRIX = 'Z_UniformPrevWorldMatrix';
 const UNIFORM_NAME_PREV_WORLD_MATRXI_FRAME = 'Z_UniformPrevWorldMatrixFrame';
@@ -273,6 +277,14 @@ export class ShaderHelper {
       }
       if (ctx.drawEnvLight) {
         ctx.env.light.envLight.initShaderBindings(pb);
+      }
+      if (ctx.linearDepthTexture) {
+        scope[UNIFORM_NAME_LINEAR_DEPTH_MAP] = pb.tex2D().uniform(0);
+        scope[UNIFORM_NAME_LINEAR_DEPTH_MAP_SIZE] = pb.vec2().uniform(0);
+      }
+      if (ctx.sceneColorTexture) {
+        scope[UNIFORM_NAME_SCENE_COLOR_MAP] = pb.tex2D().uniform(0);
+        scope[UNIFORM_NAME_SCENE_COLOR_MAP_SIZE] = pb.vec2().uniform(0);
       }
     }
   }
@@ -757,6 +769,22 @@ export class ShaderHelper {
       cameraStruct.unjitteredVPMatrix = ctx.camera.viewProjectionMatrix;
       cameraStruct.prevUnjitteredVPMatrix = ctx.camera.prevVPMatrix;
     }
+    if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+      if (ctx.linearDepthTexture) {
+        bindGroup.setTexture(UNIFORM_NAME_LINEAR_DEPTH_MAP, ctx.linearDepthTexture);
+        bindGroup.setValue(
+          UNIFORM_NAME_LINEAR_DEPTH_MAP_SIZE,
+          new Vector2(ctx.linearDepthTexture.width, ctx.linearDepthTexture.height)
+        );
+      }
+      if (ctx.sceneColorTexture) {
+        bindGroup.setTexture(UNIFORM_NAME_SCENE_COLOR_MAP, ctx.sceneColorTexture);
+        bindGroup.setValue(
+          UNIFORM_NAME_SCENE_COLOR_MAP_SIZE,
+          new Vector2(ctx.sceneColorTexture.width, ctx.sceneColorTexture.height)
+        );
+      }
+    }
     bindGroup.setValue(UNIFORM_NAME_GLOBAL, {
       camera: cameraStruct
     });
@@ -855,6 +883,38 @@ export class ShaderHelper {
    */
   static getEnvLightStrength(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_GLOBAL].light.envLightStrength;
+  }
+  /**
+   * Gets current scene color texture
+   * @param scope - Current shader scope
+   * @returns current scene color texture
+   */
+  static getSceneColorTexture(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_SCENE_COLOR_MAP];
+  }
+  /**
+   * Gets the size of current scene color texture
+   * @param scope - Current shader scope
+   * @returns The size of current scene color texture
+   */
+  static getSceneColorTextureSize(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_SCENE_COLOR_MAP_SIZE];
+  }
+  /**
+   * Gets current linear depth texture
+   * @param scope - Current shader scope
+   * @returns current linear depth texture
+   */
+  static getLinearDepthTexture(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_LINEAR_DEPTH_MAP];
+  }
+  /**
+   * Gets the size of current linear depth texture
+   * @param scope - Current shader scope
+   * @returns The size of current linear depth texture
+   */
+  static getLinearDepthTextureSize(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_LINEAR_DEPTH_MAP_SIZE];
   }
   /**
    * Gets the uniform variable of type vec3 which holds the camera position

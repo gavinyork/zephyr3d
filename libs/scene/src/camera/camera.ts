@@ -61,8 +61,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   /** @internal */
   protected _dirty: boolean;
   /** @internal */
-  protected _sampleCount: number;
-  /** @internal */
   protected _viewport: number[];
   /** @internal */
   protected _scissor: number[];
@@ -145,7 +143,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._scissor = null;
     this._clearColor = new Vector4(0, 0, 0, 1);
     this._clipMask = 0;
-    this._sampleCount = 1;
     this._frustum = null;
     this._frustumV = null;
     this._oit = new Ref();
@@ -203,7 +200,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this.ssrBlurKernelSize = other.ssrBlurKernelSize;
     this.depthPrePass = other.depthPrePass;
     this.commandBufferReuse = other.commandBufferReuse;
-    this.sampleCount = other.sampleCount;
     this.oit = other.oit;
     this.clipMask = other.clipMask;
     this.viewport = other.viewport;
@@ -392,22 +388,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   }
   set commandBufferReuse(val: boolean) {
     this._commandBufferReuse = !!val;
-  }
-  /**
-   * Sample count for MSAA
-   *
-   * @remarks
-   * If greater than one, force the scene to be rendered using multisampled framebuffer
-   */
-  get sampleCount(): number {
-    return this._sampleCount;
-  }
-  set sampleCount(val: number) {
-    if (val !== 1 && val !== 4) {
-      console.error(`Invalid sample count: ${val}`);
-    } else {
-      this._sampleCount = val;
-    }
   }
   /** OIT */
   get oit(): OIT {

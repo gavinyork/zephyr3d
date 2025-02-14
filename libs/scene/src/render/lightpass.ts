@@ -31,7 +31,9 @@ export class LightPass extends RenderPass {
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return `lp:${this._shadowMapHash}:${ctx.oit?.calculateHash() ?? ''}:${ctx.env.getHash(ctx)}`;
+    return `${this._shadowMapHash}:${ctx.oit?.calculateHash() ?? ''}:${ctx.env.getHash(ctx)}:${Number(
+      !!ctx.linearDepthTexture
+    )}:${Number(!!ctx.sceneColorTexture)}`;
   }
   /** @internal */
   protected renderLightPass(
@@ -179,7 +181,7 @@ export class LightPass extends RenderPass {
           ctx.device.popDeviceStates();
         }
       }
-      if (!renderQueue.needSceneColor || ctx.sceneColorTexture) {
+      if (!renderQueue.needSceneColor() || ctx.sceneColorTexture) {
         if (i === 0) {
           if (tmpFramebuffer) {
             ctx.device.pushDeviceStates();

@@ -169,6 +169,7 @@ export class RenderQueue {
   /** @internal */
   private _needSceneColor: boolean;
   private _needSceneDepth: boolean;
+  private _needSceneColorWithDepth: boolean;
   /** @internal */
   private _drawTransparent: boolean;
   /** @internal */
@@ -190,6 +191,7 @@ export class RenderQueue {
     this._instanceInfo = new Map();
     this._needSceneColor = false;
     this._needSceneDepth = false;
+    this._needSceneColorWithDepth = false;
     this._drawTransparent = false;
     this._disposed = false;
     this._objectColorMaps = [new Map()];
@@ -205,13 +207,17 @@ export class RenderQueue {
   set sunLight(light: DirectionalLight) {
     this._sunLight = light;
   }
-  /** Whether this render queue requires scene color pass */
-  get needSceneColor(): boolean {
+  /** @internal */
+  needSceneColor(): boolean {
     return this._needSceneColor;
   }
-  /** Whether this render queue requires linear scene depth */
-  get needSceneDepth(): boolean {
+  /** @internal */
+  needSceneDepth(): boolean {
     return this._needSceneDepth;
+  }
+  /** @internal */
+  needSceneColorWithDepth(): boolean {
+    return this._needSceneColorWithDepth;
   }
   /** Whether this render queue has transparent objects to be drawn */
   get drawTransparent(): boolean {
@@ -298,6 +304,7 @@ export class RenderQueue {
     this._itemList.transmission_trans.unlit.push(...newItemLists.transmission_trans.unlit);
     this._needSceneColor ||= queue._needSceneColor;
     this._needSceneDepth ||= queue._needSceneDepth;
+    this._needSceneColorWithDepth ||= queue._needSceneColorWithDepth;
     this._drawTransparent ||= queue._drawTransparent;
     this._objectColorMaps.push(...queue._objectColorMaps);
   }
@@ -314,9 +321,11 @@ export class RenderQueue {
       }
       const trans = drawable.getQueueType() === QUEUE_TRANSPARENT;
       const unlit = drawable.isUnlit();
-      const transmission = drawable.needSceneColor();
+      const transmission = !!drawable.needSceneColor();
+      const needDepth = !!drawable.needSceneDepth();
       this._needSceneColor ||= transmission;
       this._needSceneDepth ||= drawable.needSceneDepth();
+      this._needSceneColorWithDepth ||= transmission && needDepth;
       this._drawTransparent ||= trans;
       if (camera.getPickResultResolveFunc()) {
         drawable.getMaterial().objectColor = drawable.getObjectColor();
@@ -434,6 +443,8 @@ export class RenderQueue {
     this._unshadowedLightList = [];
     this._sunLight = null;
     this._needSceneColor = false;
+    this._needSceneDepth = false;
+    this._needSceneColorWithDepth = false;
     this._drawTransparent = false;
   }
   /** @internal */

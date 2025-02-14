@@ -1,4 +1,4 @@
-import { degree2radian, radian2degree, Vector2 } from '@zephyr3d/base';
+import { degree2radian, radian2degree } from '@zephyr3d/base';
 import { SceneNode } from '../../../scene';
 import { Water } from '../../../scene/water';
 import type { AssetRegistry } from '../asset/asset';

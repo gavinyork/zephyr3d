@@ -124,13 +124,7 @@ export class Compositor {
     const device = ctx.device;
     this._finalFramebuffer = device.getFramebuffer();
     const ssr = !!(ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS);
-    if (
-      this._postEffectsOpaque.length === 0 &&
-      this._postEffectsTransparency.length === 0 &&
-      ctx.primaryCamera.sampleCount === 1 &&
-      !ssr &&
-      !ctx.TAA
-    ) {
+    if (this._postEffectsOpaque.length === 0 && this._postEffectsTransparency.length === 0 && !ssr) {
       return;
     }
     const format = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
@@ -143,9 +137,7 @@ export class Compositor {
       w,
       h,
       ssr ? [format, fmt2, fmt2] : format,
-      depth ?? ctx.depthFormat,
-      ssr,
-      ctx.primaryCamera.sampleCount
+      depth ?? ctx.depthFormat
     );
     device.setFramebuffer(tmpFramebuffer);
     if (ssr) {
