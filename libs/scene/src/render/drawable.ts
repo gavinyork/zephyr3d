@@ -32,6 +32,10 @@ export type PickTarget = { node: SceneNode; label?: string };
 export interface DrawContext {
   /** Render device */
   device: AbstractDevice;
+  /** Framebuffer width for rendering  */
+  renderWidth: number;
+  /** Framebuffer height for rendering */
+  renderHeight: number;
   /** The camera position of the primary render pass */
   primaryCamera: Camera;
   /** The render queue which is currently being rendered */

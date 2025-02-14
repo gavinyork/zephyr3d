@@ -1,4 +1,4 @@
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Matrix4x4, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render/drawable';
 import {
   MaterialVaryingFlags,
@@ -180,11 +180,15 @@ export class ShaderHelper {
       pb.vec4('position'),
       pb.vec4('clipPlane'),
       pb.mat4('viewProjectionMatrix'),
+      pb.mat4('invViewProjectionMatrix'),
       pb.mat4('viewMatrix'),
+      pb.mat4('projectionMatrix'),
+      pb.mat4('invProjectionMatrix'),
       pb.vec4('params'),
       ...(ctx.motionVectors && ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH
         ? [pb.mat4('unjitteredVPMatrix'), pb.mat4('prevUnjitteredVPMatrix')]
         : []),
+      pb.vec2('renderSize'),
       pb.float('roughnessFactor'),
       pb.int('framestamp')
     ]);
@@ -729,12 +733,16 @@ export class ShaderHelper {
     const cameraStruct = {
       position: new Vector4(pos.x, pos.y, pos.z, ctx.camera.clipPlane ? 1 : 0),
       clipPlane: ctx.camera.clipPlane ?? Vector4.zero(),
+      renderSize: new Vector2(ctx.renderWidth, ctx.renderHeight),
       viewProjectionMatrix:
         ctx.motionVectors &&
         ctx.renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP &&
         ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR
           ? ctx.camera.jitteredVPMatrix
           : ctx.camera.viewProjectionMatrix,
+      invViewProjectionMatrix: ctx.camera.invViewProjectionMatrix,
+      projectionMatrix: ctx.camera.getProjectionMatrix(),
+      invProjectionMatrix: Matrix4x4.invert(ctx.camera.getProjectionMatrix()),
       viewMatrix: ctx.camera.viewMatrix,
       params: new Vector4(
         ctx.camera.getNearPlane(),
@@ -863,6 +871,14 @@ export class ShaderHelper {
    */
   static getCameraRoughnessFactor(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_GLOBAL].camera.roughnessFactor;
+  }
+  /**
+   * Gets framebuffer size for rendering
+   * @param scope - Current shader scope
+   * @returns The roughness factor
+   */
+  static getRenderSize(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].camera.renderSize;
   }
   /**
    * Gets the uniform variable of type uint which holds the framestamp
@@ -1060,6 +1076,30 @@ export class ShaderHelper {
    */
   static getViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_GLOBAL].camera.viewProjectionMatrix;
+  }
+  /**
+   * Gets the uniform variable of type mat4 which holds the inversed view projection matrix of current camera
+   * @param scope - Current shader scope
+   * @returns The inversed view projection matrix of current camera
+   */
+  static getInvViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].camera.invViewProjectionMatrix;
+  }
+  /**
+   * Gets the uniform variable of type mat4 which holds the projection matrix of current camera
+   * @param scope - Current shader scope
+   * @returns The projection matrix of current camera
+   */
+  static getProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].camera.projectionMatrix;
+  }
+  /**
+   * Gets the uniform variable of type mat4 which holds the inversed projection matrix of current camera
+   * @param scope - Current shader scope
+   * @returns The inversed projection matrix of current camera
+   */
+  static getInvProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].camera.invProjectionMatrix;
   }
   /**
    * Gets the uniform variable of type mat4 which holds the unjittered view projection matrix of current camera

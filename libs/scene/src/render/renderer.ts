@@ -72,32 +72,13 @@ export class SceneRenderer {
    */
   static renderScene(scene: Scene, camera: Camera, compositor?: Compositor): void {
     const device = Application.instance.device;
-    const ctx: DrawContext = {
-      device,
-      scene,
-      primaryCamera: camera,
-      picking: false,
-      oit: null,
-      motionVectors: camera.TAA,
-      HiZ: camera.HiZ && device.type !== 'webgl',
-      HiZTexture: null,
-      globalBindGroupAllocator: GlobalBindGroupAllocator.get(),
-      camera,
-      compositor,
-      timestamp: device.frameInfo.frameTimestamp,
-      queue: 0,
-      lightBlending: false,
-      renderPass: null,
-      renderPassHash: null,
-      applyFog: null,
-      flip: false,
-      depthFormat: device.getDeviceCaps().framebufferCaps.supportDepth32floatStencil8 ? 'd32fs8' : 'd24s8',
-      colorFormat: device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm',
-      drawEnvLight: false,
-      env: null,
-      materialFlags: 0,
-      TAA: camera.TAA
-    };
+    const colorFormat = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
+      ? 'rgba16f'
+      : 'rgba8unorm';
+    const depthFormat = device.getDeviceCaps().framebufferCaps.supportDepth32floatStencil8
+      ? 'd32fs8'
+      : 'd24s8';
+    const globalBindGroupAllocator = GlobalBindGroupAllocator.get();
     scene.frameUpdate();
     if (camera && !device.isContextLost()) {
       const defaultViewport = !camera.viewport && !camera.scissor;
@@ -110,23 +91,45 @@ export class SceneRenderer {
         ? device.screenToDevice(camera.viewport[3])
         : device.getDrawingBufferHeight();
       if (renderWidth <= 0 || renderHeight <= 0) {
-        ctx.camera.getPickResultResolveFunc()?.(null);
+        camera.getPickResultResolveFunc()?.(null);
         return;
       }
       const tmpFramebuffer = defaultViewport
         ? null
-        : device.pool.fetchTemporalFramebuffer(
-            false,
-            renderWidth,
-            renderHeight,
-            ctx.colorFormat,
-            ctx.depthFormat
-          );
+        : device.pool.fetchTemporalFramebuffer(false, renderWidth, renderHeight, colorFormat, depthFormat);
       const originFramebuffer = device.getFramebuffer();
       if (tmpFramebuffer) {
         device.pushDeviceStates();
         device.setFramebuffer(tmpFramebuffer);
       }
+      const ctx: DrawContext = {
+        device,
+        scene,
+        renderWidth,
+        renderHeight,
+        primaryCamera: camera,
+        picking: false,
+        oit: null,
+        motionVectors: camera.TAA,
+        HiZ: camera.HiZ && device.type !== 'webgl',
+        HiZTexture: null,
+        globalBindGroupAllocator,
+        camera,
+        compositor,
+        timestamp: device.frameInfo.frameTimestamp,
+        queue: 0,
+        lightBlending: false,
+        renderPass: null,
+        renderPassHash: null,
+        applyFog: null,
+        flip: false,
+        depthFormat,
+        colorFormat,
+        drawEnvLight: false,
+        env: null,
+        materialFlags: 0,
+        TAA: camera.TAA
+      };
       this._renderScene(ctx);
       if (tmpFramebuffer) {
         device.popDeviceStates();
@@ -150,7 +153,7 @@ export class SceneRenderer {
         device.pool.releaseFrameBuffer(tmpFramebuffer);
       }
     }
-    GlobalBindGroupAllocator.release(ctx.globalBindGroupAllocator);
+    GlobalBindGroupAllocator.release(globalBindGroupAllocator);
   }
   /** @internal */
   protected static _renderSceneDepth(

@@ -1,15 +1,17 @@
-import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { MeshMaterial } from './meshmaterial';
 import type { DrawContext, WaveGenerator } from '../render';
 import { MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
 import { Matrix4x4, Vector4 } from '@zephyr3d/base';
 import { Ref } from '../app';
+import { sampleLinearDepth } from '../shaders/ssr';
 
 export class WaterMaterial extends MeshMaterial {
   private static FEATURE_SSR = this.defineFeature();
   private static _waveUpdateState: WeakMap<WaveGenerator, number> = new WeakMap();
   private _region: Vector4;
+  private _displace: number;
   private _waveGenerator: Ref<WaveGenerator>;
   private _clipmapMatrix: Matrix4x4;
   constructor() {
@@ -17,6 +19,7 @@ export class WaterMaterial extends MeshMaterial {
     this._region = new Vector4(-99999, -99999, 99999, 99999);
     this._clipmapMatrix = new Matrix4x4();
     this._waveGenerator = new Ref();
+    this._displace = 16;
     this.cullMode = 'none';
     this.useFeature(WaterMaterial.FEATURE_SSR, true);
   }
@@ -96,6 +99,7 @@ export class WaterMaterial extends MeshMaterial {
     const pb = scope.$builder;
     this.waveGenerator?.setupUniforms(scope, 2);
     scope.region = pb.vec4().uniform(2);
+    scope.displace = pb.float().uniform(2);
     scope.$l.discardable = pb.or(
       pb.any(pb.lessThan(scope.$inputs.worldPos.xz, scope.region.xy)),
       pb.any(pb.greaterThan(scope.$inputs.worldPos.xz, scope.region.zw))
@@ -128,10 +132,51 @@ export class WaterMaterial extends MeshMaterial {
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
   }
+  waterShading(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    worldNormal: PBShaderExp,
+    foamFactor: PBShaderExp
+  ) {
+    const pb = scope.$builder;
+    pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
+      this.$l.linearDepth = sampleLinearDepth(this, this.depthTex, this.uv, 0);
+      this.$l.nonLinearDepth = pb.div(
+        pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
+        pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
+      );
+      this.$l.clipSpacePos = pb.vec4(
+        pb.sub(pb.mul(this.uv, 2), pb.vec2(1)),
+        pb.sub(pb.mul(pb.clamp(this.nonLinearDepth, 0, 1), 2), 1),
+        1
+      );
+      this.$l.wPos = pb.mul(this.mat, this.clipSpacePos);
+      this.$return(pb.vec4(pb.div(this.wPos.xyz, this.wPos.w), this.linearDepth));
+    });
+    pb.func(
+      'waterShading',
+      [pb.vec3('worldPos'), pb.vec3('worldNormal'), pb.float('foamFactor')],
+      function () {
+        this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
+        this.$l.dist = pb.length(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this)));
+        this.$l.normalScale = pb.pow(pb.clamp(pb.div(100, this.dist), 0, 1), 2);
+        this.$l.normal = pb.normalize(
+          pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
+        );
+        this.$l.displacedTexCoord = pb.add(this.screenUV, pb.mul(this.normal.xz, this.displace));
+        this.$l.wPos = this.getPosition(this.screenUV, this.invViewProj).xyz;
+        this.$l.eyeVec = pb.sub(this.worldPos.xyz, this.cameraPos);
+        this.$l.eyeVecNorm = pb.normalize(this.eyeVec);
+        this.$l.depth = pb.length(pb.sub(this.wPos.xyz, this.worldPos));
+        this.$l.viewPos = pb.mul(this.viewMatrix, pb.vec4(this.worldPos, 1)).xyz;
+      }
+    );
+  }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
     bindGroup.setValue('clipmapMatrix', this._clipmapMatrix);
     bindGroup.setValue('region', this._region);
+    bindGroup.setValue('displace', this._displace);
     if (this.waveGenerator) {
       this.waveGenerator.applyWaterBindGroup(bindGroup);
     }
