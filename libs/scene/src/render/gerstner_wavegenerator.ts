@@ -206,11 +206,11 @@ export class GerstnerWaveGenerator implements WaveGenerator {
     return scope.$builder.vec4(this.calcFragmentNormal(scope, xz), 0);
   }
   /** {@inheritDoc WaveGenerator.setupUniforms} */
-  setupUniforms(scope: PBGlobalScope): void {
+  setupUniforms(scope: PBGlobalScope, uniformGroup: number): void {
     const pb = scope.$builder;
-    scope.time = pb.float().uniform(0);
-    scope.numWaves = pb.float().uniform(0);
-    scope.waveParams = pb.vec4[MAX_NUM_WAVES * 2]().uniform(0);
+    scope.time = pb.float().uniform(uniformGroup);
+    scope.numWaves = pb.float().uniform(uniformGroup);
+    scope.waveParams = pb.vec4[MAX_NUM_WAVES * 2]().uniform(uniformGroup);
   }
   /** @internal */
   private gerstnerWave(
@@ -325,7 +325,7 @@ export class GerstnerWaveGenerator implements WaveGenerator {
   }
   /** {@inheritDoc WaveGenerator.getHash} */
   getHash(): string {
-    return '';
+    return 'GerstnerWaveGenerator';
   }
   /** {@inheritDoc WaveGenerator.dispose} */
   dispose(): void {

@@ -507,6 +507,19 @@ export class PropertyEditor extends makeEventTarget(Object)<{
         changed = ImGui.ColorEdit4('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined);
         break;
       }
+      case 'command': {
+        for (let i = 0; i < tmpProperty.str.length; i++) {
+          if (i > 0) {
+            ImGui.SameLine();
+          }
+          if (ImGui.Button(`${tmpProperty.str[i]}##command${i}`)) {
+            if (value.command && value.command.call(object, i)) {
+              this.refresh();
+            }
+          }
+        }
+        break;
+      }
       case 'object': {
         const val = tmpProperty.str as [string];
         const assetInfo = this._assetRegistry.getAssetInfo(val[0]);

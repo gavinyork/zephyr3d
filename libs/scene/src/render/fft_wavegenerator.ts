@@ -1091,22 +1091,22 @@ export class FFTWaveGenerator implements WaveGenerator {
     FFTWaveGenerator._globals.quad.draw();
   }
   /** {@inheritDoc WaveGenerator.setupUniforms} */
-  setupUniforms(scope: PBGlobalScope): void {
+  setupUniforms(scope: PBGlobalScope, uniformGroup: number): void {
     const pb = scope.$builder;
-    scope.sizes = pb.vec4().uniform(0);
-    scope.croppinesses = pb.vec4().uniform(0);
+    scope.sizes = pb.vec4().uniform(uniformGroup);
+    scope.croppinesses = pb.vec4().uniform(uniformGroup);
     if (this._useComputeShader) {
-      scope.dataTexture = pb.tex2DArray().uniform(0);
+      scope.dataTexture = pb.tex2DArray().uniform(uniformGroup);
     } else {
-      scope.dx_hy_dz_dxdz0 = pb.tex2D().uniform(0);
-      scope.sx_sz_dxdx_dzdz0 = pb.tex2D().uniform(0);
-      scope.dx_hy_dz_dxdz1 = pb.tex2D().uniform(0);
-      scope.sx_sz_dxdx_dzdz1 = pb.tex2D().uniform(0);
-      scope.dx_hy_dz_dxdz2 = pb.tex2D().uniform(0);
-      scope.sx_sz_dxdx_dzdz2 = pb.tex2D().uniform(0);
+      scope.dx_hy_dz_dxdz0 = pb.tex2D().uniform(uniformGroup);
+      scope.sx_sz_dxdx_dzdz0 = pb.tex2D().uniform(uniformGroup);
+      scope.dx_hy_dz_dxdz1 = pb.tex2D().uniform(uniformGroup);
+      scope.sx_sz_dxdx_dzdz1 = pb.tex2D().uniform(uniformGroup);
+      scope.dx_hy_dz_dxdz2 = pb.tex2D().uniform(uniformGroup);
+      scope.sx_sz_dxdx_dzdz2 = pb.tex2D().uniform(uniformGroup);
     }
     if (pb.shaderKind === 'fragment') {
-      scope.foamParams = pb.vec2().uniform(0);
+      scope.foamParams = pb.vec2().uniform(uniformGroup);
     }
   }
   /** {@inheritDoc WaveGenerator.calcVertexPositionAndNormal} */
@@ -1297,6 +1297,6 @@ export class FFTWaveGenerator implements WaveGenerator {
   }
   /** {@inheritDoc WaveGenerator.getHash} */
   getHash(): string {
-    return '';
+    return 'FFTWaveGenerator';
   }
 }

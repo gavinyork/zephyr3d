@@ -120,7 +120,7 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
       this.worldMatrix = pb.mat4().uniform(1);
       this.level = pb.float().uniform(0);
       shadingImpl.setupUniforms(this);
-      waveGenerator.setupUniforms(this);
+      waveGenerator.setupUniforms(this, 0);
       pb.main(function () {
         this.$l.xz = pb.mul(this.worldMatrix, pb.vec4(this.$inputs.position, 1)).xy;
         /*
@@ -155,7 +155,7 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
       this.pos = pb.vec3().uniform(0);
       this.region = pb.vec4().uniform(0);
       shadingImpl.setupUniforms(this);
-      waveGenerator.setupUniforms(this);
+      waveGenerator.setupUniforms(this, 0);
       pb.main(function () {
         this.$l.discardable = pb.or(
           pb.any(pb.lessThan(this.$inputs.outXZ, this.region.xy)),

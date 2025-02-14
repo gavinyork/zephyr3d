@@ -160,16 +160,10 @@ export function getGerstnerWaveGeneratorClass(assetRegistry: AssetRegistry): Ser
         type: 'command',
         get(this: GerstnerWaveGenerator, value) {
           value.str = ['Add'];
-          if (this.numWaves > 0) {
-            value.str.push('Delete');
-          }
         },
         command(this: GerstnerWaveGenerator, index) {
-          if (index === 0) {
-            this.numWaves++;
-          } else if (index === 1) {
-            this.numWaves--;
-          }
+          this.numWaves++;
+          return true;
         }
       });
       return waveProps;

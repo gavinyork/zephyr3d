@@ -41,11 +41,17 @@ export class WaterMaterial extends MeshMaterial {
   set waveGenerator(waveGenerator: WaveGenerator) {
     if (this._waveGenerator.get() !== waveGenerator) {
       this._waveGenerator.set(waveGenerator);
-      this.uniformChanged();
+      this.optionChanged(true);
     }
   }
+  needSceneColor(): boolean {
+    return true;
+  }
+  needSceneDepth(): boolean {
+    return true;
+  }
   protected _createHash(): string {
-    return `${super._createHash}:${this.waveGenerator?.getHash() ?? ''}`;
+    return `${super._createHash()}:${this.waveGenerator?.getHash() ?? ''}`;
   }
   setClipmapMatrix(mat: Matrix4x4) {
     this._clipmapMatrix.set(mat);
@@ -60,18 +66,25 @@ export class WaterMaterial extends MeshMaterial {
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
     const pb = scope.$builder;
-    this.waveGenerator?.setupUniforms(scope);
+    this.waveGenerator?.setupUniforms(scope, 2);
     scope.$inputs.position = pb.vec3().attrib('position');
     scope.clipmapMatrix = pb.mat4().uniform(2);
     scope.$l.clipmapPos = pb.mul(scope.clipmapMatrix, pb.vec4(scope.$inputs.position, 1)).xy;
     //scope.$l.level = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(0, 0, 0, 1)).y;
-    scope.worldPos = pb.mul(
+    scope.clipmapWorldPos = pb.mul(
       ShaderHelper.getWorldMatrix(scope),
       pb.vec4(scope.clipmapPos.x, 0, scope.clipmapPos.y, 1)
     ).xyz; // pb.vec3(scope.clipmapPos.x, scope.level, scope.clipmapPos.y);
     scope.worldNormal = pb.vec3(0, 1, 0);
-    this.waveGenerator?.calcVertexPositionAndNormal(scope, scope.worldPos, scope.worldPos, scope.worldNormal);
+    scope.worldPos = scope.clipmapWorldPos;
+    this.waveGenerator?.calcVertexPositionAndNormal(
+      scope,
+      scope.clipmapWorldPos,
+      scope.worldPos,
+      scope.worldNormal
+    );
     scope.$outputs.worldPos = scope.worldPos;
+    scope.$outputs.clipmapPos = scope.clipmapWorldPos;
     scope.$outputs.worldNormal = scope.worldNormal;
     ShaderHelper.setClipSpacePosition(
       scope,
@@ -81,6 +94,7 @@ export class WaterMaterial extends MeshMaterial {
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
     const pb = scope.$builder;
+    this.waveGenerator?.setupUniforms(scope, 2);
     scope.region = pb.vec4().uniform(2);
     scope.$l.discardable = pb.or(
       pb.any(pb.lessThan(scope.$inputs.worldPos.xz, scope.region.xy)),
@@ -90,6 +104,14 @@ export class WaterMaterial extends MeshMaterial {
       pb.discard();
     });
     if (this.needFragmentColor()) {
+      scope.$l.normal = this.waveGenerator
+        ? this.waveGenerator.calcFragmentNormalAndFoam(
+            scope,
+            scope.$inputs.clipmapPos.xz,
+            scope.$inputs.worldNormal
+          )
+        : scope.$inputs.worldNormal;
+      scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normal.xyz, 0.5), pb.vec3(0.5)), 1);
       if (this.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
         scope.$l.outRoughness = pb.vec4(1, 1, 1, 0);
         this.outputFragmentColor(
@@ -97,10 +119,10 @@ export class WaterMaterial extends MeshMaterial {
           scope.$inputs.worldPos,
           pb.vec4(1),
           scope.outRoughness,
-          pb.vec4(pb.add(pb.mul(scope.$inputs.worldNormal, 0.5), pb.vec3(0.5)), 1)
+          scope.outColor
         );
       } else {
-        this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(1));
+        this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.outColor);
       }
     } else {
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
@@ -110,6 +132,9 @@ export class WaterMaterial extends MeshMaterial {
     super.applyUniformValues(bindGroup, ctx, pass);
     bindGroup.setValue('clipmapMatrix', this._clipmapMatrix);
     bindGroup.setValue('region', this._region);
+    if (this.waveGenerator) {
+      this.waveGenerator.applyWaterBindGroup(bindGroup);
+    }
   }
   needUpdate() {
     return !!this._waveGenerator.get();

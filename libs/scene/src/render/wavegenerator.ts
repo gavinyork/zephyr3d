@@ -16,8 +16,9 @@ export interface WaveGenerator extends Disposable {
   /**
    * Setup uniforms for the shader program.
    * @param scope - Global scope of the shader program.
+   * @param uniformGroup - Bind group index for uniform values
    */
-  setupUniforms(scope: PBGlobalScope): void;
+  setupUniforms(scope: PBGlobalScope, uniformGroup: number): void;
   /**
    * Calculate vertex position and normal.
    * @param scope - Global scope of the shader program.

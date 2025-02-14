@@ -40,7 +40,7 @@ export type PropertyAccessor<T = unknown> = {
   get: (this: T, value: PropertyValue) => void;
   set?: (this: T, value: PropertyValue) => void | Promise<void>;
   isValid?: (this: T) => boolean;
-  command?: (this: T, index: number) => void;
+  command?: (this: T, index: number) => boolean;
   getDefaultValue?: (this: T) => any;
 };
 
