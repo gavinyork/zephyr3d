@@ -953,7 +953,7 @@ export class WebGLDevice extends BaseDevice {
     this._captureRenderBundle = null;
     return result;
   }
-  executeRenderBundle(renderBundle: RenderBundle) {
+  protected _executeRenderBundle(renderBundle: RenderBundle): number {
     for (const drawcall of renderBundle as WebGLRenderBundle) {
       this.setProgram(drawcall.program);
       this.setVertexLayout(drawcall.vertexLayout);
@@ -967,6 +967,7 @@ export class WebGLDevice extends BaseDevice {
         this.drawInstanced(drawcall.primitiveType, drawcall.first, drawcall.count, drawcall.numInstances);
       }
     }
+    return (renderBundle as WebGLRenderBundle).length;
   }
   /** @internal */
   protected _setFramebuffer(rt: FrameBuffer): void {

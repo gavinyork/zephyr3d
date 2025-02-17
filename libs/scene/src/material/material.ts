@@ -43,6 +43,8 @@ export class Material implements Clonable<Material> {
   private _persistentId: string;
   /** @internal */
   private _currentHash: string[];
+  /** @internal */
+  private _changeTag: number;
   /**
    * Creates an instance of material
    */
@@ -54,6 +56,7 @@ export class Material implements Clonable<Material> {
     this._numPasses = 1;
     this._hash = [null];
     this._optionTag = 0;
+    this._changeTag = 0;
     this._currentHash = [];
     Material._registry.set(this._persistentId, new WeakRef(this));
   }
@@ -70,6 +73,10 @@ export class Material implements Clonable<Material> {
       this._states = {};
     }
     this._numPasses = other._numPasses;
+  }
+  /** Material change tag */
+  get changeTag() {
+    return this._changeTag;
   }
   /** @internal */
   static findMaterialById(id: string) {
@@ -192,6 +199,7 @@ export class Material implements Clonable<Material> {
         const id = state.bindGroup.getGPUId();
         if (id !== state.bindGroupTag) {
           state.bindGroupTag = id;
+          this._changeTag++;
           RenderBundleWrapper.materialChanged(this.coreMaterial);
         }
       }
@@ -248,6 +256,7 @@ export class Material implements Clonable<Material> {
       for (let i = 0; i < this._numPasses; i++) {
         this._hash[i] = null;
       }
+      this._changeTag++;
       RenderBundleWrapper.materialChanged(this.coreMaterial);
     }
   }

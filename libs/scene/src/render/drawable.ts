@@ -163,8 +163,9 @@ export interface Drawable {
   /**
    * Draw the object
    * @param ctx - Context of the drawing task
+   * @param hash - Hash for render bundle optimization
    */
-  draw(ctx: DrawContext);
+  draw(ctx: DrawContext, hash?: string);
   /**
    * returns true if the object is batchable
    */

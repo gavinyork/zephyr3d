@@ -5,7 +5,7 @@ import type { MeshMaterial } from '../material';
 import { LambertMaterial } from '../material';
 import type { RenderPass, Primitive, BatchDrawable, DrawContext, PickTarget } from '../render';
 import { Application } from '../app/app';
-import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
+import type { GPUDataBuffer, RenderBundle, Texture2D } from '@zephyr3d/device';
 import type { Scene } from './scene';
 import type { BoundingBox, BoundingVolume } from '../utility/bounding_volume';
 import { QUEUE_OPAQUE } from '../values';
@@ -47,6 +47,14 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   protected _skinAnimation: boolean;
   /** @internal */
   protected _morphAnimation: boolean;
+  /** @internal */
+  protected _renderBundle: Record<string, RenderBundle>;
+  /** @internal */
+  protected _useRenderBundle: boolean;
+  /** @internal */
+  protected _materialChangeTag: number;
+  /** @internal */
+  protected _primitiveChangeTag: number;
   /**
    * Creates an instance of mesh node
    * @param scene - The scene to which the mesh node belongs
@@ -69,6 +77,10 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this.material = material ?? Mesh._getDefaultMaterial();
     this._skinAnimation = false;
     this._morphAnimation = false;
+    this._renderBundle = {};
+    this._useRenderBundle = true;
+    this._materialChangeTag = null;
+    this._primitiveChangeTag = null;
   }
   clone(method: NodeCloneMethod, recursive: boolean): Mesh {
     const other = new Mesh(this.scene);
@@ -153,6 +165,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
           : null;
       this.invalidateBoundingVolume();
       RenderBundleWrapper.drawableChanged(this);
+      this._primitiveChangeTag = null;
     }
   }
   /** Material of the mesh */
@@ -170,6 +183,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
           ? `${this.constructor.name}:${this._scene?.id ?? 0}:${this._primitive.get().id}:${m.instanceId}`
           : null;
       RenderBundleWrapper.drawableChanged(this);
+      this._materialChangeTag = null;
     }
   }
   /** Wether to draw the bounding box of the mesh node */
@@ -213,6 +227,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   setBoneMatrices(matrices: Texture2D) {
     if (this._boneMatrices !== matrices) {
       this._boneMatrices = matrices;
+      this._renderBundle = {};
       RenderBundleWrapper.drawableChanged(this);
     }
   }
@@ -223,6 +238,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   setMorphData(data: Texture2D) {
     if (this._morphData !== data) {
       this._morphData = data;
+      this._renderBundle = {};
       RenderBundleWrapper.drawableChanged(this);
     }
   }
@@ -258,6 +274,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   dispose() {
     this._primitive.dispose();
     this._material.dispose();
+    this._renderBundle = null;
     RenderBundleWrapper.drawableChanged(this);
     super.dispose();
   }
@@ -288,10 +305,32 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * {@inheritDoc Drawable.draw}
    */
-  draw(ctx: DrawContext) {
-    if (this._material.get() && this._primitive.get()) {
-      this.bind(ctx);
-      this._material.get().draw(this._primitive.get(), ctx);
+  draw(ctx: DrawContext, hash?: string) {
+    const material = this.material;
+    const primitive = this.primitive;
+    if (material && primitive) {
+      if (this._useRenderBundle && !ctx.instanceData) {
+        if (
+          this._primitiveChangeTag !== primitive.changeTag ||
+          this._materialChangeTag !== material.changeTag
+        ) {
+          this._renderBundle = {};
+          this._primitiveChangeTag = primitive.changeTag;
+          this._materialChangeTag = material.changeTag;
+        }
+        const renderBundle = this._renderBundle[hash];
+        if (!renderBundle) {
+          ctx.device.beginCapture();
+          this.bind(ctx);
+          material.draw(primitive, ctx);
+          this._renderBundle[hash] = ctx.device.endCapture();
+        } else {
+          ctx.device.executeRenderBundle(renderBundle);
+        }
+      } else {
+        this.bind(ctx);
+        material.draw(primitive, ctx);
+      }
     }
   }
   /**

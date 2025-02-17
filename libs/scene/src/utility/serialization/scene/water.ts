@@ -5,7 +5,8 @@ import type { AssetRegistry } from '../asset/asset';
 import type { PropertyAccessor, SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import { getGraphNodeClass } from './node';
-import { GerstnerWaveGenerator, WaveGenerator } from '../../../render';
+import type { WaveGenerator } from '../../../render';
+import { GerstnerWaveGenerator } from '../../../render';
 
 export class GerstnerWaveCls {
   public generator: GerstnerWaveGenerator;

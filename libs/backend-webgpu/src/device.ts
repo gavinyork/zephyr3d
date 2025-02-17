@@ -77,6 +77,12 @@ import { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPURenderPass } from './renderpass_webgpu';
 import type { WebGPUComputePass } from './computepass_webgpu';
 
+type WebGPURenderBundle = {
+  dc: number;
+  encoder: GPURenderBundleEncoder;
+  renderBundle: GPURenderBundle;
+};
+
 export class WebGPUDevice extends BaseDevice {
   private _context: GPUCanvasContext;
   private _dpr: number;
@@ -106,7 +112,7 @@ export class WebGPUDevice extends BaseDevice {
   private _defaultRenderPassDesc: GPURenderPassDescriptor;
   private _sampleCount: number;
   private _emptyBindGroup: GPUBindGroup;
-  private _captureRenderBundle: GPURenderBundleEncoder;
+  private _captureRenderBundle: WebGPURenderBundle;
   private _adapterInfo: any;
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend);
@@ -808,18 +814,26 @@ export class WebGPUDevice extends BaseDevice {
       depthStencilFormat: frameBuffer.depthFormat,
       sampleCount: frameBuffer.sampleCount
     };
-    this._captureRenderBundle = this._device.createRenderBundleEncoder(desc);
+    this._captureRenderBundle = {
+      dc: 0,
+      encoder: this._device.createRenderBundleEncoder(desc),
+      renderBundle: null
+    };
   }
   endCapture(): RenderBundle {
     if (!this._captureRenderBundle) {
       throw new Error('Device.endCapture() failed: device is not capturing draw commands');
     }
-    const renderBundle = this._captureRenderBundle.finish();
+    this._captureRenderBundle.renderBundle = this._captureRenderBundle.encoder.finish();
+    const ret = this._captureRenderBundle;
     this._captureRenderBundle = null;
-    return renderBundle;
+    return ret;
   }
-  executeRenderBundle(renderBundle: RenderBundle) {
-    this._commandQueue.executeRenderBundle(renderBundle as GPURenderBundle);
+  protected _executeRenderBundle(renderBundle: RenderBundle): number {
+    this._commandQueue.executeRenderBundle(
+      (renderBundle as WebGPURenderBundle).renderBundle as GPURenderBundle
+    );
+    return (renderBundle as WebGPURenderBundle).dc;
   }
   bufferUpload(buffer: WebGPUBuffer) {
     this._commandQueue.bufferUpload(buffer);
@@ -861,8 +875,9 @@ export class WebGPUDevice extends BaseDevice {
       1
     );
     if (this._captureRenderBundle) {
+      this._captureRenderBundle.dc++;
       this._commandQueue.capture(
-        this._captureRenderBundle,
+        this._captureRenderBundle.encoder,
         this._currentProgram,
         this._currentVertexData,
         this._currentStateSet,
@@ -894,8 +909,9 @@ export class WebGPUDevice extends BaseDevice {
       numInstances
     );
     if (this._captureRenderBundle) {
+      this._captureRenderBundle.dc++;
       this._commandQueue.capture(
-        this._captureRenderBundle,
+        this._captureRenderBundle.encoder,
         this._currentProgram,
         this._currentVertexData,
         this._currentStateSet,

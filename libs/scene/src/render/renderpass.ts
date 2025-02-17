@@ -5,10 +5,10 @@ import type { RenderItemListInfo, RenderQueueItem } from './render_queue';
 import { RenderQueue } from './render_queue';
 import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
-import type { AbstractDevice, BindGroup } from '@zephyr3d/device';
 import { ShaderHelper } from '../material/shader/helper';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
 import { MaterialVaryingFlags } from '../values';
+import type { BindGroup } from '@zephyr3d/device';
 
 /**
  * Base class for any kind of render passes
@@ -144,22 +144,6 @@ export abstract class RenderPass {
     return null;
   }
   /** @internal */
-  protected drawItem(
-    device: AbstractDevice,
-    item: RenderQueueItem,
-    ctx: DrawContext,
-    reverseWinding: boolean
-  ) {
-    const reverse = reverseWinding !== item.drawable.getNode().worldMatrixDet < 0;
-    if (reverse) {
-      device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
-    }
-    item.drawable.draw(ctx);
-    if (reverse) {
-      device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
-    }
-  }
-  /** @internal */
   private internalDrawItemList(
     ctx: DrawContext,
     items: RenderQueueItem[],
@@ -192,7 +176,7 @@ export abstract class RenderPass {
           hash
         );
       }
-      item.drawable.draw(ctx);
+      item.drawable.draw(ctx, recording ? undefined : hash);
       if (reverse) {
         ctx.device.reverseVertexWindingOrder(!ctx.device.isWindingOrderReversed());
       }

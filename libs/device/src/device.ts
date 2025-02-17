@@ -282,9 +282,9 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
   ): void;
   abstract beginCapture(): void;
   abstract endCapture(): RenderBundle;
-  abstract executeRenderBundle(renderBundle: RenderBundle);
   abstract looseContext(): void;
   abstract restoreContext(): void;
+  protected abstract _executeRenderBundle(renderBundle: RenderBundle): number;
   protected abstract _draw(primitiveType: PrimitiveType, first: number, count: number): void;
   protected abstract _drawInstanced(
     primitiveType: PrimitiveType,
@@ -492,6 +492,9 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
   drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number): void {
     this._frameInfo.drawCalls++;
     this._drawInstanced(primitiveType, first, count, numInstances);
+  }
+  executeRenderBundle(renderBundle: RenderBundle) {
+    this._frameInfo.drawCalls += this._executeRenderBundle(renderBundle);
   }
   compute(workgroupCountX, workgroupCountY, workgroupCountZ): void {
     this._frameInfo.computeCalls++;

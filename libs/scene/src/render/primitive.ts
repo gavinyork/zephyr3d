@@ -51,6 +51,8 @@ export class Primitive implements Clonable<Primitive> {
   protected _bboxChangeCallback: (() => void)[];
   /** @internal */
   protected _disposed: boolean;
+  /** @internal */
+  private _changeTag: number;
   /**
    * Creates an instance of a primitive
    */
@@ -64,6 +66,7 @@ export class Primitive implements Clonable<Primitive> {
     this._vertexLayoutDirty = false;
     this._id = ++Primitive._nextId;
     this._persistentId = crypto.randomUUID();
+    this._changeTag = 0;
     this._bbox = null;
     this._bboxChangeCallback = [];
     this._disposed = false;
@@ -84,6 +87,10 @@ export class Primitive implements Clonable<Primitive> {
    */
   get id(): number {
     return this._id;
+  }
+  /** Primitive change tag */
+  get changeTag() {
+    return this._changeTag;
   }
   /**
    * Persistent ID used in serialization
@@ -144,6 +151,7 @@ export class Primitive implements Clonable<Primitive> {
   set primitiveType(type) {
     if (type !== this._primitiveType) {
       this._primitiveType = type;
+      this._changeTag++;
       RenderBundleWrapper.primitiveChanged(this);
     }
   }
@@ -154,6 +162,7 @@ export class Primitive implements Clonable<Primitive> {
   set indexStart(val) {
     if (val !== this._indexStart) {
       this._indexStart = val;
+      this._changeTag++;
       RenderBundleWrapper.primitiveChanged(this);
     }
   }
@@ -165,6 +174,7 @@ export class Primitive implements Clonable<Primitive> {
   set indexCount(val) {
     if (val !== this._indexCount) {
       this._indexCount = val;
+      this._changeTag++;
       RenderBundleWrapper.primitiveChanged(this);
     }
   }
@@ -216,6 +226,7 @@ export class Primitive implements Clonable<Primitive> {
       }
     }
     if (this._vertexLayoutDirty) {
+      this._changeTag++;
       RenderBundleWrapper.primitiveChanged(this);
     }
   }
@@ -272,6 +283,7 @@ export class Primitive implements Clonable<Primitive> {
       stepMode
     });
     this._vertexLayoutDirty = true;
+    this._changeTag++;
     RenderBundleWrapper.primitiveChanged(this);
     return buffer;
   }
@@ -300,6 +312,7 @@ export class Primitive implements Clonable<Primitive> {
       releaseObject(this._vertexLayoutOptions.indexBuffer);
       this._vertexLayoutOptions.indexBuffer = buffer;
       this._vertexLayoutDirty = true;
+      this._changeTag++;
       RenderBundleWrapper.primitiveChanged(this);
     }
   }
