@@ -321,8 +321,8 @@ export class RenderQueue {
       }
       const trans = drawable.getQueueType() === QUEUE_TRANSPARENT;
       const unlit = drawable.isUnlit();
-      const transmission = !!drawable.needSceneColor();
       const needDepth = !!drawable.needSceneDepth();
+      const transmission = !!drawable.needSceneColor() || needDepth;
       this._needSceneColor ||= transmission;
       this._needSceneDepth ||= drawable.needSceneDepth();
       this._needSceneColorWithDepth ||= transmission && needDepth;

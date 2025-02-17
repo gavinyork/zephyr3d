@@ -14,8 +14,9 @@ export class LinearizeDepthBlitter extends Blitter {
     super();
     this._nearFar = new Vector2();
   }
-  setCameraNearFar(n: number, f: number) {
+  setCameraNearFar(n: number, f: number): this {
     this._nearFar.setXY(n, f);
+    return this;
   }
   /**
    * {@inheritDoc Blitter.filter}
