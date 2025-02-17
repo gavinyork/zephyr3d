@@ -865,7 +865,7 @@ export class SceneView extends BaseView<SceneModel> {
       this._typeToBePlaced = 'none';
     }
     this._assetRegistry
-      .fetchModel(asset.uuid, this.model.scene, { enableInstancing: true })
+      .fetchModel(asset.uuid, this.model.scene)
       .then((node) => {
         this._nodeToBePlaced.set(node.group);
         this._assetToBeAdded = asset;

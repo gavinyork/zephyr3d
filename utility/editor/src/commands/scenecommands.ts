@@ -45,9 +45,7 @@ export class AddAssetCommand extends Command<SceneNode> {
   async execute() {
     let asset: ModelInfo = null;
     try {
-      asset = await this._assetRegistry.fetchModel(this._asset.uuid, this._scene, {
-        enableInstancing: true
-      });
+      asset = await this._assetRegistry.fetchModel(this._asset.uuid, this._scene);
     } catch (err) {
       console.error(`Load asset failed: ${this._asset.name}: ${err}`);
     }

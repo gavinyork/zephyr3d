@@ -7,12 +7,10 @@ import type {
   GPUProgram,
   RenderStateSet,
   Texture2D,
-  TextureFormat,
   VertexLayout
 } from '@zephyr3d/device';
 import type { AbstractPostEffect } from './posteffect';
 import { MaterialVaryingFlags } from '../values';
-import { SSR } from './ssr';
 import { fetchSampler } from '../utility/misc';
 
 /**
@@ -29,8 +27,6 @@ export interface CompositorContext {
  * @public
  */
 export class Compositor {
-  /** @internal */
-  private static _SSRPostEffect: SSR = null;
   /** @internal */
   protected _postEffectsOpaque: AbstractPostEffect<any>[];
   /** @internal */
@@ -131,23 +127,15 @@ export class Compositor {
     const depth = this._finalFramebuffer?.getDepthAttachment() as Texture2D;
     const w = depth ? depth.width : device.getDrawingBufferWidth();
     const h = depth ? depth.height : device.getDrawingBufferHeight();
-    const fmt2: TextureFormat = ssr ? (device.type === 'webgl' ? format : 'rgba8unorm') : format;
+    //const fmt2: TextureFormat = ssr ? (device.type === 'webgl' ? format : 'rgba8unorm') : format;
     const tmpFramebuffer = device.pool.fetchTemporalFramebuffer(
       true,
       w,
       h,
-      ssr ? [format, fmt2, fmt2] : format,
+      ssr ? [format, ctx.SSRRoughnessTexture, ctx.SSRNormalTexture] : format,
       depth ?? ctx.depthFormat
     );
     device.setFramebuffer(tmpFramebuffer);
-    if (ssr) {
-      if (!Compositor._SSRPostEffect) {
-        Compositor._SSRPostEffect = new SSR();
-      }
-      Compositor._SSRPostEffect.roughnessTexture = tmpFramebuffer.getColorAttachments()[1] as Texture2D;
-      Compositor._SSRPostEffect.normalTexture = tmpFramebuffer.getColorAttachments()[2] as Texture2D;
-      this._postEffectsOpaque.unshift(Compositor._SSRPostEffect);
-    }
   }
   /** @internal */
   drawPostEffects(ctx: DrawContext, opaque: boolean, sceneDepthTexture: Texture2D) {
@@ -211,9 +199,6 @@ export class Compositor {
     if (this._prevFrameBuffer) {
       device.pool.releaseFrameBuffer(this._prevFrameBuffer);
       this._prevFrameBuffer = null;
-    }
-    if (this._postEffectsOpaque[0] === Compositor._SSRPostEffect) {
-      this._postEffectsOpaque.shift();
     }
   }
   /** @internal */

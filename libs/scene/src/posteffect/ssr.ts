@@ -28,8 +28,6 @@ export class SSR extends AbstractPostEffect<'SSR'> {
   private static _combineProgram: GPUProgram = undefined;
   private static _blurBlitterH: BilateralBlurBlitter = null;
   private static _blurBlitterV: BilateralBlurBlitter = null;
-  private _roughnessTex: Texture2D;
-  private _normalTex: Texture2D;
   private _bindgroups: Record<string, BindGroup>;
   private _resolveBindGroup: Record<string, BindGroup>;
   private _combineBindGroup: BindGroup;
@@ -42,19 +40,6 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     this._bindgroups = {};
     this._resolveBindGroup = {};
     this._combineBindGroup = null;
-    this._roughnessTex = null;
-  }
-  get roughnessTexture() {
-    return this._roughnessTex;
-  }
-  set roughnessTexture(tex: Texture2D) {
-    this._roughnessTex = tex;
-  }
-  get normalTexture() {
-    return this._normalTex;
-  }
-  set normalTexture(tex: Texture2D) {
-    this._normalTex = tex;
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
   requireLinearDepthTexture(): boolean {
@@ -105,7 +90,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     const linearSampler = fetchSampler('clamp_linear');
     this._combineBindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
     this._combineBindGroup.setTexture('reflectanceTex', reflectanceTex, linearSampler);
-    this._combineBindGroup.setTexture('roughnessTex', this._roughnessTex, linearSampler);
+    this._combineBindGroup.setTexture('roughnessTex', ctx.SSRRoughnessTexture, linearSampler);
     this._combineBindGroup.setValue(
       'targetSize',
       new Vector4(
@@ -144,8 +129,8 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     const linearSampler = fetchSampler('clamp_linear');
     bindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
     bindGroup.setTexture('intersectTex', intersectTexture, nearestSampler);
-    bindGroup.setTexture('roughnessTex', this._roughnessTex, nearestSampler);
-    bindGroup.setTexture('normalTex', this._normalTex, nearestSampler);
+    bindGroup.setTexture('roughnessTex', ctx.SSRRoughnessTexture, nearestSampler);
+    bindGroup.setTexture('normalTex', ctx.SSRNormalTexture, nearestSampler);
     bindGroup.setTexture('depthTex', sceneDepthTexture, nearestSampler);
     bindGroup.setValue('cameraNearFar', new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane()));
     bindGroup.setValue(
@@ -200,8 +185,8 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         ctx.env.light.envLight.updateBindGroup(bindGroup);
       }
     }
-    bindGroup.setTexture('roughnessTex', this._roughnessTex, nearestSampler);
-    bindGroup.setTexture('normalTex', this._normalTex, nearestSampler);
+    bindGroup.setTexture('roughnessTex', ctx.SSRRoughnessTexture, nearestSampler);
+    bindGroup.setTexture('normalTex', ctx.SSRNormalTexture, nearestSampler);
     bindGroup.setTexture('depthTex', sceneDepthTexture, nearestSampler);
     bindGroup.setValue('cameraNearFar', new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane()));
     bindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());

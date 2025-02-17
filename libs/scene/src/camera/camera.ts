@@ -13,6 +13,7 @@ import type { Scene } from '../scene/scene';
 import type { BaseCameraController } from './base';
 import type { OIT } from '../render/oit';
 import { TAA } from '../posteffect/taa';
+import { SSR } from '../posteffect/ssr';
 
 /**
  * Camera pick result
@@ -40,6 +41,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   /** @internal */
   private static _historyData: WeakMap<Camera, CameraHistoryData> = new WeakMap();
   private static _TAA: TAA = null;
+  private static _SSR: SSR = null;
   /** @internal */
   protected _projMatrix: Matrix4x4;
   /** @internal */
@@ -684,15 +686,22 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    */
   render(scene: Scene, compositor?: Compositor) {
     compositor = compositor ?? Camera._defaultCompositor;
-    if (this.TAA) {
+    const useTAA = this.TAA;
+    const useSSR = this.SSR;
+    if (useTAA) {
       if (!Camera._TAA) {
         Camera._TAA = new TAA();
       }
       compositor.appendPostEffect(Camera._TAA);
     }
+    if (useSSR) {
+      if (!Camera._SSR) {
+        Camera._SSR = new SSR();
+      }
+      compositor.appendPostEffect(Camera._SSR);
+    }
     scene.dispatchEvent('startrender', scene, this, compositor);
     const device = Application.instance.device;
-    const useTAA = this._TAA;
     if (useTAA) {
       const width = device.getDrawingBufferWidth();
       const height = device.getDrawingBufferHeight();
@@ -730,8 +739,11 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
       this._prevPosition = this.getWorldPosition();
     }
     scene.dispatchEvent('endrender', scene, this, compositor ?? null);
-    if (Camera._TAA) {
+    if (useTAA) {
       compositor.removePostEffect(Camera._TAA);
+    }
+    if (useSSR) {
+      compositor.removePostEffect(Camera._SSR);
     }
   }
   async pickAsync(posX: number, posY: number): Promise<PickResult> {

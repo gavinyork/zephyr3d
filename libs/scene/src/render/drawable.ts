@@ -3,6 +3,7 @@ import type {
   AbstractDevice,
   ColorState,
   FaceMode,
+  FrameBuffer,
   GPUDataBuffer,
   Texture2D,
   TextureFormat
@@ -106,6 +107,18 @@ export interface DrawContext {
   forceColorState?: ColorState;
   /** TAA enabled */
   TAA: boolean;
+  /** SSR enabled */
+  SSR: boolean;
+  /** SSR thickness calculation enabled */
+  SSRCalcThickness: boolean;
+  /** SSR roughness texture */
+  SSRRoughnessTexture: Texture2D;
+  /** SSR normal texture */
+  SSRNormalTexture: Texture2D;
+  /** Final frame buffer */
+  finalFramebuffer: FrameBuffer;
+  /** Intermediat frame buffer */
+  intermediateFramebuffer: FrameBuffer;
 }
 
 /**

@@ -161,7 +161,7 @@ export function mixinDrawable<
             0,
             36
           );
-          instanceBindGroupTransfromTags.set(instanceInfo, tag);
+          instanceBindGroupTransfromTags.set(instanceInfo, currentTag);
         }
       } else {
         const drawableBindGroup = this.getDrawableBindGroup(Application.instance.device, false, renderQueue);
@@ -185,7 +185,7 @@ export function mixinDrawable<
               (this as unknown as Mesh).invWorldMatrix
             );
           }
-          drawableBindGroupTransfromTags.set(drawableBindGroup, tag);
+          drawableBindGroupTransfromTags.set(drawableBindGroup, currentTag);
         }
       }
     }
