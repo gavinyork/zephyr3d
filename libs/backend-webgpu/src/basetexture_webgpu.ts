@@ -445,9 +445,10 @@ export abstract class WebGPUBaseTexture<
     buffer: GPUDataBuffer
   ): void {
     if (!((buffer as WebGPUBuffer).gpuUsage & GPUBufferUsage.COPY_DST)) {
-      throw new Error(
+      console.error(
         'copyTexturePixelsToBuffer() failed: destination buffer does not have COPY_DST usage set'
       );
+      return;
     }
     const blockWidth = getTextureFormatBlockWidth(format);
     const blockHeight = getTextureFormatBlockHeight(format);
@@ -459,9 +460,10 @@ export abstract class WebGPUBaseTexture<
     const bufferSize = blocksPerCol * rowStride;
     const bufferSizeAligned = blocksPerCol * bufferStride;
     if (buffer.byteLength < bufferSize) {
-      throw new Error(
+      console.error(
         `copyTexturePixelsToBuffer() failed: destination buffer size is ${buffer.byteLength}, should be at least ${bufferSize}`
       );
+      return;
     }
     const tmpBuffer = device.createBuffer({
       size: bufferSizeAligned,

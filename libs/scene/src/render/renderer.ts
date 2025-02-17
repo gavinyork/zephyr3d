@@ -167,41 +167,6 @@ export class SceneRenderer {
     }
     GlobalBindGroupAllocator.release(globalBindGroupAllocator);
   }
-  /** @internal */
-  protected static _renderSceneDepth(
-    ctx: DrawContext,
-    renderQueue: RenderQueue,
-    depthFramebuffer: FrameBuffer,
-    renderBackfaceDepth?: boolean
-  ) {
-    const device = ctx.device;
-    device.pushDeviceStates();
-    device.setFramebuffer(depthFramebuffer);
-    this._depthPass.encodeDepth = depthFramebuffer.getColorAttachments()[0].format === 'rgba8unorm';
-    this._depthPass.clearColor = this._depthPass.encodeDepth
-      ? new Vector4(0, 0, 0, 1)
-      : new Vector4(1, 1, 1, 1);
-    this._depthPass.clearDepth = 1;
-    if (renderBackfaceDepth) {
-      if (!this._backDepthColorState) {
-        this._backDepthColorState = device.createColorState().setColorMask(false, true, false, false);
-      }
-      if (!this._frontDepthColorState) {
-        this._frontDepthColorState = device.createColorState().setColorMask(true, false, false, false);
-      }
-      ctx.forceColorState = this._backDepthColorState;
-      ctx.forceCullMode = 'front';
-      this._depthPass.renderBackface = true;
-      this._depthPass.render(ctx, null, renderQueue);
-      this._depthPass.clearColor = null;
-      this._depthPass.renderBackface = false;
-      ctx.forceColorState = this._frontDepthColorState;
-      ctx.forceCullMode = null;
-    }
-    this._depthPass.render(ctx, null, renderQueue);
-    ctx.forceColorState = null;
-    device.popDeviceStates();
-  }
   private static renderSceneDepth(ctx: DrawContext, renderQueue: RenderQueue) {
     const format: TextureFormat =
       ctx.device.type === 'webgl'
