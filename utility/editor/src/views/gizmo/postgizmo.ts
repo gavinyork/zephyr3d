@@ -8,15 +8,7 @@ import type {
 } from '@zephyr3d/device';
 import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
 import { BoxShape, Mesh, DRef, UnlitMaterial } from '@zephyr3d/scene';
-import {
-  AbstractPostEffect,
-  Application,
-  CopyBlitter,
-  decodeNormalizedFloatFromRGBA,
-  fetchSampler,
-  PlaneShape,
-  ShaderHelper
-} from '@zephyr3d/scene';
+import { AbstractPostEffect, Application, CopyBlitter, fetchSampler, PlaneShape } from '@zephyr3d/scene';
 import { createTranslationGizmo, createRotationGizmo, createScaleGizmo, createSelectGizmo } from './gizmo';
 import type { Ray } from '@zephyr3d/base';
 import { AABB, makeEventTarget } from '@zephyr3d/base';
@@ -276,11 +268,11 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
   requireLinearDepthTexture(): boolean {
-    return true;
+    return false;
   }
   /** {@inheritDoc AbstractPostEffect.requireDepthAttachment} */
   requireDepthAttachment(): boolean {
-    return true;
+    return false;
   }
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
@@ -314,8 +306,8 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       this._gridBindGroup.setValue('texSize', PostGizmoRenderer._texSize);
       this._gridBindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
       this._gridBindGroup.setTexture(
-        'linearDepthTex',
-        sceneDepthTexture,
+        'depthTex',
+        destFramebuffer.getDepthAttachment(),
         fetchSampler('clamp_nearest_nomip')
       );
       this._gridBindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
@@ -334,7 +326,11 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       this._bindGroup.setValue('texSize', PostGizmoRenderer._texSize);
       this._bindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
       this._bindGroup.setValue('time', (ctx.device.frameInfo.elapsedOverall % 1000) * 0.001);
-      this._bindGroup.setTexture('linearDepthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
+      this._bindGroup.setTexture(
+        'depthTex',
+        destFramebuffer.getDepthAttachment(),
+        fetchSampler('clamp_nearest_nomip')
+      );
       ctx.device.setProgram(
         this._mode === 'select' ? PostGizmoRenderer._gizmoSelectProgram : PostGizmoRenderer._gizmoProgram
       );
@@ -861,7 +857,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
         this.params = pb.vec4().uniform(0);
         this.cameraPos = pb.vec3().uniform(0);
         this.steps = pb.vec4[8]().uniform(0);
-        this.linearDepthTex = pb.tex2D().uniform(0);
+        this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.texSize = pb.vec2().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         const STEPS_LEN = 8;
@@ -1064,16 +1060,22 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
             pb.vec3(0.1384, 0.1384, 0.1384)
           );
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
+          this.$l.depth = this.$builtins.fragCoord.z;
+          /*
           this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(
             this,
             this.$builtins.fragCoord.z,
             this.cameraNearFar
           );
-          this.$l.sceneDepthSample = pb.textureSampleLevel(this.linearDepthTex, this.screenUV, 0);
+          */
+          this.$l.sceneDepthSample = pb.textureSampleLevel(this.depthTex, this.screenUV, 0);
+          this.$l.sceneDepth = this.sceneDepthSample.r;
+          /*
           this.$l.sceneDepth =
             pb.getDevice().type === 'webgl'
               ? decodeNormalizedFloatFromRGBA(this, this.sceneDepthSample)
               : this.sceneDepthSample.r;
+          */
           this.$l.alpha = this.$choice(
             pb.greaterThan(this.depth, this.sceneDepth),
             pb.float(0),
@@ -1107,7 +1109,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       },
       fragment(pb) {
         this.$outputs.color = pb.vec4();
-        this.linearDepthTex = pb.tex2D().uniform(0);
+        this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.texSize = pb.vec2().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         this.time = pb.float().uniform(0);
@@ -1150,16 +1152,22 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
         }
         pb.main(function () {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
+          this.$l.depth = this.$builtins.fragCoord.z;
+          /*
           this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(
             this,
             this.$builtins.fragCoord.z,
             this.cameraNearFar
           );
-          this.$l.sceneDepthSample = pb.textureSampleLevel(this.linearDepthTex, this.screenUV, 0);
+          */
+          this.$l.sceneDepthSample = pb.textureSampleLevel(this.depthTex, this.screenUV, 0);
+          this.$l.sceneDepth = this.sceneDepthSample.r;
+          /*
           this.$l.sceneDepth =
             pb.getDevice().type === 'webgl'
               ? decodeNormalizedFloatFromRGBA(this, this.sceneDepthSample)
               : this.sceneDepthSample.r;
+          */
           this.$l.alpha = this.$choice(
             pb.greaterThan(this.depth, this.sceneDepth),
             selectMode ? pb.float(0.3) : pb.float(0.5),
