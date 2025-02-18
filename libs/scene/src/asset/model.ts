@@ -5,7 +5,7 @@ import type { Primitive } from '../render/primitive';
 import type { MeshMaterial } from '../material/meshmaterial';
 import { Mesh } from '../scene/mesh';
 import type { BoundingBox } from '../utility';
-import type { Ref } from '../app';
+import type { DRef } from '../app';
 import type { Scene } from '../scene';
 import { SceneNode } from '../scene';
 import {
@@ -175,8 +175,8 @@ export interface AssetPBRMaterialSG extends AssetPBRMaterialCommon {
  * @public
  */
 export interface AssetSubMeshData {
-  primitive: Ref<Primitive>;
-  material: Ref<MeshMaterial>;
+  primitive: DRef<Primitive>;
+  material: DRef<MeshMaterial>;
   mesh?: Mesh;
   rawPositions: Float32Array;
   rawBlendIndices: TypedArray;

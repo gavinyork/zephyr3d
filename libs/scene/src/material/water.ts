@@ -4,7 +4,7 @@ import type { DrawContext, WaveGenerator } from '../render';
 import { MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
 import { Matrix4x4, Vector4 } from '@zephyr3d/base';
-import { Ref } from '../app';
+import { DRef } from '../app';
 import { sampleLinearDepth } from '../shaders/ssr';
 
 export class WaterMaterial extends MeshMaterial {
@@ -12,13 +12,13 @@ export class WaterMaterial extends MeshMaterial {
   private static _waveUpdateState: WeakMap<WaveGenerator, number> = new WeakMap();
   private _region: Vector4;
   private _displace: number;
-  private _waveGenerator: Ref<WaveGenerator>;
+  private _waveGenerator: DRef<WaveGenerator>;
   private _clipmapMatrix: Matrix4x4;
   constructor() {
     super();
     this._region = new Vector4(-99999, -99999, 99999, 99999);
     this._clipmapMatrix = new Matrix4x4();
-    this._waveGenerator = new Ref();
+    this._waveGenerator = new DRef();
     this._displace = 16;
     this.cullMode = 'none';
     this.useFeature(WaterMaterial.FEATURE_SSR, true);

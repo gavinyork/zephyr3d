@@ -3,7 +3,7 @@ import type { IndexBuffer, PrimitiveType, Texture2D } from '@zephyr3d/device';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { TerrainPatch } from './patch';
 import { HeightField } from './heightfield';
-import { Application, Ref } from '../../app';
+import { Application, DRef } from '../../app';
 import type { CullVisitor } from '../../render/cull_visitor';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import type { Terrain } from './terrain';
@@ -133,9 +133,9 @@ export class QuadtreeNode {
 /** @internal */
 export class Quadtree {
   private _baseVertices: Float32Array;
-  private _indices: Ref<IndexBuffer>;
-  private _indicesWireframe: Ref<IndexBuffer>;
-  private _normalMap: Ref<Texture2D>;
+  private _indices: DRef<IndexBuffer>;
+  private _indicesWireframe: DRef<IndexBuffer>;
+  private _normalMap: DRef<Texture2D>;
   private _scaleX: number;
   private _scaleZ: number;
   private _patchSize: number;
@@ -151,9 +151,9 @@ export class Quadtree {
   constructor(terrain: Terrain) {
     this._terrain = terrain;
     this._baseVertices = null;
-    this._indices = new Ref();
-    this._indicesWireframe = new Ref();
-    this._normalMap = new Ref();
+    this._indices = new DRef();
+    this._indicesWireframe = new DRef();
+    this._normalMap = new DRef();
     this._scaleX = 1;
     this._scaleZ = 1;
     this._patchSize = 0;

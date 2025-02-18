@@ -10,7 +10,7 @@ import type { Camera } from '../camera/camera';
 import type { AnimationSet } from '../animation/animationset';
 import type { PickTarget } from '../render';
 import type { Compositor } from '../posteffect';
-import { Ref, WeakRef } from '../app';
+import { DRef, DWeakRef } from '../app';
 
 /**
  * Presents a world that manages a couple of objects that will be rendered
@@ -24,7 +24,7 @@ export class Scene extends makeEventTarget(Object)<{
   /** @internal */
   private static _nextId = 0;
   /** @internal */
-  protected _rootNode: Ref<SceneNode>;
+  protected _rootNode: DRef<SceneNode>;
   /** @internal */
   protected _octree: Octree;
   /** @internal */
@@ -34,11 +34,11 @@ export class Scene extends makeEventTarget(Object)<{
   /** @internal */
   protected _updateFrame: number;
   /** @internal */
-  protected _animationSet: WeakRef<AnimationSet>[];
+  protected _animationSet: DWeakRef<AnimationSet>[];
   /** @internal */
   protected _id: number;
   /** @internal */
-  protected _nodeUpdateQueue: WeakRef<SceneNode>[];
+  protected _nodeUpdateQueue: DWeakRef<SceneNode>[];
   /**
    * Creates an instance of scene
    */
@@ -51,12 +51,12 @@ export class Scene extends makeEventTarget(Object)<{
     this._env = new Environment();
     this._updateFrame = -1;
     this._animationSet = [];
-    this._rootNode = new Ref(new SceneNode(this));
+    this._rootNode = new DRef(new SceneNode(this));
     this._rootNode.get().name = 'Root';
   }
   /** @internal */
   addAnimationSet(animationSet: AnimationSet) {
-    this._animationSet.push(new WeakRef(animationSet));
+    this._animationSet.push(new DWeakRef(animationSet));
   }
   /**
    * Gets the unique identifier of the scene
@@ -168,7 +168,7 @@ export class Scene extends makeEventTarget(Object)<{
    */
   queueUpdateNode(node: SceneNode) {
     if (node && this._nodeUpdateQueue.findIndex((val) => val.get() === node) < 0) {
-      this._nodeUpdateQueue.push(new WeakRef(node));
+      this._nodeUpdateQueue.push(new DWeakRef(node));
     }
   }
   /** @internal */

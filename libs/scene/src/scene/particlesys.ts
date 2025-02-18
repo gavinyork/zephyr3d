@@ -12,7 +12,7 @@ import type { AbstractDevice, GPUDataBuffer, Texture2D } from '@zephyr3d/device'
 import { QUEUE_OPAQUE } from '../values';
 import { ParticleMaterial, type MeshMaterial } from '../material';
 import { Application } from '../app/app';
-import { Ref } from '../app';
+import { DRef } from '../app';
 import type { NodeClonable, NodeCloneMethod } from '.';
 
 const tmpVec3 = new Vector3();
@@ -83,8 +83,8 @@ export class ParticleSystem
   private _emitterShapeSizeMin: Vector3;
   private _emitterShapeSizeMax: Vector3;
   private _colorValue: Vector4;
-  private _primitive: Ref<Primitive>;
-  private _material: Ref<ParticleMaterial>;
+  private _primitive: DRef<Primitive>;
+  private _material: DRef<ParticleMaterial>;
   private _wsBoundingBox: BoundingBox;
   private _pickTarget: PickTarget;
   private _instanceData: Float32Array;
@@ -128,10 +128,10 @@ export class ParticleSystem
     this._colorMultiplier = 1;
     this._pickTarget = { node: this };
     this._flags = PS_WORLDSPACE;
-    this._primitive = new Ref();
+    this._primitive = new DRef();
     this._wsBoundingBox = new BoundingBox();
     this._instanceData = null;
-    this._material = new Ref(new ParticleMaterial());
+    this._material = new DRef(new ParticleMaterial());
   }
   clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new ParticleSystem(this.scene);

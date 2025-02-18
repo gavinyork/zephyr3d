@@ -21,7 +21,7 @@ import type {
 import type { DrawContext } from './drawable';
 import { ShaderHelper } from '../material/shader/helper';
 import { fetchSampler } from '../utility/misc';
-import { Ref } from '../app';
+import { DRef } from '../app';
 
 /**
  * Type of sky
@@ -59,16 +59,16 @@ const defaultSkyWorldMatrix = Matrix4x4.identity();
 export class SkyRenderer {
   private _skyType: SkyType;
   private _skyColor: Vector4;
-  private _skyboxTexture: Ref<TextureCube>;
-  private _bakedSkyboxTexture: Ref<TextureCube>;
+  private _skyboxTexture: DRef<TextureCube>;
+  private _bakedSkyboxTexture: DRef<TextureCube>;
   private _updateRadianceMaps: boolean;
   private _radianceMapDirty: boolean;
   private _scatterSkyboxFramebuffer: FrameBuffer;
   private _scatterSkyboxTextureWidth: number;
   private _aerialPerspectiveDensity: number;
-  private _radianceMap: Ref<TextureCube>;
+  private _radianceMap: DRef<TextureCube>;
   private _radianceMapWidth: number;
-  private _irradianceMap: Ref<TextureCube>;
+  private _irradianceMap: DRef<TextureCube>;
   private _irradianceMapWidth: number;
   private _fogType: FogType;
   private _fogColor: Vector4;
@@ -100,14 +100,14 @@ export class SkyRenderer {
     this._updateRadianceMaps = true;
     this._radianceMapDirty = true;
     this._skyColor = Vector4.zero();
-    this._skyboxTexture = new Ref();
-    this._bakedSkyboxTexture = new Ref();
+    this._skyboxTexture = new DRef();
+    this._bakedSkyboxTexture = new DRef();
     this._scatterSkyboxFramebuffer = null;
     this._scatterSkyboxTextureWidth = 256;
     this._aerialPerspectiveDensity = 1;
-    this._radianceMap = new Ref();
+    this._radianceMap = new DRef();
     this._radianceMapWidth = 128;
-    this._irradianceMap = new Ref();
+    this._irradianceMap = new DRef();
     this._irradianceMapWidth = 64;
     this._fogType = 'none';
     this._fogColor = Vector4.one();

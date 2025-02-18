@@ -3,7 +3,7 @@ import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import { Quadtree } from './quadtree';
 import { GraphNode } from '../graph_node';
-import { Application, Ref } from '../../app';
+import { Application, DRef } from '../../app';
 import { GrassManager } from './grass';
 import type { Camera } from '../../camera/camera';
 import type { BoundingVolume } from '../../utility/bounding_volume';
@@ -19,9 +19,9 @@ import type { NodeClonable, NodeCloneMethod } from '..';
  */
 export class Terrain extends GraphNode implements NodeClonable<Terrain> {
   /** @internal */
-  private _quadtree: Ref<Quadtree>;
+  private _quadtree: DRef<Quadtree>;
   /** @internal */
-  private _grassManager: Ref<GrassManager>;
+  private _grassManager: DRef<GrassManager>;
   /** @internal */
   private _maxPixelError: number;
   /** @internal */
@@ -50,8 +50,8 @@ export class Terrain extends GraphNode implements NodeClonable<Terrain> {
    */
   constructor(scene: Scene) {
     super(scene);
-    this._quadtree = new Ref();
-    this._grassManager = new Ref();
+    this._quadtree = new DRef();
+    this._grassManager = new DRef();
     this._maxPixelError = 10;
     this._maxPixelErrorDirty = true;
     this._lodCamera = null;

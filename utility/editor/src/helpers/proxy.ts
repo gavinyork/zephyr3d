@@ -1,22 +1,22 @@
 import { Matrix4x4, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import type { Scene, SceneNode } from '@zephyr3d/scene';
-import { BoundingBox, CylinderShape, Mesh, Primitive, Ref, UnlitMaterial, WeakRef } from '@zephyr3d/scene';
+import { BoundingBox, CylinderShape, Mesh, Primitive, DRef, UnlitMaterial, DWeakRef } from '@zephyr3d/scene';
 
 const PROXY_NAME = '$__PROXY__$';
 
 export class NodeProxy {
-  private _diamondPrimitive: Ref<Primitive>;
-  private _spotLightPrimitive: Ref<Primitive>;
-  private _directionalLightPrimitive: Ref<Primitive>;
-  private _lightProxyMaterial: Ref<UnlitMaterial>;
+  private _diamondPrimitive: DRef<Primitive>;
+  private _spotLightPrimitive: DRef<Primitive>;
+  private _directionalLightPrimitive: DRef<Primitive>;
+  private _lightProxyMaterial: DRef<UnlitMaterial>;
   private _scene: Scene;
-  private _proxyList: WeakRef<Mesh>[];
+  private _proxyList: DWeakRef<Mesh>[];
   constructor(scene: Scene) {
     this._scene = scene;
-    this._diamondPrimitive = new Ref();
-    this._spotLightPrimitive = new Ref();
-    this._directionalLightPrimitive = new Ref();
-    this._lightProxyMaterial = new Ref(new UnlitMaterial());
+    this._diamondPrimitive = new DRef();
+    this._spotLightPrimitive = new DRef();
+    this._directionalLightPrimitive = new DRef();
+    this._lightProxyMaterial = new DRef(new UnlitMaterial());
     this._proxyList = [];
   }
   dispose() {
@@ -59,7 +59,7 @@ export class NodeProxy {
       proxy.castShadow = false;
       proxy.name = PROXY_NAME;
       this.updateProxy(src);
-      this._proxyList.push(new WeakRef(proxy));
+      this._proxyList.push(new DWeakRef(proxy));
     }
   }
   updateProxy(src: SceneNode) {

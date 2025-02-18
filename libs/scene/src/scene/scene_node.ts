@@ -17,7 +17,7 @@ import {
   Vector4
 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
-import { Ref } from '../app/gc/ref';
+import { DRef } from '../app/gc/ref';
 import type { AnimationSet } from '../animation';
 import type { SharedModel } from '../asset';
 import type { Water } from './water';
@@ -81,9 +81,9 @@ export class SceneNode
   /** @internal */
   protected _disposed: boolean;
   /** @internal */
-  protected _animationSet: Ref<AnimationSet>;
+  protected _animationSet: DRef<AnimationSet>;
   /** @internal */
-  protected _sharedModel: Ref<SharedModel>;
+  protected _sharedModel: DRef<SharedModel>;
   /** @internal */
   protected _clipMode: boolean;
   /** @internal */
@@ -109,7 +109,7 @@ export class SceneNode
   /** @internal */
   protected _parent: SceneNode;
   /** @internal */
-  protected _children: Ref<SceneNode>[];
+  protected _children: DRef<SceneNode>[];
   /** @internal */
   protected _position: ObservableVector3;
   /** @internal */
@@ -144,8 +144,8 @@ export class SceneNode
     this._disposed = false;
     this._scene = scene;
     this._name = '';
-    this._animationSet = new Ref();
-    this._sharedModel = new Ref();
+    this._animationSet = new DRef();
+    this._sharedModel = new DRef();
     this._bv = null;
     this._bvWorld = null;
     this._bvDirty = true;
@@ -549,7 +549,7 @@ export class SceneNode
       const willDetach = (!p || !p.attached) && this.attached;
       const willAttach = !this.attached && p && p.attached;
       if (newParent) {
-        newParent._children.push(new Ref(this));
+        newParent._children.push(new DRef(this));
       }
       if (this._parent) {
         const index = this._parent._children.findIndex((val) => val.get() === this);
@@ -634,7 +634,7 @@ export class SceneNode
     }
   }
   /** Children of this xform */
-  get children(): Ref<SceneNode>[] {
+  get children(): DRef<SceneNode>[] {
     return this._children;
   }
   /**

@@ -16,7 +16,7 @@ import {
 import { Application } from '../app/app';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
-import { releaseObject, retainObject, WeakRef } from '../app';
+import { releaseObject, retainObject, DWeakRef } from '../app';
 
 /**
  * Primitive contains only the vertex and index data of a mesh
@@ -24,7 +24,7 @@ import { releaseObject, retainObject, WeakRef } from '../app';
  */
 export class Primitive implements Clonable<Primitive> {
   /** @internal */
-  private static _registry: Map<string, WeakRef<Primitive>> = new Map();
+  private static _registry: Map<string, DWeakRef<Primitive>> = new Map();
   /** @internal */
   protected _vertexLayout: VertexLayout;
   /** @internal */
@@ -70,7 +70,7 @@ export class Primitive implements Clonable<Primitive> {
     this._bbox = null;
     this._bboxChangeCallback = [];
     this._disposed = false;
-    Primitive._registry.set(this._persistentId, new WeakRef(this));
+    Primitive._registry.set(this._persistentId, new DWeakRef(this));
   }
   /** @internal */
   static findPrimitiveById(id: string) {

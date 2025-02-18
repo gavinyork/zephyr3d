@@ -49,7 +49,7 @@ import {
   MORPH_TARGET_TEX2,
   MORPH_TARGET_TEX3
 } from '../../../values';
-import { Ref } from '../../../app';
+import { DRef } from '../../../app';
 /** @internal */
 export interface GLTFContent extends GlTf {
   _manager: AssetManager;
@@ -515,8 +515,8 @@ export class GLTFLoader extends AbstractModelLoader {
           const p = primitives[i];
           const subMeshData: AssetSubMeshData = {
             name: `${meshName}-${i}`,
-            primitive: new Ref(),
-            material: new Ref(),
+            primitive: new DRef(),
+            material: new DRef(),
             rawPositions: null,
             rawBlendIndices: null,
             rawJointWeights: null,

@@ -3,7 +3,7 @@ import type { Scene, SceneNode } from '../scene';
 import type { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
 import type { Skeleton } from './skeleton';
-import { Application, WeakRef } from '../app';
+import { Application, DWeakRef } from '../app';
 
 /**
  * Options for playing animation
@@ -72,7 +72,7 @@ export class AnimationSet {
   /** @internal */
   private _disposed: boolean;
   /** @internal */
-  private _model: WeakRef<SceneNode>;
+  private _model: DWeakRef<SceneNode>;
   /** @internal */
   private _animations: Record<string, AnimationClip>;
   /** @internal */
@@ -105,7 +105,7 @@ export class AnimationSet {
   constructor(scene: Scene, model: SceneNode) {
     this._scene = scene;
     this._disposed = false;
-    this._model = new WeakRef<SceneNode>(model);
+    this._model = new DWeakRef<SceneNode>(model);
     this._scene.addAnimationSet(this);
     this._animations = {};
     this._activeTracks = new Map();

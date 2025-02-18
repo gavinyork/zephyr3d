@@ -9,7 +9,7 @@ import type {
 import type { MeshMaterial, applyMaterialMixins } from '../meshmaterial';
 import type { Matrix4x4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
-import { Ref } from '../../app';
+import { DRef } from '../../app';
 
 /**
  * ToMixedTextureType
@@ -93,7 +93,7 @@ export function mixinTextureProps<U extends string>(name: U) {
     const cls = class extends (BaseCls as typeof MeshMaterial) {
       constructor() {
         super();
-        const texture = new Ref<Texture2D>();
+        const texture = new DRef<Texture2D>();
         let sampler: TextureSampler = null;
         let texCoord = 0;
         let matrix: Matrix4x4 = null;

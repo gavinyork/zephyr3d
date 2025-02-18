@@ -17,7 +17,7 @@ const objectReferenceMap = new WeakMap<Disposable, number>();
  * Maps disposable objects to their weak references.
  * @private
  */
-const weakRefMap = new WeakMap<Disposable, Set<WeakRef<Disposable>>>();
+const weakRefMap = new WeakMap<Disposable, Set<DWeakRef<Disposable>>>();
 
 /**
  * Holds objects that are pending disposal.
@@ -70,7 +70,7 @@ export function releaseObject(obj: Disposable) {
  * @public
  * @template T - Type of the wrapped disposable object
  */
-export class Ref<T extends Disposable> {
+export class DRef<T extends Disposable> {
   /** @internal */
   private _object: T;
   /**
@@ -108,7 +108,7 @@ export class Ref<T extends Disposable> {
   }
 }
 
-export class WeakRef<T extends Disposable> {
+export class DWeakRef<T extends Disposable> {
   /** @internal */
   private _object: T;
   /**

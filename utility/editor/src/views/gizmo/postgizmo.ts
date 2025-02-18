@@ -7,7 +7,7 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
-import { BoxShape, Mesh, Ref, UnlitMaterial } from '@zephyr3d/scene';
+import { BoxShape, Mesh, DRef, UnlitMaterial } from '@zephyr3d/scene';
 import {
   AbstractPostEffect,
   Application,
@@ -88,7 +88,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   aabb_changed: [aabb: AABB];
 }>() {
   static readonly className = 'PostGizmoRenderer' as const;
-  static _aabbMesh: Ref<Mesh> = new Ref();
+  static _aabbMesh: DRef<Mesh> = new DRef();
   static _blendBlitter: CopyBlitter = new CopyBlitter();
   static _gizmoProgram: GPUProgram = null;
   static _gizmoSelectProgram: GPUProgram = null;

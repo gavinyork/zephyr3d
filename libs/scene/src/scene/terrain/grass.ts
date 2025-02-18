@@ -15,7 +15,7 @@ import { GrassMaterial } from '../../material/grassmaterial';
 import { mixinDrawable } from '../../render/drawable_mixin';
 import type { MeshMaterial } from '../../material';
 import type { SceneNode } from '..';
-import { Ref } from '../../app';
+import { DRef } from '../../app';
 
 export class GrassClusterBase {
   protected _terrain: Terrain;
@@ -96,20 +96,20 @@ export class GrassCluster extends applyMixins(GrassClusterBase, mixinDrawable) i
 }
 
 export type GrassLayer = {
-  material: Ref<GrassMaterial>;
+  material: DRef<GrassMaterial>;
   clusters: Map<QuadtreeNode, GrassCluster>;
 };
 
 export class GrassManager {
   private _clusterSize: number;
-  private _baseVertexBuffer: Map<string, Ref<StructuredBuffer>>;
-  private _indexBuffer: Ref<IndexBuffer>;
+  private _baseVertexBuffer: Map<string, DRef<StructuredBuffer>>;
+  private _indexBuffer: DRef<IndexBuffer>;
   private _layers: GrassLayer[];
   private _disposed: boolean;
   constructor(clusterSize: number, density: number[][]) {
     this._clusterSize = clusterSize;
     this._baseVertexBuffer = new Map();
-    this._indexBuffer = new Ref();
+    this._indexBuffer = new DRef();
     this._layers = [];
     this._disposed = false;
   }
@@ -210,7 +210,7 @@ export class GrassManager {
       0
     ]);
     baseVertexBuffer = device.createInterleavedVertexBuffer(['position_f32x3', 'tex0_f32x2'], vertices);
-    this._baseVertexBuffer.set(hash, new Ref(baseVertexBuffer));
+    this._baseVertexBuffer.set(hash, new DRef(baseVertexBuffer));
     return baseVertexBuffer;
   }
   getIndexBuffer(device: AbstractDevice) {
@@ -278,7 +278,7 @@ export class GrassManager {
         if (grassData.length > 0) {
           if (!layer) {
             layer = {
-              material: new Ref(
+              material: new DRef(
                 new GrassMaterial(
                   new Vector2(terrain.scaledWidth, terrain.scaledHeight),
                   terrain.quadtree.normalMap,

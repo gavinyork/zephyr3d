@@ -8,7 +8,7 @@ import type {
   TextureCube
 } from '@zephyr3d/device';
 import { Application } from '../app/app';
-import { Ref } from '../app';
+import { DRef } from '../app';
 
 /**
  * Environment light type
@@ -273,9 +273,9 @@ export class EnvIBL extends EnvironmentLighting {
   /** @internal */
   public static readonly UNIFORM_NAME_IBL_IRRADIANCE_MAP = 'zIBLIrradianceMap';
   /** @internal */
-  private _radianceMap: Ref<TextureCube>;
+  private _radianceMap: DRef<TextureCube>;
   /** @internal */
-  private _irradianceMap: Ref<TextureCube>;
+  private _irradianceMap: DRef<TextureCube>;
   /**
    * Creates an instance of EnvIBL
    * @param radianceMap - The radiance map
@@ -283,8 +283,8 @@ export class EnvIBL extends EnvironmentLighting {
    */
   constructor(radianceMap?: TextureCube, irradianceMap?: TextureCube) {
     super();
-    this._radianceMap = new Ref(radianceMap);
-    this._irradianceMap = new Ref(irradianceMap);
+    this._radianceMap = new DRef(radianceMap);
+    this._irradianceMap = new DRef(irradianceMap);
   }
   /**
    * {@inheritDoc EnvironmentLighting.getType}

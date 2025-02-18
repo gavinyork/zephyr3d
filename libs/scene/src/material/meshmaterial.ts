@@ -21,7 +21,7 @@ import { Material } from './material';
 import type { DepthPass } from '../render';
 import { type DrawContext, type ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA, packFloat16x2 } from '../shaders';
-import { Application, Ref, WeakRef } from '../app';
+import { Application, DRef, DWeakRef } from '../app';
 import { ShaderHelper } from './shader/helper';
 import type { Clonable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4, applyMixins } from '@zephyr3d/base';
@@ -228,7 +228,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         : null;
     const instance = {} as any;
     const that = this;
-    const coreMaterial = new Ref(that);
+    const coreMaterial = new DRef(that);
     let disposed = false;
     instance.isBatchable = () => true; //!isWebGL1 && that.supportInstancing();
     instance.dispose = () => {
@@ -240,7 +240,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     instance.$instanceUniforms = uniformsHolder;
     instance.$isInstance = true;
     let persistentId = crypto.randomUUID();
-    Material._registry.set(persistentId, new WeakRef(instance));
+    Material._registry.set(persistentId, new DWeakRef(instance));
     Object.defineProperty(instance, 'coreMaterial', {
       get: function () {
         return coreMaterial.get();

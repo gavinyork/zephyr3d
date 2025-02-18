@@ -4,7 +4,7 @@ import { Vector2 } from '@zephyr3d/base';
 import { Matrix4x4, Frustum, Vector4, Vector3, Ray, halton23 } from '@zephyr3d/base';
 import type { NodeClonable, NodeCloneMethod } from '../scene/scene_node';
 import { SceneNode } from '../scene/scene_node';
-import { Application, Ref } from '../app';
+import { Application, DRef } from '../app';
 import type { Drawable, PickTarget } from '../render/drawable';
 import { SceneRenderer } from '../render/renderer';
 import type { BaseTexture } from '@zephyr3d/device';
@@ -71,7 +71,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   /** @internal */
   protected _clipMask: number;
   /** @internal */
-  protected _oit: Ref<OIT>;
+  protected _oit: DRef<OIT>;
   /** @internal */
   protected _depthPrePass: boolean;
   /** @internal */
@@ -147,7 +147,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._clipMask = 0;
     this._frustum = null;
     this._frustumV = null;
-    this._oit = new Ref();
+    this._oit = new DRef();
     this._depthPrePass = false;
     this._HiZ = false;
     this._SSR = false;

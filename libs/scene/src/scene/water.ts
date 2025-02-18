@@ -8,7 +8,7 @@ import type { Drawable, DrawContext, PickTarget, Primitive, WaveGenerator } from
 import { Clipmap } from '../render';
 import { WaterMaterial } from '../material/water';
 import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
-import { Ref } from '../app';
+import { DRef } from '../app';
 import { QUEUE_OPAQUE } from '../values';
 import type { MeshMaterial } from '../material';
 import type { BoundingVolume } from '../utility/bounding_volume';
@@ -18,13 +18,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   private _pickTarget: PickTarget;
   private _clipmap: Clipmap;
   private _gridScale: number;
-  private _material: Ref<WaterMaterial>;
+  private _material: DRef<WaterMaterial>;
   constructor(scene: Scene) {
     super(scene);
     this._pickTarget = { node: this };
     this._clipmap = new Clipmap(32);
     this._gridScale = 1;
-    this._material = new Ref(new WaterMaterial());
+    this._material = new DRef(new WaterMaterial());
     this._material.get().region = new Vector4(-1, -1, 1, 1);
   }
   clone(method: NodeCloneMethod, recursive: boolean) {

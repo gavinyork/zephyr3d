@@ -12,7 +12,7 @@ import { QUEUE_OPAQUE } from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import type { NodeClonable, NodeCloneMethod, SceneNode } from './scene_node';
-import { Ref } from '../app/gc/ref';
+import { DRef } from '../app/gc/ref';
 
 /**
  * Mesh node
@@ -20,9 +20,9 @@ import { Ref } from '../app/gc/ref';
  */
 export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements BatchDrawable, NodeClonable<Mesh> {
   /** @internal */
-  private _primitive: Ref<Primitive>;
+  private _primitive: DRef<Primitive>;
   /** @internal */
-  private _material: Ref<MeshMaterial>;
+  private _material: DRef<MeshMaterial>;
   /** @internal */
   protected _castShadow: boolean;
   /** @internal */
@@ -61,8 +61,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    */
   constructor(scene: Scene, primitive?: Primitive, material?: MeshMaterial) {
     super(scene);
-    this._primitive = new Ref();
-    this._material = new Ref();
+    this._primitive = new DRef();
+    this._material = new DRef();
     this._castShadow = true;
     this._animatedBoundingBox = null;
     this._boneMatrices = null;

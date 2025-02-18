@@ -4,7 +4,7 @@ import { ShaderHelper } from './shader/helper';
 import type { DrawContext } from '../render';
 import type { Clonable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
-import { Ref } from '../app';
+import { DRef } from '../app';
 
 /**
  * Particle material
@@ -14,15 +14,15 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
   private static FEATURE_ALPHA_MAP = this.defineFeature();
   private static FEATURE_RAMP_MAP = this.defineFeature();
   private _params: Vector4;
-  private _alphaMap: Ref<Texture2D>;
-  private _rampMap: Ref<Texture2D>;
+  private _alphaMap: DRef<Texture2D>;
+  private _rampMap: DRef<Texture2D>;
   constructor() {
     super();
     this.cullMode = 'none';
     this.blendMode = 'blend';
     this._params = new Vector4(0, 1, 0, 0);
-    this._alphaMap = new Ref();
-    this._rampMap = new Ref();
+    this._alphaMap = new DRef();
+    this._rampMap = new DRef();
   }
   clone(): ParticleMaterial {
     const other = new ParticleMaterial();

@@ -20,7 +20,7 @@ import {
   PBRMetallicRoughnessMaterial,
   PlaneShape,
   PointLight,
-  Ref,
+  DRef,
   SphereShape,
   SpotLight,
   TorusShape,
@@ -61,10 +61,10 @@ export class SceneView extends BaseView<SceneModel> {
   private _tab: Tab;
   private _menubar: MenubarView;
   private _statusbar: StatusBar;
-  private _transformNode: Ref<SceneNode>;
+  private _transformNode: DRef<SceneNode>;
   private _oldTransform: TRS;
   private _dragDropTypes: string[];
-  private _nodeToBePlaced: Ref<SceneNode>;
+  private _nodeToBePlaced: DRef<SceneNode>;
   private _typeToBePlaced: 'shape' | 'asset' | 'node' | 'none';
   private _ctorToBePlaced: { new (scene: Scene): SceneNode };
   private _descToBePlaced: string;
@@ -76,22 +76,22 @@ export class SceneView extends BaseView<SceneModel> {
   private _postGizmoCaptured: boolean;
   private _showTextureViewer: boolean;
   private _showDeviceInfo: boolean;
-  private _clipBoardData: Ref<SceneNode>;
+  private _clipBoardData: DRef<SceneNode>;
   private _aabbForEdit: AABB;
   private _proxy: NodeProxy;
   constructor(model: SceneModel, assetRegistry: AssetRegistry) {
     super(model);
     this._cmdManager = new CommandManager();
-    this._transformNode = new Ref();
+    this._transformNode = new DRef();
     this._oldTransform = null;
     this._dragDropTypes = [];
-    this._nodeToBePlaced = new Ref();
+    this._nodeToBePlaced = new DRef();
     this._typeToBePlaced = 'none';
     this._ctorToBePlaced = null;
     this._descToBePlaced = null;
     this._assetToBeAdded = null;
     this._shapeToBeAdded = null;
-    this._clipBoardData = new Ref();
+    this._clipBoardData = new DRef();
     this._mousePosX = -1;
     this._mousePosY = -1;
     this._postGizmoCaptured = false;

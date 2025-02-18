@@ -5,7 +5,7 @@ import { EnvShIBL } from '../render';
 import { EnvConstantAmbient, EnvHemisphericAmbient, EnvIBL } from '../render';
 import { SkyRenderer } from '../render/sky';
 import type { TextureCube } from '@zephyr3d/device';
-import { Ref } from '../app';
+import { DRef } from '../app';
 
 /**
  * Wrapper for environmant lighting
@@ -16,8 +16,8 @@ export class EnvLightWrapper {
   private _ambientColor: ObservableVector4;
   private _ambientDown: ObservableVector4;
   private _ambientUp: ObservableVector4;
-  private _radianceMap: Ref<TextureCube>;
-  private _irradianceMap: Ref<TextureCube>;
+  private _radianceMap: DRef<TextureCube>;
+  private _irradianceMap: DRef<TextureCube>;
   private _irradianceSH: Float32Array;
   private _strength: number;
   /** @internal */
@@ -41,8 +41,8 @@ export class EnvLightWrapper {
         (this._envLight as EnvHemisphericAmbient).ambientUp.set(this._ambientUp);
       }
     };
-    this._radianceMap = new Ref();
-    this._irradianceMap = new Ref();
+    this._radianceMap = new DRef();
+    this._irradianceMap = new DRef();
     this._strength = 1;
   }
   /** @internal */

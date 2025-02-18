@@ -4,7 +4,7 @@ import type { Primitive } from '../render/primitive';
 import type { DrawContext } from '../render/drawable';
 import { QUEUE_OPAQUE } from '../values';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
-import { WeakRef } from '../app';
+import { DWeakRef } from '../app';
 import type { Clonable } from '@zephyr3d/base';
 
 type MaterialState = {
@@ -22,7 +22,7 @@ type MaterialState = {
  */
 export class Material implements Clonable<Material> {
   /** @internal */
-  protected static _registry: Map<string, WeakRef<Material>> = new Map();
+  protected static _registry: Map<string, DWeakRef<Material>> = new Map();
   /** @internal */
   private static _nextId = 0;
   /** @internal */
@@ -58,7 +58,7 @@ export class Material implements Clonable<Material> {
     this._optionTag = 0;
     this._changeTag = 0;
     this._currentHash = [];
-    Material._registry.set(this._persistentId, new WeakRef(this));
+    Material._registry.set(this._persistentId, new DWeakRef(this));
   }
   clone(): Material {
     const other = new Material();

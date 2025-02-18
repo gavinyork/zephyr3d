@@ -15,7 +15,7 @@ import type { BaseTexture, SamplerOptions } from '@zephyr3d/device';
 import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
-import { WeakRef } from '../app';
+import { DWeakRef } from '../app';
 
 /**
  * Options for texture fetching
@@ -86,11 +86,11 @@ export class AssetManager {
   private _httpRequest: HttpRequest;
   /** @internal */
   private _textures: {
-    [hash: string]: Promise<BaseTexture> | WeakRef<BaseTexture>;
+    [hash: string]: Promise<BaseTexture> | DWeakRef<BaseTexture>;
   };
   /** @internal */
   private _models: {
-    [url: string]: Promise<SharedModel> | WeakRef<SharedModel>;
+    [url: string]: Promise<SharedModel> | DWeakRef<SharedModel>;
   };
   /** @internal */
   private _binaryDatas: {
@@ -220,10 +220,10 @@ export class AssetManager {
       ) as Promise<T>;
     } else {
       const hash = this.getHash('2d', url, options);
-      let P = this._textures[hash] as Promise<T> | WeakRef<T>;
-      if (P instanceof WeakRef && P.get() && !P.get().disposed) {
+      let P = this._textures[hash] as Promise<T> | DWeakRef<T>;
+      if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
         return P.get();
-      } else if (!P || P instanceof WeakRef) {
+      } else if (!P || P instanceof DWeakRef) {
         P = this.loadTexture(
           url,
           options?.mimeType ?? null,
@@ -236,7 +236,7 @@ export class AssetManager {
       }
       const tex: T = await P;
       if (this._textures[hash] instanceof Promise) {
-        this._textures[hash] = new WeakRef<T>(tex);
+        this._textures[hash] = new DWeakRef<T>(tex);
       }
       return tex;
     }
@@ -249,15 +249,15 @@ export class AssetManager {
   ): Promise<SharedModel> {
     const hash = url;
     let P = this._models[hash];
-    if (P instanceof WeakRef && P.get() && !P.get().disposed) {
+    if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
       return P.get();
-    } else if (!P || P instanceof WeakRef) {
+    } else if (!P || P instanceof DWeakRef) {
       P = this.loadModel(url, options, httpRequest);
       this._models[hash] = P;
     }
     const sharedModel = await P;
     if (this._models[hash] instanceof Promise) {
-      this._models[hash] = new WeakRef<SharedModel>(sharedModel);
+      this._models[hash] = new DWeakRef<SharedModel>(sharedModel);
     }
     return sharedModel;
   }

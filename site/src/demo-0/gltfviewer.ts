@@ -2,7 +2,7 @@ import * as zip from '@zip.js/zip.js';
 import type * as draco3d from 'draco3d';
 import { Vector4, Vector3, HttpRequest } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
-import { Ref } from '@zephyr3d/scene';
+import { DRef } from '@zephyr3d/scene';
 import { Mesh, PlaneShape, LambertMaterial } from '@zephyr3d/scene';
 import {
   BatchGroup,
@@ -34,8 +34,8 @@ declare global {
 
 export class GLTFViewer {
   private _currentAnimation: string;
-  private _modelNode: Ref<SceneNode>;
-  private _animationSet: Ref<AnimationSet>;
+  private _modelNode: DRef<SceneNode>;
+  private _animationSet: DRef<AnimationSet>;
   private _assetManager: AssetManager;
   private _scene: Scene;
   private _tonemap: Tonemap;
@@ -68,8 +68,8 @@ export class GLTFViewer {
   constructor(scene: Scene) {
     const device = Application.instance.device;
     this._currentAnimation = null;
-    this._modelNode = new Ref();
-    this._animationSet = new Ref();
+    this._modelNode = new DRef();
+    this._animationSet = new DRef();
     this._scene = scene;
     this._scene.env.light.strength = 0.8;
     this._scene.env.sky.drawGround = true;
@@ -442,7 +442,7 @@ export class GLTFViewer {
   }
   private traverseModel(func: (node: SceneNode) => void, context?: any) {
     if (this._modelNode) {
-      const queue: Ref<SceneNode>[] = [this._modelNode];
+      const queue: DRef<SceneNode>[] = [this._modelNode];
       while (queue.length > 0) {
         const node = queue.shift();
         queue.push(...node.get().children);
