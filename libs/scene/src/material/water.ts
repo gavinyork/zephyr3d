@@ -5,7 +5,7 @@ import { MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
 import { Matrix4x4, Vector4 } from '@zephyr3d/base';
 import { DRef } from '../app';
-import { sampleLinearDepth } from '../shaders/ssr';
+import { sampleLinearDepth, screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
 
 export class WaterMaterial extends MeshMaterial {
   private static FEATURE_SSR = this.defineFeature();
@@ -14,11 +14,13 @@ export class WaterMaterial extends MeshMaterial {
   private _displace: number;
   private _waveGenerator: DRef<WaveGenerator>;
   private _clipmapMatrix: Matrix4x4;
+  private _ssrParams: Vector4;
   constructor() {
     super();
     this._region = new Vector4(-99999, -99999, 99999, 99999);
     this._clipmapMatrix = new Matrix4x4();
     this._waveGenerator = new DRef();
+    this._ssrParams = new Vector4(32, 80, 0.5, 6);
     this._displace = 16;
     this.cullMode = 'none';
     this.useFeature(WaterMaterial.FEATURE_SSR, true);
@@ -100,6 +102,7 @@ export class WaterMaterial extends MeshMaterial {
     this.waveGenerator?.setupUniforms(scope, 2);
     scope.region = pb.vec4().uniform(2);
     scope.displace = pb.float().uniform(2);
+    scope.ssrParams = pb.vec4().uniform(2);
     scope.$l.discardable = pb.or(
       pb.any(pb.lessThan(scope.$inputs.worldPos.xz, scope.region.xy)),
       pb.any(pb.greaterThan(scope.$inputs.worldPos.xz, scope.region.zw))
@@ -139,6 +142,7 @@ export class WaterMaterial extends MeshMaterial {
     foamFactor: PBShaderExp
   ) {
     const pb = scope.$builder;
+    const that = this;
     pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
       this.$l.linearDepth = sampleLinearDepth(this, this.depthTex, this.uv, 0);
       this.$l.nonLinearDepth = pb.div(
@@ -168,7 +172,44 @@ export class WaterMaterial extends MeshMaterial {
         this.$l.eyeVec = pb.sub(this.worldPos.xyz, this.cameraPos);
         this.$l.eyeVecNorm = pb.normalize(this.eyeVec);
         this.$l.depth = pb.length(pb.sub(this.wPos.xyz, this.worldPos));
-        this.$l.viewPos = pb.mul(this.viewMatrix, pb.vec4(this.worldPos, 1)).xyz;
+        this.$l.viewPos = pb.mul(ShaderHelper.getViewMatrix(this), pb.vec4(this.worldPos, 1)).xyz;
+        this.incidentVec = pb.normalize(pb.sub(this.worldPos, this.cameraPos));
+        this.reflectVecW = pb.reflect(this.incidentVec, this.normal);
+        this.$l.reflectance = pb.vec3();
+        this.$l.hitInfo = pb.vec4(0);
+        this.$if(pb.greaterThan(this.reflectVecW.y, 0), function () {
+          this.reflectVec = pb.mul(ShaderHelper.getViewMatrix(this), pb.vec4(this.reflectVecW, 0)).xyz;
+          this.hitInfo = ShaderHelper.getHiZDepthTexture(this)
+            ? screenSpaceRayTracing_HiZ(
+                this,
+                this.viewPos,
+                this.reflectVec,
+                ShaderHelper.getViewMatrix(this),
+                ShaderHelper.getProjectionMatrix(this),
+                ShaderHelper.getInvProjectionMatrix(this),
+                ShaderHelper.getCameraParams(this).xy,
+                pb.int(ShaderHelper.getHiZDepthTextureMipLevelCount(this)),
+                this.ssrParams.y,
+                this.ssrParams.z,
+                pb.vec4(ShaderHelper.getRenderSize(this), ShaderHelper.getHiZDepthTextureSize(this)),
+                ShaderHelper.getHiZDepthTexture(this)
+              )
+            : screenSpaceRayTracing_Linear2D(
+                this,
+                this.viewPos,
+                this.reflectVec,
+                ShaderHelper.getViewMatrix(this),
+                ShaderHelper.getProjectionMatrix(this),
+                ShaderHelper.getInvProjectionMatrix(this),
+                ShaderHelper.getCameraParams(this).xy,
+                this.ssrParams.x,
+                this.ssrParams.y,
+                this.ssrParams.z,
+                4,
+                pb.vec4(ShaderHelper.getRenderSize(this), ShaderHelper.getLinearDepthTextureSize(this)),
+                ShaderHelper.getLinearDepthTexture(this)
+              );
+        });
       }
     );
   }
@@ -177,6 +218,7 @@ export class WaterMaterial extends MeshMaterial {
     bindGroup.setValue('clipmapMatrix', this._clipmapMatrix);
     bindGroup.setValue('region', this._region);
     bindGroup.setValue('displace', this._displace);
+    bindGroup.setValue('ssrParams', this._ssrParams);
     if (this.waveGenerator) {
       this.waveGenerator.applyWaterBindGroup(bindGroup);
     }

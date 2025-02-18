@@ -33,7 +33,7 @@ export class LightPass extends RenderPass {
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
     return `${this._shadowMapHash}:${ctx.oit?.calculateHash() ?? ''}:${ctx.env.getHash(ctx)}:${
       ctx.linearDepthTexture?.uid ?? 0
-    }:${ctx.sceneColorTexture?.uid ?? 0}`;
+    }:${ctx.sceneColorTexture?.uid ?? 0}:${ctx.HiZTexture?.uid ?? 0}`;
   }
   /** @internal */
   protected renderLightPass(

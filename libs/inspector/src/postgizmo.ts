@@ -7,7 +7,7 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
-import { WeakRef } from '@zephyr3d/scene';
+import { DWeakRef } from '@zephyr3d/scene';
 import {
   AbstractPostEffect,
   Application,
@@ -92,7 +92,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   private _gridSteps: Float32Array;
   private _gridParams: Vector4;
   private _camera: Camera;
-  private _node: WeakRef<SceneNode>;
+  private _node: DWeakRef<SceneNode>;
   private _bindGroup: BindGroup;
   private _gridBindGroup: BindGroup;
   private _mode: GizmoMode;
@@ -113,7 +113,7 @@ export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
   constructor(camera: Camera, binding = null, size = 10) {
     super();
     this._camera = camera;
-    this._node = new WeakRef<SceneNode>(binding);
+    this._node = new DWeakRef<SceneNode>(binding);
     this._bindGroup = null;
     this._gridBindGroup = null;
     this._axisLength = size;

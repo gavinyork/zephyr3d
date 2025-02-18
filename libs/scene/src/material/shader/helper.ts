@@ -27,6 +27,7 @@ import { ProgramBuilder } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
 import { linearToGamma } from '../../shaders';
 import { Application } from '../../app';
+import { fetchSampler } from '../../utility';
 
 const UNIFORM_NAME_GLOBAL = 'Z_UniformGlobal';
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
@@ -37,6 +38,8 @@ const UNIFORM_NAME_LINEAR_DEPTH_MAP = 'Z_UniformLinearDepth';
 const UNIFORM_NAME_LINEAR_DEPTH_MAP_SIZE = 'Z_UniformLinearDepthSize';
 const UNIFORM_NAME_SCENE_COLOR_MAP = 'Z_UniformSceneColor';
 const UNIFORM_NAME_SCENE_COLOR_MAP_SIZE = 'Z_UniformSceneColorSize';
+const UNIFORM_NAME_HIZ_DEPTH_MAP = 'Z_UniformHiZDepth';
+const UNIFORM_NAME_HIZ_DEPTH_MAP_INFO = 'Z_UniformHiZDepthInfo';
 const UNIFORM_NAME_WORLD_MATRIX = 'Z_UniformWorldMatrix';
 const UNIFORM_NAME_PREV_WORLD_MATRIX = 'Z_UniformPrevWorldMatrix';
 const UNIFORM_NAME_PREV_WORLD_MATRXI_FRAME = 'Z_UniformPrevWorldMatrixFrame';
@@ -285,6 +288,10 @@ export class ShaderHelper {
       if (ctx.sceneColorTexture) {
         scope[UNIFORM_NAME_SCENE_COLOR_MAP] = pb.tex2D().uniform(0);
         scope[UNIFORM_NAME_SCENE_COLOR_MAP_SIZE] = pb.vec2().uniform(0);
+      }
+      if (ctx.HiZTexture) {
+        scope[UNIFORM_NAME_HIZ_DEPTH_MAP] = pb.tex2D().uniform(0);
+        scope[UNIFORM_NAME_HIZ_DEPTH_MAP_INFO] = pb.vec4().uniform(0);
       }
     }
   }
@@ -784,6 +791,13 @@ export class ShaderHelper {
           new Vector2(ctx.sceneColorTexture.width, ctx.sceneColorTexture.height)
         );
       }
+      if (ctx.HiZTexture) {
+        bindGroup.setTexture(UNIFORM_NAME_HIZ_DEPTH_MAP, ctx.HiZTexture, fetchSampler('clamp_nearest'));
+        bindGroup.setValue(
+          UNIFORM_NAME_HIZ_DEPTH_MAP_INFO,
+          new Vector4(ctx.HiZTexture.width, ctx.HiZTexture.height, ctx.HiZTexture.mipLevelCount, 0)
+        );
+      }
     }
     bindGroup.setValue(UNIFORM_NAME_GLOBAL, {
       camera: cameraStruct
@@ -915,6 +929,30 @@ export class ShaderHelper {
    */
   static getLinearDepthTextureSize(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_LINEAR_DEPTH_MAP_SIZE];
+  }
+  /**
+   * Gets current HiZ depth texture
+   * @param scope - Current shader scope
+   * @returns current HiZ depth texture
+   */
+  static getHiZDepthTexture(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_HIZ_DEPTH_MAP];
+  }
+  /**
+   * Gets the size of current HiZ depth texture
+   * @param scope - Current shader scope
+   * @returns The size of current HiZ depth texture
+   */
+  static getHiZDepthTextureSize(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_HIZ_DEPTH_MAP_INFO].xy;
+  }
+  /**
+   * Gets the mipmap levels count of current HiZ depth texture
+   * @param scope - Current shader scope
+   * @returns The mipmap levels count of current HiZ depth texture
+   */
+  static getHiZDepthTextureMipLevelCount(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_HIZ_DEPTH_MAP_INFO].z;
   }
   /**
    * Gets the uniform variable of type vec3 which holds the camera position
