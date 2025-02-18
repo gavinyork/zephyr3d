@@ -444,7 +444,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     const blending =
       !isObjectColorPass && (this.featureUsed<BlendMode>(FEATURE_ALPHABLEND) !== 'none' || ctx.lightBlending);
     const a2c = !isObjectColorPass && this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
-    const ztestEq = ctx.queue === QUEUE_OPAQUE && !!ctx.depthTexture;
+    const ztestEq = ctx.queue === QUEUE_OPAQUE && !!ctx.depthTexture && !ctx.sceneColorTexture;
     if (blending || a2c) {
       const blendingState = stateSet.useBlendingState();
       if (blending) {
@@ -467,7 +467,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       } else {
         stateSet.defaultDepthState();
       }
-    } else if (stateSet.blendingState?.enabled && !blending) {
+    } else {
       stateSet.defaultBlendingState();
       if (ztestEq) {
         stateSet.useDepthState().setCompareFunc('eq').enableTest(true).enableWrite(false);
@@ -701,7 +701,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         ShaderHelper.discardIfClipped(this, this.worldPos);
         let output = true;
-        if (!that.isTransparentPass(that.pass) && !this.zAlphaCutoff && !that.alphaToCoverage) {
+        if (!that.isTransparentPass(that.pass) && !that.alphaToCoverage) {
           this.outColor.a = 1;
         } else if (that.isTransparentPass(that.pass)) {
           const opacity =
@@ -710,12 +710,12 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
               : this.zOpacity;
           this.outColor.a = pb.mul(this.outColor.a, opacity);
         }
-        if (this.zAlphaCutoff) {
-          this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
-            pb.discard();
-          });
-        }
         if (that.isTransparentPass(that.pass)) {
+          if (this.zAlphaCutoff) {
+            this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
+              pb.discard();
+            });
+          }
           if (!that.drawContext.oit || that.drawContext.oit.wantsPremultipliedAlpha()) {
             this.outColor = pb.vec4(
               pb.mul(this.outColor.rgb, this.outColor.a),
@@ -738,9 +738,11 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         }
       } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
         if (color) {
-          this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
-            pb.discard();
-          });
+          if (this.zAlphaCutoff) {
+            this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
+              pb.discard();
+            });
+          }
         }
         ShaderHelper.discardIfClipped(this, this.worldPos);
         const depthPass = that.drawContext.renderPass as DepthPass;

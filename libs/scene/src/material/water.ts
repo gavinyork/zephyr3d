@@ -142,7 +142,6 @@ export class WaterMaterial extends MeshMaterial {
     foamFactor: PBShaderExp
   ) {
     const pb = scope.$builder;
-    const that = this;
     pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
       this.$l.linearDepth = sampleLinearDepth(this, this.depthTex, this.uv, 0);
       this.$l.nonLinearDepth = pb.div(

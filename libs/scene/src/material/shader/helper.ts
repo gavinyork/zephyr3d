@@ -27,7 +27,7 @@ import { ProgramBuilder } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
 import { linearToGamma } from '../../shaders';
 import { Application } from '../../app';
-import { fetchSampler } from '../../utility';
+import { fetchSampler } from '../../utility/misc';
 
 const UNIFORM_NAME_GLOBAL = 'Z_UniformGlobal';
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
