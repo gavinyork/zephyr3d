@@ -7,6 +7,7 @@ import { Application } from '../../../app/app';
 import { panoramaToCubemap } from '../../panorama';
 import { prefilterCubemap } from '../../pmrem';
 import { NodeHierarchy } from './node';
+import { Vector4 } from '@zephyr3d/base';
 
 export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
@@ -146,7 +147,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
             value.num[2] = color.z;
           },
           set(this: Scene, value) {
-            this.env.sky.skyColor.setXYZW(value.num[0], value.num[1], value.num[2], 1);
+            this.env.sky.skyColor = new Vector4(value.num[0], value.num[1], value.num[2], 1);
           }
         },
         {

@@ -129,7 +129,7 @@ export class SkyRenderer {
     this._renderStatesFog = null;
     this._renderStatesFogScatter = null;
     this._skyWorldMatrix = defaultSkyWorldMatrix;
-    this._lastSunDir = Vector3.zero();
+    this._lastSunDir = SkyRenderer._getSunDir(null);
     this._panoramaAsset = '';
   }
   /** @internal */
@@ -162,12 +162,7 @@ export class SkyRenderer {
   }
   /** Baked sky texture */
   get bakedSkyTexture(): TextureCube {
-    if (this._skyType === 'skybox' && this.skyboxTexture) {
-      return this.skyboxTexture;
-    }
-    if (!this._scatterSkyboxFramebuffer) {
-      this.updateIBLMaps(this._lastSunDir);
-    }
+    this.updateBakedSkyMap(this._lastSunDir);
     return this._bakedSkyboxTexture.get();
   }
   /**
@@ -354,6 +349,7 @@ export class SkyRenderer {
    */
   invalidateIBLMaps() {
     this._radianceMapDirty = true;
+    this._bakedSkyboxTexture.dispose();
   }
   /** @internal */
   drawScatteredFog(ctx: DrawContext) {
@@ -371,18 +367,21 @@ export class SkyRenderer {
       return null;
     }
   }
-  /**
-   * Regenerate the radiance map and irradiance map
-   *
-   * @param sunLight - The sun light
-   */
-  updateIBLMaps(sunDir: Vector3) {
-    const device = Application.instance.device;
+  update(sunLight: DirectionalLight) {
+    this.updateBakedSkyMap(SkyRenderer._getSunDir(sunLight));
+  }
+  updateBakedSkyMap(sunDir: Vector3) {
+    if (this._bakedSkyboxTexture.get() && this._lastSunDir.equalsTo(sunDir)) {
+      return;
+    }
+    this._bakedSkyboxTexture.dispose();
+    this._lastSunDir.set(sunDir);
     if (this._skyType === 'skybox' && this.skyboxTexture) {
       this._bakedSkyboxTexture.set(this.skyboxTexture);
       this._scatterSkyboxFramebuffer?.dispose();
       this._scatterSkyboxFramebuffer = null;
     } else {
+      const device = Application.instance.device;
       if (!this._scatterSkyboxFramebuffer) {
         const texCaps = device.getDeviceCaps().textureCaps;
         const format: TextureFormat =
@@ -394,7 +393,6 @@ export class SkyRenderer {
         const tex = device.createCubeTexture(format, this._scatterSkyboxTextureWidth);
         tex.name = 'BakedSkyboxTexture';
         this._scatterSkyboxFramebuffer = device.createFrameBuffer([tex], null);
-        this._radianceMapDirty = true;
       }
       const camera = new Camera(null);
       camera.setPerspective(Math.PI / 2, 1, 1, 20);
@@ -410,6 +408,14 @@ export class SkyRenderer {
       device.setRenderStates(saveRenderStates);
       this._bakedSkyboxTexture.set(this._scatterSkyboxFramebuffer.getColorAttachments()[0] as TextureCube);
     }
+  }
+  /**
+   * Regenerate the radiance map and irradiance map
+   *
+   * @param sunLight - The sun light
+   */
+  updateIBLMaps(sunDir: Vector3) {
+    this.updateBakedSkyMap(sunDir);
     prefilterCubemap(this._bakedSkyboxTexture.get(), 'ggx', this.radianceMap);
     prefilterCubemap(this._bakedSkyboxTexture.get(), 'lambertian', this.irradianceMap);
   }
@@ -436,7 +442,7 @@ export class SkyRenderer {
       bindgroup.setValue('cameraPosition', camera.getWorldPosition());
       bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
       if (this._fogType === 'scatter') {
-        const sunDir = sunLight ? sunLight.directionAndCutoff.xyz().scaleBy(-1) : ShaderHelper.defaultSunDir;
+        const sunDir = SkyRenderer._getSunDir(sunLight);
         const alpha = Math.PI / 2 - Math.acos(Math.max(-1, Math.min(1, sunDir.y)));
         const scale = this._aerialPerspectiveDensity * this._aerialPerspectiveDensity;
         const farPlane = ctx.camera.getFarPlane() * scale;

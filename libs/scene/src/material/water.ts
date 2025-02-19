@@ -117,8 +117,12 @@ export class WaterMaterial extends MeshMaterial {
             scope.$inputs.clipmapPos.xz,
             scope.$inputs.worldNormal
           )
-        : scope.$inputs.worldNormal;
-      scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normal.xyz, 0.5), pb.vec3(0.5)), 1);
+        : pb.vec4(scope.$inputs.worldNormal, 0);
+      //scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normal.xyz, 0.5), pb.vec3(0.5)), 1);
+      scope.$l.outColor = pb.vec4(
+        this.waterShading(scope, scope.$inputs.worldPos, scope.normal.xyz, scope.normal.w),
+        1
+      );
       if (this.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
         scope.$l.outRoughness = pb.vec4(1, 1, 1, 0);
         this.outputFragmentColor(
@@ -143,7 +147,8 @@ export class WaterMaterial extends MeshMaterial {
   ) {
     const pb = scope.$builder;
     pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
-      this.$l.linearDepth = sampleLinearDepth(this, this.depthTex, this.uv, 0);
+      this.$l.linearDepth = sampleLinearDepth(this, ShaderHelper.getLinearDepthTexture(this), this.uv, 0);
+      this.$l.cameraNearFar = ShaderHelper.getCameraParams(this).xy;
       this.$l.nonLinearDepth = pb.div(
         pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
         pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
@@ -160,19 +165,19 @@ export class WaterMaterial extends MeshMaterial {
       'waterShading',
       [pb.vec3('worldPos'), pb.vec3('worldNormal'), pb.float('foamFactor')],
       function () {
-        this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
+        this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), ShaderHelper.getRenderSize(this));
         this.$l.dist = pb.length(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this)));
         this.$l.normalScale = pb.pow(pb.clamp(pb.div(100, this.dist), 0, 1), 2);
         this.$l.normal = pb.normalize(
           pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
         );
         this.$l.displacedTexCoord = pb.add(this.screenUV, pb.mul(this.normal.xz, this.displace));
-        this.$l.wPos = this.getPosition(this.screenUV, this.invViewProj).xyz;
-        this.$l.eyeVec = pb.sub(this.worldPos.xyz, this.cameraPos);
+        this.$l.wPos = this.getPosition(this.screenUV, ShaderHelper.getInvViewProjectionMatrix(this)).xyz;
+        this.$l.eyeVec = pb.sub(this.worldPos.xyz, ShaderHelper.getCameraPosition(this));
         this.$l.eyeVecNorm = pb.normalize(this.eyeVec);
         this.$l.depth = pb.length(pb.sub(this.wPos.xyz, this.worldPos));
         this.$l.viewPos = pb.mul(ShaderHelper.getViewMatrix(this), pb.vec4(this.worldPos, 1)).xyz;
-        this.incidentVec = pb.normalize(pb.sub(this.worldPos, this.cameraPos));
+        this.incidentVec = pb.normalize(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this)));
         this.reflectVecW = pb.reflect(this.incidentVec, this.normal);
         this.$l.reflectance = pb.vec3();
         this.$l.hitInfo = pb.vec4(0);
@@ -209,8 +214,20 @@ export class WaterMaterial extends MeshMaterial {
                 ShaderHelper.getLinearDepthTexture(this)
               );
         });
+        this.$l.refl = pb.reflect(
+          pb.normalize(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this))),
+          this.normal
+        );
+        this.refl.y = pb.max(this.refl.y, 0.1);
+        this.reflectance = pb.mix(
+          pb.textureSampleLevel(ShaderHelper.getBakedSkyTexture(this), this.refl, 0).rgb,
+          pb.textureSampleLevel(ShaderHelper.getSceneColorTexture(this), this.hitInfo.xy, 0).rgb,
+          this.hitInfo.w
+        );
+        this.$return(this.reflectance);
       }
     );
+    return scope.waterShading(worldPos, worldNormal, foamFactor);
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);

@@ -32,6 +32,7 @@ import { fetchSampler } from '../../utility/misc';
 const UNIFORM_NAME_GLOBAL = 'Z_UniformGlobal';
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
 const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'Z_UniformLightIndexTex';
+const UNIFORM_NAME_BAKED_SKY_MAP = 'Z_UniformBakedSky';
 const UNIFORM_NAME_AERIALPERSPECTIVE_LUT = 'Z_UniformAerialPerspectiveLUT';
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
 const UNIFORM_NAME_LINEAR_DEPTH_MAP = 'Z_UniformLinearDepth';
@@ -255,6 +256,7 @@ export class ShaderHelper {
       if (ctx.applyFog === 'scatter') {
         scope[UNIFORM_NAME_AERIALPERSPECTIVE_LUT] = pb.tex2D().uniform(0);
       }
+      scope[UNIFORM_NAME_BAKED_SKY_MAP] = pb.texCube().uniform(0);
       if (ctx.currentShadowLight) {
         const scope = pb.getGlobalScope();
         const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
@@ -856,6 +858,7 @@ export class ShaderHelper {
     });
     bindGroup.setBuffer(UNIFORM_NAME_LIGHT_BUFFER, lightBuffer);
     bindGroup.setTexture(UNIFORM_NAME_LIGHT_INDEX_TEXTURE, lightIndexTexture);
+    bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.bakedSkyTexture);
     if (ctx.drawEnvLight) {
       ctx.env.light.envLight.updateBindGroup(bindGroup);
     }
@@ -953,6 +956,14 @@ export class ShaderHelper {
    */
   static getHiZDepthTextureMipLevelCount(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_HIZ_DEPTH_MAP_INFO].z;
+  }
+  /**
+   * Gets current baked skybox texture
+   * @param scope - Current shader scope
+   * @returns current baked skybox texture
+   */
+  static getBakedSkyTexture(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_BAKED_SKY_MAP];
   }
   /**
    * Gets the uniform variable of type vec3 which holds the camera position

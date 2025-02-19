@@ -7,6 +7,7 @@ import { ShadowMapper } from '../shadow/shadowmapper';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import type { Scene } from './scene';
 import type { NodeClonable, NodeCloneMethod } from '.';
+import { DWeakRef } from '../app';
 
 /**
  * Base class for any kind of light node
@@ -243,19 +244,29 @@ export abstract class PunctualLight extends BaseLight {
  * @public
  */
 export class DirectionalLight extends PunctualLight implements NodeClonable<DirectionalLight> {
-  private static _currentSunLight: DirectionalLight = null;
-  private _sunLight: boolean;
+  private static _currentSunLight: WeakMap<Scene, DWeakRef<DirectionalLight>> = new WeakMap();
   /**
    * Creates an instance of directional light
    * @param scene - The scene to which the light belongs
    */
   constructor(scene: Scene) {
     super(scene, LIGHT_TYPE_DIRECTIONAL);
-    if (!DirectionalLight._currentSunLight) {
-      DirectionalLight._currentSunLight = this;
-      this._sunLight = true;
+    if (!DirectionalLight.getSunLight(scene)) {
+      DirectionalLight.setSunLight(scene, this);
+    }
+  }
+  static getSunLight(scene: Scene) {
+    return this._currentSunLight.get(scene)?.get() ?? null;
+  }
+  static setSunLight(scene: Scene, light: DirectionalLight) {
+    if (scene !== light.scene) {
+      throw new Error('setSunLight(): Light does not belongs to scene');
+    }
+    let ref = this._currentSunLight.get(light.scene);
+    if (!ref) {
+      this._currentSunLight.set(light.scene, new DWeakRef(light));
     } else {
-      this._sunLight = false;
+      ref.set(light);
     }
   }
   clone(method: NodeCloneMethod, recursive: boolean) {
@@ -271,19 +282,14 @@ export class DirectionalLight extends PunctualLight implements NodeClonable<Dire
    * Only one directional light will be marked as sun light.
    **/
   get sunLight(): boolean {
-    return this._sunLight;
+    return DirectionalLight.getSunLight(this.scene) === this;
   }
   set sunLight(val: boolean) {
-    if (!!val !== this._sunLight) {
-      this._sunLight = !!val;
-      if (this._sunLight) {
-        DirectionalLight._currentSunLight._sunLight = false;
-        DirectionalLight._currentSunLight = this;
-      } else {
-        DirectionalLight._currentSunLight = null;
-      }
+    if (val) {
+      DirectionalLight.setSunLight(this.scene, this);
+    } else if (DirectionalLight.getSunLight(this.scene) === this) {
+      DirectionalLight.setSunLight(this.scene, null);
     }
-    this._sunLight = !!val;
   }
   /**
    * {@inheritDoc BaseLight.isDirectionLight}
