@@ -1,7 +1,7 @@
 import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext, Primitive } from '../render';
 import { AbstractPostEffect } from './posteffect';
-import { linearToGamma, packFloat16x2 } from '../shaders';
+import { linearToGamma } from '../shaders';
 import { fetchSampler } from '../utility/misc';
 import { BoxShape } from '../shapes';
 import { temporalResolve } from '../shaders/temporal';
@@ -143,12 +143,6 @@ export class TAA extends AbstractPostEffect<'TAA'> {
               0.5
             );
             this.$outputs.color = pb.vec4(this.motionVector, 0, 1);
-            if (pb.getDevice().type === 'webgl') {
-              this.$outputs.zMotionVector = packFloat16x2(
-                this,
-                pb.add(pb.mul(this.$outputs.color.xy, 0.5), pb.vec2(0.5))
-              );
-            }
           });
         }
       });

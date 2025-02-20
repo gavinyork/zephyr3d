@@ -20,7 +20,7 @@ import {
 import { Material } from './material';
 import type { DepthPass } from '../render';
 import { type DrawContext, type ShadowMapPass } from '../render';
-import { encodeNormalizedFloatToRGBA, packFloat16x2 } from '../shaders';
+import { encodeNormalizedFloatToRGBA } from '../shaders';
 import { Application, DRef, DWeakRef } from '../app';
 import { ShaderHelper } from './shader/helper';
 import type { Clonable } from '@zephyr3d/base';
@@ -67,6 +67,7 @@ export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
 let FEATURE_ALPHATEST = 0;
 let FEATURE_ALPHABLEND = 0;
 let FEATURE_ALPHATOCOVERAGE = 0;
+let FEATURE_DISABLE_TAA = 0;
 
 /** @internal */
 export type InstanceUniformType = 'float' | 'vec2' | 'vec3' | 'vec4' | 'rgb' | 'rgba';
@@ -387,6 +388,13 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       this._alphaCutoff = val;
       this.uniformChanged();
     }
+  }
+  /** Whether TAA should be disabled on this material */
+  get TAADisabled(): boolean {
+    return !!this.featureUsed(FEATURE_DISABLE_TAA);
+  }
+  set TAADisabled(val: boolean) {
+    this.useFeature(FEATURE_DISABLE_TAA, !!val);
   }
   get alphaToCoverage(): boolean {
     return this.featureUsed(FEATURE_ALPHATOCOVERAGE);
@@ -755,26 +763,24 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           this.$outputs.zFragmentOutput = pb.vec4(this.depth, 0, 0, 1);
         }
         if (that.drawContext.motionVectors) {
-          if (this.$inputs.zMotionVectorPosCurrent && this.$inputs.zMotionVectorPosPrev) {
-            this.$outputs.zMotionVector = pb.vec4(
-              pb.mul(
-                pb.sub(
-                  pb.div(this.$inputs.zMotionVectorPosCurrent.xy, this.$inputs.zMotionVectorPosCurrent.w),
-                  pb.div(this.$inputs.zMotionVectorPosPrev.xy, this.$inputs.zMotionVectorPosPrev.w)
-                ),
-                0.5
-              ),
-              0,
-              1
-            );
+          if (that.featureUsed(FEATURE_DISABLE_TAA)) {
+            this.$outputs.zMotionVector = pb.vec4(6e4, 6e4, 0, 1);
           } else {
-            this.$outputs.zMotionVector = pb.vec4(0, 0, 0, 1);
-          }
-          if (that.drawContext.device.type === 'webgl') {
-            this.$outputs.zMotionVector = packFloat16x2(
-              this,
-              pb.add(pb.mul(this.$outputs.zMotionVector.xy, 0.5), pb.vec2(0.5))
-            );
+            if (this.$inputs.zMotionVectorPosCurrent && this.$inputs.zMotionVectorPosPrev) {
+              this.$outputs.zMotionVector = pb.vec4(
+                pb.mul(
+                  pb.sub(
+                    pb.div(this.$inputs.zMotionVectorPosCurrent.xy, this.$inputs.zMotionVectorPosCurrent.w),
+                    pb.div(this.$inputs.zMotionVectorPosPrev.xy, this.$inputs.zMotionVectorPosPrev.w)
+                  ),
+                  0.5
+                ),
+                0,
+                1
+              );
+            } else {
+              this.$outputs.zMotionVector = pb.vec4(0, 0, 0, 1);
+            }
           }
         }
       } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
@@ -819,3 +825,4 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
 FEATURE_ALPHATEST = MeshMaterial.defineFeature();
 FEATURE_ALPHABLEND = MeshMaterial.defineFeature();
 FEATURE_ALPHATOCOVERAGE = MeshMaterial.defineFeature();
+FEATURE_DISABLE_TAA = MeshMaterial.defineFeature();

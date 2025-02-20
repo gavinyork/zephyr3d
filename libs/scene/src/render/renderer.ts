@@ -167,54 +167,59 @@ export class SceneRenderer {
     }
     GlobalBindGroupAllocator.release(globalBindGroupAllocator);
   }
-  private static renderSceneDepth(ctx: DrawContext, renderQueue: RenderQueue) {
-    const format: TextureFormat =
-      ctx.device.type === 'webgl'
-        ? ctx.SSRCalcThickness
-          ? 'rgba16f'
-          : 'rgba8unorm'
-        : ctx.SSRCalcThickness
-        ? 'rg32f'
-        : 'r32f';
-    const mvFormat: TextureFormat = ctx.device.type === 'webgl' ? 'rgba8unorm' : 'rg16f';
-    let depthFramebuffer: FrameBuffer;
-    if (!ctx.finalFramebuffer) {
-      depthFramebuffer = ctx.device.pool.fetchTemporalFramebuffer(
-        true,
-        ctx.renderWidth,
-        ctx.renderHeight,
-        ctx.motionVectors ? [format, mvFormat] : format,
-        ctx.depthFormat,
-        ctx.HiZ
-      );
-    } else {
-      const originDepth = ctx.finalFramebuffer?.getDepthAttachment();
-      depthFramebuffer = originDepth?.isTexture2D()
-        ? ctx.device.pool.fetchTemporalFramebuffer(
-            true,
-            originDepth.width,
-            originDepth.height,
-            ctx.motionVectors ? [format, mvFormat] : format,
-            originDepth,
-            ctx.HiZ
-          )
-        : ctx.device.pool.fetchTemporalFramebuffer(
-            true,
-            ctx.renderWidth,
-            ctx.renderHeight,
-            ctx.motionVectors ? [format, mvFormat] : format,
-            ctx.depthFormat,
-            ctx.HiZ
-          );
+  private static renderSceneDepth(ctx: DrawContext, renderQueue: RenderQueue, depthFramebuffer: FrameBuffer) {
+    let transmission = !!depthFramebuffer;
+    if (!depthFramebuffer) {
+      const format: TextureFormat =
+        ctx.device.type === 'webgl'
+          ? ctx.SSRCalcThickness
+            ? 'rgba16f'
+            : 'rgba8unorm'
+          : ctx.SSRCalcThickness
+          ? 'rg32f'
+          : 'r32f';
+      const mvFormat: TextureFormat = ctx.device.type === 'webgl' ? 'rgba16f' : 'rg16f';
+      if (!ctx.finalFramebuffer) {
+        depthFramebuffer = ctx.device.pool.fetchTemporalFramebuffer(
+          true,
+          ctx.renderWidth,
+          ctx.renderHeight,
+          ctx.motionVectors ? [format, mvFormat] : format,
+          ctx.depthFormat,
+          ctx.HiZ
+        );
+      } else {
+        const originDepth = ctx.finalFramebuffer?.getDepthAttachment();
+        depthFramebuffer = originDepth?.isTexture2D()
+          ? ctx.device.pool.fetchTemporalFramebuffer(
+              true,
+              originDepth.width,
+              originDepth.height,
+              ctx.motionVectors ? [format, mvFormat] : format,
+              originDepth,
+              ctx.HiZ
+            )
+          : ctx.device.pool.fetchTemporalFramebuffer(
+              true,
+              ctx.renderWidth,
+              ctx.renderHeight,
+              ctx.motionVectors ? [format, mvFormat] : format,
+              ctx.depthFormat,
+              ctx.HiZ
+            );
+      }
     }
     ctx.device.pushDeviceStates();
     ctx.device.setFramebuffer(depthFramebuffer);
     this._depthPass.encodeDepth = depthFramebuffer.getColorAttachments()[0].format === 'rgba8unorm';
-    this._depthPass.clearColor = this._depthPass.encodeDepth
+    this._depthPass.clearColor = transmission
+      ? null
+      : this._depthPass.encodeDepth
       ? new Vector4(0, 0, 0, 1)
       : new Vector4(1, 1, 1, 1);
-    this._depthPass.clearDepth = 1;
-    if (ctx.SSRCalcThickness) {
+    this._depthPass.clearDepth = transmission ? null : 1;
+    this._depthPass.transmission = transmission;
+    if (ctx.SSRCalcThickness && !transmission) {
       if (!this._backDepthColorState) {
         this._backDepthColorState = ctx.device.createColorState().setColorMask(false, true, false, false);
       }
@@ -224,6 +229,7 @@ export class SceneRenderer {
       ctx.forceColorState = this._backDepthColorState;
       ctx.forceCullMode = 'front';
       this._depthPass.renderBackface = true;
+      this._depthPass.transmission = false;
       this._depthPass.render(ctx, null, renderQueue);
       this._depthPass.clearColor = null;
       this._depthPass.renderBackface = false;
@@ -234,33 +240,36 @@ export class SceneRenderer {
     ctx.forceColorState = null;
     ctx.device.popDeviceStates();
 
-    ctx.motionVectorTexture = ctx.motionVectors
-      ? (depthFramebuffer.getColorAttachments()[1] as Texture2D)
-      : null;
-    ctx.linearDepthTexture = depthFramebuffer.getColorAttachments()[0] as Texture2D;
-    ctx.depthTexture = depthFramebuffer.getDepthAttachment() as Texture2D;
-    if (ctx.HiZ) {
-      let w = isPowerOf2(ctx.linearDepthTexture.width)
-        ? ctx.linearDepthTexture.width
-        : nextPowerOf2(ctx.linearDepthTexture.width);
-      let h = isPowerOf2(ctx.linearDepthTexture.height)
-        ? ctx.linearDepthTexture.height
-        : nextPowerOf2(ctx.linearDepthTexture.height);
-      w = Math.max(1, w >> 1);
-      h = Math.max(1, h >> 1);
-      w = ctx.linearDepthTexture.width;
-      h = ctx.linearDepthTexture.height;
-      const HiZFrameBuffer = ctx.device.pool.fetchTemporalFramebuffer(
-        true,
-        w,
-        h,
-        ctx.linearDepthTexture.format,
-        null,
-        true
-      );
-      buildHiZ(ctx.depthTexture, HiZFrameBuffer);
-      ctx.HiZTexture = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
+    if (!transmission) {
+      ctx.motionVectorTexture = ctx.motionVectors
+        ? (depthFramebuffer.getColorAttachments()[1] as Texture2D)
+        : null;
+      ctx.linearDepthTexture = depthFramebuffer.getColorAttachments()[0] as Texture2D;
+      ctx.depthTexture = depthFramebuffer.getDepthAttachment() as Texture2D;
+      if (ctx.HiZ) {
+        let w = isPowerOf2(ctx.linearDepthTexture.width)
+          ? ctx.linearDepthTexture.width
+          : nextPowerOf2(ctx.linearDepthTexture.width);
+        let h = isPowerOf2(ctx.linearDepthTexture.height)
+          ? ctx.linearDepthTexture.height
+          : nextPowerOf2(ctx.linearDepthTexture.height);
+        w = Math.max(1, w >> 1);
+        h = Math.max(1, h >> 1);
+        w = ctx.linearDepthTexture.width;
+        h = ctx.linearDepthTexture.height;
+        const HiZFrameBuffer = ctx.device.pool.fetchTemporalFramebuffer(
+          true,
+          w,
+          h,
+          ctx.linearDepthTexture.format,
+          null,
+          true
+        );
+        buildHiZ(ctx.depthTexture, HiZFrameBuffer);
+        ctx.HiZTexture = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
+      }
     }
+    return depthFramebuffer;
   }
   /** @internal */
   protected static _renderScene(ctx: DrawContext): void {
@@ -281,7 +290,7 @@ export class SceneRenderer {
     this.renderShadowMaps(ctx, renderQueue.shadowedLights);
 
     // Render scene depth first
-    this.renderSceneDepth(ctx, renderQueue);
+    const depthFramebuffer = this.renderSceneDepth(ctx, renderQueue, null);
 
     if (ctx.depthTexture === ctx.finalFramebuffer?.getDepthAttachment()) {
       ctx.intermediateFramebuffer = ctx.finalFramebuffer;
@@ -309,7 +318,6 @@ export class SceneRenderer {
       ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
     }
     ctx.compositor?.begin(ctx);
-    const linearDepth = ctx.linearDepthTexture;
     if (renderQueue.needSceneColor()) {
       const compositor = ctx.compositor;
       ctx.compositor = null;
@@ -345,8 +353,10 @@ export class SceneRenderer {
       ctx.compositor = compositor;
     }
     this._scenePass.render(ctx, null, renderQueue);
-    ctx.linearDepthTexture = linearDepth;
     ctx.compositor?.end(ctx);
+    if (renderQueue.needSceneColor()) {
+      this.renderSceneDepth(ctx, renderQueue, depthFramebuffer);
+    }
     renderQueue.dispose();
     ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
 

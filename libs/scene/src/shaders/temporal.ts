@@ -1,5 +1,4 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
-import { unpackFloat16x2 } from './misc';
 
 export const TAA_DEBUG_NONE = 0;
 export const TAA_DEBUG_CURRENT_COLOR = 1;
@@ -41,11 +40,7 @@ export function temporalResolve(
       }
     }
     this.$l.motionVector = pb.textureSampleLevel(motionVectorTex, this.closestUV, 0);
-    if (pb.getDevice().type === 'webgl') {
-      this.$return(pb.sub(pb.mul(unpackFloat16x2(this, this.motionVector), 2), pb.vec2(1)));
-    } else {
-      this.$return(this.motionVector.xy);
-    }
+    this.$return(this.motionVector.xy);
   });
   pb.func('clipAABB', [pb.vec3('aabbMin'), pb.vec3('aabbMax'), pb.vec3('p'), pb.vec3('q')], function () {
     this.$l.r = pb.sub(this.q, this.p);
@@ -120,10 +115,7 @@ export function temporalResolve(
   });
   pb.func('getDisocclusionFactor', [pb.vec2('uv'), pb.vec2('velocity'), pb.vec2('texSize')], function () {
     this.$l.prevVelocitySample = pb.textureSampleLevel(prevMotionVectorTex, this.uv, 0);
-    this.$l.prevVelocity =
-      pb.getDevice().type === 'webgl'
-        ? pb.sub(pb.mul(unpackFloat16x2(this, this.prevVelocitySample), 2), pb.vec2(1))
-        : this.prevVelocitySample.xy;
+    this.$l.prevVelocity = this.prevVelocitySample.xy;
     this.$l.disocclusion = pb.sub(
       pb.length(pb.mul(pb.sub(this.velocity, this.prevVelocity), this.texSize)),
       2.5
@@ -217,14 +209,17 @@ export function temporalResolve(
   });
   pb.func('temporalResolve', [pb.vec2('screenUV'), pb.vec2('texSize'), pb.float('blendFactor')], function () {
     this.$l.velocitySample = pb.textureSampleLevel(motionVectorTex, this.screenUV, 0);
-    this.$l.velocity =
-      pb.getDevice().type === 'webgl'
-        ? pb.sub(pb.mul(unpackFloat16x2(this, this.velocitySample), 2), pb.vec2(1))
-        : this.velocitySample.xy;
+    this.$l.velocity = this.velocitySample.xy;
+    this.$l.sampleColor = pb.textureSampleLevel(currentColorTex, this.screenUV, 0).rgb;
+    this.$if(
+      pb.and(pb.greaterThanEqual(this.velocity.x, 5e4), pb.greaterThanEqual(this.velocity.y, 6e4)),
+      function () {
+        this.$return(pb.vec3(1, 0, 0));
+      }
+    );
     this.$l.reprojectedUV = pb.sub(this.screenUV, pb.mul(this.velocity, pb.vec2(1, 1)));
     //this.$l.historyColor = pb.textureSampleLevel(historyColorTex, this.reprojectedUV, 0).rgb;
     this.$l.historyColor = this.sampleHistoryColorCatmulRom9(this.reprojectedUV, this.texSize);
-    this.$l.sampleColor = pb.textureSampleLevel(currentColorTex, this.screenUV, 0).rgb;
     this.$l.velocityClosest = this.getClosestVelocity(this.screenUV, this.texSize);
     this.prevColor = this.clipHistoryColor(
       this.screenUV,

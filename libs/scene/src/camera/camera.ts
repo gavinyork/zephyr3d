@@ -686,7 +686,8 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    */
   render(scene: Scene, compositor?: Compositor) {
     compositor = compositor ?? Camera._defaultCompositor;
-    const useTAA = this.TAA;
+    const device = Application.instance.device;
+    const useTAA = this.TAA && device.type !== 'webgl';
     const useSSR = this.SSR;
     if (useTAA) {
       if (!Camera._TAA) {
@@ -701,7 +702,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
       compositor.appendPostEffect(Camera._SSR);
     }
     scene.dispatchEvent('startrender', scene, this, compositor);
-    const device = Application.instance.device;
     if (useTAA) {
       const width = device.getDrawingBufferWidth();
       const height = device.getDrawingBufferHeight();

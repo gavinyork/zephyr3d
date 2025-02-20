@@ -55,6 +55,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._depthMulti = 0.1;
     this._refractionStrength = 0;
     this.cullMode = 'none';
+    this.TAADisabled = true;
     this.useFeature(WaterMaterial.FEATURE_SSR, true);
   }
   get SSR() {

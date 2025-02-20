@@ -320,36 +320,3 @@ export function fetchNormalizedFloatForDevice(
     return texel;
   }
 }
-
-/** @internal */
-export function packFloat16x2(scope: PBInsideFunctionScope, v: PBShaderExp) {
-  const pb = scope.$builder;
-  pb.func('Z_packFloat16x2', [pb.vec2('v')], function () {
-    this.$return(
-      pb.div(
-        pb.vec4(
-          pb.floor(pb.mul(this.v.x, 255)),
-          pb.floor(pb.mul(pb.fract(pb.mul(this.v.x, 255)), 255)),
-          pb.floor(pb.mul(this.v.y, 255)),
-          pb.floor(pb.mul(pb.fract(pb.mul(this.v.y, 255)), 255))
-        ),
-        255
-      )
-    );
-  });
-  return scope.Z_packFloat16x2(v);
-}
-
-/** @internal */
-export function unpackFloat16x2(scope: PBInsideFunctionScope, rgba: PBShaderExp) {
-  const pb = scope.$builder;
-  pb.func('Z_unpackFloat16x2', [pb.vec4('rgba')], function () {
-    this.$return(
-      pb.vec2(
-        pb.div(pb.add(pb.mul(this.rgba.r, 255), this.rgba.g), 255),
-        pb.div(pb.add(pb.mul(this.rgba.b, 255), this.rgba.a), 255)
-      )
-    );
-  });
-  return scope.Z_unpackFloat16x2(rgba);
-}
