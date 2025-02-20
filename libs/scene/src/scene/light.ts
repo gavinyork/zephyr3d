@@ -262,7 +262,7 @@ export class DirectionalLight extends PunctualLight implements NodeClonable<Dire
     if (scene !== light.scene) {
       throw new Error('setSunLight(): Light does not belongs to scene');
     }
-    let ref = this._currentSunLight.get(light.scene);
+    const ref = this._currentSunLight.get(light.scene);
     if (!ref) {
       this._currentSunLight.set(light.scene, new DWeakRef(light));
     } else {

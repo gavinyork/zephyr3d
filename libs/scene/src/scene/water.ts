@@ -18,12 +18,16 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   private _pickTarget: PickTarget;
   private _clipmap: Clipmap;
   private _gridScale: number;
+  private _animationSpeed: number;
+  private _timeStart: number;
   private _material: DRef<WaterMaterial>;
   constructor(scene: Scene) {
     super(scene);
     this._pickTarget = { node: this };
     this._clipmap = new Clipmap(32);
     this._gridScale = 1;
+    this._animationSpeed = 1;
+    this._timeStart = 0;
     this._material = new DRef(new WaterMaterial());
     this._material.get().region = new Vector4(-1, -1, 1, 1);
   }
@@ -44,6 +48,12 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   get waveGenerator(): WaveGenerator {
     return this.material.waveGenerator;
   }
+  get animationSpeed() {
+    return this._animationSpeed;
+  }
+  set animationSpeed(val: number) {
+    this._animationSpeed = val;
+  }
   set waveGenerator(waveGenerator: WaveGenerator) {
     this.material.waveGenerator = waveGenerator;
     if (this.material.needUpdate()) {
@@ -53,7 +63,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   update(frameId: number, elapsedInSeconds: number) {
     if (this.material.needUpdate()) {
       this.scene.queueUpdateNode(this);
-      this.material.update(frameId, elapsedInSeconds);
+      if (this._timeStart === 0) {
+        this._timeStart = elapsedInSeconds;
+      }
+      this.material.update(frameId, (elapsedInSeconds - this._timeStart) * this._animationSpeed);
     }
   }
   /**

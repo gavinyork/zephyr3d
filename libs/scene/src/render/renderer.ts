@@ -168,7 +168,7 @@ export class SceneRenderer {
     GlobalBindGroupAllocator.release(globalBindGroupAllocator);
   }
   private static renderSceneDepth(ctx: DrawContext, renderQueue: RenderQueue, depthFramebuffer: FrameBuffer) {
-    let transmission = !!depthFramebuffer;
+    const transmission = !!depthFramebuffer;
     if (!depthFramebuffer) {
       const format: TextureFormat =
         ctx.device.type === 'webgl'

@@ -45,7 +45,7 @@ export class CommandQueueImmediate {
       bufferUploads.forEach((_, buffer) => buffer.beginSyncChanges(uploadCommandEncoder));
       textureUploads.forEach((_, tex) => {
         tex.beginSyncChanges(uploadCommandEncoder);
-        if (tex.isMipmapDirty()) {
+        if (!tex.disposed && tex.isMipmapDirty()) {
           WebGPUMipmapGenerator.generateMipmap(this._device, tex, uploadCommandEncoder);
         }
       });

@@ -6,7 +6,7 @@ import { RaycastVisitor } from './raycast_visitor';
 import { Application } from '../app/app';
 import { Environment } from './environment';
 import type { GraphNode } from './graph_node';
-import { Camera } from '../camera/camera';
+import type { Camera } from '../camera/camera';
 import type { AnimationSet } from '../animation/animationset';
 import type { PickTarget } from '../render';
 import type { Compositor } from '../posteffect';

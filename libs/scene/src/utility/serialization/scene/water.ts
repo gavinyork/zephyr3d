@@ -7,7 +7,7 @@ import type { NodeHierarchy } from './node';
 import { getGraphNodeClass } from './node';
 import type { WaveGenerator } from '../../../render';
 import { FFTWaveGenerator, GerstnerWaveGenerator } from '../../../render';
-import { Texture2D } from '@zephyr3d/device';
+import type { Texture2D } from '@zephyr3d/device';
 
 export class GerstnerWaveCls {
   public generator: GerstnerWaveGenerator;
@@ -317,6 +317,18 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
           },
           set(this: Water, value) {
             this.gridScale = value.num[0];
+          }
+        },
+        {
+          name: 'AnimationSpeed',
+          type: 'float',
+          default: 1,
+          options: { minValue: 0, maxValue: 100 },
+          get(this: Water, value) {
+            value.num[0] = this.animationSpeed;
+          },
+          set(this: Water, value) {
+            this.animationSpeed = value.num[0];
           }
         },
         {

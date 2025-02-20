@@ -188,13 +188,14 @@ export class ShaderHelper {
       pb.vec4('position'),
       pb.vec4('clipPlane'),
       pb.mat4('viewProjectionMatrix'),
+      pb.mat4('unjitteredVPMatrix'),
       pb.mat4('invViewProjectionMatrix'),
       pb.mat4('viewMatrix'),
       pb.mat4('projectionMatrix'),
       pb.mat4('invProjectionMatrix'),
       pb.vec4('params'),
       ...(ctx.motionVectors && ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH
-        ? [pb.mat4('unjitteredVPMatrix'), pb.mat4('prevUnjitteredVPMatrix')]
+        ? [pb.mat4('prevUnjitteredVPMatrix')]
         : []),
       pb.vec2('renderSize'),
       pb.float('roughnessFactor'),
@@ -530,9 +531,9 @@ export class ShaderHelper {
       } else {
         this.$l.pos = this.opos;
       }
-      const unjitteredVPMatrix = that.getUnjitteredViewProjectionMatrix(this);
-      if (unjitteredVPMatrix) {
-        this.$l.unjitteredVPMatrix = unjitteredVPMatrix;
+      const prevUnjitteredVPMatrix = that.getPrevUnjitteredViewProjectionMatrix(this);
+      if (prevUnjitteredVPMatrix) {
+        this.$l.unjitteredVPMatrix = that.getUnjitteredViewProjectionMatrix(this);
         this.$l.worldPos = pb.mul(that.getWorldMatrix(this), pb.vec4(this.pos, 1));
         if (this.prevSkinMatrix) {
           this.$l.prevWorldPos = pb.mul(
@@ -543,10 +544,7 @@ export class ShaderHelper {
           this.$l.prevWorldPos = pb.mul(that.getPrevWorldMatrix(this), pb.vec4(this.pos, 1));
         }
         this.$outputs.zMotionVectorPosCurrent = pb.mul(this.unjitteredVPMatrix, this.worldPos);
-        this.$outputs.zMotionVectorPosPrev = pb.mul(
-          that.getPrevUnjitteredViewProjectionMatrix(this),
-          this.prevWorldPos
-        );
+        this.$outputs.zMotionVectorPosPrev = pb.mul(prevUnjitteredVPMatrix, this.prevWorldPos);
       }
       this.$return(this.pos);
     });
@@ -761,6 +759,7 @@ export class ShaderHelper {
         ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR
           ? ctx.camera.jitteredVPMatrix
           : ctx.camera.viewProjectionMatrix,
+      unjitteredVPMatrix: ctx.camera.viewProjectionMatrix,
       invViewProjectionMatrix: ctx.camera.invViewProjectionMatrix,
       projectionMatrix: ctx.camera.getProjectionMatrix(),
       invProjectionMatrix: Matrix4x4.invert(ctx.camera.getProjectionMatrix()),
@@ -775,7 +774,6 @@ export class ShaderHelper {
       framestamp: Application.instance.device.frameInfo.frameCounter
     } as any;
     if (ctx.motionVectors && ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
-      cameraStruct.unjitteredVPMatrix = ctx.camera.viewProjectionMatrix;
       cameraStruct.prevUnjitteredVPMatrix = ctx.camera.prevVPMatrix;
     }
     if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
@@ -885,6 +883,7 @@ export class ShaderHelper {
       shadowMapParams.shadowMap,
       shadowMapParams.shadowMapSampler
     );
+    bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.bakedSkyTexture);
     if (ctx.drawEnvLight) {
       ctx.env.light.envLight.updateBindGroup(bindGroup);
     }

@@ -175,7 +175,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     scope.$outputs.worldNormal = scope.worldNormal;
     ShaderHelper.setClipSpacePosition(
       scope,
-      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+      pb.mul(ShaderHelper.getUnjitteredViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
     );
   }
   fragmentShader(scope: PBFunctionScope): void {
@@ -381,7 +381,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         ).rgb;
         this.refraction = pb.mul(this.refraction, this.getAbsorption(this.depth));
         this.$l.fresnelTerm = this.fresnel(this.normal, pb.neg(this.eyeVecNorm));
-        this.$l.finalColor = pb.mix(this.refraction, this.reflectance, this.fresnelTerm);
+        this.$l.finalColor = pb.mix(
+          pb.mix(this.refraction, this.reflectance, this.fresnelTerm),
+          pb.vec3(1),
+          this.foamFactor
+        );
         that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
           this.$l.lightAtten = that.calculateLightAttenuation(this, type, this.worldPos, posRange, dirCutoff);
           this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);

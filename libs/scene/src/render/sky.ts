@@ -1,7 +1,8 @@
 import { Application } from '../app/app';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders/misc';
 import { smoothNoise3D } from '../shaders';
-import { CubeFace, Matrix4x4, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import type { Vector3 } from '@zephyr3d/base';
+import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import type { Primitive } from './primitive';
 import { BoxShape } from '../shapes';
 import { ScatteringLut } from './scatteringlut';
@@ -11,7 +12,6 @@ import type { DirectionalLight } from '../scene';
 import type {
   AbstractDevice,
   BindGroup,
-  FrameBuffer,
   GPUProgram,
   RenderStateSet,
   TextureCube,
@@ -63,7 +63,6 @@ export class SkyRenderer {
   private _bakedSkyboxTexture: DRef<TextureCube>;
   private _updateRadianceMaps: boolean;
   private _radianceMapDirty: boolean;
-  private _scatterSkyboxFramebuffer: FrameBuffer;
   private _scatterSkyboxTextureWidth: number;
   private _aerialPerspectiveDensity: number;
   private _radianceMap: DRef<TextureCube>;
@@ -102,7 +101,6 @@ export class SkyRenderer {
     this._skyColor = Vector4.zero();
     this._skyboxTexture = new DRef();
     this._bakedSkyboxTexture = new DRef();
-    this._scatterSkyboxFramebuffer = null;
     this._scatterSkyboxTextureWidth = 256;
     this._aerialPerspectiveDensity = 1;
     this._radianceMap = new DRef();
@@ -378,35 +376,32 @@ export class SkyRenderer {
     this._lastSunDir.set(sunDir);
     if (this._skyType === 'skybox' && this.skyboxTexture) {
       this._bakedSkyboxTexture.set(this.skyboxTexture);
-      this._scatterSkyboxFramebuffer?.dispose();
-      this._scatterSkyboxFramebuffer = null;
     } else {
       const device = Application.instance.device;
-      if (!this._scatterSkyboxFramebuffer) {
-        const texCaps = device.getDeviceCaps().textureCaps;
-        const format: TextureFormat =
-          texCaps.supportHalfFloatColorBuffer && texCaps.supportLinearHalfFloatTexture
-            ? 'rgba16f'
-            : texCaps.supportFloatColorBuffer && texCaps.supportLinearFloatTexture
-            ? 'rgba32f'
-            : 'rgba8unorm';
-        const tex = device.createCubeTexture(format, this._scatterSkyboxTextureWidth);
-        tex.name = 'BakedSkyboxTexture';
-        this._scatterSkyboxFramebuffer = device.createFrameBuffer([tex], null);
-      }
+      const texCaps = device.getDeviceCaps().textureCaps;
+      const format: TextureFormat =
+        texCaps.supportHalfFloatColorBuffer && texCaps.supportLinearHalfFloatTexture
+          ? 'rgba16f'
+          : texCaps.supportFloatColorBuffer && texCaps.supportLinearFloatTexture
+          ? 'rgba32f'
+          : 'rgba8unorm';
+      const tex = device.createCubeTexture(format, this._scatterSkyboxTextureWidth);
+      tex.name = 'BakedSkyboxTexture';
+      const scatterSkyboxFramebuffer = device.createFrameBuffer([tex], null);
       const camera = new Camera(null);
       camera.setPerspective(Math.PI / 2, 1, 1, 20);
       const saveRenderStates = device.getRenderStates();
       device.pushDeviceStates();
-      device.setFramebuffer(this._scatterSkyboxFramebuffer);
+      device.setFramebuffer(scatterSkyboxFramebuffer);
       for (const face of [CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ]) {
         camera.lookAtCubeFace(face);
-        this._scatterSkyboxFramebuffer.setColorAttachmentCubeFace(0, face);
+        scatterSkyboxFramebuffer.setColorAttachmentCubeFace(0, face);
         this._renderSky(camera, false, sunDir, true, false);
       }
       device.popDeviceStates();
       device.setRenderStates(saveRenderStates);
-      this._bakedSkyboxTexture.set(this._scatterSkyboxFramebuffer.getColorAttachments()[0] as TextureCube);
+      this._bakedSkyboxTexture.set(scatterSkyboxFramebuffer.getColorAttachments()[0] as TextureCube);
+      scatterSkyboxFramebuffer.dispose();
     }
   }
   /**
