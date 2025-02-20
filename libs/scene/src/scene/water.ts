@@ -35,6 +35,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
     super.copyFrom(other, method, recursive);
+    this.waveGenerator = other.waveGenerator;
+    this.gridScale = other.gridScale;
   }
   get material(): WaterMaterial {
     return this._material.get();

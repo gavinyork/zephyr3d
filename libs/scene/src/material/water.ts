@@ -6,7 +6,7 @@ import type {
   PBShaderExp,
   Texture2D
 } from '@zephyr3d/device';
-import { MeshMaterial } from './meshmaterial';
+import { applyMaterialMixins, MeshMaterial } from './meshmaterial';
 import type { DrawContext, WaveGenerator } from '../render';
 import { MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
@@ -14,8 +14,10 @@ import { Interpolator, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import { Application, DRef, DWeakRef } from '../app';
 import { sampleLinearDepth, screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
 import { fetchSampler } from '../utility/misc';
+import { mixinLight } from './mixins/lit';
+import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
 
-export class WaterMaterial extends MeshMaterial {
+export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
   private static FEATURE_SSR = this.defineFeature();
   private static _absorptionGrad = new Interpolator(
     'linear',
@@ -61,9 +63,11 @@ export class WaterMaterial extends MeshMaterial {
   set SSR(val: boolean) {
     this.useFeature(WaterMaterial.FEATURE_SSR, !!val);
   }
+  /** @internal */
   get region() {
     return this._region;
   }
+  /** @internal */
   set region(val: Vector4) {
     if (!val.equalsTo(this._region)) {
       this._region.set(val);
@@ -80,7 +84,8 @@ export class WaterMaterial extends MeshMaterial {
     }
   }
   get scatterRampTexture(): Texture2D {
-    return this._getScatterRampTexture(Application.instance.device);
+    const tex = this._getScatterRampTexture(Application.instance.device);
+    return tex === WaterMaterial._defaultScatterRampTexture.get() ? null : tex;
   }
   set scatterRampTexture(tex: Texture2D) {
     if (tex !== this.scatterRampTexture) {
@@ -89,7 +94,8 @@ export class WaterMaterial extends MeshMaterial {
     }
   }
   get absorptionRampTexture(): Texture2D {
-    return this._getAbsorptionRampTexture(Application.instance.device);
+    const tex = this._getAbsorptionRampTexture(Application.instance.device);
+    return tex === WaterMaterial._defaultAbsorptionRampTexture.get() ? null : tex;
   }
   set absorptionRampTexture(tex: Texture2D) {
     if (tex !== this.absorptionRampTexture) {
@@ -141,7 +147,7 @@ export class WaterMaterial extends MeshMaterial {
     return false;
   }
   supportLighting(): boolean {
-    return false;
+    return true;
   }
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
@@ -225,6 +231,7 @@ export class WaterMaterial extends MeshMaterial {
     foamFactor: PBShaderExp
   ) {
     const pb = scope.$builder;
+    const that = this;
     pb.func('getAbsorption', [pb.float('depth')], function () {
       this.$l.c = pb.textureSampleLevel(
         this.absorptionRampTex,
@@ -265,6 +272,31 @@ export class WaterMaterial extends MeshMaterial {
         )
       );
     });
+    pb.func(
+      'lightSpecular',
+      [pb.vec3('lightDir'), pb.vec3('eyeVecNorm'), pb.vec3('normal'), pb.vec3('lightColor')],
+      function () {
+        this.$l.roughness = pb.float(0.04);
+        this.$l.f0 = pb.vec3(0.02);
+        this.$l.f90 = pb.vec3(1);
+        this.$l.L = this.lightDir;
+        this.$l.V = pb.neg(this.eyeVecNorm);
+        this.$l.halfVec = pb.normalize(pb.add(this.L, this.V));
+        this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
+        this.$l.NoL = pb.clamp(pb.dot(this.normal, this.L), 0, 1);
+        this.$l.specular = pb.vec3(0);
+        this.$if(pb.greaterThan(this.NoL, 0), function () {
+          this.$l.VoH = pb.clamp(pb.dot(this.V, this.halfVec), 0, 1);
+          this.$l.NoV = pb.clamp(pb.dot(this.normal, this.V), 0, 1);
+          this.$l.F = fresnelSchlick(this, this.VoH, this.f0, this.f90);
+          this.$l.alphaRoughness = pb.mul(this.roughness, this.roughness);
+          this.$l.D = distributionGGX(this, this.NoH, this.alphaRoughness);
+          this.$l.VIS = visGGX(this, this.NoV, this.NoL, this.alphaRoughness);
+          this.specular = pb.mul(this.D, this.VIS, this.F, this.lightColor);
+        });
+        this.$return(this.specular);
+      }
+    );
     pb.func(
       'waterShading',
       [pb.vec3('worldPos'), pb.vec3('worldNormal'), pb.float('foamFactor')],
@@ -349,6 +381,27 @@ export class WaterMaterial extends MeshMaterial {
         this.refraction = pb.mul(this.refraction, this.getAbsorption(this.depth));
         this.$l.fresnelTerm = this.fresnel(this.normal, pb.neg(this.eyeVecNorm));
         this.$l.finalColor = pb.mix(this.refraction, this.reflectance, this.fresnelTerm);
+        that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
+          this.$l.lightAtten = that.calculateLightAttenuation(this, type, this.worldPos, posRange, dirCutoff);
+          this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
+          this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
+          this.$l.lightContrib = this.lightSpecular(
+            this.lightDir,
+            this.eyeVecNorm,
+            this.normal,
+            pb.mul(colorIntensity.rgb, colorIntensity.a)
+          );
+          if (shadow) {
+            this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, this.NoL));
+            this.lightContrib = pb.mul(this.lightContrib, this.shadow);
+          }
+          this.finalColor = pb.add(this.finalColor, this.lightContrib);
+        });
+        if (that.needCalculateEnvLight()) {
+          this.$l.irradiance = that.getEnvLightIrradiance(this, this.normal);
+          this.$l.sss = pb.mul(this.getScattering(this.depth), this.irradiance);
+          this.finalColor = pb.add(this.finalColor, this.sss);
+        }
         this.$return(this.finalColor);
       }
     );
@@ -362,8 +415,16 @@ export class WaterMaterial extends MeshMaterial {
     bindGroup.setValue('depthMulti', this._depthMulti);
     bindGroup.setValue('refractionStrength', this._refractionStrength);
     bindGroup.setValue('ssrParams', this._ssrParams);
-    bindGroup.setTexture('scatterRampTex', this.scatterRampTexture, fetchSampler('clamp_linear_nomip'));
-    bindGroup.setTexture('absorptionRampTex', this.absorptionRampTexture, fetchSampler('clamp_linear_nomip'));
+    bindGroup.setTexture(
+      'scatterRampTex',
+      this._getScatterRampTexture(ctx.device),
+      fetchSampler('clamp_linear_nomip')
+    );
+    bindGroup.setTexture(
+      'absorptionRampTex',
+      this._getAbsorptionRampTexture(ctx.device),
+      fetchSampler('clamp_linear_nomip')
+    );
     if (this.waveGenerator) {
       this.waveGenerator.applyWaterBindGroup(bindGroup);
     }

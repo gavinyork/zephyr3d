@@ -703,7 +703,6 @@ export function getUnlitMaterialClass(assetRegistry: AssetRegistry): Serializabl
     }
   };
 }
-
 export function getLambertMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: LambertMaterial,

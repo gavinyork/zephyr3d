@@ -9,7 +9,7 @@ import {
   PBRSpecularGlossinessMaterial,
   UnlitMaterial
 } from '../../material';
-import { GerstnerWaveGenerator, Primitive } from '../../render';
+import { FFTWaveGenerator, GerstnerWaveGenerator, Primitive } from '../../render';
 import {
   BatchGroup,
   DirectionalLight,
@@ -58,6 +58,7 @@ import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass }
 import { getAABBClass } from './scene/misc';
 import {
   GerstnerWaveCls,
+  getFFTWaveGeneratorClass,
   getGerstnerWaveClass,
   getGerstnerWaveGeneratorClass,
   getWaterClass
@@ -114,6 +115,7 @@ export function getSerializationInfo(assetRegistry: AssetRegistry) {
       [Water, getWaterClass(assetRegistry)],
       [GerstnerWaveCls, getGerstnerWaveClass(assetRegistry)],
       [GerstnerWaveGenerator, getGerstnerWaveGeneratorClass(assetRegistry)],
+      [FFTWaveGenerator, getFFTWaveGeneratorClass(assetRegistry)],
       [ParticleSystem, getParticleNodeClass(assetRegistry)],
       [PunctualLight, getPunctualLightClass(assetRegistry)],
       [DirectionalLight, getDirectionalLightClass(assetRegistry)],

@@ -1,4 +1,4 @@
-import { degree2radian, radian2degree } from '@zephyr3d/base';
+import { degree2radian, radian2degree, Vector2 } from '@zephyr3d/base';
 import { SceneNode } from '../../../scene';
 import { Water } from '../../../scene/water';
 import type { AssetRegistry } from '../asset/asset';
@@ -6,7 +6,8 @@ import type { PropertyAccessor, SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import { getGraphNodeClass } from './node';
 import type { WaveGenerator } from '../../../render';
-import { GerstnerWaveGenerator } from '../../../render';
+import { FFTWaveGenerator, GerstnerWaveGenerator } from '../../../render';
+import { Texture2D } from '@zephyr3d/device';
 
 export class GerstnerWaveCls {
   public generator: GerstnerWaveGenerator;
@@ -132,6 +133,110 @@ export function getGerstnerWaveClass(assetRegistry): SerializableClass {
   };
 }
 
+export function getFFTWaveGeneratorClass(assetRegistry: AssetRegistry): SerializableClass {
+  return {
+    ctor: FFTWaveGenerator,
+    className: 'FFTWaveGenerator',
+    getProps(val: FFTWaveGenerator) {
+      return [
+        {
+          name: 'Alignment',
+          type: 'float',
+          options: { minValue: 0, maxValue: 1 },
+          get(this: FFTWaveGenerator, value) {
+            value.num[0] = this.alignment;
+          },
+          set(this: FFTWaveGenerator, value) {
+            this.alignment = value.num[0];
+          }
+        },
+        {
+          name: 'Wind',
+          type: 'vec2',
+          get(this: FFTWaveGenerator, value) {
+            value.num[0] = this.wind.x;
+            value.num[1] = this.wind.y;
+          },
+          set(this: FFTWaveGenerator, value) {
+            this.wind = new Vector2(value.num[0], value.num[1]);
+          }
+        },
+        {
+          name: 'FoamWidth',
+          type: 'float',
+          default: 1.2,
+          options: { minValue: 0, maxValue: 10 },
+          get(this: FFTWaveGenerator, value) {
+            value.num[0] = this.foamWidth;
+          },
+          set(this: FFTWaveGenerator, value) {
+            this.foamWidth = value.num[0];
+          }
+        },
+        {
+          name: 'FoamContrast',
+          type: 'float',
+          default: 7.2,
+          options: { minValue: 0, maxValue: 10 },
+          get(this: FFTWaveGenerator, value) {
+            value.num[0] = this.foamContrast;
+          },
+          set(this: FFTWaveGenerator, value) {
+            this.foamContrast = value.num[0];
+          }
+        },
+        {
+          name: 'WaveLengthCascades',
+          type: 'vec3',
+          default: [400, 100, 15],
+          options: { minValue: 0, maxValue: 1000 },
+          get(this: FFTWaveGenerator, value) {
+            value.num[0] = this.getWaveLength(0);
+            value.num[1] = this.getWaveLength(1);
+            value.num[2] = this.getWaveLength(2);
+          },
+          set(this: FFTWaveGenerator, value) {
+            this.setWaveLength(0, value.num[0]);
+            this.setWaveLength(1, value.num[1]);
+            this.setWaveLength(2, value.num[2]);
+          }
+        },
+        {
+          name: 'WaveStrengthCascades',
+          type: 'vec3',
+          default: [0.4, 0.4, 0.2],
+          options: { minValue: 0, maxValue: 1 },
+          get(this: FFTWaveGenerator, value) {
+            value.num[0] = this.getWaveStrength(0);
+            value.num[1] = this.getWaveStrength(1);
+            value.num[2] = this.getWaveStrength(2);
+          },
+          set(this: FFTWaveGenerator, value) {
+            this.setWaveStrength(0, value.num[0]);
+            this.setWaveStrength(1, value.num[1]);
+            this.setWaveStrength(2, value.num[2]);
+          }
+        },
+        {
+          name: 'WaveCroppinessCascades',
+          type: 'vec3',
+          default: [-1.5, -1.2, -0.5],
+          options: { minValue: -4, maxValue: 0 },
+          get(this: FFTWaveGenerator, value) {
+            value.num[0] = this.getWaveCroppiness(0);
+            value.num[1] = this.getWaveCroppiness(1);
+            value.num[2] = this.getWaveCroppiness(2);
+          },
+          set(this: FFTWaveGenerator, value) {
+            this.setWaveCroppiness(0, value.num[0]);
+            this.setWaveCroppiness(1, value.num[1]);
+            this.setWaveCroppiness(2, value.num[2]);
+          }
+        }
+      ];
+    }
+  };
+}
 export function getGerstnerWaveGeneratorClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: GerstnerWaveGenerator,
@@ -189,7 +294,8 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'WaveGenerator',
           type: 'object',
           default: null,
-          objectTypes: [GerstnerWaveGenerator],
+          nullable: true,
+          objectTypes: [GerstnerWaveGenerator, FFTWaveGenerator],
           get(this: Water, value) {
             value.object[0] = this.waveGenerator ?? null;
           },
@@ -198,6 +304,122 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
               this.waveGenerator = null;
             } else {
               this.waveGenerator = value.object[0] as WaveGenerator;
+            }
+          }
+        },
+        {
+          name: 'GridScale',
+          type: 'float',
+          default: 1,
+          options: { minValue: 0, maxValue: 1 },
+          get(this: Water, value) {
+            value.num[0] = this.gridScale;
+          },
+          set(this: Water, value) {
+            this.gridScale = value.num[0];
+          }
+        },
+        {
+          name: 'DepthScale',
+          type: 'float',
+          default: 10,
+          options: { minValue: 0, maxValue: 100 },
+          get(this: Water, value) {
+            value.num[0] = this.material.depthMulti;
+          },
+          set(this: Water, value) {
+            this.material.depthMulti = value.num[0];
+          }
+        },
+        {
+          name: 'RefractionStrength',
+          type: 'float',
+          default: 0,
+          options: { minValue: 0, maxValue: 1 },
+          get(this: Water, value) {
+            value.num[0] = this.material.refractionStrength;
+          },
+          set(this: Water, value) {
+            this.material.refractionStrength = value.num[0];
+          }
+        },
+        {
+          name: 'Displace',
+          type: 'float',
+          default: 16,
+          options: { minValue: 1, maxValue: 256 },
+          get(this: Water, value) {
+            value.num[0] = this.material.displace;
+          },
+          set(this: Water, value) {
+            this.material.displace = value.num[0];
+          }
+        },
+        {
+          name: 'ScatterRampTexture',
+          type: 'object',
+          nullable: true,
+          default: null,
+          get(this: Water, value) {
+            value.str[0] = assetRegistry.getAssetId(this.material.scatterRampTexture) ?? '';
+          },
+          async set(value) {
+            if (!value) {
+              this.material.scatterRampTexture = null;
+            } else {
+              if (value.str[0]) {
+                const assetId = value.str[0];
+                const assetInfo = assetRegistry.getAssetInfo(assetId);
+                if (assetInfo && assetInfo.type === 'texture') {
+                  let tex: Texture2D;
+                  try {
+                    tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
+                  } catch (err) {
+                    console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                    tex = null;
+                  }
+                  if (tex?.isTexture2D()) {
+                    tex.name = assetInfo.name;
+                    this.material.scatterRampTexture = tex;
+                  } else {
+                    console.error('Invalid texture type');
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          name: 'AbsorptionRampTexture',
+          type: 'object',
+          nullable: true,
+          default: null,
+          get(this: Water, value) {
+            value.str[0] = assetRegistry.getAssetId(this.material.absorptionRampTexture) ?? '';
+          },
+          async set(this: Water, value) {
+            if (!value) {
+              this.material.absorptionRampTexture = null;
+            } else {
+              if (value.str[0]) {
+                const assetId = value.str[0];
+                const assetInfo = assetRegistry.getAssetInfo(assetId);
+                if (assetInfo && assetInfo.type === 'texture') {
+                  let tex: Texture2D;
+                  try {
+                    tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
+                  } catch (err) {
+                    console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                    tex = null;
+                  }
+                  if (tex?.isTexture2D()) {
+                    tex.name = assetInfo.name;
+                    this.material.absorptionRampTexture = tex;
+                  } else {
+                    console.error('Invalid texture type');
+                  }
+                }
+              }
             }
           }
         }
