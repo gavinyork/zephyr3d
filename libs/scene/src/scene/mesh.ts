@@ -309,7 +309,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     const material = this.material;
     const primitive = this.primitive;
     if (material && primitive) {
-      if (this._useRenderBundle && !ctx.instanceData) {
+      if (this._useRenderBundle && !ctx.instanceData && hash) {
         if (
           this._primitiveChangeTag !== primitive.changeTag ||
           this._materialChangeTag !== material.changeTag

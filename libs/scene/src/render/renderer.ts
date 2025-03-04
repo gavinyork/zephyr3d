@@ -291,7 +291,7 @@ export class SceneRenderer {
 
     // Render scene depth first
     const depthFramebuffer = this.renderSceneDepth(ctx, renderQueue, null);
-
+    console.log(depthFramebuffer);
     if (ctx.depthTexture === ctx.finalFramebuffer?.getDepthAttachment()) {
       ctx.intermediateFramebuffer = ctx.finalFramebuffer;
     } else {
@@ -354,9 +354,6 @@ export class SceneRenderer {
     }
     this._scenePass.render(ctx, null, renderQueue);
     ctx.compositor?.end(ctx);
-    if (renderQueue.needSceneColor()) {
-      this.renderSceneDepth(ctx, renderQueue, depthFramebuffer);
-    }
     renderQueue.dispose();
     ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
 

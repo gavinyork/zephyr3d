@@ -394,7 +394,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             this.lightDir,
             this.eyeVecNorm,
             this.normal,
-            pb.mul(colorIntensity.rgb, colorIntensity.a)
+            pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten)
           );
           if (shadow) {
             this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, this.NoL));
