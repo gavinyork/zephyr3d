@@ -94,7 +94,6 @@ class PropertyGroup {
         prop?.objectTypes?.length > 0
           ? prop.objectTypes.map((ctor) => this.grid.serailizationInfo.get(ctor)) ?? []
           : [];
-      //this.objectTypes = objTypes ?? [];
       this.properties = new Map();
       this.subgroups = [];
       if (this.value.object[0]) {
@@ -258,23 +257,18 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     const resizeBarWidth = 4;
     const availableHeight = ImGui.GetContentRegionAvail().y;
 
-    // 保存当前的样式
     ImGui.PushStyleColor(ImGui.Col.Button, ImGui.GetColorU32(ImGui.Col.ScrollbarGrab));
     ImGui.PushStyleColor(ImGui.Col.ButtonHovered, ImGui.GetColorU32(ImGui.Col.ScrollbarGrabHovered));
     ImGui.PushStyleColor(ImGui.Col.ButtonActive, ImGui.GetColorU32(ImGui.Col.ScrollbarGrabActive));
 
-    // 移除按钮的内边距
     ImGui.PushStyleVar(ImGui.StyleVar.FramePadding, new ImGui.ImVec2(0, 0));
 
-    // 设置位置并创建按钮
     ImGui.SetCursorPos(initialCursorPos);
     ImGui.Button('##resize', new ImGui.ImVec2(resizeBarWidth, availableHeight));
 
-    // 恢复样式
     ImGui.PopStyleVar();
     ImGui.PopStyleColor(3);
 
-    // 处理拖动逻辑
     if (ImGui.IsItemActive()) {
       const mouseDelta = ImGui.GetIO().MouseDelta.x;
       this._width = Math.max(Math.min(this._width - mouseDelta, this._maxWidth), this._minWidth);
@@ -366,7 +360,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       ImGui.Unindent(level * 10);
     }
     ImGui.TableNextColumn();
-    ImGui.SetNextItemWidth(-1); // 使用剩余所有宽度
+    ImGui.SetNextItemWidth(-1);
     const readonly = !value.set;
     let changed = false;
     const tmpProperty: PropertyValue = {
