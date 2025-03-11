@@ -212,7 +212,7 @@ export function temporalResolve(
     this.$l.velocity = this.velocitySample.xy;
     this.$l.sampleColor = pb.textureSampleLevel(currentColorTex, this.screenUV, 0).rgb;
     this.$if(
-      pb.and(pb.greaterThanEqual(this.velocity.x, 5e4), pb.greaterThanEqual(this.velocity.y, 6e4)),
+      pb.and(pb.greaterThanEqual(this.velocity.x, 5e4), pb.greaterThanEqual(this.velocity.y, 5e4)),
       function () {
         this.$return(pb.vec3(1, 0, 0));
       }

@@ -183,12 +183,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     const pb = scope.$builder;
     this.waveGenerator?.setupUniforms(scope, 2);
     scope.region = pb.vec4().uniform(2);
-    scope.displace = pb.float().uniform(2);
-    scope.depthMulti = pb.float().uniform(2);
-    scope.refractionStrength = pb.float().uniform(2);
-    scope.ssrParams = pb.vec4().uniform(2);
-    scope.scatterRampTex = pb.tex2D().uniform(2);
-    scope.absorptionRampTex = pb.tex2D().uniform(2);
+    if (this.needFragmentColor()) {
+      scope.displace = pb.float().uniform(2);
+      scope.depthMulti = pb.float().uniform(2);
+      scope.refractionStrength = pb.float().uniform(2);
+      scope.ssrParams = pb.vec4().uniform(2);
+      scope.scatterRampTex = pb.tex2D().uniform(2);
+      scope.absorptionRampTex = pb.tex2D().uniform(2);
+    }
     scope.$l.discardable = pb.or(
       pb.any(pb.lessThan(scope.$inputs.worldPos.xz, scope.region.xy)),
       pb.any(pb.greaterThan(scope.$inputs.worldPos.xz, scope.region.zw))
@@ -416,20 +418,22 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     super.applyUniformValues(bindGroup, ctx, pass);
     bindGroup.setValue('clipmapMatrix', this._clipmapMatrix);
     bindGroup.setValue('region', this._region);
-    bindGroup.setValue('displace', this._displace / ctx.renderWidth);
-    bindGroup.setValue('depthMulti', this._depthMulti);
-    bindGroup.setValue('refractionStrength', this._refractionStrength);
-    bindGroup.setValue('ssrParams', this._ssrParams);
-    bindGroup.setTexture(
-      'scatterRampTex',
-      this._getScatterRampTexture(ctx.device),
-      fetchSampler('clamp_linear_nomip')
-    );
-    bindGroup.setTexture(
-      'absorptionRampTex',
-      this._getAbsorptionRampTexture(ctx.device),
-      fetchSampler('clamp_linear_nomip')
-    );
+    if (this.needFragmentColor(ctx)) {
+      bindGroup.setValue('displace', this._displace / ctx.renderWidth);
+      bindGroup.setValue('depthMulti', this._depthMulti);
+      bindGroup.setValue('refractionStrength', this._refractionStrength);
+      bindGroup.setValue('ssrParams', this._ssrParams);
+      bindGroup.setTexture(
+        'scatterRampTex',
+        this._getScatterRampTexture(ctx.device),
+        fetchSampler('clamp_linear_nomip')
+      );
+      bindGroup.setTexture(
+        'absorptionRampTex',
+        this._getAbsorptionRampTexture(ctx.device),
+        fetchSampler('clamp_linear_nomip')
+      );
+    }
     if (this.waveGenerator) {
       this.waveGenerator.applyWaterBindGroup(bindGroup);
     }

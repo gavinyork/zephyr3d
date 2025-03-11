@@ -353,6 +353,9 @@ export class SceneRenderer {
       ctx.compositor = compositor;
     }
     this._scenePass.render(ctx, null, renderQueue);
+    if (renderQueue.needSceneColor()) {
+      this.renderSceneDepth(ctx, renderQueue, depthFramebuffer);
+    }
     ctx.compositor?.end(ctx);
     renderQueue.dispose();
     ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
