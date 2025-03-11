@@ -203,8 +203,12 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         userData: this,
         calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
           const p = that.worldMatrix.transformPointAffine(Vector3.zero());
-          outAABB.minPoint.setXYZ(minX, p.y, minZ);
-          outAABB.maxPoint.setXYZ(maxX, p.y + 1, maxZ);
+          if (that.waveGenerator) {
+            that.waveGenerator.calcClipmapTileAABB(minX, maxX, minZ, maxZ, p.y, outAABB);
+          } else {
+            outAABB.minPoint.setXYZ(minX, p.y, minZ);
+            outAABB.maxPoint.setXYZ(maxX, p.y + 1, maxZ);
+          }
         },
         drawPrimitive(prim, modelMatrix, offset, scale, gridScale) {
           const clipmapMatrix = new Matrix4x4(modelMatrix)
