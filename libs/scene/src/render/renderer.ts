@@ -10,6 +10,7 @@ import type { DrawContext } from './drawable';
 import type { RenderQueue } from './render_queue';
 import type { PunctualLight, Scene } from '../scene';
 import type { PerspectiveCamera, Camera } from '../camera';
+import { PostEffectLayer } from '../posteffect/posteffect';
 import type { Compositor } from '../posteffect';
 import { ClusteredLight } from './cluster_light';
 import { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
@@ -356,6 +357,7 @@ export class SceneRenderer {
     if (renderQueue.needSceneColor()) {
       this.renderSceneDepth(ctx, renderQueue, depthFramebuffer);
     }
+    ctx.compositor?.drawPostEffects(ctx, PostEffectLayer.end, ctx.linearDepthTexture);
     ctx.compositor?.end(ctx);
     renderQueue.dispose();
     ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;

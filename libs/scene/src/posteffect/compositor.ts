@@ -9,7 +9,7 @@ import type {
   Texture2D,
   VertexLayout
 } from '@zephyr3d/device';
-import type { AbstractPostEffect } from './posteffect';
+import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import { MaterialVaryingFlags } from '../values';
 import { fetchSampler } from '../utility/misc';
 
@@ -28,9 +28,7 @@ export interface CompositorContext {
  */
 export class Compositor {
   /** @internal */
-  protected _postEffectsOpaque: AbstractPostEffect<any>[];
-  /** @internal */
-  protected _postEffectsTransparency: AbstractPostEffect<any>[];
+  protected _postEffects: AbstractPostEffect<any>[][];
   /** @internal */
   private _finalFramebuffer: FrameBuffer;
   /** @internal */
@@ -49,22 +47,21 @@ export class Compositor {
    * Creates an instance of Compositor
    */
   constructor() {
-    this._postEffectsOpaque = [];
-    this._postEffectsTransparency = [];
+    this._postEffects = [];
+    this._postEffects[PostEffectLayer.opaque] = [];
+    this._postEffects[PostEffectLayer.transparent] = [];
+    this._postEffects[PostEffectLayer.end] = [];
     this._finalFramebuffer = null;
     this._prevInputTexture = null;
     this._prevFrameBuffer = null;
   }
   /** @internal */
   requireLinearDepth(ctx: DrawContext): boolean {
-    for (const postEffect of this._postEffectsOpaque) {
-      if (postEffect.requireLinearDepthTexture(ctx)) {
-        return true;
-      }
-    }
-    for (const postEffect of this._postEffectsTransparency) {
-      if (postEffect.requireLinearDepthTexture(ctx)) {
-        return true;
+    for (const list of this._postEffects) {
+      for (const postEffect of list) {
+        if (postEffect.requireLinearDepthTexture(ctx)) {
+          return true;
+        }
       }
     }
     return false;
@@ -77,15 +74,13 @@ export class Compositor {
    */
   appendPostEffect(postEffect: AbstractPostEffect<any>): void {
     if (postEffect) {
-      if (
-        this._postEffectsOpaque.indexOf(postEffect) >= 0 ||
-        this._postEffectsTransparency.indexOf(postEffect) >= 0
-      ) {
-        console.error(`Posteffect cannot be added to same compositor multiple times`);
-        return;
+      for (const list of this._postEffects) {
+        if (list.indexOf(postEffect) >= 0) {
+          console.error(`Posteffect cannot be added to same compositor multiple times`);
+          return;
+        }
       }
-      const postEffects = postEffect.opaque ? this._postEffectsOpaque : this._postEffectsTransparency;
-      postEffects.push(postEffect);
+      this._postEffects[postEffect.layer].push(postEffect);
     }
   }
   /**
@@ -94,7 +89,7 @@ export class Compositor {
    * @param postEffect - The posteffect to be remove.
    */
   removePostEffect(postEffect: AbstractPostEffect<any>): void {
-    for (const list of [this._postEffectsOpaque, this._postEffectsTransparency]) {
+    for (const list of this._postEffects) {
       const index = list.indexOf(postEffect);
       if (index >= 0) {
         list.splice(index, 1);
@@ -106,21 +101,16 @@ export class Compositor {
    * Removes all post effects
    */
   clear(): void {
-    this._postEffectsOpaque = [];
-    this._postEffectsTransparency = [];
-  }
-  /**
-   * Gets all post effects
-   */
-  getPostEffects(): AbstractPostEffect<any>[] {
-    return [...this._postEffectsOpaque, ...this._postEffectsTransparency];
+    for (const list of this._postEffects) {
+      list.splice(0, list.length);
+    }
   }
   /** @internal */
   begin(ctx: DrawContext) {
     const device = ctx.device;
     this._finalFramebuffer = device.getFramebuffer();
     const ssr = !!(ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS);
-    if (this._postEffectsOpaque.length === 0 && this._postEffectsTransparency.length === 0) {
+    if (!this._postEffects.every((list) => list.length === 0)) {
       return;
     }
     const format = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
@@ -138,8 +128,8 @@ export class Compositor {
     device.setFramebuffer(tmpFramebuffer);
   }
   /** @internal */
-  drawPostEffects(ctx: DrawContext, opaque: boolean, sceneDepthTexture: Texture2D) {
-    const postEffects = opaque ? this._postEffectsOpaque : this._postEffectsTransparency;
+  drawPostEffects(ctx: DrawContext, layer: PostEffectLayer, sceneDepthTexture: Texture2D) {
+    const postEffects = this._postEffects[layer];
     if (postEffects.length > 0) {
       const device = ctx.device;
       const inputFramebuffer = device.getFramebuffer();
@@ -154,7 +144,7 @@ export class Compositor {
           device.pool.releaseFrameBuffer(this._prevFrameBuffer);
           this._prevFrameBuffer = null;
         }
-        const isLast = this.isLastPostEffect(opaque, i);
+        const isLast = this.isLastPostEffect(layer, i);
         const finalEffect = isLast && (!postEffect.requireDepthAttachment(ctx) || !!this._finalFramebuffer);
         if (finalEffect) {
           device.setFramebuffer(this._finalFramebuffer);
@@ -202,35 +192,16 @@ export class Compositor {
     }
   }
   /** @internal */
-  private isLastPostEffect(opaque: boolean, index: number) {
-    const list = opaque ? this._postEffectsOpaque : this._postEffectsTransparency;
-    for (let i = index; i < list.length; i++) {
-      if (list[i].enabled) {
-        return false;
-      }
-    }
-    if (opaque) {
-      for (let i = 0; i < this._postEffectsTransparency.length; i++) {
-        if (this._postEffectsTransparency[i].enabled) {
+  private isLastPostEffect(layer: PostEffectLayer, index: number) {
+    for (let i = layer; i < this._postEffects.length; i++) {
+      const start = i === layer ? index + 1 : 0;
+      for (let j = start; j < this._postEffects[i].length; j++) {
+        if (this._postEffects[i][j].enabled) {
           return false;
         }
       }
     }
     return true;
-  }
-  /** @internal */
-  needDrawPostEffects(): boolean {
-    for (let i = 0; i < this._postEffectsOpaque.length; i++) {
-      if (this._postEffectsOpaque[i].enabled) {
-        return true;
-      }
-    }
-    for (let i = 0; i < this._postEffectsTransparency.length; i++) {
-      if (this._postEffectsTransparency[i].enabled) {
-        return true;
-      }
-    }
-    return false;
   }
   /** @internal */
   static _blit(device: AbstractDevice, srcTex: Texture2D, srgbOutput: boolean) {

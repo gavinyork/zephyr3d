@@ -9,7 +9,7 @@ import type {
 } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { WaterMesh } from '../render';
-import { AbstractPostEffect } from './posteffect';
+import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import { WaterShaderImpl } from '../shaders';
 import { linearToGamma } from '../shaders';
 import { Interpolator, Matrix4x4, Plane, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
@@ -51,7 +51,7 @@ export class PostWater extends AbstractPostEffect<'PostWater'> {
     super();
     this._reflectSize = 512;
     this._antiReflectanceLeak = 0.5;
-    this._opaque = true;
+    this._layer = PostEffectLayer.opaque;
     this._displace = 16;
     this._depthMulti = 0.1;
     this._refractionStrength = 0;

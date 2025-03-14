@@ -1,5 +1,5 @@
 import { Vector2 } from '@zephyr3d/base';
-import { AbstractPostEffect } from './posteffect';
+import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import type { AbstractDevice, BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
@@ -12,22 +12,15 @@ import { fetchSampler } from '../utility/misc';
 export class FXAA extends AbstractPostEffect<'FXAA'> {
   static readonly className = 'FXAA' as const;
   private static _program: GPUProgram = null;
-  private _bindgroup: BindGroup;
+  private static _bindgroup: BindGroup = null;
   private _invTexSize: Vector2;
   /**
    * Creates an instance of grayscale post effect
    */
   constructor() {
     super();
-    this._opaque = false;
-    this._bindgroup = null;
+    this._layer = PostEffectLayer.transparent;
     this._invTexSize = new Vector2();
-  }
-  /** {@inheritDoc AbstractPostEffect.dispose} */
-  dispose() {
-    super.dispose();
-    this._bindgroup?.dispose();
-    this._bindgroup = null;
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
   requireLinearDepthTexture(): boolean {
@@ -42,12 +35,12 @@ export class FXAA extends AbstractPostEffect<'FXAA'> {
     const device = ctx.device;
     this._prepare(device);
     this._invTexSize.setXY(1 / inputColorTexture.width, 1 / inputColorTexture.height);
-    this._bindgroup.setTexture('srcTex', inputColorTexture, fetchSampler('clamp_linear_nomip'));
-    this._bindgroup.setValue('flip', this.needFlip(device) ? 1 : 0);
-    this._bindgroup.setValue('srgbOut', srgbOutput ? 1 : 0);
-    this._bindgroup.setValue('invTexSize', this._invTexSize);
+    FXAA._bindgroup.setTexture('srcTex', inputColorTexture, fetchSampler('clamp_linear_nomip'));
+    FXAA._bindgroup.setValue('flip', this.needFlip(device) ? 1 : 0);
+    FXAA._bindgroup.setValue('srgbOut', srgbOutput ? 1 : 0);
+    FXAA._bindgroup.setValue('invTexSize', this._invTexSize);
     device.setProgram(FXAA._program);
-    device.setBindGroup(0, this._bindgroup);
+    device.setBindGroup(0, FXAA._bindgroup);
     this.drawFullscreenQuad();
   }
   /** @internal */
@@ -311,9 +304,7 @@ export class FXAA extends AbstractPostEffect<'FXAA'> {
           });
         }
       });
-    }
-    if (!this._bindgroup) {
-      this._bindgroup = device.createBindGroup(FXAA._program.bindGroupLayouts[0]);
+      FXAA._bindgroup = device.createBindGroup(FXAA._program.bindGroupLayouts[0]);
     }
   }
 }

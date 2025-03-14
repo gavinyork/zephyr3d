@@ -5,7 +5,6 @@ import type {
   Scene,
   EnvLightType,
   ShadowMode,
-  Compositor,
   AbstractPostEffect,
   Camera
 } from '@zephyr3d/scene';
@@ -34,7 +33,6 @@ import { MenubarView } from './views/menubar';
 
 export class Inspector {
   private _scene: Scene;
-  private _compositor: Compositor;
   private _logs: string[];
   private _inspectLights: boolean;
   private _inspectScene: boolean;
@@ -70,10 +68,9 @@ export class Inspector {
   private _sceneHierarchy: SceneHierarchy;
   private _propertyEditor: PropertyEditor;
   private _menubar: MenubarView;
-  constructor(scene: Scene, compositor: Compositor, camera?: Camera) {
+  constructor(scene: Scene, camera?: Camera) {
     this._scene = scene;
     this._sceneHierarchy = new SceneHierarchy(scene);
-    this._compositor = compositor;
     this._camera = camera;
     this._logs = [];
     this._inspectLights = false;
@@ -329,75 +326,6 @@ export class Inspector {
   }
   private renderMenuBar() {
     this._menubar.render();
-    return;
-    if (ImGui.BeginMainMenuBar()) {
-      if (ImGui.BeginMenu('Edit##scene')) {
-        if (ImGui.BeginMenu('Add##sceneobject')) {
-          if (ImGui.MenuItem('Box')) {
-            alert('Create box');
-          }
-          if (ImGui.MenuItem('Sphere')) {
-            alert('Create sphere');
-          }
-          if (ImGui.MenuItem('Plane')) {
-            alert('Create plane');
-          }
-          if (ImGui.MenuItem('Cylinder')) {
-            alert('Create cylinder');
-          }
-          ImGui.EndMenu();
-        }
-        ImGui.EndMenu();
-      }
-      if (ImGui.BeginMenu('Inspector')) {
-        ImGui.MenuItem('Scene', null, (val?: boolean) => {
-          return (this._inspectScene = val ?? this._inspectScene);
-        });
-        if (this._camera) {
-          ImGui.MenuItem('Camera', null, (val?: boolean) => {
-            return (this._inspectCamera = val ?? this._inspectCamera);
-          });
-        }
-        ImGui.MenuItem('Lights', null, (val?: boolean) => {
-          return (this._inspectLights = val ?? this._inspectLights);
-        });
-        ImGui.MenuItem('Textures', null, (val?: boolean) => {
-          return (this._inspectTextures = val ?? this._inspectTextures);
-        });
-        ImGui.MenuItem('Sky&Fog', null, (val?: boolean) => {
-          return (this._inspectSky = val ?? this._inspectSky);
-        });
-        ImGui.MenuItem('Show logs', null, (val?: boolean) => {
-          return (this._showLogs = val ?? this._showLogs);
-        });
-        ImGui.EndMenu();
-      }
-      if (this._compositor) {
-        const postEffects = this._compositor.getPostEffects();
-        this._renderPostEffects.forEach((val) => {
-          if (postEffects.indexOf(val) < 0) {
-            this._renderPostEffects.delete(val);
-          }
-        });
-        if (postEffects.length > 0 && ImGui.BeginMenu('Compositor')) {
-          for (const eff of postEffects) {
-            const name = eff.getClassName();
-            ImGui.MenuItem(name, null, (val?: boolean) => {
-              if (val === undefined || val === null) {
-                val = this._renderPostEffects.has(eff);
-              } else if (val) {
-                this._renderPostEffects.add(eff);
-              } else {
-                this._renderPostEffects.delete(eff);
-              }
-              return val;
-            });
-          }
-          ImGui.EndMenu();
-        }
-      }
-      ImGui.EndMainMenuBar();
-    }
   }
   private renderPostEffects() {
     for (const eff of this._renderPostEffects) {

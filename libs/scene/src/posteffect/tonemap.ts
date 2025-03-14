@@ -1,4 +1,4 @@
-import { AbstractPostEffect } from './posteffect';
+import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import type { AbstractDevice, BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
@@ -11,15 +11,14 @@ import { fetchSampler } from '../utility/misc';
 export class Tonemap extends AbstractPostEffect<'Tonemap'> {
   static readonly className = 'Tonemap' as const;
   private static _programTonemap: GPUProgram = null;
-  private _bindgroupTonemap: BindGroup;
+  private static _bindgroupTonemap: BindGroup = null;
   private _exposure: number;
   /**
    * Creates an instance of tonemap post effect
    */
   constructor() {
     super();
-    this._bindgroupTonemap = null;
-    this._opaque = false;
+    this._layer = PostEffectLayer.transparent;
     this._exposure = 1;
   }
   /** Exposure value */
@@ -45,12 +44,12 @@ export class Tonemap extends AbstractPostEffect<'Tonemap'> {
   }
   /** @internal */
   private _tonemap(device: AbstractDevice, inputColorTexture: Texture2D, sRGBOutput: boolean) {
-    this._bindgroupTonemap.setValue('srgbOut', sRGBOutput ? 1 : 0);
-    this._bindgroupTonemap.setValue('exposure', this._exposure);
-    this._bindgroupTonemap.setValue('flip', this.needFlip(device) ? 1 : 0);
-    this._bindgroupTonemap.setTexture('tex', inputColorTexture, fetchSampler('clamp_nearest_nomip'));
+    Tonemap._bindgroupTonemap.setValue('srgbOut', sRGBOutput ? 1 : 0);
+    Tonemap._bindgroupTonemap.setValue('exposure', this._exposure);
+    Tonemap._bindgroupTonemap.setValue('flip', this.needFlip(device) ? 1 : 0);
+    Tonemap._bindgroupTonemap.setTexture('tex', inputColorTexture, fetchSampler('clamp_nearest_nomip'));
     device.setProgram(Tonemap._programTonemap);
-    device.setBindGroup(0, this._bindgroupTonemap);
+    device.setBindGroup(0, Tonemap._bindgroupTonemap);
     this.drawFullscreenQuad();
   }
   /** @internal */
@@ -118,15 +117,7 @@ export class Tonemap extends AbstractPostEffect<'Tonemap'> {
           });
         }
       });
+      Tonemap._bindgroupTonemap = device.createBindGroup(Tonemap._programTonemap.bindGroupLayouts[0]);
     }
-    if (!this._bindgroupTonemap) {
-      this._bindgroupTonemap = device.createBindGroup(Tonemap._programTonemap.bindGroupLayouts[0]);
-    }
-  }
-  /** {@inheritDoc AbstractPostEffect.dispose} */
-  dispose(): void {
-    super.dispose();
-    this._bindgroupTonemap?.dispose();
-    this._bindgroupTonemap = null;
   }
 }

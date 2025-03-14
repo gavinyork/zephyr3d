@@ -86,7 +86,7 @@ myApp.ready().then(async function () {
   myApp.inputManager.use(imGuiInjectEvent);
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
-  const inspector = new Inspector(scene, null, camera);
+  const inspector = new Inspector(scene, camera);
 
   myApp.on('pointerup', (ev) => {
     if (ev.button === 2) {

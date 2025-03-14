@@ -214,7 +214,7 @@ export function temporalResolve(
     this.$if(
       pb.and(pb.greaterThanEqual(this.velocity.x, 5e4), pb.greaterThanEqual(this.velocity.y, 5e4)),
       function () {
-        this.$return(pb.vec3(1, 0, 0));
+        this.$return(this.sampleColor);
       }
     );
     this.$l.reprojectedUV = pb.sub(this.screenUV, pb.mul(this.velocity, pb.vec2(1, 1)));

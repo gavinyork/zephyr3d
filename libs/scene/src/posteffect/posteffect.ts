@@ -3,6 +3,12 @@ import type { DrawContext } from '../render';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { copyTexture, fetchSampler } from '../utility/misc';
 
+export enum PostEffectLayer {
+  opaque = 0,
+  transparent = 1,
+  end = 2
+}
+
 /**
  * Base class for any type of post effect
  * @public
@@ -11,20 +17,16 @@ export class AbstractPostEffect<ClassName extends string> {
   static readonly className: string;
   private static _defaultRenderStates: { CompareFunc?: RenderStateSet } = {};
   protected _outputTexture: Texture2D;
-  protected _quadVertexLayout: VertexLayout;
-  protected _quadRenderStateSet: RenderStateSet;
   protected _enabled: boolean;
-  protected _opaque: boolean;
+  protected _layer: PostEffectLayer;
   /**
    * Creates an instance of a post effect
    * @param name - Name of the post effect
    */
   constructor() {
     this._outputTexture = null;
-    this._quadVertexLayout = null;
-    this._quadRenderStateSet = null;
     this._enabled = true;
-    this._opaque = false;
+    this._layer = PostEffectLayer.end;
   }
   /** Gets class name of this instance */
   getClassName(): ClassName {
@@ -38,8 +40,8 @@ export class AbstractPostEffect<ClassName extends string> {
     this._enabled = !!val;
   }
   /** Whether this post effect will be rendered at opaque phase */
-  get opaque(): boolean {
-    return this._opaque;
+  get layer(): PostEffectLayer {
+    return this._layer;
   }
   /**
    * Check if the post effect should be rendered upside down.
@@ -103,33 +105,11 @@ export class AbstractPostEffect<ClassName extends string> {
     );
   }
   /**
-   * Disposes the post effect.
-   */
-  dispose() {
-    this._quadVertexLayout?.dispose();
-    this._quadVertexLayout = null;
-    this._quadRenderStateSet = null;
-  }
-  /**
    * Draws a fullscreen quad
    * @param renderStateSet - Render states that will be used when drawing the fullscreen quad.
    */
   protected drawFullscreenQuad(renderStateSet?: RenderStateSet) {
     drawFullscreenQuad(renderStateSet);
-    /*
-    const device = Application.instance.device;
-    if (!this._quadVertexLayout) {
-      this._quadVertexLayout = this.createVertexLayout(device);
-    }
-    if (!this._quadRenderStateSet) {
-      this._quadRenderStateSet = this.createRenderStates(device);
-    }
-    const lastRenderState = device.getRenderStates();
-    device.setVertexLayout(this._quadVertexLayout);
-    device.setRenderStates(renderStateSet ?? this._quadRenderStateSet);
-    device.draw('triangle-strip', 0, 4);
-    device.setRenderStates(lastRenderState);
-    */
   }
   /** @internal */
   protected createVertexLayout(device: AbstractDevice): VertexLayout {

@@ -71,7 +71,7 @@ ssrApp.ready().then(async () => {
   const compositor = new Compositor();
   compositor.appendPostEffect(new Tonemap());
 
-  const inspector = new Inspector(scene, compositor, camera);
+  const inspector = new Inspector(scene, camera);
 
   ssrApp.inputManager.use(inspector.handleEvent.bind(inspector));
   ssrApp.inputManager.use(camera.handleEvent.bind(camera));

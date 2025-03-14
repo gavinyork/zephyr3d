@@ -5,6 +5,7 @@ import type { RenderItemListBundle, RenderQueue } from './render_queue';
 import type { PunctualLight } from '../scene/light';
 import type { DrawContext } from './drawable';
 import { ShaderHelper } from '../material/shader/helper';
+import { PostEffectLayer } from '../posteffect/posteffect';
 
 /**
  * Forward render pass
@@ -192,7 +193,11 @@ export class LightPass extends RenderPass {
             ctx.device.popDeviceStates();
           }
         }
-        ctx.compositor?.drawPostEffects(ctx, i === 0, ctx.linearDepthTexture);
+        ctx.compositor?.drawPostEffects(
+          ctx,
+          i === 0 ? PostEffectLayer.opaque : PostEffectLayer.transparent,
+          ctx.linearDepthTexture
+        );
       }
     }
     if (tmpFramebuffer) {

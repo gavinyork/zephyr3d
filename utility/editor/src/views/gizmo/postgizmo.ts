@@ -7,7 +7,7 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
-import { BoxShape, Mesh, DRef, UnlitMaterial } from '@zephyr3d/scene';
+import { BoxShape, Mesh, DRef, UnlitMaterial, PostEffectLayer } from '@zephyr3d/scene';
 import { AbstractPostEffect, Application, CopyBlitter, fetchSampler, PlaneShape } from '@zephyr3d/scene';
 import { createTranslationGizmo, createRotationGizmo, createScaleGizmo, createSelectGizmo } from './gizmo';
 import type { Ray } from '@zephyr3d/base';
@@ -123,6 +123,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
    */
   constructor(camera: Camera, binding = null, size = 10) {
     super();
+    this._layer = PostEffectLayer.transparent;
     this._primitives = null;
     this._camera = camera;
     this._node = binding;

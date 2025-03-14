@@ -8,7 +8,7 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import { isFloatTextureFormat } from '@zephyr3d/device';
-import { AbstractPostEffect } from './posteffect';
+import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { BilateralBlurBlitter } from '../blitter/bilateralblur';
@@ -71,8 +71,8 @@ export class SAO extends AbstractPostEffect<'SAO'> {
   private static _programPacked: GPUProgram = null;
   private static _renderState: RenderStateSet = null;
   private static _renderStateBlend: RenderStateSet = null;
-  private _bindgroup: BindGroup;
-  private _bindgroupPacked: BindGroup;
+  private static _bindgroup: BindGroup = null;
+  private static _bindgroupPacked: BindGroup = null;
   private _saoScale: number;
   private _saoBias: number;
   private _saoIntensity: number;
@@ -88,10 +88,8 @@ export class SAO extends AbstractPostEffect<'SAO'> {
    */
   constructor() {
     super();
-    this._bindgroup = null;
-    this._bindgroupPacked = null;
     this._supported = true;
-    this._opaque = true;
+    this._layer = PostEffectLayer.opaque;
     this._saoScale = 10;
     this._saoBias = 1;
     this._saoIntensity = 0.025;
@@ -192,7 +190,7 @@ export class SAO extends AbstractPostEffect<'SAO'> {
     device.pushDeviceStates();
     device.setFramebuffer([fbao], depth);
     device.clearFrameBuffer(packed ? new Vector4(0, 0, 0, 1) : new Vector4(1, 0, 0, 1), null, null);
-    const bindgroup = packed ? this._bindgroupPacked : this._bindgroup;
+    const bindgroup = packed ? SAO._bindgroupPacked : SAO._bindgroup;
     bindgroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     bindgroup.setTexture('depthTex', sceneDepthTexture);
     bindgroup.setValue('scale', this._saoScale);
@@ -386,17 +384,9 @@ export class SAO extends AbstractPostEffect<'SAO'> {
       if (!SAO._program) {
         SAO._program = createProgram(false);
         SAO._programPacked = createProgram(true);
-      }
-      if (!this._bindgroup) {
-        this._bindgroup = device.createBindGroup(SAO._program.bindGroupLayouts[0]);
-        this._bindgroupPacked = device.createBindGroup(SAO._programPacked.bindGroupLayouts[0]);
+        SAO._bindgroup = device.createBindGroup(SAO._program.bindGroupLayouts[0]);
+        SAO._bindgroupPacked = device.createBindGroup(SAO._programPacked.bindGroupLayouts[0]);
       }
     }
-  }
-  /** {@inheritDoc AbstractPostEffect.dispose} */
-  dispose(): void {
-    super.dispose();
-    this._bindgroup?.dispose();
-    this._bindgroup = null;
   }
 }

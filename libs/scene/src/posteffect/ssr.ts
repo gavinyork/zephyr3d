@@ -1,4 +1,4 @@
-import { AbstractPostEffect } from './posteffect';
+import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import type { BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
@@ -36,7 +36,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
    */
   constructor() {
     super();
-    this._opaque = true;
+    this._layer = PostEffectLayer.opaque;
     this._bindgroups = {};
     this._resolveBindGroup = {};
     this._combineBindGroup = null;

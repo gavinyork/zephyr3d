@@ -19,7 +19,6 @@ export class TAA extends AbstractPostEffect<'TAA'> {
     super();
     this._bindGroup = null;
     this._skyMotionVectorBindGroup = null;
-    this._opaque = false;
   }
   renderSkyMotionVectors(ctx: DrawContext) {
     const fb = ctx.device.pool.fetchTemporalFramebuffer(
