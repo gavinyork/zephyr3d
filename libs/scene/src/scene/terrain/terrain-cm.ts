@@ -8,7 +8,6 @@ import type { Drawable, DrawContext, PickTarget, Primitive } from '../../render'
 import { Clipmap } from '../../render';
 import { ClipmapTerrainMaterial } from '../../material/terrain-cm';
 import { DRef } from '../../app';
-import { QUEUE_OPAQUE } from '../../values';
 import { MeshMaterial } from '../../material';
 import type { BoundingVolume } from '../../utility/bounding_volume';
 import { BoundingBox } from '../../utility/bounding_volume';
@@ -22,13 +21,18 @@ export class ClipmapTerrain
   private _gridScale: number;
   private _material: DRef<ClipmapTerrainMaterial>;
   private _castShadow: boolean;
+  private _sizeX: number;
+  private _sizeZ: number;
   constructor(scene: Scene) {
     super(scene);
     this._pickTarget = { node: this };
     this._clipmap = new Clipmap(32);
     this._gridScale = 1;
     this._castShadow = true;
+    this._sizeX = 256;
+    this._sizeZ = 256;
     this._material = new DRef(new ClipmapTerrainMaterial());
+    this.updateRegion();
   }
   clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new ClipmapTerrain(this.scene);
@@ -48,7 +52,25 @@ export class ClipmapTerrain
   set castShadow(val: boolean) {
     this._castShadow = !!val;
   }
-  get material(): MeshMaterial {
+  get sizeX() {
+    return this._sizeX;
+  }
+  set sizeX(val: number) {
+    if (val !== this._sizeX) {
+      this._sizeX = val;
+      this.updateRegion();
+    }
+  }
+  get sizeZ() {
+    return this._sizeZ;
+  }
+  set sizeZ(val: number) {
+    if (val !== this._sizeZ) {
+      this._sizeZ = val;
+      this.updateRegion();
+    }
+  }
+  get material(): ClipmapTerrainMaterial {
     return this._material.get();
   }
   /**
@@ -73,25 +95,25 @@ export class ClipmapTerrain
    * {@inheritDoc Drawable.getQueueType}
    */
   getQueueType(): number {
-    return this._material.get()?.getQueueType() ?? QUEUE_OPAQUE;
+    return this.material.getQueueType();
   }
   /**
    * {@inheritDoc Drawable.isUnlit}
    */
   isUnlit(): boolean {
-    return !this._material.get()?.supportLighting();
+    return !this.material.supportLighting();
   }
   /**
    * {@inheritDoc Drawable.needSceneColor}
    */
   needSceneColor(): boolean {
-    return this._material.get()?.needSceneColor();
+    return this.material.needSceneColor();
   }
   /**
    * {@inheritDoc Drawable.needSceneDepth}
    */
   needSceneDepth(): boolean {
-    return this._material.get()?.needSceneDepth();
+    return this.material.needSceneDepth();
   }
   /**
    * {@inheritDoc Drawable.getMaterial}
@@ -122,13 +144,10 @@ export class ClipmapTerrain
    */
   computeWorldBoundingVolume(): BoundingVolume {
     const p = this.worldMatrix.transformPointAffine(Vector3.zero());
-    const mat = this._material?.get();
-    return mat
-      ? new BoundingBox(
-          new Vector3(mat.region.x, p.y, mat.region.y),
-          new Vector3(mat.region.z, p.y, mat.region.w)
-        )
-      : null;
+    return new BoundingBox(
+      new Vector3(this.material.region.x, p.y - 9999, this.material.region.y),
+      new Vector3(this.material.region.z, p.y + 9999, this.material.region.w)
+    );
   }
   /**
    * Grid scale
@@ -152,14 +171,16 @@ export class ClipmapTerrain
   }
   protected _onTransformChanged(invalidateLocal: boolean): void {
     super._onTransformChanged(invalidateLocal);
-    const material = this._material?.get();
-    if (material) {
-      const x = Math.abs(this.scale.x);
-      const z = Math.abs(this.scale.z);
-      const px = this.position.x;
-      const pz = this.position.z;
-      material.region = new Vector4(px - x, pz - z, px + x, pz + z);
+    if (this._material) {
+      this.updateRegion();
     }
+  }
+  private updateRegion() {
+    const x = Math.abs(this.scale.x);
+    const z = Math.abs(this.scale.z);
+    const px = this.position.x;
+    const pz = this.position.z;
+    this.material.region = new Vector4(px, pz, px + x * this._sizeX, pz + z * this._sizeZ);
   }
   /**
    * {@inheritDoc Drawable.draw}
