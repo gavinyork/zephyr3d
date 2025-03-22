@@ -173,7 +173,7 @@ export class Terrain extends GraphNode implements NodeClonable<Terrain> {
       throw new Error('SplatMap must be rgba8unorm format');
     }
     this._material = new TerrainMaterial(options);
-    if (!this._quadtree.get().build(patchSize, sizeX, sizeZ, elevations, scale.x, scale.y, scale.z, 24)) {
+    if (!this._quadtree.get().build(patchSize, sizeX, sizeZ, elevations, scale, 24)) {
       this._quadtree.dispose();
       return false;
     }
@@ -263,7 +263,7 @@ export class Terrain extends GraphNode implements NodeClonable<Terrain> {
    * @override
    */
   computeBoundingVolume(): BoundingVolume {
-    return this._quadtree.get()?.getHeightField().getBBoxTree().getRootNode().bbox ?? null;
+    return this._quadtree.get()?.getHeightField().getBoundingbox();
   }
   /**
    * Traverse quadtree node top down

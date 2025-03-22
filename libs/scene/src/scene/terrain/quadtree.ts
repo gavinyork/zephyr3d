@@ -206,9 +206,7 @@ export class Quadtree {
     rootSizeX: number,
     rootSizeZ: number,
     elevations: Float32Array,
-    scaleX: number,
-    scaleY: number,
-    scaleZ: number,
+    scale: Vector3,
     vertexCacheSize: number
   ): boolean {
     if (
@@ -220,7 +218,7 @@ export class Quadtree {
       return false;
     }
     this._heightField = new HeightField();
-    if (!this._heightField.init(rootSizeX, rootSizeZ, 0, 0, scaleX, scaleY, scaleZ, elevations)) {
+    if (!this._heightField.init(rootSizeX, rootSizeZ, scale, elevations)) {
       this._heightField = null;
       return false;
     }
@@ -229,8 +227,8 @@ export class Quadtree {
     this._rootSizeX = rootSizeX;
     this._rootSizeZ = rootSizeZ;
     this._rootSize = nextPowerOf2(Math.max(rootSizeX - 1, rootSizeZ - 1)) + 1;
-    this._scaleX = scaleX;
-    this._scaleZ = scaleZ;
+    this._scaleX = scale.x;
+    this._scaleZ = scale.z;
     // Create base vertex buffer
     const dimension = patchSize + 2; // with "skirts"
     const vertices = new Float32Array(dimension * dimension * 3);
@@ -303,7 +301,7 @@ export class Quadtree {
     this._normalMap
       .get()
       .update(normalMapBytes, 0, 0, this._normalMap.get().width, this._normalMap.get().height);
-    return this._rootNode.initialize(this, null, 0, 0, this._baseVertices, normals, scaleY, elevations);
+    return this._rootNode.initialize(this, null, 0, 0, this._baseVertices, normals, scale.y, elevations);
   }
   strip(vertexCacheSize: number): Uint16Array {
     const dimension = this._patchSize + 2;

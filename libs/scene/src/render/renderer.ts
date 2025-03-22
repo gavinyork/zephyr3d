@@ -292,7 +292,6 @@ export class SceneRenderer {
 
     // Render scene depth first
     const depthFramebuffer = this.renderSceneDepth(ctx, renderQueue, null);
-    console.log(depthFramebuffer);
     if (ctx.depthTexture === ctx.finalFramebuffer?.getDepthAttachment()) {
       ctx.intermediateFramebuffer = ctx.finalFramebuffer;
     } else {

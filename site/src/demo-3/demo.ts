@@ -257,6 +257,7 @@ export class Demo {
       linearColorSpace: true
     });
     const terrain = new Terrain(scene);
+    terrain.scale.setXYZ(0.5, 1, 0.5);
     terrain.showState = 'hidden';
     terrain.create(mapWidth, mapHeight, heightsF32, new Vector3(1, 100, 1), 33, {
       splatMap,
