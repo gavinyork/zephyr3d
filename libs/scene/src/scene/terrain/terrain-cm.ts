@@ -1,0 +1,206 @@
+import { Vector4, applyMixins, Matrix4x4, Vector3 } from '@zephyr3d/base';
+import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
+import type { NodeClonable, NodeCloneMethod } from '../scene_node';
+import type { Scene } from '../scene';
+import { GraphNode } from '../graph_node';
+import { mixinDrawable } from '../../render/drawable_mixin';
+import type { Drawable, DrawContext, PickTarget, Primitive } from '../../render';
+import { Clipmap } from '../../render';
+import { ClipmapTerrainMaterial } from '../../material/terrain-cm';
+import { DRef } from '../../app';
+import { QUEUE_OPAQUE } from '../../values';
+import { MeshMaterial } from '../../material';
+import type { BoundingVolume } from '../../utility/bounding_volume';
+import { BoundingBox } from '../../utility/bounding_volume';
+
+export class ClipmapTerrain
+  extends applyMixins(GraphNode, mixinDrawable)
+  implements Drawable, NodeClonable<ClipmapTerrain>
+{
+  private _pickTarget: PickTarget;
+  private _clipmap: Clipmap;
+  private _gridScale: number;
+  private _material: DRef<ClipmapTerrainMaterial>;
+  private _castShadow: boolean;
+  constructor(scene: Scene) {
+    super(scene);
+    this._pickTarget = { node: this };
+    this._clipmap = new Clipmap(32);
+    this._gridScale = 1;
+    this._castShadow = true;
+    this._material = new DRef(new ClipmapTerrainMaterial());
+  }
+  clone(method: NodeCloneMethod, recursive: boolean) {
+    const other = new ClipmapTerrain(this.scene);
+    other.copyFrom(this, method, recursive);
+    other.parent = this.parent;
+    return other;
+  }
+  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
+    super.copyFrom(other, method, recursive);
+    this.gridScale = other.gridScale;
+    this.castShadow = other.castShadow;
+  }
+  /** Wether the mesh node casts shadows */
+  get castShadow(): boolean {
+    return this._castShadow;
+  }
+  set castShadow(val: boolean) {
+    this._castShadow = !!val;
+  }
+  get material(): MeshMaterial {
+    return this._material.get();
+  }
+  /**
+   * {@inheritDoc Drawable.getPickTarget }
+   */
+  getPickTarget(): PickTarget {
+    return this._pickTarget;
+  }
+  /**
+   * {@inheritDoc Drawable.getMorphData}
+   */
+  getMorphData(): Texture2D {
+    return null;
+  }
+  /**
+   * {@inheritDoc Drawable.getMorphInfo}
+   */
+  getMorphInfo(): GPUDataBuffer<unknown> {
+    return null;
+  }
+  /**
+   * {@inheritDoc Drawable.getQueueType}
+   */
+  getQueueType(): number {
+    return this._material.get()?.getQueueType() ?? QUEUE_OPAQUE;
+  }
+  /**
+   * {@inheritDoc Drawable.isUnlit}
+   */
+  isUnlit(): boolean {
+    return !this._material.get()?.supportLighting();
+  }
+  /**
+   * {@inheritDoc Drawable.needSceneColor}
+   */
+  needSceneColor(): boolean {
+    return this._material.get()?.needSceneColor();
+  }
+  /**
+   * {@inheritDoc Drawable.needSceneDepth}
+   */
+  needSceneDepth(): boolean {
+    return this._material.get()?.needSceneDepth();
+  }
+  /**
+   * {@inheritDoc Drawable.getMaterial}
+   */
+  getMaterial(): MeshMaterial {
+    return this._material.get();
+  }
+  /**
+   * {@inheritDoc Drawable.getPrimitive}
+   */
+  getPrimitive(): Primitive {
+    return null;
+  }
+  /**
+   * {@inheritDoc GraphNode.isWater}
+   */
+  isClipmapTerrain(): this is ClipmapTerrain {
+    return true;
+  }
+  /**
+   * {@inheritDoc SceneNode.computeBoundingVolume}
+   */
+  computeBoundingVolume(): BoundingVolume {
+    return null;
+  }
+  /**
+   * {@inheritDoc SceneNode.computeWorldBoundingVolume}
+   */
+  computeWorldBoundingVolume(): BoundingVolume {
+    const p = this.worldMatrix.transformPointAffine(Vector3.zero());
+    const mat = this._material?.get();
+    return mat
+      ? new BoundingBox(
+          new Vector3(mat.region.x, p.y, mat.region.y),
+          new Vector3(mat.region.z, p.y, mat.region.w)
+        )
+      : null;
+  }
+  /**
+   * Grid scale
+   */
+  get gridScale() {
+    return this._gridScale;
+  }
+  set gridScale(val: number) {
+    this._gridScale = val;
+  }
+  calculateLocalTransform(outMatrix: Matrix4x4): void {
+    outMatrix.translation(this._position);
+  }
+  calculateWorldTransform(outMatrix: Matrix4x4): void {
+    outMatrix.set(this.localMatrix);
+    if (this.parent) {
+      outMatrix.m03 += this.parent.worldMatrix.m03;
+      outMatrix.m13 += this.parent.worldMatrix.m13;
+      outMatrix.m23 += this.parent.worldMatrix.m23;
+    }
+  }
+  protected _onTransformChanged(invalidateLocal: boolean): void {
+    super._onTransformChanged(invalidateLocal);
+    const material = this._material?.get();
+    if (material) {
+      const x = Math.abs(this.scale.x);
+      const z = Math.abs(this.scale.z);
+      const px = this.position.x;
+      const pz = this.position.z;
+      material.region = new Vector4(px - x, pz - z, px + x, pz + z);
+    }
+  }
+  /**
+   * {@inheritDoc Drawable.draw}
+   */
+  draw(ctx: DrawContext) {
+    const mat = this._material?.get();
+    const camera = ctx.camera;
+    const cameraPos = camera.getWorldPosition();
+    const position = new Vector3(cameraPos.x, cameraPos.z, 0);
+    const distX = Math.max(Math.abs(position.x - mat.region.x), Math.abs(position.x - mat.region.z));
+    const distY = Math.max(Math.abs(position.y - mat.region.y), Math.abs(position.y - mat.region.w));
+    const maxDist = Math.min(Math.max(distX, distY), camera.getFarPlane());
+    const gridScale = Math.max(0.01, this._gridScale);
+    const mipLevels = Math.ceil(Math.log2(maxDist / (this._clipmap.tileResolution * gridScale))) + 1;
+    const that = this;
+    this.bind(ctx);
+    this._clipmap.draw(
+      {
+        camera,
+        position,
+        minMaxWorldPos: mat.region,
+        gridScale: gridScale,
+        userData: this,
+        calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
+          const p = that.worldMatrix.transformPointAffine(Vector3.zero());
+          outAABB.minPoint.setXYZ(minX, p.y - 9999, minZ);
+          outAABB.maxPoint.setXYZ(maxX, p.y + 9999, maxZ);
+        },
+        drawPrimitive(prim, modelMatrix, offset, scale, gridScale) {
+          const clipmapMatrix = new Matrix4x4(modelMatrix)
+            .scaleLeft(new Vector3(scale, scale, 1))
+            .translateLeft(new Vector3(offset.x, offset.y, 0))
+            .scaleLeft(new Vector3(gridScale, gridScale, 1));
+          clipmapMatrix.m03 -= that.worldMatrix.m03;
+          clipmapMatrix.m13 -= that.worldMatrix.m23;
+          mat.setClipmapMatrix(clipmapMatrix);
+          mat.apply(ctx);
+          mat.draw(prim, ctx);
+        }
+      },
+      mipLevels
+    );
+  }
+}

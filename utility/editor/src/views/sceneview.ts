@@ -24,7 +24,8 @@ import {
   SphereShape,
   SpotLight,
   TorusShape,
-  Water
+  Water,
+  ClipmapTerrain
 } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { Application, DirectionalLight } from '@zephyr3d/scene';
@@ -218,6 +219,10 @@ export class SceneView extends BaseView<SceneModel> {
             {
               label: 'Water',
               action: () => this.handleAddNode(Water, 'Add water')
+            },
+            {
+              label: 'Terrain',
+              action: () => this.handleAddNode(ClipmapTerrain, 'Add terrain')
             }
           ]
         },
@@ -419,7 +424,6 @@ export class SceneView extends BaseView<SceneModel> {
   reset(scene: Scene) {
     this.sceneFinialize();
     this._cmdManager.clear();
-    this._postGizmoRenderer.dispose();
     this._postGizmoRenderer = new PostGizmoRenderer(this.model.camera, null);
     this._postGizmoRenderer.mode = 'select';
     this._tab.sceneHierarchy.selectNode(null);

@@ -64,6 +64,8 @@ import {
   getWaterClass
 } from './scene/water';
 import { Water } from '../../scene/water';
+import { ClipmapTerrain } from '../../scene/terrain/terrain-cm';
+import { getTerrainClass } from './scene/terrain';
 
 export * from './asset/asset';
 export * from './scene/batch';
@@ -113,6 +115,7 @@ export function getSerializationInfo(assetRegistry: AssetRegistry) {
       [GraphNode, getGraphNodeClass(assetRegistry)],
       [Mesh, getMeshClass(assetRegistry)],
       [Water, getWaterClass(assetRegistry)],
+      [ClipmapTerrain, getTerrainClass(assetRegistry)],
       [GerstnerWaveCls, getGerstnerWaveClass(assetRegistry)],
       [GerstnerWaveGenerator, getGerstnerWaveGeneratorClass(assetRegistry)],
       [FFTWaveGenerator, getFFTWaveGeneratorClass(assetRegistry)],

@@ -89,6 +89,8 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   static _gridRenderState: RenderStateSet = null;
   static _blendRenderState: RenderStateSet = null;
   static _gridPrimitive: Primitive = null;
+  static _bindGroup: BindGroup = null;
+  static _gridBindGroup: BindGroup = null;
   static _rotation: Primitive = null;
   static _mvpMatrix: Matrix4x4 = new Matrix4x4();
   static _texSize: Vector2 = new Vector2();
@@ -103,8 +105,6 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   private _gridParams: Vector4;
   private _camera: Camera;
   private _node: SceneNode;
-  private _bindGroup: BindGroup;
-  private _gridBindGroup: BindGroup;
   private _mode: GizmoMode;
   private _axisLength: number;
   private _arrowLength: number;
@@ -127,8 +127,6 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
     this._primitives = null;
     this._camera = camera;
     this._node = binding;
-    this._bindGroup = null;
-    this._gridBindGroup = null;
     this._allowRotate = true;
     this._allowScale = true;
     this._allowTranslate = true;
@@ -299,21 +297,21 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
     ctx.device.clearFrameBuffer(new Vector4(0, 0, 0, 0), 1, 0);
     if (this._drawGrid) {
       ctx.device.setRenderStates(PostGizmoRenderer._gridRenderState);
-      this._gridBindGroup.setValue('viewMatrix', ctx.camera.worldMatrix);
-      this._gridBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
-      this._gridBindGroup.setValue('params', this._gridParams);
-      this._gridBindGroup.setValue('steps', this._gridSteps);
-      this._gridBindGroup.setValue('viewProjMatrix', ctx.camera.viewProjectionMatrix);
-      this._gridBindGroup.setValue('texSize', PostGizmoRenderer._texSize);
-      this._gridBindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
-      this._gridBindGroup.setTexture(
+      PostGizmoRenderer._gridBindGroup.setValue('viewMatrix', ctx.camera.worldMatrix);
+      PostGizmoRenderer._gridBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
+      PostGizmoRenderer._gridBindGroup.setValue('params', this._gridParams);
+      PostGizmoRenderer._gridBindGroup.setValue('steps', this._gridSteps);
+      PostGizmoRenderer._gridBindGroup.setValue('viewProjMatrix', ctx.camera.viewProjectionMatrix);
+      PostGizmoRenderer._gridBindGroup.setValue('texSize', PostGizmoRenderer._texSize);
+      PostGizmoRenderer._gridBindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
+      PostGizmoRenderer._gridBindGroup.setTexture(
         'depthTex',
         destFramebuffer.getDepthAttachment(),
         fetchSampler('clamp_nearest_nomip')
       );
-      this._gridBindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
+      PostGizmoRenderer._gridBindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
       ctx.device.setProgram(PostGizmoRenderer._gridProgram);
-      ctx.device.setBindGroup(0, this._gridBindGroup);
+      ctx.device.setBindGroup(0, PostGizmoRenderer._gridBindGroup);
       PostGizmoRenderer._gridPrimitive.draw();
     }
     if (
@@ -322,12 +320,12 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       !(this._mode === 'rotation' && this._rotateInfo && this._rotateInfo.axis < 0)
     ) {
       ctx.device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
-      this._bindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
-      this._bindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
-      this._bindGroup.setValue('texSize', PostGizmoRenderer._texSize);
-      this._bindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
-      this._bindGroup.setValue('time', (ctx.device.frameInfo.elapsedOverall % 1000) * 0.001);
-      this._bindGroup.setTexture(
+      PostGizmoRenderer._bindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
+      PostGizmoRenderer._bindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
+      PostGizmoRenderer._bindGroup.setValue('texSize', PostGizmoRenderer._texSize);
+      PostGizmoRenderer._bindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
+      PostGizmoRenderer._bindGroup.setValue('time', (ctx.device.frameInfo.elapsedOverall % 1000) * 0.001);
+      PostGizmoRenderer._bindGroup.setTexture(
         'depthTex',
         destFramebuffer.getDepthAttachment(),
         fetchSampler('clamp_nearest_nomip')
@@ -335,11 +333,11 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       ctx.device.setProgram(
         this._mode === 'select' ? PostGizmoRenderer._gizmoSelectProgram : PostGizmoRenderer._gizmoProgram
       );
-      ctx.device.setBindGroup(0, this._bindGroup);
+      ctx.device.setBindGroup(0, PostGizmoRenderer._bindGroup);
       this._primitives[this._mode].draw();
       if (this._alwaysDrawIndicator && this._mode !== 'select') {
         this._calcGizmoMVPMatrix('select', false, PostGizmoRenderer._mvpMatrix);
-        this._bindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
+        PostGizmoRenderer._bindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
         ctx.device.setProgram(PostGizmoRenderer._gizmoSelectProgram);
         this._primitives.select.draw();
       }
@@ -1198,6 +1196,9 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       });
       PostGizmoRenderer._gridProgram = this._createGridProgram();
       PostGizmoRenderer._gridRenderState = this._createGridRenderStates();
+      PostGizmoRenderer._gridBindGroup = Application.instance.device.createBindGroup(
+        PostGizmoRenderer._gridProgram.bindGroupLayouts[0]
+      );
     }
     if (!PostGizmoRenderer._gizmoSelectProgram) {
       PostGizmoRenderer._gizmoSelectProgram = this._createAxisProgram(true);
@@ -1206,14 +1207,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       PostGizmoRenderer._gizmoProgram = this._createAxisProgram(false);
       PostGizmoRenderer._gizmoRenderState = this._createGizmoRenderStates();
       PostGizmoRenderer._blendRenderState = this._createBlendRenderStates();
-    }
-    if (!this._gridBindGroup) {
-      this._gridBindGroup = Application.instance.device.createBindGroup(
-        PostGizmoRenderer._gridProgram.bindGroupLayouts[0]
-      );
-    }
-    if (!this._bindGroup) {
-      this._bindGroup = Application.instance.device.createBindGroup(
+      PostGizmoRenderer._bindGroup = Application.instance.device.createBindGroup(
         PostGizmoRenderer._gizmoProgram.bindGroupLayouts[0]
       );
     }

@@ -21,6 +21,7 @@ import { DRef } from '../app/gc/ref';
 import type { AnimationSet } from '../animation';
 import type { SharedModel } from '../asset';
 import type { Water } from './water';
+import type { ClipmapTerrain } from './terrain/terrain-cm';
 
 /**
  * Node iterate function type
@@ -381,6 +382,10 @@ export class SceneNode
   }
   /** true if this is a terrain node, false otherwise */
   isTerrain(): this is Terrain {
+    return false;
+  }
+  /** true if this is a clipmap terrain node, false otherwise */
+  isClipmapTerrain(): this is ClipmapTerrain {
     return false;
   }
   /** true if this is a camera node, false otherwise */

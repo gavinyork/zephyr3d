@@ -6,7 +6,7 @@ import type { GraphNode } from '../scene/graph_node';
 import type { RenderQueue } from './render_queue';
 import type { RenderPass, Drawable } from '.';
 import type { Mesh } from '../scene/mesh';
-import type { Terrain } from '../scene/terrain';
+import type { ClipmapTerrain, Terrain } from '../scene/terrain';
 import type { PunctualLight } from '../scene/light';
 import type { Visitor } from '../scene/visitor';
 import type { Camera } from '../camera/camera';
@@ -100,6 +100,8 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
       return this.visitParticleSystem(target);
     } else if (target.isTerrain()) {
       return this.visitTerrain(target);
+    } else if (target.isClipmapTerrain()) {
+      return this.visitClipmapTerrain(target);
     } else if (target.isPunctualLight()) {
       return this.visitPunctualLight(target);
     } else if (target.isBatchGroup()) {
@@ -123,6 +125,17 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {
         return node.cull(this) > 0;
+      }
+    }
+    return false;
+  }
+  /** @internal */
+  visitClipmapTerrain(node: ClipmapTerrain) {
+    if (!node.hidden && (node.castShadow || this._renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP)) {
+      const clipState = this.getClipStateWithNode(node);
+      if (clipState !== ClipState.NOT_CLIPPED) {
+        this.push(this._camera, node);
+        return true;
       }
     }
     return false;
