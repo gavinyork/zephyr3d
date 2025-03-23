@@ -1,5 +1,5 @@
 import { Vector4, applyMixins, Matrix4x4, Vector3 } from '@zephyr3d/base';
-import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
+import type { GPUDataBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
 import type { NodeClonable, NodeCloneMethod } from '../scene_node';
 import type { Scene } from '../scene';
 import { GraphNode } from '../graph_node';
@@ -7,10 +7,12 @@ import { mixinDrawable } from '../../render/drawable_mixin';
 import type { Drawable, DrawContext, PickTarget, Primitive } from '../../render';
 import { Clipmap } from '../../render';
 import { ClipmapTerrainMaterial } from '../../material/terrain-cm';
-import { DRef } from '../../app';
+import { Application, DRef } from '../../app';
 import { MeshMaterial } from '../../material';
 import type { BoundingVolume } from '../../utility/bounding_volume';
 import { BoundingBox } from '../../utility/bounding_volume';
+import { CopyBlitter } from '../../blitter';
+import { fetchSampler } from '../../utility/misc';
 
 export class ClipmapTerrain
   extends applyMixins(GraphNode, mixinDrawable)
@@ -31,7 +33,8 @@ export class ClipmapTerrain
     this._castShadow = true;
     this._sizeX = 256;
     this._sizeZ = 256;
-    this._material = new DRef(new ClipmapTerrainMaterial());
+    const heightMap = this.createHeightMap('r16f', this._sizeX, this._sizeZ, true);
+    this._material = new DRef(new ClipmapTerrainMaterial(heightMap));
     this.updateRegion();
   }
   clone(method: NodeCloneMethod, recursive: boolean) {
@@ -175,11 +178,33 @@ export class ClipmapTerrain
       this.updateRegion();
     }
   }
+  private createHeightMap(format: TextureFormat, width: number, height: number, clear: boolean) {
+    const device = Application.instance.device;
+    const heightMap = device.createTexture2D(format, width, height, {
+      samplerOptions: { mipFilter: 'none' }
+    });
+    if (clear) {
+      device.pushDeviceStates();
+      const fb = device.createFrameBuffer([heightMap], null);
+      device.setFramebuffer(fb);
+      device.clearFrameBuffer(Vector4.zero(), null, null);
+      device.popDeviceStates();
+      fb.dispose();
+    }
+    return heightMap;
+  }
   private updateRegion() {
+    const oldHeightMap = this.material.heightMap;
+    if (this._sizeX !== oldHeightMap.width || this._sizeZ !== oldHeightMap.height) {
+      const heightMap = this.createHeightMap('r16f', this._sizeX, this._sizeZ, false);
+      new CopyBlitter().blit(oldHeightMap, heightMap, fetchSampler('clamp_linear_nomip'));
+      this.material.heightMap = heightMap;
+    }
     const x = Math.abs(this.scale.x);
     const z = Math.abs(this.scale.z);
     const px = this.position.x;
     const pz = this.position.z;
+    this.material.scaleY = this.scale.y;
     this.material.region = new Vector4(px, pz, px + x * this._sizeX, pz + z * this._sizeZ);
   }
   /**
