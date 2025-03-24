@@ -1,7 +1,7 @@
 import { LightPass } from './lightpass';
 import { ShadowMapPass } from './shadowmap_pass';
 import { DepthPass } from './depthpass';
-import { isPowerOf2, nextPowerOf2, Vector4 } from '@zephyr3d/base';
+import { isPowerOf2, nextPowerOf2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { ColorState, FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
 import { Application } from '../app/app';
 import { CopyBlitter } from '../blitter';
@@ -9,7 +9,7 @@ import type { DrawContext } from './drawable';
 //import type { ShadowMapper } from '../shadow';
 import type { RenderQueue } from './render_queue';
 import type { PunctualLight, Scene } from '../scene';
-import type { PerspectiveCamera, Camera } from '../camera';
+import type { PerspectiveCamera, Camera, PickResult } from '../camera';
 import { PostEffectLayer } from '../posteffect/posteffect';
 import type { Compositor } from '../posteffect';
 import { ClusteredLight } from './cluster_light';
@@ -277,8 +277,9 @@ export class SceneRenderer {
     const device = ctx.device;
 
     // Do GPU ray picking if required
-    if (ctx.camera.getPickResultResolveFunc()) {
-      this.renderObjectColors(ctx);
+    const pickResolveFunc = ctx.camera.getPickResultResolveFunc();
+    if (pickResolveFunc) {
+      this.renderObjectColors(ctx, pickResolveFunc);
     }
 
     // Cull scene and gather lights
@@ -382,11 +383,18 @@ export class SceneRenderer {
     ctx.device.popDeviceStates();
   }
   /** @internal */
-  private static renderObjectColors(ctx: DrawContext) {
+  private static renderObjectColors(ctx: DrawContext, pickResolveFunc: (result: PickResult) => void) {
     const camera = ctx.camera as PerspectiveCamera;
     ctx.renderPass = this._objectColorPass;
     ctx.device.pushDeviceStates();
-    const fb = ctx.device.pool.fetchTemporalFramebuffer(false, 1, 1, 'rgba8unorm', ctx.depthFormat, false);
+    const fb = ctx.device.pool.fetchTemporalFramebuffer(
+      false,
+      1,
+      1,
+      ['rgba8unorm', 'rgba32f'],
+      ctx.depthFormat,
+      false
+    );
     ctx.device.setViewport(camera.viewport);
     const savedViewport = camera.viewport;
     const savedScissor = camera.scissor;
@@ -408,14 +416,27 @@ export class SceneRenderer {
     camera.scissor = savedScissor;
     camera.window = savedWindow;
     ctx.device.popDeviceStates();
-    const tex = fb.getColorAttachments()[0];
-    const pixels = new Uint8Array(4);
+    const colorTex = fb.getColorAttachments()[0];
+    const distanceTex = fb.getColorAttachments()[1];
+    const colorPixels = new Uint8Array(4);
+    const distancePixels = new Float32Array(4);
     const device = ctx.device;
-    tex
-      .readPixels(0, 0, 1, 1, 0, 0, pixels)
+    Promise.all([
+      colorTex.readPixels(0, 0, 1, 1, 0, 0, colorPixels),
+      distanceTex.readPixels(0, 0, 1, 1, 0, 0, distancePixels)
+    ])
       .then(() => {
-        const drawable = renderQueue.getDrawableByColor(pixels);
-        camera.getPickResultResolveFunc()?.(drawable ? { drawable, target: drawable.getPickTarget() } : null);
+        const drawable = renderQueue.getDrawableByColor(colorPixels);
+        pickResolveFunc(
+          drawable
+            ? {
+                distance: distancePixels[3],
+                intersectedPoint: new Vector3(distancePixels[0], distancePixels[1], distancePixels[2]),
+                drawable,
+                target: drawable.getPickTarget()
+              }
+            : null
+        );
         device.pool.releaseFrameBuffer(fb);
       })
       .catch((err) => {

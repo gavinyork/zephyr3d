@@ -20,6 +20,8 @@ import { SSR } from '../posteffect/ssr';
  * @public
  */
 export type PickResult = {
+  distance: number;
+  intersectedPoint: Vector3;
   drawable: Drawable;
   target: PickTarget;
 };

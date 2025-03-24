@@ -8,6 +8,7 @@ export type ToolBarItem = {
   shortcut?: string;
   action?: () => void;
   tooltip?: () => string;
+  visible?: () => boolean;
   selected?: () => boolean;
 };
 
@@ -135,7 +136,7 @@ export class ToolBar extends makeEventTarget(Object)<{
           ImGui.PushStyleColor(ImGui.Col.ButtonActive, this._sepColor);
           ImGui.Button('##vsep', new ImGui.ImVec2(1, -1));
           ImGui.PopStyleColor(3);
-        } else {
+        } else if (!tool.visible || tool.visible()) {
           ImGui.PushStyleColor(
             ImGui.Col.Text,
             tool.selected?.() ? this._textColorSelected : this._textColorUnselected

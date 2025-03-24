@@ -53,6 +53,7 @@ import {
 } from '../commands/scenecommands';
 import { ZipDownloader } from '../helpers/zipdownload';
 import { NodeProxy } from '../helpers/proxy';
+import { createEditTool, EditTool, isObjectEditable } from './edittools/edittool';
 
 export class SceneView extends BaseView<SceneModel> {
   private _cmdManager: CommandManager;
@@ -80,6 +81,7 @@ export class SceneView extends BaseView<SceneModel> {
   private _clipBoardData: DRef<SceneNode>;
   private _aabbForEdit: AABB;
   private _proxy: NodeProxy;
+  private _currentEditTool: DRef<EditTool>;
   constructor(model: SceneModel, assetRegistry: AssetRegistry) {
     super(model);
     this._cmdManager = new CommandManager();
@@ -100,6 +102,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._showDeviceInfo = false;
     this._aabbForEdit = null;
     this._proxy = null;
+    this._currentEditTool = new DRef();
     this._assetRegistry = assetRegistry;
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
@@ -327,6 +330,19 @@ export class SceneView extends BaseView<SceneModel> {
           }
         },
         {
+          label: FontGlyph.glyphs['pencil'],
+          tooltip: () => 'Edit selected node',
+          visible: () =>
+            !!this._currentEditTool.get() ||
+            (!this._currentEditTool.get() && isObjectEditable(this._tab.sceneHierarchy.selectedNode)),
+          selected: () => {
+            return !!this._currentEditTool.get();
+          },
+          action: () => {
+            this.handleEditNode(this._tab.sceneHierarchy.selectedNode);
+          }
+        },
+        {
           label: '-'
         },
         {
@@ -482,6 +498,8 @@ export class SceneView extends BaseView<SceneModel> {
 
     this._statusbar.render();
 
+    this._currentEditTool.get()?.render();
+
     if (this._showTextureViewer) {
       renderTextureViewer();
     }
@@ -618,20 +636,28 @@ export class SceneView extends BaseView<SceneModel> {
       if (this._postGizmoRenderer.handlePointerEvent(ev.type, p[0], p[1], ev.button)) {
         return true;
       }
-      if (ev.button === 0 && ev.type === 'pointerdown') {
+      if (this._currentEditTool.get() || (ev.button === 0 && ev.type === 'pointerdown')) {
         this.model.camera.pickAsync(p[0], p[1]).then((pickResult) => {
           let node = pickResult?.target?.node ?? null;
-          if (node) {
-            let assetNode = node;
-            while (assetNode && !this._assetRegistry.getAssetId(assetNode)) {
-              assetNode = assetNode.parent;
+          let hitPos = pickResult?.intersectedPoint ?? null;
+          if (
+            !this._currentEditTool.get()?.handlePointerEvent(ev, node, hitPos) &&
+            ev.button === 0 &&
+            ev.type === 'pointerdown'
+          ) {
+            let node = pickResult?.target?.node ?? null;
+            if (node) {
+              let assetNode = node;
+              while (assetNode && !this._assetRegistry.getAssetId(assetNode)) {
+                assetNode = assetNode.parent;
+              }
+              if (assetNode) {
+                node = assetNode;
+              }
             }
-            if (assetNode) {
-              node = assetNode;
-            }
+            node = this._proxy.getProto(node);
+            this._tab.sceneHierarchy.selectNode(node);
           }
-          node = this._proxy.getProto(node);
-          this._tab.sceneHierarchy.selectNode(node);
         });
       }
     }
@@ -794,6 +820,13 @@ export class SceneView extends BaseView<SceneModel> {
       sceneNode.position.x += 1;
       this._tab.sceneHierarchy.selectNode(sceneNode);
     });
+  }
+  private handleEditNode(node: SceneNode) {
+    if (!this._currentEditTool.get()) {
+      this._currentEditTool.set(createEditTool(node));
+    } else {
+      this._currentEditTool.dispose();
+    }
   }
   private handleDeleteNode(node: SceneNode) {
     if (node === this.model.camera) {

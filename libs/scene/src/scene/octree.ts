@@ -684,7 +684,6 @@ export class Octree {
           }
           const newSize = nextPowerOf2(Math.ceil(Math.max(d * 2, 4 * size)));
           if (newSize <= this._maxRootSize) {
-            console.log(`Octree resize: ${newSize}`);
             this.resize(newSize);
             this.placeNode(node);
             return;
