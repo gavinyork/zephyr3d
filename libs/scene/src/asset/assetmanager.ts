@@ -100,6 +100,10 @@ export class AssetManager {
   private _textDatas: {
     [url: string]: Promise<string>;
   };
+  /** @internal */
+  private _jsonDatas: {
+    [url: string]: Promise<any>;
+  };
   /**
    * Creates an instance of AssetManager
    */
@@ -109,6 +113,7 @@ export class AssetManager {
     this._models = {};
     this._binaryDatas = {};
     this._textDatas = {};
+    this._jsonDatas = {};
   }
   /**
    * HttpRequest instance of the asset manager
@@ -166,6 +171,33 @@ export class AssetManager {
     if (!P) {
       P = this.loadTextData(url, postProcess, httpRequest);
       this._textDatas[hash] = P;
+    }
+    return P;
+  }
+  /**
+   * Fetches a json resource from a given URL
+   * @param url - The URL from where to fetch the resource
+   * @param postProcess - A function that will be involved when the text data was loaded.
+   * @param httpRequest - Custom HttpRequest object to be used
+   *
+   * @remarks
+   * If a json data has already been loaded, the function will ignore the
+   * postProcess parameter and directly return the json loaded previously.
+   * To load the same json with different postProcess parameters,
+   * use different AssetManager instances separately.
+   *
+   * @returns The fetched json object
+   */
+  async fetchJsonData<T = any>(
+    url: string,
+    postProcess?: (json: T) => T,
+    httpRequest?: HttpRequest
+  ): Promise<T> {
+    const hash = httpRequest?.urlResolver?.(url) ?? url;
+    let P = this._jsonDatas[hash];
+    if (!P) {
+      P = this.loadJsonData(url, postProcess, httpRequest);
+      this._jsonDatas[hash] = P;
     }
     return P;
   }
@@ -301,6 +333,22 @@ export class AssetManager {
       }
     }
     return text;
+  }
+  /** @internal */
+  async loadJsonData(
+    url: string,
+    postProcess?: (json: any) => any,
+    httpRequest?: HttpRequest
+  ): Promise<string> {
+    let json = await (httpRequest ?? this._httpRequest).requestJson(url);
+    if (postProcess) {
+      try {
+        json = postProcess(json);
+      } catch (err) {
+        throw new Error(`Load json data post process failed: ${err}`);
+      }
+    }
+    return json;
   }
   /** @internal */
   async loadBinaryData(

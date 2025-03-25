@@ -263,6 +263,18 @@ export class HttpRequest {
     return response.text();
   }
   /**
+   * Fetch a json object from remote.
+   * @param url - The remote URL to fetch.
+   * @returns The fetch result.
+   */
+  async requestJson(url: string): Promise<string> {
+    const response = await this.request(url);
+    if (!response?.ok) {
+      throw new Error(`Asset download failed: ${url}`);
+    }
+    return response.json();
+  }
+  /**
    * Fetch an array buffer from remote.
    * @param url - The remote URL to fetch.
    * @returns The fetch result.

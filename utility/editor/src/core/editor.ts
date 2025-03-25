@@ -8,12 +8,16 @@ import { SceneModel } from '../models/scenemodel';
 import { FontGlyph } from './fontglyph';
 import { Database } from '../storage/db';
 import { EditorAssetRegistry } from './assetregistry';
+import { Application, AssetManager, DRef } from '@zephyr3d/scene';
+import { Texture2D } from '@zephyr3d/device';
 
 export class Editor {
   private static _instance: Editor;
   private _moduleManager: ModuleManager;
+  private _assetImages: { brushes: { [key: string]: DRef<Texture2D> } };
   private constructor() {
     this._moduleManager = new ModuleManager();
+    this._assetImages = { brushes: {} };
   }
   static get instance(): Editor {
     if (!this._instance) {
@@ -36,9 +40,21 @@ export class Editor {
   update(dt: number) {
     eventBus.dispatchEvent('update', dt);
   }
+  getBrushes() {
+    return this._assetImages.brushes;
+  }
   async init() {
     await Database.init();
     await FontGlyph.loadFontGlyphs('zef-16px');
+    await this.loadAssets();
+  }
+  async loadAssets() {
+    const assetManager = new AssetManager();
+    const brushConfig = await assetManager.fetchJsonData('assets/conf/brushes.json');
+    for (const name in brushConfig) {
+      const tex = await assetManager.fetchTexture<Texture2D>(brushConfig[name]);
+      this._assetImages.brushes[name] = new DRef(tex);
+    }
   }
   registerModules() {
     const assetRegistry = new EditorAssetRegistry();
