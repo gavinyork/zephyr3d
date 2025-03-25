@@ -374,6 +374,7 @@ export class SkyRenderer {
     }
     this._bakedSkyboxTexture.dispose();
     this._lastSunDir.set(sunDir);
+    this._radianceMapDirty = true;
     if (this._skyType === 'skybox' && this.skyboxTexture) {
       this._bakedSkyboxTexture.set(this.skyboxTexture);
     } else {
@@ -461,10 +462,6 @@ export class SkyRenderer {
   /** @internal */
   renderSky(ctx: DrawContext) {
     const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
-    if (!sunDir.equalsTo(this._lastSunDir)) {
-      this._radianceMapDirty = true;
-      this._lastSunDir.set(sunDir);
-    }
     this._renderSky(
       ctx.camera,
       true,

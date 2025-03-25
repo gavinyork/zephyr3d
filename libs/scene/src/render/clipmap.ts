@@ -114,11 +114,11 @@ export class Clipmap {
     for (let y = 0; y < this._tileResolution; y++) {
       for (let x = 0; x < this._tileResolution; x++) {
         indices[n++] = this.patch2d(this._tileResolution, x, y);
-        indices[n++] = this.patch2d(this._tileResolution, x + 1, y + 1);
         indices[n++] = this.patch2d(this._tileResolution, x, y + 1);
-        indices[n++] = this.patch2d(this._tileResolution, x, y);
-        indices[n++] = this.patch2d(this._tileResolution, x + 1, y);
         indices[n++] = this.patch2d(this._tileResolution, x + 1, y + 1);
+        indices[n++] = this.patch2d(this._tileResolution, x, y);
+        indices[n++] = this.patch2d(this._tileResolution, x + 1, y + 1);
+        indices[n++] = this.patch2d(this._tileResolution, x + 1, y);
       }
     }
     this._tileMesh.createAndSetVertexBuffer('position_f32x3', vertices);
@@ -152,8 +152,8 @@ export class Clipmap {
     const indices = new Uint16Array(this._tileResolution * 12);
     for (let i = 0; i < this._tileResolution * 4; i++) {
       indices[i * 3 + 0] = 0;
-      indices[i * 3 + 1] = i + 1;
       indices[i * 3 + 2] = i + 2;
+      indices[i * 3 + 1] = i + 1;
     }
     this._emptyTileMesh.createAndSetVertexBuffer('position_f32x3', vertices);
     this._emptyTileMesh.createAndSetIndexBuffer(indices);
@@ -211,18 +211,18 @@ export class Clipmap {
       const tr = (arm + i) * 2 + 3;
       if (arm % 2 === 0) {
         indices[n++] = br;
-        indices[n++] = bl;
         indices[n++] = tr;
         indices[n++] = bl;
+        indices[n++] = bl;
+        indices[n++] = tr;
         indices[n++] = tl;
-        indices[n++] = tr;
       } else {
         indices[n++] = br;
+        indices[n++] = tl;
         indices[n++] = bl;
-        indices[n++] = tl;
         indices[n++] = br;
-        indices[n++] = tl;
         indices[n++] = tr;
+        indices[n++] = tl;
       }
     }
     this._fillerMesh.createAndSetVertexBuffer('position_f32x3', vertices);
@@ -260,19 +260,19 @@ export class Clipmap {
     const indices = new Uint16Array((clipmapVertResolution * 2 - 1) * 6);
     for (let i = 0; i < clipmapVertResolution; i++) {
       indices[n++] = (i + 0) * 2 + 1;
+      indices[n++] = (i + 1) * 2 + 0;
       indices[n++] = (i + 0) * 2 + 0;
-      indices[n++] = (i + 1) * 2 + 0;
       indices[n++] = (i + 1) * 2 + 1;
-      indices[n++] = (i + 0) * 2 + 1;
       indices[n++] = (i + 1) * 2 + 0;
+      indices[n++] = (i + 0) * 2 + 1;
     }
     for (let i = 0; i < clipmapVertResolution - 1; i++) {
       indices[n++] = startOfHorizonal + (i + 0) * 2 + 1;
+      indices[n++] = startOfHorizonal + (i + 1) * 2 + 0;
       indices[n++] = startOfHorizonal + (i + 0) * 2 + 0;
-      indices[n++] = startOfHorizonal + (i + 1) * 2 + 0;
       indices[n++] = startOfHorizonal + (i + 1) * 2 + 1;
-      indices[n++] = startOfHorizonal + (i + 0) * 2 + 1;
       indices[n++] = startOfHorizonal + (i + 1) * 2 + 0;
+      indices[n++] = startOfHorizonal + (i + 0) * 2 + 1;
     }
     this._trimMesh.createAndSetVertexBuffer('position_f32x3', vertices);
     this._trimMesh.createAndSetIndexBuffer(indices);
@@ -312,11 +312,11 @@ export class Clipmap {
       const tl = i * 2 + 2;
       const tr = i * 2 + 3;
       indices[n++] = br;
-      indices[n++] = bl;
       indices[n++] = tr;
       indices[n++] = bl;
+      indices[n++] = bl;
+      indices[n++] = tr;
       indices[n++] = tl;
-      indices[n++] = tr;
     }
     for (let i = 0; i < this._tileResolution * 2 + 1; i++) {
       if (i === this._tileResolution) {
@@ -327,11 +327,11 @@ export class Clipmap {
       const tl = i * 2 + 2;
       const tr = i * 2 + 3;
       indices[n++] = startOfVertical + br;
-      indices[n++] = startOfVertical + tr;
-      indices[n++] = startOfVertical + bl;
       indices[n++] = startOfVertical + bl;
       indices[n++] = startOfVertical + tr;
+      indices[n++] = startOfVertical + bl;
       indices[n++] = startOfVertical + tl;
+      indices[n++] = startOfVertical + tr;
     }
     this._crossMesh.createAndSetVertexBuffer('position_f32x3', vertices);
     this._crossMesh.createAndSetIndexBuffer(indices);
@@ -363,8 +363,8 @@ export class Clipmap {
     let n = 0;
     for (let i = 0; i < clipmapVertResolution * 4; i += 2) {
       indices[n++] = i + 1;
-      indices[n++] = i;
       indices[n++] = i + 2;
+      indices[n++] = i;
     }
     indices[indices.length - 1] = 0;
     this._seamMesh.createAndSetVertexBuffer('position_f32x3', vertices);

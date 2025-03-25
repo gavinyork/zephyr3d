@@ -1,5 +1,5 @@
-import { Vector4, applyMixins, Matrix4x4, Vector3 } from '@zephyr3d/base';
-import type { GPUDataBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
+import { Vector4, applyMixins, Matrix4x4, Vector3, Vector2 } from '@zephyr3d/base';
+import type { BindGroup, GPUDataBuffer, GPUProgram, Texture2D, TextureFormat } from '@zephyr3d/device';
 import type { NodeClonable, NodeCloneMethod } from '../scene_node';
 import type { Scene } from '../scene';
 import { GraphNode } from '../graph_node';
@@ -13,11 +13,14 @@ import type { BoundingVolume } from '../../utility/bounding_volume';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
+import { drawFullscreenQuad } from '../../render/fullscreenquad';
 
 export class ClipmapTerrain
   extends applyMixins(GraphNode, mixinDrawable)
   implements Drawable, NodeClonable<ClipmapTerrain>
 {
+  private static _normalMapProgram: GPUProgram = null;
+  private static _normalMapBindGroup: BindGroup = null;
   private _pickTarget: PickTarget;
   private _clipmap: Clipmap;
   private _gridScale: number;
@@ -25,28 +28,37 @@ export class ClipmapTerrain
   private _castShadow: boolean;
   private _sizeX: number;
   private _sizeZ: number;
-  constructor(scene: Scene) {
+  constructor(scene: Scene, sizeX = 256, sizeZ = 256) {
     super(scene);
     this._pickTarget = { node: this };
     this._clipmap = new Clipmap(32);
     this._gridScale = 1;
     this._castShadow = true;
-    this._sizeX = 256;
-    this._sizeZ = 256;
+    this._sizeX = sizeX;
+    this._sizeZ = sizeZ;
     const heightMap = this.createHeightMap('r16f', this._sizeX, this._sizeZ, true);
     this._material = new DRef(new ClipmapTerrainMaterial(heightMap));
     this.updateRegion();
   }
   clone(method: NodeCloneMethod, recursive: boolean) {
-    const other = new ClipmapTerrain(this.scene);
+    const other = new ClipmapTerrain(this.scene, this._sizeX, this._sizeZ);
     other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
     super.copyFrom(other, method, recursive);
+    this.sizeX = other.sizeX;
+    this.sizeZ = other.sizeZ;
     this.gridScale = other.gridScale;
     this.castShadow = other.castShadow;
+  }
+  setSize(sizeX: number, sizeZ: number) {
+    if (sizeX !== this._sizeX || sizeZ !== this._sizeZ) {
+      this._sizeX = sizeX;
+      this._sizeZ = sizeZ;
+      this.updateRegion();
+    }
   }
   /** Wether the mesh node casts shadows */
   get castShadow(): boolean {
@@ -193,6 +205,99 @@ export class ClipmapTerrain
     }
     return heightMap;
   }
+  private calculateNormalMap() {
+    if (!this._material?.get()) {
+      return;
+    }
+    const device = Application.instance.device;
+    if (!ClipmapTerrain._normalMapProgram) {
+      ClipmapTerrain._normalMapProgram = device.buildRenderProgram({
+        vertex(pb) {
+          this.$inputs.pos = pb.vec2().attrib('position');
+          this.$outputs.uv = pb.vec2();
+          pb.main(function () {
+            this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+            if (device.type === 'webgpu') {
+              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+            }
+          });
+        },
+        fragment(pb) {
+          this.heightMap = pb.tex2D().uniform(0);
+          this.texelSize = pb.vec2().uniform(0);
+          this.terrainScale = pb.vec3().uniform(0);
+          this.$outputs.outColor = pb.vec4();
+          pb.func('sobel', [pb.vec2('texCoord')], function () {
+            this.$l.tl = pb.textureSample(this.heightMap, pb.sub(this.texCoord, this.texelSize)).r;
+            this.$l.t = pb.textureSample(
+              this.heightMap,
+              pb.sub(this.texCoord, pb.vec2(0, this.texelSize.y))
+            ).r;
+            this.$l.tr = pb.textureSample(
+              this.heightMap,
+              pb.add(this.texCoord, pb.vec2(this.texelSize.x, pb.neg(this.texelSize.y)))
+            ).r;
+            this.$l.l = pb.textureSample(
+              this.heightMap,
+              pb.sub(this.texCoord, pb.vec2(this.texelSize.x, 0))
+            ).r;
+            this.$l.r = pb.textureSample(
+              this.heightMap,
+              pb.add(this.texCoord, pb.vec2(this.texelSize.x, 0))
+            ).r;
+            this.$l.bl = pb.textureSample(
+              this.heightMap,
+              pb.add(this.texCoord, pb.vec2(pb.neg(this.texelSize.x), this.texelSize.y))
+            ).r;
+            this.$l.b = pb.textureSample(
+              this.heightMap,
+              pb.add(this.texCoord, pb.vec2(0, this.texelSize.y))
+            ).r;
+            this.$l.br = pb.textureSample(this.heightMap, pb.add(this.texCoord, this.texelSize)).r;
+            this.$l.dx = pb.sub(
+              pb.add(this.tr, pb.mul(this.r, 2), this.br),
+              pb.add(this.tl, pb.mul(this.l, 2), this.bl)
+            );
+            this.$l.dz = pb.sub(
+              pb.add(this.bl, pb.mul(this.b, 2), this.br),
+              pb.add(this.tl, pb.mul(this.t, 2), this.tr)
+            );
+            this.$return(pb.vec2(this.dx, this.dz));
+          });
+          pb.main(function () {
+            this.$l.dxdz = this.sobel(this.$inputs.uv);
+            this.$l.dhdxdz = pb.div(pb.mul(this.dxdz, this.terrainScale.y), this.terrainScale.xz);
+            this.$l.normal = pb.normalize(pb.vec3(pb.neg(this.dhdxdz.x), 1, pb.neg(this.dhdxdz.y)));
+            this.$outputs.outColor = pb.vec4(pb.add(pb.mul(this.normal, 0.5), pb.vec3(0.5)), 1);
+          });
+        }
+      });
+      ClipmapTerrain._normalMapBindGroup = device.createBindGroup(
+        ClipmapTerrain._normalMapProgram.bindGroupLayouts[0]
+      );
+    }
+    const heightMap = this.material.heightMap;
+    const normalMap =
+      this._material.get().normalMap ?? device.createTexture2D('rgba8unorm', this._sizeX, this._sizeZ);
+    normalMap.name = 'TerrainNormal';
+    const fb = device.createFrameBuffer([normalMap], null);
+    ClipmapTerrain._normalMapBindGroup.setValue(
+      'texelSize',
+      new Vector2(1 / heightMap.width, 1 / heightMap.height)
+    );
+    ClipmapTerrain._normalMapBindGroup.setValue('terrainScale', this.scale);
+    ClipmapTerrain._normalMapBindGroup.setTexture('heightMap', heightMap);
+    device.pushDeviceStates();
+    device.setFramebuffer(fb);
+    device.setProgram(ClipmapTerrain._normalMapProgram);
+    device.setBindGroup(0, ClipmapTerrain._normalMapBindGroup);
+    drawFullscreenQuad();
+    device.popDeviceStates();
+    fb.dispose();
+
+    this._material.get().normalMap = normalMap;
+  }
   private updateRegion() {
     const oldHeightMap = this.material.heightMap;
     if (this._sizeX !== oldHeightMap.width || this._sizeZ !== oldHeightMap.height) {
@@ -206,6 +311,7 @@ export class ClipmapTerrain
     const pz = this.position.z;
     this.material.scaleY = this.scale.y;
     this.material.region = new Vector4(px, pz, px + x * this._sizeX, pz + z * this._sizeZ);
+    this.calculateNormalMap();
   }
   /**
    * {@inheritDoc Drawable.draw}

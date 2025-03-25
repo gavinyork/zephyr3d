@@ -7,19 +7,24 @@ import { Matrix4x4, Vector4 } from '@zephyr3d/base';
 import { mixinLight } from './mixins/lit';
 import { DRef } from '../app';
 import { fetchSampler } from '../utility/misc';
+import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 
-export class ClipmapTerrainMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
+export class ClipmapTerrainMaterial extends applyMaterialMixins(
+  MeshMaterial,
+  mixinLight,
+  mixinPBRMetallicRoughness
+) {
   private _region: Vector4;
   private _clipmapMatrix: Matrix4x4;
   private _heightMap: DRef<Texture2D>;
+  private _normalMap: DRef<Texture2D>;
   private _scaleY: number;
   constructor(heightMap: Texture2D) {
     super();
     this._region = new Vector4(-99999, -99999, 99999, 99999);
     this._clipmapMatrix = new Matrix4x4();
-    this.cullMode = 'none';
-    this.TAADisabled = true;
     this._heightMap = new DRef(heightMap);
+    this._normalMap = new DRef();
     this._scaleY = 1;
   }
   /** @internal */
@@ -53,6 +58,15 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(MeshMaterial, mi
       this.uniformChanged();
     }
   }
+  get normalMap() {
+    return this._normalMap.get();
+  }
+  set normalMap(val: Texture2D) {
+    if (val !== this._normalMap.get()) {
+      this._normalMap.set(val);
+      this.uniformChanged();
+    }
+  }
   needSceneColor(): boolean {
     return false;
   }
@@ -82,7 +96,6 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(MeshMaterial, mi
       ShaderHelper.getWorldMatrix(scope),
       pb.vec4(scope.clipmapPos.x, 0, scope.clipmapPos.y, 1)
     ).xyz; // pb.vec3(scope.clipmapPos.x, scope.level, scope.clipmapPos.y);
-    scope.worldNormal = pb.vec3(0, 1, 0);
     scope.worldPos = scope.clipmapWorldPos;
     scope.$outputs.uv = pb.div(
       pb.sub(scope.worldPos.xz, scope.region.xy),
@@ -91,7 +104,6 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(MeshMaterial, mi
     scope.$l.height = pb.textureSampleLevel(scope.heightMap, scope.$outputs.uv, 0).r;
     scope.$outputs.worldPos = pb.vec3(scope.worldPos.x, pb.mul(scope.height, scope.scaleY), scope.worldPos.z);
     scope.$outputs.clipmapPos = scope.clipmapWorldPos;
-    scope.$outputs.worldNormal = scope.worldNormal;
     ShaderHelper.setClipSpacePosition(
       scope,
       pb.mul(ShaderHelper.getUnjitteredViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
@@ -109,9 +121,23 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(MeshMaterial, mi
       pb.discard();
     });
     if (this.needFragmentColor()) {
-      scope.$l.normal = scope.$inputs.worldNormal;
-      //scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normal.xyz, 0.5), pb.vec3(0.5)), 1);
-      scope.$l.outColor = pb.vec4(1);
+      scope.normalMap = pb.tex2D().uniform(2);
+      scope.$l.albedo = pb.vec4(1);
+      scope.$l.worldNormal = pb.sub(
+        pb.mul(pb.textureSample(scope.normalMap, scope.$inputs.uv).rgb, 2),
+        pb.vec3(1)
+      );
+      scope.$l.normalInfo = this.calculateNormalAndTBN(scope, scope.$inputs.worldPos, scope.worldNormal);
+      scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
+      scope.$l.litColor = this.PBRLight(
+        scope,
+        scope.$inputs.worldPos,
+        scope.normalInfo.normal,
+        scope.viewVec,
+        scope.albedo,
+        scope.normalInfo.TBN
+      );
+      scope.$l.outColor = pb.vec4(scope.litColor, 1);
       if (this.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
         scope.$l.outRoughness = pb.vec4(1, 1, 1, 0);
         this.outputFragmentColor(
@@ -134,5 +160,8 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(MeshMaterial, mi
     bindGroup.setValue('region', this._region);
     bindGroup.setValue('scaleY', this._scaleY);
     bindGroup.setTexture('heightMap', this._heightMap.get(), fetchSampler('clamp_linear_nomip'));
+    if (this.needFragmentColor(ctx)) {
+      bindGroup.setTexture('normalMap', this._normalMap.get());
+    }
   }
 }
