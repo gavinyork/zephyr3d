@@ -4,6 +4,7 @@ import type { SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import { getGraphNodeClass } from './node';
 import { ClipmapTerrain } from '../../../scene/terrain/terrain-cm';
+import { Texture2D } from '@zephyr3d/device';
 
 export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
@@ -53,6 +54,41 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
           },
           set(this: ClipmapTerrain, value) {
             this.sizeZ = value.num[0];
+          }
+        },
+        {
+          name: 'HeightMap',
+          type: 'object',
+          default: null,
+          nullable: true,
+          get(this: ClipmapTerrain, value) {
+            value.str[0] = assetRegistry.getAssetId(this.heightMap) ?? '';
+          },
+          async set(value) {
+            if (!value) {
+              this.heightMap = null;
+            } else {
+              if (value.str[0]) {
+                const assetId = value.str[0];
+                const assetInfo = assetRegistry.getAssetInfo(assetId);
+                if (assetInfo && assetInfo.type === 'texture') {
+                  let tex: Texture2D;
+                  try {
+                    tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
+                  } catch (err) {
+                    console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                    tex = null;
+                  }
+                  const isValidTextureType = tex?.isTexture2D();
+                  if (isValidTextureType) {
+                    tex.name = assetInfo.name;
+                    this.heightMap = tex;
+                  } else {
+                    console.error('Invalid texture type');
+                  }
+                }
+              }
+            }
           }
         },
         {

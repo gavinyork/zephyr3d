@@ -1,31 +1,35 @@
-import type { BindGroup, PBFunctionScope, Texture2D } from '@zephyr3d/device';
+import type { BindGroup, GPUProgram, PBFunctionScope, Texture2D } from '@zephyr3d/device';
 import { applyMaterialMixins, MeshMaterial } from './meshmaterial';
 import type { DrawContext } from '../render';
 import { MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
-import { Matrix4x4, Vector4 } from '@zephyr3d/base';
+import { Matrix4x4, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import { mixinLight } from './mixins/lit';
-import { DRef } from '../app';
+import { Application, DRef } from '../app';
 import { fetchSampler } from '../utility/misc';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
+import { drawFullscreenQuad } from '../render/fullscreenquad';
 
 export class ClipmapTerrainMaterial extends applyMaterialMixins(
   MeshMaterial,
   mixinLight,
   mixinPBRMetallicRoughness
 ) {
+  private static _normalMapProgram: GPUProgram = null;
+  private static _normalMapBindGroup: BindGroup = null;
   private _region: Vector4;
   private _clipmapMatrix: Matrix4x4;
   private _heightMap: DRef<Texture2D>;
   private _normalMap: DRef<Texture2D>;
-  private _scaleY: number;
+  private _terrainScale: Vector3;
   constructor(heightMap: Texture2D) {
     super();
     this._region = new Vector4(-99999, -99999, 99999, 99999);
     this._clipmapMatrix = new Matrix4x4();
     this._heightMap = new DRef(heightMap);
     this._normalMap = new DRef();
-    this._scaleY = 1;
+    this._terrainScale = Vector3.one();
+    this.calculateNormalMap();
   }
   /** @internal */
   get region() {
@@ -39,13 +43,14 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     }
   }
   /** @internal */
-  get scaleY() {
-    return this._scaleY;
+  get terrainScale() {
+    return this._terrainScale;
   }
   /** @internal */
-  set scaleY(val: number) {
-    if (val !== this._scaleY) {
-      this._scaleY = val;
+  set terrainScale(val: Vector3) {
+    if (!this._terrainScale.equalsTo(val)) {
+      this._terrainScale.set(val);
+      this.calculateNormalMap();
       this.uniformChanged();
     }
   }
@@ -55,6 +60,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   set heightMap(val: Texture2D) {
     if (val !== this._heightMap.get()) {
       this._heightMap.set(val);
+      this.calculateNormalMap();
       this.uniformChanged();
     }
   }
@@ -158,10 +164,102 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     super.applyUniformValues(bindGroup, ctx, pass);
     bindGroup.setValue('clipmapMatrix', this._clipmapMatrix);
     bindGroup.setValue('region', this._region);
-    bindGroup.setValue('scaleY', this._scaleY);
+    bindGroup.setValue('scaleY', this._terrainScale.y);
     bindGroup.setTexture('heightMap', this._heightMap.get(), fetchSampler('clamp_linear_nomip'));
     if (this.needFragmentColor(ctx)) {
       bindGroup.setTexture('normalMap', this._normalMap.get());
     }
+  }
+  calculateNormalMap() {
+    const device = Application.instance.device;
+    if (!ClipmapTerrainMaterial._normalMapProgram) {
+      ClipmapTerrainMaterial._normalMapProgram = device.buildRenderProgram({
+        vertex(pb) {
+          this.$inputs.pos = pb.vec2().attrib('position');
+          this.$outputs.uv = pb.vec2();
+          pb.main(function () {
+            this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+            if (device.type === 'webgpu') {
+              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+            }
+          });
+        },
+        fragment(pb) {
+          this.heightMap = pb.tex2D().uniform(0);
+          this.texelSize = pb.vec2().uniform(0);
+          this.terrainScale = pb.vec3().uniform(0);
+          this.$outputs.outColor = pb.vec4();
+          pb.func('sobel', [pb.vec2('texCoord')], function () {
+            this.$l.tl = pb.textureSample(this.heightMap, pb.sub(this.texCoord, this.texelSize)).r;
+            this.$l.t = pb.textureSample(
+              this.heightMap,
+              pb.sub(this.texCoord, pb.vec2(0, this.texelSize.y))
+            ).r;
+            this.$l.tr = pb.textureSample(
+              this.heightMap,
+              pb.add(this.texCoord, pb.vec2(this.texelSize.x, pb.neg(this.texelSize.y)))
+            ).r;
+            this.$l.l = pb.textureSample(
+              this.heightMap,
+              pb.sub(this.texCoord, pb.vec2(this.texelSize.x, 0))
+            ).r;
+            this.$l.r = pb.textureSample(
+              this.heightMap,
+              pb.add(this.texCoord, pb.vec2(this.texelSize.x, 0))
+            ).r;
+            this.$l.bl = pb.textureSample(
+              this.heightMap,
+              pb.add(this.texCoord, pb.vec2(pb.neg(this.texelSize.x), this.texelSize.y))
+            ).r;
+            this.$l.b = pb.textureSample(
+              this.heightMap,
+              pb.add(this.texCoord, pb.vec2(0, this.texelSize.y))
+            ).r;
+            this.$l.br = pb.textureSample(this.heightMap, pb.add(this.texCoord, this.texelSize)).r;
+            this.$l.dx = pb.sub(
+              pb.add(this.tr, pb.mul(this.r, 2), this.br),
+              pb.add(this.tl, pb.mul(this.l, 2), this.bl)
+            );
+            this.$l.dz = pb.sub(
+              pb.add(this.bl, pb.mul(this.b, 2), this.br),
+              pb.add(this.tl, pb.mul(this.t, 2), this.tr)
+            );
+            this.$return(pb.vec2(this.dx, this.dz));
+          });
+          pb.main(function () {
+            this.$l.dxdz = this.sobel(this.$inputs.uv);
+            this.$l.dhdxdz = pb.div(pb.mul(this.dxdz, this.terrainScale.y), this.terrainScale.xz);
+            this.$l.normal = pb.normalize(pb.vec3(pb.neg(this.dhdxdz.x), 1, pb.neg(this.dhdxdz.y)));
+            this.$outputs.outColor = pb.vec4(pb.add(pb.mul(this.normal, 0.5), pb.vec3(0.5)), 1);
+          });
+        }
+      });
+      ClipmapTerrainMaterial._normalMapBindGroup = device.createBindGroup(
+        ClipmapTerrainMaterial._normalMapProgram.bindGroupLayouts[0]
+      );
+    }
+    const heightMap = this.heightMap;
+    let normalMap = this.normalMap;
+    if (!normalMap || normalMap.width !== heightMap.width || normalMap.height !== heightMap.height) {
+      normalMap = device.createTexture2D('rgba8unorm', heightMap.width, heightMap.height);
+      normalMap.name = 'TerrainNormal';
+    }
+    const fb = device.createFrameBuffer([normalMap], null);
+    ClipmapTerrainMaterial._normalMapBindGroup.setValue(
+      'texelSize',
+      new Vector2(1 / heightMap.width, 1 / heightMap.height)
+    );
+    ClipmapTerrainMaterial._normalMapBindGroup.setValue('terrainScale', this.terrainScale);
+    ClipmapTerrainMaterial._normalMapBindGroup.setTexture('heightMap', heightMap);
+    device.pushDeviceStates();
+    device.setFramebuffer(fb);
+    device.setProgram(ClipmapTerrainMaterial._normalMapProgram);
+    device.setBindGroup(0, ClipmapTerrainMaterial._normalMapBindGroup);
+    drawFullscreenQuad();
+    device.popDeviceStates();
+    fb.dispose();
+
+    this.normalMap = normalMap;
   }
 }
