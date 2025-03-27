@@ -24,7 +24,7 @@ export class ClipmapTerrain
   private _castShadow: boolean;
   private _sizeX: number;
   private _sizeZ: number;
-  constructor(scene: Scene, sizeX = 256, sizeZ = 256, clipMapTileSize = 64) {
+  constructor(scene: Scene, sizeX = 256, sizeZ = 256, clipMapTileSize = 128) {
     super(scene);
     this._pickTarget = { node: this };
     this._clipmap = new Clipmap(clipMapTileSize);

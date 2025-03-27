@@ -98,21 +98,23 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     scope.region = pb.vec4().uniform(2);
     scope.scaleY = pb.float().uniform(2);
     scope.$l.clipmapPos = pb.mul(scope.clipmapMatrix, pb.vec4(scope.$inputs.position, 1)).xy;
-    scope.clipmapWorldPos = pb.mul(
+    scope.$l.clipmapWorldPos = pb.mul(
       ShaderHelper.getWorldMatrix(scope),
       pb.vec4(scope.clipmapPos.x, 0, scope.clipmapPos.y, 1)
-    ).xyz; // pb.vec3(scope.clipmapPos.x, scope.level, scope.clipmapPos.y);
-    scope.worldPos = scope.clipmapWorldPos;
+    ).xyz;
     scope.$outputs.uv = pb.div(
-      pb.sub(scope.worldPos.xz, scope.region.xy),
+      pb.sub(scope.clipmapWorldPos.xz, scope.region.xy),
       pb.sub(scope.region.zw, scope.region.xy)
     );
     scope.$l.height = pb.textureSampleLevel(scope.heightMap, scope.$outputs.uv, 0).r;
-    scope.$outputs.worldPos = pb.vec3(scope.worldPos.x, pb.mul(scope.height, scope.scaleY), scope.worldPos.z);
+    scope.$outputs.worldPos = pb.add(
+      scope.clipmapWorldPos,
+      pb.vec3(0, pb.mul(scope.height, scope.scaleY), 0)
+    );
     scope.$outputs.clipmapPos = scope.clipmapWorldPos;
     ShaderHelper.setClipSpacePosition(
       scope,
-      pb.mul(ShaderHelper.getUnjitteredViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
     );
   }
   fragmentShader(scope: PBFunctionScope): void {
