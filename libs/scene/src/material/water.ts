@@ -322,7 +322,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$l.normal = pb.normalize(
           pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
         );
-        this.$l.displacedTexCoord = pb.add(this.screenUV, pb.mul(this.normal.xz, this.displace));
+        this.$l.displacedTexCoord = pb.add(this.jitteredUV, pb.mul(this.normal.xz, this.displace));
         this.$l.wPos = this.getPosition(this.jitteredUV, ShaderHelper.getInvViewProjectionMatrix(this)).xyz;
         this.$l.eyeVec = pb.sub(this.worldPos.xyz, ShaderHelper.getCameraPosition(this));
         this.$l.eyeVecNorm = pb.normalize(this.eyeVec);
