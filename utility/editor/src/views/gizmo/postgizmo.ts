@@ -123,7 +123,6 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
    */
   constructor(camera: Camera, binding = null, size = 10) {
     super();
-    this._layer = PostEffectLayer.transparent;
     this._primitives = null;
     this._camera = camera;
     this._node = binding;

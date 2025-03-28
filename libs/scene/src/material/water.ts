@@ -56,7 +56,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._refractionStrength = 0;
     this.cullMode = 'none';
     this.TAADisabled = true;
-    this.useFeature(WaterMaterial.FEATURE_SSR, true);
   }
   get SSR() {
     return this.featureUsed<boolean>(WaterMaterial.FEATURE_SSR);
@@ -173,9 +172,18 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     scope.$outputs.worldPos = scope.worldPos;
     scope.$outputs.clipmapPos = scope.clipmapWorldPos;
     scope.$outputs.worldNormal = scope.worldNormal;
+    scope.$outputs.csUnjittered = pb.mul(
+      ShaderHelper.getUnjitteredViewProjectionMatrix(scope),
+      pb.vec4(scope.$outputs.worldPos, 1)
+    );
+    scope.$outputs.csJittered = pb.mul(
+      ShaderHelper.getViewProjectionMatrix(scope),
+      pb.vec4(scope.$outputs.worldPos, 1)
+    );
     ShaderHelper.setClipSpacePosition(
       scope,
-      pb.mul(ShaderHelper.getUnjitteredViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+      scope.$outputs.csUnjittered
+      //pb.mul(ShaderHelper.getUnjitteredViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
     );
   }
   fragmentShader(scope: PBFunctionScope): void {
@@ -304,14 +312,18 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       'waterShading',
       [pb.vec3('worldPos'), pb.vec3('worldNormal'), pb.float('foamFactor')],
       function () {
+        this.$l.uvJittered = pb.mul(pb.div(this.$inputs.csJittered.xy, this.$inputs.csJittered.w), 2);
+        this.$l.uvUnjittered = pb.mul(pb.div(this.$inputs.csUnjittered.xy, this.$inputs.csUnjittered.w), 2);
+        this.$l.jitterValue = pb.sub(this.uvJittered, this.uvUnjittered);
         this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), ShaderHelper.getRenderSize(this));
+        this.$l.jitteredUV = pb.add(this.screenUV, this.jitterValue);
         this.$l.dist = pb.length(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this)));
         this.$l.normalScale = pb.pow(pb.clamp(pb.div(100, this.dist), 0, 1), 2);
         this.$l.normal = pb.normalize(
           pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
         );
         this.$l.displacedTexCoord = pb.add(this.screenUV, pb.mul(this.normal.xz, this.displace));
-        this.$l.wPos = this.getPosition(this.screenUV, ShaderHelper.getInvViewProjectionMatrix(this)).xyz;
+        this.$l.wPos = this.getPosition(this.jitteredUV, ShaderHelper.getInvViewProjectionMatrix(this)).xyz;
         this.$l.eyeVec = pb.sub(this.worldPos.xyz, ShaderHelper.getCameraPosition(this));
         this.$l.eyeVecNorm = pb.normalize(this.eyeVec);
         this.$l.depth = pb.length(pb.sub(this.wPos.xyz, this.worldPos));
@@ -364,7 +376,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.hitInfo.w
         );
         this.$l.refractUV = this.displacedTexCoord;
-        this.$l.displacedPos = this.getPosition(this.refractUV, ShaderHelper.getInvProjectionMatrix(this));
+        this.$l.displacedPos = this.getPosition(
+          this.refractUV,
+          ShaderHelper.getInvViewProjectionMatrix(this)
+        );
         this.$if(
           pb.or(
             pb.greaterThanEqual(this.displacedPos.w, 0.99999),

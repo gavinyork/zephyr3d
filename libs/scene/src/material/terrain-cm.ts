@@ -24,6 +24,8 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   private _terrainScale: Vector3;
   constructor(heightMap: Texture2D) {
     super();
+    this.metallic = 0;
+    this.roughness = 1;
     this._region = new Vector4(-99999, -99999, 99999, 99999);
     this._clipmapMatrix = new Matrix4x4();
     this._heightMap = new DRef(heightMap);
@@ -116,6 +118,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       scope,
       pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
     );
+    ShaderHelper.resolveMotionVector(scope, scope.$outputs.worldPos, scope.$outputs.worldPos);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
@@ -135,7 +138,11 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         pb.mul(pb.textureSample(scope.normalMap, scope.$inputs.uv).rgb, 2),
         pb.vec3(1)
       );
-      scope.$l.normalInfo = this.calculateNormalAndTBN(scope, scope.$inputs.worldPos, scope.worldNormal);
+      scope.$l.normalInfo = this.calculateNormalAndTBN(
+        scope,
+        scope.$inputs.worldPos,
+        pb.normalize(scope.worldNormal)
+      );
       scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
       scope.$l.litColor = this.PBRLight(
         scope,

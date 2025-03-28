@@ -123,6 +123,8 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   /** @internal */
   protected _jitteredVPMatrix: Matrix4x4;
   /** @internal */
+  protected _jitteredInvVPMatrix: Matrix4x4;
+  /** @internal */
   protected _prevVPMatrix: Matrix4x4;
   /** @internal */
   protected _prevPosition: Vector3;
@@ -168,6 +170,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._pickResult = null;
     this._commandBufferReuse = true;
     this._jitteredVPMatrix = new Matrix4x4();
+    this._jitteredInvVPMatrix = new Matrix4x4();
     this._jitterValue = new Vector2(0, 0);
     this._prevVPMatrix = null;
     this._prevPosition = null;
@@ -713,6 +716,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
       this._jitteredVPMatrix[8] += this._jitterValue.x;
       this._jitteredVPMatrix[9] += this._jitterValue.y;
       this._jitteredVPMatrix.multiplyRight(this.viewMatrix);
+      Matrix4x4.invert(this._jitteredVPMatrix, this._jitteredInvVPMatrix);
       if (!this._prevJitteredVPMatrix) {
         this._prevJitteredVPMatrix = new Matrix4x4();
         this._prevJitteredVPMatrix.set(this._jitteredVPMatrix);
@@ -724,10 +728,12 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
         this._prevPosition = this.getWorldPosition();
       }
     } else {
+      this._jitterValue.setXY(0, 0);
       this._prevVPMatrix = null;
       this._prevPosition = null;
       this._prevJitteredVPMatrix = null;
       this._prevJitterValue = null;
+      this._jitteredInvVPMatrix.set(this.invViewProjectionMatrix);
     }
     device.pushDeviceStates();
     device.reverseVertexWindingOrder(false);
@@ -789,6 +795,10 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   /** @internal */
   get jitteredVPMatrix() {
     return this._jitteredVPMatrix;
+  }
+  /** @internal */
+  get jitteredInvVPMatrix() {
+    return this._jitteredInvVPMatrix;
   }
   /** @internal */
   get jitterValue() {

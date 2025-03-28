@@ -1,4 +1,4 @@
-import { Matrix4x4, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render/drawable';
 import {
   MaterialVaryingFlags,
@@ -188,8 +188,9 @@ export class ShaderHelper {
       pb.vec4('position'),
       pb.vec4('clipPlane'),
       pb.mat4('viewProjectionMatrix'),
-      pb.mat4('unjitteredVPMatrix'),
       pb.mat4('invViewProjectionMatrix'),
+      pb.mat4('unjitteredVPMatrix'),
+      pb.mat4('jitteredInvVPMatrix'),
       pb.mat4('viewMatrix'),
       pb.mat4('projectionMatrix'),
       pb.mat4('invProjectionMatrix'),
@@ -198,6 +199,7 @@ export class ShaderHelper {
         ? [pb.mat4('prevUnjitteredVPMatrix')]
         : []),
       pb.vec2('renderSize'),
+      pb.vec2('jitterValue'),
       pb.float('roughnessFactor'),
       pb.int('framestamp')
     ]);
@@ -555,6 +557,23 @@ export class ShaderHelper {
       : scope.Z_resolveVertexPosition();
   }
   /**
+   * Resolve motion vector
+   *
+   * @param scope - Current shader scope
+   * @param worldPos - Current object position in world space
+   * @param prevWorldPos - Previous object position in world space
+   */
+  static resolveMotionVector(scope: PBInsideFunctionScope, worldPos: PBShaderExp, prevWorldPos: PBShaderExp) {
+    const that = this;
+    const pb = scope.$builder;
+    const prevUnjitteredVPMatrix = that.getPrevUnjitteredViewProjectionMatrix(scope);
+    if (prevUnjitteredVPMatrix) {
+      const unjitteredVPMatrix = that.getUnjitteredViewProjectionMatrix(scope);
+      scope.$outputs.zMotionVectorPosCurrent = pb.mul(unjitteredVPMatrix, pb.vec4(worldPos.xyz, 1));
+      scope.$outputs.zMotionVectorPosPrev = pb.mul(prevUnjitteredVPMatrix, pb.vec4(prevWorldPos.xyz, 1));
+    }
+  }
+  /**
    * Calculates the normal vector of type vec3 in object space
    *
    * @param scope - Current shader scope
@@ -749,20 +768,21 @@ export class ShaderHelper {
   /** @internal */
   static setCameraUniforms(bindGroup: BindGroup, ctx: DrawContext, linear: boolean) {
     const pos = ctx.camera.getWorldPosition();
+    const useJitter =
+      ctx.motionVectors &&
+      ctx.renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP &&
+      ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR;
     const cameraStruct = {
       position: new Vector4(pos.x, pos.y, pos.z, ctx.camera.clipPlane ? 1 : 0),
       clipPlane: ctx.camera.clipPlane ?? Vector4.zero(),
       renderSize: new Vector2(ctx.renderWidth, ctx.renderHeight),
-      viewProjectionMatrix:
-        ctx.motionVectors &&
-        ctx.renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP &&
-        ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR
-          ? ctx.camera.jitteredVPMatrix
-          : ctx.camera.viewProjectionMatrix,
+      viewProjectionMatrix: useJitter ? ctx.camera.jitteredVPMatrix : ctx.camera.viewProjectionMatrix,
       unjitteredVPMatrix: ctx.camera.viewProjectionMatrix,
+      jitteredInvVPMatrix: useJitter ? ctx.camera.jitteredInvVPMatrix : ctx.camera.invViewProjectionMatrix,
+      jitterValue: ctx.camera.jitterValue,
       invViewProjectionMatrix: ctx.camera.invViewProjectionMatrix,
       projectionMatrix: ctx.camera.getProjectionMatrix(),
-      invProjectionMatrix: Matrix4x4.invert(ctx.camera.getProjectionMatrix()),
+      invProjectionMatrix: ctx.camera.invViewProjectionMatrix,
       viewMatrix: ctx.camera.viewMatrix,
       params: new Vector4(
         ctx.camera.getNearPlane(),
@@ -1216,6 +1236,22 @@ export class ShaderHelper {
    */
   static getUnjitteredViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_GLOBAL].camera.unjitteredVPMatrix;
+  }
+  /**
+   * Gets the uniform variable of type vec2 which holds the jitter value of the projection matrix of current camera
+   * @param scope - Current shader scope
+   * @returns The jitter value of projection matrix of current camera
+   */
+  static getProjectionMatrixJitterValue(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].camera.jitterValue;
+  }
+  /**
+   * Gets the uniform variable of type mat4 which holds the jittered inversed view-projection matrix
+   * @param scope - Current shader scope
+   * @returns The jittered inversed view-projection matrix
+   */
+  static getJitteredInvVPMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].camera.jitteredInvVPMatrix;
   }
   /**
    * Gets the uniform variable of type mat4 which holds the unjittered view projection at previous frame matrix of current camera
