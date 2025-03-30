@@ -97,6 +97,8 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   /** @internal */
   private _opacity: number;
   /** @internal */
+  private _taaStrength: number;
+  /** @internal */
   private _objectColor: Vector4;
   /** @internal */
   private _ctx: DrawContext;
@@ -113,6 +115,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     this._blendMode = 'none';
     this._cullMode = 'back';
     this._opacity = 1;
+    this._taaStrength = 1 - 1 / 16;
     this._objectColor = Vector4.one();
     this._ctx = null;
     this._materialPass = -1;
@@ -396,6 +399,17 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   set TAADisabled(val: boolean) {
     this.useFeature(FEATURE_DISABLE_TAA, !!val);
   }
+  /** TAA strength */
+  get TAAStrength(): number {
+    return this._taaStrength;
+  }
+  set TAAStrength(val: number) {
+    val = val > 1 ? 1 : val < 0 ? 0 : val;
+    if (this._taaStrength !== val) {
+      this._taaStrength = val;
+      this.uniformChanged();
+    }
+  }
   get alphaToCoverage(): boolean {
     return this.featureUsed(FEATURE_ALPHATOCOVERAGE);
   }
@@ -522,6 +536,9 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR
     ) {
       bindGroup.setValue('zObjectColor', this._objectColor);
+    }
+    if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH && ctx.motionVectors) {
+      bindGroup.setValue('zTAAStrength', 1 - this._taaStrength);
     }
   }
   /**
@@ -677,6 +694,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           }
           if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH && ctx.motionVectors) {
             this.$outputs.zMotionVector = pb.vec4();
+            this.zTAAStrength = pb.float().uniform(2);
           }
           if (ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
             this.$outputs.zDistance = pb.vec4();
@@ -767,7 +785,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         }
         if (that.drawContext.motionVectors) {
           if (that.featureUsed(FEATURE_DISABLE_TAA)) {
-            this.$outputs.zMotionVector = pb.vec4(6e4, 6e4, 0, 1);
+            this.$outputs.zMotionVector = pb.vec4(6e4, 6e4, 1, 1);
           } else {
             if (this.$inputs.zMotionVectorPosCurrent && this.$inputs.zMotionVectorPosPrev) {
               this.$outputs.zMotionVector = pb.vec4(
@@ -778,11 +796,11 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
                   ),
                   0.5
                 ),
-                0,
+                this.zTAAStrength,
                 1
               );
             } else {
-              this.$outputs.zMotionVector = pb.vec4(0, 0, 0, 1);
+              this.$outputs.zMotionVector = pb.vec4(0, 0, 1, 1);
             }
           }
         }

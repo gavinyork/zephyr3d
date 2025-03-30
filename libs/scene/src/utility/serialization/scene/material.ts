@@ -580,6 +580,24 @@ export function getMeshMaterialClass(): SerializableClass {
           getDefaultValue(this: MeshMaterial) {
             return this.$isInstance ? this.coreMaterial.opacity : 1;
           }
+        },
+        {
+          name: 'TAAStrength',
+          type: 'float',
+          options: {
+            minValue: 0,
+            maxValue: 1
+          },
+          default: 15 / 16,
+          get(this: MeshMaterial, value) {
+            value.num[0] = this.TAAStrength;
+          },
+          set(this: MeshMaterial, value) {
+            this.TAAStrength = value.num[0];
+          },
+          isValid(this: MeshMaterial) {
+            return !this.$isInstance;
+          }
         }
       ];
     }

@@ -55,7 +55,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._depthMulti = 0.1;
     this._refractionStrength = 0;
     this.cullMode = 'none';
-    this.TAADisabled = true;
+    //this.TAADisabled = true;
   }
   get SSR() {
     return this.featureUsed<boolean>(WaterMaterial.FEATURE_SSR);
@@ -174,8 +174,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     scope.$outputs.worldNormal = scope.worldNormal;
     ShaderHelper.setClipSpacePosition(
       scope,
-      pb.mul(ShaderHelper.getUnjitteredViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
     );
+    ShaderHelper.resolveMotionVector(scope, scope.$outputs.worldPos, scope.$outputs.worldPos);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
@@ -317,7 +318,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
         );
         this.$l.displacedTexCoord = pb.add(this.screenUV, pb.mul(this.normal.xz, this.displace));
-        this.$l.wPos = this.getPosition(this.screenUV, ShaderHelper.getJitteredInvVPMatrix(this)).xyz;
+        this.$l.wPos = this.getPosition(this.screenUV, ShaderHelper.getInvViewProjectionMatrix(this)).xyz;
         this.$l.eyeVec = pb.sub(this.worldPos.xyz, ShaderHelper.getCameraPosition(this));
         this.$l.eyeVecNorm = pb.normalize(this.eyeVec);
         this.$l.depth = pb.length(pb.sub(this.wPos.xyz, this.worldPos));
@@ -370,7 +371,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.hitInfo.w
         );
         this.$l.refractUV = this.displacedTexCoord;
-        this.$l.displacedPos = this.getPosition(this.refractUV, ShaderHelper.getJitteredInvVPMatrix(this));
+        this.$l.displacedPos = this.getPosition(
+          this.refractUV,
+          ShaderHelper.getInvViewProjectionMatrix(this)
+        );
         this.$if(
           pb.or(
             pb.greaterThanEqual(this.displacedPos.w, 0.99999),
