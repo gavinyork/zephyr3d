@@ -54,10 +54,12 @@ import {
 import { ZipDownloader } from '../helpers/zipdownload';
 import { NodeProxy } from '../helpers/proxy';
 import { createEditTool, EditTool, isObjectEditable } from './edittools/edittool';
+import { PostDecalRenderer } from './gizmo/decal';
 
 export class SceneView extends BaseView<SceneModel> {
   private _cmdManager: CommandManager;
   private _postGizmoRenderer: PostGizmoRenderer;
+  private _postDecalRenderer: PostDecalRenderer;
   private _propGrid: PropertyEditor;
   private _toolbar: ToolBar;
   private _tab: Tab;
@@ -413,6 +415,7 @@ export class SceneView extends BaseView<SceneModel> {
     );
     this._postGizmoRenderer = new PostGizmoRenderer(this.model.camera, null);
     this._postGizmoRenderer.mode = 'select';
+    this._postDecalRenderer = new PostDecalRenderer();
     this._tab = new Tab(
       this.model.scene,
       true,
@@ -996,11 +999,13 @@ export class SceneView extends BaseView<SceneModel> {
   }
   private handleStartRender(scene: Scene, camera: Camera, compositor: Compositor) {
     if (this._postGizmoRenderer && (this._postGizmoRenderer.node || this._postGizmoRenderer.drawGrid)) {
+      compositor.appendPostEffect(this._postDecalRenderer);
       compositor.appendPostEffect(this._postGizmoRenderer);
     }
   }
   private handleEndRender(scene: Scene, camera: Camera, compositor: Compositor) {
     if ((this._postGizmoRenderer && this._postGizmoRenderer.node) || this._postGizmoRenderer.drawGrid) {
+      compositor.removePostEffect(this._postDecalRenderer);
       compositor.removePostEffect(this._postGizmoRenderer);
     }
   }

@@ -25,7 +25,7 @@ import type {
 } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
-import { linearToGamma } from '../../shaders';
+import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../../shaders';
 import { Application } from '../../app';
 import { fetchSampler } from '../../utility/misc';
 
@@ -1586,6 +1586,70 @@ export class ShaderHelper {
     const pb = scope.$builder;
     nearFar = nearFar ?? this.getCameraParams(scope);
     return pb.div(nearFar.x, pb.mix(nearFar.y, nearFar.x, depth));
+  }
+  /**
+   * Sample linear depth from linear depth texture
+   * @param scope - Current shader scope
+   * @param tex - The linear depth texture
+   * @param uv - The uv coordinates
+   * @param level - The mipmap level to sample
+   * @returns Linear depth value
+   */
+  static sampleLinearDepth(
+    scope: PBInsideFunctionScope,
+    tex: PBShaderExp,
+    uv: PBShaderExp,
+    level: PBShaderExp | number
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    const depth = pb.textureSampleLevel(tex, uv, level);
+    return pb.getDevice().type === 'webgl' ? decodeNormalizedFloatFromRGBA(scope, depth) : depth.r;
+  }
+  static samplePositionFromDepth(
+    scope: PBInsideFunctionScope,
+    depthTex: PBShaderExp,
+    uv: PBShaderExp,
+    mat: PBShaderExp,
+    cameraNearFar: PBShaderExp
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    const that = this;
+    pb.func(
+      'zSamplePositionFromDepth',
+      [pb.vec2('uv'), pb.vec2('cameraNearFar'), pb.mat4('mat')],
+      function () {
+        this.$l.linearDepth = that.sampleLinearDepth(this, depthTex, this.uv, 0);
+        this.$l.nonLinearDepth = pb.div(
+          pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
+          pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
+        );
+        this.$l.clipSpacePos = pb.vec4(
+          pb.sub(pb.mul(this.uv, 2), pb.vec2(1)),
+          pb.sub(pb.mul(pb.clamp(this.nonLinearDepth, 0, 1), 2), 1),
+          1
+        );
+        this.$l.wPos = pb.mul(this.mat, this.clipSpacePos);
+        this.$return(pb.vec4(pb.div(this.wPos.xyz, this.wPos.w), this.linearDepth));
+      }
+    );
+    return scope.zSamplePositionFromDepth(uv, cameraNearFar, mat);
+  }
+  /**
+   * Sample linear depth from linear depth texture with backface
+   * @param scope - Current shader scope
+   * @param tex - The linear depth texture
+   * @param uv - The uv coordinates
+   * @param level - The mipmap level to sample
+   * @returns Linear depth value
+   */
+  static sampleLinearDepthWithBackface(
+    scope: PBInsideFunctionScope,
+    tex: PBShaderExp,
+    uv: PBShaderExp,
+    level: PBShaderExp | number
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    return pb.textureSampleLevel(tex, uv, level).rg;
   }
   /**
    * Transform color to sRGB color space if nessesary

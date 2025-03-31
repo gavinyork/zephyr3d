@@ -12,7 +12,7 @@ import { MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
 import { Interpolator, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import { Application, DRef, DWeakRef } from '../app';
-import { sampleLinearDepth, screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
+import { screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
 import { fetchSampler } from '../utility/misc';
 import { mixinLight } from './mixins/lit';
 import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
@@ -251,28 +251,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       ).rgb;
       this.$return(pb.mul(this.c, this.c));
     });
-    pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
-      this.$l.linearDepth = sampleLinearDepth(this, ShaderHelper.getLinearDepthTexture(this), this.uv, 0);
-      this.$l.cameraNearFar = ShaderHelper.getCameraParams(this).xy;
-      this.$l.nonLinearDepth = ShaderHelper.linearDepthToNonLinear(
-        this,
-        pb.mul(this.linearDepth, this.cameraNearFar.y),
-        this.cameraNearFar
-      );
-      /*
-      this.$l.nonLinearDepth = pb.div(
-        pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
-        pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
-      );
-      */
-      this.$l.clipSpacePos = pb.vec4(
-        pb.sub(pb.mul(this.uv, 2), pb.vec2(1)),
-        pb.sub(pb.mul(pb.clamp(this.nonLinearDepth, 0, 1), 2), 1),
-        1
-      );
-      this.$l.wPos = pb.mul(this.mat, this.clipSpacePos);
-      this.$return(pb.vec4(pb.div(this.wPos.xyz, this.wPos.w), this.linearDepth));
-    });
     pb.func('fresnel', [pb.vec3('normal'), pb.vec3('eyeVec')], function () {
       this.$return(
         pb.clamp(
@@ -318,7 +296,13 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
         );
         this.$l.displacedTexCoord = pb.add(this.screenUV, pb.mul(this.normal.xz, this.displace));
-        this.$l.wPos = this.getPosition(this.screenUV, ShaderHelper.getInvViewProjectionMatrix(this)).xyz;
+        this.$l.wPos = ShaderHelper.samplePositionFromDepth(
+          this,
+          ShaderHelper.getLinearDepthTexture(this),
+          this.screenUV,
+          ShaderHelper.getInvViewProjectionMatrix(this),
+          ShaderHelper.getCameraParams(this).xy
+        );
         this.$l.eyeVec = pb.sub(this.worldPos.xyz, ShaderHelper.getCameraPosition(this));
         this.$l.eyeVecNorm = pb.normalize(this.eyeVec);
         this.$l.depth = pb.length(pb.sub(this.wPos.xyz, this.worldPos));
@@ -371,9 +355,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.hitInfo.w
         );
         this.$l.refractUV = this.displacedTexCoord;
-        this.$l.displacedPos = this.getPosition(
+        this.$l.displacedPos = ShaderHelper.samplePositionFromDepth(
+          this,
+          ShaderHelper.getLinearDepthTexture(this),
           this.refractUV,
-          ShaderHelper.getInvViewProjectionMatrix(this)
+          ShaderHelper.getInvViewProjectionMatrix(this),
+          ShaderHelper.getCameraParams(this).xy
         );
         this.$if(
           pb.or(

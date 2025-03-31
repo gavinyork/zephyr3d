@@ -169,27 +169,6 @@ function validateHit(
     : scope[funcName](hit2D, surfaceZ, uv, traceRay, viewMatrix, invProjMatrix, textureSize);
 }
 
-export function sampleLinearDepth(
-  scope: PBInsideFunctionScope,
-  tex: PBShaderExp,
-  uv: PBShaderExp,
-  level: PBShaderExp | number
-): PBShaderExp {
-  const pb = scope.$builder;
-  const depth = pb.textureSampleLevel(tex, uv, level);
-  return pb.getDevice().type === 'webgl' ? decodeNormalizedFloatFromRGBA(scope, depth) : depth.r;
-}
-
-export function sampleLinearDepthWithBackface(
-  scope: PBInsideFunctionScope,
-  tex: PBShaderExp,
-  uv: PBShaderExp,
-  level: PBShaderExp | number
-): PBShaderExp {
-  const pb = scope.$builder;
-  return pb.textureSampleLevel(tex, uv, level).rg;
-}
-
 export function screenSpaceRayTracing_Linear2D(
   scope: PBInsideFunctionScope,
   viewPos: PBShaderExp,
@@ -218,11 +197,11 @@ export function screenSpaceRayTracing_Linear2D(
     function () {
       let thickness = this.thickness;
       if (useBackfaceDepth) {
-        this.$l.sceneZ = sampleLinearDepthWithBackface(this, linearDepthTex, this.uv, 0);
+        this.$l.sceneZ = ShaderHelper.sampleLinearDepthWithBackface(this, linearDepthTex, this.uv, 0);
         this.$l.sceneZMax01 = this.sceneZ.x;
         thickness = pb.max(this.thickness, pb.mul(pb.sub(this.sceneZ.y, this.sceneZ.x), this.cameraFar));
       } else {
-        this.$l.sceneZMax01 = sampleLinearDepth(this, linearDepthTex, this.uv, 0);
+        this.$l.sceneZMax01 = ShaderHelper.sampleLinearDepth(this, linearDepthTex, this.uv, 0);
       }
       this.sceneZMax = pb.neg(pb.mul(this.sceneZMax01, this.cameraFar));
       this.$return(
@@ -415,7 +394,7 @@ export function screenSpaceRayTracing_Linear2D(
       this.$if(pb.not(this.intersected), function () {
         this.$return(pb.vec4(0));
       });
-      this.$l.surfaceZ01 = sampleLinearDepth(this, linearDepthTex, this.hit2D.xy, 0);
+      this.$l.surfaceZ01 = ShaderHelper.sampleLinearDepth(this, linearDepthTex, this.hit2D.xy, 0);
       this.$if(pb.equal(this.surfaceZ01, 1), function () {
         this.$return(pb.vec4(0));
       });

@@ -16,9 +16,10 @@ import { Interpolator, Matrix4x4, Plane, Vector2, Vector3, Vector4 } from '@zeph
 import { Camera } from '../camera';
 import { CopyBlitter } from '../blitter';
 import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
-import { sampleLinearDepth, screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
+import { screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
 import type { WaveGenerator } from '../render/wavegenerator';
 import { fetchSampler } from '../utility/misc';
+import { ShaderHelper } from '../material';
 
 /**
  * The post water effect
@@ -405,7 +406,7 @@ export class PostWater extends AbstractPostEffect<'PostWater'> {
             this.$return(pb.mul(this.c, this.c));
           });
           pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
-            this.$l.linearDepth = sampleLinearDepth(this, this.depthTex, this.uv, 0);
+            this.$l.linearDepth = ShaderHelper.sampleLinearDepth(this, this.depthTex, this.uv, 0);
             this.$l.nonLinearDepth = pb.div(
               pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
               pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
@@ -438,7 +439,13 @@ export class PostWater extends AbstractPostEffect<'PostWater'> {
                 pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
               );
               this.$l.displacedTexCoord = pb.add(this.screenUV, pb.mul(this.normal.xz, this.displace));
-              this.$l.wPos = this.getPosition(this.screenUV, this.invViewProj).xyz;
+              this.$l.wPos = ShaderHelper.samplePositionFromDepth(
+                this,
+                this.depthTex,
+                this.screenUV,
+                this.invViewProj,
+                this.cameraNearFar
+              );
               this.$l.eyeVec = pb.sub(this.worldPos.xyz, this.cameraPos);
               this.$l.eyeVecNorm = pb.normalize(this.eyeVec);
               this.$l.depth = pb.length(pb.sub(this.wPos.xyz, this.worldPos));
@@ -509,7 +516,13 @@ export class PostWater extends AbstractPostEffect<'PostWater'> {
               }
               this.refractUV = this.displacedTexCoord;
               this.$l.caustics = pb.float(0);
-              this.displacedPos = this.getPosition(this.refractUV, this.invProjMatrix);
+              this.displacedPos = ShaderHelper.samplePositionFromDepth(
+                this,
+                this.depthTex,
+                this.refractUV,
+                this.invProjMatrix,
+                this.cameraNearFar
+              );
               this.$if(
                 pb.or(
                   pb.greaterThanEqual(this.displacedPos.w, 0.99999),

@@ -2,15 +2,11 @@ import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import type { BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import {
-  sampleLinearDepth,
-  screenSpaceRayTracing_HiZ,
-  screenSpaceRayTracing_Linear2D,
-  SSR_calcJitter
-} from '../shaders/ssr';
+import { screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D, SSR_calcJitter } from '../shaders/ssr';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { copyTexture, fetchSampler } from '../utility/misc';
 import { BilateralBlurBlitter } from '../blitter/bilateralblur';
+import { ShaderHelper } from '../material';
 // import { debugTexture } from '../utility';
 
 /**
@@ -399,7 +395,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         }
         this.$outputs.outColor = pb.vec4();
         pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
-          this.$l.linearDepth = sampleLinearDepth(this, this.depthTex, this.uv, 0);
+          this.$l.linearDepth = ShaderHelper.sampleLinearDepth(this, this.depthTex, this.uv, 0);
           this.$l.nonLinearDepth = pb.div(
             pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
             pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
@@ -565,7 +561,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         this.srgbOut = pb.int().uniform(0);
         this.$outputs.outColor = pb.vec4();
         pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
-          this.$l.linearDepth = sampleLinearDepth(this, this.depthTex, this.uv, 0);
+          this.$l.linearDepth = ShaderHelper.sampleLinearDepth(this, this.depthTex, this.uv, 0);
           this.$l.nonLinearDepth = pb.div(
             pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
             pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
