@@ -30,6 +30,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._timeStart = 0;
     this._material = new DRef(new WaterMaterial());
     this._material.get().region = new Vector4(-1, -1, 1, 1);
+    this._material.get().TAAStrength = 0.4;
   }
   clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new Water(this.scene);
@@ -59,6 +60,12 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     if (this.material.needUpdate()) {
       this.scene.queueUpdateNode(this);
     }
+  }
+  get TAAStrength() {
+    return this.material.TAAStrength;
+  }
+  set TAAStrength(val: number) {
+    this.material.TAAStrength = val;
   }
   update(frameId: number, elapsedInSeconds: number) {
     if (this.material.needUpdate()) {

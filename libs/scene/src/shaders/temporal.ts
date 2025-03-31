@@ -20,7 +20,7 @@ export function temporalResolve(
   prevMotionVectorTex: PBShaderExp,
   uv: PBShaderExp,
   workSize: PBShaderExp,
-  blendFactor: PBShaderExp,
+  bf: PBShaderExp,
   debug = TAA_DEBUG_NONE
 ): PBShaderExp {
   const pb = scope.$builder;
@@ -40,7 +40,7 @@ export function temporalResolve(
       }
     }
     this.$l.motionVector = pb.textureSampleLevel(motionVectorTex, this.closestUV, 0);
-    this.$return(this.motionVector.xy);
+    this.$return(this.motionVector.xyz);
   });
   pb.func('clipAABB', [pb.vec3('aabbMin'), pb.vec3('aabbMax'), pb.vec3('p'), pb.vec3('q')], function () {
     this.$l.r = pb.sub(this.q, this.p);
@@ -207,7 +207,7 @@ export function temporalResolve(
     );
     this.$return(pb.max(this.result, pb.vec3(0)));
   });
-  pb.func('temporalResolve', [pb.vec2('screenUV'), pb.vec2('texSize'), pb.float('blendFactor')], function () {
+  pb.func('temporalResolve', [pb.vec2('screenUV'), pb.vec2('texSize'), pb.float('bf')], function () {
     this.$l.velocitySample = pb.textureSampleLevel(motionVectorTex, this.screenUV, 0);
     this.$l.velocity = this.velocitySample.xy;
     this.$l.sampleColor = pb.textureSampleLevel(currentColorTex, this.screenUV, 0).rgb;
@@ -221,10 +221,11 @@ export function temporalResolve(
     //this.$l.historyColor = pb.textureSampleLevel(historyColorTex, this.reprojectedUV, 0).rgb;
     this.$l.historyColor = this.sampleHistoryColorCatmulRom9(this.reprojectedUV, this.texSize);
     this.$l.velocityClosest = this.getClosestVelocity(this.screenUV, this.texSize);
+    this.$l.blendFactor = pb.div(this.velocityClosest.z, 50000);
     this.prevColor = this.clipHistoryColor(
       this.screenUV,
       this.historyColor,
-      this.velocityClosest,
+      this.velocityClosest.xy,
       this.texSize
     );
     this.$l.screenFactor = this.$choice(
@@ -269,5 +270,5 @@ export function temporalResolve(
     }
     this.$return(this.resolvedColor);
   });
-  return scope.temporalResolve(uv, workSize, blendFactor);
+  return scope.temporalResolve(uv, workSize, bf);
 }

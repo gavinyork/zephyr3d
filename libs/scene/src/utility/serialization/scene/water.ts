@@ -368,6 +368,18 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
           }
         },
         {
+          name: 'TAAStrength',
+          type: 'float',
+          default: 0.4,
+          options: { minValue: 0, maxValue: 1 },
+          get(this: Water, value) {
+            value.num[0] = this.TAAStrength;
+          },
+          set(this: Water, value) {
+            this.TAAStrength = value.num[0];
+          }
+        },
+        {
           name: 'ScatterRampTexture',
           type: 'object',
           nullable: true,

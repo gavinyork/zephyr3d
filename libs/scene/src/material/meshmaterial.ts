@@ -538,7 +538,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       bindGroup.setValue('zObjectColor', this._objectColor);
     }
     if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH && ctx.motionVectors) {
-      bindGroup.setValue('zTAAStrength', 1 - this._taaStrength);
+      bindGroup.setValue('zTAAStrength', (1 - this._taaStrength) * 50000);
     }
   }
   /**

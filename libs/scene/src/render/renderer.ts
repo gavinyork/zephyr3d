@@ -179,7 +179,7 @@ export class SceneRenderer {
           : ctx.SSRCalcThickness
           ? 'rg32f'
           : 'r32f';
-      const mvFormat: TextureFormat = ctx.device.type === 'webgl' ? 'rgba16f' : 'rg16f';
+      const mvFormat: TextureFormat = ctx.device.type === 'webgl' ? 'rgba16f' : 'rgba16f';
       if (!ctx.finalFramebuffer) {
         depthFramebuffer = ctx.device.pool.fetchTemporalFramebuffer(
           true,
