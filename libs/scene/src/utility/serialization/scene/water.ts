@@ -320,6 +320,17 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
           }
         },
         {
+          name: 'Wireframe',
+          type: 'bool',
+          default: false,
+          get(this: Water, value) {
+            value.bool[0] = this.wireframe;
+          },
+          set(this: Water, value) {
+            this.wireframe = value.bool[0];
+          }
+        },
+        {
           name: 'AnimationSpeed',
           type: 'float',
           default: 1,

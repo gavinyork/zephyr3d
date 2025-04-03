@@ -54,6 +54,7 @@ export class ClipmapTerrain
     this.sizeX = other.sizeX;
     this.sizeZ = other.sizeZ;
     this.gridScale = other.gridScale;
+    this.wireframe = other.wireframe;
     this.castShadow = other.castShadow;
   }
   setSize(sizeX: number, sizeZ: number) {
