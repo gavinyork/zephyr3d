@@ -57,6 +57,17 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
           }
         },
         {
+          name: 'Wireframe',
+          type: 'bool',
+          default: false,
+          get(this: ClipmapTerrain, value) {
+            value.bool[0] = this.wireframe;
+          },
+          set(this: ClipmapTerrain, value) {
+            this.wireframe = value.bool[0];
+          }
+        },
+        {
           name: 'HeightMap',
           type: 'object',
           default: null,

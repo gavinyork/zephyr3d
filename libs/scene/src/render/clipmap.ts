@@ -35,26 +35,43 @@ export type ClipmapDrawContext = {
 /** @internal */
 export class Clipmap {
   _tileResolution: number;
+
   _tileMesh: Primitive;
+  _tileMeshLines: Primitive;
   _tileMeshBBox: AABB;
-  _emptyTileMesh: Primitive;
-  _emptyTileMeshBBox: AABB;
+
   _fillerMesh: Primitive;
+  _fillerMeshLines: Primitive;
   _fillerMeshAABB: AABB;
+
   _trimMesh: Primitive;
+  _trimMeshLines: Primitive;
   _trimMeshAABB: AABB;
+
   _crossMesh: Primitive;
+  _crossMeshLines: Primitive;
   _crossMeshAABB: AABB;
+
   _seamMesh: Primitive;
+  _seamMeshLines: Primitive;
   _seamMeshAABB: AABB;
+
+  _wireframe: boolean;
+
   constructor(resolution: number) {
     this._tileResolution = resolution;
+    this._wireframe = false;
     this.generateCrossMesh();
-    this.generateEmptyTileMesh();
     this.generateFillerMesh();
     this.generateSeamMesh();
     this.generateTileMesh();
     this.generateTrimMesh();
+  }
+  get wireframe() {
+    return this._wireframe;
+  }
+  set wireframe(val: boolean) {
+    this._wireframe = !!val;
   }
   get tileResolution() {
     return this._tileResolution;
@@ -63,7 +80,6 @@ export class Clipmap {
     if (val !== this._tileResolution) {
       this._tileResolution = val;
       this.generateCrossMesh();
-      this.generateEmptyTileMesh();
       this.generateFillerMesh();
       this.generateSeamMesh();
       this.generateTileMesh();
@@ -127,40 +143,23 @@ export class Clipmap {
     this._tileMesh.indexCount = indices.length;
     this._tileMesh.primitiveType = 'triangle-list';
     this._tileMeshBBox = this.calcAABB(vertices);
-  }
-  generateEmptyTileMesh() {
-    this._emptyTileMesh?.dispose();
-    this._emptyTileMesh = new Primitive();
-    const vertices = new Float32Array((this._tileResolution * 4 + 1) * 3);
-    vertices[0] = this._tileResolution * 0.5;
-    vertices[1] = this._tileResolution * 0.5;
-    vertices[2] = 0;
-    for (let i = 0; i < this._tileResolution; i++) {
-      vertices[(i + 1 + 0 * this._tileResolution) * 3 + 0] = i;
-      vertices[(i + 1 + 0 * this._tileResolution) * 3 + 1] = 0;
-      vertices[(i + 1 + 0 * this._tileResolution) * 3 + 2] = 0;
-      vertices[(i + 1 + 1 * this._tileResolution) * 3 + 0] = this._tileResolution;
-      vertices[(i + 1 + 1 * this._tileResolution) * 3 + 1] = i;
-      vertices[(i + 1 + 1 * this._tileResolution) * 3 + 2] = 0;
-      vertices[(i + 1 + 2 * this._tileResolution) * 3 + 0] = this._tileResolution - i;
-      vertices[(i + 1 + 2 * this._tileResolution) * 3 + 1] = this._tileResolution;
-      vertices[(i + 1 + 2 * this._tileResolution) * 3 + 2] = 0;
-      vertices[(i + 1 + 3 * this._tileResolution) * 3 + 0] = 0;
-      vertices[(i + 1 + 3 * this._tileResolution) * 3 + 1] = this._tileResolution - i;
-      vertices[(i + 1 + 3 * this._tileResolution) * 3 + 2] = 0;
+
+    const indicesLines = new Uint16Array(indices.length * 2);
+    for (let i = 0; i < indices.length / 3; i++) {
+      indicesLines[i * 6 + 0] = indices[i * 3 + 0];
+      indicesLines[i * 6 + 1] = indices[i * 3 + 1];
+      indicesLines[i * 6 + 2] = indices[i * 3 + 1];
+      indicesLines[i * 6 + 3] = indices[i * 3 + 2];
+      indicesLines[i * 6 + 4] = indices[i * 3 + 2];
+      indicesLines[i * 6 + 5] = indices[i * 3 + 0];
     }
-    const indices = new Uint16Array(this._tileResolution * 12);
-    for (let i = 0; i < this._tileResolution * 4; i++) {
-      indices[i * 3 + 0] = 0;
-      indices[i * 3 + 2] = i + 2;
-      indices[i * 3 + 1] = i + 1;
-    }
-    this._emptyTileMesh.createAndSetVertexBuffer('position_f32x3', vertices);
-    this._emptyTileMesh.createAndSetIndexBuffer(indices);
-    this._emptyTileMesh.indexStart = 0;
-    this._emptyTileMesh.indexCount = indices.length;
-    this._emptyTileMesh.primitiveType = 'triangle-list';
-    this._emptyTileMeshBBox = this.calcAABB(vertices);
+    this._tileMeshLines?.dispose();
+    this._tileMeshLines = new Primitive();
+    this._tileMeshLines.setVertexBuffer(this._tileMesh.getVertexBuffer('position'));
+    this._tileMeshLines.createAndSetIndexBuffer(indicesLines);
+    this._tileMeshLines.indexStart = 0;
+    this._tileMeshLines.indexCount = indicesLines.length;
+    this._tileMeshLines.primitiveType = 'line-list';
   }
   generateFillerMesh() {
     this._fillerMesh?.dispose();
@@ -231,6 +230,23 @@ export class Clipmap {
     this._fillerMesh.indexCount = indices.length;
     this._fillerMesh.primitiveType = 'triangle-list';
     this._fillerMeshAABB = this.calcAABB(vertices);
+
+    const indicesLines = new Uint16Array(indices.length * 2);
+    for (let i = 0; i < indices.length / 3; i++) {
+      indicesLines[i * 6 + 0] = indices[i * 3 + 0];
+      indicesLines[i * 6 + 1] = indices[i * 3 + 1];
+      indicesLines[i * 6 + 2] = indices[i * 3 + 1];
+      indicesLines[i * 6 + 3] = indices[i * 3 + 2];
+      indicesLines[i * 6 + 4] = indices[i * 3 + 2];
+      indicesLines[i * 6 + 5] = indices[i * 3 + 0];
+    }
+    this._fillerMeshLines?.dispose();
+    this._fillerMeshLines = new Primitive();
+    this._fillerMeshLines.setVertexBuffer(this._fillerMesh.getVertexBuffer('position'));
+    this._fillerMeshLines.createAndSetIndexBuffer(indicesLines);
+    this._fillerMeshLines.indexStart = 0;
+    this._fillerMeshLines.indexCount = indicesLines.length;
+    this._fillerMeshLines.primitiveType = 'line-list';
   }
   generateTrimMesh() {
     this._trimMesh?.dispose();
@@ -280,10 +296,25 @@ export class Clipmap {
     this._trimMesh.indexCount = indices.length;
     this._trimMesh.primitiveType = 'triangle-list';
     this._trimMeshAABB = this.calcAABB(vertices);
+
+    const indicesLines = new Uint16Array(indices.length * 2);
+    for (let i = 0; i < indices.length / 3; i++) {
+      indicesLines[i * 6 + 0] = indices[i * 3 + 0];
+      indicesLines[i * 6 + 1] = indices[i * 3 + 1];
+      indicesLines[i * 6 + 2] = indices[i * 3 + 1];
+      indicesLines[i * 6 + 3] = indices[i * 3 + 2];
+      indicesLines[i * 6 + 4] = indices[i * 3 + 2];
+      indicesLines[i * 6 + 5] = indices[i * 3 + 0];
+    }
+    this._trimMeshLines?.dispose();
+    this._trimMeshLines = new Primitive();
+    this._trimMeshLines.setVertexBuffer(this._trimMesh.getVertexBuffer('position'));
+    this._trimMeshLines.createAndSetIndexBuffer(indicesLines);
+    this._trimMeshLines.indexStart = 0;
+    this._trimMeshLines.indexCount = indicesLines.length;
+    this._trimMeshLines.primitiveType = 'line-list';
   }
   generateCrossMesh() {
-    this._crossMesh?.dispose();
-    this._crossMesh = new Primitive();
     const patchVertResolution = this._tileResolution + 1;
     const vertices = new Float32Array(patchVertResolution * 8 * 3);
     let n = 0;
@@ -333,12 +364,31 @@ export class Clipmap {
       indices[n++] = startOfVertical + tl;
       indices[n++] = startOfVertical + tr;
     }
+    this._crossMesh?.dispose();
+    this._crossMesh = new Primitive();
     this._crossMesh.createAndSetVertexBuffer('position_f32x3', vertices);
     this._crossMesh.createAndSetIndexBuffer(indices);
     this._crossMesh.indexStart = 0;
     this._crossMesh.indexCount = indices.length;
     this._crossMesh.primitiveType = 'triangle-list';
     this._crossMeshAABB = this.calcAABB(vertices);
+
+    const indicesLines = new Uint16Array(indices.length * 2);
+    for (let i = 0; i < indices.length / 3; i++) {
+      indicesLines[i * 6 + 0] = indices[i * 3 + 0];
+      indicesLines[i * 6 + 1] = indices[i * 3 + 1];
+      indicesLines[i * 6 + 2] = indices[i * 3 + 1];
+      indicesLines[i * 6 + 3] = indices[i * 3 + 2];
+      indicesLines[i * 6 + 4] = indices[i * 3 + 2];
+      indicesLines[i * 6 + 5] = indices[i * 3 + 0];
+    }
+    this._crossMeshLines?.dispose();
+    this._crossMeshLines = new Primitive();
+    this._crossMeshLines.setVertexBuffer(this._crossMesh.getVertexBuffer('position'));
+    this._crossMeshLines.createAndSetIndexBuffer(indicesLines);
+    this._crossMeshLines.indexStart = 0;
+    this._crossMeshLines.indexCount = indicesLines.length;
+    this._crossMeshLines.primitiveType = 'line-list';
   }
   generateSeamMesh() {
     this._seamMesh?.dispose();
@@ -373,6 +423,23 @@ export class Clipmap {
     this._seamMesh.indexCount = indices.length;
     this._seamMesh.primitiveType = 'triangle-list';
     this._seamMeshAABB = this.calcAABB(vertices);
+
+    const indicesLines = new Uint16Array(indices.length * 2);
+    for (let i = 0; i < indices.length / 3; i++) {
+      indicesLines[i * 6 + 0] = indices[i * 3 + 0];
+      indicesLines[i * 6 + 1] = indices[i * 3 + 1];
+      indicesLines[i * 6 + 2] = indices[i * 3 + 1];
+      indicesLines[i * 6 + 3] = indices[i * 3 + 2];
+      indicesLines[i * 6 + 4] = indices[i * 3 + 2];
+      indicesLines[i * 6 + 5] = indices[i * 3 + 0];
+    }
+    this._seamMeshLines?.dispose();
+    this._seamMeshLines = new Primitive();
+    this._seamMeshLines.setVertexBuffer(this._seamMesh.getVertexBuffer('position'));
+    this._seamMeshLines.createAndSetIndexBuffer(indicesLines);
+    this._seamMeshLines.indexStart = 0;
+    this._seamMeshLines.indexCount = indicesLines.length;
+    this._seamMeshLines.primitiveType = 'line-list';
   }
   private intervalsOverlap(a0: number, a1: number, b0: number, b1: number) {
     return a0 <= b1 && b0 <= a1;
@@ -424,7 +491,13 @@ export class Clipmap {
     // draw cross
     snappedPos.setXY(Math.floor(posX), Math.floor(posY));
     if (this.visible(context, this._crossMeshAABB, context.camera, null, snappedPos, 1, context.gridScale)) {
-      context.drawPrimitive(this._crossMesh, modelMatrices[0], snappedPos, 1, context.gridScale);
+      context.drawPrimitive(
+        this._wireframe ? this._crossMeshLines : this._crossMesh,
+        modelMatrices[0],
+        snappedPos,
+        1,
+        context.gridScale
+      );
       drawn++;
     }
 
@@ -470,7 +543,13 @@ export class Clipmap {
                 context.gridScale
               )
             ) {
-              context.drawPrimitive(this._tileMesh, modelMatrices[0], offset, scale, context.gridScale);
+              context.drawPrimitive(
+                this._wireframe ? this._tileMeshLines : this._tileMesh,
+                modelMatrices[0],
+                offset,
+                scale,
+                context.gridScale
+              );
               drawn++;
             }
           }
@@ -488,7 +567,13 @@ export class Clipmap {
           context.gridScale
         )
       ) {
-        context.drawPrimitive(this._fillerMesh, modelMatrices[0], snappedPos, scale, context.gridScale);
+        context.drawPrimitive(
+          this._wireframe ? this._fillerMeshLines : this._fillerMesh,
+          modelMatrices[0],
+          snappedPos,
+          scale,
+          context.gridScale
+        );
         drawn++;
       }
 
@@ -515,7 +600,13 @@ export class Clipmap {
             context.gridScale
           )
         ) {
-          context.drawPrimitive(this._trimMesh, modelMatrices[r], tileCentre, scale, context.gridScale);
+          context.drawPrimitive(
+            this._wireframe ? this._trimMeshLines : this._trimMesh,
+            modelMatrices[r],
+            tileCentre,
+            scale,
+            context.gridScale
+          );
           drawn++;
         }
         // draw seam
@@ -526,7 +617,13 @@ export class Clipmap {
         if (
           this.visible(context, this._seamMeshAABB, context.camera, null, nextBase, scale, context.gridScale)
         ) {
-          context.drawPrimitive(this._seamMesh, modelMatrices[0], nextBase, scale, context.gridScale);
+          context.drawPrimitive(
+            this._wireframe ? this._seamMeshLines : this._seamMesh,
+            modelMatrices[0],
+            nextBase,
+            scale,
+            context.gridScale
+          );
           drawn++;
         }
       }
@@ -536,8 +633,6 @@ export class Clipmap {
   dispose() {
     this._crossMesh.dispose();
     this._crossMesh = null;
-    this._emptyTileMesh.dispose();
-    this._emptyTileMesh = null;
     this._fillerMesh.dispose();
     this._fillerMesh = null;
     this._seamMesh.dispose();

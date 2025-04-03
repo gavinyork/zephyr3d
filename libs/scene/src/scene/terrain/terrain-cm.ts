@@ -24,7 +24,7 @@ export class ClipmapTerrain
   private _castShadow: boolean;
   private _sizeX: number;
   private _sizeZ: number;
-  constructor(scene: Scene, sizeX = 256, sizeZ = 256, clipMapTileSize = 128) {
+  constructor(scene: Scene, sizeX = 256, sizeZ = 256, clipMapTileSize = 64) {
     super(scene);
     this._pickTarget = { node: this };
     this._clipmap = new Clipmap(clipMapTileSize);
@@ -96,6 +96,12 @@ export class ClipmapTerrain
   }
   get material(): ClipmapTerrainMaterial {
     return this._material?.get() ?? null;
+  }
+  get wireframe() {
+    return this._clipmap.wireframe;
+  }
+  set wireframe(val: boolean) {
+    this._clipmap.wireframe = val;
   }
   /**
    * {@inheritDoc Drawable.getPickTarget }

@@ -437,14 +437,15 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    */
   setAt(index: number | PBShaderExp, val: number | boolean | PBShaderExp) {
     const varType = this.$ast.getType();
-    if (!varType.isArrayType()) {
+    if (!varType.isArrayType() && !(varType.isPrimitiveType() && varType.isVectorType())) {
       throw new Error('setAt() function must be used with array types');
     }
     if (typeof index === 'number') {
       if (!Number.isInteger(index)) {
         throw new Error('setAt() array index must be integer type');
       }
-      if (index < 0 || (varType.dimension > 0 && index >= varType.dimension)) {
+      const dimension = varType.isArrayType() ? varType.dimension : varType.cols;
+      if (index < 0 || (dimension > 0 && index >= dimension)) {
         throw new Error('setAt() array index out of bounds');
       }
     }
@@ -455,7 +456,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
           new ASTLValueArray(
             new ASTLValueScalar(this.$ast),
             typeof index === 'number' ? new ASTScalar(index, typeI32) : index.$ast,
-            varType.elementType
+            varType.isArrayType() ? varType.elementType : new PBPrimitiveTypeInfo(varType.scalarType)
           ),
           val instanceof PBShaderExp ? val.$ast : val
         )
