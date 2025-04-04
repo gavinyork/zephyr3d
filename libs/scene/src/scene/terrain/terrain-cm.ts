@@ -189,6 +189,12 @@ export class ClipmapTerrain
   set gridScale(val: number) {
     this._gridScale = val;
   }
+  /**
+   * World region
+   */
+  get worldRegion(): Vector4 {
+    return this.material.region;
+  }
   calculateLocalTransform(outMatrix: Matrix4x4): void {
     outMatrix.translation(this._position);
   }

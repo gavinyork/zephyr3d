@@ -8,6 +8,7 @@ export interface EditTool extends Disposable {
   handlePointerEvent(evt: PointerEvent, hitObject: any, hitPos: Vector3): boolean;
   handleKeyboardEvent(evt: KeyboardEvent): boolean;
   render(): void;
+  update(dt: number): void;
   getSubMenuItems(): MenuItemOptions[];
   getToolBarItems(): ToolBarItem[];
   getTarget(): any;

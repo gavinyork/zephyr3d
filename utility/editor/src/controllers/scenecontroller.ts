@@ -73,8 +73,9 @@ export class SceneController extends BaseController<SceneModel> {
         break;
     }
   }
-  private update() {
+  private update(dt: number) {
     this.model.camera.updateController();
+    this._view.update(dt);
   }
   private saveScene(name: string, showMessage = true) {
     const assetList = new Set<string>();

@@ -70,7 +70,7 @@ export class Editor {
   }
   render() {
     const module = this._moduleManager.currentModule;
-    if (module.view) {
+    if (module?.view) {
       imGuiNewFrame();
       module.view.render();
       ModalDialog.render();

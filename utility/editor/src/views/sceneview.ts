@@ -800,6 +800,11 @@ export class SceneView extends BaseView<SceneModel> {
       this._proxy.updateProxy(object);
     }
   }
+  update(dt: number) {
+    if (this._currentEditTool.get()) {
+      this._currentEditTool.get().update(dt);
+    }
+  }
   private editAABB(aabb: AABB) {
     this._aabbForEdit = aabb;
     this._postGizmoRenderer.editAABB(this._aabbForEdit);

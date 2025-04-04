@@ -89,6 +89,7 @@ export abstract class BaseView<Model extends BaseModel> {
     this.onDeactivate();
   }
   abstract render();
+  update(dt: number) {}
   protected onActivate() {}
   protected onDeactivate() {}
 }
