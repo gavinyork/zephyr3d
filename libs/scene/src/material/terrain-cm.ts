@@ -1,4 +1,4 @@
-import type { BindGroup, GPUProgram, PBFunctionScope, Texture2D } from '@zephyr3d/device';
+import type { BindGroup, GPUProgram, PBFunctionScope, Texture2D, Texture2DArray } from '@zephyr3d/device';
 import { applyMaterialMixins, MeshMaterial } from './meshmaterial';
 import type { DrawContext } from '../render';
 import { MaterialVaryingFlags } from '../values';
@@ -9,12 +9,26 @@ import { Application, DRef } from '../app';
 import { fetchSampler } from '../utility/misc';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
+import { CopyBlitter } from '../blitter';
+
+export type TerrainDetailMapInfo = {
+  detailMap: DRef<Texture2DArray>;
+  detailNormalMap?: DRef<Texture2DArray>;
+  detailMapList: DRef<Texture2D>[];
+  detailNormalMapList: DRef<Texture2D>[];
+  splatMap: DRef<Texture2DArray>;
+  detailMapParams: Float32Array;
+  numDetailMaps: number;
+};
+
+const MAX_DETAIL_MAPS = 8;
 
 export class ClipmapTerrainMaterial extends applyMaterialMixins(
   MeshMaterial,
   mixinLight,
   mixinPBRMetallicRoughness
 ) {
+  private static FEATURE_DETAIL_MAP = this.defineFeature();
   private static _normalMapProgram: GPUProgram = null;
   private static _normalMapBindGroup: BindGroup = null;
   private _region: Vector4;
@@ -22,6 +36,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   private _heightMap: DRef<Texture2D>;
   private _normalMap: DRef<Texture2D>;
   private _terrainScale: Vector3;
+  private _detailMapInfo: TerrainDetailMapInfo;
+  private _detailMapSize: number;
+  private _splatMapSize: number;
   constructor(heightMap: Texture2D) {
     super();
     this.metallic = 0;
@@ -30,6 +47,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     this._clipmapMatrix = new Matrix4x4();
     this._heightMap = new DRef(heightMap);
     this._normalMap = new DRef();
+    this._detailMapSize = 256;
+    this._splatMapSize = 512;
+    this._detailMapInfo = this.createDetailMapInfo();
     this._terrainScale = Vector3.one();
     this.calculateNormalMap();
   }
@@ -41,6 +61,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   set region(val: Vector4) {
     if (!val.equalsTo(this._region)) {
       this._region.set(val);
+      this.calculateNormalMap();
       this.uniformChanged();
     }
   }
@@ -52,6 +73,48 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   set terrainScale(val: Vector3) {
     if (!this._terrainScale.equalsTo(val)) {
       this._terrainScale.set(val);
+      this.calculateNormalMap();
+      this.uniformChanged();
+    }
+  }
+  addDetailMap(albedoMap: Texture2D, normalMap: Texture2D, scale: number, roughness: number) {
+    if (this._detailMapInfo.numDetailMaps === MAX_DETAIL_MAPS) {
+      console.error('Max detail maps reached');
+      return;
+    }
+    this._detailMapInfo.detailMapList.push(new DRef(albedoMap));
+    this._detailMapInfo.detailNormalMapList.push(new DRef(normalMap ?? null));
+    const blitter = new CopyBlitter();
+    blitter.srgbOut = true;
+    blitter.blit(
+      albedoMap,
+      this._detailMapInfo.detailMap.get(),
+      this._detailMapInfo.numDetailMaps,
+      albedoMap.width === this._detailMapSize && albedoMap.height === this._detailMapSize
+        ? fetchSampler('clamp_nearest_nomip')
+        : fetchSampler('clamp_linear_nomip')
+    );
+    if (normalMap) {
+      blitter.srgbOut = false;
+      blitter.blit(
+        normalMap,
+        this._detailMapInfo.detailNormalMap.get(),
+        this._detailMapInfo.numDetailMaps,
+        normalMap.width === this._detailMapSize && normalMap.height === this._detailMapSize
+          ? fetchSampler('clamp_nearest_nomip')
+          : fetchSampler('clamp_linear_nomip')
+      );
+    }
+    this._detailMapInfo.detailMapParams[this._detailMapInfo.numDetailMaps * 4] = scale;
+    this._detailMapInfo.detailMapParams[this._detailMapInfo.numDetailMaps * 4 + 1] = roughness;
+    this._detailMapInfo.numDetailMaps++;
+    this.useFeature(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP, true);
+  }
+  /** @internal */
+  update(region: Vector4, terrainScale: Vector3) {
+    if (!region.equalsTo(this._region) || !terrainScale.equalsTo(this._terrainScale)) {
+      this._region.set(region);
+      this._terrainScale.set(terrainScale);
       this.calculateNormalMap();
       this.uniformChanged();
     }
@@ -133,7 +196,14 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     });
     if (this.needFragmentColor()) {
       scope.normalMap = pb.tex2D().uniform(2);
-      scope.$l.albedo = pb.vec4(1);
+      if (this.featureUsed(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP)) {
+        scope.$l.albedo = pb.vec4(1);
+      } else {
+        scope.$l.checkerPos = pb.floor(pb.mul(scope.$inputs.uv, pb.sub(scope.region.zw, scope.region.xy)));
+        scope.$l.checker = pb.mod(pb.add(scope.checkerPos.x, scope.checkerPos.y), 2);
+        scope.$l.checkerColor = pb.mix(pb.vec3(0.4), pb.vec3(1), scope.checker);
+        scope.$l.albedo = pb.vec4(scope.checkerColor, 1);
+      }
       scope.$l.worldNormal = pb.sub(
         pb.mul(pb.textureSample(scope.normalMap, scope.$inputs.uv).rgb, 2),
         pb.vec3(1)
@@ -179,6 +249,59 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       bindGroup.setTexture('normalMap', this._normalMap.get());
     }
   }
+  createDetailMapInfo(): TerrainDetailMapInfo {
+    const device = Application.instance.device;
+    const detailMap = device.createTexture2DArray(
+      'rgba8unorm-srgb',
+      this._detailMapSize,
+      this._detailMapSize,
+      MAX_DETAIL_MAPS
+    );
+    const detailNormalMap = device.createTexture2DArray(
+      'rgba8unorm',
+      this._detailMapSize,
+      this._detailMapSize,
+      MAX_DETAIL_MAPS
+    );
+    const splatMap = device.createTexture2DArray(
+      'rgba8unorm',
+      this._splatMapSize,
+      this._splatMapSize,
+      MAX_DETAIL_MAPS >> 2
+    );
+    const fbDetail = device.createFrameBuffer([detailMap], null);
+    const fbNormal = device.createFrameBuffer([detailNormalMap], null);
+    const fbSplat = device.createFrameBuffer([splatMap], null);
+    device.pushDeviceStates();
+    device.setFramebuffer(fbDetail);
+    for (let i = 0; i < detailMap.depth; i++) {
+      fbDetail.setColorAttachmentLayer(0, i);
+      device.clearFrameBuffer(Vector4.zero(), 1, 0);
+    }
+    device.setFramebuffer(fbNormal);
+    for (let i = 0; i < detailNormalMap.depth; i++) {
+      fbNormal.setColorAttachmentLayer(0, i);
+      device.clearFrameBuffer(new Vector4(0.5, 0.5, 1, 1), 1, 0);
+    }
+    device.setFramebuffer(fbSplat);
+    for (let i = 0; i < splatMap.depth; i++) {
+      fbSplat.setColorAttachmentLayer(0, i);
+      device.clearFrameBuffer(i === 0 ? new Vector4(1, 0, 0, 0) : Vector4.zero(), 1, 0);
+    }
+    device.popDeviceStates();
+    fbDetail.dispose();
+    fbNormal.dispose();
+    return {
+      detailMap: new DRef(detailMap),
+      detailNormalMap: new DRef(detailNormalMap),
+      detailMapList: [],
+      detailNormalMapList: [],
+      splatMap: new DRef(splatMap),
+      detailMapParams: new Float32Array(MAX_DETAIL_MAPS * 4),
+      numDetailMaps: 0
+    };
+  }
+
   calculateNormalMap() {
     const device = Application.instance.device;
     if (!ClipmapTerrainMaterial._normalMapProgram) {
@@ -250,14 +373,14 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     }
     const heightMap = this.heightMap;
     let normalMap = this.normalMap;
-    if (!normalMap || normalMap.width !== heightMap.width || normalMap.height !== heightMap.height) {
-      normalMap = device.createTexture2D('rgba8unorm', heightMap.width, heightMap.height);
+    if (!normalMap) {
+      normalMap = device.createTexture2D('rgba8unorm', 1024, 1024);
       normalMap.name = 'TerrainNormal';
     }
     const fb = device.createFrameBuffer([normalMap], null);
     ClipmapTerrainMaterial._normalMapBindGroup.setValue(
       'texelSize',
-      new Vector2(1 / heightMap.width, 1 / heightMap.height)
+      new Vector2(1 / heightMap.width / this._terrainScale.x, 1 / heightMap.height / this._terrainScale.z)
     );
     ClipmapTerrainMaterial._normalMapBindGroup.setValue('terrainScale', this.terrainScale);
     ClipmapTerrainMaterial._normalMapBindGroup.setTexture('heightMap', heightMap);

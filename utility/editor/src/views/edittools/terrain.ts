@@ -1,4 +1,4 @@
-import { Application, ClipmapTerrain, DRef, Primitive } from '@zephyr3d/scene';
+import { Application, AssetRegistry, ClipmapTerrain, DRef, Primitive } from '@zephyr3d/scene';
 import type { EditTool } from './edittool';
 import { Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
 import type { MenuItemOptions } from '../../components/menubar';
@@ -23,14 +23,14 @@ export class TerrainEditTool implements EditTool {
   private _editSelected: number;
   private _brushing: boolean;
   private _hitPos: Vector2;
-  constructor(terrain: ClipmapTerrain) {
+  constructor(terrain: ClipmapTerrain, assetRegistry: AssetRegistry) {
     this._terrain = new DRef(terrain);
     this._brushSize = 10;
     this._brushAngle = 0;
     this._brushStrength = 1;
     this._disposed = false;
     this._brushing = false;
-    this._brushImageList = new ImageList();
+    this._brushImageList = new ImageList(assetRegistry);
     this._editList = ['raise', 'smooth', 'level', 'copy', 'texture'];
     this._editSelected = -1;
     this._hitPos = null;

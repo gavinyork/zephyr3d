@@ -409,15 +409,10 @@ export abstract class Blitter {
         if (destTexture.isTexture2D()) {
           this.blit2DArray(source, framebuffer, (layer as number) || 0, sampler);
         } else {
-          if (destTexture.depth !== source.depth) {
-            throw new Error(
-              'Blitter.blit() failed: can not blit between texture 2d arrays with different array size'
-            );
-          } else {
-            for (let i = 0; i < source.depth; i++) {
-              framebuffer.setColorAttachmentLayer(0, i);
-              this.blit2DArray(source, framebuffer, i, layer as TextureSampler);
-            }
+          const n = Math.min(source.depth, destTexture.depth);
+          for (let i = 0; i < n; i++) {
+            framebuffer.setColorAttachmentLayer(0, i);
+            this.blit2DArray(source, framebuffer, i, layer as TextureSampler);
           }
         }
       } else if (source.isTextureCube()) {

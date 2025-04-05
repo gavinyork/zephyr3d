@@ -221,8 +221,7 @@ export class ClipmapTerrain
         (z * this._sizeZ) / this.material.heightMap.height
       );
       this.gridScale = Math.max(Math.min(gridScale, 1), 0.1);
-      this.material.terrainScale = this.scale;
-      this.material.region = new Vector4(px, pz, px + x * this._sizeX, pz + z * this._sizeZ);
+      this.material.update(new Vector4(px, pz, px + x * this._sizeX, pz + z * this._sizeZ), this.scale);
     }
   }
   /**

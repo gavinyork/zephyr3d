@@ -831,7 +831,7 @@ export class SceneView extends BaseView<SceneModel> {
   }
   private handleEditNode(node: SceneNode) {
     if (!this._currentEditTool.get()) {
-      this._currentEditTool.set(createEditTool(node));
+      this._currentEditTool.set(createEditTool(node, this._assetRegistry));
     } else {
       this._currentEditTool.dispose();
     }
@@ -1004,13 +1004,13 @@ export class SceneView extends BaseView<SceneModel> {
   }
   private handleStartRender(scene: Scene, camera: Camera, compositor: Compositor) {
     if (this._postGizmoRenderer && (this._postGizmoRenderer.node || this._postGizmoRenderer.drawGrid)) {
-      compositor.appendPostEffect(this._postDecalRenderer);
+      //compositor.appendPostEffect(this._postDecalRenderer);
       compositor.appendPostEffect(this._postGizmoRenderer);
     }
   }
   private handleEndRender(scene: Scene, camera: Camera, compositor: Compositor) {
     if ((this._postGizmoRenderer && this._postGizmoRenderer.node) || this._postGizmoRenderer.drawGrid) {
-      compositor.removePostEffect(this._postDecalRenderer);
+      //compositor.removePostEffect(this._postDecalRenderer);
       compositor.removePostEffect(this._postGizmoRenderer);
     }
   }

@@ -1,23 +1,38 @@
+import { makeEventTarget } from '@zephyr3d/base';
 import { Texture2D } from '@zephyr3d/device';
 import { ImGui } from '@zephyr3d/imgui';
-import { DRef } from '@zephyr3d/scene';
+import { AssetRegistry, DRef } from '@zephyr3d/scene';
+import type { DBAssetInfo } from '../storage/db';
 
 type ImageInfo = {
   texture: DRef<Texture2D>;
   selected: boolean;
 };
-export class ImageList {
+export class ImageList extends makeEventTarget(Object)<{
+  add_image: [asset: string];
+}>() {
   private _images: ImageInfo[];
   private _isDragging: boolean;
   private _lastMouseX: number;
   private _selectedIndex: number;
   private _spacing: number;
-  constructor() {
+  private _acceptDragDrop: boolean;
+  private _assetRegistry: AssetRegistry;
+  constructor(assetRegistry: AssetRegistry) {
+    super();
     this._images = [];
     this._isDragging = false;
     this._lastMouseX = 0;
     this._selectedIndex = -1;
     this._spacing = 5;
+    this._acceptDragDrop = true;
+    this._assetRegistry = assetRegistry;
+  }
+  get acceptDragDrop() {
+    return this._acceptDragDrop;
+  }
+  set acceptDragDrop(val: boolean) {
+    this._acceptDragDrop = val;
   }
   private calcTotalWidth(height: number): number {
     let totalWidth = 0;
@@ -143,6 +158,32 @@ export class ImageList {
       ImGui.PopID();
     }
     ImGui.EndChild();
+    if (this._acceptDragDrop) {
+      ImGui.SetCursorPos(new ImGui.ImVec2(0, 0)); // 重置光标到 Child 窗口的左上角
+      ImGui.InvisibleButton('##droptarget', size, ImGui.ButtonFlags.MouseButtonLeft);
+      if (ImGui.BeginDragDropTarget()) {
+        const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
+        if (payload) {
+          const assetId = (payload.Data as DBAssetInfo).uuid;
+          const assetInfo = this._assetRegistry.getAssetInfo(assetId);
+          if (assetInfo && assetInfo.type === 'texture') {
+            this._assetRegistry
+              .fetchTexture<Texture2D>(assetId, assetInfo.textureOptions)
+              .then((tex) => {
+                if (tex?.isTexture2D()) {
+                  this.addImage(tex);
+                } else {
+                  console.error('Invalid texture');
+                }
+              })
+              .catch((err) => {
+                console.error(`Load asset failed: ${assetId}: ${err}`);
+              });
+          }
+        }
+        ImGui.EndDragDropTarget();
+      }
+    }
     ImGui.PopID();
     return selectionChanged;
   }

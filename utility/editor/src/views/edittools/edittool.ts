@@ -1,7 +1,7 @@
 import { Vector3 } from '@zephyr3d/base';
 import { MenuItemOptions } from '../../components/menubar';
 import { ToolBarItem } from '../../components/toolbar';
-import { ClipmapTerrain, Disposable } from '@zephyr3d/scene';
+import { AssetRegistry, ClipmapTerrain, Disposable } from '@zephyr3d/scene';
 import { TerrainEditTool } from './terrain';
 
 export interface EditTool extends Disposable {
@@ -18,9 +18,9 @@ export function isObjectEditable(obj: any): boolean {
   return obj instanceof ClipmapTerrain;
 }
 
-export function createEditTool(obj: any): EditTool {
+export function createEditTool(obj: any, assetRegistry: AssetRegistry): EditTool {
   if (obj instanceof ClipmapTerrain) {
-    return new TerrainEditTool(obj);
+    return new TerrainEditTool(obj, assetRegistry);
   }
   return null;
 }
