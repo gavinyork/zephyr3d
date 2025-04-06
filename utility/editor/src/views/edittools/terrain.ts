@@ -19,18 +19,50 @@ export class TerrainEditTool implements EditTool {
   private _brushAngle: number;
   private _brushStrength: number;
   private _brushImageList: ImageList;
+  private _detailAlbedo: ImageList;
+  private _detailNormal: ImageList;
   private _editList: string[];
   private _editSelected: number;
   private _brushing: boolean;
   private _hitPos: Vector2;
+  private _assetRegistry: AssetRegistry;
   constructor(terrain: ClipmapTerrain, assetRegistry: AssetRegistry) {
     this._terrain = new DRef(terrain);
+    this._assetRegistry = assetRegistry;
     this._brushSize = 10;
     this._brushAngle = 0;
     this._brushStrength = 1;
     this._disposed = false;
     this._brushing = false;
-    this._brushImageList = new ImageList(assetRegistry);
+    this._brushImageList = new ImageList(this._assetRegistry);
+    this._detailAlbedo = new ImageList(this._assetRegistry);
+    this._detailNormal = new ImageList(this._assetRegistry);
+    for (let i = 0; i < terrain.material.numDetailMaps; i++) {
+      this._detailAlbedo.addImage(terrain.material.getDetailMap(i));
+      this._detailNormal.addImage(terrain.material.getDetailNormalMap(i));
+    }
+    this._detailAlbedo.on('update_image', (asset: string, index: number) => {
+      this._terrain.get().material.setDetailMap(index, this._detailAlbedo.getImage(index));
+    });
+    this._detailAlbedo.on('add_image', (asset: string, index: number) => {
+      const material = this._terrain.get().material;
+      material.numDetailMaps++;
+      for (let i = material.numDetailMaps - 1; i > index; i--) {
+        material.setDetailMap(i, material.getDetailMap(i - 1));
+      }
+      material.setDetailMap(index, this._detailAlbedo.getImage(index));
+    });
+    this._detailNormal.on('update_image', (asset: string, index: number) => {
+      this._terrain.get().material.setDetailNormalMap(index, this._detailNormal.getImage(index));
+    });
+    this._detailNormal.on('add_image', (asset: string, index: number) => {
+      const material = this._terrain.get().material;
+      material.numDetailMaps++;
+      for (let i = material.numDetailMaps - 1; i > index; i--) {
+        material.setDetailNormalMap(i, material.getDetailNormalMap(i - 1));
+      }
+      material.setDetailNormalMap(index, this._detailNormal.getImage(index));
+    });
     this._editList = ['raise', 'smooth', 'level', 'copy', 'texture'];
     this._editSelected = -1;
     this._hitPos = null;
@@ -80,6 +112,30 @@ export class TerrainEditTool implements EditTool {
       this._editSelected = sel[0];
     }
     ImGui.EndChild();
+    if (this._editList[this._editSelected] === 'texture') {
+    }
+  }
+  renderDetailMapSection() {
+    ImGui.BeginChild(
+      'Detail',
+      new ImGui.ImVec2(
+        0,
+        60 * 2 +
+          2 * ImGui.GetFrameHeight() +
+          2 * ImGui.GetStyle().WindowPadding.y +
+          2 * ImGui.GetStyle().ItemSpacing.y
+      ),
+      true
+    );
+    ImGui.Text('Detail Albedo');
+    ImGui.BeginChild('AlbedoList', new ImGui.ImVec2(0, 60));
+    this._detailAlbedo.render(ImGui.GetContentRegionAvail());
+    ImGui.EndChild();
+    ImGui.Text('Detail Normal');
+    ImGui.BeginChild('NormalList', new ImGui.ImVec2(0, 60));
+    this._detailNormal.render(ImGui.GetContentRegionAvail());
+    ImGui.EndChild();
+    ImGui.EndChild();
   }
   renderBrushSection() {
     ImGui.BeginChild(
@@ -116,6 +172,9 @@ export class TerrainEditTool implements EditTool {
       ImGui.Dummy(new ImGui.ImVec2(300, 0));
       this.renderBrushSection();
       this.renderEditSection();
+      if (this._editList[this._editSelected] === 'texture') {
+        this.renderDetailMapSection();
+      }
     }
     ImGui.End();
   }
@@ -213,9 +272,14 @@ export class TerrainEditTool implements EditTool {
     }
   }
   dispose(): void {
-    if (!this._disposed) {
-      this._disposed = true;
-      this._terrain.dispose();
-    }
+    this._disposed = true;
+    this._terrain?.dispose();
+    this._terrain = null;
+    this._brushImageList?.clear();
+    this._brushImageList = null;
+    this._detailAlbedo?.clear();
+    this._detailAlbedo = null;
+    this._detailNormal?.clear();
+    this._detailNormal = null;
   }
 }

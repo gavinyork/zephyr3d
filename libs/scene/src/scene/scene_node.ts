@@ -64,7 +64,6 @@ export class SceneNode
     visiblechanged: [node: SceneNode];
     transformchanged: [node: SceneNode];
     bvchanged: [node: SceneNode];
-    disposed: [node: SceneNode];
   }>()
   implements NodeClonable<SceneNode>
 {
@@ -398,14 +397,13 @@ export class SceneNode
   }
   /** Disposes the node */
   dispose() {
-    if (!this._disposed) {
-      this._disposed = true;
-      this.remove();
-      this.removeChildren();
-      this._animationSet.dispose();
-      this._sharedModel.dispose();
-      this.dispatchEvent('disposed', this);
-    }
+    this._disposed = true;
+    this.remove();
+    this.removeChildren();
+    this._animationSet?.dispose();
+    this._animationSet = null;
+    this._sharedModel?.dispose();
+    this._sharedModel = null;
   }
   /**
    * Whether this node was disposed

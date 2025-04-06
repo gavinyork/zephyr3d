@@ -1284,10 +1284,8 @@ export class FFTWaveGenerator implements WaveGenerator {
   }
   /** {@inheritDoc WaveGenerator.dispose} */
   dispose() {
-    if (!this._disposed) {
-      this._disposed = true;
-      this.disposeInstanceData();
-    }
+    this._disposed = true;
+    this.disposeInstanceData();
   }
   /** {@inheritDoc WaveGenerator.calcClipmapTileAABB} */
   calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB) {

@@ -351,19 +351,20 @@ export class Primitive implements Clonable<Primitive> {
    * call removeVertexBuffer() or setIndexBuffer(null) first.
    */
   dispose() {
-    if (!this._disposed) {
-      const m = Primitive._registry.get(this.persistentId);
-      if (!m || m.get() !== this) {
-        throw new Error('Registry material mismatch');
-      }
+    this._disposed = true;
+    const m = Primitive._registry.get(this.persistentId);
+    if (m?.get() === this) {
       Primitive._registry.delete(this._persistentId);
       m.dispose();
-      this._disposed = true;
-      this._vertexLayout?.dispose();
+    }
+    this._vertexLayout?.dispose();
+    this._vertexLayout = null;
+    if (this._vertexLayoutOptions) {
       releaseObject(this._vertexLayoutOptions.indexBuffer);
       for (const info of this._vertexLayoutOptions.vertexBuffers) {
         releaseObject(info.buffer);
       }
+      this._vertexLayoutOptions = null;
     }
   }
   /**

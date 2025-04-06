@@ -176,27 +176,29 @@ export class Quadtree {
     return this._terrain;
   }
   dispose() {
-    if (!this._disposed) {
-      this._disposed = true;
-      if (this._rootNode) {
-        const nodes: QuadtreeNode[] = [this._rootNode];
-        while (nodes.length > 0) {
-          const node = nodes.shift();
-          if (node) {
-            for (let i = 0; i < 4; i++) {
-              const child = node.getChild(i);
-              if (child) {
-                nodes.push(child);
-              }
+    this._disposed = true;
+    if (this._rootNode) {
+      const nodes: QuadtreeNode[] = [this._rootNode];
+      while (nodes.length > 0) {
+        const node = nodes.shift();
+        if (node) {
+          for (let i = 0; i < 4; i++) {
+            const child = node.getChild(i);
+            if (child) {
+              nodes.push(child);
             }
-            node.dispose();
           }
+          node.dispose();
         }
       }
-      this._indices.dispose();
-      this._indicesWireframe.dispose();
-      this._normalMap.dispose();
+      this._rootNode = null;
     }
+    this._indices?.dispose();
+    this._indices = null;
+    this._indicesWireframe?.dispose();
+    this._indicesWireframe = null;
+    this._normalMap?.dispose();
+    this._normalMap = null;
   }
   get disposed() {
     return this._disposed;

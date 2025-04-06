@@ -327,17 +327,16 @@ export class AnimationSet {
     }
   }
   dispose() {
-    if (!this._disposed) {
-      this._disposed = true;
-      this._model.dispose();
-      for (const k in this._animations) {
-        this._animations[k].dispose();
-      }
-      this._animations = {};
-      this._activeAnimations.clear();
-      this._activeSkeletons.clear();
-      this._activeTracks.clear();
+    this._disposed = true;
+    this._model?.dispose();
+    this._model = null;
+    for (const k in this._animations) {
+      this._animations[k].dispose();
     }
+    this._animations = {};
+    this._activeAnimations.clear();
+    this._activeSkeletons.clear();
+    this._activeTracks.clear();
   }
   get disposed() {
     return this._disposed;

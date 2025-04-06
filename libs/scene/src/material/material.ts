@@ -291,20 +291,17 @@ export class Material implements Clonable<Material> {
    * Dispose material
    */
   dispose() {
-    if (!this._disposed) {
-      const m = Material._registry.get(this.persistentId);
-      if (!m || m.get() !== this) {
-        throw new Error('Registry material mismatch');
-      }
-      Material._registry.delete(this._persistentId);
+    this._disposed = true;
+    const m = Material._registry.get(this.persistentId);
+    if (m?.get() === this) {
+      Material._registry.delete(this.persistentId);
       m.dispose();
-      this._disposed = true;
-      if (this._states) {
-        for (const k in this._states) {
-          this._states[k]?.bindGroup?.dispose();
-        }
-        this._states = {};
+    }
+    if (this._states) {
+      for (const k in this._states) {
+        this._states[k]?.bindGroup?.dispose();
       }
+      this._states = {};
     }
   }
   /**

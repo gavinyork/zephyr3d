@@ -86,19 +86,17 @@ export class ABufferOIT implements OIT {
    * {@inheritDoc OIT.dispose}
    */
   dispose() {
-    if (!this._disposed) {
-      this._disposed = true;
-      this._nodeBuffer?.dispose();
-      this._nodeBuffer = null;
-      this._headStagingBuffer?.dispose();
-      this._headStagingBuffer = null;
-      this._headBuffer?.dispose();
-      this._headBuffer = null;
-      this._scissorOffsetBuffer?.dispose();
-      this._scissorOffsetBuffer = null;
-      this._hash = null;
-      this._savedScissor = null;
-    }
+    this._disposed = true;
+    this._nodeBuffer?.dispose();
+    this._nodeBuffer = null;
+    this._headStagingBuffer?.dispose();
+    this._headStagingBuffer = null;
+    this._headBuffer?.dispose();
+    this._headBuffer = null;
+    this._scissorOffsetBuffer?.dispose();
+    this._scissorOffsetBuffer = null;
+    this._hash = null;
+    this._savedScissor = null;
   }
   /**
    * {@inheritDoc OIT.disposed}

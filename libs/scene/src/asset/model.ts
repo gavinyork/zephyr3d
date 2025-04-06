@@ -513,25 +513,23 @@ export class SharedModel {
   }
   /** Disposes this model */
   dispose() {
-    if (!this._disposed) {
-      const nodes = [...this._nodes];
-      while (nodes.length > 0) {
-        const node = nodes.shift();
-        nodes.push(...node.children);
-        const mesh = node.mesh;
-        if (mesh) {
-          for (const subMesh of mesh.subMeshes) {
-            subMesh.primitive?.dispose();
-            subMesh.material?.dispose();
-          }
+    const nodes = [...this._nodes];
+    while (nodes.length > 0) {
+      const node = nodes.shift();
+      nodes.push(...node.children);
+      const mesh = node.mesh;
+      if (mesh) {
+        for (const subMesh of mesh.subMeshes) {
+          subMesh.primitive?.dispose();
+          subMesh.material?.dispose();
         }
       }
-      this._nodes = [];
-      this._skeletons = [];
-      this._scenes = [];
-      this._animations = [];
-      this._disposed = true;
     }
+    this._nodes = [];
+    this._skeletons = [];
+    this._scenes = [];
+    this._animations = [];
+    this._disposed = true;
   }
   /** Name of the model */
   get name(): string {

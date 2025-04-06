@@ -266,4 +266,11 @@ export class ClipmapTerrain
       mipLevels
     );
   }
+  dispose(): void {
+    super.dispose();
+    this._clipmap?.dispose();
+    this._clipmap = null;
+    this._material?.dispose();
+    this._material = null;
+  }
 }

@@ -54,12 +54,10 @@ import {
 import { ZipDownloader } from '../helpers/zipdownload';
 import { NodeProxy } from '../helpers/proxy';
 import { createEditTool, EditTool, isObjectEditable } from './edittools/edittool';
-import { PostDecalRenderer } from './gizmo/decal';
 
 export class SceneView extends BaseView<SceneModel> {
   private _cmdManager: CommandManager;
   private _postGizmoRenderer: PostGizmoRenderer;
-  private _postDecalRenderer: PostDecalRenderer;
   private _propGrid: PropertyEditor;
   private _toolbar: ToolBar;
   private _tab: Tab;
@@ -415,7 +413,6 @@ export class SceneView extends BaseView<SceneModel> {
     );
     this._postGizmoRenderer = new PostGizmoRenderer(this.model.camera, null);
     this._postGizmoRenderer.mode = 'select';
-    this._postDecalRenderer = new PostDecalRenderer();
     this._tab = new Tab(
       this.model.scene,
       true,

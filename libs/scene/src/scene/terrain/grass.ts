@@ -114,23 +114,23 @@ export class GrassManager {
     this._disposed = false;
   }
   dispose() {
-    if (!this._disposed) {
-      this._disposed = true;
-      this._indexBuffer.dispose();
-      for (const entry of this._baseVertexBuffer) {
-        entry[1].dispose();
-      }
-      this._baseVertexBuffer.clear();
-      for (const layer of this._layers) {
-        layer.material.dispose();
-      }
-      for (const layer of this._layers) {
-        layer.material.dispose();
-        for (const cluster of layer.clusters) {
-          cluster[1].dispose();
-        }
+    this._disposed = true;
+    this._indexBuffer?.dispose();
+    this._indexBuffer = null;
+    for (const entry of this._baseVertexBuffer) {
+      entry[1].dispose();
+    }
+    this._baseVertexBuffer.clear();
+    for (const layer of this._layers) {
+      layer.material.dispose();
+    }
+    for (const layer of this._layers) {
+      layer.material.dispose();
+      for (const cluster of layer.clusters) {
+        cluster[1].dispose();
       }
     }
+    this._layers = [];
   }
   get disposed() {
     return this._disposed;
