@@ -11,6 +11,7 @@ import { Application, DRef } from '../../app';
 import { MeshMaterial } from '../../material';
 import type { BoundingVolume } from '../../utility/bounding_volume';
 import { BoundingBox } from '../../utility/bounding_volume';
+import { RENDER_PASS_TYPE_OBJECT_COLOR } from '../../values';
 
 export class ClipmapTerrain
   extends applyMixins(GraphNode, mixinDrawable)
@@ -239,6 +240,10 @@ export class ClipmapTerrain
     const mipLevels = Math.ceil(Math.log2(maxDist / (this._clipmap.tileResolution * gridScale))) + 1;
     const that = this;
     this.bind(ctx);
+    const wireframe = this._clipmap.wireframe;
+    if (ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
+      this._clipmap.wireframe = false;
+    }
     this._clipmap.draw(
       {
         camera,
@@ -265,6 +270,7 @@ export class ClipmapTerrain
       },
       mipLevels
     );
+    this._clipmap.wireframe = wireframe;
   }
   dispose(): void {
     super.dispose();

@@ -78,6 +78,10 @@ export class ImageList extends makeEventTarget(Object)<{
     }
     this._images = [];
   }
+  dispose() {
+    this.clear();
+    this._defaultImage.dispose();
+  }
   scrollToSelected(height: number) {
     if (this._selectedIndex >= 0 && this._selectedIndex < this._images.length) {
       let offsetX = 0;

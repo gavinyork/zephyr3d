@@ -7,6 +7,7 @@ export * from './material';
 export * from './meshmaterial';
 export * from './grassmaterial';
 export * from './terrainmaterial';
+export * from './terrain-cm';
 export * from './pbrmr';
 export * from './pbrsg';
 export * from './mixins/pbr/common';

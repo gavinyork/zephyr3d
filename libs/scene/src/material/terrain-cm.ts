@@ -19,7 +19,7 @@ import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughn
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { CopyBlitter } from '../blitter';
 
-export type TerrainDetailMapInfo = {
+export type ClipmapTerrainDetailMapInfo = {
   detailMap: DRef<Texture2DArray>;
   detailNormalMap?: DRef<Texture2DArray>;
   detailMapList: DRef<Texture2D>[];
@@ -46,7 +46,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   private _heightMap: DRef<Texture2D>;
   private _normalMap: DRef<Texture2D>;
   private _terrainScale: Vector3;
-  private _detailMapInfo: TerrainDetailMapInfo;
+  private _detailMapInfo: ClipmapTerrainDetailMapInfo;
   private _detailMapSize: number;
   private _splatMapSize: number;
   constructor(heightMap: Texture2D) {
@@ -286,7 +286,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         for (let i = 0; i < numDetailMaps; i++) {
           const uv = pb.mul(this.$inputs.uv, scope.detailParams[i].x);
           const sample = pb.textureArraySample(this.detailAlbedoMap, uv, i).rgb;
-          this.color = pb.add(this.color, pb.mul(sample, this[`mask${i >> 2}`][i & 2]));
+          this.color = pb.add(this.color, pb.mul(sample, this[`mask${i >> 2}`][i & 3]));
         }
         this.$return(pb.vec4(this.color, 1));
       }
@@ -411,7 +411,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       }
     }
   }
-  createDetailMapInfo(): TerrainDetailMapInfo {
+  createDetailMapInfo(): ClipmapTerrainDetailMapInfo {
     const device = Application.instance.device;
     const detailMap = device.createTexture2DArray(
       'rgba8unorm-srgb',

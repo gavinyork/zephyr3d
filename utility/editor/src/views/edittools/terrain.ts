@@ -1,4 +1,11 @@
-import { Application, AssetRegistry, ClipmapTerrain, DRef, Primitive } from '@zephyr3d/scene';
+import {
+  Application,
+  AssetRegistry,
+  ClipmapTerrain,
+  ClipmapTerrainMaterial,
+  DRef,
+  Primitive
+} from '@zephyr3d/scene';
 import type { EditTool } from './edittool';
 import { Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
 import type { MenuItemOptions } from '../../components/menubar';
@@ -36,13 +43,13 @@ export class TerrainEditTool implements EditTool {
     this._brushing = false;
     this._brushImageList = new ImageList(this._assetRegistry);
     this._detailAlbedo = new ImageList(this._assetRegistry);
+    this._detailAlbedo.defaultImage = ClipmapTerrainMaterial.getDefaultDetailMap();
     this._detailNormal = new ImageList(this._assetRegistry);
-    for (let i = 0; i < terrain.material.numDetailMaps; i++) {
-      this._detailAlbedo.addImage(terrain.material.getDetailMap(i));
-      this._detailNormal.addImage(terrain.material.getDetailNormalMap(i));
-    }
+    this._detailNormal.defaultImage = ClipmapTerrainMaterial.getDefaultNormalMap();
+    this.refreshDetailMaps();
     this._detailAlbedo.on('update_image', (asset: string, index: number) => {
       this._terrain.get().material.setDetailMap(index, this._detailAlbedo.getImage(index));
+      this.refreshDetailMaps();
     });
     this._detailAlbedo.on('add_image', (asset: string, index: number) => {
       const material = this._terrain.get().material;
@@ -51,9 +58,11 @@ export class TerrainEditTool implements EditTool {
         material.setDetailMap(i, material.getDetailMap(i - 1));
       }
       material.setDetailMap(index, this._detailAlbedo.getImage(index));
+      this.refreshDetailMaps();
     });
     this._detailNormal.on('update_image', (asset: string, index: number) => {
       this._terrain.get().material.setDetailNormalMap(index, this._detailNormal.getImage(index));
+      this.refreshDetailMaps();
     });
     this._detailNormal.on('add_image', (asset: string, index: number) => {
       const material = this._terrain.get().material;
@@ -62,6 +71,7 @@ export class TerrainEditTool implements EditTool {
         material.setDetailNormalMap(i, material.getDetailNormalMap(i - 1));
       }
       material.setDetailNormalMap(index, this._detailNormal.getImage(index));
+      this.refreshDetailMaps();
     });
     this._editList = ['raise', 'smooth', 'level', 'copy', 'texture'];
     this._editSelected = -1;
@@ -271,15 +281,24 @@ export class TerrainEditTool implements EditTool {
         .setBlendFuncAlpha('zero', 'one');
     }
   }
+  refreshDetailMaps() {
+    const terrain = this._terrain.get();
+    this._detailAlbedo.clear();
+    this._detailNormal.clear();
+    for (let i = 0; i < terrain.material.numDetailMaps; i++) {
+      this._detailAlbedo.addImage(terrain.material.getDetailMap(i));
+      this._detailNormal.addImage(terrain.material.getDetailNormalMap(i));
+    }
+  }
   dispose(): void {
     this._disposed = true;
     this._terrain?.dispose();
     this._terrain = null;
-    this._brushImageList?.clear();
+    this._brushImageList?.dispose();
     this._brushImageList = null;
-    this._detailAlbedo?.clear();
+    this._detailAlbedo?.dispose();
     this._detailAlbedo = null;
-    this._detailNormal?.clear();
+    this._detailNormal?.dispose();
     this._detailNormal = null;
   }
 }
