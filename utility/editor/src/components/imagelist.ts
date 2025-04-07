@@ -22,6 +22,7 @@ export class ImageList extends makeEventTarget(Object)<{
   private _acceptDragDrop: boolean;
   private _assetRegistry: AssetRegistry;
   private _defaultImage: DRef<Texture2D>;
+  private _selectable: boolean;
   constructor(assetRegistry: AssetRegistry) {
     super();
     this._images = [];
@@ -30,6 +31,7 @@ export class ImageList extends makeEventTarget(Object)<{
     this._selectedIndex = -1;
     this._spacingX = 16;
     this._spacingY = 5;
+    this._selectable = true;
     this._acceptDragDrop = true;
     this._defaultImage = new DRef(Application.instance.device.createTexture2D('rgba8unorm', 1, 1));
     this._defaultImage.get().update(new Uint8Array([0, 0, 0, 255]), 0, 0, 1, 1);
@@ -40,6 +42,12 @@ export class ImageList extends makeEventTarget(Object)<{
   }
   set defaultImage(tex: Texture2D) {
     this._defaultImage.set(tex);
+  }
+  get selectable() {
+    return this._selectable;
+  }
+  set selectable(val: boolean) {
+    this._selectable = val;
   }
   get acceptDragDrop() {
     return this._acceptDragDrop;
@@ -202,7 +210,8 @@ export class ImageList extends makeEventTarget(Object)<{
             new ImGui.ImVec2(0, 0),
             new ImGui.ImVec2(1, 1),
             0
-          )
+          ) &&
+          this._selectable
         ) {
           if (this._selectedIndex !== i) {
             this._selectedIndex = i;

@@ -1,25 +1,15 @@
-import {
-  Application,
-  AssetRegistry,
-  ClipmapTerrain,
-  ClipmapTerrainMaterial,
-  DRef,
-  Primitive
-} from '@zephyr3d/scene';
+import { Application, AssetRegistry, ClipmapTerrain, ClipmapTerrainMaterial, DRef } from '@zephyr3d/scene';
 import type { EditTool } from './edittool';
-import { Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
+import { degree2radian, Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
 import type { MenuItemOptions } from '../../components/menubar';
 import type { ToolBarItem } from '../../components/toolbar';
 import { ImGui } from '@zephyr3d/imgui';
 import { ImageList } from '../../components/imagelist';
 import { Editor } from '../../core/editor';
-import { BindGroup, GPUProgram, RenderStateSet } from '@zephyr3d/device';
+import { BaseTerrainBrush } from './brushes/base';
+import { Texture2D } from '@zephyr3d/device';
 
 export class TerrainEditTool implements EditTool {
-  private static _brushProgram: GPUProgram = null;
-  private static _brushBindGroup: BindGroup = null;
-  private static _brushPrimitive: Primitive = null;
-  private static _brushRenderStates: RenderStateSet = null;
   private _terrain: DRef<ClipmapTerrain>;
   private _disposed: boolean;
   private _brushSize: number;
@@ -32,6 +22,11 @@ export class TerrainEditTool implements EditTool {
   private _editSelected: number;
   private _brushing: boolean;
   private _hitPos: Vector2;
+  private _raiseBrush: BaseTerrainBrush;
+  private _smoothBrush: BaseTerrainBrush;
+  private _levelBrush: BaseTerrainBrush;
+  private _copyBrush: BaseTerrainBrush;
+  private _textureBrush: BaseTerrainBrush;
   private _assetRegistry: AssetRegistry;
   constructor(terrain: ClipmapTerrain, assetRegistry: AssetRegistry) {
     this._terrain = new DRef(terrain);
@@ -43,8 +38,10 @@ export class TerrainEditTool implements EditTool {
     this._brushing = false;
     this._brushImageList = new ImageList(this._assetRegistry);
     this._detailAlbedo = new ImageList(this._assetRegistry);
+    this._detailAlbedo.selectable = true;
     this._detailAlbedo.defaultImage = ClipmapTerrainMaterial.getDefaultDetailMap();
     this._detailNormal = new ImageList(this._assetRegistry);
+    this._detailNormal.selectable = false;
     this._detailNormal.defaultImage = ClipmapTerrainMaterial.getDefaultNormalMap();
     this.refreshDetailMaps();
     this._detailAlbedo.on('update_image', (asset: string, index: number) => {
@@ -80,6 +77,11 @@ export class TerrainEditTool implements EditTool {
       this._brushImageList.addImage(Editor.instance.getBrushes()[name].get());
     }
     this._brushImageList.selected = 0;
+    this._raiseBrush = new BaseTerrainBrush();
+    this._smoothBrush = new BaseTerrainBrush();
+    this._levelBrush = new BaseTerrainBrush();
+    this._copyBrush = new BaseTerrainBrush();
+    this._textureBrush = new BaseTerrainBrush();
   }
   handlePointerEvent(evt: PointerEvent, hitObject: any, hitPos: Vector3): boolean {
     if (hitPos) {
@@ -97,12 +99,98 @@ export class TerrainEditTool implements EditTool {
     return false;
   }
   update() {
-    if (this._brushing && this._hitPos) {
-      this.drawRegion(this._hitPos, this._brushSize, this._brushAngle);
+    if (this._brushing && this._hitPos && this._brushImageList.selected >= 0) {
+      const texture = this._brushImageList.getImage(this._brushImageList.selected);
+      const angle = degree2radian(this._brushAngle);
+      switch (this._editList[this._editSelected]) {
+        case 'raise':
+          this.applyHeightBrush(
+            this._raiseBrush,
+            texture,
+            this._hitPos,
+            this._brushSize,
+            angle,
+            this._brushStrength
+          );
+          break;
+        case 'smooth':
+          this.applyHeightBrush(
+            this._smoothBrush,
+            texture,
+            this._hitPos,
+            this._brushSize,
+            angle,
+            this._brushStrength
+          );
+          break;
+        case 'level':
+          this.applyHeightBrush(
+            this._levelBrush,
+            texture,
+            this._hitPos,
+            this._brushSize,
+            angle,
+            this._brushStrength
+          );
+          break;
+        case 'copy':
+          this.applyHeightBrush(
+            this._copyBrush,
+            texture,
+            this._hitPos,
+            this._brushSize,
+            angle,
+            this._brushStrength
+          );
+          break;
+        case 'texture':
+          this.applyTextureBrush(texture, this._hitPos, this._brushSize, angle, this._brushStrength);
+          break;
+        default:
+          break;
+      }
       if (this._editList[this._editSelected] !== 'texture') {
         this._terrain.get().material.calculateNormalMap();
       }
     }
+  }
+  applyTextureBrush(
+    brushTexture: Texture2D,
+    hitPos: Vector2,
+    brushSize: number,
+    angle: number,
+    strength: number
+  ) {
+    this._textureBrush.brush(
+      this._terrain.get().heightMap,
+      brushTexture,
+      this._terrain.get().worldRegion,
+      hitPos,
+      brushSize,
+      angle,
+      strength,
+      null
+    );
+  }
+  applyHeightBrush(
+    brush: BaseTerrainBrush,
+    brushTexture: Texture2D,
+    hitPos: Vector2,
+    brushSize: number,
+    angle: number,
+    strength: number
+  ) {
+    const clear = this.ensureTerrainHeightMap();
+    brush.brush(
+      this._terrain.get().heightMap,
+      brushTexture,
+      this._terrain.get().worldRegion,
+      hitPos,
+      brushSize,
+      angle,
+      strength,
+      clear ? Vector4.zero() : null
+    );
   }
   handleKeyboardEvent(evt: KeyboardEvent): boolean {
     return false;
@@ -131,9 +219,9 @@ export class TerrainEditTool implements EditTool {
       new ImGui.ImVec2(
         0,
         60 * 2 +
-          2 * ImGui.GetFrameHeight() +
+          3 * ImGui.GetFrameHeight() +
           2 * ImGui.GetStyle().WindowPadding.y +
-          2 * ImGui.GetStyle().ItemSpacing.y
+          3 * ImGui.GetStyle().ItemSpacing.y
       ),
       true
     );
@@ -145,6 +233,19 @@ export class TerrainEditTool implements EditTool {
     ImGui.BeginChild('NormalList', new ImGui.ImVec2(0, 60));
     this._detailNormal.render(ImGui.GetContentRegionAvail());
     ImGui.EndChild();
+    const disabled = this._detailAlbedo.selected < 0;
+    if (disabled) {
+      ImGui.PushStyleVar(ImGui.StyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5);
+      ImGui.InputFloat('UVScale', [0] as [number], 1, 10, undefined, ImGui.InputTextFlags.ReadOnly);
+      ImGui.PopStyleVar();
+    } else {
+      const uvScale = [this._terrain.get().material.getDetailMapUVScale(this._detailAlbedo.selected)] as [
+        number
+      ];
+      if (ImGui.DragFloat('UVScale', uvScale, 1, 0, 1000, undefined)) {
+        this._terrain.get().material.setDetailMapUVScale(this._detailAlbedo.selected, uvScale[0]);
+      }
+    }
     ImGui.EndChild();
   }
   renderBrushSection() {
@@ -188,37 +289,20 @@ export class TerrainEditTool implements EditTool {
     }
     ImGui.End();
   }
-  drawRegion(pos: Vector2, size: number, angle: number) {
-    TerrainEditTool.prepareBrush();
-    const terrain = this._terrain.get();
-    const device = Application.instance.device;
+  ensureTerrainHeightMap(): boolean {
     let clear = false;
-    if (!terrain.heightMap) {
-      terrain.heightMap = device.createTexture2D(
+    if (!this._terrain.get().heightMap) {
+      this._terrain.get().heightMap = Application.instance.device.createTexture2D(
         'r16f',
-        Math.max(1, terrain.sizeX),
-        Math.max(1, terrain.sizeZ),
+        Math.max(1, this._terrain.get().sizeX),
+        Math.max(1, this._terrain.get().sizeZ),
         {
           samplerOptions: { mipFilter: 'none' }
         }
       );
       clear = true;
     }
-    const program = TerrainEditTool._brushProgram;
-    const bindGroup = TerrainEditTool._brushBindGroup;
-    const framebuffer = device.pool.fetchTemporalFramebuffer(false, 0, 0, terrain.heightMap, null, false);
-    bindGroup.setValue('params', new Vector4(pos.x, pos.y, size, angle));
-    bindGroup.setValue('region', terrain.worldRegion);
-    device.pushDeviceStates();
-    device.setProgram(program);
-    device.setBindGroup(0, bindGroup);
-    device.setRenderStates(TerrainEditTool._brushRenderStates);
-    device.setFramebuffer(framebuffer);
-    if (clear) {
-      device.clearFrameBuffer(Vector4.zero(), 1, 0);
-    }
-    TerrainEditTool._brushPrimitive.draw();
-    device.popDeviceStates();
+    return clear;
   }
   getSubMenuItems(): MenuItemOptions[] {
     return [];
@@ -231,55 +315,6 @@ export class TerrainEditTool implements EditTool {
   }
   get disposed(): boolean {
     return this._disposed;
-  }
-  static prepareBrush() {
-    if (!this._brushProgram) {
-      this._brushProgram = Application.instance.device.buildRenderProgram({
-        vertex(pb) {
-          this.params = pb.vec4().uniform(0);
-          this.region = pb.vec4().uniform(0);
-          this.$inputs.position = pb.float().attrib('position');
-          this.axis = [pb.vec2(-1, -1), pb.vec2(1, -1), pb.vec2(-1, 1), pb.vec2(1, 1)];
-          pb.main(function () {
-            this.$l.worldPos = this.params.xy;
-            this.$l.size = this.params.z;
-            this.$l.angle = this.params.w;
-            this.$l.s = pb.sin(this.angle);
-            this.$l.c = pb.cos(this.angle);
-            this.$l.rotMat = pb.mat2(this.c, this.s, pb.neg(this.s), this.c);
-            this.$l.axis = pb.mul(this.rotMat, this.axis.at(this.$builtins.vertexIndex));
-            this.$l.pos = pb.add(this.worldPos, pb.mul(pb.normalize(this.axis), this.size));
-            this.$l.uv = pb.div(pb.sub(this.pos, this.region.xy), pb.sub(this.region.zw, this.region.xy));
-            this.$l.cs = pb.sub(pb.mul(this.uv, 2), pb.vec2(1));
-            this.$outputs.uv = this.uv;
-            this.$builtins.position = pb.vec4(this.cs.x, pb.neg(this.cs.y), 0, 1);
-          });
-        },
-        fragment(pb) {
-          this.$outputs.color = pb.vec4();
-          pb.main(function () {
-            this.$l.height = pb.length(this.$inputs.uv);
-            this.$outputs.color = pb.vec4(this.height, this.height, this.height, 1);
-          });
-        }
-      });
-      this._brushBindGroup = Application.instance.device.createBindGroup(
-        this._brushProgram.bindGroupLayouts[0]
-      );
-      this._brushPrimitive = new Primitive();
-      this._brushPrimitive.createAndSetVertexBuffer('position_f32', new Float32Array([0, 1, 2, 3]));
-      this._brushPrimitive.indexCount = 4;
-      this._brushPrimitive.indexStart = 0;
-      this._brushPrimitive.primitiveType = 'triangle-strip';
-      this._brushRenderStates = Application.instance.device.createRenderStateSet();
-      this._brushRenderStates.useDepthState().enableTest(false).enableWrite(false);
-      this._brushRenderStates.useRasterizerState().setCullMode('none');
-      this._brushRenderStates
-        .useBlendingState()
-        .enable(true)
-        .setBlendFuncRGB('one', 'one')
-        .setBlendFuncAlpha('zero', 'one');
-    }
   }
   refreshDetailMaps() {
     const terrain = this._terrain.get();

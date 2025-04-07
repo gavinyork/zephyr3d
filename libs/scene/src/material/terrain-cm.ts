@@ -179,7 +179,6 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       albedoMap === ClipmapTerrainMaterial.getDefaultDetailMap() ? null : albedoMap
     );
     const blitter = new CopyBlitter();
-    blitter.srgbOut = true;
     blitter.blit(
       albedoMap,
       this._detailMapInfo.detailMap.get(),
@@ -209,7 +208,6 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       normalMap === ClipmapTerrainMaterial.getDefaultNormalMap() ? null : normalMap
     );
     const blitter = new CopyBlitter();
-    blitter.srgbOut = false;
     blitter.blit(
       normalMap,
       this._detailMapInfo.detailNormalMap.get(),
@@ -414,7 +412,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   createDetailMapInfo(): ClipmapTerrainDetailMapInfo {
     const device = Application.instance.device;
     const detailMap = device.createTexture2DArray(
-      'rgba8unorm-srgb',
+      'rgba8unorm',
       this._detailMapSize,
       this._detailMapSize,
       MAX_DETAIL_MAPS
