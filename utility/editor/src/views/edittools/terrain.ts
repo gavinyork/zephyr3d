@@ -1,4 +1,12 @@
-import { Application, AssetRegistry, ClipmapTerrain, ClipmapTerrainMaterial, DRef } from '@zephyr3d/scene';
+import {
+  Application,
+  AssetRegistry,
+  ClipmapTerrain,
+  ClipmapTerrainMaterial,
+  CopyBlitter,
+  DRef,
+  fetchSampler
+} from '@zephyr3d/scene';
 import type { EditTool } from './edittool';
 import { degree2radian, Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
 import type { MenuItemOptions } from '../../components/menubar';
@@ -7,7 +15,8 @@ import { ImGui } from '@zephyr3d/imgui';
 import { ImageList } from '../../components/imagelist';
 import { Editor } from '../../core/editor';
 import { BaseTerrainBrush } from './brushes/base';
-import { Texture2D } from '@zephyr3d/device';
+import { Texture2D, Texture2DArray } from '@zephyr3d/device';
+import { TerrainTextureBrush } from './brushes/splat';
 
 export class TerrainEditTool implements EditTool {
   private _terrain: DRef<ClipmapTerrain>;
@@ -26,8 +35,9 @@ export class TerrainEditTool implements EditTool {
   private _smoothBrush: BaseTerrainBrush;
   private _levelBrush: BaseTerrainBrush;
   private _copyBrush: BaseTerrainBrush;
-  private _textureBrush: BaseTerrainBrush;
+  private _textureBrush: TerrainTextureBrush;
   private _assetRegistry: AssetRegistry;
+  private _splatMapCopy: DRef<Texture2DArray>;
   constructor(terrain: ClipmapTerrain, assetRegistry: AssetRegistry) {
     this._terrain = new DRef(terrain);
     this._assetRegistry = assetRegistry;
@@ -39,9 +49,11 @@ export class TerrainEditTool implements EditTool {
     this._brushImageList = new ImageList(this._assetRegistry);
     this._detailAlbedo = new ImageList(this._assetRegistry);
     this._detailAlbedo.selectable = true;
+    this._detailAlbedo.maxImageCount = ClipmapTerrainMaterial.MAX_DETAIL_MAP_COUNT;
     this._detailAlbedo.defaultImage = ClipmapTerrainMaterial.getDefaultDetailMap();
     this._detailNormal = new ImageList(this._assetRegistry);
     this._detailNormal.selectable = false;
+    this._detailNormal.maxImageCount = ClipmapTerrainMaterial.MAX_DETAIL_MAP_COUNT;
     this._detailNormal.defaultImage = ClipmapTerrainMaterial.getDefaultNormalMap();
     this.refreshDetailMaps();
     this._detailAlbedo.on('update_image', (asset: string, index: number) => {
@@ -81,7 +93,17 @@ export class TerrainEditTool implements EditTool {
     this._smoothBrush = new BaseTerrainBrush();
     this._levelBrush = new BaseTerrainBrush();
     this._copyBrush = new BaseTerrainBrush();
-    this._textureBrush = new BaseTerrainBrush();
+    this._textureBrush = new TerrainTextureBrush();
+    const splatMap = this._terrain.get().material.getSplatMap();
+    const splatMapCopy = Application.instance.device.createTexture2DArray(
+      splatMap.format,
+      splatMap.width,
+      splatMap.height,
+      splatMap.depth
+    );
+    splatMapCopy.name = 'SplatMapCopy';
+    new CopyBlitter().blit(splatMap, splatMapCopy, fetchSampler('clamp_nearest_nomip'));
+    this._splatMapCopy = new DRef(splatMapCopy);
   }
   handlePointerEvent(evt: PointerEvent, hitObject: any, hitPos: Vector3): boolean {
     if (hitPos) {
@@ -144,7 +166,16 @@ export class TerrainEditTool implements EditTool {
           );
           break;
         case 'texture':
-          this.applyTextureBrush(texture, this._hitPos, this._brushSize, angle, this._brushStrength);
+          if (this._detailAlbedo.selected >= 0) {
+            this.applyTextureBrush(
+              texture,
+              this._hitPos,
+              this._brushSize,
+              angle,
+              this._brushStrength,
+              this._detailAlbedo.selected
+            );
+          }
           break;
         default:
           break;
@@ -159,18 +190,47 @@ export class TerrainEditTool implements EditTool {
     hitPos: Vector2,
     brushSize: number,
     angle: number,
-    strength: number
+    strength: number,
+    detailIndex: number
   ) {
+    const terrain = this._terrain.get();
+    const splatMapRead = terrain.material.getSplatMap();
+    const splatMapWrite = this._splatMapCopy.get();
+    terrain.material.setSplatMap(splatMapWrite);
+    this._splatMapCopy.set(splatMapRead);
+
+    const device = Application.instance.device;
+    const fb = device.pool.fetchTemporalFramebuffer<Texture2DArray>(
+      false,
+      0,
+      0,
+      splatMapWrite,
+      null,
+      false,
+      1,
+      false,
+      0,
+      0,
+      detailIndex >> 2
+    );
+    device.pushDeviceStates();
+    device.setFramebuffer(fb);
+
+    this._textureBrush.detailIndex = detailIndex;
+    this._textureBrush.sourceSplatMap = splatMapRead;
     this._textureBrush.brush(
-      this._terrain.get().heightMap,
+      null,
       brushTexture,
       this._terrain.get().worldRegion,
       hitPos,
       brushSize,
       angle,
-      strength,
+      Math.max(strength * 0.1, 0.01),
       null
     );
+
+    device.popDeviceStates();
+    device.pool.releaseFrameBuffer(fb);
   }
   applyHeightBrush(
     brush: BaseTerrainBrush,
@@ -335,5 +395,6 @@ export class TerrainEditTool implements EditTool {
     this._detailAlbedo = null;
     this._detailNormal?.dispose();
     this._detailNormal = null;
+    this._splatMapCopy.dispose();
   }
 }

@@ -2,6 +2,7 @@ import { Vector2, Vector4 } from '@zephyr3d/base';
 import {
   AbstractDevice,
   BindGroup,
+  FrameBuffer,
   GPUProgram,
   PBGlobalScope,
   PBInsideFunctionScope,
@@ -33,37 +34,49 @@ export class BaseTerrainBrush {
     clearColor: Vector4
   ) {
     const device = Application.instance.device;
+
     this.prepareBrush(device);
+
+    let framebuffer: FrameBuffer = null;
+    if (target) {
+      framebuffer = device.pool.fetchTemporalFramebuffer(false, 0, 0, target, null, false);
+      device.pushDeviceStates();
+      device.setFramebuffer(framebuffer);
+    }
+
     const program = this._brushProgram.get();
     const bindGroup = this._brushBindGroup.get();
-    const framebuffer = device.pool.fetchTemporalFramebuffer(false, 0, 0, target, null, false);
     bindGroup.setValue('params', new Vector4(pos.x, pos.y, brushSize, angle));
     bindGroup.setValue('region', region);
     bindGroup.setValue('strength', strength);
     bindGroup.setTexture('mask', mask ?? BaseTerrainBrush._defaultMask);
-    device.pushDeviceStates();
+    this.applyUniformValues(bindGroup);
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
     device.setRenderStates(this._brushRenderStates);
-    device.setFramebuffer(framebuffer);
     if (clearColor) {
       device.clearFrameBuffer(clearColor, 1, 0);
     }
     BaseTerrainBrush._brushPrimitive.draw();
-    device.popDeviceStates();
+
+    if (target) {
+      device.popDeviceStates();
+      device.pool.releaseFrameBuffer(framebuffer);
+    }
   }
   protected brushFragment(
     scope: PBInsideFunctionScope,
     mask: PBShaderExp,
     strength: PBShaderExp,
-    heightMapUV: PBShaderExp,
-    brushUV: PBShaderExp
+    brushUV: PBShaderExp,
+    heightMapUV: PBShaderExp
   ) {
     const pb = scope.$builder;
     const maskValue = pb.textureSampleLevel(mask, brushUV, 0).r;
     return pb.vec4(pb.vec3(pb.mul(maskValue, strength)), 1);
   }
   protected setupBrushUniforms(scope: PBGlobalScope) {}
+  protected applyUniformValues(bindGroup: BindGroup) {}
   protected createBrushProgram(device: AbstractDevice) {
     const that = this;
     return device.buildRenderProgram({
@@ -100,8 +113,8 @@ export class BaseTerrainBrush {
             this,
             this.mask,
             this.strength,
-            this.$inputs.uv,
-            this.$inputs.brushUV
+            this.$inputs.brushUV,
+            this.$inputs.uv
           );
         });
       }

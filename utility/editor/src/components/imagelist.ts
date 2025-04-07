@@ -23,6 +23,7 @@ export class ImageList extends makeEventTarget(Object)<{
   private _assetRegistry: AssetRegistry;
   private _defaultImage: DRef<Texture2D>;
   private _selectable: boolean;
+  private _maxImageCount: number;
   constructor(assetRegistry: AssetRegistry) {
     super();
     this._images = [];
@@ -36,6 +37,7 @@ export class ImageList extends makeEventTarget(Object)<{
     this._defaultImage = new DRef(Application.instance.device.createTexture2D('rgba8unorm', 1, 1));
     this._defaultImage.get().update(new Uint8Array([0, 0, 0, 255]), 0, 0, 1, 1);
     this._assetRegistry = assetRegistry;
+    this._maxImageCount = -1;
   }
   get defaultImage() {
     return this._defaultImage.get();
@@ -55,11 +57,21 @@ export class ImageList extends makeEventTarget(Object)<{
   set acceptDragDrop(val: boolean) {
     this._acceptDragDrop = val;
   }
+  get maxImageCount() {
+    return this._maxImageCount;
+  }
+  set maxImageCount(val: number) {
+    this._maxImageCount = val;
+  }
   private calcTotalWidth(height: number): number {
     return (height + this._spacingX) * this._images.length + this._spacingX;
   }
   insertImage(img: Texture2D, index: number) {
-    if (index >= 0 && index <= this._images.length) {
+    if (
+      index >= 0 &&
+      index <= this._images.length &&
+      (this._maxImageCount < 0 || this._images.length < this._maxImageCount)
+    ) {
       this._images.splice(index, 0, {
         texture: new DRef(img),
         selected: false
@@ -72,10 +84,12 @@ export class ImageList extends makeEventTarget(Object)<{
     }
   }
   addImage(img: Texture2D) {
-    this._images.push({
-      texture: new DRef(img),
-      selected: false
-    });
+    if (this._maxImageCount < 0 || this._images.length < this._maxImageCount) {
+      this._images.push({
+        texture: new DRef(img),
+        selected: false
+      });
+    }
   }
   getImage(index: number): Texture2D {
     return this._images[index]?.texture?.get() ?? null;

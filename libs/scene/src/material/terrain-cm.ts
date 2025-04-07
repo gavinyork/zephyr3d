@@ -64,6 +64,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     this.useFeature(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP, 0);
     this.calculateNormalMap();
   }
+  static get MAX_DETAIL_MAP_COUNT() {
+    return MAX_DETAIL_MAPS;
+  }
   /** @internal */
   get region() {
     return this._region;
@@ -121,6 +124,19 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       this._detailMapInfo.numDetailMaps = val;
     }
     this.useFeature(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP, this._detailMapInfo.numDetailMaps);
+  }
+  getSplatMap() {
+    return this._detailMapInfo.splatMap?.get() ?? null;
+  }
+  setSplatMap(tex: Texture2DArray) {
+    if (tex !== this._detailMapInfo.splatMap.get()) {
+      if (!tex || tex.depth !== MAX_DETAIL_MAPS >> 2) {
+        console.error('Invalid splat map');
+        return;
+      }
+      this._detailMapInfo.splatMap.set(tex);
+      this.uniformChanged();
+    }
   }
   getDetailMapUVScale(index: number): number {
     if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
