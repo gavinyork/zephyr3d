@@ -33,15 +33,13 @@ export class TerrainTextureBrush extends BaseTerrainBrush {
     scope: PBInsideFunctionScope,
     mask: PBShaderExp,
     strength: PBShaderExp,
-    brushUV: PBShaderExp,
     heightMapUV: PBShaderExp
   ) {
     const pb = scope.$builder;
-    const maskValue = pb.textureSampleLevel(mask, brushUV, 0).r;
     scope.$l.sourceValue = pb.textureArraySampleLevel(scope.sourceSplatMap, heightMapUV, scope.layer, 0);
     scope.sourceValue.setAt(
       scope.channel,
-      pb.add(scope.sourceValue.at(scope.channel), pb.mul(strength, maskValue))
+      pb.add(scope.sourceValue.at(scope.channel), pb.mul(strength, mask))
     );
     return pb.normalize(scope.sourceValue);
   }
@@ -57,11 +55,5 @@ export class TerrainTextureBrush extends BaseTerrainBrush {
     bindGroup.setValue('layer', this._detailIndex >> 2);
     bindGroup.setValue('channel', this._detailIndex & 3);
     bindGroup.setTexture('sourceSplatMap', this._sourceSplatMap.get(), fetchSampler('clamp_nearest_nomip'));
-  }
-  protected createRenderStates(device: AbstractDevice) {
-    const renderStates = device.createRenderStateSet();
-    renderStates.useDepthState().enableTest(false).enableWrite(false);
-    renderStates.useRasterizerState().setCullMode('none');
-    return renderStates;
   }
 }

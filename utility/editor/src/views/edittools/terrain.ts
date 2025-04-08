@@ -17,6 +17,8 @@ import { Editor } from '../../core/editor';
 import { BaseTerrainBrush } from './brushes/base';
 import { Texture2D, Texture2DArray } from '@zephyr3d/device';
 import { TerrainTextureBrush } from './brushes/splat';
+import { TerrainRaiseBrush } from './brushes/raise';
+import { TerrainHeightBrush } from './brushes/height';
 
 export class TerrainEditTool implements EditTool {
   private _terrain: DRef<ClipmapTerrain>;
@@ -31,13 +33,14 @@ export class TerrainEditTool implements EditTool {
   private _editSelected: number;
   private _brushing: boolean;
   private _hitPos: Vector2;
-  private _raiseBrush: BaseTerrainBrush;
-  private _smoothBrush: BaseTerrainBrush;
-  private _levelBrush: BaseTerrainBrush;
-  private _copyBrush: BaseTerrainBrush;
+  private _raiseBrush: TerrainRaiseBrush;
+  private _smoothBrush: TerrainHeightBrush;
+  private _levelBrush: TerrainHeightBrush;
+  private _copyBrush: TerrainHeightBrush;
   private _textureBrush: TerrainTextureBrush;
   private _assetRegistry: AssetRegistry;
   private _splatMapCopy: DRef<Texture2DArray>;
+  private _heightMapCopy: DRef<Texture2D>;
   constructor(terrain: ClipmapTerrain, assetRegistry: AssetRegistry) {
     this._terrain = new DRef(terrain);
     this._assetRegistry = assetRegistry;
@@ -89,10 +92,10 @@ export class TerrainEditTool implements EditTool {
       this._brushImageList.addImage(Editor.instance.getBrushes()[name].get());
     }
     this._brushImageList.selected = 0;
-    this._raiseBrush = new BaseTerrainBrush();
-    this._smoothBrush = new BaseTerrainBrush();
-    this._levelBrush = new BaseTerrainBrush();
-    this._copyBrush = new BaseTerrainBrush();
+    this._raiseBrush = new TerrainRaiseBrush();
+    this._smoothBrush = new TerrainRaiseBrush();
+    this._levelBrush = new TerrainRaiseBrush();
+    this._copyBrush = new TerrainRaiseBrush();
     this._textureBrush = new TerrainTextureBrush();
     const splatMap = this._terrain.get().material.getSplatMap();
     const splatMapCopy = Application.instance.device.createTexture2DArray(
@@ -104,6 +107,18 @@ export class TerrainEditTool implements EditTool {
     splatMapCopy.name = 'SplatMapCopy';
     new CopyBlitter().blit(splatMap, splatMapCopy, fetchSampler('clamp_nearest_nomip'));
     this._splatMapCopy = new DRef(splatMapCopy);
+
+    this.ensureTerrainHeightMap();
+    const heightMap = this._terrain.get().heightMap;
+    const heightMapCopy = Application.instance.device.createTexture2D(
+      heightMap.format,
+      heightMap.width,
+      heightMap.height,
+      { samplerOptions: { mipFilter: 'none' } }
+    );
+    heightMapCopy.name = 'heightMapCopy';
+    new CopyBlitter().blit(heightMap, heightMapCopy, fetchSampler('clamp_linear_nomip'));
+    this._heightMapCopy = new DRef(heightMapCopy);
   }
   handlePointerEvent(evt: PointerEvent, hitObject: any, hitPos: Vector3): boolean {
     if (hitPos) {
@@ -219,38 +234,42 @@ export class TerrainEditTool implements EditTool {
     this._textureBrush.detailIndex = detailIndex;
     this._textureBrush.sourceSplatMap = splatMapRead;
     this._textureBrush.brush(
-      null,
       brushTexture,
       this._terrain.get().worldRegion,
       hitPos,
       brushSize,
       angle,
-      Math.max(strength * 0.1, 0.01),
-      null
+      Math.max(strength * 0.1, 0.01)
     );
+    this._textureBrush.sourceSplatMap = null;
 
     device.popDeviceStates();
     device.pool.releaseFrameBuffer(fb);
   }
   applyHeightBrush(
-    brush: BaseTerrainBrush,
+    brush: TerrainHeightBrush,
     brushTexture: Texture2D,
     hitPos: Vector2,
     brushSize: number,
     angle: number,
     strength: number
   ) {
-    const clear = this.ensureTerrainHeightMap();
-    brush.brush(
-      this._terrain.get().heightMap,
-      brushTexture,
-      this._terrain.get().worldRegion,
-      hitPos,
-      brushSize,
-      angle,
-      strength,
-      clear ? Vector4.zero() : null
-    );
+    const terrain = this._terrain.get();
+    const heightMapRead = terrain.heightMap;
+    const heightMapWrite = this._heightMapCopy.get();
+    terrain.heightMap = heightMapWrite;
+    this._heightMapCopy.set(heightMapRead);
+    const device = Application.instance.device;
+    const fb = device.pool.fetchTemporalFramebuffer<Texture2D>(false, 0, 0, heightMapWrite, null, false);
+    device.pushDeviceStates();
+    device.setFramebuffer(fb);
+
+    brush.sourceHeightMap = heightMapRead;
+    brush.brush(brushTexture, this._terrain.get().worldRegion, hitPos, brushSize, angle, strength);
+    brush.sourceHeightMap = null;
+
+    device.popDeviceStates();
+    device.pool.releaseFrameBuffer(fb);
   }
   handleKeyboardEvent(evt: KeyboardEvent): boolean {
     return false;
@@ -349,10 +368,10 @@ export class TerrainEditTool implements EditTool {
     }
     ImGui.End();
   }
-  ensureTerrainHeightMap(): boolean {
-    let clear = false;
+  ensureTerrainHeightMap(): void {
     if (!this._terrain.get().heightMap) {
-      this._terrain.get().heightMap = Application.instance.device.createTexture2D(
+      const device = Application.instance.device;
+      const heightMap = device.createTexture2D(
         'r16f',
         Math.max(1, this._terrain.get().sizeX),
         Math.max(1, this._terrain.get().sizeZ),
@@ -360,9 +379,14 @@ export class TerrainEditTool implements EditTool {
           samplerOptions: { mipFilter: 'none' }
         }
       );
-      clear = true;
+      this._terrain.get().heightMap = heightMap;
+      const fb = device.pool.fetchTemporalFramebuffer(false, 0, 0, heightMap, null, false);
+      device.pushDeviceStates();
+      device.setFramebuffer(fb);
+      device.clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
+      device.popDeviceStates();
+      device.pool.releaseFrameBuffer(fb);
     }
-    return clear;
   }
   getSubMenuItems(): MenuItemOptions[] {
     return [];
@@ -396,5 +420,6 @@ export class TerrainEditTool implements EditTool {
     this._detailNormal?.dispose();
     this._detailNormal = null;
     this._splatMapCopy.dispose();
+    this._heightMapCopy.dispose();
   }
 }

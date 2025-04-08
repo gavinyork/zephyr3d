@@ -2,7 +2,6 @@ import { Vector2, Vector4 } from '@zephyr3d/base';
 import {
   AbstractDevice,
   BindGroup,
-  FrameBuffer,
   GPUProgram,
   PBGlobalScope,
   PBInsideFunctionScope,
@@ -12,7 +11,7 @@ import {
 } from '@zephyr3d/device';
 import { Application, DRef, Primitive } from '@zephyr3d/scene';
 
-export class BaseTerrainBrush {
+export abstract class BaseTerrainBrush {
   private static _brushPrimitive: Primitive = null;
   private static _defaultMask: Texture2D = null;
   protected _brushProgram: DRef<GPUProgram>;
@@ -23,26 +22,9 @@ export class BaseTerrainBrush {
     this._brushBindGroup = new DRef();
     this._brushRenderStates = null;
   }
-  brush(
-    target: Texture2D,
-    mask: Texture2D,
-    region: Vector4,
-    pos: Vector2,
-    brushSize: number,
-    angle: number,
-    strength: number,
-    clearColor: Vector4
-  ) {
+  brush(mask: Texture2D, region: Vector4, pos: Vector2, brushSize: number, angle: number, strength: number) {
     const device = Application.instance.device;
-
     this.prepareBrush(device);
-
-    let framebuffer: FrameBuffer = null;
-    if (target) {
-      framebuffer = device.pool.fetchTemporalFramebuffer(false, 0, 0, target, null, false);
-      device.pushDeviceStates();
-      device.setFramebuffer(framebuffer);
-    }
 
     const program = this._brushProgram.get();
     const bindGroup = this._brushBindGroup.get();
@@ -54,27 +36,14 @@ export class BaseTerrainBrush {
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
     device.setRenderStates(this._brushRenderStates);
-    if (clearColor) {
-      device.clearFrameBuffer(clearColor, 1, 0);
-    }
     BaseTerrainBrush._brushPrimitive.draw();
-
-    if (target) {
-      device.popDeviceStates();
-      device.pool.releaseFrameBuffer(framebuffer);
-    }
   }
-  protected brushFragment(
+  protected abstract brushFragment(
     scope: PBInsideFunctionScope,
     mask: PBShaderExp,
     strength: PBShaderExp,
-    brushUV: PBShaderExp,
     heightMapUV: PBShaderExp
-  ) {
-    const pb = scope.$builder;
-    const maskValue = pb.textureSampleLevel(mask, brushUV, 0).r;
-    return pb.vec4(pb.vec3(pb.mul(maskValue, strength)), 1);
-  }
+  ): void;
   protected setupBrushUniforms(scope: PBGlobalScope) {}
   protected applyUniformValues(bindGroup: BindGroup) {}
   protected createBrushProgram(device: AbstractDevice) {
@@ -109,13 +78,8 @@ export class BaseTerrainBrush {
         that.setupBrushUniforms(this);
         this.$outputs.color = pb.vec4();
         pb.main(function () {
-          this.$outputs.color = that.brushFragment(
-            this,
-            this.mask,
-            this.strength,
-            this.$inputs.brushUV,
-            this.$inputs.uv
-          );
+          this.$l.mask = pb.textureSampleLevel(this.mask, this.$inputs.brushUV, 0).r;
+          this.$outputs.color = that.brushFragment(this, this.mask, this.strength, this.$inputs.uv);
         });
       }
     });
@@ -124,11 +88,6 @@ export class BaseTerrainBrush {
     const renderStates = device.createRenderStateSet();
     renderStates.useDepthState().enableTest(false).enableWrite(false);
     renderStates.useRasterizerState().setCullMode('none');
-    renderStates
-      .useBlendingState()
-      .enable(true)
-      .setBlendFuncRGB('one', 'one')
-      .setBlendFuncAlpha('zero', 'one');
     return renderStates;
   }
   protected prepareBrush(device: AbstractDevice) {
