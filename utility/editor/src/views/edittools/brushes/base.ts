@@ -31,6 +31,7 @@ export abstract class BaseTerrainBrush {
     bindGroup.setValue('params', new Vector4(pos.x, pos.y, brushSize, angle));
     bindGroup.setValue('region', region);
     bindGroup.setValue('strength', strength);
+    bindGroup.setValue('brushSize', brushSize);
     bindGroup.setTexture('mask', mask ?? BaseTerrainBrush._defaultMask);
     this.applyUniformValues(bindGroup);
     device.setProgram(program);
@@ -42,7 +43,8 @@ export abstract class BaseTerrainBrush {
     scope: PBInsideFunctionScope,
     mask: PBShaderExp,
     strength: PBShaderExp,
-    heightMapUV: PBShaderExp
+    heightMapUV: PBShaderExp,
+    centerUV: PBShaderExp
   ): void;
   protected setupBrushUniforms(scope: PBGlobalScope) {}
   protected applyUniformValues(bindGroup: BindGroup) {}
@@ -68,6 +70,10 @@ export abstract class BaseTerrainBrush {
           this.$l.uv = pb.div(pb.sub(this.pos, this.region.xy), pb.sub(this.region.zw, this.region.xy));
           this.$l.cs = pb.sub(pb.mul(this.uv, 2), pb.vec2(1));
           this.$outputs.uv = this.uv;
+          this.$outputs.centerUV = pb.div(
+            pb.sub(this.worldPos, this.region.xy),
+            pb.sub(this.region.zw, this.region.xy)
+          );
           this.$outputs.brushUV = pb.add(pb.mul(this.vertexAxis, 0.5), pb.vec2(0.5));
           this.$builtins.position = pb.vec4(this.cs.x, pb.neg(this.cs.y), 0, 1);
         });
@@ -75,11 +81,18 @@ export abstract class BaseTerrainBrush {
       fragment(pb) {
         this.strength = pb.float().uniform(0);
         this.mask = pb.tex2D().uniform(0);
+        this.brushSize = pb.float().uniform(0);
         that.setupBrushUniforms(this);
         this.$outputs.color = pb.vec4();
         pb.main(function () {
           this.$l.mask = pb.textureSampleLevel(this.mask, this.$inputs.brushUV, 0).r;
-          this.$outputs.color = that.brushFragment(this, this.mask, this.strength, this.$inputs.uv);
+          this.$outputs.color = that.brushFragment(
+            this,
+            this.mask,
+            this.strength,
+            this.$inputs.uv,
+            this.$inputs.centerUV
+          );
         });
       }
     });

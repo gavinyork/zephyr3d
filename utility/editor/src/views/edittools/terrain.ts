@@ -14,13 +14,18 @@ import type { ToolBarItem } from '../../components/toolbar';
 import { ImGui } from '@zephyr3d/imgui';
 import { ImageList } from '../../components/imagelist';
 import { Editor } from '../../core/editor';
-import { BaseTerrainBrush } from './brushes/base';
 import { Texture2D, Texture2DArray } from '@zephyr3d/device';
 import { TerrainTextureBrush } from './brushes/splat';
 import { TerrainRaiseBrush } from './brushes/raise';
 import { TerrainHeightBrush } from './brushes/height';
+import { TerrainLowerBrush } from './brushes/lower';
+import { TerrainSmoothBrush } from './brushes/smooth';
+import { TerrainFlattenBrush } from './brushes/flatten';
+import { TerrainErosoinBrush } from './brushes/erosion';
 
+const blitter = new CopyBlitter();
 export class TerrainEditTool implements EditTool {
+  private static defaultBrush: DRef<Texture2D> = new DRef();
   private _terrain: DRef<ClipmapTerrain>;
   private _disposed: boolean;
   private _brushSize: number;
@@ -34,9 +39,10 @@ export class TerrainEditTool implements EditTool {
   private _brushing: boolean;
   private _hitPos: Vector2;
   private _raiseBrush: TerrainRaiseBrush;
-  private _smoothBrush: TerrainHeightBrush;
-  private _levelBrush: TerrainHeightBrush;
-  private _copyBrush: TerrainHeightBrush;
+  private _lowerBrush: TerrainLowerBrush;
+  private _smoothBrush: TerrainSmoothBrush;
+  private _flattenBrush: TerrainFlattenBrush;
+  private _erosionBrush: TerrainErosoinBrush;
   private _textureBrush: TerrainTextureBrush;
   private _assetRegistry: AssetRegistry;
   private _splatMapCopy: DRef<Texture2DArray>;
@@ -49,6 +55,9 @@ export class TerrainEditTool implements EditTool {
     this._brushStrength = 1;
     this._disposed = false;
     this._brushing = false;
+    if (!TerrainEditTool.defaultBrush.get()) {
+      TerrainEditTool.defaultBrush.set(TerrainEditTool.createDefaultBrushFallof());
+    }
     this._brushImageList = new ImageList(this._assetRegistry);
     this._detailAlbedo = new ImageList(this._assetRegistry);
     this._detailAlbedo.selectable = true;
@@ -85,17 +94,19 @@ export class TerrainEditTool implements EditTool {
       material.setDetailNormalMap(index, this._detailNormal.getImage(index));
       this.refreshDetailMaps();
     });
-    this._editList = ['raise', 'smooth', 'level', 'copy', 'texture'];
+    this._editList = ['raise', 'lower', 'smooth', 'flatten', 'erosion', 'texture'];
     this._editSelected = -1;
     this._hitPos = null;
+    this._brushImageList.addImage(TerrainEditTool.defaultBrush.get());
     for (const name in Editor.instance.getBrushes()) {
       this._brushImageList.addImage(Editor.instance.getBrushes()[name].get());
     }
     this._brushImageList.selected = 0;
     this._raiseBrush = new TerrainRaiseBrush();
-    this._smoothBrush = new TerrainRaiseBrush();
-    this._levelBrush = new TerrainRaiseBrush();
-    this._copyBrush = new TerrainRaiseBrush();
+    this._lowerBrush = new TerrainLowerBrush();
+    this._smoothBrush = new TerrainSmoothBrush();
+    this._flattenBrush = new TerrainFlattenBrush();
+    this._erosionBrush = new TerrainErosoinBrush();
     this._textureBrush = new TerrainTextureBrush();
     const splatMap = this._terrain.get().material.getSplatMap();
     const splatMapCopy = Application.instance.device.createTexture2DArray(
@@ -105,7 +116,7 @@ export class TerrainEditTool implements EditTool {
       splatMap.depth
     );
     splatMapCopy.name = 'SplatMapCopy';
-    new CopyBlitter().blit(splatMap, splatMapCopy, fetchSampler('clamp_nearest_nomip'));
+    blitter.blit(splatMap, splatMapCopy, fetchSampler('clamp_nearest_nomip'));
     this._splatMapCopy = new DRef(splatMapCopy);
 
     this.ensureTerrainHeightMap();
@@ -117,7 +128,7 @@ export class TerrainEditTool implements EditTool {
       { samplerOptions: { mipFilter: 'none' } }
     );
     heightMapCopy.name = 'heightMapCopy';
-    new CopyBlitter().blit(heightMap, heightMapCopy, fetchSampler('clamp_linear_nomip'));
+    blitter.blit(heightMap, heightMapCopy, fetchSampler('clamp_linear_nomip'));
     this._heightMapCopy = new DRef(heightMapCopy);
   }
   handlePointerEvent(evt: PointerEvent, hitObject: any, hitPos: Vector3): boolean {
@@ -150,6 +161,16 @@ export class TerrainEditTool implements EditTool {
             this._brushStrength
           );
           break;
+        case 'lower':
+          this.applyHeightBrush(
+            this._lowerBrush,
+            texture,
+            this._hitPos,
+            this._brushSize,
+            angle,
+            this._brushStrength
+          );
+          break;
         case 'smooth':
           this.applyHeightBrush(
             this._smoothBrush,
@@ -160,9 +181,9 @@ export class TerrainEditTool implements EditTool {
             this._brushStrength
           );
           break;
-        case 'level':
+        case 'flatten':
           this.applyHeightBrush(
-            this._levelBrush,
+            this._flattenBrush,
             texture,
             this._hitPos,
             this._brushSize,
@@ -170,9 +191,9 @@ export class TerrainEditTool implements EditTool {
             this._brushStrength
           );
           break;
-        case 'copy':
+        case 'erosion':
           this.applyHeightBrush(
-            this._copyBrush,
+            this._erosionBrush,
             texture,
             this._hitPos,
             this._brushSize,
@@ -209,17 +230,15 @@ export class TerrainEditTool implements EditTool {
     detailIndex: number
   ) {
     const terrain = this._terrain.get();
-    const splatMapRead = terrain.material.getSplatMap();
-    const splatMapWrite = this._splatMapCopy.get();
-    terrain.material.setSplatMap(splatMapWrite);
-    this._splatMapCopy.set(splatMapRead);
+    const splatMap = terrain.material.getSplatMap();
+    blitter.blit(splatMap, this._splatMapCopy.get(), fetchSampler('clamp_nearest_nomip'));
 
     const device = Application.instance.device;
     const fb = device.pool.fetchTemporalFramebuffer<Texture2DArray>(
       false,
       0,
       0,
-      splatMapWrite,
+      splatMap,
       null,
       false,
       1,
@@ -232,7 +251,7 @@ export class TerrainEditTool implements EditTool {
     device.setFramebuffer(fb);
 
     this._textureBrush.detailIndex = detailIndex;
-    this._textureBrush.sourceSplatMap = splatMapRead;
+    this._textureBrush.sourceSplatMap = this._splatMapCopy.get();
     this._textureBrush.brush(
       brushTexture,
       this._terrain.get().worldRegion,
@@ -255,16 +274,14 @@ export class TerrainEditTool implements EditTool {
     strength: number
   ) {
     const terrain = this._terrain.get();
-    const heightMapRead = terrain.heightMap;
-    const heightMapWrite = this._heightMapCopy.get();
-    terrain.heightMap = heightMapWrite;
-    this._heightMapCopy.set(heightMapRead);
+    const heightMap = terrain.heightMap;
+    blitter.blit(heightMap, this._heightMapCopy.get(), fetchSampler('clamp_nearest_nomip'));
     const device = Application.instance.device;
-    const fb = device.pool.fetchTemporalFramebuffer<Texture2D>(false, 0, 0, heightMapWrite, null, false);
+    const fb = device.pool.fetchTemporalFramebuffer<Texture2D>(false, 0, 0, heightMap, null, false);
     device.pushDeviceStates();
     device.setFramebuffer(fb);
 
-    brush.sourceHeightMap = heightMapRead;
+    brush.sourceHeightMap = this._heightMapCopy.get();
     brush.brush(brushTexture, this._terrain.get().worldRegion, hitPos, brushSize, angle, strength);
     brush.sourceHeightMap = null;
 
@@ -408,6 +425,39 @@ export class TerrainEditTool implements EditTool {
       this._detailAlbedo.addImage(terrain.material.getDetailMap(i));
       this._detailNormal.addImage(terrain.material.getDetailNormalMap(i));
     }
+  }
+  static createDefaultBrushFallof(): Texture2D {
+    function smoothStep(a: number, b: number, t: number) {
+      if (t <= a) {
+        return 0;
+      } else if (t >= b) {
+        return 1;
+      } else {
+        const f = (t - a) / (b - a);
+        return 3 * f * f - 2 * f * f * f;
+      }
+    }
+    const size = 64;
+    const data = new Uint8Array(4 * size * size);
+    let k = 0;
+    for (let i = 0; i < size; i++) {
+      for (let j = 0; j < size; j++) {
+        const u = (2 * j) / size - 1;
+        const v = (2 * i) / size - 1;
+        const d = Math.sqrt(u * u + v * v) * 0.9;
+        const val = ((1 - smoothStep(0, 1, d)) * 255) >> 0;
+        data[k++] = val;
+        data[k++] = val;
+        data[k++] = val;
+        data[k++] = 255;
+      }
+    }
+    const texture = Application.instance.device.createTexture2D('rgba8unorm', size, size, {
+      samplerOptions: { mipFilter: 'none' }
+    });
+    texture.name = 'DefaultBrush';
+    texture.update(data, 0, 0, size, size);
+    return texture;
   }
   dispose(): void {
     this._disposed = true;
