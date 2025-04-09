@@ -21,7 +21,6 @@ import { TerrainHeightBrush } from './brushes/height';
 import { TerrainLowerBrush } from './brushes/lower';
 import { TerrainSmoothBrush } from './brushes/smooth';
 import { TerrainFlattenBrush } from './brushes/flatten';
-import { TerrainErosoinBrush } from './brushes/erosion';
 
 const blitter = new CopyBlitter();
 export class TerrainEditTool implements EditTool {
@@ -42,7 +41,6 @@ export class TerrainEditTool implements EditTool {
   private _lowerBrush: TerrainLowerBrush;
   private _smoothBrush: TerrainSmoothBrush;
   private _flattenBrush: TerrainFlattenBrush;
-  private _erosionBrush: TerrainErosoinBrush;
   private _textureBrush: TerrainTextureBrush;
   private _assetRegistry: AssetRegistry;
   private _splatMapCopy: DRef<Texture2DArray>;
@@ -94,7 +92,7 @@ export class TerrainEditTool implements EditTool {
       material.setDetailNormalMap(index, this._detailNormal.getImage(index));
       this.refreshDetailMaps();
     });
-    this._editList = ['raise', 'lower', 'smooth', 'flatten', 'erosion', 'texture'];
+    this._editList = ['raise', 'lower', 'smooth', 'flatten', 'texture'];
     this._editSelected = -1;
     this._hitPos = null;
     this._brushImageList.addImage(TerrainEditTool.defaultBrush.get());
@@ -106,7 +104,6 @@ export class TerrainEditTool implements EditTool {
     this._lowerBrush = new TerrainLowerBrush();
     this._smoothBrush = new TerrainSmoothBrush();
     this._flattenBrush = new TerrainFlattenBrush();
-    this._erosionBrush = new TerrainErosoinBrush();
     this._textureBrush = new TerrainTextureBrush();
     const splatMap = this._terrain.get().material.getSplatMap();
     const splatMapCopy = Application.instance.device.createTexture2DArray(
@@ -184,16 +181,6 @@ export class TerrainEditTool implements EditTool {
         case 'flatten':
           this.applyHeightBrush(
             this._flattenBrush,
-            texture,
-            this._hitPos,
-            this._brushSize,
-            angle,
-            this._brushStrength
-          );
-          break;
-        case 'erosion':
-          this.applyHeightBrush(
-            this._erosionBrush,
             texture,
             this._hitPos,
             this._brushSize,
