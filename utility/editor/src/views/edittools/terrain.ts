@@ -158,7 +158,7 @@ export class TerrainEditTool implements EditTool {
             this._hitPos,
             this._brushSize,
             angle,
-            this._brushStrength
+            this._brushStrength / Math.max(Math.abs(this._terrain.get().scale.y), 0.001)
           );
           break;
         case 'lower':
@@ -168,7 +168,7 @@ export class TerrainEditTool implements EditTool {
             this._hitPos,
             this._brushSize,
             angle,
-            this._brushStrength
+            this._brushStrength / Math.max(Math.abs(this._terrain.get().scale.y), 0.001)
           );
           break;
         case 'smooth':
@@ -280,7 +280,6 @@ export class TerrainEditTool implements EditTool {
     const fb = device.pool.fetchTemporalFramebuffer<Texture2D>(false, 0, 0, heightMap, null, false);
     device.pushDeviceStates();
     device.setFramebuffer(fb);
-
     brush.sourceHeightMap = this._heightMapCopy.get();
     brush.brush(brushTexture, this._terrain.get().worldRegion, hitPos, brushSize, angle, strength);
     brush.sourceHeightMap = null;
