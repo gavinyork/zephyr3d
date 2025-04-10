@@ -41,7 +41,7 @@ export class AssetHierarchy {
   }
   async listAssets() {
     const packages = await Database.listPackages();
-    const assets = await Database.listAssets();
+    const assets = (await Database.listAssets()).filter((val) => !val.scene);
     this._assets = packages.map((pkg) => {
       const assetsInPkg = assets.filter((asset) => asset.pkg === pkg.uuid);
       return {
@@ -82,7 +82,8 @@ export class AssetHierarchy {
         path,
         thumbnail: '',
         type,
-        pkg
+        pkg,
+        scene: ''
       });
     }
   }

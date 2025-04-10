@@ -23,6 +23,7 @@ export type DBAssetInfo = {
   name: string;
   path: string;
   thumbnail: string;
+  scene: string;
   type: AssetType;
   pkg: string;
   metadata?: any;
@@ -160,7 +161,7 @@ export class Database {
   }
   static async putAsset(asset: DBAssetInfo) {
     asset.uuid = asset.uuid ?? this.randomUUID();
-    const { uuid, name, type, path, thumbnail, pkg, metadata } = asset;
+    const { uuid, name, type, path, thumbnail, pkg, scene, metadata } = asset;
     await this.instance.put(this.DB_NAME_ASSETS, {
       uuid,
       name,
@@ -168,6 +169,7 @@ export class Database {
       type,
       thumbnail,
       pkg,
+      scene,
       metadata: JSON.stringify(metadata ?? {})
     });
     return uuid;
@@ -189,6 +191,7 @@ export class Database {
           name: asset.name,
           type: asset.type,
           pkg: asset.pkg,
+          scene: asset.scene,
           path: asset.path,
           thumbnail: asset.thumbnail,
           metadata: JSON.parse(asset.metadata)
@@ -209,6 +212,7 @@ export class Database {
         name: asset.name,
         type: asset.type,
         pkg: asset.pkg,
+        scene: asset.scene,
         path: asset.path,
         thumbnail: asset.thumbnail,
         metadata: JSON.parse(asset.metadata)

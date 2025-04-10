@@ -3,7 +3,7 @@ import { AssetManager, type ModelFetchOptions, type TextureFetchOptions } from '
 import type { Scene } from '../../../scene';
 import type { Texture2D, TextureCube } from '@zephyr3d/device';
 
-export type AssetType = 'model' | 'texture';
+export type AssetType = 'model' | 'texture' | 'binary';
 export type AssetInfo = {
   id: string;
   name: string;
@@ -65,6 +65,16 @@ export class AssetRegistry {
       info.name = name;
     }
   }
+  async fetchBinary(id: string, request?: HttpRequest) {
+    const data = await this.doFetchBinary(id, request);
+    if (data) {
+      const info = this._assetMap.get(id);
+      if (info) {
+        info.allocated.set(data, id);
+      }
+    }
+    return data;
+  }
   async fetchModel(id: string, scene: Scene, options?: ModelFetchOptions, request?: HttpRequest) {
     const model = await this.doFetchModel(id, scene, options, request);
     if (model) {
@@ -114,6 +124,13 @@ export class AssetRegistry {
         });
       }
     }
+  }
+  protected async doFetchBinary(name: string, request?: HttpRequest) {
+    const info = this._assetMap.get(name);
+    if (!info || info.type !== 'binary') {
+      return null;
+    }
+    return await this._assetManager.fetchBinaryData(info.path, null, request);
   }
   protected async doFetchModel(
     name: string,
