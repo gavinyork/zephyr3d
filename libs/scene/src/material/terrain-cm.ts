@@ -33,8 +33,10 @@ export type TerrainDebugMode =
   | 'none'
   | 'vertex_normal'
   | 'fragment_normal'
+  | 'screen_normal'
   | 'tangent'
   | 'uv'
+  | 'normal_diff'
   | 'bitangent'
   | 'albedo';
 
@@ -301,11 +303,11 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     );
     return pb.normalize(normal);
   }
-  calculateDetailNormal(scope: PBInsideFunctionScope, normal: PBShaderExp, TBN: PBShaderExp) {
+  calculateDetailNormal(scope: PBInsideFunctionScope, TBN: PBShaderExp) {
     const that = this;
     const pb = scope.$builder;
     const funcName = 'getTerrainNormal';
-    pb.func(funcName, [pb.vec3('normal'), pb.mat3('TBN')], function () {
+    pb.func(funcName, [pb.mat3('TBN')], function () {
       const numDetailMaps = that.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP);
       this.$l.detailNormal = pb.vec3(0);
       for (let i = 0; i < (numDetailMaps + 3) >> 2; i++) {
@@ -320,7 +322,15 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       }
       this.$return(pb.normalize(pb.mul(this.TBN, this.detailNormal)));
     });
-    return pb.getGlobalScope()[funcName](normal, TBN);
+    return pb.getGlobalScope()[funcName](TBN);
+  }
+  /** @ts-ignore */
+  getMetallicRoughnessTexCoord(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope.$inputs.uv;
+  }
+  /** @ts-ignore */
+  getNormalTexCoord(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope.$inputs.uv;
   }
   calculateAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp {
     const that = this;
@@ -464,26 +474,28 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         scope.detailNormalMap = pb.tex2DArray().uniform(2);
       }
       scope.$l.albedo = this.calculateAlbedoColor(scope);
-      scope.$l.heightMapTexelSize = pb.div(pb.vec2(1), pb.vec2(pb.textureDimensions(scope.heightMap, 0)));
       scope.$l.worldNormal = pb.normalize(scope.$inputs.worldNormal);
-      scope.$l.worldTangent = pb.normalize(scope.$inputs.worldTangent);
-      scope.worldTangent = pb.normalize(
-        pb.sub(scope.worldTangent, pb.mul(scope.worldNormal, pb.dot(scope.worldNormal, scope.worldTangent)))
+      scope.$l.normalInfo = this.calculateNormalAndTBN(scope, scope.$inputs.worldPos);
+      scope.$l.screenNormal = scope.normalInfo.normal;
+      scope.$l.steepness = pb.sub(1, scope.screenNormal.y);
+      scope.$l.angleThreshold = pb.float(0.8);
+      scope.$l.angleContrast = pb.float(2);
+      scope.$if(pb.lessThan(pb.dot(scope.worldNormal, scope.screenNormal), 0), function () {
+        scope.screenNormal = pb.neg(scope.screenNormal);
+      });
+      scope.$l.diff = pb.sub(1, pb.dot(scope.worldNormal, scope.screenNormal));
+      scope.$l.normalBlendFactor = pb.smoothStep(
+        pb.sub(scope.angleThreshold, 0.2),
+        pb.add(scope.angleThreshold, 0.1),
+        pb.mul(scope.diff, scope.angleContrast)
       );
-      scope.$l.worldBinormal = pb.normalize(pb.cross(scope.worldNormal, scope.worldTangent));
-      scope.$l.TBN = pb.mat3(scope.worldTangent, scope.worldBinormal, scope.worldNormal);
-      scope.$l.normalInfo = this.calculateNormalAndTBN(
-        scope,
-        scope.$inputs.worldPos,
-        scope.worldNormal,
-        scope.worldTangent,
-        scope.worldBinormal
+      scope.$l.blendedNormal = pb.normalize(
+        pb.mix(scope.worldNormal, scope.screenNormal, pb.mod(scope.diff, 0.9))
       );
       if (this.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP) > 0) {
         scope.normalInfo.normal = this.calculateDetailNormal(
           scope,
-          scope.worldNormal,
-          scope.TBN
+          scope.normalInfo.TBN
           /*
           scope.normalInfo.normal,
           scope.normalInfo.TBN
@@ -501,10 +513,10 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       scope.$l.litColor = this.PBRLight(
         scope,
         scope.$inputs.worldPos,
-        scope.normalInfo.normal,
+        scope.blendedNormal,
         scope.viewVec,
         scope.albedo,
-        scope.TBN
+        scope.normalInfo.TBN
       );
       switch (this.featureUsed<TerrainDebugMode>(ClipmapTerrainMaterial.FEATURE_DEBUG_MODE)) {
         case 'albedo':
@@ -514,13 +526,19 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
           scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.worldNormal, 0.5), pb.vec3(0.5)), 1);
           break;
         case 'fragment_normal':
-          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normalInfo.normal, 0.5), pb.vec3(0.5)), 1);
+          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.blendedNormal, 0.5), pb.vec3(0.5)), 1);
+          break;
+        case 'screen_normal':
+          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.screenNormal, 0.5), pb.vec3(0.5)), 1);
           break;
         case 'tangent':
-          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.worldTangent, 0.5), pb.vec3(0.5)), 1);
+          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normalInfo.TBN[0], 0.5), pb.vec3(0.5)), 1);
           break;
         case 'bitangent':
-          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.worldBinormal, 0.5), pb.vec3(0.5)), 1);
+          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normalInfo.TBN[1], 0.5), pb.vec3(0.5)), 1);
+          break;
+        case 'normal_diff':
+          scope.$l.outColor = pb.vec4(pb.vec3(scope.diff), 1);
           break;
         case 'uv':
           scope.$l.outColor = pb.vec4(scope.$inputs.uv, 0, 1);
@@ -551,7 +569,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     bindGroup.setValue('clipmapMatrix', this._clipmapMatrix);
     bindGroup.setValue('region', this._region);
     bindGroup.setValue('terrainScale', this._terrainScale);
-    bindGroup.setTexture('heightMap', this._heightMap.get(), fetchSampler('clamp_nearest_nomip'));
+    bindGroup.setTexture('heightMap', this._heightMap.get(), fetchSampler('clamp_linear_nomip'));
     bindGroup.setValue('heightMapSize', this._heightMapSize);
     if (this.needFragmentColor(ctx)) {
       if (this._detailMapInfo.numDetailMaps > 0) {
