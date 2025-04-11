@@ -1,5 +1,6 @@
 import {
   Application,
+  AssetManager,
   AssetRegistry,
   ClipmapTerrain,
   ClipmapTerrainMaterial,
@@ -8,7 +9,7 @@ import {
   fetchSampler
 } from '@zephyr3d/scene';
 import type { EditTool } from './edittool';
-import { degree2radian, Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
+import { degree2radian, HttpRequest, Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
 import type { MenuItemOptions } from '../../components/menubar';
 import type { ToolBarItem } from '../../components/toolbar';
 import { ImGui } from '@zephyr3d/imgui';
@@ -21,6 +22,8 @@ import { TerrainHeightBrush } from './brushes/height';
 import { TerrainLowerBrush } from './brushes/lower';
 import { TerrainSmoothBrush } from './brushes/smooth';
 import { TerrainFlattenBrush } from './brushes/flatten';
+import { FilePicker } from '../../components/filepicker';
+import { Dialog } from '../dlg/dlg';
 
 const blitter = new CopyBlitter();
 export class TerrainEditTool implements EditTool {
@@ -203,9 +206,6 @@ export class TerrainEditTool implements EditTool {
         default:
           break;
       }
-      if (this._editList[this._editSelected] !== 'texture') {
-        this._terrain.get().material.calculateNormalMap();
-      }
     }
   }
   applyTextureBrush(
@@ -282,11 +282,14 @@ export class TerrainEditTool implements EditTool {
       'EditChild',
       new ImGui.ImVec2(
         0,
-        2 * ImGui.GetStyle().WindowPadding.y + ImGui.GetStyle().ItemSpacing.y + 2 * ImGui.GetFrameHeight()
+        2 * ImGui.GetStyle().WindowPadding.y + ImGui.GetStyle().ItemSpacing.y * 3 + 4 * ImGui.GetFrameHeight()
       ),
       true
     );
     ImGui.Text('Edit');
+    if (ImGui.Button('Import Height Map...')) {
+      this.importHeightMap();
+    }
     const sel = [this._editSelected] as [number];
     if (ImGui.Combo('Edit', sel, this._editList)) {
       this._editSelected = sel[0];
@@ -359,6 +362,44 @@ export class TerrainEditTool implements EditTool {
       this._brushStrength = brushStrength[0];
     }
     ImGui.EndChild();
+  }
+  importHeightMap() {
+    FilePicker.chooseFiles(false, '.jpg,.png,.dds').then((files) => {
+      if (files.length > 0) {
+        const url = URL.createObjectURL(files[0]);
+        const httpRequest = new HttpRequest((path) => url);
+        const assetManager = new AssetManager();
+        assetManager
+          .fetchTexture<Texture2D>(
+            files[0].name,
+            {
+              linearColorSpace: true,
+              samplerOptions: { mipFilter: 'none' }
+            },
+            httpRequest
+          )
+          .then((tex) => {
+            if (!tex || !tex.isTexture2D()) {
+              Dialog.messageBox('Error', 'Invalid texture');
+            }
+            const heightMap = this._terrain.get().heightMap;
+            new CopyBlitter().blit(
+              tex,
+              heightMap,
+              fetchSampler(
+                heightMap.width === tex.width && heightMap.height === tex.height
+                  ? 'clamp_nearest_nomip'
+                  : 'clamp_linear_nomip'
+              )
+            );
+            URL.revokeObjectURL(url);
+          })
+          .catch((err) => {
+            Dialog.messageBox('Error', String(err));
+            URL.revokeObjectURL(url);
+          });
+      }
+    });
   }
   render(): void {
     if (ImGui.Begin('Terrain Tools', null, ImGui.WindowFlags.AlwaysAutoResize | ImGui.WindowFlags.NoResize)) {

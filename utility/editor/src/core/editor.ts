@@ -8,7 +8,7 @@ import { SceneModel } from '../models/scenemodel';
 import { FontGlyph } from './fontglyph';
 import { Database } from '../storage/db';
 import { EditorAssetRegistry } from './assetregistry';
-import { Application, AssetManager, DRef } from '@zephyr3d/scene';
+import { AssetManager, DRef } from '@zephyr3d/scene';
 import { Texture2D } from '@zephyr3d/device';
 
 export class Editor {

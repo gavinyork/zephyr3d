@@ -5,6 +5,7 @@ import type { NodeHierarchy } from './node';
 import { getGraphNodeClass } from './node';
 import { ClipmapTerrain } from '../../../scene/terrain/terrain-cm';
 import { Texture2D } from '@zephyr3d/device';
+import { TerrainDebugMode } from '../../../material';
 
 export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
@@ -111,6 +112,21 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
           },
           set(this: ClipmapTerrain, value) {
             this.castShadow = value.bool[0];
+          }
+        },
+        {
+          name: 'Debug',
+          type: 'string',
+          enum: {
+            labels: ['None', 'UV', 'VertexNormal', 'PixelNormal', 'Tangent', 'Binormal', 'Albedo'],
+            values: ['none', 'uv', 'vertex_normal', 'fragment_normal', 'tangent', 'bitangent', 'albedo']
+          },
+          default: 'none',
+          get(this: ClipmapTerrain, value) {
+            value.str[0] = this.material.debugMode;
+          },
+          set(this: ClipmapTerrain, value) {
+            this.material.debugMode = value.str[0] as TerrainDebugMode;
           }
         }
       ];

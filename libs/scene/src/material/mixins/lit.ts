@@ -23,6 +23,7 @@ export type IMixinLight = {
   normalMapMode: 'tangent-space' | 'object-space';
   doubleSidedLighting: boolean;
   needCalculateEnvLight(): boolean;
+  getUniformNormalScale(scope: PBInsideFunctionScope): PBShaderExp;
   getEnvLightIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
   getEnvLightRadiance(
     scope: PBInsideFunctionScope,
@@ -222,6 +223,13 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         }
       });
       return pb.getGlobalScope()[funcName](...args);
+    }
+    /**
+     * Normal scale uniform
+     * @return Normal scale uniform
+     */
+    getUniformNormalScale(scope: PBInsideFunctionScope): PBShaderExp {
+      return scope.zNormalScale;
     }
     /**
      * Calculate the normal vector for current fragment

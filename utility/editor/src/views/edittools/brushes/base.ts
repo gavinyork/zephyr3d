@@ -75,7 +75,10 @@ export abstract class BaseTerrainBrush {
             pb.sub(this.region.zw, this.region.xy)
           );
           this.$outputs.brushUV = pb.add(pb.mul(this.vertexAxis, 0.5), pb.vec2(0.5));
-          this.$builtins.position = pb.vec4(this.cs.x, pb.neg(this.cs.y), 0, 1);
+          this.$builtins.position =
+            pb.getDevice().type === 'webgpu'
+              ? pb.vec4(this.cs.x, pb.neg(this.cs.y), 0, 1)
+              : pb.vec4(this.cs.x, this.cs.y, 0, 1);
         });
       },
       fragment(pb) {

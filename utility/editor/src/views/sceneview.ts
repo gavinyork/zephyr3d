@@ -813,7 +813,9 @@ export class SceneView extends BaseView<SceneModel> {
     }
   }
   private handleCopyNode(node: SceneNode) {
-    this._clipBoardData.set(node);
+    if (node) {
+      this._clipBoardData.set(node);
+    }
   }
   private handlePasteNode() {
     if (this._clipBoardData.get()) {
@@ -821,12 +823,18 @@ export class SceneView extends BaseView<SceneModel> {
     }
   }
   private handleCloneNode(node: SceneNode, method: NodeCloneMethod) {
+    if (!node) {
+      return;
+    }
     this._cmdManager.execute(new NodeCloneCommand(node, method, this._assetRegistry)).then((sceneNode) => {
       sceneNode.position.x += 1;
       this._tab.sceneHierarchy.selectNode(sceneNode);
     });
   }
   private handleEditNode(node: SceneNode) {
+    if (!node) {
+      return;
+    }
     if (!this._currentEditTool.get()) {
       this._currentEditTool.set(createEditTool(node, this._assetRegistry));
     } else {
@@ -834,6 +842,9 @@ export class SceneView extends BaseView<SceneModel> {
     }
   }
   private handleDeleteNode(node: SceneNode) {
+    if (!node) {
+      return;
+    }
     if (node === this.model.camera) {
       Dialog.messageBox('Zephyr3d editor', 'Cannot delete active camera');
       return;
