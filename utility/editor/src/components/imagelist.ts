@@ -14,6 +14,7 @@ export class ImageList extends makeEventTarget(Object)<{
   remove_image: [index: number];
 }>() {
   private _images: ImageInfo[];
+  private _linearColorSpace: boolean;
   private _isDragging: boolean;
   private _lastMouseX: number;
   private _selectedIndex: number;
@@ -28,6 +29,7 @@ export class ImageList extends makeEventTarget(Object)<{
     super();
     this._images = [];
     this._isDragging = false;
+    this._linearColorSpace = false;
     this._lastMouseX = 0;
     this._selectedIndex = -1;
     this._spacingX = 16;
@@ -50,6 +52,12 @@ export class ImageList extends makeEventTarget(Object)<{
   }
   set selectable(val: boolean) {
     this._selectable = val;
+  }
+  get linearColorSpace() {
+    return this._linearColorSpace;
+  }
+  set linearColorSpace(val: boolean) {
+    this._linearColorSpace = !!val;
   }
   get acceptDragDrop() {
     return this._acceptDragDrop;
@@ -136,7 +144,10 @@ export class ImageList extends makeEventTarget(Object)<{
         const assetInfo = this._assetRegistry.getAssetInfo(assetId);
         if (assetInfo && assetInfo.type === 'texture') {
           this._assetRegistry
-            .fetchTexture<Texture2D>(assetId, assetInfo.textureOptions)
+            .fetchTexture<Texture2D>(assetId, {
+              ...assetInfo.textureOptions,
+              linearColorSpace: this._linearColorSpace
+            })
             .then((tex) => {
               if (tex?.isTexture2D()) {
                 if (replace) {

@@ -733,8 +733,11 @@ export class SceneNode
    * Gets the position of the xform in world space
    * @returns position of the xform in world space
    */
-  getWorldPosition(): Vector3 {
-    return new Vector3(this.worldMatrix.m03, this.worldMatrix.m13, this.worldMatrix.m23);
+  getWorldPosition(outPos?: Vector3): Vector3 {
+    return (
+      outPos?.setXYZ(this.worldMatrix.m03, this.worldMatrix.m13, this.worldMatrix.m23) ??
+      new Vector3(this.worldMatrix.m03, this.worldMatrix.m13, this.worldMatrix.m23)
+    );
   }
   /**
    * Moves the xform by an offset vector

@@ -33,7 +33,9 @@ export class ClipmapTerrain
     this._castShadow = true;
     this._sizeX = sizeX;
     this._sizeZ = sizeZ;
-    this._material = new DRef(new ClipmapTerrainMaterial(ClipmapTerrain.getDefaultHeightMap()));
+    this._material = new DRef(
+      new ClipmapTerrainMaterial(ClipmapTerrain.getDefaultHeightMap(), clipMapTileSize)
+    );
     this.updateRegion();
   }
   private static getDefaultHeightMap() {
@@ -188,7 +190,10 @@ export class ClipmapTerrain
     return this._gridScale;
   }
   set gridScale(val: number) {
-    this._gridScale = val;
+    if (val !== this._gridScale) {
+      this._gridScale = val;
+      this.material.setClipmapResolution(this._clipmap.tileResolution * this.gridScale);
+    }
   }
   /**
    * World region
@@ -217,11 +222,11 @@ export class ClipmapTerrain
       const z = Math.abs(this.scale.z);
       const px = this.position.x;
       const pz = this.position.z;
-      const gridScale = Math.max(
+      this.gridScale = Math.max(
         (x * this._sizeX) / this.material.heightMap.width,
         (z * this._sizeZ) / this.material.heightMap.height
       );
-      this.gridScale = Math.max(Math.min(gridScale, 1), 0.1);
+      //this.gridScale = Math.max(Math.min(gridScale, 1), 0.1);
       this.material.update(new Vector4(px, pz, px + x * this._sizeX, pz + z * this._sizeZ), this.scale);
     }
   }
@@ -230,46 +235,56 @@ export class ClipmapTerrain
    */
   draw(ctx: DrawContext) {
     const mat = this._material?.get();
-    const camera = ctx.camera;
-    const cameraPos = camera.getWorldPosition();
-    const position = new Vector3(cameraPos.x, cameraPos.z, 0);
-    const distX = Math.max(Math.abs(position.x - mat.region.x), Math.abs(position.x - mat.region.z));
-    const distY = Math.max(Math.abs(position.y - mat.region.y), Math.abs(position.y - mat.region.w));
-    const maxDist = Math.min(Math.max(distX, distY), camera.getFarPlane());
-    const gridScale = Math.max(0.01, this._gridScale);
-    const mipLevels = Math.ceil(Math.log2(maxDist / (this._clipmap.tileResolution * gridScale))) + 1;
     const that = this;
     this.bind(ctx);
     const wireframe = this._clipmap.wireframe;
     if (ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
       this._clipmap.wireframe = false;
     }
-    this._clipmap.draw(
-      {
-        camera,
-        position,
-        minMaxWorldPos: mat.region,
-        gridScale: gridScale,
-        userData: this,
-        calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
-          const p = that.worldMatrix.transformPointAffine(Vector3.zero());
-          outAABB.minPoint.setXYZ(minX, p.y - 9999, minZ);
-          outAABB.maxPoint.setXYZ(maxX, p.y + 9999, maxZ);
-        },
-        drawPrimitive(prim, modelMatrix, offset, scale, gridScale) {
-          const clipmapMatrix = new Matrix4x4(modelMatrix)
-            .scaleLeft(new Vector3(scale, scale, 1))
-            .translateLeft(new Vector3(offset.x, offset.y, 0))
-            .scaleLeft(new Vector3(gridScale, gridScale, 1));
-          clipmapMatrix.m03 -= that.worldMatrix.m03;
-          clipmapMatrix.m13 -= that.worldMatrix.m23;
-          mat.setClipmapMatrix(clipmapMatrix);
-          mat.apply(ctx);
-          mat.draw(prim, ctx);
-        }
+    const levelAABB = this._clipmap.calcLevelAABB(ctx.camera, mat.region, Math.max(0.01, this._gridScale));
+    const cameraPos = ctx.camera.getWorldPosition();
+    //console.log(levelAABB);
+    this._clipmap.draw({
+      camera: ctx.camera,
+      minMaxWorldPos: mat.region,
+      gridScale: Math.max(0.01, this._gridScale),
+      userData: this,
+      calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
+        const p = that.worldMatrix.transformPointAffine(Vector3.zero());
+        outAABB.minPoint.setXYZ(minX, p.y - 9999, minZ);
+        outAABB.maxPoint.setXYZ(maxX, p.y + 9999, maxZ);
       },
-      mipLevels
-    );
+      drawPrimitive(prim, modelMatrix, offset, scale, gridScale, mipLevel) {
+        const clipmapMatrix = new Matrix4x4(modelMatrix)
+          .scaleLeft(new Vector3(scale, scale, 1))
+          .translateLeft(new Vector3(offset.x, offset.y, 0))
+          .scaleLeft(new Vector3(gridScale, gridScale, 1));
+        clipmapMatrix.m03 -= that.worldMatrix.m03;
+        clipmapMatrix.m13 -= that.worldMatrix.m23;
+        mat.setClipmapMatrix(clipmapMatrix);
+        mat.setHeightMapMipLevel(mipLevel);
+        if (mipLevel === 0) {
+          mat.setLevelStart(cameraPos.x, cameraPos.z, cameraPos.x, cameraPos.z);
+        } else {
+          const prevAABB = levelAABB[mipLevel - 1];
+          mat.setLevelStart(
+            prevAABB.minPoint.x,
+            prevAABB.minPoint.z,
+            prevAABB.maxPoint.x,
+            prevAABB.maxPoint.z
+          );
+        }
+        const currentAABB = levelAABB[mipLevel];
+        mat.setLevelRange(
+          currentAABB.minPoint.x,
+          currentAABB.minPoint.z,
+          currentAABB.maxPoint.x,
+          currentAABB.maxPoint.z
+        );
+        mat.apply(ctx);
+        mat.draw(prim, ctx);
+      }
+    });
     this._clipmap.wireframe = wireframe;
   }
   dispose(): void {

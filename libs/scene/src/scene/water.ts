@@ -198,45 +198,33 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
    */
   draw(ctx: DrawContext) {
     const mat = this._material?.get();
-    const camera = ctx.camera;
-    const cameraPos = camera.getWorldPosition();
-    const position = new Vector3(cameraPos.x, cameraPos.z, 0);
-    const distX = Math.max(Math.abs(position.x - mat.region.x), Math.abs(position.x - mat.region.z));
-    const distY = Math.max(Math.abs(position.y - mat.region.y), Math.abs(position.y - mat.region.w));
-    const maxDist = Math.min(Math.max(distX, distY), camera.getFarPlane());
-    const gridScale = Math.max(0.01, this._gridScale);
-    const mipLevels = Math.ceil(Math.log2(maxDist / (this._clipmap.tileResolution * gridScale))) + 1;
     const that = this;
     this.bind(ctx);
-    this._clipmap.draw(
-      {
-        camera,
-        position,
-        minMaxWorldPos: mat.region,
-        gridScale: gridScale,
-        userData: this,
-        calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
-          const p = that.worldMatrix.transformPointAffine(Vector3.zero());
-          if (that.waveGenerator) {
-            that.waveGenerator.calcClipmapTileAABB(minX, maxX, minZ, maxZ, p.y, outAABB);
-          } else {
-            outAABB.minPoint.setXYZ(minX, p.y, minZ);
-            outAABB.maxPoint.setXYZ(maxX, p.y + 1, maxZ);
-          }
-        },
-        drawPrimitive(prim, modelMatrix, offset, scale, gridScale) {
-          const clipmapMatrix = new Matrix4x4(modelMatrix)
-            .scaleLeft(new Vector3(scale, scale, 1))
-            .translateLeft(new Vector3(offset.x, offset.y, 0))
-            .scaleLeft(new Vector3(gridScale, gridScale, 1));
-          clipmapMatrix.m03 -= that.worldMatrix.m03;
-          clipmapMatrix.m13 -= that.worldMatrix.m23;
-          mat.setClipmapMatrix(clipmapMatrix);
-          mat.apply(ctx);
-          mat.draw(prim, ctx);
+    this._clipmap.draw({
+      camera: ctx.camera,
+      minMaxWorldPos: mat.region,
+      gridScale: Math.max(0.01, this._gridScale),
+      userData: this,
+      calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
+        const p = that.worldMatrix.transformPointAffine(Vector3.zero());
+        if (that.waveGenerator) {
+          that.waveGenerator.calcClipmapTileAABB(minX, maxX, minZ, maxZ, p.y, outAABB);
+        } else {
+          outAABB.minPoint.setXYZ(minX, p.y, minZ);
+          outAABB.maxPoint.setXYZ(maxX, p.y + 1, maxZ);
         }
       },
-      mipLevels
-    );
+      drawPrimitive(prim, modelMatrix, offset, scale, gridScale) {
+        const clipmapMatrix = new Matrix4x4(modelMatrix)
+          .scaleLeft(new Vector3(scale, scale, 1))
+          .translateLeft(new Vector3(offset.x, offset.y, 0))
+          .scaleLeft(new Vector3(gridScale, gridScale, 1));
+        clipmapMatrix.m03 -= that.worldMatrix.m03;
+        clipmapMatrix.m13 -= that.worldMatrix.m23;
+        mat.setClipmapMatrix(clipmapMatrix);
+        mat.apply(ctx);
+        mat.draw(prim, ctx);
+      }
+    });
   }
 }

@@ -60,11 +60,14 @@ export class TerrainEditTool implements EditTool {
       TerrainEditTool.defaultBrush.set(TerrainEditTool.createDefaultBrushFallof());
     }
     this._brushImageList = new ImageList(this._assetRegistry);
+    this._brushImageList.linearColorSpace = true;
     this._detailAlbedo = new ImageList(this._assetRegistry);
+    this._detailAlbedo.linearColorSpace = false;
     this._detailAlbedo.selectable = true;
     this._detailAlbedo.maxImageCount = ClipmapTerrainMaterial.MAX_DETAIL_MAP_COUNT;
     this._detailAlbedo.defaultImage = ClipmapTerrainMaterial.getDefaultDetailMap();
     this._detailNormal = new ImageList(this._assetRegistry);
+    this._detailNormal.linearColorSpace = true;
     this._detailNormal.selectable = false;
     this._detailNormal.maxImageCount = ClipmapTerrainMaterial.MAX_DETAIL_MAP_COUNT;
     this._detailNormal.defaultImage = ClipmapTerrainMaterial.getDefaultNormalMap();
@@ -124,8 +127,7 @@ export class TerrainEditTool implements EditTool {
     const heightMapCopy = Application.instance.device.createTexture2D(
       heightMap.format,
       heightMap.width,
-      heightMap.height,
-      { samplerOptions: { mipFilter: 'none' } }
+      heightMap.height
     );
     heightMapCopy.name = 'heightMapCopy';
     blitter.blit(heightMap, heightMapCopy, fetchSampler('clamp_linear_nomip'));
@@ -418,11 +420,9 @@ export class TerrainEditTool implements EditTool {
       const heightMap = device.createTexture2D(
         'r16f',
         Math.max(1, this._terrain.get().sizeX),
-        Math.max(1, this._terrain.get().sizeZ),
-        {
-          samplerOptions: { mipFilter: 'none' }
-        }
+        Math.max(1, this._terrain.get().sizeZ)
       );
+      heightMap.name = 'TerrainHeightMap';
       this._terrain.get().heightMap = heightMap;
       const fb = device.pool.fetchTemporalFramebuffer(false, 0, 0, heightMap, null, false);
       device.pushDeviceStates();

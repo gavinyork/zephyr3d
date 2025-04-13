@@ -10,7 +10,7 @@ import { applyMaterialMixins, MeshMaterial } from './meshmaterial';
 import type { DrawContext } from '../render';
 import { MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
-import { Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
+import { Matrix4x4, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import { mixinLight } from './mixins/lit';
 import { Application, DRef } from '../app';
 import { fetchSampler } from '../utility/misc';
@@ -32,11 +32,9 @@ const MAX_DETAIL_MAPS = 8;
 export type TerrainDebugMode =
   | 'none'
   | 'vertex_normal'
-  | 'fragment_normal'
-  | 'screen_normal'
+  | 'detail_normal'
   | 'tangent'
   | 'uv'
-  | 'normal_diff'
   | 'bitangent'
   | 'albedo';
 
@@ -57,7 +55,10 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   private _detailMapSize: number;
   private _splatMapSize: number;
   private _heightMapSize: Vector4;
-  constructor(heightMap: Texture2D) {
+  private _morphParams: Vector2;
+  private _levelStart: Vector4;
+  private _levelDiff: Vector4;
+  constructor(heightMap: Texture2D, clipmapResolution: number) {
     super();
     this.metallic = 0;
     this.roughness = 1;
@@ -65,6 +66,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     this.normalTexCoordIndex = -1;
     this._region = new Vector4(-99999, -99999, 99999, 99999);
     this._clipmapMatrix = new Matrix4x4();
+    this._morphParams = new Vector2(2 * clipmapResolution + 1, 0);
+    this._levelStart = new Vector4();
+    this._levelDiff = new Vector4();
     this._heightMap = new DRef(heightMap);
     this._detailMapSize = 256;
     this._splatMapSize = 512;
@@ -87,6 +91,13 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   }
   set debugMode(mode: TerrainDebugMode) {
     this.useFeature(ClipmapTerrainMaterial.FEATURE_DEBUG_MODE, mode);
+  }
+  /** @internal */
+  setHeightMapMipLevel(val: number) {
+    if (val !== this._morphParams.y) {
+      this._morphParams.y = val;
+      this.uniformChanged();
+    }
   }
   /** @internal */
   get region() {
@@ -143,6 +154,21 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       this._detailMapInfo.numDetailMaps = val;
     }
     this.useFeature(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP, this._detailMapInfo.numDetailMaps);
+  }
+  /** @internal */
+  setClipmapResolution(val: number) {
+    this._morphParams.x = 2 * val + 1;
+    this.uniformChanged();
+  }
+  /** @internal */
+  setLevelStart(minX: number, minZ: number, maxX: number, maxZ: number) {
+    this._levelStart.setXYZW(minX, minZ, maxX, maxZ);
+    this.uniformChanged();
+  }
+  /** @internal */
+  setLevelRange(minDX: number, minDZ: number, maxDX: number, maxDZ: number) {
+    this._levelDiff.setXYZW(minDX, minDZ, maxDX, maxDZ);
+    this.uniformChanged();
   }
   getSplatMap() {
     return this._detailMapInfo.splatMap?.get() ?? null;
@@ -297,10 +323,8 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   }
   sampleDetailNormalMap(scope: PBInsideFunctionScope, index: number, texCoord: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
-    const normal = pb.sub(
-      pb.mul(pb.textureArraySample(scope.detailNormalMap, texCoord, index).rgb, 2),
-      pb.vec3(1)
-    );
+    const sample = pb.textureArraySample(scope.detailNormalMap, texCoord, index).rgb;
+    const normal = pb.sub(pb.mul(sample, 2), pb.vec3(1));
     return pb.normalize(normal);
   }
   calculateDetailNormal(scope: PBInsideFunctionScope, TBN: PBShaderExp) {
@@ -358,8 +382,20 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     });
     return pb.getGlobalScope()[funcName]();
   }
+  sampleHeightMap(scope: PBInsideFunctionScope, uv: PBShaderExp, pos: PBShaderExp) {
+    const pb = scope.$builder;
+    pb.func('sampleHeightMap', [pb.vec2('uv'), pb.vec2('pos')], function () {
+      this.$l.h1 = pb.textureSampleLevel(this.heightMap, this.uv, this.morphParams.y).r;
+      this.$l.h2 = pb.textureSampleLevel(this.heightMap, this.uv, pb.add(this.morphParams.y, 1)).r;
+      this.$l.t = pb.mul(pb.sub(this.pos.xyxy, this.levelStart), this.levelDiff);
+      this.$l.morphFactor = pb.clamp(pb.max(pb.max(this.t.x, this.t.y), pb.max(this.t.z, this.t.w)), 0, 1);
+      this.$return(pb.mix(this.h1, this.h2, this.morphFactor));
+    });
+    return scope.sampleHeightMap(uv, pos);
+  }
   calculateTerrainTBN(
     scope: PBInsideFunctionScope,
+    clipmapPos: PBShaderExp,
     uv: PBShaderExp,
     texSize: PBShaderExp,
     scale: PBShaderExp,
@@ -367,11 +403,12 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     bitangent: PBShaderExp,
     normal: PBShaderExp
   ): PBShaderExp {
+    const that = this;
     const pb = scope.$builder;
-    const funcName = 'calcTerrainTBN';
     pb.func(
-      funcName,
+      'calcTerrainTBN',
       [
+        pb.vec2('clipmapPos'),
         pb.vec2('uv'),
         pb.vec4('texSize'),
         pb.vec3('scale'),
@@ -380,16 +417,40 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         pb.vec3('n').out()
       ],
       function () {
+        this.$l.texelSize = pb.mul(this.texSize.zw, pb.exp2(this.morphParams.y));
+        this.$l.delta = pb.exp2(pb.add(this.morphParams.y, 1));
         this.$l.uv2 = pb.add(this.uv, pb.mul(this.texSize.zw, 0.5));
-        this.$l.hL = pb.textureSampleLevel(this.heightMap, pb.sub(this.uv2, pb.vec2(this.texSize.z, 0)), 0).r;
-        this.$l.hR = pb.textureSampleLevel(this.heightMap, pb.add(this.uv2, pb.vec2(this.texSize.z, 0)), 0).r;
-        this.$l.hD = pb.textureSampleLevel(this.heightMap, pb.add(this.uv2, pb.vec2(0, this.texSize.w)), 0).r;
-        this.$l.hU = pb.textureSampleLevel(this.heightMap, pb.sub(this.uv, pb.vec2(0, this.texSize.w)), 0).r;
-        this.$l.dHdU = pb.div(pb.mul(pb.sub(this.hR, this.hL), this.scale.y), pb.mul(this.scale.x, 2));
-        this.$l.dHdV = pb.div(pb.mul(pb.sub(this.hD, this.hU), this.scale.y), pb.mul(this.scale.z, 2));
+        this.$l.hL = that.sampleHeightMap(
+          this,
+          pb.sub(this.uv2, pb.vec2(this.texelSize.x, 0)),
+          this.clipmapPos
+        );
+        this.$l.hR = that.sampleHeightMap(
+          this,
+          pb.add(this.uv2, pb.vec2(this.texelSize.x, 0)),
+          this.clipmapPos
+        );
+        this.$l.hD = that.sampleHeightMap(
+          this,
+          pb.add(this.uv2, pb.vec2(0, this.texelSize.y)),
+          this.clipmapPos
+        );
+        this.$l.hU = that.sampleHeightMap(
+          this,
+          pb.sub(this.uv2, pb.vec2(0, this.texelSize.y)),
+          this.clipmapPos
+        );
+        this.$l.dHdU = pb.div(
+          pb.mul(pb.sub(this.hR, this.hL), this.scale.y),
+          pb.mul(this.scale.x, this.delta)
+        );
+        this.$l.dHdV = pb.div(
+          pb.mul(pb.sub(this.hD, this.hU), this.scale.y),
+          pb.mul(this.scale.z, this.delta)
+        );
         //this.n = pb.normalize(pb.vec3(this.dHdU, 1, this.dHdV));
-        this.t = pb.normalize(pb.vec3(2, this.dHdU, 0));
-        this.b = pb.normalize(pb.vec3(0, this.dHdV, 2));
+        this.t = pb.normalize(pb.vec3(this.delta, this.dHdU, 0));
+        this.b = pb.normalize(pb.vec3(0, this.dHdV, this.delta));
         this.n = pb.normalize(pb.cross(this.b, this.t));
         //this.t = pb.cross(this.b, this.n);
         /*
@@ -406,13 +467,16 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         */
       }
     );
-    return scope[funcName](uv, texSize, scale, tangent, bitangent, normal);
+    return scope.calcTerrainTBN(clipmapPos, uv, texSize, scale, tangent, bitangent, normal);
   }
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
     const pb = scope.$builder;
     scope.$inputs.position = pb.vec3().attrib('position');
     scope.clipmapMatrix = pb.mat4().uniform(2);
+    scope.morphParams = pb.vec2().uniform(2);
+    scope.levelStart = pb.vec4().uniform(2);
+    scope.levelDiff = pb.vec4().uniform(2);
     scope.heightMap = pb.tex2D().uniform(2);
     scope.heightMapSize = pb.vec4().uniform(2);
     scope.region = pb.vec4().uniform(2);
@@ -426,7 +490,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       pb.sub(scope.clipmapWorldPos.xz, scope.region.xy),
       pb.sub(scope.region.zw, scope.region.xy)
     );
-    scope.$l.height = pb.textureSampleLevel(scope.heightMap, scope.$outputs.uv, 0).r;
+    scope.$l.height = this.sampleHeightMap(scope, scope.$outputs.uv, scope.clipmapWorldPos.xz);
     scope.$outputs.worldPos = pb.add(
       scope.clipmapWorldPos,
       pb.vec3(0, pb.mul(scope.height, scope.terrainScale.y), 0)
@@ -436,6 +500,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     scope.$l.n = pb.vec3();
     this.calculateTerrainTBN(
       scope,
+      scope.clipmapWorldPos.xz,
       scope.$outputs.uv,
       scope.heightMapSize,
       scope.terrainScale,
@@ -475,22 +540,12 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       }
       scope.$l.albedo = this.calculateAlbedoColor(scope);
       scope.$l.worldNormal = pb.normalize(scope.$inputs.worldNormal);
-      scope.$l.normalInfo = this.calculateNormalAndTBN(scope, scope.$inputs.worldPos);
-      scope.$l.screenNormal = scope.normalInfo.normal;
-      scope.$l.steepness = pb.sub(1, scope.screenNormal.y);
-      scope.$l.angleThreshold = pb.float(0.8);
-      scope.$l.angleContrast = pb.float(2);
-      scope.$if(pb.lessThan(pb.dot(scope.worldNormal, scope.screenNormal), 0), function () {
-        scope.screenNormal = pb.neg(scope.screenNormal);
-      });
-      scope.$l.diff = pb.sub(1, pb.dot(scope.worldNormal, scope.screenNormal));
-      scope.$l.normalBlendFactor = pb.smoothStep(
-        pb.sub(scope.angleThreshold, 0.2),
-        pb.add(scope.angleThreshold, 0.1),
-        pb.mul(scope.diff, scope.angleContrast)
-      );
-      scope.$l.blendedNormal = pb.normalize(
-        pb.mix(scope.worldNormal, scope.screenNormal, pb.mod(scope.diff, 0.9))
+      scope.$l.normalInfo = this.calculateNormalAndTBN(
+        scope,
+        scope.$inputs.worldPos,
+        scope.$inputs.worldNormal,
+        scope.$inputs.worldTangent,
+        scope.$inputs.worldBinormal
       );
       if (this.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP) > 0) {
         scope.normalInfo.normal = this.calculateDetailNormal(
@@ -513,7 +568,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       scope.$l.litColor = this.PBRLight(
         scope,
         scope.$inputs.worldPos,
-        scope.blendedNormal,
+        scope.normalInfo.normal,
         scope.viewVec,
         scope.albedo,
         scope.normalInfo.TBN
@@ -523,22 +578,16 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
           scope.$l.outColor = scope.albedo;
           break;
         case 'vertex_normal':
-          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.worldNormal, 0.5), pb.vec3(0.5)), 1);
+          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normalInfo.TBN[2], 0.5), pb.vec3(0.5)), 1);
           break;
-        case 'fragment_normal':
-          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.blendedNormal, 0.5), pb.vec3(0.5)), 1);
-          break;
-        case 'screen_normal':
-          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.screenNormal, 0.5), pb.vec3(0.5)), 1);
+        case 'detail_normal':
+          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normalInfo.normal, 0.5), pb.vec3(0.5)), 1);
           break;
         case 'tangent':
           scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normalInfo.TBN[0], 0.5), pb.vec3(0.5)), 1);
           break;
         case 'bitangent':
           scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normalInfo.TBN[1], 0.5), pb.vec3(0.5)), 1);
-          break;
-        case 'normal_diff':
-          scope.$l.outColor = pb.vec4(pb.vec3(scope.diff), 1);
           break;
         case 'uv':
           scope.$l.outColor = pb.vec4(scope.$inputs.uv, 0, 1);
@@ -566,9 +615,16 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
+    this._levelDiff.x = 1 / (this._levelDiff.x - this._levelStart.x);
+    this._levelDiff.y = 1 / (this._levelDiff.y - this._levelStart.y);
+    this._levelDiff.z = 1 / (this._levelDiff.z - this._levelStart.z);
+    this._levelDiff.w = 1 / (this._levelDiff.w - this._levelStart.w);
     bindGroup.setValue('clipmapMatrix', this._clipmapMatrix);
     bindGroup.setValue('region', this._region);
     bindGroup.setValue('terrainScale', this._terrainScale);
+    bindGroup.setValue('morphParams', this._morphParams);
+    bindGroup.setValue('levelStart', this._levelStart);
+    bindGroup.setValue('levelDiff', this._levelDiff);
     bindGroup.setTexture('heightMap', this._heightMap.get(), fetchSampler('clamp_linear_nomip'));
     bindGroup.setValue('heightMapSize', this._heightMapSize);
     if (this.needFragmentColor(ctx)) {

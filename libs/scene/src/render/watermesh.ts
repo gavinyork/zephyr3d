@@ -168,37 +168,27 @@ export class WaterMesh {
     this._waterBindGroup.setValue('pos', cameraPos);
     this._waterBindGroup.setValue('flip', flip ? 1 : 0);
     const that = this;
-    const position = new Vector3(cameraPos.x, cameraPos.z, 0);
-    const distX = Math.max(Math.abs(position.x - this._region.x), Math.abs(position.x - this._region.z));
-    const distY = Math.max(Math.abs(position.y - this._region.y), Math.abs(position.y - this._region.w));
-    const maxDist = Math.min(Math.max(distX, distY), camera.getFarPlane());
-    const gridScale = Math.max(0.01, this._gridScale);
-    const mipLevels = Math.ceil(Math.log2(maxDist / (this._tileSize * gridScale))) + 1;
-    this._clipmap.draw(
-      {
-        camera,
-        position,
-        minMaxWorldPos: this._region,
-        gridScale: gridScale,
-        userData: this,
-        calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
-          const wm = userData as WaterMesh;
-          that._waveGenerator.calcClipmapTileAABB(minX, maxX, minZ, maxZ, wm.level, outAABB);
-        },
-        drawPrimitive(prim, modelMatrix, offset, scale, gridScale) {
-          const clipmapBindGroup = that.getClipmapBindGroup(device);
-          const worldMatrix = new Matrix4x4(modelMatrix)
-            .scaleLeft(new Vector3(scale, scale, 1))
-            .translateLeft(new Vector3(offset.x, offset.y, 0))
-            .scaleLeft(new Vector3(gridScale, gridScale, 1));
-          clipmapBindGroup.setValue('worldMatrix', worldMatrix);
-          device.setBindGroup(1, clipmapBindGroup);
-          prim.primitiveType = that._wireframe ? 'line-strip' : 'triangle-list';
-          prim.draw();
-        }
+    this._clipmap.draw({
+      camera,
+      minMaxWorldPos: this._region,
+      gridScale: Math.max(0.01, this._gridScale),
+      userData: this,
+      calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
+        const wm = userData as WaterMesh;
+        that._waveGenerator.calcClipmapTileAABB(minX, maxX, minZ, maxZ, wm.level, outAABB);
       },
-      mipLevels
-    );
+      drawPrimitive(prim, modelMatrix, offset, scale, gridScale) {
+        const clipmapBindGroup = that.getClipmapBindGroup(device);
+        const worldMatrix = new Matrix4x4(modelMatrix)
+          .scaleLeft(new Vector3(scale, scale, 1))
+          .translateLeft(new Vector3(offset.x, offset.y, 0))
+          .scaleLeft(new Vector3(gridScale, gridScale, 1));
+        clipmapBindGroup.setValue('worldMatrix', worldMatrix);
+        device.setBindGroup(1, clipmapBindGroup);
+        prim.primitiveType = that._wireframe ? 'line-strip' : 'triangle-list';
+        prim.draw();
+      }
+    });
     this._usedClipmapBindGroups.push(...this._freeClipmapBindGroups);
     this._freeClipmapBindGroups.length = 0;
   }
