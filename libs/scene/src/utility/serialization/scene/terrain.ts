@@ -22,85 +22,16 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
     getProps() {
       return [
         {
-          name: 'GridScale',
-          type: 'float',
-          default: 1,
-          options: { minValue: 0, maxValue: 1 },
-          get(this: ClipmapTerrain, value) {
-            value.num[0] = this.gridScale;
-          },
-          set(this: ClipmapTerrain, value) {
-            this.gridScale = value.num[0];
-          }
-        },
-        {
-          name: 'SizeX',
-          type: 'float',
-          default: 256,
-          options: { minValue: 0, maxValue: 4096 },
+          name: 'Resolution',
+          type: 'int2',
+          default: [256, 256],
+          options: { minValue: 1, maxValue: 4096 },
           get(this: ClipmapTerrain, value) {
             value.num[0] = this.sizeX;
+            value.num[1] = this.sizeZ;
           },
           set(this: ClipmapTerrain, value) {
-            this.sizeX = value.num[0];
-          }
-        },
-        {
-          name: 'SizeZ',
-          type: 'float',
-          default: 256,
-          options: { minValue: 0, maxValue: 4096 },
-          get(this: ClipmapTerrain, value) {
-            value.num[0] = this.sizeZ;
-          },
-          set(this: ClipmapTerrain, value) {
-            this.sizeZ = value.num[0];
-          }
-        },
-        {
-          name: 'Wireframe',
-          type: 'bool',
-          default: false,
-          get(this: ClipmapTerrain, value) {
-            value.bool[0] = this.wireframe;
-          },
-          set(this: ClipmapTerrain, value) {
-            this.wireframe = value.bool[0];
-          }
-        },
-        {
-          name: 'HeightMap',
-          type: 'object',
-          default: null,
-          nullable: true,
-          get(this: ClipmapTerrain, value) {
-            value.str[0] = assetRegistry.getAssetId(this.heightMap) ?? '';
-          },
-          async set(value) {
-            if (!value) {
-              this.heightMap = null;
-            } else {
-              if (value.str[0]) {
-                const assetId = value.str[0];
-                const assetInfo = assetRegistry.getAssetInfo(assetId);
-                if (assetInfo && assetInfo.type === 'texture') {
-                  let tex: Texture2D;
-                  try {
-                    tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
-                  } catch (err) {
-                    console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                    tex = null;
-                  }
-                  const isValidTextureType = tex?.isTexture2D();
-                  if (isValidTextureType) {
-                    tex.name = assetInfo.name;
-                    this.heightMap = tex;
-                  } else {
-                    console.error('Invalid texture type');
-                  }
-                }
-              }
-            }
+            this.setSize(value.num[0], value.num[1]);
           }
         },
         {
@@ -112,6 +43,17 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
           },
           set(this: ClipmapTerrain, value) {
             this.castShadow = value.bool[0];
+          }
+        },
+        {
+          name: 'Wireframe',
+          type: 'bool',
+          default: false,
+          get(this: ClipmapTerrain, value) {
+            value.bool[0] = this.wireframe;
+          },
+          set(this: ClipmapTerrain, value) {
+            this.wireframe = value.bool[0];
           }
         },
         {

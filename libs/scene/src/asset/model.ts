@@ -7,7 +7,7 @@ import { Mesh } from '../scene/mesh';
 import type { BoundingBox } from '../utility';
 import type { DRef } from '../app';
 import type { Scene } from '../scene';
-import { SceneNode } from '../scene';
+import { SceneNode } from '../scene/scene_node';
 import {
   AnimationClip,
   AnimationSet,

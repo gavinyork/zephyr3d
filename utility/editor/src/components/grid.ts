@@ -433,6 +433,21 @@ export class PropertyEditor extends makeEventTarget(Object)<{
         }
         break;
       }
+      case 'int2': {
+        const val = tmpProperty.num as [number, number];
+        changed = ImGui.InputInt2('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+        break;
+      }
+      case 'int3': {
+        const val = tmpProperty.num as [number, number, number];
+        changed = ImGui.InputInt3('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+        break;
+      }
+      case 'int4': {
+        const val = tmpProperty.num as [number, number, number, number];
+        changed = ImGui.InputInt4('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+        break;
+      }
       case 'vec2': {
         const val = tmpProperty.num as [number, number];
         changed = ImGui.InputFloat2(

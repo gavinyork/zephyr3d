@@ -12,12 +12,13 @@ import { MeshMaterial } from '../../material';
 import type { BoundingVolume } from '../../utility/bounding_volume';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { RENDER_PASS_TYPE_OBJECT_COLOR } from '../../values';
+import { CopyBlitter } from '../../blitter';
+import { fetchSampler } from '../../utility/misc';
 
 export class ClipmapTerrain
   extends applyMixins(GraphNode, mixinDrawable)
   implements Drawable, NodeClonable<ClipmapTerrain>
 {
-  private static _defaultHeightMap: DRef<Texture2D> = new DRef();
   private _pickTarget: PickTarget;
   private _clipmap: Clipmap;
   private _gridScale: number;
@@ -33,18 +34,14 @@ export class ClipmapTerrain
     this._castShadow = true;
     this._sizeX = sizeX;
     this._sizeZ = sizeZ;
+
     this._material = new DRef(
-      new ClipmapTerrainMaterial(ClipmapTerrain.getDefaultHeightMap(), clipMapTileSize)
+      new ClipmapTerrainMaterial(
+        Application.instance.device.createTexture2D('r16f', this._sizeX, this._sizeZ),
+        clipMapTileSize
+      )
     );
     this.updateRegion();
-  }
-  private static getDefaultHeightMap() {
-    if (!this._defaultHeightMap.get()) {
-      this._defaultHeightMap.set(
-        Application.instance.device.createTexture2D('r16f', 1, 1, { samplerOptions: { mipFilter: 'none' } })
-      );
-    }
-    return this._defaultHeightMap.get();
   }
   clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new ClipmapTerrain(this.scene, this._sizeX, this._sizeZ);
@@ -54,9 +51,7 @@ export class ClipmapTerrain
   }
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
     super.copyFrom(other, method, recursive);
-    this.sizeX = other.sizeX;
-    this.sizeZ = other.sizeZ;
-    this.gridScale = other.gridScale;
+    this.setSize(other.sizeX, other.sizeZ);
     this.wireframe = other.wireframe;
     this.castShadow = other.castShadow;
   }
@@ -64,7 +59,7 @@ export class ClipmapTerrain
     if (sizeX !== this._sizeX || sizeZ !== this._sizeZ) {
       this._sizeX = sizeX;
       this._sizeZ = sizeZ;
-      this.updateRegion();
+      this.resizeHeightMap(this._sizeX, this._sizeZ);
     }
   }
   /** Wether the mesh node casts shadows */
@@ -80,7 +75,7 @@ export class ClipmapTerrain
   set sizeX(val: number) {
     if (val !== this._sizeX) {
       this._sizeX = val;
-      this.updateRegion();
+      this.resizeHeightMap(this._sizeX, this._sizeZ);
     }
   }
   get sizeZ() {
@@ -89,14 +84,17 @@ export class ClipmapTerrain
   set sizeZ(val: number) {
     if (val !== this._sizeZ) {
       this._sizeZ = val;
-      this.updateRegion();
+      this.resizeHeightMap(this._sizeX, this._sizeZ);
     }
   }
   get heightMap(): Texture2D {
-    return this.material.heightMap === ClipmapTerrain.getDefaultHeightMap() ? null : this.material.heightMap;
+    return this.material.heightMap;
   }
   set heightMap(val: Texture2D) {
-    this.material.heightMap = val ?? ClipmapTerrain.getDefaultHeightMap();
+    if (val) {
+      this.material.heightMap = val;
+      this.updateRegion();
+    }
   }
   get material(): ClipmapTerrainMaterial {
     return this._material?.get() ?? null;
@@ -184,18 +182,6 @@ export class ClipmapTerrain
     );
   }
   /**
-   * Grid scale
-   */
-  get gridScale() {
-    return this._gridScale;
-  }
-  set gridScale(val: number) {
-    if (val !== this._gridScale) {
-      this._gridScale = val;
-      this.material.setClipmapResolution(this._clipmap.tileResolution * this.gridScale);
-    }
-  }
-  /**
    * World region
    */
   get worldRegion(): Vector4 {
@@ -222,11 +208,10 @@ export class ClipmapTerrain
       const z = Math.abs(this.scale.z);
       const px = this.position.x;
       const pz = this.position.z;
-      this.gridScale = Math.max(
+      this._gridScale = Math.max(
         (x * this._sizeX) / this.material.heightMap.width,
         (z * this._sizeZ) / this.material.heightMap.height
       );
-      //this.gridScale = Math.max(Math.min(gridScale, 1), 0.1);
       this.material.update(new Vector4(px, pz, px + x * this._sizeX, pz + z * this._sizeZ), this.scale);
     }
   }
@@ -241,13 +226,13 @@ export class ClipmapTerrain
     if (ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
       this._clipmap.wireframe = false;
     }
-    const levelAABB = this._clipmap.calcLevelAABB(ctx.camera, mat.region, Math.max(0.01, this._gridScale));
+    const levelAABB = this._clipmap.calcLevelAABB(ctx.camera, mat.region, this._gridScale);
     const cameraPos = ctx.camera.getWorldPosition();
     //console.log(levelAABB);
     this._clipmap.draw({
       camera: ctx.camera,
       minMaxWorldPos: mat.region,
-      gridScale: Math.max(0.01, this._gridScale),
+      gridScale: this._gridScale,
       userData: this,
       calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
         const p = that.worldMatrix.transformPointAffine(Vector3.zero());
@@ -286,6 +271,18 @@ export class ClipmapTerrain
       }
     });
     this._clipmap.wireframe = wireframe;
+  }
+  private resizeHeightMap(sizeX: number, sizeZ: number) {
+    const oldHeightMap = this.material.heightMap;
+    const device = Application.instance.device;
+    const maxTextureSize = device.getDeviceCaps().textureCaps.maxTextureSize;
+    sizeX = Math.min(Math.max(sizeX, 1), maxTextureSize) >> 0;
+    sizeZ = Math.min(Math.max(sizeZ, 1), maxTextureSize) >> 0;
+    if (sizeX !== oldHeightMap.width || sizeZ !== oldHeightMap.height) {
+      const newHeightMap = device.createTexture2D('r16f', sizeX, sizeZ);
+      new CopyBlitter().blit(oldHeightMap, newHeightMap, fetchSampler('clamp_linear_nomip'));
+      this.heightMap = newHeightMap;
+    }
   }
   dispose(): void {
     super.dispose();
