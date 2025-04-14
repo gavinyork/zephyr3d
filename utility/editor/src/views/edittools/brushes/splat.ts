@@ -1,5 +1,4 @@
-import {
-  AbstractDevice,
+import type {
   BindGroup,
   PBGlobalScope,
   PBInsideFunctionScope,

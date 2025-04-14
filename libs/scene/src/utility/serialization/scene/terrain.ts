@@ -4,8 +4,7 @@ import type { SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import { getGraphNodeClass } from './node';
 import { ClipmapTerrain } from '../../../scene/terrain/terrain-cm';
-import { Texture2D } from '@zephyr3d/device';
-import { TerrainDebugMode } from '../../../material';
+import type { TerrainDebugMode } from '../../../material';
 
 export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass {
   return {

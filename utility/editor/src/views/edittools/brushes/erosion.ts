@@ -1,4 +1,4 @@
-import { BindGroup, PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { TerrainHeightBrush } from './height';
 
 export class TerrainErosoinBrush extends TerrainHeightBrush {

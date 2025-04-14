@@ -9,7 +9,7 @@ import { FontGlyph } from './fontglyph';
 import { Database } from '../storage/db';
 import { EditorAssetRegistry } from './assetregistry';
 import { AssetManager, DRef } from '@zephyr3d/scene';
-import { Texture2D } from '@zephyr3d/device';
+import type { Texture2D } from '@zephyr3d/device';
 
 export class Editor {
   private static _instance: Editor;

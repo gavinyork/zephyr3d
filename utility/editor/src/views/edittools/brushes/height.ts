@@ -1,4 +1,4 @@
-import { BindGroup, PBGlobalScope, PBInsideFunctionScope, Texture2D } from '@zephyr3d/device';
+import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, Texture2D } from '@zephyr3d/device';
 import { BaseTerrainBrush } from './base';
 import { DRef, fetchSampler } from '@zephyr3d/scene';
 

@@ -1,8 +1,7 @@
+import type { AssetRegistry, ClipmapTerrain } from '@zephyr3d/scene';
 import {
   Application,
   AssetManager,
-  AssetRegistry,
-  ClipmapTerrain,
   ClipmapTerrainMaterial,
   CopyBlitter,
   DRef,
@@ -15,10 +14,10 @@ import type { ToolBarItem } from '../../components/toolbar';
 import { ImGui } from '@zephyr3d/imgui';
 import { ImageList } from '../../components/imagelist';
 import { Editor } from '../../core/editor';
-import { Texture2D, Texture2DArray } from '@zephyr3d/device';
+import type { Texture2D, Texture2DArray } from '@zephyr3d/device';
 import { TerrainTextureBrush } from './brushes/splat';
 import { TerrainRaiseBrush } from './brushes/raise';
-import { TerrainHeightBrush } from './brushes/height';
+import type { TerrainHeightBrush } from './brushes/height';
 import { TerrainLowerBrush } from './brushes/lower';
 import { TerrainSmoothBrush } from './brushes/smooth';
 import { TerrainFlattenBrush } from './brushes/flatten';
@@ -99,7 +98,7 @@ export class TerrainEditTool implements EditTool {
       this.refreshDetailMaps();
     });
     this._editList = ['raise', 'lower', 'smooth', 'flatten', 'texture'];
-    this._editSelected = -1;
+    this._editSelected = 0;
     this._hitPos = null;
     this._brushImageList.addImage(TerrainEditTool.defaultBrush.get());
     for (const name in Editor.instance.getBrushes()) {

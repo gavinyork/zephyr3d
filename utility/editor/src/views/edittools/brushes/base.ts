@@ -1,5 +1,6 @@
-import { Vector2, Vector4 } from '@zephyr3d/base';
-import {
+import type { Vector2 } from '@zephyr3d/base';
+import { Vector4 } from '@zephyr3d/base';
+import type {
   AbstractDevice,
   BindGroup,
   GPUProgram,

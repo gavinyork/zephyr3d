@@ -1,7 +1,8 @@
 import { makeEventTarget } from '@zephyr3d/base';
-import { Texture2D } from '@zephyr3d/device';
+import type { Texture2D } from '@zephyr3d/device';
 import { ImGui } from '@zephyr3d/imgui';
-import { Application, AssetRegistry, DRef } from '@zephyr3d/scene';
+import type { AssetRegistry } from '@zephyr3d/scene';
+import { Application, DRef } from '@zephyr3d/scene';
 import type { DBAssetInfo } from '../storage/db';
 
 type ImageInfo = {

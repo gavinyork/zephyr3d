@@ -53,7 +53,8 @@ import {
 } from '../commands/scenecommands';
 import { ZipDownloader } from '../helpers/zipdownload';
 import { NodeProxy } from '../helpers/proxy';
-import { createEditTool, EditTool, isObjectEditable } from './edittools/edittool';
+import type { EditTool } from './edittools/edittool';
+import { createEditTool, isObjectEditable } from './edittools/edittool';
 
 export class SceneView extends BaseView<SceneModel> {
   private _cmdManager: CommandManager;
@@ -638,8 +639,8 @@ export class SceneView extends BaseView<SceneModel> {
       }
       if (this._currentEditTool.get() || (ev.button === 0 && ev.type === 'pointerdown')) {
         this.model.camera.pickAsync(p[0], p[1]).then((pickResult) => {
-          let node = pickResult?.target?.node ?? null;
-          let hitPos = pickResult?.intersectedPoint ?? null;
+          const node = pickResult?.target?.node ?? null;
+          const hitPos = pickResult?.intersectedPoint ?? null;
           if (
             !this._currentEditTool.get()?.handlePointerEvent(ev, node, hitPos) &&
             ev.button === 0 &&

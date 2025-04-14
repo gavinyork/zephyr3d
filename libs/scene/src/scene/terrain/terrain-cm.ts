@@ -8,7 +8,7 @@ import type { Drawable, DrawContext, PickTarget, Primitive } from '../../render'
 import { Clipmap } from '../../render';
 import { ClipmapTerrainMaterial } from '../../material/terrain-cm';
 import { Application, DRef } from '../../app';
-import { MeshMaterial } from '../../material';
+import type { MeshMaterial } from '../../material';
 import type { BoundingVolume } from '../../utility/bounding_volume';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { RENDER_PASS_TYPE_OBJECT_COLOR } from '../../values';

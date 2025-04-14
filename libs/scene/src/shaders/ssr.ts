@@ -1,5 +1,4 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
-import { decodeNormalizedFloatFromRGBA } from './misc';
 import { ShaderHelper } from '../material';
 
 const MAX_FLOAT_VALUE = 3.402823466e38;

@@ -9,7 +9,8 @@ import type {
   Texture2D,
   VertexLayout
 } from '@zephyr3d/device';
-import { AbstractPostEffect, PostEffectLayer } from './posteffect';
+import type { AbstractPostEffect } from './posteffect';
+import { PostEffectLayer } from './posteffect';
 import { MaterialVaryingFlags } from '../values';
 import { fetchSampler } from '../utility/misc';
 

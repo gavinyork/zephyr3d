@@ -1,4 +1,4 @@
-import { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { TerrainHeightBrush } from './height';
 
 export class TerrainLowerBrush extends TerrainHeightBrush {
