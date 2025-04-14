@@ -23,7 +23,7 @@ import {
   SpotLight
 } from '../../scene';
 import { BoxFrameShape, BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '../../shapes';
-import type { AssetRegistry } from './asset/asset';
+import type { AssetRegistry, EmbededAssetInfo } from './asset/asset';
 import { getBatchGroupClass } from './scene/batch';
 import { getCameraClass, getOrthoCameraClass, getPerspectiveCameraClass } from './scene/camera';
 import {
@@ -360,7 +360,13 @@ export function serializeObjectProps<T>(
   }
 }
 
-export function serializeObject(obj: any, assetRegistry: AssetRegistry, json?: any, assetList?: Set<string>) {
+export async function serializeObject(
+  obj: any,
+  assetRegistry: AssetRegistry,
+  json?: any,
+  assetList?: Set<string>,
+  embededAssetList?: EmbededAssetInfo[]
+) {
   const serializationInfo = getSerializationInfo(assetRegistry);
   const cls = [...serializationInfo.values()];
   const index = cls.findIndex((val) => val.ctor === obj.constructor);
@@ -380,6 +386,12 @@ export function serializeObject(obj: any, assetRegistry: AssetRegistry, json?: a
   }
   obj = info.getObject?.(obj) ?? obj;
   while (info) {
+    if (embededAssetList) {
+      const embbededAssets = await Promise.resolve(info.getEmbeddedAssets?.(obj) ?? null);
+      if (embbededAssets?.length > 0) {
+        embbededAssets.push(...embbededAssets);
+      }
+    }
     serializeObjectProps(obj, info, json.Object, assetRegistry, assetList);
     info = info.parent;
   }

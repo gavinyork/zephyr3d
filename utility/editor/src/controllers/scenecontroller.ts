@@ -55,8 +55,9 @@ export class SceneController extends BaseController<SceneModel> {
             }
           });
         } else {
-          this.saveScene(this._scene.name, false);
-          this.exportScene(this._scene.name);
+          this.saveScene(this._scene.name, false).then(() => {
+            this.exportScene(this._scene.name);
+          });
         }
         break;
       case 'OPEN_DOC':
@@ -77,11 +78,11 @@ export class SceneController extends BaseController<SceneModel> {
     this.model.camera.updateController();
     this._view.update(dt);
   }
-  private saveScene(name: string, showMessage = true) {
+  private async saveScene(name: string, showMessage = true) {
     const assetList = new Set<string>();
     this._scene = Object.assign({}, this._scene ?? {}, {
       name,
-      content: serializeObject(this.model.scene, this._assetRegistry, null, assetList), // serializeObject(this.model.scene, this._assetRegistry, {}, assetList),
+      content: await serializeObject(this.model.scene, this._assetRegistry, null, assetList), // serializeObject(this.model.scene, this._assetRegistry, {}, assetList),
       metadata: {
         activeCamera: this.model.camera?.id ?? ''
       }
@@ -97,7 +98,7 @@ export class SceneController extends BaseController<SceneModel> {
   }
   private async exportScene(name: string) {
     const assetList = new Set<string>();
-    const content = serializeObject(this.model.scene, this._assetRegistry, null, assetList);
+    const content = await serializeObject(this.model.scene, this._assetRegistry, null, assetList);
     content.meta = {
       activeCamera: this.model.camera?.id ?? ''
     };

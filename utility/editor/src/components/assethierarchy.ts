@@ -41,7 +41,7 @@ export class AssetHierarchy {
   }
   async listAssets() {
     const packages = await Database.listPackages();
-    const assets = (await Database.listAssets()).filter((val) => !val.scene);
+    const assets = (await Database.listAssets()).filter((val) => !val.embedded);
     this._assets = packages.map((pkg) => {
       const assetsInPkg = assets.filter((asset) => asset.pkg === pkg.uuid);
       return {
@@ -55,36 +55,6 @@ export class AssetHierarchy {
           this._assetRegistry.registerAsset(asset.uuid, asset.type, asset.path, asset.name);
         }
       }
-    }
-  }
-  async uploadFiles(
-    type: AssetType,
-    zip: Blob,
-    mimeType: string,
-    folderName: string,
-    paths: string[],
-    names?: string[]
-  ) {
-    const blob = await Database.putBlob({
-      data: zip,
-      mimeType
-    });
-    const pkg = await Database.putPackage({
-      blob,
-      name: folderName,
-      size: zip.size
-    });
-    for (let i = 0; i < paths.length; i++) {
-      const path = paths[i];
-      const name = names?.[i] ?? path;
-      await Database.putAsset({
-        name,
-        path,
-        thumbnail: '',
-        type,
-        pkg,
-        scene: ''
-      });
     }
   }
   async uploadRampTexture() {
@@ -115,23 +85,18 @@ export class AssetHierarchy {
       if (AssetStore.modelExtensions.findIndex((ext) => filename.endsWith(ext)) >= 0) {
         assetFiles.push(path);
       }
-      return {
-        path: file.webkitRelativePath.split('/').slice(1).join('/'),
-        file
-      };
+      return { path, file };
     });
     if (assetFiles.length === 0) {
       Dialog.messageBox('Error', 'No glb or gltf files found in the selected directory.');
       return;
     }
-    const zip = await this.zipFiles(fileList);
-    await this.uploadFiles(type, zip, null, folderName, assetFiles);
-    this._selectedAsset = null;
-    await this.listAssets();
-  }
-  async zipFiles(files: { path: string; file: File }[]) {
-    return Database.compressFiles(
-      files,
+    await Database.uploadAssets(
+      type,
+      folderName,
+      fileList.map((val) => ({ data: val.file, path: val.path })),
+      false,
+      (val) => assetFiles.indexOf(val.path) >= 0,
       () => {
         this._zipProgress?.close();
         this._zipProgress = null;
@@ -147,6 +112,8 @@ export class AssetHierarchy {
         this._zipProgress.progress = `${current}/${total}`;
       }
     );
+    this._selectedAsset = null;
+    await this.listAssets();
   }
   async doUploadAssetFile(type: AssetType, files: File[], name?: string) {
     for (const file of files) {
@@ -160,8 +127,9 @@ export class AssetHierarchy {
         Dialog.messageBox('Error', `Invalid file type. Only ${extensions.join(', ')} files are supported.`);
         return;
       }
-      const zip = await this.zipFiles([{ path: file.name, file }]);
-      await this.uploadFiles(type, zip, null, file.name, [file.name], name ? [name] : null);
+      await Database.uploadAssets(type, file.name, [
+        { data: file, path: file.name, name: name ?? file.name }
+      ]);
     }
     this._selectedAsset = null;
     await this.listAssets();

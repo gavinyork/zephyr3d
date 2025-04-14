@@ -23,7 +23,7 @@ export type DBAssetInfo = {
   name: string;
   path: string;
   thumbnail: string;
-  scene: string;
+  embedded: boolean;
   type: AssetType;
   pkg: string;
   metadata?: any;
@@ -159,9 +159,50 @@ export class Database {
       return false;
     }
   }
+  static async uploadAssets(
+    type: AssetType,
+    pkgName: string,
+    assetContents: { data: Blob; path: string; name?: string }[],
+    embedded?: boolean,
+    assetFilter?: (val: { data: Blob; path: string; name?: string }) => boolean,
+    onsuccess?: () => void,
+    onerror?: () => void,
+    onprogress?: (current: number, total: number) => void
+  ) {
+    if (!assetContents || assetContents.length === 0) {
+      return;
+    }
+    const blob = await this.compressFiles(
+      assetContents.map((val) => ({ path: val.path, file: val.data })),
+      onsuccess,
+      onerror,
+      onprogress
+    );
+    const blobId = await this.putBlob({ data: blob });
+    const pkgId = await this.putPackage({
+      blob: blobId,
+      name: pkgName,
+      size: blob.size
+    });
+    for (let i = 0; i < assetContents.length; i++) {
+      if (assetFilter && !assetFilter(assetContents[i])) {
+        continue;
+      }
+      const path = assetContents[i].path;
+      const name = assetContents[i].name ?? path;
+      await this.putAsset({
+        name,
+        path,
+        thumbnail: '',
+        type,
+        pkg: pkgId,
+        embedded: embedded ?? false
+      });
+    }
+  }
   static async putAsset(asset: DBAssetInfo) {
     asset.uuid = asset.uuid ?? this.randomUUID();
-    const { uuid, name, type, path, thumbnail, pkg, scene, metadata } = asset;
+    const { uuid, name, type, path, thumbnail, pkg, embedded, metadata } = asset;
     await this.instance.put(this.DB_NAME_ASSETS, {
       uuid,
       name,
@@ -169,7 +210,7 @@ export class Database {
       type,
       thumbnail,
       pkg,
-      scene,
+      embedded,
       metadata: JSON.stringify(metadata ?? {})
     });
     return uuid;
@@ -191,7 +232,7 @@ export class Database {
           name: asset.name,
           type: asset.type,
           pkg: asset.pkg,
-          scene: asset.scene,
+          embedded: asset.embedded,
           path: asset.path,
           thumbnail: asset.thumbnail,
           metadata: JSON.parse(asset.metadata)
@@ -212,7 +253,7 @@ export class Database {
         name: asset.name,
         type: asset.type,
         pkg: asset.pkg,
-        scene: asset.scene,
+        embedded: asset.embedded,
         path: asset.path,
         thumbnail: asset.thumbnail,
         metadata: JSON.parse(asset.metadata)
@@ -343,7 +384,7 @@ export class Database {
     });
   }
   static async compressFiles(
-    files: { path: string; file: File }[],
+    files: { path: string; file: Blob }[],
     onsuccess?: () => void,
     onerror?: () => void,
     onprogress?: (current: number, total: number) => void
