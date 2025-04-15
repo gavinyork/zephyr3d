@@ -453,6 +453,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
+    this._currentEditTool?.dispose();
     this.sceneSetup();
   }
   render() {

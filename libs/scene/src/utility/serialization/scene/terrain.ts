@@ -1,12 +1,12 @@
 import { SceneNode } from '../../../scene';
 import type { AssetRegistry, EmbeddedAssetInfo } from '../asset/asset';
-import type { SerializableClass } from '../types';
+import type { PropertyAccessor, SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import { getGraphNodeClass } from './node';
 import { ClipmapTerrain } from '../../../scene/terrain/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
 import { Application } from '../../../app';
-import { CopyBlitter } from '../../../blitter';
+import { Texture2D } from '@zephyr3d/device';
 
 async function getTerrainHeightMapContent(terrain: ClipmapTerrain): Promise<EmbeddedAssetInfo> {
   const device = Application.instance.device;
@@ -48,28 +48,137 @@ async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<Embed
   }
   return {
     assetType: 'binary',
-    assetId: terrain.heightMapAssetId,
+    assetId: terrain.splatMapAssetId,
     data: new Blob(data),
     pkgId: terrain.id,
     path: 'splatmap.raw'
   };
+}
+
+function getDetailMapProps(terrain: ClipmapTerrain, assetRegistry: AssetRegistry) {
+  const props: PropertyAccessor<ClipmapTerrain>[] = [];
+  for (let i = 0; i < terrain.numDetailMaps; i++) {
+    const accessorDetailAlbedo: PropertyAccessor<ClipmapTerrain> = {
+      name: `DetailAlbedoMap${i}`,
+      type: 'object',
+      hidden: true,
+      default: null,
+      nullable: true,
+      get(this: ClipmapTerrain, value) {
+        value.str[0] = assetRegistry.getAssetId(this.material.getDetailMap(i)) ?? '';
+      },
+      async set(value) {
+        if (!value) {
+          this.material.setDetailMap(i, null);
+        } else {
+          if (value.str[0]) {
+            const assetId = value.str[0];
+            const assetInfo = assetRegistry.getAssetInfo(assetId);
+            if (assetInfo && assetInfo.type === 'texture') {
+              let tex: Texture2D;
+              try {
+                tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
+              } catch (err) {
+                console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                tex = null;
+              }
+              if (tex?.isTexture2D()) {
+                tex.name = assetInfo.name;
+                this.material.setDetailMap(i, tex);
+              } else {
+                console.error('Invalid texture type');
+              }
+            }
+          }
+        }
+      }
+    };
+    const accessorDetailNormal: PropertyAccessor<ClipmapTerrain> = {
+      name: `DetailNormalMap${i}`,
+      type: 'object',
+      hidden: true,
+      default: null,
+      nullable: true,
+      get(this: ClipmapTerrain, value) {
+        value.str[0] = assetRegistry.getAssetId(this.material.getDetailNormalMap(i)) ?? '';
+      },
+      async set(value) {
+        if (!value) {
+          this.material.setDetailNormalMap(i, null);
+        } else {
+          if (value.str[0]) {
+            const assetId = value.str[0];
+            const assetInfo = assetRegistry.getAssetInfo(assetId);
+            if (assetInfo && assetInfo.type === 'texture') {
+              let tex: Texture2D;
+              try {
+                tex = await assetRegistry.fetchTexture<Texture2D>(assetId, {
+                  ...assetInfo.textureOptions,
+                  linearColorSpace: true
+                });
+              } catch (err) {
+                console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                tex = null;
+              }
+              if (tex?.isTexture2D()) {
+                tex.name = assetInfo.name;
+                this.material.setDetailNormalMap(i, tex);
+              } else {
+                console.error('Invalid texture type');
+              }
+            }
+          }
+        }
+      }
+    };
+    const accessorDetailUVScale: PropertyAccessor<ClipmapTerrain> = {
+      name: `DetailUVScale${i}`,
+      type: 'float',
+      hidden: true,
+      default: 80,
+      get(this: ClipmapTerrain, value) {
+        value.num[0] = this.material.getDetailMapUVScale(i);
+      },
+      async set(this: ClipmapTerrain, value) {
+        this.material.setDetailMapUVScale(i, value.num[0]);
+      }
+    };
+    const accessorDetailRoughness: PropertyAccessor<ClipmapTerrain> = {
+      name: `DetailRoughness${i}`,
+      type: 'float',
+      hidden: true,
+      default: 80,
+      get(this: ClipmapTerrain, value) {
+        value.num[0] = this.material.getDetailMapRoughness(i);
+      },
+      async set(this: ClipmapTerrain, value) {
+        this.material.setDetailMapRoughness(i, value.num[0]);
+      }
+    };
+    props.push(accessorDetailAlbedo, accessorDetailNormal, accessorDetailUVScale, accessorDetailRoughness);
+  }
+  return props;
 }
 export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: ClipmapTerrain,
     parent: getGraphNodeClass(assetRegistry),
     className: 'ClipmapTerrain',
-    createFunc(ctx: NodeHierarchy | SceneNode) {
+    createFunc(ctx: NodeHierarchy | SceneNode, init: number) {
       const node = new ClipmapTerrain(ctx.scene);
+      node.numDetailMaps = init;
       if (ctx instanceof SceneNode) {
         node.parent = ctx;
       }
       return { obj: node };
     },
+    getInitParams(obj: ClipmapTerrain) {
+      return obj.numDetailMaps;
+    },
     getEmbeddedAssets(obj: ClipmapTerrain) {
       return [getTerrainHeightMapContent(obj), getTerrainSplatMapContent(obj)];
     },
-    getProps() {
+    getProps(terrain: ClipmapTerrain) {
       return [
         {
           name: 'Resolution',
@@ -121,18 +230,7 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
             this.material.debugMode = value.str[0] as TerrainDebugMode;
           }
         },
-        {
-          name: 'NumDetailMaps',
-          type: 'int',
-          default: 0,
-          hidden: true,
-          get(this: ClipmapTerrain, value) {
-            value.num[0] = this.numDetailMaps;
-          },
-          set(this: ClipmapTerrain, value) {
-            this.numDetailMaps = value.num[0];
-          }
-        },
+        ...getDetailMapProps(terrain, assetRegistry),
         {
           name: 'SplatMap',
           type: 'object',
@@ -167,7 +265,7 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
                   return;
                 }
                 for (let i = 0; i < numLayers; i++) {
-                  const content = new Uint8Array(data, 3 + i * width * height * 4);
+                  const content = new Uint8Array(data, 3 * 4 + i * width * height * 4, width * height * 4);
                   splatMap.update(content, 0, 0, i, width, height, 1);
                 }
                 this.splatMapAssetId = value.str[0];

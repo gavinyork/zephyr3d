@@ -4,14 +4,13 @@ import type { Scene } from '../../../scene';
 import type { Texture2D, TextureCube } from '@zephyr3d/device';
 
 export type AssetType = 'model' | 'texture' | 'binary';
-export type AssetInfo = {
+export interface AssetInfo {
   id: string;
   name: string;
   type: AssetType;
   path: string;
-  allocated: WeakMap<any, string>;
   textureOptions?: TextureFetchOptions<any>;
-};
+}
 
 export type EmbeddedAssetInfo = {
   assetType: AssetType;
@@ -23,10 +22,12 @@ export type EmbeddedAssetInfo = {
 
 export class AssetRegistry {
   private _assetMap: Map<string, AssetInfo>;
+  private _allocated: WeakMap<any, string>;
   private _assetManager: AssetManager;
   private _baseUrl: string;
   constructor(baseUrl?: string) {
     this._assetMap = new Map();
+    this._allocated = new WeakMap();
     this._assetManager = new AssetManager();
     this._baseUrl = baseUrl ?? '';
   }
@@ -46,13 +47,7 @@ export class AssetRegistry {
     console.error('Putting assets not supported');
   }
   getAssetId(asset: any) {
-    for (const entry of this._assetMap) {
-      const id = entry[1].allocated.get(asset);
-      if (id) {
-        return id;
-      }
-    }
-    return null;
+    return this._allocated.get(asset) ?? null;
   }
   registerAsset(id: string, type: AssetType, path: string, name: string) {
     if (this._assetMap.has(id)) {
@@ -62,12 +57,11 @@ export class AssetRegistry {
         id,
         name,
         type,
-        path,
-        allocated: new WeakMap()
+        path
       });
     }
   }
-  getAssetInfo(id: string) {
+  getAssetInfo(id: string): AssetInfo {
     return this._assetMap.get(id);
   }
   renameAsset(id: string, name: string) {
@@ -79,20 +73,14 @@ export class AssetRegistry {
   async fetchBinary(id: string, request?: HttpRequest) {
     const data = await this.doFetchBinary(id, request);
     if (data) {
-      const info = this._assetMap.get(id);
-      if (info) {
-        info.allocated.set(data, id);
-      }
+      this._allocated.set(data, id);
     }
     return data;
   }
   async fetchModel(id: string, scene: Scene, options?: ModelFetchOptions, request?: HttpRequest) {
     const model = await this.doFetchModel(id, scene, options, request);
     if (model) {
-      const info = this._assetMap.get(id);
-      if (info) {
-        info.allocated.set(model.group, id);
-      }
+      this._allocated.set(model.group, id);
     }
     return model;
   }
@@ -103,10 +91,7 @@ export class AssetRegistry {
   ) {
     const texture = await this.doFetchTexture(id, options, request);
     if (texture) {
-      const info = this._assetMap.get(id);
-      if (info) {
-        info.allocated.set(texture, id);
-      }
+      this._allocated.set(texture, id);
     }
     return texture;
   }
@@ -130,8 +115,7 @@ export class AssetRegistry {
           id: info.id,
           name: info.name,
           type: info.type,
-          path: this.resolveUrl(this._baseUrl, info.path),
-          allocated: new Map()
+          path: this.resolveUrl(this._baseUrl, info.path)
         });
       }
     }

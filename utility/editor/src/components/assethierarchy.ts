@@ -49,13 +49,6 @@ export class AssetHierarchy {
         assets: assetsInPkg
       };
     });
-    for (const assets of this._assets) {
-      for (const asset of assets.assets) {
-        if (!this._assetRegistry.getAssetInfo(asset.uuid)) {
-          this._assetRegistry.registerAsset(asset.uuid, asset.type, asset.path, asset.name);
-        }
-      }
-    }
   }
   async uploadRampTexture() {
     const tex = await Dialog.createRampTexture('Create ramp texture', 400, 200);

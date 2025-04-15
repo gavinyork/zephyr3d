@@ -224,10 +224,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       console.error('Invalid detail map index');
       return;
     }
-    if (!albedoMap) {
-      console.error('Detail map cannot be null');
-      return;
-    }
+    albedoMap = albedoMap ?? ClipmapTerrainMaterial.getDefaultDetailMap();
     if (!this._detailMapInfo.detailMapList[index]) {
       this._detailMapInfo.detailMapList[index] = new DRef();
     }

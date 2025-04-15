@@ -1,4 +1,4 @@
-import type { AssetType } from '@zephyr3d/scene';
+import type { AssetInfo, AssetType } from '@zephyr3d/scene';
 import type { IDBPDatabase } from 'idb';
 import { openDB } from 'idb';
 import type { ZipDownloader } from '../helpers/zipdownload';
@@ -44,6 +44,7 @@ export class Database {
   static readonly DB_NAME_SCENES = 'scenes';
   static readonly DB_NAME_BLOBS = 'blobs';
   static readonly DB_NAME_PACKAGES = 'packages';
+  static assetMap: Map<string, AssetInfo> = new Map();
   static async init() {
     if (!this.instance) {
       const that = this;
@@ -55,6 +56,15 @@ export class Database {
           db.createObjectStore(that.DB_NAME_BLOBS, { keyPath: 'uuid' });
           db.createObjectStore(that.DB_NAME_PACKAGES, { keyPath: 'uuid' });
         }
+      });
+    }
+    const assets = await this.listAssets();
+    for (const asset of assets) {
+      this.assetMap.set(asset.uuid, {
+        id: asset.uuid,
+        name: asset.name,
+        path: asset.path,
+        type: asset.type
       });
     }
   }
@@ -162,7 +172,7 @@ export class Database {
   static async uploadAssets(
     type: AssetType,
     pkgName: string,
-    assetContents: { data: Blob; path: string; name?: string }[],
+    assetContents: { id?: string; data: Blob; path: string; name?: string }[],
     embedded?: boolean,
     assetFilter?: (val: { data: Blob; path: string; name?: string }) => boolean,
     onsuccess?: () => void,
@@ -190,7 +200,9 @@ export class Database {
       }
       const path = assetContents[i].path;
       const name = assetContents[i].name ?? path;
+      const uuid = assetContents[i].id ?? null;
       await this.putAsset({
+        uuid,
         name,
         path,
         thumbnail: '',
@@ -213,11 +225,21 @@ export class Database {
       embedded,
       metadata: JSON.stringify(metadata ?? {})
     });
+    this.assetMap.set(uuid, {
+      id: uuid,
+      name,
+      path,
+      type
+    });
     return uuid;
+  }
+  static getAssetInfo(id: string) {
+    return this.assetMap.get(id) ?? null;
   }
   static async deleteAsset(uuid: string): Promise<boolean> {
     try {
       await this.instance.delete(this.DB_NAME_ASSETS, uuid);
+      this.assetMap.delete(uuid);
       return true;
     } catch (error) {
       console.error('Error deleting asset:', error);

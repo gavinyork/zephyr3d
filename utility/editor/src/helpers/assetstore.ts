@@ -20,11 +20,38 @@ export class AssetStore {
       return Database.uploadAssets(
         val.assetType,
         val.pkgId,
-        [{ data: val.data, path: val.path, name: val.path }],
+        [{ id: val.assetId, data: val.data, path: val.path, name: val.path }],
         true
       );
     });
     await Promise.all(assetList);
+  }
+  static async fetchBinary(uuid: string): Promise<ArrayBuffer> {
+    const asset = await Database.getAsset(uuid);
+    if (asset?.type !== 'binary') {
+      return null;
+    }
+    const pkg = await Database.getPackage(asset.pkg);
+    if (!pkg) {
+      return null;
+    }
+    const blob = await Database.getBlob(pkg.blob);
+    if (!blob) {
+      return null;
+    }
+    const fileMap = new Map(
+      [...(await Database.decompressZip(blob.data))].map((val) => [val[0], URL.createObjectURL(val[1])])
+    );
+    const httpRequest = new HttpRequest((url) => fileMap.get(url));
+    const data = await this._assetManager.fetchBinaryData(`/${asset.path}`, null, httpRequest);
+    for (const url of fileMap.values()) {
+      URL.revokeObjectURL(url);
+    }
+    if (data) {
+      return data;
+    } else {
+      throw new Error('Binary asset cannot be loaded');
+    }
   }
   static async fetchTexture<T extends BaseTexture>(
     uuid: string,

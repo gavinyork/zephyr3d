@@ -529,7 +529,7 @@ export abstract class WebGPUBaseTexture<
     const blocksPerRow = Math.ceil(width / blockWidth);
     const blocksPerCol = Math.ceil(height / blockHeight);
     const rowStride = blocksPerRow * info.size;
-    if (rowStride * blocksPerCol * depth !== data.byteLength) {
+    if (rowStride * blocksPerCol * depth > data.byteLength) {
       throw new Error(`WebGPUTexture.update() invalid data size: ${data.byteLength}`);
     }
     if (!this._device.isTextureUploading(this as any)) {

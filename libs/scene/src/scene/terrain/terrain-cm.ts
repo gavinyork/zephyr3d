@@ -43,6 +43,9 @@ export class ClipmapTerrain
     );
     this.updateRegion();
   }
+  get MAX_DETAIL_MAP_COUNT() {
+    return ClipmapTerrainMaterial.MAX_DETAIL_MAP_COUNT;
+  }
   get heightMapAssetId() {
     if (!this._heightMapAssetId) {
       this._heightMapAssetId = crypto.randomUUID();

@@ -1,4 +1,4 @@
-import { EmbeddedAssetInfo } from './asset/asset';
+import type { EmbeddedAssetInfo } from './asset/asset';
 
 export type PropertyType =
   | 'bool'
