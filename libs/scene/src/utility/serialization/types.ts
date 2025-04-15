@@ -1,4 +1,4 @@
-import { EmbededAssetInfo } from './asset/asset';
+import { EmbeddedAssetInfo } from './asset/asset';
 
 export type PropertyType =
   | 'bool'
@@ -57,7 +57,7 @@ export type SerializableClass = {
   getObject?: (obj: any) => any;
   getInitParams?: (obj: any) => any;
   getProps: (obj: any) => PropertyAccessor<any>[];
-  getEmbeddedAssets?: (obj: any) => EmbededAssetInfo[] | Promise<EmbededAssetInfo[]>;
+  getEmbeddedAssets?: (obj: any) => (EmbeddedAssetInfo | Promise<EmbeddedAssetInfo>)[];
 };
 
 export type SerializationInfo = SerializableClass[];

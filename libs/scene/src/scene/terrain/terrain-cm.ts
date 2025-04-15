@@ -1,5 +1,5 @@
 import { Vector4, applyMixins, Matrix4x4, Vector3 } from '@zephyr3d/base';
-import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
+import type { GPUDataBuffer, Texture2D, Texture2DArray } from '@zephyr3d/device';
 import type { NodeClonable, NodeCloneMethod } from '../scene_node';
 import type { Scene } from '../scene';
 import { GraphNode } from '../graph_node';
@@ -26,6 +26,8 @@ export class ClipmapTerrain
   private _castShadow: boolean;
   private _sizeX: number;
   private _sizeZ: number;
+  private _heightMapAssetId: string;
+  private _splatMapAssetId: string;
   constructor(scene: Scene, sizeX = 256, sizeZ = 256, clipMapTileSize = 64) {
     super(scene);
     this._pickTarget = { node: this };
@@ -34,14 +36,30 @@ export class ClipmapTerrain
     this._castShadow = true;
     this._sizeX = sizeX;
     this._sizeZ = sizeZ;
-
+    this._heightMapAssetId = '';
+    this._splatMapAssetId = '';
     this._material = new DRef(
-      new ClipmapTerrainMaterial(
-        Application.instance.device.createTexture2D('r16f', this._sizeX, this._sizeZ),
-        clipMapTileSize
-      )
+      new ClipmapTerrainMaterial(this.createHeightMapTexture(this._sizeX, this._sizeZ), clipMapTileSize)
     );
     this.updateRegion();
+  }
+  get heightMapAssetId() {
+    if (!this._heightMapAssetId) {
+      this._heightMapAssetId = crypto.randomUUID();
+    }
+    return this._heightMapAssetId;
+  }
+  set heightMapAssetId(val: string) {
+    this._heightMapAssetId = val;
+  }
+  get splatMapAssetId() {
+    if (!this._splatMapAssetId) {
+      this._splatMapAssetId = crypto.randomUUID();
+    }
+    return this._splatMapAssetId;
+  }
+  set splatMapAssetId(val: string) {
+    this._splatMapAssetId = val;
   }
   clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new ClipmapTerrain(this.scene, this._sizeX, this._sizeZ);
@@ -95,6 +113,9 @@ export class ClipmapTerrain
       this.material.heightMap = val;
       this.updateRegion();
     }
+  }
+  get splatMap(): Texture2DArray {
+    return this.material.getSplatMap();
   }
   get material(): ClipmapTerrainMaterial {
     return this._material?.get() ?? null;
@@ -197,6 +218,9 @@ export class ClipmapTerrain
       outMatrix.m13 += this.parent.worldMatrix.m13;
       outMatrix.m23 += this.parent.worldMatrix.m23;
     }
+  }
+  createHeightMapTexture(width: number, height: number) {
+    return Application.instance.device.createTexture2D('r16f', width, height);
   }
   protected _onTransformChanged(invalidateLocal: boolean): void {
     super._onTransformChanged(invalidateLocal);

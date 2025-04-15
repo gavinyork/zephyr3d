@@ -23,7 +23,7 @@ import {
   SpotLight
 } from '../../scene';
 import { BoxFrameShape, BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '../../shapes';
-import type { AssetRegistry, EmbededAssetInfo } from './asset/asset';
+import type { AssetRegistry, EmbeddedAssetInfo } from './asset/asset';
 import { getBatchGroupClass } from './scene/batch';
 import { getCameraClass, getOrthoCameraClass, getPerspectiveCameraClass } from './scene/camera';
 import {
@@ -250,7 +250,8 @@ export function serializeObjectProps<T>(
   cls: SerializableClass,
   json: object,
   assetRegistry: AssetRegistry,
-  assetList?: Set<string>
+  assetList?: Set<string>,
+  embeddedAssetList?: Promise<EmbeddedAssetInfo>[]
 ) {
   const props = cls.getProps(obj) ?? [];
   for (const prop of props) {
@@ -278,7 +279,7 @@ export function serializeObjectProps<T>(
           typeof tmpVal.str[0] === 'string' && tmpVal.str[0]
             ? tmpVal.str[0]
             : tmpVal.object[0]
-            ? serializeObject(tmpVal.object[0], assetRegistry, {}, assetList)
+            ? serializeObject(tmpVal.object[0], assetRegistry, {}, assetList, embeddedAssetList)
             : null;
         if (value) {
           json[k] = value;
@@ -291,7 +292,7 @@ export function serializeObjectProps<T>(
       case 'object_array':
         json[k] = [];
         for (const p of tmpVal.object) {
-          json[k].push(serializeObject(p, assetRegistry, {}, assetList));
+          json[k].push(serializeObject(p, assetRegistry, {}, assetList, embeddedAssetList));
         }
         break;
       case 'float':
@@ -360,12 +361,12 @@ export function serializeObjectProps<T>(
   }
 }
 
-export async function serializeObject(
+export function serializeObject(
   obj: any,
   assetRegistry: AssetRegistry,
   json?: any,
   assetList?: Set<string>,
-  embededAssetList?: EmbededAssetInfo[]
+  embeddedAssetList?: Promise<EmbeddedAssetInfo>[]
 ) {
   const serializationInfo = getSerializationInfo(assetRegistry);
   const cls = [...serializationInfo.values()];
@@ -386,13 +387,10 @@ export async function serializeObject(
   }
   obj = info.getObject?.(obj) ?? obj;
   while (info) {
-    if (embededAssetList) {
-      const embbededAssets = await Promise.resolve(info.getEmbeddedAssets?.(obj) ?? null);
-      if (embbededAssets?.length > 0) {
-        embbededAssets.push(...embbededAssets);
-      }
+    if (embeddedAssetList && info.getEmbeddedAssets) {
+      embeddedAssetList?.push(...(info.getEmbeddedAssets(obj) ?? []).map((val) => Promise.resolve(val)));
     }
-    serializeObjectProps(obj, info, json.Object, assetRegistry, assetList);
+    serializeObjectProps(obj, info, json.Object, assetRegistry, assetList, embeddedAssetList);
     info = info.parent;
   }
   return json;
@@ -435,49 +433,6 @@ export async function deserializeObject<T>(ctx: any, json: object, assetRegistry
   return obj;
 }
 
-/*
-export function serializeScene(
-  nodeOrScene: Scene | SceneNode,
-  assetRegistry: AssetRegistry,
-  assetList?: Set<string>
-) {
-  const json = {} as any;
-  const v = new GatherVisitor();
-  const node = nodeOrScene instanceof SceneNode ? nodeOrScene : nodeOrScene.rootNode;
-  node.traverse(v);
-  json.allMaterials = [] as any[];
-  for (const m of v.materialSet) {
-    if (!m.persistentId) {
-      Material.registerMaterial(crypto.randomUUID(), m);
-    }
-    const pid = m.persistentId;
-    m.persistentId = '';
-    const matContent = serializeObject(m, assetRegistry, null, assetList, m.$isInstance);
-    m.persistentId = pid;
-    json.allMaterials.push({
-      id: m.persistentId,
-      proto: m.$isInstance ? m.coreMaterial.persistentId : null,
-      content: matContent
-    });
-  }
-  json.allPrimitives = [] as any[];
-  for (const p of v.primitiveSet) {
-    if (!p.persistentId) {
-      Primitive.registerPrimitive(crypto.randomUUID(), p);
-    }
-    const pid = p.persistentId;
-    p.persistentId = '';
-    const primContent = serializeObject(p, assetRegistry, null, assetList);
-    p.persistentId = pid;
-    json.allPrimitives.push({
-      id: p.persistentId,
-      content: primContent
-    });
-  }
-  json.content = serializeObject(nodeOrScene, assetRegistry, null, assetList);
-  return json;
-}
-*/
 export async function deserializeSceneFromURL(
   url: string,
   assetRegistry: AssetRegistry
@@ -493,40 +448,3 @@ export async function deserializeSceneFromURL(
     return null;
   }
 }
-/*
-export async function deserializeScene<T>(scene: Scene, assetRegistry: AssetRegistry, json: any) {
-  const allMaterials = json.allMaterials as { id: string; proto: string; content: any }[];
-  if (allMaterials) {
-    const nonInstancedMaterials = allMaterials.filter(
-      (val) => !val.proto && !Material.findMaterialById(val.id)
-    );
-    let promises: Promise<Material>[] = nonInstancedMaterials.map((val) =>
-      deserializeObject(null, val.content, assetRegistry)
-    );
-    let materials: Material[] = await Promise.all(promises);
-    for (let i = 0; i < nonInstancedMaterials.length; i++) {
-      Material.registerMaterial(nonInstancedMaterials[i].id, materials[i]);
-    }
-    const instancedMaterials = allMaterials.filter(
-      (val) => val.proto && Material.findMaterialById(val.proto) && !Material.findMaterialById(val.id)
-    );
-    promises = instancedMaterials.map((val) => deserializeObject(null, val.content, assetRegistry));
-    materials = await Promise.all(promises);
-    for (let i = 0; i < instancedMaterials.length; i++) {
-      Material.registerMaterial(instancedMaterials[i].id, materials[i]);
-    }
-  }
-  const allPrimitives = json.allPrimitives as { id: string; content: any }[];
-  if (allPrimitives) {
-    const newPrimitives = allPrimitives.filter((val) => !Primitive.findPrimitiveById(val.id));
-    const promises: Promise<Primitive>[] = newPrimitives.map((val) =>
-      deserializeObject(null, val.content, assetRegistry)
-    );
-    const primitives: Primitive[] = await Promise.all(promises);
-    for (let i = 0; i < newPrimitives.length; i++) {
-      Primitive.registerPrimitive(newPrimitives[i].id, primitives[i]);
-    }
-  }
-  return await deserializeObject<T>(scene, json.content, assetRegistry);
-}
-*/

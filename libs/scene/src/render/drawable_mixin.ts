@@ -11,7 +11,7 @@ import { MaterialVaryingFlags } from '../values';
 
 export interface IMixinDrawable {
   readonly objectColor: Vector4;
-  getId(): number;
+  getDrawableId(): number;
   pushRenderQueueRef(ref: RenderQueueRef): void;
   applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void;
   applyTransformUniforms(renderQueue: RenderQueue): void;
@@ -78,11 +78,11 @@ export function mixinDrawable<
     private _framestampBuffer: Int32Array;
     private _currentWorldMatrixBuffer: Float32Array;
     private _prevWorldMatrixBuffer: Float32Array;
-    private _id: number;
+    private _drawableId: number;
     private _objectColor: Vector4;
     constructor(...args: any[]) {
       super(...args);
-      this._id = ++_drawableId;
+      this._drawableId = ++_drawableId;
       this._objectColor = null;
       this._mdRenderQueueRef = [];
       this._mdDrawableBindGroup = null;
@@ -113,15 +113,15 @@ export function mixinDrawable<
         }
       });
     }
-    getId(): number {
-      return this._id;
+    getDrawableId(): number {
+      return this._drawableId;
     }
     getObjectColor(): Vector4 {
       if (!this._objectColor) {
-        const a = (this._id & 0xff) / 255;
-        const b = ((this._id >>> 8) & 0xff) / 255;
-        const g = ((this._id >>> 16) & 0xff) / 255;
-        const r = ((this._id >>> 24) & 0xff) / 255;
+        const a = (this._drawableId & 0xff) / 255;
+        const b = ((this._drawableId >>> 8) & 0xff) / 255;
+        const g = ((this._drawableId >>> 16) & 0xff) / 255;
+        const r = ((this._drawableId >>> 24) & 0xff) / 255;
         this._objectColor = new Vector4(r, g, b, a);
       }
       return this._objectColor;

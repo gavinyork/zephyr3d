@@ -129,7 +129,7 @@ export interface Drawable {
   /** Gets name of the drawable object */
   getName(): string;
   /** Gets unique id of the drawable object */
-  getId(): number;
+  getDrawableId(): number;
   /** Gets the XForm of the object */
   getNode(): SceneNode;
   /** If set, the pick target will be returned as the pick result  */

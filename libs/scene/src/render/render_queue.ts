@@ -329,7 +329,7 @@ export class RenderQueue {
       this._drawTransparent ||= trans;
       if (camera.getPickResultResolveFunc()) {
         drawable.getMaterial().objectColor = drawable.getObjectColor();
-        this._objectColorMaps[0].set(drawable.getId(), drawable);
+        this._objectColorMaps[0].set(drawable.getDrawableId(), drawable);
       }
       if (drawable.isBatchable()) {
         const instanceList = trans

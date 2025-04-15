@@ -1,9 +1,12 @@
 import type { Texture2D, TextureCube } from '@zephyr3d/device';
-import type { ModelFetchOptions, Scene, TextureFetchOptions } from '@zephyr3d/scene';
+import type { EmbeddedAssetInfo, ModelFetchOptions, Scene, TextureFetchOptions } from '@zephyr3d/scene';
 import { AssetRegistry } from '@zephyr3d/scene';
 import { AssetStore } from '../helpers/assetstore';
 
 export class EditorAssetRegistry extends AssetRegistry {
+  async putEmbeddedAssets(assets: EmbeddedAssetInfo[]) {
+    return AssetStore.putEmbeddedAssets(assets);
+  }
   protected async doFetchModel(name: string, scene: Scene, options?: ModelFetchOptions) {
     return AssetStore.fetchModel(scene, name, options);
   }

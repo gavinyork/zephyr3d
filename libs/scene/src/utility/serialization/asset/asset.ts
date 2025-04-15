@@ -13,7 +13,8 @@ export type AssetInfo = {
   textureOptions?: TextureFetchOptions<any>;
 };
 
-export type EmbededAssetInfo = {
+export type EmbeddedAssetInfo = {
+  assetType: AssetType;
   assetId: string;
   pkgId: string;
   path: string;
@@ -41,7 +42,7 @@ export class AssetRegistry {
   get assetManager() {
     return this._assetManager;
   }
-  async putEmbeddedAssets(assets: EmbededAssetInfo[]) {
+  async putEmbeddedAssets(assets: EmbeddedAssetInfo[]) {
     console.error('Putting assets not supported');
   }
   getAssetId(asset: any) {

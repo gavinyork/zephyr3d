@@ -1,4 +1,11 @@
-import type { AnimationSet, ModelFetchOptions, Scene, SceneNode, TextureFetchOptions } from '@zephyr3d/scene';
+import type {
+  AnimationSet,
+  EmbeddedAssetInfo,
+  ModelFetchOptions,
+  Scene,
+  SceneNode,
+  TextureFetchOptions
+} from '@zephyr3d/scene';
 import { AssetManager } from '@zephyr3d/scene';
 import { Database } from '../storage/db';
 import { HttpRequest } from '@zephyr3d/base';
@@ -8,6 +15,17 @@ export class AssetStore {
   private static _assetManager: AssetManager = new AssetManager();
   static readonly modelExtensions = ['.gltf', '.glb'];
   static readonly textureExtensions = ['jpg', 'jpeg', 'png', 'tga', 'dds', 'hdr'];
+  static async putEmbeddedAssets(assets: EmbeddedAssetInfo[]) {
+    const assetList = assets.map((val) => {
+      return Database.uploadAssets(
+        val.assetType,
+        val.pkgId,
+        [{ data: val.data, path: val.path, name: val.path }],
+        true
+      );
+    });
+    await Promise.all(assetList);
+  }
   static async fetchTexture<T extends BaseTexture>(
     uuid: string,
     options?: TextureFetchOptions<T>

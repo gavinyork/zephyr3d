@@ -2232,6 +2232,12 @@ export interface TextureFormatInfo {
   renderable: boolean;
   /** True if the texture format is a compressed format */
   compressed: boolean;
+  /** Number of bytes per-block */
+  size: number;
+  /** Block width */
+  blockWidth: number;
+  /** Block height */
+  blockHeight: number;
 }
 
 /**

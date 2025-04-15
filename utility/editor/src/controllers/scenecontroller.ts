@@ -1,4 +1,4 @@
-import type { AssetRegistry, Scene } from '@zephyr3d/scene';
+import type { AssetRegistry, EmbeddedAssetInfo, Scene } from '@zephyr3d/scene';
 import { deserializeObject, serializeObject } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import type { SceneModel } from '../models/scenemodel';
@@ -80,21 +80,31 @@ export class SceneController extends BaseController<SceneModel> {
   }
   private async saveScene(name: string, showMessage = true) {
     const assetList = new Set<string>();
+    const embeddedAssetList: Promise<EmbeddedAssetInfo>[] = [];
     this._scene = Object.assign({}, this._scene ?? {}, {
       name,
-      content: await serializeObject(this.model.scene, this._assetRegistry, null, assetList), // serializeObject(this.model.scene, this._assetRegistry, {}, assetList),
+      content: await serializeObject(
+        this.model.scene,
+        this._assetRegistry,
+        null,
+        assetList,
+        embeddedAssetList
+      ),
       metadata: {
         activeCamera: this.model.camera?.id ?? ''
       }
     });
     console.log(JSON.stringify(this._scene.content, null, 2));
     console.log([...assetList]);
-    Database.putScene(this._scene).then((uuid) => {
-      this._scene.uuid = uuid;
-      if (showMessage) {
-        Dialog.messageBox('Zephyr3d', `Scene saved: ${uuid}`);
-      }
-    });
+    console.log([...embeddedAssetList]);
+    const embeddedAssets = await Promise.all(embeddedAssetList);
+    await this._assetRegistry.putEmbeddedAssets(embeddedAssets);
+    await Database.putScene(this._scene);
+    const uuid = await Database.putScene(this._scene);
+    this._scene.uuid = uuid;
+    if (showMessage) {
+      Dialog.messageBox('Zephyr3d', `Scene saved: ${uuid}`);
+    }
   }
   private async exportScene(name: string) {
     const assetList = new Set<string>();
