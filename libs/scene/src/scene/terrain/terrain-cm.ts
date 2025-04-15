@@ -61,6 +61,12 @@ export class ClipmapTerrain
   set splatMapAssetId(val: string) {
     this._splatMapAssetId = val;
   }
+  get numDetailMaps(): number {
+    return this.material.numDetailMaps;
+  }
+  set numDetailMaps(val: number) {
+    this.material.numDetailMaps = val;
+  }
   clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new ClipmapTerrain(this.scene, this._sizeX, this._sizeZ);
     other.copyFrom(this, method, recursive);

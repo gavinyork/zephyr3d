@@ -122,6 +122,18 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
           }
         },
         {
+          name: 'NumDetailMaps',
+          type: 'int',
+          default: 0,
+          hidden: true,
+          get(this: ClipmapTerrain, value) {
+            value.num[0] = this.numDetailMaps;
+          },
+          set(this: ClipmapTerrain, value) {
+            this.numDetailMaps = value.num[0];
+          }
+        },
+        {
           name: 'SplatMap',
           type: 'object',
           default: null,
