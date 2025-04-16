@@ -29,6 +29,9 @@ export type IMixinPBRMetallicRoughness = {
     TBN: PBShaderExp,
     outRoughness?: PBShaderExp
   ): PBShaderExp;
+  calculateMetallic(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp;
+  calculateRoughness(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp;
+  calculateSpecularFactor(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp);
   calculateCommonData(
     scope: PBInsideFunctionScope,
     albedo: PBShaderExp,
@@ -207,6 +210,22 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
         }
       }
     }
+    calculateMetallic(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp {
+      const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
+      return instancing ? scope.$inputs.zMetallic : scope.zMetallic;
+    }
+    calculateRoughness(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp {
+      const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
+      return instancing ? scope.$inputs.zRoughness : scope.zRoughness;
+    }
+    calculateSpecularFactor(
+      scope: PBInsideFunctionScope,
+      albedo: PBShaderExp,
+      normal: PBShaderExp
+    ): PBShaderExp {
+      const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
+      return instancing ? scope.$inputs.zSpecularFactor : scope.zSpecularFactor;
+    }
     calculateCommonData(
       scope: PBInsideFunctionScope,
       albedo: PBShaderExp,
@@ -216,10 +235,9 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
       data: PBShaderExp
     ): void {
       const pb = scope.$builder;
-      const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
-      const metallic = instancing ? scope.$inputs.zMetallic : scope.zMetallic;
-      const roughness = instancing ? scope.$inputs.zRoughness : scope.zRoughness;
-      const specularFactor = instancing ? scope.$inputs.zSpecularFactor : scope.zSpecularFactor;
+      const metallic = this.calculateMetallic(scope, albedo, normal);
+      const roughness = this.calculateRoughness(scope, albedo, normal);
+      const specularFactor = this.calculateSpecularFactor(scope, albedo, normal);
       if (this.metallicRoughnessTexture) {
         scope.$l.metallicRoughnessSample = this.sampleMetallicRoughnessTexture(scope);
         data.metallic = pb.mul(metallic, scope.metallicRoughnessSample.z);
