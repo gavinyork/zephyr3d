@@ -6,7 +6,7 @@ import { getGraphNodeClass } from './node';
 import { ClipmapTerrain } from '../../../scene/terrain/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
 import { Application } from '../../../app';
-import { Texture2D } from '@zephyr3d/device';
+import type { Texture2D } from '@zephyr3d/device';
 
 async function getTerrainHeightMapContent(terrain: ClipmapTerrain): Promise<EmbeddedAssetInfo> {
   const device = Application.instance.device;

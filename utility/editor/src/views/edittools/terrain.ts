@@ -47,6 +47,7 @@ export class TerrainEditTool implements EditTool {
   private _assetRegistry: AssetRegistry;
   private _splatMapCopy: DRef<Texture2DArray>;
   private _heightMapCopy: DRef<Texture2D>;
+  private _heightDirty: boolean;
   constructor(terrain: ClipmapTerrain, assetRegistry: AssetRegistry) {
     this._terrain = new DRef(terrain);
     this._assetRegistry = assetRegistry;
@@ -110,6 +111,7 @@ export class TerrainEditTool implements EditTool {
     this._smoothBrush = new TerrainSmoothBrush();
     this._flattenBrush = new TerrainFlattenBrush();
     this._textureBrush = new TerrainTextureBrush();
+    this._heightDirty = false;
     const splatMap = this._terrain.get().material.getSplatMap();
     const splatMapCopy = Application.instance.device.createTexture2DArray(
       splatMap.format,
@@ -139,7 +141,7 @@ export class TerrainEditTool implements EditTool {
       if (evt.type === 'pointerdown' && evt.button === 0 && this._editSelected >= 0) {
         this._brushing = true;
       }
-      if (evt.type === 'pointerup' && evt.button === 0) {
+      if ((evt.buttons & 1) === 0) {
         this._brushing = false;
       }
     } else {
@@ -148,6 +150,10 @@ export class TerrainEditTool implements EditTool {
     return false;
   }
   update() {
+    if (!this._brushing && this._heightDirty) {
+      this._heightDirty = false;
+      this._terrain.get().updateBoundingBox();
+    }
     if (this._brushing && this._hitPos && this._brushImageList.selected >= 0) {
       const texture = this._brushImageList.getImage(this._brushImageList.selected);
       const angle = degree2radian(this._brushAngle);
@@ -274,6 +280,8 @@ export class TerrainEditTool implements EditTool {
 
     device.popDeviceStates();
     device.pool.releaseFrameBuffer(fb);
+
+    this._heightDirty = true;
   }
   handleKeyboardEvent(evt: KeyboardEvent): boolean {
     return false;
@@ -393,6 +401,8 @@ export class TerrainEditTool implements EditTool {
                   : 'clamp_linear_nomip'
               )
             );
+            this._terrain.get().updateBoundingBox();
+
             URL.revokeObjectURL(url);
           })
           .catch((err) => {
@@ -486,6 +496,10 @@ export class TerrainEditTool implements EditTool {
     return texture;
   }
   dispose(): void {
+    if (this._heightDirty && this._terrain?.get()) {
+      this._heightDirty = false;
+      this._terrain.get().updateBoundingBox();
+    }
     this._disposed = true;
     this._terrain?.dispose();
     this._terrain = null;

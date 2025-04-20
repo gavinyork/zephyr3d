@@ -84,7 +84,7 @@ export class OrbitCameraController extends BaseCameraController {
    * Creates an instance of OrbitCameraController
    * @param options - The creation options
    */
-  constructor(options?: OrbitCameraControllerOptions) {
+  constructor(options?: Partial<OrbitCameraControllerOptions>) {
     super();
     this.options = Object.assign(
       {
@@ -228,15 +228,12 @@ export class OrbitCameraController extends BaseCameraController {
       const dy = evt.offsetY - this.lastMouseY;
       this.lastMouseX = evt.offsetX;
       this.lastMouseY = evt.offsetY;
-      const center = this.options.center;
       if (this.currentOp === OperationType.ROTATE) {
         this.rotateX -= dy * this.options.rotateSpeed * 0.005;
         this.rotateY -= dx * this.options.rotateSpeed * 0.005;
       } else if (this.currentOp === OperationType.PAN) {
-        const distance = Vector3.distance(this.eyePos, center);
-        // 更新平移速度而不是直接平移
-        this.panVelocityX = -dx * this.options.panSpeed * distance * 0.005;
-        this.panVelocityY = dy * this.options.panSpeed * distance * 0.005;
+        this.panVelocityX = -dx * this.options.panSpeed;
+        this.panVelocityY = dy * this.options.panSpeed;
       } else if (this.currentOp === OperationType.ZOOM) {
         this.zoom(dy);
       }
@@ -276,14 +273,6 @@ export class OrbitCameraController extends BaseCameraController {
     const camera = this._getCamera();
     if (camera) {
       this.lookAt(camera.position, this.options.center, this.upVector);
-      /*
-      this.eyePos.set(camera.position);
-      camera.lookAt(this.eyePos, this.options.center, this.upVector);
-      Vector3.sub(this.eyePos, this.options.center, this.direction);
-      this.direction.inplaceNormalize();
-      const mat = this._getCamera().localMatrix;
-      this.xVector.setXYZ(mat[0], mat[1], mat[2]);
-      */
     }
   }
   lookAt(from: Vector3, to: Vector3, up: Vector3) {
@@ -321,7 +310,6 @@ export class OrbitCameraController extends BaseCameraController {
         this.eyePos.combineBy(right, 1, this.panVelocityX);
         this.eyePos.combineBy(up, 1, this.panVelocityY);
 
-        // 应用damping到平移速度
         this.panVelocityX *= 1 - this.options.damping;
         this.panVelocityY *= 1 - this.options.damping;
 

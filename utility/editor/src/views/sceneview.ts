@@ -32,8 +32,8 @@ import { Application, DirectionalLight } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
-import type { GenericConstructor } from '@zephyr3d/base';
-import { AABB, Quaternion, Vector3 } from '@zephyr3d/base';
+import type { GenericConstructor, AABB } from '@zephyr3d/base';
+import { Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import { Database, type DBAssetInfo } from '../storage/db';
 import { Dialog } from './dlg/dlg';
@@ -55,6 +55,7 @@ import { ZipDownloader } from '../helpers/zipdownload';
 import { NodeProxy } from '../helpers/proxy';
 import type { EditTool } from './edittools/edittool';
 import { createEditTool, isObjectEditable } from './edittools/edittool';
+import { calcHierarchyBoundingBox } from '../helpers/misc';
 
 export class SceneView extends BaseView<SceneModel> {
   private _cmdManager: CommandManager;
@@ -83,6 +84,13 @@ export class SceneView extends BaseView<SceneModel> {
   private _aabbForEdit: AABB;
   private _proxy: NodeProxy;
   private _currentEditTool: DRef<EditTool>;
+  private _cameraAnimationEyeFrom: Vector3;
+  private _cameraAnimationTargetFrom: Vector3;
+  private _cameraAnimationEyeTo: Vector3;
+  private _cameraAnimationTargetTo: Vector3;
+  private _cameraAnimationTime: number;
+  private _cameraAnimationDuration: number;
+  private _animatedCamera: Camera;
   constructor(model: SceneModel, assetRegistry: AssetRegistry) {
     super(model);
     this._cmdManager = new CommandManager();
@@ -104,6 +112,13 @@ export class SceneView extends BaseView<SceneModel> {
     this._aabbForEdit = null;
     this._proxy = null;
     this._currentEditTool = new DRef();
+    this._cameraAnimationEyeFrom = new Vector3();
+    this._cameraAnimationTargetFrom = new Vector3();
+    this._cameraAnimationEyeTo = new Vector3();
+    this._cameraAnimationTargetTo = new Vector3();
+    this._cameraAnimationTime = 0;
+    this._cameraAnimationDuration = 100;
+    this._animatedCamera = null;
     this._assetRegistry = assetRegistry;
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
@@ -331,6 +346,20 @@ export class SceneView extends BaseView<SceneModel> {
           }
         },
         {
+          label: FontGlyph.glyphs['eye'],
+          shortcut: 'F',
+          tooltip: () => 'Focus on selected node',
+          selected: () => {
+            return !!this._tab.sceneHierarchy.selectedNode;
+          },
+          action: () => {
+            const node = this._tab.sceneHierarchy.selectedNode;
+            if (node) {
+              this.lookAt(this.model.camera, node);
+            }
+          }
+        },
+        {
           label: FontGlyph.glyphs['pencil'],
           tooltip: () => 'Edit selected node',
           visible: () =>
@@ -453,6 +482,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
+    this._animatedCamera = null;
     this._currentEditTool?.dispose();
     this.sceneSetup();
   }
@@ -566,6 +596,9 @@ export class SceneView extends BaseView<SceneModel> {
     if (this.shortcut(ev)) {
       return true;
     }
+    if (this._animatedCamera) {
+      return true;
+    }
     if (this.model.camera.handleEvent(ev, type)) {
       return true;
     }
@@ -669,15 +702,21 @@ export class SceneView extends BaseView<SceneModel> {
     if (camera === node) {
       return;
     }
-    const nodePos = node.getWorldPosition();
-    const aabb = node.getWorldBoundingVolume()?.toAABB() ?? new AABB(nodePos, nodePos);
+    const aabb = calcHierarchyBoundingBox(node);
+    const nodePos = aabb.center;
     const radius = aabb.diagonalLength * 0.5;
     const distance = Math.max(radius / camera.getTanHalfFovy(), camera.getNearPlane() + 1);
     const cameraZ = camera.worldMatrix.getRow(2).xyz();
-    const worldPos = Vector3.add(nodePos, Vector3.scale(cameraZ, distance * 2));
+    const worldPos = Vector3.add(nodePos, Vector3.scale(cameraZ, Math.min(100, distance * 2)));
     const localEye = camera.parent.invWorldMatrix.transformPointAffine(worldPos);
     const localTarget = camera.parent.invWorldMatrix.transformPointAffine(nodePos);
-    camera.controller.lookAt(localEye, localTarget, Vector3.axisPY());
+    //camera.controller.lookAt(localEye, localTarget, Vector3.axisPY());
+    this._animatedCamera = camera;
+    camera.getWorldPosition(this._cameraAnimationEyeFrom);
+    Vector3.sub(this._cameraAnimationEyeFrom, cameraZ, this._cameraAnimationTargetFrom);
+    this._cameraAnimationEyeTo.set(localEye);
+    this._cameraAnimationTargetTo.set(localTarget);
+    this._cameraAnimationTime = 0;
   }
   private posToViewport(pos: number[], viewport: ArrayLike<number>): boolean {
     const cvs = Application.instance.device.canvas;
@@ -800,6 +839,18 @@ export class SceneView extends BaseView<SceneModel> {
     }
   }
   update(dt: number) {
+    if (this._animatedCamera) {
+      this._cameraAnimationTime += dt;
+      const t = Math.min(this._cameraAnimationTime / this._cameraAnimationDuration, 1);
+      this._animatedCamera.controller?.lookAt(
+        Vector3.combine(this._cameraAnimationEyeFrom, this._cameraAnimationEyeTo, 1 - t, t),
+        Vector3.combine(this._cameraAnimationTargetFrom, this._cameraAnimationTargetTo, 1 - t, t),
+        Vector3.axisPY()
+      );
+      if (this._cameraAnimationTime >= this._cameraAnimationDuration) {
+        this._animatedCamera = null;
+      }
+    }
     if (this._currentEditTool.get()) {
       this._currentEditTool.get().update(dt);
     }

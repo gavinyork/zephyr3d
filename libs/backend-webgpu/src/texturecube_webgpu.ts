@@ -6,13 +6,7 @@ import type {
   GPUDataBuffer,
   TextureFormat
 } from '@zephyr3d/device';
-import {
-  linearTextureFormatToSRGB,
-  getTextureFormatBlockWidth,
-  getTextureFormatBlockHeight,
-  getTextureFormatBlockSize,
-  GPUResourceUsageFlags
-} from '@zephyr3d/device';
+import { linearTextureFormatToSRGB, GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPUDevice } from './device';
 
@@ -109,23 +103,18 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
     if (mipLevel < 0 || mipLevel >= this.mipLevelCount) {
       throw new Error(`TextureCube.readPixels(): invalid miplevel: ${mipLevel}`);
     }
-    const blockWidth = getTextureFormatBlockWidth(this.format);
-    const blockHeight = getTextureFormatBlockHeight(this.format);
-    const blockSize = getTextureFormatBlockSize(this.format);
-    const blocksPerRow = Math.ceil(w / blockWidth);
-    const blocksPerCol = Math.ceil(h / blockHeight);
-    const imageSize = blocksPerRow * blocksPerCol * blockSize;
-    if (buffer.byteLength < imageSize) {
+    const { size } = WebGPUBaseTexture.calculateBufferSizeForCopy(w, h, this.format);
+    if (buffer.byteLength < size) {
       throw new Error(
-        `Texture2D.readPixels() failed: destination buffer size is ${buffer.byteLength}, should be at least ${imageSize}`
+        `Texture2D.readPixels() failed: destination buffer size is ${buffer.byteLength}, should be at least ${size}`
       );
     }
-    const tmpBuffer = this._device.createBuffer(imageSize, { usage: 'read' });
+    const tmpBuffer = this._device.createBuffer(size, { usage: 'read' });
     await this.copyPixelDataToBuffer(x, y, w, h, face, mipLevel, tmpBuffer);
     await tmpBuffer.getBufferSubData(
       new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength),
       0,
-      imageSize
+      size
     );
     tmpBuffer.dispose();
   }

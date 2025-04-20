@@ -774,15 +774,11 @@ export class WebGPUDevice extends BaseDevice {
     const texFormat = fb
       ? fb.getColorAttachments()[index]?.format
       : textureFormatInvMap[this._backBufferFormat];
-    const texWidth = fb ? fb.getColorAttachments()[index]?.width : this.getDrawingBufferWidth();
-    const texHeight = fb ? fb.getColorAttachments()[index]?.height : this.getDrawingBufferHeight();
     if (colorAttachment && texFormat) {
       this.flush();
       WebGPUBaseTexture.copyTexturePixelsToBuffer(
         this._device,
         colorAttachment,
-        texWidth,
-        texHeight,
         texFormat,
         x,
         y,

@@ -1,5 +1,11 @@
 import { Vector4, applyMixins, Matrix4x4, Vector3 } from '@zephyr3d/base';
-import type { GPUDataBuffer, Texture2D, Texture2DArray } from '@zephyr3d/device';
+import type {
+  GPUDataBuffer,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  Texture2D,
+  Texture2DArray
+} from '@zephyr3d/device';
 import type { NodeClonable, NodeCloneMethod } from '../scene_node';
 import type { Scene } from '../scene';
 import { GraphNode } from '../graph_node';
@@ -12,13 +18,44 @@ import type { MeshMaterial } from '../../material';
 import type { BoundingVolume } from '../../utility/bounding_volume';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { RENDER_PASS_TYPE_OBJECT_COLOR } from '../../values';
-import { CopyBlitter } from '../../blitter';
+import { BlitType, CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
+import { RenderMipmap } from '../../utility/rendermipmap';
+
+class HeightMinMaxBlitter extends CopyBlitter {
+  filter(
+    scope: PBInsideFunctionScope,
+    type: BlitType,
+    srcTex: PBShaderExp,
+    srcUV: PBShaderExp,
+    srcLayer: PBShaderExp,
+    sampleType: 'float' | 'int' | 'uint'
+  ): PBShaderExp {
+    return this.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType).xxxx;
+  }
+}
+
+class HeightBoundingGenerator extends RenderMipmap {
+  renderPixel(
+    scope: PBInsideFunctionScope,
+    leftTop: PBShaderExp,
+    rightTop: PBShaderExp,
+    leftBottom: PBShaderExp,
+    rightBottom: PBShaderExp
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    scope.$l.maxHeight = pb.max(pb.max(leftTop.r, rightTop.r), pb.max(leftBottom.r, rightBottom.r));
+    scope.$l.minHeight = pb.min(pb.min(leftTop.g, rightTop.g), pb.min(leftBottom.g, rightBottom.g));
+    return pb.vec4(scope.maxHeight, scope.minHeight, leftTop.r, 1);
+  }
+}
 
 export class ClipmapTerrain
   extends applyMixins(GraphNode, mixinDrawable)
   implements Drawable, NodeClonable<ClipmapTerrain>
 {
+  private static _heightBoundingGenerator = new HeightBoundingGenerator();
+  private static _copyBlitter = new HeightMinMaxBlitter();
   private _pickTarget: PickTarget;
   private _clipmap: Clipmap;
   private _gridScale: number;
@@ -28,6 +65,8 @@ export class ClipmapTerrain
   private _sizeZ: number;
   private _heightMapAssetId: string;
   private _splatMapAssetId: string;
+  private _minHeight: number;
+  private _maxHeight: number;
   constructor(scene: Scene, sizeX = 256, sizeZ = 256, clipMapTileSize = 64) {
     super(scene);
     this._pickTarget = { node: this };
@@ -38,6 +77,8 @@ export class ClipmapTerrain
     this._sizeZ = sizeZ;
     this._heightMapAssetId = '';
     this._splatMapAssetId = '';
+    this._minHeight = 0;
+    this._maxHeight = 0;
     this._material = new DRef(
       new ClipmapTerrainMaterial(this.createHeightMapTexture(this._sizeX, this._sizeZ), clipMapTileSize)
     );
@@ -206,9 +247,11 @@ export class ClipmapTerrain
    */
   computeWorldBoundingVolume(): BoundingVolume {
     const p = this.worldMatrix.transformPointAffine(Vector3.zero());
+    const minHeight = this._minHeight * this.scale.y;
+    const maxHeight = this._maxHeight * this.scale.y;
     return new BoundingBox(
-      new Vector3(this.material.region.x, p.y - 9999, this.material.region.y),
-      new Vector3(this.material.region.z, p.y + 9999, this.material.region.w)
+      new Vector3(this.material.region.x, p.y + Math.min(minHeight, maxHeight), this.material.region.y),
+      new Vector3(this.material.region.z, p.y + Math.max(minHeight, maxHeight), this.material.region.w)
     );
   }
   /**
@@ -228,6 +271,37 @@ export class ClipmapTerrain
       outMatrix.m23 += this.parent.worldMatrix.m23;
     }
   }
+  updateBoundingBox(tmpTexture?: Texture2D) {
+    const heightMap = this.heightMap;
+    const device = Application.instance.device;
+    const tmp =
+      tmpTexture && tmpTexture.width === heightMap.width && tmpTexture.height === heightMap.height
+        ? tmpTexture
+        : Application.instance.device.createTexture2D(
+            device.type === 'webgl' ? 'rgba16f' : 'rg32f',
+            heightMap.width,
+            heightMap.height
+          );
+    ClipmapTerrain._copyBlitter.blit(heightMap, tmp, fetchSampler('clamp_nearest_nomip'));
+    ClipmapTerrain._heightBoundingGenerator.render(tmp);
+    const data = new Float32Array(2);
+    tmp
+      .readPixels(0, 0, 1, 1, 0, tmp.mipLevelCount - 1, data)
+      .then(() => {
+        console.log(data[0], data[1]);
+        this._minHeight = data[0];
+        this._maxHeight = data[1];
+        this.invalidateWorldBoundingVolume(false);
+      })
+      .catch((err) => {
+        console.error('Read pixels failed');
+      })
+      .finally(() => {
+        if (tmp !== tmpTexture) {
+          tmp.dispose();
+        }
+      });
+  }
   createHeightMapTexture(width: number, height: number) {
     return Application.instance.device.createTexture2D('r16f', width, height);
   }
@@ -239,8 +313,8 @@ export class ClipmapTerrain
     if (this.material) {
       const x = Math.abs(this.scale.x);
       const z = Math.abs(this.scale.z);
-      const px = this.position.x;
-      const pz = this.position.z;
+      const px = this.position.x + (this.parent?.worldMatrix.m03 ?? 0);
+      const pz = this.position.z + (this.parent?.worldMatrix.m23 ?? 0);
       this._gridScale = Math.max(
         (x * this._sizeX) / this.material.heightMap.width,
         (z * this._sizeZ) / this.material.heightMap.height
@@ -313,7 +387,7 @@ export class ClipmapTerrain
     sizeZ = Math.min(Math.max(sizeZ, 1), maxTextureSize) >> 0;
     if (sizeX !== oldHeightMap.width || sizeZ !== oldHeightMap.height) {
       const newHeightMap = device.createTexture2D('r16f', sizeX, sizeZ);
-      new CopyBlitter().blit(oldHeightMap, newHeightMap, fetchSampler('clamp_linear_nomip'));
+      ClipmapTerrain._copyBlitter.blit(oldHeightMap, newHeightMap, fetchSampler('clamp_linear_nomip'));
       this.heightMap = newHeightMap;
     }
   }

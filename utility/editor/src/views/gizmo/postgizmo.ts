@@ -13,6 +13,7 @@ import { createTranslationGizmo, createRotationGizmo, createScaleGizmo, createSe
 import type { Ray } from '@zephyr3d/base';
 import { AABB, makeEventTarget } from '@zephyr3d/base';
 import { Matrix4x4, Quaternion, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import { calcHierarchyBoundingBox } from '../../helpers/misc';
 
 const tmpVecT = new Vector3();
 const tmpVecS = new Vector3();
@@ -707,24 +708,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
     matrix = matrix ?? new Matrix4x4();
     if (this._node) {
       if (mode === 'select') {
-        this._nodeBox.beginExtend();
-        this._node.iterate((child) => {
-          const bbox = child.getWorldBoundingVolume();
-          if (bbox) {
-            const aabb = bbox.toAABB();
-            this._nodeBox.extend(aabb.minPoint);
-            this._nodeBox.extend(aabb.maxPoint);
-          }
-        });
-        if (!this._nodeBox.isValid()) {
-          const worldPos = this._node.getWorldPosition();
-          this._nodeBox.minPoint.x = worldPos.x - 1;
-          this._nodeBox.minPoint.y = worldPos.y - 1;
-          this._nodeBox.minPoint.z = worldPos.z - 1;
-          this._nodeBox.maxPoint.x = worldPos.x + 1;
-          this._nodeBox.maxPoint.y = worldPos.y + 1;
-          this._nodeBox.maxPoint.z = worldPos.z + 1;
-        }
+        calcHierarchyBoundingBox(this._node, this._nodeBox);
         const scale = Vector3.sub(this._nodeBox.maxPoint, this._nodeBox.minPoint);
         matrix.scaling(scale).translateLeft(this._nodeBox.minPoint);
       } else {

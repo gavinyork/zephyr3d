@@ -54,7 +54,6 @@ export class SceneModel extends BaseModel {
       });
     }
     this._camera.controller = new OrbitCameraController({
-      center: Vector3.zero(),
       damping: 1,
       controls: {
         rotate: {
