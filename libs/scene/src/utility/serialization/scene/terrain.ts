@@ -3,7 +3,7 @@ import type { AssetRegistry, EmbeddedAssetInfo } from '../asset/asset';
 import type { PropertyAccessor, SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import { getGraphNodeClass } from './node';
-import { ClipmapTerrain } from '../../../scene/terrain/terrain-cm';
+import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
 import { Application } from '../../../app';
 import type { Texture2D } from '@zephyr3d/device';

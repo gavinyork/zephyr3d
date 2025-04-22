@@ -21,7 +21,7 @@ import { DRef } from '../app/gc/ref';
 import type { AnimationSet } from '../animation';
 import type { SharedModel } from '../asset';
 import type { Water } from './water';
-import type { ClipmapTerrain } from './terrain/terrain-cm';
+import type { ClipmapTerrain } from './terrain-cm/terrain-cm';
 
 /**
  * Node iterate function type

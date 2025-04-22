@@ -64,7 +64,7 @@ import {
   getWaterClass
 } from './scene/water';
 import { Water } from '../../scene/water';
-import { ClipmapTerrain } from '../../scene/terrain/terrain-cm';
+import { ClipmapTerrain } from '../../scene/terrain-cm/terrain-cm';
 import { getTerrainClass } from './scene/terrain';
 
 export * from './asset/asset';

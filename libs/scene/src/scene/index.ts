@@ -10,4 +10,5 @@ export * from './particlesys';
 export * from './batchgroup';
 export * from './scene';
 export * from './terrain';
+export * from './terrain-cm';
 export * from './visitor';
