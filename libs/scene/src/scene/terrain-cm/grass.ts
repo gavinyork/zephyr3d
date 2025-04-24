@@ -1,15 +1,10 @@
-import { AbstractDevice, IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
+import { IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
 import { Application, Disposable, DRef } from '../../app';
 import { nextPowerOf2, Vector4 } from '@zephyr3d/base';
-import { Primitive } from '../../render';
+import { DrawContext, Primitive } from '../../render';
+import { ClipmapGrassMaterial } from './grassmaterial';
 
 export const MAX_INSTANCES_PER_NODE = 16384;
-
-export type GrassLayer = {
-  texture: DRef<Texture2D>;
-  bladeWidth: number;
-  bladeHeight: number;
-};
 
 export type GrassInstanceInfo = {
   x: number;
@@ -17,17 +12,19 @@ export type GrassInstanceInfo = {
   angle: number;
 };
 // Two floats
-const INSTANCE_BYTES = 3 * 4;
+const INSTANCE_BYTES = 4 * 4;
 
 export class GrassInstances implements Disposable {
-  private static _baseVertexBuffer: DRef<StructuredBuffer> = new DRef();
-  private static _indexBuffer: DRef<IndexBuffer> = new DRef();
+  private _baseVertexBuffer: DRef<StructuredBuffer>;
+  private _indexBuffer: DRef<IndexBuffer>;
   private _numInstances: number;
   private _instanceBuffer: DRef<StructuredBuffer>;
   private _primitive: DRef<Primitive>;
   private _disposed: boolean;
-  constructor() {
+  constructor(baseVertexBuffer: StructuredBuffer, indexBuffer: IndexBuffer) {
     this._numInstances = 0;
+    this._baseVertexBuffer = new DRef(baseVertexBuffer);
+    this._indexBuffer = new DRef(indexBuffer);
     this._instanceBuffer = new DRef();
     this._primitive = new DRef();
     this._disposed = false;
@@ -35,104 +32,24 @@ export class GrassInstances implements Disposable {
   get numInstances() {
     return this._numInstances;
   }
-  private static _getIndexBuffer(device: AbstractDevice) {
-    if (!this._indexBuffer.get()) {
-      this._indexBuffer.set(
-        device.createIndexBuffer(new Uint16Array([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11]))
-      );
-    }
-    return this._indexBuffer.get();
-  }
-  private static _getBaseVertexBuffer(device: AbstractDevice) {
-    if (!this._baseVertexBuffer.get()) {
-      const r = 0.5;
-      const t = 1;
-      const c = r * Math.cos(Math.PI / 3);
-      const s = r * Math.sin(Math.PI / 3);
-      const vertices = new Float32Array([
-        r,
-        0,
-        0,
-        0,
-        1,
-        r,
-        t,
-        0,
-        0,
-        0,
-        -r,
-        t,
-        0,
-        1,
-        0,
-        -r,
-        0,
-        0,
-        1,
-        1,
-
-        c,
-        0,
-        s,
-        0,
-        1,
-        -c,
-        0,
-        -s,
-        1,
-        1,
-        -c,
-        t,
-        -s,
-        1,
-        0,
-        c,
-        t,
-        s,
-        0,
-        0,
-
-        -c,
-        0,
-        s,
-        0,
-        1,
-        c,
-        0,
-        -s,
-        1,
-        1,
-        c,
-        t,
-        -s,
-        1,
-        0,
-        -c,
-        t,
-        s,
-        0,
-        0
-      ]);
-      const baseVertexBuffer = device.createInterleavedVertexBuffer(
-        ['position_f32x3', 'tex0_f32x2'],
-        vertices
-      );
-      this._baseVertexBuffer.set(baseVertexBuffer);
-    }
-    return this._baseVertexBuffer.get();
-  }
   get disposed() {
     return this._disposed;
   }
-  draw(device: AbstractDevice) {
+  setBaseVertexBuffer(baseVertexBuffer: StructuredBuffer) {
+    if (baseVertexBuffer !== this._baseVertexBuffer.get()) {
+      this._baseVertexBuffer.set(baseVertexBuffer);
+      this._primitive.dispose();
+    }
+  }
+  draw() {
     if (!this._primitive.get()) {
       const primitive = new Primitive();
-      primitive.setVertexBuffer(GrassInstances._getBaseVertexBuffer(device));
+      primitive.setVertexBuffer(this._baseVertexBuffer.get());
       primitive.setVertexBuffer(this._instanceBuffer.get(), 'instance');
-      primitive.setIndexBuffer(GrassInstances._getIndexBuffer(device));
+      primitive.setIndexBuffer(this._indexBuffer.get());
       primitive.primitiveType = 'triangle-list';
       primitive.indexStart = 0;
-      primitive.indexCount = GrassInstances._getIndexBuffer(device).length;
+      primitive.indexCount = this._indexBuffer.get().length;
       this._primitive.set(primitive);
     }
     this._primitive.get().drawInstanced(this._numInstances);
@@ -158,36 +75,169 @@ export class GrassInstances implements Disposable {
     const bytesRequired = (this._numInstances + instances.length) * INSTANCE_BYTES;
     const offset = this._numInstances * INSTANCE_BYTES;
     if (currentBytes < bytesRequired) {
-      const newBuffer = device.createVertexBuffer('tex1_f32x3', new Uint8Array(nextPowerOf2(bytesRequired)));
+      const newBuffer = device.createVertexBuffer('tex1_f32x4', new Uint8Array(nextPowerOf2(bytesRequired)));
       device.copyBuffer(buffer, newBuffer, 0, 0, offset);
       buffer = newBuffer;
       this._instanceBuffer.set(buffer);
       this._primitive.dispose();
     }
-    const data = new Float32Array(3 * instances.length);
+    const data = new Float32Array(4 * instances.length);
     for (let i = 0; i < instances.length; i++) {
-      data[i * 3 + 0] = instances[i].x;
-      data[i * 3 + 1] = instances[i].y;
-      data[i * 3 + 2] = instances[i].angle;
+      data[i * 4 + 0] = instances[i].x;
+      data[i * 4 + 1] = instances[i].y;
+      data[i * 4 + 2] = Math.sin(instances[i].angle);
+      data[i * 4 + 3] = Math.cos(instances[i].angle);
     }
     buffer.bufferSubData(offset, data);
     this._numInstances += instances.length;
   }
 }
 
-export class GrassRenderer implements Disposable {
-  private _heightMap: DRef<Texture2D>;
-  private _normalMap: DRef<Texture2D>;
-  private _region: Vector4;
-  private _heightScale: number;
+export class GrassLayer implements Disposable {
+  private static _indexBuffer: DRef<IndexBuffer> = new DRef();
+  private _material: DRef<ClipmapGrassMaterial>;
   private _quadtree: DRef<GrassQuadtreeNode>;
+  private _bladeWidth: number;
+  private _bladeHeight: number;
+  private _baseVertexBuffer: DRef<StructuredBuffer>;
   private _disposed: boolean;
   constructor() {
-    this._heightMap = new DRef();
+    this._material = new DRef(new ClipmapGrassMaterial());
+    this._bladeWidth = 1;
+    this._bladeHeight = 1;
+    this._baseVertexBuffer = new DRef(this.createBaseVertexBuffer(this._bladeWidth, this._bladeHeight));
+    this._disposed = false;
+    this._quadtree = new DRef(
+      new GrassQuadtreeNode(this._baseVertexBuffer.get(), GrassLayer._getIndexBuffer())
+    );
+  }
+  get bladeWidth() {
+    return this._bladeWidth;
+  }
+  set bladeWidth(val: number) {
+    if (val !== this._bladeWidth) {
+      this._bladeWidth = val;
+      this._baseVertexBuffer.set(this.createBaseVertexBuffer(this._bladeWidth, this._bladeHeight));
+      this._quadtree.get().setBaseVertexBuffer(this._baseVertexBuffer.get());
+    }
+  }
+  set bladeHeight(val: number) {
+    if (val !== this._bladeHeight) {
+      this._bladeHeight = val;
+      this._baseVertexBuffer.set(this.createBaseVertexBuffer(this._bladeWidth, this._bladeHeight));
+      this._quadtree.get().setBaseVertexBuffer(this._baseVertexBuffer.get());
+    }
+  }
+  private static _getIndexBuffer() {
+    if (!this._indexBuffer.get()) {
+      this._indexBuffer.set(
+        Application.instance.device.createIndexBuffer(
+          new Uint16Array([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11])
+        )
+      );
+    }
+    return this._indexBuffer.get();
+  }
+  private createBaseVertexBuffer(bladeWidth: number, bladeHeight: number) {
+    const device = Application.instance.device;
+    const r = bladeWidth * 0.5;
+    const t = bladeHeight;
+    const c = r * Math.cos(Math.PI / 3);
+    const s = r * Math.sin(Math.PI / 3);
+    const vertices = new Float32Array([
+      r,
+      0,
+      0,
+      0,
+      1,
+      r,
+      t,
+      0,
+      0,
+      0,
+      -r,
+      t,
+      0,
+      1,
+      0,
+      -r,
+      0,
+      0,
+      1,
+      1,
+
+      c,
+      0,
+      s,
+      0,
+      1,
+      -c,
+      0,
+      -s,
+      1,
+      1,
+      -c,
+      t,
+      -s,
+      1,
+      0,
+      c,
+      t,
+      s,
+      0,
+      0,
+
+      -c,
+      0,
+      s,
+      0,
+      1,
+      c,
+      0,
+      -s,
+      1,
+      1,
+      c,
+      t,
+      -s,
+      1,
+      0,
+      -c,
+      t,
+      s,
+      0,
+      0
+    ]);
+    return device.createInterleavedVertexBuffer(['position_f32x3', 'tex0_f32x2'], vertices);
+  }
+  draw(ctx: DrawContext) {
+    for (let pass = 0; pass < this._material.get().numPasses; pass++) {
+      this._material.get().bind(ctx.device, pass);
+      this._quadtree.get().draw();
+    }
+  }
+  get disposed() {
+    return this._disposed;
+  }
+  dispose(): void {
+    if (!this._disposed) {
+      this._disposed = true;
+      this._material.dispose();
+      this._quadtree.dispose();
+    }
+  }
+}
+export class GrassRenderer implements Disposable {
+  private _normalMap: DRef<Texture2D>;
+  private _layers: GrassLayer[];
+  private _region: Vector4;
+  private _heightScale: number;
+  private _disposed: boolean;
+  constructor() {
     this._normalMap = new DRef();
+    this._layers = [];
     this._region = new Vector4();
     this._heightScale = 1;
-    this._quadtree = new DRef(new GrassQuadtreeNode());
     this._disposed = false;
   }
   get disposed() {
@@ -196,13 +246,13 @@ export class GrassRenderer implements Disposable {
   dispose(): void {
     if (!this._disposed) {
       this._disposed = true;
-      this._heightMap.dispose();
       this._normalMap.dispose();
-      this._quadtree.dispose();
     }
   }
-  setHeightMap(tex: Texture2D) {
-    this._heightMap.set(tex);
+  draw(ctx: DrawContext) {
+    for (const layer of this._layers) {
+      layer.draw(ctx);
+    }
   }
   setRegion(val: Vector4) {
     this._region.set(val);
@@ -214,13 +264,17 @@ export class GrassRenderer implements Disposable {
 export class GrassQuadtreeNode implements Disposable {
   private _grassInstances: GrassInstances;
   private _children: GrassQuadtreeNode[];
+  private _baseVertexBuffer: DRef<StructuredBuffer>;
+  private _indexBuffer: DRef<IndexBuffer>;
   private _disposed: boolean;
   private _minX: number;
   private _minY: number;
   private _maxX: number;
   private _maxY: number;
-  constructor() {
-    this._grassInstances = new GrassInstances();
+  constructor(baseVertexBuffer: StructuredBuffer, indexBuffer: IndexBuffer) {
+    this._baseVertexBuffer.set(baseVertexBuffer);
+    this._indexBuffer.set(indexBuffer);
+    this._grassInstances = new GrassInstances(baseVertexBuffer, indexBuffer);
     this._children = null;
     this._disposed = false;
     this._minX = 0;
@@ -228,16 +282,37 @@ export class GrassQuadtreeNode implements Disposable {
     this._maxX = 1;
     this._maxY = 1;
   }
+  draw() {
+    if (this._grassInstances.numInstances > 0) {
+      this._grassInstances.draw();
+    }
+    if (this._children) {
+      for (const child of this._children) {
+        child.draw();
+      }
+    }
+  }
+  setBaseVertexBuffer(baseVertexBuffer: StructuredBuffer) {
+    if (baseVertexBuffer !== this._baseVertexBuffer.get()) {
+      this._baseVertexBuffer.set(baseVertexBuffer);
+      this._grassInstances.setBaseVertexBuffer(baseVertexBuffer);
+      if (this._children) {
+        for (const child of this._children) {
+          child.setBaseVertexBuffer(baseVertexBuffer);
+        }
+      }
+    }
+  }
   addInstances(instances: GrassInstanceInfo[]) {
     const n = Math.min(instances.length, MAX_INSTANCES_PER_NODE - this._grassInstances.numInstances);
     this._grassInstances.addInstances(instances.slice(0, n));
     if (n < instances.length) {
       if (!this._children) {
         this._children = [
-          new GrassQuadtreeNode(),
-          new GrassQuadtreeNode(),
-          new GrassQuadtreeNode(),
-          new GrassQuadtreeNode()
+          new GrassQuadtreeNode(this._baseVertexBuffer.get(), this._indexBuffer.get()),
+          new GrassQuadtreeNode(this._baseVertexBuffer.get(), this._indexBuffer.get()),
+          new GrassQuadtreeNode(this._baseVertexBuffer.get(), this._indexBuffer.get()),
+          new GrassQuadtreeNode(this._baseVertexBuffer.get(), this._indexBuffer.get())
         ];
         this._children[0]._minX = this._minX;
         this._children[0]._minY = this._minY;
