@@ -1,6 +1,6 @@
 import { AbstractDevice, IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
 import { Application, Disposable, DRef } from '../../app';
-import { nextPowerOf2 } from '@zephyr3d/base';
+import { nextPowerOf2, Vector4 } from '@zephyr3d/base';
 import { Primitive } from '../../render';
 
 export const MAX_INSTANCES_PER_NODE = 16384;
@@ -135,7 +135,7 @@ export class GrassInstances implements Disposable {
       primitive.indexCount = GrassInstances._getIndexBuffer(device).length;
       this._primitive.set(primitive);
     }
-    this._primitive.get().draw();
+    this._primitive.get().drawInstanced(this._numInstances);
   }
   dispose(): void {
     if (!this._disposed) {
@@ -175,6 +175,42 @@ export class GrassInstances implements Disposable {
   }
 }
 
+export class GrassRenderer implements Disposable {
+  private _heightMap: DRef<Texture2D>;
+  private _normalMap: DRef<Texture2D>;
+  private _region: Vector4;
+  private _heightScale: number;
+  private _quadtree: DRef<GrassQuadtreeNode>;
+  private _disposed: boolean;
+  constructor() {
+    this._heightMap = new DRef();
+    this._normalMap = new DRef();
+    this._region = new Vector4();
+    this._heightScale = 1;
+    this._quadtree = new DRef(new GrassQuadtreeNode());
+    this._disposed = false;
+  }
+  get disposed() {
+    return this._disposed;
+  }
+  dispose(): void {
+    if (!this._disposed) {
+      this._disposed = true;
+      this._heightMap.dispose();
+      this._normalMap.dispose();
+      this._quadtree.dispose();
+    }
+  }
+  setHeightMap(tex: Texture2D) {
+    this._heightMap.set(tex);
+  }
+  setRegion(val: Vector4) {
+    this._region.set(val);
+  }
+  setHeightScale(val: number) {
+    this._heightScale = val;
+  }
+}
 export class GrassQuadtreeNode implements Disposable {
   private _grassInstances: GrassInstances;
   private _children: GrassQuadtreeNode[];
