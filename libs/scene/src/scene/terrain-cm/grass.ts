@@ -1,6 +1,6 @@
 import { IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
 import { Application, Disposable, DRef } from '../../app';
-import { nextPowerOf2, Vector4 } from '@zephyr3d/base';
+import { nextPowerOf2, Vector2, Vector4 } from '@zephyr3d/base';
 import { DrawContext, Primitive } from '../../render';
 import { ClipmapGrassMaterial } from './grassmaterial';
 
@@ -101,15 +101,37 @@ export class GrassLayer implements Disposable {
   private _bladeHeight: number;
   private _baseVertexBuffer: DRef<StructuredBuffer>;
   private _disposed: boolean;
-  constructor() {
-    this._material = new DRef(new ClipmapGrassMaterial());
-    this._bladeWidth = 1;
-    this._bladeHeight = 1;
+  constructor(normalMap: Texture2D, albedoMap: Texture2D, bladeWidth: number, bladeHeight: number) {
+    this._material = new DRef(new ClipmapGrassMaterial(normalMap));
+    this._material.get().albedoTexture = albedoMap;
+    if (albedoMap) {
+      this._material.get().setTextureSize(albedoMap.width, albedoMap.height);
+    }
+    this._bladeWidth = bladeWidth;
+    this._bladeHeight = bladeHeight;
     this._baseVertexBuffer = new DRef(this.createBaseVertexBuffer(this._bladeWidth, this._bladeHeight));
     this._disposed = false;
     this._quadtree = new DRef(
       new GrassQuadtreeNode(this._baseVertexBuffer.get(), GrassLayer._getIndexBuffer())
     );
+  }
+  setAlbedoMap(albedoMap: Texture2D) {
+    this._material.get().albedoTexture = albedoMap;
+    if (albedoMap) {
+      this._material.get().setTextureSize(albedoMap.width, albedoMap.height);
+    }
+  }
+  setNormalMap(normalMap: Texture2D) {
+    this._material.get().setNormalHeightMap(normalMap);
+  }
+  setTerrainPosScale(pos: number, scale: number) {
+    this._material.get().setTerrainPosScale(pos, scale);
+  }
+  setTerrainRegion(region: Vector4) {
+    this._material.get().setTerrainRegion(region);
+  }
+  addInstances(instances: GrassInstanceInfo[]) {
+    this._quadtree.get().addInstances(instances);
   }
   get bladeWidth() {
     return this._bladeWidth;
@@ -224,6 +246,7 @@ export class GrassLayer implements Disposable {
       this._disposed = true;
       this._material.dispose();
       this._quadtree.dispose();
+      this._baseVertexBuffer.dispose();
     }
   }
 }
@@ -231,14 +254,31 @@ export class GrassRenderer implements Disposable {
   private _normalMap: DRef<Texture2D>;
   private _layers: GrassLayer[];
   private _region: Vector4;
+  private _heightPos: number;
   private _heightScale: number;
   private _disposed: boolean;
-  constructor() {
-    this._normalMap = new DRef();
+  constructor(normalMap: Texture2D, region: Vector4, heightPos: number, heightScale: number) {
+    this._normalMap = new DRef(normalMap);
     this._layers = [];
-    this._region = new Vector4();
-    this._heightScale = 1;
+    this._region = new Vector4(region);
+    this._heightPos = heightPos;
+    this._heightScale = heightScale;
     this._disposed = false;
+  }
+  addLayer(albedoMap: Texture2D, bladeWidth: number, bladeHeight: number): number {
+    const layer = new GrassLayer(this._normalMap.get(), albedoMap, bladeWidth, bladeHeight);
+    layer.setTerrainPosScale(this._heightPos, this._heightScale);
+    layer.setTerrainRegion(this._region);
+    this._layers.push(layer);
+    return this._layers.length - 1;
+  }
+  addInstances(layer: number, instances: GrassInstanceInfo[]) {
+    const grassLayer = this._layers[layer];
+    if (!grassLayer) {
+      console.error(`Invalid grass layer: ${layer}`);
+    } else {
+      grassLayer.addInstances(instances);
+    }
   }
   get disposed() {
     return this._disposed;
@@ -254,11 +294,24 @@ export class GrassRenderer implements Disposable {
       layer.draw(ctx);
     }
   }
+  setNormalMap(tex: Texture2D) {
+    this._normalMap.set(tex);
+    for (const layer of this._layers) {
+      layer.setNormalMap(this._normalMap.get());
+    }
+  }
   setRegion(val: Vector4) {
     this._region.set(val);
+    for (const layer of this._layers) {
+      layer.setTerrainRegion(this._region);
+    }
   }
-  setHeightScale(val: number) {
-    this._heightScale = val;
+  setHeightPosScale(pos: number, scale: number) {
+    this._heightPos = pos;
+    this._heightScale = scale;
+    for (const layer of this._layers) {
+      layer.setTerrainPosScale(this._heightPos, this._heightScale);
+    }
   }
 }
 export class GrassQuadtreeNode implements Disposable {

@@ -28,27 +28,25 @@ export class ClipmapGrassMaterial
   private _terrainNormalMap: DRef<Texture2D>;
   /** @internal */
   private _textureSize: Vector2;
-  /** @internal */
-  private _bladeSize: Vector2;
   /**
    * Creates an instance of GrassMaterial class
    * @param terrainSize - terrain size
    * @param normalMap - normal map
    * @param grassTexture - grass texture
    */
-  constructor() {
+  constructor(normalMap: Texture2D) {
     super();
     this.metallic = 0;
     this.roughness = 1;
+    this.doubleSidedLighting = false;
     this.specularFactor = new Vector4(1, 1, 1, 0.2);
     this._terrainRegion = new Vector4();
     this._terrainPosScale = new Vector2();
-    this.doubleSidedLighting = false;
-    this._terrainNormalMap = new DRef();
+    this._terrainNormalMap = new DRef(normalMap);
     this._textureSize = Vector2.one();
   }
   clone(): ClipmapGrassMaterial {
-    const other = new ClipmapGrassMaterial();
+    const other = new ClipmapGrassMaterial(this._terrainNormalMap.get());
     other.copyFrom(this);
     return other;
   }
@@ -57,6 +55,25 @@ export class ClipmapGrassMaterial
     this._terrainRegion.set(other._terrainRegion);
     this._terrainNormalMap.set(other._terrainNormalMap.get());
     this._textureSize.set(other._textureSize);
+    this._terrainPosScale.set(other._terrainPosScale);
+  }
+  setNormalHeightMap(normalMap: Texture2D) {
+    if (normalMap !== this._terrainNormalMap.get()) {
+      this._terrainNormalMap.set(normalMap);
+      this.uniformChanged();
+    }
+  }
+  setTextureSize(w: number, h: number) {
+    this._textureSize.setXY(w, h);
+    this.uniformChanged();
+  }
+  setTerrainPosScale(posY: number, scaleY: number) {
+    this._terrainPosScale.setXY(posY, scaleY);
+    this.uniformChanged();
+  }
+  setTerrainRegion(region: Vector4) {
+    this._terrainRegion.set(region);
+    this.uniformChanged();
   }
   /**
    * {@inheritDoc MeshMaterial.isTransparentPass}
