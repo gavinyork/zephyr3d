@@ -1,6 +1,6 @@
 import { IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
 import { Application, Disposable, DRef } from '../../app';
-import { nextPowerOf2, Vector2, Vector4 } from '@zephyr3d/base';
+import { nextPowerOf2, Vector4 } from '@zephyr3d/base';
 import { DrawContext, Primitive } from '../../render';
 import { ClipmapGrassMaterial } from './grassmaterial';
 
@@ -287,6 +287,10 @@ export class GrassRenderer implements Disposable {
     if (!this._disposed) {
       this._disposed = true;
       this._normalMap.dispose();
+      for (const layer of this._layers) {
+        layer.dispose();
+      }
+      this._layers = null;
     }
   }
   draw(ctx: DrawContext) {

@@ -1,6 +1,8 @@
 import { Vector4, applyMixins, Matrix4x4, Vector3 } from '@zephyr3d/base';
 import type {
+  BindGroup,
   GPUDataBuffer,
+  GPUProgram,
   PBInsideFunctionScope,
   PBShaderExp,
   Texture2D,
@@ -21,6 +23,7 @@ import { RENDER_PASS_TYPE_OBJECT_COLOR } from '../../values';
 import { BlitType, CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
 import { RenderMipmap } from '../../utility/rendermipmap';
+import { GrassRenderer } from './grass';
 
 class HeightMinMaxBlitter extends CopyBlitter {
   filter(
@@ -56,10 +59,13 @@ export class ClipmapTerrain
 {
   private static _heightBoundingGenerator = new HeightBoundingGenerator();
   private static _copyBlitter = new HeightMinMaxBlitter();
+  private static _normalHeightMapProgram: GPUProgram = null;
+  private static _normalHeightMapBindGroup: BindGroup = null;
   private _pickTarget: PickTarget;
   private _clipmap: Clipmap;
   private _gridScale: number;
   private _material: DRef<ClipmapTerrainMaterial>;
+  private _grassRenderer: DRef<GrassRenderer>;
   private _castShadow: boolean;
   private _sizeX: number;
   private _sizeZ: number;
@@ -71,6 +77,7 @@ export class ClipmapTerrain
     super(scene);
     this._pickTarget = { node: this };
     this._clipmap = new Clipmap(clipMapTileSize);
+    this._grassRenderer = new DRef();
     this._gridScale = 1;
     this._castShadow = true;
     this._sizeX = sizeX;
@@ -391,6 +398,58 @@ export class ClipmapTerrain
       this.heightMap = newHeightMap;
     }
   }
+  /*
+  private calcNormalHeightMap(): Texture2D {
+    const device = Application.instance.device;
+    if (!ClipmapTerrain._normalHeightMapProgram) {
+      ClipmapTerrain._normalHeightMapProgram = device.buildRenderProgram({
+        vertex(pb) {
+          this.$inputs.pos = pb.vec2().attrib('position');
+          this.$outputs.uv = pb.vec2();
+          pb.main(function () {
+            this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+            if (device.type === 'webgpu') {
+              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+            }
+          });
+        },
+        fragment(pb) {
+          this.heightMap = pb.tex2D().uniform(0);
+          this.texelSize = pb.vec2().uniform(0);
+          this.terrainScale = pb.vec3().uniform(0);
+          this.$outputs.outColor = pb.vec4();
+          pb.func('calcNormal', [pb.vec2('texCoord')], function () {
+            this.$l.t = pb.textureSample(
+              this.heightMap,
+              pb.sub(this.texCoord, pb.vec2(0, this.texelSize.y))
+            ).r;
+            this.$l.l = pb.textureSample(
+              this.heightMap,
+              pb.sub(this.texCoord, pb.vec2(this.texelSize.x, 0))
+            ).r;
+            this.$l.r = pb.textureSample(
+              this.heightMap,
+              pb.add(this.texCoord, pb.vec2(this.texelSize.x, 0))
+            ).r;
+            this.$l.b = pb.textureSample(
+              this.heightMap,
+              pb.add(this.texCoord, pb.vec2(0, this.texelSize.y))
+            ).r;
+            this.$l.tx = pb.vec3(this.terrainScale.x, pb.mul(pb.sub(this.r, this.l), this.terrainScale.y), 0);
+            this.$l.tz = pb.vec3(0, pb.mul(pb.sub(this.b, this.t), this.terrainScale.y), this.terrainScale.z);
+            this.$l.normal = pb.normalize(pb.cross(this.tz, this.tx));
+            this.$return(this.normal);
+          });
+          pb.main(function () {
+            this.$l.normal = this.calcNormal(this.$inputs.uv);
+            this.$outputs.outColor = pb.vec4(pb.add(pb.mul(this.normal, 0.5), pb.vec3(0.5)), 1);
+          });
+        }
+      });
+    }
+  }
+  */
   dispose(): void {
     super.dispose();
     this._clipmap?.dispose();
