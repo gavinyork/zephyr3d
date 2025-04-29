@@ -1,7 +1,9 @@
-import { IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
-import { Application, Disposable, DRef } from '../../app';
+import type { IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
+import type { Disposable } from '../../app';
+import { Application, DRef } from '../../app';
 import { nextPowerOf2, Vector4 } from '@zephyr3d/base';
-import { DrawContext, Primitive } from '../../render';
+import type { DrawContext } from '../../render';
+import { Primitive } from '../../render';
 import { ClipmapGrassMaterial } from './grassmaterial';
 
 export const MAX_INSTANCES_PER_NODE = 16384;

@@ -1,4 +1,4 @@
-import { Clonable } from '@zephyr3d/base';
+import type { Clonable } from '@zephyr3d/base';
 import { Vector2, Vector4 } from '@zephyr3d/base';
 import type { BindGroup, PBFunctionScope, RenderStateSet, Texture2D } from '@zephyr3d/device';
 import {
@@ -8,7 +8,7 @@ import {
   mixinPBRMetallicRoughness,
   ShaderHelper
 } from '../../material';
-import { DrawContext } from '../../render';
+import type { DrawContext } from '../../render';
 import { RENDER_PASS_TYPE_LIGHT } from '../../values';
 import { DRef } from '../../app';
 

@@ -1,8 +1,6 @@
 import { Vector4, applyMixins, Matrix4x4, Vector3 } from '@zephyr3d/base';
 import type {
-  BindGroup,
   GPUDataBuffer,
-  GPUProgram,
   PBInsideFunctionScope,
   PBShaderExp,
   Texture2D,
@@ -20,10 +18,11 @@ import type { MeshMaterial } from '../../material';
 import type { BoundingVolume } from '../../utility/bounding_volume';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { RENDER_PASS_TYPE_OBJECT_COLOR } from '../../values';
-import { BlitType, CopyBlitter } from '../../blitter';
+import type { BlitType } from '../../blitter';
+import { CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
 import { RenderMipmap } from '../../utility/rendermipmap';
-import { GrassRenderer } from './grass';
+import type { GrassRenderer } from './grass';
 
 class HeightMinMaxBlitter extends CopyBlitter {
   filter(
@@ -59,8 +58,6 @@ export class ClipmapTerrain
 {
   private static _heightBoundingGenerator = new HeightBoundingGenerator();
   private static _copyBlitter = new HeightMinMaxBlitter();
-  private static _normalHeightMapProgram: GPUProgram = null;
-  private static _normalHeightMapBindGroup: BindGroup = null;
   private _pickTarget: PickTarget;
   private _clipmap: Clipmap;
   private _gridScale: number;
@@ -90,6 +87,9 @@ export class ClipmapTerrain
       new ClipmapTerrainMaterial(this.createHeightMapTexture(this._sizeX, this._sizeZ), clipMapTileSize)
     );
     this.updateRegion();
+  }
+  get grassRenderer() {
+    return this._grassRenderer.get();
   }
   get MAX_DETAIL_MAP_COUNT() {
     return ClipmapTerrainMaterial.MAX_DETAIL_MAP_COUNT;
