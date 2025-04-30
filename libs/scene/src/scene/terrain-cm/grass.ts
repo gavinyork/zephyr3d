@@ -1,10 +1,11 @@
 import type { IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
-import type { Disposable } from '../../app';
+import { Disposable, DWeakRef } from '../../app';
 import { Application, DRef } from '../../app';
-import { nextPowerOf2, Vector4 } from '@zephyr3d/base';
+import { nextPowerOf2 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
 import { Primitive } from '../../render';
 import { ClipmapGrassMaterial } from './grassmaterial';
+import type { ClipmapTerrain } from './terrain-cm';
 
 export const MAX_INSTANCES_PER_NODE = 16384;
 
@@ -69,7 +70,7 @@ export class GrassInstances implements Disposable {
     const device = Application.instance.device;
     if (!this._instanceBuffer.get()) {
       this._instanceBuffer.set(
-        device.createVertexBuffer('position_f32x2', new Uint8Array(instances.length * INSTANCE_BYTES))
+        device.createVertexBuffer('tex1_f32x4', new Uint8Array(instances.length * INSTANCE_BYTES))
       );
     }
     let buffer = this._instanceBuffer.get();
@@ -103,8 +104,8 @@ export class GrassLayer implements Disposable {
   private _bladeHeight: number;
   private _baseVertexBuffer: DRef<StructuredBuffer>;
   private _disposed: boolean;
-  constructor(normalMap: Texture2D, albedoMap: Texture2D, bladeWidth: number, bladeHeight: number) {
-    this._material = new DRef(new ClipmapGrassMaterial(normalMap));
+  constructor(terrain: ClipmapTerrain, bladeWidth: number, bladeHeight: number, albedoMap?: Texture2D) {
+    this._material = new DRef(new ClipmapGrassMaterial(terrain));
     this._material.get().albedoTexture = albedoMap;
     if (albedoMap) {
       this._material.get().setTextureSize(albedoMap.width, albedoMap.height);
@@ -117,20 +118,14 @@ export class GrassLayer implements Disposable {
       new GrassQuadtreeNode(this._baseVertexBuffer.get(), GrassLayer._getIndexBuffer())
     );
   }
+  updateMaterial() {
+    this._material.get().uniformChanged();
+  }
   setAlbedoMap(albedoMap: Texture2D) {
     this._material.get().albedoTexture = albedoMap;
     if (albedoMap) {
       this._material.get().setTextureSize(albedoMap.width, albedoMap.height);
     }
-  }
-  setNormalMap(normalMap: Texture2D) {
-    this._material.get().setNormalHeightMap(normalMap);
-  }
-  setTerrainPosScale(pos: number, scale: number) {
-    this._material.get().setTerrainPosScale(pos, scale);
-  }
-  setTerrainRegion(region: Vector4) {
-    this._material.get().setTerrainRegion(region);
   }
   addInstances(instances: GrassInstanceInfo[]) {
     this._quadtree.get().addInstances(instances);
@@ -235,6 +230,7 @@ export class GrassLayer implements Disposable {
     return device.createInterleavedVertexBuffer(['position_f32x3', 'tex0_f32x2'], vertices);
   }
   draw(ctx: DrawContext) {
+    this._material.get().apply(ctx);
     for (let pass = 0; pass < this._material.get().numPasses; pass++) {
       this._material.get().bind(ctx.device, pass);
       this._quadtree.get().draw();
@@ -253,24 +249,21 @@ export class GrassLayer implements Disposable {
   }
 }
 export class GrassRenderer implements Disposable {
-  private _normalMap: DRef<Texture2D>;
+  private _terrain: DWeakRef<ClipmapTerrain>;
   private _layers: GrassLayer[];
-  private _region: Vector4;
-  private _heightPos: number;
-  private _heightScale: number;
   private _disposed: boolean;
-  constructor(normalMap: Texture2D, region: Vector4, heightPos: number, heightScale: number) {
-    this._normalMap = new DRef(normalMap);
+  constructor(terrain: ClipmapTerrain) {
+    this._terrain = new DWeakRef(terrain);
     this._layers = [];
-    this._region = new Vector4(region);
-    this._heightPos = heightPos;
-    this._heightScale = heightScale;
     this._disposed = false;
   }
-  addLayer(albedoMap: Texture2D, bladeWidth: number, bladeHeight: number): number {
-    const layer = new GrassLayer(this._normalMap.get(), albedoMap, bladeWidth, bladeHeight);
-    layer.setTerrainPosScale(this._heightPos, this._heightScale);
-    layer.setTerrainRegion(this._region);
+  updateMaterial() {
+    for (const layer of this._layers) {
+      layer.updateMaterial();
+    }
+  }
+  addLayer(bladeWidth: number, bladeHeight: number, albedoMap?: Texture2D): number {
+    const layer = new GrassLayer(this._terrain.get(), bladeWidth, bladeHeight, albedoMap);
     this._layers.push(layer);
     return this._layers.length - 1;
   }
@@ -288,7 +281,7 @@ export class GrassRenderer implements Disposable {
   dispose(): void {
     if (!this._disposed) {
       this._disposed = true;
-      this._normalMap.dispose();
+      this._terrain.dispose();
       for (const layer of this._layers) {
         layer.dispose();
       }
@@ -298,25 +291,6 @@ export class GrassRenderer implements Disposable {
   draw(ctx: DrawContext) {
     for (const layer of this._layers) {
       layer.draw(ctx);
-    }
-  }
-  setNormalMap(tex: Texture2D) {
-    this._normalMap.set(tex);
-    for (const layer of this._layers) {
-      layer.setNormalMap(this._normalMap.get());
-    }
-  }
-  setRegion(val: Vector4) {
-    this._region.set(val);
-    for (const layer of this._layers) {
-      layer.setTerrainRegion(this._region);
-    }
-  }
-  setHeightPosScale(pos: number, scale: number) {
-    this._heightPos = pos;
-    this._heightScale = scale;
-    for (const layer of this._layers) {
-      layer.setTerrainPosScale(this._heightPos, this._heightScale);
     }
   }
 }
@@ -331,8 +305,8 @@ export class GrassQuadtreeNode implements Disposable {
   private _maxX: number;
   private _maxY: number;
   constructor(baseVertexBuffer: StructuredBuffer, indexBuffer: IndexBuffer) {
-    this._baseVertexBuffer.set(baseVertexBuffer);
-    this._indexBuffer.set(indexBuffer);
+    this._baseVertexBuffer = new DRef(baseVertexBuffer);
+    this._indexBuffer = new DRef(indexBuffer);
     this._grassInstances = new GrassInstances(baseVertexBuffer, indexBuffer);
     this._children = null;
     this._disposed = false;

@@ -1,6 +1,6 @@
 import type { Clonable } from '@zephyr3d/base';
 import { Vector2, Vector4 } from '@zephyr3d/base';
-import type { BindGroup, PBFunctionScope, RenderStateSet, Texture2D } from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope, RenderStateSet } from '@zephyr3d/device';
 import {
   applyMaterialMixins,
   MeshMaterial,
@@ -10,7 +10,9 @@ import {
 } from '../../material';
 import type { DrawContext } from '../../render';
 import { RENDER_PASS_TYPE_LIGHT } from '../../values';
-import { DRef } from '../../app';
+import { DWeakRef } from '../../app';
+import type { ClipmapTerrain } from './terrain-cm';
+import { fetchSampler } from '../../utility/misc';
 
 /**
  * Terrain grass material
@@ -21,58 +23,43 @@ export class ClipmapGrassMaterial
   implements Clonable<ClipmapGrassMaterial>
 {
   /** @internal */
-  private _terrainRegion: Vector4;
+  private _terrain: DWeakRef<ClipmapTerrain>;
   /** @internal */
-  private _terrainPosScale: Vector2;
+  private _terrainPosScale: Vector4;
   /** @internal */
-  private _terrainNormalMap: DRef<Texture2D>;
+  private _heightMapSize: Vector2;
   /** @internal */
   private _textureSize: Vector2;
   /**
    * Creates an instance of GrassMaterial class
-   * @param terrainSize - terrain size
-   * @param normalMap - normal map
+   * @param terrain - Clipmap terrain object
+   * @param heightMap - height map
    * @param grassTexture - grass texture
    */
-  constructor(normalMap: Texture2D) {
+  constructor(terrain: ClipmapTerrain) {
     super();
     this.metallic = 0;
     this.roughness = 1;
     this.doubleSidedLighting = false;
     this.specularFactor = new Vector4(1, 1, 1, 0.2);
-    this._terrainRegion = new Vector4();
-    this._terrainPosScale = new Vector2();
-    this._terrainNormalMap = new DRef(normalMap);
+    this._terrain = new DWeakRef(terrain);
+    this._terrainPosScale = new Vector4();
+    this._heightMapSize = new Vector2(1 / terrain.heightMap.width, 1 / terrain.heightMap.height);
     this._textureSize = Vector2.one();
   }
   clone(): ClipmapGrassMaterial {
-    const other = new ClipmapGrassMaterial(this._terrainNormalMap.get());
+    const other = new ClipmapGrassMaterial(this._terrain.get());
     other.copyFrom(this);
     return other;
   }
   copyFrom(other: this): void {
     super.copyFrom(other);
-    this._terrainRegion.set(other._terrainRegion);
-    this._terrainNormalMap.set(other._terrainNormalMap.get());
-    this._textureSize.set(other._textureSize);
     this._terrainPosScale.set(other._terrainPosScale);
-  }
-  setNormalHeightMap(normalMap: Texture2D) {
-    if (normalMap !== this._terrainNormalMap.get()) {
-      this._terrainNormalMap.set(normalMap);
-      this.uniformChanged();
-    }
+    this._heightMapSize.set(other._heightMapSize);
+    this._textureSize.set(other._textureSize);
   }
   setTextureSize(w: number, h: number) {
     this._textureSize.setXY(w, h);
-    this.uniformChanged();
-  }
-  setTerrainPosScale(posY: number, scaleY: number) {
-    this._terrainPosScale.setXY(posY, scaleY);
-    this.uniformChanged();
-  }
-  setTerrainRegion(region: Vector4) {
-    this._terrainRegion.set(region);
     this.uniformChanged();
   }
   /**
@@ -98,8 +85,11 @@ export class ClipmapGrassMaterial
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
-    bindGroup.setTexture('terrainNormalMap', this._terrainNormalMap.get());
-    bindGroup.setValue('terrainRegion', this._terrainRegion);
+    const terrain = this._terrain.get();
+    this._terrainPosScale.setXYZW(terrain.scale.x, terrain.scale.y, terrain.scale.z, terrain.worldMatrix.m13);
+    bindGroup.setTexture('terrainHeightMap', terrain.heightMap, fetchSampler('clamp_linear_nomip'));
+    bindGroup.setValue('heightMapSize', this._heightMapSize);
+    bindGroup.setValue('terrainRegion', terrain.worldRegion);
     bindGroup.setValue('terrainPosScale', this._terrainPosScale);
     if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('albedoTextureSize', this._textureSize);
@@ -109,25 +99,55 @@ export class ClipmapGrassMaterial
     super.vertexShader(scope);
     const pb = scope.$builder;
     scope.$inputs.pos = pb.vec3().attrib('position');
+    scope.$inputs.albedoUV = pb.vec2().attrib('texCoord0');
     scope.$inputs.placement = pb.vec4().attrib('texCoord1');
-    scope.terrainNormalMap = pb.tex2D().uniform(2);
+    scope.terrainHeightMap = pb.tex2D().uniform(2);
+    scope.heightMapSize = pb.vec2().uniform(2);
     scope.terrainRegion = pb.vec4().uniform(2);
-    scope.terrainPosScale = pb.vec2().uniform(2);
-    scope.$l.normalHeightSample = pb.textureSampleLevel(
-      scope.terrainNormalMap,
-      scope.$inputs.placement.xy,
-      0
-    );
-    scope.$l.normal = pb.normalize(pb.sub(pb.mul(scope.normalHeightSample.xyz, 2), pb.vec3(1)));
+    scope.terrainPosScale = pb.vec4().uniform(2);
+
+    pb.func('calcHeightMapNormal', [pb.vec2('uv'), pb.vec2('texelSize'), pb.vec3('scale')], function () {
+      this.$l.hL = pb.textureSampleLevel(
+        this.terrainHeightMap,
+        pb.sub(this.uv, pb.vec2(this.texelSize.x, 0)),
+        0
+      ).r;
+      this.$l.hR = pb.textureSampleLevel(
+        this.terrainHeightMap,
+        pb.add(this.uv, pb.vec2(this.texelSize.x, 0)),
+        0
+      ).r;
+      this.$l.hD = pb.textureSampleLevel(
+        this.terrainHeightMap,
+        pb.add(this.uv, pb.vec2(0, this.texelSize.y)),
+        0
+      ).r;
+      this.$l.hU = pb.textureSampleLevel(
+        this.terrainHeightMap,
+        pb.sub(this.uv, pb.vec2(0, this.texelSize.y)),
+        0
+      ).r;
+      this.$l.dHdU = pb.div(pb.mul(pb.sub(this.hR, this.hL), this.scale.y), pb.mul(this.scale.x, 2));
+      this.$l.dHdV = pb.div(pb.mul(pb.sub(this.hD, this.hU), this.scale.y), pb.mul(this.scale.z, 2));
+      this.t = pb.normalize(pb.vec3(1, this.dHdU, 0));
+      this.b = pb.normalize(pb.vec3(0, this.dHdV, 1));
+      this.$return(pb.normalize(pb.cross(this.b, this.t)));
+    });
+
+    scope.$l.uv = scope.$inputs.placement.xy;
+    scope.$l.heightSample = pb.textureSampleLevel(scope.terrainHeightMap, scope.uv, 0);
+    scope.$l.height = pb.add(pb.mul(scope.heightSample.r, scope.terrainPosScale.y), scope.terrainPosScale.w);
+    scope.$l.normal = scope.calcHeightMapNormal(scope.uv, scope.heightMapSize, scope.terrainPosScale.xyz);
     scope.$l.axisX = pb.vec3(scope.$inputs.placement.z, 0, scope.$inputs.placement.w);
     scope.$l.axisZ = pb.cross(scope.axisX, scope.normal);
     scope.$l.axisX = pb.cross(scope.normal, scope.axisZ);
     scope.$l.rotPos = pb.mul(pb.mat3(scope.axisX, scope.normal, scope.axisZ), scope.$inputs.pos);
-    scope.$l.height = scope.normalHeightSample.w;
-    scope.$l.posXZ = pb.add(pb.mul(scope.$inputs.placement.xy, scope.Scale.zw), scope.terrainRegion.xy);
-    scope.$l.posY = pb.add(scope.terrainPosScale.x, pb.mul(scope.height, scope.terrainPosScale.y));
-
-    scope.$outputs.worldPos = pb.add(scope.rotPos, pb.vec3(scope.posXZ.x, scope.posY, scope.posXZ.y));
+    scope.$l.posXZ = pb.add(
+      pb.mul(scope.$inputs.placement.xy, pb.sub(scope.terrainRegion.zw, scope.terrainRegion.xy)),
+      scope.terrainRegion.xy
+    );
+    scope.$outputs.zAlbedoTexCoord = scope.$inputs.albedoUV;
+    scope.$outputs.worldPos = pb.add(scope.rotPos, pb.vec3(scope.posXZ.x, scope.height, scope.posXZ.y));
     ShaderHelper.setClipSpacePosition(
       scope,
       pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))

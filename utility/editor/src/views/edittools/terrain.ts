@@ -153,6 +153,7 @@ export class TerrainEditTool implements EditTool {
     if (!this._brushing && this._heightDirty) {
       this._heightDirty = false;
       this._terrain.get().updateBoundingBox();
+      this._terrain.get().updateRegion();
     }
     if (this._brushing && this._hitPos && this._brushImageList.selected >= 0) {
       const texture = this._brushImageList.getImage(this._brushImageList.selected);

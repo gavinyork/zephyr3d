@@ -22,7 +22,7 @@ import type { BlitType } from '../../blitter';
 import { CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
 import { RenderMipmap } from '../../utility/rendermipmap';
-import type { GrassRenderer } from './grass';
+import { GrassRenderer } from './grass';
 
 class HeightMinMaxBlitter extends CopyBlitter {
   filter(
@@ -74,7 +74,7 @@ export class ClipmapTerrain
     super(scene);
     this._pickTarget = { node: this };
     this._clipmap = new Clipmap(clipMapTileSize);
-    this._grassRenderer = new DRef();
+    this._grassRenderer = new DRef(new GrassRenderer(this));
     this._gridScale = 1;
     this._castShadow = true;
     this._sizeX = sizeX;
@@ -85,6 +85,17 @@ export class ClipmapTerrain
     this._maxHeight = 0;
     this._material = new DRef(
       new ClipmapTerrainMaterial(this.createHeightMapTexture(this._sizeX, this._sizeZ), clipMapTileSize)
+    );
+    this._grassRenderer.get().addLayer(2, 1);
+    this._grassRenderer.get().addInstances(
+      0,
+      Array.from({ length: 8000 }).map(() => {
+        return {
+          angle: Math.PI * 2 * Math.random(),
+          x: Math.random(),
+          y: Math.random()
+        };
+      })
     );
     this.updateRegion();
   }
@@ -316,7 +327,7 @@ export class ClipmapTerrain
     super._onTransformChanged(invalidateLocal);
     this.updateRegion();
   }
-  private updateRegion() {
+  updateRegion() {
     if (this.material) {
       const x = Math.abs(this.scale.x);
       const z = Math.abs(this.scale.z);
@@ -328,6 +339,7 @@ export class ClipmapTerrain
       );
       this.material.update(new Vector4(px, pz, px + x * this._sizeX, pz + z * this._sizeZ), this.scale);
     }
+    this._grassRenderer?.get().updateMaterial();
   }
   /**
    * {@inheritDoc Drawable.draw}
@@ -385,6 +397,8 @@ export class ClipmapTerrain
       }
     });
     this._clipmap.wireframe = wireframe;
+
+    this._grassRenderer.get().draw(ctx);
   }
   private resizeHeightMap(sizeX: number, sizeZ: number) {
     const oldHeightMap = this.material.heightMap;
