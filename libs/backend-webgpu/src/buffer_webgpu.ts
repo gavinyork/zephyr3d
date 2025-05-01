@@ -187,11 +187,11 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
         this._gpuUsage = 0;
         let label = '';
         if (this._usage & GPUResourceUsageFlags.BF_VERTEX) {
-          this._gpuUsage |= GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST;
+          this._gpuUsage |= GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
           label += '[vertex]';
         }
         if (this._usage & GPUResourceUsageFlags.BF_INDEX) {
-          this._gpuUsage |= GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST;
+          this._gpuUsage |= GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
           label += '[index]';
         }
         if (this._usage & GPUResourceUsageFlags.BF_UNIFORM) {

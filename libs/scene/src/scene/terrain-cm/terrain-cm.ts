@@ -87,16 +87,18 @@ export class ClipmapTerrain
       new ClipmapTerrainMaterial(this.createHeightMapTexture(this._sizeX, this._sizeZ), clipMapTileSize)
     );
     this._grassRenderer.get().addLayer(2, 1);
-    this._grassRenderer.get().addInstances(
-      0,
-      Array.from({ length: 8000 }).map(() => {
-        return {
-          angle: Math.PI * 2 * Math.random(),
-          x: Math.random(),
-          y: Math.random()
-        };
-      })
-    );
+    for (let i = 0; i < 100; i++) {
+      this._grassRenderer.get().addInstances(
+        0,
+        Array.from({ length: 80 }).map(() => {
+          return {
+            angle: Math.PI * 2 * Math.random(),
+            x: Math.random(),
+            y: Math.random()
+          };
+        })
+      );
+    }
     this.updateRegion();
   }
   get grassRenderer() {
@@ -398,7 +400,9 @@ export class ClipmapTerrain
     });
     this._clipmap.wireframe = wireframe;
 
-    this._grassRenderer.get().draw(ctx);
+    if (ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR) {
+      this._grassRenderer.get().draw(ctx);
+    }
   }
   private resizeHeightMap(sizeX: number, sizeZ: number) {
     const oldHeightMap = this.material.heightMap;
