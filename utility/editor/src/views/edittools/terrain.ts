@@ -34,6 +34,7 @@ export class TerrainEditTool implements EditTool {
   private _brushStrength: number;
   private _brushImageList: ImageList;
   private _detailAlbedo: ImageList;
+  private _grassAlbedo: ImageList;
   private _detailNormal: ImageList;
   private _editList: string[];
   private _editSelected: number;
@@ -61,16 +62,34 @@ export class TerrainEditTool implements EditTool {
     }
     this._brushImageList = new ImageList(this._assetRegistry);
     this._brushImageList.linearColorSpace = true;
+
+    this._grassAlbedo = new ImageList(this._assetRegistry);
+    this._grassAlbedo.linearColorSpace = false;
+    this._grassAlbedo.selectable = true;
+
     this._detailAlbedo = new ImageList(this._assetRegistry);
     this._detailAlbedo.linearColorSpace = false;
     this._detailAlbedo.selectable = true;
     this._detailAlbedo.maxImageCount = ClipmapTerrainMaterial.MAX_DETAIL_MAP_COUNT;
     this._detailAlbedo.defaultImage = ClipmapTerrainMaterial.getDefaultDetailMap();
+
     this._detailNormal = new ImageList(this._assetRegistry);
     this._detailNormal.linearColorSpace = true;
     this._detailNormal.selectable = false;
     this._detailNormal.maxImageCount = ClipmapTerrainMaterial.MAX_DETAIL_MAP_COUNT;
     this._detailNormal.defaultImage = ClipmapTerrainMaterial.getDefaultNormalMap();
+
+    this.refreshGrassTextures();
+    this._grassAlbedo.on('update_image', (asset: string, index: number) => {
+      this._terrain.get().grassRenderer.setGrassTexture(index, this._grassAlbedo.getImage(index));
+      this.refreshGrassTextures();
+    });
+    this._grassAlbedo.on('add_image', (asset: string, index: number) => {
+      const grassRenderer = this._terrain.get().grassRenderer;
+      grassRenderer.addLayer(1, 1, this._grassAlbedo.getImage(index));
+      this.refreshGrassTextures();
+    });
+
     this.refreshDetailMaps();
     this._detailAlbedo.on('update_image', (asset: string, index: number) => {
       this._terrain.get().material.setDetailMap(index, this._detailAlbedo.getImage(index));
@@ -98,7 +117,7 @@ export class TerrainEditTool implements EditTool {
       material.setDetailNormalMap(index, this._detailNormal.getImage(index));
       this.refreshDetailMaps();
     });
-    this._editList = ['raise', 'lower', 'smooth', 'flatten', 'texture'];
+    this._editList = ['raise', 'lower', 'smooth', 'flatten', 'texture', 'grass'];
     this._editSelected = 0;
     this._hitPos = null;
     this._brushImageList.addImage(TerrainEditTool.defaultBrush.get());
@@ -292,7 +311,7 @@ export class TerrainEditTool implements EditTool {
       'EditChild',
       new ImGui.ImVec2(
         0,
-        2 * ImGui.GetStyle().WindowPadding.y + ImGui.GetStyle().ItemSpacing.y * 3 + 4 * ImGui.GetFrameHeight()
+        2 * ImGui.GetStyle().WindowPadding.y + ImGui.GetStyle().ItemSpacing.y * 3 + 3 * ImGui.GetFrameHeight()
       ),
       true
     );
@@ -305,8 +324,35 @@ export class TerrainEditTool implements EditTool {
       this._editSelected = sel[0];
     }
     ImGui.EndChild();
-    if (this._editList[this._editSelected] === 'texture') {
+  }
+  renderGrassTextureSection() {
+    ImGui.BeginChild(
+      'GrassTexture',
+      new ImGui.ImVec2(
+        0,
+        60 +
+          2 * ImGui.GetFrameHeight() +
+          2 * ImGui.GetStyle().WindowPadding.y +
+          2 * ImGui.GetStyle().ItemSpacing.y
+      ),
+      true
+    );
+    ImGui.Text('Grass Textures');
+    ImGui.BeginChild('GrassTextureList', new ImGui.ImVec2(0, 60));
+    this._grassAlbedo.render(ImGui.GetContentRegionAvail());
+    ImGui.EndChild();
+    const layer = this._grassAlbedo.selected;
+    if (layer >= 0) {
+      const grassRenderer = this._terrain.get().grassRenderer;
+      const bladeSize = [grassRenderer.getBladeWidth(layer), grassRenderer.getBladeHeight(layer)] as [
+        number,
+        number
+      ];
+      if (ImGui.SliderFloat2('BladeSize', bladeSize, 0, 10)) {
+        grassRenderer.setBladeSize(layer, bladeSize[0], bladeSize[1]);
+      }
     }
+    ImGui.EndChild();
   }
   renderDetailMapSection() {
     ImGui.BeginChild(
@@ -420,6 +466,8 @@ export class TerrainEditTool implements EditTool {
       this.renderEditSection();
       if (this._editList[this._editSelected] === 'texture') {
         this.renderDetailMapSection();
+      } else if (this._editList[this._editSelected] === 'grass') {
+        this.renderGrassTextureSection();
       }
     }
     ImGui.End();
@@ -453,6 +501,13 @@ export class TerrainEditTool implements EditTool {
   }
   get disposed(): boolean {
     return this._disposed;
+  }
+  refreshGrassTextures() {
+    const grassRenderer = this._terrain.get().grassRenderer;
+    this._grassAlbedo.clear();
+    for (let i = 0; i < grassRenderer.numLayers; i++) {
+      this._grassAlbedo.addImage(grassRenderer.getGrassTexture(i));
+    }
   }
   refreshDetailMaps() {
     const terrain = this._terrain.get();

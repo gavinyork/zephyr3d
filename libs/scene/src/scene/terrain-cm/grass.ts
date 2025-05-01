@@ -127,22 +127,28 @@ export class GrassLayer implements Disposable {
       this._material.get().setTextureSize(albedoMap.width, albedoMap.height);
     }
   }
+  getAlbedoMap() {
+    return this._material.get().albedoTexture;
+  }
   addInstances(instances: GrassInstanceInfo[]) {
     this._quadtree.get().addInstances(instances);
   }
   get bladeWidth() {
     return this._bladeWidth;
   }
+  get bladeHeight() {
+    return this._bladeHeight;
+  }
   set bladeWidth(val: number) {
-    if (val !== this._bladeWidth) {
-      this._bladeWidth = val;
-      this._baseVertexBuffer.set(this.createBaseVertexBuffer(this._bladeWidth, this._bladeHeight));
-      this._quadtree.get().setBaseVertexBuffer(this._baseVertexBuffer.get());
-    }
+    this.setBladeSize(val, this._bladeHeight);
   }
   set bladeHeight(val: number) {
-    if (val !== this._bladeHeight) {
-      this._bladeHeight = val;
+    this.setBladeSize(this._bladeWidth, val);
+  }
+  setBladeSize(width: number, height: number) {
+    if (width !== this._bladeWidth || height !== this._bladeHeight) {
+      this._bladeWidth = width;
+      this._bladeHeight = height;
       this._baseVertexBuffer.set(this.createBaseVertexBuffer(this._bladeWidth, this._bladeHeight));
       this._quadtree.get().setBaseVertexBuffer(this._baseVertexBuffer.get());
     }
@@ -262,10 +268,38 @@ export class GrassRenderer implements Disposable {
       layer.updateMaterial();
     }
   }
+  get numLayers() {
+    return this._layers.length;
+  }
   addLayer(bladeWidth: number, bladeHeight: number, albedoMap?: Texture2D): number {
     const layer = new GrassLayer(this._terrain.get(), bladeWidth, bladeHeight, albedoMap);
     this._layers.push(layer);
     return this._layers.length - 1;
+  }
+  getGrassTexture(layer: number) {
+    return this._layers[layer]?.getAlbedoMap() ?? null;
+  }
+  setGrassTexture(layer: number, texture: Texture2D) {
+    const grassLayer = this._layers[layer];
+    if (grassLayer) {
+      grassLayer.setAlbedoMap(texture);
+    } else {
+      console.error(`Invalid grass layer: ${layer}`);
+    }
+  }
+  getBladeWidth(layer: number) {
+    return this._layers[layer]?.bladeWidth ?? 0;
+  }
+  getBladeHeight(layer: number) {
+    return this._layers[layer]?.bladeHeight ?? 0;
+  }
+  setBladeSize(layer: number, width: number, height: number) {
+    const grassLayer = this._layers[layer];
+    if (grassLayer) {
+      grassLayer.setBladeSize(width, height);
+    } else {
+      console.error(`Invalid grass layer: ${layer}`);
+    }
   }
   addInstances(layer: number, instances: GrassInstanceInfo[]) {
     const grassLayer = this._layers[layer];
