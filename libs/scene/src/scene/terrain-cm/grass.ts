@@ -35,6 +35,9 @@ export class GrassInstances implements Disposable {
   get numInstances() {
     return this._numInstances;
   }
+  get instanceBuffer(): StructuredBuffer {
+    return this._instanceBuffer.get();
+  }
   get disposed() {
     return this._disposed;
   }
@@ -117,6 +120,9 @@ export class GrassLayer implements Disposable {
     this._quadtree = new DRef(
       new GrassQuadtreeNode(this._baseVertexBuffer.get(), GrassLayer._getIndexBuffer())
     );
+  }
+  get quadtree() {
+    return this._quadtree.get();
   }
   updateMaterial() {
     this._material.get().uniformChanged();
@@ -271,6 +277,9 @@ export class GrassRenderer implements Disposable {
   get numLayers() {
     return this._layers.length;
   }
+  getLayer(index: number) {
+    return this._layers[index];
+  }
   addLayer(bladeWidth: number, bladeHeight: number, albedoMap?: Texture2D): number {
     const layer = new GrassLayer(this._terrain.get(), bladeWidth, bladeHeight, albedoMap);
     this._layers.push(layer);
@@ -329,7 +338,7 @@ export class GrassRenderer implements Disposable {
   }
 }
 export class GrassQuadtreeNode implements Disposable {
-  private _grassInstances: GrassInstances;
+  private _grassInstances: DRef<GrassInstances>;
   private _children: GrassQuadtreeNode[];
   private _baseVertexBuffer: DRef<StructuredBuffer>;
   private _indexBuffer: DRef<IndexBuffer>;
@@ -341,7 +350,7 @@ export class GrassQuadtreeNode implements Disposable {
   constructor(baseVertexBuffer: StructuredBuffer, indexBuffer: IndexBuffer) {
     this._baseVertexBuffer = new DRef(baseVertexBuffer);
     this._indexBuffer = new DRef(indexBuffer);
-    this._grassInstances = new GrassInstances(baseVertexBuffer, indexBuffer);
+    this._grassInstances = new DRef(new GrassInstances(baseVertexBuffer, indexBuffer));
     this._children = null;
     this._disposed = false;
     this._minX = 0;
@@ -349,9 +358,15 @@ export class GrassQuadtreeNode implements Disposable {
     this._maxX = 1;
     this._maxY = 1;
   }
+  get grassInstances() {
+    return this._grassInstances.get();
+  }
+  get children() {
+    return this._children;
+  }
   draw() {
-    if (this._grassInstances.numInstances > 0) {
-      this._grassInstances.draw();
+    if (this._grassInstances.get().numInstances > 0) {
+      this._grassInstances.get().draw();
     }
     if (this._children) {
       for (const child of this._children) {
@@ -362,7 +377,7 @@ export class GrassQuadtreeNode implements Disposable {
   setBaseVertexBuffer(baseVertexBuffer: StructuredBuffer) {
     if (baseVertexBuffer !== this._baseVertexBuffer.get()) {
       this._baseVertexBuffer.set(baseVertexBuffer);
-      this._grassInstances.setBaseVertexBuffer(baseVertexBuffer);
+      this._grassInstances.get().setBaseVertexBuffer(baseVertexBuffer);
       if (this._children) {
         for (const child of this._children) {
           child.setBaseVertexBuffer(baseVertexBuffer);
@@ -371,8 +386,8 @@ export class GrassQuadtreeNode implements Disposable {
     }
   }
   addInstances(instances: GrassInstanceInfo[]) {
-    const n = Math.min(instances.length, MAX_INSTANCES_PER_NODE - this._grassInstances.numInstances);
-    this._grassInstances.addInstances(instances.slice(0, n));
+    const n = Math.min(instances.length, MAX_INSTANCES_PER_NODE - this._grassInstances.get().numInstances);
+    this._grassInstances.get().addInstances(instances.slice(0, n));
     if (n < instances.length) {
       if (!this._children) {
         this._children = [

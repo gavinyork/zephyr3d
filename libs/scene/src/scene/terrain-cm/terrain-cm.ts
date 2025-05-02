@@ -68,6 +68,7 @@ export class ClipmapTerrain
   private _sizeZ: number;
   private _heightMapAssetId: string;
   private _splatMapAssetId: string;
+  private _grassAssetId: string;
   private _minHeight: number;
   private _maxHeight: number;
   constructor(scene: Scene, sizeX = 256, sizeZ = 256, clipMapTileSize = 64) {
@@ -80,6 +81,7 @@ export class ClipmapTerrain
     this._sizeX = sizeX;
     this._sizeZ = sizeZ;
     this._heightMapAssetId = '';
+    this._grassAssetId = '';
     this._splatMapAssetId = '';
     this._minHeight = 0;
     this._maxHeight = 0;
@@ -111,6 +113,15 @@ export class ClipmapTerrain
   }
   set splatMapAssetId(val: string) {
     this._splatMapAssetId = val;
+  }
+  get grassAssetId() {
+    if (!this._grassAssetId) {
+      this._grassAssetId = crypto.randomUUID();
+    }
+    return this._grassAssetId;
+  }
+  set grassAssetId(val: string) {
+    this._grassAssetId = val;
   }
   get numDetailMaps(): number {
     return this.material.numDetailMaps;

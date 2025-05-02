@@ -1,4 +1,4 @@
-import { SceneNode } from '../../../scene';
+import { GrassInstanceInfo, SceneNode } from '../../../scene';
 import type { AssetRegistry, EmbeddedAssetInfo } from '../asset/asset';
 import type { PropertyAccessor, SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
@@ -7,6 +7,71 @@ import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
 import { Application } from '../../../app';
 import type { Texture2D } from '@zephyr3d/device';
+import { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
+
+function mergeTypedArrays<T extends TypedArray>(ctor: TypedArrayConstructor<T>, arrays: T[]): T {
+  const totalLength = arrays.reduce((acc, arr) => acc + arr.length, 0);
+  const result = new ctor(totalLength);
+  let offset = 0;
+  for (const array of arrays) {
+    result.set(array, offset);
+    offset += array.length;
+  }
+  return result;
+}
+
+async function getTerrainGrassContent(terrain: ClipmapTerrain): Promise<EmbeddedAssetInfo> {
+  const grassRenderer = terrain.grassRenderer;
+  const layerDatas: Uint8Array[] = [];
+  let dataSize = 4 + 4 * 3 * grassRenderer.numLayers;
+  for (let i = 0; i < grassRenderer.numLayers; i++) {
+    const promises: Promise<Uint8Array>[] = [];
+    const layer = grassRenderer.getLayer(i);
+    const queue = [layer.quadtree];
+    while (queue.length > 0) {
+      const quadtreeNode = queue.shift();
+      if (quadtreeNode.children) {
+        queue.push(...quadtreeNode.children);
+      }
+      const grassInstances = quadtreeNode.grassInstances;
+      if (grassInstances.numInstances > 0) {
+        const instanceBuffer = grassInstances.instanceBuffer;
+        const P = instanceBuffer.getBufferSubData(null, 0, grassInstances.numInstances * 4 * 4);
+        promises.push(P);
+      }
+    }
+    if (promises.length > 0) {
+      const data = await Promise.all(promises);
+      const merged = mergeTypedArrays(Uint8Array, data);
+      dataSize += merged.length;
+      layerDatas.push(merged);
+    } else {
+      layerDatas.push(new Uint8Array());
+    }
+  }
+  const data = new DataView(new ArrayBuffer(dataSize));
+  const view = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  let offset = 0;
+  data.setUint32(offset, grassRenderer.numLayers, true);
+  offset += 4;
+  for (let i = 0; i < grassRenderer.numLayers; i++) {
+    data.setUint32(offset, layerDatas[i].length, true);
+    offset += 4;
+    data.setFloat32(offset, grassRenderer.getBladeWidth(i), true);
+    offset += 4;
+    data.setFloat32(offset, grassRenderer.getBladeHeight(i), true);
+    offset += 4;
+    view.set(layerDatas[i], offset);
+    offset += layerDatas[i].length;
+  }
+  return {
+    assetType: 'binary',
+    assetId: terrain.grassAssetId,
+    data: new Blob([data.buffer]),
+    pkgId: terrain.id,
+    path: 'grass.bin'
+  };
+}
 
 async function getTerrainHeightMapContent(terrain: ClipmapTerrain): Promise<EmbeddedAssetInfo> {
   const device = Application.instance.device;
@@ -176,7 +241,7 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
       return obj.numDetailMaps;
     },
     getEmbeddedAssets(obj: ClipmapTerrain) {
-      return [getTerrainHeightMapContent(obj), getTerrainSplatMapContent(obj)];
+      return [getTerrainHeightMapContent(obj), getTerrainSplatMapContent(obj), getTerrainGrassContent(obj)];
     },
     getProps(terrain: ClipmapTerrain) {
       return [
@@ -269,6 +334,66 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
                   splatMap.update(content, 0, 0, i, width, height, 1);
                 }
                 this.splatMapAssetId = value.str[0];
+              }
+            }
+          }
+        },
+        {
+          name: 'Grass',
+          type: 'object',
+          default: null,
+          hidden: true,
+          get(this: ClipmapTerrain, value) {
+            value.str[0] = this.grassAssetId;
+          },
+          async set(this: ClipmapTerrain, value) {
+            if (value.str[0]) {
+              const assetId = value.str[0];
+              const assetInfo = assetRegistry.getAssetInfo(assetId);
+              if (assetInfo && assetInfo.type === 'binary') {
+                let data: ArrayBuffer = null;
+                try {
+                  data = await assetRegistry.fetchBinary(assetId);
+                } catch (err) {
+                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                  data = null;
+                }
+                if (!data) {
+                  console.error('Load grass data failed');
+                  return;
+                }
+                const dataView = new DataView(data);
+                let offset = 0;
+                const numLayers = dataView.getUint32(offset, true);
+                offset += 4;
+                for (let i = 0; i < numLayers; i++) {
+                  const dataSize = dataView.getUint32(offset, true);
+                  offset += 4;
+                  const bladeWidth = dataView.getFloat32(offset, true);
+                  offset += 4;
+                  const bladeHeight = dataView.getFloat32(offset, true);
+                  offset += 4;
+                  this.grassRenderer.addLayer(bladeWidth, bladeHeight);
+                  if (dataSize > 0) {
+                    const data = new Float32Array(
+                      dataView.buffer,
+                      dataView.byteOffset + offset,
+                      dataSize >> 2
+                    );
+                    const numInstances = data.length >> 2;
+                    const instances: GrassInstanceInfo[] = [];
+                    for (let i = 0; i < numInstances; i++) {
+                      instances.push({
+                        x: data[i * 4 + 0],
+                        y: data[i * 4 + 1],
+                        angle: Math.atan2(data[i * 4 + 2], data[i * 4 + 3])
+                      });
+                    }
+                    this.grassRenderer.addInstances(i, instances);
+                    offset += dataSize;
+                  }
+                }
+                this.grassAssetId = value.str[0];
               }
             }
           }
