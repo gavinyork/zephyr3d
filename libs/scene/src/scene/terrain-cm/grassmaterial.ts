@@ -153,6 +153,7 @@ export class ClipmapGrassMaterial
       pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
     );
     scope.$outputs.worldNorm = scope.normal;
+    ShaderHelper.resolveMotionVector(scope, scope.$outputs.worldPos, scope.$outputs.worldPos);
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);

@@ -86,19 +86,6 @@ export class ClipmapTerrain
     this._material = new DRef(
       new ClipmapTerrainMaterial(this.createHeightMapTexture(this._sizeX, this._sizeZ), clipMapTileSize)
     );
-    this._grassRenderer.get().addLayer(2, 1);
-    for (let i = 0; i < 100; i++) {
-      this._grassRenderer.get().addInstances(
-        0,
-        Array.from({ length: 80 }).map(() => {
-          return {
-            angle: Math.PI * 2 * Math.random(),
-            x: Math.random(),
-            y: Math.random()
-          };
-        })
-      );
-    }
     this.updateRegion();
   }
   get grassRenderer() {

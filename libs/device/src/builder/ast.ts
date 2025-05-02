@@ -920,11 +920,21 @@ export class ASTShaderExpConstructor extends ASTExpression {
   args: (number | boolean | ASTExpression)[];
   /** @internal */
   constExp: boolean;
+  /** @internal */
+  webglArgs: { name: string; args: ASTExpression[] };
+  /** @internal */
+  webgl2Args: { name: string; args: ASTExpression[] };
+  /** @internal */
+  webgpuArgs: { name: string; args: ASTExpression[] };
   constructor(type: PBTypeInfo, args: (number | boolean | ASTExpression)[]) {
     super();
     this.type = type;
     this.args = args;
     this.constExp = true;
+    this.webglArgs = null;
+    this.webgl2Args = null;
+    this.webgpuArgs = null;
+    const deviceTypes = ['webgl', 'webgl2', 'webgpu'];
     for (const arg of args) {
       if (arg === null || arg === undefined) {
         throw new Error('invalid constructor argument');
@@ -933,6 +943,19 @@ export class ASTShaderExpConstructor extends ASTExpression {
         arg.isStatement = false;
       }
       this.constExp &&= !(arg instanceof ASTExpression) || arg.isConstExp();
+    }
+    for (const type of deviceTypes) {
+      const overloads = this.type.getConstructorOverloads(type);
+      for (const overload of overloads) {
+        const convertedArgs = convertArgs(this.args, overload);
+        if (convertedArgs) {
+          this[`${type}Args`] = convertedArgs;
+          break;
+        }
+      }
+    }
+    if (!this.webglArgs && !this.webgl2Args && !this.webgpuArgs) {
+      throw new Error(`no matching overload function found for type ${this.type.toTypeName('webgl')}`);
     }
   }
   getType(): PBTypeInfo {
@@ -949,54 +972,25 @@ export class ASTShaderExpConstructor extends ASTExpression {
     return null;
   }
   toWebGL(indent: string, ctx: ASTContext): string {
-    console.assert(!this.type.isArrayType(), 'array constructor not supported in webgl1 device');
-    console.assert(
-      this.type.isConstructible(),
-      `type '${this.type.toTypeName('webgl')}' is not constructible`
-    );
-    const overloads = this.type.getConstructorOverloads('webgl');
-    for (const overload of overloads) {
-      const convertedArgs = convertArgs(this.args, overload);
-      if (convertedArgs) {
-        const c = convertedArgs.args.map((arg) => unbracket(arg.toWebGL(indent, ctx))).join(',');
-        return `${convertedArgs.name}(${c})`;
-      }
+    if (!this.webglArgs) {
+      throw new Error(`no matching overload function found for type ${this.type.toTypeName('webgl')}`);
     }
-    throw new Error(`no matching overload function found for type ${this.type.toTypeName('webgl')}`);
+    const c = this.webglArgs.args.map((arg) => unbracket(arg.toWebGL(indent, ctx))).join(',');
+    return `${this.webglArgs.name}(${c})`;
   }
   toWebGL2(indent: string, ctx: ASTContext): string {
-    console.assert(
-      this.type.isConstructible(),
-      `type '${this.type.toTypeName('webgl2')}' is not constructible`,
-      true
-    );
-    const overloads = this.type.getConstructorOverloads('webgl2');
-    for (const overload of overloads) {
-      const convertedArgs = convertArgs(this.args, overload);
-      if (convertedArgs) {
-        const c = convertedArgs.args.map((arg) => unbracket(arg.toWebGL2(indent, ctx))).join(',');
-        return `${convertedArgs.name}(${c})`;
-      }
+    if (!this.webgl2Args) {
+      throw new Error(`no matching overload function found for type ${this.type.toTypeName('webgl2')}`);
     }
-    throw new Error(`no matching overload function found for type ${this.type.toTypeName('webgl2')}`);
+    const c = this.webgl2Args.args.map((arg) => unbracket(arg.toWebGL2(indent, ctx))).join(',');
+    return `${this.webgl2Args.name}(${c})`;
   }
   toWGSL(indent: string, ctx: ASTContext): string {
-    /*
-    console.assert(
-      this.type.isConstructible(),
-      `type '${this.type.toTypeName('webgpu')}' is not constructible`,
-      true
-    );
-    */
-    const overloads = this.type.getConstructorOverloads('webgpu');
-    for (const overload of overloads) {
-      const convertedArgs = convertArgs(this.args, overload);
-      if (convertedArgs) {
-        const c = convertedArgs.args.map((arg) => unbracket(arg.toWGSL(indent, ctx))).join(',');
-        return `${convertedArgs.name}(${c})`;
-      }
+    if (!this.webgpuArgs) {
+      throw new Error(`no matching overload function found for type ${this.type.toTypeName('webgpu')}`);
     }
-    throw new Error(`no matching overload function found for type ${this.type.toTypeName('webgpu')}`);
+    const c = this.webgpuArgs.args.map((arg) => unbracket(arg.toWGSL(indent, ctx))).join(',');
+    return `${this.webgpuArgs.name}(${c})`;
   }
   toString(deviceType: string): string {
     return 'constructor';

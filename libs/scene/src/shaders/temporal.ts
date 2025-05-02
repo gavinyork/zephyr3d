@@ -263,7 +263,7 @@ export function temporalResolve(
     } else if (debug === TAA_DEBUG_VELOCITY) {
       this.resolvedColor = pb.abs(pb.sub(this.sampleColor, this.historyColor));
     } else if (debug === TAA_DEBUG_MOTION_VECTOR) {
-      this.resolvedColor = pb.vec3(pb.abs(pb.mul(this.velocityClosest, 20)), 0);
+      this.resolvedColor = pb.abs(pb.mul(this.velocityClosest, 20));
     } else {
       this.resolvedColor = pb.mix(this.prevColor.rgb, this.currentColor.rgb, this.alpha);
       this.resolvedColor = this.reinhardInv(this.resolvedColor);

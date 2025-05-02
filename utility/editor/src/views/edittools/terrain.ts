@@ -1,4 +1,4 @@
-import type { AssetRegistry, ClipmapTerrain } from '@zephyr3d/scene';
+import type { AssetRegistry, ClipmapTerrain, GrassInstanceInfo } from '@zephyr3d/scene';
 import {
   Application,
   AssetManager,
@@ -230,10 +230,37 @@ export class TerrainEditTool implements EditTool {
             );
           }
           break;
+        case 'grass':
+          if (this._grassAlbedo.selected >= 0) {
+            this.applyGrassBrush(
+              this._hitPos,
+              this._brushSize,
+              this._brushStrength,
+              this._grassAlbedo.selected
+            );
+          }
+          break;
         default:
           break;
       }
     }
+  }
+  applyGrassBrush(hitPos: Vector2, brushSize: number, brushStrength: number, grassIndex: number) {
+    const region = this._terrain.get().worldRegion;
+    const posMinX = Math.max(hitPos.x - brushSize, region.x);
+    const posMaxX = Math.min(hitPos.x + brushSize, region.z);
+    const posMinZ = Math.max(hitPos.y - brushSize, region.y);
+    const posMaxZ = Math.min(hitPos.y + brushSize, region.w);
+    const area = (posMaxZ - posMinZ) * (posMaxX - posMinX);
+    const regionWidthInv = 1 / (region.z - region.x);
+    const regionHeightInv = 1 / (region.w - region.y);
+    const numInstances = Math.ceil(area * brushStrength);
+    const instances: GrassInstanceInfo[] = Array.from({ length: numInstances }).map((val) => ({
+      x: (posMinX + Math.random() * (posMaxX - posMinX) - region.x) * regionWidthInv,
+      y: (posMinZ + Math.random() * (posMaxZ - posMinZ) - region.y) * regionHeightInv,
+      angle: Math.random() * Math.PI * 2
+    }));
+    this._terrain.get().grassRenderer.addInstances(grassIndex, instances);
   }
   applyTextureBrush(
     brushTexture: Texture2D,
@@ -414,7 +441,7 @@ export class TerrainEditTool implements EditTool {
       this._brushAngle = brushAngle[0];
     }
     const brushStrength = [this._brushStrength] as [number];
-    if (ImGui.SliderFloat('Strength', brushStrength, 0, 16, '%.1f', ImGui.SliderFlags.None)) {
+    if (ImGui.SliderFloat('Strength', brushStrength, 0, 1, '%.1f', ImGui.SliderFlags.None)) {
       this._brushStrength = brushStrength[0];
     }
     ImGui.EndChild();
