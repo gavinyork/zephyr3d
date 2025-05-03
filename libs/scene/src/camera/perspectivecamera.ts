@@ -1,6 +1,6 @@
 import { Camera } from './camera';
 import type { Scene } from '../scene/scene';
-import type { Matrix4x4 } from '@zephyr3d/base';
+import { Matrix4x4 } from '@zephyr3d/base';
 import type { NodeClonable, NodeCloneMethod } from '../scene';
 
 /**
@@ -147,7 +147,7 @@ export class PerspectiveCamera extends Camera implements NodeClonable<Perspectiv
       top = bottom + height * this._window[3];
     }
     this._projMatrix.frustum(left, right, bottom, top, this._near, this._far);
-    //this._projMatrix.perspective(this._fovY, this._aspect, this._near, this._far);
+    Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
   }
   /** @internal */
   getPickResultResolveFunc() {

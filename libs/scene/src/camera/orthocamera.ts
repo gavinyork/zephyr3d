@@ -1,6 +1,6 @@
 import { Camera } from './camera';
 import type { Scene } from '../scene/scene';
-import type { Matrix4x4 } from '@zephyr3d/base';
+import { Matrix4x4 } from '@zephyr3d/base';
 import type { NodeClonable, NodeCloneMethod } from '../scene';
 
 /**
@@ -150,5 +150,6 @@ export class OrthoCamera extends Camera implements NodeClonable<OrthoCamera> {
   /** @internal */
   protected _computeProj(): void {
     this._projMatrix.ortho(this._left, this._right, this._bottom, this._top, this._near, this._far);
+    Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
   }
 }

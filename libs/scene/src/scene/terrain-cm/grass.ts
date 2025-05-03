@@ -1,11 +1,14 @@
 import type { IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
-import { Disposable, DWeakRef } from '../../app';
+import type { Disposable } from '../../app';
+import { DWeakRef } from '../../app';
 import { Application, DRef } from '../../app';
-import { nextPowerOf2 } from '@zephyr3d/base';
+import type { Vector4 } from '@zephyr3d/base';
+import { AABB, ClipState, nextPowerOf2 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
 import { Primitive } from '../../render';
 import { ClipmapGrassMaterial } from './grassmaterial';
 import type { ClipmapTerrain } from './terrain-cm';
+import type { Camera } from '../../camera';
 
 export const MAX_INSTANCES_PER_NODE = 16384;
 
@@ -241,11 +244,11 @@ export class GrassLayer implements Disposable {
     ]);
     return device.createInterleavedVertexBuffer(['position_f32x3', 'tex0_f32x2'], vertices);
   }
-  draw(ctx: DrawContext) {
+  draw(ctx: DrawContext, region: Vector4, minY: number, maxY: number) {
     this._material.get().apply(ctx);
     for (let pass = 0; pass < this._material.get().numPasses; pass++) {
       this._material.get().bind(ctx.device, pass);
-      this._quadtree.get().draw();
+      this._quadtree.get().draw(ctx.camera, region, minY, maxY, false);
     }
   }
   get disposed() {
@@ -332,21 +335,25 @@ export class GrassRenderer implements Disposable {
     }
   }
   draw(ctx: DrawContext) {
+    const bv = this._terrain.get().getWorldBoundingVolume().toAABB();
+    const minY = bv.minPoint.y;
+    const maxY = bv.maxPoint.y;
     for (const layer of this._layers) {
-      layer.draw(ctx);
+      layer.draw(ctx, this._terrain.get().worldRegion, minY - layer.bladeHeight, maxY + layer.bladeHeight);
     }
   }
 }
 export class GrassQuadtreeNode implements Disposable {
+  private static _cullAABB = new AABB();
   private _grassInstances: DRef<GrassInstances>;
   private _children: GrassQuadtreeNode[];
   private _baseVertexBuffer: DRef<StructuredBuffer>;
   private _indexBuffer: DRef<IndexBuffer>;
   private _disposed: boolean;
   private _minX: number;
-  private _minY: number;
+  private _minZ: number;
   private _maxX: number;
-  private _maxY: number;
+  private _maxZ: number;
   constructor(baseVertexBuffer: StructuredBuffer, indexBuffer: IndexBuffer) {
     this._baseVertexBuffer = new DRef(baseVertexBuffer);
     this._indexBuffer = new DRef(indexBuffer);
@@ -354,9 +361,9 @@ export class GrassQuadtreeNode implements Disposable {
     this._children = null;
     this._disposed = false;
     this._minX = 0;
-    this._minY = 0;
+    this._minZ = 0;
     this._maxX = 1;
-    this._maxY = 1;
+    this._maxZ = 1;
   }
   get grassInstances() {
     return this._grassInstances.get();
@@ -364,13 +371,29 @@ export class GrassQuadtreeNode implements Disposable {
   get children() {
     return this._children;
   }
-  draw() {
+  draw(camera: Camera, region: Vector4, minY: number, maxY: number, skipClipTest: boolean) {
+    if (!skipClipTest) {
+      const cullAABB = GrassQuadtreeNode._cullAABB;
+      const x = region.x;
+      const z = region.y;
+      const dx = region.z - x;
+      const dz = region.w - z;
+      cullAABB.minPoint.setXYZ(x + this._minX * dx, minY, z + this._minZ * dz);
+      cullAABB.maxPoint.setXYZ(x + this._maxX * dx, maxY, z + this._maxZ * dz);
+      const clipState = camera.clipMask
+        ? cullAABB.getClipStateWithFrustumMask(camera.frustum, camera.clipMask)
+        : cullAABB.getClipStateWithFrustum(camera.frustum);
+      if (clipState === ClipState.NOT_CLIPPED) {
+        return;
+      }
+      skipClipTest = clipState === ClipState.A_INSIDE_B;
+    }
     if (this._grassInstances.get().numInstances > 0) {
       this._grassInstances.get().draw();
     }
     if (this._children) {
       for (const child of this._children) {
-        child.draw();
+        child.draw(camera, region, minY, maxY, skipClipTest);
       }
     }
   }
@@ -397,27 +420,27 @@ export class GrassQuadtreeNode implements Disposable {
           new GrassQuadtreeNode(this._baseVertexBuffer.get(), this._indexBuffer.get())
         ];
         this._children[0]._minX = this._minX;
-        this._children[0]._minY = this._minY;
+        this._children[0]._minZ = this._minZ;
         this._children[0]._maxX = (this._minX + this._maxX) * 0.5;
-        this._children[0]._maxY = (this._minY + this._maxY) * 0.5;
+        this._children[0]._maxZ = (this._minZ + this._maxZ) * 0.5;
         this._children[1]._minX = this._children[0]._maxX;
-        this._children[1]._minY = this._minY;
+        this._children[1]._minZ = this._minZ;
         this._children[1]._maxX = this._maxX;
-        this._children[1]._maxY = this._children[0]._maxY;
+        this._children[1]._maxZ = this._children[0]._maxZ;
         this._children[2]._minX = this._minX;
-        this._children[2]._minY = this._children[0]._maxY;
+        this._children[2]._minZ = this._children[0]._maxZ;
         this._children[2]._maxX = this._children[0]._maxX;
-        this._children[2]._maxY = this._maxY;
+        this._children[2]._maxZ = this._maxZ;
         this._children[3]._minX = this._children[0]._maxX;
-        this._children[3]._minY = this._children[0]._maxY;
+        this._children[3]._minZ = this._children[0]._maxZ;
         this._children[3]._maxX = this._maxX;
-        this._children[3]._maxY = this._maxY;
+        this._children[3]._maxZ = this._maxZ;
       }
       for (const child of this._children) {
         child.addInstances(
           instances.filter(
             (val) =>
-              val.x >= child._minX && val.y >= child._minY && val.x < child._maxX && val.y < child._maxY
+              val.x >= child._minX && val.y >= child._minZ && val.x < child._maxX && val.y < child._maxZ
           )
         );
       }

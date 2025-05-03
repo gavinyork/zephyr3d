@@ -48,7 +48,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._region = new Vector4(-99999, -99999, 99999, 99999);
     this._clipmapMatrix = new Matrix4x4();
     this._waveGenerator = new DRef();
-    this._ssrParams = new Vector4(32, 80, 0.5, 6);
+    this._ssrParams = new Vector4(100, 80, 0.5, 8);
     this._scatterRampTexture = new DRef();
     this._absorptionRampTexture = new DRef();
     this._displace = 16;
@@ -339,7 +339,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
                 this.ssrParams.x,
                 this.ssrParams.y,
                 this.ssrParams.z,
-                4,
+                this.ssrParams.w,
                 pb.vec4(ShaderHelper.getRenderSize(this), ShaderHelper.getLinearDepthTextureSize(this)),
                 ShaderHelper.getLinearDepthTexture(this)
               );
@@ -359,7 +359,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this,
           ShaderHelper.getLinearDepthTexture(this),
           this.refractUV,
-          ShaderHelper.getInvViewProjectionMatrix(this),
+          ShaderHelper.getInvProjectionMatrix(this),
           ShaderHelper.getCameraParams(this).xy
         );
         this.$if(
@@ -371,7 +371,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             this.refractUV = this.screenUV;
           }
         ).$else(function () {
-          this.depth = pb.length(pb.sub(this.displacedPos.xyz, this.worldPos));
+          this.depth = pb.length(pb.sub(this.displacedPos.xyz, this.viewPos));
         });
         this.$l.refraction = pb.textureSampleLevel(
           ShaderHelper.getSceneColorTexture(this),

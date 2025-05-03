@@ -1,4 +1,5 @@
-import { GrassInstanceInfo, SceneNode } from '../../../scene';
+import type { GrassInstanceInfo } from '../../../scene';
+import { SceneNode } from '../../../scene';
 import type { AssetRegistry, EmbeddedAssetInfo } from '../asset/asset';
 import type { PropertyAccessor, SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
@@ -7,7 +8,7 @@ import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
 import { Application } from '../../../app';
 import type { Texture2D } from '@zephyr3d/device';
-import { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
+import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
 
 function writeUUID(dataView: DataView, offset: number, str: string) {
   if (str && str.length === 36) {
@@ -77,7 +78,7 @@ async function getTerrainGrassContent(
   offset += 4;
   for (let i = 0; i < grassRenderer.numLayers; i++) {
     const grassTexture = grassRenderer.getGrassTexture(i);
-    let assetId = grassTexture ? assetRegistry.getAssetId(grassTexture) ?? '' : '';
+    const assetId = grassTexture ? assetRegistry.getAssetId(grassTexture) ?? '' : '';
     writeUUID(data, offset, assetId);
     offset += 36;
     data.setUint32(offset, layerDatas[i].length, true);

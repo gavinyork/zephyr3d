@@ -47,6 +47,8 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   /** @internal */
   protected _projMatrix: Matrix4x4;
   /** @internal */
+  protected _invProjMatrix: Matrix4x4;
+  /** @internal */
   protected _viewMatrix: Matrix4x4;
   /** @internal */
   protected _viewProjMatrix: Matrix4x4;
@@ -139,6 +141,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   constructor(scene: Scene, projectionMatrix?: Matrix4x4) {
     super(scene);
     this._projMatrix = projectionMatrix || Matrix4x4.identity();
+    this._invProjMatrix = Matrix4x4.invert(this._projMatrix);
     this._viewMatrix = Matrix4x4.identity();
     this._viewProjMatrix = Matrix4x4.identity();
     this._invViewProjMatrix = Matrix4x4.identity();
@@ -510,6 +513,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    */
   setPerspective(fovY: number, aspect: number, zNear: number, zFar: number): this {
     this._projMatrix.perspective(fovY, aspect, zNear, zFar);
+    Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
     this._invalidate(true);
     return this;
   }
@@ -525,6 +529,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    */
   setOrtho(left: number, right: number, bottom: number, top: number, near: number, far: number): this {
     this._projMatrix.ortho(left, right, bottom, top, near, far);
+    Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
     this._invalidate(true);
     return this;
   }
@@ -535,6 +540,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   setProjectionMatrix(matrix: Matrix4x4): void {
     if (matrix && matrix !== this._projMatrix) {
       this._projMatrix.set(matrix);
+      Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
       this._invalidate(true);
     }
   }
@@ -548,6 +554,17 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
       this._compute();
     }
     return this._projMatrix;
+  }
+  /**
+   * Gets the inverse projection matrix of the camera
+   * @returns The projection matrix
+   */
+  getInvProjectionMatrix(): Matrix4x4 {
+    if (this._dirty) {
+      this._dirty = false;
+      this._compute();
+    }
+    return this._invProjMatrix;
   }
   getRotationMatrix(): Matrix4x4 {
     const rotationMatrix = new Matrix4x4();

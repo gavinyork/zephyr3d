@@ -782,7 +782,7 @@ export class ShaderHelper {
       jitterValue: ctx.camera.jitterValue,
       invViewProjectionMatrix: ctx.camera.invViewProjectionMatrix,
       projectionMatrix: ctx.camera.getProjectionMatrix(),
-      invProjectionMatrix: ctx.camera.invViewProjectionMatrix,
+      invProjectionMatrix: ctx.camera.getInvProjectionMatrix(),
       viewMatrix: ctx.camera.viewMatrix,
       params: new Vector4(
         ctx.camera.getNearPlane(),
