@@ -9,6 +9,24 @@ import { Application } from '../../../app';
 import type { Texture2D } from '@zephyr3d/device';
 import { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
 
+function writeUUID(dataView: DataView, offset: number, str: string) {
+  if (str && str.length === 36) {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(str);
+    for (let i = 0; i < bytes.length; i++) {
+      dataView.setUint8(offset + i, bytes[i]);
+    }
+  }
+}
+
+function readUUID(dataView: DataView, offset: number) {
+  const bytes = new Uint8Array(36);
+  for (let i = 0; i < 36; i++) {
+    bytes[i] = dataView.getUint8(offset + i);
+  }
+  return bytes[0] ? new TextDecoder().decode(bytes) : '';
+}
+
 function mergeTypedArrays<T extends TypedArray>(ctor: TypedArrayConstructor<T>, arrays: T[]): T {
   const totalLength = arrays.reduce((acc, arr) => acc + arr.length, 0);
   const result = new ctor(totalLength);
@@ -20,10 +38,13 @@ function mergeTypedArrays<T extends TypedArray>(ctor: TypedArrayConstructor<T>, 
   return result;
 }
 
-async function getTerrainGrassContent(terrain: ClipmapTerrain): Promise<EmbeddedAssetInfo> {
+async function getTerrainGrassContent(
+  terrain: ClipmapTerrain,
+  assetRegistry: AssetRegistry
+): Promise<EmbeddedAssetInfo> {
   const grassRenderer = terrain.grassRenderer;
   const layerDatas: Uint8Array[] = [];
-  let dataSize = 4 + 4 * 3 * grassRenderer.numLayers;
+  let dataSize = 4 + (4 * 3 + 36) * grassRenderer.numLayers;
   for (let i = 0; i < grassRenderer.numLayers; i++) {
     const promises: Promise<Uint8Array>[] = [];
     const layer = grassRenderer.getLayer(i);
@@ -55,6 +76,10 @@ async function getTerrainGrassContent(terrain: ClipmapTerrain): Promise<Embedded
   data.setUint32(offset, grassRenderer.numLayers, true);
   offset += 4;
   for (let i = 0; i < grassRenderer.numLayers; i++) {
+    const grassTexture = grassRenderer.getGrassTexture(i);
+    let assetId = grassTexture ? assetRegistry.getAssetId(grassTexture) ?? '' : '';
+    writeUUID(data, offset, assetId);
+    offset += 36;
     data.setUint32(offset, layerDatas[i].length, true);
     offset += 4;
     data.setFloat32(offset, grassRenderer.getBladeWidth(i), true);
@@ -241,7 +266,11 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
       return obj.numDetailMaps;
     },
     getEmbeddedAssets(obj: ClipmapTerrain) {
-      return [getTerrainHeightMapContent(obj), getTerrainSplatMapContent(obj), getTerrainGrassContent(obj)];
+      return [
+        getTerrainHeightMapContent(obj),
+        getTerrainSplatMapContent(obj),
+        getTerrainGrassContent(obj, assetRegistry)
+      ];
     },
     getProps(terrain: ClipmapTerrain) {
       return [
@@ -367,13 +396,37 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
                 const numLayers = dataView.getUint32(offset, true);
                 offset += 4;
                 for (let i = 0; i < numLayers; i++) {
+                  const assetId = readUUID(dataView, offset);
+                  offset += 36;
+                  let texture: Texture2D = null;
+                  if (assetId) {
+                    const assetInfo = assetRegistry.getAssetInfo(assetId);
+                    if (assetInfo && assetInfo.type === 'texture') {
+                      try {
+                        texture = await assetRegistry.fetchTexture<Texture2D>(
+                          assetId,
+                          assetInfo.textureOptions
+                        );
+                      } catch (err) {
+                        console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                        texture = null;
+                      }
+                      if (texture?.isTexture2D()) {
+                        texture.name = assetInfo.name;
+                      } else {
+                        console.error('Invalid texture type');
+                        texture?.dispose();
+                        texture = null;
+                      }
+                    }
+                  }
                   const dataSize = dataView.getUint32(offset, true);
                   offset += 4;
                   const bladeWidth = dataView.getFloat32(offset, true);
                   offset += 4;
                   const bladeHeight = dataView.getFloat32(offset, true);
                   offset += 4;
-                  this.grassRenderer.addLayer(bladeWidth, bladeHeight);
+                  this.grassRenderer.addLayer(bladeWidth, bladeHeight, texture);
                   if (dataSize > 0) {
                     const data = new Float32Array(
                       dataView.buffer,
