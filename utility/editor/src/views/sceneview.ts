@@ -25,7 +25,9 @@ import {
   SpotLight,
   TorusShape,
   Water,
-  ClipmapTerrain
+  ClipmapTerrain,
+  PerspectiveCamera,
+  OrthoCamera
 } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { Application, DirectionalLight } from '@zephyr3d/scene';
@@ -530,7 +532,14 @@ export class SceneView extends BaseView<SceneModel> {
     }
     this.model.camera.viewport = [this._tab.width, this._statusbar.height, viewportWidth, viewportHeight];
     this.model.camera.scissor = [this._tab.width, this._statusbar.height, viewportWidth, viewportHeight];
-    this.model.camera.aspect = viewportWidth / viewportHeight;
+    if (this.model.camera instanceof PerspectiveCamera) {
+      this.model.camera.aspect = viewportWidth / viewportHeight;
+    } else if (this.model.camera instanceof OrthoCamera) {
+      this.model.camera.bottom = -10;
+      this.model.camera.top = 10;
+      this.model.camera.left = (-10 * viewportWidth) / viewportHeight;
+      this.model.camera.right = (10 * viewportWidth) / viewportHeight;
+    }
     this.model.camera.render(this.model.scene, this.model.compositor);
 
     this._statusbar.render();

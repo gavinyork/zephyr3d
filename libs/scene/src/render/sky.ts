@@ -1,7 +1,7 @@
 import { Application } from '../app/app';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders/misc';
 import { smoothNoise3D } from '../shaders';
-import type { Vector3 } from '@zephyr3d/base';
+import { Quaternion, Vector3 } from '@zephyr3d/base';
 import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import type { Primitive } from './primitive';
 import { BoxShape } from '../shapes';
@@ -57,6 +57,11 @@ const defaultSkyWorldMatrix = Matrix4x4.identity();
  * @public
  */
 export class SkyRenderer {
+  private static _skyCamera = (() => {
+    const camera = new Camera(null);
+    camera.setPerspective(Math.PI / 2, 1, 1, 20);
+    return camera;
+  })();
   private _skyType: SkyType;
   private _skyColor: Vector4;
   private _skyboxTexture: DRef<TextureCube>;
@@ -389,8 +394,7 @@ export class SkyRenderer {
       const tex = device.createCubeTexture(format, this._scatterSkyboxTextureWidth);
       tex.name = 'BakedSkyboxTexture';
       const scatterSkyboxFramebuffer = device.createFrameBuffer([tex], null);
-      const camera = new Camera(null);
-      camera.setPerspective(Math.PI / 2, 1, 1, 20);
+      const camera = SkyRenderer._skyCamera;
       const saveRenderStates = device.getRenderStates();
       device.pushDeviceStates();
       device.setFramebuffer(scatterSkyboxFramebuffer);
@@ -462,8 +466,13 @@ export class SkyRenderer {
   /** @internal */
   renderSky(ctx: DrawContext) {
     const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
+    let skyCamera = ctx.camera;
+    if (!skyCamera.isPerspective()) {
+      skyCamera = SkyRenderer._skyCamera;
+      ctx.camera.worldMatrix.decompose(null, skyCamera.rotation, null);
+    }
     this._renderSky(
-      ctx.camera,
+      skyCamera,
       true,
       sunDir,
       this._drawGround,
@@ -503,6 +512,11 @@ export class SkyRenderer {
   private _drawSkyColor(camera: Camera, depthTest: boolean) {
     const device = Application.instance.device;
     const bindgroup = this._bindgroupSky.color;
+    const p = new Vector3();
+    const s = new Vector3();
+    const r = new Quaternion();
+    camera.viewMatrix.decompose(s, r, p);
+    camera.worldMatrix.decompose(s, r, p);
     bindgroup.setValue('viewProjMatrix', camera.viewProjectionMatrix);
     bindgroup.setValue('worldMatrix', this._skyWorldMatrix);
     bindgroup.setValue('cameraPos', camera.getWorldPosition());

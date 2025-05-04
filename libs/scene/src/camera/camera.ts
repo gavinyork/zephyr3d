@@ -477,11 +477,18 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   constructRay(x: number, y: number): Ray {
     const width = this.viewport ? this.viewport[2] : Application.instance.device.getViewport().width;
     const height = this.viewport ? this.viewport[3] : Application.instance.device.getViewport().height;
-    const vClip = new Vector4((2 * x) / width - 1, 1 - (2 * y) / height, 1, 1);
-    const vWorld = this.invViewProjectionMatrix.transform(vClip);
-    vWorld.scaleBy(1 / vWorld.w);
-    const vEye = this.getWorldPosition();
-    const vDir = Vector3.sub(vWorld.xyz(), vEye).inplaceNormalize();
+    const ndcX = (2 * x) / width - 1;
+    const ndcY = 1 - (2 * y) / height;
+    const nearClip = new Vector4(ndcX, ndcY, 0, 1);
+    const farClip = new Vector4(ndcX, ndcY, 1, 1);
+    const nearWorld = this.invViewProjectionMatrix.transform(nearClip);
+    const farWorld = this.invViewProjectionMatrix.transform(farClip);
+    if (this.isPerspective()) {
+      nearWorld.scaleBy(1 / nearWorld.w);
+      farWorld.scaleBy(1 / farWorld.w);
+    }
+    const vEye = this.isPerspective() ? this.getWorldPosition() : nearWorld.xyz();
+    const vDir = Vector3.sub(farWorld.xyz(), vEye).inplaceNormalize();
     return new Ray(vEye, vDir);
   }
   /**
@@ -787,7 +794,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   }
   /** @internal */
   getPickResultResolveFunc() {
-    return null;
+    return this._pickResultResolve;
   }
   /** @internal */
   getPickPosX() {

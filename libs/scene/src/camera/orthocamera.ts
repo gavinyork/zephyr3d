@@ -15,6 +15,7 @@ export class OrthoCamera extends Camera implements NodeClonable<OrthoCamera> {
   private _bottom: number;
   private _near: number;
   private _far: number;
+  private _window: number[];
   /**
    * Creates an instance of PerspectiveCamera
    * @param scene - The scene that the camera belongs to.
@@ -31,6 +32,7 @@ export class OrthoCamera extends Camera implements NodeClonable<OrthoCamera> {
     this._top = top;
     this._near = near;
     this._far = far;
+    this._window = null;
     this._invalidate(true);
   }
   clone(method: NodeCloneMethod, recursive: boolean): OrthoCamera {
@@ -39,8 +41,17 @@ export class OrthoCamera extends Camera implements NodeClonable<OrthoCamera> {
     other.parent = this.parent;
     return other;
   }
+  /** Sub-window of the frustum */
+  get window(): number[] {
+    return this._window;
+  }
+  set window(val: number[]) {
+    this._window = val?.slice() ?? null;
+    this._invalidate(true);
+  }
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
     super.copyFrom(other, method, recursive);
+    this.window = other.window?.slice() ?? null;
     this.near = other.near;
     this.far = other.far;
     this.left = other.left;
@@ -149,7 +160,19 @@ export class OrthoCamera extends Camera implements NodeClonable<OrthoCamera> {
   }
   /** @internal */
   protected _computeProj(): void {
-    this._projMatrix.ortho(this._left, this._right, this._bottom, this._top, this._near, this._far);
+    let left = this._left;
+    let right = this._right;
+    let bottom = this._bottom;
+    let top = this._top;
+    if (this._window) {
+      const width = right - left;
+      const height = top - bottom;
+      left += width * this._window[0];
+      bottom += height * this._window[1];
+      right = left + width * this._window[2];
+      top = bottom + height * this._window[3];
+    }
+    this._projMatrix.ortho(left, right, bottom, top, this._near, this._far);
     Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
   }
 }

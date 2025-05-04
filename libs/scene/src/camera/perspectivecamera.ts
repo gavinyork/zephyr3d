@@ -39,7 +39,7 @@ export class PerspectiveCamera extends Camera implements NodeClonable<Perspectiv
   }
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
     super.copyFrom(other, method, recursive);
-    this.window = other.window;
+    this.window = other.window?.slice() ?? null;
     this.near = other.near;
     this.far = other.far;
     this.fovY = other.fovY;
@@ -148,9 +148,5 @@ export class PerspectiveCamera extends Camera implements NodeClonable<Perspectiv
     }
     this._projMatrix.frustum(left, right, bottom, top, this._near, this._far);
     Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
-  }
-  /** @internal */
-  getPickResultResolveFunc() {
-    return this._pickResultResolve;
   }
 }

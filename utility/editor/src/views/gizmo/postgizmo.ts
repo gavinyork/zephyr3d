@@ -296,6 +296,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
     ctx.device.setFramebuffer(tmpFramebuffer);
     ctx.device.clearFrameBuffer(new Vector4(0, 0, 0, 0), 1, 0);
     if (this._drawGrid) {
+      this._gridParams.z = ctx.camera.isPerspective() ? 1 : 0;
       ctx.device.setRenderStates(PostGizmoRenderer._gridRenderState);
       PostGizmoRenderer._gridBindGroup.setValue('viewMatrix', ctx.camera.worldMatrix);
       PostGizmoRenderer._gridBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
@@ -922,22 +923,36 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
             pb.mat4('viewMatrix'),
             pb.float('distance'),
             pb.vec3('colorGrid'),
-            pb.vec3('colorGridEmphasis')
+            pb.vec3('colorGridEmphasis'),
+            pb.float('persp')
           ],
           function () {
             this.$l.dFdxPos = pb.dpdx(this.P);
             this.$l.dFdyPos = pb.dpdy(this.P);
             this.$l.fwidthPos = pb.add(pb.abs(this.dFdxPos), pb.abs(this.dFdyPos));
-            this.$l.V = pb.sub(this.cameraPos, this.P);
-            this.$l.dist = pb.length(this.V);
-            this.V = pb.div(this.V, this.dist);
-            this.$l.angle = pb.sub(1, pb.abs(this.V.y));
-            this.angle = pb.mul(this.angle, this.angle);
-            this.$l.fade = pb.sub(1, pb.mul(this.angle, this.angle));
-            this.fade = pb.mul(
-              this.fade,
-              pb.sub(1, pb.smoothStep(0, this.distance, pb.sub(this.dist, this.distance)))
-            );
+            this.$l.dist = pb.float();
+            this.$l.fade = pb.float();
+            this.$if(pb.notEqual(this.persp, 0), function () {
+              this.$l.V = pb.sub(this.cameraPos, this.P);
+              this.dist = pb.length(this.V);
+              this.V = pb.div(this.V, this.dist);
+              this.$l.angle = pb.sub(1, pb.abs(this.V.y));
+              this.angle = pb.mul(this.angle, this.angle);
+              this.fade = pb.sub(1, pb.mul(this.angle, this.angle));
+              this.fade = pb.mul(
+                this.fade,
+                pb.sub(1, pb.smoothStep(0, this.distance, pb.sub(this.dist, this.distance)))
+              );
+            }).$else(function () {
+              this.dist = pb.sub(pb.mul(this.$builtins.fragCoord.z, 2), 1);
+              this.dist = pb.clamp(this.dist, 0, 1);
+              this.fade = pb.sub(1, pb.smoothStep(0, 0.5, pb.sub(this.dist, 0.5)));
+              this.dist = 1;
+              this.$l.angle = pb.sub(1, pb.abs(this.viewMatrix[2].y));
+              this.dist = pb.add(1, pb.mul(this.angle, 2));
+              this.angle = pb.mul(this.angle, this.angle);
+              this.fade = pb.mul(this.fade, pb.sub(1, pb.mul(this.angle, this.angle)));
+            });
             this.$l.gridRes = pb.mul(pb.dot(this.dFdxPos, this.viewMatrix[0].xyz), 4);
             this.$l.step_id_x = pb.int(STEPS_LEN - 1);
             this.$l.step_id_y = pb.int(STEPS_LEN - 1);
@@ -1039,7 +1054,8 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
             this.viewMatrix,
             this.params.y,
             pb.vec3(0.112, 0.112, 0.112),
-            pb.vec3(0.1384, 0.1384, 0.1384)
+            pb.vec3(0.1384, 0.1384, 0.1384),
+            this.params.z
           );
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
           this.$l.depth = this.$builtins.fragCoord.z;

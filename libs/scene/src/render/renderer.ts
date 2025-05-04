@@ -9,7 +9,7 @@ import type { DrawContext } from './drawable';
 //import type { ShadowMapper } from '../shadow';
 import type { RenderQueue } from './render_queue';
 import type { PunctualLight, Scene } from '../scene';
-import type { PerspectiveCamera, Camera, PickResult } from '../camera';
+import type { PerspectiveCamera, Camera, PickResult, OrthoCamera } from '../camera';
 import { PostEffectLayer } from '../posteffect/posteffect';
 import type { Compositor } from '../posteffect';
 import { ClusteredLight } from './cluster_light';
@@ -384,7 +384,7 @@ export class SceneRenderer {
   }
   /** @internal */
   private static renderObjectColors(ctx: DrawContext, pickResolveFunc: (result: PickResult) => void) {
-    const camera = ctx.camera as PerspectiveCamera;
+    const camera = ctx.camera as PerspectiveCamera | OrthoCamera;
     ctx.renderPass = this._objectColorPass;
     ctx.device.pushDeviceStates();
     const fb = ctx.device.pool.fetchTemporalFramebuffer(
