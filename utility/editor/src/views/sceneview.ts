@@ -246,8 +246,13 @@ export class SceneView extends BaseView<SceneModel> {
           ]
         },
         {
-          label: 'Tools',
+          label: 'View',
           subMenus: [
+            {
+              label: 'Grid',
+              action: () => (this._postGizmoRenderer.drawGrid = !this._postGizmoRenderer.drawGrid),
+              checked: () => !!this._postGizmoRenderer.drawGrid
+            },
             {
               label: 'Texture viewer',
               id: 'SHOW_TEXTURE_VIEWER',

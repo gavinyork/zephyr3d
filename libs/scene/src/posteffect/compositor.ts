@@ -111,7 +111,7 @@ export class Compositor {
     const device = ctx.device;
     this._finalFramebuffer = device.getFramebuffer();
     const ssr = !!(ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS);
-    if (!this._postEffects.every((list) => list.length === 0)) {
+    if (this._postEffects.every((list) => list.length === 0)) {
       return;
     }
     const format = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
