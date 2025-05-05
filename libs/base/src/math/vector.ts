@@ -4796,8 +4796,11 @@ export class Matrix4x4 extends VectorBase {
    * @returns The left clip plane
    */
   getLeftPlane(): number {
-    // assum this is an orthogonal projection matrix
-    return (-1 - this[12]) / this[0];
+    if (this.isPerspective()) {
+      return ((this[8] - 1) * this.getNearPlane()) / this[0];
+    } else {
+      return (-1 - this[12]) / this[0];
+    }
   }
   /**
    * Get the right clip plane.
@@ -4808,8 +4811,11 @@ export class Matrix4x4 extends VectorBase {
    * @returns The right clip plane
    */
   getRightPlane(): number {
-    // assum this is an orthogonal projection matrix
-    return (1 - this[12]) / this[0];
+    if (this.isPerspective()) {
+      return ((this[8] + 1) * this.getNearPlane()) / this[0];
+    } else {
+      return (1 - this[12]) / this[0];
+    }
   }
   /**
    * Get the top clip plane.
@@ -4820,8 +4826,11 @@ export class Matrix4x4 extends VectorBase {
    * @returns The top clip plane
    */
   getTopPlane(): number {
-    // assum this is an orthogonal projection matrix
-    return (1 - this[13]) / this[5];
+    if (this.isPerspective()) {
+      return ((this[9] + 1) * this.getNearPlane()) / this[5];
+    } else {
+      return (1 - this[13]) / this[5];
+    }
   }
   /**
    * Get the bottom clip plane.
@@ -4832,8 +4841,11 @@ export class Matrix4x4 extends VectorBase {
    * @returns The bottom clip plane
    */
   getBottomPlane(): number {
-    // assum this is an orthogonal projection matrix
-    return (-1 - this[13]) / this[5];
+    if (this.isPerspective()) {
+      return ((this[9] - 1) * this.getNearPlane()) / this[5];
+    } else {
+      return (-1 - this[13]) / this[5];
+    }
   }
   /**
    * Set the near clip plane and far clip plane.

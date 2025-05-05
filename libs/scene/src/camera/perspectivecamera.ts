@@ -118,16 +118,18 @@ export class PerspectiveCamera extends Camera implements NodeClonable<Perspectiv
    * @param matrix - The projection matrix
    */
   setProjectionMatrix(matrix: Matrix4x4): void {
-    if (matrix && matrix !== this._projMatrix && matrix.isPerspective()) {
-      this._aspect = matrix.getAspect();
-      this._fovY = matrix.getFov();
-      this._near = matrix.getNearPlane();
-      this._far = matrix.getFarPlane();
-      this._invalidate(true);
-    } else {
-      throw new Error(
-        `PerspectiveCamera.setProjectionMatrix(): param is not a perspective projection matrix`
-      );
+    if (matrix !== this._projMatrix) {
+      if (matrix?.isPerspective()) {
+        super.setProjectionMatrix(matrix);
+        this._aspect = matrix.getAspect();
+        this._fovY = matrix.getFov();
+        this._near = matrix.getNearPlane();
+        this._far = matrix.getFarPlane();
+      } else {
+        throw new Error(
+          `PerspectiveCamera.setProjectionMatrix(): param is not a perspective projection matrix`
+        );
+      }
     }
   }
   /** @internal */

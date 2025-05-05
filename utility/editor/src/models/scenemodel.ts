@@ -1,9 +1,8 @@
+import type { Camera } from '@zephyr3d/scene';
 import {
-  Camera,
   Compositor,
   DirectionalLight,
   OrbitCameraController,
-  OrthoCamera,
   PerspectiveCamera,
   Scene,
   Tonemap
@@ -44,7 +43,6 @@ export class SceneModel extends BaseModel {
       light.intensity = 8;
       light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
       this._camera = new PerspectiveCamera(this._scene, Math.PI / 3, 1, 1, 1000);
-      this._camera = new OrthoCamera(this._scene, -10, 10, -10, 10, 0, 1000);
       this._camera.lookAt(new Vector3(0, 5, 15), new Vector3(0, 0, 0), new Vector3(0, 1, 0));
     } else {
       this._scene.rootNode.iterate((child) => {

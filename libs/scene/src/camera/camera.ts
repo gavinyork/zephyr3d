@@ -546,7 +546,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    */
   setProjectionMatrix(matrix: Matrix4x4): void {
     if (matrix && matrix !== this._projMatrix) {
-      this._projMatrix.set(matrix);
+      this._projMatrix = matrix;
       Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
       this._invalidate(true);
     }

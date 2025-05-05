@@ -146,16 +146,18 @@ export class OrthoCamera extends Camera implements NodeClonable<OrthoCamera> {
    * @param matrix - The projection matrix
    */
   setProjectionMatrix(matrix: Matrix4x4): void {
-    if (matrix && matrix !== this._projMatrix && matrix.isOrtho()) {
-      this._left = matrix.getLeftPlane();
-      this._right = matrix.getRightPlane();
-      this._near = matrix.getNearPlane();
-      this._far = matrix.getFarPlane();
-      this._top = matrix.getTopPlane();
-      this._bottom = matrix.getBottomPlane();
-      this._invalidate(true);
-    } else {
-      throw new Error(`OrthoCamera.setProjectionMatrix(): param is not an orthogonal projection matrix`);
+    if (matrix !== this._projMatrix) {
+      if (matrix?.isOrtho()) {
+        super.setProjectionMatrix(matrix);
+        this._left = matrix.getLeftPlane();
+        this._right = matrix.getRightPlane();
+        this._near = matrix.getNearPlane();
+        this._far = matrix.getFarPlane();
+        this._top = matrix.getTopPlane();
+        this._bottom = matrix.getBottomPlane();
+      } else {
+        throw new Error(`OrthoCamera.setProjectionMatrix(): param is not an orthogonal projection matrix`);
+      }
     }
   }
   /** @internal */
