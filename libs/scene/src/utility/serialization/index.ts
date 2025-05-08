@@ -390,6 +390,13 @@ export function serializeObject(
     if (embeddedAssetList && info.getEmbeddedAssets) {
       embeddedAssetList?.push(...(info.getEmbeddedAssets(obj) ?? []).map((val) => Promise.resolve(val)));
     }
+    if (assetList && info.getAssets) {
+      for (const asset of info.getAssets(obj) ?? []) {
+        if (asset) {
+          assetList.add(asset);
+        }
+      }
+    }
     serializeObjectProps(obj, info, json.Object, assetRegistry, assetList, embeddedAssetList);
     info = info.parent;
   }

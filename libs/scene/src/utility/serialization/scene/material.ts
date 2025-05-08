@@ -630,6 +630,7 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
           name: 'AlphaMap',
           type: 'object',
           default: '',
+          nullable: true,
           get(this: ParticleMaterial, value) {
             value.str[0] = assetRegistry.getAssetId(this.alphaMap) ?? '';
           },
@@ -658,6 +659,7 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
           name: 'RampMap',
           type: 'object',
           default: '',
+          nullable: true,
           get(this: ParticleMaterial, value) {
             value.str[0] = assetRegistry.getAssetId(this.rampMap) ?? '';
           },

@@ -1,9 +1,9 @@
-import type { PerspectiveCamera } from '@zephyr3d/scene';
+import { PerspectiveCamera } from '@zephyr3d/scene';
 import { Application, AssetRegistry, deserializeSceneFromURL, OrbitCameraController } from '@zephyr3d/scene';
-import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+import * as common from '../common';
 
 const myApp = new Application({
-  backend: backendWebGL2,
+  backend: common.getBackend(),
   canvas: document.querySelector('#canvas')
 });
 
@@ -12,11 +12,8 @@ myApp.ready().then(async function () {
   await assetRegistry.loadFromURL('assets/scenes/test1/assets/index.json');
   const { scene, meta } = await deserializeSceneFromURL('assets/scenes/test1/scene.json', assetRegistry);
   const cameraId: string = meta.activeCamera;
-  const camera = scene.findNodeById<PerspectiveCamera>(cameraId);
+  const camera = scene.findNodeById<PerspectiveCamera>(cameraId) ?? new PerspectiveCamera(scene);
   camera.controller = new OrbitCameraController();
-  if (!camera) {
-    throw new Error('Active camera not found');
-  }
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
   myApp.on('tick', function () {

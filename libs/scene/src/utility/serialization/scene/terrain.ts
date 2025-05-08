@@ -273,6 +273,17 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
         getTerrainGrassContent(obj, assetRegistry)
       ];
     },
+    getAssets(obj: ClipmapTerrain) {
+      const assets: string[] = [];
+      for (let i = 0; i < obj.grassRenderer.numLayers; i++) {
+        const grassTexture = obj.grassRenderer.getGrassTexture(i);
+        const assetId = grassTexture ? assetRegistry.getAssetId(grassTexture) ?? '' : '';
+        if (assetId) {
+          assets.push(assetId);
+        }
+      }
+      return assets;
+    },
     getProps(terrain: ClipmapTerrain) {
       return [
         {
@@ -480,7 +491,7 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
                 const width = dataView.getUint32(0, true);
                 const height = dataView.getUint32(4, true);
                 const heightMap = this.createHeightMapTexture(width, height);
-                heightMap.update(new Uint8Array(data, 8), 0, 0, width, height);
+                heightMap.update(new Uint16Array(data, 8), 0, 0, width, height);
                 this.heightMap = heightMap;
                 this.heightMapAssetId = value.str[0];
               }

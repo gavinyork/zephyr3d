@@ -57,6 +57,7 @@ export type SerializableClass = {
   getObject?: (obj: any) => any;
   getInitParams?: (obj: any) => any;
   getProps: (obj: any) => PropertyAccessor<any>[];
+  getAssets?: (obj: any) => string[];
   getEmbeddedAssets?: (obj: any) => (EmbeddedAssetInfo | Promise<EmbeddedAssetInfo>)[];
 };
 
