@@ -1,15 +1,15 @@
 import { LightPass } from './lightpass';
 import { ShadowMapPass } from './shadowmap_pass';
 import { DepthPass } from './depthpass';
-import { isPowerOf2, nextPowerOf2, Vector3, Vector4 } from '@zephyr3d/base';
+import { isPowerOf2, Matrix4x4, nextPowerOf2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { ColorState, FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
 import { Application } from '../app/app';
 import { CopyBlitter } from '../blitter';
 import type { DrawContext } from './drawable';
-//import type { ShadowMapper } from '../shadow';
 import type { RenderQueue } from './render_queue';
 import type { PunctualLight, Scene } from '../scene';
-import type { PerspectiveCamera, Camera, PickResult, OrthoCamera } from '../camera';
+import type { PickResult } from '../camera';
+import { Camera } from '../camera';
 import { PostEffectLayer } from '../posteffect/posteffect';
 import type { Compositor } from '../posteffect';
 import { ClusteredLight } from './cluster_light';
@@ -24,6 +24,8 @@ import { fetchSampler } from '../utility/misc';
  * @internal
  */
 export class SceneRenderer {
+  /** @internal */
+  private static _pickCamera = new Camera(null);
   /** @internal */
   private static _scenePass = new LightPass();
   /** @internal */
@@ -276,17 +278,17 @@ export class SceneRenderer {
   protected static _renderScene(ctx: DrawContext): void {
     const device = ctx.device;
 
-    // Do GPU ray picking if required
-    const pickResolveFunc = ctx.camera.getPickResultResolveFunc();
-    if (pickResolveFunc) {
-      this.renderObjectColors(ctx, pickResolveFunc);
-    }
-
     // Cull scene and gather lights
     const renderQueue = this._scenePass.cullScene(ctx, ctx.camera);
     ctx.sunLight = renderQueue.sunLight;
     ctx.clusteredLight = this.getClusteredLight();
     ctx.clusteredLight.calculateLightIndex(ctx.camera, renderQueue);
+
+    // Do GPU ray picking if required
+    const pickResolveFunc = ctx.camera.getPickResultResolveFunc();
+    if (pickResolveFunc) {
+      this.renderObjectColors(ctx, pickResolveFunc, renderQueue);
+    }
 
     // Render shadow maps
     this.renderShadowMaps(ctx, renderQueue.shadowedLights);
@@ -383,8 +385,12 @@ export class SceneRenderer {
     ctx.device.popDeviceStates();
   }
   /** @internal */
-  private static renderObjectColors(ctx: DrawContext, pickResolveFunc: (result: PickResult) => void) {
-    const camera = ctx.camera as PerspectiveCamera | OrthoCamera;
+  private static renderObjectColors(
+    ctx: DrawContext,
+    pickResolveFunc: (result: PickResult) => void,
+    renderQueue: RenderQueue
+  ) {
+    const camera = ctx.camera;
     ctx.renderPass = this._objectColorPass;
     ctx.device.pushDeviceStates();
     const fb = ctx.device.pool.fetchTemporalFramebuffer(
@@ -396,25 +402,40 @@ export class SceneRenderer {
       false
     );
     ctx.device.setViewport(camera.viewport);
-    const savedViewport = camera.viewport;
-    const savedScissor = camera.scissor;
-    const savedWindow = camera.window;
     const vp = ctx.device.getViewport();
     const windowX = camera.getPickPosX() / vp.width;
     const windowY = (vp.height - camera.getPickPosY() - 1) / vp.height;
     const windowW = 1 / vp.width;
     const windowH = 1 / vp.height;
-    camera.viewport = null;
-    camera.scissor = null;
-    camera.window = [windowX, windowY, windowW, windowH];
+    camera.worldMatrix.decompose(
+      this._pickCamera.scale,
+      this._pickCamera.rotation,
+      this._pickCamera.position
+    );
+    let left = camera.getProjectionMatrix().getLeftPlane();
+    let right = camera.getProjectionMatrix().getRightPlane();
+    let bottom = camera.getProjectionMatrix().getBottomPlane();
+    let top = camera.getProjectionMatrix().getTopPlane();
+    const near = camera.getProjectionMatrix().getNearPlane();
+    const far = camera.getProjectionMatrix().getFarPlane();
+    const width = right - left;
+    const height = top - bottom;
+    left += width * windowX;
+    bottom += height * windowY;
+    right = left + width * windowW;
+    top = bottom + height * windowH;
+    this._pickCamera.setProjectionMatrix(
+      camera.isPerspective()
+        ? Matrix4x4.frustum(left, right, bottom, top, near, far)
+        : Matrix4x4.ortho(left, right, bottom, top, near, far)
+    );
     ctx.device.setFramebuffer(fb);
     this._objectColorPass.clearColor = Vector4.zero();
     this._objectColorPass.clearDepth = 1;
-    const renderQueue = this._objectColorPass.cullScene(ctx, camera);
-    this._objectColorPass.render(ctx, camera, renderQueue);
-    camera.viewport = savedViewport;
-    camera.scissor = savedScissor;
-    camera.window = savedWindow;
+    const rq = this._objectColorPass.cullScene(ctx, this._pickCamera);
+    ctx.camera = this._pickCamera;
+    this._objectColorPass.render(ctx, null, rq);
+    ctx.camera = camera;
     ctx.device.popDeviceStates();
     const colorTex = fb.getColorAttachments()[0];
     const distanceTex = fb.getColorAttachments()[1];

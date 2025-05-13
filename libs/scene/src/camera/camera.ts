@@ -6,7 +6,6 @@ import type { NodeClonable, NodeCloneMethod } from '../scene/scene_node';
 import { SceneNode } from '../scene/scene_node';
 import { Application, DRef } from '../app';
 import type { Drawable, PickTarget } from '../render/drawable';
-import { SceneRenderer } from '../render/renderer';
 import type { BaseTexture } from '@zephyr3d/device';
 import { Compositor } from '../posteffect/compositor';
 import type { Scene } from '../scene/scene';
@@ -648,31 +647,31 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   }
   /** Gets the near clip plane of the camera */
   getNearPlane(): number {
-    return this._projMatrix.getNearPlane();
+    return this.getProjectionMatrix().getNearPlane();
   }
   /** Gets the far clip plane of the camera */
   getFarPlane(): number {
-    return this._projMatrix.getFarPlane();
+    return this.getProjectionMatrix().getFarPlane();
   }
   /** Gets the vertical field of view of the camera */
   getFOV(): number {
-    return this._projMatrix.getFov();
+    return this.getProjectionMatrix().getFov();
   }
   /** Gets the tangent of half of the vertical field of view */
   getTanHalfFovy(): number {
-    return this._projMatrix.getTanHalfFov();
+    return this.getProjectionMatrix().getTanHalfFov();
   }
   /** Gets the aspect ratio */
   getAspect(): number {
-    return this._projMatrix.getAspect();
+    return this.getProjectionMatrix().getAspect();
   }
   /** Returns true if the camera is perspective */
   isPerspective(): boolean {
-    return this._projMatrix.isPerspective();
+    return this.getProjectionMatrix().isPerspective();
   }
   /** Returns true if the camera is orthographic */
   isOrtho(): boolean {
-    return this._projMatrix.isOrtho();
+    return this.getProjectionMatrix().isOrtho();
   }
   /**
    * Gets the camera history data which is used in temporal reprojection
@@ -761,8 +760,8 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     }
     device.pushDeviceStates();
     device.reverseVertexWindingOrder(false);
-    SceneRenderer.setClearColor(this._clearColor);
-    SceneRenderer.renderScene(scene, this, compositor);
+    scene.getRenderer().setClearColor(this._clearColor);
+    scene.getRenderer().renderScene(scene, this, compositor);
     device.popDeviceStates();
     if (useTAA) {
       this._prevJitteredVPMatrix.set(this._jitteredVPMatrix);

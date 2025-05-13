@@ -9,6 +9,7 @@ import type { GraphNode } from './graph_node';
 import type { Camera } from '../camera/camera';
 import type { AnimationSet } from '../animation/animationset';
 import type { PickTarget } from '../render';
+import { SceneRenderer } from '../render';
 import type { Compositor } from '../posteffect';
 import { DRef, DWeakRef } from '../app';
 import { DirectionalLight } from './light';
@@ -210,6 +211,10 @@ export class Scene extends makeEventTarget(Object)<{
         }
       }
     }
+  }
+  /** @internal */
+  getRenderer(): typeof SceneRenderer {
+    return SceneRenderer;
   }
   /** @internal */
   frameUpdate() {
