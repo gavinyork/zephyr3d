@@ -254,12 +254,41 @@ export class TerrainEditTool implements EditTool {
     const area = (posMaxZ - posMinZ) * (posMaxX - posMinX);
     const regionWidthInv = 1 / (region.z - region.x);
     const regionHeightInv = 1 / (region.w - region.y);
-    const numInstances = Math.ceil(area * brushStrength);
-    const instances: GrassInstanceInfo[] = Array.from({ length: numInstances }).map((val) => ({
+    const numInstances = Math.ceil(area * brushStrength * 0.1);
+    /*
+    const instances: GrassInstanceInfo[] = Array.from({ length: numInstances }).map(() => ({
       x: (posMinX + Math.random() * (posMaxX - posMinX) - region.x) * regionWidthInv,
       y: (posMinZ + Math.random() * (posMaxZ - posMinZ) - region.y) * regionHeightInv,
       angle: Math.random() * Math.PI * 2
     }));
+    */
+    const centerX = (posMinX + posMaxX) * 0.5;
+    const centerZ = (posMinZ + posMaxZ) * 0.5;
+    const radius = Math.min(posMaxX - centerX, posMaxZ - centerZ);
+    const instances: GrassInstanceInfo[] = Array.from({ length: numInstances }).map(() => {
+      let r: number;
+      const sigma = 0.4;
+      do {
+        let u = 0;
+        let v = 0;
+        while (u === 0) {
+          u = Math.random();
+        }
+        while (v === 0) {
+          v = Math.random();
+        }
+        const z0 = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+        r = Math.abs(z0 * sigma);
+      } while (r > 1);
+      const theta = Math.random() * 2 * Math.PI;
+      const x = r * Math.cos(theta) * radius + centerX;
+      const y = r * Math.sin(theta) * radius + centerZ;
+      return {
+        x: (x - region.x) * regionWidthInv,
+        y: (y - region.y) * regionHeightInv,
+        angle: Math.random() * Math.PI * 2
+      };
+    });
     this._terrain.get().grassRenderer.addInstances(grassIndex, instances);
   }
   applyTextureBrush(
