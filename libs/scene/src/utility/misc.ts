@@ -6,7 +6,7 @@ import type {
   TextureSampler
 } from '@zephyr3d/device';
 import { Application } from '../app/app';
-import { CopyBlitter } from '../blitter';
+import { CopyBlitter } from '../blitter/copy';
 
 /**
  * Sampler types

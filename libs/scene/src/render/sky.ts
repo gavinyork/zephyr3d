@@ -482,7 +482,8 @@ export class SkyRenderer {
       transmittanceLut,
       multiScatteringLut,
       sunDir,
-      ctx.sunLight?.diffuseAndIntensity ?? new Vector4(1, 1, 1, 10)
+      ctx.sunLight?.diffuseAndIntensity ?? new Vector4(1, 1, 1, 10),
+      1
     );
 
     this._renderSky(

@@ -204,7 +204,7 @@ export function getSkyView(
         this.viewDir
       );
       this.$l.d = rayIntersectSphere(this, pb.vec3(0), this.plantRadius, this.eyePos, this.viewDir);
-      this.$if(pb.lessThan(this.d, 0), function () {
+      this.$if(pb.lessThan(this.dis, 0), function () {
         this.$return(pb.vec3(0));
       });
       this.$if(pb.greaterThan(this.d, 0), function () {

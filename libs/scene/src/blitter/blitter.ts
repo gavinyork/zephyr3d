@@ -16,7 +16,7 @@ import type {
 } from '@zephyr3d/device';
 import { Application } from '../app';
 import { Primitive } from '../render/primitive';
-import { linearToGamma } from '../shaders';
+import { linearToGamma } from '../shaders/misc';
 
 // TODO: multi-pass support for filter
 
