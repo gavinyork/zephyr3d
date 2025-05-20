@@ -1,6 +1,11 @@
 import { Application } from '../app/app';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders/misc';
-import { renderTransmittanceLut, smoothNoise3D } from '../shaders';
+import {
+  renderMultiScatteringLut,
+  renderSkyViewLut,
+  renderTransmittanceLut,
+  smoothNoise3D
+} from '../shaders';
 import { Quaternion, Vector3 } from '@zephyr3d/base';
 import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import type { Primitive } from './primitive';
@@ -471,7 +476,15 @@ export class SkyRenderer {
       skyCamera = SkyRenderer._skyCamera;
       ctx.camera.worldMatrix.decompose(null, skyCamera.rotation, null);
     }
-    renderTransmittanceLut();
+    const transmittanceLut = renderTransmittanceLut();
+    const multiScatteringLut = renderMultiScatteringLut(transmittanceLut);
+    renderSkyViewLut(
+      transmittanceLut,
+      multiScatteringLut,
+      sunDir,
+      ctx.sunLight?.diffuseAndIntensity ?? new Vector4(1, 1, 1, 10)
+    );
+
     this._renderSky(
       skyCamera,
       true,
