@@ -1,6 +1,6 @@
 import { Application } from '../app/app';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders/misc';
-import { smoothNoise3D } from '../shaders';
+import { renderTransmittanceLut, smoothNoise3D } from '../shaders';
 import { Quaternion, Vector3 } from '@zephyr3d/base';
 import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import type { Primitive } from './primitive';
@@ -471,6 +471,7 @@ export class SkyRenderer {
       skyCamera = SkyRenderer._skyCamera;
       ctx.camera.worldMatrix.decompose(null, skyCamera.rotation, null);
     }
+    renderTransmittanceLut();
     this._renderSky(
       skyCamera,
       true,
