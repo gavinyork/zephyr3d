@@ -1,12 +1,6 @@
 import { Application } from '../app/app';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders/misc';
-import {
-  renderMultiScatteringLut,
-  renderSkyBox,
-  renderSkyViewLut,
-  renderTransmittanceLut,
-  smoothNoise3D
-} from '../shaders';
+import { renderAtmosphereLUTs, smoothNoise3D } from '../shaders';
 import { Quaternion, Vector3 } from '@zephyr3d/base';
 import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import type { Primitive } from './primitive';
@@ -472,21 +466,19 @@ export class SkyRenderer {
   /** @internal */
   renderSky(ctx: DrawContext) {
     const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
+    const sunColor = ctx.sunLight?.diffuseAndIntensity ?? new Vector4(1, 1, 1, 10);
     let skyCamera = ctx.camera;
     if (!skyCamera.isPerspective()) {
       skyCamera = SkyRenderer._skyCamera;
       ctx.camera.worldMatrix.decompose(null, skyCamera.rotation, null);
     }
-    const transmittanceLut = renderTransmittanceLut();
-    const multiScatteringLut = renderMultiScatteringLut(transmittanceLut);
-    const skyViewLut = renderSkyViewLut(
-      transmittanceLut,
-      multiScatteringLut,
-      sunDir,
-      ctx.sunLight?.diffuseAndIntensity ?? new Vector4(1, 1, 1, 10),
-      1
-    );
-    renderSkyBox(1, sunDir, ctx.sunLight?.diffuseAndIntensity ?? new Vector4(1, 1, 1, 10), skyViewLut);
+    renderAtmosphereLUTs({
+      lightColor: sunColor,
+      lightDir: sunDir,
+      cameraWorldMatrix: ctx.camera.worldMatrix,
+      cameraAspect: ctx.camera.getAspect()
+    });
+    //renderSkyBox(1, sunDir, ctx.sunLight?.diffuseAndIntensity ?? new Vector4(1, 1, 1, 10), skyViewLut);
 
     this._renderSky(
       skyCamera,

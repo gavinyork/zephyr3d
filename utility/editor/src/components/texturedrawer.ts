@@ -704,6 +704,7 @@ export class TextureDrawer {
           this.color1 = pb.vec4(0.6, 0.6, 0.6, 1);
           this.c = pb.div(pb.floor(this.$inputs.uv), 2);
           this.checker = pb.mul(pb.fract(pb.add(this.c.x, this.c.y)), 2);
+          this.checker = 0;
           this.$outputs.color = pb.add(
             pb.mul(this.color0, this.checker),
             pb.mul(this.color1, pb.sub(1, this.checker))

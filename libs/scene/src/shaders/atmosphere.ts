@@ -10,7 +10,7 @@ import {
 import { Application } from '../app';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { fetchSampler } from '../utility/misc';
-import { CubeFace, Vector3, Vector4 } from '@zephyr3d/base';
+import { CubeFace, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import { Primitive } from '../render';
 import { BoxShape } from '../shapes';
 import { Camera } from '../camera';
@@ -20,6 +20,105 @@ const RAYLEIGH_SIGMA = [5.802, 13.558, 33.1];
 const MIE_SIGMA = 3.996;
 const MIE_ABSORPTION_SIGMA = 4.4;
 const OZONE_ABSORPTION_SIGMA = [0.65, 1.881, 0.085];
+
+export type AtmosphereParams = {
+  plantRadius: number;
+  atmosphereHeight: number;
+  rayleighScatteringHeight: number;
+  mieScatteringHeight: number;
+  mieAnstropy: number;
+  ozoneCenter: number;
+  ozoneWidth: number;
+  apDistance: number;
+  cameraWorldMatrix: Matrix4x4;
+  lightDir: Vector3;
+  lightColor: Vector4;
+  cameraAspect: number;
+};
+
+const defaultAtmosphereParams: Readonly<AtmosphereParams> = {
+  plantRadius: 6360000,
+  atmosphereHeight: 60000,
+  rayleighScatteringHeight: 8000,
+  mieScatteringHeight: 1200,
+  mieAnstropy: 0.8,
+  ozoneCenter: 25000,
+  ozoneWidth: 15000,
+  apDistance: 32000,
+  cameraWorldMatrix: Matrix4x4.identity(),
+  lightDir: new Vector3(1, 0, 0),
+  lightColor: new Vector4(1, 1, 1, 10),
+  cameraAspect: 1
+};
+
+let currentAtmosphereParams: AtmosphereParams = null;
+
+function checkParams(other?: Partial<AtmosphereParams>): {
+  transmittance: boolean;
+  multiScattering: boolean;
+  skyView: boolean;
+  aerialPerspective: boolean;
+} {
+  const result = {
+    transmittance: false,
+    multiScattering: false,
+    skyView: false,
+    aerialPerspective: false
+  };
+  other = { ...defaultAtmosphereParams, ...other };
+  if (!currentAtmosphereParams) {
+    currentAtmosphereParams = {
+      ...defaultAtmosphereParams
+    };
+    result.transmittance = true;
+    result.multiScattering = true;
+    result.skyView = true;
+    result.aerialPerspective = true;
+  } else {
+    result.transmittance =
+      currentAtmosphereParams.plantRadius !== other.plantRadius ||
+      currentAtmosphereParams.atmosphereHeight !== other.atmosphereHeight ||
+      currentAtmosphereParams.rayleighScatteringHeight !== other.rayleighScatteringHeight ||
+      currentAtmosphereParams.mieScatteringHeight !== other.mieScatteringHeight ||
+      currentAtmosphereParams.ozoneCenter !== other.ozoneCenter ||
+      currentAtmosphereParams.ozoneWidth !== other.ozoneWidth;
+    result.multiScattering =
+      result.transmittance || currentAtmosphereParams.mieAnstropy !== other.mieAnstropy;
+    result.skyView =
+      result.transmittance ||
+      result.multiScattering ||
+      !currentAtmosphereParams.lightDir.equalsTo(other.lightDir) ||
+      !currentAtmosphereParams.lightColor.equalsTo(other.lightColor) ||
+      !currentAtmosphereParams.cameraWorldMatrix.equalsTo(other.cameraWorldMatrix);
+    result.aerialPerspective =
+      result.transmittance ||
+      result.multiScattering ||
+      result.skyView ||
+      currentAtmosphereParams.apDistance !== other.apDistance ||
+      currentAtmosphereParams.cameraAspect !== other.cameraAspect;
+  }
+  if (result.transmittance) {
+    currentAtmosphereParams.plantRadius = other.plantRadius;
+    currentAtmosphereParams.atmosphereHeight = other.atmosphereHeight;
+    currentAtmosphereParams.rayleighScatteringHeight = other.rayleighScatteringHeight;
+    currentAtmosphereParams.mieScatteringHeight = other.mieScatteringHeight;
+    currentAtmosphereParams.ozoneCenter = other.ozoneCenter;
+    currentAtmosphereParams.ozoneWidth = other.ozoneWidth;
+  }
+  if (result.multiScattering) {
+    currentAtmosphereParams.mieAnstropy = other.mieAnstropy;
+  }
+  if (result.skyView) {
+    currentAtmosphereParams.lightDir.set(other.lightDir);
+    currentAtmosphereParams.lightColor.set(other.lightColor);
+    currentAtmosphereParams.cameraWorldMatrix.set(other.cameraWorldMatrix);
+  }
+  if (result.aerialPerspective) {
+    currentAtmosphereParams.apDistance = other.apDistance;
+    currentAtmosphereParams.cameraAspect = other.cameraAspect;
+  }
+  return result;
+}
 
 export function rayIntersectSphere(
   scope: PBInsideFunctionScope,
@@ -214,7 +313,7 @@ export function getSkyView(
       this.$if(pb.greaterThan(this.d, 0), function () {
         this.dis = pb.min(this.dis, this.d);
       });
-      this.$if(pb.greaterThan(this.maxDis, 0), function () {
+      this.$if(pb.greaterThanEqual(this.maxDis, 0), function () {
         this.dis = pb.min(this.dis, this.maxDis);
       });
       this.$l.ds = pb.div(this.dis, N_SAMPLE);
@@ -780,6 +879,215 @@ export function skyBox(
   );
 }
 
+export function aerialPerspective(
+  scope: PBInsideFunctionScope,
+  f2UV: PBShaderExp,
+  f3CameraPos: PBShaderExp,
+  f3WorldPos: PBShaderExp,
+  fAPDistance: PBShaderExp,
+  f3Dim: PBShaderExp,
+  texAerialPerspectiveLut: PBShaderExp
+) {
+  const pb = scope.$builder;
+  const funcName = 'z_aerialPerspective';
+  pb.func(
+    funcName,
+    [pb.vec2('uv'), pb.vec3('cameraPos'), pb.vec3('worldPos'), pb.float('apDistance'), pb.vec3('dim')],
+    function () {
+      this.$l.V = pb.sub(this.worldPos, this.cameraPos);
+      this.$l.dis = pb.length(this.V);
+      this.$l.viewDir = pb.normalize(this.V);
+      this.$l.d0 = pb.clamp(pb.div(this.dis, this.apDistance), 0, 1);
+      this.$l.dz = pb.mul(this.d0, pb.sub(this.dim.z, 1));
+      this.$l.slice = pb.floor(this.dz);
+      this.$l.nextSlice = pb.min(pb.add(this.slice, 1), pb.sub(this.dim.z, 1));
+      this.$l.factor = pb.sub(this.dz, pb.floor(this.dz));
+      this.t = pb.div(this.uv, pb.vec2(this.dim.x, 1));
+      this.$l.uv1 = pb.add(this.t, pb.vec2(pb.div(this.slice, this.dim.z), 0));
+      this.$l.uv2 = pb.add(this.t, pb.vec2(pb.div(this.nextSlice, this.dim.z), 0));
+      this.$l.data1 = pb.textureSampleLevel(texAerialPerspectiveLut, this.uv1, 0);
+      this.$l.data2 = pb.textureSampleLevel(texAerialPerspectiveLut, this.uv2, 0);
+      this.$l.data = pb.mix(this.data1, this.data2, this.factor);
+      this.$l.inscattering = this.data.rgb;
+      this.$l.transmittance = this.data.a;
+      this.$return(pb.vec4(this.inscattering, pb.sub(1, this.transmittance)));
+    }
+  );
+  return scope[funcName](f2UV, f3CameraPos, f3WorldPos, fAPDistance, f3Dim);
+}
+
+export function aerialPerspectiveLut(
+  scope: PBInsideFunctionScope,
+  f2UV: PBShaderExp,
+  f3VoxelDim: PBShaderExp,
+  m44CameraWorldMatrix: PBShaderExp,
+  fAspect: PBShaderExp,
+  fPlantRadius: PBShaderExp,
+  fAtmosphereHeight: PBShaderExp,
+  fRayleighScatteringHeight: PBShaderExp,
+  fMieScatteringHeight: PBShaderExp,
+  fMieAnstropy: PBShaderExp,
+  fOzoneLevelCenterHeight: PBShaderExp,
+  fOzoneLevelWidth: PBShaderExp,
+  fAerialPerspectiveDistance: PBShaderExp,
+  fCameraPosY: PBShaderExp,
+  f3LightDir: PBShaderExp,
+  f4LightColorAndIntensity: PBShaderExp,
+  texTransmittanceLut: PBShaderExp,
+  texMultiScatteringLut: PBShaderExp
+) {
+  const pb = scope.$builder;
+  const funcName = 'z_aerialPerspectiveLut';
+  pb.func(
+    funcName,
+    [
+      pb.vec2('uv'),
+      pb.vec3('dim'),
+      pb.mat4('cameraWorldMatrix'),
+      pb.float('aspect'),
+      pb.float('plantRadius'),
+      pb.float('atmosphereHeight'),
+      pb.float('rayleighScatteringHeight'),
+      pb.float('mieScatteringHeight'),
+      pb.float('mieAnstropy'),
+      pb.float('center'),
+      pb.float('width'),
+      pb.float('maxDistance'),
+      pb.float('cameraPosY'),
+      pb.vec3('lightDir'),
+      pb.vec4('lightColorAndIntensity')
+    ],
+    function () {
+      if (1) {
+        this.$l.uvw = pb.vec3(this.uv, 0);
+        this.uvw.x = pb.mul(this.uvw.x, this.dim.x, this.dim.z);
+        this.uvw.z = pb.div(pb.floor(pb.div(this.uvw.x, this.dim.z)), this.dim.x);
+        this.uvw.x = pb.div(pb.mod(this.uvw.x, this.dim.z), this.dim.x);
+        this.uvw = pb.add(this.uvw, pb.div(pb.vec3(0.5), this.dim));
+        this.$l.viewDir = pb.normalize(
+          pb.mul(
+            this.cameraWorldMatrix,
+            pb.vec4(
+              pb.sub(pb.mul(this.uvw.x, 2), 1),
+              pb.div(pb.sub(pb.mul(this.uvw.y, 2), 1), this.aspect),
+              1,
+              0
+            )
+          ).xyz
+        );
+        this.$l.eyePos = pb.vec3(0, pb.add(this.cameraPosY, this.plantRadius), 0);
+        this.$l.maxDis = pb.mul(this.uvw.z, this.maxDistance);
+        this.$l.color = getSkyView(
+          this,
+          this.plantRadius,
+          this.atmosphereHeight,
+          this.rayleighScatteringHeight,
+          this.mieScatteringHeight,
+          this.mieAnstropy,
+          this.center,
+          this.width,
+          this.eyePos,
+          this.viewDir,
+          this.lightDir,
+          this.lightColorAndIntensity,
+          this.maxDis,
+          texTransmittanceLut,
+          texMultiScatteringLut
+        );
+        this.$l.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
+        this.$l.t1 = transmittanceToSky(
+          this,
+          this.plantRadius,
+          this.atmosphereHeight,
+          this.eyePos,
+          this.viewDir,
+          texTransmittanceLut
+        );
+        this.$l.t2 = transmittanceToSky(
+          this,
+          this.plantRadius,
+          this.atmosphereHeight,
+          this.voxelPos,
+          this.viewDir,
+          texTransmittanceLut
+        );
+        this.$l.t = pb.div(this.t1, this.t2);
+        this.$return(pb.vec4(this.color, pb.dot(this.t, pb.vec3(1 / 3, 1 / 3, 1 / 3))));
+      } else {
+        this.$l.slice = pb.clamp(pb.floor(pb.mul(this.uv.x, this.dim.z)), 0, pb.sub(this.dim.z, 1));
+        this.$l.sliceU = pb.clamp(
+          pb.mul(pb.sub(this.uv.x, pb.div(this.slice, this.dim.z)), this.dim.z),
+          0,
+          1
+        );
+        this.$l.sliceDist = pb.div(this.slice, this.dim.z);
+        this.$l.horizonAngle = pb.sub(pb.mul(this.sliceU, Math.PI * 2), Math.PI);
+        this.$l.zenithAngle = pb.mul(this.uv.y, Math.PI / 2);
+        this.$l.rayDir = pb.vec3(
+          pb.mul(pb.cos(this.zenithAngle), pb.sin(this.horizonAngle)),
+          pb.sin(this.zenithAngle),
+          pb.mul(pb.neg(pb.cos(this.zenithAngle)), pb.cos(this.horizonAngle))
+        );
+        this.$l.eyePos = pb.vec3(0, pb.add(this.cameraPosY, this.plantRadius), 0);
+        this.$l.maxDis = pb.mul(this.maxDistance, this.sliceDist);
+        this.$l.color = getSkyView(
+          this,
+          this.plantRadius,
+          this.atmosphereHeight,
+          this.rayleighScatteringHeight,
+          this.mieScatteringHeight,
+          this.mieAnstropy,
+          this.center,
+          this.width,
+          this.eyePos,
+          this.rayDir,
+          this.lightDir,
+          this.lightColorAndIntensity,
+          this.maxDis,
+          texTransmittanceLut,
+          texMultiScatteringLut
+        );
+        this.$l.voxelPos = pb.add(this.eyePos, pb.mul(this.rayDir, this.maxDis));
+        this.$l.t1 = transmittanceToSky(
+          this,
+          this.plantRadius,
+          this.atmosphereHeight,
+          this.eyePos,
+          this.rayDir,
+          texTransmittanceLut
+        );
+        this.$l.t2 = transmittanceToSky(
+          this,
+          this.plantRadius,
+          this.atmosphereHeight,
+          this.voxelPos,
+          this.rayDir,
+          texTransmittanceLut
+        );
+        this.$l.t = pb.div(this.t1, this.t2);
+        this.$return(pb.vec4(this.color, pb.dot(this.t, pb.vec3(1 / 3, 1 / 3, 1 / 3))));
+      }
+    }
+  );
+  return scope[funcName](
+    f2UV,
+    f3VoxelDim,
+    m44CameraWorldMatrix,
+    fAspect,
+    fPlantRadius,
+    fAtmosphereHeight,
+    fRayleighScatteringHeight,
+    fMieScatteringHeight,
+    fMieAnstropy,
+    fOzoneLevelCenterHeight,
+    fOzoneLevelWidth,
+    fAerialPerspectiveDistance,
+    fCameraPosY,
+    f3LightDir,
+    f4LightColorAndIntensity
+  );
+}
+
 export function skyViewLut(
   scope: PBInsideFunctionScope,
   f2UV: PBShaderExp,
@@ -976,18 +1284,42 @@ export function transmittanceLut(
   );
 }
 
+export function renderAtmosphereLUTs(params?: Partial<AtmosphereParams>) {
+  const checkResult = checkParams(params);
+  if (checkResult.transmittance) {
+    renderTransmittanceLut(currentAtmosphereParams);
+  }
+  if (checkResult.multiScattering) {
+    renderMultiScatteringLut(currentAtmosphereParams);
+  }
+  if (checkResult.skyView) {
+    renderSkyViewLut(currentAtmosphereParams);
+  }
+  if (checkResult.aerialPerspective) {
+    renderAPLut(currentAtmosphereParams);
+  }
+}
+
 /* For debug */
 let debugTransmittanceLutProgram: GPUProgram = undefined;
 let debugTransmittanceLutBindGroup: BindGroup = undefined;
+let debugTransmittanceLut: Texture2D = undefined;
 let debugTransmittanceFramebuffer: FrameBuffer = undefined;
 
 let debugMultiScatteringLutProgram: GPUProgram = undefined;
 let debugMultiScatteringLutBindGroup: BindGroup = undefined;
+let debugMultiScatteringLut: Texture2D = undefined;
 let debugMultiScatteringFramebuffer: FrameBuffer = undefined;
 
 let debugSkyViewLutProgram: GPUProgram = undefined;
 let debugSkyViewLutBindGroup: BindGroup = undefined;
+let debugSkyViewLut: Texture2D = undefined;
 let debugSkyViewFramebuffer: FrameBuffer = undefined;
+
+let debugAPLutProgram: GPUProgram = undefined;
+let debugAPLutBindGroup: BindGroup = undefined;
+let debugApLut: Texture2D = undefined;
+let debugAPFramebuffer: FrameBuffer = undefined;
 
 let debugSkyBoxProgram: GPUProgram = undefined;
 let debugSkyBoxBindGroup: BindGroup = undefined;
@@ -996,14 +1328,23 @@ let debugPrimitiveSky: Primitive = undefined;
 let debugSkyBoxCamera: Camera = undefined;
 let debugSkyBoxRenderStates: RenderStateSet = undefined;
 
-export function renderTransmittanceLut(
-  plantRadius = 6360000,
-  atmosphereHeight = 60000,
-  rayleighScatteringHeight = 8000,
-  mieScatteringHeight = 1200,
-  ozoneLevelCenterHeight = 25000,
-  ozoneLevelWidth = 15000
-): Texture2D {
+export function getTransmittanceLut() {
+  return debugTransmittanceLut;
+}
+
+export function getMultiScatteringLut() {
+  return debugMultiScatteringLut;
+}
+
+export function getSkyViewLut() {
+  return debugSkyViewLut;
+}
+
+export function getAerialPerspectiveLut() {
+  return debugApLut;
+}
+
+export function renderTransmittanceLut(params: AtmosphereParams) {
   const device = Application.instance.device;
   if (debugTransmittanceLutProgram === undefined) {
     try {
@@ -1045,8 +1386,11 @@ export function renderTransmittanceLut(
       debugTransmittanceLutBindGroup = device.createBindGroup(
         debugTransmittanceLutProgram.bindGroupLayouts[0]
       );
-      debugTransmittanceFramebuffer = device.pool.fetchTemporalFramebuffer(false, 256, 64, 'rgba16f');
-      debugTransmittanceFramebuffer.getColorAttachments()[0].name = 'DebugTransmittanceLut';
+      debugTransmittanceLut = device.createTexture2D('rgba16f', 256, 64, {
+        samplerOptions: { mipFilter: 'none' }
+      });
+      debugTransmittanceLut.name = 'DebugTransmittanceLut';
+      debugTransmittanceFramebuffer = device.createFrameBuffer([debugTransmittanceLut], null);
     } catch (err) {
       console.error(err);
       debugTransmittanceLutProgram = null;
@@ -1056,34 +1400,22 @@ export function renderTransmittanceLut(
   }
   if (debugTransmittanceLutProgram) {
     debugTransmittanceLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-    debugTransmittanceLutBindGroup.setValue('plantRadius', plantRadius);
-    debugTransmittanceLutBindGroup.setValue('atmosphereHeight', atmosphereHeight);
-    debugTransmittanceLutBindGroup.setValue('rayleighScatteringHeight', rayleighScatteringHeight);
-    debugTransmittanceLutBindGroup.setValue('mieScatteringHeight', mieScatteringHeight);
-    debugTransmittanceLutBindGroup.setValue('ozoneLevelCenterHeight', ozoneLevelCenterHeight);
-    debugTransmittanceLutBindGroup.setValue('ozoneLevelWidth', ozoneLevelWidth);
+    debugTransmittanceLutBindGroup.setValue('plantRadius', params.plantRadius);
+    debugTransmittanceLutBindGroup.setValue('atmosphereHeight', params.atmosphereHeight);
+    debugTransmittanceLutBindGroup.setValue('rayleighScatteringHeight', params.rayleighScatteringHeight);
+    debugTransmittanceLutBindGroup.setValue('mieScatteringHeight', params.mieScatteringHeight);
+    debugTransmittanceLutBindGroup.setValue('ozoneLevelCenterHeight', params.ozoneCenter);
+    debugTransmittanceLutBindGroup.setValue('ozoneLevelWidth', params.ozoneWidth);
     device.pushDeviceStates();
     device.setFramebuffer(debugTransmittanceFramebuffer);
     device.setProgram(debugTransmittanceLutProgram);
     device.setBindGroup(0, debugTransmittanceLutBindGroup);
     drawFullscreenQuad();
     device.popDeviceStates();
-    return debugTransmittanceFramebuffer.getColorAttachments()[0] as Texture2D;
-  } else {
-    return null;
   }
 }
 
-export function renderMultiScatteringLut(
-  texTransmittanceLut: Texture2D,
-  plantRadius = 6360000,
-  atmosphereHeight = 60000,
-  rayleighScatteringHeight = 8000,
-  mieScatteringHeight = 1200,
-  mieAnstropy = 0.8,
-  ozoneLevelCenterHeight = 25000,
-  ozoneLevelWidth = 15000
-): Texture2D {
+export function renderMultiScatteringLut(params: AtmosphereParams) {
   const device = Application.instance.device;
   if (debugMultiScatteringLutProgram === undefined) {
     try {
@@ -1129,8 +1461,11 @@ export function renderMultiScatteringLut(
       debugMultiScatteringLutBindGroup = device.createBindGroup(
         debugMultiScatteringLutProgram.bindGroupLayouts[0]
       );
-      debugMultiScatteringFramebuffer = device.pool.fetchTemporalFramebuffer(false, 32, 32, 'rgba16f');
-      debugMultiScatteringFramebuffer.getColorAttachments()[0].name = 'DebugMultiScatteringLut';
+      debugMultiScatteringLut = device.createTexture2D('rgba16f', 32, 32, {
+        samplerOptions: { mipFilter: 'none' }
+      });
+      debugMultiScatteringLut.name = 'DebugMultiScatteringLut';
+      debugMultiScatteringFramebuffer = device.createFrameBuffer([debugMultiScatteringLut], null);
     } catch (err) {
       console.error(err);
       debugMultiScatteringLutProgram = null;
@@ -1140,16 +1475,16 @@ export function renderMultiScatteringLut(
   }
   if (debugMultiScatteringLutProgram) {
     debugMultiScatteringLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-    debugMultiScatteringLutBindGroup.setValue('plantRadius', plantRadius);
-    debugMultiScatteringLutBindGroup.setValue('atmosphereHeight', atmosphereHeight);
-    debugMultiScatteringLutBindGroup.setValue('rayleighScatteringHeight', rayleighScatteringHeight);
-    debugMultiScatteringLutBindGroup.setValue('mieScatteringHeight', mieScatteringHeight);
-    debugMultiScatteringLutBindGroup.setValue('mieAnstropy', mieAnstropy);
-    debugMultiScatteringLutBindGroup.setValue('ozoneLevelCenterHeight', ozoneLevelCenterHeight);
-    debugMultiScatteringLutBindGroup.setValue('ozoneLevelWidth', ozoneLevelWidth);
+    debugMultiScatteringLutBindGroup.setValue('plantRadius', params.plantRadius);
+    debugMultiScatteringLutBindGroup.setValue('atmosphereHeight', params.atmosphereHeight);
+    debugMultiScatteringLutBindGroup.setValue('rayleighScatteringHeight', params.rayleighScatteringHeight);
+    debugMultiScatteringLutBindGroup.setValue('mieScatteringHeight', params.mieScatteringHeight);
+    debugMultiScatteringLutBindGroup.setValue('mieAnstropy', params.mieAnstropy);
+    debugMultiScatteringLutBindGroup.setValue('ozoneLevelCenterHeight', params.ozoneCenter);
+    debugMultiScatteringLutBindGroup.setValue('ozoneLevelWidth', params.ozoneWidth);
     debugMultiScatteringLutBindGroup.setTexture(
       'transmittanceLut',
-      texTransmittanceLut,
+      debugTransmittanceLut,
       fetchSampler('clamp_linear_nomip')
     );
     device.pushDeviceStates();
@@ -1158,27 +1493,10 @@ export function renderMultiScatteringLut(
     device.setBindGroup(0, debugMultiScatteringLutBindGroup);
     drawFullscreenQuad();
     device.popDeviceStates();
-
-    return debugMultiScatteringFramebuffer.getColorAttachments()[0] as Texture2D;
-  } else {
-    return null;
   }
 }
 
-export function renderSkyViewLut(
-  texTransmittanceLut: Texture2D,
-  texMultiScatteringLut: Texture2D,
-  lightDir: Vector3,
-  lightColorAndIntensity: Vector4,
-  cameraPosY = 0,
-  plantRadius = 6360000,
-  atmosphereHeight = 60000,
-  rayleighScatteringHeight = 8000,
-  mieScatteringHeight = 1200,
-  mieAnstropy = 0.8,
-  ozoneLevelCenterHeight = 25000,
-  ozoneLevelWidth = 15000
-): Texture2D {
+export function renderSkyViewLut(params: AtmosphereParams) {
   const device = Application.instance.device;
   if (debugSkyViewLutProgram === undefined) {
     try {
@@ -1230,8 +1548,11 @@ export function renderSkyViewLut(
         }
       });
       debugSkyViewLutBindGroup = device.createBindGroup(debugSkyViewLutProgram.bindGroupLayouts[0]);
-      debugSkyViewFramebuffer = device.pool.fetchTemporalFramebuffer(false, 256, 128, 'rgba16f');
-      debugSkyViewFramebuffer.getColorAttachments()[0].name = 'DebugSkyViewLut';
+      debugSkyViewLut = device.createTexture2D('rgba16f', 256, 128, {
+        samplerOptions: { mipFilter: 'none' }
+      });
+      debugSkyViewLut.name = 'DebugSkyViewLut';
+      debugSkyViewFramebuffer = device.createFrameBuffer([debugSkyViewLut], null);
     } catch (err) {
       console.error(err);
       debugSkyViewLutProgram = null;
@@ -1241,24 +1562,24 @@ export function renderSkyViewLut(
   }
   if (debugSkyViewLutProgram) {
     debugSkyViewLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-    debugSkyViewLutBindGroup.setValue('plantRadius', plantRadius);
-    debugSkyViewLutBindGroup.setValue('atmosphereHeight', atmosphereHeight);
-    debugSkyViewLutBindGroup.setValue('rayleighScatteringHeight', rayleighScatteringHeight);
-    debugSkyViewLutBindGroup.setValue('mieScatteringHeight', mieScatteringHeight);
-    debugSkyViewLutBindGroup.setValue('mieAnstropy', mieAnstropy);
-    debugSkyViewLutBindGroup.setValue('ozoneLevelCenterHeight', ozoneLevelCenterHeight);
-    debugSkyViewLutBindGroup.setValue('ozoneLevelWidth', ozoneLevelWidth);
-    debugSkyViewLutBindGroup.setValue('cameraPosY', cameraPosY);
-    debugSkyViewLutBindGroup.setValue('lightDir', lightDir);
-    debugSkyViewLutBindGroup.setValue('lightColorAndIntensity', lightColorAndIntensity);
+    debugSkyViewLutBindGroup.setValue('plantRadius', params.plantRadius);
+    debugSkyViewLutBindGroup.setValue('atmosphereHeight', params.atmosphereHeight);
+    debugSkyViewLutBindGroup.setValue('rayleighScatteringHeight', params.rayleighScatteringHeight);
+    debugSkyViewLutBindGroup.setValue('mieScatteringHeight', params.mieScatteringHeight);
+    debugSkyViewLutBindGroup.setValue('mieAnstropy', params.mieAnstropy);
+    debugSkyViewLutBindGroup.setValue('ozoneLevelCenterHeight', params.ozoneCenter);
+    debugSkyViewLutBindGroup.setValue('ozoneLevelWidth', params.ozoneWidth);
+    debugSkyViewLutBindGroup.setValue('cameraPosY', 1);
+    debugSkyViewLutBindGroup.setValue('lightDir', params.lightDir);
+    debugSkyViewLutBindGroup.setValue('lightColorAndIntensity', params.lightColor);
     debugSkyViewLutBindGroup.setTexture(
       'transmittanceLut',
-      texTransmittanceLut,
+      debugTransmittanceLut,
       fetchSampler('clamp_linear_nomip')
     );
     debugSkyViewLutBindGroup.setTexture(
       'multiScatteringLut',
-      texMultiScatteringLut,
+      debugMultiScatteringLut,
       fetchSampler('clamp_linear_nomip')
     );
     device.pushDeviceStates();
@@ -1267,10 +1588,109 @@ export function renderSkyViewLut(
     device.setBindGroup(0, debugSkyViewLutBindGroup);
     drawFullscreenQuad();
     device.popDeviceStates();
+  }
+}
 
-    return debugSkyViewFramebuffer.getColorAttachments()[0] as Texture2D;
-  } else {
-    return null;
+export function renderAPLut(params: AtmosphereParams) {
+  const device = Application.instance.device;
+  if (debugAPLutProgram === undefined) {
+    try {
+      debugAPLutProgram = device.buildRenderProgram({
+        vertex(pb) {
+          this.flip = pb.int().uniform(0);
+          this.$inputs.pos = pb.vec2().attrib('position');
+          this.$outputs.uv = pb.vec2();
+          pb.main(function () {
+            this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+            this.$if(pb.notEqual(this.flip, 0), function () {
+              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+            });
+          });
+        },
+        fragment(pb) {
+          this.cameraWorldMatrix = pb.mat4().uniform(0);
+          this.aspect = pb.float().uniform(0);
+          this.plantRadius = pb.float().uniform(0);
+          this.atmosphereHeight = pb.float().uniform(0);
+          this.rayleighScatteringHeight = pb.float().uniform(0);
+          this.mieScatteringHeight = pb.float().uniform(0);
+          this.mieAnstropy = pb.float().uniform(0);
+          this.ozoneLevelCenterHeight = pb.float().uniform(0);
+          this.ozoneLevelWidth = pb.float().uniform(0);
+          this.lightDir = pb.vec3().uniform(0);
+          this.cameraPosY = pb.float().uniform(0);
+          this.lightColorAndIntensity = pb.vec4().uniform(0);
+          this.apDistance = pb.float().uniform(0);
+          this.transmittanceLut = pb.tex2D().uniform(0);
+          this.multiScatteringLut = pb.tex2D().uniform(0);
+          this.$outputs.outColor = pb.vec4();
+          pb.main(function () {
+            this.$outputs.outColor = aerialPerspectiveLut(
+              this,
+              this.$inputs.uv,
+              pb.vec3(32, 32, 32),
+              this.cameraWorldMatrix,
+              this.aspect,
+              this.plantRadius,
+              this.atmosphereHeight,
+              this.rayleighScatteringHeight,
+              this.mieScatteringHeight,
+              this.mieAnstropy,
+              this.ozoneLevelCenterHeight,
+              this.ozoneLevelWidth,
+              this.apDistance,
+              this.cameraPosY,
+              this.lightDir,
+              this.lightColorAndIntensity,
+              this.transmittanceLut,
+              this.multiScatteringLut
+            );
+          });
+        }
+      });
+      debugAPLutBindGroup = device.createBindGroup(debugAPLutProgram.bindGroupLayouts[0]);
+      debugApLut = device.createTexture2D('rgba16f', 32 * 32, 32, { samplerOptions: { mipFilter: 'none' } });
+      debugApLut.name = 'DebugAPLut';
+      debugAPFramebuffer = device.createFrameBuffer([debugApLut], null);
+    } catch (err) {
+      console.error(err);
+      debugAPLutProgram = null;
+      debugAPLutBindGroup = null;
+      debugAPFramebuffer = null;
+    }
+  }
+  if (debugAPLutProgram) {
+    debugAPLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
+    debugAPLutBindGroup.setValue('cameraWorldMatrix', params.cameraWorldMatrix);
+    debugAPLutBindGroup.setValue('aspect', params.cameraAspect);
+    debugAPLutBindGroup.setValue('plantRadius', params.plantRadius);
+    debugAPLutBindGroup.setValue('atmosphereHeight', params.atmosphereHeight);
+    debugAPLutBindGroup.setValue('rayleighScatteringHeight', params.rayleighScatteringHeight);
+    debugAPLutBindGroup.setValue('mieScatteringHeight', params.mieScatteringHeight);
+    debugAPLutBindGroup.setValue('mieAnstropy', params.mieAnstropy);
+    debugAPLutBindGroup.setValue('ozoneLevelCenterHeight', params.ozoneCenter);
+    debugAPLutBindGroup.setValue('ozoneLevelWidth', params.ozoneWidth);
+    debugAPLutBindGroup.setValue('apDistance', params.apDistance);
+    debugAPLutBindGroup.setValue('cameraPosY', 1);
+    debugAPLutBindGroup.setValue('lightDir', params.lightDir);
+    debugAPLutBindGroup.setValue('lightColorAndIntensity', params.lightColor);
+    debugAPLutBindGroup.setTexture(
+      'transmittanceLut',
+      debugTransmittanceLut,
+      fetchSampler('clamp_linear_nomip')
+    );
+    debugAPLutBindGroup.setTexture(
+      'multiScatteringLut',
+      debugMultiScatteringLut,
+      fetchSampler('clamp_linear_nomip')
+    );
+    device.pushDeviceStates();
+    device.setFramebuffer(debugAPFramebuffer);
+    device.setProgram(debugAPLutProgram);
+    device.setBindGroup(0, debugAPLutBindGroup);
+    drawFullscreenQuad();
+    device.popDeviceStates();
   }
 }
 
