@@ -725,13 +725,13 @@ export interface ProgramBuilder {
   /** add two values */
   add_2(x: number | PBShaderExp, y: number | PBShaderExp);
   /** add a couple of values togeter */
-  add(x: number | PBShaderExp, ...rest: (number | PBShaderExp)[]);
+  add(x: number | PBShaderExp, y: number | PBShaderExp, ...rest: (number | PBShaderExp)[]);
   /** subtract two values */
   sub(x: number | PBShaderExp, y: number | PBShaderExp);
   /** multiply two values */
   mul_2(x: number | PBShaderExp, y: number | PBShaderExp);
   /** multiply a couple of values togeter */
-  mul(x: number | PBShaderExp, ...rest: (number | PBShaderExp)[]);
+  mul(x: number | PBShaderExp, y: number | PBShaderExp, ...rest: (number | PBShaderExp)[]);
   /** divide the first number by the second number */
   div(x: number | PBShaderExp, y: number | PBShaderExp);
   /** Same as length builtin function in GLSL and WGSL */

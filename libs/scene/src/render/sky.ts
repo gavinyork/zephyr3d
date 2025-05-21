@@ -2,6 +2,7 @@ import { Application } from '../app/app';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders/misc';
 import {
   renderMultiScatteringLut,
+  renderSkyBox,
   renderSkyViewLut,
   renderTransmittanceLut,
   smoothNoise3D
@@ -478,13 +479,14 @@ export class SkyRenderer {
     }
     const transmittanceLut = renderTransmittanceLut();
     const multiScatteringLut = renderMultiScatteringLut(transmittanceLut);
-    renderSkyViewLut(
+    const skyViewLut = renderSkyViewLut(
       transmittanceLut,
       multiScatteringLut,
       sunDir,
       ctx.sunLight?.diffuseAndIntensity ?? new Vector4(1, 1, 1, 10),
       1
     );
+    renderSkyBox(1, sunDir, ctx.sunLight?.diffuseAndIntensity ?? new Vector4(1, 1, 1, 10), skyViewLut);
 
     this._renderSky(
       skyCamera,

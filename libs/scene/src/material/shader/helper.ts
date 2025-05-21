@@ -25,7 +25,7 @@ import type {
 } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
-import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../../shaders';
+import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../../shaders/misc';
 import { Application } from '../../app';
 import { fetchSampler } from '../../utility/misc';
 

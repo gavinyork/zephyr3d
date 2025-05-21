@@ -20,7 +20,7 @@ import {
 import { Material } from './material';
 import type { DepthPass } from '../render';
 import { type DrawContext, type ShadowMapPass } from '../render';
-import { encodeNormalizedFloatToRGBA } from '../shaders';
+import { encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { Application, DRef, DWeakRef } from '../app';
 import { ShaderHelper } from './shader/helper';
 import type { Clonable } from '@zephyr3d/base';

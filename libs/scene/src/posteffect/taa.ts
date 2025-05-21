@@ -1,7 +1,7 @@
 import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext, Primitive } from '../render';
 import { AbstractPostEffect } from './posteffect';
-import { linearToGamma } from '../shaders';
+import { linearToGamma } from '../shaders/misc';
 import { fetchSampler } from '../utility/misc';
 import { BoxShape } from '../shapes';
 import { temporalResolve } from '../shaders/temporal';

@@ -7,7 +7,7 @@ import type {
 } from '@zephyr3d/device';
 import type { BlitType } from './blitter';
 import { Blitter } from './blitter';
-import { decodeNormalizedFloatFromRGBA } from '../shaders';
+import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 
 /**
  * Gaussian blur blitter

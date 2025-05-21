@@ -1,5 +1,5 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
-import { ShaderHelper } from '../material';
+import { ShaderHelper } from '../material/shader/helper';
 
 const MAX_FLOAT_VALUE = 3.402823466e38;
 
