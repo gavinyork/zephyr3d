@@ -22,6 +22,8 @@ const MIE_SIGMA = 3.996;
 const MIE_ABSORPTION_SIGMA = 4.4;
 const OZONE_ABSORPTION_SIGMA = [0.65, 1.881, 0.085];
 
+export const CAMERA_POS_Y = 1;
+
 export type AtmosphereParams = {
   plantRadius: number;
   atmosphereHeight: number;
@@ -674,7 +676,6 @@ function sunBloom(
 export function skyBox(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
-  fCameraPosY: PBShaderExp,
   f3SkyBoxWorldPos: PBShaderExp,
   fSunSolidAngle: PBShaderExp,
   texSkyViewLut: PBShaderExp
@@ -688,7 +689,6 @@ export function skyBox(
     function () {
       this.$l.rgb = pb.vec3(0);
       this.$l.viewDir = pb.normalize(this.worldPos);
-      this.$l.eyePos = pb.vec3(0, pb.add(this.params.plantRadius, this.cameraPosY), 0);
       this.rgb = pb.add(
         this.rgb,
         pb.textureSampleLevel(texSkyViewLut, viewDirToUV(this, this.viewDir), 0).rgb
@@ -700,7 +700,7 @@ export function skyBox(
       this.$return(pb.vec4(this.rgb, 1));
     }
   );
-  return scope[funcName](stParams, fCameraPosY, f3SkyBoxWorldPos, fSunSolidAngle);
+  return scope[funcName](stParams, CAMERA_POS_Y, f3SkyBoxWorldPos, fSunSolidAngle);
 }
 
 export function aerialPerspective(
@@ -745,7 +745,6 @@ export function aerialPerspectiveLut(
   stParams: PBShaderExp,
   f2UV: PBShaderExp,
   f3VoxelDim: PBShaderExp,
-  fCameraPosY: PBShaderExp,
   texTransmittanceLut: PBShaderExp,
   texMultiScatteringLut: PBShaderExp
 ) {
@@ -815,14 +814,13 @@ export function aerialPerspectiveLut(
       this.$return(pb.vec4(this.color, pb.dot(this.t, pb.vec3(1 / 3, 1 / 3, 1 / 3))));
     }
   });
-  return scope[funcName](stParams, f2UV, f3VoxelDim, fCameraPosY);
+  return scope[funcName](stParams, f2UV, f3VoxelDim, CAMERA_POS_Y);
 }
 
 export function skyViewLut(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
   f2UV: PBShaderExp,
-  fCameraPosY: PBShaderExp,
   texTransmittanceLut: PBShaderExp,
   texMultiScatteringLut: PBShaderExp
 ) {
@@ -844,7 +842,7 @@ export function skyViewLut(
     );
     this.$return(pb.vec4(this.rgb, 1));
   });
-  return scope[funcName](stParams, f2UV, fCameraPosY);
+  return scope[funcName](stParams, f2UV, CAMERA_POS_Y);
 }
 
 export function multiScatteringLut(
@@ -1104,7 +1102,6 @@ export function renderSkyViewLut(params: AtmosphereParams) {
         fragment(pb) {
           const Params = getAtmosphereParamsStruct(pb);
           this.params = Params().uniform(0);
-          this.cameraPosY = pb.float().uniform(0);
           this.transmittanceLut = pb.tex2D().uniform(0);
           this.multiScatteringLut = pb.tex2D().uniform(0);
           this.$outputs.outColor = pb.vec4();
@@ -1113,7 +1110,6 @@ export function renderSkyViewLut(params: AtmosphereParams) {
               this,
               this.params,
               this.$inputs.uv,
-              this.cameraPosY,
               this.transmittanceLut,
               this.multiScatteringLut
             );
@@ -1136,7 +1132,6 @@ export function renderSkyViewLut(params: AtmosphereParams) {
   if (debugSkyViewLutProgram) {
     debugSkyViewLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     debugSkyViewLutBindGroup.setValue('params', params);
-    debugSkyViewLutBindGroup.setValue('cameraPosY', 1);
     debugSkyViewLutBindGroup.setTexture(
       'transmittanceLut',
       debugTransmittanceLut,
@@ -1176,7 +1171,6 @@ export function renderAPLut(params: AtmosphereParams) {
         fragment(pb) {
           const Params = getAtmosphereParamsStruct(pb);
           this.params = Params().uniform(0);
-          this.cameraPosY = pb.float().uniform(0);
           this.transmittanceLut = pb.tex2D().uniform(0);
           this.multiScatteringLut = pb.tex2D().uniform(0);
           this.$outputs.outColor = pb.vec4();
@@ -1186,7 +1180,6 @@ export function renderAPLut(params: AtmosphereParams) {
               this.params,
               this.$inputs.uv,
               pb.vec3(32, 32, 32),
-              this.cameraPosY,
               this.transmittanceLut,
               this.multiScatteringLut
             );
@@ -1207,7 +1200,6 @@ export function renderAPLut(params: AtmosphereParams) {
   if (debugAPLutProgram) {
     debugAPLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     debugAPLutBindGroup.setValue('params', params);
-    debugAPLutBindGroup.setValue('cameraPosY', 1);
     debugAPLutBindGroup.setTexture(
       'transmittanceLut',
       debugTransmittanceLut,
@@ -1227,12 +1219,7 @@ export function renderAPLut(params: AtmosphereParams) {
   }
 }
 
-export function renderSkyBox(
-  params: AtmosphereParams,
-  cameraPosY: number,
-  skyViewLut: Texture2D,
-  sunSolidAngle = 0.01
-) {
+export function renderSkyBox(params: AtmosphereParams, skyViewLut: Texture2D, sunSolidAngle = 0.01) {
   const device = Application.instance.device;
   if (debugSkyBoxProgram === undefined) {
     debugSkyBoxProgram = device.buildRenderProgram({
@@ -1253,7 +1240,6 @@ export function renderSkyBox(
       fragment(pb) {
         const Params = getAtmosphereParamsStruct(pb);
         this.params = Params().uniform(0);
-        this.cameraPosY = pb.float().uniform(0);
         this.sunSolidAngle = pb.float().uniform(0);
         this.skyViewLut = pb.tex2D().uniform(0);
         this.$outputs.color = pb.vec4();
@@ -1261,7 +1247,6 @@ export function renderSkyBox(
           this.$outputs.color = skyBox(
             this,
             this.params,
-            this.cameraPosY,
             this.$inputs.worldDirection,
             this.sunSolidAngle,
             this.skyViewLut
@@ -1284,7 +1269,6 @@ export function renderSkyBox(
   }
   if (debugSkyBoxProgram) {
     debugSkyBoxBindGroup.setValue('params', params);
-    debugSkyBoxBindGroup.setValue('cameraPosY', cameraPosY);
     debugSkyBoxBindGroup.setValue('sunSolidAngle', sunSolidAngle);
     debugSkyBoxBindGroup.setTexture('skyViewLut', skyViewLut, fetchSampler('clamp_linear_nomip'));
     debugSkyBoxBindGroup.setValue(

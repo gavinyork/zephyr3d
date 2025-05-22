@@ -1,5 +1,12 @@
 import { Vector2, Vector3 } from '@zephyr3d/base';
-import type { BindGroup, GPUProgram, RenderStateSet, TextureCube, VertexLayout } from '@zephyr3d/device';
+import type {
+  BindGroup,
+  FrameBuffer,
+  GPUProgram,
+  RenderStateSet,
+  TextureCube,
+  VertexLayout
+} from '@zephyr3d/device';
 import { Application } from '../app';
 
 // reference: https://placeholderart.wordpress.com/2015/07/28/implementation-notes-runtime-environment-map-filtering-for-image-based-lighting/
@@ -288,12 +295,12 @@ function doPrefilterCubemap(
   roughness: number,
   miplevel: number,
   srcTexture: TextureCube,
-  dstTexture: TextureCube,
+  dstFramebuffer: FrameBuffer,
   filteringInfo: Vector2,
   numSamples: number
 ): void {
   const device = Application.instance.device;
-  const framebuffer = device.createFrameBuffer([dstTexture], null);
+  const framebuffer = dstFramebuffer;
   framebuffer.setColorAttachmentMipLevel(0, miplevel);
   framebuffer.setColorAttachmentGenerateMipmaps(0, false);
   const { program, bindgroup } = getProgramInfo(type, numSamples);
@@ -315,6 +322,7 @@ function doPrefilterCubemap(
     bindgroup.setValue('front', faceDirections[i][2]);
     device.draw('triangle-list', 0, 6);
   }
+  framebuffer.dispose();
 }
 
 /**
@@ -329,7 +337,7 @@ function doPrefilterCubemap(
 export function prefilterCubemap(
   tex: TextureCube,
   type: DistributionType,
-  destTex: TextureCube,
+  destTexture: TextureCube | FrameBuffer,
   numSamples?: number
 ): void {
   if (!tex || !tex.isTextureCube()) {
@@ -346,11 +354,20 @@ export function prefilterCubemap(
   const width = tex.width;
   const mipmapsCount = tex.mipLevelCount;
   const filteringInfo = new Vector2(width, mipmapsCount);
+  const fb = destTexture.isFramebuffer() ? destTexture : device.createFrameBuffer([destTexture], null);
+  const attachMiplevel = fb.getColorAttachmentMipLevel(0);
+  const generateMipmap = fb.getColorAttachmentGenerateMipmaps(0);
+  const destTex = fb.getColorAttachments()[0];
   const mips = type === 'ggx' ? destTex.mipLevelCount : 1;
   for (let i = 0; i < mips; i++) {
     const alpha = i === 0 ? 0 : Math.pow(2, i) / width;
-    doPrefilterCubemap(type, alpha, i, srcTex, destTex, filteringInfo, numSamples ?? 64);
+    doPrefilterCubemap(type, alpha, i, srcTex, fb, filteringInfo, numSamples ?? 64);
   }
   device.popDeviceStates();
   device.setRenderStates(rs);
+  fb.setColorAttachmentMipLevel(0, attachMiplevel);
+  fb.setColorAttachmentGenerateMipmaps(0, generateMipmap);
+  if (!destTex.isFramebuffer()) {
+    fb.dispose();
+  }
 }
