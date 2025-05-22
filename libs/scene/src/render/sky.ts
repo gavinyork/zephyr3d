@@ -1,6 +1,6 @@
 import { Application } from '../app/app';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders/misc';
-import { renderAtmosphereLUTs, smoothNoise3D } from '../shaders';
+import { AtmosphereParams, defaultAtmosphereParams, renderAtmosphereLUTs, smoothNoise3D } from '../shaders';
 import { Quaternion, Vector3 } from '@zephyr3d/base';
 import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import type { Primitive } from './primitive';
@@ -74,6 +74,7 @@ export class SkyRenderer {
   private _radianceMapWidth: number;
   private _irradianceMap: DRef<TextureCube>;
   private _irradianceMapWidth: number;
+  private _atmosphereParams: AtmosphereParams;
   private _fogType: FogType;
   private _fogColor: Vector4;
   private _fogParams: Vector4;
@@ -95,6 +96,7 @@ export class SkyRenderer {
   private _renderStatesFogScatter: RenderStateSet;
   private _drawGround: boolean;
   private _lastSunDir: Vector3;
+  private _lastSunColor: Vector4;
   private _panoramaAsset: string;
   /**
    * Creates an instance of SkyRenderer
@@ -112,6 +114,7 @@ export class SkyRenderer {
     this._radianceMapWidth = 128;
     this._irradianceMap = new DRef();
     this._irradianceMapWidth = 64;
+    this._atmosphereParams = { ...defaultAtmosphereParams };
     this._fogType = 'none';
     this._fogColor = Vector4.one();
     this._fogParams = new Vector4(1, 100, 50, 0.002);
@@ -133,6 +136,7 @@ export class SkyRenderer {
     this._renderStatesFogScatter = null;
     this._skyWorldMatrix = defaultSkyWorldMatrix;
     this._lastSunDir = SkyRenderer._getSunDir(null);
+    this._lastSunColor = SkyRenderer._getSunColor(null);
     this._panoramaAsset = '';
   }
   /** @internal */
@@ -165,7 +169,7 @@ export class SkyRenderer {
   }
   /** Baked sky texture */
   get bakedSkyTexture(): TextureCube {
-    this.updateBakedSkyMap(this._lastSunDir);
+    this.updateBakedSkyMap(this._lastSunDir, this._lastSunColor);
     return this._bakedSkyboxTexture.get();
   }
   /**
@@ -371,14 +375,19 @@ export class SkyRenderer {
     }
   }
   update(sunLight: DirectionalLight) {
-    this.updateBakedSkyMap(SkyRenderer._getSunDir(sunLight));
+    this.updateBakedSkyMap(SkyRenderer._getSunDir(sunLight), SkyRenderer._getSunColor(sunLight));
   }
-  updateBakedSkyMap(sunDir: Vector3) {
-    if (this._bakedSkyboxTexture.get() && this._lastSunDir.equalsTo(sunDir)) {
+  updateBakedSkyMap(sunDir: Vector3, sunColor: Vector4) {
+    if (
+      this._bakedSkyboxTexture.get() &&
+      this._lastSunDir.equalsTo(sunDir) &&
+      this._lastSunColor.equalsTo(sunColor)
+    ) {
       return;
     }
     this._bakedSkyboxTexture.dispose();
     this._lastSunDir.set(sunDir);
+    this._lastSunColor.set(sunColor);
     this._radianceMapDirty = true;
     if (this._skyType === 'skybox' && this.skyboxTexture) {
       this._bakedSkyboxTexture.set(this.skyboxTexture);
@@ -401,7 +410,7 @@ export class SkyRenderer {
       for (const face of [CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ]) {
         camera.lookAtCubeFace(face);
         scatterSkyboxFramebuffer.setColorAttachmentCubeFace(0, face);
-        this._renderSky(camera, false, sunDir, true, false);
+        this._renderSky(camera, false, sunDir, sunColor, true, false);
       }
       device.popDeviceStates();
       device.setRenderStates(saveRenderStates);
@@ -412,10 +421,10 @@ export class SkyRenderer {
   /**
    * Regenerate the radiance map and irradiance map
    *
-   * @param sunLight - The sun light
+   * @param sunColor - The sun light
    */
-  updateIBLMaps(sunDir: Vector3) {
-    this.updateBakedSkyMap(sunDir);
+  updateIBLMaps(sunDir: Vector3, sunColor: Vector4) {
+    this.updateBakedSkyMap(sunDir, sunColor);
     prefilterCubemap(this._bakedSkyboxTexture.get(), 'ggx', this.radianceMap);
     prefilterCubemap(this._bakedSkyboxTexture.get(), 'lambertian', this.irradianceMap);
   }
@@ -427,9 +436,16 @@ export class SkyRenderer {
     const savedRenderStates = device.getRenderStates();
     this._prepareSkyBox(device);
     const sunLight = ctx.sunLight;
-    if (this._fogType === 'scatter' && !sunLight) {
-      console.error('Cannot render scattering fog without sun light');
-      return;
+    if (this._fogType === 'scatter') {
+      if (!sunLight) {
+        console.error('Cannot render scattering fog without sun light');
+        return;
+      }
+      this._atmosphereParams.lightDir.set(SkyRenderer._getSunDir(ctx.sunLight));
+      this._atmosphereParams.lightColor.set(SkyRenderer._getSunColor(ctx.sunLight));
+      this._atmosphereParams.cameraAspect = camera.getAspect();
+      this._atmosphereParams.cameraWorldMatrix.set(camera.worldMatrix);
+      renderAtmosphereLUTs(this._atmosphereParams);
     }
     const fogProgram = this._fogType === 'scatter' ? this._programFogScatter : this._programFog;
     const renderStates = this._fogType === 'scatter' ? this._renderStatesFogScatter : this._renderStatesFog;
@@ -466,24 +482,18 @@ export class SkyRenderer {
   /** @internal */
   renderSky(ctx: DrawContext) {
     const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
-    const sunColor = ctx.sunLight?.diffuseAndIntensity ?? new Vector4(1, 1, 1, 10);
+    const sunColor = SkyRenderer._getSunColor(ctx.sunLight);
+    //const sunColor = ctx.sunLight?.diffuseAndIntensity ?? new Vector4(1, 1, 1, 10);
     let skyCamera = ctx.camera;
     if (!skyCamera.isPerspective()) {
       skyCamera = SkyRenderer._skyCamera;
       ctx.camera.worldMatrix.decompose(null, skyCamera.rotation, null);
     }
-    renderAtmosphereLUTs({
-      lightColor: sunColor,
-      lightDir: sunDir,
-      cameraWorldMatrix: ctx.camera.worldMatrix,
-      cameraAspect: ctx.camera.getAspect()
-    });
-    //renderSkyBox(1, sunDir, ctx.sunLight?.diffuseAndIntensity ?? new Vector4(1, 1, 1, 10), skyViewLut);
-
     this._renderSky(
       skyCamera,
       true,
       sunDir,
+      sunColor,
       this._drawGround,
       this._skyType === 'scatter' && this._cloudy > 0
     );
@@ -493,7 +503,7 @@ export class SkyRenderer {
         (ctx.env.light.radianceMap === this.radianceMap || ctx.env.light.irradianceMap === this.irradianceMap)
       ) {
         this._radianceMapDirty = false;
-        this.updateIBLMaps(sunDir);
+        this.updateIBLMaps(sunDir, sunColor);
       }
     }
   }
@@ -502,6 +512,7 @@ export class SkyRenderer {
     camera: Camera,
     depthTest: boolean,
     sunDir: Vector3,
+    sunColor: Vector4,
     drawGround: boolean,
     drawCloud: boolean
   ) {
@@ -509,6 +520,11 @@ export class SkyRenderer {
     const savedRenderStates = device.getRenderStates();
     this._prepareSkyBox(device);
     if (this._skyType === 'scatter') {
+      this._atmosphereParams.lightDir.set(sunDir);
+      this._atmosphereParams.lightColor.set(sunColor);
+      this._atmosphereParams.cameraAspect = camera.getAspect();
+      this._atmosphereParams.cameraWorldMatrix.set(camera.worldMatrix);
+      renderAtmosphereLUTs(this._atmosphereParams);
       this._drawScattering(camera, sunDir, depthTest, drawGround, drawCloud);
     } else if (this._skyType === 'skybox' && this.skyboxTexture) {
       this._drawSkybox(camera, depthTest);
@@ -854,6 +870,11 @@ export class SkyRenderer {
   private static _getSunDir(sunLight: DirectionalLight) {
     // TODO: reduce GC
     return sunLight?.directionAndCutoff.xyz().scaleBy(-1) ?? ShaderHelper.defaultSunDir;
+  }
+  /** @internal */
+  private static _getSunColor(sunLight: DirectionalLight) {
+    // TODO: reduce GC
+    return sunLight?.diffuseAndIntensity ?? new Vector4(1, 1, 1, 10);
   }
   private static _createScatterProgram(device: AbstractDevice, cloud: boolean) {
     return device.buildRenderProgram({
