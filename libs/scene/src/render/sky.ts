@@ -492,7 +492,7 @@ export class SkyRenderer {
       bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
       if (this._fogType === 'scatter') {
         const sunDir = SkyRenderer._getSunDir(sunLight);
-        bindgroup.setTexture('apLut', getAerialPerspectiveLut());
+        bindgroup.setTexture('apLut', getAerialPerspectiveLut(), fetchSampler('clamp_linear_nomip'));
         bindgroup.setValue('sliceDist', this._atmosphereParams.apDistance);
         bindgroup.setValue('sunDir', sunDir);
       } else {
@@ -585,7 +585,7 @@ export class SkyRenderer {
   private _drawSkybox(camera: Camera, depthTest: boolean) {
     const device = Application.instance.device;
     const bindgroup = this._bindgroupSky.skybox;
-    bindgroup.setTexture('skyCubeMap', this.skyboxTexture);
+    bindgroup.setTexture('skyCubeMap', this.skyboxTexture, fetchSampler('clamp_linear_nomip'));
     bindgroup.setValue(
       'flip',
       device.getFramebuffer() && device.type === 'webgpu' ? new Vector4(1, -1, 1, 1) : new Vector4(1, 1, 1, 1)
@@ -622,8 +622,8 @@ export class SkyRenderer {
     bindgroup.setValue('worldMatrix', this._skyWorldMatrix);
     bindgroup.setValue('cameraPos', camera.getWorldPosition());
     bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
-    bindgroup.setTexture('tLut', tLut);
-    bindgroup.setTexture('skyLut', skyLut);
+    bindgroup.setTexture('tLut', tLut, fetchSampler('clamp_linear_nomip'));
+    bindgroup.setTexture('skyLut', skyLut, fetchSampler('clamp_linear_nomip'));
     if (drawCloud) {
       bindgroup.setValue('cloudy', this._cloudy);
       bindgroup.setValue('cloudIntensity', this._cloudIntensity);
@@ -694,6 +694,7 @@ export class SkyRenderer {
               pb.vec3(32, 32, 32),
               this.apLut
             );
+            this.$outputs.outColor = pb.vec4(pb.vec3(this.$outputs.outColor.a), 1);
           });
         }
       });
