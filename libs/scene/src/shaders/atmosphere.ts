@@ -752,8 +752,62 @@ export function aerialPerspectiveLut(
   texMultiScatteringLut: PBShaderExp
 ) {
   const pb = scope.$builder;
-  const funcName = 'z_aerialPerspectiveLut';
   const Params = getAtmosphereParamsStruct(pb);
+  const funcNameFixVoxel = 'z_fixVoxel';
+  pb.func(
+    funcNameFixVoxel,
+    [
+      Params('params'),
+      pb.vec3('eyePos'),
+      pb.vec3('viewDir').inout(),
+      pb.float('maxDis'),
+      pb.float('adjustedMaxDis').inout()
+    ],
+    function () {
+      this.$l.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
+      this.$l.voxelHeight = pb.length(this.voxelPos);
+      this.$l.underGround = pb.lessThan(this.voxelHeight, this.params.plantRadius);
+      this.$l.cameraToVoxel = pb.sub(this.voxelPos, this.eyePos);
+      this.$l.cameraToVoxelLen = pb.length(this.cameraToVoxel);
+      this.$l.cameraToVoxelDir = pb.div(this.cameraToVoxel, this.cameraToVoxelLen);
+      this.$l.planetNearT = rayIntersectSphere(
+        this,
+        pb.vec3(0),
+        this.params.plantRadius,
+        this.eyePos,
+        this.cameraToVoxelDir
+      );
+      this.$l.belowHorizon = pb.and(
+        pb.greaterThan(this.planetNearT, 0),
+        pb.greaterThan(this.cameraToVoxelLen, this.planetNearT)
+      );
+      this.$l.eyePos2 = this.eyePos;
+      this.$if(pb.or(this.underGround, this.belowHorizon), function () {
+        this.eyePos2 = pb.add(this.eyePos2, pb.mul(pb.normalize(this.eyePos2), 0.02));
+        this.$if(this.belowHorizon, function () {
+          this.$l.voxelWorldPosNorm = pb.normalize(this.voxelPos);
+          this.$l.camProjOnGround = pb.mul(pb.normalize(this.eyePos2), this.params.plantRadius);
+          this.$l.voxProjOnGround = pb.mul(this.voxelWorldPosNorm, this.params.plantRadius);
+          this.$l.voxelGroundToRayStart = pb.sub(this.eyePos2, this.voxProjOnGround);
+          this.$if(
+            pb.lessThan(pb.dot(pb.normalize(this.voxelGroundToRayStart), this.voxelWorldPosNorm), 0.0001),
+            function () {
+              this.$l.middlePoint = pb.mul(pb.add(this.camProjOnGround, this.voxProjOnGround), 0.5);
+              this.$l.middlePointOnGround = pb.mul(pb.normalize(this.middlePoint), this.params.plantRadius);
+              this.voxelPos = pb.add(this.eyePos2, pb.mul(pb.sub(this.middlePointOnGround, this.eyePos2), 2));
+            }
+          );
+        }).$else(function () {
+          this.voxelPos = pb.mul(pb.normalize(this.voxelPos), this.params.plantRadius);
+        });
+        this.$l.V = pb.sub(this.voxelPos, this.eyePos2);
+        this.adjustedMaxDis = pb.length(this.V);
+        this.viewDir = pb.div(this.V, this.adjustedMaxDis);
+      });
+      this.$return(this.eyePos2);
+    }
+  );
+  const funcName = 'z_aerialPerspectiveLut';
   pb.func(funcName, [Params('params'), pb.vec2('uv'), pb.vec3('dim'), pb.float('cameraPosY')], function () {
     if (1) {
       this.$l.uvw = pb.vec3(this.uv, 0);
@@ -761,6 +815,7 @@ export function aerialPerspectiveLut(
       this.uvw.z = pb.div(pb.floor(pb.div(this.uvw.x, this.dim.z)), this.dim.x);
       this.uvw.x = pb.div(pb.mod(this.uvw.x, this.dim.z), this.dim.x);
       this.uvw = pb.add(this.uvw, pb.div(pb.vec3(0.5), this.dim));
+      this.$l.slice = this.uvw.z; //pb.mul(this.uvw.z, this.uvw.z);
       this.$l.viewDir = pb.normalize(
         pb.mul(
           this.params.cameraWorldMatrix,
@@ -773,7 +828,25 @@ export function aerialPerspectiveLut(
         ).xyz
       );
       this.$l.eyePos = pb.vec3(0, pb.add(this.cameraPosY, this.params.plantRadius), 0);
-      this.$l.maxDis = pb.mul(this.uvw.z, this.params.apDistance);
+      this.$l.maxDis = pb.mul(this.slice, this.params.apDistance);
+      /*
+      this.$l.adjustedMaxDis = this.maxDis;
+      this.eyePos = this[funcNameFixVoxel](
+        this.params,
+        this.eyePos,
+        this.viewDir,
+        this.maxDis,
+        this.adjustedMaxDis
+      );
+      */
+      this.$l.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
+      this.$if(pb.lessThan(pb.length(this.voxelPos), this.params.plantRadius), function () {
+        this.maxDis = pb.div(
+          pb.mul(this.maxDis, pb.sub(this.eyePos.y, this.params.plantRadius)),
+          pb.sub(this.eyePos.y, this.voxelPos.y)
+        );
+        this.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
+      });
       this.$l.color = getSkyView(
         this,
         this.params,
@@ -783,10 +856,9 @@ export function aerialPerspectiveLut(
         texTransmittanceLut,
         texMultiScatteringLut
       );
-      this.$l.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
       this.$l.t1 = transmittanceToSky(this, this.params, this.eyePos, this.viewDir, texTransmittanceLut);
       this.$l.t2 = transmittanceToSky(this, this.params, this.voxelPos, this.viewDir, texTransmittanceLut);
-      this.$l.t = pb.div(this.t1, this.t2);
+      this.$l.t = pb.clamp(pb.div(this.t1, pb.max(this.t2, pb.vec3(0.0001))), pb.vec3(0), pb.vec3(1));
       //this.$l.t = transmittance(this, this.params, this.eyePos, this.voxelPos);
       this.$return(pb.vec4(this.color, pb.dot(this.t, pb.vec3(1 / 3, 1 / 3, 1 / 3))));
     } else {
@@ -1191,6 +1263,8 @@ export function renderAPLut(params: AtmosphereParams) {
         }
       });
       debugAPLutBindGroup = device.createBindGroup(debugAPLutProgram.bindGroupLayouts[0]);
+      console.log(debugAPLutProgram.getShaderSource('vertex'));
+      console.log(debugAPLutProgram.getShaderSource('fragment'));
       debugApLut = device.createTexture2D('rgba16f', 32 * 32, 32, { samplerOptions: { mipFilter: 'none' } });
       debugApLut.name = 'DebugAPLut';
       debugAPFramebuffer = device.createFrameBuffer([debugApLut], null);

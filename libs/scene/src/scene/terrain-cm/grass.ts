@@ -10,7 +10,7 @@ import { ClipmapGrassMaterial } from './grassmaterial';
 import type { ClipmapTerrain } from './terrain-cm';
 import type { Camera } from '../../camera';
 
-export const MAX_INSTANCES_PER_NODE = 16384;
+export const MAX_INSTANCES_PER_NODE = 2048;
 
 export type GrassInstanceInfo = {
   x: number;
