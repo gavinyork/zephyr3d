@@ -1023,9 +1023,9 @@ export class Inspector {
   private renderScene() {
     ImGui.SetNextWindowSize(new ImGui.ImVec2(0, 0), ImGui.Cond.FirstUseEver);
     ImGui.Begin('Scene');
-    const density = [this._scene.env.sky.aerialPerspectiveDensity] as [number];
+    const density = [this._scene.env.sky.aerialPerspectiveDistance] as [number];
     if (ImGui.SliderFloat('ScatterFogDensity', density, 1, 50)) {
-      this._scene.env.sky.aerialPerspectiveDensity = density[0];
+      this._scene.env.sky.aerialPerspectiveDistance = density[0];
     }
     ImGui.End();
   }

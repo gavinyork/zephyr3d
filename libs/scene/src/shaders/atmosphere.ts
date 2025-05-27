@@ -270,7 +270,8 @@ export function getSkyView(
   f3ViewDir: PBShaderExp,
   fMaxDis: PBShaderExp,
   texTransmittanceLut: PBShaderExp,
-  texMultiScatteringLut: PBShaderExp
+  texMultiScatteringLut: PBShaderExp,
+  withGround = true
 ) {
   const pb = scope.$builder;
   const Params = getAtmosphereParamsStruct(pb);
@@ -288,13 +289,15 @@ export function getSkyView(
         this.eyePos,
         this.viewDir
       );
-      this.$l.d = rayIntersectSphere(this, pb.vec3(0), this.params.plantRadius, this.eyePos, this.viewDir);
       this.$if(pb.lessThan(this.dis, 0), function () {
         this.$return(pb.vec3(0));
       });
-      this.$if(pb.greaterThan(this.d, 0), function () {
-        this.dis = pb.min(this.dis, this.d);
-      });
+      if (withGround) {
+        this.$l.d = rayIntersectSphere(this, pb.vec3(0), this.params.plantRadius, this.eyePos, this.viewDir);
+        this.$if(pb.greaterThan(this.d, 0), function () {
+          this.dis = pb.min(this.dis, this.d);
+        });
+      }
       this.$if(pb.greaterThanEqual(this.maxDis, 0), function () {
         this.dis = pb.min(this.dis, this.maxDis);
       });
@@ -764,7 +767,7 @@ export function aerialPerspectiveLut(
           pb.vec4(
             pb.sub(pb.mul(this.uvw.x, 2), 1),
             pb.div(pb.sub(pb.mul(this.uvw.y, 2), 1), this.params.cameraAspect),
-            1,
+            -1,
             0
           )
         ).xyz
@@ -784,6 +787,7 @@ export function aerialPerspectiveLut(
       this.$l.t1 = transmittanceToSky(this, this.params, this.eyePos, this.viewDir, texTransmittanceLut);
       this.$l.t2 = transmittanceToSky(this, this.params, this.voxelPos, this.viewDir, texTransmittanceLut);
       this.$l.t = pb.div(this.t1, this.t2);
+      //this.$l.t = transmittance(this, this.params, this.eyePos, this.voxelPos);
       this.$return(pb.vec4(this.color, pb.dot(this.t, pb.vec3(1 / 3, 1 / 3, 1 / 3))));
     } else {
       this.$l.slice = pb.clamp(pb.floor(pb.mul(this.uv.x, this.dim.z)), 0, pb.sub(this.dim.z, 1));

@@ -1,11 +1,11 @@
 import { Application } from '@zephyr3d/scene';
 import { imGuiInit } from '@zephyr3d/imgui';
 import { Editor } from './core/editor';
-//import { backendWebGL2 } from '@zephyr3d/backend-webgl';
-import { backendWebGPU } from '../../../libs/backend-webgpu/dist';
+import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+//import { backendWebGPU } from '../../../libs/backend-webgpu/dist';
 
 const studioApp = new Application({
-  backend: backendWebGPU,
+  backend: backendWebGL2,
   canvas: document.querySelector('#canvas')
 });
 

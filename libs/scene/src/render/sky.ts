@@ -82,7 +82,6 @@ export class SkyRenderer {
   private _updateRadianceMaps: boolean;
   private _radianceMapDirty: boolean;
   private _scatterSkyboxTextureWidth: number;
-  private _aerialPerspectiveDensity: number;
   private _radianceMap: DRef<TextureCube>;
   private _radianceFrameBuffer: DRef<FrameBuffer>;
   private _radianceMapWidth: number;
@@ -125,7 +124,6 @@ export class SkyRenderer {
     this._bakedSkyboxTexture = new DRef();
     this._bakedSkyboxDirty = true;
     this._scatterSkyboxTextureWidth = 256;
-    this._aerialPerspectiveDensity = 1;
     this._radianceMap = new DRef();
     this._radianceFrameBuffer = new DRef();
     this._radianceMapWidth = 128;
@@ -221,11 +219,11 @@ export class SkyRenderer {
     }
   }
   /** Aerial perspective density */
-  get aerialPerspectiveDensity() {
-    return this._aerialPerspectiveDensity;
+  get aerialPerspectiveDistance() {
+    return this._atmosphereParams.apDistance;
   }
-  set aerialPerspectiveDensity(val: number) {
-    this._aerialPerspectiveDensity = val;
+  set aerialPerspectiveDistance(val: number) {
+    this._atmosphereParams.apDistance = val;
   }
   /**
    * Light density of the sky.
@@ -613,11 +611,11 @@ export class SkyRenderer {
     //const apLut = ScatteringLut.getAerialPerspectiveLut(alpha, 8000);
     const program = drawCloud ? this._programSky.scatter : this._programSky['scatter-nocloud'];
     const bindgroup = drawCloud ? this._bindgroupSky.scatter : this._bindgroupSky['scatter-nocloud'];
-    bindgroup.setValue('sunDir', sunDir);
     bindgroup.setValue(
       'flip',
       device.getFramebuffer() && device.type === 'webgpu' ? new Vector4(1, -1, 1, 1) : new Vector4(1, 1, 1, 1)
     );
+    bindgroup.setValue('params', this._atmosphereParams);
     bindgroup.setValue('viewProjMatrix', camera.viewProjectionMatrix);
     bindgroup.setValue('worldMatrix', this._skyWorldMatrix);
     bindgroup.setValue('cameraPos', camera.getWorldPosition());
@@ -694,7 +692,7 @@ export class SkyRenderer {
               pb.vec3(32, 32, 32),
               this.apLut
             );
-            this.$outputs.outColor = pb.vec4(pb.vec3(this.$outputs.outColor.a), 1);
+            //this.$outputs.outColor = pb.vec4(pb.vec3(pb.sub(1, this.$outputs.outColor.a)), 1);
           });
         }
       });
