@@ -399,7 +399,7 @@ export class ClipmapTerrain
     this._clipmap.wireframe = wireframe;
 
     if (ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR) {
-      this._grassRenderer.get().draw(ctx);
+      //this._grassRenderer.get().draw(ctx);
     }
   }
   private resizeHeightMap(sizeX: number, sizeZ: number) {

@@ -288,7 +288,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           }
         },
         {
-          name: 'AerialPerspectiveDensity',
+          name: 'AerialPerspectiveDistance',
           type: 'float',
           phase: 1,
           options: { minValue: 1, maxValue: 50000 },
@@ -298,6 +298,22 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           },
           set(this: Scene, value) {
             this.env.sky.aerialPerspectiveDistance = value.num[0];
+          },
+          isValid() {
+            return this.env.sky.skyType === 'scatter';
+          }
+        },
+        {
+          name: 'AerialPerspectiveDensity',
+          type: 'float',
+          phase: 1,
+          options: { minValue: 1, maxValue: 1000 },
+          default: 1,
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.aerialPerspectiveDensity;
+          },
+          set(this: Scene, value) {
+            this.env.sky.aerialPerspectiveDensity = value.num[0];
           },
           isValid() {
             return this.env.sky.skyType === 'scatter';

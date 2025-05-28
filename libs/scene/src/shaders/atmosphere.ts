@@ -37,6 +37,7 @@ export type AtmosphereParams = {
   lightDir: Vector3;
   lightColor: Vector4;
   cameraAspect: number;
+  apDensity: number;
 };
 
 export const defaultAtmosphereParams: Readonly<AtmosphereParams> = {
@@ -51,7 +52,8 @@ export const defaultAtmosphereParams: Readonly<AtmosphereParams> = {
   cameraWorldMatrix: Matrix4x4.identity(),
   lightDir: new Vector3(1, 0, 0),
   lightColor: new Vector4(1, 1, 1, 10),
-  cameraAspect: 1
+  cameraAspect: 1,
+  apDensity: 10
 };
 
 let currentAtmosphereParams: AtmosphereParams = null;
@@ -725,6 +727,7 @@ export function aerialPerspective(
       this.$l.dis = pb.length(this.V);
       this.$l.viewDir = pb.normalize(this.V);
       this.$l.d0 = pb.clamp(pb.div(this.dis, this.apDistance), 0, 1);
+      this.$l.weight = pb.clamp(pb.mul(this.d0, 2), 0, 1);
       this.$l.dz = pb.mul(this.d0, pb.sub(this.dim.z, 1));
       this.$l.slice = pb.floor(this.dz);
       this.$l.nextSlice = pb.min(pb.add(this.slice, 1), pb.sub(this.dim.z, 1));
@@ -735,8 +738,8 @@ export function aerialPerspective(
       this.$l.data1 = pb.textureSampleLevel(texAerialPerspectiveLut, this.uv1, 0);
       this.$l.data2 = pb.textureSampleLevel(texAerialPerspectiveLut, this.uv2, 0);
       this.$l.data = pb.mix(this.data1, this.data2, this.factor);
-      this.$l.inscattering = this.data.rgb;
-      this.$l.transmittance = this.data.a;
+      this.$l.inscattering = pb.mul(this.data.rgb, this.weight);
+      this.$l.transmittance = pb.sub(1, pb.mul(this.weight, pb.sub(1, this.data.a)));
       this.$return(pb.vec4(this.inscattering, pb.sub(1, this.transmittance)));
     }
   );
@@ -1037,7 +1040,8 @@ export function getAtmosphereParamsStruct(pb: ProgramBuilder) {
     pb.float('mieAnstropy'),
     pb.float('ozoneCenter'),
     pb.float('ozoneWidth'),
-    pb.float('apDistance')
+    pb.float('apDistance'),
+    pb.float('apDensity')
   ]);
 }
 
