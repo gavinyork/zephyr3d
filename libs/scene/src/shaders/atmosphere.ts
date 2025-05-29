@@ -37,7 +37,7 @@ export type AtmosphereParams = {
   lightDir: Vector3;
   lightColor: Vector4;
   cameraAspect: number;
-  apDensity: number;
+  cameraHeightScale: number;
 };
 
 export const defaultAtmosphereParams: Readonly<AtmosphereParams> = {
@@ -53,7 +53,7 @@ export const defaultAtmosphereParams: Readonly<AtmosphereParams> = {
   lightDir: new Vector3(1, 0, 0),
   lightColor: new Vector4(1, 1, 1, 10),
   cameraAspect: 1,
-  apDensity: 10
+  cameraHeightScale: 200
 };
 
 let currentAtmosphereParams: AtmosphereParams = null;
@@ -95,6 +95,7 @@ function checkParams(other?: Partial<AtmosphereParams>): {
     result.skyView =
       result.transmittance ||
       result.multiScattering ||
+      currentAtmosphereParams.cameraHeightScale !== other.cameraHeightScale ||
       !currentAtmosphereParams.lightDir.equalsTo(other.lightDir) ||
       !currentAtmosphereParams.lightColor.equalsTo(other.lightColor) ||
       !currentAtmosphereParams.cameraWorldMatrix.equalsTo(other.cameraWorldMatrix);
@@ -117,6 +118,7 @@ function checkParams(other?: Partial<AtmosphereParams>): {
     currentAtmosphereParams.mieAnstropy = other.mieAnstropy;
   }
   if (result.skyView) {
+    currentAtmosphereParams.cameraHeightScale = other.cameraHeightScale;
     currentAtmosphereParams.lightDir.set(other.lightDir);
     currentAtmosphereParams.lightColor.set(other.lightColor);
     currentAtmosphereParams.cameraWorldMatrix.set(other.cameraWorldMatrix);
@@ -688,24 +690,17 @@ export function skyBox(
   const pb = scope.$builder;
   const funcName = 'v_skybox';
   const Params = getAtmosphereParamsStruct(pb);
-  pb.func(
-    funcName,
-    [Params('params'), pb.float('cameraPosY'), pb.vec3('worldPos'), pb.float('sunSolidAngle')],
-    function () {
-      this.$l.rgb = pb.vec3(0);
-      this.$l.viewDir = pb.normalize(this.worldPos);
-      this.rgb = pb.add(
-        this.rgb,
-        pb.textureSampleLevel(texSkyViewLut, viewDirToUV(this, this.viewDir), 0).rgb
-      );
-      this.rgb = pb.add(
-        this.rgb,
-        sunBloom(this, this.viewDir, this.params.lightDir, this.params.lightColor, this.sunSolidAngle)
-      );
-      this.$return(pb.vec4(this.rgb, 1));
-    }
-  );
-  return scope[funcName](stParams, CAMERA_POS_Y, f3SkyBoxWorldPos, fSunSolidAngle);
+  pb.func(funcName, [Params('params'), pb.vec3('worldPos'), pb.float('sunSolidAngle')], function () {
+    this.$l.rgb = pb.vec3(0);
+    this.$l.viewDir = pb.normalize(this.worldPos);
+    this.rgb = pb.add(this.rgb, pb.textureSampleLevel(texSkyViewLut, viewDirToUV(this, this.viewDir), 0).rgb);
+    this.rgb = pb.add(
+      this.rgb,
+      sunBloom(this, this.viewDir, this.params.lightDir, this.params.lightColor, this.sunSolidAngle)
+    );
+    this.$return(pb.vec4(this.rgb, 1));
+  });
+  return scope[funcName](stParams, f3SkyBoxWorldPos, fSunSolidAngle);
 }
 
 export function aerialPerspective(
@@ -830,7 +825,11 @@ export function aerialPerspectiveLut(
           )
         ).xyz
       );
-      this.$l.eyePos = pb.vec3(0, pb.add(this.cameraPosY, this.params.plantRadius), 0);
+      this.$l.eyePos = pb.vec3(
+        0,
+        pb.add(pb.mul(this.cameraPosY, this.params.cameraHeightScale), this.params.plantRadius),
+        0
+      );
       this.$l.maxDis = pb.mul(this.slice, this.params.apDistance);
       /*
       this.$l.adjustedMaxDis = this.maxDis;
@@ -843,6 +842,7 @@ export function aerialPerspectiveLut(
       );
       */
       this.$l.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
+      /*
       this.$if(pb.lessThan(pb.length(this.voxelPos), this.params.plantRadius), function () {
         this.maxDis = pb.div(
           pb.mul(this.maxDis, pb.sub(this.eyePos.y, this.params.plantRadius)),
@@ -850,6 +850,7 @@ export function aerialPerspectiveLut(
         );
         this.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
       });
+      */
       this.$l.color = getSkyView(
         this,
         this.params,
@@ -875,7 +876,11 @@ export function aerialPerspectiveLut(
         pb.sin(this.zenithAngle),
         pb.mul(pb.neg(pb.cos(this.zenithAngle)), pb.cos(this.horizonAngle))
       );
-      this.$l.eyePos = pb.vec3(0, pb.add(this.cameraPosY, this.params.plantRadius), 0);
+      this.$l.eyePos = pb.vec3(
+        0,
+        pb.add(pb.mul(this.cameraPosY, this.params.cameraHeightScale), this.params.plantRadius),
+        0
+      );
       this.$l.maxDis = pb.mul(this.params.apDistance, this.sliceDist);
       this.$l.color = getSkyView(
         this,
@@ -908,7 +913,7 @@ export function skyViewLut(
   const funcName = 'v_skyViewLut';
   pb.func(funcName, [Params('params'), pb.vec2('uv'), pb.float('cameraPosY')], function () {
     this.$l.viewDir = uvToViewDir(this, this.uv);
-    this.$l.h = pb.add(this.params.plantRadius, this.cameraPosY);
+    this.$l.h = pb.add(this.params.plantRadius, pb.mul(this.cameraPosY, this.params.cameraHeightScale));
     this.$l.eyePos = pb.vec3(0, this.h, 0);
     this.$l.rgb = getSkyView(
       this,
@@ -1041,7 +1046,7 @@ export function getAtmosphereParamsStruct(pb: ProgramBuilder) {
     pb.float('ozoneCenter'),
     pb.float('ozoneWidth'),
     pb.float('apDistance'),
-    pb.float('apDensity')
+    pb.float('cameraHeightScale')
   ]);
 }
 

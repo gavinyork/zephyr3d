@@ -226,11 +226,11 @@ export class SkyRenderer {
     this._atmosphereParams.apDistance = val;
   }
   /** Aerial perspective density */
-  get aerialPerspectiveDensity() {
-    return this._atmosphereParams.apDensity;
+  get cameraHeightScale() {
+    return this._atmosphereParams.cameraHeightScale;
   }
-  set aerialPerspectiveDensity(val: number) {
-    this._atmosphereParams.apDensity = val;
+  set cameraHeightScale(val: number) {
+    this._atmosphereParams.cameraHeightScale = val;
   }
   /**
    * Light density of the sky.
@@ -498,7 +498,10 @@ export class SkyRenderer {
       if (this._fogType === 'scatter') {
         const sunDir = SkyRenderer._getSunDir(sunLight);
         bindgroup.setTexture('apLut', getAerialPerspectiveLut(), fetchSampler('clamp_linear_nomip'));
-        bindgroup.setValue('sliceDist', this._atmosphereParams.apDistance / this._atmosphereParams.apDensity);
+        bindgroup.setValue(
+          'sliceDist',
+          this._atmosphereParams.apDistance / this._atmosphereParams.cameraHeightScale
+        );
         bindgroup.setValue('sunDir', sunDir);
       } else {
         bindgroup.setValue('fogType', this.mappedFogType);
