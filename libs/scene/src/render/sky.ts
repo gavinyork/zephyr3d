@@ -94,6 +94,7 @@ export class SkyRenderer {
   private _fogParams: Vector4;
   private _cloudy: number;
   private _cloudIntensity: number;
+  private _debugAerialPerspective: number;
   private _wind: Vector2;
   private _programSky: Partial<Record<SkyType, GPUProgram>>;
   private _bindgroupSky: Partial<Record<SkyType, BindGroup>>;
@@ -131,6 +132,7 @@ export class SkyRenderer {
     this._irradianceFrameBuffer = new DRef();
     this._irradianceMapWidth = 64;
     this._atmosphereParams = { ...defaultAtmosphereParams };
+    this._debugAerialPerspective = 0;
     this._fogType = 'none';
     this._fogColor = Vector4.one();
     this._fogParams = new Vector4(1, 100, 50, 0.002);
@@ -390,6 +392,13 @@ export class SkyRenderer {
   set fogParams(val: Vector4) {
     this._fogParams.set(val);
   }
+  /** @internal */
+  get aerialPerspectiveDebug() {
+    return this._debugAerialPerspective;
+  }
+  set aerialPerspectiveDebug(val: number) {
+    this._debugAerialPerspective = val;
+  }
   /**
    * Force the radiance map and irradiance map to be regenerated.
    */
@@ -503,6 +512,7 @@ export class SkyRenderer {
           this._atmosphereParams.apDistance / this._atmosphereParams.cameraHeightScale
         );
         bindgroup.setValue('sunDir', sunDir);
+        bindgroup.setValue('debug', this._debugAerialPerspective);
       } else {
         bindgroup.setValue('fogType', this.mappedFogType);
         bindgroup.setValue('fogColor', this._fogColor);
@@ -671,6 +681,7 @@ export class SkyRenderer {
           this.apLut = pb.tex2D().uniform(0);
           this.sliceDist = pb.float().uniform(0);
           this.sunDir = pb.vec3().uniform(0);
+          this.debug = pb.int().uniform(0);
           this.srgbOut = pb.int().uniform(0);
           this.$outputs.outColor = pb.vec4();
           pb.main(function () {
@@ -702,6 +713,11 @@ export class SkyRenderer {
               pb.vec3(32, 32, 32),
               this.apLut
             );
+            this.$if(pb.equal(this.debug, 1), function () {
+              this.$outputs.outColor.a = 1;
+            }).$elseif(pb.equal(this.debug, 2), function () {
+              this.$outputs.outColor = pb.vec4(pb.vec3(this.$outputs.outColor.a), 1);
+            });
             //this.$outputs.outColor = pb.vec4(pb.vec3(pb.sub(1, this.$outputs.outColor.a)), 1);
           });
         }

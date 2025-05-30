@@ -320,6 +320,24 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           }
         },
         {
+          name: 'AerialPerspectiveDebug',
+          type: 'int',
+          enum: {
+            labels: ['None', 'InScattering', 'Transmittance'],
+            values: [0, 1, 2]
+          },
+          default: 0,
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.aerialPerspectiveDebug;
+          },
+          set(this: Scene, value) {
+            this.env.sky.aerialPerspectiveDebug = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.fogType === 'scatter';
+          }
+        },
+        {
           name: 'Cloudy',
           type: 'float',
           default: 0.6,

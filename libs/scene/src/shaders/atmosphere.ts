@@ -863,7 +863,7 @@ export function aerialPerspectiveLut(
       this.$l.t1 = transmittanceToSky(this, this.params, this.eyePos, this.viewDir, texTransmittanceLut);
       this.$l.t2 = transmittanceToSky(this, this.params, this.voxelPos, this.viewDir, texTransmittanceLut);
       this.$l.t = pb.clamp(pb.div(this.t1, pb.max(this.t2, pb.vec3(0.0001))), pb.vec3(0), pb.vec3(1));
-      //this.$l.t = transmittance(this, this.params, this.eyePos, this.voxelPos);
+      this.$l.t = transmittance(this, this.params, this.eyePos, this.voxelPos);
       this.$return(pb.vec4(this.color, pb.dot(this.t, pb.vec3(1 / 3, 1 / 3, 1 / 3))));
     } else {
       this.$l.slice = pb.clamp(pb.floor(pb.mul(this.uv.x, this.dim.z)), 0, pb.sub(this.dim.z, 1));
