@@ -422,6 +422,13 @@ export class SkyRenderer {
     //console.log(this._sunTransmittance(sunLight));
     this.updateBakedSkyMap(SkyRenderer._getSunDir(sunLight), SkyRenderer._getSunColor(sunLight));
   }
+  renderAtmosphereLUTs(ctx: DrawContext) {
+    this._atmosphereParams.lightDir.set(SkyRenderer._getSunDir(ctx.sunLight));
+    this._atmosphereParams.lightColor.set(SkyRenderer._getSunColor(ctx.sunLight));
+    this._atmosphereParams.cameraAspect = ctx.camera.getAspect();
+    this._atmosphereParams.cameraWorldMatrix.set(ctx.camera.worldMatrix);
+    renderAtmosphereLUTs(this._atmosphereParams);
+  }
   updateBakedSkyMap(sunDir: Vector3, sunColor: Vector4) {
     if (
       !this._bakedSkyboxDirty &&
@@ -632,7 +639,7 @@ export class SkyRenderer {
     return t1 < 0 ? t2 : t1;
   }
   /** @internal */
-  private _sunTransmittance(sunLight: DirectionalLight) {
+  sunTransmittance(sunLight: DirectionalLight) {
     const TRANSMITTANCE_SAMPLES = 32;
     const RAYLEIGH_SIGMA = [5.802, 13.558, 33.1];
     const MIE_SIGMA = 3.996;

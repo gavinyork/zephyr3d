@@ -284,6 +284,25 @@ export class SceneRenderer {
     ctx.clusteredLight = this.getClusteredLight();
     ctx.clusteredLight.calculateLightIndex(ctx.camera, renderQueue);
 
+    /*
+    const useScatter =
+      ctx.scene.env.sky.skyType === 'scatter' ||
+      ctx.scene.env.sky.skyType === 'scatter-nocloud' ||
+      ctx.scene.env.sky.fogType === 'scatter';
+    if (useScatter) {
+      ctx.scene.env.sky.renderAtmosphereLUTs(ctx);
+    }
+    const sunLightColor = ctx.sunLight && useScatter ? new Vector4(ctx.sunLight.diffuseAndIntensity) : null;
+    // Apply sun
+    if (sunLightColor) {
+      const sunTransmittance = ctx.scene.env.sky.sunTransmittance(ctx.sunLight);
+      ctx.sunLight.color = Vector4.mul(
+        ctx.sunLight.color,
+        new Vector4(sunTransmittance.x, sunTransmittance.y, sunTransmittance.z, 1)
+      );
+    }
+    */
+
     // Do GPU ray picking if required
     const pickResolveFunc = ctx.camera.getPickResultResolveFunc();
     if (pickResolveFunc) {
@@ -374,6 +393,13 @@ export class SceneRenderer {
     }
     //ShadowMapper.releaseTemporalResources(ctx);
     this.freeClusteredLight(ctx.clusteredLight);
+
+    /*
+    // Restore sun color
+    if (sunLightColor) {
+      ctx.sunLight.color.set(sunLightColor);
+    }
+    */
   }
   /** @internal */
   private static renderShadowMaps(ctx: DrawContext, lights: PunctualLight[]) {
