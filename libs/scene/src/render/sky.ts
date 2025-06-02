@@ -704,6 +704,7 @@ export class SkyRenderer {
             this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
             this.$l.hPos = pb.div(this.$l.hPos, this.$l.hPos.w);
             this.$l.viewDir = pb.sub(this.hPos.xyz, this.cameraPosition);
+            this.$l.debugValue = pb.vec4();
             this.$outputs.outColor = aerialPerspective(
               this,
               this.$inputs.uv,
@@ -711,14 +712,21 @@ export class SkyRenderer {
               this.hPos.xyz,
               this.sliceDist,
               pb.vec3(32, 32, 32),
+              this.debugValue,
               this.apLut
             );
             this.$if(pb.equal(this.debug, 1), function () {
               this.$outputs.outColor.a = 1;
-            }).$elseif(pb.equal(this.debug, 2), function () {
-              this.$outputs.outColor = pb.vec4(pb.vec3(this.$outputs.outColor.a), 1);
-            });
-            //this.$outputs.outColor = pb.vec4(pb.vec3(pb.sub(1, this.$outputs.outColor.a)), 1);
+            })
+              .$elseif(pb.equal(this.debug, 2), function () {
+                this.$outputs.outColor = pb.vec4(pb.vec3(this.$outputs.outColor.a), 1);
+              })
+              .$elseif(pb.equal(this.debug, 3), function () {
+                this.$outputs.outColor = pb.vec4(pb.vec3(this.debugValue.r), 1);
+              })
+              .$elseif(pb.equal(this.debug, 4), function () {
+                this.$outputs.outColor = pb.vec4(this.debugValue.zw, 0, 1);
+              });
           });
         }
       });

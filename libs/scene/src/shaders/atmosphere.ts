@@ -710,13 +710,21 @@ export function aerialPerspective(
   f3WorldPos: PBShaderExp,
   fAPDistance: PBShaderExp,
   f3Dim: PBShaderExp,
+  f4Debug: PBShaderExp,
   texAerialPerspectiveLut: PBShaderExp
 ) {
   const pb = scope.$builder;
   const funcName = 'z_aerialPerspective';
   pb.func(
     funcName,
-    [pb.vec2('uv'), pb.vec3('cameraPos'), pb.vec3('worldPos'), pb.float('apDistance'), pb.vec3('dim')],
+    [
+      pb.vec2('uv'),
+      pb.vec3('cameraPos'),
+      pb.vec3('worldPos'),
+      pb.float('apDistance'),
+      pb.vec3('dim'),
+      pb.vec4('debugValue').out()
+    ],
     function () {
       this.$l.V = pb.sub(this.worldPos, this.cameraPos);
       this.$l.dis = pb.length(this.V);
@@ -735,10 +743,11 @@ export function aerialPerspective(
       this.$l.data = pb.mix(this.data1, this.data2, this.factor);
       this.$l.inscattering = pb.mul(this.data.rgb, this.weight);
       this.$l.transmittance = pb.sub(1, pb.mul(this.weight, pb.sub(1, this.data.a)));
+      this.debugValue = pb.vec4(this.d0, this.data.a, this.uv1);
       this.$return(pb.vec4(this.inscattering, pb.sub(1, this.transmittance)));
     }
   );
-  return scope[funcName](f2UV, f3CameraPos, f3WorldPos, fAPDistance, f3Dim);
+  return scope[funcName](f2UV, f3CameraPos, f3WorldPos, fAPDistance, f3Dim, f4Debug);
 }
 
 export function aerialPerspectiveLut(
@@ -863,7 +872,7 @@ export function aerialPerspectiveLut(
       this.$l.t1 = transmittanceToSky(this, this.params, this.eyePos, this.viewDir, texTransmittanceLut);
       this.$l.t2 = transmittanceToSky(this, this.params, this.voxelPos, this.viewDir, texTransmittanceLut);
       this.$l.t = pb.clamp(pb.div(this.t1, pb.max(this.t2, pb.vec3(0.0001))), pb.vec3(0), pb.vec3(1));
-      this.$l.t = transmittance(this, this.params, this.eyePos, this.voxelPos);
+      //this.$l.t = transmittance(this, this.params, this.eyePos, this.voxelPos);
       this.$return(pb.vec4(this.color, pb.dot(this.t, pb.vec3(1 / 3, 1 / 3, 1 / 3))));
     } else {
       this.$l.slice = pb.clamp(pb.floor(pb.mul(this.uv.x, this.dim.z)), 0, pb.sub(this.dim.z, 1));

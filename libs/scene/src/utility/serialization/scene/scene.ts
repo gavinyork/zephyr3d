@@ -323,8 +323,8 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'AerialPerspectiveDebug',
           type: 'int',
           enum: {
-            labels: ['None', 'InScattering', 'Transmittance'],
-            values: [0, 1, 2]
+            labels: ['None', 'InScattering', 'Transmittance', 'DistanceRatio', 'TransmittanceUV'],
+            values: [0, 1, 2, 3, 4]
           },
           default: 0,
           get(this: Scene, value) {
