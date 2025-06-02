@@ -419,6 +419,7 @@ export class SkyRenderer {
     }
   }
   update(sunLight: DirectionalLight) {
+    //console.log(this._sunTransmittance(sunLight));
     this.updateBakedSkyMap(SkyRenderer._getSunDir(sunLight), SkyRenderer._getSunColor(sunLight));
   }
   updateBakedSkyMap(sunDir: Vector3, sunColor: Vector4) {
@@ -572,7 +573,7 @@ export class SkyRenderer {
       this._atmosphereParams.cameraAspect = camera.getAspect();
       this._atmosphereParams.cameraWorldMatrix.set(camera.worldMatrix);
       renderAtmosphereLUTs(this._atmosphereParams);
-      this._drawScattering(camera, sunDir, depthTest, drawGround, drawCloud);
+      this._drawScattering(camera, depthTest, drawGround, drawCloud);
     } else if (this._skyType === 'skybox' && this.skyboxTexture) {
       this._drawSkybox(camera, depthTest);
     } else {
@@ -618,13 +619,82 @@ export class SkyRenderer {
     this._primitiveSky.draw();
   }
   /** @internal */
-  private _drawScattering(
-    camera: Camera,
-    sunDir: Vector3,
-    depthTest: boolean,
-    drawGround: boolean,
-    drawCloud: boolean
-  ) {
+  private _rayIntersectSphere(radius: number, rayStart: Vector3, rayDir: Vector3) {
+    const OS = rayStart.magnitude;
+    const SH = -Vector3.dot(rayStart, rayDir);
+    const OH = Math.sqrt(Math.max(0, OS * OS - SH * SH));
+    const PH = Math.sqrt(Math.max(0, radius * radius - OH * OH));
+    if (OH > radius) {
+      return -1;
+    }
+    const t1 = SH - PH;
+    const t2 = SH + PH;
+    return t1 < 0 ? t2 : t1;
+  }
+  /** @internal */
+  private _sunTransmittance(sunLight: DirectionalLight) {
+    const TRANSMITTANCE_SAMPLES = 32;
+    const RAYLEIGH_SIGMA = [5.802, 13.558, 33.1];
+    const MIE_SIGMA = 3.996;
+    const MIE_ABSORPTION_SIGMA = 4.4;
+    const OZONE_ABSORPTION_SIGMA = [0.65, 1.881, 0.085];
+    function rayleighSc(params: AtmosphereParams, fH: number) {
+      const sigma = new Vector3(RAYLEIGH_SIGMA[0] * 1e-6, RAYLEIGH_SIGMA[1] * 1e-6, RAYLEIGH_SIGMA[2] * 1e-6);
+      const rho_h = Math.exp(-fH / params.rayleighScatteringHeight);
+      return Vector3.scale(sigma, rho_h);
+    }
+    function mieSc(params: AtmosphereParams, fH: number) {
+      const sigma = new Vector3(MIE_SIGMA * 1e-6, MIE_SIGMA * 1e-6, MIE_SIGMA * 1e-6);
+      const rho_h = Math.exp(-(fH / params.mieScatteringHeight));
+      return Vector3.scale(sigma, rho_h);
+    }
+    function mieAb(params: AtmosphereParams, fH: number) {
+      const sigma = new Vector3(
+        MIE_ABSORPTION_SIGMA * 1e-6,
+        MIE_ABSORPTION_SIGMA * 1e-6,
+        MIE_ABSORPTION_SIGMA * 1e-6
+      );
+      const rho_h = Math.exp(-(fH / params.mieScatteringHeight));
+      return Vector3.scale(sigma, rho_h);
+    }
+    function ozoneAb(params: AtmosphereParams, fH: number) {
+      const sigma = new Vector3(
+        OZONE_ABSORPTION_SIGMA[0] * 1e-6,
+        OZONE_ABSORPTION_SIGMA[1] * 1e-6,
+        OZONE_ABSORPTION_SIGMA[2] * 1e-6
+      );
+      const rho_h = Math.max(0, 1 - (Math.abs(fH - params.ozoneCenter) * 0.5) / params.ozoneWidth);
+      return Vector3.scale(sigma, rho_h);
+    }
+    const eyePos = new Vector3(
+      0,
+      this._atmosphereParams.plantRadius + this._atmosphereParams.cameraHeightScale,
+      0
+    );
+    const lightDir = SkyRenderer._getSunDir(sunLight);
+    const d = this._rayIntersectSphere(
+      this._atmosphereParams.plantRadius + this._atmosphereParams.atmosphereHeight,
+      eyePos,
+      lightDir
+    );
+    if (d < 0) {
+      return new Vector3(0, 0, 0);
+    }
+    const ds = d / TRANSMITTANCE_SAMPLES;
+    const sum = new Vector3(0, 0, 0);
+    const p = Vector3.combine(eyePos, lightDir, 1, ds * 0.5);
+    for (let i = 0; i < TRANSMITTANCE_SAMPLES; i++) {
+      const h = p.magnitude - this._atmosphereParams.plantRadius;
+      const scattering = Vector3.add(rayleighSc(this._atmosphereParams, h), mieSc(this._atmosphereParams, h));
+      const absorption = Vector3.add(ozoneAb(this._atmosphereParams, h), mieAb(this._atmosphereParams, h));
+      const extinction = Vector3.add(scattering, absorption);
+      Vector3.add(sum, Vector3.scale(extinction, ds), sum);
+      Vector3.add(p, Vector3.scale(lightDir, ds), p);
+    }
+    return new Vector3(Math.exp(-sum.x), Math.exp(-sum.y), Math.exp(-sum.z));
+  }
+  /** @internal */
+  private _drawScattering(camera: Camera, depthTest: boolean, drawGround: boolean, drawCloud: boolean) {
     const device = Application.instance.device;
     const tLut = getTransmittanceLut();
     const skyLut = getSkyViewLut();
