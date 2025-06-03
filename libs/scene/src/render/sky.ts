@@ -513,13 +513,12 @@ export class SkyRenderer {
       bindgroup.setValue('cameraPosition', camera.getWorldPosition());
       bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
       if (this._fogType === 'scatter') {
-        const sunDir = SkyRenderer._getSunDir(sunLight);
         bindgroup.setTexture('apLut', getAerialPerspectiveLut(), fetchSampler('clamp_linear_nomip'));
         bindgroup.setValue(
           'sliceDist',
           this._atmosphereParams.apDistance / this._atmosphereParams.cameraHeightScale
         );
-        bindgroup.setValue('sunDir', sunDir);
+        bindgroup.setValue('params', this._atmosphereParams);
         bindgroup.setValue('debug', this._debugAerialPerspective);
       } else {
         bindgroup.setValue('fogType', this.mappedFogType);
@@ -757,7 +756,7 @@ export class SkyRenderer {
           this.cameraPosition = pb.vec3().uniform(0);
           this.apLut = pb.tex2D().uniform(0);
           this.sliceDist = pb.float().uniform(0);
-          this.sunDir = pb.vec3().uniform(0);
+          this.params = getAtmosphereParamsStruct(pb)().uniform(0);
           this.debug = pb.int().uniform(0);
           this.srgbOut = pb.int().uniform(0);
           this.$outputs.outColor = pb.vec4();
@@ -780,11 +779,11 @@ export class SkyRenderer {
             );
             this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
             this.$l.hPos = pb.div(this.$l.hPos, this.$l.hPos.w);
-            this.$l.viewDir = pb.sub(this.hPos.xyz, this.cameraPosition);
             this.$l.debugValue = pb.vec4();
             this.$outputs.outColor = aerialPerspective(
               this,
               this.$inputs.uv,
+              this.params,
               this.cameraPosition,
               this.hPos.xyz,
               this.sliceDist,
@@ -796,7 +795,7 @@ export class SkyRenderer {
               this.$outputs.outColor.a = 1;
             })
               .$elseif(pb.equal(this.debug, 2), function () {
-                this.$outputs.outColor = pb.vec4(pb.vec3(this.$outputs.outColor.a), 1);
+                this.$outputs.outColor = pb.vec4(pb.vec3(pb.sub(1, this.$outputs.outColor.a)), 1);
               })
               .$elseif(pb.equal(this.debug, 3), function () {
                 this.$outputs.outColor = pb.vec4(pb.vec3(this.debugValue.r), 1);

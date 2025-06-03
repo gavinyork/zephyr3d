@@ -16,7 +16,7 @@ import { Primitive } from '../render';
 import { BoxShape } from '../shapes';
 import { Camera } from '../camera';
 
-const TRANSMITTANCE_SAMPLES = 32;
+const TRANSMITTANCE_SAMPLES = 16;
 const RAYLEIGH_SIGMA = [5.802, 13.558, 33.1];
 const MIE_SIGMA = 3.996;
 const MIE_ABSORPTION_SIGMA = 4.4;
@@ -706,6 +706,7 @@ export function skyBox(
 export function aerialPerspective(
   scope: PBInsideFunctionScope,
   f2UV: PBShaderExp,
+  stParams: PBShaderExp,
   f3CameraPos: PBShaderExp,
   f3WorldPos: PBShaderExp,
   fAPDistance: PBShaderExp,
@@ -714,10 +715,12 @@ export function aerialPerspective(
   texAerialPerspectiveLut: PBShaderExp
 ) {
   const pb = scope.$builder;
+  const Params = getAtmosphereParamsStruct(pb);
   const funcName = 'z_aerialPerspective';
   pb.func(
     funcName,
     [
+      Params('params'),
       pb.vec2('uv'),
       pb.vec3('cameraPos'),
       pb.vec3('worldPos'),
@@ -742,12 +745,22 @@ export function aerialPerspective(
       this.$l.data2 = pb.textureSampleLevel(texAerialPerspectiveLut, this.uv2, 0);
       this.$l.data = pb.mix(this.data1, this.data2, this.factor);
       this.$l.inscattering = pb.mul(this.data.rgb, this.weight);
-      this.$l.transmittance = pb.sub(1, pb.mul(this.weight, pb.sub(1, this.data.a)));
+      //this.$l.transmittance = pb.sub(1, pb.mul(this.weight, pb.sub(1, this.data.a)));
+      this.$l.planetTranslate = pb.vec3(0, this.params.plantRadius, 0);
+      this.$l.transmittance = pb.dot(
+        transmittance(
+          this,
+          this.params,
+          pb.add(this.cameraPos, this.planetTranslate),
+          pb.add(this.worldPos, this.planetTranslate)
+        ),
+        pb.vec3(1 / 3, 1 / 3, 1 / 3)
+      );
       this.debugValue = pb.vec4(this.d0, this.data.a, this.uv1);
       this.$return(pb.vec4(this.inscattering, pb.sub(1, this.transmittance)));
     }
   );
-  return scope[funcName](f2UV, f3CameraPos, f3WorldPos, fAPDistance, f3Dim, f4Debug);
+  return scope[funcName](stParams, f2UV, f3CameraPos, f3WorldPos, fAPDistance, f3Dim, f4Debug);
 }
 
 export function aerialPerspectiveLut(
@@ -851,15 +864,17 @@ export function aerialPerspectiveLut(
       );
       */
       this.$l.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
-      /*
       this.$if(pb.lessThan(pb.length(this.voxelPos), this.params.plantRadius), function () {
+        this.voxelPos = pb.mul(pb.normalize(this.voxelPos), this.params.plantRadius);
+        this.maxDis = pb.length(pb.sub(this.eyePos, this.voxelPos));
+        /*
         this.maxDis = pb.div(
           pb.mul(this.maxDis, pb.sub(this.eyePos.y, this.params.plantRadius)),
           pb.sub(this.eyePos.y, this.voxelPos.y)
         );
         this.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
+        */
       });
-      */
       this.$l.color = getSkyView(
         this,
         this.params,
