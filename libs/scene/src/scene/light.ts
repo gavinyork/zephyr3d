@@ -189,7 +189,7 @@ export abstract class PunctualLight extends BaseLight {
   }
   /** Color of the light */
   get color(): Vector4 {
-    return this._color;
+    return this._color.clone();
   }
   set color(clr: Vector4) {
     this.setColor(clr);

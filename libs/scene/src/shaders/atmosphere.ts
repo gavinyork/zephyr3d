@@ -5,16 +5,12 @@ import {
   PBInsideFunctionScope,
   PBShaderExp,
   ProgramBuilder,
-  RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
 import { Application } from '../app';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { fetchSampler } from '../utility/misc';
-import { CubeFace, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
-import { Primitive } from '../render';
-import { BoxShape } from '../shapes';
-import { Camera } from '../camera';
+import { Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 
 const TRANSMITTANCE_SAMPLES = 16;
 const RAYLEIGH_SIGMA = [5.802, 13.558, 33.1];
@@ -683,6 +679,7 @@ function sunBloom(
 export function skyBox(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
+  f4SunColor: PBShaderExp,
   f3SkyBoxWorldPos: PBShaderExp,
   fSunSolidAngle: PBShaderExp,
   texSkyViewLut: PBShaderExp
@@ -690,17 +687,24 @@ export function skyBox(
   const pb = scope.$builder;
   const funcName = 'v_skybox';
   const Params = getAtmosphereParamsStruct(pb);
-  pb.func(funcName, [Params('params'), pb.vec3('worldPos'), pb.float('sunSolidAngle')], function () {
-    this.$l.rgb = pb.vec3(0);
-    this.$l.viewDir = pb.normalize(this.worldPos);
-    this.rgb = pb.add(this.rgb, pb.textureSampleLevel(texSkyViewLut, viewDirToUV(this, this.viewDir), 0).rgb);
-    this.rgb = pb.add(
-      this.rgb,
-      sunBloom(this, this.viewDir, this.params.lightDir, this.params.lightColor, this.sunSolidAngle)
-    );
-    this.$return(pb.vec4(this.rgb, 1));
-  });
-  return scope[funcName](stParams, f3SkyBoxWorldPos, fSunSolidAngle);
+  pb.func(
+    funcName,
+    [Params('params'), pb.vec4('sunColor'), pb.vec3('worldPos'), pb.float('sunSolidAngle')],
+    function () {
+      this.$l.rgb = pb.vec3(0);
+      this.$l.viewDir = pb.normalize(this.worldPos);
+      this.rgb = pb.add(
+        this.rgb,
+        pb.textureSampleLevel(texSkyViewLut, viewDirToUV(this, this.viewDir), 0).rgb
+      );
+      this.rgb = pb.add(
+        this.rgb,
+        sunBloom(this, this.viewDir, this.params.lightDir, this.sunColor, this.sunSolidAngle)
+      );
+      this.$return(pb.vec4(this.rgb, 1));
+    }
+  );
+  return scope[funcName](stParams, f4SunColor, f3SkyBoxWorldPos, fSunSolidAngle);
 }
 
 export function aerialPerspective(
@@ -1033,13 +1037,6 @@ let debugAPLutBindGroup: BindGroup = undefined;
 let debugApLut: Texture2D = undefined;
 let debugAPFramebuffer: FrameBuffer = undefined;
 
-let debugSkyBoxProgram: GPUProgram = undefined;
-let debugSkyBoxBindGroup: BindGroup = undefined;
-let debugSkyBoxFrameBuffer: FrameBuffer = undefined;
-let debugPrimitiveSky: Primitive = undefined;
-let debugSkyBoxCamera: Camera = undefined;
-let debugSkyBoxRenderStates: RenderStateSet = undefined;
-
 export function getTransmittanceLut() {
   return debugTransmittanceLut;
 }
@@ -1326,78 +1323,6 @@ export function renderAPLut(params: AtmosphereParams) {
     device.setProgram(debugAPLutProgram);
     device.setBindGroup(0, debugAPLutBindGroup);
     drawFullscreenQuad();
-    device.popDeviceStates();
-  }
-}
-
-export function renderSkyBox(params: AtmosphereParams, skyViewLut: Texture2D, sunSolidAngle = 0.01) {
-  const device = Application.instance.device;
-  if (debugSkyBoxProgram === undefined) {
-    debugSkyBoxProgram = device.buildRenderProgram({
-      vertex(pb) {
-        this.$inputs.pos = pb.vec3().attrib('position');
-        this.viewProjMatrix = pb.mat4().uniform(0);
-        this.flip = pb.vec4().uniform(0);
-        pb.main(function () {
-          this.$outputs.worldDirection = this.$inputs.pos;
-          this.$builtins.position = pb.mul(
-            this.viewProjMatrix,
-            pb.vec4(this.$outputs.worldDirection, 1),
-            this.flip
-          );
-          this.$builtins.position.z = this.$builtins.position.w;
-        });
-      },
-      fragment(pb) {
-        const Params = getAtmosphereParamsStruct(pb);
-        this.params = Params().uniform(0);
-        this.sunSolidAngle = pb.float().uniform(0);
-        this.skyViewLut = pb.tex2D().uniform(0);
-        this.$outputs.color = pb.vec4();
-        pb.main(function () {
-          this.$outputs.color = skyBox(
-            this,
-            this.params,
-            this.$inputs.worldDirection,
-            this.sunSolidAngle,
-            this.skyViewLut
-          );
-        });
-      }
-    });
-    debugSkyBoxBindGroup = device.createBindGroup(debugSkyBoxProgram.bindGroupLayouts[0]);
-    debugSkyBoxFrameBuffer = device.createFrameBuffer(
-      [device.createCubeTexture('rgba16f', 128, { samplerOptions: { mipFilter: 'none' } })],
-      null
-    );
-    debugSkyBoxFrameBuffer.getColorAttachments()[0].name = 'DebugSkyBox';
-    debugPrimitiveSky = new BoxShape({ size: 8 });
-    debugSkyBoxCamera = new Camera(null);
-    debugSkyBoxCamera.setPerspective(Math.PI / 2, 1, 1, 20);
-    debugSkyBoxRenderStates = device.createRenderStateSet();
-    debugSkyBoxRenderStates.useDepthState().enableTest(false).enableWrite(false);
-    debugSkyBoxRenderStates.useRasterizerState().setCullMode('none');
-  }
-  if (debugSkyBoxProgram) {
-    debugSkyBoxBindGroup.setValue('params', params);
-    debugSkyBoxBindGroup.setValue('sunSolidAngle', sunSolidAngle);
-    debugSkyBoxBindGroup.setTexture('skyViewLut', skyViewLut, fetchSampler('clamp_linear_nomip'));
-    debugSkyBoxBindGroup.setValue(
-      'flip',
-      device.type === 'webgpu' ? new Vector4(1, -1, 1, 1) : new Vector4(1, 1, 1, 1)
-    );
-
-    device.pushDeviceStates();
-    device.setProgram(debugSkyBoxProgram);
-    device.setBindGroup(0, debugSkyBoxBindGroup);
-    device.setRenderStates(debugSkyBoxRenderStates);
-    device.setFramebuffer(debugSkyBoxFrameBuffer);
-    for (const face of [CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ]) {
-      debugSkyBoxCamera.lookAtCubeFace(face);
-      debugSkyBoxBindGroup.setValue('viewProjMatrix', debugSkyBoxCamera.viewProjectionMatrix);
-      debugSkyBoxFrameBuffer.setColorAttachmentCubeFace(0, face);
-      debugPrimitiveSky.draw();
-    }
     device.popDeviceStates();
   }
 }

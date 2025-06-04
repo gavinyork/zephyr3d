@@ -11,7 +11,7 @@ import {
   renderAtmosphereLUTs,
   skyBox,
   smoothNoise3D,
-  viewDirToUV
+  transmittanceToSky
 } from '../shaders';
 import { Quaternion, Vector3 } from '@zephyr3d/base';
 import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
@@ -418,9 +418,9 @@ export class SkyRenderer {
       return null;
     }
   }
-  update(sunLight: DirectionalLight) {
+  update(ctx: DrawContext) {
     //console.log(this._sunTransmittance(sunLight));
-    this.updateBakedSkyMap(SkyRenderer._getSunDir(sunLight), SkyRenderer._getSunColor(sunLight));
+    this.updateBakedSkyMap(SkyRenderer._getSunDir(ctx.sunLight), SkyRenderer._getSunColor(ctx.sunLight));
   }
   renderAtmosphereLUTs(ctx: DrawContext) {
     this._atmosphereParams.lightDir.set(SkyRenderer._getSunDir(ctx.sunLight));
@@ -490,6 +490,7 @@ export class SkyRenderer {
     const device = ctx.device;
     const savedRenderStates = device.getRenderStates();
     this._prepareSkyBox(device);
+    /*
     const sunLight = ctx.sunLight;
     if (this._fogType === 'scatter') {
       if (!sunLight) {
@@ -502,6 +503,7 @@ export class SkyRenderer {
       this._atmosphereParams.cameraWorldMatrix.set(camera.worldMatrix);
       renderAtmosphereLUTs(this._atmosphereParams);
     }
+    */
     const fogProgram = this._fogType === 'scatter' ? this._programFogScatter : this._programFog;
     const renderStates = this._fogType === 'scatter' ? this._renderStatesFogScatter : this._renderStatesFog;
     if (fogProgram && sceneDepthTexture) {
@@ -574,11 +576,13 @@ export class SkyRenderer {
     const savedRenderStates = device.getRenderStates();
     this._prepareSkyBox(device);
     if (this._skyType === 'scatter') {
+      /*
       this._atmosphereParams.lightDir.set(sunDir);
       this._atmosphereParams.lightColor.set(sunColor);
       this._atmosphereParams.cameraAspect = camera.getAspect();
       this._atmosphereParams.cameraWorldMatrix.set(camera.worldMatrix);
       renderAtmosphereLUTs(this._atmosphereParams);
+      */
       this._drawScattering(camera, depthTest, drawGround, drawCloud);
     } else if (this._skyType === 'skybox' && this.skyboxTexture) {
       this._drawSkybox(camera, depthTest);
@@ -1052,6 +1056,15 @@ export class SkyRenderer {
           this.$l.sunDir = this.params.lightDir;
           // ad-hoc
           this.$l.sunIntensity = pb.sqrt(pb.max(0, pb.mul(this.sunDir.y, this.rayDir.y)));
+          // sun color
+          this.$l.sunTransmittance = transmittanceToSky(
+            this,
+            this.params,
+            pb.vec3(0, pb.add(this.params.cameraHeightScale, this.params.plantRadius), 0),
+            this.sunDir,
+            this.tLut
+          );
+          this.$l.sunColor = pb.mul(this.params.lightColor, pb.vec4(this.sunTransmittance, 1));
 
           // compute cloud
           if (cloud) {
@@ -1071,11 +1084,17 @@ export class SkyRenderer {
               this.noiseValue = pb.smoothStep(1, pb.add(1, this.cloudy), this.noiseValue);
             });
             // use sun color as cloud color
+            /*
             this.$l.sunColor = pb.mul(
               pb.textureSampleLevel(this.skyLut, viewDirToUV(this, this.sunDir), 0),
               this.sunIntensity
             );
-            this.$l.cloudColor = pb.mul(this.sunColor.rgb, pb.mul(this.noiseValue, this.cloudIntensity));
+            */
+            this.$l.cloudColor = pb.mul(
+              this.sunColor.rgb,
+              this.sunIntensity,
+              pb.mul(this.noiseValue, this.cloudIntensity)
+            );
           }
 
           // Compute sky color
@@ -1087,6 +1106,7 @@ export class SkyRenderer {
           this.$l.skyColor = skyBox(
             this,
             this.params,
+            this.sunColor,
             this.$inputs.worldDirection,
             pb.float(0.01),
             this.skyLut

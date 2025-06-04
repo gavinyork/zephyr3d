@@ -12,7 +12,6 @@ import type { PickTarget } from '../render';
 import { SceneRenderer } from '../render';
 import type { Compositor } from '../posteffect';
 import { DRef, DWeakRef } from '../app';
-import { DirectionalLight } from './light';
 
 /**
  * Presents a world that manages a couple of objects that will be rendered
@@ -225,7 +224,6 @@ export class Scene extends makeEventTarget(Object)<{
       this.updateEnvLight();
       this.dispatchEvent('update', this);
       this.updateNodePlacement(this._octree, this._nodePlaceList);
-      this.env.sky.update(DirectionalLight.getSunLight(this));
       const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
       const deltaInSeconds = frameInfo.elapsedFrame * 0.001;
       const queue = this._nodeUpdateQueue;

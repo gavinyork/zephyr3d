@@ -278,13 +278,10 @@ export class SceneRenderer {
   protected static _renderScene(ctx: DrawContext): void {
     const device = ctx.device;
 
-    // Cull scene and gather lights
+    // Cull scene
     const renderQueue = this._scenePass.cullScene(ctx, ctx.camera);
-    ctx.sunLight = renderQueue.sunLight;
-    ctx.clusteredLight = this.getClusteredLight();
-    ctx.clusteredLight.calculateLightIndex(ctx.camera, renderQueue);
 
-    /*
+    // Update sky
     const useScatter =
       ctx.scene.env.sky.skyType === 'scatter' ||
       ctx.scene.env.sky.skyType === 'scatter-nocloud' ||
@@ -292,7 +289,9 @@ export class SceneRenderer {
     if (useScatter) {
       ctx.scene.env.sky.renderAtmosphereLUTs(ctx);
     }
-    const sunLightColor = ctx.sunLight && useScatter ? new Vector4(ctx.sunLight.diffuseAndIntensity) : null;
+    ctx.scene.env.sky.update(ctx);
+
+    const sunLightColor = ctx.sunLight && useScatter ? ctx.sunLight.color : null;
     // Apply sun
     if (sunLightColor) {
       const sunTransmittance = ctx.scene.env.sky.sunTransmittance(ctx.sunLight);
@@ -301,7 +300,10 @@ export class SceneRenderer {
         new Vector4(sunTransmittance.x, sunTransmittance.y, sunTransmittance.z, 1)
       );
     }
-    */
+
+    // Gather lights
+    ctx.clusteredLight = this.getClusteredLight();
+    ctx.clusteredLight.calculateLightIndex(ctx.camera, renderQueue);
 
     // Do GPU ray picking if required
     const pickResolveFunc = ctx.camera.getPickResultResolveFunc();
@@ -394,12 +396,10 @@ export class SceneRenderer {
     //ShadowMapper.releaseTemporalResources(ctx);
     this.freeClusteredLight(ctx.clusteredLight);
 
-    /*
     // Restore sun color
     if (sunLightColor) {
-      ctx.sunLight.color.set(sunLightColor);
+      ctx.sunLight.color = sunLightColor;
     }
-    */
   }
   /** @internal */
   private static renderShadowMaps(ctx: DrawContext, lights: PunctualLight[]) {
