@@ -7,15 +7,21 @@ import type { SceneView } from '../views/sceneview';
 import { Database, type DBSceneInfo } from '../storage/db';
 import { Dialog } from '../views/dlg/dlg';
 import { ZipDownloader } from '../helpers/zipdownload';
+import type { Editor } from '../core/editor';
 
 export class SceneController extends BaseController<SceneModel> {
+  protected _editor: Editor;
   protected _scene: DBSceneInfo;
   protected _view: SceneView;
   protected _assetRegistry: AssetRegistry;
-  constructor(model: SceneModel, view: SceneView, assetRegistry: AssetRegistry) {
+  constructor(editor: Editor, model: SceneModel, view: SceneView, assetRegistry: AssetRegistry) {
     super(model);
+    this._editor = editor;
     this._view = view;
     this._assetRegistry = assetRegistry;
+  }
+  get editor() {
+    return this._editor;
   }
   handleEvent(ev: Event, type?: string): boolean {
     return this._view.handleEvent(ev, type);

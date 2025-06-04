@@ -12,7 +12,7 @@ const studioApp = new Application({
 studioApp.ready().then(async () => {
   const device = studioApp.device;
   await imGuiInit(device, `'Consolas', 'Monaco', 'Courier New', monospace`);
-  const editor = Editor.instance;
+  const editor = new Editor();
   await editor.init();
   editor.registerModules();
   studioApp.inputManager.use(editor.handleEvent.bind(editor));

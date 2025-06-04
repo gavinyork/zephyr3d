@@ -338,6 +338,21 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           }
         },
         {
+          name: 'AtmosphereExposure',
+          type: 'float',
+          options: { minValue: 0, maxValue: 8 },
+          default: 1,
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.atmosphereExposure;
+          },
+          set(this: Scene, value) {
+            this.env.sky.atmosphereExposure = value.num[0];
+          },
+          isValid() {
+            return this.env.sky.skyType === 'scatter';
+          }
+        },
+        {
           name: 'Cloudy',
           type: 'float',
           default: 0.6,

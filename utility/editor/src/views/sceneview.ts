@@ -58,8 +58,10 @@ import { NodeProxy } from '../helpers/proxy';
 import type { EditTool } from './edittools/edittool';
 import { createEditTool, isObjectEditable } from './edittools/edittool';
 import { calcHierarchyBoundingBox } from '../helpers/misc';
+import type { Editor } from '../core/editor';
 
 export class SceneView extends BaseView<SceneModel> {
+  private _editor: Editor;
   private _cmdManager: CommandManager;
   private _postGizmoRenderer: PostGizmoRenderer;
   private _propGrid: PropertyEditor;
@@ -93,8 +95,9 @@ export class SceneView extends BaseView<SceneModel> {
   private _cameraAnimationTime: number;
   private _cameraAnimationDuration: number;
   private _animatedCamera: Camera;
-  constructor(model: SceneModel, assetRegistry: AssetRegistry) {
+  constructor(editor: Editor, model: SceneModel, assetRegistry: AssetRegistry) {
     super(model);
+    this._editor = editor;
     this._cmdManager = new CommandManager();
     this._transformNode = new DRef();
     this._oldTransform = null;
@@ -467,6 +470,9 @@ export class SceneView extends BaseView<SceneModel> {
       200,
       0.4
     );
+  }
+  get editor() {
+    return this._editor;
   }
   get toolbar() {
     return this._toolbar;
@@ -903,7 +909,7 @@ export class SceneView extends BaseView<SceneModel> {
       return;
     }
     if (!this._currentEditTool.get()) {
-      this._currentEditTool.set(createEditTool(node, this._assetRegistry));
+      this._currentEditTool.set(createEditTool(this.editor, node, this._assetRegistry));
     } else {
       this._currentEditTool.dispose();
     }

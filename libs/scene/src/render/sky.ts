@@ -1,8 +1,8 @@
 import { Application } from '../app/app';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders/misc';
+import type { AtmosphereParams } from '../shaders';
 import {
   aerialPerspective,
-  AtmosphereParams,
   defaultAtmosphereParams,
   getAerialPerspectiveLut,
   getAtmosphereParamsStruct,
@@ -20,15 +20,15 @@ import { BoxShape } from '../shapes';
 import { Camera } from '../camera/camera';
 import { prefilterCubemap } from '../utility/pmrem';
 import type { DirectionalLight } from '../scene';
-import type {
-  AbstractDevice,
-  BindGroup,
-  FrameBuffer,
-  GPUProgram,
-  RenderStateSet,
-  TextureCube,
-  TextureFormat,
-  VertexLayout
+import {
+  type AbstractDevice,
+  type BindGroup,
+  type FrameBuffer,
+  type GPUProgram,
+  type RenderStateSet,
+  type TextureCube,
+  type TextureFormat,
+  type VertexLayout
 } from '@zephyr3d/device';
 import type { DrawContext } from './drawable';
 import { ShaderHelper } from '../material/shader/helper';
@@ -89,6 +89,7 @@ export class SkyRenderer {
   private _irradianceFrameBuffer: DRef<FrameBuffer>;
   private _irradianceMapWidth: number;
   private _atmosphereParams: AtmosphereParams;
+  private _atmosphereExposure: number;
   private _fogType: FogType;
   private _fogColor: Vector4;
   private _fogParams: Vector4;
@@ -132,6 +133,7 @@ export class SkyRenderer {
     this._irradianceFrameBuffer = new DRef();
     this._irradianceMapWidth = 64;
     this._atmosphereParams = { ...defaultAtmosphereParams };
+    this._atmosphereExposure = 1;
     this._debugAerialPerspective = 0;
     this._fogType = 'none';
     this._fogColor = Vector4.one();
@@ -226,6 +228,13 @@ export class SkyRenderer {
   }
   set aerialPerspectiveDistance(val: number) {
     this._atmosphereParams.apDistance = val;
+  }
+  /** Atmosphere exposure */
+  get atmosphereExposure() {
+    return this._atmosphereExposure;
+  }
+  set atmosphereExposure(val) {
+    this._atmosphereExposure = val;
   }
   /** Aerial perspective density */
   get cameraHeightScale() {
@@ -425,6 +434,7 @@ export class SkyRenderer {
   renderAtmosphereLUTs(ctx: DrawContext) {
     this._atmosphereParams.lightDir.set(SkyRenderer._getSunDir(ctx.sunLight));
     this._atmosphereParams.lightColor.set(SkyRenderer._getSunColor(ctx.sunLight));
+    this._atmosphereParams.lightColor.w *= this._atmosphereExposure;
     this._atmosphereParams.cameraAspect = ctx.camera.getAspect();
     this._atmosphereParams.cameraWorldMatrix.set(ctx.camera.worldMatrix);
     renderAtmosphereLUTs(this._atmosphereParams);
@@ -1120,9 +1130,9 @@ export class SkyRenderer {
             this.$l.color = this.skyColor;
           }
           this.$if(pb.equal(this.srgbOut, 0), function () {
-            this.$outputs.outColor = pb.vec4(this.skyColor, 1);
+            this.$outputs.outColor = pb.vec4(this.color, 1);
           }).$else(function () {
-            this.$outputs.outColor = pb.vec4(linearToGamma(this, this.skyColor), 1);
+            this.$outputs.outColor = pb.vec4(linearToGamma(this, this.color), 1);
           });
         });
       }

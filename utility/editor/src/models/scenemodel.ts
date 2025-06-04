@@ -9,17 +9,23 @@ import {
 } from '@zephyr3d/scene';
 import { BaseModel } from './basemodel';
 import { Vector3 } from '@zephyr3d/base';
+import type { Editor } from '../core/editor';
 
 export class SceneModel extends BaseModel {
+  private _editor: Editor;
   private _scene: Scene;
   private _camera: Camera;
   private _compositor: Compositor;
-  constructor() {
+  constructor(editor: Editor) {
     super();
+    this._editor = editor;
     this._scene = null;
     this._camera = null;
     this._compositor = null;
     this.reset();
+  }
+  get editor() {
+    return this._editor;
   }
   get scene() {
     return this._scene;
@@ -40,7 +46,7 @@ export class SceneModel extends BaseModel {
     this._compositor = null;
     if (!scene) {
       const light = new DirectionalLight(this._scene);
-      light.intensity = 8;
+      light.intensity = 18;
       light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
       this._camera = new PerspectiveCamera(this._scene, Math.PI / 3, 1, 1, 1000);
       this._camera.lookAt(new Vector3(0, 5, 15), new Vector3(0, 0, 0), new Vector3(0, 1, 0));

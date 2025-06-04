@@ -12,18 +12,11 @@ import { AssetManager, DRef } from '@zephyr3d/scene';
 import type { Texture2D } from '@zephyr3d/device';
 
 export class Editor {
-  private static _instance: Editor;
   private _moduleManager: ModuleManager;
   private _assetImages: { brushes: { [key: string]: DRef<Texture2D> } };
-  private constructor() {
+  constructor() {
     this._moduleManager = new ModuleManager();
     this._assetImages = { brushes: {} };
-  }
-  static get instance(): Editor {
-    if (!this._instance) {
-      this._instance = new Editor();
-    }
-    return this._instance;
   }
   handleEvent(ev: Event, type?: string): boolean {
     if (imGuiInjectEvent(ev, type)) {
@@ -58,9 +51,9 @@ export class Editor {
   }
   registerModules() {
     const assetRegistry = new EditorAssetRegistry();
-    const sceneModel = new SceneModel();
-    const sceneView = new SceneView(sceneModel, assetRegistry);
-    const sceneController = new SceneController(sceneModel, sceneView, assetRegistry);
+    const sceneModel = new SceneModel(this);
+    const sceneView = new SceneView(this, sceneModel, assetRegistry);
+    const sceneController = new SceneController(this, sceneModel, sceneView, assetRegistry);
     this._moduleManager.register('Scene', sceneModel, sceneView, sceneController);
 
     this._moduleManager.activate('Scene', null);

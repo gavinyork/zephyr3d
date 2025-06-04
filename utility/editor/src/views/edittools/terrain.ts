@@ -13,7 +13,7 @@ import type { MenuItemOptions } from '../../components/menubar';
 import type { ToolBarItem } from '../../components/toolbar';
 import { ImGui } from '@zephyr3d/imgui';
 import { ImageList } from '../../components/imagelist';
-import { Editor } from '../../core/editor';
+import type { Editor } from '../../core/editor';
 import type { Texture2D, Texture2DArray } from '@zephyr3d/device';
 import { TerrainTextureBrush } from './brushes/splat';
 import { TerrainRaiseBrush } from './brushes/raise';
@@ -27,6 +27,7 @@ import { Dialog } from '../dlg/dlg';
 const blitter = new CopyBlitter();
 export class TerrainEditTool implements EditTool {
   private static defaultBrush: DRef<Texture2D> = new DRef();
+  private _editor: Editor;
   private _terrain: DRef<ClipmapTerrain>;
   private _disposed: boolean;
   private _brushSize: number;
@@ -49,8 +50,9 @@ export class TerrainEditTool implements EditTool {
   private _splatMapCopy: DRef<Texture2DArray>;
   private _heightMapCopy: DRef<Texture2D>;
   private _heightDirty: boolean;
-  constructor(terrain: ClipmapTerrain, assetRegistry: AssetRegistry) {
+  constructor(editor: Editor, terrain: ClipmapTerrain, assetRegistry: AssetRegistry) {
     this._terrain = new DRef(terrain);
+    this._editor = editor;
     this._assetRegistry = assetRegistry;
     this._brushSize = 10;
     this._brushAngle = 0;
@@ -121,8 +123,8 @@ export class TerrainEditTool implements EditTool {
     this._editSelected = 0;
     this._hitPos = null;
     this._brushImageList.addImage(TerrainEditTool.defaultBrush.get());
-    for (const name in Editor.instance.getBrushes()) {
-      this._brushImageList.addImage(Editor.instance.getBrushes()[name].get());
+    for (const name in this._editor.getBrushes()) {
+      this._brushImageList.addImage(this._editor.getBrushes()[name].get());
     }
     this._brushImageList.selected = 0;
     this._raiseBrush = new TerrainRaiseBrush();

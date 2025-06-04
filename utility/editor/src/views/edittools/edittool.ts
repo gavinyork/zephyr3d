@@ -4,6 +4,7 @@ import type { ToolBarItem } from '../../components/toolbar';
 import type { AssetRegistry, Disposable } from '@zephyr3d/scene';
 import { ClipmapTerrain } from '@zephyr3d/scene';
 import { TerrainEditTool } from './terrain';
+import type { Editor } from '../../core/editor';
 
 export interface EditTool extends Disposable {
   handlePointerEvent(evt: PointerEvent, hitObject: any, hitPos: Vector3): boolean;
@@ -19,9 +20,9 @@ export function isObjectEditable(obj: any): boolean {
   return obj instanceof ClipmapTerrain;
 }
 
-export function createEditTool(obj: any, assetRegistry: AssetRegistry): EditTool {
+export function createEditTool(editor: Editor, obj: any, assetRegistry: AssetRegistry): EditTool {
   if (obj instanceof ClipmapTerrain) {
-    return new TerrainEditTool(obj, assetRegistry);
+    return new TerrainEditTool(editor, obj, assetRegistry);
   }
   return null;
 }

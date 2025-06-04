@@ -1,4 +1,4 @@
-import {
+import type {
   BindGroup,
   FrameBuffer,
   GPUProgram,
@@ -44,12 +44,12 @@ export const defaultAtmosphereParams: Readonly<AtmosphereParams> = {
   mieAnstropy: 0.8,
   ozoneCenter: 25000,
   ozoneWidth: 15000,
-  apDistance: 32000,
+  apDistance: 4000,
   cameraWorldMatrix: Matrix4x4.identity(),
   lightDir: new Vector3(1, 0, 0),
   lightColor: new Vector4(1, 1, 1, 10),
   cameraAspect: 1,
-  cameraHeightScale: 200
+  cameraHeightScale: 50
 };
 
 let currentAtmosphereParams: AtmosphereParams = null;
@@ -697,10 +697,19 @@ export function skyBox(
         this.rgb,
         pb.textureSampleLevel(texSkyViewLut, viewDirToUV(this, this.viewDir), 0).rgb
       );
-      this.rgb = pb.add(
-        this.rgb,
-        sunBloom(this, this.viewDir, this.params.lightDir, this.sunColor, this.sunSolidAngle)
+      this.$l.groundDistance = rayIntersectSphere(
+        this,
+        pb.vec3(0),
+        this.params.plantRadius,
+        pb.vec3(0, pb.add(this.params.plantRadius, pb.mul(CAMERA_POS_Y, this.params.cameraHeightScale)), 0),
+        this.viewDir
       );
+      this.$if(pb.lessThan(this.groundDistance, 0), function () {
+        this.rgb = pb.add(
+          this.rgb,
+          sunBloom(this, this.viewDir, this.params.lightDir, this.sunColor, this.sunSolidAngle)
+        );
+      });
       this.$return(pb.vec4(this.rgb, 1));
     }
   );
