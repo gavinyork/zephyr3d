@@ -133,7 +133,7 @@ export class SkyRenderer {
     this._atmosphereParams = { ...defaultAtmosphereParams };
     this._atmosphereExposure = 1;
     this._debugAerialPerspective = 0;
-    this._fogType = 'none';
+    this._fogType = 'scatter';
     this._fogColor = Vector4.one();
     this._fogParams = new Vector4(1, 100, 50, 0.002);
     this._cloudy = 0.45;
