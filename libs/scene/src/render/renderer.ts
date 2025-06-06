@@ -189,7 +189,7 @@ export class SceneRenderer {
           ctx.renderHeight,
           ctx.motionVectors ? [format, mvFormat] : format,
           ctx.depthFormat,
-          ctx.HiZ
+          false
         );
       } else {
         const originDepth = ctx.finalFramebuffer?.getDepthAttachment();
@@ -200,7 +200,7 @@ export class SceneRenderer {
               originDepth.height,
               ctx.motionVectors ? [format, mvFormat] : format,
               originDepth,
-              ctx.HiZ
+              false
             )
           : ctx.device.pool.fetchTemporalFramebuffer(
               true,
@@ -208,7 +208,7 @@ export class SceneRenderer {
               ctx.renderHeight,
               ctx.motionVectors ? [format, mvFormat] : format,
               ctx.depthFormat,
-              ctx.HiZ
+              false
             );
       }
     }

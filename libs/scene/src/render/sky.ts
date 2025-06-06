@@ -470,7 +470,9 @@ export class SkyRenderer {
       const tex =
         this._bakedSkyboxTexture.get() && this._bakedSkyboxTexture.get() !== this.skyboxTexture
           ? this._bakedSkyboxTexture.get()
-          : device.createCubeTexture(format, this._scatterSkyboxTextureWidth);
+          : device.createCubeTexture(format, this._scatterSkyboxTextureWidth, {
+              samplerOptions: { mipFilter: 'none' }
+            });
       tex.name = 'BakedSkyboxTexture';
       const scatterSkyboxFramebuffer = device.pool.fetchTemporalFramebuffer(false, 0, 0, tex, null);
       const camera = SkyRenderer._skyCamera;
