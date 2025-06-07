@@ -201,6 +201,7 @@ export class GLTFViewer {
       )
       .then((info) => {
         this._camera.clearHistoryData();
+        this._modelNode.get()?.remove();
         this._modelNode.set(info.group);
         this._modelNode.get().parent = this._batchGroup;
         this._animationSet.set(info.animationSet);
