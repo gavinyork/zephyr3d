@@ -494,6 +494,7 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
                 heightMap.update(new Uint16Array(data, 8), 0, 0, width, height);
                 this.heightMap = heightMap;
                 this.heightMapAssetId = value.str[0];
+                this.updateBoundingBox();
               }
             }
           }

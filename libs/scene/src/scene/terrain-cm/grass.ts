@@ -409,15 +409,9 @@ export class GrassQuadtreeNode implements Disposable {
     }
   }
   addInstances(instances: GrassInstanceInfo[]) {
-    const aera = (this._maxX - this._minX) * (this._maxZ - this._minZ);
-    const maxNumGrasses = aera * 8;
-    const n = Math.min(
-      maxNumGrasses,
-      instances.length,
-      MAX_INSTANCES_PER_NODE - this._grassInstances.get().numInstances
-    );
+    const n = Math.min(instances.length, MAX_INSTANCES_PER_NODE - this._grassInstances.get().numInstances);
     this._grassInstances.get().addInstances(instances.slice(0, n));
-    if (aera > 0.2 && n < instances.length) {
+    if (n < instances.length) {
       if (!this._children) {
         this._children = [
           new GrassQuadtreeNode(this._baseVertexBuffer.get(), this._indexBuffer.get()),
@@ -444,10 +438,12 @@ export class GrassQuadtreeNode implements Disposable {
       }
       for (const child of this._children) {
         child.addInstances(
-          instances.filter(
-            (val) =>
-              val.x >= child._minX && val.y >= child._minZ && val.x < child._maxX && val.y < child._maxZ
-          )
+          instances
+            .slice(n)
+            .filter(
+              (val) =>
+                val.x >= child._minX && val.y >= child._minZ && val.x < child._maxX && val.y < child._maxZ
+            )
         );
       }
     }
