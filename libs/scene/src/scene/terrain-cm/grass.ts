@@ -21,14 +21,14 @@ export type GrassInstanceInfo = {
 const INSTANCE_BYTES = 4 * 4;
 
 export class GrassInstances implements Disposable {
+  private _instances: GrassInstanceInfo[];
   private _baseVertexBuffer: DRef<StructuredBuffer>;
   private _indexBuffer: DRef<IndexBuffer>;
-  private _numInstances: number;
   private _instanceBuffer: DRef<StructuredBuffer>;
   private _primitive: DRef<Primitive>;
   private _disposed: boolean;
   constructor(baseVertexBuffer: StructuredBuffer, indexBuffer: IndexBuffer) {
-    this._numInstances = 0;
+    this._instances = [];
     this._baseVertexBuffer = new DRef(baseVertexBuffer);
     this._indexBuffer = new DRef(indexBuffer);
     this._instanceBuffer = new DRef();
@@ -36,7 +36,7 @@ export class GrassInstances implements Disposable {
     this._disposed = false;
   }
   get numInstances() {
-    return this._numInstances;
+    return this._instances.length;
   }
   get instanceBuffer(): StructuredBuffer {
     return this._instanceBuffer.get();
@@ -51,17 +51,19 @@ export class GrassInstances implements Disposable {
     }
   }
   draw() {
-    if (!this._primitive.get()) {
-      const primitive = new Primitive();
-      primitive.setVertexBuffer(this._baseVertexBuffer.get());
-      primitive.setVertexBuffer(this._instanceBuffer.get(), 'instance');
-      primitive.setIndexBuffer(this._indexBuffer.get());
-      primitive.primitiveType = 'triangle-list';
-      primitive.indexStart = 0;
-      primitive.indexCount = this._indexBuffer.get().length;
-      this._primitive.set(primitive);
+    if (this._instances.length > 0) {
+      if (!this._primitive.get()) {
+        const primitive = new Primitive();
+        primitive.setVertexBuffer(this._baseVertexBuffer.get());
+        primitive.setVertexBuffer(this._instanceBuffer.get(), 'instance');
+        primitive.setIndexBuffer(this._indexBuffer.get());
+        primitive.primitiveType = 'triangle-list';
+        primitive.indexStart = 0;
+        primitive.indexCount = this._indexBuffer.get().length;
+        this._primitive.set(primitive);
+      }
+      this._primitive.get().drawInstanced(this._instances.length);
     }
-    this._primitive.get().drawInstanced(this._numInstances);
   }
   dispose(): void {
     if (!this._disposed) {
@@ -69,36 +71,57 @@ export class GrassInstances implements Disposable {
       this._instanceBuffer.dispose();
     }
   }
-  addInstances(instances: GrassInstanceInfo[]) {
-    if (instances.length === 0) {
+  updateBuffers() {
+    const device = Application.instance.device;
+    if (this._instances.length === 0) {
+      this._instanceBuffer.set(null);
       return;
     }
-    const device = Application.instance.device;
-    if (!this._instanceBuffer.get()) {
+    if (this._instances.length > 0 && !this._instanceBuffer.get()) {
       this._instanceBuffer.set(
-        device.createVertexBuffer('tex1_f32x4', new Uint8Array(instances.length * INSTANCE_BYTES))
+        device.createVertexBuffer('tex1_f32x4', new Uint8Array(this._instances.length * INSTANCE_BYTES))
       );
     }
     let buffer = this._instanceBuffer.get();
     const currentBytes = buffer.byteLength;
-    const bytesRequired = (this._numInstances + instances.length) * INSTANCE_BYTES;
-    const offset = this._numInstances * INSTANCE_BYTES;
+    const bytesRequired = this._instances.length * INSTANCE_BYTES;
     if (currentBytes < bytesRequired) {
-      const newBuffer = device.createVertexBuffer('tex1_f32x4', new Uint8Array(nextPowerOf2(bytesRequired)));
-      device.copyBuffer(buffer, newBuffer, 0, 0, offset);
-      buffer = newBuffer;
+      buffer = device.createVertexBuffer('tex1_f32x4', new Uint8Array(nextPowerOf2(bytesRequired)));
       this._instanceBuffer.set(buffer);
       this._primitive.dispose();
     }
-    const data = new Float32Array(4 * instances.length);
-    for (let i = 0; i < instances.length; i++) {
-      data[i * 4 + 0] = instances[i].x;
-      data[i * 4 + 1] = instances[i].y;
-      data[i * 4 + 2] = Math.sin(instances[i].angle);
-      data[i * 4 + 3] = Math.cos(instances[i].angle);
+    const data = new Float32Array(4 * this._instances.length);
+    for (let i = 0; i < this._instances.length; i++) {
+      data[i * 4 + 0] = this._instances[i].x;
+      data[i * 4 + 1] = this._instances[i].y;
+      data[i * 4 + 2] = Math.sin(this._instances[i].angle);
+      data[i * 4 + 3] = Math.cos(this._instances[i].angle);
     }
-    buffer.bufferSubData(offset, data);
-    this._numInstances += instances.length;
+    buffer.bufferSubData(0, data);
+  }
+  removeInstances(minX: number, minZ: number, maxX: number, maxZ: number, num: number) {
+    if (num <= 0) {
+      return 0;
+    }
+    let removed = 0;
+    for (let i = this._instances.length - 1; i >= 0; i--) {
+      const instance = this._instances[i];
+      if (instance.x >= minX && instance.x <= maxX && instance.y >= minZ && instance.y <= maxZ) {
+        this._instances.splice(i, 1);
+        removed++;
+        if (removed === num) {
+          break;
+        }
+      }
+    }
+    if (removed > 0) {
+      this.updateBuffers();
+    }
+    return removed;
+  }
+  addInstances(instances: GrassInstanceInfo[]) {
+    this._instances.push(...instances);
+    this.updateBuffers();
   }
 }
 
@@ -141,6 +164,9 @@ export class GrassLayer implements Disposable {
   }
   addInstances(instances: GrassInstanceInfo[]) {
     this._quadtree.get().addInstances(instances);
+  }
+  removeInstances(minX: number, minZ: number, maxX: number, maxZ: number, numInstances: number) {
+    this._quadtree.get().removeInstances(minX, minZ, maxX, maxZ, numInstances);
   }
   get bladeWidth() {
     return this._bladeWidth;
@@ -321,6 +347,14 @@ export class GrassRenderer implements Disposable {
       grassLayer.addInstances(instances);
     }
   }
+  removeInstances(layer: number, minX: number, minZ: number, maxX: number, maxZ: number, num: number) {
+    const grassLayer = this._layers[layer];
+    if (!grassLayer) {
+      console.error(`Invalid grass layer: ${layer}`);
+    } else {
+      grassLayer.removeInstances(minX, minZ, maxX, maxZ, num);
+    }
+  }
   get disposed() {
     return this._disposed;
   }
@@ -408,8 +442,30 @@ export class GrassQuadtreeNode implements Disposable {
       }
     }
   }
-  addInstances(instances: GrassInstanceInfo[]) {
-    const n = Math.min(instances.length, MAX_INSTANCES_PER_NODE - this._grassInstances.get().numInstances);
+  removeInstances(minX: number, minZ: number, maxX: number, maxZ: number, numInstances: number): number {
+    let n = Math.min(this._grassInstances.get().numInstances, numInstances);
+    if (n <= 0) {
+      return 0;
+    }
+    let removed = 0;
+    if (this._children) {
+      for (const child of this._children) {
+        if (child._minX < maxX && child._minZ < maxZ && child._maxX > minX && child._maxZ > minZ) {
+          removed += child.removeInstances(minX, minZ, maxX, maxZ, n);
+          n -= removed;
+        }
+      }
+    }
+    if (n > 0) {
+      removed += this._grassInstances.get().removeInstances(minX, minZ, maxX, maxZ, n);
+    }
+    return removed;
+  }
+  addInstances(instances: GrassInstanceInfo[]): number {
+    if (instances.length === 0) {
+      return 0;
+    }
+    let n = Math.min(instances.length, MAX_INSTANCES_PER_NODE - this._grassInstances.get().numInstances);
     this._grassInstances.get().addInstances(instances.slice(0, n));
     if (n < instances.length) {
       if (!this._children) {
@@ -437,16 +493,19 @@ export class GrassQuadtreeNode implements Disposable {
         this._children[3]._maxZ = this._maxZ;
       }
       for (const child of this._children) {
-        child.addInstances(
-          instances
-            .slice(n)
-            .filter(
-              (val) =>
-                val.x >= child._minX && val.y >= child._minZ && val.x < child._maxX && val.y < child._maxZ
-            )
-        );
+        if (n < instances.length) {
+          n += child.addInstances(
+            instances
+              .slice(n)
+              .filter(
+                (val) =>
+                  val.x >= child._minX && val.y >= child._minZ && val.x < child._maxX && val.y < child._maxZ
+              )
+          );
+        }
       }
     }
+    return n;
   }
   get disposed() {
     return this._disposed;

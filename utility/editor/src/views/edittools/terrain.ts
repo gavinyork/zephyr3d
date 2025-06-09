@@ -119,7 +119,7 @@ export class TerrainEditTool implements EditTool {
       material.setDetailNormalMap(index, this._detailNormal.getImage(index));
       this.refreshDetailMaps();
     });
-    this._editList = ['raise', 'lower', 'smooth', 'flatten', 'texture', 'grass'];
+    this._editList = ['raise', 'lower', 'smooth', 'flatten', 'texture', 'grass', 'erase grass'];
     this._editSelected = 0;
     this._hitPos = null;
     this._brushImageList.addImage(TerrainEditTool.defaultBrush.get());
@@ -242,10 +242,41 @@ export class TerrainEditTool implements EditTool {
             );
           }
           break;
+        case 'erase grass':
+          if (this._grassAlbedo.selected >= 0) {
+            this.applyGrassEraseBrush(
+              this._hitPos,
+              this._brushSize,
+              this._brushStrength,
+              this._grassAlbedo.selected
+            );
+          }
+          break;
         default:
           break;
       }
     }
+  }
+  applyGrassEraseBrush(hitPos: Vector2, brushSize: number, brushStrength: number, grassIndex: number) {
+    const region = this._terrain.get().worldRegion;
+    const posMinX = Math.max(hitPos.x - brushSize, region.x);
+    const posMaxX = Math.min(hitPos.x + brushSize, region.z);
+    const posMinZ = Math.max(hitPos.y - brushSize, region.y);
+    const posMaxZ = Math.min(hitPos.y + brushSize, region.w);
+    const area = (posMaxZ - posMinZ) * (posMaxX - posMinX);
+    const regionWidthInv = 1 / (region.z - region.x);
+    const regionHeightInv = 1 / (region.w - region.y);
+    const numInstances = Math.ceil(area * brushStrength * 0.1);
+    this._terrain
+      .get()
+      .grassRenderer.removeInstances(
+        grassIndex,
+        (posMinX - region.x) * regionWidthInv,
+        (posMinZ - region.y) * regionHeightInv,
+        (posMaxX - region.x) * regionWidthInv,
+        (posMaxZ - region.y) * regionHeightInv,
+        numInstances
+      );
   }
   applyGrassBrush(hitPos: Vector2, brushSize: number, brushStrength: number, grassIndex: number) {
     const region = this._terrain.get().worldRegion;
@@ -524,7 +555,10 @@ export class TerrainEditTool implements EditTool {
       this.renderEditSection();
       if (this._editList[this._editSelected] === 'texture') {
         this.renderDetailMapSection();
-      } else if (this._editList[this._editSelected] === 'grass') {
+      } else if (
+        this._editList[this._editSelected] === 'grass' ||
+        this._editList[this._editSelected] === 'erase grass'
+      ) {
         this.renderGrassTextureSection();
       }
     }
