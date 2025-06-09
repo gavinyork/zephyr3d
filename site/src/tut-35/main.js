@@ -44,8 +44,6 @@ myApp.ready().then(async () => {
   scene.env.sky.skyType = 'scatter';
   // Set the fog effect to atmospheric scattering
   scene.env.sky.fogType = 'scatter';
-  // Sets aerial perspective density
-  scene.env.sky.aerialPerspectiveDensity = 20;
 
   // Create the ground and some boxes
 

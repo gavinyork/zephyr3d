@@ -122,7 +122,6 @@ export class Demo {
     scene.env.light.irradianceMap = scene.env.sky.irradianceMap;
     scene.env.sky.skyType = 'scatter';
     scene.env.sky.fogType = 'scatter';
-    scene.env.sky.aerialPerspectiveDensity = 10;
     scene.env.sky.cloudy = 0.6;
 
     const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1)).setIntensity(25);
