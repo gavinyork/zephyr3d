@@ -57,14 +57,12 @@ type RotateInfo = {
 };
 
 type ScaleInfo = {
-  startX: number;
-  startY: number;
-  lastX: number;
-  lastY: number;
-  startPosition: number;
   axis: number;
-  bindingPosition: Vector3;
-  planePosition?: Vector3;
+  startY: number;
+  planeAxis: number;
+  lastPlanePos: Vector3;
+  type: HitType;
+  scale: Vector3;
 };
 
 /**
@@ -381,7 +379,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
             return true;
           }
           if (this._mode === 'scaling' && !this._scaleInfo) {
-            this._beginScale(x, y, hitInfo.axis, hitInfo.coord);
+            this._beginScale(x, y, hitInfo.axis, hitInfo.type, hitInfo.pointLocal);
             return true;
           }
         }
@@ -433,6 +431,13 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       if (this._mode === 'scaling') {
         const d = rayLocal.bboxIntersectionTestEx(this._scaleBox);
         if (d > 0) {
+          hitInfo.type = 'scale_uniform';
+          hitInfo.distance = d;
+          hitInfo.pointLocal = Vector3.add(
+            rayLocal.origin,
+            Vector3.scale(rayLocal.direction, hitInfo.distance)
+          );
+          hitInfo.pointWorld = worldMatrix.transformPointAffine(hitInfo.pointLocal);
           return hitInfo;
         }
       }
@@ -487,6 +492,15 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       }
     }
     return null;
+  }
+  rayPlaneIntersection(P: Vector3, N: Vector3, Q: Vector3, V: Vector3) {
+    const denominator = Vector3.dot(N, V);
+    if (Math.abs(denominator) < 1e-10) {
+      return null;
+    }
+    const PQ = Vector3.sub(P, Q);
+    const t = Vector3.dot(N, PQ) / denominator;
+    return Vector3.add(Q, Vector3.scale(V, t));
   }
   private _beginRotate(startX: number, startY: number, axis: number, hitPosition: Vector3) {
     this._endTranslation();
@@ -556,53 +570,70 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
       }
     }
   }
-  private _beginScale(startX: number, startY: number, axis: number, startPosition: number) {
+  private _beginScale(startX: number, startY: number, axis: number, type: HitType, pointLocal: Vector3) {
     this._endRotate();
     this._endTranslation();
     Application.instance.device.canvas.style.cursor = 'grab';
+    let planeAxis = axis;
+    if (type === 'move_axis') {
+      const ray = this._camera.constructRay(startX, startY);
+      const worldMatrix = this._calcGizmoWorldMatrix(this._mode, false);
+      const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
+      const rayLocal = ray.transform(invWorldMatrix);
+      const t = [0, 1, 2];
+      t.splice(axis, 1);
+      if (Math.abs(rayLocal.direction[t[0]]) > Math.abs(rayLocal.direction[t[1]])) {
+        planeAxis = t[0];
+      } else {
+        planeAxis = t[1];
+      }
+      const d = (0 - rayLocal.origin[planeAxis]) / rayLocal.direction[planeAxis];
+      pointLocal.set(rayLocal.direction);
+      pointLocal.scaleBy(d);
+      pointLocal.addBy(rayLocal.origin);
+    }
+    const scale = new Vector3();
+    this._calcGizmoWorldMatrix(this._mode, false).decompose(scale);
     this._scaleInfo = {
-      startX,
-      startY,
-      lastX: startX,
-      lastY: startY,
       axis,
-      startPosition,
-      bindingPosition: this._node ? new Vector3(this._node.position) : Vector3.zero()
+      startY,
+      planeAxis,
+      type,
+      scale: new Vector3(this._node.scale),
+      lastPlanePos: pointLocal.mulBy(scale)
     };
     this.dispatchEvent('begin_scale', this._node);
+  }
+  private _calcScaleFactor(d: number) {
+    return 1 + d * 0.2;
   }
   private _updateScale(x: number, y: number) {
     if (!this._scaleInfo) {
       return;
     }
-    let axisIndex = this._scaleInfo.axis;
-    if (axisIndex < 0) {
-      axisIndex = 1;
-      console.log(`Uniform scaling at ${axisIndex} axis`);
+    const ray = this._camera.constructRay(x, y);
+    const worldMatrix = this._calcGizmoWorldMatrix(this._mode, true);
+    const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
+    const rayLocal = ray.transform(invWorldMatrix);
+    if (Math.abs(rayLocal.direction[this._scaleInfo.planeAxis]) < 0.0001) {
+      return;
     }
-    const movementY = y - this._scaleInfo.lastY;
-    const scale = 0.95 ** movementY;
-    if (this._node && !this._node.isLight()) {
-      if (this._scaleInfo.axis < 0) {
-        this._node.scale.x *= scale;
-        this._node.scale.y *= scale;
-        this._node.scale.z *= scale;
-      } else {
-        switch (this._scaleInfo.axis) {
-          case 0:
-            this._node.scale.x *= scale;
-            break;
-          case 1:
-            this._node.scale.y *= scale;
-            break;
-          case 2:
-            this._node.scale.z *= scale;
-            break;
-        }
-      }
+    const t = ['x', 'y', 'z'];
+    if (this._scaleInfo.type === 'move_axis') {
+      const c = t[this._scaleInfo.axis];
+      const d =
+        (0 - rayLocal.origin[this._scaleInfo.planeAxis]) / rayLocal.direction[this._scaleInfo.planeAxis];
+      const p = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, d));
+      this._node.scale[c] =
+        this._scaleInfo.scale[c] *
+        this._calcScaleFactor(p[this._scaleInfo.axis] - this._scaleInfo.lastPlanePos[this._scaleInfo.axis]);
+    } else if (this._scaleInfo.type === 'scale_uniform') {
+      const d = this._scaleInfo.startY - y;
+      const factor = this._calcScaleFactor(d / 20);
+      this._node.scale.x = this._scaleInfo.scale.x * factor;
+      this._node.scale.y = this._scaleInfo.scale.y * factor;
+      this._node.scale.z = this._scaleInfo.scale.z * factor;
     }
-    this._scaleInfo.lastX = x;
-    this._scaleInfo.lastY = y;
   }
   private _endScale() {
     Application.instance.device.canvas.style.cursor = 'default';
