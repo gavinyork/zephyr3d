@@ -4,7 +4,6 @@ import {
   Application,
   OrbitCameraController,
   PerspectiveCamera,
-  Compositor,
   Tonemap,
   Mesh,
   BoxShape,
@@ -55,17 +54,15 @@ myApp.ready().then(function () {
   const eyePos = new Vector3(30, 30, 30);
   camera.lookAt(eyePos, Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
-
-  const compositor = new Compositor();
   // Add a Tonemap post-processing effect
-  compositor.appendPostEffect(new Tonemap());
+  camera.compositor.appendPostEffect(new Tonemap());
 
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
   myApp.on('tick', function () {
     light.position.setXYZ(20 * Math.cos(Date.now() * 0.001) - 10, 15, 20 * Math.sin(Date.now() * 0.001) - 10);
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   myApp.run();

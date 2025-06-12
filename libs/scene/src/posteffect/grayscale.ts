@@ -8,8 +8,7 @@ import { fetchSampler } from '../utility/misc';
  * Grayscale post effect
  * @public
  */
-export class Grayscale extends AbstractPostEffect<'Grayscale'> {
-  static readonly className = 'Grayscale' as const;
+export class Grayscale extends AbstractPostEffect {
   private static _program: GPUProgram = null;
   private static _bindgroup: BindGroup = null;
   /**

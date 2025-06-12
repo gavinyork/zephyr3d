@@ -65,8 +65,7 @@ class DepthLimitAOBlurBlitter extends BilateralBlurBlitter {
  * The Scalable Ambient Obscurance (SAO) post effect
  * @public
  */
-export class SAO extends AbstractPostEffect<'SAO'> {
-  static readonly className = 'SAO' as const;
+export class SAO extends AbstractPostEffect {
   private static _program: GPUProgram = null;
   private static _programPacked: GPUProgram = null;
   private static _renderState: RenderStateSet = null;

@@ -5,7 +5,6 @@ import {
   Application,
   PerspectiveCamera,
   DirectionalLight,
-  Compositor,
   Tonemap,
   PBRMetallicRoughnessMaterial,
   BoxShape,
@@ -74,9 +73,7 @@ myApp.ready().then(async () => {
     box2.material = material;
   }
 
-  // Added a Tonemap post-processing effect
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
+  camera.compositor.appendPostEffect(new Tonemap());
 
   // Reset aspect ratio when size was changed
   myApp.on('resize', (width, height) => {
@@ -85,7 +82,7 @@ myApp.ready().then(async () => {
 
   myApp.on('tick', function () {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   myApp.run();

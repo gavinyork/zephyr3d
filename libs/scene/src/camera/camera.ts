@@ -36,8 +36,6 @@ export type CameraHistoryData = {
  */
 export class Camera extends SceneNode implements NodeClonable<Camera> {
   /** @internal */
-  private static _defaultCompositor = new Compositor();
-  /** @internal */
   private static _halton23 = halton23(16);
   /** @internal */
   private static _historyData: WeakMap<Camera, CameraHistoryData> = new WeakMap();
@@ -131,6 +129,8 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   protected _prevPosition: Vector3;
   /** @internal */
   protected _prevJitteredVPMatrix: Matrix4x4;
+  /** @internal */
+  protected _compositor: Compositor;
   /**
    * Creates a new camera node
    *
@@ -182,6 +182,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._pickResultResolve = null;
     this._pickPosX = 0;
     this._pickPosY = 0;
+    this._compositor = new Compositor();
   }
   clone(method: NodeCloneMethod, recursive: boolean): Camera {
     const other = new Camera(this.scene);
@@ -215,6 +216,10 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this.scissor = other.scissor;
     this.clearColor = other.clearColor;
     this.setProjectionMatrix(other.getProjectionMatrix());
+  }
+  /** Compositor */
+  get compositor() {
+    return this._compositor;
   }
   /** Clip plane in camera space */
   get clipPlane(): Plane {
@@ -712,8 +717,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    * @param scene - The scene to be rendered
    * @param compositor - Compositor instance that will be used to apply postprocess effects
    */
-  render(scene: Scene, compositor?: Compositor) {
-    compositor = compositor ?? Camera._defaultCompositor;
+  render(scene: Scene) {
     const device = Application.instance.device;
     const useTAA = this.TAA && device.type !== 'webgl';
     const useSSR = this.SSR;
@@ -721,15 +725,15 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
       if (!Camera._TAA) {
         Camera._TAA = new TAA();
       }
-      compositor.appendPostEffect(Camera._TAA);
+      this._compositor.appendPostEffect(Camera._TAA);
     }
     if (useSSR) {
       if (!Camera._SSR) {
         Camera._SSR = new SSR();
       }
-      compositor.appendPostEffect(Camera._SSR);
+      this._compositor.appendPostEffect(Camera._SSR);
     }
-    scene.dispatchEvent('startrender', scene, this, compositor);
+    scene.dispatchEvent('startrender', scene, this, this._compositor);
     if (useTAA) {
       const width = device.getDrawingBufferWidth();
       const height = device.getDrawingBufferHeight();
@@ -761,7 +765,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     device.pushDeviceStates();
     device.reverseVertexWindingOrder(false);
     scene.getRenderer().setClearColor(this._clearColor);
-    scene.getRenderer().renderScene(scene, this, compositor);
+    scene.getRenderer().renderScene(scene, this);
     device.popDeviceStates();
     if (useTAA) {
       this._prevJitteredVPMatrix.set(this._jitteredVPMatrix);
@@ -769,12 +773,12 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
       this._prevVPMatrix.set(this.viewProjectionMatrix);
       this._prevPosition = this.getWorldPosition();
     }
-    scene.dispatchEvent('endrender', scene, this, compositor ?? null);
+    scene.dispatchEvent('endrender', scene, this, this._compositor);
     if (useTAA) {
-      compositor.removePostEffect(Camera._TAA);
+      this._compositor.removePostEffect(Camera._TAA);
     }
     if (useSSR) {
-      compositor.removePostEffect(Camera._SSR);
+      this._compositor.removePostEffect(Camera._SSR);
     }
   }
   async pickAsync(posX: number, posY: number): Promise<PickResult> {

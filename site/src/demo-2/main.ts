@@ -14,8 +14,7 @@ import {
   Mesh,
   DirectionalLight,
   PerspectiveCamera,
-  SphereShape,
-  Compositor
+  SphereShape
 } from '@zephyr3d/scene';
 import type { DeviceBackend } from '@zephyr3d/device';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
@@ -112,8 +111,7 @@ lightApp.ready().then(async () => {
     260
   );
   camera.controller = new FPSCameraController({ moveSpeed: 0.05 });
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
+  camera.compositor.appendPostEffect(new Tonemap());
 
   lightApp.inputManager.use(camera.handleEvent.bind(camera));
 
@@ -256,7 +254,7 @@ lightApp.ready().then(async () => {
       f(device.frameInfo.elapsedFrame * 0.004);
     }
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
     if (message) {
       lightApp.device.drawText(message, 20, 20, '#a00000');
     } else if (!ui) {

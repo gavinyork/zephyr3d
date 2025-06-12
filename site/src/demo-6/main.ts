@@ -8,7 +8,6 @@ import {
   DirectionalLight,
   Application,
   PerspectiveCamera,
-  Compositor,
   Tonemap,
   BatchGroup,
   LambertMaterial,
@@ -54,10 +53,8 @@ app.ready().then(async () => {
   );
   camera.position.setXYZ(0, 0, 100);
   camera.controller = new OrbitCameraController();
+  camera.compositor.appendPostEffect(new Tonemap());
   app.inputManager.use(camera.handleEvent.bind(camera));
-
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
 
   const numMaterials = 8;
   const batchGroup = new BatchGroup(scene);
@@ -103,7 +100,7 @@ app.ready().then(async () => {
 
   app.on('tick', () => {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   if (showUI) {

@@ -6,7 +6,6 @@ import {
   Application,
   AssetManager,
   Bloom,
-  Compositor,
   DirectionalLight,
   FFTWaveGenerator,
   FXAA,
@@ -30,7 +29,6 @@ export class Demo {
   private _terrain: Terrain;
   private _camera: PerspectiveCamera;
   private _character: ModelInfo;
-  private _compositor: Compositor;
   private _axisPZ: Vector3;
   private _actorTarget: Vector3;
   private _actorDirection: Vector3;
@@ -52,10 +50,9 @@ export class Demo {
     this._scene = this.createScene();
     this._root = new BatchGroup(this._scene) ?? new SceneNode(this._scene);
     this._camera = this.createCamera(this._scene);
-    this._compositor = new Compositor();
-    this._compositor.appendPostEffect(new Tonemap());
-    this._compositor.appendPostEffect(new Bloom());
-    this._compositor.appendPostEffect(new FXAA());
+    this._camera.compositor.appendPostEffect(new Tonemap());
+    this._camera.compositor.appendPostEffect(new Bloom());
+    this._camera.compositor.appendPostEffect(new FXAA());
     Application.instance.device.setFont('24px arial');
     this.render();
     this._loaded = false;
@@ -194,7 +191,7 @@ export class Demo {
         water.ssr = false;
         water.displace = 80;
       }
-      this._compositor.appendPostEffect(water);
+      this._camera.compositor.appendPostEffect(water);
       // loaded
       this._terrain.showState = 'visible';
       this._scene.env.sky.wind.setXY(700, 350);
@@ -476,7 +473,7 @@ export class Demo {
       this.updateCharacter();
       this.updateCamera();
     }
-    this._camera.render(this._scene, this._compositor);
+    this._camera.render(this._scene);
     if (!this._loaded) {
       Application.instance.device.drawText(`Loading: %${this._loadPercent}`, 20, 20, '#a00000');
     } else {

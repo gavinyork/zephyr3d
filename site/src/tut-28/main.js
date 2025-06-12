@@ -4,7 +4,6 @@ import {
   Application,
   OrbitCameraController,
   PerspectiveCamera,
-  Compositor,
   Tonemap,
   DirectionalLight,
   AssetManager,
@@ -39,10 +38,7 @@ myApp.ready().then(function () {
   );
   camera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
-
-  const compositor = new Compositor();
-  // Add a Tonemap post-processing effect
-  compositor.appendPostEffect(new Tonemap());
+  camera.compositor.appendPostEffect(new Tonemap());
   const bloom = new Bloom();
   bloom.threshold = 0.87;
   bloom.intensity = 1.2;
@@ -54,15 +50,15 @@ myApp.ready().then(function () {
     const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
     const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
     // The lower half of the screen uses Bloom
-    compositor.appendPostEffect(bloom);
+    camera.compositor.appendPostEffect(bloom);
     camera.viewport = [0, 0, width, height >> 1];
     camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.render(scene, compositor);
+    camera.render(scene);
     // No Bloom on the upper half of the screen
-    compositor.removePostEffect(bloom);
+    camera.compositor.removePostEffect(bloom);
     camera.viewport = [0, height >> 1, width, height - (height >> 1)];
     camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   myApp.run();

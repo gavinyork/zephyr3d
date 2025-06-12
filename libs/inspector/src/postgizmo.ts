@@ -74,8 +74,7 @@ type ScaleInfo = {
  * The post water effect
  * @public
  */
-export class PostGizmoRenderer extends AbstractPostEffect<'PostGizmoRenderer'> {
-  static readonly className = 'PostGizmoRenderer' as const;
+export class PostGizmoRenderer extends AbstractPostEffect {
   static _blendBlitter: CopyBlitter = new CopyBlitter();
   static _gizmoProgram: GPUProgram = null;
   static _gizmoSelectProgram: GPUProgram = null;

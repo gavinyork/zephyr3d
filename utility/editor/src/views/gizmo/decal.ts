@@ -4,8 +4,7 @@ import { DRef, fetchSampler, linearToGamma, PostEffectLayer, ShaderHelper } from
 import { AbstractPostEffect, Application } from '@zephyr3d/scene';
 import { Vector2, Vector4 } from '@zephyr3d/base';
 
-export class PostDecalRenderer extends AbstractPostEffect<'PostDecalRenderer'> {
-  static readonly className = 'PostDecalRenderer' as const;
+export class PostDecalRenderer extends AbstractPostEffect {
   static _defaultDecalTexture: DRef<Texture2D> = new DRef();
   static _decalProgram: GPUProgram = null;
   static _decalBindGroup: BindGroup = null;

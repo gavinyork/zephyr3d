@@ -1,5 +1,14 @@
 import { Vector3 } from '@zephyr3d/base';
-import { Scene, Application, Mesh, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, Primitive, UnlitMaterial } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  Mesh,
+  OrbitCameraController,
+  PerspectiveCamera,
+  Tonemap,
+  Primitive,
+  UnlitMaterial
+} from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
@@ -18,8 +27,14 @@ myApp.ready().then(function () {
   material.vertexColor = true;
   // Fill the triangle data
   const triangle = new Primitive();
-  const vertices = myApp.device.createVertexBuffer('position_f32x3', new Float32Array([2, -2, 0, 0, 2, 0, -2, -2, 0]));
-  const diffuse = myApp.device.createVertexBuffer('diffuse_u8normx4', new Uint8Array([255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255]));
+  const vertices = myApp.device.createVertexBuffer(
+    'position_f32x3',
+    new Float32Array([2, -2, 0, 0, 2, 0, -2, -2, 0])
+  );
+  const diffuse = myApp.device.createVertexBuffer(
+    'diffuse_u8normx4',
+    new Uint8Array([255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255])
+  );
   const indices = myApp.device.createIndexBuffer(new Uint16Array([0, 1, 2]));
   triangle.setVertexBuffer(vertices);
   triangle.setVertexBuffer(diffuse);
@@ -28,19 +43,23 @@ myApp.ready().then(function () {
   new Mesh(scene, triangle, material);
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    myApp.device.canvas.width / myApp.device.canvas.height,
+    1,
+    100
+  );
   camera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
-
-  const compositor = new Compositor();
   // Add a Tonemap post-processing effect
-  compositor.appendPostEffect(new Tonemap());
+  camera.compositor.appendPostEffect(new Tonemap());
 
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
   myApp.on('tick', function () {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   myApp.run();

@@ -61,7 +61,7 @@ export class Inspector {
   private _skyTypes: SkyType[];
   private _gizmoModes: GizmoMode[];
   private _fogTypes: FogType[];
-  private _renderPostEffects: Set<AbstractPostEffect<any>>;
+  private _renderPostEffects: Set<AbstractPostEffect>;
   private _postGizmoRenderer: PostGizmoRenderer;
   private _assetManager: AssetManager;
   private _camera: Camera;

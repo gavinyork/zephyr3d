@@ -21,7 +21,6 @@ import {
   Application,
   Tonemap,
   PerspectiveCamera,
-  Compositor,
   FXAA,
   Bloom
 } from '@zephyr3d/scene';
@@ -62,7 +61,6 @@ export class GLTFViewer {
   private _showFloor: boolean;
   private _useScatter: boolean;
   private _autoRotate: boolean;
-  private _compositor: Compositor;
   private _dracoModule: draco3d.DecoderModule;
   private _bboxNoScale: AABB;
   constructor(scene: Scene) {
@@ -101,10 +99,6 @@ export class GLTFViewer {
     this._fov = Math.PI / 3;
     this._nearPlane = 1;
     this._bboxNoScale = null;
-    this._compositor = new Compositor();
-    this._compositor.appendPostEffect(this._tonemap);
-    this._compositor.appendPostEffect(this._bloom);
-    this._compositor.appendPostEffect(this._fxaa);
     this._camera = new PerspectiveCamera(
       scene,
       Math.PI / 3,
@@ -115,6 +109,9 @@ export class GLTFViewer {
     this._camera.oit = this._oit;
     this._camera.position.setXYZ(0, 0, 15);
     this._camera.controller = new OrbitCameraController();
+    this._camera.compositor.appendPostEffect(this._tonemap);
+    this._camera.compositor.appendPostEffect(this._bloom);
+    this._camera.compositor.appendPostEffect(this._fxaa);
     this._light0 = new DirectionalLight(this._scene)
       .setColor(new Vector4(1, 1, 1, 1))
       .setIntensity(8)
@@ -168,9 +165,6 @@ export class GLTFViewer {
   }
   get animations(): string[] {
     return this._animationSet.get()?.getAnimationNames() || [];
-  }
-  get compositor(): Compositor {
-    return this._compositor;
   }
   async readZip(url: string): Promise<Map<string, string>> {
     const response = await fetch(url);
@@ -318,21 +312,21 @@ export class GLTFViewer {
     }
   }
   syncPostEffects() {
-    this._compositor.clear();
+    this._camera.compositor.clear();
     if (this._doSAO) {
-      this._compositor.appendPostEffect(this._sao);
+      this._camera.compositor.appendPostEffect(this._sao);
     }
     if (this._doWater) {
-      this._compositor.appendPostEffect(this._water);
+      this._camera.compositor.appendPostEffect(this._water);
     }
     if (this._doTonemap) {
-      this._compositor.appendPostEffect(this._tonemap);
+      this._camera.compositor.appendPostEffect(this._tonemap);
     }
     if (this._doBloom) {
-      this._compositor.appendPostEffect(this._bloom);
+      this._camera.compositor.appendPostEffect(this._bloom);
     }
     if (this._doFXAA) {
-      this._compositor.appendPostEffect(this._fxaa);
+      this._camera.compositor.appendPostEffect(this._fxaa);
     }
   }
   get punctualLightEnabled(): boolean {
@@ -387,7 +381,7 @@ export class GLTFViewer {
         this._light0.shadow.shadowRegion = this.getBoundingBox();
       }
     }
-    this._camera.render(this._scene, this._compositor);
+    this._camera.render(this._scene);
   }
   lookAt() {
     const bbox = this._bboxNoScale;

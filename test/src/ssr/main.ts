@@ -2,7 +2,6 @@ import {
   Scene,
   Application,
   PerspectiveCamera,
-  Compositor,
   BatchGroup,
   DirectionalLight,
   WeightedBlendedOIT,
@@ -68,8 +67,7 @@ ssrApp.ready().then(async () => {
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
+  camera.compositor.appendPostEffect(new Tonemap());
 
   const inspector = new Inspector(scene, camera);
 
@@ -90,7 +88,7 @@ ssrApp.ready().then(async () => {
 
   ssrApp.on('tick', () => {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
     inspector.render();
   });
   ssrApp.run();

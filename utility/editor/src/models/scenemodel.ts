@@ -1,12 +1,5 @@
 import type { Camera } from '@zephyr3d/scene';
-import {
-  Compositor,
-  DirectionalLight,
-  OrbitCameraController,
-  PerspectiveCamera,
-  Scene,
-  Tonemap
-} from '@zephyr3d/scene';
+import { DirectionalLight, OrbitCameraController, PerspectiveCamera, Scene, Tonemap } from '@zephyr3d/scene';
 import { BaseModel } from './basemodel';
 import { Vector3 } from '@zephyr3d/base';
 import type { Editor } from '../core/editor';
@@ -15,13 +8,11 @@ export class SceneModel extends BaseModel {
   private _editor: Editor;
   private _scene: Scene;
   private _camera: Camera;
-  private _compositor: Compositor;
   constructor(editor: Editor) {
     super();
     this._editor = editor;
     this._scene = null;
     this._camera = null;
-    this._compositor = null;
     this.reset();
   }
   get editor() {
@@ -29,9 +20,6 @@ export class SceneModel extends BaseModel {
   }
   get scene() {
     return this._scene;
-  }
-  get compositor() {
-    return this._compositor;
   }
   set camera(camera: Camera) {
     this._camera = camera;
@@ -43,7 +31,6 @@ export class SceneModel extends BaseModel {
     this._scene?.dispose();
     this._scene = scene ?? new Scene();
     this._camera = null;
-    this._compositor = null;
     if (!scene) {
       const light = new DirectionalLight(this._scene);
       light.intensity = 18;
@@ -87,7 +74,6 @@ export class SceneModel extends BaseModel {
         zoomWheel: true
       }
     });
-    this._compositor = new Compositor();
-    this._compositor.appendPostEffect(new Tonemap());
+    this._camera.compositor.appendPostEffect(new Tonemap());
   }
 }

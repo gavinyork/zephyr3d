@@ -69,7 +69,7 @@ type ScaleInfo = {
  * The post water effect
  * @public
  */
-export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostGizmoRenderer'>)<{
+export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect)<{
   begin_translate: [node: SceneNode];
   end_translate: [node: SceneNode];
   begin_rotate: [node: SceneNode];
@@ -78,7 +78,6 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect<'PostG
   end_scale: [node: SceneNode];
   aabb_changed: [aabb: AABB];
 }>() {
-  static readonly className = 'PostGizmoRenderer' as const;
   static _aabbMesh: DRef<Mesh> = new DRef();
   static _blendBlitter: CopyBlitter = new CopyBlitter();
   static _gizmoProgram: GPUProgram = null;

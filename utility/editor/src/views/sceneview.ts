@@ -546,7 +546,7 @@ export class SceneView extends BaseView<SceneModel> {
       this.model.camera.left = (-10 * viewportWidth) / viewportHeight;
       this.model.camera.right = (10 * viewportWidth) / viewportHeight;
     }
-    this.model.camera.render(this.model.scene, this.model.compositor);
+    this.model.camera.render(this.model.scene);
 
     this._statusbar.render();
 

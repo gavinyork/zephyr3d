@@ -1,4 +1,4 @@
-import { Application, Compositor, PerspectiveCamera, Tonemap } from '@zephyr3d/scene';
+import { Application, PerspectiveCamera, Tonemap } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Scene } from '@zephyr3d/scene';
 
@@ -16,14 +16,18 @@ myApp.ready().then(function () {
   // Create scene
   const scene = new Scene();
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
-  const compositor = new Compositor();
-  // Add a Tonemap post-processing effect
-  compositor.appendPostEffect(new Tonemap());
+  const camera = new PerspectiveCamera(
+    scene,
+    Math.PI / 3,
+    myApp.device.canvas.width / myApp.device.canvas.height,
+    1,
+    100
+  );
+  camera.compositor.appendPostEffect(new Tonemap());
   // Frame event handler
   myApp.on('tick', function () {
     // Render scene
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
   myApp.run();
 });

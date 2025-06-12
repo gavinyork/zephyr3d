@@ -9,7 +9,6 @@ import {
   OrbitCameraController,
   Mesh,
   TorusShape,
-  Compositor,
   Tonemap,
   AssetManager,
   applyMaterialMixins,
@@ -137,8 +136,7 @@ myApp.ready().then(async () => {
   camera.controller = new OrbitCameraController();
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
+  camera.compositor.appendPostEffect(new Tonemap());
 
   myApp.on('resize', (width, height) => {
     camera.aspect = width / height;
@@ -155,7 +153,7 @@ myApp.ready().then(async () => {
   });
   myApp.on('tick', () => {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   myApp.run();

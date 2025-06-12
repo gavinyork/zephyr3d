@@ -9,7 +9,6 @@ import {
   Application,
   Tonemap,
   PerspectiveCamera,
-  Compositor,
   Terrain,
   FXAA
 } from '@zephyr3d/scene';
@@ -128,11 +127,9 @@ myApp.ready().then(async () => {
   light.castShadow = true;
   light.shadow.mode = 'pcf-opt';
 
-  // Postprocessing
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new SAO());
-  compositor.appendPostEffect(new Tonemap());
-  compositor.appendPostEffect(new FXAA());
+  camera.compositor.appendPostEffect(new SAO());
+  camera.compositor.appendPostEffect(new Tonemap());
+  camera.compositor.appendPostEffect(new FXAA());
 
   // Environment lighting and fogging
   scene.env.light.type = 'ibl';
@@ -170,7 +167,7 @@ myApp.ready().then(async () => {
         camera.position.y = height + 3;
       }
     }
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   myApp.run();

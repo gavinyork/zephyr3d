@@ -8,7 +8,6 @@ import {
   Application,
   Tonemap,
   PerspectiveCamera,
-  Compositor,
   Terrain,
   FXAA,
   PostWater,
@@ -97,10 +96,9 @@ myApp.ready().then(async () => {
   water.refractionStrength = 0.12;
   water.elevation = 6;
 
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
-  compositor.appendPostEffect(water);
-  compositor.appendPostEffect(new FXAA());
+  camera.compositor.appendPostEffect(new Tonemap());
+  camera.compositor.appendPostEffect(water);
+  camera.compositor.appendPostEffect(new FXAA());
 
   scene.env.light.type = 'ibl';
   scene.env.light.strength = 0.35;
@@ -118,7 +116,7 @@ myApp.ready().then(async () => {
 
   myApp.on('tick', () => {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   myApp.run();

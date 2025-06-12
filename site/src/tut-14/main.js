@@ -4,7 +4,6 @@ import {
   Application,
   OrbitCameraController,
   PerspectiveCamera,
-  Compositor,
   Tonemap,
   AssetManager,
   panoramaToCubemap,
@@ -63,10 +62,8 @@ myApp.ready().then(function () {
   const eyePos = new Vector3(0, 0, 30);
   camera.lookAt(eyePos, Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
-
-  const compositor = new Compositor();
   // Add a Tonemap post-processing effect
-  compositor.appendPostEffect(new Tonemap());
+  camera.compositor.appendPostEffect(new Tonemap());
 
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
@@ -80,12 +77,12 @@ myApp.ready().then(function () {
     scene.env.light.type = 'ibl';
     camera.viewport = [0, 0, width, height >> 1];
     camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.render(scene, compositor);
+    camera.render(scene);
     // No ambient light on the upper half of the screen
     scene.env.light.type = 'none';
     camera.viewport = [0, height >> 1, width, height - (height >> 1)];
     camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   myApp.run();

@@ -17,8 +17,7 @@ import { ShaderHelper } from '../material';
  *
  * @internal
  */
-export class SSR extends AbstractPostEffect<'SSR'> {
-  static readonly className = 'SSR' as const;
+export class SSR extends AbstractPostEffect {
   private static _programs: Record<string, GPUProgram> = {};
   private static _resolveProgram: Record<string, GPUProgram> = {};
   private static _combineProgram: GPUProgram = undefined;

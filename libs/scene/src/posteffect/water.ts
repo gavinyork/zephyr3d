@@ -25,8 +25,7 @@ import { ShaderHelper } from '../material';
  * The post water effect
  * @public
  */
-export class PostWater extends AbstractPostEffect<'PostWater'> {
-  static readonly className = 'PostWater' as const;
+export class PostWater extends AbstractPostEffect {
   private _reflectSize: number;
   private _copyBlitter: CopyBlitter;
   private _renderingReflections: boolean;
@@ -246,7 +245,7 @@ export class PostWater extends AbstractPostEffect<'PostWater'> {
       reflCamera.clipPlane = clipPlane;
       ctx.device.pushDeviceStates();
       ctx.device.setFramebuffer(fbRefl);
-      reflCamera.render(ctx.scene, ctx.compositor);
+      reflCamera.render(ctx.scene);
       ctx.device.popDeviceStates();
       reflCamera.remove();
       this._renderingReflections = false;

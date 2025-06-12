@@ -8,7 +8,6 @@ import {
   DirectionalLight,
   Application,
   PerspectiveCamera,
-  Compositor,
   Tonemap,
   BatchGroup,
   LambertMaterial,
@@ -56,11 +55,9 @@ app.ready().then(async () => {
   camera.controller = new OrbitCameraController();
   camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
   camera.depthPrePass = true;
+  camera.compositor.appendPostEffect(new Tonemap());
 
   app.inputManager.use(camera.handleEvent.bind(camera));
-
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
 
   const batchGroup = new BatchGroup(scene);
   const boxShape = new BoxShape();
@@ -90,7 +87,7 @@ app.ready().then(async () => {
 
   app.on('tick', () => {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   if (showUI) {

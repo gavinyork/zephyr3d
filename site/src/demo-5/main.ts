@@ -10,7 +10,6 @@ import {
   DirectionalLight,
   Application,
   PerspectiveCamera,
-  Compositor,
   Tonemap,
   BatchGroup
 } from '@zephyr3d/scene';
@@ -54,10 +53,8 @@ instancingApp.ready().then(async () => {
   );
   camera.position.setXYZ(0, 0, 60);
   camera.controller = new OrbitCameraController();
+  camera.compositor.appendPostEffect(new Tonemap());
   instancingApp.inputManager.use(camera.handleEvent.bind(camera));
-
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
 
   const batchGroup = new BatchGroup(scene);
   const assetManager = new AssetManager();
@@ -121,7 +118,7 @@ instancingApp.ready().then(async () => {
   });
   instancingApp.on('tick', () => {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
   instancingApp.run();
 });

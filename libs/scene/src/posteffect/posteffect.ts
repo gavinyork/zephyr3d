@@ -2,6 +2,7 @@ import type { AbstractDevice, CompareFunc, RenderStateSet, Texture2D, VertexLayo
 import type { DrawContext } from '../render';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { copyTexture, fetchSampler } from '../utility/misc';
+import type { Disposable } from '../app';
 
 export enum PostEffectLayer {
   opaque = 0,
@@ -13,24 +14,19 @@ export enum PostEffectLayer {
  * Base class for any type of post effect
  * @public
  */
-export class AbstractPostEffect<ClassName extends string> {
-  static readonly className: string;
+export class AbstractPostEffect implements Disposable {
   private static _defaultRenderStates: { CompareFunc?: RenderStateSet } = {};
-  protected _outputTexture: Texture2D;
   protected _enabled: boolean;
   protected _layer: PostEffectLayer;
+  protected _disposed: boolean;
   /**
    * Creates an instance of a post effect
    * @param name - Name of the post effect
    */
   constructor() {
-    this._outputTexture = null;
     this._enabled = true;
     this._layer = PostEffectLayer.end;
-  }
-  /** Gets class name of this instance */
-  getClassName(): ClassName {
-    return (this.constructor as any).className as ClassName;
+    this._disposed = false;
   }
   /** Whether this post effect is enabled */
   get enabled(): boolean {
@@ -121,6 +117,15 @@ export class AbstractPostEffect<ClassName extends string> {
       ]
     });
   }
+  dispose() {
+    if (!this._disposed) {
+      this._disposed = true;
+      this.destroy();
+    }
+  }
+  get disposed() {
+    return this._disposed;
+  }
   /** @internal */
   protected createRenderStates(device: AbstractDevice): RenderStateSet {
     const renderStates = device.createRenderStateSet();
@@ -128,6 +133,8 @@ export class AbstractPostEffect<ClassName extends string> {
     renderStates.useDepthState().enableTest(false).enableWrite(false);
     return renderStates;
   }
+  /** @internal */
+  protected destroy() {}
   /** @internal */
   protected static getDefaultRenderState(ctx: DrawContext, compareFunc: CompareFunc) {
     let renderState = this._defaultRenderStates[compareFunc];

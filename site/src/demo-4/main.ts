@@ -11,7 +11,6 @@ import {
   Mesh,
   SphereShape,
   BatchGroup,
-  Compositor,
   Tonemap,
   BoundingBox
 } from '@zephyr3d/scene';
@@ -73,11 +72,9 @@ PhysicsApp.ready().then(async () => {
   );
   camera.lookAt(new Vector3(0, 40, 40), Vector3.zero(), Vector3.axisPY());
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
+  camera.compositor.appendPostEffect(new Tonemap());
+
   PhysicsApp.inputManager.use(camera.handleEvent.bind(camera));
-
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
-
   PhysicsApp.on('resize', (width, height) => {
     camera.aspect = width / height;
   });
@@ -88,7 +85,7 @@ PhysicsApp.ready().then(async () => {
   });
   PhysicsApp.on('tick', () => {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   const physicsWorld = new PhysicsWorld();

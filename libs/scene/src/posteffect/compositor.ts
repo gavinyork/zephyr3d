@@ -13,6 +13,7 @@ import type { AbstractPostEffect } from './posteffect';
 import { PostEffectLayer } from './posteffect';
 import { MaterialVaryingFlags } from '../values';
 import { fetchSampler } from '../utility/misc';
+import { DRef } from '../app';
 
 /**
  * Posteffect rendering context
@@ -29,7 +30,7 @@ export interface CompositorContext {
  */
 export class Compositor {
   /** @internal */
-  protected _postEffects: AbstractPostEffect<any>[][];
+  protected _postEffects: DRef<AbstractPostEffect>[][];
   /** @internal */
   private _finalFramebuffer: FrameBuffer;
   /** @internal */
@@ -60,7 +61,7 @@ export class Compositor {
   requireLinearDepth(ctx: DrawContext): boolean {
     for (const list of this._postEffects) {
       for (const postEffect of list) {
-        if (postEffect.requireLinearDepthTexture(ctx)) {
+        if (postEffect.get().requireLinearDepthTexture(ctx)) {
           return true;
         }
       }
@@ -73,15 +74,15 @@ export class Compositor {
    * @param postEffect - The post effect to add
    * @param opaque - true if the post effect should be applied after the opaque pass and before the transparent pass, otherwise the post effect should be applied after the transparent pass
    */
-  appendPostEffect(postEffect: AbstractPostEffect<any>): void {
+  appendPostEffect(postEffect: AbstractPostEffect): void {
     if (postEffect) {
       for (const list of this._postEffects) {
-        if (list.indexOf(postEffect) >= 0) {
+        if (list.findIndex((val) => val.get() === postEffect) >= 0) {
           console.error(`Posteffect cannot be added to same compositor multiple times`);
           return;
         }
       }
-      this._postEffects[postEffect.layer].push(postEffect);
+      this._postEffects[postEffect.layer].push(new DRef(postEffect));
     }
   }
   /**
@@ -89,10 +90,11 @@ export class Compositor {
    *
    * @param postEffect - The posteffect to be remove.
    */
-  removePostEffect(postEffect: AbstractPostEffect<any>): void {
+  removePostEffect(postEffect: AbstractPostEffect): void {
     for (const list of this._postEffects) {
-      const index = list.indexOf(postEffect);
+      const index = list.findIndex((val) => val.get() === postEffect);
       if (index >= 0) {
+        list[index].dispose();
         list.splice(index, 1);
         return;
       }
@@ -103,6 +105,9 @@ export class Compositor {
    */
   clear(): void {
     for (const list of this._postEffects) {
+      for (const p of list) {
+        p.dispose();
+      }
       list.splice(0, list.length);
     }
   }
@@ -137,7 +142,7 @@ export class Compositor {
       const inputTexture = inputFramebuffer.getColorAttachments()[0] as Texture2D;
       let tmpTexture: Texture2D = null;
       for (let i = 0; i < postEffects.length; i++) {
-        const postEffect = postEffects[i];
+        const postEffect = postEffects[i].get();
         if (!postEffect.enabled) {
           continue;
         }
@@ -197,7 +202,7 @@ export class Compositor {
     for (let i = layer; i < this._postEffects.length; i++) {
       const start = i === layer ? index + 1 : 0;
       for (let j = start; j < this._postEffects[i].length; j++) {
-        if (this._postEffects[i][j].enabled) {
+        if (this._postEffects[i][j].get().enabled) {
           return false;
         }
       }

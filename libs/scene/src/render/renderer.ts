@@ -11,7 +11,6 @@ import type { PunctualLight, Scene } from '../scene';
 import type { PickResult } from '../camera';
 import { Camera } from '../camera';
 import { PostEffectLayer } from '../posteffect/posteffect';
-import type { Compositor } from '../posteffect';
 import { ClusteredLight } from './cluster_light';
 import { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import { ObjectColorPass } from './objectcolorpass';
@@ -73,7 +72,7 @@ export class SceneRenderer {
    * @param camera - The camera that will be used to render the scene
    * @param compositor - The compositor that will be used to apply postprocess effects
    */
-  static renderScene(scene: Scene, camera: Camera, compositor?: Compositor): void {
+  static renderScene(scene: Scene, camera: Camera): void {
     const device = Application.instance.device;
     const colorFormat = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
       ? 'rgba16f'
@@ -119,7 +118,7 @@ export class SceneRenderer {
         HiZTexture: null,
         globalBindGroupAllocator,
         camera,
-        compositor,
+        compositor: camera.compositor,
         timestamp: device.frameInfo.frameTimestamp,
         queue: 0,
         lightBlending: false,

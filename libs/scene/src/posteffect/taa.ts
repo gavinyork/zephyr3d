@@ -7,8 +7,7 @@ import { BoxShape } from '../shapes';
 import { temporalResolve } from '../shaders/temporal';
 import { Vector2 } from '@zephyr3d/base';
 
-export class TAA extends AbstractPostEffect<'TAA'> {
-  static readonly className = 'TAA' as const;
+export class TAA extends AbstractPostEffect {
   private static _resolveProgram: GPUProgram[] = [];
   private static _skyMotionVectorProgram: GPUProgram = null;
   private static _box: Primitive;

@@ -7,7 +7,6 @@ import {
   AssetManager,
   BatchGroup,
   FPSCameraController,
-  Compositor,
   Tonemap,
   FXAA,
   DirectionalLight
@@ -51,15 +50,14 @@ myApp.ready().then(async () => {
   camera.ssrRoughnessFactor = 0.01;
   camera.ssrBlurScale = 0.06;
 
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
-  compositor.appendPostEffect(new FXAA());
+  camera.compositor.appendPostEffect(new Tonemap());
+  camera.compositor.appendPostEffect(new FXAA());
 
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
   myApp.on('tick', () => {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   myApp.run();

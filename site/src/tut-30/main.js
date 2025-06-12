@@ -4,7 +4,6 @@ import {
   Application,
   OrbitCameraController,
   PerspectiveCamera,
-  Compositor,
   Mesh,
   DirectionalLight,
   BoxShape,
@@ -40,11 +39,6 @@ myApp.ready().then(function () {
   const torus = new Mesh(scene, new TorusShape(), material);
   torus.position.setXYZ(0, 3, 0);
 
-  const compositor = new Compositor();
-  // Add a Tonemap post-processing effect
-  compositor.appendPostEffect(new Tonemap());
-  const fxaa = new FXAA();
-
   // Create camera
   const camera = new PerspectiveCamera(
     scene,
@@ -55,6 +49,10 @@ myApp.ready().then(function () {
   );
   camera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
+  // Add a Tonemap post-processing effect
+  camera.compositor.appendPostEffect(new Tonemap());
+
+  const fxaa = new FXAA();
 
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
@@ -63,15 +61,15 @@ myApp.ready().then(function () {
     const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
     const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
     // The lower half of the screen uses FXAA
-    compositor.appendPostEffect(fxaa);
+    camera.compositor.appendPostEffect(fxaa);
     camera.viewport = [0, 0, width, height >> 1];
     camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.render(scene, compositor);
+    camera.render(scene);
     // No FXAA on the upper half of the screen
-    compositor.removePostEffect(fxaa);
+    camera.compositor.removePostEffect(fxaa);
     camera.viewport = [0, height >> 1, width, height - (height >> 1)];
     camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   myApp.run();

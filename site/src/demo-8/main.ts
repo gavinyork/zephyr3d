@@ -6,7 +6,6 @@ import {
   Scene,
   Application,
   PerspectiveCamera,
-  Compositor,
   Tonemap,
   BatchGroup,
   Mesh,
@@ -58,10 +57,8 @@ app.ready().then(async () => {
   );
   camera.position.setXYZ(200, 0, 12);
   camera.controller = new FPSCameraController();
+  camera.compositor.appendPostEffect(new Tonemap());
   app.inputManager.use(camera.handleEvent.bind(camera));
-
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
 
   const batchGroup = new BatchGroup(scene);
 
@@ -107,7 +104,7 @@ app.ready().then(async () => {
     a += Math.cos((elapsed - t) * 0.001) * 0.01;
     lightOrigin.rotation.fromAxisAngle(new Vector3(0, 0, 1), a);
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   app.run();
