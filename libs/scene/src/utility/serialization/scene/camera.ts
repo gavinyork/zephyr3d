@@ -40,7 +40,22 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'TAA',
+          name: 'ClearColor',
+          type: 'rgba',
+          default: [0, 0, 0, 1],
+          get(this: Camera, value) {
+            value.num[0] = this.clearColor.x;
+            value.num[1] = this.clearColor.y;
+            value.num[2] = this.clearColor.z;
+            value.num[3] = this.clearColor.w;
+          },
+          set(this: Camera, value) {
+            this.clearColor.setXYZW(value.num[0], value.num[1], value.num[2], value.num[3]);
+          }
+        },
+        {
+          name: 'Enabled',
+          group: 'PostProcessing/TAA',
           type: 'bool',
           phase: 0,
           default: false,
@@ -53,6 +68,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'TAADebug',
+          group: 'PostProcessing/TAA',
           type: 'int',
           phase: 1,
           enum: {
@@ -80,6 +96,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'TAABlendFactor',
+          group: 'PostProcessing/TAA',
           type: 'float',
           phase: 1,
           options: {
@@ -99,6 +116,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSR',
+          group: 'PostProcessing/SSR',
           type: 'bool',
           phase: 0,
           default: false,
@@ -111,6 +129,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRMaxRoughness',
+          group: 'PostProcessing/SSR',
           type: 'float',
           phase: 1,
           default: 0.8,
@@ -130,6 +149,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRRoughnessFactor',
+          group: 'PostProcessing/SSR',
           type: 'float',
           phase: 1,
           default: 1.0,
@@ -149,6 +169,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRStride',
+          group: 'PostProcessing/SSR',
           type: 'int',
           phase: 1,
           default: 2,
@@ -168,6 +189,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRMaxDistance',
+          group: 'PostProcessing/SSR',
           type: 'float',
           phase: 1,
           default: 100,
@@ -187,6 +209,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRMaxSteps',
+          group: 'PostProcessing/SSR',
           type: 'int',
           phase: 1,
           default: 120,
@@ -206,6 +229,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRThickness',
+          group: 'PostProcessing/SSR',
           type: 'float',
           phase: 1,
           default: 0.5,
@@ -225,6 +249,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRBlurScale',
+          group: 'PostProcessing/SSR',
           phase: 1,
           type: 'float',
           default: 0.05,
@@ -244,6 +269,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRBlurDepthCutoff',
+          group: 'PostProcessing/SSR',
           phase: 1,
           type: 'float',
           default: 2,
@@ -263,6 +289,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRBlurKernelSize',
+          group: 'PostProcessing/SSR',
           type: 'int',
           phase: 1,
           default: 17,
@@ -282,6 +309,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRBlurStdDev',
+          group: 'PostProcessing/SSR',
           type: 'float',
           phase: 1,
           default: 10,
@@ -301,6 +329,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRCalcThickness',
+          group: 'PostProcessing/SSR',
           type: 'bool',
           phase: 1,
           default: false,
@@ -312,20 +341,6 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           },
           isValid(this: Camera) {
             return this.SSR;
-          }
-        },
-        {
-          name: 'ClearColor',
-          type: 'rgba',
-          default: [0, 0, 0, 1],
-          get(this: Camera, value) {
-            value.num[0] = this.clearColor.x;
-            value.num[1] = this.clearColor.y;
-            value.num[2] = this.clearColor.z;
-            value.num[3] = this.clearColor.w;
-          },
-          set(this: Camera, value) {
-            this.clearColor.setXYZW(value.num[0], value.num[1], value.num[2], value.num[3]);
           }
         }
       ];

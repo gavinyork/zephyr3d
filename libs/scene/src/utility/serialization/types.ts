@@ -29,6 +29,7 @@ export type PropEdit = 'aabb' | 'quaternion';
 export type PropertyAccessor<T = unknown> = {
   type: PropertyType;
   name: string;
+  group?: string;
   phase?: number;
   hidden?: boolean;
   options?: { minValue: number; maxValue: number; speed?: number };

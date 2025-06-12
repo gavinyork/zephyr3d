@@ -26,7 +26,7 @@ class PropertyGroup {
   currentType: number;
   objectTypes: SerializableClass[];
   prop: PropertyAccessor<any>;
-  properties: Map<string, Property<any>>;
+  properties: (PropertyGroup | { name: string; property: Property<any> })[];
   object: any;
   subgroups: PropertyGroup[];
   constructor(name: string, grid: PropertyEditor) {
@@ -38,10 +38,14 @@ class PropertyGroup {
     this.prop = null;
     this.currentType = -1;
     this.objectTypes = [];
-    this.properties = new Map();
+    this.properties = [];
     this.subgroups = [];
   }
   addProperty(obj: any, value: PropertyAccessor<any>) {
+    let group: PropertyGroup = this;
+    if (value.group) {
+      group = this.findOrAddGroup(value.group);
+    }
     const tmpProperty: PropertyValue = {
       num: [0, 0, 0, 0],
       str: [''],
@@ -49,27 +53,48 @@ class PropertyGroup {
       object: []
     };
     if (value.type === 'object' && value.objectTypes?.length > 0) {
-      const propGroup = this.addGroup(value.name);
+      const propGroup = group.addGroup(value.name);
       if (!value.isValid || value.isValid.call(obj)) {
         value.get.call(obj, tmpProperty);
       }
       propGroup.setObject(tmpProperty.object[0], value, obj);
     } else {
       const property: Property<any> = {
-        path: `${this.name}/${value.name}`,
+        path: `${group.name}/${value.name}`,
         name: value.name,
         value
       };
       if (!value.isValid || value.isValid.call(obj)) {
-        value.get.call(obj, this.value);
+        value.get.call(obj, group.value);
       }
-      this.properties.set(value.name, property);
+      group.properties.push({ name: value.name, property });
     }
   }
   addGroup(name: string) {
     const group = new PropertyGroup(name, this.grid);
     group.parent = this;
     this.subgroups.push(group);
+    return group;
+  }
+  findOrAddGroup(name: string) {
+    const parts = name.split('/');
+    const firstPart = parts.shift();
+    let parent = this.properties.find(
+      (p) => p instanceof PropertyGroup && p.name === firstPart
+    ) as PropertyGroup;
+    if (!parent) {
+      parent = new PropertyGroup(firstPart, this.grid);
+      this.properties.push(parent);
+    }
+    let group: PropertyGroup = null;
+    while (parts.length > 0) {
+      const part = parts.shift();
+      group = parent.subgroups.find((g) => g.name === part);
+      if (!group) {
+        group = parent.addGroup(part);
+      }
+      parent = group;
+    }
     return group;
   }
   getObject() {
@@ -94,7 +119,7 @@ class PropertyGroup {
         prop?.objectTypes?.length > 0
           ? prop.objectTypes.map((ctor) => this.grid.serailizationInfo.get(ctor)) ?? []
           : [];
-      this.properties = new Map();
+      this.properties = [];
       this.subgroups = [];
       if (this.value.object[0]) {
         let cls: SerializableClass = null;
@@ -286,7 +311,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     if (level > 0) {
       ImGui.Indent(level * 10);
     }
-    const flags = ImGui.TreeNodeFlags.DefaultOpen | ImGui.TreeNodeFlags.SpanFullWidth;
+    const flags = ImGui.TreeNodeFlags.DefaultOpen;
     const opened = ImGui.TreeNodeEx(group.name, flags);
     if (group.object && group.prop && group.objectTypes.length > 0) {
       const deletable = group.prop.nullable && group.prop.set && group.value.object?.[0];
@@ -334,7 +359,11 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     if (opened) {
       ImGui.TreePop();
       for (const property of group.properties) {
-        this.renderProperty(property[1], level + 1, group.getObject());
+        this.renderProperty(
+          property instanceof PropertyGroup ? property : property.property,
+          level + 2,
+          group.getObject()
+        );
       }
       this.renderSubGroups(group, level + 1);
     }
@@ -342,7 +371,11 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       ImGui.Unindent(level * 10);
     }
   }
-  private renderProperty(property: Property<any>, level: number, object?: any) {
+  private renderProperty(property: PropertyGroup | Property<any>, level: number, object?: any) {
+    if (property instanceof PropertyGroup) {
+      this.renderGroup(property, level - 1);
+      return;
+    }
     const { name, value } = property;
     object = object ?? this.object;
     if (value.isValid && !value.isValid.call(object)) {
