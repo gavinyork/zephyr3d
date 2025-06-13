@@ -5,8 +5,7 @@ import {
   Application,
   PerspectiveCamera,
   OrbitCameraController,
-  DirectionalLight,
-  Tonemap
+  DirectionalLight
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -42,8 +41,6 @@ myApp.ready().then(async () => {
   scene.env.sky.cloudy = 0.7;
   // Set cloud move speed
   scene.env.sky.wind.setXY(600, 0);
-
-  camera.compositor.appendPostEffect(new Tonemap());
 
   // Reset aspect ratio when size was changed
   myApp.on('resize', (width, height) => {

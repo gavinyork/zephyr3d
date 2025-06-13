@@ -4,26 +4,9 @@ import { Vector4, Vector3, HttpRequest } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
 import { DRef } from '@zephyr3d/scene';
 import { Mesh, PlaneShape, LambertMaterial } from '@zephyr3d/scene';
-import {
-  BatchGroup,
-  PostWater,
-  WeightedBlendedOIT,
-  ABufferOIT,
-  SAO,
-  FFTWaveGenerator,
-  OrbitCameraController
-} from '@zephyr3d/scene';
+import { BatchGroup, WeightedBlendedOIT, ABufferOIT, OrbitCameraController } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
-import {
-  BoundingBox,
-  AssetManager,
-  DirectionalLight,
-  Application,
-  Tonemap,
-  PerspectiveCamera,
-  FXAA,
-  Bloom
-} from '@zephyr3d/scene';
+import { BoundingBox, AssetManager, DirectionalLight, Application, PerspectiveCamera } from '@zephyr3d/scene';
 import { EnvMaps } from './envmap';
 import { Panel } from './ui';
 
@@ -37,17 +20,7 @@ export class GLTFViewer {
   private _animationSet: DRef<AnimationSet>;
   private _assetManager: AssetManager;
   private _scene: Scene;
-  private _tonemap: Tonemap;
-  private _water: PostWater;
-  private _bloom: Bloom;
-  private _fxaa: FXAA;
-  private _sao: SAO;
   private _oit: OIT;
-  private _doTonemap: boolean;
-  private _doWater: boolean;
-  private _doBloom: boolean;
-  private _doFXAA: boolean;
-  private _doSAO: boolean;
   private _camera: PerspectiveCamera;
   private _light0: DirectionalLight;
   private _light1: DirectionalLight;
@@ -74,26 +47,10 @@ export class GLTFViewer {
     this._envMaps = new EnvMaps();
     this._batchGroup = new BatchGroup(scene);
     this._assetManager = new AssetManager();
-    this._tonemap = new Tonemap();
-    this._water = new PostWater(0, new FFTWaveGenerator());
-    this._water.elevation = 2;
-    this._water.ssr = true;
     const floorMaterial = new LambertMaterial();
     floorMaterial.albedoColor = new Vector4(0.8, 0.8, 0.8, 1);
     this._floor = new Mesh(scene, new PlaneShape({ size: 1, anchor: 0 }), floorMaterial);
     this._floor.castShadow = false;
-    this._bloom = new Bloom();
-    this._sao = new SAO();
-    this._sao.radius = 10;
-    this._sao.intensity = 0.025;
-    this._bloom.threshold = 0.85;
-    this._bloom.intensity = 1.5;
-    this._fxaa = new FXAA();
-    this._doTonemap = true;
-    this._doBloom = true;
-    this._doFXAA = true;
-    this._doWater = false;
-    this._doSAO = false;
     this._autoRotate = false;
     this._oit = new WeightedBlendedOIT();
     this._fov = Math.PI / 3;
@@ -109,9 +66,6 @@ export class GLTFViewer {
     this._camera.oit = this._oit;
     this._camera.position.setXYZ(0, 0, 15);
     this._camera.controller = new OrbitCameraController();
-    this._camera.compositor.appendPostEffect(this._tonemap);
-    this._camera.compositor.appendPostEffect(this._bloom);
-    this._camera.compositor.appendPostEffect(this._fxaa);
     this._light0 = new DirectionalLight(this._scene)
       .setColor(new Vector4(1, 1, 1, 1))
       .setIntensity(8)
@@ -150,9 +104,6 @@ export class GLTFViewer {
   }
   get light1(): DirectionalLight {
     return this._light1;
-  }
-  get bloom(): Bloom {
-    return this._bloom;
   }
   get camera(): PerspectiveCamera {
     return this._camera;
@@ -223,10 +174,6 @@ export class GLTFViewer {
         this._light0.shadow.shadowRegion = this.getBoundingBox();
         this._camera.clearHistoryData();
       });
-    this._water.ssrMaxDistance = Vector3.distance(
-      this._scene.boundingBox.minPoint,
-      this._scene.boundingBox.maxPoint
-    );
   }
   async handleDrop(data: DataTransfer) {
     this.resolveDraggedItems(data).then(async (fileMap) => {
@@ -278,19 +225,16 @@ export class GLTFViewer {
     this._light0.setCastShadow(enable);
   }
   bloomEnabled(): boolean {
-    return this._doBloom;
+    return this._camera.bloom;
   }
   tonemapEnabled(): boolean {
-    return this._doTonemap;
-  }
-  waterEnabled(): boolean {
-    return this._doWater;
+    return this._camera.toneMap;
   }
   FXAAEnabled(): boolean {
-    return this._doFXAA;
+    return this._camera.FXAA;
   }
   SAOEnabled(): boolean {
-    return this._doSAO;
+    return this._camera.SSAO;
   }
   TAAEnabled(): boolean {
     return this._camera.TAA;
@@ -311,24 +255,6 @@ export class GLTFViewer {
       this._camera.oit = this._oit;
     }
   }
-  syncPostEffects() {
-    this._camera.compositor.clear();
-    if (this._doSAO) {
-      this._camera.compositor.appendPostEffect(this._sao);
-    }
-    if (this._doWater) {
-      this._camera.compositor.appendPostEffect(this._water);
-    }
-    if (this._doTonemap) {
-      this._camera.compositor.appendPostEffect(this._tonemap);
-    }
-    if (this._doBloom) {
-      this._camera.compositor.appendPostEffect(this._bloom);
-    }
-    if (this._doFXAA) {
-      this._camera.compositor.appendPostEffect(this._fxaa);
-    }
-  }
   get punctualLightEnabled(): boolean {
     return this._light0.showState !== 'hidden';
   }
@@ -337,39 +263,19 @@ export class GLTFViewer {
     this._light1.showState = enable ? 'visible' : 'hidden';
   }
   enableBloom(enable: boolean) {
-    if (!!enable !== this._doBloom) {
-      this._doBloom = !!enable;
-      this.syncPostEffects();
-    }
+    this._camera.bloom = !!enable;
   }
   enableTonemap(enable: boolean) {
-    if (!!enable !== this._doTonemap) {
-      this._doTonemap = !!enable;
-      this.syncPostEffects();
-    }
-  }
-  enableWater(enable: boolean) {
-    if (!!enable !== this._doWater) {
-      this._doWater = !!enable;
-      this.syncPostEffects();
-    }
+    this._camera.toneMap = !!enable;
   }
   enableFXAA(enable: boolean) {
-    if (!!enable !== this._doFXAA) {
-      this._doFXAA = !!enable;
-      this.syncPostEffects();
-    }
+    this._camera.FXAA = !!enable;
   }
   enableSAO(enable: boolean) {
-    if (!!enable !== this._doSAO) {
-      this._doSAO = !!enable;
-      this.syncPostEffects();
-    }
+    this._camera.SSAO = !!enable;
   }
   enableTAA(enable: boolean) {
-    if (!!enable !== this._camera.TAA) {
-      this._camera.TAA = !!enable;
-    }
+    this._camera.TAA = !!enable;
   }
   render() {
     if (this._modelNode.get()) {

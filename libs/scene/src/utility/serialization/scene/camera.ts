@@ -55,6 +55,129 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'Enabled',
+          group: 'PostProcessing/ToneMap',
+          type: 'bool',
+          phase: 0,
+          default: true,
+          get(this: Camera, value) {
+            value.bool[0] = this.toneMap;
+          },
+          set(this: Camera, value) {
+            this.toneMap = value.bool[0];
+          }
+        },
+        {
+          name: 'Exposure',
+          group: 'PostProcessing/ToneMap',
+          type: 'float',
+          options: { minValue: 0, maxValue: 8 },
+          phase: 0,
+          default: 1,
+          get(this: Camera, value) {
+            value.num[0] = this.toneMapExposure;
+          },
+          set(this: Camera, value) {
+            this.toneMapExposure = value.num[0];
+          }
+        },
+        {
+          name: 'Enabled',
+          group: 'PostProcessing/Bloom',
+          type: 'bool',
+          phase: 0,
+          default: true,
+          get(this: Camera, value) {
+            value.bool[0] = this.bloom;
+          },
+          set(this: Camera, value) {
+            this.bloom = value.bool[0];
+          }
+        },
+        {
+          name: 'MaxDownsampleLevels',
+          group: 'PostProcessing/Bloom',
+          type: 'int',
+          options: { minValue: 0, maxValue: 8 },
+          phase: 0,
+          default: 4,
+          get(this: Camera, value) {
+            value.num[0] = this.bloomMaxDownsampleLevels;
+          },
+          set(this: Camera, value) {
+            this.bloomMaxDownsampleLevels = value.num[0];
+          }
+        },
+        {
+          name: 'DownsampleLimit',
+          group: 'PostProcessing/Bloom',
+          type: 'int',
+          options: { minValue: 2, maxValue: 64 },
+          phase: 0,
+          default: 32,
+          get(this: Camera, value) {
+            value.num[0] = this.bloomDownsampleLimit;
+          },
+          set(this: Camera, value) {
+            this.bloomDownsampleLimit = value.num[0];
+          }
+        },
+        {
+          name: 'Threshold',
+          group: 'PostProcessing/Bloom',
+          type: 'float',
+          options: { minValue: 0, maxValue: 1 },
+          phase: 0,
+          default: 0.8,
+          get(this: Camera, value) {
+            value.num[0] = this.bloomThreshold;
+          },
+          set(this: Camera, value) {
+            this.bloomThreshold = value.num[0];
+          }
+        },
+        {
+          name: 'ThresholdKnee',
+          group: 'PostProcessing/Bloom',
+          type: 'float',
+          options: { minValue: 0, maxValue: 1 },
+          phase: 0,
+          default: 0,
+          get(this: Camera, value) {
+            value.num[0] = this.bloomThresholdKnee;
+          },
+          set(this: Camera, value) {
+            this.bloomThresholdKnee = value.num[0];
+          }
+        },
+        {
+          name: 'Intensity',
+          group: 'PostProcessing/Bloom',
+          type: 'float',
+          options: { minValue: 0, maxValue: 8 },
+          phase: 0,
+          default: 1,
+          get(this: Camera, value) {
+            value.num[0] = this.bloomIntensity;
+          },
+          set(this: Camera, value) {
+            this.bloomIntensity = value.num[0];
+          }
+        },
+        {
+          name: 'Enabled',
+          group: 'PostProcessing/FXAA',
+          type: 'bool',
+          phase: 0,
+          default: true,
+          get(this: Camera, value) {
+            value.bool[0] = this.FXAA;
+          },
+          set(this: Camera, value) {
+            this.FXAA = value.bool[0];
+          }
+        },
+        {
+          name: 'Enabled',
           group: 'PostProcessing/TAA',
           type: 'bool',
           phase: 0,
@@ -341,6 +464,71 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           },
           isValid(this: Camera) {
             return this.SSR;
+          }
+        },
+        {
+          name: 'Enabled',
+          group: 'PostProcessing/SSAO',
+          type: 'bool',
+          phase: 0,
+          default: false,
+          get(this: Camera, value) {
+            value.bool[0] = this.SSAO;
+          },
+          set(this: Camera, value) {
+            this.SSAO = value.bool[0];
+          }
+        },
+        {
+          name: 'Scale',
+          group: 'PostProcessing/SSAO',
+          type: 'float',
+          phase: 0,
+          default: 10,
+          get(this: Camera, value) {
+            value.num[0] = this.SSAOScale;
+          },
+          set(this: Camera, value) {
+            this.SSAOScale = value.num[0];
+          }
+        },
+        {
+          name: 'Bias',
+          group: 'PostProcessing/SSAO',
+          type: 'float',
+          phase: 0,
+          default: 1,
+          get(this: Camera, value) {
+            value.num[0] = this.SSAOBias;
+          },
+          set(this: Camera, value) {
+            this.SSAOBias = value.num[0];
+          }
+        },
+        {
+          name: 'Radius',
+          group: 'PostProcessing/SSAO',
+          type: 'float',
+          phase: 0,
+          default: 100,
+          get(this: Camera, value) {
+            value.num[0] = this.SSAORadius;
+          },
+          set(this: Camera, value) {
+            this.SSAORadius = value.num[0];
+          }
+        },
+        {
+          name: 'Intensity',
+          group: 'PostProcessing/SSAO',
+          type: 'float',
+          phase: 0,
+          default: 2.5,
+          get(this: Camera, value) {
+            value.num[0] = this.SSAOIntensity * 100;
+          },
+          set(this: Camera, value) {
+            this.SSAOIntensity = value.num[0] * 0.01;
           }
         }
       ];

@@ -4,14 +4,8 @@ Tone mapping is a process used to convert HDR images to LDR ones, and it's categ
 
 ```javascript
 
-// Create a Composto instance
-const compositor = new Compositor();
-// Create a post-processing instance of tone mapping
-const tonemap = new Tonemap();
-// Exposure, default is 1
-tonemap.exposure = 1.5;
-// Adds the effect to Compostor
-compositor.appendPostEffect(tonemap)
+// Enable tonemap
+camera.toneMap = true;
 // ...
 // Render the scene
 camera.render(scene, compositor);

@@ -5,18 +5,15 @@ import { BatchGroup, SceneNode } from '@zephyr3d/scene';
 import {
   Application,
   AssetManager,
-  Bloom,
   DirectionalLight,
   FFTWaveGenerator,
-  FXAA,
   OrbitCameraController,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
   PerspectiveCamera,
   PostWater,
   Scene,
-  Terrain,
-  Tonemap
+  Terrain
 } from '@zephyr3d/scene';
 import * as zip from '@zip.js/zip.js';
 import { TreeMaterialMetallicRoughness } from './treematerial';
@@ -50,9 +47,8 @@ export class Demo {
     this._scene = this.createScene();
     this._root = new BatchGroup(this._scene) ?? new SceneNode(this._scene);
     this._camera = this.createCamera(this._scene);
-    this._camera.compositor.appendPostEffect(new Tonemap());
-    this._camera.compositor.appendPostEffect(new Bloom());
-    this._camera.compositor.appendPostEffect(new FXAA());
+    this._camera.bloom = true;
+    this._camera.FXAA = true;
     Application.instance.device.setFont('24px arial');
     this.render();
     this._loaded = false;

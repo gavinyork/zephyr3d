@@ -4,7 +4,6 @@ import {
   Application,
   OrbitCameraController,
   PerspectiveCamera,
-  Tonemap,
   DirectionalLight,
   AssetManager
 } from '@zephyr3d/scene';
@@ -37,7 +36,6 @@ myApp.ready().then(function () {
   );
   camera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
-  const tonemap = new Tonemap();
 
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
@@ -48,12 +46,12 @@ myApp.ready().then(function () {
     // The lower half of the screen uses Tonemap
     camera.viewport = [0, 0, width, height >> 1];
     camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.compositor.appendPostEffect(tonemap);
+    camera.toneMap = false;
     camera.render(scene);
     // No Tonemap on the upper half of the screen
     camera.viewport = [0, height >> 1, width, height - (height >> 1)];
     camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.compositor.removePostEffect(tonemap);
+    camera.toneMap = true;
     camera.render(scene);
   });
 

@@ -9,9 +9,7 @@ import {
   BoxShape,
   PlaneShape,
   TorusShape,
-  PBRMetallicRoughnessMaterial,
-  Tonemap,
-  SAO
+  PBRMetallicRoughnessMaterial
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -49,11 +47,8 @@ myApp.ready().then(function () {
   );
   camera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
-  camera.compositor.appendPostEffect(new Tonemap());
-
-  const sao = new SAO();
-  sao.intensity = 0.05;
-  sao.scale = 15;
+  camera.SSAOIntensity = 0.05;
+  camera.SSAOScale = 15;
 
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
@@ -62,12 +57,12 @@ myApp.ready().then(function () {
     const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
     const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
     // The lower half of the screen uses SAO
-    camera.compositor.appendPostEffect(sao);
+    camera.SSAO = true;
     camera.viewport = [0, 0, width, height >> 1];
     camera.aspect = camera.viewport[2] / camera.viewport[3];
     camera.render(scene);
     // No SAO on the upper half of the screen
-    camera.compositor.removePostEffect(sao);
+    camera.SSAO = false;
     camera.viewport = [0, height >> 1, width, height - (height >> 1)];
     camera.aspect = camera.viewport[2] / camera.viewport[3];
     camera.render(scene);

@@ -6,7 +6,6 @@ import {
   Scene,
   Application,
   PerspectiveCamera,
-  Tonemap,
   BatchGroup,
   Mesh,
   FPSCameraController,
@@ -57,7 +56,6 @@ app.ready().then(async () => {
   );
   camera.position.setXYZ(200, 0, 12);
   camera.controller = new FPSCameraController();
-  camera.compositor.appendPostEffect(new Tonemap());
   app.inputManager.use(camera.handleEvent.bind(camera));
 
   const batchGroup = new BatchGroup(scene);

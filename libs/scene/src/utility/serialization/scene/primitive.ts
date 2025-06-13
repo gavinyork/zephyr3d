@@ -175,7 +175,7 @@ export function getTorusShapeClass(): SerializableClass {
             value.num[0] = this.options.numSlices;
           },
           set(this: TorusShape, value) {
-            this.options = { ...this.options, numSlices: value.num[0] };
+            this.options = { ...this.options, numSlices: Math.max(3, Math.min(100, value.num[0])) };
           }
         },
         {
@@ -187,7 +187,7 @@ export function getTorusShapeClass(): SerializableClass {
             value.num[0] = this.options.numSegments;
           },
           set(this: TorusShape, value) {
-            this.options = { ...this.options, numSegments: value.num[0] };
+            this.options = { ...this.options, numSegments: Math.max(3, Math.min(100, value.num[0])) };
           }
         },
         {
@@ -223,7 +223,7 @@ export function getTorusShapeClass(): SerializableClass {
             value.num[0] = this.options.radialDetail;
           },
           set(this: TorusShape, value) {
-            this.options = { ...this.options, radialDetail: value.num[0] };
+            this.options = { ...this.options, radialDetail: Math.max(3, Math.min(100, value.num[0])) };
           }
         }
       ];
@@ -380,7 +380,7 @@ export function getCylinderShapeClass(): SerializableClass {
             value.num[0] = this.options.heightDetail;
           },
           set(this: CylinderShape, value) {
-            this.options = { ...this.options, heightDetail: value.num[0] };
+            this.options = { ...this.options, heightDetail: Math.max(1, Math.min(value.num[0], 100)) };
           }
         },
         {
@@ -392,7 +392,7 @@ export function getCylinderShapeClass(): SerializableClass {
             value.num[0] = this.options.radialDetail;
           },
           set(this: CylinderShape, value) {
-            this.options = { ...this.options, radialDetail: value.num[0] };
+            this.options = { ...this.options, radialDetail: Math.max(2, Math.min(value.num[0], 100)) };
           }
         },
         {
@@ -474,7 +474,7 @@ export function getSphereShapeClass(): SerializableClass {
             value.num[0] = this.options.verticalDetail;
           },
           set(this: SphereShape, value) {
-            this.options = { ...this.options, verticalDetail: value.num[0] };
+            this.options = { ...this.options, verticalDetail: Math.max(2, Math.min(value.num[0], 100)) };
           }
         },
         {
@@ -486,7 +486,7 @@ export function getSphereShapeClass(): SerializableClass {
             value.num[0] = this.options.horizonalDetail;
           },
           set(this: SphereShape, value) {
-            this.options = { ...this.options, horizonalDetail: value.num[0] };
+            this.options = { ...this.options, horizonalDetail: Math.max(2, Math.min(value.num[0], 100)) };
           }
         }
       ];

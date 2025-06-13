@@ -11,7 +11,6 @@ import {
   Mesh,
   SphereShape,
   BatchGroup,
-  Tonemap,
   BoundingBox
 } from '@zephyr3d/scene';
 import type { DeviceBackend } from '@zephyr3d/device';
@@ -72,7 +71,6 @@ PhysicsApp.ready().then(async () => {
   );
   camera.lookAt(new Vector3(0, 40, 40), Vector3.zero(), Vector3.axisPY());
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
-  camera.compositor.appendPostEffect(new Tonemap());
 
   PhysicsApp.inputManager.use(camera.handleEvent.bind(camera));
   PhysicsApp.on('resize', (width, height) => {

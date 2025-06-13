@@ -1,4 +1,4 @@
-import { Application, OrbitCameraController, PerspectiveCamera, Tonemap } from '@zephyr3d/scene';
+import { Application, OrbitCameraController, PerspectiveCamera } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Scene } from '@zephyr3d/scene';
 import { Vector3 } from '@zephyr3d/base';
@@ -26,8 +26,6 @@ myApp.ready().then(function () {
   );
   // Set camera controller
   camera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
-  // Add a Tonemap post-processing effect
-  camera.compositor.appendPostEffect(new Tonemap());
   // Input handler middleware for camera controll
   myApp.inputManager.use(camera.handleEvent.bind(camera));
   // Frame event handler

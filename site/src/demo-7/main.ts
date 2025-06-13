@@ -8,7 +8,6 @@ import {
   DirectionalLight,
   Application,
   PerspectiveCamera,
-  Tonemap,
   BatchGroup,
   LambertMaterial,
   BoxShape,
@@ -55,7 +54,6 @@ app.ready().then(async () => {
   camera.controller = new OrbitCameraController();
   camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
   camera.depthPrePass = true;
-  camera.compositor.appendPostEffect(new Tonemap());
 
   app.inputManager.use(camera.handleEvent.bind(camera));
 

@@ -5,7 +5,6 @@ import {
   Application,
   PerspectiveCamera,
   DirectionalLight,
-  Tonemap,
   PBRMetallicRoughnessMaterial,
   BoxShape,
   Mesh,
@@ -75,8 +74,6 @@ myApp.ready().then(async () => {
     box2.position.setXYZ(20, 0, i * 10);
     box2.material = material;
   }
-
-  camera.compositor.appendPostEffect(new Tonemap());
 
   // Reset aspect ratio when size was changed
   myApp.on('resize', (width, height) => {

@@ -6,7 +6,6 @@ import {
   Scene,
   AssetManager,
   Application,
-  Tonemap,
   BoundingBox,
   FPSCameraController,
   PointLight,
@@ -111,7 +110,6 @@ lightApp.ready().then(async () => {
     260
   );
   camera.controller = new FPSCameraController({ moveSpeed: 0.05 });
-  camera.compositor.appendPostEffect(new Tonemap());
 
   lightApp.inputManager.use(camera.handleEvent.bind(camera));
 

@@ -23,7 +23,6 @@ myApp.ready().then(function () {
     1,
     100
   );
-  camera.compositor.appendPostEffect(new Tonemap());
   // Frame event handler
   myApp.on('tick', function () {
     // Render scene

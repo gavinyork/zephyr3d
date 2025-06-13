@@ -6,7 +6,6 @@ import {
   Application,
   OrbitCameraController,
   PerspectiveCamera,
-  Tonemap,
   DirectionalLight,
   Mesh,
   SphereShape,
@@ -174,8 +173,6 @@ myApp.ready().then(async function () {
   );
   camera.lookAt(new Vector3(0, 0, 12), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
-  // Add a Tonemap post-processing effect
-  camera.compositor.appendPostEffect(new Tonemap());
 
   //const inspector = new common.Inspector(scene, compositor, camera);
 

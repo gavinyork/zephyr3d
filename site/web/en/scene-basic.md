@@ -192,12 +192,8 @@ The sky colors we rendered earlier looked a bit odd, and this is because the sky
 
 ```javascript
 
-// Creates a compositor
-const compositor = new Compositor();
-// Adds a tone mapping post effect
-compositor.appendPostEffect(new Tonemap());
-
-// ...
+// Enable tonemapping for camera. (tonemapping is enabled by default)
+camera.toneMap = true;
 
 // Passes the compositor as a second parameter to the render emthod
 camera.render(scene, compositor);

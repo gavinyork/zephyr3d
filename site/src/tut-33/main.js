@@ -6,8 +6,7 @@ import {
   Application,
   PerspectiveCamera,
   OrbitCameraController,
-  panoramaToCubemap,
-  Tonemap
+  panoramaToCubemap
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -45,8 +44,6 @@ myApp.ready().then(async () => {
   scene.env.sky.skyType = 'skybox';
   // Set the skybox texture
   scene.env.sky.skyboxTexture = skyboxTexture;
-
-  camera.compositor.appendPostEffect(new Tonemap());
 
   // Reset aspect ratio when size was changed
   myApp.on('resize', (width, height) => {

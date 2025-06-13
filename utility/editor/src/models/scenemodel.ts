@@ -1,5 +1,5 @@
 import type { Camera } from '@zephyr3d/scene';
-import { DirectionalLight, OrbitCameraController, PerspectiveCamera, Scene, Tonemap } from '@zephyr3d/scene';
+import { DirectionalLight, OrbitCameraController, PerspectiveCamera, Scene } from '@zephyr3d/scene';
 import { BaseModel } from './basemodel';
 import { Vector3 } from '@zephyr3d/base';
 import type { Editor } from '../core/editor';
@@ -74,6 +74,5 @@ export class SceneModel extends BaseModel {
         zoomWheel: true
       }
     });
-    this._camera.compositor.appendPostEffect(new Tonemap());
   }
 }

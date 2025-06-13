@@ -9,7 +9,6 @@ import {
   OrbitCameraController,
   Mesh,
   TorusShape,
-  Tonemap,
   AssetManager,
   applyMaterialMixins,
   DirectionalLight,
@@ -165,7 +164,6 @@ myApp.ready().then(async () => {
   );
   camera.lookAt(new Vector3(25, 15, 0), new Vector3(0, 0, 0), Vector3.axisPY());
   camera.controller = new OrbitCameraController();
-  camera.compositor.appendPostEffect(new Tonemap());
 
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 

@@ -2,15 +2,12 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Scene,
-  SAO,
   FPSCameraController,
   DirectionalLight,
   AssetManager,
   Application,
-  Tonemap,
   PerspectiveCamera,
-  Terrain,
-  FXAA
+  Terrain
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -127,9 +124,8 @@ myApp.ready().then(async () => {
   light.castShadow = true;
   light.shadow.mode = 'pcf-opt';
 
-  camera.compositor.appendPostEffect(new SAO());
-  camera.compositor.appendPostEffect(new Tonemap());
-  camera.compositor.appendPostEffect(new FXAA());
+  camera.SSAO = true;
+  camera.FXAA = true;
 
   // Environment lighting and fogging
   scene.env.light.type = 'ibl';

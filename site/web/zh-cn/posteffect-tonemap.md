@@ -5,17 +5,13 @@
 
 ```javascript
 
-// 创建Compositor实例
-const compositor = new Compositor();
-// 创建色调映射后处理实例
-const tonemap = new Tonemap();
-// exposure属性控制曝光度，默认值为1
-tonemap.exposure = 1.5;
-// 添加该效果到compositor
-compositor.appendPostEffect(tonemap)
+// 对摄像机启用Tonemapping(默认Tonemapping是启用的)
+camera.toneMap = true;
+// toneMapExposure属性控制曝光度，默认值为1
+camera.toneMapExposure = 1.5;
 // ...
 // 渲染场景并应用效果
-camera.render(scene, compositor);
+camera.render(scene);
 
 ```
 

@@ -6,13 +6,17 @@ import type { NodeClonable, NodeCloneMethod } from '../scene/scene_node';
 import { SceneNode } from '../scene/scene_node';
 import { Application, DRef } from '../app';
 import type { Drawable, PickTarget } from '../render/drawable';
-import type { BaseTexture } from '@zephyr3d/device';
+import type { AbstractDevice, BaseTexture } from '@zephyr3d/device';
 import { Compositor } from '../posteffect/compositor';
 import type { Scene } from '../scene/scene';
 import type { BaseCameraController } from './base';
 import type { OIT } from '../render/oit';
 import { TAA } from '../posteffect/taa';
 import { SSR } from '../posteffect/ssr';
+import { Tonemap } from '../posteffect/tonemap';
+import { FXAA } from '../posteffect/fxaa';
+import { Bloom } from '../posteffect/bloom';
+import { SAO } from '../posteffect/sao';
 
 /**
  * Camera pick result
@@ -39,8 +43,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   private static _halton23 = halton23(16);
   /** @internal */
   private static _historyData: WeakMap<Camera, CameraHistoryData> = new WeakMap();
-  private static _TAA: TAA = null;
-  private static _SSR: SSR = null;
   /** @internal */
   protected _projMatrix: Matrix4x4;
   /** @internal */
@@ -80,13 +82,41 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   /** @internal */
   protected _HiZ: boolean;
   /** @internal */
-  protected _SSR: boolean;
+  protected _toneMap: boolean;
+  /** @internal */
+  protected _postEffectTonemap: DRef<Tonemap>;
+  /** @internal */
+  protected _tonemapExposure: number;
+  /** @internal */
+  protected _bloom: boolean;
+  /** @internal */
+  protected _postEffectBloom: DRef<Bloom>;
+  /** @internal */
+  protected _bloomMaxDownsampleLevels: number;
+  /** @internal */
+  protected _bloomDownsampleLimit: number;
+  /** @internal */
+  protected _bloomThreshold: number;
+  /** @internal */
+  protected _bloomThresholdKnee: number;
+  /** @internal */
+  protected _bloomIntensity: number;
+  /** @internal */
+  protected _FXAA: boolean;
+  /** @internal */
+  protected _postEffectFXAA: DRef<FXAA>;
   /** @internal */
   protected _TAA: boolean;
+  /** @internal */
+  protected _postEffectTAA: DRef<TAA>;
   /** @internal */
   protected _TAADebug: number;
   /** @internal */
   protected _TAABlendFactor: number;
+  /** @internal */
+  protected _SSR: boolean;
+  /** @internal */
+  protected _postEffectSSR: DRef<SSR>;
   /** @internal */
   protected _ssrParams: Vector4;
   /** @internal */
@@ -105,6 +135,20 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   protected _ssrBlurKernelSize: number;
   /** @internal */
   protected _ssrBlurStdDev: number;
+  /** @internal */
+  protected _SSAO: boolean;
+  /** @internal */
+  protected _postEffectSSAO: DRef<SAO>;
+  /** @internal */
+  protected _SSAOScale: number;
+  /** @internal */
+  protected _SSAOBias: number;
+  /** @internal */
+  protected _SSAORadius: number;
+  /** @internal */
+  protected _SSAOIntensity: number;
+  /** @internal */
+  protected _SSAOBlurDepthCutoff: number;
   /** @internal */
   protected _pickResultPromise: Promise<PickResult>;
   /** @internal */
@@ -156,10 +200,24 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._oit = new DRef();
     this._depthPrePass = false;
     this._HiZ = false;
-    this._SSR = false;
+    this._toneMap = true;
+    this._postEffectTonemap = new DRef();
+    this._tonemapExposure = 1;
+    this._bloom = false;
+    this._postEffectBloom = new DRef();
+    this._bloomMaxDownsampleLevels = 4;
+    this._bloomDownsampleLimit = 32;
+    this._bloomThreshold = 0.8;
+    this._bloomThresholdKnee = 0;
+    this._bloomIntensity = 1;
+    this._FXAA = false;
+    this._postEffectFXAA = new DRef();
     this._TAA = false;
+    this._postEffectTAA = new DRef();
     this._TAADebug = 0;
     this._TAABlendFactor = 1 / 16;
+    this._SSR = false;
+    this._postEffectSSR = new DRef();
     this._ssrParams = new Vector4(100, 120, 0.5, 0);
     this._ssrMaxRoughness = 0.8;
     this._ssrRoughnessFactor = 1;
@@ -169,6 +227,13 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._ssrBlurDepthCutoff = 2;
     this._ssrBlurKernelSize = 17;
     this._ssrBlurStdDev = 10;
+    this._SSAO = false;
+    this._postEffectSSAO = new DRef();
+    this._SSAOScale = 10;
+    this._SSAOBias = 1;
+    this._SSAOIntensity = 0.025;
+    this._SSAORadius = 100;
+    this._SSAOBlurDepthCutoff = 2;
     this._pickResult = null;
     this._commandBufferReuse = true;
     this._jitteredVPMatrix = new Matrix4x4();
@@ -194,6 +259,10 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     super.copyFrom(other, method, recursive);
     this.clipPlane = other.clipPlane ? new Plane(other.clipPlane) : null;
     this.HiZ = other.HiZ;
+    this.toneMap = other.toneMap;
+    this.toneMapExposure = other.toneMapExposure;
+    this.bloom = other.bloom;
+    this.FXAA = other.FXAA;
     this.TAA = other.TAA;
     this.TAADebug = other.TAADebug;
     this.TAABlendFactor = other.TAABlendFactor;
@@ -238,6 +307,105 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   }
   set HiZ(val: boolean) {
     this._HiZ = !!val;
+  }
+  /**
+   * Gets whether Tonemap is enabled.
+   */
+  get toneMap(): boolean {
+    return this._toneMap;
+  }
+  set toneMap(val: boolean) {
+    this._toneMap = !!val;
+  }
+  /**
+   * Gets whether Bloom is enabled.
+   */
+  get bloom(): boolean {
+    return this._bloom;
+  }
+  set bloom(val: boolean) {
+    this._bloom = !!val;
+  }
+  /**
+   * Maximum bloom downsample levels
+   */
+  get bloomMaxDownsampleLevels() {
+    return this._bloomMaxDownsampleLevels;
+  }
+  set bloomMaxDownsampleLevels(val: number) {
+    this._bloomMaxDownsampleLevels = val;
+    if (this._postEffectBloom.get()) {
+      this._postEffectBloom.get().maxDownsampleLevel = val;
+    }
+  }
+  /**
+   * Bloom downsample limit
+   */
+  get bloomDownsampleLimit() {
+    return this._bloomDownsampleLimit;
+  }
+  set bloomDownsampleLimit(val: number) {
+    this._bloomDownsampleLimit = val;
+    if (this._postEffectBloom.get()) {
+      this._postEffectBloom.get().downsampleLimit = val;
+    }
+  }
+  /**
+   * Bloom threshold
+   */
+  get bloomThreshold() {
+    return this._bloomThreshold;
+  }
+  set bloomThreshold(val: number) {
+    this._bloomThreshold = val;
+    if (this._postEffectBloom.get()) {
+      this._postEffectBloom.get().threshold = val;
+    }
+  }
+  /**
+   * Bloom threshold knee
+   */
+  get bloomThresholdKnee() {
+    return this._bloomThresholdKnee;
+  }
+  set bloomThresholdKnee(val: number) {
+    this._bloomThresholdKnee = val;
+    if (this._postEffectBloom.get()) {
+      this._postEffectBloom.get().thresholdKnee = val;
+    }
+  }
+  /**
+   * Bloom intensity
+   */
+  get bloomIntensity() {
+    return this._bloomIntensity;
+  }
+  set bloomIntensity(val: number) {
+    this._bloomIntensity = val;
+    if (this._postEffectBloom.get()) {
+      this._postEffectBloom.get().intensity = val;
+    }
+  }
+  /**
+   * Gets whether FXAA is enabled.
+   */
+  get FXAA(): boolean {
+    return this._FXAA;
+  }
+  set FXAA(val: boolean) {
+    this._FXAA = !!val;
+  }
+  /**
+   * Tonemap exposure
+   */
+  get toneMapExposure(): number {
+    return this._tonemapExposure;
+  }
+  set toneMapExposure(val: number) {
+    this._tonemapExposure = val;
+    if (this._postEffectTonemap.get()) {
+      this._postEffectTonemap.get().exposure = val;
+    }
   }
   /**
    * Gets whether TAA is enabled.
@@ -388,6 +556,65 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   /** @internal */
   get ssrParams(): Vector4 {
     return this._ssrParams;
+  }
+  /**
+   * Gets whether SSAO is enabled.
+   */
+  get SSAO(): boolean {
+    return this._SSAO;
+  }
+  set SSAO(val: boolean) {
+    this._SSAO = !!val;
+  }
+  /** SSAO scale */
+  get SSAOScale() {
+    return this._SSAOScale;
+  }
+  set SSAOScale(val: number) {
+    this._SSAOScale = val;
+    if (this._postEffectSSAO.get()) {
+      this._postEffectSSAO.get().scale = val;
+    }
+  }
+  /** SSAO bias */
+  get SSAOBias() {
+    return this._SSAOBias;
+  }
+  set SSAOBias(val: number) {
+    this._SSAOBias = val;
+    if (this._postEffectSSAO.get()) {
+      this._postEffectSSAO.get().bias = val;
+    }
+  }
+  /** SSAO radius */
+  get SSAORadius() {
+    return this._SSAORadius;
+  }
+  set SSAORadius(val: number) {
+    this._SSAORadius = val;
+    if (this._postEffectSSAO.get()) {
+      this._postEffectSSAO.get().radius = val;
+    }
+  }
+  /** SSAO intensity */
+  get SSAOIntensity() {
+    return this._SSAOIntensity;
+  }
+  set SSAOIntensity(val: number) {
+    this._SSAOIntensity = val;
+    if (this._postEffectSSAO.get()) {
+      this._postEffectSSAO.get().intensity = val;
+    }
+  }
+  /** SSAO depth cutoff */
+  get SSAOBlurDepthCutoff() {
+    return this._SSAOBlurDepthCutoff;
+  }
+  set SSAOBlurDepthCutoff(val: number) {
+    this._SSAOBlurDepthCutoff = val;
+    if (this._postEffectSSAO.get()) {
+      this._postEffectSSAO.get().blurDepthCutoff = val;
+    }
   }
   /** Whether to perform a depth pass */
   get depthPrePass(): boolean {
@@ -712,6 +939,71 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._prevJitteredVPMatrix = null;
     this._prevJitterValue = null;
   }
+  /** @internal */
+  private updatePostProcessing(device: AbstractDevice) {
+    this._compositor.clear();
+    if (this.toneMap) {
+      if (!this._postEffectTonemap.get()) {
+        this._postEffectTonemap.set(new Tonemap());
+        this._postEffectTonemap.get().exposure = this._tonemapExposure;
+      }
+      this._compositor.appendPostEffect(this._postEffectTonemap.get());
+    } else {
+      this._postEffectTonemap.dispose();
+    }
+    if (this.bloom) {
+      if (!this._postEffectBloom.get()) {
+        const bloom = new Bloom();
+        bloom.maxDownsampleLevel = this._bloomMaxDownsampleLevels;
+        bloom.downsampleLimit = this._bloomDownsampleLimit;
+        bloom.threshold = this._bloomThreshold;
+        bloom.thresholdKnee = this._bloomThresholdKnee;
+        bloom.intensity = this._bloomIntensity;
+        this._postEffectBloom.set(bloom);
+      }
+      this._compositor.appendPostEffect(this._postEffectBloom.get());
+    } else {
+      this._postEffectBloom.dispose();
+    }
+    if (this.FXAA) {
+      if (!this._postEffectFXAA.get()) {
+        this._postEffectFXAA.set(new FXAA());
+      }
+      this._compositor.appendPostEffect(this._postEffectFXAA.get());
+    } else {
+      this._postEffectFXAA.dispose();
+    }
+    if (this.TAA && device.type !== 'webgl') {
+      if (!this._postEffectTAA.get()) {
+        this._postEffectTAA.set(new TAA());
+      }
+      this._compositor.appendPostEffect(this._postEffectTAA.get());
+    } else {
+      this._postEffectTAA.dispose();
+    }
+    if (this.SSR) {
+      if (!this._postEffectSSR.get()) {
+        this._postEffectSSR.set(new SSR());
+      }
+      this._compositor.appendPostEffect(this._postEffectSSR.get());
+    } else {
+      this._postEffectSSR.dispose();
+    }
+    if (this.SSAO) {
+      if (!this._postEffectSSAO.get()) {
+        const ssao = new SAO();
+        ssao.scale = this._SSAOScale;
+        ssao.bias = this._SSAOBias;
+        ssao.radius = this._SSAORadius;
+        ssao.intensity = this._SSAOIntensity;
+        ssao.blurDepthCutoff = this._SSAOBlurDepthCutoff;
+        this._postEffectSSAO.set(ssao);
+      }
+      this._compositor.appendPostEffect(this._postEffectSSAO.get());
+    } else {
+      this._postEffectSSAO.dispose();
+    }
+  }
   /**
    * Renders a scene
    * @param scene - The scene to be rendered
@@ -719,20 +1011,8 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    */
   render(scene: Scene) {
     const device = Application.instance.device;
+    this.updatePostProcessing(device);
     const useTAA = this.TAA && device.type !== 'webgl';
-    const useSSR = this.SSR;
-    if (useTAA) {
-      if (!Camera._TAA) {
-        Camera._TAA = new TAA();
-      }
-      this._compositor.appendPostEffect(Camera._TAA);
-    }
-    if (useSSR) {
-      if (!Camera._SSR) {
-        Camera._SSR = new SSR();
-      }
-      this._compositor.appendPostEffect(Camera._SSR);
-    }
     scene.dispatchEvent('startrender', scene, this, this._compositor);
     if (useTAA) {
       const width = device.getDrawingBufferWidth();
@@ -774,12 +1054,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
       this._prevPosition = this.getWorldPosition();
     }
     scene.dispatchEvent('endrender', scene, this, this._compositor);
-    if (useTAA) {
-      this._compositor.removePostEffect(Camera._TAA);
-    }
-    if (useSSR) {
-      this._compositor.removePostEffect(Camera._SSR);
-    }
   }
   async pickAsync(posX: number, posY: number): Promise<PickResult> {
     this._pickPosX = posX;

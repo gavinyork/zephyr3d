@@ -8,7 +8,6 @@ import {
   ABufferOIT,
   Mesh,
   FPSCameraController,
-  Tonemap,
   BoxShape,
   BlinnMaterial,
   createGradientNoiseTexture
@@ -66,8 +65,6 @@ ssrApp.ready().then(async () => {
 
   const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
-
-  camera.compositor.appendPostEffect(new Tonemap());
 
   const inspector = new Inspector(scene, camera);
 

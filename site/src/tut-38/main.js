@@ -6,12 +6,8 @@ import {
   DirectionalLight,
   AssetManager,
   Application,
-  Tonemap,
   PerspectiveCamera,
-  Terrain,
-  FXAA,
-  PostWater,
-  FFTWaveGenerator
+  Terrain
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -90,15 +86,7 @@ myApp.ready().then(async () => {
   light.castShadow = true;
   light.shadow.mode = 'pcf-opt';
 
-  const water = new PostWater(0, new FFTWaveGenerator());
-  water.boundary.setXYZW(0, 0, 500, 500);
-  water.depthMulti = 0.06;
-  water.refractionStrength = 0.12;
-  water.elevation = 6;
-
-  camera.compositor.appendPostEffect(new Tonemap());
-  camera.compositor.appendPostEffect(water);
-  camera.compositor.appendPostEffect(new FXAA());
+  camera.FXAA = true;
 
   scene.env.light.type = 'ibl';
   scene.env.light.strength = 0.35;

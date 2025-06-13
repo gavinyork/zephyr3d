@@ -8,7 +8,6 @@ import {
   DirectionalLight,
   Application,
   PerspectiveCamera,
-  Tonemap,
   BatchGroup,
   LambertMaterial,
   BoxShape,
@@ -53,7 +52,6 @@ app.ready().then(async () => {
   );
   camera.position.setXYZ(0, 0, 100);
   camera.controller = new OrbitCameraController();
-  camera.compositor.appendPostEffect(new Tonemap());
   app.inputManager.use(camera.handleEvent.bind(camera));
 
   const numMaterials = 8;

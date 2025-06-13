@@ -4,7 +4,6 @@ import {
   Application,
   OrbitCameraController,
   PerspectiveCamera,
-  Tonemap,
   AssetManager,
   panoramaToCubemap,
   prefilterCubemap,
@@ -62,8 +61,6 @@ myApp.ready().then(function () {
   const eyePos = new Vector3(0, 0, 30);
   camera.lookAt(eyePos, Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
-  // Add a Tonemap post-processing effect
-  camera.compositor.appendPostEffect(new Tonemap());
 
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 

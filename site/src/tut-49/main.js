@@ -7,8 +7,6 @@ import {
   AssetManager,
   BatchGroup,
   FPSCameraController,
-  Tonemap,
-  FXAA,
   DirectionalLight
 } from '@zephyr3d/scene';
 
@@ -50,8 +48,7 @@ myApp.ready().then(async () => {
   camera.ssrRoughnessFactor = 0.01;
   camera.ssrBlurScale = 0.06;
 
-  camera.compositor.appendPostEffect(new Tonemap());
-  camera.compositor.appendPostEffect(new FXAA());
+  camera.FXAA = true;
 
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 

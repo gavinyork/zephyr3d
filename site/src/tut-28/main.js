@@ -4,10 +4,8 @@ import {
   Application,
   OrbitCameraController,
   PerspectiveCamera,
-  Tonemap,
   DirectionalLight,
-  AssetManager,
-  Bloom
+  AssetManager
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -38,10 +36,6 @@ myApp.ready().then(function () {
   );
   camera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
-  camera.compositor.appendPostEffect(new Tonemap());
-  const bloom = new Bloom();
-  bloom.threshold = 0.87;
-  bloom.intensity = 1.2;
 
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
@@ -50,12 +44,12 @@ myApp.ready().then(function () {
     const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
     const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
     // The lower half of the screen uses Bloom
-    camera.compositor.appendPostEffect(bloom);
+    camera.bloom = true;
     camera.viewport = [0, 0, width, height >> 1];
     camera.aspect = camera.viewport[2] / camera.viewport[3];
     camera.render(scene);
     // No Bloom on the upper half of the screen
-    camera.compositor.removePostEffect(bloom);
+    camera.bloom = false;
     camera.viewport = [0, height >> 1, width, height - (height >> 1)];
     camera.aspect = camera.viewport[2] / camera.viewport[3];
     camera.render(scene);

@@ -1,30 +1,16 @@
-import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
-import type {
-  SkyType,
-  FogType,
-  Scene,
-  EnvLightType,
-  ShadowMode,
-  AbstractPostEffect,
-  Camera
-} from '@zephyr3d/scene';
-import { FFTWaveGenerator, GerstnerWaveGenerator } from '@zephyr3d/scene';
+import { Vector3, Vector4 } from '@zephyr3d/base';
+import type { SkyType, FogType, Scene, EnvLightType, ShadowMode, Camera } from '@zephyr3d/scene';
 import {
   PunctualLight,
   AssetManager,
   Application,
   panoramaToCubemap,
   prefilterCubemap,
-  Tonemap,
-  SAO,
-  PostWater,
-  Bloom,
   PerspectiveCamera
 } from '@zephyr3d/scene';
 import { ImGui, imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import type { Texture2D, BaseTexture, FrameBuffer } from '@zephyr3d/device';
 import { TextureDrawer } from './textureview';
-import type { GizmoMode } from './postgizmo';
 import { PostGizmoRenderer } from './postgizmo';
 import { SceneHierarchy } from './views/scenehierarchy';
 import { PropertyEditor } from './views/grid';
@@ -59,9 +45,7 @@ export class Inspector {
   private _envlightTypes: EnvLightType[];
   private _shadowMethods: ShadowMode[];
   private _skyTypes: SkyType[];
-  private _gizmoModes: GizmoMode[];
   private _fogTypes: FogType[];
-  private _renderPostEffects: Set<AbstractPostEffect>;
   private _postGizmoRenderer: PostGizmoRenderer;
   private _assetManager: AssetManager;
   private _camera: Camera;
@@ -107,8 +91,6 @@ export class Inspector {
     this._shadowMethods = ['hard', 'pcf-pd', 'pcf-opt', 'vsm', 'esm'];
     this._skyTypes = ['none', 'color', 'skybox', 'scatter'];
     this._fogTypes = ['none', 'linear', 'exp', 'exp2', 'scatter'];
-    this._gizmoModes = ['none', 'rotation', 'scaling', 'translation', 'select'];
-    this._renderPostEffects = new Set();
     this._assetManager = null;
     this._assetManager = new AssetManager();
     this._propertyEditor = new PropertyEditor(300, 8, 600, 200, 0.4);
@@ -281,7 +263,6 @@ export class Inspector {
     if (this._showLogs) {
       this.renderLogs();
     }
-    this.renderPostEffects();
     imGuiEndFrame();
   }
   private renderStatusBar() {
@@ -326,361 +307,6 @@ export class Inspector {
   }
   private renderMenuBar() {
     this._menubar.render();
-  }
-  private renderPostEffects() {
-    for (const eff of this._renderPostEffects) {
-      if (eff instanceof Tonemap) {
-        this.renderTonemap(eff);
-      } else if (eff instanceof SAO) {
-        this.renderSAO(eff);
-      } else if (eff instanceof PostWater) {
-        this.renderPostWater(eff);
-      } else if (eff instanceof Bloom) {
-        this.renderBloom(eff);
-      } else if (eff instanceof PostGizmoRenderer) {
-        this.renderGizmo(eff);
-      }
-    }
-  }
-  private renderPostWaterCommon(water: PostWater) {
-    const wireframe = [water.wireframe] as [boolean];
-    if (ImGui.Checkbox('Wireframe##water', wireframe)) {
-      water.wireframe = wireframe[0];
-    }
-    const ssr = [water.ssr] as [boolean];
-    if (ImGui.Checkbox('SSR##water', ssr)) {
-      water.ssr = ssr[0];
-    }
-    ImGui.SliderFloat(
-      'GridScale##water',
-      (val?: number) => {
-        return (water.gridScale = val = val ?? water.gridScale);
-      },
-      0,
-      1
-    );
-    ImGui.SliderFloat(
-      'Speed##water',
-      (val?: number) => {
-        return (water.speed = val = val ?? water.speed);
-      },
-      0,
-      10
-    );
-    ImGui.SliderFloat(
-      'Elevation##water',
-      (val?: number) => {
-        return (water.elevation = val = val ?? water.elevation);
-      },
-      -100,
-      100
-    );
-    const region = Array.from(water.boundary) as [number, number, number, number];
-    if (ImGui.SliderFloat4('Region##water', region, -1000, 1000)) {
-      water.boundary.set(region);
-    }
-    ImGui.SliderFloat(
-      'SSRMaxDistance##water',
-      (val?: number) => (water.ssrMaxDistance = val = val ?? water.ssrMaxDistance),
-      0,
-      1000
-    );
-    ImGui.SliderInt(
-      'SSRIterations##water',
-      (val?: number) => (water.ssrIterations = val = val ?? water.ssrIterations),
-      1,
-      200
-    );
-    ImGui.SliderFloat(
-      'SSRThickness##water',
-      (val?: number) => (water.ssrThickness = val = val ?? water.ssrThickness),
-      0,
-      5
-    );
-    ImGui.SliderFloat(
-      'AntiReflectanceLeak##water',
-      (val?: number) => (water.antiReflectanceLeak = val = val ?? water.antiReflectanceLeak),
-      0,
-      10
-    );
-    ImGui.SliderFloat(
-      'Displace##water',
-      (val?: number) => {
-        return (water.displace = val = val ?? water.displace);
-      },
-      1,
-      100
-    );
-    ImGui.SliderFloat(
-      'DepthMulti##water',
-      (val?: number) => {
-        return (water.depthMulti = val = val ?? water.depthMulti);
-      },
-      0,
-      1
-    );
-    ImGui.SliderFloat(
-      'RefractionStrength##water',
-      (val?: number) => {
-        return (water.refractionStrength = val = val ?? water.refractionStrength);
-      },
-      -1,
-      1
-    );
-    const slope = [water.causticsSlopeMin, water.causticsSlopeMax] as [number, number];
-    if (ImGui.SliderFloat2('CausticsSlope##water', slope, 0, 1)) {
-      water.causticsSlopeMin = slope[0];
-      water.causticsSlopeMax = slope[1];
-    }
-    ImGui.SliderFloat(
-      'CausticsFalloff##water',
-      (val?: number) => {
-        return (water.causticsFalloff = val = val ?? water.causticsFalloff);
-      },
-      0,
-      32
-    );
-    ImGui.SliderFloat(
-      'CausticsIntensity##water',
-      (val?: number) => {
-        return (water.causticsIntensity = val = val ?? water.causticsIntensity);
-      },
-      0,
-      1000
-    );
-  }
-  private renderPostWater(water: PostWater) {
-    if (ImGui.Begin('PostWater')) {
-      this.renderPostWaterCommon(water);
-      if (water.waveGenerator instanceof FFTWaveGenerator) {
-        this.renderPostWaterFFT(water);
-      } else if (water.waveGenerator instanceof GerstnerWaveGenerator) {
-        this.renderPostWaterGerstner(water);
-      }
-    }
-    ImGui.End();
-  }
-  private renderPostWaterGerstner(water: PostWater) {
-    const t = water.waveGenerator as GerstnerWaveGenerator;
-    const numWaves = [t.numWaves] as [number];
-    if (ImGui.SliderInt('WaveCount##water', numWaves, 1, 64)) {
-      t.numWaves = numWaves[0];
-    }
-    for (let i = 0; i < t.numWaves; i++) {
-      ImGui.PushID(i);
-      if (ImGui.CollapsingHeader(`Wave${i}`)) {
-        const omni = [t.isOmniWave(i)] as [boolean];
-        if (ImGui.Checkbox(`Omni##Wave${i}`, omni)) {
-          t.setOmniWave(i, omni[0]);
-        }
-        if (omni[0]) {
-          const origin = [t.getOriginX(i), t.getOriginZ(i)] as [number, number];
-          if (ImGui.SliderFloat2(`Origin##Wave${i}`, origin, -500, 500)) {
-            t.setOrigin(i, origin[0], origin[1]);
-          }
-        } else {
-          const direction = [t.getWaveDirection(i)] as [number];
-          if (ImGui.SliderFloat(`Direction##Wave${i}`, direction, 0, Math.PI * 2)) {
-            t.setWaveDirection(i, direction[0]);
-          }
-        }
-        const amplitude = [t.getWaveAmplitude(i)] as [number];
-        if (ImGui.SliderFloat(`Amplitude##Wave${i}`, amplitude, 0, 5)) {
-          t.setWaveAmplitude(i, amplitude[0]);
-        }
-        const steepness = [t.getWaveSteepness(i)] as [number];
-        if (ImGui.SliderFloat(`Steepness##Wave${i}`, steepness, 0, 10)) {
-          t.setWaveSteepness(i, steepness[0]);
-        }
-        const waveLength = [t.getWaveLength(i)] as [number];
-        if (ImGui.SliderFloat(`WaveLength##Wave${i}`, waveLength, 0, 100)) {
-          t.setWaveLength(i, waveLength[0]);
-        }
-      }
-      ImGui.PopID();
-    }
-  }
-  private renderPostWaterFFT(water: PostWater) {
-    const g = water.waveGenerator as FFTWaveGenerator;
-    const tmpWind = new Vector2(g.wind);
-    if (ImGui.SliderFloat2('Wind', tmpWind, 0, 64)) {
-      g.wind = tmpWind;
-    }
-    ImGui.SliderFloat(
-      'FoamWidth##water',
-      (val?: number) => {
-        return (g.foamWidth = val = val ?? g.foamWidth);
-      },
-      0,
-      2
-    );
-    ImGui.SliderFloat(
-      'FoamContrast##water',
-      (val?: number) => {
-        return (g.foamContrast = val = val ?? g.foamContrast);
-      },
-      0,
-      8
-    );
-    const alignment = [g.alignment] as [number];
-    if (ImGui.SliderFloat('alignment', alignment, 0, 4)) {
-      g.alignment = alignment[0];
-    }
-    for (let i = 0; i < 3; i++) {
-      const size = [g.getWaveLength(i)] as [number];
-      if (ImGui.SliderFloat(`Size${i}`, size, 0, 1000)) {
-        g.setWaveLength(i, size[0]);
-      }
-      const strength = [g.getWaveStrength(i)] as [number];
-      if (ImGui.SliderFloat(`Strength${i}`, strength, 0, 10)) {
-        g.setWaveStrength(i, strength[0]);
-      }
-      const croppiness = [g.getWaveCroppiness(i)] as [number];
-      if (ImGui.SliderFloat(`Croppiness${i}`, croppiness, -2, 2)) {
-        g.setWaveCroppiness(i, croppiness[0]);
-      }
-    }
-  }
-  private renderSAO(sao: SAO) {
-    if (ImGui.Begin('SAO')) {
-      ImGui.DragFloat(
-        'Scale##sao',
-        (val?: number) => {
-          return (sao.scale = val = val ?? sao.scale);
-        },
-        0.01,
-        0,
-        10
-      );
-      ImGui.DragFloat(
-        'Bias##sao',
-        (val?: number) => {
-          return (sao.bias = val = val ?? sao.bias);
-        },
-        0.01,
-        -1,
-        1
-      );
-      ImGui.DragFloat(
-        'Intensity##sao',
-        (val?: number) => {
-          return (sao.intensity = val = val ?? sao.intensity);
-        },
-        0.01,
-        0,
-        1
-      );
-      ImGui.DragFloat(
-        'Radius##sao',
-        (val?: number) => {
-          return (sao.radius = val = val ?? sao.radius);
-        },
-        0.01,
-        1,
-        100
-      );
-      ImGui.DragFloat(
-        'minResolution##sao',
-        (val?: number) => {
-          return (sao.minResolution = val = val ?? sao.minResolution);
-        },
-        0.01,
-        0,
-        1
-      );
-      ImGui.SliderFloat(
-        'blurKernelSize',
-        (val?: number) => {
-          return (sao.blurKernelSize = val = val ?? sao.blurKernelSize);
-        },
-        0,
-        64
-      );
-      ImGui.SliderFloat(
-        'blurStdDev',
-        (val?: number) => {
-          return (sao.blurStdDev = val = val ?? sao.blurStdDev);
-        },
-        0,
-        128
-      );
-      ImGui.SliderFloat(
-        'blurDepthCutoff',
-        (val?: number) => {
-          return (sao.blurDepthCutoff = val = val ?? sao.blurDepthCutoff);
-        },
-        0,
-        1
-      );
-    }
-    ImGui.End();
-  }
-  private renderGizmo(gizmo: PostGizmoRenderer) {
-    if (ImGui.Begin('Gizmo')) {
-      const enabled = [gizmo.enabled] as [boolean];
-      if (ImGui.Checkbox('Enabled##gizmo', enabled)) {
-        gizmo.enabled = enabled[0];
-      }
-      const drawGrid = [gizmo.drawGrid] as [boolean];
-      if (ImGui.Checkbox('Grid##gizmo', drawGrid)) {
-        gizmo.drawGrid = drawGrid[0];
-      }
-      const size = [gizmo.gridSize] as [number];
-      if (ImGui.SliderInt('Size##gizmo', size, 1, 100000)) {
-        gizmo.gridSize = size[0];
-      }
-      const dist = [gizmo.gridDistance] as [number];
-      if (ImGui.SliderInt('Distance##gizmo', dist, 1, 10000)) {
-        gizmo.gridDistance = dist[0];
-      }
-      ImGui.Combo(
-        'Mode##gizmo',
-        (val?: number) => {
-          if (val === undefined) {
-            val = this._gizmoModes.indexOf(gizmo.mode);
-          } else {
-            gizmo.mode = this._gizmoModes[val];
-          }
-          return val;
-        },
-        this._gizmoModes
-      );
-    }
-    ImGui.End();
-  }
-  private renderBloom(bloom: Bloom) {
-    if (ImGui.Begin('Bloom')) {
-      const maxDownsampleLevel = [bloom.maxDownsampleLevel] as [number];
-      if (ImGui.SliderInt('MaxDownsampleLevel##Bloom', maxDownsampleLevel, 1, 16)) {
-        bloom.maxDownsampleLevel = maxDownsampleLevel[0];
-      }
-      const downsampleLimit = [bloom.downsampleLimit] as [number];
-      if (ImGui.SliderInt('DownsampleLimit##Bloom', downsampleLimit, 1, 512)) {
-        bloom.downsampleLimit = downsampleLimit[0];
-      }
-      const threshold = [bloom.threshold] as [number];
-      if (ImGui.SliderFloat('Threshold##Bloom', threshold, 0, 16)) {
-        bloom.threshold = threshold[0];
-      }
-      const knee = [bloom.thresholdKnee] as [number];
-      if (ImGui.SliderFloat('Knee##Bloom', knee, 0, 1)) {
-        bloom.thresholdKnee = knee[0];
-      }
-      const intensity = [bloom.intensity] as [number];
-      if (ImGui.SliderFloat('Intensity##Bloom', intensity, 0, 100)) {
-        bloom.intensity = intensity[0];
-      }
-    }
-    ImGui.End();
-  }
-  private renderTonemap(tonemap: Tonemap) {
-    if (ImGui.Begin('Tonemap')) {
-      const exposure = [tonemap.exposure] as [number];
-      if (ImGui.SliderFloat('Exposure##Tonemap', exposure, 0, 16)) {
-        tonemap.exposure = exposure[0];
-      }
-    }
-    ImGui.End();
   }
   private renderSky() {
     ImGui.Begin('Sky & Fog');

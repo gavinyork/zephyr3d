@@ -4,7 +4,6 @@ import {
   Application,
   OrbitCameraController,
   PerspectiveCamera,
-  Tonemap,
   DirectionalLight,
   AssetManager
 } from '@zephyr3d/scene';
@@ -37,8 +36,6 @@ myApp.ready().then(function () {
   );
   camera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
-  // Add a Tonemap post-processing effect
-  camera.compositor.appendPostEffect(new Tonemap());
 
   myApp.inputManager.use(camera.handleEvent.bind(camera));
 
