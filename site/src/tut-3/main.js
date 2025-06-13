@@ -1,4 +1,4 @@
-import { Application, PerspectiveCamera, Tonemap } from '@zephyr3d/scene';
+import { Application, PerspectiveCamera } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Scene } from '@zephyr3d/scene';
 

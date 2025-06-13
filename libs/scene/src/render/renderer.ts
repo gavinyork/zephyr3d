@@ -2,7 +2,14 @@ import { LightPass } from './lightpass';
 import { ShadowMapPass } from './shadowmap_pass';
 import { DepthPass } from './depthpass';
 import { isPowerOf2, Matrix4x4, nextPowerOf2, Vector3, Vector4 } from '@zephyr3d/base';
-import type { ColorState, FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
+import type {
+  BindGroup,
+  ColorState,
+  FrameBuffer,
+  GPUProgram,
+  Texture2D,
+  TextureFormat
+} from '@zephyr3d/device';
 import { Application } from '../app/app';
 import { CopyBlitter } from '../blitter';
 import type { DrawContext } from './drawable';
@@ -10,19 +17,26 @@ import type { RenderQueue } from './render_queue';
 import type { PunctualLight, Scene } from '../scene';
 import type { PickResult } from '../camera';
 import { Camera } from '../camera';
-import { PostEffectLayer } from '../posteffect/posteffect';
+import { AbstractPostEffect, PostEffectLayer } from '../posteffect/posteffect';
 import { ClusteredLight } from './cluster_light';
 import { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import { ObjectColorPass } from './objectcolorpass';
 import { buildHiZ } from './hzb';
 import { MaterialVaryingFlags } from '../values';
 import { fetchSampler } from '../utility/misc';
+import { Primitive } from '.';
+import { BoxShape } from '../shapes';
 
 /**
  * Forward render scheme
  * @internal
  */
 export class SceneRenderer {
+  /** @internal */
+  private static _skyMotionVectorProgram: GPUProgram = null;
+  /** @internal */
+  private static _skyMotionVectorBindGroup: BindGroup = null;
+  private static _box: Primitive = null;
   /** @internal */
   private static _pickCamera = new Camera(null);
   /** @internal */
@@ -113,7 +127,7 @@ export class SceneRenderer {
         primaryCamera: camera,
         picking: false,
         oit: null,
-        motionVectors: camera.TAA,
+        motionVectors: device.type !== 'webgl' && (camera.TAA || camera.motionBlur),
         HiZ: camera.HiZ && device.type !== 'webgl',
         HiZTexture: null,
         globalBindGroupAllocator,
@@ -248,6 +262,9 @@ export class SceneRenderer {
         : null;
       ctx.linearDepthTexture = depthFramebuffer.getColorAttachments()[0] as Texture2D;
       ctx.depthTexture = depthFramebuffer.getDepthAttachment() as Texture2D;
+      if (ctx.motionVectorTexture) {
+        this.renderSkyMotionVectors(ctx);
+      }
       if (ctx.HiZ) {
         let w = isPowerOf2(ctx.linearDepthTexture.width)
           ? ctx.linearDepthTexture.width
@@ -399,6 +416,83 @@ export class SceneRenderer {
     if (sunLightColor) {
       ctx.sunLight.color = sunLightColor;
     }
+  }
+  private static _getSkyMotionVectorProgram(ctx: DrawContext): GPUProgram {
+    if (!this._skyMotionVectorProgram) {
+      this._skyMotionVectorProgram = ctx.device.buildRenderProgram({
+        vertex(pb) {
+          this.$inputs.pos = pb.vec3().attrib('position');
+          this.VPMatrix = pb.mat4().uniform(0);
+          this.prevVPMatrix = pb.mat4().uniform(0);
+          this.cameraPos = pb.vec3().uniform(0);
+          this.prevCameraPos = pb.vec3().uniform(0);
+          pb.main(function () {
+            this.$l.worldPos = pb.add(this.$inputs.pos, this.cameraPos);
+            this.$l.prevWorldPos = pb.add(this.$inputs.pos, this.prevCameraPos);
+            this.$l.clipPos = pb.mul(this.VPMatrix, pb.vec4(this.worldPos, 1));
+            this.$l.prevClipPos = pb.mul(this.prevVPMatrix, pb.vec4(this.prevWorldPos, 1));
+            this.clipPos.z = this.clipPos.w;
+            this.$builtins.position = this.clipPos;
+            this.$outputs.currentPos = this.clipPos;
+            this.$outputs.prevPos = this.prevClipPos;
+          });
+        },
+        fragment(pb) {
+          this.$outputs.color = pb.vec4();
+          pb.main(function () {
+            this.$l.motionVector = pb.mul(
+              pb.sub(
+                pb.div(this.$inputs.currentPos.xy, this.$inputs.currentPos.w),
+                pb.div(this.$inputs.prevPos.xy, this.$inputs.prevPos.w)
+              ),
+              0.5
+            );
+            this.$outputs.color = pb.vec4(this.motionVector, 0, 1);
+          });
+        }
+      });
+    }
+    return this._skyMotionVectorProgram;
+  }
+  private static _getBox(ctx: DrawContext) {
+    if (!this._box) {
+      this._box = new BoxShape({
+        size: 2,
+        needNormal: false,
+        needUV: false
+      });
+    }
+    return this._box;
+  }
+  /** @internal */
+  private static renderSkyMotionVectors(ctx: DrawContext) {
+    if (!ctx.motionVectorTexture) {
+      return;
+    }
+    const fb = ctx.device.pool.fetchTemporalFramebuffer(
+      false,
+      0,
+      0,
+      ctx.motionVectorTexture,
+      ctx.depthTexture
+    );
+    const program = this._getSkyMotionVectorProgram(ctx);
+    if (!this._skyMotionVectorBindGroup) {
+      this._skyMotionVectorBindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
+    }
+    const box = this._getBox(ctx);
+    this._skyMotionVectorBindGroup.setValue('VPMatrix', ctx.camera.viewProjectionMatrix);
+    this._skyMotionVectorBindGroup.setValue('prevVPMatrix', ctx.camera.prevVPMatrix);
+    this._skyMotionVectorBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
+    this._skyMotionVectorBindGroup.setValue('prevCameraPos', ctx.camera.prevPosition);
+    ctx.device.pushDeviceStates();
+    ctx.device.setProgram(program);
+    ctx.device.setBindGroup(0, this._skyMotionVectorBindGroup);
+    ctx.device.setRenderStates(AbstractPostEffect.getDefaultRenderState(ctx, 'le'));
+    ctx.device.setFramebuffer(fb);
+    box.draw();
+    ctx.device.popDeviceStates();
+    ctx.device.pool.releaseFrameBuffer(fb);
   }
   /** @internal */
   private static renderShadowMaps(ctx: DrawContext, lights: PunctualLight[]) {
