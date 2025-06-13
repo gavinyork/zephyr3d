@@ -136,7 +136,7 @@ export class AbstractPostEffect implements Disposable {
   /** @internal */
   protected destroy() {}
   /** @internal */
-  protected static getDefaultRenderState(ctx: DrawContext, compareFunc: CompareFunc) {
+  static getDefaultRenderState(ctx: DrawContext, compareFunc: CompareFunc) {
     let renderState = this._defaultRenderStates[compareFunc];
     if (!renderState) {
       renderState = ctx.device.createRenderStateSet();

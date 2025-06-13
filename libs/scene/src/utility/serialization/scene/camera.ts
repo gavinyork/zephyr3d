@@ -54,7 +54,8 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'Enabled',
+          name: 'ToneMapEnabled',
+          label: 'Enabled',
           group: 'PostProcessing/ToneMap',
           type: 'bool',
           phase: 0,
@@ -67,7 +68,8 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'Exposure',
+          name: 'ToneMapExposure',
+          label: 'Exposure',
           group: 'PostProcessing/ToneMap',
           type: 'float',
           options: { minValue: 0, maxValue: 8 },
@@ -81,7 +83,8 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'Enabled',
+          name: 'BloomEnabled',
+          label: 'Enabled',
           group: 'PostProcessing/Bloom',
           type: 'bool',
           phase: 0,
@@ -94,7 +97,8 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'MaxDownsampleLevels',
+          name: 'BloomMaxDownsampleLevels',
+          label: 'MaxDownsampleLevels',
           group: 'PostProcessing/Bloom',
           type: 'int',
           options: { minValue: 0, maxValue: 8 },
@@ -108,7 +112,8 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'DownsampleLimit',
+          name: 'BloomDownsampleLimit',
+          label: 'DownsampleLimit',
           group: 'PostProcessing/Bloom',
           type: 'int',
           options: { minValue: 2, maxValue: 64 },
@@ -122,7 +127,8 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'Threshold',
+          name: 'BloomThreshold',
+          label: 'Threshold',
           group: 'PostProcessing/Bloom',
           type: 'float',
           options: { minValue: 0, maxValue: 1 },
@@ -136,7 +142,8 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'ThresholdKnee',
+          name: 'BloomThresholdKnee',
+          label: 'ThresholdKnee',
           group: 'PostProcessing/Bloom',
           type: 'float',
           options: { minValue: 0, maxValue: 1 },
@@ -150,7 +157,8 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'Intensity',
+          name: 'BloomIntensity',
+          label: 'Intensity',
           group: 'PostProcessing/Bloom',
           type: 'float',
           options: { minValue: 0, maxValue: 8 },
@@ -164,7 +172,8 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'Enabled',
+          name: 'FXAAEnabled',
+          label: 'Enabled',
           group: 'PostProcessing/FXAA',
           type: 'bool',
           phase: 0,
@@ -177,7 +186,8 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'Enabled',
+          name: 'TAAEnabled',
+          label: 'Enabled',
           group: 'PostProcessing/TAA',
           type: 'bool',
           phase: 0,
@@ -191,6 +201,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'TAADebug',
+          label: 'Debug',
           group: 'PostProcessing/TAA',
           type: 'int',
           phase: 1,
@@ -219,6 +230,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'TAABlendFactor',
+          label: 'BlendFactor',
           group: 'PostProcessing/TAA',
           type: 'float',
           phase: 1,
@@ -238,7 +250,43 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'SSR',
+          name: 'MotionBlurEnabled',
+          label: 'Enabled',
+          group: 'PostProcessing/MotionBlur',
+          type: 'bool',
+          phase: 0,
+          default: false,
+          get(this: Camera, value) {
+            value.bool[0] = this.motionBlur;
+          },
+          set(this: Camera, value) {
+            this.motionBlur = value.bool[0];
+          }
+        },
+        {
+          name: 'MotionBlurStrength',
+          label: 'Strength',
+          group: 'PostProcessing/MotionBlur',
+          type: 'float',
+          phase: 1,
+          default: 1,
+          options: {
+            minValue: 0,
+            maxValue: 10
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.motionBlurStrength;
+          },
+          set(this: Camera, value) {
+            this.motionBlurStrength = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.motionBlur;
+          }
+        },
+        {
+          name: 'SSREnabled',
+          label: 'Enabled',
           group: 'PostProcessing/SSR',
           type: 'bool',
           phase: 0,
@@ -252,6 +300,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRMaxRoughness',
+          label: 'RoughnessThreshold',
           group: 'PostProcessing/SSR',
           type: 'float',
           phase: 1,
@@ -272,6 +321,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRRoughnessFactor',
+          label: 'RoughnessFactor',
           group: 'PostProcessing/SSR',
           type: 'float',
           phase: 1,
@@ -292,6 +342,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRStride',
+          label: 'Stride',
           group: 'PostProcessing/SSR',
           type: 'int',
           phase: 1,
@@ -312,6 +363,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRMaxDistance',
+          label: 'MaxDistance',
           group: 'PostProcessing/SSR',
           type: 'float',
           phase: 1,
@@ -332,6 +384,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRMaxSteps',
+          label: 'MaxSteps',
           group: 'PostProcessing/SSR',
           type: 'int',
           phase: 1,
@@ -352,6 +405,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRThickness',
+          label: 'Thickness',
           group: 'PostProcessing/SSR',
           type: 'float',
           phase: 1,
@@ -372,6 +426,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRBlurScale',
+          label: 'BlurScale',
           group: 'PostProcessing/SSR',
           phase: 1,
           type: 'float',
@@ -392,6 +447,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRBlurDepthCutoff',
+          label: 'BlurDepthCutoff',
           group: 'PostProcessing/SSR',
           phase: 1,
           type: 'float',
@@ -412,6 +468,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRBlurKernelSize',
+          label: 'BlurKernelSize',
           group: 'PostProcessing/SSR',
           type: 'int',
           phase: 1,
@@ -432,6 +489,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRBlurStdDev',
+          label: 'BlurStdDev',
           group: 'PostProcessing/SSR',
           type: 'float',
           phase: 1,
@@ -452,6 +510,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
         },
         {
           name: 'SSRCalcThickness',
+          label: 'CalcThickness',
           group: 'PostProcessing/SSR',
           type: 'bool',
           phase: 1,
@@ -467,7 +526,8 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'Enabled',
+          name: 'SSAOEnabled',
+          label: 'Enabled',
           group: 'PostProcessing/SSAO',
           type: 'bool',
           phase: 0,
@@ -480,7 +540,8 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'Scale',
+          name: 'SSAOScale',
+          label: 'Scale',
           group: 'PostProcessing/SSAO',
           type: 'float',
           phase: 0,
@@ -493,7 +554,8 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'Bias',
+          name: 'SSAOBias',
+          label: 'Bias',
           group: 'PostProcessing/SSAO',
           type: 'float',
           phase: 0,
@@ -506,7 +568,8 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'Radius',
+          name: 'SSAORadius',
+          label: 'Radius',
           group: 'PostProcessing/SSAO',
           type: 'float',
           phase: 0,
@@ -519,7 +582,8 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           }
         },
         {
-          name: 'Intensity',
+          name: 'SSAOIntensity',
+          label: 'Intensity',
           group: 'PostProcessing/SSAO',
           type: 'float',
           phase: 0,

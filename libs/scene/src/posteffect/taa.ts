@@ -1,6 +1,6 @@
 import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext, Primitive } from '../render';
-import { AbstractPostEffect } from './posteffect';
+import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import { fetchSampler } from '../utility/misc';
 import { BoxShape } from '../shapes';
@@ -17,6 +17,7 @@ export class TAA extends AbstractPostEffect {
   constructor() {
     super();
     this._bindGroup = null;
+    this._layer = PostEffectLayer.transparent;
     this._skyMotionVectorBindGroup = null;
   }
   renderSkyMotionVectors(ctx: DrawContext) {
@@ -60,7 +61,7 @@ export class TAA extends AbstractPostEffect {
     ) {
       this.passThrough(ctx, inputColorTexture, srgbOutput);
     } else {
-      this.renderSkyMotionVectors(ctx);
+      //this.renderSkyMotionVectors(ctx);
       let program = TAA._resolveProgram[ctx.camera.TAADebug];
       if (!program) {
         program = TAA._getResolveProgram(ctx, ctx.camera.TAADebug);

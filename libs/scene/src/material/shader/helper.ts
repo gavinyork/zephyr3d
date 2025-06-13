@@ -201,6 +201,7 @@ export class ShaderHelper {
       pb.vec2('renderSize'),
       pb.vec2('jitterValue'),
       pb.float('roughnessFactor'),
+      pb.float('frameDeltaTime'),
       pb.int('framestamp')
     ]);
     if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
@@ -791,6 +792,7 @@ export class ShaderHelper {
         linear ? 0 : 1
       ),
       roughnessFactor: ctx.camera.SSR ? ctx.camera.ssrRoughnessFactor : 1,
+      frameDeltaTime: Application.instance.device.frameInfo.elapsedFrame * 0.001,
       framestamp: Application.instance.device.frameInfo.frameCounter
     } as any;
     if (ctx.motionVectors && ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH) {

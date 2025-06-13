@@ -217,7 +217,7 @@ export function temporalResolve(
         this.$return(this.sampleColor);
       }
     );
-    this.$l.reprojectedUV = pb.sub(this.screenUV, pb.mul(this.velocity, pb.vec2(1, 1)));
+    this.$l.reprojectedUV = pb.sub(this.screenUV, this.velocity);
     //this.$l.historyColor = pb.textureSampleLevel(historyColorTex, this.reprojectedUV, 0).rgb;
     this.$l.historyColor = this.sampleHistoryColorCatmulRom9(this.reprojectedUV, this.texSize);
     this.$l.velocityClosest = this.getClosestVelocity(this.screenUV, this.texSize);

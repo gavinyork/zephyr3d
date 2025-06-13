@@ -388,7 +388,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       ImGui.Indent(level * 10);
     }
     ImGui.AlignTextToFramePadding();
-    ImGui.Text(name);
+    ImGui.Text(value.label ?? name);
     if (level > 0) {
       ImGui.Unindent(level * 10);
     }
@@ -436,7 +436,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             tmpProperty.num[0] = value.enum.values[val[0]] as number;
           }
         } else {
-          const val = tmpProperty.num as [number];
+          const val = [tmpProperty.num[0]] as [number];
           changed = ImGui.DragFloat(
             '##value',
             val,
@@ -445,6 +445,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             value.options?.maxValue ?? undefined,
             '%.3f'
           );
+          tmpProperty.num[0] = val[0];
         }
         break;
       }
