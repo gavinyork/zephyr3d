@@ -33,6 +33,7 @@ export class FontCanvas {
       this._context.fillRect(0, 0, this._canvas.width, this._canvas.height);
       this._context.fillStyle = '#ffffff';
       this._context.imageSmoothingEnabled = true;
+      this._context.imageSmoothingQuality = 'high';
     }
   }
 }

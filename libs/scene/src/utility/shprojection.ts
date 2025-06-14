@@ -106,7 +106,6 @@ function init() {
   renderStates.useRasterizerState().setCullMode('none');
   renderStates.useDepthState().enableTest(false).enableWrite(false);
   projectionProgram = createProjectionProgram();
-  //console.log(projectionProgram.getShaderSource('fragment'));
   projectionBindgroup = device.createBindGroup(projectionProgram.bindGroupLayouts[0]);
 }
 

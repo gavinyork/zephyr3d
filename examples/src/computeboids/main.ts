@@ -110,8 +110,6 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
       });
     }
   });
-  console.log(spriteUpdateProgram.getShaderSource('compute'));
-  console.log(spriteUpdateProgram.bindGroupLayouts[0]);
   const spriteVertexBuffer = device.createVertexBuffer(
     'position_f32x2',
     new Float32Array([-0.01, -0.02, 0.01, -0.02, 0.0, 0.02])

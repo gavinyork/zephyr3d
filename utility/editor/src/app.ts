@@ -11,7 +11,7 @@ const studioApp = new Application({
 
 studioApp.ready().then(async () => {
   const device = studioApp.device;
-  await imGuiInit(device, `'Consolas', 'Monaco', 'Courier New', monospace`);
+  await imGuiInit(device, `'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`, 12);
   const editor = new Editor();
   await editor.init();
   editor.registerModules();

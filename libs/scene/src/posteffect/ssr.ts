@@ -7,7 +7,6 @@ import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { copyTexture, fetchSampler } from '../utility/misc';
 import { BilateralBlurBlitter } from '../blitter/bilateralblur';
 import { ShaderHelper } from '../material';
-// import { debugTexture } from '../utility';
 
 /**
  * SSR post effect
@@ -86,6 +85,7 @@ export class SSR extends AbstractPostEffect {
     this._combineBindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
     this._combineBindGroup.setTexture('reflectanceTex', reflectanceTex, linearSampler);
     this._combineBindGroup.setTexture('roughnessTex', ctx.SSRRoughnessTexture, linearSampler);
+    this._combineBindGroup.setValue('ssrMaxRoughness', ctx.camera.ssrMaxRoughness);
     this._combineBindGroup.setValue(
       'targetSize',
       new Vector4(
@@ -127,6 +127,7 @@ export class SSR extends AbstractPostEffect {
     bindGroup.setTexture('roughnessTex', ctx.SSRRoughnessTexture, nearestSampler);
     bindGroup.setTexture('normalTex', ctx.SSRNormalTexture, nearestSampler);
     bindGroup.setTexture('depthTex', sceneDepthTexture, nearestSampler);
+    bindGroup.setValue('ssrMaxRoughness', ctx.camera.ssrMaxRoughness);
     bindGroup.setValue('cameraNearFar', new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane()));
     bindGroup.setValue(
       'targetSize',
@@ -231,6 +232,7 @@ export class SSR extends AbstractPostEffect {
       fetchSampler('clamp_nearest_nomip'),
       AbstractPostEffect.getDefaultRenderState(ctx, 'eq')
     );
+
     const intersectFramebuffer = device.pool.fetchTemporalFramebuffer(
       false,
       inputColorTexture.width,
@@ -260,7 +262,6 @@ export class SSR extends AbstractPostEffect {
     device.setFramebuffer(intersectFramebuffer);
     this.intersect(ctx, inputColorTexture, sceneDepthTexture, true, false);
     const intersectTex = intersectFramebuffer.getColorAttachments()[0] as Texture2D;
-    //debugTexture(intersectTex, 'SSR_Intersect');
     device.setFramebuffer(pingpongFramebuffer[0]);
     this.resolve(ctx, inputColorTexture, sceneDepthTexture, intersectTex);
     if (ctx.camera.ssrBlurScale > 0 && ctx.camera.ssrBlurKernelSize > 0) {
@@ -328,6 +329,7 @@ export class SSR extends AbstractPostEffect {
         this.reflectanceTex = pb.tex2D().uniform(0);
         this.roughnessTex = pb.tex2D().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
+        this.ssrMaxRoughness = pb.float().uniform(0);
         this.srgbOut = pb.int().uniform(0);
         this.$outputs.outColor = pb.vec4();
         pb.func(
@@ -345,11 +347,15 @@ export class SSR extends AbstractPostEffect {
         );
         pb.main(function () {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
-          this.$l.reflectance = pb.textureSampleLevel(this.reflectanceTex, this.screenUV, 0).rgb;
           this.$l.sceneColor = pb.textureSampleLevel(this.colorTex, this.screenUV, 0).rgb;
           this.$l.roughnessInfo = pb.textureSampleLevel(this.roughnessTex, this.screenUV, 0);
-          this.combined = this.resolveSample(this.sceneColor, this.reflectance, this.roughnessInfo);
-          this.$outputs.outColor = pb.vec4(this.combined, 1);
+          this.$l.combined = pb.vec3();
+          this.$if(pb.greaterThanEqual(this.roughnessInfo.a, this.ssrMaxRoughness), function () {
+            this.combined = this.sceneColor;
+          }).$else(function () {
+            this.$l.reflectance = pb.textureSampleLevel(this.reflectanceTex, this.screenUV, 0).rgb;
+            this.combined = this.resolveSample(this.sceneColor, this.reflectance, this.roughnessInfo);
+          });
           this.$if(pb.equal(this.srgbOut, 0), function () {
             this.$outputs.outColor = pb.vec4(this.combined, 1);
           }).$else(function () {
@@ -388,6 +394,7 @@ export class SSR extends AbstractPostEffect {
         this.viewMatrix = pb.mat4().uniform(0);
         this.invViewMatrix = pb.mat4().uniform(0);
         this.invProjMatrix = pb.mat4().uniform(0);
+        this.ssrMaxRoughness = pb.float().uniform(0);
         if (ctx.env.light.envLight) {
           this.envLightStrength = pb.float().uniform(0);
           ctx.env.light.envLight.initShaderBindings(pb);
@@ -460,8 +467,11 @@ export class SSR extends AbstractPostEffect {
         );
         pb.main(function () {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
-          this.$l.intersectSample = pb.textureSampleLevel(this.intersectTex, this.screenUV, 0);
           this.$l.roughnessInfo = pb.textureSampleLevel(this.roughnessTex, this.screenUV, 0);
+          this.$if(pb.greaterThanEqual(this.roughnessInfo.a, this.ssrMaxRoughness), function () {
+            pb.discard();
+          });
+          this.$l.intersectSample = pb.textureSampleLevel(this.intersectTex, this.screenUV, 0);
           this.$l.reflectance = pb.vec3();
           this.$if(pb.greaterThan(this.intersectSample.w, 0), function () {
             this.$l.indirectIntersectSample = pb.textureSampleLevel(
@@ -575,13 +585,16 @@ export class SSR extends AbstractPostEffect {
         });
         pb.main(function () {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
+          this.$l.roughnessValue = pb.textureSampleLevel(this.roughnessTex, this.screenUV, 0);
+          this.$l.roughness = this.roughnessValue.a;
+          this.$if(pb.greaterThanEqual(this.roughness, this.ssrMaxRoughness), function () {
+            pb.discard();
+          });
           if (!blur) {
             this.$l.sceneColor = pb.textureSampleLevel(this.colorTex, this.screenUV, 0).rgb;
           }
-          this.$l.roughnessValue = pb.textureSampleLevel(this.roughnessTex, this.screenUV, 0);
           this.$l.pos = this.getPosition(this.screenUV, this.invProjMatrix);
           this.$l.linearDepth = this.pos.w;
-          this.$l.roughness = this.roughnessValue.a;
           this.$l.color = pb.vec3(0);
           this.$l.a = pb.float();
           this.$if(pb.greaterThanEqual(this.linearDepth, 1), function () {
@@ -601,42 +614,39 @@ export class SSR extends AbstractPostEffect {
               pb.reflect(this.viewVec, this.viewNormal),
               SSR_calcJitter(this, this.viewPos, this.roughness)
             );
-            this.$l.hitInfo = pb.vec4(0);
-            this.$if(pb.lessThan(this.roughness, this.ssrMaxRoughness), function () {
-              this.hitInfo = ctx.HiZTexture
-                ? screenSpaceRayTracing_HiZ(
-                    this,
-                    this.viewPos,
-                    this.reflectVec,
-                    this.viewMatrix,
-                    this.projMatrix,
-                    this.invProjMatrix,
-                    this.cameraNearFar,
-                    this.depthMipLevels,
-                    this.ssrParams.y,
-                    this.ssrParams.z,
-                    this.targetSize,
-                    this.hizTex,
-                    this.normalTex
-                  )
-                : screenSpaceRayTracing_Linear2D(
-                    this,
-                    this.viewPos,
-                    this.reflectVec,
-                    this.viewMatrix,
-                    this.projMatrix,
-                    this.invProjMatrix,
-                    this.cameraNearFar,
-                    this.ssrParams.x,
-                    this.ssrParams.y,
-                    this.ssrParams.z,
-                    this.ssrStride,
-                    this.targetSize,
-                    this.depthTex,
-                    this.normalTex,
-                    !!ctx.primaryCamera.ssrCalcThickness
-                  );
-            });
+            this.$l.hitInfo = ctx.HiZTexture
+              ? screenSpaceRayTracing_HiZ(
+                  this,
+                  this.viewPos,
+                  this.reflectVec,
+                  this.viewMatrix,
+                  this.projMatrix,
+                  this.invProjMatrix,
+                  this.cameraNearFar,
+                  this.depthMipLevels,
+                  this.ssrParams.y,
+                  this.ssrParams.z,
+                  this.targetSize,
+                  this.hizTex,
+                  this.normalTex
+                )
+              : screenSpaceRayTracing_Linear2D(
+                  this,
+                  this.viewPos,
+                  this.reflectVec,
+                  this.viewMatrix,
+                  this.projMatrix,
+                  this.invProjMatrix,
+                  this.cameraNearFar,
+                  this.ssrParams.x,
+                  this.ssrParams.y,
+                  this.ssrParams.z,
+                  this.ssrStride,
+                  this.targetSize,
+                  this.depthTex,
+                  this.normalTex,
+                  !!ctx.primaryCamera.ssrCalcThickness
+                );
             if (blur) {
               this.blurRadius = pb.float(0);
               this.$if(pb.greaterThan(this.roughness, 0.001), function () {

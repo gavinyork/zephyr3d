@@ -290,7 +290,7 @@ export class Renderer {
       fragment(pb) {
         this.$outputs.outColor = pb.vec4();
         if (diffuseMap) {
-          this.tex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.tex = pb.tex2D().uniform(0);
         }
         pb.main(function () {
           if (diffuseMap) {

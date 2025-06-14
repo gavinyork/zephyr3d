@@ -1302,8 +1302,6 @@ export function renderAPLut(params: AtmosphereParams) {
         }
       });
       debugAPLutBindGroup = device.createBindGroup(debugAPLutProgram.bindGroupLayouts[0]);
-      console.log(debugAPLutProgram.getShaderSource('vertex'));
-      console.log(debugAPLutProgram.getShaderSource('fragment'));
       debugApLut = device.createTexture2D('rgba16f', 32 * 32, 32, { samplerOptions: { mipFilter: 'none' } });
       debugApLut.name = 'DebugAPLut';
       debugAPFramebuffer = device.createFrameBuffer([debugApLut], null);

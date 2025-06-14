@@ -32,8 +32,8 @@ export async function imGuiInit(device: AbstractDevice, fontFamily?: string, fon
   io.BackendFlags |= ImGui.BackendFlags.HasMouseCursors;
   const font = io.Fonts.AddFontDefault();
 
-  font.FontName = fontFamily || 'arial';
-  font.FontSize = fontSize || 16;
+  font.FontName = fontFamily || `'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`;
+  font.FontSize = fontSize || 12;
   ImGui_Impl.Init(device);
 }
 

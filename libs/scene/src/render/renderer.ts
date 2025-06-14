@@ -24,7 +24,7 @@ import { ObjectColorPass } from './objectcolorpass';
 import { buildHiZ } from './hzb';
 import { MaterialVaryingFlags } from '../values';
 import { fetchSampler } from '../utility/misc';
-import { Primitive } from '.';
+import type { Primitive } from '.';
 import { BoxShape } from '../shapes';
 
 /**
