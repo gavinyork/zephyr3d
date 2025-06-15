@@ -55,9 +55,30 @@ export class Scene extends makeEventTarget(Object)<{
     this._rootNode = new DRef(new SceneNode(this));
     this._rootNode.get().name = 'Root';
   }
-  /** @internal */
+  /**
+   * Gets the animation sets in the scene
+   * @returns All animation sets in the scene
+   */
+  getAnimatoinSets() {
+    return this._animationSet;
+  }
+  /**
+   * Adds an animation set to the scene
+   * @param animationSet - The animation set to be added
+   */
   addAnimationSet(animationSet: AnimationSet) {
     this._animationSet.push(new DWeakRef(animationSet));
+  }
+  /**
+   * Deletes an animation set from the scene
+   * @param animationSet - The animation set to be removed
+   */
+  deleteAnimationSet(animationSet: AnimationSet) {
+    const index = this._animationSet.findIndex((val) => val.get() === animationSet);
+    if (index >= 0) {
+      this._animationSet[index].dispose();
+      this._animationSet.splice(index, 1);
+    }
   }
   /**
    * Gets the unique identifier of the scene

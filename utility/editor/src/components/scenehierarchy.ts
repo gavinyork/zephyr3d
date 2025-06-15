@@ -15,11 +15,13 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
   private _scene: Scene;
   private _selectedNode: SceneNode;
+  private _selectedAnimation: string;
   private _assetRegistry: AssetRegistry;
   constructor(scene: Scene, assetRegistry: AssetRegistry) {
     super();
     this._scene = scene;
     this._selectedNode = null;
+    this._selectedAnimation = null;
     this._assetRegistry = assetRegistry;
   }
   get scene() {
@@ -32,6 +34,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     }
   }
   render() {
+    this.renderAnimations();
     this.renderSceneNode(this._scene.rootNode);
   }
   selectNode(node: SceneNode) {
@@ -48,6 +51,62 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   get selectedNode() {
     return this._selectedNode;
   }
+  private renderAnimations() {
+    if (ImGui.TreeNodeEx('Animations##Animations', SceneHierarchy.baseFlags)) {
+      for (let i = 0; i < this._scene.getAnimatoinSets().length; i++) {
+        const animationSet = this._scene.getAnimatoinSets()[i].get();
+        if (animationSet) {
+          ImGui.PushID(i);
+          if (ImGui.TreeNodeEx('Animation', SceneHierarchy.baseFlags)) {
+            for (let j = 0; j < animationSet.getAnimationNames().length; j++) {
+              ImGui.PushID(j);
+              const name = animationSet.getAnimationNames()[j];
+              const animation = animationSet.getAnimationClip(name);
+              if (animation) {
+                const flags =
+                  ImGui.TreeNodeFlags.SpanAvailWidth |
+                  (this._selectedAnimation === animation.name ? ImGui.TreeNodeFlags.Selected : 0);
+                const isOpen = ImGui.TreeNodeEx(name ?? 'noname', flags);
+                if (isOpen) {
+                  const tracks = [...animation.tracks];
+                  for (let k = 0; k < tracks.length; k++) {
+                    ImGui.PushID(k);
+                    if (
+                      ImGui.TreeNodeEx(this.getNodeName(tracks[k][0]), ImGui.TreeNodeFlags.SpanAvailWidth)
+                    ) {
+                      ImGui.TreePop();
+                    }
+                    ImGui.PopID();
+                  }
+                  ImGui.TreePop();
+                }
+              }
+              ImGui.PopID();
+            }
+            ImGui.TreePop();
+          }
+          ImGui.PopID();
+        }
+      }
+      ImGui.TreePop();
+    }
+  }
+  private getNodeName(node: SceneNode): string {
+    if (node === node.scene.rootNode) {
+      return 'Scene';
+    }
+    if (node.name) {
+      return node.name;
+    }
+    const serializationInfo = getSerializationInfo(this._assetRegistry);
+    let cls: SerializableClass = null;
+    let ctor = node.constructor;
+    while (!cls) {
+      cls = serializationInfo.get(ctor);
+      ctor = Object.getPrototypeOf(ctor);
+    }
+    return cls.className;
+  }
   private renderSceneNode(node: SceneNode) {
     const serializationInfo = getSerializationInfo(this._assetRegistry);
     let cls: SerializableClass = null;
@@ -56,7 +115,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
       cls = serializationInfo.get(ctor);
       ctor = Object.getPrototypeOf(ctor);
     }
-    const label = `${(node === node.scene.rootNode ? 'Scene' : node.name) || cls.className}##${node.id}`;
+    const label = `${this.getNodeName(node)}##${node.id}`;
     let flags = SceneHierarchy.baseFlags;
     if (this._selectedNode === node) {
       flags |= ImGui.TreeNodeFlags.Selected;

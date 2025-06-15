@@ -213,6 +213,14 @@ export class AnimationSet {
     return name ? this._activeAnimations.has(this._animations[name]) : this._activeAnimations.size > 0;
   }
   /**
+   * Gets the animation clip by name
+   * @param name - Name of the animation to get
+   * @returns The animation clip if exists, otherwise null
+   */
+  getAnimationClip(name: string): AnimationClip | null {
+    return this._animations[name] ?? null;
+  }
+  /**
    * Gets the weight of specific animation which is currently playing
    * @param name - Name of the animation
    * @returns Weight of the animation or 0 if this animation is not playing

@@ -672,7 +672,7 @@ export class SharedModel {
   ) {
     const node: SceneNode = new SceneNode(scene);
     nodeMap.set(assetNode, node);
-    node.name = `${assetNode.name}`;
+    node.name = assetNode.name ?? '';
     node.position.set(assetNode.position);
     node.rotation.set(assetNode.rotation);
     node.scale.set(assetNode.scaling);
