@@ -1,5 +1,4 @@
 import type { AnimationTrack } from './animationtrack';
-import type { SceneNode } from '../scene/scene_node';
 import type { Skeleton } from './skeleton';
 
 /**
@@ -12,7 +11,7 @@ export class AnimationClip {
   /** @internal */
   protected _duration: number;
   /** @internal */
-  protected _tracks: Map<SceneNode, AnimationTrack[]>;
+  protected _tracks: Map<unknown, AnimationTrack[]>;
   /** @internal */
   protected _skeletons: Set<Skeleton>;
   /**
@@ -59,11 +58,11 @@ export class AnimationClip {
   }
   /**
    * Adds an animation track to the animation
-   * @param node - The node that will be controlled by the track
+   * @param target - The node that will be controlled by the track
    * @param track - The track to be added
    * @returns self
    */
-  addTrack(node: SceneNode, track: AnimationTrack): this {
+  addTrack(target: unknown, track: AnimationTrack): this {
     if (!track) {
       return;
     }
@@ -76,20 +75,20 @@ export class AnimationClip {
       }
     }
     const blendId = track.getBlendId();
-    const tracks = this._tracks.get(node);
+    const tracks = this._tracks.get(target);
     if (tracks && tracks.findIndex((track) => track.getBlendId() === blendId) >= 0) {
       console.error('Tracks with same BlendId could not be added to same animation');
       return;
     }
     track.animation = this;
-    let trackInfo = this._tracks.get(node);
+    let trackInfo = this._tracks.get(target);
     if (!trackInfo) {
       trackInfo = [];
-      this._tracks.set(node, trackInfo);
+      this._tracks.set(target, trackInfo);
     }
     trackInfo.push(track);
     this._duration = Math.max(this._duration, track.interpolator.maxTime);
-    track.reset(node);
+    track.reset(target);
     return this;
   }
 }

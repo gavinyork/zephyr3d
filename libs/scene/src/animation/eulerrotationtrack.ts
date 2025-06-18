@@ -9,7 +9,7 @@ const tmpVec3 = new Vector3();
  * Euler angle rotation animation track
  * @public
  */
-export class EulerRotationTrack extends AnimationTrack<Quaternion> {
+export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
   private _state: Quaternion;
   /**
    * Create an instance of EulerRotationTrack from keyframe values
@@ -28,7 +28,7 @@ export class EulerRotationTrack extends AnimationTrack<Quaternion> {
     super(interpolator);
     this._state = new Quaternion();
   }
-  calculateState(currentTime: number): Quaternion {
+  calculateState(target: unknown, currentTime: number): Quaternion {
     this._interpolator.interpolate(currentTime, tmpVec3);
     this._state.fromEulerAngle(tmpVec3.x, tmpVec3.y, tmpVec3.z);
     return this._state;

@@ -1,5 +1,4 @@
 import type { Interpolator } from '@zephyr3d/base';
-import type { SceneNode } from '../scene';
 import type { AnimationClip } from './animation';
 
 /**
@@ -15,12 +14,15 @@ export abstract class AnimationTrack<StateType = unknown> {
    * Creates a new animation track
    * @param interpolator - Interpolator for the track
    */
-  constructor(interpolator: Interpolator) {
+  constructor(interpolator?: Interpolator) {
     this._interpolator = interpolator;
   }
-  /** Gets the interpolator of the track */
+  /** Interpolator of the track */
   get interpolator(): Interpolator {
     return this._interpolator;
+  }
+  set interpolator(val: Interpolator) {
+    this._interpolator = val;
   }
   /** Animation this track belongs to */
   get animation(): AnimationClip {
@@ -30,19 +32,20 @@ export abstract class AnimationTrack<StateType = unknown> {
     this._animation = ani;
   }
   /** Stops playing the track and rewind to the first frame */
-  reset(node: SceneNode) {}
+  reset(target: unknown) {}
   /**
    * Calculates current animation state
+   * @param target - The animated object
    * @param currentTime - At which time the animation state should be calculated.
    * @returns State object
    */
-  abstract calculateState(currentTime: number): StateType;
+  abstract calculateState(target: unknown, currentTime: number): StateType;
   /**
    * Applys animation state to node
-   * @param node - The scene node to which the state will be applied
+   * @param target - The animated object to which the state will be applied
    * @param state - The animation state
    */
-  abstract applyState(node: SceneNode, state: StateType);
+  abstract applyState(target: unknown, state: StateType);
   /**
    * Mixes two animation state according to specific weight value
    * @param a - The first state object

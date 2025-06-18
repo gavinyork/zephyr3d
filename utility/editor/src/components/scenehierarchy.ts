@@ -91,12 +91,14 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
       ImGui.TreePop();
     }
   }
-  private getNodeName(node: SceneNode): string {
-    if (node === node.scene.rootNode) {
-      return 'Scene';
-    }
-    if (node.name) {
-      return node.name;
+  private getNodeName(node: unknown): string {
+    if (node instanceof SceneNode) {
+      if (node === node.scene.rootNode) {
+        return 'Scene';
+      }
+      if (node.name) {
+        return node.name;
+      }
     }
     const serializationInfo = getSerializationInfo(this._assetRegistry);
     let cls: SerializableClass = null;

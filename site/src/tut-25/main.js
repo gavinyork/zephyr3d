@@ -7,10 +7,10 @@ import {
   LambertMaterial,
   AnimationSet,
   AnimationClip,
-  TranslationTrack,
+  NodeTranslationTrack,
   BoxShape,
   Mesh,
-  EulerRotationTrack
+  NodeEulerRotationTrack
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -28,7 +28,7 @@ myApp.ready().then(async () => {
   animationClip
     .addTrack(
       box,
-      new TranslationTrack('linear', [
+      new NodeTranslationTrack('linear', [
         {
           time: 0,
           value: new Vector3(0, 0, 0)
@@ -45,7 +45,7 @@ myApp.ready().then(async () => {
     )
     .addTrack(
       box,
-      new EulerRotationTrack('linear', [
+      new NodeEulerRotationTrack('linear', [
         {
           time: 0,
           value: new Vector3(0, 0, 0)

@@ -33,7 +33,7 @@ class MyAnimationTrack extends AnimationTrack {
     this._state = new Float32Array(2);
   }
   // 利用interpolator插值计算并返回给定时刻的轨道状态
-  calculateState(currentTime) {
+  calculateState(target, currentTime) {
     this._interpolator.interpolate(currentTime, this._state);
     return this._state;
   }

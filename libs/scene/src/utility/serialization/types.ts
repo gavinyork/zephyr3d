@@ -39,6 +39,7 @@ export type PropertyAccessor<T = unknown> = {
   objectTypes?: unknown[];
   default?: any;
   nullable?: boolean;
+  animatable?: boolean;
   persistent?: boolean;
   edit?: PropEdit;
   get: (this: T, value: PropertyValue) => void;

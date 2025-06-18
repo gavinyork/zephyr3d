@@ -7,7 +7,7 @@ import type { SceneNode } from '../scene';
  * Rotation animation track
  * @public
  */
-export class RotationTrack extends AnimationTrack<Quaternion> {
+export class NodeRotationTrack extends AnimationTrack<Quaternion> {
   private _state: Quaternion;
   /**
    * Create an instance of RotationTrack from keyframe values
@@ -43,7 +43,7 @@ export class RotationTrack extends AnimationTrack<Quaternion> {
     }
     this._state = new Quaternion();
   }
-  calculateState(currentTime: number): Quaternion {
+  calculateState(target: unknown, currentTime: number): Quaternion {
     this._interpolator.interpolate(currentTime, this._state);
     return this._state;
   }

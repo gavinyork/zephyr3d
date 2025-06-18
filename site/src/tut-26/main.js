@@ -17,7 +17,7 @@ class MyAnimationTrack extends AnimationTrack {
     super(interpolator);
     this._state = new Float32Array(2);
   }
-  calculateState(currentTime) {
+  calculateState(target, currentTime) {
     this._interpolator.interpolate(currentTime, this._state);
     return this._state;
   }

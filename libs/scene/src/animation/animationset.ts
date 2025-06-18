@@ -78,7 +78,7 @@ export class AnimationSet {
   /** @internal */
   private _scene: Scene;
   /** @internal */
-  private _activeTracks: Map<SceneNode, Map<unknown, AnimationTrack[]>>;
+  private _activeTracks: Map<unknown, Map<unknown, AnimationTrack[]>>;
   /** @internal */
   private _activeSkeletons: Map<Skeleton, number>;
   /** @internal */
@@ -190,7 +190,7 @@ export class AnimationSet {
             return weight * fadeIn * fadeOut;
           });
           const states = tracks.map((track) =>
-            track.calculateState(this._activeAnimations.get(track.animation).currentTime)
+            track.calculateState(k, this._activeAnimations.get(track.animation).currentTime)
           );
           const state = weightedAverage(weights, states, (a, b, t) => {
             return tracks[0].mixState(a, b, t);

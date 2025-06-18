@@ -11,10 +11,10 @@ import { SceneNode } from '../scene/scene_node';
 import {
   AnimationClip,
   AnimationSet,
-  RotationTrack,
-  ScaleTrack,
+  NodeRotationTrack,
+  NodeScaleTrack,
   Skeleton,
-  TranslationTrack
+  NodeTranslationTrack
 } from '../animation';
 import { processMorphData } from '../animation/morphtarget';
 import { MAX_MORPH_TARGETS } from '../values';
@@ -612,11 +612,11 @@ export class SharedModel {
         const animation = new AnimationClip(animationData.name);
         for (const track of animationData.tracks) {
           if (track.type === 'translation') {
-            animation.addTrack(nodeMap.get(track.node), new TranslationTrack(track.interpolator));
+            animation.addTrack(nodeMap.get(track.node), new NodeTranslationTrack(track.interpolator));
           } else if (track.type === 'scale') {
-            animation.addTrack(nodeMap.get(track.node), new ScaleTrack(track.interpolator));
+            animation.addTrack(nodeMap.get(track.node), new NodeScaleTrack(track.interpolator));
           } else if (track.type === 'rotation') {
-            animation.addTrack(nodeMap.get(track.node), new RotationTrack(track.interpolator));
+            animation.addTrack(nodeMap.get(track.node), new NodeRotationTrack(track.interpolator));
           } else if (track.type === 'weights') {
             for (const m of track.node.mesh.subMeshes) {
               if (track.interpolator.stride > MAX_MORPH_TARGETS) {

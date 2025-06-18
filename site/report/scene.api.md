@@ -172,8 +172,8 @@ export abstract class AnimationTrack<StateType = unknown> {
     set animation(ani: AnimationClip);
     // @internal (undocumented)
     protected _animation: AnimationClip;
-    abstract applyState(node: SceneNode, state: StateType): any;
-    abstract calculateState(currentTime: number): StateType;
+    abstract applyState(target: unknown, state: StateType): any;
+    abstract calculateState(target: unknow, currentTime: number): StateType;
     abstract getBlendId(): unknown;
     get interpolator(): Interpolator;
     // @internal (undocumented)
@@ -1664,7 +1664,7 @@ export class EulerRotationTrack extends AnimationTrack<Quaternion> {
     // (undocumented)
     applyState(node: SceneNode, state: Quaternion): void;
     // (undocumented)
-    calculateState(currentTime: number): Quaternion;
+    calculateState(target: unknown, currentTime: number): Quaternion;
     // (undocumented)
     getBlendId(): unknown;
     // (undocumented)

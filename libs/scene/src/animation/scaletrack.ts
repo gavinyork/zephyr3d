@@ -7,7 +7,7 @@ import type { SceneNode } from '../scene';
  * Scale animation track
  * @public
  */
-export class ScaleTrack extends AnimationTrack<Vector3> {
+export class NodeScaleTrack extends AnimationTrack<Vector3> {
   private _state: Vector3;
   /**
    * Create an instance of ScaleTrack from keyframe values
@@ -42,7 +42,7 @@ export class ScaleTrack extends AnimationTrack<Vector3> {
     }
     this._state = new Vector3();
   }
-  calculateState(currentTime: number): Vector3 {
+  calculateState(target: unknown, currentTime: number): Vector3 {
     this._interpolator.interpolate(currentTime, this._state);
     return this._state;
   }

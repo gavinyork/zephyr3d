@@ -7,7 +7,7 @@ import type { SceneNode } from '../scene';
  * Translate animation track
  * @public
  */
-export class TranslationTrack extends AnimationTrack<Vector3> {
+export class NodeTranslationTrack extends AnimationTrack<Vector3> {
   private _state: Vector3;
   /**
    * Create an instance of TranslationTrack from keyframe values
@@ -42,7 +42,7 @@ export class TranslationTrack extends AnimationTrack<Vector3> {
     }
     this._state = new Vector3();
   }
-  calculateState(currentTime: number): Vector3 {
+  calculateState(target: unknown, currentTime: number): Vector3 {
     this._interpolator.interpolate(currentTime, this._state);
     return this._state;
   }
