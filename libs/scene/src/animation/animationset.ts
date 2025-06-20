@@ -3,6 +3,7 @@ import type { Scene, SceneNode } from '../scene';
 import type { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
 import type { Skeleton } from './skeleton';
+import type { Disposable } from '../app/gc/ref';
 import { Application, DWeakRef } from '../app';
 
 /**
@@ -68,7 +69,7 @@ export type StopAnimationOptions = {
  * Animation set
  * @public
  */
-export class AnimationSet {
+export class AnimationSet implements Disposable {
   /** @internal */
   private _disposed: boolean;
   /** @internal */

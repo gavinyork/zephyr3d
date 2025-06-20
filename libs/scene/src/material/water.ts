@@ -206,7 +206,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             scope.$inputs.worldNormal
           )
         : pb.vec4(scope.$inputs.worldNormal, 0);
-      //scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normal.xyz, 0.5), pb.vec3(0.5)), 1);
       scope.$l.outColor = pb.vec4(
         this.waterShading(scope, scope.$inputs.worldPos, scope.normal.xyz, scope.normal.w),
         1

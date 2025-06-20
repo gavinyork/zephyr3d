@@ -28,8 +28,8 @@ export class FBMWaveGenerator implements WaveGenerator {
     this._windVelocity = new Vector2(0.1, 0);
     this._amplitude = 0.3;
     this._frequency = 3;
-    this._lacunarity = 2;
-    this._gain = 0.5;
+    this._lacunarity = 1.83;
+    this._gain = 0.57;
     this._disposed = false;
   }
   clone(): this {
@@ -238,9 +238,11 @@ export class FBMWaveGenerator implements WaveGenerator {
       funcName,
       [pb.vec2('st'), pb.float('frequency'), pb.float('gain'), pb.float('lacunarity'), pb.int('numOctaves')],
       function () {
-        this.$l.value = pb.float(0);
-        this.$l.a = pb.float(1);
-        this.$l.f = this.frequency;
+        this.$l.m2 = pb.mat2(0.8, 0.6, -0.6, 0.8);
+        this.$l.p = this.st; //pb.mul(this.st, 0.05);
+        this.$l.a = pb.float(0);
+        this.$l.b = pb.float(1);
+        this.$l.c = pb.float(0);
         this.$for(
           pb.int('i'),
           0,
@@ -251,12 +253,14 @@ export class FBMWaveGenerator implements WaveGenerator {
                 this.$break();
               });
             }
-            this.value = pb.add(this.value, pb.mul(this.a, that.noise2D(this, pb.mul(this.st, this.f))));
-            this.a = pb.mul(this.a, this.gain);
-            this.f = pb.mul(this.f, this.lacunarity);
+            this.$l.n = pb.sub(that.noise2D(this, this.p), 0.5);
+            this.a = pb.add(this.a, pb.mul(this.n, this.b));
+            this.c = pb.add(this.c, this.b);
+            this.b = pb.mul(this.b, this.gain);
+            this.p = pb.mul(this.m2, this.p, this.frequency);
           }
         );
-        this.$return(this.value);
+        this.$return(pb.div(this.a, this.c));
       }
     );
     return scope[funcName](st, frequency, gain, lacunarity, numOctaves);
@@ -264,50 +268,28 @@ export class FBMWaveGenerator implements WaveGenerator {
   /** @internal */
   private noise2D(scope: PBInsideFunctionScope, st: PBShaderExp) {
     const pb = scope.$builder;
-    const funcName = 'improvedNoise2D';
+    const funcName = 'noise2D';
     pb.func(funcName, [pb.vec2('st')], function () {
       this.$l.i = pb.floor(this.st);
       this.$l.f = pb.fract(this.st);
-      this.$l.gradients = pb.vec2[4]();
-      this.gradients.setAt(
-        0,
-        pb.normalize(
-          pb.vec2(pb.sub(hash(this, this.i), 0.5), pb.sub(hash(this, pb.add(this.i, pb.vec2(0.1))), 0.5))
+      this.$l.u = pb.mul(
+        this.f,
+        this.f,
+        this.f,
+        pb.add(pb.mul(this.f, pb.sub(pb.mul(this.f, 6), pb.vec2(15))), pb.vec2(10))
+      );
+      this.$l.a = hash(this, pb.add(this.i, pb.vec2(0)));
+      this.$l.b = hash(this, pb.add(this.i, pb.vec2(1, 0)));
+      this.$l.c = hash(this, pb.add(this.i, pb.vec2(0, 1)));
+      this.$l.d = hash(this, pb.add(this.i, pb.vec2(1, 1)));
+      this.$return(
+        pb.add(
+          this.a,
+          pb.mul(pb.sub(this.b, this.a), this.u.x),
+          pb.mul(pb.sub(this.c, this.a), this.u.y),
+          pb.mul(pb.sub(pb.add(this.a, this.d), pb.add(this.b, this.c)), this.u.x, this.u.y)
         )
       );
-      this.gradients.setAt(
-        1,
-        pb.normalize(
-          pb.vec2(
-            pb.sub(hash(this, pb.add(this.i, pb.vec2(1, 0))), 0.5),
-            pb.sub(hash(this, pb.add(this.i, pb.vec2(1.1, 0.1))), 0.5)
-          )
-        )
-      );
-      this.gradients.setAt(
-        2,
-        pb.normalize(
-          pb.vec2(
-            pb.sub(hash(this, pb.add(this.i, pb.vec2(0, 1))), 0.5),
-            pb.sub(hash(this, pb.add(this.i, pb.vec2(0.1, 1.1))), 0.5)
-          )
-        )
-      );
-      this.gradients.setAt(
-        3,
-        pb.normalize(
-          pb.vec2(
-            pb.sub(hash(this, pb.add(this.i, pb.vec2(1, 1))), 0.5),
-            pb.sub(hash(this, pb.add(this.i, pb.vec2(1.1, 1.1))), 0.5)
-          )
-        )
-      );
-      this.$l.n0 = pb.dot(this.gradients[0], this.f);
-      this.$l.n1 = pb.dot(this.gradients[1], pb.sub(this.f, pb.vec2(1, 0)));
-      this.$l.n2 = pb.dot(this.gradients[2], pb.sub(this.f, pb.vec2(0, 1)));
-      this.$l.n3 = pb.dot(this.gradients[3], pb.sub(this.f, pb.vec2(1)));
-      this.$l.u = pb.mul(this.f, this.f, pb.sub(pb.vec2(3), pb.mul(this.f, 2)));
-      this.$return(pb.mix(pb.mix(this.n0, this.n1, this.u.x), pb.mix(this.n2, this.n3, this.u.x), this.u.y));
     });
     return scope[funcName](st);
   }
@@ -317,8 +299,8 @@ export class FBMWaveGenerator implements WaveGenerator {
   }
   /** {@inheritDoc WaveGenerator.calcClipmapTileAABB} */
   calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB) {
-    const maxHeight = this._amplitude * this._numOctaves;
-    outAABB.minPoint.setXYZ(minX, y, minZ);
+    const maxHeight = 1.5 * this._amplitude;
+    outAABB.minPoint.setXYZ(minX, y - maxHeight, minZ);
     outAABB.maxPoint.setXYZ(maxX, y + maxHeight, maxZ);
   }
   /** {@inheritDoc WaveGenerator.calcFragmentNormal} */

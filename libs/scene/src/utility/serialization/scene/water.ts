@@ -187,6 +187,32 @@ export function getFBMWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
             this.frequency = value.num[0];
           }
         }
+        /*
+        {
+          name: 'Gain',
+          type: 'float',
+          options: { minValue: 0, maxValue: 1 },
+          default: 0.5,
+          get(this: FBMWaveGenerator, value) {
+            value.num[0] = this.gain;
+          },
+          set(this: FBMWaveGenerator, value) {
+            this.gain = value.num[0];
+          }
+        },
+        {
+          name: 'Lacunarity',
+          type: 'float',
+          options: { minValue: 0, maxValue: 5 },
+          default: 2,
+          get(this: FBMWaveGenerator, value) {
+            value.num[0] = this.lacunarity;
+          },
+          set(this: FBMWaveGenerator, value) {
+            this.lacunarity = value.num[0];
+          }
+        }
+          */
       ];
     }
   };

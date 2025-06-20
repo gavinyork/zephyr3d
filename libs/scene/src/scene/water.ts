@@ -82,6 +82,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         this._timeStart = elapsedInSeconds;
       }
       this.material.update(frameId, (elapsedInSeconds - this._timeStart) * this._animationSpeed);
+      this.invalidateWorldBoundingVolume(false);
     }
   }
   /**
@@ -156,12 +157,24 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   computeWorldBoundingVolume(): BoundingVolume {
     const p = this.worldMatrix.transformPointAffine(Vector3.zero());
     const mat = this._material?.get();
-    return mat
-      ? new BoundingBox(
-          new Vector3(mat.region.x, p.y, mat.region.y),
-          new Vector3(mat.region.z, p.y, mat.region.w)
-        )
-      : null;
+    if (mat) {
+      const boundingBox = new BoundingBox();
+      if (mat.waveGenerator) {
+        mat.waveGenerator.calcClipmapTileAABB(
+          mat.region.x,
+          mat.region.z,
+          mat.region.y,
+          mat.region.w,
+          p.y,
+          boundingBox
+        );
+      } else {
+        boundingBox.minPoint.setXYZ(mat.region.x, p.y, mat.region.y);
+        boundingBox.maxPoint.setXYZ(mat.region.z, p.y + 1, mat.region.w);
+      }
+      return boundingBox;
+    }
+    return null;
   }
   /**
    * Grid scale

@@ -122,7 +122,7 @@ export abstract class RenderMipmap {
           this.dstSize = pb.vec2().uniform(0);
           that.setupUniforms(this);
           if (device.type !== 'webgpu') {
-            this.srcMipLevel = pb.int().uniform(0);
+            this.srcMipLevel = pb.float().uniform(0);
           }
           pb.main(function () {
             const miplevel = device.type === 'webgpu' ? 0 : this.srcMipLevel;
