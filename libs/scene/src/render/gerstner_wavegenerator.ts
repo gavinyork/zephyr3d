@@ -26,6 +26,12 @@ export class GerstnerWaveGenerator implements WaveGenerator {
     this._numWaves = 4;
     this._disposed = false;
   }
+  clone(): this {
+    const other = new GerstnerWaveGenerator();
+    other.numWaves = this.numWaves;
+    other._waveParams.set(this._waveParams);
+    return other as this;
+  }
   get disposed() {
     return this._disposed;
   }

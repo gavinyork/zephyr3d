@@ -6,7 +6,7 @@ import type { PropertyAccessor, SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import { getGraphNodeClass } from './node';
 import type { WaveGenerator } from '../../../render';
-import { FFTWaveGenerator, GerstnerWaveGenerator } from '../../../render';
+import { FBMWaveGenerator, FFTWaveGenerator, GerstnerWaveGenerator } from '../../../render';
 import type { Texture2D } from '@zephyr3d/device';
 
 export class GerstnerWaveCls {
@@ -126,6 +126,65 @@ export function getGerstnerWaveClass(assetRegistry): SerializableClass {
           },
           isValid(this: GerstnerWaveCls) {
             return this.isOmni;
+          }
+        }
+      ];
+    }
+  };
+}
+
+export function getFBMWaveGeneratorClass(assetRegistry: AssetRegistry): SerializableClass {
+  return {
+    ctor: FBMWaveGenerator,
+    className: 'FBMWaveGenerator',
+    getProps(val: FBMWaveGenerator) {
+      return [
+        {
+          name: 'NumOctaves',
+          type: 'int',
+          options: { minValue: 1, maxValue: 8 },
+          default: 4,
+          get(this: FBMWaveGenerator, value) {
+            value.num[0] = this.numOctaves;
+          },
+          set(this: FBMWaveGenerator, value) {
+            this.numOctaves = value.num[0];
+          }
+        },
+        {
+          name: 'Wind',
+          type: 'vec2',
+          default: [0.1, 0],
+          get(this: FBMWaveGenerator, value) {
+            value.num[0] = this.wind.x;
+            value.num[1] = this.wind.y;
+          },
+          set(this: FBMWaveGenerator, value) {
+            this.wind = new Vector2(value.num[0], value.num[1]);
+          }
+        },
+        {
+          name: 'Amplitude',
+          type: 'float',
+          options: { minValue: 0, maxValue: 5 },
+          default: 0.3,
+          get(this: FBMWaveGenerator, value) {
+            value.num[0] = this.amplitude;
+          },
+          set(this: FBMWaveGenerator, value) {
+            this.amplitude = value.num[0];
+          }
+        },
+        {
+          name: 'Frequency',
+          type: 'float',
+          options: { minValue: 0, maxValue: 16 },
+          default: 3,
+          get(this: FBMWaveGenerator, value) {
+            value.num[0] = this.frequency;
+          },
+          set(this: FBMWaveGenerator, value) {
+            this.frequency = value.num[0];
           }
         }
       ];
@@ -295,7 +354,7 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
           type: 'object',
           default: null,
           nullable: true,
-          objectTypes: [GerstnerWaveGenerator, FFTWaveGenerator],
+          objectTypes: [GerstnerWaveGenerator, FFTWaveGenerator, FBMWaveGenerator],
           get(this: Water, value) {
             value.object[0] = this.waveGenerator ?? null;
           },

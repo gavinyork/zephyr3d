@@ -14,6 +14,11 @@ import type { Disposable } from '../app';
  */
 export interface WaveGenerator extends Disposable {
   /**
+   * Create a new instance from this
+   * @returns The created instance
+   */
+  clone(): this;
+  /**
    * Setup uniforms for the shader program.
    * @param scope - Global scope of the shader program.
    * @param uniformGroup - Bind group index for uniform values

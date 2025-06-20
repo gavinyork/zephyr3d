@@ -278,6 +278,9 @@ export class FFTWaveGenerator implements WaveGenerator {
   get disposed() {
     return this._disposed;
   }
+  clone(): this {
+    return new FFTWaveGenerator(this._params) as this;
+  }
   /*
   get params() {
     return this._params;

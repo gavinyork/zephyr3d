@@ -5,7 +5,7 @@ import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
 import { mixinDrawable } from '../render/drawable_mixin';
 import type { Drawable, DrawContext, PickTarget, Primitive, WaveGenerator } from '../render';
-import { Clipmap } from '../render';
+import { Clipmap, FBMWaveGenerator } from '../render';
 import { WaterMaterial } from '../material/water';
 import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
 import { DRef } from '../app';
@@ -31,6 +31,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._material = new DRef(new WaterMaterial());
     this._material.get().region = new Vector4(-1, -1, 1, 1);
     this._material.get().TAAStrength = 0.4;
+    this.waveGenerator = new FBMWaveGenerator();
   }
   clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new Water(this.scene);
@@ -40,7 +41,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
     super.copyFrom(other, method, recursive);
-    this.waveGenerator = other.waveGenerator;
+    this.waveGenerator = other.waveGenerator?.clone() ?? null;
     this.gridScale = other.gridScale;
     this.wireframe = other.wireframe;
   }
