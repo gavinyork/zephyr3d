@@ -365,11 +365,17 @@ export class ClipmapTerrain
         outAABB.minPoint.setXYZ(minX, p.y - 9999, minZ);
         outAABB.maxPoint.setXYZ(maxX, p.y + 9999, maxZ);
       },
-      drawPrimitive(prim, modelMatrix, offset, scale, gridScale, mipLevel) {
-        const clipmapMatrix = new Matrix4x4(modelMatrix)
-          .scaleLeft(new Vector3(scale, scale, 1))
-          .translateLeft(new Vector3(offset.x, offset.y, 0))
-          .scaleLeft(new Vector3(gridScale, gridScale, 1));
+      drawPrimitive(prim, rotation, offset, scale, gridScale, mipLevel) {
+        const clipmapMatrix = Matrix4x4.rotationZ(rotation);
+        const scale2 = scale * gridScale;
+        clipmapMatrix[0] *= scale2;
+        clipmapMatrix[1] *= scale2;
+        clipmapMatrix[4] *= scale2;
+        clipmapMatrix[5] *= scale2;
+        clipmapMatrix[8] *= scale2;
+        clipmapMatrix[9] *= scale2;
+        clipmapMatrix[12] = offset.x * gridScale;
+        clipmapMatrix[13] = offset.y * gridScale;
         clipmapMatrix.m03 -= that.worldMatrix.m03;
         clipmapMatrix.m13 -= that.worldMatrix.m23;
         mat.setClipmapMatrix(clipmapMatrix);

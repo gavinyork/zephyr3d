@@ -9,18 +9,7 @@ import { Primitive } from './primitive';
 
 const tmpAABB = new AABB();
 const tmpV3 = new Vector3();
-const modelMatrices = [
-  Matrix4x4.identity(),
-  // rotation z 270
-  Matrix4x4.rotationZ((270 * Math.PI) / 180),
-  //new Matrix4x4(0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1),
-  // rotation z 90
-  Matrix4x4.rotationZ((90 * Math.PI) / 180),
-  //new Matrix4x4(0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1),
-  // rotation z 180
-  Matrix4x4.rotationZ((180 * Math.PI) / 180)
-  //new Matrix4x4(-1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)
-];
+const rotationValues = [0, Math.PI * 1.5, Math.PI * 0.5, Math.PI] as const;
 
 /** @internal */
 export type ClipmapDrawContext = {
@@ -39,7 +28,7 @@ export type ClipmapDrawContext = {
   );
   drawPrimitive(
     prim: Primitive,
-    modelMatrix: Matrix4x4,
+    rotation: number,
     offset: Vector2,
     scale: number,
     gridScale: number,
@@ -461,17 +450,17 @@ export class Clipmap {
   }
   private updateAABB(
     aabb: AABB,
-    modelMatrix: Matrix4x4,
+    rotation: number,
     offset: Vector2,
     scale: number,
     gridScale: number,
     outAABB: AABB
   ) {
-    if (!modelMatrix) {
+    if (!rotation) {
       tmpAABB.minPoint.set(aabb.minPoint);
       tmpAABB.maxPoint.set(aabb.maxPoint);
     } else {
-      AABB.transform(aabb, modelMatrix, tmpAABB);
+      AABB.transform(aabb, Matrix4x4.rotationZ(rotation), tmpAABB);
     }
     const minX = (tmpAABB.minPoint.x * scale + offset.x) * gridScale;
     const maxX = (tmpAABB.maxPoint.x * scale + offset.x) * gridScale;
@@ -494,17 +483,17 @@ export class Clipmap {
     ctx: ClipmapDrawContext,
     aabb: AABB,
     camera: Camera,
-    modelMatrix: Matrix4x4,
+    rotation: number,
     offset: Vector2,
     scale: number,
     gridScale: number,
     level: number
   ) {
-    if (!modelMatrix) {
+    if (!rotation) {
       tmpAABB.minPoint.set(aabb.minPoint);
       tmpAABB.maxPoint.set(aabb.maxPoint);
     } else {
-      AABB.transform(aabb, modelMatrix, tmpAABB);
+      AABB.transform(aabb, Matrix4x4.rotationZ(rotation), tmpAABB);
     }
     const minX = (tmpAABB.minPoint.x * scale + offset.x) * gridScale;
     const maxX = (tmpAABB.maxPoint.x * scale + offset.x) * gridScale;
@@ -572,14 +561,7 @@ export class Clipmap {
       let r = 0;
       r |= d.x >= scale ? 0 : 2;
       r |= d.y >= scale ? 0 : 1;
-      this.updateAABB(
-        this._trimMeshAABB,
-        r === 0 ? null : modelMatrices[r],
-        tileCentre,
-        scale,
-        gridScale,
-        aabb
-      );
+      this.updateAABB(this._trimMeshAABB, rotationValues[r], tileCentre, scale, gridScale, aabb);
       // draw seam
       const nextBase = new Vector2(
         nextSnappedPos.x - (this._tileResolution << (l + 1)),
@@ -596,10 +578,8 @@ export class Clipmap {
     const maxDist = Math.min(Math.max(distX, distY), camera.getFarPlane());
     return Math.max(Math.ceil(Math.log2(maxDist / (this._tileResolution * gridScale))), 0) + 1;
   }
-  gather(
-    context: ClipmapDrawContext
-  ): { primitive: Primitive; matrices: Matrix4x4[]; mipLevels: number[] }[] {
-    const renderData: { primitive: Primitive; matrices: Matrix4x4[]; mipLevels: number[] }[] = [];
+  gather(context: ClipmapDrawContext): { primitive: Primitive; instanceDatas: number[] }[] {
+    const renderData: { primitive: Primitive; instanceDatas: number[] }[] = [];
     const mipLevels = this.calcMipLevels(context.camera, context.minMaxWorldPos, context.gridScale);
     context.camera.getWorldPosition(tmpV3);
 
@@ -618,34 +598,25 @@ export class Clipmap {
     ) {
       renderData.push({
         primitive: this._wireframe ? this._crossMeshLines : this._crossMesh,
-        matrices: [
-          new Matrix4x4(modelMatrices[0])
-            .translateLeft(new Vector3(snappedPos.x, snappedPos.y, 0))
-            .scaleLeft(new Vector3(context.gridScale, context.gridScale, 1))
-        ],
-        mipLevels: [0]
+        instanceDatas: [rotationValues[0], snappedPos.x, snappedPos.y, 1, 0]
       });
     }
 
-    const tilePrimitives: { primitive: Primitive; matrices: Matrix4x4[]; mipLevels: number[] } = {
+    const tilePrimitives: { primitive: Primitive; instanceDatas: number[] } = {
       primitive: this._wireframe ? this._tileMeshLines : this._tileMesh,
-      matrices: [],
-      mipLevels: []
+      instanceDatas: []
     };
-    const fillerPrimitives: { primitive: Primitive; matrices: Matrix4x4[]; mipLevels: number[] } = {
+    const fillerPrimitives: { primitive: Primitive; instanceDatas: number[] } = {
       primitive: this._wireframe ? this._fillerMeshLines : this._fillerMesh,
-      matrices: [],
-      mipLevels: []
+      instanceDatas: []
     };
-    const trimPrimitives: { primitive: Primitive; matrices: Matrix4x4[]; mipLevels: number[] } = {
+    const trimPrimitives: { primitive: Primitive; instanceDatas: number[] } = {
       primitive: this._wireframe ? this._trimMeshLines : this._trimMesh,
-      matrices: [],
-      mipLevels: []
+      instanceDatas: []
     };
-    const seamPrimitives: { primitive: Primitive; matrices: Matrix4x4[]; mipLevels: number[] } = {
+    const seamPrimitives: { primitive: Primitive; instanceDatas: number[] } = {
       primitive: this._wireframe ? this._seamMeshLines : this._seamMesh,
-      matrices: [],
-      mipLevels: []
+      instanceDatas: []
     };
 
     for (let l = 0; l < mipLevels; l++) {
@@ -691,13 +662,7 @@ export class Clipmap {
                 l
               )
             ) {
-              tilePrimitives.matrices.push(
-                new Matrix4x4(modelMatrices[0])
-                  .scaleLeft(new Vector3(scale, scale, 1))
-                  .translateLeft(new Vector3(offset.x, offset.y, 0))
-                  .scaleLeft(new Vector3(context.gridScale, context.gridScale, 1))
-              );
-              tilePrimitives.mipLevels.push(l);
+              tilePrimitives.instanceDatas.push(rotationValues[0], offset.x, offset.y, scale, l);
             }
           }
         }
@@ -715,13 +680,7 @@ export class Clipmap {
           l
         )
       ) {
-        fillerPrimitives.matrices.push(
-          new Matrix4x4(modelMatrices[0])
-            .scaleLeft(new Vector3(scale, scale, 1))
-            .translateLeft(new Vector3(snappedPos.x, snappedPos.y, 0))
-            .scaleLeft(new Vector3(context.gridScale, context.gridScale, 1))
-        );
-        fillerPrimitives.mipLevels.push(l);
+        fillerPrimitives.instanceDatas.push(rotationValues[0], snappedPos.x, snappedPos.y, scale, l);
       }
 
       if (l !== mipLevels - 1) {
@@ -741,20 +700,14 @@ export class Clipmap {
             context,
             this._trimMeshAABB,
             context.camera,
-            r === 0 ? null : modelMatrices[r],
+            rotationValues[r],
             tileCentre,
             scale,
             context.gridScale,
             l
           )
         ) {
-          trimPrimitives.matrices.push(
-            new Matrix4x4(modelMatrices[r])
-              .scaleLeft(new Vector3(scale, scale, 1))
-              .translateLeft(new Vector3(tileCentre.x, tileCentre.y, 0))
-              .scaleLeft(new Vector3(context.gridScale, context.gridScale, 1))
-          );
-          trimPrimitives.mipLevels.push(l);
+          trimPrimitives.instanceDatas.push(rotationValues[r], tileCentre.x, tileCentre.y, scale, l);
         }
         // draw seam
         const nextBase = new Vector2(
@@ -773,26 +726,20 @@ export class Clipmap {
             l
           )
         ) {
-          seamPrimitives.matrices.push(
-            new Matrix4x4(modelMatrices[0])
-              .scaleLeft(new Vector3(scale, scale, 1))
-              .translateLeft(new Vector3(nextBase.x, nextBase.y, 0))
-              .scaleLeft(new Vector3(context.gridScale, context.gridScale, 1))
-          );
-          seamPrimitives.mipLevels.push(l);
+          seamPrimitives.instanceDatas.push(rotationValues[0], nextBase.x, nextBase.y, scale, l);
         }
       }
     }
-    if (tilePrimitives.matrices.length > 0) {
+    if (tilePrimitives.instanceDatas.length > 0) {
       renderData.push(tilePrimitives);
     }
-    if (fillerPrimitives.matrices.length > 0) {
+    if (fillerPrimitives.instanceDatas.length > 0) {
       renderData.push(fillerPrimitives);
     }
-    if (trimPrimitives.matrices.length > 0) {
+    if (trimPrimitives.instanceDatas.length > 0) {
       renderData.push(trimPrimitives);
     }
-    if (seamPrimitives.matrices.length > 0) {
+    if (seamPrimitives.instanceDatas.length > 0) {
       renderData.push(seamPrimitives);
     }
     return renderData;
@@ -817,7 +764,7 @@ export class Clipmap {
     ) {
       context.drawPrimitive(
         this._wireframe ? this._crossMeshLines : this._crossMesh,
-        modelMatrices[0],
+        rotationValues[0],
         snappedPos,
         1,
         context.gridScale,
@@ -871,7 +818,7 @@ export class Clipmap {
             ) {
               context.drawPrimitive(
                 this._wireframe ? this._tileMeshLines : this._tileMesh,
-                modelMatrices[0],
+                rotationValues[0],
                 offset,
                 scale,
                 context.gridScale,
@@ -897,7 +844,7 @@ export class Clipmap {
       ) {
         context.drawPrimitive(
           this._wireframe ? this._fillerMeshLines : this._fillerMesh,
-          modelMatrices[0],
+          rotationValues[0],
           snappedPos,
           scale,
           context.gridScale,
@@ -923,7 +870,7 @@ export class Clipmap {
             context,
             this._trimMeshAABB,
             context.camera,
-            r === 0 ? null : modelMatrices[r],
+            rotationValues[r],
             tileCentre,
             scale,
             context.gridScale,
@@ -932,7 +879,7 @@ export class Clipmap {
         ) {
           context.drawPrimitive(
             this._wireframe ? this._trimMeshLines : this._trimMesh,
-            modelMatrices[r],
+            rotationValues[r],
             tileCentre,
             scale,
             context.gridScale,
@@ -959,7 +906,7 @@ export class Clipmap {
         ) {
           context.drawPrimitive(
             this._wireframe ? this._seamMeshLines : this._seamMesh,
-            modelMatrices[0],
+            rotationValues[0],
             nextBase,
             scale,
             context.gridScale,

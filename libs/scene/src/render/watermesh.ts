@@ -1,4 +1,4 @@
-import { Vector4, Vector3, Matrix4x4 } from '@zephyr3d/base';
+import { Vector4, Matrix4x4 } from '@zephyr3d/base';
 import type { AbstractDevice, GPUProgram, BindGroup, RenderStateSet } from '@zephyr3d/device';
 import { Application } from '../app';
 import { Clipmap } from './clipmap';
@@ -177,13 +177,19 @@ export class WaterMesh {
         const wm = userData as WaterMesh;
         that._waveGenerator.calcClipmapTileAABB(minX, maxX, minZ, maxZ, wm.level, outAABB);
       },
-      drawPrimitive(prim, modelMatrix, offset, scale, gridScale) {
+      drawPrimitive(prim, rotation, offset, scale, gridScale) {
         const clipmapBindGroup = that.getClipmapBindGroup(device);
-        const worldMatrix = new Matrix4x4(modelMatrix)
-          .scaleLeft(new Vector3(scale, scale, 1))
-          .translateLeft(new Vector3(offset.x, offset.y, 0))
-          .scaleLeft(new Vector3(gridScale, gridScale, 1));
-        clipmapBindGroup.setValue('worldMatrix', worldMatrix);
+        const clipmapMatrix = Matrix4x4.rotationZ(rotation);
+        const scale2 = scale * gridScale;
+        clipmapMatrix[0] *= scale2;
+        clipmapMatrix[1] *= scale2;
+        clipmapMatrix[4] *= scale2;
+        clipmapMatrix[5] *= scale2;
+        clipmapMatrix[8] *= scale2;
+        clipmapMatrix[9] *= scale2;
+        clipmapMatrix[12] = offset.x * gridScale;
+        clipmapMatrix[13] = offset.y * gridScale;
+        clipmapBindGroup.setValue('worldMatrix', clipmapMatrix);
         device.setBindGroup(1, clipmapBindGroup);
         prim.primitiveType = that._wireframe ? 'line-strip' : 'triangle-list';
         prim.draw();

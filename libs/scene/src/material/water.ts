@@ -10,7 +10,7 @@ import { applyMaterialMixins, MeshMaterial } from './meshmaterial';
 import type { DrawContext, WaveGenerator } from '../render';
 import { MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
-import { Interpolator, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
+import { Interpolator, Vector3, Vector4 } from '@zephyr3d/base';
 import { Application, DRef, DWeakRef } from '../app';
 import { screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
 import { fetchSampler } from '../utility/misc';
@@ -41,12 +41,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _scatterRampTexture: DRef<Texture2D>;
   private _absorptionRampTexture: DRef<Texture2D>;
   private _waveGenerator: DRef<WaveGenerator>;
-  private _clipmapMatrix: Matrix4x4;
+  private _clipmapInfo: Vector4;
+  private _clipmapGridInfo: Vector4;
   private _ssrParams: Vector4;
   constructor() {
     super();
     this._region = new Vector4(-99999, -99999, 99999, 99999);
-    this._clipmapMatrix = new Matrix4x4();
+    this._clipmapInfo = new Vector4();
+    this._clipmapGridInfo = new Vector4();
     this._waveGenerator = new DRef();
     this._ssrParams = new Vector4(100, 80, 0.5, 8);
     this._scatterRampTexture = new DRef();
@@ -139,9 +141,19 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   protected _createHash(): string {
     return `${super._createHash()}:${this.waveGenerator?.getHash() ?? ''}`;
   }
-  setClipmapMatrix(mat: Matrix4x4) {
-    this._clipmapMatrix.set(mat);
+  setClipmapInfo(rotation: number, scale: number, offsetX: number, offsetY: number) {
+    this._clipmapInfo.setXYZW(rotation, scale, offsetX, offsetY);
     this.uniformChanged();
+  }
+  setClipmapGridInfo(gridScale: number, gridOffsetX: number, gridOffsetY: number) {
+    if (
+      this._clipmapGridInfo.x !== gridScale ||
+      this._clipmapGridInfo.y !== gridOffsetX ||
+      this._clipmapGridInfo.z !== gridOffsetY
+    ) {
+      this._clipmapGridInfo.setXYZW(gridScale, gridOffsetX, gridOffsetY, 0);
+      this.uniformChanged();
+    }
   }
   supportInstancing(): boolean {
     return false;
@@ -154,7 +166,31 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     const pb = scope.$builder;
     this.waveGenerator?.setupUniforms(scope, 2);
     scope.$inputs.position = pb.vec3().attrib('position');
-    scope.clipmapMatrix = pb.mat4().uniform(2);
+    scope.clipmapInfo = pb.vec4().uniform(2);
+    scope.clipmapGridInfo = pb.vec4().uniform(2);
+
+    scope.$l.s = pb.sin(scope.clipmapInfo.x);
+    scope.$l.c = pb.cos(scope.clipmapInfo.x);
+    scope.$l.scale2 = pb.mul(scope.clipmapInfo.y, scope.clipmapGridInfo.x);
+    scope.$l.clipmapMatrix = pb.mat4(
+      pb.mul(scope.c, scope.scale2),
+      pb.mul(scope.s, scope.scale2),
+      0,
+      0,
+      pb.neg(pb.mul(scope.s, scope.scale2)),
+      pb.mul(scope.c, scope.scale2),
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      pb.sub(pb.mul(scope.clipmapInfo.z, scope.clipmapGridInfo.x), scope.clipmapGridInfo.y),
+      pb.sub(pb.mul(scope.clipmapInfo.w, scope.clipmapGridInfo.x), scope.clipmapGridInfo.z),
+      0,
+      1
+    );
+
     scope.$l.clipmapPos = pb.mul(scope.clipmapMatrix, pb.vec4(scope.$inputs.position, 1)).xy;
     //scope.$l.level = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(0, 0, 0, 1)).y;
     scope.clipmapWorldPos = pb.mul(
@@ -412,7 +448,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
-    bindGroup.setValue('clipmapMatrix', this._clipmapMatrix);
+    bindGroup.setValue('clipmapInfo', this._clipmapInfo);
+    bindGroup.setValue('clipmapGridInfo', this._clipmapGridInfo);
     bindGroup.setValue('region', this._region);
     if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('displace', this._displace / ctx.renderWidth);
