@@ -19,39 +19,39 @@ import type { VertexBufferInfo } from './vertexdata';
  */
 export type TextureImageElement = ImageBitmap | HTMLCanvasElement;
 
-/** @internal */
+/** @public */
 export const MAX_VERTEX_ATTRIBUTES = 16;
-/** @internal */
+/** @public */
 export const MAX_BINDING_GROUPS = 4;
-/** @internal */
+/** @public */
 export const MAX_TEXCOORD_INDEX_COUNT = 8;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_POSITION = 0;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_NORMAL = 1;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_DIFFUSE = 2;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TANGENT = 3;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD0 = 4;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD1 = 5;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD2 = 6;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD3 = 7;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD4 = 8;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD5 = 9;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD6 = 10;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD7 = 11;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_BLEND_WEIGHT = 12;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_BLEND_INDICES = 13;
 
 /**
@@ -332,7 +332,7 @@ export type VertexAttribFormat =
   | 'blendindices_f32x4'
   | 'blendindices_u32x4';
 
-const vertexAttribFormatMap: Record<VertexAttribFormat, [number, PBPrimitiveType, number, string, number]> = {
+const vertexAttribFormatMap = {
   position_u8normx2: [VERTEX_ATTRIB_POSITION, PBPrimitiveType.U8VEC2_NORM, 2, 'u8norm', 2],
   position_u8normx4: [VERTEX_ATTRIB_POSITION, PBPrimitiveType.U8VEC4_NORM, 4, 'u8norm', 4],
   position_i8normx2: [VERTEX_ATTRIB_POSITION, PBPrimitiveType.I8VEC2_NORM, 2, 'i8norm', 2],
@@ -605,7 +605,7 @@ const vertexAttribFormatMap: Record<VertexAttribFormat, [number, PBPrimitiveType
   blendindices_f16x4: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.F16VEC4, 8, 'f16', 4],
   blendindices_f32x4: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.F32VEC4, 16, 'f32', 4],
   blendindices_u32x4: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.U32VEC4, 16, 'u32', 4]
-};
+} as const;
 
 /**
  * The semantic type of vertex
@@ -627,7 +627,7 @@ export type VertexSemantic =
   | 'texCoord6'
   | 'texCoord7';
 
-const vertexAttribNameMap: Record<VertexSemantic, number> = {
+const vertexAttribNameMap = {
   position: VERTEX_ATTRIB_POSITION,
   normal: VERTEX_ATTRIB_NORMAL,
   diffuse: VERTEX_ATTRIB_DIFFUSE,
@@ -642,7 +642,7 @@ const vertexAttribNameMap: Record<VertexSemantic, number> = {
   texCoord5: VERTEX_ATTRIB_TEXCOORD5,
   texCoord6: VERTEX_ATTRIB_TEXCOORD6,
   texCoord7: VERTEX_ATTRIB_TEXCOORD7
-};
+} as const;
 
 const vertexAttribNameRevMap = {
   [VERTEX_ATTRIB_POSITION]: 'position',
@@ -659,7 +659,7 @@ const vertexAttribNameRevMap = {
   [VERTEX_ATTRIB_TEXCOORD5]: 'texCoord5',
   [VERTEX_ATTRIB_TEXCOORD6]: 'texCoord6',
   [VERTEX_ATTRIB_TEXCOORD7]: 'texCoord7'
-};
+} as const;
 
 /**
  * Options for creating vertex layout
@@ -784,6 +784,26 @@ export function matchVertexBuffer(buffer: StructuredBuffer, name: VertexSemantic
   } else {
     return buffer.structure.structMembers[0].name === name;
   }
+}
+
+/**
+ * Get vertex attribute type of specified vertex format
+ * @param fmt - The vertex format
+ * @returns Vertex attribute type, possible values are 'f32', 'f16', 'i32', 'u32', 'i16', 'u16', 'i8norm', 'u8norm', 'i16norm', 'u16norm'
+ * @
+ */
+export function getVertexAttributeFormat(fmt: VertexAttribFormat) {
+  return vertexAttribFormatMap[fmt][3];
+}
+
+/**
+ * Get vertex attribute index of specified vertex format
+ * @param fmt - The vertex format
+ * @returns Vertex attribute index
+ * @
+ */
+export function getVertexAttributeIndex(fmt: VertexAttribFormat): number {
+  return vertexAttribFormatMap[fmt][0];
 }
 
 /**

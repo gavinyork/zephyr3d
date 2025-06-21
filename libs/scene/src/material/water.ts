@@ -166,12 +166,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     const pb = scope.$builder;
     this.waveGenerator?.setupUniforms(scope, 2);
     scope.$inputs.position = pb.vec3().attrib('position');
-    scope.clipmapInfo = pb.vec4().uniform(2);
+    scope.$inputs.clipmapInfo = pb.vec4().attrib('texCoord0');
     scope.clipmapGridInfo = pb.vec4().uniform(2);
 
-    scope.$l.s = pb.sin(scope.clipmapInfo.x);
-    scope.$l.c = pb.cos(scope.clipmapInfo.x);
-    scope.$l.scale2 = pb.mul(scope.clipmapInfo.y, scope.clipmapGridInfo.x);
+    scope.$l.s = pb.sin(scope.$inputs.clipmapInfo.x);
+    scope.$l.c = pb.cos(scope.$inputs.clipmapInfo.x);
+    scope.$l.scale2 = pb.mul(scope.$inputs.clipmapInfo.y, scope.clipmapGridInfo.x);
     scope.$l.clipmapMatrix = pb.mat4(
       pb.mul(scope.c, scope.scale2),
       pb.mul(scope.s, scope.scale2),
@@ -185,8 +185,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       0,
       1,
       0,
-      pb.sub(pb.mul(scope.clipmapInfo.z, scope.clipmapGridInfo.x), scope.clipmapGridInfo.y),
-      pb.sub(pb.mul(scope.clipmapInfo.w, scope.clipmapGridInfo.x), scope.clipmapGridInfo.z),
+      pb.sub(pb.mul(scope.$inputs.clipmapInfo.z, scope.clipmapGridInfo.x), scope.clipmapGridInfo.y),
+      pb.sub(pb.mul(scope.$inputs.clipmapInfo.w, scope.clipmapGridInfo.x), scope.clipmapGridInfo.z),
       0,
       1
     );
@@ -448,7 +448,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
-    bindGroup.setValue('clipmapInfo', this._clipmapInfo);
+    //bindGroup.setValue('clipmapInfo', this._clipmapInfo);
     bindGroup.setValue('clipmapGridInfo', this._clipmapGridInfo);
     bindGroup.setValue('region', this._region);
     if (this.needFragmentColor(ctx)) {

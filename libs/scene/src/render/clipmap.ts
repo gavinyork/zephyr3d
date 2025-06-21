@@ -6,13 +6,27 @@ import type { Vector4 } from '@zephyr3d/base';
 import { AABB, ClipState, Matrix4x4, Vector2, Vector3 } from '@zephyr3d/base';
 import type { Camera } from '../camera';
 import { Primitive } from './primitive';
+import {
+  getVertexAttributeFormat,
+  getVertexAttributeIndex,
+  VERTEX_ATTRIB_POSITION,
+  VERTEX_ATTRIB_TEXCOORD0,
+  type VertexAttribFormat
+} from '@zephyr3d/device';
 
 const tmpAABB = new AABB();
 const tmpV3 = new Vector3();
 const rotationValues = [0, Math.PI * 1.5, Math.PI * 0.5, Math.PI] as const;
 
 /** @internal */
-export type ClipmapDrawContext = {
+export type PrimitiveInstanceInfo = {
+  primitive: Primitive;
+  numInstances: number;
+  instanceDatas: Float32Array;
+  mipLevels: Float32Array;
+};
+/** @internal */
+export interface ClipmapGatherContext {
   camera: Camera;
   gridScale: number;
   minMaxWorldPos: Vector4;
@@ -26,6 +40,10 @@ export type ClipmapDrawContext = {
     outAABB: AABB,
     level: number
   );
+}
+
+/** @internal */
+export interface ClipmapDrawContext extends ClipmapGatherContext {
   drawPrimitive(
     prim: Primitive,
     rotation: number,
@@ -34,36 +52,69 @@ export type ClipmapDrawContext = {
     gridScale: number,
     level: number
   );
-};
+}
 
 /** @internal */
 export class Clipmap {
-  _tileResolution: number;
+  private _instanceDataPool: Float32Array[];
+  private _instanceDataPoolSize: number;
+  private _mipLevelDataPool: Float32Array[];
+  private _mipLevelDataPoolSize: number;
+  private _nonInstanceDataPool: Float32Array[];
+  private _nonInstanceDataPoolSize: number;
+  private _nonInstanceMipLevelDataPool: Float32Array[];
+  private _nonInstanceMipLevelDataPoolSize: number;
+  private _extraInstanceBuffers: VertexAttribFormat[];
+  private _tileResolution: number;
+  private _maxMipLevels: number;
 
-  _tileMesh: Primitive;
-  _tileMeshLines: Primitive;
-  _tileMeshBBox: AABB;
+  private _tileMesh: Primitive;
+  private _tileMeshLines: Primitive;
+  private _tileMeshBBox: AABB;
 
-  _fillerMesh: Primitive;
-  _fillerMeshLines: Primitive;
-  _fillerMeshAABB: AABB;
+  private _fillerMesh: Primitive;
+  private _fillerMeshLines: Primitive;
+  private _fillerMeshAABB: AABB;
 
-  _trimMesh: Primitive;
-  _trimMeshLines: Primitive;
-  _trimMeshAABB: AABB;
+  private _trimMesh: Primitive;
+  private _trimMeshLines: Primitive;
+  private _trimMeshAABB: AABB;
 
-  _crossMesh: Primitive;
-  _crossMeshLines: Primitive;
-  _crossMeshAABB: AABB;
+  private _crossMesh: Primitive;
+  private _crossMeshLines: Primitive;
+  private _crossMeshAABB: AABB;
 
-  _seamMesh: Primitive;
-  _seamMeshLines: Primitive;
-  _seamMeshAABB: AABB;
+  private _seamMesh: Primitive;
+  private _seamMeshLines: Primitive;
+  private _seamMeshAABB: AABB;
 
-  _wireframe: boolean;
+  private _wireframe: boolean;
 
-  constructor(resolution: number) {
+  constructor(resolution: number, extraInstanceBuffers: VertexAttribFormat[], maxMipLevels = 64) {
+    if (
+      extraInstanceBuffers &&
+      extraInstanceBuffers.findIndex(
+        (val) =>
+          getVertexAttributeIndex(val) === VERTEX_ATTRIB_POSITION ||
+          getVertexAttributeIndex(val) === VERTEX_ATTRIB_TEXCOORD0 ||
+          getVertexAttributeFormat(val) !== 'f32'
+      ) >= 0
+    ) {
+      throw new Error(
+        'Extra instance buffers must be f32 format and cannot have vertex attribute of POSITOIN and TEXCOORD0'
+      );
+    }
+    this._extraInstanceBuffers = extraInstanceBuffers?.slice() ?? [];
     this._tileResolution = resolution;
+    this._maxMipLevels = Math.min(64, Math.max(1, maxMipLevels >>> 0));
+    this._instanceDataPool = [];
+    this._instanceDataPoolSize = 0;
+    this._mipLevelDataPool = [];
+    this._mipLevelDataPoolSize = 0;
+    this._nonInstanceDataPool = [];
+    this._nonInstanceDataPoolSize = 0;
+    this._nonInstanceMipLevelDataPool = [];
+    this._nonInstanceMipLevelDataPoolSize = 0;
     this._wireframe = false;
     this.generateCrossMesh();
     this.generateFillerMesh();
@@ -89,6 +140,49 @@ export class Clipmap {
       this.generateTileMesh();
       this.generateTrimMesh();
     }
+  }
+  private allocInstanceBuffer(): Float32Array {
+    if (this._instanceDataPoolSize === 0) {
+      const buffer = new Float32Array(this._maxMipLevels * 16 * 4);
+      this._instanceDataPool.push(buffer);
+      return buffer;
+    } else {
+      return this._instanceDataPool[--this._instanceDataPoolSize];
+    }
+  }
+  private allocNonInstanceBuffer(x: number, y: number, z: number, w: number): Float32Array {
+    let buffer: Float32Array;
+    if (this._nonInstanceDataPoolSize === 0) {
+      buffer = new Float32Array(4);
+      this._nonInstanceDataPool.push(buffer);
+    } else {
+      buffer = this._nonInstanceDataPool[--this._nonInstanceDataPoolSize];
+    }
+    buffer[0] = x;
+    buffer[1] = y;
+    buffer[2] = z;
+    buffer[3] = w;
+    return buffer;
+  }
+  private allocMipLevelBuffer(): Float32Array {
+    if (this._mipLevelDataPoolSize === 0) {
+      const buffer = new Float32Array(this._maxMipLevels * 16);
+      this._mipLevelDataPool.push(buffer);
+      return buffer;
+    } else {
+      return this._mipLevelDataPool[--this._mipLevelDataPoolSize];
+    }
+  }
+  private allocNonInstanceMipLevelBuffer(val: number): Float32Array {
+    let buffer: Float32Array;
+    if (this._nonInstanceMipLevelDataPoolSize === 0) {
+      buffer = new Float32Array(1);
+      this._nonInstanceMipLevelDataPool.push(buffer);
+    } else {
+      buffer = this._nonInstanceMipLevelDataPool[--this._nonInstanceMipLevelDataPoolSize];
+    }
+    buffer[0] = val;
+    return buffer;
   }
   private patch2d(tileResolution: number, x: number, y: number) {
     return y * (tileResolution + 1) + x;
@@ -142,6 +236,12 @@ export class Clipmap {
       }
     }
     this._tileMesh.createAndSetVertexBuffer('position_f32x3', vertices);
+    this._tileMesh.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._instanceDataPoolSize++;
+    for (const fmt of this._extraInstanceBuffers) {
+      this._tileMesh.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._instanceDataPoolSize++;
+    }
     this._tileMesh.createAndSetIndexBuffer(indices);
     this._tileMesh.indexStart = 0;
     this._tileMesh.indexCount = indices.length;
@@ -160,6 +260,12 @@ export class Clipmap {
     this._tileMeshLines?.dispose();
     this._tileMeshLines = new Primitive();
     this._tileMeshLines.setVertexBuffer(this._tileMesh.getVertexBuffer('position'));
+    this._tileMeshLines.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._instanceDataPoolSize++;
+    for (const fmt of this._extraInstanceBuffers) {
+      this._tileMeshLines.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._instanceDataPoolSize++;
+    }
     this._tileMeshLines.createAndSetIndexBuffer(indicesLines);
     this._tileMeshLines.indexStart = 0;
     this._tileMeshLines.indexCount = indicesLines.length;
@@ -229,6 +335,12 @@ export class Clipmap {
       }
     }
     this._fillerMesh.createAndSetVertexBuffer('position_f32x3', vertices);
+    this._fillerMesh.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._instanceDataPoolSize++;
+    for (const fmt of this._extraInstanceBuffers) {
+      this._fillerMesh.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._instanceDataPoolSize++;
+    }
     this._fillerMesh.createAndSetIndexBuffer(indices);
     this._fillerMesh.indexStart = 0;
     this._fillerMesh.indexCount = indices.length;
@@ -247,6 +359,12 @@ export class Clipmap {
     this._fillerMeshLines?.dispose();
     this._fillerMeshLines = new Primitive();
     this._fillerMeshLines.setVertexBuffer(this._fillerMesh.getVertexBuffer('position'));
+    this._fillerMeshLines.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._instanceDataPoolSize++;
+    for (const fmt of this._extraInstanceBuffers) {
+      this._fillerMeshLines.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._instanceDataPoolSize++;
+    }
     this._fillerMeshLines.createAndSetIndexBuffer(indicesLines);
     this._fillerMeshLines.indexStart = 0;
     this._fillerMeshLines.indexCount = indicesLines.length;
@@ -295,6 +413,12 @@ export class Clipmap {
       indices[n++] = startOfHorizonal + (i + 0) * 2 + 1;
     }
     this._trimMesh.createAndSetVertexBuffer('position_f32x3', vertices);
+    this._trimMesh.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._instanceDataPoolSize++;
+    for (const fmt of this._extraInstanceBuffers) {
+      this._trimMesh.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._instanceDataPoolSize++;
+    }
     this._trimMesh.createAndSetIndexBuffer(indices);
     this._trimMesh.indexStart = 0;
     this._trimMesh.indexCount = indices.length;
@@ -313,6 +437,12 @@ export class Clipmap {
     this._trimMeshLines?.dispose();
     this._trimMeshLines = new Primitive();
     this._trimMeshLines.setVertexBuffer(this._trimMesh.getVertexBuffer('position'));
+    this._trimMeshLines.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._instanceDataPoolSize++;
+    for (const fmt of this._extraInstanceBuffers) {
+      this._trimMeshLines.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._instanceDataPoolSize++;
+    }
     this._trimMeshLines.createAndSetIndexBuffer(indicesLines);
     this._trimMeshLines.indexStart = 0;
     this._trimMeshLines.indexCount = indicesLines.length;
@@ -371,6 +501,16 @@ export class Clipmap {
     this._crossMesh?.dispose();
     this._crossMesh = new Primitive();
     this._crossMesh.createAndSetVertexBuffer('position_f32x3', vertices);
+    this._crossMesh.createAndSetVertexBuffer(
+      'tex0_f32x4',
+      this.allocNonInstanceBuffer(0, 0, 0, 0),
+      'instance'
+    );
+    this._nonInstanceDataPoolSize++;
+    for (const fmt of this._extraInstanceBuffers) {
+      this._crossMesh.createAndSetVertexBuffer(fmt, this.allocNonInstanceBuffer(0, 0, 0, 0), 'instance');
+      this._nonInstanceDataPoolSize++;
+    }
     this._crossMesh.createAndSetIndexBuffer(indices);
     this._crossMesh.indexStart = 0;
     this._crossMesh.indexCount = indices.length;
@@ -422,6 +562,12 @@ export class Clipmap {
     }
     indices[indices.length - 1] = 0;
     this._seamMesh.createAndSetVertexBuffer('position_f32x3', vertices);
+    this._seamMesh.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._instanceDataPoolSize++;
+    for (const fmt of this._extraInstanceBuffers) {
+      this._seamMesh.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._instanceDataPoolSize++;
+    }
     this._seamMesh.createAndSetIndexBuffer(indices);
     this._seamMesh.indexStart = 0;
     this._seamMesh.indexCount = indices.length;
@@ -440,6 +586,12 @@ export class Clipmap {
     this._seamMeshLines?.dispose();
     this._seamMeshLines = new Primitive();
     this._seamMeshLines.setVertexBuffer(this._seamMesh.getVertexBuffer('position'));
+    this._seamMeshLines.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._instanceDataPoolSize++;
+    for (const fmt of this._extraInstanceBuffers) {
+      this._fillerMeshLines.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._instanceDataPoolSize++;
+    }
     this._seamMeshLines.createAndSetIndexBuffer(indicesLines);
     this._seamMeshLines.indexStart = 0;
     this._seamMeshLines.indexCount = indicesLines.length;
@@ -480,7 +632,7 @@ export class Clipmap {
     }
   }
   private visible(
-    ctx: ClipmapDrawContext,
+    ctx: ClipmapGatherContext,
     aabb: AABB,
     camera: Camera,
     rotation: number,
@@ -571,15 +723,38 @@ export class Clipmap {
     }
     return outAABB;
   }
-  calcMipLevels(camera: Camera, minMaxWorldPos: Vector4, gridScale: number) {
+  private calcMipLevels(camera: Camera, minMaxWorldPos: Vector4, gridScale: number) {
     camera.getWorldPosition(tmpV3);
     const distX = Math.max(Math.abs(tmpV3.x - minMaxWorldPos.x), Math.abs(tmpV3.x - minMaxWorldPos.z));
     const distY = Math.max(Math.abs(tmpV3.z - minMaxWorldPos.y), Math.abs(tmpV3.z - minMaxWorldPos.w));
     const maxDist = Math.min(Math.max(distX, distY), camera.getFarPlane());
-    return Math.max(Math.ceil(Math.log2(maxDist / (this._tileResolution * gridScale))), 0) + 1;
+    return Math.min(
+      Math.max(Math.ceil(Math.log2(maxDist / (this._tileResolution * gridScale))), 0) + 1,
+      this._maxMipLevels
+    );
   }
-  gather(context: ClipmapDrawContext): { primitive: Primitive; instanceDatas: number[] }[] {
-    const renderData: { primitive: Primitive; instanceDatas: number[] }[] = [];
+  private addInstance(
+    info: PrimitiveInstanceInfo,
+    rotation: number,
+    offsetX: number,
+    offsetY: number,
+    scale: number,
+    mipLevel: number
+  ) {
+    info.mipLevels[info.numInstances] = mipLevel;
+    info.instanceDatas[info.numInstances * 4 + 0] = rotation;
+    info.instanceDatas[info.numInstances * 4 + 1] = scale;
+    info.instanceDatas[info.numInstances * 4 + 2] = offsetX;
+    info.instanceDatas[info.numInstances * 4 + 3] = offsetY;
+    info.numInstances++;
+  }
+
+  gather(context: ClipmapGatherContext): PrimitiveInstanceInfo[] {
+    this._instanceDataPoolSize = this._instanceDataPool.length;
+    this._mipLevelDataPoolSize = this._mipLevelDataPool.length;
+    this._nonInstanceDataPoolSize = this._nonInstanceDataPool.length;
+    this._nonInstanceMipLevelDataPoolSize = this._nonInstanceMipLevelDataPool.length;
+    const renderData: PrimitiveInstanceInfo[] = [];
     const mipLevels = this.calcMipLevels(context.camera, context.minMaxWorldPos, context.gridScale);
     context.camera.getWorldPosition(tmpV3);
 
@@ -596,27 +771,38 @@ export class Clipmap {
     if (
       this.visible(context, this._crossMeshAABB, context.camera, null, snappedPos, 1, context.gridScale, 0)
     ) {
-      renderData.push({
+      const crossPrimitives: PrimitiveInstanceInfo = {
         primitive: this._wireframe ? this._crossMeshLines : this._crossMesh,
-        instanceDatas: [rotationValues[0], snappedPos.x, snappedPos.y, 1, 0]
-      });
+        numInstances: 1,
+        instanceDatas: this.allocNonInstanceBuffer(rotationValues[0], 1, snappedPos.x, snappedPos.y),
+        mipLevels: this.allocNonInstanceMipLevelBuffer(0)
+      };
+      renderData.push(crossPrimitives);
     }
 
-    const tilePrimitives: { primitive: Primitive; instanceDatas: number[] } = {
+    const tilePrimitives: PrimitiveInstanceInfo = {
       primitive: this._wireframe ? this._tileMeshLines : this._tileMesh,
-      instanceDatas: []
+      numInstances: 0,
+      instanceDatas: this.allocInstanceBuffer(),
+      mipLevels: this.allocMipLevelBuffer()
     };
-    const fillerPrimitives: { primitive: Primitive; instanceDatas: number[] } = {
+    const fillerPrimitives: PrimitiveInstanceInfo = {
       primitive: this._wireframe ? this._fillerMeshLines : this._fillerMesh,
-      instanceDatas: []
+      numInstances: 0,
+      instanceDatas: this.allocInstanceBuffer(),
+      mipLevels: this.allocMipLevelBuffer()
     };
-    const trimPrimitives: { primitive: Primitive; instanceDatas: number[] } = {
+    const trimPrimitives: PrimitiveInstanceInfo = {
       primitive: this._wireframe ? this._trimMeshLines : this._trimMesh,
-      instanceDatas: []
+      numInstances: 0,
+      instanceDatas: this.allocInstanceBuffer(),
+      mipLevels: this.allocMipLevelBuffer()
     };
-    const seamPrimitives: { primitive: Primitive; instanceDatas: number[] } = {
+    const seamPrimitives: PrimitiveInstanceInfo = {
       primitive: this._wireframe ? this._seamMeshLines : this._seamMesh,
-      instanceDatas: []
+      numInstances: 0,
+      instanceDatas: this.allocInstanceBuffer(),
+      mipLevels: this.allocMipLevelBuffer()
     };
 
     for (let l = 0; l < mipLevels; l++) {
@@ -662,7 +848,7 @@ export class Clipmap {
                 l
               )
             ) {
-              tilePrimitives.instanceDatas.push(rotationValues[0], offset.x, offset.y, scale, l);
+              this.addInstance(tilePrimitives, rotationValues[0], offset.x, offset.y, scale, l);
             }
           }
         }
@@ -680,7 +866,7 @@ export class Clipmap {
           l
         )
       ) {
-        fillerPrimitives.instanceDatas.push(rotationValues[0], snappedPos.x, snappedPos.y, scale, l);
+        this.addInstance(fillerPrimitives, rotationValues[0], snappedPos.x, snappedPos.y, scale, l);
       }
 
       if (l !== mipLevels - 1) {
@@ -707,7 +893,7 @@ export class Clipmap {
             l
           )
         ) {
-          trimPrimitives.instanceDatas.push(rotationValues[r], tileCentre.x, tileCentre.y, scale, l);
+          this.addInstance(trimPrimitives, rotationValues[r], tileCentre.x, tileCentre.y, scale, l);
         }
         // draw seam
         const nextBase = new Vector2(
@@ -726,21 +912,26 @@ export class Clipmap {
             l
           )
         ) {
-          seamPrimitives.instanceDatas.push(rotationValues[0], nextBase.x, nextBase.y, scale, l);
+          this.addInstance(seamPrimitives, rotationValues[0], nextBase.x, nextBase.y, scale, l);
         }
       }
     }
-    if (tilePrimitives.instanceDatas.length > 0) {
+    if (tilePrimitives.numInstances > 0) {
       renderData.push(tilePrimitives);
     }
-    if (fillerPrimitives.instanceDatas.length > 0) {
+    if (fillerPrimitives.numInstances > 0) {
       renderData.push(fillerPrimitives);
     }
-    if (trimPrimitives.instanceDatas.length > 0) {
+    if (trimPrimitives.numInstances > 0) {
       renderData.push(trimPrimitives);
     }
-    if (seamPrimitives.instanceDatas.length > 0) {
+    if (seamPrimitives.numInstances > 0) {
       renderData.push(seamPrimitives);
+    }
+    for (const info of renderData) {
+      info.primitive
+        .getVertexBuffer('texCoord0')
+        .bufferSubData(0, info.instanceDatas, 0, info.numInstances * 4);
     }
     return renderData;
   }

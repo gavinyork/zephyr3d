@@ -74,7 +74,7 @@ export class ClipmapTerrain
   constructor(scene: Scene, sizeX = 256, sizeZ = 256, clipMapTileSize = 64) {
     super(scene);
     this._pickTarget = { node: this };
-    this._clipmap = new Clipmap(clipMapTileSize);
+    this._clipmap = new Clipmap(clipMapTileSize, []);
     this._grassRenderer = new DRef(new GrassRenderer(this));
     this._gridScale = 1;
     this._castShadow = true;

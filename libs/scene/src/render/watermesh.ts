@@ -37,7 +37,7 @@ export class WaterMesh {
     this._waterRenderStates = Application.instance.device.createRenderStateSet();
     this._waterRenderStates.useRasterizerState().setCullMode('none');
     this._waterRenderStates.useDepthState().enableTest(true).enableWrite(true).setCompareFunc('le');
-    this._clipmap = new Clipmap(this._tileSize);
+    this._clipmap = new Clipmap(this._tileSize, []);
     this._updateFrameStamp = -1;
     this._usedClipmapBindGroups = [];
     this._freeClipmapBindGroups = [];
@@ -129,7 +129,7 @@ export class WaterMesh {
     if (val !== this._tileSize) {
       this._tileSize = val;
       if (!this._clipmap) {
-        this._clipmap = new Clipmap(this._tileSize);
+        this._clipmap = new Clipmap(this._tileSize, []);
       } else {
         this._clipmap.tileResolution = this._tileSize;
       }

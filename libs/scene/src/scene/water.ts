@@ -4,7 +4,14 @@ import type { NodeClonable, NodeCloneMethod } from './scene_node';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
 import { mixinDrawable } from '../render/drawable_mixin';
-import type { Drawable, DrawContext, PickTarget, Primitive, WaveGenerator } from '../render';
+import type {
+  Drawable,
+  DrawContext,
+  PickTarget,
+  Primitive,
+  PrimitiveInstanceInfo,
+  WaveGenerator
+} from '../render';
 import { Clipmap, FBMWaveGenerator } from '../render';
 import { WaterMaterial } from '../material/water';
 import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
@@ -13,10 +20,12 @@ import { QUEUE_OPAQUE } from '../values';
 import type { MeshMaterial } from '../material';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import { BoundingBox } from '../utility/bounding_volume';
+import { Camera } from '../camera';
 
 export class Water extends applyMixins(GraphNode, mixinDrawable) implements Drawable, NodeClonable<Water> {
   private _pickTarget: PickTarget;
   private _clipmap: Clipmap;
+  private _renderData: PrimitiveInstanceInfo[];
   private _gridScale: number;
   private _animationSpeed: number;
   private _timeStart: number;
@@ -24,7 +33,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   constructor(scene: Scene) {
     super(scene);
     this._pickTarget = { node: this };
-    this._clipmap = new Clipmap(32);
+    this._clipmap = new Clipmap(32, []);
+    this._renderData = null;
     this._gridScale = 1;
     this._animationSpeed = 1;
     this._timeStart = 0;
@@ -32,6 +42,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._material.get().region = new Vector4(-1, -1, 1, 1);
     this._material.get().TAAStrength = 0.4;
     this.waveGenerator = new FBMWaveGenerator();
+    scene.queuePerCameraUpdateNode(this);
   }
   clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new Water(this.scene);
@@ -84,6 +95,26 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       this.material.update(frameId, (elapsedInSeconds - this._timeStart) * this._animationSpeed);
       this.invalidateWorldBoundingVolume(false);
     }
+  }
+  updatePerCamera(camera: Camera, elapsedInSeconds: number, deltaInSeconds: number): void {
+    const mat = this._material.get();
+    const that = this;
+    this._renderData = this._clipmap.gather({
+      camera,
+      minMaxWorldPos: mat.region,
+      gridScale: Math.max(0.01, this._gridScale),
+      userData: this,
+      calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
+        const p = that.worldMatrix.transformPointAffine(Vector3.zero());
+        if (that.waveGenerator) {
+          that.waveGenerator.calcClipmapTileAABB(minX, maxX, minZ, maxZ, p.y, outAABB);
+        } else {
+          outAABB.minPoint.setXYZ(minX, p.y, minZ);
+          outAABB.maxPoint.setXYZ(maxX, p.y + 1, maxZ);
+        }
+      }
+    });
+    this.scene.queuePerCameraUpdateNode(this);
   }
   /**
    * {@inheritDoc Drawable.getPickTarget }
@@ -212,8 +243,14 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
    */
   draw(ctx: DrawContext) {
     const mat = this._material?.get();
-    const that = this;
     this.bind(ctx);
+    mat.setClipmapGridInfo(this._gridScale, this.worldMatrix.m03, this.worldMatrix.m23);
+    mat.apply(ctx);
+    for (const info of this._renderData) {
+      mat.draw(info.primitive, ctx, info.numInstances);
+    }
+    /*
+    const that = this;
     this._clipmap.draw({
       camera: ctx.camera,
       minMaxWorldPos: mat.region,
@@ -229,7 +266,6 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         }
       },
       drawPrimitive(prim, rotation, offset, scale, gridScale) {
-        /*
         const clipmapMatrix = Matrix4x4.rotationZ(rotation);
         const scale2 = scale * gridScale;
         clipmapMatrix[0] *= scale2;
@@ -246,12 +282,12 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
           .scaleLeft(new Vector3(gridScale, gridScale, 1));
         clipmapMatrix.m03 -= that.worldMatrix.m03;
         clipmapMatrix.m13 -= that.worldMatrix.m23;
-        */
         mat.setClipmapInfo(rotation, scale, offset.x, offset.y);
         mat.setClipmapGridInfo(gridScale, that.worldMatrix.m03, that.worldMatrix.m23);
         mat.apply(ctx);
         mat.draw(prim, ctx);
       }
     });
+    */
   }
 }

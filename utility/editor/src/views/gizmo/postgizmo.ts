@@ -604,7 +604,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect)<{
     this.dispatchEvent('begin_scale', this._node);
   }
   private _calcScaleFactor(d: number) {
-    return 1 + d * 0.2;
+    return Math.max(0.0001, 1 + d * 0.2);
   }
   private _updateScale(x: number, y: number) {
     if (!this._scaleInfo) {
@@ -629,9 +629,10 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect)<{
     } else if (this._scaleInfo.type === 'scale_uniform') {
       const d = this._scaleInfo.startY - y;
       const factor = this._calcScaleFactor(d / 20);
-      this._node.scale.x = this._scaleInfo.scale.x * factor;
-      this._node.scale.y = this._scaleInfo.scale.y * factor;
-      this._node.scale.z = this._scaleInfo.scale.z * factor;
+      this._node.scale.x = this._node.scale.x * factor;
+      this._node.scale.y = this._node.scale.y * factor;
+      this._node.scale.z = this._node.scale.z * factor;
+      this._scaleInfo.startY = y;
     }
   }
   private _endScale() {
