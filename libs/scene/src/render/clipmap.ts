@@ -596,6 +596,207 @@ export class Clipmap {
     const maxDist = Math.min(Math.max(distX, distY), camera.getFarPlane());
     return Math.max(Math.ceil(Math.log2(maxDist / (this._tileResolution * gridScale))), 0) + 1;
   }
+  gather(
+    context: ClipmapDrawContext
+  ): { primitive: Primitive; matrices: Matrix4x4[]; mipLevels: number[] }[] {
+    const renderData: { primitive: Primitive; matrices: Matrix4x4[]; mipLevels: number[] }[] = [];
+    const mipLevels = this.calcMipLevels(context.camera, context.minMaxWorldPos, context.gridScale);
+    context.camera.getWorldPosition(tmpV3);
+
+    const snappedPos = new Vector2();
+    const tileSize = new Vector2();
+    const base = new Vector2();
+    const offset = new Vector2();
+
+    const posX = tmpV3.x / context.gridScale;
+    const posY = tmpV3.z / context.gridScale;
+
+    // draw cross
+    snappedPos.setXY(Math.floor(posX), Math.floor(posY));
+    if (
+      this.visible(context, this._crossMeshAABB, context.camera, null, snappedPos, 1, context.gridScale, 0)
+    ) {
+      renderData.push({
+        primitive: this._wireframe ? this._crossMeshLines : this._crossMesh,
+        matrices: [
+          new Matrix4x4(modelMatrices[0])
+            .translateLeft(new Vector3(snappedPos.x, snappedPos.y, 0))
+            .scaleLeft(new Vector3(context.gridScale, context.gridScale, 1))
+        ],
+        mipLevels: [0]
+      });
+    }
+
+    const tilePrimitives: { primitive: Primitive; matrices: Matrix4x4[]; mipLevels: number[] } = {
+      primitive: this._wireframe ? this._tileMeshLines : this._tileMesh,
+      matrices: [],
+      mipLevels: []
+    };
+    const fillerPrimitives: { primitive: Primitive; matrices: Matrix4x4[]; mipLevels: number[] } = {
+      primitive: this._wireframe ? this._fillerMeshLines : this._fillerMesh,
+      matrices: [],
+      mipLevels: []
+    };
+    const trimPrimitives: { primitive: Primitive; matrices: Matrix4x4[]; mipLevels: number[] } = {
+      primitive: this._wireframe ? this._trimMeshLines : this._trimMesh,
+      matrices: [],
+      mipLevels: []
+    };
+    const seamPrimitives: { primitive: Primitive; matrices: Matrix4x4[]; mipLevels: number[] } = {
+      primitive: this._wireframe ? this._seamMeshLines : this._seamMesh,
+      matrices: [],
+      mipLevels: []
+    };
+
+    for (let l = 0; l < mipLevels; l++) {
+      const scale = 1 << l;
+      snappedPos.setXY(Math.floor(posX / scale) * scale, Math.floor(posY / scale) * scale);
+      // draw tiles
+      tileSize.setXY(this._tileResolution << l, this._tileResolution << l);
+      base.setXY(
+        snappedPos.x - (this._tileResolution << (l + 1)),
+        snappedPos.y - (this._tileResolution << (l + 1))
+      );
+      for (let x = 0; x < 4; x++) {
+        for (let y = 0; y < 4; y++) {
+          if (l !== 0 && (x === 1 || x === 2) && (y === 1 || y === 2)) {
+            continue;
+          }
+          const fillX = x >= 2 ? scale : 0;
+          const fillY = y >= 2 ? scale : 0;
+          offset.setXY(base.x + x * tileSize.x + fillX, base.y + y * tileSize.y + fillY);
+          if (
+            this.intervalsOverlap(
+              offset.x * context.gridScale,
+              (offset.x + tileSize.x) * context.gridScale,
+              context.minMaxWorldPos.x,
+              context.minMaxWorldPos.z
+            ) &&
+            this.intervalsOverlap(
+              offset.y * context.gridScale,
+              (offset.y + tileSize.y) * context.gridScale,
+              context.minMaxWorldPos.y,
+              context.minMaxWorldPos.w
+            )
+          ) {
+            if (
+              this.visible(
+                context,
+                this._tileMeshBBox,
+                context.camera,
+                null,
+                offset,
+                scale,
+                context.gridScale,
+                l
+              )
+            ) {
+              tilePrimitives.matrices.push(
+                new Matrix4x4(modelMatrices[0])
+                  .scaleLeft(new Vector3(scale, scale, 1))
+                  .translateLeft(new Vector3(offset.x, offset.y, 0))
+                  .scaleLeft(new Vector3(context.gridScale, context.gridScale, 1))
+              );
+              tilePrimitives.mipLevels.push(l);
+            }
+          }
+        }
+      }
+      // draw filler
+      if (
+        this.visible(
+          context,
+          this._fillerMeshAABB,
+          context.camera,
+          null,
+          snappedPos,
+          scale,
+          context.gridScale,
+          l
+        )
+      ) {
+        fillerPrimitives.matrices.push(
+          new Matrix4x4(modelMatrices[0])
+            .scaleLeft(new Vector3(scale, scale, 1))
+            .translateLeft(new Vector3(snappedPos.x, snappedPos.y, 0))
+            .scaleLeft(new Vector3(context.gridScale, context.gridScale, 1))
+        );
+        fillerPrimitives.mipLevels.push(l);
+      }
+
+      if (l !== mipLevels - 1) {
+        const nextScale = scale * 2;
+        const nextSnappedPos = new Vector2(
+          Math.floor(posX / nextScale) * nextScale,
+          Math.floor(posY / nextScale) * nextScale
+        );
+        // draw trim
+        const tileCentre = new Vector2(snappedPos.x + scale * 0.5, snappedPos.y + scale * 0.5);
+        const d = new Vector2(posX - nextSnappedPos.x, posY - nextSnappedPos.y);
+        let r = 0;
+        r |= d.x >= scale ? 0 : 2;
+        r |= d.y >= scale ? 0 : 1;
+        if (
+          this.visible(
+            context,
+            this._trimMeshAABB,
+            context.camera,
+            r === 0 ? null : modelMatrices[r],
+            tileCentre,
+            scale,
+            context.gridScale,
+            l
+          )
+        ) {
+          trimPrimitives.matrices.push(
+            new Matrix4x4(modelMatrices[r])
+              .scaleLeft(new Vector3(scale, scale, 1))
+              .translateLeft(new Vector3(tileCentre.x, tileCentre.y, 0))
+              .scaleLeft(new Vector3(context.gridScale, context.gridScale, 1))
+          );
+          trimPrimitives.mipLevels.push(l);
+        }
+        // draw seam
+        const nextBase = new Vector2(
+          nextSnappedPos.x - (this._tileResolution << (l + 1)),
+          nextSnappedPos.y - (this._tileResolution << (l + 1))
+        );
+        if (
+          this.visible(
+            context,
+            this._seamMeshAABB,
+            context.camera,
+            null,
+            nextBase,
+            scale,
+            context.gridScale,
+            l
+          )
+        ) {
+          seamPrimitives.matrices.push(
+            new Matrix4x4(modelMatrices[0])
+              .scaleLeft(new Vector3(scale, scale, 1))
+              .translateLeft(new Vector3(nextBase.x, nextBase.y, 0))
+              .scaleLeft(new Vector3(context.gridScale, context.gridScale, 1))
+          );
+          seamPrimitives.mipLevels.push(l);
+        }
+      }
+    }
+    if (tilePrimitives.matrices.length > 0) {
+      renderData.push(tilePrimitives);
+    }
+    if (fillerPrimitives.matrices.length > 0) {
+      renderData.push(fillerPrimitives);
+    }
+    if (trimPrimitives.matrices.length > 0) {
+      renderData.push(trimPrimitives);
+    }
+    if (seamPrimitives.matrices.length > 0) {
+      renderData.push(seamPrimitives);
+    }
+    return renderData;
+  }
   draw(context: ClipmapDrawContext): number {
     let drawn = 0;
     const mipLevels = this.calcMipLevels(context.camera, context.minMaxWorldPos, context.gridScale);

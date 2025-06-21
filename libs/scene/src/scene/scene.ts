@@ -40,6 +40,8 @@ export class Scene extends makeEventTarget(Object)<{
   protected _id: number;
   /** @internal */
   protected _nodeUpdateQueue: DWeakRef<SceneNode>[];
+  /** @internal */
+  protected _perCameraUpdateQueue: DWeakRef<SceneNode>[];
   /**
    * Creates an instance of scene
    */
@@ -49,6 +51,7 @@ export class Scene extends makeEventTarget(Object)<{
     this._octree = new Octree(this, 8, 8);
     this._nodePlaceList = new Set();
     this._nodeUpdateQueue = [];
+    this._perCameraUpdateQueue = [];
     this._env = new Environment();
     this._updateFrame = -1;
     this._animationSet = [];
@@ -193,6 +196,19 @@ export class Scene extends makeEventTarget(Object)<{
       this._nodeUpdateQueue.push(new DWeakRef(node));
     }
   }
+  /**
+   * Add node to the per-camera update queue so the node's update method will be called once per camera before render.
+   * @param node - Node to be queued to update
+   *
+   * @remarks
+   * Node will be removed from update queue after frame rendered, to update the node continuous,
+   * call queuePerCameraUpdateNode in the update method.
+   */
+  queuePerCameraUpdateNode(node: SceneNode) {
+    if (node && this._perCameraUpdateQueue.findIndex((val) => val.get() === node) < 0) {
+      this._perCameraUpdateQueue.push(new DWeakRef(node));
+    }
+  }
   /** @internal */
   invalidateNodePlacement(node: GraphNode) {
     this._nodePlaceList.add(node);
@@ -244,17 +260,35 @@ export class Scene extends makeEventTarget(Object)<{
       this.updateAnimations();
       this.updateEnvLight();
       this.dispatchEvent('update', this);
+      if (this._nodeUpdateQueue.length > 0) {
+        const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
+        const deltaInSeconds = frameInfo.elapsedFrame * 0.001;
+        const queue = this._nodeUpdateQueue;
+        this._nodeUpdateQueue = [];
+        while (queue.length > 0) {
+          const ref = queue.shift();
+          ref.get()?.update(frameInfo.frameCounter, elapsedInSeconds, deltaInSeconds);
+          ref.dispose();
+        }
+      }
       this.updateNodePlacement(this._octree, this._nodePlaceList);
+    }
+  }
+  /** @internal */
+  frameUpdatePerCamera(camera: Camera) {
+    if (this._perCameraUpdateQueue.length > 0) {
+      const frameInfo = Application.instance.device.frameInfo;
       const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
       const deltaInSeconds = frameInfo.elapsedFrame * 0.001;
-      const queue = this._nodeUpdateQueue;
-      this._nodeUpdateQueue = [];
+      const queue = this._perCameraUpdateQueue;
+      this._perCameraUpdateQueue = [];
       while (queue.length > 0) {
         const ref = queue.shift();
-        ref.get()?.update(frameInfo.frameCounter, elapsedInSeconds, deltaInSeconds);
+        ref.get()?.updatePerCamera(camera, elapsedInSeconds, deltaInSeconds);
         ref.dispose();
       }
     }
+    this.updateNodePlacement(this._octree, this._nodePlaceList);
   }
   /**
    * Update node placement in the octree

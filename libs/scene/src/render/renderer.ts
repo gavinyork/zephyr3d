@@ -96,6 +96,7 @@ export class SceneRenderer {
       : 'd24s8';
     const globalBindGroupAllocator = GlobalBindGroupAllocator.get();
     scene.frameUpdate();
+    scene.frameUpdatePerCamera(camera);
     if (camera && !device.isContextLost()) {
       const defaultViewport = !camera.viewport && !camera.scissor;
       const renderX = camera.viewport ? device.screenToDevice(camera.viewport[0]) : 0;
