@@ -529,6 +529,16 @@ export class Clipmap {
     this._crossMeshLines?.dispose();
     this._crossMeshLines = new Primitive();
     this._crossMeshLines.setVertexBuffer(this._crossMesh.getVertexBuffer('position'));
+    this._crossMeshLines.createAndSetVertexBuffer(
+      'tex0_f32x4',
+      this.allocNonInstanceBuffer(0, 0, 0, 0),
+      'instance'
+    );
+    this._nonInstanceDataPoolSize++;
+    for (const fmt of this._extraInstanceBuffers) {
+      this._crossMeshLines.createAndSetVertexBuffer(fmt, this.allocNonInstanceBuffer(0, 0, 0, 0), 'instance');
+      this._nonInstanceDataPoolSize++;
+    }
     this._crossMeshLines.createAndSetIndexBuffer(indicesLines);
     this._crossMeshLines.indexStart = 0;
     this._crossMeshLines.indexCount = indicesLines.length;

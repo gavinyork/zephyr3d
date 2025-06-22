@@ -327,14 +327,20 @@ export class FFTWaveGenerator implements WaveGenerator {
     return this._params.foamParams.x;
   }
   set foamWidth(val: number) {
-    this._params.foamParams.x = val;
+    if (val !== this._params.foamParams.x) {
+      this._params.foamParams.x = val;
+      this.paramsChanged();
+    }
   }
   /** Gets the foam contrast */
   get foamContrast(): number {
     return this._params.foamParams.y;
   }
   set foamContrast(val: number) {
-    this._params.foamParams.y = val;
+    if (val !== this._params.foamParams.y) {
+      this._params.foamParams.y = val;
+      this.paramsChanged();
+    }
   }
   /** Gets the wave length for the specified cascade */
   getWaveLength(cascade: number) {
