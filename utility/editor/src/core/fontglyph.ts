@@ -20,7 +20,7 @@ export class FontGlyph {
       const deviceFont = new Font(`12px ${config.name}`, Application.instance.device.getScale());
       for (const glyph of config.glyphs) {
         imGuiSetFontGlyph(glyph.code, deviceFont);
-        console.log(`==> ${glyph.css}`);
+        //console.log(`==> ${glyph.css}`);
         this.glyphs[glyph.css] = String.fromCharCode(glyph.code);
         this.allGlyphs += this.glyphs[glyph.css];
       }

@@ -10,19 +10,20 @@ import type { NodeClonable, NodeCloneMethod } from '../scene_node';
 import type { Scene } from '../scene';
 import { GraphNode } from '../graph_node';
 import { mixinDrawable } from '../../render/drawable_mixin';
-import type { Drawable, DrawContext, PickTarget, Primitive } from '../../render';
+import type { Drawable, DrawContext, PickTarget, Primitive, PrimitiveInstanceInfo } from '../../render';
 import { Clipmap } from '../../render';
 import { ClipmapTerrainMaterial } from '../../material/terrain-cm';
 import { Application, DRef } from '../../app';
 import type { MeshMaterial } from '../../material';
 import type { BoundingVolume } from '../../utility/bounding_volume';
 import { BoundingBox } from '../../utility/bounding_volume';
-import { RENDER_PASS_TYPE_OBJECT_COLOR } from '../../values';
+import { MAX_TERRAIN_MIPMAP_LEVELS, RENDER_PASS_TYPE_OBJECT_COLOR } from '../../values';
 import type { BlitType } from '../../blitter';
 import { CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
 import { RenderMipmap } from '../../utility/rendermipmap';
 import { GrassRenderer } from './grass';
+import { Camera } from '../../camera';
 
 class HeightMinMaxBlitter extends CopyBlitter {
   filter(
@@ -58,8 +59,10 @@ export class ClipmapTerrain
 {
   private static _heightBoundingGenerator = new HeightBoundingGenerator();
   private static _copyBlitter = new HeightMinMaxBlitter();
+  private static _tmpBuffer = new Float32Array(MAX_TERRAIN_MIPMAP_LEVELS * 2 * 4);
   private _pickTarget: PickTarget;
   private _clipmap: Clipmap;
+  private _renderData: PrimitiveInstanceInfo[];
   private _gridScale: number;
   private _material: DRef<ClipmapTerrainMaterial>;
   private _grassRenderer: DRef<GrassRenderer>;
@@ -74,7 +77,8 @@ export class ClipmapTerrain
   constructor(scene: Scene, sizeX = 256, sizeZ = 256, clipMapTileSize = 64) {
     super(scene);
     this._pickTarget = { node: this };
-    this._clipmap = new Clipmap(clipMapTileSize, []);
+    this._clipmap = new Clipmap(clipMapTileSize, ['tex1_f32'], MAX_TERRAIN_MIPMAP_LEVELS);
+    this._renderData = null;
     this._grassRenderer = new DRef(new GrassRenderer(this));
     this._gridScale = 1;
     this._castShadow = true;
@@ -86,9 +90,10 @@ export class ClipmapTerrain
     this._minHeight = 0;
     this._maxHeight = 0;
     this._material = new DRef(
-      new ClipmapTerrainMaterial(this.createHeightMapTexture(this._sizeX, this._sizeZ), clipMapTileSize)
+      new ClipmapTerrainMaterial(this.createHeightMapTexture(this._sizeX, this._sizeZ))
     );
     this.updateRegion();
+    scene.queuePerCameraUpdateNode(this);
   }
   get grassRenderer() {
     return this._grassRenderer.get();
@@ -306,7 +311,6 @@ export class ClipmapTerrain
     tmp
       .readPixels(0, 0, 1, 1, 0, tmp.mipLevelCount - 1, data)
       .then(() => {
-        console.log(data[0], data[1]);
         this._minHeight = data[0];
         this._maxHeight = data[1];
         this.invalidateWorldBoundingVolume(false);
@@ -327,6 +331,56 @@ export class ClipmapTerrain
     super._onTransformChanged(invalidateLocal);
     this.updateRegion();
   }
+  updatePerCamera(camera: Camera, elapsedInSeconds: number, deltaInSeconds: number): void {
+    const mat = this._material.get();
+    const that = this;
+    const bv = this.getWorldBoundingVolume().toAABB();
+    this._renderData = this._clipmap.gather({
+      camera: camera,
+      minMaxWorldPos: mat.region,
+      gridScale: this._gridScale,
+      userData: this,
+      calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
+        const p = that.worldMatrix.transformPointAffine(Vector3.zero());
+        outAABB.minPoint.setXYZ(minX, bv ? bv.minPoint.y : p.y - 9999, minZ);
+        outAABB.maxPoint.setXYZ(maxX, bv ? bv.maxPoint.y : p.y + 9999, maxZ);
+      }
+    });
+    let maxMipLevel = 0;
+    for (const info of this._renderData) {
+      const buffer = info.primitive.getVertexBuffer('texCoord1');
+      buffer.bufferSubData(0, info.mipLevels, 0, info.numInstances);
+      if (info.maxMiplevel > maxMipLevel) {
+        maxMipLevel = info.maxMiplevel;
+      }
+    }
+    const levelAABB = this._clipmap.calcLevelAABB(camera, mat.region, this._gridScale);
+    const cameraPos = camera.getWorldPosition();
+    const tmpBuffer = ClipmapTerrain._tmpBuffer;
+
+    for (let i = 0; i <= maxMipLevel; i++) {
+      if (i === 0) {
+        tmpBuffer[i * 8 + 0] = cameraPos.x;
+        tmpBuffer[i * 8 + 1] = cameraPos.z;
+        tmpBuffer[i * 8 + 2] = cameraPos.x;
+        tmpBuffer[i * 8 + 3] = cameraPos.z;
+      } else {
+        const prevAABB = levelAABB[i - 1];
+        tmpBuffer[i * 8 + 0] = prevAABB.minPoint.x;
+        tmpBuffer[i * 8 + 1] = prevAABB.minPoint.z;
+        tmpBuffer[i * 8 + 2] = prevAABB.maxPoint.x;
+        tmpBuffer[i * 8 + 3] = prevAABB.maxPoint.z;
+      }
+      const currentAABB = levelAABB[i];
+      tmpBuffer[i * 8 + 4] = 1 / (currentAABB.minPoint.x - tmpBuffer[i * 8 + 0]);
+      tmpBuffer[i * 8 + 5] = 1 / (currentAABB.minPoint.z - tmpBuffer[i * 8 + 1]);
+      tmpBuffer[i * 8 + 6] = 1 / (currentAABB.maxPoint.x - tmpBuffer[i * 8 + 2]);
+      tmpBuffer[i * 8 + 7] = 1 / (currentAABB.maxPoint.z - tmpBuffer[i * 8 + 3]);
+    }
+    mat.setLevelData(tmpBuffer, 8 * (maxMipLevel + 1));
+
+    this.scene.queuePerCameraUpdateNode(this);
+  }
   updateRegion() {
     if (this.material) {
       const x = Math.abs(this.scale.x);
@@ -346,64 +400,12 @@ export class ClipmapTerrain
    */
   draw(ctx: DrawContext) {
     const mat = this._material?.get();
-    const that = this;
     this.bind(ctx);
-    const wireframe = this._clipmap.wireframe;
-    if (ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
-      this._clipmap.wireframe = false;
+    mat.setClipmapGridInfo(this._gridScale, this.worldMatrix.m03, this.worldMatrix.m23);
+    mat.apply(ctx);
+    for (const info of this._renderData) {
+      mat.draw(info.primitive, ctx, info.numInstances);
     }
-    const levelAABB = this._clipmap.calcLevelAABB(ctx.camera, mat.region, this._gridScale);
-    const cameraPos = ctx.camera.getWorldPosition();
-    //console.log(levelAABB);
-    this._clipmap.draw({
-      camera: ctx.camera,
-      minMaxWorldPos: mat.region,
-      gridScale: this._gridScale,
-      userData: this,
-      calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
-        const p = that.worldMatrix.transformPointAffine(Vector3.zero());
-        outAABB.minPoint.setXYZ(minX, p.y - 9999, minZ);
-        outAABB.maxPoint.setXYZ(maxX, p.y + 9999, maxZ);
-      },
-      drawPrimitive(prim, rotation, offset, scale, gridScale, mipLevel) {
-        const clipmapMatrix = Matrix4x4.rotationZ(rotation);
-        const scale2 = scale * gridScale;
-        clipmapMatrix[0] *= scale2;
-        clipmapMatrix[1] *= scale2;
-        clipmapMatrix[4] *= scale2;
-        clipmapMatrix[5] *= scale2;
-        clipmapMatrix[8] *= scale2;
-        clipmapMatrix[9] *= scale2;
-        clipmapMatrix[12] = offset.x * gridScale;
-        clipmapMatrix[13] = offset.y * gridScale;
-        clipmapMatrix.m03 -= that.worldMatrix.m03;
-        clipmapMatrix.m13 -= that.worldMatrix.m23;
-        mat.setClipmapMatrix(clipmapMatrix);
-        mat.setHeightMapMipLevel(mipLevel);
-        if (mipLevel === 0) {
-          mat.setLevelStart(cameraPos.x, cameraPos.z, cameraPos.x, cameraPos.z);
-        } else {
-          const prevAABB = levelAABB[mipLevel - 1];
-          mat.setLevelStart(
-            prevAABB.minPoint.x,
-            prevAABB.minPoint.z,
-            prevAABB.maxPoint.x,
-            prevAABB.maxPoint.z
-          );
-        }
-        const currentAABB = levelAABB[mipLevel];
-        mat.setLevelRange(
-          currentAABB.minPoint.x,
-          currentAABB.minPoint.z,
-          currentAABB.maxPoint.x,
-          currentAABB.maxPoint.z
-        );
-        mat.apply(ctx);
-        mat.draw(prim, ctx);
-      }
-    });
-    this._clipmap.wireframe = wireframe;
-
     if (ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR) {
       this._grassRenderer.get().draw(ctx);
     }

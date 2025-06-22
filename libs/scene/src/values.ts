@@ -100,6 +100,9 @@ export const MORPH_WEIGHTS_VECTOR_COUNT = (MAX_MORPH_TARGETS + 3) >> 2;
 /** @internal */
 export const MORPH_ATTRIBUTE_VECTOR_COUNT = (MAX_MORPH_ATTRIBUTES + 3) >> 2;
 
+/** @internal */
+export const MAX_TERRAIN_MIPMAP_LEVELS = 64;
+
 /**
  * Material varying flags
  * @public

@@ -24,6 +24,7 @@ export type PrimitiveInstanceInfo = {
   numInstances: number;
   instanceDatas: Float32Array;
   mipLevels: Float32Array;
+  maxMiplevel: number;
 };
 /** @internal */
 export interface ClipmapGatherContext {
@@ -599,7 +600,7 @@ export class Clipmap {
     this._seamMeshLines.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
     this._instanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
-      this._fillerMeshLines.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._seamMeshLines.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
       this._instanceDataPoolSize++;
     }
     this._seamMeshLines.createAndSetIndexBuffer(indicesLines);
@@ -756,6 +757,7 @@ export class Clipmap {
     info.instanceDatas[info.numInstances * 4 + 1] = scale;
     info.instanceDatas[info.numInstances * 4 + 2] = offsetX;
     info.instanceDatas[info.numInstances * 4 + 3] = offsetY;
+    info.maxMiplevel = mipLevel;
     info.numInstances++;
   }
 
@@ -785,7 +787,8 @@ export class Clipmap {
         primitive: this._wireframe ? this._crossMeshLines : this._crossMesh,
         numInstances: 1,
         instanceDatas: this.allocNonInstanceBuffer(rotationValues[0], 1, snappedPos.x, snappedPos.y),
-        mipLevels: this.allocNonInstanceMipLevelBuffer(0)
+        mipLevels: this.allocNonInstanceMipLevelBuffer(0),
+        maxMiplevel: 0
       };
       renderData.push(crossPrimitives);
     }
@@ -794,25 +797,29 @@ export class Clipmap {
       primitive: this._wireframe ? this._tileMeshLines : this._tileMesh,
       numInstances: 0,
       instanceDatas: this.allocInstanceBuffer(),
-      mipLevels: this.allocMipLevelBuffer()
+      mipLevels: this.allocMipLevelBuffer(),
+      maxMiplevel: 0
     };
     const fillerPrimitives: PrimitiveInstanceInfo = {
       primitive: this._wireframe ? this._fillerMeshLines : this._fillerMesh,
       numInstances: 0,
       instanceDatas: this.allocInstanceBuffer(),
-      mipLevels: this.allocMipLevelBuffer()
+      mipLevels: this.allocMipLevelBuffer(),
+      maxMiplevel: 0
     };
     const trimPrimitives: PrimitiveInstanceInfo = {
       primitive: this._wireframe ? this._trimMeshLines : this._trimMesh,
       numInstances: 0,
       instanceDatas: this.allocInstanceBuffer(),
-      mipLevels: this.allocMipLevelBuffer()
+      mipLevels: this.allocMipLevelBuffer(),
+      maxMiplevel: 0
     };
     const seamPrimitives: PrimitiveInstanceInfo = {
       primitive: this._wireframe ? this._seamMeshLines : this._seamMesh,
       numInstances: 0,
       instanceDatas: this.allocInstanceBuffer(),
-      mipLevels: this.allocMipLevelBuffer()
+      mipLevels: this.allocMipLevelBuffer(),
+      maxMiplevel: 0
     };
 
     for (let l = 0; l < mipLevels; l++) {
