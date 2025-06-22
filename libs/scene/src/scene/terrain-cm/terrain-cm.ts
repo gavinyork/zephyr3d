@@ -1,4 +1,5 @@
-import { Vector4, applyMixins, Matrix4x4, Vector3 } from '@zephyr3d/base';
+import type { Matrix4x4 } from '@zephyr3d/base';
+import { Vector4, applyMixins, Vector3 } from '@zephyr3d/base';
 import type {
   GPUDataBuffer,
   PBInsideFunctionScope,
@@ -23,7 +24,7 @@ import { CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
 import { RenderMipmap } from '../../utility/rendermipmap';
 import { GrassRenderer } from './grass';
-import { Camera } from '../../camera';
+import type { Camera } from '../../camera';
 
 class HeightMinMaxBlitter extends CopyBlitter {
   filter(

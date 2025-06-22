@@ -1,5 +1,6 @@
 import { Vector4 } from '@zephyr3d/base';
-import { applyMixins, Matrix4x4, Vector3 } from '@zephyr3d/base';
+import type { Matrix4x4 } from '@zephyr3d/base';
+import { applyMixins, Vector3 } from '@zephyr3d/base';
 import type { NodeClonable, NodeCloneMethod } from './scene_node';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
@@ -20,7 +21,7 @@ import { QUEUE_OPAQUE } from '../values';
 import type { MeshMaterial } from '../material';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import { BoundingBox } from '../utility/bounding_volume';
-import { Camera } from '../camera';
+import type { Camera } from '../camera';
 
 export class Water extends applyMixins(GraphNode, mixinDrawable) implements Drawable, NodeClonable<Water> {
   private _pickTarget: PickTarget;
