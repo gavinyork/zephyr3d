@@ -165,6 +165,7 @@ export class FFTWaveGenerator implements WaveGenerator {
   private _ifftTextures: Texture2D[] | Texture2DArray;
   private _cascades: Vector4[];
   private _paramsChanged: boolean;
+  private _version: number;
   private _resolutionChanged: boolean;
   private _textureFormat: TextureFormat;
   private _h0TextureFormat: TextureFormat;
@@ -271,9 +272,13 @@ export class FFTWaveGenerator implements WaveGenerator {
       this._updateRenderStates = Application.instance.device.createRenderStateSet();
       this._updateRenderStates.useRasterizerState().setCullMode('none');
       this._updateRenderStates.useDepthState().enableTest(false).enableWrite(false);
-      this._paramsChanged = true;
       this._disposed = false;
+      this._version = 0;
+      this.paramsChanged();
     }
+  }
+  get version() {
+    return this._version;
   }
   get disposed() {
     return this._disposed;
@@ -294,6 +299,7 @@ export class FFTWaveGenerator implements WaveGenerator {
   */
   private paramsChanged() {
     this._paramsChanged = true;
+    this._version++;
   }
   /** Gets the wave alighment */
   get alignment(): number {
@@ -653,6 +659,10 @@ export class FFTWaveGenerator implements WaveGenerator {
       this.postIfft2TwoPass();
     }
     device.popDeviceStates();
+  }
+  /** {@inheritDoc WaveGenerator.needUpdate} */
+  needUpdate() {
+    return true;
   }
   /** @internal */
   private disposeNTextures(texture: Texture2D[] | Texture2DArray) {

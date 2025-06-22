@@ -202,6 +202,7 @@ export class ShaderHelper {
       pb.vec2('jitterValue'),
       pb.float('roughnessFactor'),
       pb.float('frameDeltaTime'),
+      pb.float('elapsedTime'),
       pb.int('framestamp')
     ]);
     if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
@@ -793,6 +794,7 @@ export class ShaderHelper {
       ),
       roughnessFactor: ctx.camera.SSR ? ctx.camera.ssrRoughnessFactor : 1,
       frameDeltaTime: Application.instance.device.frameInfo.elapsedFrame * 0.001,
+      elapsedTime: Application.instance.device.frameInfo.elapsedOverall * 0.001,
       framestamp: Application.instance.device.frameInfo.frameCounter
     } as any;
     if (ctx.motionVectors && ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
@@ -985,6 +987,22 @@ export class ShaderHelper {
    */
   static getBakedSkyTexture(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_BAKED_SKY_MAP];
+  }
+  /**
+   * Gets the elapsed time in seconds
+   * @param scope - Current shader scope
+   * @returns The elapsed time in seconds
+   */
+  static getElapsedTime(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].camera.elapsedTime;
+  }
+  /**
+   * Gets the elapsed time since last frame in seconds
+   * @param scope - Current shader scope
+   * @returns The elapsed time since last frame in seconds
+   */
+  static getElapsedTimeFrame(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].camera.frameDeltaTime;
   }
   /**
    * Gets the uniform variable of type vec3 which holds the camera position

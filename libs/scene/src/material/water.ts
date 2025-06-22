@@ -41,6 +41,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _scatterRampTexture: DRef<Texture2D>;
   private _absorptionRampTexture: DRef<Texture2D>;
   private _waveGenerator: DRef<WaveGenerator>;
+  private _waveVersion: number;
   private _clipmapInfo: Vector4;
   private _clipmapGridInfo: Vector4;
   private _ssrParams: Vector4;
@@ -50,6 +51,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._clipmapInfo = new Vector4();
     this._clipmapGridInfo = new Vector4();
     this._waveGenerator = new DRef();
+    this._waveVersion = -1;
     this._ssrParams = new Vector4(100, 80, 0.5, 8);
     this._scatterRampTexture = new DRef();
     this._absorptionRampTexture = new DRef();
@@ -82,6 +84,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   set waveGenerator(waveGenerator: WaveGenerator) {
     if (this._waveGenerator.get() !== waveGenerator) {
       this._waveGenerator.set(waveGenerator);
+      this._waveVersion = -1;
       this.optionChanged(true);
     }
   }
@@ -446,6 +449,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     );
     return scope.waterShading(worldPos, worldNormal, foamFactor);
   }
+  applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number): void {
+    super.applyUniforms(bindGroup, ctx, needUpdate, pass);
+    const waveGenerator = this._waveGenerator.get();
+    if (waveGenerator && this._waveVersion !== waveGenerator.version) {
+      waveGenerator.applyWaterBindGroup(bindGroup);
+      this._waveVersion = waveGenerator.version;
+    }
+  }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
     //bindGroup.setValue('clipmapInfo', this._clipmapInfo);
@@ -472,7 +483,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     }
   }
   needUpdate() {
-    return !!this._waveGenerator.get();
+    return !!this._waveGenerator.get()?.needUpdate();
   }
   update(frameId: number, elapsed: number) {
     const waveGenerator = this._waveGenerator.get();

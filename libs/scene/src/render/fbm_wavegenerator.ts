@@ -3,6 +3,7 @@ import { Vector2 } from '@zephyr3d/base';
 import type { WaveGenerator } from './wavegenerator';
 import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { hash } from '../shaders';
+import { ShaderHelper } from '../material';
 
 const MAX_NUM_OCTAVES = 16;
 
@@ -11,7 +12,7 @@ const MAX_NUM_OCTAVES = 16;
  * @public
  */
 export class FBMWaveGenerator implements WaveGenerator {
-  private _currentTime: number;
+  private _version: number;
   private _windVelocity: Vector2;
   private _numOctaves: number;
   private _amplitude: number;
@@ -23,7 +24,7 @@ export class FBMWaveGenerator implements WaveGenerator {
    * Creates a new Gerstner wave generator.
    */
   constructor() {
-    this._currentTime = 0;
+    this._version = 0;
     this._numOctaves = 4;
     this._windVelocity = new Vector2(0.1, 0);
     this._amplitude = 0.3;
@@ -40,6 +41,9 @@ export class FBMWaveGenerator implements WaveGenerator {
     other.frequency = this.frequency;
     return other as this;
   }
+  get version() {
+    return this._version;
+  }
   get disposed() {
     return this._disposed;
   }
@@ -48,28 +52,40 @@ export class FBMWaveGenerator implements WaveGenerator {
     return this._numOctaves;
   }
   set numOctaves(val: number) {
-    this._numOctaves = val;
+    if (val !== this.numOctaves) {
+      this._numOctaves = val;
+      this._version++;
+    }
   }
   /** Wave amplitude */
   get amplitude(): number {
     return this._amplitude;
   }
   set amplitude(val: number) {
-    this._amplitude = val;
+    if (val !== this._amplitude) {
+      this._amplitude = val;
+      this._version++;
+    }
   }
   /** Wave frequency */
   get frequency(): number {
     return this._frequency;
   }
   set frequency(val: number) {
-    this._frequency = val;
+    if (val !== this._frequency) {
+      this._frequency = val;
+      this._version++;
+    }
   }
   /** Wind velocity */
   get wind(): Vector2 {
     return this._windVelocity;
   }
   set wind(val: Vector2) {
-    this._windVelocity.set(val);
+    if (!val.equalsTo(this._windVelocity)) {
+      this._windVelocity.set(val);
+      this._version++;
+    }
   }
   /** @internal */
   private calcWaveNormal(
@@ -103,7 +119,6 @@ export class FBMWaveGenerator implements WaveGenerator {
         this.$l.hr = that.calcWaveHeight(
           this,
           pb.add(this.worldPos, pb.vec2(this.epsilon, 0)),
-          this.time,
           this.windVelocity,
           this.amplitude,
           this.frequency,
@@ -114,7 +129,6 @@ export class FBMWaveGenerator implements WaveGenerator {
         this.$l.hl = that.calcWaveHeight(
           this,
           pb.sub(this.worldPos, pb.vec2(this.epsilon, 0)),
-          this.time,
           this.windVelocity,
           this.amplitude,
           this.frequency,
@@ -125,7 +139,6 @@ export class FBMWaveGenerator implements WaveGenerator {
         this.$l.hu = that.calcWaveHeight(
           this,
           pb.add(this.worldPos, pb.vec2(0, this.epsilon)),
-          this.time,
           this.windVelocity,
           this.amplitude,
           this.frequency,
@@ -136,7 +149,6 @@ export class FBMWaveGenerator implements WaveGenerator {
         this.$l.hd = that.calcWaveHeight(
           this,
           pb.sub(this.worldPos, pb.vec2(0, this.epsilon)),
-          this.time,
           this.windVelocity,
           this.amplitude,
           this.frequency,
@@ -156,7 +168,6 @@ export class FBMWaveGenerator implements WaveGenerator {
   private calcWaveHeight(
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp,
-    time: PBShaderExp,
     windVelocity: PBShaderExp,
     amplitude: PBShaderExp,
     frequency: PBShaderExp,
@@ -171,7 +182,6 @@ export class FBMWaveGenerator implements WaveGenerator {
       funcName,
       [
         pb.vec2('worldPos'),
-        pb.float('time'),
         pb.vec2('windVelocity'),
         pb.float('amplitude'),
         pb.float('frequency'),
@@ -180,7 +190,7 @@ export class FBMWaveGenerator implements WaveGenerator {
         pb.int('numOctaves')
       ],
       function () {
-        this.$l.windOffset = pb.mul(this.windVelocity, this.time);
+        this.$l.windOffset = pb.mul(this.windVelocity, ShaderHelper.getElapsedTime(this));
         this.$l.height = that.fbm(
           this,
           pb.add(pb.mul(this.worldPos, 0.01), this.windOffset),
@@ -220,7 +230,7 @@ export class FBMWaveGenerator implements WaveGenerator {
         this.$return(pb.mul(this.height, this.amplitude));
       }
     );
-    return scope[funcName](worldPos, time, windVelocity, amplitude, frequency, gain, lacunarity, numOctaves);
+    return scope[funcName](worldPos, windVelocity, amplitude, frequency, gain, lacunarity, numOctaves);
   }
   /** @internal */
   private fbm(
@@ -294,8 +304,10 @@ export class FBMWaveGenerator implements WaveGenerator {
     return scope[funcName](st);
   }
   /** {@inheritDoc WaveGenerator.update} */
-  update(timeInSeconds: number): void {
-    this._currentTime = timeInSeconds;
+  update(): void {}
+  /** {@inheritDoc WaveGenerator.needUpdate} */
+  needUpdate() {
+    return false;
   }
   /** {@inheritDoc WaveGenerator.calcClipmapTileAABB} */
   calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB) {
@@ -311,7 +323,7 @@ export class FBMWaveGenerator implements WaveGenerator {
       this.$l.normal = that.calcWaveNormal(
         this,
         this.xz,
-        this.time,
+        ShaderHelper.getElapsedTime(this),
         this.windVelocity,
         this.waveAmplitude,
         this.waveFrequency,
@@ -330,7 +342,6 @@ export class FBMWaveGenerator implements WaveGenerator {
   /** {@inheritDoc WaveGenerator.setupUniforms} */
   setupUniforms(scope: PBGlobalScope, uniformGroup: number): void {
     const pb = scope.$builder;
-    scope.time = pb.float().uniform(uniformGroup);
     scope.numOctaves = pb.int().uniform(uniformGroup);
     scope.windVelocity = pb.vec2().uniform(uniformGroup);
     scope.waveAmplitude = pb.float().uniform(uniformGroup);
@@ -354,7 +365,7 @@ export class FBMWaveGenerator implements WaveGenerator {
         this.outNormal = that.calcWaveNormal(
           this,
           this.inPos.xz,
-          this.time,
+          ShaderHelper.getElapsedTime(this),
           this.windVelocity,
           this.waveAmplitude,
           this.waveFrequency,
@@ -365,7 +376,6 @@ export class FBMWaveGenerator implements WaveGenerator {
         this.$l.h = that.calcWaveHeight(
           this,
           this.inPos.xz,
-          this.time,
           this.windVelocity,
           this.waveAmplitude,
           this.waveFrequency,
@@ -389,7 +399,6 @@ export class FBMWaveGenerator implements WaveGenerator {
   }
   /** {@inheritDoc WaveGenerator.applyWaterBindGroup} */
   applyWaterBindGroup(bindGroup: BindGroup): void {
-    bindGroup.setValue('time', this._currentTime);
     bindGroup.setValue('numOctaves', this._numOctaves);
     bindGroup.setValue('windVelocity', this._windVelocity);
     bindGroup.setValue('waveAmplitude', this._amplitude);

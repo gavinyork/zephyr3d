@@ -19,6 +19,11 @@ export interface WaveGenerator extends Disposable {
    */
   clone(): this;
   /**
+   * Wave parameters change version
+   * @internal
+   */
+  version: number;
+  /**
    * Setup uniforms for the shader program.
    * @param scope - Global scope of the shader program.
    * @param uniformGroup - Bind group index for uniform values
@@ -80,6 +85,11 @@ export interface WaveGenerator extends Disposable {
    * @param device - Rendering device.
    */
   getHash(): string;
+  /**
+   * Wether this wave generator's update() method should be called this frame
+   * @returns true if this wave generator's update() method should be called this frame
+   */
+  needUpdate(): boolean;
   /**
    * Check if the wave generator is ok.
    * @param device - Rendering device.
