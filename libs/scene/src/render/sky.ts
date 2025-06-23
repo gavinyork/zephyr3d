@@ -501,42 +501,69 @@ export class SkyRenderer {
     prefilterCubemap(this._bakedSkyboxTexture.get(), 'lambertian', this.irradianceFramebuffer);
   }
   /** @internal */
-  renderFog(ctx: DrawContext) {
+  renderAtmosphericFog(ctx: DrawContext) {
     const camera = ctx.camera;
     const sceneDepthTexture = ctx.linearDepthTexture;
     const device = ctx.device;
+    const fogProgram = this._programFogScatter;
+    const renderStates = this._renderStatesFogScatter;
+    const bindgroup = this._bindgroupFogScatter;
+    bindgroup.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
+    bindgroup.setValue('rt', device.getFramebuffer() ? 1 : 0);
+    bindgroup.setValue('invProjViewMatrix', camera.invViewProjectionMatrix);
+    bindgroup.setValue('cameraNearFar', new Vector2(camera.getNearPlane(), camera.getFarPlane()));
+    bindgroup.setValue('cameraPosition', camera.getWorldPosition());
+    bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
+    bindgroup.setTexture('apLut', getAerialPerspectiveLut(), fetchSampler('clamp_linear_nomip'));
+    bindgroup.setValue(
+      'sliceDist',
+      this._atmosphereParams.apDistance / this._atmosphereParams.cameraHeightScale
+    );
+    bindgroup.setValue('params', this._atmosphereParams);
+    bindgroup.setValue('debug', this._debugAerialPerspective);
+    device.setProgram(fogProgram);
+    device.setBindGroup(0, bindgroup);
+    device.setVertexLayout(this._vertexLayout);
+    device.setRenderStates(renderStates);
+    device.draw('triangle-strip', 0, 4);
+  }
+  /** @internal */
+  renderLegacyFog(ctx: DrawContext) {
+    const sceneDepthTexture = ctx.linearDepthTexture;
+    const camera = ctx.camera;
+    const device = ctx.device;
+    const bindgroup = this._bindgroupFog;
+    bindgroup.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
+    bindgroup.setValue('rt', device.getFramebuffer() ? 1 : 0);
+    bindgroup.setValue('invProjViewMatrix', camera.invViewProjectionMatrix);
+    bindgroup.setValue('cameraNearFar', new Vector2(camera.getNearPlane(), camera.getFarPlane()));
+    bindgroup.setValue('cameraPosition', camera.getWorldPosition());
+    bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
+    bindgroup.setValue('fogType', this.mappedFogType);
+    bindgroup.setValue('fogColor', this._fogColor);
+    bindgroup.setValue('fogParams', this._fogParams);
+    device.setProgram(this._programFog);
+    device.setBindGroup(0, bindgroup);
+    device.setVertexLayout(this._vertexLayout);
+    device.setRenderStates(this._renderStatesFog);
+    device.draw('triangle-strip', 0, 4);
+  }
+  /** @internal */
+  renderFog(ctx: DrawContext) {
+    const sceneDepthTexture = ctx.linearDepthTexture;
+    if (!sceneDepthTexture) {
+      return;
+    }
+    const device = ctx.device;
     const savedRenderStates = device.getRenderStates();
     this._prepareSkyBox(device);
-    const fogProgram = this._fogType === 'scatter' ? this._programFogScatter : this._programFog;
-    const renderStates = this._fogType === 'scatter' ? this._renderStatesFogScatter : this._renderStatesFog;
-    if (fogProgram && sceneDepthTexture) {
-      const bindgroup = this._fogType === 'scatter' ? this._bindgroupFogScatter : this._bindgroupFog;
-      bindgroup.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
-      bindgroup.setValue('rt', device.getFramebuffer() ? 1 : 0);
-      bindgroup.setValue('invProjViewMatrix', camera.invViewProjectionMatrix);
-      bindgroup.setValue('cameraNearFar', new Vector2(camera.getNearPlane(), camera.getFarPlane()));
-      bindgroup.setValue('cameraPosition', camera.getWorldPosition());
-      bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
-      if (this._fogType === 'scatter') {
-        bindgroup.setTexture('apLut', getAerialPerspectiveLut(), fetchSampler('clamp_linear_nomip'));
-        bindgroup.setValue(
-          'sliceDist',
-          this._atmosphereParams.apDistance / this._atmosphereParams.cameraHeightScale
-        );
-        bindgroup.setValue('params', this._atmosphereParams);
-        bindgroup.setValue('debug', this._debugAerialPerspective);
-      } else {
-        bindgroup.setValue('fogType', this.mappedFogType);
-        bindgroup.setValue('fogColor', this._fogColor);
-        bindgroup.setValue('fogParams', this._fogParams);
-      }
-      device.setProgram(fogProgram);
-      device.setBindGroup(0, bindgroup);
-      device.setVertexLayout(this._vertexLayout);
-      device.setRenderStates(renderStates);
-      device.draw('triangle-strip', 0, 4);
-      device.setRenderStates(savedRenderStates);
+    if (this._skyType === 'scatter') {
+      this.renderAtmosphericFog(ctx);
     }
+    if (this._fogType !== 'none' && this._fogType !== 'scatter') {
+      this.renderLegacyFog(ctx);
+    }
+    device.setRenderStates(savedRenderStates);
   }
   /** @internal */
   renderSky(ctx: DrawContext) {
