@@ -27,7 +27,7 @@ export class SceneModel extends BaseModel {
   get camera() {
     return this._camera;
   }
-  reset(scene?: Scene, activeCameraId?: string) {
+  reset(scene?: Scene, activeCameraId?: string, cameraLookAt?: number[]) {
     this._scene?.dispose();
     this._scene = scene ?? new Scene();
     this._camera = null;
@@ -49,6 +49,7 @@ export class SceneModel extends BaseModel {
     }
     this._camera.controller = new OrbitCameraController({
       damping: 1,
+      center: cameraLookAt ? new Vector3(cameraLookAt[0], cameraLookAt[1], cameraLookAt[2]) : Vector3.zero(),
       controls: {
         rotate: {
           button: 1,

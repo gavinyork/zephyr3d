@@ -149,6 +149,10 @@ export class SceneView extends BaseView<SceneModel> {
             {
               label: 'Export',
               action: () => eventBus.dispatchEvent('action', 'EXPORT_DOC')
+            },
+            {
+              label: 'Batch export...',
+              action: () => eventBus.dispatchEvent('action', 'BATCH_EXPORT_DOC')
             }
           ]
         },
@@ -696,6 +700,7 @@ export class SceneView extends BaseView<SceneModel> {
           const node = pickResult?.target?.node ?? null;
           const hitPos = pickResult?.intersectedPoint ?? null;
           if (
+            !placeNode &&
             !this._currentEditTool.get()?.handlePointerEvent(ev, node, hitPos) &&
             ev.button === 0 &&
             ev.type === 'pointerdown'

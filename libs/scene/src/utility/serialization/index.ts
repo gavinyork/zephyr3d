@@ -381,7 +381,7 @@ export function serializeObject(
   json = json ?? {};
   json.ClassName = info.className;
   json.Object = {};
-  if (initParams) {
+  if (initParams !== undefined && initParams !== null) {
     json.Init = initParams;
     if (assetList && initParams.asset && assetRegistry.getAssetInfo(initParams.asset)) {
       assetList.add(initParams.asset);

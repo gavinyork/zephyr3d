@@ -156,7 +156,7 @@ export class TerrainEditTool implements EditTool {
     this._heightMapCopy = new DRef(heightMapCopy);
   }
   handlePointerEvent(evt: PointerEvent, hitObject: any, hitPos: Vector3): boolean {
-    if (hitPos) {
+    if (hitPos && hitObject === this._terrain.get()) {
       this._hitPos = this._hitPos ?? new Vector2();
       this._hitPos.setXY(hitPos.x, hitPos.z);
       if (evt.type === 'pointerdown' && evt.button === 0 && this._editSelected >= 0) {

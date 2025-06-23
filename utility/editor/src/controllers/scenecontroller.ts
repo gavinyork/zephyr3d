@@ -1,5 +1,5 @@
 import type { AssetRegistry, EmbeddedAssetInfo, Scene } from '@zephyr3d/scene';
-import { deserializeObject, serializeObject } from '@zephyr3d/scene';
+import { deserializeObject, OrbitCameraController, serializeObject } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import type { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
@@ -57,14 +57,28 @@ export class SceneController extends BaseController<SceneModel> {
           Dialog.promptName('Input scene name:').then((name) => {
             if (name) {
               this.saveScene(name, false);
-              this.exportScene(name);
+              this.exportScene(this.model.scene, name);
             }
           });
         } else {
           this.saveScene(this._scene.name, false).then(() => {
-            this.exportScene(this._scene.name);
+            this.exportScene(this.model.scene, this._scene.name);
           });
         }
+        break;
+      case 'BATCH_EXPORT_DOC':
+        Database.listScenes().then((scenes) => {
+          Dialog.batchExportScene('Batch export scene', scenes, 300).then((sceneList) => {
+            if (sceneList.length > 0) {
+              Promise.all(sceneList.map((val) => this.loadScene(val))).then((scenes) => {
+                this.batchExportScene(
+                  scenes.map((scene, index) => ({ scene: scene, name: sceneList[index].name })),
+                  'scenes'
+                );
+              });
+            }
+          });
+        });
         break;
       case 'OPEN_DOC':
         Database.listScenes().then((scenes) => {
@@ -97,7 +111,11 @@ export class SceneController extends BaseController<SceneModel> {
         embeddedAssetList
       ),
       metadata: {
-        activeCamera: this.model.camera?.id ?? ''
+        activeCamera: this.model.camera?.id ?? '',
+        activeCameraLookAt:
+          this.model.camera?.controller instanceof OrbitCameraController
+            ? [...this.model.camera.controller.center]
+            : [0, 0, 0]
       }
     });
     console.log(JSON.stringify(this._scene.content, null, 2));
@@ -112,9 +130,28 @@ export class SceneController extends BaseController<SceneModel> {
       Dialog.messageBox('Zephyr3d', `Scene saved: ${uuid}`);
     }
   }
-  private async exportScene(name: string) {
+  private async batchExportScene(scenes: { scene: Scene; name: string }[], name: string) {
     const assetList = new Set<string>();
-    const content = await serializeObject(this.model.scene, this._assetRegistry, null, assetList);
+    const contents = await Promise.all(
+      scenes.map((val) => serializeObject(val.scene, this._assetRegistry, null, assetList))
+    );
+    const zipDownloader = new ZipDownloader(`${name}.zip`);
+    if (assetList.size > 0) {
+      await Database.exportAssets(zipDownloader, [...assetList], 'assets');
+    }
+    for (let i = 0; i < contents.length; i++) {
+      const content = contents[i];
+      const name = scenes[i].name;
+      await zipDownloader.zipWriter.add(
+        `scene.${name}.json`,
+        new Blob([JSON.stringify(content, null, 2)]).stream()
+      );
+    }
+    await zipDownloader.finish();
+  }
+  private async exportScene(scene: Scene, name: string) {
+    const assetList = new Set<string>();
+    const content = await serializeObject(scene, this._assetRegistry, null, assetList);
     content.meta = {
       activeCamera: this.model.camera?.id ?? ''
     };
@@ -122,19 +159,25 @@ export class SceneController extends BaseController<SceneModel> {
     if (assetList.size > 0) {
       await Database.exportAssets(zipDownloader, [...assetList], 'assets');
     }
-    await zipDownloader.zipWriter.add('scene.json', new Blob([JSON.stringify(content, null, 2)]).stream());
+    await zipDownloader.zipWriter.add(
+      `scene.${name}.json`,
+      new Blob([JSON.stringify(content, null, 2)]).stream()
+    );
     await zipDownloader.finish();
+  }
+  async loadScene(sceneinfo: DBSceneInfo) {
+    return deserializeObject<Scene>(null, sceneinfo.content, this._assetRegistry);
   }
   openScene(uuid: string) {
     Database.getScene(uuid)
       .then((sceneinfo) => {
         if (sceneinfo) {
           this._scene = sceneinfo;
-          deserializeObject<Scene>(null, sceneinfo.content, this._assetRegistry).then((scene) => {
-            //deserializeObject<Scene>(null, sceneinfo.content, this._assetRegistry).then((scene) => {
+          this.loadScene(sceneinfo).then((scene) => {
             if (scene) {
               const cameraId = sceneinfo.metadata?.activeCamera as string;
-              this.reset(scene, cameraId);
+              const cameraLookAt = sceneinfo.metadata?.activeCameraLookAt as number[];
+              this.reset(scene, cameraId, cameraLookAt);
             } else {
               throw new Error('Cannot load scene');
             }
@@ -151,8 +194,8 @@ export class SceneController extends BaseController<SceneModel> {
     this._scene = null;
     this.reset();
   }
-  reset(scene?: Scene, cameraId?: string) {
-    this.model.reset(scene, cameraId);
+  reset(scene?: Scene, cameraId?: string, cameraLookAt?: number[]) {
+    this.model.reset(scene, cameraId, cameraLookAt);
     this._view.reset(this.model.scene);
   }
 }
