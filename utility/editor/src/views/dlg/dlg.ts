@@ -6,10 +6,21 @@ import { DlgPromptName } from './newscenedlg';
 import { DlgOpenScene } from './openscenedlg';
 import { DlgRampTextureCreator } from './ramptexturedlg';
 import { DlgRename } from './renamedlg';
+import { DlgExportScene } from './exportscenedlg';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
     new DlgMessage(`${title}##Dialog`, message, true, width, height);
+  }
+  public static async batchExportScene(
+    title: string,
+    scene: DBSceneInfo[],
+    width?: number,
+    height?: number
+  ): Promise<DBSceneInfo[]> {
+    return new Promise<DBSceneInfo[]>((resolve) => {
+      new DlgExportScene(title, true, scene, width, height, resolve);
+    });
   }
   public static async openScene(
     title: string,
