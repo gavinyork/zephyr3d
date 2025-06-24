@@ -7,13 +7,7 @@ import { MAX_BINDING_GROUPS, getVertexAttribByName } from '../gpuobject';
 import type { PBReflectionTagGetter } from './reflection';
 import { PBReflection } from './reflection';
 import type { ShaderExpTagValue, ShaderTypeFunc } from './base';
-import {
-  PBShaderExp,
-  setCurrentProgramBuilder,
-  getCurrentProgramBuilder,
-  makeConstructor,
-  Proxiable
-} from './base';
+import { PBShaderExp, makeConstructor, Proxiable } from './base';
 import * as AST from './ast';
 import * as errors from './errors';
 import { setBuiltinFuncs } from './builtinfunc';
@@ -42,6 +36,7 @@ import {
 } from './types';
 
 import type { StorageTextureConstructor } from './constructors';
+import { getCurrentProgramBuilder, setCurrentProgramBuilder } from './misc';
 
 const COMPUTE_UNIFORM_NAME = 'ch_compute_uniform_block';
 const COMPUTE_STORAGE_NAME = 'ch_compute_storage_block';

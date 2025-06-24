@@ -26,19 +26,9 @@ import {
 import { PBASTError } from './errors';
 import type { VertexSemantic } from '../gpuobject';
 import type { ProgramBuilder } from './programbuilder';
+import { getCurrentProgramBuilder } from './misc';
 
-let currentProgramBuilder: ProgramBuilder = null;
 const constructorCache: Map<ShaderTypeFunc, Record<string | symbol, ShaderTypeFunc>> = new Map();
-
-/** @internal */
-export function setCurrentProgramBuilder(pb: ProgramBuilder) {
-  currentProgramBuilder = pb;
-}
-
-/** @internal */
-export function getCurrentProgramBuilder(): ProgramBuilder {
-  return currentProgramBuilder;
-}
 
 /** @public */
 export interface ShaderExpTagRecord {
@@ -449,7 +439,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
         throw new Error('setAt() array index out of bounds');
       }
     }
-    currentProgramBuilder
+    getCurrentProgramBuilder()
       .getCurrentScope()
       .$ast.statements.push(
         new ASTAssignment(
@@ -514,7 +504,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @returns The type name of this variable
    */
   getTypeName(): string {
-    return this.$ast.getType().toTypeName(currentProgramBuilder.getDevice().type);
+    return this.$ast.getType().toTypeName(getCurrentProgramBuilder().getDevice().type);
   }
   /** @internal */
   protected $get(prop: string): any {
@@ -534,8 +524,8 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
               }
               const element = varType.structMembers[elementIndex];
               if (element.type.isStructType()) {
-                const ctor = currentProgramBuilder.structInfo.structs[element.type.structName];
-                exp = ctor.call(currentProgramBuilder, `${this.$str}.${prop}`);
+                const ctor = getCurrentProgramBuilder().structInfo.structs[element.type.structName];
+                exp = ctor.call(getCurrentProgramBuilder(), `${this.$str}.${prop}`);
               } else {
                 exp = new PBShaderExp(`${this.$str}.${prop}`, element.type);
               }
@@ -544,7 +534,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
               if (!varType.isPrimitiveType() || !varType.isVectorType()) {
                 throw new Error(
                   `invalid index operation: ${this.$ast.toString(
-                    currentProgramBuilder.getDevice().type
+                    getCurrentProgramBuilder().getDevice().type
                   )}[${prop}]`
                 );
               }
@@ -556,7 +546,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
               ) {
                 throw new Error(
                   `unknown swizzle target: ${this.$ast.toString(
-                    currentProgramBuilder.getDevice().type
+                    getCurrentProgramBuilder().getDevice().type
                   )}[${prop}]`
                 );
               }
@@ -618,7 +608,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
             if (!dstAST) {
               throw new Error(`can not set struct member '${prop}: invalid value type`);
             }
-            currentProgramBuilder
+            getCurrentProgramBuilder()
               .getCurrentScope()
               .$ast.statements.push(
                 new ASTAssignment(
@@ -635,7 +625,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
               throw new Error(`invalid index operation: ${this.$str}[${num}]`);
             }
             const type = PBPrimitiveTypeInfo.getCachedTypeInfo(varType.scalarType);
-            currentProgramBuilder
+            getCurrentProgramBuilder()
               .getCurrentScope()
               .$ast.statements.push(
                 new ASTAssignment(
@@ -657,7 +647,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
               throw new Error(`invalid matrix column vector assignment: ${this.$str}[${num}]`);
             }
             const type = PBPrimitiveTypeInfo.getCachedTypeInfo(varType.resizeType(1, varType.cols));
-            currentProgramBuilder
+            getCurrentProgramBuilder()
               .getCurrentScope()
               .$ast.statements.push(
                 new ASTAssignment(
