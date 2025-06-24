@@ -185,7 +185,7 @@ lightApp.ready().then(async () => {
       function initLights(model: SceneNode) {
         const light = new DirectionalLight(scene)
           .setColor(new Vector4(1, 1, 1, 1))
-          .setIntensity(5)
+          .setIntensity(15)
           .setCastShadow(false);
         light.lookAt(new Vector3(0, 0, 0), new Vector3(0.5, -0.707, -0.5), Vector3.axisPY());
         light.castShadow = true;

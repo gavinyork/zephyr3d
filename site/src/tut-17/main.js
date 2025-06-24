@@ -29,8 +29,8 @@ myApp.ready().then(function () {
   pointLight.range = 60;
   // enable shadowing
   pointLight.castShadow = true;
-  pointLight.shadow.depthBias = 0;
-  pointLight.shadow.normalBias = 0.1;
+  pointLight.shadow.depthBias = 0.7;
+  pointLight.shadow.normalBias = 5;
 
   // Create several boxes
   const boxMaterial = new LambertMaterial();

@@ -29,8 +29,8 @@ myApp.ready().then(function () {
   spotLight.range = 200;
   spotLight.position.setXYZ(0, 10, 0);
   spotLight.castShadow = true;
-  spotLight.shadow.depthBias = 0;
-  spotLight.shadow.normalBias = 0.1;
+  spotLight.shadow.depthBias = 0.7;
+  spotLight.shadow.normalBias = 5;
 
   // Create several boxes
   const boxMaterial = new LambertMaterial();

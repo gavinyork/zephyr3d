@@ -251,6 +251,7 @@ export class DirectionalLight extends PunctualLight implements NodeClonable<Dire
    */
   constructor(scene: Scene) {
     super(scene, LIGHT_TYPE_DIRECTIONAL);
+    this.intensity = 10;
     if (!DirectionalLight.getSunLight(scene)) {
       DirectionalLight.setSunLight(scene, this);
     }

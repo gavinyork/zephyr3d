@@ -55,7 +55,10 @@ PhysicsApp.ready().then(async () => {
   device.setFont('24px arial');
 
   const scene = new Scene();
-  const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(true);
+  const light = new DirectionalLight(scene)
+    .setColor(new Vector4(1, 1, 1, 1))
+    .setIntensity(15)
+    .setCastShadow(true);
   light.lookAt(new Vector3(0, 0, 0), new Vector3(0.5, -0.707, -0.5), Vector3.axisPY());
   light.shadow.mode = 'pcf-opt';
   light.shadow.pcfKernelSize = 3;

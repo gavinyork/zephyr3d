@@ -76,7 +76,10 @@ app.ready().then(async () => {
     opaqueMesh.position.setXYZ(Math.random() * 5 - 2.5, Math.random() * 5 - 2.5, Math.random() * 5 - 2.5);
     opaqueMesh.parent = batchGroup;
   }
-  const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
+  const light = new DirectionalLight(scene)
+    .setCastShadow(false)
+    .setColor(new Vector4(1, 1, 1, 1))
+    .setIntensity(15);
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
   app.on('resize', (width, height) => {

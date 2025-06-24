@@ -25,7 +25,6 @@ myApp.ready().then(async () => {
   scene.env.light.strength = 1;
 
   const light = new DirectionalLight(scene);
-  light.setColor(Vector4.one());
   light.lookAt(new Vector3(1, 4, -1), new Vector3(0, 0, 0), new Vector3(0, 1, 1));
 
   // Load mesh

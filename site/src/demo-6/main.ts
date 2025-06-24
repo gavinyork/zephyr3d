@@ -89,7 +89,10 @@ app.ready().then(async () => {
 
   createNBoxes(5000);
 
-  const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
+  const light = new DirectionalLight(scene)
+    .setCastShadow(false)
+    .setColor(new Vector4(1, 1, 1, 1))
+    .setIntensity(15);
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
   app.on('resize', (width, height) => {

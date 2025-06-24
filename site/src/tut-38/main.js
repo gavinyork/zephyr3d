@@ -80,7 +80,6 @@ myApp.ready().then(async () => {
 
   const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
   light.lookAt(new Vector3(1, 1, 1), new Vector3(0, 0, 0), Vector3.axisPY());
-  light.intensity = 4;
   light.shadow.shadowMapSize = 2048;
   light.shadow.numShadowCascades = 4;
   light.castShadow = true;
