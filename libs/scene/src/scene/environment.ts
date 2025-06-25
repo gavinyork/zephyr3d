@@ -46,6 +46,12 @@ export class EnvLightWrapper {
     this._strength = 1;
   }
   /** @internal */
+  dispose() {
+    this._envLight?.dispose();
+    this._radianceMap.dispose();
+    this._irradianceMap.dispose();
+  }
+  /** @internal */
   getHash(ctx?: DrawContext): string {
     return !ctx || ctx.drawEnvLight
       ? `${this.type}:${this._envLight.hasRadiance() ? '1' : '0'}:${
@@ -183,5 +189,10 @@ export class Environment {
   /** @internal */
   needSceneDepthTexture(): boolean {
     return this._sky.fogType !== 'none';
+  }
+  /** @internal */
+  dispose() {
+    this._sky.dispose();
+    this._light.dispose();
   }
 }

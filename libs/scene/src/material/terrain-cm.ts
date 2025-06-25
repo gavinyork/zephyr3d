@@ -736,6 +736,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     device.popDeviceStates();
     fbDetail.dispose();
     fbNormal.dispose();
+    fbSplat.dispose();
     return {
       detailMap: new DRef(detailMap),
       detailNormalMap: new DRef(detailNormalMap),

@@ -61,6 +61,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this.cullMode = 'none';
     //this.TAADisabled = true;
   }
+  dispose() {
+    super.dispose();
+    this._waveGenerator.dispose();
+    this._scatterRampTexture.dispose();
+    this._absorptionRampTexture.dispose();
+  }
   get SSR() {
     return this.featureUsed<boolean>(WaterMaterial.FEATURE_SSR);
   }

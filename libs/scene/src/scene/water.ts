@@ -45,6 +45,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this.waveGenerator = new FBMWaveGenerator();
     scene.queuePerCameraUpdateNode(this);
   }
+  dispose(): void {
+    super.dispose();
+    this._clipmap.dispose();
+    this._clipmap = null;
+    this._renderData = null;
+    this._material.dispose();
+  }
   clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new Water(this.scene);
     other.copyFrom(this, method, recursive);

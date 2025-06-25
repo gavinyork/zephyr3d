@@ -121,6 +121,7 @@ export class Scene extends makeEventTarget(Object)<{
    * Disposes the scene
    */
   dispose() {
+    this._env.dispose();
     this._rootNode.dispose();
   }
   /**

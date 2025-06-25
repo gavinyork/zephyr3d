@@ -62,6 +62,10 @@ export abstract class EnvironmentLighting {
    * Returns whether this environment lighting supports diffuse light
    */
   abstract hasIrradiance(): boolean;
+  /**
+   * Dispose this object
+   */
+  dispose() {}
 }
 
 /**
@@ -76,7 +80,7 @@ export class EnvShIBL extends EnvironmentLighting {
   /** @internal */
   public static readonly UNIFORM_NAME_IBL_IRRADIANCE_SH = 'zIBLIrradianceSH';
   /** @internal */
-  private _radianceMap: TextureCube;
+  private _radianceMap: DRef<TextureCube>;
   /** @internal */
   private _irradianceSH: Float32Array;
   /**
@@ -86,7 +90,7 @@ export class EnvShIBL extends EnvironmentLighting {
    */
   constructor(radianceMap?: TextureCube, irradianceSH?: (Vector4 | Vector3)[] | Float32Array) {
     super();
-    this._radianceMap = radianceMap || null;
+    this._radianceMap = new DRef(radianceMap || null);
     if (!irradianceSH) {
       this._irradianceSH = null;
     } else {
@@ -115,12 +119,19 @@ export class EnvShIBL extends EnvironmentLighting {
   getType(): EnvLightType {
     return 'ibl-sh';
   }
+  /**
+   * {@inheritDoc EnvironmentLighting.dispose}
+   * @override
+   */
+  dispose() {
+    this._radianceMap.dispose();
+  }
   /** The radiance map */
   get radianceMap(): TextureCube {
-    return this._radianceMap;
+    return this._radianceMap.get();
   }
   set radianceMap(tex: TextureCube) {
-    this._radianceMap = tex;
+    this._radianceMap.set(tex);
   }
   /** The irradiance sh coeffecients */
   get irradianceSH(): Float32Array {
@@ -152,9 +163,9 @@ export class EnvShIBL extends EnvironmentLighting {
    * @override
    */
   updateBindGroup(bg: BindGroup): void {
-    if (this._radianceMap) {
-      bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this._radianceMap.mipLevelCount - 1);
-      bg.setTexture(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this._radianceMap);
+    if (this.radianceMap) {
+      bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this.radianceMap.mipLevelCount - 1);
+      bg.setTexture(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this.radianceMap);
     }
     if (this._irradianceSH) {
       bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH, this._irradianceSH);
@@ -292,6 +303,14 @@ export class EnvIBL extends EnvironmentLighting {
    */
   getType(): EnvLightType {
     return 'ibl';
+  }
+  /**
+   * {@inheritDoc EnvironmentLighting.dispose}
+   * @override
+   */
+  dispose() {
+    this._radianceMap.dispose();
+    this._irradianceMap.dispose();
   }
   /** The radiance map */
   get radianceMap(): TextureCube {

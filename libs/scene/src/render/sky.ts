@@ -74,18 +74,30 @@ export class SkyRenderer {
     camera.setPerspective(Math.PI / 2, 1, 1, 20);
     return camera;
   })();
+  private static _programSky: Partial<Record<SkyType, GPUProgram>> = {};
+  private static _bindgroupSky: Partial<Record<SkyType, BindGroup>> = {};
+  private static _programFog: GPUProgram = null;
+  private static _bindgroupFog: BindGroup = null;
+  private static _programFogScatter: GPUProgram = null;
+  private static _bindgroupFogScatter: BindGroup = null;
+  private static _vertexLayout: VertexLayout = null;
+  private static _primitiveSky: Primitive = null;
+  private static _renderStatesSky: RenderStateSet = null;
+  private static _renderStatesSkyNoDepthTest: RenderStateSet = null;
+  private static _renderStatesFog: RenderStateSet = null;
+  private static _renderStatesFogScatter: RenderStateSet = null;
   private _skyType: SkyType;
   private _skyColor: Vector4;
-  private _skyboxTexture: DRef<TextureCube>;
-  private _bakedSkyboxTexture: DRef<TextureCube>;
   private _bakedSkyboxDirty: boolean;
   private _updateRadianceMaps: boolean;
   private _scatterSkyboxTextureWidth: number;
+  private _skyboxTexture: DRef<TextureCube>;
+  private _bakedSkyboxTexture: DRef<TextureCube>;
   private _radianceMap: DRef<TextureCube>;
   private _radianceFrameBuffer: DRef<FrameBuffer>;
-  private _radianceMapWidth: number;
   private _irradianceMap: DRef<TextureCube>;
   private _irradianceFrameBuffer: DRef<FrameBuffer>;
+  private _radianceMapWidth: number;
   private _irradianceMapWidth: number;
   private _atmosphereParams: AtmosphereParams;
   private _atmosphereExposure: number;
@@ -96,19 +108,7 @@ export class SkyRenderer {
   private _cloudIntensity: number;
   private _debugAerialPerspective: number;
   private _wind: Vector2;
-  private _programSky: Partial<Record<SkyType, GPUProgram>>;
-  private _bindgroupSky: Partial<Record<SkyType, BindGroup>>;
-  private _programFog: GPUProgram;
-  private _bindgroupFog: BindGroup;
-  private _programFogScatter: GPUProgram;
-  private _bindgroupFogScatter: BindGroup;
-  private _vertexLayout: VertexLayout;
-  private _primitiveSky: Primitive;
   private _skyWorldMatrix: Matrix4x4;
-  private _renderStatesSky: RenderStateSet;
-  private _renderStatesSkyNoDepthTest: RenderStateSet;
-  private _renderStatesFog: RenderStateSet;
-  private _renderStatesFogScatter: RenderStateSet;
   private _drawGround: boolean;
   private _lastSunDir: Vector3;
   private _lastSunColor: Vector4;
@@ -140,22 +140,19 @@ export class SkyRenderer {
     this._cloudIntensity = 15;
     this._wind = new Vector2(200, 0);
     this._drawGround = false;
-    this._programSky = {};
-    this._bindgroupSky = {};
-    this._programFog = null;
-    this._bindgroupFog = null;
-    this._programFogScatter = null;
-    this._bindgroupFogScatter = null;
-    this._vertexLayout = null;
-    this._primitiveSky = null;
-    this._renderStatesSky = null;
-    this._renderStatesSkyNoDepthTest = null;
-    this._renderStatesFog = null;
-    this._renderStatesFogScatter = null;
     this._skyWorldMatrix = defaultSkyWorldMatrix;
     this._lastSunDir = SkyRenderer._getSunDir(null);
     this._lastSunColor = SkyRenderer._getSunColor(null);
     this._panoramaAsset = '';
+  }
+  /** @internal */
+  dispose() {
+    this._skyboxTexture.dispose();
+    this._bakedSkyboxTexture.dispose();
+    this._radianceMap.dispose();
+    this._radianceFrameBuffer.dispose();
+    this._irradianceMap.dispose();
+    this._irradianceFrameBuffer.dispose();
   }
   /** @internal */
   getHash(ctx: DrawContext): string {
@@ -505,9 +502,9 @@ export class SkyRenderer {
     const camera = ctx.camera;
     const sceneDepthTexture = ctx.linearDepthTexture;
     const device = ctx.device;
-    const fogProgram = this._programFogScatter;
-    const renderStates = this._renderStatesFogScatter;
-    const bindgroup = this._bindgroupFogScatter;
+    const fogProgram = SkyRenderer._programFogScatter;
+    const renderStates = SkyRenderer._renderStatesFogScatter;
+    const bindgroup = SkyRenderer._bindgroupFogScatter;
     bindgroup.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
     bindgroup.setValue('rt', device.getFramebuffer() ? 1 : 0);
     bindgroup.setValue('invProjViewMatrix', camera.invViewProjectionMatrix);
@@ -523,7 +520,7 @@ export class SkyRenderer {
     bindgroup.setValue('debug', this._debugAerialPerspective);
     device.setProgram(fogProgram);
     device.setBindGroup(0, bindgroup);
-    device.setVertexLayout(this._vertexLayout);
+    device.setVertexLayout(SkyRenderer._vertexLayout);
     device.setRenderStates(renderStates);
     device.draw('triangle-strip', 0, 4);
   }
@@ -532,7 +529,7 @@ export class SkyRenderer {
     const sceneDepthTexture = ctx.linearDepthTexture;
     const camera = ctx.camera;
     const device = ctx.device;
-    const bindgroup = this._bindgroupFog;
+    const bindgroup = SkyRenderer._bindgroupFog;
     bindgroup.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
     bindgroup.setValue('rt', device.getFramebuffer() ? 1 : 0);
     bindgroup.setValue('invProjViewMatrix', camera.invViewProjectionMatrix);
@@ -542,10 +539,10 @@ export class SkyRenderer {
     bindgroup.setValue('fogType', this.mappedFogType);
     bindgroup.setValue('fogColor', this._fogColor);
     bindgroup.setValue('fogParams', this._fogParams);
-    device.setProgram(this._programFog);
+    device.setProgram(SkyRenderer._programFog);
     device.setBindGroup(0, bindgroup);
-    device.setVertexLayout(this._vertexLayout);
-    device.setRenderStates(this._renderStatesFog);
+    device.setVertexLayout(SkyRenderer._vertexLayout);
+    device.setRenderStates(SkyRenderer._renderStatesFog);
     device.draw('triangle-strip', 0, 4);
   }
   /** @internal */
@@ -556,7 +553,7 @@ export class SkyRenderer {
     }
     const device = ctx.device;
     const savedRenderStates = device.getRenderStates();
-    this._prepareSkyBox(device);
+    SkyRenderer._prepareSkyBox(device);
     if (this._skyType === 'scatter') {
       this.renderAtmosphericFog(ctx);
     }
@@ -578,7 +575,7 @@ export class SkyRenderer {
   private _renderSky(camera: Camera, depthTest: boolean, drawGround: boolean, drawCloud: boolean) {
     const device = Application.instance.device;
     const savedRenderStates = device.getRenderStates();
-    this._prepareSkyBox(device);
+    SkyRenderer._prepareSkyBox(device);
     if (this._skyType === 'scatter') {
       this._drawScattering(camera, depthTest, drawGround, drawCloud);
     } else if (this._skyType === 'skybox' && this.skyboxTexture) {
@@ -591,7 +588,7 @@ export class SkyRenderer {
   /** @internal */
   private _drawSkyColor(camera: Camera, depthTest: boolean) {
     const device = Application.instance.device;
-    const bindgroup = this._bindgroupSky.color;
+    const bindgroup = SkyRenderer._bindgroupSky.color;
     const p = new Vector3();
     const s = new Vector3();
     const r = new Quaternion();
@@ -602,15 +599,17 @@ export class SkyRenderer {
     bindgroup.setValue('cameraPos', camera.getWorldPosition());
     bindgroup.setValue('color', this._skyColor);
     bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
-    device.setProgram(this._programSky.color);
+    device.setProgram(SkyRenderer._programSky.color);
     device.setBindGroup(0, bindgroup);
-    device.setRenderStates(depthTest ? this._renderStatesSky : this._renderStatesSkyNoDepthTest);
-    this._primitiveSky.draw();
+    device.setRenderStates(
+      depthTest ? SkyRenderer._renderStatesSky : SkyRenderer._renderStatesSkyNoDepthTest
+    );
+    SkyRenderer._primitiveSky.draw();
   }
   /** @internal */
   private _drawSkybox(camera: Camera, depthTest: boolean) {
     const device = Application.instance.device;
-    const bindgroup = this._bindgroupSky.skybox;
+    const bindgroup = SkyRenderer._bindgroupSky.skybox;
     bindgroup.setTexture('skyCubeMap', this.skyboxTexture, fetchSampler('clamp_linear_nomip'));
     bindgroup.setValue(
       'flip',
@@ -620,10 +619,12 @@ export class SkyRenderer {
     bindgroup.setValue('worldMatrix', this._skyWorldMatrix);
     bindgroup.setValue('cameraPos', camera.getWorldPosition());
     bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
-    device.setProgram(this._programSky.skybox);
+    device.setProgram(SkyRenderer._programSky.skybox);
     device.setBindGroup(0, bindgroup);
-    device.setRenderStates(depthTest ? this._renderStatesSky : this._renderStatesSkyNoDepthTest);
-    this._primitiveSky.draw();
+    device.setRenderStates(
+      depthTest ? SkyRenderer._renderStatesSky : SkyRenderer._renderStatesSkyNoDepthTest
+    );
+    SkyRenderer._primitiveSky.draw();
   }
   /** @internal */
   private _rayIntersectSphere(radius: number, rayStart: Vector3, rayDir: Vector3) {
@@ -706,8 +707,10 @@ export class SkyRenderer {
     const tLut = getTransmittanceLut();
     const skyLut = getSkyViewLut();
     //const apLut = ScatteringLut.getAerialPerspectiveLut(alpha, 8000);
-    const program = drawCloud ? this._programSky.scatter : this._programSky['scatter-nocloud'];
-    const bindgroup = drawCloud ? this._bindgroupSky.scatter : this._bindgroupSky['scatter-nocloud'];
+    const program = drawCloud ? SkyRenderer._programSky.scatter : SkyRenderer._programSky['scatter-nocloud'];
+    const bindgroup = drawCloud
+      ? SkyRenderer._bindgroupSky.scatter
+      : SkyRenderer._bindgroupSky['scatter-nocloud'];
     bindgroup.setValue(
       'flip',
       device.getFramebuffer() && device.type === 'webgpu' ? new Vector4(1, -1, 1, 1) : new Vector4(1, 1, 1, 1)
@@ -728,11 +731,13 @@ export class SkyRenderer {
     bindgroup.setValue('drawGround', drawGround ? 1 : 0);
     device.setProgram(program);
     device.setBindGroup(0, bindgroup);
-    device.setRenderStates(depthTest ? this._renderStatesSky : this._renderStatesSkyNoDepthTest);
-    this._primitiveSky.draw();
+    device.setRenderStates(
+      depthTest ? SkyRenderer._renderStatesSky : SkyRenderer._renderStatesSkyNoDepthTest
+    );
+    SkyRenderer._primitiveSky.draw();
   }
   /** @internal */
-  private _prepareSkyBox(device: AbstractDevice) {
+  private static _prepareSkyBox(device: AbstractDevice) {
     if (!this._programFogScatter) {
       this._programFogScatter = device.buildRenderProgram({
         label: 'FogScatter',

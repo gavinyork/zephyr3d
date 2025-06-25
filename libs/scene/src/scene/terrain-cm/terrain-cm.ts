@@ -481,5 +481,7 @@ export class ClipmapTerrain
     this._clipmap = null;
     this._material?.dispose();
     this._material = null;
+    this._grassRenderer?.dispose();
+    this._grassRenderer = null;
   }
 }
