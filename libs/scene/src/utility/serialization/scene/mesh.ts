@@ -19,7 +19,6 @@ export function getMeshClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: Mesh,
     parent: getGraphNodeClass(assetRegistry),
-    className: 'Mesh',
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new Mesh(ctx.scene);
       if (ctx instanceof SceneNode) {

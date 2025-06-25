@@ -34,7 +34,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
       cls = serializationInfo.get(ctor);
       ctor = Object.getPrototypeOf(ctor);
     }
-    const label = `${node.name || cls.className}##${node.id}`;
+    const label = `${node.name || cls.ctor.name}##${node.id}`;
     let flags = SceneHierarchy.baseFlags;
     if (this._selectedNode === node) {
       flags |= ImGui.TreeNodeFlags.Selected;

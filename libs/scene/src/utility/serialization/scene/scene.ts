@@ -12,7 +12,6 @@ import { Vector4 } from '@zephyr3d/base';
 export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: Scene,
-    className: 'Scene',
     createFunc() {
       return { obj: new Scene() };
     },

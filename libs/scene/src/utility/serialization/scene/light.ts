@@ -12,7 +12,6 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
   return {
     ctor: PunctualLight,
     parent: getSceneNodeClass(assetRegistry),
-    className: 'PunctualLight',
     getProps() {
       return [
         {
@@ -118,8 +117,10 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
           type: 'object',
           edit: 'aabb',
           default: null,
-          nullable: true,
           objectTypes: [AABB],
+          isNullable() {
+            return true;
+          },
           get(this: PunctualLight, value) {
             value.object[0] = this.shadow.shadowRegion;
           },
@@ -381,7 +382,6 @@ export function getDirectionalLightClass(assetRegistry: AssetRegistry): Serializ
   return {
     ctor: DirectionalLight,
     parent: getPunctualLightClass(assetRegistry),
-    className: 'DirectionalLight',
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new DirectionalLight(ctx.scene);
       if (ctx instanceof SceneNode) {
@@ -411,7 +411,6 @@ export function getPointLightClass(assetRegistry: AssetRegistry): SerializableCl
   return {
     ctor: PointLight,
     parent: getPunctualLightClass(assetRegistry),
-    className: 'PointLight',
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new PointLight(ctx.scene);
       if (ctx instanceof SceneNode) {
@@ -445,7 +444,6 @@ export function getSpotLightClass(assetRegistry: AssetRegistry): SerializableCla
   return {
     ctor: SpotLight,
     parent: getPunctualLightClass(assetRegistry),
-    className: 'SpotLight',
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new SpotLight(ctx.scene);
       if (ctx instanceof SceneNode) {

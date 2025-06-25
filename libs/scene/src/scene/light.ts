@@ -163,7 +163,7 @@ export abstract class AmbientLight extends BaseLight {
  * Base class for any kind of puncual light
  * @public
  */
-export abstract class PunctualLight extends BaseLight {
+export class PunctualLight extends BaseLight {
   /** @internal */
   protected _color: Vector4;
   /** @internal */
@@ -237,6 +237,8 @@ export abstract class PunctualLight extends BaseLight {
     this.invalidateUniforms();
     // this._transformCallback(true, false);
   }
+  /** @internal */
+  computeUniforms(): void {}
 }
 
 /**

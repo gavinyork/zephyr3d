@@ -5,7 +5,6 @@ import type { SerializableClass } from '../types';
 export function getPrimitiveClass(): SerializableClass {
   return {
     ctor: Primitive,
-    className: 'Primitive',
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -28,7 +27,6 @@ export function getBoxShapeClass(): SerializableClass {
   return {
     ctor: BoxShape,
     parent: getPrimitiveClass(),
-    className: 'BoxShape',
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -89,7 +87,6 @@ export function getBoxFrameShapeClass(): SerializableClass {
   return {
     ctor: BoxFrameShape,
     parent: getPrimitiveClass(),
-    className: 'BoxFrameShape',
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -150,7 +147,6 @@ export function getTorusShapeClass(): SerializableClass {
   return {
     ctor: TorusShape,
     parent: getPrimitiveClass(),
-    className: 'TorusShape',
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -235,7 +231,6 @@ export function getPlaneShapeClass(): SerializableClass {
   return {
     ctor: PlaneShape,
     parent: getPrimitiveClass(),
-    className: 'PlaneShape',
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -320,7 +315,6 @@ export function getCylinderShapeClass(): SerializableClass {
   return {
     ctor: CylinderShape,
     parent: getPrimitiveClass(),
-    className: 'CylinderShape',
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -438,7 +432,6 @@ export function getSphereShapeClass(): SerializableClass {
   return {
     ctor: SphereShape,
     parent: getPrimitiveClass(),
-    className: 'SphereShape',
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {

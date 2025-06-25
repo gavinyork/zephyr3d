@@ -11,7 +11,6 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
   return {
     ctor: ParticleSystem,
     parent: getGraphNodeClass(assetRegistry),
-    className: 'ParticleSystem',
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new ParticleSystem(ctx.scene);
       if (ctx instanceof SceneNode) {

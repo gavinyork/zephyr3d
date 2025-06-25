@@ -127,9 +127,9 @@ class PropertyGroup {
         while (ctor) {
           cls = serializationInfo.get(ctor);
           if (cls) {
-            const props = cls.getProps(this.value.object[0]).filter((p) => !p.hidden);
+            const props = cls.getProps().filter((p) => !p.hidden);
             if (props.length > 0) {
-              const group = this.addGroup(cls.className);
+              const group = this.addGroup(cls.ctor.name);
               for (const prop of props) {
                 group.addProperty(this.value.object[0], prop);
               }
@@ -314,7 +314,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     const flags = ImGui.TreeNodeFlags.DefaultOpen;
     const opened = ImGui.TreeNodeEx(group.name, flags);
     if (group.object && group.prop && group.objectTypes.length > 0) {
-      const deletable = group.prop.nullable && group.prop.set && group.value.object?.[0];
+      const deletable = group.prop.isNullable?.() && group.prop.set && group.value.object?.[0];
       const editable = group.value.object?.[0] instanceof AABB && group.prop.edit === 'aabb';
       const buttonSize = ImGui.GetFrameHeight();
       const spacing = (editable ? buttonSize : 0) + (deletable ? buttonSize : 0);
@@ -328,7 +328,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
         ImGui.Combo(
           '',
           index,
-          group.objectTypes.map((val) => val.className),
+          group.objectTypes.map((val) => val.ctor.name),
           group.objectTypes.length
         )
       ) {
@@ -569,7 +569,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
         if (assetInfo) {
           val[0] = assetInfo.name;
         }
-        if (value.nullable) {
+        if (value.isNullable?.()) {
           ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
         }
         ImGui.InputText('##value', val, undefined, ImGui.InputTextFlags.ReadOnly);
@@ -582,7 +582,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
           }
           ImGui.EndDragDropTarget();
         }
-        if (value.nullable) {
+        if (value.isNullable?.()) {
           ImGui.SameLine(0, 0);
           if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
             value.set.call(object, null);
@@ -592,8 +592,8 @@ export class PropertyEditor extends makeEventTarget(Object)<{
               if (ImGui.BeginPopup('X##list')) {
                 for (const t of property.value.objectTypes) {
                   const cls = this._serializationInfo.get(t);
-                  if (cls && ImGui.MenuItem(`${cls.className}##create`)) {
-                    alert(cls.className);
+                  if (cls && ImGui.MenuItem(`${cls.ctor.name}##create`)) {
+                    alert(cls.ctor.name);
                   }
                 }
                 ImGui.EndPopup();

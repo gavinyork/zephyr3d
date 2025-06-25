@@ -9,6 +9,7 @@ import type { TerrainDebugMode } from '../../../material';
 import { Application } from '../../../app';
 import type { Texture2D } from '@zephyr3d/device';
 import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
+import { MAX_TERRAIN_MIPMAP_LEVELS } from '../../../values';
 
 function writeUUID(dataView: DataView, offset: number, str: string) {
   if (str && str.length === 36) {
@@ -146,15 +147,20 @@ async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<Embed
   };
 }
 
-function getDetailMapProps(terrain: ClipmapTerrain, assetRegistry: AssetRegistry) {
+function getDetailMapProps(assetRegistry: AssetRegistry) {
   const props: PropertyAccessor<ClipmapTerrain>[] = [];
-  for (let i = 0; i < terrain.numDetailMaps; i++) {
+  for (let i = 0; i < MAX_TERRAIN_MIPMAP_LEVELS; i++) {
     const accessorDetailAlbedo: PropertyAccessor<ClipmapTerrain> = {
       name: `DetailAlbedoMap${i}`,
       type: 'object',
       hidden: true,
       default: null,
-      nullable: true,
+      isValid(this: ClipmapTerrain) {
+        return this.numDetailMaps > i;
+      },
+      isNullable() {
+        return true;
+      },
       get(this: ClipmapTerrain, value) {
         value.str[0] = assetRegistry.getAssetId(this.material.getDetailMap(i)) ?? '';
       },
@@ -189,7 +195,9 @@ function getDetailMapProps(terrain: ClipmapTerrain, assetRegistry: AssetRegistry
       type: 'object',
       hidden: true,
       default: null,
-      nullable: true,
+      isNullable() {
+        return true;
+      },
       get(this: ClipmapTerrain, value) {
         value.str[0] = assetRegistry.getAssetId(this.material.getDetailNormalMap(i)) ?? '';
       },
@@ -254,7 +262,6 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
   return {
     ctor: ClipmapTerrain,
     parent: getGraphNodeClass(assetRegistry),
-    className: 'ClipmapTerrain',
     createFunc(ctx: NodeHierarchy | SceneNode, init: number) {
       const node = new ClipmapTerrain(ctx.scene);
       node.numDetailMaps = init;
@@ -284,7 +291,7 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
       }
       return assets;
     },
-    getProps(terrain: ClipmapTerrain) {
+    getProps() {
       return [
         {
           name: 'Resolution',
@@ -336,7 +343,7 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
             this.material.debugMode = value.str[0] as TerrainDebugMode;
           }
         },
-        ...getDetailMapProps(terrain, assetRegistry),
+        ...getDetailMapProps(assetRegistry),
         {
           name: 'SplatMap',
           type: 'object',

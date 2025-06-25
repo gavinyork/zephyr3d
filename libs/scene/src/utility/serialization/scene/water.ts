@@ -8,8 +8,9 @@ import { getGraphNodeClass } from './node';
 import type { WaveGenerator } from '../../../render';
 import { FBMWaveGenerator, FFTWaveGenerator, GerstnerWaveGenerator } from '../../../render';
 import type { Texture2D } from '@zephyr3d/device';
+import { MAX_GERSTNER_WAVE_COUNT } from '../../../values';
 
-export class GerstnerWaveCls {
+export class Wave {
   public generator: GerstnerWaveGenerator;
   public index: number;
   public direction: number;
@@ -42,26 +43,25 @@ export class GerstnerWaveCls {
 
 export function getGerstnerWaveClass(assetRegistry): SerializableClass {
   return {
-    ctor: GerstnerWaveCls,
-    className: 'Wave',
+    ctor: Wave,
     createFunc(ctx: GerstnerWaveGenerator, initParams: number) {
       return {
-        obj: new GerstnerWaveCls(ctx, initParams)
+        obj: new Wave(ctx, initParams)
       };
     },
-    getInitParams(obj: GerstnerWaveCls) {
+    getInitParams(obj: Wave) {
       return obj.index;
     },
-    getProps(val: GerstnerWaveCls) {
+    getProps() {
       return [
         {
           name: 'Direction',
           type: 'float',
           options: { minValue: 0, maxValue: 360 },
-          get(this: GerstnerWaveCls, value) {
+          get(this: Wave, value) {
             value.num[0] = radian2degree(this.direction);
           },
-          set(this: GerstnerWaveCls, value) {
+          set(this: Wave, value) {
             this.direction = degree2radian(value.num[0]);
             this.generator.setWaveAmplitude(this.index, this.direction);
           }
@@ -70,10 +70,10 @@ export function getGerstnerWaveClass(assetRegistry): SerializableClass {
           name: 'Steepness',
           type: 'float',
           options: { minValue: 0, maxValue: 1 },
-          get(this: GerstnerWaveCls, value) {
+          get(this: Wave, value) {
             value.num[0] = this.steepness;
           },
-          set(this: GerstnerWaveCls, value) {
+          set(this: Wave, value) {
             this.steepness = value.num[0];
             this.generator.setWaveSteepness(this.index, this.steepness);
           }
@@ -82,10 +82,10 @@ export function getGerstnerWaveClass(assetRegistry): SerializableClass {
           name: 'Amplitude',
           type: 'float',
           options: { minValue: 0, maxValue: 1 },
-          get(this: GerstnerWaveCls, value) {
+          get(this: Wave, value) {
             value.num[0] = this.amplitude;
           },
-          set(this: GerstnerWaveCls, value) {
+          set(this: Wave, value) {
             this.amplitude = value.num[0];
             this.generator.setWaveAmplitude(this.index, this.amplitude);
           }
@@ -93,10 +93,10 @@ export function getGerstnerWaveClass(assetRegistry): SerializableClass {
         {
           name: 'WaveLength',
           type: 'float',
-          get(this: GerstnerWaveCls, value) {
+          get(this: Wave, value) {
             value.num[0] = this.waveLength;
           },
-          set(this: GerstnerWaveCls, value) {
+          set(this: Wave, value) {
             this.waveLength = value.num[0];
             this.generator.setWaveLength(this.index, this.waveLength);
           }
@@ -104,10 +104,10 @@ export function getGerstnerWaveClass(assetRegistry): SerializableClass {
         {
           name: 'OmniWave',
           type: 'bool',
-          get(this: GerstnerWaveCls, value) {
+          get(this: Wave, value) {
             value.bool[0] = this.isOmni;
           },
-          set(this: GerstnerWaveCls, value) {
+          set(this: Wave, value) {
             this.isOmni = value.bool[0];
             this.generator.setOmniWave(this.index, this.isOmni);
           }
@@ -115,16 +115,16 @@ export function getGerstnerWaveClass(assetRegistry): SerializableClass {
         {
           name: 'OmniOrigin',
           type: 'vec2',
-          get(this: GerstnerWaveCls, value) {
+          get(this: Wave, value) {
             value.num[0] = this.originX;
             value.num[1] = this.originZ;
           },
-          set(this: GerstnerWaveCls, value) {
+          set(this: Wave, value) {
             this.originX = value.num[0];
             this.originZ = value.num[1];
             this.generator.setOrigin(this.index, this.originX, this.originZ);
           },
-          isValid(this: GerstnerWaveCls) {
+          isValid(this: Wave) {
             return this.isOmni;
           }
         }
@@ -136,8 +136,7 @@ export function getGerstnerWaveClass(assetRegistry): SerializableClass {
 export function getFBMWaveGeneratorClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: FBMWaveGenerator,
-    className: 'FBMWaveGenerator',
-    getProps(val: FBMWaveGenerator) {
+    getProps() {
       return [
         {
           name: 'NumOctaves',
@@ -221,8 +220,7 @@ export function getFBMWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
 export function getFFTWaveGeneratorClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: FFTWaveGenerator,
-    className: 'FFTWaveGenerator',
-    getProps(val: FFTWaveGenerator) {
+    getProps() {
       return [
         {
           name: 'Alignment',
@@ -325,22 +323,26 @@ export function getFFTWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
 export function getGerstnerWaveGeneratorClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: GerstnerWaveGenerator,
-    className: 'GerstnerWaveGenerator',
-    getProps(val: GerstnerWaveGenerator) {
+    getProps() {
       const waveProps: PropertyAccessor<GerstnerWaveGenerator>[] = [];
-      for (let i = 0; i < val.numWaves; i++) {
+      for (let i = 0; i < MAX_GERSTNER_WAVE_COUNT; i++) {
         waveProps.push({
           name: `Wave${i}`,
           type: 'object',
-          nullable: i === val.numWaves - 1,
-          objectTypes: [GerstnerWaveCls],
+          objectTypes: [Wave],
+          isNullable() {
+            return i === this.numWaves - 1;
+          },
+          isValid() {
+            return this.numWaves > i;
+          },
           get(this: GerstnerWaveGenerator, value) {
-            value.object[0] = new GerstnerWaveCls(this, i);
+            value.object[0] = new Wave(this, i);
           },
           set(this: GerstnerWaveGenerator, value) {
             if (value.object[0]) {
-              (value.object[0] as GerstnerWaveCls).update();
-            } else if (i === val.numWaves - 1) {
+              (value.object[0] as Wave).update();
+            } else if (i === this.numWaves - 1) {
               this.numWaves--;
             }
           }
@@ -365,7 +367,6 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: Water,
     parent: getGraphNodeClass(assetRegistry),
-    className: 'Water',
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new Water(ctx.scene);
       if (ctx instanceof SceneNode) {
@@ -379,8 +380,10 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'WaveGenerator',
           type: 'object',
           default: null,
-          nullable: true,
           objectTypes: [GerstnerWaveGenerator, FFTWaveGenerator, FBMWaveGenerator],
+          isNullable() {
+            return true;
+          },
           get(this: Water, value) {
             value.object[0] = this.waveGenerator ?? null;
           },
@@ -478,8 +481,10 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'ScatterRampTexture',
           type: 'object',
-          nullable: true,
           default: null,
+          isNullable() {
+            return true;
+          },
           get(this: Water, value) {
             value.str[0] = assetRegistry.getAssetId(this.material.scatterRampTexture) ?? '';
           },
@@ -512,8 +517,10 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'AbsorptionRampTexture',
           type: 'object',
-          nullable: true,
           default: null,
+          isNullable() {
+            return true;
+          },
           get(this: Water, value) {
             value.str[0] = assetRegistry.getAssetId(this.material.absorptionRampTexture) ?? '';
           },

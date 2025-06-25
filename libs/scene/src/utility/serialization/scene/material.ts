@@ -474,7 +474,6 @@ function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<U
 export function getMeshMaterialClass(): SerializableClass {
   return {
     ctor: MeshMaterial,
-    className: 'MeshMaterial',
     createFunc(ctx, initParams) {
       let mat = Material.findMaterialById(initParams.persistentId);
       if (mat) {
@@ -608,7 +607,6 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
   return {
     ctor: ParticleMaterial,
     parent: getMeshMaterialClass(),
-    className: 'ParticleMaterial',
     createFunc(ctx, initParams) {
       let mat = Material.findMaterialById(initParams.persistentId);
       if (mat) {
@@ -630,7 +628,9 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
           name: 'AlphaMap',
           type: 'object',
           default: '',
-          nullable: true,
+          isNullable() {
+            return true;
+          },
           get(this: ParticleMaterial, value) {
             value.str[0] = assetRegistry.getAssetId(this.alphaMap) ?? '';
           },
@@ -659,7 +659,9 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
           name: 'RampMap',
           type: 'object',
           default: '',
-          nullable: true,
+          isNullable() {
+            return true;
+          },
           get(this: ParticleMaterial, value) {
             value.str[0] = assetRegistry.getAssetId(this.rampMap) ?? '';
           },
@@ -693,7 +695,6 @@ export function getUnlitMaterialClass(assetRegistry: AssetRegistry): Serializabl
   return {
     ctor: UnlitMaterial,
     parent: getMeshMaterialClass(),
-    className: 'UnlitMaterial',
     createFunc(ctx, initParams) {
       let mat = Material.findMaterialById(initParams.persistentId);
       if (mat) {
@@ -727,7 +728,6 @@ export function getLambertMaterialClass(assetRegistry: AssetRegistry): Serializa
   return {
     ctor: LambertMaterial,
     parent: getMeshMaterialClass(),
-    className: 'LambertMaterial',
     createFunc(ctx, initParams) {
       let mat = Material.findMaterialById(initParams.persistentId);
       if (mat) {
@@ -762,7 +762,6 @@ export function getBlinnMaterialClass(assetRegistry: AssetRegistry): Serializabl
   return {
     ctor: BlinnMaterial,
     parent: getMeshMaterialClass(),
-    className: 'BlinnMaterial',
     createFunc(ctx, initParams) {
       let mat = Material.findMaterialById(initParams.persistentId);
       if (mat) {
@@ -816,7 +815,6 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
   return {
     ctor: PBRMetallicRoughnessMaterial,
     parent: getMeshMaterialClass(),
-    className: 'PBRMetallicRoughnessMaterial',
     createFunc(ctx, initParams) {
       let mat = Material.findMaterialById(initParams.persistentId);
       if (mat) {
@@ -905,7 +903,6 @@ export function getPBRSpecularGlossinessMaterialClass(assetRegistry: AssetRegist
   return {
     ctor: PBRSpecularGlossinessMaterial,
     parent: getMeshMaterialClass(),
-    className: 'PBRSpecularGlossinessMaterial',
     createFunc(ctx, initParams) {
       let mat = Material.findMaterialById(initParams.persistentId);
       if (mat) {

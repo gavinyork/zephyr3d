@@ -159,7 +159,9 @@ export function getTextureProps<T extends Material>(
       type: 'object',
       default: null,
       phase: phase,
-      nullable: true,
+      isNullable() {
+        return true;
+      },
       get(value) {
         value.str[0] = assetRegistry.getAssetId(this[name]) ?? '';
       },

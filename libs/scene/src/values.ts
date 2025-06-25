@@ -103,6 +103,9 @@ export const MORPH_ATTRIBUTE_VECTOR_COUNT = (MAX_MORPH_ATTRIBUTES + 3) >> 2;
 /** @internal */
 export const MAX_TERRAIN_MIPMAP_LEVELS = 64;
 
+/** @internal */
+export const MAX_GERSTNER_WAVE_COUNT = 16;
+
 /**
  * Material varying flags
  * @public

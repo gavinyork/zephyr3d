@@ -57,7 +57,7 @@ import { getSceneClass } from './scene/scene';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
 import {
-  GerstnerWaveCls,
+  Wave,
   getFBMWaveGeneratorClass,
   getFFTWaveGeneratorClass,
   getGerstnerWaveClass,
@@ -117,7 +117,7 @@ export function getSerializationInfo(assetRegistry: AssetRegistry) {
       [Mesh, getMeshClass(assetRegistry)],
       [Water, getWaterClass(assetRegistry)],
       [ClipmapTerrain, getTerrainClass(assetRegistry)],
-      [GerstnerWaveCls, getGerstnerWaveClass(assetRegistry)],
+      [Wave, getGerstnerWaveClass(assetRegistry)],
       [GerstnerWaveGenerator, getGerstnerWaveGeneratorClass(assetRegistry)],
       [FFTWaveGenerator, getFFTWaveGeneratorClass(assetRegistry)],
       [FBMWaveGenerator, getFBMWaveGeneratorClass(assetRegistry)],
@@ -157,7 +157,7 @@ export async function deserializeObjectProps<T>(
   json: object,
   assetRegistry: AssetRegistry
 ) {
-  const props = (cls.getProps(obj) ?? []).sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0));
+  const props = (cls.getProps() ?? []).sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0));
   let currentPhase: number = undefined;
   const promises: Promise<void>[] = [];
   for (const prop of props) {
@@ -255,7 +255,7 @@ export function serializeObjectProps<T>(
   assetList?: Set<string>,
   embeddedAssetList?: Promise<EmbeddedAssetInfo>[]
 ) {
-  const props = cls.getProps(obj) ?? [];
+  const props = cls.getProps() ?? [];
   for (const prop of props) {
     if (prop.isValid && !prop.isValid.call(obj)) {
       continue;
@@ -379,7 +379,7 @@ export function serializeObject(
   let info = cls[index];
   const initParams = info?.getInitParams?.(obj);
   json = json ?? {};
-  json.ClassName = info.className;
+  json.ClassName = info.ctor.name;
   json.Object = {};
   if (initParams !== undefined && initParams !== null) {
     json.Init = initParams;
@@ -387,7 +387,6 @@ export function serializeObject(
       assetList.add(initParams.asset);
     }
   }
-  obj = info.getObject?.(obj) ?? obj;
   while (info) {
     if (embeddedAssetList && info.getEmbeddedAssets) {
       embeddedAssetList?.push(...(info.getEmbeddedAssets(obj) ?? []).map((val) => Promise.resolve(val)));
@@ -405,11 +404,15 @@ export function serializeObject(
   return json;
 }
 
-export async function deserializeObject<T>(ctx: any, json: object, assetRegistry: AssetRegistry): Promise<T> {
+export async function deserializeObject<T extends object>(
+  ctx: any,
+  json: object,
+  assetRegistry: AssetRegistry
+): Promise<T> {
   const serializationInfo = getSerializationInfo(assetRegistry);
   const cls = [...serializationInfo.values()];
   const className = json['ClassName'];
-  const index = cls.findIndex((val) => val.className === className);
+  const index = cls.findIndex((val) => val.ctor.name === className);
   if (index < 0) {
     throw new Error('Deserialize object failed: Cannot found serialization meta data');
   }
@@ -426,7 +429,7 @@ export async function deserializeObject<T>(ctx: any, json: object, assetRegistry
     p = result.obj;
     loadProps = result.loadProps ?? true;
   } else {
-    p = new info.ctor();
+    p = new info.ctor() as T;
   }
   //const p: T | Promise<T> = info.createFunc ? info.createFunc(ctx, initParams) : new info.ctor();
   if (!p) {

@@ -1,5 +1,5 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Vector3 } from '@zephyr3d/base';
 import {
   Scene,
   Application,

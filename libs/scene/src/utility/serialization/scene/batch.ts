@@ -8,7 +8,6 @@ export function getBatchGroupClass(assetRegistry: AssetRegistry): SerializableCl
   return {
     ctor: BatchGroup,
     parent: getGraphNodeClass(assetRegistry),
-    className: 'BatchGroup',
     createFunc(scene: Scene | SceneNode) {
       if (scene instanceof Scene) {
         return { obj: new BatchGroup(scene) };

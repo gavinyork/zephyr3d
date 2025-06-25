@@ -1,3 +1,4 @@
+import type { GenericConstructor } from '@zephyr3d/base';
 import type { EmbeddedAssetInfo } from './asset/asset';
 
 export type PropertyType =
@@ -38,28 +39,26 @@ export type PropertyAccessor<T = unknown> = {
   instance?: boolean;
   objectTypes?: unknown[];
   default?: any;
-  nullable?: boolean;
   animatable?: boolean;
   persistent?: boolean;
   edit?: PropEdit;
   get: (this: T, value: PropertyValue) => void;
   set?: (this: T, value: PropertyValue) => void | Promise<void>;
   isValid?: (this: T) => boolean;
+  isNullable?: (this: T) => boolean;
   command?: (this: T, index: number) => boolean;
   getDefaultValue?: (this: T) => any;
 };
 
 export type SerializableClass = {
-  ctor?: any;
-  className?: string;
+  ctor: GenericConstructor;
   parent?: SerializableClass;
   createFunc?: (
     ctx?: any,
     init?: any
   ) => { obj: any; loadProps?: boolean } | Promise<{ obj: any; loadProps?: boolean }>;
-  getObject?: (obj: any) => any;
   getInitParams?: (obj: any) => any;
-  getProps: (obj: any) => PropertyAccessor<any>[];
+  getProps: () => PropertyAccessor<any>[];
   getAssets?: (obj: any) => string[];
   getEmbeddedAssets?: (obj: any) => (EmbeddedAssetInfo | Promise<EmbeddedAssetInfo>)[];
 };

@@ -18,7 +18,6 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
   return {
     ctor: Camera,
     parent: getSceneNodeClass(assetRegistry),
-    className: 'Camera',
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new Camera(ctx.scene);
       if (ctx instanceof SceneNode) {
@@ -604,7 +603,6 @@ export function getPerspectiveCameraClass(assetRegistry: AssetRegistry): Seriali
   return {
     ctor: PerspectiveCamera,
     parent: getCameraClass(assetRegistry),
-    className: 'PerspectiveCamera',
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new PerspectiveCamera(ctx.scene);
       if (ctx instanceof SceneNode) {
@@ -660,7 +658,6 @@ export function getOrthoCameraClass(assetRegistry: AssetRegistry): SerializableC
   return {
     ctor: OrthoCamera,
     parent: getCameraClass(assetRegistry),
-    className: 'OrthoCamera',
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new OrthoCamera(ctx.scene);
       if (ctx instanceof SceneNode) {
