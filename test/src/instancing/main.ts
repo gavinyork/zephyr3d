@@ -11,8 +11,6 @@ import {
   DirectionalLight
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
-import { Inspector } from '@zephyr3d/inspector';
-import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 
 const myApp = new Application({
   backend: backendWebGL2,
@@ -20,7 +18,6 @@ const myApp = new Application({
 });
 
 myApp.ready().then(async function () {
-  await imGuiInit(myApp.device);
   const scene = new Scene();
 
   const batchGroup = new BatchGroup(scene);
@@ -83,10 +80,7 @@ myApp.ready().then(async function () {
   camera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
 
-  myApp.inputManager.use(imGuiInjectEvent);
   myApp.inputManager.use(camera.handleEvent.bind(camera));
-
-  const inspector = new Inspector(scene, camera);
 
   myApp.on('pointerup', (ev) => {
     if (ev.button === 2) {
@@ -100,9 +94,6 @@ myApp.ready().then(async function () {
 
     camera.updateController();
     camera.render(scene);
-    imGuiNewFrame();
-    inspector.render();
-    imGuiEndFrame();
   });
 
   myApp.run();

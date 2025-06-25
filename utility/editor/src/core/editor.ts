@@ -8,7 +8,7 @@ import { SceneModel } from '../models/scenemodel';
 import { FontGlyph } from './fontglyph';
 import { Database } from '../storage/db';
 import { EditorAssetRegistry } from './assetregistry';
-import { AssetManager, DRef } from '@zephyr3d/scene';
+import { AssetManager, DRef, SerializationManager } from '@zephyr3d/scene';
 import type { Texture2D } from '@zephyr3d/device';
 
 export class Editor {
@@ -50,10 +50,10 @@ export class Editor {
     }
   }
   registerModules() {
-    const assetRegistry = new EditorAssetRegistry();
+    const serializationManager = new SerializationManager(new EditorAssetRegistry());
     const sceneModel = new SceneModel(this);
-    const sceneView = new SceneView(this, sceneModel, assetRegistry);
-    const sceneController = new SceneController(this, sceneModel, sceneView, assetRegistry);
+    const sceneView = new SceneView(this, sceneModel, serializationManager);
+    const sceneController = new SceneController(this, sceneModel, sceneView, serializationManager);
     this._moduleManager.register('Scene', sceneModel, sceneView, sceneController);
 
     this._moduleManager.activate('Scene', null);

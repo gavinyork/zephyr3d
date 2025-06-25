@@ -76,6 +76,7 @@ export * from './scene/mesh';
 export * from './scene/node';
 export * from './scene/particle';
 export * from './types';
+export * from './manager';
 
 const serializationInfoCache: WeakMap<AssetRegistry, Map<any, SerializableClass>> = new WeakMap();
 

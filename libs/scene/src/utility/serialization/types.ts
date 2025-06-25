@@ -37,7 +37,7 @@ export type PropertyAccessor<T = unknown> = {
   options?: { minValue: number; maxValue: number; speed?: number };
   enum?: { labels: string[]; values: (number | string)[] };
   instance?: boolean;
-  objectTypes?: unknown[];
+  objectTypes?: GenericConstructor[];
   default?: any;
   animatable?: boolean;
   persistent?: boolean;

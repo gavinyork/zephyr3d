@@ -1,8 +1,9 @@
+import type { GenericConstructor } from '@zephyr3d/base';
 import { makeEventTarget } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
-import type { AssetRegistry, Scene, SerializableClass } from '@zephyr3d/scene';
+import type { Scene, SerializableClass, SerializationManager } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
-import { BatchGroup, getSerializationInfo } from '@zephyr3d/scene';
+import { BatchGroup } from '@zephyr3d/scene';
 
 export class SceneHierarchy extends makeEventTarget(Object)<{
   node_deselected: [node: SceneNode];
@@ -16,13 +17,13 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   private _scene: Scene;
   private _selectedNode: SceneNode;
   private _selectedAnimation: string;
-  private _assetRegistry: AssetRegistry;
-  constructor(scene: Scene, assetRegistry: AssetRegistry) {
+  private _serializationManager: SerializationManager;
+  constructor(scene: Scene, serializationManager: SerializationManager) {
     super();
     this._scene = scene;
     this._selectedNode = null;
     this._selectedAnimation = null;
-    this._assetRegistry = assetRegistry;
+    this._serializationManager = serializationManager;
   }
   get scene() {
     return this._scene;
@@ -100,21 +101,19 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
         return node.name;
       }
     }
-    const serializationInfo = getSerializationInfo(this._assetRegistry);
     let cls: SerializableClass = null;
-    let ctor = node.constructor;
+    let ctor = node.constructor as GenericConstructor;
     while (!cls) {
-      cls = serializationInfo.get(ctor);
+      cls = this._serializationManager.getClassByConstructor(ctor);
       ctor = Object.getPrototypeOf(ctor);
     }
-    return cls.className;
+    return cls.ctor.name;
   }
   private renderSceneNode(node: SceneNode) {
-    const serializationInfo = getSerializationInfo(this._assetRegistry);
     let cls: SerializableClass = null;
-    let ctor = node.constructor;
+    let ctor = node.constructor as GenericConstructor;
     while (!cls) {
-      cls = serializationInfo.get(ctor);
+      cls = this._serializationManager.getClassByConstructor(ctor);
       ctor = Object.getPrototypeOf(ctor);
     }
     const label = `${this.getNodeName(node)}##${node.id}`;

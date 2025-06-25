@@ -4,11 +4,11 @@ import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import { Tab } from '../components/tab';
 import type {
-  AssetRegistry,
   Camera,
   Compositor,
   NodeCloneMethod,
   Scene,
+  SerializationManager,
   ShapeOptionType,
   ShapeType
 } from '@zephyr3d/scene';
@@ -80,7 +80,7 @@ export class SceneView extends BaseView<SceneModel> {
   private _shapeToBeAdded: { cls: GenericConstructor<ShapeType>; options: any };
   private _mousePosX: number;
   private _mousePosY: number;
-  private _assetRegistry: AssetRegistry;
+  private _serializationManager: SerializationManager;
   private _postGizmoCaptured: boolean;
   private _showTextureViewer: boolean;
   private _showDeviceInfo: boolean;
@@ -95,7 +95,7 @@ export class SceneView extends BaseView<SceneModel> {
   private _cameraAnimationTime: number;
   private _cameraAnimationDuration: number;
   private _animatedCamera: Camera;
-  constructor(editor: Editor, model: SceneModel, assetRegistry: AssetRegistry) {
+  constructor(editor: Editor, model: SceneModel, serializationManager: SerializationManager) {
     super(model);
     this._editor = editor;
     this._cmdManager = new CommandManager();
@@ -124,7 +124,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._cameraAnimationTime = 0;
     this._cameraAnimationDuration = 100;
     this._animatedCamera = null;
-    this._assetRegistry = assetRegistry;
+    this._serializationManager = serializationManager;
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
       items: [
@@ -462,10 +462,10 @@ export class SceneView extends BaseView<SceneModel> {
       true,
       this._menubar.height + this._toolbar.height,
       this._statusbar.height,
-      assetRegistry
+      this._serializationManager
     );
     this._propGrid = new PropertyEditor(
-      assetRegistry,
+      this._serializationManager,
       this._menubar.height + this._toolbar.height,
       this._statusbar.height,
       400,
@@ -653,7 +653,12 @@ export class SceneView extends BaseView<SceneModel> {
               case 'asset':
                 this._cmdManager
                   .execute(
-                    new AddAssetCommand(this.model.scene, this._assetRegistry, this._assetToBeAdded, pos)
+                    new AddAssetCommand(
+                      this.model.scene,
+                      this._serializationManager.assetRegistry,
+                      this._assetToBeAdded,
+                      pos
+                    )
                   )
                   .then((node) => {
                     this._tab.sceneHierarchy.selectNode(node);
@@ -708,7 +713,7 @@ export class SceneView extends BaseView<SceneModel> {
             let node = pickResult?.target?.node ?? null;
             if (node) {
               let assetNode = node;
-              while (assetNode && !this._assetRegistry.getAssetId(assetNode)) {
+              while (assetNode && !this._serializationManager.assetRegistry.getAssetId(assetNode)) {
                 assetNode = assetNode.parent;
               }
               if (assetNode) {
@@ -904,17 +909,19 @@ export class SceneView extends BaseView<SceneModel> {
     if (!node) {
       return;
     }
-    this._cmdManager.execute(new NodeCloneCommand(node, method, this._assetRegistry)).then((sceneNode) => {
-      sceneNode.position.x += 1;
-      this._tab.sceneHierarchy.selectNode(sceneNode);
-    });
+    this._cmdManager
+      .execute(new NodeCloneCommand(node, method, this._serializationManager.assetRegistry))
+      .then((sceneNode) => {
+        sceneNode.position.x += 1;
+        this._tab.sceneHierarchy.selectNode(sceneNode);
+      });
   }
   private handleEditNode(node: SceneNode) {
     if (!node) {
       return;
     }
     if (!this._currentEditTool.get()) {
-      this._currentEditTool.set(createEditTool(this.editor, node, this._assetRegistry));
+      this._currentEditTool.set(createEditTool(this.editor, node, this._serializationManager.assetRegistry));
     } else {
       this._currentEditTool.dispose();
     }
@@ -936,7 +943,7 @@ export class SceneView extends BaseView<SceneModel> {
     if (node.isParentOf(this._postGizmoRenderer.node)) {
       this._postGizmoRenderer.node = null;
     }
-    this._cmdManager.execute(new NodeDeleteCommand(node, this._assetRegistry));
+    this._cmdManager.execute(new NodeDeleteCommand(node, this._serializationManager.assetRegistry));
   }
   private handleNodeSelected(node: SceneNode) {
     this._postGizmoRenderer.node = node === node.scene.rootNode ? null : node;
@@ -995,7 +1002,7 @@ export class SceneView extends BaseView<SceneModel> {
       this._nodeToBePlaced.dispose();
       this._typeToBePlaced = 'none';
     }
-    this._assetRegistry
+    this._serializationManager.assetRegistry
       .fetchModel(asset.uuid, this.model.scene)
       .then((node) => {
         this._nodeToBePlaced.set(node.group);

@@ -13,8 +13,6 @@ import {
   createGradientNoiseTexture
 } from '@zephyr3d/scene';
 import * as common from '../common';
-import { Inspector } from '@zephyr3d/inspector';
-import { imGuiInit } from '@zephyr3d/imgui';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 
 const ssrApp = new Application({
@@ -27,7 +25,6 @@ ssrApp.ready().then(async () => {
   const device = ssrApp.device;
   const noiseTex = createGradientNoiseTexture(device, 128, 50, false);
   noiseTex.name = 'GradientNoiseTexture';
-  await imGuiInit(device);
   const scene = new Scene();
   scene.env.sky.skyType = 'color';
   scene.env.sky.skyColor = new Vector4(0, 0, 1, 1);
@@ -69,9 +66,6 @@ ssrApp.ready().then(async () => {
     .setIntensity(15);
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
-  const inspector = new Inspector(scene, camera);
-
-  ssrApp.inputManager.use(inspector.handleEvent.bind(inspector));
   ssrApp.inputManager.use(camera.handleEvent.bind(camera));
 
   ssrApp.on('resize', (width, height) => {
@@ -89,7 +83,6 @@ ssrApp.ready().then(async () => {
   ssrApp.on('tick', () => {
     camera.updateController();
     camera.render(scene);
-    inspector.render();
   });
   ssrApp.run();
 });

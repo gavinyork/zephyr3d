@@ -1,13 +1,9 @@
 import { ImGui } from '@zephyr3d/imgui';
-import type { AssetRegistry } from '@zephyr3d/scene';
-import {
-  getSerializationInfo,
-  type PropertyAccessor,
-  type PropertyValue,
-  type SerializableClass
-} from '@zephyr3d/scene';
+import type { SerializationManager } from '@zephyr3d/scene';
+import { type PropertyAccessor, type PropertyValue, type SerializableClass } from '@zephyr3d/scene';
 import type { DBAssetInfo } from '../storage/db';
 import { FontGlyph } from '../core/fontglyph';
+import type { GenericConstructor } from '@zephyr3d/base';
 import { AABB, degree2radian, makeEventTarget, Quaternion, radian2degree } from '@zephyr3d/base';
 import { RotationEditor } from './rotationeditor';
 
@@ -109,7 +105,7 @@ class PropertyGroup {
   }
   setObject(obj: any, prop?: PropertyAccessor<any>, parentObj?: any) {
     if (this.value.object[0] !== obj || this.prop !== prop) {
-      const serializationInfo = this.grid.serailizationInfo;
+      const serializationManager = this.grid.serailizationManager;
       this.value.object[0] = obj ?? null;
       this.property = null;
       this.object = parentObj;
@@ -117,15 +113,15 @@ class PropertyGroup {
       this.prop = prop ?? null;
       this.objectTypes =
         prop?.objectTypes?.length > 0
-          ? prop.objectTypes.map((ctor) => this.grid.serailizationInfo.get(ctor)) ?? []
+          ? prop.objectTypes.map((ctor) => serializationManager.getClassByConstructor(ctor)) ?? []
           : [];
       this.properties = [];
       this.subgroups = [];
       if (this.value.object[0]) {
         let cls: SerializableClass = null;
-        let ctor = this.value.object[0].constructor;
+        let ctor = this.value.object[0].constructor as GenericConstructor;
         while (ctor) {
-          cls = serializationInfo.get(ctor);
+          cls = serializationManager.getClassByConstructor(ctor);
           if (cls) {
             const props = cls.getProps().filter((p) => !p.hidden);
             if (props.length > 0) {
@@ -155,12 +151,11 @@ export class PropertyEditor extends makeEventTarget(Object)<{
   private _minWidth: number;
   private _padding: number;
   private _labelPercent: number;
-  private _serializationInfo: Map<any, SerializableClass>;
-  private _assetRegistry: AssetRegistry;
+  private _serializationManager: SerializationManager;
   private _dragging: boolean;
   private _dirty: boolean;
   constructor(
-    assetRegistry: AssetRegistry,
+    serializationManager: SerializationManager,
     top: number,
     bottom: number,
     width: number,
@@ -170,8 +165,8 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     labelPercent = 0.4
   ) {
     super();
-    this._assetRegistry = assetRegistry;
-    this._serializationInfo = getSerializationInfo(assetRegistry);
+
+    this._serializationManager = serializationManager;
     this._rootGroup = new PropertyGroup('Root', this);
     this._top = top;
     this._bottom = bottom;
@@ -183,8 +178,8 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     this._dragging = false;
     this._dirty = false;
   }
-  get serailizationInfo(): Map<any, SerializableClass> {
-    return this._serializationInfo;
+  get serailizationManager(): SerializationManager {
+    return this._serializationManager;
   }
   get object(): any {
     return this._rootGroup.getObject();
@@ -565,7 +560,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       }
       case 'object': {
         const val = tmpProperty.str as [string];
-        const assetInfo = this._assetRegistry.getAssetInfo(val[0]);
+        const assetInfo = this._serializationManager.assetRegistry.getAssetInfo(val[0]);
         if (assetInfo) {
           val[0] = assetInfo.name;
         }
@@ -591,7 +586,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
               ImGui.OpenPopup('X##list');
               if (ImGui.BeginPopup('X##list')) {
                 for (const t of property.value.objectTypes) {
-                  const cls = this._serializationInfo.get(t);
+                  const cls = this._serializationManager.getClassByConstructor(t);
                   if (cls && ImGui.MenuItem(`${cls.ctor.name}##create`)) {
                     alert(cls.ctor.name);
                   }

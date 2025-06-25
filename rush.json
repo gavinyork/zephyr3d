@@ -454,10 +454,6 @@
       "shouldPublish": true
     },
     {
-      "packageName": "@zephyr3d/inspector",
-      "projectFolder": "libs/inspector"
-    },
-    {
       "packageName": "@zephyr3d/editor",
       "projectFolder": "utility/editor"
     },

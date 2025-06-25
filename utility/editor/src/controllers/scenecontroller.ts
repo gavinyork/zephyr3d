@@ -1,4 +1,4 @@
-import type { AssetRegistry, EmbeddedAssetInfo, Scene } from '@zephyr3d/scene';
+import type { EmbeddedAssetInfo, Scene, SerializationManager } from '@zephyr3d/scene';
 import { deserializeObject, OrbitCameraController, serializeObject } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import type { SceneModel } from '../models/scenemodel';
@@ -13,12 +13,17 @@ export class SceneController extends BaseController<SceneModel> {
   protected _editor: Editor;
   protected _scene: DBSceneInfo;
   protected _view: SceneView;
-  protected _assetRegistry: AssetRegistry;
-  constructor(editor: Editor, model: SceneModel, view: SceneView, assetRegistry: AssetRegistry) {
+  protected _serializationManager: SerializationManager;
+  constructor(
+    editor: Editor,
+    model: SceneModel,
+    view: SceneView,
+    serializationManager: SerializationManager
+  ) {
     super(model);
     this._editor = editor;
     this._view = view;
-    this._assetRegistry = assetRegistry;
+    this._serializationManager = serializationManager;
   }
   get editor() {
     return this._editor;
@@ -105,7 +110,7 @@ export class SceneController extends BaseController<SceneModel> {
       name,
       content: await serializeObject(
         this.model.scene,
-        this._assetRegistry,
+        this._serializationManager.assetRegistry,
         null,
         assetList,
         embeddedAssetList
@@ -122,7 +127,7 @@ export class SceneController extends BaseController<SceneModel> {
     console.log([...assetList]);
     console.log([...embeddedAssetList]);
     const embeddedAssets = await Promise.all(embeddedAssetList);
-    await this._assetRegistry.putEmbeddedAssets(embeddedAssets);
+    await this._serializationManager.assetRegistry.putEmbeddedAssets(embeddedAssets);
     await Database.putScene(this._scene);
     const uuid = await Database.putScene(this._scene);
     this._scene.uuid = uuid;
@@ -133,7 +138,9 @@ export class SceneController extends BaseController<SceneModel> {
   private async batchExportScene(scenes: { scene: Scene; name: string }[], name: string) {
     const assetList = new Set<string>();
     const contents = await Promise.all(
-      scenes.map((val) => serializeObject(val.scene, this._assetRegistry, null, assetList))
+      scenes.map((val) =>
+        serializeObject(val.scene, this._serializationManager.assetRegistry, null, assetList)
+      )
     );
     const zipDownloader = new ZipDownloader(`${name}.zip`);
     if (assetList.size > 0) {
@@ -151,7 +158,7 @@ export class SceneController extends BaseController<SceneModel> {
   }
   private async exportScene(scene: Scene, name: string) {
     const assetList = new Set<string>();
-    const content = await serializeObject(scene, this._assetRegistry, null, assetList);
+    const content = await serializeObject(scene, this._serializationManager.assetRegistry, null, assetList);
     content.meta = {
       activeCamera: this.model.camera?.id ?? ''
     };
@@ -166,7 +173,7 @@ export class SceneController extends BaseController<SceneModel> {
     await zipDownloader.finish();
   }
   async loadScene(sceneinfo: DBSceneInfo) {
-    return deserializeObject<Scene>(null, sceneinfo.content, this._assetRegistry);
+    return deserializeObject<Scene>(null, sceneinfo.content, this._serializationManager.assetRegistry);
   }
   openScene(uuid: string) {
     Database.getScene(uuid)

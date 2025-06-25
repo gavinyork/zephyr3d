@@ -198,6 +198,9 @@ function getDetailMapProps(assetRegistry: AssetRegistry) {
       isNullable() {
         return true;
       },
+      isValid() {
+        return this.numDetailMaps > i;
+      },
       get(this: ClipmapTerrain, value) {
         value.str[0] = assetRegistry.getAssetId(this.material.getDetailNormalMap(i)) ?? '';
       },
@@ -235,6 +238,9 @@ function getDetailMapProps(assetRegistry: AssetRegistry) {
       type: 'float',
       hidden: true,
       default: 80,
+      isValid() {
+        return this.numDetailMaps > i;
+      },
       get(this: ClipmapTerrain, value) {
         value.num[0] = this.material.getDetailMapUVScale(i);
       },
@@ -247,6 +253,9 @@ function getDetailMapProps(assetRegistry: AssetRegistry) {
       type: 'float',
       hidden: true,
       default: 80,
+      isValid() {
+        return this.numDetailMaps > i;
+      },
       get(this: ClipmapTerrain, value) {
         value.num[0] = this.material.getDetailMapRoughness(i);
       },

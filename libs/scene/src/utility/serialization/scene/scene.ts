@@ -213,34 +213,6 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           }
         },
         {
-          name: 'FogStart',
-          type: 'float',
-          phase: 1,
-          isValid() {
-            return this.env.sky.fogType === 'linear';
-          },
-          get(this: Scene, value) {
-            value.num[0] = this.env.sky.fogStart;
-          },
-          set(this: Scene, value) {
-            this.env.sky.fogStart = value.num[0];
-          }
-        },
-        {
-          name: 'FogEnd',
-          type: 'float',
-          phase: 1,
-          isValid() {
-            return this.env.sky.fogType === 'linear';
-          },
-          get(this: Scene, value) {
-            value.num[0] = this.env.sky.fogEnd;
-          },
-          set(this: Scene, value) {
-            this.env.sky.fogEnd = value.num[0];
-          }
-        },
-        {
           name: 'FogDensity',
           type: 'float',
           phase: 1,

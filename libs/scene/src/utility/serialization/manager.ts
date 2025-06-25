@@ -96,8 +96,11 @@ export class SerializationManager {
   get assetRegistry() {
     return this._assetRegistry;
   }
+  getClassByConstructor(ctor: GenericConstructor) {
+    return this._classMap.get(ctor) ?? null;
+  }
   getClassByObject(obj: object) {
-    return this._classMap.get(obj.constructor as GenericConstructor) ?? null;
+    return this.getClassByConstructor(obj.constructor as GenericConstructor);
   }
   getClassByName(className: string) {
     for (const val of this._classMap) {
