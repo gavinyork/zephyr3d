@@ -16,7 +16,7 @@
     "build:check": "tsc -p . --noEmit",
     "lint": "eslint \"src/**/*.ts\" -f compact",
     "lint-fix": "eslint --fix \"src/**/*.ts\" -f compact",
-    "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c",
+    "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent",
     "serve": "web-dev-server --no-cache --watch --open dist/index.html"
   },
   "engines": {

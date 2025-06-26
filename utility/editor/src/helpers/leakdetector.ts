@@ -1,5 +1,5 @@
 import { TraceMap, originalPositionFor } from '@jridgewell/trace-mapping';
-import { GPUObject } from '@zephyr3d/device';
+import type { GPUObject } from '@zephyr3d/device';
 import { Application } from '@zephyr3d/scene';
 
 let traceMap: TraceMap = null;
@@ -137,19 +137,11 @@ export function getStackFrames(stack: string, maxDepth: number) {
 }
 
 function extractFileName(filePath: string) {
-  if (!filePath) return 'unknown';
-
-  // 移除查询参数和hash
-  const cleanPath = filePath.split('?')[0].split('#')[0];
-
-  // 提取文件名
-  const fileName = cleanPath.split('/').pop() || 'unknown';
-
-  return fileName;
+  return filePath ? filePath.split('?')[0].split('#')[0].split('/').pop() || 'unknown' : 'unknown';
 }
 
 function parseStackLine(line: string) {
-  // Chrome/Edge 格式: "    at functionName (file:line:column)"
+  // Chrome/Edge: "    at functionName (file:line:column)"
   let match = line.match(/^\s*at\s+(.+?)\s+\((.+?):(\d+):(\d+)\)$/);
   if (match) {
     return {
@@ -162,7 +154,7 @@ function parseStackLine(line: string) {
     };
   }
 
-  // Chrome/Edge 格式: "    at file:line:column"
+  // Chrome/Edge: "    at file:line:column"
   match = line.match(/^\s*at\s+(.+?):(\d+):(\d+)$/);
   if (match) {
     return {
@@ -175,7 +167,7 @@ function parseStackLine(line: string) {
     };
   }
 
-  // Firefox 格式: "functionName@file:line:column"
+  // Firefox: "functionName@file:line:column"
   match = line.match(/^(.+?)@(.+?):(\d+):(\d+)$/);
   if (match) {
     return {
@@ -188,7 +180,6 @@ function parseStackLine(line: string) {
     };
   }
 
-  // Safari 或其他格式的回退
   return {
     function: 'unknown',
     file: 'unknown',
@@ -198,9 +189,3 @@ function parseStackLine(line: string) {
     unparsed: line.trim()
   };
 }
-
-export function testSourceMap() {
-  console.log(getMappedStack());
-}
-
-export class LeakDetector {}

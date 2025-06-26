@@ -22,10 +22,10 @@ export class Editor {
   handleEvent(ev: Event, type?: string): boolean {
     if (
       ev.type === 'keyup' &&
-      (ev as KeyboardEvent).key === 'G' &&
+      (ev as KeyboardEvent).key === 'F12' &&
       (ev as KeyboardEvent).ctrlKey &&
-      (ev as KeyboardEvent).shiftKey &&
-      (ev as KeyboardEvent).altKey
+      !(ev as KeyboardEvent).shiftKey &&
+      !(ev as KeyboardEvent).altKey
     ) {
       const stat = getGPUObjectStatistics();
       console.dir(stat);
