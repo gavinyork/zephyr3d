@@ -313,12 +313,19 @@ export abstract class Blitter {
     getBlitPrimitive2D().draw();
   }
   /**
+   * Blits a 2D texture to a frame buffer
+   * @param source - The source texture
+   * @param dest - The frame buffer to blit onto
+   * @param sampler - Sampler for source texture
+   */
+  blit(source: Texture2D, dest: FrameBuffer, sampler?: TextureSampler): void;
+  /**
    * Blits a 2D texture to 2D texture or frame buffer
    * @param source - The source texture
    * @param dest - The destination texture or frame buffer
    * @param sampler - Sampler for source texture
    */
-  blit(source: Texture2D, dest: Texture2D | FrameBuffer, sampler?: TextureSampler): void;
+  blit(source: Texture2D, dest: Texture2D, sampler?: TextureSampler): void;
   /**
    * Blits a 2D texture to given layer of a 2D array texture
    * @param source - The source texture
@@ -339,13 +346,21 @@ export abstract class Blitter {
    */
   blit(source: Texture2DArray, dest: Texture2DArray, sampler?: TextureSampler): void;
   /**
+   * Blits given layer of a 2d array texture to a frame buffer
+   * @param source - The source texture
+   * @param dest - The frame buffer to blit onto
+   * @param layer - The layer to be copied
+   * @param sampler - Sampler for source texture
+   */
+  blit(source: Texture2DArray, dest: FrameBuffer, layer: number, sampler?: TextureSampler): void;
+  /**
    * Blits given layer of a 2d array texture to a 2d texture or frame buffer
    * @param source - The source texture
    * @param dest - The destination texture or frame buffer
    * @param layer - The layer to be copied
    * @param sampler - Sampler for source texture
    */
-  blit(source: Texture2DArray, dest: Texture2D | FrameBuffer, layer: number, sampler?: TextureSampler): void;
+  blit(source: Texture2DArray, dest: Texture2D, layer: number, sampler?: TextureSampler): void;
   /**
    * Blits a cube texture to another cube texture
    *
@@ -358,13 +373,21 @@ export abstract class Blitter {
    */
   blit(source: TextureCube, dest: TextureCube, sampler?: TextureSampler): void;
   /**
+   * Blits given face of a cube texture to a frame buffer
+   * @param source - The source texture
+   * @param dest - The frame buffer to blit onto
+   * @param face - The face to be copied
+   * @param sampler - Sampler for source texture
+   */
+  blit(source: TextureCube, dest: FrameBuffer, face: number, sampler?: TextureSampler): void;
+  /**
    * Blits given face of a cube texture to a 2d texture or frame buffer
    * @param source - The source texture
    * @param dest - The destination texture or frame buffer
    * @param face - The face to be copied
    * @param sampler - Sampler for source texture
    */
-  blit(source: TextureCube, dest: Texture2D | FrameBuffer, face: number, sampler?: TextureSampler): void;
+  blit(source: TextureCube, dest: Texture2D, face: number, sampler?: TextureSampler): void;
   blit(
     source: BaseTexture,
     dest: BaseTexture | FrameBuffer,

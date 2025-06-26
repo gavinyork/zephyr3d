@@ -10,6 +10,7 @@ import { Database } from '../storage/db';
 import { EditorAssetRegistry } from './assetregistry';
 import { AssetManager, DRef, SerializationManager } from '@zephyr3d/scene';
 import type { Texture2D } from '@zephyr3d/device';
+import { getGPUObjectStatistics } from '../helpers/leakdetector';
 
 export class Editor {
   private _moduleManager: ModuleManager;
@@ -19,6 +20,17 @@ export class Editor {
     this._assetImages = { brushes: {} };
   }
   handleEvent(ev: Event, type?: string): boolean {
+    if (
+      ev.type === 'keyup' &&
+      (ev as KeyboardEvent).key === 'G' &&
+      (ev as KeyboardEvent).ctrlKey &&
+      (ev as KeyboardEvent).shiftKey &&
+      (ev as KeyboardEvent).altKey
+    ) {
+      const stat = getGPUObjectStatistics();
+      console.dir(stat);
+      return true;
+    }
     if (imGuiInjectEvent(ev, type)) {
       return true;
     }

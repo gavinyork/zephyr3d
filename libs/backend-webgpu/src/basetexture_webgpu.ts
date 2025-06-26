@@ -27,6 +27,8 @@ import type { TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 import type { WebGPUBuffer } from './buffer_webgpu';
 import type { WebGPUTextureCaps, TextureFormatInfoWebGPU } from './capabilities_webgpu';
+import type { WebGPUBindGroup } from './bindgroup_webgpu';
+import { WebGPUMipmapGenerator } from './utils_webgpu';
 
 export abstract class WebGPUBaseTexture<
   T extends GPUTexture | GPUExternalTexture = GPUTexture
@@ -48,6 +50,7 @@ export abstract class WebGPUBaseTexture<
   protected _mipLevelCount: number;
   protected _samplerOptions: SamplerOptions;
   protected _ringBuffer: UploadRingBuffer;
+  protected _mipBindGroups: WebGPUBindGroup[][];
   protected _pendingUploads: (UploadTexture | UploadImage)[];
   constructor(device: WebGPUDevice, target: TextureType) {
     super(device);
@@ -64,6 +67,7 @@ export abstract class WebGPUBaseTexture<
     this._samplerOptions = null;
     this._memCost = 0;
     this._mipmapDirty = false;
+    this._mipBindGroups = [];
     this._views = [];
     this._defaultView = null;
     this._ringBuffer = new UploadRingBuffer(device);
@@ -155,6 +159,14 @@ export abstract class WebGPUBaseTexture<
       this._object = null;
       this._device.updateVideoMemoryCost(-this._memCost);
       this._memCost = 0;
+      this._ringBuffer.purge();
+      this._views = [];
+      for (const face of this._mipBindGroups) {
+        for (const level of face) {
+          level?.dispose();
+        }
+      }
+      this._mipBindGroups = [];
     }
   }
   restore() {
@@ -649,6 +661,23 @@ export abstract class WebGPUBaseTexture<
       });
       this._device.textureUpload(this as WebGPUBaseTexture);
     }
+  }
+  getMipmapGenerationBindGroup(level: number, face: number) {
+    const faceGroups = this._mipBindGroups;
+    let levelGroups = faceGroups[face];
+    if (!levelGroups) {
+      levelGroups = [];
+      faceGroups[face] = levelGroups;
+    }
+    let levelGroup = levelGroups[level];
+    if (!levelGroup) {
+      levelGroup = this._device.createBindGroup(
+        WebGPUMipmapGenerator.getMipmapGenerationBindGroupLayout(this._device)
+      ) as WebGPUBindGroup;
+      levelGroup.setTextureView('tex', this, level - 1, face, 1);
+      levelGroups[level] = levelGroup;
+    }
+    return levelGroup;
   }
   /** @internal */
   protected _getSamplerOptions(params: Partial<TextureFormatInfoWebGPU>, shadow: boolean): SamplerOptions {

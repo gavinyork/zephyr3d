@@ -3,7 +3,7 @@ import { imGuiInit } from '@zephyr3d/imgui';
 import { Editor } from './core/editor';
 //import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
-import { initLeakDetector, testSourceMap } from './helpers/leakdetector';
+import { getGPUObjectStatistics, initLeakDetector, testSourceMap } from './helpers/leakdetector';
 
 const studioApp = new Application({
   backend: backendWebGPU,
@@ -27,6 +27,7 @@ studioApp.ready().then(async () => {
   studioApp.on('resize', (width, height) => {
     editor.resize(width, height);
   });
+
   studioApp.on('tick', () => {
     editor.update(device.frameInfo.elapsedFrame);
     editor.render();

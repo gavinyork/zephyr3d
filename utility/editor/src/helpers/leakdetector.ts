@@ -1,10 +1,81 @@
 import { TraceMap, originalPositionFor } from '@jridgewell/trace-mapping';
+import { GPUObject } from '@zephyr3d/device';
+import { Application } from '@zephyr3d/scene';
 
 let traceMap: TraceMap = null;
+const gpuObjectStackTraceMap: WeakMap<GPUObject, string> = new WeakMap();
+const stackTraceGPUObjectMap: Map<string, GPUObject[]> = new Map();
+
+function getGPUObjectType(obj: GPUObject) {
+  if (obj.isBindGroup()) {
+    return 'BindGroup';
+  }
+  if (obj.isBuffer()) {
+    return 'Buffer';
+  }
+  if (obj.isFramebuffer()) {
+    return 'FrameBuffer';
+  }
+  if (obj.isProgram()) {
+    return 'Program';
+  }
+  if (obj.isSampler()) {
+    return 'Sampler';
+  }
+  if (obj.isTexture()) {
+    return 'Texture';
+  }
+  if (obj.isVertexLayout()) {
+    return 'VertexLayout';
+  }
+  return 'unknown';
+}
+
+export function getGPUObjectStatistics() {
+  return [...stackTraceGPUObjectMap]
+    .sort((a, b) => b[1].length - a[1].length)
+    .map((val) => ({
+      stack: getStackFrames(val[0], 32),
+      objectType: getGPUObjectType(val[1][0]),
+      objectCount: val[1].length
+    }));
+}
 
 export async function initLeakDetector() {
   const jsmap = await (await fetch('js/index.js.map')).text();
   traceMap = new TraceMap(jsmap);
+
+  const device = Application.instance.device;
+  device.on('gpuobject_added', function (obj) {
+    const stack = new Error().stack;
+    if (stack) {
+      gpuObjectStackTraceMap.set(obj, stack);
+    }
+    let objList = stackTraceGPUObjectMap.get(stack);
+    if (!objList) {
+      objList = [];
+      stackTraceGPUObjectMap.set(stack, objList);
+    }
+    objList.push(obj);
+  });
+  device.on('gpuobject_removed', function (obj) {
+    const stack = gpuObjectStackTraceMap.get(obj);
+    if (stack) {
+      gpuObjectStackTraceMap.delete(obj);
+      const objList = stackTraceGPUObjectMap.get(stack);
+      if (objList) {
+        const index = objList.indexOf(obj);
+        if (index >= 0) {
+          objList.splice(index, 1);
+        }
+        if (objList.length === 0) {
+          stackTraceGPUObjectMap.delete(stack);
+        }
+      }
+    }
+  });
+
+  Error['stackTraceLimit'] = 50;
 }
 
 export function sourceMapToOrigin(line: number, column: number) {
@@ -43,6 +114,93 @@ export function getMappedStack(): string {
   return mapped;
 }
 
+export function getStackFrames(stack: string, maxDepth: number) {
+  const lines = stack.split('\n');
+  const frames = [];
+
+  // 从索引 2 开始，跳过 "Error" 和 "captureStackFrames" 本身
+  for (let i = 2; i < Math.min(lines.length, maxDepth + 2); i++) {
+    const line = lines[i];
+    if (!line) continue;
+
+    const frame = parseStackLine(line);
+    if (frame) {
+      frames.push({
+        ...frame,
+        index: i - 2,
+        raw: line.trim()
+      });
+    }
+  }
+
+  return frames;
+}
+
+function extractFileName(filePath: string) {
+  if (!filePath) return 'unknown';
+
+  // 移除查询参数和hash
+  const cleanPath = filePath.split('?')[0].split('#')[0];
+
+  // 提取文件名
+  const fileName = cleanPath.split('/').pop() || 'unknown';
+
+  return fileName;
+}
+
+function parseStackLine(line: string) {
+  // Chrome/Edge 格式: "    at functionName (file:line:column)"
+  let match = line.match(/^\s*at\s+(.+?)\s+\((.+?):(\d+):(\d+)\)$/);
+  if (match) {
+    return {
+      function: match[1],
+      file: extractFileName(match[2]),
+      fullPath: match[2],
+      line: parseInt(match[3]),
+      column: parseInt(match[4]),
+      unparsed: ''
+    };
+  }
+
+  // Chrome/Edge 格式: "    at file:line:column"
+  match = line.match(/^\s*at\s+(.+?):(\d+):(\d+)$/);
+  if (match) {
+    return {
+      function: 'anonymous',
+      file: extractFileName(match[1]),
+      fullPath: match[1],
+      line: parseInt(match[2]),
+      column: parseInt(match[3]),
+      unparsed: ''
+    };
+  }
+
+  // Firefox 格式: "functionName@file:line:column"
+  match = line.match(/^(.+?)@(.+?):(\d+):(\d+)$/);
+  if (match) {
+    return {
+      function: match[1] || 'anonymous',
+      file: extractFileName(match[2]),
+      fullPath: match[2],
+      line: parseInt(match[3]),
+      column: parseInt(match[4]),
+      unparsed: ''
+    };
+  }
+
+  // Safari 或其他格式的回退
+  return {
+    function: 'unknown',
+    file: 'unknown',
+    fullPath: 'unknown',
+    line: 0,
+    column: 0,
+    unparsed: line.trim()
+  };
+}
+
 export function testSourceMap() {
   console.log(getMappedStack());
 }
+
+export class LeakDetector {}

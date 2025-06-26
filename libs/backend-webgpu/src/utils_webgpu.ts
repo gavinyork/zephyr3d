@@ -121,8 +121,13 @@ export class WebGPUClearQuad {
 export class WebGPUMipmapGenerator {
   static _frameBufferInfo: FrameBufferInfo = null;
   static _mipmapGenerationProgram: WebGPUProgram = null;
-  static _mipmapGenerationBindGroup: WeakMap<WebGPUBaseTexture, WebGPUBindGroup[][]> = new WeakMap();
   static _mipmapGenerationStateSet: WebGPURenderStateSet = null;
+  static getMipmapGenerationBindGroupLayout(device: WebGPUDevice) {
+    if (!this._mipmapGenerationProgram) {
+      this.initMipmapGeneration(device);
+    }
+    return this._mipmapGenerationProgram.bindGroupLayouts[0];
+  }
   static generateMipmap(device: WebGPUDevice, tex: WebGPUBaseTexture, cmdEncoder?: GPUCommandEncoder) {
     if (!tex.isRenderable()) {
       return;
@@ -165,10 +170,7 @@ export class WebGPUMipmapGenerator {
     face: number
   ) {
     const renderPassEncoder = this.beginMipmapGenerationPass(commandEncoder, dstTex, format, dstLevel, face);
-    renderPassEncoder.setBindGroup(
-      0,
-      this.getMipmapGenerationBindGroup(device, srcTex, srcLevel, face).bindGroup
-    );
+    renderPassEncoder.setBindGroup(0, srcTex.getMipmapGenerationBindGroup(srcLevel, face).bindGroup);
     const pipeline = device.pipelineCache.fetchRenderPipeline(
       this._mipmapGenerationProgram,
       null,
@@ -219,32 +221,6 @@ export class WebGPUMipmapGenerator {
     const renderPassEncoder = encoder.beginRenderPass(passDesc);
     renderPassEncoder.insertDebugMarker('MipmapGeneration');
     return renderPassEncoder;
-  }
-  private static getMipmapGenerationBindGroup(
-    device: WebGPUDevice,
-    texture: WebGPUBaseTexture,
-    level: number,
-    face: number
-  ): WebGPUBindGroup {
-    let faceGroups = this._mipmapGenerationBindGroup.get(texture);
-    if (!faceGroups) {
-      faceGroups = [];
-      this._mipmapGenerationBindGroup.set(texture, faceGroups);
-    }
-    let levelGroups = faceGroups[face];
-    if (!levelGroups) {
-      levelGroups = [];
-      faceGroups[face] = levelGroups;
-    }
-    let levelGroup = levelGroups[level];
-    if (!levelGroup) {
-      levelGroup = device.createBindGroup(
-        this._mipmapGenerationProgram.bindGroupLayouts[0]
-      ) as WebGPUBindGroup;
-      levelGroup.setTextureView('tex', texture, level - 1, face, 1);
-      levelGroups[level] = levelGroup;
-    }
-    return levelGroup;
   }
   private static initMipmapGeneration(device: WebGPUDevice): void {
     this._mipmapGenerationProgram = device.buildRenderProgram({

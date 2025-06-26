@@ -228,14 +228,16 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       albedoMap === ClipmapTerrainMaterial.getDefaultDetailMap() ? null : albedoMap
     );
     const blitter = new CopyBlitter();
+    const fb = Application.instance.device.createFrameBuffer([this._detailMapInfo.detailMap.get()], null);
     blitter.blit(
       albedoMap,
-      this._detailMapInfo.detailMap.get(),
+      fb,
       index,
       albedoMap.width === this._detailMapSize && albedoMap.height === this._detailMapSize
         ? fetchSampler('clamp_nearest_nomip')
         : fetchSampler('clamp_linear_nomip')
     );
+    fb.dispose();
   }
   getDetailNormalMap(index: number): Texture2D {
     if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
@@ -257,14 +259,19 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       normalMap === ClipmapTerrainMaterial.getDefaultNormalMap() ? null : normalMap
     );
     const blitter = new CopyBlitter();
+    const fb = Application.instance.device.createFrameBuffer(
+      [this._detailMapInfo.detailNormalMap.get()],
+      null
+    );
     blitter.blit(
       normalMap,
-      this._detailMapInfo.detailNormalMap.get(),
+      fb,
       index,
       normalMap.width === this._detailMapSize && normalMap.height === this._detailMapSize
         ? fetchSampler('clamp_nearest_nomip')
         : fetchSampler('clamp_linear_nomip')
     );
+    fb.dispose();
   }
   /** @internal */
   update(region: Vector4, terrainScale: Vector3) {

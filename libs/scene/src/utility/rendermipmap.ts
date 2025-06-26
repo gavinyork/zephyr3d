@@ -41,19 +41,14 @@ export abstract class RenderMipmap {
         this.renderLevel(device, i, srcTex, srcTex);
       }
     } else {
-      const tmpFramebuffer = device.pool.fetchTemporalFramebuffer(
-        false,
-        srcTex.width,
-        srcTex.height,
-        srcTex.format,
-        null,
-        true
-      );
+      const tmpTexture = device.createTexture2D(srcTex.format, srcTex.width, srcTex.height);
+      const tmpFramebuffer = device.createFrameBuffer([tmpTexture], null);
       const dstTex = tmpFramebuffer.getColorAttachments()[0] as Texture2D;
       for (let i = 0; i < srcTex.mipLevelCount - 1; i++) {
         this.renderLevel(device, i, srcTex, dstTex);
       }
-      device.pool.releaseFrameBuffer(tmpFramebuffer);
+      tmpFramebuffer.dispose();
+      tmpTexture.dispose();
     }
     device.popDeviceStates();
   }
@@ -64,17 +59,8 @@ export abstract class RenderMipmap {
     dstTexture: Texture2D
   ): void {
     const sampler = fetchSampler('clamp_nearest_nomip');
-    const framebuffer = device.pool.fetchTemporalFramebuffer(
-      false,
-      0,
-      0,
-      [dstTexture],
-      null,
-      false,
-      1,
-      true,
-      miplevel + 1
-    );
+    const framebuffer = device.createFrameBuffer([dstTexture], null);
+    framebuffer.setColorAttachmentMipLevel(0, miplevel + 1);
     const bindGroup = this._bindGroup.get();
     framebuffer.setColorAttachmentGenerateMipmaps(0, false);
     this._srcSize[0] = Math.max(srcTexture.width >> miplevel, 1);
@@ -97,7 +83,7 @@ export abstract class RenderMipmap {
     if (srcTexture !== dstTexture) {
       device.copyFramebufferToTexture2D(framebuffer, 0, srcTexture, miplevel + 1);
     }
-    device.pool.releaseFrameBuffer(framebuffer);
+    framebuffer.dispose();
   }
   private prepare(device: AbstractDevice) {
     if (!this._program.get()) {
