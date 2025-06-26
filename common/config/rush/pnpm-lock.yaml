@@ -19,7 +19,7 @@ importers:
       '@typescript-eslint/eslint-plugin': ^8.17.0
       '@typescript-eslint/parser': ^8.17.0
       '@web/dev-server': ^0.1.35
-      '@webgpu/types': ^0.1.40
+      '@webgpu/types': ^0.1.62
       '@zephyr3d/backend-webgl': workspace:*
       '@zephyr3d/backend-webgpu': workspace:*
       '@zephyr3d/base': workspace:*
@@ -48,7 +48,7 @@ importers:
     dependencies:
       '@rollup/plugin-commonjs': 28.0.2_rollup@4.30.1
       '@types/diff': 5.2.3
-      '@webgpu/types': 0.1.54
+      '@webgpu/types': 0.1.62
       '@zephyr3d/backend-webgl': link:../libs/backend-webgl
       '@zephyr3d/backend-webgpu': link:../libs/backend-webgpu
       '@zephyr3d/base': link:../libs/base
@@ -99,7 +99,7 @@ importers:
       '@types/node': ^18.13.0
       '@typescript-eslint/eslint-plugin': ^8.17.0
       '@typescript-eslint/parser': ^8.17.0
-      '@webgpu/types': ^0.1.40
+      '@webgpu/types': ^0.1.62
       '@zephyr3d/base': workspace:*
       '@zephyr3d/device': workspace:*
       cross-env: ^7.0.3
@@ -121,7 +121,7 @@ importers:
     dependencies:
       '@rollup/plugin-commonjs': 28.0.2_rollup@4.30.1
       '@types/node': 18.19.75
-      '@webgpu/types': 0.1.54
+      '@webgpu/types': 0.1.62
       '@zephyr3d/base': link:../base
       '@zephyr3d/device': link:../device
       rollup-plugin-import-css: 3.5.8_rollup@4.30.1
@@ -164,7 +164,7 @@ importers:
       '@types/node': ^18.13.0
       '@typescript-eslint/eslint-plugin': ^8.17.0
       '@typescript-eslint/parser': ^8.17.0
-      '@webgpu/types': ^0.1.40
+      '@webgpu/types': ^0.1.62
       '@zephyr3d/base': workspace:*
       '@zephyr3d/device': workspace:*
       cross-env: ^7.0.3
@@ -186,7 +186,7 @@ importers:
     dependencies:
       '@rollup/plugin-commonjs': 28.0.2_rollup@4.30.1
       '@types/node': 18.19.75
-      '@webgpu/types': 0.1.54
+      '@webgpu/types': 0.1.62
       '@zephyr3d/base': link:../base
       '@zephyr3d/device': link:../device
       rollup-plugin-import-css: 3.5.8_rollup@4.30.1
@@ -288,7 +288,7 @@ importers:
       '@types/node': ^18.13.0
       '@typescript-eslint/eslint-plugin': ^8.17.0
       '@typescript-eslint/parser': ^8.17.0
-      '@webgpu/types': ^0.1.40
+      '@webgpu/types': ^0.1.62
       '@zephyr3d/base': workspace:*
       cross-env: ^7.0.3
       eslint: ^8.56.0
@@ -309,7 +309,7 @@ importers:
     dependencies:
       '@rollup/plugin-commonjs': 28.0.2_rollup@4.30.1
       '@types/node': 18.19.75
-      '@webgpu/types': 0.1.54
+      '@webgpu/types': 0.1.62
       '@zephyr3d/base': link:../base
       rollup-plugin-import-css: 3.5.8_rollup@4.30.1
     devDependencies:
@@ -352,7 +352,7 @@ importers:
       '@types/node': ^18.13.0
       '@typescript-eslint/eslint-plugin': ^8.17.0
       '@typescript-eslint/parser': ^8.17.0
-      '@webgpu/types': ^0.1.40
+      '@webgpu/types': ^0.1.62
       '@zephyr3d/base': workspace:*
       '@zephyr3d/device': workspace:*
       cross-env: ^7.0.3
@@ -374,7 +374,7 @@ importers:
     dependencies:
       '@types/emscripten': 1.40.0
       '@types/node': 18.19.75
-      '@webgpu/types': 0.1.54
+      '@webgpu/types': 0.1.62
       '@zephyr3d/base': link:../base
       '@zephyr3d/device': link:../device
       rollup-plugin-import-css: 3.5.8_rollup@4.30.1
@@ -418,7 +418,7 @@ importers:
       '@types/draco3d': ^1.4.9
       '@typescript-eslint/eslint-plugin': ^8.17.0
       '@typescript-eslint/parser': ^8.17.0
-      '@webgpu/types': ^0.1.40
+      '@webgpu/types': ^0.1.62
       '@zephyr3d/base': workspace:*
       '@zephyr3d/device': workspace:*
       cross-env: ^7.0.3
@@ -440,7 +440,7 @@ importers:
     dependencies:
       '@rollup/plugin-commonjs': 28.0.2_rollup@4.30.1
       '@types/draco3d': 1.4.10
-      '@webgpu/types': 0.1.54
+      '@webgpu/types': 0.1.62
       '@zephyr3d/base': link:../base
       '@zephyr3d/device': link:../device
       rollup-plugin-import-css: 3.5.8_rollup@4.30.1
@@ -488,7 +488,7 @@ importers:
       '@typescript-eslint/eslint-plugin': ^8.17.0
       '@typescript-eslint/parser': ^8.17.0
       '@web/dev-server': ^0.1.35
-      '@webgpu/types': ^0.1.40
+      '@webgpu/types': ^0.1.62
       '@zephyr3d/backend-webgl': workspace:*
       '@zephyr3d/backend-webgpu': workspace:*
       '@zephyr3d/base': workspace:*
@@ -527,7 +527,7 @@ importers:
       '@popperjs/core': 2.11.8
       '@types/diff': 5.2.3
       '@types/draco3d': 1.4.10
-      '@webgpu/types': 0.1.54
+      '@webgpu/types': 0.1.62
       '@zephyr3d/backend-webgl': link:../libs/backend-webgl
       '@zephyr3d/backend-webgpu': link:../libs/backend-webgpu
       '@zephyr3d/base': link:../libs/base
@@ -590,7 +590,7 @@ importers:
       '@typescript-eslint/eslint-plugin': ^8.17.0
       '@typescript-eslint/parser': ^8.17.0
       '@web/dev-server': ^0.1.35
-      '@webgpu/types': ^0.1.40
+      '@webgpu/types': ^0.1.62
       '@zephyr3d/backend-webgl': workspace:*
       '@zephyr3d/backend-webgpu': workspace:*
       '@zephyr3d/base': workspace:*
@@ -618,7 +618,7 @@ importers:
       typescript: ^5.7.3
     dependencies:
       '@rollup/plugin-commonjs': 28.0.2_rollup@4.30.1
-      '@webgpu/types': 0.1.54
+      '@webgpu/types': 0.1.62
       '@zephyr3d/backend-webgl': link:../libs/backend-webgl
       '@zephyr3d/backend-webgpu': link:../libs/backend-webgpu
       '@zephyr3d/base': link:../libs/base
@@ -673,7 +673,7 @@ importers:
       '@typescript-eslint/eslint-plugin': ^8.17.0
       '@typescript-eslint/parser': ^8.17.0
       '@web/dev-server': ^0.1.35
-      '@webgpu/types': ^0.1.40
+      '@webgpu/types': ^0.1.62
       '@zephyr3d/backend-webgl': workspace:*
       '@zephyr3d/backend-webgpu': workspace:*
       '@zephyr3d/base': workspace:*
@@ -706,7 +706,7 @@ importers:
       '@jridgewell/trace-mapping': 0.3.25
       '@types/node': 18.19.75
       '@types/streamsaver': 2.0.5
-      '@webgpu/types': 0.1.54
+      '@webgpu/types': 0.1.62
       '@zephyr3d/backend-webgl': link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu': link:../../libs/backend-webgpu
       '@zephyr3d/base': link:../../libs/base
@@ -2814,8 +2814,8 @@ packages:
       parse5: 6.0.1
     dev: true
 
-  /@webgpu/types/0.1.54:
-    resolution: {integrity: sha512-81oaalC8LFrXjhsczomEQ0u3jG+TqE6V9QHLA8GNZq/Rnot0KDugu3LhSYSlie8tSdooAN1Hov05asrUUp9qgg==}
+  /@webgpu/types/0.1.62:
+    resolution: {integrity: sha512-eS+Go7OnNIILkrrh/w450XfzdyCfnJPmfAgJlNKIn1sR31Jhi9dbsIjFvP98z2U+AgtgNRfCk2lBQdczHCaOGQ==}
     dev: false
 
   /@zip.js/zip.js/2.7.57:

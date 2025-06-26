@@ -232,9 +232,6 @@ export class WebGPUDevice extends BaseDevice {
     if (!this._adapter) {
       throw new Error('WebGPU: requestAdapter() failed');
     }
-    if (this._adapter.isFallbackAdapter) {
-      console.warn('using a fallback adapter');
-    }
     this._adapterInfo = this._adapter['requestAdapterInfo']
       ? await this._adapter['requestAdapterInfo']()
       : {};

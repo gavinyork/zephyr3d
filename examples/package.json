@@ -55,7 +55,7 @@
   },
   "dependencies": {
     "@types/diff": "^5.0.2",
-    "@webgpu/types": "^0.1.40",
+    "@webgpu/types": "^0.1.62",
     "diff": "^5.0.0",
     "@zephyr3d/base": "workspace:*",
     "@zephyr3d/device": "workspace:*",

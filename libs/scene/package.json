@@ -71,7 +71,7 @@
   "dependencies": {
     "@zephyr3d/base": "workspace:*",
     "@zephyr3d/device": "workspace:*",
-    "@webgpu/types": "^0.1.40",
+    "@webgpu/types": "^0.1.62",
     "@types/draco3d": "^1.4.9",
     "@rollup/plugin-commonjs": "~28.0.2",
     "rollup-plugin-import-css": "~3.5.8"
