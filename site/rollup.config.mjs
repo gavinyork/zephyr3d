@@ -174,7 +174,10 @@ function getTutTarget(input, output) {
     },
     plugins: [
       nodeResolve(),
-      swc(),
+      swc({
+        sourceMaps: true,
+        inlineSourcesContent: false
+      }),
       commonjs(),
       terser({
         compress: codeCompress,

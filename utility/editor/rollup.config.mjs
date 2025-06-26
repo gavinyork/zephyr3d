@@ -1,5 +1,6 @@
 import { swc } from 'rollup-plugin-swc3';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
+import sourcemaps from 'rollup-plugin-sourcemaps2';
 import path from 'path';
 import copy from 'rollup-plugin-copy';
 import { fileURLToPath } from 'url';
@@ -18,7 +19,14 @@ function getTargetWorker() {
       format: 'esm',
       sourcemap: true
     },
-    plugins: [nodeResolve(), swc()]
+    plugins: [
+      nodeResolve(),
+      sourcemaps(),
+      swc({
+        sourceMaps: true,
+        inlineSourcesContent: false
+      })
+    ]
   };
 }
 
@@ -38,7 +46,11 @@ function getTargetWeb() {
     },
     plugins: [
       nodeResolve(),
-      swc(),
+      sourcemaps(),
+      swc({
+        sourceMaps: true,
+        inlineSourcesContent: false
+      }),
       commonjs(),
       copy({
         targets: [

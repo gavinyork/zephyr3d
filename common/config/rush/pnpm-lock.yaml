@@ -660,6 +660,7 @@ importers:
     specifiers:
       '@babel/core': ^7.20.12
       '@babel/preset-env': ^7.20.2
+      '@jridgewell/trace-mapping': ^0.3.25
       '@rollup/plugin-commonjs': ~28.0.2
       '@rollup/plugin-json': ^6.1.0
       '@rollup/plugin-node-resolve': ~16.0.0
@@ -693,6 +694,7 @@ importers:
       rollup-plugin-copy: ^3.4.0
       rollup-plugin-dts: ~6.1.1
       rollup-plugin-import-css: ~3.5.8
+      rollup-plugin-sourcemaps2: ^0.5.2
       rollup-plugin-swc3: ~0.12.1
       rollup-plugin-typescript2: ^0.34.1
       run-script-os: ^1.1.6
@@ -701,6 +703,7 @@ importers:
       tslib: ^2.8.1
       typescript: ^5.7.3
     dependencies:
+      '@jridgewell/trace-mapping': 0.3.25
       '@types/node': 18.19.75
       '@types/streamsaver': 2.0.5
       '@webgpu/types': 0.1.54
@@ -738,6 +741,7 @@ importers:
       rollup: 4.30.1
       rollup-plugin-copy: 3.5.0
       rollup-plugin-dts: 6.1.1_rollup@4.30.1+typescript@5.7.3
+      rollup-plugin-sourcemaps2: 0.5.2_69b38c55320fdddf2051599cb8672ef4
       rollup-plugin-swc3: 0.12.1_@swc+core@1.10.14+rollup@4.30.1
       rollup-plugin-typescript2: 0.34.1_rollup@4.30.1+typescript@5.7.3
       run-script-os: 1.1.6
@@ -1870,7 +1874,6 @@ packages:
   /@jridgewell/resolve-uri/3.1.2:
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
     engines: {node: '>=6.0.0'}
-    dev: true
 
   /@jridgewell/set-array/1.2.1:
     resolution: {integrity: sha512-R8gLRTZeyp03ymzP/6Lil/28tGeGEzhx1q2k703KGWRAI1VdvPIXdG70VJc2pAMw3NA6JKL5hhFu1sJX0Mnn/A==}
@@ -1892,7 +1895,6 @@ packages:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.0
-    dev: true
 
   /@microsoft/api-documenter/7.26.7:
     resolution: {integrity: sha512-VruYlHYAhQfuBNyndvyD9GBmCRWSOZ8D9+eXicygycNPMC/SPM71WWu2OwP98CTBvq/OhG/uRvUGGdL4QvgiFQ==}
@@ -5310,6 +5312,21 @@ packages:
     dependencies:
       '@rollup/pluginutils': 5.1.4_rollup@4.30.1
       rollup: 4.30.1
+
+  /rollup-plugin-sourcemaps2/0.5.2_69b38c55320fdddf2051599cb8672ef4:
+    resolution: {integrity: sha512-NTz5Y5ySYH9cZZF+qteTHN2x3dnFggTKzCtiN3NhtMvIEXdkOsZVBh6r6xrwsyDnZAhmKRsttwTfXfJVoanM6w==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@types/node': '>=18.0.0'
+      rollup: '>=4'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+    dependencies:
+      '@rollup/pluginutils': 5.1.4_rollup@4.30.1
+      '@types/node': 18.19.75
+      rollup: 4.30.1
+    dev: true
 
   /rollup-plugin-swc3/0.12.1_@swc+core@1.10.14+rollup@4.30.1:
     resolution: {integrity: sha512-iNV1T432XvyejZ19/41C2gLbXxEOiiJynPPAFF0WzwwFT5FHx7SstAp0yjJRLyrbZjfIhoWJVl3hX3c3Stv/GQ==}

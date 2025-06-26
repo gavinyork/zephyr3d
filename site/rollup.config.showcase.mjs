@@ -21,7 +21,10 @@ function getWebTarget() {
       css(),
       nodeResolve(),
       commonjs(),
-      swc(),
+      swc({
+        sourceMaps: true,
+        inlineSourcesContent: false
+      })
       // terser(),
     ]
   };

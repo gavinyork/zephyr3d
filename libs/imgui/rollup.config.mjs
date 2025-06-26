@@ -30,7 +30,10 @@ function getTargetES6() {
     plugins: [
       nodeResolve(),
       commonjs(),
-      swc()
+      swc({
+        sourceMaps: true,
+        inlineSourcesContent: false
+      })
       // terser()
     ]
   };

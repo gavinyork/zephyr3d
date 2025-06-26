@@ -16,7 +16,7 @@
     "build:check": "tsc -p . --noEmit",
     "lint": "eslint \"src/**/*.ts\" -f compact",
     "lint-fix": "eslint --fix \"src/**/*.ts\" -f compact",
-    "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent",
+    "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c",
     "serve": "web-dev-server --no-cache --watch --open dist/index.html"
   },
   "engines": {
@@ -40,6 +40,7 @@
     "@rollup/plugin-terser": "~0.4.4",
     "@rollup/plugin-commonjs": "~28.0.2",
     "@rollup/plugin-json": "^6.1.0",
+    "rollup-plugin-sourcemaps2": "^0.5.2",
     "rollup-plugin-typescript2": "^0.34.1",
     "@rollup/pluginutils": "~5.1.4",
     "rollup": "~4.30.1",
@@ -60,6 +61,7 @@
     "idb": "^8.0.1",
     "@zip.js/zip.js": "^2.7.54",
     "streamsaver": "^2.0.6",
+    "@jridgewell/trace-mapping": "^0.3.25",
     "@zephyr3d/base": "workspace:*",
     "@zephyr3d/device": "workspace:*",
     "@zephyr3d/scene": "workspace:*",

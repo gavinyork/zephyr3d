@@ -34,7 +34,13 @@ function getTargetES6() {
         console.error(warning.message);
       }
     },
-    plugins: [nodeResolve(), swc()]
+    plugins: [
+      nodeResolve(),
+      swc({
+        sourceMaps: true,
+        inlineSourcesContent: false
+      })
+    ]
   };
 }
 

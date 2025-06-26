@@ -3,6 +3,7 @@ import { imGuiInit } from '@zephyr3d/imgui';
 import { Editor } from './core/editor';
 //import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
+import { initLeakDetector, testSourceMap } from './helpers/leakdetector';
 
 const studioApp = new Application({
   backend: backendWebGPU,
@@ -10,6 +11,8 @@ const studioApp = new Application({
 });
 
 studioApp.ready().then(async () => {
+  await initLeakDetector();
+  testSourceMap();
   const device = studioApp.device;
   await imGuiInit(device, `'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`, 12);
   const editor = new Editor();

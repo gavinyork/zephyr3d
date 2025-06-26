@@ -46,7 +46,10 @@ function getTargetES6(input, output) {
     },
     plugins: [
       nodeResolve(),
-      swc(),
+      swc({
+        sourceMaps: true,
+        inlineSourcesContent: false
+      }),
       // terser()
       copy({
         targets: [
