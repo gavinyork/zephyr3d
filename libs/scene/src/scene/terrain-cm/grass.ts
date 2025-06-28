@@ -66,10 +66,11 @@ export class GrassInstances implements Disposable {
     }
   }
   dispose(): void {
-    if (!this._disposed) {
-      this._disposed = true;
-      this._instanceBuffer.dispose();
-    }
+    this._disposed = true;
+    this._baseVertexBuffer.dispose();
+    this._indexBuffer.dispose();
+    this._instanceBuffer.dispose();
+    this._primitive.dispose();
   }
   updateBuffers() {
     const device = Application.instance.device;
@@ -281,12 +282,10 @@ export class GrassLayer implements Disposable {
     return this._disposed;
   }
   dispose(): void {
-    if (!this._disposed) {
-      this._disposed = true;
-      this._material.dispose();
-      this._quadtree.dispose();
-      this._baseVertexBuffer.dispose();
-    }
+    this._disposed = true;
+    this._material.dispose();
+    this._quadtree.dispose();
+    this._baseVertexBuffer.dispose();
   }
 }
 export class GrassRenderer implements Disposable {
@@ -511,13 +510,13 @@ export class GrassQuadtreeNode implements Disposable {
     return this._disposed;
   }
   dispose(): void {
-    if (!this._disposed) {
-      this._disposed = true;
-      this._grassInstances.dispose();
-      if (this._children) {
-        for (const child of this._children) {
-          child.dispose();
-        }
+    this._disposed = true;
+    this._baseVertexBuffer.dispose();
+    this._indexBuffer.dispose();
+    this._grassInstances.dispose();
+    if (this._children) {
+      for (const child of this._children) {
+        child.dispose();
       }
     }
   }

@@ -93,6 +93,7 @@ export class SkyRenderer {
   private _scatterSkyboxTextureWidth: number;
   private _skyboxTexture: DRef<TextureCube>;
   private _bakedSkyboxTexture: DRef<TextureCube>;
+  private _bakedSkyboxFrameBuffer: DRef<FrameBuffer>;
   private _radianceMap: DRef<TextureCube>;
   private _radianceFrameBuffer: DRef<FrameBuffer>;
   private _irradianceMap: DRef<TextureCube>;
@@ -122,6 +123,7 @@ export class SkyRenderer {
     this._skyColor = Vector4.zero();
     this._skyboxTexture = new DRef();
     this._bakedSkyboxTexture = new DRef();
+    this._bakedSkyboxFrameBuffer = new DRef();
     this._bakedSkyboxDirty = true;
     this._scatterSkyboxTextureWidth = 256;
     this._radianceMap = new DRef();
@@ -149,6 +151,7 @@ export class SkyRenderer {
   dispose() {
     this._skyboxTexture.dispose();
     this._bakedSkyboxTexture.dispose();
+    this._bakedSkyboxFrameBuffer.dispose();
     this._radianceMap.dispose();
     this._radianceFrameBuffer.dispose();
     this._irradianceMap.dispose();
@@ -471,20 +474,21 @@ export class SkyRenderer {
               samplerOptions: { mipFilter: 'none' }
             });
       tex.name = 'BakedSkyboxTexture';
-      const scatterSkyboxFramebuffer = device.pool.fetchTemporalFramebuffer(false, 0, 0, tex, null);
+      if (tex !== this._bakedSkyboxTexture.get()) {
+        this._bakedSkyboxFrameBuffer.set(device.createFrameBuffer([tex], null));
+      }
       const camera = SkyRenderer._skyCamera;
       const saveRenderStates = device.getRenderStates();
       device.pushDeviceStates();
-      device.setFramebuffer(scatterSkyboxFramebuffer);
+      device.setFramebuffer(this._bakedSkyboxFrameBuffer.get());
       for (const face of [CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ]) {
         camera.lookAtCubeFace(face);
-        scatterSkyboxFramebuffer.setColorAttachmentCubeFace(0, face);
+        this._bakedSkyboxFrameBuffer.get().setColorAttachmentCubeFace(0, face);
         this._renderSky(camera, false, true, false);
       }
       device.popDeviceStates();
       device.setRenderStates(saveRenderStates);
       this._bakedSkyboxTexture.set(tex);
-      device.pool.releaseFrameBuffer(scatterSkyboxFramebuffer);
     }
   }
   /**

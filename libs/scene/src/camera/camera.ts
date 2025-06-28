@@ -1211,6 +1211,14 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._projMatrix = null;
     this._viewMatrix = null;
     this._viewProjMatrix = null;
+    this._postEffectBloom.dispose();
+    this._postEffectFXAA.dispose();
+    this._postEffectMotionBlur.dispose();
+    this._postEffectSSAO.dispose();
+    this._postEffectSSR.dispose();
+    this._postEffectTAA.dispose();
+    this._postEffectTonemap.dispose();
+    this._oit.dispose();
     super.dispose();
   }
 }

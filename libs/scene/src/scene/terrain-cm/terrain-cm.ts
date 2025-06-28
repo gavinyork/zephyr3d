@@ -306,7 +306,9 @@ export class ClipmapTerrain
             heightMap.width,
             heightMap.height
           );
-    ClipmapTerrain._copyBlitter.blit(heightMap, tmp, fetchSampler('clamp_nearest_nomip'));
+    const tmpFB = device.createFrameBuffer([tmp], null);
+    ClipmapTerrain._copyBlitter.blit(heightMap, tmpFB, fetchSampler('clamp_nearest_nomip'));
+    tmpFB.dispose();
     ClipmapTerrain._heightBoundingGenerator.render(tmp);
     const data = new Float32Array(2);
     tmp
@@ -419,7 +421,9 @@ export class ClipmapTerrain
     sizeZ = Math.min(Math.max(sizeZ, 1), maxTextureSize) >> 0;
     if (sizeX !== oldHeightMap.width || sizeZ !== oldHeightMap.height) {
       const newHeightMap = device.createTexture2D('r16f', sizeX, sizeZ);
-      ClipmapTerrain._copyBlitter.blit(oldHeightMap, newHeightMap, fetchSampler('clamp_linear_nomip'));
+      const fb = device.createFrameBuffer([newHeightMap], null);
+      ClipmapTerrain._copyBlitter.blit(oldHeightMap, fb, fetchSampler('clamp_linear_nomip'));
+      fb.dispose();
       this.heightMap = newHeightMap;
     }
   }

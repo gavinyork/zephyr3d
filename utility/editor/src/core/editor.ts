@@ -10,14 +10,20 @@ import { Database } from '../storage/db';
 import { EditorAssetRegistry } from './assetregistry';
 import { AssetManager, DRef, SerializationManager } from '@zephyr3d/scene';
 import type { Texture2D } from '@zephyr3d/device';
-import { getGPUObjectStatistics } from '../helpers/leakdetector';
+import {
+  analyzeGPUObjectGrowth,
+  formatGrowthAnalysis,
+  getGPUObjectStatistics
+} from '../helpers/leakdetector';
 
 export class Editor {
   private _moduleManager: ModuleManager;
   private _assetImages: { brushes: { [key: string]: DRef<Texture2D> } };
+  private _leakTestA: ReturnType<typeof getGPUObjectStatistics>;
   constructor() {
     this._moduleManager = new ModuleManager();
     this._assetImages = { brushes: {} };
+    this._leakTestA = null;
   }
   handleEvent(ev: Event, type?: string): boolean {
     if (
@@ -27,8 +33,18 @@ export class Editor {
       !(ev as KeyboardEvent).shiftKey &&
       !(ev as KeyboardEvent).altKey
     ) {
-      const stat = getGPUObjectStatistics();
-      console.dir(stat);
+      const statistics = getGPUObjectStatistics();
+      if (!this._leakTestA) {
+        this._leakTestA = statistics;
+      } else {
+        const analysis = analyzeGPUObjectGrowth(this._leakTestA, statistics, {
+          minGrowth: 1,
+          stackDepth: 32,
+          includeNewStacks: true
+        });
+        console.log(formatGrowthAnalysis(analysis));
+        this._leakTestA = null;
+      }
       return true;
     }
     if (imGuiInjectEvent(ev, type)) {

@@ -94,7 +94,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect)<{
   static _texSize: Vector2 = new Vector2();
   static _cameraNearFar: Vector2 = new Vector2();
   static _axises = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)];
-  private _primitives: Partial<Record<GizmoMode, Primitive>>;
+  static _primitives: Partial<Record<GizmoMode, Primitive>> = null;
   private _allowTranslate: boolean;
   private _allowRotate: boolean;
   private _allowScale: boolean;
@@ -121,7 +121,6 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect)<{
    */
   constructor(camera: Camera, binding = null, size = 10) {
     super();
-    this._primitives = null;
     this._camera = camera;
     this._node = binding;
     this._allowRotate = true;
@@ -332,12 +331,12 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect)<{
         this._mode === 'select' ? PostGizmoRenderer._gizmoSelectProgram : PostGizmoRenderer._gizmoProgram
       );
       ctx.device.setBindGroup(0, PostGizmoRenderer._bindGroup);
-      this._primitives[this._mode].draw();
+      PostGizmoRenderer._primitives[this._mode].draw();
       if (this._alwaysDrawIndicator && this._mode !== 'select') {
         this._calcGizmoMVPMatrix('select', false, PostGizmoRenderer._mvpMatrix);
         PostGizmoRenderer._bindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
         ctx.device.setProgram(PostGizmoRenderer._gizmoSelectProgram);
-        this._primitives.select.draw();
+        PostGizmoRenderer._primitives.select.draw();
       }
     }
     PostGizmoRenderer._blendBlitter.renderStates = PostGizmoRenderer._blendRenderState;
@@ -1241,8 +1240,8 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect)<{
         PostGizmoRenderer._gizmoProgram.bindGroupLayouts[0]
       );
     }
-    if (!this._primitives) {
-      this._primitives = {
+    if (!PostGizmoRenderer._primitives) {
+      PostGizmoRenderer._primitives = {
         translation: createTranslationGizmo(
           this._axisLength,
           this._axisRadius,

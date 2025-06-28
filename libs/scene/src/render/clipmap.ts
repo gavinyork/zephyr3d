@@ -1129,13 +1129,23 @@ export class Clipmap {
   dispose() {
     this._crossMesh.dispose();
     this._crossMesh = null;
+    this._crossMeshLines.dispose();
+    this._crossMeshLines = null;
     this._fillerMesh.dispose();
     this._fillerMesh = null;
+    this._fillerMeshLines.dispose();
+    this._fillerMeshLines = null;
     this._seamMesh.dispose();
     this._seamMesh = null;
+    this._seamMeshLines.dispose();
+    this._seamMeshLines = null;
     this._trimMesh.dispose();
     this._trimMesh = null;
+    this._trimMeshLines.dispose();
+    this._trimMeshLines = null;
     this._tileMesh.dispose();
     this._tileMesh = null;
+    this._tileMeshLines.dispose();
+    this._tileMeshLines = null;
   }
 }

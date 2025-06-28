@@ -611,22 +611,8 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         scope.$inputs.worldBinormal
       );
       if (this.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP) > 0) {
-        scope.normalInfo.normal = this.calculateDetailNormal(
-          scope,
-          scope.normalInfo.TBN
-          /*
-          scope.normalInfo.normal,
-          scope.normalInfo.TBN
-          */
-        );
+        scope.normalInfo.normal = this.calculateDetailNormal(scope, scope.normalInfo.TBN);
       }
-      /*
-      scope.$l.ttt = pb.mul(
-        pb.mat3(scope.worldTangent, scope.worldBinormal, scope.worldNormal),
-        pb.vec3(0, 0, 1)
-      );
-      scope.albedo = pb.vec4(pb.add(pb.mul(scope.normalInfo.normal, 0.5), pb.vec3(0.5)), 1);
-      */
       scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
       scope.$l.litColor = this.PBRLight(
         scope,
@@ -757,8 +743,8 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
 
   dispose(): void {
     super.dispose();
-    this._heightMap?.dispose();
-    this._heightMap = null;
+    this._heightMap.dispose();
+    this._levelDataBuffer.dispose();
     if (this._detailMapInfo) {
       this._detailMapInfo.detailMap?.dispose();
       this._detailMapInfo.detailNormalMap?.dispose();
