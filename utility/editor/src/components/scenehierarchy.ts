@@ -73,7 +73,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
       cls = this._serializationManager.getClassByConstructor(ctor);
       ctor = Object.getPrototypeOf(ctor);
     }
-    const label = `${this.getNodeName(node)}##${node.id}`;
+    const label = `${this.getNodeName(node)}##${node.persistentId}`;
     let flags = SceneHierarchy.baseFlags;
     if (this._selectedNode === node) {
       flags |= ImGui.TreeNodeFlags.Selected;
@@ -90,9 +90,9 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
       this.dispatchEvent('node_double_clicked', node);
     }
     if (ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
-      ImGui.OpenPopup(`context_${node.id}`);
+      ImGui.OpenPopup(`context_${node.persistentId}`);
     }
-    if (ImGui.BeginPopup(`context_${node.id}`)) {
+    if (ImGui.BeginPopup(`context_${node.persistentId}`)) {
       if (node !== this._scene.rootNode) {
         if (ImGui.MenuItem('Delete', 'Delete')) {
           this.dispatchEvent('node_request_delete', node);
@@ -107,7 +107,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
       const animationSet = node.animationSet;
       if (animationSet && animationSet.getAnimationNames().length > 0) {
         if (ImGui.BeginMenu('Animation')) {
-          ImGui.PushID(node.id);
+          ImGui.PushID(node.persistentId);
           for (let i = 0; i < animationSet.getAnimationNames().length; i++) {
             ImGui.PushID(i);
             const name = animationSet.getAnimationNames()[i];

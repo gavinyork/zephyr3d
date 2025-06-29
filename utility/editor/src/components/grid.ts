@@ -1,6 +1,9 @@
 import { ImGui } from '@zephyr3d/imgui';
 import type { SerializationManager } from '@zephyr3d/scene';
 import {
+  AnimationClip,
+  AnimationSet,
+  PropertyTrack,
   SceneNode,
   type PropertyAccessor,
   type PropertyValue,
@@ -401,7 +404,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     if (animatable && this.object instanceof SceneNode) {
       if (ImGui.Button('A')) {
         const hash = this._serializationManager.getPropertyName(value);
-        const animationSet = this.object.animationSet;
+        let animationSet = this.object.animationSet;
         Dialog.selectAnimationAndTrack(
           'Create animation track',
           animationSet ? animationSet.getAnimationNames() : [],
@@ -409,6 +412,16 @@ export class PropertyEditor extends makeEventTarget(Object)<{
         ).then((val) => {
           if (val) {
             console.log(hash, val.animationName, val.trackName);
+            if (!animationSet) {
+              animationSet = new AnimationSet(this.object);
+            }
+            let animation = animationSet.getAnimationClip(val.animationName);
+            if (!animation) {
+              animation = new AnimationClip(val.animationName);
+              animationSet.add(animation);
+            }
+            const track = new PropertyTrack(value);
+            animation.addTrack(object, track);
           }
         });
       }

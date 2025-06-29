@@ -101,7 +101,7 @@ export class Scene extends makeEventTarget(Object)<{
   findNodeById<T extends SceneNode>(id: string) {
     let node: T = null;
     this._rootNode?.get().iterate((child) => {
-      if (child.id === id) {
+      if (child.persistentId === id) {
         node = child as T;
         return true;
       }

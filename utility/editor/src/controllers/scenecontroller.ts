@@ -116,7 +116,7 @@ export class SceneController extends BaseController<SceneModel> {
         embeddedAssetList
       ),
       metadata: {
-        activeCamera: this.model.camera?.id ?? '',
+        activeCamera: this.model.camera?.persistentId ?? '',
         activeCameraLookAt:
           this.model.camera?.controller instanceof OrbitCameraController
             ? [...this.model.camera.controller.center]
@@ -158,7 +158,7 @@ export class SceneController extends BaseController<SceneModel> {
     const assetList = new Set<string>();
     const content = await serializeObject(scene, this._serializationManager, null, assetList);
     content.meta = {
-      activeCamera: this.model.camera?.id ?? ''
+      activeCamera: this.model.camera?.persistentId ?? ''
     };
     const zipDownloader = new ZipDownloader(`${name}.zip`);
     if (assetList.size > 0) {

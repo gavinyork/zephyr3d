@@ -94,7 +94,7 @@ async function getTerrainGrassContent(
     assetType: 'binary',
     assetId: terrain.grassAssetId,
     data: new Blob([data.buffer]),
-    pkgId: terrain.id,
+    pkgId: terrain.persistentId,
     path: 'grass.bin'
   };
 }
@@ -114,7 +114,7 @@ async function getTerrainHeightMapContent(terrain: ClipmapTerrain): Promise<Embe
     assetType: 'binary',
     assetId: terrain.heightMapAssetId,
     data: new Blob([head.buffer, data]),
-    pkgId: terrain.id,
+    pkgId: terrain.persistentId,
     path: 'heightmap.raw'
   };
 }
@@ -141,7 +141,7 @@ async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<Embed
     assetType: 'binary',
     assetId: terrain.splatMapAssetId,
     data: new Blob(data),
-    pkgId: terrain.id,
+    pkgId: terrain.persistentId,
     path: 'splatmap.raw'
   };
 }

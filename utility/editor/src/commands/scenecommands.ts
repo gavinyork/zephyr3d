@@ -53,11 +53,11 @@ export class AddAssetCommand extends Command<SceneNode> {
     if (asset) {
       asset.group.position.set(this._position);
       if (this._nodeId) {
-        asset.group.id = this._nodeId;
+        asset.group.persistentId = this._nodeId;
       } else {
-        this._nodeId = asset.group.id;
+        this._nodeId = asset.group.persistentId;
       }
-      idNodeMap[asset.group.id] = asset.group;
+      idNodeMap[asset.group.persistentId] = asset.group;
       return asset.group;
     } else {
       this._nodeId = '';
@@ -81,7 +81,7 @@ export class AddChildCommand<T extends SceneNode = SceneNode> extends Command<T>
   private _ctor: { new (scene: Scene): T };
   constructor(parentNode: SceneNode, ctor: { new (scene: Scene): T }, position?: Vector3) {
     super('Add child node');
-    this._parentId = parentNode.id;
+    this._parentId = parentNode.persistentId;
     idNodeMap[this._parentId] = parentNode;
     this._nodeId = '';
     this._ctor = ctor;
@@ -100,9 +100,9 @@ export class AddChildCommand<T extends SceneNode = SceneNode> extends Command<T>
       node.position.set(this._position);
     }
     if (this._nodeId) {
-      node.id = this._nodeId;
+      node.persistentId = this._nodeId;
     } else {
-      this._nodeId = node.id;
+      this._nodeId = node.persistentId;
     }
     idNodeMap[this._nodeId] = node;
     return node;
@@ -131,9 +131,9 @@ export class AddParticleSystemCommand extends Command<ParticleSystem> {
     const node = new ParticleSystem(this._scene);
     node.position.set(this._position);
     if (this._nodeId) {
-      node.id = this._nodeId;
+      node.persistentId = this._nodeId;
     } else {
-      this._nodeId = node.id;
+      this._nodeId = node.persistentId;
     }
     idNodeMap[this._nodeId] = node;
     return node;
@@ -198,9 +198,9 @@ export class AddShapeCommand<T extends ShapeType> extends Command<Mesh> {
     const mesh = new Mesh(this._scene, shape, new PBRMetallicRoughnessMaterial());
     mesh.position.set(this._position);
     if (this._nodeId) {
-      mesh.id = this._nodeId;
+      mesh.persistentId = this._nodeId;
     } else {
-      this._nodeId = mesh.id;
+      this._nodeId = mesh.persistentId;
     }
     idNodeMap[this._nodeId] = mesh;
     return mesh;
@@ -227,9 +227,9 @@ export class NodeDeleteCommand extends Command {
     super('Delete node');
     this._scene = node.scene;
     this._manager = manager;
-    this._nodeId = node.id;
+    this._nodeId = node.persistentId;
     idNodeMap[this._nodeId] = node;
-    this._parentId = node.parent.id;
+    this._parentId = node.parent.persistentId;
     idNodeMap[this._parentId] = node.parent;
     this._archive = null;
   }
@@ -240,7 +240,7 @@ export class NodeDeleteCommand extends Command {
       this._archive = await serializeObject(nodeHierarchy, this._manager, null, null); // await serializeObject(node, this._assetRegistry);
       node.remove();
       node.iterate((child) => {
-        delete idNodeMap[child.id];
+        delete idNodeMap[child.persistentId];
       });
       delete idNodeMap[this._nodeId];
     }
@@ -258,7 +258,7 @@ export class NodeDeleteCommand extends Command {
         //const node = (await deserializeObject(this._scene, this._archive, this._assetRegistry)) as SceneNode;
         if (node) {
           node.iterate((child) => {
-            idNodeMap[child.id] = child;
+            idNodeMap[child.persistentId] = child;
           });
           node.parent = parent;
         }
@@ -273,9 +273,9 @@ export class NodeReparentCommand extends Command {
   private _oldLocalMatrix: Matrix4x4;
   constructor(node: SceneNode, newParent: SceneNode) {
     super('Reparent object');
-    this._nodeId = node.id;
+    this._nodeId = node.persistentId;
     idNodeMap[this._nodeId] = node;
-    this._newParentId = newParent.id;
+    this._newParentId = newParent.persistentId;
     idNodeMap[this._newParentId] = newParent;
     this._oldParentId = '';
     this._oldLocalMatrix = null;
@@ -284,7 +284,7 @@ export class NodeReparentCommand extends Command {
     const node = idNodeMap[this._nodeId];
     const newParent = idNodeMap[this._newParentId];
     if (node && newParent) {
-      this._oldParentId = node.parent.id;
+      this._oldParentId = node.parent.persistentId;
       idNodeMap[this._oldParentId] = node.parent;
       this._oldLocalMatrix = new Matrix4x4(node.localMatrix);
       const newLocalMatrix = Matrix4x4.invertAffine(newParent.worldMatrix).multiplyRight(node.worldMatrix);
@@ -309,7 +309,7 @@ export class NodeCloneCommand extends Command<SceneNode> {
   private _assetRegistry: AssetRegistry;
   constructor(node: SceneNode, method: NodeCloneMethod, assetRegistry: AssetRegistry) {
     super('Clone node');
-    this._nodeId = node.id;
+    this._nodeId = node.persistentId;
     idNodeMap[this._nodeId] = node;
     this._method = method;
     this._assetRegistry = assetRegistry;
@@ -343,8 +343,8 @@ export class NodeCloneCommand extends Command<SceneNode> {
       return newNode;
     }
     const newNode = await cloneNode(node);
-    this._newNodeId = newNode.id;
-    idNodeMap[newNode.id] = newNode;
+    this._newNodeId = newNode.persistentId;
+    idNodeMap[newNode.persistentId] = newNode;
 
     return newNode;
   }
@@ -364,7 +364,7 @@ export class NodeTransformCommand extends Command {
   private _newTransform: TRS;
   constructor(node: SceneNode, oldTransform: TRS, newTransform: TRS, desc: string) {
     super(desc);
-    this._nodeId = node.id;
+    this._nodeId = node.persistentId;
     idNodeMap[this._nodeId] = node;
     this._oldTransform = {
       position: new Vector3(oldTransform.position),

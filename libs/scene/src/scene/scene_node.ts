@@ -191,10 +191,10 @@ export class SceneNode
   /**
    * Id of the node
    */
-  get id() {
+  get persistentId() {
     return this._id;
   }
-  set id(id: string) {
+  set persistentId(id: string) {
     this._id = id;
   }
   /**

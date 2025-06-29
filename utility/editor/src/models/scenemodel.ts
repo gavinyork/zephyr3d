@@ -40,7 +40,7 @@ export class SceneModel extends BaseModel {
     } else {
       this._scene.rootNode.iterate((child) => {
         if (child instanceof PerspectiveCamera) {
-          if (!activeCameraId || child.id === activeCameraId) {
+          if (!activeCameraId || child.persistentId === activeCameraId) {
             this._camera = child;
             return true;
           }

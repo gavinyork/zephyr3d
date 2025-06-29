@@ -183,10 +183,10 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
           type: 'string',
           hidden: true,
           get(this: SceneNode, value) {
-            value.str[0] = this.id;
+            value.str[0] = this.persistentId;
           },
           set(this: SceneNode, value) {
-            this.id = value.str[0];
+            this.persistentId = value.str[0];
           }
         },
         {
