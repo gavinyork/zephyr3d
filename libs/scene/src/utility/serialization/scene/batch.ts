@@ -1,13 +1,12 @@
-import { BatchGroup, SceneNode } from '../../../scene';
+import { BatchGroup, GraphNode, SceneNode } from '../../../scene';
 import { Scene } from '../../../scene/scene';
 import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
-import { getGraphNodeClass } from './node';
 
 export function getBatchGroupClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: BatchGroup,
-    parent: getGraphNodeClass(assetRegistry),
+    parent: GraphNode,
     createFunc(scene: Scene | SceneNode) {
       if (scene instanceof Scene) {
         return { obj: new BatchGroup(scene) };

@@ -1,11 +1,17 @@
 import { ImGui } from '@zephyr3d/imgui';
 import type { SerializationManager } from '@zephyr3d/scene';
-import { type PropertyAccessor, type PropertyValue, type SerializableClass } from '@zephyr3d/scene';
+import {
+  SceneNode,
+  type PropertyAccessor,
+  type PropertyValue,
+  type SerializableClass
+} from '@zephyr3d/scene';
 import type { DBAssetInfo } from '../storage/db';
 import { FontGlyph } from '../core/fontglyph';
 import type { GenericConstructor } from '@zephyr3d/base';
 import { AABB, degree2radian, makeEventTarget, Quaternion, radian2degree } from '@zephyr3d/base';
 import { RotationEditor } from './rotationeditor';
+import { Dialog } from '../views/dlg/dlg';
 
 interface Property<T extends {}> {
   path: string;
@@ -123,7 +129,7 @@ class PropertyGroup {
         while (ctor) {
           cls = serializationManager.getClassByConstructor(ctor);
           if (cls) {
-            const props = cls.getProps().filter((p) => !p.hidden);
+            const props = serializationManager.getPropertiesByClass(cls).filter((p) => !p.hidden);
             if (props.length > 0) {
               const group = this.addGroup(cls.ctor.name);
               for (const prop of props) {
@@ -225,9 +231,10 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     const resizeBarWidth = 4;
     const padding = 8;
     ImGui.SetCursorPosX(ImGui.GetCursorPosX() + resizeBarWidth + padding);
-    const availableWidth = this._width - this._padding * 2 - 4 - resizeBarWidth - padding;
-    const labelWidth = availableWidth * this._labelPercent;
-    const valueWidth = availableWidth * (1 - this._labelPercent);
+    const animateLabelWidth = ImGui.GetFrameHeight();
+    const availableWidth = this._width - this._padding * 2 - 4 - resizeBarWidth - padding - animateLabelWidth;
+    const labelWidth = Math.max(0, availableWidth * this._labelPercent);
+    const valueWidth = Math.max(0, availableWidth * (1 - this._labelPercent));
     const contentHeight = ImGui.GetContentRegionAvail().y;
     const childFlags = ImGui.WindowFlags.None; // 允许在需要时显示滚动条
 
@@ -251,10 +258,15 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       if (
         ImGui.BeginTable(
           'PropertyTable',
-          2,
+          3,
           ImGui.TableFlags.BordersInnerV | ImGui.TableFlags.PadOuterX | ImGui.TableFlags.SizingFixedFit
         )
       ) {
+        ImGui.TableSetupColumn(
+          'Animatable',
+          ImGui.TableColumnFlags.NoResize | ImGui.TableColumnFlags.WidthFixed,
+          animateLabelWidth
+        );
         ImGui.TableSetupColumn('Name', ImGui.TableColumnFlags.WidthFixed, labelWidth);
         ImGui.TableSetupColumn('Value', ImGui.TableColumnFlags.WidthFixed, valueWidth);
         this.renderSubGroups(this._rootGroup, 0);
@@ -303,9 +315,12 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     }
     ImGui.TableNextRow();
     ImGui.TableNextColumn();
+    ImGui.TableNextColumn();
+    /*
     if (level > 0) {
       ImGui.Indent(level * 10);
     }
+    */
     const flags = ImGui.TreeNodeFlags.DefaultOpen;
     const opened = ImGui.TreeNodeEx(group.name, flags);
     if (group.object && group.prop && group.objectTypes.length > 0) {
@@ -362,9 +377,11 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       }
       this.renderSubGroups(group, level + 1);
     }
+    /*
     if (level > 0) {
       ImGui.Unindent(level * 10);
     }
+    */
   }
   private renderProperty(property: PropertyGroup | Property<any>, level: number, object?: any) {
     if (property instanceof PropertyGroup) {
@@ -379,13 +396,32 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     ImGui.PushID(property.path);
     ImGui.TableNextRow();
     ImGui.TableNextColumn();
+    ImGui.SetNextItemWidth(-1);
+    const animatable = !!value.animatable;
+    if (animatable && this.object instanceof SceneNode) {
+      if (ImGui.Button('A')) {
+        const hash = this._serializationManager.getPropertyName(value);
+        const animationSet = this.object.animationSet;
+        Dialog.selectAnimationAndTrack(
+          'Create animation track',
+          animationSet ? animationSet.getAnimationNames() : [],
+          300
+        ).then((val) => {
+          if (val) {
+            console.log(hash, val.animationName, val.trackName);
+          }
+        });
+      }
+    }
+    ImGui.TableNextColumn();
+    const baseX = ImGui.GetCursorPosX();
     if (level > 0) {
-      ImGui.Indent(level * 10);
+      ImGui.SetCursorPosX(baseX + level * 10);
     }
     ImGui.AlignTextToFramePadding();
     ImGui.Text(value.label ?? name);
     if (level > 0) {
-      ImGui.Unindent(level * 10);
+      ImGui.SetCursorPosX(baseX);
     }
     ImGui.TableNextColumn();
     ImGui.SetNextItemWidth(-1);

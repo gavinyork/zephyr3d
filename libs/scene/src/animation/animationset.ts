@@ -1,10 +1,10 @@
 import { weightedAverage } from '@zephyr3d/base';
-import type { Scene, SceneNode } from '../scene';
+import type { SceneNode } from '../scene';
 import type { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
 import type { Skeleton } from './skeleton';
 import type { Disposable } from '../app/gc/ref';
-import { Application, DWeakRef } from '../app';
+import { DWeakRef } from '../app/gc/ref';
 
 /**
  * Options for playing animation
@@ -77,8 +77,6 @@ export class AnimationSet implements Disposable {
   /** @internal */
   private _animations: Record<string, AnimationClip>;
   /** @internal */
-  private _scene: Scene;
-  /** @internal */
   private _activeTracks: Map<unknown, Map<unknown, AnimationTrack[]>>;
   /** @internal */
   private _activeSkeletons: Map<Skeleton, number>;
@@ -103,11 +101,9 @@ export class AnimationSet implements Disposable {
    * @param scene - The scene to which the animation set belongs
    * @param model - The model which is controlled by the animation set
    */
-  constructor(scene: Scene, model: SceneNode) {
-    this._scene = scene;
+  constructor(model: SceneNode) {
     this._disposed = false;
     this._model = new DWeakRef<SceneNode>(model);
-    this._scene.addAnimationSet(this);
     this._animations = {};
     this._activeTracks = new Map();
     this._activeSkeletons = new Map();
@@ -148,7 +144,7 @@ export class AnimationSet implements Disposable {
   /**
    * Updates all animations of the model
    */
-  update(): void {
+  update(deltaInSeconds: number): void {
     this._activeAnimations.forEach((v, k) => {
       if (v.fadeOut > 0 && v.fadeOutStart < 0) {
         v.fadeOutStart = v.animateTime;
@@ -157,7 +153,7 @@ export class AnimationSet implements Disposable {
       if (v.firstFrame) {
         v.firstFrame = false;
       } else {
-        const timeAdvance = Application.instance.device.frameInfo.elapsedFrame * 0.001 * v.speedRatio;
+        const timeAdvance = deltaInSeconds * v.speedRatio;
         v.currentTime += timeAdvance;
         v.animateTime += timeAdvance;
         if (v.currentTime > k.timeDuration) {
@@ -207,7 +203,7 @@ export class AnimationSet implements Disposable {
   }
   /**
    * Checks whether an animation is playing
-   * @param name - Name of the animation to be checked
+   * @param name - Name of the animation to be checked, if not given, checks if any animation is playing
    * @returns true if the animation is playing, otherwise false
    */
   isPlayingAnimation(name?: string): boolean {

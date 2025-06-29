@@ -1,10 +1,9 @@
 import { degree2radian, radian2degree, Vector2 } from '@zephyr3d/base';
-import { SceneNode } from '../../../scene';
+import { GraphNode, SceneNode } from '../../../scene';
 import { Water } from '../../../scene/water';
 import type { AssetRegistry } from '../asset/asset';
 import type { PropertyAccessor, SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
-import { getGraphNodeClass } from './node';
 import type { WaveGenerator } from '../../../render';
 import { FBMWaveGenerator, FFTWaveGenerator, GerstnerWaveGenerator } from '../../../render';
 import type { Texture2D } from '@zephyr3d/device';
@@ -57,6 +56,7 @@ export function getGerstnerWaveClass(assetRegistry): SerializableClass {
         {
           name: 'Direction',
           type: 'float',
+          animatable: true,
           options: { minValue: 0, maxValue: 360 },
           get(this: Wave, value) {
             value.num[0] = radian2degree(this.direction);
@@ -69,6 +69,7 @@ export function getGerstnerWaveClass(assetRegistry): SerializableClass {
         {
           name: 'Steepness',
           type: 'float',
+          animatable: true,
           options: { minValue: 0, maxValue: 1 },
           get(this: Wave, value) {
             value.num[0] = this.steepness;
@@ -81,6 +82,7 @@ export function getGerstnerWaveClass(assetRegistry): SerializableClass {
         {
           name: 'Amplitude',
           type: 'float',
+          animatable: true,
           options: { minValue: 0, maxValue: 1 },
           get(this: Wave, value) {
             value.num[0] = this.amplitude;
@@ -93,6 +95,7 @@ export function getGerstnerWaveClass(assetRegistry): SerializableClass {
         {
           name: 'WaveLength',
           type: 'float',
+          animatable: true,
           get(this: Wave, value) {
             value.num[0] = this.waveLength;
           },
@@ -115,6 +118,7 @@ export function getGerstnerWaveClass(assetRegistry): SerializableClass {
         {
           name: 'OmniOrigin',
           type: 'vec2',
+          animatable: true,
           get(this: Wave, value) {
             value.num[0] = this.originX;
             value.num[1] = this.originZ;
@@ -154,6 +158,7 @@ export function getFBMWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
           name: 'Wind',
           type: 'vec2',
           default: [0.1, 0],
+          animatable: true,
           get(this: FBMWaveGenerator, value) {
             value.num[0] = this.wind.x;
             value.num[1] = this.wind.y;
@@ -165,6 +170,7 @@ export function getFBMWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
         {
           name: 'Amplitude',
           type: 'float',
+          animatable: true,
           options: { minValue: 0, maxValue: 5 },
           default: 0.3,
           get(this: FBMWaveGenerator, value) {
@@ -177,6 +183,7 @@ export function getFBMWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
         {
           name: 'Frequency',
           type: 'float',
+          animatable: true,
           options: { minValue: 0, maxValue: 16 },
           default: 3,
           get(this: FBMWaveGenerator, value) {
@@ -186,32 +193,6 @@ export function getFBMWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
             this.frequency = value.num[0];
           }
         }
-        /*
-        {
-          name: 'Gain',
-          type: 'float',
-          options: { minValue: 0, maxValue: 1 },
-          default: 0.5,
-          get(this: FBMWaveGenerator, value) {
-            value.num[0] = this.gain;
-          },
-          set(this: FBMWaveGenerator, value) {
-            this.gain = value.num[0];
-          }
-        },
-        {
-          name: 'Lacunarity',
-          type: 'float',
-          options: { minValue: 0, maxValue: 5 },
-          default: 2,
-          get(this: FBMWaveGenerator, value) {
-            value.num[0] = this.lacunarity;
-          },
-          set(this: FBMWaveGenerator, value) {
-            this.lacunarity = value.num[0];
-          }
-        }
-          */
       ];
     }
   };
@@ -225,6 +206,7 @@ export function getFFTWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
         {
           name: 'Alignment',
           type: 'float',
+          animatable: true,
           options: { minValue: 0, maxValue: 1 },
           get(this: FFTWaveGenerator, value) {
             value.num[0] = this.alignment;
@@ -236,6 +218,7 @@ export function getFFTWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
         {
           name: 'Wind',
           type: 'vec2',
+          animatable: true,
           get(this: FFTWaveGenerator, value) {
             value.num[0] = this.wind.x;
             value.num[1] = this.wind.y;
@@ -248,6 +231,7 @@ export function getFFTWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
           name: 'FoamWidth',
           type: 'float',
           default: 1.2,
+          animatable: true,
           options: { minValue: 0, maxValue: 10 },
           get(this: FFTWaveGenerator, value) {
             value.num[0] = this.foamWidth;
@@ -260,6 +244,7 @@ export function getFFTWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
           name: 'FoamContrast',
           type: 'float',
           default: 7.2,
+          animatable: true,
           options: { minValue: 0, maxValue: 10 },
           get(this: FFTWaveGenerator, value) {
             value.num[0] = this.foamContrast;
@@ -271,6 +256,7 @@ export function getFFTWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
         {
           name: 'WaveLengthCascades',
           type: 'vec3',
+          animatable: true,
           default: [400, 100, 15],
           options: { minValue: 0, maxValue: 1000 },
           get(this: FFTWaveGenerator, value) {
@@ -287,6 +273,7 @@ export function getFFTWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
         {
           name: 'WaveStrengthCascades',
           type: 'vec3',
+          animatable: true,
           default: [0.4, 0.4, 0.2],
           options: { minValue: 0, maxValue: 1 },
           get(this: FFTWaveGenerator, value) {
@@ -303,6 +290,7 @@ export function getFFTWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
         {
           name: 'WaveCroppinessCascades',
           type: 'vec3',
+          animatable: true,
           default: [-1.5, -1.2, -0.5],
           options: { minValue: -4, maxValue: 0 },
           get(this: FFTWaveGenerator, value) {
@@ -366,7 +354,7 @@ export function getGerstnerWaveGeneratorClass(assetRegistry: AssetRegistry): Ser
 export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: Water,
-    parent: getGraphNodeClass(assetRegistry),
+    parent: GraphNode,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new Water(ctx.scene);
       if (ctx instanceof SceneNode) {
@@ -422,6 +410,7 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'AnimationSpeed',
           type: 'float',
           default: 1,
+          animatable: true,
           options: { minValue: 0, maxValue: 100 },
           get(this: Water, value) {
             value.num[0] = this.animationSpeed;
@@ -433,6 +422,7 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'DepthScale',
           type: 'float',
+          animatable: true,
           default: 10,
           options: { minValue: 0, maxValue: 100 },
           get(this: Water, value) {
@@ -446,6 +436,7 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'RefractionStrength',
           type: 'float',
           default: 0,
+          animatable: true,
           options: { minValue: 0, maxValue: 1 },
           get(this: Water, value) {
             value.num[0] = this.material.refractionStrength;

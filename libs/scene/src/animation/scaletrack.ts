@@ -12,24 +12,28 @@ export class NodeScaleTrack extends AnimationTrack<Vector3> {
   /**
    * Create an instance of ScaleTrack from keyframe values
    * @param interpolator - Interpolator object that contains keyframe values
+   * @param embedded - Whether this track be an embedded track
    */
-  constructor(interpolator: Interpolator);
+  constructor(interpolator: Interpolator, embedded?: boolean);
   /**
    * Create an instance of ScaleTrack from keyframe values
    * @param mode - The interpolation mode of keyframes
    * @param keyFrames - Keyframe values
+   * @param embedded - Whether this track be an embedded track
    */
-  constructor(mode: InterpolationMode, keyFrames: { time: number; value: Vector3 }[]);
+  constructor(mode: InterpolationMode, keyFrames: { time: number; value: Vector3 }[], embedded?: boolean);
   constructor(
     modeOrInterpolator?: Interpolator | InterpolationMode,
-    keyFrames?: { time: number; value: Vector3 }[]
+    keyFramesOrEmbedded?: { time: number; value: Vector3 }[] | boolean,
+    embedded?: boolean
   ) {
     if (modeOrInterpolator instanceof Interpolator) {
       if (modeOrInterpolator.target !== 'vec3') {
         throw new Error(`ScaleTrack(): interpolator target must be 'vec3'`);
       }
-      super(modeOrInterpolator);
+      super(modeOrInterpolator, (keyFramesOrEmbedded as boolean) ?? false);
     } else {
+      const keyFrames = keyFramesOrEmbedded as { time: number; value: Vector3 }[];
       const inputs = new Float32Array(keyFrames.map((val) => val.time));
       const outputs = new Float32Array(keyFrames.length * 3);
       for (let i = 0; i < keyFrames.length; i++) {
@@ -38,7 +42,7 @@ export class NodeScaleTrack extends AnimationTrack<Vector3> {
         outputs[i * 3 + 2] = keyFrames[i].value.z;
       }
       const interpolator = new Interpolator(modeOrInterpolator, 'vec3', inputs, outputs);
-      super(interpolator);
+      super(interpolator, embedded ?? false);
     }
     this._state = new Vector3();
   }

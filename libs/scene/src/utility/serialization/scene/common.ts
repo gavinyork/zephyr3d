@@ -23,6 +23,7 @@ export function getTextureProps<T extends Material>(
       name: name[0].toUpperCase() + name.slice(1, name.length - 7) + 'TexCoordScale',
       type: 'vec2',
       phase: phase + 1,
+      animatable: true,
       default: [1, 1],
       get(this: T, value) {
         const matrix = this[name.slice(0, name.length - 7) + 'TexCoordMatrix'] as Matrix4x4;

@@ -1,7 +1,6 @@
 import type { SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 import type { NodeHierarchy } from './node';
-import { getSceneNodeClass } from './node';
 import type { AssetRegistry } from '../asset/asset';
 import { SceneNode } from '../../../scene';
 import {
@@ -17,7 +16,7 @@ import {
 export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: Camera,
-    parent: getSceneNodeClass(assetRegistry),
+    parent: SceneNode,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new Camera(ctx.scene);
       if (ctx instanceof SceneNode) {
@@ -130,6 +129,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           label: 'Threshold',
           group: 'PostProcessing/Bloom',
           type: 'float',
+          animatable: true,
           options: { minValue: 0, maxValue: 1 },
           phase: 0,
           default: 0.8,
@@ -145,6 +145,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           label: 'ThresholdKnee',
           group: 'PostProcessing/Bloom',
           type: 'float',
+          animatable: true,
           options: { minValue: 0, maxValue: 1 },
           phase: 0,
           default: 0,
@@ -160,6 +161,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           label: 'Intensity',
           group: 'PostProcessing/Bloom',
           type: 'float',
+          animatable: true,
           options: { minValue: 0, maxValue: 8 },
           phase: 0,
           default: 1,
@@ -267,6 +269,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
           label: 'Strength',
           group: 'PostProcessing/MotionBlur',
           type: 'float',
+          animatable: true,
           phase: 1,
           default: 1,
           options: {
@@ -602,7 +605,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
 export function getPerspectiveCameraClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: PerspectiveCamera,
-    parent: getCameraClass(assetRegistry),
+    parent: Camera,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new PerspectiveCamera(ctx.scene);
       if (ctx instanceof SceneNode) {
@@ -657,7 +660,7 @@ export function getPerspectiveCameraClass(assetRegistry: AssetRegistry): Seriali
 export function getOrthoCameraClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: OrthoCamera,
-    parent: getCameraClass(assetRegistry),
+    parent: Camera,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new OrthoCamera(ctx.scene);
       if (ctx instanceof SceneNode) {

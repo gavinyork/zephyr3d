@@ -943,7 +943,7 @@ export class SceneView extends BaseView<SceneModel> {
     if (node.isParentOf(this._postGizmoRenderer.node)) {
       this._postGizmoRenderer.node = null;
     }
-    this._cmdManager.execute(new NodeDeleteCommand(node, this._serializationManager.assetRegistry));
+    this._cmdManager.execute(new NodeDeleteCommand(node, this._serializationManager));
   }
   private handleNodeSelected(node: SceneNode) {
     this._postGizmoRenderer.node = node === node.scene.rootNode ? null : node;

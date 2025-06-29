@@ -7,6 +7,10 @@ import type { AnimationClip } from './animation';
  */
 export abstract class AnimationTrack<StateType = unknown> {
   /** @internal */
+  protected _name: string;
+  /** @internal */
+  protected _embedded: boolean;
+  /** @internal */
   protected _interpolator: Interpolator;
   /** @internal */
   protected _animation: AnimationClip;
@@ -14,8 +18,17 @@ export abstract class AnimationTrack<StateType = unknown> {
    * Creates a new animation track
    * @param interpolator - Interpolator for the track
    */
-  constructor(interpolator?: Interpolator) {
+  constructor(interpolator?: Interpolator, embedded?: boolean) {
+    this._name = 'noname';
+    this._embedded = !!embedded;
     this._interpolator = interpolator;
+  }
+  /** Name of the track */
+  get name() {
+    return this._name;
+  }
+  set name(val: string) {
+    this._name = val;
   }
   /** Interpolator of the track */
   get interpolator(): Interpolator {

@@ -1,9 +1,8 @@
 import type { GrassInstanceInfo } from '../../../scene';
-import { SceneNode } from '../../../scene';
+import { GraphNode, SceneNode } from '../../../scene';
 import type { AssetRegistry, EmbeddedAssetInfo } from '../asset/asset';
 import type { PropertyAccessor, SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
-import { getGraphNodeClass } from './node';
 import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
 import { Application } from '../../../app';
@@ -270,7 +269,7 @@ function getDetailMapProps(assetRegistry: AssetRegistry) {
 export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: ClipmapTerrain,
-    parent: getGraphNodeClass(assetRegistry),
+    parent: GraphNode,
     createFunc(ctx: NodeHierarchy | SceneNode, init: number) {
       const node = new ClipmapTerrain(ctx.scene);
       node.numDetailMaps = init;

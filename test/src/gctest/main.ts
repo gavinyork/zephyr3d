@@ -1,4 +1,4 @@
-import { PerspectiveCamera } from '@zephyr3d/scene';
+import { PerspectiveCamera, SerializationManager } from '@zephyr3d/scene';
 import { Application, AssetRegistry, deserializeSceneFromURL, OrbitCameraController } from '@zephyr3d/scene';
 import * as common from '../common';
 
@@ -8,9 +8,9 @@ const myApp = new Application({
 });
 
 myApp.ready().then(async function () {
-  const assetRegistry = new AssetRegistry('assets/scenes/test1');
-  await assetRegistry.loadFromURL('assets/scenes/test1/assets/index.json');
-  const { scene, meta } = await deserializeSceneFromURL('assets/scenes/test1/scene.json', assetRegistry);
+  const manager = new SerializationManager(new AssetRegistry('assets/scenes/test1'));
+  await manager.assetRegistry.loadFromURL('assets/scenes/test1/assets/index.json');
+  const { scene, meta } = await deserializeSceneFromURL('assets/scenes/test1/scene.json', manager);
   const cameraId: string = meta.activeCamera;
   const camera = scene.findNodeById<PerspectiveCamera>(cameraId) ?? new PerspectiveCamera(scene);
   camera.controller = new OrbitCameraController();

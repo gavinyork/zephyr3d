@@ -1,72 +1,7 @@
-import { AABB } from '@zephyr3d/base';
-import { Camera, OrthoCamera, PerspectiveCamera } from '../../camera';
-import {
-  BlinnMaterial,
-  LambertMaterial,
-  MeshMaterial,
-  ParticleMaterial,
-  PBRMetallicRoughnessMaterial,
-  PBRSpecularGlossinessMaterial,
-  UnlitMaterial
-} from '../../material';
-import { FBMWaveGenerator, FFTWaveGenerator, GerstnerWaveGenerator, Primitive } from '../../render';
-import {
-  BatchGroup,
-  DirectionalLight,
-  GraphNode,
-  Mesh,
-  ParticleSystem,
-  PointLight,
-  PunctualLight,
-  Scene,
-  SceneNode,
-  SpotLight
-} from '../../scene';
-import { BoxFrameShape, BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '../../shapes';
-import type { AssetRegistry, EmbeddedAssetInfo } from './asset/asset';
-import { getBatchGroupClass } from './scene/batch';
-import { getCameraClass, getOrthoCameraClass, getPerspectiveCameraClass } from './scene/camera';
-import {
-  getDirectionalLightClass,
-  getPointLightClass,
-  getPunctualLightClass,
-  getSpotLightClass
-} from './scene/light';
-import {
-  getBlinnMaterialClass,
-  getLambertMaterialClass,
-  getMeshMaterialClass,
-  getParticleMaterialClass,
-  getPBRMetallicRoughnessMaterialClass,
-  getPBRSpecularGlossinessMaterialClass,
-  getUnlitMaterialClass
-} from './scene/material';
-import { getMeshClass } from './scene/mesh';
-import { getGraphNodeClass, getNodeHierarchyClass, getSceneNodeClass, NodeHierarchy } from './scene/node';
-import { getParticleNodeClass } from './scene/particle';
-import {
-  getBoxFrameShapeClass,
-  getBoxShapeClass,
-  getCylinderShapeClass,
-  getPlaneShapeClass,
-  getPrimitiveClass,
-  getSphereShapeClass,
-  getTorusShapeClass
-} from './scene/primitive';
-import { getSceneClass } from './scene/scene';
+import { Scene } from '../../scene';
+import type { EmbeddedAssetInfo } from './asset/asset';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
-import { getAABBClass } from './scene/misc';
-import {
-  Wave,
-  getFBMWaveGeneratorClass,
-  getFFTWaveGeneratorClass,
-  getGerstnerWaveClass,
-  getGerstnerWaveGeneratorClass,
-  getWaterClass
-} from './scene/water';
-import { Water } from '../../scene/water';
-import { ClipmapTerrain } from '../../scene/terrain-cm/terrain-cm';
-import { getTerrainClass } from './scene/terrain';
+import type { SerializationManager } from './manager';
 
 export * from './asset/asset';
 export * from './scene/batch';
@@ -77,8 +12,6 @@ export * from './scene/node';
 export * from './scene/particle';
 export * from './types';
 export * from './manager';
-
-const serializationInfoCache: WeakMap<AssetRegistry, Map<any, SerializableClass>> = new WeakMap();
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -107,58 +40,13 @@ function getDefaultValue<T>(obj: T, prop: PropertyAccessor<T>) {
   return v;
 }
 
-export function getSerializationInfo(assetRegistry: AssetRegistry) {
-  let info = serializationInfoCache.get(assetRegistry);
-  if (!info) {
-    info = new Map<any, SerializableClass>([
-      [AABB, getAABBClass()],
-      [NodeHierarchy, getNodeHierarchyClass(assetRegistry)],
-      [SceneNode, getSceneNodeClass(assetRegistry)],
-      [GraphNode, getGraphNodeClass(assetRegistry)],
-      [Mesh, getMeshClass(assetRegistry)],
-      [Water, getWaterClass(assetRegistry)],
-      [ClipmapTerrain, getTerrainClass(assetRegistry)],
-      [Wave, getGerstnerWaveClass(assetRegistry)],
-      [GerstnerWaveGenerator, getGerstnerWaveGeneratorClass(assetRegistry)],
-      [FFTWaveGenerator, getFFTWaveGeneratorClass(assetRegistry)],
-      [FBMWaveGenerator, getFBMWaveGeneratorClass(assetRegistry)],
-      [ParticleSystem, getParticleNodeClass(assetRegistry)],
-      [PunctualLight, getPunctualLightClass(assetRegistry)],
-      [DirectionalLight, getDirectionalLightClass(assetRegistry)],
-      [SpotLight, getSpotLightClass(assetRegistry)],
-      [PointLight, getPointLightClass(assetRegistry)],
-      [Camera, getCameraClass(assetRegistry)],
-      [PerspectiveCamera, getPerspectiveCameraClass(assetRegistry)],
-      [OrthoCamera, getOrthoCameraClass(assetRegistry)],
-      [BatchGroup, getBatchGroupClass(assetRegistry)],
-      [Scene, getSceneClass(assetRegistry)],
-      [MeshMaterial, getMeshMaterialClass()],
-      [UnlitMaterial, getUnlitMaterialClass(assetRegistry)],
-      [LambertMaterial, getLambertMaterialClass(assetRegistry)],
-      [BlinnMaterial, getBlinnMaterialClass(assetRegistry)],
-      [PBRMetallicRoughnessMaterial, getPBRMetallicRoughnessMaterialClass(assetRegistry)],
-      [PBRSpecularGlossinessMaterial, getPBRSpecularGlossinessMaterialClass(assetRegistry)],
-      [ParticleMaterial, getParticleMaterialClass(assetRegistry)],
-      [Primitive, getPrimitiveClass()],
-      [BoxShape, getBoxShapeClass()],
-      [BoxFrameShape, getBoxFrameShapeClass()],
-      [SphereShape, getSphereShapeClass()],
-      [TorusShape, getTorusShapeClass()],
-      [CylinderShape, getCylinderShapeClass()],
-      [PlaneShape, getPlaneShapeClass()]
-    ]);
-    serializationInfoCache.set(assetRegistry, info);
-  }
-  return info;
-}
-
 export async function deserializeObjectProps<T>(
   obj: T,
   cls: SerializableClass,
   json: object,
-  assetRegistry: AssetRegistry
+  manager: SerializationManager
 ) {
-  const props = (cls.getProps() ?? []).sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0));
+  const props = (manager.getPropertiesByClass(cls) ?? []).sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0));
   let currentPhase: number = undefined;
   const promises: Promise<void>[] = [];
   for (const prop of props) {
@@ -195,7 +83,7 @@ export async function deserializeObjectProps<T>(
         if (typeof v === 'string' && v) {
           tmpVal.str[0] = v;
         } else {
-          tmpVal.object[0] = v ? (await deserializeObject<any>(obj, v, assetRegistry)) ?? null : null;
+          tmpVal.object[0] = v ? (await deserializeObject<any>(obj, v, manager)) ?? null : null;
         }
         break;
       case 'object_array':
@@ -205,7 +93,7 @@ export async function deserializeObjectProps<T>(
             if (typeof p === 'string' && p) {
               tmpVal.str[0] = p;
             } else {
-              tmpVal.object.push(p ? (await deserializeObject<any>(obj, p, assetRegistry)) ?? null : null);
+              tmpVal.object.push(p ? (await deserializeObject<any>(obj, p, manager)) ?? null : null);
             }
           }
         }
@@ -252,11 +140,11 @@ export function serializeObjectProps<T>(
   obj: T,
   cls: SerializableClass,
   json: object,
-  assetRegistry: AssetRegistry,
+  manager: SerializationManager,
   assetList?: Set<string>,
   embeddedAssetList?: Promise<EmbeddedAssetInfo>[]
 ) {
-  const props = cls.getProps() ?? [];
+  const props = manager.getPropertiesByClass(cls) ?? [];
   for (const prop of props) {
     if (prop.isValid && !prop.isValid.call(obj)) {
       continue;
@@ -282,11 +170,11 @@ export function serializeObjectProps<T>(
           typeof tmpVal.str[0] === 'string' && tmpVal.str[0]
             ? tmpVal.str[0]
             : tmpVal.object[0]
-            ? serializeObject(tmpVal.object[0], assetRegistry, {}, assetList, embeddedAssetList)
+            ? serializeObject(tmpVal.object[0], manager, {}, assetList, embeddedAssetList)
             : null;
         if (value) {
           json[k] = value;
-          if (assetList && typeof json[k] === 'string' && assetRegistry.getAssetInfo(json[k])) {
+          if (assetList && typeof json[k] === 'string' && manager.assetRegistry.getAssetInfo(json[k])) {
             assetList.add(json[k]);
           }
         }
@@ -295,7 +183,7 @@ export function serializeObjectProps<T>(
       case 'object_array':
         json[k] = [];
         for (const p of tmpVal.object) {
-          json[k].push(serializeObject(p, assetRegistry, {}, assetList, embeddedAssetList));
+          json[k].push(serializeObject(p, manager, {}, assetList, embeddedAssetList));
         }
         break;
       case 'float':
@@ -366,13 +254,12 @@ export function serializeObjectProps<T>(
 
 export function serializeObject(
   obj: any,
-  assetRegistry: AssetRegistry,
+  manager: SerializationManager,
   json?: any,
   assetList?: Set<string>,
   embeddedAssetList?: Promise<EmbeddedAssetInfo>[]
 ) {
-  const serializationInfo = getSerializationInfo(assetRegistry);
-  const cls = [...serializationInfo.values()];
+  const cls = manager.getClasses();
   const index = cls.findIndex((val) => val.ctor === obj.constructor);
   if (index < 0) {
     throw new Error('Serialize object failed: Cannot found serialization meta data');
@@ -384,7 +271,7 @@ export function serializeObject(
   json.Object = {};
   if (initParams !== undefined && initParams !== null) {
     json.Init = initParams;
-    if (assetList && initParams.asset && assetRegistry.getAssetInfo(initParams.asset)) {
+    if (assetList && initParams.asset && manager.assetRegistry.getAssetInfo(initParams.asset)) {
       assetList.add(initParams.asset);
     }
   }
@@ -399,8 +286,8 @@ export function serializeObject(
         }
       }
     }
-    serializeObjectProps(obj, info, json.Object, assetRegistry, assetList, embeddedAssetList);
-    info = info.parent;
+    serializeObjectProps(obj, info, json.Object, manager, assetList, embeddedAssetList);
+    info = manager.getClassByConstructor(info.parent);
   }
   return json;
 }
@@ -408,10 +295,9 @@ export function serializeObject(
 export async function deserializeObject<T extends object>(
   ctx: any,
   json: object,
-  assetRegistry: AssetRegistry
+  manager: SerializationManager
 ): Promise<T> {
-  const serializationInfo = getSerializationInfo(assetRegistry);
-  const cls = [...serializationInfo.values()];
+  const cls = manager.getClasses();
   const className = json['ClassName'];
   const index = cls.findIndex((val) => val.ctor.name === className);
   if (index < 0) {
@@ -439,8 +325,8 @@ export async function deserializeObject<T extends object>(
   const obj = p instanceof Promise ? await p : p;
   if (loadProps) {
     while (info) {
-      await deserializeObjectProps(obj, info, json, assetRegistry);
-      info = info.parent;
+      await deserializeObjectProps(obj, info, json, manager);
+      info = manager.getClassByConstructor(info.parent);
     }
   }
   return obj;
@@ -448,12 +334,12 @@ export async function deserializeObject<T extends object>(
 
 export async function deserializeSceneFromURL(
   url: string,
-  assetRegistry: AssetRegistry
+  manager: SerializationManager
 ): Promise<{ scene: Scene; meta: any }> {
   try {
-    const data = await assetRegistry.assetManager.fetchTextData(url);
+    const data = await manager.assetRegistry.assetManager.fetchTextData(url);
     const json = JSON.parse(data);
-    const scene = await deserializeObject<Scene>(null, json, assetRegistry);
+    const scene = await deserializeObject<Scene>(null, json, manager);
     const meta = json['meta'] ?? null;
     return { scene, meta };
   } catch (err) {

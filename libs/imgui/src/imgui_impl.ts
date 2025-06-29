@@ -40,8 +40,6 @@ export class Input {
   }
   onKeypress(e: KeyboardEvent) {
     e.preventDefault();
-    console.log(`key pressed: `);
-    console.log(e);
     canvas_on_keypress(e);
   }
   onCompositionEnd(e: CompositionEvent) {
@@ -112,7 +110,6 @@ function canvas_on_blur(event: FocusEvent): void {
   for (let i = 0; i < io.MouseDown.length; ++i) {
     io.MouseDown[i] = false;
   }
-  console.log('canvas_on_blur');
 }
 
 const key_code_to_index: Record<string, number> = {
@@ -143,7 +140,6 @@ const key_code_to_index: Record<string, number> = {
 export function canvas_on_keydown(event: KeyboardEvent): boolean {
   const key_index = key_code_to_index[event.code];
   if (key_index) {
-    //console.log(event.type, event.key, event.code, key_index);
     const io = ImGui.GetIO();
     io.KeyCtrl = event.ctrlKey;
     io.KeyShift = event.shiftKey;
@@ -162,7 +158,6 @@ export function canvas_on_keydown(event: KeyboardEvent): boolean {
 export function canvas_on_keyup(event: KeyboardEvent): boolean {
   const key_index = key_code_to_index[event.code];
   if (key_index) {
-    //console.log(event.type, event.key, event.code, key_index);
     const io = ImGui.GetIO();
     io.KeyCtrl = event.ctrlKey;
     io.KeyShift = event.shiftKey;
@@ -178,7 +173,6 @@ export function canvas_on_keyup(event: KeyboardEvent): boolean {
 }
 
 export function canvas_on_keypress(event: KeyboardEvent): boolean {
-  //console.log(event);
   const io = ImGui.GetIO();
   io.AddInputCharacter(event.charCode);
   if (io.WantCaptureKeyboard || io.WantTextInput) {
@@ -389,23 +383,9 @@ export function Init(device: AbstractDevice): void {
 
   io.SetClipboardTextFn = (user_data: any, text: string): void => {
     clipboard_text = text;
-    // console.log(`set clipboard_text: "${clipboard_text}"`);
-    if (typeof navigator !== 'undefined' && typeof (navigator as any).clipboard !== 'undefined') {
-      // console.log(`clipboard.writeText: "${clipboard_text}"`);
-      (navigator as any).clipboard.writeText(clipboard_text).then((): void => {
-        // console.log(`clipboard.writeText: "${clipboard_text}" done.`);
-      });
-    }
+    navigator.clipboard.writeText(clipboard_text);
   };
   io.GetClipboardTextFn = (user_data: any): string => {
-    // if (typeof navigator !== "undefined" && typeof (navigator as any).clipboard !== "undefined") {
-    //     console.log(`clipboard.readText: "${clipboard_text}"`);
-    //     (navigator as any).clipboard.readText().then((text: string): void => {
-    //         clipboard_text = text;
-    //         console.log(`clipboard.readText: "${clipboard_text}" done.`);
-    //     });
-    // }
-    // console.log(`get clipboard_text: "${clipboard_text}"`);
     return clipboard_text;
   };
   io.ClipboardUserData = null;

@@ -590,7 +590,7 @@ export class SharedModel {
   createSceneNode(scene: Scene, instancing: boolean): SceneNode {
     const group = new SceneNode(scene);
     group.name = this.name;
-    const animationSet = new AnimationSet(scene, group);
+    const animationSet = new AnimationSet(group);
     for (let i = 0; i < this.scenes.length; i++) {
       const assetScene = this.scenes[i];
       const skeletonMeshMap: Map<
@@ -609,14 +609,14 @@ export class SharedModel {
         );
       }
       for (const animationData of this.animations) {
-        const animation = new AnimationClip(animationData.name);
+        const animation = new AnimationClip(animationData.name, true);
         for (const track of animationData.tracks) {
           if (track.type === 'translation') {
-            animation.addTrack(nodeMap.get(track.node), new NodeTranslationTrack(track.interpolator));
+            animation.addTrack(nodeMap.get(track.node), new NodeTranslationTrack(track.interpolator, true));
           } else if (track.type === 'scale') {
-            animation.addTrack(nodeMap.get(track.node), new NodeScaleTrack(track.interpolator));
+            animation.addTrack(nodeMap.get(track.node), new NodeScaleTrack(track.interpolator, true));
           } else if (track.type === 'rotation') {
-            animation.addTrack(nodeMap.get(track.node), new NodeRotationTrack(track.interpolator));
+            animation.addTrack(nodeMap.get(track.node), new NodeRotationTrack(track.interpolator, true));
           } else if (track.type === 'weights') {
             for (const m of track.node.mesh.subMeshes) {
               if (track.interpolator.stride > MAX_MORPH_TARGETS) {
@@ -624,7 +624,7 @@ export class SharedModel {
                   `Morph target too large: ${track.interpolator.stride}, the maximum is ${MAX_MORPH_TARGETS}`
                 );
               } else {
-                const morphTrack = new MorphTargetTrack(track, m);
+                const morphTrack = new MorphTargetTrack(track, m, true);
                 animation.addTrack(m.mesh, morphTrack);
               }
             }

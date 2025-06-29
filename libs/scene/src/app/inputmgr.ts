@@ -17,6 +17,7 @@ type PointerEventHandler = (this: HTMLElement, ev: PointerEvent) => any;
 type KeyboardEventHandler = (this: HTMLElement, ev: KeyboardEvent) => any;
 type DragEventHandler = (this: HTMLElement, ev: DragEvent) => any;
 type WheelEventHandler = (this: HTMLElement, ev: WheelEvent) => any;
+type CompositionEventHandler = (this: HTMLElement, ev: CompositionEvent) => any;
 
 /**
  * Input handler type
@@ -43,6 +44,7 @@ export class InputManager {
   private _keyboardHandler: KeyboardEventHandler;
   private _dragHandler: DragEventHandler;
   private _wheelHandler: WheelEventHandler;
+  private _compositionHandler: CompositionEventHandler;
   private _captureId: number;
   private _middlewares: InputEventHandler[];
   private _lastEventDatas: PointerEventData[];
@@ -66,6 +68,7 @@ export class InputManager {
     this._keyboardHandler = this._getKeyboardHandler();
     this._dragHandler = this._getDragHandler();
     this._wheelHandler = this._getWheelHandler();
+    this._compositionHandler = this._getCompositionHandler();
     this._captureId = -1;
     this._middlewares = [];
   }
@@ -88,6 +91,9 @@ export class InputManager {
       this._target.addEventListener('dragover', this._dragHandler);
       this._target.addEventListener('drop', this._dragHandler);
       this._target.addEventListener('wheel', this._wheelHandler);
+      this._target.addEventListener('compositionstart', this._compositionHandler);
+      this._target.addEventListener('compositionupdate', this._compositionHandler);
+      this._target.addEventListener('compositionend', this._compositionHandler);
     }
   }
   /** @internal */
@@ -109,6 +115,9 @@ export class InputManager {
       this._target.removeEventListener('dragover', this._dragHandler);
       this._target.removeEventListener('drop', this._dragHandler);
       this._target.removeEventListener('wheel', this._wheelHandler);
+      this._target.removeEventListener('compositionstart', this._compositionHandler);
+      this._target.removeEventListener('compositionupdate', this._compositionHandler);
+      this._target.removeEventListener('compositionend', this._compositionHandler);
       this._lastEventDatas = [];
     }
   }
@@ -130,8 +139,18 @@ export class InputManager {
     }
     return this;
   }
+  /**
+   * Log event handler
+   * @param ev - Event to be logged
+   * @param type - Event type
+   * @returns Always returns false
+   */
+  static log(ev: Event, type?: string) {
+    console.log('Event log:', type ?? ev.type);
+    return false;
+  }
   private _callMiddlewares(
-    ev: PointerEvent | WheelEvent | KeyboardEvent | DragEvent,
+    ev: PointerEvent | WheelEvent | KeyboardEvent | DragEvent | CompositionEvent,
     type?: string
   ): boolean {
     for (const handler of this._middlewares) {
@@ -251,6 +270,14 @@ export class InputManager {
   private _getWheelHandler() {
     const that = this;
     return function (ev: WheelEvent) {
+      if (!that._callMiddlewares(ev)) {
+        that._app.dispatchEvent(ev.type as any);
+      }
+    };
+  }
+  private _getCompositionHandler() {
+    const that = this;
+    return function (ev: CompositionEvent) {
       if (!that._callMiddlewares(ev)) {
         that._app.dispatchEvent(ev.type as any);
       }

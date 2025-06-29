@@ -36,6 +36,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'AmbientColor',
           type: 'rgb',
+          animatable: true,
           phase: 1,
           default: [0.2, 0.2, 0.2],
           get(this: Scene, value) {
@@ -55,6 +56,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'AmbientUp',
           type: 'rgb',
           phase: 1,
+          animatable: true,
           default: [0.3, 0.5, 0.8],
           get(this: Scene, value) {
             const color = this.env.light.ambientUp;
@@ -73,6 +75,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'AmbientDown',
           type: 'rgb',
           phase: 1,
+          animatable: true,
           default: [0.2, 0.2, 0.2],
           get(this: Scene, value) {
             const color = this.env.light.ambientDown;
@@ -90,6 +93,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'EnvLightStrength',
           type: 'float',
+          animatable: true,
           phase: 0,
           options: { minValue: 0, maxValue: 10 },
           default: 1,
@@ -134,6 +138,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'SkyColor',
           type: 'rgb',
+          animatable: true,
           phase: 1,
           default: [1, 1, 1],
           isValid() {
@@ -184,6 +189,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'FogColor',
           type: 'rgb',
           phase: 1,
+          animatable: true,
           default: [1, 1, 1],
           isValid() {
             return this.env.sky.fogType !== 'none' && this.env.sky.fogType !== 'scatter';
@@ -201,6 +207,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'FogTop',
           type: 'float',
+          animatable: true,
           phase: 1,
           isValid() {
             return this.env.sky.fogType !== 'none' && this.env.sky.fogType !== 'scatter';
@@ -215,6 +222,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'FogDensity',
           type: 'float',
+          animatable: true,
           phase: 1,
           options: { minValue: 0, maxValue: 1 },
           default: 0.1,
@@ -231,6 +239,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'FogStart',
           type: 'float',
+          animatable: true,
           phase: 1,
           default: 0,
           get(this: Scene, value) {
@@ -245,6 +254,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         },
         {
           name: 'FogEnd',
+          animatable: true,
           type: 'float',
           phase: 1,
           default: 100,
@@ -261,6 +271,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'AerialPerspectiveDistance',
           type: 'float',
+          animatable: true,
           phase: 1,
           options: { minValue: 1, maxValue: 50000 },
           default: 1,
@@ -277,6 +288,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'CameraHeightScale',
           type: 'float',
+          animatable: true,
           phase: 1,
           options: { minValue: 1, maxValue: 1000 },
           default: 200,
@@ -311,6 +323,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'AtmosphereExposure',
           type: 'float',
+          animatable: true,
           options: { minValue: 0, maxValue: 8 },
           default: 1,
           get(this: Scene, value) {
@@ -327,6 +340,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           name: 'Cloudy',
           type: 'float',
           default: 0.6,
+          animatable: true,
           phase: 1,
           options: { minValue: 0, maxValue: 1 },
           get(this: Scene, value) {
@@ -342,6 +356,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'CloudIntensity',
           type: 'float',
+          animatable: true,
           default: 40,
           phase: 1,
           options: { minValue: 0, maxValue: 200 },
@@ -358,6 +373,7 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
         {
           name: 'Wind',
           type: 'vec2',
+          animatable: true,
           default: [0, 0],
           phase: 1,
           options: { minValue: -100, maxValue: 100 },

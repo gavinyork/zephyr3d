@@ -230,6 +230,9 @@ export class SceneNode
   }
   set animationSet(animationSet: AnimationSet) {
     this._animationSet.set(animationSet);
+    if (animationSet) {
+      this.scene.queueUpdateNode(this);
+    }
   }
   get sharedModel() {
     return this._sharedModel.get();
@@ -847,7 +850,13 @@ export class SceneNode
   /**
    * Update node state once per-frame
    */
-  update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number) {}
+  update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number) {
+    const animationSet = this.animationSet;
+    if (animationSet) {
+      animationSet.update(deltaInSeconds);
+      this.scene.queueUpdateNode(this);
+    }
+  }
   /**
    * Update node state once per-camera
    */

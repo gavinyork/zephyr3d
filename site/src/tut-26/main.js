@@ -52,7 +52,7 @@ myApp.ready().then(async () => {
   const scene = new Scene();
   const assetManager = new AssetManager();
   const model = await assetManager.fetchModel(scene, 'assets/models/BoxTextured.glb');
-  const animationSet = new AnimationSet(scene, model.group);
+  const animationSet = new AnimationSet(model.group);
   const animation = new AnimationClip('UserTrackTest');
   const interpolator = new Interpolator(
     'linear',

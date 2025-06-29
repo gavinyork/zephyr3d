@@ -7,6 +7,7 @@ import { DlgOpenScene } from './openscenedlg';
 import { DlgRampTextureCreator } from './ramptexturedlg';
 import { DlgRename } from './renamedlg';
 import { DlgExportScene } from './exportscenedlg';
+import { DlgSelectAnimation } from './selectanimationdlg';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
@@ -54,6 +55,15 @@ export class Dialog {
   ): Promise<{ data: Uint8ClampedArray; name: string }> {
     return new Promise((resolve) => {
       new DlgRampTextureCreator(title, true, width, height, resolve);
+    });
+  }
+  public static async selectAnimationAndTrack(
+    title: string,
+    animationNames: string[],
+    width?: number
+  ): Promise<{ animationName: string; trackName: string }> {
+    return new Promise((resolve) => {
+      new DlgSelectAnimation(title, true, animationNames, width, resolve);
     });
   }
 }

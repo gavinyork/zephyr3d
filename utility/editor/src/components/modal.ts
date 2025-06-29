@@ -9,16 +9,18 @@ export class ModalDialog extends makeEventTarget(Object)<{
   private _id: string;
   private _size: ImGui.ImVec2;
   private _mask: boolean;
+  private _noResize: boolean;
   static render() {
     if (this._currentDlg) {
       this._currentDlg.render();
     }
   }
-  constructor(id: string, open: boolean, width = 0, height = 0, mask = true) {
+  constructor(id: string, open: boolean, width = 0, height = 0, mask = true, noResize = false) {
     super();
     this._id = id;
     this._mask = mask;
     this._size = new ImGui.ImVec2(width, height);
+    this._noResize = !!noResize;
     if (open) {
       this.open();
     }
@@ -63,12 +65,12 @@ export class ModalDialog extends makeEventTarget(Object)<{
     if (ModalDialog._currentDlg !== this) {
       return;
     }
-    ImGui.SetNextWindowSize(this._size, ImGui.Cond.FirstUseEver);
+    ImGui.SetNextWindowSize(this._size, this._noResize ? ImGui.Cond.Always : ImGui.Cond.FirstUseEver);
     ImGui.OpenPopup(this._id);
     if (!this._mask) {
       ImGui.PushStyleColor(ImGui.Col.ModalWindowDimBg, new ImGui.ImVec4(0, 0, 0, 0));
     }
-    if (ImGui.BeginPopupModal(this._id, null)) {
+    if (ImGui.BeginPopupModal(this._id, null, this._noResize ? ImGui.WindowFlags.NoResize : undefined)) {
       ImGui.PushID(this._id);
       this.doRender();
       ImGui.PopID();

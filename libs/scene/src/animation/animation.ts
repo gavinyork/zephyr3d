@@ -9,6 +9,8 @@ export class AnimationClip {
   /** @internal */
   protected _name: string;
   /** @internal */
+  protected _embedded: boolean;
+  /** @internal */
   protected _duration: number;
   /** @internal */
   protected _tracks: Map<unknown, AnimationTrack[]>;
@@ -19,11 +21,16 @@ export class AnimationClip {
    * @param name - Name of the animation
    * @param model - Parent node if this is a skeleton animation
    */
-  constructor(name: string) {
+  constructor(name: string, embedded = false) {
     this._name = name;
+    this._embedded = embedded;
     this._tracks = new Map();
     this._duration = 0;
     this._skeletons = new Set();
+  }
+  /** Whether this is an embedded animation */
+  get embedded(): boolean {
+    return this._embedded;
   }
   /** Disposes self */
   dispose() {

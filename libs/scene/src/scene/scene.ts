@@ -7,7 +7,6 @@ import { Application } from '../app/app';
 import { Environment } from './environment';
 import type { GraphNode } from './graph_node';
 import type { Camera } from '../camera/camera';
-import type { AnimationSet } from '../animation/animationset';
 import type { PickTarget } from '../render';
 import { SceneRenderer } from '../render';
 import type { Compositor } from '../posteffect';
@@ -35,8 +34,6 @@ export class Scene extends makeEventTarget(Object)<{
   /** @internal */
   protected _updateFrame: number;
   /** @internal */
-  protected _animationSet: DWeakRef<AnimationSet>[];
-  /** @internal */
   protected _id: number;
   /** @internal */
   protected _nodeUpdateQueue: DWeakRef<SceneNode>[];
@@ -54,34 +51,8 @@ export class Scene extends makeEventTarget(Object)<{
     this._perCameraUpdateQueue = [];
     this._env = new Environment();
     this._updateFrame = -1;
-    this._animationSet = [];
     this._rootNode = new DRef(new SceneNode(this));
     this._rootNode.get().name = 'Root';
-  }
-  /**
-   * Gets the animation sets in the scene
-   * @returns All animation sets in the scene
-   */
-  getAnimatoinSets() {
-    return this._animationSet;
-  }
-  /**
-   * Adds an animation set to the scene
-   * @param animationSet - The animation set to be added
-   */
-  addAnimationSet(animationSet: AnimationSet) {
-    this._animationSet.push(new DWeakRef(animationSet));
-  }
-  /**
-   * Deletes an animation set from the scene
-   * @param animationSet - The animation set to be removed
-   */
-  deleteAnimationSet(animationSet: AnimationSet) {
-    const index = this._animationSet.findIndex((val) => val.get() === animationSet);
-    if (index >= 0) {
-      this._animationSet[index].dispose();
-      this._animationSet.splice(index, 1);
-    }
   }
   /**
    * Gets the unique identifier of the scene
@@ -215,18 +186,6 @@ export class Scene extends makeEventTarget(Object)<{
     this._nodePlaceList.add(node);
   }
   /** @internal */
-  private updateAnimations() {
-    for (let i = this._animationSet.length - 1; i >= 0; i--) {
-      const animationSet = this._animationSet[i].get();
-      if (!animationSet) {
-        this._animationSet[i].dispose();
-        this._animationSet.splice(i, 1);
-      } else if (animationSet.model?.attached) {
-        animationSet.update();
-      }
-    }
-  }
-  /** @internal */
   private updateEnvLight() {
     if (this.env.light.type === 'ibl') {
       if (!this.env.light.radianceMap) {
@@ -258,7 +217,7 @@ export class Scene extends makeEventTarget(Object)<{
     const frameInfo = Application.instance.device.frameInfo;
     if (frameInfo.frameCounter !== this._updateFrame) {
       this._updateFrame = frameInfo.frameCounter;
-      this.updateAnimations();
+      //this.updateAnimations();
       this.updateEnvLight();
       this.dispatchEvent('update', this);
       if (this._nodeUpdateQueue.length > 0) {
@@ -268,7 +227,10 @@ export class Scene extends makeEventTarget(Object)<{
         this._nodeUpdateQueue = [];
         while (queue.length > 0) {
           const ref = queue.shift();
-          ref.get()?.update(frameInfo.frameCounter, elapsedInSeconds, deltaInSeconds);
+          const node = ref.get();
+          if (node?.attached) {
+            node.update(frameInfo.frameCounter, elapsedInSeconds, deltaInSeconds);
+          }
           ref.dispose();
         }
       }

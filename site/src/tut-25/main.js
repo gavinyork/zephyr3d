@@ -23,7 +23,7 @@ myApp.ready().then(async () => {
   const scene = new Scene();
 
   const box = new Mesh(scene, new BoxShape(), new LambertMaterial());
-  const animationSet = new AnimationSet(scene, box);
+  const animationSet = new AnimationSet(box);
   const animationClip = new AnimationClip('move');
   animationClip
     .addTrack(

@@ -13,8 +13,8 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
    * Create an instance of TranslationTrack from keyframe values
    * @param prop - Property to be animated
    */
-  constructor(prop: PropertyAccessor) {
-    super();
+  constructor(prop: PropertyAccessor, embedded?: boolean) {
+    super(undefined, embedded);
     this._prop = prop;
     this._state = { num: [0, 0, 0, 0] };
     switch (this._prop.type) {

@@ -254,7 +254,7 @@ export class RampTextureCreator {
     ImGui.EndChild();
     if (ImGui.BeginChild('AlphaEditor', new ImGui.ImVec2(0, height), true, ImGui.WindowFlags.NoScrollbar)) {
       if (
-        (ImGui.BeginChild('CurveEditor', new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing())),
+        (ImGui.BeginChild('CurveEditor', new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing() * 2)),
         true,
         ImGui.WindowFlags.NoScrollbar)
       ) {
@@ -263,12 +263,12 @@ export class RampTextureCreator {
         ImGui.PopID();
       }
       ImGui.EndChild();
+      ImGui.Text('Alpha');
       const showAlpha = [this._showAlpha] as [boolean];
       if (ImGui.Checkbox('Show Alpha', showAlpha)) {
         this._showAlpha = showAlpha[0];
         this.updateTexture();
       }
-      ImGui.Text('Alpha');
     }
     ImGui.EndChild();
   }

@@ -3,7 +3,6 @@ import { DirectionalLight, PointLight, PunctualLight, SpotLight } from '../../..
 import type { SerializableClass } from '../types';
 import { AABB, degree2radian, radian2degree, Vector4 } from '@zephyr3d/base';
 import type { NodeHierarchy } from './node';
-import { getSceneNodeClass } from './node';
 import type { AssetRegistry } from '../asset/asset';
 import { SceneNode } from '../../../scene';
 import type { ShadowMode } from '../../../shadow';
@@ -11,12 +10,13 @@ import type { ShadowMode } from '../../../shadow';
 export function getPunctualLightClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: PunctualLight,
-    parent: getSceneNodeClass(assetRegistry),
+    parent: SceneNode,
     getProps() {
       return [
         {
           name: 'Color',
           type: 'rgb',
+          animatable: true,
           default: [1, 1, 1],
           get(this: PunctualLight, value) {
             value.num[0] = this.color.x;
@@ -30,6 +30,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
         {
           name: 'Intensity',
           type: 'float',
+          animatable: true,
           default: 1,
           options: {
             minValue: 0,
@@ -381,7 +382,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
 export function getDirectionalLightClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: DirectionalLight,
-    parent: getPunctualLightClass(assetRegistry),
+    parent: PunctualLight,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new DirectionalLight(ctx.scene);
       if (ctx instanceof SceneNode) {
@@ -410,7 +411,7 @@ export function getDirectionalLightClass(assetRegistry: AssetRegistry): Serializ
 export function getPointLightClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: PointLight,
-    parent: getPunctualLightClass(assetRegistry),
+    parent: PunctualLight,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new PointLight(ctx.scene);
       if (ctx instanceof SceneNode) {
@@ -423,6 +424,7 @@ export function getPointLightClass(assetRegistry: AssetRegistry): SerializableCl
         {
           name: 'Range',
           type: 'float',
+          animatable: true,
           default: 10,
           options: {
             minValue: 0,
@@ -443,7 +445,7 @@ export function getPointLightClass(assetRegistry: AssetRegistry): SerializableCl
 export function getSpotLightClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: SpotLight,
-    parent: getPunctualLightClass(assetRegistry),
+    parent: PunctualLight,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new SpotLight(ctx.scene);
       if (ctx instanceof SceneNode) {
@@ -456,6 +458,7 @@ export function getSpotLightClass(assetRegistry: AssetRegistry): SerializableCla
         {
           name: 'Range',
           type: 'float',
+          animatable: true,
           default: 10,
           options: {
             minValue: 0,
@@ -471,6 +474,7 @@ export function getSpotLightClass(assetRegistry: AssetRegistry): SerializableCla
         {
           name: 'BeamAngle',
           type: 'float',
+          animatable: true,
           default: 90,
           options: {
             minValue: 0,

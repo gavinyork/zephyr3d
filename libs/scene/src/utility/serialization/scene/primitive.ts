@@ -26,7 +26,7 @@ export function getPrimitiveClass(): SerializableClass {
 export function getBoxShapeClass(): SerializableClass {
   return {
     ctor: BoxShape,
-    parent: getPrimitiveClass(),
+    parent: Primitive,
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -86,7 +86,7 @@ export function getBoxShapeClass(): SerializableClass {
 export function getBoxFrameShapeClass(): SerializableClass {
   return {
     ctor: BoxFrameShape,
-    parent: getPrimitiveClass(),
+    parent: Primitive,
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -146,7 +146,7 @@ export function getBoxFrameShapeClass(): SerializableClass {
 export function getTorusShapeClass(): SerializableClass {
   return {
     ctor: TorusShape,
-    parent: getPrimitiveClass(),
+    parent: Primitive,
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -230,7 +230,7 @@ export function getTorusShapeClass(): SerializableClass {
 export function getPlaneShapeClass(): SerializableClass {
   return {
     ctor: PlaneShape,
-    parent: getPrimitiveClass(),
+    parent: Primitive,
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -314,7 +314,7 @@ export function getPlaneShapeClass(): SerializableClass {
 export function getCylinderShapeClass(): SerializableClass {
   return {
     ctor: CylinderShape,
-    parent: getPrimitiveClass(),
+    parent: Primitive,
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -431,7 +431,7 @@ export function getCylinderShapeClass(): SerializableClass {
 export function getSphereShapeClass(): SerializableClass {
   return {
     ctor: SphereShape,
-    parent: getPrimitiveClass(),
+    parent: Primitive,
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {

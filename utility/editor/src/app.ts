@@ -1,4 +1,4 @@
-import { Application } from '@zephyr3d/scene';
+import { Application, InputManager } from '@zephyr3d/scene';
 import { imGuiInit } from '@zephyr3d/imgui';
 import { Editor } from './core/editor';
 //import { backendWebGL2 } from '@zephyr3d/backend-webgl';

@@ -4,6 +4,7 @@ import type {
   NodeCloneMethod,
   Scene,
   SceneNode,
+  SerializationManager,
   ShapeOptionType,
   ShapeType
 } from '@zephyr3d/scene';
@@ -217,15 +218,15 @@ export class AddShapeCommand<T extends ShapeType> extends Command<Mesh> {
 }
 
 export class NodeDeleteCommand extends Command {
-  private _assetRegistry: AssetRegistry;
+  private _manager: SerializationManager;
   private _scene: any;
   private _archive: any;
   private _nodeId: string;
   private _parentId: string;
-  constructor(node: SceneNode, assetRegistry: AssetRegistry) {
+  constructor(node: SceneNode, manager: SerializationManager) {
     super('Delete node');
     this._scene = node.scene;
-    this._assetRegistry = assetRegistry;
+    this._manager = manager;
     this._nodeId = node.id;
     idNodeMap[this._nodeId] = node;
     this._parentId = node.parent.id;
@@ -236,7 +237,7 @@ export class NodeDeleteCommand extends Command {
     const node = idNodeMap[this._nodeId];
     if (node) {
       const nodeHierarchy = new NodeHierarchy(node.scene, node);
-      this._archive = await serializeObject(nodeHierarchy, this._assetRegistry, null, null); // await serializeObject(node, this._assetRegistry);
+      this._archive = await serializeObject(nodeHierarchy, this._manager, null, null); // await serializeObject(node, this._assetRegistry);
       node.remove();
       node.iterate((child) => {
         delete idNodeMap[child.id];
@@ -251,7 +252,7 @@ export class NodeDeleteCommand extends Command {
         const nodeHierarchy = await deserializeObject<NodeHierarchy>(
           this._scene,
           this._archive,
-          this._assetRegistry
+          this._manager
         );
         const node = nodeHierarchy.rootNode;
         //const node = (await deserializeObject(this._scene, this._archive, this._assetRegistry)) as SceneNode;

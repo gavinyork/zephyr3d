@@ -203,6 +203,7 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
         {
           name: 'Position',
           type: 'vec3',
+          animatable: true,
           get(this: SceneNode, value) {
             value.num[0] = this.position.x;
             value.num[1] = this.position.y;
@@ -215,6 +216,7 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
         {
           name: 'Scale',
           type: 'vec3',
+          animatable: true,
           get(this: SceneNode, value) {
             value.num[0] = this.scale.x;
             value.num[1] = this.scale.y;
@@ -228,6 +230,7 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
           name: 'Rotation',
           type: 'vec3',
           edit: 'quaternion',
+          animatable: true,
           get(this: SceneNode, value) {
             const zyx = this.rotation.toEulerAngles();
             value.num[0] = Math.round(radian2degree(zyx.x));
@@ -302,7 +305,7 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
 export function getGraphNodeClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: GraphNode,
-    parent: getSceneNodeClass(assetRegistry),
+    parent: SceneNode,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new GraphNode(ctx.scene);
       if (ctx instanceof SceneNode) {

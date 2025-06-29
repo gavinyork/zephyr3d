@@ -1,16 +1,15 @@
-import type { EmitterBehavior, EmitterShape } from '../../../scene';
+import { GraphNode, type EmitterBehavior, type EmitterShape } from '../../../scene';
 import { SceneNode } from '../../../scene/scene_node';
 import { ParticleSystem } from '../../../scene/particlesys';
 import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
-import { getGraphNodeClass } from './node';
 import { ParticleMaterial } from '../../../material';
 
 export function getParticleNodeClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: ParticleSystem,
-    parent: getGraphNodeClass(assetRegistry),
+    parent: GraphNode,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new ParticleSystem(ctx.scene);
       if (ctx instanceof SceneNode) {
@@ -67,6 +66,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'Gravity',
           type: 'vec3',
+          animatable: true,
           default: [0, 0, 0],
           get(this: ParticleSystem, value) {
             const gravity = this.gravity;
@@ -81,6 +81,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'Wind',
           type: 'vec3',
+          animatable: true,
           default: [0, 0, 0],
           get(this: ParticleSystem, value) {
             const wind = this.wind;
@@ -94,6 +95,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         },
         {
           name: 'Scalar',
+          animatable: true,
           type: 'float',
           default: 1,
           get(this: ParticleSystem, value) {
@@ -105,6 +107,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         },
         {
           name: 'Aspect',
+          animatable: true,
           type: 'float',
           default: 1,
           get(this: ParticleSystem, value) {
@@ -128,6 +131,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'JitterSpeed',
           type: 'float',
+          animatable: true,
           default: 1,
           get(this: ParticleSystem, value) {
             value.num[0] = this.jitterSpeed;
@@ -139,6 +143,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'JitterPower',
           type: 'float',
+          animatable: true,
           default: 0,
           get(this: ParticleSystem, value) {
             value.num[0] = this.jitterPower;
@@ -191,6 +196,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'Rotation',
           type: 'vec2',
+          animatable: true,
           default: [0, 0],
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleRotationMin;
@@ -204,6 +210,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'ConeRadius',
           type: 'vec2',
+          animatable: true,
           default: [0, 0.1],
           get(this: ParticleSystem, value) {
             value.num[0] = this.emitterConeRadiusMin;
@@ -217,6 +224,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'Velocity',
           type: 'vec2',
+          animatable: true,
           default: [2, 3],
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleVelocityMin;
@@ -230,6 +238,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         {
           name: 'Life',
           type: 'vec2',
+          animatable: true,
           default: [1, 1.5],
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleLifeMin;
@@ -242,6 +251,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         },
         {
           name: 'Size1',
+          animatable: true,
           type: 'vec2',
           default: [0.4, 0.5],
           get(this: ParticleSystem, value) {
@@ -255,6 +265,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         },
         {
           name: 'Size2',
+          animatable: true,
           type: 'vec2',
           default: [0, 0.1],
           get(this: ParticleSystem, value) {
@@ -268,6 +279,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         },
         {
           name: 'Acceleration',
+          animatable: true,
           type: 'vec2',
           default: [-0.01, -0.02],
           get(this: ParticleSystem, value) {
@@ -281,6 +293,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         },
         {
           name: 'Transparency',
+          animatable: true,
           type: 'float',
           default: 1,
           get(this: ParticleSystem, value) {
@@ -292,6 +305,7 @@ export function getParticleNodeClass(assetRegistry: AssetRegistry): Serializable
         },
         {
           name: 'ColorMultiplier',
+          animatable: true,
           type: 'float',
           default: 1,
           get(this: ParticleSystem, value) {

@@ -26,8 +26,8 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
   /**
    * Create an instance of MorphTargetTrack
    */
-  constructor(assetTrack: AssetAnimationTrack, subMesh: AssetSubMeshData) {
-    super(assetTrack.interpolator);
+  constructor(assetTrack: AssetAnimationTrack, subMesh: AssetSubMeshData, embedded?: boolean) {
+    super(assetTrack.interpolator, embedded);
     this._state = {
       numTargets: assetTrack.interpolator.stride,
       boundingBox: new BoundingBox(),

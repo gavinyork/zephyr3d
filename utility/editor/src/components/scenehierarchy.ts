@@ -16,13 +16,11 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
   private _scene: Scene;
   private _selectedNode: SceneNode;
-  private _selectedAnimation: string;
   private _serializationManager: SerializationManager;
   constructor(scene: Scene, serializationManager: SerializationManager) {
     super();
     this._scene = scene;
     this._selectedNode = null;
-    this._selectedAnimation = null;
     this._serializationManager = serializationManager;
   }
   get scene() {
@@ -35,7 +33,6 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     }
   }
   render() {
-    this.renderAnimations();
     this.renderSceneNode(this._scene.rootNode);
   }
   selectNode(node: SceneNode) {
@@ -51,46 +48,6 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   }
   get selectedNode() {
     return this._selectedNode;
-  }
-  private renderAnimations() {
-    if (ImGui.TreeNodeEx('Animations##Animations', SceneHierarchy.baseFlags)) {
-      for (let i = 0; i < this._scene.getAnimatoinSets().length; i++) {
-        const animationSet = this._scene.getAnimatoinSets()[i].get();
-        if (animationSet) {
-          ImGui.PushID(i);
-          if (ImGui.TreeNodeEx('Animation', SceneHierarchy.baseFlags)) {
-            for (let j = 0; j < animationSet.getAnimationNames().length; j++) {
-              ImGui.PushID(j);
-              const name = animationSet.getAnimationNames()[j];
-              const animation = animationSet.getAnimationClip(name);
-              if (animation) {
-                const flags =
-                  ImGui.TreeNodeFlags.SpanAvailWidth |
-                  (this._selectedAnimation === animation.name ? ImGui.TreeNodeFlags.Selected : 0);
-                const isOpen = ImGui.TreeNodeEx(name ?? 'noname', flags);
-                if (isOpen) {
-                  const tracks = [...animation.tracks];
-                  for (let k = 0; k < tracks.length; k++) {
-                    ImGui.PushID(k);
-                    if (
-                      ImGui.TreeNodeEx(this.getNodeName(tracks[k][0]), ImGui.TreeNodeFlags.SpanAvailWidth)
-                    ) {
-                      ImGui.TreePop();
-                    }
-                    ImGui.PopID();
-                  }
-                  ImGui.TreePop();
-                }
-              }
-              ImGui.PopID();
-            }
-            ImGui.TreePop();
-          }
-          ImGui.PopID();
-        }
-      }
-      ImGui.TreePop();
-    }
   }
   private getNodeName(node: unknown): string {
     if (node instanceof SceneNode) {

@@ -96,6 +96,9 @@ export class SerializationManager {
   get assetRegistry() {
     return this._assetRegistry;
   }
+  getClasses(): SerializableClass[] {
+    return [...this._classMap.values()];
+  }
   getClassByConstructor(ctor: GenericConstructor) {
     return this._classMap.get(ctor) ?? null;
   }
@@ -109,6 +112,9 @@ export class SerializationManager {
       }
     }
     return null;
+  }
+  getPropertiesByClass(cls: SerializableClass) {
+    return this._clsPropMap.get(cls);
   }
   getPropertyByName(name: string) {
     return this._propMap[name] ?? null;

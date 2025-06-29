@@ -8,17 +8,16 @@ import {
   UnlitMaterial
 } from '../../../material';
 import { Primitive } from '../../../render';
-import { Mesh, SceneNode } from '../../../scene';
+import { GraphNode, Mesh, SceneNode } from '../../../scene';
 import { BoxFrameShape, BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '../../../shapes';
 import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
-import { getGraphNodeClass } from './node';
 
 export function getMeshClass(assetRegistry: AssetRegistry): SerializableClass {
   return {
     ctor: Mesh,
-    parent: getGraphNodeClass(assetRegistry),
+    parent: GraphNode,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new Mesh(ctx.scene);
       if (ctx instanceof SceneNode) {

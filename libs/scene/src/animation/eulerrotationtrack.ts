@@ -13,19 +13,39 @@ export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
   private _state: Quaternion;
   /**
    * Create an instance of EulerRotationTrack from keyframe values
+   * @param interpolator - Interpolator object that contains the keyframe values
+   * @param embedded - Whether this track be an embedded track
+   */
+  constructor(interpolator: Interpolator, embedded?: boolean);
+  /**
+   * Create an instance of EulerRotationTrack from keyframe values
    * @param mode - The interpolation mode of keyframes
    * @param keyFrames - Keyframe values
+   * @param embedded - Whether this track be an embedded track
    */
-  constructor(mode: InterpolationMode, keyFrames: { time: number; value: Vector3 }[]) {
-    const inputs = new Float32Array(keyFrames.map((val) => val.time));
-    const outputs = new Float32Array(keyFrames.length * 3);
-    for (let i = 0; i < keyFrames.length; i++) {
-      outputs[i * 3 + 0] = keyFrames[i].value.x;
-      outputs[i * 3 + 1] = keyFrames[i].value.y;
-      outputs[i * 3 + 2] = keyFrames[i].value.z;
+  constructor(mode: InterpolationMode, keyFrames: { time: number; value: Vector3 }[], embedded?: boolean);
+  constructor(
+    modeOrInterpolator?: Interpolator | InterpolationMode,
+    keyFramesOrEmbedded?: { time: number; value: Vector3 }[] | boolean,
+    embedded?: boolean
+  ) {
+    if (modeOrInterpolator instanceof Interpolator) {
+      if (modeOrInterpolator.target !== 'vec3') {
+        throw new Error(`TranslationTrack(): interpolator target must be 'vec3'`);
+      }
+      super(modeOrInterpolator, (keyFramesOrEmbedded as boolean) ?? false);
+    } else {
+      const keyFrames = keyFramesOrEmbedded as { time: number; value: Vector3 }[];
+      const inputs = new Float32Array(keyFrames.map((val) => val.time));
+      const outputs = new Float32Array(keyFrames.length * 3);
+      for (let i = 0; i < keyFrames.length; i++) {
+        outputs[i * 3 + 0] = keyFrames[i].value.x;
+        outputs[i * 3 + 1] = keyFrames[i].value.y;
+        outputs[i * 3 + 2] = keyFrames[i].value.z;
+      }
+      const interpolator = new Interpolator(modeOrInterpolator, 'vec3', inputs, outputs);
+      super(interpolator, embedded ?? false);
     }
-    const interpolator = new Interpolator(mode, 'vec3', inputs, outputs);
-    super(interpolator);
     this._state = new Quaternion();
   }
   calculateState(target: unknown, currentTime: number): Quaternion {
