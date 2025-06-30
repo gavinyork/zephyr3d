@@ -46,8 +46,21 @@ class PropertyGroup {
     this.properties = [];
     this.subgroups = [];
   }
+  addSeparator(label: string) {
+    this.properties.push({
+      name: label,
+      property: {
+        name: label,
+        path: '',
+        value: null
+      }
+    });
+  }
   addProperty(obj: any, value: PropertyAccessor<any>) {
     let group: PropertyGroup = this;
+    if (value.isValid && !value.isValid.call(obj)) {
+      return;
+    }
     if (value.group) {
       group = this.findOrAddGroup(value.group);
     }
@@ -58,11 +71,17 @@ class PropertyGroup {
       object: []
     };
     if (value.type === 'object' && value.objectTypes?.length > 0) {
+      value.get.call(obj, tmpProperty);
       const propGroup = group.addGroup(value.name);
-      if (!value.isValid || value.isValid.call(obj)) {
-        value.get.call(obj, tmpProperty);
-      }
       propGroup.setObject(tmpProperty.object[0], value, obj);
+    } else if (value.type === 'object_array' && value.objectTypes?.length > 0) {
+      value.get.call(obj, tmpProperty);
+      if (tmpProperty.object) {
+        for (let i = 0; i < tmpProperty.object.length; i++) {
+          const propGroup = group.addGroup(value.name);
+          propGroup.setObject(tmpProperty.object[i], value, obj);
+        }
+      }
     } else {
       const property: Property<any> = {
         path: `${group.name}/${value.name}`,
@@ -134,9 +153,9 @@ class PropertyGroup {
           if (cls) {
             const props = serializationManager.getPropertiesByClass(cls).filter((p) => !p.hidden);
             if (props.length > 0) {
-              const group = this.addGroup(cls.ctor.name);
+              this.addSeparator(cls.ctor.name);
               for (const prop of props) {
-                group.addProperty(this.value.object[0], prop);
+                this.addProperty(this.value.object[0], prop);
               }
             }
           }
@@ -272,7 +291,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
         );
         ImGui.TableSetupColumn('Name', ImGui.TableColumnFlags.WidthFixed, labelWidth);
         ImGui.TableSetupColumn('Value', ImGui.TableColumnFlags.WidthFixed, valueWidth);
-        this.renderSubGroups(this._rootGroup, 0);
+        this.renderGroup(this._rootGroup, 0, true);
 
         ImGui.EndTable();
       }
@@ -312,7 +331,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       ImGui.SetMouseCursor(ImGui.MouseCursor.ResizeEW);
     }
   }
-  private renderGroup(group: PropertyGroup, level = 0) {
+  private renderGroup(group: PropertyGroup, level = 0, toplevel = false) {
     if (group.prop?.isValid && group.object && !group.prop.isValid.call(group.object)) {
       return;
     }
@@ -325,7 +344,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     }
     */
     const flags = ImGui.TreeNodeFlags.DefaultOpen;
-    const opened = ImGui.TreeNodeEx(group.name, flags);
+    const opened = toplevel ? true : ImGui.TreeNodeEx(group.name, flags);
     if (group.object && group.prop && group.objectTypes.length > 0) {
       const deletable = group.prop.isNullable?.() && group.prop.set && group.value.object?.[0];
       const editable = group.value.object?.[0] instanceof AABB && group.prop.edit === 'aabb';
@@ -370,7 +389,9 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       ImGui.EndChild();
     }
     if (opened) {
-      ImGui.TreePop();
+      if (!toplevel) {
+        ImGui.TreePop();
+      }
       for (const property of group.properties) {
         this.renderProperty(
           property instanceof PropertyGroup ? property : property.property,
@@ -393,17 +414,16 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     }
     const { name, value } = property;
     object = object ?? this.object;
-    if (value.isValid && !value.isValid.call(object)) {
+    if (value && value.isValid && !value.isValid.call(object)) {
       return;
     }
     ImGui.PushID(property.path);
     ImGui.TableNextRow();
     ImGui.TableNextColumn();
     ImGui.SetNextItemWidth(-1);
-    const animatable = !!value.animatable;
+    const animatable = value && !!value.animatable;
     if (animatable && this.object instanceof SceneNode) {
       if (ImGui.Button('A')) {
-        const hash = this._serializationManager.getPropertyName(value);
         let animationSet = this.object.animationSet;
         Dialog.selectAnimationAndTrack(
           'Create animation track',
@@ -411,9 +431,9 @@ export class PropertyEditor extends makeEventTarget(Object)<{
           300
         ).then((val) => {
           if (val) {
-            console.log(hash, val.animationName, val.trackName);
             if (!animationSet) {
               animationSet = new AnimationSet(this.object);
+              this.object.animationSet = animationSet;
             }
             let animation = animationSet.getAnimationClip(val.animationName);
             if (!animation) {
@@ -421,7 +441,9 @@ export class PropertyEditor extends makeEventTarget(Object)<{
               animationSet.add(animation);
             }
             const track = new PropertyTrack(value);
+            track.name = val.trackName;
             animation.addTrack(object, track);
+            this.refresh();
           }
         });
       }
@@ -432,224 +454,234 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       ImGui.SetCursorPosX(baseX + level * 10);
     }
     ImGui.AlignTextToFramePadding();
-    ImGui.Text(value.label ?? name);
-    if (level > 0) {
-      ImGui.SetCursorPosX(baseX);
+    if (!value) {
+      ImGui.TextDisabled(name ?? '');
+    } else {
+      ImGui.Text(value.label ?? name);
+      if (level > 0) {
+        ImGui.SetCursorPosX(baseX);
+      }
     }
-    ImGui.TableNextColumn();
-    ImGui.SetNextItemWidth(-1);
-    const readonly = !value.set;
-    let changed = false;
-    const tmpProperty: PropertyValue = {
-      num: [0, 0, 0, 0],
-      str: [''],
-      bool: [false],
-      object: []
-    };
-    value.get.call(object, tmpProperty);
-    switch (value.type) {
-      case 'bool': {
-        const val = tmpProperty.bool as [boolean];
-        changed = ImGui.Checkbox(`##value`, val) && !readonly;
-        break;
-      }
-      case 'int': {
-        if (value.enum) {
-          const val = [value.enum.values.indexOf(tmpProperty.num[0])] as [number];
-          changed = ImGui.Combo('##value', val, value.enum.labels) && !readonly;
-          if (changed) {
-            tmpProperty.num[0] = value.enum.values[val[0]] as number;
-          }
-        } else {
-          const val = tmpProperty.num as [number];
-          changed = ImGui.DragInt(
-            '##value',
-            val,
-            readonly ? 0 : value.options?.speed ?? 0.1,
-            value.options?.minValue ?? undefined,
-            value.options?.maxValue ?? undefined
-          );
+    if (value) {
+      ImGui.TableNextColumn();
+      ImGui.SetNextItemWidth(-1);
+      const readonly = !value.set;
+      let changed = false;
+      const tmpProperty: PropertyValue = {
+        num: [0, 0, 0, 0],
+        str: [''],
+        bool: [false],
+        object: []
+      };
+      value.get.call(object, tmpProperty);
+      switch (value.type) {
+        case 'bool': {
+          const val = tmpProperty.bool as [boolean];
+          changed = ImGui.Checkbox(`##value`, val) && !readonly;
+          break;
         }
-        break;
-      }
-      case 'float': {
-        if (value.enum) {
-          const val = [value.enum.values.indexOf(tmpProperty.num[0])] as [number];
-          changed = ImGui.Combo('##value', val, value.enum.labels) && !readonly;
-          if (changed) {
-            tmpProperty.num[0] = value.enum.values[val[0]] as number;
+        case 'int': {
+          if (value.enum) {
+            const val = [value.enum.values.indexOf(tmpProperty.num[0])] as [number];
+            changed = ImGui.Combo('##value', val, value.enum.labels) && !readonly;
+            if (changed) {
+              tmpProperty.num[0] = value.enum.values[val[0]] as number;
+            }
+          } else {
+            const val = tmpProperty.num as [number];
+            changed = ImGui.DragInt(
+              '##value',
+              val,
+              readonly ? 0 : value.options?.speed ?? 0.1,
+              value.options?.minValue ?? undefined,
+              value.options?.maxValue ?? undefined
+            );
           }
-        } else {
-          const val = [tmpProperty.num[0]] as [number];
-          changed = ImGui.DragFloat(
-            '##value',
-            val,
-            readonly ? 0 : value.options?.speed ?? 0.01,
-            value.options?.minValue ?? undefined,
-            value.options?.maxValue ?? undefined,
-            '%.3f'
-          );
-          tmpProperty.num[0] = val[0];
+          break;
         }
-        break;
-      }
-      case 'string': {
-        if (value.enum) {
-          const val = [value.enum.values.indexOf(tmpProperty.str[0])] as [number];
-          changed = ImGui.Combo('##value', val, value.enum.labels) && !readonly;
-          if (changed) {
-            tmpProperty.str[0] = value.enum.values[val[0]] as string;
+        case 'float': {
+          if (value.enum) {
+            const val = [value.enum.values.indexOf(tmpProperty.num[0])] as [number];
+            changed = ImGui.Combo('##value', val, value.enum.labels) && !readonly;
+            if (changed) {
+              tmpProperty.num[0] = value.enum.values[val[0]] as number;
+            }
+          } else {
+            const val = [tmpProperty.num[0]] as [number];
+            changed = ImGui.DragFloat(
+              '##value',
+              val,
+              readonly ? 0 : value.options?.speed ?? 0.01,
+              value.options?.minValue ?? undefined,
+              value.options?.maxValue ?? undefined,
+              '%.3f'
+            );
+            tmpProperty.num[0] = val[0];
           }
-        } else {
-          const val = tmpProperty.str as [string];
-          changed = ImGui.InputText(
+          break;
+        }
+        case 'string': {
+          if (value.enum) {
+            const val = [value.enum.values.indexOf(tmpProperty.str[0])] as [number];
+            changed = ImGui.Combo('##value', val, value.enum.labels) && !readonly;
+            if (changed) {
+              tmpProperty.str[0] = value.enum.values[val[0]] as string;
+            }
+          } else {
+            const val = tmpProperty.str as [string];
+            changed = ImGui.InputText(
+              '##value',
+              val,
+              undefined,
+              readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+            );
+          }
+          break;
+        }
+        case 'int2': {
+          const val = tmpProperty.num as [number, number];
+          changed = ImGui.InputInt2('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+          break;
+        }
+        case 'int3': {
+          const val = tmpProperty.num as [number, number, number];
+          changed = ImGui.InputInt3('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+          break;
+        }
+        case 'int4': {
+          const val = tmpProperty.num as [number, number, number, number];
+          changed = ImGui.InputInt4('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+          break;
+        }
+        case 'vec2': {
+          const val = tmpProperty.num as [number, number];
+          changed = ImGui.InputFloat2(
             '##value',
             val,
             undefined,
             readonly ? ImGui.InputTextFlags.ReadOnly : undefined
           );
+          break;
         }
-        break;
-      }
-      case 'int2': {
-        const val = tmpProperty.num as [number, number];
-        changed = ImGui.InputInt2('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
-        break;
-      }
-      case 'int3': {
-        const val = tmpProperty.num as [number, number, number];
-        changed = ImGui.InputInt3('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
-        break;
-      }
-      case 'int4': {
-        const val = tmpProperty.num as [number, number, number, number];
-        changed = ImGui.InputInt4('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
-        break;
-      }
-      case 'vec2': {
-        const val = tmpProperty.num as [number, number];
-        changed = ImGui.InputFloat2(
-          '##value',
-          val,
-          undefined,
-          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
-        );
-        break;
-      }
-      case 'vec3': {
-        const val = tmpProperty.num as [number, number, number];
-        if (value.edit === 'quaternion') {
-          ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
-          ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
-        }
-        changed = ImGui.InputFloat3(
-          '##value',
-          val,
-          undefined,
-          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
-        );
-        if (value.edit === 'quaternion') {
-          ImGui.SameLine(0, 0);
-          if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
-            ImGui.OpenPopup('EditQuaternion');
-            RotationEditor.reset(
-              Quaternion.fromEulerAngle(degree2radian(val[0]), degree2radian(val[1]), degree2radian(val[2])),
-              new ImGui.ImVec2(100, 100)
-            );
+        case 'vec3': {
+          const val = tmpProperty.num as [number, number, number];
+          if (value.edit === 'quaternion') {
+            ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
+            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
           }
-          if (
-            ImGui.BeginPopup('EditQuaternion', ImGui.WindowFlags.NoResize | ImGui.WindowFlags.NoScrollbar)
-          ) {
-            ImGui.BeginChild('xxyy', new ImGui.ImVec2(100, 100));
-            const quat = RotationEditor.render();
-            const v = quat.toEulerAngles();
-            val[0] = radian2degree(v.x);
-            val[1] = radian2degree(v.y);
-            val[2] = radian2degree(v.z);
-            changed = true;
+          changed = ImGui.InputFloat3(
+            '##value',
+            val,
+            undefined,
+            readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+          );
+          if (value.edit === 'quaternion') {
+            ImGui.SameLine(0, 0);
+            if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
+              ImGui.OpenPopup('EditQuaternion');
+              RotationEditor.reset(
+                Quaternion.fromEulerAngle(
+                  degree2radian(val[0]),
+                  degree2radian(val[1]),
+                  degree2radian(val[2])
+                ),
+                new ImGui.ImVec2(100, 100)
+              );
+            }
+            if (
+              ImGui.BeginPopup('EditQuaternion', ImGui.WindowFlags.NoResize | ImGui.WindowFlags.NoScrollbar)
+            ) {
+              ImGui.BeginChild('xxyy', new ImGui.ImVec2(100, 100));
+              const quat = RotationEditor.render();
+              const v = quat.toEulerAngles();
+              val[0] = radian2degree(v.x);
+              val[1] = radian2degree(v.y);
+              val[2] = radian2degree(v.z);
+              changed = true;
+              ImGui.EndChild();
+              ImGui.EndPopup();
+            }
             ImGui.EndChild();
-            ImGui.EndPopup();
           }
-          ImGui.EndChild();
+          break;
         }
-        break;
-      }
-      case 'vec4': {
-        const val = tmpProperty.num as [number, number, number, number];
-        changed = ImGui.InputFloat4(
-          '##value',
-          val,
-          undefined,
-          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
-        );
-        break;
-      }
-      case 'rgb': {
-        const val = tmpProperty.num as [number, number, number];
-        changed = ImGui.ColorEdit3('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined);
-        break;
-      }
-      case 'rgba': {
-        const val = tmpProperty.num as [number, number, number, number];
-        changed = ImGui.ColorEdit4('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined);
-        break;
-      }
-      case 'command': {
-        for (let i = 0; i < tmpProperty.str.length; i++) {
-          if (i > 0) {
-            ImGui.SameLine();
-          }
-          if (ImGui.Button(`${tmpProperty.str[i]}##command${i}`)) {
-            if (value.command && value.command.call(object, i)) {
-              this.refresh();
+        case 'vec4': {
+          const val = tmpProperty.num as [number, number, number, number];
+          changed = ImGui.InputFloat4(
+            '##value',
+            val,
+            undefined,
+            readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+          );
+          break;
+        }
+        case 'rgb': {
+          const val = tmpProperty.num as [number, number, number];
+          changed = ImGui.ColorEdit3('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined);
+          break;
+        }
+        case 'rgba': {
+          const val = tmpProperty.num as [number, number, number, number];
+          changed = ImGui.ColorEdit4('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined);
+          break;
+        }
+        case 'command': {
+          for (let i = 0; i < tmpProperty.str.length; i++) {
+            if (i > 0) {
+              ImGui.SameLine();
+            }
+            if (ImGui.Button(`${tmpProperty.str[i]}##command${i}`)) {
+              if (value.command && value.command.call(object, i)) {
+                this.refresh();
+              }
             }
           }
+          break;
         }
-        break;
-      }
-      case 'object': {
-        const val = tmpProperty.str as [string];
-        const assetInfo = this._serializationManager.assetRegistry.getAssetInfo(val[0]);
-        if (assetInfo) {
-          val[0] = assetInfo.name;
-        }
-        if (value.isNullable?.()) {
-          ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
-        }
-        ImGui.InputText('##value', val, undefined, ImGui.InputTextFlags.ReadOnly);
-        if (ImGui.BeginDragDropTarget()) {
-          const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
-          if (payload) {
-            tmpProperty.str[0] = (payload.Data as DBAssetInfo).uuid;
-            value.set.call(object, tmpProperty);
-            this.dispatchEvent('object_property_changed', object, value.name);
+        case 'object': {
+          const val = tmpProperty.str as [string];
+          const assetInfo = this._serializationManager.assetRegistry.getAssetInfo(val[0]);
+          if (assetInfo) {
+            val[0] = assetInfo.name;
           }
-          ImGui.EndDragDropTarget();
-        }
-        if (value.isNullable?.()) {
-          ImGui.SameLine(0, 0);
-          if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
-            value.set.call(object, null);
-            this.dispatchEvent('object_property_changed', object, value.name);
-            if (property.value.objectTypes?.length > 0) {
-              ImGui.OpenPopup('X##list');
-              if (ImGui.BeginPopup('X##list')) {
-                for (const t of property.value.objectTypes) {
-                  const cls = this._serializationManager.getClassByConstructor(t);
-                  if (cls && ImGui.MenuItem(`${cls.ctor.name}##create`)) {
-                    alert(cls.ctor.name);
+          if (value.isNullable?.()) {
+            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
+          }
+          ImGui.InputText('##value', val, undefined, ImGui.InputTextFlags.ReadOnly);
+          if (ImGui.BeginDragDropTarget()) {
+            const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
+            if (payload) {
+              tmpProperty.str[0] = (payload.Data as DBAssetInfo).uuid;
+              value.set.call(object, tmpProperty);
+              this.dispatchEvent('object_property_changed', object, value.name);
+            }
+            ImGui.EndDragDropTarget();
+          }
+          if (value.isNullable?.()) {
+            ImGui.SameLine(0, 0);
+            if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
+              value.set.call(object, null);
+              this.dispatchEvent('object_property_changed', object, value.name);
+              if (property.value.objectTypes?.length > 0) {
+                ImGui.OpenPopup('X##list');
+                if (ImGui.BeginPopup('X##list')) {
+                  for (const t of property.value.objectTypes) {
+                    const cls = this._serializationManager.getClassByConstructor(t);
+                    if (cls && ImGui.MenuItem(`${cls.ctor.name}##create`)) {
+                      alert(cls.ctor.name);
+                    }
                   }
+                  ImGui.EndPopup();
                 }
-                ImGui.EndPopup();
               }
             }
           }
         }
       }
-    }
-    if (changed && value.set) {
-      value.set.call(object, tmpProperty);
-      this.dispatchEvent('object_property_changed', object, value.name);
+      if (changed && value.set) {
+        value.set.call(object, tmpProperty);
+        this.dispatchEvent('object_property_changed', object, value.name);
+      }
     }
     ImGui.PopID();
   }
