@@ -5,9 +5,10 @@ import type { SerializableClass } from '../types';
 import { degree2radian, radian2degree } from '@zephyr3d/base';
 import type { Mesh, ParticleSystem, Visitor } from '../../../scene';
 import { GraphNode } from '../../../scene';
-import type { AssetRegistry } from '../asset/asset';
 import type { Material } from '../../../material';
 import type { Primitive } from '../../../render';
+import type { SerializationManager } from '../manager';
+import { AnimationSet } from '../../../animation';
 
 export class GatherVisitor implements Visitor<SceneNode> {
   /** @internal */
@@ -112,7 +113,7 @@ export class NodeHierarchy {
   }
 }
 
-export function getNodeHierarchyClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getNodeHierarchyClass(): SerializableClass {
   return {
     ctor: NodeHierarchy,
     createFunc(ctx) {
@@ -159,12 +160,12 @@ export function getNodeHierarchyClass(assetRegistry: AssetRegistry): Serializabl
   };
 }
 
-export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getSceneNodeClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: SceneNode,
     async createFunc(ctx: NodeHierarchy | SceneNode, init?: { asset?: string }) {
       if (init?.asset) {
-        return { obj: (await assetRegistry.fetchModel(init.asset, ctx.scene)).group };
+        return { obj: (await manager.assetRegistry.fetchModel(init.asset, ctx.scene)).group };
       }
       const node = new SceneNode(ctx.scene);
       if (ctx instanceof SceneNode) {
@@ -173,7 +174,7 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
       return { obj: node };
     },
     getInitParams(obj: SceneNode) {
-      const asset = assetRegistry.getAssetId(obj);
+      const asset = manager.assetRegistry.getAssetId(obj);
       return asset ? { asset } : undefined;
     },
     getProps() {
@@ -296,13 +297,24 @@ export function getSceneNodeClass(assetRegistry: AssetRegistry): SerializableCla
               }
             }
           }
+        },
+        {
+          name: 'Animations',
+          type: 'object',
+          objectTypes: [AnimationSet],
+          isNullable() {
+            return true;
+          },
+          get(this: SceneNode, value) {
+            value.object[0] = this.animationSet;
+          }
         }
       ];
     }
   };
 }
 
-export function getGraphNodeClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getGraphNodeClass(): SerializableClass {
   return {
     ctor: GraphNode,
     parent: SceneNode,

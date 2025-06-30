@@ -1,15 +1,15 @@
 import type { Texture2D } from '@zephyr3d/device';
 import type { EnvLightType, FogType, SkyType } from '../../../render';
 import { Scene } from '../../../scene/scene';
-import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
 import { Application } from '../../../app/app';
 import { panoramaToCubemap } from '../../panorama';
 import { prefilterCubemap } from '../../pmrem';
 import { NodeHierarchy } from './node';
 import { Vector4 } from '@zephyr3d/base';
+import type { SerializationManager } from '../manager';
 
-export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getSceneClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: Scene,
     createFunc() {
@@ -398,11 +398,14 @@ export function getSceneClass(assetRegistry: AssetRegistry): SerializableClass {
           async set(this: Scene, value) {
             if (value.str[0]) {
               const assetId = value.str[0];
-              const assetInfo = assetRegistry.getAssetInfo(assetId);
+              const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
               if (assetInfo && assetInfo.type === 'texture') {
                 let tex: Texture2D;
                 try {
-                  tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
+                  tex = await manager.assetRegistry.fetchTexture<Texture2D>(
+                    assetId,
+                    assetInfo.textureOptions
+                  );
                 } catch (err) {
                   console.error(`Load asset failed: ${value.str[0]}: ${err}`);
                   tex = null;

@@ -10,11 +10,10 @@ import {
 import { Primitive } from '../../../render';
 import { GraphNode, Mesh, SceneNode } from '../../../scene';
 import { BoxFrameShape, BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '../../../shapes';
-import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 
-export function getMeshClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getMeshClass(): SerializableClass {
   return {
     ctor: Mesh,
     parent: GraphNode,

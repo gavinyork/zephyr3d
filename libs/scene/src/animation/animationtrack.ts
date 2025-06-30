@@ -30,6 +30,10 @@ export abstract class AnimationTrack<StateType = unknown> {
   set name(val: string) {
     this._name = val;
   }
+  /** Wether this is an embedded track */
+  get embedded(): boolean {
+    return this._embedded;
+  }
   /** Interpolator of the track */
   get interpolator(): Interpolator {
     return this._interpolator;

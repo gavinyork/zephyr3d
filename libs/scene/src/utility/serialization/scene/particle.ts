@@ -1,12 +1,11 @@
 import { GraphNode, type EmitterBehavior, type EmitterShape } from '../../../scene';
 import { SceneNode } from '../../../scene/scene_node';
 import { ParticleSystem } from '../../../scene/particlesys';
-import type { AssetRegistry } from '../asset/asset';
 import type { SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import { ParticleMaterial } from '../../../material';
 
-export function getParticleNodeClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getParticleNodeClass(): SerializableClass {
   return {
     ctor: ParticleSystem,
     parent: GraphNode,

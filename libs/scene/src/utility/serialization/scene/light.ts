@@ -3,11 +3,10 @@ import { DirectionalLight, PointLight, PunctualLight, SpotLight } from '../../..
 import type { SerializableClass } from '../types';
 import { AABB, degree2radian, radian2degree, Vector4 } from '@zephyr3d/base';
 import type { NodeHierarchy } from './node';
-import type { AssetRegistry } from '../asset/asset';
 import { SceneNode } from '../../../scene';
 import type { ShadowMode } from '../../../shadow';
 
-export function getPunctualLightClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getPunctualLightClass(): SerializableClass {
   return {
     ctor: PunctualLight,
     parent: SceneNode,
@@ -379,7 +378,7 @@ export function getPunctualLightClass(assetRegistry: AssetRegistry): Serializabl
     }
   };
 }
-export function getDirectionalLightClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getDirectionalLightClass(): SerializableClass {
   return {
     ctor: DirectionalLight,
     parent: PunctualLight,
@@ -408,7 +407,7 @@ export function getDirectionalLightClass(assetRegistry: AssetRegistry): Serializ
   };
 }
 
-export function getPointLightClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getPointLightClass(): SerializableClass {
   return {
     ctor: PointLight,
     parent: PunctualLight,
@@ -442,7 +441,7 @@ export function getPointLightClass(assetRegistry: AssetRegistry): SerializableCl
   };
 }
 
-export function getSpotLightClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getSpotLightClass(): SerializableClass {
   return {
     ctor: SpotLight,
     parent: PunctualLight,

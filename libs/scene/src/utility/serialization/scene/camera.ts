@@ -1,7 +1,6 @@
 import type { SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 import type { NodeHierarchy } from './node';
-import type { AssetRegistry } from '../asset/asset';
 import { SceneNode } from '../../../scene';
 import {
   TAA_DEBUG_ALAPH,
@@ -13,7 +12,7 @@ import {
   TAA_DEBUG_VELOCITY
 } from '../../../shaders';
 
-export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getCameraClass(): SerializableClass {
   return {
     ctor: Camera,
     parent: SceneNode,
@@ -602,7 +601,7 @@ export function getCameraClass(assetRegistry: AssetRegistry): SerializableClass 
   };
 }
 
-export function getPerspectiveCameraClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getPerspectiveCameraClass(): SerializableClass {
   return {
     ctor: PerspectiveCamera,
     parent: Camera,
@@ -657,7 +656,7 @@ export function getPerspectiveCameraClass(assetRegistry: AssetRegistry): Seriali
   };
 }
 
-export function getOrthoCameraClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getOrthoCameraClass(): SerializableClass {
   return {
     ctor: OrthoCamera,
     parent: Camera,

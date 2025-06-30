@@ -1,13 +1,13 @@
 import { degree2radian, radian2degree, Vector2 } from '@zephyr3d/base';
 import { GraphNode, SceneNode } from '../../../scene';
 import { Water } from '../../../scene/water';
-import type { AssetRegistry } from '../asset/asset';
 import type { PropertyAccessor, SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import type { WaveGenerator } from '../../../render';
 import { FBMWaveGenerator, FFTWaveGenerator, GerstnerWaveGenerator } from '../../../render';
 import type { Texture2D } from '@zephyr3d/device';
 import { MAX_GERSTNER_WAVE_COUNT } from '../../../values';
+import type { SerializationManager } from '../manager';
 
 export class Wave {
   public generator: GerstnerWaveGenerator;
@@ -40,7 +40,7 @@ export class Wave {
   }
 }
 
-export function getGerstnerWaveClass(assetRegistry): SerializableClass {
+export function getGerstnerWaveClass(): SerializableClass {
   return {
     ctor: Wave,
     createFunc(ctx: GerstnerWaveGenerator, initParams: number) {
@@ -137,7 +137,7 @@ export function getGerstnerWaveClass(assetRegistry): SerializableClass {
   };
 }
 
-export function getFBMWaveGeneratorClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getFBMWaveGeneratorClass(): SerializableClass {
   return {
     ctor: FBMWaveGenerator,
     getProps() {
@@ -198,7 +198,7 @@ export function getFBMWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
   };
 }
 
-export function getFFTWaveGeneratorClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getFFTWaveGeneratorClass(): SerializableClass {
   return {
     ctor: FFTWaveGenerator,
     getProps() {
@@ -308,7 +308,7 @@ export function getFFTWaveGeneratorClass(assetRegistry: AssetRegistry): Serializ
     }
   };
 }
-export function getGerstnerWaveGeneratorClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getGerstnerWaveGeneratorClass(): SerializableClass {
   return {
     ctor: GerstnerWaveGenerator,
     getProps() {
@@ -351,7 +351,7 @@ export function getGerstnerWaveGeneratorClass(assetRegistry: AssetRegistry): Ser
     }
   };
 }
-export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getWaterClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: Water,
     parent: GraphNode,
@@ -477,7 +477,7 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
             return true;
           },
           get(this: Water, value) {
-            value.str[0] = assetRegistry.getAssetId(this.material.scatterRampTexture) ?? '';
+            value.str[0] = manager.assetRegistry.getAssetId(this.material.scatterRampTexture) ?? '';
           },
           async set(value) {
             if (!value) {
@@ -485,11 +485,14 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
             } else {
               if (value.str[0]) {
                 const assetId = value.str[0];
-                const assetInfo = assetRegistry.getAssetInfo(assetId);
+                const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
                 if (assetInfo && assetInfo.type === 'texture') {
                   let tex: Texture2D;
                   try {
-                    tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
+                    tex = await manager.assetRegistry.fetchTexture<Texture2D>(
+                      assetId,
+                      assetInfo.textureOptions
+                    );
                   } catch (err) {
                     console.error(`Load asset failed: ${value.str[0]}: ${err}`);
                     tex = null;
@@ -513,7 +516,7 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
             return true;
           },
           get(this: Water, value) {
-            value.str[0] = assetRegistry.getAssetId(this.material.absorptionRampTexture) ?? '';
+            value.str[0] = manager.assetRegistry.getAssetId(this.material.absorptionRampTexture) ?? '';
           },
           async set(this: Water, value) {
             if (!value) {
@@ -521,11 +524,14 @@ export function getWaterClass(assetRegistry: AssetRegistry): SerializableClass {
             } else {
               if (value.str[0]) {
                 const assetId = value.str[0];
-                const assetInfo = assetRegistry.getAssetInfo(assetId);
+                const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
                 if (assetInfo && assetInfo.type === 'texture') {
                   let tex: Texture2D;
                   try {
-                    tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
+                    tex = await manager.assetRegistry.fetchTexture<Texture2D>(
+                      assetId,
+                      assetInfo.textureOptions
+                    );
                   } catch (err) {
                     console.error(`Load asset failed: ${value.str[0]}: ${err}`);
                     tex = null;

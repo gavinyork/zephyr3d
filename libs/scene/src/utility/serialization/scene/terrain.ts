@@ -9,6 +9,7 @@ import { Application } from '../../../app';
 import type { Texture2D } from '@zephyr3d/device';
 import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
 import { MAX_TERRAIN_MIPMAP_LEVELS } from '../../../values';
+import type { SerializationManager } from '../manager';
 
 function writeUUID(dataView: DataView, offset: number, str: string) {
   if (str && str.length === 36) {
@@ -266,7 +267,7 @@ function getDetailMapProps(assetRegistry: AssetRegistry) {
   }
   return props;
 }
-export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getTerrainClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: ClipmapTerrain,
     parent: GraphNode,
@@ -285,14 +286,14 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
       return [
         getTerrainHeightMapContent(obj),
         getTerrainSplatMapContent(obj),
-        getTerrainGrassContent(obj, assetRegistry)
+        getTerrainGrassContent(obj, manager.assetRegistry)
       ];
     },
     getAssets(obj: ClipmapTerrain) {
       const assets: string[] = [];
       for (let i = 0; i < obj.grassRenderer.numLayers; i++) {
         const grassTexture = obj.grassRenderer.getGrassTexture(i);
-        const assetId = grassTexture ? assetRegistry.getAssetId(grassTexture) ?? '' : '';
+        const assetId = grassTexture ? manager.assetRegistry.getAssetId(grassTexture) ?? '' : '';
         if (assetId) {
           assets.push(assetId);
         }
@@ -351,7 +352,7 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
             this.material.debugMode = value.str[0] as TerrainDebugMode;
           }
         },
-        ...getDetailMapProps(assetRegistry),
+        ...getDetailMapProps(manager.assetRegistry),
         {
           name: 'SplatMap',
           type: 'object',
@@ -363,11 +364,11 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
           async set(this: ClipmapTerrain, value) {
             if (value.str[0]) {
               const assetId = value.str[0];
-              const assetInfo = assetRegistry.getAssetInfo(assetId);
+              const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
               if (assetInfo && assetInfo.type === 'binary') {
                 let data: ArrayBuffer = null;
                 try {
-                  data = await assetRegistry.fetchBinary(assetId);
+                  data = await manager.assetRegistry.fetchBinary(assetId);
                 } catch (err) {
                   console.error(`Load asset failed: ${value.str[0]}: ${err}`);
                   data = null;
@@ -405,11 +406,11 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
           async set(this: ClipmapTerrain, value) {
             if (value.str[0]) {
               const assetId = value.str[0];
-              const assetInfo = assetRegistry.getAssetInfo(assetId);
+              const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
               if (assetInfo && assetInfo.type === 'binary') {
                 let data: ArrayBuffer = null;
                 try {
-                  data = await assetRegistry.fetchBinary(assetId);
+                  data = await manager.assetRegistry.fetchBinary(assetId);
                 } catch (err) {
                   console.error(`Load asset failed: ${value.str[0]}: ${err}`);
                   data = null;
@@ -427,10 +428,10 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
                   offset += 36;
                   let texture: Texture2D = null;
                   if (assetId) {
-                    const assetInfo = assetRegistry.getAssetInfo(assetId);
+                    const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
                     if (assetInfo && assetInfo.type === 'texture') {
                       try {
-                        texture = await assetRegistry.fetchTexture<Texture2D>(
+                        texture = await manager.assetRegistry.fetchTexture<Texture2D>(
                           assetId,
                           assetInfo.textureOptions
                         );
@@ -489,11 +490,11 @@ export function getTerrainClass(assetRegistry: AssetRegistry): SerializableClass
           async set(this: ClipmapTerrain, value) {
             if (value.str[0]) {
               const assetId = value.str[0];
-              const assetInfo = assetRegistry.getAssetInfo(assetId);
+              const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
               if (assetInfo && assetInfo.type === 'binary') {
                 let data: ArrayBuffer = null;
                 try {
-                  data = await assetRegistry.fetchBinary(assetId);
+                  data = await manager.assetRegistry.fetchBinary(assetId);
                 } catch (err) {
                   console.error(`Load asset failed: ${value.str[0]}: ${err}`);
                   data = null;

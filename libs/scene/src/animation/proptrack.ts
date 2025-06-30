@@ -57,4 +57,7 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
   getBlendId(): unknown {
     return this._prop;
   }
+  getProp(): PropertyAccessor {
+    return this._prop;
+  }
 }

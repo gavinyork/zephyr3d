@@ -1,0 +1,160 @@
+import { InterpolationMode, InterpolationTarget, Interpolator } from '@zephyr3d/base';
+import { AnimationClip, AnimationSet, PropertyTrack } from '../../../animation';
+import type { SerializationManager } from '../manager';
+import type { SerializableClass } from '../types';
+
+export function getInterpolatorClass(): SerializableClass {
+  return {
+    ctor: Interpolator,
+    createFunc(
+      ctx,
+      init: { mode: InterpolationMode; target: InterpolationTarget; inputs: number[]; outputs: number[] }
+    ) {
+      return { obj: new Interpolator(init.mode, init.target, init.inputs, init.outputs) };
+    },
+    getInitParams(obj: Interpolator) {
+      return {
+        mode: obj.mode,
+        target: obj.target,
+        inputs: obj.inputs instanceof Float32Array ? [...obj.inputs] : obj.inputs ?? [],
+        outputs: obj.outputs instanceof Float32Array ? [...obj.outputs] : obj.outputs ?? []
+      };
+    },
+    getProps() {
+      return [
+        {
+          name: 'Mode',
+          type: 'string',
+          get(this: Interpolator, value) {
+            value.str[0] = this.mode;
+          }
+        },
+        {
+          name: 'Target',
+          type: 'string',
+          get(this: Interpolator, value) {
+            value.str[0] = this.target;
+          }
+        },
+        {
+          name: 'Inputs',
+          type: 'string',
+          get(this: Interpolator, value) {
+            const data = this.inputs instanceof Float32Array ? [...this.inputs] : this.inputs ?? [];
+            value.str[0] = JSON.stringify(data);
+          },
+          set(this: Interpolator, value) {
+            const data = JSON.parse(value.str[0]) as number[];
+            this.inputs = new Float32Array(data);
+          }
+        },
+        {
+          name: 'Outputs',
+          type: 'string',
+          get(this: Interpolator, value) {
+            const data = this.outputs instanceof Float32Array ? [...this.outputs] : this.outputs ?? [];
+            value.str[0] = JSON.stringify(data);
+          },
+          set(this: Interpolator, value) {
+            const data = JSON.parse(value.str[0]) as number[];
+            this.outputs = new Float32Array(data);
+          }
+        }
+      ];
+    }
+  };
+}
+
+export function getPropTrackClass(manager: SerializationManager): SerializableClass {
+  return {
+    ctor: PropertyTrack,
+    getProps() {
+      return [
+        {
+          name: 'TrackName',
+          label: 'Name',
+          type: 'string',
+          get(this: PropertyTrack, value) {
+            value.str[0] = this.name;
+          },
+          set(this: PropertyTrack, value) {
+            this.name = value.str[0];
+          }
+        },
+        {
+          name: 'TrackProp',
+          type: 'string',
+          get(this: PropertyTrack, value) {
+            value.str[0] = manager.getPropertyName(this.getProp());
+          }
+        },
+        {
+          name: 'TrackData',
+          type: 'object',
+          get(this: PropertyTrack, value) {
+            value.object[0] = this.interpolator;
+          },
+          set(this: PropertyTrack, value) {
+            this.interpolator = value.object[0] as Interpolator;
+          }
+        }
+      ];
+    }
+  };
+}
+
+export function getAnimationClass(): SerializableClass {
+  return {
+    ctor: AnimationClip,
+    getProps() {
+      return [
+        {
+          name: 'Tracks',
+          type: 'object_array',
+          objectTypes: [PropertyTrack],
+          get(this: AnimationClip, value) {
+            value.object = [];
+            for (const tracks of this.tracks) {
+              value.object.push(...tracks[1].filter((track) => track instanceof PropertyTrack));
+            }
+          }
+        }
+      ];
+    }
+  };
+}
+
+export function getAnimationSetClass(): SerializableClass {
+  return {
+    ctor: AnimationSet,
+    getProps() {
+      return [
+        {
+          name: 'Animations',
+          type: 'object_array',
+          objectTypes: [AnimationClip],
+          get(this: AnimationSet, value) {
+            value.object = this.getAnimationNames().map((name) => this.getAnimationClip(name));
+          },
+          set(this: AnimationSet, value) {
+            for (const ani of value.object) {
+              const animation = ani as AnimationClip;
+              const existAnimation = this.getAnimationClip(animation.name);
+              if (existAnimation) {
+                for (const tracks of animation.tracks) {
+                  for (const track of tracks[1]) {
+                    if (!track.embedded) {
+                      existAnimation.addTrack(tracks[0], track);
+                    }
+                  }
+                }
+              } else {
+                this.add(animation);
+              }
+            }
+          }
+        }
+      ];
+    }
+  };
+}

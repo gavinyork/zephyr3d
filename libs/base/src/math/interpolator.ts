@@ -1,4 +1,3 @@
-import type { TypedArray } from '../utils';
 import { Quaternion } from './vector';
 
 /**
@@ -7,7 +6,7 @@ import { Quaternion } from './vector';
  */
 export type InterpolationMode = 'unknown' | 'step' | 'linear' | 'cubicspline' | 'cubicspline-natural';
 
-export type InterpolateData = TypedArray | number[];
+export type InterpolateData = Float32Array | number[];
 
 /**
  * Target of interpolation

@@ -609,7 +609,17 @@ export class SharedModel {
         );
       }
       for (const animationData of this.animations) {
-        const animation = new AnimationClip(animationData.name, true);
+        let name = animationData.name ?? `_embbeded_animation`;
+        if (animationSet.getAnimationClip(name)) {
+          const baseName = name;
+          for (let t = 1; ; t++) {
+            name = `${baseName}_${t}`;
+            if (!animationSet.getAnimationClip(name)) {
+              break;
+            }
+          }
+        }
+        const animation = new AnimationClip(name, true);
         for (const track of animationData.tracks) {
           if (track.type === 'translation') {
             animation.addTrack(nodeMap.get(track.node), new NodeTranslationTrack(track.interpolator, true));

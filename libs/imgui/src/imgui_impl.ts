@@ -13,24 +13,28 @@ const fonts: Record<string, DeviceFont> = {};
 
 export class Input {
   public _dom_input: HTMLInputElement;
-  constructor() {
+  constructor(cvs: HTMLCanvasElement) {
     this._dom_input = document.createElement('input');
     this._dom_input.style.position = 'fixed';
     this._dom_input.style.top = -10000 + 'px';
     this._dom_input.style.left = -10000 + 'px';
     this._dom_input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
       this.onKeydown(e as KeyboardEvent);
     });
     this._dom_input.addEventListener('keyup', (e) => {
+      e.stopPropagation();
       this.onKeyup(e as KeyboardEvent);
     });
     this._dom_input.addEventListener('keypress', (e) => {
+      e.stopPropagation();
       this.onKeypress(e as KeyboardEvent);
     });
     this._dom_input.addEventListener('compositionend', (e) => {
       this.onCompositionEnd(e as CompositionEvent);
     });
-    document.body.appendChild(this._dom_input);
+    cvs.appendChild(this._dom_input);
+    this.blur();
   }
   onKeydown(e: KeyboardEvent) {
     canvas_on_keydown(e);
@@ -398,6 +402,7 @@ export function Init(device: AbstractDevice): void {
 
   renderer = new Renderer(device);
   glyphManager = new GlyphManager(device, 1024, 1024, 1);
+  dom_input = new Input(device.canvas);
 
   window_on_resize();
   renderer.device.canvas.style.touchAction = 'none'; // Disable browser handling of all panning and zooming gestures.
@@ -738,9 +743,6 @@ function input_text_update(io: ImGui.IO): void {
   if (!activeId || activeId != inpId) {
     dom_input?.blur();
   } else {
-    if (!dom_input) {
-      dom_input = new Input();
-    }
     dom_input.focus();
   }
 }

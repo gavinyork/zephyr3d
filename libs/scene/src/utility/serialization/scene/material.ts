@@ -11,15 +11,15 @@ import {
   UnlitMaterial
 } from '../../../material';
 import type { PropertyAccessor, SerializableClass } from '../types';
-import type { AssetRegistry } from '../asset/asset';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import { getTextureProps } from './common';
+import type { SerializationManager } from '../manager';
 
 type PBRMaterial = PBRMetallicRoughnessMaterial | PBRSpecularGlossinessMaterial;
 type LitPropTypes = LambertMaterial | BlinnMaterial | PBRMaterial;
 type UnlitPropTypes = UnlitMaterial | LitPropTypes;
 
-function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMaterial>[] {
+function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRMaterial>[] {
   return [
     {
       name: 'IOR',
@@ -56,7 +56,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !this.$isInstance && !!this.occlusionTexture;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'occlusionTexture', '2D', 0),
+    ...getTextureProps<PBRMaterial>(manager.assetRegistry, 'occlusionTexture', '2D', 0),
     {
       name: 'EmissiveColor',
       type: 'rgb',
@@ -91,8 +91,8 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return this.$isInstance ? this.coreMaterial.emissiveStrength : 1;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'emissiveTexture', '2D', 0),
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'specularTexture', '2D', 0),
+    ...getTextureProps<PBRMaterial>(manager.assetRegistry, 'emissiveTexture', '2D', 0),
+    ...getTextureProps<PBRMaterial>(manager.assetRegistry, 'specularTexture', '2D', 0),
     {
       name: 'Transmission',
       type: 'bool',
@@ -128,7 +128,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !this.$isInstance && !!this.transmission;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'transmissionTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager.assetRegistry, 'transmissionTexture', '2D', 1, function () {
       return this.transmission;
     }),
     {
@@ -151,7 +151,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !this.$isInstance && !!this.transmission;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'thicknessTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager.assetRegistry, 'thicknessTexture', '2D', 1, function () {
       return this.transmission;
     }),
     {
@@ -227,7 +227,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !this.$isInstance && !!this.iridescence;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'iridescenceTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager.assetRegistry, 'iridescenceTexture', '2D', 1, function () {
       return this.iridescence;
     }),
     {
@@ -286,9 +286,15 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !this.$isInstance && !!this.iridescence;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'iridescenceThicknessTexture', '2D', 1, function () {
-      return this.iridescence;
-    }),
+    ...getTextureProps<PBRMaterial>(
+      manager.assetRegistry,
+      'iridescenceThicknessTexture',
+      '2D',
+      1,
+      function () {
+        return this.iridescence;
+      }
+    ),
     {
       name: 'ClearCoat',
       type: 'bool',
@@ -324,7 +330,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !this.$isInstance && !!this.clearcoat;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'clearcoatIntensityTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager.assetRegistry, 'clearcoatIntensityTexture', '2D', 1, function () {
       return this.clearcoat;
     }),
     {
@@ -347,10 +353,10 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !this.$isInstance && !!this.clearcoat;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'clearcoatRoughnessTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager.assetRegistry, 'clearcoatRoughnessTexture', '2D', 1, function () {
       return this.clearcoat;
     }),
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'clearcoatNormalTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager.assetRegistry, 'clearcoatNormalTexture', '2D', 1, function () {
       return this.clearcoat;
     }),
     {
@@ -386,7 +392,7 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !this.$isInstance && !!this.sheen;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'sheenColorTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager.assetRegistry, 'sheenColorTexture', '2D', 1, function () {
       return this.sheen;
     }),
     {
@@ -409,16 +415,16 @@ function getPBRCommonProps(assetRegistry: AssetRegistry): PropertyAccessor<PBRMa
         return !this.$isInstance && !!this.sheen;
       }
     },
-    ...getTextureProps<PBRMaterial>(assetRegistry, 'sheenRoughnessTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager.assetRegistry, 'sheenRoughnessTexture', '2D', 1, function () {
       return this.sheen;
     }),
-    ...getLitMaterialProps(assetRegistry)
+    ...getLitMaterialProps(manager)
   ];
 }
 
-function getLitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<LitPropTypes>[] {
+function getLitMaterialProps(manager: SerializationManager): PropertyAccessor<LitPropTypes>[] {
   return [
-    ...getUnlitMaterialProps(assetRegistry),
+    ...getUnlitMaterialProps(manager),
     {
       name: 'vertexNormal',
       type: 'bool',
@@ -447,10 +453,10 @@ function getLitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<Lit
         return !this.$isInstance && !!this.vertexNormal;
       }
     },
-    ...getTextureProps<LitPropTypes>(assetRegistry, 'normalTexture', '2D', 0)
+    ...getTextureProps<LitPropTypes>(manager.assetRegistry, 'normalTexture', '2D', 0)
   ];
 }
-function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<UnlitPropTypes>[] {
+function getUnlitMaterialProps(manager: SerializationManager): PropertyAccessor<UnlitPropTypes>[] {
   return [
     {
       name: 'vertexColor',
@@ -484,7 +490,7 @@ function getUnlitMaterialProps(assetRegistry: AssetRegistry): PropertyAccessor<U
         return this.$isInstance ? this.coreMaterial.albedoColor : [1, 1, 1, 1];
       }
     },
-    ...getTextureProps<UnlitPropTypes>(assetRegistry, 'albedoTexture', '2D', 0)
+    ...getTextureProps<UnlitPropTypes>(manager.assetRegistry, 'albedoTexture', '2D', 0)
   ];
 }
 
@@ -622,7 +628,7 @@ export function getMeshMaterialClass(): SerializableClass {
   };
 }
 
-export function getParticleMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getParticleMaterialClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: ParticleMaterial,
     parent: MeshMaterial,
@@ -651,16 +657,19 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
             return true;
           },
           get(this: ParticleMaterial, value) {
-            value.str[0] = assetRegistry.getAssetId(this.alphaMap) ?? '';
+            value.str[0] = manager.assetRegistry.getAssetId(this.alphaMap) ?? '';
           },
           async set(this: ParticleMaterial, value) {
             if (value.str[0]) {
               const assetId = value.str[0];
-              const assetInfo = assetRegistry.getAssetInfo(assetId);
+              const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
               if (assetInfo && assetInfo.type === 'texture') {
                 let tex: Texture2D;
                 try {
-                  tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
+                  tex = await manager.assetRegistry.fetchTexture<Texture2D>(
+                    assetId,
+                    assetInfo.textureOptions
+                  );
                 } catch (err) {
                   console.error(`Load asset failed: ${value.str[0]}: ${err}`);
                 }
@@ -682,16 +691,19 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
             return true;
           },
           get(this: ParticleMaterial, value) {
-            value.str[0] = assetRegistry.getAssetId(this.rampMap) ?? '';
+            value.str[0] = manager.assetRegistry.getAssetId(this.rampMap) ?? '';
           },
           async set(this: ParticleMaterial, value) {
             if (value.str[0]) {
               const assetId = value.str[0];
-              const assetInfo = assetRegistry.getAssetInfo(assetId);
+              const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
               if (assetInfo && assetInfo.type === 'texture') {
                 let tex: Texture2D;
                 try {
-                  tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
+                  tex = await manager.assetRegistry.fetchTexture<Texture2D>(
+                    assetId,
+                    assetInfo.textureOptions
+                  );
                 } catch (err) {
                   console.error(`Load asset failed: ${value.str[0]}: ${err}`);
                 }
@@ -710,7 +722,7 @@ export function getParticleMaterialClass(assetRegistry: AssetRegistry): Serializ
   };
 }
 
-export function getUnlitMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getUnlitMaterialClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: UnlitMaterial,
     parent: MeshMaterial,
@@ -739,11 +751,11 @@ export function getUnlitMaterialClass(assetRegistry: AssetRegistry): Serializabl
       };
     },
     getProps() {
-      return getUnlitMaterialProps(assetRegistry);
+      return getUnlitMaterialProps(manager);
     }
   };
 }
-export function getLambertMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getLambertMaterialClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: LambertMaterial,
     parent: MeshMaterial,
@@ -772,12 +784,12 @@ export function getLambertMaterialClass(assetRegistry: AssetRegistry): Serializa
       };
     },
     getProps() {
-      return getLitMaterialProps(assetRegistry);
+      return getLitMaterialProps(manager);
     }
   };
 }
 
-export function getBlinnMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getBlinnMaterialClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: BlinnMaterial,
     parent: MeshMaterial,
@@ -825,13 +837,13 @@ export function getBlinnMaterialClass(assetRegistry: AssetRegistry): Serializabl
             return this.$isInstance ? this.coreMaterial.shininess : 32;
           }
         },
-        ...getLitMaterialProps(assetRegistry)
+        ...getLitMaterialProps(manager)
       ];
     }
   };
 }
 
-export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getPBRMetallicRoughnessMaterialClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: PBRMetallicRoughnessMaterial,
     parent: MeshMaterial,
@@ -914,15 +926,25 @@ export function getPBRMetallicRoughnessMaterialClass(assetRegistry: AssetRegistr
             return this.$isInstance ? this.coreMaterial.specularFactor : [1, 1, 1, 1];
           }
         },
-        ...getTextureProps<PBRMetallicRoughnessMaterial>(assetRegistry, 'metallicRoughnessTexture', '2D', 0),
-        ...getTextureProps<PBRMetallicRoughnessMaterial>(assetRegistry, 'specularColorTexture', '2D', 0),
-        ...getPBRCommonProps(assetRegistry)
+        ...getTextureProps<PBRMetallicRoughnessMaterial>(
+          manager.assetRegistry,
+          'metallicRoughnessTexture',
+          '2D',
+          0
+        ),
+        ...getTextureProps<PBRMetallicRoughnessMaterial>(
+          manager.assetRegistry,
+          'specularColorTexture',
+          '2D',
+          0
+        ),
+        ...getPBRCommonProps(manager)
       ];
     }
   };
 }
 
-export function getPBRSpecularGlossinessMaterialClass(assetRegistry: AssetRegistry): SerializableClass {
+export function getPBRSpecularGlossinessMaterialClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: PBRSpecularGlossinessMaterial,
     parent: MeshMaterial,
@@ -986,7 +1008,7 @@ export function getPBRSpecularGlossinessMaterialClass(assetRegistry: AssetRegist
             return this.$isInstance ? this.coreMaterial.glossinessFactor : 1;
           }
         },
-        ...getPBRCommonProps(assetRegistry)
+        ...getPBRCommonProps(manager)
       ];
     }
   };

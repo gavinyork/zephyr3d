@@ -132,7 +132,11 @@ export class AnimationSet implements Disposable {
    * Adds an animation
    */
   add(animation: AnimationClip) {
-    this._animations[animation.name] = animation;
+    if (!animation.name || this._animations[animation.name]) {
+      console.error('Animation must have unique name');
+    } else {
+      this._animations[animation.name] = animation;
+    }
   }
   /**
    * Gets names of all the animations of the model

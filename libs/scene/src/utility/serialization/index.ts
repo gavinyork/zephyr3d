@@ -1,4 +1,4 @@
-import { Scene } from '../../scene';
+import type { Scene } from '../../scene';
 import type { EmbeddedAssetInfo } from './asset/asset';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import type { SerializationManager } from './manager';
