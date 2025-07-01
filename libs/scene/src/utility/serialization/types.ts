@@ -38,6 +38,7 @@ export type PropertyAccessor<T = unknown> = {
   enum?: { labels: string[]; values: (number | string)[] };
   instance?: boolean;
   objectTypes?: GenericConstructor[];
+  readonly?: boolean;
   default?: any;
   animatable?: boolean;
   persistent?: boolean;

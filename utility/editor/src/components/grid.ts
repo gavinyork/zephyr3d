@@ -19,6 +19,7 @@ import { Dialog } from '../views/dlg/dlg';
 interface Property<T extends {}> {
   path: string;
   name: string;
+  object: any;
   value: PropertyAccessor<T>;
 }
 
@@ -52,6 +53,7 @@ class PropertyGroup {
       property: {
         name: label,
         path: '',
+        object: null,
         value: null
       }
     });
@@ -78,7 +80,7 @@ class PropertyGroup {
       value.get.call(obj, tmpProperty);
       if (tmpProperty.object) {
         for (let i = 0; i < tmpProperty.object.length; i++) {
-          const propGroup = group.addGroup(value.name);
+          const propGroup = group.addGroup(`${value.name}[${i}]`);
           propGroup.setObject(tmpProperty.object[i], value, obj);
         }
       }
@@ -86,6 +88,7 @@ class PropertyGroup {
       const property: Property<any> = {
         path: `${group.name}/${value.name}`,
         name: value.name,
+        object: obj,
         value
       };
       if (!value.isValid || value.isValid.call(obj)) {
@@ -338,82 +341,78 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     ImGui.TableNextRow();
     ImGui.TableNextColumn();
     ImGui.TableNextColumn();
-    /*
+    const baseX = ImGui.GetCursorPosX();
     if (level > 0) {
-      ImGui.Indent(level * 10);
+      ImGui.SetCursorPosX(baseX + level * 10);
     }
-    */
+    ImGui.AlignTextToFramePadding();
     const flags = ImGui.TreeNodeFlags.DefaultOpen;
     const opened = toplevel ? true : ImGui.TreeNodeEx(group.name, flags);
     if (group.object && group.prop && group.objectTypes.length > 0) {
       const deletable = group.prop.isNullable?.() && group.prop.set && group.value.object?.[0];
+      const readonly = !!group.prop.readonly;
       const editable = group.value.object?.[0] instanceof AABB && group.prop.edit === 'aabb';
       const buttonSize = ImGui.GetFrameHeight();
       const spacing = (editable ? buttonSize : 0) + (deletable ? buttonSize : 0);
       ImGui.TableNextColumn();
-      ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
-      ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - spacing);
-      const index = [
-        group.objectTypes.findIndex((val) => val.ctor === (group.value.object?.[0]?.constructor ?? null))
-      ] as [number];
-      if (
-        ImGui.Combo(
-          '',
-          index,
-          group.objectTypes.map((val) => val.ctor.name),
-          group.objectTypes.length
-        )
-      ) {
-        const newObj = new group.objectTypes[index[0]].ctor();
-        group.prop.set.call(group.object, { object: [newObj] });
-        this.dispatchEvent('object_property_changed', group.object, group.prop.name);
-        this.refresh();
-      }
-      if (deletable) {
-        ImGui.SameLine(0, 0);
-        if (ImGui.Button(`${FontGlyph.glyphs['trash-empty']}##clear`, new ImGui.ImVec2(buttonSize, 0))) {
-          group.prop.set.call(group.object, { object: [null] });
+      if (!readonly) {
+        ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - spacing);
+        const index = [
+          group.objectTypes.findIndex((val) => val.ctor === (group.value.object?.[0]?.constructor ?? null))
+        ] as [number];
+        if (
+          ImGui.Combo(
+            '',
+            index,
+            group.objectTypes.map((val) => val.ctor.name),
+            group.objectTypes.length
+          )
+        ) {
+          const newObj = new group.objectTypes[index[0]].ctor();
+          group.prop.set.call(group.object, { object: [newObj] });
           this.dispatchEvent('object_property_changed', group.object, group.prop.name);
           this.refresh();
-          if (editable) {
-            this.dispatchEvent('end_edit_aabb', group.value.object[0] as AABB);
+        }
+        if (deletable) {
+          ImGui.SameLine(0, 0);
+          if (ImGui.Button(`${FontGlyph.glyphs['trash-empty']}##clear`, new ImGui.ImVec2(buttonSize, 0))) {
+            group.prop.set.call(group.object, { object: [null] });
+            this.dispatchEvent('object_property_changed', group.object, group.prop.name);
+            this.refresh();
+            if (editable) {
+              this.dispatchEvent('end_edit_aabb', group.value.object[0] as AABB);
+            }
           }
         }
-      }
-      if (editable) {
-        ImGui.SameLine(0, 0);
-        if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
-          this.dispatchEvent('request_edit_aabb', group.value.object[0] as AABB);
+        if (editable) {
+          ImGui.SameLine(0, 0);
+          if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
+            this.dispatchEvent('request_edit_aabb', group.value.object[0] as AABB);
+          }
         }
+        ImGui.EndChild();
       }
-      ImGui.EndChild();
     }
     if (opened) {
       if (!toplevel) {
         ImGui.TreePop();
       }
       for (const property of group.properties) {
-        this.renderProperty(
-          property instanceof PropertyGroup ? property : property.property,
-          level + 2,
-          group.getObject()
-        );
+        this.renderProperty(property instanceof PropertyGroup ? property : property.property, level + 2);
       }
       this.renderSubGroups(group, level + 1);
     }
-    /*
     if (level > 0) {
-      ImGui.Unindent(level * 10);
+      ImGui.SetCursorPosX(baseX);
     }
-    */
   }
-  private renderProperty(property: PropertyGroup | Property<any>, level: number, object?: any) {
+  private renderProperty(property: PropertyGroup | Property<any>, level: number) {
     if (property instanceof PropertyGroup) {
       this.renderGroup(property, level - 1);
       return;
     }
-    const { name, value } = property;
-    object = object ?? this.object;
+    const { name, object, value } = property;
     if (value && value.isValid && !value.isValid.call(object)) {
       return;
     }

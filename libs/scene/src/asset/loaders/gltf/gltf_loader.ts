@@ -335,6 +335,10 @@ export class GLTFLoader extends AbstractModelLoader {
       const sampler = samplers[channel.sampler];
       const input = gltf._accessors[sampler.input].getNormalizedDeinterlacedView(gltf);
       const output = gltf._accessors[sampler.output].getNormalizedDeinterlacedView(gltf);
+      if (!(input instanceof Float32Array) || !(output instanceof Float32Array)) {
+        console.error('Input/output channel of animation must be Float32Array');
+        continue;
+      }
       const mode: InterpolationMode =
         sampler.interpolation === 'STEP'
           ? 'step'

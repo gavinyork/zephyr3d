@@ -109,9 +109,17 @@ export function getAnimationClass(): SerializableClass {
     getProps() {
       return [
         {
+          name: 'Name',
+          type: 'string',
+          get(this: AnimationClip, value) {
+            value.str[0] = this.name;
+          }
+        },
+        {
           name: 'Tracks',
           type: 'object_array',
           objectTypes: [PropertyTrack],
+          readonly: true,
           get(this: AnimationClip, value) {
             value.object = [];
             for (const tracks of this.tracks) {
@@ -133,6 +141,7 @@ export function getAnimationSetClass(): SerializableClass {
           name: 'Animations',
           type: 'object_array',
           objectTypes: [AnimationClip],
+          readonly: true,
           get(this: AnimationSet, value) {
             value.object = this.getAnimationNames().map((name) => this.getAnimationClip(name));
           },

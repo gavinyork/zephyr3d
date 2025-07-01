@@ -302,6 +302,7 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
           name: 'Animations',
           type: 'object',
           objectTypes: [AnimationSet],
+          readonly: true,
           isNullable() {
             return true;
           },
