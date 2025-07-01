@@ -44,7 +44,10 @@ export type PropertyAccessor<T = unknown> = {
   persistent?: boolean;
   edit?: PropEdit;
   get: (this: T, value: PropertyValue) => void;
-  set?: (this: T, value: PropertyValue) => void | Promise<void>;
+  set?: (this: T, value: PropertyValue, index?: number) => void | Promise<void>;
+  create?: (this: T, ctor: GenericConstructor, index: number) => void;
+  delete?: (this: T, index: number) => void;
+  add?: (this: T, value: PropertyValue, index?: number) => void | Promise<void>;
   isValid?: (this: T) => boolean;
   isNullable?: (this: T) => boolean;
   command?: (this: T, index: number) => boolean;

@@ -1,5 +1,6 @@
 import { AnimationTrack } from './animationtrack';
 import type { PropertyAccessor, PropertyValue } from '../utility';
+import { Interpolator } from '@zephyr3d/base';
 
 /**
  * Translate animation track
@@ -13,24 +14,51 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
    * Create an instance of TranslationTrack from keyframe values
    * @param prop - Property to be animated
    */
-  constructor(prop: PropertyAccessor, embedded?: boolean) {
+  constructor(prop: PropertyAccessor, value?: number[], embedded?: boolean) {
     super(undefined, embedded);
     this._prop = prop;
     this._state = { num: [0, 0, 0, 0] };
+    if (value) {
+      this._state.num = value.slice();
+    }
     switch (this._prop.type) {
       case 'float':
         this._count = 1;
+        this._interpolator = new Interpolator(
+          'cubicspline-natural',
+          'number',
+          new Float32Array([0, 1]),
+          new Float32Array([this._state.num[0], this._state.num[0]])
+        );
         break;
       case 'vec2':
         this._count = 2;
+        this._interpolator = new Interpolator(
+          'cubicspline-natural',
+          'vec2',
+          new Float32Array([0, 1]),
+          new Float32Array([...this._state.num.slice(0, 2), ...this._state.num.slice(0, 2)])
+        );
         break;
       case 'rgb':
       case 'vec3':
         this._count = 3;
+        this._interpolator = new Interpolator(
+          'cubicspline-natural',
+          'vec3',
+          new Float32Array([0, 1]),
+          new Float32Array([...this._state.num.slice(0, 3), ...this._state.num.slice(0, 3)])
+        );
         break;
       case 'rgba':
       case 'vec4':
         this._count = 4;
+        this._interpolator = new Interpolator(
+          'cubicspline-natural',
+          'vec4',
+          new Float32Array([0, 1]),
+          new Float32Array([...this._state.num.slice(0, 4), ...this._state.num.slice(0, 4)])
+        );
         break;
       default:
         throw new Error(`Property '${this._prop.name}' cannot be animated`);

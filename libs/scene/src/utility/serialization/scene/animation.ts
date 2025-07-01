@@ -1,5 +1,5 @@
 import { InterpolationMode, InterpolationTarget, Interpolator } from '@zephyr3d/base';
-import { AnimationClip, AnimationSet, PropertyTrack } from '../../../animation';
+import { AnimationClip, AnimationSet, AnimationTrack, PropertyTrack } from '../../../animation';
 import type { SerializationManager } from '../manager';
 import type { SerializableClass } from '../types';
 
@@ -91,6 +91,7 @@ export function getPropTrackClass(manager: SerializationManager): SerializableCl
         {
           name: 'TrackData',
           type: 'object',
+          objectTypes: [Interpolator],
           get(this: PropertyTrack, value) {
             value.object[0] = this.interpolator;
           },
@@ -116,14 +117,30 @@ export function getAnimationClass(): SerializableClass {
           }
         },
         {
+          name: 'Duration',
+          type: 'float',
+          get(this: AnimationClip, value) {
+            value.num[0] = this.timeDuration;
+          }
+        },
+        {
           name: 'Tracks',
           type: 'object_array',
           objectTypes: [PropertyTrack],
-          readonly: true,
           get(this: AnimationClip, value) {
             value.object = [];
             for (const tracks of this.tracks) {
               value.object.push(...tracks[1].filter((track) => track instanceof PropertyTrack));
+            }
+          },
+          delete(this: AnimationClip, index) {
+            const trackList: AnimationTrack[] = [];
+            for (const tracks of this.tracks) {
+              trackList.push(...tracks[1].filter((track) => track instanceof PropertyTrack));
+            }
+            const trackToRemove = trackList[index];
+            if (trackToRemove) {
+              this.deleteTrack(trackToRemove);
             }
           }
         }

@@ -4,6 +4,8 @@ import { ModalDialog } from '../../components/modal';
 import { CurveEditor } from '../../components/curveeditor';
 
 export class DlgCurveEditor extends ModalDialog {
+  private labels: string[];
+  private channel: [number];
   private resolve: (val: Interpolator) => void;
   private editor: CurveEditor;
   constructor(
@@ -11,11 +13,16 @@ export class DlgCurveEditor extends ModalDialog {
     open: boolean,
     width: number,
     height: number,
+    interpolator: Interpolator,
     resolve: (val: Interpolator) => void
   ) {
     super(id, open, width, height);
     this.resolve = resolve;
-    this.editor = new CurveEditor();
+    this.editor = new CurveEditor(interpolator);
+    if (interpolator && interpolator.target !== 'number') {
+      this.labels = ['x', 'y', 'z'];
+      this.channel = [0];
+    }
   }
 
   public doRender(): void {
@@ -32,6 +39,7 @@ export class DlgCurveEditor extends ModalDialog {
       this.editor.renderCurveView(canvasSize);
     }
     ImGui.EndChild();
+    ImGui.Columns(2, 'ButtonLayout', false);
     if (ImGui.Button('Ok')) {
       this.resolve(this.editor.interpolator);
       this.close();
@@ -41,5 +49,12 @@ export class DlgCurveEditor extends ModalDialog {
       this.resolve(null);
       this.close();
     }
+    if (this.labels) {
+      ImGui.SameLine();
+      if (ImGui.Combo('Channel', this.channel, this.labels)) {
+        this.editor.channel = this.channel[0];
+      }
+    }
+    ImGui.NextColumn();
   }
 }

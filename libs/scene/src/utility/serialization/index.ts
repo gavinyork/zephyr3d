@@ -129,7 +129,7 @@ export async function deserializeObjectProps<T>(
         tmpVal.num[3] = v[3];
         break;
     }
-    promises.push(Promise.resolve(prop.set.call(obj, tmpVal)));
+    promises.push(Promise.resolve(prop.set.call(obj, tmpVal, -1)));
   }
   if (promises.length > 0) {
     await Promise.all(promises);

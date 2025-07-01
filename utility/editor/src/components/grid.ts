@@ -26,6 +26,8 @@ interface Property<T extends {}> {
 class PropertyGroup {
   grid: PropertyEditor;
   name: string;
+  index: number;
+  count: number;
   value: PropertyValue;
   parent: PropertyGroup;
   property: Property<any>;
@@ -38,6 +40,8 @@ class PropertyGroup {
   constructor(name: string, grid: PropertyEditor) {
     this.grid = grid;
     this.name = name;
+    this.index = 0;
+    this.count = 1;
     this.parent = null;
     this.value = { num: [], str: [], bool: [], object: [null] };
     this.property = null;
@@ -75,13 +79,13 @@ class PropertyGroup {
     if (value.type === 'object' && value.objectTypes?.length > 0) {
       value.get.call(obj, tmpProperty);
       const propGroup = group.addGroup(value.name);
-      propGroup.setObject(tmpProperty.object[0], value, obj);
+      propGroup.setObject(tmpProperty.object[0], value, obj, 0, 1);
     } else if (value.type === 'object_array' && value.objectTypes?.length > 0) {
       value.get.call(obj, tmpProperty);
       if (tmpProperty.object) {
         for (let i = 0; i < tmpProperty.object.length; i++) {
           const propGroup = group.addGroup(`${value.name}[${i}]`);
-          propGroup.setObject(tmpProperty.object[i], value, obj);
+          propGroup.setObject(tmpProperty.object[i], value, obj, i, tmpProperty.object.length);
         }
       }
     } else {
@@ -134,18 +138,23 @@ class PropertyGroup {
     }
     return null;
   }
-  setObject(obj: any, prop?: PropertyAccessor<any>, parentObj?: any) {
+  setObject(obj: any, prop?: PropertyAccessor<any>, parentObj?: any, index?: number, count?: number) {
     if (this.value.object[0] !== obj || this.prop !== prop) {
       const serializationManager = this.grid.serailizationManager;
       this.value.object[0] = obj ?? null;
       this.property = null;
       this.object = parentObj;
       this.currentType = -1;
+      this.index = index ?? 0;
+      this.count = count ?? 1;
       this.prop = prop ?? null;
       this.objectTypes =
         prop?.objectTypes?.length > 0
           ? prop.objectTypes.map((ctor) => serializationManager.getClassByConstructor(ctor)) ?? []
           : [];
+      if (this.objectTypes.length > 0 && this.prop.isNullable?.call(obj)) {
+        this.objectTypes.unshift(null);
+      }
       this.properties = [];
       this.subgroups = [];
       if (this.value.object[0]) {
@@ -348,12 +357,24 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     ImGui.AlignTextToFramePadding();
     const flags = ImGui.TreeNodeFlags.DefaultOpen;
     const opened = toplevel ? true : ImGui.TreeNodeEx(group.name, flags);
-    if (group.object && group.prop && group.objectTypes.length > 0) {
-      const deletable = group.prop.isNullable?.() && group.prop.set && group.value.object?.[0];
+    if (
+      group.object &&
+      group.prop &&
+      (group.prop.type === 'object' || group.prop.type === 'object_array') &&
+      group.objectTypes.length > 0
+    ) {
       const readonly = !!group.prop.readonly;
       const editable = group.value.object?.[0] instanceof AABB && group.prop.edit === 'aabb';
+      const settable = !!group.prop.set && (group.prop.type === 'object' || group.index < group.count);
+      const addable = group.prop.type === 'object_array' && !!group.prop.add;
+      const deletable = group.prop.type === 'object_array' && group.prop.delete;
+
       const buttonSize = ImGui.GetFrameHeight();
-      const spacing = (editable ? buttonSize : 0) + (deletable ? buttonSize : 0);
+      const spacing =
+        (editable ? buttonSize : 0) +
+        (settable ? buttonSize : 0) +
+        (addable ? buttonSize : 0) +
+        (deletable ? buttonSize : 0);
       ImGui.TableNextColumn();
       if (!readonly) {
         ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
@@ -361,23 +382,44 @@ export class PropertyEditor extends makeEventTarget(Object)<{
         const index = [
           group.objectTypes.findIndex((val) => val.ctor === (group.value.object?.[0]?.constructor ?? null))
         ] as [number];
-        if (
-          ImGui.Combo(
-            '',
-            index,
-            group.objectTypes.map((val) => val.ctor.name),
-            group.objectTypes.length
-          )
-        ) {
-          const newObj = new group.objectTypes[index[0]].ctor();
-          group.prop.set.call(group.object, { object: [newObj] });
-          this.dispatchEvent('object_property_changed', group.object, group.prop.name);
-          this.refresh();
+        ImGui.Combo(
+          '',
+          index,
+          group.objectTypes.map((val) => val?.ctor.name ?? 'NULL'),
+          group.objectTypes.length
+        );
+        if (settable) {
+          ImGui.SameLine(0, 0);
+          if (ImGui.Button(`${FontGlyph.glyphs['ok']}##set`, new ImGui.ImVec2(buttonSize, 0))) {
+            const ctor = group.objectTypes[index[0]]?.ctor;
+            const newObj = ctor
+              ? group.prop.create
+                ? group.prop.create.call(group.object, ctor, group.index)
+                : new ctor()
+              : null;
+            group.prop.set.call(group.object, { object: [newObj] }, group.index);
+            this.dispatchEvent('object_property_changed', group.object, group.prop.name);
+            this.refresh();
+          }
+        }
+        if (addable) {
+          ImGui.SameLine(0, 0);
+          if (ImGui.Button(`${FontGlyph.glyphs['plus']}##add`, new ImGui.ImVec2(buttonSize, 0))) {
+            const ctor = group.objectTypes[index[0]]?.ctor;
+            const newObj = ctor
+              ? group.prop.create
+                ? group.prop.create.call(group.object, ctor, group.index)
+                : new ctor()
+              : null;
+            group.prop.add.call(group.object, { object: [newObj] }, group.index);
+            this.dispatchEvent('object_property_changed', group.object, group.prop.name);
+            this.refresh();
+          }
         }
         if (deletable) {
           ImGui.SameLine(0, 0);
-          if (ImGui.Button(`${FontGlyph.glyphs['trash-empty']}##clear`, new ImGui.ImVec2(buttonSize, 0))) {
-            group.prop.set.call(group.object, { object: [null] });
+          if (ImGui.Button(`${FontGlyph.glyphs['cancel']}##delete`, new ImGui.ImVec2(buttonSize, 0))) {
+            group.prop.delete.call(group.object, group.index);
             this.dispatchEvent('object_property_changed', group.object, group.prop.name);
             this.refresh();
             if (editable) {
@@ -439,7 +481,9 @@ export class PropertyEditor extends makeEventTarget(Object)<{
               animation = new AnimationClip(val.animationName);
               animationSet.add(animation);
             }
-            const track = new PropertyTrack(value);
+            const propValue = { num: [0, 0, 0, 0] };
+            value.get.call(object, propValue);
+            const track = new PropertyTrack(value, propValue.num);
             track.name = val.trackName;
             animation.addTrack(object, track);
             this.refresh();

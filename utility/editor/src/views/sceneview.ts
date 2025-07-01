@@ -35,7 +35,7 @@ import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import type { GenericConstructor, AABB } from '@zephyr3d/base';
-import { Quaternion, Vector3 } from '@zephyr3d/base';
+import { Interpolator, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import { Database, type DBAssetInfo } from '../storage/db';
 import { Dialog } from './dlg/dlg';
@@ -272,7 +272,17 @@ export class SceneView extends BaseView<SceneModel> {
               label: 'Curve editor',
               id: 'SHOW_CURVE_EDITOR',
               action: () => {
-                Dialog.editCurve('Edit curve', 600, 500).then((interpolator) => {
+                Dialog.editCurve(
+                  'Edit curve',
+                  new Interpolator(
+                    'cubicspline-natural',
+                    'vec3',
+                    new Float32Array([0, 1]),
+                    new Float32Array([0, 0, 0, 0, 0, 0])
+                  ),
+                  600,
+                  500
+                ).then((interpolator) => {
                   console.dir(interpolator);
                 });
               }

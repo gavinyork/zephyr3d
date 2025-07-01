@@ -33,13 +33,7 @@ import {
 } from './scene/primitive';
 import { getSceneClass } from './scene/scene';
 import { getTerrainClass } from './scene/terrain';
-import {
-  getWaterClass,
-  getGerstnerWaveClass,
-  getGerstnerWaveGeneratorClass,
-  getFFTWaveGeneratorClass,
-  getFBMWaveGeneratorClass
-} from './scene/water';
+import { getWaterClass, getFFTWaveGeneratorClass, getFBMWaveGeneratorClass } from './scene/water';
 import {
   getAnimationClass,
   getAnimationSetClass,
@@ -69,8 +63,6 @@ export class SerializationManager {
         getMeshClass(),
         getWaterClass(this),
         getTerrainClass(this),
-        getGerstnerWaveClass(),
-        getGerstnerWaveGeneratorClass(),
         getFFTWaveGeneratorClass(),
         getFBMWaveGeneratorClass(),
         getParticleNodeClass(),

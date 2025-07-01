@@ -178,7 +178,11 @@ export class AnimationSet implements Disposable {
     });
     // Update tracks
     this._activeTracks.forEach((v, k) => {
-      v.forEach((tracks) => {
+      v.forEach((alltracks) => {
+        // Only deal with tracks which have not been removed
+        const tracks = alltracks.filter(
+          (track) => track.animation && this.isPlayingAnimation(track.animation.name)
+        );
         if (tracks.length > 0) {
           const weights = tracks.map((track) => {
             const info = this._activeAnimations.get(track.animation);

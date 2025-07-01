@@ -13,6 +13,8 @@ export class AnimationClip {
   /** @internal */
   protected _duration: number;
   /** @internal */
+  protected _autoPlay: boolean;
+  /** @internal */
   protected _tracks: Map<unknown, AnimationTrack[]>;
   /** @internal */
   protected _skeletons: Set<Skeleton>;
@@ -64,7 +66,25 @@ export class AnimationClip {
     this._skeletons.add(skeleton);
   }
   /**
-   * Adds an animation track to the animation
+   * Deletes an animation track from this animation
+   * @param track - The track to delete
+   * @returns self
+   */
+  deleteTrack(track: AnimationTrack): this {
+    if (track?.animation !== this) {
+      console.error('Cannot delete animation track which is not belongs to THIS animation');
+    }
+    for (const k of this._tracks.keys()) {
+      const tracks = this._tracks.get(k);
+      const index = tracks.indexOf(track);
+      if (index >= 0) {
+        tracks.splice(index, 1);
+      }
+    }
+    return this;
+  }
+  /**
+   * Adds an animation track to this animation
    * @param target - The node that will be controlled by the track
    * @param track - The track to be added
    * @returns self

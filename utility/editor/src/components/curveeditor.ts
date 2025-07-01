@@ -1,11 +1,9 @@
-import { Interpolator } from '@zephyr3d/base';
+import { InterpolationMode, Interpolator } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
-
-export type CurveInterpolation = 'linear' | 'step' | 'cubicspline-natural';
 
 interface Point {
   x: number;
-  value: number;
+  value: number[];
 }
 
 interface CurveSettings {
@@ -18,7 +16,7 @@ interface CurveSettings {
   backgroundColor: number;
   drawLabels: boolean;
   drawHints: boolean;
-  interpolationType: CurveInterpolation;
+  interpolationType: InterpolationMode;
 }
 
 export class CurveEditor {
@@ -39,12 +37,72 @@ export class CurveEditor {
   private _selectedPointIndex: number;
   private _cachedCurvePoints: Array<{ x: number; y: number }>;
   private _curveDirty: boolean;
+  private _currentChannel: number;
+  private _resultBuffer: Float32Array;
 
-  constructor(points?: Point[], settings?: Partial<CurveSettings>) {
+  constructor(interpolator?: Interpolator);
+  constructor(points?: Point[], settings?: Partial<CurveSettings>);
+  constructor(pointsOrInterpolator?: Point[] | Interpolator, settings?: Partial<CurveSettings>) {
+    let points: Point[];
+    let timeRangeMin = Number.MAX_VALUE;
+    let timeRangeMax = -Number.MAX_VALUE;
+    let valueRangeMin = Number.MAX_VALUE;
+    let valueRangeMax = -Number.MAX_VALUE;
+    let interpolationMode: InterpolationMode;
+    if (pointsOrInterpolator instanceof Interpolator) {
+      this._interpolator = pointsOrInterpolator;
+      this._resultBuffer = new Float32Array(this._interpolator.stride);
+      interpolationMode = pointsOrInterpolator.mode;
+      if (interpolationMode === 'cubicspline') {
+        throw new Error('No support for cubicspline interpolation');
+      }
+      const inputs = pointsOrInterpolator.inputs;
+      const outputs = pointsOrInterpolator.outputs;
+      const stride = pointsOrInterpolator.stride;
+      points = [];
+      for (let i = 0; i < inputs.length; i++) {
+        const x = inputs[i];
+        const value = Array.from({ length: stride }).map((val, index) => outputs[i * stride + index]);
+        if (x > timeRangeMax) {
+          timeRangeMax = x;
+        }
+        if (x < timeRangeMin) {
+          timeRangeMin = x;
+        }
+        for (const v of value) {
+          if (v > valueRangeMax) {
+            valueRangeMax = v;
+          }
+          if (v < valueRangeMin) {
+            valueRangeMin = v;
+          }
+        }
+        points.push({
+          x,
+          value
+        });
+      }
+      if (valueRangeMin === valueRangeMax) {
+        valueRangeMin -= 1;
+        valueRangeMax += 1;
+      }
+    } else {
+      this._interpolator = null;
+      this._resultBuffer = null;
+      timeRangeMin = 0;
+      timeRangeMax = 1;
+      valueRangeMin = -1;
+      valueRangeMax = 1;
+      interpolationMode = 'cubicspline-natural';
+      points = pointsOrInterpolator ?? [
+        { x: timeRangeMin, value: [0] },
+        { x: timeRangeMax, value: [0] }
+      ];
+    }
     // Default settings
     this._settings = {
-      timeRange: [0, 1],
-      valueRange: [-1, 1],
+      timeRange: [timeRangeMin, timeRangeMax],
+      valueRange: [valueRangeMin, valueRangeMax],
       curveColor: ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 1, 1)),
       curveColorActive: ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 0, 1)),
       pointColor: ImGui.GetColorU32(new ImGui.ImVec4(0.7, 0.7, 0.7, 1)),
@@ -52,25 +110,32 @@ export class CurveEditor {
       backgroundColor: ImGui.GetColorU32(new ImGui.ImVec4(0.2, 0.2, 0.2, 1)),
       drawLabels: true,
       drawHints: true,
-      interpolationType: 'cubicspline-natural',
+      interpolationType: interpolationMode,
       ...settings
     };
     this._timeRangeStartInput = [this._settings.timeRange[0]];
     this._timeRangeEndInput = [this._settings.timeRange[1]];
     this._valueRangeStartInput = [this._settings.valueRange[0]];
     this._valueRangeEndInput = [this._settings.valueRange[1]];
-    this._points = points ?? [
-      { x: this._settings.timeRange[0], value: 0 },
-      { x: this._settings.timeRange[1], value: 0 }
-    ];
+    this._points = points;
     this._isDragging = false;
     this._curveActive = false;
+    this._currentChannel = 0;
     this._selectedPointIndex = -1;
     this._cachedCurvePoints = [];
     this.updateInterpolator();
   }
   get interpolator() {
     return this._interpolator;
+  }
+  get channel() {
+    return this._currentChannel;
+  }
+  set channel(val: number) {
+    if (val !== this._currentChannel) {
+      this._currentChannel = val;
+      this.updateInterpolator();
+    }
   }
   get timeMin(): number {
     return this._settings.timeRange[0];
@@ -84,10 +149,10 @@ export class CurveEditor {
   get valueMax(): number {
     return this._settings.valueRange[1];
   }
-  get interpolateMode(): CurveInterpolation {
+  get interpolateMode(): InterpolationMode {
     return this._settings.interpolationType;
   }
-  set interpolateMode(value: CurveInterpolation) {
+  set interpolateMode(value: InterpolationMode) {
     if (this._settings.interpolationType != value) {
       this._settings.interpolationType = value;
       this.interpolationChanged();
@@ -125,14 +190,14 @@ export class CurveEditor {
       ImGui.Text('Interpolation');
       const interpolationTypes = ['linear', 'step', 'cubicspline-natural'];
       const currentType = interpolationTypes.indexOf(this._settings.interpolationType);
-      const interpolationLabels = ['Linear', 'Step', 'Cubic Spline'];
+      const interpolationLabels = ['Linear', 'Step', 'CubicSplineNatural'];
 
       let interpolationChanged = false;
       if (ImGui.BeginCombo('Type', interpolationLabels[currentType])) {
         interpolationTypes.forEach((type, index) => {
           const isSelected = type === this._settings.interpolationType;
           if (ImGui.Selectable(interpolationLabels[index], isSelected)) {
-            this._settings.interpolationType = type as CurveInterpolation;
+            this._settings.interpolationType = type as InterpolationMode;
             interpolationChanged = true;
             changed = true;
           }
@@ -174,9 +239,8 @@ export class CurveEditor {
     this._points[0].x = this._settings.timeRange[0];
     this._points[this._points.length - 1].x = this._settings.timeRange[1];
     this._points.forEach((point) => {
-      point.value = Math.max(
-        this._settings.valueRange[0],
-        Math.min(this._settings.valueRange[1], point.value)
+      point.value = point.value.map((value) =>
+        Math.max(this._settings.valueRange[0], Math.min(this._settings.valueRange[1], value))
       );
     });
     for (let i = 1; i < this._points.length - 1; i++) {
@@ -274,7 +338,7 @@ export class CurveEditor {
     const pointIndex = this.findPointNear(relativeMousePos);
     if (pointIndex >= 0) {
       const point = this._points[pointIndex];
-      this.drawHint(point.x, point.value, cursorPos, relativeMousePos, drawList);
+      this.drawHint(point.x, point.value[this._currentChannel], cursorPos, relativeMousePos, drawList);
     }
     const lineColor = ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 1, 0.3));
     drawList.AddLine(
@@ -340,9 +404,8 @@ export class CurveEditor {
       return null;
     }
 
-    const result = new Float32Array(1);
-    this._interpolator.interpolate(time, result);
-    return result[0];
+    this._interpolator.interpolate(time, this._resultBuffer);
+    return this._resultBuffer[this._currentChannel];
   }
   private drawCurve(drawList: ImGui.ImDrawList, cursorPos: ImGui.ImVec2): void {
     if (this._points.length < 2) {
@@ -353,8 +416,8 @@ export class CurveEditor {
       for (let i = 0; i < this._points.length - 1; i++) {
         const p1 = this._points[i];
         const p2 = this._points[i + 1];
-        const screen1 = this.worldToScreen(p1.x, p1.value);
-        const screen2 = this.worldToScreen(p2.x, p2.value);
+        const screen1 = this.worldToScreen(p1.x, p1.value[this._currentChannel]);
+        const screen2 = this.worldToScreen(p2.x, p2.value[this._currentChannel]);
         drawList.AddLine(
           new ImGui.ImVec2(cursorPos.x + screen1.x, cursorPos.y + screen1.y),
           new ImGui.ImVec2(cursorPos.x + screen2.x, cursorPos.y + screen1.y),
@@ -373,8 +436,8 @@ export class CurveEditor {
         const p1 = this._points[i];
         const p2 = this._points[i + 1];
 
-        const screen1 = this.worldToScreen(p1.x, p1.value);
-        const screen2 = this.worldToScreen(p2.x, p2.value);
+        const screen1 = this.worldToScreen(p1.x, p1.value[this._currentChannel]);
+        const screen2 = this.worldToScreen(p2.x, p2.value[this._currentChannel]);
 
         drawList.AddLine(
           new ImGui.ImVec2(cursorPos.x + screen1.x, cursorPos.y + screen1.y),
@@ -410,26 +473,28 @@ export class CurveEditor {
       this._cachedCurvePoints = [];
       return;
     }
-    if (this._settings.interpolationType !== 'cubicspline-natural') {
+    if (
+      this._settings.interpolationType !== 'cubicspline-natural' &&
+      this._settings.interpolationType !== 'cubicspline'
+    ) {
       this._cachedCurvePoints = [];
       return;
     }
     const interpolator = this._interpolator;
     const numSegments = Math.min(Math.ceil(this._canvasSize.x / 2), 100);
-    const result = new Float32Array(1);
     this._cachedCurvePoints = [];
     const timeRange = this._points[this._points.length - 1].x - this._points[0].x;
     const step = timeRange / numSegments;
     for (let i = 0; i <= numSegments; i++) {
       const x = this._points[0].x + i * step;
-      interpolator.interpolate(x, result);
-      this._cachedCurvePoints.push({ x, y: result[0] });
+      interpolator.interpolate(x, this._resultBuffer);
+      this._cachedCurvePoints.push({ x, y: this._resultBuffer[this._currentChannel] });
     }
     this._curveDirty = false;
   }
   private drawPoints(drawList: ImGui.ImDrawList, cursorPos: ImGui.ImVec2): void {
     this._points.forEach((point, index) => {
-      const screenPos = this.worldToScreen(point.x, point.value);
+      const screenPos = this.worldToScreen(point.x, point.value[this._currentChannel]);
       const color =
         index === this._selectedPointIndex ? this._settings.selectedPointColor : this._settings.pointColor;
 
@@ -450,7 +515,7 @@ export class CurveEditor {
         this._isDragging = true;
       } else {
         const worldPos = this.screenToWorld(relativeMousePos.x, relativeMousePos.y);
-        this.addPoint(worldPos.x, worldPos.y);
+        this.addPoint(worldPos.x);
       }
     }
     if (ImGui.IsMouseClicked(1)) {
@@ -518,7 +583,7 @@ export class CurveEditor {
   }
   private findPointNear(screenPos: ImGui.ImVec2, threshold: number = 10): number {
     for (let i = 0; i < this._points.length; i++) {
-      const pointScreen = this.worldToScreen(this._points[i].x, this._points[i].value);
+      const pointScreen = this.worldToScreen(this._points[i].x, this._points[i].value[this._currentChannel]);
       const dx = pointScreen.x - screenPos.x;
       const dy = pointScreen.y - screenPos.y;
       if (dx * dx + dy * dy <= threshold * threshold) {
@@ -527,14 +592,14 @@ export class CurveEditor {
     }
     return -1;
   }
-  private addPoint(time: number, value: number): void {
+  private addPoint(time: number): void {
     const minTime = this._points[0].x;
     const maxTime = this._points[this._points.length - 1].x;
     time = Math.max(minTime + 0.001, Math.min(maxTime - 0.001, time));
-    value = Math.max(this._settings.valueRange[0], Math.min(this._settings.valueRange[1], value));
+    this._interpolator.interpolate(time, this._resultBuffer);
     const newPoint: Point = {
       x: time,
-      value: value
+      value: Array.from({ length: this._interpolator.stride }).map((_, index) => this._resultBuffer[index])
     };
     this._points.push(newPoint);
     this.sortPoints();
@@ -562,7 +627,7 @@ export class CurveEditor {
       return;
     }
     newValue = Math.max(this._settings.valueRange[0], Math.min(this._settings.valueRange[1], newValue));
-    this._points[index].value = newValue;
+    this._points[index].value[this._currentChannel] = newValue;
     this.updateInterpolator();
   }
   private updatePointPosition(index: number, time: number, value: number): void {
@@ -574,7 +639,7 @@ export class CurveEditor {
     time = Math.max(minTime + 0.001, Math.min(maxTime - 0.001, time));
     value = Math.max(this._settings.valueRange[0], Math.min(this._settings.valueRange[1], value));
     this._points[index].x = time;
-    this._points[index].value = value;
+    this._points[index].value[this._currentChannel] = value;
     this.sortPoints();
     if (this._selectedPointIndex === index) {
       this._selectedPointIndex = this._points.findIndex((p) => p.x === time);
@@ -583,25 +648,35 @@ export class CurveEditor {
   }
 
   private updateInterpolator(): void {
-    if (this._points.length < 2) {
-      this._interpolator = null;
-      return;
-    }
     const inputs = new Float32Array(this._points.length);
-    const outputs = new Float32Array(this._points.length);
+    const outputs = new Float32Array(this._points.length * this._interpolator.stride);
     for (let i = 0; i < this._points.length; i++) {
       inputs[i] = this._points[i].x;
-      outputs[i] = this._points[i].value;
+      if (this._interpolator.stride > 1) {
+        for (let j = 0; j < this._interpolator.stride; j++) {
+          outputs[i * this._interpolator.stride + j] = this._points[i].value[j];
+        }
+      } else {
+        outputs[i] = this._points[i].value[0];
+      }
     }
-    this._interpolator = new Interpolator(this._settings.interpolationType, 'number', inputs, outputs);
+    if (!this._interpolator) {
+      this._interpolator = new Interpolator(this._settings.interpolationType, 'number', inputs, outputs);
+    } else {
+      this._interpolator.inputs = inputs;
+      this._interpolator.outputs = outputs;
+      this._interpolator.mode = this._settings.interpolationType;
+    }
+    if (!this._resultBuffer) {
+      this._resultBuffer = new Float32Array(this._interpolator.stride);
+    }
     this._curveDirty = true;
   }
   getValue(time: number): number {
     if (!this._interpolator || this._points.length < 2) {
       return 0;
     }
-    const result = new Float32Array(1);
-    this._interpolator.interpolate(time, result);
-    return result[0];
+    this._interpolator.interpolate(time, this._resultBuffer);
+    return this._resultBuffer[this._currentChannel];
   }
 }

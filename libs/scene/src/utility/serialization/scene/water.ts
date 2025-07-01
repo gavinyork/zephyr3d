@@ -1,141 +1,12 @@
-import { degree2radian, radian2degree, Vector2 } from '@zephyr3d/base';
+import { Vector2 } from '@zephyr3d/base';
 import { GraphNode, SceneNode } from '../../../scene';
 import { Water } from '../../../scene/water';
-import type { PropertyAccessor, SerializableClass } from '../types';
+import type { SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import type { WaveGenerator } from '../../../render';
 import { FBMWaveGenerator, FFTWaveGenerator, GerstnerWaveGenerator } from '../../../render';
 import type { Texture2D } from '@zephyr3d/device';
-import { MAX_GERSTNER_WAVE_COUNT } from '../../../values';
 import type { SerializationManager } from '../manager';
-
-export class Wave {
-  public generator: GerstnerWaveGenerator;
-  public index: number;
-  public direction: number;
-  public amplitude: number;
-  public steepness: number;
-  public waveLength: number;
-  public isOmni: boolean;
-  public originX: number;
-  public originZ: number;
-  constructor(generator: GerstnerWaveGenerator, index: number) {
-    this.generator = generator;
-    this.index = index;
-    this.direction = this.generator.getWaveDirection(this.index);
-    this.amplitude = this.generator.getWaveAmplitude(this.index);
-    this.steepness = this.generator.getWaveSteepness(this.index);
-    this.waveLength = this.generator.getWaveLength(this.index);
-    this.isOmni = this.generator.isOmniWave(this.index);
-    this.originX = this.generator.getOriginX(this.index);
-    this.originZ = this.generator.getOriginZ(this.index);
-  }
-  update() {
-    this.generator.setWaveDirection(this.index, this.direction);
-    this.generator.setWaveAmplitude(this.index, this.amplitude);
-    this.generator.setWaveSteepness(this.index, this.steepness);
-    this.generator.setWaveLength(this.index, this.waveLength);
-    this.generator.setOmniWave(this.index, this.isOmni);
-    this.generator.setOrigin(this.index, this.originX, this.originZ);
-  }
-}
-
-export function getGerstnerWaveClass(): SerializableClass {
-  return {
-    ctor: Wave,
-    createFunc(ctx: GerstnerWaveGenerator, initParams: number) {
-      return {
-        obj: new Wave(ctx, initParams)
-      };
-    },
-    getInitParams(obj: Wave) {
-      return obj.index;
-    },
-    getProps() {
-      return [
-        {
-          name: 'Direction',
-          type: 'float',
-          animatable: true,
-          options: { minValue: 0, maxValue: 360 },
-          get(this: Wave, value) {
-            value.num[0] = radian2degree(this.direction);
-          },
-          set(this: Wave, value) {
-            this.direction = degree2radian(value.num[0]);
-            this.generator.setWaveAmplitude(this.index, this.direction);
-          }
-        },
-        {
-          name: 'Steepness',
-          type: 'float',
-          animatable: true,
-          options: { minValue: 0, maxValue: 1 },
-          get(this: Wave, value) {
-            value.num[0] = this.steepness;
-          },
-          set(this: Wave, value) {
-            this.steepness = value.num[0];
-            this.generator.setWaveSteepness(this.index, this.steepness);
-          }
-        },
-        {
-          name: 'Amplitude',
-          type: 'float',
-          animatable: true,
-          options: { minValue: 0, maxValue: 1 },
-          get(this: Wave, value) {
-            value.num[0] = this.amplitude;
-          },
-          set(this: Wave, value) {
-            this.amplitude = value.num[0];
-            this.generator.setWaveAmplitude(this.index, this.amplitude);
-          }
-        },
-        {
-          name: 'WaveLength',
-          type: 'float',
-          animatable: true,
-          get(this: Wave, value) {
-            value.num[0] = this.waveLength;
-          },
-          set(this: Wave, value) {
-            this.waveLength = value.num[0];
-            this.generator.setWaveLength(this.index, this.waveLength);
-          }
-        },
-        {
-          name: 'OmniWave',
-          type: 'bool',
-          get(this: Wave, value) {
-            value.bool[0] = this.isOmni;
-          },
-          set(this: Wave, value) {
-            this.isOmni = value.bool[0];
-            this.generator.setOmniWave(this.index, this.isOmni);
-          }
-        },
-        {
-          name: 'OmniOrigin',
-          type: 'vec2',
-          animatable: true,
-          get(this: Wave, value) {
-            value.num[0] = this.originX;
-            value.num[1] = this.originZ;
-          },
-          set(this: Wave, value) {
-            this.originX = value.num[0];
-            this.originZ = value.num[1];
-            this.generator.setOrigin(this.index, this.originX, this.originZ);
-          },
-          isValid(this: Wave) {
-            return this.isOmni;
-          }
-        }
-      ];
-    }
-  };
-}
 
 export function getFBMWaveGeneratorClass(): SerializableClass {
   return {
@@ -308,49 +179,7 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
     }
   };
 }
-export function getGerstnerWaveGeneratorClass(): SerializableClass {
-  return {
-    ctor: GerstnerWaveGenerator,
-    getProps() {
-      const waveProps: PropertyAccessor<GerstnerWaveGenerator>[] = [];
-      for (let i = 0; i < MAX_GERSTNER_WAVE_COUNT; i++) {
-        waveProps.push({
-          name: `Wave${i}`,
-          type: 'object',
-          objectTypes: [Wave],
-          isNullable() {
-            return i === this.numWaves - 1;
-          },
-          isValid() {
-            return this.numWaves > i;
-          },
-          get(this: GerstnerWaveGenerator, value) {
-            value.object[0] = new Wave(this, i);
-          },
-          set(this: GerstnerWaveGenerator, value) {
-            if (value.object[0]) {
-              (value.object[0] as Wave).update();
-            } else if (i === this.numWaves - 1) {
-              this.numWaves--;
-            }
-          }
-        });
-      }
-      waveProps.push({
-        name: 'Operation',
-        type: 'command',
-        get(this: GerstnerWaveGenerator, value) {
-          value.str = ['Add'];
-        },
-        command(this: GerstnerWaveGenerator, index) {
-          this.numWaves++;
-          return true;
-        }
-      });
-      return waveProps;
-    }
-  };
-}
+
 export function getWaterClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: Water,

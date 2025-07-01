@@ -43,9 +43,14 @@ export class Dialog {
       new DlgRename(title, true, width, name, resolve);
     });
   }
-  public static async editCurve(title: string, width?: number, height?: number): Promise<Interpolator> {
+  public static async editCurve(
+    title: string,
+    interpolator: Interpolator,
+    width?: number,
+    height?: number
+  ): Promise<Interpolator> {
     return new Promise((resolve) => {
-      new DlgCurveEditor(title, true, width, height, resolve);
+      new DlgCurveEditor(title, true, width, height, interpolator, resolve);
     });
   }
   public static async createRampTexture(

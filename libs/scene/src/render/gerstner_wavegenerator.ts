@@ -26,6 +26,21 @@ export class GerstnerWaveGenerator implements WaveGenerator {
     this._version = 0;
     this._disposed = false;
   }
+  /** @internal */
+  static randomWaveData(array: Float32Array, offset: number) {
+    array[offset + 0] = Math.random() * Math.PI * 2;
+    array[offset + 1] = Math.random() * 0.5 + 0.5;
+    array[offset + 2] = Math.random() * 0.1;
+    array[offset + 3] = Math.random() * 10;
+    array[offset + 4] = Math.random() * 100 - 50;
+    array[offset + 5] = 0;
+    array[offset + 6] = Math.random() * 100 - 50;
+    array[offset + 7] = 0;
+  }
+  /** @internal */
+  setRaw(data: Float32Array, index: number) {
+    this._waveParams.set(data, index * 8);
+  }
   clone(): this {
     const other = new GerstnerWaveGenerator();
     other.numWaves = this.numWaves;
@@ -54,6 +69,24 @@ export class GerstnerWaveGenerator implements WaveGenerator {
       this._numWaves = val;
       this._version++;
     }
+  }
+  /** Delete wave at index */
+  deleteWave(index: number) {
+    for (let i = index; i < this._numWaves - 1; i++) {
+      for (let j = 0; j < 8; j++) {
+        this._waveParams[i * 8 + j] = this._waveParams[(i + 1) * 8 + j];
+      }
+    }
+    this._numWaves--;
+  }
+  /** Delete wave at index */
+  insertWave(index: number) {
+    for (let i = index; i < this._numWaves - 1; i++) {
+      for (let j = 0; j < 8; j++) {
+        this._waveParams[(i + 1) * 8 + j] = this._waveParams[i * 8 + j];
+      }
+    }
+    this._numWaves++;
   }
   /**
    * Sets the angle of the wave direction in radians.
@@ -180,15 +213,8 @@ export class GerstnerWaveGenerator implements WaveGenerator {
     }
   }
   /** @internal */
-  private randomWave(i: number) {
-    this._waveParams[i * 8 + 0] = Math.random() * Math.PI * 2;
-    this._waveParams[i * 8 + 1] = Math.random() * 0.5 + 0.5;
-    this._waveParams[i * 8 + 2] = Math.random() * 0.1;
-    this._waveParams[i * 8 + 3] = Math.random() * 10;
-    this._waveParams[i * 8 + 4] = Math.random() * 100 - 50;
-    this._waveParams[i * 8 + 5] = 0;
-    this._waveParams[i * 8 + 6] = Math.random() * 100 - 50;
-    this._waveParams[i * 8 + 7] = 0;
+  randomWave(i: number) {
+    GerstnerWaveGenerator.randomWaveData(this._waveParams, i * 8);
   }
   /** {@inheritDoc WaveGenerator.update} */
   update(): void {}

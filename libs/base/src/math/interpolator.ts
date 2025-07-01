@@ -4,7 +4,7 @@ import { Quaternion } from './vector';
  * The interpolation mode
  * @public
  */
-export type InterpolationMode = 'unknown' | 'step' | 'linear' | 'cubicspline' | 'cubicspline-natural';
+export type InterpolationMode = 'step' | 'linear' | 'cubicspline' | 'cubicspline-natural';
 
 export type InterpolateData = Float32Array | number[];
 
@@ -92,9 +92,21 @@ export class Interpolator {
   get mode(): InterpolationMode {
     return this._mode;
   }
+  set mode(val: InterpolationMode) {
+    if (val !== this._mode) {
+      this._mode = val;
+      this._stride = strideMap[this._target] ?? Math.floor(this._outputs.length / this._inputs.length);
+    }
+  }
   /** Gets the interpolation target */
   get target(): InterpolationTarget {
     return this._target;
+  }
+  set target(val: InterpolationTarget) {
+    if (val !== this._target) {
+      this._target = val;
+      this._stride = strideMap[this._target] ?? Math.floor(this._outputs.length / this._inputs.length);
+    }
   }
   /** stride */
   get stride(): number {
